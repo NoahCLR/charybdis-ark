@@ -3,10 +3,11 @@
 This app edits the **connected keyboard**. It is the only live app; Profile
 Studio, which is frozen, edits the `.c` files. Do not blur that line.
 
-Read [`docs/LIVE_EDIT_APP_DIRECTION.md`](docs/LIVE_EDIT_APP_DIRECTION.md)
-before changing anything here. It carries the goal, the decisions, and what is
-deliberately still undesigned. The interface direction and its prototype are in
-[`design/`](design/README.md).
+Start with `git status --short`, then read the setup in [README.md](README.md)
+and the reading map in [docs/README.md](docs/README.md). Read Current Product
+Status and Open Issues in [the direction](docs/LIVE_EDIT_APP_DIRECTION.md)
+before changing behavior; read its relevant decisions before architecture work.
+The interface direction and its prototype are in [design/](design/README.md).
 
 ## Repository ownership
 
@@ -24,11 +25,12 @@ ordinary test, preview, or catalog command may require a sibling checkout.
 `config.h`, or `rgb_config.c`. No walking a QMK checkout at runtime. No
 `vscode` import below `extension.js` and `panel-html.js`.
 
-Two sanctioned exceptions, both by-hand build steps that write checked-in or
-throwaway files and are never imported by the app:
+Developer-only tools, never imported by the application runtime:
 
 - `scripts/generate-keycode-catalog.js` regenerates the vendored catalog.
 - `scripts/preview.js` renders the interface against the test fixtures.
+- `scripts/check-compatibility.js` runs the explicitly selected firmware host
+  runners; it is never imported by runtime code.
 
 ## Layout
 
@@ -48,9 +50,41 @@ webview/            the interface: browser ES modules, no build step
   ui/               screens and components
   styles.css        the design system
 design/             the interface direction and its clickable prototype
+docs/               app-owned product direction, specs and contributor workflows
+upstream/           pinned external contracts and inputs; read its AGENTS.md
 scripts/            developer entry points and build steps
 tests/              mirrors core/, plus the view modules and the posted payloads
+dev/                ignored generated previews, never authoritative source
 ```
+
+## Documentation ownership
+
+Use [docs/README.md](docs/README.md) to place new documentation. Update the
+existing governing document first. Product behavior changes update README and
+the relevant spec in the same pass; architecture decisions update the direction
+or an app-owned spec. Keep Current Product Status and Open Issues accurate.
+Do not put app plans or new app specifications under `upstream/`.
+
+Active plans may live in `docs/plans/`; include scope, acceptance criteria and
+remaining work. When complete, fold lasting rules into the governing document
+and delete the plan (D-L07). Test logs and session narratives belong in reports,
+commit messages or the final handoff, not permanent finding registers. Record
+which checks actually ran and any limitations; never imply unit tests prove
+hardware acceptance.
+
+## Working alongside firmware agents
+
+Use this repository for Live changes, not the retained copy in firmware.
+Separate agents should use separate Git worktrees when changing this same repo.
+Do not reset, stage or commit unrelated work left by another agent. The presence
+of a sibling checkout does not authorize editing it.
+
+The compatibility bridge reads three working copies: coordinate a stable period
+with agents changing them, and use the actual worktree paths being tested.
+There is no automated build or device reservation system. Coordinate before
+sharing a QMK build directory or opening the physical keyboard; close competing
+Live/VIA/diagnostic sessions. Fixture previews and ordinary app tests need no
+device. Do not flash or Apply a profile merely to verify an editor change.
 
 ## Layer rules
 
@@ -145,7 +179,10 @@ then `npm run check`, `npm run keycodes -- --check`, and `git diff --check`
 before handing code changes back. For preview/setup changes also run
 `npm run preview`. Docs-only changes may skip runtime checks; say so.
 Firmware host tests and QMK compilation are not this repository's build gates.
-Wire/schema changes still require coordinated firmware compatibility testing;
+Before merging wire/schema or cross-language codec changes, run
+`npm run test:compat -- --firmware PATH --live PATH --qmk PATH --report NEW_FILE`
+as described in [COMPATIBILITY.md](docs/COMPATIBILITY.md). UI-only changes need
+only the independent app checks. Wire/schema changes require this bridge;
 see [`upstream/README.md`](upstream/README.md). Never weaken a failing test to
 make extraction or a protocol change pass.
 

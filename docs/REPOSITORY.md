@@ -35,9 +35,9 @@ writing them. A successful enumeration is not an Apply/recovery hardware test.
 The GitHub workflow runs app checks, catalog verification, preview generation
 and native module loading; it contains no publishing job.
 
-The existing extension installation may still point into the firmware checkout.
-Retarget it when switching normal use to this repository; F5 can test this copy
-first. Recovery files live under VS Code's extension-global storage, outside
+For a local installation, check the extension symlink points at the intended
+Live checkout. F5 can test a worktree without retargeting that installed copy.
+Recovery files live under VS Code's extension-global storage, outside
 both source checkouts. Preserve those files and profile backups during a switch.
 The independent repo does not require changes to a shared workspace or to the
 firmware project's active working tree.
@@ -51,3 +51,6 @@ host tests, compilation and physical-device acceptance are separate integration
 gates for coordinated firmware or protocol changes; see the upstream guide.
 No test here may silently substitute an adjacent firmware or QMK checkout for
 the pinned inputs.
+
+The explicit [compatibility bridge](COMPATIBILITY.md) tests selected working
+copies together; it is separate from the independent app suite.

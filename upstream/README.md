@@ -60,8 +60,8 @@ The firmware project also owns five cross-language runners:
 `run_macro_program_size_tests.sh`, `run_profile_compiled_defaults_v1_tests.sh`
 and `run_profile_pd_v1_tests.sh`, under its `tests/host/`. They compare app
 readers, writers and macro sizing with C implementations. They are not included
-here: they depend on firmware source, QMK and a C toolchain. The source revision
-still targets its in-tree app; running it does not automatically validate this
-independent checkout. Connecting those runners to an explicit app revision is
-firmware integration work. Do not present these snapshots as a replacement for
-that integration coverage or physical interruption acceptance.
+here: they depend on firmware source, QMK and a C toolchain. Use the separate
+[compatibility bridge](../docs/COMPATIBILITY.md) to run updated firmware runners
+against the selected independent Live checkout. The imported snapshots remain
+unchanged; they are not a replacement for cross-language integration coverage
+or physical interruption acceptance.

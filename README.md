@@ -16,9 +16,20 @@ checked-in `.nvmrc`), run `npm ci`, then `npm run check`. Press F5 with
 **Run Charybdis Live** to launch an Extension Development Host. No firmware
 repository, QMK checkout, or multi-root workspace is required.
 
+The root `.editorconfig` defines indentation and whitespace conventions.
+Folder settings select VS Code's built-in JavaScript, JSON, HTML and CSS
+formatters and the YAML extension for YAML; Markdown is not reformatted on
+save. **Check Charybdis Live** is available as the default test task. The
+extension supplies its own **Charybdis Live** status-bar button; the shared
+parent workspace does not add a duplicate or a test button.
+
 [`upstream/README.md`](upstream/README.md) explains the imported test vectors,
 protocol references and QMK catalog inputs. [`docs/REPOSITORY.md`](docs/REPOSITORY.md)
 records source provenance and the repository boundary.
+
+New contributors and agents should start with [AGENTS.md](AGENTS.md) and the
+[documentation map](docs/README.md), which defines reading order, document
+ownership and where new plans or specifications belong.
 
 ## Shape
 
@@ -250,3 +261,7 @@ slot, configured or not: its Pointing modes section lists the eight slots as
 rows, each with a Hold and a Toggle key, and marks an empty slot's row as doing
 nothing yet. Search finds the same keys as `Slot 6 · hold (empty)`. A board can be laid out before its modes are, and the key says `empty`
 on its second line until the slot is filled in.
+
+For protocol changes, run the separate [firmware compatibility check](docs/COMPATIBILITY.md)
+against explicit firmware, Live and QMK checkouts before merging. UI-only work
+continues to use the independent app checks.

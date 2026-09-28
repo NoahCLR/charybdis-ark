@@ -1,13 +1,16 @@
 # Charybdis Live — UI direction
 
 `charybdis-live-ui.html` is a clickable design prototype for the live app. Open
-it in a browser; nothing else is needed. It renders the real keymap from
-`keymaps/noah/keymap.c`, the real colours, timings and scalars from a profile
-read off the keyboard, the app's own ANSI picker layout and its physical LED
-numbering — so the screens show what the app actually has to display.
+it in a browser; nothing else is needed. Its embedded example data originated
+from an authored keymap and a keyboard profile capture. It reads neither the
+current firmware source nor the connected keyboard. The example also includes
+the ANSI picker layout and physical LED numbering.
 
 It is a design artefact, not a second implementation: it posts no messages and
 talks to no device.
+
+Use `npm run preview` and the actual `webview/` for implementation verification.
+This prototype illustrates design intent and may lag the running app.
 
 ## The rule the design is built on
 

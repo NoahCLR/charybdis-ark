@@ -30,6 +30,8 @@ test("imported contracts match their pinned provenance and checksums", () => {
     }
     for (const entry of fs.readdirSync(path.join(root, "upstream"), {recursive: true, withFileTypes: true})) {
         if (!entry.isFile()) continue;
+        // Finder metadata is ignored by Git and is not an imported contract.
+        if (entry.name === ".DS_Store") continue;
         const relative = path.relative(root, path.join(entry.parentPath || entry.path, entry.name)).split(path.sep).join("/");
         if (["upstream/README.md", "upstream/AGENTS.md", "upstream/manifest.json"].includes(relative)) continue;
         assert.ok(listed.has(relative), `unrecorded upstream input: ${relative}`);
