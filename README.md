@@ -50,8 +50,10 @@ ownership and where new plans or specifications belong.
   interface posts.
 
 The layer rules and where new work belongs are in [`AGENTS.md`](AGENTS.md).
-The short version: nothing here may read the firmware repository, and the
-webview receives the model as a message rather than importing the core.
+The application runtime must not read the firmware repository, and the webview
+receives the model as a message rather than importing the core. Developer
+inspection and the explicit compatibility tests may read selected firmware
+checkouts; ordinary app checks remain self-contained.
 
 In **Manage layers**, **Make base** swaps a layer with the current base. Empty
 physical keys entering the base become `KC_NO`; `KC_NO` physical keys leaving it
