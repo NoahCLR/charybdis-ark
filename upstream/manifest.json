@@ -1,0 +1,482 @@
+{
+  "format": 1,
+  "sources": {
+    "firmware": {
+      "repository": "https://github.com/NoahCLR/charybdis-4x6",
+      "commit": "624e7185b7b85876bab14c63ce3ce510c00bd5d1"
+    },
+    "qmk": {
+      "repository": "https://github.com/NoahCLR/bastardkb-qmk",
+      "commit": "aac9f637ee4ad99fe8f962372b9dfd56be538703"
+    }
+  },
+  "files": [
+    {
+      "path": "upstream/firmware/docs/architecture/authority-state-table.md",
+      "source": "firmware",
+      "sourcePath": "docs/architecture/authority-state-table.md",
+      "sourceSha256": "218f283c2a7a7a8f6632027ddfa0e04129e53b52f631ad98ea938d077d0090e7",
+      "sha256": "218f283c2a7a7a8f6632027ddfa0e04129e53b52f631ad98ea938d077d0090e7",
+      "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
+    },
+    {
+      "path": "upstream/firmware/docs/architecture/device-resident-profile.md",
+      "source": "firmware",
+      "sourcePath": "docs/architecture/device-resident-profile.md",
+      "sourceSha256": "66a6b0ef0ce263e96e2b36ae7d3dfcf41dab452d5ea10f39af30824550f030ec",
+      "sha256": "366387469e8df79381863d0cdee70d0cb7270e38cec133957cbf1d0331163a8b",
+      "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
+    },
+    {
+      "path": "upstream/firmware/docs/architecture/field-classification.md",
+      "source": "firmware",
+      "sourcePath": "docs/architecture/field-classification.md",
+      "sourceSha256": "a4432540884c9c848a376819775b84048c1baa3be19454d295dd5b4bfa068101",
+      "sha256": "a4432540884c9c848a376819775b84048c1baa3be19454d295dd5b4bfa068101",
+      "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
+    },
+    {
+      "path": "upstream/firmware/docs/architecture/logical-profile-transaction-v1.md",
+      "source": "firmware",
+      "sourcePath": "docs/architecture/logical-profile-transaction-v1.md",
+      "sourceSha256": "dde799f42ff20b3ddbab0cb8ac64743f2a3ee27116e0baa8e1c687097a5c34ba",
+      "sha256": "dde799f42ff20b3ddbab0cb8ac64743f2a3ee27116e0baa8e1c687097a5c34ba",
+      "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
+    },
+    {
+      "path": "upstream/firmware/docs/architecture/memory-budgets.md",
+      "source": "firmware",
+      "sourcePath": "docs/architecture/memory-budgets.md",
+      "sourceSha256": "e1c0c803a86f5a6baf9ca526bb3b84577d54df4cf62bf438cb11981f6b17cee6",
+      "sha256": "e1c0c803a86f5a6baf9ca526bb3b84577d54df4cf62bf438cb11981f6b17cee6",
+      "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
+    },
+    {
+      "path": "upstream/firmware/docs/architecture/pd-mode-domain-v1.md",
+      "source": "firmware",
+      "sourcePath": "docs/architecture/pd-mode-domain-v1.md",
+      "sourceSha256": "6c27444212f71ce5052fe25c4caacbe384fad445fe001a21ff0ead9ffeeae94e",
+      "sha256": "54fc18c0bf1d5390ec6d4d14b4d6474e81d392a6b66e5dc1f44650f541829980",
+      "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
+    },
+    {
+      "path": "upstream/firmware/docs/architecture/portable-profile-v1.md",
+      "source": "firmware",
+      "sourcePath": "docs/architecture/portable-profile-v1.md",
+      "sourceSha256": "5da782e419bcebe46da6e9c71a34d864b7f8258aea1d918e6eda0c08750b2a54",
+      "sha256": "5da782e419bcebe46da6e9c71a34d864b7f8258aea1d918e6eda0c08750b2a54",
+      "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
+    },
+    {
+      "path": "upstream/firmware/docs/architecture/profile-split-v1.md",
+      "source": "firmware",
+      "sourcePath": "docs/architecture/profile-split-v1.md",
+      "sourceSha256": "ac423721d3bca995d693a35308798238e4ee2778b8066e0acb10f31f5ad54680",
+      "sha256": "ac423721d3bca995d693a35308798238e4ee2778b8066e0acb10f31f5ad54680",
+      "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
+    },
+    {
+      "path": "upstream/firmware/docs/architecture/profile-wire-v1.md",
+      "source": "firmware",
+      "sourcePath": "docs/architecture/profile-wire-v1.md",
+      "sourceSha256": "a527f2ec839dcc1518e530e3ee86af56d400758069af4d4aa10e27ce3d4840be",
+      "sha256": "62cf0c2e1e97b709f47b44b3f8ea8ccfc2a59456e1255c6f108eb5874d416fc7",
+      "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
+    },
+    {
+      "path": "upstream/firmware/docs/architecture/split-activity-sync.md",
+      "source": "firmware",
+      "sourcePath": "docs/architecture/split-activity-sync.md",
+      "sourceSha256": "05b68942eb418b1068d1ba9d1ebadbf5c622964fe0b00d747c2d770510b6ab46",
+      "sha256": "a62d40e9c9f77eba422a4b45620f14277eee4f87c5d7600ffaa7413d02fd8cd4",
+      "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
+    },
+    {
+      "path": "upstream/firmware/docs/architecture/storage-and-resource-baseline.md",
+      "source": "firmware",
+      "sourcePath": "docs/architecture/storage-and-resource-baseline.md",
+      "sourceSha256": "788a9e8419b21498429ee9b4e771e822e79d9e4ff1562137d1dc3b07e1ae07a1",
+      "sha256": "788a9e8419b21498429ee9b4e771e822e79d9e4ff1562137d1dc3b07e1ae07a1",
+      "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
+    },
+    {
+      "path": "upstream/firmware/tests/fixtures/combo_domain_v1.fixture",
+      "source": "firmware",
+      "sourcePath": "tests/fixtures/combo_domain_v1.fixture",
+      "sourceSha256": "860e50fb4e5cd23ec77de942f524cdf7943f7a567da8fd9b0b172564deca95e1",
+      "sha256": "860e50fb4e5cd23ec77de942f524cdf7943f7a567da8fd9b0b172564deca95e1"
+    },
+    {
+      "path": "upstream/firmware/tests/fixtures/combo_readback_v1.fixture",
+      "source": "firmware",
+      "sourcePath": "tests/fixtures/combo_readback_v1.fixture",
+      "sourceSha256": "d8192bdf8589dc59dccc0a9082d5eb6a9f3e78559c225e0387dd9a3b073faae7",
+      "sha256": "d8192bdf8589dc59dccc0a9082d5eb6a9f3e78559c225e0387dd9a3b073faae7"
+    },
+    {
+      "path": "upstream/firmware/tests/fixtures/combo_readback_v2.fixture",
+      "source": "firmware",
+      "sourcePath": "tests/fixtures/combo_readback_v2.fixture",
+      "sourceSha256": "c87387d5a0c450cdb5c60a67b246c4e459b6a294f69e7039e2748a9cb510932e",
+      "sha256": "c87387d5a0c450cdb5c60a67b246c4e459b6a294f69e7039e2748a9cb510932e"
+    },
+    {
+      "path": "upstream/firmware/tests/fixtures/compiled_profile_eight_v1.fixture",
+      "source": "firmware",
+      "sourcePath": "tests/fixtures/compiled_profile_eight_v1.fixture",
+      "sourceSha256": "1a7e85c3bc7ec569b9a47f8fbe881eab9f4dda5819f6a22f7c01d0b44a100c31",
+      "sha256": "1a7e85c3bc7ec569b9a47f8fbe881eab9f4dda5819f6a22f7c01d0b44a100c31"
+    },
+    {
+      "path": "upstream/firmware/tests/fixtures/compiled_profile_pd_v2.fixture",
+      "source": "firmware",
+      "sourcePath": "tests/fixtures/compiled_profile_pd_v2.fixture",
+      "sourceSha256": "716d05a5c0698895d8fe3c59e37f25a9a9d5110b936f032edb098778c48e0eed",
+      "sha256": "716d05a5c0698895d8fe3c59e37f25a9a9d5110b936f032edb098778c48e0eed"
+    },
+    {
+      "path": "upstream/firmware/tests/fixtures/compiled_profile_v1.fixture",
+      "source": "firmware",
+      "sourcePath": "tests/fixtures/compiled_profile_v1.fixture",
+      "sourceSha256": "6a62535fd355263f3de15834b938cbd392e24709f9a8e572361e2d8b931b7c56",
+      "sha256": "6a62535fd355263f3de15834b938cbd392e24709f9a8e572361e2d8b931b7c56"
+    },
+    {
+      "path": "upstream/firmware/tests/fixtures/key_behavior_domain_v1.fixture",
+      "source": "firmware",
+      "sourcePath": "tests/fixtures/key_behavior_domain_v1.fixture",
+      "sourceSha256": "ecfb9b0e80a55940d4b1ecdc70d79e73870477ee32bd26e6edb062dfcf65d404",
+      "sha256": "ecfb9b0e80a55940d4b1ecdc70d79e73870477ee32bd26e6edb062dfcf65d404"
+    },
+    {
+      "path": "upstream/firmware/tests/fixtures/pd_mode_domain_v1.json",
+      "source": "firmware",
+      "sourcePath": "tests/fixtures/pd_mode_domain_v1.json",
+      "sourceSha256": "0926857b4fcedc50f51e96041f5df0ecf72cad370fad67553df5d8d9d1a7a4b8",
+      "sha256": "0926857b4fcedc50f51e96041f5df0ecf72cad370fad67553df5d8d9d1a7a4b8"
+    },
+    {
+      "path": "upstream/firmware/tests/fixtures/profile_blob_v1.fixture",
+      "source": "firmware",
+      "sourcePath": "tests/fixtures/profile_blob_v1.fixture",
+      "sourceSha256": "dd42716bdb4dad468abe5a2ab6eb1b97a13d768e2e931d2e7e157725f07ddd93",
+      "sha256": "dd42716bdb4dad468abe5a2ab6eb1b97a13d768e2e931d2e7e157725f07ddd93"
+    },
+    {
+      "path": "upstream/firmware/tests/fixtures/profile_candidate_v1.fixture",
+      "source": "firmware",
+      "sourcePath": "tests/fixtures/profile_candidate_v1.fixture",
+      "sourceSha256": "e6b6cf01cf4453002030abfff68228a6601135487c49600570b3571e390cf3aa",
+      "sha256": "e6b6cf01cf4453002030abfff68228a6601135487c49600570b3571e390cf3aa"
+    },
+    {
+      "path": "upstream/firmware/tests/fixtures/profile_wire_v1_reads.fixture",
+      "source": "firmware",
+      "sourcePath": "tests/fixtures/profile_wire_v1_reads.fixture",
+      "sourceSha256": "55e040085017e219ce31d84ecc14443de503cc26d02b317760ad02ce7ddac80c",
+      "sha256": "55e040085017e219ce31d84ecc14443de503cc26d02b317760ad02ce7ddac80c"
+    },
+    {
+      "path": "upstream/firmware/tests/fixtures/rgb_domain_v1.fixture",
+      "source": "firmware",
+      "sourcePath": "tests/fixtures/rgb_domain_v1.fixture",
+      "sourceSha256": "177862b621734e28e6fca49f16502e3c0da599eae9b1e08ff6f99d99743fcf74",
+      "sha256": "177862b621734e28e6fca49f16502e3c0da599eae9b1e08ff6f99d99743fcf74"
+    },
+    {
+      "path": "upstream/qmk/LICENSE",
+      "source": "qmk",
+      "sourcePath": "LICENSE",
+      "sourceSha256": "8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643",
+      "sha256": "8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643"
+    },
+    {
+      "path": "upstream/qmk/data/constants/keycodes/extras/keycodes_us_0.0.1.hjson",
+      "source": "qmk",
+      "sourcePath": "data/constants/keycodes/extras/keycodes_us_0.0.1.hjson",
+      "sourceSha256": "f11cf6f91bc75c57ef19418fdc8e1631bb258d8dc74b797fbdcf1924e7d81399",
+      "sha256": "f11cf6f91bc75c57ef19418fdc8e1631bb258d8dc74b797fbdcf1924e7d81399"
+    },
+    {
+      "path": "upstream/qmk/data/constants/keycodes/extras/keycodes_us_extended_0.0.1.hjson",
+      "source": "qmk",
+      "sourcePath": "data/constants/keycodes/extras/keycodes_us_extended_0.0.1.hjson",
+      "sourceSha256": "1f901472db827927efd95f09e914116d7e10eb8a9e1b4f220a5c933a10b7e4ac",
+      "sha256": "1f901472db827927efd95f09e914116d7e10eb8a9e1b4f220a5c933a10b7e4ac"
+    },
+    {
+      "path": "upstream/qmk/data/constants/keycodes/extras/keycodes_us_international_0.0.1.hjson",
+      "source": "qmk",
+      "sourcePath": "data/constants/keycodes/extras/keycodes_us_international_0.0.1.hjson",
+      "sourceSha256": "f98387b686f5b9387bccc09794923466bf59239e215e147a133532c40d841647",
+      "sha256": "f98387b686f5b9387bccc09794923466bf59239e215e147a133532c40d841647"
+    },
+    {
+      "path": "upstream/qmk/data/constants/keycodes/extras/keycodes_us_international_linux_0.0.1.hjson",
+      "source": "qmk",
+      "sourcePath": "data/constants/keycodes/extras/keycodes_us_international_linux_0.0.1.hjson",
+      "sourceSha256": "e764cd66da52dba9b36a8b9cb12ed652ad8497e93cc2a287ad0b93bdb78bcf63",
+      "sha256": "e764cd66da52dba9b36a8b9cb12ed652ad8497e93cc2a287ad0b93bdb78bcf63"
+    },
+    {
+      "path": "upstream/qmk/data/constants/keycodes/keycodes_0.0.1.hjson",
+      "source": "qmk",
+      "sourcePath": "data/constants/keycodes/keycodes_0.0.1.hjson",
+      "sourceSha256": "152c5878ed7c570cad9bd6b41b5bf39bf3b25e42321e0f8aa6f9f7e8b45b1c9e",
+      "sha256": "152c5878ed7c570cad9bd6b41b5bf39bf3b25e42321e0f8aa6f9f7e8b45b1c9e"
+    },
+    {
+      "path": "upstream/qmk/data/constants/keycodes/keycodes_0.0.1_audio.hjson",
+      "source": "qmk",
+      "sourcePath": "data/constants/keycodes/keycodes_0.0.1_audio.hjson",
+      "sourceSha256": "9d2c267d5b4aa200b362735aeb9abadef70c1314ccbdbb334ac51d42f475e0e1",
+      "sha256": "9d2c267d5b4aa200b362735aeb9abadef70c1314ccbdbb334ac51d42f475e0e1"
+    },
+    {
+      "path": "upstream/qmk/data/constants/keycodes/keycodes_0.0.1_basic.hjson",
+      "source": "qmk",
+      "sourcePath": "data/constants/keycodes/keycodes_0.0.1_basic.hjson",
+      "sourceSha256": "e6bb72e5e76218fc2d81bbd22a74dfcbed6a2388845675a0b797bba73ed27dfe",
+      "sha256": "e6bb72e5e76218fc2d81bbd22a74dfcbed6a2388845675a0b797bba73ed27dfe"
+    },
+    {
+      "path": "upstream/qmk/data/constants/keycodes/keycodes_0.0.1_joystick.hjson",
+      "source": "qmk",
+      "sourcePath": "data/constants/keycodes/keycodes_0.0.1_joystick.hjson",
+      "sourceSha256": "7bfb1f415c0bc5fdbf2b4e3f20463c42336d8af46357f76fac0342098b8bbe0b",
+      "sha256": "7bfb1f415c0bc5fdbf2b4e3f20463c42336d8af46357f76fac0342098b8bbe0b"
+    },
+    {
+      "path": "upstream/qmk/data/constants/keycodes/keycodes_0.0.1_lighting.hjson",
+      "source": "qmk",
+      "sourcePath": "data/constants/keycodes/keycodes_0.0.1_lighting.hjson",
+      "sourceSha256": "de347d59eba8dfff52df2ee1537d4a70e8f0475d7df7e332a2eb92bd7a013270",
+      "sha256": "de347d59eba8dfff52df2ee1537d4a70e8f0475d7df7e332a2eb92bd7a013270"
+    },
+    {
+      "path": "upstream/qmk/data/constants/keycodes/keycodes_0.0.1_macro.hjson",
+      "source": "qmk",
+      "sourcePath": "data/constants/keycodes/keycodes_0.0.1_macro.hjson",
+      "sourceSha256": "7f14938251b3ddc4a4bc5b9fa866ad48eca855186410a4b6645fe1c78030da74",
+      "sha256": "7f14938251b3ddc4a4bc5b9fa866ad48eca855186410a4b6645fe1c78030da74"
+    },
+    {
+      "path": "upstream/qmk/data/constants/keycodes/keycodes_0.0.1_magic.hjson",
+      "source": "qmk",
+      "sourcePath": "data/constants/keycodes/keycodes_0.0.1_magic.hjson",
+      "sourceSha256": "5ac2fce274d7e32c31173812fa0978f427bc2d6c9f3f206b6086050fdbd13921",
+      "sha256": "5ac2fce274d7e32c31173812fa0978f427bc2d6c9f3f206b6086050fdbd13921"
+    },
+    {
+      "path": "upstream/qmk/data/constants/keycodes/keycodes_0.0.1_midi.hjson",
+      "source": "qmk",
+      "sourcePath": "data/constants/keycodes/keycodes_0.0.1_midi.hjson",
+      "sourceSha256": "c48968ea96e7b1969d42d4dfc136b88d51e45b182bc9db6adfe1e258dfb813ce",
+      "sha256": "c48968ea96e7b1969d42d4dfc136b88d51e45b182bc9db6adfe1e258dfb813ce"
+    },
+    {
+      "path": "upstream/qmk/data/constants/keycodes/keycodes_0.0.1_programmable_button.hjson",
+      "source": "qmk",
+      "sourcePath": "data/constants/keycodes/keycodes_0.0.1_programmable_button.hjson",
+      "sourceSha256": "cc49e62efb0e65f035269cdd18eef6ae9313e76a1d8059319c7a6359633fc952",
+      "sha256": "cc49e62efb0e65f035269cdd18eef6ae9313e76a1d8059319c7a6359633fc952"
+    },
+    {
+      "path": "upstream/qmk/data/constants/keycodes/keycodes_0.0.1_quantum.hjson",
+      "source": "qmk",
+      "sourcePath": "data/constants/keycodes/keycodes_0.0.1_quantum.hjson",
+      "sourceSha256": "3056e2f976f82b22159ffc14ade277651733103193124659c4fd9bbb8bd5d3bc",
+      "sha256": "3056e2f976f82b22159ffc14ade277651733103193124659c4fd9bbb8bd5d3bc"
+    },
+    {
+      "path": "upstream/qmk/data/constants/keycodes/keycodes_0.0.1_sequencer.hjson",
+      "source": "qmk",
+      "sourcePath": "data/constants/keycodes/keycodes_0.0.1_sequencer.hjson",
+      "sourceSha256": "46f470c86ffeefd6d00e86801d1f65c377312fa33dd56c20e9278f8e1679b21c",
+      "sha256": "46f470c86ffeefd6d00e86801d1f65c377312fa33dd56c20e9278f8e1679b21c"
+    },
+    {
+      "path": "upstream/qmk/data/constants/keycodes/keycodes_0.0.1_steno.hjson",
+      "source": "qmk",
+      "sourcePath": "data/constants/keycodes/keycodes_0.0.1_steno.hjson",
+      "sourceSha256": "4a4b8b51b8a163f555da39589311ce7270f7533e8b5fb3510afae980a174bd7a",
+      "sha256": "4a4b8b51b8a163f555da39589311ce7270f7533e8b5fb3510afae980a174bd7a"
+    },
+    {
+      "path": "upstream/qmk/data/constants/keycodes/keycodes_0.0.1_swap_hands.hjson",
+      "source": "qmk",
+      "sourcePath": "data/constants/keycodes/keycodes_0.0.1_swap_hands.hjson",
+      "sourceSha256": "4b72be744020fcc8e2e75f59cfcd7953cb0b91ace3278be0904a3677605e0f94",
+      "sha256": "4b72be744020fcc8e2e75f59cfcd7953cb0b91ace3278be0904a3677605e0f94"
+    },
+    {
+      "path": "upstream/qmk/data/constants/keycodes/keycodes_0.0.2.hjson",
+      "source": "qmk",
+      "sourcePath": "data/constants/keycodes/keycodes_0.0.2.hjson",
+      "sourceSha256": "5622857a50fd0010850e930549eaecb0decbdbba88a424bafaaf8fc48d08ac7c",
+      "sha256": "5622857a50fd0010850e930549eaecb0decbdbba88a424bafaaf8fc48d08ac7c"
+    },
+    {
+      "path": "upstream/qmk/data/constants/keycodes/keycodes_0.0.2_basic.hjson",
+      "source": "qmk",
+      "sourcePath": "data/constants/keycodes/keycodes_0.0.2_basic.hjson",
+      "sourceSha256": "29b0f73e0672a879e505e469aa8e0d8fee9a9bdce16fb0a352d775209410c3c3",
+      "sha256": "29b0f73e0672a879e505e469aa8e0d8fee9a9bdce16fb0a352d775209410c3c3"
+    },
+    {
+      "path": "upstream/qmk/data/constants/keycodes/keycodes_0.0.2_kb.hjson",
+      "source": "qmk",
+      "sourcePath": "data/constants/keycodes/keycodes_0.0.2_kb.hjson",
+      "sourceSha256": "85d17a49c47d178240d3dd62ae82ebc89b4efcd55e62aea29703d622e66312d6",
+      "sha256": "85d17a49c47d178240d3dd62ae82ebc89b4efcd55e62aea29703d622e66312d6"
+    },
+    {
+      "path": "upstream/qmk/data/constants/keycodes/keycodes_0.0.2_magic.hjson",
+      "source": "qmk",
+      "sourcePath": "data/constants/keycodes/keycodes_0.0.2_magic.hjson",
+      "sourceSha256": "715451b18737581155d1e435facda43d986f6a3527c7eb0a04ff5eb34827f0e0",
+      "sha256": "715451b18737581155d1e435facda43d986f6a3527c7eb0a04ff5eb34827f0e0"
+    },
+    {
+      "path": "upstream/qmk/data/constants/keycodes/keycodes_0.0.2_midi.hjson",
+      "source": "qmk",
+      "sourcePath": "data/constants/keycodes/keycodes_0.0.2_midi.hjson",
+      "sourceSha256": "628d27c47b686a437f2337a29e00ffee50f11501821d260cd518949596eae38e",
+      "sha256": "628d27c47b686a437f2337a29e00ffee50f11501821d260cd518949596eae38e"
+    },
+    {
+      "path": "upstream/qmk/data/constants/keycodes/keycodes_0.0.2_quantum.hjson",
+      "source": "qmk",
+      "sourcePath": "data/constants/keycodes/keycodes_0.0.2_quantum.hjson",
+      "sourceSha256": "42d6edf1c34e3797d125cf2c039bc4b4a5f3d2e3e0e2d5abd059c0e0715d035e",
+      "sha256": "42d6edf1c34e3797d125cf2c039bc4b4a5f3d2e3e0e2d5abd059c0e0715d035e"
+    },
+    {
+      "path": "upstream/qmk/data/constants/keycodes/keycodes_0.0.2_sequencer.hjson",
+      "source": "qmk",
+      "sourcePath": "data/constants/keycodes/keycodes_0.0.2_sequencer.hjson",
+      "sourceSha256": "9d2be54726400c094ad8a0bd972abe0ea7d1f7cc6e2a50dcc7e61bf78f347c5e",
+      "sha256": "9d2be54726400c094ad8a0bd972abe0ea7d1f7cc6e2a50dcc7e61bf78f347c5e"
+    },
+    {
+      "path": "upstream/qmk/data/constants/keycodes/keycodes_0.0.2_swap_hands.hjson",
+      "source": "qmk",
+      "sourcePath": "data/constants/keycodes/keycodes_0.0.2_swap_hands.hjson",
+      "sourceSha256": "d23d2b5ffa61a14e70dfc1898989ea3763969e2159610f4e33d0e4653f7894a7",
+      "sha256": "d23d2b5ffa61a14e70dfc1898989ea3763969e2159610f4e33d0e4653f7894a7"
+    },
+    {
+      "path": "upstream/qmk/data/constants/keycodes/keycodes_0.0.2_user.hjson",
+      "source": "qmk",
+      "sourcePath": "data/constants/keycodes/keycodes_0.0.2_user.hjson",
+      "sourceSha256": "2442c40b17f33f873f779f87a5b75700d1c4c4ec22cfb4d0f3579b09ccc0896c",
+      "sha256": "2442c40b17f33f873f779f87a5b75700d1c4c4ec22cfb4d0f3579b09ccc0896c"
+    },
+    {
+      "path": "upstream/qmk/data/constants/keycodes/keycodes_0.0.3.hjson",
+      "source": "qmk",
+      "sourcePath": "data/constants/keycodes/keycodes_0.0.3.hjson",
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "upstream/qmk/data/constants/keycodes/keycodes_0.0.3_quantum.hjson",
+      "source": "qmk",
+      "sourcePath": "data/constants/keycodes/keycodes_0.0.3_quantum.hjson",
+      "sourceSha256": "1a12f938dde0dfb804fda17c41eb27f536cf4808c70d335533154f7bb31e404c",
+      "sha256": "1a12f938dde0dfb804fda17c41eb27f536cf4808c70d335533154f7bb31e404c"
+    },
+    {
+      "path": "upstream/qmk/data/constants/keycodes/keycodes_0.0.4.hjson",
+      "source": "qmk",
+      "sourcePath": "data/constants/keycodes/keycodes_0.0.4.hjson",
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "upstream/qmk/data/constants/keycodes/keycodes_0.0.4_lighting.hjson",
+      "source": "qmk",
+      "sourcePath": "data/constants/keycodes/keycodes_0.0.4_lighting.hjson",
+      "sourceSha256": "5cf64be402085795f55ffc33d0d580d78e2ffbfe9079df5f344657f0530235ba",
+      "sha256": "5cf64be402085795f55ffc33d0d580d78e2ffbfe9079df5f344657f0530235ba"
+    },
+    {
+      "path": "upstream/qmk/data/constants/keycodes/keycodes_0.0.5.hjson",
+      "source": "qmk",
+      "sourcePath": "data/constants/keycodes/keycodes_0.0.5.hjson",
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "upstream/qmk/data/constants/keycodes/keycodes_0.0.5_basic.hjson",
+      "source": "qmk",
+      "sourcePath": "data/constants/keycodes/keycodes_0.0.5_basic.hjson",
+      "sourceSha256": "9728eaa897b21de86b0e43dad4f3fc29c6dacb370c895206648a30c05fc49ba0",
+      "sha256": "9728eaa897b21de86b0e43dad4f3fc29c6dacb370c895206648a30c05fc49ba0"
+    },
+    {
+      "path": "upstream/qmk/data/constants/keycodes/keycodes_0.0.6.hjson",
+      "source": "qmk",
+      "sourcePath": "data/constants/keycodes/keycodes_0.0.6.hjson",
+      "sourceSha256": "caea0206376458e475c193c71428f8c8728155085ad10d3bdda7ec2d9dcf8d3b",
+      "sha256": "caea0206376458e475c193c71428f8c8728155085ad10d3bdda7ec2d9dcf8d3b"
+    },
+    {
+      "path": "upstream/qmk/data/constants/keycodes/keycodes_0.0.6_connection.hjson",
+      "source": "qmk",
+      "sourcePath": "data/constants/keycodes/keycodes_0.0.6_connection.hjson",
+      "sourceSha256": "7c21c66738a17314356de95c81c49ff1bf9032360f150a4dba314a211a86f29d",
+      "sha256": "7c21c66738a17314356de95c81c49ff1bf9032360f150a4dba314a211a86f29d"
+    },
+    {
+      "path": "upstream/qmk/data/constants/keycodes/keycodes_0.0.6_quantum.hjson",
+      "source": "qmk",
+      "sourcePath": "data/constants/keycodes/keycodes_0.0.6_quantum.hjson",
+      "sourceSha256": "4c79b46be2cce867f19086757e5116810a49a95a778299f08a58813bf0733ef5",
+      "sha256": "4c79b46be2cce867f19086757e5116810a49a95a778299f08a58813bf0733ef5"
+    },
+    {
+      "path": "upstream/qmk/data/constants/keycodes/keycodes_0.0.7.hjson",
+      "source": "qmk",
+      "sourcePath": "data/constants/keycodes/keycodes_0.0.7.hjson",
+      "sourceSha256": "899fa8cce79340738d57e66b7852f750fd1b0cb57cddc36f7a10a3b0b428799a",
+      "sha256": "899fa8cce79340738d57e66b7852f750fd1b0cb57cddc36f7a10a3b0b428799a"
+    },
+    {
+      "path": "upstream/qmk/data/constants/keycodes/keycodes_0.0.8.hjson",
+      "source": "qmk",
+      "sourcePath": "data/constants/keycodes/keycodes_0.0.8.hjson",
+      "sourceSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "upstream/qmk/data/constants/keycodes/keycodes_0.0.8_lighting.hjson",
+      "source": "qmk",
+      "sourcePath": "data/constants/keycodes/keycodes_0.0.8_lighting.hjson",
+      "sourceSha256": "60cb58a289026c97961a4804ff7e5b8711b066467770c85318bdeddcc81f5166",
+      "sha256": "60cb58a289026c97961a4804ff7e5b8711b066467770c85318bdeddcc81f5166"
+    },
+    {
+      "path": "upstream/qmk/keyboards/bastardkb/charybdis/4x6/keyboard.json",
+      "source": "qmk",
+      "sourcePath": "keyboards/bastardkb/charybdis/4x6/keyboard.json",
+      "sourceSha256": "6c7ab28a3c0e6fa57e968bc7d612f7a05c6ae1e0b475340dd67fac8afb9c93d8",
+      "sha256": "6c7ab28a3c0e6fa57e968bc7d612f7a05c6ae1e0b475340dd67fac8afb9c93d8"
+    },
+    {
+      "path": "upstream/qmk/keyboards/bastardkb/charybdis/charybdis.h",
+      "source": "qmk",
+      "sourcePath": "keyboards/bastardkb/charybdis/charybdis.h",
+      "sourceSha256": "052ca279ab5455415d58a009eb59f664bd1c383d729e09b41d78c5aeaedd3fae",
+      "sha256": "052ca279ab5455415d58a009eb59f664bd1c383d729e09b41d78c5aeaedd3fae"
+    },
+    {
+      "path": "upstream/qmk/version.txt",
+      "source": "qmk",
+      "sourcePath": null,
+      "sourceSha256": "83c3e180a018e47084b1b8a39e2bf04b0537b48af90177f15fbcbb31f674227d",
+      "sha256": "83c3e180a018e47084b1b8a39e2bf04b0537b48af90177f15fbcbb31f674227d",
+      "transformation": "Version stamp from the unchanged vendored keycode catalog; not an upstream source file."
+    }
+  ]
+}
