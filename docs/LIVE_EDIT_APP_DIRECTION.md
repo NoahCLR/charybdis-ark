@@ -1012,7 +1012,7 @@ before merging; UI-only changes use the independent suite. See
 
 Live owns cross-language integration and may require firmware/QMK for that
 explicit gate. Firmware builds, host tests and diagnostics do not require Live,
-including its retained in-tree copy. Firmware owns frozen regression vectors;
+including any historical in-tree copy. Firmware owns frozen regression vectors;
 Live integration continues generating current inputs and comparing the actual
 implementations. No checks are silently skipped when a sibling app is absent.
 See [compatibility workflow](COMPATIBILITY.md).

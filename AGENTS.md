@@ -83,7 +83,8 @@ hardware acceptance.
 
 ## Working alongside firmware agents
 
-Use this repository for Live changes, not the retained copy in firmware.
+Use this repository for Live changes. Older firmware checkouts may still contain
+an in-tree app copy; it is historical and must not receive new app work.
 Separate agents should use separate Git worktrees when changing this same repo.
 Do not reset, stage or commit unrelated work left by another agent. The presence
 of a sibling checkout does not authorize editing it.
