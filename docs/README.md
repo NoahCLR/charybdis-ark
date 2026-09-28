@@ -4,6 +4,11 @@ Start at the root [AGENTS.md](../AGENTS.md) for development rules and
 [README.md](../README.md) for installation, commands and current user behavior.
 This map tells a new contributor what to read and where to write.
 
+Looking for the firmware on disk? The active checkout on Noah's machine is
+`/Users/noah/dev/charybdis/charybdis-4x6`. Start with the
+[local workspace map](REPOSITORY.md#local-development-workspace) for current
+source and worktrees; `upstream/` is the pinned baseline, not that checkout.
+
 | Document | Responsibility | Read when |
 | --- | --- | --- |
 | [PRODUCT_GOAL.md](PRODUCT_GOAL.md) | Product promise and completion criteria | Understanding what the app should become |

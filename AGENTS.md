@@ -11,9 +11,18 @@ The interface direction and its prototype are in [design/](design/README.md).
 
 ## Repository ownership
 
-Start with `git status --short`. This repository is the app; firmware and
-Profile Studio live elsewhere. Do not edit sibling repositories as part of an
-app task unless the user requests it. Preserve unrelated changes.
+This repository is the app. On Noah's development machine, the active firmware
+checkout is `/Users/noah/dev/charybdis/charybdis-4x6`, the app checkout is
+`/Users/noah/dev/charybdis/charybdis-live`, and the upstream QMK build dependency
+is `/Users/noah/dev/charybdis/bastardkb-qmk`. See the
+[local workspace map](docs/REPOSITORY.md#local-development-workspace) for roles,
+worktree discovery and how to inspect ongoing firmware work.
+
+Agents may read those checkouts to understand current firmware behavior; the
+runtime's repository-independence rule does not prohibit developer discovery.
+Do not edit sibling repositories as part of an app task unless the user requests
+it. Preserve unrelated changes, and inspect Git status before interpreting a
+checkout as a committed baseline.
 
 The imported contract files in [`upstream/`](upstream/README.md) have pinned
 provenance and checksums. Read its instructions before changing them. No
@@ -21,7 +30,7 @@ ordinary test, preview, or catalog command may require a sibling checkout.
 
 ## The one rule
 
-**Nothing in this app may read the firmware repository.** No parsing `keymap.c`,
+**The application runtime must not read the firmware repository.** No parsing `keymap.c`,
 `config.h`, or `rgb_config.c`. No walking a QMK checkout at runtime. No
 `vscode` import below `extension.js` and `panel-html.js`.
 

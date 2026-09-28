@@ -27,6 +27,11 @@ parent workspace does not add a duplicate or a test button.
 protocol references and QMK catalog inputs. [`docs/REPOSITORY.md`](docs/REPOSITORY.md)
 records source provenance and the repository boundary.
 
+For local firmware development, the active checkout is
+`/Users/noah/dev/charybdis/charybdis-4x6`; see the
+[workspace map](docs/REPOSITORY.md#local-development-workspace). Agents can
+inspect it while the app and its ordinary tests remain self-contained.
+
 New contributors and agents should start with [AGENTS.md](AGENTS.md) and the
 [documentation map](docs/README.md), which defines reading order, document
 ownership and where new plans or specifications belong.
