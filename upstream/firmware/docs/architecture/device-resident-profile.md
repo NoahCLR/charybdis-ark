@@ -1,12 +1,13 @@
 # Device-Resident Profile Target
 
 This document defines the ownership model for live editing with Charybdis Live
-([`tools/charybdis-live/`](../../../../README.md)). It supersedes the earlier project assumption that the three C
+(the independent app repository in the
+[local workspace map](https://github.com/NoahCLR/charybdis-4x6/blob/e88316c52edf335800824edc75470953fd73ffd2/README.md#local-repositories-and-worktrees)). It supersedes the earlier project assumption that the three C
 authoring files must remain the only source of truth during a live editing
 session.
 
-This is the technical profile contract beneath the broader
-[`Product Goal`](../../../../docs/PRODUCT_GOAL.md).
+This is the technical profile contract beneath the broader product goal,
+which Charybdis Live owns in its `docs/PRODUCT_GOAL.md`.
 The product target is first-grade keyboard control software, not only a working
 live-edit protocol.
 
@@ -35,12 +36,12 @@ On a connected keyboard, the active committed device generation is the live
 authority. The three C files remain:
 
 - compiled factory defaults and the recovery fallback;
-- the human-reviewable and version-controlled representation, authored with
-  the separate, frozen Profile Studio.
+- the human-reviewable and version-controlled representation, edited directly
+  in the firmware repository.
 
 The live app never reads or writes them. Its durable representation is the
-portable profile; `.c` import and export stay in Profile Studio (D-L09 in the
-[direction](../../../../docs/LIVE_EDIT_APP_DIRECTION.md)). Connecting a keyboard never
+portable profile; `.c` import and export are outside the app (D-L09, an app
+decision in Live's direction). Connecting a keyboard never
 silently overwrites the keyboard or a draft.
 
 Every editor draft records the device generation and digest it was based on. A
@@ -129,8 +130,9 @@ physical capacity.
 
 ## Implementation Sequence
 
-The delivery slices are in the [product goal](../../../../docs/PRODUCT_GOAL.md#delivery-strategy)
-and their status in the [direction](../../../../docs/LIVE_EDIT_APP_DIRECTION.md#current-product-status).
+The delivery slices are in Live's product goal and the product's status in
+Live's direction; the firmware's status is in the
+[firmware direction](https://github.com/NoahCLR/charybdis-4x6/blob/e88316c52edf335800824edc75470953fd73ffd2/docs/LIVE_EDIT_APP_DIRECTION.md#current-firmware-status).
 The logical-generation manifest and cross-store commit and recovery ordering
 are implemented; external VIA edit adoption remains. The active phase is
 acceptance: reboot, reconnect, applicable USB/role configurations,

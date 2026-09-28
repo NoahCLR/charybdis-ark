@@ -52,7 +52,7 @@ FNV-1a 32-bit and CRC32 helpers. Unknown domains are rejected. The domain
 codecs — `rgb-domain-v1.js`, `key-behavior-domain-v1.js`,
 `combo-domain-v1.js`, `pd-mode-domain-v1.js`, `settings-domain-v1.js` — are
 exact inverses of their decoders and enforce the firmware's limits. The RGB
-byte contract is frozen in [`schema/rgb-domain-v1.md`](schema/rgb-domain-v1.md);
+byte contract is frozen in [`rgb-domain-v1.md`](../upstream/firmware/docs/architecture/rgb-domain-v1.md), a pinned firmware spec;
 its firmware counterpart is `users/noah/lib/profile/schema/profile_rgb_v1.c`.
 `schema/compiled-profile-v1.js` resolves expressions in the keyboard's
 vocabulary (`KC_A`, `LT(1, KC_A)`, `PD_SLOT_0`, `VIA_MACRO_3`) to actions and

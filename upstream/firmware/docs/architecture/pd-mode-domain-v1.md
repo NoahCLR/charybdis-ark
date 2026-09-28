@@ -22,7 +22,7 @@ and restore preserve them without the repository.
   stays a layer/CPI policy and uses no slot.
 - There are two engine families, **directional** (four or eight directions,
   single axis or dominant axis; see D-L24 and D-L28 in the
-  [direction](../../../../docs/LIVE_EDIT_APP_DIRECTION.md)) and **scrolling**. Optional
+  [direction](https://github.com/NoahCLR/charybdis-4x6/blob/e88316c52edf335800824edc75470953fd73ffd2/docs/LIVE_EDIT_APP_DIRECTION.md)) and **scrolling**. Optional
   modifier and mouse-button policies cover Arrow and Pinch. No behavior depends
   on a slot's name.
 
@@ -48,7 +48,7 @@ keycode allocation.
 | 6, 7 | Empty | Disabled | Inert actions; retained, editable RGB row |
 
 Dragscroll and Pinch run this repository's
-[`pd_mode_dragscroll.c`](https://github.com/NoahCLR/charybdis-4x6/blob/624e7185b7b85876bab14c63ce3ce510c00bd5d1/users/noah/lib/pointing/modes/pd_mode_dragscroll.c),
+[`pd_mode_dragscroll.c`](https://github.com/NoahCLR/charybdis-4x6/blob/e88316c52edf335800824edc75470953fd73ffd2/users/noah/lib/pointing/modes/pd_mode_dragscroll.c),
 not the fork's native `DRAGSCROLL_MODE`; never activate both engines.
 
 ### Slot operations and RGB identity
@@ -214,14 +214,14 @@ A button press a mode consumes never reaches the button's own behavior, and
 its release goes to the mode that took the press, even after another mode
 replaced it; the release of a press the mode did not take stays with the
 behavior. The key runtime owns that routing; see
-[Runtime Flow](https://github.com/NoahCLR/charybdis-4x6/blob/624e7185b7b85876bab14c63ce3ce510c00bd5d1/docs/architecture/runtime-flow.md#key-press-flow).
+[Runtime Flow](https://github.com/NoahCLR/charybdis-4x6/blob/e88316c52edf335800824edc75470953fd73ffd2/docs/architecture/runtime-flow.md#key-press-flow).
 
 ## Validation and evidence
 
 Firmware implements whole-payload and single-record cold validators in
 `users/noah/lib/profile/schema/profile_pd_v1.c`; no cache, heap or pointing-path
 decode is introduced. The app codec lives in
-`tools/charybdis-live/core/schema/pd-mode-domain-v1.js`. It rejects unknown
+`core/schema/pd-mode-domain-v1.js` in the independent Live repository. It rejects unknown
 object fields, coercion, explicit null values, truncation, trailing bytes,
 reserved data, incorrect ID order and noncanonical encodings.
 

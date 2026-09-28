@@ -3,7 +3,7 @@
 Activity coalescing is on in the default build. `NOAH_SPLIT_ACTIVITY_COALESCE=no`
 builds the uncoalesced comparison firmware. It is accepted on hardware in daily
 use; its measured effect on the report rate is still open, see the
-[optimization handoff](https://github.com/NoahCLR/charybdis-4x6/blob/624e7185b7b85876bab14c63ce3ce510c00bd5d1/docs/plans/split-transport-optimization.md).
+[optimization handoff](https://github.com/NoahCLR/charybdis-4x6/blob/e88316c52edf335800824edc75470953fd73ffd2/docs/plans/split-transport-optimization.md).
 The split link runs at QMK's default 230,400 baud, with no speed selector; see
 D-L43 for why 460,800 was removed.
 
@@ -16,7 +16,7 @@ processing, or the RGB renderer. The fork's activity sender owns the last
 successfully written snapshot and calls the version-1 admission/result hooks.
 Its weak default admits every changed snapshot, preserving ordinary QMK use.
 
-The hook is fork commit `6889960271` on `sol`, so the default build needs that
+The hook is fork commit `6889960271` on `noah-userspace-contracts`, so the default build needs that
 commit or later. Building coalescing against a fork without
 `QMK_SPLIT_ACTIVITY_POLICY_VERSION == 1` fails compilation and names the
 opt-out. Activity wire bytes
@@ -75,18 +75,20 @@ VIA custom channel 0, value `0x0A`, diagnostic builds only:
 - Read (`7`) page 0 returns metadata. Pages 1..N return transaction ID page-1; reads
   before freezing return unavailable. Malformed/unknown/unavailable status codes
   match Profile Wire (1/2/3). Replies echo bytes 0–4; status is byte 5.
-- A successful read has payload length 25 at byte 6, format version 1 at byte 7.
+- A successful read has payload length 25 at byte 6, format version 2 at byte 7.
   Metadata: count at 8, armed at 9, frozen at 10, LE32 duration us at 11,
   PUT_ACTIVITY ID at 15, remaining bytes zero.
 - Transaction page: ID at 8; LE32 attempts/failures/attempted bytes/total us/max us
-  at 9/13/17/21/25; remaining bytes zero.
+  at 9/13/17/21/25; format 2 adds LE16 CRC failures at 29: writes the slave
+  dropped and reported, and reads the master rejected (zero without the frame
+  CRC). Attempted bytes include each frame's CRC byte. Remaining bytes zero.
 
 `node tools/capture-split-diagnostics.cjs` arms, waits without device requests,
-then reads frozen pages as JSON. It uses the existing Charybdis Live node-hid
-installation but is a separate engineering tool. Close competing app/VIA
+then reads frozen pages as JSON. It uses the firmware tools' own node-hid
+installation (`npm ci --prefix tools`) and is a separate engineering tool. Close competing app/VIA
 connections. Select `--path` if more than one matching keyboard is attached.
 Capture with the procedure in
-[`measurements/pointing-cadence/`](https://github.com/NoahCLR/charybdis-4x6/blob/624e7185b7b85876bab14c63ce3ce510c00bd5d1/measurements/pointing-cadence/README.md),
+[`measurements/pointing-cadence/`](https://github.com/NoahCLR/charybdis-4x6/blob/e88316c52edf335800824edc75470953fd73ffd2/measurements/pointing-cadence/README.md),
 which also keeps the recorded sets.
 
 The same run reads the pointing-cadence recorder (custom value `0x03`) when

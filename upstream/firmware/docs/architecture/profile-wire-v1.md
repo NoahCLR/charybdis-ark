@@ -217,7 +217,7 @@ supported stable PD id exactly once, and tap-branch colors match the compiled
 tap count. Identity tables sort by id; renderer group rows and tap-branch
 colors preserve authored order. The full validation and canonicalization
 contract is mirrored in
-`tools/charybdis-live/core/schema/rgb-domain-v1.md`.
+[RGB domain v1](rgb-domain-v1.md).
 
 ## Digests And Checksums
 
@@ -364,7 +364,7 @@ Capability feature bits are:
 | 10 | action-ABI digest available |
 | 11 | compiled-profile digest available |
 | 12 | atomic logical apply |
-| 13 | legacy pointing-mode source (see [pd-mode-domain-v1.md](pd-mode-domain-v1.md)) |
+| 13 | legacy pointing-mode source (see [pd-mode-domain-v1.md](./pd-mode-domain-v1.md)) |
 | 14 | owned layer keys: `TG()`, `TO()`, `TT()` and `OSL()` act through userspace layer ownership, so a host may offer them in behaviours and combos where the placement rules allow (`TT()` and `OSL()` joined the bit on the same unreleased branch; every flashed build that sets it has all four) |
 | 15 | behaviour QMK functions: a behaviour sends QMK and keyboard keycodes past the layer keycodes and below the user range (the Charybdis DPI and sniping keys, RGB Matrix, Magic, `QK_BOOT`…) as a synthetic QMK record, so they run as they do on a key, and a key whose own keycode is one keeps a plain key's fallback hold; a host may offer them in a behaviour's target, tap and hold. Without it, the engine sends them as report keys, keeping only the low byte, and a host must refuse them there |
 | 16 | custom keys and keycode blocks: userspace keycodes sit in fixed blocks (custom keys `0x7e40`, pointing holds `0x7e80`, pointing locks `0x7ea0`, layer locks `0x7ec0`, each reserved beyond what is supported), action kind 7 is a custom key, and settings version 5 names the 64 custom keys. It comes with its own action ABI digest; a host knowing that digest may offer custom keys as keys and combo outputs, never as behaviour steps |
@@ -375,8 +375,8 @@ their schema feature bits. Candidate chunk capacity is
 zero exactly when candidate writes are absent and otherwise is `1..20`.
 Commit and runtime activation require candidate writes. RGB preview also
 requires the RGB domain. Peer reconciliation requires both split-keyboard and
-persistent-commit support. Studio rejects inconsistent combinations before it
-offers a live operation.
+persistent-commit support. The live client rejects inconsistent combinations
+before it offers a live operation.
 
 Status also uses two pages. Page 0 reports state flags and source, compiled,
 active, pending, and committed digests. Page 1 reports active, committed, and
@@ -513,7 +513,7 @@ the prior generation remains active meanwhile. A duplicate commit for the same
 transaction is a no-op while commit/activation is progressing and after final
 success. Once durable commit has entered activation, abort cannot undo it.
 Failure while completing or confirming the final marker is reported as
-durability unknown, not as a safe failure: Studio must reconcile committed
+durability unknown, not as a safe failure: the live client must reconcile committed
 generation and digest before retrying.
 
 Abort is idempotent before durable commit; retrying a successful or no-op abort
