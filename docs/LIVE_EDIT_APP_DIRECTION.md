@@ -719,7 +719,9 @@ Firmware decision; its text is in the firmware direction.
 
 Charybdis Live is now Charybdis Ark: "Ark" in running text, `charybdis-ark` for
 the repository and package, `charybdisArk.*` for commands and
-`CHARYBDIS_ARK_ROOT` for the bridge. "Live" named a feature, live editing, and
+`CHARYBDIS_ARK_ROOT` for the bridge. Ark stands for **Alter, Review, Keep**:
+alter a draft, review its changes, then keep them on the keyboard with Apply.
+"Live" named a feature, live editing, and
 read ambiguously as the product; the feature keeps its words (live editing, the
 live profile, Live Link). Historical paths such as `tools/charybdis-live/` and
 the D-L35 title keep the name they had. VS Code keys an extension's storage by

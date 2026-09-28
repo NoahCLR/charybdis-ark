@@ -50,8 +50,8 @@ function pinPublished(firmwareRoot, pin) {
 // Compare Ark's pinned firmware inputs with the selected firmware working copy.
 // A pinned fixture that differs means Ark's own tests check stale bytes, so it
 // fails; a pinned spec that differs only lags and is reported.
-function compareUpstream(liveRoot, firmwareRoot) {
-    const manifest = JSON.parse(fs.readFileSync(path.join(liveRoot, "upstream/manifest.json"), "utf8"));
+function compareUpstream(arkRoot, firmwareRoot) {
+    const manifest = JSON.parse(fs.readFileSync(path.join(arkRoot, "upstream/manifest.json"), "utf8"));
     const pin = manifest.sources.firmware?.commit;
     const result = {pin, pinPublished: pinPublished(firmwareRoot, pin), publishedRef: PUBLISHED_REF, fixtures: [], specs: []};
     for (const file of manifest.files) {

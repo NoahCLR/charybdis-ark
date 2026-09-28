@@ -1,4 +1,4 @@
-# Firmware / Live compatibility check
+# Firmware / Ark compatibility check
 
 Ordinary Ark UI work runs `npm run check` without firmware or QMK. Before
 merging wire, schema, encoder/decoder or macro-sizing changes, run this separate

@@ -66,11 +66,11 @@ Node dependencies have been installed.
    arrange compatibility testing with the firmware project. App tests prove
    behavior against these vectors; they do not compile or run current firmware.
 
-Live owns five cross-language runners under `tests/integration/`. They compile
+Ark owns five cross-language runners under `tests/integration/`. They compile
 probes from the selected firmware and compare readers, writers and macro sizing
-with Live's current implementation. Use the separate
+with Ark's current implementation. Use the separate
 [compatibility bridge](../docs/COMPATIBILITY.md); it also fails when a pinned
 fixture differs from the selected firmware and lists specs that lag it. Firmware itself does not require
-Live; it keeps independent regression fixtures and C tests. The imported
+Ark; it keeps independent regression fixtures and C tests. The imported
 snapshots here remain unchanged and do not replace integration or physical
 interruption acceptance.

@@ -1,10 +1,15 @@
 # Charybdis Ark
 
+**Alter, Review, Keep.** Edit a draft, review its changes, then save it to the
+connected keyboard.
+
 Live firmware editor for the Charybdis. It talks to the connected keyboard over
 Raw HID and **never parses a firmware repository**.
 
 This is the app. Authored C defaults are edited directly in the firmware
-repository. The product direction lives in
+repository. Its source repository is
+[NoahCLR/charybdis-ark](https://github.com/NoahCLR/charybdis-ark).
+The product direction lives in
 [`docs/LIVE_EDIT_APP_DIRECTION.md`](docs/LIVE_EDIT_APP_DIRECTION.md), and
 the interface direction with its clickable prototype lives in
 [`design/`](design/README.md).
