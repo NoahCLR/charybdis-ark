@@ -197,7 +197,9 @@ Before merging wire/schema or cross-language codec changes, run
 `npm run test:compat -- --firmware PATH --live PATH --qmk PATH --report NEW_FILE`
 as described in [COMPATIBILITY.md](docs/COMPATIBILITY.md). UI-only changes need
 only the independent app checks. Wire/schema changes require this bridge;
-see [`upstream/README.md`](upstream/README.md). Never weaken a failing test to
+see [`upstream/README.md`](upstream/README.md). Local work may pin an
+unpushed firmware commit; before pushing a change that moves a pin, fetch the
+firmware checkout and run the bridge with `--publish`. Never weaken a failing test to
 make extraction or a protocol change pass.
 
 ### Checking it the way the panel renders it

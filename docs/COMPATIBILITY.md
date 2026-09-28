@@ -26,6 +26,12 @@ revision as [its README](../upstream/README.md#updating-a-contract) describes. A
 pinned spec that differs only lags: it is printed as a warning and listed under
 `upstream.specs` in the report. Review it deliberately; it does not fail.
 
+It also records whether the pinned firmware commit is published: contained in
+the firmware checkout's `refs/remotes/origin/main`. The bridge never fetches,
+so fetch that checkout first for a current answer. An unpublished pin is a
+warning during local work. With `--publish`, it fails before any runner starts;
+run that form before pushing a Live change that moves a pin.
+
 The bridge then sequentially runs these Live-owned integration runners under `tests/integration/`:
 
 - `run_qmk_portable_editor_tests.sh`: firmware option pages → app reader.

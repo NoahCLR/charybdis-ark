@@ -8,6 +8,8 @@ test("compatibility paths are explicit and arguments reject ambiguity", () => {
     assert.throws(() => parse([]), /Required --firmware/);
     assert.throws(() => parse(["--live"]), /Missing value/);
     assert.throws(() => parse(["--live", "a", "--live", "b"]), /duplicate/);
+    assert.throws(() => parse(["--publish", "--publish"]), /duplicate/);
+    assert.equal(parse(["--firmware", "f", "--live", "l", "--qmk", "q", "--report", "r", "--publish"]).publish, true);
     assert.throws(() => run(["--firmware", "/missing-compat-firmware", "--live", ".", "--qmk", ".", "--report", "/tmp/unused"]), /Missing firmware checkout/);
 });
 
@@ -26,7 +28,9 @@ test("bridge selects explicit checkouts, records dirty state, and stops on failu
         for (const file of ["package.json", "core/schema/macro-payload.js", "tests/fixtures/pd-profile.js"]) write(roots.live, file);
         const sha = text => require("node:crypto").createHash("sha256").update(text).digest("hex");
         const pinned = [["tests/fixtures/golden.fixture", "bytes"], ["docs/architecture/spec.md", "spec"]];
-        write(roots.live, "upstream/manifest.json", JSON.stringify({format: 1, sources: {firmware: {commit: "0".repeat(40)}},
+        const pin = execFileSync("git", ["-C", roots.firmware, "rev-parse", "HEAD"], {encoding: "utf8"}).trim();
+        execFileSync("git", ["-C", roots.firmware, "update-ref", "refs/remotes/origin/main", pin]);
+        write(roots.live, "upstream/manifest.json", JSON.stringify({format: 1, sources: {firmware: {commit: pin}},
             files: pinned.map(([file, text]) => ({path: `upstream/firmware/${file}`, source: "firmware", sourcePath: file, sourceSha256: sha(text)}))}));
         for (const [file, text] of pinned) write(roots.firmware, file, text);
         for (const file of ["quantum/quantum_keycodes.h", "quantum/keycodes.h", "platforms/marker"]) write(roots.qmk, file);
@@ -37,7 +41,14 @@ test("bridge selects explicit checkouts, records dirty state, and stops on failu
         assert.equal(run(args("pass.json")), 0);
         let report = JSON.parse(fs.readFileSync(path.join(base, "pass.json")));
         assert.equal(report.results.length, 5); assert.equal(report.passed, true);
-        assert.deepEqual(report.upstream, {pin: "0".repeat(40), fixtures: [], specs: []});
+        assert.deepEqual(report.upstream, {pin, pinPublished: true, publishedRef: "refs/remotes/origin/main", fixtures: [], specs: []});
+        assert.equal(run([...args("published.json"), "--publish"]), 0);
+        execFileSync("git", ["-C", roots.firmware, "update-ref", "-d", "refs/remotes/origin/main"]);
+        assert.equal(run(args("local-pin.json")), 0);
+        assert.equal(JSON.parse(fs.readFileSync(path.join(base, "local-pin.json"))).upstream.pinPublished, false);
+        assert.equal(run([...args("unpublished.json"), "--publish"]), 1);
+        report = JSON.parse(fs.readFileSync(path.join(base, "unpublished.json")));
+        assert.equal(report.passed, false); assert.equal(report.publish, true); assert.equal(report.results.length, 0);
         assert.equal(report.checkouts.live.dirty, true); assert.match(report.checkouts.live.revision, /^[a-f0-9]{40}$/);
         assert.throws(() => run(args("pass.json")), /EEXIST/);
         write(roots.live, RUNNERS[1], script + 'exit 7\n');

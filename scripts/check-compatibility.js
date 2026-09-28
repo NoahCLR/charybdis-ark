@@ -7,12 +7,15 @@ const {createHash} = require("node:crypto");
 
 const RUNNERS = ["qmk_portable_editor", "qmk_portable_profile", "macro_program_size", "profile_compiled_defaults_v1", "profile_pd_v1"]
     .map(name => `tests/integration/run_${name}_tests.sh`);
-const usage = "npm run test:compat -- --firmware PATH --live PATH --qmk PATH --report NEW_FILE.json";
+const usage = "npm run test:compat -- --firmware PATH --live PATH --qmk PATH --report NEW_FILE.json [--publish]";
+// A pin is published when the firmware checkout's last-fetched main contains it.
+const PUBLISHED_REF = "refs/remotes/origin/main";
 
 function parse(argv) {
     const flags = {};
     for (let i = 0; i < argv.length; i++) {
         const key = argv[i];
+        if (key === "--publish" && !flags.publish) { flags.publish = true; continue; }
         if (!["--firmware", "--live", "--qmk", "--report"].includes(key) || flags[key.slice(2)] !== undefined) throw new Error(`Unknown or duplicate argument: ${key}. Usage: ${usage}`);
         const value = argv[++i];
         if (!value || value.startsWith("--")) throw new Error(`Missing value for ${key}. Usage: ${usage}`);
@@ -36,12 +39,21 @@ function checkout(label, input, required) {
     return {path: root, revision, dirty: Boolean(status), status};
 }
 
+// Local refs only: the bridge never fetches, so fetch the firmware checkout first
+// for a current answer. An unknown pin or missing ref is unpublished.
+function pinPublished(firmwareRoot, pin) {
+    if (!/^[a-f0-9]{40}$/.test(pin || "")) return false;
+    const result = spawnSync("git", ["-C", firmwareRoot, "merge-base", "--is-ancestor", pin, PUBLISHED_REF], {stdio: "ignore"});
+    return result.status === 0;
+}
+
 // Compare Live's pinned firmware inputs with the selected firmware working copy.
 // A pinned fixture that differs means Live's own tests check stale bytes, so it
 // fails; a pinned spec that differs only lags and is reported.
 function compareUpstream(liveRoot, firmwareRoot) {
     const manifest = JSON.parse(fs.readFileSync(path.join(liveRoot, "upstream/manifest.json"), "utf8"));
-    const result = {pin: manifest.sources.firmware?.commit, fixtures: [], specs: []};
+    const pin = manifest.sources.firmware?.commit;
+    const result = {pin, pinPublished: pinPublished(firmwareRoot, pin), publishedRef: PUBLISHED_REF, fixtures: [], specs: []};
     for (const file of manifest.files) {
         if (file.source !== "firmware") continue;
         const source = path.join(firmwareRoot, file.sourcePath);
@@ -64,7 +76,7 @@ function run(argv) {
     // Keep the report out of checkout status and never overwrite an existing file.
     for (const entry of Object.values(checkouts)) if (reportPath === entry.path || reportPath.startsWith(entry.path + path.sep)) throw new Error("Place --report outside the three checkouts.");
     const fd = fs.openSync(reportPath, "wx");
-    const report = {format: 1, startedAt: new Date().toISOString(), node: process.version, checkouts, results: [], passed: false};
+    const report = {format: 1, publish: Boolean(flags.publish), startedAt: new Date().toISOString(), node: process.version, checkouts, results: [], passed: false};
     const write = () => { fs.ftruncateSync(fd, 0); fs.writeSync(fd, JSON.stringify(report, null, 2) + "\n", 0, "utf8"); };
     try {
         write();
@@ -73,6 +85,11 @@ function run(argv) {
         write();
         const describe = entry => `  ${entry.path}${entry.missing ? " (missing in firmware)" : ""}`;
         if (report.upstream.specs.length) console.log(`\nWarning: upstream/ specs lag the selected firmware (pinned ${report.upstream.pin}):\n${report.upstream.specs.map(describe).join("\n")}`);
+        if (!report.upstream.pinPublished) {
+            const message = `upstream/ pins firmware ${report.upstream.pin}, which the firmware checkout's ${PUBLISHED_REF} does not contain`;
+            if (flags.publish) { console.error(`\n${message}. Push and merge that commit, or re-pin to one on main, before publishing (upstream/README.md).`); return 1; }
+            console.log(`\nWarning: ${message}; fine locally, but --publish will fail.`);
+        }
         if (report.upstream.fixtures.length) {
             console.error(`\nupstream/ fixtures differ from the selected firmware; refresh them from a committed firmware revision (upstream/README.md):\n${report.upstream.fixtures.map(describe).join("\n")}`);
             return 1;

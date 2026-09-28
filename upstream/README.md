@@ -43,7 +43,13 @@ Node dependencies have been installed.
 
 1. Select a committed firmware or QMK revision. Inspect the relevant protocol,
    schema, capability and migration changes before copying files. Use committed
-   blobs, not an unreviewed working-tree snapshot.
+   blobs, not an unreviewed working-tree snapshot. Locally, any committed
+   revision will do, pushed or not. A pin change is pushed only once its
+   revision is on the source's remote `main`: a feature-branch commit disappears
+   when a squash or rebase merge replaces it, and the pinned links then point
+   nowhere. If firmware merged by squash or rebase, re-pin to the merged commit.
+   Fetch the firmware checkout, then run the bridge with `--publish` before
+   pushing.
 2. Copy the required files at their existing paths here, retaining historical
    fixtures still needed for compatibility. Record a new source entry if only
    some files advance to a different revision; each file's `source` must resolve
