@@ -84,8 +84,6 @@ Remaining before calling the product complete:
 
 - **Charybdis Live** (this repository) is the app and the only one
   developed (D-L35). Nothing at runtime reads the firmware repository.
-- **Profile Studio** (`tools/charybdis-profile-studio/`) authors `keymap.c`,
-  `config.h` and `rgb_config.c`. It is frozen (D-L04).
 - The first live app (v1, which lived at the same path) ported Studio's interface
   (D-L06). It was frozen by D-L35 and then removed; the profiles it wrote remain
   a firmware compatibility check in
@@ -113,17 +111,17 @@ are complete. D-L16 wired Studio's macro UI into v1 and went with it (D-L35).
 
 ### D-L02 — The live app is a VS Code extension for now
 
-It ships as its own extension, sharing nothing with Profile Studio at runtime.
+It ships as its own extension.
 Its `core/` has no `vscode` imports, so repackaging as a standalone desktop app
 is a shell and adapter swap rather than a rewrite. The independent repository
 needs no firmware workspace (D-L44); requiring VS Code remains a distribution
 limitation. The trigger to repackage is the first non-developer user.
 
-### D-L04 — Profile Studio is frozen at `refactor/aug`
+### D-L04 — The source editor is retired
 
-Bug fixes only; it is not a development target. That is what made forking
-presentation code between the apps cheap: nobody fixes the same bug twice in a
-tool nobody is changing. Retirement stays open and does not need deciding.
+Profile Studio has been removed. Authored C defaults are edited directly in the
+firmware repository and validated by its host tests and introspection tools.
+The live app edits device profiles and does not import or export C source.
 
 ### D-L05 — The keycode catalog is vendored, not parsed
 
@@ -199,7 +197,7 @@ lever for comparing ordinary against live behaviour on identical source.
 ### D-L09 — The live app owns a canonical profile format, not `.c`
 
 Backup, restore, sharing and version control go through the portable profile.
-`.c` import and export stay in Profile Studio. This amends the product goal,
+`.c` import and export remain outside the live app. This amends the product goal,
 which listed the C files as an import source and export target of the control
 software; honouring that would drag C parsing and the repository dependency
 back into the app.

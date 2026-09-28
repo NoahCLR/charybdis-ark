@@ -1,7 +1,7 @@
 # Charybdis Live — Agent Instructions
 
-This app edits the **connected keyboard**. It is the only live app; Profile
-Studio, which is frozen, edits the `.c` files. Do not blur that line.
+This app edits the **connected keyboard**. Authored C defaults are edited
+directly in the firmware repository; the app never edits those files.
 
 Start with `git status --short`, then read the setup in [README.md](README.md)
 and the reading map in [docs/README.md](docs/README.md). Read Current Product

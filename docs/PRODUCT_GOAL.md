@@ -73,13 +73,13 @@ that profile state has converged.
 The three C files remain valuable as:
 
 - compiled factory defaults and recovery input;
-- a reviewable, version-controlled representation, authored with the separate,
-  frozen [Profile Studio](https://github.com/NoahCLR/charybdis-4x6/blob/624e7185b7b85876bab14c63ce3ce510c00bd5d1/docs/tooling/PROFILE_STUDIO.md).
+- a reviewable, version-controlled representation, edited directly in the
+  firmware repository.
 
 The control software never reads or writes those files. Its backup, restore,
 sharing and version-control format is the portable profile
 ([`portable-profile-v1.md`](../upstream/firmware/docs/architecture/portable-profile-v1.md)); `.c` import
-and export stay in Profile Studio (D-L09 in the
+and export remain outside the live app (D-L09 in the
 [direction](LIVE_EDIT_APP_DIRECTION.md)).
 Apply to keyboard, refresh from keyboard, export, import or restore a backup,
 and reset are separate directional operations.

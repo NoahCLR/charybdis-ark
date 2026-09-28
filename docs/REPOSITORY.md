@@ -2,8 +2,8 @@
 
 Charybdis Live is an independent VS Code extension repository. Its app core,
 webview, tests, developer preview and keycode generation work from this checkout.
-Firmware compilation, authored C profiles, hardware measurements, diagnostics
-and Profile Studio belong to the firmware repository.
+Firmware compilation, authored C profiles, hardware measurements and diagnostics
+belong to the firmware repository.
 
 ## Local development workspace
 
