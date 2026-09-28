@@ -63,7 +63,8 @@ Node dependencies have been installed.
 Live owns five cross-language runners under `tests/integration/`. They compile
 probes from the selected firmware and compare readers, writers and macro sizing
 with Live's current implementation. Use the separate
-[compatibility bridge](../docs/COMPATIBILITY.md). Firmware itself does not require
+[compatibility bridge](../docs/COMPATIBILITY.md); it also fails when a pinned
+fixture differs from the selected firmware and lists specs that lag it. Firmware itself does not require
 Live; it keeps independent regression fixtures and C tests. The imported
 snapshots here remain unchanged and do not replace integration or physical
 interruption acceptance.

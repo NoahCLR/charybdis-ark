@@ -18,7 +18,15 @@ Git, Node, Python 3, a C compiler with the runners' sanitizer support, and the s
 QMK tree are required. Missing checkouts or required integration inputs fail before any tests run. No dependency installation, fetching, device
 access or firmware flashing occurs.
 
-The bridge sequentially runs these Live-owned integration runners under `tests/integration/`:
+It first compares every firmware input pinned in `upstream/manifest.json` with
+the selected firmware working copy. A pinned fixture that differs or is missing
+fails the check before any runner starts, because this repository's own tests
+would be exercising stale bytes; refresh `upstream/` from a committed firmware
+revision as [its README](../upstream/README.md#updating-a-contract) describes. A
+pinned spec that differs only lags: it is printed as a warning and listed under
+`upstream.specs` in the report. Review it deliberately; it does not fail.
+
+The bridge then sequentially runs these Live-owned integration runners under `tests/integration/`:
 
 - `run_qmk_portable_editor_tests.sh`: firmware option pages → app reader.
 - `run_qmk_portable_profile_tests.sh`: firmware settings pages → app reader.

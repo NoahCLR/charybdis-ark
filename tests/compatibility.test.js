@@ -24,6 +24,11 @@ test("bridge selects explicit checkouts, records dirty state, and stops on failu
             execFileSync("git", ["-C", root, "-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "fixture"]);
         }
         for (const file of ["package.json", "core/schema/macro-payload.js", "tests/fixtures/pd-profile.js"]) write(roots.live, file);
+        const sha = text => require("node:crypto").createHash("sha256").update(text).digest("hex");
+        const pinned = [["tests/fixtures/golden.fixture", "bytes"], ["docs/architecture/spec.md", "spec"]];
+        write(roots.live, "upstream/manifest.json", JSON.stringify({format: 1, sources: {firmware: {commit: "0".repeat(40)}},
+            files: pinned.map(([file, text]) => ({path: `upstream/firmware/${file}`, source: "firmware", sourcePath: file, sourceSha256: sha(text)}))}));
+        for (const [file, text] of pinned) write(roots.firmware, file, text);
         for (const file of ["quantum/quantum_keycodes.h", "quantum/keycodes.h", "platforms/marker"]) write(roots.qmk, file);
         for (const file of ["tests/host/noah_host_qmk_env.sh", "users/noah/source_manifest.mk", "tests/host/profile_pd_v1_test.c"]) write(roots.firmware, file);
         const script = '# Live-owned runner\nnode -e \'if (!process.env.CHARYBDIS_LIVE_ROOT.endsWith("/live") || !process.env.QMK_ROOT.endsWith("/qmk") || !process.env.FIRMWARE_ROOT.endsWith("/firmware")) process.exit(9)\'\n';
@@ -32,12 +37,23 @@ test("bridge selects explicit checkouts, records dirty state, and stops on failu
         assert.equal(run(args("pass.json")), 0);
         let report = JSON.parse(fs.readFileSync(path.join(base, "pass.json")));
         assert.equal(report.results.length, 5); assert.equal(report.passed, true);
+        assert.deepEqual(report.upstream, {pin: "0".repeat(40), fixtures: [], specs: []});
         assert.equal(report.checkouts.live.dirty, true); assert.match(report.checkouts.live.revision, /^[a-f0-9]{40}$/);
         assert.throws(() => run(args("pass.json")), /EEXIST/);
         write(roots.live, RUNNERS[1], script + 'exit 7\n');
         assert.equal(run(args("fail.json")), 1);
         report = JSON.parse(fs.readFileSync(path.join(base, "fail.json")));
         assert.equal(report.passed, false); assert.equal(report.results.length, 2); assert.equal(report.results[1].exitCode, 7);
+        write(roots.live, RUNNERS[1], script);
+        write(roots.firmware, "docs/architecture/spec.md", "spec, revised");
+        assert.equal(run(args("lagging-spec.json")), 0);
+        report = JSON.parse(fs.readFileSync(path.join(base, "lagging-spec.json")));
+        assert.equal(report.passed, true); assert.deepEqual(report.upstream.specs, [{path: "docs/architecture/spec.md", missing: false}]);
+        fs.unlinkSync(path.join(roots.firmware, "tests/fixtures/golden.fixture"));
+        assert.equal(run(args("stale-fixture.json")), 1);
+        report = JSON.parse(fs.readFileSync(path.join(base, "stale-fixture.json")));
+        assert.equal(report.passed, false); assert.equal(report.results.length, 0);
+        assert.deepEqual(report.upstream.fixtures, [{path: "tests/fixtures/golden.fixture", missing: true}]);
         fs.unlinkSync(path.join(roots.live, RUNNERS[0]));
         assert.throws(() => run(args("missing.json")), /Live checkout is missing/);
     } finally {fs.rmSync(base, {recursive:true, force:true});}
