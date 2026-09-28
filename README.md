@@ -1,4 +1,4 @@
-# Charybdis Live
+# Charybdis Ark
 
 Live firmware editor for the Charybdis. It talks to the connected keyboard over
 Raw HID and **never parses a firmware repository**.
@@ -13,14 +13,14 @@ the interface direction with its clickable prototype lives in
 
 Open this folder directly in VS Code. Use Node 26.10.0 (`nvm use` with the
 checked-in `.nvmrc`), run `npm ci`, then `npm run check`. Press F5 with
-**Run Charybdis Live** to launch an Extension Development Host. No firmware
+**Run Charybdis Ark** to launch an Extension Development Host. No firmware
 repository, QMK checkout, or multi-root workspace is required.
 
 The root `.editorconfig` defines indentation and whitespace conventions.
 Folder settings select VS Code's built-in JavaScript, JSON, HTML and CSS
 formatters and the YAML extension for YAML; Markdown is not reformatted on
-save. **Check Charybdis Live** is available as the default test task. The
-extension supplies its own **Charybdis Live** status-bar button; the shared
+save. **Check Charybdis Ark** is available as the default test task. The
+extension supplies its own **Charybdis Ark** status-bar button; the shared
 parent workspace does not add a duplicate or a test button.
 
 [`upstream/README.md`](upstream/README.md) explains the imported test vectors,
@@ -180,16 +180,19 @@ VS Code's extension directory. The checkout then is the installed extension
 and a window reload picks up every edit. For a new installation:
 
 ```sh
-ln -s "$PWD" ~/.vscode/extensions/noah.charybdis-live-0.1.0   # then reload the window
+ln -s "$PWD" ~/.vscode/extensions/noah.charybdis-ark-0.1.0   # then reload the window
 ```
 
 If this path already links to an older checkout, retarget that symlink when
-you are ready to switch. Keep the extension identity `noah.charybdis-live`;
+you are ready to switch. Keep the extension identity `noah.charybdis-ark`;
 recovery files use VS Code's extension-global storage, outside this checkout.
+If an older `noah.charybdis-live-0.1.0` link is still installed, remove it: the
+app was named Charybdis Live, and Ark copies the recovery files saved under that
+identity into its own storage on start (D-L47).
 F5 provides a separate development host without changing the installed link.
 
-That gives a **Charybdis Live** button in the status bar. The
-panel also opens from the command palette — **Charybdis: Open Charybdis Live** — and the repo's `.vscode/launch.json` has *Run Charybdis Live*, which
+That gives a **Charybdis Ark** button in the status bar. The
+panel also opens from the command palette — **Charybdis: Open Charybdis Ark** — and the repo's `.vscode/launch.json` has *Run Charybdis Ark*, which
 launches an Extension Development Host with a debugger attached instead.
 
 To work on the interface without a keyboard, run `npm run preview`, serve this
@@ -270,8 +273,8 @@ nothing yet. Search finds the same keys as `Slot 6 · hold (empty)`. A board can
 on its second line until the slot is filled in.
 
 For protocol changes, run the separate [firmware compatibility check](docs/COMPATIBILITY.md)
-against explicit firmware, Live and QMK checkouts before merging. UI-only work
+against explicit firmware, Ark and QMK checkouts before merging. UI-only work
 continues to use the independent app checks.
-Live owns these integration runners under `tests/integration/`; they read the
-selected firmware sources. Firmware's own tests and build require no Live
+Ark owns these integration runners under `tests/integration/`; they read the
+selected firmware sources. Firmware's own tests and build require no Ark
 checkout or app dependencies.

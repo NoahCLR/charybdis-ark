@@ -2,7 +2,7 @@
 
 ## Product Promise
 
-Charybdis Live ([this repository](../README.md)) is
+Charybdis Ark ([this repository](../README.md)) is
 intended to become first-grade control software for this keyboard. A user connects the keyboard, sees the configuration that is
 actually running, changes every supported behavior visually, and safely saves
 the result without editing C or reflashing firmware.
@@ -79,7 +79,7 @@ The three C files remain valuable as:
 The control software never reads or writes those files. Its backup, restore,
 sharing and version-control format is the portable profile
 ([`portable-profile-v1.md`](../upstream/firmware/docs/architecture/portable-profile-v1.md)); `.c` import
-and export remain outside the live app (D-L09 in the
+and export remain outside Ark (D-L09 in the
 [direction](LIVE_EDIT_APP_DIRECTION.md)).
 Apply to keyboard, refresh from keyboard, export, import or restore a backup,
 and reset are separate directional operations.

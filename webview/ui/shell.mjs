@@ -63,7 +63,7 @@ export function rail() {
 
     const node = el(`<aside class="rail">
         <div class="rail-device">
-            <div class="rail-mark"><span class="mark-glyph">C</span> <span class="nm">Charybdis Live</span>
+            <div class="rail-mark"><span class="mark-glyph">C</span> <span class="nm">Charybdis Ark</span>
                 <button class="btn tiny ghost" data-act="refresh" aria-label="Read keyboard" ${health.busy ? "disabled" : ""}
                     data-tip="Read the connected keyboard again while keeping your draft.">Read</button></div>
             ${selector}

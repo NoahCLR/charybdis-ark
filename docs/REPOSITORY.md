@@ -1,6 +1,6 @@
 # Repository ownership and source provenance
 
-Charybdis Live is an independent VS Code extension repository. Its app core,
+Charybdis Ark is an independent VS Code extension repository. Its app core,
 webview, tests, developer preview and keycode generation work from this checkout.
 Firmware compilation, authored C profiles, hardware measurements and diagnostics
 belong to the firmware repository.
@@ -12,19 +12,19 @@ On Noah's development machine the workspace is
 
 | Absolute path | Role |
 | --- | --- |
-| `/Users/noah/dev/charybdis/charybdis-live` | Active app repository; make Live changes here or in its task worktree |
+| `/Users/noah/dev/charybdis/charybdis-ark` | Active app repository; make Ark changes here or in its task worktree |
 | `/Users/noah/dev/charybdis/charybdis-4x6` | Active firmware/userspace repository owned by this project; current C implementation, tests and firmware docs |
 | `/Users/noah/dev/charybdis/bastardkb-qmk` | Upstream QMK/Bastard Keyboards checkout and build dependency; inspect its behavior without treating it as our app or userspace source |
 | `/Users/noah/dev/charybdis/builds` | Build artifacts via a local symlink, not source |
 
-From the main Live checkout the firmware and QMK paths are also
+From the main Ark checkout the firmware and QMK paths are also
 `../charybdis-4x6` and `../bastardkb-qmk`. These relative paths do not necessarily
 hold inside a task worktree. For discovery on this machine, use:
 
 ```sh
 git -C /Users/noah/dev/charybdis/charybdis-4x6 status --short
 git -C /Users/noah/dev/charybdis/charybdis-4x6 worktree list
-git -C /Users/noah/dev/charybdis/charybdis-live worktree list
+git -C /Users/noah/dev/charybdis/charybdis-ark worktree list
 ```
 
 Use the worktree selected for the task when one is specified. Do not infer that
@@ -69,8 +69,10 @@ source revision.
 Use Node from `.nvmrc`, run `npm ci`, then `npm run check` and
 `npm run keycodes -- --check`. `npm run preview` builds the offline fixture UI.
 Open this repository directly in VS Code and use its F5 launch configuration.
-The extension identity remains `noah.charybdis-live`; the checkout's path does
-not identify device profiles or recovery files.
+The extension identity is `noah.charybdis-ark`; the checkout's path does not
+identify device profiles or recovery files. Recovery files saved under the
+former identities `noah.charybdis-live` and `noah.charybdis-live-v2` are copied
+into Ark's storage on start (D-L47).
 
 Normal tests use injected HID adapters. `npm run probe:live-link` additionally
 loads the native HID module and enumerates matching devices without opening or
@@ -79,7 +81,7 @@ The GitHub workflow runs app checks, catalog verification, preview generation
 and native module loading; it contains no publishing job.
 
 For a local installation, check the extension symlink points at the intended
-Live checkout. F5 can test a worktree without retargeting that installed copy.
+Ark checkout. F5 can test a worktree without retargeting that installed copy.
 Recovery files live under VS Code's extension-global storage, outside
 both source checkouts. Preserve those files and profile backups during a switch.
 The independent repo does not require changes to a shared workspace or to the

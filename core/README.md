@@ -1,4 +1,4 @@
-# Charybdis Live Core
+# Charybdis Ark Core
 
 This is the app itself: everything except the VS Code shell and the webview.
 It has no VS Code or webview dependency. Its layers — `data`, `transport`,

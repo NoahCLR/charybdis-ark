@@ -1,6 +1,6 @@
-# Charybdis Live — UI direction
+# Charybdis Ark — UI direction
 
-`charybdis-live-ui.html` is a clickable design prototype for the live app. Open
+`charybdis-ark-ui.html` is a clickable design prototype for Ark. Open
 it in a browser; nothing else is needed. Its embedded example data originated
 from an authored keymap and a keyboard profile capture. It reads neither the
 current firmware source nor the connected keyboard. The example also includes
@@ -133,7 +133,7 @@ python3 -m http.server 8971            # from this directory
 "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
   --headless --disable-gpu --hide-scrollbars --force-device-scale-factor=2 \
   --window-size=1560,1200 --virtual-time-budget=4000 \
-  --screenshot=renders/01-keys-key.png "http://localhost:8971/charybdis-live-ui.html#keys?tab=key"
+  --screenshot=renders/01-keys-key.png "http://localhost:8971/charybdis-ark-ui.html#keys?tab=key"
 ```
 
 ## Where the stills are

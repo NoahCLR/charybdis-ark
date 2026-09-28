@@ -733,7 +733,7 @@ function normalizeRequestId(value) {
 
 function equalityCheck(label, actual, expected) {
     const ok = Number(actual) === Number(expected);
-    return {label, ok, actual, limit: expected, message: ok ? "" : `${label} is ${actual}; Charybdis Live requires ${expected}.`};
+    return {label, ok, actual, limit: expected, message: ok ? "" : `${label} is ${actual}; Charybdis Ark requires ${expected}.`};
 }
 
 function minimumCheck(label, actual, expected) {

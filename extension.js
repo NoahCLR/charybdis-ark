@@ -1,6 +1,6 @@
 "use strict";
 
-// Charybdis Live — extension host.
+// Charybdis Ark — extension host.
 //
 // Thin on purpose. It owns the VS Code surface (command, panel, message relay)
 // and nothing else. Device, protocol and profile decisions live in core/, which
@@ -13,6 +13,8 @@
 // core/session/panel-session.js; this file adds the VS Code parts — dialogs,
 // files, progress and the panel itself.
 
+const fs = require("node:fs");
+const path = require("node:path");
 const vscode = require("vscode");
 
 const {upgradePdSnapshot, validateSnapshot} = require("./core/session/portable-profile-session");
@@ -21,25 +23,47 @@ const {buildPanelModel, routeMessage, takeOutbox} = require("./core/session/pane
 const {draftControl, portableControl, readKeyboard} = require("./core/session/panel-controls");
 const {getHtml} = require("./panel-html");
 
-const VIEW_TYPE = "charybdisLive.panel";
+const VIEW_TYPE = "charybdisArk.panel";
+// VS Code keys an extension's storage by its identity, and the app was once
+// Charybdis Live (D-L47). Its recovery copies are adopted from these folders.
+const FORMER_IDENTITIES = ["noah.charybdis-live", "noah.charybdis-live-v2"];
 
 function activate(context) {
     context.subscriptions.push(
-        vscode.commands.registerCommand("charybdisLive.open", () => openPanel(context))
+        vscode.commands.registerCommand("charybdisArk.open", () => openPanel(context))
     );
 
     const status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 2);
-    status.text = "$(radio-tower) Charybdis Live";
-    status.tooltip = "Open Charybdis Live — edit the connected keyboard";
-    status.command = "charybdisLive.open";
+    status.text = "$(radio-tower) Charybdis Ark";
+    status.tooltip = "Open Charybdis Ark — edit the connected keyboard";
+    status.command = "charybdisArk.open";
     status.show();
     context.subscriptions.push(status);
+
+    adoptFormerRecoveries(context.globalStorageUri.fsPath).catch((error) => {
+        vscode.window.showWarningMessage(`Charybdis Ark could not copy recovery files saved as Charybdis Live: ${error.message}`);
+    });
+}
+
+// Copies, never moves or overwrites: the originals stay where they were, and a
+// name already here is left alone, so running this on every start is safe.
+async function adoptFormerRecoveries(target) {
+    await fs.promises.mkdir(target, {recursive: true});
+    for (const identity of FORMER_IDENTITIES) {
+        const source = path.join(path.dirname(target), identity);
+        let names;
+        try {names = await fs.promises.readdir(source);} catch (error) {if (error.code === "ENOENT") continue; throw error;}
+        for (const name of names.filter((entry) => /^recovery-.+\.json$/.test(entry))) {
+            try {await fs.promises.copyFile(path.join(source, name), path.join(target, name), fs.constants.COPYFILE_EXCL);}
+            catch (error) {if (error.code !== "EEXIST") throw error;}
+        }
+    }
 }
 
 function deactivate() {}
 
 function openPanel(context) {
-    const panel = vscode.window.createWebviewPanel(VIEW_TYPE, "Charybdis Live", vscode.ViewColumn.One, {
+    const panel = vscode.window.createWebviewPanel(VIEW_TYPE, "Charybdis Ark", vscode.ViewColumn.One, {
         enableScripts: true,
         retainContextWhenHidden: true,
         localResourceRoots: [vscode.Uri.joinPath(context.extensionUri, "webview")],
@@ -78,7 +102,7 @@ async function handleMessage(panel, session, message) {
     } catch (error) {
         const text = error instanceof Error ? error.message : String(error);
         const code = error?.code ? ` [${error.code}]` : "";
-        vscode.window.showErrorMessage(`Charybdis Live: ${text}`);
+        vscode.window.showErrorMessage(`Charybdis Ark: ${text}`);
         // Put it in the panel too. A toast is easy to miss and disappears,
         // and the panel is where someone looks when it seems stuck.
         session.notice = `Failed${code}: ${text}`;
@@ -112,7 +136,7 @@ async function connectAndRead(panel, session, selectedDeviceId) {
     }
 }
 
-module.exports = {activate, deactivate};
+module.exports = {activate, deactivate, adoptFormerRecoveries};
 
 async function saveRecoveryFile(session, document) {
     await vscode.workspace.fs.createDirectory(session.recoveryRoot);

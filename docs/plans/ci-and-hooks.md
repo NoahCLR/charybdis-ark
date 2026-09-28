@@ -1,12 +1,12 @@
 # Plan: published-pin CI, RGB integration and local hooks
 
-Parked until Live and firmware both have their remotes. Nothing here is
+Parked until Ark and firmware both have their remotes. Nothing here is
 implemented. Firmware's half is `docs/plans/ci-and-hooks.md` in the firmware
 repository. When done, fold the lasting rules into `AGENTS.md`,
 [compatibility](../COMPATIBILITY.md) and [upstream](../../upstream/README.md),
 then delete this file (D-L07).
 
-Goal: a pushed Live change is checked against published firmware, and cheap
+Goal: a pushed Ark change is checked against published firmware, and cheap
 failures are caught before a commit rather than in review.
 
 ## Where things stand
@@ -35,7 +35,7 @@ and `--no-verify` skips them. CI is the enforcement.
    comparing `core/schema/rgb-domain-v1.js` with firmware's
    `users/noah/lib/profile/schema/profile_rgb_v1.c` in both directions, and add it
    to the bridge's runners. Firmware's
-   [what Live consumes](https://github.com/NoahCLR/charybdis-4x6/blob/main/docs/architecture/live-compatibility.md#what-live-consumes)
+   [what Ark consumes](https://github.com/NoahCLR/charybdis-4x6/blob/main/docs/architecture/ark-compatibility.md#what-ark-consumes)
    list gains the probe it compiles.
 4. **Hooks with prek.** Add `.pre-commit-config.yaml`; `prek` and `pre-commit`
    both read it, prek is preferred for its single binary.

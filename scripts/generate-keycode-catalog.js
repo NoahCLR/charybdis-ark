@@ -3,12 +3,12 @@
 
 // Generates the vendored keycode catalog from QMK's own constant data.
 //
-// The live app must not depend on a firmware workspace, so this runs once
+// Ark must not depend on a firmware workspace, so this runs once
 // against a QMK checkout and writes a checked-in JSON file. QMK version drift
 // then shows up as a diff rather than as silent behaviour change.
 //
 // This captures the numeric keycode, which Profile Studio's parser discards:
-// Studio only ever needed names, while the live app must also render what it
+// Studio only ever needed names, while Ark must also render what it
 // reads back from a device, where a keycode arrives as a bare uint16.
 //
 // Defaults to the pinned inputs in upstream/qmk; no sibling checkout is needed.

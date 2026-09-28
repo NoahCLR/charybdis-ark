@@ -1,4 +1,4 @@
-name: Check Charybdis Live
+name: Check Charybdis Ark
 on: [push, pull_request, workflow_dispatch]
 permissions:
   contents: read

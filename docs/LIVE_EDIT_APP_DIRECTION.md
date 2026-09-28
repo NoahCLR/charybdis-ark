@@ -1,6 +1,6 @@
-# Live Edit App — Direction
+# Ark — Direction
 
-The current status of the live app and the decisions behind it. The end goal is
+The current status of Ark and the decisions behind it. The end goal is
 the [product goal](PRODUCT_GOAL.md); the technical authority is
 [`architecture/device-resident-profile.md`](../upstream/firmware/docs/architecture/device-resident-profile.md).
 This document records how we get there and what we decided along the way.
@@ -24,12 +24,12 @@ app decisions continue the D-L series here; firmware numbers its own from D-F01.
 
 ## The Direction In One Sentence
 
-The keyboard becomes the source of truth, and the live app becomes a client of
+The keyboard becomes the source of truth, and Ark becomes a client of
 the keyboard rather than a client of the repository.
 
 ## Current Product Status
 
-The live app in [this repository](../README.md) reads
+Ark ([this repository](../README.md)) reads
 everything it edits from the keyboard without a firmware workspace, keeps every
 change in one reviewed draft, and applies it to both halves as one atomic
 logical generation. The user reports that the workflow works on their keyboard;
@@ -82,7 +82,7 @@ Remaining before calling the product complete:
 
 ## The Tools
 
-- **Charybdis Live** (this repository) is the app and the only one
+- **Charybdis Ark** (this repository) is the app and the only one
   developed (D-L35). Nothing at runtime reads the firmware repository.
 - The first live app (v1, which lived at the same path) ported Studio's interface
   (D-L06). It was frozen by D-L35 and then removed; the profiles it wrote remain
@@ -100,11 +100,11 @@ which is not yet built.
 
 Numbers are stable and cited from code and docs. D-L01 (branch from
 `refactor/live_edit`, revert only Studio's shell) and D-L03 (move `live-link/`
-into the live app, since layered into `core/` by D-L10) were branch setup and
+into Ark, since layered into `core/` by D-L10) were branch setup and
 are complete. D-L16 wired Studio's macro UI into v1 and went with it (D-L35).
 Firmware decisions keep their heading here and their text in the firmware direction.
 
-### D-L02 — The live app is a VS Code extension for now
+### D-L02 — Ark is a VS Code extension for now
 
 It ships as its own extension.
 Its `core/` has no `vscode` imports, so repackaging as a standalone desktop app
@@ -116,12 +116,12 @@ limitation. The trigger to repackage is the first non-developer user.
 
 Profile Studio has been removed. Authored C defaults are edited directly in the
 firmware repository and validated by its host tests and introspection tools.
-The live app edits device profiles and does not import or export C source.
+Ark edits device profiles and does not import or export C source.
 
 ### D-L05 — The keycode catalog is vendored, not parsed
 
 A build step (`npm run keycodes`) reads QMK's `*.hjson` keycode files once and
-emits a checked-in JSON catalog inside the live app, stamped with the QMK
+emits a checked-in JSON catalog inside Ark, stamped with the QMK
 version it came from. Keycodes arrive from VIA as bare `uint16`, and the app
 needs both directions without a firmware workspace. Vendoring also turns QMK
 version drift into a diffable file rather than a silent behaviour change.
@@ -176,15 +176,15 @@ Firmware decision; its text is in the firmware direction.
 
 Firmware decision; its text is in the firmware direction.
 
-### D-L09 — The live app owns a canonical profile format, not `.c`
+### D-L09 — Ark owns a canonical profile format, not `.c`
 
 Backup, restore, sharing and version control go through the portable profile.
-`.c` import and export remain outside the live app. This amends the product goal,
+`.c` import and export remain outside Ark. This amends the product goal,
 which listed the C files as an import source and export target of the control
 software; honouring that would drag C parsing and the repository dependency
 back into the app.
 
-### D-L10 — The live app is layered, and the layering is enforced
+### D-L10 — Ark is layered, and the layering is enforced
 
 `core/` is split into `transport`, `schema`, `protocol`, `model`, `session` and
 `data`, with imports pointing one way and `tests/` mirroring it. The webview
@@ -689,7 +689,7 @@ Firmware decision; its text is in the firmware direction.
 
 ### D-L44 — The app has its own repository and pinned firmware inputs
 
-Charybdis Live owns its code, contributor instructions, tests, preview and
+Charybdis Ark owns its code, contributor instructions, tests, preview and
 catalog generation in an independent repository. The VS Code host remains
 unchanged. Firmware test vectors, device contracts and the QMK catalog inputs
 live under `upstream/`, with revision and checksum provenance. Ordinary app
@@ -702,8 +702,8 @@ firmware repository and its consumers are maintained separately. See
 
 ### D-L45 — Compatibility tests select both implementations explicitly
 
-The developer-only compatibility bridge runs the five Live-owned
-cross-language runners against explicit firmware, Live and QMK Git roots.
+The developer-only compatibility bridge runs the five Ark-owned
+cross-language runners against explicit firmware, Ark and QMK Git roots.
 It records revisions, dirty state and results without changing runtime or
 requiring firmware for ordinary app checks. Protocol changes run the bridge
 before merging; UI-only changes use the independent suite. Development pins
@@ -711,6 +711,19 @@ any committed firmware revision; a pushed pin names a commit on firmware's
 remote `main`, which `--publish` enforces. See
 [compatibility workflow](COMPATIBILITY.md).
 
-### D-L46 — Firmware has no reverse dependency on Live
+### D-L46 — Firmware has no reverse dependency on Ark
 
 Firmware decision; its text is in the firmware direction.
+
+### D-L47 — The app is named Ark
+
+Charybdis Live is now Charybdis Ark: "Ark" in running text, `charybdis-ark` for
+the repository and package, `charybdisArk.*` for commands and
+`CHARYBDIS_ARK_ROOT` for the bridge. "Live" named a feature, live editing, and
+read ambiguously as the product; the feature keeps its words (live editing, the
+live profile, Live Link). Historical paths such as `tools/charybdis-live/` and
+the D-L35 title keep the name they had. VS Code keys an extension's storage by
+its identity, so on start Ark copies recovery files saved under
+`noah.charybdis-live` and `noah.charybdis-live-v2` into its own storage, never
+moving or overwriting one. Portable profiles keep the `.charybdis.json`
+extension: it names the keyboard, not the app.

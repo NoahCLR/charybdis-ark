@@ -1,6 +1,6 @@
 {
-  "name": "charybdis-live",
-  "displayName": "Charybdis Live",
+  "name": "charybdis-ark",
+  "displayName": "Charybdis Ark",
   "description": "Live firmware editor for the Charybdis: edits the connected keyboard over Raw HID.",
   "version": "0.1.0",
   "publisher": "noah",
@@ -18,8 +18,8 @@
   "contributes": {
     "commands": [
       {
-        "command": "charybdisLive.open",
-        "title": "Open Charybdis Live",
+        "command": "charybdisArk.open",
+        "title": "Open Charybdis Ark",
         "category": "Charybdis"
       }
     ]

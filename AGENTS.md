@@ -1,4 +1,4 @@
-# Charybdis Live — Agent Instructions
+# Charybdis Ark — Agent Instructions
 
 This app edits the **connected keyboard**. Authored C defaults are edited
 directly in the firmware repository; the app never edits those files.
@@ -13,7 +13,7 @@ The interface direction and its prototype are in [design/](design/README.md).
 
 This repository is the app. On Noah's development machine, the active firmware
 checkout is `/Users/noah/dev/charybdis/charybdis-4x6`, the app checkout is
-`/Users/noah/dev/charybdis/charybdis-live`, and the upstream QMK build dependency
+`/Users/noah/dev/charybdis/charybdis-ark`, and the upstream QMK build dependency
 is `/Users/noah/dev/charybdis/bastardkb-qmk`. See the
 [local workspace map](docs/REPOSITORY.md#local-development-workspace) for roles,
 worktree discovery and how to inspect ongoing firmware work.
@@ -38,7 +38,7 @@ Developer-only tools, never imported by the application runtime:
 
 - `scripts/generate-keycode-catalog.js` regenerates the vendored catalog.
 - `scripts/preview.js` renders the interface against the test fixtures.
-- `scripts/check-compatibility.js` runs Live-owned integration runners against explicitly selected
+- `scripts/check-compatibility.js` runs Ark-owned integration runners against explicitly selected
   firmware source; it is never imported by runtime code.
 
 ## Layout
@@ -87,7 +87,7 @@ hardware acceptance.
 
 ## Working alongside firmware agents
 
-Use this repository for Live changes. Older firmware checkouts may still contain
+Use this repository for Ark changes. Older firmware checkouts may still contain
 an in-tree app copy; it is historical and must not receive new app work.
 Separate agents should use separate Git worktrees when changing this same repo.
 Do not reset, stage or commit unrelated work left by another agent. The presence
@@ -97,7 +97,7 @@ The compatibility bridge reads three working copies: coordinate a stable period
 with agents changing them, and use the actual worktree paths being tested.
 There is no automated build or device reservation system. Coordinate before
 sharing a QMK build directory or opening the physical keyboard; close competing
-Live/VIA/diagnostic sessions. Fixture previews and ordinary app tests need no
+Ark/VIA/diagnostic sessions. Fixture previews and ordinary app tests need no
 device. Do not flash or Apply a profile merely to verify an editor change.
 
 ## Layer rules
@@ -194,7 +194,7 @@ before handing code changes back. For preview/setup changes also run
 `npm run preview`. Docs-only changes may skip runtime checks; say so.
 Firmware host tests and QMK compilation are not this repository's build gates.
 Before merging wire/schema or cross-language codec changes, run
-`npm run test:compat -- --firmware PATH --live PATH --qmk PATH --report NEW_FILE`
+`npm run test:compat -- --firmware PATH --ark PATH --qmk PATH --report NEW_FILE`
 as described in [COMPATIBILITY.md](docs/COMPATIBILITY.md). UI-only changes need
 only the independent app checks. Wire/schema changes require this bridge;
 see [`upstream/README.md`](upstream/README.md). Local work may pin an

@@ -2,7 +2,7 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Run Charybdis Live",
+      "name": "Run Charybdis Ark",
       "type": "extensionHost",
       "request": "launch",
       "args": [

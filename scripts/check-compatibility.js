@@ -7,7 +7,7 @@ const {createHash} = require("node:crypto");
 
 const RUNNERS = ["qmk_portable_editor", "qmk_portable_profile", "macro_program_size", "profile_compiled_defaults_v1", "profile_pd_v1"]
     .map(name => `tests/integration/run_${name}_tests.sh`);
-const usage = "npm run test:compat -- --firmware PATH --live PATH --qmk PATH --report NEW_FILE.json [--publish]";
+const usage = "npm run test:compat -- --firmware PATH --ark PATH --qmk PATH --report NEW_FILE.json [--publish]";
 // A pin is published when the firmware checkout's last-fetched main contains it.
 const PUBLISHED_REF = "refs/remotes/origin/main";
 
@@ -16,12 +16,12 @@ function parse(argv) {
     for (let i = 0; i < argv.length; i++) {
         const key = argv[i];
         if (key === "--publish" && !flags.publish) { flags.publish = true; continue; }
-        if (!["--firmware", "--live", "--qmk", "--report"].includes(key) || flags[key.slice(2)] !== undefined) throw new Error(`Unknown or duplicate argument: ${key}. Usage: ${usage}`);
+        if (!["--firmware", "--ark", "--qmk", "--report"].includes(key) || flags[key.slice(2)] !== undefined) throw new Error(`Unknown or duplicate argument: ${key}. Usage: ${usage}`);
         const value = argv[++i];
         if (!value || value.startsWith("--")) throw new Error(`Missing value for ${key}. Usage: ${usage}`);
         flags[key.slice(2)] = value;
     }
-    for (const key of ["firmware", "live", "qmk", "report"]) if (!flags[key]) throw new Error(`Required --${key}. Usage: ${usage}`);
+    for (const key of ["firmware", "ark", "qmk", "report"]) if (!flags[key]) throw new Error(`Required --${key}. Usage: ${usage}`);
     return flags;
 }
 
@@ -47,8 +47,8 @@ function pinPublished(firmwareRoot, pin) {
     return result.status === 0;
 }
 
-// Compare Live's pinned firmware inputs with the selected firmware working copy.
-// A pinned fixture that differs means Live's own tests check stale bytes, so it
+// Compare Ark's pinned firmware inputs with the selected firmware working copy.
+// A pinned fixture that differs means Ark's own tests check stale bytes, so it
 // fails; a pinned spec that differs only lags and is reported.
 function compareUpstream(liveRoot, firmwareRoot) {
     const manifest = JSON.parse(fs.readFileSync(path.join(liveRoot, "upstream/manifest.json"), "utf8"));
@@ -69,7 +69,7 @@ function run(argv) {
     const flags = parse(argv);
     const checkouts = {
         firmware: checkout("firmware", flags.firmware, ["tests/host/noah_host_qmk_env.sh", "users/noah/source_manifest.mk", "tests/host/profile_pd_v1_test.c"]),
-        live: checkout("Live", flags.live, [...RUNNERS, "package.json", "upstream/manifest.json", "core/schema/macro-payload.js", "tests/fixtures/pd-profile.js"]),
+        ark: checkout("Ark", flags.ark, [...RUNNERS, "package.json", "upstream/manifest.json", "core/schema/macro-payload.js", "tests/fixtures/pd-profile.js"]),
         qmk: checkout("QMK", flags.qmk, ["quantum/quantum_keycodes.h", "quantum/keycodes.h", "platforms"]),
     };
     const reportPath = path.resolve(flags.report);
@@ -81,7 +81,7 @@ function run(argv) {
     try {
         write();
         for (const [name, info] of Object.entries(checkouts)) console.log(`${name}: ${info.path}\n  ${info.revision} (${info.dirty ? "dirty" : "clean"})`);
-        report.upstream = compareUpstream(checkouts.live.path, checkouts.firmware.path);
+        report.upstream = compareUpstream(checkouts.ark.path, checkouts.firmware.path);
         write();
         const describe = entry => `  ${entry.path}${entry.missing ? " (missing in firmware)" : ""}`;
         if (report.upstream.specs.length) console.log(`\nWarning: upstream/ specs lag the selected firmware (pinned ${report.upstream.pin}):\n${report.upstream.specs.map(describe).join("\n")}`);
@@ -94,10 +94,10 @@ function run(argv) {
             console.error(`\nupstream/ fixtures differ from the selected firmware; refresh them from a committed firmware revision (upstream/README.md):\n${report.upstream.fixtures.map(describe).join("\n")}`);
             return 1;
         }
-        const env = {...process.env, FIRMWARE_ROOT: checkouts.firmware.path, CHARYBDIS_LIVE_ROOT: checkouts.live.path, QMK_ROOT: checkouts.qmk.path, QMK_HOME: checkouts.qmk.path};
+        const env = {...process.env, FIRMWARE_ROOT: checkouts.firmware.path, CHARYBDIS_ARK_ROOT: checkouts.ark.path, QMK_ROOT: checkouts.qmk.path, QMK_HOME: checkouts.qmk.path};
         for (const runner of RUNNERS) {
             console.log(`\nRunning ${runner}`);
-            const result = spawnSync("sh", [path.join(checkouts.live.path, runner)], {cwd: checkouts.firmware.path, env, stdio: "inherit"});
+            const result = spawnSync("sh", [path.join(checkouts.ark.path, runner)], {cwd: checkouts.firmware.path, env, stdio: "inherit"});
             report.results.push({runner, exitCode: result.status, signal: result.signal, error: result.error?.message});
             write();
             if (result.status !== 0) return 1;

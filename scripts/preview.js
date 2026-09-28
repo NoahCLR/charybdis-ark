@@ -153,7 +153,7 @@ fs.mkdirSync(path.join(__dirname, "..", "dev"), {recursive: true});
 fs.writeFileSync(path.join(__dirname, "..", "dev", "model.json"), JSON.stringify(model));
 const page = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
-<title>Charybdis Live — preview</title>
+<title>Charybdis Ark — preview</title>
 <link rel="stylesheet" href="../webview/styles.css?built=${Date.now()}">
 <script>
 // Stand in for the extension host: answer the webview's "ready" with one

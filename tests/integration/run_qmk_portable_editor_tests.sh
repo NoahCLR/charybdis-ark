@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 ROOT="${FIRMWARE_ROOT:?Set FIRMWARE_ROOT to the selected firmware checkout}"
-: "${CHARYBDIS_LIVE_ROOT:?Set CHARYBDIS_LIVE_ROOT to the selected Live checkout}"
+: "${CHARYBDIS_ARK_ROOT:?Set CHARYBDIS_ARK_ROOT to the selected Ark checkout}"
 . "$ROOT/tests/host/noah_host_qmk_env.sh"
 noah_host_export_qmk_cpath "$ROOT"
 BUILD_DIR="$(mktemp -d)"
@@ -17,7 +17,7 @@ for variant in normal features sanitized; do
     "$BUILD_DIR/test" "$BUILD_DIR/options.fixture"
     node - "$ROOT" "$BUILD_DIR/options.fixture" <<'JS'
 const assert = require("node:assert/strict"), fs = require("node:fs");
-const {readKeyboardOptions} = require(process.env.CHARYBDIS_LIVE_ROOT + "/core/protocol/keyboard-options-v1");
+const {readKeyboardOptions} = require(process.env.CHARYBDIS_ARK_ROOT + "/core/protocol/keyboard-options-v1");
 const fixture = fs.readFileSync(process.argv[3]), metadata = fixture.subarray(0,9), data = fixture.subarray(9);
 let id = 0;
 readKeyboardOptions({request: async request => {

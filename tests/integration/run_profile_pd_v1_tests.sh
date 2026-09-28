@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 ROOT="${FIRMWARE_ROOT:?Set FIRMWARE_ROOT to the selected firmware checkout}"
-: "${CHARYBDIS_LIVE_ROOT:?Set CHARYBDIS_LIVE_ROOT to the selected Live checkout}"
+: "${CHARYBDIS_ARK_ROOT:?Set CHARYBDIS_ARK_ROOT to the selected Ark checkout}"
 BUILD_DIR="$(mktemp -d)"
 trap 'rm -rf "$BUILD_DIR"' EXIT INT TERM
 
@@ -9,7 +9,7 @@ node - "$ROOT" "$BUILD_DIR/corpus.bin" <<'JS'
 const fs = require("node:fs");
 const root = process.argv[2];
 const fixture = require(root + "/tests/fixtures/pd_mode_domain_v1.json");
-const {decodePdDomain, encodePdDomain} = require(process.env.CHARYBDIS_LIVE_ROOT + "/core/schema/pd-mode-domain-v1");
+const {decodePdDomain, encodePdDomain} = require(process.env.CHARYBDIS_ARK_ROOT + "/core/schema/pd-mode-domain-v1");
 const golden = Buffer.from(fixture.hex, "hex");
 if (!encodePdDomain(fixture.slots).equals(golden)) throw new Error("PD fixture drift");
 const chunks = [];
