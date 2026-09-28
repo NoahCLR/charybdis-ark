@@ -12,7 +12,7 @@ source and worktrees; `upstream/` is the pinned baseline, not that checkout.
 | Document | Responsibility | Read when |
 | --- | --- | --- |
 | [PRODUCT_GOAL.md](PRODUCT_GOAL.md) | Product promise and completion criteria | Understanding what the app should become |
-| [LIVE_EDIT_APP_DIRECTION.md](LIVE_EDIT_APP_DIRECTION.md) | Current status, open issues and stable D-L decisions | Changing behavior or architecture |
+| [LIVE_EDIT_APP_DIRECTION.md](LIVE_EDIT_APP_DIRECTION.md) | Product status, open issues and the app's D-L decisions; firmware decisions are pointers to the firmware direction | Changing behavior or architecture |
 | [REPOSITORY.md](REPOSITORY.md) | Repository ownership, source provenance and environment boundaries | Starting in a new checkout |
 | [COMPATIBILITY.md](COMPATIBILITY.md) | Explicit cross-repository integration workflow | Changing wire formats, schemas or shared codec assumptions |
 | [core/README.md](../core/README.md) | Runtime data flow and adapter contract | Working in core or the extension shell |

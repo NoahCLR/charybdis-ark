@@ -72,6 +72,10 @@ Use [docs/README.md](docs/README.md) to place new documentation. Update the
 existing governing document first. Product behavior changes update README and
 the relevant spec in the same pass; architecture decisions update the direction
 or an app-owned spec. Keep Current Product Status and Open Issues accurate.
+Each decision has one home: app decisions continue the D-L series here, while a
+D-L heading marked as a firmware decision is only a pointer to the firmware
+repository's direction, which owns that text. Change a firmware decision there,
+as firmware work, not here.
 Do not put app plans or new app specifications under `upstream/`.
 
 Active plans may live in `docs/plans/`; include scope, acceptance criteria and
