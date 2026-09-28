@@ -61,6 +61,6 @@ An agent can start from this repo with AGENTS, this map and the task request;
 no prior conversation is required. Check Git status before assuming a baseline:
 uncommitted and untracked files are available in this working directory but
 will not appear in a fresh clone or worktree. Preserve them until their owner
-commits or explicitly transfers them. Protocol work also needs the selected
-firmware checkout to include the bridge-aware runners. Passing tests against
+commits or explicitly transfers them. Protocol work uses Live-owned integration runners against the selected
+firmware source; keep those build recipes aligned with firmware wiring. Passing tests against
 a dirty checkout is not a pinned compatibility release.

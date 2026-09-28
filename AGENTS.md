@@ -38,8 +38,8 @@ Developer-only tools, never imported by the application runtime:
 
 - `scripts/generate-keycode-catalog.js` regenerates the vendored catalog.
 - `scripts/preview.js` renders the interface against the test fixtures.
-- `scripts/check-compatibility.js` runs the explicitly selected firmware host
-  runners; it is never imported by runtime code.
+- `scripts/check-compatibility.js` runs Live-owned integration runners against explicitly selected
+  firmware source; it is never imported by runtime code.
 
 ## Layout
 

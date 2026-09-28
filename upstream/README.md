@@ -60,13 +60,10 @@ Node dependencies have been installed.
    arrange compatibility testing with the firmware project. App tests prove
    behavior against these vectors; they do not compile or run current firmware.
 
-The firmware project also owns five cross-language runners:
-`run_qmk_portable_editor_tests.sh`, `run_qmk_portable_profile_tests.sh`,
-`run_macro_program_size_tests.sh`, `run_profile_compiled_defaults_v1_tests.sh`
-and `run_profile_pd_v1_tests.sh`, under its `tests/host/`. They compare app
-readers, writers and macro sizing with C implementations. They are not included
-here: they depend on firmware source, QMK and a C toolchain. Use the separate
-[compatibility bridge](../docs/COMPATIBILITY.md) to run updated firmware runners
-against the selected independent Live checkout. The imported snapshots remain
-unchanged; they are not a replacement for cross-language integration coverage
-or physical interruption acceptance.
+Live owns five cross-language runners under `tests/integration/`. They compile
+probes from the selected firmware and compare readers, writers and macro sizing
+with Live's current implementation. Use the separate
+[compatibility bridge](../docs/COMPATIBILITY.md). Firmware itself does not require
+Live; it keeps independent regression fixtures and C tests. The imported
+snapshots here remain unchanged and do not replace integration or physical
+interruption acceptance.

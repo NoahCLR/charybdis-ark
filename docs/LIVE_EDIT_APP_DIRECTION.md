@@ -1001,9 +1001,18 @@ firmware repository and its consumers are maintained separately. See
 
 ### D-L45 — Compatibility tests select both implementations explicitly
 
-The developer-only compatibility bridge runs the five firmware-owned
+The developer-only compatibility bridge runs the five Live-owned
 cross-language runners against explicit firmware, Live and QMK Git roots.
 It records revisions, dirty state and results without changing runtime or
 requiring firmware for ordinary app checks. Protocol changes run the bridge
 before merging; UI-only changes use the independent suite. See
 [compatibility workflow](COMPATIBILITY.md).
+
+### D-L46 — Firmware has no reverse dependency on Live
+
+Live owns cross-language integration and may require firmware/QMK for that
+explicit gate. Firmware builds, host tests and diagnostics do not require Live,
+including its retained in-tree copy. Firmware owns frozen regression vectors;
+Live integration continues generating current inputs and comparing the actual
+implementations. No checks are silently skipped when a sibling app is absent.
+See [compatibility workflow](COMPATIBILITY.md).

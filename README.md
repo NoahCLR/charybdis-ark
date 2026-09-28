@@ -270,3 +270,6 @@ on its second line until the slot is filled in.
 For protocol changes, run the separate [firmware compatibility check](docs/COMPATIBILITY.md)
 against explicit firmware, Live and QMK checkouts before merging. UI-only work
 continues to use the independent app checks.
+Live owns these integration runners under `tests/integration/`; they read the
+selected firmware sources. Firmware's own tests and build require no Live
+checkout or app dependencies.

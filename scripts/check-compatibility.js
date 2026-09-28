@@ -5,7 +5,7 @@ const path = require("node:path");
 const {execFileSync, spawnSync} = require("node:child_process");
 
 const RUNNERS = ["qmk_portable_editor", "qmk_portable_profile", "macro_program_size", "profile_compiled_defaults_v1", "profile_pd_v1"]
-    .map(name => `tests/host/run_${name}_tests.sh`);
+    .map(name => `tests/integration/run_${name}_tests.sh`);
 const usage = "npm run test:compat -- --firmware PATH --live PATH --qmk PATH --report NEW_FILE.json";
 
 function parse(argv) {
@@ -39,16 +39,10 @@ function run(argv) {
     if (argv.length === 1 && argv[0] === "--help") { console.log(usage); return 0; }
     const flags = parse(argv);
     const checkouts = {
-        firmware: checkout("firmware", flags.firmware, [...RUNNERS, "tests/host/noah_host_live_env.sh", "users/noah/source_manifest.mk"]),
-        live: checkout("Live", flags.live, ["package.json", "core/schema/macro-payload.js", "tests/fixtures/pd-profile.js"]),
+        firmware: checkout("firmware", flags.firmware, ["tests/host/noah_host_qmk_env.sh", "users/noah/source_manifest.mk", "tests/host/profile_pd_v1_test.c"]),
+        live: checkout("Live", flags.live, [...RUNNERS, "package.json", "core/schema/macro-payload.js", "tests/fixtures/pd-profile.js"]),
         qmk: checkout("QMK", flags.qmk, ["quantum/quantum_keycodes.h", "quantum/keycodes.h", "platforms"]),
     };
-    for (const runner of RUNNERS) {
-        const source = fs.readFileSync(path.join(checkouts.firmware.path, runner), "utf8");
-        if (!source.includes("noah_host_export_live_root") || !source.includes("process.env.CHARYBDIS_LIVE_ROOT") || source.includes("/tools/charybdis-live")) {
-            throw new Error(`${runner} does not support the selected Live checkout; update the firmware compatibility runners first.`);
-        }
-    }
     const reportPath = path.resolve(flags.report);
     // Keep the report out of checkout status and never overwrite an existing file.
     for (const entry of Object.values(checkouts)) if (reportPath === entry.path || reportPath.startsWith(entry.path + path.sep)) throw new Error("Place --report outside the three checkouts.");
@@ -58,10 +52,10 @@ function run(argv) {
     try {
         write();
         for (const [name, info] of Object.entries(checkouts)) console.log(`${name}: ${info.path}\n  ${info.revision} (${info.dirty ? "dirty" : "clean"})`);
-        const env = {...process.env, CHARYBDIS_LIVE_ROOT: checkouts.live.path, QMK_ROOT: checkouts.qmk.path, QMK_HOME: checkouts.qmk.path};
+        const env = {...process.env, FIRMWARE_ROOT: checkouts.firmware.path, CHARYBDIS_LIVE_ROOT: checkouts.live.path, QMK_ROOT: checkouts.qmk.path, QMK_HOME: checkouts.qmk.path};
         for (const runner of RUNNERS) {
             console.log(`\nRunning ${runner}`);
-            const result = spawnSync("sh", [path.join(checkouts.firmware.path, runner)], {cwd: checkouts.firmware.path, env, stdio: "inherit"});
+            const result = spawnSync("sh", [path.join(checkouts.live.path, runner)], {cwd: checkouts.firmware.path, env, stdio: "inherit"});
             report.results.push({runner, exitCode: result.status, signal: result.signal, error: result.error?.message});
             write();
             if (result.status !== 0) return 1;
