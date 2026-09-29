@@ -29,15 +29,15 @@ locations only when a new document is warranted; create directories as needed.
 | `docs/architecture/<subject>.md` | App-owned technical contracts too substantial for the direction or core guide |
 | `docs/<workflow>.md` | Contributor procedures, setup and integration workflows |
 | `design/` | App UI principles, design assets and illustrative prototypes |
-| `docs/plans/<subject>.md` | Active, bounded work plans; remove after promoting lasting decisions |
 | `upstream/` | Imported source snapshots only, governed by its manifest and instructions |
 
 Link new durable documents from this map or the document that governs them.
 Keep one authoritative description of each rule; link instead of copying it.
 Retain D-L identifiers when amending decisions. Do not introduce parallel
 backlogs, dated review folders, agent diaries or completion reports in `docs/`.
-Current product gaps belong in the direction's Open Issues; temporary task
-steps belong in an active plan.
+Current product gaps belong in the direction's Open Issues; tasks and active
+plans belong in the work-queue vault (`charybdis-notes`, see the
+[workspace map](REPOSITORY.md#local-development-workspace)), not in `docs/`.
 
 ## Authority and evidence
 
