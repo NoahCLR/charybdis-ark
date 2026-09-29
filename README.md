@@ -1,6 +1,6 @@
 # Charybdis Ark
 
-**Alter, Review, Keep.** Edit a draft, review its changes, then save it to the
+**Adjust, Review, Keep.** Edit a draft, review its changes, then save it to the
 connected keyboard.
 
 Live firmware editor for the Charybdis. It talks to the connected keyboard over
