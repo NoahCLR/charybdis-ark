@@ -7,7 +7,8 @@ Start with `git status --short`, then read the setup in [README.md](README.md)
 and the reading map in [docs/README.md](docs/README.md). Read Current Product
 Status and Open Issues in [the direction](docs/LIVE_EDIT_APP_DIRECTION.md)
 before changing behavior; read its relevant decisions before architecture work.
-The interface direction and its prototype are in [design/](design/README.md).
+The interface's rules are in the README's "The interface" section and the
+direction's decisions; `npm run preview` renders the real interface.
 
 ## Repository ownership
 
@@ -58,7 +59,6 @@ webview/            the interface: browser ES modules, no build step
   view/             model → presentation (pure, tested)
   ui/               screens and components
   styles.css        the design system
-design/             the interface direction and its clickable prototype
 docs/               app-owned product direction, specs and contributor workflows
 upstream/           pinned external contracts and inputs; read its AGENTS.md
 scripts/            developer entry points and build steps

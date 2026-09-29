@@ -10,9 +10,8 @@ This is the app. Authored C defaults are edited directly in the firmware
 repository. Its source repository is
 [NoahCLR/charybdis-ark](https://github.com/NoahCLR/charybdis-ark).
 The product direction lives in
-[`docs/LIVE_EDIT_APP_DIRECTION.md`](docs/LIVE_EDIT_APP_DIRECTION.md), and
-the interface direction with its clickable prototype lives in
-[`design/`](design/README.md).
+[`docs/LIVE_EDIT_APP_DIRECTION.md`](docs/LIVE_EDIT_APP_DIRECTION.md); the
+interface's rules are under [The interface](#the-interface) below.
 
 Review and the behaviour editor explain combo/tap timing risks on older
 firmware, using the connected profile. Firmware with physical gesture timing
