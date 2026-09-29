@@ -12,6 +12,10 @@
     "firmware-gesture-hardening": {
       "repository": "https://github.com/NoahCLR/charybdis-4x6",
       "commit": "b2d004fec56fcbc5c743f3fc1cd2ae3c3823309e"
+    },
+    "firmware-layer-tap-hold": {
+      "repository": "https://github.com/NoahCLR/charybdis-4x6",
+      "commit": "ddd94b8e6d129092cc3eae57bfd5de8dd8672409"
     }
   },
   "files": [
@@ -81,10 +85,10 @@
     },
     {
       "path": "upstream/firmware/docs/architecture/profile-wire-v1.md",
-      "source": "firmware-gesture-hardening",
+      "source": "firmware-layer-tap-hold",
       "sourcePath": "docs/architecture/profile-wire-v1.md",
-      "sourceSha256": "0f1ce6b0fedaf816fc2cd8b6c52b740a1dcc1e73727d309623b08b68ad8d4906",
-      "sha256": "0f1ce6b0fedaf816fc2cd8b6c52b740a1dcc1e73727d309623b08b68ad8d4906",
+      "sourceSha256": "ea229f54263289019089a81b2f475263bf876f8345a375210cdc681e3d0368d0",
+      "sha256": "ea229f54263289019089a81b2f475263bf876f8345a375210cdc681e3d0368d0",
       "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
     },
     {
