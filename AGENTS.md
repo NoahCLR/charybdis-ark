@@ -100,7 +100,10 @@ worktree; never copy it into this repository.
 `dev` is the trunk. Branch each task from `dev` in its own worktree and
 squash-land it back onto `dev` locally when Noah says so; pull requests are
 optional. `main` is the released line and only moves by fast-forward from
-`dev`. Push only to `NoahCLR/charybdis-ark`. A pin to firmware or QMK names a
+`dev`. Push only to `NoahCLR/charybdis-ark`. The work-queue vault's
+`_agents/bin/verify` runs this file's checks for what a branch changed
+(adding the compatibility bridge for wire, schema or `upstream/` changes),
+and `_agents/bin/land` squash-lands a branch onto `dev` after verifying it. A pin to firmware or QMK names a
 commit on that repository's trunk, taken after its squash landing.
 
 ## Working alongside firmware agents
