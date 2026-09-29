@@ -601,7 +601,7 @@ button.tier:hover { background: var(--surface-3); }
 .rowlist .rowgroup + .rowgroup .group-h { border-top: 1px solid var(--line); }
 
 .beh-head { display: flex; align-items: flex-start; gap: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
-.beh-timing { display: grid; grid-template-columns: repeat(3, minmax(0, 150px)) auto; gap: 14px; align-items: end; padding: 13px 0 16px; }
+.beh-timing { display: grid; grid-template-columns: repeat(3, minmax(0, 200px)) auto; gap: 14px; align-items: end; padding: 13px 0 16px; }
 .bgrid { display: grid; gap: 6px; align-items: stretch; overflow-x: auto; padding-bottom: 2px; }
 .bhead { display: flex; align-items: center; gap: 7px; padding: 0 2px 4px; font-size: 11.5px; color: var(--text-2); }
 .bhead .bn { font-family: var(--mono); font-size: 10px; color: var(--text-3); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; }
@@ -622,6 +622,10 @@ button.tier:hover { background: var(--surface-3); }
 .bcell .bl { font-size: 10.5px; color: var(--text-3); }
 .bcell.empty { border-style: dashed; background: none; }
 .bcell.empty .plus { color: var(--text-3); font-size: 14px; }
+/* The key's own action where the row leaves a first-press tier empty: present,
+   but not stored in the row, so it keeps the empty cell's dashed edge. */
+.bcell.inherited { border-style: dashed; background: none; }
+.bcell.inherited .bk { color: var(--text-2); }
 .cell-editor { margin-top: 14px; border: 1px solid var(--line-2); border-radius: 10px; background: var(--surface-2); overflow: hidden; }
 .ce-head { display: flex; align-items: center; gap: 10px; padding: 10px 13px; border-bottom: 1px solid var(--line); }
 .ce-head h4 { font-size: 13px; }

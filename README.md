@@ -14,6 +14,15 @@ The product direction lives in
 the interface direction with its clickable prototype lives in
 [`design/`](design/README.md).
 
+Review and the behaviour editor explain combo/tap timing risks on older
+firmware, using the connected profile. Firmware with physical gesture timing
+(feature bit 17) is recognized without changing the layout or tuning values.
+
+Timing checks resolve inherited defaults, warn about overlapping or impossible
+release tiers, and exclude proven-impossible layer routes. Narrow gesture/chord
+windows receive advice; this is conservative analysis, not a guarantee that
+every gesture is physically practical (D-L49).
+
 ## Develop independently
 
 Open this folder directly in VS Code. Use Node 26.10.0 (`nvm use` with the
@@ -84,7 +93,24 @@ menus open only with an editable draft.
 
 Underneath it, one workbench whose tabs are the key, its behaviour, its combos,
 and the macros and pointing modes the layer reaches. A behaviour is tap count ×
-tier, so it is drawn as a grid. **Change key…** moves a behaviour to another
+tier, so it is drawn as a grid. Timing fields start with **Multi tap window**
+(release to next press), then Tap / hold and Long hold. Behaviour and combo
+timings matching the default show a muted placeholder such as `150 · default`;
+other values look entered. Labels end at `ms`. Clearing an override restores the
+default. LT keys show their own dual-role default.
+Changing a behaviour timing default moves every row following it, including
+explicit values matching the old default; distinct custom timings stay fixed.
+Review lists inherited effective-time changes under Tap & Hold Timing and any
+matching overrides converted to defaults under their behaviours. Those stored
+changes discard together with the default edit.
+Selecting a key opens its grid in Behaviours even before it has a stored row.
+Only a grid action, timing override or anchor change adds the row to the draft;
+browsing leaves the board and behaviour counts unchanged. Transparent keys and
+`KC_NO` cannot have behaviours. Empty branches preserve the key's built-in
+actions until you override them. A dual-role key's empty first tap or hold
+shows, dashed and marked "built in", what the key does there on its own: an
+`LT()` taps its key and holds its layer, an `MT()` or `OSM()` holds its
+modifiers. **Change key…** moves a behaviour to another
 key through the keycode picker; when that key already has one, you choose to
 overwrite it, swap the two, or cancel, and either is one undoable draft step.
 On a keyboard that owns its layer keys (Profile Wire feature bit 14), a

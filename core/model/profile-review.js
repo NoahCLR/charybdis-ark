@@ -9,6 +9,7 @@ const {customKeyNamesOf} = require("../schema/settings-domain-v1");
 const {macroEditorView} = require("./macro-editor");
 const rgbEnums = require("../schema/rgb-domain-v1");
 const {KEY_BEHAVIOR_HOLD_MODES} = require("../schema/key-behavior-domain-v1");
+const {effectiveTimings} = require("./gesture-timing");
 const {VOCABULARY, word, layerName: layerCalled, slotName, modifierNames} = require("./vocabulary");
 
 const words = text => String(text).replace(/^(RGB_|KEY_FEEDBACK_|PD_MODE_)/, "").replace(/_/g, " ").toLowerCase();
@@ -98,14 +99,16 @@ const TIERS = [["tap", "tap"], ["hold", "hold"], ["longHold", "long"]];
 // shows, named as the grid names it (1× tap, 2× hold).
 function behaviourFields(row, defaults, names) {
     if (!row) return new Map();
-    // Compared by what is stored, shown with the default it stands for, so a
-    // changed default in Settings does not read as a change to every row.
+    // Stored row edits stay here. Inherited effects appear under the settings
+    // change that caused them, so discarding a default does not discard an
+    // unrelated branch or anchor edit on one of its followers.
     // Each timing is marked with what it decides, as Settings marks its default.
     const timing = (value, fallback, labelMark) => ({text: value ? `${value} ms` : `default · ${fallback} ms`, key: value, labelMark});
+    const inherited = effectiveTimings({...row, tapHoldTerm: 0, longerHoldTerm: 0, multiTapTerm: 0}, defaults);
     const fields = new Map([
-        ["Tap / hold", timing(row.tapHoldTerm, defaults[1], {kind: "tier", tier: "hold"})],
+        ["Multi tap window", timing(row.multiTapTerm, defaults[3], {kind: "branch", count: 2})],
+        ["Tap / hold", timing(row.tapHoldTerm, inherited.hold, {kind: "tier", tier: "hold"})],
         ["Long hold", timing(row.longerHoldTerm, defaults[2], {kind: "tier", tier: "long"})],
-        ["Repeated taps", timing(row.multiTapTerm, defaults[3], {kind: "branch", count: 2})],
         ["Keeps auto-mouse anchored", row.keepsAutoMouseAnchored ? "yes" : "no"],
     ]);
     for (const step of row.steps) for (const [tier, name] of TIERS) {
@@ -319,6 +322,24 @@ function profileReview(before, after) {
     for (const section of sections(after, b.settings)) {
         const old = sectionsA.find(entry => entry.id === section.id);
         item(section.area, `settings:${section.id}`, section.label, old?.fields || new Map(), section.fields, {kind: "settings", section: section.id, area: section.area, ...(section.stage ? {stage: section.stage} : {})}, [true, true]);
+    }
+    const timingChange = items.find(entry => entry.unit === "settings:keyTiming");
+    if (timingChange) {
+        const affected = new Set();
+        for (const next of b.behaviors.rows) {
+            const old = a.behaviors.rows.find(row => JSON.stringify(row.target) === JSON.stringify(next.target));
+            if (!old) continue;
+            const oldTimes = effectiveTimings(old, a.settings.values), nextTimes = effectiveTimings(next, b.settings.values);
+            for (const [field, term, label] of [["multiTapTerm", "repeat", "Multi tap window"], ["tapHoldTerm", "hold", "Tap / hold"], ["longerHoldTerm", "long", "Long hold"]]) {
+                // Normalized explicit matches already have a stored behaviour
+                // change above; include inherited-only effects here.
+                if (old[field] !== 0 || next[field] !== 0 || oldTimes[term] === nextTimes[term]) continue;
+                affected.add(JSON.stringify(next.target));
+                timingChange.fields.push({label: `${action(next.target, namesB)} · ${label}`, status: "changed",
+                    before: `default · ${oldTimes[term]} ms`, after: `default · ${nextTimes[term]} ms`});
+            }
+        }
+        if (affected.size) timingChange.note = `${affected.size} behaviour${affected.size === 1 ? " follows" : "s follow"} the changed defaults; effective times are listed below.`;
     }
     const masks = after.options?.keymapMasks.reduce((mask, value) => mask | value, 0) || 0;
     item("Settings", "settings:otherKeyOptions", "Other key options", new Map([["Stored bits", `0x${(a.settings.values[24] & ~masks).toString(16)}`]]),

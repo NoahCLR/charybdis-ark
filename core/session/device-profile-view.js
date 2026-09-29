@@ -7,6 +7,7 @@ const {VOCABULARY, branchName} = require("../model/vocabulary");
 const keycodes = require("../data/keycode-catalog");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {KEY_BEHAVIOR_HOLD_MODES} = require("../schema/key-behavior-domain-v1");
+const {builtInFirstStep} = require("../model/built-in-behavior");
 const {
     RGB_AUTOMOUSE_MODES, RGB_DOMAIN_V1, RGB_KEY_SEMANTICS, RGB_LAYER_MODES,
     RGB_LOCALITIES, RGB_PD_MODE_IDS, RGB_STAGE_BITS, RGB_TAP_COMMIT_MODES,
@@ -28,7 +29,24 @@ function actionDisplay(action) {
     return resolved.known && resolved.label !== resolved.name ? {label: resolved.label} : {};
 }
 
-function behaviorRowsForView(domain) {
+// A modifiers-only keycode is how a key holds its modifiers; the catalogue
+// names it "Shift+N/A", which reads as a broken key rather than "Shift".
+function builtInDisplay(action) {
+    const display = actionDisplay(action);
+    return display.label ? {label: display.label.replace(/\+N\/A$/, "")} : display;
+}
+
+// The key's own first tap and hold, shaped like authored branches, for the
+// tiers its row leaves empty (model/built-in-behavior.js).
+function builtInForView(target, features) {
+    const {tap, hold} = builtInFirstStep(target, features);
+    return {
+        ...(tap ? {tap: {helper: "TAP_SENDS", action: actionName(tap), ...builtInDisplay(tap)}} : {}),
+        ...(hold ? {hold: {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: actionName(hold), repeatHz: "0", ...builtInDisplay(hold)}} : {}),
+    };
+}
+
+function behaviorRowsForView(domain, features = {}) {
     const hold = (branch) => branch && ({
         helper: enumName(KEY_BEHAVIOR_HOLD_MODES, branch.mode),
         action: actionName(branch.action),
@@ -37,6 +55,7 @@ function behaviorRowsForView(domain) {
     });
     return domain.rows.map((row) => ({
         keycode: actionName(row.target),
+        builtIn: builtInForView(row.target, features),
         tapHoldTerm: String(row.tapHoldTerm),
         longerHoldTerm: String(row.longerHoldTerm),
         multiTapTerm: String(row.multiTapTerm),
@@ -141,4 +160,4 @@ function combosForView(read, labels) {
     }));
 }
 
-module.exports = {baseRgbForView, behaviorRowsForView, combosForView, rgbForView};
+module.exports = {baseRgbForView, behaviorRowsForView, builtInForView, combosForView, rgbForView};

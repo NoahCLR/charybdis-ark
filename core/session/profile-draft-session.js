@@ -18,6 +18,7 @@ const {effectiveComboTerm} = require("../schema/combo-domain-v1");
 const {resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../data/charybdis-layout");
 const keycodes = require("../data/keycode-catalog");
+const {PROFILE_WIRE_FEATURES} = require("../protocol/profile-wire-v1");
 const {randomUUID} = require("node:crypto");
 const copy = value => JSON.parse(JSON.stringify(value));
 // History entries are frozen: they are handed out by reference, decoded once
@@ -422,7 +423,9 @@ class ProfileDraftSession {
         const known = this.checksCache.get(draft);
         if (known && known.keyboard === keyboard && known.order === order) return known.checks;
         const checks = draftProfileChecks(keyboard, draft, order, {brightnessMax: this.current.limits?.brightnessMax,
-            effects: this.current.options?.effects});
+            effects: this.current.options?.effects,
+            ownedTapping: Boolean(this.capabilities?.featureFlags & PROFILE_WIRE_FEATURES.OWNED_TAPPING),
+            physicalGestureTiming: Boolean(this.capabilities?.featureFlags & PROFILE_WIRE_FEATURES.PHYSICAL_GESTURE_TIMING)});
         this.checksCache.set(draft, {keyboard, order, checks});
         return checks;
     }

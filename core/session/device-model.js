@@ -12,10 +12,11 @@
 const {PD_BINDINGS} = require("../data/pd-bindings");
 const {VOCABULARY, slotName} = require("../model/vocabulary");
 const keycodeCatalog = require("../data/keycode-catalog");
-const {baseRgbForView, behaviorRowsForView, combosForView, rgbForView} = require("./device-profile-view");
+const {baseRgbForView, behaviorRowsForView, builtInForView, combosForView, rgbForView} = require("./device-profile-view");
+const {effectiveTimings} = require("../model/gesture-timing");
 const {keyLabel, profileKeyNames} = require("../model/key-names");
 const {layerName} = require("../model/vocabulary");
-const {knownActionAbi, layerRef, nativeCode} = require("../schema/actions");
+const {keycodeAction, knownActionAbi, layerRef, nativeCode} = require("../schema/actions");
 const {dpiChoices} = require("../model/pointer-dpi");
 const {PROFILE_WIRE_FEATURES} = require("../protocol/profile-wire-v1");
 
@@ -67,11 +68,12 @@ function buildDeviceModel(state = {}) {
         pdModes: (state.committed?.domains?.pdModes || []).map((slot) => ({...slot, displayName: slotName(slot), binding: PD_BINDINGS[slot.id]})),
         pdModeEditing: {writable: Boolean(state.capabilities?.supportedDomainMask & 16) && state.committed?.state === "read" && !state.committed.failures?.length && !state.busy,
             dpiChoices: dpiChoices({normalSpeed: true})},
-        keyBehaviors: committedKeyBehaviors(state.committed),
+        keyBehaviors: committedKeyBehaviors(state.committed, state.capabilities),
         behaviorEditing: {
             busy: Boolean(state.busy),
             writable: Boolean(state.capabilities?.supportedDomainMask & 2) && state.committed?.state === "read" && !state.committed.failures?.length && !state.busy,
             maxTapStepsPerBehavior: state.capabilities?.maxTapStepsPerBehavior || 5,
+            keyDefaults: behaviorDefaults(state, catalog.aliases),
         },
         profileIdentity: state.committed?.state === "read" ? {source: state.committed.source, generation: state.committed.generation, digest: state.committed.digest, originHalf: state.committed.originHalf} : null,
         rgb: {...committedRgb(state.committed),
@@ -191,12 +193,35 @@ function committedRgb(committed) {
     return committed?.state === "read" && committed.domains?.rgb ? rgbForView(committed.domains.rgb) : {};
 }
 
-function committedKeyBehaviors(committed) {
+function committedKeyBehaviors(committed, capabilities) {
     const decoded = committed?.state === "read" ? committed.domains?.keyBehaviors : undefined;
     if (!decoded) {
         return [];
     }
-    return behaviorRowsForView(decoded);
+    return behaviorRowsForView(decoded, behaviorFeatures(capabilities));
+}
+
+function behaviorFeatures(capabilities) {
+    const flags = capabilities?.featureFlags || 0;
+    return {
+        physicalGestureTiming: Boolean(flags & PROFILE_WIRE_FEATURES.PHYSICAL_GESTURE_TIMING),
+        ownedTapping: Boolean(flags & PROFILE_WIRE_FEATURES.OWNED_TAPPING),
+    };
+}
+
+// Unstored editor rows need the same built-in actions and timing defaults as
+// saved rows. Publish presentation only; these are not profile behaviours.
+function behaviorDefaults(state, aliases) {
+    const defaults = state.settingsView?.timing || {};
+    const values = [defaults.tappingTerm, defaults.tapHoldTerm, defaults.longerHoldTerm, defaults.multiTapTerm];
+    const features = behaviorFeatures(state.capabilities);
+    return Object.fromEntries([...new Set(profileKeycodes(state))].filter(code => code > 1).map(code => {
+        const target = keycodeAction(code);
+        const name = keycodeCatalog.resolve(code).name;
+        const timing = effectiveTimings({target}, values);
+        return [aliases[name] || name, {builtIn: builtInForView(target, features),
+            timing: {tapHoldTerm: timing.hold, longerHoldTerm: timing.long, multiTapTerm: timing.repeat}}];
+    }));
 }
 
 function deviceHeader(state) {

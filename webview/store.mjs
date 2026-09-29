@@ -78,8 +78,8 @@ export const state = {
 // The combo builder, opened for a combo (or none, for a new one) and closed
 // again. Its fields live here rather than in the DOM, because a board click
 // while picking inputs redraws the whole screen. A new combo starts on the
-// keyboard's default window, filled in; on a keyboard without one it starts
-// empty.
+// keyboard's default window, shown as a placeholder; on a keyboard without
+// one it starts empty.
 export function openComboBuilder(combo = null, defaultTermMs = "") {
     const follows = combo ? Boolean(combo.followsDefault) : defaultTermMs !== "";
     state.combo = {
@@ -159,6 +159,7 @@ export const writable = () => Boolean(getModel()?.draft?.matching && !getModel()
 // into the draft, so the draft must be this keyboard's, current and idle, and
 // the area's own capability must hold. Exporting only reads the keyboard.
 const AREA_CAPABILITY = {
+    behaviours: (model) => Boolean(model?.behaviorEditing?.writable),
     settings: (model) => Boolean(model?.settingsEditing?.writable),
     macros: (model) => Boolean(model?.macroEditing?.writable),
     customKeys: (model) => Boolean(model?.customKeyEditing?.writable),

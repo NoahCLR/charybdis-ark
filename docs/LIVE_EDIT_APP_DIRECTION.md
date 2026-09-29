@@ -39,7 +39,7 @@ matrix.
 | Product surface | Current state |
 | --- | --- |
 | Layout and eight layers | Read/write; names and overlay order travel with complete profiles; a reorder renumbers layer keys by default ("Keys follow their layers") |
-| Key behaviours, combos and RGB | Read/write editors over the shared draft; matching Keys reach sections share open state across tabs, open independently, and use the page scrollbar |
+| Key behaviours, combos and RGB | Read/write editors over the shared draft; selected keys open an unstored behaviour grid until the first edit; matching Keys reach sections share open state across tabs, open independently, and use the page scrollbar |
 | Macros | 64 named VIA macro slots with builder, recorder and preview; shared-memory and per-macro limits shown and enforced (D-L25, D-L26) |
 | Custom keys | 64 named keys that do what their behaviour says: rename, add or open the behaviour, place, see where each is used (D-L42) |
 | Mouse | Pointer and sniping DPI, auto-sniping and auto-mouse: global-policy sections the core files under the Mouse area, so the rail, the review and import counts all place them there. The auto-mouse fade delay is a share of the timeout, edited on its lighting stage (D-L17) |
@@ -77,8 +77,8 @@ Remaining before calling the product complete:
   built features so the picker reads them from the device.
 - **Firmware open issues** are tracked in the firmware direction: the one-half
   power-cycle recovery transition, why a peer stops acknowledging a push or
-  fails a flash write mid-copy (D-L22, D-L27), `LT()` row tap/hold timing
-  (D-L34) and the keycode-block migration not yet run on hardware (D-L42).
+  fails a flash write mid-copy (D-L22, D-L27), physical acceptance of buffered gesture timing
+  (firmware D-F01) and the keycode-block migration not yet run on hardware (D-L42).
 
 ## The Tools
 
@@ -729,3 +729,93 @@ its identity, so on start Ark copies recovery files saved under
 `noah.charybdis-live` and `noah.charybdis-live-v2` into its own storage, never
 moving or overwriting one. Portable profiles keep the `.charybdis.json`
 extension: it names the keyboard, not the app.
+
+### D-L48 — Gesture timing advice follows firmware capability
+
+Profile Wire feature bit 17 identifies physical gesture timing. Without it,
+review and the behaviour editor warn when a reachable authored hold/repeat key
+is buffered by an enabled combo, or an authored layer-tap also waits for native
+QMK tapping. Advice names effective inherited timings and competing combo
+windows, using the connected profile and native combo reference-layer rules.
+It does not infer a safe timing from subtracting those windows.
+
+Warnings participate in the existing new/existing/fixed review and remain
+confirmable; they neither reject a legal profile nor rewrite its timings.
+Unknown offline timing semantics do not produce a firmware-defect claim. On a
+keyboard advertising bit 17, this legacy warning disappears. General guidance
+still explains double hold as press–release–press-and-hold, the released repeat
+gap, and tap/hold classification. Firmware buffering can postpone output even
+when it preserves physical gesture eligibility.
+
+The firmware owns timing semantics (D-F01 in its direction); Ark consumes the
+capability, not source code. Hardware acceptance of a particular firmware build
+is separate from recognition of its advertised policy.
+
+### D-L49 — Timing findings constrain the reachability graph conservatively
+
+Ark resolves each row's timing overrides against the connected settings, including
+the dual-role default for authored LT rows. A Hold and Long hold both set to
+"tap on release after hold" have an impossible Hold branch when Long hold is
+at or before Tap / hold: no release interval selects Hold. Review and the
+behaviour editor warn, and the layer graph removes that proven-impossible edge,
+including behaviours reached through combo outputs. Global-default edits are
+analyzed in the same draft, with new/existing/fixed findings.
+
+Other equal or reversed thresholds warn about overlapping tiers without claiming
+which action is impossible: immediate actions, scan order and release modes
+matter. Positive hold-tier gaps under 50 ms, first-tap and repeat windows under
+50 ms, and enabled combo windows under 50 ms receive notices. This is an explicit
+comfort heuristic, never a validity rule or a model of the person's dexterity.
+Warnings remain confirmable and notices need no confirmation. No values change
+automatically. Combo waits are not subtracted from physical repeat windows.
+
+This is conservative static analysis, not a complete input-state simulator.
+Transparent action inheritance, pointing interception, interruption, host bindings,
+scan cadence, fingers and overlapping chord sequences are not proven feasible.
+Unknown paths remain in the graph rather than inventing traps. Invalid timing
+relationships are reported even for unplaced rows so moving one later cannot
+hide the problem. Revisit the rule against firmware release-matrix tests when
+release precedence changes.
+
+Feature bit 18 identifies runtime-owned tapping, extending bit 17's authored LT
+bypass to every handled key (including authored MT/OSM and owned TT/OSL). Ark
+keeps native-buffering warnings for those families on bit-17-only firmware.
+Neither capability changes stored profile bytes. Firmware owns that policy and
+its native-key controls; Ark owns these findings and their presentation.
+
+An empty first-press tap or hold on a dual-role row is not "nothing": the
+keyboard runs the key's own action there. The behaviour grid shows it as a
+dashed "built in" cell, derived from the stored keycode and claimed only where
+firmware advertises it: an LT() row's tap and layer hold on bit 17, an MT() or
+OSM() row's tap and modifier hold on bit 18. Older firmware classified these
+keys in QMK first, so Ark claims nothing there. The built-in cell is display
+only; setting an action in it authors the tier (core/model/built-in-behavior.js).
+New behaviour editors start with no authored branches, preserving these defaults.
+Selecting a key opens its row or an unstored grid; only an action, timing override
+or anchor change creates a draft row. Previews never enter the host model's stored
+behaviour list, counts or board marks. Transparent keys and `KC_NO` have no
+behaviour editor, and the host rejects them as new or retargeted row targets.
+Opening a custom key's behaviour follows the same rule.
+The timing controls lead with **Multi tap window** (release to next press),
+followed by Tap / hold and Long hold. Behaviour and combo timing inputs show
+inherited or default-matching values as muted placeholders (`150 · default`),
+with no default/custom marker after `ms` in the label. Other values remain entered.
+Presentation alone never rewrites an explicit override that matches the default.
+When a behaviour timing default changes, explicit row values equal to that
+specific old default become inheritance zeros in the same draft step. Existing
+zeros follow naturally; distinct custom values stay fixed. LT's Tap / hold follows
+the dual-role default, other rows the normal threshold. Unchanged defaults and
+unrelated settings edits do not normalize rows.
+Review lists each inherited effective-time change under Tap & Hold Timing, with
+the affected behaviour and old/new milliseconds. Explicit matches adopting
+inheritance appear as stored behaviour changes grouped with the settings edit.
+Inherited effects are not independent discard units, so discarding the default
+does not discard unrelated edits on rows that already inherited it. Undo restores
+the entire step, including any former explicit values.
+The host supplies per-key defaults using the same timing
+resolution as review, including LT's dual-role threshold. Displaying a default
+keeps the stored inheritance zero; changing another field never freezes it as an
+override. Clearing an override restores the default. An unchanged empty preview
+posts nothing.
+The target is a lookup key, not an implicit authored tap action: copying an
+`LT()` target into a tap branch would fail the firmware's placement rules.

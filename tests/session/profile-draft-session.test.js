@@ -17,6 +17,50 @@ function settings(draft, id, updates) {
         fields:section.fields.map(field => field.kind === "toggle" ? {macro:field.macro, enabled:updates[field.macro] ?? field.enabled} : {macro:field.macro,value:updates[field.macro] ?? field.value})};
 }
 function stage(draft, edit) {return draft.stage({...edit,draftRevision:draft.revision});}
+
+test("default timing edits move matching behaviours, report inherited effects, and discard atomically", () => {
+    const {draft: seed, caps} = fixture();
+    const defaults = validateSnapshot(seed.document).settings.values;
+    for (const [keycode, tapHoldTerm, longerHoldTerm] of [
+        ["KC_Q", 0, 0], ["KC_W", defaults[1], defaults[2]],
+        ["KC_E", 333, 633], ["LT(3,KC_F)", defaults[0], defaults[2]],
+    ]) stage(seed, {type: "saveBehavior", behavior: {keycode, tapHoldTerm, longerHoldTerm, multiTapTerm: defaults[3], steps: []}});
+    const draft = new ProfileDraftSession(seed.current, "board", caps);
+    const baseline = draft.current.fingerprint;
+    const row = keycode => behaviorRowsForView(validateSnapshot(draft.document).behaviors).find(entry => entry.keycode === keycode);
+    stage(draft, {type: "saveBehavior", behavior: {...row("KC_Q"), keepsAutoMouseAnchored: true}});
+    const anchored = draft.current.fingerprint;
+    stage(draft, settings(draft, "keyTiming", {longerHoldTerm: "500"}));
+    assert.equal(row("KC_Q").longerHoldTerm, "0");
+    assert.equal(row("KC_W").longerHoldTerm, "0", "an explicit old-default match adopts inheritance");
+    assert.equal(row("KC_E").longerHoldTerm, "633", "custom timing stays fixed");
+    assert.equal(row("LT(3,KC_F)").longerHoldTerm, "0");
+    const changes = draft.changes(), setting = changes.find(entry => entry.unit === "settings:keyTiming");
+    const effect = setting.fields.find(field => field.label === "Q · Long hold");
+    assert.deepEqual([effect.before, effect.after], [`default · ${defaults[2]} ms`, "default · 500 ms"]);
+    assert.ok(!setting.fields.some(field => field.label === "E · Long hold"));
+    const q = changes.find(entry => entry.place?.keycode === "KC_Q");
+    assert.notEqual(q.group, setting.group, "the anchor edit is independent of inherited timing effects");
+    const w = changes.find(entry => entry.place?.keycode === "KC_W");
+    assert.equal(w.group, setting.group, "adopting the default discards with its source setting");
+    draft.undo(draft.revision);
+    assert.equal(draft.current.fingerprint, anchored);
+    draft.redo(draft.revision);
+    stage(draft, settings(draft, "keyTiming", {longerHoldTerm: "550"}));
+    assert.equal(row("KC_W").longerHoldTerm, "0", "it continues following subsequent defaults");
+    draft.discard(draft.revision, draft.changes().find(entry => entry.unit === "settings:keyTiming").group);
+    assert.equal(draft.current.fingerprint, anchored, "discard restores defaults and explicit matching bytes, keeping the anchor edit");
+    draft.discard(draft.revision, draft.changes()[0].group);
+    assert.equal(draft.current.fingerprint, baseline);
+
+    stage(draft, settings(draft, "keyTiming", {tapHoldTerm: "175"}));
+    assert.equal(row("KC_W").tapHoldTerm, "0");
+    assert.equal(row("LT(3,KC_F)").tapHoldTerm, String(defaults[0]), "LT does not follow the normal threshold");
+    stage(draft, settings(draft, "keyTiming", {tappingTerm: "250", multiTapTerm: "180"}));
+    assert.equal(row("LT(3,KC_F)").tapHoldTerm, "0", "LT follows its own dual-role default");
+    assert.equal(row("KC_E").tapHoldTerm, "333");
+    assert.equal(row("KC_E").multiTapTerm, "0");
+});
 test("a draft opens only on firmware whose key numbering the app knows", () => {
     const value = legacyDocument(), snapshot = {document:value, fingerprint:fingerprint(value), summary:summary(value), limits:{brightnessMax:200}};
     assert.throws(() => new ProfileDraftSession(snapshot, "board", {compiledLayerCount:8, supportedDomainMask:15, actionAbiDigest:value.actionAbiDigest}), /numbers its keys differently/);
@@ -81,7 +125,8 @@ test("the history lists every step, when it was made, and what it changed from t
     const field = steps[3].changes[0].fields.find(entry=>entry.before!==null&&entry.after!==null);
     assert.match(field.before,/one/,"the last step compares with the draft before it, not the keyboard");
     assert.match(field.after,/two/);
-    assert.deepEqual(steps[2].changes.map(row=>row.area),["Settings"],"each step lists only what it changed");
+    assert.deepEqual(new Set(steps[2].changes.map(row=>row.area)),new Set(["Settings", "Behaviours"]),"a default edit includes explicit matching timings converted to inheritance");
+    assert.ok(steps[2].changes.filter(row=>row.area==="Behaviours").every(row=>row.fields.length === 1 && row.fields[0].label === "Tap / hold" && row.fields[0].after === "default · 175 ms"));
     assert.deepEqual(steps.map(entry=>entry.current),[false,false,false,true]);
 
     draft.jump(draft.revision,1);
@@ -374,4 +419,15 @@ test("edits link by the layer they touched, so a reorder between them ties nothi
     assert.equal(groupOf(draft,"layout:3:0"),groupOf(draft,"layout:3:1"),"Symbols' two keys, made together, moved together");
     assert.equal(groupOf(draft,"layout:2:0"),groupOf(draft,"layout:2:1"));
     assert.notEqual(groupOf(draft,"layout:3:0"),groupOf(draft,"layout:2:0"),"Navigation's keys are another edit");
+});
+
+test("draft checks use the connected firmware's physical gesture capability", () => {
+    const {snapshot, caps} = fixture();
+    const row = behaviorRowsForView(validateSnapshot(snapshot.document).behaviors).find(row => row.keycode.startsWith("LT("));
+    assert.ok(row, "fixture includes an authored layer-tap");
+    for (const fixed of [false, true]) {
+        const draft = new ProfileDraftSession(snapshot, "board", {...caps, featureFlags: fixed ? 1 << 17 : 0});
+        stage(draft, {type: "updateLayoutKeys", layers: [{layer: "Layer 0", changes: [{layoutIndex: 0, keycode: row.keycode}]}]});
+        assert.equal(draft.checks().some(check => check.kind === "gestureTiming" && check.place.keycode === row.keycode), !fixed);
+    }
 });

@@ -3,12 +3,13 @@
 // Whole-profile findings shown before Apply. Layer reachability lives in its
 // own walk; these checks cover actions that the firmware accepts but cannot
 // perform, and destination limits that would refuse the save.
+const {gestureTimingFindings} = require("./gesture-timing");
 const {layerReach, compareFindings} = require("./layer-reach");
 const {baseLighting} = require("./settings-editor");
 const {macroProgramBytes, MACRO_PROGRAM_MAX} = require("../schema/macro-payload");
 
 function profileFindings(decoded, destination = {}) {
-    const findings = layerReach(decoded);
+    const findings = [...layerReach(decoded, {legacyGestureTiming: destination.physicalGestureTiming === false, legacyOwnedTapping: destination.ownedTapping === false}), ...gestureTimingFindings(decoded)];
     for (const [slot, count] of Object.entries(decoded.danglingPdBindings || {})) {
         if (!count) continue;
         findings.push({kind: "inertPointing", level: "warning", layers: [], identity: `${slot}:${count}`, count,

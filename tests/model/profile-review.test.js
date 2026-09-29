@@ -113,13 +113,17 @@ test("a new pointing mode is one added item, however many fields it sets", () =>
     assert.ok(items[0].fields.length>5,"it lists what it sets");
     assert.deepEqual(items[0].place,{kind:"pointing",slot:6});
 });
-test("changing a default in Settings is one settings item, not a change to every behaviour that uses it", () => {
+test("changing a default lists inherited effective times under its settings item", () => {
     const base=pdDocument(), before=snapshot(base);
     const after=snapshot(withDomain(base,64,payload=>require("../../core/schema/settings-domain-v1").decodeSettings(payload),
         value=>require("../../core/schema/settings-domain-v1").encodeSettings(value),settings=>({...settings,values:settings.values.map((v,i)=>i===1?175:v)})));
     const items=profileReview(before,after);
     assert.deepEqual(items.map(entry=>entry.unit),["settings:keyTiming"]);
-    assert.deepEqual(items[0].fields.map(field=>[field.before,field.after]),[[String(validateSnapshot(base).settings.values[1]),"175"]]);
+    assert.deepEqual([items[0].fields[0].before,items[0].fields[0].after],[String(validateSnapshot(base).settings.values[1]),"175"]);
+    const expected = validateSnapshot(base).behaviors.rows.filter(row => !row.tapHoldTerm && !(row.target.kind === 1 && row.target.operand >= 0x4000 && row.target.operand <= 0x4fff));
+    assert.equal(items[0].fields.length, expected.length + 1);
+    assert.ok(items[0].fields.slice(1).every(field => field.before === "default · 150 ms" && field.after === "default · 175 ms" && field.label.endsWith(" · Tap / hold")));
+    assert.match(items[0].note, new RegExp(`^${expected.length} behaviours follow`));
 });
 test("renaming a layer does not read as a change to the settings that name it", () => {
     const before=snapshot(pdDocument());
@@ -172,7 +176,7 @@ test("a setting is marked with what it governs, as the Settings screen marks it"
         value=>({...value,values:value.values.map((v,i)=>i===1?175:i===2?450:i===5?3:v)})));
     const items=profileReview(before,after);
     const timing=items.find(entry=>entry.unit==="settings:keyTiming").fields;
-    assert.deepEqual(timing.map(field=>field.labelMark),[{kind:"tier",tier:"hold"},{kind:"tier",tier:"long"}]);
+    assert.deepEqual(timing.filter(field=>field.labelMark).map(field=>field.labelMark),[{kind:"tier",tier:"hold"},{kind:"tier",tier:"long"}]);
     const layer=items.find(entry=>entry.unit==="settings:autoMouse").fields.find(field=>field.label==="Auto-mouse layer");
     assert.deepEqual(layer.afterMark,{kind:"layer",layer:3},"a layer value carries the layer's colour");
 });

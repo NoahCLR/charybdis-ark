@@ -10,6 +10,7 @@ import {createRequire} from "node:module";
 import path from "node:path";
 import {fileURLToPath} from "node:url";
 import * as edits from "../webview/view/edits.mjs";
+import {behaviourEditorRow, behaviourTimingEdit, behaviourTimingField} from "../webview/view/behavior-editor.mjs";
 import {shareHold} from "../webview/view/share.mjs";
 import {AXIS, BUTTON, DIRECTIONAL_STARTER_THRESHOLD, KIND, SCROLL_STARTER, dpiOptions, newMode, readConfig, settleButtons, startingRecord} from "../webview/view/pointing-config.mjs";
 
@@ -176,6 +177,52 @@ test("a behaviour row is added for a key without one, and deleted again", () => 
     assert.equal(rows(), before + 1);
     stage(draft, edits.deleteBehaviour("KC_Q", draft.identity()));
     assert.equal(rows(), before);
+});
+
+test("new behaviour rows preserve built-in actions, including LT targets", () => {
+    for (const [keycode, operand] of [["LT(3,KC_F)", 0x4309], ["MT(MOD_LCTL,KC_F)", 0x2109], ["MO(3)", 0x5223], ["KC_Q", 0x14]]) {
+        const draft = session();
+        stage(draft, edits.addBehaviour(keycode, draft.identity()));
+        const row = () => decoded(draft).behaviors.rows.find(entry => entry.target.kind === 1 && entry.target.operand === operand
+            || keycode === "MO(3)" && entry.target.kind === 2 && entry.target.operand === 3);
+        assert.deepEqual(row().steps, [], keycode);
+        stage(draft, edits.saveBehaviour({keycode, steps: []}, {terms: {tapHoldTerm: "177"}}, draft.identity()));
+        assert.equal(row().tapHoldTerm, 177, "timing-only edits keep the target valid");
+        assert.deepEqual(row().steps, []);
+        assert.throws(() => stage(draft, edits.saveBehaviour({keycode, steps: []}, {change: {
+            tapCount: 0, kind: "tap", branch: {helper: "TAP_SENDS", action: "LT(3,KC_F)"},
+        }}, draft.identity())), /makes its own tap\/hold decision/, "LT is still refused as an authored action");
+    }
+});
+
+test("an unstored editor only creates a row after an action, timing override or anchor change", () => {
+    for (const change of [
+        {terms: {multiTapTerm: "777"}},
+        {terms: {tapHoldTerm: "177"}},
+        {terms: {longerHoldTerm: "477"}},
+        {anchored: true},
+        {change: {tapCount: 0, kind: "tap", branch: {helper: "TAP_SENDS", action: "KC_A"}}},
+    ]) {
+        const draft = session();
+        const before = decoded(draft).behaviors.rows.length;
+        const row = behaviourEditorRow({behaviorTimingDefaults: {tapHoldTerm: "150", longerHoldTerm: "400", multiTapTerm: "150"}}, "KC_Q");
+        assert.equal(edits.saveBehaviour(row, {}, draft.identity()), null);
+        const field = behaviourTimingField(row, "multiTapTerm");
+        assert.equal(edits.saveBehaviour(row, {terms: {multiTapTerm: behaviourTimingEdit("150", field)}}, draft.identity()), null);
+        assert.equal(edits.saveBehaviour(row, {change: {tapCount: 0, kind: "tap", branch: null}}, draft.identity()), null);
+        assert.throws(() => stage(draft, edits.saveBehaviour(row, {terms: {multiTapTerm: "0.0"}}, draft.identity())), /whole number/);
+        assert.equal(draft.dirty, false);
+        stage(draft, edits.saveBehaviour(row, change, draft.identity()));
+        const saved = decoded(draft).behaviors.rows.find(entry => entry.target.operand === 0x14);
+        assert.equal(decoded(draft).behaviors.rows.length, before + 1);
+        assert.equal(saved.tapHoldTerm, Number(change.terms?.tapHoldTerm || 0));
+        assert.equal(saved.longerHoldTerm, Number(change.terms?.longerHoldTerm || 0));
+        assert.equal(saved.multiTapTerm, Number(change.terms?.multiTapTerm || 0));
+        assert.equal(saved.keepsAutoMouseAnchored, Boolean(change.anchored));
+        assert.equal(saved.steps.length, change.change ? 1 : 0);
+        draft.undo(draft.revision);
+        assert.equal(decoded(draft).behaviors.rows.length, before);
+    }
 });
 
 test("a behaviour moves to another key, and overwrites or swaps with one already there", () => {

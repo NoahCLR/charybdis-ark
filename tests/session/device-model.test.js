@@ -22,6 +22,15 @@ test("the picker offers TT, OSL and TO only when the keyboard owns its layer key
     assert.equal(buildDeviceModel({capabilities: {featureFlags: 1 << 14}}).ownsLayerKeys, true);
 });
 
+test("behaviour rows claim built-in first actions from the keyboard's advertised features", () => {
+    const committed = decodedDeviceProfile();
+    const rows = (featureFlags) => buildDeviceModel({capabilities: {featureFlags}, committed}).keyBehaviors;
+    const claims = (list) => list.filter((row) => Object.keys(row.builtIn).length).map((row) => row.keycode);
+    const lt = claims(rows(1 << 17)).filter((keycode) => keycode.startsWith("LT("));
+    assert.ok(lt.length > 0, "the fixture's LT row inherits its tap and layer hold on bit 17 firmware");
+    assert.deepEqual(claims(rows(0)), [], "older firmware claims nothing");
+});
+
 // The ported Studio UI renders whatever shape it is given, so these assertions
 // pin the contract between the device and that UI. Getting a field name wrong
 // here shows up as a silently empty tab, which is exactly the failure the port
@@ -36,6 +45,25 @@ const MODEL_FIELDS = [
 function layoutWith(keys) {
     return {state: "read", layers: [{layer: 0, keys}]};
 }
+
+test("unstored behaviour defaults share the firmware timing and built-in rules", () => {
+    const values = [0x4309, 0x2109, 0x04, 0, 1];
+    const state = {layout: layoutWith(values.map((keycode, layoutIndex) => ({keycode, layoutIndex, resolved: resolve(keycode)}))),
+        capabilities: {featureFlags: (1 << 17) | (1 << 18)},
+        settingsView: {timing: {tappingTerm: "210", tapHoldTerm: "150", longerHoldTerm: "400", multiTapTerm: "170"}}};
+    const model = buildDeviceModel(state);
+    const defaults = model.behaviorEditing.keyDefaults;
+    assert.equal(defaults["LT(3,KC_F)"].timing.tapHoldTerm, "210", "LT inherits the dual-role threshold");
+    assert.equal(defaults["LT(3,KC_F)"].builtIn.tap.action, "KC_F");
+    assert.equal(defaults["LT(3,KC_F)"].builtIn.hold.action, "MO(3)");
+    assert.equal(defaults["MT(MOD_LCTL,KC_F)"].timing.tapHoldTerm, "150");
+    assert.equal(defaults["MT(MOD_LCTL,KC_F)"].builtIn.tap.action, "KC_F");
+    assert.deepEqual(defaults.KC_A.timing, {tapHoldTerm: "150", longerHoldTerm: "400", multiTapTerm: "170"});
+    assert.equal(defaults.KC_NO, undefined);
+    assert.equal(defaults.KC_TRANSPARENT, undefined);
+    assert.deepEqual(model.keyBehaviors, [], "no behaviour is authored by publishing defaults");
+    assert.deepEqual(buildDeviceModel({...state, capabilities: {}}).behaviorEditing.keyDefaults["LT(3,KC_F)"].builtIn, {});
+});
 
 test("device shortcut labels stay complete and semantic names require the advertised ABI", () => {
     const values = [0x0806, 0x0a1d, 0x7e80, 0x7ec5, 0x7ec6, 0x7e42];

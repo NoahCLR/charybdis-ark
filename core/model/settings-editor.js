@@ -1,6 +1,8 @@
 "use strict";
 
-const {layerOfRef} = require("../schema/actions");
+const {actionLimitsFor, layerOfRef} = require("../schema/actions");
+const {effectiveTimings} = require("./gesture-timing");
+const {encodeKeyBehaviorDomain} = require("../schema/key-behavior-domain-v1");
 const {validateSnapshot, decodedOf} = require("./portable-profile");
 const {decodeProfileBlob, encodeProfileBlob} = require("../schema/profile-blob-v1");
 const {encodeSettings, validSetting} = require("../schema/settings-domain-v1");
@@ -211,7 +213,22 @@ function editSettings(snapshot, message, capabilities) {
     rescaleShares(value.settings.values, before);
     if (!value.settings.values[23]) throw fail("Keep at least one startup layer selected.");
     if (!value.settings.values.every((number, id) => validSetting(id, number))) throw fail("A setting is outside the keyboard's supported range.");
-    const domains = decodeProfileBlob(value.profile).domains.map(domain => domain.id === 0x40 ? {...domain, payload: encodeSettings(value.settings)} : domain);
+    // A timing displayed as default follows that default, including an older
+    // profile's explicit value equal to it. Adopt inheritance only for changed
+    // defaults; unrelated settings edits never rewrite behaviour rows.
+    let behaviorsChanged = false;
+    for (const row of value.behaviors.rows) {
+        const old = effectiveTimings({...row, tapHoldTerm: 0, longerHoldTerm: 0, multiTapTerm: 0}, before);
+        const next = effectiveTimings({...row, tapHoldTerm: 0, longerHoldTerm: 0, multiTapTerm: 0}, value.settings.values);
+        for (const [field, term] of [["tapHoldTerm", "hold"], ["longerHoldTerm", "long"], ["multiTapTerm", "repeat"]]) {
+            if (old[term] !== next[term] && row[field] !== 0 && row[field] === old[term]) {
+                row[field] = 0;
+                behaviorsChanged = true;
+            }
+        }
+    }
+    const domains = decodeProfileBlob(value.profile).domains.map(domain => domain.id === 0x40 ? {...domain, payload: encodeSettings(value.settings)}
+        : domain.id === 0x20 && behaviorsChanged ? {...domain, payload: encodeKeyBehaviorDomain(value.behaviors, actionLimitsFor(value.document.version))} : domain);
     const document = {...value.document, profile: encodeProfileBlob({schema: {major: value.document.version, minor: 0}, domains}).toString("base64")};
     validateSnapshot(document, capabilities);
     return document;

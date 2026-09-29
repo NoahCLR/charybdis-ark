@@ -22,7 +22,7 @@ const PROFILE_WIRE_STATUS = Object.freeze({
 });
 
 const PROFILE_WIRE_KNOWN_MASKS = Object.freeze({
-    FEATURE_FLAGS: 0x0001ffff,
+    FEATURE_FLAGS: 0x0007ffff,
     REQUIRED_READ_FEATURES: 0x0000000f,
     STATE_FLAGS: 0x01ff,
     SUPPORTED_DOMAINS: 0x1f,
@@ -52,6 +52,8 @@ const PROFILE_WIRE_FEATURES = Object.freeze({
     // settings v5 names the 64 custom keys. It comes with the action ABI the
     // app knows (schema/actions.js), so the model tests that digest.
     CUSTOM_KEYS: 1 << 16,
+    PHYSICAL_GESTURE_TIMING: 1 << 17,
+    OWNED_TAPPING: 1 << 18,
 });
 
 const PROFILE_WIRE_DOMAINS = Object.freeze({

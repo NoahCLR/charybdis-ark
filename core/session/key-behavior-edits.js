@@ -76,6 +76,9 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
         const target = action(keycode, named?.target);
         return {target, index: rows.findIndex(row => equivalent(row.target, target))};
     };
+    const checkTarget = target => {
+        if (native(target) === 0 || native(target) === 1) throw invalid("Transparent keys and KC_NO cannot have a behaviour.");
+    };
 
     // Move a row to the key it listens to. When that key already has a row the
     // edit says what happens to it: replaced, or given the old key in a swap.
@@ -83,10 +86,12 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
         const from = rowFor(message.keycode);
         if (from.index < 0) throw invalid("This behaviour row is no longer present. Read from keyboard again.");
         const to = rowFor(message.target);
+        checkTarget(to.target);
         if (to.index === from.index) throw invalid("This behaviour already listens to that key.");
         if (to.index >= 0) {
             if (!RETARGET_CONFLICTS.has(message.conflict)) throw invalid("That key already has a behaviour. Choose to overwrite it or swap the two.");
             if (message.conflict === "swap") {
+                checkTarget(rows[from.index].target);
                 rows[to.index] = {...rows[to.index], target: rows[from.index].target};
                 rows[from.index] = {...rows[from.index], target: to.target};
             } else {
@@ -110,6 +115,7 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
         if (!previous) throw invalid("This behaviour row is no longer present. Read from keyboard again.");
         rows.splice(index, 1);
     } else {
+        checkTarget(target);
         if (message.type === "addBehavior" && previous) throw invalid("This key already has a behaviour row. Edit the existing row instead.");
         const suppliedSteps = message.type === "addBehavior" && form.steps === undefined
             ? [{tapCount: 0, tap: form.tap, hold: form.hold, longHold: form.longHold}] : form.steps;

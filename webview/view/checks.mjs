@@ -61,3 +61,9 @@ export function confirmText(checks) {
 export function checkTags(check) {
     return [LEVEL_WORD[check.level] || check.level, ...(check.status === "new" ? [] : [STATUS_WORD[check.status] || check.status])];
 }
+
+// Findings already use the behaviour's semantic keycode in their edit target.
+export function behaviourTimingChecks(model, keycode) {
+    return (model?.draft?.checks || []).filter(check => check.kind === "gestureTiming"
+        && check.status !== "fixed" && check.place?.keycode === keycode);
+}
