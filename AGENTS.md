@@ -78,12 +78,22 @@ repository's direction, which owns that text. Change a firmware decision there,
 as firmware work, not here.
 Do not put app plans or new app specifications under `upstream/`.
 
-Active plans may live in `docs/plans/`; include scope, acceptance criteria and
-remaining work. When complete, fold lasting rules into the governing document
-and delete the plan (D-L07). Test logs and session narratives belong in reports,
+Active plans live in the work-queue vault (below), not in this repository;
+include scope, acceptance criteria and remaining work. When complete, fold
+lasting rules into the governing document here and delete the plan (D-L07). Test logs and session narratives belong in reports,
 commit messages or the final handoff, not permanent finding registers. Record
 which checks actually ran and any limitations; never imply unit tests prove
 hardware acceptance.
+
+## Work queue
+
+Work is filed, refined and planned in the work-queue vault at
+`/Users/noah/dev/charybdis/charybdis-notes` (an Obsidian vault; see the
+[local workspace map](docs/REPOSITORY.md#local-development-workspace)). Its
+`AGENTS.md` says how a note becomes a task and how a task is claimed and
+handed back. It never overrides this file: every change here follows the
+rules above, whichever way the task arrived. Use its absolute path from any
+worktree; never copy it into this repository.
 
 ## Working alongside firmware agents
 

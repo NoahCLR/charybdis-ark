@@ -16,6 +16,7 @@ On Noah's development machine the workspace is
 | `/Users/noah/dev/charybdis/charybdis-4x6` | Active firmware/userspace repository owned by this project; current C implementation, tests and firmware docs |
 | `/Users/noah/dev/charybdis/bastardkb-qmk` | Upstream QMK/Bastard Keyboards checkout and build dependency; inspect its behavior without treating it as our app or userspace source |
 | `/Users/noah/dev/charybdis/builds` | Build artifacts via a local symlink, not source |
+| `/Users/noah/dev/charybdis/charybdis-notes` | Work-queue Obsidian vault (private `NoahCLR/charybdis-notes`): notes, tasks, active plans and keyboard checks for all three repositories; its `AGENTS.md` governs claiming and status |
 
 From the main Ark checkout the firmware and QMK paths are also
 `../charybdis-4x6` and `../bastardkb-qmk`. These relative paths do not necessarily
