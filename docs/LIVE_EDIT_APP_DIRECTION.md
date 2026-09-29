@@ -77,8 +77,8 @@ Remaining before calling the product complete:
   built features so the picker reads them from the device.
 - **Firmware open issues** are tracked in the firmware direction: the one-half
   power-cycle recovery transition, why a peer stops acknowledging a push or
-  fails a flash write mid-copy (D-L22, D-L27), `LT()` row tap/hold timing
-  (D-L34) and the keycode-block migration not yet run on hardware (D-L42).
+  fails a flash write mid-copy (D-L22, D-L27), physical acceptance of buffered gesture timing
+  (firmware D-F01) and the keycode-block migration not yet run on hardware (D-L42).
 
 ## The Tools
 
@@ -729,3 +729,24 @@ its identity, so on start Ark copies recovery files saved under
 `noah.charybdis-live` and `noah.charybdis-live-v2` into its own storage, never
 moving or overwriting one. Portable profiles keep the `.charybdis.json`
 extension: it names the keyboard, not the app.
+
+### D-L48 — Gesture timing advice follows firmware capability
+
+Profile Wire feature bit 17 identifies physical gesture timing. Without it,
+review and the behaviour editor warn when a reachable authored hold/repeat key
+is buffered by an enabled combo, or an authored layer-tap also waits for native
+QMK tapping. Advice names effective inherited timings and competing combo
+windows, using the connected profile and native combo reference-layer rules.
+It does not infer a safe timing from subtracting those windows.
+
+Warnings participate in the existing new/existing/fixed review and remain
+confirmable; they neither reject a legal profile nor rewrite its timings.
+Unknown offline timing semantics do not produce a firmware-defect claim. On a
+keyboard advertising bit 17, this legacy warning disappears. General guidance
+still explains double hold as press–release–press-and-hold, the released repeat
+gap, and tap/hold classification. Firmware buffering can postpone output even
+when it preserves physical gesture eligibility.
+
+The firmware owns timing semantics (D-F01 in its direction); Ark consumes the
+capability, not source code. Hardware acceptance of a particular firmware build
+is separate from recognition of its advertised policy.

@@ -22,3 +22,15 @@ test("whole-profile findings retain new and fixed status beside the keyboard", (
     const checks = draftProfileChecks(keyboard, draft, [0, 1, 2, 3, 4, 5, 6, 7], {});
     assert.equal(checks.find(row => row.kind === "inertPointing")?.status, "new");
 });
+
+test("gesture timing advice is gated by the destination firmware", () => {
+    const decoded = validateSnapshot(document());
+    // The imported layout has an authored LT; use it as a reachable witness.
+    decoded.behaviors.rows = [{target: {kind: 1, flags: 0, operand: 0x4131}, steps: [{tapIndex: 1, tap: {kind: 1, flags: 0, operand: 4}}]}];
+    assert.ok(profileFindings(decoded, {physicalGestureTiming: false}).some(x => x.kind === "gestureTiming"));
+    assert.ok(!profileFindings(decoded, {physicalGestureTiming: true}).some(x => x.kind === "gestureTiming"));
+    const draft = structuredClone(decoded);
+    draft.behaviors.rows = [];
+    const checks = draftProfileChecks(decoded, draft, undefined, {physicalGestureTiming: false});
+    assert.equal(checks.find(x => x.kind === "gestureTiming").status, "fixed");
+});

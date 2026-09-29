@@ -230,3 +230,33 @@ test("layer keys that hold or toggle Base do nothing, and are counted wherever t
     assert.deepEqual(finding.place, {kind: "key", layer: 0, layoutIndex: 0});
     assert.deepEqual(kinds(profile({keys: {"0:0": TO(0)}})), []);
 });
+
+test("legacy timing findings follow reachable physical combo members and effective defaults", () => {
+    const row = {target: code(0xd3), tapHoldTerm: 100, multiTapTerm: 0,
+        steps: [{tapIndex: 1, hold: {mode: 1, action: code(0xd7)}}]};
+    const combo = {inputs: [code(0xd3), code(KC_B)], output: code(KC_A), termMs: null};
+    const p = profile({keys: {"0:0": 0xd3, "0:1": KC_B}, rows: [row], combos: [combo], settings: {3: 150}});
+    const timing = value => layerReach(value, {legacyGestureTiming: true}).filter(x => x.kind === "gestureTiming");
+    assert.equal(timing(p).length, 1);
+    assert.match(timing(p)[0].detail, /combo 0 \(50 ms\)/);
+    assert.match(timing(p)[0].detail, /hold: 100 ms; repeated taps: 150 ms/);
+    assert.equal(timing(p)[0].level, "warning");
+    assert.equal(layerReach(p).some(x => x.kind === "gestureTiming"), false, "fixed firmware has no legacy warning");
+    p.settings.values[20] = 0;
+    assert.equal(timing(p).length, 0, "disabled combos do not buffer");
+    p.settings.values[20] = 1;
+    p.settings.values[27] = 1; // base uses raw layer 1 as combo reference
+    assert.equal(timing(p).length, 0, "reference lookup no longer matches this member");
+    p.settings.values[27] = 0x76543210;
+    p.document.layers[0].fill(KC_A);
+    assert.equal(timing(p).length, 0, "an unplaced behavior has no physical member");
+});
+
+test("legacy authored LT warning does not require combo membership", () => {
+    const key = 0x432f;
+    const p = profile({keys: {"0:0": key}, rows: [{target: code(key), steps: [{tapIndex: 1, tap: code(KC_B)}]}], settings: {0: 200, 3: 150}});
+    const checks = layerReach(p, {legacyGestureTiming: true});
+    const finding = checks.find(x => x.kind === "gestureTiming");
+    assert.match(finding.detail, /QMK also decides tap or hold/);
+    assert.match(finding.detail, /hold: 200 ms/);
+});

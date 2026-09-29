@@ -14,6 +14,10 @@ The product direction lives in
 the interface direction with its clickable prototype lives in
 [`design/`](design/README.md).
 
+Review and the behaviour editor explain combo/tap timing risks on older
+firmware, using the connected profile. Firmware with physical gesture timing
+(feature bit 17) is recognized without changing the layout or tuning values.
+
 ## Develop independently
 
 Open this folder directly in VS Code. Use Node 26.10.0 (`nvm use` with the

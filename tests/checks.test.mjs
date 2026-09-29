@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {checkGroups, checkSourceGroup, checkTags, checksToConfirm, confirmText} from "../webview/view/checks.mjs";
+import {behaviourTimingChecks, checkGroups, checkSourceGroup, checkTags, checksToConfirm, confirmText} from "../webview/view/checks.mjs";
 
 const check = (level, status, title = `${level} ${status}`) => ({level, status, title, key: title});
 
@@ -61,4 +61,12 @@ test("a check's tags say its level, and where it comes from unless it is new", (
     assert.deepEqual(checkTags(check("trap", "new")), ["Trap"]);
     assert.deepEqual(checkTags(check("notice", "existing")), ["Notice", "on the keyboard"]);
     assert.deepEqual(checkTags(check("warning", "fixed")), ["Warning", "fixed"]);
+});
+
+test("behaviour editor shows only current timing findings for its target", () => {
+    const warning = {kind: "gestureTiming", status: "existing", place: {keycode: "QK_MOUSE_BUTTON_3"}};
+    const model = {draft: {checks: [warning, {...warning, status: "fixed"}, {...warning, kind: "trap"},
+        {...warning, place: {keycode: "KC_A"}}]}};
+    assert.deepEqual(behaviourTimingChecks(model, "QK_MOUSE_BUTTON_3"), [warning]);
+    assert.deepEqual(behaviourTimingChecks({}, "KC_A"), []);
 });

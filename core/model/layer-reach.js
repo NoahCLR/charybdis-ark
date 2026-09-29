@@ -28,6 +28,7 @@
 // a one-shot counts as a hold, so the walk finds every way out a person could
 // find and at most a few they could not. It never invents a trap.
 
+const {effectiveComboTerm} = require("../schema/combo-domain-v1");
 const keycodes = require("../data/keycode-catalog");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../data/charybdis-layout");
 const {layerLockOfCode} = require("../data/user-keycodes");
@@ -405,6 +406,42 @@ function findings(facts, walked) {
     return results;
 }
 
+// QMK buffers a matching member even when the remaining chord members are
+// absent. Match each reachable physical position through its reference layer;
+// the behavior still belongs to the key resolved on the active layer stack.
+function gestureTimingFindings(decoded, facts, walked) {
+    const affected = new Map();
+    for (const active of walked.cache.keys()) {
+        const reference = facts.comboLayer(highest(active));
+        facts.layers[0].forEach((_, position) => {
+            const key = resolve(facts, active, position);
+            const row = facts.rows.get(key?.code);
+            if (!row) return;
+            const nativeLayerTap = key.code >= 0x4000 && key.code <= 0x4fff;
+            const repeated = row.steps.some(step => step.tapIndex > 0);
+            const held = row.steps.some(step => step.hold || step.longHold);
+            if (!nativeLayerTap && !repeated && !held) return;
+            const comboCode = reference === highest(active) ? key.code : facts.layers[reference]?.[position];
+            const members = facts.combos.filter(combo => combo.inputs.includes(comboCode));
+            if (!nativeLayerTap && !members.length) return;
+            const entry = affected.get(key.code) || {row, nativeLayerTap, combos: new Set()};
+            members.forEach(combo => entry.combos.add(combo.index));
+            affected.set(key.code, entry);
+        });
+    }
+    return [...affected].map(([code, {row, nativeLayerTap, combos}]) => {
+        const repeat = row.multiTapTerm || decoded.settings.values[3];
+        const hold = row.tapHoldTerm || decoded.settings.values[nativeLayerTap ? 0 : 1];
+        const competing = [...combos].sort((a,b) => a-b).map(index => `combo ${index} (${effectiveComboTerm(decoded.combos, decoded.combos.rows[index])} ms)`);
+        const reason = competing.length ? `This key also waits for ${competing.join(", ")}. ` : "";
+        return {kind: "gestureTiming", level: LEVELS.WARNING, layers: [], identity: String(code),
+            title: `${codeName(code)} has timing affected by input buffering`,
+            detail: `${reason}This firmware does not report physical gesture timing. Buffering can delay holds${row.steps.some(step => step.tapIndex > 0) ? " or make an on-time second press miss its repeat window" : ""}.${nativeLayerTap ? " QMK also decides tap or hold before this authored behaviour runs." : ""} Effective tap / hold: ${hold} ms; repeated taps: ${repeat} ms.`,
+            fix: "Use firmware with physical gesture timing. Longer timings can help repeated taps on older firmware, but also delay actions. Double hold means press, release, then press and keep holding.",
+            place: {kind: "behaviour", keycode: codeName(code)}};
+    });
+}
+
 // A finding's identity across two profiles: what kind it is and which layers it
 // is about, named by the keyboard layer each slot holds (`order[slot]`, as
 // model/layer-order.js keeps it).
@@ -412,10 +449,11 @@ const IDENTITY = Object.freeze([0, 1, 2, 3, 4, 5, 6, 7]);
 const findingKey = (finding, order = IDENTITY) => `${finding.kind}:${finding.layers.map((slot) => order[slot]).sort((a, b) => a - b).join(",")}${finding.identity === undefined ? "" : `:${finding.identity}`}`;
 
 // The findings for a validated profile.
-function layerReach(decoded) {
+function layerReach(decoded, {legacyGestureTiming = false} = {}) {
     if (decoded?.document?.layers?.length !== LAYERS) return [];
     const facts = profileFacts(decoded);
-    return findings(facts, walk(facts));
+    const walked = walk(facts);
+    return [...findings(facts, walked), ...(legacyGestureTiming ? gestureTimingFindings(decoded, facts, walked) : [])];
 }
 
 // The findings for a draft beside its keyboard's: each finding in the draft is

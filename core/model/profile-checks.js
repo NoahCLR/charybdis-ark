@@ -8,7 +8,7 @@ const {baseLighting} = require("./settings-editor");
 const {macroProgramBytes, MACRO_PROGRAM_MAX} = require("../schema/macro-payload");
 
 function profileFindings(decoded, destination = {}) {
-    const findings = layerReach(decoded);
+    const findings = layerReach(decoded, {legacyGestureTiming: destination.physicalGestureTiming === false});
     for (const [slot, count] of Object.entries(decoded.danglingPdBindings || {})) {
         if (!count) continue;
         findings.push({kind: "inertPointing", level: "warning", layers: [], identity: `${slot}:${count}`, count,

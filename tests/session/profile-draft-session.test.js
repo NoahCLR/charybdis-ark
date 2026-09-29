@@ -375,3 +375,14 @@ test("edits link by the layer they touched, so a reorder between them ties nothi
     assert.equal(groupOf(draft,"layout:2:0"),groupOf(draft,"layout:2:1"));
     assert.notEqual(groupOf(draft,"layout:3:0"),groupOf(draft,"layout:2:0"),"Navigation's keys are another edit");
 });
+
+test("draft checks use the connected firmware's physical gesture capability", () => {
+    const {snapshot, caps} = fixture();
+    const row = behaviorRowsForView(validateSnapshot(snapshot.document).behaviors).find(row => row.keycode.startsWith("LT("));
+    assert.ok(row, "fixture includes an authored layer-tap");
+    for (const fixed of [false, true]) {
+        const draft = new ProfileDraftSession(snapshot, "board", {...caps, featureFlags: fixed ? 1 << 17 : 0});
+        stage(draft, {type: "updateLayoutKeys", layers: [{layer: "Layer 0", changes: [{layoutIndex: 0, keycode: row.keycode}]}]});
+        assert.equal(draft.checks().some(check => check.kind === "gestureTiming" && check.place.keycode === row.keycode), !fixed);
+    }
+});
