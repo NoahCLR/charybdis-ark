@@ -49,7 +49,7 @@ Bare firmware paths in imported documents refer to the source repository, not
 this checkout. Historical decisions and the static design prototype are context,
 not evidence of current hardware behavior.
 
-Generated previews belong in ignored `dev/`. Compatibility reports belong
+Generated previews belong in ignored `preview/`. Compatibility reports belong
 outside the three tested checkouts, as required by the bridge. Put verification
 commands/results in commit messages and handoffs. Physical measurements remain
 owned by the firmware project's measurement procedures; link their evidence

@@ -4,7 +4,7 @@
 // fixtures, with no keyboard attached.
 //
 // This is a build step, not part of the app: it runs by hand, writes into
-// `dev/`, and nothing under `webview/` ever reads a file.
+// `preview/`, and nothing under `webview/` ever reads a file.
 
 const fs = require("node:fs");
 const path = require("node:path");
@@ -123,7 +123,7 @@ const model = process.argv.includes("--device") ? deviceModel() : buildModel();
 // `--vscode` also writes the page as the panel actually renders it: the host
 // puts its own stylesheet in front of this one (a cascade layer that dresses
 // <code> and pads the body) and hangs its theme class on <body>. Both of those
-// have broken this interface before, and neither is visible in dev/index.html.
+// have broken this interface before, and neither is visible in preview/index.html.
 function writeHostPages(page) {
     const root = "/Applications/Visual Studio Code.app/Contents/Resources/app";
     const shell = path.join(root, "out/vs/workbench/contrib/webview/browser/pre/index.html");
@@ -146,15 +146,15 @@ function writeHostPages(page) {
             + `  --vscode-font-family: -apple-system, sans-serif;\n  --vscode-font-size: 13px;\n`
             + `  --monaco-monospace-font: "SF Mono", Menlo, monospace;\n${declarations}\n}\n`
             + `html, body { background: var(--vscode-editor-background); }\n</style>\n`;
-        fs.writeFileSync(path.join(__dirname, "..", "dev", `vscode-${label}.html`),
+        fs.writeFileSync(path.join(__dirname, "..", "preview", `vscode-${label}.html`),
             page.replace("<body>", `<body class="vscode-body ${klass}">`).replace("<link rel=", injected + "<link rel="));
-        console.log(`written dev/vscode-${label}.html`);
+        console.log(`written preview/vscode-${label}.html`);
     }
 }
 
 Promise.resolve(model).then((model) => {
-fs.mkdirSync(path.join(__dirname, "..", "dev"), {recursive: true});
-fs.writeFileSync(path.join(__dirname, "..", "dev", "model.json"), JSON.stringify(model));
+fs.mkdirSync(path.join(__dirname, "..", "preview"), {recursive: true});
+fs.writeFileSync(path.join(__dirname, "..", "preview", "model.json"), JSON.stringify(model));
 const page = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <title>Charybdis Ark — preview</title>
@@ -192,7 +192,7 @@ if (wantedScreen) {
 <script type="module" src="../webview/app.mjs?built=${Date.now()}"></script>
 </body></html>
 `;
-fs.writeFileSync(path.join(__dirname, "..", "dev", "index.html"), page);
+fs.writeFileSync(path.join(__dirname, "..", "preview", "index.html"), page);
 if (process.argv.includes("--vscode")) writeHostPages(page);
 console.log("layers", model.layers.length,
     "· behaviours", model.keyBehaviors.length,
@@ -201,5 +201,5 @@ console.log("layers", model.layers.length,
     "· macros", model.viaMacros.length,
     "· settings sections", model.configDefaults.length,
     "· rgb layer rows", model.rgb.layerColors?.length);
-console.log("written dev/index.html");
+console.log("written preview/index.html");
 }).catch((error) => {console.error(String(error.message || error)); process.exit(1);});

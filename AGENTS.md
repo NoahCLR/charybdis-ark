@@ -63,7 +63,7 @@ docs/               app-owned product direction, specs and contributor workflows
 upstream/           pinned external contracts and inputs; read its AGENTS.md
 scripts/            developer entry points and build steps
 tests/              mirrors core/, plus the view modules and the posted payloads
-dev/                ignored generated previews, never authoritative source
+preview/            ignored generated previews, never authoritative source
 ```
 
 ## Documentation ownership
@@ -210,7 +210,7 @@ Every layer may also import from itself.
 ```sh
 npm run check                 # syntax across the tree, then all tests
 npm run keycodes -- --check   # fails if the vendored catalog has drifted
-npm run preview               # then serve the folder and open dev/index.html
+npm run preview               # then serve the folder and open preview/index.html
 ```
 
 Run `npm ci` when dependencies change. Run targeted tests during development,
@@ -229,17 +229,17 @@ make extraction or a protocol change pass.
 
 ### Checking it the way the panel renders it
 
-`dev/index.html` is this interface alone. The panel is this interface *inside*
+`preview/index.html` is this interface alone. The panel is this interface *inside*
 the host's own stylesheet, which arrives in a cascade layer — so it loses to
 every property this sheet declares, and wins every property it does not. That
 has already cost us twice: `body { padding: 0 20px }` squeezed the whole app,
 and the host's `code { background; color; padding; border-radius }` turned every
 inline keycode into a coloured chip in a black-and-white interface.
 
-`npm run preview -- --vscode` writes `dev/vscode-dark.html` and
-`dev/vscode-light.html`: the same page with the host's real stylesheet and theme
+`npm run preview -- --vscode` writes `preview/vscode-dark.html` and
+`preview/vscode-light.html`: the same page with the host's real stylesheet and theme
 colours read out of the installed app, under the theme class it puts on `<body>`.
-Look at a new surface there, not only in `dev/index.html`.
+Look at a new surface there, not only in `preview/index.html`.
 
 ### Proving a control is wired
 
