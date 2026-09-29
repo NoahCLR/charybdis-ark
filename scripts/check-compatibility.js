@@ -8,8 +8,8 @@ const {createHash} = require("node:crypto");
 const RUNNERS = ["qmk_portable_editor", "qmk_portable_profile", "macro_program_size", "profile_compiled_defaults_v1", "profile_pd_v1"]
     .map(name => `tests/integration/run_${name}_tests.sh`);
 const usage = "npm run test:compat -- --firmware PATH --ark PATH --qmk PATH --report NEW_FILE.json [--publish]";
-// A pin is published when the firmware checkout's last-fetched main contains it.
-const PUBLISHED_REF = "refs/remotes/origin/main";
+// A pin is published when the firmware checkout's last-fetched dev, its trunk, contains it.
+const PUBLISHED_REF = "refs/remotes/origin/dev";
 
 function parse(argv) {
     const flags = {};
@@ -87,7 +87,7 @@ function run(argv) {
         if (report.upstream.specs.length) console.log(`\nWarning: upstream/ specs lag the selected firmware (pinned ${report.upstream.pin}):\n${report.upstream.specs.map(describe).join("\n")}`);
         if (!report.upstream.pinPublished) {
             const message = `upstream/ pins firmware ${report.upstream.pin}, which the firmware checkout's ${PUBLISHED_REF} does not contain`;
-            if (flags.publish) { console.error(`\n${message}. Push and merge that commit, or re-pin to one on main, before publishing (upstream/README.md).`); return 1; }
+            if (flags.publish) { console.error(`\n${message}. Push and merge that commit, or re-pin to one on dev, before publishing (upstream/README.md).`); return 1; }
             console.log(`\nWarning: ${message}; fine locally, but --publish will fail.`);
         }
         if (report.upstream.fixtures.length) {

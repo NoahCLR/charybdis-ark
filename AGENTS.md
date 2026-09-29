@@ -7,7 +7,8 @@ Start with `git status --short`, then read the setup in [README.md](README.md)
 and the reading map in [docs/README.md](docs/README.md). Read Current Product
 Status and Open Issues in [the direction](docs/LIVE_EDIT_APP_DIRECTION.md)
 before changing behavior; read its relevant decisions before architecture work.
-The interface direction and its prototype are in [design/](design/README.md).
+The interface's rules are in the README's "The interface" section and the
+direction's decisions; `npm run preview` renders the real interface.
 
 ## Repository ownership
 
@@ -58,12 +59,11 @@ webview/            the interface: browser ES modules, no build step
   view/             model → presentation (pure, tested)
   ui/               screens and components
   styles.css        the design system
-design/             the interface direction and its clickable prototype
 docs/               app-owned product direction, specs and contributor workflows
 upstream/           pinned external contracts and inputs; read its AGENTS.md
 scripts/            developer entry points and build steps
 tests/              mirrors core/, plus the view modules and the posted payloads
-dev/                ignored generated previews, never authoritative source
+preview/            ignored generated previews, never authoritative source
 ```
 
 ## Documentation ownership
@@ -94,6 +94,21 @@ Work is filed, refined and planned in the work-queue vault at
 handed back. It never overrides this file: every change here follows the
 rules above, whichever way the task arrived. Use its absolute path from any
 worktree; never copy it into this repository.
+
+## Branches
+
+`dev` is the trunk. Branch each task from `dev` in its own worktree and
+squash-land it back onto `dev` locally when Noah says so; pull requests are
+optional. `main` is the released line and only moves by the vault's
+`_agents/bin/promote`, a merge commit whose tree is exactly `dev`'s. Landed
+commits, promotions and release tags carry trailers naming the firmware and QMK
+commits they were tested with (`Stack-Firmware`, `Stack-QMK`, `Ark-Pins`,
+`Stack-Tested`); the tools write them. A pull request body carries the same
+block (`_agents/bin/stack --for ark`). Push only to `NoahCLR/charybdis-ark`. The work-queue vault's
+`_agents/bin/verify` runs this file's checks for what a branch changed
+(adding the compatibility bridge for wire, schema or `upstream/` changes),
+and `_agents/bin/land` squash-lands a branch onto `dev` after verifying it. A pin to firmware or QMK names a
+commit on that repository's trunk, taken after its squash landing.
 
 ## Working alongside firmware agents
 
@@ -195,7 +210,7 @@ Every layer may also import from itself.
 ```sh
 npm run check                 # syntax across the tree, then all tests
 npm run keycodes -- --check   # fails if the vendored catalog has drifted
-npm run preview               # then serve the folder and open dev/index.html
+npm run preview               # then serve the folder and open preview/index.html
 ```
 
 Run `npm ci` when dependencies change. Run targeted tests during development,
@@ -214,17 +229,17 @@ make extraction or a protocol change pass.
 
 ### Checking it the way the panel renders it
 
-`dev/index.html` is this interface alone. The panel is this interface *inside*
+`preview/index.html` is this interface alone. The panel is this interface *inside*
 the host's own stylesheet, which arrives in a cascade layer — so it loses to
 every property this sheet declares, and wins every property it does not. That
 has already cost us twice: `body { padding: 0 20px }` squeezed the whole app,
 and the host's `code { background; color; padding; border-radius }` turned every
 inline keycode into a coloured chip in a black-and-white interface.
 
-`npm run preview -- --vscode` writes `dev/vscode-dark.html` and
-`dev/vscode-light.html`: the same page with the host's real stylesheet and theme
+`npm run preview -- --vscode` writes `preview/vscode-dark.html` and
+`preview/vscode-light.html`: the same page with the host's real stylesheet and theme
 colours read out of the installed app, under the theme class it puts on `<body>`.
-Look at a new surface there, not only in `dev/index.html`.
+Look at a new surface there, not only in `preview/index.html`.
 
 ### Proving a control is wired
 

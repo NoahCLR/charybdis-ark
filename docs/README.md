@@ -16,7 +16,6 @@ source and worktrees; `upstream/` is the pinned baseline, not that checkout.
 | [REPOSITORY.md](REPOSITORY.md) | Repository ownership, source provenance and environment boundaries | Starting in a new checkout |
 | [COMPATIBILITY.md](COMPATIBILITY.md) | Explicit cross-repository integration workflow | Changing wire formats, schemas or shared codec assumptions |
 | [core/README.md](../core/README.md) | Runtime data flow and adapter contract | Working in core or the extension shell |
-| [design/README.md](../design/README.md) | Visual and interaction direction | Working on UI |
 | [upstream/README.md](../upstream/README.md) | Imported inputs, provenance and update procedure | Reading or updating firmware/QMK contracts |
 
 ## Where new documents belong
@@ -28,7 +27,6 @@ locations only when a new document is warranted; create directories as needed.
 | --- | --- |
 | `docs/architecture/<subject>.md` | App-owned technical contracts too substantial for the direction or core guide |
 | `docs/<workflow>.md` | Contributor procedures, setup and integration workflows |
-| `design/` | App UI principles, design assets and illustrative prototypes |
 | `upstream/` | Imported source snapshots only, governed by its manifest and instructions |
 
 Link new durable documents from this map or the document that governs them.
@@ -46,10 +44,10 @@ describe the client; imported firmware specifications describe the pinned
 upstream revision. New app decisions cannot redefine a firmware wire contract.
 Coordinate such changes with firmware and run the compatibility bridge.
 Bare firmware paths in imported documents refer to the source repository, not
-this checkout. Historical decisions and the static design prototype are context,
-not evidence of current hardware behavior.
+this checkout. Historical decisions are context, not evidence of current
+hardware behavior.
 
-Generated previews belong in ignored `dev/`. Compatibility reports belong
+Generated previews belong in ignored `preview/`. Compatibility reports belong
 outside the three tested checkouts, as required by the bridge. Put verification
 commands/results in commit messages and handoffs. Physical measurements remain
 owned by the firmware project's measurement procedures; link their evidence

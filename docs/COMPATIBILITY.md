@@ -27,7 +27,7 @@ pinned spec that differs only lags: it is printed as a warning and listed under
 `upstream.specs` in the report. Review it deliberately; it does not fail.
 
 It also records whether the pinned firmware commit is published: contained in
-the firmware checkout's `refs/remotes/origin/main`. The bridge never fetches,
+the firmware checkout's `refs/remotes/origin/dev`, its trunk. The bridge never fetches,
 so fetch that checkout first for a current answer. An unpublished pin is a
 warning during local work. With `--publish`, it fails before any runner starts;
 run that form before pushing an Ark change that moves a pin.

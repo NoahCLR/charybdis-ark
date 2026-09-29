@@ -10,9 +10,8 @@ This is the app. Authored C defaults are edited directly in the firmware
 repository. Its source repository is
 [NoahCLR/charybdis-ark](https://github.com/NoahCLR/charybdis-ark).
 The product direction lives in
-[`docs/LIVE_EDIT_APP_DIRECTION.md`](docs/LIVE_EDIT_APP_DIRECTION.md), and
-the interface direction with its clickable prototype lives in
-[`design/`](design/README.md).
+[`docs/LIVE_EDIT_APP_DIRECTION.md`](docs/LIVE_EDIT_APP_DIRECTION.md); the
+interface's rules are under [The interface](#the-interface) below.
 
 Review and the behaviour editor explain combo/tap timing risks on older
 firmware, using the connected profile. Firmware with physical gesture timing
@@ -196,9 +195,9 @@ being read back, while the editor stays visible and temporarily busy.
 ```sh
 npm ci
 npm run check           # syntax across the tree, then all tests
-npm run preview         # build dev/model.json from the test fixtures
+npm run preview         # build preview/model.json from the test fixtures
 npm run preview -- --device  # …or from the keyboard that is plugged in, read-only
-npm run preview -- --vscode  # also write dev/vscode-{dark,light}.html, as the panel renders
+npm run preview -- --vscode  # also write preview/vscode-{dark,light}.html, as the panel renders
 npm run probe:live-link # read-only enumeration of matching HID interfaces
 npm run keycodes -- --check # verify the catalog against the local pinned QMK inputs
 npm run keycodes           # regenerate from those same inputs
@@ -227,7 +226,7 @@ panel also opens from the command palette — **Charybdis: Open Charybdis Ark** 
 launches an Extension Development Host with a debugger attached instead.
 
 To work on the interface without a keyboard, run `npm run preview`, serve this
-folder (`python3 -m http.server 8972`) and open `dev/index.html`. The preview
+folder (`python3 -m http.server 8972`) and open `preview/index.html`. The preview
 stands in for the extension host: it answers the webview's `ready` with one
 fixture model and logs every edit the interface posts back.
 Use `npm run preview -- --multiple --vscode` to inspect the selector with two
