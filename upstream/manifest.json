@@ -9,9 +9,9 @@
       "repository": "https://github.com/NoahCLR/bastardkb-qmk",
       "commit": "aac9f637ee4ad99fe8f962372b9dfd56be538703"
     },
-    "firmware-owned-tapping": {
+    "firmware-gesture-hardening": {
       "repository": "https://github.com/NoahCLR/charybdis-4x6",
-      "commit": "79f8ef6ae2399aadffd8a2bff5fce1514691c03f"
+      "commit": "b2d004fec56fcbc5c743f3fc1cd2ae3c3823309e"
     }
   },
   "files": [
@@ -49,10 +49,10 @@
     },
     {
       "path": "upstream/firmware/docs/architecture/memory-budgets.md",
-      "source": "firmware",
+      "source": "firmware-gesture-hardening",
       "sourcePath": "docs/architecture/memory-budgets.md",
-      "sourceSha256": "1f75574b84d1deacf5709d7e98b2c633605ccc4ceca0ec4d1d366d6ed30dcd7e",
-      "sha256": "1f75574b84d1deacf5709d7e98b2c633605ccc4ceca0ec4d1d366d6ed30dcd7e",
+      "sourceSha256": "5ff53543c42383d24d6a65c6cde50bea1b7118589ad8a16fa74324007ba946a6",
+      "sha256": "5ff53543c42383d24d6a65c6cde50bea1b7118589ad8a16fa74324007ba946a6",
       "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
     },
     {
@@ -81,10 +81,10 @@
     },
     {
       "path": "upstream/firmware/docs/architecture/profile-wire-v1.md",
-      "source": "firmware-owned-tapping",
+      "source": "firmware-gesture-hardening",
       "sourcePath": "docs/architecture/profile-wire-v1.md",
-      "sourceSha256": "eabbeba9037eca7adbba90290fafea2418699583b1736ff80634c741e4a3e614",
-      "sha256": "eabbeba9037eca7adbba90290fafea2418699583b1736ff80634c741e4a3e614",
+      "sourceSha256": "0f1ce6b0fedaf816fc2cd8b6c52b740a1dcc1e73727d309623b08b68ad8d4906",
+      "sha256": "0f1ce6b0fedaf816fc2cd8b6c52b740a1dcc1e73727d309623b08b68ad8d4906",
       "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
     },
     {

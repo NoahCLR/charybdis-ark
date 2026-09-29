@@ -5,7 +5,7 @@ import {css, isOff, label as hsvLabel} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {scrollContentTo} from "../lib/scroll.mjs";
 import {LED_INDEX} from "../view/geometry.mjs";
-import {actionLabel, behaviourFor, cellLabel, behaviourListeningTo, resolvedPositions, canonicalKeycode, behaviourGridSteps, behaviourGroups, behavioursInView, behaviourRouteKeys, behaviourTiers, comboAnswers, comboGroups, combosInView, comboInputKeys, comboInputShown, combosOnKey, combosAt, keyFace, keyMeaning, keyName, macroKeycodes, macroReach, pointingReach, pointingSlotFor, pointingVariant, reachInView, reachKeys, toggleComboInput, visibleKeycode} from "../view/keyface.mjs";
+import {actionLabel, behaviourFor, cellLabel, inheritedBranch, behaviourListeningTo, resolvedPositions, canonicalKeycode, behaviourGridSteps, behaviourGroups, behavioursInView, behaviourRouteKeys, behaviourTiers, comboAnswers, comboGroups, combosInView, comboInputKeys, comboInputShown, combosOnKey, combosAt, keyFace, keyMeaning, keyName, macroKeycodes, macroReach, pointingReach, pointingSlotFor, pointingVariant, reachInView, reachKeys, toggleComboInput, visibleKeycode} from "../view/keyface.mjs";
 import {feedbackColours, layerColourRow, mappedKeyCount, pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {closeComboBuilder, currentLayer, getModel, heldLayers, layerName, layers, openComboBuilder, positionAt, post, previewing, render, selectedPosition, showLayer, state, writable, canEdit as canEditArea} from "../store.mjs";
 import * as edits from "../view/edits.mjs";
@@ -452,6 +452,14 @@ function behaviourEditor(behaviour) {
         const branch = step[TIER_FIELDS[kind]];
         const id = `${step.tapCount}-${kind}`;
         const open = state.cell === id;
+        const inherited = inheritedBranch(behaviour, step, kind);
+        if (!branch && inherited) {
+            const label = cellLabel(model, inherited);
+            return `<button class="bcell inherited ${open ? "on" : ""}" data-cell="${id}"
+                data-tip="What this key does on its own. Set an action here to replace it.">
+                <span class="bk named">${esc(label)}</span>
+                <span class="bl">${esc(["built in", helperLabel(kind, inherited.helper)].join(" · "))}</span></button>`;
+        }
         if (!branch) return `<button class="bcell empty ${open ? "on" : ""}" data-cell="${id}"><span class="plus">+</span></button>`;
         // The grid reads by name; the keycode is on hover and in the editor.
         const label = cellLabel(model, branch);
@@ -494,7 +502,7 @@ function behaviourEditor(behaviour) {
                 ${steps.map((step) => cellFor(step, kind)).join("")}`).join("")}
         </div>
         <div id="cellEditor"></div>
-        <p class="note" style="margin-top:12px">Every cell is one action: what it sends, and how it runs once its threshold passes. Empty cells are dropped when the profile is applied.</p>
+        <p class="note" style="margin-top:12px">Every cell is one action: what it sends, and how it runs once its threshold passes. Empty cells are dropped when the profile is applied.${Object.keys(behaviour.builtIn || {}).length ? " A built-in cell is what the key does on its own; it is not stored, and setting an action there replaces it." : ""}</p>
     </div>`);
 
     node.querySelectorAll("[data-cell]").forEach((button) => button.addEventListener("click", () => {

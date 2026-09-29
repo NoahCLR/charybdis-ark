@@ -622,6 +622,10 @@ button.tier:hover { background: var(--surface-3); }
 .bcell .bl { font-size: 10.5px; color: var(--text-3); }
 .bcell.empty { border-style: dashed; background: none; }
 .bcell.empty .plus { color: var(--text-3); font-size: 14px; }
+/* The key's own action where the row leaves a first-press tier empty: present,
+   but not stored in the row, so it keeps the empty cell's dashed edge. */
+.bcell.inherited { border-style: dashed; background: none; }
+.bcell.inherited .bk { color: var(--text-2); }
 .cell-editor { margin-top: 14px; border: 1px solid var(--line-2); border-radius: 10px; background: var(--surface-2); overflow: hidden; }
 .ce-head { display: flex; align-items: center; gap: 10px; padding: 10px 13px; border-bottom: 1px solid var(--line); }
 .ce-head h4 { font-size: 13px; }

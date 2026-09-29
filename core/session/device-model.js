@@ -67,7 +67,7 @@ function buildDeviceModel(state = {}) {
         pdModes: (state.committed?.domains?.pdModes || []).map((slot) => ({...slot, displayName: slotName(slot), binding: PD_BINDINGS[slot.id]})),
         pdModeEditing: {writable: Boolean(state.capabilities?.supportedDomainMask & 16) && state.committed?.state === "read" && !state.committed.failures?.length && !state.busy,
             dpiChoices: dpiChoices({normalSpeed: true})},
-        keyBehaviors: committedKeyBehaviors(state.committed),
+        keyBehaviors: committedKeyBehaviors(state.committed, state.capabilities),
         behaviorEditing: {
             busy: Boolean(state.busy),
             writable: Boolean(state.capabilities?.supportedDomainMask & 2) && state.committed?.state === "read" && !state.committed.failures?.length && !state.busy,
@@ -191,12 +191,16 @@ function committedRgb(committed) {
     return committed?.state === "read" && committed.domains?.rgb ? rgbForView(committed.domains.rgb) : {};
 }
 
-function committedKeyBehaviors(committed) {
+function committedKeyBehaviors(committed, capabilities) {
     const decoded = committed?.state === "read" ? committed.domains?.keyBehaviors : undefined;
     if (!decoded) {
         return [];
     }
-    return behaviorRowsForView(decoded);
+    const flags = capabilities?.featureFlags || 0;
+    return behaviorRowsForView(decoded, {
+        physicalGestureTiming: Boolean(flags & PROFILE_WIRE_FEATURES.PHYSICAL_GESTURE_TIMING),
+        ownedTapping: Boolean(flags & PROFILE_WIRE_FEATURES.OWNED_TAPPING),
+    });
 }
 
 function deviceHeader(state) {

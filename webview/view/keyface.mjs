@@ -408,6 +408,16 @@ export function behaviourGridSteps(behaviour, advertisedMaximum = 5) {
     return Array.from({length: maximum}, (_, tapCount) => populated.get(tapCount) || {tapCount});
 }
 
+// What the keyboard does for a first-press tier the row leaves empty: the key's
+// own tap or hold (core/model/built-in-behavior.js). An authored cell, a later
+// press and a key with nothing built in inherit nothing, so their cells stay empty.
+const BUILT_IN_TIERS = {tap: "tap", hold: "hold"};
+export function inheritedBranch(behaviour, step, kind) {
+    const field = BUILT_IN_TIERS[kind];
+    if (!field || step?.tapCount !== 0 || step[field]) return null;
+    return behaviour?.builtIn?.[field] || null;
+}
+
 // Whether this key is one of a combo's inputs. The keyboard reports per-layer
 // input references only when its firmware tracks them, so this falls back to
 // the keycodes themselves — and everything that answers "is this combo on this

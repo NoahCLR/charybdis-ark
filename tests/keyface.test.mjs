@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import keyNames from "../core/model/key-names.js";
 import test from "node:test";
 import {createRequire} from "node:module";
-import {behaviourFor, cellLabel, comboAnswers, comboInputKeys, comboInputShown, combosOnKey, comboReferenceLayer, combosAt, behaviourListeningTo, canonicalKeycode, behaviourGridSteps, behaviourGroups, behavioursInView, behaviourRouteKeys, behaviourTiers, macroReach, pointingReach, reachInView, reachablePositions, resolvedPositions, bindingKeycode, bindingsForSlot, comboGroups, combosInView, combosForKey, keyFace, keyMeaning, keyName, layerOfKeycode, macroKeycodes, macroPlacements, customKeyPlacements, macroAction, namedAction, pointingAction, pointingSlotFor, reachKeys, slotKeycodes, toggleComboInput, visibleKeycode} from "../webview/view/keyface.mjs";
+import {behaviourFor, cellLabel, inheritedBranch, comboAnswers, comboInputKeys, comboInputShown, combosOnKey, comboReferenceLayer, combosAt, behaviourListeningTo, canonicalKeycode, behaviourGridSteps, behaviourGroups, behavioursInView, behaviourRouteKeys, behaviourTiers, macroReach, pointingReach, reachInView, reachablePositions, resolvedPositions, bindingKeycode, bindingsForSlot, comboGroups, combosInView, combosForKey, keyFace, keyMeaning, keyName, layerOfKeycode, macroKeycodes, macroPlacements, customKeyPlacements, macroAction, namedAction, pointingAction, pointingSlotFor, reachKeys, slotKeycodes, toggleComboInput, visibleKeycode} from "../webview/view/keyface.mjs";
 
 // Slots come from the host with their binding keycodes; the tests use the
 // host's own registry rather than a copy of it.
@@ -851,4 +851,16 @@ test("a behaviour cell reads by the host's name for its key, and by its keycode 
     assert.equal(cellLabel(model, {action: "LOCK_LAYER(1)"}), "Lock Numbers");
     assert.equal(cellLabel(model, {action: "LT(1,KC_F)"}), "F / Numbers");
     assert.equal(cellLabel(model, {action: "QK_BOOT"}), "QK_BOOT", "no clean name: the keycode is the label");
+});
+
+test("only an empty first-press tap or hold inherits the key's own action", () => {
+    const hold = {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "LSFT(KC_NO)", label: "Shift"};
+    const tap = {helper: "TAP_SENDS", action: "KC_S", label: "S"};
+    const behaviour = {keycode: "MT(MOD_LSFT,KC_S)", builtIn: {tap, hold}};
+    assert.equal(inheritedBranch(behaviour, {tapCount: 0}, "hold"), hold);
+    assert.equal(inheritedBranch(behaviour, {tapCount: 0}, "tap"), tap);
+    assert.equal(inheritedBranch(behaviour, {tapCount: 0, hold: {action: "KC_A"}}, "hold"), null, "an authored cell replaces it");
+    assert.equal(inheritedBranch(behaviour, {tapCount: 1}, "hold"), null, "later presses have no built-in action");
+    assert.equal(inheritedBranch(behaviour, {tapCount: 0}, "long"), null, "no key has a built-in long hold");
+    assert.equal(inheritedBranch({keycode: "KC_A", builtIn: {}}, {tapCount: 0}, "hold"), null);
 });

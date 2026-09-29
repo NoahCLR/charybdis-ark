@@ -93,7 +93,10 @@ menus open only with an editable draft.
 
 Underneath it, one workbench whose tabs are the key, its behaviour, its combos,
 and the macros and pointing modes the layer reaches. A behaviour is tap count ×
-tier, so it is drawn as a grid. **Change key…** moves a behaviour to another
+tier, so it is drawn as a grid. A dual-role key's empty first tap or hold
+shows, dashed and marked "built in", what the key does there on its own: an
+`LT()` taps its key and holds its layer, an `MT()` or `OSM()` holds its
+modifiers. **Change key…** moves a behaviour to another
 key through the keycode picker; when that key already has one, you choose to
 overwrite it, swap the two, or cancel, and either is one undoable draft step.
 On a keyboard that owns its layer keys (Profile Wire feature bit 14), a

@@ -22,6 +22,15 @@ test("the picker offers TT, OSL and TO only when the keyboard owns its layer key
     assert.equal(buildDeviceModel({capabilities: {featureFlags: 1 << 14}}).ownsLayerKeys, true);
 });
 
+test("behaviour rows claim built-in first actions from the keyboard's advertised features", () => {
+    const committed = decodedDeviceProfile();
+    const rows = (featureFlags) => buildDeviceModel({capabilities: {featureFlags}, committed}).keyBehaviors;
+    const claims = (list) => list.filter((row) => Object.keys(row.builtIn).length).map((row) => row.keycode);
+    const lt = claims(rows(1 << 17)).filter((keycode) => keycode.startsWith("LT("));
+    assert.ok(lt.length > 0, "the fixture's LT row inherits its tap and layer hold on bit 17 firmware");
+    assert.deepEqual(claims(rows(0)), [], "older firmware claims nothing");
+});
+
 // The ported Studio UI renders whatever shape it is given, so these assertions
 // pin the contract between the device and that UI. Getting a field name wrong
 // here shows up as a silently empty tab, which is exactly the failure the port

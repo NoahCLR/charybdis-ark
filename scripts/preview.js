@@ -13,6 +13,7 @@ const {buildPanelModel, startLayerEdit} = require("../core/session/panel-session
 const portable = require("../core/model/portable-profile");
 const keycodes = require("../core/data/keycode-catalog");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../core/protocol/via-layout-v1");
+const {PROFILE_WIRE_KNOWN_MASKS} = require("../core/protocol/profile-wire-v1");
 const {document: pdDocument} = require("../tests/fixtures/pd-profile");
 
 // A readable keymap for the preview only. The fixture profile ships an empty
@@ -50,7 +51,10 @@ const capabilities = {
     compiledLayerCount: 8,
     supportedDomainMask: 31,
     actionAbiDigest: 0x1d3fcacc,
-    featureFlags: 0xffff,
+    // Current firmware: every feature this app knows, including physical
+    // gesture timing and runtime-owned tapping, which change what an empty
+    // behaviour cell means.
+    featureFlags: PROFILE_WIRE_KNOWN_MASKS.FEATURE_FLAGS,
     responseVersion: 1,
     reportSize: 32,
     brightnessMax: 255,
