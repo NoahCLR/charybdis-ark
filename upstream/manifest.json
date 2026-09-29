@@ -13,9 +13,9 @@
       "repository": "https://github.com/NoahCLR/charybdis-4x6",
       "commit": "b2d004fec56fcbc5c743f3fc1cd2ae3c3823309e"
     },
-    "firmware-layer-tap-hold": {
+    "firmware-tap-hold-admission": {
       "repository": "https://github.com/NoahCLR/charybdis-4x6",
-      "commit": "ddd94b8e6d129092cc3eae57bfd5de8dd8672409"
+      "commit": "a2870809b0dc091e8ce1505ac746b52dd405b4de"
     }
   },
   "files": [
@@ -85,10 +85,10 @@
     },
     {
       "path": "upstream/firmware/docs/architecture/profile-wire-v1.md",
-      "source": "firmware-layer-tap-hold",
+      "source": "firmware-tap-hold-admission",
       "sourcePath": "docs/architecture/profile-wire-v1.md",
-      "sourceSha256": "ea229f54263289019089a81b2f475263bf876f8345a375210cdc681e3d0368d0",
-      "sha256": "ea229f54263289019089a81b2f475263bf876f8345a375210cdc681e3d0368d0",
+      "sourceSha256": "8cd099c15d5926b1c91065529ba7e1c4a8be78cafd694a8e7ffa4c8c30b36999",
+      "sha256": "8cd099c15d5926b1c91065529ba7e1c4a8be78cafd694a8e7ffa4c8c30b36999",
       "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
     },
     {
