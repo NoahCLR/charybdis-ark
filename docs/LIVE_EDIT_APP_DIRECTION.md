@@ -750,3 +750,35 @@ when it preserves physical gesture eligibility.
 The firmware owns timing semantics (D-F01 in its direction); Ark consumes the
 capability, not source code. Hardware acceptance of a particular firmware build
 is separate from recognition of its advertised policy.
+
+### D-L49 — Timing findings constrain the reachability graph conservatively
+
+Ark resolves each row's timing overrides against the connected settings, including
+the dual-role default for authored LT rows. A Hold and Long hold both set to
+"tap on release after hold" have an impossible Hold branch when Long hold is
+at or before Tap / hold: no release interval selects Hold. Review and the
+behaviour editor warn, and the layer graph removes that proven-impossible edge,
+including behaviours reached through combo outputs. Global-default edits are
+analyzed in the same draft, with new/existing/fixed findings.
+
+Other equal or reversed thresholds warn about overlapping tiers without claiming
+which action is impossible: immediate actions, scan order and release modes
+matter. Positive hold-tier gaps under 50 ms, first-tap and repeat windows under
+50 ms, and enabled combo windows under 50 ms receive notices. This is an explicit
+comfort heuristic, never a validity rule or a model of the person's dexterity.
+Warnings remain confirmable and notices need no confirmation. No values change
+automatically. Combo waits are not subtracted from physical repeat windows.
+
+This is conservative static analysis, not a complete input-state simulator.
+Transparent action inheritance, pointing interception, interruption, host bindings,
+scan cadence, fingers and overlapping chord sequences are not proven feasible.
+Unknown paths remain in the graph rather than inventing traps. Invalid timing
+relationships are reported even for unplaced rows so moving one later cannot
+hide the problem. Revisit the rule against firmware release-matrix tests when
+release precedence changes.
+
+Feature bit 18 identifies runtime-owned tapping, extending bit 17's authored LT
+bypass to every handled key (including authored MT/OSM and owned TT/OSL). Ark
+keeps native-buffering warnings for those families on bit-17-only firmware.
+Neither capability changes stored profile bytes. Firmware owns that policy and
+its native-key controls; Ark owns these findings and their presentation.

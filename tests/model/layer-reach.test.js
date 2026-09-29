@@ -260,3 +260,39 @@ test("legacy authored LT warning does not require combo membership", () => {
     assert.match(finding.detail, /QMK also decides tap or hold/);
     assert.match(finding.detail, /hold: 200 ms/);
 });
+
+test("an impossible release hold cannot invent a layer entrance or escape", () => {
+    const row = {target: code(KC_ESC), tapHoldTerm: 100, longerHoldTerm: 100,
+        steps: [{tapIndex: 0, hold: {mode: 4, action: code(TG(2))}, longHold: {mode: 4, action: code(KC_A)}}]};
+    const p = profile({keys: {"0:0": KC_ESC, "2:1": KC_B}, rows: [row]});
+    assert.ok(layerReach(p).some(f => f.kind === "unreachable" && f.layers.includes(2)));
+    row.longerHoldTerm = 101;
+    assert.ok(!layerReach(p).some(f => f.kind === "unreachable" && f.layers.includes(2)));
+});
+
+test("native tapping warnings distinguish the original timing fix from owned tapping", () => {
+    for (const target of [0x2104, 0x5281, 0x52a1, 0x52c1]) {
+        const p = profile({keys: {"0:0": target}, rows: [{target: code(target), steps: [{tapIndex: 0, tap: code(KC_A)}]}]});
+        assert.ok(layerReach(p, {legacyGestureTiming: false, legacyOwnedTapping: true}).some(f => f.kind === "gestureTiming"));
+        assert.ok(!layerReach(p, {legacyGestureTiming: false, legacyOwnedTapping: false}).some(f => f.kind === "gestureTiming"));
+    }
+});
+
+test("combo-output behaviours use the same timing reachability as physical keys", () => {
+    const row = {target: code(KC_ESC), tapHoldTerm: 100, longerHoldTerm: 100,
+        steps: [{tapIndex: 0, hold: {mode: 4, action: code(TG(2))}, longHold: {mode: 4, action: code(KC_A)}}]};
+    const p = profile({keys: {"0:1": KC_B, "2:2": KC_B}, rows: [row],
+        combos: [{inputs: [code(KC_A), code(KC_B)], output: code(KC_ESC)}]});
+    assert.ok(layerReach(p).some(f => f.kind === "unreachable" && f.layers.includes(2)));
+    row.longerHoldTerm = 200;
+    assert.ok(!layerReach(p).some(f => f.kind === "unreachable" && f.layers.includes(2)));
+});
+
+test("an impossible release action cannot conceal a trapped layer", () => {
+    const row = {target: code(KC_ESC), tapHoldTerm: 100, longerHoldTerm: 100,
+        steps: [{tapIndex: 0, hold: {mode: 4, action: code(TO(0))}, longHold: {mode: 4, action: code(KC_A)}}]};
+    const p = profile({keys: {"0:0": TG(2), "2:0": KC_B, "2:1": KC_ESC}, rows: [row]});
+    assert.deepEqual(traps(p).map(f => f.layers), [[2]]);
+    row.longerHoldTerm = 200;
+    assert.deepEqual(traps(p), []);
+});

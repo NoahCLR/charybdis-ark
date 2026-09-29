@@ -34,3 +34,17 @@ test("gesture timing advice is gated by the destination firmware", () => {
     const checks = draftProfileChecks(decoded, draft, undefined, {physicalGestureTiming: false});
     assert.equal(checks.find(x => x.kind === "gestureTiming").status, "fixed");
 });
+
+test("timing changes report new, existing and fixed findings, including inherited defaults", () => {
+    const keyboard = validateSnapshot(document());
+    const action = operand => ({kind: 1, flags: 0, operand});
+    keyboard.behaviors.rows = [{target: action(4), tapHoldTerm: 0, longerHoldTerm: 0,
+        steps: [{tapIndex: 0, hold: {mode: 4, action: action(5)}, longHold: {mode: 4, action: action(6)}}]}];
+    keyboard.settings.values[1] = 100; keyboard.settings.values[2] = 200;
+    const draft = structuredClone(keyboard); draft.settings.values[2] = 100;
+    const checks = (before, after) => draftProfileChecks(before, after, undefined, {physicalGestureTiming: true, ownedTapping: true})
+        .filter(f => f.kind === "gestureTiming" && f.title.includes("cannot send"));
+    assert.equal(checks(keyboard, draft)[0].status, "new");
+    assert.equal(checks(draft, draft)[0].status, "existing");
+    assert.equal(checks(draft, keyboard)[0].status, "fixed");
+});

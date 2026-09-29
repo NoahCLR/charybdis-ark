@@ -9,9 +9,9 @@
       "repository": "https://github.com/NoahCLR/bastardkb-qmk",
       "commit": "aac9f637ee4ad99fe8f962372b9dfd56be538703"
     },
-    "firmware-gesture-timing": {
+    "firmware-owned-tapping": {
       "repository": "https://github.com/NoahCLR/charybdis-4x6",
-      "commit": "537c7fdc62c0386a2ef41deb5834a2715641a734"
+      "commit": "79f8ef6ae2399aadffd8a2bff5fce1514691c03f"
     }
   },
   "files": [
@@ -81,10 +81,10 @@
     },
     {
       "path": "upstream/firmware/docs/architecture/profile-wire-v1.md",
-      "source": "firmware-gesture-timing",
+      "source": "firmware-owned-tapping",
       "sourcePath": "docs/architecture/profile-wire-v1.md",
-      "sourceSha256": "5d2da13b6c543b461e6455c1dd9edcce5bc6772106c1c15b4c9a68dd8bb3288b",
-      "sha256": "5d2da13b6c543b461e6455c1dd9edcce5bc6772106c1c15b4c9a68dd8bb3288b",
+      "sourceSha256": "eabbeba9037eca7adbba90290fafea2418699583b1736ff80634c741e4a3e614",
+      "sha256": "eabbeba9037eca7adbba90290fafea2418699583b1736ff80634c741e4a3e614",
       "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
     },
     {

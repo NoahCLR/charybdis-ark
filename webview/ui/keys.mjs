@@ -476,7 +476,7 @@ function behaviourEditor(behaviour) {
             </div>
         </div>
         <p class="note" style="margin-bottom:12px">Double hold means press, release, then press and keep holding. Repeated taps limits the gap after release; Tap / hold separates a tap from a hold.</p>
-        ${behaviourTimingChecks(model, behaviour.keycode).map(check => `<p class="note" role="status" style="margin-bottom:12px"><strong>Timing warning.</strong> ${esc(check.detail)} ${esc(check.fix)}</p>`).join("")}
+        ${behaviourTimingChecks(model, behaviour.keycode).map(check => `<p class="note" role="status" style="margin-bottom:12px"><strong>${check.level === "notice" ? "Timing advice." : "Timing warning."}</strong> ${esc(check.detail)} ${esc(check.fix)}</p>`).join("")}
         <div class="beh-timing">
             <label class="field"><span>${marked(model, {kind: "tier", tier: "hold"}, "Tap / hold")}</span><input class="input mono" data-term="tapHoldTerm" value="${esc(zeroBlank(behaviour.tapHoldTerm))}" placeholder="default" ${canEdit ? "" : "disabled"}></label>
             <label class="field"><span>${marked(model, {kind: "tier", tier: "long"}, tierName(model, "long"))}</span><input class="input mono" data-term="longerHoldTerm" value="${esc(zeroBlank(behaviour.longerHoldTerm))}" placeholder="default" ${canEdit ? "" : "disabled"}></label>

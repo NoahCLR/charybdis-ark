@@ -18,6 +18,11 @@ Review and the behaviour editor explain combo/tap timing risks on older
 firmware, using the connected profile. Firmware with physical gesture timing
 (feature bit 17) is recognized without changing the layout or tuning values.
 
+Timing checks resolve inherited defaults, warn about overlapping or impossible
+release tiers, and exclude proven-impossible layer routes. Narrow gesture/chord
+windows receive advice; this is conservative analysis, not a guarantee that
+every gesture is physically practical (D-L49).
+
 ## Develop independently
 
 Open this folder directly in VS Code. Use Node 26.10.0 (`nvm use` with the
