@@ -10,6 +10,8 @@ import {feedbackColours, layerColourRow, mappedKeyCount, pdColourRow, stageEnabl
 import {closeComboBuilder, currentLayer, getModel, heldLayers, layerName, layers, openComboBuilder, positionAt, post, previewing, render, selectedPosition, showLayer, state, writable, canEdit as canEditArea} from "../store.mjs";
 import * as edits from "../view/edits.mjs";
 import {behaviourTimingChecks} from "../view/checks.mjs";
+import {behaviourEditorRow, behaviourTimingEdit, behaviourTimingField, canHaveBehaviour} from "../view/behavior-editor.mjs";
+import {timingInput} from "../view/timing-input.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {board} from "./board.mjs";
 import {keepInView, layerBar} from "./layerbar.mjs";
@@ -88,15 +90,9 @@ export function screenKeys() {
                 if (answer) state.combo.labels[answer.keycode] = answer.editLabel || answer.display || answer.keycode;
             } else {
                 state.selected = index;
-                const shown = resolvedPositions(layers(), state.layer, heldLayers())
-                    .find((entry) => entry.position.layoutIndex === index)?.position;
-                const behaviour = behaviourFor(model, keyMeaning(shown));
-                // A behaviour picked on the board is the one this key carries.
-                if (state.tab === "behaviours" && behaviour) {
-                    state.behaviourRow = behaviour.keycode;
-                    state.behaviourRoute = {row: behaviour.keycode, group: "view"};
-                    state.cell = null;
-                }
+                // Follow the stored key, including one with no authored row.
+                // Transparent and disabled positions never get a behaviour.
+                selectBehaviourKey(keyMeaning(positionAt(layer, index)));
             }
             render();
         },
@@ -228,6 +224,7 @@ function bench() {
     </div>`);
     node.querySelectorAll("[data-tab]").forEach((button) => button.addEventListener("click", () => {
         state.tab = button.dataset.tab;
+        if (state.tab === "behaviours") selectBehaviourKey(keyMeaning(selectedPosition()));
         state.cell = null;
         render();
     }));
@@ -281,10 +278,10 @@ function tabKey(body) {
         <section>
             <div class="sect-h"><h4>What this key reaches</h4></div>
             <div class="stack" style="gap:8px">
-                <button class="reach ${behaviour ? "" : "empty"}" data-goto="behaviours">
+                <button class="reach ${behaviour ? "" : "empty"}" data-goto="behaviours" ${canHaveBehaviour(model, keyMeaning(position)) ? "" : "disabled"}>
                     <span class="rl">Behaviour</span>
-                    <span class="rv">${behaviour ? `${esc(actionLabel(model, behaviour.keycode))} · ${behaviour.steps.length} branch${behaviour.steps.length === 1 ? "" : "es"}` : "none on this key"}</span>
-                    <span class="ra">${behaviour ? "Edit" : "Add"}</span></button>
+                    <span class="rv">${behaviour ? `${esc(actionLabel(model, behaviour.keycode))} · ${behaviour.steps.length} branch${behaviour.steps.length === 1 ? "" : "es"}` : canHaveBehaviour(model, keyMeaning(position)) ? "Using the key’s defaults" : "Unavailable for transparent keys and KC_NO"}</span>
+                    <span class="ra">${behaviour ? "Edit" : "Open"}</span></button>
                 <button class="reach ${combos.length ? "" : "empty"}" data-goto="combos">
                     <span class="rl">Combos</span>
                     <span class="rv">${combos.length ? combos.map((combo) => `${comboBadge(model, combo.badge)} → ${esc(combo.outputDisplay || combo.output)}`).join(" · ") : "not part of a combo"}</span>
@@ -306,7 +303,7 @@ function tabKey(body) {
     }));
     node.querySelectorAll("[data-goto]").forEach((button) => button.addEventListener("click", () => {
         state.tab = button.dataset.goto;
-        if (state.tab === "behaviours" && behaviour) state.behaviourRow = behaviour.keycode;
+        if (state.tab === "behaviours") selectBehaviourKey(keyMeaning(position));
         if (state.tab === "combos" && !combos.length) openComboBuilder(null, edits.comboDefaultTermValue(getModel()));
         render();
     }));
@@ -346,31 +343,21 @@ const viewBehaviourNote = (entry) => {
     return [indexes.length ? `index ${indexes.join(", ")}${sources.length ? ` · on ${sources.join(", ")}` : ""}` : "",
         entry.combos.length ? comboNote(entry) : ""].filter(Boolean).join(" · ");
 };
+function selectBehaviourKey(keycode) {
+    state.behaviourRow = keycode;
+    state.behaviourRoute = {row: keycode, group: "view"};
+    state.cell = null;
+    state.cellHow = null;
+}
+
 function tabBehaviours(body, right) {
     const model = getModel();
-    const layer = currentLayer();
     const {here, through, combos, combosBelow, elsewhere} = behaviourGroups(model, layers(), state.layer);
     const inView = behavioursInView(model, layers(), state.layer, heldLayers());
-    if (!state.behaviourRow || !behaviourFor(model, state.behaviourRow)) {
-        const shown = resolvedPositions(layers(), state.layer, heldLayers())
-            .find((entry) => entry.position.layoutIndex === state.selected)?.position;
-        state.behaviourRow = behaviourFor(model, keyMeaning(shown))?.keycode
-            || inView[0]?.row.keycode || here[0]?.keycode || combos[0]?.row.keycode || through[0]?.row.keycode
-            || combosBelow[0]?.row.keycode || elsewhere[0]?.keycode || null;
-    }
-    const behaviour = behaviourFor(model, state.behaviourRow);
+    if (!state.behaviourRow) selectBehaviourKey(keyMeaning(selectedPosition()));
+    const behaviour = behaviourEditorRow(model, state.behaviourRow);
 
     right.replaceChildren();
-    const selectedCode = keyMeaning(selectedPosition());
-    if (writable() && selectedCode && !behaviourFor(model, selectedCode)) {
-        const add = el(`<button class="btn tiny" data-tip="Give the selected key a behaviour: taps, holds, long holds and repeated-tap branches.">+ Behaviour on ${esc(keyName(selectedPosition()) || selectedCode)}</button>`);
-        add.addEventListener("click", () => {
-            state.behaviourRow = selectedCode;
-            state.cell = null;
-            post(edits.addBehaviour(selectedCode, model.profileIdentity));
-        });
-        right.appendChild(add);
-    }
 
     const route = behaviourRoute();
     const changed = draftMarks(model?.draft?.changes).behaviours;
@@ -427,26 +414,32 @@ function tabBehaviours(body, right) {
     }));
     const main = node.querySelector(".beh-main");
     if (behaviour) main.appendChild(behaviourEditor(behaviour));
-    else main.appendChild(el(`<p class="note" style="padding:16px">No behaviour selected. Pick a key on the board and add one.</p>`));
+    else main.appendChild(el(`<p class="note" style="padding:16px">Transparent keys and KC_NO cannot have a behaviour. Pick a mapped key on the board.</p>`));
     body.replaceChildren(node);
 }
 
 // An empty timing field falls back to the keyboard's own default, which it
 // reports and Settings · Tap & Hold Timing edits — so the note names both.
-function timingDefaultsNote(model) {
-    const defaults = model?.behaviorTimingDefaults || {};
-    const values = [["tap / hold", defaults.tapHoldTerm], ["long hold", defaults.longerHoldTerm], ["repeated taps", defaults.multiTapTerm]]
+function timingDefaultsNote(behaviour) {
+    const defaults = behaviour.timingDefaults;
+    const values = [["multi tap window", defaults.multiTapTerm], ["tap / hold", defaults.tapHoldTerm], ["long hold", defaults.longerHoldTerm]]
         .filter(([, value]) => String(value ?? "").trim() !== "")
         .map(([name, value]) => `${name} ${value} ms`);
     return values.length
-        ? `Timing left empty uses the keyboard default from Settings · Tap & Hold Timing: ${values.join(", ")}.`
-        : "Timing left empty uses the keyboard default from Settings · Tap & Hold Timing.";
+        ? `Keyboard defaults from Settings · Tap & Hold Timing: ${values.join(", ")}. Clear an override to follow its default.`
+        : "Clear a timing override to follow the keyboard default from Settings · Tap & Hold Timing.";
 }
 
 function behaviourEditor(behaviour) {
     const model = getModel();
     const steps = behaviourGridSteps(behaviour, model?.behaviorEditing?.maxTapStepsPerBehavior);
-    const canEdit = writable();
+    const canEdit = canEditArea("behaviours");
+    const timingControl = (name, label, mark) => {
+        const field = behaviourTimingField(behaviour, name);
+        return `<label class="field"><span>${marked(model, mark, label)} · ms</span>
+            <input class="input mono" data-term="${name}" data-stored="${esc(field.stored)}" value="${esc(field.value)}"
+                placeholder="${esc(field.fallback === "" ? "default unavailable" : field.placeholder)}" ${canEdit ? "" : "disabled"}></label>`;
+    };
 
     const cellFor = (step, kind) => {
         const branch = step[TIER_FIELDS[kind]];
@@ -474,21 +467,22 @@ function behaviourEditor(behaviour) {
             <div>
                 <div class="row" style="gap:9px"><h3 style="font-size:15px">${esc(actionLabel(model, behaviour.keycode))}</h3>
                     ${actionLabel(model, behaviour.keycode) === behaviour.keycode ? "" : `<code class="dim">${esc(behaviour.keycode)}</code>`}</div>
-                <p class="note" style="margin-top:3px">${esc(timingDefaultsNote(model))}</p>
+                <p class="note" style="margin-top:3px">${esc(timingDefaultsNote(behaviour))}</p>
+                ${behaviour.stored ? "" : `<p class="note" style="margin-top:3px">Using the key’s defaults. A behaviour is added to the draft when you change a timing, switch or grid action.</p>`}
             </div>
-            <div class="right row" style="gap:8px;margin-left:auto">
+            ${behaviour.stored ? `<div class="right row" style="gap:8px;margin-left:auto">
                 <button class="btn ghost" data-act="rekey" ${canEdit ? "" : "disabled"}
                     data-tip="Pick the key this behaviour listens to. Everything it does moves with it.">Change key…</button>
                 <button class="btn ghost" data-act="remove" ${canEdit ? "" : "disabled"}
                     data-tip="Remove this behaviour from the draft. Its keys then send their plain keycode.">Remove behaviour</button>
-            </div>
+            </div>` : ""}
         </div>
-        <p class="note" style="margin-bottom:12px">Double hold means press, release, then press and keep holding. Repeated taps limits the gap after release; Tap / hold separates a tap from a hold.</p>
+        <p class="note" style="margin-bottom:12px">Multi tap window is the time allowed from releasing the key to pressing it again. Tap / hold separates a tap from a hold. Double hold means press, release, then press and keep holding.</p>
         ${behaviourTimingChecks(model, behaviour.keycode).map(check => `<p class="note" role="status" style="margin-bottom:12px"><strong>${check.level === "notice" ? "Timing advice." : "Timing warning."}</strong> ${esc(check.detail)} ${esc(check.fix)}</p>`).join("")}
         <div class="beh-timing">
-            <label class="field"><span>${marked(model, {kind: "tier", tier: "hold"}, "Tap / hold")}</span><input class="input mono" data-term="tapHoldTerm" value="${esc(zeroBlank(behaviour.tapHoldTerm))}" placeholder="default" ${canEdit ? "" : "disabled"}></label>
-            <label class="field"><span>${marked(model, {kind: "tier", tier: "long"}, tierName(model, "long"))}</span><input class="input mono" data-term="longerHoldTerm" value="${esc(zeroBlank(behaviour.longerHoldTerm))}" placeholder="default" ${canEdit ? "" : "disabled"}></label>
-            <label class="field"><span>${marked(model, {kind: "branch", count: 2}, "Repeated taps")}</span><input class="input mono" data-term="multiTapTerm" value="${esc(zeroBlank(behaviour.multiTapTerm))}" placeholder="default" ${canEdit ? "" : "disabled"}></label>
+            ${timingControl("multiTapTerm", "Multi tap window", {kind: "branch", count: 2})}
+            ${timingControl("tapHoldTerm", "Tap / hold", {kind: "tier", tier: "hold"})}
+            ${timingControl("longerHoldTerm", tierName(model, "long"), {kind: "tier", tier: "long"})}
             <label class="sw" data-tip="Treat this row as a mouse gesture, so pressing it keeps the pointer layer up instead of letting auto-mouse reset.">
                 <input type="checkbox" data-anchor ${behaviour.keepsAutoMouseAnchored ? "checked" : ""} ${canEdit ? "" : "disabled"}>
                 <span class="track"></span><span class="txt">Keeps auto-mouse anchored</span></label>
@@ -520,7 +514,11 @@ function behaviourEditor(behaviour) {
     node.querySelector('[data-act="remove"]')?.addEventListener("click", () =>
         post(edits.deleteBehaviour(behaviour.keycode, model.profileIdentity)));
     const commit = () => saveBehaviour(node, behaviour);
-    node.querySelectorAll("[data-term]").forEach((input) => input.addEventListener("change", commit));
+    node.querySelectorAll("[data-term]").forEach((input) => input.addEventListener("change", () => {
+        input.dataset.stored = behaviourTimingEdit(input.value, behaviourTimingField(behaviour, input.dataset.term));
+        commit();
+        input.value = behaviourTimingField({...behaviour, [input.dataset.term]: input.dataset.stored}, input.dataset.term).value;
+    }));
     node.querySelector("[data-anchor]")?.addEventListener("change", commit);
     return node;
 }
@@ -532,7 +530,7 @@ function cellEditor(behaviour, step, kind) {
     // choice survives renders until an action carries it to the draft.
     const pending = !branch && state.cellHow?.cell === cell && state.cellHow.keycode === behaviour.keycode ? state.cellHow : null;
     const shown = branch || pending;
-    const canEdit = writable();
+    const canEdit = canEditArea("behaviours");
     const node = el(`<div class="cell-editor">
         <div class="ce-head"><span class="tag">${esc(branchName(getModel(), step.tapCount + 1))}</span><h4>${esc(tierName(getModel(), kind))}</h4>
             <span class="note">${kind === "tap" ? "A tap tier fires on release, so it has no helper." : "Runs once this row's threshold passes."}</span>
@@ -585,13 +583,12 @@ function cellEditor(behaviour, step, kind) {
 function saveBehaviour(root, behaviour, change) {
     const terms = Object.fromEntries(["tapHoldTerm", "longerHoldTerm", "multiTapTerm"].flatMap((name) => {
         const field = root.querySelector?.(`[data-term="${name}"]`);
-        return field ? [[name, field.value]] : [];
+        return field ? [[name, field.dataset.stored]] : [];
     }));
     const anchorField = root.querySelector?.("[data-anchor]");
-    post(edits.saveBehaviour(behaviour, {terms, anchored: anchorField ? anchorField.checked : undefined, change}, getModel().profileIdentity));
+    const message = edits.saveBehaviour(behaviour, {terms, anchored: anchorField ? anchorField.checked : undefined, change}, getModel().profileIdentity);
+    if (message) post(message);
 }
-
-const zeroBlank = (value) => Number(value) ? String(value) : "";
 
 /* ── combos ────────────────────────────────────────────────────────────── */
 
@@ -706,6 +703,7 @@ function comboBuilder(canEdit, holdTerm) {
     // The keyboard's default window; empty on a keyboard that has none, where
     // every combo keeps its own.
     const fallback = edits.comboDefaultTermValue(model);
+    const windowField = timingInput(form.termMs, fallback, form.followsDefault && fallback !== "");
     const node = el(`<div class="card" style="background:var(--surface-2)">
         <div class="card-h" style="padding:11px 13px"><h3>${editing ? `Edit ${esc(original?.badge || "combo")}` : "New combo"}</h3>
             <span class="right">${editing ? `<button class="btn tiny ghost" data-act="delete" ${canEdit ? "" : "disabled"}>Delete</button>` : ""}</span></div>
@@ -726,8 +724,8 @@ function comboBuilder(canEdit, holdTerm) {
                         data-tip="Switch the board into input-picking mode; click keys to add or remove them.">${state.combo.picking ? "Picking on board…" : "Pick on board"}</button>
                 </div>
             </div>
-            <label class="field" data-tip="How close together its keys must be pressed, from the first to the last."><span>Combo window · ms${fallback ? ` <span class="tag" data-termtag>${form.followsDefault ? "default" : "custom"}</span>` : ""}</span>
-                <div class="input-row"><input class="input mono" data-term value="${esc(form.followsDefault && fallback ? fallback : form.termMs)}" placeholder="${fallback ? `${esc(fallback)} · default` : "ms"}" ${canEdit ? "" : "disabled"}>
+            <label class="field" data-tip="How close together its keys must be pressed, from the first to the last."><span>Combo window · ms</span>
+                <div class="input-row"><input class="input mono" data-term value="${esc(windowField.value)}" placeholder="${esc(windowField.placeholder)}" ${canEdit ? "" : "disabled"}>
                 ${fallback ? `<button class="btn tiny ghost" data-act="usedefault" ${canEdit ? "" : "disabled"} ${form.followsDefault ? "hidden" : ""}
                     data-tip="Follow the default combo window (Settings · Combos) again, so this combo changes with it.">Use default · ${esc(fallback)} ms</button>` : ""}</div></label>
             <div class="row" style="gap:14px;flex-wrap:wrap">
@@ -762,12 +760,10 @@ function comboBuilder(canEdit, holdTerm) {
     // redraws the screen keeps them.
     node.querySelector("[data-output]").addEventListener("input", (event) => { form.output = event.target.value; });
     // Typing a window gives the combo its own; emptying the field, or Use
-    // default, has it follow the keyboard's default again. The tag and the
-    // button change in place, so typing keeps its focus.
+    // default, has it follow the keyboard's default again. The button changes
+    // in place, and matching defaults become placeholders after editing.
     const followed = (follows) => {
         form.followsDefault = follows;
-        const tag = node.querySelector("[data-termtag]");
-        if (tag) tag.textContent = follows ? "default" : "custom";
         const button = node.querySelector('[data-act="usedefault"]');
         if (button) button.hidden = follows;
     };
@@ -775,10 +771,13 @@ function comboBuilder(canEdit, holdTerm) {
         form.termMs = event.target.value;
         if (fallback) followed(event.target.value.trim() === "");
     });
+    node.querySelector("[data-term]").addEventListener("change", (event) => {
+        event.target.value = timingInput(form.termMs, fallback, form.followsDefault && fallback !== "").value;
+    });
     node.querySelector('[data-act="usedefault"]')?.addEventListener("click", (event) => {
         event.preventDefault();
         form.termMs = fallback;
-        node.querySelector("[data-term]").value = fallback;
+        node.querySelector("[data-term]").value = "";
         followed(true);
     });
     // A combo cannot both need a hold and refuse one — the keyboard rejects it,
@@ -1050,7 +1049,7 @@ export function keysShortcut(event) {
 // ⌘V makes it send the copied key, running as it already does or as chosen.
 function cellShortcut(action) {
     if (state.tab !== "behaviours" || !state.cell) return false;
-    const behaviour = behaviourFor(getModel(), state.behaviourRow);
+    const behaviour = behaviourEditorRow(getModel(), state.behaviourRow);
     const [tapCount, kind] = state.cell.split("-");
     const step = behaviour && behaviourGridSteps(behaviour, getModel()?.behaviorEditing?.maxTapStepsPerBehavior)
         .find((row) => String(row.tapCount) === tapCount);
@@ -1058,10 +1057,10 @@ function cellShortcut(action) {
     const branch = step[TIER_FIELDS[kind]];
     const change = (next) => saveBehaviour(document, behaviour, {tapCount: step.tapCount, kind, branch: next});
     if (action === "clear") {
-        if (branch && writable()) change(null);
+        if (branch && canEditArea("behaviours")) change(null);
     } else if (action === "copy") {
         if (branch) { state.keyClipboard = {keycode: branch.action, label: branch.action}; navigator.clipboard?.writeText(branch.action).catch(() => {}); render(); }
-    } else if (state.keyClipboard && writable()) {
+    } else if (state.keyClipboard && canEditArea("behaviours")) {
         const pending = state.cellHow?.cell === state.cell && state.cellHow.keycode === behaviour.keycode ? state.cellHow : null;
         const how = branch || pending || {helper: vocabulary(getModel()).holdHelpers[0]?.[0]};
         const edit = edits.cellEdit(kind, {stored: Boolean(branch), action: state.keyClipboard.keycode, helper: how.helper, repeatHz: how.repeatHz});

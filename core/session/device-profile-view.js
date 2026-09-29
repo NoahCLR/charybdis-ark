@@ -160,4 +160,4 @@ function combosForView(read, labels) {
     }));
 }
 
-module.exports = {baseRgbForView, behaviorRowsForView, combosForView, rgbForView};
+module.exports = {baseRgbForView, behaviorRowsForView, builtInForView, combosForView, rgbForView};

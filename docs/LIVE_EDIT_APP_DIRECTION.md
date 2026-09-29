@@ -39,7 +39,7 @@ matrix.
 | Product surface | Current state |
 | --- | --- |
 | Layout and eight layers | Read/write; names and overlay order travel with complete profiles; a reorder renumbers layer keys by default ("Keys follow their layers") |
-| Key behaviours, combos and RGB | Read/write editors over the shared draft; matching Keys reach sections share open state across tabs, open independently, and use the page scrollbar |
+| Key behaviours, combos and RGB | Read/write editors over the shared draft; selected keys open an unstored behaviour grid until the first edit; matching Keys reach sections share open state across tabs, open independently, and use the page scrollbar |
 | Macros | 64 named VIA macro slots with builder, recorder and preview; shared-memory and per-macro limits shown and enforced (D-L25, D-L26) |
 | Custom keys | 64 named keys that do what their behaviour says: rename, add or open the behaviour, place, see where each is used (D-L42) |
 | Mouse | Pointer and sniping DPI, auto-sniping and auto-mouse: global-policy sections the core files under the Mouse area, so the rail, the review and import counts all place them there. The auto-mouse fade delay is a share of the timeout, edited on its lighting stage (D-L17) |
@@ -790,3 +790,32 @@ firmware advertises it: an LT() row's tap and layer hold on bit 17, an MT() or
 OSM() row's tap and modifier hold on bit 18. Older firmware classified these
 keys in QMK first, so Ark claims nothing there. The built-in cell is display
 only; setting an action in it authors the tier (core/model/built-in-behavior.js).
+New behaviour editors start with no authored branches, preserving these defaults.
+Selecting a key opens its row or an unstored grid; only an action, timing override
+or anchor change creates a draft row. Previews never enter the host model's stored
+behaviour list, counts or board marks. Transparent keys and `KC_NO` have no
+behaviour editor, and the host rejects them as new or retargeted row targets.
+Opening a custom key's behaviour follows the same rule.
+The timing controls lead with **Multi tap window** (release to next press),
+followed by Tap / hold and Long hold. Behaviour and combo timing inputs show
+inherited or default-matching values as muted placeholders (`150 · default`),
+with no default/custom marker after `ms` in the label. Other values remain entered.
+Presentation alone never rewrites an explicit override that matches the default.
+When a behaviour timing default changes, explicit row values equal to that
+specific old default become inheritance zeros in the same draft step. Existing
+zeros follow naturally; distinct custom values stay fixed. LT's Tap / hold follows
+the dual-role default, other rows the normal threshold. Unchanged defaults and
+unrelated settings edits do not normalize rows.
+Review lists each inherited effective-time change under Tap & Hold Timing, with
+the affected behaviour and old/new milliseconds. Explicit matches adopting
+inheritance appear as stored behaviour changes grouped with the settings edit.
+Inherited effects are not independent discard units, so discarding the default
+does not discard unrelated edits on rows that already inherited it. Undo restores
+the entire step, including any former explicit values.
+The host supplies per-key defaults using the same timing
+resolution as review, including LT's dual-role threshold. Displaying a default
+keeps the stored inheritance zero; changing another field never freezes it as an
+override. Clearing an override restores the default. An unchanged empty preview
+posts nothing.
+The target is a lookup key, not an implicit authored tap action: copying an
+`LT()` target into a tap branch would fail the firmware's placement rules.

@@ -67,7 +67,7 @@ function editor(model, key, canEdit) {
         <div class="card-h"><h3>${esc(key.name || `Custom key ${key.slot}`)}</h3>
             <span class="tag" data-tip="${esc(key.keycode)}">Key ${esc(key.slot)}</span>
             <span class="right row" style="gap:8px">
-                <button class="btn tiny ghost" data-act="behaviour" ${writable() ? "" : "disabled"}>${key.hasBehavior ? "Edit behaviour…" : "Add a behaviour…"}</button>
+                <button class="btn tiny ghost" data-act="behaviour" ${canEditArea("behaviours") ? "" : "disabled"}>Open behaviour…</button>
                 <button class="btn tiny ghost" data-act="place" ${writable() ? "" : "disabled"}>Place on a key…</button></span></div>
         <div class="card-b stack">
             <label class="field"><span>Name</span>
@@ -89,7 +89,8 @@ function editor(model, key, canEdit) {
     });
     card.querySelector('[data-act="behaviour"]').addEventListener("click", () => {
         Object.assign(state, {screen: "keys", tab: "behaviours", behaviourRow: key.keycode});
-        if (!key.hasBehavior) post(edits.addBehaviour(key.keycode, model.profileIdentity));
+        state.cell = null;
+        state.cellHow = null;
         render();
     });
     card.querySelectorAll("[data-goto-layer]").forEach((button) => button.addEventListener("click", () =>

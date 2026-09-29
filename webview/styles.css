@@ -601,7 +601,7 @@ button.tier:hover { background: var(--surface-3); }
 .rowlist .rowgroup + .rowgroup .group-h { border-top: 1px solid var(--line); }
 
 .beh-head { display: flex; align-items: flex-start; gap: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
-.beh-timing { display: grid; grid-template-columns: repeat(3, minmax(0, 150px)) auto; gap: 14px; align-items: end; padding: 13px 0 16px; }
+.beh-timing { display: grid; grid-template-columns: repeat(3, minmax(0, 200px)) auto; gap: 14px; align-items: end; padding: 13px 0 16px; }
 .bgrid { display: grid; gap: 6px; align-items: stretch; overflow-x: auto; padding-bottom: 2px; }
 .bhead { display: flex; align-items: center; gap: 7px; padding: 0 2px 4px; font-size: 11.5px; color: var(--text-2); }
 .bhead .bn { font-family: var(--mono); font-size: 10px; color: var(--text-3); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; }

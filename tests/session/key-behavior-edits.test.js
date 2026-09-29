@@ -103,6 +103,15 @@ test("invalid edits and references are rejected before upload", () => {
     assert.throws(() => edit({type: "saveBehavior", behavior: form()}, {...capabilities, maxTapStepsPerBehavior: 4}), /Tap index/);
 });
 
+test("transparent and disabled keys cannot receive or be retargeted to a behaviour", () => {
+    for (const keycode of ["KC_NO", "XXXXXXX", "KC_TRANSPARENT", "KC_TRNS", "_______", "0x0000", "0x0001"]) {
+        for (const type of ["saveBehavior", "addBehavior"]) {
+            assert.throws(() => edit({type, behavior: {...form(), keycode}}), /Transparent keys and KC_NO cannot have a behaviour/, keycode);
+        }
+        assert.throws(() => edit({type: "retargetBehavior", keycode: views[0].keycode, target: keycode}), /Transparent keys and KC_NO cannot have a behaviour/, keycode);
+    }
+});
+
 test("retargeting moves a row to a free key and keeps everything it does", () => {
     const [first] = views;
     const moved = edit({type: "retargetBehavior", keycode: first.keycode, target: "KC_A"});

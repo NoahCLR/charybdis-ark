@@ -24,11 +24,11 @@ export const swapKeys = (layer, from, to) => layoutKeys(layer, [
 export const TIER_FIELDS = {tap: "tap", hold: "hold", long: "longHold"};
 export const DEFAULT_REPEAT_HZ = "20";
 
-// A new behaviour starts by tapping its own key, which is what the key did
-// before. A custom key sends nothing of itself, so its behaviour starts empty.
+// Empty branches preserve the key's firmware defaults. Copying the target into
+// a tap branch would override those defaults and is invalid for keys like LT.
 export const addBehaviour = (keycode, identity) => ({
     type: "addBehavior", expectedBase: identity,
-    behavior: {keycode, steps: /^CUSTOM_KEY_\d+$/.test(keycode) ? [] : [{tapCount: 0, tap: {helper: "TAP_SENDS", action: keycode}}]},
+    behavior: {keycode, steps: []},
 });
 export const deleteBehaviour = (keycode, identity) => ({type: "deleteBehavior", keycode, expectedBase: identity});
 export const retargetBehaviour = (keycode, target, identity, conflict) =>
@@ -73,17 +73,20 @@ export function saveBehaviour(behaviour, {terms = {}, anchored, change} = {}, id
         }
         return next;
     }).filter((step) => step.tap || step.hold || step.longHold);
+    const behavior = {
+        keycode: behaviour.keycode,
+        tapHoldTerm: term("tapHoldTerm"),
+        longerHoldTerm: term("longerHoldTerm"),
+        multiTapTerm: term("multiTapTerm"),
+        keepsAutoMouseAnchored: anchored ?? behaviour.keepsAutoMouseAnchored,
+        steps,
+    };
+    if (behaviour.stored === false && !steps.length && !behavior.keepsAutoMouseAnchored
+        && [behavior.tapHoldTerm, behavior.longerHoldTerm, behavior.multiTapTerm].every(value => /^0+$/.test(value))) return null;
     return {
         type: "saveBehavior",
         expectedBase: identity,
-        behavior: {
-            keycode: behaviour.keycode,
-            tapHoldTerm: term("tapHoldTerm"),
-            longerHoldTerm: term("longerHoldTerm"),
-            multiTapTerm: term("multiTapTerm"),
-            keepsAutoMouseAnchored: anchored ?? behaviour.keepsAutoMouseAnchored,
-            steps,
-        },
+        behavior,
     };
 }
 

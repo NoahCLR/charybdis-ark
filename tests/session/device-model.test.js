@@ -46,6 +46,25 @@ function layoutWith(keys) {
     return {state: "read", layers: [{layer: 0, keys}]};
 }
 
+test("unstored behaviour defaults share the firmware timing and built-in rules", () => {
+    const values = [0x4309, 0x2109, 0x04, 0, 1];
+    const state = {layout: layoutWith(values.map((keycode, layoutIndex) => ({keycode, layoutIndex, resolved: resolve(keycode)}))),
+        capabilities: {featureFlags: (1 << 17) | (1 << 18)},
+        settingsView: {timing: {tappingTerm: "210", tapHoldTerm: "150", longerHoldTerm: "400", multiTapTerm: "170"}}};
+    const model = buildDeviceModel(state);
+    const defaults = model.behaviorEditing.keyDefaults;
+    assert.equal(defaults["LT(3,KC_F)"].timing.tapHoldTerm, "210", "LT inherits the dual-role threshold");
+    assert.equal(defaults["LT(3,KC_F)"].builtIn.tap.action, "KC_F");
+    assert.equal(defaults["LT(3,KC_F)"].builtIn.hold.action, "MO(3)");
+    assert.equal(defaults["MT(MOD_LCTL,KC_F)"].timing.tapHoldTerm, "150");
+    assert.equal(defaults["MT(MOD_LCTL,KC_F)"].builtIn.tap.action, "KC_F");
+    assert.deepEqual(defaults.KC_A.timing, {tapHoldTerm: "150", longerHoldTerm: "400", multiTapTerm: "170"});
+    assert.equal(defaults.KC_NO, undefined);
+    assert.equal(defaults.KC_TRANSPARENT, undefined);
+    assert.deepEqual(model.keyBehaviors, [], "no behaviour is authored by publishing defaults");
+    assert.deepEqual(buildDeviceModel({...state, capabilities: {}}).behaviorEditing.keyDefaults["LT(3,KC_F)"].builtIn, {});
+});
+
 test("device shortcut labels stay complete and semantic names require the advertised ABI", () => {
     const values = [0x0806, 0x0a1d, 0x7e80, 0x7ec5, 0x7ec6, 0x7e42];
     const state = {

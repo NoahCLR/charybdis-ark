@@ -93,7 +93,21 @@ menus open only with an editable draft.
 
 Underneath it, one workbench whose tabs are the key, its behaviour, its combos,
 and the macros and pointing modes the layer reaches. A behaviour is tap count ×
-tier, so it is drawn as a grid. A dual-role key's empty first tap or hold
+tier, so it is drawn as a grid. Timing fields start with **Multi tap window**
+(release to next press), then Tap / hold and Long hold. Behaviour and combo
+timings matching the default show a muted placeholder such as `150 · default`;
+other values look entered. Labels end at `ms`. Clearing an override restores the
+default. LT keys show their own dual-role default.
+Changing a behaviour timing default moves every row following it, including
+explicit values matching the old default; distinct custom timings stay fixed.
+Review lists inherited effective-time changes under Tap & Hold Timing and any
+matching overrides converted to defaults under their behaviours. Those stored
+changes discard together with the default edit.
+Selecting a key opens its grid in Behaviours even before it has a stored row.
+Only a grid action, timing override or anchor change adds the row to the draft;
+browsing leaves the board and behaviour counts unchanged. Transparent keys and
+`KC_NO` cannot have behaviours. Empty branches preserve the key's built-in
+actions until you override them. A dual-role key's empty first tap or hold
 shows, dashed and marked "built in", what the key does there on its own: an
 `LT()` taps its key and holds its layer, an `MT()` or `OSM()` holds its
 modifiers. **Change key…** moves a behaviour to another

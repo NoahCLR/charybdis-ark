@@ -36,7 +36,6 @@ function edited() {
         buttons: slot.buttons.map((button) => ({...button, tap: {...button.tap, keycode: String(button.tap.keycode)}}))}});
     return draft;
 }
-const describe = (items) => items.map((item) => JSON.stringify(item)).sort();
 
 test("discarding one middle combo deletion restores the full packed table", () => {
     const seeded = new ProfileDraftSession(snapshotOf(pdDocument()), "board", capabilities);
@@ -68,7 +67,14 @@ test("each unit goes back to the keyboard's value, and nothing else moves", () =
     for (const unit of units) {
         const document = revertUnits(base, current, new Set([unit]), capabilities);
         const left = profileReview(base, {...current, document, fingerprint: fingerprint(document)});
-        assert.deepEqual(describe(left), describe(rows.filter((row) => row.unit !== unit)), unit);
+        assert.deepEqual(left.map(row => row.unit).sort(), rows.filter(row => row.unit !== unit).map(row => row.unit).sort(), unit);
+        // Effective timing descriptions legitimately change when a default or
+        // one of its followers is restored. Prove isolation against stored
+        // bytes instead: putting only this unit back must recover the exact
+        // current document, with no other changes hidden by review wording.
+        const restored = {...current, document, fingerprint: fingerprint(document)};
+        const roundTrip = revertUnits(current, restored, new Set([unit]), capabilities);
+        assert.equal(fingerprint(roundTrip), current.fingerprint, unit);
     }
 });
 
