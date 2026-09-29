@@ -29,7 +29,7 @@ test("bridge selects explicit checkouts, records dirty state, and stops on failu
         const sha = text => require("node:crypto").createHash("sha256").update(text).digest("hex");
         const pinned = [["tests/fixtures/golden.fixture", "bytes"], ["docs/architecture/spec.md", "spec"]];
         const pin = execFileSync("git", ["-C", roots.firmware, "rev-parse", "HEAD"], {encoding: "utf8"}).trim();
-        execFileSync("git", ["-C", roots.firmware, "update-ref", "refs/remotes/origin/main", pin]);
+        execFileSync("git", ["-C", roots.firmware, "update-ref", "refs/remotes/origin/dev", pin]);
         write(roots.ark, "upstream/manifest.json", JSON.stringify({format: 1, sources: {firmware: {commit: pin}},
             files: pinned.map(([file, text]) => ({path: `upstream/firmware/${file}`, source: "firmware", sourcePath: file, sourceSha256: sha(text)}))}));
         for (const [file, text] of pinned) write(roots.firmware, file, text);
@@ -41,9 +41,9 @@ test("bridge selects explicit checkouts, records dirty state, and stops on failu
         assert.equal(run(args("pass.json")), 0);
         let report = JSON.parse(fs.readFileSync(path.join(base, "pass.json")));
         assert.equal(report.results.length, 5); assert.equal(report.passed, true);
-        assert.deepEqual(report.upstream, {pin, pinPublished: true, publishedRef: "refs/remotes/origin/main", fixtures: [], specs: []});
+        assert.deepEqual(report.upstream, {pin, pinPublished: true, publishedRef: "refs/remotes/origin/dev", fixtures: [], specs: []});
         assert.equal(run([...args("published.json"), "--publish"]), 0);
-        execFileSync("git", ["-C", roots.firmware, "update-ref", "-d", "refs/remotes/origin/main"]);
+        execFileSync("git", ["-C", roots.firmware, "update-ref", "-d", "refs/remotes/origin/dev"]);
         assert.equal(run(args("local-pin.json")), 0);
         assert.equal(JSON.parse(fs.readFileSync(path.join(base, "local-pin.json"))).upstream.pinPublished, false);
         assert.equal(run([...args("unpublished.json"), "--publish"]), 1);

@@ -95,6 +95,14 @@ handed back. It never overrides this file: every change here follows the
 rules above, whichever way the task arrived. Use its absolute path from any
 worktree; never copy it into this repository.
 
+## Branches
+
+`dev` is the trunk. Branch each task from `dev` in its own worktree and
+squash-land it back onto `dev` locally when Noah says so; pull requests are
+optional. `main` is the released line and only moves by fast-forward from
+`dev`. Push only to `NoahCLR/charybdis-ark`. A pin to firmware or QMK names a
+commit on that repository's trunk, taken after its squash landing.
+
 ## Working alongside firmware agents
 
 Use this repository for Ark changes. Older firmware checkouts may still contain

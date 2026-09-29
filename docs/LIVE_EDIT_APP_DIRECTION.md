@@ -708,7 +708,8 @@ It records revisions, dirty state and results without changing runtime or
 requiring firmware for ordinary app checks. Protocol changes run the bridge
 before merging; UI-only changes use the independent suite. Development pins
 any committed firmware revision; a pushed pin names a commit on firmware's
-remote `main`, which `--publish` enforces. See
+remote `dev`, its trunk, which `--publish` enforces. Firmware `main` only
+fast-forwards from `dev`, so a published pin stays reachable from both. See
 [compatibility workflow](COMPATIBILITY.md).
 
 ### D-L46 — Firmware has no reverse dependency on Ark
