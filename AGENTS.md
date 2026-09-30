@@ -3,8 +3,8 @@
 This app edits the **connected keyboard**. Authored C defaults are edited
 directly in the firmware repository; the app never edits those files.
 
-Start with `git status --short`, then read the setup in [README.md](README.md)
-and the reading map in [docs/README.md](docs/README.md). Read Current Product
+Start with `git status --short`, then read the development setup in
+[docs/REPOSITORY.md](docs/REPOSITORY.md#development-and-installation) and the reading map in [docs/README.md](docs/README.md). Read Current Product
 Status and Open Issues in [the direction](docs/LIVE_EDIT_APP_DIRECTION.md)
 before changing behavior; read its relevant decisions before architecture work.
 The interface's rules are in the README's "The interface" section and the
@@ -74,8 +74,12 @@ preview/            ignored generated previews, never authoritative source
 
 Use [docs/README.md](docs/README.md) to place new documentation. Update the
 existing governing document first. Product behavior changes update README and
-the relevant spec in the same pass; architecture decisions update the direction
-or an app-owned spec. Keep Current Product Status and Open Issues accurate.
+the relevant spec in the same pass. `README.md` is for people using Ark: what
+it does, installing it, and how each screen, review, apply and backups behave.
+Keep development material out of it: setup, commands, the code's layout, CI,
+compatibility and release mechanics go in
+[docs/REPOSITORY.md](docs/REPOSITORY.md#development-and-installation).
+Architecture decisions update the direction or an app-owned spec. Keep Current Product Status and Open Issues accurate.
 Each decision has one home: app decisions continue the D-L series here, while a
 D-L heading marked as a firmware decision is only a pointer to the firmware
 repository's direction, which owns that text. Change a firmware decision there,
