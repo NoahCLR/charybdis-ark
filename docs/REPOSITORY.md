@@ -103,14 +103,17 @@ copies together; it is separate from the independent app suite.
 
 ### Protected main promotions
 
-GitHub `main` requires a pull request and the `Promotion from dev` check,
-including for administrators. The check accepts only this repository's `dev`
+GitHub `main` requires a pull request and these checks, including for
+administrators: `Promotion from dev`, and this repository's CI on the promotion
+PR itself: `check (ubuntu-latest)`, `check (macos-latest)`, `browser` and
+`compatibility`. The check accepts only this repository's `dev`
 branch and a merge tree identical to that branch. Force pushes and deletion
 are blocked. GitHub PR merging uses merge commits; squash and rebase merging
 are disabled so the promoted development history stays reachable.
 
 The shared vault's `promote --push` publishes `dev`, opens or resumes its
-promotion PR, waits for the source check, and merges through GitHub. It records
+promotion PR, waits until GitHub reports every required check passed, and
+merges through GitHub. It records
 the verified stack in the merge message and reconciles local `main` to GitHub's
 merge identity. Direct `main` pushes are rejected by the local hook as well.
 Normal task development still lands locally onto `dev`.

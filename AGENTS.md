@@ -266,8 +266,9 @@ silently wins and edits to the visible one are dropped. Then add the payload to
 
 ### Publishing protected main
 
-`main` publication requires a same-repository `dev` → `main` PR and the
-`Promotion from dev` check, including for administrators. Use the shared
+`main` publication requires a same-repository `dev` → `main` PR with the
+`Promotion from dev` check and this repository's CI jobs (`check` on both
+systems, `browser`, `compatibility`), including for administrators. Use the shared
 `promote --push` command only when publishing is requested; never push `main`
 directly or bypass protection. The command accepts GitHub's resulting merge
 identity. `release --push` freezes tags only after those promotion PRs merge.
