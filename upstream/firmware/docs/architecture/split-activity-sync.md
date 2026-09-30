@@ -3,7 +3,7 @@
 Activity coalescing is on in the default build. `NOAH_SPLIT_ACTIVITY_COALESCE=no`
 builds the uncoalesced comparison firmware. It is accepted on hardware in daily
 use; its measured effect on the report rate is still open, see the
-[optimization handoff](https://github.com/NoahCLR/charybdis-4x6/blob/67cc6921dfd57b33233cb51996e11d9d9822a8f1/docs/plans/split-transport-optimization.md).
+*Split transport optimization* plan in the work-queue vault.
 The split link runs at QMK's default 230,400 baud, with no speed selector; see
 D-L43 for why 460,800 was removed.
 
@@ -88,7 +88,7 @@ then reads frozen pages as JSON. It uses the firmware tools' own node-hid
 installation (`npm ci --prefix tools`) and is a separate engineering tool. Close competing app/VIA
 connections. Select `--path` if more than one matching keyboard is attached.
 Capture with the procedure in
-[`measurements/pointing-cadence/`](https://github.com/NoahCLR/charybdis-4x6/blob/67cc6921dfd57b33233cb51996e11d9d9822a8f1/measurements/pointing-cadence/README.md),
+[`measurements/pointing-cadence/`](https://github.com/NoahCLR/charybdis-4x6/blob/ca4e746f8b47daf425bc31f2726674d4c872fae9/measurements/pointing-cadence/README.md),
 which also keeps the recorded sets.
 
 The same run reads the pointing-cadence recorder (custom value `0x03`) when
@@ -140,5 +140,5 @@ transport timeouts.
 ## Remaining work
 
 The runtime RPC replacement and asynchronous transport remain behind the
-measurement gates in `docs/plans/split-transport-optimization.md`. No 1 kHz claim
+measurement gates in the *Split transport optimization* plan (work-queue vault). No 1 kHz claim
 or acceptance is implied by the activity implementation or calculated byte savings.

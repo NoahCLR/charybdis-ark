@@ -22,7 +22,7 @@ It first compares every firmware input (including aliased sources) pinned in `up
 the selected firmware working copy. A pinned fixture that differs or is missing
 fails the check before any runner starts, because this repository's own tests
 would be exercising stale bytes; refresh `upstream/` from a committed firmware
-revision as [its README](../upstream/README.md#updating-a-contract) describes. A
+revision with `npm run upstream` as [its README](../upstream/README.md#updating-a-contract) describes. A
 pinned spec that differs only lags: it is printed as a warning and listed under
 `upstream.specs` in the report. Review it deliberately; it does not fail.
 
@@ -52,7 +52,8 @@ streams to the terminal. A failed runner stops the check and leaves a failed
 report; an incomplete report is not a pass. Do not edit the checkouts during a
 run: this tests working copies, not immutable snapshots or a dirty-tree archive.
 
-CI checks all source pins and runs the bridge with `--publish`. Branch checks select
+CI checks all source pins, checks that `upstream/` reproduces exactly from them
+(`npm run upstream -- --check`), and runs the bridge with `--publish`. Branch checks select
 published dependency trunks; release-tag checks select that same tag in all three
 repositories. The report records the selected commits and is retained as an artifact.
 `npm run pins -- --firmware PATH --qmk PATH` checks just ancestry without compiling.

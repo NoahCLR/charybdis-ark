@@ -38,6 +38,8 @@ ordinary test, preview, or catalog command may require a sibling checkout.
 Developer-only tools, never imported by the application runtime:
 
 - `scripts/generate-keycode-catalog.js` regenerates the vendored catalog.
+- `scripts/refresh-upstream.js` re-pins or checks the `upstream/` snapshots from explicitly
+  selected firmware and QMK checkouts (committed blobs only).
 - `scripts/preview.js` renders the interface against the test fixtures.
 - `scripts/check-compatibility.js` runs Ark-owned integration runners against explicitly selected
   firmware source; it is never imported by runtime code.
