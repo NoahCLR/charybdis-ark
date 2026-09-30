@@ -308,3 +308,23 @@ continues to use the independent app checks.
 Ark owns these integration runners under `tests/integration/`; they read the
 selected firmware sources. Firmware's own tests and build require no Ark
 checkout or app dependencies.
+
+## Automated verification and publishing
+
+CI runs the independent app suite on Linux and macOS, loads the native HID module,
+checks every imported source pin against its published trunk, and runs the
+[compatibility bridge](docs/COMPATIBILITY.md). On a release tag the bridge selects
+the matching firmware and QMK tags. Its report is retained in Actions.
+
+`npm run test:browser` starts a fixture-only preview and drives a pointer-speed
+edit, checking the complete posted settings section and the host stylesheet
+cascade. Install its browser once with `npx playwright install chromium`.
+The small host-style fixture covers known padding/cascade regressions; it is not
+a VS Code extension-host or physical-device acceptance test.
+
+The shared vault tools own publication: `verify` records the tested source trees,
+dependencies, toolchain and artifacts; `land` attaches a receipt. The installed
+pre-push hook rejects new protected-branch commits without matching evidence.
+`release VERSION --push` resumes the prepared stack even after development moves
+on, and waits for both repos' tagged CI plus both firmware assets before making
+the GitHub releases public. It never applies a profile to the keyboard.

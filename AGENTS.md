@@ -120,7 +120,7 @@ of a sibling checkout does not authorize editing it.
 
 The compatibility bridge reads three working copies: coordinate a stable period
 with agents changing them, and use the actual worktree paths being tested.
-There is no automated build or device reservation system. Coordinate before
+The shared `verify` command serializes QMK pair builds; there is no device reservation system. Coordinate before
 sharing a QMK build directory or opening the physical keyboard; close competing
 Ark/VIA/diagnostic sessions. Fixture previews and ordinary app tests need no
 device. Do not flash or Apply a profile merely to verify an editor change.
@@ -210,6 +210,7 @@ Every layer may also import from itself.
 ```sh
 npm run check                 # syntax across the tree, then all tests
 npm run keycodes -- --check   # fails if the vendored catalog has drifted
+npm run test:browser          # fixture browser smoke, Chromium required
 npm run preview               # then serve the folder and open preview/index.html
 ```
 
@@ -260,3 +261,11 @@ Two failures this catches, both of which once shipped unnoticed: a field with
 no listener at all, and a field rendered twice, where the second registration
 silently wins and edits to the visible one are dropped. Then add the payload to
 `tests/edits.test.mjs` so its shape is pinned for good.
+
+### Publishing protected main
+
+`main` publication requires a same-repository `dev` → `main` PR and the
+`Promotion from dev` check, including for administrators. Use the shared
+`promote --push` command only when publishing is requested; never push `main`
+directly or bypass protection. The command accepts GitHub's resulting merge
+identity. `release --push` freezes tags only after those promotion PRs merge.

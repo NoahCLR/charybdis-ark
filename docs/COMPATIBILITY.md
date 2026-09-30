@@ -18,7 +18,7 @@ Git, Node, Python 3, a C compiler with the runners' sanitizer support, and the s
 QMK tree are required. Missing checkouts or required integration inputs fail before any tests run. No dependency installation, fetching, device
 access or firmware flashing occurs.
 
-It first compares every firmware input pinned in `upstream/manifest.json` with
+It first compares every firmware input (including aliased sources) pinned in `upstream/manifest.json` with
 the selected firmware working copy. A pinned fixture that differs or is missing
 fails the check before any runner starts, because this repository's own tests
 would be exercising stale bytes; refresh `upstream/` from a committed firmware
@@ -26,9 +26,9 @@ revision as [its README](../upstream/README.md#updating-a-contract) describes. A
 pinned spec that differs only lags: it is printed as a warning and listed under
 `upstream.specs` in the report. Review it deliberately; it does not fail.
 
-It also records whether the pinned firmware commit is published: contained in
+It also records whether every firmware and QMK source pin is published. Firmware pins must be contained in
 the firmware checkout's `refs/remotes/origin/dev`, its trunk. The bridge never fetches,
-so fetch that checkout first for a current answer. An unpublished pin is a
+so fetch both dependency checkouts first for a current answer. QMK pins must be contained in `refs/remotes/origin/noah-userspace-contracts`. An unpublished pin is a
 warning during local work. With `--publish`, it fails before any runner starts;
 run that form before pushing an Ark change that moves a pin.
 
@@ -39,6 +39,7 @@ The bridge then sequentially runs these Ark-owned integration runners under `tes
 - `run_macro_program_size_tests.sh`: app size predictions against C decoding.
 - `run_profile_compiled_defaults_v1_tests.sh`: app profiles → C validation.
 - `run_profile_pd_v1_tests.sh`: app PD corpus → C validation.
+- `run_profile_rgb_v1_tests.sh`: app RGB encodings and malformed-byte corpus → C validation, for both compiled schema versions, with address/undefined-behavior sanitizers. Ark reads both backup versions; each C build accepts its own compiled version.
 
 The selected Ark root is exported as `CHARYBDIS_ARK_ROOT`; `QMK_ROOT` and
 `QMK_HOME` identify the selected QMK tree. The integration runner files come from
@@ -51,10 +52,14 @@ streams to the terminal. A failed runner stops the check and leaves a failed
 report; an incomplete report is not a pass. Do not edit the checkouts during a
 run: this tests working copies, not immutable snapshots or a dirty-tree archive.
 
-For repeatable CI later, check out explicitly pinned commits of all three
-repositories, ensure the trees are clean and retain the report and console log.
+CI checks all source pins and runs the bridge with `--publish`. Branch checks select
+published dependency trunks; release-tag checks select that same tag in all three
+repositories. The report records the selected commits and is retained as an artifact.
+`npm run pins -- --firmware PATH --qmk PATH` checks just ancestry without compiling.
+Use `--firmware-ref REV --qmk-ref REV` to check membership in a selected local
+release history; the defaults are the fetched origin trunks.
 Revision pins belong in the integrating CI job; this command neither chooses
-nor updates a known-compatible release automatically. These five checks do not
+nor updates a known-compatible release automatically. These six checks do not
 replace either repository's full suite or physical-device acceptance.
 
 Firmware's full suite and build are independent of Ark. It uses frozen,

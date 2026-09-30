@@ -30,7 +30,7 @@ test("bridge selects explicit checkouts, records dirty state, and stops on failu
         const pinned = [["tests/fixtures/golden.fixture", "bytes"], ["docs/architecture/spec.md", "spec"]];
         const pin = execFileSync("git", ["-C", roots.firmware, "rev-parse", "HEAD"], {encoding: "utf8"}).trim();
         execFileSync("git", ["-C", roots.firmware, "update-ref", "refs/remotes/origin/dev", pin]);
-        write(roots.ark, "upstream/manifest.json", JSON.stringify({format: 1, sources: {firmware: {commit: pin}},
+        write(roots.ark, "upstream/manifest.json", JSON.stringify({format: 1, sources: {firmware: {commit: pin, repository: "https://github.com/NoahCLR/charybdis-4x6"}},
             files: pinned.map(([file, text]) => ({path: `upstream/firmware/${file}`, source: "firmware", sourcePath: file, sourceSha256: sha(text)}))}));
         for (const [file, text] of pinned) write(roots.firmware, file, text);
         for (const file of ["quantum/quantum_keycodes.h", "quantum/keycodes.h", "platforms/marker"]) write(roots.qmk, file);
@@ -40,8 +40,8 @@ test("bridge selects explicit checkouts, records dirty state, and stops on failu
         const args = report => ["--firmware", roots.firmware, "--ark", roots.ark, "--qmk", roots.qmk, "--report", path.join(base, report)];
         assert.equal(run(args("pass.json")), 0);
         let report = JSON.parse(fs.readFileSync(path.join(base, "pass.json")));
-        assert.equal(report.results.length, 5); assert.equal(report.passed, true);
-        assert.deepEqual(report.upstream, {pin, pinPublished: true, publishedRef: "refs/remotes/origin/dev", fixtures: [], specs: []});
+        assert.equal(report.results.length, RUNNERS.length); assert.equal(report.passed, true);
+        assert.deepEqual({...report.upstream, pins: undefined}, {pins: undefined, pin, pinPublished: true, publishedRef: "refs/remotes/origin/dev", fixtures: [], specs: []});
         assert.equal(run([...args("published.json"), "--publish"]), 0);
         execFileSync("git", ["-C", roots.firmware, "update-ref", "-d", "refs/remotes/origin/dev"]);
         assert.equal(run(args("local-pin.json")), 0);

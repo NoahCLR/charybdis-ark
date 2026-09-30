@@ -100,3 +100,29 @@ the pinned inputs.
 
 The explicit [compatibility bridge](COMPATIBILITY.md) tests selected working
 copies together; it is separate from the independent app suite.
+
+### Protected main promotions
+
+GitHub `main` requires a pull request and the `Promotion from dev` check,
+including for administrators. The check accepts only this repository's `dev`
+branch and a merge tree identical to that branch. Force pushes and deletion
+are blocked. GitHub PR merging uses merge commits; squash and rebase merging
+are disabled so the promoted development history stays reachable.
+
+The shared vault's `promote --push` publishes `dev`, opens or resumes its
+promotion PR, waits for the source check, and merges through GitHub. It records
+the verified stack in the merge message and reconciles local `main` to GitHub's
+merge identity. Direct `main` pushes are rejected by the local hook as well.
+Normal task development still lands locally onto `dev`.
+
+`release VERSION` verifies a provisional local stack without freezing tags.
+`release VERSION --push` first publishes the promotion PRs, then tests and tags
+the resulting GitHub commits. Retries after that checkpoint retain those exact
+commits. An old checkpoint referencing unpublished local promotion commits is
+rejected rather than silently retagged. Publishing requires the promotion
+workflow to have been landed and pushed to `dev` first.
+
+`dev` cannot be force-pushed or deleted on GitHub, and published `v*` release
+tags cannot be moved or deleted (rulesets without bypass). Merge commits take
+the PR's title and body, so a merge from the GitHub page carries the same
+verification trailers as one made by `promote --push`.
