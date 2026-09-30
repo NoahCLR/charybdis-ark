@@ -32,7 +32,8 @@
     "preview": "node scripts/preview.js",
     "test:compat": "node scripts/check-compatibility.js",
     "test:browser": "playwright test",
-    "pins": "node scripts/check-pins.js"
+    "pins": "node scripts/check-pins.js",
+    "upstream": "node scripts/refresh-upstream.js"
   },
   "dependencies": {
     "node-hid": "^3.4.0"

@@ -46,6 +46,8 @@ jobs:
           fetch-depth: 0
           path: .ci/qmk
       - run: node scripts/check-pins.js --firmware .ci/firmware --qmk .ci/qmk
+      - name: Check upstream/ reproduces exactly from its pins
+        run: node scripts/refresh-upstream.js --check --firmware .ci/firmware --qmk .ci/qmk
       - name: Test the selected published stack
         run: npm run test:compat -- --firmware .ci/firmware --ark . --qmk .ci/qmk --publish --report "${{ runner.temp }}/compat.json"
       - uses: actions/upload-artifact@v7

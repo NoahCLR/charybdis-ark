@@ -51,21 +51,25 @@ Node dependencies have been installed.
    nowhere. If firmware merged by squash or rebase, re-pin to the merged commit.
    Fetch the firmware checkout, then run the bridge with `--publish` before
    pushing.
-2. Copy the required files at their existing paths here, retaining historical
-   fixtures still needed for compatibility. Record a new source entry if only
-   some files advance to a different revision; each file's `source` must resolve
-   to the revision it actually came from.
-3. Update `sourcePath`, `sourceSha256`, `sha256` and any transformation note in
-   the manifest. For documentation, resolve relative links to local copies or
-   pinned upstream source. Never edit fixture bytes simply to match the app.
-4. For QMK changes, update all relevant catalog fragments, the keyboard header,
-   layout and version stamp coherently. The stamp is
-   `git describe --tags --exclude 'v2*'` of the pinned QMK commit: excluding
-   the stack's own `vYYYY.MM.DD` release tags keeps it naming the upstream QMK
-   version. Run `npm run keycodes`, review the
-   generated diff, then `npm run keycodes -- --check` and `npm run check`.
-   An explicit `npm run keycodes -- --qmk /path/to/qmk` is available for comparing
-   a candidate checkout, but it does not update the imported inputs or manifest.
+2. Refresh with the tool, which reads only committed blobs and never fetches:
+   `npm run upstream -- --firmware PATH --qmk PATH` re-pins every listed file to
+   the local trunks (or `--firmware-rev REV` / `--qmk-rev REV`), one source per
+   repository. It rewrites each file's hashes and transformation note, the QMK
+   version stamp (`git describe --tags --exclude 'v2*'` of the pinned commit, so
+   the stack's own `vYYYY.MM.DD` release tags never replace the upstream QMK
+   version) and the keycode catalog. It lists files whose content changed
+   separately from those whose pinned links only moved, and flags changed
+   fixture or QMK input bytes. Documentation links to another imported file
+   stay as written; every other relative link is pinned to the source commit.
+   Never edit fixture bytes simply to match the app.
+3. To add a file, list it in the manifest (`path`, `source`, `sourcePath`), then
+   refresh. Historical fixtures still needed for compatibility stay listed.
+4. Review the diff, then run `npm run check`, `npm run keycodes -- --check` and
+   `npm run upstream -- --check --firmware PATH --qmk PATH`, which rebuilds every
+   file from the commit its entry pins and fails on any difference; CI's
+   compatibility job runs the same check. An explicit
+   `npm run keycodes -- --qmk /path/to/qmk` compares a candidate checkout's
+   catalog without updating the imported inputs or manifest.
 5. For wire changes, update the app's codecs and tests in the same change and
    arrange compatibility testing with the firmware project. App tests prove
    behavior against these vectors; they do not compile or run current firmware.
