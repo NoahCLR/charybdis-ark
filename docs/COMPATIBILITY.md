@@ -52,10 +52,18 @@ streams to the terminal. A failed runner stops the check and leaves a failed
 report; an incomplete report is not a pass. Do not edit the checkouts during a
 run: this tests working copies, not immutable snapshots or a dirty-tree archive.
 
-CI checks all source pins, checks that `upstream/` reproduces exactly from them
-(`npm run upstream -- --check`), and runs the bridge with `--publish`. Branch checks select
-published dependency trunks; release-tag checks select that same tag in all three
-repositories. The report records the selected commits and is retained as an artifact.
+CI's required `compatibility` job checks all source pins, checks that `upstream/`
+reproduces exactly from them (`npm run upstream -- --check`), and runs the bridge
+with `--publish` against exactly the firmware and QMK commits Ark pins; release-tag
+checks select that same tag in all three repositories. Gating on the pins lets
+firmware move ahead without turning Ark red: Ark claims compatibility with what it
+pins, and the release stack test proves the three agree before a tag.
+A separate job, `compatibility with firmware dev (early warning)`, runs the bridge
+against firmware `dev` and the BK trunk as they are now, on every push, pull
+request, nightly and on demand. It is not required and never blocks landing or
+promotion; red means firmware moved in a way Ark must follow (re-pin with
+`npm run upstream`, update codecs and tests). The reports record the selected
+commits and are retained as artifacts.
 `npm run pins -- --firmware PATH --qmk PATH` checks just ancestry without compiling.
 Use `--firmware-ref REV --qmk-ref REV` to check membership in a selected local
 release history; the defaults are the fetched origin trunks.
