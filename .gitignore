@@ -4,3 +4,6 @@ preview/
 *.log
 *.vsix
 coverage/
+test-results/
+playwright-report/
+.ci/

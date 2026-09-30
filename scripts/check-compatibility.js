@@ -5,7 +5,9 @@ const path = require("node:path");
 const {execFileSync, spawnSync} = require("node:child_process");
 const {createHash} = require("node:crypto");
 
-const RUNNERS = ["qmk_portable_editor", "qmk_portable_profile", "macro_program_size", "profile_compiled_defaults_v1", "profile_pd_v1"]
+const {checkPins} = require("./check-pins");
+
+const RUNNERS = ["qmk_portable_editor", "qmk_portable_profile", "macro_program_size", "profile_compiled_defaults_v1", "profile_pd_v1", "profile_rgb_v1"]
     .map(name => `tests/integration/run_${name}_tests.sh`);
 const usage = "npm run test:compat -- --firmware PATH --ark PATH --qmk PATH --report NEW_FILE.json [--publish]";
 // A pin is published when the firmware checkout's last-fetched dev, its trunk, contains it.
@@ -55,7 +57,7 @@ function compareUpstream(arkRoot, firmwareRoot) {
     const pin = manifest.sources.firmware?.commit;
     const result = {pin, pinPublished: pinPublished(firmwareRoot, pin), publishedRef: PUBLISHED_REF, fixtures: [], specs: []};
     for (const file of manifest.files) {
-        if (file.source !== "firmware") continue;
+        if (manifest.sources[file.source]?.repository !== "https://github.com/NoahCLR/charybdis-4x6") continue;
         const source = path.join(firmwareRoot, file.sourcePath);
         const sha = fs.existsSync(source) ? createHash("sha256").update(fs.readFileSync(source)).digest("hex") : null;
         if (sha === file.sourceSha256) continue;
@@ -82,7 +84,14 @@ function run(argv) {
         write();
         for (const [name, info] of Object.entries(checkouts)) console.log(`${name}: ${info.path}\n  ${info.revision} (${info.dirty ? "dirty" : "clean"})`);
         report.upstream = compareUpstream(checkouts.ark.path, checkouts.firmware.path);
+        report.upstream.pins = checkPins(JSON.parse(fs.readFileSync(path.join(checkouts.ark.path, "upstream/manifest.json"))),
+            {firmware: checkouts.firmware.path, qmk: checkouts.qmk.path});
         write();
+        const unpublished = report.upstream.pins.filter(pin => !pin.published);
+        if (unpublished.length) {
+            console.error(`Unpublished pins: ${unpublished.map(pin => pin.name).join(", ")}`);
+            if (flags.publish) return 1;
+        }
         const describe = entry => `  ${entry.path}${entry.missing ? " (missing in firmware)" : ""}`;
         if (report.upstream.specs.length) console.log(`\nWarning: upstream/ specs lag the selected firmware (pinned ${report.upstream.pin}):\n${report.upstream.specs.map(describe).join("\n")}`);
         if (!report.upstream.pinPublished) {
