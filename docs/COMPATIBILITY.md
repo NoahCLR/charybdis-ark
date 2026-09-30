@@ -70,6 +70,18 @@ containing firmware's pin:
   equality, not commit equality);
 - Ark's pinned fixtures equal the firmware's.
 
+What can break Ark, and what checks it:
+
+| Surface | Defined in | Ark learns it from | Checked by |
+| --- | --- | --- | --- |
+| Profile Wire channel | firmware `compat/qmk_via_profile_channel.c` | protocol and schema versions, feature flags | agreement (pages decode, versions); golden fixtures |
+| Stored profile format (blob, domains, settings, compiled defaults) | firmware `lib/profile/schema/` | schema version | the bridge's runners; agreement (fixtures equal) |
+| Action vocabulary and action-ABI digest | firmware, and BK keycode values | digest against `KNOWN_ACTION_ABIS` | agreement (digest known) |
+| Keycode catalog and layout | BK | Ark's pinned BK snapshot | agreement (files equal at firmware's BK pin); `npm run keycodes -- --check` |
+| VIA surface (layers, macro buffer, macro format) | BK's VIA and firmware config | capacities on the capability pages | agreement (decoder consistency rules); macro-size runner |
+| Keyboard options (RGB effects and order, LED flags) | BK's RGB matrix and firmware config | reported at runtime | portable-editor runner |
+| Behaviour on the keyboard | firmware | nothing | keyboard checks only; not automatable |
+
 Firmware version, compiled-default digest and capacities are reported, never
 compared: they change with ordinary keymap edits. CI's `agreement` job runs it
 against firmware `dev` on pushes and nightly, firmware `main` on PRs to `main`

@@ -820,3 +820,16 @@ override. Clearing an override restores the default. An unchanged empty preview
 posts nothing.
 The target is a lookup key, not an implicit authored tap action: copying an
 `LT()` target into a tap branch would fail the firmware's placement rules.
+
+### D-L50 — Ark agrees with firmware by contract; `main` is a released stack
+
+Ark talks to a keyboard, not to a firmware commit: it follows the capability
+pages the keyboard answers, and one Ark serves a range of firmware. Ark and
+firmware are in sync when the contract agrees, not when commits match. The
+agreement check (`npm run agreement`) decodes the pages firmware states with
+Ark's own runtime decoder and gating, and requires Ark's BK keycode and layout
+inputs and pinned fixtures to equal firmware's (file equality, not commit
+equality); keymap values are reported, never gating. It is required on `main`.
+`dev` tests against Ark's own pins; `main` moves only by a release, which tests
+that exact stack and its agreement and publishes the table in the notes
+(firmware D-F04). See [agreement](COMPATIBILITY.md#agreement-with-a-firmware-contract).
