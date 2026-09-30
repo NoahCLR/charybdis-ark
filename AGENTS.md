@@ -40,6 +40,8 @@ Developer-only tools, never imported by the application runtime:
 - `scripts/generate-keycode-catalog.js` regenerates the vendored catalog.
 - `scripts/refresh-upstream.js` re-pins or checks the `upstream/` snapshots from explicitly
   selected firmware and QMK checkouts (committed blobs only).
+- `scripts/check-agreement.js` (`npm run agreement`) judges a firmware's stated contract with
+  Ark's own runtime decoder and gating; required on `main` in CI.
 - `scripts/preview.js` renders the interface against the test fixtures.
 - `scripts/check-compatibility.js` runs Ark-owned integration runners against explicitly selected
   firmware source; it is never imported by runtime code.
@@ -102,7 +104,7 @@ worktree; never copy it into this repository.
 `dev` is the trunk. Branch each task from `dev` in its own worktree and
 squash-land it back onto `dev` locally when Noah says so; pull requests are
 optional. `main` is the released line and only moves by the vault's
-`_agents/bin/promote`, a merge commit whose tree is exactly `dev`'s. Landed
+`_agents/bin/release`, as a merge commit whose tree is exactly `dev`'s. Landed
 commits, promotions and release tags carry trailers naming the firmware and QMK
 commits they were tested with (`Stack-Firmware`, `Stack-QMK`, `Ark-Pins`,
 `Stack-Tested`); the tools write them. A pull request body carries the same
@@ -268,7 +270,6 @@ silently wins and edits to the visible one are dropped. Then add the payload to
 
 `main` publication requires a same-repository `dev` → `main` PR with the
 `Promotion from dev` check and this repository's CI jobs (`check` on both
-systems, `browser`, `compatibility`), including for administrators. Use the shared
-`promote --push` command only when publishing is requested; never push `main`
-directly or bypass protection. The command accepts GitHub's resulting merge
-identity. `release --push` freezes tags only after those promotion PRs merge.
+systems, `browser`, `compatibility`, `agreement`), including for
+administrators. Only the shared `release --push` opens it, when Noah asks for a
+release; never push `main` directly or bypass protection.

@@ -67,6 +67,46 @@ jobs:
           name: compatibility-report
           path: ${{ runner.temp }}/compat.json
 
+  agreement:
+    # Required on main. Firmware states its contract (tests/host/
+    # run_contract_probe.sh); Ark judges it with its own runtime code
+    # (scripts/check-agreement.js), against BK at firmware's pin. Firmware main
+    # on PRs to main, the release tag on tags, firmware dev otherwise (also
+    # nightly: would a release agree today?).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+      - uses: actions/checkout@v6
+        with:
+          repository: NoahCLR/charybdis-4x6
+          ref: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || (github.base_ref == 'main' && 'main' || 'dev') }}
+          path: .ci/firmware
+          persist-credentials: false
+      - name: Read firmware's BK pin
+        id: pin
+        run: node -e 'console.log("commit=" + require("./.ci/firmware/qmk-pin.json").commit)' >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v6
+        with:
+          repository: NoahCLR/bastardkb-qmk
+          ref: ${{ steps.pin.outputs.commit }}
+          path: .ci/qmk
+          persist-credentials: false
+      - name: Judge the firmware contract
+        run: node scripts/check-agreement.js --firmware .ci/firmware --qmk .ci/qmk --report "${{ runner.temp }}/agreement.json" --markdown "${{ runner.temp }}/agreement.md"
+      - name: Show the agreement table
+        if: always()
+        run: cat "${{ runner.temp }}/agreement.md" >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: agreement-report
+          path: |
+            ${{ runner.temp }}/agreement.json
+            ${{ runner.temp }}/agreement.md
+
   compatibility-heads:
     # Early warning, not required: Ark against firmware dev and the BK trunk as
     # they are now. Red means firmware moved in a way Ark must follow (re-pin
@@ -88,7 +128,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           repository: NoahCLR/bastardkb-qmk
-          ref: noah-userspace-contracts
+          ref: noah-userspace-contracts-dev
           fetch-depth: 0
           path: .ci/qmk
       - name: Test Ark against the current firmware and BK trunks

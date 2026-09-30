@@ -46,15 +46,16 @@ Node dependencies have been installed.
    blobs, not an unreviewed working-tree snapshot. Locally, any committed
    revision will do, pushed or not. A pin change is pushed only once its
    revision is on the source's remote trunk (firmware `dev`; QMK
-   `noah-userspace-contracts`): a feature-branch commit disappears
+   `noah-userspace-contracts-dev`): a feature-branch commit disappears
    when a squash or rebase merge replaces it, and the pinned links then point
    nowhere. If firmware merged by squash or rebase, re-pin to the merged commit.
    Fetch the firmware checkout, then run the bridge with `--publish` before
    pushing.
 2. Refresh with the tool, which reads only committed blobs and never fetches:
    `npm run upstream -- --firmware PATH --qmk PATH` re-pins every listed file to
-   the local trunks (or `--firmware-rev REV` / `--qmk-rev REV`), one source per
-   repository. It rewrites each file's hashes and transformation note, the QMK
+   firmware's local `dev` and to the BK commit that firmware's `qmk-pin.json`
+   names, so Ark's BK inputs are the ones the firmware is built with (or
+   `--firmware-rev REV` / `--qmk-rev REV`), one source per repository. It rewrites each file's hashes and transformation note, the QMK
    version stamp (`git describe --tags --exclude 'v2*'` of the pinned commit, so
    the stack's own `vYYYY.MM.DD` release tags never replace the upstream QMK
    version) and the keycode catalog. It lists files whose content changed

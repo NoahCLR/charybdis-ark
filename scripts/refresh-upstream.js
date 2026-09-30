@@ -7,8 +7,9 @@
 // Every file comes from a committed blob, never a working tree, and nothing is
 // fetched. --check rebuilds each file from the commit its manifest entry pins
 // and fails on any difference. Without it, every file is re-pinned to one
-// revision per repository (default: the local trunks), the manifest and QMK
-// version stamp are rewritten, and the keycode catalog is regenerated.
+// revision per repository (default: firmware's local dev, and the BK commit
+// that firmware's qmk-pin.json names), the manifest and QMK version stamp are
+// rewritten, and the keycode catalog is regenerated.
 // Adding a file is still a manifest edit; this tool refreshes what is listed.
 const fs = require("node:fs");
 const path = require("node:path");
@@ -17,7 +18,7 @@ const {execFileSync} = require("node:child_process");
 
 const REPOSITORIES = {
     firmware: {url: "https://github.com/NoahCLR/charybdis-4x6", trunk: "dev"},
-    qmk: {url: "https://github.com/NoahCLR/bastardkb-qmk", trunk: "noah-userspace-contracts"},
+    qmk: {url: "https://github.com/NoahCLR/bastardkb-qmk", trunk: "noah-userspace-contracts-dev"},
 };
 const LINK_NOTE = "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs.";
 const STAMP_PATH = "upstream/qmk/version.txt";
@@ -104,7 +105,16 @@ function refresh(arkRoot, roots, revisions = {}, {catalog = true} = {}) {
     const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
     const commits = {};
     for (const name of Object.keys(REPOSITORIES)) {
-        commits[name] = git(roots[name], ["rev-parse", "--verify", `${revisions[name] || REPOSITORIES[name].trunk}^{commit}`]).trim();
+        let revision = revisions[name] || REPOSITORIES[name].trunk;
+        // BK follows the firmware being pinned: the commit its qmk-pin.json names.
+        if (name === "qmk" && !revisions.qmk) {
+            try {
+                revision = JSON.parse(git(roots.firmware, ["show", `${commits.firmware}:qmk-pin.json`])).commit;
+            } catch {
+                // Firmware older than its BK pin: fall back to the BK dev branch.
+            }
+        }
+        commits[name] = git(roots[name], ["rev-parse", "--verify", `${revision}^{commit}`]).trim();
     }
     const report = {commits, content: [], links: [], fixtures: []};
     for (const {file, repository, source, output} of render(manifest, roots, commits)) {

@@ -28,7 +28,7 @@ pinned spec that differs only lags: it is printed as a warning and listed under
 
 It also records whether every firmware and QMK source pin is published. Firmware pins must be contained in
 the firmware checkout's `refs/remotes/origin/dev`, its trunk. The bridge never fetches,
-so fetch both dependency checkouts first for a current answer. QMK pins must be contained in `refs/remotes/origin/noah-userspace-contracts`. An unpublished pin is a
+so fetch both dependency checkouts first for a current answer. QMK pins must be contained in `refs/remotes/origin/noah-userspace-contracts-dev`, the BK fork's development branch. An unpublished pin is a
 warning during local work. With `--publish`, it fails before any runner starts;
 run that form before pushing an Ark change that moves a pin.
 
@@ -51,6 +51,30 @@ files), Node version, timestamps and each runner's exit status. Runner output
 streams to the terminal. A failed runner stops the check and leaves a failed
 report; an incomplete report is not a pass. Do not edit the checkouts during a
 run: this tests working copies, not immutable snapshots or a dirty-tree archive.
+
+## Agreement with a firmware contract
+
+The bridge proves byte-level equivalence of codecs; the agreement check answers
+the release question: does this Ark speak that firmware? Firmware states its
+contract with `tests/host/run_contract_probe.sh`: the exact Profile Wire
+capability pages its keyboard answers, its BK pin (`qmk-pin.json`) and the
+hashes of its fixtures. `npm run agreement -- --firmware PATH --qmk PATH`
+judges it with Ark's own runtime code, where `--qmk` is a BK checkout
+containing firmware's pin:
+
+- the capability pages decode with Ark's Profile Wire decoder (all its
+  consistency rules);
+- the protocol and profile schema are ones Ark speaks, and Ark knows the
+  action-ABI digest (`KNOWN_ACTION_ABIS`);
+- Ark's BK keycode and layout inputs equal those at firmware's BK pin (file
+  equality, not commit equality);
+- Ark's pinned fixtures equal the firmware's.
+
+Firmware version, compiled-default digest and capacities are reported, never
+compared: they change with ordinary keymap edits. CI's `agreement` job runs it
+against firmware `dev` on pushes and nightly, firmware `main` on PRs to `main`
+and the tag on release tags; it is required on `main`, and its table is in the
+job summary and in release notes.
 
 CI's required `compatibility` job checks all source pins, checks that `upstream/`
 reproduces exactly from them (`npm run upstream -- --check`), and runs the bridge
