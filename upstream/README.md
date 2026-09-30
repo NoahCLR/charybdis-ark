@@ -59,7 +59,10 @@ Node dependencies have been installed.
    the manifest. For documentation, resolve relative links to local copies or
    pinned upstream source. Never edit fixture bytes simply to match the app.
 4. For QMK changes, update all relevant catalog fragments, the keyboard header,
-   layout and version stamp coherently. Run `npm run keycodes`, review the
+   layout and version stamp coherently. The stamp is
+   `git describe --tags --exclude 'v2*'` of the pinned QMK commit: excluding
+   the stack's own `vYYYY.MM.DD` release tags keeps it naming the upstream QMK
+   version. Run `npm run keycodes`, review the
    generated diff, then `npm run keycodes -- --check` and `npm run check`.
    An explicit `npm run keycodes -- --qmk /path/to/qmk` is available for comparing
    a candidate checkout, but it does not update the imported inputs or manifest.
