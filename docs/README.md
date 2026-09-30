@@ -1,7 +1,7 @@
 # Documentation map
 
 Start at the root [AGENTS.md](../AGENTS.md) for development rules and
-[README.md](../README.md) for installation and current user behavior;
+[README.md](../README.md) for what Ark does and installing it, [GUIDE.md](GUIDE.md) for current user behavior;
 [REPOSITORY.md](REPOSITORY.md#development-and-installation) for development setup,
 commands, the code's layout, CI and publishing.
 This map tells a new contributor what to read and where to write.
@@ -13,6 +13,7 @@ source and worktrees; `upstream/` is the pinned baseline, not that checkout.
 
 | Document | Responsibility | Read when |
 | --- | --- | --- |
+| [GUIDE.md](GUIDE.md) | Current user behavior: each screen, the interface's rules, Review, Apply, backups | Changing anything a user sees or does |
 | [PRODUCT_GOAL.md](PRODUCT_GOAL.md) | Product promise and completion criteria | Understanding what the app should become |
 | [LIVE_EDIT_APP_DIRECTION.md](LIVE_EDIT_APP_DIRECTION.md) | Product status, open issues and the app's D-L decisions; firmware decisions are pointers to the firmware direction | Changing behavior or architecture |
 | [REPOSITORY.md](REPOSITORY.md) | Repository ownership, source provenance, development setup, commands, CI and publishing | Starting in a new checkout |

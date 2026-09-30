@@ -7,8 +7,8 @@ Start with `git status --short`, then read the development setup in
 [docs/REPOSITORY.md](docs/REPOSITORY.md#development-and-installation) and the reading map in [docs/README.md](docs/README.md). Read Current Product
 Status and Open Issues in [the direction](docs/LIVE_EDIT_APP_DIRECTION.md)
 before changing behavior; read its relevant decisions before architecture work.
-The interface's rules are in the README's "The interface" section and the
-direction's decisions; `npm run preview` renders the real interface.
+The interface's rules are in [the guide](docs/GUIDE.md)'s "The interface"
+section and the direction's decisions; `npm run preview` renders the real interface.
 
 ## Repository ownership
 
@@ -73,10 +73,13 @@ preview/            ignored generated previews, never authoritative source
 ## Documentation ownership
 
 Use [docs/README.md](docs/README.md) to place new documentation. Update the
-existing governing document first. Product behavior changes update README and
-the relevant spec in the same pass. `README.md` is for people using Ark: what
-it does, installing it, and how each screen, review, apply and backups behave.
-Keep development material out of it: setup, commands, the code's layout, CI,
+existing governing document first. Product behavior changes update
+[docs/GUIDE.md](docs/GUIDE.md) and the relevant spec in the same pass, and
+`README.md` when what a user can do changes. `README.md` is a short pitch for
+Charybdis owners, in Noah's personal voice: what you can change, that nothing
+is saved until reviewed, installing, and links; keep it short. `docs/GUIDE.md`
+is for people using Ark in depth: how each screen, review, apply and backups
+behave. Keep development material out of both: setup, commands, the code's layout, CI,
 compatibility and release mechanics go in
 [docs/REPOSITORY.md](docs/REPOSITORY.md#development-and-installation).
 Architecture decisions update the direction or an app-owned spec. Keep Current Product Status and Open Issues accurate.
