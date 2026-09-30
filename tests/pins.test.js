@@ -7,7 +7,7 @@ test("all firmware aliases and QMK pins must belong to their published trunks", 
     const base = fs.mkdtempSync(path.join(os.tmpdir(), "ark-pins-"));
     try {
         const roots = {}, sources = {};
-        for (const [name, slug, trunk] of [["firmware", "charybdis-4x6", "dev"], ["qmk", "bastardkb-qmk", "noah-userspace-contracts"]]) {
+        for (const [name, slug, trunk] of [["firmware", "charybdis-4x6", "dev"], ["qmk", "bastardkb-qmk", "noah-userspace-contracts-dev"]]) {
             const root = roots[name] = path.join(base, name);
             fs.mkdirSync(root);
             const git = (...args) => execFileSync("git", ["-C", root, ...args], {encoding: "utf8"}).trim();

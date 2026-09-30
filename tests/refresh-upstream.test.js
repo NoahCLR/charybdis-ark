@@ -41,7 +41,7 @@ test("refresh re-pins from committed trunks, check reproduces it and catches dri
         qmk.write("data/keycodes.hjson", "{}\n");
         const oldQmk = qmk.commit("old");
         qmk.git("tag", "0.1.0");
-        qmk.git("branch", "-M", "noah-userspace-contracts");
+        qmk.git("branch", "-M", "noah-userspace-contracts-dev");
 
         const entry = (file, source, sourcePath) => ({path: file, source, sourcePath});
         fs.mkdirSync(path.join(ark, "upstream"), {recursive: true});
@@ -85,5 +85,16 @@ test("refresh re-pins from committed trunks, check reproduces it and catches dri
 
         fs.appendFileSync(path.join(ark, "upstream/firmware/tests/fixtures/f.fixture"), "tampered\n");
         assert.match(check(ark, roots).join("\n"), /f\.fixture differs from its pinned source/);
+        fs.writeFileSync(path.join(ark, "upstream/firmware/tests/fixtures/f.fixture"), "02\n");
+
+        // Once firmware pins its BK commit, Ark's BK inputs follow that pin,
+        // not the BK dev head (which has moved on past it).
+        firmware.write("qmk-pin.json", JSON.stringify({repository: QMK, commit: oldQmk}));
+        firmware.commit("pin BK");
+        const repinned = refresh(ark, roots, {}, {catalog: false});
+        assert.equal(JSON.parse(fs.readFileSync(path.join(ark, "upstream/manifest.json"), "utf8")).sources.qmk.commit, oldQmk);
+        assert.equal(fs.readFileSync(path.join(ark, "upstream/qmk/version.txt"), "utf8"), "0.1.0\n");
+        assert.deepEqual(repinned.fixtures, []);
+        assert.deepEqual(check(ark, roots), []);
     } finally {fs.rmSync(base, {recursive: true, force: true});}
 });

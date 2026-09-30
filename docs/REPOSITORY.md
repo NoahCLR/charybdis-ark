@@ -103,29 +103,27 @@ copies together; it is separate from the independent app suite.
 
 ### Protected main promotions
 
-GitHub `main` requires a pull request and these checks, including for
-administrators: `Promotion from dev`, and this repository's CI on the promotion
-PR itself: `check (ubuntu-latest)`, `check (macos-latest)`, `browser` and
-`compatibility`. The check accepts only this repository's `dev`
-branch and a merge tree identical to that branch. Force pushes and deletion
-are blocked. GitHub PR merging uses merge commits; squash and rebase merging
-are disabled so the promoted development history stays reachable.
+`main` moves only by the shared vault's `release`, so every `main` is a
+released, tested stack. GitHub `main` requires a pull request and these checks,
+including for administrators: `Promotion from dev`, and this repository's CI on
+the promotion PR itself: `check (ubuntu-latest)`, `check (macos-latest)`,
+`browser`, `compatibility` and `agreement`. `Promotion from dev` accepts only
+this repository's `dev` branch and a merge tree identical to that branch. Force
+pushes and deletion are blocked. GitHub PR merging uses merge commits; squash and
+rebase merging are disabled so the promoted development history stays reachable.
 
-The shared vault's `promote --push` publishes `dev`, opens or resumes its
-promotion PR, waits until GitHub reports every required check passed, and
-merges through GitHub. It records
-the verified stack in the merge message and reconciles local `main` to GitHub's
-merge identity. Direct `main` pushes are rejected by the local hook as well.
-Normal task development still lands locally onto `dev`.
-
-`release VERSION` verifies a provisional local stack without freezing tags.
-`release VERSION --push` first publishes the promotion PRs, then tests and tags
-the resulting GitHub commits. Retries after that checkpoint retain those exact
-commits. An old checkpoint referencing unpublished local promotion commits is
-rejected rather than silently retagged. Publishing requires the promotion
-workflow to have been landed and pushed to `dev` first.
+`release VERSION` checks and tests without publishing: its preflight requires
+this repository's `dev` to agree with firmware `dev`, and its stack test runs
+exactly what `main` will hold. `release VERSION --push` then promotes the BK
+fork's released line, firmware and this repository in that order: it publishes
+`dev`, opens or resumes the promotion PR, waits until GitHub reports every
+required check passed, merges, and reconciles local `main` to GitHub's merge
+identity. The merge message carries the `dev` tip's stack and verification
+trailers. Retries resume the frozen preparation. Direct `main` pushes are
+rejected by the local hook as well. Normal task development still lands
+locally onto `dev`.
 
 `dev` cannot be force-pushed or deleted on GitHub, and published `v*` release
 tags cannot be moved or deleted (rulesets without bypass). Merge commits take
 the PR's title and body, so a merge from the GitHub page carries the same
-verification trailers as one made by `promote --push`.
+verification trailers as one made by `release`.

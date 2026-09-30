@@ -7,7 +7,7 @@ const {spawnSync} = require("node:child_process");
 function checkPins(manifest, roots, refs = {}) {
     const repositories = {
         "https://github.com/NoahCLR/charybdis-4x6": ["firmware", refs.firmware || "refs/remotes/origin/dev"],
-        "https://github.com/NoahCLR/bastardkb-qmk": ["qmk", refs.qmk || "refs/remotes/origin/noah-userspace-contracts"],
+        "https://github.com/NoahCLR/bastardkb-qmk": ["qmk", refs.qmk || "refs/remotes/origin/noah-userspace-contracts-dev"],
     };
     if (!manifest.sources || !Object.keys(manifest.sources).length) throw new Error("Manifest has no sources");
     return Object.entries(manifest.sources).map(([name, source]) => {

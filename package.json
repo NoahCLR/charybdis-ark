@@ -2,7 +2,7 @@
   "name": "charybdis-ark",
   "displayName": "Charybdis Ark",
   "description": "Live firmware editor for the Charybdis: edits the connected keyboard over Raw HID.",
-  "version": "2026.9.30",
+  "version": "2026.9.30+1",
   "publisher": "noah",
   "private": true,
   "engines": {
@@ -33,7 +33,8 @@
     "test:compat": "node scripts/check-compatibility.js",
     "test:browser": "playwright test",
     "pins": "node scripts/check-pins.js",
-    "upstream": "node scripts/refresh-upstream.js"
+    "upstream": "node scripts/refresh-upstream.js",
+    "agreement": "node scripts/check-agreement.js"
   },
   "dependencies": {
     "node-hid": "^3.4.0"
