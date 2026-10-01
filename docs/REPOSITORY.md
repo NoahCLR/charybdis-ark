@@ -182,8 +182,9 @@ The small host-style fixture covers known padding/cascade regressions; it is not
 a VS Code extension-host or physical-device acceptance test.
 
 The shared vault tools own publication: `verify` records the tested source trees,
-dependencies, toolchain and artifacts; `land` attaches a receipt. The installed
-pre-push hook rejects new protected-branch commits without matching evidence.
+dependencies, toolchain and artifacts; `land` merges the task's pull request for
+exactly the verified commit and attaches a receipt. The installed pre-push hook
+refuses direct pushes to `dev` and `main`.
 `release VERSION --push` resumes the prepared stack even after development moves
 on, and waits for both repos' tagged CI plus both firmware assets before making
 the GitHub releases public. It never applies a profile to the keyboard.
@@ -220,10 +221,11 @@ fork's released line, firmware and this repository in that order: it publishes
 required check passed, merges, and reconciles local `main` to GitHub's merge
 identity. The merge message carries the `dev` tip's stack and verification
 trailers. Retries resume the frozen preparation. Direct `main` pushes are
-rejected by the local hook as well. Normal task development still lands
-locally onto `dev`.
+rejected by the local hook as well. Normal task development reaches `dev`
+through task pull requests.
 
-`dev` cannot be force-pushed or deleted on GitHub, and published `v*` release
+`dev` cannot be force-pushed or deleted on GitHub and accepts changes only
+through pull requests, and published `v*` release
 tags cannot be moved or deleted (rulesets without bypass). Merge commits take
 the PR's title and body, so a merge from the GitHub page carries the same
 verification trailers as one made by `release`.
