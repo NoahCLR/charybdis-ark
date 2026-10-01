@@ -1,24 +1,30 @@
 name: Check Charybdis Ark
+
+# Development is verified locally (the work-queue vault's verify), so nothing
+# runs on dev pushes or pull requests into dev. A release's dev → main pull
+# request runs everything main requires. Nightly runs check dev, warn early
+# about firmware dev, and raise an alarm if the published mains disagree; they
+# never block. Scheduled runs start from the default branch (main), so they
+# check out dev (or main, for the mains check) explicitly.
 on:
-  push:
-    branches: [main, dev]
-    tags: ["v*"]
   pull_request:
+    branches: [main]
   workflow_dispatch:
   schedule:
-    # Nightly early warning: does firmware dev still work with this Ark?
     - cron: "23 3 * * *"
 permissions:
   contents: read
 jobs:
   check:
-    if: github.event_name != 'schedule'
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event_name == 'schedule' && 'dev' || '' }}
+          persist-credentials: false
       - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
@@ -30,14 +36,35 @@ jobs:
       - name: Load the native HID module
         run: node -e "require('node-hid')"
 
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event_name == 'schedule' && 'dev' || '' }}
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: browser-failure
+          path: test-results/
+
   compatibility:
     # Required on main. Ark against exactly the firmware and QMK commits it
-    # pins, so firmware can move ahead without turning Ark red. Release tags
-    # test the same tag in all three repositories.
+    # pins, so firmware can move ahead without turning Ark red.
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
@@ -47,15 +74,17 @@ jobs:
       - uses: actions/checkout@v6
         with:
           repository: NoahCLR/charybdis-4x6
-          ref: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || steps.pins.outputs.firmware }}
+          ref: ${{ steps.pins.outputs.firmware }}
           fetch-depth: 0
           path: .ci/firmware
+          persist-credentials: false
       - uses: actions/checkout@v6
         with:
           repository: NoahCLR/bastardkb-qmk
-          ref: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || steps.pins.outputs.qmk }}
+          ref: ${{ steps.pins.outputs.qmk }}
           fetch-depth: 0
           path: .ci/qmk
+          persist-credentials: false
       - run: node scripts/check-pins.js --firmware .ci/firmware --qmk .ci/qmk
       - name: Check upstream/ reproduces exactly from its pins
         run: node scripts/refresh-upstream.js --check --firmware .ci/firmware --qmk .ci/qmk
@@ -69,20 +98,37 @@ jobs:
 
   agreement:
     # Required on main. Firmware states its contract (tests/host/
-    # run_contract_probe.sh); Ark judges it with its own runtime code
-    # (scripts/check-agreement.js), against BK at firmware's pin. Firmware main
-    # on PRs to main, the release tag on tags, firmware dev otherwise (also
-    # nightly: would a release agree today?).
+    # run_contract_probe.sh); Ark judges it with its own runtime code, against
+    # BK at firmware's pin. On a promotion pull request: firmware main, or
+    # firmware dev when the release marker says the release is joint. Nightly
+    # and on demand: Ark dev against firmware dev (would a release agree today?).
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event_name == 'schedule' && 'dev' || '' }}
+          persist-credentials: false
       - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
+      - name: Which firmware this Ark is judged against
+        id: firmware
+        run: |
+          python3 - <<'PYTHON' >> "$GITHUB_OUTPUT"
+          import json, os, re
+          event = json.load(open(os.environ['GITHUB_EVENT_PATH']))
+          pr = event.get('pull_request')
+          if pr is None:
+              print('ref=dev')
+          else:
+              marker = re.search(r'<!-- charybdis-release (\{.*?\}) -->', pr.get('body') or '')
+              joint = marker and json.loads(marker.group(1)).get('joint') == 'firmware'
+              print('ref=' + ('dev' if joint else 'main'))
+          PYTHON
       - uses: actions/checkout@v6
         with:
           repository: NoahCLR/charybdis-4x6
-          ref: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || (github.base_ref == 'main' && 'main' || 'dev') }}
+          ref: ${{ steps.firmware.outputs.ref }}
           path: .ci/firmware
           persist-credentials: false
       - name: Read firmware's BK pin
@@ -94,7 +140,7 @@ jobs:
           ref: ${{ steps.pin.outputs.commit }}
           path: .ci/qmk
           persist-credentials: false
-      - name: Judge the firmware contract
+      - name: Judge the firmware ${{ steps.firmware.outputs.ref }} contract
         run: node scripts/check-agreement.js --firmware .ci/firmware --qmk .ci/qmk --report "${{ runner.temp }}/agreement.json" --markdown "${{ runner.temp }}/agreement.md"
       - name: Show the agreement table
         if: always()
@@ -108,14 +154,17 @@ jobs:
             ${{ runner.temp }}/agreement.md
 
   compatibility-heads:
-    # Early warning, not required: Ark against firmware dev and the BK trunk as
-    # they are now. Red means firmware moved in a way Ark must follow (re-pin
-    # with npm run upstream, update codecs); it never blocks landing or promotion.
+    # Early warning, never required: Ark dev against firmware dev and the BK
+    # trunk as they are now. Red means firmware moved in a way Ark must follow
+    # (re-pin with npm run upstream, update codecs).
     name: compatibility with firmware dev (early warning)
-    if: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event_name == 'schedule' && 'dev' || '' }}
+          persist-credentials: false
       - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
@@ -125,12 +174,14 @@ jobs:
           ref: dev
           fetch-depth: 0
           path: .ci/firmware
+          persist-credentials: false
       - uses: actions/checkout@v6
         with:
           repository: NoahCLR/bastardkb-qmk
           ref: noah-userspace-contracts-dev
           fetch-depth: 0
           path: .ci/qmk
+          persist-credentials: false
       - name: Test Ark against the current firmware and BK trunks
         run: npm run test:compat -- --firmware .ci/firmware --ark . --qmk .ci/qmk --report "${{ runner.temp }}/compat-heads.json"
       - name: Explain a failure
@@ -144,20 +195,42 @@ jobs:
           name: compatibility-heads-report
           path: ${{ runner.temp }}/compat-heads.json
 
-  browser:
-    if: github.event_name != 'schedule'
+  mains-agree:
+    # Alarm, never required: do the published releases still agree? Ark main
+    # against firmware main and BK at firmware main's pin. Releases check this
+    # before merging; red here means the mains drifted apart anyway.
+    name: published mains agree
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: main
+          persist-credentials: false
       - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
-          cache: npm
-      - run: npm ci
-      - run: npx playwright install --with-deps chromium
-      - run: npm run test:browser
-      - uses: actions/upload-artifact@v7
-        if: failure()
+      - uses: actions/checkout@v6
         with:
-          name: browser-failure
-          path: test-results/
+          repository: NoahCLR/charybdis-4x6
+          ref: main
+          path: .ci/firmware
+          persist-credentials: false
+      - name: Read firmware main's BK pin
+        id: pin
+        run: node -e 'console.log("commit=" + require("./.ci/firmware/qmk-pin.json").commit)' >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v6
+        with:
+          repository: NoahCLR/bastardkb-qmk
+          ref: ${{ steps.pin.outputs.commit }}
+          path: .ci/qmk
+          persist-credentials: false
+      - name: Judge firmware main's contract with Ark main
+        run: node scripts/check-agreement.js --firmware .ci/firmware --qmk .ci/qmk --markdown "${{ runner.temp }}/mains.md"
+      - name: Say what a failure means
+        if: failure()
+        run: |
+          echo "**The published Ark main and firmware main disagree.** Someone installing both releases today gets a pair that does not speak the same contract; release the follow-up." >> "$GITHUB_STEP_SUMMARY"
+      - name: Show the agreement table
+        if: always()
+        run: cat "${{ runner.temp }}/mains.md" >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true

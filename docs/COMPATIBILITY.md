@@ -85,19 +85,21 @@ What can break Ark, and what checks it:
 
 Firmware version, compiled-default digest and capacities are reported, never
 compared: they change with ordinary keymap edits. CI's `agreement` job runs it
-against firmware `dev` on pushes and nightly, firmware `main` on PRs to `main`
-and the tag on release tags; it is required on `main`, and its table is in the
-job summary and in release notes.
+on a release's promotion pull request against firmware `main`, or firmware
+`dev` when the release marker says the release is joint (D-L51), and nightly
+against firmware `dev`; it is required on `main`, and its table is in the job
+summary. Firmware's promotion pull request runs the same check the other way
+round (`Agreement with Ark main`), and a nightly `published mains agree` job
+checks Ark `main` against firmware `main`.
 
 CI's required `compatibility` job checks all source pins, checks that `upstream/`
 reproduces exactly from them (`npm run upstream -- --check`), and runs the bridge
-with `--publish` against exactly the firmware and QMK commits Ark pins; release-tag
-checks select that same tag in all three repositories. Gating on the pins lets
-firmware move ahead without turning Ark red: Ark claims compatibility with what it
-pins, and the release stack test proves the three agree before a tag.
+with `--publish` against exactly the firmware and QMK commits Ark pins, on the
+promotion pull request. Gating on the pins lets firmware move ahead without
+turning Ark red: Ark claims compatibility with what it pins, and agreement proves
+the released pair speaks one contract.
 A separate job, `compatibility with firmware dev (early warning)`, runs the bridge
-against firmware `dev` and the BK trunk as they are now, on every push, pull
-request, nightly and on demand. It is not required and never blocks landing or
+against firmware `dev` and the BK trunk as they are now, nightly and on demand. It is not required and never blocks landing or
 promotion; red means firmware moved in a way Ark must follow (re-pin with
 `npm run upstream`, update codecs and tests). The reports record the selected
 commits and are retained as artifacts.
