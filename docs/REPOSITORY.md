@@ -186,9 +186,10 @@ cascade. Install its browser once with `npx playwright install chromium`.
 The small host-style fixture covers known padding/cascade regressions; it is not
 a VS Code extension-host or physical-device acceptance test.
 
-The shared vault tools own publication: `verify` records the tested source trees,
-dependencies, toolchain and artifacts; `land` merges the task's pull request for
-exactly the verified commit and attaches a receipt. The installed pre-push hook
+The shared vault tools own publication: `verify` records a pass for the tested
+tree and the pinned firmware and QMK commits; `land` merges the task's pull
+request for exactly the verified commit, with verify's summary in its message.
+The installed pre-push hook
 refuses direct pushes to `dev` and `main`. `release` prepares a release and
 `release --publish` publishes it (below). They never apply a profile to the
 keyboard.
