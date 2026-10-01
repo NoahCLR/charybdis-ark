@@ -108,9 +108,11 @@ worktree; never copy it into this repository.
 
 ## Branches
 
-`dev` is the trunk. Branch each task from `dev` in its own worktree and
-squash-land it back onto `dev` locally when Noah says so; pull requests are
-optional. `main` is the released line and only moves by the vault's
+`dev` is the trunk. Branch each task from `dev` in its own worktree, verify it,
+and open a pull request into `dev` with the vault's `_agents/bin/open-pr`; when
+Noah says so, the vault's `_agents/bin/land` merges it on GitHub (squash) for
+exactly the verified commit, without waiting for CI. `dev` takes changes only
+through pull requests and is never pushed directly. `main` is the released line and only moves by the vault's
 `_agents/bin/release`, as a merge commit whose tree is exactly `dev`'s. Landed
 commits, promotions and release tags carry trailers naming the firmware and QMK
 commits they were tested with (`Stack-Firmware`, `Stack-QMK`, `Ark-Pins`,
@@ -118,8 +120,9 @@ commits they were tested with (`Stack-Firmware`, `Stack-QMK`, `Ark-Pins`,
 block (`_agents/bin/stack --for ark`). Push only to `NoahCLR/charybdis-ark`. The work-queue vault's
 `_agents/bin/verify` runs this file's checks for what a branch changed
 (adding the compatibility bridge for wire, schema or `upstream/` changes),
-and `_agents/bin/land` squash-lands a branch onto `dev` after verifying it. A pin to firmware or QMK names a
-commit on that repository's trunk, taken after its squash landing.
+and `_agents/bin/land` merges a branch's pull request into `dev` after verifying
+it. A pin to firmware or QMK names a commit on that repository's trunk, taken
+after its landing (firmware squashes, so a landed commit has a new hash).
 
 ## Working alongside firmware agents
 
@@ -234,9 +237,10 @@ Before merging wire/schema or cross-language codec changes, run
 `npm run test:compat -- --firmware PATH --ark PATH --qmk PATH --report NEW_FILE`
 as described in [COMPATIBILITY.md](docs/COMPATIBILITY.md). UI-only changes need
 only the independent app checks. Wire/schema changes require this bridge;
-see [`upstream/README.md`](upstream/README.md). Local work may pin an
-unpushed firmware commit; before pushing a change that moves a pin, fetch the
-firmware checkout and run the bridge with `--publish`. Never weaken a failing test to
+see [`upstream/README.md`](upstream/README.md). Local work may pin a
+firmware commit that has not landed yet; before landing a change that moves a
+pin, fetch the firmware checkout and run the bridge with `--publish` (`land`
+refuses pins that are not on the published trunks). Never weaken a failing test to
 make extraction or a protocol change pass.
 
 ### Checking it the way the panel renders it
