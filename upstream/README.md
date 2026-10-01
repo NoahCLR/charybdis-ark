@@ -44,13 +44,14 @@ Node dependencies have been installed.
 1. Select a committed firmware or QMK revision. Inspect the relevant protocol,
    schema, capability and migration changes before copying files. Use committed
    blobs, not an unreviewed working-tree snapshot. Locally, any committed
-   revision will do, pushed or not. A pin change is pushed only once its
-   revision is on the source's remote trunk (firmware `dev`; QMK
-   `noah-userspace-contracts-dev`): a feature-branch commit disappears
-   when a squash or rebase merge replaces it, and the pinned links then point
-   nowhere. If firmware merged by squash or rebase, re-pin to the merged commit.
+   revision will do, landed or not. A pin change lands only once its revision
+   is on the source's published trunk (firmware `dev`; QMK
+   `noah-userspace-contracts-dev`), and `land` refuses it otherwise: firmware
+   pull requests are squash-merged, so a feature-branch commit is replaced by
+   the merged one and the pinned links would point nowhere. Re-pin to the
+   merged commit (BK lands merge commits, so its branch commits survive).
    Fetch the firmware checkout, then run the bridge with `--publish` before
-   pushing.
+   landing.
 2. Refresh with the tool, which reads only committed blobs and never fetches:
    `npm run upstream -- --firmware PATH --qmk PATH` re-pins every listed file to
    firmware's local `dev` and to the BK commit that firmware's `qmk-pin.json`

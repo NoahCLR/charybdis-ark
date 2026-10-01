@@ -3,12 +3,12 @@
 This app edits the **connected keyboard**. Authored C defaults are edited
 directly in the firmware repository; the app never edits those files.
 
-Start with `git status --short`, then read the setup in [README.md](README.md)
-and the reading map in [docs/README.md](docs/README.md). Read Current Product
+Start with `git status --short`, then read the development setup in
+[docs/REPOSITORY.md](docs/REPOSITORY.md#development-and-installation) and the reading map in [docs/README.md](docs/README.md). Read Current Product
 Status and Open Issues in [the direction](docs/LIVE_EDIT_APP_DIRECTION.md)
 before changing behavior; read its relevant decisions before architecture work.
-The interface's rules are in the README's "The interface" section and the
-direction's decisions; `npm run preview` renders the real interface.
+The interface's rules are in [the guide](docs/GUIDE.md)'s "The interface"
+section and the direction's decisions; `npm run preview` renders the real interface.
 
 ## Repository ownership
 
@@ -73,9 +73,16 @@ preview/            ignored generated previews, never authoritative source
 ## Documentation ownership
 
 Use [docs/README.md](docs/README.md) to place new documentation. Update the
-existing governing document first. Product behavior changes update README and
-the relevant spec in the same pass; architecture decisions update the direction
-or an app-owned spec. Keep Current Product Status and Open Issues accurate.
+existing governing document first. Product behavior changes update
+[docs/GUIDE.md](docs/GUIDE.md) and the relevant spec in the same pass, and
+`README.md` when what a user can do changes. `README.md` is a short pitch for
+Charybdis owners, in Noah's personal voice: what you can change, that nothing
+is saved until reviewed, installing, and links; keep it short. `docs/GUIDE.md`
+is for people using Ark in depth: how each screen, review, apply and backups
+behave. Keep development material out of both: setup, commands, the code's layout, CI,
+compatibility and release mechanics go in
+[docs/REPOSITORY.md](docs/REPOSITORY.md#development-and-installation).
+Architecture decisions update the direction or an app-owned spec. Keep Current Product Status and Open Issues accurate.
 Each decision has one home: app decisions continue the D-L series here, while a
 D-L heading marked as a firmware decision is only a pointer to the firmware
 repository's direction, which owns that text. Change a firmware decision there,
@@ -101,9 +108,11 @@ worktree; never copy it into this repository.
 
 ## Branches
 
-`dev` is the trunk. Branch each task from `dev` in its own worktree and
-squash-land it back onto `dev` locally when Noah says so; pull requests are
-optional. `main` is the released line and only moves by the vault's
+`dev` is the trunk. Branch each task from `dev` in its own worktree, verify it,
+and open a pull request into `dev` with the vault's `_agents/bin/open-pr`; when
+Noah says so, the vault's `_agents/bin/land` merges it on GitHub (squash) for
+exactly the verified commit, without waiting for CI. `dev` takes changes only
+through pull requests and is never pushed directly. `main` is the released line and only moves by the vault's
 `_agents/bin/release`, as a merge commit whose tree is exactly `dev`'s. Landed
 commits, promotions and release tags carry trailers naming the firmware and QMK
 commits they were tested with (`Stack-Firmware`, `Stack-QMK`, `Ark-Pins`,
@@ -111,8 +120,9 @@ commits they were tested with (`Stack-Firmware`, `Stack-QMK`, `Ark-Pins`,
 block (`_agents/bin/stack --for ark`). Push only to `NoahCLR/charybdis-ark`. The work-queue vault's
 `_agents/bin/verify` runs this file's checks for what a branch changed
 (adding the compatibility bridge for wire, schema or `upstream/` changes),
-and `_agents/bin/land` squash-lands a branch onto `dev` after verifying it. A pin to firmware or QMK names a
-commit on that repository's trunk, taken after its squash landing.
+and `_agents/bin/land` merges a branch's pull request into `dev` after verifying
+it. A pin to firmware or QMK names a commit on that repository's trunk, taken
+after its landing (firmware squashes, so a landed commit has a new hash).
 
 ## Working alongside firmware agents
 
@@ -227,9 +237,10 @@ Before merging wire/schema or cross-language codec changes, run
 `npm run test:compat -- --firmware PATH --ark PATH --qmk PATH --report NEW_FILE`
 as described in [COMPATIBILITY.md](docs/COMPATIBILITY.md). UI-only changes need
 only the independent app checks. Wire/schema changes require this bridge;
-see [`upstream/README.md`](upstream/README.md). Local work may pin an
-unpushed firmware commit; before pushing a change that moves a pin, fetch the
-firmware checkout and run the bridge with `--publish`. Never weaken a failing test to
+see [`upstream/README.md`](upstream/README.md). Local work may pin a
+firmware commit that has not landed yet; before landing a change that moves a
+pin, fetch the firmware checkout and run the bridge with `--publish` (`land`
+refuses pins that are not on the published trunks). Never weaken a failing test to
 make extraction or a protocol change pass.
 
 ### Checking it the way the panel renders it

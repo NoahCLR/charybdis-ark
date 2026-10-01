@@ -1,330 +1,60 @@
 # Charybdis Ark
 
-**Adjust, Review, Keep.** Edit a draft, review its changes, then save it to the
-connected keyboard.
+**Adjust, Review, Keep.**
 
-Live firmware editor for the Charybdis. It talks to the connected keyboard over
-Raw HID and **never parses a firmware repository**.
+Ark is the editor for [my Charybdis 4x6 firmware](https://github.com/NoahCLR/charybdis-4x6).
+Plug the keyboard in and you see exactly what is on it. Change it, and save it
+back. You don't write C, you don't reflash, and you don't need a firmware
+checkout. Everything Ark shows comes from the keyboard itself.
 
-This is the app. Authored C defaults are edited directly in the firmware
-repository. Its source repository is
-[NoahCLR/charybdis-ark](https://github.com/NoahCLR/charybdis-ark).
-The product direction lives in
-[`docs/LIVE_EDIT_APP_DIRECTION.md`](docs/LIVE_EDIT_APP_DIRECTION.md); the
-interface's rules are under [The interface](#the-interface) below.
+## What you can change
 
-Review and the behaviour editor explain combo/tap timing risks on older
-firmware, using the connected profile. Firmware with physical gesture timing
-(feature bit 17) is recognized without changing the layout or tuning values.
+- **Keys and layers.** Pick keys from an ANSI board or search all of QMK. Drag
+  one key onto another to swap them. Rename, reorder and re-base layers, and
+  preview several layers stacked the way the keyboard would resolve them.
+- **Behaviours.** Set what a key does on tap, hold and long hold, for each tap
+  count, in one grid with its timing.
+- **Combos, macros and custom keys.** Build combos, write named macros or
+  record them, and name your own custom keys.
+- **Lighting.** Set layer and mode colours, combo and key feedback, and the
+  auto-mouse fade. The board on screen is painted the way the keyboard will
+  light up.
+- **Trackball.** Set pointer speed, sniping and auto-mouse, and eight pointing
+  modes (scroll, volume, zoom, arrows, your own shortcuts…) with their keys.
 
-Timing checks resolve inherited defaults, warn about overlapping or impossible
-release tiers, and exclude proven-impossible layer routes. Narrow gesture/chord
-windows receive advice; this is conservative analysis, not a guarantee that
-every gesture is physically practical (D-L49).
+## Nothing is saved until you say so
 
-## Develop independently
+Every edit goes into a draft with undo, redo and a full history. **Review**
+lists what changed and checks what the layers let you reach. It warns you
+about a layer you could lock yourself into, combos that can't fire and macros
+that are too long to play. **Apply** saves a recovery copy, writes both halves
+and reads the result back to prove it.
 
-Open this folder directly in VS Code. Use Node 26.10.0 (`nvm use` with the
-checked-in `.nvmrc`), run `npm ci`, then `npm run check`. Press F5 with
-**Run Charybdis Ark** to launch an Extension Development Host. No firmware
-repository, QMK checkout, or multi-root workspace is required.
+**Export profile** saves your whole setup as one file. **Import profile**
+restores it after the same review.
 
-The root `.editorconfig` defines indentation and whitespace conventions.
-Folder settings select VS Code's built-in JavaScript, JSON, HTML and CSS
-formatters and the YAML extension for YAML; Markdown is not reformatted on
-save. **Check Charybdis Ark** is available as the default test task. The
-extension supplies its own **Charybdis Ark** status-bar button; the shared
-parent workspace does not add a duplicate or a test button.
+## Install
 
-[`upstream/README.md`](upstream/README.md) explains the imported test vectors,
-protocol references and QMK catalog inputs. [`docs/REPOSITORY.md`](docs/REPOSITORY.md)
-records source provenance and the repository boundary.
-
-For local firmware development, the active checkout is
-`/Users/noah/dev/charybdis/charybdis-4x6`; see the
-[workspace map](docs/REPOSITORY.md#local-development-workspace). Agents can
-inspect it while the app and its ordinary tests remain self-contained.
-
-New contributors and agents should start with [AGENTS.md](AGENTS.md) and the
-[documentation map](docs/README.md), which defines reading order, document
-ownership and where new plans or specifications belong.
-
-## Shape
-
-- `extension.js` — the VS Code surface: command, panel, message relay.
-- `panel-html.js` — the panel's HTML shell, the only host file that knows
-  webview URIs.
-- `core/` — the device, with no host dependency, layered so imports point one
-  way: `transport/`, `schema/`, `protocol/`, `model/`, `session/`, `data/`.
-- `webview/` — the interface as browser ES modules, no build step. `lib/` and
-  `view/` are pure and carry tests; `ui/` draws; `styles.css` is the design
-  system.
-- `tests/` — mirrors `core/`, plus the view modules and the payloads the
-  interface posts.
-
-The layer rules and where new work belongs are in [`AGENTS.md`](AGENTS.md).
-The application runtime must not read the firmware repository, and the webview
-receives the model as a message rather than importing the core. Developer
-inspection and the explicit compatibility tests may read selected firmware
-checkouts; ordinary app checks remain self-contained.
-
-In **Manage layers**, **Make base** swaps a layer with the current base. Empty
-physical keys entering the base become `KC_NO`; `KC_NO` physical keys leaving it
-become transparent. Unused matrix positions keep their values. If the former
-base had no layer colour, it receives the saved base HSV as its own all-key
-colour, even when an animated base effect is
-selected. The review gives transparent and `KC_NO` base keys separate notices.
-
-## The interface
-
-After the complete keyboard read opens an editable draft, the board stays on
-screen, full width, painted with the light the keyboard would actually show for
-that layer — the base effect, then
-the layer's colour on the keys it owns — with the legends drawn on top in
-whichever of black or white stays readable, and the behaviour dots and combo
-badges on the key face in the feedback colours the keyboard flashes.
-During initial read, refresh or device selection, every screen menu is disabled
-and a loading step replaces the screen. Once the read finishes, Device opens
-if the keyboard reported its capabilities. Profile & backups opens when a
-connected keyboard supports complete-profile backup, including five-layer
-firmware that can be read and backed up. The Configure
-menus open only with an editable draft.
-
-Underneath it, one workbench whose tabs are the key, its behaviour, its combos,
-and the macros and pointing modes the layer reaches. A behaviour is tap count ×
-tier, so it is drawn as a grid. Timing fields start with **Multi tap window**
-(release to next press), then Tap / hold and Long hold. Behaviour and combo
-timings matching the default show a muted placeholder such as `150 · default`;
-other values look entered. Labels end at `ms`. Clearing an override restores the
-default. LT keys show their own dual-role default.
-Changing a behaviour timing default moves every row following it, including
-explicit values matching the old default; distinct custom timings stay fixed.
-Review lists inherited effective-time changes under Tap & Hold Timing and any
-matching overrides converted to defaults under their behaviours. Those stored
-changes discard together with the default edit.
-Selecting a key opens its grid in Behaviours even before it has a stored row.
-Only a grid action, timing override or anchor change adds the row to the draft;
-browsing leaves the board and behaviour counts unchanged. Transparent keys and
-`KC_NO` cannot have behaviours. Empty branches preserve the key's built-in
-actions until you override them. A dual-role key's empty first tap or hold
-shows, dashed and marked "built in", what the key does there on its own: an
-`LT()` taps its key and holds its layer, an `MT()` or `OSM()` holds its
-modifiers. **Change key…** moves a behaviour to another
-key through the keycode picker; when that key already has one, you choose to
-overwrite it, swap the two, or cancel, and either is one undoable draft step.
-On a keyboard that owns its layer keys (Profile Wire feature bit 14), a
-behaviour takes QMK's layer keys where the keyboard can run them: `TG()`,
-`TO()` and `LOCK_LAYER()` anywhere, `OSL()` as a tap, `TT()` and `MO()` as a
-"Press and hold until release" branch; `LT()` and `LM()` stay keys and combos,
-and `DF()`/`PDF()` are refused.
-On the board, drag one key onto another to swap them, ⌘C and ⌘V copy a key
-onto the selected key, and Delete or Backspace makes it transparent. ⌘Z undoes
-and ⇧⌘Z or ⌘Y redoes the draft everywhere except inside a text field, which
-keeps its own undo. **Draft history** in the rail opens every step of the
-draft, newest first, each with when it was made and what it changed from the
-step before it (not from the keyboard, as the review compares); go straight
-back or forward to any of them. Board keys work from the keyboard too: Space or Enter
-selects one, and Enter on the selected key opens its picker.
-
-The layer stack is not one of those tabs, because
-it is not a property of the selected key. The layers are tabs along the foot
-of the board card, next to the workbench, the picked one opening into the board
-it shows, on Keys and on Lighting alike; **Rename & Reorder** stays at the end
-of those tabs, outside what scrolls, and opens upward over the board, so a layer
-is renamed and reordered where its keys are on screen. Drag a row by the grip
-on its left to move it, or focus the grip and press ↑ ↓. The bottom row is the
-base: always on, and what every transparent key falls through to. It is not
-dragged; **Make base** on another row swaps that layer into it, and the old
-base takes its place. **Keys follow their layers** (on by
-default) renumbers every layer key (MO, LT, TG, TO, TT, OSL, LOCK_LAYER…) on
-layers, behaviours and combos so each still reaches the same layer. Make base is
-the exception: the two layers trade roles, so `TO(0)` still goes home and a key
-that reached the new base now reaches the old one — the key that held Numbers
-from Base holds Base from Numbers. Turned off, the layers move but those keys
-keep their numbers — except the swap, which the toggle does not change. Names, colours and the pointer and sniping settings move
-with their layer either way. After Make base, the review's checks say what it
-left behind: transparent keys on the new base, which have nothing under them,
-the old base if nothing reaches it, and any layer key that holds or toggles the
-base, which does nothing since the base is always on.
-
-**⌘-click** (Ctrl-click off a Mac) more layer tabs to preview them on
-together. The board then shows what the keyboard would answer with, by the
-firmware's rule: the highest layer on wins, a transparent key is answered by the
-highest layer below it that is also on, and Base is always on. Keys answered from
-below are seen through the top layer's glass: frosted like a transparent key,
-their legend sharp, in the light of the layer that answers, and
-on Lighting the board paints every layer on, lowest first, as the keyboard does.
-The highest layer keeps the tab joined to the board and every edit is stored on
-it; a key answered from below says so on the Key tab, and setting it overrides
-that answer. ⌘-click Base on its own to see the picked layer over just Base.
-⌘-click a layer again to take it out, or click any tab to go back to
-one layer. Layers on under the top one are tinted and outlined in their own
-light, so the set reads from the tabs. The set holds across Keys and Lighting and is dropped
-when the keyboard or its layer order changes. It is a what-if: a set no key can
-actually hold together still previews.
-
-Before anything is applied, the review **checks** what the layers let you
-reach. A layer that can lock with no way back to Base — nothing on it, or on
-anything held over it, releases the lock or moves back — is a **trap**: the
-review shows the steps into it and the way out. The first four trap states have
-paths; if more exist, their number is shown. Combos are checked against keys
-that occur together on a reachable stack, including keys inherited through
-transparent positions. Active traps have red cards; warnings have orange cards.
-Apply asks "Apply anyway" before writing whenever
-the draft has a trap or warning, including one already on the keyboard.
-Other checks cover a layer with keys nothing reaches, a layer key onto an empty
-layer, transparent and `KC_NO` keys on Base, a pointer layer that cannot work,
-and layer keys the keyboard leaves to QMK. They also name combos that cannot
-fire, actions aimed at empty pointing slots, and macros too long to play.
-Brightness or lighting effects unsupported by the destination are blockers:
-Apply stays disabled until they are fixed. Notices and checks fixed by the draft need no
-confirmation. Each check says whether the draft made it, the keyboard already
-has it, or the draft fixes it. When a new warning or trap has a clear source in
-the draft, the check links to that change and the change is highlighted. If
-several edits could be responsible, the review leaves the source unlabeled.
-
-Every colour on screen is a colour the keyboard emits; one amber signal marks
-work that has not reached the keyboard yet. Complete edits stage into one draft
-as they are made; incomplete builders such as a new combo keep their local form
-until it is valid. The floating bar is the only way changes leave the window.
-After Apply completes, it reports the keys, profile, combos and base lighting
-being read back, while the editor stays visible and temporarily busy.
-
-## Commands
+It's early days: for now Ark runs as a VS Code extension, installed from a
+checkout.
 
 ```sh
+git clone https://github.com/NoahCLR/charybdis-ark.git
+cd charybdis-ark
 npm ci
-npm run check           # syntax across the tree, then all tests
-npm run preview         # build preview/model.json from the test fixtures
-npm run preview -- --device  # …or from the keyboard that is plugged in, read-only
-npm run preview -- --vscode  # also write preview/vscode-{dark,light}.html, as the panel renders
-npm run probe:live-link # read-only enumeration of matching HID interfaces
-npm run keycodes -- --check # verify the catalog against the local pinned QMK inputs
-npm run keycodes           # regenerate from those same inputs
+ln -s "$PWD" ~/.vscode/extensions/noah.charybdis-ark-0.1.0   # then reload VS Code
 ```
 
-## Installing it
+Click **Charybdis Ark** in the status bar, or run **Charybdis: Open Charybdis
+Ark** from the command palette.
 
-For normal use, the extension can be installed by symlinking this folder into
-VS Code's extension directory. The checkout then is the installed extension
-and a window reload picks up every edit. For a new installation:
+The keyboard needs the left/right pair from a
+[firmware release](https://github.com/NoahCLR/charybdis-4x6/releases/latest).
+A plain `qmk compile` image can't be read or saved by Ark.
 
-```sh
-ln -s "$PWD" ~/.vscode/extensions/noah.charybdis-ark-0.1.0   # then reload the window
-```
+## Learn more
 
-If this path already links to an older checkout, retarget that symlink when
-you are ready to switch. Keep the extension identity `noah.charybdis-ark`;
-recovery files use VS Code's extension-global storage, outside this checkout.
-If an older `noah.charybdis-live-0.1.0` link is still installed, remove it: the
-app was named Charybdis Live, and Ark copies the recovery files saved under that
-identity into its own storage on start (D-L47).
-F5 provides a separate development host without changing the installed link.
-
-That gives a **Charybdis Ark** button in the status bar. The
-panel also opens from the command palette — **Charybdis: Open Charybdis Ark** — and the repo's `.vscode/launch.json` has *Run Charybdis Ark*, which
-launches an Extension Development Host with a debugger attached instead.
-
-To work on the interface without a keyboard, run `npm run preview`, serve this
-folder (`python3 -m http.server 8972`) and open `preview/index.html`. The preview
-stands in for the extension host: it answers the webview's `ready` with one
-fixture model and logs every edit the interface posts back.
-Use `npm run preview -- --multiple --vscode` to inspect the selector with two
-fixture keyboards in the VS Code themed preview.
-
-## State of the build
-
-Every screen is drawn and wired to the host:
-
-| Surface | What it edits |
-| --- | --- |
-| Keys | Layout keys, key behaviours, combos, layer names and priority; reachable behaviours, macros and pointing modes are shown in place, whether a key, a behaviour branch or a combo reaches them |
-| Lighting | Six stages, the stage mask, layer and pointing-mode colours with their localities, combo and key feedback, auto-mouse fade with its hold as a share of the timeout, LED group rows and reusable groups |
-| Macros | Both banks: name, payload, insert-at-cursor step builder, reorder/remove controls, parsed preview, configurable recorder and placement; search by name, and the layers that set each macro off — by key, behaviour or combo — in their layer colour, each opening that layer in Keys with the macro picked |
-| Mouse | Pointer speed, sniping and auto-mouse — the Settings sections the keyboard's model files under Mouse, drawn with the same cards and posted whole |
-| Pointing modes | All eight slots: movement, speed, direction shortcuts, scroll tuning, buttons, bindings, placement, clear and duplicate |
-| Settings | Every other section the keyboard reports, posted whole, read-only where the firmware cannot report; the Combos section also carries the default combo window and the combo hold threshold, which the keyboard stores with its combos |
-| Profile & backups | Import (the file against the keyboard, counted by what it configures — keys, lighting, macros, mouse, pointing — before it becomes the draft), export, upgrade export, recovery state |
-| Device | Read-only: connection, committed generation, what was read |
-
-The keycode picker leads with the ANSI board, then task-shaped Symbols,
-Navigation, Numpad, Layers, Pointing modes, Macros, Mouse, Media, Lighting,
-Magic and Custom sections. The complete QMK catalogue remains available under
-More keys, Other QMK and All keycodes, and search spans all of it — named
-macros included, found by the name they were given. Layers offers each layer
-as Hold (`MO`), Lock (`LOCK_LAYER`, the same lock as QMK's `TG`) and Tap-hold
-(`LT`); a keyboard that owns its layer keys adds Tap-toggle (`TT`), One-shot
-(`OSL`) and Move (`TO`).
-
-Colour on any screen comes from the model, never from a constant, and a stage
-that is switched off is drawn as off — hollow dots, plain badges, unlit keys.
-
-Every edit is kept in a local draft and reaches the keyboard only through
-review and apply. Review lists each changed thing once, under the area it is
-edited in, with the fields that changed, can open it where it is edited, and
-can discard part of the draft: things made by the same edit (a key swap, a
-moved behaviour) go back together, as one undoable step. Layers are compared
-by which layer they are, not where they sit, so a reorder is one **Layer
-priority** item and a key edited or a layer renamed after it is its own item;
-each can be discarded without the other. A keyboard the app cannot open a draft for — its profile
-could not be read, or its firmware predates profile editing — is read-only:
-the host refuses any edit rather than writing it directly.
-
-**Read from keyboard** runs one complete read at a time. The health strip says
-both halves agree only after the firmware reports a known, converged peer;
-matching generation numbers alone are insufficient. A failed committed-profile
-read remains an error instead of being labelled as compiled defaults. Those
-defaults are shown only when fresh device status reports no committed profile.
-When more than one compatible keyboard is connected, the selector at the top
-left chooses which one to read and edit. Switching keeps a dirty draft attached
-to its original keyboard; the other keyboard stays read-only until you switch
-back or discard that draft. Device choices keep their identity across rescans
-within the panel, so replacing one keyboard cannot reuse its draft by list order.
-Switching keyboards closes an open layer editor or import review; reopen it on
-the selected keyboard before keeping changes.
-After a disconnect, a retained dirty draft requires **Review against the
-keyboard** before editing or applying, even if the HID path and saved profile
-look unchanged.
-
-## Cleared pointing slots
-
-A key bound to a **cleared pointing slot** is allowed. The keyboard keeps its
-mode keycodes in a fixed registry and its runtime refuses to activate a slot
-with an empty record, so such a key is inert, not invalid — it does nothing
-until the slot is configured again. The clear goes through even while something
-still reaches the slot, the validated profile counts what
-still points at the empty slot, and the Pointing modes screen and the hover card
-say the key does nothing for now.
-
-The same reasoning runs the other way, so the keycode picker offers **every**
-slot, configured or not: its Pointing modes section lists the eight slots as
-rows, each with a Hold and a Toggle key, and marks an empty slot's row as doing
-nothing yet. Search finds the same keys as `Slot 6 · hold (empty)`. A board can be laid out before its modes are, and the key says `empty`
-on its second line until the slot is filled in.
-
-For protocol changes, run the separate [firmware compatibility check](docs/COMPATIBILITY.md)
-against explicit firmware, Ark and QMK checkouts before merging. UI-only work
-continues to use the independent app checks.
-Ark owns these integration runners under `tests/integration/`; they read the
-selected firmware sources. Firmware's own tests and build require no Ark
-checkout or app dependencies.
-
-## Automated verification and publishing
-
-CI runs the independent app suite on Linux and macOS, loads the native HID module,
-checks every imported source pin against its published trunk, and runs the
-[compatibility bridge](docs/COMPATIBILITY.md). On a release tag the bridge selects
-the matching firmware and QMK tags. Its report is retained in Actions.
-
-`npm run test:browser` starts a fixture-only preview and drives a pointer-speed
-edit, checking the complete posted settings section and the host stylesheet
-cascade. Install its browser once with `npx playwright install chromium`.
-The small host-style fixture covers known padding/cascade regressions; it is not
-a VS Code extension-host or physical-device acceptance test.
-
-The shared vault tools own publication: `verify` records the tested source trees,
-dependencies, toolchain and artifacts; `land` attaches a receipt. The installed
-pre-push hook rejects new protected-branch commits without matching evidence.
-`release VERSION --push` resumes the prepared stack even after development moves
-on, and waits for both repos' tagged CI plus both firmware assets before making
-the GitHub releases public. It never applies a profile to the keyboard.
+- [Ark guide](docs/GUIDE.md): every screen, Review's checks, what happens
+  while a profile is applied, and backups
+- [Product goal](docs/PRODUCT_GOAL.md): what Ark is meant to become
+- [Developing Ark](docs/REPOSITORY.md#development-and-installation)

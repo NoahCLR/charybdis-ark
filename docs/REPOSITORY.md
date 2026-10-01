@@ -88,6 +88,107 @@ both source checkouts. Preserve those files and profile backups during a switch.
 The independent repo does not require changes to a shared workspace or to the
 firmware project's active working tree.
 
+### Working on Ark
+
+Open this folder directly in VS Code. Use Node 26.10.0 (`nvm use` with the
+checked-in `.nvmrc`), run `npm ci`, then `npm run check`. Press F5 with
+**Run Charybdis Ark** to launch an Extension Development Host. No firmware
+repository, QMK checkout, or multi-root workspace is required.
+
+The root `.editorconfig` defines indentation and whitespace conventions.
+Folder settings select VS Code's built-in JavaScript, JSON, HTML and CSS
+formatters and the YAML extension for YAML; Markdown is not reformatted on
+save. **Check Charybdis Ark** is available as the default test task. The
+extension supplies its own **Charybdis Ark** status-bar button; the shared
+parent workspace does not add a duplicate or a test button.
+
+[`upstream/README.md`](../upstream/README.md) explains the imported test vectors,
+protocol references and QMK catalog inputs. [`docs/REPOSITORY.md`](REPOSITORY.md)
+records source provenance and the repository boundary.
+
+For local firmware development, the active checkout is
+`/Users/noah/dev/charybdis/charybdis-4x6`; see the
+[workspace map](REPOSITORY.md#local-development-workspace). Agents can
+inspect it while the app and its ordinary tests remain self-contained.
+
+New contributors and agents should start with [AGENTS.md](../AGENTS.md) and the
+[documentation map](../README.md), which defines reading order, document
+ownership and where new plans or specifications belong.
+
+### The code's layout
+
+- `extension.js` — the VS Code surface: command, panel, message relay.
+- `panel-html.js` — the panel's HTML shell, the only host file that knows
+  webview URIs.
+- `core/` — the device, with no host dependency, layered so imports point one
+  way: `transport/`, `schema/`, `protocol/`, `model/`, `session/`, `data/`.
+- `webview/` — the interface as browser ES modules, no build step. `lib/` and
+  `view/` are pure and carry tests; `ui/` draws; `styles.css` is the design
+  system.
+- `tests/` — mirrors `core/`, plus the view modules and the payloads the
+  interface posts.
+
+The layer rules and where new work belongs are in [`AGENTS.md`](../AGENTS.md).
+The application runtime must not read the firmware repository, and the webview
+receives the model as a message rather than importing the core. Developer
+inspection and the explicit compatibility tests may read selected firmware
+checkouts; ordinary app checks remain self-contained.
+
+### Commands
+
+```sh
+npm ci
+npm run check           # syntax across the tree, then all tests
+npm run preview         # build preview/model.json from the test fixtures
+npm run preview -- --device  # …or from the keyboard that is plugged in, read-only
+npm run preview -- --vscode  # also write preview/vscode-{dark,light}.html, as the panel renders
+npm run probe:live-link # read-only enumeration of matching HID interfaces
+npm run keycodes -- --check # verify the catalog against the local pinned QMK inputs
+npm run keycodes           # regenerate from those same inputs
+```
+
+### Running it without a keyboard
+
+F5 provides a separate development host without changing the installed link. The repo's `.vscode/launch.json` has *Run Charybdis Ark*, which
+launches an Extension Development Host with a debugger attached.
+
+To work on the interface without a keyboard, run `npm run preview`, serve this
+folder (`python3 -m http.server 8972`) and open `preview/index.html`. The preview
+stands in for the extension host: it answers the webview's `ready` with one
+fixture model and logs every edit the interface posts back.
+Use `npm run preview -- --multiple --vscode` to inspect the selector with two
+fixture keyboards in the VS Code themed preview.
+
+### Compatibility with firmware
+
+For protocol changes, run the separate [firmware compatibility check](COMPATIBILITY.md)
+against explicit firmware, Ark and QMK checkouts before merging. UI-only work
+continues to use the independent app checks.
+Ark owns these integration runners under `tests/integration/`; they read the
+selected firmware sources. Firmware's own tests and build require no Ark
+checkout or app dependencies.
+
+### CI and publishing
+
+CI runs the independent app suite on Linux and macOS, loads the native HID module,
+checks every imported source pin against its published trunk, and runs the
+[compatibility bridge](COMPATIBILITY.md). On a release tag the bridge selects
+the matching firmware and QMK tags. Its report is retained in Actions.
+
+`npm run test:browser` starts a fixture-only preview and drives a pointer-speed
+edit, checking the complete posted settings section and the host stylesheet
+cascade. Install its browser once with `npx playwright install chromium`.
+The small host-style fixture covers known padding/cascade regressions; it is not
+a VS Code extension-host or physical-device acceptance test.
+
+The shared vault tools own publication: `verify` records the tested source trees,
+dependencies, toolchain and artifacts; `land` merges the task's pull request for
+exactly the verified commit and attaches a receipt. The installed pre-push hook
+refuses direct pushes to `dev` and `main`.
+`release VERSION --push` resumes the prepared stack even after development moves
+on, and waits for both repos' tagged CI plus both firmware assets before making
+the GitHub releases public. It never applies a profile to the keyboard.
+
 ## Verification boundaries
 
 App changes require the app suite, relevant targeted tests and whitespace
@@ -120,10 +221,11 @@ fork's released line, firmware and this repository in that order: it publishes
 required check passed, merges, and reconciles local `main` to GitHub's merge
 identity. The merge message carries the `dev` tip's stack and verification
 trailers. Retries resume the frozen preparation. Direct `main` pushes are
-rejected by the local hook as well. Normal task development still lands
-locally onto `dev`.
+rejected by the local hook as well. Normal task development reaches `dev`
+through task pull requests.
 
-`dev` cannot be force-pushed or deleted on GitHub, and published `v*` release
+`dev` cannot be force-pushed or deleted on GitHub and accepts changes only
+through pull requests, and published `v*` release
 tags cannot be moved or deleted (rulesets without bypass). Merge commits take
 the PR's title and body, so a merge from the GitHub page carries the same
 verification trailers as one made by `release`.
