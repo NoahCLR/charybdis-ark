@@ -108,7 +108,10 @@ worktree; never copy it into this repository.
 
 ## Branches
 
-`dev` is the trunk. Branch each task from `dev` in its own worktree, verify it,
+`dev` is the trunk. Branch each task from `dev` in its own worktree, named
+`<type>/<slug>` (`fix/`, `feat/`, `refactor/`, `docs/`, `chore/`; the work-queue
+vault's `AGENTS.md`, "Branch names"; `open-pr` and `land` refuse any other name),
+verify it,
 and open a pull request into `dev` with the vault's `_agents/bin/open-pr`; when
 Noah says so, the vault's `_agents/bin/land` merges it on GitHub (squash) for
 exactly the verified commit, without waiting for CI. `dev` takes changes only
