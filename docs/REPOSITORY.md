@@ -170,10 +170,15 @@ checkout or app dependencies.
 
 ### CI and publishing
 
-CI runs the independent app suite on Linux and macOS, loads the native HID module,
-checks every imported source pin against its published trunk, and runs the
-[compatibility bridge](COMPATIBILITY.md). On a release tag the bridge selects
-the matching firmware and QMK tags. Its report is retained in Actions.
+Development is verified locally, so CI does not run on `dev` or on pull requests
+into it (D-L51). A release's `dev` → `main` pull request runs the independent app
+suite on Linux and macOS, loads the native HID module, runs the browser smoke,
+checks every imported source pin against its published trunk, runs the
+[compatibility bridge](COMPATIBILITY.md) at the pins and judges the firmware
+contract Ark will sit next to (`agreement`). Nightly, never blocking, CI checks
+`dev` (app suite, browser, early-warning bridge and agreement with firmware
+`dev`) and whether the published mains still agree. Reports are retained in
+Actions.
 
 `npm run test:browser` starts a fixture-only preview and drives a pointer-speed
 edit, checking the complete posted settings section and the host stylesheet
@@ -181,13 +186,13 @@ cascade. Install its browser once with `npx playwright install chromium`.
 The small host-style fixture covers known padding/cascade regressions; it is not
 a VS Code extension-host or physical-device acceptance test.
 
-The shared vault tools own publication: `verify` records the tested source trees,
-dependencies, toolchain and artifacts; `land` merges the task's pull request for
-exactly the verified commit and attaches a receipt. The installed pre-push hook
-refuses direct pushes to `dev` and `main`.
-`release VERSION --push` resumes the prepared stack even after development moves
-on, and waits for both repos' tagged CI plus both firmware assets before making
-the GitHub releases public. It never applies a profile to the keyboard.
+The shared vault tools own publication: `verify` records a pass for the tested
+tree and the pinned firmware and QMK commits; `land` merges the task's pull
+request for exactly the verified commit, with verify's summary in its message.
+The installed pre-push hook
+refuses direct pushes to `dev` and `main`. `release` prepares a release and
+`release --publish` publishes it (below). They never apply a profile to the
+keyboard.
 
 ## Verification boundaries
 
@@ -207,25 +212,23 @@ copies together; it is separate from the independent app suite.
 `main` moves only by the shared vault's `release`, so every `main` is a
 released, tested stack. GitHub `main` requires a pull request and these checks,
 including for administrators: `Promotion from dev`, and this repository's CI on
-the promotion PR itself: `check (ubuntu-latest)`, `check (macos-latest)`,
+the promotion pull request itself: `check (ubuntu-latest)`, `check (macos-latest)`,
 `browser`, `compatibility` and `agreement`. `Promotion from dev` accepts only
 this repository's `dev` branch and a merge tree identical to that branch. Force
-pushes and deletion are blocked. GitHub PR merging uses merge commits; squash and
-rebase merging are disabled so the promoted development history stays reachable.
+pushes and deletion are blocked. Promotions merge as merge commits, so the
+promoted development history stays reachable; task pull requests into `dev` are
+squashed.
 
-`release VERSION` checks and tests without publishing: its preflight requires
-this repository's `dev` to agree with firmware `dev`, and its stack test runs
-exactly what `main` will hold. `release VERSION --push` then promotes the BK
-fork's released line, firmware and this repository in that order: it publishes
-`dev`, opens or resumes the promotion PR, waits until GitHub reports every
-required check passed, merges, and reconciles local `main` to GitHub's merge
-identity. The merge message carries the `dev` tip's stack and verification
-trailers. Retries resume the frozen preparation. Direct `main` pushes are
-rejected by the local hook as well. Normal task development reaches `dev`
-through task pull requests.
+`release` prepares a release: it decides from the agreement check whether Ark
+releases alone, after firmware or together with it, lands Ark's version through
+its own pull request, drafts the notes and opens the `dev` → `main` pull request.
+`release --publish` waits for the required checks, re-checks agreement against
+firmware's `main` as it is then (its prepared `dev` in a joint release), merges
+the pull request for exactly the prepared `dev` head, tags it and publishes the
+GitHub release. Direct `main` pushes are rejected by the local hook as well.
+Normal task development reaches `dev` through task pull requests.
 
 `dev` cannot be force-pushed or deleted on GitHub and accepts changes only
-through pull requests, and published `v*` release
-tags cannot be moved or deleted (rulesets without bypass). Merge commits take
-the PR's title and body, so a merge from the GitHub page carries the same
-verification trailers as one made by `release`.
+through pull requests, and published `v*` release tags cannot be moved or
+deleted (rulesets without bypass). Merge commits take the pull request's title
+and body, so a release's notes are its promotion's commit message.

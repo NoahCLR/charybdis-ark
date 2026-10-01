@@ -10,6 +10,18 @@ before changing behavior; read its relevant decisions before architecture work.
 The interface's rules are in [the guide](docs/GUIDE.md)'s "The interface"
 section and the direction's decisions; `npm run preview` renders the real interface.
 
+## Every change follows the vault's rules
+
+Every change in this repository, with or without a task from the work queue,
+follows the work-queue vault's `AGENTS.md`
+(`/Users/noah/dev/charybdis/charybdis-notes/AGENTS.md`), section **Branches,
+landing and pushing**. Read it before your first change in a session. It covers
+your own worktree and its `<type>/<slug>` branch (rename a branch the harness
+made), `verify`, a draft pull request with `open-pr` linked to the thread,
+landing only on Noah's "land it" with `land`, `release` as the only way `main`
+moves, and saying what each of Noah's commands will do before asking for it. The tools enforce part of it; the rest
+is yours to follow. This file still governs the code itself.
+
 ## Repository ownership
 
 This repository is the app. On Noah's development machine, the active firmware
@@ -108,16 +120,18 @@ worktree; never copy it into this repository.
 
 ## Branches
 
-`dev` is the trunk. Branch each task from `dev` in its own worktree, verify it,
+`dev` is the trunk. Branch each task from `dev` in its own worktree, named
+`<type>/<slug>` (`fix/`, `feat/`, `refactor/`, `docs/`, `chore/`; the work-queue
+vault's `AGENTS.md`, "Branch names"; `open-pr` and `land` refuse any other name),
+verify it,
 and open a pull request into `dev` with the vault's `_agents/bin/open-pr`; when
 Noah says so, the vault's `_agents/bin/land` merges it on GitHub (squash) for
 exactly the verified commit, without waiting for CI. `dev` takes changes only
 through pull requests and is never pushed directly. `main` is the released line and only moves by the vault's
-`_agents/bin/release`, as a merge commit whose tree is exactly `dev`'s. Landed
-commits, promotions and release tags carry trailers naming the firmware and QMK
-commits they were tested with (`Stack-Firmware`, `Stack-QMK`, `Ark-Pins`,
-`Stack-Tested`); the tools write them. A pull request body carries the same
-block (`_agents/bin/stack --for ark`). Push only to `NoahCLR/charybdis-ark`. The work-queue vault's
+`_agents/bin/release`, as a merge commit whose tree is exactly `dev`'s. Each
+landed commit's message ends with what verify ran, and the firmware and QMK
+commits it was tested against are the pins in its own `upstream/manifest.json`.
+Push only to `NoahCLR/charybdis-ark`. The work-queue vault's
 `_agents/bin/verify` runs this file's checks for what a branch changed
 (adding the compatibility bridge for wire, schema or `upstream/` changes),
 and `_agents/bin/land` merges a branch's pull request into `dev` after verifying
@@ -282,5 +296,7 @@ silently wins and edits to the visible one are dropped. Then add the payload to
 `main` publication requires a same-repository `dev` → `main` PR with the
 `Promotion from dev` check and this repository's CI jobs (`check` on both
 systems, `browser`, `compatibility`, `agreement`), including for
-administrators. Only the shared `release --push` opens it, when Noah asks for a
-release; never push `main` directly or bypass protection.
+administrators. Only the shared vault's `release` opens it and only
+`release --publish` merges it, when Noah asks; never push `main` directly or
+bypass protection. CI runs only on those pull requests and nightly, never on
+`dev` (D-L51).
