@@ -282,5 +282,7 @@ silently wins and edits to the visible one are dropped. Then add the payload to
 `main` publication requires a same-repository `dev` → `main` PR with the
 `Promotion from dev` check and this repository's CI jobs (`check` on both
 systems, `browser`, `compatibility`, `agreement`), including for
-administrators. Only the shared `release --push` opens it, when Noah asks for a
-release; never push `main` directly or bypass protection.
+administrators. Only the shared vault's `release` opens it and only
+`release --publish` merges it, when Noah asks; never push `main` directly or
+bypass protection. CI runs only on those pull requests and nightly, never on
+`dev` (D-L51).

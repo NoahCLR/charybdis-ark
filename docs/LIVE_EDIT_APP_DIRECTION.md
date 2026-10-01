@@ -833,3 +833,17 @@ equality); keymap values are reported, never gating. It is required on `main`.
 `dev` tests against Ark's own pins; `main` moves only by a release, which tests
 that exact stack and its agreement and publishes the table in the notes
 (firmware D-F04). See [agreement](COMPATIBILITY.md#agreement-with-a-firmware-contract).
+
+### D-L51 — CI runs for releases; agreement judges the other release
+
+Development is verified locally (the work-queue vault's `verify`), so CI does not
+run on `dev` or on pull requests into it. A release's `dev` → `main` pull request
+runs everything `main` requires (`check` on Linux and macOS, `browser`,
+`compatibility` at the pins and `agreement`). `agreement` judges the firmware
+Ark will be released next to: firmware `main`, or firmware `dev` when the
+pull request's hidden release marker names a joint release; the release command
+re-checks it when it merges. Nightly runs check `dev`, warn early about firmware
+`dev`, and raise an alarm if the published Ark `main` and firmware `main` ever
+disagree; none of them blocks. This replaces D-L50's "required on `main`" and
+release-stack wording where they differ: Ark and firmware release separately,
+and together only when the contract between them changes (firmware D-F06).
