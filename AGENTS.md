@@ -113,11 +113,10 @@ and open a pull request into `dev` with the vault's `_agents/bin/open-pr`; when
 Noah says so, the vault's `_agents/bin/land` merges it on GitHub (squash) for
 exactly the verified commit, without waiting for CI. `dev` takes changes only
 through pull requests and is never pushed directly. `main` is the released line and only moves by the vault's
-`_agents/bin/release`, as a merge commit whose tree is exactly `dev`'s. Landed
-commits, promotions and release tags carry trailers naming the firmware and QMK
-commits they were tested with (`Stack-Firmware`, `Stack-QMK`, `Ark-Pins`,
-`Stack-Tested`); the tools write them. A pull request body carries the same
-block (`_agents/bin/stack --for ark`). Push only to `NoahCLR/charybdis-ark`. The work-queue vault's
+`_agents/bin/release`, as a merge commit whose tree is exactly `dev`'s. Each
+landed commit's message ends with what verify ran, and the firmware and QMK
+commits it was tested against are the pins in its own `upstream/manifest.json`.
+Push only to `NoahCLR/charybdis-ark`. The work-queue vault's
 `_agents/bin/verify` runs this file's checks for what a branch changed
 (adding the compatibility bridge for wire, schema or `upstream/` changes),
 and `_agents/bin/land` merges a branch's pull request into `dev` after verifying
