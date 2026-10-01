@@ -30,7 +30,8 @@ It also records whether every firmware and QMK source pin is published. Firmware
 the firmware checkout's `refs/remotes/origin/dev`, its trunk. The bridge never fetches,
 so fetch both dependency checkouts first for a current answer. QMK pins must be contained in `refs/remotes/origin/noah-userspace-contracts-dev`, the BK fork's development branch. An unpublished pin is a
 warning during local work. With `--publish`, it fails before any runner starts;
-run that form before pushing an Ark change that moves a pin.
+run that form before landing an Ark change that moves a pin (`land` also refuses
+pins that are not on the published trunks).
 
 The bridge then sequentially runs these Ark-owned integration runners under `tests/integration/`:
 
