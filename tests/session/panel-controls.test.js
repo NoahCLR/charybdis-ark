@@ -65,15 +65,16 @@ test("reading the keyboard connects, reads in dependency order and says what it 
 test("apply writes a recovery copy through the host, then reads the keyboard again", async () => {
     const session = sessionWithDraft(), draft = session.draft, h = host();
     const readSteps = [];
-    session.service.emitChange = () => readSteps.push(session.postApplyReadStep);
+    session.service.emitChange = () => readSteps.push([session.postApplyReadStep, session.applyRunning]);
     stage(session, {type: "updateLayoutKeys", layers: [{layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_A"}]}]});
     draft.review(draft.revision);
     session.service.calls.length = 0;
     await draftControl(session, {type: "applyProfileDraft", draftRevision: draft.revision}, h);
     assert.equal(h.saved.length, 1);
     assert.deepEqual(session.service.calls, ["restorePortableProfile", "readLayout", "readCommittedProfile", "readCombos", "readBaseRgb"]);
-    assert.deepEqual(readSteps, ["layout", "profile", "combos", "baseRgb"]);
+    assert.deepEqual(readSteps, [["layout", true], ["profile", true], ["combos", true], ["baseRgb", true]]);
     assert.equal(session.postApplyReadStep, undefined, "the readback state clears when Apply finishes");
+    assert.equal(session.applyRunning, false, "a later operation is not drawn as this Apply's readback");
     assert.match(session.notice, /Recovery copy: \/recovery\/1\.json/);
     assert.match(session.notice, /both halves and verified/);
     assert.equal(session.resetDraftForms, true);
@@ -86,6 +87,7 @@ test("a failed post-Apply read clears its progress stage", async () => {
     session.service.readCommittedProfile = async () => {throw new Error("readback interrupted");};
     await assert.rejects(draftControl(session, {type: "applyProfileDraft", draftRevision: session.draft.revision}, host()), /readback interrupted/);
     assert.equal(session.postApplyReadStep, undefined);
+    assert.equal(session.applyRunning, false);
 });
 
 test("a destination blocker refuses Apply before recovery or HID", async () => {

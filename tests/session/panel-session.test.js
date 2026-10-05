@@ -172,6 +172,23 @@ test("post-Apply readback keeps the editor visible and reports the current read"
     assert.deepEqual(buildPanelModel(session, connected({busy: true})).postApplyRead, {step: "combos", progress: null});
 });
 
+test("a finished Apply is shown only during its own readback", () => {
+    const session = panelWithDraft();
+    const done = {id: 1, state: "done", steps: []};
+    session.applyRunning = true;
+    assert.equal(buildPanelModel(session, connected({busy: true, liveApply: done})).apply, done, "the readback after Apply is drawn as such");
+    session.applyRunning = false;
+    session.portableBusy = true;
+    const exporting = buildPanelModel(session, connected({busy: true, phase: "reading complete profile", liveApply: done}));
+    assert.equal(exporting.draft.busy, true);
+    assert.equal(exporting.apply, null, "a later export is not drawn as reading back the Apply");
+    session.portableBusy = false;
+    const failed = {id: 2, state: "failed", steps: [], failure: {label: "Send", reason: "x", saved: "none"}};
+    assert.equal(buildPanelModel(session, connected({liveApply: failed})).apply, failed, "a failed Apply stays until dismissed");
+    const applying = {id: 3, state: "applying", steps: []};
+    assert.equal(buildPanelModel(session, connected({busy: true, liveApply: applying})).apply, applying);
+});
+
 test("configure screens stay gated until a complete editable read finishes", () => {
     const session = {service: {portable: null}, readBusy: true, readReady: false};
     const partial = connected({layout: {state: "read", layers: []}, committed: {state: "read"}});

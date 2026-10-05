@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {configureReady, postApplyReadText, readScreen, screenAvailable} from "../webview/view/readiness.mjs";
+import {busyText, configureReady, postApplyReadText, readScreen, screenAvailable} from "../webview/view/readiness.mjs";
 
 test("loading names the active read and never claims the board is ready", () => {
     assert.deepEqual(readScreen(null), {state: "loading", title: "Reading your keyboard", detail: "Looking for a keyboard"});
@@ -48,4 +48,11 @@ test("post-Apply readback names the current data instead of a generic operation"
     assert.equal(postApplyReadText({step: "profile"}), "Reading saved lighting, behaviours and settings");
     assert.equal(postApplyReadText({step: "combos"}), "Checking active combos");
     assert.equal(postApplyReadText({step: "baseRgb"}), "Checking base lighting");
+});
+
+test("a read or export names what it reads and claims nothing about saving", () => {
+    assert.deepEqual(busyText("reading complete profile"), {detail: "Reading the complete profile", writes: false});
+    assert.deepEqual(busyText("refreshing"), {detail: "Checking both halves", writes: false});
+    assert.deepEqual(busyText("connected"), {detail: "Finishing the current step", writes: false}, "a raw phase is never shown");
+    assert.deepEqual(busyText("restoring complete profile"), {detail: "Saving the profile to both halves", writes: true});
 });

@@ -136,19 +136,23 @@ async function draftControl(session, message, host = {}) {
             // enforces that decision before writing a recovery copy or HID.
             if (draft.hasBlockers()) throw new Error("Resolve the blockers in Checks before applying this profile.");
             if (draft.hasChecksToConfirm() && message.confirmChecks !== true) throw new Error("This draft has warnings or traps. Confirm them in the review before applying.");
-            let recovery = "";
-            const result = await run(host, "Applying the complete profile to both halves",
-                () => draft.apply(service, revision, async (document) => (recovery = await host.saveRecovery(document))));
-            session.resetDraftForms = true;
+            // A finished Apply is shown only while this control still runs:
+            // a later read or export is not its readback.
+            session.applyRunning = true;
             try {
+                let recovery = "";
+                const result = await run(host, "Applying the complete profile to both halves",
+                    () => draft.apply(service, revision, async (document) => (recovery = await host.saveRecovery(document))));
+                session.resetDraftForms = true;
                 await rereadKeyboard(service, (step) => {
                     session.postApplyReadStep = step;
                     service.emitChange?.();
                 });
+                session.notice = `${savedNotice(result, "applied to")} Recovery copy: ${recovery}`;
             } finally {
+                session.applyRunning = false;
                 session.postApplyReadStep = undefined;
             }
-            session.notice = `${savedNotice(result, "applied to")} Recovery copy: ${recovery}`;
             return;
         }
         default: throw new Error("Unsupported draft control.");
