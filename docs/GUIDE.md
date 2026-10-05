@@ -162,7 +162,8 @@ behaviour dots and the badges of the combos it fires with these layers on, and
 on Lighting the board paints every layer on, lowest first, as the keyboard does.
 The highest layer keeps the tab joined to the board and every edit is stored on
 it; a key answered from below says so on the Key tab, and setting it overrides
-that answer. ⌘-click Base on its own to see the picked layer over just Base.
+that answer. ⌘-click Base on its own to see the picked layer over just Base;
+from Base, ⌘-click a layer to see it over Base.
 ⌘-click a layer again to take it out, or click any tab to go back to
 one layer. Layers on under the top one are tinted and outlined in their own
 light, so the set reads from the tabs. The set holds across Keys and Lighting and is dropped
