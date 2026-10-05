@@ -495,7 +495,11 @@ different activations. The view can therefore overlap those groups; it is the
 current activation, not another storage location. A combo in the view requires
 all inputs in that activation and uses the configured Combo Layer Matching
 reference when one is set. Tab counts still count the selected layer's stored
-routes.
+routes. On the board, a key the selected layer stores keeps its own marks; a
+transparent key answered from below wears that key's behaviour dots and the
+badges of the combos On this view lists it in (`combosInPreview` in
+webview/view/keyface.mjs). Under Combo Layer Matching the reference layer's keys
+are matched instead, so no answer from below adds a badge.
 
 The reach sections have one open state by section identity across those four
 tabs. Opening one does not close another. A section unique to one tab keeps its

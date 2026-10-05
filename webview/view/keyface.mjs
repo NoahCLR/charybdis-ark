@@ -563,6 +563,39 @@ export function combosOnLayer(model, stack, at) {
 }
 export const combosAt = (model, stack, at, layoutIndex) => combosOnLayer(model, stack, at).get(layoutIndex) || [];
 
+// The combos the board marks while `held` are previewed on under `at`. A key
+// the layer stores keeps its own marks (combosOnLayer). A transparent key shows
+// the key answering from below, and wears that key's marks as it wears its
+// behaviour dots: the combos **On this view** fires (combosInView) that take
+// that key as an input. Under Combo Layer Matching the keyboard matches the
+// reference layer's raw keycodes, never an answer from below, so the layer's
+// own marks already say it all. Each (model, layer, preview) is grouped once.
+const previewCombosByModel = new WeakMap();
+export function combosInPreview(model, stack, at, held) {
+    const own = combosOnLayer(model, stack, at);
+    if (!model || !held?.length || comboReferenceLayer(model, at) !== at) return own;
+    let perView = previewCombosByModel.get(model);
+    if (!perView) previewCombosByModel.set(model, perView = new Map());
+    const view = `${at}:${held.join(",")}`;
+    const cached = perView.get(view);
+    if (cached?.stack === stack) return cached.keys;
+    const keys = new Map([...own].map(([layoutIndex, combos]) => [layoutIndex, [...combos]]));
+    for (const {combo, keys: pressed} of combosInView(model, stack, at, held)) {
+        for (const key of pressed) {
+            if (!key.fellThrough) continue;
+            const combos = keys.get(key.position.layoutIndex) || [];
+            if (!combos.includes(combo)) combos.push(combo);
+            keys.set(key.position.layoutIndex, combos);
+        }
+    }
+    const order = new Map((model.combos || []).map((combo, index) => [combo, index]));
+    for (const combos of keys.values()) combos.sort((a, b) => order.get(a) - order.get(b));
+    perView.set(view, {stack, keys});
+    return keys;
+}
+export const combosShownAt = (model, stack, at, held, layoutIndex) =>
+    combosInPreview(model, stack, at, held).get(layoutIndex) || [];
+
 // The combo builder holds its inputs by the names the combo stores, in stored
 // order, never by board position: a combo fires on keycodes, and one position
 // carries a different key on every layer. The board is only where they are
