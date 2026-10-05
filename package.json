@@ -2,7 +2,7 @@
   "name": "charybdis-ark",
   "displayName": "Charybdis Ark",
   "description": "Live firmware editor for the Charybdis: edits the connected keyboard over Raw HID.",
-  "version": "2026.10.1+1",
+  "version": "2026.10.5",
   "publisher": "noah",
   "private": true,
   "engines": {
