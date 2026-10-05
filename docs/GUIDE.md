@@ -27,7 +27,7 @@ Every screen is drawn and wired to the host:
 | Mouse | Pointer speed, sniping and auto-mouse — the Settings sections the keyboard's model files under Mouse, drawn with the same cards and posted whole |
 | Pointing modes | All eight slots: movement, speed, direction shortcuts and how often they send (every step, or once per movement until the ball pauses or moves back the other way), scroll tuning and which way a scrolling mode scrolls (both axes, horizontal only or vertical only), what each direction's shortcut does with held modifiers, thresholds shown as ball movement at the mode's DPI, buttons, bindings, placement, clear and duplicate |
 | Settings | Every other section the keyboard reports, posted whole, read-only where the firmware cannot report; the Combos section also carries the default combo window and the combo hold threshold, which the keyboard stores with its combos |
-| Profile & backups | Import (the file against the keyboard, counted by what it configures — keys, lighting, macros, mouse, pointing — before it becomes the draft), export, upgrade export, recovery state |
+| Profile & backups | Import (the file against the keyboard, counted by what it configures — keys, lighting, macros, mouse, pointing — before it becomes the draft), export, upgrade export, profile memory, recovery state |
 | Device | Read-only: connection, committed generation, what was read |
 
 The keycode picker leads with the ANSI board, then task-shaped Symbols,
@@ -289,6 +289,18 @@ portable file. **Import profile** shows a review, saves a recovery copy, restore
 both halves and verifies the complete readback. A failed or interrupted restore
 reports the saved recovery file instead of claiming success. Recovery files are
 kept in the extension's local storage; the app shows their full path.
+
+**Profile memory** shows how full the profile is. Behaviours, combos,
+lighting, pointing modes, settings and every layer, macro and custom-key name
+share one block on the keyboard: 5,088 bytes on current firmware, the size the
+keyboard reports. The card lists what uses it, area by area, and the counted
+limits beside it: behaviours, behaviour steps, combos, lighting groups and
+lighting group rows. Each area can stay under its own limit and the profile
+still fill up, so a full profile can refuse an edit in any of them. The bar
+turns amber from 90%. The figures are your draft's while it has changes, and
+the keyboard's otherwise; they follow every edit, undo and discard. Macro steps
+are stored apart from the profile, so the card shows them as a second bar,
+counted slot by slot on Macros.
 
 The standard firmware reserves eight layers. **Manage layers** names and orders
 the overlays, with the highest-priority layer shown first and Base fixed at the

@@ -266,3 +266,23 @@ test("a layer is dragged to any place above the base, and Make base swaps it wit
     assert.deepEqual(edit.order, [5, 7, 2, 3, 4, 6, 0, 1], "the old base moves like any other layer now");
     assert.equal(validateSnapshot(layerEditDocument(edit)).settings.names[0], edit.names[5]);
 });
+
+test("the profile meter follows the draft, and is absent without a keyboard or an advertised size", () => {
+    const sized = {...capabilities, maxProfilePayload: 5088, maxBehaviorRows: 64};
+    const session = {service: {portable: snapshot()}};
+    const keyboard = buildPanelModel(session, connected({capabilities: sized})).portable.usage;
+    assert.equal(keyboard.source, "keyboard", "with nothing changed, the figures are the keyboard's");
+    assert.equal(keyboard.capacity, 5088);
+    const draft = session.draft;
+    const behaviours = keyboard.counts.find((entry) => entry.id === "behaviours").used;
+    routeMessage(session, {type: "saveBehavior", draftId: draft.id, draftRevision: draft.revision,
+        behavior: {keycode: "KC_F13", tapHoldTerm: 0, longerHoldTerm: 0, multiTapTerm: 0, steps: []}}, connected({capabilities: sized}));
+    const staged = buildPanelModel(session, connected({capabilities: sized})).portable.usage;
+    assert.equal(staged.source, "draft");
+    assert.equal(staged.used, keyboard.used + 14, "a behaviour without steps costs its 14-byte row");
+    assert.equal(staged.counts.find((entry) => entry.id === "behaviours").used, behaviours + 1);
+    draft.undo(draft.revision);
+    assert.equal(buildPanelModel(session, connected({capabilities: sized})).portable.usage.used, keyboard.used, "undo takes the bytes back");
+    assert.equal(buildPanelModel(session, connected({capabilities: sized, connected: false})).portable.usage, null);
+    assert.equal(buildPanelModel(session, connected()).portable.usage, null, "firmware that advertises no size shows no meter");
+});
