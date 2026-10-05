@@ -20,7 +20,8 @@ test("base is under every preview, so ⌘-clicking it alone previews the picked 
     assert.deepEqual(toggleLayer(3, [0], 0), {top: 3, on: []}, "and back to the plain single-layer view");
     assert.deepEqual(toggleLayer(3, [1], 0), {top: 3, on: [1]}, "with other layers on, base stays on");
     assert.deepEqual(toggleLayer(0, [], 0), {top: 0, on: []}, "base on its own has nothing to go under");
-    assert.deepEqual(toggleLayer(0, [], 2), {top: 2, on: []}, "from base, a ⌘-click is the same as picking that layer");
+    assert.deepEqual(toggleLayer(0, [], 2), {top: 2, on: [0]}, "from base, a ⌘-clicked layer goes on over base");
+    assert.deepEqual(toggleLayer(2, [0], 2), {top: 0, on: []}, "and ⌘-clicking it again leaves base on its own");
 });
 
 test("a base listed on stays on as layers come and go above it", () => {
