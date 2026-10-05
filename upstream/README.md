@@ -5,8 +5,8 @@ not symlinks, a firmware checkout, or code the app loads from another repository
 The application runtime uses its own codecs and vendored `core/data/` catalog.
 Tests, fixture previews and catalog maintenance use the files here.
 
-For ongoing firmware development, inspect the real checkout at
-`/Users/noah/dev/charybdis/charybdis-4x6`, not these snapshots. The
+For ongoing firmware development, inspect the real checkout, `charybdis-4x6`
+beside this one in Noah's workspace, not these snapshots. The
 [workspace map](../docs/REPOSITORY.md#local-development-workspace) explains how
 to locate task worktrees and distinguish current source from this pinned baseline.
 
