@@ -222,6 +222,26 @@ test("an eight-direction mode reads as eight directions, and lists its diagonals
     assert.ok(item.fields.some(field=>field.label==="Up-left"),"the diagonals it now reads are listed");
 });
 
+test("a mode switched to once per movement says so in the review", () => {
+    const base=pdDocument(), before=snapshot(base), slots=validateSnapshot(base).pdModes;
+    const directional=slots.findIndex(slot=>slot.kind===1);
+    const after=snapshot(withDomain(base,80,decodePdDomain,encodePdDomain,modes=>modes.map((mode,id)=>id===directional?{...mode,directionOutput:1}:mode)));
+    const [item]=profileReview(before,after);
+    const output=item.fields.find(field=>field.label==="How often it sends");
+    assert.equal(output.before,"Every step");
+    assert.equal(output.after,"Once per movement");
+});
+
+test("a scrolling mode limited to one axis says so in the review", () => {
+    const base=pdDocument(), before=snapshot(base), slots=validateSnapshot(base).pdModes;
+    const scrolling=slots.findIndex(slot=>slot.kind===2);
+    const after=snapshot(withDomain(base,80,decodePdDomain,encodePdDomain,modes=>modes.map((mode,id)=>id===scrolling?{...mode,axis:2}:mode)));
+    const [item]=profileReview(before,after);
+    const axes=item.fields.find(field=>field.label==="Scrolls");
+    assert.equal(axes.before,"Both axes");
+    assert.equal(axes.after,"Vertical only");
+});
+
 test("a reorder that makes a new base names it first, and says which layer left the base", () => {
     const {layerOrderReview} = require("../../core/model/profile-review");
     const order = [3, 1, 2, 0, 4, 5, 6, 7];

@@ -7,7 +7,7 @@
 
 const NONE = {holdHelpers: [], tiers: {}, branches: [], localities: [], paintModes: [], fadeModes: [], tapCommit: [],
     feedbackOwners: [], stages: [], pointing: {kinds: [], axes: [], invert: [], pointerLayer: [], buttons: [],
-        emptyDirection: [], modifierPolicy: [], scrollFields: []}, modifiers: [], comboOptions: {}};
+        emptyDirection: [], directionOutput: [], scrollAxes: [], modifierPolicy: [], scrollFields: []}, modifiers: [], comboOptions: {}};
 
 export const vocabulary = (model) => model?.vocabulary || NONE;
 

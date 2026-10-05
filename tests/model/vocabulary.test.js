@@ -22,6 +22,8 @@ test("every stored enum value has a word", () => {
     coversNumbers(VOCABULARY.pointing.axes, pd.PD_AXIS, "axes");
     coversNumbers(VOCABULARY.pointing.buttons, pd.PD_BUTTON, "button kinds");
     coversNumbers(VOCABULARY.pointing.emptyDirection, pd.PD_EMPTY_DIRECTION, "empty direction");
+    coversNumbers(VOCABULARY.pointing.directionOutput, pd.PD_DIRECTION_OUTPUT, "directional output");
+    coversNumbers(VOCABULARY.pointing.scrollAxes, pd.PD_SCROLL_AXES, "scroll axes");
     coversNumbers(VOCABULARY.pointing.modifierPolicy, pd.PD_MODIFIERS, "modifier policy");
 });
 

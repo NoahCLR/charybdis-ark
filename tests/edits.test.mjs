@@ -12,7 +12,7 @@ import {fileURLToPath} from "node:url";
 import * as edits from "../webview/view/edits.mjs";
 import {behaviourEditorRow, behaviourTimingEdit, behaviourTimingField} from "../webview/view/behavior-editor.mjs";
 import {shareHold} from "../webview/view/share.mjs";
-import {AXIS, BUTTON, DIRECTIONAL_STARTER_THRESHOLD, KIND, SCROLL_STARTER, dpiOptions, newMode, readConfig, settleButtons, startingRecord} from "../webview/view/pointing-config.mjs";
+import {AXIS, BUTTON, DIRECTIONAL_STARTER_THRESHOLD, KIND, MODIFIER_POLICY, SCROLL_AXES, SCROLL_STARTER, dpiOptions, modeDpi, newMode, readConfig, settleButtons, settleTaps, startingRecord, thresholdDistance} from "../webview/view/pointing-config.mjs";
 
 const require = createRequire(import.meta.url);
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -523,6 +523,97 @@ test("an eight-direction mode posts its diagonals; another axis posts them empty
     const nothing = readConfig(decoded(draft).pdModes[4], formOf({kind: KIND.DIRECTIONAL, name: "Arrow", dpi: "0", axis: AXIS.DOMINANT, emptyDirection: 2}));
     stage(draft, edits.pdMode(4, nothing, draft.identity()));
     assert.equal(decoded(draft).pdModes[4].emptyDirection, 2);
+});
+
+test("a directional mode posts how often it sends, and keeps it when the form does not draw it", () => {
+    const draft = session();
+    const slot = decoded(draft).pdModes[4];
+    assert.equal(slot.directionOutput, 0, "existing modes send every step");
+    const once = readConfig(slot, formOf({kind: KIND.DIRECTIONAL, name: "Arrow", dpi: "0", directionOutput: 1}));
+    assert.equal(once.directionOutput, 1);
+    stage(draft, edits.pdMode(4, once, draft.identity()));
+    assert.equal(decoded(draft).pdModes[4].directionOutput, 1);
+    const kept = readConfig(decoded(draft).pdModes[4], formOf({kind: KIND.DIRECTIONAL, name: "Arrow", dpi: "0", axis: AXIS.EIGHT, thresholdX: "40", thresholdY: "40"}));
+    assert.equal(kept.directionOutput, 1, "switching axis keeps the choice");
+    stage(draft, edits.pdMode(4, kept, draft.identity()));
+    assert.equal(decoded(draft).pdModes[4].directionOutput, 1);
+    assert.equal(newMode({id: 7, buttons: [{}, {}, {}].map(() => ({kind: 0, modifiers: 0, tap: {keycode: 0, modifierPolicy: 0, mask: 0}}))}, KIND.DIRECTIONAL).directionOutput, 0,
+        "a new mode sends every step");
+});
+
+test("a scrolling mode posts which axes it scrolls; switching kind starts each kind from its own axis", () => {
+    const draft = session();
+    const scroll = decoded(draft).pdModes[0];
+    assert.equal(scroll.axis, SCROLL_AXES.BOTH, "existing scrolling modes scroll both axes");
+    const vertical = readConfig(scroll, formOf({kind: KIND.SCROLLING, name: "Dragscroll", dpi: "0", scrollAxes: SCROLL_AXES.VERTICAL}));
+    stage(draft, edits.pdMode(0, vertical, draft.identity()));
+    assert.equal(decoded(draft).pdModes[0].axis, SCROLL_AXES.VERTICAL);
+    const kept = readConfig(decoded(draft).pdModes[0], formOf({kind: KIND.SCROLLING, name: "Dragscroll", dpi: "0"}));
+    assert.equal(kept.axis, SCROLL_AXES.VERTICAL, "a field not drawn keeps the stored axes");
+
+    // Arrow reads the dominant axis, which as a scroll axis would mean
+    // vertical only: switched to scrolling it starts on both.
+    const arrow = decoded(draft).pdModes[4];
+    const scrolling = readConfig(startingRecord(arrow, KIND.SCROLLING), formOf({kind: KIND.SCROLLING, name: "Arrow", dpi: "0"}));
+    assert.equal(scrolling.axis, SCROLL_AXES.BOTH);
+    stage(draft, edits.pdMode(4, scrolling, draft.identity()));
+    // And a vertical-only scroll switched to directional starts on the
+    // vertical axis with its shipped threshold, not as a dominant axis
+    // without a horizontal threshold.
+    const directional = readConfig(startingRecord(decoded(draft).pdModes[0], KIND.DIRECTIONAL), formOf({kind: KIND.DIRECTIONAL, name: "Dragscroll", dpi: "0"}));
+    assert.equal(directional.axis, AXIS.VERTICAL);
+    stage(draft, edits.pdMode(0, directional, draft.identity()));
+    assert.equal(decoded(draft).pdModes[0].thresholdY, DIRECTIONAL_STARTER_THRESHOLD);
+});
+
+test("each direction posts what held modifiers do to it, and an empty direction posts nothing", () => {
+    const draft = session();
+    const arrow = decoded(draft).pdModes[4];
+    assert.equal(arrow.directions.up.modifierPolicy, MODIFIER_POLICY.MASK, "the factory Arrow leaves Alt out of up and down");
+    // Clearing a shortcut that leaves modifiers out posts an empty direction,
+    // not a mask the keyboard refuses.
+    const cleared = readConfig(arrow, formOf({kind: KIND.DIRECTIONAL, name: "Arrow", dpi: "0", "dir:up": ""}));
+    assert.deepEqual(cleared.directions.up, {keycode: "0", modifierPolicy: 0, mask: 0});
+    stage(draft, edits.pdMode(4, cleared, draft.identity()));
+    assert.equal(decoded(draft).pdModes[4].directions.up.keycode, 0);
+
+    const exact = readConfig(decoded(draft).pdModes[4], formOf({kind: KIND.DIRECTIONAL, name: "Arrow", dpi: "0",
+        "dirPolicy:left": MODIFIER_POLICY.EXACT, "dirPolicy:down": MODIFIER_POLICY.INHERIT}));
+    assert.equal(exact.directions.down.mask, 0, "a mask goes only with Ignore");
+    stage(draft, edits.pdMode(4, exact, draft.identity()));
+    const after = decoded(draft).pdModes[4];
+    assert.equal(after.directions.left.modifierPolicy, MODIFIER_POLICY.EXACT);
+    assert.deepEqual([after.directions.down.modifierPolicy, after.directions.down.mask], [MODIFIER_POLICY.INHERIT, 0]);
+
+    // Ignore is stored only with what it leaves out: chosen alone it is held
+    // by the editor and the direction posts as stored; with a modifier it
+    // posts.
+    const chosen = readConfig(after, formOf({kind: KIND.DIRECTIONAL, name: "Arrow", dpi: "0", "dirPolicy:right": MODIFIER_POLICY.MASK}));
+    const {config, pending} = settleTaps(after, chosen);
+    assert.deepEqual(Object.keys(pending), ["dir:right"]);
+    assert.equal(config.directions.right.modifierPolicy, after.directions.right.modifierPolicy);
+    stage(draft, edits.pdMode(4, config, draft.identity()));
+    const masked = settleTaps(after, readConfig(after, formOf({kind: KIND.DIRECTIONAL, name: "Arrow", dpi: "0",
+        "dirPolicy:right": MODIFIER_POLICY.MASK, "dirMask:right": 0x02})));
+    assert.deepEqual(masked.pending, {});
+    stage(draft, edits.pdMode(4, masked.config, draft.identity()));
+    assert.deepEqual([decoded(draft).pdModes[4].directions.right.modifierPolicy, decoded(draft).pdModes[4].directions.right.mask], [MODIFIER_POLICY.MASK, 0x02]);
+
+    // Diagonals carry theirs too.
+    const eight = readConfig(decoded(draft).pdModes[4], formOf({kind: KIND.DIRECTIONAL, name: "Arrow", dpi: "0", axis: AXIS.EIGHT,
+        thresholdX: "40", thresholdY: "40", "diag:upLeft": "KC_HOME", "diagPolicy:upLeft": MODIFIER_POLICY.EXACT}));
+    stage(draft, edits.pdMode(4, eight, draft.identity()));
+    assert.equal(decoded(draft).pdModes[4].diagonals.upLeft.modifierPolicy, MODIFIER_POLICY.EXACT);
+});
+
+test("a threshold reads as ball movement at the mode's pointer speed", () => {
+    const defaults = [{id: "normalPointerSpeed", fields: [{macro: "normalDpi", value: "1200"}]}];
+    assert.equal(modeDpi({dpi: 400}, defaults), 400);
+    assert.equal(modeDpi({dpi: 0}, defaults), 1200, "a mode keeping normal speed runs at the normal DPI");
+    assert.equal(modeDpi({dpi: 0}, []), 0);
+    assert.deepEqual(thresholdDistance(80, 400), {short: "≈ 5.1 mm", long: "Sensor counts: about 5.1 mm of ball movement at 400 DPI."});
+    assert.equal(thresholdDistance(800, 400).short, "≈ 51 mm");
+    assert.equal(thresholdDistance(80, 0), null, "unknown speed says nothing");
 });
 
 test("an axis switched back on starts from the shipped threshold, and a typed zero on a read axis is posted as typed", () => {

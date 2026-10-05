@@ -3,7 +3,7 @@
   "sources": {
     "firmware": {
       "repository": "https://github.com/NoahCLR/charybdis-4x6",
-      "commit": "993c516285fea09f55a53be4afbf8d5ba04373ad"
+      "commit": "4f4b92bdc849ef7676bc119011528ea879220098"
     },
     "qmk": {
       "repository": "https://github.com/NoahCLR/bastardkb-qmk",
@@ -24,7 +24,7 @@
       "source": "firmware",
       "sourcePath": "docs/architecture/device-resident-profile.md",
       "sourceSha256": "2017be82f67fa5bb3cc9ddee3206ed755866b84a1c10a04335eb78d1e6ae9967",
-      "sha256": "51d2d2efa9f3b23c615f3f60c454d97f9e54fda9c42319c6f3b3c2fef79cc675",
+      "sha256": "725d382f48c7b8c9306d857af6a5bf44d10e79414c3a829dcae1e6d6091e82b3",
       "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
     },
     {
@@ -55,8 +55,8 @@
       "path": "upstream/firmware/docs/architecture/pd-mode-domain-v1.md",
       "source": "firmware",
       "sourcePath": "docs/architecture/pd-mode-domain-v1.md",
-      "sourceSha256": "d08fb77a4b28b88c7a2a36779c249544ba1e2d376d0de9004ba302f4f7225f9e",
-      "sha256": "485d1b8eb2177ce92c4a4c391fa024adc9b1b2a0ccbd303e8797e29cc4d32f05",
+      "sourceSha256": "40ecb3192e1f8b99b710b2d0be3eaa295240bcbd6ca5de4d0ed6e97e17e9a63c",
+      "sha256": "8a14be713ad830e8d72c8a7da7df4e56399fb0d441864494a527e4ca107a32b8",
       "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
     },
     {
@@ -96,7 +96,7 @@
       "source": "firmware",
       "sourcePath": "docs/architecture/split-activity-sync.md",
       "sourceSha256": "cb59ea91d5adfe570223e34730298095899f941c88ead9e260b5fbd19f5c7c34",
-      "sha256": "744547ed9a246861015a93e20b8a2aee5bd90fd590f2f86e283baf099acff414",
+      "sha256": "e25a4afc35cf249a853da15c7afb3dc4603ce9ec69807e507fd6f58a1e8dbe1b",
       "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
     },
     {

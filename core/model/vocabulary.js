@@ -56,6 +56,8 @@ const VOCABULARY = Object.freeze({
         kinds: [[0, "Empty"], [1, "Directional keys / shortcuts"], [2, "Scrolling"]],
         axes: [[2, "Dominant axis"], [3, "Eight directions"], [0, "Vertical only"], [1, "Horizontal only"]],
         invert: [[0, "Neither axis"], [1, "Horizontal"], [2, "Vertical"], [3, "Both axes"]],
+        // Which axes a scrolling mode scrolls.
+        scrollAxes: [[0, "Both axes"], [1, "Horizontal only"], [2, "Vertical only"]],
         pointerLayer: [[0, "Keep the pointer layer active"], [1, "Return to the typing layer"]],
         buttons: [[0, "Pass through"], [1, "Consume"], [2, "Tap a shortcut"], [3, "Hold modifiers"]],
         // What moving toward a direction with no shortcut does. "Both" sends
@@ -64,6 +66,9 @@ const VOCABULARY = Object.freeze({
         // straight direction's diagonals. Only eight directions has those, so
         // elsewhere it acts as "its neighbours take over".
         emptyDirection: [[0, "Its neighbours take over"], [1, "Send both neighbours"], [2, "Nothing"]],
+        // How often a directional mode sends: once for each threshold step,
+        // or once per movement: again only after a pause or moving back.
+        directionOutput: [[0, "Every step"], [1, "Once per movement"]],
         modifierPolicy: [[0, "Inherit modifiers"], [1, "Ignore"], [2, "Exact shortcut"]],
         scrollFields: [
             ["thresholdH", "Horizontal activation threshold"], ["thresholdV", "Vertical activation threshold"],

@@ -56,7 +56,9 @@ function pointingFields(slot, names) {
             result.set(name, tap(slot.diagonals?.[diagonal]));
         }
         result.set("When a direction is empty", word(P.emptyDirection, slot.emptyDirection ?? 0));
+        result.set("How often it sends", word(P.directionOutput, slot.directionOutput ?? 0));
     } else {
+        result.set("Scrolls", word(P.scrollAxes, slot.axis ?? 0));
         result.set(P.heldModifiers, mods(slot.heldModifiers));
         for (const [field, label] of P.scrollFields) result.set(label, slot.scroll[field]);
         result.set("Reverse scrolling", word(P.invert, slot.scroll.invert));
