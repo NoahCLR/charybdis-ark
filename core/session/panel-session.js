@@ -10,6 +10,7 @@
 
 const {fingerprint, summary, reorderLayers} = require("../model/portable-profile");
 const {profileReview} = require("../model/profile-review");
+const {profileUsage} = require("../model/profile-usage");
 const {ProfileDraftSession, DRAFT_EDITS} = require("./profile-draft-session");
 const {buildDeviceModel, deviceSummary} = require("./device-model");
 
@@ -97,6 +98,7 @@ function buildPanelModel(session, state) {
         review: session.portableReview ? {incoming: summary(session.portableReview.document), current: session.portableReview.before.summary,
             fileName: session.portableReview.fileName || null, differences: importDifferences(session)} : null,
         layers: session.portableLayers ? {key: session.portableLayers.before.fingerprint, order: session.portableLayers.order, names: session.portableLayers.names, keysFollow: session.portableLayers.keysFollow !== false} : null,
+        usage: usageOf(session, state, model.draft),
     };
     if (!model.draft?.matching) model.layers?.forEach((layer, index) => {layer.displayName = state.portableSummary?.names[index] || layer.name;});
     const editableDraft = Boolean(model.draft?.matching && !model.draft.stale && state.connected);
@@ -107,6 +109,15 @@ function buildPanelModel(session, state) {
         progress: state.portableProgress || state.layout?.progress || state.committed?.progress || null,
     };
     return model;
+}
+
+// How full the profile is: the draft's, when one is open for this keyboard,
+// otherwise what the keyboard runs. Nothing without a connected keyboard.
+function usageOf(session, state, draft) {
+    if (!state.connected) return null;
+    const fromDraft = Boolean(session.draft && draft?.matching);
+    const usage = profileUsage(fromDraft ? session.draft.current : session.service?.portable, state.capabilities);
+    return usage && {...usage, source: fromDraft && session.draft.dirty ? "draft" : "keyboard"};
 }
 
 // A chosen profile file against what the keyboard holds, not the draft: that

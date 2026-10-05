@@ -12,6 +12,7 @@ import {getModel, post, canEdit as canEditArea} from "../store.mjs";
 import {topbar} from "./shell.mjs";
 import {categorySummary, statusSummary} from "../view/review.mjs";
 import {stageOrder} from "../view/vocabulary.mjs";
+import {profileUsageView} from "../view/profile-usage.mjs";
 
 export function screenProfile() {
     const model = getModel();
@@ -59,6 +60,9 @@ export function screenProfile() {
     actions.querySelector('[data-act="import"]').addEventListener("click", () => post({type: "choosePortableProfile"}));
     pad.appendChild(actions);
 
+    const usage = portable.available ? profileUsageView(portable.usage, model?.macroBank) : null;
+    if (usage) pad.appendChild(usageCard(usage));
+
     if (portable.pdUpgradeAvailable) {
         const card = el(`<div class="card"><div class="card-h"><h3>Firmware upgrade</h3>
             <span class="right"><span class="chip"><i class="dot draft"></i>geometry change ahead</span></span></div>
@@ -80,6 +84,30 @@ export function screenProfile() {
 
     main.appendChild(content);
     return main;
+}
+
+// How full the profile is, area by area, with the counted limits beside it.
+// Every area shares the one block, so the bar is what an edit can run into.
+function usageCard(usage) {
+    const bytes = (value) => value.toLocaleString("en-US");
+    return el(`<div class="card usage">
+        <div class="card-h"><h3>Profile memory</h3><span class="right note">${esc(usage.source)}</span></div>
+        <div class="card-b" style="display:grid;gap:12px">
+            <div><div class="sect-h"><h4>Profile</h4>
+                <span class="right note">${bytes(usage.used)} of ${bytes(usage.capacity)} bytes used · ${bytes(usage.free)} free</span></div>
+                <div class="meter ${usage.nearlyFull ? "near" : ""}" data-tip="${Math.round(usage.share * 100)}% used"><i style="width:${usage.share * 100}%"></i></div></div>
+            <p class="note">Behaviours, combos, lighting, pointing modes, settings and names all share this one block, so a full profile can refuse an edit in any of them${usage.nearlyFull ? ". It is nearly full: the next edit may not fit" : ""}.</p>
+            <div class="usage-tables">
+                <table class="t"><thead><tr><th>Uses the block</th><th>Bytes</th><th></th></tr></thead>
+                    <tbody>${usage.areas.map((area) => `<tr><td>${esc(area.label)}</td><td class="mono">${bytes(area.bytes)}</td><td class="note mono">${area.percent}%</td></tr>`).join("")}</tbody></table>
+                ${usage.counts.length ? `<table class="t"><thead><tr><th>Counted limits</th><th>Used</th><th></th></tr></thead>
+                    <tbody>${usage.counts.map((count) => `<tr><td>${esc(count.label)}</td><td class="mono">${count.used} of ${count.limit}</td><td class="note">${count.full ? "full" : ""}</td></tr>`).join("")}</tbody></table>` : ""}
+            </div>
+            ${usage.macros ? `<div><div class="sect-h"><h4>Macro memory (separate)</h4>
+                <span class="right note">${bytes(usage.macros.used)} of ${bytes(usage.macros.capacity)} bytes used</span></div>
+                <div class="meter"><i style="width:${usage.macros.share * 100}%"></i></div>
+                <p class="note" style="margin-top:6px">Macro steps are stored apart from the profile and counted slot by slot on Macros. Macro names count in the profile above.</p></div>` : ""}
+        </div></div>`);
 }
 
 // The file against the keyboard, counted area by area: enough to decide

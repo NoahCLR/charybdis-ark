@@ -58,6 +58,14 @@ const capabilities = {
     responseVersion: 1,
     reportSize: 32,
     brightnessMax: 255,
+    // The sizes current firmware advertises, so Profile & backups shows its meter.
+    maxProfilePayload: 5088,
+    maxBehaviorRows: 64,
+    maxPopulatedBehaviorSteps: 128,
+    maxCombos: 32,
+    maxReusableRgbGroups: 16,
+    maxRgbStageGroupRows: 32,
+    viaMacroBytes: 7191,
 };
 
 function buildModel() {
