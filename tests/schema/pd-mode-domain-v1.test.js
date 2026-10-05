@@ -85,6 +85,39 @@ test("scroll validation rejects bad timing and ratios before they reach arithmet
     reject(() => encodePdDomain(value), "INVALID_PARAMETER");
 });
 
+test("every directional mode stores how often it sends in byte 87; 88 and 89 stay reserved", () => {
+    const {PD_DIRECTION_OUTPUT} = require("../../core/schema/pd-mode-domain-v1");
+    const record = 8 + 4 * 96;   // Arrow, dominant axis
+    for (const axis of [2, 3]) {
+        const value = slots();
+        Object.assign(value[4], {axis, directionOutput: PD_DIRECTION_OUTPUT.ONCE}, axis === 3 ? {thresholdX: 40, thresholdY: 40} : {});
+        const encoded = encodePdDomain(value);
+        assert.equal(encoded[record + 87], 1);
+        assert.equal(decodePdDomain(encoded)[4].directionOutput, PD_DIRECTION_OUTPUT.ONCE);
+        for (const [offset, byte, code] of [[87, 2, "INVALID_POLICY"], [88, 1, "RESERVED"], [89, 1, "RESERVED"]]) {
+            const b = Buffer.from(encoded); b[record + offset] = byte;
+            reject(() => decodePdDomain(b), code);
+        }
+    }
+    assert.equal(decodePdDomain(bytes())[4].directionOutput, PD_DIRECTION_OUTPUT.REPEAT, "existing records send every step");
+    assert.equal(decodePdDomain(bytes())[0].directionOutput, 0, "a scrolling record's byte 87 is its own");
+    const value = slots(); value[4].directionOutput = 2;
+    reject(() => encodePdDomain(value), "INVALID_POLICY");
+});
+
+test("a scrolling mode stores which axes it scrolls in byte 3", () => {
+    const {PD_SCROLL_AXES} = require("../../core/schema/pd-mode-domain-v1");
+    for (const axis of [PD_SCROLL_AXES.HORIZONTAL, PD_SCROLL_AXES.VERTICAL]) {
+        const value = slots(); value[0].axis = axis;
+        const encoded = encodePdDomain(value);
+        assert.equal(encoded[8 + 3], axis);
+        assert.equal(decodePdDomain(encoded)[0].axis, axis);
+    }
+    assert.equal(decodePdDomain(bytes())[0].axis, PD_SCROLL_AXES.BOTH, "existing scrolling modes scroll both axes");
+    const value = slots(); value[0].axis = 3;
+    reject(() => encodePdDomain(value), "INVALID_PARAMETER");
+});
+
 test("button override validation requires balanced, explicit output kinds", () => {
     for (const button of [{kind: 4}, {kind: 0, modifiers: 8}, {kind: 1, tap: {keycode: 4}},
         {kind: 2}, {kind: 2, modifiers: 8, tap: {keycode: 4}}, {kind: 3}, {kind: 3, modifiers: 8, tap: {keycode: 4}}]) {

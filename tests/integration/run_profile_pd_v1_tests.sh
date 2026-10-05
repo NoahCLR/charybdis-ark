@@ -39,15 +39,24 @@ for (let offset = 8 + 4 * 96; offset < 8 + 5 * 96; offset++) {
         const bytes = Buffer.from(eight); bytes[offset] = value; add(bytes);
     }
 }
-// Every directional mode carries the empty-direction policy in byte 86.
+// Every directional mode carries the empty-direction policy in byte 86 and
+// how often it sends in byte 87.
 const dominantSlots = structuredClone(fixture.slots);
-Object.assign(dominantSlots[4], {axis: 2, emptyDirection: 2});
+Object.assign(dominantSlots[4], {axis: 2, emptyDirection: 2, directionOutput: 1});
 const dominant = encodePdDomain(dominantSlots);
 add(dominant);
 for (let offset = 8 + 4 * 96 + 70; offset < 8 + 4 * 96 + 90; offset++) {
     for (const value of [0, 1, 2, 3, 0xff]) {
         const bytes = Buffer.from(dominant); bytes[offset] = value; add(bytes);
     }
+}
+// A scrolling mode carries which axes it scrolls in byte 3.
+const scrollSlots = structuredClone(fixture.slots);
+scrollSlots[0].axis = 2;
+const scrollOne = encodePdDomain(scrollSlots);
+add(scrollOne);
+for (const value of [0, 1, 2, 3, 4, 0xff]) {
+    const bytes = Buffer.from(scrollOne); bytes[8 + 3] = value; add(bytes);
 }
 for (const name of ["Édition ⌘", "😀".repeat(5), "x".repeat(23)]) {
     const slots = structuredClone(fixture.slots); slots[7].name = name; add(encodePdDomain(slots));

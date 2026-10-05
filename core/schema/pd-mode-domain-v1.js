@@ -4,15 +4,21 @@
 const PD_DOMAIN_V1 = Object.freeze({ID: 0x50, VERSION: 1, SLOTS: 8, HEADER_SIZE: 8, RECORD_SIZE: 96, NAME_SIZE: 24, SIZE: 776});
 const PD_KIND = Object.freeze({DISABLED: 0, DIRECTIONAL: 1, SCROLLING: 2});
 const PD_AXIS = Object.freeze({VERTICAL: 0, HORIZONTAL: 1, DOMINANT: 2, EIGHT: 3});
+// Which axes a scrolling mode scrolls, in the same byte (firmware D-F08).
+const PD_SCROLL_AXES = Object.freeze({BOTH: 0, HORIZONTAL: 1, VERTICAL: 2});
 // What an eight-direction mode does when a diagonal has no shortcut.
 const PD_EMPTY_DIRECTION = Object.freeze({NEAREST: 0, BOTH: 1, NOTHING: 2});
+// How often a directional mode sends: once per threshold step, or once per
+// movement (firmware D-F07).
+const PD_DIRECTION_OUTPUT = Object.freeze({REPEAT: 0, ONCE: 1});
 const PD_MODIFIERS = Object.freeze({INHERIT: 0, MASK: 1, EXACT: 2});
 const PD_BUTTON = Object.freeze({PASS_THROUGH: 0, CONSUME: 1, TAP: 2, HOLD_MODIFIERS: 3});
 const HEADER = Buffer.from([1, 8, 96, 0, 0, 0, 0, 0]);
 const DIRECTIONS = ["left", "right", "up", "down"];
 // Eight directions keep their diagonals in bytes 70..85, which any other
 // directional record leaves zero. Byte 86 is what every directional mode does
-// with motion toward a direction that has no shortcut.
+// with motion toward a direction that has no shortcut, byte 87 how often it
+// sends.
 const DIAGONALS = ["upLeft", "upRight", "downLeft", "downRight"];
 const SCROLL_U16 = ["thresholdH", "thresholdV", "divisorH", "divisorV", "intervalMs", "expireMs", "lockMs"];
 const SCROLL_U8 = ["startNumerator", "startDenominator", "sustainNumerator", "sustainDenominator", "decayDivisor", "invert"];
@@ -67,16 +73,18 @@ function validateRecord(p, slot, offset) {
             if (!validTap(p.subarray(at, at + 4))) reject("INVALID_ACTION", at, "Unsupported diagonal tap or modifier policy.");
         }
         if (p[86] > PD_EMPTY_DIRECTION.NOTHING) reject("INVALID_POLICY", 86, "Unknown empty-direction policy.");
-        if (!zero(p.subarray(87, 90))) reject("RESERVED", 87, "Reserved PD bytes must be zero.");
+        if (p[87] > PD_DIRECTION_OUTPUT.ONCE) reject("INVALID_POLICY", 87, "Unknown directional output policy.");
+        if (!zero(p.subarray(88, 90))) reject("RESERVED", 88, "Reserved PD bytes must be zero.");
     } else if (p[1] === PD_KIND.DIRECTIONAL) {
         if (p[6] || !zero(p.subarray(70, 86))) reject("INVALID_PARAMETER", 6, "Directional modes cannot carry scroll settings or owned scroll modifiers.");
         if (p[86] > PD_EMPTY_DIRECTION.NOTHING) reject("INVALID_POLICY", 86, "Unknown empty-direction policy.");
-        if (!zero(p.subarray(87, 90))) reject("RESERVED", 87, "Reserved PD bytes must be zero.");
+        if (p[87] > PD_DIRECTION_OUTPUT.ONCE) reject("INVALID_POLICY", 87, "Unknown directional output policy.");
+        if (!zero(p.subarray(88, 90))) reject("RESERVED", 88, "Reserved PD bytes must be zero.");
         if ((p[3] !== PD_AXIS.VERTICAL && !x) || (p[3] !== PD_AXIS.HORIZONTAL && !y)) reject("INVALID_PARAMETER", 32, "Enabled axes need a nonzero movement threshold.");
         if ((p[3] === PD_AXIS.VERTICAL && (x || !zero(p.subarray(36, 44)))) ||
             (p[3] === PD_AXIS.HORIZONTAL && (y || !zero(p.subarray(44, 52))))) reject("INVALID_PARAMETER", 32, "Unused axes must have zero thresholds and outputs.");
     } else {
-        if (p[3] || !zero(p.subarray(32, 52))) reject("INVALID_PARAMETER", 3, "Scrolling modes cannot carry directional settings.");
+        if (p[3] > PD_SCROLL_AXES.VERTICAL || !zero(p.subarray(32, 52))) reject("INVALID_PARAMETER", 3, "Scrolling modes cannot carry directional settings.");
         if (![70, 72, 74, 76, 82].every(at => p.readUInt16LE(at) > 0) || p.readUInt16LE(80) < p.readUInt16LE(82) ||
             ![84, 85, 86, 87].every(at => p[at] > 0) || p[84] < p[85] || p[86] < p[87] ||
             p[86] * p[85] > p[84] * p[87] || p[88] < 2 || p[89] > 3) reject("INVALID_PARAMETER", 70, "Invalid scrolling thresholds, ratios, divisors or timing.");
@@ -105,6 +113,7 @@ function decodePdDomain(bytes) {
             scroll: Object.fromEntries([...SCROLL_U16.map((name, i) => [name, p[1] === PD_KIND.SCROLLING ? p.readUInt16LE(70 + i * 2) : 0]), ...SCROLL_U8.map((name, i) => [name, p[1] === PD_KIND.SCROLLING ? p[84 + i] : 0])]),
             diagonals: Object.fromEntries(DIAGONALS.map((name, i) => [name, p[1] === PD_KIND.DIRECTIONAL ? tapFromBytes(p, 70 + i * 4) : {keycode: 0, modifierPolicy: 0, mask: 0}])),
             emptyDirection: p[1] === PD_KIND.DIRECTIONAL ? p[86] : 0,
+            directionOutput: p[1] === PD_KIND.DIRECTIONAL ? p[87] : 0,
         };
     });
 }
@@ -131,7 +140,7 @@ function encodePdDomain(slots) {
     const bytes = Buffer.alloc(PD_DOMAIN_V1.SIZE);
     HEADER.copy(bytes);
     for (let id = 0; id < PD_DOMAIN_V1.SLOTS; id++) {
-        const slot = object(slots[id], ["id", "kind", "pointerLayer", "axis", "dpi", "heldModifiers", "name", "thresholdX", "thresholdY", "directions", "buttons", "scroll", "diagonals", "emptyDirection"], "Slot");
+        const slot = object(slots[id], ["id", "kind", "pointerLayer", "axis", "dpi", "heldModifiers", "name", "thresholdX", "thresholdY", "directions", "buttons", "scroll", "diagonals", "emptyDirection", "directionOutput"], "Slot");
         const p = bytes.subarray(8 + id * 96, 8 + (id + 1) * 96);
         p[0] = integer(slot.id, 7);
         for (const [at, name] of [[1, "kind"], [2, "pointerLayer"], [3, "axis"], [6, "heldModifiers"]]) p[at] = integer(optional(slot[name], 0), 255);
@@ -156,6 +165,7 @@ function encodePdDomain(slots) {
             // A directional record's bytes 70..90 hold diagonals or nothing.
             DIAGONALS.forEach((name, i) => writeTap(p, 70 + i * 4, diagonals[name]));
             p[86] = integer(optional(slot.emptyDirection, 0), 255);
+            p[87] = integer(optional(slot.directionOutput, 0), 255);
         } else {
             SCROLL_U16.forEach((name, i) => p.writeUInt16LE(integer(optional(scroll[name], 0), 65535), 70 + i * 2));
             SCROLL_U8.forEach((name, i) => { p[84 + i] = integer(optional(scroll[name], 0), 255); });
@@ -165,4 +175,4 @@ function encodePdDomain(slots) {
     return bytes;
 }
 
-module.exports = {PD_DOMAIN_V1, PD_KIND, PD_AXIS, PD_EMPTY_DIRECTION, PD_MODIFIERS, PD_BUTTON, DIAGONALS, isPdTapKey, encodePdDomain, decodePdDomain};
+module.exports = {PD_DOMAIN_V1, PD_KIND, PD_AXIS, PD_SCROLL_AXES, PD_EMPTY_DIRECTION, PD_DIRECTION_OUTPUT, PD_MODIFIERS, PD_BUTTON, DIAGONALS, isPdTapKey, encodePdDomain, decodePdDomain};

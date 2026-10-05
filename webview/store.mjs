@@ -49,6 +49,7 @@ export const state = {
     pdSlot: 0,
     pdKind: null,      // movement selection while the rebuilt form catches up: {slot, kind}
     pdButtons: null,   // {slot, rows: {index: override}}: button overrides whose kind is chosen but not yet its shortcut or modifiers
+    pdTaps: null,      // {slot, rows: {"dir:up": tap}}: direction shortcuts set to ignore modifiers before any is chosen
     pdAdvanced: false,  // Advanced open on the pointing editor, whichever slot is shown
     applyDismissed: 0,  // the failed Apply (by id) the person closed, so it stays closed
     pdPreview: false,
@@ -113,6 +114,7 @@ export function resetDraftForms() {
     state.lastTake = null;
     state.pdKind = null;
     state.pdButtons = null;
+    state.pdTaps = null;
     state.retarget = null;
     closeComboBuilder();
 }

@@ -7,7 +7,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
-import {AXIS, BUTTON, KIND} from "../webview/view/pointing-config.mjs";
+import {AXIS, BUTTON, KIND, MODIFIER_POLICY, SCROLL_AXES} from "../webview/view/pointing-config.mjs";
 import {MODIFIER_BITS} from "../webview/view/keyvalues.mjs";
 import {TIER_FIELDS} from "../webview/view/edits.mjs";
 
@@ -18,6 +18,8 @@ const {VOCABULARY} = require("../core/model/vocabulary");
 test("the webview's pointing numbers are the schema's", () => {
     assert.deepEqual(KIND, {DIRECTIONAL: pd.PD_KIND.DIRECTIONAL, SCROLLING: pd.PD_KIND.SCROLLING});
     assert.deepEqual(AXIS, {VERTICAL: pd.PD_AXIS.VERTICAL, HORIZONTAL: pd.PD_AXIS.HORIZONTAL, DOMINANT: pd.PD_AXIS.DOMINANT, EIGHT: pd.PD_AXIS.EIGHT});
+    assert.deepEqual(SCROLL_AXES, {...pd.PD_SCROLL_AXES});
+    assert.deepEqual(MODIFIER_POLICY, {...pd.PD_MODIFIERS});
     assert.deepEqual(BUTTON, {PASS_THROUGH: pd.PD_BUTTON.PASS_THROUGH, CONSUME: pd.PD_BUTTON.CONSUME, TAP: pd.PD_BUTTON.TAP, HOLD_MODIFIERS: pd.PD_BUTTON.HOLD_MODIFIERS});
 });
 
