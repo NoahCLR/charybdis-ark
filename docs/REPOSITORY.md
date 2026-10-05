@@ -148,6 +148,25 @@ npm run keycodes -- --check # verify the catalog against the local pinned QMK in
 npm run keycodes           # regenerate from those same inputs
 ```
 
+### Trying a branch before it lands
+
+`tools/branch-window/` is a second, separate VS Code extension
+(`noah.charybdis-ark-branch`), a developer tool that is not part of Ark. Link it
+once from the main checkout, then reload VS Code:
+
+```sh
+ln -s "$PWD/tools/branch-window" ~/.vscode/extensions/noah.charybdis-ark-branch-0.1.0
+```
+
+Its **Ark branch** button, beside **Charybdis Ark**, lists every Ark worktree
+on a branch: the main checkout first, then the most recently committed. Picking
+one opens a new window running that checkout's Ark, as F5 does but without a
+debugger; the installed Ark keeps running unchanged in every other window.
+Close the window to stop. It checks out and installs nothing: a branch is
+listed while its worktree exists, with the modules `verify` installed there,
+and disappears when `land` removes it. Detached worktrees (the tools' cached
+pin checkouts) are not listed.
+
 ### Running it without a keyboard
 
 F5 provides a separate development host without changing the installed link. The repo's `.vscode/launch.json` has *Run Charybdis Ark*, which
