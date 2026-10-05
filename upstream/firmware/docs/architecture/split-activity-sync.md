@@ -2,8 +2,8 @@
 
 Activity coalescing is on in the default build. `NOAH_SPLIT_ACTIVITY_COALESCE=no`
 builds the uncoalesced comparison firmware. It is accepted on hardware in daily
-use; its measured effect on the report rate is still open, see the
-*Split transport optimization* plan in the work-queue vault.
+use; its measured effect on the report rate is still open. Measure it with the
+recorders below.
 The split link runs at QMK's default 230,400 baud, with no speed selector; see
 D-L43 for why 460,800 was removed.
 
@@ -88,7 +88,7 @@ then reads frozen pages as JSON. It uses the firmware tools' own node-hid
 installation (`npm ci --prefix tools`) and is a separate engineering tool. Close competing app/VIA
 connections. Select `--path` if more than one matching keyboard is attached.
 Capture with the procedure in
-[`measurements/pointing-cadence/`](https://github.com/NoahCLR/charybdis-4x6/blob/d0aa4ed957b03b518e96ca0ae42be6a22107fbc8/measurements/pointing-cadence/README.md),
+[`measurements/pointing-cadence/`](https://github.com/NoahCLR/charybdis-4x6/blob/993c516285fea09f55a53be4afbf8d5ba04373ad/measurements/pointing-cadence/README.md),
 which also keeps the recorded sets.
 
 The same run reads the pointing-cadence recorder (custom value `0x03`) when
@@ -139,6 +139,7 @@ transport timeouts.
 
 ## Remaining work
 
-The runtime RPC replacement and asynchronous transport remain behind the
-measurement gates in the *Split transport optimization* plan (work-queue vault). No 1 kHz claim
-or acceptance is implied by the activity implementation or calculated byte savings.
+A dedicated runtime exchange replacing the four-transaction RPC, and an
+asynchronous transport, are not built. Measure with the recorders below before
+building either. No 1 kHz claim or acceptance is implied by the activity
+implementation or calculated byte savings.
