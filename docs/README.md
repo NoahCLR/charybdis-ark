@@ -6,8 +6,8 @@ Start at the root [AGENTS.md](../AGENTS.md) for development rules and
 commands, the code's layout, CI and publishing.
 This map tells a new contributor what to read and where to write.
 
-Looking for the firmware on disk? The active checkout on Noah's machine is
-`/Users/noah/dev/charybdis/charybdis-4x6`. Start with the
+Looking for the firmware on disk? The active checkout is `charybdis-4x6` beside
+this one in Noah's workspace. Start with the
 [local workspace map](REPOSITORY.md#local-development-workspace) for current
 source and worktrees; `upstream/` is the pinned baseline, not that checkout.
 

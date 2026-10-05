@@ -10,24 +10,32 @@ before changing behavior; read its relevant decisions before architecture work.
 The interface's rules are in [the guide](docs/GUIDE.md)'s "The interface"
 section and the direction's decisions; `npm run preview` renders the real interface.
 
-## Every change follows the vault's rules
+## How a change is made
 
-Every change in this repository, with or without a task from the work queue,
-follows the work-queue vault's `AGENTS.md`
-(`/Users/noah/dev/charybdis/charybdis-notes/AGENTS.md`), section **Branches,
-landing and pushing**. Read it before your first change in a session. It covers
-your own worktree and its `<type>/<slug>` branch (rename a branch the harness
-made), `verify`, a draft pull request with `open-pr` linked to the thread,
-landing only on Noah's "land it" with `land`, `release` as the only way `main`
-moves, and saying what each of Noah's commands will do before asking for it. The tools enforce part of it; the rest
-is yours to follow. This file still governs the code itself.
+Only Noah works on this repository. His private notes vault, `charybdis-notes`,
+sits beside this repository's main checkout (from any worktree:
+`"$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")/../charybdis-notes"`). It holds the work queue and the tools every change goes through.
+If it is there, read its `AGENTS.md` before your first change in a session:
+**Every agent, wherever it starts** (work starts from a note or right here,
+and Noah's commands have skills) and **Branches, landing and pushing** (your
+own worktree on a `<type>/<slug>` branch from `dev`, `verify`, a draft pull
+request with `open-pr` linked to the thread, landing only on Noah's
+"land it" with `land`, `release` as the only way `main` moves, and saying
+what each of Noah's commands will do before asking for it). The tools enforce
+part of it; the rest is yours to follow. This file still governs the code
+itself.
+
+Without the vault: branch from `dev` as `<type>/<slug>`, run the checks this
+file lists, and open a pull request into `dev` on `NoahCLR/charybdis-ark`. Never
+push `dev` or `main` directly, and nothing goes upstream. Noah lands
+and releases.
 
 ## Repository ownership
 
-This repository is the app. On Noah's development machine, the active firmware
-checkout is `/Users/noah/dev/charybdis/charybdis-4x6`, the app checkout is
-`/Users/noah/dev/charybdis/charybdis-ark`, and the upstream QMK build dependency
-is `/Users/noah/dev/charybdis/bastardkb-qmk`. See the
+This repository is the app. On Noah's Macs, the checkouts sit side by side in
+one workspace folder: the app (`charybdis-ark`), the firmware
+(`charybdis-4x6`) and the upstream QMK build dependency (`bastardkb-qmk`),
+whichever of them that Mac has. See the
 [local workspace map](docs/REPOSITORY.md#local-development-workspace) for roles,
 worktree discovery and how to inspect ongoing firmware work.
 
@@ -110,13 +118,13 @@ hardware acceptance.
 
 ## Work queue
 
-Work is filed, refined and planned in the work-queue vault at
-`/Users/noah/dev/charybdis/charybdis-notes` (an Obsidian vault; see the
+Work is filed, refined and planned in the work-queue vault,
+`charybdis-notes` beside this checkout (an Obsidian vault; see the
 [local workspace map](docs/REPOSITORY.md#local-development-workspace)). Its
 `AGENTS.md` says how a note becomes a task and how a task is claimed and
 handed back. It never overrides this file: every change here follows the
-rules above, whichever way the task arrived. Use its absolute path from any
-worktree; never copy it into this repository.
+rules above, whichever way the task arrived. From a worktree, find it as
+described under "How a change is made"; never copy it into this repository.
 
 ## Branches
 

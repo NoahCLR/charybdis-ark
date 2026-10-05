@@ -6,13 +6,14 @@ bridge against the working copies involved in the change:
 
 ```sh
 npm run test:compat -- \
-  --firmware /Users/noah/dev/charybdis/charybdis-4x6 \
-  --ark /Users/noah/dev/charybdis/charybdis-ark \
-  --qmk /Users/noah/dev/charybdis/bastardkb-qmk \
+  --firmware ../charybdis-4x6 \
+  --ark . \
+  --qmk ../bastardkb-qmk \
   --report /tmp/charybdis-compatibility.json
 ```
 
-Run from Ark. All four arguments are required; checkout paths must be Git
+Run from the main Ark checkout, with the firmware and QMK checkouts beside it
+(from a worktree, use their paths in the workspace). All four arguments are required; checkout paths must be Git
 repository roots. Use a new report filename for each run, outside the checkouts.
 Git, Node, Python 3, a C compiler with the runners' sanitizer support, and the selected
 QMK tree are required. Missing checkouts or required integration inputs fail before any tests run. No dependency installation, fetching, device

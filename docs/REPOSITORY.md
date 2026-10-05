@@ -7,25 +7,26 @@ belong to the firmware repository.
 
 ## Local development workspace
 
-On Noah's development machine the workspace is
-`/Users/noah/dev/charybdis/charybdis.code-workspace`. Its folders are:
+On Noah's Macs the checkouts sit side by side in one workspace folder
+(`/Users/noah/dev/charybdis` on his main Mac, opened through
+`charybdis.code-workspace`). A Mac has only the ones it works on. Its folders:
 
-| Absolute path | Role |
+| Folder | Role |
 | --- | --- |
-| `/Users/noah/dev/charybdis/charybdis-ark` | Active app repository; make Ark changes here or in its task worktree |
-| `/Users/noah/dev/charybdis/charybdis-4x6` | Active firmware/userspace repository owned by this project; current C implementation, tests and firmware docs |
-| `/Users/noah/dev/charybdis/bastardkb-qmk` | Upstream QMK/Bastard Keyboards checkout and build dependency; inspect its behavior without treating it as our app or userspace source |
-| `/Users/noah/dev/charybdis/builds` | Build artifacts via a local symlink, not source |
-| `/Users/noah/dev/charybdis/charybdis-notes` | Work-queue Obsidian vault (private `NoahCLR/charybdis-notes`): notes, tasks, active plans and keyboard checks for all three repositories; its `AGENTS.md` governs claiming and status |
+| `charybdis-ark` | Active app repository; make Ark changes here or in its task worktree |
+| `charybdis-4x6` | Active firmware/userspace repository owned by this project; current C implementation, tests and firmware docs |
+| `bastardkb-qmk` | Upstream QMK/Bastard Keyboards checkout and build dependency; inspect its behavior without treating it as our app or userspace source |
+| `builds` | Build artifacts via a symlink into iCloud Drive, not source |
+| `charybdis-notes` | Work-queue Obsidian vault (private `NoahCLR/charybdis-notes`): notes, tasks, active plans and keyboard checks for all three repositories, and the tools; its `AGENTS.md` governs claiming and status |
 
-From the main Ark checkout the firmware and QMK paths are also
-`../charybdis-4x6` and `../bastardkb-qmk`. These relative paths do not necessarily
-hold inside a task worktree. For discovery on this machine, use:
+From the main Ark checkout the others are `../charybdis-4x6` and so on. Inside
+a task worktree, the workspace is the folder above the main checkout:
 
 ```sh
-git -C /Users/noah/dev/charybdis/charybdis-4x6 status --short
-git -C /Users/noah/dev/charybdis/charybdis-4x6 worktree list
-git -C /Users/noah/dev/charybdis/charybdis-ark worktree list
+workspace="$(dirname "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")"
+git -C "$workspace/charybdis-4x6" status --short
+git -C "$workspace/charybdis-4x6" worktree list
+git -C "$workspace/charybdis-ark" worktree list
 ```
 
 Use the worktree selected for the task when one is specified. Do not infer that
@@ -106,8 +107,8 @@ parent workspace does not add a duplicate or a test button.
 protocol references and QMK catalog inputs. [`docs/REPOSITORY.md`](REPOSITORY.md)
 records source provenance and the repository boundary.
 
-For local firmware development, the active checkout is
-`/Users/noah/dev/charybdis/charybdis-4x6`; see the
+For local firmware development, the active checkout is `charybdis-4x6` in the
+workspace; see the
 [workspace map](REPOSITORY.md#local-development-workspace). Agents can
 inspect it while the app and its ordinary tests remain self-contained.
 
