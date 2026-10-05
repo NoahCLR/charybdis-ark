@@ -65,6 +65,10 @@ Developer-only tools, never imported by the application runtime:
 - `scripts/preview.js` renders the interface against the test fixtures.
 - `scripts/check-compatibility.js` runs Ark-owned integration runners against explicitly selected
   firmware source; it is never imported by runtime code.
+- `tools/branch-window/` is a separate developer extension that opens Ark from
+  any of its worktrees in a new window
+  ([REPOSITORY.md](docs/REPOSITORY.md#trying-a-branch-before-it-lands)). It is
+  its own VS Code shell, so it may import `vscode`; nothing in the app imports it.
 
 ## Layout
 
@@ -86,6 +90,7 @@ webview/            the interface: browser ES modules, no build step
 docs/               app-owned product direction, specs and contributor workflows
 upstream/           pinned external contracts and inputs; read its AGENTS.md
 scripts/            developer entry points and build steps
+tools/              developer tools outside the app, e.g. the branch-window extension
 tests/              mirrors core/, plus the view modules and the posted payloads
 preview/            ignored generated previews, never authoritative source
 ```
