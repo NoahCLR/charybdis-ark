@@ -4,7 +4,7 @@
 import {el, esc} from "../lib/dom.mjs";
 import {getModel, post, render, state} from "../store.mjs";
 import {statusSummary} from "../view/review.mjs";
-import {postApplyReadText, screenAvailable} from "../view/readiness.mjs";
+import {busyText, postApplyReadText, screenAvailable} from "../view/readiness.mjs";
 import {openHistory} from "./history.mjs";
 
 // The review opens at once; the host marks it reviewed when it answers.
@@ -200,11 +200,12 @@ export function commitBar() {
     }
 
     if (draft.busy) {
+        const busy = busyText(model?.device?.health?.phase);
         return el(`<div class="commit applying">
             <span class="n">${spinner()} <strong>Working with the keyboard</strong>
-            <span class="muted">${esc(model?.device?.health?.phase || "talking to the keyboard")}</span></span>
-            <span class="sep"></span>
-            <span class="note">the keyboard keeps running its saved profile until both halves confirm</span></div>`);
+            <span class="muted">${esc(busy.detail)}</span></span>
+            ${busy.writes ? `<span class="sep"></span>
+            <span class="note">the keyboard keeps running its saved profile until both halves confirm</span>` : ""}</div>`);
     }
     if (!draft.matching) {
         const node = el(`<div class="commit" style="border-color:var(--draft)">

@@ -24,6 +24,15 @@ export function postApplyReadText(read) {
         ? `${label} · ${progress.done} of ${progress.total}` : label;
 }
 
+// The commit bar while the keyboard is busy with anything but an Apply: what
+// is happening in words, and whether it writes to the keyboard. Reads and
+// exports save nothing, so they make no claim about the saved profile.
+const BUSY = {...PHASES, "restoring complete profile": "Saving the profile to both halves"};
+
+export function busyText(phase) {
+    return {detail: BUSY[phase] || "Finishing the current step", writes: phase === "restoring complete profile"};
+}
+
 export const configureReady = (model) => model?.load?.state === "ready";
 
 export function screenAvailable(model, screen) {

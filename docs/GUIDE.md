@@ -243,6 +243,9 @@ combo numbers shift because the device stores them in a packed table.
 After Apply completes, the editor stays visible while the app reads keys,
 profile domains, combos and base lighting back from the keyboard. The bottom
 bar names each read and shows its progress; editing resumes when it finishes.
+Only that readback is shown as following an Apply. A later read, export or
+discard names what it reads and says nothing about saving, because it writes
+nothing to the keyboard.
 
 What to expect while it applies:
 
