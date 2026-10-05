@@ -106,7 +106,11 @@ changes discard together with the default edit.
 Selecting a key opens its grid in Behaviours even before it has a stored row.
 Only a grid action, timing override or anchor change adds the row to the draft;
 browsing leaves the board and behaviour counts unchanged. Transparent keys and
-`KC_NO` cannot have behaviours. Empty branches preserve the key's built-in
+`KC_NO` cannot have behaviours. In a layer preview, a transparent key opens the
+key the board shows through it: the editor names the layer that supplies that
+key and says the behaviour belongs to its keycode, so changing it changes that
+key wherever it is pressed. Turning layers on or off in the preview updates the
+open key, whichever you did first. Empty branches preserve the key's built-in
 actions until you override them. A dual-role key's empty first tap or hold
 shows, dashed and marked "built in", what the key does there on its own: an
 `LT()` taps its key and holds its layer, an `MT()` or `OSM()` holds its

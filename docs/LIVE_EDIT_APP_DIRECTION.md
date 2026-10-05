@@ -799,6 +799,13 @@ Selecting a key opens its row or an unstored grid; only an action, timing overri
 or anchor change creates a draft row. Previews never enter the host model's stored
 behaviour list, counts or board marks. Transparent keys and `KC_NO` have no
 behaviour editor, and the host rejects them as new or retargeted row targets.
+Behaviour rows are keyed by keycode, so in a layer preview selecting a
+transparent position opens the keycode the board shows there, answered from
+below (`behaviourKeyAt` in webview/view/behavior-editor.mjs), naming the layer
+that supplies it and that the row is shared by that keycode. A position answered
+by `KC_NO`, by nothing, or shown alone outside a preview keeps no editor.
+Changing the previewed layers re-resolves a row opened from the selected key; a
+row picked from the list stays (`toggleLayerOn` in webview/store.mjs).
 Opening a custom key's behaviour follows the same rule.
 The timing controls lead with **Multi tap window** (release to next press),
 followed by Tap / hold and Long hold. Behaviour and combo timing inputs show

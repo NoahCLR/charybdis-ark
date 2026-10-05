@@ -10,7 +10,7 @@ import {feedbackColours, layerColourRow, mappedKeyCount, pdColourRow, stageEnabl
 import {closeComboBuilder, currentLayer, getModel, heldLayers, layerName, layers, openComboBuilder, positionAt, post, previewing, render, selectedPosition, showLayer, state, writable, canEdit as canEditArea} from "../store.mjs";
 import * as edits from "../view/edits.mjs";
 import {behaviourTimingChecks} from "../view/checks.mjs";
-import {behaviourEditorRow, behaviourTimingEdit, behaviourTimingField, canHaveBehaviour} from "../view/behavior-editor.mjs";
+import {behaviourEditorRow, behaviourKeyAt, behaviourTimingEdit, behaviourTimingField, canHaveBehaviour} from "../view/behavior-editor.mjs";
 import {timingInput} from "../view/timing-input.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {board} from "./board.mjs";
@@ -90,9 +90,9 @@ export function screenKeys() {
                 if (answer) state.combo.labels[answer.keycode] = answer.editLabel || answer.display || answer.keycode;
             } else {
                 state.selected = index;
-                // Follow the stored key, including one with no authored row.
-                // Transparent and disabled positions never get a behaviour.
-                selectBehaviourKey(keyMeaning(positionAt(layer, index)));
+                // Follow the key the board shows, including one with no
+                // authored row. Transparent and disabled keys never get one.
+                selectBehaviourKey(behaviourKey(index).keycode);
             }
             render();
         },
@@ -224,7 +224,7 @@ function bench() {
     </div>`);
     node.querySelectorAll("[data-tab]").forEach((button) => button.addEventListener("click", () => {
         state.tab = button.dataset.tab;
-        if (state.tab === "behaviours") selectBehaviourKey(keyMeaning(selectedPosition()));
+        if (state.tab === "behaviours") selectBehaviourKey(behaviourKey(selectedPosition()?.layoutIndex).keycode);
         state.cell = null;
         render();
     }));
@@ -239,7 +239,9 @@ function tabKey(body) {
     const model = getModel();
     const layer = currentLayer();
     const position = selectedPosition();
-    const behaviour = behaviourFor(model, keyMeaning(position));
+    const followed = behaviourKey(position?.layoutIndex);
+    const behaviour = behaviourFor(model, followed.keycode);
+    const behaviourOpen = canHaveBehaviour(model, followed.keycode);
     const combos = position ? combosAt(model, layers(), state.layer, position.layoutIndex) : [];
     const slot = pointingSlotFor(model, keyMeaning(position));
 
@@ -278,9 +280,9 @@ function tabKey(body) {
         <section>
             <div class="sect-h"><h4>What this key reaches</h4></div>
             <div class="stack" style="gap:8px">
-                <button class="reach ${behaviour ? "" : "empty"}" data-goto="behaviours" ${canHaveBehaviour(model, keyMeaning(position)) ? "" : "disabled"}>
+                <button class="reach ${behaviour ? "" : "empty"}" data-goto="behaviours" ${behaviourOpen ? "" : "disabled"}>
                     <span class="rl">Behaviour</span>
-                    <span class="rv">${behaviour ? `${esc(actionLabel(model, behaviour.keycode))} · ${behaviour.steps.length} branch${behaviour.steps.length === 1 ? "" : "es"}` : canHaveBehaviour(model, keyMeaning(position)) ? "Using the key’s defaults" : "Unavailable for transparent keys and KC_NO"}</span>
+                    <span class="rv">${behaviour ? `${esc(actionLabel(model, behaviour.keycode))} · ${behaviour.steps.length} branch${behaviour.steps.length === 1 ? "" : "es"}` : behaviourOpen ? "Using the key’s defaults" : "Unavailable for transparent keys and KC_NO"}${behaviourOpen && followed.from ? ` · from ${esc(layerName(followed.from))}` : ""}</span>
                     <span class="ra">${behaviour ? "Edit" : "Open"}</span></button>
                 <button class="reach ${combos.length ? "" : "empty"}" data-goto="combos">
                     <span class="rl">Combos</span>
@@ -303,7 +305,7 @@ function tabKey(body) {
     }));
     node.querySelectorAll("[data-goto]").forEach((button) => button.addEventListener("click", () => {
         state.tab = button.dataset.goto;
-        if (state.tab === "behaviours") selectBehaviourKey(keyMeaning(position));
+        if (state.tab === "behaviours") selectBehaviourKey(followed.keycode);
         if (state.tab === "combos" && !combos.length) openComboBuilder(null, edits.comboDefaultTermValue(getModel()));
         render();
     }));
@@ -343,6 +345,24 @@ const viewBehaviourNote = (entry) => {
     return [indexes.length ? `index ${indexes.join(", ")}${sources.length ? ` · on ${sources.join(", ")}` : ""}` : "",
         entry.combos.length ? comboNote(entry) : ""].filter(Boolean).join(" · ");
 };
+// The key a board position opens in Behaviours: in a layer preview, a
+// transparent key follows the key answered from below.
+const behaviourKey = (index) => behaviourKeyAt(layers(), state.layer, heldLayers(), index);
+
+// When the open row is the one the selected transparent key shows through,
+// say which layer supplies it and that the row belongs to that keycode, so an
+// edit here is not mistaken for one local to this position.
+function followedBelow(behaviour) {
+    const position = selectedPosition();
+    const followed = behaviourKey(position?.layoutIndex);
+    if (!followed.from || followed.keycode !== state.behaviourRow) return "";
+    const model = getModel();
+    const name = actionLabel(model, behaviour.keycode);
+    return `<p class="note" style="margin-bottom:12px">The selected key on <b>${esc(layerName(currentLayer()))}</b> is transparent,
+        so in this preview <b>${esc(layerName(followed.from))}</b> answers with ${esc(name)}. A behaviour belongs to its keycode:
+        this is ${esc(name)}’s, and a change here applies wherever ${esc(name)} is pressed, not only at this position.</p>`;
+}
+
 function selectBehaviourKey(keycode) {
     state.behaviourRow = keycode;
     state.behaviourRoute = {row: keycode, group: "view"};
@@ -354,7 +374,7 @@ function tabBehaviours(body, right) {
     const model = getModel();
     const {here, through, combos, combosBelow, elsewhere} = behaviourGroups(model, layers(), state.layer);
     const inView = behavioursInView(model, layers(), state.layer, heldLayers());
-    if (!state.behaviourRow) selectBehaviourKey(keyMeaning(selectedPosition()));
+    if (!state.behaviourRow) selectBehaviourKey(behaviourKey(selectedPosition()?.layoutIndex).keycode);
     const behaviour = behaviourEditorRow(model, state.behaviourRow);
 
     right.replaceChildren();
@@ -413,7 +433,11 @@ function tabBehaviours(body, right) {
         render();
     }));
     const main = node.querySelector(".beh-main");
-    if (behaviour) main.appendChild(behaviourEditor(behaviour));
+    if (behaviour) {
+        const followed = followedBelow(behaviour);
+        if (followed) main.appendChild(el(followed));
+        main.appendChild(behaviourEditor(behaviour));
+    }
     else main.appendChild(el(`<p class="note" style="padding:16px">Transparent keys and KC_NO cannot have a behaviour. Pick a mapped key on the board.</p>`));
     body.replaceChildren(node);
 }
