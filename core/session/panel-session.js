@@ -77,8 +77,11 @@ function buildPanelModel(session, state) {
         model.diagnostics = actual.diagnostics;
         if (model.draft.dirty && model.draft.matching) model.device.subtitle = "Showing your local draft · the keyboard still runs the last applied profile";
     }
-    // The last Apply's steps: live while it runs, kept when it failed.
-    model.apply = state.liveApply && state.liveApply.state !== "idle" ? state.liveApply : null;
+    // The last Apply's steps: live while it runs, kept when it failed. A
+    // successful one lasts only until its readback ends, so a later busy
+    // operation is not drawn as reading back an Apply.
+    const live = state.liveApply;
+    model.apply = live && (live.state === "applying" || live.state === "failed" || (live.state === "done" && session.applyRunning)) ? live : null;
     model.postApplyRead = session.postApplyReadStep ? {
         step: session.postApplyReadStep,
         progress: session.postApplyReadStep === "layout" ? state.layout?.progress

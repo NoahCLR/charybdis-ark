@@ -349,7 +349,10 @@ After a successful Apply, the app reads layout, committed domains, combos and
 VIA base lighting again. The editor and rail stay visible but busy; the commit
 bar names the current read and its page progress until editing resumes. This
 readback is separate from the ten transaction steps and does not claim another
-two-half verification.
+two-half verification. A finished Apply reaches the model only while its own
+control still runs; any later busy operation (read, export, discard, review
+against the keyboard) gets the generic busy bar, which names the operation and
+mentions the saved profile only while a profile is being written.
 
 Candidate status page 1 (see
 [Profile Wire V1](../upstream/firmware/docs/architecture/profile-wire-v1.md#candidate-operation-status))
