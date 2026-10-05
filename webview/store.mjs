@@ -3,6 +3,7 @@
 // the host, which answers with a new model. The draft lives on that side too,
 // so what is drawn is always what would be applied.
 
+import {behaviourKeyAt, behaviourRowAfterPreview} from "./view/behavior-editor.mjs";
 import {layersOn, toggleLayer} from "./view/layer-set.mjs";
 import {initialReachGroups} from "./view/reach-groups.mjs";
 
@@ -141,9 +142,14 @@ export function showLayer(index) {
     state.layersOn = [];
 }
 export function toggleLayerOn(index) {
+    const selectedKey = () => behaviourKeyAt(layers(), state.layer, heldLayers(), selectedPosition()?.layoutIndex).keycode;
+    const before = selectedKey();
     const next = toggleLayer(state.layer, heldLayers(), index);
     state.layer = next.top;
     state.layersOn = next.on;
+    const row = behaviourRowAfterPreview(state.behaviourRow, before, selectedKey());
+    if (row === state.behaviourRow) return;
+    Object.assign(state, {behaviourRow: row, behaviourRoute: {row, group: "view"}, cell: null, cellHow: null});
 }
 export const layerName = (layer) => layer?.displayName || layer?.name || "";
 export const positionAt = (layer, index) =>

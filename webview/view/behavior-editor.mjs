@@ -1,10 +1,28 @@
-import {behaviourListeningTo, canonicalKeycode} from "./keyface.mjs";
+import {behaviourListeningTo, canonicalKeycode, keyFace, keyMeaning, resolvedPositions} from "./keyface.mjs";
 import {timingInput} from "./timing-input.mjs";
 
 export function canHaveBehaviour(model, keycode) {
     const key = canonicalKeycode(model, keycode);
     return Boolean(key) && !["KC_NO", "XXXXXXX", "KC_TRANSPARENT", "KC_TRNS", "_______"].includes(key)
         && !/^0x0*[01]$/i.test(key);
+}
+
+// The key a board position opens in Behaviours. Rows are keyed by keycode, so
+// in a layer preview a transparent position follows the key the board shows
+// there, answered from below, and names the layer that supplies it. Outside a
+// preview, or with nothing mapped below, it stays the stored key.
+export function behaviourKeyAt(stack, at, held, index) {
+    const own = (stack[at]?.positions || []).find((position) => position.layoutIndex === index);
+    if (!held?.length || keyFace(own).kind !== "transparent") return {keycode: keyMeaning(own), from: null};
+    const answer = resolvedPositions(stack, at, held).find((entry) => entry.position.layoutIndex === index);
+    return answer ? {keycode: keyMeaning(answer.position), from: answer.layer} : {keycode: keyMeaning(own), from: null};
+}
+
+// The row Behaviours shows once the previewed layers change. A row opened from
+// the selected key follows what that key answers with now; one picked from the
+// list stays.
+export function behaviourRowAfterPreview(row, before, after) {
+    return row === before ? after : row;
 }
 
 // A preview is never inserted into model.keyBehaviors: counts, reach markers
