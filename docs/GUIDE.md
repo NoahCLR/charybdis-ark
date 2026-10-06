@@ -18,7 +18,8 @@ identity into its own storage on start.
 ## Using Ark in Chrome
 
 Ark also runs as a web page, in Chrome or Edge on a computer, with the same
-screens as in VS Code. It is a set of static files: once the page has loaded it
+screens as in VS Code; the released page's address is in the
+[README](../README.md#install). It is a set of static files: once the page has loaded it
 talks to nothing but the keyboard, and nothing you do leaves your computer.
 The page reaches a keyboard over WebHID, which only Chrome and Edge have and
 only on a page served over HTTPS (or from `localhost`). In Safari, Firefox or on

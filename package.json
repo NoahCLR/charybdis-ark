@@ -32,6 +32,7 @@
     "preview": "node scripts/preview.js",
     "build:web": "node scripts/build-web.js",
     "web": "node scripts/build-web.js && node scripts/serve.js dist/web --port 8975",
+    "check:site": "node scripts/check-static-site.js dist/web",
     "test:compat": "node scripts/check-compatibility.js",
     "test:browser": "playwright test",
     "pins": "node scripts/check-pins.js",

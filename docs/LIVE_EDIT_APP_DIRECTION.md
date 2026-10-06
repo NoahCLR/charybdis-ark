@@ -48,7 +48,7 @@ matrix.
 | Backup and restore | Complete snapshots, import review against the keyboard, recovery file and verified restore |
 | Drafts and Apply | One draft with item-by-item review, discard by edit group, Show, undo/redo and draft history; the review checks reachable actions, confirms active warnings and traps, and blocks profiles the destination cannot save (D-L36); Apply shows its steps and says where a failure happened (D-L19, D-L23, D-L29, D-L30) |
 | Recovery | Atomic logical Apply, differential transfer, reboot recovery fencing, firmware roll-forward after the decision, resume after a lost or power-cycled peer link, bounded cancel owned by the keyboard (D-L20–D-L22, D-L27, D-L39) |
-| Where it runs | The VS Code extension, and a web page that runs all of Ark in Chrome or Edge over WebHID (D-L52): Choose keyboard, one tab at a time, recovery copies in the browser's storage, a light/dark toggle. `npm run build:web` writes the page as static files; it is not yet published |
+| Where it runs | The VS Code extension, and a web page that runs all of Ark in Chrome or Edge over WebHID (D-L52): Choose keyboard, one tab at a time, recovery copies in the browser's storage, a light/dark toggle. `npm run build:web` writes the page as static files; a workflow publishes it to Cloudflare Pages from `dev` and `main`, from the first run after the one-time setup |
 | Demo without a keyboard | Explore a demo, in both hosts and on a browser without WebHID: the bundled demo profile (`core/data/`) in a real draft under current firmware's capabilities, every screen editable and reviewed; Apply refused, Export saves the draft, Open a profile file replaces it, leaving with edits not exported asks first (D-L53) |
 
 The rail's health strip shows connection, both-half convergence, draft state
@@ -67,7 +67,7 @@ Remaining before calling the product complete:
   USB role migration is untested: on the normal pair the left half exposes no
   Raw HID interface (`FORCE_SLAVE`/`usb_disconnect`), so it needs role-switching
   firmware;
-- publishing the web page (D-L52);
+- the web page's first publication, after its one-time Cloudflare setup (D-L52);
 - the open issues below.
 
 ## Open Issues
@@ -890,7 +890,8 @@ Ark will be released next to: firmware `main`, or firmware `dev` when the
 pull request's hidden release marker names a joint release; the release command
 re-checks it when it merges. Nightly runs check `dev`, warn early about firmware
 `dev`, and raise an alarm if the published Ark `main` and firmware `main` ever
-disagree; none of them blocks. This replaces D-L50's "required on `main`" and
+disagree; none of them blocks. The one workflow that does run on `dev` pushes
+is publishing the web page (D-L52), whose tests gate only that publish. This replaces D-L50's "required on `main`" and
 release-stack wording where they differ: Ark and firmware release separately,
 and together only when the contract between them changes (firmware D-F06).
 
@@ -914,9 +915,19 @@ it. Recovery copies are kept in the browser's storage (IndexedDB), listed on
 Profile & backups with a download each; clearing the site's data deletes them.
 The legacy eight-slot upgrade export stays the extension's.
 
-The page will be published to Cloudflare Pages from GitHub Actions, as the
-folder the build writes; that and the headers only a server can send
-(`frame-ancestors`) are later work. The demo without a keyboard is D-L53.
+The page is published to Cloudflare Pages from GitHub Actions, as the folder
+the build writes and nothing else (`.github/workflows/publish-web.yml`): `dev`
+to the preview address `dev.<project>.pages.dev` for testing, `main`, the
+project's production branch, to the custom domain. Each run builds the page,
+tests those built files in Chrome and checks they are static files only, with
+no Pages Functions or `_worker.js`, before Wrangler uploads them. This is
+D-L51's one exception: it runs on `dev` pushes, and its tests gate only the
+publish, never a merge or a release. The build's `_headers` sends the page's
+policy with `frame-ancestors 'none'`, which only a header can set,
+`Permissions-Policy: hid=(self)`, `nosniff` and `no-referrer`; the page is
+revalidated on every load and each hashed file cached for good, so a release
+shows on the next load and never mixes with an old one's files. The demo without
+a keyboard is D-L53.
 
 ### D-L53 — The demo is a draft with no keyboard behind it
 
