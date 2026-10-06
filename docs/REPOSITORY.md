@@ -172,7 +172,10 @@ they share in a chunk; the host's clock worker (`web/sleep-worker.js`);
 file but `index.html` carries a hash of its content in its name, so a new
 release can never be served an old file. `index.html` names them itself, and
 the version (`package.json`) and commit (git, or `ARK_COMMIT` in the
-environment) the build came from. `_headers` (from `web/_headers`) is what
+environment) the build came from. It runs only the host: the host starts, then
+loads the panel itself (the build names it to the host, and `index.html` only
+fetches it early), so the panel finds `acquireVsCodeApi` waiting. On a phone the
+host starts nothing and shows a notice instead (`web/phone.mjs`, D-L52). `_headers` (from `web/_headers`) is what
 Cloudflare Pages sends with the page when it is [published](#publishing-the-web-page).
 `dist/web-manifest.json`, beside the site rather than in it, lists the hashed
 names for tests and tools; it is never published and the page never fetches it.

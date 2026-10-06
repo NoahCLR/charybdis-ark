@@ -43,7 +43,7 @@ needs the keyboard, and Export takes what you made there to yours.
 It's early days: Ark runs as a VS Code extension, installed from a checkout,
 and now also as a web page in Chrome or Edge, talking to the keyboard over
 WebHID. The released page is at **https://ark.ncleroy.dev**; nothing to install,
-just open it.
+just open it on your computer. On a phone it just says so.
 You can also build it and open it locally (`npm run web`).
 
 For the extension:

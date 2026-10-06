@@ -24,7 +24,11 @@ talks to nothing but the keyboard, and nothing you do leaves your computer.
 The page reaches a keyboard over WebHID, which only Chrome and Edge have and
 only on a page served over HTTPS (or from `localhost`). In Safari, Firefox or on
 a plain `http://` address the page says Ark needs Chrome or Edge over HTTPS
-instead of offering a keyboard.
+instead of offering a keyboard; the demo still works there, on a tablet too.
+On a phone the page shows only the keyboard's outline and a notice that Ark
+runs on a computer, with links to Ark's and the firmware's repositories and to
+BastardKB, the keyboard's official seller: no phone browser can reach the
+keyboard, and Ark's screens need a computer's.
 
 **Choosing the keyboard.** A page sees only the keyboards you have let it open.
 The first time, choose **Choose keyboard** and pick your Charybdis in Chrome's
@@ -54,7 +58,8 @@ download any you want to keep. **Export profile** downloads the profile file;
 **Import profile** opens the browser's file chooser and takes files up to
 100 kB. The legacy **Export upgrade pair** is not offered on the page. Errors
 show in the rail's message rather than as a notification, and the page's
-version and commit are at the foot of the rail.
+version and commit are at the foot of the rail, with GitHub's logo: choose them
+to open that commit on GitHub in a new tab.
 
 ## Exploring without a keyboard
 

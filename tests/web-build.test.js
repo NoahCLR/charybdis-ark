@@ -62,8 +62,12 @@ test("the page names its files itself, carries its policy, and says what it was 
         const page = fs.readFileSync(path.join(outdir, "index.html"), "utf8");
         assert.ok(!page.includes("{{"), "every name is filled in");
         assert.ok(page.includes(`href="./${manifest.styles}"`));
-        // The host first: it defines acquireVsCodeApi before the panel asks for it.
-        assert.ok(page.indexOf(`src="./${manifest.host}"`) < page.indexOf(`src="./${manifest.panel}"`));
+        // The page runs only the host. The host loads the panel once it has
+        // defined acquireVsCodeApi, or on a phone never does; the page only
+        // fetches the panel early.
+        assert.ok(page.includes(`<script type="module" src="./${manifest.host}"></script>`));
+        assert.ok(!page.includes(`src="./${manifest.panel}"`), "the panel is not a script of the page's own");
+        assert.ok(page.includes(`<link rel="modulepreload" href="./${manifest.panel}">`));
         assert.match(page, /Charybdis Ark 1\.2\.3 \(abc123\)/);
         const policy = unescape(page.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/)[1]);
         assert.equal(policy, pagePolicy());
@@ -76,6 +80,7 @@ test("the page names its files itself, carries its policy, and says what it was 
         // starts, and nothing it bundles opens a connection.
         const host = fs.readFileSync(path.join(outdir, manifest.host), "utf8");
         assert.ok(host.includes(`"./${manifest.worker}"`), "the host starts the hashed worker");
+        assert.ok(host.includes(`"./${manifest.panel}"`), "the host loads the hashed panel");
         assert.ok(host.includes('"abc123"'), "the host carries the build it was made from");
         for (const file of [manifest.host, manifest.panel, ...fs.readdirSync(outdir).filter((name) => name.startsWith("chunk-"))]) {
             assert.doesNotMatch(fs.readFileSync(path.join(outdir, file), "utf8"), /\bfetch\(|XMLHttpRequest|WebSocket|EventSource|sendBeacon/, file);

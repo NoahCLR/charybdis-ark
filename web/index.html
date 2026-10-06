@@ -13,8 +13,10 @@
 <meta name="generator" content="Charybdis Ark {{version}} ({{commit}})">
 <title>Charybdis Ark</title>
 <link rel="stylesheet" href="./{{styles}}">
+<!-- The host loads the panel once it is running, or on a phone shows a notice
+     instead (web/page.mjs); the panel is fetched alongside it meanwhile. -->
 <script type="module" src="./{{host}}"></script>
-<script type="module" src="./{{panel}}"></script>
+<link rel="modulepreload" href="./{{panel}}">
 </head>
 <body>
 <div id="root"></div>
