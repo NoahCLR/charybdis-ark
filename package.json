@@ -6,7 +6,7 @@
   "publisher": "noah",
   "private": true,
   "engines": {
-    "vscode": "^1.85.0"
+    "vscode": "^1.90.0"
   },
   "categories": [
     "Other"
@@ -30,6 +30,7 @@
     "keycodes": "node scripts/generate-keycode-catalog.js",
     "probe:live-link": "node scripts/probe-live-link.js",
     "preview": "node scripts/preview.js",
+    "build:web": "node scripts/build-web.js",
     "test:compat": "node scripts/check-compatibility.js",
     "test:browser": "playwright test",
     "pins": "node scripts/check-pins.js",
@@ -40,6 +41,8 @@
     "node-hid": "^3.4.0"
   },
   "devDependencies": {
-    "@playwright/test": "1.63.0"
+    "@playwright/test": "1.63.0",
+    "buffer": "6.0.3",
+    "esbuild": "0.28.2"
   }
 }

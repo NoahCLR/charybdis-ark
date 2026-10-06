@@ -76,7 +76,7 @@ test("the extension shell reaches core only through session/", () => {
 });
 
 test("only the extension shell knows about VS Code", () => {
-    for (const dir of ["core", "scripts", "webview"]) {
+    for (const dir of ["core", "scripts", "webview", "web"]) {
         for (const file of sourceFiles(dir)) {
             const text = fs.readFileSync(file, "utf8");
             assert.ok(
@@ -105,7 +105,7 @@ test("the webview stays a renderer", () => {
 test("nothing we author mentions the firmware repository", () => {
     // The one sanctioned QMK reader is the catalog generator, which is a build
     // step producing a checked-in file rather than a runtime dependency.
-    const authored = [...sourceFiles("core"), ...sourceFiles("webview"), path.join(APP_ROOT, "extension.js")];
+    const authored = [...sourceFiles("core"), ...sourceFiles("webview"), ...sourceFiles("web"), path.join(APP_ROOT, "extension.js")];
     for (const file of authored) {
         const text = fs.readFileSync(file, "utf8");
         // Matched on word boundaries: the rule is about the firmware's files,

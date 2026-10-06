@@ -130,6 +130,9 @@ ownership and where new plans or specifications belong.
   system.
 - `tests/` — mirrors `core/`, plus the view modules and the payloads the
   interface posts.
+- `web/` — entries for the [web build](#the-web-build) only: what a browser
+  host takes from `core/`, and the stand-ins the bundle uses in place of Node's
+  `Buffer` and the native HID adapter. The extension never loads them.
 
 The layer rules and where new work belongs are in [`AGENTS.md`](../AGENTS.md).
 The application runtime must not read the firmware repository, and the webview
@@ -148,7 +151,35 @@ npm run preview -- --vscode  # also write preview/vscode-{dark,light}.html, as t
 npm run probe:live-link # read-only enumeration of matching HID interfaces
 npm run keycodes -- --check # verify the catalog against the local pinned QMK inputs
 npm run keycodes           # regenerate from those same inputs
+npm run build:web          # bundle core/ and the panel for Chrome into dist/web/
 ```
+
+### The web build
+
+The web version of Ark runs `core/` and the panel inside Chrome rather than in
+VS Code. `npm run build:web` (`scripts/build-web.js`, esbuild) bundles them
+into the ignored `dist/web/`: `web/core.mjs`, the part of `core/` a browser
+host needs, as one module; `webview/app.mjs` with everything it imports; and
+`webview/styles.css`. Each file's name carries a hash of its content, so a new
+release can never be served an old file, and `dist/web/manifest.json` maps
+`core`, `panel` and `styles` to those names for the page that loads them. Each
+build empties the folder first.
+
+It is a separate output, not a step of the extension: the extension still runs
+`core/` and `webview/` as they are, and `webview/` stays build-free source. No
+module of `core/` is rewritten for the browser. Its `Buffer` is the `buffer`
+package in the bundle (`web/buffer.mjs`), and `web/no-native-hid.js` takes the
+place of `core/transport/node-hid-adapter.js`, so a browser host passes its own
+device adapter. The build fails if node-hid, `vscode` or any Node built-in
+would reach a bundle, or if a bundle takes any package but `buffer`. A browser
+host needs a secure context (HTTPS or localhost) for the draft's
+`crypto.randomUUID()`.
+
+To export more of `core/` to a browser host, add it to `web/core.mjs`.
+`npm run test:browser` builds it and checks it in Chrome: the bundle has to
+decode and re-encode every profile fixture exactly as Node does, stage edits and
+build the same panel model, and the bundled panel has to render that model and
+post its edits.
 
 ### Trying a branch before it lands
 
@@ -206,7 +237,7 @@ Actions.
 
 `npm run test:browser` starts a fixture-only preview and drives a pointer-speed
 edit, checking the complete posted settings section and the host stylesheet
-cascade. Install its browser once with `npx playwright install chromium`.
+cascade, then checks [the web build](#the-web-build) in Chrome against Node. Install its browser once with `npx playwright install chromium`.
 The small host-style fixture covers known padding/cascade regressions; it is not
 a VS Code extension-host or physical-device acceptance test.
 
