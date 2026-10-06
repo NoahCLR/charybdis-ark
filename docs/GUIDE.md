@@ -25,7 +25,7 @@ Every screen is drawn and wired to the host:
 | Lighting | Six stages, the stage mask, layer and pointing-mode colours with their localities, combo and key feedback, auto-mouse fade with its hold as a share of the timeout, LED group rows and reusable groups |
 | Macros | Both banks: name, payload, insert-at-cursor step builder, reorder/remove controls, parsed preview, configurable recorder and placement; search by name, and the layers that set each macro off — by key, behaviour or combo — in their layer colour, each opening that layer in Keys with the macro picked |
 | Mouse | Pointer speed, sniping and auto-mouse — the Settings sections the keyboard's model files under Mouse, drawn with the same cards and posted whole |
-| Pointing modes | All eight slots: movement, speed, direction shortcuts and how often they send (every step, or once per movement until the ball pauses or moves back the other way), scroll tuning and which way a scrolling mode scrolls (both axes, horizontal only or vertical only), what each direction's shortcut does with held modifiers, thresholds shown as ball movement at the mode's DPI, buttons, bindings, placement, clear and duplicate |
+| Pointing modes | Every slot the firmware has, eight or 32: movement, speed, direction shortcuts and how often they send (every step, or once per movement until the ball pauses or moves back the other way), scroll tuning and which way a scrolling mode scrolls (both axes, horizontal only or vertical only), what each direction's shortcut does with held modifiers, thresholds shown as ball movement at the mode's DPI, buttons, bindings, placement, clear and duplicate |
 | Settings | Every other section the keyboard reports, posted whole, read-only where the firmware cannot report; the Combos section also carries the default combo window and the combo hold threshold, which the keyboard stores with its combos |
 | Profile & backups | Import (the file against the keyboard, counted by what it configures — keys, lighting, macros, mouse, pointing — before it becomes the draft), export, upgrade export, profile memory, recovery state |
 | Device | Read-only: connection, committed generation, what was read |
@@ -308,6 +308,22 @@ bottom. Moving a layer updates the keys, behaviours, combos, RGB assignments and
 pointer settings that refer to it. There is no need to change the layer count
 or reflash for ordinary profile editing.
 
+**Pointing slots.** Firmware has eight pointing slots or, from the 32-slot
+firmware on, 32. Ark asks the keyboard which and shows exactly that many. On
+32 slots, Pointing modes lists the configured slots as cards and the empty ones
+as a grid of numbered chips beneath them (a chip in amber still has keys
+reaching it); the key picker lists the slots in two columns; Lighting's slot
+list scrolls beside the colour editor. Each slot keeps its own Hold and Toggle
+key (`PD_SLOT_n`, `PD_SLOT_n_LOCK`) and its own lighting row, and an empty slot
+takes no room in the profile, so 32 slots cost only what you configure.
+
+A backup from eight-slot firmware imports onto 32-slot firmware: its keys,
+behaviours, combos, macros and settings come across unchanged, its eight slots
+keep their places, and slots 8 to 31 start empty and unlit (right half). The
+review shows the result before anything is applied. A backup goes the other
+way only by reflashing the firmware it came from: eight-slot firmware does not
+take a 32-slot profile, and nothing is dropped to make it fit.
+
 Old five-layer firmware is no longer built here. Its storage geometry is
 incompatible with current firmware, so retain the old pair and its backups if
 you still use it. Executable custom combo hooks and unsupported macro content
@@ -327,7 +343,7 @@ still points at the empty slot, and the Pointing modes screen and the hover card
 say the key does nothing for now.
 
 The same reasoning runs the other way, so the keycode picker offers **every**
-slot, configured or not: its Pointing modes section lists the eight slots as
-rows, each with a Hold and a Toggle key, and marks an empty slot's row as doing
+slot, configured or not: its Pointing modes section lists every slot as a
+row, each with a Hold and a Toggle key, and marks an empty slot's row as doing
 nothing yet. Search finds the same keys as `Slot 6 · hold (empty)`. A board can be laid out before its modes are, and the key says `empty`
 on its second line until the slot is filled in.

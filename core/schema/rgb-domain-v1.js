@@ -63,7 +63,19 @@ const RGB_PD_MODE_IDS = Object.freeze({
     PD_MODE_PINCH: 5,
     PD_MODE_SLOT_6: 6,
     PD_MODE_SLOT_7: 7,
+    // The 32-slot firmware's further slots (format 3).
+    ...Object.fromEntries(Array.from({length: 24}, (_, index) => [`PD_MODE_SLOT_${index + 8}`, index + 8])),
 });
+// How many pointing slots each payload format colours: format 1 the six
+// factory modes, 2 the eight configurable slots, 3 the 32-slot firmware's.
+const RGB_PD_SLOTS_BY_FORMAT = Object.freeze({1: 6, 2: 8, 3: 32});
+const RGB_FORMAT_VERSIONS = Object.freeze(Object.keys(RGB_PD_SLOTS_BY_FORMAT).map(Number));
+// The payload format that colours a given number of pointing slots.
+function rgbFormatForPdSlots(slotCount) {
+    const entry = Object.entries(RGB_PD_SLOTS_BY_FORMAT).find(([, slots]) => slots === slotCount);
+    if (!entry) throw new RangeError(`No RGB payload format colours ${slotCount} pointing slots.`);
+    return Number(entry[0]);
+}
 
 const BLACK = Object.freeze({h: 0, s: 0, v: 0});
 
@@ -152,8 +164,13 @@ function encodeRgbDomainV1(profile, options = {}) {
     return payload;
 }
 
+// A payload decodes by the format its header names; given the format a
+// keyboard takes (options.formatVersion), a payload of another is refused.
 function decodeRgbDomainV1(value, options = {}) {
     const bytes = copyBytes(value, "RGB domain payload");
+    if (options.formatVersion !== undefined && bytes.length && bytes[0] !== options.formatVersion) {
+        throw rgbError("INVALID_VERSION", `RGB payload format ${bytes[0]} is not the expected format ${options.formatVersion}.`);
+    }
     const limits = normalizeOptions({...options, formatVersion: bytes[0]});
     if (bytes.length < RGB_DOMAIN_V1.HEADER_SIZE) {
         throw rgbError("TRUNCATED", `RGB domain needs a ${RGB_DOMAIN_V1.HEADER_SIZE}-byte header.`);
@@ -161,7 +178,7 @@ function decodeRgbDomainV1(value, options = {}) {
     if (bytes.length > RGB_DOMAIN_V1.MAX_PAYLOAD_SIZE) {
         throw rgbError("CAPACITY_EXCEEDED", `RGB domain payload is ${bytes.length} bytes; maximum is ${RGB_DOMAIN_V1.MAX_PAYLOAD_SIZE}.`);
     }
-    if (![1, 2].includes(bytes[0])) {
+    if (!RGB_FORMAT_VERSIONS.includes(bytes[0])) {
         throw rgbError("INVALID_VERSION", `RGB payload format ${bytes[0]} is not supported.`);
     }
     if (bytes[1] !== 0 || bytes[14] !== 0 || bytes[15] !== 0) {
@@ -283,7 +300,7 @@ function normalizeProfile(profile, limits) {
     if (!profile || typeof profile !== "object") {
         throw new TypeError("RGB domain input must be an object.");
     }
-    if (profile.formatVersion !== undefined && ![1, 2].includes(profile.formatVersion)) {
+    if (profile.formatVersion !== undefined && !RGB_FORMAT_VERSIONS.includes(profile.formatVersion)) {
         throw rgbError("INVALID_VERSION", `RGB payload format ${profile.formatVersion} is not supported.`);
     }
     const stageEnableMask = assertStageMask(profile.stageEnableMask, limits.compiledStageMask, "stageEnableMask");
@@ -348,7 +365,7 @@ function normalizeProfile(profile, limits) {
 
 function normalizeOptions(options = {}) {
     const formatVersion = options.formatVersion ?? 1;
-    const maxPdModes = formatVersion === 2 ? 8 : 6;
+    const maxPdModes = RGB_PD_SLOTS_BY_FORMAT[formatVersion] ?? RGB_PD_SLOTS_BY_FORMAT[1];
     const maxLogicalLayers = options.maxLogicalLayers === undefined ? RGB_DOMAIN_V1.MAX_LOGICAL_LAYERS : assertU8(options.maxLogicalLayers, "maxLogicalLayers");
     if (maxLogicalLayers > RGB_DOMAIN_V1.MAX_LOGICAL_LAYERS) {
         throw new RangeError(`maxLogicalLayers cannot exceed ${RGB_DOMAIN_V1.MAX_LOGICAL_LAYERS}.`);
@@ -362,7 +379,7 @@ function normalizeOptions(options = {}) {
         : Array.from(options.supportedPdModeIds, (value) => assertU8(value, "supportedPdModeIds entry"));
     supportedPdModeIds.sort((left, right) => left - right);
     if (supportedPdModeIds.length > maxPdModes || new Set(supportedPdModeIds).size !== supportedPdModeIds.length) {
-        throw new RangeError(`supportedPdModeIds must contain at most ${RGB_DOMAIN_V1.MAX_PD_MODES} unique ids.`);
+        throw new RangeError(`supportedPdModeIds must contain at most ${maxPdModes} unique ids.`);
     }
     const knownPdModeIds = new Set(Object.values(RGB_PD_MODE_IDS).filter(id => id < maxPdModes));
     if (supportedPdModeIds.some((id) => !knownPdModeIds.has(id))) {
@@ -580,8 +597,12 @@ function assertSelector(value, count, table, row) {
     return value;
 }
 
+// A group row naming a slot the keyboard does not colour has an invalid
+// selector, as the firmware reports it.
 function assertPdSelector(value, limits, table, row) {
-    if (value !== RGB_DOMAIN_V1.SELECTOR_ALL) assertSupportedPdId(value, limits, table, row, "selector");
+    if (value !== RGB_DOMAIN_V1.SELECTOR_ALL && !limits.supportedPdModeSet.has(value)) {
+        throw rgbError("INVALID_SELECTOR", `${table}[${row}] selector ${value} does not reference a pointing slot.`, {table, row, field: "selector"});
+    }
     return value;
 }
 
@@ -677,6 +698,7 @@ module.exports = {
     RGB_LAYER_MODES,
     RGB_LOCALITIES,
     RGB_PD_MODE_IDS,
+    RGB_PD_SLOTS_BY_FORMAT,
     RGB_STAGE_BITS,
     RGB_STAGE_MASK_ALL,
     RGB_TAP_COMMIT_MODES,
@@ -686,4 +708,5 @@ module.exports = {
     decodeRgbDomainV1,
     encodeRgbDomainV1,
     ledsToBitmap,
+    rgbFormatForPdSlots,
 };

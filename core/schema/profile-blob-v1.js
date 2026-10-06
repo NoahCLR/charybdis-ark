@@ -31,8 +31,10 @@ const PROFILE_DOMAIN_VERSIONS = Object.freeze({
 
 const PROFILE_BLOB_V2 = Object.freeze({...PROFILE_BLOB_V1, SCHEMA_MAJOR: 2, MAX_SIZE: 5088});
 // Settings v3 names the VIA macros where v2 carried user macros, and v5 the
-// custom keys too; a keyboard may still store v2, so all are read.
-const PROFILE_DOMAIN_VERSIONS_V2 = Object.freeze({...PROFILE_DOMAIN_VERSIONS, 16: 2, 64: [2, 3, 4, 5], 80: 1});
+// custom keys too; a keyboard may still store v2, so all are read. RGB v3 and
+// PD v2 are the 32-slot firmware's, which keeps schema 2.0: the action
+// vocabulary says which pair a keyboard takes (schema/actions.js).
+const PROFILE_DOMAIN_VERSIONS_V2 = Object.freeze({...PROFILE_DOMAIN_VERSIONS, 16: [2, 3], 64: [2, 3, 4, 5], 80: [1, 2]});
 function schemaFormat(major) {
     if (major === 1) return PROFILE_BLOB_V1;
     if (major === 2) return PROFILE_BLOB_V2;

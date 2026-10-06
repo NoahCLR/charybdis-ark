@@ -177,7 +177,9 @@ folder (`python3 -m http.server 8972`) and open `preview/index.html`. The previe
 stands in for the extension host: it answers the webview's `ready` with one
 fixture model and logs every edit the interface posts back.
 Use `npm run preview -- --multiple --vscode` to inspect the selector with two
-fixture keyboards in the VS Code themed preview.
+fixture keyboards in the VS Code themed preview, and `npm run preview -- --slots 32`
+for the 32-slot pointing firmware (its compiled profile, with slot 12
+configured too).
 
 ### Compatibility with firmware
 

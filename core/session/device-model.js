@@ -9,7 +9,7 @@
 // An empty RGB tab is truthful; a tab populated from the authored source would
 // be a lie about what the keyboard is running.
 
-const {PD_BINDINGS} = require("../data/pd-bindings");
+const {PD_SLOT_BINDINGS} = require("../data/pd-bindings");
 const {VOCABULARY, slotName} = require("../model/vocabulary");
 const keycodeCatalog = require("../data/keycode-catalog");
 const {baseRgbForView, behaviorRowsForView, builtInForView, combosForView, rgbForView} = require("./device-profile-view");
@@ -65,7 +65,7 @@ function buildDeviceModel(state = {}) {
         // surface (model/vocabulary.js slotName).
         // and the keycodes that bind it (data/pd-bindings.js), so the interface
         // names and finds a pointing-mode key without a registry of its own.
-        pdModes: (state.committed?.domains?.pdModes || []).map((slot) => ({...slot, displayName: slotName(slot), binding: PD_BINDINGS[slot.id]})),
+        pdModes: (state.committed?.domains?.pdModes || []).map((slot) => ({...slot, displayName: slotName(slot), binding: PD_SLOT_BINDINGS[slot.id]})),
         pdModeEditing: {writable: Boolean(state.capabilities?.supportedDomainMask & 16) && state.committed?.state === "read" && !state.committed.failures?.length && !state.busy,
             dpiChoices: dpiChoices({normalSpeed: true})},
         keyBehaviors: committedKeyBehaviors(state.committed, state.capabilities),

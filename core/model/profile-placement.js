@@ -6,7 +6,7 @@
 // encode, and an upload is checked before it starts, with a message naming the
 // row instead of the keyboard's bare rejection.
 
-const {PLACEMENT, actionLimitsFor, actionName, behaviorEmitProblem, keycodeAction, placementProblem} = require("../schema/actions");
+const {PLACEMENT, actionLimitsOfBlob, actionName, behaviorEmitProblem, keycodeAction, placementProblem} = require("../schema/actions");
 const {decodeProfileBlob, PROFILE_DOMAIN_IDS} = require("../schema/profile-blob-v1");
 const {decodeKeyBehaviorDomain, KEY_BEHAVIOR_HOLD_MODES} = require("../schema/key-behavior-domain-v1");
 const {decodeComboDomain} = require("../schema/combo-domain-v1");
@@ -43,7 +43,7 @@ const keyPlacementProblem = (code, options) => placementProblem(keycodeAction(co
 // The first misplaced action in an encoded profile, or undefined.
 function profilePlacementProblem(bytes, options) {
     const profile = decodeProfileBlob(bytes);
-    const actionOptions = actionLimitsFor(profile.schema.major);
+    const actionOptions = actionLimitsOfBlob(profile);
     const domain = id => profile.domains.find(row => row.id === id);
     const behaviors = domain(PROFILE_DOMAIN_IDS.KEY_BEHAVIORS)?.payload;
     const combos = domain(PROFILE_DOMAIN_IDS.COMBOS);

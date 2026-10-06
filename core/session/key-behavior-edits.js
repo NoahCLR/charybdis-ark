@@ -5,7 +5,7 @@ const keycodes = require("../data/keycode-catalog");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {decodeKeyBehaviorDomain, encodeKeyBehaviorDomain, KEY_BEHAVIOR_HOLD_MODES} = require("../schema/key-behavior-domain-v1");
 const {semanticActionForExpression, resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
-const {actionName, isOwnedLayerCode, knownActionAbi} = require("../schema/actions");
+const {actionName, isOwnedLayerCode, knownActionAbi, pdSlotCountFor} = require("../schema/actions");
 const {behaviorPlacementProblem} = require("../model/profile-placement");
 const {PROFILE_WIRE_FEATURES} = require("../protocol/profile-wire-v1");
 
@@ -24,7 +24,7 @@ function integer(value, max, label, optional = false) {
 
 function editKeyBehaviors(payload, message, capabilities = {}) {
     if (!(capabilities.supportedDomainMask & 2)) throw invalid("This firmware does not support saving key behaviours.");
-    const maxPdModes = capabilities.supportedDomainMask & 16 ? 8 : 6;
+    const maxPdModes = pdSlotCountFor(capabilities);
     const {rows} = decodeKeyBehaviorDomain(payload, {actionLimits: {maxPdModes}});
     const knownAbi = knownActionAbi(capabilities.actionAbiDigest);
     const ownsLayerKeys = Boolean(capabilities.featureFlags & PROFILE_WIRE_FEATURES.OWNED_LAYER_TOGGLES);

@@ -19,8 +19,9 @@ checkout. Everything Ark shows comes from the keyboard itself.
 - **Lighting.** Set layer and mode colours, combo and key feedback, and the
   auto-mouse fade. The board on screen is painted the way the keyboard will
   light up.
-- **Trackball.** Set pointer speed, sniping and auto-mouse, and eight pointing
-  modes (scroll, volume, zoom, arrows, your own shortcuts…) with their keys.
+- **Trackball.** Set pointer speed, sniping and auto-mouse, and up to 32 pointing
+  modes, as many as your firmware has (scroll, volume, zoom, arrows, your own
+  shortcuts…), with their keys.
 
 ## Nothing is saved until you say so
 

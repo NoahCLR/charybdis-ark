@@ -63,7 +63,7 @@ function editMacro(snapshot, message, capabilities) {
         if (typeof message.name !== "string") throw fail("A macro name must be text.");
         if (!asciiName(message.name.trim())) throw fail(`A macro name is up to ${SETTINGS.MACRO_NAME_CHARS} plain characters: letters, digits, spaces and punctuation.`, "MACRO_NAME_INVALID");
         // Names live in settings v4, which only a schema-2 profile carries.
-        if (value.document.version !== 2) throw fail("Naming macros needs the eight-slot pointing firmware (profile schema 2).");
+        if (value.document.version !== 2) throw fail("Naming macros needs the configurable pointing-slot firmware (profile schema 2).");
         const settings = upgradeSettings(value.settings);
         settings.macroNames[index] = message.name.trim();
         const domains = decodeProfileBlob(value.profile).domains.map(domain => domain.id === 0x40 ? {...domain, version: settings.formatVersion, payload: encodeSettings(settings)} : domain);

@@ -43,7 +43,7 @@ matrix.
 | Macros | 64 named VIA macro slots with builder, recorder and preview; shared-memory and per-macro limits shown and enforced (D-L25, D-L26) |
 | Custom keys | 64 named keys that do what their behaviour says: rename, add or open the behaviour, place, see where each is used (D-L42) |
 | Mouse | Pointer and sniping DPI, auto-sniping and auto-mouse: global-policy sections the core files under the Mouse area, so the rail, the review and import counts all place them there. The auto-mouse fade delay is a share of the timeout, edited on its lighting stage (D-L17) |
-| Pointing modes | Eight device-owned slots and eight RGB rows; see [PD-mode domain v1](../upstream/firmware/docs/architecture/pd-mode-domain-v1.md) |
+| Pointing modes | Eight device-owned slots and eight RGB rows (PD domain v1, RGB v2), or 32 on firmware whose action vocabulary has them (sparse PD domain v2, RGB v3); the slot count is the vocabulary's (`core/schema/actions.js` `pdSlotCountFor`), and an eight-slot backup imports onto 32-slot firmware. See [PD-mode domain v1](../upstream/firmware/docs/architecture/pd-mode-domain-v1.md) |
 | Global policy | Every other portable setting, including startup layers, combo matching and device-reported lighting and key options; unsupported firmware features stay read-only |
 | Backup and restore | Complete snapshots, import review against the keyboard, recovery file and verified restore |
 | Drafts and Apply | One draft with item-by-item review, discard by edit group, Show, undo/redo and draft history; the review checks reachable actions, confirms active warnings and traps, and blocks profiles the destination cannot save (D-L36); Apply shows its steps and says where a failure happened (D-L19, D-L23, D-L29, D-L30) |
@@ -75,6 +75,13 @@ Remaining before calling the product complete:
   does not include, matched against its rules files and QMK's defaults. It
   drifts when a feature is enabled or disabled. The keyboard should report its
   built features so the picker reads them from the device.
+- **Eight-slot firmware is tested from a frozen fixture.** Ark speaks the
+  32-slot firmware's contract (digest `0xf79c6151`, PD v2 and RGB v3), checked
+  on the keyboard and against its pinned golden vectors, the compatibility
+  bridge and agreement. It still speaks the eight-slot firmware, but only from a
+  frozen copy of that firmware's compiled profile
+  (`tests/fixtures/compiled_profile_pd_eight_slot.fixture`), which the firmware
+  no longer keeps. It retires with eight-slot support.
 - **Firmware open issues** are tracked in the firmware direction: the one-half
   power-cycle recovery transition, why a peer stops acknowledging a push or
   fails a flash write mid-copy (D-L22, D-L27), physical acceptance of buffered gesture timing

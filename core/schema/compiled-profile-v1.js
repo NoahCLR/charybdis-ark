@@ -3,7 +3,7 @@
 // Expressions as the keyboard's vocabulary spells them — KC_A, LT(1, KC_A),
 // PD_SLOT_0, VIA_MACRO_3 — resolved to profile actions and native keycodes.
 
-const {PD_BINDINGS, FORMER_NAMES, pdBindingOfName} = require("../data/pd-bindings");
+const {PD_SLOT_BINDINGS, FORMER_NAMES, pdBindingOfName} = require("../data/pd-bindings");
 const {customKeyCode, customKeyOfName, layerLockCode, LAYER_LOCK_SLOTS} = require("../data/user-keycodes");
 const {PROFILE_ACTION_KINDS} = require("./profile-blob-v1");
 
@@ -20,7 +20,7 @@ const CHARYBDIS_KEYCODE_VALUES = Object.freeze({
 });
 
 // Every pointing-mode binding as the action a behaviour or combo stores.
-const PD_ACTIONS = Object.freeze(Object.fromEntries(PD_BINDINGS.flatMap(({slot, hold, lock}) => {
+const PD_ACTIONS = Object.freeze(Object.fromEntries(PD_SLOT_BINDINGS.flatMap(({slot, hold, lock}) => {
     const entries = [
         [hold, {kind: PROFILE_ACTION_KINDS.PD_MODE_MOMENTARY, operand: slot}],
         [lock, {kind: PROFILE_ACTION_KINDS.PD_MODE_LOCK, operand: slot}],
@@ -100,7 +100,7 @@ function resolveNativeQmkExpression(value, model) {
     if (custom !== undefined) return customKeyCode(custom);
 
     const pd = pdBindingOfName(expression);
-    if (pd) return pd.locked ? PD_BINDINGS[pd.slot].lockCode : PD_BINDINGS[pd.slot].holdCode;
+    if (pd) return pd.locked ? PD_SLOT_BINDINGS[pd.slot].lockCode : PD_SLOT_BINDINGS[pd.slot].holdCode;
 
     const call = parseCall(expression);
     if (!call) return undefined;

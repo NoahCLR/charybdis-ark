@@ -749,3 +749,23 @@ test("the combo hold threshold is the one the keyboard stores, else its tapping 
     assert.equal(edits.comboDefaultTermValue(model), "50");
     assert.equal(edits.comboDefaultTermValue({comboReadback: {defaultTermMs: null}}), "", "an older keyboard has no default");
 });
+
+// ── the 32-slot firmware ────────────────────────────────────────────────
+
+test("on the 32-slot firmware, the same builders reach slots past seven", () => {
+    const {CAPABILITIES_32, document32} = require(path.join(here, "fixtures", "pd-slots-32"));
+    const doc = document32();
+    const draft = new ProfileDraftSession({document: doc, fingerprint: portable.fingerprint(doc), summary: portable.summary(doc)}, "test-device", CAPABILITIES_32);
+    const wide = () => portable.validateSnapshot(draft.document, CAPABILITIES_32);
+    stage(draft, edits.pdMode(27, newMode(wide().pdModes[27], KIND.SCROLLING), draft.identity()));
+    assert.equal(wide().pdModes[27].kind, KIND.SCROLLING);
+    stage(draft, edits.duplicatePdMode(30, 12, draft.identity()));
+    assert.equal(wide().pdModes[30].name, "Tabs");
+    stage(draft, edits.pdModeColour("PD_MODE_SLOT_25", "RGB_LEFT_HALF", {h: 1, s: 2, v: 3}));
+    assert.deepEqual(wide().rgb.pdModeColors[25], {pdModeId: 25, color: {h: 1, s: 2, v: 3}, locality: RGB_LOCALITIES.RGB_LEFT_HALF});
+    stage(draft, edits.setKey("Layer 1", 27, "PD_SLOT_31_LOCK"));
+    assert.equal(draft.document.layers[1][slotOf(27)], 0x7ebf);
+    stage(draft, edits.clearPdMode(12, draft.identity()));
+    assert.equal(wide().pdModes[12].kind, 0);
+    assert.ok(reviewAreas(draft).includes("Pointing modes"));
+});

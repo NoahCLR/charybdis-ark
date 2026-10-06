@@ -1,7 +1,27 @@
 "use strict";
 
 // PD domain codec, carried by schema-2 profiles and legacy migration evidence.
+//
+// Version 1 stores eight slots, every one of them, in ID order. Version 2 is
+// the 32-slot firmware's: a header naming its capacity and record count, then
+// only the slots that hold something (configured, or disabled with a name),
+// each in the same 96-byte record, in ascending ID order. An omitted slot is
+// disabled and nameless. Both decode to one dense array, a record per slot, so
+// the slot count is the array's length and everything above reads both alike.
 const PD_DOMAIN_V1 = Object.freeze({ID: 0x50, VERSION: 1, SLOTS: 8, HEADER_SIZE: 8, RECORD_SIZE: 96, NAME_SIZE: 24, SIZE: 776});
+const PD_DOMAIN_V2 = Object.freeze({ID: 0x50, VERSION: 2, SLOTS: 32, HEADER_SIZE: 8, RECORD_SIZE: 96, NAME_SIZE: 24, MAX_SIZE: 8 + 32 * 96});
+// The domain version that stores a given number of slots, and back.
+const PD_FORMATS = Object.freeze([PD_DOMAIN_V1, PD_DOMAIN_V2]);
+function pdDomainVersionFor(slotCount) {
+    const format = PD_FORMATS.find(entry => entry.SLOTS === slotCount);
+    if (!format) fail("INVALID_LENGTH", 0, `No PD domain stores ${slotCount} slots.`);
+    return format.VERSION;
+}
+function pdSlotCountOfVersion(version) {
+    const format = PD_FORMATS.find(entry => entry.VERSION === version);
+    if (!format) fail("INVALID_HEADER", 0, `PD domain version ${version} is not supported.`);
+    return format.SLOTS;
+}
 const PD_KIND = Object.freeze({DISABLED: 0, DIRECTIONAL: 1, SCROLLING: 2});
 const PD_AXIS = Object.freeze({VERTICAL: 0, HORIZONTAL: 1, DOMINANT: 2, EIGHT: 3});
 // Which axes a scrolling mode scrolls, in the same byte (firmware D-F08).
@@ -45,9 +65,9 @@ function readName(bytes, offset) {
     }
     return text;
 }
-function validateRecord(p, slot, offset) {
+function validateRecord(p, slot, offset, slots = PD_DOMAIN_V1.SLOTS) {
     const reject = (code, at, message) => fail(code, offset + at, message);
-    if (p[0] !== slot) reject("INVALID_ID", 0, "PD slots must appear exactly once in ID order 0–7.");
+    if (p[0] !== slot) reject("INVALID_ID", 0, `PD slots must appear exactly once in ID order 0–${slots - 1}.`);
     if (p[7] || !zero(p.subarray(90))) reject("RESERVED", p[7] ? 7 : 90, "Reserved PD bytes must be zero.");
     const name = readName(p.subarray(8, 32), offset + 8);
     if (p[1] > 2 || p[2] > 1 || p[3] > PD_AXIS.EIGHT) reject("INVALID_POLICY", 1, "Unknown engine, layer policy or axis policy.");
@@ -94,8 +114,37 @@ function validateRecord(p, slot, offset) {
 function tapFromBytes(bytes, at) {
     return {keycode: bytes.readUInt16LE(at), modifierPolicy: bytes[at + 2], mask: bytes[at + 3]};
 }
-function decodePdDomain(bytes) {
+function slotOfRecord(p, id, offset) {
+    return {
+        id, kind: p[1], pointerLayer: p[2], axis: p[3], dpi: p.readUInt16LE(4), heldModifiers: p[6], name: readName(p.subarray(8, 32), offset + 8),
+        thresholdX: p.readUInt16LE(32), thresholdY: p.readUInt16LE(34),
+        directions: Object.fromEntries(DIRECTIONS.map((name, i) => [name, tapFromBytes(p, 36 + i * 4)])),
+        buttons: Array.from({length: 3}, (_, i) => ({kind: p[52 + i * 6], modifiers: p[53 + i * 6], tap: tapFromBytes(p, 54 + i * 6)})),
+        // Bytes 70..90 are scroll settings only in a scrolling mode.
+        scroll: Object.fromEntries([...SCROLL_U16.map((name, i) => [name, p[1] === PD_KIND.SCROLLING ? p.readUInt16LE(70 + i * 2) : 0]), ...SCROLL_U8.map((name, i) => [name, p[1] === PD_KIND.SCROLLING ? p[84 + i] : 0])]),
+        diagonals: Object.fromEntries(DIAGONALS.map((name, i) => [name, p[1] === PD_KIND.DIRECTIONAL ? tapFromBytes(p, 70 + i * 4) : {keycode: 0, modifierPolicy: 0, mask: 0}])),
+        emptyDirection: p[1] === PD_KIND.DIRECTIONAL ? p[86] : 0,
+        directionOutput: p[1] === PD_KIND.DIRECTIONAL ? p[87] : 0,
+    };
+}
+// A slot the sparse format leaves out: disabled, with no name.
+function omittedSlot(id) {
+    const p = Buffer.alloc(PD_DOMAIN_V2.RECORD_SIZE);
+    p[0] = id;
+    return slotOfRecord(p, id, 0);
+}
+// Whether a slot needs a record of its own in the sparse format.
+const storesRecord = slot => slot.kind !== PD_KIND.DISABLED || slot.name !== "";
+
+// A payload decodes by the version its header names; given the version its
+// profile envelope states, a payload of any other version is refused.
+function decodePdDomain(bytes, {version} = {}) {
     if (!Buffer.isBuffer(bytes)) fail("INVALID_ARGUMENT", 0, "PD domain must be a Buffer.");
+    if (version !== undefined) {
+        pdSlotCountOfVersion(version);
+        if (bytes.length && bytes[0] !== version) fail("INVALID_HEADER", 0, `This PD domain must be version ${version}.`);
+    }
+    if (bytes.length && bytes[0] === PD_DOMAIN_V2.VERSION) return decodeSparse(bytes);
     if (bytes.length !== PD_DOMAIN_V1.SIZE) fail("INVALID_LENGTH", 0, "PD domain must contain exactly 776 bytes.");
     for (let at = 0; at < HEADER.length; at++) {
         if (bytes[at] !== HEADER[at]) fail("INVALID_HEADER", at, "Unsupported PD domain header.");
@@ -104,18 +153,31 @@ function decodePdDomain(bytes) {
         const offset = PD_DOMAIN_V1.HEADER_SIZE + id * PD_DOMAIN_V1.RECORD_SIZE;
         const p = bytes.subarray(offset, offset + PD_DOMAIN_V1.RECORD_SIZE);
         validateRecord(p, id, offset);
-        return {
-            id, kind: p[1], pointerLayer: p[2], axis: p[3], dpi: p.readUInt16LE(4), heldModifiers: p[6], name: readName(p.subarray(8, 32), offset + 8),
-            thresholdX: p.readUInt16LE(32), thresholdY: p.readUInt16LE(34),
-            directions: Object.fromEntries(DIRECTIONS.map((name, i) => [name, tapFromBytes(p, 36 + i * 4)])),
-            buttons: Array.from({length: 3}, (_, i) => ({kind: p[52 + i * 6], modifiers: p[53 + i * 6], tap: tapFromBytes(p, 54 + i * 6)})),
-            // Bytes 70..90 are scroll settings only in a scrolling mode.
-            scroll: Object.fromEntries([...SCROLL_U16.map((name, i) => [name, p[1] === PD_KIND.SCROLLING ? p.readUInt16LE(70 + i * 2) : 0]), ...SCROLL_U8.map((name, i) => [name, p[1] === PD_KIND.SCROLLING ? p[84 + i] : 0])]),
-            diagonals: Object.fromEntries(DIAGONALS.map((name, i) => [name, p[1] === PD_KIND.DIRECTIONAL ? tapFromBytes(p, 70 + i * 4) : {keycode: 0, modifierPolicy: 0, mask: 0}])),
-            emptyDirection: p[1] === PD_KIND.DIRECTIONAL ? p[86] : 0,
-            directionOutput: p[1] === PD_KIND.DIRECTIONAL ? p[87] : 0,
-        };
+        return slotOfRecord(p, id, offset);
     });
+}
+function decodeSparse(bytes) {
+    const {HEADER_SIZE, RECORD_SIZE, SLOTS} = PD_DOMAIN_V2;
+    if (bytes.length < HEADER_SIZE) fail("INVALID_LENGTH", 0, "PD domain v2 needs an 8-byte header.");
+    const count = bytes[3];
+    if (bytes[1] !== SLOTS) fail("INVALID_HEADER", 1, `PD domain v2 must hold ${SLOTS} slots.`);
+    if (bytes[2] !== RECORD_SIZE) fail("INVALID_HEADER", 2, `PD domain v2 records must be ${RECORD_SIZE} bytes.`);
+    if (count > SLOTS) fail("INVALID_HEADER", 3, `PD domain v2 cannot hold more than ${SLOTS} records.`);
+    for (let at = 4; at < HEADER_SIZE; at++) if (bytes[at]) fail("RESERVED", at, "Reserved PD header bytes must be zero.");
+    if (bytes.length !== HEADER_SIZE + count * RECORD_SIZE) fail("INVALID_LENGTH", 0, `PD domain v2 with ${count} records must contain exactly ${HEADER_SIZE + count * RECORD_SIZE} bytes.`);
+    const slots = Array.from({length: SLOTS}, (_, id) => omittedSlot(id));
+    let prior = -1;
+    for (let index = 0; index < count; index++) {
+        const offset = HEADER_SIZE + index * RECORD_SIZE;
+        const p = bytes.subarray(offset, offset + RECORD_SIZE), id = p[0];
+        if (id >= SLOTS || id <= prior) fail("INVALID_ID", offset, `PD records must have unique IDs below ${SLOTS} in ascending order.`);
+        validateRecord(p, id, offset, SLOTS);
+        const slot = slotOfRecord(p, id, offset);
+        if (!storesRecord(slot)) fail("NONCANONICAL", offset + 1, "A disabled slot without a name is stored by leaving its record out.");
+        slots[id] = slot;
+        prior = id;
+    }
+    return slots;
 }
 
 function object(value, keys, label) {
@@ -135,44 +197,65 @@ function writeTap(p, at, value = {}) {
     p[at + 2] = integer(optional(value.modifierPolicy, 0), 255);
     p[at + 3] = integer(optional(value.mask, 0), 255);
 }
-function encodePdDomain(slots) {
-    if (!Array.isArray(slots) || slots.length !== PD_DOMAIN_V1.SLOTS) fail("INVALID_LENGTH", 0, "Exactly eight PD slots are required.");
-    const bytes = Buffer.alloc(PD_DOMAIN_V1.SIZE);
-    HEADER.copy(bytes);
-    for (let id = 0; id < PD_DOMAIN_V1.SLOTS; id++) {
-        const slot = object(slots[id], ["id", "kind", "pointerLayer", "axis", "dpi", "heldModifiers", "name", "thresholdX", "thresholdY", "directions", "buttons", "scroll", "diagonals", "emptyDirection", "directionOutput"], "Slot");
-        const p = bytes.subarray(8 + id * 96, 8 + (id + 1) * 96);
-        p[0] = integer(slot.id, 7);
-        for (const [at, name] of [[1, "kind"], [2, "pointerLayer"], [3, "axis"], [6, "heldModifiers"]]) p[at] = integer(optional(slot[name], 0), 255);
-        for (const [at, name] of [[4, "dpi"], [32, "thresholdX"], [34, "thresholdY"]]) p.writeUInt16LE(integer(optional(slot[name], 0), 65535), at);
-        if (typeof slot.name !== "string" || Buffer.byteLength(slot.name, "utf8") >= 24 || /[\u0000-\u001f\u007f]/u.test(slot.name) || Buffer.from(slot.name).toString("utf8") !== slot.name) {
-            fail("INVALID_NAME", 8 + id * 96 + 8, "Names must fit 23 UTF-8 bytes and contain no ASCII controls.");
-        }
-        p.write(slot.name, 8, 23, "utf8");
-        const directions = object(optional(slot.directions, {}), DIRECTIONS, "Directions");
-        DIRECTIONS.forEach((name, i) => writeTap(p, 36 + i * 4, directions[name]));
-        const buttons = optional(slot.buttons, [{}, {}, {}]);
-        if (!Array.isArray(buttons) || buttons.length !== 3) fail("INVALID_LENGTH", 0, "Exactly three button overrides are required.");
-        for (let i = 0; i < 3; i++) {
-            const button = object(buttons[i], ["kind", "modifiers", "tap"], "Button");
-            p[52 + i * 6] = integer(optional(button.kind, 0), 255);
-            p[53 + i * 6] = integer(optional(button.modifiers, 0), 255);
-            writeTap(p, 54 + i * 6, button.tap);
-        }
-        const scroll = object(optional(slot.scroll, {}), [...SCROLL_U16, ...SCROLL_U8], "Scroll settings");
-        const diagonals = object(optional(slot.diagonals, {}), DIAGONALS, "Diagonals");
-        if (slot.kind === PD_KIND.DIRECTIONAL) {
-            // A directional record's bytes 70..90 hold diagonals or nothing.
-            DIAGONALS.forEach((name, i) => writeTap(p, 70 + i * 4, diagonals[name]));
-            p[86] = integer(optional(slot.emptyDirection, 0), 255);
-            p[87] = integer(optional(slot.directionOutput, 0), 255);
-        } else {
-            SCROLL_U16.forEach((name, i) => p.writeUInt16LE(integer(optional(scroll[name], 0), 65535), 70 + i * 2));
-            SCROLL_U8.forEach((name, i) => { p[84 + i] = integer(optional(scroll[name], 0), 255); });
-        }
+function writeRecord(p, input, id) {
+    const slot = object(input, ["id", "kind", "pointerLayer", "axis", "dpi", "heldModifiers", "name", "thresholdX", "thresholdY", "directions", "buttons", "scroll", "diagonals", "emptyDirection", "directionOutput"], "Slot");
+    p[0] = integer(slot.id, 255);
+    for (const [at, name] of [[1, "kind"], [2, "pointerLayer"], [3, "axis"], [6, "heldModifiers"]]) p[at] = integer(optional(slot[name], 0), 255);
+    for (const [at, name] of [[4, "dpi"], [32, "thresholdX"], [34, "thresholdY"]]) p.writeUInt16LE(integer(optional(slot[name], 0), 65535), at);
+    if (typeof slot.name !== "string" || Buffer.byteLength(slot.name, "utf8") >= 24 || /[\u0000-\u001f\u007f]/u.test(slot.name) || Buffer.from(slot.name).toString("utf8") !== slot.name) {
+        fail("INVALID_NAME", 8 + id * 96 + 8, "Names must fit 23 UTF-8 bytes and contain no ASCII controls.");
     }
+    p.write(slot.name, 8, 23, "utf8");
+    const directions = object(optional(slot.directions, {}), DIRECTIONS, "Directions");
+    DIRECTIONS.forEach((name, i) => writeTap(p, 36 + i * 4, directions[name]));
+    const buttons = optional(slot.buttons, [{}, {}, {}]);
+    if (!Array.isArray(buttons) || buttons.length !== 3) fail("INVALID_LENGTH", 0, "Exactly three button overrides are required.");
+    for (let i = 0; i < 3; i++) {
+        const button = object(buttons[i], ["kind", "modifiers", "tap"], "Button");
+        p[52 + i * 6] = integer(optional(button.kind, 0), 255);
+        p[53 + i * 6] = integer(optional(button.modifiers, 0), 255);
+        writeTap(p, 54 + i * 6, button.tap);
+    }
+    const scroll = object(optional(slot.scroll, {}), [...SCROLL_U16, ...SCROLL_U8], "Scroll settings");
+    const diagonals = object(optional(slot.diagonals, {}), DIAGONALS, "Diagonals");
+    if (slot.kind === PD_KIND.DIRECTIONAL) {
+        // A directional record's bytes 70..90 hold diagonals or nothing.
+        DIAGONALS.forEach((name, i) => writeTap(p, 70 + i * 4, diagonals[name]));
+        p[86] = integer(optional(slot.emptyDirection, 0), 255);
+        p[87] = integer(optional(slot.directionOutput, 0), 255);
+    } else {
+        SCROLL_U16.forEach((name, i) => p.writeUInt16LE(integer(optional(scroll[name], 0), 65535), 70 + i * 2));
+        SCROLL_U8.forEach((name, i) => { p[84 + i] = integer(optional(scroll[name], 0), 255); });
+    }
+}
+// Eight slots encode as version 1, thirty-two as the sparse version 2 with
+// only the records it needs: the format is the one that holds that many.
+function encodePdDomain(slots) {
+    if (!Array.isArray(slots) || !PD_FORMATS.some(format => format.SLOTS === slots.length)) fail("INVALID_LENGTH", 0, "Exactly eight or thirty-two PD slots are required.");
+    if (slots.length === PD_DOMAIN_V1.SLOTS) {
+        const bytes = Buffer.alloc(PD_DOMAIN_V1.SIZE);
+        HEADER.copy(bytes);
+        for (let id = 0; id < PD_DOMAIN_V1.SLOTS; id++) {
+            if (!slots[id] || typeof slots[id] !== "object") fail("INVALID_ARGUMENT", 0, "Slot must be an object with supported fields.");
+            writeRecord(bytes.subarray(8 + id * 96, 8 + (id + 1) * 96), slots[id], id);
+        }
+        decodePdDomain(bytes);
+        return bytes;
+    }
+    const {RECORD_SIZE, SLOTS, VERSION} = PD_DOMAIN_V2;
+    const records = [];
+    for (let id = 0; id < SLOTS; id++) {
+        const slot = slots[id];
+        if (!slot || typeof slot !== "object" || Array.isArray(slot)) fail("INVALID_ARGUMENT", 0, "Slot must be an object with supported fields.");
+        if (slot.id !== id) fail("INVALID_ID", 0, `PD slots must appear exactly once in ID order 0–${SLOTS - 1}.`);
+        if (!storesRecord({kind: slot.kind ?? 0, name: slot.name})) continue;
+        const p = Buffer.alloc(RECORD_SIZE);
+        writeRecord(p, slot, id);
+        records.push(p);
+    }
+    const bytes = Buffer.concat([Buffer.from([VERSION, SLOTS, RECORD_SIZE, records.length, 0, 0, 0, 0]), ...records]);
     decodePdDomain(bytes);
     return bytes;
 }
 
-module.exports = {PD_DOMAIN_V1, PD_KIND, PD_AXIS, PD_SCROLL_AXES, PD_EMPTY_DIRECTION, PD_DIRECTION_OUTPUT, PD_MODIFIERS, PD_BUTTON, DIAGONALS, isPdTapKey, encodePdDomain, decodePdDomain};
+module.exports = {PD_DOMAIN_V1, PD_DOMAIN_V2, pdDomainVersionFor, pdSlotCountOfVersion, PD_KIND, PD_AXIS, PD_SCROLL_AXES, PD_EMPTY_DIRECTION, PD_DIRECTION_OUTPUT, PD_MODIFIERS, PD_BUTTON, DIAGONALS, isPdTapKey, encodePdDomain, decodePdDomain};

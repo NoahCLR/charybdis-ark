@@ -10,9 +10,13 @@ import {LED_INDEX, TRACKBALL_LED, inLocality, trackballInLocality} from "./geome
 const OFF = {h: "0", s: "0", v: "0"};
 
 
+// A pointing slot's lighting row by the name the RGB enum gives its id; the
+// 32-slot firmware's slots past seven are PD_MODE_SLOT_n. A keyboard reports
+// rows only for the slots it has.
 export const PD_MODE_IDS = [
     "PD_MODE_DRAGSCROLL", "PD_MODE_VOLUME", "PD_MODE_BRIGHTNESS", "PD_MODE_ZOOM",
     "PD_MODE_ARROW", "PD_MODE_PINCH", "PD_MODE_SLOT_6", "PD_MODE_SLOT_7",
+    ...Array.from({length: 24}, (_, index) => `PD_MODE_SLOT_${index + 8}`),
 ];
 
 export function stageEnabled(model, id) {
