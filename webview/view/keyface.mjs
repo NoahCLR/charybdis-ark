@@ -408,14 +408,28 @@ export function behaviourGridSteps(behaviour, advertisedMaximum = 5) {
     return Array.from({length: maximum}, (_, tapCount) => populated.get(tapCount) || {tapCount});
 }
 
-// What the keyboard does for a first-press tier the row leaves empty: the key's
-// own tap or hold (core/model/built-in-behavior.js). An authored cell, a later
-// press and a key with nothing built in inherit nothing, so their cells stay empty.
-const BUILT_IN_TIERS = {tap: "tap", hold: "hold"};
+// What the keyboard does for a tier the row leaves empty (core/model/
+// built-in-behavior.js). The key's own tap fills an empty tap at every tap count
+// the row reaches, its deepest authored count, and is sent once per press, so
+// it carries `times` past a single tap. Past that depth the presses are
+// separate, shorter gestures, so those cells stay empty. The built-in hold
+// belongs to the first press, and a fallback hold also gives way to an authored
+// long hold there. An authored cell and a key with nothing built in inherit nothing.
 export function inheritedBranch(behaviour, step, kind) {
-    const field = BUILT_IN_TIERS[kind];
-    if (!field || step?.tapCount !== 0 || step[field]) return null;
-    return behaviour?.builtIn?.[field] || null;
+    const builtIn = behaviour?.builtIn || {};
+    if (!step || !Number.isInteger(step.tapCount)) return null;
+    if (kind === "tap") {
+        if (!builtIn.tap || step.tap) return null;
+        const authored = (behaviour.steps || []).filter((entry) => entry.tap || entry.hold || entry.longHold);
+        const depth = Math.max(1, ...authored.map((entry) => entry.tapCount + 1));
+        if (step.tapCount >= depth) return null;
+        return step.tapCount ? {...builtIn.tap, times: step.tapCount + 1} : builtIn.tap;
+    }
+    if (kind === "hold") {
+        if (!builtIn.hold || step.tapCount !== 0 || step.hold || (builtIn.hold.fallback && step.longHold)) return null;
+        return builtIn.hold;
+    }
+    return null;
 }
 
 // Whether this key is one of a combo's inputs. The keyboard reports per-layer

@@ -26,9 +26,11 @@ test("behaviour rows claim built-in first actions from the keyboard's advertised
     const committed = decodedDeviceProfile();
     const rows = (featureFlags) => buildDeviceModel({capabilities: {featureFlags}, committed}).keyBehaviors;
     const claims = (list) => list.filter((row) => Object.keys(row.builtIn).length).map((row) => row.keycode);
-    const lt = claims(rows(1 << 17)).filter((keycode) => keycode.startsWith("LT("));
-    assert.ok(lt.length > 0, "the fixture's LT row inherits its tap and layer hold on bit 17 firmware");
-    assert.deepEqual(claims(rows(0)), [], "older firmware claims nothing");
+    const dualRole = (list) => claims(list).filter((keycode) => /^(LT|MT|OSM)\(/.test(keycode));
+    assert.ok(dualRole(rows(1 << 17)).some((keycode) => keycode.startsWith("LT(")), "the fixture's LT row inherits its tap and layer hold on bit 17 firmware");
+    assert.deepEqual(dualRole(rows(0)), [], "older firmware claims no dual-role action");
+    assert.ok(["KC_1", "LGUI(KC_C)", "QK_MOUSE_BUTTON_3"].every((keycode) => claims(rows(0)).includes(keycode)),
+        "plain keys tap and hold themselves on every firmware");
 });
 
 // The ported Studio UI renders whatever shape it is given, so these assertions

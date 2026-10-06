@@ -114,10 +114,15 @@ key the board shows through it: the editor names the layer that supplies that
 key and says the behaviour belongs to its keycode, so changing it changes that
 key wherever it is pressed. Turning layers on or off in the preview updates the
 open key, whichever you did first. Empty branches preserve the key's built-in
-actions until you override them. A dual-role key's empty first tap or hold
-shows, dashed and marked "built in", what the key does there on its own: an
-`LT()` taps its key and holds its layer, an `MT()` or `OSM()` holds its
-modifiers. **Change key…** moves a behaviour to another
+actions until you override them. An empty cell shows, dashed and marked
+"built in", what the key does there on its own. An empty tap sends the key's
+own tap once per press, so an empty Double tap sends it twice (`×2`), at every
+tap count up to the deepest one the behaviour sets; past that, the presses are
+separate shorter gestures and the cell stays empty. On the first press, an
+`LT()` holds its layer and an `MT()` or `OSM()` its modifiers. A plain key,
+such as `-` or `Ctrl+C`, stays held down until release, unless that first
+press sets a Hold or Long hold. Shift, Ctrl, Alt and Cmd on their own show
+nothing built in. **Change key…** moves a behaviour to another
 key through the keycode picker; when that key already has one, you choose to
 overwrite it, swap the two, or cancel, and either is one undoable draft step.
 On a keyboard that owns its layer keys (Profile Wire feature bit 14), a
