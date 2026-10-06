@@ -74,7 +74,31 @@ const capabilities = {
     viaMacroBytes: 7191,
 };
 
-function buildModel() {
+// The hosts the preview stands in for. The extension's is what it always was;
+// the web page's says what the page offers, in its words (web/web-host.mjs),
+// with no keyboard yet, or in a browser without WebHID. preview/index.html
+// shows the extension's; ?host=web, web-none or web-unsupported the others.
+const VSCODE_HOST = {exportPdUpgrade() {}};
+async function webHosts() {
+    const {BLOCKED, WEB_WORDS} = await import("../web/web-host.mjs");
+    const {version} = require("../package.json");
+    const offered = {chooseKeyboard: true, theme: "dark", build: {version, commit: "preview"}, recoveries: [
+        {id: 2, name: "recovery-2026-10-06T09-14-03-512Z.charybdis.json", savedAt: "2026-10-06T09:14:03.512Z"},
+        {id: 1, name: "recovery-2026-10-01T18-40-55-020Z.charybdis.json", savedAt: "2026-10-01T18:40:55.020Z"},
+    ]};
+    return {
+        web: {words: WEB_WORDS, panel: () => offered},
+        "web-none": {words: WEB_WORDS, panel: () => ({...offered, recoveries: []})},
+        "web-unsupported": {words: WEB_WORDS, panel: () => ({...offered, chooseKeyboard: false, recoveries: [], blocked: BLOCKED.unsupported})},
+    };
+}
+
+// No keyboard: what a host publishes before one is chosen or connected.
+function emptyModel(host) {
+    return buildPanelModel({service: {portable: null}, host}, {connected: false, busy: false, devices: [], phase: "empty"});
+}
+
+function buildModel(host = VSCODE_HOST) {
     const doc = fillPreviewLayer(SLOTS_32 ? document32() : pdDocument());
     const snapshot = {
         document: doc,
@@ -98,7 +122,7 @@ function buildModel() {
     };
     // The host's own model builder, so the preview cannot drift from it. The
     // layer editor is open so Rename & Reorder has something to show.
-    const panel = {service: {portable: null}, draft: session, portableLayers: startLayerEdit(snapshot, session.revision)};
+    const panel = {service: {portable: null}, host, draft: session, portableLayers: startLayerEdit(snapshot, session.revision)};
     const model = buildPanelModel(panel, state);
     return model;
 }
@@ -123,7 +147,7 @@ async function deviceModel() {
         if ((service.capabilities?.supportedDomainMask & 15) === 15) await service.readPortableProfile();
 
         // Exactly the model the panel would build for this keyboard.
-        const panel = {service};
+        const panel = {service, host: VSCODE_HOST};
         const model = buildPanelModel(panel, service.snapshot());
         if (panel.draft) panel.portableLayers = startLayerEdit(panel.draft.current, panel.draft.revision);
         model.portable.layers = panel.portableLayers ? {key: panel.portableLayers.before.fingerprint, order: panel.portableLayers.order, names: panel.portableLayers.names, keysFollow: panel.portableLayers.keysFollow !== false} : null;
@@ -166,9 +190,13 @@ function writeHostPages(page) {
     }
 }
 
-Promise.resolve(model).then((model) => {
+Promise.all([model, webHosts()]).then(([model, hosts]) => {
 fs.mkdirSync(path.join(__dirname, "..", "preview"), {recursive: true});
 fs.writeFileSync(path.join(__dirname, "..", "preview", "model.json"), JSON.stringify(model));
+for (const [name, host] of Object.entries(hosts)) {
+    const web = name === "web" ? buildModel(host) : emptyModel(host);
+    fs.writeFileSync(path.join(__dirname, "..", "preview", `model-${name}.json`), JSON.stringify(web));
+}
 const page = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <title>Charybdis Ark — preview</title>
@@ -176,7 +204,8 @@ const page = `<!doctype html>
 <script>
 // Stand in for the extension host: answer the webview's "ready" with one
 // fixture model, exactly as the real host answers it after reading a keyboard,
-// and log every edit it posts back.
+// and log every edit it posts back. ?host=web (web-none, web-unsupported)
+// answers as the web page's host does instead, and turns its theme toggle.
 const posted = [];
 let model = null, wanted = false;
 const publish = () => {
@@ -188,11 +217,13 @@ window.acquireVsCodeApi = () => ({
         posted.push(message);
         console.log("posted", JSON.stringify(message));
         if (message.type === "ready" || message.type === "refresh") { wanted = true; publish(); }
+        if (message.type === "setTheme" && model?.host) { model.host.theme = message.theme; publish(); }
     },
     getState: () => undefined, setState: () => {},
 });
 window.__posted = posted;
-fetch("./model.json").then((response) => response.json()).then((loaded) => { model = loaded; publish(); });
+const host = new URLSearchParams(location.search).get("host");
+fetch(host ? "./model-" + host + ".json" : "./model.json").then((response) => response.json()).then((loaded) => { model = loaded; publish(); });
 // ?screen=lighting opens a screen by clicking its rail button, the way a
 // person would, so the preview needs no hook inside the app.
 const wantedScreen = new URLSearchParams(location.search).get("screen");

@@ -15,6 +15,46 @@ If an older `noah.charybdis-live-0.1.0` link is still installed, remove it: the
 app was named Charybdis Live, and Ark copies the recovery files saved under that
 identity into its own storage on start.
 
+## Using Ark in Chrome
+
+Ark also runs as a web page, in Chrome or Edge on a computer, with the same
+screens as in VS Code. It is a set of static files: once the page has loaded it
+talks to nothing but the keyboard, and nothing you do leaves your computer.
+The page reaches a keyboard over WebHID, which only Chrome and Edge have and
+only on a page served over HTTPS (or from `localhost`). In Safari, Firefox or on
+a plain `http://` address the page says Ark needs Chrome or Edge over HTTPS
+instead of offering a keyboard.
+
+**Choosing the keyboard.** A page sees only the keyboards you have let it open.
+The first time, choose **Choose keyboard** and pick your Charybdis in Chrome's
+list; Ark then reads it. After that the page reconnects to it by itself whenever
+it opens, without asking again. **Choose keyboard** stays in the rail, under the
+keyboard's name, for letting the page open another one; with two, the rail's
+selector switches between them. Chrome's site settings forget a keyboard you no
+longer want the page to open.
+
+**One tab at a time.** Only one Ark tab holds the keyboard. A second one says
+Ark is open in another tab, and takes over when that tab closes. Closing or
+reloading the tab while the draft has unapplied edits, or while Apply is
+running, asks first: the draft lives in the tab and does not survive a reload.
+Apply keeps its pace in a background tab, but keep the tab open until it ends.
+
+**Light and dark.** The button at the top right of every screen switches
+between a light and a dark theme. Ark starts from your system's setting and
+remembers your choice in this browser. In VS Code there is no toggle; the panel
+follows VS Code's theme.
+
+**Recovery copies and files.** Apply and Import save a recovery copy in the
+browser's storage before they write anything, and refuse to write if it cannot
+be saved. Profile & backups lists every copy, newest first, with a
+**Download** button each. Ark asks Chrome to keep this storage when space runs
+low, but clearing the site's data (or the browser's) deletes the copies, so
+download any you want to keep. **Export profile** downloads the profile file;
+**Import profile** opens the browser's file chooser and takes files up to
+100 kB. The legacy **Export upgrade pair** is not offered on the page. Errors
+show in the rail's message rather than as a notification, and the page's
+version and commit are at the foot of the rail.
+
 ## What it edits
 
 Every screen is drawn and wired to the host:
@@ -292,7 +332,8 @@ What to expect while it applies:
   its keys and macros are one complete version again, which may need the other
   half connected.
 
-Drafts live in the editor window; closing it loses unapplied changes. The
+Drafts live in the editor window (in Chrome, the tab); closing it loses
+unapplied changes. The
 transaction and recovery contract is specified in
 [`docs/architecture/logical-profile-transaction-v1.md`](../upstream/firmware/docs/architecture/logical-profile-transaction-v1.md).
 Physical power-loss acceptance across every decision boundary is still in
@@ -306,7 +347,9 @@ lighting and global settings. Flashed defaults and live edits become one
 portable file. **Import profile** shows a review, saves a recovery copy, restores
 both halves and verifies the complete readback. A failed or interrupted restore
 reports the saved recovery file instead of claiming success. Recovery files are
-kept in the extension's local storage; the app shows their full path.
+kept in the extension's local storage; the app shows their full path. In
+Chrome they are kept in the browser's storage and listed on Profile & backups,
+each with a download (see [Using Ark in Chrome](#using-ark-in-chrome)).
 
 **Profile memory** shows how full the profile is. Behaviours, combos,
 lighting, pointing modes, settings and every layer, macro and custom-key name

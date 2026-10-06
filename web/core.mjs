@@ -27,6 +27,7 @@ export {
     takeOutbox,
 } from "../core/session/panel-session.js";
 export {readKeyboard, draftControl, portableControl, rereadKeyboard} from "../core/session/panel-controls.js";
+export {exportedProfile, openPanelLoop} from "../core/session/panel-loop.js";
 export {upgradePdSnapshot, validateSnapshot} from "../core/session/portable-profile-session.js";
 export {APPLY_STEPS, ApplyProgress, failureReason} from "../core/session/apply-progress.js";
 export {DEFAULT_REQUEST_TIMEOUT_MS, DeviceRequestCoordinator} from "../core/transport/request-coordinator.js";
@@ -39,6 +40,7 @@ export {
     normalizeDeviceDescriptors,
     normalizeRawHidReport,
 } from "../core/transport/device-adapter.js";
+export {WEBHID_DEVICE_FILTERS, WebHidDeviceAdapter} from "../core/transport/webhid-adapter.js";
 export {VOCABULARY, word, layerName} from "../core/model/vocabulary.js";
 
 export * as portable from "../core/model/portable-profile.js";

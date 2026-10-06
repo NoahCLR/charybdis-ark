@@ -38,6 +38,20 @@ test("restore saves recovery first, restores both stores, then verifies complete
     assert.deepEqual({...result.performance, elapsedMs: 0}, {elapsedMs: 0, baseSource: "device-read", layoutBytes: 28, macroBytes: 28, viaConfigReports: 1, layoutReports: 3, macroReports: 3});
     assert.deepEqual(f.events, ["backup", "stage", "via stage", "commit", "via accepted", "local roll-forward", "both halves"]);
 });
+test("restore hands the host's sleep to every wait on the way", async () => {
+    const f = fixture(), sleep = async () => {}, seen = [];
+    const {createCoordinator, createViaCoordinator, waitStorage, readIdentity, capture} = f.operations;
+    Object.assign(f.operations, {
+        createCoordinator: (connection, options) => {seen.push(["upload", options.sleep]); return createCoordinator(connection, options);},
+        createViaCoordinator: (connection, options) => {seen.push(["via", options.sleep]); return createViaCoordinator(connection, options);},
+        waitStorage: (connection, ids, options) => {seen.push(["storage", options?.sleep]); return waitStorage(connection, ids, options);},
+        readIdentity: (connection, ids, options) => {seen.push(["identity", options?.sleep]); return readIdentity(connection, ids, options);},
+        capture: (...args) => {seen.push(["capture", args[6]?.sleep]); return capture(...args);},
+    });
+    await restoreProfile({}, {}, capabilities, f.targetDocument, {...f.options, sleep});
+    assert.deepEqual(seen.map(([name]) => name), ["capture", "upload", "via", "identity", "storage"]);
+    assert.ok(seen.every(([, given]) => given === sleep), "each wait is given the host's sleep");
+});
 test("restore verifies and reuses the reviewed snapshot without rereading its complete payload", async () => {
     const f = fixture();
     let captures = 0, identityReads = 0;

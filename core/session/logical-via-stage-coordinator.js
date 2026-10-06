@@ -7,13 +7,16 @@ const REGIONS = Object.freeze({CONFIG: 1, KEYMAP: 2, MACRO: 4});
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 class LogicalViaStageCoordinator {
-    constructor(connection, {requestIds, pollMs = 20, timeoutMs = 90000, onProgress = () => {}} = {}) {
+    // `sleep` waits between polls; a host whose timers are throttled (a
+    // background browser tab) passes its own.
+    constructor(connection, {requestIds, pollMs = 20, timeoutMs = 90000, onProgress = () => {}, sleep = delay} = {}) {
         if (!connection || typeof connection.request !== "function" || !requestIds || typeof requestIds.next !== "function") throw new TypeError("Logical VIA staging requires a connection and request ids.");
         this.connection = connection;
         this.requestIds = requestIds;
         this.pollMs = pollMs;
         this.timeoutMs = timeoutMs;
         this.onProgress = onProgress;
+        this.sleep = typeof sleep === "function" ? sleep : delay;
     }
 
     async waitFor(transactionId, operationSequence, acceptedStates) {
@@ -25,7 +28,7 @@ class LogicalViaStageCoordinator {
             // candidate, e.g. when the candidate's lease ran out.
             if (status.transactionId === transactionId && !status.pending && status.state === LOGICAL_VIA_STATE.ABORTED) throw Object.assign(new Error("The keyboard cancelled this save before it was committed."), {code: "LOGICAL_VIA_STAGE_CANCELLED", status});
             if (status.transactionId === transactionId && !status.pending && status.operationSequence !== operationSequence && acceptedStates.includes(status.state)) return status;
-            await delay(this.pollMs);
+            await this.sleep(this.pollMs);
         } while (Date.now() < deadline);
         throw Object.assign(new Error("Timed out while staging the VIA profile on the other half."), {code: "LOGICAL_VIA_STAGE_TIMEOUT"});
     }
@@ -68,7 +71,7 @@ class LogicalViaStageCoordinator {
             // IDLE with the exact retained identity means firmware already
             // released the normal-reconciliation fence after local roll-forward.
             if (exact && !status.pending && [LOGICAL_VIA_STATE.ACCEPTED, LOGICAL_VIA_STATE.IDLE].includes(status.state)) return status;
-            await delay(this.pollMs);
+            await this.sleep(this.pollMs);
         } while (Date.now() < deadline);
         throw Object.assign(new Error("Timed out waiting for the staged VIA profile to become the recovery authority."), {code: "LOGICAL_VIA_ACCEPT_TIMEOUT"});
     }

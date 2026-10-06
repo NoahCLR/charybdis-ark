@@ -48,6 +48,7 @@ matrix.
 | Backup and restore | Complete snapshots, import review against the keyboard, recovery file and verified restore |
 | Drafts and Apply | One draft with item-by-item review, discard by edit group, Show, undo/redo and draft history; the review checks reachable actions, confirms active warnings and traps, and blocks profiles the destination cannot save (D-L36); Apply shows its steps and says where a failure happened (D-L19, D-L23, D-L29, D-L30) |
 | Recovery | Atomic logical Apply, differential transfer, reboot recovery fencing, firmware roll-forward after the decision, resume after a lost or power-cycled peer link, bounded cancel owned by the keyboard (D-L20–D-L22, D-L27, D-L39) |
+| Where it runs | The VS Code extension, and a web page that runs all of Ark in Chrome or Edge over WebHID (D-L52): Choose keyboard, one tab at a time, recovery copies in the browser's storage, a light/dark toggle. `npm run build:web` writes the page as static files; it is not yet published |
 
 The rail's health strip shows connection, both-half convergence, draft state
 and recovery state. Convergence needs the firmware's peer-known and
@@ -65,7 +66,7 @@ Remaining before calling the product complete:
   USB role migration is untested: on the normal pair the left half exposes no
   Raw HID interface (`FORCE_SLAVE`/`usb_disconnect`), so it needs role-switching
   firmware;
-- standalone packaging (D-L02);
+- publishing the web page (D-L52), and a demo that works without a keyboard;
 - the open issues below.
 
 ## Open Issues
@@ -118,6 +119,9 @@ Its `core/` has no `vscode` imports, so repackaging as a standalone desktop app
 is a shell and adapter swap rather than a rewrite. The independent repository
 needs no firmware workspace (D-L44); requiring VS Code remains a distribution
 limitation. The trigger to repackage is the first non-developer user.
+
+Amended by D-L52: the second host is a web page, beside the extension rather
+than instead of it, so using Ark no longer requires VS Code.
 
 ### D-L04 — The source editor is retired
 
@@ -888,3 +892,27 @@ re-checks it when it merges. Nightly runs check `dev`, warn early about firmware
 disagree; none of them blocks. This replaces D-L50's "required on `main`" and
 release-stack wording where they differ: Ark and firmware release separately,
 and together only when the contract between them changes (firmware D-F06).
+
+### D-L52 — Ark is also a web page
+
+Ark runs in Chrome (and Edge) as a web page, beside the VS Code extension, so
+using it needs no VS Code, no checkout and no install. Both hosts run the same
+`core/` and panel through the shared host loop (`core/session/panel-loop.js`);
+the page's host (`web/`) does over WebHID, in the page, what `extension.js`
+does in VS Code. What differs between them reaches the panel in the model
+(`model.host`): Choose keyboard, the host's words for connecting, the theme
+toggle and the recovery copies. The panel never asks which host it is in.
+
+The page is static files with no server code: `npm run build:web` writes the
+complete site, hashed names and all, and after it loads the page makes no
+network request (its policy says `connect-src 'none'`). The keyboard is reached
+only through WebHID, after the person picks it in Chrome's picker. One tab holds
+the keyboard (a Web Lock); leaving with unapplied edits or during Apply asks
+first; Apply's waits run on a worker's clock, so a background tab does not slow
+it. Recovery copies are kept in the browser's storage (IndexedDB), listed on
+Profile & backups with a download each; clearing the site's data deletes them.
+The legacy eight-slot upgrade export stays the extension's.
+
+The page will be published to Cloudflare Pages from GitHub Actions, as the
+folder the build writes; that, the headers only a server can send
+(`frame-ancestors`) and a demo without a keyboard are later work.

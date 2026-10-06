@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!-- The page's policy travels with it, so it holds under any server: scripts,
+     styles and the worker from this site only, inline style attributes for the
+     panel's layout and device colours, and no connection anywhere. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; worker-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; connect-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<meta name="generator" content="Charybdis Ark {{version}} ({{commit}})">
+<title>Charybdis Ark</title>
+<link rel="stylesheet" href="./{{styles}}">
+<script type="module" src="./{{host}}"></script>
+<script type="module" src="./{{panel}}"></script>
+</head>
+<body>
+<div id="root"></div>
+</body>
+</html>

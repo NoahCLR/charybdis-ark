@@ -36,8 +36,12 @@ restores it after the same review.
 
 ## Install
 
-It's early days: for now Ark runs as a VS Code extension, installed from a
-checkout.
+It's early days: Ark runs as a VS Code extension, installed from a checkout,
+and now also as a web page in Chrome or Edge, talking to the keyboard over
+WebHID. The page isn't online yet; until it is, you can build it and open it
+locally (`npm run web`).
+
+For the extension:
 
 ```sh
 git clone https://github.com/NoahCLR/charybdis-ark.git
@@ -56,6 +60,6 @@ A plain `qmk compile` image can't be read or saved by Ark.
 ## Learn more
 
 - [Ark guide](docs/GUIDE.md): every screen, Review's checks, what happens
-  while a profile is applied, and backups
+  while a profile is applied, backups, and using Ark in Chrome
 - [Product goal](docs/PRODUCT_GOAL.md): what Ark is meant to become
 - [Developing Ark](docs/REPOSITORY.md#development-and-installation)

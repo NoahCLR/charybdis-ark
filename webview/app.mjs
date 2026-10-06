@@ -9,6 +9,7 @@ import {captureContentScroll, captureKeysBenchHeight, revealSelectedContentRow, 
 import {activateOnKey, captureFocus, focusDialog, restoreFocus, trapTab} from "./lib/focus.mjs";
 import {closeComboBuilder, getModel, layerName, post, render as rerender, resetDraftForms, setModel, setRenderer, state, writable} from "./store.mjs";
 import {historyAction} from "./view/edits.mjs";
+import {chooseKeyboard, hostOf, otherTheme, setTheme} from "./view/host.mjs";
 import {readScreen, screenAvailable} from "./view/readiness.mjs";
 import {discardLabel, groupNote, placeState, reviewBlocks, statusSummary, stillShown} from "./view/review.mjs";
 import {bindLayerIndex, hideHover, mountHover} from "./ui/hover.mjs";
@@ -241,6 +242,8 @@ function render() {
     const bar = commitBar();
     if (bar) screen.appendChild(bar);
     root.appendChild(app);
+    const theme = hostOf(model).theme;
+    root.querySelector('[data-act="theme"]')?.addEventListener("click", () => post(setTheme(otherTheme(theme))));
     restoreKeysBenchHeight(root, benchHeight);
     restoreContentScroll(root, scroll);
     revealSelectedContentRow(root);
@@ -259,6 +262,8 @@ function render() {
 
 function readPlaceholder(read, model) {
     const loading = read.state === "loading";
+    // Without a keyboard, a host with a picker offers it first.
+    const choose = hostOf(model).chooseKeyboard && !model?.device?.connected;
     const screenTitle = state.screen === "profile" ? "Profile & backups" : state.screen === "device" ? "Device" : "Keyboard";
     const secondary = screenAvailable(model, "profile") && state.screen !== "profile"
         ? {screen: "profile", label: "Profile & backups"}
@@ -269,9 +274,12 @@ function readPlaceholder(read, model) {
             ${loading ? '<span class="spin" aria-hidden="true"></span>' : '<i class="dot err" aria-hidden="true"></i>'}
             <h2>${esc(read.title)}</h2><p>${esc(read.detail)}</p>
             ${loading ? '<p class="note">The menus open when their keyboard data is ready.</p>'
-                : `<div class="read-actions"><button class="btn primary" data-act="retry">Read keyboard</button>
+                : read.state === "blocked" ? ""
+                : `<div class="read-actions">${choose ? '<button class="btn primary" data-act="choose-keyboard">Choose keyboard</button>' : ""}
+                    <button class="btn ${choose ? "ghost" : "primary"}" data-act="retry">Read keyboard</button>
                     ${secondary ? `<button class="btn ghost" data-act="secondary">${esc(secondary.label)}</button>` : ""}</div>`}
         </div></div></div></div>`);
+    screen.querySelector('[data-act="choose-keyboard"]')?.addEventListener("click", () => post(chooseKeyboard()));
     screen.querySelector('[data-act="retry"]')?.addEventListener("click", () => post({type: "refresh"}));
     screen.querySelector('[data-act="secondary"]')?.addEventListener("click", () => {state.screen = secondary.screen; render();});
     return screen;
@@ -297,6 +305,11 @@ addEventListener("message", (event) => {
     const message = event.data;
     if (message?.type !== "model") return;
     setModel(message.model);
+    // A host that leaves the theme to the panel says which; otherwise the
+    // host's own theme (VS Code's body class) holds.
+    const theme = hostOf(message.model).theme;
+    if (theme) document.documentElement.dataset.theme = theme;
+    else delete document.documentElement.dataset.theme;
     // The host reports a refused edit as a notice prefixed "Failed"; that is a
     // failure, so it is shown as one rather than as a neutral message.
     if (message.notice) {
