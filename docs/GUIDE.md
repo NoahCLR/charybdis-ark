@@ -55,6 +55,41 @@ download any you want to keep. **Export profile** downloads the profile file;
 show in the rail's message rather than as a notification, and the page's
 version and commit are at the foot of the rail.
 
+## Exploring without a keyboard
+
+With no keyboard connected, the connect area offers **Explore a demo** beside
+**Read keyboard** (VS Code) or **Choose keyboard** (the web page). It is offered
+on a browser without WebHID too, since it needs no keyboard. The demo opens a
+complete setup, as current firmware holds one (eight layers, 32 pointing slots,
+64 macros and 64 custom keys), in the same draft a keyboard's opens in. Every
+screen works, and every edit stages, is checked and shows in the review exactly
+as it would on a keyboard; undo, redo, Discard, the draft history, Rename &
+Reorder and Import all work on it.
+
+It never claims to be a keyboard. A strip across the top of the window says
+**Demo · no keyboard** on every screen; the rail names it Demo, with no
+connection, halves or recovery to report, and the Device screen says what it
+stands in for. Nothing in it reaches a keyboard, and nothing is kept: the demo
+lives in this window until it is left or closed.
+
+**Apply needs a keyboard.** The commit bar's button reads **Review changes**,
+and where the review would offer Apply it says Apply needs a keyboard and
+offers **Export…**. Export, there or on Profile & backups, saves the demo's
+setup with your edits as a profile file (`charybdis-demo-<date>.charybdis.json`);
+on your keyboard, **Import profile** reviews it against what the keyboard holds
+before anything is applied.
+
+**Open a profile file…**, on the strip, replaces the demo's setup with one of
+your exported `.charybdis.json` files, checked as Import checks it (an older
+backup is brought up to current firmware the same way). A file Import would
+refuse is refused, and the demo stays as it was.
+
+**Leaving.** **Leave demo** on the strip, or **Choose keyboard** or **Read**,
+leaves the demo for a keyboard. With edits not exported since, Ark asks first
+and offers Export; opening another profile file asks the same way. Closing or
+reloading a web page with such edits asks too. While a keyboard is connected,
+or a draft holds unapplied edits for one, the demo is not offered.
+
 ## What it edits
 
 Every screen is drawn and wired to the host:

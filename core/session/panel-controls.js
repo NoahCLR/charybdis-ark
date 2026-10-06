@@ -15,6 +15,7 @@
 // and `host.words.noneFound`, when a host says "no keyboard found" its own way.
 
 const {validateSnapshot} = require("./portable-profile-session");
+const {DEMO_WORDS, panelCapabilities, panelState} = require("./demo-session");
 const {applyLayerEdit, discardDraftForDevice, layerEditDocument, startLayerEdit} = require("./panel-session");
 const {IDENTITY} = require("../model/layer-order");
 
@@ -97,6 +98,10 @@ async function draftControl(session, message, host = {}) {
     const draft = session.draft, service = session.service;
     if (!draft) throw new Error("Read a complete keyboard profile before editing.");
     const revision = message.draftRevision;
+    // The demo has no keyboard to write or to review against.
+    if (session.demo && (message.type === "applyProfileDraft" || message.type === "rebaseProfileDraft")) {
+        throw Object.assign(new Error(DEMO_WORDS.applyNeedsKeyboard), {code: "DEMO_REFUSED"});
+    }
     switch (message.type) {
         case "reviewProfileDraft": draft.review(revision); return;
         case "closeProfileDraftReview": draft.closeReview(revision); return;
@@ -108,7 +113,7 @@ async function draftControl(session, message, host = {}) {
             // The draft's own keyboard, unchanged: discarding is an undoable
             // step. Otherwise the keyboard is read again and the draft starts
             // over from it.
-            if (!draft.stale && !draft.base.incomplete && service.snapshot().selectedDeviceId === draft.deviceId) {
+            if (!draft.stale && !draft.base.incomplete && panelState(session).selectedDeviceId === draft.deviceId) {
                 draft.discardAll(revision);
                 session.resetDraftForms = true;
                 session.notice = "Draft discarded. Undo (⌘Z) brings it back.";
@@ -174,10 +179,10 @@ async function portableControl(session, message, host = {}) {
             // The host answers with the file's text, and its name when it has one.
             const chosen = await host.chooseProfile?.();
             if (chosen === undefined) return;
-            const value = validateSnapshot(typeof chosen === "string" ? chosen : chosen.text, service.capabilities);
+            const value = validateSnapshot(typeof chosen === "string" ? chosen : chosen.text, panelCapabilities(session));
             session.portableReview = {document: value.document, fileName: typeof chosen === "string" ? null : chosen.name || null,
                 before: session.draft?.current || await service.readPortableProfile({forRestore: true}), revision: session.draft?.revision,
-                deviceId: service.snapshot().selectedDeviceId, draftId: session.draft?.id};
+                deviceId: panelState(session).selectedDeviceId, draftId: session.draft?.id};
             session.portableLayers = undefined;
             return;
         }
@@ -185,7 +190,7 @@ async function portableControl(session, message, host = {}) {
             const before = session.draft?.current || await service.readPortableProfile();
             session.portableReview = undefined;
             session.portableLayers = startLayerEdit(before, session.draft?.revision);
-            session.portableLayers.deviceId = service.snapshot().selectedDeviceId;
+            session.portableLayers.deviceId = panelState(session).selectedDeviceId;
             session.portableLayers.draftId = session.draft?.id;
             return;
         }
@@ -199,7 +204,7 @@ async function portableControl(session, message, host = {}) {
             const before = layers ? edit?.before : review?.before;
             if (!before) throw new Error("Review the profile before restoring it.");
             const editorDeviceId = layers ? edit.deviceId : review.deviceId;
-            const selectedDeviceId = service.snapshot().selectedDeviceId;
+            const selectedDeviceId = panelState(session).selectedDeviceId;
             if (editorDeviceId !== undefined && editorDeviceId !== selectedDeviceId) {
                 throw new Error("This profile review belongs to another keyboard. Open it again on the selected keyboard.");
             }

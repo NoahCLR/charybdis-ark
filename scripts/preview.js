@@ -87,6 +87,9 @@ async function webHosts() {
         {id: 1, name: "recovery-2026-10-01T18-40-55-020Z.charybdis.json", savedAt: "2026-10-01T18:40:55.020Z"},
     ]};
     return {
+        none: VSCODE_HOST,
+        demo: VSCODE_HOST,
+        "demo-edited": {words: WEB_WORDS, panel: () => offered},
         web: {words: WEB_WORDS, panel: () => offered},
         "web-none": {words: WEB_WORDS, panel: () => ({...offered, recoveries: []})},
         "web-unsupported": {words: WEB_WORDS, panel: () => ({...offered, chooseKeyboard: false, recoveries: [], blocked: BLOCKED.unsupported})},
@@ -97,6 +100,18 @@ async function webHosts() {
 function emptyModel(host) {
     return buildPanelModel({service: {portable: null}, host}, {connected: false, busy: false, devices: [], phase: "empty"});
 }
+
+// The demo, as the host loop opens it: the bundled demo profile in a real
+// draft (core/session/demo-session.js), and with `edits` staged in it, so the
+// review and leaving with edits not exported can be looked at.
+function demoModel(host, edits = []) {
+    const {openDemo, panelState} = require("../core/session/demo-session");
+    const session = {service: {portable: null, snapshot: () => ({connected: false, busy: false, devices: []})}, host};
+    openDemo(session, session.service.snapshot());
+    for (const edit of edits) session.draft.stage({...edit, draftId: session.draft.id, draftRevision: session.draft.revision});
+    return buildPanelModel(session, panelState(session));
+}
+const DEMO_EDIT = {type: "updateConfigDefaults", sectionId: "normalPointerSpeed", fields: [{macro: "normalDpi", value: "1400"}, {macro: "snipingDpi", value: "200"}]};
 
 function buildModel(host = VSCODE_HOST) {
     const doc = fillPreviewLayer(SLOTS_32 ? document32() : pdDocument());
@@ -194,7 +209,7 @@ Promise.all([model, webHosts()]).then(([model, hosts]) => {
 fs.mkdirSync(path.join(__dirname, "..", "preview"), {recursive: true});
 fs.writeFileSync(path.join(__dirname, "..", "preview", "model.json"), JSON.stringify(model));
 for (const [name, host] of Object.entries(hosts)) {
-    const web = name === "web" ? buildModel(host) : emptyModel(host);
+    const web = name === "web" ? buildModel(host) : name === "demo" ? demoModel(host) : name === "demo-edited" ? demoModel(host, [DEMO_EDIT]) : emptyModel(host);
     fs.writeFileSync(path.join(__dirname, "..", "preview", `model-${name}.json`), JSON.stringify(web));
 }
 const page = `<!doctype html>
@@ -206,6 +221,8 @@ const page = `<!doctype html>
 // fixture model, exactly as the real host answers it after reading a keyboard,
 // and log every edit it posts back. ?host=web (web-none, web-unsupported)
 // answers as the web page's host does instead, and turns its theme toggle.
+// ?host=none is the extension with no keyboard; Explore a demo there opens
+// ?host=demo's model, the bundled demo (demo-edited has an edit staged).
 const posted = [];
 let model = null, wanted = false;
 const publish = () => {
@@ -218,6 +235,7 @@ window.acquireVsCodeApi = () => ({
         console.log("posted", JSON.stringify(message));
         if (message.type === "ready" || message.type === "refresh") { wanted = true; publish(); }
         if (message.type === "setTheme" && model?.host) { model.host.theme = message.theme; publish(); }
+        if (message.type === "openDemo") fetch("./model-demo.json").then((response) => response.json()).then((loaded) => { model = loaded; publish(); });
     },
     getState: () => undefined, setState: () => {},
 });

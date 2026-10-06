@@ -13,6 +13,7 @@ test("the card names its source, its areas and its counted limits", () => {
     const view = profileUsageView(usage(2000));
     assert.equal(view.source, "What the keyboard runs");
     assert.equal(profileUsageView(usage(2000, {source: "draft"})).source, "Your draft");
+    assert.equal(profileUsageView(usage(2000, {source: "demo"})).source, "The demo setup");
     assert.equal(view.free, 3088);
     assert.deepEqual(view.areas.map((area) => area.label), ["Behaviours", "Pointing modes", "Settings and headers"],
         "an area the profile does not carry is left out");

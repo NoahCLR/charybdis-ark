@@ -37,7 +37,7 @@ export const configureReady = (model) => model?.load?.state === "ready";
 
 export function screenAvailable(model, screen) {
     if (!model || model.load?.state === "loading") return false;
-    if (screen === "device") return Boolean(model.device?.connected);
+    if (screen === "device") return Boolean(model.device?.connected || model.demo?.active);
     if (screen === "profile") return Boolean(model.portable?.available);
     return configureReady(model);
 }

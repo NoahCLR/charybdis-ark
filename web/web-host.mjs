@@ -5,7 +5,7 @@
 // errors. web/page.mjs starts it with the page's own globals; everything it
 // touches comes in through `env`, so it can be started with stand-ins.
 
-import {openPanelLoop, WebHidDeviceAdapter} from "./core.mjs";
+import {demoUnsaved, openPanelLoop, WebHidDeviceAdapter} from "./core.mjs";
 import {connectPanel} from "./panel-channel.mjs";
 import {openRecoveries} from "./recoveries.mjs";
 import {workerSleep} from "./sleep.mjs";
@@ -17,10 +17,14 @@ export const WEB_WORDS = Object.freeze({
     noneFound: "Chrome has no Charybdis this page may open yet. Choose keyboard and pick yours.",
 });
 
-// Why a tab cannot reach a keyboard at all (model.host.blocked).
+// Why a tab cannot reach a keyboard at all (model.host.blocked). `demo` says
+// the demo is still offered there: it needs no keyboard. A tab waiting on
+// another does not offer it, since it takes the keyboard over when that one
+// closes.
 export const BLOCKED = Object.freeze({
     unsupported: Object.freeze({title: "Ark needs Chrome or Edge",
-        detail: "Ark talks to the keyboard over WebHID, which only Chrome and Edge have, and only on a page served over HTTPS. Open this page there to edit your keyboard."}),
+        detail: "Ark talks to the keyboard over WebHID, which only Chrome and Edge have, and only on a page served over HTTPS. Open this page there to edit your keyboard, or explore the demo here.",
+        demo: true}),
     otherTab: Object.freeze({title: "Ark is open in another tab",
         detail: "One tab holds the keyboard at a time. Keep working in the other Ark tab, or close it: this tab takes over when it does."}),
 });
@@ -35,10 +39,11 @@ export function initialTheme(saved, prefersLight) {
     return saved === "light" || saved === "dark" ? saved : prefersLight ? "light" : "dark";
 }
 
-// Whether leaving the page would lose something: unapplied edits, or an
-// Apply (or a restore) part way through.
+// Whether leaving the page would lose something: unapplied edits (in the
+// demo, edits not exported since), or an Apply (or a restore) part way through.
 export function leaving(session) {
-    return Boolean(session.draft?.dirty || session.applyRunning || session.service?.phase === "restoring complete profile");
+    const edits = session.demo ? demoUnsaved(session) : session.draft?.dirty;
+    return Boolean(edits || session.applyRunning || session.service?.phase === "restoring complete profile");
 }
 
 // A chosen profile file as the loop takes it, refused when it is too large.
@@ -93,7 +98,7 @@ export function startWebHost(env) {
         if (message?.type === "chooseKeyboard" && hid && !blocked) {
             picking = adapter.requestDevice().then(() => null, (error) => error);
         }
-        if (message?.type === "choosePortableProfile") {
+        if (message?.type === "choosePortableProfile" || message?.type === "openDemoProfile") {
             choosing = chooseFile(document);
             choosing.catch(() => {});
         }
@@ -140,7 +145,9 @@ export function startWebHost(env) {
                     loop.session.notice = failure.code === "CANCELLED" ? "No keyboard was chosen." : `Failed: ${failure.message}`;
                     return loop.publish();
                 }
-                return loop.handleMessage({type: "refresh"});
+                // Choosing a keyboard from the demo leaves it, as the panel
+                // asked; the read below does that.
+                return loop.handleMessage({type: "refresh", ...(message.discardDemo === true ? {discardDemo: true} : {})});
             }
             case "ready": case "refresh": case "selectDevice":
                 await holding;

@@ -49,6 +49,7 @@ matrix.
 | Drafts and Apply | One draft with item-by-item review, discard by edit group, Show, undo/redo and draft history; the review checks reachable actions, confirms active warnings and traps, and blocks profiles the destination cannot save (D-L36); Apply shows its steps and says where a failure happened (D-L19, D-L23, D-L29, D-L30) |
 | Recovery | Atomic logical Apply, differential transfer, reboot recovery fencing, firmware roll-forward after the decision, resume after a lost or power-cycled peer link, bounded cancel owned by the keyboard (D-L20–D-L22, D-L27, D-L39) |
 | Where it runs | The VS Code extension, and a web page that runs all of Ark in Chrome or Edge over WebHID (D-L52): Choose keyboard, one tab at a time, recovery copies in the browser's storage, a light/dark toggle. `npm run build:web` writes the page as static files; it is not yet published |
+| Demo without a keyboard | Explore a demo, in both hosts and on a browser without WebHID: the bundled demo profile (`core/data/`) in a real draft under current firmware's capabilities, every screen editable and reviewed; Apply refused, Export saves the draft, Open a profile file replaces it, leaving with edits not exported asks first (D-L53) |
 
 The rail's health strip shows connection, both-half convergence, draft state
 and recovery state. Convergence needs the firmware's peer-known and
@@ -66,7 +67,7 @@ Remaining before calling the product complete:
   USB role migration is untested: on the normal pair the left half exposes no
   Raw HID interface (`FORCE_SLAVE`/`usb_disconnect`), so it needs role-switching
   firmware;
-- publishing the web page (D-L52), and a demo that works without a keyboard;
+- publishing the web page (D-L52);
 - the open issues below.
 
 ## Open Issues
@@ -914,5 +915,32 @@ Profile & backups with a download each; clearing the site's data deletes them.
 The legacy eight-slot upgrade export stays the extension's.
 
 The page will be published to Cloudflare Pages from GitHub Actions, as the
-folder the build writes; that, the headers only a server can send
-(`frame-ancestors`) and a demo without a keyboard are later work.
+folder the build writes; that and the headers only a server can send
+(`frame-ancestors`) are later work. The demo without a keyboard is D-L53.
+
+### D-L53 — The demo is a draft with no keyboard behind it
+
+Ark can be explored with no keyboard. The demo is not a simulated keyboard
+answering the wire protocol: it is the same `ProfileDraftSession` a keyboard's
+read opens, over a profile document, run by the shared host loop, so every
+screen, edit, check and review behaves as on a keyboard and both hosts offer it
+(`core/session/demo-session.js`). Its document is the bundled demo profile, an
+export of a real keyboard shipped as data (`core/data/demo-profile.charybdis.json`,
+never hand-edited and never read from a firmware checkout), or a profile file
+opened in its place and checked as Import checks one. It runs under the
+capabilities current firmware reports (the 32-slot action vocabulary
+`0xf79c6151`, its limits and keyboard options), held equal to what the fake
+current keyboard reports by test.
+
+Inside the session the demo is the draft's device: while `session.demo` is set,
+the state the panel answers to is the demo's (`panelState`), in which the draft's
+source is present, so the editing gates hold unchanged. What the panel is told
+is not a keyboard: `model.device` says Demo with no connection, generation or
+halves, `model.demo` says the demo is open, and the panel shows a persistent
+strip saying so. What needs a keyboard is refused in core, not only hidden:
+Apply and reviewing against the keyboard. Export saves the draft itself, since
+there is no keyboard profile to export. Reading or choosing a keyboard leaves
+the demo; with edits not exported since, the message must say the panel asked
+(`discardDemo`), or it is refused. The demo is offered only with no keyboard
+connected and no unapplied keyboard draft, and on a page that cannot reach a
+keyboard only where the host says so (`model.host.blocked.demo`).

@@ -34,6 +34,10 @@ and reads the result back to prove it.
 **Export profile** saves your whole setup as one file. **Import profile**
 restores it after the same review.
 
+No keyboard to hand? **Explore a demo** opens Ark on a complete setup with nothing
+connected. Every screen works and every edit shows up in the review; only Apply
+needs the keyboard, and Export takes what you made there to yours.
+
 ## Install
 
 It's early days: Ark runs as a VS Code extension, installed from a checkout,
