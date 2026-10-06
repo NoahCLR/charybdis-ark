@@ -810,8 +810,17 @@ this. Bare modifiers are buffered, not tapped, and claim nothing. Dual-role
 keys are claimed only where firmware advertises them: an LT() row's tap and
 layer hold on bit 17, an MT() or OSM() row's tap and modifier hold on bit 18.
 Older firmware classified those keys in QMK first, so Ark claims nothing there.
-The built-in cell is display only; setting an action in it authors the tier
-(core/model/built-in-behavior.js).
+The other hold tier also fills a cell. With no Long hold, nothing happens at
+its threshold and a release never selects it, so the press's Hold, set or
+built in, carries on as its helper runs (held, repeating, sending on release,
+or already sent at the hold threshold); the vocabulary's `holdWithoutLongHold`
+words it. With a Long hold and no Hold at all, the press stays in its tap
+window until Long hold, and a release in between sends that count's tap, set
+or built in; Ark claims this for plain keys, custom keys and macros
+(`releaseTaps`), not for layer keys (no tap once held past Tap / hold),
+pointing keys (their own hold) or bare modifiers.
+A dashed cell is display only; setting an action in it authors the tier
+(core/model/built-in-behavior.js, `impliedBranch` in webview/view/keyface.mjs).
 New behaviour editors start with no authored branches, preserving these defaults.
 Selecting a key opens its row or an unstored grid; only an action, timing override
 or anchor change creates a draft row. Previews never enter the host model's stored

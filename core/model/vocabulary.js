@@ -18,6 +18,14 @@ const VOCABULARY = Object.freeze({
         ["TAP_ON_RELEASE_AFTER_HOLD", "tap on release after hold"],
         ["REPEAT_WHILE_HELD", "repeat while held"],
     ],
+    // What a Hold does past the Long hold threshold when no Long hold is set:
+    // nothing takes over, so it carries on the way it runs.
+    holdWithoutLongHold: [
+        ["PRESS_AND_HOLD_UNTIL_RELEASE", "stays held until release"],
+        ["TAP_AT_HOLD_THRESHOLD", "already sent at hold threshold"],
+        ["TAP_ON_RELEASE_AFTER_HOLD", "still sends on release"],
+        ["REPEAT_WHILE_HELD", "keeps repeating until release"],
+    ],
     tapSends: "tap sends",
     tiers: {tap: "Tap", hold: "Hold", long: "Long hold"},
     // A behaviour's branch by how many taps start it.

@@ -13,6 +13,12 @@
 // is a fallback: held, it stays down until release, but only while the first
 // press authors neither a hold nor a long hold (`fallback`).
 //
+// A press that has a Long hold but no hold of its own stays in its tap window
+// until Long hold, so a release after Tap / hold and before Long hold still
+// sends that count's tap (`releaseTaps`). That holds for plain keys, custom
+// keys and macros. Layer keys send no tap once held past Tap / hold, pointing
+// keys hold their mode, and dual-role keys always have their own hold.
+//
 // Plain keys have done this on every firmware with a Profile Wire. Dual-role
 // keys are claimed only by firmware that advertises it: authored LT() rows since
 // physical gesture timing (Profile Wire bit 17), MT() and OSM() rows since
@@ -21,15 +27,18 @@
 // buffered rather than tapped, so it claims nothing.
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {keycodeAction} = require("../schema/actions");
+const {customKeyOfCode} = require("../data/user-keycodes");
 
 const within = (code, start, end) => code >= start && code <= end;
 const plainKey = (code) => (within(code, 0x0004, 0x00ff) && !within(code, 0x00e0, 0x00e7)) || within(code, 0x0100, 0x1fff);
 
 function builtInActions(target, {physicalGestureTiming = false, ownedTapping = false} = {}) {
+    if (target?.kind === ACTION.CUSTOM_KEY || target?.kind === ACTION.VIA_MACRO) return {releaseTaps: true};
     if (target?.kind !== ACTION.QMK_KEYCODE || !Number.isInteger(target.operand)) return {};
     const code = target.operand;
+    if (customKeyOfCode(code) !== undefined || within(code, 0x7700, 0x777f)) return {releaseTaps: true};
     if (plainKey(code)) {
-        return {tap: keycodeAction(code), hold: keycodeAction(code), fallback: true};
+        return {tap: keycodeAction(code), hold: keycodeAction(code), fallback: true, releaseTaps: true};
     }
     if (within(code, 0x4000, 0x4fff) && physicalGestureTiming) {
         return {tap: keycodeAction(code & 0xff), hold: {kind: ACTION.LAYER_MOMENTARY, operand: (code >> 8) & 0x0f}};

@@ -122,7 +122,13 @@ separate shorter gestures and the cell stays empty. On the first press, an
 `LT()` holds its layer and an `MT()` or `OSM()` its modifiers. A plain key,
 such as `-` or `Ctrl+C`, stays held down until release, unless that first
 press sets a Hold or Long hold. Shift, Ctrl, Alt and Cmd on their own show
-nothing built in. **Change key…** moves a behaviour to another
+nothing built in. An empty Long hold beside a Hold, set or built in, shows
+that the Hold carries on, since nothing takes over at Long hold: one held
+until release stays held, one that repeats keeps repeating, one that sends
+on release still sends whenever you let go, and one that fired at its
+threshold does nothing more. An empty Hold beside a Long hold shows the tap
+a release before Long hold sends, for plain keys, custom keys and macros;
+layer and pointing keys send no tap once held. **Change key…** moves a behaviour to another
 key through the keycode picker; when that key already has one, you choose to
 overwrite it, swap the two, or cancel, and either is one undoable draft step.
 On a keyboard that owns its layer keys (Profile Wire feature bit 14), a

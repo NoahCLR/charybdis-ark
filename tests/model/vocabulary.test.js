@@ -12,6 +12,7 @@ const coversNumbers = (list, values, label) => assert.deepEqual(list.map(([id]) 
 
 test("every stored enum value has a word", () => {
     covers(VOCABULARY.holdHelpers, KEY_BEHAVIOR_HOLD_MODES, "hold helpers");
+    covers(VOCABULARY.holdWithoutLongHold, KEY_BEHAVIOR_HOLD_MODES, "holds without a long hold");
     covers(VOCABULARY.localities, rgb.RGB_LOCALITIES, "localities");
     covers(VOCABULARY.paintModes, rgb.RGB_LAYER_MODES, "layer paint modes");
     covers(VOCABULARY.fadeModes, rgb.RGB_AUTOMOUSE_MODES, "auto-mouse fades");

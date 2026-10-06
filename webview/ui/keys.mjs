@@ -5,7 +5,7 @@ import {css, isOff, label as hsvLabel} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {scrollContentTo} from "../lib/scroll.mjs";
 import {LED_INDEX} from "../view/geometry.mjs";
-import {actionLabel, behaviourFor, cellLabel, inheritedBranch, behaviourListeningTo, resolvedPositions, canonicalKeycode, behaviourGridSteps, behaviourGroups, behavioursInView, behaviourRouteKeys, behaviourTiers, comboAnswers, comboGroups, combosInView, comboInputKeys, comboInputShown, combosOnKey, combosAt, keyFace, keyMeaning, keyName, macroKeycodes, macroReach, pointingReach, pointingSlotFor, pointingVariant, reachInView, reachKeys, toggleComboInput, visibleKeycode} from "../view/keyface.mjs";
+import {actionLabel, behaviourFor, cellLabel, impliedBranch, inheritedBranch, behaviourListeningTo, resolvedPositions, canonicalKeycode, behaviourGridSteps, behaviourGroups, behavioursInView, behaviourRouteKeys, behaviourTiers, comboAnswers, comboGroups, combosInView, comboInputKeys, comboInputShown, combosOnKey, combosAt, keyFace, keyMeaning, keyName, macroKeycodes, macroReach, pointingReach, pointingSlotFor, pointingVariant, reachInView, reachKeys, toggleComboInput, visibleKeycode} from "../view/keyface.mjs";
 import {feedbackColours, layerColourRow, mappedKeyCount, pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {closeComboBuilder, currentLayer, getModel, heldLayers, layerName, layers, openComboBuilder, positionAt, post, previewing, render, selectedPosition, showLayer, state, writable, canEdit as canEditArea} from "../store.mjs";
 import * as edits from "../view/edits.mjs";
@@ -480,6 +480,25 @@ function behaviourEditor(behaviour) {
                 <span class="bk named">${esc(label)}</span>
                 <span class="bl">${esc(["built in", `${helperLabel(kind, inherited.helper)}${times}`].join(" · "))}</span></button>`;
         }
+        const implied = !branch && impliedBranch(behaviour, step, kind);
+        if (implied?.meaning === "continues") {
+            // Past Long hold the Hold carries on; one that fired at its own
+            // threshold has nothing left to do.
+            const {hold} = implied;
+            const label = hold.helper === "TAP_AT_HOLD_THRESHOLD" ? "Nothing more" : cellLabel(model, hold);
+            return `<button class="bcell inherited ${open ? "on" : ""}" data-cell="${id}"
+                data-tip="No Long hold is set, so nothing takes over at its threshold: the Hold carries on. Set an action here to add a Long hold.">
+                <span class="bk named">${esc(label)}</span>
+                <span class="bl">${esc([tierName(model, "hold"), word(vocabulary(model).holdWithoutLongHold, hold.helper)].join(" · "))}</span></button>`;
+        }
+        if (implied?.meaning === "tapsBeforeLong") {
+            const {tap} = implied;
+            const times = tap.times ? ` ×${tap.times}` : "";
+            return `<button class="bcell inherited ${open ? "on" : ""}" data-cell="${id}"
+                data-tip="No Hold is set: let go after Tap / hold but before Long hold and the key sends its tap. Set an action here to add a Hold.">
+                <span class="bk named">${esc(cellLabel(model, tap))}</span>
+                <span class="bl">${esc(["released before Long hold", `${helperLabel("tap", tap.helper)}${times}`].join(" · "))}</span></button>`;
+        }
         if (!branch) return `<button class="bcell empty ${open ? "on" : ""}" data-cell="${id}"><span class="plus">+</span></button>`;
         // The grid reads by name; the keycode is on hover and in the editor.
         const label = cellLabel(model, branch);
@@ -489,6 +508,8 @@ function behaviourEditor(behaviour) {
             <span class="bl">${esc([sendsKind(model, branch.action), helperLabel(kind, branch.helper)].filter(Boolean).join(" · "))}</span></button>`;
     };
 
+    const dashed = steps.some((step) => ["tap", "hold", "long"].some((kind) => !step[TIER_FIELDS[kind]]
+        && (inheritedBranch(behaviour, step, kind) || impliedBranch(behaviour, step, kind))));
     const node = el(`<div>
         <div class="beh-head">
             <div>
@@ -524,7 +545,7 @@ function behaviourEditor(behaviour) {
                 ${["tap", "hold", "long"].map((kind) => cellFor(step, kind)).join("")}`).join("")}
         </div>
         <div id="cellEditor"></div>
-        <p class="note" style="margin-top:12px">Every cell is one action: what it sends, and how it runs once its threshold passes. Empty cells are dropped when the profile is applied.${Object.keys(behaviour.builtIn || {}).length ? " A built-in cell is what the key does on its own; it is not stored, and setting an action there replaces it." : ""}</p>
+        <p class="note" style="margin-top:12px">Every cell is one action: what it sends, and how it runs once its threshold passes. Empty cells are dropped when the profile is applied.${dashed ? " A dashed cell is what the keyboard does there with nothing set: the key's own action, or the other hold tier carrying on. It is not stored, and setting an action there replaces it." : ""}</p>
     </div>`);
 
     node.querySelectorAll("[data-cell]").forEach((button) => button.addEventListener("click", () => {

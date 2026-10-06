@@ -432,6 +432,28 @@ export function inheritedBranch(behaviour, step, kind) {
     return null;
 }
 
+// What an empty Hold or Long hold does because of the other hold tier
+// (core/model/built-in-behavior.js). With no Long hold, nothing takes over at
+// its threshold, so the press's Hold, set or built in, carries on the way it
+// runs: `continues`. With a Long hold and no Hold of any kind, the press stays
+// in its tap window until Long hold, so a release in between sends the tap
+// that count would send, set or built in, on keys whose tap survives a hold
+// (`releaseTaps`): `tapsBeforeLong`. Otherwise the cell is simply empty.
+export function impliedBranch(behaviour, step, kind) {
+    if (!step || !Number.isInteger(step.tapCount)) return null;
+    if (kind === "long") {
+        if (step.longHold) return null;
+        const hold = step.hold || inheritedBranch(behaviour, step, "hold");
+        return hold ? {meaning: "continues", hold} : null;
+    }
+    if (kind === "hold") {
+        if (step.hold || !step.longHold || !behaviour?.builtIn?.releaseTaps || inheritedBranch(behaviour, step, "hold")) return null;
+        const tap = step.tap || inheritedBranch(behaviour, step, "tap");
+        return tap ? {meaning: "tapsBeforeLong", tap} : null;
+    }
+    return null;
+}
+
 // Whether this key is one of a combo's inputs. The keyboard reports per-layer
 // input references only when its firmware tracks them, so this falls back to
 // the keycodes themselves — and everything that answers "is this combo on this

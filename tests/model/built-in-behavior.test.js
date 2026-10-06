@@ -20,7 +20,7 @@ test("dual-role keys fill an empty tap and first hold with their own meaning", (
 
 test("a plain key taps itself and holds itself down as a fallback, on every firmware", () => {
     for (const code of [0x04, 0x2d, 0xa8, 0xff, 0x021e, 0x0106, 0x1fff]) {
-        assert.deepEqual(builtInActions(key(code)), {tap: key(code), hold: key(code), fallback: true}, `0x${code.toString(16)}`);
+        assert.deepEqual(builtInActions(key(code)), {tap: key(code), hold: key(code), fallback: true, releaseTaps: true}, `0x${code.toString(16)}`);
         assert.deepEqual(builtInActions(key(code), both), builtInActions(key(code)), "no feature changes a plain key");
     }
 });
@@ -32,8 +32,15 @@ test("a dual-role built-in action is claimed only by firmware that advertises it
     assert.deepEqual(builtInActions(key(0x2a16)), {});
 });
 
+test("custom keys and macros keep their tap when released before a long hold, and claim nothing else", () => {
+    for (const target of [{kind: ACTION.CUSTOM_KEY, operand: 0}, {kind: ACTION.VIA_MACRO, operand: 3}, key(0x7e40), key(0x7e7f), key(0x7700), key(0x777f)]) {
+        assert.deepEqual(builtInActions(target, both), {releaseTaps: true});
+    }
+    assert.equal(builtInActions(key(0x4338), both).releaseTaps, undefined, "a dual-role key always has its own hold");
+});
+
 test("bare modifiers, other key families and non-keycode targets inherit nothing", () => {
-    const others = [key(0x00), key(0x01), key(0x03), key(0xe0), key(0xe3), key(0xe7), key(0x5223), key(0x5310), key(0x7e00),
+    const others = [key(0x00), key(0x01), key(0x03), key(0xe0), key(0xe3), key(0xe7), key(0x5223), key(0x5310), key(0x7e00), key(0x7e80), key(0x7ec0),
         {kind: ACTION.LAYER_MOMENTARY, operand: 3}, {kind: ACTION.PD_MODE_MOMENTARY, operand: 0}, undefined];
     for (const target of others) assert.deepEqual(builtInActions(target, both), {});
 });
