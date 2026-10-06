@@ -248,8 +248,8 @@ it had. The project name is the workflow's `PAGES_PROJECT`.
 
 | Branch | Where it goes |
 | --- | --- |
-| `dev` | a preview deployment, at `https://dev.charybdis-ark.pages.dev`, for testing |
-| `main` | the production deployment, at the custom domain (and `charybdis-ark.pages.dev`) |
+| `dev` | a preview deployment, at `https://ark-dev.ncleroy.dev` (and `dev.charybdis-ark.pages.dev`), for testing |
+| `main` | the production deployment, at `https://ark.ncleroy.dev` (and `charybdis-ark.pages.dev`) |
 
 The workflow has `contents: read` only, never runs on pull requests, and
 publishes one run at a time per branch (a newer push waits; an upload is never
@@ -280,8 +280,13 @@ immutable. Pages joins a header named by two matching rules, so nothing sets
    `npx wrangler pages project create charybdis-ark --production-branch=main`,
    or in the dashboard Workers & Pages, Create, Pages, *Upload assets*. Any
    other name works if `PAGES_PROJECT` in the workflow says the same.
-2. Add the custom domain `ark.ncleroy.dev` to the project, under Custom
-   domains. `README.md` gives this address.
+2. Add the custom domains `ark.ncleroy.dev` and `ark-dev.ncleroy.dev` to the
+   project, under Custom domains, and wait for both to show Active (until then
+   Pages answers 522). `README.md` gives the first. Then, in the `ncleroy.dev`
+   zone's DNS, change the `ark-dev` CNAME's target to
+   `dev.charybdis-ark.pages.dev` and keep it proxied. A branch's own domain
+   works only through a proxied record in a zone on Cloudflare; with other DNS,
+   or unproxied, it serves the production page instead.
 3. Create an API token with only *Account, Cloudflare Pages, Edit*, for this
    account.
 4. In GitHub (Settings, Secrets and variables, Actions), add the token as

@@ -1,8 +1,8 @@
 name: Publish the web page
 
 # Publishes the web page (D-L52) to Cloudflare Pages: dev to the preview
-# address dev.<project>.pages.dev, main (a release) to the production branch
-# and its custom domain. It is D-L51's one exception, the only workflow that
+# address ark-dev.ncleroy.dev, main (a release) to the production branch and
+# ark.ncleroy.dev. It is D-L51's one exception, the only workflow that
 # runs on dev pushes: its browser test gates this publish and nothing else, and
 # it is never a required check. Each run builds the page, tests the built files
 # in Chrome, checks they are static files only, and only then uploads them.
