@@ -30,9 +30,9 @@ const share = (macro, id, of, label, hint) => ({macro, id, of, label, hint, kind
 // layer — so every surface that shows the setting can mark it the same way.
 const sections = [
     {id: "keyTiming", label: "Tap & Hold Timing", fields: [
-        number("tappingTerm", 0, "Dual-role tap / hold", "How long LT(), MT(), TT(), OSL() and OSM() keys wait before a press counts as a hold (QMK's tapping term). LT() behaviours with empty tap / hold timing use it too; other behaviours use Behaviour tap / hold."),
-        number("tapHoldTerm", 1, "Behaviour tap / hold", "Used when a behaviour leaves its tap / hold timing empty.", {governs: {kind: "tier", tier: "hold"}}),
-        number("longerHoldTerm", 2, "Long hold", "Used when a behaviour leaves its long-hold timing empty.", {governs: {kind: "tier", tier: "long"}}),
+        number("tappingTerm", 0, "Dual-role tap / hold threshold", "How long LT(), MT(), TT(), OSL() and OSM() keys wait before a press counts as a hold (QMK's tapping term). LT() behaviours with an empty Tap / hold threshold use it too; other behaviours use the Behaviour tap / hold threshold."),
+        number("tapHoldTerm", 1, "Behaviour tap / hold threshold", "Used when a behaviour leaves its Tap / hold threshold empty.", {governs: {kind: "tier", tier: "hold"}}),
+        number("longerHoldTerm", 2, "Long hold threshold", "Used when a behaviour leaves its Long hold threshold empty.", {governs: {kind: "tier", tier: "long"}}),
         number("multiTapTerm", 3, "Repeated taps", "Maximum gap between repeated taps when a behaviour has no override.", {governs: {kind: "branch", count: 2}}),
     ]},
     {id: "normalPointerSpeed", label: "Pointer Speed", area: "Mouse", fields: [

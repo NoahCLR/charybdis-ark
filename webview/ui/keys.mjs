@@ -446,7 +446,7 @@ function tabBehaviours(body, right) {
 // reports and Settings · Tap & Hold Timing edits — so the note names both.
 function timingDefaultsNote(behaviour) {
     const defaults = behaviour.timingDefaults;
-    const values = [["multi tap window", defaults.multiTapTerm], ["tap / hold", defaults.tapHoldTerm], ["long hold", defaults.longerHoldTerm]]
+    const values = [["multi tap window", defaults.multiTapTerm], ["tap / hold threshold", defaults.tapHoldTerm], ["long hold threshold", defaults.longerHoldTerm]]
         .filter(([, value]) => String(value ?? "").trim() !== "")
         .map(([name, value]) => `${name} ${value} ms`);
     return values.length
@@ -526,7 +526,7 @@ function behaviourEditor(behaviour) {
             </div>` : ""}
         </div>
         <div class="beh-intro">
-            <p class="note">Multi tap window is the time allowed from releasing the key to pressing it again. Tap / hold separates a tap from a hold. Double hold means press, release, then press and keep holding.</p>
+            <p class="note">Multi tap window is the time allowed from releasing the key to pressing it again. The Tap / hold threshold separates a tap from a hold. Double hold means press, release, then press and keep holding.</p>
             <label class="sw" data-tip="Treat this row as a mouse gesture, so pressing it keeps the pointer layer up instead of letting auto-mouse reset.">
                 <input type="checkbox" data-anchor ${behaviour.keepsAutoMouseAnchored ? "checked" : ""} ${canEdit ? "" : "disabled"}>
                 <span class="track"></span><span class="txt">Keeps auto-mouse anchored</span></label>

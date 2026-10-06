@@ -36,9 +36,9 @@ test("default timing edits move matching behaviours, report inherited effects, a
     assert.equal(row("KC_E").longerHoldTerm, "633", "custom timing stays fixed");
     assert.equal(row("LT(3,KC_F)").longerHoldTerm, "0");
     const changes = draft.changes(), setting = changes.find(entry => entry.unit === "settings:keyTiming");
-    const effect = setting.fields.find(field => field.label === "Q · Long hold");
+    const effect = setting.fields.find(field => field.label === "Q · Long hold threshold");
     assert.deepEqual([effect.before, effect.after], [`default · ${defaults[2]} ms`, "default · 500 ms"]);
-    assert.ok(!setting.fields.some(field => field.label === "E · Long hold"));
+    assert.ok(!setting.fields.some(field => field.label === "E · Long hold threshold"));
     const q = changes.find(entry => entry.place?.keycode === "KC_Q");
     assert.notEqual(q.group, setting.group, "the anchor edit is independent of inherited timing effects");
     const w = changes.find(entry => entry.place?.keycode === "KC_W");
@@ -126,7 +126,7 @@ test("the history lists every step, when it was made, and what it changed from t
     assert.match(field.before,/one/,"the last step compares with the draft before it, not the keyboard");
     assert.match(field.after,/two/);
     assert.deepEqual(new Set(steps[2].changes.map(row=>row.area)),new Set(["Settings", "Behaviours"]),"a default edit includes explicit matching timings converted to inheritance");
-    assert.ok(steps[2].changes.filter(row=>row.area==="Behaviours").every(row=>row.fields.length === 1 && row.fields[0].label === "Tap / hold" && row.fields[0].after === "default · 175 ms"));
+    assert.ok(steps[2].changes.filter(row=>row.area==="Behaviours").every(row=>row.fields.length === 1 && row.fields[0].label === "Tap / hold threshold" && row.fields[0].after === "default · 175 ms"));
     assert.deepEqual(steps.map(entry=>entry.current),[false,false,false,true]);
 
     draft.jump(draft.revision,1);

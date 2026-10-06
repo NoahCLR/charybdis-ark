@@ -32,12 +32,12 @@ function gestureTimingFindings(decoded) {
             if (releaseHoldUnreachable(step, terms)) {
                 add(`release:${step.tapIndex}`, `${branch} hold cannot send its release action`,
                     `Hold needs a release at or after ${terms.hold} ms, but Long hold takes precedence on release from ${terms.long} ms. There is no release time that selects ${actionName(step.hold.action)}.`,
-                    "Set Long hold later than Tap / hold, or change one of the actions or how it runs.");
+                    "Set the Long hold threshold later than the Tap / hold threshold, or change one of the actions or how it runs.");
             } else if (step.longHold && Number.isInteger(terms.long) && Number.isInteger(terms.hold)) {
                 const gap = terms.long - terms.hold;
                 if (gap <= 0) add(`order:${step.tapIndex}`, `${branch} hold thresholds overlap`,
-                    `Long hold is ${terms.long} ms and Tap / hold is ${terms.hold} ms. Which actions run also depends on their hold modes, input delivery and scan order; the normal Hold-then-Long-hold progression is not available.`,
-                    "Put Long hold after Tap / hold for distinct tiers. This warning does not claim both actions are impossible.");
+                    `The Long hold threshold is ${terms.long} ms and the Tap / hold threshold is ${terms.hold} ms. Which actions run also depends on their hold modes, input delivery and scan order; the normal Hold-then-Long-hold progression is not available.`,
+                    "Put the Long hold threshold after the Tap / hold threshold for distinct tiers. This warning does not claim both actions are impossible.");
                 else if (step.hold && gap < SHORT_WINDOW_MS) add(`narrow:${step.tapIndex}`, `${branch} has a narrow hold interval`,
                     `Only ${gap} ms separates Hold (${terms.hold} ms) from Long hold (${terms.long} ms). Selecting or using just the first tier may be difficult.`,
                     "Increase the gap if you need to select Hold separately. The 50 ms advisory threshold is a comfort heuristic, not a firmware limit.", "notice");
