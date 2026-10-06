@@ -19,7 +19,6 @@ const {resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../data/charybdis-layout");
 const keycodes = require("../data/keycode-catalog");
 const {PROFILE_WIRE_FEATURES} = require("../protocol/profile-wire-v1");
-const {randomUUID} = require("node:crypto");
 const copy = value => JSON.parse(JSON.stringify(value));
 // History entries are frozen: they are handed out by reference, decoded once
 // and kept, so nothing may edit one in place.
@@ -90,7 +89,8 @@ class ProfileDraftSession {
         this.connectionToken = connectionToken ?? null;
         this.latestConnectionToken = this.connectionToken;
         this.connectionChanged = false;
-        this.id = randomUUID();
+        // Web Crypto, which Node and the browser both have, so one line serves both hosts.
+        this.id = globalThis.crypto.randomUUID();
         this.capabilities = copy(capabilities);
         this.base = copy(snapshot);
         this.latest = copy(snapshot);

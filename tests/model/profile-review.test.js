@@ -91,7 +91,7 @@ test("a behaviour lists only the fields that changed, in the editor's words", ()
     const after=snapshot(behaviours(base,rows=>rows.map(row=>JSON.stringify(row.target)===JSON.stringify(target)?{...row,tapHoldTerm:180}:row)));
     const [item]=profileReview(before,after);
     assert.equal(item.status,"changed");
-    assert.deepEqual(item.fields,[{label:"Tap / hold",status:"changed",before:`default · ${validateSnapshot(base).settings.values[1]} ms`,after:"180 ms",
+    assert.deepEqual(item.fields,[{label:"Tap / hold threshold",status:"changed",before:`default · ${validateSnapshot(base).settings.values[1]} ms`,after:"180 ms",
         labelMark:{kind:"tier",tier:"hold"}}], "the tiers that did not change are not repeated, and the timing is marked with the tier it decides");
 });
 test("a removed behaviour is marked removed and lists what it held, without its defaults", () => {
@@ -122,7 +122,7 @@ test("changing a default lists inherited effective times under its settings item
     assert.deepEqual([items[0].fields[0].before,items[0].fields[0].after],[String(validateSnapshot(base).settings.values[1]),"175"]);
     const expected = validateSnapshot(base).behaviors.rows.filter(row => !row.tapHoldTerm && !(row.target.kind === 1 && row.target.operand >= 0x4000 && row.target.operand <= 0x4fff));
     assert.equal(items[0].fields.length, expected.length + 1);
-    assert.ok(items[0].fields.slice(1).every(field => field.before === "default · 150 ms" && field.after === "default · 175 ms" && field.label.endsWith(" · Tap / hold")));
+    assert.ok(items[0].fields.slice(1).every(field => field.before === "default · 150 ms" && field.after === "default · 175 ms" && field.label.endsWith(" · Tap / hold threshold")));
     assert.match(items[0].note, new RegExp(`^${expected.length} behaviours follow`));
 });
 test("renaming a layer does not read as a change to the settings that name it", () => {
@@ -220,6 +220,26 @@ test("an eight-direction mode reads as eight directions, and lists its diagonals
     const axis=item.fields.find(field=>field.label==="Axes");
     assert.equal(axis.after,"Eight directions","not undefined");
     assert.ok(item.fields.some(field=>field.label==="Up-left"),"the diagonals it now reads are listed");
+});
+
+test("a mode switched to once per movement says so in the review", () => {
+    const base=pdDocument(), before=snapshot(base), slots=validateSnapshot(base).pdModes;
+    const directional=slots.findIndex(slot=>slot.kind===1);
+    const after=snapshot(withDomain(base,80,decodePdDomain,encodePdDomain,modes=>modes.map((mode,id)=>id===directional?{...mode,directionOutput:1}:mode)));
+    const [item]=profileReview(before,after);
+    const output=item.fields.find(field=>field.label==="How often it sends");
+    assert.equal(output.before,"Every step");
+    assert.equal(output.after,"Once per movement");
+});
+
+test("a scrolling mode limited to one axis says so in the review", () => {
+    const base=pdDocument(), before=snapshot(base), slots=validateSnapshot(base).pdModes;
+    const scrolling=slots.findIndex(slot=>slot.kind===2);
+    const after=snapshot(withDomain(base,80,decodePdDomain,encodePdDomain,modes=>modes.map((mode,id)=>id===scrolling?{...mode,axis:2}:mode)));
+    const [item]=profileReview(before,after);
+    const axes=item.fields.find(field=>field.label==="Scrolls");
+    assert.equal(axes.before,"Both axes");
+    assert.equal(axes.after,"Vertical only");
 });
 
 test("a reorder that makes a new base names it first, and says which layer left the base", () => {

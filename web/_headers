@@ -1,0 +1,22 @@
+# What Cloudflare Pages sends with the published page, written into
+# dist/web/_headers by scripts/build-web.js. It fills in the page's policy as
+# its <meta> tag carries it, with frame-ancestors, which only a header can set,
+# and one rule for each content-hashed file it wrote.
+#
+# A header named in two matching rules is sent with both values joined, so
+# Cache-Control is set by exact paths only, never under /*.
+
+/*
+  Content-Security-Policy: {{csp}}
+  Permissions-Policy: hid=(self)
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+
+# The page names this release's files, so it is asked for afresh every load.
+/
+  Cache-Control: no-cache
+/index.html
+  Cache-Control: no-cache
+
+# A hashed file's name changes with its content, so it is cached for good.
+{{hashed}}

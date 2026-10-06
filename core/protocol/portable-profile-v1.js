@@ -63,13 +63,15 @@ async function readSettingsLimits(connection, ids) {
     if (bytes.length !== 2 || bytes[0] !== 1) throw fail("Unsupported keyboard settings limits.");
     return {brightnessMax: bytes[1]};
 }
-async function waitForStorage(connection, ids, {timeoutMs = 90000, pollMs = 150} = {}) {
+const defaultSleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+// `sleep` waits between polls; a host whose timers are throttled passes its own.
+async function waitForStorage(connection, ids, {timeoutMs = 90000, pollMs = 150, sleep = defaultSleep} = {}) {
     const deadline = Date.now() + timeoutMs;
     do {
         const status = await readStorageStatus(connection, ids);
         if (status.ready) return status;
         if (status.conflicts || (status.flags & 2)) throw fail("The halves need storage recovery before restoring a profile.");
-        await new Promise(resolve => setTimeout(resolve, pollMs));
+        await sleep(pollMs);
     } while (Date.now() < deadline);
     throw fail("The two halves have not finished saving. Keep the recovery file and reconnect both halves.");
 }

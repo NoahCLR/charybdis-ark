@@ -7,17 +7,22 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
-import {AXIS, BUTTON, KIND} from "../webview/view/pointing-config.mjs";
+import {AXIS, BUTTON, KIND, MODIFIER_POLICY, SCROLL_AXES} from "../webview/view/pointing-config.mjs";
 import {MODIFIER_BITS} from "../webview/view/keyvalues.mjs";
 import {TIER_FIELDS} from "../webview/view/edits.mjs";
+import {PD_MODE_IDS} from "../webview/view/lighting.mjs";
 
 const require = createRequire(import.meta.url);
 const pd = require("../core/schema/pd-mode-domain-v1");
 const {VOCABULARY} = require("../core/model/vocabulary");
+const {RGB_PD_MODE_IDS} = require("../core/schema/rgb-domain-v1");
+const {PD_SLOT_CAPACITY} = require("../core/data/pd-bindings");
 
 test("the webview's pointing numbers are the schema's", () => {
     assert.deepEqual(KIND, {DIRECTIONAL: pd.PD_KIND.DIRECTIONAL, SCROLLING: pd.PD_KIND.SCROLLING});
     assert.deepEqual(AXIS, {VERTICAL: pd.PD_AXIS.VERTICAL, HORIZONTAL: pd.PD_AXIS.HORIZONTAL, DOMINANT: pd.PD_AXIS.DOMINANT, EIGHT: pd.PD_AXIS.EIGHT});
+    assert.deepEqual(SCROLL_AXES, {...pd.PD_SCROLL_AXES});
+    assert.deepEqual(MODIFIER_POLICY, {...pd.PD_MODIFIERS});
     assert.deepEqual(BUTTON, {PASS_THROUGH: pd.PD_BUTTON.PASS_THROUGH, CONSUME: pd.PD_BUTTON.CONSUME, TAP: pd.PD_BUTTON.TAP, HOLD_MODIFIERS: pd.PD_BUTTON.HOLD_MODIFIERS});
 });
 
@@ -27,4 +32,10 @@ test("the webview's modifier bits and names are the vocabulary's", () => {
 
 test("the webview's tiers are the vocabulary's", () => {
     assert.deepEqual(Object.keys(TIER_FIELDS).sort(), Object.keys(VOCABULARY.tiers).sort());
+});
+
+test("the webview names every pointing slot's lighting row as the RGB schema does", () => {
+    assert.equal(PD_MODE_IDS.length, PD_SLOT_CAPACITY);
+    assert.deepEqual(PD_MODE_IDS.map((name) => RGB_PD_MODE_IDS[name]), PD_MODE_IDS.map((_, id) => id));
+    assert.equal(Object.keys(RGB_PD_MODE_IDS).length, PD_SLOT_CAPACITY);
 });

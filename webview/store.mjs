@@ -3,8 +3,10 @@
 // the host, which answers with a new model. The draft lives on that side too,
 // so what is drawn is always what would be applied.
 
+import {behaviourKeyAt, behaviourRowAfterPreview} from "./view/behavior-editor.mjs";
 import {layersOn, toggleLayer} from "./view/layer-set.mjs";
 import {initialReachGroups} from "./view/reach-groups.mjs";
+import {demoOf, leaving} from "./view/demo.mjs";
 
 const vscode = acquireVsCodeApi();
 
@@ -48,6 +50,7 @@ export const state = {
     pdSlot: 0,
     pdKind: null,      // movement selection while the rebuilt form catches up: {slot, kind}
     pdButtons: null,   // {slot, rows: {index: override}}: button overrides whose kind is chosen but not yet its shortcut or modifiers
+    pdTaps: null,      // {slot, rows: {"dir:up": tap}}: direction shortcuts set to ignore modifiers before any is chosen
     pdAdvanced: false,  // Advanced open on the pointing editor, whichever slot is shown
     applyDismissed: 0,  // the failed Apply (by id) the person closed, so it stays closed
     pdPreview: false,
@@ -69,6 +72,7 @@ export const state = {
     ledRow: {target: "layer", owner: "", source: ""}, // the LED group row being built, kept across renders
     settingsSearch: "",
     overlay: null,
+    leaveDemo: null,     // {ask, message}: leaving the demo (or replacing its file) waiting on its question
     confirmChecks: null, // the draft revision whose checks Apply is asking about
     picker: null,
     notice: "",
@@ -112,6 +116,7 @@ export function resetDraftForms() {
     state.lastTake = null;
     state.pdKind = null;
     state.pdButtons = null;
+    state.pdTaps = null;
     state.retarget = null;
     closeComboBuilder();
 }
@@ -141,9 +146,14 @@ export function showLayer(index) {
     state.layersOn = [];
 }
 export function toggleLayerOn(index) {
+    const selectedKey = () => behaviourKeyAt(layers(), state.layer, heldLayers(), selectedPosition()?.layoutIndex).keycode;
+    const before = selectedKey();
     const next = toggleLayer(state.layer, heldLayers(), index);
     state.layer = next.top;
     state.layersOn = next.on;
+    const row = behaviourRowAfterPreview(state.behaviourRow, before, selectedKey());
+    if (row === state.behaviourRow) return;
+    Object.assign(state, {behaviourRow: row, behaviourRoute: {row, group: "view"}, cell: null, cellHow: null});
 }
 export const layerName = (layer) => layer?.displayName || layer?.name || "";
 export const positionAt = (layer, index) =>
@@ -152,8 +162,23 @@ export const selectedPosition = () => positionAt(currentLayer(), state.selected)
     || (currentLayer()?.positions || [])[0];
 
 // Editing is only offered where the keyboard says it is possible; everywhere
-// else the control stays visible and disabled, with the reason.
-export const writable = () => Boolean(getModel()?.draft?.matching && !getModel()?.draft.stale && !getModel()?.draft.busy && getModel()?.device?.connected);
+// else the control stays visible and disabled, with the reason. The demo's
+// draft has no keyboard, and is editable all the same (core/session/demo-session.js).
+export const writable = () => Boolean(getModel()?.draft?.matching && !getModel()?.draft.stale && !getModel()?.draft.busy
+    && (getModel()?.device?.connected || demoOf(getModel()).active));
+
+// Posts a message that leaves the demo (or replaces its file), asking first
+// when that would lose edits not exported (view/demo.mjs leaving()).
+export function postLeavingDemo(message) {
+    const leave = leaving(getModel(), message);
+    if (!leave.ask) {
+        post(leave.message);
+        return;
+    }
+    state.leaveDemo = leave;
+    state.overlay = "leaveDemo";
+    render();
+}
 
 // Whether an area can be edited now, decided in one place: every edit goes
 // into the draft, so the draft must be this keyboard's, current and idle, and

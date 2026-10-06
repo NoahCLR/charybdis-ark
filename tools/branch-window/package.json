@@ -1,0 +1,25 @@
+{
+  "name": "charybdis-ark-branch",
+  "displayName": "Charybdis Ark Branch",
+  "description": "Developer tool: open Charybdis Ark from any of its branches in a new window.",
+  "publisher": "noah",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "main": "./extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "charybdisArkBranch.open",
+        "title": "Open Charybdis Ark from a branch",
+        "category": "Charybdis"
+      }
+    ]
+  }
+}

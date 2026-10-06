@@ -7,8 +7,10 @@
 import {el, esc} from "./lib/dom.mjs";
 import {captureContentScroll, captureKeysBenchHeight, revealSelectedContentRow, restoreContentScroll, restoreKeysBenchHeight} from "./lib/scroll.mjs";
 import {activateOnKey, captureFocus, focusDialog, restoreFocus, trapTab} from "./lib/focus.mjs";
-import {closeComboBuilder, getModel, layerName, post, render as rerender, resetDraftForms, setModel, setRenderer, state, writable} from "./store.mjs";
+import {closeComboBuilder, getModel, layerName, post, postLeavingDemo, render as rerender, resetDraftForms, setModel, setRenderer, state, writable} from "./store.mjs";
 import {historyAction} from "./view/edits.mjs";
+import {chooseKeyboard, hostOf, otherTheme, setTheme} from "./view/host.mjs";
+import {DEMO_WORDS, demoOf, leaveDemo, openDemo, openDemoProfile} from "./view/demo.mjs";
 import {readScreen, screenAvailable} from "./view/readiness.mjs";
 import {discardLabel, groupNote, placeState, reviewBlocks, statusSummary, stillShown} from "./view/review.mjs";
 import {bindLayerIndex, hideHover, mountHover} from "./ui/hover.mjs";
@@ -44,11 +46,17 @@ const SCREENS = {
     profile: screenProfile,
 };
 
+const kv = (rows) => `<dl class="kv" style="grid-template-columns:170px 1fr">${rows
+    .map(([key, value]) => `<dt>${esc(key)}</dt><dd>${esc(value ?? "—")}</dd>`).join("")}</dl>`;
+const whatWasRead = (model) => `<div class="card"><div class="card-h"><h3>What was read</h3></div>
+    <div class="list">${(model?.diagnostics || []).map((note) =>
+        `<div class="list-row" style="grid-template-columns:1fr"><span class="note">${esc(note)}</span></div>`).join("")
+        || `<div class="list-row"><span class="note">Nothing has been read yet.</span></div>`}</div></div>`;
+
 function screenDevice() {
     const model = getModel();
+    if (demoOf(model).active) return screenDemoDevice(model);
     const device = model?.device || {};
-    const kv = (rows) => `<dl class="kv" style="grid-template-columns:170px 1fr">${rows
-        .map(([key, value]) => `<dt>${esc(key)}</dt><dd>${esc(value ?? "—")}</dd>`).join("")}</dl>`;
     const main = el(`<div class="main">${topbar(
         "Device",
         "What the keyboard says about itself. Everything this app shows comes from here — it never reads a firmware repository.",
@@ -71,12 +79,39 @@ function screenDevice() {
                         ["Draft", model?.draft ? `${model.draft.changes.length} change${model.draft.changes.length === 1 ? "" : "s"}` : "none"],
                     ])}</div></div>
             </div>
-            <div class="card"><div class="card-h"><h3>What was read</h3></div>
-                <div class="list">${(model?.diagnostics || []).map((note) =>
-                    `<div class="list-row" style="grid-template-columns:1fr"><span class="note">${esc(note)}</span></div>`).join("")
-                    || `<div class="list-row"><span class="note">Nothing has been read yet.</span></div>`}</div></div>
+            ${whatWasRead(model)}
         </div></div></div>`);
     main.querySelector('[data-act="read"]').addEventListener("click", () => post({type: "refresh"}));
+    return main;
+}
+
+// The Device screen in the demo: what stands in for a keyboard, and that it
+// is not one. Reading a keyboard from here leaves the demo, asking first.
+function screenDemoDevice(model) {
+    const device = model?.device || {}, demo = demoOf(model);
+    const main = el(`<div class="main">${topbar(
+        "Device",
+        "No keyboard is connected. The demo stands in for one running current firmware, so every screen works; nothing here reaches a keyboard.",
+        `<button class="btn" data-act="read" ${device.health?.busy ? "disabled" : ""}>Read from keyboard</button>`,
+    )}
+        <div class="content"><div class="pad" style="max-width:940px;display:grid;gap:14px">
+            <div class="grid2">
+                <div class="card"><div class="card-h"><h3>Connection</h3>
+                    <span class="right"><span class="chip"><i class="dot demo"></i>no keyboard</span></span></div>
+                    <div class="card-b">${kv([
+                        ["Product", device.label],
+                        ["Status", device.subtitle],
+                    ])}</div></div>
+                <div class="card"><div class="card-h"><h3>Demo setup</h3>
+                    <span class="right"><span class="chip"><i class="dot demo"></i>demo</span></span></div>
+                    <div class="card-b">${kv([
+                        ["Opened", demo.fileName || demo.name],
+                        ["Draft", model?.draft ? `${model.draft.changes.length} change${model.draft.changes.length === 1 ? "" : "s"}` : "none"],
+                    ])}</div></div>
+            </div>
+            ${whatWasRead(model)}
+        </div></div></div>`);
+    main.querySelector('[data-act="read"]').addEventListener("click", () => postLeavingDemo({type: "refresh"}));
     return main;
 }
 
@@ -104,7 +139,8 @@ function reviewOverlay() {
     const item = (entry, index, discard, titleSlot, source) => reviewItem(model, entry, {discard, titleSlot, sourceLabel: source,
         show: stillShown(entry) && placeState(entry.place, model.layers) ? `<button class="btn tiny ghost" data-show="${index}"
             data-tip="Close the review and open this where it is edited.">Show</button>` : ""});
-    const columns = reviewColumns("What changes", "On the keyboard", "In your draft");
+    const demo = demoOf(model);
+    const columns = reviewColumns("What changes", demo.active ? "In the demo setup" : "On the keyboard", "In your draft");
     const discardable = draft.changes.every((change) => Number.isInteger(change.group));
     const shown = [];
     const sections = reviewBlocks(draft.changes).map(({area, blocks, count}) => `<section class="rv-sect">
@@ -146,9 +182,13 @@ function reviewOverlay() {
         <div class="sheet-b rv">
             ${checks}
             ${sections}
-            <div style="padding:14px 18px 18px"><div class="callout warn">Apply writes a recovery copy, stages the changed blocks on both halves, then publishes one generation. The keyboard keeps running its saved profile until both halves confirm. If it is interrupted, the recovery copy restores it.</div></div>
+            <div style="padding:14px 18px 18px"><div class="callout warn">${demo.active ? esc(demo.applyNeedsKeyboard)
+                : "Apply writes a recovery copy, stages the changed blocks on both halves, then publishes one generation. The keyboard keeps running its saved profile until both halves confirm. If it is interrupted, the recovery copy restores it."}</div></div>
         </div>
-        ${confirming ? `<div class="sheet-f ck-confirm ${hasTrap ? "trap" : "warning"}" role="alertdialog" aria-label="Confirm profile checks">
+        ${demo.active ? `<div class="sheet-f demo-apply"><span class="note"><i class="dot demo"></i> ${esc(DEMO_WORDS.status)}</span>
+            <span class="right"><button class="btn" data-act="close">Keep editing</button>
+                <button class="btn primary" data-act="export">Export…</button></span></div>`
+        : confirming ? `<div class="sheet-f ck-confirm ${hasTrap ? "trap" : "warning"}" role="alertdialog" aria-label="Confirm profile checks">
             <span class="ck-confirm-t"><i class="dot ${hasTrap ? "err" : "warn"}"></i>${esc(confirmText(confirmChecks))}</span>
             <span class="right"><button class="btn" data-act="unconfirm">Go back</button>
                 <button class="btn primary" data-act="apply-anyway" ${canApply ? "" : "disabled"}>Apply anyway</button></span></div>`
@@ -165,6 +205,10 @@ function reviewOverlay() {
         button.addEventListener("mouseleave", () => parts.forEach((part) => part.classList.remove("lit")));
     });
     node.addEventListener("click", (event) => {
+        if (event.target.closest('[data-act="export"]')) {
+            post({type: "exportPortableProfile"});
+            return;
+        }
         const discard = event.target.closest("[data-discard]");
         if (discard) {
             post({type: "discardProfileDraftChanges", group: Number(discard.dataset.discard)});
@@ -233,7 +277,9 @@ function render() {
     hideHover();
     const model = getModel();
     root.replaceChildren();
-    const app = el(`<div class="app"></div>`);
+    const demo = demoOf(model);
+    const app = el(`<div class="app${demo.active ? " demo" : ""}"></div>`);
+    if (demo.active) app.appendChild(demoBanner(demo));
     app.appendChild(rail());
     const read = screenAvailable(model, state.screen) ? null : readScreen(model, state.screen);
     const screen = read ? readPlaceholder(read, model) : (SCREENS[state.screen] || screenKeys)();
@@ -241,6 +287,8 @@ function render() {
     const bar = commitBar();
     if (bar) screen.appendChild(bar);
     root.appendChild(app);
+    const theme = hostOf(model).theme;
+    root.querySelector('[data-act="theme"]')?.addEventListener("click", () => post(setTheme(otherTheme(theme))));
     restoreKeysBenchHeight(root, benchHeight);
     restoreContentScroll(root, scroll);
     revealSelectedContentRow(root);
@@ -252,6 +300,8 @@ function render() {
     if (review) root.appendChild(review);
     const history = historyOverlay();
     if (history) root.appendChild(history);
+    const leave = leaveDemoOverlay();
+    if (leave) root.appendChild(leave);
     restoreFocus(root, focus);
     focusDialog(root);
     reveal();
@@ -259,6 +309,11 @@ function render() {
 
 function readPlaceholder(read, model) {
     const loading = read.state === "loading";
+    // Without a keyboard, a host with a picker offers it first.
+    const choose = hostOf(model).chooseKeyboard && !model?.device?.connected;
+    // Without a keyboard the demo is offered beside it; a host that cannot
+    // reach one at all still offers it, where the host says so.
+    const demoHere = demoOf(model).offered && (read.state !== "blocked" || Boolean(hostOf(model).blocked?.demo));
     const screenTitle = state.screen === "profile" ? "Profile & backups" : state.screen === "device" ? "Device" : "Keyboard";
     const secondary = screenAvailable(model, "profile") && state.screen !== "profile"
         ? {screen: "profile", label: "Profile & backups"}
@@ -269,12 +324,62 @@ function readPlaceholder(read, model) {
             ${loading ? '<span class="spin" aria-hidden="true"></span>' : '<i class="dot err" aria-hidden="true"></i>'}
             <h2>${esc(read.title)}</h2><p>${esc(read.detail)}</p>
             ${loading ? '<p class="note">The menus open when their keyboard data is ready.</p>'
-                : `<div class="read-actions"><button class="btn primary" data-act="retry">Read keyboard</button>
+                : read.state === "blocked" ? (demoHere ? `<div class="read-actions">${exploreButton("primary")}</div>` : "")
+                : `<div class="read-actions">${choose ? '<button class="btn primary" data-act="choose-keyboard">Choose keyboard</button>' : ""}
+                    <button class="btn ${choose ? "ghost" : "primary"}" data-act="retry">Read keyboard</button>
+                    ${demoHere ? exploreButton("ghost") : ""}
                     ${secondary ? `<button class="btn ghost" data-act="secondary">${esc(secondary.label)}</button>` : ""}</div>`}
         </div></div></div></div>`);
+    screen.querySelector('[data-act="explore-demo"]')?.addEventListener("click", () => post(openDemo()));
+    screen.querySelector('[data-act="choose-keyboard"]')?.addEventListener("click", () => post(chooseKeyboard()));
     screen.querySelector('[data-act="retry"]')?.addEventListener("click", () => post({type: "refresh"}));
     screen.querySelector('[data-act="secondary"]')?.addEventListener("click", () => {state.screen = secondary.screen; render();});
     return screen;
+}
+
+const exploreButton = (tone) => `<button class="btn ${tone}" data-act="explore-demo" data-tip="${esc(DEMO_WORDS.exploreTip)}">${esc(DEMO_WORDS.explore)}</button>`;
+
+// The demo's strip across the window: it is a demo, nothing is connected, and
+// the two things only the demo has, another file and the way out.
+function demoBanner(demo) {
+    const node = el(`<div class="demo-banner" role="status">
+        <i class="dot demo" aria-hidden="true"></i><strong>${esc(DEMO_WORDS.status)}</strong>
+        <span class="copy">${esc(DEMO_WORDS.banner)}${demo.fileName ? ` <span class="mono">${esc(demo.fileName)}</span>` : ""}</span>
+        <span class="acts"><button class="btn tiny" data-act="open-demo-profile"
+                data-tip="Open one of your exported .charybdis.json profiles in the demo, in place of this setup.">Open a profile file…</button>
+            <button class="btn tiny ghost" data-act="leave-demo" data-tip="Close the demo and go back to connecting a keyboard.">Leave demo</button></span>
+    </div>`);
+    node.querySelector('[data-act="open-demo-profile"]').addEventListener("click", () => postLeavingDemo(openDemoProfile()));
+    node.querySelector('[data-act="leave-demo"]').addEventListener("click", () => postLeavingDemo(leaveDemo()));
+    return node;
+}
+
+// Leaving the demo, or replacing its file, with edits not exported: asked
+// once, with Export offered first.
+function leaveDemoOverlay() {
+    const leave = state.leaveDemo;
+    if (state.overlay !== "leaveDemo" || !leave) return null;
+    const node = el(`<div class="scrim"><div class="sheet leave-demo" role="alertdialog" aria-modal="true" aria-label="${esc(leave.ask.title)}">
+        <div class="sheet-h"><h2>${esc(leave.ask.title)}</h2></div>
+        <div class="sheet-b"><p>${esc(leave.ask.detail)}</p></div>
+        <div class="sheet-f"><button class="btn ghost" data-act="stay">Stay in the demo</button>
+            <span class="right"><button class="btn" data-act="confirm-leave">${esc(leave.ask.confirm)}</button>
+                <button class="btn primary" data-act="export">Export…</button></span></div>
+    </div></div>`);
+    const close = () => {state.overlay = null; state.leaveDemo = null; rerender();};
+    node.addEventListener("click", (event) => {
+        if (event.target === node || event.target.closest('[data-act="stay"]')) close();
+        else if (event.target.closest('[data-act="export"]')) {
+            close();
+            post({type: "exportPortableProfile"});
+        } else if (event.target.closest('[data-act="confirm-leave"]')) {
+            // Posted from this click, so a host that opens a picker or a file
+            // chooser for it still can.
+            post(leave.message);
+            close();
+        }
+    });
+    return node;
 }
 
 // A place asked for by a jump — the review's Show — is scrolled to and marked
@@ -293,10 +398,22 @@ setRenderer(render);
 bindLayerIndex(() => state.layer);
 mountHover(root);
 
+let inDemo = false;   // whether the last model was the demo's
+
 addEventListener("message", (event) => {
     const message = event.data;
     if (message?.type !== "model") return;
     setModel(message.model);
+    // Leaving the demo goes back to where a keyboard is connected, or the demo
+    // explored again; a screen of the demo's would only say it is unavailable.
+    const demoNow = Boolean(message.model?.demo?.active);
+    if (inDemo && !demoNow) state.screen = "keys";
+    inDemo = demoNow;
+    // A host that leaves the theme to the panel says which; otherwise the
+    // host's own theme (VS Code's body class) holds.
+    const theme = hostOf(message.model).theme;
+    if (theme) document.documentElement.dataset.theme = theme;
+    else delete document.documentElement.dataset.theme;
     // The host reports a refused edit as a notice prefixed "Failed"; that is a
     // failure, so it is shown as one rather than as a neutral message.
     if (message.notice) {
@@ -326,6 +443,7 @@ addEventListener("message", (event) => {
     }
     if (state.overlay === "review" && !message.model?.draft?.dirty) state.overlay = null;
     if (state.overlay === "history" && !message.model?.draft) { state.overlay = null; post({type: "closeProfileDraftHistory"}); }
+    if (state.overlay === "leaveDemo" && !message.model?.demo?.active) { state.overlay = null; state.leaveDemo = null; }
     render();
 });
 
@@ -359,6 +477,7 @@ addEventListener("keydown", (event) => {
         if (state.overlay === "review") post({type: "closeProfileDraftReview"});
         if (state.overlay === "history") post({type: "closeProfileDraftHistory"});
         state.overlay = null;
+        state.leaveDemo = null;
         render();
     }
 });

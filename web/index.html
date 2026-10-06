@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!-- The page's policy travels with it, so it holds under any server. It is
+     scripts/build-web.js's POLICY; the published page also gets it as a header,
+     with frame-ancestors (web/_headers). -->
+<meta http-equiv="Content-Security-Policy" content="{{csp}}">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<meta name="generator" content="Charybdis Ark {{version}} ({{commit}})">
+<title>Charybdis Ark</title>
+<link rel="stylesheet" href="./{{styles}}">
+<script type="module" src="./{{host}}"></script>
+<script type="module" src="./{{panel}}"></script>
+</head>
+<body>
+<div id="root"></div>
+</body>
+</html>

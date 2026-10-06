@@ -37,12 +37,14 @@ export const configureReady = (model) => model?.load?.state === "ready";
 
 export function screenAvailable(model, screen) {
     if (!model || model.load?.state === "loading") return false;
-    if (screen === "device") return Boolean(model.device?.connected);
+    if (screen === "device") return Boolean(model.device?.connected || model.demo?.active);
     if (screen === "profile") return Boolean(model.portable?.available);
     return configureReady(model);
 }
 
 export function readScreen(model, screen = "keys") {
+    // A host that cannot reach a keyboard at all says why, in place of reading.
+    if (model?.host?.blocked) return {state: "blocked", title: model.host.blocked.title, detail: model.host.blocked.detail};
     if (!model || model.load?.state === "loading") {
         const phase = model?.load?.phase || "enumerating";
         const progress = model?.load?.progress;
@@ -56,7 +58,8 @@ export function readScreen(model, screen = "keys") {
         detail: "Read the keyboard to see its connection and diagnostics."};
     if (configureReady(model)) return null;
     const device = model.device || {};
-    if (!device.connected) return {state: "unavailable", title: "Connect your keyboard", detail: device.health?.error || "Connect a Charybdis, then read it to begin editing."};
+    if (!device.connected) return {state: "unavailable", title: "Connect your keyboard",
+        detail: device.health?.error || model.host?.words?.connectHint || "Connect a Charybdis, then read it to begin editing."};
     if (model.portable?.legacy) return {state: "unavailable", title: "This keyboard is read-only", detail: "This firmware has five layers. You can back up its profile, then install the eight-layer firmware to edit it."};
     return {state: "unavailable", title: "Keyboard not ready for edits",
         detail: device.health?.error || "A complete profile could not be read. Read the keyboard again to retry."};

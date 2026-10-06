@@ -408,14 +408,50 @@ export function behaviourGridSteps(behaviour, advertisedMaximum = 5) {
     return Array.from({length: maximum}, (_, tapCount) => populated.get(tapCount) || {tapCount});
 }
 
-// What the keyboard does for a first-press tier the row leaves empty: the key's
-// own tap or hold (core/model/built-in-behavior.js). An authored cell, a later
-// press and a key with nothing built in inherit nothing, so their cells stay empty.
-const BUILT_IN_TIERS = {tap: "tap", hold: "hold"};
+// What the keyboard does for a tier the row leaves empty (core/model/
+// built-in-behavior.js). The key's own tap fills an empty tap at every tap count
+// the row reaches, its deepest authored count, and is sent once per press, so
+// it carries `times` past a single tap. Past that depth the presses are
+// separate, shorter gestures, so those cells stay empty. The built-in hold
+// belongs to the first press, and a fallback hold also gives way to an authored
+// long hold there. An authored cell and a key with nothing built in inherit nothing.
 export function inheritedBranch(behaviour, step, kind) {
-    const field = BUILT_IN_TIERS[kind];
-    if (!field || step?.tapCount !== 0 || step[field]) return null;
-    return behaviour?.builtIn?.[field] || null;
+    const builtIn = behaviour?.builtIn || {};
+    if (!step || !Number.isInteger(step.tapCount)) return null;
+    if (kind === "tap") {
+        if (!builtIn.tap || step.tap) return null;
+        const authored = (behaviour.steps || []).filter((entry) => entry.tap || entry.hold || entry.longHold);
+        const depth = Math.max(1, ...authored.map((entry) => entry.tapCount + 1));
+        if (step.tapCount >= depth) return null;
+        return step.tapCount ? {...builtIn.tap, times: step.tapCount + 1} : builtIn.tap;
+    }
+    if (kind === "hold") {
+        if (!builtIn.hold || step.tapCount !== 0 || step.hold || (builtIn.hold.fallback && step.longHold)) return null;
+        return builtIn.hold;
+    }
+    return null;
+}
+
+// What an empty Hold or Long hold does because of the other hold tier
+// (core/model/built-in-behavior.js). With no Long hold, nothing takes over at
+// its threshold, so the press's Hold, set or built in, carries on the way it
+// runs: `continues`. With a Long hold and no Hold of any kind, the press stays
+// in its tap window until Long hold, so a release in between sends the tap
+// that count would send, set or built in, on keys whose tap survives a hold
+// (`releaseTaps`): `tapsBeforeLong`. Otherwise the cell is simply empty.
+export function impliedBranch(behaviour, step, kind) {
+    if (!step || !Number.isInteger(step.tapCount)) return null;
+    if (kind === "long") {
+        if (step.longHold) return null;
+        const hold = step.hold || inheritedBranch(behaviour, step, "hold");
+        return hold ? {meaning: "continues", hold} : null;
+    }
+    if (kind === "hold") {
+        if (step.hold || !step.longHold || !behaviour?.builtIn?.releaseTaps || inheritedBranch(behaviour, step, "hold")) return null;
+        const tap = step.tap || inheritedBranch(behaviour, step, "tap");
+        return tap ? {meaning: "tapsBeforeLong", tap} : null;
+    }
+    return null;
 }
 
 // Whether this key is one of a combo's inputs. The keyboard reports per-layer
@@ -562,6 +598,39 @@ export function combosOnLayer(model, stack, at) {
     return keys;
 }
 export const combosAt = (model, stack, at, layoutIndex) => combosOnLayer(model, stack, at).get(layoutIndex) || [];
+
+// The combos the board marks while `held` are previewed on under `at`. A key
+// the layer stores keeps its own marks (combosOnLayer). A transparent key shows
+// the key answering from below, and wears that key's marks as it wears its
+// behaviour dots: the combos **On this view** fires (combosInView) that take
+// that key as an input. Under Combo Layer Matching the keyboard matches the
+// reference layer's raw keycodes, never an answer from below, so the layer's
+// own marks already say it all. Each (model, layer, preview) is grouped once.
+const previewCombosByModel = new WeakMap();
+export function combosInPreview(model, stack, at, held) {
+    const own = combosOnLayer(model, stack, at);
+    if (!model || !held?.length || comboReferenceLayer(model, at) !== at) return own;
+    let perView = previewCombosByModel.get(model);
+    if (!perView) previewCombosByModel.set(model, perView = new Map());
+    const view = `${at}:${held.join(",")}`;
+    const cached = perView.get(view);
+    if (cached?.stack === stack) return cached.keys;
+    const keys = new Map([...own].map(([layoutIndex, combos]) => [layoutIndex, [...combos]]));
+    for (const {combo, keys: pressed} of combosInView(model, stack, at, held)) {
+        for (const key of pressed) {
+            if (!key.fellThrough) continue;
+            const combos = keys.get(key.position.layoutIndex) || [];
+            if (!combos.includes(combo)) combos.push(combo);
+            keys.set(key.position.layoutIndex, combos);
+        }
+    }
+    const order = new Map((model.combos || []).map((combo, index) => [combo, index]));
+    for (const combos of keys.values()) combos.sort((a, b) => order.get(a) - order.get(b));
+    perView.set(view, {stack, keys});
+    return keys;
+}
+export const combosShownAt = (model, stack, at, held, layoutIndex) =>
+    combosInPreview(model, stack, at, held).get(layoutIndex) || [];
 
 // The combo builder holds its inputs by the names the combo stores, in stored
 // order, never by board position: a combo fires on keycodes, and one position

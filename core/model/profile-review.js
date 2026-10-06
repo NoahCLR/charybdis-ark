@@ -56,7 +56,9 @@ function pointingFields(slot, names) {
             result.set(name, tap(slot.diagonals?.[diagonal]));
         }
         result.set("When a direction is empty", word(P.emptyDirection, slot.emptyDirection ?? 0));
+        result.set("How often it sends", word(P.directionOutput, slot.directionOutput ?? 0));
     } else {
+        result.set("Scrolls", word(P.scrollAxes, slot.axis ?? 0));
         result.set(P.heldModifiers, mods(slot.heldModifiers));
         for (const [field, label] of P.scrollFields) result.set(label, slot.scroll[field]);
         result.set("Reverse scrolling", word(P.invert, slot.scroll.invert));
@@ -107,14 +109,14 @@ function behaviourFields(row, defaults, names) {
     const inherited = effectiveTimings({...row, tapHoldTerm: 0, longerHoldTerm: 0, multiTapTerm: 0}, defaults);
     const fields = new Map([
         ["Multi tap window", timing(row.multiTapTerm, defaults[3], {kind: "branch", count: 2})],
-        ["Tap / hold", timing(row.tapHoldTerm, inherited.hold, {kind: "tier", tier: "hold"})],
-        ["Long hold", timing(row.longerHoldTerm, defaults[2], {kind: "tier", tier: "long"})],
+        ["Tap / hold threshold", timing(row.tapHoldTerm, inherited.hold, {kind: "tier", tier: "hold"})],
+        ["Long hold threshold", timing(row.longerHoldTerm, defaults[2], {kind: "tier", tier: "long"})],
         ["Keeps auto-mouse anchored", row.keepsAutoMouseAnchored ? "yes" : "no"],
     ]);
     for (const step of row.steps) for (const [tier, name] of TIERS) {
         const branch = step[tier];
         if (!branch || (tier === "tap" && !branch.kind)) continue;
-        const how = tier === "tap" ? "" : ` · ${word(VOCABULARY.holdHelpers, Object.entries(KEY_BEHAVIOR_HOLD_MODES).find(([, id]) => id === branch.mode)?.[0])}${branch.repeatHz ? ` · ${branch.repeatHz} Hz` : ""}`;
+        const how = tier === "tap" ? "" : ` · ${word(VOCABULARY.holdHelpers[name], Object.entries(KEY_BEHAVIOR_HOLD_MODES).find(([, id]) => id === branch.mode)?.[0])}${branch.repeatHz ? ` · ${branch.repeatHz} Hz` : ""}`;
         // A tier is named as the grid names it, and carries which branch and
         // tier it is, so the review can colour it as the grid does.
         const reaches = tier === "tap" ? branch : branch.action;
@@ -330,7 +332,7 @@ function profileReview(before, after) {
             const old = a.behaviors.rows.find(row => JSON.stringify(row.target) === JSON.stringify(next.target));
             if (!old) continue;
             const oldTimes = effectiveTimings(old, a.settings.values), nextTimes = effectiveTimings(next, b.settings.values);
-            for (const [field, term, label] of [["multiTapTerm", "repeat", "Multi tap window"], ["tapHoldTerm", "hold", "Tap / hold"], ["longerHoldTerm", "long", "Long hold"]]) {
+            for (const [field, term, label] of [["multiTapTerm", "repeat", "Multi tap window"], ["tapHoldTerm", "hold", "Tap / hold threshold"], ["longerHoldTerm", "long", "Long hold threshold"]]) {
                 // Normalized explicit matches already have a stored behaviour
                 // change above; include inherited-only effects here.
                 if (old[field] !== 0 || next[field] !== 0 || oldTimes[term] === nextTimes[term]) continue;
@@ -344,7 +346,7 @@ function profileReview(before, after) {
     const masks = after.options?.keymapMasks.reduce((mask, value) => mask | value, 0) || 0;
     item("Settings", "settings:otherKeyOptions", "Other key options", new Map([["Stored bits", `0x${(a.settings.values[24] & ~masks).toString(16)}`]]),
         new Map([["Stored bits", `0x${(b.settings.values[24] & ~masks).toString(16)}`]]), {kind: "settings"}, [true, true]);
-    for (let id = 0; id < 8; id++) {
+    for (let id = 0; id < Math.max(a.pdModes?.length || 0, b.pdModes?.length || 0); id++) {
         const old = a.pdModes?.[id], next = b.pdModes?.[id];
         item("Pointing modes", `pd:${id}`, `Slot ${id}${(next?.name || old?.name) ? ` · ${next?.kind ? next.name : old?.name}` : ""}`,
             pointingFields(old, namesA), pointingFields(next, namesB), {kind: "pointing", slot: id}, [Boolean(old?.kind), Boolean(next?.kind)], {kind: "pointing", slot: id});

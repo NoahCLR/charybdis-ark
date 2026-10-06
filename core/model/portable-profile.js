@@ -1,8 +1,8 @@
 "use strict";
-const {ACTION_ABI, actionLimitsFor, keycodeAction, pdSlotOfCode} = require("../schema/actions");
-const {decodePdDomain, encodePdDomain} = require("../schema/pd-mode-domain-v1");
+const {ACTION_ABI, ACTION_ABI_32_SLOTS, actionLimitsFor, keycodeAction, knownActionAbi, pdSlotCountOfVocabulary, pdSlotOfCode} = require("../schema/actions");
+const {decodePdDomain, encodePdDomain, pdDomainVersionFor} = require("../schema/pd-mode-domain-v1");
 const {decodeProfileBlob, encodeProfileBlob, crc32, fnv1a32} = require("../schema/profile-blob-v1");
-const {decodeRgbDomainV1, encodeRgbDomainV1} = require("../schema/rgb-domain-v1");
+const {decodeRgbDomainV1, encodeRgbDomainV1, rgbFormatForPdSlots} = require("../schema/rgb-domain-v1");
 const {decodeKeyBehaviorDomain, encodeKeyBehaviorDomain} = require("../schema/key-behavior-domain-v1");
 const {decodeComboDomain, encodeComboDomain} = require("../schema/combo-domain-v1");
 const {decodeSettings, encodeSettings} = require("../schema/settings-domain-v1");
@@ -101,13 +101,18 @@ function validateSnapshot(value, capabilities) {
     const macros = value.macros.map(slot => {const bytes = base64(slot, 8192, "macro"); validateViaMacro(bytes); return bytes;});
     const profile = base64(value.profile, value.version === 2 ? 5088 : 4064, "profile data"), decoded = decodeProfileBlob(profile), domains = decoded.domains;
     if (decoded.schema.major !== value.version || domains.map(d => d.id).join() !== (value.version === 2 ? "16,32,48,64,80" : "16,32,48,64")) throw fail("The profile is missing configuration. Partial profiles cannot be restored as a complete backup.");
-    const actionOptions = actionLimitsFor(value.version);
+    // A schema-2 profile stores as many pointing slots as its action vocabulary
+    // has (actions.js pdSlotCountOfVocabulary): eight in PD v1 with RGB v2, or
+    // 32 in PD v2 with RGB v3. Actions may reach exactly those slots.
+    const pdModes = value.version === 2 ? decodePdDomain(domains[4].payload, {version: domains[4].version}) : undefined;
+    if (pdModes && (pdModes.length !== pdSlotCountOfVocabulary(value.actionAbiDigest) || domains[4].version !== pdDomainVersionFor(pdModes.length))) throw fail("The profile's pointing slots do not match its action vocabulary.");
+    const actionOptions = actionLimitsFor(value.version, pdModes?.length);
     const rgb = decodeRgbDomainV1(domains[0].payload), behaviors = decodeKeyBehaviorDomain(domains[1].payload, actionOptions), combos = decodeComboDomain(domains[2].payload, domains[2].version, actionOptions), settings = decodeSettings(domains[3].payload);
-    const pdModes = value.version === 2 ? decodePdDomain(domains[4].payload) : undefined;
     // Settings may be one version ahead of the document: v3 names the VIA
     // macros inside a schema-2 profile.
     const settingsVersion = settings.formatVersion ?? 1;
-    if (rgb.formatVersion !== value.version || !(settingsVersion === value.version || (value.version === 2 && settingsVersion >= 3)) || domains[3].version !== settingsVersion) throw fail("Profile domain versions disagree.");
+    const rgbVersion = pdModes ? rgbFormatForPdSlots(pdModes.length) : value.version;
+    if (rgb.formatVersion !== rgbVersion || domains[0].version !== rgbVersion || !(settingsVersion === value.version || (value.version === 2 && settingsVersion >= 3)) || domains[3].version !== settingsVersion) throw fail("Profile domain versions disagree.");
     if (rgb.layerColors.length !== value.layers.length || rgb.layerColors.some(row => row.layerId >= 8)) throw fail("RGB does not cover all eight layers.");
     // A binding for an empty slot is allowed, because the keyboard allows it:
     // the mode keycodes are a fixed registry, and the runtime refuses to
@@ -122,7 +127,7 @@ function validateSnapshot(value, capabilities) {
         danglingPdBindings.set(id, (danglingPdBindings.get(id) || 0) + 1);
         void source;
     };
-    const checkNativePd = (code, source) => checkPd(pdSlotOfCode(code), source);
+    const checkNativePd = (code, source) => checkPd(pdSlotOfCode(code, pdModes?.length), source);
     if (pdModes) value.layers.flat().forEach(code => checkNativePd(code, "layer"));
     const checkAction = action => {
         if ([4, 5].includes(action.kind)) checkPd(action.operand, "action");
@@ -141,7 +146,8 @@ function validateSnapshot(value, capabilities) {
         return validateSnapshot(upgradeFiveLayerSnapshot(value), capabilities);
     }
     if (capabilities?.schema?.major === 2 && value.version === 1) return validateSnapshot(upgradePdSnapshot(value), capabilities);
-    if (capabilities?.actionAbiDigest === ACTION_ABI && value.version === 2 && value.actionAbiDigest === PRE_BLOCK_ACTION_ABI) return validateSnapshot(upgradeKeycodeBlocks(value), capabilities);
+    if (knownActionAbi(capabilities?.actionAbiDigest) && value.version === 2 && value.actionAbiDigest === PRE_BLOCK_ACTION_ABI) return validateSnapshot(upgradeKeycodeBlocks(value), capabilities);
+    if (capabilities?.actionAbiDigest === ACTION_ABI_32_SLOTS && value.version === 2 && value.actionAbiDigest === ACTION_ABI) return validateSnapshot(upgradePdSlots(value), capabilities);
     const capacity = capabilities?.viaMacroBytes ?? macroBankBytes(value);
     if (capabilities && (value.actionAbiDigest !== capabilities.actionAbiDigest || capabilities.compiledLayerCount !== value.layers.length || (capabilities.supportedDomainMask & (value.version === 2 ? 31 : 15)) !== (value.version === 2 ? 31 : 15))) throw fail("The connected firmware does not support this profile's action vocabulary or eight-layer storage.");
     const bank = macroBank(macros, capacity);
@@ -203,13 +209,41 @@ function upgradeKeycodeBlocks(source) {
             if (a.kind === 1 && customKeyOfCode(a.operand) !== undefined) throw fail(`A behaviour step sends CUSTOM_KEY_${customKeyOfCode(a.operand)}, which a step cannot send in this firmware. Remove that step on the older firmware and take the backup again.`);
         });
     }
-    const options = actionLimitsFor(2);
+    const options = actionLimitsFor(2, value.pdModes.length);
     result.actionAbiDigest = ACTION_ABI;
     result.profile = encodeProfileBlob({schema: {major: 2, minor: 0}, domains: [
-        {id: 16, version: 2, payload: encodeRgbDomainV1(value.rgb)}, {id: 32, version: 1, payload: encodeKeyBehaviorDomain(value.behaviors, options)},
+        {id: 16, version: value.rgb.formatVersion, payload: encodeRgbDomainV1(value.rgb)}, {id: 32, version: 1, payload: encodeKeyBehaviorDomain(value.behaviors, options)},
         {id: 48, version: value.combos.version, payload: encodeComboDomain(value.combos, options)}, {id: 64, version: value.settings.formatVersion, payload: encodeSettings(value.settings)},
-        {id: 80, version: 1, payload: encodePdDomain(value.pdModes)},
+        {id: 80, version: pdDomainVersionFor(value.pdModes.length), payload: encodePdDomain(value.pdModes)},
     ]}).toString("base64");
+    return result;
+}
+
+// A backup of the eight-slot firmware, for the 32-slot one. Keys, behaviours,
+// combos and settings mean the same there, so they stay as they are; the
+// pointing slots move to the sparse PD v2 (a disabled slot without a name is
+// left out), and lighting to RGB v3, the new slots uncoloured on the right half
+// as the configurable slots 6 and 7 once started (upgradePdSnapshot).
+function upgradePdSlots(source) {
+    const value = validateSnapshot(source);
+    if (source.version !== 2 || source.actionAbiDigest !== ACTION_ABI) throw fail("This profile does not use the eight-slot action vocabulary.");
+    const slots = pdSlotCountOfVocabulary(ACTION_ABI_32_SLOTS);
+    const pdModes = Array.from({length: slots}, (_, id) => value.pdModes[id] || {id, kind: 0, name: ""});
+    const rgb = value.rgb;
+    rgb.formatVersion = rgbFormatForPdSlots(slots);
+    for (let id = value.pdModes.length; id < slots; id++) rgb.pdModeColors.push({pdModeId: id, color: {h: 0, s: 0, v: 0}, locality: 2});
+    const blob = decodeProfileBlob(value.profile);
+    const domains = blob.domains.map(domain => domain.id === 16 ? {id: 16, version: rgb.formatVersion, payload: encodeRgbDomainV1(rgb)}
+        : domain.id === 80 ? {id: 80, version: pdDomainVersionFor(slots), payload: encodePdDomain(pdModes)} : domain);
+    let profile;
+    try {
+        profile = encodeProfileBlob({schema: blob.schema, domains});
+    } catch (error) {
+        if (error.code !== "CAPACITY_EXCEEDED") throw error;
+        throw fail("This backup does not fit the 32-slot firmware's profile once its new pointing slots have their lighting. Remove a behaviour, combo or name on the older firmware and take the backup again.");
+    }
+    const result = {...JSON.parse(JSON.stringify(source)), actionAbiDigest: ACTION_ABI_32_SLOTS, profile: profile.toString("base64")};
+    validateSnapshot(result);
     return result;
 }
 
@@ -270,7 +304,7 @@ function reorderLayers(document, order, names, {keysFollow = true} = {}) {
     if (document.layers?.length !== 8) throw fail("Layer ordering becomes available after the eight-layer update.");
     // Renumbering reads every layer key, and older firmware numbered them
     // differently.
-    if (document.actionAbiDigest !== ACTION_ABI) throw fail("Layer ordering needs the firmware this app was made for. Update both halves first.");
+    if (!knownActionAbi(document.actionAbiDigest)) throw fail("Layer ordering needs the firmware this app was made for. Update both halves first.");
     const validated = validateSnapshot(document), result = JSON.parse(JSON.stringify(document));
     if (!Array.isArray(order) || order.length !== 8 || new Set(order).size !== 8 || order.some(id => !Number.isInteger(id) || id < 0 || id >= 8)) throw fail("Include every layer once.");
     const remap = []; order.forEach((old, next) => {remap[old] = next;});
@@ -293,7 +327,7 @@ function reorderLayers(document, order, names, {keysFollow = true} = {}) {
         result.layers[remap[0]] = result.layers[remap[0]].map((code, slot) => PHYSICAL_MATRIX_SLOTS.has(slot) && code === 0x0000 ? 0x0001 : code);
     }
     const {rgb, behaviors, combos, settings, pdModes} = validated;
-    const actionOptions = actionLimitsFor(pdModes ? 2 : 1);
+    const actionOptions = actionLimitsFor(pdModes ? 2 : 1, pdModes?.length);
     const action = a => {if (!renumbers) return; if ([2, 3].includes(a.kind)) a.operand = reach(a.operand); else if (a.kind === 1) a.operand = native(a.operand);};
     walkActions(behaviors, action); walkActions(combos, action);
     rgb.layerColors.forEach(row => {row.layerId = remap[row.layerId];}); rgb.layerColors.sort((a, b) => a.layerId - b.layerId);
@@ -311,9 +345,9 @@ function reorderLayers(document, order, names, {keysFollow = true} = {}) {
     settings.values[23] = remap.reduce((mask, next, old) => mask | ((settings.values[23] >> old) & 1) << reach(old), 0);
     const oldReferences = settings.values[27]; settings.values[27] = order.reduce((packed, old, next) => (packed | remap[(oldReferences >>> (old * 4)) & 15] << (next * 4)) >>> 0, 0);
     result.profile = encodeProfileBlob({schema: {major: document.version, minor: 0}, domains: [
-        {id: 16, version: document.version, payload: encodeRgbDomainV1(rgb)}, {id: 32, version: 1, payload: encodeKeyBehaviorDomain(behaviors, actionOptions)},
+        {id: 16, version: rgb.formatVersion, payload: encodeRgbDomainV1(rgb)}, {id: 32, version: 1, payload: encodeKeyBehaviorDomain(behaviors, actionOptions)},
         {id: 48, version: combos.version, payload: encodeComboDomain(combos, actionOptions)}, {id: 64, version: settings.formatVersion ?? document.version, payload: encodeSettings(settings)},
-        ...(pdModes ? [{id: 80, version: 1, payload: encodePdDomain(pdModes)}] : []),
+        ...(pdModes ? [{id: 80, version: pdDomainVersionFor(pdModes.length), payload: encodePdDomain(pdModes)}] : []),
     ]}).toString("base64");
     validateSnapshot(result); return result;
 }
@@ -342,4 +376,4 @@ function summaryOf(value) {
         macros: value.document.macros.filter(Boolean).length + (value.settings.macros || []).filter(bytes => bytes.length).length,
         names: value.settings.names.map((name, index) => layerName(value.settings.names, index))};
 }
-module.exports = {encodeNamedProfile, comboTableOf, upgradePdSnapshot, upgradeKeycodeBlocks, createSnapshot, validateSnapshot, materializeProfile, macroSlots, macroBank, macroBankBytes, validateViaMacro, fingerprint, fingerprintOf, decodedOf, reorderLayers, summary, summaryOf};
+module.exports = {encodeNamedProfile, comboTableOf, upgradePdSnapshot, upgradeKeycodeBlocks, upgradePdSlots, createSnapshot, validateSnapshot, materializeProfile, macroSlots, macroBank, macroBankBytes, validateViaMacro, fingerprint, fingerprintOf, decodedOf, reorderLayers, summary, summaryOf};

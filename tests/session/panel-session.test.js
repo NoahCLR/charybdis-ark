@@ -13,7 +13,7 @@ const snapshot = () => {
 const device = {id: "kb", manufacturer: "Bastard Keyboards", product: "Charybdis 4x6"};
 const connected = (extra = {}) => ({connected: true, busy: false, selectedDeviceId: "kb", devices: [device], capabilities, ...extra});
 
-// A panel session exactly as extension.js keeps one, with the first complete
+// A panel session exactly as panel-loop.js keeps one, with the first complete
 // read already in: publishing it opens the draft.
 function panelWithDraft() {
     const read = snapshot();
@@ -265,4 +265,50 @@ test("a layer is dragged to any place above the base, and Make base swaps it wit
     applyLayerEdit(edit, {type: "editPortableLayer", id: 0, direction: 1});
     assert.deepEqual(edit.order, [5, 7, 2, 3, 4, 6, 0, 1], "the old base moves like any other layer now");
     assert.equal(validateSnapshot(layerEditDocument(edit)).settings.names[0], edit.names[5]);
+});
+
+test("the profile meter follows the draft, and is absent without a keyboard or an advertised size", () => {
+    const sized = {...capabilities, maxProfilePayload: 5088, maxBehaviorRows: 64};
+    const session = {service: {portable: snapshot()}};
+    const keyboard = buildPanelModel(session, connected({capabilities: sized})).portable.usage;
+    assert.equal(keyboard.source, "keyboard", "with nothing changed, the figures are the keyboard's");
+    assert.equal(keyboard.capacity, 5088);
+    const draft = session.draft;
+    const behaviours = keyboard.counts.find((entry) => entry.id === "behaviours").used;
+    routeMessage(session, {type: "saveBehavior", draftId: draft.id, draftRevision: draft.revision,
+        behavior: {keycode: "KC_F13", tapHoldTerm: 0, longerHoldTerm: 0, multiTapTerm: 0, steps: []}}, connected({capabilities: sized}));
+    const staged = buildPanelModel(session, connected({capabilities: sized})).portable.usage;
+    assert.equal(staged.source, "draft");
+    assert.equal(staged.used, keyboard.used + 14, "a behaviour without steps costs its 14-byte row");
+    assert.equal(staged.counts.find((entry) => entry.id === "behaviours").used, behaviours + 1);
+    draft.undo(draft.revision);
+    assert.equal(buildPanelModel(session, connected({capabilities: sized})).portable.usage.used, keyboard.used, "undo takes the bytes back");
+    assert.equal(buildPanelModel(session, connected({capabilities: sized, connected: false})).portable.usage, null);
+    assert.equal(buildPanelModel(session, connected()).portable.usage, null, "firmware that advertises no size shows no meter");
+});
+
+test("the model says what its host offers, in the host's words", () => {
+    const {HOST_WORDS} = require("../../core/session/panel-session");
+    // A session with no host describes the extension's: nothing extra, its words.
+    const plain = buildPanelModel(panelWithDraft(), connected());
+    assert.deepEqual(plain.host, {chooseKeyboard: false, blocked: null, theme: null, recoveries: null, build: null, progress: null, words: {...HOST_WORDS}});
+
+    const session = panelWithDraft();
+    const recoveries = [{id: 1, name: "recovery-1.charybdis.json", savedAt: "2026-10-06T09:00:00.000Z"}];
+    session.host = {words: {noKeyboard: "Choose keyboard to connect one."},
+        panel: () => ({chooseKeyboard: true, theme: "light", recoveries, build: {version: "1", commit: "abc"}, progress: "Reading"})};
+    const model = buildPanelModel(session, connected());
+    assert.deepEqual(model.host, {chooseKeyboard: true, blocked: null, theme: "light", recoveries, build: {version: "1", commit: "abc"}, progress: "Reading",
+        words: {...HOST_WORDS, noKeyboard: "Choose keyboard to connect one."}});
+    session.host.panel = () => ({theme: "sepia", blocked: {title: "No", detail: "Why"}});
+    assert.equal(buildPanelModel(session, connected()).host.theme, null, "only a theme the panel has");
+    assert.deepEqual(buildPanelModel(session, connected()).host.blocked, {title: "No", detail: "Why"});
+});
+
+test("the legacy upgrade export is offered only by a host that has it", () => {
+    const session = panelWithDraft();
+    session.host = {};
+    assert.equal(buildPanelModel(session, connected()).portable.pdUpgradeAvailable, false);
+    session.host = {exportPdUpgrade: async () => {}};
+    assert.equal(buildPanelModel(session, connected()).portable.pdUpgradeAvailable, true);
 });

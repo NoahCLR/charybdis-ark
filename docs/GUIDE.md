@@ -15,6 +15,82 @@ If an older `noah.charybdis-live-0.1.0` link is still installed, remove it: the
 app was named Charybdis Live, and Ark copies the recovery files saved under that
 identity into its own storage on start.
 
+## Using Ark in Chrome
+
+Ark also runs as a web page, in Chrome or Edge on a computer, with the same
+screens as in VS Code; the released page's address is in the
+[README](../README.md#install). It is a set of static files: once the page has loaded it
+talks to nothing but the keyboard, and nothing you do leaves your computer.
+The page reaches a keyboard over WebHID, which only Chrome and Edge have and
+only on a page served over HTTPS (or from `localhost`). In Safari, Firefox or on
+a plain `http://` address the page says Ark needs Chrome or Edge over HTTPS
+instead of offering a keyboard.
+
+**Choosing the keyboard.** A page sees only the keyboards you have let it open.
+The first time, choose **Choose keyboard** and pick your Charybdis in Chrome's
+list; Ark then reads it. After that the page reconnects to it by itself whenever
+it opens, without asking again. **Choose keyboard** stays in the rail, under the
+keyboard's name, for letting the page open another one; with two, the rail's
+selector switches between them. Chrome's site settings forget a keyboard you no
+longer want the page to open.
+
+**One tab at a time.** Only one Ark tab holds the keyboard. A second one says
+Ark is open in another tab, and takes over when that tab closes. Closing or
+reloading the tab while the draft has unapplied edits, or while Apply is
+running, asks first: the draft lives in the tab and does not survive a reload.
+Apply keeps its pace in a background tab, but keep the tab open until it ends.
+
+**Light and dark.** The button at the top right of every screen switches
+between a light and a dark theme. Ark starts from your system's setting and
+remembers your choice in this browser. In VS Code there is no toggle; the panel
+follows VS Code's theme.
+
+**Recovery copies and files.** Apply and Import save a recovery copy in the
+browser's storage before they write anything, and refuse to write if it cannot
+be saved. Profile & backups lists every copy, newest first, with a
+**Download** button each. Ark asks Chrome to keep this storage when space runs
+low, but clearing the site's data (or the browser's) deletes the copies, so
+download any you want to keep. **Export profile** downloads the profile file;
+**Import profile** opens the browser's file chooser and takes files up to
+100 kB. The legacy **Export upgrade pair** is not offered on the page. Errors
+show in the rail's message rather than as a notification, and the page's
+version and commit are at the foot of the rail.
+
+## Exploring without a keyboard
+
+With no keyboard connected, the connect area offers **Explore a demo** beside
+**Read keyboard** (VS Code) or **Choose keyboard** (the web page). It is offered
+on a browser without WebHID too, since it needs no keyboard. The demo opens a
+complete setup, as current firmware holds one (eight layers, 32 pointing slots,
+64 macros and 64 custom keys), in the same draft a keyboard's opens in. Every
+screen works, and every edit stages, is checked and shows in the review exactly
+as it would on a keyboard; undo, redo, Discard, the draft history, Rename &
+Reorder and Import all work on it.
+
+It never claims to be a keyboard. A strip across the top of the window says
+**Demo · no keyboard** on every screen; the rail names it Demo, with no
+connection, halves or recovery to report, and the Device screen says what it
+stands in for. Nothing in it reaches a keyboard, and nothing is kept: the demo
+lives in this window until it is left or closed.
+
+**Apply needs a keyboard.** The commit bar's button reads **Review changes**,
+and where the review would offer Apply it says Apply needs a keyboard and
+offers **Export…**. Export, there or on Profile & backups, saves the demo's
+setup with your edits as a profile file (`charybdis-demo-<date>.charybdis.json`);
+on your keyboard, **Import profile** reviews it against what the keyboard holds
+before anything is applied.
+
+**Open a profile file…**, on the strip, replaces the demo's setup with one of
+your exported `.charybdis.json` files, checked as Import checks it (an older
+backup is brought up to current firmware the same way). A file Import would
+refuse is refused, and the demo stays as it was.
+
+**Leaving.** **Leave demo** on the strip, or **Choose keyboard** or **Read**,
+leaves the demo for a keyboard. With edits not exported since, Ark asks first
+and offers Export; opening another profile file asks the same way. Closing or
+reloading a web page with such edits asks too. While a keyboard is connected,
+or a draft holds unapplied edits for one, the demo is not offered.
+
 ## What it edits
 
 Every screen is drawn and wired to the host:
@@ -25,9 +101,9 @@ Every screen is drawn and wired to the host:
 | Lighting | Six stages, the stage mask, layer and pointing-mode colours with their localities, combo and key feedback, auto-mouse fade with its hold as a share of the timeout, LED group rows and reusable groups |
 | Macros | Both banks: name, payload, insert-at-cursor step builder, reorder/remove controls, parsed preview, configurable recorder and placement; search by name, and the layers that set each macro off — by key, behaviour or combo — in their layer colour, each opening that layer in Keys with the macro picked |
 | Mouse | Pointer speed, sniping and auto-mouse — the Settings sections the keyboard's model files under Mouse, drawn with the same cards and posted whole |
-| Pointing modes | All eight slots: movement, speed, direction shortcuts, scroll tuning, buttons, bindings, placement, clear and duplicate |
+| Pointing modes | Every slot the firmware has, eight or 32: movement, speed, direction shortcuts and how often they send (every step, or once per movement until the ball pauses or moves back the other way), scroll tuning and which way a scrolling mode scrolls (both axes, horizontal only or vertical only), what each direction's shortcut does with held modifiers, thresholds shown as ball movement at the mode's DPI, buttons, bindings, placement, clear and duplicate |
 | Settings | Every other section the keyboard reports, posted whole, read-only where the firmware cannot report; the Combos section also carries the default combo window and the combo hold threshold, which the keyboard stores with its combos |
-| Profile & backups | Import (the file against the keyboard, counted by what it configures — keys, lighting, macros, mouse, pointing — before it becomes the draft), export, upgrade export, recovery state |
+| Profile & backups | Import (the file against the keyboard, counted by what it configures — keys, lighting, macros, mouse, pointing — before it becomes the draft), export, upgrade export, profile memory, recovery state |
 | Device | Read-only: connection, committed generation, what was read |
 
 The keycode picker leads with the ANSI board, then task-shaped Symbols,
@@ -93,8 +169,15 @@ menus open only with an editable draft.
 
 Underneath it, one workbench whose tabs are the key, its behaviour, its combos,
 and the macros and pointing modes the layer reaches. A behaviour is tap count ×
-tier, so it is drawn as a grid. Timing fields start with **Multi tap window**
-(release to next press), then Tap / hold and Long hold. Behaviour and combo
+tier, so it is drawn as a grid: a row for every tap count the keyboard allows,
+always all of them, and a column each for Tap, Hold and Long hold. Each timing
+heads what it governs: **Multi tap window** (release to next press) the tap
+counts, the Tap / hold threshold the Hold column and the Long hold threshold
+its own; Tap fires on release.
+The timing fields over Hold and Long hold read **Tap / hold threshold** and
+**Long hold threshold**, and a hold cell's **How it runs** names its own
+column's: "tap at Tap / hold threshold" under Hold, "tap at Long hold
+threshold" under Long hold. Behaviour and combo
 timings matching the default show a muted placeholder such as `150 · default`;
 other values look entered. Labels end at `ms`. Clearing an override restores the
 default. LT keys show their own dual-role default.
@@ -106,11 +189,26 @@ changes discard together with the default edit.
 Selecting a key opens its grid in Behaviours even before it has a stored row.
 Only a grid action, timing override or anchor change adds the row to the draft;
 browsing leaves the board and behaviour counts unchanged. Transparent keys and
-`KC_NO` cannot have behaviours. Empty branches preserve the key's built-in
-actions until you override them. A dual-role key's empty first tap or hold
-shows, dashed and marked "built in", what the key does there on its own: an
-`LT()` taps its key and holds its layer, an `MT()` or `OSM()` holds its
-modifiers. **Change key…** moves a behaviour to another
+`KC_NO` cannot have behaviours. In a layer preview, a transparent key opens the
+key the board shows through it: the editor names the layer that supplies that
+key and says the behaviour belongs to its keycode, so changing it changes that
+key wherever it is pressed. Turning layers on or off in the preview updates the
+open key, whichever you did first. Empty branches preserve the key's built-in
+actions until you override them. An empty cell shows, dashed and marked
+"built in", what the key does there on its own. An empty tap sends the key's
+own tap once per press, so an empty Double tap sends it twice (`×2`), at every
+tap count up to the deepest one the behaviour sets; past that, the presses are
+separate shorter gestures and the cell stays empty. On the first press, an
+`LT()` holds its layer and an `MT()` or `OSM()` its modifiers. A plain key,
+such as `-` or `Ctrl+C`, stays held down until release, unless that first
+press sets a Hold or Long hold. Shift, Ctrl, Alt and Cmd on their own show
+nothing built in. An empty Long hold beside a Hold, set or built in, shows
+that the Hold carries on, since nothing takes over at the Long hold threshold: one held
+until release stays held, one that repeats keeps repeating, one that sends
+on release still sends whenever you let go, and one that fired at its
+threshold does nothing more. An empty Hold beside a Long hold shows the tap
+a release before the Long hold threshold sends, for plain keys, custom keys and macros;
+layer and pointing keys send no tap once held. **Change key…** moves a behaviour to another
 key through the keycode picker; when that key already has one, you choose to
 overwrite it, swap the two, or cancel, and either is one undoable draft step.
 On a keyboard that owns its layer keys (Profile Wire feature bit 14), a
@@ -153,11 +251,13 @@ together. The board then shows what the keyboard would answer with, by the
 firmware's rule: the highest layer on wins, a transparent key is answered by the
 highest layer below it that is also on, and Base is always on. Keys answered from
 below are seen through the top layer's glass: frosted like a transparent key,
-their legend sharp, in the light of the layer that answers, and
+their legend sharp, in the light of the layer that answers, with that key's
+behaviour dots and the badges of the combos it fires with these layers on, and
 on Lighting the board paints every layer on, lowest first, as the keyboard does.
 The highest layer keeps the tab joined to the board and every edit is stored on
 it; a key answered from below says so on the Key tab, and setting it overrides
-that answer. ⌘-click Base on its own to see the picked layer over just Base.
+that answer. ⌘-click Base on its own to see the picked layer over just Base;
+from Base, ⌘-click a layer to see it over Base.
 ⌘-click a layer again to take it out, or click any tab to go back to
 one layer. Layers on under the top one are tinted and outlined in their own
 light, so the set reads from the tabs. The set holds across Keys and Lighting and is dropped
@@ -268,7 +368,8 @@ What to expect while it applies:
   its keys and macros are one complete version again, which may need the other
   half connected.
 
-Drafts live in the editor window; closing it loses unapplied changes. The
+Drafts live in the editor window (in Chrome, the tab); closing it loses
+unapplied changes. The
 transaction and recovery contract is specified in
 [`docs/architecture/logical-profile-transaction-v1.md`](../upstream/firmware/docs/architecture/logical-profile-transaction-v1.md).
 Physical power-loss acceptance across every decision boundary is still in
@@ -282,13 +383,43 @@ lighting and global settings. Flashed defaults and live edits become one
 portable file. **Import profile** shows a review, saves a recovery copy, restores
 both halves and verifies the complete readback. A failed or interrupted restore
 reports the saved recovery file instead of claiming success. Recovery files are
-kept in the extension's local storage; the app shows their full path.
+kept in the extension's local storage; the app shows their full path. In
+Chrome they are kept in the browser's storage and listed on Profile & backups,
+each with a download (see [Using Ark in Chrome](#using-ark-in-chrome)).
+
+**Profile memory** shows how full the profile is. Behaviours, combos,
+lighting, pointing modes, settings and every layer, macro and custom-key name
+share one block on the keyboard: 5,088 bytes on current firmware, the size the
+keyboard reports. The card lists what uses it, area by area, and the counted
+limits beside it: behaviours, behaviour steps, combos, lighting groups and
+lighting group rows. Each area can stay under its own limit and the profile
+still fill up, so a full profile can refuse an edit in any of them. The bar
+turns amber from 90%. The figures are your draft's while it has changes, and
+the keyboard's otherwise; they follow every edit, undo and discard. Macro steps
+are stored apart from the profile, so the card shows them as a second bar,
+counted slot by slot on Macros.
 
 The standard firmware reserves eight layers. **Manage layers** names and orders
 the overlays, with the highest-priority layer shown first and Base fixed at the
 bottom. Moving a layer updates the keys, behaviours, combos, RGB assignments and
 pointer settings that refer to it. There is no need to change the layer count
 or reflash for ordinary profile editing.
+
+**Pointing slots.** Firmware has eight pointing slots or, from the 32-slot
+firmware on, 32. Ark asks the keyboard which and shows exactly that many. On
+32 slots, Pointing modes lists the configured slots as cards and the empty ones
+as a grid of numbered chips beneath them (a chip in amber still has keys
+reaching it); the key picker lists the slots in two columns; Lighting's slot
+list scrolls beside the colour editor. Each slot keeps its own Hold and Toggle
+key (`PD_SLOT_n`, `PD_SLOT_n_LOCK`) and its own lighting row, and an empty slot
+takes no room in the profile, so 32 slots cost only what you configure.
+
+A backup from eight-slot firmware imports onto 32-slot firmware: its keys,
+behaviours, combos, macros and settings come across unchanged, its eight slots
+keep their places, and slots 8 to 31 start empty and unlit (right half). The
+review shows the result before anything is applied. A backup goes the other
+way only by reflashing the firmware it came from: eight-slot firmware does not
+take a 32-slot profile, and nothing is dropped to make it fit.
 
 Old five-layer firmware is no longer built here. Its storage geometry is
 incompatible with current firmware, so retain the old pair and its backups if
@@ -309,7 +440,7 @@ still points at the empty slot, and the Pointing modes screen and the hover card
 say the key does nothing for now.
 
 The same reasoning runs the other way, so the keycode picker offers **every**
-slot, configured or not: its Pointing modes section lists the eight slots as
-rows, each with a Hold and a Toggle key, and marks an empty slot's row as doing
+slot, configured or not: its Pointing modes section lists every slot as a
+row, each with a Hold and a Toggle key, and marks an empty slot's row as doing
 nothing yet. Search finds the same keys as `Slot 6 · hold (empty)`. A board can be laid out before its modes are, and the key says `empty`
 on its second line until the slot is filled in.

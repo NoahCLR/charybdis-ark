@@ -12,7 +12,7 @@
 // Navigation" and LT(3,KC_SLASH) "/ / Navigation". Only the raw keycode, where
 // a screen shows one, keeps the number.
 
-const {PD_BINDINGS} = require("../data/pd-bindings");
+const {PD_SLOT_BINDINGS} = require("../data/pd-bindings");
 const {CUSTOM_KEY_SLOTS, customKeyCode} = require("../data/user-keycodes");
 const keycodes = require("../data/keycode-catalog");
 const {actionName} = require("../schema/actions");
@@ -98,7 +98,7 @@ function profileKeyNames({layers, macros = [], customKeys = [], behaviors = [], 
     // still empty, and stays put when a slot is cleared. It does nothing until
     // the slot is configured, which the label says.
     for (const slot of pdModes) for (const locked of [false, true]) {
-        const binding = PD_BINDINGS[slot.id];
+        const binding = PD_SLOT_BINDINGS[slot.id];
         const name = locked ? binding.lock : binding.hold, code = locked ? binding.lockCode : binding.holdCode;
         const label = `${slotName(slot)} · ${locked ? "toggle" : "hold"}${slot.kind ? "" : " (empty)"}`;
         const native = keycodes.resolve(code).name;

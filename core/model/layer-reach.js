@@ -443,7 +443,7 @@ function gestureTimingFindings(decoded, facts, walked, legacyGestureTiming, lega
         const reason = competing.length ? `This key also waits for ${competing.join(", ")}. ` : "";
         return {kind: "gestureTiming", level: LEVELS.WARNING, layers: [], identity: String(code),
             title: `${codeName(code)} has timing affected by input buffering`,
-            detail: `${reason}This firmware does not report all timing fixes needed for this key. Buffering can delay holds${legacyGestureTiming && row.steps.some(step => step.tapIndex > 0) ? " or make an on-time second press miss its repeat window" : ""}.${nativeWait ? " QMK also decides tap or hold before this authored behaviour runs." : ""} Effective tap / hold: ${hold} ms; repeated taps: ${repeat} ms.`,
+            detail: `${reason}This firmware does not report all timing fixes needed for this key. Buffering can delay holds${legacyGestureTiming && row.steps.some(step => step.tapIndex > 0) ? " or make an on-time second press miss its repeat window" : ""}.${nativeWait ? " QMK also decides tap or hold before this authored behaviour runs." : ""} Effective tap / hold threshold: ${hold} ms; repeated taps: ${repeat} ms.`,
             fix: "Use firmware with physical gesture timing and runtime-owned tapping. Longer timings can help repeated taps on older firmware, but also delay actions. Double hold means press, release, then press and keep holding.",
             place: {kind: "behaviour", keycode: codeName(code)}};
     });

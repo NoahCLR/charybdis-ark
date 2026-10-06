@@ -7,7 +7,7 @@ const {VOCABULARY, branchName} = require("../model/vocabulary");
 const keycodes = require("../data/keycode-catalog");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {KEY_BEHAVIOR_HOLD_MODES} = require("../schema/key-behavior-domain-v1");
-const {builtInFirstStep} = require("../model/built-in-behavior");
+const {builtInActions} = require("../model/built-in-behavior");
 const {
     RGB_AUTOMOUSE_MODES, RGB_DOMAIN_V1, RGB_KEY_SEMANTICS, RGB_LAYER_MODES,
     RGB_LOCALITIES, RGB_PD_MODE_IDS, RGB_STAGE_BITS, RGB_TAP_COMMIT_MODES,
@@ -36,13 +36,17 @@ function builtInDisplay(action) {
     return display.label ? {label: display.label.replace(/\+N\/A$/, "")} : display;
 }
 
-// The key's own first tap and hold, shaped like authored branches, for the
-// tiers its row leaves empty (model/built-in-behavior.js).
+// The key's own tap and first-press hold, shaped like authored branches, for
+// the tiers its row leaves empty (model/built-in-behavior.js). A fallback hold
+// gives way to any authored first-press hold or long hold; `releaseTaps` says
+// a press with only a long hold still taps when released before it.
 function builtInForView(target, features) {
-    const {tap, hold} = builtInFirstStep(target, features);
+    const {tap, hold, fallback, releaseTaps} = builtInActions(target, features);
     return {
+        ...(releaseTaps ? {releaseTaps: true} : {}),
         ...(tap ? {tap: {helper: "TAP_SENDS", action: actionName(tap), ...builtInDisplay(tap)}} : {}),
-        ...(hold ? {hold: {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: actionName(hold), repeatHz: "0", ...builtInDisplay(hold)}} : {}),
+        ...(hold ? {hold: {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: actionName(hold), repeatHz: "0", ...builtInDisplay(hold),
+            ...(fallback ? {fallback: true} : {})}} : {}),
     };
 }
 

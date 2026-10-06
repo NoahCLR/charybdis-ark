@@ -15,8 +15,20 @@ pages, the layout, the committed profile, combos, macro banks, settings,
 keyboard options and the base RGB effect. It publishes a sanitized snapshot;
 `session/device-model.js` turns that into the `model` the webview renders, and
 `session/panel-session.js` adds the draft and the panel's own state to it,
-routes each message the webview posts, and runs the Rename & Reorder panel — so
-`extension.js` keeps only VS Code's dialogs, files and progress.
+routes each message the webview posts, and runs the Rename & Reorder panel.
+`session/panel-loop.js` is the loop every host runs around them: route a
+message, run it, publish the model, turn a failure into the panel's notice,
+and decide what an export holds. A host passes in only its own functions
+(posting to the panel, toasts, progress, saving a recovery copy, choosing a
+profile file, saving an export), listed at the top of that file, so
+`extension.js` keeps only VS Code's dialogs, files and progress, and the web
+page's host (`web/web-host.mjs`) only the browser's. What differs between
+hosts reaches the panel as `model.host` (`panel-session.js`): whether it offers
+Choose keyboard or a theme toggle, its recovery copies, its words for
+connecting, and why it cannot reach a keyboard at all. `session/demo-session.js`
+is the demo (D-L53): the same draft over the bundled demo profile with no device
+behind it, which the loop answers to in place of the device service's state
+while it is open.
 
 Custom Profile Wire pages use one monotonically increasing nonzero request-id
 sequence per connected session (wrapping `255` to `1`), so a delayed response
@@ -102,6 +114,37 @@ the full HID device. The adapter boundary always uses 32-byte protocol frames;
 native writes are prefixed with the zero report-id byte required by `node-hid`,
 and reads accept either 32 protocol bytes or 33 bytes with that zero prefix.
 Any other native report invalidates the device session.
+
+The four identifiers live in `transport/device-adapter.js` and are shared by
+every adapter.
+
+## Browser adapter
+
+`WebHidDeviceAdapter` implements the same contract over Chrome's WebHID. It
+takes the `hid` object (`navigator.hid`) as an option and never names
+`navigator` itself; without one, every call fails with
+`NATIVE_MODULE_UNAVAILABLE`.
+
+`listDevices()` returns only the interfaces this page has already been allowed
+to open (`getDevices()`) whose collections carry the Raw HID usage page and
+usage. `requestDevice()` opens Chrome's picker filtered to all four
+identifiers and must run from a user gesture; a dismissed picker fails with
+`CANCELLED`. WebHID has no device path, so each `HIDDevice` object gets an id
+(`webhid:1`, `webhid:2`, …) the first time the adapter sees it and keeps it
+while Chrome keeps that object, which is as long as the keyboard stays plugged
+in. Descriptors carry node-hid's keys; those WebHID cannot know (path, serial
+number, manufacturer, release, interface) are `undefined`.
+
+Reports are sent with report id 0. An `inputreport` must carry report id 0 and
+exactly 32 bytes and reaches `onReport` as a `Buffer`; anything else
+invalidates the session. Chrome's `disconnect` event for the open device ends
+the connection; `close()` removes both listeners and closes the device once.
+
+A browser tab in the background has its timers throttled, so the waits between
+polls while reading and saving a profile (the candidate and VIA stage
+coordinators, and the storage wait) take a `sleep(ms)` the host passes as an
+option of `ProfileDeviceService` (or of `openPanelLoop`); the web page passes
+one kept by a worker. Without it they use `setTimeout`, as the extension does.
 
 The read-only CLI lists matching interfaces without opening or writing to one:
 

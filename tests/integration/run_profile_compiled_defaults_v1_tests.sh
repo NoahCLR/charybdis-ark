@@ -53,7 +53,31 @@ const {macros, ...rest} = stored.settings;
 const v3 = encodeSettings({...rest, formatVersion: 3, macroNames: Array.from({length: 64}, (_, i) => i === 63 ? "Édition ⌘" : i === 0 ? "Sign-off" : "")});
 const blob = decodeProfileBlob(stored.profile);
 fs.writeFileSync(process.argv[3] + '.pd3', encodeProfileBlob({schema: blob.schema, domains: blob.domains.map(d => d.id === 0x40 ? {...d, version: 3, payload: v3} : d)}));
+// Those four carry eight pointing slots (RGB v2, PD v1). The 32-slot firmware
+// refuses them as they are and takes Ark's import translation (upgradePdSlots),
+// written beside each as portable32.bin.*. A profile Ark writes for 32 slots
+// itself, its compiled profile with slot 12 configured and every name at its
+// worst case, is .pd6.
+const {upgradePdSlots} = require(app + "/core/model/portable-profile");
+const {ACTION_ABI} = require(app + "/core/schema/actions");
+const wrap = bytes => ({format: "charybdis-profile", version: 2, keyboard: "charybdis-4x6", actionAbiDigest: ACTION_ABI,
+    layers: Array.from({length: 8}, () => Array(60).fill(1)), profile: bytes.toString("base64"), macros: Array(64).fill("")});
+for (const suffix of [".pd", ".pd3", ".pd4", ".pd5"]) {
+    const eight = fs.readFileSync(process.argv[3] + suffix);
+    fs.writeFileSync(process.argv[3].replace(/portable\.bin$/, "portable32.bin") + suffix, Buffer.from(upgradePdSlots(wrap(eight)).profile, "base64"));
+}
+const {CAPABILITIES_32, document32} = require(app + "/tests/fixtures/pd-slots-32");
+let wide = document32();
+for (let slot = 0; slot < 64; slot++) wide = editMacro({document: wide, fingerprint: fingerprint(wide)}, {keycode: `VIA_MACRO_${slot}`, name: `Macro ${slot} name`.padEnd(20, "!"), expectedFingerprint: fingerprint(wide)});
+for (let slot = 0; slot < 64; slot++) wide = editCustomKey({document: wide, fingerprint: fingerprint(wide)}, {keycode: `CUSTOM_KEY_${slot}`, name: `Custom key ${slot}`.padEnd(20, "?"), expectedFingerprint: fingerprint(wide)}, CAPABILITIES_32);
+fs.writeFileSync(process.argv[3] + '.pd6', validateSnapshot(wide, CAPABILITIES_32).profile);
 JS
+
+# Ark's translation is the firmware's documented one, byte for byte.
+for suffix in .pd .pd3 .pd4 .pd5; do
+    python3 "$ROOT/tests/host/translate_eight_slot_profile.py" "$BUILD_DIR/portable.bin$suffix" "$BUILD_DIR/reference32.bin$suffix"
+    cmp "$BUILD_DIR/reference32.bin$suffix" "$BUILD_DIR/portable32.bin$suffix"
+done
 
 build_and_run() {
     name="$1"
@@ -95,15 +119,16 @@ build_and_run() {
         -o "$bin"
     if [ "$name" = configured ] || [ "$name" = configured_sanitized ]; then
         "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture"
-        "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --import-profile "$BUILD_DIR/portable.bin.pd"
-        "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --import-profile "$BUILD_DIR/portable.bin.pd3"
-        "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --import-profile "$BUILD_DIR/portable.bin.pd4"
-        "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --import-profile "$BUILD_DIR/portable.bin.pd5"
+        for suffix in .pd .pd3 .pd4 .pd5; do
+            "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --reject-profile "$BUILD_DIR/portable.bin$suffix"
+            "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --import-profile "$BUILD_DIR/portable32.bin$suffix"
+        done
+        "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --import-profile "$BUILD_DIR/portable.bin.pd6"
         if [ -n "${NOAH_TEST_PD_IMPORT:-}" ]; then
             "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --import-profile "$NOAH_TEST_PD_IMPORT"
         fi
     elif [ "$name" = empty ]; then
-        "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --empty-profile "$BUILD_DIR/portable.bin.pd"
+        "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --empty-profile "$BUILD_DIR/portable32.bin.pd"
     fi
 }
 

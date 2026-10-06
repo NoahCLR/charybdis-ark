@@ -9,7 +9,8 @@
 // positions in the layer stack, as `state.layer` is.
 //
 // Base is under every preview, so it only needs listing to preview a layer
-// over base alone: `on` is then `[0]`. With other layers on, base stays on.
+// over base alone: `on` is then `[0]`. With other layers on, base stays on,
+// and a layer added while base is the top goes on over it.
 
 export const EMPTY = Object.freeze([]);
 
@@ -20,7 +21,8 @@ export const layersOn = (top, on, count) =>
 
 // Toggles one layer into or out of the set. The highest layer left becomes the
 // top; with none left, base is shown on its own. Base toggles only while no
-// other layer is on under the top: once one is, base is on regardless.
+// other layer is on under the top: once one is, base is on regardless. From
+// base, a layer added goes on over base rather than replacing it.
 export function toggleLayer(top, on, index) {
     const held = [...(on || EMPTY)];
     if (index <= 0) {
@@ -30,7 +32,7 @@ export function toggleLayer(top, on, index) {
     const set = new Set([top, ...held]);
     if (set.has(index)) set.delete(index);
     else set.add(index);
-    const base = held.includes(0);
+    const base = top <= 0 || held.includes(0);
     set.delete(0);
     const sorted = [...set].sort((a, b) => a - b);
     const next = sorted.pop() ?? 0;

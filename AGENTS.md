@@ -63,13 +63,20 @@ Developer-only tools, never imported by the application runtime:
 - `scripts/check-agreement.js` (`npm run agreement`) judges a firmware's stated contract with
   Ark's own runtime decoder and gating; required on `main` in CI.
 - `scripts/preview.js` renders the interface against the test fixtures.
+- `scripts/build-web.js` (`npm run build:web`) bundles `core/` through
+  `web/core.mjs`, and the panel, for Chrome into the ignored `dist/web/`; the
+  extension never uses it ([REPOSITORY.md](docs/REPOSITORY.md#the-web-build)).
 - `scripts/check-compatibility.js` runs Ark-owned integration runners against explicitly selected
   firmware source; it is never imported by runtime code.
+- `tools/branch-window/` is a separate developer extension that opens Ark from
+  any of its worktrees in a new window
+  ([REPOSITORY.md](docs/REPOSITORY.md#trying-a-branch-before-it-lands)). It is
+  its own VS Code shell, so it may import `vscode`; nothing in the app imports it.
 
 ## Layout
 
 ```
-extension.js        VS Code surface only: command, panel, message relay
+extension.js        VS Code surface only: command, panel, the host functions the panel loop runs
 panel-html.js       the panel's HTML shell; the only host file that knows webview URIs
 core/               the app, with no host dependency
   transport/        device adapters and the request coordinator
@@ -85,9 +92,12 @@ webview/            the interface: browser ES modules, no build step
   styles.css        the design system
 docs/               app-owned product direction, specs and contributor workflows
 upstream/           pinned external contracts and inputs; read its AGENTS.md
+web/                web build entries: what a browser host takes from core/
 scripts/            developer entry points and build steps
+tools/              developer tools outside the app, e.g. the branch-window extension
 tests/              mirrors core/, plus the view modules and the posted payloads
 preview/            ignored generated previews, never authoritative source
+dist/               ignored web build output (`npm run build:web`)
 ```
 
 ## Documentation ownership
@@ -197,8 +207,11 @@ Every layer may also import from itself.
   layout are inert data in `core/data/`, readable from every layer; the
   interface gets a slot's bindings as `pdModes[].binding`.
 - What a panel control does in order (read, apply, discard, rebase, import,
-  layers) → `core/session/panel-controls.js`. `extension.js` passes in only
-  what a host has: progress, the recovery file, a chosen profile file.
+  layers) → `core/session/panel-controls.js`. The loop that routes each panel
+  message, runs it, publishes the model and turns a failure into a notice →
+  `core/session/panel-loop.js`, shared by every host. `extension.js` passes in
+  only what a host has: posting to the panel, toasts, progress, the recovery
+  file, a chosen profile file, and saving an export.
 
 ## Conventions
 

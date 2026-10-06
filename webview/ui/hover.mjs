@@ -2,7 +2,7 @@
 // without leaving the layer you are reading.
 
 import {el, esc} from "../lib/dom.mjs";
-import {actionLabel, behaviourFor, behaviourTiers, combosAt, keyMeaning, keyName, macroKeycodes, pointingSlotFor, resolvedPositions, visibleKeycode} from "../view/keyface.mjs";
+import {actionLabel, behaviourFor, behaviourTiers, combosAt, combosShownAt, keyMeaning, keyName, macroKeycodes, pointingSlotFor, resolvedPositions, visibleKeycode} from "../view/keyface.mjs";
 import {pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {getModel, heldLayers, layerName, positionAt} from "../store.mjs";
 import {branchBadge, comboBadge, keyNameMarked, mark, marked, sends, sendsKind, tierDot} from "./marks.mjs";
@@ -80,7 +80,7 @@ function seenThrough(model, stack, index) {
     const answer = resolvedPositions(stack, state(), held).find((entry) => entry.position.layoutIndex === index);
     if (!answer?.fellThrough) return "";
     const from = answer.layer, position = answer.position;
-    const sections = reachSections(model, from, position, index);
+    const sections = reachSections(model, from, position, index, combosShownAt(model, stack, state(), held, index));
     return `<div class="hc-through"><div class="hc-sect">
             <div class="hc-h">Seen through from ${marked(model, {kind: "layer", layer: from.index}, layerName(from))}</div>
             <div class="hc-title"><span class="t">${keyNameMarked(model, keyName(position), keyMeaning(position))}</span></div>
@@ -89,10 +89,11 @@ function seenThrough(model, stack, index) {
 }
 
 // What one stored key reaches: its behaviour, macros, pointing mode and the
-// combos on its layer at this position. Empty when it reaches none of them.
-function reachSections(model, layer, position, index) {
+// combos on its layer at this position — or, for a key seen through a preview,
+// the combos the board badges it with there. Empty when it reaches none of them.
+function reachSections(model, layer, position, index,
+    combos = combosAt(model, model?.layers || [], layer?.index ?? 0, index)) {
     const behaviour = behaviourFor(model, keyMeaning(position));
-    const combos = combosAt(model, model?.layers || [], layer?.index ?? 0, index);
     const macros = macroKeycodes(keyMeaning(position));
     const slot = pointingSlotFor(model, keyMeaning(position));
     const lit = stageEnabled(model, "key");

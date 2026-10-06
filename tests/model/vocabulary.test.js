@@ -11,7 +11,9 @@ const covers = (list, values, label) => assert.deepEqual(list.map(([id]) => id).
 const coversNumbers = (list, values, label) => assert.deepEqual(list.map(([id]) => id).sort(), Object.values(values).sort(), label);
 
 test("every stored enum value has a word", () => {
-    covers(VOCABULARY.holdHelpers, KEY_BEHAVIOR_HOLD_MODES, "hold helpers");
+    covers(VOCABULARY.holdHelpers.hold, KEY_BEHAVIOR_HOLD_MODES, "hold helpers under Hold");
+    covers(VOCABULARY.holdHelpers.long, KEY_BEHAVIOR_HOLD_MODES, "hold helpers under Long hold");
+    covers(VOCABULARY.holdWithoutLongHold, KEY_BEHAVIOR_HOLD_MODES, "holds without a long hold");
     covers(VOCABULARY.localities, rgb.RGB_LOCALITIES, "localities");
     covers(VOCABULARY.paintModes, rgb.RGB_LAYER_MODES, "layer paint modes");
     covers(VOCABULARY.fadeModes, rgb.RGB_AUTOMOUSE_MODES, "auto-mouse fades");
@@ -22,6 +24,8 @@ test("every stored enum value has a word", () => {
     coversNumbers(VOCABULARY.pointing.axes, pd.PD_AXIS, "axes");
     coversNumbers(VOCABULARY.pointing.buttons, pd.PD_BUTTON, "button kinds");
     coversNumbers(VOCABULARY.pointing.emptyDirection, pd.PD_EMPTY_DIRECTION, "empty direction");
+    coversNumbers(VOCABULARY.pointing.directionOutput, pd.PD_DIRECTION_OUTPUT, "directional output");
+    coversNumbers(VOCABULARY.pointing.scrollAxes, pd.PD_SCROLL_AXES, "scroll axes");
     coversNumbers(VOCABULARY.pointing.modifierPolicy, pd.PD_MODIFIERS, "modifier policy");
 });
 

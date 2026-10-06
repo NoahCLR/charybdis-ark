@@ -24,3 +24,17 @@ test("every pointing slot has a hold and a lock binding, found by name and by ke
     assert.deepEqual([PD_BINDINGS[0].holdCode, PD_BINDINGS[0].lockCode, PD_BINDINGS[6].holdCode, PD_BINDINGS[7].lockCode], [0x7e80, 0x7ea0, 0x7e86, 0x7ea7],
         "the firmware's fixed keycode blocks");
 });
+
+test("the keycode blocks hold 32 slots; a keyboard reaches only its own", () => {
+    const {PD_SLOT_BINDINGS, PD_SLOT_CAPACITY} = require("../../core/data/pd-bindings");
+    assert.equal(PD_SLOT_CAPACITY, 32);
+    assert.equal(PD_SLOT_BINDINGS.length, 32);
+    assert.deepEqual(PD_SLOT_BINDINGS.slice(0, 8), PD_BINDINGS, "the first eight are every configurable-slot firmware's");
+    assert.deepEqual([PD_SLOT_BINDINGS[31].hold, PD_SLOT_BINDINGS[31].holdCode, PD_SLOT_BINDINGS[31].lockCode], ["PD_SLOT_31", 0x7e9f, 0x7ebf]);
+    assert.deepEqual(pdBindingOfName("PD_SLOT_20_LOCK"), {slot: 20, locked: true});
+    assert.equal(resolveNativeQmkExpression("PD_SLOT_20", {}), 0x7e94);
+    assert.equal(resolveNativeQmkExpression("PD_SLOT_32", {}), undefined);
+    assert.deepEqual(pdBindingOfCode(0x7eb4), {slot: 20, locked: true});
+    assert.equal(pdBindingOfCode(0x7eb4, 8), undefined, "past an eight-slot keyboard's last slot");
+    assert.equal(pdBindingOfCode(0x7ec0), undefined, "the layer-lock block");
+});

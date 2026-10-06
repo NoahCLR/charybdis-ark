@@ -39,9 +39,10 @@ for (let offset = 8 + 4 * 96; offset < 8 + 5 * 96; offset++) {
         const bytes = Buffer.from(eight); bytes[offset] = value; add(bytes);
     }
 }
-// Every directional mode carries the empty-direction policy in byte 86.
+// Every directional mode carries the empty-direction policy in byte 86 and
+// how often it sends in byte 87.
 const dominantSlots = structuredClone(fixture.slots);
-Object.assign(dominantSlots[4], {axis: 2, emptyDirection: 2});
+Object.assign(dominantSlots[4], {axis: 2, emptyDirection: 2, directionOutput: 1});
 const dominant = encodePdDomain(dominantSlots);
 add(dominant);
 for (let offset = 8 + 4 * 96 + 70; offset < 8 + 4 * 96 + 90; offset++) {
@@ -49,10 +50,43 @@ for (let offset = 8 + 4 * 96 + 70; offset < 8 + 4 * 96 + 90; offset++) {
         const bytes = Buffer.from(dominant); bytes[offset] = value; add(bytes);
     }
 }
+// A scrolling mode carries which axes it scrolls in byte 3.
+const scrollSlots = structuredClone(fixture.slots);
+scrollSlots[0].axis = 2;
+const scrollOne = encodePdDomain(scrollSlots);
+add(scrollOne);
+for (const value of [0, 1, 2, 3, 4, 0xff]) {
+    const bytes = Buffer.from(scrollOne); bytes[8 + 3] = value; add(bytes);
+}
 for (const name of ["Édition ⌘", "😀".repeat(5), "x".repeat(23)]) {
     const slots = structuredClone(fixture.slots); slots[7].name = name; add(encodePdDomain(slots));
 }
 fs.writeFileSync(process.argv[3], Buffer.concat(chunks));
+
+// Version 2, the 32-slot firmware's sparse domain: the firmware's golden
+// vectors and Ark's mutations of them, each line Ark's verdict (code and
+// payload offset) for the C validator to agree with.
+const v2 = require(root + "/tests/fixtures/pd_mode_domain_v2.json");
+const lines = [];
+function addV2(name, bytes) {
+    let code = "OK", offset = 0;
+    try {decodePdDomain(bytes, {version: 2});} catch (error) {code = error.code; offset = error.offset;}
+    lines.push(`${code} ${offset} ${name} ${bytes.toString("hex") || "-"}`);
+}
+for (const vector of [...v2.valid, ...v2.invalid]) {
+    const bytes = Buffer.from(vector.hex, "hex");
+    const expected = vector.error ? `${vector.error.code} ${vector.error.offset}` : "OK 0";
+    addV2(vector.name, bytes);
+    if (!lines.at(-1).startsWith(expected + " ")) throw new Error(`Ark disagrees with firmware vector ${vector.name}: ${lines.at(-1).split(" ").slice(0, 2).join(" ")}, firmware ${expected}`);
+}
+const presets = Buffer.from(v2.valid.find(vector => vector.name === "presets").hex, "hex");
+for (let offset = 0; offset < 8 + 2 * 96; offset++) {
+    for (const value of [0, 1, 2, 0x20, 0x21, 0x60, 0x7f, 0xff]) {
+        const bytes = Buffer.from(presets); bytes[offset] = value; addV2(`ark-presets-${offset}-${value}`, bytes);
+    }
+}
+for (const length of [8, 9, 103, 104, 105, presets.length - 1]) addV2(`ark-presets-length-${length}`, presets.subarray(0, length));
+fs.writeFileSync(process.argv[3] + ".v2.txt", lines.join("\n") + "\n");
 JS
 
 build_and_run() {
@@ -62,7 +96,7 @@ build_and_run() {
         "$ROOT/tests/host/profile_pd_v1_test.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_pd_v1.c" \
         -o "$BUILD_DIR/$name"
-    "$BUILD_DIR/$name" "$BUILD_DIR/corpus.bin"
+    "$BUILD_DIR/$name" "$BUILD_DIR/corpus.bin" "$BUILD_DIR/corpus.bin.v2.txt"
 }
 build_and_run normal
 build_and_run sanitized -fsanitize=address,undefined -fno-omit-frame-pointer

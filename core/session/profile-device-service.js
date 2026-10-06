@@ -2,7 +2,7 @@
 
 const {baseLighting} = require("../model/settings-editor");
 const {profilePlacementProblem} = require("../model/profile-placement");
-const {actionLimitsFor, knownActionAbi} = require("../schema/actions");
+const {actionLimitsOfBlob, knownActionAbi, pdSlotCountOfVocabulary} = require("../schema/actions");
 const {customKeyOfCode, layerLockOfCode} = require("../data/user-keycodes");
 const {pdBindingOfCode} = require("../data/pd-bindings");
 const {layerName} = require("../model/vocabulary");
@@ -47,6 +47,10 @@ class ProfileDeviceService {
             onUnexpectedReport: ({reason}) => this.addDiagnostic(`Ignored an unexpected Raw HID report: ${reason}.`),
         });
         this.onChange = typeof options.onChange === "function" ? options.onChange : undefined;
+        // The wait between polls while reading and saving a profile. A host
+        // whose timers are throttled (a background browser tab) passes its
+        // own; the timer's is used otherwise.
+        this.sleep = typeof options.sleep === "function" ? options.sleep : undefined;
         this.profileSummary = normalizeProfileSummary(options.profileSummary);
         this.requestIdStart = normalizeRequestId(options.requestIdStart === undefined ? 1 : options.requestIdStart);
         this.readCandidateStatus = typeof options.readCandidateStatus === "function"
@@ -293,15 +297,15 @@ class ProfileDeviceService {
             for (const domain of blob.domains) {
                 try {
                     if (domain.id === PROFILE_DOMAIN_IDS.RGB) {
-                        domains.rgb = decodeRgbDomainV1(domain.payload);
+                        domains.rgb = decodeRgbDomainV1(domain.payload, {formatVersion: domain.version});
                     } else if (domain.id === PROFILE_DOMAIN_IDS.KEY_BEHAVIORS) {
-                        domains.keyBehaviors = decodeKeyBehaviorDomain(domain.payload, actionLimitsFor(blob.schema.major));
+                        domains.keyBehaviors = decodeKeyBehaviorDomain(domain.payload, actionLimitsOfBlob(blob));
                     } else if (domain.id === PROFILE_DOMAIN_IDS.PD_MODES) {
-                        domains.pdModes = decodePdDomain(domain.payload);
+                        domains.pdModes = decodePdDomain(domain.payload, {version: domain.version});
                     } else if (domain.id === PROFILE_DOMAIN_IDS.SETTINGS) {
                         domains.settings = decodeSettings(domain.payload);
                     } else if (domain.id === PROFILE_DOMAIN_IDS.COMBOS) {
-                        domains.combos = decodeComboDomain(domain.payload, domain.version, actionLimitsFor(blob.schema.major));
+                        domains.combos = decodeComboDomain(domain.payload, domain.version, actionLimitsOfBlob(blob));
                     }
                 } catch (error) {
                     failures.push({domainId: domain.id, message: error instanceof Error ? error.message : String(error)});
@@ -410,7 +414,7 @@ class ProfileDeviceService {
         await this.runOperation("reading complete profile", async () => {
             result = await captureProfile(this.connection, this.requestIds, this.capabilities, message => {
                 this.portableProgress = message; this.emitChange();
-            }, false, forRestore);
+            }, false, forRestore, {sleep: this.sleep});
             result.limits = await readSettingsLimits(this.connection, this.requestIds);
             result.options = await readKeyboardOptions(this.connection, this.requestIds);
             this.portable = result;
@@ -449,6 +453,7 @@ class ProfileDeviceService {
             started = true;
             result = await restoreProfile(this.connection, this.requestIds, this.capabilities, document, {...options,
                 baseSnapshot: cachedBase,
+                sleep: this.sleep,
                 onProgress: message => {this.portableProgress = message;},
                 // The step view the commit bar draws; it outlives the apply
                 // when it failed, so the person can see where and why.
@@ -804,11 +809,13 @@ function cloneCandidateStatus(status) {
 }
 
 // Keys neither QMK's catalogue nor the keyboard's own blocks name. The
-// catalogue ends at QK_USER_31; the blocks count only on the ABI the app knows.
+// catalogue ends at QK_USER_31; the blocks count only on the ABI the app knows,
+// and a pointing key only up to the slots that vocabulary has.
 function unnamedKeyCount(layers, capabilities) {
     const ownBlocks = knownActionAbi(capabilities?.actionAbiDigest);
+    const slots = pdSlotCountOfVocabulary(capabilities?.actionAbiDigest);
     const named = ({keycode, resolved}) => resolved.known
-        || ownBlocks && (customKeyOfCode(keycode) !== undefined || layerLockOfCode(keycode) !== undefined || pdBindingOfCode(keycode) !== undefined);
+        || ownBlocks && (customKeyOfCode(keycode) !== undefined || layerLockOfCode(keycode) !== undefined || pdBindingOfCode(keycode, slots) !== undefined);
     return layers.flatMap((entry) => entry.keys).filter((key) => !named(key)).length;
 }
 

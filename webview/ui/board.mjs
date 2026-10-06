@@ -7,12 +7,14 @@
 // a transparent key shows the key of the highest layer below that is on. Its
 // cap is frosted like any transparent key's, since this layer is glass there
 // and the key is seen through it; its legend stays sharp, and the light it
-// shows is the answering layer's, so its colour names that layer. Selection and
+// shows is the answering layer's, so its colour names that layer. It wears the
+// answering key's behaviour dots and the badges of the combos it fires in this
+// preview (combosInPreview). Selection and
 // edits still name this layer's own position.
 
 import {css, idealText, isOff} from "../lib/colour.mjs";
 import {GEO, LED_INDEX, TRACKBALL_LED, fitText, keyFaceRows, keyVisual} from "../view/geometry.mjs";
-import {behaviourFor, behaviourTiers, combosAt, keyFace, keyMeaning, resolvedPositions} from "../view/keyface.mjs";
+import {behaviourFor, behaviourTiers, combosShownAt, keyFace, keyMeaning, resolvedPositions} from "../view/keyface.mjs";
 import {keyLight, ownLight, stageEnabled, tierColour, trackballLight} from "../view/lighting.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {hideHover} from "./hover.mjs";
@@ -60,7 +62,7 @@ export function board(model, layer, options = {}) {
 
         const showMarks = faces && mode !== "leds";
         const tiers = showMarks ? behaviourTiers(behaviourFor(model, keyMeaning(shown))) : [];
-        const combos = showMarks ? combosAt(model, model?.layers || [], layer?.index ?? 0, index) : [];
+        const combos = showMarks ? combosShownAt(model, stack, layer?.index ?? 0, held, index) : [];
         const sub = mode === "leds" ? "" : face.sub;
         const rows = keyFaceRows(visual.y,
             {tiers: tiers.length > 0, combos: combos.length > 0, sub: Boolean(sub)});

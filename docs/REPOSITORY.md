@@ -1,7 +1,8 @@
 # Repository ownership and source provenance
 
-Charybdis Ark is an independent VS Code extension repository. Its app core,
-webview, tests, developer preview and keycode generation work from this checkout.
+Charybdis Ark is an independent repository for the VS Code extension and the
+web page (D-L52). Its app core, webview, web host, tests, developer preview and
+keycode generation work from this checkout.
 Firmware compilation, authored C profiles, hardware measurements and diagnostics
 belong to the firmware repository.
 
@@ -79,8 +80,9 @@ into Ark's storage on start (D-L47).
 Normal tests use injected HID adapters. `npm run probe:live-link` additionally
 loads the native HID module and enumerates matching devices without opening or
 writing them. A successful enumeration is not an Apply/recovery hardware test.
-The GitHub workflow runs app checks, catalog verification, preview generation
-and native module loading; it contains no publishing job.
+The check workflow runs app checks, catalog verification, preview generation
+and native module loading; it contains no publishing job. Publishing the web
+page is its own workflow ([below](#publishing-the-web-page)).
 
 For a local installation, check the extension symlink points at the intended
 Ark checkout. F5 can test a worktree without retargeting that installed copy.
@@ -118,7 +120,9 @@ ownership and where new plans or specifications belong.
 
 ### The code's layout
 
-- `extension.js` — the VS Code surface: command, panel, message relay.
+- `extension.js` — the VS Code surface: command, panel, and the host functions
+  (dialogs, files, progress, toasts) the shared panel loop in
+  `core/session/panel-loop.js` runs.
 - `panel-html.js` — the panel's HTML shell, the only host file that knows
   webview URIs.
 - `core/` — the device, with no host dependency, layered so imports point one
@@ -128,6 +132,11 @@ ownership and where new plans or specifications belong.
   system.
 - `tests/` — mirrors `core/`, plus the view modules and the payloads the
   interface posts.
+- `web/` — the [web page](#the-web-build): its HTML, the browser host that
+  does in a page what `extension.js` does in VS Code, what that host takes from
+  `core/`, and the stand-ins the bundle uses in place of Node's `Buffer` and the
+  native HID adapter. It may import `core/` (through `web/core.mjs`); the
+  extension never loads it, and `webview/` never imports it.
 
 The layer rules and where new work belongs are in [`AGENTS.md`](../AGENTS.md).
 The application runtime must not read the firmware repository, and the webview
@@ -146,7 +155,178 @@ npm run preview -- --vscode  # also write preview/vscode-{dark,light}.html, as t
 npm run probe:live-link # read-only enumeration of matching HID interfaces
 npm run keycodes -- --check # verify the catalog against the local pinned QMK inputs
 npm run keycodes           # regenerate from those same inputs
+npm run build:web          # build the web page into dist/web/
+npm run web                # …then serve it at http://localhost:8975/
+npm run check:site         # check dist/web/ is static files only, ready to publish
 ```
+
+### The web build
+
+The web version of Ark (D-L52) runs `core/` and the panel inside Chrome rather
+than in VS Code. `npm run build:web` (`scripts/build-web.js`, esbuild) writes
+the complete static site into the ignored `dist/web/`, ready to publish as it
+is: `index.html` (from `web/index.html`); the page's host (`web/page.mjs`)
+and `web/core.mjs`, the part of `core/` a browser host needs, with the code
+they share in a chunk; the host's clock worker (`web/sleep-worker.js`);
+`webview/app.mjs` with everything it imports; and `webview/styles.css`. Every
+file but `index.html` carries a hash of its content in its name, so a new
+release can never be served an old file. `index.html` names them itself, and
+the version (`package.json`) and commit (git, or `ARK_COMMIT` in the
+environment) the build came from. `_headers` (from `web/_headers`) is what
+Cloudflare Pages sends with the page when it is [published](#publishing-the-web-page).
+`dist/web-manifest.json`, beside the site rather than in it, lists the hashed
+names for tests and tools; it is never published and the page never fetches it.
+Each build empties the folder first. `npm run check:site`
+(`scripts/check-static-site.js`) checks that `dist/web/` holds only what the
+build writes, with no server code Pages would run.
+
+To try the page, run `npm run web`: it builds, then serves `dist/web/` at
+`http://localhost:8975/` (`scripts/serve.js`, a static server for this machine
+only). Open that in Chrome or Edge; `localhost` is a secure context, so WebHID
+works there as over HTTPS. Choose keyboard asks Chrome for the keyboard once;
+after that the page reconnects to it on load. The page holds the keyboard as
+the extension does, so close Ark in VS Code (and VIA) first. Recovery copies
+saved while trying it live in that origin's storage
+(`http://localhost:8975`), not in VS Code's.
+
+The page carries its Content Security Policy in a `<meta>` tag, so it holds
+under any server: scripts, styles and the worker from the page's own origin,
+the panel's inline style attributes, and `connect-src 'none'`, so after it
+loads the page makes no request at all. The policy is written once, as
+`POLICY` in `scripts/build-web.js`; `_headers` sends the same policy with
+`frame-ancestors 'none'`, which only works as a header.
+
+The browser host (`web/web-host.mjs`) runs the shared panel loop over
+`WebHidDeviceAdapter` and gives the panel an `acquireVsCodeApi` stand-in
+(`web/panel-channel.mjs`) that, like VS Code, delivers every message later and
+as a copy. Chrome opens its keyboard picker and file chooser only from a click,
+and a message reaches the host only after the click has ended, so the stand-in
+also shows the host each message synchronously, as a copy, while the panel's
+click handler is still running: the host starts `navigator.hid.requestDevice()`
+(or the file chooser) there, and the message that follows waits for what was
+picked. The host holds a Web Lock for as long as the page is open, so a second
+tab waits rather than connecting; warns on `beforeunload` while the draft has
+unapplied edits or Apply runs; passes `core/` a `sleep` driven by a dedicated
+worker, whose timers Chrome does not throttle in a background tab as it does the
+page's; and keeps recovery copies in IndexedDB after asking for persistent
+storage.
+
+It is a separate output, not a step of the extension: the extension still runs
+`core/` and `webview/` as they are, and `webview/` stays build-free source. No
+module of `core/` is rewritten for the browser. Its `Buffer` is the `buffer`
+package in the bundle (`web/buffer.mjs`), and `web/no-native-hid.js` takes the
+place of `core/transport/node-hid-adapter.js`, so a browser host passes its own
+device adapter. The build fails if node-hid, `vscode` or any Node built-in
+would reach a bundle, or if a bundle takes any package but `buffer`. A browser
+host needs a secure context (HTTPS or localhost) for the draft's
+`crypto.randomUUID()`.
+
+To export more of `core/` to a browser host, add it to `web/core.mjs`.
+`npm run test:browser` builds it and checks it in Chrome: the bundle has to
+decode and re-encode every profile fixture exactly as Node does, stage edits and
+build the same panel model, and the bundled panel has to render that model and
+post its edits. It then loads the built page with a fake `navigator.hid`
+(`browser-tests/fake-hid.js`) whose keyboard is `tests/fixtures/fake-keyboard.js`,
+a read-only simulated Charybdis answering in Node: Choose keyboard, a complete
+read, an edit, an export, an Apply the fake refuses (which still leaves a
+recovery copy to list and download), the theme, a reload that reconnects
+without the picker, a second tab that is refused, a browser without WebHID, and
+that no request went anywhere but the page's own files.
+
+### Publishing the web page
+
+`.github/workflows/publish-web.yml` publishes the page to Cloudflare Pages
+whenever `dev` or `main` moves. It builds the page (`npm ci`, then the web
+build, with `ARK_COMMIT` set to the pushed commit), runs the page's browser
+tests (`web-page.spec.js` and `web-build.spec.js`) against exactly those files
+(`ARK_WEB_BUILT=1` stops Playwright rebuilding them), checks they are static
+files only (`scripts/check-static-site.js`), and only then uploads `dist/web/`
+with Wrangler (`cloudflare/wrangler-action`, pinned to a commit) as
+`pages deploy dist/web --project-name=charybdis-ark --branch=<dev|main>`. A
+failed build, test or check publishes nothing, and the address keeps the page
+it had. The project name is the workflow's `PAGES_PROJECT`.
+
+| Branch | Where it goes |
+| --- | --- |
+| `dev` | a preview deployment, at `https://ark-dev.ncleroy.dev` (and `dev.charybdis-ark.pages.dev`), for testing |
+| `main` | the production deployment, at `https://ark.ncleroy.dev` (and `charybdis-ark.pages.dev`) |
+
+The workflow has `contents: read` only, never runs on pull requests, and
+publishes one run at a time per branch (a newer push waits; an upload is never
+cancelled). It is D-L51's one exception: it runs on `dev` pushes, and its tests
+gate only the publish. Its job is not one of `main`'s required checks and is
+deliberately not named like them. If `CLOUDFLARE_API_TOKEN` or
+`CLOUDFLARE_ACCOUNT_ID` is missing, the run still builds and tests the page,
+then fails at "Require the Cloudflare credentials", naming the missing secret:
+a red run, rather than a green one that left the address on an old page.
+
+`_headers` sends, for every file, the page's Content Security Policy with
+`frame-ancestors 'none'`, `Permissions-Policy: hid=(self)`,
+`X-Content-Type-Options: nosniff` and `Referrer-Policy: no-referrer`. `/` and
+`/index.html` are `Cache-Control: no-cache`: the browser may keep the page but
+asks for it again on every load (an unchanged page is a cheap 304), so a
+release shows on the next load. `no-store` would add nothing but a full
+download each time. Each hashed file gets
+`public, max-age=31536000, immutable` by an exact rule of its own, which the
+build writes for the files it wrote: a new page names new files, so it never
+mixes with an old one's, and no file whose name stays the same is ever marked
+immutable. Pages joins a header named by two matching rules, so nothing sets
+`Cache-Control` under `/*`.
+
+**One-time setup, before the first run (Noah):**
+
+1. In Cloudflare, create a Pages project named `charybdis-ark` for direct
+   upload, not a Git connection, with `main` as its production branch:
+   `npx wrangler pages project create charybdis-ark --production-branch=main`,
+   or in the dashboard Workers & Pages, Create, Pages, *Upload assets*. Any
+   other name works if `PAGES_PROJECT` in the workflow says the same.
+2. Add the custom domains `ark.ncleroy.dev` and `ark-dev.ncleroy.dev` to the
+   project, under Custom domains, and wait for both to show Active (until then
+   Pages answers 522). `README.md` gives the first. Then, in the `ncleroy.dev`
+   zone's DNS, change the `ark-dev` CNAME's target to
+   `dev.charybdis-ark.pages.dev` and keep it proxied. A branch's own domain
+   works only through a proxied record in a zone on Cloudflare; with other DNS,
+   or unproxied, it serves the production page instead.
+3. Create an API token with only *Account, Cloudflare Pages, Edit*, for this
+   account.
+4. In GitHub (Settings, Secrets and variables, Actions), add the token as
+   `CLOUDFLARE_API_TOKEN` and the account id (shown on the account's overview)
+   as `CLOUDFLARE_ACCOUNT_ID`.
+
+**Publishing by hand.** To publish `dev` or `main` again without a push, run
+the workflow from the Actions tab (*Publish the web page*, Run workflow, pick
+the branch) or with `gh workflow run publish-web.yml --ref dev`. Other branches
+are refused. Without GitHub, from a clean checkout of the branch, run the same
+steps locally and upload with Wrangler, logged in with `npx wrangler login`:
+
+```sh
+npm ci && npm run build:web
+npx playwright test browser-tests/web-page.spec.js browser-tests/web-build.spec.js
+npm run check:site
+npx wrangler pages deploy dist/web --project-name=charybdis-ark --branch=dev   # or main
+```
+
+Locally Playwright rebuilds `dist/web/` before testing it; that is the same
+build, as long as nothing changed in between.
+
+### Trying a branch before it lands
+
+`tools/branch-window/` is a second, separate VS Code extension
+(`noah.charybdis-ark-branch`), a developer tool that is not part of Ark. Link it
+once from the main checkout, then reload VS Code:
+
+```sh
+ln -s "$PWD/tools/branch-window" ~/.vscode/extensions/noah.charybdis-ark-branch-0.1.0
+```
+
+Its **Ark branch** button, beside **Charybdis Ark**, lists every Ark worktree
+on a branch: the main checkout first, then the most recently committed. Picking
+one opens a new window running that checkout's Ark, as F5 does but without a
+debugger; the installed Ark keeps running unchanged in every other window.
+Close the window to stop. It checks out and installs nothing: a branch is
+listed while its worktree exists, with the modules `verify` installed there,
+and disappears when `land` removes it. Detached worktrees (the tools' cached
+pin checkouts) are not listed.
 
 ### Running it without a keyboard
 
@@ -154,11 +334,16 @@ F5 provides a separate development host without changing the installed link. The
 launches an Extension Development Host with a debugger attached.
 
 To work on the interface without a keyboard, run `npm run preview`, serve this
-folder (`python3 -m http.server 8972`) and open `preview/index.html`. The preview
+folder (`node scripts/serve.js . --port 8972`) and open `preview/index.html`.
+`preview/index.html?host=web` answers as the web page's host instead, with
+its Choose keyboard, theme toggle, build line and recovery copies;
+`?host=web-none` has no keyboard yet and `?host=web-unsupported` no WebHID. The preview
 stands in for the extension host: it answers the webview's `ready` with one
 fixture model and logs every edit the interface posts back.
 Use `npm run preview -- --multiple --vscode` to inspect the selector with two
-fixture keyboards in the VS Code themed preview.
+fixture keyboards in the VS Code themed preview, and `npm run preview -- --slots 32`
+for the 32-slot pointing firmware (its compiled profile, with slot 12
+configured too).
 
 ### Compatibility with firmware
 
@@ -172,7 +357,9 @@ checkout or app dependencies.
 ### CI and publishing
 
 Development is verified locally, so CI does not run on `dev` or on pull requests
-into it (D-L51). A release's `dev` → `main` pull request runs the independent app
+into it (D-L51). The one exception is [publishing the web page](#publishing-the-web-page),
+which builds and tests the page on each `dev` and `main` push before it
+uploads it, and gates nothing else. A release's `dev` → `main` pull request runs the independent app
 suite on Linux and macOS, loads the native HID module, runs the browser smoke,
 checks every imported source pin against its published trunk, runs the
 [compatibility bridge](COMPATIBILITY.md) at the pins and judges the firmware
@@ -183,7 +370,8 @@ Actions.
 
 `npm run test:browser` starts a fixture-only preview and drives a pointer-speed
 edit, checking the complete posted settings section and the host stylesheet
-cascade. Install its browser once with `npx playwright install chromium`.
+cascade, then checks [the web build](#the-web-build) in Chrome against Node
+and the built page against a fake keyboard. Install its browser once with `npx playwright install chromium`.
 The small host-style fixture covers known padding/cascade regressions; it is not
 a VS Code extension-host or physical-device acceptance test.
 

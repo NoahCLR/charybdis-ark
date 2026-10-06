@@ -5,8 +5,16 @@
 
 export const KIND = {DIRECTIONAL: 1, SCROLLING: 2};
 export const BUTTON = {PASS_THROUGH: 0, CONSUME: 1, TAP: 2, HOLD_MODIFIERS: 3};
+// What a direction's shortcut does with modifiers held while it sends: they
+// apply, the chosen ones are left out, or the shortcut is sent exactly.
+export const MODIFIER_POLICY = {INHERIT: 0, MASK: 1, EXACT: 2};
 export const DIRECTIONS = [["up", "Up"], ["left", "Left"], ["right", "Right"], ["down", "Down"]];
 export const AXIS = {VERTICAL: 0, HORIZONTAL: 1, DOMINANT: 2, EIGHT: 3};
+// A scrolling mode keeps which axes it scrolls in the same stored byte.
+export const SCROLL_AXES = {BOTH: 0, HORIZONTAL: 1, VERTICAL: 2};
+// The axes a slot scrolls; a slot only just switched to scrolling still holds
+// its directional axis, which means nothing here, so it starts on both.
+export const scrollAxesOf = (slot) => slot.kind === KIND.SCROLLING ? slot.axis ?? SCROLL_AXES.BOTH : SCROLL_AXES.BOTH;
 // Eight directions add the diagonals, stored beside the straight directions.
 export const DIAGONALS = [["upLeft", "Up-left"], ["upRight", "Up-right"], ["downLeft", "Down-left"], ["downRight", "Down-right"]];
 // The directions each axis setting reads. The keyboard refuses a mode that
@@ -48,7 +56,7 @@ export const SCROLL_STARTER = {thresholdH: 2, thresholdV: 3, divisorH: 6, diviso
     startNumerator: 7, startDenominator: 4, sustainNumerator: 5, sustainDenominator: 4, decayDivisor: 4, invert: 0};
 export function startingRecord(slot, kind) {
     if (kind === KIND.SCROLLING && !SCROLL_FIELDS.some(([key]) => Number(slot.scroll?.[key]))) return {...slot, scroll: {...SCROLL_STARTER}};
-    if (kind === KIND.DIRECTIONAL && !Number(slot.thresholdX) && !Number(slot.thresholdY)) return {...slot, thresholdX: 0, thresholdY: DIRECTIONAL_STARTER_THRESHOLD};
+    if (kind === KIND.DIRECTIONAL && !Number(slot.thresholdX) && !Number(slot.thresholdY)) return {...slot, axis: AXIS.VERTICAL, thresholdX: 0, thresholdY: DIRECTIONAL_STARTER_THRESHOLD};
     return slot;
 }
 // A new mode for an empty slot, from the firmware's shipped tuning: a
@@ -59,7 +67,7 @@ export function startingRecord(slot, kind) {
 export function newMode(slot, kind) {
     const starter = kind === KIND.SCROLLING
         ? {...slot, kind, axis: 0, thresholdX: 0, thresholdY: 0, heldModifiers: 0, scroll: {...SCROLL_STARTER}}
-        : {...slot, kind, axis: AXIS.DOMINANT, thresholdX: DIRECTIONAL_STARTER_THRESHOLD, thresholdY: DIRECTIONAL_STARTER_THRESHOLD, emptyDirection: 0};
+        : {...slot, kind, axis: AXIS.DOMINANT, thresholdX: DIRECTIONAL_STARTER_THRESHOLD, thresholdY: DIRECTIONAL_STARTER_THRESHOLD, emptyDirection: 0, directionOutput: 0};
     return readConfig(starter, {kind: () => kind, name: () => `Mode ${slot.id}`, dpi: () => "0"});
 }
 // Volume's vertical threshold, the firmware's shipped tuning for a directional
@@ -101,27 +109,77 @@ export function readConfig(slot, form) {
         config.thresholdX = threshold(readsHorizontal(axis), readsHorizontal(slot.axis), number(form.thresholdX?.(), slot.thresholdX));
         config.thresholdY = threshold(readsVertical(axis), readsVertical(slot.axis), number(form.thresholdY?.(), slot.thresholdY));
         const reads = axisReads(axis);
-        config.directions = Object.fromEntries(DIRECTIONS.map(([direction]) => [direction, reads.includes(direction) ? {
+        config.directions = Object.fromEntries(DIRECTIONS.map(([direction]) => [direction, reads.includes(direction) ? tapRecord({
             keycode: form[`dir:${direction}`] ? form[`dir:${direction}`]() || "0" : String(slot.directions?.[direction]?.keycode ?? 0),
             modifierPolicy: form[`dirPolicy:${direction}`] ? form[`dirPolicy:${direction}`]() : slot.directions?.[direction]?.modifierPolicy ?? 0,
             mask: form[`dirMask:${direction}`] ? form[`dirMask:${direction}`]() : slot.directions?.[direction]?.mask ?? 0,
-        } : {keycode: "0", modifierPolicy: 0, mask: 0}]));
+        }) : tapRecord({})]));
         // Diagonals exist only in eight-direction mode; any other axis
         // carries them as zero, which the keyboard requires.
         const eight = axis === AXIS.EIGHT;
-        config.diagonals = Object.fromEntries(DIAGONALS.map(([diagonal]) => [diagonal, eight ? {
+        config.diagonals = Object.fromEntries(DIAGONALS.map(([diagonal]) => [diagonal, eight ? tapRecord({
             keycode: form[`diag:${diagonal}`] ? form[`diag:${diagonal}`]() || "0" : String(slot.diagonals?.[diagonal]?.keycode ?? 0),
-            modifierPolicy: slot.diagonals?.[diagonal]?.modifierPolicy ?? 0,
-            mask: slot.diagonals?.[diagonal]?.mask ?? 0,
-        } : {keycode: "0", modifierPolicy: 0, mask: 0}]));
+            modifierPolicy: form[`diagPolicy:${diagonal}`] ? form[`diagPolicy:${diagonal}`]() : slot.diagonals?.[diagonal]?.modifierPolicy ?? 0,
+            mask: form[`diagMask:${diagonal}`] ? form[`diagMask:${diagonal}`]() : slot.diagonals?.[diagonal]?.mask ?? 0,
+        }) : tapRecord({})]));
         config.emptyDirection = form.emptyDirection ? form.emptyDirection() : slot.emptyDirection ?? 0;
+        config.directionOutput = form.directionOutput ? form.directionOutput() : slot.directionOutput ?? 0;
     } else {
+        config.axis = form.scrollAxes ? form.scrollAxes() : scrollAxesOf(slot);
         config.heldModifiers = form.heldModifiers ? form.heldModifiers() : slot.heldModifiers;
         config.scroll = Object.fromEntries(SCROLL_FIELDS.map(([key]) => [key,
             number(form[`scroll:${key}`]?.(), slot.scroll?.[key] ?? 0)]));
         config.scroll.invert = form.invert ? form.invert() : slot.scroll?.invert ?? 0;
     }
     return config;
+}
+
+// One direction's shortcut as the keyboard stores it: no shortcut stores
+// nothing at all, and a modifier mask goes only with "Ignore", which needs
+// one. Clearing a shortcut that left out modifiers therefore posts an empty
+// direction rather than a mask the keyboard refuses.
+export function tapRecord({keycode, modifierPolicy, mask}) {
+    const code = String(keycode ?? "").trim() || "0";
+    if (code === "0") return {keycode: "0", modifierPolicy: MODIFIER_POLICY.INHERIT, mask: 0};
+    const policy = Number(modifierPolicy) || MODIFIER_POLICY.INHERIT;
+    return {keycode: code, modifierPolicy: policy, mask: policy === MODIFIER_POLICY.MASK ? Number(mask) || 0 : 0};
+}
+// Every direction and diagonal shortcut of a directional record, by its form
+// key's suffix and where it sits in the record.
+export const TAP_ROWS = [...DIRECTIONS.map(([name, label]) => ({key: `dir:${name}`, group: "directions", name, label})),
+    ...DIAGONALS.map(([name, label]) => ({key: `diag:${name}`, group: "diagonals", name, label}))];
+// "Ignore" is stored only with the modifiers it leaves out, and they are
+// chosen after it, so until then the direction posts as the slot stored it
+// and the editor holds the choice, as it does for button overrides.
+export function settleTaps(slot, config) {
+    const pending = {};
+    if (config.kind !== KIND.DIRECTIONAL) return {config, pending};
+    const settled = {...config, directions: {...config.directions}, diagonals: {...config.diagonals}};
+    for (const {key, group, name} of TAP_ROWS) {
+        const tap = settled[group][name];
+        if (tap.modifierPolicy !== MODIFIER_POLICY.MASK || tap.mask) continue;
+        pending[key] = tap;
+        const stored = slot[group]?.[name] || {};
+        settled[group][name] = tapRecord({keycode: tap.keycode, modifierPolicy: stored.modifierPolicy, mask: stored.mask});
+    }
+    return {config: settled, pending};
+}
+
+// The DPI a mode runs at: its own, or the normal pointer DPI the keyboard
+// reports when it keeps that.
+export function modeDpi(slot, configDefaults) {
+    if (Number(slot.dpi)) return Number(slot.dpi);
+    const field = (configDefaults || []).find((section) => section.id === "normalPointerSpeed")?.fields?.find((entry) => entry.macro === "normalDpi");
+    return Number(field?.value) || 0;
+}
+// About how far the ball turns before a threshold of sensor counts is
+// reached at a DPI, short for beside the value and in full for its tip;
+// null when either is unknown.
+export function thresholdDistance(counts, dpi) {
+    const value = Number(counts), speed = Number(dpi);
+    if (!value || !speed) return null;
+    const mm = value / speed * 25.4, text = mm < 10 ? mm.toFixed(1) : String(Math.round(mm));
+    return {short: `≈ ${text} mm`, long: `Sensor counts: about ${text} mm of ball movement at ${speed} DPI.`};
 }
 
 // One mouse-button override as the keyboard stores it: a shortcut only when

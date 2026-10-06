@@ -5,13 +5,16 @@
 // A panel session is a plain object the host keeps per window — the device
 // service, the draft, the layer editor, and the outbox the next model carries
 // (a notice, an accepted edit, a request to reset forms). Everything here is
-// free of VS Code, so it is tested like the rest of core/; extension.js keeps
-// only dialogs, files and progress.
+// free of VS Code, so it is tested like the rest of core/; panel-loop.js runs
+// it for every host, and extension.js keeps only VS Code's dialogs, files and
+// progress.
 
 const {fingerprint, summary, reorderLayers} = require("../model/portable-profile");
 const {profileReview} = require("../model/profile-review");
+const {profileUsage} = require("../model/profile-usage");
 const {ProfileDraftSession, DRAFT_EDITS} = require("./profile-draft-session");
 const {buildDeviceModel, deviceSummary} = require("./device-model");
+const {demoDiagnostics, demoHeader, demoModel} = require("./demo-session");
 
 const DRAFT_CONTROLS = new Set([
     "reviewProfileDraft", "undoProfileDraft", "redoProfileDraft", "jumpProfileDraft", "discardProfileDraft", "discardProfileDraftChanges",
@@ -21,6 +24,37 @@ const PORTABLE_MESSAGES = new Set([
     "exportPdUpgrade", "exportPortableProfile", "choosePortableProfile", "restorePortableProfile",
     "managePortableLayers", "editPortableLayer", "savePortableLayers", "cancelPortableReview",
 ]);
+// The demo's own controls (demo-session.js).
+const DEMO_MESSAGES = new Set(["openDemo", "openDemoProfile", "leaveDemo"]);
+
+// What the panel says and offers that depends on its host, published as
+// `model.host`, so the panel never asks which host it is in. A host passes
+// `words` that differ from these, and `panel()` for what it offers now:
+//
+//   chooseKeyboard   the panel offers Choose keyboard, which opens the host's picker
+//   blocked          {title, detail}: why this host cannot reach a keyboard at all
+//   theme            "light" or "dark" when the panel offers its own theme toggle
+//   recoveries       [{id, name, savedAt}]: recovery copies the panel lists, each downloadable
+//   build            {version, commit} the host was built from
+//   progress         what the host is doing, where it has no indicator of its own
+//
+// A session without a host (the preview, tests) describes the extension's.
+const HOST_WORDS = Object.freeze({
+    noKeyboard: "No keyboard is connected. Connect one and choose Read keyboard.",
+    connectHint: "Connect a Charybdis, then read it to begin editing.",
+});
+function hostModel(host) {
+    const offered = host?.panel?.() || {};
+    return {
+        chooseKeyboard: Boolean(offered.chooseKeyboard),
+        blocked: offered.blocked || null,
+        theme: offered.theme === "light" || offered.theme === "dark" ? offered.theme : null,
+        recoveries: Array.isArray(offered.recoveries) ? offered.recoveries : null,
+        build: offered.build || null,
+        progress: offered.progress || null,
+        words: {...HOST_WORDS, ...host?.words},
+    };
+}
 
 // A complete read of an eight-layer keyboard opens the draft, or refreshes the
 // one already open against what the keyboard now holds.
@@ -50,9 +84,11 @@ function discardDraftForDevice(session, state, snapshot) {
 
 // The model the webview renders. With a draft open, the editable surfaces come
 // from the draft, while the device header and diagnostics stay the keyboard's
-// own: the rail describes the keyboard, not the draft.
+// own: the rail describes the keyboard, not the draft. In the demo, `state` is
+// the demo's (demo-session.js panelState), and the header says demo: no
+// keyboard is read, so none is described.
 function buildPanelModel(session, state) {
-    observePortable(session, state);
+    if (!session.demo) observePortable(session, state);
     if (session.draft && state.connected && state.selectedDeviceId === session.draft.deviceId) session.draft.noteConnection(state.connectionToken);
     const device = state.devices?.find((entry) => entry.id === state.selectedDeviceId);
     const busy = Boolean(state.busy || session.portableBusy || session.readBusy);
@@ -80,6 +116,11 @@ function buildPanelModel(session, state) {
     // The last Apply's steps: live while it runs, kept when it failed. A
     // successful one lasts only until its readback ends, so a later busy
     // operation is not drawn as reading back an Apply.
+    if (session.demo) {
+        model.device = demoHeader(session, busy);
+        model.diagnostics = demoDiagnostics(session);
+    }
+    model.demo = demoModel(session, state);
     const live = state.liveApply;
     model.apply = live && (live.state === "applying" || live.state === "failed" || (live.state === "done" && session.applyRunning)) ? live : null;
     model.postApplyRead = session.postApplyReadStep ? {
@@ -91,22 +132,36 @@ function buildPanelModel(session, state) {
         available: Boolean(state.connected && [5, 8].includes(state.capabilities?.compiledLayerCount) && (state.capabilities?.supportedDomainMask & 15) === 15),
         eightLayers: state.capabilities?.compiledLayerCount === 8,
         legacy: state.capabilities?.compiledLayerCount === 5,
-        pdUpgradeAvailable: Boolean(state.capabilities?.featureFlags & (1 << 13)),
+        // The legacy upgrade export is the extension's alone; a host without it
+        // does not offer it.
+        pdUpgradeAvailable: Boolean(state.capabilities?.featureFlags & (1 << 13)) && (!session.host || typeof session.host.exportPdUpgrade === "function"),
         busy,
         progress: state.portableProgress,
         review: session.portableReview ? {incoming: summary(session.portableReview.document), current: session.portableReview.before.summary,
             fileName: session.portableReview.fileName || null, differences: importDifferences(session)} : null,
         layers: session.portableLayers ? {key: session.portableLayers.before.fingerprint, order: session.portableLayers.order, names: session.portableLayers.names, keysFollow: session.portableLayers.keysFollow !== false} : null,
+        usage: usageOf(session, state, model.draft),
     };
     if (!model.draft?.matching) model.layers?.forEach((layer, index) => {layer.displayName = state.portableSummary?.names[index] || layer.name;});
     const editableDraft = Boolean(model.draft?.matching && !model.draft.stale && state.connected);
     const readReady = (session.readReady ?? editableDraft) && editableDraft;
+    model.host = hostModel(session.host);
     model.load = {
         state: session.readBusy ? "loading" : readReady ? "ready" : "unavailable",
         phase: state.phase || "idle",
         progress: state.portableProgress || state.layout?.progress || state.committed?.progress || null,
     };
     return model;
+}
+
+// How full the profile is: the draft's, when one is open for this keyboard,
+// otherwise what the keyboard runs. Nothing without a connected keyboard. In
+// the demo, an unedited draft is the demo setup.
+function usageOf(session, state, draft) {
+    if (!state.connected) return null;
+    const fromDraft = Boolean(session.draft && draft?.matching);
+    const usage = profileUsage(fromDraft ? session.draft.current : session.service?.portable, state.capabilities);
+    return usage && {...usage, source: fromDraft && session.draft.dirty ? "draft" : session.demo ? "demo" : "keyboard"};
 }
 
 // A chosen profile file against what the keyboard holds, not the draft: that
@@ -152,6 +207,10 @@ function routeMessage(session, message, state) {
         return "none";
     }
     if (session.portableBusy || session.readBusy) return "none";
+    if (DEMO_MESSAGES.has(type)) return "demo";
+    // A panel that loads again in the demo stays in it; reading a keyboard
+    // leaves it first (panel-loop.js), so nothing reads one from here.
+    if (session.demo && (type === "ready" || type === "refresh" || type === "selectDevice")) return "none";
     if (session.draft && (DRAFT_EDITS.has(type) || DRAFT_CONTROLS.has(type)) && message.draftId !== session.draft.id) {
         throw new Error("This edit belongs to an older draft. Read the keyboard before continuing.");
     }
@@ -251,4 +310,4 @@ function applyLayerEdit(edit, message) {
 
 const layerEditDocument = (edit) => reorderLayers(edit.before.document, edit.order, edit.order.map((old) => edit.names[old]), {keysFollow: edit.keysFollow !== false});
 
-module.exports = {DRAFT_CONTROLS, PORTABLE_MESSAGES, applyLayerEdit, buildPanelModel, discardDraftForDevice, layerEditDocument, observePortable, routeMessage, startLayerEdit, takeOutbox};
+module.exports = {DEMO_MESSAGES, DRAFT_CONTROLS, HOST_WORDS, PORTABLE_MESSAGES, applyLayerEdit, buildPanelModel, hostModel, discardDraftForDevice, layerEditDocument, observePortable, routeMessage, startLayerEdit, takeOutbox};

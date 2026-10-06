@@ -43,11 +43,13 @@ matrix.
 | Macros | 64 named VIA macro slots with builder, recorder and preview; shared-memory and per-macro limits shown and enforced (D-L25, D-L26) |
 | Custom keys | 64 named keys that do what their behaviour says: rename, add or open the behaviour, place, see where each is used (D-L42) |
 | Mouse | Pointer and sniping DPI, auto-sniping and auto-mouse: global-policy sections the core files under the Mouse area, so the rail, the review and import counts all place them there. The auto-mouse fade delay is a share of the timeout, edited on its lighting stage (D-L17) |
-| Pointing modes | Eight device-owned slots and eight RGB rows; see [PD-mode domain v1](../upstream/firmware/docs/architecture/pd-mode-domain-v1.md) |
+| Pointing modes | Eight device-owned slots and eight RGB rows (PD domain v1, RGB v2), or 32 on firmware whose action vocabulary has them (sparse PD domain v2, RGB v3); the slot count is the vocabulary's (`core/schema/actions.js` `pdSlotCountFor`), and an eight-slot backup imports onto 32-slot firmware. See [PD-mode domain v1](../upstream/firmware/docs/architecture/pd-mode-domain-v1.md) |
 | Global policy | Every other portable setting, including startup layers, combo matching and device-reported lighting and key options; unsupported firmware features stay read-only |
 | Backup and restore | Complete snapshots, import review against the keyboard, recovery file and verified restore |
 | Drafts and Apply | One draft with item-by-item review, discard by edit group, Show, undo/redo and draft history; the review checks reachable actions, confirms active warnings and traps, and blocks profiles the destination cannot save (D-L36); Apply shows its steps and says where a failure happened (D-L19, D-L23, D-L29, D-L30) |
 | Recovery | Atomic logical Apply, differential transfer, reboot recovery fencing, firmware roll-forward after the decision, resume after a lost or power-cycled peer link, bounded cancel owned by the keyboard (D-L20–D-L22, D-L27, D-L39) |
+| Where it runs | The VS Code extension, and a web page that runs all of Ark in Chrome or Edge over WebHID (D-L52): Choose keyboard, one tab at a time, recovery copies in the browser's storage, a light/dark toggle. `npm run build:web` writes the page as static files; a workflow publishes it to Cloudflare Pages: `dev` at `ark-dev.ncleroy.dev`, `main` at `ark.ncleroy.dev` from the first release |
+| Demo without a keyboard | Explore a demo, in both hosts and on a browser without WebHID: the bundled demo profile (`core/data/`) in a real draft under current firmware's capabilities, every screen editable and reviewed; Apply refused, Export saves the draft, Open a profile file replaces it, leaving with edits not exported asks first (D-L53) |
 
 The rail's health strip shows connection, both-half convergence, draft state
 and recovery state. Convergence needs the firmware's peer-known and
@@ -65,7 +67,7 @@ Remaining before calling the product complete:
   USB role migration is untested: on the normal pair the left half exposes no
   Raw HID interface (`FORCE_SLAVE`/`usb_disconnect`), so it needs role-switching
   firmware;
-- standalone packaging (D-L02);
+- the web page's first release to `ark.ncleroy.dev` (D-L52);
 - the open issues below.
 
 ## Open Issues
@@ -75,6 +77,13 @@ Remaining before calling the product complete:
   does not include, matched against its rules files and QMK's defaults. It
   drifts when a feature is enabled or disabled. The keyboard should report its
   built features so the picker reads them from the device.
+- **Eight-slot firmware is tested from a frozen fixture.** Ark speaks the
+  32-slot firmware's contract (digest `0xf79c6151`, PD v2 and RGB v3), checked
+  on the keyboard and against its pinned golden vectors, the compatibility
+  bridge and agreement. It still speaks the eight-slot firmware, but only from a
+  frozen copy of that firmware's compiled profile
+  (`tests/fixtures/compiled_profile_pd_eight_slot.fixture`), which the firmware
+  no longer keeps. It retires with eight-slot support.
 - **Firmware open issues** are tracked in the firmware direction: the one-half
   power-cycle recovery transition, why a peer stops acknowledging a push or
   fails a flash write mid-copy (D-L22, D-L27), physical acceptance of buffered gesture timing
@@ -111,6 +120,9 @@ Its `core/` has no `vscode` imports, so repackaging as a standalone desktop app
 is a shell and adapter swap rather than a rewrite. The independent repository
 needs no firmware workspace (D-L44); requiring VS Code remains a distribution
 limitation. The trigger to repackage is the first non-developer user.
+
+Amended by D-L52: the second host is a web page, beside the extension rather
+than instead of it, so using Ark no longer requires VS Code.
 
 ### D-L04 — The source editor is retired
 
@@ -495,7 +507,11 @@ different activations. The view can therefore overlap those groups; it is the
 current activation, not another storage location. A combo in the view requires
 all inputs in that activation and uses the configured Combo Layer Matching
 reference when one is set. Tab counts still count the selected layer's stored
-routes.
+routes. On the board, a key the selected layer stores keeps its own marks; a
+transparent key answered from below wears that key's behaviour dots and the
+badges of the combos On this view lists it in (`combosInPreview` in
+webview/view/keyface.mjs). Under Combo Layer Matching the reference layer's keys
+are matched instead, so no answer from below adds a badge.
 
 The reach sections have one open state by section identity across those four
 tabs. Opening one does not close another. A section unique to one tab keeps its
@@ -544,7 +560,9 @@ sequenced Apply itself. Each rule now has one home:
 - Settings bits and base lighting: `fieldMask` and `baseLighting` in
   `core/model/settings-editor.js`.
 - Panel sequencing: `core/session/panel-controls.js`, tested with a fake
-  service; `extension.js` supplies dialogs, files and progress.
+  service; the message loop around it, for every host:
+  `core/session/panel-loop.js`. `extension.js` supplies dialogs, files,
+  progress and toasts as host functions.
 - Interface: `canEdit(area)` for permission, `view/reach-groups.mjs` and
   `ui/groups.mjs` for grouped lists, `slotLight` in `ui/marks.mjs`, one form
   per macro slot and one `state.combo` for the builder.
@@ -758,8 +776,10 @@ is separate from recognition of its advertised policy.
 ### D-L49 — Timing findings constrain the reachability graph conservatively
 
 Ark resolves each row's timing overrides against the connected settings, including
-the dual-role default for authored LT rows. A Hold and Long hold both set to
-"tap on release after hold" have an impossible Hold branch when Long hold is
+the dual-role default for authored LT rows. A Hold and Long hold that both
+tap on release ("tap on release after Tap / hold threshold", "… after Long
+hold threshold") have
+an impossible Hold branch when Long hold is
 at or before Tap / hold: no release interval selects Hold. Review and the
 behaviour editor warn, and the layer graph removes that proven-impossible edge,
 including behaviours reached through combo outputs. Global-default edits are
@@ -787,18 +807,41 @@ keeps native-buffering warnings for those families on bit-17-only firmware.
 Neither capability changes stored profile bytes. Firmware owns that policy and
 its native-key controls; Ark owns these findings and their presentation.
 
-An empty first-press tap or hold on a dual-role row is not "nothing": the
-keyboard runs the key's own action there. The behaviour grid shows it as a
-dashed "built in" cell, derived from the stored keycode and claimed only where
-firmware advertises it: an LT() row's tap and layer hold on bit 17, an MT() or
-OSM() row's tap and modifier hold on bit 18. Older firmware classified these
-keys in QMK first, so Ark claims nothing there. The built-in cell is display
-only; setting an action in it authors the tier (core/model/built-in-behavior.js).
+An empty tap or first-press hold is not "nothing": the keyboard runs the key's
+own action there. The behaviour grid shows it as a dashed "built in" cell,
+derived from the stored keycode. An empty tap sends the key's own tap once per
+press, so it is claimed at every tap count up to the row's deepest stored step
+and marked `×N` past a single tap; deeper counts are separate gestures and stay
+empty. The hold belongs to the first press. A plain key (a basic keycode, alone
+or with modifiers) taps itself and holds itself down as a fallback that any
+first-press hold or long hold replaces; every firmware with a Profile Wire does
+this. Bare modifiers are buffered, not tapped, and claim nothing. Dual-role
+keys are claimed only where firmware advertises them: an LT() row's tap and
+layer hold on bit 17, an MT() or OSM() row's tap and modifier hold on bit 18.
+Older firmware classified those keys in QMK first, so Ark claims nothing there.
+The other hold tier also fills a cell. With no Long hold, nothing happens at
+its threshold and a release never selects it, so the press's Hold, set or
+built in, carries on as its helper runs (held, repeating, sending on release,
+or already sent at the Tap / hold threshold); the vocabulary's `holdWithoutLongHold`
+words it. With a Long hold and no Hold at all, the press stays in its tap
+window until Long hold, and a release in between sends that count's tap, set
+or built in; Ark claims this for plain keys, custom keys and macros
+(`releaseTaps`), not for layer keys (no tap once held past Tap / hold),
+pointing keys (their own hold) or bare modifiers.
+A dashed cell is display only; setting an action in it authors the tier
+(core/model/built-in-behavior.js, `impliedBranch` in webview/view/keyface.mjs).
 New behaviour editors start with no authored branches, preserving these defaults.
 Selecting a key opens its row or an unstored grid; only an action, timing override
 or anchor change creates a draft row. Previews never enter the host model's stored
 behaviour list, counts or board marks. Transparent keys and `KC_NO` have no
 behaviour editor, and the host rejects them as new or retargeted row targets.
+Behaviour rows are keyed by keycode, so in a layer preview selecting a
+transparent position opens the keycode the board shows there, answered from
+below (`behaviourKeyAt` in webview/view/behavior-editor.mjs), naming the layer
+that supplies it and that the row is shared by that keycode. A position answered
+by `KC_NO`, by nothing, or shown alone outside a preview keeps no editor.
+Changing the previewed layers re-resolves a row opened from the selected key; a
+row picked from the list stays (`toggleLayerOn` in webview/store.mjs).
 Opening a custom key's behaviour follows the same rule.
 The timing controls lead with **Multi tap window** (release to next press),
 followed by Tap / hold and Long hold. Behaviour and combo timing inputs show
@@ -847,6 +890,68 @@ Ark will be released next to: firmware `main`, or firmware `dev` when the
 pull request's hidden release marker names a joint release; the release command
 re-checks it when it merges. Nightly runs check `dev`, warn early about firmware
 `dev`, and raise an alarm if the published Ark `main` and firmware `main` ever
-disagree; none of them blocks. This replaces D-L50's "required on `main`" and
+disagree; none of them blocks. The one workflow that does run on `dev` pushes
+is publishing the web page (D-L52), whose tests gate only that publish. This replaces D-L50's "required on `main`" and
 release-stack wording where they differ: Ark and firmware release separately,
 and together only when the contract between them changes (firmware D-F06).
+
+### D-L52 — Ark is also a web page
+
+Ark runs in Chrome (and Edge) as a web page, beside the VS Code extension, so
+using it needs no VS Code, no checkout and no install. Both hosts run the same
+`core/` and panel through the shared host loop (`core/session/panel-loop.js`);
+the page's host (`web/`) does over WebHID, in the page, what `extension.js`
+does in VS Code. What differs between them reaches the panel in the model
+(`model.host`): Choose keyboard, the host's words for connecting, the theme
+toggle and the recovery copies. The panel never asks which host it is in.
+
+The page is static files with no server code: `npm run build:web` writes the
+complete site, hashed names and all, and after it loads the page makes no
+network request (its policy says `connect-src 'none'`). The keyboard is reached
+only through WebHID, after the person picks it in Chrome's picker. One tab holds
+the keyboard (a Web Lock); leaving with unapplied edits or during Apply asks
+first; Apply's waits run on a worker's clock, so a background tab does not slow
+it. Recovery copies are kept in the browser's storage (IndexedDB), listed on
+Profile & backups with a download each; clearing the site's data deletes them.
+The legacy eight-slot upgrade export stays the extension's.
+
+The page is published to Cloudflare Pages from GitHub Actions, as the folder
+the build writes and nothing else (`.github/workflows/publish-web.yml`): `dev`
+to the preview address `ark-dev.ncleroy.dev` for testing, `main`, the
+project's production branch, to `ark.ncleroy.dev`. Each run builds the page,
+tests those built files in Chrome and checks they are static files only, with
+no Pages Functions or `_worker.js`, before Wrangler uploads them. This is
+D-L51's one exception: it runs on `dev` pushes, and its tests gate only the
+publish, never a merge or a release. The build's `_headers` sends the page's
+policy with `frame-ancestors 'none'`, which only a header can set,
+`Permissions-Policy: hid=(self)`, `nosniff` and `no-referrer`; the page is
+revalidated on every load and each hashed file cached for good, so a release
+shows on the next load and never mixes with an old one's files. The demo without
+a keyboard is D-L53.
+
+### D-L53 — The demo is a draft with no keyboard behind it
+
+Ark can be explored with no keyboard. The demo is not a simulated keyboard
+answering the wire protocol: it is the same `ProfileDraftSession` a keyboard's
+read opens, over a profile document, run by the shared host loop, so every
+screen, edit, check and review behaves as on a keyboard and both hosts offer it
+(`core/session/demo-session.js`). Its document is the bundled demo profile, an
+export of a real keyboard shipped as data (`core/data/demo-profile.charybdis.json`,
+never hand-edited and never read from a firmware checkout), or a profile file
+opened in its place and checked as Import checks one. It runs under the
+capabilities current firmware reports (the 32-slot action vocabulary
+`0xf79c6151`, its limits and keyboard options), held equal to what the fake
+current keyboard reports by test.
+
+Inside the session the demo is the draft's device: while `session.demo` is set,
+the state the panel answers to is the demo's (`panelState`), in which the draft's
+source is present, so the editing gates hold unchanged. What the panel is told
+is not a keyboard: `model.device` says Demo with no connection, generation or
+halves, `model.demo` says the demo is open, and the panel shows a persistent
+strip saying so. What needs a keyboard is refused in core, not only hidden:
+Apply and reviewing against the keyboard. Export saves the draft itself, since
+there is no keyboard profile to export. Reading or choosing a keyboard leaves
+the demo; with edits not exported since, the message must say the panel asked
+(`discardDemo`), or it is refused. The demo is offered only with no keyboard
+connected and no unapplied keyboard draft, and on a page that cannot reach a
+keyboard only where the host says so (`model.host.blocked.demo`).

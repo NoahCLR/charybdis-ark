@@ -11,12 +11,31 @@
 const {RGB_STAGE_BITS} = require("../schema/rgb-domain-v1");
 
 const VOCABULARY = Object.freeze({
-    // How a hold tier runs once its threshold passes; a tap tier only sends.
-    holdHelpers: [
-        ["PRESS_AND_HOLD_UNTIL_RELEASE", "held until release"],
-        ["TAP_AT_HOLD_THRESHOLD", "tap at hold threshold"],
-        ["TAP_ON_RELEASE_AFTER_HOLD", "tap on release after hold"],
-        ["REPEAT_WHILE_HELD", "repeat while held"],
+    // How a hold tier runs once its threshold passes, in that tier's words: a
+    // helper that names a threshold names the tier's own, the Tap / hold
+    // threshold for Hold and the Long hold threshold for Long hold. A tap tier
+    // only sends.
+    holdHelpers: {
+        hold: [
+            ["PRESS_AND_HOLD_UNTIL_RELEASE", "held until release"],
+            ["TAP_AT_HOLD_THRESHOLD", "tap at Tap / hold threshold"],
+            ["TAP_ON_RELEASE_AFTER_HOLD", "tap on release after Tap / hold threshold"],
+            ["REPEAT_WHILE_HELD", "repeat while held"],
+        ],
+        long: [
+            ["PRESS_AND_HOLD_UNTIL_RELEASE", "held until release"],
+            ["TAP_AT_HOLD_THRESHOLD", "tap at Long hold threshold"],
+            ["TAP_ON_RELEASE_AFTER_HOLD", "tap on release after Long hold threshold"],
+            ["REPEAT_WHILE_HELD", "repeat while held"],
+        ],
+    },
+    // What a Hold does past the Long hold threshold when no Long hold is set:
+    // nothing takes over, so it carries on the way it runs.
+    holdWithoutLongHold: [
+        ["PRESS_AND_HOLD_UNTIL_RELEASE", "stays held until release"],
+        ["TAP_AT_HOLD_THRESHOLD", "already sent at Tap / hold threshold"],
+        ["TAP_ON_RELEASE_AFTER_HOLD", "still sends on release"],
+        ["REPEAT_WHILE_HELD", "keeps repeating until release"],
     ],
     tapSends: "tap sends",
     tiers: {tap: "Tap", hold: "Hold", long: "Long hold"},
@@ -56,6 +75,8 @@ const VOCABULARY = Object.freeze({
         kinds: [[0, "Empty"], [1, "Directional keys / shortcuts"], [2, "Scrolling"]],
         axes: [[2, "Dominant axis"], [3, "Eight directions"], [0, "Vertical only"], [1, "Horizontal only"]],
         invert: [[0, "Neither axis"], [1, "Horizontal"], [2, "Vertical"], [3, "Both axes"]],
+        // Which axes a scrolling mode scrolls.
+        scrollAxes: [[0, "Both axes"], [1, "Horizontal only"], [2, "Vertical only"]],
         pointerLayer: [[0, "Keep the pointer layer active"], [1, "Return to the typing layer"]],
         buttons: [[0, "Pass through"], [1, "Consume"], [2, "Tap a shortcut"], [3, "Hold modifiers"]],
         // What moving toward a direction with no shortcut does. "Both" sends
@@ -64,6 +85,9 @@ const VOCABULARY = Object.freeze({
         // straight direction's diagonals. Only eight directions has those, so
         // elsewhere it acts as "its neighbours take over".
         emptyDirection: [[0, "Its neighbours take over"], [1, "Send both neighbours"], [2, "Nothing"]],
+        // How often a directional mode sends: once for each threshold step,
+        // or once per movement: again only after a pause or moving back.
+        directionOutput: [[0, "Every step"], [1, "Once per movement"]],
         modifierPolicy: [[0, "Inherit modifiers"], [1, "Ignore"], [2, "Exact shortcut"]],
         scrollFields: [
             ["thresholdH", "Horizontal activation threshold"], ["thresholdV", "Vertical activation threshold"],

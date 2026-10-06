@@ -1,5 +1,6 @@
-// Pointing modes: eight device-owned slots. Each one re-reads the trackball as
-// scrolling or as directional keys while its key is held or toggled.
+// Pointing modes: the device-owned slots, eight or 32 as the firmware has them.
+// Each one re-reads the trackball as scrolling or as directional keys while its
+// key is held or toggled.
 //
 // The surface leads with what the mode is — name, movement, speed, actions —
 // and keeps thresholds, ratios and button overrides under Advanced, where they
@@ -7,7 +8,7 @@
 
 import {css, isOff} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
-import {AXIS, BUTTON, DIAGONALS, DIRECTIONS, KIND, SCROLL_FIELDS, axisReads, dpiOptions, newMode, readConfig, readsHorizontal, readsVertical, settleButtons, startingRecord} from "../view/pointing-config.mjs";
+import {AXIS, BUTTON, DIAGONALS, DIRECTIONS, KIND, MODIFIER_POLICY, SCROLL_FIELDS, TAP_ROWS, axisReads, dpiOptions, modeDpi, newMode, readConfig, readsHorizontal, readsVertical, scrollAxesOf, settleButtons, settleTaps, startingRecord, thresholdDistance} from "../view/pointing-config.mjs";
 import {MODIFIER_BITS, keyName, modifierNames} from "../view/keyvalues.mjs";
 import {bindingsForSlot} from "../view/keyface.mjs";
 import {pdColourRow, stageEnabled} from "../view/lighting.mjs";
@@ -39,6 +40,9 @@ const SCROLL_LEAD = [["divisorH"], ["divisorV"], ["intervalMs", "ms"], ["lockMs"
 // the two axis ratios, each as one numerator : denominator pair.
 const SCROLL_SINGLES = [["thresholdH"], ["thresholdV"], ["expireMs", "ms"], ["decayDivisor"]];
 const SCROLL_RATIOS = [["startNumerator", "startDenominator"], ["sustainNumerator", "sustainDenominator"]];
+// More slots than this, and the empty ones are listed as numbered chips
+// under the configured cards, so 32 slots fit beside the editor.
+const FULL_CARD_SLOTS = 8;
 // A slot's binding keycodes come with the model (data/pd-bindings.js).
 const bindingName = (slot) => slot.binding?.hold || "";
 const axisLabel = (model, axis) => word(words(model).axes, axis);
@@ -51,7 +55,7 @@ export function screenPointing() {
 
     const main = el(`<div class="main">${topbar(
         "Pointing modes",
-        "Eight device-owned slots. Each re-reads the trackball while its key is held or toggled — as scrolling, or as directional keys and shortcuts.",
+        `${slots.length && slots.length !== 8 ? slots.length : "Eight"} device-owned slots. Each re-reads the trackball while its key is held or toggled — as scrolling, or as directional keys and shortcuts.`,
         slots.length && canEdit ? `<span class="note">Changes stage as you make them</span>` : "",
     )}</div>`);
     const content = el(`<div class="content"><div class="pad pd-page"></div></div>`);
@@ -65,27 +69,49 @@ export function screenPointing() {
         return main;
     }
 
-    const list = el(`<nav class="pd-slots" aria-label="Pointing slots"></nav>`);
+    const compact = slots.length > FULL_CARD_SLOTS;
+    const list = el(`<nav class="pd-slots ${compact ? "many" : ""}" aria-label="Pointing slots"></nav>`);
     const changedSlots = draftMarks(model?.draft?.changes).pointing;
+    const pick = (slot) => { state.pdSlot = slot.id; state.pdKind = null; state.pdButtons = null; state.pdTaps = null; render(); };
     for (const slot of slots) {
+        if (compact && !slot.kind) continue;
         const {swatch} = slotLight(model, slot);
         const bindings = !slot.kind ? bindingsForSlot(model, slot) : null;
         const inert = bindings ? bindings.keys.length + bindings.behaviours.length + bindings.combos.length : 0;
         const card = el(`<button class="slotcard ${slot.kind ? "" : "empty"}" data-slot="${slot.id}" aria-current="${state.pdSlot === slot.id}">
             ${swatch()}
             <span class="nm">${slot.kind ? esc(slot.name) : "Empty slot"}</span><span class="no">${changedSlots.has(slot.id) ? draftDot("Changed in your draft", "lead") : ""}${slot.id}</span>
-            <span class="meta">${slot.kind === KIND.SCROLLING ? "Scrolling" : slot.kind === KIND.DIRECTIONAL ? `Directional · ${esc(axisLabel(model, slot.axis))}` : "Available"}</span>
+            <span class="meta">${slot.kind === KIND.SCROLLING ? `Scrolling${slot.axis ? ` · ${esc(word(words(model).scrollAxes, slot.axis))}` : ""}` : slot.kind === KIND.DIRECTIONAL ? `Directional · ${esc(axisLabel(model, slot.axis))}` : "Available"}</span>
             <span class="meta mono">${esc(bindingName(slot))}</span>
             ${inert ? `<span class="meta warn">${inert} action${inert === 1 ? "" : "s"} reach it · inert</span>` : ""}</button>`);
-        card.addEventListener("click", () => { state.pdSlot = slot.id; state.pdKind = null; state.pdButtons = null; render(); });
+        card.addEventListener("click", () => pick(slot));
         list.append(card);
     }
+    if (compact) list.append(emptyChips(model, slots.filter((slot) => !slot.kind), changedSlots, pick));
     pad.appendChild(list);
 
     const slot = slots.find((row) => row.id === state.pdSlot) || slots[0];
     pad.appendChild(slot.kind ? editor(model, slot, canEdit, slots) : emptySlot(model, slot, canEdit, slots));
     main.appendChild(content);
     return main;
+}
+
+// The empty slots of a keyboard with many, as one grid of numbered chips: the
+// slot to fill next is a click away without 24 cards saying "Empty slot". A
+// chip marks a draft change, and a slot that keys still reach, as its card would.
+function emptyChips(model, empties, changedSlots, pick) {
+    const node = el(`<div class="pd-empties"><div class="pd-empties-h">Empty slots · ${empties.length}</div><div class="pd-chips"></div></div>`);
+    const grid = node.querySelector(".pd-chips");
+    for (const slot of empties) {
+        const {keys, behaviours, combos} = bindingsForSlot(model, slot);
+        const inert = keys.length + behaviours.length + combos.length;
+        const tip = `Slot ${slot.id} · empty${inert ? ` · ${inert} action${inert === 1 ? "" : "s"} reach it` : ""}`;
+        const chip = el(`<button class="slotchip ${inert ? "warn" : ""}" data-slot="${slot.id}" aria-current="${state.pdSlot === slot.id}"
+            aria-label="${esc(tip)}" data-tip="${esc(tip)}">${slot.id}${changedSlots.has(slot.id) ? draftDot("Changed in your draft", "corner") : ""}</button>`);
+        chip.addEventListener("click", () => pick(slot));
+        grid.append(chip);
+    }
+    return node;
 }
 
 // A binding for an empty slot is allowed by the keyboard, so the interface
@@ -143,7 +169,7 @@ function editor(model, slot, canEdit, slots) {
 
     const field = (label, value, key, options = {}) => {
         const node = el(`<label class="field"><span>${esc(label)}</span>
-            <span class="affix ${options.unit ? "unit" : ""}"><input class="input mono" value="${esc(value ?? "")}" inputmode="numeric" ${disabled}
+            <span class="affix ${options.unit ? "unit" : ""} ${options.wide ? "wide" : ""}"><input class="input mono" value="${esc(value ?? "")}" inputmode="numeric" ${disabled}
             ${options.tip ? `data-tip="${esc(options.tip)}"` : ""}>${options.unit ? `<i>${esc(options.unit)}</i>` : ""}</span></label>`);
         form[key] = () => node.querySelector("input").value;
         return node;
@@ -237,8 +263,6 @@ function editor(model, slot, canEdit, slots) {
                     klass: `arm ${direction}`, labelHtml: `<b>${ARROWS[direction]}</b> ${esc(label)}`,
                 }));
             }
-            form[`dirPolicy:${direction}`] = () => slot.directions?.[direction]?.modifierPolicy ?? 0;
-            form[`dirMask:${direction}`] = () => slot.directions?.[direction]?.mask ?? 0;
         }
         if (slot.axis === AXIS.EIGHT) {
             for (const [diagonal, label] of DIAGONALS) {
@@ -251,6 +275,8 @@ function editor(model, slot, canEdit, slots) {
         // shortcut does.
         card.querySelector(".card-b").append(select("When a direction is empty", words(model).emptyDirection, slot.emptyDirection ?? 0, "emptyDirection",
             {tip: "Moving toward a direction with no shortcut: its neighbours take over its share; both neighbours are sent (a diagonal's two straight directions, a straight direction's two diagonals, so in eight directions only); or the move does nothing."}));
+        card.querySelector(".card-b").append(select("How often it sends", words(model).directionOutput, slot.directionOutput ?? 0, "directionOutput",
+            {tip: "Every step sends the shortcut again each time the ball moves a threshold further. Once per movement sends it once, however far the ball goes; it sends again when the ball moves back the other way, or after a 150 ms pause. Turning toward another direction sends nothing more."}));
         cross.append(el(`<div class="hub" aria-hidden="true"><svg viewBox="0 0 64 64">
             <circle cx="32" cy="32" r="22"/><circle cx="32" cy="32" r="3"/>
             ${reads.includes("up") ? `<path d="M32 4l-4 5h8z"/>` : ""}${reads.includes("down") ? `<path d="M32 60l-4-5h8z"/>` : ""}
@@ -265,6 +291,8 @@ function editor(model, slot, canEdit, slots) {
         const steps = card.querySelector(".pd-grid4");
         for (const [key, unit] of SCROLL_LEAD) steps.append(field(scrollLabel(model, key, unit), slot.scroll?.[key], `scroll:${key}`, {unit}));
         const lower = card.querySelector(".pd-split");
+        lower.append(select("Scrolls", words(model).scrollAxes, scrollAxesOf(slot), "scrollAxes",
+            {tip: "Which way this mode scrolls. With one axis, a swipe the other way does nothing, and its slight drift does not scroll the allowed axis."}));
         lower.append(select("Reverse scrolling", words(model).invert, slot.scroll?.invert, "invert"));
         lower.append(modifiers(words(model).heldModifiers, slot.heldModifiers, "heldModifiers"));
         wrap.append(card);
@@ -314,11 +342,49 @@ function editor(model, slot, canEdit, slots) {
     const behaviour = el(`<div class="pd-grid3"></div>`);
     behaviour.append(select("After this mode ends", words(model).pointerLayer, slot.pointerLayer, "pointerLayer"));
     if (!scrolling) {
-        // An axis the mode does not read has no threshold to set.
-        if (readsHorizontal(slot.axis)) behaviour.append(field("Horizontal movement per tap", slot.thresholdX, "thresholdX"));
-        if (readsVertical(slot.axis)) behaviour.append(field("Vertical movement per tap", slot.thresholdY, "thresholdY"));
+        // An axis the mode does not read has no threshold to set. Sending
+        // once per movement, the threshold is how far a movement has to go.
+        const per = slot.directionOutput === 1 ? "movement before it sends" : "movement per tap";
+        const dpi = modeDpi(slot, model.configDefaults);
+        const distance = (counts) => {
+            const shown = thresholdDistance(counts, dpi);
+            return shown ? {unit: shown.short, wide: true, tip: shown.long} : {tip: "Sensor counts at this mode's pointer speed."};
+        };
+        if (readsHorizontal(slot.axis)) behaviour.append(field(`Horizontal ${per}`, slot.thresholdX, "thresholdX", distance(slot.thresholdX)));
+        if (readsVertical(slot.axis)) behaviour.append(field(`Vertical ${per}`, slot.thresholdY, "thresholdY", distance(slot.thresholdY)));
     }
     section("Behaviour").append(behaviour);
+
+    if (!scrolling) {
+        // Each shortcut's own handling of modifiers held while it sends. A
+        // direction with no shortcut stores none, so only those with one
+        // are listed; an "Ignore" still being set up is drawn as chosen.
+        const mods = section("Held modifiers");
+        const unfinished = state.pdTaps?.slot === slot.id ? state.pdTaps.rows : {};
+        const rows = TAP_ROWS.filter(({group, name}) => (group === "diagonals" ? slot.axis === AXIS.EIGHT : axisReads(slot.axis).includes(name))
+            && Number(slot[group]?.[name]?.keycode));
+        if (rows.length) {
+            const table = el(`<div class="pd-taps"><span class="h">Direction</span><span class="h">While modifiers are held</span><span class="h">Left out</span></div>`);
+            for (const {key, group, name, label} of rows) {
+                const tap = unfinished[key] || slot[group][name];
+                const prefix = group === "diagonals" ? "diag" : "dir";
+                const policy = select(`${label} with held modifiers`, words(model).modifierPolicy, tap.modifierPolicy ?? 0, `${prefix}Policy:${name}`,
+                    {tip: "Inherit: modifiers you hold apply to the shortcut, so Shift with an arrow selects. Ignore: the modifiers chosen below are left out while it sends. Exact: it sends exactly its shortcut, whatever you hold."});
+                policy.querySelector("span").classList.add("sr");
+                const masking = tap.modifierPolicy === MODIFIER_POLICY.MASK;
+                const left = masking ? modifierNames(tap.mask).join(", ") || "choose at least one below" : "—";
+                table.append(el(`<span class="n">${ARROWS[name]} ${esc(label)}</span>`), policy, el(`<span class="note">${esc(left)}</span>`));
+                if (masking) {
+                    const grid = modifiers(`${label} leaves out`, tap.mask ?? 0, `${prefix}Mask:${name}`);
+                    grid.classList.add("mods");
+                    table.append(grid);
+                }
+            }
+            mods.append(table);
+        } else {
+            mods.append(el(`<p class="note">Give a direction a shortcut to choose what held modifiers do to it.</p>`));
+        }
+    }
 
     if (scrolling) {
         const tuning = el(`<div class="pd-grid3"></div>`);
@@ -386,9 +452,12 @@ function editor(model, slot, canEdit, slots) {
     });
 
     stageCurrent = () => {
-        const {config, pending} = settleButtons(slot, readConfig(slot, form));
-        const holding = Object.keys(pending).length > 0, held = Boolean(state.pdButtons);
-        state.pdButtons = holding ? {slot: slot.id, rows: pending} : null;
+        const buttons = settleButtons(slot, readConfig(slot, form));
+        const {config, pending} = settleTaps(slot, buttons.config);
+        const holding = Object.keys(buttons.pending).length > 0 || Object.keys(pending).length > 0;
+        const held = Boolean(state.pdButtons || state.pdTaps);
+        state.pdButtons = Object.keys(buttons.pending).length ? {slot: slot.id, rows: buttons.pending} : null;
+        state.pdTaps = Object.keys(pending).length ? {slot: slot.id, rows: pending} : null;
         post(edits.pdMode(slot.id, config, model.profileIdentity));
         // A new kind draws its own field, even when nothing new was stored.
         if (holding || held) render();
@@ -401,6 +470,7 @@ function editor(model, slot, canEdit, slots) {
     head.querySelector('[data-act="clear"]').addEventListener("click", () => {
         state.pdKind = null;
         state.pdButtons = null;
+        state.pdTaps = null;
         post(edits.clearPdMode(slot.id, model.profileIdentity));
     });
     head.querySelector('[data-act="duplicate"]')?.addEventListener("click", () => {

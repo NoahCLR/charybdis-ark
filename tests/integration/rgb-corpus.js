@@ -11,18 +11,23 @@ const options = {
     tapBranchColorCount: Number(fixture["codec.tap_branch_color_count"]),
     supportedPdModeIds: Array.from({length: 8}, (_, id) => id).filter(id => Number(fixture["codec.supported_pd_mode_mask"]) & (1 << id)),
 };
+// 1: the schema-1 build (six PD rows). 3: the schema-2 build of the 32-slot
+// firmware, from its own golden compiled domain (rgb_domain_v3.json).
 const version = Number(process.argv[4]);
 let golden = Buffer.from(fixture["payload.hex"], "hex");
-if (version === 2) {
-    const model = decodeRgbDomainV1(golden, options);
-    model.formatVersion = 2;
-    options.supportedPdModeIds.push(6, 7);
-    model.pdModeColors.push(...[6, 7].map(pdModeId => ({pdModeId, color: {h: 0, s: 0, v: 0}, locality: 0})));
-    golden = encodeRgbDomainV1(model, options);
-}
+if (version === 3) {
+    const v3 = require(process.argv[2] + "/tests/fixtures/rgb_domain_v3.json");
+    Object.assign(options, {compiledStageMask: v3.limits.compiledStageMask, logicalLayerCount: v3.limits.logicalLayerCount,
+        maximumBrightness: v3.limits.maximumBrightness, tapBranchColorCount: v3.limits.tapBranchColorCount,
+        supportedPdModeIds: Array.from({length: 32}, (_, id) => id).filter(id => (v3.limits.supportedPdModeMask >>> id) & 1)});
+    golden = Buffer.from(v3.valid.find(vector => vector.name === "compiled").hex, "hex");
+} else if (version !== 1) throw new Error(`No RGB corpus for format ${version}.`);
 assert.deepEqual(encodeRgbDomainV1(decodeRgbDomainV1(golden, options), options), golden);
-const chunks = [Buffer.from([options.compiledStageMask, options.logicalLayerCount, options.maximumBrightness,
-    options.tapBranchColorCount, version === 2 ? 255 : 63])];
+// The probe's limits: four single bytes, then the PD slot mask as 32 bits.
+const config = Buffer.alloc(8);
+config.set([options.compiledStageMask, options.logicalLayerCount, options.maximumBrightness, options.tapBranchColorCount]);
+config.writeUInt32LE(options.supportedPdModeIds.reduce((mask, id) => (mask | (1 << id)) >>> 0, 0), 4);
+const chunks = [config];
 let accepted = 0, rejected = 0;
 function add(bytes) {
     let valid = 1;

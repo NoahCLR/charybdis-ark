@@ -19,8 +19,9 @@ checkout. Everything Ark shows comes from the keyboard itself.
 - **Lighting.** Set layer and mode colours, combo and key feedback, and the
   auto-mouse fade. The board on screen is painted the way the keyboard will
   light up.
-- **Trackball.** Set pointer speed, sniping and auto-mouse, and eight pointing
-  modes (scroll, volume, zoom, arrows, your own shortcuts…) with their keys.
+- **Trackball.** Set pointer speed, sniping and auto-mouse, and up to 32 pointing
+  modes, as many as your firmware has (scroll, volume, zoom, arrows, your own
+  shortcuts…), with their keys.
 
 ## Nothing is saved until you say so
 
@@ -33,10 +34,19 @@ and reads the result back to prove it.
 **Export profile** saves your whole setup as one file. **Import profile**
 restores it after the same review.
 
+No keyboard to hand? **Explore a demo** opens Ark on a complete setup with nothing
+connected. Every screen works and every edit shows up in the review; only Apply
+needs the keyboard, and Export takes what you made there to yours.
+
 ## Install
 
-It's early days: for now Ark runs as a VS Code extension, installed from a
-checkout.
+It's early days: Ark runs as a VS Code extension, installed from a checkout,
+and now also as a web page in Chrome or Edge, talking to the keyboard over
+WebHID. The released page is at **https://ark.ncleroy.dev**; nothing to install,
+just open it.
+You can also build it and open it locally (`npm run web`).
+
+For the extension:
 
 ```sh
 git clone https://github.com/NoahCLR/charybdis-ark.git
@@ -55,6 +65,6 @@ A plain `qmk compile` image can't be read or saved by Ark.
 ## Learn more
 
 - [Ark guide](docs/GUIDE.md): every screen, Review's checks, what happens
-  while a profile is applied, and backups
+  while a profile is applied, backups, and using Ark in Chrome
 - [Product goal](docs/PRODUCT_GOAL.md): what Ark is meant to become
 - [Developing Ark](docs/REPOSITORY.md#development-and-installation)

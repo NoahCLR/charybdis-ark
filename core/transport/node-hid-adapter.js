@@ -1,17 +1,16 @@
 "use strict";
 
 const {
+    CHARYBDIS_PRODUCT_ID,
+    CHARYBDIS_VENDOR_ID,
     LIVE_LINK_ERROR_CODES,
     LiveLinkTransportError,
+    QMK_RAW_HID_USAGE,
+    QMK_RAW_HID_USAGE_PAGE,
     RAW_HID_REPORT_SIZE,
     liveLinkError,
     normalizeRawHidReport,
 } = require("./device-adapter");
-
-const CHARYBDIS_VENDOR_ID = 0xA8F8;
-const CHARYBDIS_PRODUCT_ID = 0x1833;
-const QMK_RAW_HID_USAGE_PAGE = 0xFF60;
-const QMK_RAW_HID_USAGE = 0x61;
 const NODE_HID_REPORT_ID = 0;
 const NODE_HID_REPORT_SIZE = RAW_HID_REPORT_SIZE + 1;
 
