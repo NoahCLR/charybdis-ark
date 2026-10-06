@@ -73,7 +73,7 @@ Developer-only tools, never imported by the application runtime:
 ## Layout
 
 ```
-extension.js        VS Code surface only: command, panel, message relay
+extension.js        VS Code surface only: command, panel, the host functions the panel loop runs
 panel-html.js       the panel's HTML shell; the only host file that knows webview URIs
 core/               the app, with no host dependency
   transport/        device adapters and the request coordinator
@@ -202,8 +202,11 @@ Every layer may also import from itself.
   layout are inert data in `core/data/`, readable from every layer; the
   interface gets a slot's bindings as `pdModes[].binding`.
 - What a panel control does in order (read, apply, discard, rebase, import,
-  layers) → `core/session/panel-controls.js`. `extension.js` passes in only
-  what a host has: progress, the recovery file, a chosen profile file.
+  layers) → `core/session/panel-controls.js`. The loop that routes each panel
+  message, runs it, publishes the model and turns a failure into a notice →
+  `core/session/panel-loop.js`, shared by every host. `extension.js` passes in
+  only what a host has: posting to the panel, toasts, progress, the recovery
+  file, a chosen profile file, and saving an export.
 
 ## Conventions
 

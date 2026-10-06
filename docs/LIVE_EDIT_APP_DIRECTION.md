@@ -555,7 +555,9 @@ sequenced Apply itself. Each rule now has one home:
 - Settings bits and base lighting: `fieldMask` and `baseLighting` in
   `core/model/settings-editor.js`.
 - Panel sequencing: `core/session/panel-controls.js`, tested with a fake
-  service; `extension.js` supplies dialogs, files and progress.
+  service; the message loop around it, for every host:
+  `core/session/panel-loop.js`. `extension.js` supplies dialogs, files,
+  progress and toasts as host functions.
 - Interface: `canEdit(area)` for permission, `view/reach-groups.mjs` and
   `ui/groups.mjs` for grouped lists, `slotLight` in `ui/marks.mjs`, one form
   per macro slot and one `state.combo` for the builder.

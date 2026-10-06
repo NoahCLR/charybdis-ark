@@ -1,0 +1,113 @@
+"use strict";
+
+// The loop every host runs for one open panel: take a message the panel
+// posted, route it, run it, publish the model, and turn a failure into the
+// panel's notice. It used to live in extension.js; a second host copying it
+// would drift from the first, so VS Code and any other host share this one.
+//
+// A host passes in only what a host has, as plain functions on `host`:
+//
+//   host.post(message)              delivers a message to the panel (the model)
+//   host.showError(text)            optional: shows a failure outside the panel too
+//   host.progress(title, run)       optional: runs `run` behind a progress indicator
+//   host.saveRecovery(document)     writes a recovery copy, resolves to where it went
+//   host.chooseProfile()            resolves to a chosen file ({text, name}, or its
+//                                   text), or undefined when nothing was chosen
+//   host.saveExport(file)           saves an exported profile ({fileName, text});
+//                                   resolves to where it went, or undefined if cancelled
+//   host.exportPdUpgrade(session)   optional, VS Code only: the legacy eight-slot
+//                                   upgrade export, which a host without it refuses
+//
+// `options` go to the device service: `adapter` is the device adapter (see
+// core/README.md; the native one when omitted). Tests may pass a ready-made
+// `service` instead.
+
+const {ProfileDeviceService} = require("./profile-device-service");
+const {buildPanelModel, routeMessage, takeOutbox} = require("./panel-session");
+const {draftControl, portableControl, readKeyboard} = require("./panel-controls");
+
+function openPanelLoop(host, options = {}) {
+    const session = {service: undefined, notice: undefined};
+    const loop = {
+        session,
+        publish: () => publish(session, host),
+        handleMessage: (message) => handleMessage(session, message, host),
+        close: () => session.service.close(),
+    };
+    const {service, ...device} = options;
+    session.service = service || new ProfileDeviceService({...device, onChange: loop.publish});
+    return loop;
+}
+
+function publish(session, host) {
+    const model = buildPanelModel(session, session.service.snapshot());
+    void host.post({type: "model", model, ...takeOutbox(session)});
+}
+
+// Every path through here publishes, including the ones that decline or fail:
+// the webview waits on that reply — a combo builder closes when its edit is
+// accepted and stays open when it is refused — and a refusal reaches the panel
+// as a notice rather than as silence.
+async function handleMessage(session, message, host) {
+    try {
+        const route = routeMessage(session, message, session.service.snapshot());
+        if (route === "draft") await draftMessage(session, message, host);
+        else if (route === "portable") await portableMessage(session, message, host);
+        else if (route === "read") await connectAndRead(session, message.type === "selectDevice" ? message.deviceId : undefined, host);
+        // A staged edit, and even an unrecognised message, is answered, so the
+        // panel is never left waiting on a reply.
+        else publish(session, host);
+    } catch (error) {
+        const text = error instanceof Error ? error.message : String(error);
+        const code = error?.code ? ` [${error.code}]` : "";
+        host.showError?.(text);
+        // Put it in the panel too. A toast is easy to miss and disappears,
+        // and the panel is where someone looks when it seems stuck.
+        session.notice = `Failed${code}: ${text}`;
+        publish(session, host);
+    }
+}
+
+// Connect, learn what the keyboard is, and read what it is running.
+async function connectAndRead(session, selectedDeviceId, host) {
+    try {
+        session.readReady = await readKeyboard(session, selectedDeviceId, host);
+    } finally {
+        session.readBusy = false;
+        publish(session, host);
+    }
+}
+
+async function draftMessage(session, message, host) {
+    session.portableBusy = true;
+    try {
+        await draftControl(session, message, host);
+    } finally {session.portableBusy = false; publish(session, host);}
+}
+
+// Exporting is split: what to save is decided here, saving it is the host's
+// (a file dialog in VS Code, a download on a web page).
+async function portableMessage(session, message, host) {
+    session.portableBusy = true;
+    try {
+        if (message.type === "exportPdUpgrade" && host.exportPdUpgrade) {
+            await host.exportPdUpgrade(session);
+        } else if (message.type === "exportPortableProfile") {
+            const file = exportedProfile(await session.service.readPortableProfile());
+            const where = await host.saveExport(file);
+            if (where) session.notice = "Complete keyboard profile exported to " + where;
+        } else {
+            await portableControl(session, message, host);
+        }
+    } finally {session.portableBusy = false; publish(session, host);}
+}
+
+// What an exported profile file holds, and the name a host may suggest for it.
+function exportedProfile(snapshot, now = new Date()) {
+    return {
+        fileName: `charybdis-${now.toISOString().slice(0, 10)}.charybdis.json`,
+        text: JSON.stringify(snapshot.document, null, 2) + "\n",
+    };
+}
+
+module.exports = {exportedProfile, openPanelLoop};
