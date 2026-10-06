@@ -603,14 +603,21 @@ button.tier:hover { background: var(--surface-3); }
 .rowlist .rowgroup + .rowgroup .group-h { border-top: 1px solid var(--line); }
 
 .beh-head { display: flex; align-items: flex-start; gap: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
-.beh-timing { display: grid; grid-template-columns: repeat(3, minmax(0, 200px)) auto; gap: 14px; align-items: end; padding: 13px 0 16px; }
-.bgrid { display: grid; gap: 6px; align-items: stretch; overflow-x: auto; padding-bottom: 2px; }
-.bhead { display: flex; align-items: center; gap: 7px; padding: 0 2px 4px; font-size: 11.5px; color: var(--text-2); }
+.beh-intro { display: flex; align-items: flex-start; gap: 18px; padding: 13px 0 16px; }
+.beh-intro .note { flex: 1; min-width: 0; }
+.beh-intro .sw { flex: none; }
+/* One row per tap count the keyboard allows, all shown; a column per tier.
+   Each timing heads what it governs: Multi tap window the tap counts, Tap /
+   hold and Long hold their tiers. */
+.bgrid { display: grid; grid-template-columns: 140px repeat(3, minmax(150px, 1fr)); gap: 6px; align-items: stretch; overflow-x: auto; padding-bottom: 2px; }
+.bgrid .bterm-field { gap: 5px; align-self: end; min-width: 0; margin-bottom: 6px; }
+.bterm { display: flex; align-items: center; align-self: end; height: 32px; margin-bottom: 6px; padding: 0 2px; font-size: 11px; color: var(--text-3); }
+.bhead { display: flex; align-items: center; gap: 7px; padding: 0 2px; font-size: 11.5px; color: var(--text-2); }
 .bhead .bn { font-family: var(--mono); font-size: 10px; color: var(--text-3); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; }
 .bhead .bx { margin-left: auto; color: var(--text-3); font-size: 11px; }
 .bhead .bx:hover { color: var(--text); }
 .bhead.add { justify-content: flex-start; }
-.btier { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--text-3); }
+.btier { display: flex; align-items: center; gap: 7px; padding: 0 2px; font-size: 11.5px; color: var(--text-3); }
 .fbdot { width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--line-3); flex: none; display: inline-block; }
 .rowitem .fbdot, .reach .fbdot { margin-right: 3px; }
 .bcell {

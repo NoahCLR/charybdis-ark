@@ -19,7 +19,7 @@ import {attachLayersControl} from "./layers.mjs";
 import {openPicker} from "./picker.mjs";
 import {attachGroupToggles, attachReachRows, groupHeader, groupOpen, reachAttrs, reachTable} from "./groups.mjs";
 import {inGroupOrder, reachEntries, setReachGroupOpen} from "../view/reach-groups.mjs";
-import {branchBadge, comboBadge, keyNameMarked, marked, sends, sendsKind, slotLight, tierDot} from "./marks.mjs";
+import {branchBadge, comboBadge, keyNameMarked, sends, sendsKind, slotLight, tierDot} from "./marks.mjs";
 import {branchName, helperWord, tierName, vocabulary, word} from "../view/vocabulary.mjs";
 import {topbar, unavailable} from "./shell.mjs";
 
@@ -458,9 +458,9 @@ function behaviourEditor(behaviour) {
     const model = getModel();
     const steps = behaviourGridSteps(behaviour, model?.behaviorEditing?.maxTapStepsPerBehavior);
     const canEdit = canEditArea("behaviours");
-    const timingControl = (name, label, mark) => {
+    const timingControl = (name, label) => {
         const field = behaviourTimingField(behaviour, name);
-        return `<label class="field"><span>${marked(model, mark, label)} · ms</span>
+        return `<label class="field bterm-field"><span>${esc(label)} · ms</span>
             <input class="input mono" data-term="${name}" data-stored="${esc(field.stored)}" value="${esc(field.value)}"
                 placeholder="${esc(field.fallback === "" ? "default unavailable" : field.placeholder)}" ${canEdit ? "" : "disabled"}></label>`;
     };
@@ -501,23 +501,24 @@ function behaviourEditor(behaviour) {
                     data-tip="Remove this behaviour from the draft. Its keys then send their plain keycode.">Remove behaviour</button>
             </div>` : ""}
         </div>
-        <p class="note" style="margin-bottom:12px">Multi tap window is the time allowed from releasing the key to pressing it again. Tap / hold separates a tap from a hold. Double hold means press, release, then press and keep holding.</p>
-        ${behaviourTimingChecks(model, behaviour.keycode).map(check => `<p class="note" role="status" style="margin-bottom:12px"><strong>${check.level === "notice" ? "Timing advice." : "Timing warning."}</strong> ${esc(check.detail)} ${esc(check.fix)}</p>`).join("")}
-        <div class="beh-timing">
-            ${timingControl("multiTapTerm", "Multi tap window", {kind: "branch", count: 2})}
-            ${timingControl("tapHoldTerm", "Tap / hold", {kind: "tier", tier: "hold"})}
-            ${timingControl("longerHoldTerm", tierName(model, "long"), {kind: "tier", tier: "long"})}
+        <div class="beh-intro">
+            <p class="note">Multi tap window is the time allowed from releasing the key to pressing it again. Tap / hold separates a tap from a hold. Double hold means press, release, then press and keep holding.</p>
             <label class="sw" data-tip="Treat this row as a mouse gesture, so pressing it keeps the pointer layer up instead of letting auto-mouse reset.">
                 <input type="checkbox" data-anchor ${behaviour.keepsAutoMouseAnchored ? "checked" : ""} ${canEdit ? "" : "disabled"}>
                 <span class="track"></span><span class="txt">Keeps auto-mouse anchored</span></label>
         </div>
-        <div class="bgrid" style="grid-template-columns:86px repeat(${steps.length}, minmax(150px, 1fr))">
+        ${behaviourTimingChecks(model, behaviour.keycode).map(check => `<p class="note" role="status" style="margin-bottom:12px"><strong>${check.level === "notice" ? "Timing advice." : "Timing warning."}</strong> ${esc(check.detail)} ${esc(check.fix)}</p>`).join("")}
+        <div class="bgrid">
             <span></span>
-            ${steps.map((step) => `<div class="bhead">${branchBadge(model, step.tapCount + 1)}
-                <span>${esc(branchName(model, step.tapCount + 1))}</span></div>`).join("")}
-            ${["tap", "hold", "long"].map((kind) => [kind, tierName(model, kind)]).map(([kind, name]) => `
-                <div class="btier">${tierDot(model, kind)}${name}</div>
-                ${steps.map((step) => cellFor(step, kind)).join("")}`).join("")}
+            ${["tap", "hold", "long"].map((kind) => `<div class="btier">${tierDot(model, kind)}${tierName(model, kind)}</div>`).join("")}
+            ${timingControl("multiTapTerm", "Multi tap window")}
+            <p class="bterm">On release, before Tap / hold</p>
+            ${timingControl("tapHoldTerm", "Tap / hold")}
+            ${timingControl("longerHoldTerm", tierName(model, "long"))}
+            ${steps.map((step) => `
+                <div class="bhead">${branchBadge(model, step.tapCount + 1)}
+                    <span>${esc(branchName(model, step.tapCount + 1))}</span></div>
+                ${["tap", "hold", "long"].map((kind) => cellFor(step, kind)).join("")}`).join("")}
         </div>
         <div id="cellEditor"></div>
         <p class="note" style="margin-top:12px">Every cell is one action: what it sends, and how it runs once its threshold passes. Empty cells are dropped when the profile is applied.${Object.keys(behaviour.builtIn || {}).length ? " A built-in cell is what the key does on its own; it is not stored, and setting an action there replaces it." : ""}</p>
@@ -557,7 +558,7 @@ function cellEditor(behaviour, step, kind) {
     const canEdit = canEditArea("behaviours");
     const node = el(`<div class="cell-editor">
         <div class="ce-head"><span class="tag">${esc(branchName(getModel(), step.tapCount + 1))}</span><h4>${esc(tierName(getModel(), kind))}</h4>
-            <span class="note">${kind === "tap" ? "A tap tier fires on release, so it has no helper." : "Runs once this row's threshold passes."}</span>
+            <span class="note">${kind === "tap" ? "A tap tier fires on release, so it has no helper." : "Runs once this tier's threshold passes."}</span>
             <span class="right"><button class="btn tiny ghost" data-act="close">Done</button></span></div>
         <div class="ce-body">
             <label class="field"><span>Sends</span>

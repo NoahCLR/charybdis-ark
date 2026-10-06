@@ -93,8 +93,11 @@ menus open only with an editable draft.
 
 Underneath it, one workbench whose tabs are the key, its behaviour, its combos,
 and the macros and pointing modes the layer reaches. A behaviour is tap count ×
-tier, so it is drawn as a grid. Timing fields start with **Multi tap window**
-(release to next press), then Tap / hold and Long hold. Behaviour and combo
+tier, so it is drawn as a grid: a row for every tap count the keyboard allows,
+always all of them, and a column each for Tap, Hold and Long hold. Each timing
+heads what it governs: **Multi tap window** (release to next press) the tap
+counts, Tap / hold the Hold column and Long hold its own; Tap fires on release.
+Behaviour and combo
 timings matching the default show a muted placeholder such as `150 · default`;
 other values look entered. Labels end at `ms`. Clearing an override restores the
 default. LT keys show their own dual-role default.
