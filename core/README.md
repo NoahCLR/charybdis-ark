@@ -103,6 +103,31 @@ native writes are prefixed with the zero report-id byte required by `node-hid`,
 and reads accept either 32 protocol bytes or 33 bytes with that zero prefix.
 Any other native report invalidates the device session.
 
+The four identifiers live in `transport/device-adapter.js` and are shared by
+every adapter.
+
+## Browser adapter
+
+`WebHidDeviceAdapter` implements the same contract over Chrome's WebHID. It
+takes the `hid` object (`navigator.hid`) as an option and never names
+`navigator` itself; without one, every call fails with
+`NATIVE_MODULE_UNAVAILABLE`.
+
+`listDevices()` returns only the interfaces this page has already been allowed
+to open (`getDevices()`) whose collections carry the Raw HID usage page and
+usage. `requestDevice()` opens Chrome's picker filtered to all four
+identifiers and must run from a user gesture; a dismissed picker fails with
+`CANCELLED`. WebHID has no device path, so each `HIDDevice` object gets an id
+(`webhid:1`, `webhid:2`, …) the first time the adapter sees it and keeps it
+while Chrome keeps that object, which is as long as the keyboard stays plugged
+in. Descriptors carry node-hid's keys; those WebHID cannot know (path, serial
+number, manufacturer, release, interface) are `undefined`.
+
+Reports are sent with report id 0. An `inputreport` must carry report id 0 and
+exactly 32 bytes and reaches `onReport` as a `Buffer`; anything else
+invalidates the session. Chrome's `disconnect` event for the open device ends
+the connection; `close()` removes both listeners and closes the device once.
+
 The read-only CLI lists matching interfaces without opening or writing to one:
 
 ```sh
