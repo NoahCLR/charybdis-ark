@@ -2,6 +2,13 @@
 
 const RAW_HID_REPORT_SIZE = 32;
 
+// The four identifiers of the Charybdis QMK Raw HID interface. Every adapter
+// matches on all four, whatever its host calls them.
+const CHARYBDIS_VENDOR_ID = 0xA8F8;
+const CHARYBDIS_PRODUCT_ID = 0x1833;
+const QMK_RAW_HID_USAGE_PAGE = 0xFF60;
+const QMK_RAW_HID_USAGE = 0x61;
+
 const LIVE_LINK_ERROR_CODES = Object.freeze({
     ALREADY_CONNECTED: "ALREADY_CONNECTED",
     CANCELLED: "CANCELLED",
@@ -95,8 +102,12 @@ function normalizeDeviceDescriptors(devices) {
 }
 
 module.exports = {
+    CHARYBDIS_PRODUCT_ID,
+    CHARYBDIS_VENDOR_ID,
     LIVE_LINK_ERROR_CODES,
     LiveLinkTransportError,
+    QMK_RAW_HID_USAGE,
+    QMK_RAW_HID_USAGE_PAGE,
     RAW_HID_REPORT_SIZE,
     assertConnectedDevice,
     assertDeviceAdapter,
