@@ -91,7 +91,7 @@ test("a behaviour lists only the fields that changed, in the editor's words", ()
     const after=snapshot(behaviours(base,rows=>rows.map(row=>JSON.stringify(row.target)===JSON.stringify(target)?{...row,tapHoldTerm:180}:row)));
     const [item]=profileReview(before,after);
     assert.equal(item.status,"changed");
-    assert.deepEqual(item.fields,[{label:"Tap / hold",status:"changed",before:`default · ${validateSnapshot(base).settings.values[1]} ms`,after:"180 ms",
+    assert.deepEqual(item.fields,[{label:"Tap / hold threshold",status:"changed",before:`default · ${validateSnapshot(base).settings.values[1]} ms`,after:"180 ms",
         labelMark:{kind:"tier",tier:"hold"}}], "the tiers that did not change are not repeated, and the timing is marked with the tier it decides");
 });
 test("a removed behaviour is marked removed and lists what it held, without its defaults", () => {
@@ -122,7 +122,7 @@ test("changing a default lists inherited effective times under its settings item
     assert.deepEqual([items[0].fields[0].before,items[0].fields[0].after],[String(validateSnapshot(base).settings.values[1]),"175"]);
     const expected = validateSnapshot(base).behaviors.rows.filter(row => !row.tapHoldTerm && !(row.target.kind === 1 && row.target.operand >= 0x4000 && row.target.operand <= 0x4fff));
     assert.equal(items[0].fields.length, expected.length + 1);
-    assert.ok(items[0].fields.slice(1).every(field => field.before === "default · 150 ms" && field.after === "default · 175 ms" && field.label.endsWith(" · Tap / hold")));
+    assert.ok(items[0].fields.slice(1).every(field => field.before === "default · 150 ms" && field.after === "default · 175 ms" && field.label.endsWith(" · Tap / hold threshold")));
     assert.match(items[0].note, new RegExp(`^${expected.length} behaviours follow`));
 });
 test("renaming a layer does not read as a change to the settings that name it", () => {

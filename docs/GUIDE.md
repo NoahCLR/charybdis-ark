@@ -96,7 +96,8 @@ and the macros and pointing modes the layer reaches. A behaviour is tap count ×
 tier, so it is drawn as a grid: a row for every tap count the keyboard allows,
 always all of them, and a column each for Tap, Hold and Long hold. Each timing
 heads what it governs: **Multi tap window** (release to next press) the tap
-counts, Tap / hold the Hold column and Long hold its own; Tap fires on release.
+counts, the Tap / hold threshold the Hold column and the Long hold threshold
+its own; Tap fires on release.
 The timing fields over Hold and Long hold read **Tap / hold threshold** and
 **Long hold threshold**, and a hold cell's **How it runs** names its own
 column's: "tap at Tap / hold threshold" under Hold, "tap at Long hold
@@ -126,11 +127,11 @@ separate shorter gestures and the cell stays empty. On the first press, an
 such as `-` or `Ctrl+C`, stays held down until release, unless that first
 press sets a Hold or Long hold. Shift, Ctrl, Alt and Cmd on their own show
 nothing built in. An empty Long hold beside a Hold, set or built in, shows
-that the Hold carries on, since nothing takes over at Long hold: one held
+that the Hold carries on, since nothing takes over at the Long hold threshold: one held
 until release stays held, one that repeats keeps repeating, one that sends
 on release still sends whenever you let go, and one that fired at its
 threshold does nothing more. An empty Hold beside a Long hold shows the tap
-a release before Long hold sends, for plain keys, custom keys and macros;
+a release before the Long hold threshold sends, for plain keys, custom keys and macros;
 layer and pointing keys send no tap once held. **Change key…** moves a behaviour to another
 key through the keycode picker; when that key already has one, you choose to
 overwrite it, swap the two, or cancel, and either is one undoable draft step.

@@ -109,8 +109,8 @@ function behaviourFields(row, defaults, names) {
     const inherited = effectiveTimings({...row, tapHoldTerm: 0, longerHoldTerm: 0, multiTapTerm: 0}, defaults);
     const fields = new Map([
         ["Multi tap window", timing(row.multiTapTerm, defaults[3], {kind: "branch", count: 2})],
-        ["Tap / hold", timing(row.tapHoldTerm, inherited.hold, {kind: "tier", tier: "hold"})],
-        ["Long hold", timing(row.longerHoldTerm, defaults[2], {kind: "tier", tier: "long"})],
+        ["Tap / hold threshold", timing(row.tapHoldTerm, inherited.hold, {kind: "tier", tier: "hold"})],
+        ["Long hold threshold", timing(row.longerHoldTerm, defaults[2], {kind: "tier", tier: "long"})],
         ["Keeps auto-mouse anchored", row.keepsAutoMouseAnchored ? "yes" : "no"],
     ]);
     for (const step of row.steps) for (const [tier, name] of TIERS) {
@@ -332,7 +332,7 @@ function profileReview(before, after) {
             const old = a.behaviors.rows.find(row => JSON.stringify(row.target) === JSON.stringify(next.target));
             if (!old) continue;
             const oldTimes = effectiveTimings(old, a.settings.values), nextTimes = effectiveTimings(next, b.settings.values);
-            for (const [field, term, label] of [["multiTapTerm", "repeat", "Multi tap window"], ["tapHoldTerm", "hold", "Tap / hold"], ["longerHoldTerm", "long", "Long hold"]]) {
+            for (const [field, term, label] of [["multiTapTerm", "repeat", "Multi tap window"], ["tapHoldTerm", "hold", "Tap / hold threshold"], ["longerHoldTerm", "long", "Long hold threshold"]]) {
                 // Normalized explicit matches already have a stored behaviour
                 // change above; include inherited-only effects here.
                 if (old[field] !== 0 || next[field] !== 0 || oldTimes[term] === nextTimes[term]) continue;
