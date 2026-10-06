@@ -11,18 +11,29 @@
 const {RGB_STAGE_BITS} = require("../schema/rgb-domain-v1");
 
 const VOCABULARY = Object.freeze({
-    // How a hold tier runs once its threshold passes; a tap tier only sends.
-    holdHelpers: [
-        ["PRESS_AND_HOLD_UNTIL_RELEASE", "held until release"],
-        ["TAP_AT_HOLD_THRESHOLD", "tap at hold threshold"],
-        ["TAP_ON_RELEASE_AFTER_HOLD", "tap on release after hold"],
-        ["REPEAT_WHILE_HELD", "repeat while held"],
-    ],
+    // How a hold tier runs once its threshold passes, in that tier's words: a
+    // helper that names a threshold names the tier's own, the Tap / hold
+    // threshold for Hold and the Long hold threshold for Long hold. A tap tier
+    // only sends.
+    holdHelpers: {
+        hold: [
+            ["PRESS_AND_HOLD_UNTIL_RELEASE", "held until release"],
+            ["TAP_AT_HOLD_THRESHOLD", "tap at Tap / hold threshold"],
+            ["TAP_ON_RELEASE_AFTER_HOLD", "tap on release after Tap / hold threshold"],
+            ["REPEAT_WHILE_HELD", "repeat while held"],
+        ],
+        long: [
+            ["PRESS_AND_HOLD_UNTIL_RELEASE", "held until release"],
+            ["TAP_AT_HOLD_THRESHOLD", "tap at Long hold threshold"],
+            ["TAP_ON_RELEASE_AFTER_HOLD", "tap on release after Long hold threshold"],
+            ["REPEAT_WHILE_HELD", "repeat while held"],
+        ],
+    },
     // What a Hold does past the Long hold threshold when no Long hold is set:
     // nothing takes over, so it carries on the way it runs.
     holdWithoutLongHold: [
         ["PRESS_AND_HOLD_UNTIL_RELEASE", "stays held until release"],
-        ["TAP_AT_HOLD_THRESHOLD", "already sent at hold threshold"],
+        ["TAP_AT_HOLD_THRESHOLD", "already sent at Tap / hold threshold"],
         ["TAP_ON_RELEASE_AFTER_HOLD", "still sends on release"],
         ["REPEAT_WHILE_HELD", "keeps repeating until release"],
     ],
