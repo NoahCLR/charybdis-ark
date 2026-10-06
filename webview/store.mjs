@@ -6,6 +6,7 @@
 import {behaviourKeyAt, behaviourRowAfterPreview} from "./view/behavior-editor.mjs";
 import {layersOn, toggleLayer} from "./view/layer-set.mjs";
 import {initialReachGroups} from "./view/reach-groups.mjs";
+import {demoOf, leaving} from "./view/demo.mjs";
 
 const vscode = acquireVsCodeApi();
 
@@ -71,6 +72,7 @@ export const state = {
     ledRow: {target: "layer", owner: "", source: ""}, // the LED group row being built, kept across renders
     settingsSearch: "",
     overlay: null,
+    leaveDemo: null,     // {ask, message}: leaving the demo (or replacing its file) waiting on its question
     confirmChecks: null, // the draft revision whose checks Apply is asking about
     picker: null,
     notice: "",
@@ -160,8 +162,23 @@ export const selectedPosition = () => positionAt(currentLayer(), state.selected)
     || (currentLayer()?.positions || [])[0];
 
 // Editing is only offered where the keyboard says it is possible; everywhere
-// else the control stays visible and disabled, with the reason.
-export const writable = () => Boolean(getModel()?.draft?.matching && !getModel()?.draft.stale && !getModel()?.draft.busy && getModel()?.device?.connected);
+// else the control stays visible and disabled, with the reason. The demo's
+// draft has no keyboard, and is editable all the same (core/session/demo-session.js).
+export const writable = () => Boolean(getModel()?.draft?.matching && !getModel()?.draft.stale && !getModel()?.draft.busy
+    && (getModel()?.device?.connected || demoOf(getModel()).active));
+
+// Posts a message that leaves the demo (or replaces its file), asking first
+// when that would lose edits not exported (view/demo.mjs leaving()).
+export function postLeavingDemo(message) {
+    const leave = leaving(getModel(), message);
+    if (!leave.ask) {
+        post(leave.message);
+        return;
+    }
+    state.leaveDemo = leave;
+    state.overlay = "leaveDemo";
+    render();
+}
 
 // Whether an area can be edited now, decided in one place: every edit goes
 // into the draft, so the draft must be this keyboard's, current and idle, and

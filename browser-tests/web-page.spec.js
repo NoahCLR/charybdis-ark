@@ -146,6 +146,99 @@ test("without WebHID the page says Ark needs Chrome or Edge over HTTPS", async (
     await expect(placeholder.locator("h2")).toHaveText("Ark needs Chrome or Edge");
     await expect(placeholder).toContainText("HTTPS");
     await expect(page.locator('[data-act="choose-keyboard"]')).toHaveCount(0);
+
+    // The demo needs no keyboard, so it is still offered, and works.
+    await placeholder.locator('[data-act="explore-demo"]').click();
+    await ready(page);
+    await expect(page.locator(".demo-banner")).toContainText("Demo · no keyboard");
+    await page.locator('[data-screen="profile"]').click();
+    const [exported] = await Promise.all([page.waitForEvent("download"), page.locator('[data-act="export"]').click()]);
+    expect(exported.suggestedFilename()).toMatch(/^charybdis-demo-/);
     expect(errors).toEqual([]);
-    expect(requests.filter((url) => !url.startsWith(new URL("/dist/web/", baseURL).href))).toEqual([]);
+    expect(requests.filter((url) => !url.startsWith(new URL("/dist/web/", baseURL).href) && !url.startsWith("blob:"))).toEqual([]);
+});
+
+// The demo needs no keyboard: a browser with WebHID but nothing chosen, where
+// the fake keyboard is never asked anything.
+test("explore the demo: edit on several screens, review with no Apply, export, open a profile file and leave", async ({page, context, baseURL}) => {
+    test.setTimeout(90000);
+    const {keyboard, ownFilesOnly} = await withKeyboard(context, baseURL);
+    const errors = await open(page);
+    const placeholder = page.locator(".read-placeholder");
+    await expect(placeholder.locator("h2")).toHaveText("Connect your keyboard");
+    await expect(placeholder.locator('[data-act="choose-keyboard"]')).toBeVisible();
+    await placeholder.locator('[data-act="explore-demo"]').click();
+    await ready(page);
+
+    // It never looks like a keyboard.
+    const banner = page.locator(".demo-banner");
+    await expect(banner).toContainText("Demo · no keyboard");
+    await expect(banner).toContainText("No keyboard is connected");
+    await expect(page.locator(".rail-product")).toHaveText("Demo");
+    await expect(page.locator(".rail-status")).toContainText("Demo · no keyboard");
+    await expect(page.locator(".rail-status")).not.toContainText(/Connected|halves|Recovery/);
+
+    // Mouse: a pointer speed.
+    await page.locator('[data-screen="mouse"]').click();
+    const dpi = page.locator('select[data-macro="normalDpi"]');
+    await expect(dpi).toBeEnabled();
+    await dpi.selectOption(await dpi.evaluate((select) => [...select.options].find((option) => !option.selected).value));
+    await expect(page.locator(".rail-status")).toContainText("1 change in draft");
+    // Custom keys: a name.
+    await page.locator('[data-screen="customKeys"]').click();
+    const keyName = page.locator(".main [data-name]").first();
+    await expect(keyName).toBeEnabled();
+    await keyName.fill("Demo key");
+    await keyName.dispatchEvent("change");
+    await expect(page.locator(".rail-status")).toContainText("2 changes in draft");
+    // Macros: a name.
+    await page.locator('[data-screen="macros"]').click();
+    const macroName = page.locator(".main [data-name]").first();
+    await expect(macroName).toBeEnabled();
+    await macroName.fill("Demo macro");
+    await macroName.dispatchEvent("change");
+    await expect(page.locator(".rail-status")).toContainText("3 changes in draft");
+
+    // The review shows them, says Apply needs a keyboard and offers Export.
+    await page.locator('.commit [data-act="review"]').click();
+    const sheet = page.locator(".sheet");
+    await expect(sheet.locator("h2")).toHaveText("Review 3 changes");
+    for (const area of ["Mouse", "Custom keys", "Macros"]) await expect(sheet.locator(".rv-sect h4", {hasText: area})).toHaveCount(1);
+    await expect(sheet).toContainText("Apply needs a keyboard");
+    await expect(sheet.locator('[data-act="apply"], [data-act="apply-anyway"]')).toHaveCount(0);
+    const [exported] = await Promise.all([page.waitForEvent("download"), sheet.locator('[data-act="export"]').click()]);
+    expect(exported.suggestedFilename()).toMatch(/^charybdis-demo-\d{4}-\d\d-\d\d\.charybdis\.json$/);
+    const file = JSON.parse(await (await exported.createReadStream()).toArray().then((chunks) => Buffer.concat(chunks).toString("utf8")));
+    await expect(page.locator(".rail-message")).toContainText("Import it on your keyboard");
+    await page.locator('.sheet [data-act="close"]').first().click();
+
+    // Open a profile file: exported just now, so nothing is asked first.
+    const replacement = pdDocument();
+    const [chooser] = await Promise.all([page.waitForEvent("filechooser"), banner.locator('[data-act="open-demo-profile"]').click()]);
+    await chooser.setFiles({name: "mine.charybdis.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(replacement))});
+    await expect(page.locator(".rail-message")).toContainText("Opened mine.charybdis.json in the demo.");
+    await expect(banner).toContainText("mine.charybdis.json");
+    await expect(page.locator(".rail-status")).toContainText("Draft clean");
+
+    // The exported file is one Import takes, as on a keyboard.
+    await page.locator('[data-screen="profile"]').click();
+    const [importChooser] = await Promise.all([page.waitForEvent("filechooser"), page.locator('[data-act="import"]').click()]);
+    await importChooser.setFiles({name: "demo.charybdis.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(file))});
+    await expect(page.locator('[data-act="restore"]')).toBeEnabled();
+    await page.locator('[data-act="restore"]').click();
+    await expect(page.locator(".rail-status")).toContainText(/\d+ changes? in draft/);
+
+    // Leaving with edits not exported asks first, and offers Export.
+    await banner.locator('[data-act="leave-demo"]').click();
+    const ask = page.locator(".sheet.leave-demo");
+    await expect(ask).toContainText("have not been exported");
+    await expect(ask.locator('[data-act="export"]')).toBeVisible();
+    await ask.locator('[data-act="confirm-leave"]').click();
+    await expect(banner).toHaveCount(0);
+    await expect(placeholder.locator("h2")).toHaveText("Connect your keyboard");
+
+    expect(keyboard.requests).toEqual([], "nothing was sent to a keyboard");
+    expect(await page.evaluate(() => window.__fakeHid)).toEqual({requested: 0, refusedWithoutClick: 0, opened: 0});
+    expect(errors).toEqual([]);
+    ownFilesOnly();
 });

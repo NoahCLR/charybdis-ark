@@ -1222,6 +1222,20 @@ details > summary { list-style: none; }
 .read-placeholder h2, .read-placeholder p { margin: 0; }
 .read-placeholder p { max-width: 52ch; color: var(--text-2); }
 .read-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
+
+/* ── the demo ──────────────────────────────────────────────────────────── */
+/* A demo is never a keyboard: a strip across the whole window says so on every
+   screen, in one place, and the rail's dot for it is hollow, since nothing is
+   connected to be on or off. */
+.app.demo { grid-template-rows: auto minmax(0, 1fr); }
+.demo-banner { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; padding: 8px 14px 8px 18px;
+  border-bottom: 1px solid var(--line-2); background: var(--surface-2); font-size: 12px; color: var(--text-2); }
+.demo-banner strong { color: var(--text); font-weight: 600; white-space: nowrap; }
+.demo-banner .copy { flex: 1; min-width: 0; }
+.demo-banner .acts { display: flex; gap: 6px; flex: none; }
+.dot.demo { background: none; box-shadow: inset 0 0 0 1.2px var(--text-2); width: 7px; height: 7px; }
+.sheet.leave-demo { width: min(560px, 100%); }
+.sheet.leave-demo .sheet-b { padding: 16px 18px; color: var(--text-2); font-size: 12.5px; }
 .busy-veil { position: absolute; inset: 0; background: color-mix(in srgb, var(--bg) 55%, transparent);
   display: grid; place-items: center; z-index: 30; }
 .unavailable { display: grid; gap: 8px; padding: 14px 16px; border: 1px solid var(--line);

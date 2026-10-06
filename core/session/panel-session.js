@@ -14,6 +14,7 @@ const {profileReview} = require("../model/profile-review");
 const {profileUsage} = require("../model/profile-usage");
 const {ProfileDraftSession, DRAFT_EDITS} = require("./profile-draft-session");
 const {buildDeviceModel, deviceSummary} = require("./device-model");
+const {demoDiagnostics, demoHeader, demoModel} = require("./demo-session");
 
 const DRAFT_CONTROLS = new Set([
     "reviewProfileDraft", "undoProfileDraft", "redoProfileDraft", "jumpProfileDraft", "discardProfileDraft", "discardProfileDraftChanges",
@@ -23,6 +24,8 @@ const PORTABLE_MESSAGES = new Set([
     "exportPdUpgrade", "exportPortableProfile", "choosePortableProfile", "restorePortableProfile",
     "managePortableLayers", "editPortableLayer", "savePortableLayers", "cancelPortableReview",
 ]);
+// The demo's own controls (demo-session.js).
+const DEMO_MESSAGES = new Set(["openDemo", "openDemoProfile", "leaveDemo"]);
 
 // What the panel says and offers that depends on its host, published as
 // `model.host`, so the panel never asks which host it is in. A host passes
@@ -81,9 +84,11 @@ function discardDraftForDevice(session, state, snapshot) {
 
 // The model the webview renders. With a draft open, the editable surfaces come
 // from the draft, while the device header and diagnostics stay the keyboard's
-// own: the rail describes the keyboard, not the draft.
+// own: the rail describes the keyboard, not the draft. In the demo, `state` is
+// the demo's (demo-session.js panelState), and the header says demo: no
+// keyboard is read, so none is described.
 function buildPanelModel(session, state) {
-    observePortable(session, state);
+    if (!session.demo) observePortable(session, state);
     if (session.draft && state.connected && state.selectedDeviceId === session.draft.deviceId) session.draft.noteConnection(state.connectionToken);
     const device = state.devices?.find((entry) => entry.id === state.selectedDeviceId);
     const busy = Boolean(state.busy || session.portableBusy || session.readBusy);
@@ -111,6 +116,11 @@ function buildPanelModel(session, state) {
     // The last Apply's steps: live while it runs, kept when it failed. A
     // successful one lasts only until its readback ends, so a later busy
     // operation is not drawn as reading back an Apply.
+    if (session.demo) {
+        model.device = demoHeader(session, busy);
+        model.diagnostics = demoDiagnostics(session);
+    }
+    model.demo = demoModel(session, state);
     const live = state.liveApply;
     model.apply = live && (live.state === "applying" || live.state === "failed" || (live.state === "done" && session.applyRunning)) ? live : null;
     model.postApplyRead = session.postApplyReadStep ? {
@@ -145,12 +155,13 @@ function buildPanelModel(session, state) {
 }
 
 // How full the profile is: the draft's, when one is open for this keyboard,
-// otherwise what the keyboard runs. Nothing without a connected keyboard.
+// otherwise what the keyboard runs. Nothing without a connected keyboard. In
+// the demo, an unedited draft is the demo setup.
 function usageOf(session, state, draft) {
     if (!state.connected) return null;
     const fromDraft = Boolean(session.draft && draft?.matching);
     const usage = profileUsage(fromDraft ? session.draft.current : session.service?.portable, state.capabilities);
-    return usage && {...usage, source: fromDraft && session.draft.dirty ? "draft" : "keyboard"};
+    return usage && {...usage, source: fromDraft && session.draft.dirty ? "draft" : session.demo ? "demo" : "keyboard"};
 }
 
 // A chosen profile file against what the keyboard holds, not the draft: that
@@ -196,6 +207,10 @@ function routeMessage(session, message, state) {
         return "none";
     }
     if (session.portableBusy || session.readBusy) return "none";
+    if (DEMO_MESSAGES.has(type)) return "demo";
+    // A panel that loads again in the demo stays in it; reading a keyboard
+    // leaves it first (panel-loop.js), so nothing reads one from here.
+    if (session.demo && (type === "ready" || type === "refresh" || type === "selectDevice")) return "none";
     if (session.draft && (DRAFT_EDITS.has(type) || DRAFT_CONTROLS.has(type)) && message.draftId !== session.draft.id) {
         throw new Error("This edit belongs to an older draft. Read the keyboard before continuing.");
     }
@@ -295,4 +310,4 @@ function applyLayerEdit(edit, message) {
 
 const layerEditDocument = (edit) => reorderLayers(edit.before.document, edit.order, edit.order.map((old) => edit.names[old]), {keysFollow: edit.keysFollow !== false});
 
-module.exports = {DRAFT_CONTROLS, HOST_WORDS, PORTABLE_MESSAGES, applyLayerEdit, buildPanelModel, hostModel, discardDraftForDevice, layerEditDocument, observePortable, routeMessage, startLayerEdit, takeOutbox};
+module.exports = {DEMO_MESSAGES, DRAFT_CONTROLS, HOST_WORDS, PORTABLE_MESSAGES, applyLayerEdit, buildPanelModel, hostModel, discardDraftForDevice, layerEditDocument, observePortable, routeMessage, startLayerEdit, takeOutbox};

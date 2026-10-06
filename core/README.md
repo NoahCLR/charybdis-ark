@@ -25,7 +25,10 @@ profile file, saving an export), listed at the top of that file, so
 page's host (`web/web-host.mjs`) only the browser's. What differs between
 hosts reaches the panel as `model.host` (`panel-session.js`): whether it offers
 Choose keyboard or a theme toggle, its recovery copies, its words for
-connecting, and why it cannot reach a keyboard at all.
+connecting, and why it cannot reach a keyboard at all. `session/demo-session.js`
+is the demo (D-L53): the same draft over the bundled demo profile with no device
+behind it, which the loop answers to in place of the device service's state
+while it is open.
 
 Custom Profile Wire pages use one monotonically increasing nonzero request-id
 sequence per connected session (wrapping `255` to `1`), so a delayed response

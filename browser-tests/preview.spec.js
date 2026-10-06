@@ -79,3 +79,77 @@ test("the extension's panel has no theme toggle, picker, build line or browser r
     await expect(page.locator(".card.recoveries")).toHaveCount(0);
     await expect(page.locator('[data-act="upgrade"]')).toHaveCount(1);
 });
+
+// The demo's controls (scripts/preview.js builds the demo's models with the
+// real demo session). Each has to post what it says it does.
+test("the demo's controls post their messages", async ({page}) => {
+    const errors = [];
+    page.on("pageerror", error => errors.push(error.message));
+    const posted = () => page.evaluate(() => window.__posted.filter((message) => message.type !== "ready"));
+    const clear = () => page.evaluate(() => {window.__posted.length = 0;});
+
+    // With no keyboard the extension offers the demo beside Read keyboard, and
+    // a browser without WebHID still offers it.
+    await page.goto("/preview/index.html?host=none");
+    const placeholder = page.locator(".read-placeholder");
+    await expect(placeholder.locator('[data-act="retry"]')).toHaveText("Read keyboard");
+    await clear();
+    await placeholder.locator('[data-act="explore-demo"]').click();
+    await expect.poll(posted).toEqual([{type: "openDemo"}]);
+    await expect(page.locator(".demo-banner")).toBeVisible();
+    await page.goto("/preview/index.html?host=web-unsupported");
+    await expect(page.locator('.read-placeholder [data-act="explore-demo"]')).toHaveCount(1);
+    await page.goto("/preview/index.html?host=web-none");
+    await expect(page.locator('.read-placeholder [data-act="choose-keyboard"]')).toHaveCount(1);
+    await expect(page.locator('.read-placeholder [data-act="explore-demo"]')).toHaveCount(1);
+
+    // In the demo, with nothing to lose: an edit posts, and the banner's
+    // controls post without asking.
+    await page.goto("/preview/index.html?host=demo");
+    await expect(page.locator(".rail-product")).toHaveText("Demo");
+    await page.locator('[data-screen="mouse"]').click();
+    await clear();
+    await page.locator('select[data-macro="normalDpi"]').selectOption("1400");
+    await expect.poll(posted).toEqual([expect.objectContaining({type: "updateConfigDefaults", sectionId: "normalPointerSpeed",
+        fields: expect.arrayContaining([{macro: "normalDpi", value: "1400"}])})]);
+    await clear();
+    await page.locator('.demo-banner [data-act="open-demo-profile"]').click();
+    await expect.poll(posted).toEqual([expect.objectContaining({type: "openDemoProfile"})]);
+    await clear();
+    await page.locator('.demo-banner [data-act="leave-demo"]').click();
+    await expect.poll(posted).toEqual([expect.objectContaining({type: "leaveDemo"})]);
+    expect(JSON.stringify(await posted())).not.toContain("discardDemo");
+    await page.locator('[data-screen="device"]').click();
+    await expect(page.locator(".main h1")).toHaveText("Device");
+    await expect(page.locator(".main")).toContainText("no keyboard");
+
+    // With an edit not exported: the review has Export in Apply's place, and
+    // leaving asks first, then says it asked.
+    await page.goto("/preview/index.html?host=demo-edited");
+    await page.locator('.commit [data-act="review"]').click();
+    await expect(page.locator('.sheet [data-act="apply"]')).toHaveCount(0);
+    await clear();
+    await page.locator('.sheet [data-act="export"]').click();
+    await expect.poll(posted).toEqual([expect.objectContaining({type: "exportPortableProfile"})]);
+    await page.locator('.sheet [data-act="close"]').first().click();
+
+    for (const [control, type] of [['.demo-banner [data-act="leave-demo"]', "leaveDemo"], ['.demo-banner [data-act="open-demo-profile"]', "openDemoProfile"],
+        ['.rail [data-act="choose-keyboard"]', "chooseKeyboard"], ['.rail [data-act="refresh"]', "refresh"]]) {
+        await clear();
+        await page.locator(control).click();
+        const ask = page.locator(".sheet.leave-demo");
+        await expect(ask).toBeVisible();
+        expect(await posted()).toEqual([]);
+        await ask.locator('[data-act="stay"]').click();
+        await expect(ask).toHaveCount(0);
+        expect(await posted()).toEqual([]);
+        await page.locator(control).click();
+        await ask.locator('[data-act="confirm-leave"]').click();
+        await expect.poll(posted).toEqual([expect.objectContaining({type, discardDemo: true})]);
+    }
+    await clear();
+    await page.locator('.demo-banner [data-act="leave-demo"]').click();
+    await page.locator('.sheet.leave-demo [data-act="export"]').click();
+    await expect.poll(posted).toEqual([expect.objectContaining({type: "exportPortableProfile"})]);
+    expect(errors).toEqual([]);
+});

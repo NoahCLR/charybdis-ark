@@ -12,7 +12,8 @@
 //   host.progress(title, run)       optional: runs `run` behind a progress indicator
 //   host.saveRecovery(document)     writes a recovery copy, resolves to where it went
 //   host.chooseProfile()            resolves to a chosen file ({text, name}, or its
-//                                   text), or undefined when nothing was chosen
+//                                   text), or undefined when nothing was chosen;
+//                                   Import and the demo's Open a profile file use it
 //   host.saveExport(file)           saves an exported profile ({fileName, text});
 //                                   resolves to where it went, or undefined if cancelled
 //   host.exportPdUpgrade(session)   optional, VS Code only: the legacy eight-slot
@@ -29,7 +30,11 @@
 const {ProfileDeviceService} = require("./profile-device-service");
 const {buildPanelModel, routeMessage, takeOutbox} = require("./panel-session");
 const {draftControl, portableControl, readKeyboard} = require("./panel-controls");
+const {demoControl, demoExport, leaveDemo, panelState} = require("./demo-session");
 
+// Reading a keyboard leaves the demo first (asking about unexported edits is
+// the panel's, and a message that has not asked is refused).
+const LEAVES_DEMO = new Set(["refresh", "selectDevice"]);
 function openPanelLoop(host, options = {}) {
     const session = {service: undefined, notice: undefined, host};
     const loop = {
@@ -44,7 +49,7 @@ function openPanelLoop(host, options = {}) {
 }
 
 function publish(session, host) {
-    const model = buildPanelModel(session, session.service.snapshot());
+    const model = buildPanelModel(session, panelState(session));
     void host.post({type: "model", model, ...takeOutbox(session)});
 }
 
@@ -54,8 +59,10 @@ function publish(session, host) {
 // as a notice rather than as silence.
 async function handleMessage(session, message, host) {
     try {
-        const route = routeMessage(session, message, session.service.snapshot());
+        if (session.demo && LEAVES_DEMO.has(message?.type) && !session.portableBusy) leaveDemo(session, message);
+        const route = routeMessage(session, message, panelState(session));
         if (route === "draft") await draftMessage(session, message, host);
+        else if (route === "demo") await demoMessage(session, message, host);
         else if (route === "portable") await portableMessage(session, message, host);
         else if (route === "read") await connectAndRead(session, message.type === "selectDevice" ? message.deviceId : undefined, host);
         // A staged edit, and even an unrecognised message, is answered, so the
@@ -96,6 +103,13 @@ async function portableMessage(session, message, host) {
     try {
         if (message.type === "exportPdUpgrade" && host.exportPdUpgrade) {
             await host.exportPdUpgrade(session);
+        } else if (message.type === "exportPortableProfile" && session.demo) {
+            const {snapshot, saved} = demoExport(session);
+            const where = await host.saveExport(exportedProfile(snapshot, new Date(), "charybdis-demo"));
+            if (where) {
+                saved();
+                session.notice = `Demo setup exported to ${where}. Import it on your keyboard to review and apply it.`;
+            }
         } else if (message.type === "exportPortableProfile") {
             const file = exportedProfile(await session.service.readPortableProfile());
             const where = await host.saveExport(file);
@@ -106,10 +120,18 @@ async function portableMessage(session, message, host) {
     } finally {session.portableBusy = false; publish(session, host);}
 }
 
+// The demo's controls: open it, open a profile file in it, leave it.
+async function demoMessage(session, message, host) {
+    session.portableBusy = true;
+    try {
+        await demoControl(session, message, host, session.service.snapshot());
+    } finally {session.portableBusy = false; publish(session, host);}
+}
+
 // What an exported profile file holds, and the name a host may suggest for it.
-function exportedProfile(snapshot, now = new Date()) {
+function exportedProfile(snapshot, now = new Date(), stem = "charybdis") {
     return {
-        fileName: `charybdis-${now.toISOString().slice(0, 10)}.charybdis.json`,
+        fileName: `${stem}-${now.toISOString().slice(0, 10)}.charybdis.json`,
         text: JSON.stringify(snapshot.document, null, 2) + "\n",
     };
 }

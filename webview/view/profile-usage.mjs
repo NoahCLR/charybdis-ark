@@ -31,7 +31,7 @@ export function profileUsageView(usage, macroBank) {
     if (!usage) return null;
     const fraction = share(usage.used, usage.capacity);
     return {
-        source: usage.source === "draft" ? "Your draft" : "What the keyboard runs",
+        source: usage.source === "draft" ? "Your draft" : usage.source === "demo" ? "The demo setup" : "What the keyboard runs",
         used: usage.used,
         capacity: usage.capacity,
         free: Math.max(0, usage.capacity - usage.used),

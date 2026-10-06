@@ -72,6 +72,14 @@ test("leaving asks first with unapplied edits or an Apply running", () => {
     assert.equal(leaving({service: {phase: "reading layout"}}), false);
 });
 
+test("in the demo, leaving asks only about edits not exported", () => {
+    const draft = (print) => ({dirty: true, current: {fingerprint: print}});
+    assert.equal(leaving({demo: {exported: null}, draft: draft(1)}), true);
+    assert.equal(leaving({demo: {exported: 1}, draft: draft(1)}), false, "exported as they are");
+    assert.equal(leaving({demo: {exported: 1}, draft: draft(2)}), true, "edited since");
+    assert.equal(leaving({demo: {exported: null}, draft: {dirty: false}}), false);
+});
+
 test("a chosen profile file has the extension's size limit", async () => {
     assert.equal(await readProfileFile(undefined), undefined);
     const file = (size) => ({size, name: "mine.charybdis.json", text: async () => "{}"});
@@ -90,4 +98,8 @@ test("the page's words are its own", () => {
     assert.match(BLOCKED.unsupported.title, /Chrome or Edge/);
     assert.match(BLOCKED.unsupported.detail, /HTTPS/);
     assert.match(BLOCKED.otherTab.title, /another tab/);
+    // The demo needs no keyboard, so a browser without WebHID still offers it;
+    // a tab waiting on another does not, since it takes the keyboard over.
+    assert.equal(BLOCKED.unsupported.demo, true);
+    assert.equal(BLOCKED.otherTab.demo, undefined);
 });

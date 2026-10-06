@@ -2,10 +2,11 @@
 // passes through on its way to the device.
 
 import {el, esc} from "../lib/dom.mjs";
-import {getModel, post, render, state} from "../store.mjs";
+import {getModel, post, postLeavingDemo, render, state} from "../store.mjs";
 import {statusSummary} from "../view/review.mjs";
 import {busyText, postApplyReadText, screenAvailable} from "../view/readiness.mjs";
 import {buildLine, chooseKeyboard, hostOf, themeLabel} from "../view/host.mjs";
+import {DEMO_WORDS, demoOf} from "../view/demo.mjs";
 import {openHistory} from "./history.mjs";
 
 // The review opens at once; the host marks it reviewed when it answers.
@@ -49,6 +50,7 @@ export function rail() {
     const health = device.health || {};
     const draft = model?.draft;
     const host = hostOf(model);
+    const demo = demoOf(model);
     const devices = model?.devices || [];
     const selector = devices.length > 1 ? `<label class="rail-picker-label" for="rail-device-picker">Keyboard</label>
             <select class="input rail-picker" id="rail-device-picker" data-act="select-device" ${health.busy ? "disabled" : ""}>
@@ -74,10 +76,11 @@ export function rail() {
             ${host.chooseKeyboard ? `<button class="btn tiny rail-choose" data-act="choose-keyboard" ${health.busy ? "disabled" : ""}
                 data-tip="Pick a Charybdis in the browser's list. Once chosen, it reconnects by itself next time.">Choose keyboard</button>` : ""}
             <div class="rail-status">
-                ${line(device.connected ? "on" : "err",
+                ${demo.active ? line("demo", DEMO_WORDS.status, "Nothing is connected. The demo runs Ark's own draft over a demo setup; only Apply needs a keyboard.") : ""}
+                ${demo.active ? "" : line(device.connected ? "on" : "err",
                     device.connected ? (health.busy ? health.phase || "Working" : "Connected") : "Disconnected",
                     "Whether this window is talking to a keyboard.")}
-                ${line(health.profile === "synced" ? "on" : health.profile === "attention" ? "draft" : "",
+                ${demo.active ? "" : line(health.profile === "synced" ? "on" : health.profile === "attention" ? "draft" : "",
                     health.profile === "synced" ? "Both halves agree" : health.profile === "attention" ? "Halves need attention"
                         : health.profile === "unread" ? "Profile not read" : "Profile unavailable",
                     "The committed generation and digest each half reports.")}
@@ -86,7 +89,7 @@ export function rail() {
                     : line(draft?.dirty ? "draft" : "on",
                         draft ? (draft.dirty ? `${draft.changes.length} change${draft.changes.length === 1 ? "" : "s"} in draft` : "Draft clean") : "No draft",
                         "Edits waiting in this window. The keyboard still runs its saved profile.")}
-                ${health.restartNeeded
+                ${demo.active ? "" : health.restartNeeded
                     ? line("err", "Restart the keyboard",
                         "The other half did not confirm a cancelled save, so the keyboard refuses new saves. Unplug the USB cable (not the cable between the halves), wait a few seconds and plug it back in. Nothing was lost.")
                     : line(health.recoveryPending ? "draft" : device.connected ? "on" : "",
@@ -113,8 +116,9 @@ export function rail() {
         render();
     }));
     node.querySelector('[data-act="dismiss"]')?.addEventListener("click", () => { state.notice = ""; state.error = ""; render(); });
-    node.querySelector('[data-act="refresh"]').addEventListener("click", () => post({type: "refresh"}));
-    node.querySelector('[data-act="choose-keyboard"]')?.addEventListener("click", () => post(chooseKeyboard()));
+    // From the demo, reading or choosing a keyboard leaves it, asking first.
+    node.querySelector('[data-act="refresh"]').addEventListener("click", () => postLeavingDemo({type: "refresh"}));
+    node.querySelector('[data-act="choose-keyboard"]')?.addEventListener("click", () => postLeavingDemo(chooseKeyboard()));
     node.querySelector('[data-act="select-device"]')?.addEventListener("change", (event) => post({type: "selectDevice", deviceId: event.target.value}));
     node.querySelector('[data-act="open-review"]')?.addEventListener("click", openReview);
     node.querySelector('[data-act="history"]').addEventListener("click", openHistory);
@@ -250,16 +254,18 @@ export function commitBar() {
     if (!draft.dirty) return null;
 
     // One way on: the review, where Apply lives. What the draft holds is said
-    // by what happened to it, which fits where a list of areas did not.
+    // by what happened to it, which fits where a list of areas did not. In the
+    // demo the review has Export where Apply would be.
+    const demo = demoOf(model).active;
     const node = el(`<div class="commit">
         <span class="n"><i class="dot draft"></i> <strong>${draft.changes.length} change${draft.changes.length === 1 ? "" : "s"}</strong>
         <span class="muted">in your draft</span></span>
         <span class="peek"><span class="note" style="white-space:nowrap">${esc(statusSummary(draft.changes))}</span></span>
         <span class="sep"></span>
         <button class="btn ghost tiny" data-act="discard"
-            data-tip="Put every change back to what the keyboard holds. Undo (⌘Z) brings them back.">Discard all</button>
+            data-tip="${demo ? "Put every change back to the demo setup." : "Put every change back to what the keyboard holds."} Undo (⌘Z) brings them back.">Discard all</button>
         <button class="btn primary" data-act="review"
-            data-tip="See every change, then write the draft to both halves as one generation.">Review and apply</button></div>`);
+            data-tip="${demo ? "See every change and what the checks find. Apply needs a keyboard; Export saves the setup." : "See every change, then write the draft to both halves as one generation."}">${demo ? "Review changes" : "Review and apply"}</button></div>`);
     node.querySelector('[data-act="review"]').addEventListener("click", openReview);
     node.querySelector('[data-act="discard"]').addEventListener("click", () => post({type: "discardProfileDraft"}));
     return node;
@@ -267,7 +273,7 @@ export function commitBar() {
 
 // Read-only reasons, said plainly where the control is.
 export function unavailable(model) {
-    if (!model?.device?.connected) return hostOf(model).blocked?.title || hostOf(model).words.noKeyboard || "";
+    if (!model?.device?.connected && !demoOf(model).active) return hostOf(model).blocked?.title || hostOf(model).words.noKeyboard || "";
     if (!model?.layers?.length) return "Nothing has been read from the keyboard yet. Choose Read keyboard.";
     if (!model?.draft) return "This keyboard's firmware cannot hold a complete eight-layer profile, so edits cannot be drafted here.";
     if (!model.draft.matching) return "The local draft belongs to another keyboard. Select it again or discard the draft here.";
