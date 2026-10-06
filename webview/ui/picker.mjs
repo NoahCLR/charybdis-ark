@@ -100,12 +100,15 @@ function sectionBody(model) {
         // One row per slot, laid out like the layers: the slot, what it does,
         // then its two keycodes. An empty slot is still offered, since its
         // keycodes are fixed; the row says it does nothing until configured.
+        // Past eight slots the rows run down two columns, slot order first.
         const slots = model?.pdModes || [];
+        const many = slots.length > 8;
+        const rows = many ? ` style="grid-template-rows:repeat(${Math.ceil(slots.length / 2)}, auto)"` : "";
         if (!slots.length) return `<p class="note" style="padding:18px">This keyboard has not reported its pointing modes.</p>`;
         const kinds = vocabulary(model).pointing.kinds;
         const button = (value, label, tip) =>
             `<button class="pk wide ${picked(value) ? "on" : ""}" data-pick="${esc(value)}" data-tip="${esc(tip)}"><span class="l">${label}</span><span class="c">${esc(value)}</span></button>`;
-        return `<div class="pk-body"><div class="pk-layers modes">${slots.map((slot) => `
+        return `<div class="pk-body"><div class="pk-layers modes ${many ? "many" : ""}"${rows}>${slots.map((slot) => `
             <div class="pk-layer ${slot.kind ? "" : "empty"}">
                 <span class="ix">${slot.id}</span>
                 <span class="nm"><span>${esc(slot.displayName)}</span><span class="sub">${esc(slot.kind ? word(kinds, slot.kind) : "Empty — does nothing yet")}</span></span>

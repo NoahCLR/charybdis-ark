@@ -31,15 +31,15 @@ function revertUnits(before, after, units, capabilities) {
     const document = copy(b.document);
     const blob = decodeProfileBlob(Buffer.from(document.profile, "base64"));
     const baseBlob = decodeProfileBlob(Buffer.from(a.document.profile, "base64"));
-    const actionOptions = actionLimitsFor(document.version);
+    const actionOptions = actionLimitsFor(document.version, b.pdModes?.length);
     const rgbOptions = {maximumBrightness: after.limits?.brightnessMax ?? 255};
     // Each domain is decoded once, edited for every unit, and encoded once.
     const codecs = {
-        [PROFILE_DOMAIN_IDS.RGB]: [payload => decodeRgbDomainV1(payload, rgbOptions), value => encodeRgbDomainV1(value, rgbOptions)],
+        [PROFILE_DOMAIN_IDS.RGB]: [(payload, version) => decodeRgbDomainV1(payload, {...rgbOptions, formatVersion: version}), value => encodeRgbDomainV1(value, rgbOptions)],
         [PROFILE_DOMAIN_IDS.KEY_BEHAVIORS]: [payload => decodeKeyBehaviorDomain(payload, actionOptions).rows, rows => encodeKeyBehaviorDomain({rows}, actionOptions)],
         [PROFILE_DOMAIN_IDS.COMBOS]: [(payload, version) => decodeComboDomain(payload, version, actionOptions), table => encodeComboDomain({...table, rows: table.rows.filter(Boolean)}, actionOptions)],
         [PROFILE_DOMAIN_IDS.SETTINGS]: [payload => decodeSettings(payload), value => encodeSettings(value)],
-        [PROFILE_DOMAIN_IDS.PD_MODES]: [payload => decodePdDomain(payload), slots => encodePdDomain(slots)],
+        [PROFILE_DOMAIN_IDS.PD_MODES]: [(payload, version) => decodePdDomain(payload, {version}), slots => encodePdDomain(slots)],
     };
     const open = new Map();
     const domain = id => {

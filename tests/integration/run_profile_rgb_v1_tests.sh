@@ -4,9 +4,11 @@ ROOT="${FIRMWARE_ROOT:?Set FIRMWARE_ROOT}"
 APP="${CHARYBDIS_ARK_ROOT:?Set CHARYBDIS_ARK_ROOT}"
 BUILD_DIR="$(mktemp -d)"
 trap 'rm -rf "$BUILD_DIR"' EXIT INT TERM
-for version in 1 2; do
+# Format 1 is the schema-1 build; format 3 the schema-2 build of the 32-slot
+# firmware, which reads no other RGB format.
+for version in 1 3; do
 schema_flags=""
-if [ "$version" = 2 ]; then schema_flags="-DNOAH_PD_PROFILE_ENABLE"; fi
+if [ "$version" = 3 ]; then schema_flags="-DNOAH_PD_PROFILE_ENABLE"; fi
 node "$APP/tests/integration/rgb-corpus.js" "$ROOT" "$BUILD_DIR/corpus.bin" "$version"
 for variant in normal sanitized; do
     flags=""

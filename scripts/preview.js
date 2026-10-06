@@ -15,6 +15,12 @@ const keycodes = require("../core/data/keycode-catalog");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../core/protocol/via-layout-v1");
 const {PROFILE_WIRE_KNOWN_MASKS} = require("../core/protocol/profile-wire-v1");
 const {document: pdDocument} = require("../tests/fixtures/pd-profile");
+const {document32} = require("../tests/fixtures/pd-slots-32");
+const {ACTION_ABI, ACTION_ABI_32_SLOTS} = require("../core/schema/actions");
+
+// `--slots 32` previews the 32-slot firmware: its compiled profile with slot 12
+// configured too, and keys for slot 12 and the empty slot 20.
+const SLOTS_32 = process.argv.includes("--slots") && process.argv[process.argv.indexOf("--slots") + 1] === "32";
 
 // A readable keymap for the preview only. The fixture profile ships an empty
 // VIA layout, which renders honestly but tells you nothing about the layout
@@ -31,7 +37,7 @@ const PREVIEW_BASE = [
 // Keys the keyboard stores as bare user keycodes: a configured pointing mode, an
 // empty slot, a VIA macro and a custom key. The preview carries them because
 // they are the values whose stored name and semantic name differ.
-const PREVIEW_PD_BINDINGS = {50: 0x7e80, 52: 0x7e86, 48: 0x7700, 49: 0x7e40};
+const PREVIEW_PD_BINDINGS = {50: 0x7e80, 52: 0x7e86, 48: 0x7700, 49: 0x7e40, ...(SLOTS_32 ? {53: 0x7e8c, 54: 0x7eb4} : {})};
 
 function fillPreviewLayer(document) {
     for (const [layoutIndex, code] of Object.entries(PREVIEW_PD_BINDINGS)) {
@@ -50,7 +56,7 @@ function fillPreviewLayer(document) {
 const capabilities = {
     compiledLayerCount: 8,
     supportedDomainMask: 31,
-    actionAbiDigest: 0x1d3fcacc,
+    actionAbiDigest: SLOTS_32 ? ACTION_ABI_32_SLOTS : ACTION_ABI,
     // Current firmware: every feature this app knows, including physical
     // gesture timing and runtime-owned tapping, which change what an empty
     // behaviour cell means.
@@ -69,7 +75,7 @@ const capabilities = {
 };
 
 function buildModel() {
-    const doc = fillPreviewLayer(pdDocument());
+    const doc = fillPreviewLayer(SLOTS_32 ? document32() : pdDocument());
     const snapshot = {
         document: doc,
         fingerprint: portable.fingerprint(doc),

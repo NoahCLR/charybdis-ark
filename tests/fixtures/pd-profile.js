@@ -7,7 +7,7 @@ const {decodeProfileBlob, encodeProfileBlob} = require("../../core/schema/profil
 const {decodePdDomain, encodePdDomain} = require("../../core/schema/pd-mode-domain-v1");
 const {decodeKeyBehaviorDomain, encodeKeyBehaviorDomain} = require("../../core/schema/key-behavior-domain-v1");
 function document() {
-    const fixture = fs.readFileSync(path.resolve(__dirname, "../../upstream/firmware/tests/fixtures/compiled_profile_pd_v2.fixture"), "utf8");
+    const fixture = fs.readFileSync(path.resolve(__dirname, "./compiled_profile_pd_eight_slot.fixture"), "utf8");
     const blob = decodeProfileBlob(Buffer.from(fixture.match(/^profile.full.hex=(.+)$/m)[1], "hex"));
     // Creation/duplication tests require two empty destinations, independently
     // of the user's current compiled profile (which now configures slot 6).

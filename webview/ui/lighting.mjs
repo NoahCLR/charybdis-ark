@@ -295,7 +295,8 @@ function stageBody(body) {
 
     if (state.stage === "pd") {
         node.className = "tab-split";
-        const list = el(`<aside class="rowlist"><div class="rowlist-h">Pointing modes</div></aside>`);
+        // Past eight slots the list scrolls on its own beside the editor.
+        const list = el(`<aside class="rowlist ${(model.pdModes || []).length > 8 ? "many" : ""}"><div class="rowlist-h">Pointing modes</div></aside>`);
         (model.pdModes || []).forEach((slot) => {
             const row = pdColourRow(model, slot.id);
             const lit = row && !isOff(row.color);

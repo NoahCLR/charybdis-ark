@@ -228,7 +228,7 @@ function editSettings(snapshot, message, capabilities) {
         }
     }
     const domains = decodeProfileBlob(value.profile).domains.map(domain => domain.id === 0x40 ? {...domain, payload: encodeSettings(value.settings)}
-        : domain.id === 0x20 && behaviorsChanged ? {...domain, payload: encodeKeyBehaviorDomain(value.behaviors, actionLimitsFor(value.document.version))} : domain);
+        : domain.id === 0x20 && behaviorsChanged ? {...domain, payload: encodeKeyBehaviorDomain(value.behaviors, actionLimitsFor(value.document.version, value.pdModes?.length))} : domain);
     const document = {...value.document, profile: encodeProfileBlob({schema: {major: value.document.version, minor: 0}, domains}).toString("base64")};
     validateSnapshot(document, capabilities);
     return document;
