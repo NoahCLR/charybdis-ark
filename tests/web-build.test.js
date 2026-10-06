@@ -1,8 +1,8 @@
 "use strict";
 
 // The web build (scripts/build-web.js): a complete static site of hashed files,
-// a page that names them itself, nothing a browser cannot have, and an entry
-// whose every export exists. That the bundle behaves as Node does, and that the
+// a page that names them itself, the headers it is published with, nothing a
+// browser cannot have, and an entry whose every export exists. That the bundle behaves as Node does, and that the
 // page works, is browser-tests/web-build.spec.js's and web-page.spec.js's.
 
 const assert = require("node:assert/strict");
@@ -10,14 +10,22 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
-const {buildInfo, buildWeb} = require("../scripts/build-web");
+const {buildInfo, buildWeb, headerPolicy, pagePolicy, IMMUTABLE} = require("../scripts/build-web");
+const {checkStaticSite, parseHeaders} = require("../scripts/check-static-site");
 
 const temporary = () => fs.mkdtempSync(path.join(os.tmpdir(), "ark-web-"));
+// The build writes its manifest beside the site, so each test builds into a
+// folder inside its own temporary directory.
+// The page's attributes as the browser reads them.
+const unescape = (html) => html.replace(/&#(\d+);/g, (match, code) => String.fromCharCode(Number(code)));
 
-test("every file the build writes is named by its content, and the manifest says which is which", async () => {
-    const outdir = temporary();
+test("every file the build writes is named by its content, and the manifest beside it says which is which", async () => {
+    const root = temporary();
+    const outdir = path.join(root, "web");
     try {
+        fs.mkdirSync(outdir);
         fs.writeFileSync(path.join(outdir, "core-OLDRELEASE.js"), "");
+        fs.writeFileSync(path.join(outdir, "manifest.json"), "{}");
         const build = {version: "1.2.3", commit: "abc123"};
         const manifest = await buildWeb({outdir, build});
         assert.deepEqual(Object.keys(manifest).sort(), ["core", "host", "panel", "styles", "worker"]);
@@ -26,11 +34,11 @@ test("every file the build writes is named by its content, and the manifest says
         assert.match(manifest.worker, /^worker-[A-Z0-9]{8}\.js$/);
         assert.match(manifest.panel, /^panel-[A-Z0-9]{8}\.js$/);
         assert.match(manifest.styles, /^styles-[A-Z0-9]{8}\.css$/);
-        assert.deepEqual(JSON.parse(fs.readFileSync(path.join(outdir, "manifest.json"), "utf8")), manifest);
+        assert.deepEqual(JSON.parse(fs.readFileSync(path.join(root, "web-manifest.json"), "utf8")), manifest, "the manifest is beside the site, never published");
         const written = fs.readdirSync(outdir).sort();
         const chunks = written.filter((name) => /^chunk-[A-Z0-9]{8}\.js$/.test(name));
         assert.ok(chunks.length, "host and core share their code");
-        assert.deepEqual(written, [...Object.values(manifest), ...chunks, "index.html", "manifest.json"].sort(), "an earlier build's files are gone");
+        assert.deepEqual(written, [...Object.values(manifest), ...chunks, "_headers", "index.html"].sort(), "an earlier build's files are gone");
 
         // The same sources give the same names; the hash follows the content.
         assert.deepEqual(await buildWeb({outdir, build}), manifest);
@@ -40,13 +48,15 @@ test("every file the build writes is named by its content, and the manifest says
         assert.ok(core.includes("web/no-native-hid.js"), "the native adapter's stand-in takes its place");
         const panel = fs.readFileSync(path.join(outdir, manifest.panel), "utf8");
         assert.ok(!panel.includes("core/"), "the panel bundle is the renderer alone");
+        assert.deepEqual(checkStaticSite(outdir, {project: root}), [], "what the build writes is ready to publish");
     } finally {
-        fs.rmSync(outdir, {recursive: true, force: true});
+        fs.rmSync(root, {recursive: true, force: true});
     }
 });
 
 test("the page names its files itself, carries its policy, and says what it was built from", async () => {
-    const outdir = temporary();
+    const root = temporary();
+    const outdir = path.join(root, "web");
     try {
         const manifest = await buildWeb({outdir, build: {version: "1.2.3", commit: "abc123"}});
         const page = fs.readFileSync(path.join(outdir, "index.html"), "utf8");
@@ -55,7 +65,8 @@ test("the page names its files itself, carries its policy, and says what it was 
         // The host first: it defines acquireVsCodeApi before the panel asks for it.
         assert.ok(page.indexOf(`src="./${manifest.host}"`) < page.indexOf(`src="./${manifest.panel}"`));
         assert.match(page, /Charybdis Ark 1\.2\.3 \(abc123\)/);
-        const policy = page.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/)[1];
+        const policy = unescape(page.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/)[1]);
+        assert.equal(policy, pagePolicy());
         for (const rule of ["default-src 'none'", "script-src 'self'", "worker-src 'self'", "style-src 'self'", "connect-src 'none'"]) {
             assert.ok(policy.split("; ").includes(rule), rule);
         }
@@ -70,7 +81,43 @@ test("the page names its files itself, carries its policy, and says what it was 
             assert.doesNotMatch(fs.readFileSync(path.join(outdir, file), "utf8"), /\bfetch\(|XMLHttpRequest|WebSocket|EventSource|sendBeacon/, file);
         }
     } finally {
-        fs.rmSync(outdir, {recursive: true, force: true});
+        fs.rmSync(root, {recursive: true, force: true});
+    }
+});
+
+test("the page is published with its policy as a header, and only hashed files are cached for good", async () => {
+    const root = temporary();
+    const outdir = path.join(root, "web");
+    try {
+        const manifest = await buildWeb({outdir, build: {version: "1.2.3", commit: "abc123"}});
+        const rules = parseHeaders(fs.readFileSync(path.join(outdir, "_headers"), "utf8"));
+        const header = (rule, name) => (rules.get(rule) || []).filter((line) => line.toLowerCase().startsWith(`${name.toLowerCase()}: `))
+            .map((line) => line.slice(name.length + 2));
+
+        // One policy: the header is the page's own, with what only a header can say.
+        const page = fs.readFileSync(path.join(outdir, "index.html"), "utf8");
+        const meta = unescape(page.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/)[1]);
+        assert.deepEqual(header("/*", "Content-Security-Policy"), [headerPolicy()]);
+        assert.equal(headerPolicy(), `${meta}; frame-ancestors 'none'`);
+        assert.ok(meta.split("; ").includes("connect-src 'none'"));
+        assert.ok(!meta.includes("frame-ancestors"), "Chrome ignores frame-ancestors in a meta tag, and says so in the console");
+        assert.deepEqual(header("/*", "Permissions-Policy"), ["hid=(self)"]);
+        assert.deepEqual(header("/*", "X-Content-Type-Options"), ["nosniff"]);
+        assert.deepEqual(header("/*", "Referrer-Policy"), ["no-referrer"]);
+
+        // Pages joins a header named by two matching rules, so Cache-Control
+        // comes from exact paths only: the page is revalidated on every load,
+        // and each hashed file, and nothing else, is immutable.
+        assert.deepEqual(header("/*", "Cache-Control"), []);
+        assert.deepEqual(header("/", "Cache-Control"), ["no-cache"]);
+        assert.deepEqual(header("/index.html", "Cache-Control"), ["no-cache"]);
+        const hashed = fs.readdirSync(outdir).filter((name) => !["index.html", "_headers"].includes(name)).sort();
+        assert.ok(Object.values(manifest).every((file) => hashed.includes(file)));
+        const immutable = [...rules.keys()].filter((rule) => header(rule, "Cache-Control").includes(IMMUTABLE));
+        assert.deepEqual(immutable, hashed.map((name) => `/${name}`));
+        assert.ok(rules.size <= 100, "Pages reads at most 100 rules");
+    } finally {
+        fs.rmSync(root, {recursive: true, force: true});
     }
 });
 

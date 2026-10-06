@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<!-- The page's policy travels with it, so it holds under any server: scripts,
-     styles and the worker from this site only, inline style attributes for the
-     panel's layout and device colours, and no connection anywhere. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; worker-src 'self'; style-src 'self'; style-src-attr 'unsafe-inline'; connect-src 'none'; base-uri 'none'; form-action 'none'">
+<!-- The page's policy travels with it, so it holds under any server. It is
+     scripts/build-web.js's POLICY; the published page also gets it as a header,
+     with frame-ancestors (web/_headers). -->
+<meta http-equiv="Content-Security-Policy" content="{{csp}}">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="dark light">
 <meta name="generator" content="Charybdis Ark {{version}} ({{commit}})">

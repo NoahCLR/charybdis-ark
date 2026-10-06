@@ -5,19 +5,26 @@
 // has no build step; core/ and webview/ stay the sources it runs as they are.
 //
 //     index.html                the page (web/index.html, with the names below)
+//     _headers                  what Cloudflare Pages sends with it (web/_headers)
 //     host-<hash>.js            the page's host (web/page.mjs), with the core it runs
 //     core-<hash>.js            core/ for a browser host (web/core.mjs)
 //     chunk-<hash>.js           what host and core share
 //     worker-<hash>.js          the host's clock (web/sleep-worker.js)
 //     panel-<hash>.js           the panel (webview/app.mjs)
 //     styles-<hash>.css         its styles
-//     manifest.json             which hashed file is which, for tests and tools
 //
 // Every file but index.html carries a hash of its content in its name, so a
 // release can never be served a previous release's file. index.html names them
-// itself — the page fetches nothing, manifest.json included — and says which
-// version and commit it was built from: package.json's version, and the commit
-// from git or from ARK_COMMIT.
+// itself — the page fetches nothing — and says which version and commit it was
+// built from: package.json's version, and the commit from git or from
+// ARK_COMMIT. dist/web-manifest.json, beside the site rather than in it, says
+// which hashed file is which, for tests and tools; it is never published.
+//
+// The page's Content Security Policy is POLICY, below, and nowhere else: the
+// page carries it in a <meta> tag, so it holds under any server, and _headers
+// sends it with frame-ancestors, which only a header can set. _headers also
+// keeps index.html from being cached and lets every hashed file be cached for
+// good, by one rule per file the build wrote.
 //
 // The build fails if node-hid, fs, vscode or any other Node built-in would
 // reach a bundle. node-hid-adapter.js is the one module core/ loads that cannot
@@ -31,6 +38,8 @@ const esbuild = require("esbuild");
 
 const APP_ROOT = path.resolve(__dirname, "..");
 const OUTDIR = path.join(APP_ROOT, "dist", "web");
+// Beside the site it describes, so publishing the folder never publishes it.
+const manifestFileFor = (outdir) => path.join(path.dirname(outdir), `${path.basename(outdir)}-manifest.json`);
 const NODE_HID_ADAPTER = path.join(APP_ROOT, "core", "transport", "node-hid-adapter.js");
 const NO_NATIVE_HID = path.join(APP_ROOT, "web", "no-native-hid.js");
 
@@ -40,6 +49,20 @@ const NODE_BUILTINS = new Set(builtinModules);
 const HOST_PACKAGES = ["vscode", "node-hid"];
 // What a bundle may take from node_modules: the buffer package and its two dependencies.
 const PACKAGES = {core: ["buffer", "base64-js", "ieee754"], panel: [], worker: []};
+
+// The page's policy: scripts, styles and the worker from the page's own origin,
+// the panel's inline style attributes, and no connection anywhere.
+const POLICY = ["default-src 'none'", "script-src 'self'", "worker-src 'self'", "style-src 'self'",
+    "style-src-attr 'unsafe-inline'", "connect-src 'none'", "base-uri 'none'", "form-action 'none'"];
+// Only a header can say who may frame the page; in a <meta> tag Chrome ignores
+// it and says so in the console.
+const HEADER_ONLY_POLICY = ["frame-ancestors 'none'"];
+const pagePolicy = () => POLICY.join("; ");
+const headerPolicy = () => [...POLICY, ...HEADER_ONLY_POLICY].join("; ");
+// A hashed file never changes under its name; the page itself is asked for
+// afresh every time (no-cache revalidates, so an unchanged page is a cheap 304,
+// and a release shows on the next load).
+const IMMUTABLE = "public, max-age=31536000, immutable";
 
 const browserOnly = {
     name: "browser-only",
@@ -115,12 +138,28 @@ function buildInfo(env = process.env) {
     }
 }
 
+// Fills a {{name}} template from `names`; a name the build does not write fails it.
+function fill(template, file, names, escape = (value) => value) {
+    return template.replace(/\{\{(\w+)\}\}/g, (match, name) => {
+        if (names[name] === undefined) throw new Error(`${file} names ${match}, which the build does not write`);
+        return escape(names[name]);
+    });
+}
+
+// _headers for the hashed files the build wrote: one exact rule each, so no
+// splat can ever mark a file immutable whose name does not change with it.
+function headersFile(hashedFiles) {
+    const hashed = [...hashedFiles].sort().map((file) => `/${file}\n  Cache-Control: ${IMMUTABLE}`).join("\n");
+    return fill(fs.readFileSync(path.join(APP_ROOT, "web", "_headers"), "utf8"), "web/_headers", {csp: headerPolicy(), hashed});
+}
+
 const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (character) => `&#${character.charCodeAt(0)};`);
 
 // Builds into `outdir`, emptied first so no earlier release's file lingers, and
 // returns the manifest it wrote.
-async function buildWeb({outdir = OUTDIR, entries = {core: "web/core.mjs", host: "web/page.mjs"}, build = buildInfo()} = {}) {
+async function buildWeb({outdir = OUTDIR, manifestFile = manifestFileFor(outdir), entries = {core: "web/core.mjs", host: "web/page.mjs"}, build = buildInfo()} = {}) {
     fs.rmSync(outdir, {recursive: true, force: true});
+    fs.rmSync(manifestFile, {force: true});
     fs.mkdirSync(outdir, {recursive: true});
     const worker = await bundle("worker", {worker: "web/sleep-worker.js"}, outdir, {format: "iife"});
     const manifest = {
@@ -138,26 +177,23 @@ async function buildWeb({outdir = OUTDIR, entries = {core: "web/core.mjs", host:
         ...await bundle("panel", {panel: "webview/app.mjs", styles: "webview/styles.css"}, outdir),
     };
     if (manifest.host) {
-        const names = {...manifest, version: build.version, commit: build.commit};
-        const page = fs.readFileSync(path.join(APP_ROOT, "web", "index.html"), "utf8")
-            .replace(/\{\{(\w+)\}\}/g, (match, name) => {
-                if (names[name] === undefined) throw new Error(`web/index.html names ${match}, which the build does not write`);
-                return escapeHtml(names[name]);
-            });
+        const names = {...manifest, version: build.version, commit: build.commit, csp: pagePolicy()};
+        const page = fill(fs.readFileSync(path.join(APP_ROOT, "web", "index.html"), "utf8"), "web/index.html", names, escapeHtml);
         fs.writeFileSync(path.join(outdir, "index.html"), page);
+        fs.writeFileSync(path.join(outdir, "_headers"), headersFile(fs.readdirSync(outdir).filter((name) => name !== "index.html")));
     }
-    fs.writeFileSync(path.join(outdir, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
+    fs.writeFileSync(manifestFile, `${JSON.stringify(manifest, null, 2)}\n`);
     return manifest;
 }
 
 if (require.main === module) {
     buildWeb().then((manifest) => {
         for (const [name, file] of Object.entries(manifest)) console.log(`${name.padEnd(7)}${path.relative(APP_ROOT, path.join(OUTDIR, file))}`);
-        console.log(`written ${path.relative(APP_ROOT, path.join(OUTDIR, "index.html"))} and manifest.json`);
+        console.log(`written ${path.relative(APP_ROOT, path.join(OUTDIR, "index.html"))}, _headers and ${path.relative(APP_ROOT, manifestFileFor(OUTDIR))}`);
     }).catch((error) => {
         console.error(error.errors?.length ? error.errors.map((entry) => entry.text).join("\n") : String(error.message || error));
         process.exit(1);
     });
 }
 
-module.exports = {buildInfo, buildWeb, OUTDIR};
+module.exports = {buildInfo, buildWeb, headerPolicy, pagePolicy, manifestFileFor, IMMUTABLE, OUTDIR};

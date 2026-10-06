@@ -10,7 +10,7 @@ const {exerciseCore} = require("./core-exercise");
 const ROOT = path.resolve(__dirname, "..");
 const FIRMWARE_FIXTURES = path.join(ROOT, "upstream", "firmware", "tests", "fixtures");
 const APP_FIXTURES = path.join(ROOT, "tests", "fixtures");
-const manifest = () => JSON.parse(fs.readFileSync(path.join(ROOT, "dist", "web", "manifest.json"), "utf8"));
+const manifest = () => JSON.parse(fs.readFileSync(path.join(ROOT, "dist", "web-manifest.json"), "utf8"));
 
 // `key=value` fixture files, comments skipped.
 function values(file) {

@@ -80,8 +80,9 @@ into Ark's storage on start (D-L47).
 Normal tests use injected HID adapters. `npm run probe:live-link` additionally
 loads the native HID module and enumerates matching devices without opening or
 writing them. A successful enumeration is not an Apply/recovery hardware test.
-The GitHub workflow runs app checks, catalog verification, preview generation
-and native module loading; it contains no publishing job.
+The check workflow runs app checks, catalog verification, preview generation
+and native module loading; it contains no publishing job. Publishing the web
+page is its own workflow ([below](#publishing-the-web-page)).
 
 For a local installation, check the extension symlink points at the intended
 Ark checkout. F5 can test a worktree without retargeting that installed copy.
@@ -156,6 +157,7 @@ npm run keycodes -- --check # verify the catalog against the local pinned QMK in
 npm run keycodes           # regenerate from those same inputs
 npm run build:web          # build the web page into dist/web/
 npm run web                # …then serve it at http://localhost:8975/
+npm run check:site         # check dist/web/ is static files only, ready to publish
 ```
 
 ### The web build
@@ -170,9 +172,13 @@ they share in a chunk; the host's clock worker (`web/sleep-worker.js`);
 file but `index.html` carries a hash of its content in its name, so a new
 release can never be served an old file. `index.html` names them itself, and
 the version (`package.json`) and commit (git, or `ARK_COMMIT` in the
-environment) the build came from; `manifest.json` lists the same names for
-tests and tools, but the page never fetches it. Each build empties the folder
-first.
+environment) the build came from. `_headers` (from `web/_headers`) is what
+Cloudflare Pages sends with the page when it is [published](#publishing-the-web-page).
+`dist/web-manifest.json`, beside the site rather than in it, lists the hashed
+names for tests and tools; it is never published and the page never fetches it.
+Each build empties the folder first. `npm run check:site`
+(`scripts/check-static-site.js`) checks that `dist/web/` holds only what the
+build writes, with no server code Pages would run.
 
 To try the page, run `npm run web`: it builds, then serves `dist/web/` at
 `http://localhost:8975/` (`scripts/serve.js`, a static server for this machine
@@ -186,8 +192,9 @@ saved while trying it live in that origin's storage
 The page carries its Content Security Policy in a `<meta>` tag, so it holds
 under any server: scripts, styles and the worker from the page's own origin,
 the panel's inline style attributes, and `connect-src 'none'`, so after it
-loads the page makes no request at all. `frame-ancestors` only works as a
-header, which publishing will set.
+loads the page makes no request at all. The policy is written once, as
+`POLICY` in `scripts/build-web.js`; `_headers` sends the same policy with
+`frame-ancestors 'none'`, which only works as a header.
 
 The browser host (`web/web-host.mjs`) runs the shared panel loop over
 `WebHidDeviceAdapter` and gives the panel an `acquireVsCodeApi` stand-in
@@ -225,6 +232,77 @@ read, an edit, an export, an Apply the fake refuses (which still leaves a
 recovery copy to list and download), the theme, a reload that reconnects
 without the picker, a second tab that is refused, a browser without WebHID, and
 that no request went anywhere but the page's own files.
+
+### Publishing the web page
+
+`.github/workflows/publish-web.yml` publishes the page to Cloudflare Pages
+whenever `dev` or `main` moves. It builds the page (`npm ci`, then the web
+build, with `ARK_COMMIT` set to the pushed commit), runs the page's browser
+tests (`web-page.spec.js` and `web-build.spec.js`) against exactly those files
+(`ARK_WEB_BUILT=1` stops Playwright rebuilding them), checks they are static
+files only (`scripts/check-static-site.js`), and only then uploads `dist/web/`
+with Wrangler (`cloudflare/wrangler-action`, pinned to a commit) as
+`pages deploy dist/web --project-name=charybdis-ark --branch=<dev|main>`. A
+failed build, test or check publishes nothing, and the address keeps the page
+it had. The project name is the workflow's `PAGES_PROJECT`.
+
+| Branch | Where it goes |
+| --- | --- |
+| `dev` | a preview deployment, at `https://dev.charybdis-ark.pages.dev`, for testing |
+| `main` | the production deployment, at the custom domain (and `charybdis-ark.pages.dev`) |
+
+The workflow has `contents: read` only, never runs on pull requests, and
+publishes one run at a time per branch (a newer push waits; an upload is never
+cancelled). It is D-L51's one exception: it runs on `dev` pushes, and its tests
+gate only the publish. Its job is not one of `main`'s required checks and is
+deliberately not named like them. If `CLOUDFLARE_API_TOKEN` or
+`CLOUDFLARE_ACCOUNT_ID` is missing, the run still builds and tests the page,
+then fails at "Require the Cloudflare credentials", naming the missing secret:
+a red run, rather than a green one that left the address on an old page.
+
+`_headers` sends, for every file, the page's Content Security Policy with
+`frame-ancestors 'none'`, `Permissions-Policy: hid=(self)`,
+`X-Content-Type-Options: nosniff` and `Referrer-Policy: no-referrer`. `/` and
+`/index.html` are `Cache-Control: no-cache`: the browser may keep the page but
+asks for it again on every load (an unchanged page is a cheap 304), so a
+release shows on the next load. `no-store` would add nothing but a full
+download each time. Each hashed file gets
+`public, max-age=31536000, immutable` by an exact rule of its own, which the
+build writes for the files it wrote: a new page names new files, so it never
+mixes with an old one's, and no file whose name stays the same is ever marked
+immutable. Pages joins a header named by two matching rules, so nothing sets
+`Cache-Control` under `/*`.
+
+**One-time setup, before the first run (Noah):**
+
+1. In Cloudflare, create a Pages project named `charybdis-ark` for direct
+   upload, not a Git connection, with `main` as its production branch:
+   `npx wrangler pages project create charybdis-ark --production-branch=main`,
+   or in the dashboard Workers & Pages, Create, Pages, *Upload assets*. Any
+   other name works if `PAGES_PROJECT` in the workflow says the same.
+2. Add the custom domain `ark.ncleroy.dev` to the project, under Custom
+   domains. `README.md` gives this address.
+3. Create an API token with only *Account, Cloudflare Pages, Edit*, for this
+   account.
+4. In GitHub (Settings, Secrets and variables, Actions), add the token as
+   `CLOUDFLARE_API_TOKEN` and the account id (shown on the account's overview)
+   as `CLOUDFLARE_ACCOUNT_ID`.
+
+**Publishing by hand.** To publish `dev` or `main` again without a push, run
+the workflow from the Actions tab (*Publish the web page*, Run workflow, pick
+the branch) or with `gh workflow run publish-web.yml --ref dev`. Other branches
+are refused. Without GitHub, from a clean checkout of the branch, run the same
+steps locally and upload with Wrangler, logged in with `npx wrangler login`:
+
+```sh
+npm ci && npm run build:web
+npx playwright test browser-tests/web-page.spec.js browser-tests/web-build.spec.js
+npm run check:site
+npx wrangler pages deploy dist/web --project-name=charybdis-ark --branch=dev   # or main
+```
+
+Locally Playwright rebuilds `dist/web/` before testing it; that is the same
+build, as long as nothing changed in between.
 
 ### Trying a branch before it lands
 
@@ -274,7 +352,9 @@ checkout or app dependencies.
 ### CI and publishing
 
 Development is verified locally, so CI does not run on `dev` or on pull requests
-into it (D-L51). A release's `dev` → `main` pull request runs the independent app
+into it (D-L51). The one exception is [publishing the web page](#publishing-the-web-page),
+which builds and tests the page on each `dev` and `main` push before it
+uploads it, and gates nothing else. A release's `dev` → `main` pull request runs the independent app
 suite on Linux and macOS, loads the native HID module, runs the browser smoke,
 checks every imported source pin against its published trunk, runs the
 [compatibility bridge](COMPATIBILITY.md) at the pins and judges the firmware
