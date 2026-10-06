@@ -38,10 +38,12 @@ function builtInDisplay(action) {
 
 // The key's own tap and first-press hold, shaped like authored branches, for
 // the tiers its row leaves empty (model/built-in-behavior.js). A fallback hold
-// gives way to any authored first-press hold or long hold.
+// gives way to any authored first-press hold or long hold; `releaseTaps` says
+// a press with only a long hold still taps when released before it.
 function builtInForView(target, features) {
-    const {tap, hold, fallback} = builtInActions(target, features);
+    const {tap, hold, fallback, releaseTaps} = builtInActions(target, features);
     return {
+        ...(releaseTaps ? {releaseTaps: true} : {}),
         ...(tap ? {tap: {helper: "TAP_SENDS", action: actionName(tap), ...builtInDisplay(tap)}} : {}),
         ...(hold ? {hold: {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: actionName(hold), repeatHz: "0", ...builtInDisplay(hold),
             ...(fallback ? {fallback: true} : {})}} : {}),

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import keyNames from "../core/model/key-names.js";
 import test from "node:test";
 import {createRequire} from "node:module";
-import {behaviourFor, cellLabel, inheritedBranch, comboAnswers, comboInputKeys, comboInputShown, combosOnKey, comboReferenceLayer, combosAt, combosInPreview, combosShownAt, behaviourListeningTo, canonicalKeycode, behaviourGridSteps, behaviourGroups, behavioursInView, behaviourRouteKeys, behaviourTiers, macroReach, pointingReach, reachInView, reachablePositions, resolvedPositions, bindingKeycode, bindingsForSlot, comboGroups, combosInView, combosForKey, keyFace, keyMeaning, keyName, layerOfKeycode, macroKeycodes, macroPlacements, customKeyPlacements, macroAction, namedAction, pointingAction, pointingSlotFor, reachKeys, slotKeycodes, toggleComboInput, visibleKeycode} from "../webview/view/keyface.mjs";
+import {behaviourFor, cellLabel, impliedBranch, inheritedBranch, comboAnswers, comboInputKeys, comboInputShown, combosOnKey, comboReferenceLayer, combosAt, combosInPreview, combosShownAt, behaviourListeningTo, canonicalKeycode, behaviourGridSteps, behaviourGroups, behavioursInView, behaviourRouteKeys, behaviourTiers, macroReach, pointingReach, reachInView, reachablePositions, resolvedPositions, bindingKeycode, bindingsForSlot, comboGroups, combosInView, combosForKey, keyFace, keyMeaning, keyName, layerOfKeycode, macroKeycodes, macroPlacements, customKeyPlacements, macroAction, namedAction, pointingAction, pointingSlotFor, reachKeys, slotKeycodes, toggleComboInput, visibleKeycode} from "../webview/view/keyface.mjs";
 
 // Slots come from the host with their binding keycodes; the tests use the
 // host's own registry rather than a copy of it.
@@ -915,4 +915,40 @@ test("a plain key's fallback hold gives way to any authored first-press hold or 
     assert.equal(inheritedBranch(behaviour, {tapCount: 0}, "hold"), hold);
     assert.equal(inheritedBranch(behaviour, {tapCount: 0, longHold: {action: "KC_A"}}, "hold"), null);
     assert.equal(inheritedBranch(behaviour, {tapCount: 0, hold: {action: "KC_A"}}, "hold"), null);
+});
+
+test("with no Long hold set, a press's Hold carries on past the Long hold threshold", () => {
+    const tap = {helper: "TAP_SENDS", action: "KC_MINUS", label: "-"};
+    const fallback = {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "KC_MINUS", label: "-", fallback: true};
+    const plain = {keycode: "KC_MINUS", builtIn: {tap, hold: fallback, releaseTaps: true}, steps: []};
+    assert.deepEqual(impliedBranch(plain, {tapCount: 0}, "long"), {meaning: "continues", hold: fallback}, "the fallback hold carries on");
+    for (const helper of ["PRESS_AND_HOLD_UNTIL_RELEASE", "TAP_AT_HOLD_THRESHOLD", "TAP_ON_RELEASE_AFTER_HOLD", "REPEAT_WHILE_HELD"]) {
+        const hold = {helper, action: "KC_A"};
+        assert.deepEqual(impliedBranch(plain, {tapCount: 2, hold}, "long"), {meaning: "continues", hold}, helper);
+    }
+    const lt = {keycode: "LT(3,KC_SLASH)", builtIn: {tap, hold: {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "MO(3)"}}, steps: []};
+    assert.equal(impliedBranch(lt, {tapCount: 0}, "long").hold.action, "MO(3)", "a built-in layer hold carries on");
+    assert.equal(impliedBranch(plain, {tapCount: 0, longHold: {action: "KC_B"}}, "long"), null, "a set Long hold takes over");
+    assert.equal(impliedBranch(plain, {tapCount: 1}, "long"), null, "no Hold, nothing to carry on");
+    assert.equal(impliedBranch(plain, {tapCount: 0}, "tap"), null);
+});
+
+test("with only a Long hold set, a release before it sends the press's tap on keys whose tap survives a hold", () => {
+    const tap = {helper: "TAP_SENDS", action: "KC_MINUS", label: "-"};
+    const longHold = {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "KC_B"};
+    const fallback = {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "KC_MINUS", fallback: true};
+    const plain = {keycode: "KC_MINUS", builtIn: {tap, hold: fallback, releaseTaps: true}, steps: [{tapCount: 1, longHold}]};
+    assert.deepEqual(impliedBranch(plain, {tapCount: 0, longHold}, "hold"), {meaning: "tapsBeforeLong", tap});
+    assert.deepEqual(impliedBranch(plain, {tapCount: 1, longHold}, "hold"), {meaning: "tapsBeforeLong", tap: {...tap, times: 2}}, "the count's own built-in tap");
+    const set = {helper: "TAP_SENDS", action: "KC_C"};
+    assert.deepEqual(impliedBranch(plain, {tapCount: 1, tap: set, longHold}, "hold"), {meaning: "tapsBeforeLong", tap: set}, "the count's set tap");
+    assert.equal(impliedBranch(plain, {tapCount: 0, hold: {action: "KC_A"}, longHold}, "hold"), null, "a set Hold is the Hold");
+    assert.equal(impliedBranch(plain, {tapCount: 0}, "hold"), null, "without a Long hold the fallback hold is shown instead");
+    const custom = {keycode: "CUSTOM_KEY_0", builtIn: {releaseTaps: true}, steps: [{tapCount: 0, longHold}]};
+    assert.equal(impliedBranch(custom, {tapCount: 0, longHold}, "hold"), null, "no tap to send");
+    assert.deepEqual(impliedBranch(custom, {tapCount: 0, tap: set, longHold}, "hold"), {meaning: "tapsBeforeLong", tap: set});
+    const layer = {keycode: "MO(3)", builtIn: {}, steps: [{tapCount: 0, tap: set, longHold}]};
+    assert.equal(impliedBranch(layer, {tapCount: 0, tap: set, longHold}, "hold"), null, "a layer key sends no tap once held");
+    const lt = {keycode: "LT(3,KC_SLASH)", builtIn: {tap, hold: {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "MO(3)"}}, steps: []};
+    assert.equal(impliedBranch(lt, {tapCount: 0, longHold}, "hold"), null, "a dual-role key's own hold fills the cell");
 });

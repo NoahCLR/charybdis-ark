@@ -5,7 +5,7 @@
 // hover card and the review never call one value two things. A value the
 // table does not know reads as itself rather than disappearing.
 
-const NONE = {holdHelpers: [], tiers: {}, branches: [], localities: [], paintModes: [], fadeModes: [], tapCommit: [],
+const NONE = {holdHelpers: [], holdWithoutLongHold: [], tiers: {}, branches: [], localities: [], paintModes: [], fadeModes: [], tapCommit: [],
     feedbackOwners: [], stages: [], pointing: {kinds: [], axes: [], invert: [], pointerLayer: [], buttons: [],
         emptyDirection: [], directionOutput: [], scrollAxes: [], modifierPolicy: [], scrollFields: []}, modifiers: [], comboOptions: {}};
 
