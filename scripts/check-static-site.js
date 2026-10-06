@@ -17,7 +17,8 @@
 // Beyond that the folder must hold exactly what scripts/build-web.js writes:
 // index.html, _headers and content-hashed .js and .css files, as plain files,
 // no folders or links. _headers must mark exactly those hashed files immutable
-// and keep the page itself out of the cache.
+// and keep the page itself out of the cache, and keep every file out of search
+// engines.
 
 const fs = require("node:fs");
 const path = require("node:path");
@@ -59,7 +60,8 @@ function headerProblems(text, hashedFiles) {
         if (!cacheOf(page).some((line) => /no-cache|no-store/i.test(line))) problems.push(`_headers lets ${page} be cached`);
     }
     if (!rules.has("/*")) problems.push("_headers sets no headers for every file (/*)");
-    else if (cacheOf("/*").length) problems.push("_headers sets Cache-Control for every file (/*), which joins every other rule's");
+    else if (!rules.get("/*").some((line) => /^x-robots-tag:.*\bnoindex\b/i.test(line))) problems.push("_headers lets search engines index the page: /* sends no X-Robots-Tag: noindex");
+    if (rules.has("/*") && cacheOf("/*").length) problems.push("_headers sets Cache-Control for every file (/*), which joins every other rule's");
     return problems;
 }
 

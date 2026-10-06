@@ -262,7 +262,12 @@ a red run, rather than a green one that left the address on an old page.
 
 `_headers` sends, for every file, the page's Content Security Policy with
 `frame-ancestors 'none'`, `Permissions-Policy: hid=(self)`,
-`X-Content-Type-Options: nosniff` and `Referrer-Policy: no-referrer`. `/` and
+`X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer` and
+`X-Robots-Tag: noindex, nofollow`, which the page also carries as a
+`<meta name="robots">` tag: no address it is published to, `pages.dev` ones
+included, is meant to show up in search engines, and `check-static-site.js`
+refuses a `_headers` without it. There is deliberately no `robots.txt`: a
+crawler it turned away would never see the `noindex`. `/` and
 `/index.html` are `Cache-Control: no-cache`: the browser may keep the page but
 asks for it again on every load (an unchanged page is a cheap 304), so a
 release shows on the next load. `no-store` would add nothing but a full
