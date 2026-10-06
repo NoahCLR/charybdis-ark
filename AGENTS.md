@@ -63,6 +63,9 @@ Developer-only tools, never imported by the application runtime:
 - `scripts/check-agreement.js` (`npm run agreement`) judges a firmware's stated contract with
   Ark's own runtime decoder and gating; required on `main` in CI.
 - `scripts/preview.js` renders the interface against the test fixtures.
+- `scripts/build-web.js` (`npm run build:web`) bundles `core/` through
+  `web/core.mjs`, and the panel, for Chrome into the ignored `dist/web/`; the
+  extension never uses it ([REPOSITORY.md](docs/REPOSITORY.md#the-web-build)).
 - `scripts/check-compatibility.js` runs Ark-owned integration runners against explicitly selected
   firmware source; it is never imported by runtime code.
 - `tools/branch-window/` is a separate developer extension that opens Ark from
@@ -89,10 +92,12 @@ webview/            the interface: browser ES modules, no build step
   styles.css        the design system
 docs/               app-owned product direction, specs and contributor workflows
 upstream/           pinned external contracts and inputs; read its AGENTS.md
+web/                web build entries: what a browser host takes from core/
 scripts/            developer entry points and build steps
 tools/              developer tools outside the app, e.g. the branch-window extension
 tests/              mirrors core/, plus the view modules and the posted payloads
 preview/            ignored generated previews, never authoritative source
+dist/               ignored web build output (`npm run build:web`)
 ```
 
 ## Documentation ownership
