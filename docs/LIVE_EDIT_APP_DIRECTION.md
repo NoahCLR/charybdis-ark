@@ -48,7 +48,7 @@ matrix.
 | Backup and restore | Complete snapshots, import review against the keyboard, recovery file and verified restore |
 | Drafts and Apply | One draft with item-by-item review, discard by edit group, Show, undo/redo and draft history; the review checks reachable actions, confirms active warnings and traps, and blocks profiles the destination cannot save (D-L36); Apply shows its steps and says where a failure happened (D-L19, D-L23, D-L29, D-L30) |
 | Recovery | Atomic logical Apply, differential transfer, reboot recovery fencing, firmware roll-forward after the decision, resume after a lost or power-cycled peer link, bounded cancel owned by the keyboard (D-L20–D-L22, D-L27, D-L39) |
-| Where it runs | The VS Code extension, and a web page that runs all of Ark in Chrome or Edge over WebHID (D-L52): Choose keyboard, one tab at a time, recovery copies in the browser's storage, a light/dark toggle. `npm run build:web` writes the page as static files; a workflow publishes it to Cloudflare Pages from `dev` and `main`, from the first run after the one-time setup |
+| Where it runs | The VS Code extension, and a web page that runs all of Ark in Chrome or Edge over WebHID (D-L52): Choose keyboard, one tab at a time, recovery copies in the browser's storage, a light/dark toggle. `npm run build:web` writes the page as static files; a workflow publishes it to Cloudflare Pages: `dev` at `ark-dev.ncleroy.dev`, `main` at `ark.ncleroy.dev` from the first release |
 | Demo without a keyboard | Explore a demo, in both hosts and on a browser without WebHID: the bundled demo profile (`core/data/`) in a real draft under current firmware's capabilities, every screen editable and reviewed; Apply refused, Export saves the draft, Open a profile file replaces it, leaving with edits not exported asks first (D-L53) |
 
 The rail's health strip shows connection, both-half convergence, draft state
@@ -67,7 +67,7 @@ Remaining before calling the product complete:
   USB role migration is untested: on the normal pair the left half exposes no
   Raw HID interface (`FORCE_SLAVE`/`usb_disconnect`), so it needs role-switching
   firmware;
-- the web page's first publication, after its one-time Cloudflare setup (D-L52);
+- the web page's first release to `ark.ncleroy.dev` (D-L52);
 - the open issues below.
 
 ## Open Issues
@@ -917,8 +917,8 @@ The legacy eight-slot upgrade export stays the extension's.
 
 The page is published to Cloudflare Pages from GitHub Actions, as the folder
 the build writes and nothing else (`.github/workflows/publish-web.yml`): `dev`
-to the preview address `dev.<project>.pages.dev` for testing, `main`, the
-project's production branch, to the custom domain. Each run builds the page,
+to the preview address `ark-dev.ncleroy.dev` for testing, `main`, the
+project's production branch, to `ark.ncleroy.dev`. Each run builds the page,
 tests those built files in Chrome and checks they are static files only, with
 no Pages Functions or `_worker.js`, before Wrangler uploads them. This is
 D-L51's one exception: it runs on `dev` pushes, and its tests gate only the
