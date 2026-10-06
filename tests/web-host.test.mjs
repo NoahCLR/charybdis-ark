@@ -9,6 +9,15 @@ import {workerSleep} from "../web/sleep.mjs";
 import {BLOCKED, PROFILE_FILE_LIMIT, WEB_WORDS, initialTheme, leaving, readProfileFile} from "../web/web-host.mjs";
 import {recoveryName} from "../web/recoveries.mjs";
 
+// A MessageChannel delivers on a later task, but not within any fixed time: a
+// loaded runner can take longer than a few milliseconds. Wait for the delivery
+// itself, giving up only after a generous bound.
+async function delivered(list, count = 1) {
+    for (const end = Date.now() + 2000; list.length < count && Date.now() < end;) {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+}
+
 test("the stand-in delivers both ways later and as copies, and shows the click its message at once", async () => {
     const received = [], gestures = [], target = new EventTarget(), shown = [];
     target.addEventListener("message", (event) => shown.push(event.data));
@@ -21,14 +30,14 @@ test("the stand-in delivers both ways later and as copies, and shows the click i
         assert.notEqual(gestures[0], sent, "as a copy");
         assert.deepEqual(received, [], "the message itself arrives later, as in VS Code");
         sent.layers[0].changes[0].keycode = "KC_B";
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        await delivered(received);
         assert.equal(received.length, 1);
         assert.equal(received[0].layers[0].changes[0].keycode, "KC_A", "the panel cannot change what the host was sent");
 
         const model = {type: "model", model: {draft: {dirty: false}}};
         await panel.post(model);
         assert.deepEqual(shown, [], "the model arrives later too");
-        await new Promise((resolve) => setTimeout(resolve, 10));
+        await delivered(shown);
         assert.deepEqual(shown, [model]);
         shown[0].model.draft.dirty = true;
         assert.equal(model.model.draft.dirty, false, "nor the host's model by touching what it was sent");
