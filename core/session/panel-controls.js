@@ -5,9 +5,8 @@
 // (import review, layer editing, restore).
 //
 // This used to live in extension.js. It is sequencing and session state, not
-// VS Code, so it sits here with a test; the host passes in only what a host
-// has — a progress indicator, where a recovery copy is written, and a file the
-// person chose — as `host`:
+// VS Code, so it sits here with a test; core/session/panel-loop.js runs it with
+// the host's own functions as `host`, of which these use three:
 //
 //   host.progress(title, run)      runs `run` behind a progress indicator
 //   host.saveRecovery(document)    writes a recovery copy, returns its path

@@ -65,6 +65,16 @@ test("core layers import only downward", () => {
     }
 });
 
+test("the extension shell reaches core only through session/", () => {
+    // What a host does with a panel is core/session/panel-loop.js; a host that
+    // needed a lower layer would be doing the loop's work itself.
+    const core = requiresIn(path.join(APP_ROOT, "extension.js")).filter((target) => target.startsWith("./core/"));
+    assert.ok(core.length, "extension.js runs the shared panel loop");
+    for (const target of core) {
+        assert.ok(target.startsWith("./core/session/"), `extension.js imports ${target}; only core/session/ is the host's`);
+    }
+});
+
 test("only the extension shell knows about VS Code", () => {
     for (const dir of ["core", "scripts", "webview"]) {
         for (const file of sourceFiles(dir)) {

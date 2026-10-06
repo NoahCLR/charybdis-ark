@@ -5,8 +5,9 @@
 // A panel session is a plain object the host keeps per window — the device
 // service, the draft, the layer editor, and the outbox the next model carries
 // (a notice, an accepted edit, a request to reset forms). Everything here is
-// free of VS Code, so it is tested like the rest of core/; extension.js keeps
-// only dialogs, files and progress.
+// free of VS Code, so it is tested like the rest of core/; panel-loop.js runs
+// it for every host, and extension.js keeps only VS Code's dialogs, files and
+// progress.
 
 const {fingerprint, summary, reorderLayers} = require("../model/portable-profile");
 const {profileReview} = require("../model/profile-review");

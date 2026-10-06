@@ -118,7 +118,9 @@ ownership and where new plans or specifications belong.
 
 ### The code's layout
 
-- `extension.js` — the VS Code surface: command, panel, message relay.
+- `extension.js` — the VS Code surface: command, panel, and the host functions
+  (dialogs, files, progress, toasts) the shared panel loop in
+  `core/session/panel-loop.js` runs.
 - `panel-html.js` — the panel's HTML shell, the only host file that knows
   webview URIs.
 - `core/` — the device, with no host dependency, layered so imports point one

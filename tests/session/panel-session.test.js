@@ -13,7 +13,7 @@ const snapshot = () => {
 const device = {id: "kb", manufacturer: "Bastard Keyboards", product: "Charybdis 4x6"};
 const connected = (extra = {}) => ({connected: true, busy: false, selectedDeviceId: "kb", devices: [device], capabilities, ...extra});
 
-// A panel session exactly as extension.js keeps one, with the first complete
+// A panel session exactly as panel-loop.js keeps one, with the first complete
 // read already in: publishing it opens the draft.
 function panelWithDraft() {
     const read = snapshot();
