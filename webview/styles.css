@@ -422,12 +422,13 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 .kc.drop-target .kc-rect { filter: brightness(1.3) drop-shadow(0 0 5px var(--ring)); }
 .board [data-key] { touch-action: none; }
 /* A click focuses the key it selects, and the selection ring already says
-   which key that is, so the browser's own focus outline is not drawn for it.
-   Moving through the board from the keyboard still shows where focus is, as a
-   thin outline inset past the selection ring — outside the key it would run
-   under the neighbouring keys, which paint later. */
+   which key that is, so the browser's own focus outline is not drawn for it —
+   nor once a shortcut such as Delete is pressed on it, which makes the browser
+   count the focus as keyboard focus. Tabbing to a key that is not selected
+   still shows where focus is, as a thin outline inset past the selection ring:
+   outside the key it would run under the neighbouring keys, which paint later. */
 .board [tabindex]:focus { outline: none; }
-.board [tabindex]:focus-visible { outline: 1.5px solid var(--text-2); outline-offset: -6px; }
+.board [tabindex]:not(.sel):focus-visible { outline: 1.5px solid var(--text-2); outline-offset: -6px; }
 .sv-field, .hue-ramp { touch-action: none; cursor: crosshair; }
 /* Selected and indicated must never read alike: the selection is a solid ring
    inside the key; the keys for the picked row, or the inputs of the combo
