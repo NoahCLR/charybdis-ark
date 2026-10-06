@@ -104,6 +104,8 @@ test("the page is published with its policy as a header, and only hashed files a
         assert.deepEqual(header("/*", "Permissions-Policy"), ["hid=(self)"]);
         assert.deepEqual(header("/*", "X-Content-Type-Options"), ["nosniff"]);
         assert.deepEqual(header("/*", "Referrer-Policy"), ["no-referrer"]);
+        assert.deepEqual(header("/*", "X-Robots-Tag"), ["noindex, nofollow"]);
+        assert.match(page, /<meta name="robots" content="noindex, nofollow">/);
 
         // Pages joins a header named by two matching rules, so Cache-Control
         // comes from exact paths only: the page is revalidated on every load,
