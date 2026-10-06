@@ -890,14 +890,29 @@ test("a behaviour cell reads by the host's name for its key, and by its keycode 
     assert.equal(cellLabel(model, {action: "QK_BOOT"}), "QK_BOOT", "no clean name: the keycode is the label");
 });
 
-test("only an empty first-press tap or hold inherits the key's own action", () => {
+test("an empty tap inherits the key's own tap at every count the row reaches, once per press", () => {
     const hold = {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "LSFT(KC_NO)", label: "Shift"};
     const tap = {helper: "TAP_SENDS", action: "KC_S", label: "S"};
-    const behaviour = {keycode: "MT(MOD_LSFT,KC_S)", builtIn: {tap, hold}};
+    const behaviour = {keycode: "MT(MOD_LSFT,KC_S)", builtIn: {tap, hold}, steps: [{tapCount: 2, hold: {action: "KC_A"}}]};
     assert.equal(inheritedBranch(behaviour, {tapCount: 0}, "hold"), hold);
     assert.equal(inheritedBranch(behaviour, {tapCount: 0}, "tap"), tap);
+    assert.deepEqual(inheritedBranch(behaviour, {tapCount: 1}, "tap"), {...tap, times: 2}, "a double tap sends the key's tap twice");
+    assert.deepEqual(inheritedBranch(behaviour, {tapCount: 2, hold: {action: "KC_A"}}, "tap"), {...tap, times: 3});
+    assert.equal(inheritedBranch(behaviour, {tapCount: 3}, "tap"), null, "past the deepest authored count the presses are separate gestures");
+    assert.equal(inheritedBranch({...behaviour, steps: []}, {tapCount: 1}, "tap"), null, "an unstored row reaches only a single tap");
+    assert.equal(inheritedBranch({...behaviour, steps: []}, {tapCount: 0}, "tap"), tap);
+    assert.equal(inheritedBranch(behaviour, {tapCount: 1, tap: {action: "KC_B"}}, "tap"), null, "an authored cell replaces it");
     assert.equal(inheritedBranch(behaviour, {tapCount: 0, hold: {action: "KC_A"}}, "hold"), null, "an authored cell replaces it");
-    assert.equal(inheritedBranch(behaviour, {tapCount: 1}, "hold"), null, "later presses have no built-in action");
+    assert.equal(inheritedBranch(behaviour, {tapCount: 0, longHold: {action: "KC_A"}}, "hold"), hold, "a dual-role hold stays beside a long hold");
+    assert.equal(inheritedBranch(behaviour, {tapCount: 1}, "hold"), null, "later presses have no built-in hold");
     assert.equal(inheritedBranch(behaviour, {tapCount: 0}, "long"), null, "no key has a built-in long hold");
     assert.equal(inheritedBranch({keycode: "KC_A", builtIn: {}}, {tapCount: 0}, "hold"), null);
+});
+
+test("a plain key's fallback hold gives way to any authored first-press hold or long hold", () => {
+    const hold = {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "KC_MINUS", label: "-", fallback: true};
+    const behaviour = {keycode: "KC_MINUS", builtIn: {tap: {helper: "TAP_SENDS", action: "KC_MINUS", label: "-"}, hold}, steps: []};
+    assert.equal(inheritedBranch(behaviour, {tapCount: 0}, "hold"), hold);
+    assert.equal(inheritedBranch(behaviour, {tapCount: 0, longHold: {action: "KC_A"}}, "hold"), null);
+    assert.equal(inheritedBranch(behaviour, {tapCount: 0, hold: {action: "KC_A"}}, "hold"), null);
 });

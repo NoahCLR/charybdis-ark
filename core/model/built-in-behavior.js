@@ -1,21 +1,36 @@
 "use strict";
 
-// What a dual-role key does on its first press where its behaviour row leaves
-// the tier empty. The keyboard fills that gap with the key's own meaning, so an
-// empty cell is not "nothing": LT() taps its key and holds its layer, MT() taps
-// its key and holds its modifiers, OSM() taps as a one-shot and holds its
-// modifiers. Each fact is claimed only by firmware that advertises it: authored
-// LT() rows since physical gesture timing (Profile Wire bit 17), MT() and OSM()
-// rows since runtime-owned tapping (bit 18). Older firmware classified those
-// keys in QMK first, and the app does not guess what that produced.
+// What a key does where its behaviour row leaves a tier empty. The keyboard
+// fills that gap with the key's own meaning, so an empty cell is not "nothing".
+//
+// The key's own tap fills an empty tap at every tap count the row reaches, sent
+// once per press: a double tap that authors no tap sends it twice. A plain key
+// (a basic keycode, alone or with modifiers) taps itself; LT() taps its key,
+// MT() taps its key and OSM() arms its one-shot.
+//
+// The built-in hold belongs to the first press. LT() holds its layer and MT()
+// and OSM() their modifiers, whatever else the row authors. A plain key's hold
+// is a fallback: held, it stays down until release, but only while the first
+// press authors neither a hold nor a long hold (`fallback`).
+//
+// Plain keys have done this on every firmware with a Profile Wire. Dual-role
+// keys are claimed only by firmware that advertises it: authored LT() rows since
+// physical gesture timing (Profile Wire bit 17), MT() and OSM() rows since
+// runtime-owned tapping (bit 18). Older firmware classified those keys in QMK
+// first, and the app does not guess what that produced. A bare modifier key is
+// buffered rather than tapped, so it claims nothing.
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {keycodeAction} = require("../schema/actions");
 
 const within = (code, start, end) => code >= start && code <= end;
+const plainKey = (code) => (within(code, 0x0004, 0x00ff) && !within(code, 0x00e0, 0x00e7)) || within(code, 0x0100, 0x1fff);
 
-function builtInFirstStep(target, {physicalGestureTiming = false, ownedTapping = false} = {}) {
+function builtInActions(target, {physicalGestureTiming = false, ownedTapping = false} = {}) {
     if (target?.kind !== ACTION.QMK_KEYCODE || !Number.isInteger(target.operand)) return {};
     const code = target.operand;
+    if (plainKey(code)) {
+        return {tap: keycodeAction(code), hold: keycodeAction(code), fallback: true};
+    }
     if (within(code, 0x4000, 0x4fff) && physicalGestureTiming) {
         return {tap: keycodeAction(code & 0xff), hold: {kind: ACTION.LAYER_MOMENTARY, operand: (code >> 8) & 0x0f}};
     }
@@ -28,4 +43,4 @@ function builtInFirstStep(target, {physicalGestureTiming = false, ownedTapping =
     return {};
 }
 
-module.exports = {builtInFirstStep};
+module.exports = {builtInActions};

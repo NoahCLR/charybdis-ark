@@ -798,13 +798,20 @@ keeps native-buffering warnings for those families on bit-17-only firmware.
 Neither capability changes stored profile bytes. Firmware owns that policy and
 its native-key controls; Ark owns these findings and their presentation.
 
-An empty first-press tap or hold on a dual-role row is not "nothing": the
-keyboard runs the key's own action there. The behaviour grid shows it as a
-dashed "built in" cell, derived from the stored keycode and claimed only where
-firmware advertises it: an LT() row's tap and layer hold on bit 17, an MT() or
-OSM() row's tap and modifier hold on bit 18. Older firmware classified these
-keys in QMK first, so Ark claims nothing there. The built-in cell is display
-only; setting an action in it authors the tier (core/model/built-in-behavior.js).
+An empty tap or first-press hold is not "nothing": the keyboard runs the key's
+own action there. The behaviour grid shows it as a dashed "built in" cell,
+derived from the stored keycode. An empty tap sends the key's own tap once per
+press, so it is claimed at every tap count up to the row's deepest stored step
+and marked `×N` past a single tap; deeper counts are separate gestures and stay
+empty. The hold belongs to the first press. A plain key (a basic keycode, alone
+or with modifiers) taps itself and holds itself down as a fallback that any
+first-press hold or long hold replaces; every firmware with a Profile Wire does
+this. Bare modifiers are buffered, not tapped, and claim nothing. Dual-role
+keys are claimed only where firmware advertises them: an LT() row's tap and
+layer hold on bit 17, an MT() or OSM() row's tap and modifier hold on bit 18.
+Older firmware classified those keys in QMK first, so Ark claims nothing there.
+The built-in cell is display only; setting an action in it authors the tier
+(core/model/built-in-behavior.js).
 New behaviour editors start with no authored branches, preserving these defaults.
 Selecting a key opens its row or an unstored grid; only an action, timing override
 or anchor change creates a draft row. Previews never enter the host model's stored

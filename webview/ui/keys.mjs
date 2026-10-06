@@ -472,10 +472,13 @@ function behaviourEditor(behaviour) {
         const inherited = inheritedBranch(behaviour, step, kind);
         if (!branch && inherited) {
             const label = cellLabel(model, inherited);
-            return `<button class="bcell inherited ${open ? "on" : ""}" data-cell="${id}"
-                data-tip="What this key does on its own. Set an action here to replace it.">
+            const times = inherited.times ? ` ×${inherited.times}` : "";
+            const tip = inherited.times
+                ? `What this key does on its own: its tap, once for each of the ${inherited.times} presses. Set an action here to replace it.`
+                : "What this key does on its own. Set an action here to replace it.";
+            return `<button class="bcell inherited ${open ? "on" : ""}" data-cell="${id}" data-tip="${esc(tip)}">
                 <span class="bk named">${esc(label)}</span>
-                <span class="bl">${esc(["built in", helperLabel(kind, inherited.helper)].join(" · "))}</span></button>`;
+                <span class="bl">${esc(["built in", `${helperLabel(kind, inherited.helper)}${times}`].join(" · "))}</span></button>`;
         }
         if (!branch) return `<button class="bcell empty ${open ? "on" : ""}" data-cell="${id}"><span class="plus">+</span></button>`;
         // The grid reads by name; the keycode is on hover and in the editor.
