@@ -11,7 +11,8 @@ const covers = (list, values, label) => assert.deepEqual(list.map(([id]) => id).
 const coversNumbers = (list, values, label) => assert.deepEqual(list.map(([id]) => id).sort(), Object.values(values).sort(), label);
 
 test("every stored enum value has a word", () => {
-    covers(VOCABULARY.holdHelpers, KEY_BEHAVIOR_HOLD_MODES, "hold helpers");
+    covers(VOCABULARY.holdHelpers.hold, KEY_BEHAVIOR_HOLD_MODES, "hold helpers under Hold");
+    covers(VOCABULARY.holdHelpers.long, KEY_BEHAVIOR_HOLD_MODES, "hold helpers under Long hold");
     covers(VOCABULARY.holdWithoutLongHold, KEY_BEHAVIOR_HOLD_MODES, "holds without a long hold");
     covers(VOCABULARY.localities, rgb.RGB_LOCALITIES, "localities");
     covers(VOCABULARY.paintModes, rgb.RGB_LAYER_MODES, "layer paint modes");

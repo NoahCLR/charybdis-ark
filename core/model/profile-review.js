@@ -116,7 +116,7 @@ function behaviourFields(row, defaults, names) {
     for (const step of row.steps) for (const [tier, name] of TIERS) {
         const branch = step[tier];
         if (!branch || (tier === "tap" && !branch.kind)) continue;
-        const how = tier === "tap" ? "" : ` · ${word(VOCABULARY.holdHelpers, Object.entries(KEY_BEHAVIOR_HOLD_MODES).find(([, id]) => id === branch.mode)?.[0])}${branch.repeatHz ? ` · ${branch.repeatHz} Hz` : ""}`;
+        const how = tier === "tap" ? "" : ` · ${word(VOCABULARY.holdHelpers[name], Object.entries(KEY_BEHAVIOR_HOLD_MODES).find(([, id]) => id === branch.mode)?.[0])}${branch.repeatHz ? ` · ${branch.repeatHz} Hz` : ""}`;
         // A tier is named as the grid names it, and carries which branch and
         // tier it is, so the review can colour it as the grid does.
         const reaches = tier === "tap" ? branch : branch.action;

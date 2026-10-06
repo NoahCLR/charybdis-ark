@@ -5,7 +5,7 @@
 // hover card and the review never call one value two things. A value the
 // table does not know reads as itself rather than disappearing.
 
-const NONE = {holdHelpers: [], holdWithoutLongHold: [], tiers: {}, branches: [], localities: [], paintModes: [], fadeModes: [], tapCommit: [],
+const NONE = {holdHelpers: {hold: [], long: []}, holdWithoutLongHold: [], tiers: {}, branches: [], localities: [], paintModes: [], fadeModes: [], tapCommit: [],
     feedbackOwners: [], stages: [], pointing: {kinds: [], axes: [], invert: [], pointerLayer: [], buttons: [],
         emptyDirection: [], directionOutput: [], scrollAxes: [], modifierPolicy: [], scrollFields: []}, modifiers: [], comboOptions: {}};
 
@@ -22,9 +22,11 @@ export const stageOrder = (model) => vocabulary(model).stages;
 // A pointing slot's name as the host gives it.
 export const slotCalled = (model, id) => (model?.pdModes || []).find((slot) => slot.id === id)?.displayName || `Slot ${id}`;
 
-// How a tier runs, in the editor's words: a tap tier only sends.
+// How a tier runs, in the editor's words: a tap tier only sends, and a hold
+// helper names its own tier's threshold.
+export const holdHelpers = (model, kind) => vocabulary(model).holdHelpers?.[kind] || [];
 export const helperWord = (model, kind, helper) => kind === "tap"
-    ? vocabulary(model).tapSends || "tap sends" : word(vocabulary(model).holdHelpers, helper);
+    ? vocabulary(model).tapSends || "tap sends" : word(holdHelpers(model, kind), helper);
 
 // A tier's name: Tap, Hold, Long hold.
 export const tierName = (model, kind) => vocabulary(model).tiers[kind] || kind;

@@ -20,7 +20,7 @@ import {openPicker} from "./picker.mjs";
 import {attachGroupToggles, attachReachRows, groupHeader, groupOpen, reachAttrs, reachTable} from "./groups.mjs";
 import {inGroupOrder, reachEntries, setReachGroupOpen} from "../view/reach-groups.mjs";
 import {branchBadge, comboBadge, keyNameMarked, sends, sendsKind, slotLight, tierDot} from "./marks.mjs";
-import {branchName, helperWord, tierName, vocabulary, word} from "../view/vocabulary.mjs";
+import {branchName, helperWord, holdHelpers, tierName, vocabulary, word} from "../view/vocabulary.mjs";
 import {topbar, unavailable} from "./shell.mjs";
 
 const TABS = [
@@ -487,7 +487,7 @@ function behaviourEditor(behaviour) {
             const {hold} = implied;
             const label = hold.helper === "TAP_AT_HOLD_THRESHOLD" ? "Nothing more" : cellLabel(model, hold);
             return `<button class="bcell inherited ${open ? "on" : ""}" data-cell="${id}"
-                data-tip="No Long hold is set, so nothing takes over at its threshold: the Hold carries on. Set an action here to add a Long hold.">
+                data-tip="No Long hold is set, so nothing takes over at the Long hold threshold: the Hold carries on. Set an action here to add a Long hold.">
                 <span class="bk named">${esc(label)}</span>
                 <span class="bl">${esc([tierName(model, "hold"), word(vocabulary(model).holdWithoutLongHold, hold.helper)].join(" · "))}</span></button>`;
         }
@@ -495,9 +495,9 @@ function behaviourEditor(behaviour) {
             const {tap} = implied;
             const times = tap.times ? ` ×${tap.times}` : "";
             return `<button class="bcell inherited ${open ? "on" : ""}" data-cell="${id}"
-                data-tip="No Hold is set: let go after Tap / hold but before Long hold and the key sends its tap. Set an action here to add a Hold.">
+                data-tip="No Hold is set: let go after the Tap / hold threshold but before the Long hold threshold and the key sends its tap. Set an action here to add a Hold.">
                 <span class="bk named">${esc(cellLabel(model, tap))}</span>
-                <span class="bl">${esc(["released before Long hold", `${helperLabel("tap", tap.helper)}${times}`].join(" · "))}</span></button>`;
+                <span class="bl">${esc(["released before Long hold threshold", `${helperLabel("tap", tap.helper)}${times}`].join(" · "))}</span></button>`;
         }
         if (!branch) return `<button class="bcell empty ${open ? "on" : ""}" data-cell="${id}"><span class="plus">+</span></button>`;
         // The grid reads by name; the keycode is on hover and in the editor.
@@ -536,9 +536,9 @@ function behaviourEditor(behaviour) {
             <span></span>
             ${["tap", "hold", "long"].map((kind) => `<div class="btier">${tierDot(model, kind)}${tierName(model, kind)}</div>`).join("")}
             ${timingControl("multiTapTerm", "Multi tap window")}
-            <p class="bterm">On release, before Tap / hold</p>
-            ${timingControl("tapHoldTerm", "Tap / hold")}
-            ${timingControl("longerHoldTerm", tierName(model, "long"))}
+            <p class="bterm">On release, before the Tap / hold threshold</p>
+            ${timingControl("tapHoldTerm", "Tap / hold threshold")}
+            ${timingControl("longerHoldTerm", `${tierName(model, "long")} threshold`)}
             ${steps.map((step) => `
                 <div class="bhead">${branchBadge(model, step.tapCount + 1)}
                     <span>${esc(branchName(model, step.tapCount + 1))}</span></div>
@@ -590,7 +590,7 @@ function cellEditor(behaviour, step, kind) {
                 <button class="btn" data-act="pick" ${canEdit ? "" : "disabled"}>Pick…</button></div></label>
             ${kind === "tap" ? "<span></span>" : `<label class="field"><span>How it runs</span>
                 <select class="input" data-helper ${canEdit ? "" : "disabled"}>
-                    ${vocabulary(getModel()).holdHelpers.map(([value, text]) => `<option value="${value}" ${shown?.helper === value ? "selected" : ""}>${text}</option>`).join("")}
+                    ${holdHelpers(getModel(), kind).map(([value, text]) => `<option value="${value}" ${shown?.helper === value ? "selected" : ""}>${text}</option>`).join("")}
                 </select></label>`}
             ${kind === "tap" ? "<span></span>" : `<label class="field" data-repeat-field ${shown?.helper === "REPEAT_WHILE_HELD" ? "" : "hidden"}><span>Repeat rate · Hz</span>
                 <input class="input mono" type="number" min="1" max="100" step="1" data-repeat value="${esc(Number(shown?.repeatHz) > 0 ? shown.repeatHz : DEFAULT_REPEAT_HZ)}" ${canEdit ? "" : "disabled"}></label>`}
@@ -1111,7 +1111,7 @@ function cellShortcut(action) {
         if (branch) { state.keyClipboard = {keycode: branch.action, label: branch.action}; navigator.clipboard?.writeText(branch.action).catch(() => {}); render(); }
     } else if (state.keyClipboard && canEditArea("behaviours")) {
         const pending = state.cellHow?.cell === state.cell && state.cellHow.keycode === behaviour.keycode ? state.cellHow : null;
-        const how = branch || pending || {helper: vocabulary(getModel()).holdHelpers[0]?.[0]};
+        const how = branch || pending || {helper: holdHelpers(getModel(), kind)[0]?.[0]};
         const edit = edits.cellEdit(kind, {stored: Boolean(branch), action: state.keyClipboard.keycode, helper: how.helper, repeatHz: how.repeatHz});
         if (!edit.pending && edit.branch?.action !== branch?.action) { state.cellHow = null; change(edit.branch); }
     }

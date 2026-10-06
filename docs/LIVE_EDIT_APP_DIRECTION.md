@@ -769,8 +769,10 @@ is separate from recognition of its advertised policy.
 ### D-L49 — Timing findings constrain the reachability graph conservatively
 
 Ark resolves each row's timing overrides against the connected settings, including
-the dual-role default for authored LT rows. A Hold and Long hold both set to
-"tap on release after hold" have an impossible Hold branch when Long hold is
+the dual-role default for authored LT rows. A Hold and Long hold that both
+tap on release ("tap on release after Tap / hold threshold", "… after Long
+hold threshold") have
+an impossible Hold branch when Long hold is
 at or before Tap / hold: no release interval selects Hold. Review and the
 behaviour editor warn, and the layer graph removes that proven-impossible edge,
 including behaviours reached through combo outputs. Global-default edits are
@@ -813,7 +815,7 @@ Older firmware classified those keys in QMK first, so Ark claims nothing there.
 The other hold tier also fills a cell. With no Long hold, nothing happens at
 its threshold and a release never selects it, so the press's Hold, set or
 built in, carries on as its helper runs (held, repeating, sending on release,
-or already sent at the hold threshold); the vocabulary's `holdWithoutLongHold`
+or already sent at the Tap / hold threshold); the vocabulary's `holdWithoutLongHold`
 words it. With a Long hold and no Hold at all, the press stays in its tap
 window until Long hold, and a release in between sends that count's tap, set
 or built in; Ark claims this for plain keys, custom keys and macros

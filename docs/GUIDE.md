@@ -97,7 +97,10 @@ tier, so it is drawn as a grid: a row for every tap count the keyboard allows,
 always all of them, and a column each for Tap, Hold and Long hold. Each timing
 heads what it governs: **Multi tap window** (release to next press) the tap
 counts, Tap / hold the Hold column and Long hold its own; Tap fires on release.
-Behaviour and combo
+The timing fields over Hold and Long hold read **Tap / hold threshold** and
+**Long hold threshold**, and a hold cell's **How it runs** names its own
+column's: "tap at Tap / hold threshold" under Hold, "tap at Long hold
+threshold" under Long hold. Behaviour and combo
 timings matching the default show a muted placeholder such as `150 · default`;
 other values look entered. Labels end at `ms`. Clearing an override restores the
 default. LT keys show their own dual-role default.
