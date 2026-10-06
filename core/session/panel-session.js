@@ -24,6 +24,35 @@ const PORTABLE_MESSAGES = new Set([
     "managePortableLayers", "editPortableLayer", "savePortableLayers", "cancelPortableReview",
 ]);
 
+// What the panel says and offers that depends on its host, published as
+// `model.host`, so the panel never asks which host it is in. A host passes
+// `words` that differ from these, and `panel()` for what it offers now:
+//
+//   chooseKeyboard   the panel offers Choose keyboard, which opens the host's picker
+//   blocked          {title, detail}: why this host cannot reach a keyboard at all
+//   theme            "light" or "dark" when the panel offers its own theme toggle
+//   recoveries       [{id, name, savedAt}]: recovery copies the panel lists, each downloadable
+//   build            {version, commit} the host was built from
+//   progress         what the host is doing, where it has no indicator of its own
+//
+// A session without a host (the preview, tests) describes the extension's.
+const HOST_WORDS = Object.freeze({
+    noKeyboard: "No keyboard is connected. Connect one and choose Read keyboard.",
+    connectHint: "Connect a Charybdis, then read it to begin editing.",
+});
+function hostModel(host) {
+    const offered = host?.panel?.() || {};
+    return {
+        chooseKeyboard: Boolean(offered.chooseKeyboard),
+        blocked: offered.blocked || null,
+        theme: offered.theme === "light" || offered.theme === "dark" ? offered.theme : null,
+        recoveries: Array.isArray(offered.recoveries) ? offered.recoveries : null,
+        build: offered.build || null,
+        progress: offered.progress || null,
+        words: {...HOST_WORDS, ...host?.words},
+    };
+}
+
 // A complete read of an eight-layer keyboard opens the draft, or refreshes the
 // one already open against what the keyboard now holds.
 function observePortable(session, state) {
@@ -93,7 +122,9 @@ function buildPanelModel(session, state) {
         available: Boolean(state.connected && [5, 8].includes(state.capabilities?.compiledLayerCount) && (state.capabilities?.supportedDomainMask & 15) === 15),
         eightLayers: state.capabilities?.compiledLayerCount === 8,
         legacy: state.capabilities?.compiledLayerCount === 5,
-        pdUpgradeAvailable: Boolean(state.capabilities?.featureFlags & (1 << 13)),
+        // The legacy upgrade export is the extension's alone; a host without it
+        // does not offer it.
+        pdUpgradeAvailable: Boolean(state.capabilities?.featureFlags & (1 << 13)) && (!session.host || typeof session.host.exportPdUpgrade === "function"),
         busy,
         progress: state.portableProgress,
         review: session.portableReview ? {incoming: summary(session.portableReview.document), current: session.portableReview.before.summary,
@@ -104,6 +135,7 @@ function buildPanelModel(session, state) {
     if (!model.draft?.matching) model.layers?.forEach((layer, index) => {layer.displayName = state.portableSummary?.names[index] || layer.name;});
     const editableDraft = Boolean(model.draft?.matching && !model.draft.stale && state.connected);
     const readReady = (session.readReady ?? editableDraft) && editableDraft;
+    model.host = hostModel(session.host);
     model.load = {
         state: session.readBusy ? "loading" : readReady ? "ready" : "unavailable",
         phase: state.phase || "idle",
@@ -263,4 +295,4 @@ function applyLayerEdit(edit, message) {
 
 const layerEditDocument = (edit) => reorderLayers(edit.before.document, edit.order, edit.order.map((old) => edit.names[old]), {keysFollow: edit.keysFollow !== false});
 
-module.exports = {DRAFT_CONTROLS, PORTABLE_MESSAGES, applyLayerEdit, buildPanelModel, discardDraftForDevice, layerEditDocument, observePortable, routeMessage, startLayerEdit, takeOutbox};
+module.exports = {DRAFT_CONTROLS, HOST_WORDS, PORTABLE_MESSAGES, applyLayerEdit, buildPanelModel, hostModel, discardDraftForDevice, layerEditDocument, observePortable, routeMessage, startLayerEdit, takeOutbox};

@@ -42,11 +42,12 @@ function requireReady(capabilities, writing = false) {
         throw fail("FIRMWARE_UPDATE_REQUIRED", guidance + " Your current keyboard configuration has not been changed.");
     }
 }
-async function captureProfile(connection, ids, capabilities, onProgress = () => {}, allowCandidate = false, allowIncomplete = false) {
+// `sleep`, here and below, is the host's wait between polls (the timer's when omitted).
+async function captureProfile(connection, ids, capabilities, onProgress = () => {}, allowCandidate = false, allowIncomplete = false, {sleep} = {}) {
     requireReady(capabilities);
     const options = {nextRequestId: () => ids.next()};
     onProgress("Reading the complete keyboard configuration");
-    const storageBefore = await waitForStorage(connection, ids), before = await readProfileStatus(connection, options);
+    const storageBefore = await waitForStorage(connection, ids, {sleep}), before = await readProfileStatus(connection, options);
     if (![PROFILE_ACTIVE_KIND.COMMITTED, PROFILE_ACTIVE_KIND.COMPILED_ONLY].includes(before.activeKind) || !(before.stateFlags & 32) || (before.stateFlags & (allowCandidate ? 8 : 12)) || before.conflictCount) throw fail("KEYBOARD_NOT_READY", "Let both halves finish saving before taking a backup.");
     const defaults = await readCompiledPayload(connection, options);
     const active = before.activeKind === PROFILE_ACTIVE_KIND.COMMITTED ? await readCommittedPayload(connection, options) : defaults;
@@ -71,9 +72,9 @@ async function captureProfile(connection, ids, capabilities, onProgress = () => 
     validateSnapshot(document, capabilities);
     return {document, fingerprint: fingerprint(document), summary: summary(document), status: after, identity: snapshotIdentity(after, storageAfter, settings), storage: heldStorage(via.layout, via.macros)};
 }
-async function readIdentity(connection, ids, {allowCandidate = true} = {}) {
+async function readIdentity(connection, ids, {allowCandidate = true, sleep} = {}) {
     const options = {nextRequestId: () => ids.next()};
-    const storageBefore = await waitForStorage(connection, ids), before = await readProfileStatus(connection, options);
+    const storageBefore = await waitForStorage(connection, ids, {sleep}), before = await readProfileStatus(connection, options);
     if ((before.stateFlags & (allowCandidate ? 8 : 12)) || before.conflictCount) throw fail("KEYBOARD_NOT_READY", "The keyboard changed before the save could start.");
     const settings = await readSettings(connection, ids);
     const after = await readProfileStatus(connection, options), storageAfter = await readStorageStatus(connection, ids);
@@ -185,7 +186,7 @@ function withFailure(error, applyProgress, saved) {
     return Object.assign(error, {step: failure.step, stepLabel: failure.label, reason: failure.reason, saved: failure.saved});
 }
 
-async function restoreProfile(connection, ids, capabilities, document, {expectedFingerprint, saveRecovery, baseSnapshot, onProgress = () => {}, onApplyProgress = () => {}, operations = {}} = {}) {
+async function restoreProfile(connection, ids, capabilities, document, {expectedFingerprint, saveRecovery, baseSnapshot, onProgress = () => {}, onApplyProgress = () => {}, operations = {}, sleep} = {}) {
     const applyProgress = new ApplyProgress(view => {
         onApplyProgress(view);
         onProgress(progressText(view));
@@ -223,11 +224,11 @@ async function restoreProfile(connection, ids, capabilities, document, {expected
         if (baseSnapshot?.document && baseSnapshot.identity && (baseSnapshot.incomplete || hasStorage(baseSnapshot, capabilities)) && (!expectedFingerprint || baseSnapshot.fingerprint === expectedFingerprint)) {
             if (!baseSnapshot.incomplete) validateSnapshot(baseSnapshot.document, capabilities);
             applyProgress.report("check", {detail: "Comparing with the reviewed profile"});
-            const liveIdentity = await currentIdentity(connection, ids, {allowCandidate: false});
+            const liveIdentity = await currentIdentity(connection, ids, {allowCandidate: false, sleep});
             if (identityKey(liveIdentity) !== identityKey(baseSnapshot.identity)) throw fail("PROFILE_CHANGED", "The keyboard changed since the restore was reviewed. Review it again.");
             before = baseSnapshot;
         } else {
-            before = await capture(connection, ids, capabilities, message => applyProgress.report("check", {detail: message}), false, true);
+            before = await capture(connection, ids, capabilities, message => applyProgress.report("check", {detail: message}), false, true, {sleep});
         }
         if (expectedFingerprint && before.fingerprint !== expectedFingerprint) throw fail("PROFILE_CHANGED", "The keyboard changed since the restore was reviewed. Review it again.");
         applyProgress.report("backup");
@@ -239,10 +240,10 @@ async function restoreProfile(connection, ids, capabilities, document, {expected
         if (!beforeIdentity) throw fail("PROFILE_IDENTITY_UNAVAILABLE", "The keyboard read did not include a stable save identity.");
         const candidate = await readCandidate(connection, options);
         if (candidate.state !== CANDIDATE_STATE.IDLE) throw fail("KEYBOARD_BUSY", "The keyboard has an unfinished profile transaction. Finish or recover it before restoring.");
-        const coordinator = createCoordinator(connection, {chunkSize: capabilities.candidateChunkMax, requestIds: ids,
+        const coordinator = createCoordinator(connection, {chunkSize: capabilities.candidateChunkMax, requestIds: ids, sleep,
             readPeerStatus: operations.readPeerStatus === undefined ? readCandidatePeerStatus : operations.readPeerStatus,
             onProgress: progress => coordinatorReport(progress, applyProgress)});
-        const viaCoordinator = createViaCoordinator(connection, {requestIds: ids, onProgress: progress => applyProgress.report("stage", {completed: progress.completed, total: progress.total})});
+        const viaCoordinator = createViaCoordinator(connection, {requestIds: ids, sleep, onProgress: progress => applyProgress.report("stage", {completed: progress.completed, total: progress.total})});
         const expectedStorageDigest = viaStorageDigest(target);
         if (beforeIdentity.storageGeneration >= 0xffffffff) throw fail("STORAGE_GENERATION_EXHAUSTED", "The keyboard storage generation cannot advance safely.");
         const targetStorageGeneration = beforeIdentity.storageGeneration + 1;
@@ -252,7 +253,7 @@ async function restoreProfile(connection, ids, capabilities, document, {expected
         try {
             applyProgress.report("upload");
             prepared = await coordinator.upload(target.profile, {metadata: candidateMetadataForBlob(target.profile, {actionAbiDigest: capabilities.actionAbiDigest, viaGeneration: targetStorageGeneration, viaDigest: expectedStorageDigest}), verifyBase: async () => {
-                const identity = await currentIdentity(connection, ids, {allowCandidate: true});
+                const identity = await currentIdentity(connection, ids, {allowCandidate: true, sleep});
                 if (identityKey(identity) !== identityKey(beforeIdentity)) throw fail("PROFILE_CHANGED", "The keyboard changed before restore could start.");
             }});
             mutated = true;
@@ -271,7 +272,7 @@ async function restoreProfile(connection, ids, capabilities, document, {expected
             const layoutBytes = layoutRanges.reduce((sum, range) => sum + range.bytes.length, 0);
             const macroWriteNeeded = macroRanges.length > 0 || base.macros.at(-1) !== target.macros.at(-1);
             applyProgress.report("verify", {detail: "Reading back both halves"});
-            const storage = await waitStorage(connection, ids);
+            const storage = await waitStorage(connection, ids, {sleep});
             await verifyRanges(connection, readStored, VIA_STORAGE.LAYOUT_READ, target.layout, layoutRanges);
             await verifyRanges(connection, readStored, VIA_STORAGE.MACRO_READ, target.macros, macroRanges, {verifyFinalByte: macroRanges.length > 0});
             const status = await readProfile(connection, options);

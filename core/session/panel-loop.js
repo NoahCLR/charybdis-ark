@@ -16,18 +16,22 @@
 //   host.saveExport(file)           saves an exported profile ({fileName, text});
 //                                   resolves to where it went, or undefined if cancelled
 //   host.exportPdUpgrade(session)   optional, VS Code only: the legacy eight-slot
-//                                   upgrade export, which a host without it refuses
+//                                   upgrade export, which a host without it neither
+//                                   offers nor runs
+//   host.words, host.panel()        optional: what the panel says and offers in this
+//                                   host (`model.host`; see panel-session.js)
 //
 // `options` go to the device service: `adapter` is the device adapter (see
-// core/README.md; the native one when omitted). Tests may pass a ready-made
-// `service` instead.
+// core/README.md; the native one when omitted) and `sleep(ms)` the wait between
+// polls while reading and saving (the timer's when omitted; a browser tab passes
+// one its throttling cannot slow). Tests may pass a ready-made `service` instead.
 
 const {ProfileDeviceService} = require("./profile-device-service");
 const {buildPanelModel, routeMessage, takeOutbox} = require("./panel-session");
 const {draftControl, portableControl, readKeyboard} = require("./panel-controls");
 
 function openPanelLoop(host, options = {}) {
-    const session = {service: undefined, notice: undefined};
+    const session = {service: undefined, notice: undefined, host};
     const loop = {
         session,
         publish: () => publish(session, host),

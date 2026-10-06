@@ -5,6 +5,7 @@ import {el, esc} from "../lib/dom.mjs";
 import {getModel, post, render, state} from "../store.mjs";
 import {statusSummary} from "../view/review.mjs";
 import {busyText, postApplyReadText, screenAvailable} from "../view/readiness.mjs";
+import {buildLine, chooseKeyboard, hostOf, themeLabel} from "../view/host.mjs";
 import {openHistory} from "./history.mjs";
 
 // The review opens at once; the host marks it reviewed when it answers.
@@ -47,6 +48,7 @@ export function rail() {
     const device = model?.device || {};
     const health = device.health || {};
     const draft = model?.draft;
+    const host = hostOf(model);
     const devices = model?.devices || [];
     const selector = devices.length > 1 ? `<label class="rail-picker-label" for="rail-device-picker">Keyboard</label>
             <select class="input rail-picker" id="rail-device-picker" data-act="select-device" ${health.busy ? "disabled" : ""}>
@@ -64,11 +66,13 @@ export function rail() {
     const node = el(`<aside class="rail">
         <div class="rail-device">
             <div class="rail-mark"><span class="mark-glyph">C</span> <span class="nm">Charybdis Ark</span>
-                <button class="btn tiny ghost" data-act="refresh" aria-label="Read keyboard" ${health.busy ? "disabled" : ""}
+                <button class="btn tiny ghost" data-act="refresh" aria-label="Read keyboard" ${health.busy || host.blocked ? "disabled" : ""}
                     data-tip="Read the connected keyboard again while keeping your draft.">Read</button></div>
             ${selector}
             <div class="rail-product">${esc(device.label || "No keyboard connected")}</div>
             <div class="rail-meta">${esc(device.summary || "—")}</div>
+            ${host.chooseKeyboard ? `<button class="btn tiny rail-choose" data-act="choose-keyboard" ${health.busy ? "disabled" : ""}
+                data-tip="Pick a Charybdis in the browser's list. Once chosen, it reconnects by itself next time.">Choose keyboard</button>` : ""}
             <div class="rail-status">
                 ${line(device.connected ? "on" : "err",
                     device.connected ? (health.busy ? health.phase || "Working" : "Connected") : "Disconnected",
@@ -91,6 +95,7 @@ export function rail() {
             </div>
         </div>
         <nav class="rail-nav">${nav}</nav>
+        ${host.progress ? `<div class="rail-progress" role="status">${spinner()}<span>${esc(host.progress)}</span></div>` : ""}
         ${railMessage()}
         <div class="rail-foot">
             <button class="btn tiny ghost rail-history" data-act="history" ${draft ? "" : "disabled"}
@@ -100,6 +105,7 @@ export function rail() {
             <button class="btn tiny ghost icon" data-act="redo" ${draft?.canRedo ? "" : "disabled"}
                 data-tip="${esc(draft?.redoLabel ? `Redo: ${draft.redoLabel} (⇧⌘Z)` : "Redo the edit you just undid (⇧⌘Z).")}">↻</button>
         </div>
+        ${host.build ? `<div class="rail-build">${esc(buildLine(host.build))}</div>` : ""}
     </aside>`);
 
     node.querySelectorAll("[data-screen]").forEach((button) => button.addEventListener("click", () => {
@@ -108,6 +114,7 @@ export function rail() {
     }));
     node.querySelector('[data-act="dismiss"]')?.addEventListener("click", () => { state.notice = ""; state.error = ""; render(); });
     node.querySelector('[data-act="refresh"]').addEventListener("click", () => post({type: "refresh"}));
+    node.querySelector('[data-act="choose-keyboard"]')?.addEventListener("click", () => post(chooseKeyboard()));
     node.querySelector('[data-act="select-device"]')?.addEventListener("change", (event) => post({type: "selectDevice", deviceId: event.target.value}));
     node.querySelector('[data-act="open-review"]')?.addEventListener("click", openReview);
     node.querySelector('[data-act="history"]').addEventListener("click", openHistory);
@@ -116,10 +123,23 @@ export function rail() {
     return node;
 }
 
+// A host that leaves the theme to the panel (a web page) gets its toggle at
+// the top right of every screen; in VS Code the panel follows VS Code's theme.
 export const topbar = (title, subtitle, actions = "") => `<header class="topbar">
     <div><h1>${esc(title)}</h1><p class="sub">${esc(subtitle)}</p></div>
-    <div class="topbar-actions">${actions}</div>
+    <div class="topbar-actions">${actions}${themeToggle()}</div>
 </header>`;
+
+const THEME_ICONS = {
+    dark: '<svg viewBox="0 0 16 16"><path d="M13.2 10.1A5.6 5.6 0 0 1 5.9 2.8a5.6 5.6 0 1 0 7.3 7.3z"/></svg>',
+    light: '<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.8"/><path d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1"/></svg>',
+};
+function themeToggle() {
+    const theme = hostOf(getModel()).theme;
+    if (!theme) return "";
+    return `<button class="btn tiny ghost icon theme-toggle" data-act="theme" data-theme-now="${esc(theme)}"
+        aria-label="${esc(themeLabel(theme))}" data-tip="${esc(themeLabel(theme))}">${THEME_ICONS[theme]}</button>`;
+}
 
 // What the keyboard or the host last said — a read, a save, a refusal — sits
 // in the rail's free space above the draft history: not over the screen being
@@ -247,7 +267,7 @@ export function commitBar() {
 
 // Read-only reasons, said plainly where the control is.
 export function unavailable(model) {
-    if (!model?.device?.connected) return "No keyboard is connected. Connect one and choose Read keyboard.";
+    if (!model?.device?.connected) return hostOf(model).blocked?.title || hostOf(model).words.noKeyboard || "";
     if (!model?.layers?.length) return "Nothing has been read from the keyboard yet. Choose Read keyboard.";
     if (!model?.draft) return "This keyboard's firmware cannot hold a complete eight-layer profile, so edits cannot be drafted here.";
     if (!model.draft.matching) return "The local draft belongs to another keyboard. Select it again or discard the draft here.";

@@ -173,3 +173,34 @@ test("closing the loop closes the device service", async () => {
     await loop.close();
     assert.deepEqual(service.calls, ["close"]);
 });
+
+test("the host's words say no keyboard was found, and its sleep reaches the device service", async () => {
+    const host = fakeHost({words: {noneFound: "Choose keyboard and pick yours."}});
+    const sleep = async () => {};
+    const loop = openPanelLoop(host, {adapter: new FakeDeviceAdapter({devices: []}), sleep});
+    assert.equal(loop.session.service.sleep, sleep, "the service polls with the host's sleep");
+    assert.equal(loop.session.host, host);
+    await loop.handleMessage({type: "ready"});
+    assert.equal(last(host).notice, "Choose keyboard and pick yours.");
+    assert.equal(last(host).model.host.words.noneFound, "Choose keyboard and pick yours.");
+    assert.equal(openPanelLoop(fakeHost(), {adapter: new FakeDeviceAdapter()}).session.service.sleep, undefined, "the timer's otherwise");
+    await loop.close();
+});
+
+test("messages meant for a host's own controls are answered, never run", async () => {
+    const host = fakeHost(), loop = loopWithDraft(host);
+    for (const message of [{type: "chooseKeyboard"}, {type: "setTheme", theme: "light"}, {type: "downloadRecovery", id: 1}]) {
+        await loop.handleMessage(message);
+        assert.equal(last(host).type, "model");
+    }
+    assert.equal(host.posted.length, 3);
+    assert.deepEqual(host.errors, []);
+});
+
+test("a host without the legacy upgrade export neither offers nor runs it", async () => {
+    const host = fakeHost(), loop = loopWithDraft(host);
+    loop.publish();
+    assert.equal(last(host).model.portable.pdUpgradeAvailable, false);
+    await loop.handleMessage({type: "exportPdUpgrade"});
+    assert.match(last(host).notice, /^Failed: Unsupported portable control/);
+});

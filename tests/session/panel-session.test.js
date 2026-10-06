@@ -286,3 +286,29 @@ test("the profile meter follows the draft, and is absent without a keyboard or a
     assert.equal(buildPanelModel(session, connected({capabilities: sized, connected: false})).portable.usage, null);
     assert.equal(buildPanelModel(session, connected()).portable.usage, null, "firmware that advertises no size shows no meter");
 });
+
+test("the model says what its host offers, in the host's words", () => {
+    const {HOST_WORDS} = require("../../core/session/panel-session");
+    // A session with no host describes the extension's: nothing extra, its words.
+    const plain = buildPanelModel(panelWithDraft(), connected());
+    assert.deepEqual(plain.host, {chooseKeyboard: false, blocked: null, theme: null, recoveries: null, build: null, progress: null, words: {...HOST_WORDS}});
+
+    const session = panelWithDraft();
+    const recoveries = [{id: 1, name: "recovery-1.charybdis.json", savedAt: "2026-10-06T09:00:00.000Z"}];
+    session.host = {words: {noKeyboard: "Choose keyboard to connect one."},
+        panel: () => ({chooseKeyboard: true, theme: "light", recoveries, build: {version: "1", commit: "abc"}, progress: "Reading"})};
+    const model = buildPanelModel(session, connected());
+    assert.deepEqual(model.host, {chooseKeyboard: true, blocked: null, theme: "light", recoveries, build: {version: "1", commit: "abc"}, progress: "Reading",
+        words: {...HOST_WORDS, noKeyboard: "Choose keyboard to connect one."}});
+    session.host.panel = () => ({theme: "sepia", blocked: {title: "No", detail: "Why"}});
+    assert.equal(buildPanelModel(session, connected()).host.theme, null, "only a theme the panel has");
+    assert.deepEqual(buildPanelModel(session, connected()).host.blocked, {title: "No", detail: "Why"});
+});
+
+test("the legacy upgrade export is offered only by a host that has it", () => {
+    const session = panelWithDraft();
+    session.host = {};
+    assert.equal(buildPanelModel(session, connected()).portable.pdUpgradeAvailable, false);
+    session.host = {exportPdUpgrade: async () => {}};
+    assert.equal(buildPanelModel(session, connected()).portable.pdUpgradeAvailable, true);
+});

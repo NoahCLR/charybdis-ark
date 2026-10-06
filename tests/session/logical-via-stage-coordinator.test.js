@@ -81,3 +81,14 @@ test("a staging the keyboard cancelled fails at once instead of timing out", asy
     assert.ok(Date.now() - started < 5000);
     assert.equal(typeof coordinator.abort, "undefined", "only the keyboard ends a staging");
 });
+
+test("the wait between polls is the one the host passes", async () => {
+    const connection = new Harness(); let id = 0;
+    connection.transactionId = 5; connection.generation = 6; connection.digest = 7;
+    connection.state = LOGICAL_VIA_STATE.STAGED;
+    const slept = [];
+    const sleep = async (ms) => {slept.push(ms); connection.state = LOGICAL_VIA_STATE.ACCEPTED;};
+    const coordinator = new LogicalViaStageCoordinator(connection, {requestIds: {next: () => ++id}, pollMs: 25, sleep});
+    await coordinator.waitUntilAccepted({transactionId: 5, generation: 6, digest: 7});
+    assert.deepEqual(slept, [25]);
+});

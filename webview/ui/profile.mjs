@@ -13,6 +13,7 @@ import {topbar} from "./shell.mjs";
 import {categorySummary, statusSummary} from "../view/review.mjs";
 import {stageOrder} from "../view/vocabulary.mjs";
 import {profileUsageView} from "../view/profile-usage.mjs";
+import {downloadRecovery, hostOf, savedWhen} from "../view/host.mjs";
 
 export function screenProfile() {
     const model = getModel();
@@ -82,8 +83,27 @@ export function screenProfile() {
         <span class="chip state">${health.recoveryPending ? "pending" : "clear"}</span>
     </div>`));
 
+    const recoveries = hostOf(model).recoveries;
+    if (recoveries) pad.appendChild(recoveriesCard(recoveries));
+
     main.appendChild(content);
     return main;
+}
+
+// The recovery copies a host keeps where no file can be opened (a browser's
+// storage), each downloadable as the file the extension would have written.
+function recoveriesCard(recoveries) {
+    const node = el(`<div class="card recoveries">
+        <div class="card-h"><h3>Recovery copies</h3><span class="right note">${recoveries.length} in this browser</span></div>
+        ${recoveries.length ? `<div class="list">${recoveries.map((copy) => `<div class="list-row recovery-row">
+            <span class="mono">${esc(copy.name)}</span><span class="note">${esc(savedWhen(copy.savedAt))}</span>
+            <button class="btn tiny" data-recovery="${esc(copy.id)}">Download</button></div>`).join("")}</div>` : ""}
+        <div class="card-b"><p class="note">${recoveries.length ? "" : "None yet. "}Apply and Import save a copy of what the keyboard held here before they write anything. They stay in this browser until you clear the site's data, which deletes them too, so download any you want to keep.</p></div>
+    </div>`);
+    node.querySelectorAll("[data-recovery]").forEach((button) => button.addEventListener("click", () => {
+        post(downloadRecovery(recoveries.find((copy) => String(copy.id) === button.dataset.recovery).id));
+    }));
+    return node;
 }
 
 // How full the profile is, area by area, with the counted limits beside it.

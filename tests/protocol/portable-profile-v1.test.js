@@ -27,6 +27,15 @@ test("convergence requires matching peer identity, valid digest and no pending w
     bytes[1] = 6; await assert.rejects(waitForStorage(connection,ids()),/recovery/);
 });
 
+test("waiting for storage sleeps with the host's sleep", async () => {
+    const bytes = Buffer.alloc(25); bytes.set([1,4|8]); bytes.writeUInt32LE(4,2); bytes.writeUInt32LE(99,6); bytes.writeUInt32LE(4,10); bytes.writeUInt32LE(99,14);
+    const connection = {request: async request => response(request, bytes)};
+    const slept = [];
+    const status = await waitForStorage(connection, ids(), {pollMs: 40, sleep: async ms => {slept.push(ms); bytes[1] = 4;}});
+    assert.equal(status.ready, true);
+    assert.deepEqual(slept, [40]);
+});
+
 
 test("optional brightness limits distinguish old firmware from malformed readback", async () => {
     const connection = {request: async (request, options) => {

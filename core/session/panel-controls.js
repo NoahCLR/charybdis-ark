@@ -6,11 +6,13 @@
 //
 // This used to live in extension.js. It is sequencing and session state, not
 // VS Code, so it sits here with a test; core/session/panel-loop.js runs it with
-// the host's own functions as `host`, of which these use three:
+// the host's own functions as `host`, of which these use three,
 //
 //   host.progress(title, run)      runs `run` behind a progress indicator
 //   host.saveRecovery(document)    writes a recovery copy, returns its path
 //   host.chooseProfile()           resolves to a chosen file's text, or undefined
+//
+// and `host.words.noneFound`, when a host says "no keyboard found" its own way.
 
 const {validateSnapshot} = require("./portable-profile-session");
 const {applyLayerEdit, discardDraftForDevice, layerEditDocument, startLayerEdit} = require("./panel-session");
@@ -45,7 +47,7 @@ async function readKeyboard(session, selectedDeviceId, host = {}) {
     await service.enumerate();
     const devices = service.snapshot().devices;
     if (!devices.length) {
-        session.notice = "No Charybdis Raw HID interface found. Connect the keyboard and choose Read keyboard again.";
+        session.notice = host.words?.noneFound || "No Charybdis Raw HID interface found. Connect the keyboard and choose Read keyboard again.";
         return false;
     }
     if (selectedDeviceId && !devices.some((device) => device.id === selectedDeviceId)) {

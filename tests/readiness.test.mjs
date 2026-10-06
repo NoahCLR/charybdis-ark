@@ -56,3 +56,12 @@ test("a read or export names what it reads and claims nothing about saving", () 
     assert.deepEqual(busyText("connected"), {detail: "Finishing the current step", writes: false}, "a raw phase is never shown");
     assert.deepEqual(busyText("restoring complete profile"), {detail: "Saving the profile to both halves", writes: true});
 });
+
+test("a host that cannot reach a keyboard says why, and a host's words say how to connect", () => {
+    const blocked = {host: {blocked: {title: "Ark is open in another tab", detail: "One tab holds the keyboard."}}, load: {state: "unavailable"}, device: {connected: false}};
+    assert.deepEqual(readScreen(blocked), {state: "blocked", title: "Ark is open in another tab", detail: "One tab holds the keyboard."});
+    assert.deepEqual(readScreen(blocked, "profile").state, "blocked");
+    const web = {host: {words: {connectHint: "Choose keyboard and pick it."}}, load: {state: "unavailable"}, device: {connected: false}};
+    assert.equal(readScreen(web).detail, "Choose keyboard and pick it.");
+    assert.equal(readScreen({...web, device: {connected: false, health: {error: "Unplugged."}}}).detail, "Unplugged.", "what the keyboard said comes first");
+});

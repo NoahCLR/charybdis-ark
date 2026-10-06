@@ -47,6 +47,10 @@ class ProfileDeviceService {
             onUnexpectedReport: ({reason}) => this.addDiagnostic(`Ignored an unexpected Raw HID report: ${reason}.`),
         });
         this.onChange = typeof options.onChange === "function" ? options.onChange : undefined;
+        // The wait between polls while reading and saving a profile. A host
+        // whose timers are throttled (a background browser tab) passes its
+        // own; the timer's is used otherwise.
+        this.sleep = typeof options.sleep === "function" ? options.sleep : undefined;
         this.profileSummary = normalizeProfileSummary(options.profileSummary);
         this.requestIdStart = normalizeRequestId(options.requestIdStart === undefined ? 1 : options.requestIdStart);
         this.readCandidateStatus = typeof options.readCandidateStatus === "function"
@@ -410,7 +414,7 @@ class ProfileDeviceService {
         await this.runOperation("reading complete profile", async () => {
             result = await captureProfile(this.connection, this.requestIds, this.capabilities, message => {
                 this.portableProgress = message; this.emitChange();
-            }, false, forRestore);
+            }, false, forRestore, {sleep: this.sleep});
             result.limits = await readSettingsLimits(this.connection, this.requestIds);
             result.options = await readKeyboardOptions(this.connection, this.requestIds);
             this.portable = result;
@@ -449,6 +453,7 @@ class ProfileDeviceService {
             started = true;
             result = await restoreProfile(this.connection, this.requestIds, this.capabilities, document, {...options,
                 baseSnapshot: cachedBase,
+                sleep: this.sleep,
                 onProgress: message => {this.portableProgress = message;},
                 // The step view the commit bar draws; it outlives the apply
                 // when it failed, so the person can see where and why.

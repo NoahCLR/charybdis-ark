@@ -1,7 +1,8 @@
 # Repository ownership and source provenance
 
-Charybdis Ark is an independent VS Code extension repository. Its app core,
-webview, tests, developer preview and keycode generation work from this checkout.
+Charybdis Ark is an independent repository for the VS Code extension and the
+web page (D-L52). Its app core, webview, web host, tests, developer preview and
+keycode generation work from this checkout.
 Firmware compilation, authored C profiles, hardware measurements and diagnostics
 belong to the firmware repository.
 
@@ -130,9 +131,11 @@ ownership and where new plans or specifications belong.
   system.
 - `tests/` — mirrors `core/`, plus the view modules and the payloads the
   interface posts.
-- `web/` — entries for the [web build](#the-web-build) only: what a browser
-  host takes from `core/`, and the stand-ins the bundle uses in place of Node's
-  `Buffer` and the native HID adapter. The extension never loads them.
+- `web/` — the [web page](#the-web-build): its HTML, the browser host that
+  does in a page what `extension.js` does in VS Code, what that host takes from
+  `core/`, and the stand-ins the bundle uses in place of Node's `Buffer` and the
+  native HID adapter. It may import `core/` (through `web/core.mjs`); the
+  extension never loads it, and `webview/` never imports it.
 
 The layer rules and where new work belongs are in [`AGENTS.md`](../AGENTS.md).
 The application runtime must not read the firmware repository, and the webview
@@ -151,19 +154,55 @@ npm run preview -- --vscode  # also write preview/vscode-{dark,light}.html, as t
 npm run probe:live-link # read-only enumeration of matching HID interfaces
 npm run keycodes -- --check # verify the catalog against the local pinned QMK inputs
 npm run keycodes           # regenerate from those same inputs
-npm run build:web          # bundle core/ and the panel for Chrome into dist/web/
+npm run build:web          # build the web page into dist/web/
+npm run web                # …then serve it at http://localhost:8975/
 ```
 
 ### The web build
 
-The web version of Ark runs `core/` and the panel inside Chrome rather than in
-VS Code. `npm run build:web` (`scripts/build-web.js`, esbuild) bundles them
-into the ignored `dist/web/`: `web/core.mjs`, the part of `core/` a browser
-host needs, as one module; `webview/app.mjs` with everything it imports; and
-`webview/styles.css`. Each file's name carries a hash of its content, so a new
-release can never be served an old file, and `dist/web/manifest.json` maps
-`core`, `panel` and `styles` to those names for the page that loads them. Each
-build empties the folder first.
+The web version of Ark (D-L52) runs `core/` and the panel inside Chrome rather
+than in VS Code. `npm run build:web` (`scripts/build-web.js`, esbuild) writes
+the complete static site into the ignored `dist/web/`, ready to publish as it
+is: `index.html` (from `web/index.html`); the page's host (`web/page.mjs`)
+and `web/core.mjs`, the part of `core/` a browser host needs, with the code
+they share in a chunk; the host's clock worker (`web/sleep-worker.js`);
+`webview/app.mjs` with everything it imports; and `webview/styles.css`. Every
+file but `index.html` carries a hash of its content in its name, so a new
+release can never be served an old file. `index.html` names them itself, and
+the version (`package.json`) and commit (git, or `ARK_COMMIT` in the
+environment) the build came from; `manifest.json` lists the same names for
+tests and tools, but the page never fetches it. Each build empties the folder
+first.
+
+To try the page, run `npm run web`: it builds, then serves `dist/web/` at
+`http://localhost:8975/` (`scripts/serve.js`, a static server for this machine
+only). Open that in Chrome or Edge; `localhost` is a secure context, so WebHID
+works there as over HTTPS. Choose keyboard asks Chrome for the keyboard once;
+after that the page reconnects to it on load. The page holds the keyboard as
+the extension does, so close Ark in VS Code (and VIA) first. Recovery copies
+saved while trying it live in that origin's storage
+(`http://localhost:8975`), not in VS Code's.
+
+The page carries its Content Security Policy in a `<meta>` tag, so it holds
+under any server: scripts, styles and the worker from the page's own origin,
+the panel's inline style attributes, and `connect-src 'none'`, so after it
+loads the page makes no request at all. `frame-ancestors` only works as a
+header, which publishing will set.
+
+The browser host (`web/web-host.mjs`) runs the shared panel loop over
+`WebHidDeviceAdapter` and gives the panel an `acquireVsCodeApi` stand-in
+(`web/panel-channel.mjs`) that, like VS Code, delivers every message later and
+as a copy. Chrome opens its keyboard picker and file chooser only from a click,
+and a message reaches the host only after the click has ended, so the stand-in
+also shows the host each message synchronously, as a copy, while the panel's
+click handler is still running: the host starts `navigator.hid.requestDevice()`
+(or the file chooser) there, and the message that follows waits for what was
+picked. The host holds a Web Lock for as long as the page is open, so a second
+tab waits rather than connecting; warns on `beforeunload` while the draft has
+unapplied edits or Apply runs; passes `core/` a `sleep` driven by a dedicated
+worker, whose timers Chrome does not throttle in a background tab as it does the
+page's; and keeps recovery copies in IndexedDB after asking for persistent
+storage.
 
 It is a separate output, not a step of the extension: the extension still runs
 `core/` and `webview/` as they are, and `webview/` stays build-free source. No
@@ -179,7 +218,13 @@ To export more of `core/` to a browser host, add it to `web/core.mjs`.
 `npm run test:browser` builds it and checks it in Chrome: the bundle has to
 decode and re-encode every profile fixture exactly as Node does, stage edits and
 build the same panel model, and the bundled panel has to render that model and
-post its edits.
+post its edits. It then loads the built page with a fake `navigator.hid`
+(`browser-tests/fake-hid.js`) whose keyboard is `tests/fixtures/fake-keyboard.js`,
+a read-only simulated Charybdis answering in Node: Choose keyboard, a complete
+read, an edit, an export, an Apply the fake refuses (which still leaves a
+recovery copy to list and download), the theme, a reload that reconnects
+without the picker, a second tab that is refused, a browser without WebHID, and
+that no request went anywhere but the page's own files.
 
 ### Trying a branch before it lands
 
@@ -206,7 +251,10 @@ F5 provides a separate development host without changing the installed link. The
 launches an Extension Development Host with a debugger attached.
 
 To work on the interface without a keyboard, run `npm run preview`, serve this
-folder (`python3 -m http.server 8972`) and open `preview/index.html`. The preview
+folder (`node scripts/serve.js . --port 8972`) and open `preview/index.html`.
+`preview/index.html?host=web` answers as the web page's host instead, with
+its Choose keyboard, theme toggle, build line and recovery copies;
+`?host=web-none` has no keyboard yet and `?host=web-unsupported` no WebHID. The preview
 stands in for the extension host: it answers the webview's `ready` with one
 fixture model and logs every edit the interface posts back.
 Use `npm run preview -- --multiple --vscode` to inspect the selector with two
@@ -237,7 +285,8 @@ Actions.
 
 `npm run test:browser` starts a fixture-only preview and drives a pointer-speed
 edit, checking the complete posted settings section and the host stylesheet
-cascade, then checks [the web build](#the-web-build) in Chrome against Node. Install its browser once with `npx playwright install chromium`.
+cascade, then checks [the web build](#the-web-build) in Chrome against Node
+and the built page against a fake keyboard. Install its browser once with `npx playwright install chromium`.
 The small host-style fixture covers known padding/cascade regressions; it is not
 a VS Code extension-host or physical-device acceptance test.
 
