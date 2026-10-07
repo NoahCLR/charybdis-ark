@@ -4,10 +4,10 @@
 # A normal install takes 25-40 seconds. On GitHub's runners one has hung for over
 # an hour, and with no limit a hung install holds the web page's publish queue or
 # a release's browser check for up to six hours. Each attempt is stopped after
-# ARK_CHROME_INSTALL_SECONDS (default 60) and retried, up to three attempts.
+# ARK_CHROME_INSTALL_SECONDS (default 90) and retried, up to three attempts.
 set -u
 
-limit="${ARK_CHROME_INSTALL_SECONDS:-60}"
+limit="${ARK_CHROME_INSTALL_SECONDS:-90}"
 attempts=3
 attempt=1
 while :; do
@@ -19,7 +19,10 @@ while :; do
         exit 1
     fi
     echo "Chrome install attempt $attempt failed or took over ${limit}s; retrying" >&2
-    # A stopped attempt can leave apt's package database half configured.
+    # Stopping npx does not stop the apt-get it started as root, which keeps
+    # apt's lock and fails every retry; stop it, then repair what it left.
+    sudo pkill -KILL -x apt-get >/dev/null 2>&1 || true
+    sudo pkill -KILL -x dpkg >/dev/null 2>&1 || true
     sudo dpkg --configure -a >/dev/null 2>&1 || true
     attempt=$((attempt + 1))
 done
