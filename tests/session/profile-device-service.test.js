@@ -92,7 +92,7 @@ function serviceHarness(options = {}) {
             if (report[0] === VIA_READS.COMMAND_GET_PROTOCOL_VERSION) {
                 const viaResponse = Buffer.from(report);
                 viaResponse[1] = 0;
-                viaResponse[2] = VIA_READS.EXPECTED_PROTOCOL_VERSION;
+                viaResponse[2] = VIA_READS.PROTOCOL_VERSION;
                 queueMicrotask(() => connection.emitReport(viaResponse));
                 return;
             }
@@ -269,6 +269,18 @@ test("compatibility checks Milestone A domains and fixed report framing", () => 
     assert.match(compatibility.reasons.join("\n"), /Milestone A domains/);
 });
 
+test("compatibility accepts VIA 12 and 13 and nothing else", () => {
+    const via = (protocolVersion) => evaluateProfileCompatibility({}, {}, {protocolVersion, firmwareVersion: 0})
+        .checks.find((check) => check.label === "VIA protocol version");
+    // Released firmware reports 12; QMK 0.34.6 and later report 13.
+    assert.equal(via(12).ok, true);
+    assert.equal(via(13).ok, true);
+    for (const version of [11, 14, undefined]) {
+        assert.equal(via(version).ok, false);
+        assert.match(via(version).message, /supports 12 or 13/);
+    }
+});
+
 test("persistent live apply requires every mutation capability", () => {
     const compatible = {compatible: true, reasons: []};
     const completeFlags = PROFILE_WIRE_FEATURES.CANDIDATE_WRITE
@@ -324,7 +336,7 @@ test("request ids advance across refreshes and reject a delayed duplicate", asyn
         onWrite({connection, report}) {
             if (report[0] === VIA_READS.COMMAND_GET_PROTOCOL_VERSION) {
                 const viaResponse = Buffer.from(report);
-                viaResponse[2] = VIA_READS.EXPECTED_PROTOCOL_VERSION;
+                viaResponse[2] = VIA_READS.PROTOCOL_VERSION;
                 queueMicrotask(() => connection.emitReport(viaResponse));
                 return;
             }
