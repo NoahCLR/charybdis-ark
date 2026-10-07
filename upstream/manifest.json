@@ -3,7 +3,7 @@
   "sources": {
     "firmware": {
       "repository": "https://github.com/NoahCLR/charybdis-4x6",
-      "commit": "bdd2b5a3b196340ce7d4c1b2d423109b9c4b2250"
+      "commit": "46f87137e55e25282f954864d116cee23647a225"
     },
     "qmk": {
       "repository": "https://github.com/NoahCLR/bastardkb-qmk",
@@ -24,7 +24,7 @@
       "source": "firmware",
       "sourcePath": "docs/architecture/device-resident-profile.md",
       "sourceSha256": "d76293cb6716cd8d7f0d30f6c381f315cc11a894fa2cd3ddbcefa5b2d0ff1b06",
-      "sha256": "9046a957a4ccb1afb3b96177c481f2d65721387c73900a5483dd5464ca77ed18",
+      "sha256": "be5b67a1ac4c974e2127b3b4e86296db057ac5c8c17d19cb7866c315bcb4c04e",
       "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
     },
     {
@@ -47,8 +47,8 @@
       "path": "upstream/firmware/docs/architecture/memory-budgets.md",
       "source": "firmware",
       "sourcePath": "docs/architecture/memory-budgets.md",
-      "sourceSha256": "cc1df27d3be071eecf07024a248dbfbeb910d3e23c04291ae9618a57f654c003",
-      "sha256": "cc1df27d3be071eecf07024a248dbfbeb910d3e23c04291ae9618a57f654c003",
+      "sourceSha256": "167b029dea0082eb406ec1557ee2efb0dd482658dca5b4159e46497685a93c74",
+      "sha256": "167b029dea0082eb406ec1557ee2efb0dd482658dca5b4159e46497685a93c74",
       "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
     },
     {
@@ -56,7 +56,7 @@
       "source": "firmware",
       "sourcePath": "docs/architecture/pd-mode-domain-v1.md",
       "sourceSha256": "061b09d125afd7d368cf63d08591f00d71d83da803778f5d3ae0faa767af16be",
-      "sha256": "d3cd75726d038794ee1c89d095d7ea889bf56f5e4cbc0f3912271c38fdb7d6b0",
+      "sha256": "826ab6281fd8399b4e5167e16a9ec7e20c4397bc88b96130dce7036577a231ab",
       "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
     },
     {
@@ -96,7 +96,7 @@
       "source": "firmware",
       "sourcePath": "docs/architecture/split-activity-sync.md",
       "sourceSha256": "cb59ea91d5adfe570223e34730298095899f941c88ead9e260b5fbd19f5c7c34",
-      "sha256": "559b3060080327767f432e616234912cd321fb978e0df3c50a61aa10c4dc33fe",
+      "sha256": "edbfe597b45c07ba925c16f856fced9d5c525b426b7d4c632fc5fb76e3c560c5",
       "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
     },
     {
