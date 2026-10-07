@@ -43,7 +43,7 @@ jobs:
       - run: npm ci
       - name: Build the web page
         run: ARK_COMMIT="$(git rev-parse --short "$GITHUB_SHA")" npm run build:web
-      - run: npx playwright install --with-deps chromium
+      - run: sh scripts/install-chrome.sh
       - name: Test the built page in Chrome
         # ARK_WEB_BUILT: test dist/web/ as built above, without rebuilding it.
         env:
