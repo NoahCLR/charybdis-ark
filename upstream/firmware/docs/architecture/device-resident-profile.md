@@ -2,7 +2,7 @@
 
 This document defines the ownership model for live editing with Charybdis Ark
 (the independent app repository in the
-[local workspace map](https://github.com/NoahCLR/charybdis-4x6/blob/48ae9d3f6ac233c44d06c6898e856176c1f53948/docs/DEVELOPMENT.md#local-repositories-and-worktrees)). It supersedes the earlier project assumption that the three C
+[local workspace map](https://github.com/NoahCLR/charybdis-4x6/blob/bdd2b5a3b196340ce7d4c1b2d423109b9c4b2250/docs/DEVELOPMENT.md#local-repositories-and-worktrees)). It supersedes the earlier project assumption that the three C
 authoring files must remain the only source of truth during a live editing
 session.
 
@@ -123,6 +123,19 @@ Device ownership does not justify permanent scan-loop cost. In steady state:
 - pointing-device cadence is measured on hardware and protected by a regression
   threshold.
 
+VIA scan admission samples receiver verification, local digest, mailbox and boot
+recovery work flags together under one atomic section. They are hints: selected
+workers retain their own protected snapshots and epoch checks, in the existing
+priority order. Receiver verification and the mailbox each define their start
+condition once, shared by admission and worker, so a hint cannot drift narrower
+than its worker and silently stall it; digest and boot recovery are each a
+single flag their worker checks first. Work arriving after admission is
+observed on the next scan.
+Admission is checked every scan, independently of ordinary metadata polling;
+role changes, pending mutations and logical roll-forward still follow their
+existing checks and deadlines. The roll-forward clock is read only while an
+accepted transaction is waiting for host writes.
+
 Small materialized runtime caches are valid engineering choices. Each keyboard
 half has 270,336 bytes of physical SRAM; static regression policies and runtime
 high-water evidence must guide the tradeoff without presenting policy margin as
@@ -132,7 +145,7 @@ physical capacity.
 
 The delivery slices are in Ark's product goal and the product's status in
 Ark's direction; the firmware's status is in the
-[firmware direction](https://github.com/NoahCLR/charybdis-4x6/blob/48ae9d3f6ac233c44d06c6898e856176c1f53948/docs/LIVE_EDIT_APP_DIRECTION.md#current-firmware-status).
+[firmware direction](https://github.com/NoahCLR/charybdis-4x6/blob/bdd2b5a3b196340ce7d4c1b2d423109b9c4b2250/docs/LIVE_EDIT_APP_DIRECTION.md#current-firmware-status).
 The logical-generation manifest and cross-store commit and recovery ordering
 are implemented; external VIA edit adoption remains. The active phase is
 acceptance: reboot, reconnect, applicable USB/role configurations,

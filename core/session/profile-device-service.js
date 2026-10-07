@@ -690,7 +690,7 @@ function evaluateProfileCompatibility(capabilities, summary = {}, viaIdentity = 
     const checks = [
         equalityCheck("Protocol major", capabilities?.protocol?.major, PROFILE_STUDIO_PROTOCOL.major),
         equalityCheck("Schema major", capabilities?.schema?.major, capabilities?.supportedDomainMask & 16 ? 2 : PROFILE_STUDIO_SCHEMA.major),
-        equalityCheck("VIA protocol version", viaIdentity?.protocolVersion, VIA_READS.EXPECTED_PROTOCOL_VERSION),
+        oneOfCheck("VIA protocol version", viaIdentity?.protocolVersion, VIA_READS.SUPPORTED_PROTOCOL_VERSIONS),
         equalityCheck("VIA firmware version", viaIdentity?.firmwareVersion, capabilities?.firmwareVersion),
         equalityCheck("Raw HID report size", capabilities?.reportSize, RAW_HID_REPORT_SIZE),
         minimumCheck("Status pages", capabilities?.statusPageCount, PROFILE_WIRE_V1.STATUS_PAGE_COUNT),
@@ -739,6 +739,11 @@ function normalizeRequestId(value) {
 function equalityCheck(label, actual, expected) {
     const ok = Number(actual) === Number(expected);
     return {label, ok, actual, limit: expected, message: ok ? "" : `${label} is ${actual}; Charybdis Ark requires ${expected}.`};
+}
+
+function oneOfCheck(label, actual, accepted) {
+    const ok = accepted.includes(Number(actual));
+    return {label, ok, actual, limit: accepted, message: ok ? "" : `${label} is ${actual}; Charybdis Ark supports ${accepted.join(" or ")}.`};
 }
 
 function minimumCheck(label, actual, expected) {

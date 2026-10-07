@@ -3,11 +3,11 @@
   "sources": {
     "firmware": {
       "repository": "https://github.com/NoahCLR/charybdis-4x6",
-      "commit": "48ae9d3f6ac233c44d06c6898e856176c1f53948"
+      "commit": "bdd2b5a3b196340ce7d4c1b2d423109b9c4b2250"
     },
     "qmk": {
       "repository": "https://github.com/NoahCLR/bastardkb-qmk",
-      "commit": "b8f5e32c086320857bc2f86aae9da870d98a629e"
+      "commit": "e8e2a57fc9af0688fb726685fa456c6d1f07ff57"
     }
   },
   "files": [
@@ -23,8 +23,8 @@
       "path": "upstream/firmware/docs/architecture/device-resident-profile.md",
       "source": "firmware",
       "sourcePath": "docs/architecture/device-resident-profile.md",
-      "sourceSha256": "2017be82f67fa5bb3cc9ddee3206ed755866b84a1c10a04335eb78d1e6ae9967",
-      "sha256": "a5b7eb58b9f4f9e53fe4609b62cac5d758df87f4be63de7362697dcf2d8617b7",
+      "sourceSha256": "d76293cb6716cd8d7f0d30f6c381f315cc11a894fa2cd3ddbcefa5b2d0ff1b06",
+      "sha256": "9046a957a4ccb1afb3b96177c481f2d65721387c73900a5483dd5464ca77ed18",
       "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
     },
     {
@@ -47,8 +47,8 @@
       "path": "upstream/firmware/docs/architecture/memory-budgets.md",
       "source": "firmware",
       "sourcePath": "docs/architecture/memory-budgets.md",
-      "sourceSha256": "3de4cf913c12e0150e47ce62bda3eb1bdf9d9ec1603122887e9a52abe6eb0830",
-      "sha256": "3de4cf913c12e0150e47ce62bda3eb1bdf9d9ec1603122887e9a52abe6eb0830",
+      "sourceSha256": "cc1df27d3be071eecf07024a248dbfbeb910d3e23c04291ae9618a57f654c003",
+      "sha256": "cc1df27d3be071eecf07024a248dbfbeb910d3e23c04291ae9618a57f654c003",
       "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
     },
     {
@@ -56,7 +56,7 @@
       "source": "firmware",
       "sourcePath": "docs/architecture/pd-mode-domain-v1.md",
       "sourceSha256": "061b09d125afd7d368cf63d08591f00d71d83da803778f5d3ae0faa767af16be",
-      "sha256": "979bccc0fc34b313d872b6b6c613317efa084d04f02fcb8d8dc2c45387d3a1ba",
+      "sha256": "d3cd75726d038794ee1c89d095d7ea889bf56f5e4cbc0f3912271c38fdb7d6b0",
       "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
     },
     {
@@ -71,8 +71,8 @@
       "path": "upstream/firmware/docs/architecture/profile-split-v1.md",
       "source": "firmware",
       "sourcePath": "docs/architecture/profile-split-v1.md",
-      "sourceSha256": "fc92d7d358fa654f5d71d8a9a34b414101cf7fe6b8fc7d871dc021dcaec2e504",
-      "sha256": "fc92d7d358fa654f5d71d8a9a34b414101cf7fe6b8fc7d871dc021dcaec2e504",
+      "sourceSha256": "9c1326eca5e6f152a2fb204c861fddcbd1c338dded168f792b6d60470ce84623",
+      "sha256": "9c1326eca5e6f152a2fb204c861fddcbd1c338dded168f792b6d60470ce84623",
       "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
     },
     {
@@ -96,7 +96,7 @@
       "source": "firmware",
       "sourcePath": "docs/architecture/split-activity-sync.md",
       "sourceSha256": "cb59ea91d5adfe570223e34730298095899f941c88ead9e260b5fbd19f5c7c34",
-      "sha256": "977f65ab00cace67dcfa84f1fd5f23c9e0ce14a03e01872b8798cfa0a5ce6b9c",
+      "sha256": "559b3060080327767f432e616234912cd321fb978e0df3c50a61aa10c4dc33fe",
       "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
     },
     {
@@ -496,8 +496,8 @@
       "path": "upstream/qmk/version.txt",
       "source": "qmk",
       "sourcePath": null,
-      "sourceSha256": "0890e9b89f913a96c387c67827858cdff05b7acdbc75d5c620baccb4f129029c",
-      "sha256": "0890e9b89f913a96c387c67827858cdff05b7acdbc75d5c620baccb4f129029c",
+      "sourceSha256": "c87e330dedb68d5671425c2c13a5e478b10949747b913e1e7e92642239b9b9e8",
+      "sha256": "c87e330dedb68d5671425c2c13a5e478b10949747b913e1e7e92642239b9b9e8",
       "transformation": "Version stamp synthesized as `git describe --tags --exclude 'v2*'` of the pinned QMK commit; not an upstream source file."
     }
   ]

@@ -90,7 +90,11 @@ const VIA_READS = Object.freeze({
     COMMAND_GET_KEYBOARD_VALUE: 0x02,
     VALUE_FIRMWARE_VERSION: 0x04,
     UNHANDLED: 0xff,
-    EXPECTED_PROTOCOL_VERSION: 0x000c,
+    // QMK 0.34.6 moved VIA from 12 to 13 by adding one keyboard value
+    // (keycodes version, 0x06); the commands Ark sends are unchanged. Firmware
+    // released before it reports 12, so Ark accepts both.
+    PROTOCOL_VERSION: 0x000d,
+    SUPPORTED_PROTOCOL_VERSIONS: Object.freeze([0x000c, 0x000d]),
 });
 
 class ProfileWireProtocolError extends Error {
