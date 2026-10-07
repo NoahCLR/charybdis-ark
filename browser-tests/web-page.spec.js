@@ -40,6 +40,21 @@ async function open(page) {
     return errors;
 }
 
+// The build line links to its commit on GitHub, with GitHub's mark, when the
+// page was built from one. A build of uncommitted changes ("-dirty", as when
+// these tests run on a work in progress) shows the line alone.
+async function expectBuildLink(line, mark) {
+    const commit = (await line.textContent()).trim().split(" · ")[1];
+    if (/^[0-9a-f]{7,40}$/.test(commit)) {
+        expect(await line.evaluate((node) => node.tagName)).toBe("A");
+        expect(await line.getAttribute("href")).toBe(`https://github.com/NoahCLR/charybdis-ark/commit/${commit}`);
+        await expect(line.locator(`svg.${mark} path`)).toHaveCount(1);
+    } else {
+        expect(await line.evaluate((node) => node.tagName)).not.toBe("A");
+        await expect(line.locator("svg")).toHaveCount(0);
+    }
+}
+
 const ready = (page) => expect(page.locator('[data-screen="mouse"]')).toBeEnabled({timeout: 20000});
 
 test("choose a keyboard, read it, stage an edit, keep a recovery copy, and reconnect on reload", async ({page, context, baseURL}) => {
@@ -53,6 +68,8 @@ test("choose a keyboard, read it, stage an edit, keep a recovery copy, and recon
     await expect(placeholder.locator("h2")).toHaveText("Connect your keyboard");
     await expect(placeholder).toContainText("pick it in Chrome's list with Choose keyboard");
     await expect(page.locator(".rail-build")).toHaveText(/^Ark \d{4}\.\d+\.\d+\S* · \S+$/);
+    await expectBuildLink(page.locator(".rail-build"), "rail-build-mark");
+    expect(await page.locator(".rail-build").getAttribute("target")).toBe(await page.locator("a.rail-build").count() ? "_blank" : null);
     expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBe("light");
 
     // The click reaches the picker while it is still a click.
@@ -241,4 +258,90 @@ test("explore the demo: edit on several screens, review with no Apply, export, o
     expect(await page.evaluate(() => window.__fakeHid)).toEqual({requested: 0, refusedWithoutClick: 0, opened: 0});
     expect(errors).toEqual([]);
     ownFilesOnly();
+});
+
+// A phone (web/phone.mjs): touch only, with a phone-sized screen. It gets a
+// notice and nothing else: no panel, and no host to take the keyboard's lock,
+// open IndexedDB or start the worker. A tablet or a narrow desktop window
+// still gets Ark.
+const phone = {viewport: {width: 390, height: 844}, screen: {width: 390, height: 844}, deviceScaleFactor: 3, isMobile: true, hasTouch: true};
+const tablet = {viewport: {width: 744, height: 1133}, screen: {width: 744, height: 1133}, deviceScaleFactor: 2, isMobile: true, hasTouch: true};
+
+test("a phone gets a notice that Ark runs on a computer, with the repositories, and nothing of Ark", async ({browser, baseURL}) => {
+    const context = await browser.newContext({...phone, baseURL, colorScheme: "light"});
+    try {
+        const {requests, ownFilesOnly} = await withKeyboard(context, baseURL);
+        const page = await context.newPage();
+        const errors = await open(page);
+        const notice = page.locator(".phone-notice");
+        // At the top, the board's shape: every key and the trackball, no legends.
+        const board = notice.locator("svg.phone-board");
+        await expect(notice.locator(":scope > *").first()).toHaveClass("phone-board");
+        await expect(board.locator("rect.phone-key")).toHaveCount(56);
+        await expect(board.locator("circle.phone-ball")).toHaveCount(1);
+        await expect(board.locator("text")).toHaveCount(0);
+        await expect(notice.locator("h1")).toHaveText("Ark runs on a computer");
+        await expect(notice).toContainText("Chrome or Edge on a computer");
+        await expect(notice).toContainText(`Open this page there: ${new URL(baseURL).host}`);
+        const buttons = notice.locator(".phone-links a");
+        await expect(buttons).toHaveText(["Ark on GitHub", "The firmware on GitHub", "Buy a Charybdis from BastardKB"]);
+        expect(await buttons.evaluateAll((links) => links.map((link) => link.href)))
+            .toEqual(["https://github.com/NoahCLR/charybdis-ark", "https://github.com/NoahCLR/charybdis-4x6", "https://bastardkb.com/"]);
+        // GitHub's mark on the two GitHub links, and only there.
+        expect(await buttons.evaluateAll((links) => links.map((link) => link.querySelectorAll("svg.phone-icon path").length)))
+            .toEqual([1, 1, 0]);
+        await expect(notice.locator(".phone-seller")).toContainText("hundreds of hours of good firmware and hardware tinkering");
+        await expect(notice.locator(".phone-build")).toHaveText(/^Ark \d{4}\.\d+\.\d+\S* · \S+$/);
+        await expectBuildLink(notice.locator(".phone-build"), "phone-build-mark");
+        expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBe("light");
+
+        // Nothing of Ark: no panel, and no host behind it.
+        await expect(page.locator(".app, .read-placeholder")).toHaveCount(0);
+        expect(await page.evaluate(() => typeof window.acquireVsCodeApi)).toBe("undefined");
+        expect(await page.evaluate(async () => {
+            const locks = await navigator.locks.query();
+            return {locks: locks.held.length + locks.pending.length, databases: (await indexedDB.databases()).length, hid: window.__fakeHid};
+        })).toEqual({locks: 0, databases: 0, hid: {requested: 0, refusedWithoutClick: 0, opened: 0}});
+        expect(requests.filter((url) => /\/worker-[A-Z0-9]+\.js$/.test(url))).toEqual([]);
+
+        // It fits the screen, and turning the phone keeps the notice.
+        expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+        await page.setViewportSize({width: 844, height: 390});
+        await expect(notice).toBeVisible();
+        await expect(page.locator(".app")).toHaveCount(0);
+        expect(errors).toEqual([]);
+        ownFilesOnly();
+    } finally {
+        await context.close();
+    }
+});
+
+test("a tablet still gets Ark: the demo, and that Ark needs Chrome or Edge to connect", async ({browser, baseURL}) => {
+    const context = await browser.newContext({...tablet, baseURL});
+    try {
+        await context.addInitScript(() => Object.defineProperty(Navigator.prototype, "hid", {configurable: true, get: () => undefined}));
+        const page = await context.newPage();
+        const errors = await open(page);
+        const placeholder = page.locator(".read-placeholder");
+        await expect(placeholder.locator("h2")).toHaveText("Ark needs Chrome or Edge");
+        await expect(placeholder.locator('[data-act="explore-demo"]')).toBeVisible();
+        await expect(page.locator(".phone-notice")).toHaveCount(0);
+        expect(errors).toEqual([]);
+    } finally {
+        await context.close();
+    }
+});
+
+test("a narrow window on a computer still gets Ark", async ({browser, baseURL}) => {
+    const context = await browser.newContext({viewport: {width: 380, height: 800}, baseURL});
+    try {
+        await withKeyboard(context, baseURL);
+        const page = await context.newPage();
+        const errors = await open(page);
+        await expect(page.locator(".read-placeholder h2")).toHaveText("Connect your keyboard");
+        await expect(page.locator(".phone-notice")).toHaveCount(0);
+        expect(errors).toEqual([]);
+    } finally {
+        await context.close();
+    }
 });

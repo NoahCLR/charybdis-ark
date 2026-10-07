@@ -106,7 +106,7 @@ function fakeKeyboard({document, generation = 42, firmwareVersion = 0x00010000, 
         const reply = Buffer.from(request);
         switch (request[0]) {
             case VIA_READS.COMMAND_GET_PROTOCOL_VERSION:
-                reply.fill(0, 1); reply.writeUInt16BE(VIA_READS.EXPECTED_PROTOCOL_VERSION, 1);
+                reply.fill(0, 1); reply.writeUInt16BE(VIA_READS.PROTOCOL_VERSION, 1);
                 return reply;
             case VIA_READS.COMMAND_GET_KEYBOARD_VALUE:
                 if (request[1] !== VIA_READS.VALUE_FIRMWARE_VERSION) return undefined;

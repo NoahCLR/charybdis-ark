@@ -97,6 +97,7 @@ test("_headers has to cache exactly the hashed files for good, and the page neve
         assert.match(edit((text) => text.replace("/index.html\n  Cache-Control: no-cache", "/index.html\n  Cache-Control: public, max-age=3600")), /lets \/index\.html be cached/);
         assert.match(edit((text) => text.replace("/*\n", "/*\n  Cache-Control: public, max-age=60\n")), /sets Cache-Control for every file/);
         assert.match(edit((text) => `  X-Orphan: 1\n${text}`), /a header before any path/);
+        assert.match(edit((text) => text.replace(/^  X-Robots-Tag: .*\n/m, "")), /lets search engines index the page/);
     } finally {
         done();
     }

@@ -48,7 +48,7 @@ matrix.
 | Backup and restore | Complete snapshots, import review against the keyboard, recovery file and verified restore |
 | Drafts and Apply | One draft with item-by-item review, discard by edit group, Show, undo/redo and draft history; the review checks reachable actions, confirms active warnings and traps, and blocks profiles the destination cannot save (D-L36); Apply shows its steps and says where a failure happened (D-L19, D-L23, D-L29, D-L30) |
 | Recovery | Atomic logical Apply, differential transfer, reboot recovery fencing, firmware roll-forward after the decision, resume after a lost or power-cycled peer link, bounded cancel owned by the keyboard (D-L20–D-L22, D-L27, D-L39) |
-| Where it runs | The VS Code extension, and a web page that runs all of Ark in Chrome or Edge over WebHID (D-L52): Choose keyboard, one tab at a time, recovery copies in the browser's storage, a light/dark toggle. `npm run build:web` writes the page as static files; a workflow publishes it to Cloudflare Pages: `dev` at `ark-dev.ncleroy.dev`, `main` at `ark.ncleroy.dev` from the first release |
+| Where it runs | The VS Code extension, and a web page that runs all of Ark in Chrome or Edge over WebHID (D-L52): Choose keyboard, one tab at a time, recovery copies in the browser's storage, a light/dark toggle. A phone gets only a notice that Ark runs on a computer, with links to the repositories; a tablet gets Ark. `npm run build:web` writes the page as static files; a workflow publishes it to Cloudflare Pages: `dev` at `ark-dev.ncleroy.dev`, `main` at `ark.ncleroy.dev` from the first release |
 | Demo without a keyboard | Explore a demo, in both hosts and on a browser without WebHID: the bundled demo profile (`core/data/`) in a real draft under current firmware's capabilities, every screen editable and reviewed; Apply refused, Export saves the draft, Open a profile file replaces it, leaving with edits not exported asks first (D-L53) |
 
 The rail's health strip shows connection, both-half convergence, draft state
@@ -914,6 +914,15 @@ first; Apply's waits run on a worker's clock, so a background tab does not slow
 it. Recovery copies are kept in the browser's storage (IndexedDB), listed on
 Profile & backups with a download each; clearing the site's data deletes them.
 The legacy eight-slot upgrade export stays the extension's.
+
+A phone gets none of this: the page shows a notice that Ark runs on a computer,
+with links to Ark's and the firmware's repositories and to BastardKB, the
+keyboard's official seller, and starts neither the host nor the panel
+(`web/phone.mjs`). No phone browser has WebHID, and the
+interface is built for a computer's screen. A phone is touch only with a screen
+whose shorter side is under 600 pixels, decided once as the page loads: a tablet
+gets Ark, where it offers the demo, and turning a phone or resizing a desktop
+window never swaps Ark out from under a draft.
 
 The page is published to Cloudflare Pages from GitHub Actions, as the folder
 the build writes and nothing else (`.github/workflows/publish-web.yml`): `dev`

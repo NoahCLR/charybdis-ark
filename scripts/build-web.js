@@ -6,7 +6,8 @@
 //
 //     index.html                the page (web/index.html, with the names below)
 //     _headers                  what Cloudflare Pages sends with it (web/_headers)
-//     host-<hash>.js            the page's host (web/page.mjs), with the core it runs
+//     host-<hash>.js            the page's host (web/page.mjs), with the core it runs;
+//                               it loads the panel, or on a phone shows a notice instead
 //     core-<hash>.js            core/ for a browser host (web/core.mjs)
 //     chunk-<hash>.js           what host and core share
 //     worker-<hash>.js          the host's clock (web/sleep-worker.js)
@@ -162,8 +163,10 @@ async function buildWeb({outdir = OUTDIR, manifestFile = manifestFileFor(outdir)
     fs.rmSync(manifestFile, {force: true});
     fs.mkdirSync(outdir, {recursive: true});
     const worker = await bundle("worker", {worker: "web/sleep-worker.js"}, outdir, {format: "iife"});
+    const panel = await bundle("panel", {panel: "webview/app.mjs", styles: "webview/styles.css"}, outdir);
     const manifest = {
         ...worker,
+        ...panel,
         ...await bundle("core", entries, outdir, {
             inject: [path.join(APP_ROOT, "web", "buffer.mjs")],
             splitting: true,
@@ -172,9 +175,9 @@ async function buildWeb({outdir = OUTDIR, manifestFile = manifestFileFor(outdir)
                 __ARK_VERSION__: JSON.stringify(build.version),
                 __ARK_COMMIT__: JSON.stringify(build.commit),
                 __ARK_SLEEP_WORKER__: JSON.stringify(`./${worker.worker}`),
+                __ARK_PANEL__: JSON.stringify(`./${panel.panel}`),
             },
         }),
-        ...await bundle("panel", {panel: "webview/app.mjs", styles: "webview/styles.css"}, outdir),
     };
     if (manifest.host) {
         const names = {...manifest, version: build.version, commit: build.commit, csp: pagePolicy()};

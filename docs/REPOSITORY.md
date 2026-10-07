@@ -172,7 +172,10 @@ they share in a chunk; the host's clock worker (`web/sleep-worker.js`);
 file but `index.html` carries a hash of its content in its name, so a new
 release can never be served an old file. `index.html` names them itself, and
 the version (`package.json`) and commit (git, or `ARK_COMMIT` in the
-environment) the build came from. `_headers` (from `web/_headers`) is what
+environment) the build came from. It runs only the host: the host starts, then
+loads the panel itself (the build names it to the host, and `index.html` only
+fetches it early), so the panel finds `acquireVsCodeApi` waiting. On a phone the
+host starts nothing and shows a notice instead (`web/phone.mjs`, D-L52). `_headers` (from `web/_headers`) is what
 Cloudflare Pages sends with the page when it is [published](#publishing-the-web-page).
 `dist/web-manifest.json`, beside the site rather than in it, lists the hashed
 names for tests and tools; it is never published and the page never fetches it.
@@ -262,7 +265,12 @@ a red run, rather than a green one that left the address on an old page.
 
 `_headers` sends, for every file, the page's Content Security Policy with
 `frame-ancestors 'none'`, `Permissions-Policy: hid=(self)`,
-`X-Content-Type-Options: nosniff` and `Referrer-Policy: no-referrer`. `/` and
+`X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer` and
+`X-Robots-Tag: noindex, nofollow`, which the page also carries as a
+`<meta name="robots">` tag: no address it is published to, `pages.dev` ones
+included, is meant to show up in search engines, and `check-static-site.js`
+refuses a `_headers` without it. There is deliberately no `robots.txt`: a
+crawler it turned away would never see the `noindex`. `/` and
 `/index.html` are `Cache-Control: no-cache`: the browser may keep the page but
 asks for it again on every load (an unchanged page is a cheap 304), so a
 release shows on the next load. `no-store` would add nothing but a full

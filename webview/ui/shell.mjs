@@ -5,7 +5,7 @@ import {el, esc} from "../lib/dom.mjs";
 import {getModel, post, postLeavingDemo, render, state} from "../store.mjs";
 import {statusSummary} from "../view/review.mjs";
 import {busyText, postApplyReadText, screenAvailable} from "../view/readiness.mjs";
-import {buildLine, chooseKeyboard, hostOf, themeLabel} from "../view/host.mjs";
+import {buildLine, chooseKeyboard, commitUrl, githubMark, hostOf, themeLabel} from "../view/host.mjs";
 import {DEMO_WORDS, demoOf} from "../view/demo.mjs";
 import {openHistory} from "./history.mjs";
 
@@ -108,7 +108,7 @@ export function rail() {
             <button class="btn tiny ghost icon" data-act="redo" ${draft?.canRedo ? "" : "disabled"}
                 data-tip="${esc(draft?.redoLabel ? `Redo: ${draft.redoLabel} (⇧⌘Z)` : "Redo the edit you just undid (⇧⌘Z).")}">↻</button>
         </div>
-        ${host.build ? `<div class="rail-build">${esc(buildLine(host.build))}</div>` : ""}
+        ${railBuild(host.build)}
     </aside>`);
 
     node.querySelectorAll("[data-screen]").forEach((button) => button.addEventListener("click", () => {
@@ -148,6 +148,16 @@ function themeToggle() {
 // What the keyboard or the host last said — a read, a save, a refusal — sits
 // in the rail's free space above the draft history: not over the screen being
 // worked in, and below the navigation so nothing moves when it appears.
+// The build the page came from, as a link to its commit on GitHub, in a new
+// tab so the draft stays where it is.
+function railBuild(build) {
+    if (!build) return "";
+    const url = commitUrl(build);
+    return url
+        ? `<a class="rail-build" href="${esc(url)}" target="_blank" rel="noopener" title="This build's commit on GitHub">${githubMark("rail-build-mark")}<span>${esc(buildLine(build))}</span></a>`
+        : `<div class="rail-build"><span>${esc(buildLine(build))}</span></div>`;
+}
+
 function railMessage() {
     const model = getModel();
     const error = state.error || model?.device?.health?.error;
