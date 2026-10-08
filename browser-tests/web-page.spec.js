@@ -6,6 +6,7 @@
 const {test, expect} = require("@playwright/test");
 const {installFakeHid} = require("./fake-hid");
 const {fakeKeyboard} = require("../tests/fixtures/fake-keyboard");
+const {dropFiles} = require("./profile-drop");
 const {document32: pdDocument} = require("../tests/fixtures/pd-slots-32");
 const {CHARYBDIS_PRODUCT_ID, CHARYBDIS_VENDOR_ID, QMK_RAW_HID_USAGE, QMK_RAW_HID_USAGE_PAGE} = require("../core/transport/device-adapter");
 
@@ -56,6 +57,37 @@ async function expectBuildLink(line, mark) {
 }
 
 const ready = (page) => expect(page.locator('[data-screen="mouse"]')).toBeEnabled({timeout: 20000});
+
+for (const demo of [false, true]) test(`drop a profile into the real ${demo ? "demo" : "keyboard"} import review, use it, and undo`, async ({page, context, baseURL}) => {
+    const {keyboard, ownFilesOnly} = await withKeyboard(context, baseURL);
+    const errors = await open(page);
+    await page.locator(`.read-placeholder [data-act="${demo ? "explore-demo" : "choose-keyboard"}"]`).click();
+    await ready(page);
+    await page.locator('[data-screen="profile"]').click();
+    // Choosing remains available and uses the same review card.
+    const file = pdDocument();
+    file.layers[0][0] = 5;
+    const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.locator('[data-act="import"]').click()]);
+    await chooser.setFiles({name: "chosen.charybdis.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(file))});
+    await expect(page.locator(".card").filter({has: page.locator('[data-act="restore"]')})).toContainText("chosen.charybdis.json");
+    await page.locator('[data-act="cancel"]').click();
+    await expect(page.locator('[data-act="restore"]')).toHaveCount(0);
+    await dropFiles(page, [{name: "broken.json", text: "not json"}]);
+    await expect(page.locator(".rail-message")).toContainText("Failed");
+    await expect(page.locator('[data-act="restore"]')).toHaveCount(0);
+    await dropFiles(page, [{name: "dropped.charybdis.json", text: JSON.stringify(file), type: ""}]);
+    await expect(page.locator('[data-act="restore"]')).toBeEnabled();
+    await expect(page.locator(".card").filter({has: page.locator('[data-act="restore"]')})).toContainText("dropped.charybdis.json");
+    expect(keyboard.mutations).toEqual([]);
+    await page.locator('[data-act="restore"]').click();
+    await expect(page.locator(".rail-status")).toContainText(/\d+ changes? in draft/);
+    await expect(page.locator('[data-act="restore"]')).toHaveCount(0);
+    await page.keyboard.press("Meta+z");
+    await expect(page.locator(".rail-status")).not.toContainText(/\d+ changes? in draft/);
+    expect(keyboard.mutations).toEqual([]);
+    expect(errors).toEqual([]);
+    ownFilesOnly();
+});
 
 test("choose a keyboard, read it, stage an edit, keep a recovery copy, and reconnect on reload", async ({page, context, baseURL}) => {
     test.setTimeout(90000);

@@ -1160,6 +1160,9 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .profile-action-mark svg { width: 19px; height: 19px; stroke: currentColor; fill: none; stroke-width: 1.5; }
 .profile-action h3 { font-size: 15px; }
 .profile-action .btn { margin-top: auto; }
+.profile-action[data-profile-drop] { border-style: dashed; }
+.profile-action.drag-over { border-color: var(--text); background: var(--surface-2); }
+.profile-action .profile-drop-status { color: var(--text); }
 .profile-recovery { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
 .profile-recovery .copy { display: grid; gap: 2px; }
 .profile-recovery .state { margin-left: auto; }

@@ -37,6 +37,26 @@ const decoded = (draft) => portable.validateSnapshot(draft.document);
 const slotOf = (layoutIndex) => CHARYBDIS_4X6_LAYOUT_MATRIX[layoutIndex][0] * 6 + CHARYBDIS_4X6_LAYOUT_MATRIX[layoutIndex][1];
 const reviewAreas = (draft) => draft.view({selectedDeviceId: "test-device", connected: true}).changes.map((change) => change.area);
 
+test("a dropped profile's payload opens a review before an undoable draft replacement", async () => {
+    const {portableControl} = require("../core/session/panel-controls");
+    const {routeMessage} = require("../core/session/panel-session");
+    const draft = session(), before = draft.document;
+    const incoming = structuredClone(before);
+    incoming.layers[0][0] = 5;
+    const state = {selectedDeviceId: "test-device", connected: true, capabilities};
+    const panel = {draft, service: {snapshot: () => state}};
+    const payload = {...edits.reviewPortableProfile(JSON.stringify(incoming), "777.charybdis.json"),
+        draftId: draft.id, draftRevision: draft.revision};
+    assert.equal(routeMessage(panel, payload, state), "portable");
+    await portableControl(panel, payload);
+    assert.equal(panel.portableReview.fileName, "777.charybdis.json");
+    assert.deepEqual(draft.document, before, "opening review leaves the draft untouched");
+    await portableControl(panel, {type: "restorePortableProfile"});
+    assert.equal(draft.document.layers[0][0], 5);
+    draft.undo(draft.revision);
+    assert.deepEqual(draft.document, before);
+});
+
 // ── layout keys ─────────────────────────────────────────────────────────
 
 test("a key picked in the interface lands at its position on the layer the board was showing", () => {

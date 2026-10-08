@@ -7,6 +7,9 @@
 
 import {hsv} from "../lib/colour.mjs";
 
+// A dropped file opens the same import review as the host's file chooser.
+export const reviewPortableProfile = (text, name) => ({type: "reviewPortableProfile", text, name});
+
 // ── layout keys ─────────────────────────────────────────────────────────
 
 export const layoutKeys = (layer, changes) => ({type: "updateLayoutKeys", layer, changes});

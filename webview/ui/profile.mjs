@@ -15,6 +15,7 @@ import {stageOrder} from "../view/vocabulary.mjs";
 import {profileUsageView} from "../view/profile-usage.mjs";
 import {downloadRecovery, hostOf, savedWhen} from "../view/host.mjs";
 import {DEMO_WORDS, demoOf} from "../view/demo.mjs";
+import {reviewPortableProfile} from "../view/edits.mjs";
 
 export function screenProfile() {
     const model = getModel();
@@ -42,12 +43,13 @@ export function screenProfile() {
     if (portable.review) pad.appendChild(reviewCard(model, portable, busy));
 
     const actions = el(`<div class="profile-actions">
-        <div class="card profile-action">
+        <div class="card profile-action" data-profile-drop aria-disabled="${!canImport}">
             <div class="card-b">
                 <span class="profile-action-mark"><svg viewBox="0 0 24 24"><path d="M12 21V9M7.5 13.5 12 9l4.5 4.5M4 5h16"/></svg></span>
                 <h3>Import profile</h3>
-                <p class="note">${demo ? "Choose a complete backup and review its differences from the demo setup first. Import replaces the demo's draft; Undo brings it back."
-                    : "Choose a complete backup and review its differences first. Import replaces the local draft; nothing is written to the keyboard until you review and apply it."}</p>
+                <p class="note">${demo ? "Choose or drop a complete backup here and review its differences from the demo setup first. Import replaces the demo's draft; Undo brings it back."
+                    : "Choose or drop a complete backup here and review its differences first. Import replaces the local draft; nothing is written to the keyboard until you review and apply it."}</p>
+                <p class="note profile-drop-status" role="status" hidden></p>
                 <button class="btn" data-act="import" ${canImport ? "" : "disabled"}>Choose profile…</button>
             </div>
         </div>
@@ -63,6 +65,7 @@ export function screenProfile() {
     </div>`);
     actions.querySelector('[data-act="export"]').addEventListener("click", () => post({type: "exportPortableProfile"}));
     actions.querySelector('[data-act="import"]').addEventListener("click", () => post({type: "choosePortableProfile"}));
+    wireProfileDrop(actions.querySelector("[data-profile-drop]"));
     pad.appendChild(actions);
 
     const usage = portable.available ? profileUsageView(portable.usage, model?.macroBank) : null;
@@ -81,6 +84,54 @@ export function screenProfile() {
 
     main.appendChild(content);
     return main;
+}
+
+function wireProfileDrop(card) {
+    const status = card.querySelector(".profile-drop-status");
+    const choose = card.querySelector('[data-act="import"]');
+    let reading = false;
+    const available = () => !reading && canEditArea("import");
+    const tell = (text) => {status.textContent = text; status.hidden = !text;};
+    const files = (event) => Array.from(event.dataTransfer?.types || []).includes("Files");
+    for (const type of ["dragenter", "dragover"]) card.addEventListener(type, (event) => {
+        if (!files(event)) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = available() ? "copy" : "none";
+        card.classList.toggle("drag-over", available());
+    });
+    card.addEventListener("dragleave", (event) => {
+        if (!card.contains(event.relatedTarget)) card.classList.remove("drag-over");
+    });
+    card.addEventListener("drop", async (event) => {
+        if (!files(event)) return;
+        event.preventDefault();
+        card.classList.remove("drag-over");
+        if (!available()) return;
+        const dropped = Array.from(event.dataTransfer.files);
+        if (dropped.length !== 1) {tell("Drop one profile file at a time."); return;}
+        const file = dropped[0];
+        if (file.size > 100000) {tell("This profile file is too large."); return;}
+        const draft = getModel()?.draft;
+        const {id, revision} = draft;
+        reading = true;
+        choose.disabled = true;
+        tell("Reading profile…");
+        try {
+            const text = await file.text();
+            if (!card.isConnected) return;
+            if (!canEditArea("import") || getModel()?.draft?.id !== id || getModel()?.draft?.revision !== revision) {
+                tell("The draft changed while reading this file. Drop it again when ready.");
+                return;
+            }
+            tell("");
+            post(reviewPortableProfile(text, file.name));
+        } catch {
+            tell("This profile file could not be read. Try Choose profile instead.");
+        } finally {
+            reading = false;
+            choose.disabled = !canEditArea("import");
+        }
+    });
 }
 
 // The recovery copies a host keeps where no file can be opened (a browser's

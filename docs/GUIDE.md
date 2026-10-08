@@ -392,6 +392,13 @@ kept in the extension's local storage; the app shows their full path. In
 Chrome they are kept in the browser's storage and listed on Profile & backups,
 each with a download (see [Using Ark in Chrome](#using-ark-in-chrome)).
 
+On **Profile & backups**, use **Choose profile…** or drop one backup file
+onto the **Import profile** card. Both open the same review, including in the
+demo. **Use as draft** replaces the draft; Undo brings it back, and the keyboard
+changes only after Review and Apply. Import is disabled while the keyboard or
+draft is unavailable, stale or busy. Multiple, unreadable, invalid and oversized
+files are refused without replacing your draft.
+
 **Profile memory** shows how full the profile is. Behaviours, combos,
 lighting, pointing modes, settings and every layer, macro and custom-key name
 share one block on the keyboard: 5,088 bytes on current firmware, the size the

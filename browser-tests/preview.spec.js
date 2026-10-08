@@ -1,5 +1,85 @@
 "use strict";
 const {test, expect} = require("@playwright/test");
+const {dropFiles} = require("./profile-drop");
+
+for (const host of ["", "?host=web", "?host=demo"]) {
+    test(`Import card posts a dropped file and refuses multiple, oversized and unreadable files (${host || "extension"})`, async ({page}) => {
+        await page.goto(`/preview/index.html${host}`);
+        await page.locator('[data-screen="profile"]').click();
+        const card = page.locator("[data-profile-drop]");
+        await expect(card).toContainText("drop a complete backup here");
+        await page.evaluate(() => {window.__posted.length = 0;});
+        const file = {name: "777.charybdis.json", text: '{"sentinel":777}'};
+        await card.evaluate((node) => {
+            const transfer = new DataTransfer();
+            transfer.items.add(new File(["{}"], "profile.json"));
+            node.dispatchEvent(new DragEvent("dragover", {bubbles: true, cancelable: true, dataTransfer: transfer}));
+        });
+        await expect(card).toHaveClass(/drag-over/);
+        expect(await dropFiles(page, [file, file])).toBe(true);
+        await expect(card.locator('[role="status"]')).toHaveText("Drop one profile file at a time.");
+        await expect(card).not.toHaveClass(/drag-over/);
+        await dropFiles(page, [{...file, text: "x".repeat(100001)}]);
+        await expect(card.locator('[role="status"]')).toHaveText("This profile file is too large.");
+        await page.evaluate(() => {
+            const text = File.prototype.text;
+            File.prototype.text = () => Promise.reject(new Error("unreadable"));
+            window.__restoreFileText = () => {File.prototype.text = text;};
+        });
+        await dropFiles(page, [file]);
+        await expect(card.locator('[role="status"]')).toContainText("could not be read");
+        await page.evaluate(() => window.__restoreFileText());
+        expect(await page.evaluate(() => window.__posted)).toEqual([]);
+        expect(await dropFiles(page, [file])).toBe(true);
+        await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([
+            expect.objectContaining({type: "reviewPortableProfile", name: file.name, text: file.text, draftId: expect.any(String), draftRevision: expect.any(Number)}),
+        ]);
+        // Dropping outside the Import card never navigates away or posts.
+        await page.evaluate(() => {window.__posted.length = 0;});
+        expect(await dropFiles(page, [file], "body")).toBe(true);
+        expect(await page.evaluate(() => window.__posted)).toEqual([]);
+    });
+}
+
+test("dropping respects every Import gate and cancels a read when the surface changes", async ({page}) => {
+    await page.goto("/preview/index.html");
+    await page.locator('[data-screen="profile"]').click();
+    await page.evaluate(async () => {
+        const store = await import("/webview/store.mjs");
+        window.__dropModel = structuredClone(store.getModel());
+        window.__setDropModel = (patch) => {
+            const next = structuredClone(window.__dropModel);
+            for (const [area, values] of Object.entries(patch)) Object.assign(next[area], values);
+            store.setModel(next);
+            store.render();
+        };
+        window.__posted.length = 0;
+    });
+    const file = {name: "profile.json", text: "{}"};
+    for (const patch of [{device: {connected: false}}, {draft: {matching: false}}, {draft: {stale: true}},
+        {draft: {busy: true}}, {portable: {busy: true}}]) {
+        await page.evaluate((patch) => window.__setDropModel(patch), patch);
+        await expect(page.locator('[data-act="import"]')).toBeDisabled();
+        expect(await dropFiles(page, [file])).toBe(true);
+        expect(await page.evaluate(() => window.__posted)).toEqual([]);
+    }
+    await page.evaluate(() => window.__setDropModel({portable: {available: false}}));
+    await expect(page.locator('[data-act="import"]')).toHaveCount(0);
+    expect(await dropFiles(page, [file], "body")).toBe(true);
+    expect(await page.evaluate(() => window.__posted)).toEqual([]);
+    await page.evaluate(() => {
+        window.__setDropModel({});
+        File.prototype.text = () => new Promise((resolve) => {window.__finishDropRead = resolve;});
+    });
+    await dropFiles(page, [file]);
+    await expect(page.locator('[data-act="import"]')).toBeDisabled();
+    await expect(page.locator('.profile-drop-status')).toHaveText("Reading profile…");
+    await page.evaluate(() => {
+        window.__setDropModel({draft: {revision: window.__dropModel.draft.revision + 1}});
+        window.__finishDropRead("{}");
+    });
+    expect(await page.evaluate(() => window.__posted)).toEqual([]);
+});
 for (const theme of ["plain", "vscode-dark", "vscode-light"]) {
     test(`Mouse edit posts its complete section (${theme})`, async ({page}) => {
         const errors = [];
