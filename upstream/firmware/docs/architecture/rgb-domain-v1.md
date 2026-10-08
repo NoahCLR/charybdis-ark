@@ -1,7 +1,7 @@
 # RGB Domain V1
 
 This document freezes the canonical encoding for Profile Wire domain `0x10`,
-version `1`: every Milestone A RGB surface, as the keyboard stores it and the
+version `3`: every RGB surface, as the keyboard stores it and the
 live app decodes, edits and re-encodes it for the candidate mailbox.
 
 All integers are unsigned. Multi-byte integers are little-endian. Every HSV is
@@ -15,13 +15,13 @@ The payload starts with this fixed 16-byte header:
 
 | Offset | Size | Field |
 | ---: | ---: | --- |
-| 0 | 1 | payload format version, equal to the domain version: `1` in schema 1, `3` in schema-2 firmware with 32 pointing slots |
+| 0 | 1 | payload format version, equal to the domain version: `3` in schema 2.0 |
 | 1 | 1 | reserved, zero |
 | 2 | 2 | stage-enable mask |
 | 4 | 1 | reusable group count, `0..16` |
 | 5 | 1 | layer-color count, `1..8` when compiled |
 | 6 | 1 | layer-group row count |
-| 7 | 1 | PD-color count: the firmware's slot count when its PD stage is compiled (`6`, `8`, `32` in versions 1, 2, 3), else `0` |
+| 7 | 1 | PD-color count: the firmware's slot count when its PD stage is compiled (`32` in version 3), else `0` |
 | 8 | 1 | PD-group row count |
 | 9 | 1 | combo-group row count |
 | 10 | 1 | tap-branch color count, exactly the compiled count and at most `4` |
@@ -32,7 +32,7 @@ The payload starts with this fixed 16-byte header:
 
 The aggregate of the four group-row counts at offsets 6, 8, 9, and 11 is at
 most 32. The maximum RGB payload is 4,052 bytes so its envelope can still fit
-inside the 4,064-byte canonical profile blob.
+inside the current 5,088-byte canonical profile blob.
 
 Stage-enable bits are:
 
@@ -146,3 +146,18 @@ the payload, dictionary, or renderer tables in RAM.
 This document governs the byte format. Transport and activation are specified
 by [Profile Wire](profile-wire-v1.md) and the
 [logical transaction contract](logical-profile-transaction-v1.md).
+
+## Compiled RGB and effective frames
+
+`profile_rgb_compiled_v1.c` is the sole authored RGB encoder. Both the complete
+compiled profile and factory RGB fallback use its canonical bytes. On a cold
+path it fills one immutable encoded cache and validates a memory-backed view;
+frame access uses the same decoded domain interface as stored RGB. Effective
+accessors never reinterpret authored tables or replay the profile writer.
+
+The cache bound is 551 bytes: 35 fixed bytes, sixteen 9-byte bitmap groups,
+eight 5-byte layer colors, 32 5-byte PD colors, at most 32 5-byte stage rows in
+total, and four 3-byte tap colors. Combo rows are smaller, so this covers every
+current shape without reserving a profile-sized buffer. A copied view retains
+publication/epoch checks for stored frames; factory bytes never change during
+a firmware run. This is a representation bound, not a hardware RAM claim.

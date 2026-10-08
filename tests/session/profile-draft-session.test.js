@@ -1,7 +1,7 @@
 "use strict";
 const test = require("node:test"), assert = require("node:assert/strict");
 const {ProfileDraftSession} = require("../../core/session/profile-draft-session");
-const {document, legacyDocument} = require("../fixtures/portable-profile");
+const {document} = require("../fixtures/portable-profile");
 const {options} = require("../fixtures/keyboard-options");
 const {fingerprint, reorderLayers, summary, validateSnapshot} = require("../../core/model/portable-profile");
 const {settingsEditorView} = require("../../core/model/settings-editor");
@@ -62,8 +62,10 @@ test("default timing edits move matching behaviours, report inherited effects, a
     assert.equal(row("KC_E").multiTapTerm, "0");
 });
 test("a draft opens only on firmware whose key numbering the app knows", () => {
-    const value = legacyDocument(), snapshot = {document:value, fingerprint:fingerprint(value), summary:summary(value), limits:{brightnessMax:200}};
-    assert.throws(() => new ProfileDraftSession(snapshot, "board", {compiledLayerCount:8, supportedDomainMask:15, actionAbiDigest:value.actionAbiDigest}), /numbers its keys differently/);
+    const {snapshot, caps} = fixture();
+    for (const actionAbiDigest of [0x1d3fcacc, 0x61072732, 0x12345678]) {
+        assert.throws(() => new ProfileDraftSession(snapshot, "board", {...caps, actionAbiDigest}), /numbers its keys differently/);
+    }
 });
 test("review blockers stop Apply before a recovery copy or device write", async () => {
     const {snapshot, caps} = fixture();
@@ -269,7 +271,7 @@ test("a macro name discarded back leaves no indescribable settings difference", 
     const draft = new ProfileDraftSession({document:value,fingerprint:fingerprint(value),summary:summary(value),limits:{brightnessMax:200}}, "board", {compiledLayerCount:8,supportedDomainMask:31,actionAbiDigest:value.actionAbiDigest});
     stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_3",name:"Hello",expectedFingerprint:draft.current.fingerprint});
     draft.discard(draft.revision,groupOf(draft,"macro:3"));
-    assert.equal(draft.dirty,false,"the settings format the name upgraded goes back too");
+    assert.equal(draft.dirty,false,"discard restores the original settings bytes too");
 });
 test("a rebase does not tie together everything it carried over", () => {
     const {draft,snapshot,caps} = fixture();

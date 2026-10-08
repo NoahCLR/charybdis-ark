@@ -29,17 +29,14 @@ test("the firmware fixture decodes native inputs, output and timing without a re
     assert.equal(new Set(requests.map(request => request[3])).size, 4);
 });
 
-test("older firmware's readback repeats the hold threshold on every row and has no default", () => {
-    const actual = decode(fixturePages(1));
-    assert.equal(actual.version, 1);
-    assert.equal(actual.defaultTermMs, null);
-    assert.equal(actual.holdTermMs, 200);
-    assert.deepEqual(actual.rows[0], {id: 0, inputs: [7, 0x4109], output: 0x2b, termMs: 50, followsDefault: false, mustHold: false, mustTap: false, ordered: false});
-    const split = fixturePages(1); split[2].writeUInt16LE(199, 6);
-    assert.throws(() => decode(rehash(split)), {code: "COMBO_MALFORMED"});
-    // Version 1 has no follow-the-default flag.
-    const flagged = fixturePages(1); flagged[1][8] = 8;
-    assert.throws(() => decode(rehash(flagged)), {code: "COMBO_MALFORMED"});
+test("retired combo readback is rejected before rows are requested", async () => {
+    const pages = fixturePages(1);
+    assert.throws(() => decode(pages), {code: "COMBO_INCOMPATIBLE"});
+    const seen = [];
+    await assert.rejects(readDeviceCombos({request: async request => {
+        seen.push(request[4]); return responseFor(request, pages);
+    }}), {code: "COMBO_INCOMPATIBLE"});
+    assert.deepEqual(seen, [0]);
 });
 
 test("combo policy flags, callback output, timing zeros and a disabled empty table survive decoding", () => {

@@ -135,14 +135,18 @@ class CandidateUploadCoordinator {
                 context.metadata = candidateMetadataForBlob(context.blob, {
                     actionAbiDigest: options.actionAbiDigest,
                     requestedDomains: options.requestedDomains,
+                    viaGeneration: options.viaGeneration,
+                    viaDigest: options.viaDigest,
                 });
             } else {
                 const supplied = normalizeCandidateMetadata(options.metadata);
                 const derived = candidateMetadataForBlob(context.blob, {
                     actionAbiDigest: supplied.actionAbiDigest,
                     requestedDomains: supplied.requestedDomains,
+                    viaGeneration: supplied.viaGeneration,
+                    viaDigest: supplied.viaDigest,
                 });
-                for (const field of ["schemaMajor", "schemaMinor", "requestedDomains", "flags", "payloadLength", "crc32", "digest", "actionAbiDigest"]) {
+                for (const field of ["schemaMajor", "schemaMinor", "requestedDomains", "flags", "payloadLength", "crc32", "digest", "actionAbiDigest", "storeFormatVersion"]) {
                     if (supplied[field] !== derived[field]) {
                         throw new RangeError(`Candidate metadata ${field} does not match the exact candidate blob.`);
                     }

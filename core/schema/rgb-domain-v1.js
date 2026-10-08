@@ -1,20 +1,22 @@
 "use strict";
 
-const {PROFILE_DOMAIN_IDS} = require("./profile-blob-v1");
+const {PROFILE_BLOB_V1, PROFILE_DOMAIN_IDS} = require("./profile-blob-v1");
 
 const RGB_DOMAIN_V1 = Object.freeze({
     DOMAIN_ID: PROFILE_DOMAIN_IDS.RGB,
-    DOMAIN_VERSION: 1,
-    FORMAT_VERSION: 1,
+    // Format 3, the only one the keyboard stores: a colour row per pointing
+    // slot, 32 of them.
+    DOMAIN_VERSION: 3,
+    FORMAT_VERSION: 3,
+    PD_SLOTS: 32,
     HEADER_SIZE: 16,
     PHYSICAL_LED_COUNT: 58,
     LED_BITMAP_SIZE: 8,
     MAX_GROUPS: 16,
     MAX_LOGICAL_LAYERS: 8,
-    MAX_PD_MODES: 6,
     MAX_STAGE_GROUP_ROWS: 32,
     MAX_TAP_BRANCH_COLORS: 4,
-    MAX_PAYLOAD_SIZE: 4052,
+    MAX_PAYLOAD_SIZE: PROFILE_BLOB_V1.MAX_SIZE - PROFILE_BLOB_V1.HEADER_SIZE - PROFILE_BLOB_V1.DOMAIN_HEADER_SIZE,
     SELECTOR_ALL: 0xff,
 });
 
@@ -66,16 +68,6 @@ const RGB_PD_MODE_IDS = Object.freeze({
     // The 32-slot firmware's further slots (format 3).
     ...Object.fromEntries(Array.from({length: 24}, (_, index) => [`PD_MODE_SLOT_${index + 8}`, index + 8])),
 });
-// How many pointing slots each payload format colours: format 1 the six
-// factory modes, 2 the eight configurable slots, 3 the 32-slot firmware's.
-const RGB_PD_SLOTS_BY_FORMAT = Object.freeze({1: 6, 2: 8, 3: 32});
-const RGB_FORMAT_VERSIONS = Object.freeze(Object.keys(RGB_PD_SLOTS_BY_FORMAT).map(Number));
-// The payload format that colours a given number of pointing slots.
-function rgbFormatForPdSlots(slotCount) {
-    const entry = Object.entries(RGB_PD_SLOTS_BY_FORMAT).find(([, slots]) => slots === slotCount);
-    if (!entry) throw new RangeError(`No RGB payload format colours ${slotCount} pointing slots.`);
-    return Number(entry[0]);
-}
 
 const BLACK = Object.freeze({h: 0, s: 0, v: 0});
 
@@ -89,10 +81,10 @@ class RgbDomainProtocolError extends Error {
 }
 
 function encodeRgbDomainV1(profile, options = {}) {
-    const limits = normalizeOptions({...options, formatVersion: profile?.formatVersion ?? options.formatVersion ?? 1});
+    const limits = normalizeOptions(options);
     const value = normalizeProfile(profile, limits);
     const header = Buffer.alloc(RGB_DOMAIN_V1.HEADER_SIZE);
-    header[0] = value.formatVersion;
+    header[0] = RGB_DOMAIN_V1.FORMAT_VERSION;
     header[1] = 0;
     header.writeUInt16LE(value.stageEnableMask, 2);
     header[4] = value.groups.length;
@@ -164,21 +156,16 @@ function encodeRgbDomainV1(profile, options = {}) {
     return payload;
 }
 
-// A payload decodes by the format its header names; given the format a
-// keyboard takes (options.formatVersion), a payload of another is refused.
 function decodeRgbDomainV1(value, options = {}) {
     const bytes = copyBytes(value, "RGB domain payload");
-    if (options.formatVersion !== undefined && bytes.length && bytes[0] !== options.formatVersion) {
-        throw rgbError("INVALID_VERSION", `RGB payload format ${bytes[0]} is not the expected format ${options.formatVersion}.`);
-    }
-    const limits = normalizeOptions({...options, formatVersion: bytes[0]});
+    const limits = normalizeOptions(options);
     if (bytes.length < RGB_DOMAIN_V1.HEADER_SIZE) {
         throw rgbError("TRUNCATED", `RGB domain needs a ${RGB_DOMAIN_V1.HEADER_SIZE}-byte header.`);
     }
     if (bytes.length > RGB_DOMAIN_V1.MAX_PAYLOAD_SIZE) {
         throw rgbError("CAPACITY_EXCEEDED", `RGB domain payload is ${bytes.length} bytes; maximum is ${RGB_DOMAIN_V1.MAX_PAYLOAD_SIZE}.`);
     }
-    if (!RGB_FORMAT_VERSIONS.includes(bytes[0])) {
+    if (bytes[0] !== RGB_DOMAIN_V1.FORMAT_VERSION) {
         throw rgbError("INVALID_VERSION", `RGB payload format ${bytes[0]} is not supported.`);
     }
     if (bytes[1] !== 0 || bytes[14] !== 0 || bytes[15] !== 0) {
@@ -293,14 +280,14 @@ function decodeRgbDomainV1(value, options = {}) {
 }
 
 function createRgbDomainV1(profile, options = {}) {
-    return {id: RGB_DOMAIN_V1.DOMAIN_ID, version: profile.formatVersion ?? 1, payload: encodeRgbDomainV1(profile, options)};
+    return {id: RGB_DOMAIN_V1.DOMAIN_ID, version: RGB_DOMAIN_V1.DOMAIN_VERSION, payload: encodeRgbDomainV1(profile, options)};
 }
 
 function normalizeProfile(profile, limits) {
     if (!profile || typeof profile !== "object") {
         throw new TypeError("RGB domain input must be an object.");
     }
-    if (profile.formatVersion !== undefined && !RGB_FORMAT_VERSIONS.includes(profile.formatVersion)) {
+    if (profile.formatVersion !== undefined && profile.formatVersion !== RGB_DOMAIN_V1.FORMAT_VERSION) {
         throw rgbError("INVALID_VERSION", `RGB payload format ${profile.formatVersion} is not supported.`);
     }
     const stageEnableMask = assertStageMask(profile.stageEnableMask, limits.compiledStageMask, "stageEnableMask");
@@ -346,7 +333,7 @@ function normalizeProfile(profile, limits) {
         throw rgbError("CAPACITY_EXCEEDED", `RGB stage group rows total ${groupRowCount}; maximum is ${RGB_DOMAIN_V1.MAX_STAGE_GROUP_ROWS}.`);
     }
     const normalized = {
-        formatVersion: profile.formatVersion ?? limits.formatVersion,
+        formatVersion: RGB_DOMAIN_V1.FORMAT_VERSION,
         stageEnableMask,
         groups,
         layerColors,
@@ -364,8 +351,7 @@ function normalizeProfile(profile, limits) {
 }
 
 function normalizeOptions(options = {}) {
-    const formatVersion = options.formatVersion ?? 1;
-    const maxPdModes = RGB_PD_SLOTS_BY_FORMAT[formatVersion] ?? RGB_PD_SLOTS_BY_FORMAT[1];
+    const maxPdModes = RGB_DOMAIN_V1.PD_SLOTS;
     const maxLogicalLayers = options.maxLogicalLayers === undefined ? RGB_DOMAIN_V1.MAX_LOGICAL_LAYERS : assertU8(options.maxLogicalLayers, "maxLogicalLayers");
     if (maxLogicalLayers > RGB_DOMAIN_V1.MAX_LOGICAL_LAYERS) {
         throw new RangeError(`maxLogicalLayers cannot exceed ${RGB_DOMAIN_V1.MAX_LOGICAL_LAYERS}.`);
@@ -386,7 +372,7 @@ function normalizeOptions(options = {}) {
         throw new RangeError("supportedPdModeIds contains an id outside the Profile Wire v1 PD-mode registry.");
     }
     return {
-        formatVersion, maxPdModes,
+        maxPdModes,
         compiledStageMask: assertStageMask(options.compiledStageMask === undefined ? RGB_STAGE_MASK_ALL : options.compiledStageMask, RGB_STAGE_MASK_ALL, "compiledStageMask"),
         logicalLayerCount,
         maxLogicalLayers,
@@ -698,7 +684,6 @@ module.exports = {
     RGB_LAYER_MODES,
     RGB_LOCALITIES,
     RGB_PD_MODE_IDS,
-    RGB_PD_SLOTS_BY_FORMAT,
     RGB_STAGE_BITS,
     RGB_STAGE_MASK_ALL,
     RGB_TAP_COMMIT_MODES,
@@ -708,5 +693,4 @@ module.exports = {
     decodeRgbDomainV1,
     encodeRgbDomainV1,
     ledsToBitmap,
-    rgbFormatForPdSlots,
 };

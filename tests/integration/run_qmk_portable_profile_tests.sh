@@ -13,8 +13,11 @@ for variant in normal sanitized; do
         -I"$ROOT/tests/host/include/portable_profile" -I"$ROOT/tests/host/include" -I"$ROOT" -I"$ROOT/users/noah" \
         "$ROOT/tests/host/qmk_portable_profile_test.c" \
         "$ROOT/users/noah/lib/compat/qmk_portable_profile.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_settings_defaults.c" \
         "$ROOT/users/noah/lib/profile/runtime/effective_settings_runtime.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_blob_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_domain_registry.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_checksum.c" \
         -o "$BUILD_DIR/test"
     "$BUILD_DIR/test" "$BUILD_DIR/responses.fixture" "$BUILD_DIR/named.fixture"
@@ -23,7 +26,7 @@ for variant in normal sanitized; do
     node - "$ROOT" "$BUILD_DIR/responses.fixture" "$BUILD_DIR/named.fixture" <<'JS'
 const assert = require("node:assert/strict"), fs = require("node:fs");
 const {readSettings} = require(process.env.CHARYBDIS_ARK_ROOT + "/core/protocol/portable-profile-v1");
-const {decodeSettings, macroNamesOf} = require(process.env.CHARYBDIS_ARK_ROOT + "/core/schema/settings-domain-v1");
+const {decodeSettings} = require(process.env.CHARYBDIS_ARK_ROOT + "/core/schema/settings-domain-v1");
 function read(path) {
     const fixture = fs.readFileSync(path), pages = fixture.length / 32;
     let id = 0;
@@ -35,11 +38,11 @@ function read(path) {
     }}, {next: () => ++id}).then(decodeSettings);
 }
 (async () => {
-    const stored = macroNamesOf(await read(process.argv[3]));
+    const stored = (await read(process.argv[3])).macroNames;
     assert.equal(stored[5], "Screenshot");
     assert.equal(stored.filter(Boolean).length, 1);
     const authored = await read(process.argv[4]);
-    assert.deepEqual(macroNamesOf(authored).filter(Boolean), ["Drag Screenshot", "Twenty characters!!!"]);
+    assert.deepEqual(authored.macroNames.filter(Boolean), ["Drag Screenshot", "Twenty characters!!!"]);
     assert.deepEqual([authored.names[0], authored.names[1], authored.names[7]], ["Base", "", "Twenty-three bytes long"]);
     console.log("app reads the firmware's streamed settings and its macro and layer names");
 })().catch(error => {console.error(error); process.exitCode = 1;});

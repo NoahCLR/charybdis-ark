@@ -9,13 +9,20 @@ node - "$ROOT" "$BUILD_DIR/corpus.bin" <<'JS'
 const fs = require("node:fs");
 const root = process.argv[2];
 const fixture = require(root + "/tests/fixtures/pd_mode_domain_v1.json");
-const {decodePdDomain, encodePdDomain} = require(process.env.CHARYBDIS_ARK_ROOT + "/core/schema/pd-mode-domain-v1");
+const {decodePdDomain, encodePdRecord, validatePdRecord} = require(process.env.CHARYBDIS_ARK_ROOT + "/core/schema/pd-mode-domain-v1");
+// A test-only envelope for firmware's frozen eight-record harness. Every
+// record uses the current codec; Ark has no production v1 domain decoder.
+const frozenHeader = Buffer.from([1, 8, 96, 0, 0, 0, 0, 0]);
+const encodeRecords = slots => Buffer.concat([frozenHeader, ...slots.map(slot => encodePdRecord(slot))]);
 const golden = Buffer.from(fixture.hex, "hex");
-if (!encodePdDomain(fixture.slots).equals(golden)) throw new Error("PD fixture drift");
+if (!encodeRecords(fixture.slots).equals(golden)) throw new Error("PD fixture drift");
 const chunks = [];
 function add(bytes) {
     let valid = 1;
-    try {decodePdDomain(bytes);} catch {valid = 0;}
+    try {
+        if (bytes.length !== 776 || !bytes.subarray(0, 8).equals(frozenHeader)) throw Error("frozen envelope");
+        for (let slot = 0; slot < 8; slot++) validatePdRecord(bytes.subarray(8 + slot * 96, 8 + (slot + 1) * 96), slot);
+    } catch {valid = 0;}
     const header = Buffer.alloc(3); header[0] = valid; header.writeUInt16LE(bytes.length, 1);
     chunks.push(header, bytes);
 }
@@ -32,7 +39,7 @@ add(Buffer.concat([golden, Buffer.from([0])]));
 const eightSlots = structuredClone(fixture.slots);
 Object.assign(eightSlots[4], {axis: 3, thresholdX: 40, thresholdY: 40, emptyDirection: 1,
     diagonals: {upLeft: {keycode: 0x50, modifierPolicy: 0, mask: 0}, upRight: {keycode: 0x4f, modifierPolicy: 1, mask: 2}, downLeft: {keycode: 0, modifierPolicy: 0, mask: 0}, downRight: {keycode: 0x51, modifierPolicy: 2, mask: 0}}});
-const eight = encodePdDomain(eightSlots);
+const eight = encodeRecords(eightSlots);
 add(eight);
 for (let offset = 8 + 4 * 96; offset < 8 + 5 * 96; offset++) {
     for (const value of [0, 1, 2, 3, 4, 0x7f, 0x80, 0xff]) {
@@ -43,7 +50,7 @@ for (let offset = 8 + 4 * 96; offset < 8 + 5 * 96; offset++) {
 // how often it sends in byte 87.
 const dominantSlots = structuredClone(fixture.slots);
 Object.assign(dominantSlots[4], {axis: 2, emptyDirection: 2, directionOutput: 1});
-const dominant = encodePdDomain(dominantSlots);
+const dominant = encodeRecords(dominantSlots);
 add(dominant);
 for (let offset = 8 + 4 * 96 + 70; offset < 8 + 4 * 96 + 90; offset++) {
     for (const value of [0, 1, 2, 3, 0xff]) {
@@ -53,13 +60,13 @@ for (let offset = 8 + 4 * 96 + 70; offset < 8 + 4 * 96 + 90; offset++) {
 // A scrolling mode carries which axes it scrolls in byte 3.
 const scrollSlots = structuredClone(fixture.slots);
 scrollSlots[0].axis = 2;
-const scrollOne = encodePdDomain(scrollSlots);
+const scrollOne = encodeRecords(scrollSlots);
 add(scrollOne);
 for (const value of [0, 1, 2, 3, 4, 0xff]) {
     const bytes = Buffer.from(scrollOne); bytes[8 + 3] = value; add(bytes);
 }
 for (const name of ["Édition ⌘", "😀".repeat(5), "x".repeat(23)]) {
-    const slots = structuredClone(fixture.slots); slots[7].name = name; add(encodePdDomain(slots));
+    const slots = structuredClone(fixture.slots); slots[7].name = name; add(encodeRecords(slots));
 }
 fs.writeFileSync(process.argv[3], Buffer.concat(chunks));
 
@@ -70,7 +77,7 @@ const v2 = require(root + "/tests/fixtures/pd_mode_domain_v2.json");
 const lines = [];
 function addV2(name, bytes) {
     let code = "OK", offset = 0;
-    try {decodePdDomain(bytes, {version: 2});} catch (error) {code = error.code; offset = error.offset;}
+    try {decodePdDomain(bytes);} catch (error) {code = error.code; offset = error.offset;}
     lines.push(`${code} ${offset} ${name} ${bytes.toString("hex") || "-"}`);
 }
 for (const vector of [...v2.valid, ...v2.invalid]) {
@@ -95,6 +102,7 @@ build_and_run() {
     cc -std=c11 -Wall -Wextra -Werror -pedantic "$@" -I"$ROOT" \
         "$ROOT/tests/host/profile_pd_v1_test.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_pd_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
         -o "$BUILD_DIR/$name"
     "$BUILD_DIR/$name" "$BUILD_DIR/corpus.bin" "$BUILD_DIR/corpus.bin.v2.txt"
 }

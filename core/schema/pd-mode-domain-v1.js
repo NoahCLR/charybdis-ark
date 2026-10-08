@@ -1,27 +1,11 @@
 "use strict";
 
-// PD domain codec, carried by schema-2 profiles and legacy migration evidence.
-//
-// Version 1 stores eight slots, every one of them, in ID order. Version 2 is
-// the 32-slot firmware's: a header naming its capacity and record count, then
-// only the slots that hold something (configured, or disabled with a name),
-// each in the same 96-byte record, in ascending ID order. An omitted slot is
-// disabled and nameless. Both decode to one dense array, a record per slot, so
-// the slot count is the array's length and everything above reads both alike.
-const PD_DOMAIN_V1 = Object.freeze({ID: 0x50, VERSION: 1, SLOTS: 8, HEADER_SIZE: 8, RECORD_SIZE: 96, NAME_SIZE: 24, SIZE: 776});
+// PD domain codec, version 2, the only one the keyboard stores: a header
+// naming its capacity (32 slots) and record count, then only the slots that
+// hold something (configured, or disabled with a name), each in a 96-byte
+// record, in ascending ID order. An omitted slot is disabled and nameless. It
+// decodes to one dense array, a record per slot.
 const PD_DOMAIN_V2 = Object.freeze({ID: 0x50, VERSION: 2, SLOTS: 32, HEADER_SIZE: 8, RECORD_SIZE: 96, NAME_SIZE: 24, MAX_SIZE: 8 + 32 * 96});
-// The domain version that stores a given number of slots, and back.
-const PD_FORMATS = Object.freeze([PD_DOMAIN_V1, PD_DOMAIN_V2]);
-function pdDomainVersionFor(slotCount) {
-    const format = PD_FORMATS.find(entry => entry.SLOTS === slotCount);
-    if (!format) fail("INVALID_LENGTH", 0, `No PD domain stores ${slotCount} slots.`);
-    return format.VERSION;
-}
-function pdSlotCountOfVersion(version) {
-    const format = PD_FORMATS.find(entry => entry.VERSION === version);
-    if (!format) fail("INVALID_HEADER", 0, `PD domain version ${version} is not supported.`);
-    return format.SLOTS;
-}
 const PD_KIND = Object.freeze({DISABLED: 0, DIRECTIONAL: 1, SCROLLING: 2});
 const PD_AXIS = Object.freeze({VERTICAL: 0, HORIZONTAL: 1, DOMINANT: 2, EIGHT: 3});
 // Which axes a scrolling mode scrolls, in the same byte (firmware D-F08).
@@ -33,7 +17,6 @@ const PD_EMPTY_DIRECTION = Object.freeze({NEAREST: 0, BOTH: 1, NOTHING: 2});
 const PD_DIRECTION_OUTPUT = Object.freeze({REPEAT: 0, ONCE: 1});
 const PD_MODIFIERS = Object.freeze({INHERIT: 0, MASK: 1, EXACT: 2});
 const PD_BUTTON = Object.freeze({PASS_THROUGH: 0, CONSUME: 1, TAP: 2, HOLD_MODIFIERS: 3});
-const HEADER = Buffer.from([1, 8, 96, 0, 0, 0, 0, 0]);
 const DIRECTIONS = ["left", "right", "up", "down"];
 // Eight directions keep their diagonals in bytes 70..85, which any other
 // directional record leaves zero. Byte 86 is what every directional mode does
@@ -65,7 +48,7 @@ function readName(bytes, offset) {
     }
     return text;
 }
-function validateRecord(p, slot, offset, slots = PD_DOMAIN_V1.SLOTS) {
+function validateRecord(p, slot, offset, slots = PD_DOMAIN_V2.SLOTS) {
     const reject = (code, at, message) => fail(code, offset + at, message);
     if (p[0] !== slot) reject("INVALID_ID", 0, `PD slots must appear exactly once in ID order 0–${slots - 1}.`);
     if (p[7] || !zero(p.subarray(90))) reject("RESERVED", p[7] ? 7 : 90, "Reserved PD bytes must be zero.");
@@ -136,29 +119,11 @@ function omittedSlot(id) {
 // Whether a slot needs a record of its own in the sparse format.
 const storesRecord = slot => slot.kind !== PD_KIND.DISABLED || slot.name !== "";
 
-// A payload decodes by the version its header names; given the version its
-// profile envelope states, a payload of any other version is refused.
-function decodePdDomain(bytes, {version} = {}) {
+function decodePdDomain(bytes) {
     if (!Buffer.isBuffer(bytes)) fail("INVALID_ARGUMENT", 0, "PD domain must be a Buffer.");
-    if (version !== undefined) {
-        pdSlotCountOfVersion(version);
-        if (bytes.length && bytes[0] !== version) fail("INVALID_HEADER", 0, `This PD domain must be version ${version}.`);
-    }
-    if (bytes.length && bytes[0] === PD_DOMAIN_V2.VERSION) return decodeSparse(bytes);
-    if (bytes.length !== PD_DOMAIN_V1.SIZE) fail("INVALID_LENGTH", 0, "PD domain must contain exactly 776 bytes.");
-    for (let at = 0; at < HEADER.length; at++) {
-        if (bytes[at] !== HEADER[at]) fail("INVALID_HEADER", at, "Unsupported PD domain header.");
-    }
-    return Array.from({length: PD_DOMAIN_V1.SLOTS}, (_, id) => {
-        const offset = PD_DOMAIN_V1.HEADER_SIZE + id * PD_DOMAIN_V1.RECORD_SIZE;
-        const p = bytes.subarray(offset, offset + PD_DOMAIN_V1.RECORD_SIZE);
-        validateRecord(p, id, offset);
-        return slotOfRecord(p, id, offset);
-    });
-}
-function decodeSparse(bytes) {
-    const {HEADER_SIZE, RECORD_SIZE, SLOTS} = PD_DOMAIN_V2;
+    const {HEADER_SIZE, RECORD_SIZE, SLOTS, VERSION} = PD_DOMAIN_V2;
     if (bytes.length < HEADER_SIZE) fail("INVALID_LENGTH", 0, "PD domain v2 needs an 8-byte header.");
+    if (bytes[0] !== VERSION) fail("INVALID_HEADER", 0, `PD domain version ${bytes[0]} is not supported.`);
     const count = bytes[3];
     if (bytes[1] !== SLOTS) fail("INVALID_HEADER", 1, `PD domain v2 must hold ${SLOTS} slots.`);
     if (bytes[2] !== RECORD_SIZE) fail("INVALID_HEADER", 2, `PD domain v2 records must be ${RECORD_SIZE} bytes.`);
@@ -228,20 +193,9 @@ function writeRecord(p, input, id) {
         SCROLL_U8.forEach((name, i) => { p[84 + i] = integer(optional(scroll[name], 0), 255); });
     }
 }
-// Eight slots encode as version 1, thirty-two as the sparse version 2 with
-// only the records it needs: the format is the one that holds that many.
+// The 32 slots, with only the records the sparse format needs.
 function encodePdDomain(slots) {
-    if (!Array.isArray(slots) || !PD_FORMATS.some(format => format.SLOTS === slots.length)) fail("INVALID_LENGTH", 0, "Exactly eight or thirty-two PD slots are required.");
-    if (slots.length === PD_DOMAIN_V1.SLOTS) {
-        const bytes = Buffer.alloc(PD_DOMAIN_V1.SIZE);
-        HEADER.copy(bytes);
-        for (let id = 0; id < PD_DOMAIN_V1.SLOTS; id++) {
-            if (!slots[id] || typeof slots[id] !== "object") fail("INVALID_ARGUMENT", 0, "Slot must be an object with supported fields.");
-            writeRecord(bytes.subarray(8 + id * 96, 8 + (id + 1) * 96), slots[id], id);
-        }
-        decodePdDomain(bytes);
-        return bytes;
-    }
+    if (!Array.isArray(slots) || slots.length !== PD_DOMAIN_V2.SLOTS) fail("INVALID_LENGTH", 0, `Exactly ${PD_DOMAIN_V2.SLOTS} PD slots are required.`);
     const {RECORD_SIZE, SLOTS, VERSION} = PD_DOMAIN_V2;
     const records = [];
     for (let id = 0; id < SLOTS; id++) {
@@ -258,4 +212,17 @@ function encodePdDomain(slots) {
     return bytes;
 }
 
-module.exports = {PD_DOMAIN_V1, PD_DOMAIN_V2, pdDomainVersionFor, pdSlotCountOfVersion, PD_KIND, PD_AXIS, PD_SCROLL_AXES, PD_EMPTY_DIRECTION, PD_DIRECTION_OUTPUT, PD_MODIFIERS, PD_BUTTON, DIAGONALS, isPdTapKey, encodePdDomain, decodePdDomain};
+// One 96-byte record, and its rules, alone. The firmware's frozen record
+// corpus is wrapped in the retired eight-slot envelope; the cross-language
+// runner checks its records with these, and no profile carries that envelope.
+function encodePdRecord(slot, id = slot?.id) {
+    const p = Buffer.alloc(PD_DOMAIN_V2.RECORD_SIZE);
+    writeRecord(p, slot, id);
+    return p;
+}
+function validatePdRecord(bytes, id, offset = 0) {
+    if (!Buffer.isBuffer(bytes) || bytes.length !== PD_DOMAIN_V2.RECORD_SIZE) fail("INVALID_LENGTH", offset, `A PD record is ${PD_DOMAIN_V2.RECORD_SIZE} bytes.`);
+    validateRecord(bytes, id, offset);
+}
+
+module.exports = {PD_DOMAIN_V2, PD_KIND, PD_AXIS, PD_SCROLL_AXES, PD_EMPTY_DIRECTION, PD_DIRECTION_OUTPUT, PD_MODIFIERS, PD_BUTTON, DIAGONALS, isPdTapKey, encodePdDomain, decodePdDomain, encodePdRecord, validatePdRecord};

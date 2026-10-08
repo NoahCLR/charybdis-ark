@@ -13,11 +13,11 @@ function fixture() {
     const stage = message => draft.stage({...message, draftRevision: draft.revision});
     return {draft, stage, caps};
 }
-test("all six modes migrate as data, with eight RGB rows and two empty slots", () => {
+test("the six factory modes stay data, with 32 RGB rows and the remaining slots empty", () => {
     const value = validateSnapshot(document());
     assert.equal(value.document.version, 2);
-    assert.deepEqual(value.pdModes.map(mode => mode.name), ["Dragscroll", "Volume", "Brightness", "Zoom", "Arrow", "Pinch", "", ""]);
-    assert.equal(value.rgb.formatVersion, 2); assert.equal(value.rgb.pdModeColors.length, 8);
+    assert.deepEqual(value.pdModes.map(mode => mode.name), ["Dragscroll", "Volume", "Brightness", "Zoom", "Arrow", "Pinch", ...Array(26).fill("")]);
+    assert.equal(value.rgb.formatVersion, 3); assert.equal(value.rgb.pdModeColors.length, 32);
     assert.equal(value.pdModes[4].buttons[0].modifiers, 32);
     assert.equal(value.pdModes[5].heldModifiers, 8);
     assert.deepEqual(value.settings.values.slice(10, 15), [0, 0, 0, 0, 0]);

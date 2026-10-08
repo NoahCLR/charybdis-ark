@@ -9,37 +9,22 @@
 // ask here rather than each doing it their own way.
 
 const keycodes = require("../data/keycode-catalog");
-const {PD_SLOT_BINDINGS, pdBindingOfCode} = require("../data/pd-bindings");
+const {PD_SLOT_BINDINGS, PD_SLOT_CAPACITY, pdBindingOfCode} = require("../data/pd-bindings");
 const {customKeyOfCode} = require("../data/user-keycodes");
 const {PROFILE_ACTION_KINDS: ACTION} = require("./profile-blob-v1");
 const {resolveNativeQmkExpression} = require("./compiled-profile-v1");
-const {PROFILE_DOMAIN_IDS} = require("./profile-blob-v1");
-const {pdSlotCountOfVersion} = require("./pd-mode-domain-v1");
 
-// The native action ABIs whose semantic actions map onto VIA keycodes: the
-// ones with the userspace keycode blocks (Profile Wire feature bit 16). Older
-// vocabularies number those keys differently; only an imported backup is
-// translated from them (model/portable-profile.js).
-//
-// ACTION_ABI is the eight-slot firmware's vocabulary. The 32-slot firmware
-// numbers its keys the same way but accepts pointing slots 0..31, so it has a
-// vocabulary of its own; a backup of the first restores onto the second
-// through model/portable-profile.js upgradePdSlots.
-const ACTION_ABI = 0x1d3fcacc;
-// The 32-slot firmware's action-ABI digest (firmware D-F09).
-const ACTION_ABI_32_SLOTS = 0xf79c6151;
-const KNOWN_ACTION_ABIS = Object.freeze([ACTION_ABI, ACTION_ABI_32_SLOTS]);
+// The native action ABI whose semantic actions map onto VIA keycodes: the
+// 32-slot firmware's, with the userspace keycode blocks (Profile Wire feature
+// bit 16) and pointing slots 0..31 (firmware D-F09). A keyboard advertising
+// another vocabulary numbers its keys differently, so Ark reads it but
+// neither names its keys nor edits it.
+const ACTION_ABI = 0xf79c6151;
+const KNOWN_ACTION_ABIS = Object.freeze([ACTION_ABI]);
 const knownActionAbi = value => KNOWN_ACTION_ABIS.includes(value);
 
-// How many pointing slots a firmware has, from its action vocabulary: the one
-// place the app decides it. Schema 1 had six fixed modes; the configurable
-// slots came with schema 2 and the PD domain (supported-domain bit 16), eight
-// of them, and 32 with ACTION_ABI_32_SLOTS. Codecs and editors are handed the
-// count; nothing else infers it.
-const pdSlotCountOfVocabulary = (actionAbiDigest, schemaMajor = 2) =>
-    schemaMajor !== 2 ? 6 : actionAbiDigest === ACTION_ABI_32_SLOTS ? 32 : 8;
-const pdSlotCountFor = capabilities =>
-    pdSlotCountOfVocabulary(capabilities?.actionAbiDigest, capabilities?.supportedDomainMask & 16 ? 2 : 1);
+// The keyboard's pointing slots: all 32 of the keycode blocks.
+const PD_SLOT_COUNT = PD_SLOT_CAPACITY;
 
 // An action's name, the one every edit message and row lookup uses.
 function actionName(action) {
@@ -65,20 +50,8 @@ const nativeCode = action => action.kind === ACTION.QMK_KEYCODE ? action.operand
 // A native keycode as the action a profile stores for it.
 const keycodeAction = operand => ({kind: ACTION.QMK_KEYCODE, operand});
 
-// The pointing slot a native keycode binds, if it is a pointing-mode key on a
-// keyboard with this many slots.
-const pdSlotOfCode = (code, slotCount) => pdBindingOfCode(code, slotCount)?.slot;
-
-// The action limits a profile decodes with: actions may reach its pointing
-// slots. Without a count, the first firmware of the schema: schema 2 has eight
-// pointing slots, schema 1 six.
-const actionLimitsFor = (version, pdSlots = pdSlotCountOfVocabulary(undefined, version)) => ({actionLimits: {maxPdModes: pdSlots}});
-// The action limits of a decoded profile blob, from the slots its own PD
-// domain stores (its version says how many).
-function actionLimitsOfBlob(profile) {
-    const domain = profile.domains.find(row => row.id === PROFILE_DOMAIN_IDS.PD_MODES);
-    return actionLimitsFor(profile.schema.major, domain ? pdSlotCountOfVersion(domain.version) : undefined);
-}
+// The pointing slot a native keycode binds, if it is a pointing-mode key.
+const pdSlotOfCode = code => pdBindingOfCode(code)?.slot;
 
 // A layer as edit messages and group rows name it, and back.
 const layerRef = index => `Layer ${index}`;
@@ -152,4 +125,4 @@ function behaviorEmitProblem(action, {behaviorQmkFunctions = false} = {}) {
     return `${actionName(action)} runs in QMK's own key handling, which this keyboard's behaviours do not reach yet, so it only works as a key or a combo here. A firmware update lets behaviours send it.`;
 }
 
-module.exports = {PLACEMENT, placementProblem, behaviorEmitProblem, isOwnedLayerCode, KNOWN_ACTION_ABIS, ACTION_ABI, ACTION_ABI_32_SLOTS, knownActionAbi, pdSlotCountFor, pdSlotCountOfVocabulary, actionName, nativeCode, keycodeAction, pdSlotOfCode, actionLimitsFor, actionLimitsOfBlob, layerRef, layerOfRef};
+module.exports = {PLACEMENT, placementProblem, behaviorEmitProblem, isOwnedLayerCode, KNOWN_ACTION_ABIS, ACTION_ABI, knownActionAbi, PD_SLOT_COUNT, actionName, nativeCode, keycodeAction, pdSlotOfCode, layerRef, layerOfRef};

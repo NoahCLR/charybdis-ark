@@ -1,6 +1,6 @@
 "use strict";
 const {readViaStorage, readRegion, writeRegion, writeViaMacros, changedRanges, viaStorageDigest, VIA_STORAGE} = require("../protocol/via-storage-v1");
-const {readLegacyPdSource, readSettings, readStorageStatus, waitForStorage} = require("../protocol/portable-profile-v1");
+const {readSettings, readStorageStatus, waitForStorage} = require("../protocol/portable-profile-v1");
 const {readProfileStatus, PROFILE_ACTIVE_KIND, PROFILE_STATE_FLAGS} = require("../protocol/profile-wire-v1");
 const {readCommittedPayload, readCompiledPayload} = require("../protocol/profile-payload-v1");
 const {readDeviceCombos} = require("../protocol/combo-readback-v1");
@@ -8,7 +8,8 @@ const {candidateMetadataForBlob, readCandidatePeerStatus, readCandidateStatus, C
 const {ApplyProgress, failureReason} = require("./apply-progress");
 const {CandidateUploadCoordinator} = require("./candidate-upload-coordinator");
 const {LogicalViaStageCoordinator} = require("./logical-via-stage-coordinator");
-const {upgradePdSnapshot, createSnapshot, validateSnapshot, materializeProfile, fingerprint, summary, reorderLayers} = require("../model/portable-profile");
+const {createSnapshot, validateSnapshot, materializeProfile, fingerprint, summary, reorderLayers} = require("../model/portable-profile");
+const {knownActionAbi} = require("../schema/actions");
 const {encodeSettings} = require("../schema/settings-domain-v1");
 const {crc32, fnv1a32} = require("../schema/profile-blob-v1");
 const fail = (code, message) => Object.assign(new Error(message), {code});
@@ -36,10 +37,13 @@ function capturedBase(before, capabilities) {
     if (base.layout.length !== 960 || base.macros.length !== capabilities.viaMacroBytes || base.profile.length < 1) throw fail("INVALID_RECOVERY_CAPTURE", "The interrupted recovery capture is malformed.");
     return base;
 }
+// A complete profile is the eight layers and every domain; saving one needs
+// atomic logical Apply on both halves.
+const supportsCompleteProfile = capabilities => capabilities?.compiledLayerCount === 8
+    && (capabilities?.supportedDomainMask & 31) === 31 && knownActionAbi(capabilities?.actionAbiDigest);
 function requireReady(capabilities, writing = false) {
-    if ((writing ? capabilities?.compiledLayerCount !== 8 : ![5, 8].includes(capabilities?.compiledLayerCount)) || (capabilities?.supportedDomainMask & 15) !== 15 || (writing && !(capabilities?.featureFlags & (1 << 12)))) {
-        const guidance = capabilities?.compiledLayerCount === 5 ? "Use the five-layer backup bridge on both halves and export your profile before installing the eight-layer firmware. Import becomes available after that update." : "Complete profile Apply requires firmware with atomic profile support on both halves.";
-        throw fail("FIRMWARE_UPDATE_REQUIRED", guidance + " Your current keyboard configuration has not been changed.");
+    if (!supportsCompleteProfile(capabilities) || (writing && !(capabilities?.featureFlags & (1 << 12)))) {
+        throw fail("FIRMWARE_UPDATE_REQUIRED", "Complete profile backup and Apply need current firmware on both halves. Your current keyboard configuration has not been changed.");
     }
 }
 // `sleep`, here and below, is the host's wait between polls (the timer's when omitted).
@@ -52,7 +56,6 @@ async function captureProfile(connection, ids, capabilities, onProgress = () => 
     const defaults = await readCompiledPayload(connection, options);
     const active = before.activeKind === PROFILE_ACTIVE_KIND.COMMITTED ? await readCommittedPayload(connection, options) : defaults;
     const combos = await readDeviceCombos(connection, options), settings = await readSettings(connection, ids);
-    const pdSource = capabilities.featureFlags & (1 << 13) ? await readLegacyPdSource(connection, ids) : null;
     const via = await readViaStorage(connection, {allowIncomplete});
     if (!settings.equals(await readSettings(connection, ids))) throw fail("PROFILE_CHANGED", "Keyboard settings changed during the backup. Read it again before continuing.");
     const profile = materializeProfile(active.bytes, defaults.bytes, combos, settings);
@@ -68,7 +71,6 @@ async function captureProfile(connection, ids, capabilities, onProgress = () => 
             identity: snapshotIdentity(after, storageAfter, settings)};
     }
     const document = createSnapshot({profile, via, actionAbiDigest: capabilities.actionAbiDigest});
-    if (pdSource) document.pdModeSource = {version: 1, actionAbiDigest: capabilities.actionAbiDigest, compiledDefaultDigest: capabilities.compiledDefaultDigest, domain: pdSource.toString("base64")};
     validateSnapshot(document, capabilities);
     return {document, fingerprint: fingerprint(document), summary: summary(document), status: after, identity: snapshotIdentity(after, storageAfter, settings), storage: heldStorage(via.layout, via.macros)};
 }
@@ -311,4 +313,4 @@ async function restoreProfile(connection, ids, capabilities, document, {expected
         }
     }
 }
-module.exports = {upgradePdSnapshot, captureProfile, readIdentity, restoreProfile, validateSnapshot, summary, fingerprint, reorderLayers, peerReport};
+module.exports = {supportsCompleteProfile, captureProfile, readIdentity, restoreProfile, validateSnapshot, summary, fingerprint, reorderLayers, peerReport};

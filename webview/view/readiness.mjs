@@ -60,7 +60,6 @@ export function readScreen(model, screen = "keys") {
     const device = model.device || {};
     if (!device.connected) return {state: "unavailable", title: "Connect your keyboard",
         detail: device.health?.error || model.host?.words?.connectHint || "Connect a Charybdis, then read it to begin editing."};
-    if (model.portable?.legacy) return {state: "unavailable", title: "This keyboard is read-only", detail: "This firmware has five layers. You can back up its profile, then install the eight-layer firmware to edit it."};
     return {state: "unavailable", title: "Keyboard not ready for edits",
         detail: device.health?.error || "A complete profile could not be read. Read the keyboard again to retry."};
 }

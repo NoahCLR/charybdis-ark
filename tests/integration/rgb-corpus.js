@@ -2,26 +2,14 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const {decodeRgbDomainV1, encodeRgbDomainV1} = require("../../core/schema/rgb-domain-v1");
-const fixture = Object.fromEntries(fs.readFileSync(process.argv[2] + "/tests/fixtures/rgb_domain_v1.fixture", "utf8")
-    .split(/\r?\n/).filter(line => line && !line.startsWith("#")).map(line => line.split("=")));
-const options = {
-    compiledStageMask: Number(fixture["codec.compiled_stage_mask"]),
-    logicalLayerCount: Number(fixture["codec.logical_layer_count"]),
-    maximumBrightness: Number(fixture["codec.maximum_brightness"]),
-    tapBranchColorCount: Number(fixture["codec.tap_branch_color_count"]),
-    supportedPdModeIds: Array.from({length: 8}, (_, id) => id).filter(id => Number(fixture["codec.supported_pd_mode_mask"]) & (1 << id)),
-};
-// 1: the schema-1 build (six PD rows). 3: the schema-2 build of the 32-slot
-// firmware, from its own golden compiled domain (rgb_domain_v3.json).
-const version = Number(process.argv[4]);
-let golden = Buffer.from(fixture["payload.hex"], "hex");
-if (version === 3) {
-    const v3 = require(process.argv[2] + "/tests/fixtures/rgb_domain_v3.json");
-    Object.assign(options, {compiledStageMask: v3.limits.compiledStageMask, logicalLayerCount: v3.limits.logicalLayerCount,
-        maximumBrightness: v3.limits.maximumBrightness, tapBranchColorCount: v3.limits.tapBranchColorCount,
-        supportedPdModeIds: Array.from({length: 32}, (_, id) => id).filter(id => (v3.limits.supportedPdModeMask >>> id) & 1)});
-    golden = Buffer.from(v3.valid.find(vector => vector.name === "compiled").hex, "hex");
-} else if (version !== 1) throw new Error(`No RGB corpus for format ${version}.`);
+// Format 3, the 32-slot firmware's, from its own golden compiled domain
+// (rgb_domain_v3.json): the only RGB format it reads.
+const v3 = require(process.argv[2] + "/tests/fixtures/rgb_domain_v3.json");
+const version = 3;
+const options = {compiledStageMask: v3.limits.compiledStageMask, logicalLayerCount: v3.limits.logicalLayerCount,
+    maximumBrightness: v3.limits.maximumBrightness, tapBranchColorCount: v3.limits.tapBranchColorCount,
+    supportedPdModeIds: Array.from({length: 32}, (_, id) => id).filter(id => (v3.limits.supportedPdModeMask >>> id) & 1)};
+const golden = Buffer.from(v3.valid.find(vector => vector.name === "compiled").hex, "hex");
 assert.deepEqual(encodeRgbDomainV1(decodeRgbDomainV1(golden, options), options), golden);
 // The probe's limits: four single bytes, then the PD slot mask as 32 bits.
 const config = Buffer.alloc(8);
@@ -32,9 +20,9 @@ let accepted = 0, rejected = 0;
 function add(bytes) {
     let valid = 1;
     try {
-        // Ark can read backups of either version. Each firmware binary accepts
-        // only its compiled schema; compare against that selected contract.
-        if (bytes[0] !== version) throw new Error("Different compiled schema");
+        // Ark still reads older backups' formats; the firmware takes only
+        // format 3, so a byte that makes another format is a rejection.
+        if (bytes[0] !== version) throw new Error("Another RGB format");
         decodeRgbDomainV1(bytes, options); accepted++;
     } catch {valid = 0; rejected++;}
     const header = Buffer.alloc(3); header[0] = valid; header.writeUInt16LE(bytes.length, 1);

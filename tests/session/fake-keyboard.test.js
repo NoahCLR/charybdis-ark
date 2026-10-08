@@ -4,8 +4,8 @@ const assert = require("node:assert/strict");
 const {openPanelLoop} = require("../../core/session/panel-loop");
 const {fingerprint} = require("../../core/model/portable-profile");
 const {fakeKeyboardAdapter} = require("../fixtures/fake-keyboard");
+const {backup32, document32} = require("../fixtures/pd-slots-32");
 const pdProfile = require("../fixtures/pd-profile");
-const portableProfile = require("../fixtures/portable-profile");
 
 function recordingHost() {
     const host = {
@@ -21,10 +21,10 @@ function recordingHost() {
 }
 const last = (host) => host.posted[host.posted.length - 1];
 
-// Two documents: the eight-slot compiled profile with an empty layout, and a
+// Two current documents: the compiled profile with an empty layout, and a
 // backup with keys on its layout and a combo, so both banks and the combo
 // readback carry something.
-for (const [name, document] of [["the compiled pointing profile", pdProfile.document()], ["a backup with keys and a combo", portableProfile.document()]]) {
+for (const [name, document] of [["the compiled pointing profile", document32()], ["a backup with keys and a combo", backup32()]]) {
     test(`a complete read of the fake keyboard reproduces ${name} and opens an editable draft`, async () => {
         const host = recordingHost(), adapter = fakeKeyboardAdapter({document});
         const loop = openPanelLoop(host, {adapter, defaultTimeoutMs: 200});
@@ -56,10 +56,17 @@ for (const [name, document] of [["the compiled pointing profile", pdProfile.docu
 
 test("the fake keyboard refuses a write with the unhandled echo and records it", () => {
     const {fakeKeyboard} = require("../fixtures/fake-keyboard");
-    const keyboard = fakeKeyboard({document: pdProfile.document()});
+    const keyboard = fakeKeyboard({document: document32()});
     const write = Buffer.alloc(32); write.set([0x05, 0, 0, 0, 0x00, 0x04]);
     const [response] = keyboard.answer(write);
     assert.equal(response[0], 0xff);
     assert.deepEqual(response.subarray(1), write.subarray(1));
     assert.equal(keyboard.mutations.length, 1);
+});
+
+test("the fake keyboard runs current firmware, and refuses to serve an older profile format", () => {
+    const {fakeKeyboard} = require("../fixtures/fake-keyboard");
+    const source = pdProfile.document(), profile = Buffer.from(source.profile, "base64");
+    profile[9] = 2; // Retired RGB envelope version.
+    assert.throws(() => fakeKeyboard({document: {...source, profile: profile.toString("base64")}}), /older firmware/);
 });

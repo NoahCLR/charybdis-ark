@@ -6,7 +6,7 @@ import {behaviourFor, cellLabel, impliedBranch, inheritedBranch, comboAnswers, c
 
 // Slots come from the host with their binding keycodes; the tests use the
 // host's own registry rather than a copy of it.
-const {PD_BINDINGS} = createRequire(import.meta.url)("../core/data/pd-bindings.js");
+const {PD_SLOT_BINDINGS: PD_BINDINGS} = createRequire(import.meta.url)("../core/data/pd-bindings.js");
 const slotWith = (fields) => ({...fields, binding: PD_BINDINGS[fields.id]});
 
 test("visible macro keycodes use the VIA slot name for both QMK's named and unnamed values", () => {

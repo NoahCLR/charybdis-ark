@@ -67,14 +67,14 @@ test("representative RGB payload and whole-profile blob match the shared C/JavaS
     assert.equal(payload.toString("hex"), golden.payloadHex);
     assert.deepEqual(decodeRgbDomainV1(payload, golden.codecOptions), golden.profile);
 
-    const blob = encodeProfileBlob({domains: [createRgbDomainV1(golden.profile, golden.codecOptions)]});
+    const blob = encodeProfileBlob({schema: {major: 2, minor: 0}, domains: [createRgbDomainV1(golden.profile, golden.codecOptions)]});
     assert.equal(blob.toString("hex"), golden.blobHex);
     assert.equal(fnv1a32(blob), Number.parseInt(golden.fnv1a32, 16));
     assert.equal(crc32(blob), Number.parseInt(golden.crc32, 16));
     const decoded = decodeProfileBlob(blob);
     assert.equal(decoded.domains.length, 1);
     assert.equal(decoded.domains[0].id, PROFILE_DOMAIN_IDS.RGB);
-    assert.equal(decoded.domains[0].version, RGB_DOMAIN_V1.DOMAIN_VERSION);
+    assert.equal(decoded.domains[0].version, 3);
     assert.deepEqual(decodeRgbDomainV1(decoded.domains[0].payload, golden.codecOptions), golden.profile);
 });
 

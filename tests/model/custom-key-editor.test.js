@@ -8,11 +8,10 @@ const {macroEditorView, editMacro} = require("../../core/model/macro-editor");
 const {profileReview} = require("../../core/model/profile-review");
 const {revertUnits} = require("../../core/model/profile-revert");
 const {buildDeviceModel} = require("../../core/session/device-model");
-const {macroNamesOf} = require("../../core/schema/settings-domain-v1");
-const capabilities = {compiledLayerCount: 8, supportedDomainMask: 31, actionAbiDigest: 0x1d3fcacc};
+const capabilities = {compiledLayerCount: 8, supportedDomainMask: 31, actionAbiDigest: 0xf79c6151};
 const snapshot = value => ({document: value, fingerprint: fingerprint(value)});
 
-test("all 64 custom keys are listed, and a name takes the settings to v5 without touching anything else", () => {
+test("all 64 custom keys are listed, and a name changes nothing else", () => {
     const before = snapshot(pdDocument());
     const view = customKeyEditorView(before, capabilities);
     assert.equal(view.keys.length, 64);
@@ -22,7 +21,7 @@ test("all 64 custom keys are listed, and a name takes the settings to v5 without
     const after = validateSnapshot(named, capabilities);
     assert.equal(after.settings.formatVersion, 5);
     assert.equal(after.settings.customKeyNames[2], "Click Spam", "trimmed");
-    assert.deepEqual(macroNamesOf(after.settings), macroNamesOf(validateSnapshot(before.document).settings), "the macros keep their names");
+    assert.deepEqual(after.settings.macroNames, validateSnapshot(before.document).settings.macroNames, "the macros keep their names");
     assert.deepEqual(named.layers, before.document.layers);
     const [item] = profileReview(before, snapshot(named)).filter(row => row.unit === "customKey:2");
     assert.equal(item.title, "Custom key 2 · Click Spam");
@@ -35,7 +34,7 @@ test("all 64 custom keys are listed, and a name takes the settings to v5 without
     assert.equal(model.customKeyEditing.writable, true);
 });
 
-test("a macro name edit keeps the v5 custom-key names", () => {
+test("a macro name edit keeps the custom-key names", () => {
     let current = snapshot(pdDocument());
     current = snapshot(editCustomKey(current, {keycode: "CUSTOM_KEY_0", name: "Right Thumb", expectedFingerprint: current.fingerprint}, capabilities));
     current = snapshot(editMacro(current, {keycode: "VIA_MACRO_3", name: "OCR Copy", expectedFingerprint: current.fingerprint}, capabilities));
@@ -50,13 +49,13 @@ test("an imported profile without custom-key names can take one name back from t
     keyboard = snapshot(editCustomKey(keyboard, {keycode: "CUSTOM_KEY_0", name: "Right Thumb", expectedFingerprint: keyboard.fingerprint}, capabilities));
     keyboard = snapshot(editCustomKey(keyboard, {keycode: "CUSTOM_KEY_1", name: "Left Thumb", expectedFingerprint: keyboard.fingerprint}, capabilities));
     const imported = snapshot(pdDocument());
-    assert.equal(validateSnapshot(imported.document).settings.formatVersion, 2, "a backup from before the custom keys");
+    assert.deepEqual(validateSnapshot(imported.document).settings.customKeyNames, Array(64).fill(""), "a backup whose custom keys have no names");
     assert.deepEqual(profileReview(keyboard, imported).filter(row => row.unit.startsWith("customKey:")).map(row => row.unit), ["customKey:0", "customKey:1"]);
     const kept = snapshot(revertUnits(keyboard, imported, new Set(["customKey:0"]), capabilities));
     const settings = validateSnapshot(kept.document, capabilities).settings;
     assert.equal(settings.formatVersion, 5);
     assert.deepEqual(settings.customKeyNames.slice(0, 2), ["Right Thumb", ""]);
-    assert.deepEqual(macroNamesOf(settings), macroNamesOf(validateSnapshot(imported.document).settings), "the imported macro names stay");
+    assert.deepEqual(settings.macroNames, validateSnapshot(imported.document).settings.macroNames, "the imported macro names stay");
     assert.deepEqual(profileReview(keyboard, kept).filter(row => row.unit.startsWith("customKey:")).map(row => row.unit), ["customKey:1"]);
 });
 

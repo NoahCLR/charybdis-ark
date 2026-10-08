@@ -2,7 +2,7 @@
 
 const {baseLighting} = require("../model/settings-editor");
 const {profilePlacementProblem} = require("../model/profile-placement");
-const {actionLimitsOfBlob, knownActionAbi, pdSlotCountOfVocabulary} = require("../schema/actions");
+const {knownActionAbi} = require("../schema/actions");
 const {customKeyOfCode, layerLockOfCode} = require("../data/user-keycodes");
 const {pdBindingOfCode} = require("../data/pd-bindings");
 const {layerName} = require("../model/vocabulary");
@@ -30,7 +30,7 @@ const {CANDIDATE_STATE_NAMES, readCandidateStatus} = require("../protocol/profil
 const {PROFILE_ACTIVE_KIND, PROFILE_STATE_FLAGS, PROFILE_WIRE_KNOWN_MASKS, PROFILE_WIRE_FEATURES, PROFILE_WIRE_V1, VIA_READS, readProfileCapabilities, readProfileStatus, readViaIdentity} = require("../protocol/profile-wire-v1");
 
 const PROFILE_STUDIO_PROTOCOL = Object.freeze({major: 1, minor: 0});
-const PROFILE_STUDIO_SCHEMA = Object.freeze({major: 1, minor: 0});
+const PROFILE_STUDIO_SCHEMA = Object.freeze({major: 2, minor: 0});
 const PROFILE_DOMAIN_FLAGS = Object.freeze({RGB: 1 << 0, KEY_BEHAVIORS: 1 << 1});
 const REQUIRED_PROFILE_DOMAIN_MASK = PROFILE_DOMAIN_FLAGS.RGB | PROFILE_DOMAIN_FLAGS.KEY_BEHAVIORS;
 const REQUIRED_LIVE_MUTATION_FEATURES = PROFILE_WIRE_FEATURES.CANDIDATE_WRITE
@@ -297,15 +297,15 @@ class ProfileDeviceService {
             for (const domain of blob.domains) {
                 try {
                     if (domain.id === PROFILE_DOMAIN_IDS.RGB) {
-                        domains.rgb = decodeRgbDomainV1(domain.payload, {formatVersion: domain.version});
+                        domains.rgb = decodeRgbDomainV1(domain.payload);
                     } else if (domain.id === PROFILE_DOMAIN_IDS.KEY_BEHAVIORS) {
-                        domains.keyBehaviors = decodeKeyBehaviorDomain(domain.payload, actionLimitsOfBlob(blob));
+                        domains.keyBehaviors = decodeKeyBehaviorDomain(domain.payload);
                     } else if (domain.id === PROFILE_DOMAIN_IDS.PD_MODES) {
-                        domains.pdModes = decodePdDomain(domain.payload, {version: domain.version});
+                        domains.pdModes = decodePdDomain(domain.payload);
                     } else if (domain.id === PROFILE_DOMAIN_IDS.SETTINGS) {
                         domains.settings = decodeSettings(domain.payload);
                     } else if (domain.id === PROFILE_DOMAIN_IDS.COMBOS) {
-                        domains.combos = decodeComboDomain(domain.payload, domain.version, actionLimitsOfBlob(blob));
+                        domains.combos = decodeComboDomain(domain.payload);
                     }
                 } catch (error) {
                     failures.push({domainId: domain.id, message: error instanceof Error ? error.message : String(error)});
@@ -689,7 +689,7 @@ function evaluateProfileCompatibility(capabilities, summary = {}, viaIdentity = 
     const source = normalizeProfileSummary(summary);
     const checks = [
         equalityCheck("Protocol major", capabilities?.protocol?.major, PROFILE_STUDIO_PROTOCOL.major),
-        equalityCheck("Schema major", capabilities?.schema?.major, capabilities?.supportedDomainMask & 16 ? 2 : PROFILE_STUDIO_SCHEMA.major),
+        equalityCheck("Schema major", capabilities?.schema?.major, PROFILE_STUDIO_SCHEMA.major),
         oneOfCheck("VIA protocol version", viaIdentity?.protocolVersion, VIA_READS.SUPPORTED_PROTOCOL_VERSIONS),
         equalityCheck("VIA firmware version", viaIdentity?.firmwareVersion, capabilities?.firmwareVersion),
         equalityCheck("Raw HID report size", capabilities?.reportSize, RAW_HID_REPORT_SIZE),
@@ -814,13 +814,11 @@ function cloneCandidateStatus(status) {
 }
 
 // Keys neither QMK's catalogue nor the keyboard's own blocks name. The
-// catalogue ends at QK_USER_31; the blocks count only on the ABI the app knows,
-// and a pointing key only up to the slots that vocabulary has.
+// catalogue ends at QK_USER_31; the blocks count only on the ABI the app knows.
 function unnamedKeyCount(layers, capabilities) {
     const ownBlocks = knownActionAbi(capabilities?.actionAbiDigest);
-    const slots = pdSlotCountOfVocabulary(capabilities?.actionAbiDigest);
     const named = ({keycode, resolved}) => resolved.known
-        || ownBlocks && (customKeyOfCode(keycode) !== undefined || layerLockOfCode(keycode) !== undefined || pdBindingOfCode(keycode, slots) !== undefined);
+        || ownBlocks && (customKeyOfCode(keycode) !== undefined || layerLockOfCode(keycode) !== undefined || pdBindingOfCode(keycode) !== undefined);
     return layers.flatMap((entry) => entry.keys).filter((key) => !named(key)).length;
 }
 

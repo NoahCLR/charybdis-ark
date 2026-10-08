@@ -2,7 +2,6 @@
 // Editing the 32-slot firmware's pointing slots past the first eight, end to
 // end through the draft: mode, key, behaviour, colour, review and discard.
 const test = require("node:test"), assert = require("node:assert/strict");
-const {document} = require("../fixtures/pd-profile");
 const {CAPABILITIES_32, document32} = require("../fixtures/pd-slots-32");
 const {ProfileDraftSession} = require("../../core/session/profile-draft-session");
 const {fingerprint, summary, validateSnapshot} = require("../../core/model/portable-profile");
@@ -47,22 +46,16 @@ test("slot 20 is created, bound, lit, reviewed and discarded like any other", ()
     assert.equal(validateSnapshot(draft.document, CAPABILITIES_32).pdModes[20].kind, 0);
 });
 
-test("the eight-slot firmware keeps its eight slots and refuses the others", () => {
-    const eight = document(), caps = {compiledLayerCount: 8, supportedDomainMask: 31, actionAbiDigest: eight.actionAbiDigest};
-    const {draft, stage} = draftOf(eight, caps);
-    assert.throws(() => stage({type: "savePdMode", slot: 8, config: {kind: 1, name: "Nine", axis: 1, thresholdX: 30}}), /between 0 and 7/);
-    assert.throws(() => stage({type: "updatePdModeColor", pointingMode: "PD_MODE_SLOT_8", h: "1", s: "1", v: "1", locality: "RGB_RIGHT_HALF"}), /absent/);
-    assert.throws(() => stage({type: "addBehavior", behavior: {keycode: "KC_F13", tap: {helper: "TAP_SENDS", action: "PD_SLOT_8"}}}));
-    const model = buildDeviceModel({...draft.editingState({connected: true, selectedDeviceId: "board", capabilities: caps}), capabilities: caps});
-    assert.equal(model.pdModes.length, 8);
-    assert.ok(!model.qmkKeycodes.some(key => key.value === "PD_SLOT_8"));
+test("the eight-slot action vocabulary cannot open a draft", () => {
+    const current = document32();
+    assert.throws(() => draftOf(current, {...CAPABILITIES_32, actionAbiDigest: 0x1d3fcacc}), /numbers its keys differently/);
 });
 
-test("behaviour edits take their slot limit from the keyboard's vocabulary", () => {
+test("behaviour edits accept every current slot and refuse slots past the bank", () => {
     const wide = document32();
     const blob = decodeProfileBlob(Buffer.from(wide.profile, "base64"));
     const payload = blob.domains.find(domain => domain.id === 0x20).payload;
-    const message = {type: "addBehavior", behavior: {keycode: "KC_F14", tap: {helper: "TAP_SENDS", action: "PD_SLOT_25"}}};
+    const message = {type: "addBehavior", behavior: {keycode: "KC_F14", tap: {helper: "TAP_SENDS", action: "PD_SLOT_31"}}};
     assert.ok(editKeyBehaviors(payload, message, CAPABILITIES_32).length > payload.length);
-    assert.throws(() => editKeyBehaviors(payload, message, {...CAPABILITIES_32, actionAbiDigest: 0x1d3fcacc}));
+    assert.throws(() => editKeyBehaviors(payload, {...message, behavior: {...message.behavior, tap: {helper: "TAP_SENDS", action: "PD_SLOT_32"}}}, CAPABILITIES_32));
 });

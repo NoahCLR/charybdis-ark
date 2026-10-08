@@ -348,10 +348,9 @@ its Choose keyboard, theme toggle, build line and recovery copies;
 `?host=web-none` has no keyboard yet and `?host=web-unsupported` no WebHID. The preview
 stands in for the extension host: it answers the webview's `ready` with one
 fixture model and logs every edit the interface posts back.
-Use `npm run preview -- --multiple --vscode` to inspect the selector with two
-fixture keyboards in the VS Code themed preview, and `npm run preview -- --slots 32`
-for the 32-slot pointing firmware (its compiled profile, with slot 12
-configured too).
+The fixture is current firmware's compiled profile, with slot 12 configured
+too. Use `npm run preview -- --multiple --vscode` to inspect the selector with
+two fixture keyboards in the VS Code themed preview.
 
 ### Compatibility with firmware
 

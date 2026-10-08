@@ -24,7 +24,7 @@ const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require(path.join(here, "..", "core", "pro
 const {RGB_LOCALITIES} = require(path.join(here, "..", "core", "schema", "rgb-domain-v1"));
 const {document: pdDocument} = require(path.join(here, "fixtures", "pd-profile"));
 
-const capabilities = {compiledLayerCount: 8, supportedDomainMask: 31, actionAbiDigest: 0x1d3fcacc};
+const capabilities = {compiledLayerCount: 8, supportedDomainMask: 31, actionAbiDigest: 0xf79c6151};
 
 function session() {
     const doc = pdDocument();

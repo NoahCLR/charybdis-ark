@@ -2,12 +2,14 @@
 const {test} = require("node:test");
 const assert = require("node:assert/strict");
 const {captureProfile, restoreProfile, fingerprint, summary, validateSnapshot} = require("../../core/session/portable-profile-session");
-const {legacyDocument: document} = require("../fixtures/portable-profile");
 const pd = require("../fixtures/pd-profile");
+const {document32: document} = require("../fixtures/pd-slots-32");
+const {ACTION_ABI} = require("../../core/schema/actions");
 const {changedRanges, viaStorageDigest} = require("../../core/protocol/via-storage-v1");
 const {decodeProfileBlob, encodeProfileBlob, fnv1a32} = require("../../core/schema/profile-blob-v1");
 const {encodeSettings} = require("../../core/schema/settings-domain-v1");
-const capabilities = {compiledLayerCount: 8, supportedDomainMask: 15, featureFlags: 1 << 12, actionAbiDigest: 0xeb80829c, candidateChunkMax: 20, viaMacroBytes: 7191};
+// Current firmware: schema 2.0 with every domain, the 32-slot vocabulary.
+const capabilities = {compiledLayerCount: 8, supportedDomainMask: 31, featureFlags: 1 << 12, actionAbiDigest: ACTION_ABI, candidateChunkMax: 20, viaMacroBytes: 7191};
 function fixture() {
     const source = document(), targetDocument = structuredClone(source), events = [];
     targetDocument.layers[0][0] ^= 1; targetDocument.macros[0] = Buffer.from("hello").toString("base64");
@@ -179,9 +181,22 @@ test("recovery retries allow an incomplete base and prove the repaired target", 
     const restored = await restoreProfile({}, {}, capabilities, f.targetDocument, f.options);
     assert.equal(restored.fingerprint, fingerprint(f.targetDocument));
 });
+test("a schema-1 profile is refused before recovery, staging or device reads", async () => {
+    const f = fixture(), target = structuredClone(f.targetDocument);
+    const blob = Buffer.from(target.profile, "base64"); blob[4] = 1;
+    target.profile = blob.toString("base64"); target.version = 1;
+    f.operations.capture = async () => {throw Error("must not read the keyboard");};
+    await assert.rejects(restoreProfile({}, {}, capabilities, target, f.options),
+        error => error.code === "INVALID_PORTABLE_PROFILE" && /older firmware/.test(error.message));
+    assert.deepEqual(f.events, []);
+});
 test("older firmware is rejected before any device read or write", async () => {
     const connection = {request: () => {throw Error("must not access device");}};
-    await assert.rejects(captureProfile(connection, {}, {compiledLayerCount: 5}), error => error.code === "FIRMWARE_UPDATE_REQUIRED");
+    for (const incompatible of [
+        {...capabilities, compiledLayerCount: 5},
+        {...capabilities, supportedDomainMask: 15},
+        {...capabilities, actionAbiDigest: 0x1d3fcacc},
+    ]) await assert.rejects(captureProfile(connection, {}, incompatible), {code: "FIRMWARE_UPDATE_REQUIRED"});
 });
 // The commit marker became durable, then a status read failed before the app
 // saw CONVERGING_PEER. The app asks the keyboard to cancel, which the keyboard
@@ -219,8 +234,8 @@ const EDITS = {
     "imported macro": source => ({...JSON.parse(JSON.stringify(source)), macros: source.macros.map((slot, index) => index === 3 ? Buffer.from("imported").toString("base64") : slot)}),
 };
 const FIXTURES = {
-    legacy: {document, capabilities},
-    "schema-2": {document: pd.document, capabilities: {...capabilities, actionAbiDigest: pd.document().actionAbiDigest, supportedDomainMask: 31}},
+    current: {document, capabilities},
+    "six configured slots": {document: pd.document, capabilities: {...capabilities, actionAbiDigest: pd.document().actionAbiDigest}},
 };
 // Both banks start as the keyboard holds them; the fakes apply exactly the
 // ranges the session hands over, the way the staging coordinator and the
@@ -274,21 +289,72 @@ for (const fixtureName of Object.keys(FIXTURES)) {
     }
 }
 test("a cached read of the same keyboard without its stored bank is read again", async () => {
-    const t = transfer("legacy", "layout-only", {cached: true});
+    const t = transfer("current", "layout-only", {cached: true});
     t.options.baseSnapshot = {...t.snapshot, storage: undefined};
     await restoreProfile({}, {}, t.caps, t.targetDocument, t.options);
     assert.deepEqual(t.events, ["capture", "local"]);
     assert.ok(t.peer.macros.equals(t.target.macros));
 });
 test("a cached bank for a keyboard that changed since is never compared against", async () => {
-    const t = transfer("legacy", "layout-only", {cached: true});
+    const t = transfer("current", "layout-only", {cached: true});
     t.options.operations.readIdentity = async () => ({...t.snapshot.identity, storageDigest: t.snapshot.identity.storageDigest + 1});
     await assert.rejects(restoreProfile({}, {}, t.caps, t.targetDocument, t.options), error => error.code === "PROFILE_CHANGED");
     assert.ok(t.peer.macros.equals(t.raw.macros) && t.local.macros.equals(t.raw.macros), "nothing was written");
 });
 test("a read that lost its stored bank refuses before anything is sent", async () => {
-    const t = transfer("legacy", "layout-only");
+    const t = transfer("current", "layout-only");
     t.options.operations.capture = async () => ({...t.snapshot, storage: undefined});
     await assert.rejects(restoreProfile({}, {}, t.caps, t.targetDocument, t.options), error => error.code === "BASE_STORAGE_UNAVAILABLE" && error.saved === "none");
     assert.ok(t.peer.macros.equals(t.raw.macros));
+});
+
+// Current firmware's compiled profile (GET 0x05) carries all five domains,
+// with its authored combos and immutable factory settings. A capture takes
+// lighting, behaviours and pointing from the running profile and combos and
+// settings from their live readbacks, so the factory pair never stands in for
+// what the keyboard runs, and no domain appears twice.
+const {fakeKeyboard} = require("../fixtures/fake-keyboard");
+const {backup32, CAPABILITIES_32} = require("../fixtures/pd-slots-32");
+const {settings: currentSettings} = require("../fixtures/portable-profile");
+const {encodeComboDomain} = require("../../core/schema/combo-domain-v1");
+const {decodeSettings} = require("../../core/schema/settings-domain-v1");
+const captureCapabilities = {...CAPABILITIES_32, featureFlags: 1 << 12, candidateChunkMax: 20, viaMacroBytes: 7191};
+function wired(keyboard) {
+    let id = 0;
+    return {connection: {request: async (report) => keyboard.answer(report)[0]}, ids: {next: () => (id = id % 255 + 1)}};
+}
+function factoryProfile(source) {
+    const factory = currentSettings(); factory.values[0] = 1600; factory.names[1] = "Factory";
+    const combos = {version: 2, defaultTermMs: 40, holdTermMs: 180, rows: [{inputs: [6, 7].map(operand => ({kind: 1, operand, flags: 0})), output: {kind: 1, operand: 9, flags: 0}, termMs: null, mustHold: false, mustTap: true, ordered: false}]};
+    const blob = decodeProfileBlob(Buffer.from(source.profile, "base64"));
+    return encodeProfileBlob({schema: blob.schema, domains: blob.domains.map(domain => domain.id === 0x40 ? {...domain, payload: encodeSettings(factory)}
+        : domain.id === 0x30 ? {...domain, payload: encodeComboDomain(combos)} : domain)});
+}
+for (const compiledOnly of [false, true]) {
+    test(`a capture ${compiledOnly ? "of a keyboard running its defaults" : "of a committed profile"} keeps the live combos and settings beside a five-domain compiled read`, async () => {
+        const source = backup32(), compiled = factoryProfile(source);
+        assert.deepEqual(decodeProfileBlob(compiled).domains.map(domain => domain.id), [16, 32, 48, 64, 80], "the compiled read has every domain");
+        const keyboard = fakeKeyboard({document: source, compiled, compiledOnly});
+        const {connection, ids} = wired(keyboard);
+        const captured = await captureProfile(connection, ids, captureCapabilities);
+        const reads = new Set(keyboard.requests.filter(r => r[0] === 0x08 && r[1] === 0).map(r => r[2]));
+        assert.ok(reads.has(0x05) && reads.has(0x06) && reads.has(0x07), "the compiled, combo and settings reads all ran");
+        assert.equal(reads.has(0x04), !compiledOnly);
+        const domains = decodeProfileBlob(Buffer.from(captured.document.profile, "base64")).domains;
+        assert.deepEqual(domains.map(domain => domain.id), [16, 32, 48, 64, 80], "each domain once, in registry order");
+        const live = validateSnapshot(source);
+        assert.deepEqual(decodeSettings(domains[3].payload), live.settings, "the live settings, not the factory ones");
+        assert.notEqual(decodeSettings(domains[3].payload).values[0], 1600);
+        assert.ok(domains[2].payload.equals(decodeProfileBlob(live.profile).domains[2].payload), "the live combos, not the authored defaults");
+        assert.equal(captured.fingerprint, fingerprint(source), "the export is the keyboard's effective profile");
+    });
+}
+
+test("a capture never reads the retired PD page, even from firmware that still advertises bit 13", async () => {
+    const source = backup32(), keyboard = fakeKeyboard({document: source});
+    const {connection, ids} = wired(keyboard);
+    const captured = await captureProfile(connection, ids, {...captureCapabilities, featureFlags: (1 << 12) | (1 << 13)});
+    assert.equal(keyboard.requests.some(r => r[0] === 0x08 && r[1] === 0 && r[2] === 0x09), false, "no GET 0x09");
+    assert.equal(Object.hasOwn(captured.document, "pdModeSource"), false, "no pointing-mode source is written");
+    assert.deepEqual(keyboard.unhandled, []);
 });

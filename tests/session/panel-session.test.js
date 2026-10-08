@@ -5,7 +5,7 @@ const {applyLayerEdit, buildPanelModel, discardDraftForDevice, layerEditDocument
 const {fingerprint, summary, validateSnapshot} = require("../../core/model/portable-profile");
 const {document} = require("../fixtures/pd-profile");
 
-const capabilities = {compiledLayerCount: 8, supportedDomainMask: 31, actionAbiDigest: 0x1d3fcacc, featureFlags: 1 << 13};
+const capabilities = {compiledLayerCount: 8, supportedDomainMask: 31, actionAbiDigest: 0xf79c6151, featureFlags: 0};
 const snapshot = () => {
     const doc = document();
     return {document: doc, fingerprint: fingerprint(doc), summary: summary(doc), limits: {brightnessMax: 200}};
@@ -150,6 +150,27 @@ test("a clean draft closes automatically when selecting a legacy keyboard", () =
     assert.equal(session.resetDraftForms, true);
 });
 
+test("an eight-slot action vocabulary cannot offer portable profile controls", () => {
+    const session = panelWithDraft();
+    const unsupported = connected({capabilities: {...capabilities, actionAbiDigest: 0x1d3fcacc}});
+    const model = buildPanelModel(session, unsupported);
+    assert.equal(model.portable.available, false);
+    assert.equal(model.draft, undefined);
+});
+
+test("an unsupported vocabulary keeps unapplied edits read-only even with the same device ID", () => {
+    const session = panelWithDraft(), draft = session.draft;
+    draft.stage({type: "updateLayoutKeys", draftRevision: draft.revision, layer: "Layer 1", changes: [{layoutIndex: 0, keycode: "KC_B"}]});
+    const unsupported = connected({capabilities: {...capabilities, actionAbiDigest: 0x1d3fcacc}});
+    const model = buildPanelModel(session, unsupported);
+    assert.equal(session.draft, draft, "unapplied edits remain available for the original firmware");
+    assert.equal(model.draft.dirty, true);
+    assert.equal(model.draft.matching, false);
+    assert.equal(model.draft.connected, false);
+    assert.equal(model.load.state, "unavailable");
+    assert.throws(() => routeMessage(session, {type: "updateLayoutKeys", draftId: draft.id, draftRevision: draft.revision}, unsupported), /Reconnect/);
+});
+
 test("an in-flight read keeps the panel busy across service operation gaps", () => {
     const session = panelWithDraft();
     assert.equal(routeMessage(session, {type: "refresh"}, connected()), "read");
@@ -216,7 +237,6 @@ test("the model shows the draft's surfaces but the keyboard's own header", () =>
     assert.match(model.device.subtitle, /local draft/, "the rail says the keyboard still runs what it ran");
     assert.equal(model.layers[1].displayName, draft.current.summary.names[1]);
     assert.equal(model.portable.available, true);
-    assert.equal(model.portable.pdUpgradeAvailable, true);
     assert.equal(model.portable.layers, null, "the layer editor is closed until Rename & Reorder opens it");
 });
 
@@ -305,10 +325,10 @@ test("the model says what its host offers, in the host's words", () => {
     assert.deepEqual(buildPanelModel(session, connected()).host.blocked, {title: "No", detail: "Why"});
 });
 
-test("the legacy upgrade export is offered only by a host that has it", () => {
+test("no host or firmware brings back the retired PD upgrade export", () => {
     const session = panelWithDraft();
-    session.host = {};
-    assert.equal(buildPanelModel(session, connected()).portable.pdUpgradeAvailable, false);
     session.host = {exportPdUpgrade: async () => {}};
-    assert.equal(buildPanelModel(session, connected()).portable.pdUpgradeAvailable, true);
+    const state = connected();
+    state.capabilities = {...state.capabilities, featureFlags: 1 << 13};
+    assert.equal("pdUpgradeAvailable" in buildPanelModel(session, state).portable, false);
 });

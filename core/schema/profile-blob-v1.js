@@ -1,15 +1,18 @@
 "use strict";
 
+// The one profile format the keyboard stores: schema 2.0, up to 5,088 bytes.
+// Earlier schemas and domain versions are refused, as the firmware refuses
+// them (firmware D-F10).
 const PROFILE_BLOB_V1 = Object.freeze({
     MAGIC: "NLP1",
     HEADER_SIZE: 8,
     DOMAIN_HEADER_SIZE: 4,
     ACTION_SIZE: 4,
-    SCHEMA_MAJOR: 1,
+    SCHEMA_MAJOR: 2,
     SCHEMA_MINOR: 0,
     CANONICAL_FLAG: 1,
     KNOWN_FLAGS: 1,
-    MAX_SIZE: 4064,
+    MAX_SIZE: 5088,
 });
 
 const PROFILE_DOMAIN_IDS = Object.freeze({
@@ -20,25 +23,19 @@ const PROFILE_DOMAIN_IDS = Object.freeze({
     PD_MODES: 0x50,
 });
 
+// Each domain's one version, as the firmware's registry has them
+// (profile_domain_registry.h).
 const PROFILE_DOMAIN_VERSIONS = Object.freeze({
-    [PROFILE_DOMAIN_IDS.RGB]: 1,
+    [PROFILE_DOMAIN_IDS.RGB]: 3,
     [PROFILE_DOMAIN_IDS.KEY_BEHAVIORS]: 1,
-    // v2 stores the default window and hold threshold once; either schema's
-    // keyboard reads v1 as well.
-    [PROFILE_DOMAIN_IDS.COMBOS]: [1, 2],
-    [PROFILE_DOMAIN_IDS.SETTINGS]: 1,
+    [PROFILE_DOMAIN_IDS.COMBOS]: 2,
+    [PROFILE_DOMAIN_IDS.SETTINGS]: 5,
+    [PROFILE_DOMAIN_IDS.PD_MODES]: 2,
 });
-
-const PROFILE_BLOB_V2 = Object.freeze({...PROFILE_BLOB_V1, SCHEMA_MAJOR: 2, MAX_SIZE: 5088});
-// Settings v3 names the VIA macros where v2 carried user macros, and v5 the
-// custom keys too; a keyboard may still store v2, so all are read. RGB v3 and
-// PD v2 are the 32-slot firmware's, which keeps schema 2.0: the action
-// vocabulary says which pair a keyboard takes (schema/actions.js).
-const PROFILE_DOMAIN_VERSIONS_V2 = Object.freeze({...PROFILE_DOMAIN_VERSIONS, 16: [2, 3], 64: [2, 3, 4, 5], 80: [1, 2]});
-function schemaFormat(major) {
-    if (major === 1) return PROFILE_BLOB_V1;
-    if (major === 2) return PROFILE_BLOB_V2;
-    throw profileBlobError("INCOMPATIBLE_SCHEMA", `Profile schema ${major} is not supported.`);
+function assertSchema(major, minor) {
+    if (major !== PROFILE_BLOB_V1.SCHEMA_MAJOR || minor !== PROFILE_BLOB_V1.SCHEMA_MINOR) {
+        throw profileBlobError("INCOMPATIBLE_SCHEMA", `Profile blob schema ${major}.${minor} is not supported.`);
+    }
 }
 
 const PROFILE_ACTION_KINDS = Object.freeze({
@@ -55,7 +52,7 @@ const PROFILE_ACTION_KINDS = Object.freeze({
 
 const PROFILE_ACTION_LIMITS = Object.freeze({
     maxLogicalLayers: 8,
-    maxPdModes: 6,
+    maxPdModes: 32,
     maxViaMacroSlots: 64,
     maxCustomKeys: 64,
 });
@@ -72,11 +69,11 @@ class ProfileBlobProtocolError extends Error {
 }
 
 function encodeProfileBlob(profile = {}, options = {}) {
-    const format = schemaFormat(profile?.schema?.major ?? 1);
-    const domainVersions = normalizeDomainVersions(options.domainVersions ?? (format.SCHEMA_MAJOR === 2 ? PROFILE_DOMAIN_VERSIONS_V2 : undefined));
     if (!profile || typeof profile !== "object") {
         throw new TypeError("Profile blob input must be an object.");
     }
+    assertSchema(profile.schema?.major ?? PROFILE_BLOB_V1.SCHEMA_MAJOR, profile.schema?.minor ?? PROFILE_BLOB_V1.SCHEMA_MINOR);
+    const domainVersions = normalizeDomainVersions(options.domainVersions);
     if (profile.domains !== undefined && !Array.isArray(profile.domains)) {
         throw new TypeError("Profile blob domains must be an array.");
     }
@@ -90,13 +87,13 @@ function encodeProfileBlob(profile = {}, options = {}) {
 
     const encodedDomains = domains.map((domain) => encodeDomainEnvelope(domain, {domainVersions}));
     const totalLength = PROFILE_BLOB_V1.HEADER_SIZE + encodedDomains.reduce((total, domain) => total + domain.length, 0);
-    if (totalLength > format.MAX_SIZE) {
-        throw profileBlobError("CAPACITY_EXCEEDED", `Profile blob is ${totalLength} bytes; maximum is ${format.MAX_SIZE}.`);
+    if (totalLength > PROFILE_BLOB_V1.MAX_SIZE) {
+        throw profileBlobError("CAPACITY_EXCEEDED", `Profile blob is ${totalLength} bytes; maximum is ${PROFILE_BLOB_V1.MAX_SIZE}.`);
     }
 
     const output = Buffer.alloc(totalLength);
     MAGIC_BYTES.copy(output, 0);
-    output[4] = format.SCHEMA_MAJOR;
+    output[4] = PROFILE_BLOB_V1.SCHEMA_MAJOR;
     output[5] = PROFILE_BLOB_V1.SCHEMA_MINOR;
     output[6] = domains.length;
     output[7] = PROFILE_BLOB_V1.CANONICAL_FLAG;
@@ -114,16 +111,13 @@ function decodeProfileBlob(value, options = {}) {
     if (bytes.length < PROFILE_BLOB_V1.HEADER_SIZE) {
         throw profileBlobError("TRUNCATED", `Profile blob needs an ${PROFILE_BLOB_V1.HEADER_SIZE}-byte header.`);
     }
-    const format = schemaFormat(bytes[4]);
-    const domainVersions = normalizeDomainVersions(options.domainVersions ?? (format.SCHEMA_MAJOR === 2 ? PROFILE_DOMAIN_VERSIONS_V2 : undefined));
-    if (bytes.length > format.MAX_SIZE) {
-        throw profileBlobError("CAPACITY_EXCEEDED", `Profile blob is ${bytes.length} bytes; maximum is ${format.MAX_SIZE}.`);
-    }
+    const domainVersions = normalizeDomainVersions(options.domainVersions);
     if (!bytes.subarray(0, MAGIC_BYTES.length).equals(MAGIC_BYTES)) {
         throw profileBlobError("INVALID_MAGIC", `Profile blob magic must be ${PROFILE_BLOB_V1.MAGIC}.`);
     }
-    if (bytes[4] !== format.SCHEMA_MAJOR || bytes[5] !== PROFILE_BLOB_V1.SCHEMA_MINOR) {
-        throw profileBlobError("INCOMPATIBLE_SCHEMA", `Profile blob schema ${bytes[4]}.${bytes[5]} is not supported.`);
+    assertSchema(bytes[4], bytes[5]);
+    if (bytes.length > PROFILE_BLOB_V1.MAX_SIZE) {
+        throw profileBlobError("CAPACITY_EXCEEDED", `Profile blob is ${bytes.length} bytes; maximum is ${PROFILE_BLOB_V1.MAX_SIZE}.`);
     }
     if ((bytes[7] & ~PROFILE_BLOB_V1.KNOWN_FLAGS) !== 0) {
         throw profileBlobError("RESERVED_FLAGS", `Profile blob flags contain unknown bits 0x${(bytes[7] & ~PROFILE_BLOB_V1.KNOWN_FLAGS).toString(16)}.`);
@@ -404,8 +398,6 @@ module.exports = {
     PROFILE_ACTION_KINDS,
     PROFILE_ACTION_LIMITS,
     PROFILE_BLOB_V1,
-    PROFILE_BLOB_V2,
-    PROFILE_DOMAIN_VERSIONS_V2,
     PROFILE_DOMAIN_IDS,
     PROFILE_DOMAIN_VERSIONS,
     ProfileBlobProtocolError,

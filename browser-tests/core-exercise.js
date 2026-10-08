@@ -32,26 +32,23 @@ function exerciseCore(core, inputs) {
         }
     };
 
-    const {portable, actions, profileBlob, rgbDomain, keyBehaviorDomain, comboDomain, settingsDomain, pdModeDomain} = core;
+    const {portable, profileBlob, rgbDomain, keyBehaviorDomain, comboDomain, settingsDomain, pdModeDomain} = core;
     // A profile's domains, each decoded and encoded again the way a snapshot
     // decodes them (portable-profile.js validateSnapshot).
-    const domainCodec = (domain, schemaMajor, pdSlots) => {
-        const limits = actions.actionLimitsFor(schemaMajor, pdSlots);
+    const domainCodec = (domain) => {
         switch (domain.id) {
             case 0x10: return [(bytes) => rgbDomain.decodeRgbDomainV1(bytes), (value) => rgbDomain.encodeRgbDomainV1(value)];
-            case 0x20: return [(bytes) => keyBehaviorDomain.decodeKeyBehaviorDomain(bytes, limits), (value) => keyBehaviorDomain.encodeKeyBehaviorDomain(value, limits)];
-            case 0x30: return [(bytes) => comboDomain.decodeComboDomain(bytes, domain.version, limits), (value) => comboDomain.encodeComboDomain(value, limits)];
+            case 0x20: return [(bytes) => keyBehaviorDomain.decodeKeyBehaviorDomain(bytes), (value) => keyBehaviorDomain.encodeKeyBehaviorDomain(value)];
+            case 0x30: return [(bytes) => comboDomain.decodeComboDomain(bytes), (value) => comboDomain.encodeComboDomain(value)];
             case 0x40: return [(bytes) => settingsDomain.decodeSettings(bytes), (value) => settingsDomain.encodeSettings(value)];
-            case 0x50: return [(bytes) => pdModeDomain.decodePdDomain(bytes, {version: domain.version}), (value) => pdModeDomain.encodePdDomain(value)];
+            case 0x50: return [(bytes) => pdModeDomain.decodePdDomain(bytes), (value) => pdModeDomain.encodePdDomain(value)];
             default: return null;
         }
     };
     const blobs = inputs.blobs.map(({name, hex: text}) => attempt(() => {
         const decoded = profileBlob.decodeProfileBlob(bytesOf(text));
-        const pd = decoded.domains.find((domain) => domain.id === 0x50);
-        const pdSlots = pd ? pdModeDomain.decodePdDomain(pd.payload, {version: pd.version}).length : undefined;
         const domains = decoded.domains.map((domain) => {
-            const codec = domainCodec(domain, decoded.schema.major, pdSlots);
+            const codec = domainCodec(domain);
             if (!codec) return {id: domain.id, payload: domain.payload};
             const value = attempt(() => codec[0](domain.payload));
             const encoded = value.error ? value : attempt(() => codec[1](codec[0](domain.payload)));
@@ -66,7 +63,7 @@ function exerciseCore(core, inputs) {
         rgb: [(bytes, options) => rgbDomain.decodeRgbDomainV1(bytes, options), (value, options) => rgbDomain.encodeRgbDomainV1(value, options)],
         behaviors: [(bytes, options) => keyBehaviorDomain.decodeKeyBehaviorDomain(bytes, options), (value, options) => keyBehaviorDomain.encodeKeyBehaviorDomain(value, options)],
         behaviorEnvelope: [(bytes, options) => keyBehaviorDomain.decodeKeyBehaviorDomainEnvelope(bytes, options), (value, options) => keyBehaviorDomain.encodeKeyBehaviorDomainEnvelope(value, options)],
-        combos: [(bytes, options) => comboDomain.decodeComboDomain(bytes, options.version, options), (value, options) => comboDomain.encodeComboDomain(value, options)],
+        combos: [(bytes, options) => comboDomain.decodeComboDomain(bytes, options), (value, options) => comboDomain.encodeComboDomain(value, options)],
         pd: [(bytes, options) => pdModeDomain.decodePdDomain(bytes, options), (value) => pdModeDomain.encodePdDomain(value)],
     };
     const domains = inputs.domains.map(({name, kind, hex: text, options = {}}) => {

@@ -5,7 +5,7 @@ const {test} = require("node:test");
 const assert = require("node:assert/strict");
 const fixture = require("../../upstream/firmware/tests/fixtures/pd_mode_domain_v1.json");
 const golden = require("../../upstream/firmware/tests/fixtures/pd_mode_domain_v2.json");
-const {PD_DOMAIN_V2, encodePdDomain, decodePdDomain, pdDomainVersionFor, pdSlotCountOfVersion} = require("../../core/schema/pd-mode-domain-v1");
+const {PD_DOMAIN_V2, encodePdDomain, decodePdDomain} = require("../../core/schema/pd-mode-domain-v1");
 const {decodeProfileBlob, encodeProfileBlob} = require("../../core/schema/profile-blob-v1");
 
 const reject = (fn, code) => assert.throws(fn, error => error.code === code, `expected ${code}`);
@@ -22,7 +22,7 @@ test("every firmware vector decodes, and its slots encode to exactly its bytes",
     assert.deepEqual(golden.valid.map(vector => vector.name), ["empty", "presets", "gap", "full"]);
     for (const vector of golden.valid) {
         const bytes = Buffer.from(vector.hex, "hex");
-        const decoded = decodePdDomain(bytes, {version: 2});
+        const decoded = decodePdDomain(bytes);
         assert.equal(decoded.length, 32, vector.name);
         assert.deepEqual(decoded.filter(slot => slot.kind || slot.name).map(slot => slot.id), vector.slots.map(slot => slot.id), vector.name);
         assert.equal(encodePdDomain(denseOf(vector.slots)).toString("hex"), vector.hex, `${vector.name} from its slots`);
@@ -34,17 +34,15 @@ test("every firmware vector decodes, and its slots encode to exactly its bytes",
 test("every firmware rejection is refused with the firmware's code at its offset", () => {
     assert.ok(golden.invalid.some(vector => vector.error.code === "NONCANONICAL"));
     for (const vector of golden.invalid) {
-        assert.throws(() => decodePdDomain(Buffer.from(vector.hex, "hex"), {version: 2}),
+        assert.throws(() => decodePdDomain(Buffer.from(vector.hex, "hex")),
             error => error.code === vector.error.code && error.offset === vector.error.offset, `${vector.name}: ${vector.error.code} at ${vector.error.offset}`);
     }
 });
 
-test("an envelope's version decides the payload: a v1 payload is no v2 domain, nor the reverse", () => {
-    const v1 = Buffer.from(fixture.hex, "hex"), v2 = Buffer.from(golden.valid[1].hex, "hex");
-    assert.equal(decodePdDomain(v1).length, 8, "without a stated version the header decides");
-    reject(() => decodePdDomain(v1, {version: 2}), "INVALID_HEADER");
-    reject(() => decodePdDomain(v2, {version: 1}), "INVALID_HEADER");
-    reject(() => decodePdDomain(v2, {version: 3}), "INVALID_HEADER");
+test("a version-1 payload is no PD domain the keyboard stores", () => {
+    reject(() => decodePdDomain(Buffer.from(fixture.hex, "hex")), "INVALID_HEADER");
+    const v2 = Buffer.from(golden.valid[1].hex, "hex");
+    for (const version of [1, 3]) {const bytes = Buffer.from(v2); bytes[0] = version; reject(() => decodePdDomain(bytes), "INVALID_HEADER");}
 });
 
 test("an empty 32-slot domain is its header alone", () => {
@@ -125,12 +123,7 @@ test("the v2 encoder refuses what the keyboard would refuse", () => {
     reject(() => encodePdDomain(unnamed), "INVALID_NAME");
 });
 
-test("the domain version follows the slot count, and a schema-2 blob carries either", () => {
-    assert.equal(pdDomainVersionFor(8), 1);
-    assert.equal(pdDomainVersionFor(32), 2);
-    assert.equal(pdSlotCountOfVersion(1), 8);
-    assert.equal(pdSlotCountOfVersion(2), 32);
-    reject(() => pdDomainVersionFor(6), "INVALID_LENGTH");
+test("a schema-2 blob carries the sparse domain as version 2", () => {
     const payload = encodePdDomain(slots32());
     const blob = encodeProfileBlob({schema: {major: 2, minor: 0}, domains: [{id: 0x50, version: 2, payload}]});
     assert.deepEqual(decodeProfileBlob(blob).domains[0].payload, payload);
@@ -146,6 +139,6 @@ test("the firmware's compiled profile carries the presets vector and the compile
     assert.equal(rgb.version, 3);
     const rgbVectors = require("../../upstream/firmware/tests/fixtures/rgb_domain_v3.json");
     assert.equal(rgb.payload.toString("hex"), rgbVectors.valid.find(vector => vector.name === "compiled").hex);
-    const {ACTION_ABI_32_SLOTS} = require("../../core/schema/actions");
-    assert.equal(parseInt(text.match(/^profile.action_abi=(.+)$/m)[1], 16), ACTION_ABI_32_SLOTS, "the 32-slot vocabulary");
+    const {ACTION_ABI} = require("../../core/schema/actions");
+    assert.equal(parseInt(text.match(/^profile.action_abi=(.+)$/m)[1], 16), ACTION_ABI, "the vocabulary Ark knows");
 });

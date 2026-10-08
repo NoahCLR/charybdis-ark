@@ -8,7 +8,6 @@ const {decodeProfileBlob, encodeProfileBlob} = require("../../core/schema/profil
 const {encodeKeyBehaviorDomain} = require("../../core/schema/key-behavior-domain-v1");
 const {encodeComboDomain} = require("../../core/schema/combo-domain-v1");
 const {document: pdDocument} = require("../fixtures/pd-profile");
-const {legacyDocument} = require("../fixtures/portable-profile");
 
 const snapshot = value => ({document: value, fingerprint: fingerprint(value)});
 const schema2 = {maxProfilePayload: 5088, maxBehaviorRows: 64, maxPopulatedBehaviorSteps: 128, maxCombos: 32, maxReusableRgbGroups: 16, maxRgbStageGroupRows: 32};
@@ -31,9 +30,9 @@ test("a populated profile's areas add up to the bytes Apply writes", () => {
     assert.equal(usage.capacity, 5088, "the limit is the one the firmware advertises");
     assert.equal(total(usage), usage.used);
     assert.deepEqual(usage.areas.map(entry => entry.id), AREAS);
-    assert.equal(area(usage, "pointing"), 776 + 4, "eight pointing slots are a fixed size, used or not");
-    assert.equal(area(usage, "names"), 8 * 24, "eight layer names, before any macro is named");
-    const {behaviors, combos} = validateSnapshot(value);
+    const {behaviors, combos, pdModes} = validateSnapshot(value);
+    assert.equal(area(usage, "pointing"), 4 + 8 + 96 * pdModes.filter(slot => slot.kind || slot.name).length, "a record per stored slot");
+    assert.equal(area(usage, "names"), 8 * 24 + 128, "eight layer names and a length byte for each macro and custom key name");
     assert.deepEqual(count(usage, "behaviours"), {id: "behaviours", used: behaviors.rows.length, limit: 64});
     assert.deepEqual(count(usage, "behaviourSteps"), {id: "behaviourSteps", used: behaviors.populatedStepCount, limit: 128});
     assert.equal(count(usage, "combos").used, combos.rows.length);
@@ -52,16 +51,9 @@ test("naming a macro moves its bytes into names", () => {
     const before = snapshot(pdDocument());
     const after = snapshot(editMacro(before, {keycode: "VIA_MACRO_3", name: "Zoom mute", expectedFingerprint: before.fingerprint}));
     const a = profileUsage(before, schema2), b = profileUsage(after, schema2);
-    // Settings v4 adds a length byte for each of the 64 names; the name adds its 9 characters.
-    assert.equal(area(b, "names") - area(a, "names"), 64 + 9);
+    // The name adds its 9 characters to the length byte every name has.
+    assert.equal(area(b, "names") - area(a, "names"), 9);
     assert.equal(total(b), b.used);
-});
-
-test("a schema-1 profile is measured against its own limit and has no pointing modes", () => {
-    const usage = profileUsage(snapshot(legacyDocument()), {...schema2, maxProfilePayload: 4064});
-    assert.equal(usage.capacity, 4064);
-    assert.equal(area(usage, "pointing"), 0);
-    assert.equal(total(usage), usage.used);
 });
 
 test("nothing is shown that the keyboard did not report", () => {

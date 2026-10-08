@@ -77,7 +77,7 @@ test("the extension's panel has no theme toggle, picker, build line or browser r
     expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBeUndefined();
     await page.locator('[data-screen="profile"]').click();
     await expect(page.locator(".card.recoveries")).toHaveCount(0);
-    await expect(page.locator('[data-act="upgrade"]')).toHaveCount(1);
+    await expect(page.locator('[data-act="upgrade"]')).toHaveCount(0, {message: "the retired PD upgrade export is offered by no host"});
 });
 
 // The demo's controls (scripts/preview.js builds the demo's models with the

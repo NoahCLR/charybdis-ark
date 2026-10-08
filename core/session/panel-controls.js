@@ -14,6 +14,7 @@
 //
 // and `host.words.noneFound`, when a host says "no keyboard found" its own way.
 
+const {supportsCompleteProfile} = require("./portable-profile-session");
 const {validateSnapshot} = require("./portable-profile-session");
 const {DEMO_WORDS, panelCapabilities, panelState} = require("./demo-session");
 const {applyLayerEdit, discardDraftForDevice, layerEditDocument, startLayerEdit} = require("./panel-session");
@@ -73,7 +74,7 @@ async function readKeyboard(session, selectedDeviceId, host = {}) {
     await service.readBaseRgb();
     await service.readCombos();
     let macroFailure = "", portable;
-    if ((service.capabilities?.supportedDomainMask & 15) === 15) {
+    if (supportsCompleteProfile(service.capabilities)) {
         try {portable = await service.readPortableProfile();}
         catch (error) {macroFailure = " Macros and global settings could not be read: " + error.message;}
     }
