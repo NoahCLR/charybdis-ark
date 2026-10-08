@@ -491,6 +491,9 @@ so a dark one reads dark.
 
 A repeated element sits in the same place every time it appears, so a screen
 reads as a grid rather than as text that wraps wherever it lands.
+Review and Draft history reserve separate positions for tap-count badges and
+tier dots, including when either is absent; title slots fit a full combo badge
+with space before its name.
 The Keys workbench tabs count what the selected layer stores. The Key tab counts
 mapped keys, excluding transparent and disabled positions; its selected key's
 layout index belongs in the key details. Every Keys tab is at least as tall as

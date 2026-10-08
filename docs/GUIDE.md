@@ -126,7 +126,9 @@ that is switched off is drawn as off — hollow dots, plain badges, unlit keys.
 Every edit is kept in a local draft and reaches the keyboard only through
 review and apply. Review lists each changed thing once, under the area it is
 edited in, with the fields that changed, can open it where it is edited, and
-can discard part of the draft: things made by the same edit (a key swap, a
+can discard part of the draft. In Review and Draft history, combo badges have
+space before their names, and tap-count badges and tier dots occupy separate
+aligned positions. Things made by the same edit (a key swap, a
 moved behaviour) go back together, as one undoable step. Layers are compared
 by which layer they are, not where they sit, so a reorder is one **Layer
 priority** item and a key edited or a layer renamed after it is its own item;
