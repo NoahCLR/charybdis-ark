@@ -746,8 +746,10 @@ table.t.fixed { table-layout: fixed; }
 .rv-swatch { width: 12px; height: 12px; border-radius: 4px; border: 1px solid var(--line-2); flex: none; display: inline-block; }
 /* Marks (ui/marks.mjs): one size wherever a label or value carries one. */
 .mk { display: inline-flex; align-items: center; gap: 6px; }
-.mk-slot { display: inline-flex; justify-content: flex-end; align-items: center; gap: 4px; width: 34px; flex: none; }
-.mk-slot.title { width: 20px; justify-content: flex-start; }
+/* Reserve separate branch and tier tracks even when one mark is absent. */
+.mk-slot { display: inline-grid; grid-template-columns: 24px 7px; justify-items: end; align-items: center; gap: 4px; width: 35px; flex: none; }
+.mk-slot > .fbdot { grid-column: 2; }
+.mk-slot.title { display: inline-flex; width: 34px; justify-content: flex-start; }
 /* A branch that sends a pointing mode or a macro reads as that thing (ui/marks.mjs sends). */
 .sends { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; font-family: var(--sans); font-size: 11px; color: var(--text); font-weight: 520; vertical-align: middle; }
 .sends-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
