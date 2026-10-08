@@ -19,8 +19,8 @@ checkout. Everything Ark shows comes from the keyboard itself.
 - **Lighting.** Set layer and mode colours, combo and key feedback, and the
   auto-mouse fade. The board on screen is painted the way the keyboard will
   light up.
-- **Trackball.** Set pointer speed, sniping and auto-mouse, and up to 32 pointing
-  modes, as many as your firmware has (scroll, volume, zoom, arrows, your own
+- **Trackball.** Set pointer speed, sniping and auto-mouse, and 32 pointing
+  slots (scroll, volume, zoom, arrows, your own
   shortcuts…), with their keys.
 
 ## Nothing is saved until you say so
@@ -32,7 +32,7 @@ that are too long to play. **Apply** saves a recovery copy, writes both halves
 and reads the result back to prove it.
 
 **Export profile** saves your whole setup as one file. **Import profile**
-restores it after the same review.
+restores a current-format backup after the same review. Older backups are refused.
 
 No keyboard to hand? **Explore a demo** opens Ark on a complete setup with nothing
 connected. Every screen works and every edit shows up in the review; only Apply

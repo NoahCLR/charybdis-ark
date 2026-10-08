@@ -24,10 +24,10 @@ test("RGB policies preserve zero and reject missing or malformed values", () => 
 });
 
 test("LED membership edits preserve references and refuse deleting an assigned group", () => {
-    const next = editDeviceProfile(bytes, {type: "saveRgbReusableLedGroup", group: {originalName: "Group 0", ledIndices: [0, 1, 57]}});
-    assert.deepEqual(rgb(next).groups[0].leds, [0, 1, 57]);
-    assert.throws(() => editDeviceProfile(bytes, {type: "deleteRgbReusableLedGroup", name: "Group 0"}), /assignments/);
-    assert.throws(() => editDeviceProfile(bytes, {type: "saveRgbReusableLedGroup", group: {originalName: "Group 0", ledIndices: [58]}}));
+    const next = editDeviceProfile(bytes, {type: "saveRgbReusableLedGroup", group: {originalName: "Group 1", ledIndices: [0, 1, 57]}});
+    assert.deepEqual(rgb(next).groups.find(group => group.leds.includes(57)).leds, [0, 1, 57]);
+    assert.throws(() => editDeviceProfile(bytes, {type: "deleteRgbReusableLedGroup", name: "Group 1"}), /assignments/);
+    assert.throws(() => editDeviceProfile(bytes, {type: "saveRgbReusableLedGroup", group: {originalName: "Group 1", ledIndices: [58]}}));
 });
 
 const {decodeComboDomain} = require("../../core/schema/combo-domain-v1");
@@ -36,8 +36,8 @@ const {fixturePages} = require("../fixtures/device-combos");
 const {assertEffectiveCombos} = require("../../core/session/device-profile-edits");
 const readOf = pages => ({state: "read", ...decodeComboPages(pages[0], pages.slice(1))});
 const pages = fixturePages();
-const context = {capabilities: {supportedDomainMask: 7, actionAbiDigest: 0x1d3fcacc}, combos: readOf(pages)};
-const comboTable = bytes => {const domain = decodeProfileBlob(bytes).domains.find(row => row.id === 0x30); return decodeComboDomain(domain.payload, domain.version);};
+const context = {capabilities: {supportedDomainMask: 7, actionAbiDigest: 0xf79c6151}, combos: readOf(pages)};
+const comboTable = bytes => {const domain = decodeProfileBlob(bytes).domains.find(row => row.id === 0x30); return decodeComboDomain(domain.payload);};
 const comboRows = bytes => comboTable(bytes).rows;
 test("adding, editing and deleting combos preserves every untouched profile domain and combo", () => {
     const added = editDeviceProfile(bytes, {type: "addCombo", inputs: ["KC_A", "KC_B"], output: "LGUI(KC_C)", termMs: "25", ordered: true}, context);
@@ -81,17 +81,8 @@ test("a combo follows the default window until it has its own, and the default i
     assert.deepEqual(comboTable(empty), {version: 2, defaultTermMs: 70, holdTermMs: 200, rows: []});
     assert.equal(comboTable(editDeviceProfile(empty, {type: "updateComboHoldTerm", holdTermMs: 250}, context)).holdTermMs, 250);
 });
-test("a keyboard without a stored default keeps every window explicit until a combo edit can upgrade it", () => {
-    const old = {...context, combos: readOf(fixturePages(1))};
-    const added = editDeviceProfile(bytes, {type: "addCombo", inputs: ["KC_A", "KC_B"], output: "KC_C", termMs: "30"}, old);
-    assert.equal(comboTable(added).version, 1);
-    assert.deepEqual(comboRows(added).map(row => row.termMs), [50, 50, 30]);
-    assert.throws(() => editDeviceProfile(bytes, {type: "addCombo", inputs: ["KC_A", "KC_B"], output: "KC_C", termMs: ""}, old), /enter one/);
-    assert.throws(() => editDeviceProfile(bytes, {type: "updateComboDefaultTerm", defaultTermMs: 70}, old), /no default combo window/);
-    // A table from before the default, on a keyboard that stores one, takes
-    // the keyboard's default and keeps its own windows.
-    const upgraded = editDeviceProfile(added, {type: "deleteCombo", id: 0}, {...context, comboDefaults: {defaultTermMs: 60, holdTermMs: 150}});
-    assert.deepEqual(comboTable(upgraded), {...comboTable(added), version: 2, defaultTermMs: 60, rows: comboRows(added).slice(1).map((row, id) => ({...row, id}))});
+test("retired combo readback never becomes an editable table", () => {
+    assert.throws(() => readOf(fixturePages(1)), {code: "COMBO_INCOMPATIBLE"});
 });
 test("Cmd+N from the combo picker saves and verifies as a standard modified key", () => {
     const message = {type: "saveCombo", id: 0, inputs: ["G(KC_C)", "G(KC_V)"], output: "G(KC_N)", termMs: "50"};

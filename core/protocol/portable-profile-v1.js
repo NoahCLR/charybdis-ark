@@ -1,6 +1,5 @@
 "use strict";
 const {isUnhandledEcho, orUnhandled} = require("./via-unhandled-v1");
-const {decodePdDomain} = require("../schema/pd-mode-domain-v1");
 const {buildProfileGetRequest, decodeProfileResponse, profileResponseMatcher} = require("./profile-wire-v1");
 const {crc32, fnv1a32} = require("../schema/profile-blob-v1");
 const {SETTINGS, decodeSettings} = require("../schema/settings-domain-v1");
@@ -15,7 +14,7 @@ async function readSettings(connection, ids) {
     const before = await page(connection, 7, 0, ids);
     if (before.length !== 12 || before[0] !== 1 || before[1] !== 25) throw fail("Invalid settings metadata.");
     const length = before.readUInt16LE(2);
-    if (length < 344 || length > SETTINGS.V5_MAX_SIZE) throw fail("Invalid settings capacity.");
+    if (length < SETTINGS.FIXED_SIZE + SETTINGS.MACRO_NAMES + SETTINGS.CUSTOM_KEY_NAMES || length > SETTINGS.MAX_SIZE) throw fail("Invalid settings capacity.");
     const chunks = [];
     for (let offset = 0; offset < length; offset += 25) {
         const bytes = await page(connection, 7, 1 + offset / 25, ids);
@@ -25,20 +24,6 @@ async function readSettings(connection, ids) {
     const bytes = Buffer.concat(chunks), after = await page(connection, 7, 0, ids);
     if (!before.equals(after) || crc32(bytes) !== before.readUInt32LE(4) || fnv1a32(bytes) !== before.readUInt32LE(8)) throw fail("Keyboard settings changed during the read. Try again.");
     decodeSettings(bytes); return bytes;
-}
-async function readLegacyPdSource(connection, ids) {
-    const before = await page(connection, 9, 0, ids);
-    if (before.length !== 12 || before[0] !== 1 || before[1] !== 25 || before.readUInt16LE(2) !== 776) throw fail("Invalid legacy pointing-mode metadata.");
-    const chunks = [];
-    for (let offset = 0; offset < 776; offset += 25) {
-        const chunk = await page(connection, 9, 1 + offset / 25, ids);
-        if (chunk.length !== Math.min(25, 776 - offset)) throw fail("Truncated pointing-mode read.");
-        chunks.push(chunk);
-    }
-    const bytes = Buffer.concat(chunks), after = await page(connection, 9, 0, ids);
-    if (!before.equals(after) || crc32(bytes) !== before.readUInt32LE(4) || fnv1a32(bytes) !== before.readUInt32LE(8)) throw fail("Pointing modes changed during backup. Read the keyboard again.");
-    decodePdDomain(bytes);
-    return bytes;
 }
 async function readStorageStatus(connection, ids) {
     const bytes = await page(connection, 8, 0, ids);
@@ -75,4 +60,4 @@ async function waitForStorage(connection, ids, {timeoutMs = 90000, pollMs = 150,
     } while (Date.now() < deadline);
     throw fail("The two halves have not finished saving. Keep the recovery file and reconnect both halves.");
 }
-module.exports = {readLegacyPdSource, readSettings, readSettingsLimits, readStorageStatus, waitForStorage};
+module.exports = {readSettings, readSettingsLimits, readStorageStatus, waitForStorage};

@@ -29,7 +29,7 @@ export {
 export {readKeyboard, draftControl, portableControl, rereadKeyboard} from "../core/session/panel-controls.js";
 export {exportedProfile, openPanelLoop} from "../core/session/panel-loop.js";
 export {DEMO_CAPABILITIES, demoUnsaved, openDemo} from "../core/session/demo-session.js";
-export {upgradePdSnapshot, validateSnapshot} from "../core/session/portable-profile-session.js";
+export {validateSnapshot} from "../core/session/portable-profile-session.js";
 export {APPLY_STEPS, ApplyProgress, failureReason} from "../core/session/apply-progress.js";
 export {DEFAULT_REQUEST_TIMEOUT_MS, DeviceRequestCoordinator} from "../core/transport/request-coordinator.js";
 export {

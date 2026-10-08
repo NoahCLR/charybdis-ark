@@ -21,12 +21,12 @@ const {createHash} = require("node:crypto");
 const {execFileSync} = require("node:child_process");
 const {decodeCapabilityPages} = require("../core/protocol/profile-wire-v1");
 const {knownActionAbi, KNOWN_ACTION_ABIS} = require("../core/schema/actions");
-const {PROFILE_BLOB_V1, PROFILE_BLOB_V2} = require("../core/schema/profile-blob-v1");
+const {PROFILE_BLOB_V1} = require("../core/schema/profile-blob-v1");
 
 const FIRMWARE = "https://github.com/NoahCLR/charybdis-4x6";
 const QMK = "https://github.com/NoahCLR/bastardkb-qmk";
 const PROTOCOL_MAJORS = [1];
-const SCHEMA_MAJORS = [PROFILE_BLOB_V1.SCHEMA_MAJOR, PROFILE_BLOB_V2.SCHEMA_MAJOR];
+const SCHEMA_MAJORS = [PROFILE_BLOB_V1.SCHEMA_MAJOR];
 
 const sha256 = bytes => createHash("sha256").update(bytes).digest("hex");
 const hex = value => `0x${(value >>> 0).toString(16).padStart(8, "0")}`;

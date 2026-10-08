@@ -16,9 +16,6 @@
 //                                   Import and the demo's Open a profile file use it
 //   host.saveExport(file)           saves an exported profile ({fileName, text});
 //                                   resolves to where it went, or undefined if cancelled
-//   host.exportPdUpgrade(session)   optional, VS Code only: the legacy eight-slot
-//                                   upgrade export, which a host without it neither
-//                                   offers nor runs
 //   host.words, host.panel()        optional: what the panel says and offers in this
 //                                   host (`model.host`; see panel-session.js)
 //
@@ -101,9 +98,7 @@ async function draftMessage(session, message, host) {
 async function portableMessage(session, message, host) {
     session.portableBusy = true;
     try {
-        if (message.type === "exportPdUpgrade" && host.exportPdUpgrade) {
-            await host.exportPdUpgrade(session);
-        } else if (message.type === "exportPortableProfile" && session.demo) {
+        if (message.type === "exportPortableProfile" && session.demo) {
             const {snapshot, saved} = demoExport(session);
             const where = await host.saveExport(exportedProfile(snapshot, new Date(), "charybdis-demo"));
             if (where) {

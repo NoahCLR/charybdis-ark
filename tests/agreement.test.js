@@ -8,8 +8,8 @@ const {judge, markdown} = require("../scripts/check-agreement");
 const FIRMWARE = "https://github.com/NoahCLR/charybdis-4x6";
 const QMK = "https://github.com/NoahCLR/bastardkb-qmk";
 // Capability pages as firmware's contract probe states them (action-ABI digest
-// 0x1d3fcacc, schema 2, eight layers).
-const PAGES = ["0102010002002014027fdf0700ccca3f1d0000010011864b93", "0808400580200410203a084040e013e0130014171c1f000000"];
+// 0xf79c6151, schema 2, eight layers).
+const PAGES = ["0102010002002014027fdf070051619cf70000010011864b93", "0808400580200410203a084040e013e0130014171c1f000000"];
 const sha = text => createHash("sha256").update(text).digest("hex");
 
 function setup() {

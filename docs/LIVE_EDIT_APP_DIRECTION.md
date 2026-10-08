@@ -43,9 +43,9 @@ matrix.
 | Macros | 64 named VIA macro slots with builder, recorder and preview; shared-memory and per-macro limits shown and enforced (D-L25, D-L26) |
 | Custom keys | 64 named keys that do what their behaviour says: rename, add or open the behaviour, place, see where each is used (D-L42) |
 | Mouse | Pointer and sniping DPI, auto-sniping and auto-mouse: global-policy sections the core files under the Mouse area, so the rail, the review and import counts all place them there. The auto-mouse fade delay is a share of the timeout, edited on its lighting stage (D-L17) |
-| Pointing modes | Eight device-owned slots and eight RGB rows (PD domain v1, RGB v2), or 32 on firmware whose action vocabulary has them (sparse PD domain v2, RGB v3); the slot count is the vocabulary's (`core/schema/actions.js` `pdSlotCountFor`), and an eight-slot backup imports onto 32-slot firmware. See [PD-mode domain v1](../upstream/firmware/docs/architecture/pd-mode-domain-v1.md) |
+| Pointing modes | 32 device-owned slots (sparse PD domain v2, RGB v3); Ark accepts only the current action vocabulary and profile formats (D-L54). See [PD-mode domain v1](../upstream/firmware/docs/architecture/pd-mode-domain-v1.md) |
 | Global policy | Every other portable setting, including startup layers, combo matching and device-reported lighting and key options; unsupported firmware features stay read-only |
-| Backup and restore | Complete snapshots, import review against the keyboard, recovery file and verified restore |
+| Backup and restore | Complete current-format snapshots, import review against the keyboard, recovery file and verified restore; older backups are refused (D-L54) |
 | Drafts and Apply | One draft with item-by-item review, discard by edit group, Show, undo/redo and draft history; the review checks reachable actions, confirms active warnings and traps, and blocks profiles the destination cannot save (D-L36); Apply shows its steps and says where a failure happened (D-L19, D-L23, D-L29, D-L30) |
 | Recovery | Atomic logical Apply, differential transfer, reboot recovery fencing, firmware roll-forward after the decision, resume after a lost or power-cycled peer link, bounded cancel owned by the keyboard (D-L20–D-L22, D-L27, D-L39) |
 | Where it runs | The VS Code extension, and a web page that runs all of Ark in Chrome or Edge over WebHID (D-L52): Choose keyboard, one tab at a time, recovery copies in the browser's storage, a light/dark toggle. A phone gets only a notice that Ark runs on a computer, with links to the repositories; a tablet gets Ark. `npm run build:web` writes the page as static files; a workflow publishes it to Cloudflare Pages: `dev` at `ark-dev.ncleroy.dev`, `main` at `ark.ncleroy.dev` from the first release |
@@ -77,13 +77,6 @@ Remaining before calling the product complete:
   does not include, matched against its rules files and QMK's defaults. It
   drifts when a feature is enabled or disabled. The keyboard should report its
   built features so the picker reads them from the device.
-- **Eight-slot firmware is tested from a frozen fixture.** Ark speaks the
-  32-slot firmware's contract (digest `0xf79c6151`, PD v2 and RGB v3), checked
-  on the keyboard and against its pinned golden vectors, the compatibility
-  bridge and agreement. It still speaks the eight-slot firmware, but only from a
-  frozen copy of that firmware's compiled profile
-  (`tests/fixtures/compiled_profile_pd_eight_slot.fixture`), which the firmware
-  no longer keeps. It retires with eight-slot support.
 - **Firmware open issues** are tracked in the firmware direction: the one-half
   power-cycle recovery transition, why a peer stops acknowledging a push or
   fails a flash write mid-copy (D-L22, D-L27), physical acceptance of buffered gesture timing
@@ -281,9 +274,8 @@ The standard image reserves eight layers; base stays at index zero and the app
 moves overlays and rewrites references together. The action ABI describes the
 engine vocabulary independently of authored rows, so empty and populated
 builds advertise the same ABI. The old five-layer snapshot bridge is retired
-(D-L40). Old portable snapshots remain importable only when they carry the
-source evidence required by the current schema. No firmware is flashed by the
-app.
+(D-L40). Ark accepts only current portable snapshots and does not upgrade older
+backups (D-L54). No firmware is flashed by the app.
 
 Before a file becomes the draft or is restored, its card compares it with what
 the keyboard holds, since that is what applying it would write, counting the
@@ -394,9 +386,9 @@ edit past it, and marks a slot VIA wrote past it as too long.
 Every empty slot keeps room for ten key taps (30 bytes); when free memory
 cannot keep that for every empty slot, the highest-numbered empty slots show no
 room and cannot be edited until space is freed. The firmware does not enforce the reserve, so the
-app shows what a VIA edit left. Settings version 4 guarantees every macro name
-20 printable ASCII characters; see
-[portable profile](../upstream/firmware/docs/architecture/portable-profile-v1.md#version-4-every-macro-name-gets-20-characters).
+app shows what a VIA edit left. Current settings version 5 gives every macro
+name up to 20 printable ASCII characters, as version 4 did; see the
+[portable profile](../upstream/firmware/docs/architecture/portable-profile-v1.md).
 
 ### D-L27 — A stale copy on the other half can no longer hold off every later one
 
@@ -913,7 +905,6 @@ the keyboard (a Web Lock); leaving with unapplied edits or during Apply asks
 first; Apply's waits run on a worker's clock, so a background tab does not slow
 it. Recovery copies are kept in the browser's storage (IndexedDB), listed on
 Profile & backups with a download each; clearing the site's data deletes them.
-The legacy eight-slot upgrade export stays the extension's.
 
 A phone gets none of this: the page shows a notice that Ark runs on a computer,
 with links to Ark's and the firmware's repositories and to BastardKB, the
@@ -964,3 +955,21 @@ the demo; with edits not exported since, the message must say the panel asked
 (`discardDemo`), or it is refused. The demo is offered only with no keyboard
 connected and no unapplied keyboard draft, and on a page that cannot reach a
 keyboard only where the host says so (`model.host.blocked.demo`).
+
+### D-L54 — Ark accepts only current profile formats
+
+Ark follows the firmware's current-only profile contract (firmware D-F10):
+schema 2.0, RGB 3, key behaviours 1, combos 2, settings 5 and sparse PD 2,
+with eight layers, 64 VIA macros and the 32-slot action vocabulary
+`0xf79c6151`. Candidate uploads use store format 3 and a nonzero VIA binding.
+The codecs reject earlier schemas and domain versions. Complete-profile
+imports reject older action vocabularies, layer counts and legacy pointing
+source evidence before a draft, recovery copy or device write is started.
+
+The backup-upgrade chain and eight-slot firmware support are removed. Ark
+neither translates older backups nor silently drops their data; Noah runs
+current-format profiles. Test-only frozen inputs remain to prove rejection and
+to exercise the unchanged pointing record rules against C. The preview uses
+current firmware's 32-slot profile. Device diagnostics may still display an
+unsupported keyboard's reported capabilities and unnamed keycodes, but it
+cannot open an editable draft or export a complete current-format backup.

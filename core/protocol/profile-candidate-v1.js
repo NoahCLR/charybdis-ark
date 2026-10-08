@@ -27,7 +27,12 @@ const PROFILE_CANDIDATE_V1 = Object.freeze({
     MAX_BLOB_SIZE: 5088,
     STATUS_LAYOUT_VERSION: 1,
     STATUS_PAYLOAD_SIZE: 25,
-    LOGICAL_STORE_FORMAT: 2,
+    // Format 3 (`NR`): every save is one logical generation bound to the VIA
+    // store's generation and digest. The firmware refuses any other format,
+    // including the custom-only format 0 earlier firmware took.
+    LOGICAL_STORE_FORMAT: 3,
+    SCHEMA_MAJOR: 2,
+    SCHEMA_MINOR: 0,
     KNOWN_DOMAIN_MASK: PROFILE_WIRE_DOMAINS.RGB | PROFILE_WIRE_DOMAINS.KEY_BEHAVIORS | PROFILE_WIRE_DOMAINS.COMBOS | PROFILE_WIRE_DOMAINS.SETTINGS | PROFILE_WIRE_DOMAINS.PD_MODES,
 });
 
@@ -153,10 +158,8 @@ function buildCandidateBeginRequest(transactionId, metadata) {
     report.writeUInt32LE(normalized.digest, 15);
     report.writeUInt32LE(normalized.actionAbiDigest, 19);
     report[23] = normalized.storeFormatVersion;
-    if (normalized.storeFormatVersion !== 0) {
-        report.writeUInt32LE(normalized.viaGeneration, 24);
-        report.writeUInt32LE(normalized.viaDigest, 28);
-    }
+    report.writeUInt32LE(normalized.viaGeneration, 24);
+    report.writeUInt32LE(normalized.viaDigest, 28);
     return report;
 }
 
@@ -417,12 +420,16 @@ async function readCandidatePeerStatus(connection, options = {}) {
     }
 }
 
+// A candidate is always bound to the VIA store generation it will publish
+// with: options.viaGeneration and options.viaDigest are required and nonzero.
 function candidateMetadataForBlob(value, options = {}) {
     const blob = copyBytes(value, "Candidate profile blob");
     if (blob.length < PROFILE_CANDIDATE_V1.MIN_BLOB_SIZE || blob.length > PROFILE_CANDIDATE_V1.MAX_BLOB_SIZE) {
         throw new RangeError(`Candidate profile blob must contain ${PROFILE_CANDIDATE_V1.MIN_BLOB_SIZE} through ${PROFILE_CANDIDATE_V1.MAX_BLOB_SIZE} bytes.`);
     }
     const decoded = decodeProfileBlob(blob);
+    assertCurrentSchema(decoded.schema.major, decoded.schema.minor);
+    const {viaGeneration, viaDigest} = assertViaBinding(options.viaGeneration, options.viaDigest);
     let derivedDomains = 0;
     for (const domain of decoded.domains) {
         if (domain.id === PROFILE_DOMAIN_IDS.RGB) derivedDomains |= PROFILE_WIRE_DOMAINS.RGB;
@@ -450,9 +457,9 @@ function candidateMetadataForBlob(value, options = {}) {
         crc32: crc32(blob),
         digest: fnv1a32(blob),
         actionAbiDigest: assertU32(options.actionAbiDigest, "Action-ABI digest"),
-        storeFormatVersion: options.viaGeneration === undefined && options.viaDigest === undefined ? 0 : (decoded.schema.major === 2 ? 3 : PROFILE_CANDIDATE_V1.LOGICAL_STORE_FORMAT),
-        viaGeneration: options.viaGeneration === undefined ? 0 : assertU32(options.viaGeneration, "VIA generation"),
-        viaDigest: options.viaDigest === undefined ? 0 : assertU32(options.viaDigest, "VIA digest"),
+        storeFormatVersion: PROFILE_CANDIDATE_V1.LOGICAL_STORE_FORMAT,
+        viaGeneration,
+        viaDigest,
     };
 }
 
@@ -465,21 +472,20 @@ function normalizeCandidateMetadata(metadata) {
         throw new RangeError("Candidate flags must be zero for Profile Wire v1.");
     }
     const payloadLength = assertU16(metadata.payloadLength, "Candidate payload length");
-    if (payloadLength < PROFILE_CANDIDATE_V1.MIN_BLOB_SIZE || payloadLength > (metadata.schemaMajor === 2 ? 5088 : 4064)) {
+    if (payloadLength < PROFILE_CANDIDATE_V1.MIN_BLOB_SIZE || payloadLength > PROFILE_CANDIDATE_V1.MAX_BLOB_SIZE) {
         throw new RangeError(`Candidate payload length must be ${PROFILE_CANDIDATE_V1.MIN_BLOB_SIZE} through ${PROFILE_CANDIDATE_V1.MAX_BLOB_SIZE}.`);
     }
-    const storeFormatVersion = metadata.storeFormatVersion === undefined ? 0 : assertU8(metadata.storeFormatVersion, "Candidate store format");
-    if (storeFormatVersion !== 0 && storeFormatVersion !== (metadata.schemaMajor === 2 ? 3 : PROFILE_CANDIDATE_V1.LOGICAL_STORE_FORMAT)) {
-        throw new RangeError(`Candidate store format must be zero or ${PROFILE_CANDIDATE_V1.LOGICAL_STORE_FORMAT}.`);
+    const schemaMajor = assertU8(metadata.schemaMajor, "Candidate schema major");
+    const schemaMinor = assertU8(metadata.schemaMinor, "Candidate schema minor");
+    assertCurrentSchema(schemaMajor, schemaMinor);
+    const storeFormatVersion = assertU8(metadata.storeFormatVersion, "Candidate store format");
+    if (storeFormatVersion !== PROFILE_CANDIDATE_V1.LOGICAL_STORE_FORMAT) {
+        throw new RangeError(`Candidate store format must be ${PROFILE_CANDIDATE_V1.LOGICAL_STORE_FORMAT}.`);
     }
-    const viaGeneration = metadata.viaGeneration === undefined ? 0 : assertU32(metadata.viaGeneration, "VIA generation");
-    const viaDigest = metadata.viaDigest === undefined ? 0 : assertU32(metadata.viaDigest, "VIA digest");
-    if (storeFormatVersion === 0 ? (viaGeneration !== 0 || viaDigest !== 0) : (viaGeneration === 0 || viaDigest === 0)) {
-        throw new RangeError("Logical candidates require a nonzero VIA generation and digest; legacy candidates require both to be zero.");
-    }
+    const {viaGeneration, viaDigest} = assertViaBinding(metadata.viaGeneration, metadata.viaDigest);
     return {
-        schemaMajor: assertU8(metadata.schemaMajor, "Candidate schema major"),
-        schemaMinor: assertU8(metadata.schemaMinor, "Candidate schema minor"),
+        schemaMajor,
+        schemaMinor,
         requestedDomains: assertDomainMask(metadata.requestedDomains),
         flags,
         payloadLength,
@@ -490,6 +496,24 @@ function normalizeCandidateMetadata(metadata) {
         viaGeneration,
         viaDigest,
     };
+}
+
+function assertCurrentSchema(major, minor) {
+    if (major !== PROFILE_CANDIDATE_V1.SCHEMA_MAJOR || minor !== PROFILE_CANDIDATE_V1.SCHEMA_MINOR) {
+        throw candidateProtocolError("INCOMPATIBLE_SCHEMA", `Candidates use profile schema ${PROFILE_CANDIDATE_V1.SCHEMA_MAJOR}.${PROFILE_CANDIDATE_V1.SCHEMA_MINOR}; this blob is ${major}.${minor}.`);
+    }
+}
+
+function assertViaBinding(generation, digest) {
+    if (generation === undefined || digest === undefined) {
+        throw candidateProtocolError("VIA_BINDING_REQUIRED", "A candidate must be bound to the VIA store generation and digest it publishes with.");
+    }
+    const viaGeneration = assertU32(generation, "VIA generation");
+    const viaDigest = assertU32(digest, "VIA digest");
+    if (viaGeneration === 0 || viaDigest === 0) {
+        throw candidateProtocolError("VIA_BINDING_REQUIRED", "A candidate's VIA generation and digest must both be nonzero.");
+    }
+    return {viaGeneration, viaDigest};
 }
 
 function buildMutationHeader(valueId, transactionId, command = PROFILE_CANDIDATE_V1.COMMAND_SET) {

@@ -3,8 +3,8 @@
 // Layer names and priority are edited beside the board, in Keys → Layers, where
 // what a layer holds is visible while it is named.
 //
-// A complete profile is layers, behaviours, combos, both macro banks, lighting
-// and settings. Restoring one replaces all of that, so the card counts, area
+// A complete profile is layers, behaviours, combos, macros, pointing modes,
+// lighting and settings. Restoring one replaces all of that, so the card counts, area
 // by area, what the file changes on the keyboard before anything is written.
 
 import {el, esc} from "../lib/dom.mjs";
@@ -29,7 +29,7 @@ export function screenProfile() {
 
     const main = el(`<div class="main">${topbar(
         "Profile & backups",
-        "A complete backup is everything the keyboard stores: layers, behaviours, combos, both macro banks, lighting and settings.",
+        "A complete backup is everything the keyboard stores: layers, behaviours, combos, macros, pointing modes, lighting and settings.",
     )}</div>`);
 
     const content = el(`<div class="content"><div class="pad" style="max-width:960px;display:grid;gap:14px"></div></div>`);
@@ -37,9 +37,7 @@ export function screenProfile() {
 
     if (portable.progress) pad.appendChild(el(`<div class="profile-progress"><span class="spin"></span><span>${esc(portable.progress)}</span></div>`));
     if (!portable.available) {
-        pad.appendChild(el(`<div class="unavailable">${esc(portable.legacy
-            ? "This keyboard runs the five-layer firmware. Install the backup bridge, export your profile there, then install the eight-layer update."
-            : "Connect a keyboard with complete-profile firmware to manage its backups and layers.")}</div>`));
+        pad.appendChild(el(`<div class="unavailable">${esc("Connect a keyboard with complete-profile firmware to manage its backups and layers.")}</div>`));
     }
     if (portable.review) pad.appendChild(reviewCard(model, portable, busy));
 
@@ -69,17 +67,6 @@ export function screenProfile() {
 
     const usage = portable.available ? profileUsageView(portable.usage, model?.macroBank) : null;
     if (usage) pad.appendChild(usageCard(usage));
-
-    if (portable.pdUpgradeAvailable) {
-        const card = el(`<div class="card"><div class="card-h"><h3>Firmware upgrade</h3>
-            <span class="right"><span class="chip"><i class="dot draft"></i>geometry change ahead</span></span></div>
-            <div class="card-b" style="display:grid;gap:10px">
-                <p class="note">Before flashing a pair that changes the stored geometry, export a verified original and a migrated copy through the old-geometry bridge. The migrated file is the one that restores onto the new firmware.</p>
-                <button class="btn" style="justify-self:start" data-act="upgrade" ${busy ? "disabled" : ""}>Export upgrade pair…</button>
-            </div></div>`);
-        card.querySelector('[data-act="upgrade"]').addEventListener("click", () => post({type: "exportPdUpgrade"}));
-        pad.appendChild(card);
-    }
 
     if (!demo) pad.appendChild(el(`<div class="profile-recovery">
         <i class="dot ${health.recoveryPending ? "draft" : "on"}" style="margin-top:6px"></i>
@@ -151,7 +138,7 @@ function reviewCard(model, portable, busy) {
         ? "An interrupted restore left an incomplete configuration, so this file cannot be compared with it. This profile replaces it; the interrupted data is kept as a diagnostic copy, so keep your original backup as well."
         : draft
             ? `${pending ? `This replaces your draft and its ${pending} change${pending === 1 ? "" : "s"}; Undo brings ${pending === 1 ? "it" : "them"} back. ` : ""}Nothing is written to the keyboard until you review and apply; the review shows every change field by field.`
-            : "This replaces the keyboard's layout, behaviours, combos, macros, lighting and settings. A recovery copy is saved automatically before restoring, and both halves are verified afterwards.";
+            : "This replaces the keyboard's layout, behaviours, combos, macros, pointing modes, lighting and settings. A recovery copy is saved automatically before restoring, and both halves are verified afterwards.";
     const node = el(`<div class="card">
         <div class="card-h"><h3>${draft ? "Use this profile as your draft?" : "Restore this profile?"}</h3>
             ${fileName ? `<span class="right note mono">${esc(fileName)}</span>` : ""}</div>

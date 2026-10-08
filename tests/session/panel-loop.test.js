@@ -7,7 +7,7 @@ const {LIVE_LINK_ERROR_CODES, liveLinkError} = require("../../core/transport/dev
 const {fingerprint, summary} = require("../../core/model/portable-profile");
 const {document} = require("../fixtures/pd-profile");
 
-const capabilities = {compiledLayerCount: 8, supportedDomainMask: 31, actionAbiDigest: 0x1d3fcacc, featureFlags: 1 << 13};
+const capabilities = {compiledLayerCount: 8, supportedDomainMask: 31, actionAbiDigest: 0xf79c6151, featureFlags: 0};
 const snapshot = () => {
     const doc = document();
     return {document: doc, fingerprint: fingerprint(doc), summary: summary(doc), limits: {brightnessMax: 200}};
@@ -156,16 +156,15 @@ test("the exported file is the document as text, named for its day", () => {
     });
 });
 
-test("the eight-slot upgrade export is the host's, and refused by a host without it", async () => {
-    const host = fakeHost(), loop = loopWithDraft(host);
-    await loop.handleMessage({type: "exportPdUpgrade"});
-    assert.match(last(host).notice, /^Failed: Unsupported portable control/);
+test("the retired PD upgrade export is no message any host runs", async () => {
     const seen = [];
-    const vscodeLike = fakeHost({exportPdUpgrade: async (session) => {seen.push(session); session.notice = "saved both";}});
-    const upgrading = loopWithDraft(vscodeLike);
-    await upgrading.handleMessage({type: "exportPdUpgrade"});
-    assert.deepEqual(seen, [upgrading.session]);
-    assert.equal(last(vscodeLike).notice, "saved both");
+    const host = fakeHost({exportPdUpgrade: async (session) => {seen.push(session);}}), loop = loopWithDraft(host);
+    const posted = host.posted.length;
+    await loop.handleMessage({type: "exportPdUpgrade"});
+    assert.equal(host.posted.length, posted + 1, "an unknown message is answered with the model");
+    assert.equal(last(host).type, "model");
+    assert.deepEqual(seen, [], "not even a host that still has the function");
+    assert.deepEqual(host.errors, []);
 });
 
 test("closing the loop closes the device service", async () => {
@@ -197,10 +196,8 @@ test("messages meant for a host's own controls are answered, never run", async (
     assert.deepEqual(host.errors, []);
 });
 
-test("a host without the legacy upgrade export neither offers nor runs it", async () => {
+test("the panel offers no PD upgrade export", async () => {
     const host = fakeHost(), loop = loopWithDraft(host);
     loop.publish();
-    assert.equal(last(host).model.portable.pdUpgradeAvailable, false);
-    await loop.handleMessage({type: "exportPdUpgrade"});
-    assert.match(last(host).notice, /^Failed: Unsupported portable control/);
+    assert.equal("pdUpgradeAvailable" in last(host).model.portable, false);
 });

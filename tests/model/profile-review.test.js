@@ -53,7 +53,7 @@ function withDomain(value, id, decode, encode, change) {
 }
 const behaviours = (value, change) => withDomain(value,32,payload=>decodeKeyBehaviorDomain(payload,{actionLimits:{maxPdModes:8}}).rows,rows=>encodeKeyBehaviorDomain({rows},{actionLimits:{maxPdModes:8}}),change);
 // The rows of the stored table, with its default window and hold threshold kept.
-const combos = (value, change, timing = {}) => withDomain(value,48,payload=>decodeComboDomain(payload,2),table=>encodeComboDomain({...table,...timing}),table=>({...table,rows:change(table.rows)}));
+const combos = (value, change, timing = {}) => withDomain(value,48,payload=>decodeComboDomain(payload),table=>encodeComboDomain({...table,...timing}),table=>({...table,rows:change(table.rows)}));
 const comboRows = () => Array.from({length:7}, (_, id) => ({inputs:[{kind:1,flags:0,operand:4+id},{kind:1,flags:0,operand:30+id}],
     output:{kind:1,flags:0,operand:40+id},termMs:50,mustHold:false,mustTap:false,ordered:false}));
 test("a changed default window is one Combo timing change, and the combos that follow it do not change", () => {

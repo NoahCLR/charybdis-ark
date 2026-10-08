@@ -5,8 +5,8 @@ const {decodeRgbDomainV1, encodeRgbDomainV1, RGB_LAYER_MODES, RGB_LOCALITIES, RG
 
 const keycodes = require("../data/keycode-catalog");
 const {semanticActionForExpression, resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
-const {decodeComboDomain, encodeComboDomain, upgradeComboTable, effectiveComboTerm} = require("../schema/combo-domain-v1");
-const {actionLimitsOfBlob, actionName, keycodeAction, knownActionAbi, layerRef, nativeCode, pdSlotCountFor} = require("../schema/actions");
+const {decodeComboDomain, encodeComboDomain, effectiveComboTerm} = require("../schema/combo-domain-v1");
+const {actionName, keycodeAction, knownActionAbi, layerRef, nativeCode} = require("../schema/actions");
 const {comboPlacementProblem} = require("../model/profile-placement");
 const {comboTableOf} = require("../model/portable-profile");
 const {BEHAVIOR_EDITS, editKeyBehaviors} = require("./key-behavior-edits");
@@ -78,10 +78,8 @@ function editDeviceProfile(bytes, message, context = {}) {
     if (PD_EDITS.has(message.type)) {
         if (!(context.capabilities?.supportedDomainMask & 16)) throw invalid("PD editing needs firmware with configurable pointing slots.");
         const profile = decodeProfileBlob(bytes);
-        if (profile.schema.major !== 2) throw invalid("Upgrade this profile before editing modes.");
         const domain = existing(profile.domains, row => row.id === 80, "Pointing modes");
-        const slots = decodePdDomain(domain.payload, {version: domain.version});
-        if (slots.length !== pdSlotCountFor(context.capabilities)) throw invalid(`This profile stores ${slots.length} pointing slots, but the keyboard has ${pdSlotCountFor(context.capabilities)}. Read from keyboard again.`);
+        const slots = decodePdDomain(domain.payload);
         const id = integer(message.slot, slots.length - 1, "Slot");
         if (message.type === "clearPdMode") slots[id] = {id, kind: 0, name: ""};
         else if (message.type === "duplicatePdMode") {
@@ -114,7 +112,7 @@ function editDeviceProfile(bytes, message, context = {}) {
     const domain = existing(profile.domains, row => row.id === PROFILE_DOMAIN_IDS.RGB, "RGB");
     const maximumBrightness = context.maximumBrightness ?? 255;
     const rgbOptions = {maximumBrightness};
-    const rgb = decodeRgbDomainV1(domain.payload, {...rgbOptions, formatVersion: domain.version});
+    const rgb = decodeRgbDomainV1(domain.payload, rgbOptions);
     const editColor = (value) => color(value, maximumBrightness);
     switch (message.type) {
         case "updateLayerColor": {
@@ -188,12 +186,7 @@ function editCombos(bytes, message, context) {
     const profile = decodeProfileBlob(bytes);
     const domain = profile.domains.find(row => row.id === PROFILE_DOMAIN_IDS.COMBOS);
     const nativeAction = keycodeAction;
-    const actionOptions = actionLimitsOfBlob(profile);
-    let table = domain ? decodeComboDomain(domain.payload, domain.version, actionOptions) : comboTableOf(read);
-    // A keyboard that stores the default reads the older format too; a table
-    // from before it, such as an older backup, takes the keyboard's default on
-    // its first combo edit, and its own windows stay as they are.
-    if (table.version === 1 && context.comboDefaults) table = upgradeComboTable(table, context.comboDefaults);
+    const table = domain ? decodeComboDomain(domain.payload) : comboTableOf(read);
     const expression = value => {
         const name = String(value).trim();
         if (/^MO\(/.test(name)) return semanticActionForExpression(name, {});
@@ -204,17 +197,13 @@ function editCombos(bytes, message, context) {
     };
     const followsDefault = message.followsDefault === true || String(message.termMs ?? "").trim() === "";
     if (message.type === "updateComboHoldTerm") {
-        if (table.version === 1 && !table.rows.length) throw invalid("This keyboard stores the combo hold threshold with its combos, so it can be set once there is a combo. Flash the updated firmware pair to set it without one.");
         table.holdTermMs = integer(message.holdTermMs, 65535, "Hold threshold");
     } else if (message.type === "updateComboDefaultTerm") {
-        if (table.version === 1) throw invalid("This keyboard has no default combo window. Flash the updated firmware pair to set one.");
         table.defaultTermMs = comboWindow(message.defaultTermMs, "Default combo window");
     } else if (message.type === "deleteCombo") {
         table.rows.splice(integer(message.id, table.rows.length - 1, "Combo index"), 1);
     } else {
         if (!Array.isArray(message.inputs)) throw invalid("Choose two to four combo input keys.");
-        if (followsDefault && table.version === 1) throw invalid("This keyboard has no default combo window, so enter one for this combo.");
-        if (table.holdTermMs === null) table.holdTermMs = integer(message.holdTermMs, 65535, "Hold threshold");
         const row = {inputs: message.inputs.map(expression), output: expression(message.output), termMs: followsDefault ? null : comboWindow(message.termMs), mustHold: message.mustHold === true, mustTap: message.mustTap === true, ordered: message.ordered === true};
         if (message.type === "saveCombo") table.rows[integer(message.id, table.rows.length - 1, "Combo index")] = row;
         else table.rows.push(row);
@@ -223,7 +212,7 @@ function editCombos(bytes, message, context) {
     // row is checked, not only the one being edited.
     const problem = comboPlacementProblem(table.rows, {layerCount: context.capabilities.compiledLayerCount ?? 8});
     if (problem) throw invalid(problem);
-    const payload = encodeComboDomain(table, actionOptions);
+    const payload = encodeComboDomain(table);
     if (domain) Object.assign(domain, {version: table.version, payload});
     else profile.domains.push({id: PROFILE_DOMAIN_IDS.COMBOS, version: table.version, payload});
     return encodeProfileBlob(profile);
@@ -236,9 +225,9 @@ function assertEffectiveCombos(bytes, read) {
     const domain = profile.domains.find(row => row.id === PROFILE_DOMAIN_IDS.COMBOS);
     if (!domain) return;
     if (read?.state !== "read") throw invalid("The profile was saved, but the running combos could not be verified. Read from keyboard before retrying.");
-    const table = decodeComboDomain(domain.payload, domain.version, actionLimitsOfBlob(profile));
+    const table = decodeComboDomain(domain.payload);
     const expected = table.rows.map(row => ({...row, termMs: effectiveComboTerm(table, row), followsDefault: row.termMs === null, inputs: row.inputs.map(nativeCode), output: nativeCode(row.output)}));
-    const shared = (table.version === 1 || table.defaultTermMs === read.defaultTermMs) && (table.holdTermMs === null || table.holdTermMs === read.holdTermMs);
+    const shared = table.defaultTermMs === read.defaultTermMs && table.holdTermMs === read.holdTermMs;
     if (!shared || expected.length !== read.rows.length || expected.some((row, index) => { const actual = read.rows[index]; return ["id", "output", "termMs", "followsDefault", "mustHold", "mustTap", "ordered"].some(key => row[key] !== actual[key]) || JSON.stringify(row.inputs) !== JSON.stringify(actual.inputs); })) throw invalid("The saved combo profile does not match the running combo table. Flash the current firmware pair and read from keyboard again.");
 }
 

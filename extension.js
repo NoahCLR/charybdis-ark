@@ -17,7 +17,6 @@ const fs = require("node:fs");
 const path = require("node:path");
 const vscode = require("vscode");
 
-const {upgradePdSnapshot, validateSnapshot} = require("./core/session/portable-profile-session");
 const {openPanelLoop} = require("./core/session/panel-loop");
 const {getHtml} = require("./panel-html");
 
@@ -97,7 +96,6 @@ function vscodeHost(panel, recoveryRoot) {
             await vscode.workspace.fs.writeFile(uri, Buffer.from(file.text));
             return uri.fsPath;
         },
-        exportPdUpgrade,
     };
 }
 
@@ -109,24 +107,4 @@ async function saveRecoveryFile(recoveryRoot, document) {
     const uri = vscode.Uri.joinPath(recoveryRoot, "recovery-" + new Date().toISOString().replace(/[:.]/g, "-") + suffix);
     await vscode.workspace.fs.writeFile(uri, Buffer.from(JSON.stringify(document, null, 2) + "\n"));
     return uri.fsPath;
-}
-
-// The legacy eight-slot upgrade export: two files written and read back, so it
-// stays VS Code's.
-async function exportPdUpgrade(session) {
-    const snapshot = await session.service.readPortableProfile(), upgraded = upgradePdSnapshot(snapshot.document);
-    const uri = await vscode.window.showSaveDialog({title: "Save original profile and PD upgrade", saveLabel: "Save both profiles", filters: {"Charybdis profile": ["charybdis.json"]}});
-    if (!uri) return;
-    const next = uri.with({path: uri.path.replace(/(?:\.charybdis)?\.json$/i, "") + ".pd8.charybdis.json"});
-    let exists = false;
-    try {await vscode.workspace.fs.stat(next); exists = true;} catch (error) {if (error.code !== "FileNotFound") throw error;}
-    if (exists || next.toString() === uri.toString()) throw new Error("The upgraded backup path already exists. Choose a new backup name.");
-    for (const [target, value] of [[uri, snapshot.document], [next, upgraded]]) {
-        const bytes = Buffer.from(JSON.stringify(value, null, 2) + "\n");
-        await vscode.workspace.fs.writeFile(target, bytes);
-        const verified = Buffer.from(await vscode.workspace.fs.readFile(target));
-        if (!verified.equals(bytes)) throw new Error("Backup verification failed. Keep the existing firmware until both backups are saved.");
-        validateSnapshot(verified.toString("utf8"));
-    }
-    session.notice = "Original and eight-slot profiles saved and verified. Keep the original firmware pair too. After installing the new firmware on both halves, import " + next.fsPath;
 }

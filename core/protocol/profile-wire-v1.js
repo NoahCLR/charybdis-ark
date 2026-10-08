@@ -23,6 +23,9 @@ const PROFILE_WIRE_STATUS = Object.freeze({
 
 const PROFILE_WIRE_KNOWN_MASKS = Object.freeze({
     FEATURE_FLAGS: 0x0007ffff,
+    // Bits current firmware never advertises. An older image that does still
+    // decodes; nothing reads them.
+    RETIRED_FEATURES: 1 << 13,
     REQUIRED_READ_FEATURES: 0x0000000f,
     STATE_FLAGS: 0x01ff,
     SUPPORTED_DOMAINS: 0x1f,
@@ -42,7 +45,8 @@ const PROFILE_WIRE_FEATURES = Object.freeze({
     ACTION_ABI_DIGEST: 1 << 10,
     COMPILED_PROFILE_HASH: 1 << 11,
     ATOMIC_LOGICAL_APPLY: 1 << 12,
-    LEGACY_PD_SOURCE: 1 << 13,
+    // Bit 13 is retired and never advertised; the legacy PD readback page
+    // (GET 0x09) it announced is unsupported.
     // TG(), TO(), TT() and OSL() act through the keyboard's layer ownership.
     OWNED_LAYER_TOGGLES: 1 << 14,
     // Behaviours send QMK and keyboard functions (DPI_MOD, RGB Matrix…)

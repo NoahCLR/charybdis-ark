@@ -56,7 +56,7 @@ be saved. Profile & backups lists every copy, newest first, with a
 low, but clearing the site's data (or the browser's) deletes the copies, so
 download any you want to keep. **Export profile** downloads the profile file;
 **Import profile** opens the browser's file chooser and takes files up to
-100 kB. The legacy **Export upgrade pair** is not offered on the page. Errors
+100 kB. Errors
 show in the rail's message rather than as a notification, and the page's
 version and commit are at the foot of the rail, with GitHub's logo: choose them
 to open that commit on GitHub in a new tab.
@@ -108,7 +108,7 @@ Every screen is drawn and wired to the host:
 | Mouse | Pointer speed, sniping and auto-mouse — the Settings sections the keyboard's model files under Mouse, drawn with the same cards and posted whole |
 | Pointing modes | Every slot the firmware has, eight or 32: movement, speed, direction shortcuts and how often they send (every step, or once per movement until the ball pauses or moves back the other way), scroll tuning and which way a scrolling mode scrolls (both axes, horizontal only or vertical only), what each direction's shortcut does with held modifiers, thresholds shown as ball movement at the mode's DPI, buttons, bindings, placement, clear and duplicate |
 | Settings | Every other section the keyboard reports, posted whole, read-only where the firmware cannot report; the Combos section also carries the default combo window and the combo hold threshold, which the keyboard stores with its combos |
-| Profile & backups | Import (the file against the keyboard, counted by what it configures — keys, lighting, macros, mouse, pointing — before it becomes the draft), export, upgrade export, profile memory, recovery state |
+| Profile & backups | Import (the file against the keyboard, counted by what it configures — keys, lighting, macros, mouse, pointing — before it becomes the draft), export, profile memory, recovery state |
 | Device | Read-only: connection, committed generation, what was read |
 
 The keycode picker leads with the ANSI board, then task-shaped Symbols,
@@ -168,8 +168,8 @@ badges on the key face in the feedback colours the keyboard flashes.
 During initial read, refresh or device selection, every screen menu is disabled
 and a loading step replaces the screen. Once the read finishes, Device opens
 if the keyboard reported its capabilities. Profile & backups opens when a
-connected keyboard supports complete-profile backup, including five-layer
-firmware that can be read and backed up. The Configure
+connected keyboard runs current eight-layer firmware with complete-profile
+backup. The Configure
 menus open only with an editable draft.
 
 Underneath it, one workbench whose tabs are the key, its behaviour, its combos,
@@ -410,25 +410,21 @@ bottom. Moving a layer updates the keys, behaviours, combos, RGB assignments and
 pointer settings that refer to it. There is no need to change the layer count
 or reflash for ordinary profile editing.
 
-**Pointing slots.** Firmware has eight pointing slots or, from the 32-slot
-firmware on, 32. Ark asks the keyboard which and shows exactly that many. On
-32 slots, Pointing modes lists the configured slots as cards and the empty ones
-as a grid of numbered chips beneath them (a chip in amber still has keys
-reaching it); the key picker lists the slots in two columns; Lighting's slot
-list scrolls beside the colour editor. Each slot keeps its own Hold and Toggle
-key (`PD_SLOT_n`, `PD_SLOT_n_LOCK`) and its own lighting row, and an empty slot
-takes no room in the profile, so 32 slots cost only what you configure.
+**Pointing slots.** Current firmware has 32. Pointing modes lists the configured
+slots as cards and the empty ones as a grid of numbered chips beneath them (a
+chip in amber still has keys reaching it); the key picker lists the slots in
+two columns; Lighting's slot list scrolls beside the colour editor. Each slot
+keeps its own Hold and Toggle key (`PD_SLOT_n`, `PD_SLOT_n_LOCK`) and lighting
+row. An empty slot takes no room in the profile, so 32 slots cost only what you
+configure.
 
-A backup from eight-slot firmware imports onto 32-slot firmware: its keys,
-behaviours, combos, macros and settings come across unchanged, its eight slots
-keep their places, and slots 8 to 31 start empty and unlit (right half). The
-review shows the result before anything is applied. A backup goes the other
-way only by reflashing the firmware it came from: eight-slot firmware does not
-take a 32-slot profile, and nothing is dropped to make it fit.
+Ark accepts backups in the current format only: eight layers and 32 pointing
+slots, with all settings and names. A backup from five-layer or eight-slot
+firmware, or one carrying older domain versions, is refused when opened.
+Ark does not translate it or drop data to make it fit. Keep the old firmware
+pair and its backups together if you still need them.
 
-Old five-layer firmware is no longer built here. Its storage geometry is
-incompatible with current firmware, so retain the old pair and its backups if
-you still use it. Executable custom combo hooks and unsupported macro content
+Executable custom combo hooks and unsupported macro content
 cannot be represented as profile data; export reports these explicitly instead
 of producing an incomplete file.
 The [portable profile contract](../upstream/firmware/docs/architecture/portable-profile-v1.md) records

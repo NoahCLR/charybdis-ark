@@ -26,26 +26,26 @@ async function inputs() {
     for (const dir of [FIRMWARE_FIXTURES, APP_FIXTURES]) {
         for (const file of fs.readdirSync(dir).filter((name) => name.endsWith(".fixture")).sort()) {
             for (const [key, hex] of values(path.join(dir, file))) {
-                if (/^(profile\.full|blob\.[a-z]+)\.hex$/.test(key)) blobs.push({name: `${dir === APP_FIXTURES ? "app" : "firmware"}/${file} ${key}`, hex});
+                if (/^(profile\.full|blob\.[a-z]+)\.hex$/.test(key)) blobs.push({name: `${dir === APP_FIXTURES ? "app" : "firmware"}/${file} ${key}`, hex, rejects: ["compiled_profile_v1.fixture", "compiled_profile_eight_v1.fixture"].includes(file) ? "INCOMPATIBLE_SCHEMA" : undefined});
             }
         }
     }
     const rgb = values(path.join(FIRMWARE_FIXTURES, "rgb_domain_v1.fixture"));
-    const rgbV1Options = {
+    const rgbOptions = {
         compiledStageMask: Number(rgb.get("codec.compiled_stage_mask")),
         logicalLayerCount: Number(rgb.get("codec.logical_layer_count")),
         maximumBrightness: Number(rgb.get("codec.maximum_brightness")),
         tapBranchColorCount: Number(rgb.get("codec.tap_branch_color_count")),
-        supportedPdModeIds: Array.from({length: 6}, (_, id) => id).filter((id) => Number(rgb.get("codec.supported_pd_mode_mask")) & (1 << id)),
+        supportedPdModeIds: Array.from({length: 32}, (_, id) => id).filter((id) => Number(rgb.get("codec.supported_pd_mode_mask")) & (1 << id)),
     };
     const behaviors = values(path.join(FIRMWARE_FIXTURES, "key_behavior_domain_v1.fixture"));
     const rgbV3 = json("rgb_domain_v3.json"), pdV2 = json("pd_mode_domain_v2.json");
     const domains = [
-        {name: "rgb_domain_v1 payload", kind: "rgb", hex: rgb.get("payload.hex"), options: rgbV1Options},
+        {name: "rgb_domain_v1 payload", kind: "rgb", hex: rgb.get("payload.hex"), options: rgbOptions},
         ...[...rgbV3.valid, ...rgbV3.invalid].map((vector) => ({name: `rgb_domain_v3 ${vector.name}`, kind: "rgb", hex: vector.hex, options: {...rgbV3.limits, formatVersion: 3}})),
         ...[...behaviors].filter(([key]) => key.startsWith("payload.")).map(([key, hex]) => ({name: `key_behavior_domain_v1 ${key}`, kind: "behaviors", hex})),
         ...[...behaviors].filter(([key]) => key.startsWith("envelope.")).map(([key, hex]) => ({name: `key_behavior_domain_v1 ${key}`, kind: "behaviorEnvelope", hex})),
-        {name: "combo_domain_v1", kind: "combos", hex: fs.readFileSync(path.join(FIRMWARE_FIXTURES, "combo_domain_v1.fixture"), "utf8").trim(), options: {version: 1}},
+        {name: "combo_domain_v1", kind: "combos", hex: fs.readFileSync(path.join(FIRMWARE_FIXTURES, "combo_domain_v1.fixture"), "utf8").trim(), options: {version: 2}},
         {name: "pd_mode_domain_v1", kind: "pd", hex: json("pd_mode_domain_v1.json").hex, options: {version: 1}},
         ...[...pdV2.valid, ...pdV2.invalid].map((vector) => ({name: `pd_mode_domain_v2 ${vector.name}`, kind: "pd", hex: vector.hex, options: {version: 2}})),
     ];
@@ -57,9 +57,9 @@ async function inputs() {
         {name: "pd-profile", document: pdDocument()},
         {name: "pd-slots-32", document: document32()},
         {name: "portable-profile", document: portableFixture.document()},
-        {name: "portable-profile legacy", document: portableFixture.legacyDocument()},
+        {name: "retired portable version", document: {...portableFixture.document(), version: 1}, rejects: "INVALID_PORTABLE_PROFILE"},
     ];
-    for (const {name, document} of documents) blobs.push({name: `document ${name}`, hex: Buffer.from(document.profile, "base64").toString("hex")});
+    for (const {name, document} of documents.filter(entry => !entry.rejects)) blobs.push({name: `document ${name}`, hex: Buffer.from(document.profile, "base64").toString("hex")});
 
     const edits = await import("../webview/view/edits.mjs");
     const {ACTION_ABI} = require("../core/schema/actions");
@@ -104,7 +104,8 @@ test("the bundled core decodes, encodes and stages exactly as Node does", async 
     // The envelope vectors (blob.*) carry placeholder payloads, which only
     // have to fail alike.
     for (const [index, blob] of node.blobs.entries()) {
-        const {name, hex} = given.blobs[index];
+        const {name, hex, rejects} = given.blobs[index];
+        if (rejects) {expect(blob.error, name).toBe(rejects); continue;}
         expect(blob.error, `${name}: ${blob.message}`).toBeUndefined();
         expect(blob.value.encoded, name).toEqual({buffer: hex});
         for (const [at, domain] of blob.value.domains.entries()) {
@@ -115,7 +116,8 @@ test("the bundled core decodes, encodes and stages exactly as Node does", async 
     }
     // Each document is written again, field for field, from what it decoded to.
     for (const [index, entry] of node.documents.entries()) {
-        const {name, document} = given.documents[index];
+        const {name, document, rejects} = given.documents[index];
+        if (rejects) {expect(entry.error, name).toBe(rejects); continue;}
         expect(entry.error, `${name}: ${entry.message}`).toBeUndefined();
         expect(entry.value.rewritten, name).toEqual(document);
     }

@@ -14,13 +14,8 @@ const portable = require("../core/model/portable-profile");
 const keycodes = require("../core/data/keycode-catalog");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../core/protocol/via-layout-v1");
 const {PROFILE_WIRE_KNOWN_MASKS} = require("../core/protocol/profile-wire-v1");
-const {document: pdDocument} = require("../tests/fixtures/pd-profile");
 const {document32} = require("../tests/fixtures/pd-slots-32");
-const {ACTION_ABI, ACTION_ABI_32_SLOTS} = require("../core/schema/actions");
-
-// `--slots 32` previews the 32-slot firmware: its compiled profile with slot 12
-// configured too, and keys for slot 12 and the empty slot 20.
-const SLOTS_32 = process.argv.includes("--slots") && process.argv[process.argv.indexOf("--slots") + 1] === "32";
+const {ACTION_ABI} = require("../core/schema/actions");
 
 // A readable keymap for the preview only. The fixture profile ships an empty
 // VIA layout, which renders honestly but tells you nothing about the layout
@@ -34,10 +29,11 @@ const PREVIEW_BASE = [
     "KC_LGUI", "KC_SPC", "KC_ESC", "KC_ENT", "KC_ENT", "KC_DEL", "KC_BSPC", "KC_BSPC",
 ];
 
-// Keys the keyboard stores as bare user keycodes: a configured pointing mode, an
-// empty slot, a VIA macro and a custom key. The preview carries them because
-// they are the values whose stored name and semantic name differ.
-const PREVIEW_PD_BINDINGS = {50: 0x7e80, 52: 0x7e86, 48: 0x7700, 49: 0x7e40, ...(SLOTS_32 ? {53: 0x7e8c, 54: 0x7eb4} : {})};
+// Keys the keyboard stores as bare user keycodes: configured pointing modes
+// (slots 0 and 12), empty slots (6 and 20), a VIA macro and a custom key. The
+// preview carries them because they are the values whose stored name and
+// semantic name differ.
+const PREVIEW_PD_BINDINGS = {50: 0x7e80, 52: 0x7e86, 48: 0x7700, 49: 0x7e40, 53: 0x7e8c, 54: 0x7eb4};
 
 function fillPreviewLayer(document) {
     for (const [layoutIndex, code] of Object.entries(PREVIEW_PD_BINDINGS)) {
@@ -56,11 +52,11 @@ function fillPreviewLayer(document) {
 const capabilities = {
     compiledLayerCount: 8,
     supportedDomainMask: 31,
-    actionAbiDigest: SLOTS_32 ? ACTION_ABI_32_SLOTS : ACTION_ABI,
+    actionAbiDigest: ACTION_ABI,
     // Current firmware: every feature this app knows, including physical
     // gesture timing and runtime-owned tapping, which change what an empty
     // behaviour cell means.
-    featureFlags: PROFILE_WIRE_KNOWN_MASKS.FEATURE_FLAGS,
+    featureFlags: PROFILE_WIRE_KNOWN_MASKS.FEATURE_FLAGS & ~PROFILE_WIRE_KNOWN_MASKS.RETIRED_FEATURES,
     responseVersion: 1,
     reportSize: 32,
     brightnessMax: 255,
@@ -78,7 +74,7 @@ const capabilities = {
 // the web page's says what the page offers, in its words (web/web-host.mjs),
 // with no keyboard yet, or in a browser without WebHID. preview/index.html
 // shows the extension's; ?host=web, web-none or web-unsupported the others.
-const VSCODE_HOST = {exportPdUpgrade() {}};
+const VSCODE_HOST = {};
 async function webHosts() {
     const {BLOCKED, WEB_WORDS} = await import("../web/web-host.mjs");
     const {version} = require("../package.json");
@@ -114,7 +110,7 @@ function demoModel(host, edits = []) {
 const DEMO_EDIT = {type: "updateConfigDefaults", sectionId: "normalPointerSpeed", fields: [{macro: "normalDpi", value: "1400"}, {macro: "snipingDpi", value: "200"}]};
 
 function buildModel(host = VSCODE_HOST) {
-    const doc = fillPreviewLayer(SLOTS_32 ? document32() : pdDocument());
+    const doc = fillPreviewLayer(document32());
     const snapshot = {
         document: doc,
         fingerprint: portable.fingerprint(doc),

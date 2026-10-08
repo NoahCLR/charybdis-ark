@@ -5,7 +5,6 @@ const {layerOfRef, nativeCode} = require("../schema/actions");
 const {keyLabel, keyLabelWithName, profileKeyNames} = require("./key-names");
 const {decodedOf} = require("./portable-profile");
 const {settingsEditorView} = require("./settings-editor");
-const {customKeyNamesOf} = require("../schema/settings-domain-v1");
 const {macroEditorView} = require("./macro-editor");
 const rgbEnums = require("../schema/rgb-domain-v1");
 const {KEY_BEHAVIOR_HOLD_MODES} = require("../schema/key-behavior-domain-v1");
@@ -31,7 +30,7 @@ const actionField = (value, names, extra = {}) => ({text: action(value, names), 
 // The names an action can be read by in one snapshot.
 const namesIn = (value, macros) => ({layers: value.settings.names,
     keys: profileKeyNames({actionsKnown: true, layers: value.settings.names, macros: macros?.viaMacros, behaviors: value.behaviors.rows, pdModes: value.pdModes,
-        customKeys: customKeyNamesOf(value.settings).map((name, slot) => ({slot, name}))})});
+        customKeys: value.settings.customKeyNames.map((name, slot) => ({slot, name}))})});
 // The mark an action carries: what it reaches, when that has a colour of its
 // own — a pointing mode's light, a layer's colour.
 const actionMark = value => !value ? undefined
@@ -301,7 +300,7 @@ function profileReview(before, after) {
         item("Macros", `macro:${i}`, `Macro ${i}${(next.name || old.name) ? ` · ${next.name || old.name}` : ""}`, fields(old), fields(next), {kind: "macro", index: i}, [has(old), has(next)]);
     });
     // A custom key is its name here; what it does is its behaviour's item.
-    const keyNamesA = customKeyNamesOf(a.settings), keyNamesB = customKeyNamesOf(b.settings);
+    const keyNamesA = a.settings.customKeyNames, keyNamesB = b.settings.customKeyNames;
     keyNamesA.forEach((old, i) => {
         const next = keyNamesB[i], fields = name => new Map([["Name", name || "no name"]]);
         item("Custom keys", `customKey:${i}`, `Custom key ${i}${(next || old) ? ` · ${next || old}` : ""}`, fields(old), fields(next), {kind: "customKey", index: i}, [Boolean(old), Boolean(next)]);

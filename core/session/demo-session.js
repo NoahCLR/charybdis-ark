@@ -19,8 +19,8 @@
 
 const {ProfileDraftSession} = require("./profile-draft-session");
 const {validateSnapshot, fingerprint, summary} = require("./portable-profile-session");
-const {ACTION_ABI_32_SLOTS} = require("../schema/actions");
-const {PROFILE_WIRE_FEATURES, PROFILE_WIRE_KNOWN_MASKS} = require("../protocol/profile-wire-v1");
+const {ACTION_ABI} = require("../schema/actions");
+const {PROFILE_WIRE_KNOWN_MASKS} = require("../protocol/profile-wire-v1");
 const DEMO_PROFILE = require("../data/demo-profile.charybdis.json");
 
 // The draft's keyboard, which is none. A device id is never this word.
@@ -29,8 +29,7 @@ const DEMO_DEVICE_ID = "demo";
 // What current firmware (the 32-slot pair) reports about itself, as the device
 // service decodes it, without what only a real keyboard has: its firmware
 // version and the digest of the profile it was compiled with. It advertises
-// every feature this app knows but the legacy pointing-mode source, which only
-// a schema-1 backup carries. tests/session/demo-session.test.js holds this to
+// every feature this app knows but the retired ones. tests/session/demo-session.test.js holds this to
 // what the simulated current keyboard (tests/fixtures/fake-keyboard.js) reports.
 const DEMO_CAPABILITIES = Object.freeze({
     responseVersion: 1,
@@ -39,8 +38,8 @@ const DEMO_CAPABILITIES = Object.freeze({
     reportSize: 32,
     candidateChunkMax: 20,
     statusPageCount: 2,
-    featureFlags: PROFILE_WIRE_KNOWN_MASKS.FEATURE_FLAGS & ~PROFILE_WIRE_FEATURES.LEGACY_PD_SOURCE,
-    actionAbiDigest: ACTION_ABI_32_SLOTS,
+    featureFlags: PROFILE_WIRE_KNOWN_MASKS.FEATURE_FLAGS & ~PROFILE_WIRE_KNOWN_MASKS.RETIRED_FEATURES,
+    actionAbiDigest: ACTION_ABI,
     compiledLayerCount: 8,
     maxLogicalLayers: 8,
     maxBehaviorRows: 64,
@@ -94,7 +93,7 @@ const DEMO_WORDS = Object.freeze({
 const fail = (text, code = "DEMO_REFUSED") => Object.assign(new Error(text), {code});
 
 // A document as the demo's keyboard side: checked as Import checks a file
-// against current firmware (so an older backup is brought up to it), with the
+// against current firmware, with the
 // limits and options a keyboard would have reported beside it.
 function demoSnapshot(value) {
     const {document} = validateSnapshot(value, DEMO_CAPABILITIES);

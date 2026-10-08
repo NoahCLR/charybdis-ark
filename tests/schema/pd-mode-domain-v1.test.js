@@ -2,10 +2,18 @@
 const {test} = require("node:test");
 const assert = require("node:assert/strict");
 const fixture = require("../../upstream/firmware/tests/fixtures/pd_mode_domain_v1.json");
-const {PD_DOMAIN_V1, encodePdDomain, decodePdDomain, isPdTapKey} = require("../../core/schema/pd-mode-domain-v1");
+const {PD_DOMAIN_V2, encodePdDomain, decodePdDomain, isPdTapKey} = require("../../core/schema/pd-mode-domain-v1");
 const {decodeProfileBlob, encodeProfileBlob} = require("../../core/schema/profile-blob-v1");
-const slots = () => structuredClone(fixture.slots);
-const bytes = () => Buffer.from(fixture.hex, "hex");
+// The firmware's eight-slot record fixture as the 32 slots the keyboard has:
+// slot 6 disabled but named, so it keeps a record, and the rest empty. The
+// first seven slots are the first seven records, at the offsets the frozen
+// eight-slot envelope had them.
+const slots = () => {
+    const value = [...structuredClone(fixture.slots), ...Array.from({length: 24}, (_, index) => ({id: index + 8, kind: 0, name: ""}))];
+    value[6] = {id: 6, kind: 0, name: "Spare"};
+    return value;
+};
+const bytes = () => encodePdDomain(slots());
 const reject = (fn, code) => assert.throws(fn, error => error.code === code);
 
 test("native PD, layer-lock and custom-key identities sit in their fixed blocks", () => {
@@ -22,16 +30,17 @@ test("native PD, layer-lock and custom-key identities sit in their fixed blocks"
     assert.equal(resolveNativeQmkExpression("MACRO_0", model), undefined, "the retired user macros are gone");
 });
 
-test("eight PD slots match the independent byte fixture and preserve the full preset policies", () => {
-    const encoded = encodePdDomain(slots());
-    assert.equal(encoded.length, 776);
-    assert.equal(encoded.toString("hex"), fixture.hex);
+test("the fixture's slots encode as its records and preserve the full preset policies", () => {
+    const encoded = encodePdDomain(slots()), frozen = Buffer.from(fixture.hex, "hex");
+    assert.equal(encoded.length, 8 + 7 * 96, "six configured slots and one named one");
+    for (let slot = 0; slot < 6; slot++) assert.deepEqual(encoded.subarray(8 + slot * 96, 8 + (slot + 1) * 96), frozen.subarray(8 + slot * 96, 8 + (slot + 1) * 96), `slot ${slot}`);
     const decoded = decodePdDomain(encoded);
     assert.deepEqual(encodePdDomain(decoded), encoded);
     assert.equal(decoded[4].directions.up.mask, 0x44);
     assert.equal(decoded[4].buttons[0].modifiers, 0x20);
     assert.equal(decoded[5].heldModifiers, 8);
     assert.equal(decoded[7].kind, 0);
+    assert.deepEqual(decoded[6], {...decodePdDomain(encodePdDomain(slots().map(slot => slot.id === 6 ? {id: 6, kind: 0, name: ""} : slot)))[6], name: "Spare"});
 });
 
 test("slot seven accepts a custom media mode and byte-bounded Unicode names", () => {
@@ -47,9 +56,9 @@ test("slot seven accepts a custom media mode and byte-bounded Unicode names", ()
 });
 
 test("PD decoder rejects malformed framing, hidden disabled state and noncanonical records", () => {
-    reject(() => decodePdDomain(bytes().subarray(1)), "INVALID_LENGTH");
+    reject(() => decodePdDomain(bytes().subarray(0, -1)), "INVALID_LENGTH");
     reject(() => decodePdDomain(Buffer.concat([bytes(), Buffer.from([0])])), "INVALID_LENGTH");
-    for (const [offset, value, code] of [[0, 2, "INVALID_HEADER"], [3, 1, "INVALID_HEADER"], [8, 1, "INVALID_ID"],
+    for (const [offset, value, code] of [[0, 1, "INVALID_HEADER"], [1, 8, "INVALID_HEADER"], [8, 1, "INVALID_ID"],
         [15, 1, "RESERVED"], [98, 1, "RESERVED"], [8 + 6 * 96 + 4, 100, "INVALID_PARAMETER"],
         [16, 0xc0, "INVALID_NAME"], [39, 1, "INVALID_NAME"], [9, 3, "INVALID_POLICY"]]) {
         const b = bytes(); b[offset] = value;
@@ -135,9 +144,11 @@ test("encoder rejects unknown fields and numeric coercion rather than silently d
     }
 });
 
-test("standalone PD codec does not enable a new domain in current live writers", () => {
-    reject(() => encodeProfileBlob({domains: [{id: PD_DOMAIN_V1.ID, version: 1, payload: bytes()}]}), "UNKNOWN_DOMAIN");
-    const envelope = Buffer.alloc(12);
-    Buffer.from([0x4e, 0x4c, 0x50, 0x31, 1, 0, 1, 1, 0x50, 1, 8, 3]).copy(envelope);
-    reject(() => decodeProfileBlob(Buffer.concat([envelope, bytes()])), "UNKNOWN_DOMAIN");
+test("a profile carries the PD domain only as version 2, and the retired eight-slot payload is refused", () => {
+    const payload = bytes();
+    assert.deepEqual(decodeProfileBlob(encodeProfileBlob({domains: [{id: PD_DOMAIN_V2.ID, version: 2, payload}]})).domains[0].payload, payload);
+    reject(() => encodeProfileBlob({domains: [{id: PD_DOMAIN_V2.ID, version: 1, payload}]}), "UNKNOWN_DOMAIN_VERSION");
+    const envelope = Buffer.from([0x4e, 0x4c, 0x50, 0x31, 2, 0, 1, 1, 0x50, 1, 8, 3]);
+    reject(() => decodeProfileBlob(Buffer.concat([envelope, Buffer.from(fixture.hex, "hex")])), "UNKNOWN_DOMAIN_VERSION");
+    assert.throws(() => decodePdDomain(Buffer.from(fixture.hex, "hex")), error => error.code === "INVALID_HEADER" && error.offset === 0);
 });

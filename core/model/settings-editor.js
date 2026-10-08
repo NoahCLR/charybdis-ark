@@ -1,6 +1,6 @@
 "use strict";
 
-const {actionLimitsFor, layerOfRef} = require("../schema/actions");
+const {layerOfRef} = require("../schema/actions");
 const {effectiveTimings} = require("./gesture-timing");
 const {encodeKeyBehaviorDomain} = require("../schema/key-behavior-domain-v1");
 const {validateSnapshot, decodedOf} = require("./portable-profile");
@@ -228,8 +228,8 @@ function editSettings(snapshot, message, capabilities) {
         }
     }
     const domains = decodeProfileBlob(value.profile).domains.map(domain => domain.id === 0x40 ? {...domain, payload: encodeSettings(value.settings)}
-        : domain.id === 0x20 && behaviorsChanged ? {...domain, payload: encodeKeyBehaviorDomain(value.behaviors, actionLimitsFor(value.document.version, value.pdModes?.length))} : domain);
-    const document = {...value.document, profile: encodeProfileBlob({schema: {major: value.document.version, minor: 0}, domains}).toString("base64")};
+        : domain.id === 0x20 && behaviorsChanged ? {...domain, payload: encodeKeyBehaviorDomain(value.behaviors)} : domain);
+    const document = {...value.document, profile: encodeProfileBlob({domains}).toString("base64")};
     validateSnapshot(document, capabilities);
     return document;
 }

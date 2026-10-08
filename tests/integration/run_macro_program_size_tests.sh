@@ -46,7 +46,7 @@ for (let i = 0; i < 3000; i++) {
     while (held.length) payload += `{-${held.pop()}}`;
     payloads.push(payload);
 }
-const macros = payloads.map(payload => encodeMacroPayload(payload, "via"));
+const macros = payloads.map(payload => encodeMacroPayload(payload));
 const output = execFileSync(process.argv[3], {input: macros.map(bytes => bytes.toString("hex")).join("\n") + "\n"}).toString().trim().split("\n").map(Number);
 assert.equal(output.length, macros.length);
 let over = 0;

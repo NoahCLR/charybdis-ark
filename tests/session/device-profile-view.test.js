@@ -83,11 +83,11 @@ test("real device RGB retains every value and reference through the presentation
     assert.equal(view.pdModeColors[0].pointingMode, "PD_MODE_DRAGSCROLL");
     assert.equal(view.pdModeColors[0].locality, "RGB_RIGHT_HALF");
     assert.equal(view.automouseFade.mode, "FOLLOW_REAL_DESTINATION");
-    assert.deepEqual(view.automouseFade.end_color, {h: "0", s: "255", v: "200"});
+    assert.deepEqual(view.automouseFade.end_color, {h: "167", s: "255", v: "199"});
     assert.equal(view.keyBehaviorFeedback.tapCommitMode, "KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS");
     assert.equal(view.keyBehaviorFeedback.tapBranchColors.length, 4);
-    assert.deepEqual(view.ledGroups[0].ledIndices, [24, 25, 26, 27, 28, 53, 54, 55]);
-    assert.equal(view.ledGroups[0].usageCount, 3);
+    assert.deepEqual(view.ledGroups[1].ledIndices, [24, 25, 26, 27, 28, 53, 54, 55]);
+    assert.equal(view.ledGroups[1].usageCount, 3);
     assert.equal(view.pdModeLedGroups[0].owner, "RGB_PD_MODE_GROUP_ALL");
     assert.equal(view.keyBehaviorFeedbackLedGroups[0].owner, "KEY_FEEDBACK_GROUP_ALL");
     assert.equal(JSON.stringify(rgb), original, "converting a snapshot cannot mutate it");

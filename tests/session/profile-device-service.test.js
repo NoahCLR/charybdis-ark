@@ -40,7 +40,7 @@ function readPages(options = {}) {
                 | PROFILE_WIRE_FEATURES.PEER_RECONCILIATION
                 | PROFILE_WIRE_FEATURES.ATOMIC_LOGICAL_APPLY
             : 0);
-    capabilityIdentity.set([1, 2, 1, 0, options.schemaMajor || 1, 0, 32, options.mutation ? 20 : 0, 2], 0);
+    capabilityIdentity.set([1, 2, 1, 0, options.schemaMajor || 2, 0, 32, options.mutation ? 20 : 0, 2], 0);
     capabilityIdentity.writeUInt32LE(featureFlags, 9);
     capabilityIdentity.writeUInt32LE(options.actionAbiDigest ?? 0x12345678, 13);
     const capacity = Buffer.from([
@@ -197,7 +197,7 @@ test("service exposes opaque descriptors and performs only capability/status rea
     const connected = await service.connect(scanned.devices[0].id);
     assert.equal(connected.connected, true);
     assert.equal(connected.connectionToken, 1);
-    assert.equal(connected.capabilities.schema.major, 1);
+    assert.equal(connected.capabilities.schema.major, 2);
     assert.equal(connected.status.activeKind, 0);
     assert.equal(connected.compatibility.compatible, true);
     assert.equal(adapter.lastConnection().writes.length, 6);
@@ -229,7 +229,7 @@ test("rescans keep each interface ID and never give a replacement the old draft 
 });
 
 test("compatibility reports schema and source-capacity blockers", async () => {
-    const {service} = serviceHarness({schemaMajor: 2, maxLayers: 8});
+    const {service} = serviceHarness({schemaMajor: 1, maxLayers: 8});
     const scanned = await service.enumerate();
     await service.connect(scanned.devices[0].id);
     const changed = service.setProfileSummary({layerCount: 9});
@@ -374,6 +374,6 @@ test("the layout read counts only keys the app cannot name", () => {
     const {unnamedKeyCount} = require("../../core/session/profile-device-service");
     const keycodes = require("../../core/data/keycode-catalog");
     const layers = [{layer: 0, keys: [0x0004, 0x7e42, 0x7e85, 0x7ea3, 0x7ec2, 0x7e90, 0x7ee0].map((keycode) => ({keycode, resolved: keycodes.resolve(keycode)}))}];
-    assert.equal(unnamedKeyCount(layers, {actionAbiDigest: 0x1d3fcacc}), 2, "an unused pointing slot and a code past the blocks");
-    assert.equal(unnamedKeyCount(layers, {actionAbiDigest: 0x61072732}), 5, "older firmware's user keys are not read as blocks");
+    assert.equal(unnamedKeyCount(layers, {actionAbiDigest: 0xf79c6151}), 1, "configured or empty pointing slots are named; a code past the blocks is not");
+    for (const actionAbiDigest of [0x1d3fcacc, 0x61072732]) assert.equal(unnamedKeyCount(layers, {actionAbiDigest}), 5, "older firmware's user keys are not read as blocks");
 });

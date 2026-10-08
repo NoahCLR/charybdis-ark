@@ -16,7 +16,7 @@
 const {FakeDeviceAdapter} = require("../../core/transport/fake-device-adapter");
 const {RAW_HID_REPORT_SIZE} = require("../../core/transport/device-adapter");
 const {VIA_UNHANDLED} = require("../../core/protocol/via-unhandled-v1");
-const {PROFILE_ACTIVE_KIND, PROFILE_STATE_FLAGS, PROFILE_WIRE_FEATURES, PROFILE_WIRE_KNOWN_MASKS, PROFILE_WIRE_V1, VIA_READS} = require("../../core/protocol/profile-wire-v1");
+const {PROFILE_ACTIVE_KIND, PROFILE_STATE_FLAGS, PROFILE_WIRE_KNOWN_MASKS, PROFILE_WIRE_V1, VIA_READS} = require("../../core/protocol/profile-wire-v1");
 const {PROFILE_PAYLOAD_V1} = require("../../core/protocol/profile-payload-v1");
 const {COMBO_READBACK_V1} = require("../../core/protocol/combo-readback-v1");
 const {PROFILE_CANDIDATE_V1, CANDIDATE_STATE} = require("../../core/protocol/profile-candidate-v1");
@@ -37,21 +37,30 @@ const VALUE = {CAPABILITIES: 1, STATUS: 2, COMMITTED: PROFILE_PAYLOAD_V1.VALUE, 
 // keymap reset, custom set (Profile Wire SET, RGB Matrix set), custom save,
 // EEPROM reset, bootloader jump, macro write and reset, layout write, encoder set.
 const MUTATING_COMMANDS = new Set([0x03, 0x05, 0x06, 0x07, 0x09, 0x0a, 0x0b, 0x0f, 0x10, 0x13, 0x15]);
-// Every feature current firmware advertises but the legacy pointing-mode
-// source, which only a schema-1 backup carries.
-const FEATURES = PROFILE_WIRE_KNOWN_MASKS.FEATURE_FLAGS & ~PROFILE_WIRE_FEATURES.LEGACY_PD_SOURCE;
+// Every feature current firmware advertises; it never advertises the retired ones.
+const FEATURES = PROFILE_WIRE_KNOWN_MASKS.FEATURE_FLAGS & ~PROFILE_WIRE_KNOWN_MASKS.RETIRED_FEATURES;
 
-function fakeKeyboard({document, generation = 42, firmwareVersion = 0x00010000, brightnessMax = 255, options = keyboardOptions.wire()} = {}) {
+// The domain versions current firmware stores, and refuses any other.
+const CURRENT_DOMAINS = "16:3,32:1,48:2,64:5,80:2";
+
+// `compiled` is the profile it was built with, which GET 0x05 serves: the
+// document's own unless given (current firmware's carries every domain, with
+// its authored combos and factory settings). `compiledOnly` runs those
+// defaults, with nothing committed; the live combo and settings readbacks
+// still answer from the document.
+function fakeKeyboard({document, compiled, compiledOnly = false, generation = 42, firmwareVersion = 0x00010000, brightnessMax = 255, options = keyboardOptions.wire()} = {}) {
     const held = validateSnapshot(document);
     if (document.version !== 2 || document.layers.length !== 8) throw new Error("The fake keyboard runs current firmware: a schema-2, eight-layer document.");
-    const profile = held.profile, digest = fnv1a32(profile);
+    const versions = blob => decodeProfileBlob(blob).domains.map(domain => `${domain.id}:${domain.version}`).join();
+    if (versions(held.profile) !== CURRENT_DOMAINS || (compiled && versions(compiled) !== CURRENT_DOMAINS)) throw new Error("The fake keyboard runs current firmware: RGB 3, key behaviours 1, combos 2, settings 5 and PD 2.");
+    const profile = held.profile, digest = fnv1a32(profile), defaults = compiled || profile;
     const settings = decodeProfileBlob(profile).domains.find(domain => domain.id === PROFILE_DOMAIN_IDS.SETTINGS).payload;
     const storageDigest = viaStorageDigest({layout: held.layout, macros: held.macros});
 
     const capabilities = [page(25, (p) => {
         p.set([1, 2, 1, 0, 2, 0, RAW_HID_REPORT_SIZE, PROFILE_CANDIDATE_V1.CHUNK_MAX, PROFILE_WIRE_V1.STATUS_PAGE_COUNT]);
         p.writeUInt32LE(FEATURES, 9); p.writeUInt32LE(document.actionAbiDigest, 13);
-        p.writeUInt32LE(firmwareVersion, 17); p.writeUInt32LE(digest, 21);
+        p.writeUInt32LE(firmwareVersion, 17); p.writeUInt32LE(fnv1a32(defaults), 21);
     }), page(25, (p) => {
         // Layers, behaviour rows, tap steps, populated steps, combos, keys per
         // combo, RGB groups, stage rows, LEDs, LED bitmap, custom keys, macros.
@@ -59,13 +68,17 @@ function fakeKeyboard({document, generation = 42, firmwareVersion = 0x00010000, 
         p.writeUInt16LE(5088, 13); p.writeUInt16LE(5088, 15); p.writeUInt16LE(5120, 17);
         p.writeUInt16LE(held.macros.length, 19); p[21] = 31;
     })];
-    // Committed, converged with the other half, nothing pending.
+    // Committed (or running its defaults), converged with the other half,
+    // nothing pending.
     const status = [page(25, (p) => {
         p.set([1, 2]);
-        p.writeUInt16LE(PROFILE_STATE_FLAGS.COMMITTED_VALID | PROFILE_STATE_FLAGS.PEER_KNOWN | PROFILE_STATE_FLAGS.PEER_CONVERGED, 2);
-        for (const offset of [4, 8, 12, 20]) p.writeUInt32LE(digest, offset);
-        p[24] = PROFILE_ACTIVE_KIND.COMMITTED;
+        p.writeUInt16LE((compiledOnly ? PROFILE_STATE_FLAGS.ACTIVE_IS_COMPILED_DEFAULT : PROFILE_STATE_FLAGS.COMMITTED_VALID) | PROFILE_STATE_FLAGS.PEER_KNOWN | PROFILE_STATE_FLAGS.PEER_CONVERGED, 2);
+        for (const offset of [4, 8]) p.writeUInt32LE(fnv1a32(defaults), offset);
+        p.writeUInt32LE(compiledOnly ? fnv1a32(defaults) : digest, 12);
+        if (!compiledOnly) p.writeUInt32LE(digest, 20);
+        p[24] = compiledOnly ? PROFILE_ACTIVE_KIND.COMPILED_ONLY : PROFILE_ACTIVE_KIND.COMMITTED;
     }), page(25, (p) => {
+        if (compiledOnly) return;
         p.writeUInt32LE(generation, 0); p.writeUInt32LE(generation, 5); p.writeUInt32LE(generation, 10);
     })];
     const candidateStatus = [page(25, (p) => {
@@ -80,8 +93,8 @@ function fakeKeyboard({document, generation = 42, firmwareVersion = 0x00010000, 
     const values = {
         [VALUE.CAPABILITIES]: capabilities,
         [VALUE.STATUS]: status,
-        [VALUE.COMMITTED]: payloadPages(profile, generation),
-        [VALUE.COMPILED]: payloadPages(profile, 0),
+        ...(compiledOnly ? {} : {[VALUE.COMMITTED]: payloadPages(profile, generation)}),
+        [VALUE.COMPILED]: payloadPages(defaults, 0),
         [VALUE.COMBOS]: comboPages(held.combos),
         [VALUE.SETTINGS]: storedPages(settings),
         [VALUE.STORAGE]: storage,

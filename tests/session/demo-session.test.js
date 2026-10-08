@@ -8,8 +8,8 @@ const assert = require("node:assert/strict");
 const {openPanelLoop} = require("../../core/session/panel-loop");
 const {fingerprint} = require("../../core/model/portable-profile");
 const {fakeKeyboardAdapter} = require("../fixtures/fake-keyboard");
-const {document: pdDocument} = require("../fixtures/pd-profile");
-const {ACTION_ABI_32_SLOTS} = require("../../core/schema/actions");
+const {document32: pdDocument} = require("../fixtures/pd-slots-32");
+const {ACTION_ABI} = require("../../core/schema/actions");
 const {
     DEMO_CAPABILITIES, DEMO_DEVICE_ID, DEMO_LIMITS, DEMO_OPTIONS, demoProfile, demoRefusal, demoSnapshot, demoState, panelState,
 } = require("../../core/session/demo-session");
@@ -52,7 +52,7 @@ test("the demo stands in for current firmware: what the 32-slot keyboard reports
         const {firmwareVersion, compiledDefaultDigest, ...reported} = loop.session.service.capabilities;
         assert.ok(firmwareVersion && compiledDefaultDigest);
         assert.deepEqual(JSON.parse(JSON.stringify(DEMO_CAPABILITIES)), reported);
-        assert.equal(DEMO_CAPABILITIES.actionAbiDigest, ACTION_ABI_32_SLOTS);
+        assert.equal(DEMO_CAPABILITIES.actionAbiDigest, ACTION_ABI);
         assert.deepEqual(loop.session.service.portable.limits, DEMO_LIMITS);
     } finally {
         await loop.close();
@@ -61,13 +61,14 @@ test("the demo stands in for current firmware: what the 32-slot keyboard reports
     assert.deepEqual(DEMO_OPTIONS.effects.map((effect) => effect.id), DEMO_OPTIONS.effects.map((_, index) => index + 1));
 });
 
-test("a profile for the demo is checked as Import checks it, and an older backup is brought up to current firmware", () => {
+test("the demo checks current profiles as Import does and refuses older backups", () => {
     const snapshot = demoSnapshot(demoProfile());
     assert.equal(snapshot.fingerprint, fingerprint(demoProfile()));
     assert.deepEqual(snapshot.limits, DEMO_LIMITS);
     assert.equal(snapshot.options, DEMO_OPTIONS);
-    const older = demoSnapshot(pdDocument());
-    assert.equal(older.document.actionAbiDigest, ACTION_ABI_32_SLOTS, "an eight-slot backup imports onto 32-slot firmware");
+    assert.equal(demoSnapshot(pdDocument()).document.actionAbiDigest, ACTION_ABI);
+    assert.throws(() => demoSnapshot({...pdDocument(), actionAbiDigest: 0x1d3fcacc}), {code: "INVALID_PORTABLE_PROFILE"});
+    assert.throws(() => demoSnapshot({...pdDocument(), version: 1}), {code: "INVALID_PORTABLE_PROFILE"});
     assert.throws(() => demoSnapshot("{}"), /supported Charybdis profile/);
     assert.throws(() => demoSnapshot("not json"), /not a valid profile/);
 });
@@ -108,7 +109,7 @@ test("with no keyboard the demo opens the bundled profile in a real draft, and n
         assert.ok(model.diagnostics.every((line) => !/generation/.test(line)));
         assert.deepEqual(model.devices, []);
         assert.equal(model.apply, null);
-        assert.equal(model.portable.pdUpgradeAvailable, false);
+        assert.equal("pdUpgradeAvailable" in model.portable, false, "no host offers the retired PD upgrade export");
         assert.equal(model.profileIdentity.originHalf, DEMO_DEVICE_ID);
         assert.equal(model.portable.usage.source, "demo", "an unedited demo is the demo setup, not a keyboard's");
 
@@ -208,7 +209,7 @@ test("Open a profile file replaces the demo profile with the file, checked as Im
         assert.equal(model.demo.active, true);
         assert.equal(model.demo.fileName, "mine.charybdis.json");
         assert.equal(model.draft.dirty, false);
-        assert.equal(loop.session.draft.current.document.actionAbiDigest, ACTION_ABI_32_SLOTS, "brought up to current firmware");
+        assert.equal(loop.session.draft.current.document.actionAbiDigest, ACTION_ABI, "brought up to current firmware");
         assert.match(model.device.summary, /mine\.charybdis\.json/);
 
         // A file Import would refuse is refused, and the demo stays as it was.

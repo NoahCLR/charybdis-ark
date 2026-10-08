@@ -9,7 +9,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 const {validateSnapshot, fingerprint, summary} = require("../../core/model/portable-profile");
-const {ACTION_ABI_32_SLOTS} = require("../../core/schema/actions");
+const {ACTION_ABI} = require("../../core/schema/actions");
 const {DEMO_CAPABILITIES, DEMO_DEVICE_ID} = require("../../core/session/demo-session");
 const {ProfileDraftSession} = require("../../core/session/profile-draft-session");
 const {buildPanelModel} = require("../../core/session/panel-session");
@@ -30,7 +30,7 @@ test("the demo profile decodes under the current schema, for current firmware, u
     assert.equal(decoded.document, document, "nothing about it needed upgrading");
     assert.equal(document.version, 2);
     assert.equal(document.keyboard, "charybdis-4x6");
-    assert.equal(document.actionAbiDigest, ACTION_ABI_32_SLOTS, "the 32-slot action vocabulary, 0xf79c6151");
+    assert.equal(document.actionAbiDigest, ACTION_ABI, "the 32-slot action vocabulary, 0xf79c6151");
     assert.equal(document.layers.length, 8);
     assert.equal(document.macros.length, 64);
     assert.equal(decoded.pdModes.length, 32);

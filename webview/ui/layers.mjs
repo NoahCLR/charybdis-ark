@@ -47,8 +47,7 @@ export function attachLayersControl(bar) {
 
     const panel = el(`<div class="layerpanel" role="dialog" aria-label="Layers"></div>`);
     if (!portable.layers) {
-        panel.append(el(`<p class="note" style="padding:4px 2px">${esc(canEdit ? "Reading the layer stack…" : portable.legacy
-            ? "This keyboard runs the five-layer firmware, which has no editable layer stack."
+        panel.append(el(`<p class="note" style="padding:4px 2px">${esc(canEdit ? "Reading the layer stack…"
             : "Connect a keyboard with complete-profile firmware to rename or reorder its layers.")}</p>`));
         // One request per opening: the stack is read from the keyboard, or
         // lifted from the draft when one is open.

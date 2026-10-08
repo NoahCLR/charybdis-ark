@@ -22,11 +22,15 @@ const {
     candidateStatusStallTimeoutMs,
 } = require("../../core/session/candidate-upload-coordinator");
 
+// Every candidate publishes with the VIA store generation it is bound to.
+const BINDING = Object.freeze({viaGeneration: 6, viaDigest: 0xabcdef01});
+
 function representativeBlob(payloadSize = 41) {
     return encodeProfileBlob({
+        schema: {major: 2, minor: 0},
         domains: [{
             id: PROFILE_DOMAIN_IDS.RGB,
-            version: 1,
+            version: 3,
             payload: Buffer.from(Array.from({length: payloadSize}, (_, index) => index)),
         }],
     });
@@ -331,7 +335,7 @@ test("upload stages strictly sequential 20-byte chunks and validates only after 
         onProgress(value) {
             progress.push(value);
         },
-    }).upload(blob, {actionAbiDigest: 0x12345678});
+    }).upload(blob, {...BINDING, actionAbiDigest: 0x12345678});
 
     assert.equal(result.transactionId, 0xffff);
     assert.equal(result.status.state, CANDIDATE_STATE.VALIDATED);
@@ -350,7 +354,7 @@ test("upload stages strictly sequential 20-byte chunks and validates only after 
 test("a prepared candidate commits through custom-save and waits for activation", async () => {
     const harness = new CandidateFirmwareHarness({commitReads: 2, activationReads: 2});
     const client = coordinator(harness);
-    const prepared = await client.upload(representativeBlob(1), {actionAbiDigest: 1, transactionId: 0x1234});
+    const prepared = await client.upload(representativeBlob(1), {...BINDING, actionAbiDigest: 1, transactionId: 0x1234});
     const result = await client.commit(prepared.transactionId, {digest: prepared.metadata.digest});
 
     assert.equal(result.status.state, CANDIDATE_STATE.IDLE);
@@ -370,7 +374,7 @@ test("a split commit polls through peer preparation and convergence before activ
         activationReads: 2,
     });
     const client = coordinator(harness);
-    const prepared = await client.upload(representativeBlob(1), {actionAbiDigest: 1, transactionId: 0x1234});
+    const prepared = await client.upload(representativeBlob(1), {...BINDING, actionAbiDigest: 1, transactionId: 0x1234});
     const decisions = [];
     const result = await client.commit(prepared.transactionId, {digest: prepared.metadata.digest, afterDecision: async decision => {
         decisions.push(decision);
@@ -396,7 +400,7 @@ test("a split commit polls through peer preparation and convergence before activ
 test("resuming a post-decision commit invokes local roll-forward once", async () => {
     const harness = new CandidateFirmwareHarness({splitBarrier: true, convergenceReads: 2, activationReads: 2});
     const blob = representativeBlob(1);
-    const metadata = candidateMetadataForBlob(blob, {actionAbiDigest: 1});
+    const metadata = candidateMetadataForBlob(blob, {...BINDING, actionAbiDigest: 1});
     harness.status = {
         ...harness.status,
         state: CANDIDATE_STATE.CONVERGING_PEER,
@@ -426,7 +430,7 @@ test("lost commit acknowledgement is safely resolved from progressing status", a
         activationReads: 2,
     });
     const client = coordinator(harness);
-    const prepared = await client.upload(representativeBlob(1), {actionAbiDigest: 1, transactionId: 0x1234});
+    const prepared = await client.upload(representativeBlob(1), {...BINDING, actionAbiDigest: 1, transactionId: 0x1234});
 
     await assert.rejects(
         client.commit(prepared.transactionId, {digest: prepared.metadata.digest}),
@@ -445,7 +449,7 @@ test("terminal postcommit authority failure is surfaced without retrying or abor
         authorityErrorId: CANDIDATE_ERROR.POSTCOMMIT_AUTHORITY_LOST,
     });
     const client = coordinator(harness);
-    const prepared = await client.upload(representativeBlob(1), {actionAbiDigest: 1, transactionId: 0x1234});
+    const prepared = await client.upload(representativeBlob(1), {...BINDING, actionAbiDigest: 1, transactionId: 0x1234});
 
     await assert.rejects(
         client.commit(prepared.transactionId, {digest: prepared.metadata.digest}),
@@ -463,7 +467,7 @@ test("terminal postcommit authority failure is surfaced without retrying or abor
 test("commit preflight refuses a mismatched digest before custom-save", async () => {
     const harness = new CandidateFirmwareHarness();
     const client = coordinator(harness);
-    const prepared = await client.upload(representativeBlob(1), {actionAbiDigest: 1, transactionId: 0x1234});
+    const prepared = await client.upload(representativeBlob(1), {...BINDING, actionAbiDigest: 1, transactionId: 0x1234});
     await assert.rejects(
         client.commit(prepared.transactionId, {digest: (prepared.metadata.digest ^ 1) >>> 0}),
         (error) => error.code === "CANDIDATE_IDENTITY_MISMATCH" && error.safeToRetry === false
@@ -474,7 +478,7 @@ test("commit preflight refuses a mismatched digest before custom-save", async ()
 test("activation failure remains visible after durable commit", async () => {
     const harness = new CandidateFirmwareHarness({activationError: true});
     const client = coordinator(harness);
-    const prepared = await client.upload(representativeBlob(1), {actionAbiDigest: 1, transactionId: 0x1234});
+    const prepared = await client.upload(representativeBlob(1), {...BINDING, actionAbiDigest: 1, transactionId: 0x1234});
     await assert.rejects(
         client.commit(prepared.transactionId, {digest: prepared.metadata.digest}),
         (error) => error.code === "DEVICE_REJECTED"
@@ -490,7 +494,7 @@ test("unknown marker durability is an ambiguous outcome that requires reconcilia
         activationErrorId: CANDIDATE_ERROR.DURABILITY_UNKNOWN,
     });
     const client = coordinator(harness);
-    const prepared = await client.upload(representativeBlob(1), {actionAbiDigest: 1, transactionId: 0x1234});
+    const prepared = await client.upload(representativeBlob(1), {...BINDING, actionAbiDigest: 1, transactionId: 0x1234});
     await assert.rejects(
         client.commit(prepared.transactionId, {digest: prepared.metadata.digest}),
         (error) => error.code === "DURABILITY_UNKNOWN"
@@ -516,7 +520,7 @@ test("preflight refuses every non-idle firmware candidate without sending a muta
         harness.status.state = state;
         harness.status.transactionId = 0x4321;
         await assert.rejects(
-            coordinator(harness).upload(representativeBlob(1), {actionAbiDigest: 1}),
+            coordinator(harness).upload(representativeBlob(1), {...BINDING, actionAbiDigest: 1}),
             (error) => error.code === "ACTIVE_CANDIDATE"
                 && error.phase === "preflight"
                 && error.transactionId === 0x4321
@@ -542,7 +546,7 @@ test("upload snapshots caller-owned bytes before asynchronous preflight", async 
     });
     const blob = representativeBlob(21);
     const expected = Buffer.from(blob);
-    const upload = coordinator(harness).upload(blob, {actionAbiDigest: 1});
+    const upload = coordinator(harness).upload(blob, {...BINDING, actionAbiDigest: 1});
     await reached;
     blob.fill(0xee);
     releasePreflight();
@@ -558,7 +562,7 @@ test("busy frames are resubmitted only from a safe status and exact bytes are pr
         processBusyValidate: true,
     });
     const blob = representativeBlob(1);
-    const result = await coordinator(harness).upload(blob, {actionAbiDigest: 1, transactionId: 7});
+    const result = await coordinator(harness).upload(blob, {...BINDING, actionAbiDigest: 1, transactionId: 7});
     assert.equal(result.status.state, CANDIDATE_STATE.VALIDATED);
     const chunks = operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_CHUNK);
     assert.equal(chunks.length, 2);
@@ -572,7 +576,7 @@ test("busy polling refuses a partial-overlap chunk resubmission", async () => {
         makeBusyChunkUnsafe: true,
     });
     await assert.rejects(
-        coordinator(harness).upload(representativeBlob(1), {actionAbiDigest: 1}),
+        coordinator(harness).upload(representativeBlob(1), {...BINDING, actionAbiDigest: 1}),
         (error) => error.code === "UNSAFE_RESUBMISSION"
             && error.phase === "writing"
             && error.abortAttempted === true
@@ -588,7 +592,7 @@ test("cancellation after staging starts performs a best-effort idempotent abort"
     const harness = new CandidateFirmwareHarness();
     const controller = new AbortController();
     const upload = coordinator(harness).upload(representativeBlob(), {
-        actionAbiDigest: 1,
+        ...BINDING, actionAbiDigest: 1,
         signal: controller.signal,
         onProgress(progress) {
             if (progress.phase === "writing" && progress.bytesSent === 20) controller.abort();
@@ -618,7 +622,7 @@ for (const transportErrorCode of ["TIMEOUT", "DISCONNECTED"]) {
             transportErrorCode,
         });
         await assert.rejects(
-            coordinator(harness).upload(representativeBlob(), {actionAbiDigest: 1}),
+            coordinator(harness).upload(representativeBlob(), {...BINDING, actionAbiDigest: 1}),
             (error) => error.code === "TRANSPORT_OUTCOME_AMBIGUOUS"
                 && error.phase === "writing"
                 && error.ambiguous === true
@@ -633,7 +637,7 @@ for (const transportErrorCode of ["TIMEOUT", "DISCONNECTED"]) {
 test("a queued operation that never advances returns bounded structured ambiguity", async () => {
     const harness = new CandidateFirmwareHarness({neverProcess: true});
     await assert.rejects(
-        coordinator(harness, {maxStatusPolls: 2}).upload(representativeBlob(1), {actionAbiDigest: 1}),
+        coordinator(harness, {maxStatusPolls: 2}).upload(representativeBlob(1), {...BINDING, actionAbiDigest: 1}),
         (error) => error.code === "OPERATION_OUTCOME_AMBIGUOUS"
             && error.phase === "begin"
             && error.operation === CANDIDATE_OPERATION.BEGIN
@@ -675,7 +679,7 @@ test("observable split state progress renews the stall deadline", async () => {
             now += milliseconds;
         },
     });
-    const prepared = await client.upload(representativeBlob(1), {actionAbiDigest: 1, transactionId: 0x1234});
+    const prepared = await client.upload(representativeBlob(1), {...BINDING, actionAbiDigest: 1, transactionId: 0x1234});
     const result = await client.commit(prepared.transactionId, {digest: prepared.metadata.digest});
     assert.equal(result.status.state, CANDIDATE_STATE.IDLE);
     assert.equal(now > 2, true);
@@ -690,7 +694,7 @@ test("the copy to the other half moving on keeps a long peer preparation alive, 
             pollIntervalMs: 1, statusStallTimeoutMs: 3, now: () => now, async sleep(ms) { now += ms; },
             readPeerStatus, onProgress: (progress) => { if (progress.peer) peers.push(progress.peer.transferOffset); },
         });
-        const prepared = await client.upload(representativeBlob(1), {actionAbiDigest: 1, transactionId: 0x1234});
+        const prepared = await client.upload(representativeBlob(1), {...BINDING, actionAbiDigest: 1, transactionId: 0x1234});
         return {result: await client.commit(prepared.transactionId, {digest: prepared.metadata.digest}), peers};
     };
     // Page 0 stays identical through PREPARING_PEER, so without page 1 the
@@ -716,7 +720,7 @@ test("an unexpected polling failure cleans up the admitted candidate before retr
                 sleepCalls += 1;
                 if (sleepCalls === 1) throw new Error("poll scheduler failed");
             },
-        }).upload(representativeBlob(1), {actionAbiDigest: 1}),
+        }).upload(representativeBlob(1), {...BINDING, actionAbiDigest: 1}),
         (error) => error.code === "UPLOAD_FAILED"
             && error.abortAttempted === true
             && error.abortSucceeded === true
@@ -730,7 +734,7 @@ test("semantic validation failures retain phase, progress, and firmware location
     const harness = new CandidateFirmwareHarness({validationError: true});
     const blob = representativeBlob(1);
     await assert.rejects(
-        coordinator(harness).upload(blob, {actionAbiDigest: 1, transactionId: 0x1234}),
+        coordinator(harness).upload(blob, {...BINDING, actionAbiDigest: 1, transactionId: 0x1234}),
         (error) => {
             assert.equal(error.code, "DEVICE_REJECTED");
             assert.equal(error.phase, "validating");
@@ -756,7 +760,7 @@ test("semantic validation failures retain phase, progress, and firmware location
     assert.equal(harness.status.state, CANDIDATE_STATE.IDLE);
 
     harness.options.validationError = false;
-    const retry = await coordinator(harness).upload(blob, {actionAbiDigest: 1, transactionId: 0x1235});
+    const retry = await coordinator(harness).upload(blob, {...BINDING, actionAbiDigest: 1, transactionId: 0x1235});
     assert.equal(retry.status.state, CANDIDATE_STATE.VALIDATED);
 });
 
@@ -767,7 +771,7 @@ test("cleanup resubmits an idempotent abort after busy status becomes poisoned",
         validationError: true,
     });
     await assert.rejects(
-        coordinator(harness).upload(representativeBlob(1), {actionAbiDigest: 1}),
+        coordinator(harness).upload(representativeBlob(1), {...BINDING, actionAbiDigest: 1}),
         (error) => error.code === "DEVICE_REJECTED"
             && error.abortAttempted === true
             && error.abortSucceeded === true
@@ -781,7 +785,7 @@ test("a profile changed after BEGIN is aborted before any chunks or commit", asy
     const firmware = new CandidateFirmwareHarness();
     const coordinator = new CandidateUploadCoordinator(firmware, {pollIntervalMs: 0});
     let checked = false;
-    await assert.rejects(coordinator.upload(representativeBlob(), {actionAbiDigest: 0x12345678, verifyBase: async () => {
+    await assert.rejects(coordinator.upload(representativeBlob(), {...BINDING, actionAbiDigest: 0x12345678, verifyBase: async () => {
         checked = true;
         assert.ok(firmware.writes.some(report => report[2] === PROFILE_CANDIDATE_V1.VALUE_BEGIN));
         throw Object.assign(new Error("Profile changed"), {code: "PROFILE_EDIT_CONFLICT"});
@@ -793,7 +797,7 @@ test("a profile changed after BEGIN is aborted before any chunks or commit", asy
 
 test("a keyboard that is not ready refuses the frame outright, and that is not a lost response", async () => {
     const harness = new CandidateFirmwareHarness({unhandledOperation: CANDIDATE_OPERATION.BEGIN});
-    await assert.rejects(coordinator(harness).upload(representativeBlob(), {actionAbiDigest: 0x12345678}), (error) => {
+    await assert.rejects(coordinator(harness).upload(representativeBlob(), {...BINDING, actionAbiDigest: 0x12345678}), (error) => {
         assert.ok(error instanceof CandidateUploadError);
         assert.equal(error.code, "KEYBOARD_NOT_READY");
         assert.equal(error.ambiguous, false, "the keyboard answered: nothing was admitted");
@@ -801,4 +805,36 @@ test("a keyboard that is not ready refuses the frame outright, and that is not a
         return true;
     });
     assert.equal(operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_CHUNK).length, 0, "nothing is staged after the refusal");
+});
+
+test("an upload without a nonzero VIA binding fails before anything reaches the keyboard", async () => {
+    const blob = representativeBlob(1);
+    const unbound = [
+        {actionAbiDigest: 1},
+        {actionAbiDigest: 1, viaGeneration: 6},
+        {...BINDING, actionAbiDigest: 1, viaGeneration: 0},
+        {...BINDING, actionAbiDigest: 1, viaDigest: 0},
+        {metadata: {...candidateMetadataForBlob(blob, {...BINDING, actionAbiDigest: 1}), viaDigest: 0}},
+        {metadata: {...candidateMetadataForBlob(blob, {...BINDING, actionAbiDigest: 1}), storeFormatVersion: 0, viaGeneration: 0, viaDigest: 0}},
+    ];
+    for (const options of unbound) {
+        const harness = new CandidateFirmwareHarness();
+        await assert.rejects(coordinator(harness).upload(blob, options), (error) => {
+            assert.ok(error instanceof CandidateUploadError);
+            assert.equal(error.code, "INVALID_CANDIDATE");
+            assert.equal(error.safeToRetry, true);
+            return true;
+        });
+        assert.equal(harness.writes.length, 0, "not even the preflight status read");
+    }
+});
+
+test("BEGIN carries store format 3 and the VIA binding it was given", async () => {
+    const harness = new CandidateFirmwareHarness();
+    await coordinator(harness).upload(representativeBlob(1), {...BINDING, actionAbiDigest: 1});
+    const [begin] = operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_BEGIN);
+    assert.equal(begin[5], 2);
+    assert.equal(begin[23], 3);
+    assert.equal(begin.readUInt32LE(24), BINDING.viaGeneration);
+    assert.equal(begin.readUInt32LE(28), BINDING.viaDigest);
 });

@@ -1,6 +1,6 @@
 "use strict";
 const test = require("node:test"), assert = require("node:assert/strict");
-const {actionName, nativeCode, keycodeAction, pdSlotOfCode, actionLimitsFor, layerRef, layerOfRef, knownActionAbi} = require("../../core/schema/actions");
+const {actionName, nativeCode, keycodeAction, pdSlotOfCode, layerRef, layerOfRef, knownActionAbi} = require("../../core/schema/actions");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../../core/schema/profile-blob-v1");
 
 test("an action has one name and one native keycode", () => {
@@ -18,20 +18,18 @@ test("an action has one name and one native keycode", () => {
     assert.equal(pdSlotOfCode(0x7ea7), 7);
     assert.equal(pdSlotOfCode(0x0004), undefined);
     // The keycode blocks hold 32 slots; how many a keyboard has is its
-    // vocabulary's to say (pdSlotCountFor), and its decode limits enforce it.
+    // current vocabulary defines 32 slots, and its decode limits enforce it.
     assert.equal(actionName({kind: ACTION.PD_MODE_LOCK, operand: 31}), "PD_SLOT_31_LOCK");
     assert.equal(nativeCode({kind: ACTION.PD_MODE_MOMENTARY, operand: 31}), 0x7e9f);
     assert.throws(() => actionName({kind: ACTION.PD_MODE_MOMENTARY, operand: 32}), /pointing slot/);
 });
 
-test("decode limits follow the schema version, and a layer reference reads back", () => {
-    assert.deepEqual(actionLimitsFor(2), {actionLimits: {maxPdModes: 8}});
-    assert.deepEqual(actionLimitsFor(1), {actionLimits: {maxPdModes: 6}});
+test("one action vocabulary is known, and a layer reference reads back", () => {
     assert.equal(layerRef(3), "Layer 3");
     assert.equal(layerOfRef("Layer 3"), 3);
     assert.equal(layerOfRef("Numbers"), undefined);
-    assert.equal(knownActionAbi(0x1d3fcacc), true, "the vocabulary with the keycode blocks");
-    assert.equal(knownActionAbi(0x61072732), false, "older numbering is only translated on import");
+    assert.equal(knownActionAbi(0xf79c6151), true, "the vocabulary with the keycode blocks and 32 pointing slots");
+    for (const retired of [0x1d3fcacc, 0x61072732, 0xeb80829c, 0xdcb00959]) assert.equal(knownActionAbi(retired), false, `0x${retired.toString(16)} is retired`);
     assert.equal(knownActionAbi(1), false);
 });
 
@@ -54,25 +52,12 @@ test("placement follows the keyboard's rule: only layer keycodes are restricted"
     assert.equal(places(code(0x7e42)), "ok - - - ok", "however it is stored");
 });
 
-test("the slot count comes from the keyboard's vocabulary, in one place", () => {
-    const {ACTION_ABI, ACTION_ABI_32_SLOTS, KNOWN_ACTION_ABIS, pdSlotCountFor, pdSlotCountOfVocabulary, actionLimitsOfBlob} = require("../../core/schema/actions");
-    assert.deepEqual(KNOWN_ACTION_ABIS, [ACTION_ABI, ACTION_ABI_32_SLOTS], "the eight-slot vocabulary stays known");
-    assert.equal(ACTION_ABI, 0x1d3fcacc);
-    assert.equal(knownActionAbi(ACTION_ABI_32_SLOTS), true);
-    assert.equal(pdSlotCountFor({supportedDomainMask: 31, actionAbiDigest: ACTION_ABI_32_SLOTS}), 32);
-    assert.equal(pdSlotCountFor({supportedDomainMask: 31, actionAbiDigest: ACTION_ABI}), 8);
-    assert.equal(pdSlotCountFor({supportedDomainMask: 31, actionAbiDigest: 0x61072732}), 8, "older numbering, eight slots");
-    assert.equal(pdSlotCountFor({supportedDomainMask: 15, actionAbiDigest: 0xeb80829c}), 6, "no PD domain: the six fixed modes");
-    assert.equal(pdSlotCountFor(undefined), 6);
-    assert.equal(pdSlotCountOfVocabulary(ACTION_ABI_32_SLOTS, 1), 6, "schema 1 had no configurable slots");
-    assert.deepEqual(actionLimitsFor(2, 32), {actionLimits: {maxPdModes: 32}});
-    // A stored profile says how many slots it holds through its PD domain version.
-    const blob = (version) => ({schema: {major: 2}, domains: [{id: 0x50, version}]});
-    assert.deepEqual(actionLimitsOfBlob(blob(1)), {actionLimits: {maxPdModes: 8}});
-    assert.deepEqual(actionLimitsOfBlob(blob(2)), {actionLimits: {maxPdModes: 32}});
-    assert.deepEqual(actionLimitsOfBlob({schema: {major: 1}, domains: []}), {actionLimits: {maxPdModes: 6}});
-    // A code past a keyboard's last slot is not a pointing key there.
+test("the keyboard has the 32 pointing slots of the keycode blocks", () => {
+    const {ACTION_ABI, KNOWN_ACTION_ABIS, PD_SLOT_COUNT} = require("../../core/schema/actions");
+    assert.deepEqual(KNOWN_ACTION_ABIS, [ACTION_ABI]);
+    assert.equal(ACTION_ABI, 0xf79c6151);
+    assert.equal(PD_SLOT_COUNT, 32);
     assert.equal(pdSlotOfCode(0x7e94), 20);
-    assert.equal(pdSlotOfCode(0x7e94, 8), undefined);
-    assert.equal(pdSlotOfCode(0x7ebf, 32), 31);
+    assert.equal(pdSlotOfCode(0x7ebf), 31);
+    assert.equal(pdSlotOfCode(0x7ec0), undefined, "the layer-lock block");
 });

@@ -1,7 +1,6 @@
 "use strict";
 
 const catalog = require("../data/keycode-catalog");
-const {validateMacroIr} = require("./settings-domain-v1");
 const fail = message => Object.assign(new Error(message), {code: "INVALID_MACRO"});
 const validKey = key => Number.isInteger(key) && ((key >= 4 && key <= 0xa4) || (key >= 0xe0 && key <= 0xe7));
 const escapeText = text => text.replace(/[{}]/g, brace => brace + brace);
@@ -53,21 +52,15 @@ function parsePayload(payload) {
     return steps;
 }
 
-function encodeMacroPayload(payload, kind) {
-    if (!["via", "user"].includes(kind)) throw fail("Unknown macro bank.");
+// A VIA macro as the bytes QMK stores: text as is, then 1 and an opcode for a
+// key tap (1), press (2), release (3) or a delay (4, digits, '|').
+function encodeMacroPayload(payload) {
     const chunks = [];
     for (const step of parsePayload(payload)) {
         if (step.kind === "text") {
-            const bytes = Buffer.from(step.text, "ascii");
-            if (kind === "via") chunks.push(bytes);
-            else for (let offset = 0; offset < bytes.length; offset += 255) {
-                const part = bytes.subarray(offset, offset + 255);
-                chunks.push(Buffer.from([1, part.length]), part);
-            }
+            chunks.push(Buffer.from(step.text, "ascii"));
         } else if (step.kind === "delay") {
-            chunks.push(kind === "via" ? Buffer.concat([Buffer.from([1, 4]), Buffer.from(`${step.delay}|`)]) : Buffer.from([2, step.delay & 255, step.delay >> 8]));
-        } else if (kind === "user") {
-            chunks.push(Buffer.from(step.kind === "tap" ? [5, step.keys.length, ...step.keys] : [step.kind === "down" ? 3 : 4, step.keys[0]]));
+            chunks.push(Buffer.concat([Buffer.from([1, 4]), Buffer.from(`${step.delay}|`)]));
         } else if (step.kind === "tap" && step.keys.length > 1) {
             for (const key of step.keys) chunks.push(Buffer.from([1, 2, key]));
             for (const key of [...step.keys].reverse()) chunks.push(Buffer.from([1, 3, key]));
@@ -75,38 +68,23 @@ function encodeMacroPayload(payload, kind) {
             chunks.push(Buffer.from([1, {tap: 1, down: 2, up: 3}[step.kind], step.keys[0]]));
         }
     }
-    const bytes = Buffer.concat(chunks);
-    if (kind === "user") validateMacroIr(bytes);
-    return bytes;
+    return Buffer.concat(chunks);
 }
 
-function decodeMacroPayload(bytes, kind) {
-    if (!Buffer.isBuffer(bytes) || !["via", "user"].includes(kind)) throw fail("Invalid macro bytes or bank.");
-    if (kind === "user") validateMacroIr(bytes);
+function decodeMacroPayload(bytes) {
+    if (!Buffer.isBuffer(bytes)) throw fail("Invalid macro bytes.");
     let output = "", offset = 0;
     while (offset < bytes.length) {
         let op = bytes[offset++];
-        if (kind === "via") {
-            if (op !== 1) {output += escapeText(String.fromCharCode(op)); continue;}
-            op = bytes[offset++];
-            if (op === 4) {
-                const end = bytes.indexOf(124, offset);
-                if (end < 0) throw fail("Truncated macro delay.");
-                output += `{${bytes.subarray(offset, end).toString("ascii")}}`; offset = end + 1;
-            } else {
-                if (![1, 2, 3].includes(op) || !validKey(bytes[offset])) throw fail("Invalid macro key instruction.");
-                output += `{${op === 2 ? "+" : op === 3 ? "-" : ""}${keyName(bytes[offset++])}}`;
-            }
-        } else if (op === 1) {
-            const length = bytes[offset++];
-            output += escapeText(bytes.subarray(offset, offset + length).toString("ascii")); offset += length;
-        } else if (op === 2) {
-            output += `{${bytes.readUInt16LE(offset)}}`; offset += 2;
-        } else if (op === 3 || op === 4) {
-            output += `{${op === 3 ? "+" : "-"}${keyName(bytes[offset++])}}`;
+        if (op !== 1) {output += escapeText(String.fromCharCode(op)); continue;}
+        op = bytes[offset++];
+        if (op === 4) {
+            const end = bytes.indexOf(124, offset);
+            if (end < 0) throw fail("Truncated macro delay.");
+            output += `{${bytes.subarray(offset, end).toString("ascii")}}`; offset = end + 1;
         } else {
-            const length = bytes[offset++];
-            output += `{${[...bytes.subarray(offset, offset + length)].map(keyName).join(",")}}`; offset += length;
+            if (![1, 2, 3].includes(op) || !validKey(bytes[offset])) throw fail("Invalid macro key instruction.");
+            output += `{${op === 2 ? "+" : op === 3 ? "-" : ""}${keyName(bytes[offset++])}}`;
         }
     }
     parsePayload(output);

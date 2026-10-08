@@ -71,7 +71,7 @@ test("device shortcut labels stay complete and semantic names require the advert
     const values = [0x0806, 0x0a1d, 0x7e80, 0x7ec5, 0x7ec6, 0x7e42];
     const state = {
         layout: layoutWith(values.map((keycode, layoutIndex) => ({keycode, layoutIndex, resolved: resolve(keycode)}))),
-        committed: decodedDeviceProfile(), capabilities: {actionAbiDigest: 0x1d3fcacc},
+        committed: decodedDeviceProfile(), capabilities: {actionAbiDigest: 0xf79c6151},
     };
     const model = buildDeviceModel(state);
     assert.deepEqual(model.layers[0].positions.map(key => key.display), ["Cmd+C", "Shift+Cmd+Z", "Pd slot 0", "Lock Layer 5", "Lock Layer 6", "Custom key 2"],
@@ -89,7 +89,7 @@ test("a position carries what its value means, not only what the keyboard calls 
     const model = buildDeviceModel({
         layout: layoutWith(values.map((keycode, layoutIndex) => ({keycode, layoutIndex, resolved: resolve(keycode)}))),
         committed: decodedDeviceProfile(),
-        capabilities: {actionAbiDigest: 0x1d3fcacc},
+        capabilities: {actionAbiDigest: 0xf79c6151},
         macroView: {viaMacros: [{keycode: "VIA_MACRO_0", kind: "via", name: "Sign-off"}]},
         customKeyView: {keys: [{slot: 0, keycode: "CUSTOM_KEY_0", code: 0x7e40, name: "Right Thumb", hasBehavior: true}]},
     });
@@ -305,7 +305,7 @@ test("decoded domains reach the UI only after a verified read", () => {
 
     const done = buildDeviceModel({committed: committedRead({domains: {rgb, keyBehaviors: behaviors}})});
     assert.equal(done.rgb.layerColors[0].layer, "Layer 0");
-    assert.equal(done.rgb.layerColors.length, 5);
+    assert.equal(done.rgb.layerColors.length, 8);
     assert.equal(done.keyBehaviors.length, 37);
     assert.ok(done.keyBehaviors.every(row => row.keycode && row.steps.every(step => Number.isInteger(step.tapCount))));
 });
@@ -326,7 +326,7 @@ test("a domain that fails to decode is named, and the others still render", () =
         }),
     });
 
-    assert.equal(model.rgb.layerColors.length, 5, "one bad domain must not discard the whole profile");
+    assert.equal(model.rgb.layerColors.length, 8, "one bad domain must not discard the whole profile");
     assert.deepEqual(model.keyBehaviors, []);
     assert.match(model.diagnostics.join(" "), /0x20 did not decode/);
     assert.match(model.diagnostics.join(" "), /row count exceeds/);
@@ -353,7 +353,7 @@ test("compiled defaults are shown, and labelled as compiled", () => {
         committed: committedRead({source: "compiled", generation: 0, byteLength: 210, domains: decodedDeviceProfile().domains}),
     });
 
-    assert.equal(model.rgb.layerColors.length, 5, "the tabs must populate from compiled defaults");
+    assert.equal(model.rgb.layerColors.length, 8, "the tabs must populate from compiled defaults");
     assert.equal(model.keyBehaviors.length, 37);
     assert.match(model.diagnostics.join(" "), /compiled defaults/);
     assert.match(model.diagnostics.join(" "), /Nothing is committed/);
@@ -389,8 +389,8 @@ test("a behaviour on a key never renames what the vocabulary already names", () 
         row({kind: 6, flags: 0, operand: 0}),   // VIA_MACRO_0
     ]}};
     const macroView = {viaMacros: [{kind: "via", keycode: "VIA_MACRO_0", payload: ""}], hardcodedMacros: []};
-    const labels = buildDeviceModel({committed, macroView, capabilities: {actionAbiDigest: 0x1d3fcacc}}).qmkKeyLabels;
-    const plain = buildDeviceModel({macroView, capabilities: {actionAbiDigest: 0x1d3fcacc}}).qmkKeyLabels;
+    const labels = buildDeviceModel({committed, macroView, capabilities: {actionAbiDigest: 0xf79c6151}}).qmkKeyLabels;
+    const plain = buildDeviceModel({macroView, capabilities: {actionAbiDigest: 0xf79c6151}}).qmkKeyLabels;
     assert.equal(labels["MO(1)"], plain["MO(1)"], "MO(1) reads as it does with no behaviour on it, not \"Mo(1)\"");
     assert.equal(labels.QK_MACRO_0, "Macro 0", "the macro screen's name");
     assert.equal(labels["0x7EC2"], "Lock Layer 2", "a bare user slot reads by what it does to which layer");

@@ -1,6 +1,6 @@
 {
   "profile": {
-    "formatVersion": 1,
+    "formatVersion": 3,
     "stageEnableMask": 31,
     "groups": [
       {"id": 0, "leds": []},

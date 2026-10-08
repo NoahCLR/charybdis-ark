@@ -199,7 +199,7 @@ class ProfileDraftSession {
             if (!DRAFT_EDITS.has(message.type)) throw fail("Unsupported draft edit.");
             if (message.expectedBase && ["source", "generation", "digest", "originHalf"].some(key => message.expectedBase[key] !== this.identity()[key])) throw fail("This form belongs to an older draft. Reload it before keeping changes.");
             document = {...current.document, profile: editDeviceProfile(Buffer.from(current.document.profile, "base64"), message, {
-                capabilities: this.capabilities, combos: this.combos(), comboDefaults: this.comboDefaults(), maximumBrightness: current.limits?.brightnessMax,
+                capabilities: this.capabilities, combos: this.combos(), maximumBrightness: current.limits?.brightnessMax,
             }).toString("base64")};
         }
         this.replace(document, message.draftRevision, "edit", editLabel(message, current.document));
@@ -351,8 +351,7 @@ class ProfileDraftSession {
             document = rearranged(this.current.document, inverse(order));
             order = IDENTITY;
         } else document = revertUnits(this.referenceFor(order).snapshot, this.current, units, this.capabilities);
-        // Some bytes carry no row of their own, such as the settings format a
-        // macro name upgraded. Once nothing described is left, the draft is
+        // Some bytes carry no row of their own, such as reserved macro-bank padding. Once nothing described is left, the draft is
         // the keyboard's profile again, not an indescribable difference.
         const left = this.describe(validateSnapshot(document, this.capabilities).document, order);
         if (left.every(row => row.unit === "profile")) {document = copy(validateSnapshot(this.base.document, this.capabilities).document); order = IDENTITY;}
@@ -442,13 +441,6 @@ class ProfileDraftSession {
         return {state: "read", enabled: Boolean(settings.values[20]), layerReferences: Array.from({length: 8}, (_, i) => (settings.values[27] >>> (4 * i)) & 15),
             version: combos.version, defaultTermMs: combos.defaultTermMs, holdTermMs: combos.holdTermMs,
             rows: combos.rows.map(row => ({...row, termMs: effectiveComboTerm(combos, row), followsDefault: row.termMs === null, inputs: row.inputs.map(native), output: native(row.output)}))};
-    }
-    // The keyboard's default window and hold threshold, when it stores them. A
-    // draft from an older backup, whose table has neither, takes them on its
-    // first combo edit (device-profile-edits.js).
-    comboDefaults() {
-        const base = this.base.incomplete ? undefined : this.baseSnapshot.decoded.combos;
-        return base?.version === 2 ? {defaultTermMs: base.defaultTermMs, holdTermMs: base.holdTermMs} : null;
     }
     editingState(state) {
         if (state.selectedDeviceId !== this.deviceId) return state;

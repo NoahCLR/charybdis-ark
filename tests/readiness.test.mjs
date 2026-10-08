@@ -16,7 +16,6 @@ test("only a ready model releases Configure screens", () => {
     assert.equal(configureReady({load: {state: "ready"}}), true);
     assert.equal(readScreen({load: {state: "ready"}}), null);
     assert.match(readScreen({load: {state: "unavailable"}, device: {connected: true}}).detail, /complete profile/);
-    assert.match(readScreen({load: {state: "unavailable"}, device: {connected: true}, portable: {legacy: true}}).detail, /five layers/);
 });
 
 test("rail screens follow the read and the capability each screen needs", () => {
@@ -31,12 +30,12 @@ test("rail screens follow the read and the capability each screen needs", () => 
     assert.equal(screenAvailable({...noKeyboard, portable: {available: false, review: {fileName: "old.json"}}}, "profile"), false,
         "a retained review cannot make a disconnected keyboard available");
 
-    const legacy = {load: {state: "unavailable"}, device: {connected: true}, portable: {available: true, legacy: true}};
-    assert.equal(screenAvailable(legacy, "keys"), false);
-    assert.equal(screenAvailable(legacy, "profile"), true, "the read-only bridge can export a backup");
-    assert.equal(screenAvailable(legacy, "device"), true);
+    const unsupported = {load: {state: "unavailable"}, device: {connected: true}, portable: {available: false}};
+    assert.equal(screenAvailable(unsupported, "keys"), false);
+    assert.equal(screenAvailable(unsupported, "profile"), false, "unsupported firmware cannot export a complete current profile");
+    assert.equal(screenAvailable(unsupported, "device"), true);
 
-    const failedCapture = {...legacy, portable: {available: true, legacy: false}};
+    const failedCapture = {...unsupported, portable: {available: true}};
     assert.equal(screenAvailable(failedCapture, "profile"), true, "a connected device can retry profile export after capture failed");
     const ready = {...failedCapture, load: {state: "ready"}};
     for (const screen of ["keys", "lighting", "profile", "device"]) assert.equal(screenAvailable(ready, screen), true, screen);

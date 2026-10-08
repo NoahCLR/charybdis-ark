@@ -74,7 +74,7 @@ test("JavaScript consumes the same golden reports as the C firmware codec", () =
     assert.deepEqual(decodeCapabilityPages([pages["capabilities-page-0"], pages["capabilities-page-1"]]), {
         responseVersion: 1,
         protocol: {major: 1, minor: 0},
-        schema: {major: 1, minor: 0},
+        schema: {major: 2, minor: 0},
         reportSize: 32,
         candidateChunkMax: 0,
         statusPageCount: 2,
@@ -95,10 +95,10 @@ test("JavaScript consumes the same golden reports as the C firmware codec", () =
         ledBitmapSize: 8,
         customKeySlots: 64,
         viaMacroSlots: 64,
-        maxProfilePayload: 4064,
-        profileSlotPayload: 4064,
-        profileSlotSize: 4096,
-        viaMacroBytes: 7551,
+        maxProfilePayload: 5088,
+        profileSlotPayload: 5088,
+        profileSlotSize: 5120,
+        viaMacroBytes: 7191,
         supportedDomainMask: 3,
     });
     assert.deepEqual(decodeStatusPages([pages["status-page-0"], pages["status-page-1"]]), {
@@ -373,4 +373,12 @@ test("capability reads serialize through the transport connection", async () => 
     assert.deepEqual(requests.map((request) => request[3]), [0xfe, 0xff]);
     assert.deepEqual(requests.map((request) => request[4]), [0, 1]);
     assert.equal(decoded.maxProfilePayload, 4064);
+});
+
+test("feature bit 13 is retired: no feature names it, and an older image that sets it still decodes", () => {
+    assert.equal(PROFILE_WIRE_KNOWN_MASKS.RETIRED_FEATURES, 1 << 13);
+    assert.equal(Object.values(PROFILE_WIRE_FEATURES).some((bit) => bit & PROFILE_WIRE_KNOWN_MASKS.RETIRED_FEATURES), false);
+    const older = compiledOnlyPages().map((page) => Buffer.from(page));
+    older[0].writeUInt32LE(older[0].readUInt32LE(9) | (1 << 13), 9);
+    assert.ok(decodeCapabilityPages(older).featureFlags & (1 << 13));
 });

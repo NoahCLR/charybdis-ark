@@ -4,7 +4,7 @@ const assert = require("node:assert/strict");
 const {ProfileDeviceService} = require("../../core/session/profile-device-service");
 const {settingsEditorView} = require("../../core/model/settings-editor");
 const {fingerprint} = require("../../core/model/portable-profile");
-const {legacyDocument: document} = require("../fixtures/portable-profile");
+const {document} = require("../fixtures/portable-profile");
 const {wire} = require("../fixtures/keyboard-options");
 test("a profile exceeding the connected keyboard's brightness limit is refused before any writes", async () => {
     const service = new ProfileDeviceService(), requests = [];
@@ -13,7 +13,7 @@ test("a profile exceeding the connected keyboard's brightness limit is refused b
         const reply = Buffer.alloc(32); request.copy(reply, 0, 0, 5); reply[6] = 2; reply.set([1,100],7); return reply;
     }};
     service.requestIds = {next: () => 1};
-    service.capabilities = {compiledLayerCount:8, supportedDomainMask:15, actionAbiDigest: document().actionAbiDigest};
+    service.capabilities = {compiledLayerCount:8, supportedDomainMask:31, actionAbiDigest: document().actionAbiDigest};
     await assert.rejects(service.restorePortableProfile(document(), {saveRecovery: () => {throw Error("must not start restore");}}), /brightness.*limit of 100/);
     assert.equal(requests.length, 1);
 });
@@ -34,7 +34,7 @@ test("an unavailable lighting effect is refused before recovery or profile stagi
         const reply = Buffer.alloc(32); request.copy(reply, 0, 0, 5); reply[6] = payload.length; payload.copy(reply, 7); return reply;
     }};
     service.requestIds = {next: () => 1};
-    service.capabilities = {compiledLayerCount:8, supportedDomainMask:15, actionAbiDigest: document().actionAbiDigest};
+    service.capabilities = {compiledLayerCount:8, supportedDomainMask:31, actionAbiDigest: document().actionAbiDigest};
     await assert.rejects(service.restorePortableProfile(target, {saveRecovery: () => {throw Error("must not start restore");}}), /lighting effect unavailable/);
     assert.equal(requests.length, 7);
 });
@@ -43,7 +43,7 @@ test("a restore that starts re-reads the keyboard's status, even when it fails",
     const service = new ProfileDeviceService();
     const base = {document: document(), fingerprint: fingerprint(document()), limits: {brightnessMax: 255}, options: require("../fixtures/keyboard-options").options()};
     service.portable = base;
-    service.capabilities = {compiledLayerCount:8, supportedDomainMask:15, actionAbiDigest: document().actionAbiDigest};
+    service.capabilities = {compiledLayerCount:8, supportedDomainMask:31, actionAbiDigest: document().actionAbiDigest};
     service.requestIds = {next: () => 1};
     service.connection = {connected: true, request: async () => {throw Object.assign(Error("link dropped mid-apply"), {code: "TIMEOUT"});}};
     let refreshed = 0;
@@ -59,11 +59,11 @@ test("a profile with a misplaced action is refused, naming it, before recovery o
     const base = {document: document(), fingerprint: fingerprint(document()), limits: {brightnessMax: 255}, options: require("../fixtures/keyboard-options").options()};
     const blob = decodeProfileBlob(Buffer.from(base.document.profile, "base64"));
     const code = operand => ({kind: 1, flags: 0, operand});
-    const combos = {id: PROFILE_DOMAIN_IDS.COMBOS, version: 1, payload: encodeComboDomain({version: 1, defaultTermMs: null, holdTermMs: 0, rows: [{inputs: [code(0x04), code(0x05)], output: code(0x4104), termMs: 0, mustHold: false, mustTap: false, ordered: false}]}, {actionLimits: {maxPdModes: blob.schema.major === 2 ? 8 : 6}})};
+    const combos = {id: PROFILE_DOMAIN_IDS.COMBOS, version: 2, payload: encodeComboDomain({version: 2, defaultTermMs: 50, holdTermMs: 0, rows: [{inputs: [code(0x04), code(0x05)], output: code(0x4104), termMs: null, mustHold: false, mustTap: false, ordered: false}]})};
     const target = {...base.document, profile: encodeProfileBlob({...blob, domains: [...blob.domains.filter(domain => domain.id !== PROFILE_DOMAIN_IDS.COMBOS), combos]}).toString("base64")};
     let writes = 0;
     service.portable = base;
-    service.capabilities = {compiledLayerCount: 8, supportedDomainMask: 15, actionAbiDigest: document().actionAbiDigest};
+    service.capabilities = {compiledLayerCount: 8, supportedDomainMask: 31, actionAbiDigest: document().actionAbiDigest};
     service.requestIds = {next: () => 1};
     service.connection = {connected: true, request: async () => {writes++; throw Error("must not reach the keyboard");}};
     await assert.rejects(service.restorePortableProfile(target, {expectedFingerprint: base.fingerprint, saveRecovery: () => {throw Error("must not start restore");}}), /Combo 0: LT\(1,KC_A\) makes its own tap\/hold decision/);

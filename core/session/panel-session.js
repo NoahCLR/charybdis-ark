@@ -12,6 +12,7 @@
 const {fingerprint, summary, reorderLayers} = require("../model/portable-profile");
 const {profileReview} = require("../model/profile-review");
 const {profileUsage} = require("../model/profile-usage");
+const {supportsCompleteProfile} = require("./portable-profile-session");
 const {ProfileDraftSession, DRAFT_EDITS} = require("./profile-draft-session");
 const {buildDeviceModel, deviceSummary} = require("./device-model");
 const {demoDiagnostics, demoHeader, demoModel} = require("./demo-session");
@@ -21,7 +22,7 @@ const DRAFT_CONTROLS = new Set([
     "applyProfileDraft", "rebaseProfileDraft", "closeProfileDraftReview",
 ]);
 const PORTABLE_MESSAGES = new Set([
-    "exportPdUpgrade", "exportPortableProfile", "choosePortableProfile", "restorePortableProfile",
+    "exportPortableProfile", "choosePortableProfile", "restorePortableProfile",
     "managePortableLayers", "editPortableLayer", "savePortableLayers", "cancelPortableReview",
 ]);
 // The demo's own controls (demo-session.js).
@@ -56,15 +57,15 @@ function hostModel(host) {
     };
 }
 
-// A complete read of an eight-layer keyboard opens the draft, or refreshes the
+// A complete read of a supported keyboard opens the draft, or refreshes the
 // one already open against what the keyboard now holds.
 function observePortable(session, state) {
-    if (session.draft && !session.draft.dirty && state.connected && state.selectedDeviceId !== session.draft.deviceId) {
+    if (session.draft && !session.draft.dirty && state.connected && (state.selectedDeviceId !== session.draft.deviceId || !supportsCompleteProfile(state.capabilities))) {
         session.draft = undefined;
         session.resetDraftForms = true;
     }
     const portable = session.service.portable;
-    if (!portable || portable === session.observedPortable || portable.incomplete || !state.connected || state.capabilities?.compiledLayerCount !== 8) return;
+    if (!portable || portable === session.observedPortable || portable.incomplete || !state.connected || !supportsCompleteProfile(state.capabilities)) return;
     if (!session.draft) {
         session.draft = new ProfileDraftSession(portable, state.selectedDeviceId, state.capabilities, state.connectionToken);
         session.resetDraftForms = true;
@@ -74,7 +75,7 @@ function observePortable(session, state) {
 }
 
 function discardDraftForDevice(session, state, snapshot) {
-    session.draft = state.capabilities?.compiledLayerCount === 8
+    session.draft = supportsCompleteProfile(state.capabilities)
         ? new ProfileDraftSession(snapshot, state.selectedDeviceId, state.capabilities, state.connectionToken)
         : undefined;
     session.portableReview = undefined;
@@ -92,12 +93,14 @@ function buildPanelModel(session, state) {
     if (session.draft && state.connected && state.selectedDeviceId === session.draft.deviceId) session.draft.noteConnection(state.connectionToken);
     const device = state.devices?.find((entry) => entry.id === state.selectedDeviceId);
     const busy = Boolean(state.busy || session.portableBusy || session.readBusy);
-    const editing = session.draft ? session.draft.editingState(state) : state;
+    const supported = supportsCompleteProfile(state.capabilities);
+    const editing = session.draft && supported ? session.draft.editingState(state) : state;
     const model = buildDeviceModel({...editing, busy: editing.busy || session.portableBusy || session.readBusy, device});
     model.devices = (state.devices || []).map(({id, label}) => ({id, label}));
     model.selectedDeviceId = state.selectedDeviceId || "";
     if (session.draft) {
-        model.draft = {...session.draft.view(state), busy};
+        const view = session.draft.view(state);
+        model.draft = {...view, matching: view.matching && supported, connected: view.connected && supported, busy};
         if (session.historyOpen) model.draft.steps = session.draft.steps();
         if (model.draft.matching) {
             model.profileIdentity = session.draft.identity();
@@ -129,12 +132,7 @@ function buildPanelModel(session, state) {
             : session.postApplyReadStep === "profile" ? state.committed?.progress : null,
     } : null;
     model.portable = {
-        available: Boolean(state.connected && [5, 8].includes(state.capabilities?.compiledLayerCount) && (state.capabilities?.supportedDomainMask & 15) === 15),
-        eightLayers: state.capabilities?.compiledLayerCount === 8,
-        legacy: state.capabilities?.compiledLayerCount === 5,
-        // The legacy upgrade export is the extension's alone; a host without it
-        // does not offer it.
-        pdUpgradeAvailable: Boolean(state.capabilities?.featureFlags & (1 << 13)) && (!session.host || typeof session.host.exportPdUpgrade === "function"),
+        available: Boolean(state.connected && supportsCompleteProfile(state.capabilities)),
         busy,
         progress: state.portableProgress,
         review: session.portableReview ? {incoming: summary(session.portableReview.document), current: session.portableReview.before.summary,
@@ -221,7 +219,7 @@ function routeMessage(session, message, state) {
         if (!session.draft) {
             throw new Error("This keyboard has no editable draft, so the change was not written. Read the keyboard again; if it stays read-only, update both halves to firmware with profile editing.");
         }
-        if (state.busy || !state.connected || state.selectedDeviceId !== session.draft.deviceId || (state.connectionToken ?? null) !== session.draft.connectionToken) {
+        if (state.busy || !state.connected || !supportsCompleteProfile(state.capabilities) || state.selectedDeviceId !== session.draft.deviceId || (state.connectionToken ?? null) !== session.draft.connectionToken) {
             throw new Error("Reconnect the keyboard this draft belongs to and wait for its current operation.");
         }
         session.acceptedEdit = session.draft.stage(message);

@@ -8,19 +8,19 @@
 
 const {decodedOf, encodeNamedProfile, validateSnapshot} = require("./portable-profile");
 const {decodeProfileBlob, PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
-const {SETTINGS, asciiName, customKeyNamesOf, encodeSettings, upgradeSettings} = require("../schema/settings-domain-v1");
+const {SETTINGS, asciiName, encodeSettings} = require("../schema/settings-domain-v1");
 const {knownActionAbi} = require("../schema/actions");
 const {CUSTOM_KEY_SLOTS, customKeyCode} = require("../data/user-keycodes");
 const fail = (message, code = "CUSTOM_KEY_EDIT_CONFLICT") => Object.assign(new Error(message), {code});
 
-// A keyboard with the userspace keycode blocks has custom keys; its action ABI
-// is the one the app knows, and its profiles are schema 2.
-const customKeysSupported = (document, capabilities) => document?.version === 2 && knownActionAbi(capabilities?.actionAbiDigest ?? document.actionAbiDigest);
+// A keyboard with the userspace keycode blocks has custom keys: its action ABI
+// is the one the app knows.
+const customKeysSupported = (document, capabilities) => Boolean(document) && knownActionAbi(capabilities?.actionAbiDigest ?? document.actionAbiDigest);
 
 function customKeyEditorView(snapshot, capabilities) {
     if (!snapshot?.document || snapshot.incomplete || !customKeysSupported(snapshot.document, capabilities)) return null;
     const {settings, behaviors} = decodedOf(snapshot);
-    const names = customKeyNamesOf(settings);
+    const names = settings.customKeyNames;
     const behaved = new Set(behaviors.rows.filter(row => row.target.kind === ACTION.CUSTOM_KEY).map(row => row.target.operand));
     return {identity: snapshot.fingerprint,
         keys: names.map((name, slot) => ({slot, keycode: `CUSTOM_KEY_${slot}`, code: customKeyCode(slot), name, hasBehavior: behaved.has(slot)})),
@@ -28,8 +28,7 @@ function customKeyEditorView(snapshot, capabilities) {
         names: {perName: SETTINGS.MACRO_NAME_CHARS}};
 }
 
-// A custom key's name. Names live in the profile's settings domain, so naming
-// a key upgrades that domain to v5.
+// A custom key's name. Names live in the profile's settings domain.
 function editCustomKey(snapshot, message, capabilities) {
     if (!snapshot?.document || !message.expectedFingerprint || message.expectedFingerprint !== snapshot.fingerprint) throw fail("The keyboard changed since this draft was opened. Read the keyboard and review the draft before saving again.");
     const match = /^CUSTOM_KEY_(\d+)$/.exec(message.keycode || "");
@@ -40,12 +39,12 @@ function editCustomKey(snapshot, message, capabilities) {
     const value = validateSnapshot(snapshot.document, capabilities);
     const name = message.name.trim();
     if (!asciiName(name)) throw fail(`A custom key name is up to ${SETTINGS.MACRO_NAME_CHARS} plain characters: letters, digits, spaces and punctuation.`, "CUSTOM_KEY_NAME_INVALID");
-    if (name === customKeyNamesOf(value.settings)[slot]) return value.document;
+    if (name === value.settings.customKeyNames[slot]) return value.document;
     const document = JSON.parse(JSON.stringify(value.document));
-    const settings = upgradeSettings(value.settings, 5);
+    const settings = structuredClone(value.settings);
     settings.customKeyNames[slot] = name;
-    const domains = decodeProfileBlob(value.profile).domains.map(domain => domain.id === 0x40 ? {...domain, version: settings.formatVersion, payload: encodeSettings(settings)} : domain);
-    document.profile = encodeNamedProfile({schema: {major: 2, minor: 0}, domains}).toString("base64");
+    const domains = decodeProfileBlob(value.profile).domains.map(domain => domain.id === 0x40 ? {...domain, payload: encodeSettings(settings)} : domain);
+    document.profile = encodeNamedProfile({domains}).toString("base64");
     validateSnapshot(document, capabilities);
     return document;
 }

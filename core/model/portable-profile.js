@@ -1,17 +1,23 @@
 "use strict";
-const {ACTION_ABI, ACTION_ABI_32_SLOTS, actionLimitsFor, keycodeAction, knownActionAbi, pdSlotCountOfVocabulary, pdSlotOfCode} = require("../schema/actions");
-const {decodePdDomain, encodePdDomain, pdDomainVersionFor} = require("../schema/pd-mode-domain-v1");
-const {decodeProfileBlob, encodeProfileBlob, crc32, fnv1a32} = require("../schema/profile-blob-v1");
-const {decodeRgbDomainV1, encodeRgbDomainV1, rgbFormatForPdSlots} = require("../schema/rgb-domain-v1");
+const {keycodeAction, knownActionAbi, pdSlotOfCode} = require("../schema/actions");
+const {decodePdDomain, encodePdDomain} = require("../schema/pd-mode-domain-v1");
+const {decodeProfileBlob, encodeProfileBlob, crc32, fnv1a32, PROFILE_BLOB_V1, PROFILE_DOMAIN_VERSIONS} = require("../schema/profile-blob-v1");
+const {decodeRgbDomainV1, encodeRgbDomainV1} = require("../schema/rgb-domain-v1");
 const {decodeKeyBehaviorDomain, encodeKeyBehaviorDomain} = require("../schema/key-behavior-domain-v1");
-const {decodeComboDomain, encodeComboDomain} = require("../schema/combo-domain-v1");
+const {COMBO_DOMAIN_VERSION, decodeComboDomain, encodeComboDomain} = require("../schema/combo-domain-v1");
 const {decodeSettings, encodeSettings} = require("../schema/settings-domain-v1");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../data/charybdis-layout");
-const {CUSTOM_KEY_BASE, LAYER_LOCK_BASE, LAYER_LOCK_SLOTS, PD_HOLD_BASE, PD_LOCK_BASE, customKeyOfCode} = require("../data/user-keycodes");
+const {LAYER_LOCK_BASE, LAYER_LOCK_SLOTS} = require("../data/user-keycodes");
 const {layerName} = require("./vocabulary");
 
-// The vocabulary before the userspace keycode blocks (users/noah/noah_keymap_ids.h).
-const PRE_BLOCK_ACTION_ABI = 0x61072732;
+// A portable profile is the keyboard's whole configuration in the one format
+// it stores: eight layers, the 64 VIA macros, and a schema 2.0 profile with
+// every domain (RGB 3, key behaviours 1, combos 2, settings 5, PD 2) in the
+// action vocabulary Ark knows. The keyboard migrates nothing and neither does
+// Ark: a backup in an older format is refused.
+const LAYERS = 8;
+const DOMAIN_IDS = Object.keys(PROFILE_DOMAIN_VERSIONS).map(Number).sort((a, b) => a - b);
+const domain = (id, payload) => ({id, version: PROFILE_DOMAIN_VERSIONS[id], payload});
 const fail = message => Object.assign(new Error(message), {code: "INVALID_PORTABLE_PROFILE"});
 const u16 = value => Number.isInteger(value) && value >= 0 && value <= 65535;
 const PHYSICAL_MATRIX_SLOTS = new Set(CHARYBDIS_4X6_LAYOUT_MATRIX.map(([row, column]) => row * 6 + column));
@@ -52,8 +58,8 @@ function validateViaMacro(bytes) {
     }
     if (held.size) throw fail("A macro leaves keys pressed.");
 }
-// The macro bank a document's storage geometry has, when no keyboard says.
-const macroBankBytes = document => document.layers.length === 5 ? 7551 : 7191;
+// The macro bank the eight-layer storage geometry has, when no keyboard says.
+const MACRO_BANK_BYTES = 7191;
 function macroBank(slots, capacity) {
     const size = slots.reduce((total, bytes) => total + bytes.length + 1, 1);
     if (size > capacity) throw fail(`Macros need ${size} bytes; this keyboard has ${capacity}.`);
@@ -64,24 +70,22 @@ function macroBank(slots, capacity) {
 function materializeProfile(active, defaults, combos, settings) {
     if (!combos || combos.noTimer || combos.customTrigger || combos.customRelease || combos.customRepress || combos.strictTimer || combos.fixedReference) throw fail("This keyboard uses combo hooks or timing that cannot be represented by a portable profile.");
     const live = decodeProfileBlob(active), fallback = decodeProfileBlob(defaults);
-    if (live.schema.major !== fallback.schema.major) throw fail("Active and default profiles use different schemas.");
-    const domains = (live.schema.major === 2 ? [0x10, 0x20, 0x50] : [0x10, 0x20]).map(id => {
-        const domain = live.domains.find(d => d.id === id) || fallback.domains.find(d => d.id === id);
-        if (!domain) throw fail("The keyboard did not report every profile domain.");
-        return domain;
+    const domains = [0x10, 0x20, 0x50].map(id => {
+        const found = live.domains.find(d => d.id === id) || fallback.domains.find(d => d.id === id);
+        if (!found) throw fail("The keyboard did not report every profile domain.");
+        return found;
     });
     const table = comboTableOf(combos);
-    domains.push({id: 0x30, version: table.version, payload: encodeComboDomain(table)}, {id: 0x40, version: settings[0], payload: settings});
-    return encodeProfileBlob({schema: live.schema, domains});
+    decodeSettings(settings);
+    domains.push(domain(0x30, encodeComboDomain(table)), domain(0x40, settings));
+    return encodeProfileBlob({domains});
 }
-// The combo table the keyboard runs, in the format it reads: version 2 keeps
-// which combos follow the default window, version 1 has only their windows.
-// Firmware built without combos reports no default, and stores none.
+// The combo table the keyboard runs, as it stores it: which combos follow the
+// default window, and the two shared values.
 function comboTableOf(combos) {
-    const version = combos.version === 2 && combos.defaultTermMs ? 2 : 1;
-    return {version, defaultTermMs: version === 2 ? combos.defaultTermMs : null, holdTermMs: combos.holdTermMs,
+    return {version: COMBO_DOMAIN_VERSION, defaultTermMs: combos.defaultTermMs, holdTermMs: combos.holdTermMs,
         rows: combos.rows.map(row => ({inputs: row.inputs.map(keycodeAction), output: keycodeAction(row.output),
-            termMs: version === 2 && row.followsDefault ? null : row.termMs, mustHold: row.mustHold, mustTap: row.mustTap, ordered: row.ordered}))};
+            termMs: row.followsDefault ? null : row.termMs, mustHold: row.mustHold, mustTap: row.mustTap, ordered: row.ordered}))};
 }
 function createSnapshot({profile, via, actionAbiDigest}) {
     const document = {format: "charybdis-profile", version: decodeProfileBlob(profile).schema.major, keyboard: "charybdis-4x6", actionAbiDigest,
@@ -94,26 +98,22 @@ function validateSnapshot(value, capabilities) {
         if (Buffer.byteLength(value) > 100000) throw fail("This profile file is too large.");
         try {value = JSON.parse(value);} catch {throw fail("This is not a valid profile file.");}
     }
-    if (!value || value.format !== "charybdis-profile" || ![1, 2].includes(value.version) || value.keyboard !== "charybdis-4x6" || !Number.isInteger(value.actionAbiDigest) || value.actionAbiDigest < 1 || value.actionAbiDigest > 0xffffffff) throw fail("Choose a supported Charybdis profile file.");
-    if (Object.keys(value).some(key => !["format", "version", "keyboard", "actionAbiDigest", "layers", "profile", "macros", "pdModeSource"].includes(key))) throw fail("This profile contains unsupported fields.");
-    if (!Array.isArray(value.layers) || ![5, 8].includes(value.layers.length) || value.layers.some(keys => !Array.isArray(keys) || keys.length !== 60 || !keys.every(u16))) throw fail("A complete profile must contain all matrix layers.");
+    if (!value || value.format !== "charybdis-profile" || value.keyboard !== "charybdis-4x6" || !Number.isInteger(value.actionAbiDigest) || value.actionAbiDigest < 1 || value.actionAbiDigest > 0xffffffff) throw fail("Choose a supported Charybdis profile file.");
+    if (value.version !== PROFILE_BLOB_V1.SCHEMA_MAJOR || !knownActionAbi(value.actionAbiDigest)) throw fail("This profile is from older firmware, in a format the keyboard no longer stores. Export a new backup from current firmware.");
+    if (Object.keys(value).some(key => !["format", "version", "keyboard", "actionAbiDigest", "layers", "profile", "macros"].includes(key))) throw fail("This profile contains unsupported fields.");
+    if (!Array.isArray(value.layers) || value.layers.length !== LAYERS || value.layers.some(keys => !Array.isArray(keys) || keys.length !== 60 || !keys.every(u16))) throw fail("A complete profile must contain all eight layers.");
     if (!Array.isArray(value.macros) || value.macros.length !== 64) throw fail("A complete profile must contain all 64 macro slots.");
     const macros = value.macros.map(slot => {const bytes = base64(slot, 8192, "macro"); validateViaMacro(bytes); return bytes;});
-    const profile = base64(value.profile, value.version === 2 ? 5088 : 4064, "profile data"), decoded = decodeProfileBlob(profile), domains = decoded.domains;
-    if (decoded.schema.major !== value.version || domains.map(d => d.id).join() !== (value.version === 2 ? "16,32,48,64,80" : "16,32,48,64")) throw fail("The profile is missing configuration. Partial profiles cannot be restored as a complete backup.");
-    // A schema-2 profile stores as many pointing slots as its action vocabulary
-    // has (actions.js pdSlotCountOfVocabulary): eight in PD v1 with RGB v2, or
-    // 32 in PD v2 with RGB v3. Actions may reach exactly those slots.
-    const pdModes = value.version === 2 ? decodePdDomain(domains[4].payload, {version: domains[4].version}) : undefined;
-    if (pdModes && (pdModes.length !== pdSlotCountOfVocabulary(value.actionAbiDigest) || domains[4].version !== pdDomainVersionFor(pdModes.length))) throw fail("The profile's pointing slots do not match its action vocabulary.");
-    const actionOptions = actionLimitsFor(value.version, pdModes?.length);
-    const rgb = decodeRgbDomainV1(domains[0].payload), behaviors = decodeKeyBehaviorDomain(domains[1].payload, actionOptions), combos = decodeComboDomain(domains[2].payload, domains[2].version, actionOptions), settings = decodeSettings(domains[3].payload);
-    // Settings may be one version ahead of the document: v3 names the VIA
-    // macros inside a schema-2 profile.
-    const settingsVersion = settings.formatVersion ?? 1;
-    const rgbVersion = pdModes ? rgbFormatForPdSlots(pdModes.length) : value.version;
-    if (rgb.formatVersion !== rgbVersion || domains[0].version !== rgbVersion || !(settingsVersion === value.version || (value.version === 2 && settingsVersion >= 3)) || domains[3].version !== settingsVersion) throw fail("Profile domain versions disagree.");
-    if (rgb.layerColors.length !== value.layers.length || rgb.layerColors.some(row => row.layerId >= 8)) throw fail("RGB does not cover all eight layers.");
+    const profile = base64(value.profile, PROFILE_BLOB_V1.MAX_SIZE, "profile data");
+    let domains;
+    try {domains = decodeProfileBlob(profile).domains;} catch (error) {
+        if (["INCOMPATIBLE_SCHEMA", "UNKNOWN_DOMAIN_VERSION"].includes(error.code)) throw fail("This profile is from older firmware, in a format the keyboard no longer stores. Export a new backup from current firmware.");
+        throw error;
+    }
+    if (domains.map(d => d.id).join() !== DOMAIN_IDS.join()) throw fail("The profile is missing configuration. Partial profiles cannot be restored as a complete backup.");
+    const pdModes = decodePdDomain(domains[4].payload);
+    const rgb = decodeRgbDomainV1(domains[0].payload), behaviors = decodeKeyBehaviorDomain(domains[1].payload), combos = decodeComboDomain(domains[2].payload), settings = decodeSettings(domains[3].payload);
+    if (rgb.layerColors.length !== LAYERS || rgb.layerColors.some(row => row.layerId >= LAYERS)) throw fail("RGB does not cover all eight layers.");
     // A binding for an empty slot is allowed, because the keyboard allows it:
     // the mode keycodes are a fixed registry, and the runtime refuses to
     // activate a slot whose record is empty rather than misbehaving
@@ -122,129 +122,22 @@ function validateSnapshot(value, capabilities) {
     // nothing until its slot is configured again. They are counted here so the
     // interface can say so before anyone wonders why a key went quiet.
     const danglingPdBindings = new Map();
-    const checkPd = (id, source) => {
-        if (!pdModes || id === undefined || pdModes[id]?.kind) return;
+    const checkPd = id => {
+        if (id === undefined || pdModes[id]?.kind) return;
         danglingPdBindings.set(id, (danglingPdBindings.get(id) || 0) + 1);
-        void source;
     };
-    const checkNativePd = (code, source) => checkPd(pdSlotOfCode(code, pdModes?.length), source);
-    if (pdModes) value.layers.flat().forEach(code => checkNativePd(code, "layer"));
+    const checkNativePd = code => checkPd(pdSlotOfCode(code));
+    value.layers.flat().forEach(checkNativePd);
     const checkAction = action => {
-        if ([4, 5].includes(action.kind)) checkPd(action.operand, "action");
-        if (action.kind === 1) checkNativePd(action.operand, "action");
-        if ([2, 3].includes(action.kind) && action.operand >= 8) throw fail("A profile action references a missing layer.");
+        if ([4, 5].includes(action.kind)) checkPd(action.operand);
+        if (action.kind === 1) checkNativePd(action.operand);
+        if ([2, 3].includes(action.kind) && action.operand >= LAYERS) throw fail("A profile action references a missing layer.");
     };
     walkActions(behaviors, checkAction); walkActions(combos, checkAction);
-    if (value.pdModeSource !== undefined) {
-        const source = value.pdModeSource;
-        if (value.version !== 1 || !source || source.version !== 1 || ![0xdcb00959, 0xeb80829c].includes(source.actionAbiDigest) || !Number.isInteger(source.compiledDefaultDigest) || source.compiledDefaultDigest < 1 || source.compiledDefaultDigest > 0xffffffff || Object.keys(source).some(key => !["version", "actionAbiDigest", "compiledDefaultDigest", "domain"].includes(key))) throw fail("Unsupported pointing-mode migration source.");
-        const modes = decodePdDomain(base64(source.domain, 776, "pointing-mode source"));
-        if (modes.some((mode, id) => mode.kind !== [2, 1, 1, 1, 1, 2, 0, 0][id])) throw fail("The migration source does not represent the six legacy modes.");
-    }
-    const layout = Buffer.alloc(value.layers.length * 120); value.layers.flat().forEach((v, id) => layout.writeUInt16BE(v, id * 2));
-    if (capabilities?.compiledLayerCount === 8 && value.layers.length === 5) {
-        return validateSnapshot(upgradeFiveLayerSnapshot(value), capabilities);
-    }
-    if (capabilities?.schema?.major === 2 && value.version === 1) return validateSnapshot(upgradePdSnapshot(value), capabilities);
-    if (knownActionAbi(capabilities?.actionAbiDigest) && value.version === 2 && value.actionAbiDigest === PRE_BLOCK_ACTION_ABI) return validateSnapshot(upgradeKeycodeBlocks(value), capabilities);
-    if (capabilities?.actionAbiDigest === ACTION_ABI_32_SLOTS && value.version === 2 && value.actionAbiDigest === ACTION_ABI) return validateSnapshot(upgradePdSlots(value), capabilities);
-    const capacity = capabilities?.viaMacroBytes ?? macroBankBytes(value);
-    if (capabilities && (value.actionAbiDigest !== capabilities.actionAbiDigest || capabilities.compiledLayerCount !== value.layers.length || (capabilities.supportedDomainMask & (value.version === 2 ? 31 : 15)) !== (value.version === 2 ? 31 : 15))) throw fail("The connected firmware does not support this profile's action vocabulary or eight-layer storage.");
-    const bank = macroBank(macros, capacity);
-    return {document: value, profile, layout, macros: bank, settings, rgb, behaviors, combos,
-        ...(pdModes ? {pdModes, danglingPdBindings: Object.fromEntries(danglingPdBindings)} : {})};
-}
-function upgradePdSnapshot(source) {
-    if (source.layers?.length === 5) source = upgradeFiveLayerSnapshot(source);
-    const value = validateSnapshot(source);
-    if (source.version !== 1 || source.actionAbiDigest !== 0xeb80829c) throw fail("This profile does not use the supported legacy action vocabulary.");
-    if (!source.pdModeSource) throw fail("This backup does not contain the old pointing-mode settings. Keep the original firmware and export a new backup using its matching PD readback bridge before changing storage geometry.");
-    const slots = decodePdDomain(Buffer.from(source.pdModeSource.domain, "base64"));
-    for (let id = 0; id < 6; id++) slots[id].dpi = id === 0 || id === 5 ? Math.max(100, value.settings.values[10]) : value.settings.values[10 + id];
-    const rgb = value.rgb; rgb.formatVersion = 2;
-    for (let id = 6; id < 8; id++) rgb.pdModeColors.push({pdModeId: id, color: {h: 0, s: 0, v: 0}, locality: 2});
-    const settings = value.settings; settings.formatVersion = 2; settings.values.fill(0, 10, 15);
-    const profile = encodeProfileBlob({schema: {major: 2, minor: 0}, domains: [
-        {id: 16, version: 2, payload: encodeRgbDomainV1(rgb)}, {id: 32, version: 1, payload: encodeKeyBehaviorDomain(value.behaviors)},
-        {id: 48, version: value.combos.version, payload: encodeComboDomain(value.combos)}, {id: 64, version: 2, payload: encodeSettings(settings)},
-        {id: 80, version: 1, payload: encodePdDomain(slots)},
-    ]});
-    const result = {...source, version: 2, actionAbiDigest: 0x61072732, profile: profile.toString("base64")};
-    delete result.pdModeSource;
-    validateSnapshot(result);
-    return result;
-}
-
-// A backup from before the keycode blocks, renumbered key by key: pointing
-// holds 0x7e50+n and locks 0x7e56+n (slots 6/7 at 0x7ef0..0x7ef3), layer locks
-// 0x7e5c+n and the keymap's own keys from 0x7e64 each move to their block; the
-// keymap keys become custom keys 0, 1, 2… in order. A retired user macro
-// (0x7e40..0x7e4f, action kind 7) did nothing, so a key holding one is emptied;
-// one a behaviour or combo sends has no counterpart and refuses the import.
-function upgradeKeycodeBlocks(source) {
-    const value = validateSnapshot(source), result = JSON.parse(JSON.stringify(source));
-    const native = code => {
-        if (code >= 0x7e40 && code <= 0x7e4f) return 0x0000;
-        if (code >= 0x7e50 && code <= 0x7e55) return PD_HOLD_BASE + code - 0x7e50;
-        if (code >= 0x7e56 && code <= 0x7e5b) return PD_LOCK_BASE + code - 0x7e56;
-        if (code >= 0x7ef0 && code <= 0x7ef3) return ((code - 0x7ef0) % 2 ? PD_LOCK_BASE : PD_HOLD_BASE) + 6 + ((code - 0x7ef0) >> 1);
-        if (code >= 0x7e5c && code < 0x7e5c + LAYER_LOCK_SLOTS) return LAYER_LOCK_BASE + code - 0x7e5c;
-        if (code >= 0x7e64 && code < 0x7e64 + 64) return CUSTOM_KEY_BASE + code - 0x7e64;
-        if (code >= 0x7e40 && code <= 0x7fff) throw fail(`A key of the older firmware (0x${code.toString(16)}) has no counterpart in this firmware.`);
-        return code;
-    };
-    result.layers = source.layers.map(layer => layer.map(native));
-    const renumber = a => {
-        if (a.kind === 7) throw fail("A behaviour or combo sends a retired user macro, which this firmware no longer has.");
-        if (a.kind === 1) a.operand = native(a.operand);
-    };
-    walkActions(value.behaviors, renumber); walkActions(value.combos, renumber);
-    // A behaviour names its custom key by kind, as the keyboard encodes it;
-    // combos keep native keycodes, as the keyboard reads them back. A step
-    // that sent a keymap key did nothing and has no counterpart here.
-    for (const row of value.behaviors.rows) {
-        const custom = row.target.kind === 1 ? customKeyOfCode(row.target.operand) : undefined;
-        if (custom !== undefined) row.target = {...row.target, kind: 7, operand: custom};
-        walkActions({steps: row.steps}, a => {
-            if (a.kind === 1 && customKeyOfCode(a.operand) !== undefined) throw fail(`A behaviour step sends CUSTOM_KEY_${customKeyOfCode(a.operand)}, which a step cannot send in this firmware. Remove that step on the older firmware and take the backup again.`);
-        });
-    }
-    const options = actionLimitsFor(2, value.pdModes.length);
-    result.actionAbiDigest = ACTION_ABI;
-    result.profile = encodeProfileBlob({schema: {major: 2, minor: 0}, domains: [
-        {id: 16, version: value.rgb.formatVersion, payload: encodeRgbDomainV1(value.rgb)}, {id: 32, version: 1, payload: encodeKeyBehaviorDomain(value.behaviors, options)},
-        {id: 48, version: value.combos.version, payload: encodeComboDomain(value.combos, options)}, {id: 64, version: value.settings.formatVersion, payload: encodeSettings(value.settings)},
-        {id: 80, version: pdDomainVersionFor(value.pdModes.length), payload: encodePdDomain(value.pdModes)},
-    ]}).toString("base64");
-    return result;
-}
-
-// A backup of the eight-slot firmware, for the 32-slot one. Keys, behaviours,
-// combos and settings mean the same there, so they stay as they are; the
-// pointing slots move to the sparse PD v2 (a disabled slot without a name is
-// left out), and lighting to RGB v3, the new slots uncoloured on the right half
-// as the configurable slots 6 and 7 once started (upgradePdSnapshot).
-function upgradePdSlots(source) {
-    const value = validateSnapshot(source);
-    if (source.version !== 2 || source.actionAbiDigest !== ACTION_ABI) throw fail("This profile does not use the eight-slot action vocabulary.");
-    const slots = pdSlotCountOfVocabulary(ACTION_ABI_32_SLOTS);
-    const pdModes = Array.from({length: slots}, (_, id) => value.pdModes[id] || {id, kind: 0, name: ""});
-    const rgb = value.rgb;
-    rgb.formatVersion = rgbFormatForPdSlots(slots);
-    for (let id = value.pdModes.length; id < slots; id++) rgb.pdModeColors.push({pdModeId: id, color: {h: 0, s: 0, v: 0}, locality: 2});
-    const blob = decodeProfileBlob(value.profile);
-    const domains = blob.domains.map(domain => domain.id === 16 ? {id: 16, version: rgb.formatVersion, payload: encodeRgbDomainV1(rgb)}
-        : domain.id === 80 ? {id: 80, version: pdDomainVersionFor(slots), payload: encodePdDomain(pdModes)} : domain);
-    let profile;
-    try {
-        profile = encodeProfileBlob({schema: blob.schema, domains});
-    } catch (error) {
-        if (error.code !== "CAPACITY_EXCEEDED") throw error;
-        throw fail("This backup does not fit the 32-slot firmware's profile once its new pointing slots have their lighting. Remove a behaviour, combo or name on the older firmware and take the backup again.");
-    }
-    const result = {...JSON.parse(JSON.stringify(source)), actionAbiDigest: ACTION_ABI_32_SLOTS, profile: profile.toString("base64")};
-    validateSnapshot(result);
-    return result;
+    const layout = Buffer.alloc(LAYERS * 120); value.layers.flat().forEach((v, id) => layout.writeUInt16BE(v, id * 2));
+    if (capabilities && (value.actionAbiDigest !== capabilities.actionAbiDigest || capabilities.compiledLayerCount !== LAYERS || (capabilities.supportedDomainMask & 31) !== 31)) throw fail("The connected firmware does not support this profile's action vocabulary or eight-layer storage.");
+    const bank = macroBank(macros, capabilities?.viaMacroBytes ?? MACRO_BANK_BYTES);
+    return {document: value, profile, layout, macros: bank, settings, rgb, behaviors, combos, pdModes, danglingPdBindings: Object.fromEntries(danglingPdBindings)};
 }
 
 // A profile with a renamed macro or custom key. Every name fits the settings
@@ -267,7 +160,7 @@ function walkActions(value, action) {
 // The fingerprint and summary of a document, from its decoded form when the
 // caller already has it, so a document decoded once is not decoded again.
 function fingerprintOf({document, profile, layout, macros}) {
-    const bytes = Buffer.concat([profile, layout, macros, ...(document.pdModeSource ? [Buffer.from(document.pdModeSource.domain, "base64")] : [])]);
+    const bytes = Buffer.concat([profile, layout, macros]);
     return `${document.actionAbiDigest}:${crc32(bytes)}:${fnv1a32(bytes)}`;
 }
 const fingerprint = document => fingerprintOf(validateSnapshot(document));
@@ -301,10 +194,6 @@ const decodedOf = snapshot => snapshot.decoded && snapshot.decoded.document === 
 // slots keep their stored values. An uncoloured old base also keeps
 // the saved base HSV as its own all-key colour after it becomes an overlay.
 function reorderLayers(document, order, names, {keysFollow = true} = {}) {
-    if (document.layers?.length !== 8) throw fail("Layer ordering becomes available after the eight-layer update.");
-    // Renumbering reads every layer key, and older firmware numbered them
-    // differently.
-    if (!knownActionAbi(document.actionAbiDigest)) throw fail("Layer ordering needs the firmware this app was made for. Update both halves first.");
     const validated = validateSnapshot(document), result = JSON.parse(JSON.stringify(document));
     if (!Array.isArray(order) || order.length !== 8 || new Set(order).size !== 8 || order.some(id => !Number.isInteger(id) || id < 0 || id >= 8)) throw fail("Include every layer once.");
     const remap = []; order.forEach((old, next) => {remap[old] = next;});
@@ -327,7 +216,6 @@ function reorderLayers(document, order, names, {keysFollow = true} = {}) {
         result.layers[remap[0]] = result.layers[remap[0]].map((code, slot) => PHYSICAL_MATRIX_SLOTS.has(slot) && code === 0x0000 ? 0x0001 : code);
     }
     const {rgb, behaviors, combos, settings, pdModes} = validated;
-    const actionOptions = actionLimitsFor(pdModes ? 2 : 1, pdModes?.length);
     const action = a => {if (!renumbers) return; if ([2, 3].includes(a.kind)) a.operand = reach(a.operand); else if (a.kind === 1) a.operand = native(a.operand);};
     walkActions(behaviors, action); walkActions(combos, action);
     rgb.layerColors.forEach(row => {row.layerId = remap[row.layerId];}); rgb.layerColors.sort((a, b) => a.layerId - b.layerId);
@@ -344,36 +232,16 @@ function reorderLayers(document, order, names, {keysFollow = true} = {}) {
     settings.values[5] = remap[settings.values[5]]; settings.values[9] = remap[settings.values[9]];
     settings.values[23] = remap.reduce((mask, next, old) => mask | ((settings.values[23] >> old) & 1) << reach(old), 0);
     const oldReferences = settings.values[27]; settings.values[27] = order.reduce((packed, old, next) => (packed | remap[(oldReferences >>> (old * 4)) & 15] << (next * 4)) >>> 0, 0);
-    result.profile = encodeProfileBlob({schema: {major: document.version, minor: 0}, domains: [
-        {id: 16, version: rgb.formatVersion, payload: encodeRgbDomainV1(rgb)}, {id: 32, version: 1, payload: encodeKeyBehaviorDomain(behaviors, actionOptions)},
-        {id: 48, version: combos.version, payload: encodeComboDomain(combos, actionOptions)}, {id: 64, version: settings.formatVersion ?? document.version, payload: encodeSettings(settings)},
-        ...(pdModes ? [{id: 80, version: pdDomainVersionFor(pdModes.length), payload: encodePdDomain(pdModes)}] : []),
+    result.profile = encodeProfileBlob({domains: [
+        domain(16, encodeRgbDomainV1(rgb)), domain(32, encodeKeyBehaviorDomain(behaviors)), domain(48, encodeComboDomain(combos)),
+        domain(64, encodeSettings(settings)), domain(80, encodePdDomain(pdModes)),
     ]}).toString("base64");
     validateSnapshot(result); return result;
-}
-function upgradeFiveLayerSnapshot(source) {
-    if (source.actionAbiDigest !== 0xdcb00959) throw fail("This five-layer firmware vocabulary cannot be upgraded automatically.");
-    const value = validateSnapshot(source), result = JSON.parse(JSON.stringify(source));
-    const native = code => {
-        if (code >= 0x7ffd && code <= 0x7fff) throw fail("A legacy user trigger has no corresponding slot in the eight-layer firmware.");
-        return code >= 0x7e61 && code <= 0x7fff ? code + 3 : code;
-    };
-    result.layers = source.layers.map(layer => layer.map(native));
-    while (result.layers.length < 8) result.layers.push(Array(60).fill(1));
-    walkActions(value.behaviors, action => {if (action.kind === 1) action.operand = native(action.operand);});
-    walkActions(value.combos, action => {if (action.kind === 1) action.operand = native(action.operand);});
-    for (let id = 5; id < 8; id++) value.rgb.layerColors.push({layerId: id, color: {h: 0, s: 0, v: 0}, mode: 1});
-    result.actionAbiDigest = 0xeb80829c;
-    result.profile = encodeProfileBlob({domains: [
-        {id:16,version:1,payload:encodeRgbDomainV1(value.rgb)}, {id:32,version:1,payload:encodeKeyBehaviorDomain(value.behaviors)},
-        {id:48,version:value.combos.version,payload:encodeComboDomain(value.combos)}, {id:64,version:1,payload:encodeSettings(value.settings)},
-    ]}).toString("base64");
-    return result;
 }
 const summary = document => summaryOf(validateSnapshot(document));
 function summaryOf(value) {
     return {layers: value.document.layers.length, behaviors: value.behaviors.rows.length, combos: value.combos.rows.length,
-        macros: value.document.macros.filter(Boolean).length + (value.settings.macros || []).filter(bytes => bytes.length).length,
+        macros: value.document.macros.filter(Boolean).length,
         names: value.settings.names.map((name, index) => layerName(value.settings.names, index))};
 }
-module.exports = {encodeNamedProfile, comboTableOf, upgradePdSnapshot, upgradeKeycodeBlocks, upgradePdSlots, createSnapshot, validateSnapshot, materializeProfile, macroSlots, macroBank, macroBankBytes, validateViaMacro, fingerprint, fingerprintOf, decodedOf, reorderLayers, summary, summaryOf};
+module.exports = {MACRO_BANK_BYTES, encodeNamedProfile, comboTableOf, createSnapshot, validateSnapshot, materializeProfile, macroSlots, macroBank, validateViaMacro, fingerprint, fingerprintOf, decodedOf, reorderLayers, summary, summaryOf};

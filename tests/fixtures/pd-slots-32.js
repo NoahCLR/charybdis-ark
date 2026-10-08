@@ -1,29 +1,18 @@
 "use strict";
-// The 32-slot firmware: its own compiled profile (the pinned
-// compiled_profile_pd_v2.fixture: RGB v3, sparse PD v2, slots 0-6 configured),
-// materialized the way pd-profile.js materializes the eight-slot one.
-const fs = require("node:fs"), path = require("node:path");
-const {settings} = require("./portable-profile");
-const {materializeProfile, createSnapshot, validateSnapshot} = require("../../core/model/portable-profile");
-const {encodeSettings} = require("../../core/schema/settings-domain-v1");
-const {ACTION_ABI_32_SLOTS} = require("../../core/schema/actions");
+// The 32 pointing slots of current firmware's compiled profile
+// (portable-profile.js), with a slot past the first eight configured.
+const {validateSnapshot} = require("../../core/model/portable-profile");
 const {decodeProfileBlob, encodeProfileBlob} = require("../../core/schema/profile-blob-v1");
 const {decodePdDomain, encodePdDomain} = require("../../core/schema/pd-mode-domain-v1");
 const {decodeRgbDomainV1, encodeRgbDomainV1} = require("../../core/schema/rgb-domain-v1");
+const {compiled, document: backup, CURRENT_CAPABILITIES} = require("./portable-profile");
 
-const CAPABILITIES_32 = Object.freeze({compiledLayerCount: 8, supportedDomainMask: 31, schema: {major: 2}, actionAbiDigest: ACTION_ABI_32_SLOTS});
-const FIXTURE = path.resolve(__dirname, "../../upstream/firmware/tests/fixtures/compiled_profile_pd_v2.fixture");
+const CAPABILITIES_32 = CURRENT_CAPABILITIES;
+const compiled32 = () => compiled();
+const backup32 = () => backup();
 
-function compiled32() {
-    const fixture = fs.readFileSync(FIXTURE, "utf8");
-    const compiled = Buffer.from(fixture.match(/^profile.full.hex=(.+)$/m)[1], "hex");
-    const policy = settings(); policy.formatVersion = 2; policy.values.fill(0, 10, 15);
-    const profile = materializeProfile(compiled, compiled, {version: 2, defaultTermMs: 50, holdTermMs: 200, rows: []}, encodeSettings(policy));
-    return createSnapshot({profile, actionAbiDigest: parseInt(fixture.match(/^profile.action_abi=(.+)$/m)[1], 16), via: {layers: 8, layout: Buffer.alloc(960), macros: Buffer.alloc(7191), macroSlots: 64}});
-}
-
-// A slot past the first eight, configured: Volume copied into slot 12 as
-// "Tabs", with its own colour, so a screen has a high slot that does something.
+// Volume copied into slot 12 as "Tabs", with its own colour, so a screen has
+// a high slot that does something.
 function document32({highSlot = true} = {}) {
     const doc = compiled32();
     if (!highSlot) return doc;
@@ -40,4 +29,4 @@ function document32({highSlot = true} = {}) {
     return doc;
 }
 
-module.exports = {CAPABILITIES_32, compiled32, document32};
+module.exports = {CAPABILITIES_32, backup32, compiled32, document32};

@@ -24,9 +24,9 @@ const AREA_OF_DOMAIN = {
 const AREAS = ["behaviours", "combos", "names", "lighting", "pointing", "settings"];
 
 // Bytes the settings domain spends on names: eight fixed 24-byte layer names
-// and, from v3, a length byte plus the text of each macro and custom-key name.
+// and a length byte plus the text of each macro and custom-key name.
 function nameBytes(settings) {
-    const records = [...(settings.formatVersion >= 3 ? settings.macroNames : []), ...(settings.customKeyNames || [])];
+    const records = [...settings.macroNames, ...settings.customKeyNames];
     return SETTINGS.LAYERS * SETTINGS.NAME_BYTES + records.reduce((total, name) => total + 1 + Buffer.byteLength(name), 0);
 }
 

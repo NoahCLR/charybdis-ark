@@ -4,7 +4,7 @@ const test = require("node:test");
 const {keyLabel, keyLabelWithName, profileKeyNames} = require("../../core/model/key-names");
 const {decodedDeviceProfile} = require("../fixtures/device-profile");
 const keycodes = require("../../core/data/keycode-catalog");
-const {PD_BINDINGS} = require("../../core/data/pd-bindings");
+const {PD_SLOT_BINDINGS: PD_BINDINGS} = require("../../core/data/pd-bindings");
 
 const PD_SLOT_0 = PD_BINDINGS[0].holdCode;
 

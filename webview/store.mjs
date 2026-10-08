@@ -190,8 +190,8 @@ const AREA_CAPABILITY = {
     customKeys: (model) => Boolean(model?.customKeyEditing?.writable),
     pointing: (model) => Boolean(model?.pdModeEditing?.writable),
     combos: (model) => model?.comboReadback?.writable !== false,
-    layers: (model) => Boolean(model?.portable?.available && model.portable.eightLayers && !model.portable.busy),
-    import: (model) => Boolean(model?.portable?.available && model.portable.eightLayers && !model.portable.busy),
+    layers: (model) => Boolean(model?.portable?.available && !model.portable.busy),
+    import: (model) => Boolean(model?.portable?.available && !model.portable.busy),
 };
 export function canEdit(area) {
     const model = getModel();

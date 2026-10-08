@@ -6,7 +6,7 @@
 const {test, expect} = require("@playwright/test");
 const {installFakeHid} = require("./fake-hid");
 const {fakeKeyboard} = require("../tests/fixtures/fake-keyboard");
-const {document: pdDocument} = require("../tests/fixtures/pd-profile");
+const {document32: pdDocument} = require("../tests/fixtures/pd-slots-32");
 const {CHARYBDIS_PRODUCT_ID, CHARYBDIS_VENDOR_ID, QMK_RAW_HID_USAGE, QMK_RAW_HID_USAGE_PAGE} = require("../core/transport/device-adapter");
 
 const PAGE = "/dist/web/index.html";
