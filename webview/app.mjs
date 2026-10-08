@@ -485,5 +485,11 @@ addEventListener("resize", () => {
     root.querySelector(".keys-pad .bench")?.style.removeProperty("min-height");
 });
 
+// A dropped file must never navigate away from Ark and lose the draft,
+// including outside the Import card or while that card is disabled.
+for (const type of ["dragover", "drop"]) addEventListener(type, (event) => {
+    if (Array.from(event.dataTransfer?.types || []).includes("Files")) event.preventDefault();
+});
+
 render();
 post({type: "ready"});

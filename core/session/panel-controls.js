@@ -176,11 +176,16 @@ async function portableControl(session, message, host = {}) {
         case "cancelPortableReview":
             session.portableReview = undefined; session.portableLayers = undefined;
             return;
-        case "choosePortableProfile": {
+        case "choosePortableProfile":
+        case "reviewPortableProfile": {
             // The host answers with the file's text, and its name when it has one.
-            const chosen = await host.chooseProfile?.();
+            // A drop carries those same values directly from the panel.
+            const chosen = message.type === "reviewPortableProfile" ? message : await host.chooseProfile?.();
             if (chosen === undefined) return;
-            const value = validateSnapshot(typeof chosen === "string" ? chosen : chosen.text, panelCapabilities(session));
+            const text = typeof chosen === "string" ? chosen : chosen.text;
+            if (typeof text !== "string") throw new Error("This profile file could not be read.");
+            if (Buffer.byteLength(text, "utf8") > 100000) throw new Error("This profile file is too large.");
+            const value = validateSnapshot(text, panelCapabilities(session));
             session.portableReview = {document: value.document, fileName: typeof chosen === "string" ? null : chosen.name || null,
                 before: session.draft?.current || await service.readPortableProfile({forRestore: true}), revision: session.draft?.revision,
                 deviceId: panelState(session).selectedDeviceId, draftId: session.draft?.id};

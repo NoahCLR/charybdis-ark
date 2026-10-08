@@ -30,6 +30,40 @@ function fakeHost(extra = {}) {
 }
 const last = (host) => host.posted[host.posted.length - 1];
 
+test("dropped files use the chooser's validation and review without opening a host dialog or writing", async () => {
+    const service = fakeService();
+    const host = fakeHost({chooseProfile: () => {throw new Error("a drop must not open a chooser");}});
+    const loop = openPanelLoop(host, {service});
+    loop.publish();
+    const draft = loop.session.draft;
+    const message = (text) => ({type: "reviewPortableProfile", text, name: "desk.charybdis.json",
+        draftId: draft.id, draftRevision: draft.revision});
+    const before = draft.document;
+    const changed = structuredClone(before);
+    changed.layers[0][0] = 5;
+    await loop.handleMessage(message(JSON.stringify(changed)));
+    const review = loop.session.portableReview;
+    assert.equal(last(host).model.portable.review.fileName, "desk.charybdis.json");
+    assert.deepEqual(draft.document, before);
+    assert.deepEqual(service.calls, []);
+    assert.deepEqual(host.recoveries, []);
+    for (const text of ["not json", "{}", undefined, " ".repeat(100001), "é".repeat(50001)]) {
+        await loop.handleMessage(message(text));
+        assert.match(last(host).notice, /^Failed/);
+        assert.equal(loop.session.portableReview, review, "a refused file preserves the existing review");
+        assert.deepEqual(draft.document, before);
+        assert.equal(loop.session.portableBusy, false);
+    }
+    await loop.handleMessage({...message(JSON.stringify(changed)), draftId: "old"});
+    assert.match(last(host).notice, /Read the keyboard/);
+    await loop.handleMessage({...message(JSON.stringify(changed)), draftRevision: -1});
+    assert.match(last(host).notice, /^Failed/);
+    service.snapshot().connected = false;
+    await loop.handleMessage(message(JSON.stringify(changed)));
+    assert.match(last(host).notice, /Read the keyboard/);
+    assert.deepEqual(service.calls, []);
+});
+
 // A connected keyboard with a complete profile, as panel-controls.test.js fakes it.
 function fakeService(extra = {}) {
     const calls = [];

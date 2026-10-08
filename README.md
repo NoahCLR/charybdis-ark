@@ -32,7 +32,8 @@ that are too long to play. **Apply** saves a recovery copy, writes both halves
 and reads the result back to prove it.
 
 **Export profile** saves your whole setup as one file. **Import profile**
-restores a current-format backup after the same review. Older backups are refused.
+takes a current-format backup by choosing a file or dropping it onto the Import
+card, then restores it after the same review. Older backups are refused.
 
 No keyboard to hand? **Explore a demo** opens Ark on a complete setup with nothing
 connected. Every screen works and every edit shows up in the review; only Apply

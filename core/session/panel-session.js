@@ -22,7 +22,7 @@ const DRAFT_CONTROLS = new Set([
     "applyProfileDraft", "rebaseProfileDraft", "closeProfileDraftReview",
 ]);
 const PORTABLE_MESSAGES = new Set([
-    "exportPortableProfile", "choosePortableProfile", "restorePortableProfile",
+    "exportPortableProfile", "choosePortableProfile", "reviewPortableProfile", "restorePortableProfile",
     "managePortableLayers", "editPortableLayer", "savePortableLayers", "cancelPortableReview",
 ]);
 // The demo's own controls (demo-session.js).
@@ -226,6 +226,14 @@ function routeMessage(session, message, state) {
         return "staged";
     }
     if (DRAFT_CONTROLS.has(type)) return "draft";
+    if (type === "reviewPortableProfile") {
+        if (!session.draft || message.draftId !== session.draft.id || state.busy || !state.connected
+            || !supportsCompleteProfile(state.capabilities) || state.selectedDeviceId !== session.draft.deviceId
+            || (state.connectionToken ?? null) !== session.draft.connectionToken) {
+            throw new Error("Read the keyboard and wait for its current operation before importing a profile.");
+        }
+        session.draft.assertRevision(message.draftRevision);
+    }
     if (PORTABLE_MESSAGES.has(type)) return "portable";
     if (type === "ready" || type === "refresh" || type === "selectDevice") {
         if (state.busy) return "none";
