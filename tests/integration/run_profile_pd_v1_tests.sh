@@ -10,10 +10,28 @@ const fs = require("node:fs");
 const root = process.argv[2];
 const fixture = require(root + "/tests/fixtures/pd_mode_domain_v1.json");
 const {decodePdDomain, encodePdRecord, validatePdRecord} = require(process.env.CHARYBDIS_ARK_ROOT + "/core/schema/pd-mode-domain-v1");
-// A test-only envelope for firmware's frozen eight-record harness. Every
-// record uses the current codec; Ark has no production v1 domain decoder.
+// A test-only envelope for firmware's frozen eight-record harness: 96-byte
+// records with a 24-byte name field, which firmware checks by turning each into
+// a 128-byte one (v3_from_frozen in its probe). Every record uses the current
+// codec through the same two conversions; Ark has no production v1 decoder.
 const frozenHeader = Buffer.from([1, 8, 96, 0, 0, 0, 0, 0]);
-const encodeRecords = slots => Buffer.concat([frozenHeader, ...slots.map(slot => encodePdRecord(slot))]);
+const frozenOf = record => {
+    const out = Buffer.from(record.subarray(0, 96));
+    out.fill(0, 8, 32);
+    record.copy(out, 8, 96, 96 + Math.min(record[8], 24));
+    return out;
+};
+// The old name field verbatim; its length is its first zero, or 33 (past the
+// limit) when it has none, so a name the old rule refused is refused again.
+const v3FromFrozen = frozen => {
+    const out = Buffer.alloc(128), end = frozen.subarray(8, 32).indexOf(0);
+    frozen.copy(out, 0, 0, 96);
+    out.fill(0, 9, 32);
+    out[8] = end < 0 ? 33 : end;
+    frozen.copy(out, 96, 8, 32);
+    return out;
+};
+const encodeRecords = slots => Buffer.concat([frozenHeader, ...slots.map(slot => frozenOf(encodePdRecord(slot)))]);
 const golden = Buffer.from(fixture.hex, "hex");
 if (!encodeRecords(fixture.slots).equals(golden)) throw new Error("PD fixture drift");
 const chunks = [];
@@ -21,7 +39,7 @@ function add(bytes) {
     let valid = 1;
     try {
         if (bytes.length !== 776 || !bytes.subarray(0, 8).equals(frozenHeader)) throw Error("frozen envelope");
-        for (let slot = 0; slot < 8; slot++) validatePdRecord(bytes.subarray(8 + slot * 96, 8 + (slot + 1) * 96), slot);
+        for (let slot = 0; slot < 8; slot++) validatePdRecord(v3FromFrozen(bytes.subarray(8 + slot * 96, 8 + (slot + 1) * 96)), slot);
     } catch {valid = 0;}
     const header = Buffer.alloc(3); header[0] = valid; header.writeUInt16LE(bytes.length, 1);
     chunks.push(header, bytes);
@@ -70,10 +88,10 @@ for (const name of ["Édition ⌘", "😀".repeat(5), "x".repeat(23)]) {
 }
 fs.writeFileSync(process.argv[3], Buffer.concat(chunks));
 
-// Version 2, the 32-slot firmware's sparse domain: the firmware's golden
+// Version 3, the firmware's sparse domain of 128-byte records: its golden
 // vectors and Ark's mutations of them, each line Ark's verdict (code and
 // payload offset) for the C validator to agree with.
-const v2 = require(root + "/tests/fixtures/pd_mode_domain_v2.json");
+const v2 = require(root + "/tests/fixtures/pd_mode_domain_v3.json");
 const lines = [];
 function addV2(name, bytes) {
     let code = "OK", offset = 0;
@@ -87,12 +105,12 @@ for (const vector of [...v2.valid, ...v2.invalid]) {
     if (!lines.at(-1).startsWith(expected + " ")) throw new Error(`Ark disagrees with firmware vector ${vector.name}: ${lines.at(-1).split(" ").slice(0, 2).join(" ")}, firmware ${expected}`);
 }
 const presets = Buffer.from(v2.valid.find(vector => vector.name === "presets").hex, "hex");
-for (let offset = 0; offset < 8 + 2 * 96; offset++) {
+for (let offset = 0; offset < 8 + 2 * 128; offset++) {
     for (const value of [0, 1, 2, 0x20, 0x21, 0x60, 0x7f, 0xff]) {
         const bytes = Buffer.from(presets); bytes[offset] = value; addV2(`ark-presets-${offset}-${value}`, bytes);
     }
 }
-for (const length of [8, 9, 103, 104, 105, presets.length - 1]) addV2(`ark-presets-length-${length}`, presets.subarray(0, length));
+for (const length of [8, 9, 135, 136, 137, presets.length - 1]) addV2(`ark-presets-length-${length}`, presets.subarray(0, length));
 fs.writeFileSync(process.argv[3] + ".v2.txt", lines.join("\n") + "\n");
 JS
 

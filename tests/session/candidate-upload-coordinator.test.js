@@ -27,10 +27,10 @@ const BINDING = Object.freeze({viaGeneration: 6, viaDigest: 0xabcdef01});
 
 function representativeBlob(payloadSize = 41) {
     return encodeProfileBlob({
-        schema: {major: 2, minor: 0},
+        schema: {major: 3, minor: 0},
         domains: [{
             id: PROFILE_DOMAIN_IDS.RGB,
-            version: 3,
+            version: 4,
             payload: Buffer.from(Array.from({length: payloadSize}, (_, index) => index)),
         }],
     });
@@ -829,12 +829,12 @@ test("an upload without a nonzero VIA binding fails before anything reaches the 
     }
 });
 
-test("BEGIN carries store format 3 and the VIA binding it was given", async () => {
+test("BEGIN carries store format 4 and the VIA binding it was given", async () => {
     const harness = new CandidateFirmwareHarness();
     await coordinator(harness).upload(representativeBlob(1), {...BINDING, actionAbiDigest: 1});
     const [begin] = operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_BEGIN);
-    assert.equal(begin[5], 2);
-    assert.equal(begin[23], 3);
+    assert.equal(begin[5], 3);
+    assert.equal(begin[23], 4);
     assert.equal(begin.readUInt32LE(24), BINDING.viaGeneration);
     assert.equal(begin.readUInt32LE(28), BINDING.viaDigest);
 });

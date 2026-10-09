@@ -4,18 +4,23 @@ const {decodePdDomain, encodePdDomain} = require("../schema/pd-mode-domain-v1");
 const {decodeProfileBlob, encodeProfileBlob, crc32, fnv1a32, PROFILE_BLOB_V1, PROFILE_DOMAIN_VERSIONS} = require("../schema/profile-blob-v1");
 const {decodeRgbDomainV1, encodeRgbDomainV1} = require("../schema/rgb-domain-v1");
 const {decodeKeyBehaviorDomain, encodeKeyBehaviorDomain} = require("../schema/key-behavior-domain-v1");
-const {COMBO_DOMAIN_VERSION, decodeComboDomain, encodeComboDomain} = require("../schema/combo-domain-v1");
-const {decodeSettings, encodeSettings} = require("../schema/settings-domain-v1");
+const {ALL_LAYERS, COMBO_DOMAIN_VERSION, decodeComboDomain, encodeComboDomain} = require("../schema/combo-domain-v1");
+const {SETTING, decodeSettings, encodeSettings} = require("../schema/settings-domain-v1");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../data/charybdis-layout");
 const {LAYER_LOCK_BASE, LAYER_LOCK_SLOTS} = require("../data/user-keycodes");
 const {layerName} = require("./vocabulary");
+const {profileDepthOptions} = require("../schema/profile-depth");
 
 // A portable profile is the keyboard's whole configuration in the one format
-// it stores: eight layers, the 64 VIA macros, and a schema 2.0 profile with
-// every domain (RGB 3, key behaviours 1, combos 2, settings 5, PD 2) in the
-// action vocabulary Ark knows. The keyboard migrates nothing and neither does
-// Ark: a backup in an older format is refused.
-const LAYERS = 8;
+// it stores: sixteen layers, the 128 VIA macros, and a schema 3.0 profile with
+// every domain (RGB 4, key behaviours 2, combos 3, settings 6, PD 3) in the
+// action vocabulary Ark knows (firmware D-F14). The keyboard migrates nothing:
+// a backup in an older format is refused here, and translated by
+// backup-translation.js before anything else reads it.
+const LAYERS = 16, MACRO_SLOTS = 128, MATRIX_KEYS = 60;
+// A file holds at most a full 65,504-byte profile in base64, sixteen layers of
+// keys and a full macro bank; this ceiling leaves room for all three.
+const FILE_MAX_BYTES = 262144;
 const DOMAIN_IDS = Object.keys(PROFILE_DOMAIN_VERSIONS).map(Number).sort((a, b) => a - b);
 const domain = (id, payload) => ({id, version: PROFILE_DOMAIN_VERSIONS[id], payload});
 const fail = message => Object.assign(new Error(message), {code: "INVALID_PORTABLE_PROFILE"});
@@ -58,8 +63,9 @@ function validateViaMacro(bytes) {
     }
     if (held.size) throw fail("A macro leaves keys pressed.");
 }
-// The macro bank the eight-layer storage geometry has, when no keyboard says.
-const MACRO_BANK_BYTES = 7191;
+// The macro bank the sixteen-layer storage geometry has, when no keyboard says:
+// a 12 KiB VIA region less config and the 1,920-byte keymap (D-F14).
+const MACRO_BANK_BYTES = 10327;
 function macroBank(slots, capacity) {
     const size = slots.reduce((total, bytes) => total + bytes.length + 1, 1);
     if (size > capacity) throw fail(`Macros need ${size} bytes; this keyboard has ${capacity}.`);
@@ -85,25 +91,26 @@ function materializeProfile(active, defaults, combos, settings) {
 function comboTableOf(combos) {
     return {version: COMBO_DOMAIN_VERSION, defaultTermMs: combos.defaultTermMs, holdTermMs: combos.holdTermMs,
         rows: combos.rows.map(row => ({inputs: row.inputs.map(keycodeAction), output: keycodeAction(row.output),
-            termMs: row.followsDefault ? null : row.termMs, mustHold: row.mustHold, mustTap: row.mustTap, ordered: row.ordered}))};
+            termMs: row.followsDefault ? null : row.termMs, mustHold: row.mustHold, mustTap: row.mustTap, ordered: row.ordered,
+            enabled: row.enabled ?? true, allowedLayers: row.allowedLayers ?? ALL_LAYERS}))};
 }
 function createSnapshot({profile, via, actionAbiDigest}) {
     const document = {format: "charybdis-profile", version: decodeProfileBlob(profile).schema.major, keyboard: "charybdis-4x6", actionAbiDigest,
-        layers: Array.from({length: via.layers}, (_, layer) => Array.from({length: 60}, (_, pos) => via.layout.readUInt16BE((layer * 60 + pos) * 2))),
+        layers: Array.from({length: via.layers}, (_, layer) => Array.from({length: MATRIX_KEYS}, (_, pos) => via.layout.readUInt16BE((layer * MATRIX_KEYS + pos) * 2))),
         profile: profile.toString("base64"), macros: macroSlots(via.macros, via.macroSlots).map(bytes => bytes.toString("base64"))};
     validateSnapshot(document); return document;
 }
 function validateSnapshot(value, capabilities) {
     if (typeof value === "string") {
-        if (Buffer.byteLength(value) > 100000) throw fail("This profile file is too large.");
+        if (Buffer.byteLength(value) > FILE_MAX_BYTES) throw fail("This profile file is too large.");
         try {value = JSON.parse(value);} catch {throw fail("This is not a valid profile file.");}
     }
     if (!value || value.format !== "charybdis-profile" || value.keyboard !== "charybdis-4x6" || !Number.isInteger(value.actionAbiDigest) || value.actionAbiDigest < 1 || value.actionAbiDigest > 0xffffffff) throw fail("Choose a supported Charybdis profile file.");
     if (value.version !== PROFILE_BLOB_V1.SCHEMA_MAJOR || !knownActionAbi(value.actionAbiDigest)) throw fail("This profile is from older firmware, in a format the keyboard no longer stores. Export a new backup from current firmware.");
     if (Object.keys(value).some(key => !["format", "version", "keyboard", "actionAbiDigest", "layers", "profile", "macros"].includes(key))) throw fail("This profile contains unsupported fields.");
-    if (!Array.isArray(value.layers) || value.layers.length !== LAYERS || value.layers.some(keys => !Array.isArray(keys) || keys.length !== 60 || !keys.every(u16))) throw fail("A complete profile must contain all eight layers.");
-    if (!Array.isArray(value.macros) || value.macros.length !== 64) throw fail("A complete profile must contain all 64 macro slots.");
-    const macros = value.macros.map(slot => {const bytes = base64(slot, 8192, "macro"); validateViaMacro(bytes); return bytes;});
+    if (!Array.isArray(value.layers) || value.layers.length !== LAYERS || value.layers.some(keys => !Array.isArray(keys) || keys.length !== MATRIX_KEYS || !keys.every(u16))) throw fail(`A complete profile must contain all ${LAYERS} layers.`);
+    if (!Array.isArray(value.macros) || value.macros.length !== MACRO_SLOTS) throw fail(`A complete profile must contain all ${MACRO_SLOTS} macro slots.`);
+    const macros = value.macros.map(slot => {const bytes = base64(slot, MACRO_BANK_BYTES, "macro"); validateViaMacro(bytes); return bytes;});
     const profile = base64(value.profile, PROFILE_BLOB_V1.MAX_SIZE, "profile data");
     let domains;
     try {domains = decodeProfileBlob(profile).domains;} catch (error) {
@@ -112,8 +119,9 @@ function validateSnapshot(value, capabilities) {
     }
     if (domains.map(d => d.id).join() !== DOMAIN_IDS.join()) throw fail("The profile is missing configuration. Partial profiles cannot be restored as a complete backup.");
     const pdModes = decodePdDomain(domains[4].payload);
-    const rgb = decodeRgbDomainV1(domains[0].payload), behaviors = decodeKeyBehaviorDomain(domains[1].payload), combos = decodeComboDomain(domains[2].payload), settings = decodeSettings(domains[3].payload);
-    if (rgb.layerColors.length !== LAYERS || rgb.layerColors.some(row => row.layerId >= LAYERS)) throw fail("RGB does not cover all eight layers.");
+    const codecOptions = profileDepthOptions(capabilities, domains[0].payload);
+    const rgb = decodeRgbDomainV1(domains[0].payload, codecOptions.rgb), behaviors = decodeKeyBehaviorDomain(domains[1].payload, codecOptions.behaviors), combos = decodeComboDomain(domains[2].payload), settings = decodeSettings(domains[3].payload);
+    if (rgb.layerColors.length !== LAYERS || rgb.layerColors.some(row => row.layerId >= LAYERS)) throw fail(`RGB does not cover all ${LAYERS} layers.`);
     // A binding for an empty slot is allowed, because the keyboard allows it:
     // the mode keycodes are a fixed registry, and the runtime refuses to
     // activate a slot whose record is empty rather than misbehaving
@@ -134,10 +142,10 @@ function validateSnapshot(value, capabilities) {
         if ([2, 3].includes(action.kind) && action.operand >= LAYERS) throw fail("A profile action references a missing layer.");
     };
     walkActions(behaviors, checkAction); walkActions(combos, checkAction);
-    const layout = Buffer.alloc(LAYERS * 120); value.layers.flat().forEach((v, id) => layout.writeUInt16BE(v, id * 2));
-    if (capabilities && (value.actionAbiDigest !== capabilities.actionAbiDigest || capabilities.compiledLayerCount !== LAYERS || (capabilities.supportedDomainMask & 31) !== 31)) throw fail("The connected firmware does not support this profile's action vocabulary or eight-layer storage.");
+    const layout = Buffer.alloc(LAYERS * MATRIX_KEYS * 2); value.layers.flat().forEach((v, id) => layout.writeUInt16BE(v, id * 2));
+    if (capabilities && (value.actionAbiDigest !== capabilities.actionAbiDigest || capabilities.compiledLayerCount !== LAYERS || (capabilities.supportedDomainMask & 31) !== 31)) throw fail(`The connected firmware does not support this profile's action vocabulary or ${LAYERS}-layer storage.`);
     const bank = macroBank(macros, capabilities?.viaMacroBytes ?? MACRO_BANK_BYTES);
-    return {document: value, profile, layout, macros: bank, settings, rgb, behaviors, combos, pdModes, danglingPdBindings: Object.fromEntries(danglingPdBindings)};
+    return {document: value, profile, layout, macros: bank, settings, rgb, behaviors, combos, pdModes, codecOptions, danglingPdBindings: Object.fromEntries(danglingPdBindings)};
 }
 
 // A profile with a renamed macro or custom key. Every name fits the settings
@@ -195,19 +203,19 @@ const decodedOf = snapshot => snapshot.decoded && snapshot.decoded.document === 
 // the saved base HSV as its own all-key colour after it becomes an overlay.
 function reorderLayers(document, order, names, {keysFollow = true} = {}) {
     const validated = validateSnapshot(document), result = JSON.parse(JSON.stringify(document));
-    if (!Array.isArray(order) || order.length !== 8 || new Set(order).size !== 8 || order.some(id => !Number.isInteger(id) || id < 0 || id >= 8)) throw fail("Include every layer once.");
+    if (!Array.isArray(order) || order.length !== LAYERS || new Set(order).size !== LAYERS || order.some(id => !Number.isInteger(id) || id < 0 || id >= LAYERS)) throw fail("Include every layer once.");
     const remap = []; order.forEach((old, next) => {remap[old] = next;});
     const reach = old => (old === 0 ? 0 : old === order[0] ? remap[0] : keysFollow ? remap[old] : old);
     const renumbers = keysFollow || order[0] !== 0;
     function native(code) {
         if (!renumbers) return code;
-        if (code >= 0x4000 && code <= 0x4fff) {const layer = (code >> 8) & 15; if (layer >= 8) throw fail("A key points outside the layer bank."); return (code & 0xf0ff) | (reach(layer) << 8);}
+        if (code >= 0x4000 && code <= 0x4fff) {const layer = (code >> 8) & 15; if (layer >= LAYERS) throw fail("A key points outside the layer bank."); return (code & 0xf0ff) | (reach(layer) << 8);}
         for (const start of [0x5200, 0x5220, 0x5240, 0x5260, 0x5280, 0x52c0, 0x52e0, LAYER_LOCK_BASE]) {
             const width = start === LAYER_LOCK_BASE ? LAYER_LOCK_SLOTS : 32;
-            if (code >= start && code < start + width) {if (code - start >= 8) throw fail("A key points outside the layer bank."); return start + reach(code - start);}
+            if (code >= start && code < start + width) {if (code - start >= LAYERS) throw fail("A key points outside the layer bank."); return start + reach(code - start);}
         }
         // Layer-mod stores a four-bit layer followed by five modifier bits.
-        if (code >= 0x5000 && code <= 0x51ff) {const layer = (code >> 5) & 15; if (layer >= 8) throw fail("Invalid layer-mod reference."); return (code & 0xfe1f) | reach(layer) << 5;}
+        if (code >= 0x5000 && code <= 0x51ff) {const layer = (code >> 5) & 15; if (layer >= LAYERS) throw fail("Invalid layer-mod reference."); return (code & 0xfe1f) | reach(layer) << 5;}
         return code;
     }
     result.layers = order.map(old => document.layers[old].map(native));
@@ -228,12 +236,23 @@ function reorderLayers(document, order, names, {keysFollow = true} = {}) {
         }
     }
     rgb.layerGroupRows.forEach(row => {if (row.selector !== 255) row.selector = remap[row.selector];});
-    settings.names = names || order.map(old => settings.names[old]);
+    // A name the editor only showed as a default ("Layer 9" for an unnamed
+    // layer) stays unnamed, wherever the layer goes.
+    const unnamed = (name, old) => name === layerName([], old) && settings.names[old] === "";
+    settings.names = names ? names.map((name, next) => (unnamed(name, order[next]) ? "" : name)) : order.map(old => settings.names[old]);
     settings.values[5] = remap[settings.values[5]]; settings.values[9] = remap[settings.values[9]];
-    settings.values[23] = remap.reduce((mask, next, old) => mask | ((settings.values[23] >> old) & 1) << reach(old), 0);
-    const oldReferences = settings.values[27]; settings.values[27] = order.reduce((packed, old, next) => (packed | remap[(oldReferences >>> (old * 4)) & 15] << (next * 4)) >>> 0, 0);
+    settings.values[23] = remap.reduce((mask, next, old) => (mask | ((settings.values[23] >>> old) & 1) << reach(old)) >>> 0, 0);
+    // Each layer's switches, placements and combo reference go with it; a
+    // reference names a layer by what it holds, so it follows that layer.
+    const follow = mask => remap.reduce((moved, next, old) => (moved | ((mask >>> old) & 1) << next) >>> 0, 0);
+    settings.values[SETTING.LAYER_BEHAVIORS] = follow(settings.values[SETTING.LAYER_BEHAVIORS]);
+    settings.values[SETTING.LAYER_COMBOS] = follow(settings.values[SETTING.LAYER_COMBOS]);
+    settings.layers = order.map(old => ({...settings.layers[old], reference: remap[settings.layers[old].reference]}));
+    // The layers a behaviour or combo may act on are layers by what they hold.
+    behaviors.rows.forEach(row => {row.allowedLayers = follow(row.allowedLayers);});
+    combos.rows.forEach(row => {row.allowedLayers = follow(row.allowedLayers);});
     result.profile = encodeProfileBlob({domains: [
-        domain(16, encodeRgbDomainV1(rgb)), domain(32, encodeKeyBehaviorDomain(behaviors)), domain(48, encodeComboDomain(combos)),
+        domain(16, encodeRgbDomainV1(rgb, validated.codecOptions.rgb)), domain(32, encodeKeyBehaviorDomain(behaviors, validated.codecOptions.behaviors)), domain(48, encodeComboDomain(combos)),
         domain(64, encodeSettings(settings)), domain(80, encodePdDomain(pdModes)),
     ]}).toString("base64");
     validateSnapshot(result); return result;
@@ -244,4 +263,4 @@ function summaryOf(value) {
         macros: value.document.macros.filter(Boolean).length,
         names: value.settings.names.map((name, index) => layerName(value.settings.names, index))};
 }
-module.exports = {MACRO_BANK_BYTES, encodeNamedProfile, comboTableOf, createSnapshot, validateSnapshot, materializeProfile, macroSlots, macroBank, validateViaMacro, fingerprint, fingerprintOf, decodedOf, reorderLayers, summary, summaryOf};
+module.exports = {LAYERS, MACRO_SLOTS, MACRO_BANK_BYTES, FILE_MAX_BYTES, encodeNamedProfile, comboTableOf, createSnapshot, validateSnapshot, materializeProfile, macroSlots, macroBank, validateViaMacro, fingerprint, fingerprintOf, decodedOf, reorderLayers, summary, summaryOf};

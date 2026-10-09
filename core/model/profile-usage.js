@@ -23,11 +23,11 @@ const AREA_OF_DOMAIN = {
 // The order the areas are listed in: what an edit most often grows first.
 const AREAS = ["behaviours", "combos", "names", "lighting", "pointing", "settings"];
 
-// Bytes the settings domain spends on names: eight fixed 24-byte layer names
-// and a length byte plus the text of each macro and custom-key name.
+// Bytes the settings domain spends on names: a length byte plus the text of
+// each layer, macro and custom-key name.
 function nameBytes(settings) {
-    const records = [...settings.macroNames, ...settings.customKeyNames];
-    return SETTINGS.LAYERS * SETTINGS.NAME_BYTES + records.reduce((total, name) => total + 1 + Buffer.byteLength(name), 0);
+    const records = [...settings.names, ...settings.macroNames, ...settings.customKeyNames];
+    return records.reduce((total, name) => total + 1 + Buffer.byteLength(name), 0);
 }
 
 const positive = value => Number.isInteger(value) && value > 0;

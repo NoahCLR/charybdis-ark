@@ -33,7 +33,7 @@ const PREVIEW_BASE = [
 // (slots 0 and 12), empty slots (6 and 20), a VIA macro and a custom key. The
 // preview carries them because they are the values whose stored name and
 // semantic name differ.
-const PREVIEW_PD_BINDINGS = {50: 0x7e80, 52: 0x7e86, 48: 0x7700, 49: 0x7e40, 53: 0x7e8c, 54: 0x7eb4};
+const PREVIEW_PD_BINDINGS = {50: 0x7e80, 52: 0x7e86, 48: 0x7700, 49: 0x7f00, 53: 0x7e8c, 54: 0x7eb4};
 
 function fillPreviewLayer(document) {
     for (const [layoutIndex, code] of Object.entries(PREVIEW_PD_BINDINGS)) {
@@ -50,24 +50,26 @@ function fillPreviewLayer(document) {
 }
 
 const capabilities = {
-    compiledLayerCount: 8,
+    compiledLayerCount: 16,
     supportedDomainMask: 31,
     actionAbiDigest: ACTION_ABI,
     // Current firmware: every feature this app knows, including physical
     // gesture timing and runtime-owned tapping, which change what an empty
     // behaviour cell means.
     featureFlags: PROFILE_WIRE_KNOWN_MASKS.FEATURE_FLAGS & ~PROFILE_WIRE_KNOWN_MASKS.RETIRED_FEATURES,
-    responseVersion: 1,
+    responseVersion: 2,
     reportSize: 32,
     brightnessMax: 255,
     // The sizes current firmware advertises, so Profile & backups shows its meter.
-    maxProfilePayload: 5088,
-    maxBehaviorRows: 64,
-    maxPopulatedBehaviorSteps: 128,
-    maxCombos: 32,
+    maxProfilePayload: 65504,
+    maxBehaviorRows: 128,
+    maxPopulatedBehaviorSteps: 640,
+    maxCombos: 128,
+    maxKeysPerCombo: 16,
+    maxTapStepsPerBehavior: 5,
     maxReusableRgbGroups: 16,
     maxRgbStageGroupRows: 32,
-    viaMacroBytes: 7191,
+    viaMacroBytes: 10327,
 };
 
 // The hosts the preview stands in for. The extension's is what it always was;

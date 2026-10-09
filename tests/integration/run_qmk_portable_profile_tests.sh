@@ -31,8 +31,9 @@ function read(path) {
     const fixture = fs.readFileSync(path), pages = fixture.length / 32;
     let id = 0;
     return readSettings({request: async request => {
-        assert.ok(request[4] < pages);
-        const response = Buffer.from(fixture.subarray(request[4] * 32, request[4] * 32 + 32));
+        const page = request[4] | (request[5] << 8);
+        assert.ok(page < pages);
+        const response = Buffer.from(fixture.subarray(page * 32, page * 32 + 32));
         request.copy(response, 0, 0, 5);
         return response;
     }}, {next: () => ++id}).then(decodeSettings);
@@ -42,8 +43,11 @@ function read(path) {
     assert.equal(stored[5], "Screenshot");
     assert.equal(stored.filter(Boolean).length, 1);
     const authored = await read(process.argv[4]);
-    assert.deepEqual(authored.macroNames.filter(Boolean), ["Drag Screenshot", "Twenty characters!!!"]);
-    assert.deepEqual([authored.names[0], authored.names[1], authored.names[7]], ["Base", "", "Twenty-three bytes long"]);
+    // Names are counted UTF-8 of up to 32 bytes (firmware D-F14), on all
+    // sixteen layers.
+    assert.deepEqual(authored.macroNames.filter(Boolean), ["Drag Screenshot", "Thirty-two bytes of name, exact!"]);
+    assert.deepEqual([authored.names[0], authored.names[1], authored.names[7], authored.names[15]], ["Base", "", "Été", "Thirty-two bytes of name, exact!"]);
+    assert.deepEqual(authored.customKeyNames.filter(Boolean), ["Right Thumb", "Last"]);
     console.log("app reads the firmware's streamed settings and its macro and layer names");
 })().catch(error => {console.error(error); process.exitCode = 1;});
 JS

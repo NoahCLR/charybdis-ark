@@ -10,6 +10,7 @@ const {decodePdDomain} = require("../schema/pd-mode-domain-v1");
 const {readSettingsLimits} = require("../protocol/portable-profile-v1");
 const {readKeyboardOptions} = require("../protocol/keyboard-options-v1");
 const {decodeSettings} = require("../schema/settings-domain-v1");
+const {profileDepthOptions} = require("../schema/profile-depth");
 const {captureProfile, restoreProfile, validateSnapshot} = require("./portable-profile-session");
 const {settingsEditorView} = require("../model/settings-editor");
 const {macroEditorView} = require("../model/macro-editor");
@@ -30,7 +31,7 @@ const {CANDIDATE_STATE_NAMES, readCandidateStatus} = require("../protocol/profil
 const {PROFILE_ACTIVE_KIND, PROFILE_STATE_FLAGS, PROFILE_WIRE_KNOWN_MASKS, PROFILE_WIRE_FEATURES, PROFILE_WIRE_V1, VIA_READS, readProfileCapabilities, readProfileStatus, readViaIdentity} = require("../protocol/profile-wire-v1");
 
 const PROFILE_STUDIO_PROTOCOL = Object.freeze({major: 1, minor: 0});
-const PROFILE_STUDIO_SCHEMA = Object.freeze({major: 2, minor: 0});
+const PROFILE_STUDIO_SCHEMA = Object.freeze({major: 3, minor: 0});
 const PROFILE_DOMAIN_FLAGS = Object.freeze({RGB: 1 << 0, KEY_BEHAVIORS: 1 << 1});
 const REQUIRED_PROFILE_DOMAIN_MASK = PROFILE_DOMAIN_FLAGS.RGB | PROFILE_DOMAIN_FLAGS.KEY_BEHAVIORS;
 const REQUIRED_LIVE_MUTATION_FEATURES = PROFILE_WIRE_FEATURES.CANDIDATE_WRITE
@@ -292,14 +293,15 @@ class ProfileDeviceService {
                 throw new Error("The keyboard disconnected while its profile was being read.");
             }
             const blob = decodeProfileBlob(bytes);
+            const depth = profileDepthOptions(this.capabilities, blob.domains.find(domain => domain.id === PROFILE_DOMAIN_IDS.RGB)?.payload);
             const domains = {};
             const failures = [];
             for (const domain of blob.domains) {
                 try {
                     if (domain.id === PROFILE_DOMAIN_IDS.RGB) {
-                        domains.rgb = decodeRgbDomainV1(domain.payload);
+                        domains.rgb = decodeRgbDomainV1(domain.payload, depth.rgb);
                     } else if (domain.id === PROFILE_DOMAIN_IDS.KEY_BEHAVIORS) {
-                        domains.keyBehaviors = decodeKeyBehaviorDomain(domain.payload);
+                        domains.keyBehaviors = decodeKeyBehaviorDomain(domain.payload, depth.behaviors);
                     } else if (domain.id === PROFILE_DOMAIN_IDS.PD_MODES) {
                         domains.pdModes = decodePdDomain(domain.payload);
                     } else if (domain.id === PROFILE_DOMAIN_IDS.SETTINGS) {
@@ -448,6 +450,7 @@ class ProfileDeviceService {
             // The keyboard refuses a profile whose actions sit where it cannot
             // run them; say which one before anything is sent.
             const misplaced = profilePlacementProblem(Buffer.from(target.document.profile, "base64"), {layerCount: this.capabilities?.compiledLayerCount ?? 8,
+                capabilities: this.capabilities,
                 behaviorQmkFunctions: Boolean(this.capabilities?.featureFlags & PROFILE_WIRE_FEATURES.BEHAVIOR_QMK_FUNCTIONS)});
             if (misplaced) throw Object.assign(new Error(`${misplaced} Fix it before saving this profile.`), {code: "PLACEMENT_REFUSED"});
             started = true;

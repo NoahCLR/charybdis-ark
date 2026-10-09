@@ -257,7 +257,7 @@ function routeMessage(session, message, state) {
 // keysFollow: whether moving a layer renumbers the layer keys that reach it
 // (the default), or leaves them reaching whatever layer takes its place.
 function startLayerEdit(before, revision) {
-    return {before, revision, order: Array.from({length: 8}, (_, id) => id), names: [...before.summary.names], keysFollow: true};
+    return {before, revision, order: Array.from({length: before.summary.layers}, (_, id) => id), names: [...before.summary.names], keysFollow: true};
 }
 
 // Applies one message from the Rename & Reorder panel to its local state. A name
@@ -278,13 +278,13 @@ function applyLayerEdit(edit, message) {
         }
     }
     if (message.type === "savePortableLayers" && message.names !== undefined) {
-        if (!Array.isArray(message.names) || message.names.length !== 8) throw new Error("Read the layers again before naming them.");
+        if (!Array.isArray(message.names) || message.names.length !== edit.names.length) throw new Error("Read the layers again before naming them.");
         reorderLayers(edit.before.document, edit.order, edit.order.map((old) => message.names[old]), {keysFollow: edit.keysFollow});
         edit.names = [...message.names];
         return edit;
     }
     const id = message.id;
-    if (!Number.isInteger(id) || id < 0 || id > 7) throw new Error("Read the layers again before editing them.");
+    if (!Number.isInteger(id) || id < 0 || id >= edit.order.length) throw new Error("Read the layers again before editing them.");
     if (message.name !== undefined) {
         if (typeof message.name !== "string") throw new Error("Enter a layer name.");
         const names = [...edit.names];
@@ -309,7 +309,7 @@ function applyLayerEdit(edit, message) {
         return edit;
     }
     const to = Number.isInteger(message.to) ? message.to : Number.isInteger(message.direction) && [1, -1].includes(message.direction) ? from + message.direction : NaN;
-    if (from < 1 || !(to >= 1 && to <= 7)) throw new Error("The base stays at the bottom; use Make base to put another layer there.");
+    if (from < 1 || !(to >= 1 && to < edit.order.length)) throw new Error("The base stays at the bottom; use Make base to put another layer there.");
     edit.order.splice(to, 0, ...edit.order.splice(from, 1));
     return edit;
 }

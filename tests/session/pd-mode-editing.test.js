@@ -8,16 +8,16 @@ const {candidateMetadataForBlob, buildCandidateBeginRequest} = require("../../co
 const {buildDeviceModel} = require("../../core/session/device-model");
 function fixture() {
     const value = document(), snapshot = {document: value, fingerprint: fingerprint(value), summary: summary(value)};
-    const caps = {compiledLayerCount: 8, supportedDomainMask: 31, actionAbiDigest: value.actionAbiDigest};
+    const caps = {compiledLayerCount: 16, supportedDomainMask: 31, actionAbiDigest: value.actionAbiDigest};
     const draft = new ProfileDraftSession(snapshot, "board", caps);
     const stage = message => draft.stage({...message, draftRevision: draft.revision});
     return {draft, stage, caps};
 }
 test("the six factory modes stay data, with 32 RGB rows and the remaining slots empty", () => {
     const value = validateSnapshot(document());
-    assert.equal(value.document.version, 2);
+    assert.equal(value.document.version, 3);
     assert.deepEqual(value.pdModes.map(mode => mode.name), ["Dragscroll", "Volume", "Brightness", "Zoom", "Arrow", "Pinch", ...Array(26).fill("")]);
-    assert.equal(value.rgb.formatVersion, 3); assert.equal(value.rgb.pdModeColors.length, 32);
+    assert.equal(value.rgb.formatVersion, 4); assert.equal(value.rgb.pdModeColors.length, 32);
     assert.equal(value.pdModes[4].buttons[0].modifiers, 32);
     assert.equal(value.pdModes[5].heldModifiers, 8);
     assert.deepEqual(value.settings.values.slice(10, 15), [0, 0, 0, 0, 0]);
@@ -33,7 +33,7 @@ test("create, bind, edit RGB and macros, reorder, review and undo share a PD dra
 
     stage({type: "updatePdModeColor", pointingMode: "PD_MODE_SLOT_7", h: "64", s: "255", v: "100", locality: "RGB_RIGHT_HALF"});
     stage({type: "updateViaMacro", keycode: "VIA_MACRO_0", payload: "hello", name: "Greeting"});
-    const reordered = reorderLayers(draft.document, [0, 2, 1, 3, 4, 5, 6, 7]);
+    const reordered = reorderLayers(draft.document, [0, 2, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
     assert.deepEqual(validateSnapshot(reordered).pdModes, validateSnapshot(draft.document).pdModes);
     const view = draft.view({connected: true, selectedDeviceId: "board"});
     const slot = view.changes.find(change => change.area === "Pointing modes" && change.unit === "pd:7");
@@ -71,12 +71,12 @@ test("keycode-picker modifier expressions are accepted as directional actions", 
     assert.equal(mode.directions.up.keycode, 0x081d);
     assert.equal(mode.directions.down.keycode, 0x081c);
 });
-test("logical Apply declares schema two, all five domains and storage format three", () => {
+test("logical Apply declares schema three, all five domains and storage format four", () => {
     const value = validateSnapshot(document());
     const metadata = candidateMetadataForBlob(value.profile, {actionAbiDigest: value.document.actionAbiDigest, viaGeneration: 3, viaDigest: 42});
-    assert.equal(metadata.schemaMajor, 2); assert.equal(metadata.requestedDomains, 31); assert.equal(metadata.storeFormatVersion, 3);
+    assert.equal(metadata.schemaMajor, 3); assert.equal(metadata.requestedDomains, 31); assert.equal(metadata.storeFormatVersion, 4);
     const frame = buildCandidateBeginRequest(1, metadata);
-    assert.equal(frame[23], 3); assert.equal(frame.readUInt32LE(24), 3); assert.equal(frame.readUInt32LE(28), 42);
+    assert.equal(frame[23], 4); assert.equal(frame.readUInt32LE(24), 3); assert.equal(frame.readUInt32LE(28), 42);
 });
 
 test("a cleared slot keeps its bindings, because the keyboard keeps its keycodes", () => {

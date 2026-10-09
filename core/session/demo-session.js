@@ -19,6 +19,7 @@
 
 const {ProfileDraftSession} = require("./profile-draft-session");
 const {validateSnapshot, fingerprint, summary} = require("./portable-profile-session");
+const {translateBackup} = require("../model/backup-translation");
 const {ACTION_ABI} = require("../schema/actions");
 const {PROFILE_WIRE_KNOWN_MASKS} = require("../protocol/profile-wire-v1");
 const DEMO_PROFILE = require("../data/demo-profile.charybdis.json");
@@ -32,32 +33,35 @@ const DEMO_DEVICE_ID = "demo";
 // every feature this app knows but the retired ones. tests/session/demo-session.test.js holds this to
 // what the simulated current keyboard (tests/fixtures/fake-keyboard.js) reports.
 const DEMO_CAPABILITIES = Object.freeze({
-    responseVersion: 1,
+    responseVersion: 2,
     protocol: Object.freeze({major: 1, minor: 0}),
-    schema: Object.freeze({major: 2, minor: 0}),
+    schema: Object.freeze({major: 3, minor: 0}),
     reportSize: 32,
     candidateChunkMax: 20,
     statusPageCount: 2,
     featureFlags: PROFILE_WIRE_KNOWN_MASKS.FEATURE_FLAGS & ~PROFILE_WIRE_KNOWN_MASKS.RETIRED_FEATURES,
     actionAbiDigest: ACTION_ABI,
-    compiledLayerCount: 8,
-    maxLogicalLayers: 8,
-    maxBehaviorRows: 64,
+    compiledLayerCount: 16,
+    maxLogicalLayers: 16,
+    maxBehaviorRows: 128,
     maxTapStepsPerBehavior: 5,
-    maxPopulatedBehaviorSteps: 128,
-    maxCombos: 32,
-    maxKeysPerCombo: 4,
+    maxPopulatedBehaviorSteps: 640,
+    maxCombos: 128,
+    maxKeysPerCombo: 16,
     maxReusableRgbGroups: 16,
     maxRgbStageGroupRows: 32,
     physicalLedCount: 58,
     ledBitmapSize: 8,
-    customKeySlots: 64,
-    viaMacroSlots: 64,
-    maxProfilePayload: 5088,
-    profileSlotPayload: 5088,
-    profileSlotSize: 5120,
-    viaMacroBytes: 7191,
+    customKeySlots: 128,
+    viaMacroSlots: 128,
+    maxProfilePayload: 65504,
+    profileSlotPayload: 65504,
+    profileSlotSize: 65536,
+    viaMacroBytes: 10327,
     supportedDomainMask: PROFILE_WIRE_KNOWN_MASKS.SUPPORTED_DOMAINS,
+    nameMaxBytes: 32,
+    layerMaskBits: 32,
+    placementPositions: 60,
 });
 
 // What current firmware reports beside its profile, written here as data (it
@@ -96,7 +100,7 @@ const fail = (text, code = "DEMO_REFUSED") => Object.assign(new Error(text), {co
 // against current firmware, with the
 // limits and options a keyboard would have reported beside it.
 function demoSnapshot(value) {
-    const {document} = validateSnapshot(value, DEMO_CAPABILITIES);
+    const {document} = validateSnapshot(translateBackup(value), DEMO_CAPABILITIES);
     return {document, fingerprint: fingerprint(document), summary: summary(document), limits: {...DEMO_LIMITS}, options: DEMO_OPTIONS};
 }
 
@@ -250,7 +254,7 @@ function demoHeader(session, busy) {
 
 function demoDiagnostics(session) {
     return [
-        `No keyboard is connected. The demo opened ${session.demo.name} as current firmware would hold it: eight layers, 32 pointing slots, 64 macros and 64 custom keys.`,
+        `No keyboard is connected. The demo opened ${session.demo.name} as current firmware would hold it: sixteen layers, 32 pointing slots, 128 macros and 128 custom keys.`,
         "Edits, checks and the review work as they would on a keyboard. Apply needs one: export the setup, then import it on your keyboard.",
     ];
 }

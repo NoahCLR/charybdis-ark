@@ -1,6 +1,6 @@
 # Ark-owned firmware integration
 
-These five shell runners are invoked only by `npm run test:compat`, not by
+These six shell runners are invoked only by `npm run test:compat`, not by
 ordinary app checks or firmware's suite. The bridge supplies absolute
 `FIRMWARE_ROOT`, `CHARYBDIS_ARK_ROOT` and `QMK_ROOT` paths. Never guess sibling
 paths. The selected Ark checkout owns these runners; firmware supplies the C
@@ -13,3 +13,7 @@ runners, preserving their normal/sanitized variants, PD mutations, seeded macro
 corpus and profile round trips. Keep compilation recipes aligned with firmware
 source wiring. A missing or incompatible source is a failure, not a skipped
 check. Firmware's ordinary runners now use independent regression data instead.
+
+RGB agreement runs the current format at both five- and eight-tap depth,
+compiling firmware with the same depth as Ark's codec limits. Both normal and
+sanitizer variants check fresh app encodings and mutated/truncated bytes.

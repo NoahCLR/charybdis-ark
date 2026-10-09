@@ -8,7 +8,7 @@ const {settingsEditorView} = require("../../core/model/settings-editor");
 const {behaviorRowsForView} = require("../../core/session/device-profile-view");
 function fixture() {
     const value = document(), snapshot = {document:value, fingerprint:fingerprint(value), summary:summary(value), limits:{brightnessMax:200}, options:options()};
-    const caps = {compiledLayerCount:8,supportedDomainMask:31,actionAbiDigest:value.actionAbiDigest};
+    const caps = {compiledLayerCount:16,supportedDomainMask:31,actionAbiDigest:value.actionAbiDigest};
     return {snapshot, caps, draft:new ProfileDraftSession(snapshot, "board", caps)};
 }
 function settings(draft, id, updates) {
@@ -208,7 +208,7 @@ test("interrupted apply retains the full target and can review against an incomp
 });
 test("layer reordering is undoable and updates layout and settings references together", () => {
     const {draft,snapshot} = fixture();
-    draft.replace(reorderLayers(draft.document,[0,2,1,3,4,5,6,7],["Base","Symbols","Numbers","Navigation","Pointer","Extra 1","Extra 2","Extra 3"]),draft.revision);
+    draft.replace(reorderLayers(draft.document,[0,2,1,3,4,5,6,7,8,9,10,11,12,13,14,15],["Base","Symbols","Numbers","Navigation","Pointer","Extra 1","Extra 2","Extra 3",...Array(8).fill("")]),draft.revision);
     assert.equal(draft.current.summary.names[1],"Symbols");
     assert.equal(draft.document.layers[0][0],0x5222);
     draft.undo(draft.revision); assert.equal(draft.current.fingerprint,snapshot.fingerprint);
@@ -268,7 +268,7 @@ test("a discard from a current review keeps it current, and discarding the last 
 });
 test("a macro name discarded back leaves no indescribable settings difference", () => {
     const value = require("../fixtures/pd-profile").document();
-    const draft = new ProfileDraftSession({document:value,fingerprint:fingerprint(value),summary:summary(value),limits:{brightnessMax:200}}, "board", {compiledLayerCount:8,supportedDomainMask:31,actionAbiDigest:value.actionAbiDigest});
+    const draft = new ProfileDraftSession({document:value,fingerprint:fingerprint(value),summary:summary(value),limits:{brightnessMax:200}}, "board", {compiledLayerCount:16,supportedDomainMask:31,actionAbiDigest:value.actionAbiDigest});
     stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_3",name:"Hello",expectedFingerprint:draft.current.fingerprint});
     draft.discard(draft.revision,groupOf(draft,"macro:3"));
     assert.equal(draft.dirty,false,"discard restores the original settings bytes too");
@@ -309,7 +309,7 @@ test("a revision is decoded once and its history entry cannot be edited in place
 
 // ── layers compared by identity ─────────────────────────────────────────
 
-const SWAP = [0,1,3,2,4,5,6,7];
+const SWAP = [0,1,3,2,4,5,6,7,8,9,10,11,12,13,14,15];
 // A Rename & Reorder save: the step it rearranges the draft by, every layer
 // keeping its name unless `names` (by new slot) says otherwise.
 function layers(draft, step = SWAP, {names, keysFollow = true} = {}) {
@@ -346,7 +346,7 @@ test("a key edited on a swapped layer is its own item, and each discard keeps th
 });
 test("a swap and a rename are two items, and discarding one keeps the other", () => {
     const {draft,snapshot} = fixture();
-    layers(draft,SWAP,{names:["Base","Numbers","Nav","Symbols","Pointer","Extra 1","Extra 2","Extra 3"]});
+    layers(draft,SWAP,{names:["Base","Numbers","Nav","Symbols","Pointer","Extra 1","Extra 2","Extra 3",...Array(8).fill("")]});
     assert.deepEqual(units(draft),["layerName:2","layerOrder"]);
     assert.equal(draft.view({}).undoLabel,"Swapped Symbols and Navigation, renamed Navigation to Nav");
     assert.notEqual(groupOf(draft,"layerOrder"),groupOf(draft,"layerName:2"),"one save, two decisions");
@@ -363,11 +363,11 @@ test("a swap and a rename are two items, and discarding one keeps the other", ()
 });
 test("several swaps are one priority change: the net move of every layer they touched", () => {
     const {draft} = fixture();
-    layers(draft); layers(draft,[0,1,2,4,3,5,6,7]);
+    layers(draft); layers(draft,[0,1,2,4,3,5,6,7,8,9,10,11,12,13,14,15]);
     const chained = draft.changes().find(row => row.unit === "layerOrder");
     assert.deepEqual(chained.fields.map(field => [field.label,field.before,field.after]),
         [["Symbols","2","4 · higher"],["Pointer","4","3 · lower"],["Navigation","3","2 · lower"]],"two swaps sharing a layer move three");
-    layers(draft,[0,1,2,3,4,6,5,7]);
+    layers(draft,[0,1,2,3,4,6,5,7,8,9,10,11,12,13,14,15]);
     assert.deepEqual(draft.changes().filter(row => row.unit === "layerOrder").length,1,"a separate swap joins the same item");
     assert.deepEqual(draft.changes()[0].fields.map(field => field.label),["Extra 1","Extra 2","Symbols","Pointer","Navigation"]);
 });
@@ -386,12 +386,12 @@ test("swapping back leaves no layer order, and names alone never make one", () =
     assert.equal(draft.dirty,false);
     assert.deepEqual(draft.changes(),[]);
     // The contents move, the names are swapped over: on names alone nothing changed.
-    layers(draft,SWAP,{names:["Base","Numbers","Symbols","Navigation","Pointer","Extra 1","Extra 2","Extra 3"]});
+    layers(draft,SWAP,{names:["Base","Numbers","Symbols","Navigation","Pointer","Extra 1","Extra 2","Extra 3",...Array(8).fill("")]});
     assert.deepEqual(units(draft),["layerName:2","layerName:3","layerOrder"]);
 });
 test("keys that keep their numbers through a reorder are listed as the changes they are", () => {
     const {draft,snapshot} = fixture();
-    layers(draft,[0,2,1,3,4,5,6,7],{keysFollow:false});
+    layers(draft,[0,2,1,3,4,5,6,7,8,9,10,11,12,13,14,15],{keysFollow:false});
     assert.equal(draft.document.layers[0][0],snapshot.document.layers[0][0],"the key kept its number");
     assert.ok(units(draft).includes("layerOrder"));
     assert.ok(units(draft).includes("layout:0:0"),"and now reaches another layer, which the review says");
@@ -407,10 +407,10 @@ test("undo and redo carry the order; a rebase keeps it; an import and a whole di
     draft.observe(external.current,"board"); draft.rebase(draft.revision);
     assert.deepEqual(units(draft),["layerOrder","layout:2:0","macro:9"]);
     const imported = reorderLayers(snapshot.document,SWAP,SWAP.map(slot => snapshot.summary.names[slot]));
-    draft.replace(imported,draft.revision,"edit","Imported a profile",[0,1,2,3,4,5,6,7]);
+    draft.replace(imported,draft.revision,"edit","Imported a profile",[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]);
     assert.deepEqual(units(draft).filter(unit => unit.startsWith("layer")),["layerName:2","layerName:3"],"an import is compared slot by slot");
     draft.undo(draft.revision); draft.discardAll(draft.revision);
-    assert.equal(draft.dirty,false); assert.deepEqual(draft.order,[0,1,2,3,4,5,6,7]);
+    assert.equal(draft.dirty,false); assert.deepEqual(draft.order,[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15]);
 });
 test("edits link by the layer they touched, so a reorder between them ties nothing new", () => {
     const {draft} = fixture();

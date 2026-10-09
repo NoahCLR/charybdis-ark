@@ -30,7 +30,7 @@ export const BLOCKED = Object.freeze({
 });
 
 // The same limit the extension sets on a chosen profile file.
-export const PROFILE_FILE_LIMIT = 100000;
+export const PROFILE_FILE_LIMIT = 262144;
 export const THEME_KEY = "charybdis-ark.theme";
 const LOCK = "charybdis-ark.keyboard";
 

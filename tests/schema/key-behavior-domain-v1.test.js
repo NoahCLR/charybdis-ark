@@ -46,6 +46,9 @@ function representative() {
     return {rows: [
         {
             target: {kind: PROFILE_ACTION_KINDS.PD_MODE_MOMENTARY, operand: 2},
+            // Disabled, and allowed on layers 0 and 2 only: both kept as stored.
+            enabled: false,
+            allowedLayers: 0x0005,
             steps: [{tapIndex: 1, tap: {kind: PROFILE_ACTION_KINDS.CUSTOM_KEY, operand: 2}}],
         },
         {
@@ -89,6 +92,8 @@ test("empty and representative key-behavior payloads match exact golden bytes", 
                 longerHoldTerm: 400,
                 multiTapTerm: 175,
                 keepsAutoMouseAnchored: true,
+                enabled: true,
+                allowedLayers: 0xffff,
                 steps: [
                     {
                         tapIndex: 0,
@@ -115,12 +120,14 @@ test("empty and representative key-behavior payloads match exact golden bytes", 
                 longerHoldTerm: 0,
                 multiTapTerm: 0,
                 keepsAutoMouseAnchored: false,
+                enabled: false,
+                allowedLayers: 0x0005,
                 steps: [{tapIndex: 1, tap: {kind: PROFILE_ACTION_KINDS.CUSTOM_KEY, flags: 0, operand: 2}}],
             },
         ],
         rowCount: 2,
         populatedStepCount: 3,
-        byteLength: 58,
+        byteLength: 66,
     });
 });
 
@@ -130,9 +137,9 @@ test("domain envelope composes with the canonical whole-profile blob", () => {
     assert.equal(envelope.toString("hex"), golden.representativeEnvelopeHex);
     assert.equal(envelope[0], PROFILE_DOMAIN_IDS.KEY_BEHAVIORS);
     assert.deepEqual(decodeKeyBehaviorDomainEnvelope(envelope), decodeKeyBehaviorDomain(encodeKeyBehaviorDomain(representative())));
-    const blob = encodeProfileBlob({schema: {major: 2, minor: 0}, domains: [{
+    const blob = encodeProfileBlob({schema: {major: 3, minor: 0}, domains: [{
         id: PROFILE_DOMAIN_IDS.KEY_BEHAVIORS,
-        version: 1,
+        version: 2,
         payload: encodeKeyBehaviorDomain(representative()),
     }]});
     assert.equal(blob.toString("hex"), golden.representativeBlobHex);
@@ -181,7 +188,7 @@ test("encoder enforces actions, authorable hold modes, repeat rates, and capacit
             steps: [{tapIndex: 0, hold: {mode, repeatHz, action: {kind: PROFILE_ACTION_KINDS.QMK_KEYCODE, operand: 2}}}],
         }]}), (error) => error.code === code);
     }
-    assert.throws(() => encodeKeyBehaviorDomain({rows: Array.from({length: 65}, (_, operand) => ({
+    assert.throws(() => encodeKeyBehaviorDomain({rows: Array.from({length: 129}, (_, operand) => ({
         target: {kind: PROFILE_ACTION_KINDS.QMK_KEYCODE, operand}, steps: [],
     }))}), (error) => error.code === "CAPACITY_EXCEEDED");
     assert.throws(() => encodeKeyBehaviorDomain(representative(), {maxPopulatedSteps: 2}), (error) => error.code === "CAPACITY_EXCEEDED");
@@ -191,27 +198,36 @@ test("encoder enforces actions, authorable hold modes, repeat rates, and capacit
 
 test("decoder rejects noncanonical ordering, counts, flags, lengths, and truncation", () => {
     const valid = encodeKeyBehaviorDomain(representative());
-    const reservedHeader = Buffer.from(valid);
-    reservedHeader[2] = 1;
-    assert.throws(() => decodeKeyBehaviorDomain(reservedHeader), (error) => error.code === "RESERVED_FIELDS");
-
+    // The header is two u16 counts: rows, then populated steps.
     const badCount = Buffer.from(valid);
-    badCount[1] -= 1;
+    badCount[2] -= 1;
     assert.throws(() => decodeKeyBehaviorDomain(badCount), (error) => error.code === "COUNT_MISMATCH");
+    const wideCount = Buffer.from(valid);
+    wideCount[3] = 1; // 259 steps declared
+    assert.throws(() => decodeKeyBehaviorDomain(wideCount), (error) => ["COUNT_MISMATCH", "CAPACITY_EXCEEDED"].includes(error.code));
+    const disabledFlag = Buffer.from(valid);
+    disabledFlag[16] |= 0x02;
+    assert.equal(decodeKeyBehaviorDomain(disabledFlag).rows[0].enabled, false);
+    // Allowed layers name bank layers only: bit 15 is the last.
+    const lastLayer = Buffer.from(valid);
+    lastLayer.writeUInt32LE(0x8000, 18);
+    assert.equal(decodeKeyBehaviorDomain(lastLayer).rows[0].allowedLayers, 0x8000);
+    lastLayer.writeUInt32LE(0x10000, 18);
+    assert.throws(() => decodeKeyBehaviorDomain(lastLayer), (error) => error.code === "INVALID_LAYERS");
     const badRowFlags = Buffer.from(valid);
     badRowFlags[16] = 0x80;
     assert.throws(() => decodeKeyBehaviorDomain(badRowFlags), (error) => error.code === "RESERVED_FLAGS");
     const emptyStep = Buffer.from(valid);
-    emptyStep[19] = 0;
+    emptyStep[23] = 0;
     assert.throws(() => decodeKeyBehaviorDomain(emptyStep), (error) => error.code === "EMPTY_STEP");
     const reservedStep = Buffer.from(valid);
-    reservedStep[19] = 0x80;
+    reservedStep[23] = 0x80;
     assert.throws(() => decodeKeyBehaviorDomain(reservedStep), (error) => error.code === "RESERVED_FLAGS");
     const duplicateStep = Buffer.from(valid);
-    duplicateStep[26] = 0;
+    duplicateStep[30] = 0;
     assert.throws(() => decodeKeyBehaviorDomain(duplicateStep), (error) => error.code === "DUPLICATE_STEP");
     const internalHoldMode = Buffer.from(valid);
-    internalHoldMode[20] = 0;
+    internalHoldMode[24] = 0;
     assert.throws(() => decodeKeyBehaviorDomain(internalHoldMode), (error) => error.code === "INVALID_HOLD_MODE");
 
     const firstRowLength = valid.readUInt16LE(4) + KEY_BEHAVIOR_DOMAIN_V1.ROW_LENGTH_SIZE;
@@ -238,19 +254,19 @@ test("decoder honors negotiated capacity ceilings", () => {
     assert.throws(() => decodeKeyBehaviorDomain(payload, {maxPayloadSize: 32}), (error) => error.code === "CAPACITY_EXCEEDED");
 });
 
-test("negotiated behavior limits can lower but never raise frozen v1 ceilings", () => {
+test("negotiated behavior limits honor counted wire ceilings", () => {
     const lowered = {
-        maxRows: 63,
-        maxPopulatedSteps: 127,
+        maxRows: 127,
+        maxPopulatedSteps: 639,
         maxTapStepsPerBehavior: 4,
         maxRepeatHz: 99,
         maxPayloadSize: KEY_BEHAVIOR_LIMITS.maxPayloadSize - 1,
     };
     assert.doesNotThrow(() => encodeKeyBehaviorDomain({rows: []}, lowered));
     for (const [field, ceiling] of [
-        ["maxRows", 64],
-        ["maxPopulatedSteps", 128],
-        ["maxTapStepsPerBehavior", 5],
+        ["maxRows", 128],
+        ["maxPopulatedSteps", 128 * 255],
+        ["maxTapStepsPerBehavior", 255],
         ["maxRepeatHz", 100],
         ["maxPayloadSize", KEY_BEHAVIOR_LIMITS.maxPayloadSize],
     ]) {

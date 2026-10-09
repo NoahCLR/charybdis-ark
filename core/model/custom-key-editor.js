@@ -1,14 +1,14 @@
 "use strict";
 
-// The 64 custom keys: named keys that do only what their behaviour says. A key
-// has an identity (CUSTOM_KEY_n, keycode 0x7e40 + n) and a name; what it does
+// The 128 custom keys: named keys that do only what their behaviour says. A key
+// has an identity (CUSTOM_KEY_n, keycode 0x7f00 + n) and a name; what it does
 // is its behaviour row, edited like any other. Without a row it does nothing,
 // and a behaviour step cannot send one: it is placed on a layer or emitted by
 // a combo.
 
 const {decodedOf, encodeNamedProfile, validateSnapshot} = require("./portable-profile");
 const {decodeProfileBlob, PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
-const {SETTINGS, asciiName, encodeSettings} = require("../schema/settings-domain-v1");
+const {SETTINGS, validName, encodeSettings} = require("../schema/settings-domain-v1");
 const {knownActionAbi} = require("../schema/actions");
 const {CUSTOM_KEY_SLOTS, customKeyCode} = require("../data/user-keycodes");
 const fail = (message, code = "CUSTOM_KEY_EDIT_CONFLICT") => Object.assign(new Error(message), {code});
@@ -24,8 +24,8 @@ function customKeyEditorView(snapshot, capabilities) {
     const behaved = new Set(behaviors.rows.filter(row => row.target.kind === ACTION.CUSTOM_KEY).map(row => row.target.operand));
     return {identity: snapshot.fingerprint,
         keys: names.map((name, slot) => ({slot, keycode: `CUSTOM_KEY_${slot}`, code: customKeyCode(slot), name, hasBehavior: behaved.has(slot)})),
-        // Each name may be 20 characters; the profile as a whole has a ceiling.
-        names: {perName: SETTINGS.MACRO_NAME_CHARS}};
+        // Each name may be 32 bytes of text; the profile as a whole has a ceiling.
+        names: {perName: SETTINGS.NAME_MAX_BYTES}};
 }
 
 // A custom key's name. Names live in the profile's settings domain.
@@ -38,7 +38,7 @@ function editCustomKey(snapshot, message, capabilities) {
     if (!customKeysSupported(snapshot.document, capabilities)) throw fail("Custom keys need firmware with the userspace keycode blocks.", "CUSTOM_KEYS_UNSUPPORTED");
     const value = validateSnapshot(snapshot.document, capabilities);
     const name = message.name.trim();
-    if (!asciiName(name)) throw fail(`A custom key name is up to ${SETTINGS.MACRO_NAME_CHARS} plain characters: letters, digits, spaces and punctuation.`, "CUSTOM_KEY_NAME_INVALID");
+    if (!validName(name)) throw fail(`A custom key name is up to ${SETTINGS.NAME_MAX_BYTES} bytes of text, with no control characters. Accented letters and symbols take two to four bytes each.`, "CUSTOM_KEY_NAME_INVALID");
     if (name === value.settings.customKeyNames[slot]) return value.document;
     const document = JSON.parse(JSON.stringify(value.document));
     const settings = structuredClone(value.settings);

@@ -38,14 +38,14 @@ matrix.
 
 | Product surface | Current state |
 | --- | --- |
-| Layout and eight layers | Read/write; names and overlay order travel with complete profiles; a reorder renumbers layer keys by default ("Keys follow their layers") |
+| Layout and 16 layers | Read/write; names and overlay order travel with complete profiles; a reorder renumbers layer keys by default ("Keys follow their layers") |
 | Key behaviours, combos and RGB | Read/write editors over the shared draft; selected keys open an unstored behaviour grid until the first edit; matching Keys reach sections share open state across tabs, open independently, and use the page scrollbar |
-| Macros | 64 named VIA macro slots with builder, recorder and preview; shared-memory and per-macro limits shown and enforced (D-L25, D-L26) |
-| Custom keys | 64 named keys that do what their behaviour says: rename, add or open the behaviour, place, see where each is used (D-L42) |
+| Macros | 128 named VIA macro slots with builder, recorder and preview; shared-memory and per-macro limits shown and enforced (D-L25, D-L26) |
+| Custom keys | 128 named keys that do what their behaviour says: rename, add or open the behaviour, place, see where each is used (D-L42) |
 | Mouse | Pointer and sniping DPI, auto-sniping and auto-mouse: global-policy sections the core files under the Mouse area, so the rail, the review and import counts all place them there. The auto-mouse fade delay is a share of the timeout, edited on its lighting stage (D-L17) |
-| Pointing modes | 32 device-owned slots (sparse PD domain v2, RGB v3); Ark accepts only the current action vocabulary and profile formats (D-L54). See [PD-mode domain v1](../upstream/firmware/docs/architecture/pd-mode-domain-v1.md) |
+| Pointing modes | 32 device-owned slots (sparse PD domain v3, RGB v4); live codecs accept only the current action vocabulary and profile formats (D-L54). See [PD-mode domain v1](../upstream/firmware/docs/architecture/pd-mode-domain-v1.md) |
 | Global policy | Every other portable setting, including startup layers, combo matching and device-reported lighting and key options; unsupported firmware features stay read-only |
-| Backup and restore | Complete current-format snapshots, choose or drop a file for import review against the keyboard, recovery file and verified restore; older backups are refused (D-L54) |
+| Backup and restore | Complete current-format snapshots, choose or drop a file for import review against the keyboard, recovery file and verified restore; the preceding eight-layer backup is translated before review (D-L54) |
 | Drafts and Apply | One draft with item-by-item review, discard by edit group, Show, undo/redo and draft history; the review checks reachable actions, confirms active warnings and traps, and blocks profiles the destination cannot save (D-L36); Apply shows its steps and says where a failure happened (D-L19, D-L23, D-L29, D-L30) |
 | Recovery | Atomic logical Apply, differential transfer, reboot recovery fencing, firmware roll-forward after the decision, resume after a lost or power-cycled peer link, bounded cancel owned by the keyboard (D-L20–D-L22, D-L27, D-L39) |
 | Where it runs | The VS Code extension, and a web page that runs all of Ark in Chrome or Edge over WebHID (D-L52): Choose keyboard, one tab at a time, recovery copies in the browser's storage, a light/dark toggle. A phone gets only a notice that Ark runs on a computer, with links to the repositories; a tablet gets Ark. `npm run build:web` writes the page as static files; a workflow publishes it to Cloudflare Pages: `dev` at `ark-dev.ncleroy.dev`, `main` at `ark.ncleroy.dev` from the first release |
@@ -270,12 +270,12 @@ explicitly empty domains mean different things; a complete file carries every
 domain and never falls back to destination authored data. The contract is in
 [portable-profile-v1.md](../upstream/firmware/docs/architecture/portable-profile-v1.md).
 
-The standard image reserves eight layers; base stays at index zero and the app
+The standard image reserves 16 layers; base stays at index zero and the app
 moves overlays and rewrites references together. The action ABI describes the
 engine vocabulary independently of authored rows, so empty and populated
 builds advertise the same ABI. The old five-layer snapshot bridge is retired
-(D-L40). Ark accepts only current portable snapshots and does not upgrade older
-backups (D-L54). No firmware is flashed by the app.
+(D-L40). Ark edits current portable snapshots and translates the immediately preceding
+eight-layer backup before Import review (D-L54). No firmware is flashed by the app.
 
 Choose profile and dropping one file onto the Import profile card open the
 same validated review in both hosts and in the demo. Dropping is available only
@@ -314,8 +314,8 @@ not unapplied changes. Closing the editor loses the draft.
 
 ### D-L20 — Differential Apply
 
-The VIA macro bank is 7,191 bytes and a 32-byte Raw HID report carries 28 data
-bytes, so one complete macro read is 257 exchanges; the old path read the
+The VIA macro bank is 10,327 bytes and a 32-byte Raw HID report carries 28 data
+bytes, so one complete macro read is 369 exchanges; the old path read the
 profile four times and rewrote the whole bank. Apply now verifies and reuses
 the snapshot already loaded as its recovery base, uses custom, VIA and settings
 identities for the compare-and-swap checks, writes only changed 28-byte blocks
@@ -323,7 +323,7 @@ and reads those back exactly. Refresh and Export remain independent complete
 reads.
 
 "Changed" means changed from the bank the keyboard holds, not from one rebuilt
-from the document: a valid bank may keep stale bytes after its 64th macro,
+from the document: a valid bank may keep stale bytes after its 128th macro,
 which a document cannot carry. A capture keeps the exact layout and macro
 bytes it read, and an Apply result the target it proved; a cached snapshot
 without them is read again. See
@@ -380,7 +380,7 @@ Firmware decision; its text is in the firmware direction.
 
 ### D-L26 — Macro slots share one visible memory, and every slot says what fits
 
-All 64 slots share the keyboard's macro memory (7,191 bytes on the eight-layer
+All 128 slots share the keyboard's macro memory (10,327 bytes on the 16-layer
 geometry; a key tap takes 3 bytes, a typed character 1). A macro plays only if
 the firmware compiles it into at most 512 bytes (`MACRO_PAYLOAD_IR_MAX_BYTES`),
 about 170 key taps; a longer one used to be accepted and then silently never
@@ -391,8 +391,8 @@ edit past it, and marks a slot VIA wrote past it as too long.
 Every empty slot keeps room for ten key taps (30 bytes); when free memory
 cannot keep that for every empty slot, the highest-numbered empty slots show no
 room and cannot be edited until space is freed. The firmware does not enforce the reserve, so the
-app shows what a VIA edit left. Current settings version 5 gives every macro
-name up to 20 printable ASCII characters, as version 4 did; see the
+app shows what a VIA edit left. Current settings version 6 gives every macro
+name up to 32 UTF-8 bytes, following the shared counted-name contract; see the
 [portable profile](../upstream/firmware/docs/architecture/portable-profile-v1.md).
 
 ### D-L27 — A stale copy on the other half can no longer hold off every later one
@@ -794,12 +794,45 @@ Warnings remain confirmable and notices need no confirmation. No values change
 automatically. Combo waits are not subtracted from physical repeat windows.
 
 This is conservative static analysis, not a complete input-state simulator.
-Transparent action inheritance, pointing interception, interruption, host bindings,
-scan cadence, fingers and overlapping chord sequences are not proven feasible.
+Stored layer-source resolution and participation policies are modeled; pointing
+interception, interruption, host bindings, scan cadence, fingers and overlapping
+chord sequences are not proven feasible.
 Unknown paths remain in the graph rather than inventing traps. Invalid timing
 relationships are reported even for unplaced rows so moving one later cannot
 hide the problem. Revisit the rule against firmware release-matrix tests when
 release precedence changes.
+
+Ark checks sets of held/locked states through shared Boolean decisions, so
+independent layer controls do not expand into an exponential list of states.
+A permanently available TO(0), or universally available toggles for every
+lockable layer, proves a way home directly. Other profiles receive complete
+forward reachability and backward escape checks under the same conservative
+action model. A held layer can be released; traps concern locks that remain
+after release. Two separately escapable layers can still cover each other's
+exits together, so those interactions remain part of the check.
+
+Review reports the smallest trapping layer combinations, with concrete entry
+paths and repairs. Unrelated safe locks do not multiply one trap into thousands
+of findings. Paths include a hold release when it is needed to reach a later
+action. Up to four trapping combinations are named; any additional minimal
+combinations are counted. New, existing and fixed findings continue to follow
+layer identity through reordering.
+
+Memory and work budgets keep checks responsive. If the compact proof cannot
+finish, a bounded explicit walk may still resolve a small graph (4,096 states,
+65,536 edges). Any remaining warning names the involved layers and opens one
+for inspection. If reachability was established but escape was not, layer and
+combo reachability findings remain valid and only escape is marked uncertain.
+A partial check never reports an unproved absence or marks an earlier finding
+fixed in the area that remains uncertain.
+Generated combo-output behaviours honor the source layer of the last declared
+combo member, which owns the output independently of physical press order.
+Reference remapping changes the matched code, never that physical source.
+When the owner code has several eligible placements, each placement's source
+conditions separately admit the row or its native fallback; another member's
+permissions cannot admit the output behaviour. Generated outputs have no
+physical placement: only the behaviour master and row enable/allowed-layer
+mask apply, as the firmware's participation contract defines.
 
 Feature bit 18 identifies runtime-owned tapping, extending bit 17's authored LT
 bypass to every handled key (including authored MT/OSM and owned TT/OSL). Ark
@@ -948,7 +981,7 @@ export of a real keyboard shipped as data (`core/data/demo-profile.charybdis.jso
 never hand-edited and never read from a firmware checkout), or a profile file
 opened in its place and checked as Import checks one. It runs under the
 capabilities current firmware reports (the 32-slot action vocabulary
-`0xf79c6151`, its limits and keyboard options), held equal to what the fake
+`0x837cf479`, its 16-layer/128-slot limits and keyboard options), held equal to what the fake
 current keyboard reports by test.
 
 Inside the session the demo is the draft's device: while `session.demo` is set,
@@ -964,20 +997,48 @@ the demo; with edits not exported since, the message must say the panel asked
 connected and no unapplied keyboard draft, and on a page that cannot reach a
 keyboard only where the host says so (`model.host.blocked.demo`).
 
-### D-L54 — Ark accepts only current profile formats
+### D-L54 — Current live formats, with a preceding-backup bridge
 
-Ark follows the firmware's current-only profile contract (firmware D-F10):
-schema 2.0, RGB 3, key behaviours 1, combos 2, settings 5 and sparse PD 2,
-with eight layers, 64 VIA macros and the 32-slot action vocabulary
-`0xf79c6151`. Candidate uploads use store format 3 and a nonzero VIA binding.
-The codecs reject earlier schemas and domain versions. Complete-profile
-imports reject older action vocabularies, layer counts and legacy pointing
-source evidence before a draft, recovery copy or device write is started.
+Ark's live codecs follow firmware D-F14: schema 3.0, RGB 4, key behaviours 2,
+combos 3, settings 6 and sparse PD 3; 16 layers, 128 VIA macros and 128 custom
+keys; action vocabulary `0x837cf479`. Three capability pages report the wider
+counts, 64 KiB storage slots and 65,504-byte payload capacity. Candidate uploads
+use store format 4 and a nonzero VIA binding. Earlier live firmware remains
+read-only; Ark does not edit its domains or upload old bytes.
 
-The backup-upgrade chain and eight-slot firmware support are removed. Ark
-neither translates older backups nor silently drops their data; Noah runs
-current-format profiles. Test-only frozen inputs remain to prove rejection and
-to exercise the unchanged pointing record rules against C. The preview uses
-current firmware's 32-slot profile. Device diagnostics may still display an
-unsupported keyboard's reported capabilities and unnamed keycodes, but it
-cannot open an editable draft or export a complete current-format backup.
+The connected firmware's advertised tap depth governs both behaviour steps
+and the RGB tap-branch palette throughout read, edit, history, reorder and
+partial Discard. Offline snapshots carry that depth in the counted RGB palette;
+import and Apply validate it against the destination's advertised limits.
+
+Import has one explicit bridge for the immediately preceding schema 2.0 backup
+with action ABI `0xf79c6151` (eight layers, 64 macros/custom keys, 32 pointing
+slots; RGB 3, behaviours 1, combos 2, settings 5 and PD 2). Translation preserves
+all fields, remaps native custom-key references by slot, adds transparent layers
+and empty name/macro slots, and enables every new participation policy. It
+first validates source records, action references, counts, names and macro
+capacity against that preceding format's limits, then validates the translated
+document under the current complete-profile contract
+before Import review. The connected keyboard and draft remain unchanged until
+Use as draft and then the existing recovery-first Apply flow. Demo file opening
+and restore use the same translator. Unknown versions and malformed input fail;
+there is no general historical upgrade chain or data-dropping fallback.
+
+Upgrading firmware changes storage geometry and starts from flashed defaults.
+Export with the preceding Ark first, flash the matched pair to both halves,
+then import and review that backup with this Ark. The guide carries these steps.
+
+### D-L55 — Participation controls edit policy, preserving definitions
+
+Ark exposes the firmware's participation contract at every scope: master and
+source-layer switches in Settings, enabled/allowed-layer controls on shared
+behaviour and combo definitions, and Use behaviour / Join combos on physical
+placements. The key inspector explains blocked scopes and navigates from a
+transparent inherited key to the placement that supplies its keycode. Controls
+stage ordinary profile edits; Review and partial Discard preserve other fields,
+Undo/Redo restore policy, and layer reordering moves masks and placement bits
+with their layers. Disabling retains definitions and timing. A bypassed native
+key falls through normally; a bypassed custom key produces no output.
+
+The source-layer and gesture capture rules remain firmware-owned in
+[participation-policy.md](../upstream/firmware/docs/architecture/participation-policy.md).

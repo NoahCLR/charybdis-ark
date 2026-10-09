@@ -91,7 +91,7 @@ test("invalid edits and references are rejected before upload", () => {
     for (const steps of [undefined, [{tapCount: 5}], [{tapCount: 0}, {tapCount: 0}], [{tapCount: 0, tap: {helper: "" , action: "KC_A"}}], [{tapCount: 0, tap: {helper: "BOGUS", action: "KC_A"}}]]) {
         assert.throws(() => save({...form(), steps}));
     }
-    for (const action of ["", "UNKNOWN", "MO(8)", "LOCK_LAYER(8)", "VIA_MACRO_64", "MACRO_16", "TG(2)", "G(MO(2))"]) {
+    for (const action of ["", "UNKNOWN", "MO(8)", "LOCK_LAYER(16)", "VIA_MACRO_128", "MACRO_16", "TG(2)", "G(MO(2))"]) {
         assert.throws(() => save({...form(), steps: [{tapCount: 0, tap: {helper: "TAP_SENDS", action}}]}), undefined, action);
     }
     for (const repeatHz of ["", "0", "101", "-1", "2.5"]) assert.throws(() => save({...form(), steps: [{tapCount: 0, hold: {helper: "REPEAT_WHILE_HELD", action: "KC_A", repeatHz}}]}));
@@ -100,7 +100,7 @@ test("invalid edits and references are rejected before upload", () => {
     assert.throws(() => edit({type: "saveBehavior", behavior: form()}, {...capabilities, supportedDomainMask: 1}), /firmware/);
     assert.throws(() => edit({type: "saveBehavior", behavior: form()}, {...capabilities, maxBehaviorRows: original.rowCount}), /row count/);
     assert.throws(() => edit({type: "saveBehavior", behavior: form()}, {...capabilities, maxPopulatedBehaviorSteps: original.populatedStepCount}), /step count/);
-    assert.throws(() => edit({type: "saveBehavior", behavior: form()}, {...capabilities, maxTapStepsPerBehavior: 4}), /Tap index/);
+    assert.throws(() => edit({type: "saveBehavior", behavior: form()}, {...capabilities, maxTapStepsPerBehavior: 4}), /Tap branch index/);
 });
 
 test("transparent and disabled keys cannot receive or be retargeted to a behaviour", () => {

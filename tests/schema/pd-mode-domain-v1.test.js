@@ -2,7 +2,7 @@
 const {test} = require("node:test");
 const assert = require("node:assert/strict");
 const fixture = require("../../upstream/firmware/tests/fixtures/pd_mode_domain_v1.json");
-const {PD_DOMAIN_V2, encodePdDomain, decodePdDomain, isPdTapKey} = require("../../core/schema/pd-mode-domain-v1");
+const {PD_DOMAIN, encodePdDomain, decodePdDomain, isPdTapKey} = require("../../core/schema/pd-mode-domain-v1");
 const {decodeProfileBlob, encodeProfileBlob} = require("../../core/schema/profile-blob-v1");
 // The firmware's eight-slot record fixture as the 32 slots the keyboard has:
 // slot 6 disabled but named, so it keeps a record, and the rest empty. The
@@ -18,22 +18,27 @@ const reject = (fn, code) => assert.throws(fn, error => error.code === code);
 
 test("native PD, layer-lock and custom-key identities sit in their fixed blocks", () => {
     const {resolveNativeQmkExpression} = require("../../core/schema/compiled-profile-v1");
-    const model = {layers: Array.from({length: 8}, (_, id) => ({id}))};
-    for (let id = 0; id < 8; id++) {
+    const model = {layers: Array.from({length: 16}, (_, id) => ({id}))};
+    for (let id = 0; id < 16; id++) {
         assert.equal(resolveNativeQmkExpression(`PD_SLOT_${id}`, model), 0x7e80 + id);
         assert.equal(resolveNativeQmkExpression(`PD_SLOT_${id}_LOCK`, model), 0x7ea0 + id);
         assert.equal(resolveNativeQmkExpression(`LOCK_LAYER(${id})`, model), 0x7ec0 + id);
     }
-    assert.equal(resolveNativeQmkExpression("LOCK_LAYER(8)", model), undefined, "only eight layers have a lock");
-    for (const id of [0, 3, 63]) assert.equal(resolveNativeQmkExpression(`CUSTOM_KEY_${id}`, model), 0x7e40 + id);
-    assert.equal(resolveNativeQmkExpression("CUSTOM_KEY_64", model), undefined);
+    assert.equal(resolveNativeQmkExpression("LOCK_LAYER(16)", model), undefined, "only sixteen layers have a lock");
+    // Custom keys moved to their own block, 0x7f00 (D-F14).
+    for (const id of [0, 3, 63, 64, 127]) assert.equal(resolveNativeQmkExpression(`CUSTOM_KEY_${id}`, model), 0x7f00 + id);
+    assert.equal(resolveNativeQmkExpression("CUSTOM_KEY_128", model), undefined);
     assert.equal(resolveNativeQmkExpression("MACRO_0", model), undefined, "the retired user macros are gone");
 });
 
 test("the fixture's slots encode as its records and preserve the full preset policies", () => {
     const encoded = encodePdDomain(slots()), frozen = Buffer.from(fixture.hex, "hex");
-    assert.equal(encoded.length, 8 + 7 * 96, "six configured slots and one named one");
-    for (let slot = 0; slot < 6; slot++) assert.deepEqual(encoded.subarray(8 + slot * 96, 8 + (slot + 1) * 96), frozen.subarray(8 + slot * 96, 8 + (slot + 1) * 96), `slot ${slot}`);
+    assert.equal(encoded.length, 8 + 7 * 128, "six configured slots and one named one");
+    // Each record is the frozen one, its name moved to the counted field.
+    for (let slot = 0; slot < 6; slot++) {
+        const now = encoded.subarray(8 + slot * 128, 8 + (slot + 1) * 128), before = frozen.subarray(8 + slot * 96, 8 + (slot + 1) * 96);
+        assert.deepEqual([now.subarray(0, 8), now.subarray(32, 96)], [before.subarray(0, 8), before.subarray(32, 96)], `slot ${slot}`);
+    }
     const decoded = decodePdDomain(encoded);
     assert.deepEqual(encodePdDomain(decoded), encoded);
     assert.equal(decoded[4].directions.up.mask, 0x44);
@@ -48,9 +53,10 @@ test("slot seven accepts a custom media mode and byte-bounded Unicode names", ()
     value[7] = {id: 7, kind: 1, axis: 2, name: "Édition ⌘", thresholdX: 40, thresholdY: 60,
         directions: {left: {keycode: 0xac}, right: {keycode: 0xab}, up: {keycode: 0xa9}, down: {keycode: 0xaa}}};
     assert.equal(decodePdDomain(encodePdDomain(value))[7].name, value[7].name);
-    value[7].name = "x".repeat(23); encodePdDomain(value);
+    value[7].name = "x".repeat(32); encodePdDomain(value);
     value[7].name += "x"; reject(() => encodePdDomain(value), "INVALID_NAME");
-    for (const name of ["\ud800", "\u0000", "x\n", "é".repeat(12)]) {
+    value[7].name = "é".repeat(16); encodePdDomain(value);
+    for (const name of ["\ud800", "\u0000", "x\n", "é".repeat(17)]) {
         value[7].name = name; reject(() => encodePdDomain(value), "INVALID_NAME");
     }
 });
@@ -59,8 +65,8 @@ test("PD decoder rejects malformed framing, hidden disabled state and noncanonic
     reject(() => decodePdDomain(bytes().subarray(0, -1)), "INVALID_LENGTH");
     reject(() => decodePdDomain(Buffer.concat([bytes(), Buffer.from([0])])), "INVALID_LENGTH");
     for (const [offset, value, code] of [[0, 1, "INVALID_HEADER"], [1, 8, "INVALID_HEADER"], [8, 1, "INVALID_ID"],
-        [15, 1, "RESERVED"], [98, 1, "RESERVED"], [8 + 6 * 96 + 4, 100, "INVALID_PARAMETER"],
-        [16, 0xc0, "INVALID_NAME"], [39, 1, "INVALID_NAME"], [9, 3, "INVALID_POLICY"]]) {
+        [15, 1, "RESERVED"], [98, 1, "RESERVED"], [17, 1, "RESERVED"], [8 + 6 * 128 + 4, 100, "INVALID_PARAMETER"],
+        [8 + 96, 0xc0, "INVALID_NAME"], [8 + 127, 1, "INVALID_NAME"], [16, 33, "INVALID_NAME"], [9, 3, "INVALID_POLICY"]]) {
         const b = bytes(); b[offset] = value;
         reject(() => decodePdDomain(b), code);
     }
@@ -96,7 +102,7 @@ test("scroll validation rejects bad timing and ratios before they reach arithmet
 
 test("every directional mode stores how often it sends in byte 87; 88 and 89 stay reserved", () => {
     const {PD_DIRECTION_OUTPUT} = require("../../core/schema/pd-mode-domain-v1");
-    const record = 8 + 4 * 96;   // Arrow, dominant axis
+    const record = 8 + 4 * 128;  // Arrow, dominant axis
     for (const axis of [2, 3]) {
         const value = slots();
         Object.assign(value[4], {axis, directionOutput: PD_DIRECTION_OUTPUT.ONCE}, axis === 3 ? {thresholdX: 40, thresholdY: 40} : {});
@@ -144,11 +150,11 @@ test("encoder rejects unknown fields and numeric coercion rather than silently d
     }
 });
 
-test("a profile carries the PD domain only as version 2, and the retired eight-slot payload is refused", () => {
+test("a profile carries the PD domain only as version 3, and the retired payloads are refused", () => {
     const payload = bytes();
-    assert.deepEqual(decodeProfileBlob(encodeProfileBlob({domains: [{id: PD_DOMAIN_V2.ID, version: 2, payload}]})).domains[0].payload, payload);
-    reject(() => encodeProfileBlob({domains: [{id: PD_DOMAIN_V2.ID, version: 1, payload}]}), "UNKNOWN_DOMAIN_VERSION");
-    const envelope = Buffer.from([0x4e, 0x4c, 0x50, 0x31, 2, 0, 1, 1, 0x50, 1, 8, 3]);
+    assert.deepEqual(decodeProfileBlob(encodeProfileBlob({domains: [{id: PD_DOMAIN.ID, version: 3, payload}]})).domains[0].payload, payload);
+    for (const version of [1, 2]) reject(() => encodeProfileBlob({domains: [{id: PD_DOMAIN.ID, version, payload}]}), "UNKNOWN_DOMAIN_VERSION");
+    const envelope = Buffer.from([0x4e, 0x4c, 0x50, 0x31, 3, 0, 1, 1, 0x50, 1, 8, 3]);
     reject(() => decodeProfileBlob(Buffer.concat([envelope, Buffer.from(fixture.hex, "hex")])), "UNKNOWN_DOMAIN_VERSION");
     assert.throws(() => decodePdDomain(Buffer.from(fixture.hex, "hex")), error => error.code === "INVALID_HEADER" && error.offset === 0);
 });

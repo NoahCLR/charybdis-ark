@@ -67,7 +67,7 @@ function profileKeyNames({layers, macros = [], customKeys = [], behaviors = [], 
         labels[native] = label;
         labels[slot.keycode] = label;
     }
-    // Every custom key, named or not: all 64 exist, and one without a name
+    // Every custom key, named or not: all 128 exist, and one without a name
     // reads by its number.
     for (let slot = 0; slot < CUSTOM_KEY_SLOTS; slot++) {
         const name = `CUSTOM_KEY_${slot}`, code = customKeyCode(slot);

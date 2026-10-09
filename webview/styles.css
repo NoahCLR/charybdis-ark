@@ -1179,6 +1179,7 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .sv-field { height: 92px; border-radius: 8px; border: 1px solid var(--line); position: relative; }
 .sv-field .thumb { position: absolute; width: 11px; height: 11px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.5); transform: translate(-50%,-50%); }
 .note { font-size: 11.5px; color: var(--text-3); line-height: 1.5; }
+.note.warn { color: var(--warning); }
 .callout { border: 1px solid var(--line); border-left: 2px solid var(--line-3); border-radius: 0 8px 8px 0; padding: 11px 13px; background: var(--surface-2); font-size: 12px; color: var(--text-2); }
 .callout.warn { border-left-color: var(--draft); }
 /* A share of a duration as a slider whose track is the duration: solid up to

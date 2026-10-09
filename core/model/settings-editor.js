@@ -5,7 +5,7 @@ const {effectiveTimings} = require("./gesture-timing");
 const {encodeKeyBehaviorDomain} = require("../schema/key-behavior-domain-v1");
 const {validateSnapshot, decodedOf} = require("./portable-profile");
 const {decodeProfileBlob, encodeProfileBlob} = require("../schema/profile-blob-v1");
-const {encodeSettings, validSetting} = require("../schema/settings-domain-v1");
+const {SETTING, SETTINGS, encodeSettings, validSetting} = require("../schema/settings-domain-v1");
 const {dpiChoices} = require("./pointer-dpi");
 const {layerName} = require("./vocabulary");
 const fail = message => Object.assign(new Error(message), {code: "INVALID_SETTINGS_EDIT"});
@@ -142,15 +142,26 @@ function settingsSections(snapshot, settings) {
         {...byte("effectMode", 21, 8, "Lighting effect"), choices: effects, readOnly: !options, hint: options ? "Effects available on this keyboard. Layer colours can override the base effect." : "Update both halves to report the available lighting effects."},
         {...byte("effectLeds", 21, 24, "Apply base effect to"), choices: flags, readOnly: !options, hint: options ? "Choose which LED classes receive the base effect. Layer colours and feedback have their own policies." : "Update both halves to report the LED classes."});
     const name = i => layerName(settings.names, i);
+    const everyLayer = make => Array.from({length: SETTINGS.LAYERS}, (_, i) => make(i));
     result.push({id: "startupLayers", area: "Settings", label: "Startup Layers", expanded: false, description: "Choose the layers active when the keyboard starts. Keep at least one selected; higher layers take priority.", fields:
-        Array.from({length: 8}, (_, i) => ({...toggle(`startupLayer${i}`, 23, name(i), `Layer ${i}`), bitMask: 1 << i, governs: {kind: "layer", layer: i}}))});
+        everyLayer(i => ({...toggle(`startupLayer${i}`, SETTING.DEFAULT_LAYERS, name(i), `Layer ${i}`), bitMask: 2 ** i, governs: {kind: "layer", layer: i}}))});
+    // Behaviours and combos each have a master switch and one per layer
+    // (participation-policy.md): a key takes part only where every switch that
+    // applies is on, judged by the layer its key came from. Each behaviour and
+    // combo has its own switch and layers in Keys, and each key position its
+    // own in the key's editor.
+    result.push({id: "behaviorSettings", area: "Settings", label: "Behaviours", fields:
+        [toggle("behaviorsEnabled", SETTING.BEHAVIORS_ENABLED, "Enabled", "Turn every behaviour on or off. Off, each key does what it would without one: a plain key, or its own LT() or MT()."),
+            ...everyLayer(i => ({...toggle(`behaviorsOnLayer${i}`, SETTING.LAYER_BEHAVIORS, `On ${name(i)}`, "Keys that come from this layer use their behaviours."), bitMask: 2 ** i, governs: {kind: "layer", layer: i}}))]});
     // Combos get a section of their own beside their layer matching. The
     // Settings screen adds the default window and hold threshold to it, which
     // the keyboard stores with the combos rather than here.
     result.push({id: "comboSettings", area: "Settings", label: "Combos", fields:
-        [toggle("combosEnabled", 20, "Enabled", "Turn every combo on or off. Each combo's own window and conditions are set in Keys · Combos.")]});
+        [toggle("combosEnabled", SETTING.COMBOS_ENABLED, "Enabled", "Turn every combo on or off. Each combo's own window and conditions are set in Keys · Combos."),
+            ...everyLayer(i => ({...toggle(`combosOnLayer${i}`, SETTING.LAYER_COMBOS, `On ${name(i)}`, "Keys that come from this layer can join combos."), bitMask: 2 ** i, governs: {kind: "layer", layer: i}}))]});
+    // A layer's combo reference is in its layer record, not a setting value.
     result.push({id: "comboReferences", area: "Settings", label: "Combo Layer Matching", expanded: false, description: "Choose which layer supplies the key assignments used to match combos on each layer. Select the same layer to keep its combos independent.", fields:
-        Array.from({length: 8}, (_, i) => ({...layer(`comboReference${i}`, 27, `Combos on ${name(i)}`), shift: i * 4, width: 4, governs: {kind: "layer", layer: i}}))});
+        everyLayer(i => ({...layer(`comboReference${i}`, undefined, `Combos on ${name(i)}`), record: "reference", layer: i, governs: {kind: "layer", layer: i}}))});
     result.push({id: "keyboardOptions", area: "Settings", label: "Key Options", expanded: false, description: options ? "Keyboard-wide remapping and typing options. These apply across all layers." : "Update both halves to report their supported key options.", fields:
         options ? optionLabels.map(([macro, label], i) => ({...toggle(macro, 24, label), bitMask: options.keymapMasks[i], readOnly: !(options.supportedKeymapOptions & (1 << i)), hint: options.supportedKeymapOptions & (1 << i) ? "" : "This option is not enabled in the running firmware."})) : []});
     return result;
@@ -162,7 +173,7 @@ function settingsEditorView(snapshot) {
     return {identity: snapshot.fingerprint,
         brightnessMax: snapshot.limits?.brightnessMax,
         sections: settingsSections(snapshot, settings).map(section => ({...section, fields: section.fields.map(field => {
-            const value = settingValue(field, settings.values);
+            const value = field.record ? settings.layers[field.layer][field.record] : settingValue(field, settings.values);
             if (field.kind === "share") return {...field, value: String(shareOf(value, settings.values[field.of])),
                 ms: String(value), whole: String(settings.values[field.of])};
             const brightness = field.macro === "brightness";
@@ -189,7 +200,7 @@ function editSettings(snapshot, message, capabilities) {
             if (typeof input.enabled !== "boolean") throw fail(`${field.label} must be enabled or disabled.`);
             number = Number(input.enabled);
         } else {
-            const text = field.kind === "layer" ? (layer => layer < 8 ? String(layer) : undefined)(layerOfRef(input.value)) : input.value;
+            const text = field.kind === "layer" ? (layer => layer < SETTINGS.LAYERS ? String(layer) : undefined)(layerOfRef(input.value)) : input.value;
             if (typeof text !== "string" || !/^\d+$/.test(text)) throw fail(`${field.label} needs a whole number${field.kind === "layer" ? " identifying a layer" : ""}.`);
             number = Number(text);
             if (field.macro === "brightness" && number !== baseLighting(value.settings.values).brightness) {
@@ -203,6 +214,10 @@ function editSettings(snapshot, message, capabilities) {
         if (field.kind === "share") {
             const whole = value.settings.values[field.of], stored = value.settings.values[field.id];
             if (number !== shareOf(stored, whole)) value.settings.values[field.id] = shareAt(number, whole);
+            continue;
+        }
+        if (field.record) {
+            value.settings.layers[field.layer] = {...value.settings.layers[field.layer], [field.record]: number};
             continue;
         }
         const previous = settingValue(field, value.settings.values);
@@ -228,7 +243,7 @@ function editSettings(snapshot, message, capabilities) {
         }
     }
     const domains = decodeProfileBlob(value.profile).domains.map(domain => domain.id === 0x40 ? {...domain, payload: encodeSettings(value.settings)}
-        : domain.id === 0x20 && behaviorsChanged ? {...domain, payload: encodeKeyBehaviorDomain(value.behaviors)} : domain);
+        : domain.id === 0x20 && behaviorsChanged ? {...domain, payload: encodeKeyBehaviorDomain(value.behaviors, value.codecOptions.behaviors)} : domain);
     const document = {...value.document, profile: encodeProfileBlob({domains}).toString("base64")};
     validateSnapshot(document, capabilities);
     return document;

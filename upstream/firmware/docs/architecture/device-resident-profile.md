@@ -2,7 +2,7 @@
 
 This document defines the ownership model for live editing with Charybdis Ark
 (the independent app repository in the
-[local workspace map](https://github.com/NoahCLR/charybdis-4x6/blob/c3d659d13489c3f79db74b35fb1649c1f4e98acc/docs/DEVELOPMENT.md#local-repositories-and-worktrees)). It supersedes the earlier project assumption that the three C
+[local workspace map](https://github.com/NoahCLR/charybdis-4x6/blob/df8d6b2ae92af2cd8f46b077fbd248317b6389e9/docs/DEVELOPMENT.md#local-repositories-and-worktrees)). It supersedes the earlier project assumption that the three C
 authoring files must remain the only source of truth during a live editing
 session.
 
@@ -75,7 +75,7 @@ logical profile.
 ## Current Implementation Gap
 
 Ark now reads the complete supported configuration from the keyboard,
-edits all current domains, exports/imports a materialized eight-layer snapshot,
+edits all current domains, exports/imports a materialized snapshot of the whole layer bank,
 and applies one custom/VIA logical generation without consulting repository
 sources. Both custom halves are durably prepared before the decision marker;
 activation and reboot recovery require the bound VIA identity to converge.
@@ -145,7 +145,7 @@ physical capacity.
 
 The delivery slices are in Ark's product goal and the product's status in
 Ark's direction; the firmware's status is in the
-[firmware direction](https://github.com/NoahCLR/charybdis-4x6/blob/c3d659d13489c3f79db74b35fb1649c1f4e98acc/docs/LIVE_EDIT_APP_DIRECTION.md#current-firmware-status).
+[firmware direction](https://github.com/NoahCLR/charybdis-4x6/blob/df8d6b2ae92af2cd8f46b077fbd248317b6389e9/docs/LIVE_EDIT_APP_DIRECTION.md#current-firmware-status).
 The logical-generation manifest and cross-store commit and recovery ordering
 are implemented; external VIA edit adoption remains. The active phase is
 acceptance: reboot, reconnect, applicable USB/role configurations,
@@ -161,8 +161,8 @@ and recover the same editable values without consulting the C files.
 
 ## Current-format admission
 
-Firmware accepts only its current schema 2.0 domain versions and `NR` format-3
-storage (D-F10). Every save binds VIA generation/digest, including custom-only
+Firmware accepts only its current schema 3.0 domain versions and `NS` format-4
+storage (D-F10, D-F14). Every save binds VIA generation/digest, including custom-only
 edits. Legacy storage is refused at boot; older backup translation belongs to
 the client. See [Profile Wire](profile-wire-v1.md) and
 [logical transactions](logical-profile-transaction-v1.md) for admission and

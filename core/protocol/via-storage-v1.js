@@ -5,8 +5,11 @@ const {RAW_HID_REPORT_SIZE, normalizeRawHidReport} = require("../transport/devic
 
 const VIA_STORAGE = Object.freeze({MACRO_COUNT: 0x0c, MACRO_SIZE: 0x0d, MACRO_READ: 0x0e, MACRO_WRITE: 0x0f, LAYER_COUNT: 0x11, LAYOUT_READ: 0x12, LAYOUT_WRITE: 0x13, CHUNK: 28});
 const fail = message => Object.assign(new Error(message), {code: "VIA_STORAGE_INVALID"});
+// The sixteen-layer VIA region (firmware D-F14): 12 KiB, holding a 1,920-byte
+// keymap and a 10,327-byte macro bank. No VIA read or write reaches past it.
+const VIA_REGION_BYTES = 12288, LAYOUT_BYTES = 1920, MACRO_BANK_BYTES = 10327;
 function viaStorageDigest({layout, macros}) {
-    if (!Buffer.isBuffer(layout) || layout.length !== 960 || !Buffer.isBuffer(macros) || macros.length !== 7191) throw fail("Unsupported keyboard storage geometry.");
+    if (!Buffer.isBuffer(layout) || layout.length !== LAYOUT_BYTES || !Buffer.isBuffer(macros) || macros.length !== MACRO_BANK_BYTES) throw fail("Unsupported keyboard storage geometry.");
     let hash = 2166136261;
     const hashByte = byte => {hash = Math.imul((hash ^ byte) >>> 0, 16777619) >>> 0;};
     for (const [id, bytes] of [[1, Buffer.from([1, 0])], [2, layout], [3, Buffer.alloc(0)], [4, macros]]) {
@@ -30,7 +33,7 @@ async function scalar(connection, command, width) {
 }
 
 async function readRegion(connection, command, length, {startOffset = 0} = {}) {
-    if (!Number.isInteger(length) || length < 1 || length > 8192 || !Number.isInteger(startOffset) || startOffset < 0 || startOffset + length > 8192) throw fail("Invalid storage size.");
+    if (!Number.isInteger(length) || length < 1 || length > VIA_REGION_BYTES || !Number.isInteger(startOffset) || startOffset < 0 || startOffset + length > VIA_REGION_BYTES) throw fail("Invalid storage size.");
     const bytes = Buffer.alloc(length);
     for (let offset = 0; offset < length; offset += VIA_STORAGE.CHUNK) {
         const count = Math.min(VIA_STORAGE.CHUNK, length - offset);
@@ -69,7 +72,7 @@ async function writeChangedRegion(connection, command, target, current, {onProgr
 }
 
 async function writeRegion(connection, command, bytes, {onProgress = () => {}, startOffset = 0} = {}) {
-    if (!Buffer.isBuffer(bytes) || bytes.length < 1 || bytes.length > 8192 || !Number.isInteger(startOffset) || startOffset < 0 || startOffset + bytes.length > 8192) throw fail("Invalid storage payload.");
+    if (!Buffer.isBuffer(bytes) || bytes.length < 1 || bytes.length > VIA_REGION_BYTES || !Number.isInteger(startOffset) || startOffset < 0 || startOffset + bytes.length > VIA_REGION_BYTES) throw fail("Invalid storage payload.");
     for (let offset = 0; offset < bytes.length; offset += VIA_STORAGE.CHUNK) {
         const count = Math.min(VIA_STORAGE.CHUNK, bytes.length - offset);
         const request = Buffer.alloc(RAW_HID_REPORT_SIZE);
@@ -85,7 +88,7 @@ async function readViaStorage(connection, {matrixRows = 10, matrixColumns = 6, a
     const layers = await scalar(connection, VIA_STORAGE.LAYER_COUNT, 1);
     const macroSlots = await scalar(connection, VIA_STORAGE.MACRO_COUNT, 1);
     const macroCapacity = await scalar(connection, VIA_STORAGE.MACRO_SIZE, 2);
-    if (layers < 1 || layers > 8 || macroSlots < 1 || macroSlots > 64 || macroCapacity < macroSlots + 1 || macroCapacity > 8192 || matrixRows !== 10 || matrixColumns !== 6) throw fail("Unsupported keyboard storage geometry.");
+    if (layers < 1 || layers > 16 || macroSlots < 1 || macroSlots > 128 || macroCapacity < macroSlots + 1 || macroCapacity > VIA_REGION_BYTES || matrixRows !== 10 || matrixColumns !== 6) throw fail("Unsupported keyboard storage geometry.");
     const layout = await readRegion(connection, VIA_STORAGE.LAYOUT_READ, layers * matrixRows * matrixColumns * 2);
     const macros = await readRegion(connection, VIA_STORAGE.MACRO_READ, macroCapacity);
     if (!allowIncomplete && macros[macros.length - 1] !== 0) throw fail("A macro write is incomplete. Import your recovery profile before taking another backup.");
@@ -109,4 +112,4 @@ async function writeViaMacros(connection, bytes, {current, onProgress = () => {}
     return ranges;
 }
 
-module.exports = {VIA_STORAGE, viaStorageDigest, readViaStorage, readRegion, writeRegion, changedRanges, writeChangedRegion, writeViaMacros};
+module.exports = {VIA_STORAGE, VIA_REGION_BYTES, LAYOUT_BYTES, MACRO_BANK_BYTES, viaStorageDigest, readViaStorage, readRegion, writeRegion, changedRanges, writeChangedRegion, writeViaMacros};

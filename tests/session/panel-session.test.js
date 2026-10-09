@@ -5,7 +5,7 @@ const {applyLayerEdit, buildPanelModel, discardDraftForDevice, layerEditDocument
 const {fingerprint, summary, validateSnapshot} = require("../../core/model/portable-profile");
 const {document} = require("../fixtures/pd-profile");
 
-const capabilities = {compiledLayerCount: 8, supportedDomainMask: 31, actionAbiDigest: 0xf79c6151, featureFlags: 0};
+const capabilities = {compiledLayerCount: 16, supportedDomainMask: 31, actionAbiDigest: 0x837cf479, featureFlags: 0};
 const snapshot = () => {
     const doc = document();
     return {document: doc, fingerprint: fingerprint(doc), summary: summary(doc), limits: {brightnessMax: 200}};
@@ -249,7 +249,7 @@ test("the outbox is carried by one model, then forgotten", () => {
 test("Rename & Reorder renames and reorders, keeps Base at the bottom, and carries names with a move", () => {
     const before = snapshot();
     const edit = startLayerEdit(before, 3);
-    assert.deepEqual(edit.order, [0, 1, 2, 3, 4, 5, 6, 7]);
+    assert.deepEqual(edit.order, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
     applyLayerEdit(edit, {type: "editPortableLayer", id: 2, name: "Symbols+"});
     assert.equal(edit.names[2], "Symbols+");
     const typed = [...edit.names];
@@ -259,7 +259,7 @@ test("Rename & Reorder renames and reorders, keeps Base at the bottom, and carri
     assert.equal(edit.names[4], "Mouse", "a name typed before the move survives it");
     assert.throws(() => applyLayerEdit(edit, {type: "editPortableLayer", id: 0, direction: 1}), /base stays at the bottom/);
     assert.throws(() => applyLayerEdit(edit, {type: "editPortableLayer", id: 1, direction: -1}), /base stays at the bottom/);
-    assert.throws(() => applyLayerEdit(edit, {type: "editPortableLayer", id: 9, name: "x"}), /Read the layers again/);
+    assert.throws(() => applyLayerEdit(edit, {type: "editPortableLayer", id: 16, name: "x"}), /Read the layers again/);
     assert.throws(() => applyLayerEdit(null, {type: "editPortableLayer", id: 1, name: "x"}), /Read the layers again/);
     assert.throws(() => applyLayerEdit(edit, {type: "savePortableLayers", names: ["only one"]}), /naming them/);
 
@@ -271,19 +271,19 @@ test("Rename & Reorder renames and reorders, keeps Base at the bottom, and carri
 test("a layer is dragged to any place above the base, and Make base swaps it with the base", () => {
     const edit = startLayerEdit(snapshot(), 3);
     applyLayerEdit(edit, {type: "editPortableLayer", id: 1, to: 6});
-    assert.deepEqual(edit.order, [0, 2, 3, 4, 5, 6, 1, 7], "layer 1 lands in slot 6, the ones between shift down");
+    assert.deepEqual(edit.order, [0, 2, 3, 4, 5, 6, 1, 7, 8, 9, 10, 11, 12, 13, 14, 15], "layer 1 lands in slot 6, the ones between shift down");
     applyLayerEdit(edit, {type: "editPortableLayer", id: 7, to: 1});
-    assert.deepEqual(edit.order, [0, 7, 2, 3, 4, 5, 6, 1]);
+    assert.deepEqual(edit.order, [0, 7, 2, 3, 4, 5, 6, 1, 8, 9, 10, 11, 12, 13, 14, 15]);
     assert.throws(() => applyLayerEdit(edit, {type: "editPortableLayer", id: 2, to: 0}), /Make base/);
-    assert.throws(() => applyLayerEdit(edit, {type: "editPortableLayer", id: 2, to: 8}), /Make base/);
+    assert.throws(() => applyLayerEdit(edit, {type: "editPortableLayer", id: 2, to: 16}), /Make base/);
     assert.throws(() => applyLayerEdit(edit, {type: "editPortableLayer", id: 0, to: 3}), /base stays/);
 
     applyLayerEdit(edit, {type: "editPortableLayer", id: 5, makeBase: true});
-    assert.deepEqual(edit.order, [5, 7, 2, 3, 4, 0, 6, 1], "layer 5 is the base, and the old base takes its slot");
+    assert.deepEqual(edit.order, [5, 7, 2, 3, 4, 0, 6, 1, 8, 9, 10, 11, 12, 13, 14, 15], "layer 5 is the base, and the old base takes its slot");
     assert.throws(() => applyLayerEdit(edit, {type: "editPortableLayer", id: 5, makeBase: true}), /already the base/);
     assert.throws(() => applyLayerEdit(edit, {type: "editPortableLayer", id: 5, direction: 1}), /base stays/);
     applyLayerEdit(edit, {type: "editPortableLayer", id: 0, direction: 1});
-    assert.deepEqual(edit.order, [5, 7, 2, 3, 4, 6, 0, 1], "the old base moves like any other layer now");
+    assert.deepEqual(edit.order, [5, 7, 2, 3, 4, 6, 0, 1, 8, 9, 10, 11, 12, 13, 14, 15], "the old base moves like any other layer now");
     assert.equal(validateSnapshot(layerEditDocument(edit)).settings.names[0], edit.names[5]);
 });
 
@@ -299,7 +299,7 @@ test("the profile meter follows the draft, and is absent without a keyboard or a
         behavior: {keycode: "KC_F13", tapHoldTerm: 0, longerHoldTerm: 0, multiTapTerm: 0, steps: []}}, connected({capabilities: sized}));
     const staged = buildPanelModel(session, connected({capabilities: sized})).portable.usage;
     assert.equal(staged.source, "draft");
-    assert.equal(staged.used, keyboard.used + 14, "a behaviour without steps costs its 14-byte row");
+    assert.equal(staged.used, keyboard.used + 18, "a behaviour without steps costs its 18-byte row");
     assert.equal(staged.counts.find((entry) => entry.id === "behaviours").used, behaviours + 1);
     draft.undo(draft.revision);
     assert.equal(buildPanelModel(session, connected({capabilities: sized})).portable.usage.used, keyboard.used, "undo takes the bytes back");

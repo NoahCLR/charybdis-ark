@@ -1,8 +1,8 @@
 "use strict";
 
-const {MACRO_BANK_BYTES, decodedOf, encodeNamedProfile, validateSnapshot} = require("./portable-profile");
+const {MACRO_BANK_BYTES, MACRO_SLOTS, decodedOf, encodeNamedProfile, validateSnapshot} = require("./portable-profile");
 const {decodeProfileBlob} = require("../schema/profile-blob-v1");
-const {SETTINGS, asciiName, encodeSettings} = require("../schema/settings-domain-v1");
+const {SETTINGS, validName, encodeSettings} = require("../schema/settings-domain-v1");
 const {macroKeycodes, encodeMacroPayload, decodeMacroPayload, macroProgramBytes, MACRO_PROGRAM_MAX} = require("../schema/macro-payload");
 const fail = (message, code = "MACRO_EDIT_CONFLICT") => Object.assign(new Error(message), {code});
 
@@ -40,7 +40,7 @@ function macroEditorView(snapshot, capabilities) {
         macroBank: {capacity: budget.capacity, stored: budget.stored, free: budget.free, available: budget.available,
             slots: slots.length, reserveTaps: SLOT_RESERVE_TAPS, programMax: MACRO_PROGRAM_MAX},
         // Every slot can hold a full-length name, whatever the others hold.
-        names: {perName: SETTINGS.MACRO_NAME_CHARS},
+        names: {perName: SETTINGS.NAME_MAX_BYTES},
         macroPayloadKeycodes: macroKeycodes()};
 }
 
@@ -50,7 +50,7 @@ function editMacro(snapshot, message, capabilities) {
     if (!snapshot?.document || !message.expectedFingerprint || message.expectedFingerprint !== snapshot.fingerprint) throw fail("The keyboard changed since this macro draft was opened. Read the keyboard and review the draft before saving again.");
     const match = /^VIA_MACRO_(\d+)$/.exec(message.keycode || "");
     const index = match && Number(match[1]);
-    if (!match || index >= 64 || String(index) !== match[1]) throw fail("Choose a macro slot reported by the keyboard.");
+    if (!match || index >= MACRO_SLOTS || String(index) !== match[1]) throw fail("Choose a macro slot reported by the keyboard.");
     if (message.payload === undefined && message.name === undefined) throw fail("Send the macro's steps, its name, or both.");
     const value = validateSnapshot(snapshot.document, capabilities);
     const document = JSON.parse(JSON.stringify(value.document));
@@ -61,7 +61,7 @@ function editMacro(snapshot, message, capabilities) {
     }
     if (message.name !== undefined && message.name !== value.settings.macroNames[index]) {
         if (typeof message.name !== "string") throw fail("A macro name must be text.");
-        if (!asciiName(message.name.trim())) throw fail(`A macro name is up to ${SETTINGS.MACRO_NAME_CHARS} plain characters: letters, digits, spaces and punctuation.`, "MACRO_NAME_INVALID");
+        if (!validName(message.name.trim())) throw fail(`A macro name is up to ${SETTINGS.NAME_MAX_BYTES} bytes of text, with no control characters. Accented letters and symbols take two to four bytes each.`, "MACRO_NAME_INVALID");
         const settings = structuredClone(value.settings);
         settings.macroNames[index] = message.name.trim();
         const domains = decodeProfileBlob(value.profile).domains.map(domain => domain.id === 0x40 ? {...domain, payload: encodeSettings(settings)} : domain);

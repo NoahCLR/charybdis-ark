@@ -40,18 +40,21 @@ The bridge then sequentially runs these Ark-owned integration runners under `tes
 - `run_qmk_portable_profile_tests.sh`: firmware settings pages → app reader.
 - `run_macro_program_size_tests.sh`: app size predictions against C decoding.
 - `run_profile_compiled_defaults_v1_tests.sh`: app profiles → C validation. A
-  profile Ark writes for current firmware (schema 2.0, RGB 3, key behaviours 1,
-  combos 2, settings 5, PD 2) is accepted directly. The eight-slot profiles are
-  frozen firmware-owned rejection evidence: refused as they are. Ark has no
-  backup translation path.
+  profile Ark writes for current firmware (schema 3.0, RGB 4, key behaviours 2,
+  combos 3, settings 6, PD 3) is accepted directly. The eight-slot profiles are
+  frozen firmware-owned rejection evidence: refused as they are. The bridge
+  also checks Ark's translation of the immediately preceding backup, maximum
+  names and the simultaneous maximum profile in normal and sanitizer builds.
 - `run_profile_pd_v1_tests.sh`: app PD record corpus → C validation. The
-  test-only version-1 envelope wraps shared 96-byte records checked with Ark's
-  current record codec, preserving the frozen harness's mutation coverage
-  without a production version-1 decoder. The current version-2 vectors and
-  their mutations also require C to report Ark's error code and byte offset.
+  test-only version-1 envelope converts frozen 96-byte records into the current
+  128-byte records checked with Ark's codec, preserving the frozen harness's
+  mutation coverage without a production version-1 decoder. The current
+  version-3 vectors and their mutations also require C to report Ark's error
+  code and byte offset.
 - `run_profile_rgb_v1_tests.sh`: app RGB encodings and malformed-byte corpus →
-  C validation for format 3, with address/undefined-behavior sanitizers. Both
-  implementations reject a byte that names an older format.
+  C validation for format 4 at five- and eight-tap depth, with
+  address/undefined-behavior sanitizers. Both implementations reject a byte
+  that names an older format.
 
 The selected Ark root is exported as `CHARYBDIS_ARK_ROOT`; `QMK_ROOT` and
 `QMK_HOME` identify the selected QMK tree. The integration runner files come from

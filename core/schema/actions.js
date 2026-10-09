@@ -19,7 +19,7 @@ const {resolveNativeQmkExpression} = require("./compiled-profile-v1");
 // bit 16) and pointing slots 0..31 (firmware D-F09). A keyboard advertising
 // another vocabulary numbers its keys differently, so Ark reads it but
 // neither names its keys nor edits it.
-const ACTION_ABI = 0xf79c6151;
+const ACTION_ABI = 0x837cf479;
 const KNOWN_ACTION_ABIS = Object.freeze([ACTION_ABI]);
 const knownActionAbi = value => KNOWN_ACTION_ABIS.includes(value);
 
@@ -92,7 +92,7 @@ function layerRuleOf(code, layerCount) {
     return undefined;
 }
 
-function placementProblem(action, placement, {layerCount = 8} = {}) {
+function placementProblem(action, placement, {layerCount = 16} = {}) {
     if (action.kind === ACTION.CUSTOM_KEY || (action.kind === ACTION.QMK_KEYCODE && customKeyOfCode(action.operand) !== undefined)) {
         return [PLACEMENT.KEY, PLACEMENT.COMBO_OUTPUT].includes(placement) ? undefined
             : `${actionName(action)} is a custom key: it does what its own behaviour says, so it works as a key or a combo output, not inside a behaviour.`;

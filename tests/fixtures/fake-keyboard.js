@@ -41,7 +41,7 @@ const MUTATING_COMMANDS = new Set([0x03, 0x05, 0x06, 0x07, 0x09, 0x0a, 0x0b, 0x0
 const FEATURES = PROFILE_WIRE_KNOWN_MASKS.FEATURE_FLAGS & ~PROFILE_WIRE_KNOWN_MASKS.RETIRED_FEATURES;
 
 // The domain versions current firmware stores, and refuses any other.
-const CURRENT_DOMAINS = "16:3,32:1,48:2,64:5,80:2";
+const CURRENT_DOMAINS = "16:4,32:2,48:3,64:6,80:3";
 
 // `compiled` is the profile it was built with, which GET 0x05 serves: the
 // document's own unless given (current firmware's carries every domain, with
@@ -50,23 +50,26 @@ const CURRENT_DOMAINS = "16:3,32:1,48:2,64:5,80:2";
 // still answer from the document.
 function fakeKeyboard({document, compiled, compiledOnly = false, generation = 42, firmwareVersion = 0x00010000, brightnessMax = 255, options = keyboardOptions.wire()} = {}) {
     const held = validateSnapshot(document);
-    if (document.version !== 2 || document.layers.length !== 8) throw new Error("The fake keyboard runs current firmware: a schema-2, eight-layer document.");
+    if (document.version !== 3 || document.layers.length !== 16) throw new Error("The fake keyboard runs current firmware: a schema-3, sixteen-layer document.");
     const versions = blob => decodeProfileBlob(blob).domains.map(domain => `${domain.id}:${domain.version}`).join();
-    if (versions(held.profile) !== CURRENT_DOMAINS || (compiled && versions(compiled) !== CURRENT_DOMAINS)) throw new Error("The fake keyboard runs current firmware: RGB 3, key behaviours 1, combos 2, settings 5 and PD 2.");
+    if (versions(held.profile) !== CURRENT_DOMAINS || (compiled && versions(compiled) !== CURRENT_DOMAINS)) throw new Error("The fake keyboard runs current firmware: RGB 4, key behaviours 2, combos 3, settings 6 and PD 3.");
     const profile = held.profile, digest = fnv1a32(profile), defaults = compiled || profile;
     const settings = decodeProfileBlob(profile).domains.find(domain => domain.id === PROFILE_DOMAIN_IDS.SETTINGS).payload;
     const storageDigest = viaStorageDigest({layout: held.layout, macros: held.macros});
 
     const capabilities = [page(25, (p) => {
-        p.set([1, 2, 1, 0, 2, 0, RAW_HID_REPORT_SIZE, PROFILE_CANDIDATE_V1.CHUNK_MAX, PROFILE_WIRE_V1.STATUS_PAGE_COUNT]);
+        p.set([2, 3, 1, 0, 3, 0, RAW_HID_REPORT_SIZE, PROFILE_CANDIDATE_V1.CHUNK_MAX, PROFILE_WIRE_V1.STATUS_PAGE_COUNT]);
         p.writeUInt32LE(FEATURES, 9); p.writeUInt32LE(document.actionAbiDigest, 13);
         p.writeUInt32LE(firmwareVersion, 17); p.writeUInt32LE(fnv1a32(defaults), 21);
     }), page(25, (p) => {
-        // Layers, behaviour rows, tap steps, populated steps, combos, keys per
-        // combo, RGB groups, stage rows, LEDs, LED bitmap, custom keys, macros.
-        p.set([8, 8, 64, 5, 128, 32, 4, 16, 32, 58, 8, 64, 64]);
-        p.writeUInt16LE(5088, 13); p.writeUInt16LE(5088, 15); p.writeUInt16LE(5120, 17);
+        // Layers, behaviour rows, tap depth, (steps on page 2), combos, keys
+        // per combo, RGB groups, stage rows, LEDs, LED bitmap, custom keys, macros.
+        p.set([16, 16, 128, 5, 0, 128, 16, 16, 32, 58, 8, 128, 128]);
+        p.writeUInt16LE(65504, 13); p.writeUInt16LE(65504, 15);
         p.writeUInt16LE(held.macros.length, 19); p[21] = 31;
+    }), page(25, (p) => {
+        // Populated steps, tap depth, slot size, name bytes, mask bits, positions.
+        p.writeUInt16LE(640, 0); p[2] = 5; p.writeUInt32LE(65536, 3); p.set([32, 32, 60], 7);
     })];
     // Committed (or running its defaults), converged with the other half,
     // nothing pending.
@@ -95,7 +98,7 @@ function fakeKeyboard({document, compiled, compiledOnly = false, generation = 42
         [VALUE.STATUS]: status,
         ...(compiledOnly ? {} : {[VALUE.COMMITTED]: payloadPages(profile, generation)}),
         [VALUE.COMPILED]: payloadPages(defaults, 0),
-        [VALUE.COMBOS]: comboPages(held.combos),
+        [VALUE.COMBOS]: comboPages(held.combos, held.settings.layers.map(record => record.reference)),
         [VALUE.SETTINGS]: storedPages(settings),
         [VALUE.STORAGE]: storage,
         [VALUE.CANDIDATE_STATUS]: candidateStatus,
@@ -127,16 +130,16 @@ function fakeKeyboard({document, compiled, compiledOnly = false, generation = 42
                 return reply;
             case VIA_LAYOUT_COMMANDS.GET_KEYCODE: {
                 const [layer, row, column] = request.subarray(1, 4);
-                if (layer >= 8 || row >= 10 || column >= 6) return undefined;
+                if (layer >= 16 || row >= 10 || column >= 6) return undefined;
                 reply.fill(0, 4); reply.writeUInt16BE(document.layers[layer][row * 6 + column], 4);
                 return reply;
             }
             case PROFILE_WIRE_V1.COMMAND_GET:
                 if (request[1] === 3) return rgbValue(request, reply);
                 if (request[1] !== PROFILE_WIRE_V1.CHANNEL) return undefined;
-                return profileValue(values[request[2]]?.[request[4]], reply);
-            case VIA_STORAGE.LAYER_COUNT: return scalar(reply, [8]);
-            case VIA_STORAGE.MACRO_COUNT: return scalar(reply, [64]);
+                return profileValue(values[request[2]]?.[request[4] | (request[5] << 8)], reply);
+            case VIA_STORAGE.LAYER_COUNT: return scalar(reply, [16]);
+            case VIA_STORAGE.MACRO_COUNT: return scalar(reply, [128]);
             case VIA_STORAGE.MACRO_SIZE: return scalar(reply, [held.macros.length >> 8, held.macros.length & 255]);
             case VIA_STORAGE.LAYOUT_READ: return region(held.layout, request, reply);
             case VIA_STORAGE.MACRO_READ: return region(held.macros, request, reply);
@@ -198,28 +201,33 @@ function storedPages(bytes) {
     });
     return [metadata, ...chunks(bytes)];
 }
-// The combo table as the keyboard reports it: keycodes, not actions, with the
-// table's own version (2 keeps the default window).
-function comboPages(table) {
-    const version = table.version, rows = table.rows;
+// The combo table as the keyboard reports it (readout version 3): keycodes,
+// not actions, with each layer's reference from the settings' layer records.
+function comboPages(table, references) {
+    const rows = table.rows;
     const metadata = page(25, (p) => {
-        p.set([version, rows.length, COMBO_READBACK_V1.MAX_INPUTS, 8, 1, 0, 0, 1, 2, 3, 4, 5, 6, 7]);
-        if (version === 2) {p.writeUInt16LE(table.defaultTermMs, 18); p.writeUInt16LE(table.holdTermMs, 20);}
+        p.set([COMBO_READBACK_V1.VERSION, rows.length, COMBO_READBACK_V1.MAX_INPUTS, 16, 1, 0]);
+        p.writeUInt16LE(table.defaultTermMs, 10); p.writeUInt16LE(table.holdTermMs, 12); p[14] = COMBO_READBACK_V1.PAGES_PER_ROW;
     });
+    const referencePage = page(25, (p) => p.set(references));
     const code = (action) => {
         const value = nativeCode(action);
         if (value === undefined) throw new Error("A combo in this document has no keycode the keyboard could report.");
         return value;
     };
-    const pages = rows.map((row, id) => page(25, (p) => {
-        p.set([id, row.inputs.length]);
-        p.writeUInt16LE(code(row.output), 2);
-        p.writeUInt16LE(row.termMs ?? table.defaultTermMs, 4);
-        if (version === 1) p.writeUInt16LE(table.holdTermMs, 6);
-        p[8] = (row.mustHold ? 1 : 0) | (row.mustTap ? 2 : 0) | (row.ordered ? 4 : 0) | (version === 2 && row.termMs === null ? 8 : 0);
-        row.inputs.forEach((input, slot) => p.writeUInt16LE(code(input), 9 + 2 * slot));
-    }));
-    return rehash([metadata, ...pages]);
+    const pages = rows.flatMap((row, id) => {
+        const slots = Buffer.alloc(32);
+        row.inputs.forEach((input, slot) => slots.writeUInt16LE(code(input), 2 * slot));
+        return [page(25, (p) => {
+            p.set([id, row.inputs.length]);
+            p.writeUInt16LE(code(row.output), 2);
+            p.writeUInt16LE(row.termMs ?? table.defaultTermMs, 4);
+            p[6] = (row.mustHold ? 1 : 0) | (row.mustTap ? 2 : 0) | (row.ordered ? 4 : 0) | (row.termMs === null ? 8 : 0) | (row.enabled === false ? 16 : 0);
+            p.writeUInt32LE(row.allowedLayers ?? 0xffff, 7);
+            slots.copy(p, 11, 0, 14);
+        }), page(25, (p) => slots.copy(p, 0, 14, 32))];
+    });
+    return rehash([metadata, referencePage, ...pages]);
 }
 
 // A FakeDeviceAdapter wired to a fake keyboard: each written report is
