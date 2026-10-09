@@ -96,6 +96,13 @@ and offers Export; opening another profile file asks the same way. Closing or
 reloading a web page with such edits asks too. While a keyboard is connected,
 or a draft holds unapplied edits for one, the demo is not offered.
 
+## Macro feedback
+
+The Payload preview and syntax or held-key warnings update while you type.
+Incomplete or invalid text stays local; valid text enters the draft when you
+leave the Payload field. **Discard local text** returns to the staged macro.
+The playback byte meter follows that staged macro, as its label says.
+
 ## What it edits
 
 Every screen is drawn and wired to the host:

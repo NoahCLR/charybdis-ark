@@ -92,8 +92,6 @@ function memoryMeter(memory) {
 function editor(model, slot, canEdit) {
     const draft = macroForm(slot.keycode).draft;
     const payload = draft ?? slot.payload ?? "";
-    const {steps, error} = parseMacro(payload, {keys: model?.macroPayloadKeycodes});
-    const held = unreleased(steps);
     const dirty = draft !== undefined && draft !== slot.payload;
 
     const wrap = el(`<div class="stack"></div>`);
@@ -116,6 +114,7 @@ function editor(model, slot, canEdit) {
     nameInput?.addEventListener("change", () => post(edits.macroNameMessage(slot.keycode, nameInput.value, model?.macroEditing?.identity)));
     textarea.addEventListener("input", () => {
         setMacroForm(slot.keycode, {draft: textarea.value, cursor: textarea.selectionStart});
+        refreshFeedback();
     });
     textarea.addEventListener("change", () => stageMacro(model, slot, textarea.value));
     for (const eventName of ["click", "keyup", "select"]) textarea.addEventListener(eventName, () => {
@@ -134,8 +133,22 @@ function editor(model, slot, canEdit) {
     if (slot.playable === false) body.prepend(el(`<div class="unavailable">This macro compiles to ${esc(slot.program)} bytes and the keyboard plays at most ${esc(max)}, so pressing it does nothing. Shorten it by about ${esc(Math.ceil((slot.program - max) / 3))} key taps.</div>`));
     if (slot.available === false) body.prepend(el(`<div class="unavailable">This slot has no room: the free macro memory is kept for the lower empty slots, each with room for ${esc(model?.macroBank?.reserveTaps ?? 10)} key taps. Shorten or clear another macro to open it.</div>`));
     body.append(stepBuilder(model, slot, canEdit, textarea));
-    body.append(preview(model, slot, steps, error, held, payload, canEdit));
-    body.append(actions(model, slot, canEdit, dirty, payload));
+    // Refresh only feedback while typing: replacing the editor would lose the
+    // textarea's focus, selection and in-progress input. Staging stays on change.
+    const feedback = el(`<div class="stack"></div>`);
+    const chip = card.querySelector(".chip");
+    function refreshFeedback() {
+        const current = textarea.value;
+        const {steps, error} = parseMacro(current, {keys: model?.macroPayloadKeycodes});
+        const edited = current !== (slot.payload ?? "");
+        feedback.replaceChildren(
+            preview(model, slot, steps, error, unreleased(steps), current, canEdit),
+            actions(model, slot, canEdit, edited, current),
+        );
+        chip.innerHTML = `<i class="dot ${edited ? "draft" : "on"}"></i>${edited ? "edited here" : "as read"}`;
+    }
+    refreshFeedback();
+    body.append(feedback);
     wrap.append(card);
     wrap.append(recorder(model, slot, canEdit, textarea));
     return wrap;
