@@ -6,7 +6,7 @@
 // real when the slot is staged, and says so if it disagrees.
 
 import {el, esc} from "../lib/dom.mjs";
-import {describeStep, macroMatches, macroPeek, parseMacro, serializeMacro, unreleased} from "../view/macro.mjs";
+import {describeStep, macroMatches, macroPeek, parseMacro, serializeMacro, serializeMacroStep, unreleased} from "../view/macro.mjs";
 import {macroPlacements} from "../view/keyface.mjs";
 import {NAME_TIP, nameCount} from "../view/names.mjs";
 import {setReachGroupOpen} from "../view/reach-groups.mjs";
@@ -238,10 +238,10 @@ function stepBuilder(model, slot, canEdit, textarea) {
         },
     }));
     node.querySelector('[data-act="insert"]').addEventListener("click", () => {
-        const text = value.value.trim();
+        const text = kind.value === "text" ? value.value : value.value.trim();
         if (!text) return;
         const keys = text.split(",").map((name) => name.trim()).filter(Boolean).join(",");
-        const addition = kind.value === "text" ? text
+        const addition = kind.value === "text" ? serializeMacroStep({kind: "text", text})
             : kind.value === "delay" ? `{${text.replace(/\D/g, "")}}`
             : kind.value === "press" ? `{+${keys}}`
             : kind.value === "release" ? `{-${keys}}`

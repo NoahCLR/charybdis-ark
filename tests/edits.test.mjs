@@ -398,6 +398,14 @@ test("a macro payload is posted as the text the keyboard stores", () => {
         /macro command|}/i, "a payload the keyboard cannot parse is refused");
 });
 
+test("literal JSON and command-looking macro text stage as exact VIA bytes", () => {
+    const draft = session();
+    const text = ' {"a":1} {KC_A} ';
+    const payload = text.replace(/[{}]/g, brace => brace + brace);
+    stage(draft, edits.macroMessage("VIA_MACRO_0", payload, draft.current.fingerprint));
+    assert.equal(Buffer.from(decoded(draft).document.macros[0], "base64").toString("ascii"), text);
+});
+
 test("a macro name is posted without its steps, and review shows the rename", () => {
     const draft = session();
     stage(draft, edits.macroMessage("VIA_MACRO_5", "hello", draft.current.fingerprint));

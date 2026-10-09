@@ -96,6 +96,14 @@ and offers Export; opening another profile file asks the same way. Closing or
 reloading a web page with such edits asks too. While a keyboard is connected,
 or a draft holds unapplied edits for one, the demo is not offered.
 
+## Macro text
+
+Choose **Text** in **Add a step** to insert supported ASCII text literally,
+including JSON braces and leading or trailing spaces. The Payload field keeps
+macro command syntax: `{KC_A}` taps a key, and `{{` or `}}` sends a literal
+brace. Text steps escape those braces for you. Tabs and newlines are supported;
+Unicode text and macros beyond the keyboard's playback limit remain invalid.
+
 ## What it edits
 
 Every screen is drawn and wired to the host:
