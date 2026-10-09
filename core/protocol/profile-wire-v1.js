@@ -4,7 +4,10 @@ const {isUnhandledEcho, requestHandled} = require("./via-unhandled-v1");
 const {RAW_HID_REPORT_SIZE, normalizeRawHidReport} = require("../transport/device-adapter");
 
 const PROFILE_WIRE_V1 = Object.freeze({
-    CAPABILITY_PAGE_COUNT: 2,
+    // Response layout 2 (firmware D-F14): three pages, the third carrying the
+    // fields wider than a byte. Older firmware's two-page layout is refused.
+    CAPABILITY_LAYOUT: 2,
+    CAPABILITY_PAGE_COUNT: 3,
     CHANNEL: 0x00,
     COMMAND_GET: 0x08,
     PAYLOAD_OFFSET: 7,
@@ -22,7 +25,7 @@ const PROFILE_WIRE_STATUS = Object.freeze({
 });
 
 const PROFILE_WIRE_KNOWN_MASKS = Object.freeze({
-    FEATURE_FLAGS: 0x0007ffff,
+    FEATURE_FLAGS: 0x001fffff,
     // Bits current firmware never advertises. An older image that does still
     // decodes; nothing reads them.
     RETIRED_FEATURES: 1 << 13,
@@ -53,11 +56,17 @@ const PROFILE_WIRE_FEATURES = Object.freeze({
     // through QMK's key processing, so they may sit in a behaviour.
     BEHAVIOR_QMK_FUNCTIONS: 1 << 15,
     // Userspace keycodes sit in fixed blocks, action kind 7 is a custom key and
-    // settings v5 names the 64 custom keys. It comes with the action ABI the
-    // app knows (schema/actions.js), so the model tests that digest.
+    // the settings domain names the 128 custom keys. It comes with the action
+    // ABI the app knows (schema/actions.js), so the model tests that digest.
     CUSTOM_KEYS: 1 << 16,
     PHYSICAL_GESTURE_TIMING: 1 << 17,
     OWNED_TAPPING: 1 << 18,
+    // GET 0x04..0x07 take a 16-bit page: request byte 4 its low byte, byte 5
+    // its high byte (a 65,504-byte payload is 2,621 pages).
+    WIDE_PAGES: 1 << 19,
+    // Behaviour and combo participation at the master, layer, definition and
+    // placement scopes (participation-policy.md).
+    PARTICIPATION_CONTROLS: 1 << 20,
 });
 
 const PROFILE_WIRE_DOMAINS = Object.freeze({
@@ -117,13 +126,18 @@ function assertByte(value, label, {nonzero = false} = {}) {
     return value;
 }
 
+// A page above 255 is a wide page: its high byte goes in request byte 5, which
+// only the wide readbacks (feature bit 19) read; every other value's byte 5
+// stays zero.
 function buildProfileGetRequest(valueId, page, requestId) {
     const report = Buffer.alloc(RAW_HID_REPORT_SIZE);
     report[0] = PROFILE_WIRE_V1.COMMAND_GET;
     report[1] = PROFILE_WIRE_V1.CHANNEL;
     report[2] = assertByte(valueId, "valueId");
     report[3] = assertByte(requestId, "requestId", {nonzero: true});
-    report[4] = assertByte(page, "page");
+    if (!Number.isInteger(page) || page < 0 || page > 0xffff) throw new RangeError("page must be a 16-bit integer.");
+    report[4] = page & 0xff;
+    report[5] = page >> 8;
     return report;
 }
 
@@ -188,10 +202,14 @@ function decodeCapabilityPages(pages) {
     assertPageSet(pages, PROFILE_WIRE_V1.CAPABILITY_PAGE_COUNT, "capability");
     const identity = pages[0];
     const capacity = pages[1];
-    if (identity[0] !== 1 || identity[1] !== PROFILE_WIRE_V1.CAPABILITY_PAGE_COUNT) {
-        throw new ProfileWireProtocolError("INCOMPATIBLE_RESPONSE", "Unsupported Profile Wire capability layout.");
+    const wide = pages[2];
+    if (identity[0] !== PROFILE_WIRE_V1.CAPABILITY_LAYOUT || identity[1] !== PROFILE_WIRE_V1.CAPABILITY_PAGE_COUNT) {
+        throw new ProfileWireProtocolError("INCOMPATIBLE_RESPONSE", "Unsupported Profile Wire capability layout: this keyboard runs firmware from before 16 layers. Update both halves.");
     }
     assertZeroRange(capacity, 22, 25, "capability page 1");
+    assertZeroRange(capacity, 4, 5, "capability page 1");
+    assertZeroRange(capacity, 17, 19, "capability page 1");
+    assertZeroRange(wide, 10, 25, "capability page 2");
     const decoded = {
         responseVersion: identity[0],
         protocol: {major: identity[2], minor: identity[3]},
@@ -207,7 +225,7 @@ function decodeCapabilityPages(pages) {
         maxLogicalLayers: capacity[1],
         maxBehaviorRows: capacity[2],
         maxTapStepsPerBehavior: capacity[3],
-        maxPopulatedBehaviorSteps: capacity[4],
+        maxPopulatedBehaviorSteps: readU16(wide, 0),
         maxCombos: capacity[5],
         maxKeysPerCombo: capacity[6],
         maxReusableRgbGroups: capacity[7],
@@ -218,10 +236,16 @@ function decodeCapabilityPages(pages) {
         viaMacroSlots: capacity[12],
         maxProfilePayload: readU16(capacity, 13),
         profileSlotPayload: readU16(capacity, 15),
-        profileSlotSize: readU16(capacity, 17),
+        profileSlotSize: readU32(wide, 3),
         viaMacroBytes: readU16(capacity, 19),
         supportedDomainMask: capacity[21],
+        nameMaxBytes: wide[7],
+        layerMaskBits: wide[8],
+        placementPositions: wide[9],
     };
+    if (wide[2] !== capacity[3]) {
+        throw new ProfileWireProtocolError("MALFORMED_RESPONSE", "The two capability pages report different tap depths.");
+    }
     assertKnownMask(decoded.featureFlags, PROFILE_WIRE_KNOWN_MASKS.FEATURE_FLAGS, "capability feature flags");
     assertKnownMask(decoded.supportedDomainMask, PROFILE_WIRE_KNOWN_MASKS.SUPPORTED_DOMAINS, "supported domain mask");
     if (decoded.reportSize !== RAW_HID_REPORT_SIZE) {

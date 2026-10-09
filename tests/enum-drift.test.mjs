@@ -11,6 +11,7 @@ import {AXIS, BUTTON, KIND, MODIFIER_POLICY, SCROLL_AXES} from "../webview/view/
 import {MODIFIER_BITS} from "../webview/view/keyvalues.mjs";
 import {TIER_FIELDS} from "../webview/view/edits.mjs";
 import {PD_MODE_IDS} from "../webview/view/lighting.mjs";
+import {NAME_MAX_BYTES} from "../webview/view/names.mjs";
 
 const require = createRequire(import.meta.url);
 const pd = require("../core/schema/pd-mode-domain-v1");
@@ -24,6 +25,10 @@ test("the webview's pointing numbers are the schema's", () => {
     assert.deepEqual(SCROLL_AXES, {...pd.PD_SCROLL_AXES});
     assert.deepEqual(MODIFIER_POLICY, {...pd.PD_MODIFIERS});
     assert.deepEqual(BUTTON, {PASS_THROUGH: pd.PD_BUTTON.PASS_THROUGH, CONSUME: pd.PD_BUTTON.CONSUME, TAP: pd.PD_BUTTON.TAP, HOLD_MODIFIERS: pd.PD_BUTTON.HOLD_MODIFIERS});
+});
+
+test("the webview's name limit is the schema's", () => {
+    assert.equal(NAME_MAX_BYTES, require("../core/schema/profile-name").NAME_MAX_BYTES);
 });
 
 test("the webview's modifier bits and names are the vocabulary's", () => {

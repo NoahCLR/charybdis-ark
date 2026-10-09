@@ -285,7 +285,7 @@ export function commitBar() {
 export function unavailable(model) {
     if (!model?.device?.connected && !demoOf(model).active) return hostOf(model).blocked?.title || hostOf(model).words.noKeyboard || "";
     if (!model?.layers?.length) return "Nothing has been read from the keyboard yet. Choose Read keyboard.";
-    if (!model?.draft) return "This keyboard's firmware cannot hold a complete eight-layer profile, so edits cannot be drafted here.";
+    if (!model?.draft) return "This keyboard's firmware cannot hold a complete 16-layer profile, so edits cannot be drafted here. Update both halves.";
     if (!model.draft.matching) return "The local draft belongs to another keyboard. Select it again or discard the draft here.";
     if (model.draft.stale) return "Review the draft against the current keyboard before editing further.";
     return "";

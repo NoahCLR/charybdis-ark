@@ -1,5 +1,5 @@
 "use strict";
-const {readViaStorage, readRegion, writeRegion, writeViaMacros, changedRanges, viaStorageDigest, VIA_STORAGE} = require("../protocol/via-storage-v1");
+const {readViaStorage, readRegion, writeRegion, writeViaMacros, changedRanges, viaStorageDigest, VIA_STORAGE, LAYOUT_BYTES} = require("../protocol/via-storage-v1");
 const {readSettings, readStorageStatus, waitForStorage} = require("../protocol/portable-profile-v1");
 const {readProfileStatus, PROFILE_ACTIVE_KIND, PROFILE_STATE_FLAGS} = require("../protocol/profile-wire-v1");
 const {readCommittedPayload, readCompiledPayload} = require("../protocol/profile-payload-v1");
@@ -8,7 +8,8 @@ const {candidateMetadataForBlob, readCandidatePeerStatus, readCandidateStatus, C
 const {ApplyProgress, failureReason} = require("./apply-progress");
 const {CandidateUploadCoordinator} = require("./candidate-upload-coordinator");
 const {LogicalViaStageCoordinator} = require("./logical-via-stage-coordinator");
-const {createSnapshot, validateSnapshot, materializeProfile, fingerprint, summary, reorderLayers} = require("../model/portable-profile");
+const {LAYERS, createSnapshot, validateSnapshot, materializeProfile, fingerprint, summary, reorderLayers} = require("../model/portable-profile");
+const {translateBackup} = require("../model/backup-translation");
 const {knownActionAbi} = require("../schema/actions");
 const {encodeSettings} = require("../schema/settings-domain-v1");
 const {crc32, fnv1a32} = require("../schema/profile-blob-v1");
@@ -18,14 +19,14 @@ const identityStatusKey = s => JSON.stringify([s.activeKind, s.activeDigest, s.a
 const identityKey = identity => JSON.stringify(identity);
 const snapshotIdentity = (profile, storage, settings) => ({profile: identityStatusKey(profile), storageGeneration: storage.generation, storageDigest: storage.digest, settingsCrc: crc32(settings), settingsDigest: fnv1a32(settings)});
 // The bytes the keyboard's VIA bank holds, which differential transfer must
-// compare with. A document keeps only the 64 macro streams, and a valid bank
+// compare with. A document keeps only the 128 macro streams, and a valid bank
 // may hold stale bytes after them (a writer that shortened the macros need not
 // clear the rest); rebuilding the bank from the document would read those as
 // zeros, send no write for them, and fail the whole-bank digest. So a capture
 // keeps what it read beside the identity it verified, and an Apply result
 // keeps the target it proved the keyboard holds.
 const heldStorage = (layout, macros) => ({layout: Buffer.from(layout), macros: Buffer.from(macros)});
-const hasStorage = (snapshot, capabilities) => snapshot?.storage?.layout?.length === 960 && snapshot.storage.macros?.length === capabilities.viaMacroBytes;
+const hasStorage = (snapshot, capabilities) => snapshot?.storage?.layout?.length === LAYOUT_BYTES && snapshot.storage.macros?.length === capabilities.viaMacroBytes;
 function capturedBase(before, capabilities) {
     if (!before.incomplete) {
         const base = validateSnapshot(before.document, capabilities);
@@ -34,12 +35,12 @@ function capturedBase(before, capabilities) {
     }
     const decode = field => Buffer.from(before.document[field], "base64");
     const base = {profile: decode("profile"), layout: decode("layout"), macros: decode("macros")};
-    if (base.layout.length !== 960 || base.macros.length !== capabilities.viaMacroBytes || base.profile.length < 1) throw fail("INVALID_RECOVERY_CAPTURE", "The interrupted recovery capture is malformed.");
+    if (base.layout.length !== LAYOUT_BYTES || base.macros.length !== capabilities.viaMacroBytes || base.profile.length < 1) throw fail("INVALID_RECOVERY_CAPTURE", "The interrupted recovery capture is malformed.");
     return base;
 }
-// A complete profile is the eight layers and every domain; saving one needs
+// A complete profile is the sixteen layers and every domain; saving one needs
 // atomic logical Apply on both halves.
-const supportsCompleteProfile = capabilities => capabilities?.compiledLayerCount === 8
+const supportsCompleteProfile = capabilities => capabilities?.compiledLayerCount === LAYERS
     && (capabilities?.supportedDomainMask & 31) === 31 && knownActionAbi(capabilities?.actionAbiDigest);
 function requireReady(capabilities, writing = false) {
     if (!supportsCompleteProfile(capabilities) || (writing && !(capabilities?.featureFlags & (1 << 12)))) {
@@ -207,7 +208,7 @@ async function restoreProfile(connection, ids, capabilities, document, {expected
         const startedAt = Date.now();
         requireReady(capabilities);
         requireReady(capabilities, true);
-        const target = validateSnapshot(document, capabilities);
+        const target = validateSnapshot(translateBackup(document), capabilities);
         document = target.document;
         const capture = operations.capture || captureProfile;
         const currentIdentity = operations.readIdentity || readIdentity;

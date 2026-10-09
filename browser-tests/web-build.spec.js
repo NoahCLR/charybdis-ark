@@ -39,15 +39,15 @@ async function inputs() {
         supportedPdModeIds: Array.from({length: 32}, (_, id) => id).filter((id) => Number(rgb.get("codec.supported_pd_mode_mask")) & (1 << id)),
     };
     const behaviors = values(path.join(FIRMWARE_FIXTURES, "key_behavior_domain_v1.fixture"));
-    const rgbV3 = json("rgb_domain_v3.json"), pdV2 = json("pd_mode_domain_v2.json");
+    const rgbV4 = json("rgb_domain_v4.json"), pdV3 = json("pd_mode_domain_v3.json");
     const domains = [
         {name: "rgb_domain_v1 payload", kind: "rgb", hex: rgb.get("payload.hex"), options: rgbOptions},
-        ...[...rgbV3.valid, ...rgbV3.invalid].map((vector) => ({name: `rgb_domain_v3 ${vector.name}`, kind: "rgb", hex: vector.hex, options: {...rgbV3.limits, formatVersion: 3}})),
+        ...[...rgbV4.valid, ...rgbV4.invalid].map((vector) => ({name: `rgb_domain_v4 ${vector.name}`, kind: "rgb", hex: vector.hex, options: {...rgbV4.limits, formatVersion: 4}})),
         ...[...behaviors].filter(([key]) => key.startsWith("payload.")).map(([key, hex]) => ({name: `key_behavior_domain_v1 ${key}`, kind: "behaviors", hex})),
         ...[...behaviors].filter(([key]) => key.startsWith("envelope.")).map(([key, hex]) => ({name: `key_behavior_domain_v1 ${key}`, kind: "behaviorEnvelope", hex})),
-        {name: "combo_domain_v1", kind: "combos", hex: fs.readFileSync(path.join(FIRMWARE_FIXTURES, "combo_domain_v1.fixture"), "utf8").trim(), options: {version: 2}},
+        {name: "combo_domain_v3", kind: "combos", hex: fs.readFileSync(path.join(FIRMWARE_FIXTURES, "combo_domain_v3.fixture"), "utf8").trim(), options: {version: 3}},
         {name: "pd_mode_domain_v1", kind: "pd", hex: json("pd_mode_domain_v1.json").hex, options: {version: 1}},
-        ...[...pdV2.valid, ...pdV2.invalid].map((vector) => ({name: `pd_mode_domain_v2 ${vector.name}`, kind: "pd", hex: vector.hex, options: {version: 2}})),
+        ...[...pdV3.valid, ...pdV3.invalid].map((vector) => ({name: `pd_mode_domain_v3 ${vector.name}`, kind: "pd", hex: vector.hex, options: {version: 3}})),
     ];
 
     const {document: pdDocument} = require("../tests/fixtures/pd-profile");
@@ -67,9 +67,9 @@ async function inputs() {
     const draft = {
         document: pdDocument(),
         deviceId: "web-build-charybdis",
-        capabilities: {compiledLayerCount: 8, supportedDomainMask: 31, actionAbiDigest: ACTION_ABI, featureFlags: PROFILE_WIRE_KNOWN_MASKS.FEATURE_FLAGS,
-            responseVersion: 1, reportSize: 32, brightnessMax: 255, maxProfilePayload: 5088, maxBehaviorRows: 64, maxPopulatedBehaviorSteps: 128,
-            maxCombos: 32, maxReusableRgbGroups: 16, maxRgbStageGroupRows: 32, viaMacroBytes: 7191},
+        capabilities: {compiledLayerCount: 16, supportedDomainMask: 31, actionAbiDigest: ACTION_ABI, featureFlags: PROFILE_WIRE_KNOWN_MASKS.FEATURE_FLAGS,
+            responseVersion: 2, reportSize: 32, brightnessMax: 255, maxProfilePayload: 65504, maxBehaviorRows: 128, maxPopulatedBehaviorSteps: 640,
+            maxCombos: 128, maxComboInputs: 16, maxTapStepsPerBehavior: 5, maxReusableRgbGroups: 16, maxRgbStageGroupRows: 32, viaMacroBytes: 10327},
         messages: [
             edits.setKey("Layer 1", 27, "KC_B"),
             {type: "updateConfigDefaults", sectionId: "normalPointerSpeed", fields: [{macro: "normalDpi", value: "1400"}, {macro: "snipingDpi", value: "200"}]},

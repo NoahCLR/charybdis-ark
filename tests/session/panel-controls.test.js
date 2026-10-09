@@ -7,7 +7,7 @@ const {ProfileDraftSession} = require("../../core/session/profile-draft-session"
 const {fingerprint, summary} = require("../../core/model/portable-profile");
 const {document} = require("../fixtures/pd-profile");
 
-const capabilities = {compiledLayerCount: 8, supportedDomainMask: 31, actionAbiDigest: 0xf79c6151, featureFlags: 0};
+const capabilities = {compiledLayerCount: 16, supportedDomainMask: 31, actionAbiDigest: 0x837cf479, featureFlags: 0};
 const snapshot = () => {
     const doc = document();
     return {document: doc, fingerprint: fingerprint(doc), summary: summary(doc), limits: {brightnessMax: 200}};
@@ -237,7 +237,7 @@ test("the layer panel's keys-follow toggle decides whether layer keys are renumb
         const after = draft.current.document;
         assert.deepEqual(after.layers[1].slice(2), before.layers[4].slice(2), "layer 4 moved to 1 with its keys");
         assert.equal(draft.current.summary.names[1], layer4Name, "its name moved with it");
-        assert.deepEqual(draft.order, [0, 4, 1, 2, 3, 5, 6, 7], "the draft knows which layer each slot now holds");
+        assert.deepEqual(draft.order, [0, 4, 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], "the draft knows which layer each slot now holds");
         const units = draft.changes().map((row) => row.unit);
         assert.equal(units.filter((unit) => unit === "layerOrder").length, 1, "the move is one item");
         if (keysFollow) assert.deepEqual(units.filter((unit) => unit.startsWith("layout:")).sort(), ["layout:0:0", "layout:0:1"], "only the keys edited before the move");

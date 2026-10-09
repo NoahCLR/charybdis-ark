@@ -1,6 +1,6 @@
 "use strict";
 
-const {validateSnapshot, fingerprint, fingerprintOf, summaryOf} = require("../model/portable-profile");
+const {LAYERS, validateSnapshot, fingerprint, fingerprintOf, summaryOf} = require("../model/portable-profile");
 const {layerOrderReview, profileReview} = require("../model/profile-review");
 const {IDENTITY, compose, inverse, isIdentity, layerUnit, rearranged} = require("../model/layer-order");
 const {layerName: layerCalled} = require("../model/vocabulary");
@@ -76,11 +76,11 @@ function placed(item) {
     if (item.place?.kind === "behaviour") return {...item, place: {kind: "behaviour", keycode: actionName(item.place.target)}};
     return item;
 }
-const DRAFT_EDITS = new Set([...PD_EDITS, ...RGB_EDITS, ...COMBO_EDITS, ...BEHAVIOR_EDITS, "updateConfigDefaults", "updateViaMacro", "updateCustomKey", "updateLayoutKeys", "applyAllChanges"]);
+const DRAFT_EDITS = new Set([...PD_EDITS, ...RGB_EDITS, ...COMBO_EDITS, ...BEHAVIOR_EDITS, "updatePlacementPolicy", "updateConfigDefaults", "updateViaMacro", "updateCustomKey", "updateLayoutKeys", "applyAllChanges"]);
 
 class ProfileDraftSession {
     constructor(snapshot, deviceId, capabilities, connectionToken = null) {
-        if (!deviceId || snapshot.incomplete || capabilities.compiledLayerCount !== 8) throw fail("Read a complete eight-layer profile before editing.");
+        if (!deviceId || snapshot.incomplete || capabilities.compiledLayerCount !== LAYERS) throw fail(`Read a complete ${LAYERS}-layer profile before editing.`);
         // Every edit reads or writes keycodes, which only firmware numbering its
         // keys as this app does can be trusted with.
         if (!knownActionAbi(capabilities.actionAbiDigest)) throw fail("This keyboard's firmware numbers its keys differently from this app. Update both halves before editing.");
@@ -117,7 +117,7 @@ class ProfileDraftSession {
         this.decodeCache ??= new WeakMap();
         let known = this.decodeCache.get(document);
         if (!known) {
-            const decoded = validateSnapshot(document);
+            const decoded = validateSnapshot(document, this.capabilities);
             known = {decoded, fingerprint: fingerprintOf(decoded), summary: summaryOf(decoded)};
             this.decodeCache.set(document, known);
         }
@@ -213,18 +213,18 @@ class ProfileDraftSession {
         this.replace(document, revision, "layers", layersLabel(step, before, after), compose(this.order, step));
     }
     editLayout(message) {
-        if (message.adds?.length || message.deletes?.length) throw fail("Use Manage layers to name or reorder the eight available layers.");
+        if (message.adds?.length || message.deletes?.length) throw fail(`Use Manage layers to name or reorder the ${LAYERS} available layers.`);
         const groups = message.layoutGroups || message.layers || [{layer: message.layer, changes: message.changes}];
         if (!Array.isArray(groups) || !groups.length) throw fail("Choose keys to change.");
         const document = this.document;
         for (const group of groups) {
             const layer = layerOfRef(group.layer);
-            if (!(layer < 8) || !Array.isArray(group.changes)) throw fail("Choose a layer reported by this keyboard.");
+            if (!(layer < LAYERS) || !Array.isArray(group.changes)) throw fail("Choose a layer reported by this keyboard.");
             for (const change of group.changes) {
                 const position = Number.isInteger(change.layoutIndex) && CHARYBDIS_4X6_LAYOUT_MATRIX[change.layoutIndex];
                 const code = keycodes.encode(change.keycode) ?? (knownActionAbi(this.capabilities.actionAbiDigest) ? resolveNativeQmkExpression(change.keycode, {}) : undefined);
                 if (!position || !Number.isInteger(code)) throw fail(`Cannot represent the key ${change.keycode} on this keyboard.`);
-                const misplaced = keyPlacementProblem(code, {layerCount: 8});
+                const misplaced = keyPlacementProblem(code, {layerCount: this.capabilities.compiledLayerCount ?? LAYERS});
                 if (misplaced) throw fail(misplaced);
                 document.layers[layer][position[0] * 6 + position[1]] = code;
             }
@@ -438,7 +438,7 @@ class ProfileDraftSession {
     combos() {
         const {combos, settings} = this.decode(this.history[this.cursor]).decoded;
         const native = nativeCode;
-        return {state: "read", enabled: Boolean(settings.values[20]), layerReferences: Array.from({length: 8}, (_, i) => (settings.values[27] >>> (4 * i)) & 15),
+        return {state: "read", enabled: Boolean(settings.values[20]), layerReferences: settings.layers.map(record => record.reference),
             version: combos.version, defaultTermMs: combos.defaultTermMs, holdTermMs: combos.holdTermMs,
             rows: combos.rows.map(row => ({...row, termMs: effectiveComboTerm(combos, row), followsDefault: row.termMs === null, inputs: row.inputs.map(native), output: native(row.output)}))};
     }

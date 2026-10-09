@@ -8,6 +8,8 @@ import {LED_INDEX} from "../view/geometry.mjs";
 import {actionLabel, behaviourFor, cellLabel, impliedBranch, inheritedBranch, behaviourListeningTo, resolvedPositions, canonicalKeycode, behaviourGridSteps, behaviourGroups, behavioursInView, behaviourRouteKeys, behaviourTiers, comboAnswers, comboGroups, combosInView, comboInputKeys, comboInputShown, combosOnKey, combosAt, keyFace, keyMeaning, keyName, macroKeycodes, macroReach, pointingReach, pointingSlotFor, pointingVariant, reachInView, reachKeys, toggleComboInput, visibleKeycode} from "../view/keyface.mjs";
 import {feedbackColours, layerColourRow, mappedKeyCount, pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {closeComboBuilder, currentLayer, getModel, heldLayers, layerName, layers, openComboBuilder, positionAt, post, previewing, render, selectedPosition, showLayer, state, writable, canEdit as canEditArea} from "../store.mjs";
+import {definitionControls} from "./participation.mjs";
+import {participationAt} from "../view/participation.mjs";
 import * as edits from "../view/edits.mjs";
 import {behaviourTimingChecks} from "../view/checks.mjs";
 import {behaviourEditorRow, behaviourKeyAt, behaviourTimingEdit, behaviourTimingField, canHaveBehaviour} from "../view/behavior-editor.mjs";
@@ -309,6 +311,26 @@ function tabKey(body) {
         if (state.tab === "combos" && !combos.length) openComboBuilder(null, edits.comboDefaultTermValue(getModel()));
         render();
     }));
+    const answer = position && resolvedPositions(layers(), state.layer, heldLayers()).find(entry => entry.position.layoutIndex === position.layoutIndex);
+    if (answer && model?.participation) {
+        const source = answer.layer, key = answer.position;
+        const behavior = behaviourFor(model, keyMeaning(key));
+        const bp = participationAt(model, source.index, key, behavior);
+        const cp = participationAt(model, source.index, key, undefined, "combo");
+        const inherited = source.index !== layer.index;
+        const controls = el(`<div class="stack" style="gap:9px;margin-top:16px">
+            <h4>Participation · ${esc(layerName(source))}</h4>
+            ${inherited ? `<p class="note">This transparent key inherits its permissions from ${esc(layerName(source))}.</p><button class="btn tiny" data-source-layer>Open source placement</button>` : `
+            <label class="sw"><input type="checkbox" data-use-behavior ${bp.placementOn ? "checked" : ""} ${writable() ? "" : "disabled"}><span class="track"></span><span class="txt">Use behaviour</span></label>
+            <label class="sw"><input type="checkbox" data-join-combos ${cp.placementOn ? "checked" : ""} ${writable() ? "" : "disabled"}><span class="track"></span><span class="txt">Join combos</span></label>`}
+            <p class="note">Behaviour: ${esc(bp.reasons.length ? bp.reasons.join("; ") : behavior ? "all permissions allow it" : "no shared definition")}. Combos: ${esc(cp.reasons.length ? cp.reasons.join("; ") : "placement is eligible; each combo also has its own permissions")}.</p>
+            ${/^CUSTOM_KEY_\d+$/.test(canonicalKeycode(model, keyMeaning(key))) ? `<p class="note">A custom key has no normal output when its behaviour is bypassed or disabled. Map a plain keycode on a gaming layer that needs direct output.</p>` : ""}
+        </div>`);
+        controls.querySelector("[data-source-layer]")?.addEventListener("click", () => {showLayer(layers().indexOf(source)); render();});
+        controls.querySelectorAll("input").forEach(input => input.addEventListener("change", () => post(edits.placementPolicy(source.index, key.layoutIndex,
+            controls.querySelector("[data-use-behavior]").checked, controls.querySelector("[data-join-combos]").checked))));
+        node.querySelector("section").appendChild(controls);
+    }
     body.replaceChildren(node);
 }
 
@@ -569,6 +591,10 @@ function behaviourEditor(behaviour) {
         input.value = behaviourTimingField({...behaviour, [input.dataset.term]: input.dataset.stored}, input.dataset.term).value;
     }));
     node.querySelector("[data-anchor]")?.addEventListener("change", commit);
+    node.querySelector(".beh-intro").appendChild(definitionControls(layers().map(layer => ({...layer, label: layerName(layer)})), behaviour, canEdit, permissions => {
+        const message = edits.saveBehaviour(behaviour, permissions, model.profileIdentity);
+        if (message) post(message);
+    }));
     return node;
 }
 
@@ -790,6 +816,8 @@ function comboBuilder(canEdit, holdTerm) {
             <p class="note">A combo needs its output and at least two inputs, so this form keeps its own state until you keep it.</p>
         </div></div>`);
 
+    node.querySelector(".card-b").insertBefore(definitionControls(layers().map(layer => ({...layer, label: layerName(layer)})), form, canEdit,
+        permissions => Object.assign(form, permissions)), node.querySelector(".card-b").firstChild);
     node.querySelectorAll("[data-remove]").forEach((button) => button.addEventListener("click", () => {
         state.combo.inputs = state.combo.inputs.filter((input) => input !== button.dataset.remove);
         render();

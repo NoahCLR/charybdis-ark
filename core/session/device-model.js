@@ -18,6 +18,7 @@ const {keyLabel, profileKeyNames} = require("../model/key-names");
 const {layerName} = require("../model/vocabulary");
 const {keycodeAction, knownActionAbi, layerRef, nativeCode} = require("../schema/actions");
 const {dpiChoices} = require("../model/pointer-dpi");
+const {LAYERS} = require("../model/portable-profile");
 const {PROFILE_WIRE_FEATURES} = require("../protocol/profile-wire-v1");
 
 const CATALOG_SOURCE = "vendored QMK keycode catalog";
@@ -86,12 +87,19 @@ function buildDeviceModel(state = {}) {
         viaMacros: state.macroView?.viaMacros || [],
         macroNameSpace: state.macroView?.names || null,
         macroBank: state.macroView?.macroBank || null,
-        macroEditing: {identity: state.macroView?.identity || "", writable: Boolean(state.macroView) && state.capabilities?.compiledLayerCount === 8 && !state.busy},
+        macroEditing: {identity: state.macroView?.identity || "", writable: Boolean(state.macroView) && state.capabilities?.compiledLayerCount === LAYERS && !state.busy},
         behaviorTimingDefaults: state.settingsView?.timing || {},
         configDefaults: state.settingsView?.sections || [],
-        settingsEditing: {identity: state.settingsView?.identity || "", writable: Boolean(state.settingsView) && state.capabilities?.compiledLayerCount === 8 && !state.busy},
+        participation: state.committed?.state === "read" && state.committed.domains?.settings?.values && state.committed.domains.settings.layers ? {
+            behaviorsEnabled: Boolean(state.committed.domains.settings.values[28]),
+            combosEnabled: Boolean(state.committed.domains.settings.values[20]),
+            behaviorLayers: state.committed.domains.settings.values[29],
+            comboLayers: state.committed.domains.settings.values[30],
+            layers: state.committed.domains.settings.layers,
+        } : null,
+        settingsEditing: {identity: state.settingsView?.identity || "", writable: Boolean(state.settingsView) && state.capabilities?.compiledLayerCount === LAYERS && !state.busy},
         macroPayloadKeycodes: state.macroView?.macroPayloadKeycodes || [],
-        // The 64 named custom keys, on a keyboard with the keycode blocks.
+        // The 128 named custom keys, on a keyboard with the keycode blocks.
         customKeys: state.customKeyView?.keys || [],
         customKeyNameSpace: state.customKeyView?.names || null,
         customKeyEditing: {identity: state.customKeyView?.identity || "", writable: Boolean(state.customKeyView) && !state.busy},

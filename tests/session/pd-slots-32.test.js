@@ -28,7 +28,7 @@ test("slot 20 is created, bound, lit, reviewed and discarded like any other", ()
     assert.ok(value.document.layers[0].includes(0x7eb4), "PD_SLOT_20_LOCK on the board");
     assert.deepEqual(value.rgb.pdModeColors[20], {pdModeId: 20, color: {h: 64, s: 255, v: 100}, locality: 2});
     assert.deepEqual(value.behaviors.rows.find(row => row.target.operand === 0x68).steps[0].tap, {kind: 4, flags: 0, operand: 31});
-    assert.equal(decodeProfileBlob(value.profile).domains.find(domain => domain.id === 0x50).version, 2);
+    assert.equal(decodeProfileBlob(value.profile).domains.find(domain => domain.id === 0x50).version, 3);
 
     const view = draft.view({connected: true, selectedDeviceId: "board"});
     const slot = view.changes.find(change => change.unit === "pd:20");

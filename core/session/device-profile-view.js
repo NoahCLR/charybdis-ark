@@ -64,6 +64,8 @@ function behaviorRowsForView(domain, features = {}) {
         longerHoldTerm: String(row.longerHoldTerm),
         multiTapTerm: String(row.multiTapTerm),
         keepsAutoMouseAnchored: row.keepsAutoMouseAnchored,
+        enabled: row.enabled,
+        allowedLayers: row.allowedLayers,
         steps: row.steps.map((step) => ({
             tapCount: step.tapIndex,
             tapCountName: branchName(step.tapIndex + 1),
@@ -156,6 +158,7 @@ function combosForView(read, labels) {
     };
     return read.rows.map(row => ({
         id: row.id, badge: `C${row.id}`,
+        enabled: row.enabled ?? true, allowedLayers: row.allowedLayers ?? 0xffff,
         inputs: row.inputs.map(value => resolve(value).name),
         inputDisplays: row.inputs.map(value => resolve(value).label),
         output: resolve(row.output).name,

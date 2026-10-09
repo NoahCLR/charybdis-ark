@@ -57,7 +57,7 @@ export function statusSummary(changes) {
 export const CATEGORIES = ["Keys", "Lighting", "Macros", "Mouse", "Pointing modes", "Other"];
 // A custom key's name is counted with the keys, where its behaviour is too.
 const SECTIONS = {
-    keyTiming: ["Keys", "Tap & hold timing", 31], startupLayers: ["Keys", "Startup layers", 22], comboSettings: ["Keys", "Combo settings", 40], comboReferences: ["Keys", "Combo layer matching", 41],
+    keyTiming: ["Keys", "Tap & hold timing", 31], startupLayers: ["Keys", "Startup layers", 22], behaviorSettings: ["Keys", "Behaviour settings", 32], comboSettings: ["Keys", "Combo settings", 40], comboReferences: ["Keys", "Combo layer matching", 41],
     keyboardOptions: ["Keys", "Key options", 50], rgbAppearance: ["Lighting", "Base effect", 1], lightingFeedback: ["Lighting", "Key feedback", 15],
     normalPointerSpeed: ["Mouse", "Pointer speed", 1], sniping: ["Mouse", "Auto-sniping", 2], autoMouse: ["Mouse", "Auto-mouse", 3],
 };

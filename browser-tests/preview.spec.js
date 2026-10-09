@@ -19,7 +19,7 @@ for (const host of ["", "?host=web", "?host=demo"]) {
         expect(await dropFiles(page, [file, file])).toBe(true);
         await expect(card.locator('[role="status"]')).toHaveText("Drop one profile file at a time.");
         await expect(card).not.toHaveClass(/drag-over/);
-        await dropFiles(page, [{...file, text: "x".repeat(100001)}]);
+        await dropFiles(page, [{...file, text: "x".repeat(262145)}]);
         await expect(card.locator('[role="status"]')).toHaveText("This profile file is too large.");
         await page.evaluate(() => {
             const text = File.prototype.text;

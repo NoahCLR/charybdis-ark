@@ -66,8 +66,8 @@ to open that commit on GitHub in a new tab.
 With no keyboard connected, the connect area offers **Explore a demo** beside
 **Read keyboard** (VS Code) or **Choose keyboard** (the web page). It is offered
 on a browser without WebHID too, since it needs no keyboard. The demo opens a
-complete setup, as current firmware holds one (eight layers, 32 pointing slots,
-64 macros and 64 custom keys), in the same draft a keyboard's opens in. Every
+complete setup, as current firmware holds one (16 layers, 32 pointing slots,
+128 macros and 128 custom keys), in the same draft a keyboard's opens in. Every
 screen works, and every edit stages, is checked and shows in the review exactly
 as it would on a keyboard; undo, redo, Discard, the draft history, Rename &
 Reorder and Import all work on it.
@@ -106,7 +106,7 @@ Every screen is drawn and wired to the host:
 | Lighting | Six stages, the stage mask, layer and pointing-mode colours with their localities, combo and key feedback, auto-mouse fade with its hold as a share of the timeout, LED group rows and reusable groups |
 | Macros | Both banks: name, payload, insert-at-cursor step builder, reorder/remove controls, parsed preview, configurable recorder and placement; search by name, and the layers that set each macro off — by key, behaviour or combo — in their layer colour, each opening that layer in Keys with the macro picked |
 | Mouse | Pointer speed, sniping and auto-mouse — the Settings sections the keyboard's model files under Mouse, drawn with the same cards and posted whole |
-| Pointing modes | Every slot the firmware has, eight or 32: movement, speed, direction shortcuts and how often they send (every step, or once per movement until the ball pauses or moves back the other way), scroll tuning and which way a scrolling mode scrolls (both axes, horizontal only or vertical only), what each direction's shortcut does with held modifiers, thresholds shown as ball movement at the mode's DPI, buttons, bindings, placement, clear and duplicate |
+| Pointing modes | All 32 slots: movement, speed, direction shortcuts and how often they send (every step, or once per movement until the ball pauses or moves back the other way), scroll tuning and which way a scrolling mode scrolls (both axes, horizontal only or vertical only), what each direction's shortcut does with held modifiers, thresholds shown as ball movement at the mode's DPI, buttons, bindings, placement, clear and duplicate |
 | Settings | Every other section the keyboard reports, posted whole, read-only where the firmware cannot report; the Combos section also carries the default combo window and the combo hold threshold, which the keyboard stores with its combos |
 | Profile & backups | Import (the file against the keyboard, counted by what it configures — keys, lighting, macros, mouse, pointing — before it becomes the draft), export, profile memory, recovery state |
 | Device | Read-only: connection, committed generation, what was read |
@@ -136,6 +136,19 @@ each can be discarded without the other. A keyboard the app cannot open a draft 
 could not be read, or its firmware predates profile editing — is read-only:
 the host refuses any edit rather than writing it directly.
 
+Review checks whether you can reach your layers and combos and get back to
+Base after locking layers. It checks independent controls together and reports
+the smallest trapping combinations, with the steps into them and a repair.
+Safe layers added beside the same trap do not create more warnings. Findings
+show whether the draft introduced, retained or fixed the problem.
+
+For unusually complex interactions, Review can ask you to check specific
+layers together and requires confirmation before Apply. **Show** opens one of
+those layers. Check whether their keys cover each other's exits, or keep a
+TO(0) escape accessible through every overlay. If Ark checked reachability but
+could not establish every escape, the warning says so; the completed checks
+still appear.
+
 **Read from keyboard** runs one complete read at a time. The health strip says
 both halves agree only after the firmware reports a known, converged peer;
 matching generation numbers alone are insufficient. A failed committed-profile
@@ -152,12 +165,51 @@ After a disconnect, a retained dirty draft requires **Review against the
 keyboard** before editing or applying, even if the HID path and saved profile
 look unchanged.
 
-Macro keycodes are shown as `VIA_MACRO_0` through `VIA_MACRO_63` in the live
+Macro keycodes are shown as `VIA_MACRO_0` through `VIA_MACRO_127` in the live
 editor, including slots whose QMK values have no named constant.
-**Custom keys** lists the 64 custom keys: rename one, add or edit its
+**Custom keys** lists the 128 custom keys: rename one, add or edit its
 behaviour, place it on a key, and see where it is used; the key picker offers
 them in its own Custom keys section. Their names are stored on the keyboard; a
 keyboard with none stored reports the names authored in `keymap.c`.
+
+## Choosing where behaviours and combos run
+
+Definitions and participation are separate. Switching something off keeps
+its actions, inputs, outputs, timing and names, ready to enable again.
+
+| Scope | Where to change it | What it controls |
+| --- | --- | --- |
+| Whole keyboard | Settings → Key behaviours or Combos | Master switch for that engine |
+| Source layer | The same Settings section | Whether that layer uses behaviours or joins combos |
+| Definition | Keys → Behaviours or the combo editor | Enabled switch and allowed layers for that shared definition |
+| Physical placement | Pick a key in Keys | **Use behaviour** and **Join combos** for that source layer and position |
+
+All applicable switches must allow an event. The layer that supplies the
+non-transparent keycode owns its policy: a transparent overlay inherits the
+lower source layer's controls. The key inspector explains an inherited
+placement and offers **Open source placement**, and lists the scopes keeping
+behaviour or combo participation off.
+
+For a plain gaming key, disable **Use behaviour** on that placement to emit
+its underlying keycode directly; disabling **Join combos** independently stops
+that placement entering a combo. A custom key bypassed this way emits nothing,
+since its behaviour supplies its action. A combo still needs every physical
+input to be eligible. A gesture already in progress completes under the
+policy captured when it started.
+
+A combo output uses the source layer of its last declared input, regardless
+of which input you press last. Its behaviour follows the master switch and
+the definition's enabled and allowed-layer controls; physical placement
+controls and source-layer behaviour switches do not apply to that generated
+output. Another input's allowance cannot enable it.
+
+The profile holds up to 128 shared behaviour definitions and 128 combos with
+up to 16 inputs each. Firmware normally provides five tap steps per behaviour
+(640 steps total); Ark uses the connected keyboard's advertised tap depth and
+matching tap-feedback colours when firmware is configured for more. Layer, macro,
+custom-key and pointing-mode names allow up to 32 UTF-8 bytes; accented letters
+can use more than one byte. All edits go through the draft, Review, Undo and
+Apply, including switches and layer allowances.
 
 ## The interface
 
@@ -170,7 +222,7 @@ badges on the key face in the feedback colours the keyboard flashes.
 During initial read, refresh or device selection, every screen menu is disabled
 and a loading step replaces the screen. Once the read finishes, Device opens
 if the keyboard reported its capabilities. Profile & backups opens when a
-connected keyboard runs current eight-layer firmware with complete-profile
+connected keyboard runs current firmware with complete-profile
 backup. The Configure
 menus open only with an editable draft.
 
@@ -274,8 +326,9 @@ actually hold together still previews.
 Before anything is applied, the review **checks** what the layers let you
 reach. A layer that can lock with no way back to Base — nothing on it, or on
 anything held over it, releases the lock or moves back — is a **trap**: the
-review shows the steps into it and the way out. The first four trap states have
-paths; if more exist, their number is shown. Combos are checked against keys
+review shows the steps into it and a suggested repair. The first four smallest
+trapping combinations have paths, including a necessary hold release; if more
+minimal combinations exist, their number is shown. Combos are checked against keys
 that occur together on a reachable stack, including keys inherited through
 transparent positions. Active traps have red cards; warnings have orange cards.
 Apply asks "Apply anyway" before writing whenever
@@ -403,7 +456,7 @@ files are refused without replacing your draft.
 
 **Profile memory** shows how full the profile is. Behaviours, combos,
 lighting, pointing modes, settings and every layer, macro and custom-key name
-share one block on the keyboard: 5,088 bytes on current firmware, the size the
+share one block on the keyboard: 65,504 bytes on current firmware, the size the
 keyboard reports. The card lists what uses it, area by area, and the counted
 limits beside it: behaviours, behaviour steps, combos, lighting groups and
 lighting group rows. Each area can stay under its own limit and the profile
@@ -413,7 +466,7 @@ the keyboard's otherwise; they follow every edit, undo and discard. Macro steps
 are stored apart from the profile, so the card shows them as a second bar,
 counted slot by slot on Macros.
 
-The standard firmware reserves eight layers. **Manage layers** names and orders
+The standard firmware reserves 16 layers. **Manage layers** names and orders
 the overlays, with the highest-priority layer shown first and Base fixed at the
 bottom. Moving a layer updates the keys, behaviours, combos, RGB assignments and
 pointer settings that refer to it. There is no need to change the layer count
@@ -427,11 +480,26 @@ keeps its own Hold and Toggle key (`PD_SLOT_n`, `PD_SLOT_n_LOCK`) and lighting
 row. An empty slot takes no room in the profile, so 32 slots cost only what you
 configure.
 
-Ark accepts backups in the current format only: eight layers and 32 pointing
-slots, with all settings and names. A backup from five-layer or eight-slot
-firmware, or one carrying older domain versions, is refused when opened.
-Ark does not translate it or drop data to make it fit. Keep the old firmware
-pair and its backups together if you still need them.
+### Upgrading from eight-layer firmware
+
+Export your saved setup with the previous Ark before flashing. Keep that file
+and the old left/right pair. Flash both halves with the matching new pair,
+then open the new Ark and read the keyboard. The larger storage layout starts
+with flashed defaults; it does not migrate the old on-device profile.
+
+Choose your exported backup in **Profile & backups**. Ark translates the
+immediately preceding eight-layer, 32-pointing-slot format into the new format
+before Import review. **Use as draft**, check Review, then **Apply** restores
+both halves through the usual recovery transaction. No write happens during
+translation or Import review.
+
+The translation keeps all keys, behaviours, combos, pointing modes, macros and
+names. The eight added layers are transparent and unnamed, macro/custom-key
+slots 64–127 are empty, and every participation control starts on. Custom-key
+placements and native references move to their new keycodes while keeping
+the same slot. Five-layer and eight-pointing-slot backups, unknown action
+vocabularies and malformed files are refused; Ark does not drop data to make
+a backup fit.
 
 Executable custom combo hooks and unsupported macro content
 cannot be represented as profile data; export reports these explicitly instead

@@ -44,14 +44,21 @@ function response(request, payload, status = 0) {
     return report;
 }
 
+// Capability layout 2 (firmware D-F14): three pages, the third holding the
+// fields wider than a byte.
 function compiledOnlyPages() {
     const identity = Buffer.alloc(PROFILE_WIRE_V1.PAYLOAD_SIZE);
-    identity.set([1, 2, 1, 0, 1, 0, 32, 20, 2, 0x3f], 0);
+    identity.set([2, 3, 1, 0, 3, 0, 32, 20, 2, 0x3f], 0);
     const capacity = Buffer.from([
-        5, 8, 64, 5, 128, 32, 4, 16, 32, 58, 8, 16, 64,
-        0xe0, 0x0f, 0xe0, 0x0f, 0x00, 0x10, 0x7f, 0x1d, 3, 0, 0, 0,
+        16, 16, 128, 5, 0, 128, 16, 16, 32, 58, 8, 128, 128,
+        0xe0, 0xff, 0xe0, 0xff, 0x00, 0x00, 0x57, 0x28, 3, 0, 0, 0,
     ]);
-    return [identity, capacity];
+    const wide = Buffer.alloc(PROFILE_WIRE_V1.PAYLOAD_SIZE);
+    wide.writeUInt16LE(640, 0);
+    wide[2] = 5;
+    wide.writeUInt32LE(65536, 3);
+    wide.set([32, 32, 60], 7);
+    return [identity, capacity, wide];
 }
 
 test("Profile Wire get requests are canonical 32-byte frames", () => {
@@ -60,46 +67,54 @@ test("Profile Wire get requests are canonical 32-byte frames", () => {
     assert.deepEqual(Array.from(request.subarray(0, 5)), [0x08, 0, 1, 0x42, 1]);
     assert.equal(request.subarray(5).every((byte) => byte === 0), true);
     assert.throws(() => buildProfileGetRequest(1, 0, 0), /nonzero/);
+    // A wide page (feature bit 19): byte 4 its low byte, byte 5 its high byte.
+    const wide = buildProfileGetRequest(PROFILE_WIRE_V1.VALUE_PAYLOAD ?? 0x04, 2621, 0x43);
+    assert.deepEqual(Array.from(wide.subarray(4, 6)), [2621 & 0xff, 2621 >> 8]);
+    assert.equal(wide.subarray(6).every((byte) => byte === 0), true);
+    assert.throws(() => buildProfileGetRequest(4, 0x10000, 1), RangeError);
 });
 
 test("JavaScript consumes the same golden reports as the C firmware codec", () => {
     const fixtures = goldenFixtures();
     const pages = {};
-    for (const prefix of ["capabilities-page-0", "capabilities-page-1", "status-page-0", "status-page-1"]) {
+    for (const prefix of ["capabilities-page-0", "capabilities-page-1", "capabilities-page-2", "status-page-0", "status-page-1"]) {
         const request = fixtures[`${prefix}-request`];
         const actualRequest = buildProfileGetRequest(request[2], request[4], request[3]);
         assert.deepEqual(actualRequest, request);
         pages[prefix] = decodeProfileResponse(fixtures[`${prefix}-response`], request);
     }
-    assert.deepEqual(decodeCapabilityPages([pages["capabilities-page-0"], pages["capabilities-page-1"]]), {
-        responseVersion: 1,
+    assert.deepEqual(decodeCapabilityPages([pages["capabilities-page-0"], pages["capabilities-page-1"], pages["capabilities-page-2"]]), {
+        responseVersion: 2,
         protocol: {major: 1, minor: 0},
-        schema: {major: 2, minor: 0},
+        schema: {major: 3, minor: 0},
         reportSize: 32,
         candidateChunkMax: 0,
         statusPageCount: 2,
-        featureFlags: 0x00000c1f,
+        featureFlags: 0x00080c1f,
         actionAbiDigest: 0x12345678,
         firmwareVersion: 0x00010000,
         compiledDefaultDigest: 0x89abcdef,
-        compiledLayerCount: 5,
-        maxLogicalLayers: 8,
-        maxBehaviorRows: 64,
+        compiledLayerCount: 16,
+        maxLogicalLayers: 16,
+        maxBehaviorRows: 128,
         maxTapStepsPerBehavior: 5,
-        maxPopulatedBehaviorSteps: 128,
-        maxCombos: 32,
-        maxKeysPerCombo: 4,
+        maxPopulatedBehaviorSteps: 640,
+        maxCombos: 128,
+        maxKeysPerCombo: 16,
         maxReusableRgbGroups: 16,
         maxRgbStageGroupRows: 32,
         physicalLedCount: 58,
         ledBitmapSize: 8,
-        customKeySlots: 64,
-        viaMacroSlots: 64,
-        maxProfilePayload: 5088,
-        profileSlotPayload: 5088,
-        profileSlotSize: 5120,
-        viaMacroBytes: 7191,
+        customKeySlots: 128,
+        viaMacroSlots: 128,
+        maxProfilePayload: 65504,
+        profileSlotPayload: 65504,
+        profileSlotSize: 65536,
+        viaMacroBytes: 10327,
         supportedDomainMask: 3,
+        nameMaxBytes: 32,
+        layerMaskBits: 32,
+        placementPositions: 60,
     });
     assert.deepEqual(decodeStatusPages([pages["status-page-0"], pages["status-page-1"]]), {
         responseVersion: 1,
@@ -137,38 +152,56 @@ test("response correlation includes value, request id, and page", () => {
     assert.equal(profileResponseMatcher(matching, request), false);
 });
 
-test("capability pages decode frozen Stage 00 capacities", () => {
+test("capability pages decode the bigger profile's capacities", () => {
     const decoded = decodeCapabilityPages(compiledOnlyPages());
     assert.deepEqual(decoded.protocol, {major: 1, minor: 0});
-    assert.deepEqual(decoded.schema, {major: 1, minor: 0});
+    assert.deepEqual(decoded.schema, {major: 3, minor: 0});
     assert.equal(decoded.featureFlags, 0x3f);
-    assert.equal(decoded.compiledLayerCount, 5);
-    assert.equal(decoded.maxBehaviorRows, 64);
-    assert.equal(decoded.maxPopulatedBehaviorSteps, 128);
+    assert.equal(decoded.compiledLayerCount, 16);
+    assert.equal(decoded.maxBehaviorRows, 128);
+    assert.equal(decoded.maxPopulatedBehaviorSteps, 640);
     assert.equal(decoded.physicalLedCount, 58);
-    assert.equal(decoded.maxProfilePayload, 4064);
-    assert.equal(decoded.profileSlotSize, 4096);
-    assert.equal(decoded.viaMacroBytes, 7551);
+    assert.equal(decoded.maxProfilePayload, 65504);
+    assert.equal(decoded.profileSlotSize, 65536);
+    assert.equal(decoded.viaMacroBytes, 10327);
+    assert.equal(decoded.nameMaxBytes, 32);
+    // An image from before 16 layers reports layout 1 with two pages.
+    const older = compiledOnlyPages().map((page) => Buffer.from(page));
+    older[0].set([1, 2], 0);
+    assert.throws(() => decodeCapabilityPages(older), (error) => error.code === "INCOMPATIBLE_RESPONSE");
+    // Page 1's moved fields stay zero, and both pages agree on the tap depth.
+    for (const [page, offset] of [[1, 4], [1, 17], [1, 18], [2, 10], [2, 24]]) {
+        const bytes = compiledOnlyPages().map((value) => Buffer.from(value));
+        bytes[page][offset] = 1;
+        assert.throws(() => decodeCapabilityPages(bytes), `page ${page} byte ${offset}`);
+    }
+    const depth = compiledOnlyPages().map((page) => Buffer.from(page));
+    depth[2][2] = 8;
+    assert.throws(() => decodeCapabilityPages(depth), /tap depths/);
 });
 
 test("patterned capability vectors decode every semantic field exactly", () => {
     const identity = Buffer.alloc(25);
-    identity.set([1, 2, 1, 7, 1, 9, 32, 20, 2], 0);
+    identity.set([2, 3, 1, 7, 3, 9, 32, 20, 2], 0);
     identity.writeUInt32LE(0x00000fff, 9);
     identity.writeUInt32LE(0x12345678, 13);
     identity.writeUInt32LE(0x89abcdef, 17);
     identity.writeUInt32LE(0x0badf00d, 21);
     const capacity = Buffer.alloc(25);
-    capacity.set([5, 8, 64, 5, 128, 32, 4, 16, 32, 58, 8, 64, 64], 0);
-    capacity.writeUInt16LE(4000, 13);
-    capacity.writeUInt16LE(4064, 15);
-    capacity.writeUInt16LE(4096, 17);
-    capacity.writeUInt16LE(7551, 19);
+    capacity.set([12, 16, 100, 5, 0, 96, 12, 16, 32, 58, 8, 120, 110], 0);
+    capacity.writeUInt16LE(40000, 13);
+    capacity.writeUInt16LE(65504, 15);
+    capacity.writeUInt16LE(9999, 19);
     capacity[21] = 3;
-    assert.deepEqual(decodeCapabilityPages([identity, capacity]), {
-        responseVersion: 1,
+    const wide = Buffer.alloc(25);
+    wide.writeUInt16LE(500, 0);
+    wide[2] = 5;
+    wide.writeUInt32LE(0x00010000, 3);
+    wide.set([31, 32, 64], 7);
+    assert.deepEqual(decodeCapabilityPages([identity, capacity, wide]), {
+        responseVersion: 2,
         protocol: {major: 1, minor: 7},
-        schema: {major: 1, minor: 9},
+        schema: {major: 3, minor: 9},
         reportSize: 32,
         candidateChunkMax: 20,
         statusPageCount: 2,
@@ -176,24 +209,27 @@ test("patterned capability vectors decode every semantic field exactly", () => {
         actionAbiDigest: 0x12345678,
         firmwareVersion: 0x89abcdef,
         compiledDefaultDigest: 0x0badf00d,
-        compiledLayerCount: 5,
-        maxLogicalLayers: 8,
-        maxBehaviorRows: 64,
+        compiledLayerCount: 12,
+        maxLogicalLayers: 16,
+        maxBehaviorRows: 100,
         maxTapStepsPerBehavior: 5,
-        maxPopulatedBehaviorSteps: 128,
-        maxCombos: 32,
-        maxKeysPerCombo: 4,
+        maxPopulatedBehaviorSteps: 500,
+        maxCombos: 96,
+        maxKeysPerCombo: 12,
         maxReusableRgbGroups: 16,
         maxRgbStageGroupRows: 32,
         physicalLedCount: 58,
         ledBitmapSize: 8,
-        customKeySlots: 64,
-        viaMacroSlots: 64,
-        maxProfilePayload: 4000,
-        profileSlotPayload: 4064,
-        profileSlotSize: 4096,
-        viaMacroBytes: 7551,
+        customKeySlots: 120,
+        viaMacroSlots: 110,
+        maxProfilePayload: 40000,
+        profileSlotPayload: 65504,
+        profileSlotSize: 65536,
+        viaMacroBytes: 9999,
         supportedDomainMask: 3,
+        nameMaxBytes: 31,
+        layerMaskBits: 32,
+        placementPositions: 64,
     });
 });
 
@@ -370,9 +406,9 @@ test("capability reads serialize through the transport connection", async () => 
         },
     };
     const decoded = await readProfileCapabilities(connection, {requestId: 0xfe});
-    assert.deepEqual(requests.map((request) => request[3]), [0xfe, 0xff]);
-    assert.deepEqual(requests.map((request) => request[4]), [0, 1]);
-    assert.equal(decoded.maxProfilePayload, 4064);
+    assert.deepEqual(requests.map((request) => request[4]), [0, 1, 2]);
+    assert.equal(new Set(requests.map((request) => request[3])).size, 3, "each page has its own request id");
+    assert.equal(decoded.maxProfilePayload, 65504);
 });
 
 test("feature bit 13 is retired: no feature names it, and an older image that sets it still decodes", () => {

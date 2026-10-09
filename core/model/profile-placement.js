@@ -10,6 +10,7 @@ const {PLACEMENT, actionName, behaviorEmitProblem, keycodeAction, placementProbl
 const {decodeProfileBlob, PROFILE_DOMAIN_IDS} = require("../schema/profile-blob-v1");
 const {decodeKeyBehaviorDomain, KEY_BEHAVIOR_HOLD_MODES} = require("../schema/key-behavior-domain-v1");
 const {decodeComboDomain} = require("../schema/combo-domain-v1");
+const {profileDepthOptions} = require("../schema/profile-depth");
 
 function behaviorPlacementProblem(rows, options) {
     for (const row of rows) {
@@ -46,7 +47,8 @@ function profilePlacementProblem(bytes, options) {
     const domain = id => profile.domains.find(row => row.id === id);
     const behaviors = domain(PROFILE_DOMAIN_IDS.KEY_BEHAVIORS)?.payload;
     const combos = domain(PROFILE_DOMAIN_IDS.COMBOS);
-    return (behaviors && behaviorPlacementProblem(decodeKeyBehaviorDomain(behaviors).rows, options))
+    const depth = profileDepthOptions(options?.capabilities, domain(PROFILE_DOMAIN_IDS.RGB)?.payload);
+    return (behaviors && behaviorPlacementProblem(decodeKeyBehaviorDomain(behaviors, depth.behaviors).rows, options))
         || (combos && comboPlacementProblem(decodeComboDomain(combos.payload).rows, options))
         || undefined;
 }

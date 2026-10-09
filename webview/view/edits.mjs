@@ -16,6 +16,7 @@ export const layoutKeys = (layer, changes) => ({type: "updateLayoutKeys", layer,
 export const setKey = (layer, layoutIndex, keycode) => layoutKeys(layer, [{layoutIndex, keycode}]);
 // Delete and Backspace leave a key transparent, so the layer below answers.
 export const clearKey = (layer, layoutIndex) => setKey(layer, layoutIndex, "KC_TRANSPARENT");
+export const placementPolicy = (layer, layoutIndex, useBehavior, joinCombos) => ({type: "updatePlacementPolicy", layer, layoutIndex, useBehavior, joinCombos});
 // A swap is one message, so one undo takes both keys back.
 export const swapKeys = (layer, from, to) => layoutKeys(layer, [
     {layoutIndex: from.layoutIndex, keycode: to.keycode},
@@ -61,7 +62,7 @@ export function cellEdit(kind, {stored, action, helper, repeatHz}) {
 // One behaviour row, posted whole: the form is the row. `terms` are the
 // timing fields as typed (empty means the keyboard default, stored as 0),
 // `change` replaces one cell, and every other cell is carried as read.
-export function saveBehaviour(behaviour, {terms = {}, anchored, change} = {}, identity) {
+export function saveBehaviour(behaviour, {terms = {}, anchored, enabled, allowedLayers, change} = {}, identity) {
     const term = (name) => terms[name] === undefined ? String(behaviour[name] ?? "0") : String(terms[name]).trim() || "0";
     const sourceSteps = new Map((behaviour.steps || []).map((step) => [step.tapCount, step]));
     if (change && !sourceSteps.has(change.tapCount)) sourceSteps.set(change.tapCount, {tapCount: change.tapCount});
@@ -82,9 +83,11 @@ export function saveBehaviour(behaviour, {terms = {}, anchored, change} = {}, id
         longerHoldTerm: term("longerHoldTerm"),
         multiTapTerm: term("multiTapTerm"),
         keepsAutoMouseAnchored: anchored ?? behaviour.keepsAutoMouseAnchored,
+        enabled: enabled ?? behaviour.enabled ?? true,
+        allowedLayers: allowedLayers ?? behaviour.allowedLayers ?? 0xffff,
         steps,
     };
-    if (behaviour.stored === false && !steps.length && !behavior.keepsAutoMouseAnchored
+    if (behaviour.stored === false && behavior.enabled && behavior.allowedLayers === 0xffff && !steps.length && !behavior.keepsAutoMouseAnchored
         && [behavior.tapHoldTerm, behavior.longerHoldTerm, behavior.multiTapTerm].every(value => /^0+$/.test(value))) return null;
     return {
         type: "saveBehavior",
@@ -97,8 +100,10 @@ export function saveBehaviour(behaviour, {terms = {}, anchored, change} = {}, id
 
 // A combo follows the default window unless it has its own: followsDefault,
 // or an empty window, says it follows.
-export function comboMessage(id, {output, inputs, termMs, followsDefault, holdTermMs, mustHold, mustTap, ordered}) {
+export function comboMessage(id, {output, inputs, termMs, followsDefault, holdTermMs, mustHold, mustTap, ordered, enabled, allowedLayers}) {
     const payload = {output: String(output ?? "").trim(), inputs, termMs, followsDefault: Boolean(followsDefault), holdTermMs, mustHold: Boolean(mustHold), mustTap: Boolean(mustTap), ordered: Boolean(ordered)};
+    if (enabled !== undefined) payload.enabled = enabled;
+    if (allowedLayers !== undefined) payload.allowedLayers = allowedLayers;
     return id === null || id === undefined ? {type: "addCombo", ...payload} : {type: "saveCombo", id, ...payload};
 }
 export const deleteCombo = (id) => ({type: "deleteCombo", id});

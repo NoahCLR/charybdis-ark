@@ -14,7 +14,7 @@ async function readSettings(connection, ids) {
     const before = await page(connection, 7, 0, ids);
     if (before.length !== 12 || before[0] !== 1 || before[1] !== 25) throw fail("Invalid settings metadata.");
     const length = before.readUInt16LE(2);
-    if (length < SETTINGS.FIXED_SIZE + SETTINGS.MACRO_NAMES + SETTINGS.CUSTOM_KEY_NAMES || length > SETTINGS.MAX_SIZE) throw fail("Invalid settings capacity.");
+    if (length < SETTINGS.MIN_SIZE || length > SETTINGS.MAX_SIZE) throw fail("Invalid settings capacity.");
     const chunks = [];
     for (let offset = 0; offset < length; offset += 25) {
         const bytes = await page(connection, 7, 1 + offset / 25, ids);

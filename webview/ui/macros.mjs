@@ -8,6 +8,7 @@
 import {el, esc} from "../lib/dom.mjs";
 import {describeStep, macroMatches, macroPeek, parseMacro, serializeMacro, unreleased} from "../view/macro.mjs";
 import {macroPlacements} from "../view/keyface.mjs";
+import {NAME_TIP, nameCount} from "../view/names.mjs";
 import {setReachGroupOpen} from "../view/reach-groups.mjs";
 import {canEdit as canEditArea, getModel, layerName, layers, macroForm, post, render, setMacroForm, state, writable} from "../store.mjs";
 import * as edits from "../view/edits.mjs";
@@ -111,9 +112,7 @@ function editor(model, slot, canEdit) {
         </div></div>`);
     const textarea = card.querySelector("textarea");
     const nameInput = card.querySelector("[data-name]");
-    nameInput?.addEventListener("input", () => {
-        card.querySelector("[data-name-count]").textContent = `${nameInput.value.length} / ${model.macroNameSpace.perName} characters`;
-    });
+    nameInput?.addEventListener("input", () => showCount(card.querySelector("[data-name-count]"), nameInput.value, model.macroNameSpace.perName));
     nameInput?.addEventListener("change", () => post(edits.macroNameMessage(slot.keycode, nameInput.value, model?.macroEditing?.identity)));
     textarea.addEventListener("input", () => {
         setMacroForm(slot.keycode, {draft: textarea.value, cursor: textarea.selectionStart});
@@ -143,14 +142,21 @@ function editor(model, slot, canEdit) {
 }
 
 // Every slot can hold a full-length name. The host enforces the rule; the
-// field stops at the limit and the counter says where it stands.
+// counter says where the name stands in bytes, which is what the keyboard
+// counts.
 function nameField(model, slot, canEdit) {
     const space = model?.macroNameSpace;
     if (!space) return "";
+    const count = nameCount(slot.name || "", space.perName);
     return `<label class="field"><span>Name</span>
-        <input class="input" data-name maxlength="${esc(space.perName)}" value="${esc(slot.name || "")}" placeholder="Macro ${esc(slot.keycode.split("_").at(-1))}" ${canEdit ? "" : "disabled"}
-            data-tip="Up to ${esc(space.perName)} plain characters: letters, digits, spaces and punctuation.">
-        <span class="note" data-name-count>${esc((slot.name || "").length)} / ${esc(space.perName)} characters</span></label>`;
+        <input class="input" data-name value="${esc(slot.name || "")}" placeholder="Macro ${esc(slot.keycode.split("_").at(-1))}" ${canEdit ? "" : "disabled"}
+            data-tip="${esc(NAME_TIP)}">
+        <span class="note${count.over ? " warn" : ""}" data-name-count>${esc(count.label)}</span></label>`;
+}
+function showCount(node, text, max) {
+    const count = nameCount(text, max);
+    node.textContent = count.label;
+    node.classList.toggle("warn", count.over);
 }
 
 // The layers that set this macro off themselves — a key carrying it, a

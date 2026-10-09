@@ -28,16 +28,16 @@ test("the demo profile decodes under the current schema, for current firmware, u
     const document = JSON.parse(text);
     const decoded = validateSnapshot(document, DEMO_CAPABILITIES);
     assert.equal(decoded.document, document, "nothing about it needed upgrading");
-    assert.equal(document.version, 2);
+    assert.equal(document.version, 3);
     assert.equal(document.keyboard, "charybdis-4x6");
-    assert.equal(document.actionAbiDigest, ACTION_ABI, "the 32-slot action vocabulary, 0xf79c6151");
-    assert.equal(document.layers.length, 8);
-    assert.equal(document.macros.length, 64);
+    assert.equal(document.actionAbiDigest, ACTION_ABI, "the 32-slot action vocabulary, 0x837cf479");
+    assert.equal(document.layers.length, 16);
+    assert.equal(document.macros.length, 128);
     assert.equal(decoded.pdModes.length, 32);
     assert.ok(decoded.profile.length <= DEMO_CAPABILITIES.maxProfilePayload);
     assert.ok(decoded.macros.length <= DEMO_CAPABILITIES.viaMacroBytes);
     assert.deepEqual(decoded.danglingPdBindings, {}, "no key reaches an empty pointing slot");
-    assert.equal(summary(document).names.length, 8);
+    assert.equal(summary(document).names.length, 16);
 });
 
 test("the demo profile is complete: it opens a draft in which every area can be edited", () => {
@@ -48,7 +48,7 @@ test("the demo profile is complete: it opens a draft in which every area can be 
     openDemo(session, {connected: false});
     const model = buildPanelModel(session, demoState());
     assert.equal(model.load.state, "ready");
-    assert.equal(model.layers.length, 8);
+    assert.equal(model.layers.length, 16);
     for (const area of ["behaviorEditing", "settingsEditing", "macroEditing", "customKeyEditing", "pdModeEditing"]) {
         assert.equal(model[area]?.writable, true, area);
     }

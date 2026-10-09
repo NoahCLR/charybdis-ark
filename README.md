@@ -11,11 +11,13 @@ checkout. Everything Ark shows comes from the keyboard itself.
 
 - **Keys and layers.** Pick keys from an ANSI board or search all of QMK. Drag
   one key onto another to swap them. Rename, reorder and re-base layers, and
-  preview several layers stacked the way the keyboard would resolve them.
+  preview several of the 16 layers stacked the way the keyboard would resolve them.
 - **Behaviours.** Set what a key does on tap, hold and long hold, for each tap
-  count, in one grid with its timing.
+  count, in one grid with its timing. Keep up to 128 definitions with five tap
+  counts each, and choose which layers and placements use them.
 - **Combos, macros and custom keys.** Build combos, write named macros or
-  record them, and name your own custom keys.
+  record them, and name your own custom keys. There are 128 slots in each bank;
+  a combo can have up to 16 inputs, with its own enable and layer controls.
 - **Lighting.** Set layer and mode colours, combo and key feedback, and the
   auto-mouse fade. The board on screen is painted the way the keyboard will
   light up.
@@ -33,7 +35,9 @@ and reads the result back to prove it.
 
 **Export profile** saves your whole setup as one file. **Import profile**
 takes a current-format backup by choosing a file or dropping it onto the Import
-card, then restores it after the same review. Older backups are refused.
+card, then restores it after the same review. Backups from the previous
+eight-layer, 32-pointing-slot firmware are translated for review too; see the
+[upgrade steps](docs/GUIDE.md#upgrading-from-eight-layer-firmware).
 
 No keyboard to hand? **Explore a demo** opens Ark on a complete setup with nothing
 connected. Every screen works and every edit shows up in the review; only Apply

@@ -1,6 +1,7 @@
 "use strict";
 
-// The one profile format the keyboard stores: schema 2.0, up to 5,088 bytes.
+// The one profile format the keyboard stores: schema 3.0, up to 65,504 bytes
+// (one 64 KiB slot less its header, firmware D-F14).
 // Earlier schemas and domain versions are refused, as the firmware refuses
 // them (firmware D-F10).
 const PROFILE_BLOB_V1 = Object.freeze({
@@ -8,11 +9,11 @@ const PROFILE_BLOB_V1 = Object.freeze({
     HEADER_SIZE: 8,
     DOMAIN_HEADER_SIZE: 4,
     ACTION_SIZE: 4,
-    SCHEMA_MAJOR: 2,
+    SCHEMA_MAJOR: 3,
     SCHEMA_MINOR: 0,
     CANONICAL_FLAG: 1,
     KNOWN_FLAGS: 1,
-    MAX_SIZE: 5088,
+    MAX_SIZE: 65504,
 });
 
 const PROFILE_DOMAIN_IDS = Object.freeze({
@@ -26,11 +27,11 @@ const PROFILE_DOMAIN_IDS = Object.freeze({
 // Each domain's one version, as the firmware's registry has them
 // (profile_domain_registry.h).
 const PROFILE_DOMAIN_VERSIONS = Object.freeze({
-    [PROFILE_DOMAIN_IDS.RGB]: 3,
-    [PROFILE_DOMAIN_IDS.KEY_BEHAVIORS]: 1,
-    [PROFILE_DOMAIN_IDS.COMBOS]: 2,
-    [PROFILE_DOMAIN_IDS.SETTINGS]: 5,
-    [PROFILE_DOMAIN_IDS.PD_MODES]: 2,
+    [PROFILE_DOMAIN_IDS.RGB]: 4,
+    [PROFILE_DOMAIN_IDS.KEY_BEHAVIORS]: 2,
+    [PROFILE_DOMAIN_IDS.COMBOS]: 3,
+    [PROFILE_DOMAIN_IDS.SETTINGS]: 6,
+    [PROFILE_DOMAIN_IDS.PD_MODES]: 3,
 });
 function assertSchema(major, minor) {
     if (major !== PROFILE_BLOB_V1.SCHEMA_MAJOR || minor !== PROFILE_BLOB_V1.SCHEMA_MINOR) {
@@ -51,10 +52,10 @@ const PROFILE_ACTION_KINDS = Object.freeze({
 });
 
 const PROFILE_ACTION_LIMITS = Object.freeze({
-    maxLogicalLayers: 8,
+    maxLogicalLayers: 16,
     maxPdModes: 32,
-    maxViaMacroSlots: 64,
-    maxCustomKeys: 64,
+    maxViaMacroSlots: 128,
+    maxCustomKeys: 128,
 });
 
 const MAGIC_BYTES = Buffer.from(PROFILE_BLOB_V1.MAGIC, "ascii");

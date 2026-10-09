@@ -24,7 +24,7 @@ const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require(path.join(here, "..", "core", "pro
 const {RGB_LOCALITIES} = require(path.join(here, "..", "core", "schema", "rgb-domain-v1"));
 const {document: pdDocument} = require(path.join(here, "fixtures", "pd-profile"));
 
-const capabilities = {compiledLayerCount: 8, supportedDomainMask: 31, actionAbiDigest: 0xf79c6151};
+const capabilities = {compiledLayerCount: 16, supportedDomainMask: 31, actionAbiDigest: 0x837cf479};
 
 function session() {
     const doc = pdDocument();
@@ -87,7 +87,7 @@ test("a modifier around a macro or pointing key is refused, not stored as anothe
     // the picker builds Cmd + VIA macro 3 as G(VIA_MACRO_3)
     const picked = edits.pickerExpression({keys: ["VIA_MACRO_3"], mods: ["Cmd"]});
     assert.equal(picked, "G(VIA_MACRO_3)");
-    for (const keycode of [picked, "C(PD_SLOT_0)", "LOCK_LAYER(8)", "LT(60, 0x00)"]) {
+    for (const keycode of [picked, "C(PD_SLOT_0)", "LOCK_LAYER(16)", "LT(60, 0x00)"]) {
         assert.throws(() => stage(draft, edits.setKey("Layer 0", 3, keycode)), /Cannot represent/, keycode);
     }
     assert.deepEqual(draft.document.layers[0], before);
@@ -416,7 +416,7 @@ test("a macro left holding a key is refused, and macro and custom keys land as t
     assert.throws(() => stage(draft, edits.macroMessage("VIA_MACRO_0", "{+KC_A}", draft.current.fingerprint)), /Release/);
     stage(draft, edits.layoutKeys("Layer 0", [{layoutIndex: 0, keycode: "VIA_MACRO_63"}, {layoutIndex: 1, keycode: "CUSTOM_KEY_15"}]));
     assert.equal(draft.document.layers[0][slotOf(0)], 0x773f);
-    assert.equal(draft.document.layers[0][slotOf(1)], 0x7e4f);
+    assert.equal(draft.document.layers[0][slotOf(1)], 0x7f0f);
     assert.throws(() => stage(draft, edits.layoutKeys("Layer 0", [{layoutIndex: 1, keycode: "MACRO_15"}])), /Cannot represent/, "the retired user macros are gone");
 });
 
@@ -788,4 +788,74 @@ test("on the 32-slot firmware, the same builders reach slots past seven", () => 
     stage(draft, edits.clearPdMode(12, draft.identity()));
     assert.equal(wide().pdModes[12].kind, 0);
     assert.ok(reviewAreas(draft).includes("Pointing modes"));
+});
+
+test("participation controls preserve definitions, review their scopes, and undo or discard as one edit", () => {
+    const initial = require("./fixtures/portable-profile").document();
+    const draft = new ProfileDraftSession({document: initial, fingerprint: portable.fingerprint(initial), summary: portable.summary(initial), limits: {brightnessMax: 200}}, "test-device", capabilities);
+    const base = draft.document;
+    stage(draft, edits.placementPolicy(15, 0, false, false));
+    assert.deepEqual(decoded(draft).settings.layers[15].bypass, [slotOf(0)]);
+    assert.deepEqual(decoded(draft).settings.layers[15].exclude, [slotOf(0)]);
+    let change = draft.view({selectedDeviceId: "test-device", connected: true}).changes.find(row => row.unit.startsWith("placement:"));
+    assert.equal(change.fields.length, 2);
+    draft.discard(draft.revision, change.group); assert.deepEqual(draft.document, base);
+    const model = buildDeviceModel(draft.editingState({selectedDeviceId: "test-device", connected: true, capabilities}));
+    const behavior = model.keyBehaviors[0], original = decoded(draft).behaviors.rows[0];
+    stage(draft, edits.saveBehaviour(behavior, {enabled: false, allowedLayers: 2 ** 15}, draft.identity()));
+    let stored = decoded(draft).behaviors.rows.find(row => JSON.stringify(row.target) === JSON.stringify(original.target));
+    assert.equal(stored.enabled, false); assert.equal(stored.allowedLayers, 32768);
+    assert.deepEqual(stored.steps, original.steps);
+    change = draft.view({selectedDeviceId: "test-device", connected: true}).changes.find(row => row.unit.startsWith("behavior:"));
+    assert.deepEqual(change.fields.map(field => field.label), ["Enabled", "Allowed layers"]);
+    // Another edit from a form that omits the fields must keep both permissions.
+    stage(draft, {type: "saveBehavior", behavior: {...edits.saveBehaviour(behavior).behavior, enabled: undefined, allowedLayers: undefined}});
+    stored = decoded(draft).behaviors.rows.find(row => JSON.stringify(row.target) === JSON.stringify(original.target));
+    assert.equal(stored.enabled, false); assert.equal(stored.allowedLayers, 32768);
+    draft.undo(draft.revision); assert.deepEqual(draft.document, base);
+    const combo = {id: 0, inputs: ["KC_A", "KC_B"], output: "KC_E", followsDefault: true, termMs: "50"};
+    stage(draft, edits.comboMessage(combo.id, {...combo, enabled: false, allowedLayers: 32768}));
+    assert.equal(decoded(draft).combos.rows[0].enabled, false);
+    assert.equal(decoded(draft).combos.rows[0].allowedLayers, 32768);
+    change = draft.view({selectedDeviceId: "test-device", connected: true}).changes.find(row => row.unit === "combo:0");
+    assert.deepEqual(change.fields.map(field => field.label), ["Enabled", "Allowed layers"]);
+    draft.discard(draft.revision, change.group); assert.deepEqual(draft.document, base);
+});
+
+test("a late layer carries its participation masks and placement flags through reorder", () => {
+    const draft = session();
+    stage(draft, edits.placementPolicy(15, 55, false, false));
+    const view = settingsEditorView(draft.current);
+    for (const [sectionId, macro] of [["behaviorSettings", "behaviorsOnLayer15"], ["comboSettings", "combosOnLayer15"]]) {
+        const section = view.sections.find(row => row.id === sectionId);
+        stage(draft, edits.settingsSection(section, field => field.macro === macro ? false : undefined));
+    }
+    const order = Array.from({length: 16}, (_, i) => i); [order[1], order[15]] = [order[15], order[1]];
+    const next = portable.validateSnapshot(portable.reorderLayers(draft.document, order));
+    assert.deepEqual(next.settings.layers[1].bypass, [slotOf(55)]);
+    assert.deepEqual(next.settings.layers[1].exclude, [slotOf(55)]);
+    assert.equal(next.settings.values[29] & 2, 0); assert.equal(next.settings.values[30] & 2, 0);
+    draft.editLayers(portable.reorderLayers(draft.document, order), draft.revision, order);
+    const placement = draft.changes().find(row => row.unit.startsWith("placement:"));
+    assert.equal(placement.place.layer, 1);
+    draft.discard(draft.revision, placement.group);
+    const reverted = portable.validateSnapshot(draft.document);
+    assert.deepEqual(reverted.settings.layers[1].bypass, []);
+    assert.deepEqual(reverted.settings.layers[1].exclude, []);
+    assert.equal(reverted.settings.values[29] & 2, 0);
+    assert.equal(reverted.settings.values[30] & 2, 0);
+    assert(draft.changes().some(row => row.unit === "layerOrder"));
+});
+
+test("an old backup opens as a translated import review before replacing the draft", async () => {
+    const {portableControl} = require("../core/session/panel-controls");
+    const previous = require("./fixtures/previous-profile.charybdis.json");
+    const draft = session(), before = draft.document;
+    const panel = {draft, service: {snapshot: () => ({selectedDeviceId: "test-device", connected: true, capabilities})}};
+    await portableControl(panel, edits.reviewPortableProfile(JSON.stringify(previous), "previous.json"));
+    assert.deepEqual(draft.document, before);
+    assert.equal(panel.portableReview.document.version, 3);
+    await portableControl(panel, {type: "restorePortableProfile"});
+    assert.equal(draft.document.layers.length, 16); assert.equal(draft.document.macros.length, 128);
+    draft.undo(draft.revision); assert.deepEqual(draft.document, before);
 });

@@ -1,19 +1,20 @@
 "use strict";
+const {MAX_TAP_DEPTH} = require("./profile-depth");
 
 const {PROFILE_BLOB_V1, PROFILE_DOMAIN_IDS} = require("./profile-blob-v1");
 
 const RGB_DOMAIN_V1 = Object.freeze({
     DOMAIN_ID: PROFILE_DOMAIN_IDS.RGB,
-    // Format 3, the only one the keyboard stores: a colour row per pointing
-    // slot, 32 of them.
-    DOMAIN_VERSION: 3,
-    FORMAT_VERSION: 3,
+    // Format 4, the only one the keyboard stores: a colour row per pointing
+    // slot, 32 of them, and per layer of the sixteen-layer bank (D-F14).
+    DOMAIN_VERSION: 4,
+    FORMAT_VERSION: 4,
     PD_SLOTS: 32,
     HEADER_SIZE: 16,
     PHYSICAL_LED_COUNT: 58,
     LED_BITMAP_SIZE: 8,
     MAX_GROUPS: 16,
-    MAX_LOGICAL_LAYERS: 8,
+    MAX_LOGICAL_LAYERS: 16,
     MAX_STAGE_GROUP_ROWS: 32,
     MAX_TAP_BRANCH_COLORS: 4,
     MAX_PAYLOAD_SIZE: PROFILE_BLOB_V1.MAX_SIZE - PROFILE_BLOB_V1.HEADER_SIZE - PROFILE_BLOB_V1.DOMAIN_HEADER_SIZE,
@@ -432,8 +433,8 @@ function normalizeComboRows(input, groupState, limits) {
 
 function normalizeKeyFeedback(value, limits) {
     const branches = requiredArray(value?.tapBranchColors, "keyFeedback.tapBranchColors");
-    if (branches.length > RGB_DOMAIN_V1.MAX_TAP_BRANCH_COLORS) {
-        throw rgbError("CAPACITY_EXCEEDED", `Key-feedback tap-branch color count ${branches.length}; maximum is ${RGB_DOMAIN_V1.MAX_TAP_BRANCH_COLORS}.`, {table: "keyFeedback.tapBranchColors"});
+    if (branches.length > limits.tapBranchColorCount) {
+        throw rgbError("CAPACITY_EXCEEDED", `Key-feedback tap-branch color count ${branches.length}; maximum is ${limits.tapBranchColorCount}.`, {table: "keyFeedback.tapBranchColors"});
     }
     if ((limits.compiledStageMask & RGB_STAGE_BITS.KEY_BEHAVIOR) !== 0 && branches.length !== limits.tapBranchColorCount) {
         throw rgbError("INCOMPLETE_SURFACE", `Key-feedback tap-branch colors must contain exactly ${limits.tapBranchColorCount} compiled entries.`, {table: "keyFeedback.tapBranchColors"});
@@ -476,7 +477,7 @@ function assertCompiledSurfaces(profile, limits) {
 }
 
 function assertHeaderCounts(counts, limits) {
-    if (counts.groups > RGB_DOMAIN_V1.MAX_GROUPS || counts.layerColors > limits.maxLogicalLayers || counts.pdColors > limits.maxPdModes || counts.branchColors > RGB_DOMAIN_V1.MAX_TAP_BRANCH_COLORS) {
+    if (counts.groups > RGB_DOMAIN_V1.MAX_GROUPS || counts.layerColors > limits.maxLogicalLayers || counts.pdColors > limits.maxPdModes || counts.branchColors > limits.tapBranchColorCount) {
         throw rgbError("CAPACITY_EXCEEDED", "RGB payload header count exceeds a fixed v1 capacity.");
     }
     if (counts.layerGroups + counts.pdGroups + counts.comboGroups + counts.keyGroups > RGB_DOMAIN_V1.MAX_STAGE_GROUP_ROWS) {
@@ -654,8 +655,8 @@ function assertU16(value, label) {
 
 function assertTapBranchColorCount(value) {
     const count = assertU8(value, "tapBranchColorCount");
-    if (count === 0 || count > RGB_DOMAIN_V1.MAX_TAP_BRANCH_COLORS) {
-        throw new RangeError(`tapBranchColorCount must be between one and ${RGB_DOMAIN_V1.MAX_TAP_BRANCH_COLORS}.`);
+    if (count === 0 || count >= MAX_TAP_DEPTH) {
+        throw new RangeError(`tapBranchColorCount must be between one and ${MAX_TAP_DEPTH - 1}.`);
     }
     return count;
 }

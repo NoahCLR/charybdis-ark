@@ -15,8 +15,8 @@ function message(current, sectionId, updates = {}) {
 test("Defaults and inherited behaviour timing come entirely from the complete keyboard snapshot", () => {
     const current = snapshot(), view = settingsEditorView(current);
     assert.equal(view.brightnessMax, 200);
-    const model = buildDeviceModel({settingsView: view, capabilities: {compiledLayerCount: 8}});
-    assert.equal(model.configDefaults.length, 11, "Combos has a section of its own");
+    const model = buildDeviceModel({settingsView: view, capabilities: {compiledLayerCount: 16}});
+    assert.equal(model.configDefaults.length, 12, "Combos and behaviours each have a section of their own");
     const fields = model.configDefaults.flatMap(section => section.fields);
     assert.equal(fields.find(field => field.macro === "volumeDpi"), undefined, "a pointing mode's speed is set on its slot, not in settings");
     assert.equal(fields.find(field => field.macro === "mouseLayer").value, "Layer 4");
@@ -24,7 +24,7 @@ test("Defaults and inherited behaviour timing come entirely from the complete ke
     assert.equal(model.behaviorTimingDefaults.tapHoldTerm, "150");
     assert.equal(model.settingsEditing.writable, true);
     assert.equal(buildDeviceModel({settingsView: view, capabilities: {compiledLayerCount: 5}}).settingsEditing.writable, false);
-    assert.equal(buildDeviceModel({settingsView: view, capabilities: {compiledLayerCount: 8}, busy: true}).settingsEditing.writable, false);
+    assert.equal(buildDeviceModel({settingsView: view, capabilities: {compiledLayerCount: 16}, busy: true}).settingsEditing.writable, false);
     assert.equal(settingsEditorView({incomplete: true}), null);
     assert.deepEqual(buildDeviceModel().configDefaults, []);
 });
@@ -87,7 +87,7 @@ test("invalid settings, incomplete sections and stale drafts fail before any dev
     assert.throws(() => edit("autoMouse", {mouseTimeout: "0"}), /Timeout.*range/, "the fade needs a timeout to be a share of");
     assert.throws(() => edit("automouseFade", {mouseFadeHold: "100"}), /range/, "a share is shorter than the whole");
     assert.throws(() => edit("autoMouse", {mouseDebounce: "256"}), /debounce.*range/);
-    assert.throws(() => edit("autoMouse", {mouseLayer: "Layer 8"}), /layer/);
+    assert.throws(() => edit("autoMouse", {mouseLayer: "Layer 16"}), /layer/);
     assert.throws(() => edit("comboSettings", {combosEnabled: "false"}), /enabled or disabled/);
     for (const value of ["", "1.5", "Infinity", "-1", "65536", " 150 "]) assert.throws(() => edit("keyTiming", {tapHoldTerm: value}));
     assert.throws(() => edit("normalPointerSpeed", {normalDpi: "500"}), /range/);
@@ -144,14 +144,17 @@ test("all native controls preserve a complete profile unchanged, including unkno
     assert.equal(validateSnapshot(next).settings.values[24], 0x8001);
     assert.throws(() => editSettings(current, message(current, "keyboardOptions", {autocorrect:true})), /not enabled/);
 });
-test("startup layers validate the final mask, and combo references preserve untouched nibbles", () => {
+test("startup layers validate the final mask, and combo references edit only their layer's record", () => {
     const current = withSettings(() => {});
-    const next = editSettings(current, message(current, "startupLayers", {startupLayer0:false, startupLayer7:true}));
-    assert.equal(validateSnapshot(next).settings.values[23], 128);
+    const next = editSettings(current, message(current, "startupLayers", {startupLayer0:false, startupLayer15:true}));
+    assert.equal(validateSnapshot(next).settings.values[23], 0x8000);
     assert.throws(() => editSettings(current, message(current, "startupLayers", {startupLayer0:false})), /at least one/);
-    const combos = editSettings(current, message(current, "comboReferences", {comboReference7:"Layer 0", comboReference2:"Layer 1"}));
-    assert.equal(validateSnapshot(combos).settings.values[27], 0x06543110);
-    assert.throws(() => editSettings(current, message(current, "comboReferences", {comboReference0:"Layer 8"})), /layer/);
+    const combos = editSettings(current, message(current, "comboReferences", {comboReference15:"Layer 0", comboReference2:"Layer 1"}));
+    const records = validateSnapshot(combos).settings.layers;
+    assert.deepEqual(records.map(record => record.reference), [0, 1, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 0]);
+    // The retired v5 scalar stays zero; the references live in the records.
+    assert.equal(validateSnapshot(combos).settings.values[27], 0);
+    assert.throws(() => editSettings(current, message(current, "comboReferences", {comboReference0:"Layer 16"})), /layer/);
 });
 test("lighting choices only allow reported effects and LED classes, while preserving other bytes", () => {
     const current = withSettings(settings => {settings.values[21] = 0xff1e0101;});

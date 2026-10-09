@@ -36,7 +36,7 @@ const {fixturePages} = require("../fixtures/device-combos");
 const {assertEffectiveCombos} = require("../../core/session/device-profile-edits");
 const readOf = pages => ({state: "read", ...decodeComboPages(pages[0], pages.slice(1))});
 const pages = fixturePages();
-const context = {capabilities: {supportedDomainMask: 7, actionAbiDigest: 0xf79c6151}, combos: readOf(pages)};
+const context = {capabilities: {supportedDomainMask: 7, actionAbiDigest: 0x837cf479}, combos: readOf(pages)};
 const comboTable = bytes => {const domain = decodeProfileBlob(bytes).domains.find(row => row.id === 0x30); return decodeComboDomain(domain.payload);};
 const comboRows = bytes => comboTable(bytes).rows;
 test("adding, editing and deleting combos preserves every untouched profile domain and combo", () => {
@@ -78,7 +78,7 @@ test("a combo follows the default window until it has its own, and the default i
     // With every combo deleted, both combo-wide values stay stored.
     let empty = retimed;
     for (let id = 2; id >= 0; id--) empty = editDeviceProfile(empty, {type: "deleteCombo", id}, context);
-    assert.deepEqual(comboTable(empty), {version: 2, defaultTermMs: 70, holdTermMs: 200, rows: []});
+    assert.deepEqual(comboTable(empty), {version: 3, defaultTermMs: 70, holdTermMs: 200, rows: []});
     assert.equal(comboTable(editDeviceProfile(empty, {type: "updateComboHoldTerm", holdTermMs: 250}, context)).holdTermMs, 250);
 });
 test("retired combo readback never becomes an editable table", () => {
@@ -127,5 +127,14 @@ test("auto-mouse save encodes all three policies exactly and keeps the chosen en
         assert.deepEqual(rgb(edited).automouseFade, {mode, endColor: {h: 179, s: 255, v: 199}});
         assert.deepEqual(rgb(edited).layerColors, rgb(bytes).layerColors);
         assert.deepEqual(rgb(edited).pdModeColors, rgb(bytes).pdModeColors);
+    }
+});
+
+test("effective combo verification includes definition enable and allowed source layers", () => {
+    const current = editDeviceProfile(bytes, {type: "updateComboHoldTerm", holdTermMs: 300}, context);
+    const read = {...context.combos, holdTermMs: 300};
+    assert.doesNotThrow(() => assertEffectiveCombos(current, read));
+    for (const patch of [{enabled: false}, {allowedLayers: 32767}]) {
+        assert.throws(() => assertEffectiveCombos(current, {...read, rows: read.rows.map((row, index) => index ? row : {...row, ...patch})}), /running combo/);
     }
 });

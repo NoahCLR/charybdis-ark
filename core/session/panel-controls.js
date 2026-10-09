@@ -16,9 +16,12 @@
 
 const {supportsCompleteProfile} = require("./portable-profile-session");
 const {validateSnapshot} = require("./portable-profile-session");
+const {FILE_MAX_BYTES} = require("../model/portable-profile");
+const {translateBackup} = require("../model/backup-translation");
 const {DEMO_WORDS, panelCapabilities, panelState} = require("./demo-session");
 const {applyLayerEdit, discardDraftForDevice, layerEditDocument, startLayerEdit} = require("./panel-session");
 const {IDENTITY} = require("../model/layer-order");
+const {LAYERS} = require("../model/portable-profile");
 
 const run = (host, title, work) => host.progress ? host.progress(title, work) : work();
 // The other half confirmed its copy before the keyboard switched, but the
@@ -90,7 +93,7 @@ async function readKeyboard(session, selectedDeviceId, host = {}) {
     }
     if (macroFailure) session.notice += macroFailure;
     return Boolean(!state.error && state.committed?.state === "read" && state.layout?.state === "read"
-        && state.capabilities?.compiledLayerCount === 8 && portable && !portable.incomplete);
+        && state.capabilities?.compiledLayerCount === LAYERS && portable && !portable.incomplete);
 }
 
 // The draft's own controls. Each leaves the session's outbox (notice, form
@@ -123,9 +126,9 @@ async function draftControl(session, message, host = {}) {
             draft.assertRevision(revision, {allowStale: true});
             const state = service.snapshot();
             if (!state.connected) throw new Error("Reconnect and read the keyboard before discarding its draft.");
-            const eight = state.capabilities?.compiledLayerCount === 8;
-            discardDraftForDevice(session, state, eight ? await service.readPortableProfile() : undefined);
-            session.notice = eight ? "Draft discarded. Showing the saved keyboard configuration." : "Draft discarded. This keyboard remains read-only.";
+            const complete = state.capabilities?.compiledLayerCount === LAYERS;
+            discardDraftForDevice(session, state, complete ? await service.readPortableProfile() : undefined);
+            session.notice = complete ? "Draft discarded. Showing the saved keyboard configuration." : "Draft discarded. This keyboard remains read-only.";
             return;
         }
         case "rebaseProfileDraft": {
@@ -184,8 +187,8 @@ async function portableControl(session, message, host = {}) {
             if (chosen === undefined) return;
             const text = typeof chosen === "string" ? chosen : chosen.text;
             if (typeof text !== "string") throw new Error("This profile file could not be read.");
-            if (Buffer.byteLength(text, "utf8") > 100000) throw new Error("This profile file is too large.");
-            const value = validateSnapshot(text, panelCapabilities(session));
+            if (Buffer.byteLength(text, "utf8") > FILE_MAX_BYTES) throw new Error("This profile file is too large.");
+            const value = validateSnapshot(translateBackup(text), panelCapabilities(session));
             session.portableReview = {document: value.document, fileName: typeof chosen === "string" ? null : chosen.name || null,
                 before: session.draft?.current || await service.readPortableProfile({forRestore: true}), revision: session.draft?.revision,
                 deviceId: panelState(session).selectedDeviceId, draftId: session.draft?.id};

@@ -32,6 +32,13 @@ const DEFAULT_PREPARING_PEER_TRANSFER_ALLOWANCE_MS = 20000;
 const DEFAULT_STATUS_SCHEDULING_MARGIN_MS = 1000;
 const DEFAULT_STATUS_SCAN_STEP_ALLOWANCE_MS = 45;
 const DEFAULT_STATUS_TIMEOUT_SAFETY_MS = 1000;
+// Whole-profile validation takes one step a scan, each one read of at most 20
+// bytes; settings and names read 20 bytes a step, behaviours a few bytes a
+// step. A maximum 37,667-byte profile took 7,429 steps (firmware D-F14), so a
+// step per four bytes gives a conservative software allowance with 5 ms
+// per scan. Real scan and validation latency still need hardware acceptance.
+const VALIDATION_BYTES_PER_STEP = 4;
+const DEFAULT_VALIDATION_STEP_ALLOWANCE_MS = 5;
 
 const COMMIT_IN_PROGRESS_STATES = Object.freeze([
     CANDIDATE_STATE.PREPARING_PEER,
@@ -869,6 +876,11 @@ function candidatePayloadLength(context) {
 // allows the firmware's full 60-second no-progress window plus enough time for
 // the audited maximum transfer and scheduling overhead. Observable status
 // transitions renew the deadline for the newly visible phase.
+//
+// VALIDATING is the other phase page 0 cannot show progress in: validation
+// renews the firmware's lease each step, so no precommit cleanup runs while it
+// works, and a large profile may validate for longer than the cleanup window.
+// It gets an allowance proportional to the candidate.
 function candidateStatusStallTimeoutMs(payloadLength, state) {
     if (state === CANDIDATE_STATE.PREPARING_PEER) {
         return FIRMWARE_PREPARING_PEER_NO_PROGRESS_TIMEOUT_MS
@@ -878,6 +890,11 @@ function candidateStatusStallTimeoutMs(payloadLength, state) {
         PROFILE_CANDIDATE_V1.MIN_BLOB_SIZE,
         Math.min(PROFILE_CANDIDATE_V1.MAX_BLOB_SIZE, Number(payloadLength) || PROFILE_CANDIDATE_V1.MAX_BLOB_SIZE)
     );
+    if (state === CANDIDATE_STATE.VALIDATING) {
+        return FIRMWARE_SPLIT_PEER_TIMEOUT_MS
+            + DEFAULT_STATUS_SCHEDULING_MARGIN_MS
+            + Math.ceil(boundedLength / VALIDATION_BYTES_PER_STEP) * DEFAULT_VALIDATION_STEP_ALLOWANCE_MS;
+    }
     const scanSteps = Math.ceil(boundedLength / PROFILE_CANDIDATE_V1.CHUNK_MAX);
     const workAllowance = FIRMWARE_SPLIT_PEER_TIMEOUT_MS
         + DEFAULT_STATUS_SCHEDULING_MARGIN_MS

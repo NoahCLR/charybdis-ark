@@ -33,10 +33,10 @@ test("real compiled defaults remain a canonical cross-language profile fixture",
     assert.equal(bytes.length, Number(fixture.get("profile.byte_length")));
     assert.equal(decoded.crc32, Number.parseInt(fixture.get("profile.crc32"), 16));
     assert.equal(decoded.digest, Number.parseInt(fixture.get("profile.fnv1a32"), 16));
-    assert.deepEqual(decoded.domains.map((domain) => [domain.id, domain.version]), [[0x10, 3], [0x20, 1], [0x30, 2], [0x40, 5], [0x50, 2]]);
+    assert.deepEqual(decoded.domains.map((domain) => [domain.id, domain.version]), [[0x10, 4], [0x20, 2], [0x30, 3], [0x40, 6], [0x50, 3]]);
     const rgb = decodeRgbDomainV1(decoded.domains[0].payload);
     const behaviors = decodeKeyBehaviorDomain(decoded.domains[1].payload);
-    assert.equal(rgb.layerColors.length, 8);
+    assert.equal(rgb.layerColors.length, 16);
     assert.equal(rgb.pdModeColors.length, 32);
     assert.deepEqual(encodeRgbDomainV1(rgb), decoded.domains[0].payload);
     assert.deepEqual(encodeKeyBehaviorDomain({rows: behaviors.rows}), decoded.domains[1].payload);
@@ -74,13 +74,13 @@ function minimalStudioModel() {
 }
 
 const milestoneCapabilities = {
-    maxLogicalLayers: 8,
-    maxBehaviorRows: 64,
+    maxLogicalLayers: 16,
+    maxBehaviorRows: 128,
     maxTapStepsPerBehavior: 5,
-    maxPopulatedBehaviorSteps: 128,
-    customKeySlots: 64,
-    viaMacroSlots: 64,
-    maxProfilePayload: 5088,
+    maxPopulatedBehaviorSteps: 640,
+    customKeySlots: 128,
+    viaMacroSlots: 128,
+    maxProfilePayload: 65504,
     physicalLedCount: 58,
 };
 
@@ -99,10 +99,10 @@ test("the native resolver refuses expressions whose bits would land on another k
     // Well-formed expressions still resolve, including nested modifiers.
     assert.equal(resolve("C(S(0x04))", {}), 0x0304);
     assert.equal(resolve("LT(15,0x04)", {}), 0x4f04);
-    assert.equal(resolve("LOCK_LAYER(7)", {}) - resolve("LOCK_LAYER(0)", {}), 7);
+    assert.equal(resolve("LOCK_LAYER(15)", {}) - resolve("LOCK_LAYER(0)", {}), 15);
     // Each of these used to OR into an unrelated keycode: a dead user keycode,
     // a macro with Ctrl dropped, RIGHT_THUMB, TO(4), QK_BOOTLOADER, MO(1)+mods.
-    for (const expression of ["G(VIA_MACRO_3)", "C(VIA_MACRO_3)", "C(PD_SLOT_0)", "LOCK_LAYER(8)",
+    for (const expression of ["G(VIA_MACRO_3)", "C(VIA_MACRO_3)", "C(PD_SLOT_0)", "LOCK_LAYER(16)",
         "LT(18,0x04)", "LT(60,0x00)", "LCTL(MO(1))"]) {
         assert.equal(resolve(expression, {}), undefined, expression);
     }

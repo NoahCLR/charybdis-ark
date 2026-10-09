@@ -58,14 +58,14 @@ async function expectBuildLink(line, mark) {
 
 const ready = (page) => expect(page.locator('[data-screen="mouse"]')).toBeEnabled({timeout: 20000});
 
-for (const demo of [false, true]) test(`drop a profile into the real ${demo ? "demo" : "keyboard"} import review, use it, and undo`, async ({page, context, baseURL}) => {
+for (const previous of [false, true]) for (const demo of [false, true]) test(`drop a ${previous ? "previous-format" : "current-format"} profile into the real ${demo ? "demo" : "keyboard"} import review, use it, and undo`, async ({page, context, baseURL}) => {
     const {keyboard, ownFilesOnly} = await withKeyboard(context, baseURL);
     const errors = await open(page);
     await page.locator(`.read-placeholder [data-act="${demo ? "explore-demo" : "choose-keyboard"}"]`).click();
     await ready(page);
     await page.locator('[data-screen="profile"]').click();
     // Choosing remains available and uses the same review card.
-    const file = pdDocument();
+    const file = previous ? structuredClone(require("../tests/fixtures/previous-profile.charybdis.json")) : pdDocument();
     file.layers[0][0] = 5;
     const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.locator('[data-act="import"]').click()]);
     await chooser.setFiles({name: "chosen.charybdis.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(file))});

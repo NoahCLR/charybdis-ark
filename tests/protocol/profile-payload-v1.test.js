@@ -205,8 +205,6 @@ test("metadata that does not describe a readable payload is refused", () => {
         [{chunkSize: 0}, "MALFORMED_RESPONSE"],
         [{chunkSize: 26}, "MALFORMED_RESPONSE"],
         [{payloadLength: 0}, "MALFORMED_RESPONSE"],
-        // 255 pages of 25 bytes is the addressable ceiling.
-        [{payloadLength: 25 * 256}, "INCOMPATIBLE_RESPONSE"],
     ]) {
         assert.throws(
             () => decodePayloadMetadata(metadataPage({bytes, generation: 1, ...overrides})),
@@ -215,6 +213,13 @@ test("metadata that does not describe a readable payload is refused", () => {
                 return true;
             }
         );
+    }
+});
+
+test("wide pages address a whole 64 KiB slot", () => {
+    // Pages are 16 bits (feature bit 19): past 255 pages, up to 65,504 bytes.
+    for (const payloadLength of [25 * 256, 65504]) {
+        assert.equal(decodePayloadMetadata(metadataPage({bytes: payloadOf(10), generation: 1, payloadLength})).payloadLength, payloadLength);
     }
 });
 

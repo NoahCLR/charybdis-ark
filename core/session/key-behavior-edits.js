@@ -8,6 +8,7 @@ const {semanticActionForExpression, resolveNativeQmkExpression} = require("../sc
 const {PD_SLOT_COUNT, actionName, isOwnedLayerCode, knownActionAbi} = require("../schema/actions");
 const {behaviorPlacementProblem} = require("../model/profile-placement");
 const {PROFILE_WIRE_FEATURES} = require("../protocol/profile-wire-v1");
+const {profileDepthOptions} = require("../schema/profile-depth");
 
 const BEHAVIOR_EDITS = new Set(["saveBehavior", "addBehavior", "deleteBehavior", "retargetBehavior"]);
 const RETARGET_CONFLICTS = new Set(["overwrite", "swap"]);
@@ -25,7 +26,7 @@ function integer(value, max, label, optional = false) {
 function editKeyBehaviors(payload, message, capabilities = {}) {
     if (!(capabilities.supportedDomainMask & 2)) throw invalid("This firmware does not support saving key behaviours.");
     const maxPdModes = PD_SLOT_COUNT;
-    const {rows} = decodeKeyBehaviorDomain(payload);
+    const {rows} = decodeKeyBehaviorDomain(payload, profileDepthOptions(capabilities).behaviors);
     const knownAbi = knownActionAbi(capabilities.actionAbiDigest);
     const ownsLayerKeys = Boolean(capabilities.featureFlags & PROFILE_WIRE_FEATURES.OWNED_LAYER_TOGGLES);
     const behaviorQmkFunctions = Boolean(capabilities.featureFlags & PROFILE_WIRE_FEATURES.BEHAVIOR_QMK_FUNCTIONS);
@@ -35,7 +36,7 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
         || (native(left) !== undefined && native(left) === native(right));
     // The keyboard refuses a profile whose actions sit where it cannot run
     // them, so every row is checked, not only the one being edited.
-    const layerCount = capabilities.compiledLayerCount ?? 8;
+    const layerCount = capabilities.compiledLayerCount ?? 16;
     const checkPlacements = (rows) => {
         const problem = behaviorPlacementProblem(rows, {layerCount, behaviorQmkFunctions});
         if (problem) throw invalid(problem);
@@ -123,7 +124,7 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
         const steps = [];
         const seen = new Set();
         for (const step of suppliedSteps) {
-            const tapIndex = integer(step?.tapCount, 4, "Tap branch index");
+            const tapIndex = integer(step?.tapCount, (capabilities.maxTapStepsPerBehavior ?? 5) - 1, "Tap branch index");
             if (seen.has(tapIndex)) throw invalid("A behaviour cannot repeat a tap branch index.");
             seen.add(tapIndex);
             const oldStep = previous?.steps.find(row => row.tapIndex === tapIndex);
@@ -152,12 +153,16 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
         }
         const anchored = form.keepsAutoMouseAnchored ?? previous?.keepsAutoMouseAnchored ?? false;
         if (typeof anchored !== "boolean") throw invalid("The auto-mouse anchor flag must be on or off.");
+        const enabled = form.enabled ?? previous?.enabled ?? true;
+        if (typeof enabled !== "boolean") throw invalid("The behaviour must be enabled or disabled.");
         const row = {
             target: previous?.target ?? target,
             tapHoldTerm: integer(form.tapHoldTerm, 65535, "Tap/hold time", true),
             longerHoldTerm: integer(form.longerHoldTerm, 65535, "Long-hold time", true),
             multiTapTerm: integer(form.multiTapTerm, 65535, "Multi-tap time", true),
             keepsAutoMouseAnchored: anchored,
+            enabled,
+            allowedLayers: integer(form.allowedLayers ?? previous?.allowedLayers ?? (2 ** layerCount - 1), 2 ** layerCount - 1, "Allowed layers"),
             steps,
         };
         if (previous) rows[index] = row;

@@ -68,16 +68,16 @@ test("unstored behaviour defaults share the firmware timing and built-in rules",
 });
 
 test("device shortcut labels stay complete and semantic names require the advertised ABI", () => {
-    const values = [0x0806, 0x0a1d, 0x7e80, 0x7ec5, 0x7ec6, 0x7e42];
+    const values = [0x0806, 0x0a1d, 0x7e80, 0x7ec5, 0x7ec6, 0x7f02];
     const state = {
         layout: layoutWith(values.map((keycode, layoutIndex) => ({keycode, layoutIndex, resolved: resolve(keycode)}))),
-        committed: decodedDeviceProfile(), capabilities: {actionAbiDigest: 0xf79c6151},
+        committed: decodedDeviceProfile(), capabilities: {actionAbiDigest: 0x837cf479},
     };
     const model = buildDeviceModel(state);
     assert.deepEqual(model.layers[0].positions.map(key => key.display), ["Cmd+C", "Shift+Cmd+Z", "Pd slot 0", "Lock Layer 5", "Lock Layer 6", "Custom key 2"],
         "a layer lock and a custom key are user slots under the native ABI, named by what they are");
-    assert.equal(model.layers[0].positions[5].keycode, "QK_USER_2", "the editable identity still encodes to the original numeric value");
-    assert.equal(buildDeviceModel({...state, capabilities: {}}).layers[0].positions[5].display, "User 2", "an unknown ABI names no custom key");
+    assert.equal(model.layers[0].positions[5].keycode, "0x7F02", "the editable identity still encodes to the original numeric value");
+    assert.doesNotMatch(buildDeviceModel({...state, capabilities: {}}).layers[0].positions[5].display, /Custom key/, "an unknown ABI names no custom key");
 });
 
 test("a position carries what its value means, not only what the keyboard calls it", () => {
@@ -85,18 +85,21 @@ test("a position carries what its value means, not only what the keyboard calls 
     // user keycodes, while every other domain names them semantically. The
     // position publishes both, so a lookup from a key to what it reaches has
     // something to match on and does not re-derive the mapping.
-    const values = [0x7e80, 0x7700, 0x0004, 0x7e40];
+    const values = [0x7e80, 0x7700, 0x0004, 0x7f00];
     const model = buildDeviceModel({
         layout: layoutWith(values.map((keycode, layoutIndex) => ({keycode, layoutIndex, resolved: resolve(keycode)}))),
         committed: decodedDeviceProfile(),
-        capabilities: {actionAbiDigest: 0xf79c6151},
+        capabilities: {actionAbiDigest: 0x837cf479},
         macroView: {viaMacros: [{keycode: "VIA_MACRO_0", kind: "via", name: "Sign-off"}]},
-        customKeyView: {keys: [{slot: 0, keycode: "CUSTOM_KEY_0", code: 0x7e40, name: "Right Thumb", hasBehavior: true}]},
+        customKeyView: {keys: [{slot: 0, keycode: "CUSTOM_KEY_0", code: 0x7f00, name: "Right Thumb", hasBehavior: true}]},
     });
     assert.deepEqual(model.layers[0].positions.map((key) => [key.keycode, key.semantic]), [
-        ["0x7E80", "PD_SLOT_0"], ["QK_MACRO_0", "VIA_MACRO_0"], ["KC_A", "KC_A"], ["QK_USER_0", "CUSTOM_KEY_0"]]);
-    assert.equal(model.qmkKeyLabels.QK_USER_0, "Right Thumb", "a named custom key is labelled by its name");
-    assert.ok(model.qmkKeycodes.some(key => key.value === "CUSTOM_KEY_63" && key.keycode === 0x7e7f && key.group === "Custom keys"), "every custom key is offered");
+        ["0x7E80", "PD_SLOT_0"], ["QK_MACRO_0", "VIA_MACRO_0"], ["KC_A", "KC_A"], ["0x7F00", "CUSTOM_KEY_0"]]);
+    assert.equal(model.qmkKeyLabels["0x7F00"], "Right Thumb", "a named custom key is labelled by its name");
+    for (const [slot, keycode] of [[63, 0x7f3f], [64, 0x7f40], [127, 0x7f7f]]) {
+        assert.ok(model.qmkKeycodes.some(key => key.value === `CUSTOM_KEY_${slot}` && key.keycode === keycode && key.group === "Custom keys"), `custom key ${slot} is offered`);
+    }
+    assert.ok(!model.qmkKeycodes.some(key => key.value === "CUSTOM_KEY_128"));
     assert.equal(model.qmkKeyLabels.QK_MACRO_0, "Sign-off", "a named macro is labelled by its name");
 });
 
@@ -262,7 +265,7 @@ test("the header exposes one health model for connection, convergence and recove
     assert.equal(connected.health.phase, "reading profile");
     assert.equal(connected.health.restartNeeded, false);
     const wedged = buildDeviceModel({
-        capabilities: {compiledLayerCount: 8},
+        capabilities: {compiledLayerCount: 16},
         status: {committedGeneration: 4, activeGeneration: 4, peerGeneration: 4, committedDigest: 1, peerKnown: true, peerConverged: true, peerCleanupPending: true},
     }).device;
     assert.equal(wedged.health.restartNeeded, true, "the rail asks for a restart while the peer holds a cancelled save");
@@ -305,7 +308,7 @@ test("decoded domains reach the UI only after a verified read", () => {
 
     const done = buildDeviceModel({committed: committedRead({domains: {rgb, keyBehaviors: behaviors}})});
     assert.equal(done.rgb.layerColors[0].layer, "Layer 0");
-    assert.equal(done.rgb.layerColors.length, 8);
+    assert.equal(done.rgb.layerColors.length, 16);
     assert.equal(done.keyBehaviors.length, 37);
     assert.ok(done.keyBehaviors.every(row => row.keycode && row.steps.every(step => Number.isInteger(step.tapCount))));
 });
@@ -326,7 +329,7 @@ test("a domain that fails to decode is named, and the others still render", () =
         }),
     });
 
-    assert.equal(model.rgb.layerColors.length, 8, "one bad domain must not discard the whole profile");
+    assert.equal(model.rgb.layerColors.length, 16, "one bad domain must not discard the whole profile");
     assert.deepEqual(model.keyBehaviors, []);
     assert.match(model.diagnostics.join(" "), /0x20 did not decode/);
     assert.match(model.diagnostics.join(" "), /row count exceeds/);
@@ -353,7 +356,7 @@ test("compiled defaults are shown, and labelled as compiled", () => {
         committed: committedRead({source: "compiled", generation: 0, byteLength: 210, domains: decodedDeviceProfile().domains}),
     });
 
-    assert.equal(model.rgb.layerColors.length, 8, "the tabs must populate from compiled defaults");
+    assert.equal(model.rgb.layerColors.length, 16, "the tabs must populate from compiled defaults");
     assert.equal(model.keyBehaviors.length, 37);
     assert.match(model.diagnostics.join(" "), /compiled defaults/);
     assert.match(model.diagnostics.join(" "), /Nothing is committed/);
@@ -389,8 +392,8 @@ test("a behaviour on a key never renames what the vocabulary already names", () 
         row({kind: 6, flags: 0, operand: 0}),   // VIA_MACRO_0
     ]}};
     const macroView = {viaMacros: [{kind: "via", keycode: "VIA_MACRO_0", payload: ""}], hardcodedMacros: []};
-    const labels = buildDeviceModel({committed, macroView, capabilities: {actionAbiDigest: 0xf79c6151}}).qmkKeyLabels;
-    const plain = buildDeviceModel({macroView, capabilities: {actionAbiDigest: 0xf79c6151}}).qmkKeyLabels;
+    const labels = buildDeviceModel({committed, macroView, capabilities: {actionAbiDigest: 0x837cf479}}).qmkKeyLabels;
+    const plain = buildDeviceModel({macroView, capabilities: {actionAbiDigest: 0x837cf479}}).qmkKeyLabels;
     assert.equal(labels["MO(1)"], plain["MO(1)"], "MO(1) reads as it does with no behaviour on it, not \"Mo(1)\"");
     assert.equal(labels.QK_MACRO_0, "Macro 0", "the macro screen's name");
     assert.equal(labels["0x7EC2"], "Lock Layer 2", "a bare user slot reads by what it does to which layer");

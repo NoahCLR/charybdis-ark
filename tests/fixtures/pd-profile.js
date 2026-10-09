@@ -23,6 +23,6 @@ function document() {
         }
         return domain;
     })});
-    return createSnapshot({profile, actionAbiDigest: doc.actionAbiDigest, via: {layers: 8, layout: Buffer.alloc(960), macros: Buffer.alloc(7191), macroSlots: 64}});
+    return createSnapshot({profile, actionAbiDigest: doc.actionAbiDigest, via: {layers: 16, layout: Buffer.alloc(1920), macros: Buffer.alloc(10327), macroSlots: 128}});
 }
 module.exports = {document};

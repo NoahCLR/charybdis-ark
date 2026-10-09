@@ -24,14 +24,14 @@ const PROFILE_CANDIDATE_V1 = Object.freeze({
     VALUE_STATUS: 0x18,
     CHUNK_MAX: 20,
     MIN_BLOB_SIZE: 8,
-    MAX_BLOB_SIZE: 5088,
+    MAX_BLOB_SIZE: 65504,
     STATUS_LAYOUT_VERSION: 1,
     STATUS_PAYLOAD_SIZE: 25,
-    // Format 3 (`NR`): every save is one logical generation bound to the VIA
-    // store's generation and digest. The firmware refuses any other format,
-    // including the custom-only format 0 earlier firmware took.
-    LOGICAL_STORE_FORMAT: 3,
-    SCHEMA_MAJOR: 2,
+    // Format 4 (`NS`, firmware D-F14): every save is one logical generation
+    // bound to the VIA store's generation and digest, in a 64 KiB slot. The
+    // firmware refuses any other format.
+    LOGICAL_STORE_FORMAT: 4,
+    SCHEMA_MAJOR: 3,
     SCHEMA_MINOR: 0,
     KNOWN_DOMAIN_MASK: PROFILE_WIRE_DOMAINS.RGB | PROFILE_WIRE_DOMAINS.KEY_BEHAVIORS | PROFILE_WIRE_DOMAINS.COMBOS | PROFILE_WIRE_DOMAINS.SETTINGS | PROFILE_WIRE_DOMAINS.PD_MODES,
 });

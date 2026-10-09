@@ -13,8 +13,8 @@ test("complete snapshots flatten effective domains and round-trip without destin
     const source = document(), actual = validateSnapshot(JSON.stringify(source));
     assert.equal(actual.behaviors.rows.length, 37); assert.equal(actual.combos.rows.length, 1);
     // The keyboard stores a default window, and its combo follows it.
-    assert.deepEqual([actual.combos.version, actual.combos.defaultTermMs, actual.combos.holdTermMs, actual.combos.rows[0].termMs], [2, 50, 200, null]);
-    assert.equal(actual.settings.names[3], "Navigation"); assert.equal(actual.layout.length, 960);
+    assert.deepEqual([actual.combos.version, actual.combos.defaultTermMs, actual.combos.holdTermMs, actual.combos.rows[0].termMs], [3, 50, 200, null]);
+    assert.equal(actual.settings.names[3], "Navigation"); assert.equal(actual.layout.length, 1920);
     assert.equal(fingerprint(JSON.parse(JSON.stringify(source))), fingerprint(source));
 });
 test("empty domains are explicit and replace flashed behaviours and combos", () => {
@@ -24,12 +24,12 @@ test("empty domains are explicit and replace flashed behaviours and combos", () 
     assert.equal(validateSnapshot(source).behaviors.rows.length, 0); assert.equal(validateSnapshot(source).combos.rows.length, 0);
 });
 test("reorder moves matrix data, RGB, pointer policy and every layer action reference together", () => {
-    const source = document(), reordered = reorderLayers(source, [0, 4, 2, 3, 1, 5, 6, 7]);
+    const source = document(), reordered = reorderLayers(source, [0, 4, 2, 3, 1, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
     const actual = validateSnapshot(reordered);
     assert.deepEqual(reordered.layers[0].slice(0, 5), [0x5224, 0x4431, 0x7ec1, 0x5082, 0x52c4]);
     assert.equal(actual.settings.names[1], "Pointer"); assert.equal(actual.settings.values[5], 1);
     assert.equal(actual.rgb.layerColors.find(row => row.layerId === 1).color.v, 150);
-    assert.equal(fingerprint(reorderLayers(reordered, [0, 4, 2, 3, 1, 5, 6, 7])), fingerprint(source));
+    assert.equal(fingerprint(reorderLayers(reordered, [0, 4, 2, 3, 1, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])), fingerprint(source));
 });
 test("a backup from older firmware is refused, never upgraded: the keyboard stores only the current format", () => {
     const older = /older firmware/;
@@ -37,9 +37,9 @@ test("a backup from older firmware is refused, never upgraded: the keyboard stor
     // Another schema, action vocabulary or layer count, and the retired
     // pointing-mode evidence older backups carried.
     assert.throws(() => validateSnapshot({...source, version: 1}), older);
-    for (const actionAbiDigest of [0x1d3fcacc, 0x61072732, 0xeb80829c, 0xdcb00959]) assert.throws(() => validateSnapshot({...source, actionAbiDigest}), older);
+    for (const actionAbiDigest of [0x1d3fcacc, 0x61072732, 0xeb80829c, 0xdcb00959, 0xf79c6151]) assert.throws(() => validateSnapshot({...source, actionAbiDigest}), older);
     assert.throws(() => validateSnapshot({...source, pdModeSource: {version: 1}}), /unsupported fields/);
-    assert.throws(() => validateSnapshot({...source, layers: source.layers.slice(0, 5)}), /eight layers/);
+    assert.throws(() => validateSnapshot({...source, layers: source.layers.slice(0, 8)}), /16 layers/);
     // A current envelope around a retired domain version.
     const blob = decodeProfileBlob(Buffer.from(source.profile, "base64"));
     const raw = Buffer.from(source.profile, "base64");
@@ -58,7 +58,7 @@ test("behaviour targets and tap/hold branches follow their layers", () => {
     const behaviors = decodeKeyBehaviorDomain(blob.domains[1].payload);
     behaviors.rows = [{target: {kind: 2, operand: 1}, steps: [{tapIndex: 0, tap: {kind: 3, operand: 4}, hold: {mode: 1, repeatHz: 0, action: {kind: 2, operand: 1}}}]}];
     blob.domains[1].payload = encodeKeyBehaviorDomain(behaviors); source.profile = encodeProfileBlob(blob).toString("base64");
-    const row = validateSnapshot(reorderLayers(source, [0, 4, 2, 3, 1, 5, 6, 7])).behaviors.rows[0];
+    const row = validateSnapshot(reorderLayers(source, [0, 4, 2, 3, 1, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])).behaviors.rows[0];
     assert.equal(row.target.operand, 4); assert.equal(row.steps[0].tap.operand, 1); assert.equal(row.steps[0].hold.action.operand, 4);
 });
 test("owned layer keys follow their layers on a key, in a behaviour and on a combo", () => {
@@ -74,7 +74,7 @@ test("owned layer keys follow their layers on a key, in a behaviour and on a com
     blob.domains[2].payload = encodeComboDomain(combos);
     source.profile = encodeProfileBlob(blob).toString("base64");
 
-    const reordered = reorderLayers(source, [0, 4, 2, 3, 1, 5, 6, 7]), actual = validateSnapshot(reordered);
+    const reordered = reorderLayers(source, [0, 4, 2, 3, 1, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]), actual = validateSnapshot(reordered);
     assert.deepEqual(reordered.layers[0].slice(10, 15), [0x5264, 0x5201, 0x5284, 0x52c1, 0x5244]);
     assert.equal(actual.behaviors.rows[0].target.operand, 0x52c4, "TT(1) as a behaviour's key becomes TT(4)");
     assert.equal(actual.behaviors.rows[0].steps[0].tap.operand, 0x5264, "TG(1) as a tap becomes TG(4)");
@@ -94,7 +94,7 @@ test("with keys not following, layers move but every layer key keeps its number"
     source.profile = encodeProfileBlob(blob).toString("base64");
     const before = validateSnapshot(source);
 
-    const order = [0, 4, 2, 3, 1, 5, 6, 7];
+    const order = [0, 4, 2, 3, 1, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
     const moved = reorderLayers(source, order, undefined, {keysFollow: false}), actual = validateSnapshot(moved);
     // Each layer's own keys move with it, untouched...
     order.forEach((old, next) => assert.deepEqual(moved.layers[next], source.layers[old], `layer ${old} lands at ${next} as it was`));
@@ -127,18 +127,18 @@ test("a new base trades roles with the old one: keys to either keep their number
     const before = validateSnapshot(source);
 
     // Navigation (3) becomes the base; the old base takes slot 3.
-    const order = [3, 1, 2, 0, 4, 5, 6, 7];
+    const order = [3, 1, 2, 0, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
     const moved = reorderLayers(source, order), actual = validateSnapshot(moved);
     assert.deepEqual(moved.layers[3].slice(10, 14), [0x5200, 0x5203, 0x5262, 0x5223], "TO(0) stays home, TO(3) and MO(3) now reach the old base, TG(2) follows");
     assert.equal(actual.behaviors.rows[0].steps[0].tap.operand, 0, "LOCK_LAYER(0) still names the base");
     assert.equal(actual.behaviors.rows[0].steps[0].hold.action.operand, 3, "MO(3) held the new base, so it holds the old one");
     assert.equal(actual.combos.rows[0].output.operand, 0x5203);
     // Moved on past the swap, the old base is still what those keys reach.
-    const further = reorderLayers(source, [3, 1, 2, 4, 5, 6, 7, 0]);
+    const further = reorderLayers(source, [3, 1, 2, 4, 5, 6, 7, 0, 8, 9, 10, 11, 12, 13, 14, 15]);
     assert.equal(further.layers[7][11], 0x5207, "TO(3) reaches the old base in slot 7");
     assert.equal(further.layers[7][12], 0x5262, "TG(2) stays with Symbols");
     // Keys not following leaves the other layers' keys alone, never the swap.
-    const kept = reorderLayers(source, [3, 1, 4, 5, 6, 7, 2, 0], undefined, {keysFollow: false});
+    const kept = reorderLayers(source, [3, 1, 4, 5, 6, 7, 2, 0, 8, 9, 10, 11, 12, 13, 14, 15], undefined, {keysFollow: false});
     assert.deepEqual(kept.layers[7].slice(10, 14), [0x5200, 0x5207, 0x5262, 0x5227], "TO(3) and MO(3) still reach the old base; TG(2) keeps its number");
     assert.deepEqual(validateSnapshot(kept).behaviors.rows[0].steps[0].hold.action.operand, 7);
     assert.equal(actual.settings.names[0], before.settings.names[3]);
@@ -146,7 +146,7 @@ test("a new base trades roles with the old one: keys to either keep their number
     assert.deepEqual(actual.rgb.layerColors.find(row => row.layerId === 0).color, before.rgb.layerColors.find(row => row.layerId === 3).color, "the new base keeps its colour");
     assert.equal(actual.settings.values[23], 1, "the bottom slot is still the one that starts on");
     assert.equal(actual.settings.values[5], order.indexOf(before.settings.values[5]), "the pointer layer follows what it holds");
-    assert.equal(actual.settings.values[27] >>> 0, 0x76543210, "each layer's combos still read from the layer itself");
+    assert.deepEqual(actual.settings.layers.map(record => record.reference), Array.from({length: 16}, (_, layer) => layer), "each layer's combos still read from the layer itself");
 });
 
 test("Make base gives the old uncoloured base its saved HSV and normalizes empty keys", () => {
@@ -159,7 +159,7 @@ test("Make base gives the old uncoloured base its saved HSV and normalizes empty
     source.layers[0].splice(0, 4, 0, 1, 4, 0);
     source.layers[3].splice(0, 4, 1, 0, 5, 1);
 
-    const moved = reorderLayers(source, [3, 1, 2, 0, 4, 5, 6, 7]);
+    const moved = reorderLayers(source, [3, 1, 2, 0, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
     const rgb = validateSnapshot(moved).rgb;
     assert.deepEqual(moved.layers[0].slice(0, 4), [0, 0, 5, 0], "transparent positions entering base become KC_NO");
     assert.deepEqual(moved.layers[3].slice(0, 4), [1, 1, 4, 1], "KC_NO positions leaving base become transparent");
@@ -175,7 +175,7 @@ test("Make base leaves unused matrix slots alone through a base swap and back", 
     source.layers[0] = source.layers[0].map((_, slot) => physical.has(slot) ? 4 : 0);
     source.layers[2] = source.layers[2].map((_, slot) => physical.has(slot) ? 1 : 0);
 
-    const swap = [2, 1, 0, 3, 4, 5, 6, 7];
+    const swap = [2, 1, 0, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
     const moved = reorderLayers(source, swap);
     assert.equal(moved.layers[0][0], 0, "a physical transparent key entering base becomes KC_NO");
     assert.equal(moved.layers[2][0], 4, "a physical key leaving base keeps its assignment");
@@ -195,18 +195,18 @@ test("Make base keeps an existing old-base colour, while overlay reorders keep e
     source.profile = encodeProfileBlob(blob).toString("base64");
     source.layers[0][0] = 0;
     source.layers[3][0] = 1;
-    const moved = reorderLayers(source, [3, 1, 2, 0, 4, 5, 6, 7]);
+    const moved = reorderLayers(source, [3, 1, 2, 0, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
     assert.deepEqual(validateSnapshot(moved).rgb.layerColors[3], {layerId: 3, color: {h: 0, s: 0, v: 120}, mode: 0});
-    const overlay = reorderLayers(source, [0, 3, 2, 1, 4, 5, 6, 7]);
+    const overlay = reorderLayers(source, [0, 3, 2, 1, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
     assert.equal(overlay.layers[0][0], 0);
     assert.equal(overlay.layers[1][0], 1);
 });
 
 test("partial, incompatible, over-capacity and malformed profiles fail before restore", () => {
     const source = document();
-    assert.throws(() => validateSnapshot({...source, layers: source.layers.slice(0, 4)}), /eight layers/);
+    assert.throws(() => validateSnapshot({...source, layers: source.layers.slice(0, 4)}), /16 layers/);
     assert.throws(() => validateSnapshot({...source, profile: source.profile + "!"}), /profile data/);
-    assert.throws(() => validateSnapshot(source, {compiledLayerCount: 8, supportedDomainMask: 15, actionAbiDigest: 1}), /vocabulary/);
+    assert.throws(() => validateSnapshot(source, {compiledLayerCount: 16, supportedDomainMask: 15, actionAbiDigest: 1}), /vocabulary/);
     assert.throws(() => reorderLayers(source, [1, 1, 2, 3, 4, 5, 6, 7]), /every layer once/);
 });
 module.exports = {settings, document};

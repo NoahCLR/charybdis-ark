@@ -7,7 +7,7 @@ const {settingsEditorView} = require("../../core/model/settings-editor");
 const {ProfileDraftSession} = require("../../core/session/profile-draft-session");
 const {document: pdDocument} = require("../fixtures/pd-profile");
 
-const capabilities = {compiledLayerCount: 8, supportedDomainMask: 31, actionAbiDigest: 0xf79c6151};
+const capabilities = {compiledLayerCount: 16, supportedDomainMask: 31, actionAbiDigest: 0x837cf479};
 const snapshotOf = (document) => ({document, fingerprint: fingerprint(document), summary: summary(document), limits: {brightnessMax: 200}});
 
 // A draft with one edit of every kind the review describes.

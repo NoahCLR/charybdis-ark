@@ -48,7 +48,7 @@ test("JavaScript emits the exact candidate frames consumed by the firmware fixtu
     assert.equal(CANDIDATE_STATE.CONVERGING_PEER, 9);
     const fixtures = goldenFixtures();
     const metadata = {
-        schemaMajor: 2,
+        schemaMajor: 3,
         schemaMinor: 0,
         requestedDomains: 3,
         flags: 0,
@@ -56,13 +56,13 @@ test("JavaScript emits the exact candidate frames consumed by the firmware fixtu
         crc32: 0x11223344,
         digest: 0x88776655,
         actionAbiDigest: 0xccbbaa99,
-        storeFormatVersion: 3,
+        storeFormatVersion: 4,
         viaGeneration: 6,
         viaDigest: 0xabcdef01,
     };
     assert.deepEqual(buildCandidateBeginRequest(0x1234, metadata), fixtures["begin-request"]);
     assert.deepEqual(
-        buildCandidateChunkRequest(0x1234, 0, Buffer.from("4e4c503102000001", "hex")),
+        buildCandidateChunkRequest(0x1234, 0, Buffer.from("4e4c503103000001", "hex")),
         fixtures["chunk-request"]
     );
     assert.deepEqual(buildCandidateValidateRequest(0x1234), fixtures["validate-request"]);
@@ -175,7 +175,8 @@ test("candidate status uses normal request correlation and decodes structured lo
 test("candidate codecs reject noncanonical padding, invalid bounds, and unknown status values", () => {
     const fixtures = goldenFixtures();
     assert.throws(() => buildCandidateChunkRequest(1, 0, Buffer.alloc(0)), /1 through 20/);
-    assert.throws(() => buildCandidateChunkRequest(1, 5070, Buffer.alloc(20)), /end at or before/);
+    assert.throws(() => buildCandidateChunkRequest(1, 65500, Buffer.alloc(20)), /end at or before/);
+    assert.equal(buildCandidateChunkRequest(1, 65484, Buffer.alloc(20)).readUInt16LE(5), 65484, "the last chunk of a full slot");
     assert.throws(() => buildCandidateAbortRequest(0), /nonzero/);
 
     const badAck = Buffer.from(fixtures["begin-queued-ack"]);
@@ -200,21 +201,21 @@ test("candidate codecs reject noncanonical padding, invalid bounds, and unknown 
     assert.equal(decodeCandidateStatusResponse(failed, fixtures["operation-status-request"]).state, CANDIDATE_STATE.AUTHORITY_FAILED);
 });
 
-const SCHEMA_2 = {major: 2, minor: 0};
+const SCHEMA_3 = {major: 3, minor: 0};
 const binding = {viaGeneration: 9, viaDigest: 0x89abcdef};
 
 test("metadata is derived from the canonical blob and its exact domain mask", () => {
     const blob = encodeProfileBlob({
-        schema: SCHEMA_2,
-        domains: [{id: PROFILE_DOMAIN_IDS.RGB, version: 3, payload: Buffer.alloc(3)}],
+        schema: SCHEMA_3,
+        domains: [{id: PROFILE_DOMAIN_IDS.RGB, version: 4, payload: Buffer.alloc(3)}],
     });
     const metadata = candidateMetadataForBlob(blob, {actionAbiDigest: 0x12345678, ...binding});
-    assert.equal(metadata.schemaMajor, 2);
+    assert.equal(metadata.schemaMajor, 3);
     assert.equal(metadata.schemaMinor, 0);
     assert.equal(metadata.requestedDomains, 1);
     assert.equal(metadata.payloadLength, blob.length);
     assert.equal(metadata.actionAbiDigest, 0x12345678);
-    assert.equal(metadata.storeFormatVersion, 3);
+    assert.equal(metadata.storeFormatVersion, 4);
     assert.notEqual(metadata.crc32, metadata.digest);
     assert.throws(
         () => candidateMetadataForBlob(blob, {actionAbiDigest: 1, requestedDomains: 2, ...binding}),
@@ -222,18 +223,18 @@ test("metadata is derived from the canonical blob and its exact domain mask", ()
     );
 });
 
-test("every candidate begin binds the target VIA identity in store format 3", () => {
-    const blob = encodeProfileBlob({schema: SCHEMA_2, domains: []});
+test("every candidate begin binds the target VIA identity in store format 4", () => {
+    const blob = encodeProfileBlob({schema: SCHEMA_3, domains: []});
     const metadata = candidateMetadataForBlob(blob, {actionAbiDigest: 0x12345678, ...binding});
     const report = buildCandidateBeginRequest(0x4321, metadata);
-    assert.equal(report[5], 2);
-    assert.equal(report[23], 3);
+    assert.equal(report[5], 3);
+    assert.equal(report[23], 4);
     assert.equal(report.readUInt32LE(24), 9);
     assert.equal(report.readUInt32LE(28), 0x89abcdef);
 });
 
 test("a candidate without a nonzero VIA binding fails before anything is sent", () => {
-    const blob = encodeProfileBlob({schema: SCHEMA_2, domains: []});
+    const blob = encodeProfileBlob({schema: SCHEMA_3, domains: []});
     const unbound = (error) => error.code === "VIA_BINDING_REQUIRED";
     assert.throws(() => candidateMetadataForBlob(blob, {actionAbiDigest: 1}), unbound);
     assert.throws(() => candidateMetadataForBlob(blob, {actionAbiDigest: 1, viaGeneration: 9}), unbound);
@@ -251,24 +252,25 @@ test("a candidate without a nonzero VIA binding fails before anything is sent", 
     assert.throws(() => buildCandidateBeginRequest(1, {...metadata, viaDigest: 0}), unbound);
 });
 
-test("the custom-only store format 0, and every format but 3, is refused", () => {
-    const blob = encodeProfileBlob({schema: SCHEMA_2, domains: []});
+test("the custom-only store format 0, and every format but 4, is refused", () => {
+    const blob = encodeProfileBlob({schema: SCHEMA_3, domains: []});
     const metadata = candidateMetadataForBlob(blob, {actionAbiDigest: 1, ...binding});
-    for (const storeFormatVersion of [0, 1, 2, 4, undefined]) {
+    for (const storeFormatVersion of [0, 1, 2, 3, 5, undefined]) {
         assert.throws(() => buildCandidateBeginRequest(1, {...metadata, storeFormatVersion}), /store format/);
     }
     // Format 0 carried no binding; dropping it as well changes nothing.
     assert.throws(() => buildCandidateBeginRequest(1, {...metadata, storeFormatVersion: 0, viaGeneration: 0, viaDigest: 0}), /store format/);
 });
 
-test("only schema 2.0 candidates are built, up to the 5,088-byte payload", () => {
+test("only schema 3.0 candidates are built, up to the 65,504-byte payload", () => {
     const schema1 = Buffer.from("4e4c503101000001", "hex");
     assert.throws(() => candidateMetadataForBlob(schema1, {actionAbiDigest: 1, ...binding}), (error) => error.code === "INCOMPATIBLE_SCHEMA");
-    const metadata = candidateMetadataForBlob(encodeProfileBlob({schema: SCHEMA_2, domains: []}), {actionAbiDigest: 1, ...binding});
+    const metadata = candidateMetadataForBlob(encodeProfileBlob({schema: SCHEMA_3, domains: []}), {actionAbiDigest: 1, ...binding});
     assert.throws(() => buildCandidateBeginRequest(1, {...metadata, schemaMajor: 1}), (error) => error.code === "INCOMPATIBLE_SCHEMA");
     assert.throws(() => buildCandidateBeginRequest(1, {...metadata, schemaMinor: 1}), (error) => error.code === "INCOMPATIBLE_SCHEMA");
-    assert.equal(buildCandidateBeginRequest(1, {...metadata, payloadLength: 5088}).readUInt16LE(9), 5088);
-    assert.throws(() => buildCandidateBeginRequest(1, {...metadata, payloadLength: 5089}), /payload length/);
+    assert.throws(() => candidateMetadataForBlob(Buffer.from("4e4c503102000001", "hex"), {actionAbiDigest: 1, ...binding}), (error) => error.code === "INCOMPATIBLE_SCHEMA");
+    assert.equal(buildCandidateBeginRequest(1, {...metadata, payloadLength: 65504}).readUInt16LE(9), 65504);
+    assert.throws(() => buildCandidateBeginRequest(1, {...metadata, payloadLength: 65505}), /payload length/);
 });
 
 test("request and transaction id allocators wrap without emitting zero", () => {

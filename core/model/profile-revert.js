@@ -30,11 +30,11 @@ function revertUnits(before, after, units, capabilities) {
     const document = copy(b.document);
     const blob = decodeProfileBlob(Buffer.from(document.profile, "base64"));
     const baseBlob = decodeProfileBlob(Buffer.from(a.document.profile, "base64"));
-    const rgbOptions = {maximumBrightness: after.limits?.brightnessMax ?? 255};
+    const rgbOptions = {maximumBrightness: after.limits?.brightnessMax ?? 255, ...b.codecOptions.rgb};
     // Each domain is decoded once, edited for every unit, and encoded once.
     const codecs = {
         [PROFILE_DOMAIN_IDS.RGB]: [payload => decodeRgbDomainV1(payload, rgbOptions), value => encodeRgbDomainV1(value, rgbOptions)],
-        [PROFILE_DOMAIN_IDS.KEY_BEHAVIORS]: [payload => decodeKeyBehaviorDomain(payload).rows, rows => encodeKeyBehaviorDomain({rows})],
+        [PROFILE_DOMAIN_IDS.KEY_BEHAVIORS]: [payload => decodeKeyBehaviorDomain(payload, b.codecOptions.behaviors).rows, rows => encodeKeyBehaviorDomain({rows}, b.codecOptions.behaviors)],
         [PROFILE_DOMAIN_IDS.COMBOS]: [payload => decodeComboDomain(payload), table => encodeComboDomain({...table, rows: table.rows.filter(Boolean)})],
         [PROFILE_DOMAIN_IDS.SETTINGS]: [payload => decodeSettings(payload), value => encodeSettings(value)],
         [PROFILE_DOMAIN_IDS.PD_MODES]: [payload => decodePdDomain(payload), slots => encodePdDomain(slots)],
@@ -79,8 +79,19 @@ function revertUnits(before, after, units, capabilities) {
                 settingBits(settings, 24, ~masks >>> 0);
             } else {
                 const fields = sections.get(rest);
-                if (!fields || fields.some(field => !Number.isInteger(field.id))) throw fail("These settings cannot be discarded on their own.");
-                for (const field of fields) settingBits(settings, field.id, fieldMask(field));
+                if (!fields) throw fail("These settings cannot be discarded on their own.");
+                for (const field of fields) {
+                    if (field.record) settings.mine.layers[field.layer][field.record] = copy(settings.theirs.layers[field.layer][field.record]);
+                    else if (Number.isInteger(field.id)) settingBits(settings, field.id, fieldMask(field));
+                    else throw fail("These settings cannot be discarded on their own.");
+                }
+            }
+        } else if (kind === "placement") {
+            const settings = domain(PROFILE_DOMAIN_IDS.SETTINGS), [layer, position] = parts.map(Number);
+            for (const field of ["bypass", "exclude"]) {
+                const set = new Set(settings.mine.layers[layer][field]);
+                if (settings.theirs.layers[layer][field].includes(position)) set.add(position); else set.delete(position);
+                settings.mine.layers[layer][field] = [...set].sort((a, b) => a - b);
             }
         } else if (kind === "behavior") {
             const behaviors = domain(PROFILE_DOMAIN_IDS.KEY_BEHAVIORS);

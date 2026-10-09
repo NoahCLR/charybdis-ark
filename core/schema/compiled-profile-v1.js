@@ -95,7 +95,7 @@ function resolveNativeQmkExpression(value, model) {
     if (expression === "XXXXXXX") return catalog.KC_NO ?? 0;
 
     let match = expression.match(/^VIA_MACRO_(\d+)$/);
-    if (match && Number(match[1]) < 64) return QMK_MACRO_BASE + Number(match[1]);
+    if (match && Number(match[1]) < 128) return QMK_MACRO_BASE + Number(match[1]);
     const custom = customKeyOfName(expression);
     if (custom !== undefined) return customKeyCode(custom);
 
@@ -109,7 +109,7 @@ function resolveNativeQmkExpression(value, model) {
         const bases = {TO: 0x5200, MO: 0x5220, DF: 0x5240, TG: 0x5260, OSL: 0x5280};
         return layer === undefined || layer > 0x1f ? undefined : bases[call.name] | layer;
     }
-    // The firmware supports a lock for each of its eight layers; the rest of
+    // The firmware supports a lock for each of its sixteen layers; the rest of
     // the reserved block has no key behind it.
     if (call.name === "LOCK_LAYER" && call.args.length === 1) {
         const layer = layerIdOrUndefined(call.args[0], model);

@@ -111,6 +111,8 @@ function behaviourFields(row, defaults, names) {
         ["Tap / hold threshold", timing(row.tapHoldTerm, inherited.hold, {kind: "tier", tier: "hold"})],
         ["Long hold threshold", timing(row.longerHoldTerm, defaults[2], {kind: "tier", tier: "long"})],
         ["Keeps auto-mouse anchored", row.keepsAutoMouseAnchored ? "yes" : "no"],
+        ["Enabled", row.enabled ? "on" : "off"],
+        ["Allowed layers", {text: names.layers.filter((_, i) => row.allowedLayers & 2 ** i).join(", ") || "none", key: row.allowedLayers}],
     ]);
     for (const step of row.steps) for (const [tier, name] of TIERS) {
         const branch = step[tier];
@@ -148,7 +150,9 @@ function comboFields(row, table, names) {
     const window = row.termMs === null ? {text: `default · ${table.defaultTermMs} ms`, key: "default"} : {text: `${row.termMs} ms`, key: row.termMs};
     return new Map([["Keys", {text: row.inputs.map(input => action(input, names)).join(" + "),
         detail: row.inputs.map(input => action(input, names, true)).join(" + "), key: JSON.stringify(row.inputs)}],
-        ["Sends", actionField(row.output, names, {mark: actionMark(row.output)})], ["Window", window], ["Conditions", options || "none"]]);
+        ["Sends", actionField(row.output, names, {mark: actionMark(row.output)})], ["Window", window], ["Conditions", options || "none"],
+        ["Enabled", row.enabled ? "on" : "off"],
+        ["Allowed layers", {text: names.layers.filter((_, i) => row.allowedLayers & 2 ** i).join(", ") || "none", key: row.allowedLayers}]]);
 }
 // The two values every combo shares. A version 1 table has no default window,
 // and without combos no hold threshold either.
@@ -274,6 +278,14 @@ function profileReview(before, after) {
             {kind: "key", layer: l, layoutIndex: LAYOUT_INDEX.get(p)}, undefined, {kind: "layer", layer: l});
     }));
     a.settings.names.forEach((name, i) => item("Layers", `layerName:${i}`, `Layer ${i}`, new Map([["Name", layerCalled(a.settings.names, i)]]), new Map([["Name", layerCalled(b.settings.names, i)]]), {kind: "layers"}, undefined, {kind: "layer", layer: i}));
+    a.settings.layers.forEach((record, layer) => {
+        for (const [row, column] of CHARYBDIS_4X6_LAYOUT_MATRIX) {
+            const position = row * 6 + column;
+            const fields = entry => new Map([["Use shared behaviour", entry.bypass.includes(position) ? "off" : "on"], ["Join combos", entry.exclude.includes(position) ? "off" : "on"]]);
+            item("Layout", `placement:${layer}:${position}`, `Participation · ${layerCalled(b.settings.names, layer)} · key ${LAYOUT_INDEX.get(position)}`, fields(record), fields(b.settings.layers[layer]),
+                {kind: "key", layer, layoutIndex: LAYOUT_INDEX.get(position)}, [true, true]);
+        }
+    });
     const targets = new Map([...a.behaviors.rows, ...b.behaviors.rows].map(row => [JSON.stringify(row.target), row.target]));
     for (const [id, target] of targets) {
         const old = a.behaviors.rows.find(row => JSON.stringify(row.target) === id), next = b.behaviors.rows.find(row => JSON.stringify(row.target) === id);

@@ -17,6 +17,7 @@
 
 import {el, esc} from "../lib/dom.mjs";
 import {mappedKeyCount} from "../view/lighting.mjs";
+import {NAME_MAX_BYTES, NAME_TIP} from "../view/names.mjs";
 import {getModel, layers, post, render, state, canEdit as canEditArea} from "../store.mjs";
 
 let dismiss = null;   // the outside-click listener for the open panel
@@ -121,7 +122,7 @@ function editor(model, portable, busy) {
                 : `<button class="lp-grip" data-grip="${layerId}" ${busy ? "disabled" : ""} aria-label="Move ${esc(label)}: drag, or press the up and down arrows"
                     data-tip="Drag to move this layer, or focus it and press ↑ ↓.">${GRIP}</button>`}
             <span class="note mono">${layerId}</span>
-            <input class="input" value="${esc(names[layerId])}" data-name="${layerId}" maxlength="23" ${busy ? "disabled" : ""}
+            <input class="input" value="${esc(names[layerId])}" data-name="${layerId}" maxlength="${NAME_MAX_BYTES}" ${busy ? "disabled" : ""} data-tip="${esc(NAME_TIP)}"
                 aria-label="${layerId ? `Name for layer ${layerId}` : "Base layer name"}">
             <span class="note ${mapped ? "" : "dim"}">${mapped ? `${mapped} key${mapped === 1 ? "" : "s"}` : "nothing mapped"}</span>
             ${base ? `<span class="tag lp-base" data-tip="Always on, and what every transparent key falls through to.">base</span>`
@@ -144,7 +145,7 @@ function editor(model, portable, busy) {
         grip.addEventListener("keydown", (event) => {
             const direction = {ArrowUp: 1, ArrowDown: -1}[event.key];
             const position = portable.layers.order.indexOf(id);
-            if (!direction || position + direction < 1 || position + direction > 7) return;
+            if (!direction || position + direction < 1 || position + direction >= portable.layers.order.length) return;
             event.preventDefault();
             state.layerGripFocus = id;
             move(id, {direction});

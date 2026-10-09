@@ -7,6 +7,7 @@
 // belong for the once-a-year visit.
 
 import {css, isOff} from "../lib/colour.mjs";
+import {NAME_MAX_BYTES, NAME_TIP} from "../view/names.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {AXIS, BUTTON, DIAGONALS, DIRECTIONS, KIND, MODIFIER_POLICY, SCROLL_FIELDS, TAP_ROWS, axisReads, dpiOptions, modeDpi, newMode, readConfig, readsHorizontal, readsVertical, scrollAxesOf, settleButtons, settleTaps, startingRecord, thresholdDistance} from "../view/pointing-config.mjs";
 import {MODIFIER_BITS, keyName, modifierNames} from "../view/keyvalues.mjs";
@@ -236,7 +237,7 @@ function editor(model, slot, canEdit, slots) {
         <div class="card-b pd-identity"></div></div>`);
     const headBody = head.querySelector(".card-b");
     const name = el(`<label class="field"><span>Name</span>
-        <input class="input" value="${esc(slot.name)}" maxlength="23" ${disabled}></label>`);
+        <input class="input" value="${esc(slot.name)}" maxlength="${NAME_MAX_BYTES}" data-tip="${esc(NAME_TIP)}" ${disabled}></label>`);
     form.name = () => name.querySelector("input").value.trim();
     headBody.append(name);
     headBody.append(select("Movement", words(model).kinds.filter(([value]) => value), kind, "kind",

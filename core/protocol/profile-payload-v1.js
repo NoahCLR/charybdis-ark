@@ -33,8 +33,9 @@ const PROFILE_PAYLOAD_V1 = Object.freeze({
     METADATA_PAGE: 0,
     METADATA_SIZE: 21,
     DEFAULT_GENERATION_RETRIES: 3,
-    // A page index is one byte, so page 255 is the last addressable chunk.
-    MAX_CHUNKS: 0xff,
+    // A page index is 16 bits (feature bit 19): a full 65,504-byte payload is
+    // 2,621 chunks.
+    MAX_CHUNKS: 0xffff,
 });
 
 function decodePayloadMetadata(payload) {

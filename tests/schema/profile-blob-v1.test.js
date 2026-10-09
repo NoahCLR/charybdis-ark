@@ -42,8 +42,8 @@ function fixtures() {
             fnv1a32: `0x${values.get("blob.ordered.fnv1a32")}`,
             crc32: `0x${values.get("blob.ordered.crc32")}`,
             domains: [
-                {id: PROFILE_DOMAIN_IDS.RGB, version: 3, payload: "deadbeef"},
-                {id: PROFILE_DOMAIN_IDS.KEY_BEHAVIORS, version: 1, payload: "000102"},
+                {id: PROFILE_DOMAIN_IDS.RGB, version: 4, payload: "deadbeef"},
+                {id: PROFILE_DOMAIN_IDS.KEY_BEHAVIORS, version: 2, payload: "000102"},
             ],
         },
         actions: actionKinds.map((kind) => ({
@@ -60,13 +60,13 @@ function hex(value) {
 
 test("empty and ordered-domain blobs match deterministic golden vectors", () => {
     const golden = fixtures();
-    const empty = encodeProfileBlob({schema: {major: 2, minor: 0}, domains: []});
+    const empty = encodeProfileBlob({schema: {major: 3, minor: 0}, domains: []});
     assert.equal(empty.toString("hex"), golden.empty.hex);
     assert.equal(fnv1a32(empty), Number.parseInt(golden.empty.fnv1a32, 16));
     assert.equal(crc32(empty), Number.parseInt(golden.empty.crc32, 16));
     assert.deepEqual(decodeProfileBlob(empty), {
         magic: "NLP1",
-        schema: {major: 2, minor: 0},
+        schema: {major: 3, minor: 0},
         flags: 1,
         domains: [],
         byteLength: 8,
@@ -74,9 +74,9 @@ test("empty and ordered-domain blobs match deterministic golden vectors", () => 
         crc32: Number.parseInt(golden.empty.crc32, 16),
     });
 
-    const encoded = encodeProfileBlob({schema: {major: 2, minor: 0}, domains: [
-        {id: PROFILE_DOMAIN_IDS.KEY_BEHAVIORS, version: 1, payload: hex("000102")},
-        {id: PROFILE_DOMAIN_IDS.RGB, version: 3, payload: hex("deadbeef")},
+    const encoded = encodeProfileBlob({schema: {major: 3, minor: 0}, domains: [
+        {id: PROFILE_DOMAIN_IDS.KEY_BEHAVIORS, version: 2, payload: hex("000102")},
+        {id: PROFILE_DOMAIN_IDS.RGB, version: 4, payload: hex("deadbeef")},
     ]});
     assert.equal(encoded.toString("hex"), golden.orderedDomains.hex, "encoder must sort domains by id");
     const decoded = decodeProfileBlob(encoded);
@@ -90,11 +90,11 @@ test("empty and ordered-domain blobs match deterministic golden vectors", () => 
 });
 
 test("domain envelope readers support later domain codecs without accepting padding", () => {
-    const first = Buffer.from("10030200aabb", "hex");
-    const second = Buffer.from("20010100cc", "hex");
+    const first = Buffer.from("10040200aabb", "hex");
+    const second = Buffer.from("20020100cc", "hex");
     assert.deepEqual(decodeDomainEnvelope(first), {
         id: PROFILE_DOMAIN_IDS.RGB,
-        version: 3,
+        version: 4,
         payload: hex("aabb"),
     });
     assert.throws(() => decodeDomainEnvelope(Buffer.concat([first, Buffer.from([0])])), (error) => error.code === "TRAILING_BYTES");
@@ -107,21 +107,21 @@ test("domain envelope readers support later domain codecs without accepting padd
 });
 
 test("strict blob decode rejects unknown, duplicate, out-of-order, truncated, and trailing domains", () => {
-    const header = Buffer.from("4e4c503102000101", "hex");
+    const header = Buffer.from("4e4c503103000101", "hex");
     assert.throws(() => decodeProfileBlob(Buffer.concat([header, Buffer.from("60010000", "hex")])), (error) => error.code === "UNKNOWN_DOMAIN");
     // Each domain's one version: the retired ones are refused like any other.
-    for (const envelope of ["10010000", "10020000", "30010000", "40020000", "40040000", "50010000"]) {
+    for (const envelope of ["10010000", "10030000", "20010000", "30010000", "30020000", "40050000", "50010000", "50020000"]) {
         assert.throws(() => decodeProfileBlob(Buffer.concat([header, Buffer.from(envelope, "hex")])), (error) => error.code === "UNKNOWN_DOMAIN_VERSION", envelope);
     }
 
-    const duplicateHeader = Buffer.from("4e4c503102000201", "hex");
-    const rgb = Buffer.from("10030000", "hex");
+    const duplicateHeader = Buffer.from("4e4c503103000201", "hex");
+    const rgb = Buffer.from("10040000", "hex");
     assert.throws(() => decodeProfileBlob(Buffer.concat([duplicateHeader, rgb, rgb])), (error) => error.code === "DUPLICATE_DOMAIN");
-    const behaviors = Buffer.from("20010000", "hex");
+    const behaviors = Buffer.from("20020000", "hex");
     assert.throws(() => decodeProfileBlob(Buffer.concat([duplicateHeader, behaviors, rgb])), (error) => error.code === "DOMAIN_ORDER");
-    assert.throws(() => decodeProfileBlob(Buffer.concat([header, Buffer.from("10030400aabb", "hex")])), (error) => error.code === "TRUNCATED");
-    assert.throws(() => decodeProfileBlob(Buffer.concat([Buffer.from("4e4c503102000001", "hex"), Buffer.from([0])])), (error) => error.code === "TRAILING_BYTES");
-    assert.throws(() => decodeProfileBlob(Buffer.from("4e4c5031020001", "hex")), (error) => error.code === "TRUNCATED");
+    assert.throws(() => decodeProfileBlob(Buffer.concat([header, Buffer.from("10040400aabb", "hex")])), (error) => error.code === "TRUNCATED");
+    assert.throws(() => decodeProfileBlob(Buffer.concat([Buffer.from("4e4c503103000001", "hex"), Buffer.from([0])])), (error) => error.code === "TRAILING_BYTES");
+    assert.throws(() => decodeProfileBlob(Buffer.from("4e4c5031030001", "hex")), (error) => error.code === "TRUNCATED");
 });
 
 test("strict blob header validation rejects magic, schema, and reserved flag variants", () => {
@@ -129,10 +129,10 @@ test("strict blob header validation rejects magic, schema, and reserved flag var
     const invalidMagic = Buffer.from(valid);
     invalidMagic[0] = 0;
     assert.throws(() => decodeProfileBlob(invalidMagic), (error) => error.code === "INVALID_MAGIC");
-    for (const [offset, value] of [[4, 1], [4, 3], [5, 1]]) {
+    for (const [offset, value] of [[4, 1], [4, 2], [4, 4], [5, 1]]) {
         const invalidSchema = Buffer.from(valid);
         invalidSchema[offset] = value;
-        assert.throws(() => decodeProfileBlob(invalidSchema), (error) => error.code === "INCOMPATIBLE_SCHEMA", "only schema 2.0");
+        assert.throws(() => decodeProfileBlob(invalidSchema), (error) => error.code === "INCOMPATIBLE_SCHEMA", "only schema 3.0");
     }
     const reservedFlag = Buffer.from(valid);
     reservedFlag[7] = 3;
@@ -144,15 +144,15 @@ test("strict blob header validation rejects magic, schema, and reserved flag var
 
 test("blob encoder rejects duplicate, unknown, oversized, and invalid inputs", () => {
     assert.throws(() => encodeProfileBlob({domains: [
-        {id: PROFILE_DOMAIN_IDS.RGB, version: 3, payload: Buffer.alloc(0)},
-        {id: PROFILE_DOMAIN_IDS.RGB, version: 3, payload: Buffer.alloc(0)},
+        {id: PROFILE_DOMAIN_IDS.RGB, version: 4, payload: Buffer.alloc(0)},
+        {id: PROFILE_DOMAIN_IDS.RGB, version: 4, payload: Buffer.alloc(0)},
     ]}), (error) => error.code === "DUPLICATE_DOMAIN");
     assert.throws(() => encodeProfileBlob({domains: [{id: 0x60, version: 1, payload: Buffer.alloc(0)}]}), (error) => error.code === "UNKNOWN_DOMAIN");
-    assert.throws(() => encodeProfileBlob({domains: [{id: PROFILE_DOMAIN_IDS.SETTINGS, version: 4, payload: Buffer.alloc(0)}]}), (error) => error.code === "UNKNOWN_DOMAIN_VERSION");
+    assert.throws(() => encodeProfileBlob({domains: [{id: PROFILE_DOMAIN_IDS.SETTINGS, version: 5, payload: Buffer.alloc(0)}]}), (error) => error.code === "UNKNOWN_DOMAIN_VERSION");
     assert.throws(() => encodeProfileBlob({schema: {major: 1, minor: 0}, domains: []}), (error) => error.code === "INCOMPATIBLE_SCHEMA");
     assert.throws(() => encodeProfileBlob({domains: [{
         id: PROFILE_DOMAIN_IDS.RGB,
-        version: 3,
+        version: 4,
         payload: Buffer.alloc(PROFILE_BLOB_V1.MAX_SIZE),
     }]}), (error) => error.code === "CAPACITY_EXCEEDED");
     assert.throws(() => encodeProfileBlob({domains: [{id: 0x100, version: 1, payload: Buffer.alloc(0)}]}), /8-bit/);
@@ -179,11 +179,14 @@ test("semantic action decode rejects kinds, flags, operands, truncation, and cap
     assert.throws(() => decodeSemanticAction(Buffer.from("08000000", "hex")), (error) => error.code === "UNKNOWN_ACTION_KIND");
     assert.throws(() => decodeSemanticAction(Buffer.from("01010000", "hex")), (error) => error.code === "RESERVED_FLAGS");
     assert.throws(() => decodeSemanticAction(Buffer.from("00000100", "hex")), (error) => error.code === "INVALID_OPERAND");
-    assert.throws(() => decodeSemanticAction(Buffer.from("02000800", "hex")), (error) => error.code === "INVALID_OPERAND");
+    assert.deepEqual(decodeSemanticAction(Buffer.from("02000f00", "hex")), {kind: 2, flags: 0, operand: 15}, "layers reach 15");
+    assert.throws(() => decodeSemanticAction(Buffer.from("02001000", "hex")), (error) => error.code === "INVALID_OPERAND");
     assert.throws(() => decodeSemanticAction(Buffer.from("04002000", "hex")), (error) => error.code === "INVALID_OPERAND", "pointing slots stop at 31");
     assert.deepEqual(decodeSemanticAction(Buffer.from("04001f00", "hex")), {kind: 4, flags: 0, operand: 31});
-    assert.throws(() => decodeSemanticAction(Buffer.from("06004000", "hex")), (error) => error.code === "INVALID_OPERAND");
-    assert.throws(() => decodeSemanticAction(Buffer.from("07004000", "hex")), (error) => error.code === "INVALID_OPERAND");
+    assert.deepEqual(decodeSemanticAction(Buffer.from("06007f00", "hex")), {kind: 6, flags: 0, operand: 127}, "macros reach 127");
+    assert.throws(() => decodeSemanticAction(Buffer.from("06008000", "hex")), (error) => error.code === "INVALID_OPERAND");
+    assert.deepEqual(decodeSemanticAction(Buffer.from("07007f00", "hex")), {kind: 7, flags: 0, operand: 127}, "custom keys reach 127");
+    assert.throws(() => decodeSemanticAction(Buffer.from("07008000", "hex")), (error) => error.code === "INVALID_OPERAND");
     assert.throws(() => decodeSemanticAction(Buffer.alloc(3)), (error) => error.code === "INVALID_LENGTH");
     assert.throws(() => encodeSemanticAction({kind: 1, operand: 0x10000}), /16-bit/);
 });

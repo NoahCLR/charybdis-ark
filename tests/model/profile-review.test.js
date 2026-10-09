@@ -6,15 +6,15 @@ const {fingerprint,reorderLayers} = require("../../core/model/portable-profile")
 const snapshot = document => ({document,fingerprint:fingerprint(document)});
 test("unchanged snapshots have no review entries and layer renaming does not invent policy changes", () => {
     const before=snapshot(document()); assert.deepEqual(profileReview(before,before),[]);
-    const names=["Base","Numbers","Symbols","Navigation","Mouse","Extra 1","Extra 2","Extra 3"];
-    const after=snapshot(reorderLayers(before.document,[0,1,2,3,4,5,6,7],names));
+    const names=["Base","Numbers","Symbols","Navigation","Mouse","Extra 1","Extra 2","Extra 3",...Array(8).fill("")];
+    const after=snapshot(reorderLayers(before.document,[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15],names));
     assert.deepEqual(profileReview(before,after),[{area:"Layers",unit:"layerName:4",title:"Layer 4",status:"changed",
         fields:[{label:"Name",status:"changed",before:"Pointer",after:"Mouse"}],place:{kind:"layers"},titleMark:{kind:"layer",layer:4}}]);
 });
 test("review preserves untrusted names as text data", () => {
     const before=snapshot(document());
-    const names=["<img src=x>","Numbers","Symbols","Navigation","Pointer","Extra 1","Extra 2","Extra 3"];
-    const after=snapshot(reorderLayers(before.document,[0,1,2,3,4,5,6,7],names));
+    const names=["<img src=x>","Numbers","Symbols","Navigation","Pointer","Extra 1","Extra 2","Extra 3",...Array(8).fill("")];
+    const after=snapshot(reorderLayers(before.document,[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15],names));
     assert.equal(profileReview(before,after)[0].fields[0].after,names[0]);
 });
 test("a combo's keys read as the screens read them, with no stored name where nothing reads alike", () => {
@@ -128,7 +128,7 @@ test("changing a default lists inherited effective times under its settings item
 test("renaming a layer does not read as a change to the settings that name it", () => {
     const before=snapshot(pdDocument());
     const names=validateSnapshot(before.document).settings.names.map((name,i)=>i===4?"Mouse":name);
-    const units=profileReview(before,snapshot(reorderLayers(before.document,[0,1,2,3,4,5,6,7],names))).map(entry=>entry.unit);
+    const units=profileReview(before,snapshot(reorderLayers(before.document,[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15],names))).map(entry=>entry.unit);
     assert.deepEqual(units,["layerName:4"]);
 });
 const {decodeRgbDomainV1, encodeRgbDomainV1} = require("../../core/schema/rgb-domain-v1");
@@ -244,7 +244,7 @@ test("a scrolling mode limited to one axis says so in the review", () => {
 
 test("a reorder that makes a new base names it first, and says which layer left the base", () => {
     const {layerOrderReview} = require("../../core/model/profile-review");
-    const order = [3, 1, 2, 0, 4, 5, 6, 7];
+    const order = [3, 1, 2, 0, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
     const item = layerOrderReview(snapshot(reorderLayers(document(), order)), order);
     assert.deepEqual(item.fields.map((field) => [field.label, field.before, field.after]), [
         ["Base layer", "Base", "Navigation"],

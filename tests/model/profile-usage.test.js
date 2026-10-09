@@ -31,8 +31,8 @@ test("a populated profile's areas add up to the bytes Apply writes", () => {
     assert.equal(total(usage), usage.used);
     assert.deepEqual(usage.areas.map(entry => entry.id), AREAS);
     const {behaviors, combos, pdModes} = validateSnapshot(value);
-    assert.equal(area(usage, "pointing"), 4 + 8 + 96 * pdModes.filter(slot => slot.kind || slot.name).length, "a record per stored slot");
-    assert.equal(area(usage, "names"), 8 * 24 + 128, "eight layer names and a length byte for each macro and custom key name");
+    assert.equal(area(usage, "pointing"), 4 + 8 + 128 * pdModes.filter(slot => slot.kind || slot.name).length, "a record per stored slot");
+    assert.equal(area(usage, "names"), validateSnapshot(value).settings.names.reduce((sum, name) => sum + 1 + Buffer.byteLength(name), 256), "counted UTF-8 names in all three banks");
     assert.deepEqual(count(usage, "behaviours"), {id: "behaviours", used: behaviors.rows.length, limit: 64});
     assert.deepEqual(count(usage, "behaviourSteps"), {id: "behaviourSteps", used: behaviors.populatedStepCount, limit: 128});
     assert.equal(count(usage, "combos").used, combos.rows.length);

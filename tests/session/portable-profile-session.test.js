@@ -9,7 +9,7 @@ const {changedRanges, viaStorageDigest} = require("../../core/protocol/via-stora
 const {decodeProfileBlob, encodeProfileBlob, fnv1a32} = require("../../core/schema/profile-blob-v1");
 const {encodeSettings} = require("../../core/schema/settings-domain-v1");
 // Current firmware: schema 2.0 with every domain, the 32-slot vocabulary.
-const capabilities = {compiledLayerCount: 8, supportedDomainMask: 31, featureFlags: 1 << 12, actionAbiDigest: ACTION_ABI, candidateChunkMax: 20, viaMacroBytes: 7191};
+const capabilities = {compiledLayerCount: 16, supportedDomainMask: 31, featureFlags: 1 << 12, actionAbiDigest: ACTION_ABI, candidateChunkMax: 20, viaMacroBytes: 10327};
 function fixture() {
     const source = document(), targetDocument = structuredClone(source), events = [];
     targetDocument.layers[0][0] ^= 1; targetDocument.macros[0] = Buffer.from("hello").toString("base64");
@@ -283,7 +283,7 @@ for (const fixtureName of Object.keys(FIXTURES)) {
                 assert.ok(stale.some(range => range.offset <= t.raw.macros.length - 20 && range.offset + range.bytes.length > t.raw.macros.length - 20), "the stale bytes are written");
                 assert.equal(result.performance.macroBytes, stale.reduce((sum, range) => sum + range.bytes.length, 0), "and nothing that already matches");
                 assert.ok(result.storage.macros.equals(t.target.macros), "the result keeps the bank it proved, for the next Apply");
-                assert.equal(result.document.macros.length, 64, "the document stays canonical");
+                assert.equal(result.document.macros.length, 128, "the document stays canonical");
             });
         }
     }
@@ -318,14 +318,14 @@ const {backup32, CAPABILITIES_32} = require("../fixtures/pd-slots-32");
 const {settings: currentSettings} = require("../fixtures/portable-profile");
 const {encodeComboDomain} = require("../../core/schema/combo-domain-v1");
 const {decodeSettings} = require("../../core/schema/settings-domain-v1");
-const captureCapabilities = {...CAPABILITIES_32, featureFlags: 1 << 12, candidateChunkMax: 20, viaMacroBytes: 7191};
+const captureCapabilities = {...CAPABILITIES_32, featureFlags: 1 << 12, candidateChunkMax: 20, viaMacroBytes: 10327};
 function wired(keyboard) {
     let id = 0;
     return {connection: {request: async (report) => keyboard.answer(report)[0]}, ids: {next: () => (id = id % 255 + 1)}};
 }
 function factoryProfile(source) {
     const factory = currentSettings(); factory.values[0] = 1600; factory.names[1] = "Factory";
-    const combos = {version: 2, defaultTermMs: 40, holdTermMs: 180, rows: [{inputs: [6, 7].map(operand => ({kind: 1, operand, flags: 0})), output: {kind: 1, operand: 9, flags: 0}, termMs: null, mustHold: false, mustTap: true, ordered: false}]};
+    const combos = {version: 3, defaultTermMs: 40, holdTermMs: 180, rows: [{inputs: [6, 7].map(operand => ({kind: 1, operand, flags: 0})), output: {kind: 1, operand: 9, flags: 0}, termMs: null, mustHold: false, mustTap: true, ordered: false}]};
     const blob = decodeProfileBlob(Buffer.from(source.profile, "base64"));
     return encodeProfileBlob({schema: blob.schema, domains: blob.domains.map(domain => domain.id === 0x40 ? {...domain, payload: encodeSettings(factory)}
         : domain.id === 0x30 ? {...domain, payload: encodeComboDomain(combos)} : domain)});

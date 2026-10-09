@@ -33,7 +33,7 @@ test("a dual-role built-in action is claimed only by firmware that advertises it
 });
 
 test("custom keys and macros keep their tap when released before a long hold, and claim nothing else", () => {
-    for (const target of [{kind: ACTION.CUSTOM_KEY, operand: 0}, {kind: ACTION.VIA_MACRO, operand: 3}, key(0x7e40), key(0x7e7f), key(0x7700), key(0x777f)]) {
+    for (const target of [{kind: ACTION.CUSTOM_KEY, operand: 0}, {kind: ACTION.VIA_MACRO, operand: 3}, key(0x7f00), key(0x7f7f), key(0x7700), key(0x777f)]) {
         assert.deepEqual(builtInActions(target, both), {releaseTaps: true});
     }
     assert.equal(builtInActions(key(0x4338), both).releaseTaps, undefined, "a dual-role key always has its own hold");

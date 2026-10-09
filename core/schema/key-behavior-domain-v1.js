@@ -1,4 +1,5 @@
 "use strict";
+const {MAX_TAP_DEPTH} = require("./profile-depth");
 
 const {
     PROFILE_ACTION_KINDS,
@@ -12,15 +13,19 @@ const {
     readSemanticAction,
 } = require("./profile-blob-v1");
 
+// Domain 0x20 version 2 (firmware D-F14): up to 128 rows and the advertised
+// tap depth (five by default), a u16 step count, and per row an enabled flag and the layers it may
+// act on (participation-policy.md).
 const KEY_BEHAVIOR_DOMAIN_V1 = Object.freeze({
-    VERSION: 1,
+    VERSION: 2,
     HEADER_SIZE: 4,
     ROW_LENGTH_SIZE: 2,
-    ROW_FIXED_SIZE: 12,
+    ROW_FIXED_SIZE: 16,
     STEP_HEADER_SIZE: 2,
     HOLD_SIZE: 6,
     ROW_FLAG_KEEPS_AUTO_MOUSE_ANCHORED: 1 << 0,
-    KNOWN_ROW_FLAGS: 1 << 0,
+    ROW_FLAG_DISABLED: 1 << 1,
+    KNOWN_ROW_FLAGS: (1 << 0) | (1 << 1),
     STEP_HAS_TAP: 1 << 0,
     STEP_HAS_HOLD: 1 << 1,
     STEP_HAS_LONG_HOLD: 1 << 2,
@@ -35,9 +40,10 @@ const KEY_BEHAVIOR_HOLD_MODES = Object.freeze({
 });
 
 const KEY_BEHAVIOR_LIMITS = Object.freeze({
-    maxRows: 64,
-    maxPopulatedSteps: 128,
+    maxRows: 128,
+    maxPopulatedSteps: 640,
     maxTapStepsPerBehavior: 5,
+    maxLayers: 16,
     maxRepeatHz: 100,
     maxPayloadSize: PROFILE_BLOB_V1.MAX_SIZE - PROFILE_BLOB_V1.HEADER_SIZE - PROFILE_BLOB_V1.DOMAIN_HEADER_SIZE,
 });
@@ -60,7 +66,7 @@ function encodeKeyBehaviorDomain(value = {}, options = {}) {
     }
 
     const populatedStepCount = rows.reduce((total, row) => total + row.steps.length, 0);
-    if (populatedStepCount > limits.maxPopulatedSteps || populatedStepCount > 0xff) {
+    if (populatedStepCount > limits.maxPopulatedSteps) {
         throw behaviorError("CAPACITY_EXCEEDED", `Populated key-behavior step count exceeds ${limits.maxPopulatedSteps}.`);
     }
     const encodedRows = rows.map((row) => encodeRow(row));
@@ -71,7 +77,7 @@ function encodeKeyBehaviorDomain(value = {}, options = {}) {
 
     const output = Buffer.alloc(size);
     output[0] = rows.length;
-    output[1] = populatedStepCount;
+    output.writeUInt16LE(populatedStepCount, 2);
     let offset = KEY_BEHAVIOR_DOMAIN_V1.HEADER_SIZE;
     for (const row of encodedRows) {
         row.copy(output, offset);
@@ -90,8 +96,8 @@ function decodeKeyBehaviorDomain(value, options = {}) {
         throw behaviorError("CAPACITY_EXCEEDED", `Key-behavior payload is ${bytes.length} bytes; maximum is ${limits.maxPayloadSize}.`);
     }
     const rowCount = bytes[0];
-    const declaredStepCount = bytes[1];
-    if (bytes[2] !== 0 || bytes[3] !== 0) {
+    const declaredStepCount = bytes.readUInt16LE(2);
+    if (bytes[1] !== 0) {
         throw behaviorError("RESERVED_FIELDS", "Key-behavior header reserved bytes must be zero.");
     }
     if (rowCount > limits.maxRows || declaredStepCount > limits.maxPopulatedSteps) {
@@ -133,8 +139,12 @@ function decodeKeyBehaviorDomain(value, options = {}) {
         const multiTapTerm = bytes.readUInt16LE(bodyStart + 8);
         const flags = bytes[bodyStart + 10];
         const stepCount = bytes[bodyStart + 11];
+        const allowedLayers = bytes.readUInt32LE(bodyStart + 12);
         if ((flags & ~KEY_BEHAVIOR_DOMAIN_V1.KNOWN_ROW_FLAGS) !== 0) {
             throw behaviorError("RESERVED_FLAGS", "Key-behavior row contains unknown flags.", {row: rowIndex});
+        }
+        if (allowedLayers >= 2 ** limits.maxLayers) {
+            throw behaviorError("INVALID_LAYERS", "Key-behavior row allows a layer outside the layer bank.", {row: rowIndex});
         }
         if (stepCount > limits.maxTapStepsPerBehavior) {
             throw behaviorError("CAPACITY_EXCEEDED", "Key-behavior row exceeds the tap-step capacity.", {row: rowIndex});
@@ -169,6 +179,8 @@ function decodeKeyBehaviorDomain(value, options = {}) {
             longerHoldTerm,
             multiTapTerm,
             keepsAutoMouseAnchored: (flags & KEY_BEHAVIOR_DOMAIN_V1.ROW_FLAG_KEEPS_AUTO_MOUSE_ANCHORED) !== 0,
+            enabled: (flags & KEY_BEHAVIOR_DOMAIN_V1.ROW_FLAG_DISABLED) === 0,
+            allowedLayers,
             steps,
         });
         previousTargetBytes = targetBytes;
@@ -194,7 +206,7 @@ function encodeKeyBehaviorDomainEnvelope(value, options = {}) {
 function decodeKeyBehaviorDomainEnvelope(value, options = {}) {
     const envelope = decodeDomainEnvelope(value);
     if (envelope.id !== PROFILE_DOMAIN_IDS.KEY_BEHAVIORS || envelope.version !== KEY_BEHAVIOR_DOMAIN_V1.VERSION) {
-        throw behaviorError("WRONG_DOMAIN", "Expected a key-behavior domain v1 envelope.");
+        throw behaviorError("WRONG_DOMAIN", "Expected a key-behavior domain v2 envelope.");
     }
     return decodeKeyBehaviorDomain(envelope.payload, options);
 }
@@ -225,6 +237,8 @@ function normalizeRow(row, limits, actionLimits, rowIndex) {
         longerHoldTerm: assertU16(row.longerHoldTerm ?? 0, "longerHoldTerm"),
         multiTapTerm: assertU16(row.multiTapTerm ?? 0, "multiTapTerm"),
         keepsAutoMouseAnchored: assertBoolean(row.keepsAutoMouseAnchored ?? false, "keepsAutoMouseAnchored"),
+        enabled: assertBoolean(row.enabled ?? true, "enabled"),
+        allowedLayers: assertLayerMask(row.allowedLayers ?? allLayers(limits), limits, rowIndex),
         steps,
     };
 }
@@ -238,9 +252,10 @@ function encodeRow(row) {
     output.writeUInt16LE(row.tapHoldTerm, 6);
     output.writeUInt16LE(row.longerHoldTerm, 8);
     output.writeUInt16LE(row.multiTapTerm, 10);
-    output[12] = row.keepsAutoMouseAnchored ? KEY_BEHAVIOR_DOMAIN_V1.ROW_FLAG_KEEPS_AUTO_MOUSE_ANCHORED : 0;
+    output[12] = (row.keepsAutoMouseAnchored ? KEY_BEHAVIOR_DOMAIN_V1.ROW_FLAG_KEEPS_AUTO_MOUSE_ANCHORED : 0) | (row.enabled ? 0 : KEY_BEHAVIOR_DOMAIN_V1.ROW_FLAG_DISABLED);
     output[13] = row.steps.length;
-    let offset = 14;
+    output.writeUInt32LE(row.allowedLayers, 14);
+    let offset = 18;
     for (const step of encodedSteps) {
         step.copy(output, offset);
         offset += step.length;
@@ -375,9 +390,10 @@ function readBoundedAction(bytes, offset, rowEnd, actionLimits, rowIndex, stepIn
 function normalizeLimits(value) {
     const limits = {};
     for (const [field, fallback] of Object.entries(KEY_BEHAVIOR_LIMITS)) {
-        const candidate = value?.[field] ?? fallback;
-        if (!Number.isInteger(candidate) || candidate < 1 || candidate > fallback) {
-            throw new RangeError(`${field} must be a positive integer no greater than the frozen v1 ceiling ${fallback}.`);
+        const ceiling = field === "maxTapStepsPerBehavior" ? MAX_TAP_DEPTH : field === "maxPopulatedSteps" ? KEY_BEHAVIOR_LIMITS.maxRows * MAX_TAP_DEPTH : fallback;
+        const candidate = value?.[field] ?? (field === "maxPopulatedSteps" ? (value?.maxRows ?? KEY_BEHAVIOR_LIMITS.maxRows) * (value?.maxTapStepsPerBehavior ?? KEY_BEHAVIOR_LIMITS.maxTapStepsPerBehavior) : fallback);
+        if (!Number.isInteger(candidate) || candidate < 1 || candidate > ceiling) {
+            throw new RangeError(`${field} must be a positive integer no greater than the wire ceiling ${ceiling}.`);
         }
         limits[field] = candidate;
     }
@@ -394,6 +410,15 @@ function assertU16(value, label) {
     const number = Number(value);
     if (!Number.isInteger(number) || number < 0 || number > 0xffff) throw new RangeError(`${label} must be a 16-bit integer.`);
     return number;
+}
+
+// Every layer of the bank: what a row allows unless it says otherwise.
+const allLayers = limits => 2 ** limits.maxLayers - 1;
+function assertLayerMask(value, limits, rowIndex) {
+    if (!Number.isInteger(value) || value < 0 || value > allLayers(limits)) {
+        throw behaviorError("INVALID_LAYERS", "Key-behavior row allows a layer outside the layer bank.", {row: rowIndex});
+    }
+    return value;
 }
 
 function assertBoolean(value, label) {

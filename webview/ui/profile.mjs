@@ -110,7 +110,7 @@ function wireProfileDrop(card) {
         const dropped = Array.from(event.dataTransfer.files);
         if (dropped.length !== 1) {tell("Drop one profile file at a time."); return;}
         const file = dropped[0];
-        if (file.size > 100000) {tell("This profile file is too large."); return;}
+        if (file.size > 262144) {tell("This profile file is too large."); return;}
         const draft = getModel()?.draft;
         const {id, revision} = draft;
         reading = true;

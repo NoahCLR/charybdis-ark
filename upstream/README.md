@@ -76,7 +76,7 @@ Node dependencies have been installed.
    arrange compatibility testing with the firmware project. App tests prove
    behavior against these vectors; they do not compile or run current firmware.
 
-Ark owns five cross-language runners under `tests/integration/`. They compile
+Ark owns six cross-language runners under `tests/integration/`. They compile
 probes from the selected firmware and compare readers, writers and macro sizing
 with Ark's current implementation. Use the separate
 [compatibility bridge](../docs/COMPATIBILITY.md); it also fails when a pinned

@@ -1,9 +1,10 @@
-// Custom keys: the keyboard's 64 named keys that do only what their behaviour
+// Custom keys: the keyboard's 128 named keys that do only what their behaviour
 // says. A key here is its name; what it does is its behaviour, edited on the
 // Keys screen like any other. Place one on a layer or send it from a combo.
 
 import {el, esc} from "../lib/dom.mjs";
 import {customKeyPlacements} from "../view/keyface.mjs";
+import {NAME_MAX_BYTES, NAME_TIP, nameCount} from "../view/names.mjs";
 import {setReachGroupOpen} from "../view/reach-groups.mjs";
 import {canEdit as canEditArea, getModel, layerName, layers, post, render, state, writable} from "../store.mjs";
 import * as edits from "../view/edits.mjs";
@@ -62,7 +63,8 @@ export function screenCustomKeys() {
 }
 
 function editor(model, key, canEdit) {
-    const space = model?.customKeyNameSpace || {perName: 20};
+    const space = model?.customKeyNameSpace || {perName: NAME_MAX_BYTES};
+    const count = nameCount(key.name, space.perName);
     const card = el(`<div class="card">
         <div class="card-h"><h3>${esc(key.name || `Custom key ${key.slot}`)}</h3>
             <span class="tag" data-tip="${esc(key.keycode)}">Key ${esc(key.slot)}</span>
@@ -71,16 +73,18 @@ function editor(model, key, canEdit) {
                 <button class="btn tiny ghost" data-act="place" ${writable() ? "" : "disabled"}>Place on a key…</button></span></div>
         <div class="card-b stack">
             <label class="field"><span>Name</span>
-                <input class="input" data-name maxlength="${esc(space.perName)}" value="${esc(key.name)}" placeholder="Custom key ${esc(key.slot)}" ${canEdit ? "" : "disabled"}
-                    data-tip="Up to ${esc(space.perName)} plain characters: letters, digits, spaces and punctuation.">
-                <span class="note" data-name-count>${esc(key.name.length)} / ${esc(space.perName)} characters</span></label>
+                <input class="input" data-name value="${esc(key.name)}" placeholder="Custom key ${esc(key.slot)}" ${canEdit ? "" : "disabled"}
+                    data-tip="${esc(NAME_TIP)}">
+                <span class="note${count.over ? " warn" : ""}" data-name-count>${esc(count.label)}</span></label>
             <div class="field"><span>What it does</span>
                 <span class="note">${key.hasBehavior ? "Its behaviour: open it to see and change what each tap and hold sends." : "Nothing yet. Add a behaviour to give it taps and holds."}</span></div>
             ${placedOn(model, key)}
         </div></div>`);
     const nameInput = card.querySelector("[data-name]");
     nameInput.addEventListener("input", () => {
-        card.querySelector("[data-name-count]").textContent = `${nameInput.value.length} / ${space.perName} characters`;
+        const now = nameCount(nameInput.value, space.perName), node = card.querySelector("[data-name-count]");
+        node.textContent = now.label;
+        node.classList.toggle("warn", now.over);
     });
     nameInput.addEventListener("change", () => post(edits.customKeyNameMessage(key.keycode, nameInput.value, model?.customKeyEditing?.identity)));
     card.querySelector('[data-act="place"]').addEventListener("click", () => {

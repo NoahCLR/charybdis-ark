@@ -40,13 +40,16 @@ function readPages(options = {}) {
                 | PROFILE_WIRE_FEATURES.PEER_RECONCILIATION
                 | PROFILE_WIRE_FEATURES.ATOMIC_LOGICAL_APPLY
             : 0);
-    capabilityIdentity.set([1, 2, 1, 0, options.schemaMajor || 2, 0, 32, options.mutation ? 20 : 0, 2], 0);
+    capabilityIdentity.set([2, 3, 1, 0, options.schemaMajor || 3, 0, 32, options.mutation ? 20 : 0, 2], 0);
     capabilityIdentity.writeUInt32LE(featureFlags, 9);
     capabilityIdentity.writeUInt32LE(options.actionAbiDigest ?? 0x12345678, 13);
     const capacity = Buffer.from([
-        5, options.maxLayers || 8, 64, 5, 128, 32, 4, 16, 32, 58, 8, 16, 64,
-        0xe0, 0x0f, 0xe0, 0x0f, 0x00, 0x10, 0x7f, 0x1d, 3, 0, 0, 0,
+        5, options.maxLayers || 16, 128, 5, 0, 128, 16, 16, 32, 58, 8, 128, 128,
+        0xe0, 0xff, 0xe0, 0xff, 0, 0, 0x57, 0x28, 3, 0, 0, 0,
     ]);
+    const wide = Buffer.alloc(25);
+    wide.writeUInt16LE(640, 0); wide[2] = 5;
+    wide.writeUInt32LE(65536, 3); wide[7] = 32; wide[8] = 32; wide[9] = 60;
     const statusIdentity = Buffer.alloc(25);
     statusIdentity.set([1, 2], 0);
     const stateFlags = options.stateFlags ?? (options.mutation ? 0x31 : 0x81);
@@ -57,6 +60,7 @@ function readPages(options = {}) {
     return {
         [`${PROFILE_WIRE_V1.VALUE_CAPABILITIES}:0`]: capabilityIdentity,
         [`${PROFILE_WIRE_V1.VALUE_CAPABILITIES}:1`]: capacity,
+        [`${PROFILE_WIRE_V1.VALUE_CAPABILITIES}:2`]: wide,
         [`${PROFILE_WIRE_V1.VALUE_STATUS}:0`]: statusIdentity,
         [`${PROFILE_WIRE_V1.VALUE_STATUS}:1`]: Buffer.alloc(25),
     };
@@ -197,13 +201,13 @@ test("service exposes opaque descriptors and performs only capability/status rea
     const connected = await service.connect(scanned.devices[0].id);
     assert.equal(connected.connected, true);
     assert.equal(connected.connectionToken, 1);
-    assert.equal(connected.capabilities.schema.major, 2);
+    assert.equal(connected.capabilities.schema.major, 3);
     assert.equal(connected.status.activeKind, 0);
     assert.equal(connected.compatibility.compatible, true);
-    assert.equal(adapter.lastConnection().writes.length, 6);
-    assert.deepEqual(adapter.lastConnection().writes.map((report) => report[0]), [1, 2, 8, 8, 8, 8]);
-    assert.deepEqual(adapter.lastConnection().writes.slice(2).map((report) => report[2]), [1, 1, 2, 2]);
-    assert.deepEqual(adapter.lastConnection().writes.slice(2).map((report) => report[3]), [1, 2, 3, 4]);
+    assert.equal(adapter.lastConnection().writes.length, 7);
+    assert.deepEqual(adapter.lastConnection().writes.map((report) => report[0]), [1, 2, 8, 8, 8, 8, 8]);
+    assert.deepEqual(adapter.lastConnection().writes.slice(2).map((report) => report[2]), [1, 1, 1, 2, 2]);
+    assert.deepEqual(adapter.lastConnection().writes.slice(2).map((report) => report[3]), [1, 2, 3, 4, 5]);
 
     const disconnected = await service.disconnect();
     assert.equal(disconnected.connected, false);
@@ -239,7 +243,7 @@ test("compatibility reports schema and source-capacity blockers", async () => {
 });
 
 test("compatibility is recomputed when the active source profile changes", async () => {
-    const {service} = serviceHarness();
+    const {service} = serviceHarness({maxLayers: 8});
     const scanned = await service.enumerate();
     await service.connect(scanned.devices[0].id);
     const changed = service.setProfileSummary({layerCount: 9});
@@ -360,7 +364,7 @@ test("request ids advance across refreshes and reject a delayed duplicate", asyn
     assert.equal(refreshed.connected, true);
     assert.equal(refreshed.error, null);
     const customWrites = adapter.lastConnection().writes.filter((report) => report[0] === PROFILE_WIRE_V1.COMMAND_GET);
-    assert.deepEqual(customWrites.map((report) => report[3]), [1, 2, 3, 4, 5, 6, 7, 8]);
+    assert.deepEqual(customWrites.map((report) => report[3]), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
     assert.ok(refreshed.diagnostics.some((entry) => entry.includes("unexpected Raw HID report")));
 });
 
@@ -374,6 +378,6 @@ test("the layout read counts only keys the app cannot name", () => {
     const {unnamedKeyCount} = require("../../core/session/profile-device-service");
     const keycodes = require("../../core/data/keycode-catalog");
     const layers = [{layer: 0, keys: [0x0004, 0x7e42, 0x7e85, 0x7ea3, 0x7ec2, 0x7e90, 0x7ee0].map((keycode) => ({keycode, resolved: keycodes.resolve(keycode)}))}];
-    assert.equal(unnamedKeyCount(layers, {actionAbiDigest: 0xf79c6151}), 1, "configured or empty pointing slots are named; a code past the blocks is not");
+    assert.equal(unnamedKeyCount(layers, {actionAbiDigest: 0x837cf479}), 1, "configured or empty pointing slots are named; a code past the blocks is not");
     for (const actionAbiDigest of [0x1d3fcacc, 0x61072732]) assert.equal(unnamedKeyCount(layers, {actionAbiDigest}), 5, "older firmware's user keys are not read as blocks");
 });

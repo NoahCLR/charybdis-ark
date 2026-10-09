@@ -34,12 +34,12 @@ test("a key reads by the profile's name for it, under every name it is known by"
 
 test("every custom key reads by its name, or by its number without one", () => {
     const names = profileKeyNames({actionsKnown: true, customKeys: [{slot: 0, name: "Right Thumb"}, {slot: 1, name: ""}]});
-    assert.equal(keyLabel(names, 0x7e40), "Right Thumb");
+    assert.equal(keyLabel(names, 0x7f00), "Right Thumb");
     assert.equal(names.labels.CUSTOM_KEY_0, "Right Thumb");
-    assert.equal(keyLabel(names, 0x7e41), "Custom key 1");
-    assert.equal(keyLabel(names, 0x7e7f), "Custom key 63", "all 64 exist, named or not");
-    assert.equal(names.custom.length, 64);
-    assert.equal(names.aliases[keycodes.resolve(0x7e40).name], "CUSTOM_KEY_0");
+    assert.equal(keyLabel(names, 0x7f01), "Custom key 1");
+    assert.equal(keyLabel(names, 0x7f7f), "Custom key 127", "all 128 exist, named or not");
+    assert.equal(names.custom.length, 128);
+    assert.equal(names.aliases[keycodes.resolve(0x7f00).name], "CUSTOM_KEY_0");
     assert.deepEqual(profileKeyNames({actionsKnown: false}).custom, [], "an unknown ABI numbers its keys otherwise");
 });
 
