@@ -104,7 +104,7 @@ Every screen is drawn and wired to the host:
 | --- | --- |
 | Keys | Layout keys, key behaviours, combos, layer names and priority; reachable behaviours, macros and pointing modes are shown in place, whether a key, a behaviour branch or a combo reaches them |
 | Lighting | Six stages, the stage mask, layer and pointing-mode colours with their localities, combo and key feedback, auto-mouse fade with its hold as a share of the timeout, LED group rows and reusable groups |
-| Macros | Both banks: name, payload, insert-at-cursor step builder, reorder/remove controls, parsed preview, configurable recorder and placement; search by name, and the layers that set each macro off — by key, behaviour or combo — in their layer colour, each opening that layer in Keys with the macro picked |
+| Macros | Named slots: literal Text, editable key/delay/press/release steps, reorder/remove controls, Advanced raw payload, live size feedback, configurable recorder and placement; search by name, and the layers that set each macro off — by key, behaviour or combo — in their layer colour, each opening that layer in Keys with the macro picked |
 | Mouse | Pointer speed, sniping and auto-mouse — the Settings sections the keyboard's model files under Mouse, drawn with the same cards and posted whole |
 | Pointing modes | All 32 slots: movement, speed, direction shortcuts and how often they send (every step, or once per movement until the ball pauses or moves back the other way), scroll tuning and which way a scrolling mode scrolls (both axes, horizontal only or vertical only), what each direction's shortcut does with held modifiers, thresholds shown as ball movement at the mode's DPI, buttons, bindings, placement, clear and duplicate |
 | Settings | Every other section the keyboard reports, posted whole, read-only where the firmware cannot report; the Combos section also carries the default combo window and the combo hold threshold, which the keyboard stores with its combos |
@@ -546,9 +546,32 @@ them read-only and keeps ASCII editing.
 
 ## Unicode text macros
 
-On supporting firmware, Text and Payload preserve accents, curly quotes,
-symbols, emoji and combining sequences exactly. Text steps preserve literal
-braces and whitespace. Configure the host before enabling Unicode playback in
+Each empty macro opens with a **Text** box. Type or paste exactly what you want
+it to type: braces, code, whitespace and line breaks are literal. On supporting
+firmware, accents, curly quotes, symbols, emoji and combining sequences are
+preserved too. Typing `{KC_A}` in Text types those six characters.
+
+Use **Add a step** for another Text block, a key or chord, a delay, a press and
+hold, or a release. Edit each step directly and move or remove it with the
+buttons on its row. Key pickers offer only the basic keys macros can send;
+a chord takes up to 16 distinct keys, and a press or release takes one.
+Record appends key steps; **Clear take** restores what was there before recording.
+
+Playback size and macro-memory usage follow the edit while you type. Valid edits
+enter the draft when you finish editing a field or change a key step. Incomplete,
+invalid or oversized edits stay visible locally with their reason and never
+replace the last valid draft. **Discard local edits** returns to the draft's
+current macro; use draft Undo to reverse an edit already kept there. Text boxes
+keep long content inside their rows, with scrolling and preserved line breaks.
+
+**Advanced → Raw payload** offers the existing command syntax: `{KC_A}` taps a
+key, `{+KC_A}` presses it, `{-KC_A}` releases it, and `{120}` waits 120 ms.
+Literal braces there must be doubled as `{{` and `}}`; Text escapes them for you.
+Valid raw edits read back as editable steps. A raw edit that cannot be completely
+parsed disables step editing until corrected or discarded, preserving its whole
+input. Both views describe the same macro and use the same playback-size limit.
+
+Configure the host before enabling Unicode playback in
 **Settings → Host**: macOS needs Unicode Hex Input enabled and active; Windows
 needs WinCompose running with Right Alt as Compose; Linux needs an input method
 or target application accepting Ctrl+Shift+U entry. Linux support varies by

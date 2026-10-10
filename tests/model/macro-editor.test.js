@@ -4,7 +4,7 @@ const assert = require("node:assert/strict");
 const {document} = require("../fixtures/portable-profile");
 const {document: pdDocument} = require("../fixtures/pd-profile");
 const {fingerprint, validateSnapshot} = require("../../core/model/portable-profile");
-const {macroEditorView, editMacro, macroBudget, SLOT_RESERVE_TAPS} = require("../../core/model/macro-editor");
+const {macroEditorView, editMacro, macroInputStatus, macroBudget, SLOT_RESERVE_TAPS} = require("../../core/model/macro-editor");
 const {decodeProfileBlob} = require("../../core/schema/profile-blob-v1");
 const {editSettings, settingsEditorView} = require("../../core/model/settings-editor");
 const {buildDeviceModel} = require("../../core/session/device-model");
@@ -166,4 +166,16 @@ test("Unicode host setup persists with the profile and gates Unicode edits on le
     assert.throws(() => editMacro(legacy, {keycode: "VIA_MACRO_0", expectedFingerprint: legacy.fingerprint, unicodeHostMode: 1}, {...capabilities, featureFlags: 0}), /steps/);
     assert.throws(() => editMacro(legacy, {keycode: "VIA_MACRO_0", expectedFingerprint: legacy.fingerprint, payload: "café"}, {...capabilities, featureFlags: 0}), /ASCII/);
     assert.doesNotThrow(() => editMacro(legacy, {keycode: "VIA_MACRO_0", expectedFingerprint: legacy.fingerprint, payload: "ASCII"}, {...capabilities, featureFlags: 0}));
+});
+
+
+test("live macro inspection and staging agree without inspection changing the snapshot", () => {
+    const current = snapshot(pdDocument()), before = structuredClone(current);
+    for (const payload of ["{{KC_A}}\nhello", "a".repeat(508), "a".repeat(509), "{+KC_A}", "{65536}"]) {
+        const message = {keycode: "VIA_MACRO_17", payload, expectedFingerprint: current.fingerprint};
+        const result = macroInputStatus(current, message);
+        if (result.error) assert.throws(() => editMacro(current, message), error => error.code === result.code && error.message === result.error);
+        else assert.equal(Buffer.from(editMacro(current, message).macros[17], "base64").length, result.bytes);
+    }
+    assert.deepEqual(current, before);
 });

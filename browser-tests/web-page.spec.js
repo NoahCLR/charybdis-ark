@@ -377,3 +377,31 @@ test("a narrow window on a computer still gets Ark", async ({browser, baseURL}) 
         await context.close();
     }
 });
+
+
+test("literal macro steps stage through the real web host, export exactly, undo and redo", async ({page, context, baseURL}) => {
+    const {keyboard, ownFilesOnly} = await withKeyboard(context, baseURL);
+    const errors = await open(page);
+    await page.locator('.read-placeholder [data-act="explore-demo"]').click();
+    await ready(page);
+    await page.locator('[data-screen="macros"]').click();
+    await page.locator('[data-slot="VIA_MACRO_17"]').click();
+    const text = ' {"key": "{KC_A}"}\nhello ';
+    await page.locator("[data-step-text]").fill(text);
+    await expect(page.locator("[data-macro-size]")).toContainText(`${Buffer.byteLength(text)} bytes of macro memory`);
+    await expect(page.locator(".rail-status")).toContainText("Draft clean");
+    await page.locator("[data-step-text]").dispatchEvent("change");
+    await expect(page.locator(".rail-status")).toContainText("1 change in draft");
+    await page.locator('.commit [data-act="review"]').click();
+    const [exported] = await Promise.all([page.waitForEvent("download"), page.locator('.sheet [data-act="export"]').click()]);
+    const file = JSON.parse(await (await exported.createReadStream()).toArray().then(chunks => Buffer.concat(chunks).toString("utf8")));
+    expect(Buffer.from(file.macros[17], "base64").toString("utf8")).toBe(text);
+    await page.locator('.sheet [data-act="close"]').first().click();
+    await page.locator('.rail [data-act="undo"]').click();
+    await expect(page.locator("[data-step-text]")).toHaveValue("");
+    await page.locator('.rail [data-act="redo"]').click();
+    await expect(page.locator("[data-step-text]")).toHaveValue(text);
+    expect(keyboard.requests).toEqual([]);
+    expect(errors).toEqual([]);
+    ownFilesOnly();
+});

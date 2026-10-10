@@ -1,12 +1,12 @@
 "use strict";
 const {test, expect} = require("@playwright/test");
 for (const theme of ["vscode-dark", "vscode-light"]) {
-    test(`Host Settings and Text builder post exact content (${theme})`, async ({page}) => {
+    test(`Host Settings and literal Text steps post exact content (${theme})`, async ({page}) => {
         await page.goto(`/preview/${theme}.html`);
         await page.evaluate(async () => {
             const store = await import("/webview/store.mjs");
             const model = structuredClone(store.getModel());
-            model.macroUnicode = {supported: true, mode: 1};
+            model.macroUnicode = {supported: true, mode: 1, enabled: true};
             store.setModel(model); store.state.screen = "macros"; store.render();
             window.__posted.length = 0;
         });
@@ -20,13 +20,13 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
         await page.evaluate(async () => {
             const store = await import("/webview/store.mjs");
             const model = structuredClone(store.getModel());
-            model.macroUnicode = {supported:true,mode:1};
-            store.setModel(model); store.state.screen = "macros"; store.render(); window.__posted.length = 0;
+            model.macroUnicode = {supported:true,mode:1,enabled:true};
+            store.setModel(model); store.state.screen = "macros"; store.state.macroSlot = "VIA_MACRO_17"; store.render(); window.__posted.length = 0;
         });
-        await page.locator('[data-kind]').selectOption("text");
         const text = ' {"café": “hello”} 🙂 e\u0301 👩‍💻 ';
-        await page.locator('[data-value]').fill(text);
-        await page.locator('[data-act="insert"]').click();
+        await page.locator('[data-step-text]').fill(text);
+        await page.locator('[data-step-text]').dispatchEvent('change');
+        await expect.poll(() => page.evaluate(() => window.__posted.filter(item => item.type === 'updateViaMacro').length)).toBe(1);
         const posted = await page.evaluate(() => window.__posted.filter(item => item.type === "updateViaMacro"));
         expect(posted.at(-1)?.payload).toContain(text.replaceAll("{", "{{").replaceAll("}", "}}"));
     });

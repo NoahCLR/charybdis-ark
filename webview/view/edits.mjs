@@ -170,6 +170,7 @@ export const deleteLedGroup = (name) => ({type: "deleteRgbReusableLedGroup", nam
 // ── macros, pointing, settings ──────────────────────────────────────────
 
 export const macroMessage = (keycode, payload, identity) => ({type: "updateViaMacro", keycode, payload, expectedFingerprint: identity});
+export const macroValidationMessage = (keycode, payload, requestId) => ({type: "validateViaMacro", keycode, payload, requestId});
 // A VIA macro's name; its steps stay as they are.
 export const macroNameMessage = (keycode, name, identity) => ({type: "updateViaMacro", keycode, name: String(name ?? "").trim(), expectedFingerprint: identity});
 export const customKeyNameMessage = (keycode, name, identity) => ({type: "updateCustomKey", keycode, name: String(name ?? "").trim(), expectedFingerprint: identity});

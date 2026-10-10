@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {describeStep, macroMatches, macroPeek, parseMacro, serializeMacro, unreleased} from "../webview/view/macro.mjs";
+import {describeStep, macroMatches, macroPeek, parseMacro, serializeMacro, macroStepsInput, unreleased} from "../webview/view/macro.mjs";
 
 test("a payload reads back as the steps the keyboard will play", () => {
     const {steps, error} = parseMacro("noah@xomnia.com{120}{KC_ENT}");
@@ -86,4 +86,42 @@ test("a macro is found by its name, and by its slot when it has none", () => {
     assert.equal(macroMatches(unnamed, "VIA_MACRO_12"), true, "and its keycode");
     assert.equal(macroMatches(unnamed, "screen"), false);
     assert.equal(macroMatches(unnamed, ""), true, "an empty search hides nothing");
+});
+
+
+test("editable text is literal, including command-looking braces, code and Unicode", () => {
+    const text = ' {"café": "{KC_A}"}\n\t🙂 e\u0301 👩‍💻 ';
+    const steps = [{kind: "text", text}, {kind: "delay", delay: "120"}, {kind: "tap", keys: ["KC_LGUI", "KC_A"]}];
+    const input = macroStepsInput(steps);
+    assert.equal(input.error, "");
+    const parsed = parseMacro(input.payload, {unicode: true});
+    assert.equal(parsed.error, "");
+    assert.equal(parsed.steps[0].text, text);
+    assert.deepEqual(parsed.steps.slice(1), [{kind: "delay", delay: 120}, steps[2]]);
+    assert.equal(macroStepsInput([{kind: "text", text: ""}]).payload, "");
+});
+
+test("incomplete steps keep their input and give a field error instead of inventing a valid edit", () => {
+    for (const delay of ["", "-1", "1.5", "65536", "wat"]) {
+        const input = macroStepsInput([{kind: "delay", delay}]);
+        assert.equal(input.payload, `{${delay}}`);
+        assert.match(input.error, /delay/i);
+    }
+    const input = macroStepsInput([{kind: "tap", keys: []}, {kind: "text", text: "after"}]);
+    assert.equal(input.payload, "{}after");
+    assert.match(input.error, /Choose a key/);
+});
+
+
+test("canonical names and aliases are one key for holds, releases and chord limits", async () => {
+    const {createRequire} = await import("node:module"), require = createRequire(import.meta.url);
+    const aliases = require("../core/data/keycode-catalog.js").aliasTable();
+    const keys = require("../core/schema/macro-payload.js").macroKeycodes();
+    const source = "{+KC_LGUI}{KC_A}{-KC_LEFT_GUI}";
+    const parsed = parseMacro(source, {aliases, keys});
+    assert.equal(parsed.error, "");
+    assert.deepEqual(unreleased(parsed.steps, aliases), []);
+    assert.equal(serializeMacro(parsed.steps), source, "alias identity checking preserves raw spelling");
+    assert.match(parseMacro("{KC_LGUI,KC_LEFT_GUI}", {aliases, keys}).error, /distinct/);
+    assert.match(parseMacro("{+KC_LGUI}{KC_LEFT_GUI}{-KC_LGUI}", {aliases, keys}).error, /already held/);
 });
