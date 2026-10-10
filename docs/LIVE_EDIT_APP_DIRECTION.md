@@ -44,7 +44,7 @@ matrix.
 | Custom keys | 128 named keys that do what their behaviour says: rename, add or open the behaviour, place, see where each is used (D-L42) |
 | Mouse | Pointer and sniping DPI, auto-sniping and auto-mouse: global-policy sections the core files under the Mouse area, so the rail, the review and import counts all place them there. The auto-mouse fade delay is a share of the timeout, edited on its lighting stage (D-L17) |
 | Pointing modes | 32 device-owned slots (sparse PD domain v3, RGB v4); live codecs accept only the current action vocabulary and profile formats (D-L54). See [PD-mode domain v1](../upstream/firmware/docs/architecture/pd-mode-domain-v1.md) |
-| Global policy | Every other portable setting, including startup layers, combo matching and device-reported lighting and key options; unsupported firmware features stay read-only |
+| Global policy | Every other portable setting, including startup layers, combo matching and device-reported lighting and key options; Windows Unicode setup links to WinCompose and macOS Unicode setup warns about Option shortcuts (D-L56); unsupported firmware features stay read-only |
 | Backup and restore | Complete current-format snapshots, choose or drop a file for import review against the keyboard, recovery file and verified restore; the preceding eight-layer backup is translated before review (D-L54) |
 | Drafts and Apply | One draft with item-by-item review, discard by edit group, Show, undo/redo and draft history; the review checks reachable actions, confirms active warnings and traps, and blocks profiles the destination cannot save (D-L36); Apply shows its steps and says where a failure happened; one coherent capture supplies the editor and draft, and copy/read status updates retain the active editor (D-L19, D-L23, D-L29, D-L30) |
 | Recovery | Atomic logical Apply, capability-gated differential custom uploads (D-L58), differential VIA transfer, reboot recovery fencing, firmware roll-forward after the decision, resume after a lost or power-cycled peer link, bounded cancel owned by the keyboard (D-L20–D-L22, D-L27, D-L39) |
@@ -1151,7 +1151,15 @@ entry needs the Unicode Hex Input source, so it is a layout choice there, not a
 switch; the switch stays for Windows and Linux. The macro editor refuses a
 character the layout cannot type unless Unicode entry is available, naming it,
 and refuses an ordinary key held across text that needs Unicode entry, as the
-keyboard's preflight does. Keys are labelled as the layout prints them
+keyboard's preflight does. On Unicode-capable firmware, Settings → Host links
+to WinCompose's GitHub project with the shared GitHub mark when the effective
+OS is Windows and Unicode playback is enabled (Auto follows detection).
+When macOS Unicode entry is selected, the Host section warns that an active
+Unicode Hex Input source may interfere with Option symbols and shortcuts,
+including word navigation. This applies to ordinary keys and key-step shortcuts
+as well as macro text. Ark neither switches the host input source nor claims
+that its layout choice can preserve the usual source's Option behaviour.
+Keys are labelled as the layout prints them
 (`core/model/key-names.js`): the layout screen, the picker's board and search,
 and Review, from the same data; stored keycodes never change, and US keeps the
 catalogue's labels. The picker includes Shift and Option/AltGr legends and

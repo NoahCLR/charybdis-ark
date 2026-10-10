@@ -181,7 +181,12 @@ function settingsSections(snapshot, settings, capabilities) {
     const osName = [null, "macos", "windows", "linux"][host.effective];
     const offered = hostLayouts().filter(layout => !osName || layout.os === "any" || layout.os === osName || layout.id === host.layout);
     const layoutWord = id => VOCABULARY.hostLayouts.find(([value]) => value === id)?.[1];
-    result.push({id: "host", area: "Settings", label: "Host", description: available
+    result.push({id: "host", area: "Settings", label: "Host",
+        ...(supportsUnicodeMacros(capabilities) && host.effective === 2 && host.unicodeEnabled
+            ? {githubLink: {label: "WinCompose on GitHub", url: "https://github.com/samhocevar/wincompose"}} : {}),
+        ...(supportsUnicodeMacros(capabilities) && macos && host.unicodeMode
+            ? {warning: "While Unicode Hex Input is active on your Mac, Option-based symbols and shortcuts may stop working, including Option+Left/Right for word navigation. This affects ordinary typing and key-step shortcuts too. Ark does not switch your Mac's input source; switch back to your usual source when you need those keys, and match the layout here before playing macros."} : {}),
+        description: available
         ? `Detected: ${host.detected ? label(host.detected) : "Unknown"}. Effective: ${host.effective ? label(host.effective) : "Unknown"}. Detection is a best guess; override it if incorrect. ${setup} The keyboard cannot confirm your input setup.`
         : "Update both halves to report their host OS and support these settings.", fields: [
         {...number("hostOs", SETTING.UNICODE_HOST_MODE, "Host OS", "Auto uses the keyboard’s USB detection. This controls display names, the layouts offered and Unicode entry; it does not swap keys.", {max: 3}), bitMask: 3, kind: "number", readOnly: !available,
