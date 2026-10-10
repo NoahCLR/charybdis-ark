@@ -14,6 +14,16 @@ const snapshot = () => {
 };
 const device = {id: "kb", manufacturer: "Bastard Keyboards", product: "Charybdis 4x6"};
 
+test("Apply progress updates do not rebuild or post the complete panel model", () => {
+    const host = fakeHost();
+    const loop = openPanelLoop(host, {adapter: new FakeDeviceAdapter()});
+    loop.session.draft = {id: "draft-777", revision: 3};
+    const apply = {id: 777, state: "applying", current: "stage", steps: [], bytes: {completed: 12, total: 120}};
+    loop.session.service.reportApplyProgress(apply);
+    assert.deepEqual(host.posted, [{type: "applyProgress", apply, draftId: "draft-777", draftRevision: 3}]);
+    assert.deepEqual(loop.session.service.liveApply, apply, "full snapshots retain the latest progress");
+});
+
 // A host that records everything the loop hands it.
 function fakeHost(extra = {}) {
     const host = {

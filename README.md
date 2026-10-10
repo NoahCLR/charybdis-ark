@@ -36,7 +36,7 @@ Every edit goes into a draft with undo, redo and a full history. **Review**
 lists what changed and checks what the layers let you reach. It warns you
 about a layer you could lock yourself into, combos that can't fire and macros
 that are too long to play. **Apply** saves a recovery copy, writes both halves
-and reads the result back to prove it.
+and reads the result back to prove it. You can stay in the editor while it copies.
 
 **Export profile** saves your whole setup as one file. **Import profile**
 takes a current-format backup by choosing a file or dropping it onto the Import

@@ -354,6 +354,12 @@ macros on this half, check both halves. `restoreProfile()` reports at each real
 boundary with byte counts. A failure keeps its step, a reason from the
 keyboard's own error (or the other half's last answer), and whether anything
 was saved. The commit bar keeps a failed Apply on screen until dismissed.
+Transfer progress uses a separate `applyProgress` panel message, correlated to
+the current draft ID and revision. The service retains the latest view for
+full snapshots; progress alone updates the commit bar without rebuilding the
+profile model or the visible editor. Connection, profile and busy-state changes
+still publish full models. The active screen must not add work to each copy
+chunk, including when a macro's local Text or Advanced input is present.
 After a successful Apply, the app reads layout, committed domains, combos and
 VIA base lighting again. The editor and rail stay visible but busy; the commit
 bar names the current read and its page progress until editing resumes. This

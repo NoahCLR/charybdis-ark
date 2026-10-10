@@ -42,7 +42,11 @@ function openPanelLoop(host, options = {}) {
         close: () => session.service.close(),
     };
     const {service, ...device} = options;
-    session.service = service || new ProfileDeviceService({...device, onChange: loop.publish});
+    session.service = service || new ProfileDeviceService({...device, onChange: loop.publish,
+        onApplyProgress: apply => {
+            void host.post({type: "applyProgress", apply, draftId: session.draft?.id, draftRevision: session.draft?.revision});
+        },
+    });
     return loop;
 }
 

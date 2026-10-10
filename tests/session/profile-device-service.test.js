@@ -15,6 +15,24 @@ const {
 const {PROFILE_ACTIVE_KIND, PROFILE_WIRE_FEATURES, PROFILE_WIRE_STATUS, PROFILE_WIRE_V1, VIA_READS} = require("../../core/protocol/profile-wire-v1");
 const {document} = require("../fixtures/pd-profile");
 
+test("Apply progress has a separate notification and cannot let a closed panel stop a save", () => {
+    let changes = 0;
+    const progress = [];
+    const service = new ProfileDeviceService({adapter: new FakeDeviceAdapter(), onChange: () => changes++,
+        onApplyProgress: view => progress.push(view)});
+    const view = {id: 777, state: "applying", steps: [], bytes: {completed: 12, total: 120}};
+    for (let completed = 1; completed <= 120; completed++) service.reportApplyProgress({...view, bytes: {completed, total: 120}});
+    assert.equal(changes, 0, "copy counters never rebuild a full snapshot");
+    assert.equal(progress.length, 120);
+    progress.at(-1).bytes.completed = 0;
+    assert.equal(service.liveApply.bytes.completed, 120, "the panel receives a separate progress value");
+    service.onApplyProgress = () => {throw Error("panel closed");};
+    assert.doesNotThrow(() => service.reportApplyProgress(view));
+    service.onApplyProgress = undefined;
+    service.reportApplyProgress(view);
+    assert.equal(changes, 1, "other service clients keep the complete-snapshot fallback");
+});
+
 function response(request, payload) {
     const report = Buffer.from(request);
     report.fill(0, 5);

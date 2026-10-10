@@ -409,6 +409,8 @@ nothing to the keyboard.
 
 What to expect while it applies:
 
+- You can stay on any screen, including Macros. The save bar updates while
+  the editor stays visible and disabled; changing screens is optional.
 - Apply waits for held keys, locked layers and pointer modes to clear before
   the commit decision, and says so; after 60 s the save is cancelled and
   nothing changes. Anything that fails before the decision leaves the saved

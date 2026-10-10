@@ -403,6 +403,19 @@ let inDemo = false;   // whether the last model was the demo's
 addEventListener("message", (event) => {
     const message = event.data;
     if (message?.type === "macroValidation") { receiveMacroValidation(message); return; }
+    if (message?.type === "applyProgress") {
+        const model = getModel(), draft = model?.draft;
+        if (!draft?.busy || message.draftId !== draft.id || message.draftRevision !== draft.revision
+            || !message.apply || (model.apply && message.apply.id < model.apply.id)) return;
+        setModel({...model, apply: message.apply});
+        // A copy's byte counter must not rebuild its disabled editors. The
+        // same main thread receives HID replies in the browser host.
+        const main = root.querySelector(".main"), previous = main?.querySelector(":scope > .commit"), next = commitBar();
+        if (previous && next) previous.replaceWith(next);
+        else if (next && main) main.append(next);
+        else previous?.remove();
+        return;
+    }
     if (message?.type !== "model") return;
     setModel(message.model);
     // Leaving the demo goes back to where a keyboard is connected, or the demo
