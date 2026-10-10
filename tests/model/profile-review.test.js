@@ -278,3 +278,23 @@ test("Space Cadet modifiers use current host names on the board and in Review", 
         assert.deepEqual(model.layers[0].positions.map(p=>p.value),keys);
     }
 });
+
+test("layout and Review labels follow the host layout on each side, including macOS ISO", () => {
+    const settings = require("../../core/schema/settings-domain-v1");
+    const {buildDeviceModel} = require("../../core/session/device-model");
+    const {resolve} = require("../../core/data/keycode-catalog");
+    const withHost = (word) => withDomain(document(), 64, settings.decodeSettings, settings.encodeSettings,
+        value => ({...value, values: value.values.map((v, i) => i === 27 ? word : v)}));
+    for (const [host, word, code, label] of [
+        [{effective: 2, layout: 9}, 2 | (9 << 16), 0x1c, "Z"],
+        [{effective: 2, layout: 9}, 2 | (9 << 16), 0x233, "Ö"],
+        [{effective: 1, layout: 2, macosIso: true}, 1 | (2 << 16) | (1 << 24), 0x35, "§"],
+    ]) {
+        const before = snapshot(withHost(word)), after = snapshot(structuredClone(before.document));
+        after.document.layers[0][0] = code;
+        assert.equal(profileReview(before, after).find(row => row.unit === "layout:0:0").fields[0].after, label);
+        const model = buildDeviceModel({settingsView: {host}, layout: {state: "read", layers: [{layer: 0, keys: [{keycode: code, layoutIndex: 0, resolved: resolve(code)}]}]}});
+        assert.equal(model.layers[0].positions[0].editLabel, label);
+        assert.equal(model.layers[0].positions[0].value, code);
+    }
+});

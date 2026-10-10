@@ -14,7 +14,8 @@ Key and modifier names follow that OS throughout the editors and Review.
 
 ## What you can change
 
-- **Keys and layers.** Pick keys from an ANSI board or search all of QMK. Drag
+- **Keys and layers.** Pick keys from a board labelled for your keyboard layout
+  or search all of QMK. Drag
   one key onto another to swap them. Rename, reorder and re-base layers, and
   preview several of the 16 layers stacked the way the keyboard would resolve them.
 - **Behaviours.** Set what a key does on tap, hold and long hold, for each tap
