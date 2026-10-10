@@ -6,6 +6,7 @@ const {SETTINGS, validName, encodeSettings} = require("../schema/settings-domain
 const {macroKeycodes, macroModifierKeycodes, encodeMacroPayload, decodeMacroPayload, macroProgramBytes, MACRO_PROGRAM_MAX} = require("../schema/macro-payload");
 const {supportsUnicodeMacros} = require("../schema/macro-payload");
 const {hostSettings} = require("../schema/host-settings");
+const {inspectMacroInput} = require("./macro-input");
 const fail = (message, code = "MACRO_EDIT_CONFLICT") => Object.assign(new Error(message), {code});
 
 
@@ -56,20 +57,35 @@ function macroEditorView(snapshot, capabilities) {
 
 // A macro's steps, its name, or both. A name lives in the profile's settings
 // domain.
-function editMacro(snapshot, message, capabilities) {
-    if (!snapshot?.document || !message.expectedFingerprint || message.expectedFingerprint !== snapshot.fingerprint) throw fail("The keyboard changed since this macro draft was opened. Read the keyboard and review the draft before saving again.");
-    const match = /^VIA_MACRO_(\d+)$/.exec(message.keycode || "");
+function macroInputStatus(snapshot, message, capabilities) {
+    const index = macroIndex(message.keycode);
+    const {document, settings} = decodedOf(snapshot);
+    const slots = document.macros.map(value => Buffer.from(value, "base64"));
+    const budget = macroBudget(slots, capabilities?.viaMacroBytes ?? MACRO_BANK_BYTES);
+    const host = hostSettings(settings.values, snapshot.hostOs?.detected);
+    return inspectMacroInput(message.payload, {unicode: supportsUnicodeMacros(capabilities), mode: host.unicodeMode,
+        enabled: host.unicodeEnabled, currentBytes: slots[index].length, bankFree: budget.free});
+}
+
+function macroIndex(keycode) {
+    const match = /^VIA_MACRO_(\d+)$/.exec(keycode || "");
     const index = match && Number(match[1]);
     if (!match || index >= MACRO_SLOTS || String(index) !== match[1]) throw fail("Choose a macro slot reported by the keyboard.");
+    return index;
+}
+
+function editMacro(snapshot, message, capabilities) {
+    if (!snapshot?.document || !message.expectedFingerprint || message.expectedFingerprint !== snapshot.fingerprint) throw fail("The keyboard changed since this macro draft was opened. Read the keyboard and review the draft before saving again.");
+    const index = macroIndex(message.keycode);
     if (message.payload === undefined && message.name === undefined) throw fail("Send the macro's steps, its name, or both.");
     const value = validateSnapshot(snapshot.document, capabilities);
     const document = JSON.parse(JSON.stringify(value.document));
     if (message.payload !== undefined) {
         const unicode = supportsUnicodeMacros(capabilities);
         const host = hostSettings(value.settings.values, snapshot.hostOs?.detected);
-        if (/[^\x00-\x7F]/u.test(message.payload) && unicode && !host.unicodeMode) throw fail("Choose a known host OS and enable Unicode playback in Settings → Host before saving Unicode text.", "UNICODE_SETUP_REQUIRED");
-        const bytes = encodeMacroPayload(message.payload, {unicode, textEntry: host.unicodeEnabled}), program = macroProgramBytes(bytes);
-        if (program > MACRO_PROGRAM_MAX) throw fail(`This macro needs ${program} bytes to play and the keyboard plays at most ${MACRO_PROGRAM_MAX}. Shorten it by about ${Math.ceil((program - MACRO_PROGRAM_MAX) / KEY_TAP_BYTES)} key taps.`, "MACRO_TOO_LONG");
+        const status = macroInputStatus(snapshot, message, capabilities);
+        if (status.error) throw fail(status.error, status.code);
+        const bytes = encodeMacroPayload(message.payload, {unicode, textEntry: host.unicodeEnabled});
         document.macros[index] = bytes.toString("base64");
     }
     if (message.name !== undefined && message.name !== value.settings.macroNames[index]) {
@@ -84,4 +100,4 @@ function editMacro(snapshot, message, capabilities) {
     return document;
 }
 
-module.exports = {macroEditorView, editMacro, macroBudget, SLOT_RESERVE_TAPS};
+module.exports = {macroEditorView, editMacro, macroInputStatus, macroBudget, SLOT_RESERVE_TAPS};

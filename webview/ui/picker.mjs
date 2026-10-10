@@ -13,8 +13,9 @@ import {vocabulary, word} from "../view/vocabulary.mjs";
 
 const modifierControls = model => vocabulary(model).pickerModifiers || [];
 
-export function openPicker({title, context, contextKeycode, seed = [], mode = "single", onPick}) {
-    state.picker = {title, context, contextKeycode, mode, section: "board", search: "", mods: [], keys: seed.slice(), layerTap: null, onPick};
+export function openPicker({title, context, contextKeycode, seed = [], mode = "single", allowedKeys = null, maxKeys = Infinity, onPick}) {
+    const keys = allowedKeys ? seed.map(key => getModel()?.qmkKeycodeAliases?.[key] || key) : seed.slice();
+    state.picker = {title, context, contextKeycode, mode, allowedKeys, maxKeys, section: "board", search: "", mods: [], keys, layerTap: null, onPick};
     render();
 }
 
@@ -23,6 +24,11 @@ export function openPicker({title, context, contextKeycode, seed = [], mode = "s
 const layerTapName = (index) => layerName(layers()[Number(index)]) || `Layer ${index}`;
 
 export const closePicker = () => { state.picker = null; render(); };
+
+const pickValue = (value) => state.picker.allowedKeys ? getModel()?.qmkKeycodeAliases?.[value] || value : value;
+const allowed = (value) => !state.picker.allowedKeys || state.picker.allowedKeys.includes(value);
+const sections = (model) => pickerSections().filter(section => !state.picker.allowedKeys || section.kind === "board"
+    || entriesForPickerSection(model?.qmkKeycodes || [], section).some(entry => allowed(entry.value)));
 
 const expression = () => state.picker ? pickerExpression(state.picker) : "";
 
@@ -45,12 +51,12 @@ function macroButton(slot, picked) {
 function sectionBody(model) {
     const picker = state.picker;
     const catalogue = model?.qmkKeycodes || [];
-    const picked = (value) => picker.keys.includes(value);
+    const picked = (value) => picker.keys.includes(pickValue(value));
 
     if (picker.search) {
         const query = picker.search.toLowerCase();
-        const macros = (model?.viaMacros || []).filter((slot) => macroMatches(slot, query));
-        const matches = catalogue.filter((entry) => pickable(entry)
+        const macros = (model?.viaMacros || []).filter((slot) => allowed(slot.keycode) && macroMatches(slot, query));
+        const matches = catalogue.filter((entry) => allowed(entry.value) && pickable(entry)
             && (entry.search?.includes(query) || entry.value.toLowerCase().includes(query))).slice(0, 64);
         if (!matches.length && !macros.length) return `<p class="note" style="padding:18px">Nothing in the keyboard's catalogue or macros matches “${esc(picker.search)}”.</p>`;
         const count = matches.length + macros.length;
@@ -61,9 +67,9 @@ function sectionBody(model) {
                 <div class="pk-rows">${chunk(matches, 8).map((row) => `<div class="pk-row">${row.map((entry) => keyButton(entry, picked(entry.value))).join("")}</div>`).join("")}</div>` : ""}</div>`;
     }
 
-    const section = pickerSections().find((entry) => entry.id === picker.section) || pickerSections()[0];
+    const section = sections(model).find((entry) => entry.id === picker.section) || sections(model)[0];
     if (section.kind === "board") {
-        const keys = PICKER_BOARD.keys.map((source) => {
+        const keys = PICKER_BOARD.keys.filter(source => allowed(source.value)).map((source) => {
             const modifier = /^KC_(?:LEFT_|RIGHT_|L|R)(?:CTL|SFT|ALT|GUI)$/.test(source.value);
             const spoken = model?.qmkKeyLabels?.[source.value];
             const key = modifier ? {...source, labels: [(spoken || source.value).replace(/^(Left|Right) /, "")]} : source;
@@ -78,7 +84,7 @@ function sectionBody(model) {
             </g>`;
         }).join("");
         return `<div class="pk-body"><div class="pkb"><svg viewBox="0 0 ${PICKER_BOARD.width} ${PICKER_BOARD.height}" xmlns="http://www.w3.org/2000/svg">${keys}</svg></div>
-            <p class="note" style="margin-top:12px">Click a key. Modifiers above wrap it, so <code>${esc(modifierControls(model).find(({value}) => value === "G")?.label || "G")}</code> + <code>C</code> stores <code>G(KC_C)</code> — identical to <code>LGUI(KC_C)</code>.</p></div>`;
+            <p class="note" style="margin-top:12px">${picker.mode === "list" ? picker.maxKeys === 1 ? "Choose the key to press or release." : "Choose the keys to send together." : `Click a key. Modifiers above wrap it, so <code>${esc(modifierControls(model).find(({value}) => value === "G")?.label || "G")}</code> + <code>C</code> stores <code>G(KC_C)</code> — identical to <code>LGUI(KC_C)</code>.`}</p></div>`;
     }
     if (section.kind === "layers") {
         // TG(n) is the same lock as LOCK_LAYER(n), so a key storing it lights
@@ -127,7 +133,7 @@ function sectionBody(model) {
         return `<div class="pk-body"><div class="pk-rows">${chunk(slots, 8).map((row) => `<div class="pk-row">${row.map((slot) =>
             macroButton(slot, picked(slot.keycode))).join("")}</div>`).join("")}</div></div>`;
     }
-    const entries = entriesForPickerSection(catalogue, section);
+    const entries = entriesForPickerSection(catalogue, section).filter(entry => allowed(entry.value));
     if (!entries.length) return `<p class="note" style="padding:18px">The keyboard's catalogue has nothing in this section.</p>`;
     return `<div class="pk-body"><div class="pk-rows">${chunk(entries, 8).map((row) =>
         `<div class="pk-row">${row.map((entry) => keyButton(entry, picked(entry.value))).join("")}</div>`).join("")}</div></div>`;
@@ -141,7 +147,7 @@ export function pickerOverlay() {
     const node = el(`<div class="scrim"><div class="sheet picker" role="dialog" aria-modal="true" aria-label="Pick a keycode" style="width:min(1180px,100%)">
         <div class="sheet-h">
             <div><h2>Pick a keycode</h2>
-                <p class="note">${picker.mode === "list" ? "Choose one or more keys." : `For <b>${esc(picker.title)}</b> · ${esc([picker.contextKeycode ? actionLabel(model, picker.contextKeycode) : "", picker.context].filter(Boolean).join(" · "))}`}</p></div>
+                <p class="note">${picker.mode === "list" ? picker.maxKeys === 1 ? "Choose one key." : Number.isFinite(picker.maxKeys) ? `Choose up to ${picker.maxKeys} keys to send together.` : "Choose one or more keys." : `For <b>${esc(picker.title)}</b> · ${esc([picker.contextKeycode ? actionLabel(model, picker.contextKeycode) : "", picker.context].filter(Boolean).join(" · "))}`}</p></div>
             <input class="input" id="pickerSearch" placeholder="Search every section" style="max-width:300px;margin-left:12px" value="${esc(picker.search)}">
             <span class="right" style="margin-left:auto"><button class="btn ghost" data-act="cancel">Cancel</button></span>
         </div>
@@ -150,7 +156,7 @@ export function pickerOverlay() {
                 data-tip="Wraps the picked key as ${wrap}(key).">${esc(label)}</button>`).join("")}
             <span class="note" style="margin-left:auto">held together with the key</span></div>`}
         <div class="sheet-b" style="display:grid;grid-template-columns:186px minmax(0,1fr);align-items:start">
-            <div class="picker-side">${pickerSections().map((section) =>
+            <div class="picker-side">${sections(model).map((section) =>
                 `<button data-sec="${esc(section.id)}" aria-current="${picker.section === section.id && !picker.search}">${esc(section.label)}</button>`).join("")}</div>
             <div>${sectionBody(model)}</div>
         </div>
@@ -193,9 +199,11 @@ export function pickerOverlay() {
         }
         const pick = event.target.closest("[data-pick]");
         if (pick) {
-            const chosen = pick.dataset.pick;
+            const chosen = pickValue(pick.dataset.pick);
+            if (!allowed(chosen)) return;
+            if (picker.mode === "list" && !picker.keys.includes(chosen) && picker.keys.length >= picker.maxKeys && picker.maxKeys !== 1) return;
             picker.keys = picker.mode === "list"
-                ? (picker.keys.includes(chosen) ? picker.keys.filter((key) => key !== chosen) : [...picker.keys, chosen])
+                ? (picker.keys.includes(chosen) ? picker.keys.filter((key) => key !== chosen) : picker.maxKeys === 1 ? [chosen] : [...picker.keys, chosen])
                 : [chosen];
             render();
         }

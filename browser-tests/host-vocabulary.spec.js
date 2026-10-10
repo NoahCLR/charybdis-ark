@@ -64,14 +64,14 @@ for(const theme of ["vscode-dark","vscode-light"]) {
         });
         for(const host of [1,2,3,0]) {
             await sendHost(page,host);
-            await expect(page.locator('.step .tok').nth(0)).toHaveText(hostKeyLabel('Right GUI',host));
-            await expect(page.locator('.step .tok').nth(1)).toHaveText(`${hostKeyLabel('Left GUI',host)} + ${hostKeyLabel('Right Alt',host)}`);
-            await expect(page.locator('.step .tok').nth(2)).toHaveText(hostKeyLabel('Right GUI',host));
+            await expect(page.locator('.macro-step .tok').nth(0)).toHaveText(hostKeyLabel('Right GUI',host));
+            await expect(page.locator('.macro-step .tok').nth(1)).toHaveText(`${hostKeyLabel('Left GUI',host)} + ${hostKeyLabel('Right Alt',host)}`);
+            await expect(page.locator('.macro-step .tok').nth(2)).toHaveText(hostKeyLabel('Right GUI',host));
         }
         await page.evaluate(async()=>{const s=await import('/webview/store.mjs');s.setMacroForm('VIA_MACRO_0',{draft:'{+KC_RALT}'});s.render();});
         for(const host of [1,2,3,0]) {
             await sendHost(page,host);
-            await expect(page.locator('.unavailable').filter({hasText:'never releases'})).toContainText(hostKeyLabel('Right Alt',host));
+            await expect(page.locator('.unavailable').filter({hasText:'before the macro ends'})).toContainText(hostKeyLabel('Right Alt',host));
         }
     });
 }

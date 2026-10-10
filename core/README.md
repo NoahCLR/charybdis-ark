@@ -50,8 +50,13 @@ portable profile (`model/portable-profile.js`) with undo and redo history, a
 review built by `model/profile-review.js`, the checks of what the layers let
 you reach from `model/layer-reach.js` (a trap has to be confirmed before
 Apply), and staleness checks on every message (draft id, revision, and the base
-the form was built from). The domain
-edits themselves live in `session/device-profile-edits.js` and
+the form was built from).
+
+The macro inspector (`model/macro-input.js`, through `model/macro-editor.js`) shares
+staging's codec and limits. `validateViaMacro` receives a correlated
+`macroValidation` reply without an edit, toast or device call; only a subsequent
+`updateViaMacro` stages anything. The domain edits themselves live in
+`session/device-profile-edits.js` and
 `session/key-behavior-edits.js`.
 
 Apply goes through `session/portable-profile-session.js`: a recovery copy is

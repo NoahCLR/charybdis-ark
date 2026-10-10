@@ -877,3 +877,20 @@ test("the Host section posts staged settings with Review, undo, redo and backup 
     draft.undo(draft.revision); assert.equal(decoded(draft).settings.values[27], 0);
     draft.redo(draft.revision); draft.redo(draft.revision); assert.deepEqual(draft.document, backup);
 });
+
+
+test("literal step messages inspect and stage the exact text with undo intact", async () => {
+    const {macroStepsInput} = await import("../webview/view/macro.mjs");
+    const {macroInputStatus} = require("../core/model/macro-editor");
+    const draft = session(), text = ' {"key": "{KC_A}"}\nhello ';
+    const {payload} = macroStepsInput([{kind: "text", text}, {kind: "tap", keys: ["KC_ENT"]}]);
+    const message = edits.macroValidationMessage("VIA_MACRO_17", payload, 777);
+    assert.deepEqual(message, {type: "validateViaMacro", keycode: "VIA_MACRO_17", payload, requestId: 777});
+    assert.equal(macroInputStatus(draft.current, message, draft.capabilities).error, "");
+    const before = draft.document;
+    stage(draft, edits.macroMessage(message.keycode, message.payload, draft.current.fingerprint));
+    assert.equal(Buffer.from(draft.document.macros[17], "base64").subarray(0, Buffer.byteLength(text)).toString(), text);
+    assert.ok(reviewAreas(draft).includes("Macros"));
+    draft.undo(draft.revision);
+    assert.deepEqual(draft.document, before);
+});

@@ -199,4 +199,4 @@ if (require.main === module) {
     });
 }
 
-module.exports = {buildInfo, buildWeb, headerPolicy, pagePolicy, manifestFileFor, IMMUTABLE, OUTDIR};
+module.exports = {buildInfo, buildWeb, bundle, headerPolicy, pagePolicy, manifestFileFor, IMMUTABLE, OUTDIR};

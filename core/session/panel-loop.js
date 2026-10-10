@@ -28,6 +28,7 @@ const {ProfileDeviceService} = require("./profile-device-service");
 const {buildPanelModel, routeMessage, takeOutbox} = require("./panel-session");
 const {draftControl, portableControl, readKeyboard} = require("./panel-controls");
 const {demoControl, demoExport, leaveDemo, panelState} = require("./demo-session");
+const {macroInputStatus} = require("../model/macro-editor");
 
 // Reading a keyboard leaves the demo first (asking about unexported edits is
 // the panel's, and a message that has not asked is refused).
@@ -50,11 +51,29 @@ function publish(session, host) {
     void host.post({type: "model", model, ...takeOutbox(session)});
 }
 
-// Every path through here publishes, including the ones that decline or fail:
+// Edit/control paths publish, including the ones that decline or fail:
 // the webview waits on that reply — a combo builder closes when its edit is
 // accepted and stays open when it is refused — and a refusal reaches the panel
 // as a notice rather than as silence.
 async function handleMessage(session, message, host) {
+    if (message?.type === "validateViaMacro") {
+        const reply = {type: "macroValidation", keycode: message.keycode, payload: message.payload,
+            requestId: message.requestId, draftId: message.draftId, draftRevision: message.draftRevision};
+        try {
+            const draft = session.draft, state = panelState(session);
+            if (!draft || message.draftId !== draft.id || !state.connected || state.selectedDeviceId !== draft.deviceId
+                || state.busy || session.portableBusy || session.readBusy || (state.connectionToken ?? null) !== draft.connectionToken) {
+                throw new Error("Read the keyboard and wait for its current operation before editing this macro.");
+            }
+            draft.assertRevision(message.draftRevision);
+            reply.validation = macroInputStatus(draft.current, message, draft.capabilities);
+        } catch (error) {
+            reply.validation = {error: error.message, code: error.code || "MACRO_EDIT_CONFLICT"};
+        }
+        // Local inspection neither stages an edit nor emits a toast or HID.
+        await host.post(reply);
+        return;
+    }
     try {
         if (session.demo && LEAVES_DEMO.has(message?.type) && !session.portableBusy) leaveDemo(session, message);
         const route = routeMessage(session, message, panelState(session));

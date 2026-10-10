@@ -204,7 +204,10 @@ function writeHostPages(page) {
     }
 }
 
-Promise.all([model, webHosts()]).then(([model, hosts]) => {
+const previewDir = path.join(__dirname, "..", "preview");
+const macroHost = require("./build-web").bundle("core", {macroHost: "scripts/preview-macro-host.mjs"}, previewDir,
+    {inject: [path.join(__dirname, "..", "web", "buffer.mjs")]});
+Promise.all([model, webHosts(), macroHost]).then(([model, hosts, macroHost]) => {
 fs.mkdirSync(path.join(__dirname, "..", "preview"), {recursive: true});
 fs.writeFileSync(path.join(__dirname, "..", "preview", "model.json"), JSON.stringify(model));
 for (const [name, host] of Object.entries(hosts)) {
@@ -232,6 +235,8 @@ window.acquireVsCodeApi = () => ({
     postMessage: (message) => {
         posted.push(message);
         console.log("posted", JSON.stringify(message));
+        if (message.type === "validateViaMacro") Promise.all([import("./${macroHost.macroHost}"), import("../webview/store.mjs")])
+            .then(([host, store]) => window.dispatchEvent(new MessageEvent("message", {data: host.inspect(message, store.getModel())})));
         if (message.type === "ready" || message.type === "refresh") { wanted = true; publish(); }
         if (message.type === "setTheme" && model?.host) { model.host.theme = message.theme; publish(); }
         if (message.type === "openDemo") fetch("./model-demo.json").then((response) => response.json()).then((loaded) => { model = loaded; publish(); });

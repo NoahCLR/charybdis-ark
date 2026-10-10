@@ -1,4 +1,4 @@
-// Macros: the keyboard's macro slots, edited as the payload it stores, each
+// Macros: the keyboard's macro slots, edited as literal text and key steps, each
 // with an optional name kept in the keyboard's profile. The slots share one
 // block of macro memory; the host says which still have room.
 //
@@ -6,7 +6,7 @@
 // real when the slot is staged, and says so if it disagrees.
 
 import {el, esc} from "../lib/dom.mjs";
-import {describeStep, macroMatches, macroPeek, parseMacro, serializeMacro, serializeMacroStep, unreleased} from "../view/macro.mjs";
+import {describeStep, macroMatches, macroPeek, parseMacro, macroStepsInput, unreleased} from "../view/macro.mjs";
 import {actionLabel, macroPlacements} from "../view/keyface.mjs";
 import {NAME_TIP, nameCount} from "../view/names.mjs";
 import {setReachGroupOpen} from "../view/reach-groups.mjs";
@@ -18,8 +18,8 @@ import {draftDot, draftMarks} from "../view/review.mjs";
 import {topbar, unavailable} from "./shell.mjs";
 
 const STEP_KINDS = [
-    ["tap", "Tap key or chord"], ["press", "Press and hold"], ["release", "Release"],
-    ["text", "Text"], ["delay", "Delay"],
+    ["text", "Text"], ["tap", "Tap key or chord"], ["delay", "Delay"],
+    ["press", "Press and hold"], ["release", "Release"],
 ];
 
 export function screenMacros() {
@@ -86,61 +86,92 @@ function memoryMeter(memory) {
     return `<div class="sect-h" style="margin-top:14px"><h4>Macro memory</h4>
             <span class="right note">${used.toLocaleString("en-US")} of ${memory.capacity.toLocaleString("en-US")} bytes used</span></div>
         <div class="meter"><i style="width:${share}%"></i></div>
-        <p class="note" style="margin-top:6px">A key tap takes 3 bytes, a typed character 1. Every empty slot keeps room for ${memory.reserveTaps} key taps${closed ? `; ${closed} slot${closed === 1 ? " has" : "s have"} no room left` : ""}.</p>`;
+        <p class="note" style="margin-top:6px">A key tap takes 3 bytes; text uses its UTF-8 bytes. Every empty slot keeps room for ${memory.reserveTaps} key taps${closed ? `; ${closed} slot${closed === 1 ? " has" : "s have"} no room left` : ""}.</p>`;
 }
 
 function editor(model, slot, canEdit) {
-    const draft = macroForm(slot.keycode).draft;
-    const payload = draft ?? slot.payload ?? "";
-    const {steps, error} = parseMacro(payload, {keys: model?.macroPayloadKeycodes, unicode: model?.macroUnicode?.supported, textEntry: Boolean(model?.macroUnicode?.mode), modifierKeys: model?.macroPayloadModifierKeycodes});
-    const held = unreleased(steps);
-    const dirty = draft !== undefined && draft !== slot.payload;
-
+    const form = macroForm(slot.keycode);
+    const payload = form.draft ?? slot.payload ?? "";
+    const parsed = parseMacro(payload, {unicode: true, keys: model?.macroPayloadKeycodes, aliases: model?.qmkKeycodeAliases});
+    let steps = form.steps ?? (parsed.steps.length ? parsed.steps : [{kind: "text", text: ""}]);
+    const editable = canEdit && !state.recording && (!parsed.error || Boolean(form.steps));
+    const dirty = form.draft !== undefined && payload !== slot.payload;
     const wrap = el(`<div class="stack"></div>`);
-    const card = el(`<div class="card">
+    const card = el(`<div class="card" data-macro-editor="${esc(slot.keycode)}">
         <div class="card-h"><h3>${esc(slot.name || `Macro ${slot.keycode.split("_").at(-1)}`)}</h3>
-            <span class="tag" data-tip="${esc(slot.keycode)}">Slot ${esc(slot.keycode.split("_").at(-1))}</span>
-            <span class="right row" style="gap:8px">
-                <span class="chip"><i class="dot ${dirty ? "draft" : "on"}"></i>${dirty ? "edited here" : "as read"}</span>
+            <span class="tag">Slot ${esc(slot.keycode.split("_").at(-1))}</span>
+            <span class="right row"><span class="chip" data-local-state><i class="dot ${dirty ? "draft" : "on"}"></i>${dirty ? "edited here" : "as read"}</span>
                 <button class="btn tiny ghost" data-act="place" ${writable() ? "" : "disabled"}>Place on a key…</button></span></div>
         <div class="card-b stack">
             ${nameField(model, slot, canEdit)}
             ${placedOn(model, slot)}
             ${unicodeSetup(model, canEdit)}
-            <label class="field"><span>Payload</span>
-                <textarea class="input mono" rows="3" style="height:auto;padding:9px 10px;resize:vertical" ${canEdit ? "" : "disabled"}
-                    data-tip="Exactly as the keyboard stores it. Text is literal; {KC_A} taps, {+KC_A} presses, {-KC_A} releases, {120} waits. Use {{ and }} for literal braces.">${esc(payload)}</textarea></label>
+            <div class="sect-h"><h4>Steps</h4><span class="right note">played from top to bottom</span></div>
+            <p class="note">Type or paste exactly what you want in Text. Add keys and delays as separate steps.</p>
+            <div data-macro-steps class="stack"></div>
+            <div data-macro-feedback role="status" aria-live="polite"></div>
+            <div class="row macro-add"><select class="input" data-kind aria-label="New step type" ${editable ? "" : "disabled"}>
+                ${STEP_KINDS.map(([value, text]) => `<option value="${value}" ${value === (form.newKind || "text") ? "selected" : ""}>${text}</option>`).join("")}</select>
+                <button class="btn" data-act="insert" ${editable ? "" : "disabled"}>Add a step</button></div>
+            <details data-raw ${form.rawOpen || (parsed.error && !form.steps) ? "open" : ""}>
+                <summary>Advanced · Raw payload</summary>
+                <label class="field"><span>Raw payload</span><textarea class="input mono" rows="3" data-raw-payload="${esc(slot.keycode)}" ${canEdit && !state.recording ? "" : "disabled"}>${esc(payload)}</textarea></label>
+                <p class="note">Commands use {KC_A}, {+KC_A}, {-KC_A} and {120}. Literal braces use {{ and }}. Text steps escape them automatically.</p>
+            </details>
+            <div class="row macro-actions">
+                <button class="btn ghost" data-act="discard" ${dirty ? "" : "disabled"}>Discard local edits</button>
+                <button class="btn ghost" data-act="clear" ${canEdit && !state.recording ? "" : "disabled"}>Clear macro</button>
+            </div>
         </div></div>`);
+    // Pointer actions that discard/clear this input take precedence over the
+    // change event caused by leaving its field.
+    card.addEventListener("pointerdown", event => {
+        if (event.target.closest('[data-act="discard"], [data-act="clear"]')) setMacroForm(slot.keycode, {cancelBlur: true});
+    });
     card.querySelector("[data-host-settings]")?.addEventListener("click", () => { state.screen = "settings"; render(); });
-    const textarea = card.querySelector("textarea");
     const nameInput = card.querySelector("[data-name]");
     nameInput?.addEventListener("input", () => showCount(card.querySelector("[data-name-count]"), nameInput.value, model.macroNameSpace.perName));
-    nameInput?.addEventListener("change", () => post(edits.macroNameMessage(slot.keycode, nameInput.value, model?.macroEditing?.identity)));
-    textarea.addEventListener("input", () => {
-        setMacroForm(slot.keycode, {draft: textarea.value, cursor: textarea.selectionStart});
-    });
-    textarea.addEventListener("change", () => stageMacro(model, slot, textarea.value));
-    for (const eventName of ["click", "keyup", "select"]) textarea.addEventListener(eventName, () => {
-        setMacroForm(slot.keycode, {cursor: textarea.selectionStart});
-    });
-    card.querySelectorAll("[data-goto-layer]").forEach((button) => button.addEventListener("click", () =>
-        showOnLayer(slot.keycode, Number(button.dataset.gotoLayer))));
+    nameInput?.addEventListener("change", () => post(edits.macroNameMessage(slot.keycode, nameInput.value, getModel()?.macroEditing?.identity)));
+    card.querySelectorAll("[data-goto-layer]").forEach(button => button.addEventListener("click", () => showOnLayer(slot.keycode, Number(button.dataset.gotoLayer))));
     card.querySelector('[data-act="place"]').addEventListener("click", () => {
-        state.placement = {keycode: slot.keycode};
-        state.screen = "keys"; state.tab = "key"; render();
+        state.placement = {keycode: slot.keycode}; state.screen = "keys"; state.tab = "key"; render();
     });
-
-    const body = card.querySelector(".card-b");
-    // A macro the keyboard will not play says so first, above its steps.
-    const max = model?.macroBank?.programMax ?? 512;
-    if (slot.needsUnicodeSetup) body.prepend(el(`<div class="unavailable">This macro has Unicode text. Choose its host setup below before it can play.</div>`));
-    else if (slot.playable === false) body.prepend(el(`<div class="unavailable">This macro compiles to ${esc(slot.program)} bytes and the keyboard plays at most ${esc(max)}, so pressing it does nothing. Shorten it by about ${esc(Math.ceil((slot.program - max) / 3))} key taps.</div>`));
-    if (slot.available === false) body.prepend(el(`<div class="unavailable">This slot has no room: the free macro memory is kept for the lower empty slots, each with room for ${esc(model?.macroBank?.reserveTaps ?? 10)} key taps. Shorten or clear another macro to open it.</div>`));
-    body.append(stepBuilder(model, slot, canEdit, textarea));
-    body.append(preview(model, slot, steps, error, held, payload, canEdit));
-    body.append(actions(model, slot, canEdit, dirty, payload));
-    wrap.append(card);
-    wrap.append(recorder(model, slot, canEdit, textarea));
+    steps.forEach((step, index) => card.querySelector("[data-macro-steps]").append(stepEditor(model, slot, steps, step, index, editable)));
+    const kind = card.querySelector("[data-kind]");
+    kind.addEventListener("change", () => setMacroForm(slot.keycode, {newKind: kind.value}));
+    card.querySelector('[data-act="insert"]').addEventListener("click", () => {
+        const step = kind.value === "text" ? {kind: "text", text: ""} : kind.value === "delay" ? {kind: "delay", delay: 120} : {kind: kind.value, keys: []};
+        saveSteps(slot, [...(macroForm(slot.keycode).steps ?? steps), step], true); render();
+    });
+    const raw = card.querySelector("[data-raw-payload]");
+    raw.addEventListener("input", () => {
+        setMacroForm(slot.keycode, {draft: raw.value, steps: undefined, stepError: "", cancelBlur: false});
+        inspectEdit(slot, false);
+        const current = macroForm(slot.keycode);
+        const parsed = parseMacro(current.draft ?? slot.payload ?? "", {unicode: true, keys: model?.macroPayloadKeycodes, aliases: model?.qmkKeycodeAliases});
+        steps = current.steps ?? (parsed.steps.length ? parsed.steps : [{kind: "text", text: ""}]);
+        const editable = canEdit && !state.recording && (!parsed.error || Boolean(current.steps));
+        // Refresh while typing in raw text. Blur happens between pointerdown
+        // and click, so it must preserve every control the user can press.
+        card.querySelector("[data-macro-steps]").replaceChildren(...steps.map((step, index) => stepEditor(model, slot, steps, step, index, editable)));
+        kind.disabled = !editable;
+        card.querySelector('[data-act="insert"]').disabled = !editable;
+    });
+    raw.addEventListener("change", () => inspectEdit(slot, true));
+    card.querySelector("[data-raw]").addEventListener("toggle", event => {
+        if (event.target.isConnected) setMacroForm(slot.keycode, {rawOpen: event.target.open});
+    });
+    card.querySelector('[data-act="discard"]').addEventListener("click", () => {
+        setMacroForm(slot.keycode, {draft: undefined, steps: undefined, stepError: "", validation: null, wantsStage: false, cancelBlur: false}); render();
+    });
+    card.querySelector('[data-act="clear"]').addEventListener("click", () => {
+        setMacroForm(slot.keycode, {cancelBlur: false});
+        saveSteps(slot, [{kind: "text", text: ""}], true); render();
+    });
+    if (slot.available === false) card.querySelector(".card-b").prepend(el(`<div class="unavailable">This slot has no room. Shorten or clear another macro to open it.</div>`));
+    paintFeedback(card, model, slot);
+    if (form.draft !== undefined && !matchingValidation(form, model, slot) && !form.stepError) requestInspection(slot);
+    wrap.append(card, recorder(model, slot, canEdit));
     return wrap;
 }
 
@@ -196,126 +227,138 @@ function showOnLayer(keycode, at) {
     render();
 }
 
-function stageMacro(model, slot, payload) {
-    const parsed = parseMacro(payload, {keys: model?.macroPayloadKeycodes, unicode: model?.macroUnicode?.supported, textEntry: Boolean(model?.macroUnicode?.mode), modifierKeys: model?.macroPayloadModifierKeycodes});
-    if (parsed.error || unreleased(parsed.steps).length) return false;
-    setMacroForm(slot.keycode, {draft: payload});
-    post(edits.macroMessage(slot.keycode, payload, model?.macroEditing?.identity));
-    return true;
+// Input remains local until the host has inspected this exact payload under
+// the current draft. A late reply can never stage a newer or discarded edit.
+let nextInspection = 0;
+const pendingInspections = new Map();
+const inspectionContext = (model, slot) => JSON.stringify([model?.draft?.id, model?.draft?.revision,
+    model?.macroUnicode, slot?.bytes, model?.macroBank?.free, canEditArea("macros")]);
+const matchingValidation = (form, model, slot) => Boolean(form.validation) && form.validation.payload === form.draft &&
+    form.validation.context === inspectionContext(model, slot);
+
+function currentSlot(keycode) { return getModel()?.viaMacros?.find(slot => slot.keycode === keycode); }
+
+function requestInspection(slot) {
+    const form = macroForm(slot.keycode), model = getModel();
+    if (form.draft === undefined || form.stepError || !canEditArea("macros")) return;
+    const context = inspectionContext(model, slot);
+    const pending = pendingInspections.get(slot.keycode);
+    if (pending?.context === context && pending.payload === form.draft && pending.requestId === form.requestId) return;
+    const requestId = ++nextInspection;
+    pendingInspections.set(slot.keycode, {context, payload: form.draft, requestId});
+    setMacroForm(slot.keycode, {requestId});
+    post(edits.macroValidationMessage(slot.keycode, form.draft, requestId));
 }
 
-function stepBuilder(model, slot, canEdit, textarea) {
-    const stepDraft = macroForm(slot.keycode).step || {kind: "tap", value: ""};
-    const node = el(`<div class="card" style="background:var(--surface-2)">
-        <div class="card-h" style="padding:10px 12px"><h3>Add a step</h3><span class="right note">inserted at the cursor</span></div>
-        <div class="card-b" style="padding:12px;display:grid;grid-template-columns:160px minmax(0,1fr) auto;gap:8px;align-items:end">
-            <label class="field"><span>Step</span><select class="input" data-kind ${canEdit ? "" : "disabled"}>
-                ${STEP_KINDS.map(([value, text]) => `<option value="${value}" ${stepDraft.kind === value ? "selected" : ""}>${text}</option>`).join("")}</select></label>
-            <label class="field"><span data-label>Keys</span>
-                <div class="input-row"><input class="input mono" data-value value="${esc(stepDraft.value)}" placeholder="KC_LGUI, KC_D" ${canEdit ? "" : "disabled"}>
-                <button class="btn" data-act="pick" ${canEdit ? "" : "disabled"}>Pick…</button></div></label>
-            <button class="btn" data-act="insert" ${canEdit ? "" : "disabled"}>Add step</button>
-        </div></div>`);
-    const kind = node.querySelector("[data-kind]");
-    const value = node.querySelector("[data-value]");
-    const label = node.querySelector("[data-label]");
-    const pick = node.querySelector('[data-act="pick"]');
-    const sync = () => {
-        const mode = kind.value;
-        label.textContent = mode === "text" ? "Text" : mode === "delay" ? "Milliseconds" : "Keys";
-        value.placeholder = mode === "text" ? "typed literally" : mode === "delay" ? "120" : "KC_LGUI, KC_D";
-        pick.style.display = mode === "text" || mode === "delay" ? "none" : "";
-    };
-    const remember = () => {
-        setMacroForm(slot.keycode, {step: {kind: kind.value, value: value.value}});
-    };
-    kind.addEventListener("change", () => { remember(); sync(); });
-    value.addEventListener("input", remember);
-    sync();
-    pick.addEventListener("click", () => openPicker({
-        title: "Macro step keys", context: slot.keycode, mode: "list",
-        seed: value.value.split(",").map((name) => name.trim()).filter(Boolean),
-        onPick: (expression) => {
-            setMacroForm(slot.keycode, {step: {kind: kind.value, value: expression}});
-            render();
+function inspectEdit(slot, stage) {
+    slot = currentSlot(slot.keycode) || slot;
+    if (stage && macroForm(slot.keycode).cancelBlur) {
+        setMacroForm(slot.keycode, {cancelBlur: false});
+        return;
+    }
+    const model = getModel(), form = macroForm(slot.keycode);
+    setMacroForm(slot.keycode, {wantsStage: stage});
+    if (matchingValidation(form, model, slot)) keepValidated(slot);
+    else requestInspection(slot);
+    refreshFeedback(slot.keycode);
+}
+
+function keepValidated(slot) {
+    const model = getModel(), form = macroForm(slot.keycode);
+    if (!canEditArea("macros") || slot.available === false || !form.wantsStage || form.stepError || state.recording || !matchingValidation(form, model, slot) || form.validation.validation.error) return;
+    setMacroForm(slot.keycode, {wantsStage: false});
+    if (form.draft !== slot.payload) post(edits.macroMessage(slot.keycode, form.draft, model?.macroEditing?.identity));
+}
+
+export function receiveMacroValidation(message) {
+    const form = macroForm(message.keycode), model = getModel();
+    if (form.requestId !== message.requestId || form.draft !== message.payload || message.draftId !== model?.draft?.id || message.draftRevision !== model?.draft?.revision) return;
+    const pending = pendingInspections.get(message.keycode), slot = currentSlot(message.keycode);
+    pendingInspections.delete(message.keycode);
+    if (!slot || pending?.context !== inspectionContext(model, slot)) {
+        if (slot) requestInspection(slot);
+        return;
+    }
+    setMacroForm(message.keycode, {validation: {...message, context: pending.context}});
+    if (slot) keepValidated(slot);
+    refreshFeedback(message.keycode);
+}
+
+function saveSteps(slot, steps, stage = false) {
+    const {payload, error} = macroStepsInput(steps);
+    setMacroForm(slot.keycode, {steps, draft: payload, stepError: error, cancelBlur: false});
+    const raw = document.querySelector(`[data-raw-payload="${slot.keycode}"]`);
+    if (raw && document.activeElement !== raw) raw.value = payload;
+    inspectEdit(slot, stage);
+}
+
+function refreshFeedback(keycode) {
+    const card = document.querySelector(`[data-macro-editor="${keycode}"]`), slot = currentSlot(keycode);
+    if (card && slot) paintFeedback(card, getModel(), slot);
+}
+
+function paintFeedback(card, model, slot) {
+    const form = macroForm(slot.keycode), local = form.draft !== undefined;
+    const payload = form.draft ?? slot.payload;
+    const parsed = parseMacro(payload, {keys: model?.macroPayloadKeycodes, aliases: model?.qmkKeycodeAliases, unicode: model?.macroUnicode?.supported,
+        textEntry: Boolean(model?.macroUnicode?.enabled), modifierKeys: model?.macroPayloadModifierKeycodes});
+    const held = unreleased(parsed.steps, model?.qmkKeycodeAliases);
+    const inspection = matchingValidation(form, model, slot) ? form.validation.validation : null;
+    const error = form.stepError || parsed.error || (held.length ? `Release ${held.map(key => actionLabel(model, key)).join(", ")} before the macro ends.` : "") || inspection?.error;
+    const program = local ? inspection?.program : slot.program;
+    const bytes = local ? inspection?.bytes : slot.bytes;
+    const max = model?.macroBank?.programMax ?? 512;
+    const feedback = card.querySelector("[data-macro-feedback]");
+    feedback.replaceChildren(el(`<div class="stack">
+        ${error ? `<div class="unavailable">${esc(error)} This edit is not staged.</div>` : ""}
+        <div class="meter ${program > max ? "over" : ""}"><i style="width:${Math.min(100, (program ?? 0) / max * 100)}%"></i></div>
+        <p class="note" data-macro-size>${program == null ? "Playback size unavailable" : `${esc(program)} of ${esc(max)} playback bytes`} · ${bytes == null ? "macro memory size unavailable" : `${esc(bytes)} bytes of macro memory`}</p>
+        <p class="note">${error ? "Fix this edit before it can be kept in your draft." : local && !inspection ? "Checking this edit…" : "Valid edits are kept in your draft when you finish editing a step."}</p>
+    </div>`));
+    const dirty = local && payload !== slot.payload;
+    card.querySelector("[data-local-state]").replaceChildren(el(`<i class="dot ${dirty ? "draft" : "on"}"></i>`), document.createTextNode(dirty ? "edited here" : "as read"));
+    card.querySelector('[data-act="discard"]').disabled = form.draft === undefined || form.draft === slot.payload;
+}
+
+function stepEditor(model, slot, steps, step, index, canEdit) {
+    const label = STEP_KINDS.find(([kind]) => kind === step.kind)?.[1] || step.kind;
+    const node = el(`<div class="macro-step" data-step="${index}">
+        <div class="row macro-step-head"><span class="kind">${esc(label)}</span><span class="right row">
+            <button class="btn tiny ghost" data-move="-1" ${canEdit && index > 0 ? "" : "disabled"} aria-label="Move step up">↑</button>
+            <button class="btn tiny ghost" data-move="1" ${canEdit && index < steps.length - 1 ? "" : "disabled"} aria-label="Move step down">↓</button>
+            <button class="btn tiny ghost" data-remove ${canEdit ? "" : "disabled"}>Remove</button></span></div>
+        ${step.kind === "text" ? `<label class="field"><textarea aria-label="Text for step ${index + 1}" class="input" rows="3" data-step-text="${index}" placeholder="Type or paste text" ${canEdit ? "" : "disabled"}>${esc(step.text)}</textarea></label>`
+            : step.kind === "delay" ? `<label class="field"><span>Milliseconds</span><input class="input mono" data-step-delay="${index}" type="number" min="0" max="65535" value="${esc(step.delay)}" ${canEdit ? "" : "disabled"}></label>`
+            : `<div class="row"><span class="tok">${esc(describeStep(step, key => actionLabel(model, key))) || "Choose keys"}</span><button class="btn" data-pick-step ${canEdit ? "" : "disabled"}>Pick…</button></div>`}
+    </div>`);
+    const input = node.querySelector("textarea, input");
+    input?.addEventListener("input", () => {
+        const next = macroForm(slot.keycode).steps ?? steps;
+        saveSteps(slot, next.map((item, at) => at === index ? {...item, ...(step.kind === "text" ? {text: input.value} : {delay: input.value})} : item));
+    });
+    input?.addEventListener("change", () => inspectEdit(slot, true));
+    node.querySelector("[data-pick-step]")?.addEventListener("click", () => openPicker({
+        title: label, contextKeycode: slot.keycode, mode: "list", seed: step.keys, allowedKeys: model.macroPayloadKeycodes, maxKeys: step.kind === "tap" ? 16 : 1,
+        onPick: expression => {
+            const next = macroForm(slot.keycode).steps ?? steps;
+            saveSteps(slot, next.map((item, at) => at === index ? {...item, keys: expression.split(",").map(key => key.trim()).filter(Boolean)} : item), true); render();
         },
     }));
-    node.querySelector('[data-act="insert"]').addEventListener("click", () => {
-        const text = kind.value === "text" ? value.value : value.value.trim();
-        if (!text) return;
-        const keys = text.split(",").map((name) => name.trim()).filter(Boolean).join(",");
-        const addition = kind.value === "text" ? serializeMacroStep({kind: "text", text})
-            : kind.value === "delay" ? `{${text.replace(/\D/g, "")}}`
-            : kind.value === "press" ? `{+${keys}}`
-            : kind.value === "release" ? `{-${keys}}`
-            : `{${keys}}`;
-        const cursor = Math.max(0, Math.min(textarea.value.length,
-            macroForm(slot.keycode).cursor ?? textarea.selectionStart ?? textarea.value.length));
-        textarea.value = `${textarea.value.slice(0, cursor)}${addition}${textarea.value.slice(cursor)}`;
-        setMacroForm(slot.keycode, {cursor: cursor + addition.length});
-        stageMacro(model, slot, textarea.value);
-        render();
+    node.querySelector("[data-remove]").addEventListener("click", () => {
+        const next = (macroForm(slot.keycode).steps ?? steps).filter((_, at) => at !== index);
+        saveSteps(slot, next.length ? next : [{kind: "text", text: ""}], true); render();
     });
+    node.querySelectorAll("[data-move]").forEach(button => button.addEventListener("click", () => {
+        const next = (macroForm(slot.keycode).steps ?? steps).slice(), target = index + Number(button.dataset.move);
+        [next[index], next[target]] = [next[target], next[index]];
+        saveSteps(slot, next, true); render();
+    }));
     return node;
 }
 
-function preview(model, slot, steps, error, held, payload, canEdit) {
-    const node = el(`<div>
-        <div class="sect-h"><h4>Payload preview</h4>
-            <span class="right note">${steps.length} step${steps.length === 1 ? "" : "s"}</span></div>
-    </div>`);
-    const max = model?.macroBank?.programMax ?? 512;
-    if (error) node.append(el(`<div class="unavailable">${esc(error)} The keyboard would refuse this payload, so it cannot be staged until it reads cleanly.</div>`));
-    if (!error && held.length) node.append(el(`<div class="unavailable">This macro never releases ${esc(held.map(key => actionLabel(model, key)).join(", "))}. The keyboard would keep holding ${held.length === 1 ? "it" : "them"} after the macro ends.</div>`));
-    if (!steps.length) node.append(el(`<p class="note">This slot is empty. Type a payload, add a step, or record one.</p>`));
-    steps.forEach((step, index) => {
-        const row = el(`<div class="step"><span class="grip">⠿</span><span class="kind">${esc(step.kind)}</span>
-            <span class="tok">${esc(describeStep(step, key => actionLabel(model, key)))}</span><span class="right row" style="gap:4px">
-                <button class="btn tiny ghost" data-move="-1" ${canEdit && index > 0 ? "" : "disabled"} aria-label="Move step up">↑</button>
-                <button class="btn tiny ghost" data-move="1" ${canEdit && index < steps.length - 1 ? "" : "disabled"} aria-label="Move step down">↓</button>
-                <button class="btn tiny ghost" data-remove ${canEdit ? "" : "disabled"}>Remove</button></span></div>`);
-        row.querySelector("[data-remove]")?.addEventListener("click", () => {
-            const next = steps.filter((_, candidate) => candidate !== index);
-            const nextPayload = serializeMacro(next);
-            stageMacro(model, slot, nextPayload);
-            render();
-        });
-        row.querySelectorAll("[data-move]").forEach((button) => button.addEventListener("click", () => {
-            const target = index + Number(button.dataset.move);
-            if (target < 0 || target >= steps.length) return;
-            const next = steps.slice();
-            [next[index], next[target]] = [next[target], next[index]];
-            const nextPayload = serializeMacro(next);
-            stageMacro(model, slot, nextPayload);
-            render();
-        }));
-        node.append(row);
-    });
-    // The keyboard compiles a macro before playing it, and plays only one
-    // that compiles to at most `max` bytes; the host refuses a longer edit.
-    node.append(el(`<div class="meter ${slot.playable === false ? "over" : ""}" style="margin-top:10px"><i style="width:${Math.min(100, ((slot.program ?? 0) / max) * 100)}%"></i></div>`));
-    node.append(el(`<p class="note" style="margin-top:6px">${esc(slot.program ?? 0)} of ${esc(max)} bytes the keyboard can play${slot.playable === false ? "" : ` · room for about ${esc(slot.roomTaps)} more key taps`}. Sizes follow the staged macro.</p>`));
-    return node;
-}
-
-function actions(model, slot, canEdit, dirty, payload) {
-    const {steps, error} = parseMacro(payload, {keys: model?.macroPayloadKeycodes, unicode: model?.macroUnicode?.supported, textEntry: Boolean(model?.macroUnicode?.mode), modifierKeys: model?.macroPayloadModifierKeycodes});
-    const blocked = Boolean(error || unreleased(steps).length);
-    const node = el(`<div class="row" style="gap:8px">
-        <span class="note">${blocked ? "Fix the payload before it can be staged." : "Valid changes are kept in the draft automatically."}</span>
-        <button class="btn ghost" data-act="discard" ${dirty ? "" : "disabled"}
-            data-tip="Drop text that has not passed validation and show the latest staged payload.">Discard local text</button>
-        <button class="btn ghost" data-act="clear" ${canEdit ? "" : "disabled"}>Clear payload</button>
-    </div>`);
-    node.querySelector('[data-act="discard"]').addEventListener("click", () => {
-        setMacroForm(slot.keycode, {draft: undefined});
-        render();
-    });
-    node.querySelector('[data-act="clear"]').addEventListener("click", () => {
-        stageMacro(model, slot, "");
-        render();
-    });
-    return node;
+function stageMacro(model, slot, payload) {
+    setMacroForm(slot.keycode, {draft: payload, steps: undefined, stepError: ""});
+    inspectEdit(slot, true);
 }
 
 /* ── the recorder ──────────────────────────────────────────────────────── */
@@ -333,7 +376,7 @@ const codeToKeycode = (code) => EVENT_CODES[code]
     || (/^Digit(\d)$/.test(code) ? `KC_${code.slice(5)}` : "")
     || (/^F(\d{1,2})$/.test(code) ? `KC_${code}` : "");
 
-function recorder(model, slot, canEdit, textarea) {
+function recorder(model, slot, canEdit) {
     const recording = state.recording?.slot === slot.keycode;
     const node = el(`<div class="card">
         <div class="card-h"><h3>Record</h3><span class="right"><span class="tag">${recording ? "recording" : "idle"}</span></span></div>
@@ -349,7 +392,7 @@ function recorder(model, slot, canEdit, textarea) {
                 <label class="field" style="width:120px"><span>Round to (ms)</span><input class="input mono" data-round value="${esc(state.recordDelayRound)}" ${state.recordDelays === false ? "disabled" : ""}></label>
             </div>
             <div class="row" style="gap:8px">
-                <span class="note">${recording ? "Typing in this window is captured. Press Escape or Stop when the take is done." : "Captures this window's key events at the end of the payload."}</span>
+                <span class="note">${recording ? "Typing in this window is captured. Press Escape or Stop when the take is done." : "Appends key steps captured in this window."}</span>
                 <span class="right row" style="gap:8px"><button class="btn ghost" data-act="clear-take" ${recording || state.lastTake?.slot === slot.keycode ? "" : "disabled"}>Clear take</button>
                 <button class="btn ${recording ? "" : "primary"}" data-act="record" ${canEdit ? "" : "disabled"}>${recording ? "Stop" : "● Record"}</button></span>
             </div>
@@ -375,13 +418,13 @@ function recorder(model, slot, canEdit, textarea) {
         document.removeEventListener("keyup", onRecordKey, true);
         state.recording = null;
         state.lastTake = null;
-        setMacroForm(slot.keycode, {draft: take.before});
+        setMacroForm(slot.keycode, {draft: take.before, steps: undefined, stepError: ""});
         if (staged) stageMacro(model, slot, take.before);
         render();
     });
     node.querySelector('[data-act="record"]').addEventListener("click", () => {
         if (recording) { stopRecording(model, slot); return; }
-        startRecording(slot, textarea.value);
+        startRecording(slot, macroForm(slot.keycode).draft ?? slot.payload ?? "");
     });
     return node;
 }
@@ -391,7 +434,7 @@ function recorder(model, slot, canEdit, textarea) {
 // that pauses for a recording — undo, the key shortcuts — resumes on Stop.
 function startRecording(slot, before) {
     state.lastTake = null;
-    setMacroForm(slot.keycode, {draft: before});
+    setMacroForm(slot.keycode, {draft: before, steps: undefined, stepError: ""});
     state.recording = {slot: slot.keycode, before, last: Date.now(), captured: false};
     document.addEventListener("keydown", onRecordKey, true);
     document.addEventListener("keyup", onRecordKey, true);
@@ -422,7 +465,7 @@ function onRecordKey(event) {
     const now = Date.now();
     const gap = now - recording.last;
     const current = macroForm(recording.slot).draft ?? "";
-    setMacroForm(recording.slot, {draft: edits.recordedPayload(current, {
+    setMacroForm(recording.slot, {steps: undefined, stepError: "", draft: edits.recordedPayload(current, {
         keycode, type: event.type, gap, captured: recording.captured,
         delays: state.recordDelays !== false, threshold: state.recordDelayThreshold, round: state.recordDelayRound,
         explicit: state.recordMode === "explicit",

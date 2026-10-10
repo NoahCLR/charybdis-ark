@@ -18,6 +18,7 @@ const printable = (character, unicode) => {
 export function parseMacro(payload, options = {}) {
     const steps = [];
     const held = new Set();
+    const keyId = key => options.aliases?.[key] || key;
     let text = "";
     let textHoldError = false;
     const flush = () => { if (text && options.textEntry && [...held].some(key => options.modifierKeys ? !options.modifierKeys.includes(key) : !/KC_(?:LCTL|LSFT|LALT|LGUI|RCTL|RSFT|RALT|RGUI|LEFT_CTRL|LEFT_SHIFT|LEFT_ALT|LEFT_GUI|RIGHT_CTRL|RIGHT_SHIFT|RIGHT_ALT|RIGHT_GUI)$/.test(key))) textHoldError = true; if (text) steps.push({kind: "text", text}); text = ""; };
@@ -48,15 +49,16 @@ export function parseMacro(payload, options = {}) {
         const keys = (kind === "tap" ? command : command.slice(1)).split(",").map((name) => name.trim()).filter(Boolean);
         if (!keys.length) return fail(steps, "A macro command needs at least one key.");
         if (kind !== "tap" && keys.length !== 1) return fail(steps, "A press or release names one key; use a tap for a chord.");
-        if (keys.length > MAX_KEYS || new Set(keys).size !== keys.length) return fail(steps, "A chord is up to 16 distinct keys.");
+        const identities = keys.map(keyId);
+        if (keys.length > MAX_KEYS || new Set(identities).size !== keys.length) return fail(steps, "A chord is up to 16 distinct keys.");
         const unknown = allowed && keys.find((key) => !allowed.has(key));
         if (unknown) return fail(steps, `${unknown} is not a key a macro can send.`);
         if (kind === "release") {
-            if (!held.delete(keys[0])) return fail(steps, `${keys[0]} is released but was never pressed.`);
+            if (!held.delete(identities[0])) return fail(steps, `${keys[0]} is released but was never pressed.`);
         } else {
-            if (keys.some((key) => held.has(key))) return fail(steps, "A macro presses a key that is already held.");
+            if (identities.some((key) => held.has(key))) return fail(steps, "A macro presses a key that is already held.");
             if (held.size + keys.length > MAX_KEYS) return fail(steps, "A macro holds at most 16 keys at once.");
-            if (kind === "press") held.add(keys[0]);
+            if (kind === "press") held.add(identities[0]);
         }
         steps.push({kind, keys});
     }
@@ -80,6 +82,22 @@ export function serializeMacroStep(step) {
 
 export const serializeMacro = (steps) => steps.map(serializeMacroStep).join("");
 
+// Editable steps retain incomplete fields locally. The raw view must reflect
+// them verbatim, while incomplete commands are never posted for staging.
+export function macroStepsInput(steps) {
+    let error = "";
+    const payload = steps.map(step => {
+        if (step.kind === "text") return serializeMacroStep(step);
+        if (step.kind === "delay") {
+            if (!/^\d+$/.test(String(step.delay)) || Number(step.delay) > MAX_DELAY) error ||= "Enter a delay between 0 and 65,535 milliseconds.";
+            return `{${step.delay}}`;
+        }
+        if (!step.keys?.length) error ||= "Choose a key for each key step.";
+        return `{${step.kind === "press" ? "+" : step.kind === "release" ? "-" : ""}${(step.keys || []).join(",")}}`;
+    }).join("");
+    return {payload, error};
+}
+
 // What a slot shows on its cell. Every macro on a real keyboard tends to open
 // with the same modifier press, so the head of the payload makes them all look
 // identical; what tells them apart is the key they actually send.
@@ -96,11 +114,12 @@ export function macroPeek(payload, label = (name) => name) {
 
 // Held keys that are never released leave the keyboard holding them, so the
 // preview says so rather than letting it through quietly.
-export function unreleased(steps) {
+export function unreleased(steps, aliases = {}) {
     const held = [];
     for (const step of steps) {
-        if (step.kind === "press") held.push(...step.keys);
-        if (step.kind === "release") for (const key of step.keys) {
+        const keys = step.keys?.map(key => aliases[key] || key) || [];
+        if (step.kind === "press") held.push(...keys);
+        if (step.kind === "release") for (const key of keys) {
             const at = held.indexOf(key);
             if (at >= 0) held.splice(at, 1);
         }

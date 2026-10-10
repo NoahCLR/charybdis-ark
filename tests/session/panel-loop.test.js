@@ -235,3 +235,48 @@ test("the panel offers no PD upgrade export", async () => {
     loop.publish();
     assert.equal("pdUpgradeAvailable" in last(host).model.portable, false);
 });
+
+
+test("live macro validation replies inline without staging, history, toasts or device calls", async () => {
+    const service = fakeService(), host = fakeHost(), loop = openPanelLoop(host, {service});
+    loop.publish(); host.posted.length = 0;
+    const draft = loop.session.draft, before = structuredClone(draft.document), revision = draft.revision;
+    const message = {type: "validateViaMacro", keycode: "VIA_MACRO_17", payload: "{{KC_A}}\nhello", requestId: 777,
+        draftId: draft.id, draftRevision: revision};
+    await loop.handleMessage(message);
+    assert.deepEqual(last(host), {...message, type: "macroValidation", validation: require("../../core/model/macro-editor").macroInputStatus(draft.current, message, draft.capabilities)});
+    assert.equal(last(host).validation.error, "");
+    await loop.handleMessage({...message, payload: "a".repeat(509)});
+    assert.equal(last(host).validation.code, "MACRO_TOO_LONG");
+    await loop.handleMessage({...message, payload: "{+KC_A}"});
+    assert.match(last(host).validation.error, /Release/);
+    for (const stale of [{draftId: "old"}, {draftRevision: revision - 1}]) {
+        await loop.handleMessage({...message, ...stale});
+        assert.ok(last(host).validation.error);
+    }
+    for (const blocked of [{connected: false}, {selectedDeviceId: "other"}, {busy: true}, {connectionToken: "new"}]) {
+        const state = service.snapshot(), saved = {...state};
+        Object.assign(state, blocked);
+        await loop.handleMessage(message);
+        assert.ok(last(host).validation.error);
+        Object.assign(state, saved);
+        for (const key of Object.keys(blocked)) if (!(key in saved)) delete state[key];
+    }
+    assert.deepEqual(draft.document, before);
+    assert.equal(draft.revision, revision);
+    assert.equal(draft.dirty, false);
+    assert.deepEqual(host.errors, []);
+    assert.deepEqual(service.calls, []);
+    assert.ok(host.posted.every(reply => reply.type === "macroValidation"));
+});
+
+test("demo macros use the same live validation without a keyboard", async () => {
+    const service = fakeService(), host = fakeHost(), loop = openPanelLoop(host, {service});
+    await loop.handleMessage({type: "openDemo"});
+    const draft = loop.session.draft;
+    await loop.handleMessage({type: "validateViaMacro", keycode: "VIA_MACRO_17", payload: "literal {{braces}}", requestId: 1,
+        draftId: draft.id, draftRevision: draft.revision});
+    assert.equal(last(host).type, "macroValidation");
+    assert.equal(last(host).validation.error, "");
+    assert.deepEqual(service.calls, []);
+});

@@ -58,7 +58,7 @@ export const state = {
     macroSearch: "",
     customKey: null,
     customKeySearch: "",
-    macroForms: {},       // keycode → {draft, step, cursor}: one macro slot's unsaved text, the step being built, where it goes
+    macroForms: {},       // keycode → one macro slot's local steps, raw input and validation
     recording: null,     // {slot, before, last, captured} only while a take is being captured
     lastTake: null,      // {slot, before}: the finished take Clear take can undo
     recordDelays: true,

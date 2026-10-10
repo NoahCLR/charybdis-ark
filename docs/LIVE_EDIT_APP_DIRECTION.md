@@ -40,7 +40,7 @@ matrix.
 | --- | --- |
 | Layout and 16 layers | Read/write; names and overlay order travel with complete profiles; a reorder renumbers layer keys by default ("Keys follow their layers") |
 | Key behaviours, combos and RGB | Read/write editors over the shared draft; selected keys open an unstored behaviour grid until the first edit; matching Keys reach sections share open state across tabs, open independently, and use the page scrollbar |
-| Macros | 128 named VIA macro slots with builder, recorder and preview; capability-gated Unicode text and saved macOS/Windows/Linux host setup; shared-memory and per-macro limits shown and enforced (D-L25, D-L26) |
+| Macros | 128 named VIA macro slots with literal Text, editable steps, Advanced raw payload, recorder and live validation; capability-gated Unicode text and saved macOS/Windows/Linux host setup; shared-memory and per-macro limits shown and enforced (D-L25, D-L26) |
 | Custom keys | 128 named keys that do what their behaviour says: rename, add or open the behaviour, place, see where each is used (D-L42) |
 | Mouse | Pointer and sniping DPI, auto-sniping and auto-mouse: global-policy sections the core files under the Mouse area, so the rail, the review and import counts all place them there. The auto-mouse fade delay is a share of the timeout, edited on its lighting stage (D-L17) |
 | Pointing modes | 32 device-owned slots (sparse PD domain v3, RGB v4); live codecs accept only the current action vocabulary and profile formats (D-L54). See [PD-mode domain v1](../upstream/firmware/docs/architecture/pd-mode-domain-v1.md) |
@@ -387,6 +387,25 @@ about 170 key taps; a longer one used to be accepted and then silently never
 played. The app computes that size exactly (`macroProgramBytes`, checked
 against the firmware decoder by `run_macro_program_size_tests.sh`), refuses an
 edit past it, and marks a slot VIA wrote past it as too long.
+
+The primary macro editor is an ordered list of editable Text, tap/chord, delay,
+press and release steps. Empty macros start with Text; it preserves literal
+braces, whitespace and Unicode without exposing command syntax. Raw commands
+remain under Advanced and round-trip to the same steps. Incomplete step fields
+remain local instead of being silently removed or coerced. Unparseable raw input
+is retained whole and blocks step editing so rebuilding a partial parse cannot
+lose its tail. Text fields contain long input without overlapping feedback or
+controls. Recording appends commands to the same escaped payload.
+
+Live inspection uses the production macro codec and the same playback, setup
+and bank limits as staging (`model/macro-input.js`, called by `macro-editor.js`).
+The panel loop answers `validateViaMacro` with `macroValidation`, correlated by
+slot, exact payload, request id and draft id/revision, without staging, history,
+toasts, device calls or a full model redraw. The interface also checks its
+current inspection context (host setup, slot bytes and bank space) before using
+a reply. Valid completed edits post the existing `updateViaMacro`; rejected
+input and its feedback remain local. Field input updates feedback without
+replacing the field, preserving native editing and composition.
 
 Every empty slot keeps room for ten key taps (30 bytes); when free memory
 cannot keep that for every empty slot, the highest-numbered empty slots show no
