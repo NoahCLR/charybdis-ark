@@ -16,6 +16,7 @@ const {
     buildCandidateAbortRequest,
     buildCandidateBeginRequest,
     buildCandidateChunkRequest,
+    buildCandidateReuseRequest,
     buildCandidateCommitRequest,
     buildCandidateStatusRequest,
     buildCandidateValidateRequest,
@@ -36,6 +37,24 @@ function goldenFixtures() {
     }
     return entries;
 }
+
+test("reuse bounds and source identities are canonical before encoding", () => {
+    const source = {kind: 1, origin: 0, generation: 7, digest: 123, crc32: 456};
+    const range = {offset: 20, sourceOffset: 40, length: 1024, source};
+    const request = buildCandidateReuseRequest(0x1234, range);
+    assert.equal(request[2], 0x1b);
+    assert.equal(request.readUInt16LE(5), 20);
+    assert.equal(request.readUInt16LE(7), 40);
+    assert.equal(request.readUInt16LE(9), 1024);
+    assert.equal(request.subarray(25).every(byte => byte === 0), true);
+    for (const invalid of [{length: 0}, {length: 1025}, {offset: 65504}, {sourceOffset: 65504},
+        {source: {...source, generation: 0}}, {source: {...source, origin: 2}}, {source: {...source, kind: 2}},
+        {source: {...source, kind: 0, origin: 255}}]) {
+        assert.throws(() => buildCandidateReuseRequest(0x1234, {...range, ...invalid}), RangeError);
+    }
+    const compiled = buildCandidateReuseRequest(0x1234, {...range, source: {...source, kind: 0, origin: 255, generation: 0}});
+    assert.equal(compiled[23], 0); assert.equal(compiled[24], 255);
+});
 
 test("JavaScript emits the exact candidate frames consumed by the firmware fixture", () => {
     assert.equal(CANDIDATE_ERROR.TIMEOUT, 19);

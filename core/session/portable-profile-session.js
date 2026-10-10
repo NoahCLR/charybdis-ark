@@ -1,7 +1,7 @@
 "use strict";
 const {readViaStorage, readRegion, writeRegion, writeViaMacros, changedRanges, viaStorageDigest, VIA_STORAGE, LAYOUT_BYTES} = require("../protocol/via-storage-v1");
 const {readSettings, readStorageStatus, waitForStorage} = require("../protocol/portable-profile-v1");
-const {readProfileStatus, PROFILE_ACTIVE_KIND, PROFILE_STATE_FLAGS} = require("../protocol/profile-wire-v1");
+const {readProfileStatus, PROFILE_ACTIVE_KIND, PROFILE_STATE_FLAGS, PROFILE_WIRE_FEATURES} = require("../protocol/profile-wire-v1");
 const {ProfilePayloadReader} = require("./profile-payload-reader");
 const {readDeviceCombos} = require("../protocol/combo-readback-v1");
 const {candidateMetadataForBlob, readCandidatePeerStatus, readCandidateStatus, CANDIDATE_STATE} = require("../protocol/profile-candidate-v1");
@@ -25,7 +25,16 @@ const snapshotIdentity = (profile, storage, settings) => ({profile: identityStat
 // zeros, send no write for them, and fail the whole-bank digest. So a capture
 // keeps what it read beside the identity it verified, and an Apply result
 // keeps the target it proved the keyboard holds.
-const heldStorage = (layout, macros) => ({layout: Buffer.from(layout), macros: Buffer.from(macros)});
+const heldStorage = (layout, macros, profile) => ({layout: Buffer.from(layout), macros: Buffer.from(macros),
+    ...(profile ? {profile: Buffer.from(profile)} : {})});
+function candidateBaseSource(before, capabilities) {
+    const bytes = before.storage?.profile, status = before.status;
+    if (!(capabilities.featureFlags & PROFILE_WIRE_FEATURES.CANDIDATE_REUSE) || !bytes || !status
+        || ![PROFILE_ACTIVE_KIND.COMPILED_ONLY, PROFILE_ACTIVE_KIND.COMMITTED].includes(status.activeKind)
+        || fnv1a32(bytes) !== status.activeDigest) return undefined;
+    return {bytes, kind: status.activeKind, generation: status.activeGeneration, digest: status.activeDigest,
+        crc32: crc32(bytes), origin: status.activeOriginHalf};
+}
 const hasStorage = (snapshot, capabilities) => snapshot?.storage?.layout?.length === LAYOUT_BYTES && snapshot.storage.macros?.length === capabilities.viaMacroBytes;
 function capturedBase(before, capabilities) {
     if (!before.incomplete) {
@@ -79,7 +88,7 @@ async function captureProfile(connection, ids, capabilities, onProgress = () => 
     }
     const document = createSnapshot({profile, via, actionAbiDigest: capabilities.actionAbiDigest});
     validateSnapshot(document, capabilities);
-    return {document, readback: {active, source: before.activeKind === PROFILE_ACTIVE_KIND.COMMITTED ? "committed" : "compiled", combos}, fingerprint: fingerprint(document), summary: summary(document), status: after, identity: snapshotIdentity(after, storageAfter, settings), storage: heldStorage(via.layout, via.macros)};
+    return {document, readback: {active, source: before.activeKind === PROFILE_ACTIVE_KIND.COMMITTED ? "committed" : "compiled", combos}, fingerprint: fingerprint(document), summary: summary(document), status: after, identity: snapshotIdentity(after, storageAfter, settings), storage: heldStorage(via.layout, via.macros, active.bytes)};
 }
 async function readIdentity(connection, ids, {allowCandidate = true, sleep} = {}) {
     const options = {nextRequestId: () => ids.next()};
@@ -261,7 +270,9 @@ async function restoreProfile(connection, ids, capabilities, document, {expected
         let prepared, decisionObserved = false, commitRequested = false;
         try {
             applyProgress.report("upload");
-            prepared = await coordinator.upload(target.profile, {metadata: candidateMetadataForBlob(target.profile, {actionAbiDigest: capabilities.actionAbiDigest, viaGeneration: targetStorageGeneration, viaDigest: expectedStorageDigest}), verifyBase: async () => {
+            prepared = await coordinator.upload(target.profile, {baseSource: candidateBaseSource(before, capabilities),
+                streamChunks: Boolean(capabilities.featureFlags & PROFILE_WIRE_FEATURES.CANDIDATE_STREAM),
+                metadata: candidateMetadataForBlob(target.profile, {actionAbiDigest: capabilities.actionAbiDigest, viaGeneration: targetStorageGeneration, viaDigest: expectedStorageDigest}), verifyBase: async () => {
                 const identity = await currentIdentity(connection, ids, {allowCandidate: true, sleep});
                 if (identityKey(identity) !== identityKey(beforeIdentity)) throw fail("PROFILE_CHANGED", "The keyboard changed before restore could start.");
             }});
@@ -294,7 +305,7 @@ async function restoreProfile(connection, ids, capabilities, document, {expected
             const resultFingerprint = fingerprint(document);
             applyProgress.finish();
             // Both halves were just proved to hold the whole target bank.
-            return {document, fingerprint: resultFingerprint, summary: summary(document), status, identity: snapshotIdentity(status, storageAfter, encodeSettings(target.settings)), storage: heldStorage(target.layout, target.macros), recovery, peerUnseen,
+            return {document, fingerprint: resultFingerprint, summary: summary(document), status, identity: snapshotIdentity(status, storageAfter, encodeSettings(target.settings)), storage: heldStorage(target.layout, target.macros, target.profile), recovery, peerUnseen,
                 performance: {elapsedMs: Date.now() - startedAt, baseSource: before === baseSnapshot ? "verified-cache" : "device-read", layoutBytes, macroBytes, viaConfigReports: 1, layoutReports: layoutRanges.reduce((sum, range) => sum + Math.ceil(range.bytes.length / 12), 0), macroReports: macroWriteNeeded ? macroRanges.reduce((sum, range) => sum + Math.ceil(range.bytes.length / 12), 0) : 0}};
         } catch (error) {
             let cancelled = false;

@@ -61,6 +61,27 @@ function compiledOnlyPages() {
     return [identity, capacity, wide];
 }
 
+test("macro protection does not advertise candidate transfer extensions", () => {
+    assert.equal(PROFILE_WIRE_FEATURES.CANDIDATE_REUSE, 1 << 24);
+    assert.equal(PROFILE_WIRE_FEATURES.CANDIDATE_STREAM, 1 << 25);
+    const pages = compiledOnlyPages();
+    pages[0].writeUInt32LE((pages[0].readUInt32LE(9) | (1 << 23)) & ~PROFILE_WIRE_FEATURES.CANDIDATE_WRITE, 9);
+    pages[0][7] = 0;
+    const capabilities = decodeCapabilityPages(pages);
+    assert.equal(capabilities.featureFlags & (PROFILE_WIRE_FEATURES.CANDIDATE_REUSE | PROFILE_WIRE_FEATURES.CANDIDATE_STREAM), 0);
+});
+
+test("candidate transfer extensions require candidate-write capability", () => {
+    for (const feature of [PROFILE_WIRE_FEATURES.CANDIDATE_REUSE, PROFILE_WIRE_FEATURES.CANDIDATE_STREAM]) {
+        const pages = compiledOnlyPages();
+        pages[0].writeUInt32LE(pages[0].readUInt32LE(9) | feature, 9);
+        assert.ok(decodeCapabilityPages(pages).featureFlags & feature);
+        pages[0].writeUInt32LE(pages[0].readUInt32LE(9) & ~PROFILE_WIRE_FEATURES.CANDIDATE_WRITE, 9);
+        pages[0][7] = 0;
+        assert.throws(() => decodeCapabilityPages(pages), /extensions require candidate-write/);
+    }
+});
+
 test("Profile Wire get requests are canonical 32-byte frames", () => {
     const request = buildProfileGetRequest(PROFILE_WIRE_V1.VALUE_CAPABILITIES, 1, 0x42);
     assert.equal(request.length, 32);

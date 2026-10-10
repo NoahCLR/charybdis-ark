@@ -55,6 +55,11 @@ class CandidateFirmwareHarness {
 
     async request(value, requestOptions) {
         const report = Buffer.from(value);
+        if (this.mailbox && this.options.scanBetweenReports) {
+            const previous = this.mailbox;
+            this.mailbox = undefined;
+            this.process(previous);
+        }
         this.writes.push(report);
         this.requestOptions.push(requestOptions);
         if (this.options.processThenThrowOnOperation !== undefined
@@ -89,6 +94,9 @@ class CandidateFirmwareHarness {
                 : PROFILE_CANDIDATE_V1.COMMAND_SET
         );
         const operation = operationForValue(report[2]);
+        if (report[2] === PROFILE_CANDIDATE_V1.VALUE_STREAM_CHUNK && this.status.state === CANDIDATE_STATE.REJECTED) {
+            return acknowledgement(report, CANDIDATE_ADMISSION.REJECTED, CANDIDATE_ERROR.POISONED);
+        }
         // A profile owner that is not ready leaves the frame to QMK, which
         // echoes it back with byte 0 set to id_unhandled.
         if (this.options.unhandledOperation === operation) {
@@ -209,12 +217,20 @@ class CandidateFirmwareHarness {
                 operationSequence: this.status.operationSequence,
             };
         } else if (operation === CANDIDATE_OPERATION.CHUNK) {
+            if (report.readUInt16LE(5) === this.options.chunkErrorAt) {
+                this.status.state = CANDIDATE_STATE.REJECTED;
+                this.status.error = {...noError(), id: CANDIDATE_ERROR.STORAGE_FAILURE};
+                return;
+            }
             this.status.transactionId = transactionId;
             this.status.nextOffset = report.readUInt16LE(5) + report[7];
             this.status.state = this.status.nextOffset === this.status.payloadLength
                 ? CANDIDATE_STATE.COMPLETE
                 : CANDIDATE_STATE.RECEIVING;
             this.status.error = noError();
+        } else if (operation === CANDIDATE_OPERATION.REUSE) {
+            this.status.nextOffset = report.readUInt16LE(5) + report.readUInt16LE(9);
+            this.status.state = this.status.nextOffset === this.status.payloadLength ? CANDIDATE_STATE.COMPLETE : CANDIDATE_STATE.RECEIVING;
         } else if (operation === CANDIDATE_OPERATION.VALIDATE) {
             this.status.transactionId = transactionId;
             this.status.state = CANDIDATE_STATE.VALIDATING;
@@ -306,6 +322,8 @@ function operationForValue(valueId) {
     return {
         [PROFILE_CANDIDATE_V1.VALUE_BEGIN]: CANDIDATE_OPERATION.BEGIN,
         [PROFILE_CANDIDATE_V1.VALUE_CHUNK]: CANDIDATE_OPERATION.CHUNK,
+        [PROFILE_CANDIDATE_V1.VALUE_STREAM_CHUNK]: CANDIDATE_OPERATION.CHUNK,
+        [PROFILE_CANDIDATE_V1.VALUE_REUSE]: CANDIDATE_OPERATION.REUSE,
         [PROFILE_CANDIDATE_V1.VALUE_VALIDATE]: CANDIDATE_OPERATION.VALIDATE,
         [PROFILE_CANDIDATE_V1.VALUE_COMMIT]: CANDIDATE_OPERATION.COMMIT,
         [PROFILE_CANDIDATE_V1.VALUE_ABORT]: CANDIDATE_OPERATION.ABORT,
@@ -837,4 +855,100 @@ test("BEGIN carries store format 4 and the VIA binding it was given", async () =
     assert.equal(begin[23], 4);
     assert.equal(begin.readUInt32LE(24), BINDING.viaGeneration);
     assert.equal(begin.readUInt32LE(28), BINDING.viaDigest);
+});
+
+test("streaming checks bounded batches and reduces exchanges without bypassing validation", async () => {
+    const blob = representativeBlob(401);
+    const old = new CandidateFirmwareHarness({scanBetweenReports: true});
+    const fast = new CandidateFirmwareHarness({scanBetweenReports: true});
+    await coordinator(old).upload(blob, {...BINDING, actionAbiDigest: 1});
+    const result = await coordinator(fast).upload(blob, {...BINDING, actionAbiDigest: 1, streamChunks: true});
+    assert.equal(result.status.state, CANDIDATE_STATE.VALIDATED);
+    assert.equal(operationWrites(fast, PROFILE_CANDIDATE_V1.VALUE_STREAM_CHUNK).length, Math.ceil(blob.length / 20));
+    assert.ok(fast.writes.length < old.writes.length * 0.8);
+    assert.equal(operationWrites(fast, PROFILE_CANDIDATE_V1.VALUE_VALIDATE).length, 1);
+    assert.equal(operationWrites(fast, PROFILE_CANDIDATE_V1.VALUE_COMMIT).length, 0);
+});
+test("streaming drains mailbox BUSY before retrying the unadmitted suffix", async () => {
+    const harness = new CandidateFirmwareHarness();
+    const blob = representativeBlob(121);
+    const result = await coordinator(harness).upload(blob, {...BINDING, actionAbiDigest: 1, streamChunks: true});
+    assert.equal(result.status.nextOffset, blob.length);
+    assert.equal(result.status.state, CANDIDATE_STATE.VALIDATED);
+    assert.equal(result.progress.chunkIndex, Math.ceil(blob.length / 20) - 1);
+    assert.equal(result.progress.chunkCount, Math.ceil(blob.length / 20));
+    assert.equal(result.progress.bytesUploaded, blob.length);
+});
+test("streaming storage failure stays visible and prevents validation or commit", async () => {
+    const harness = new CandidateFirmwareHarness({scanBetweenReports: true, chunkErrorAt: 20});
+    await assert.rejects(coordinator(harness).upload(representativeBlob(121), {...BINDING, actionAbiDigest: 1, streamChunks: true}), /rejected|STORAGE_FAILURE/);
+    assert.equal(operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_VALIDATE).length, 0);
+    assert.equal(operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_COMMIT).length, 0);
+});
+test("a lost streaming acknowledgement stops without replaying the ambiguous chunk", async () => {
+    const harness = new CandidateFirmwareHarness({scanBetweenReports: true, processThenThrowOnOperation: CANDIDATE_OPERATION.CHUNK});
+    await assert.rejects(coordinator(harness).upload(representativeBlob(121), {...BINDING, actionAbiDigest: 1, streamChunks: true}),
+        error => error.code === "TRANSPORT_OUTCOME_AMBIGUOUS" && error.ambiguous === true && error.safeToRetry === false
+            && error.progress.chunkIndex === 0 && error.progress.bytesUploaded === 0);
+    assert.equal(operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_STREAM_CHUNK).length, 1);
+    assert.equal(operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_VALIDATE).length, 0);
+    assert.equal(operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_COMMIT).length, 0);
+    assert.equal(harness.status.state, CANDIDATE_STATE.RECEIVING);
+    assert.equal(harness.status.nextOffset, 20);
+});
+test("cancelling a confirmed streaming prefix aborts before the next batch", async () => {
+    const harness = new CandidateFirmwareHarness({scanBetweenReports: true});
+    const controller = new AbortController();
+    await assert.rejects(coordinator(harness).upload(representativeBlob(401), {...BINDING, actionAbiDigest: 1,
+        streamChunks: true, signal: controller.signal,
+        onProgress(progress) { if (progress.phase === "writing" && progress.bytesSent === 80) controller.abort(); }}),
+        error => error.code === "CANCELLED" && error.abortSucceeded === true);
+    assert.equal(operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_STREAM_CHUNK).length, 4);
+    assert.equal(operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_VALIDATE).length, 0);
+    assert.equal(operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_COMMIT).length, 0);
+    assert.equal(harness.status.state, CANDIDATE_STATE.IDLE);
+});
+test("reuse describes the verified source and still validates the entire target", async () => {
+    const {crc32, fnv1a32} = require("../../core/schema/profile-blob-v1");
+    const bytes = representativeBlob(3001), blob = Buffer.from(bytes); blob[1000] = 0xff;
+    const harness = new CandidateFirmwareHarness({scanBetweenReports: true});
+    const baseSource = {bytes, generation: 4, origin: 0, kind: 1, digest: fnv1a32(bytes), crc32: crc32(bytes)};
+    const result = await coordinator(harness).upload(blob, {...BINDING, actionAbiDigest: 1, baseSource, streamChunks: true});
+    assert.equal(result.status.state, CANDIDATE_STATE.VALIDATED);
+    const copies = operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_REUSE);
+    assert.ok(copies.length >= 3 && copies.length <= 5);
+    assert.ok(operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_STREAM_CHUNK).length <= 1);
+    for (const frame of copies) {
+        assert.equal(frame.readUInt32LE(11), 4); assert.equal(frame.readUInt32LE(15), baseSource.digest);
+        assert.equal(frame.readUInt32LE(19), baseSource.crc32);
+    }
+    assert.equal(operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_VALIDATE).length, 1);
+    assert.equal(operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_COMMIT).length, 0);
+    assert.ok(harness.writes.length < Math.ceil(blob.length / 20) / 5);
+});
+test("invalid reuse source fails before BEGIN", async () => {
+    const harness = new CandidateFirmwareHarness();
+    const bytes = representativeBlob(121);
+    await assert.rejects(coordinator(harness).upload(bytes, {...BINDING, actionAbiDigest: 1,
+        baseSource: {bytes, crc32: 0, digest: 0, generation: 0, origin: 255, kind: 0}}), /source bytes/);
+    assert.equal(harness.writes.length, 0);
+});
+
+test("legacy, streaming and reuse progress count actual chunks and separate prepared bytes", async () => {
+    const {crc32, fnv1a32} = require("../../core/schema/profile-blob-v1");
+    const source = representativeBlob(3001), target = Buffer.from(source); target[1000] = 0xff;
+    for (const transfer of [{}, {streamChunks: true}, {streamChunks: true,
+        baseSource: {bytes: source, generation: 4, origin: 0, kind: 1, digest: fnv1a32(source), crc32: crc32(source)}}]) {
+        const harness = new CandidateFirmwareHarness({scanBetweenReports: true}), reports = [];
+        const result = await coordinator(harness).upload(target, {...BINDING, actionAbiDigest: 1, ...transfer,
+            onProgress(progress) { reports.push(progress); }});
+        const chunks = harness.writes.filter(frame => [PROFILE_CANDIDATE_V1.VALUE_CHUNK, PROFILE_CANDIDATE_V1.VALUE_STREAM_CHUNK].includes(frame[2]));
+        assert.equal(result.progress.chunkCount, chunks.length);
+        assert.equal(result.progress.chunkIndex, chunks.length - 1);
+        assert.equal(result.progress.bytesUploaded, chunks.reduce((n, frame) => n + frame[7], 0));
+        assert.equal(result.progress.bytesReused, target.length - result.progress.bytesUploaded);
+        assert.equal(result.progress.bytesPrepared, target.length);
+        assert.equal(result.progress.bytesSent, result.progress.bytesPrepared);
+        for (const report of reports) assert.equal(report.bytesPrepared, report.bytesUploaded + report.bytesReused);
+    }
 });

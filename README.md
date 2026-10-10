@@ -5,7 +5,9 @@
 Ark is the editor for [my Charybdis 4x6 firmware](https://github.com/NoahCLR/charybdis-4x6).
 Plug the keyboard in and you see exactly what is on it. Change it, and save it
 back. You don't write C, you don't reflash, and you don't need a firmware
-checkout. Everything Ark shows comes from the keyboard itself.
+checkout. Everything Ark shows comes from the keyboard itself. With compatible
+firmware, small edits reuse unchanged profile data while the complete result
+is still checked and saved to both halves.
 
 Paste text straight into a macro, including code and literal braces, and add
 shortcuts or delays as separate steps. Pick your computer's keyboard layout in
