@@ -38,7 +38,7 @@ matrix.
 
 | Product surface | Current state |
 | --- | --- |
-| Layout and 16 layers | Read/write; names and overlay order travel with complete profiles; a reorder renumbers layer keys by default ("Keys follow their layers") |
+| Layout and 16 layers | Read/write; key labels and picker legends follow the chosen host layout (D-L56); names and overlay order travel with complete profiles; a reorder renumbers layer keys by default ("Keys follow their layers") |
 | Key behaviours, combos and RGB | Read/write editors over the shared draft; selected keys open an unstored behaviour grid until the first edit; matching Keys reach sections share open state across tabs, open independently, and use the page scrollbar |
 | Macros | 128 named VIA macro slots with literal Text, editable steps, Advanced raw payload, recorder and live validation; capability-gated Unicode text, saved macOS/Windows/Linux host setup and a host keyboard layout macro text is typed and checked through (D-L56); shared-memory and per-macro limits shown and enforced (D-L25, D-L26) |
 | Custom keys | 128 named keys that do what their behaviour says: rename, add or open the behaviour, place, see where each is used (D-L42) |
@@ -1151,4 +1151,9 @@ entry needs the Unicode Hex Input source, so it is a layout choice there, not a
 switch; the switch stays for Windows and Linux. The macro editor refuses a
 character the layout cannot type unless Unicode entry is available, naming it,
 and refuses an ordinary key held across text that needs Unicode entry, as the
-keyboard's preflight does. Labelling keys by the layout is separate work.
+keyboard's preflight does. Keys are labelled as the layout prints them
+(`core/model/key-names.js`): the layout screen, the picker's board and search,
+and Review, from the same data; stored keycodes never change, and US keeps the
+catalogue's labels. The picker includes Shift and Option/AltGr legends and
+marks dead keys with ◌. Shifted symbols and shortcut base keys follow the
+layout; macOS ISO swaps the same key positions in labels as in playback.

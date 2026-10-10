@@ -29,6 +29,8 @@ function buildDeviceModel(state = {}) {
     // the screens and the review (model/key-names.js).
     const names = profileKeyNames({
         hostOs: state.settingsView?.host?.effective,
+        hostLayout: state.settingsView?.host?.layout,
+        macosIso: state.settingsView?.host?.macosIso,
         layers: state.committed?.domains?.settings?.names,
         actionsKnown: knownActionAbi(state.capabilities?.actionAbiDigest),
         macros: state.macroView?.viaMacros,
@@ -66,6 +68,9 @@ function buildDeviceModel(state = {}) {
         // names things as the review does (model/vocabulary.js).
         vocabulary: {...VOCABULARY, ...hostVocabulary},
         layers: layersFromDevice(state.layout, catalog.labels, catalog.aliases, names.layers),
+        // What each typing key prints: plain, Shift, Option/AltGr, then both,
+        // for the picker's board; null on US, whose board is drawn as is.
+        hostLayoutLegends: names.legends,
 
         // Read off the keyboard when the committed profile has been read;
         // empty rather than fabricated before that.

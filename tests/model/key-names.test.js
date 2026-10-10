@@ -125,3 +125,41 @@ test("modifier-bearing catalogue families inherit host vocabulary regardless of 
         assert.equal(keyLabel(names,keycodes.lookup('SC_RAPC').value),hostKeyLabel('Right Alt/)',hostOs));
     }
 });
+
+test("keys read as the host layout prints them, and stored keycodes do not change", () => {
+    const german = profileKeyNames({hostLayout: 9});
+    for (const [name, label] of [["KC_Y", "Z"], ["KC_Z", "Y"], ["KC_SCLN", "Ö"], ["KC_SEMICOLON", "Ö"], ["KC_MINS", "ß"], ["KC_GRV", "^ ◌"], ["KC_EXLM", "!"], ["KC_AT", "\""], ["KC_COLN", "Ö"]]) {
+        assert.equal(german.labels[name], label, name);
+    }
+    assert.deepEqual(german.legends.KC_Y, ["Z", "", "", ""]);
+    assert.deepEqual(german.legends.KC_1, ["1", "!", "", ""]);
+    assert.deepEqual(german.legends.KC_GRV, ["^ ◌", "°", "", ""]);
+    const french = profileKeyNames({hostLayout: 10});
+    assert.equal(french.labels.KC_1, "&");
+    assert.equal(french.labels.KC_EXLM, "1", "AZERTY types 1 with Shift");
+    assert.deepEqual(french.legends.KC_1.slice(0, 2), ["&", "1"]);
+    assert.equal(profileKeyNames({hostLayout: 2}).labels.KC_2, "2", "a digit is its own label on Dutch too");
+    const us = profileKeyNames({});
+    assert.equal(us.legends, null);
+    assert.equal(us.labels.KC_Y, undefined, "US keeps the catalogue's labels");
+    assert.equal(keycodes.encode("KC_Y"), 0x1c);
+});
+
+test("macOS ISO labels swap the same positions as playback, including modified keys", () => {
+    const ansi = profileKeyNames({hostOs: 1, hostLayout: 2});
+    const iso = profileKeyNames({hostOs: 1, hostLayout: 2, macosIso: true});
+    assert.equal(ansi.labels.KC_GRV, "`");
+    assert.equal(iso.labels.KC_GRV, "§");
+    assert.equal(iso.labels.KC_NUBS, "`");
+    assert.deepEqual(iso.legends.KC_GRV, ansi.legends.KC_NUBS);
+    assert.deepEqual(iso.legends.KC_2, ["2", "@", "€", "™"]);
+    assert.deepEqual(iso.legends.KC_E, ["E", "", "´ ◌", "‰"]);
+    assert.equal(profileKeyNames({hostOs: 1, hostLayout: 9, macosIso: true}).labels.KC_GRV, "^ ◌", "only macOS layouts swap");
+    assert.equal(profileKeyNames({hostOs: 2, hostLayout: 2, macosIso: true}).labels.KC_GRV, "§", "playback uses the layout's OS even if the effective OS differs");
+    const german = profileKeyNames({hostOs: 2, hostLayout: 9});
+    assert.equal(keyLabel(german, 0x133), "Ctrl+Ö");
+    assert.equal(keyLabel(german, 0x21c), "Shift+Z");
+    assert.equal(keyLabel(german, 0x233), "Ö");
+    assert.equal(keyLabel(german, 0x211c), "Z / Ctrl");
+    assert.equal(keyLabel(german, 0x4133), "Ö / Layer 1");
+});

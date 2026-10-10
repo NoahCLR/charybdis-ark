@@ -111,7 +111,8 @@ Every screen is drawn and wired to the host:
 | Profile & backups | Import (the file against the keyboard, counted by what it configures — keys, lighting, macros, mouse, pointing — before it becomes the draft), export, profile memory, recovery state |
 | Device | Read-only: connection, committed generation, what was read |
 
-The keycode picker leads with the ANSI board, then task-shaped Symbols,
+The keycode picker leads with a board labelled for your host keyboard layout
+(ANSI for US; see [Host settings](#host-settings)), then task-shaped Symbols,
 Navigation, Numpad, Layers, Pointing modes, Macros, Mouse, Media, Lighting,
 Magic and Custom sections. The complete QMK catalogue remains available under
 More keys, Other QMK and All keycodes, and search spans all of it — named
@@ -556,8 +557,19 @@ firmware assumes. On macOS, **ISO keyboard on macOS** matters if macOS set this
 keyboard up as ISO (its Keyboard Setup Assistant asks): macOS then swaps the key
 left of 1 with the one left of Z, and macros must swap them too. On macOS there
 is no Unicode switch: choose the **Unicode Hex Input** layout for emoji and
-other characters your layout cannot type. The layout only changes how text is
-typed; key assignments and their names stay as they are.
+other characters your layout cannot type.
+
+Keys are labelled as the layout prints them, on the layout screen, in the
+picker's Keyboard tab and in Review: with German, the key QMK stores as `KC_Y`
+reads `Z` and `KC_SCLN` reads `Ö`, and searching the picker for `ö` finds it.
+Letters show their capital, as on a keycap; a dead key shows its accent and ◌.
+The picker board shows Shift above and Option/AltGr on the right, with
+Shift+Option/AltGr at the top right. The ISO option swaps the affected labels
+on macOS just as it swaps macro playback. Shifted symbols and shortcuts follow
+the layout too. The QMK name stays in each key's details and still finds it in
+search. Only the
+labels change: the keys stored on the keyboard stay the same, so changing the
+layout never moves a key. US shows the familiar ANSI labels.
 
 The effective OS names modifier keys consistently in the layout, picker, macros,
 pointing controls and Review: Option/Command on macOS, Alt/Windows on Windows,

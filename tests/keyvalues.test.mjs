@@ -34,3 +34,14 @@ test("modifier masks read back as the names the keyboard holds", () => {
     assert.deepEqual(modifierNames(buildDeviceModel(), 1 | 8), ["Left Ctrl", "Left GUI"]);
     assert.deepEqual(modifierNames(buildDeviceModel(), 255), modifierBits(buildDeviceModel()).map(([, name]) => name));
 });
+
+test("the picker finds a key by what the host layout prints on it", () => {
+    const settingsView = {host: {effective: 2, layout: 9}};
+    const model = buildDeviceModel({settingsView});
+    const entry = model.qmkKeycodes?.find?.((row) => row.value === "KC_SEMICOLON") || model.catalog?.entries?.find((row) => row.value === "KC_SEMICOLON");
+    assert.ok(entry, "the catalogue lists KC_SEMICOLON");
+    assert.equal(entry.label, "Ö");
+    assert.ok(entry.search.includes("ö"));
+    assert.deepEqual(model.hostLayoutLegends.KC_Y, ["Z", "", "", ""]);
+    assert.equal(buildDeviceModel().hostLayoutLegends, null);
+});

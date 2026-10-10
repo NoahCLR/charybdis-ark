@@ -29,9 +29,12 @@ function action(value, names = {}, withName = false) {
 // An action as a field: shown by its name, compared by what is stored.
 const actionField = (value, names, extra = {}) => ({text: action(value, names), detail: action(value, names, true), key: JSON.stringify(value), ...extra});
 // The names an action can be read by in one snapshot.
-const namesIn = (value, macros, detected) => ({layers: value.settings.names,
-    keys: profileKeyNames({hostOs: hostSettings(value.settings.values, detected).effective, actionsKnown: true, layers: value.settings.names, macros: macros?.viaMacros, behaviors: value.behaviors.rows, pdModes: value.pdModes,
-        customKeys: value.settings.customKeyNames.map((name, slot) => ({slot, name}))})});
+const namesIn = (value, macros, detected) => {
+    const host = hostSettings(value.settings.values, detected);
+    return {layers: value.settings.names,
+        keys: profileKeyNames({hostOs: host.effective, hostLayout: host.layout, macosIso: host.macosIso, actionsKnown: true, layers: value.settings.names, macros: macros?.viaMacros, behaviors: value.behaviors.rows, pdModes: value.pdModes,
+            customKeys: value.settings.customKeyNames.map((name, slot) => ({slot, name}))})};
+};
 // The mark an action carries: what it reaches, when that has a colour of its
 // own — a pointing mode's light, a layer's colour.
 const actionMark = value => !value ? undefined

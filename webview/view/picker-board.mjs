@@ -1,6 +1,15 @@
 // The ANSI board the keycode picker draws, taken from the app that ships it so
 // a second interface cannot teach a different keyboard.
 
+// Layout legends already carry dead-key marks and the macOS ISO swap from the
+// model. Keep the stored value and board geometry while choosing what to draw.
+export function pickerBoardKey(source, model) {
+  const spoken = model?.qmkKeyLabels?.[source.value];
+  const modifier = /^KC_(?:LEFT_|RIGHT_|L|R)(?:CTL|SFT|ALT|GUI)$/.test(source.value);
+  const legend = model?.hostLayoutLegends?.[source.value];
+  return modifier ? {...source, labels: [(spoken || source.value).replace(/^(Left|Right) /, "")]} : legend ? {...source, labels: legend} : source;
+}
+
 export const PICKER_BOARD = {
   width: 1563.3125,
   height: 466.2,

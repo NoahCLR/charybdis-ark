@@ -5,7 +5,7 @@
 import {el, esc} from "../lib/dom.mjs";
 import {getModel, layerName, layers, post, render, state} from "../store.mjs";
 import {actionLabel} from "../view/keyface.mjs";
-import {PICKER_BOARD} from "../view/picker-board.mjs";
+import {PICKER_BOARD, pickerBoardKey} from "../view/picker-board.mjs";
 import {pickerExpression} from "../view/edits.mjs";
 import {entriesForPickerSection, pickable, pickerSections} from "../view/picker-sections.mjs";
 import {macroMatches} from "../view/macro.mjs";
@@ -70,20 +70,25 @@ function sectionBody(model) {
     const section = sections(model).find((entry) => entry.id === picker.section) || sections(model)[0];
     if (section.kind === "board") {
         const keys = PICKER_BOARD.keys.filter(source => allowed(source.value)).map((source) => {
-            const modifier = /^KC_(?:LEFT_|RIGHT_|L|R)(?:CTL|SFT|ALT|GUI)$/.test(source.value);
             const spoken = model?.qmkKeyLabels?.[source.value];
-            const key = modifier ? {...source, labels: [(spoken || source.value).replace(/^(Left|Right) /, "")]} : source;
+            // The host layout's legends replace the ANSI board's, so a German
+            // board reads Z where QMK says KC_Y; the key it stores is unchanged.
+            const key = pickerBoardKey(source, model);
             const on = picked(key.value);
             const shifted = key.labels[1] && key.labels[1].length <= 3;
+            const extra = key.labels[2] || key.labels[3];
             return `<g class="pkb-key ${on ? "on" : ""}" data-pick="${esc(key.value)}" tabindex="0" role="button" aria-label="${esc(spoken || key.value)}">
                 <rect x="${key.x}" y="${key.y}" width="${key.w}" height="${key.h}" rx="8"></rect>
-                ${shifted
+                ${extra
+                    ? key.labels.map((label, index) => label ? `<text class="${index === 0 ? `pkb-main ${label.length > 1 ? "sm" : ""}` : "pkb-alt"}" x="${key.x + key.w * (index < 2 ? 0.26 : 0.74)}" y="${key.y + key.h * (index % 2 ? 0.36 : 0.74)}">${esc(label)}</text>` : "").join("")
+                    : shifted
                     ? `<text class="pkb-alt" x="${key.x + key.w / 2}" y="${key.y + key.h * 0.36}">${esc(key.labels[1])}</text>
                        <text class="pkb-main" x="${key.x + key.w / 2}" y="${key.y + key.h * 0.74}">${esc(key.labels[0])}</text>`
                     : `<text class="pkb-main ${key.labels[0].length > 4 ? "sm" : ""}" x="${key.x + key.w / 2}" y="${key.y + key.h / 2 + 5}">${esc(key.labels[0])}</text>`}
             </g>`;
         }).join("");
         return `<div class="pk-body"><div class="pkb"><svg viewBox="0 0 ${PICKER_BOARD.width} ${PICKER_BOARD.height}" xmlns="http://www.w3.org/2000/svg">${keys}</svg></div>
+            ${model?.hostLayoutLegends ? `<p class="note" style="margin-top:12px">Shift above; ${modifierControls(model).find(({value}) => value === "A")?.label === "Option" ? "Option" : "AltGr"} on the right. ◌ marks a dead key: press it, then a letter.</p>` : ""}
             <p class="note" style="margin-top:12px">${picker.mode === "list" ? picker.maxKeys === 1 ? "Choose the key to press or release." : "Choose the keys to send together." : `Click a key. Modifiers above wrap it, so <code>${esc(modifierControls(model).find(({value}) => value === "G")?.label || "G")}</code> + <code>C</code> stores <code>G(KC_C)</code> — identical to <code>LGUI(KC_C)</code>.`}</p></div>`;
     }
     if (section.kind === "layers") {

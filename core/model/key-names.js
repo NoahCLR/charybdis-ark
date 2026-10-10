@@ -20,6 +20,7 @@ const {actionName} = require("../schema/actions");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
 const {layerName, slotName} = require("./vocabulary");
+const {hostLayout, US_HOST_LAYOUT} = require("../data/host-layouts");
 
 // What a layer key does to its layer, in the picker's words. TG is a lock on
 // this firmware (D-L34).
@@ -50,11 +51,45 @@ function semanticLabel(semantic) {
 // host naming without requiring another screen or group allowlist.
 const carriesModifiers = entry => ["modifiers", "magic"].includes(entry.group) || /\b[LR]?(?:Ctrl|Shift|Alt|GUI|Cmd)\b/.test(entry.label);
 
-function profileKeyNames({hostOs = 0, layers, macros = [], customKeys = [], behaviors = [], pdModes = [], actionsKnown = false} = {}) {
-    const labels = {}, aliases = {}, pointing = [], custom = [];
+// A key as the host layout prints it (data/host-layouts.js): a letter as its
+// capital, as on a keycap; anything else as it types it plain; a dead key as
+// its accent. Shifted symbol keycodes (KC_EXLM is S(KC_1)) read as what the
+// layout types with Shift. US keeps the catalogue's own labels. Stored
+// keycodes never change, only what they are called.
+function hostLayoutNames(layoutId, macosIso) {
+    const layout = hostLayout(layoutId);
+    if (!layout || layoutId === US_HOST_LAYOUT) return {labels: {}, legends: null};
+    const swapIso = macosIso && layout.os === "macos";
+    const labels = {}, legends = {};
+    const text = cell => cell && typeof cell === "object" ? `${cell.dead} ◌` : cell || "";
+    const name = (resolved, label) => {
+        const entry = keycodes.lookup(resolved.name) || resolved;
+        labels[entry.name] = label;
+        for (const alias of entry.aliases || []) labels[alias] = label;
+    };
+    for (const key of Object.keys(layout.keys)) {
+        const source = swapIso && key === "KC_GRV" ? "KC_NUBS" : swapIso && key === "KC_NUBS" ? "KC_GRV" : key;
+        const cells = layout.keys[source];
+        const value = keycodes.encode(key);
+        if (key === "KC_SPC" || value === undefined) continue;
+        const plain = text(cells[0]), shift = text(cells[1]);
+        const capital = shift.length === 1 && shift !== plain && shift === plain.toUpperCase();
+        if (plain) name(keycodes.resolve(value), capital ? shift : plain);
+        const shifted = keycodes.resolve(0x0200 | value);
+        if (shift && shifted.group === "shifted") name(shifted, shift);
+        legends[key] = [capital ? shift : plain, capital ? "" : shift, text(cells[2]), text(cells[3])];
+    }
+    return {labels, legends};
+}
+
+function profileKeyNames({hostOs = 0, hostLayout: layoutId = US_HOST_LAYOUT, macosIso = false, layers, macros = [], customKeys = [], behaviors = [], pdModes = [], actionsKnown = false} = {}) {
+    const typed = hostLayoutNames(layoutId, macosIso);
+    const labels = {...typed.labels}, aliases = {}, pointing = [], custom = [];
     const modifiers = hostKeyVocabulary(hostOs).modifiers;
     for (const entry of keycodes.entries()) if (carriesModifiers(entry)) {
-        const label = entry.value >= 0xe0 && entry.value <= 0xe7 ? modifiers[entry.value - 0xe0][1] : hostKeyLabel(entry.label, hostOs);
+        let label = entry.value >= 0xe0 && entry.value <= 0xe7 ? modifiers[entry.value - 0xe0][1] : hostKeyLabel(entry.label, hostOs);
+        const base = typed.labels[keycodes.resolve(entry.value & 0xff).name];
+        if (entry.kind === "modified" && base !== undefined) label = label.replace(/\+[^+]+$/, () => `+${base}`);
         labels[entry.name] = label;
         for (const alias of entry.aliases || []) labels[alias] = label;
     }
@@ -70,7 +105,7 @@ function profileKeyNames({hostOs = 0, layers, macros = [], customKeys = [], beha
             labels[native] = labels[name] = layerKeyLabel(name, layers);
         }
     }
-    const layered = {labels, aliases, pointing, custom, hostOs, layers: layers || []};
+    const layered = {labels, aliases, pointing, custom, hostOs, legends: typed.legends, layers: layers || []};
     if (!actionsKnown) return layered;
     for (const slot of macros) {
         const native = keycodes.resolve(resolveNativeQmkExpression(slot.keycode, {})).name;
@@ -159,6 +194,14 @@ function keyLabel(names, value) {
     if (resolved.kind === "layer-mod") {
         const modifiers = resolved.label.replace(/^Layer \d+ \+ /, "");
         return `${layerName(names?.layers, resolved.layer)} + ${hostKeyLabel(modifiers, names?.hostOs)}`;
+    }
+    if (resolved.kind === "mod-tap") {
+        const tap = keycodes.lookup(resolved.tap);
+        return hostKeyLabel(resolved.label, names?.hostOs).replace(/^[^/]+ \/ /, () => `${tap ? keyLabel(names, tap.value) : resolved.tap} / `);
+    }
+    if (resolved.kind === "modified") {
+        const base = keycodes.resolve(value & 0xff);
+        return hostKeyLabel(resolved.label, names?.hostOs).replace(/\+[^+]+$/, () => `+${keyLabel(names, base.value)}`);
     }
     return carriesModifiers(resolved) ? hostKeyLabel(resolved.label, names?.hostOs) : resolved.label;
 }
