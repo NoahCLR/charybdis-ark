@@ -356,3 +356,38 @@ test("complete capture preserves Unicode bank bytes and still rejects legacy des
     malformed.macros[0] = Buffer.from([0xc0,0xaf]).toString('base64');
     assert.throws(() => validateSnapshot(malformed), /UTF-8/);
 });
+
+test("Apply negotiates transfer extensions and uses the raw stored profile as its source", async () => {
+    const {PROFILE_WIRE_FEATURES} = require("../../core/protocol/profile-wire-v1");
+    const {crc32} = require("../../core/schema/profile-blob-v1");
+    for (const extensions of [0, PROFILE_WIRE_FEATURES.CANDIDATE_REUSE | PROFILE_WIRE_FEATURES.CANDIDATE_STREAM]) {
+        const f = fixture(), raw = Buffer.from(f.source.profile, "base64");
+        f.options.baseSnapshot = {document: f.source, fingerprint: fingerprint(f.source), identity: f.identity,
+            status: {activeKind: 1, activeGeneration: 3, activeDigest: fnv1a32(raw), activeOriginHalf: 0},
+            storage: {...f.storage, profile: raw}};
+        const factory = f.operations.createCoordinator;
+        let given;
+        f.operations.createCoordinator = (connection, options) => {
+            const coordinator = factory(connection, options), upload = coordinator.upload;
+            coordinator.upload = async (bytes, options) => {given = options; return upload(bytes, options);};
+            return coordinator;
+        };
+        await restoreProfile({}, {}, {...capabilities, featureFlags: capabilities.featureFlags | extensions}, f.targetDocument, f.options);
+        assert.equal(given.streamChunks, Boolean(extensions));
+        if (extensions) {
+            assert.deepEqual(given.baseSource, {bytes: raw, kind: 1, generation: 3, digest: fnv1a32(raw), crc32: crc32(raw), origin: 0});
+        } else assert.equal(given.baseSource, undefined);
+    }
+});
+test("a raw custom source that does not match its active identity falls back to full transfer", async () => {
+    const {PROFILE_WIRE_FEATURES} = require("../../core/protocol/profile-wire-v1");
+    const f = fixture(), raw = Buffer.from(f.source.profile, "base64");
+    f.options.baseSnapshot = {document: f.source, fingerprint: fingerprint(f.source), identity: f.identity,
+        status: {activeKind: 1, activeGeneration: 3, activeDigest: fnv1a32(raw) ^ 1, activeOriginHalf: 0}, storage: {...f.storage, profile: raw}};
+    const factory = f.operations.createCoordinator;
+    f.operations.createCoordinator = (connection, options) => {
+        const coordinator = factory(connection, options), upload = coordinator.upload;
+        coordinator.upload = async (bytes, options) => {assert.equal(options.baseSource, undefined); return upload(bytes, options);}; return coordinator;
+    };
+    await restoreProfile({}, {}, {...capabilities, featureFlags: capabilities.featureFlags | PROFILE_WIRE_FEATURES.CANDIDATE_REUSE}, f.targetDocument, f.options);
+});

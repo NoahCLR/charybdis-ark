@@ -14,6 +14,7 @@ const {
     buildCandidateAbortRequest,
     buildCandidateBeginRequest,
     buildCandidateChunkRequest,
+    buildCandidateReuseRequest,
     buildCandidateCommitRequest,
     buildCandidateValidateRequest,
     candidateMetadataForBlob,
@@ -22,6 +23,9 @@ const {
     normalizeCandidateMetadata,
     readCandidateStatus,
 } = require("../protocol/profile-candidate-v1");
+
+const {candidateTransferPlan} = require("../protocol/candidate-transfer-plan");
+const {crc32, fnv1a32} = require("../schema/profile-blob-v1");
 
 const DEFAULT_POLL_INTERVAL_MS = 10;
 const DEFAULT_MAX_BUSY_RESUBMISSIONS = 3;
@@ -137,7 +141,6 @@ class CandidateUploadCoordinator {
         try {
             context.blob = copyBytes(value, "Candidate profile blob");
             context.totalBytes = context.blob.length;
-            context.chunkCount = Math.ceil(context.totalBytes / this.chunkSize);
             if (options.metadata === undefined) {
                 context.metadata = candidateMetadataForBlob(context.blob, {
                     actionAbiDigest: options.actionAbiDigest,
@@ -160,6 +163,14 @@ class CandidateUploadCoordinator {
                 }
                 context.metadata = supplied;
             }
+
+            const base = options.baseSource && {...options.baseSource, bytes: Buffer.from(options.baseSource.bytes)};
+            if (base && (crc32(base.bytes) !== base.crc32 || fnv1a32(base.bytes) !== base.digest)) {
+                throw new RangeError("Reuse source bytes do not match the reviewed source identity.");
+            }
+            const plan = candidateTransferPlan(context.blob, base?.bytes);
+            context.chunkCount = plan.filter(part => part.kind === "write")
+                .reduce((count, part) => count + Math.ceil(part.length / this.chunkSize), 0);
 
             throwIfCancelled(context);
             context.phase = UPLOAD_PHASE.PREFLIGHT;
@@ -185,19 +196,29 @@ class CandidateUploadCoordinator {
             this.emitProgress(context);
 
             context.phase = UPLOAD_PHASE.WRITING;
-            for (let offset = 0, chunkIndex = 0; offset < context.blob.length; chunkIndex += 1) {
+            for (const part of plan) {
                 throwIfCancelled(context);
-                const bytes = context.blob.subarray(offset, Math.min(offset + this.chunkSize, context.blob.length));
-                context.operation = CANDIDATE_OPERATION.CHUNK;
-                context.chunkIndex = chunkIndex;
-                context.status = await this.performMutation(
-                    buildCandidateChunkRequest(context.transactionId, offset, bytes),
-                    context,
-                    {offset, length: bytes.length}
-                );
-                offset += bytes.length;
-                context.bytesSent = offset;
-                this.emitProgress(context);
+                if (part.kind === "reuse") {
+                    context.operation = CANDIDATE_OPERATION.REUSE;
+                    context.status = await this.performMutation(buildCandidateReuseRequest(context.transactionId, {...part, source: base}), context, part);
+                    context.bytesSent = part.offset + part.length;
+                    context.bytesReused += part.length;
+                    this.emitProgress(context);
+                } else if (options.streamChunks) {
+                    await this.writeChunkRange(context, part);
+                } else {
+                    for (let offset = part.offset; offset < part.offset + part.length;) {
+                        const bytes = context.blob.subarray(offset, Math.min(offset + this.chunkSize, part.offset + part.length));
+                        context.operation = CANDIDATE_OPERATION.CHUNK;
+                        context.chunkIndex = context.chunksAdmitted;
+                        context.status = await this.performMutation(buildCandidateChunkRequest(context.transactionId, offset, bytes), context, {offset, length: bytes.length});
+                        context.chunksAdmitted++;
+                        context.bytesUploaded += bytes.length;
+                        offset += bytes.length;
+                        context.bytesSent = offset;
+                        this.emitProgress(context);
+                    }
+                }
             }
 
             throwIfCancelled(context);
@@ -346,49 +367,118 @@ class CandidateUploadCoordinator {
         }
     }
 
+    async writeChunkRange(context, part) {
+        let offset = part.offset;
+        while (offset < part.offset + part.length) {
+            const baseline = context.status;
+            let admitted = 0;
+            while (admitted < 4 && offset < part.offset + part.length) {
+                throwIfCancelled(context);
+                const bytes = context.blob.subarray(offset, Math.min(offset + this.chunkSize, part.offset + part.length));
+                const frame = buildCandidateChunkRequest(context.transactionId, offset, bytes);
+                frame[2] = PROFILE_CANDIDATE_V1.VALUE_STREAM_CHUNK;
+                context.operation = CANDIDATE_OPERATION.CHUNK;
+                context.chunkIndex = context.chunksAdmitted;
+                const ack = await this.admitMutation(frame, context);
+                if (ack.admission === CANDIDATE_ADMISSION.BUSY) {
+                    // Nothing was admitted for this frame. Drain the accepted
+                    // prefix before retrying; never guess about lost replies.
+                    if (admitted) break;
+                    context.status = await this.performMutation(frame, context, {offset, length: bytes.length});
+                    context.chunksAdmitted++;
+                    context.bytesUploaded += bytes.length;
+                    offset += bytes.length;
+                    break;
+                }
+                if (ack.admission !== CANDIDATE_ADMISSION.QUEUED) {
+                    throw uploadError("ADMISSION_REJECTED", "Firmware rejected a streaming chunk.", context, {safeToRetry: false,
+                        deviceError: {id: ack.errorId, name: ack.errorName, frameOffset: ack.frameOffset}});
+                }
+                admitted++;
+                context.chunksAdmitted++;
+                offset += bytes.length;
+            }
+            if (admitted) {
+                context.status = await this.waitForChunkBatch(context, baseline, offset, admitted);
+                context.bytesUploaded += offset - baseline.nextOffset;
+                context.chunkIndex = context.chunksAdmitted - 1;
+            }
+            context.bytesSent = offset;
+            this.emitProgress(context);
+        }
+    }
+
+    async waitForChunkBatch(context, baseline, end, admitted) {
+        const budget = this.createStatusBudget(context, baseline);
+        const sequence = (baseline.operationSequence + admitted) & 0xffff;
+        while (true) {
+            throwIfCancelled(context);
+            const status = await this.readStatus(context, {ambiguous: true});
+            context.status = status;
+            assertCandidateIdentity(status, context);
+            assertNoDeviceError(status, context);
+            if (status.digest !== context.metadata.digest || status.payloadLength !== context.totalBytes
+                || status.nextOffset < baseline.nextOffset || status.nextOffset > end) {
+                throw operationStatusMismatch(status, context, "streaming chunk identity or offset changed");
+            }
+            if (!status.mailboxPending && status.nextOffset === end && status.operationSequence === sequence && status.lastOperation === CANDIDATE_OPERATION.CHUNK) {
+                assertSuccessfulOperationStatus(status, context, {offset: baseline.nextOffset, length: end - baseline.nextOffset});
+                return status;
+            }
+            if (!this.statusBudgetAllowsAnotherPoll(budget, status)) break;
+            await this.waitBeforePoll(context);
+        }
+        throw uploadError("OPERATION_OUTCOME_AMBIGUOUS", "Streaming chunks did not confirm their exact accepted prefix.", context, {ambiguous: true, safeToRetry: false});
+    }
+
+    async admitMutation(frame, context) {
+        let response;
+        try {
+            response = await this.connection.request(frame, {
+                matchResponse: orUnhandled(candidateMutationResponseMatcher, frame),
+                signal: requestSignal(context),
+                timeoutMs: this.requestTimeoutMs,
+            });
+        } catch (cause) {
+            throw uploadError(
+                "TRANSPORT_OUTCOME_AMBIGUOUS",
+                "The candidate mutation response was lost; the keyboard may or may not have admitted it.",
+                context,
+                {ambiguous: true, cause, safeToRetry: context.operation === CANDIDATE_OPERATION.COMMIT}
+            );
+        }
+        // The profile owner takes candidate frames only while it is ready;
+        // while it reconciles the halves, recovers, or has a storage error,
+        // the frame falls through to QMK's unhandled reply. That is a
+        // definite answer — this frame was not admitted — not a lost one.
+        if (isUnhandledEcho(response, frame)) {
+            throw uploadError(
+                "KEYBOARD_NOT_READY",
+                `The keyboard is not ready to take a profile ${operationLabel(context.operation)} right now; it may be reconciling its halves or recovering. Read the keyboard again, then retry.`,
+                context,
+                {ambiguous: false, safeToRetry: false}
+            );
+        }
+        let acknowledgment;
+        try {
+            acknowledgment = decodeCandidateAcknowledgement(response, frame);
+        } catch (cause) {
+            throw uploadError("PROTOCOL_ERROR", cause.message, context, {
+                ambiguous: true,
+                cause,
+                safeToRetry: false,
+            });
+        }
+        throwIfCancelled(context);
+        return acknowledgment;
+    }
+
     async performMutation(frame, context, operationDetails = {}) {
         let baseline = context.status;
         let busyResubmissions = 0;
         while (true) {
             throwIfCancelled(context);
-            let response;
-            try {
-                response = await this.connection.request(frame, {
-                    matchResponse: orUnhandled(candidateMutationResponseMatcher, frame),
-                    signal: requestSignal(context),
-                    timeoutMs: this.requestTimeoutMs,
-                });
-            } catch (cause) {
-                throw uploadError(
-                    "TRANSPORT_OUTCOME_AMBIGUOUS",
-                    "The candidate mutation response was lost; the keyboard may or may not have admitted it.",
-                    context,
-                    {ambiguous: true, cause, safeToRetry: context.operation === CANDIDATE_OPERATION.COMMIT}
-                );
-            }
-            // The profile owner takes candidate frames only while it is ready;
-            // while it reconciles the halves, recovers, or has a storage error,
-            // the frame falls through to QMK's unhandled reply. That is a
-            // definite answer — this frame was not admitted — not a lost one.
-            if (isUnhandledEcho(response, frame)) {
-                throw uploadError(
-                    "KEYBOARD_NOT_READY",
-                    `The keyboard is not ready to take a profile ${operationLabel(context.operation)} right now; it may be reconciling its halves or recovering. Read the keyboard again, then retry.`,
-                    context,
-                    {ambiguous: false, safeToRetry: false}
-                );
-            }
-            let acknowledgment;
-            try {
-                acknowledgment = decodeCandidateAcknowledgement(response, frame);
-            } catch (cause) {
-                throw uploadError("PROTOCOL_ERROR", cause.message, context, {
-                    ambiguous: true,
-                    cause,
-                    safeToRetry: false,
-                });
-            }
-            throwIfCancelled(context);
+            const acknowledgment = await this.admitMutation(frame, context);
 
             if (acknowledgment.admission === CANDIDATE_ADMISSION.QUEUED) {
                 return this.waitForProcessedOperation(context, baseline, operationDetails);
@@ -693,6 +783,7 @@ function assertSuccessfulOperationStatus(status, context, operationDetails) {
                 throw operationStatusMismatch(status, context, "begin metadata/state did not match");
             }
             break;
+        case CANDIDATE_OPERATION.REUSE:
         case CANDIDATE_OPERATION.CHUNK: {
             const expectedOffset = operationDetails.offset + operationDetails.length;
             const expectedState = expectedOffset === status.payloadLength
@@ -730,8 +821,9 @@ function operationStatusCouldBeOurs(status, context, operationDetails) {
         case CANDIDATE_OPERATION.BEGIN:
             return status.payloadLength === operationDetails.metadata.payloadLength
                 && status.digest === operationDetails.metadata.digest;
+        case CANDIDATE_OPERATION.REUSE:
         case CANDIDATE_OPERATION.CHUNK:
-            return status.nextOffset === operationDetails.offset + operationDetails.length;
+            return !status.mailboxPending && status.nextOffset === operationDetails.offset + operationDetails.length;
         case CANDIDATE_OPERATION.VALIDATE:
             return [CANDIDATE_STATE.VALIDATING, CANDIDATE_STATE.VALIDATED, CANDIDATE_STATE.REJECTED].includes(status.state);
         case CANDIDATE_OPERATION.COMMIT:
@@ -752,6 +844,7 @@ function canSafelyResubmit(status, context, operationDetails) {
     switch (context.operation) {
         case CANDIDATE_OPERATION.BEGIN:
             return status.state === CANDIDATE_STATE.IDLE;
+        case CANDIDATE_OPERATION.REUSE:
         case CANDIDATE_OPERATION.CHUNK: {
             if (status.transactionId !== context.transactionId
                 || ![CANDIDATE_STATE.RECEIVING, CANDIDATE_STATE.COMPLETE].includes(status.state)) {
@@ -847,9 +940,12 @@ function createUploadContext(signal) {
         afterDecision: undefined,
         blob: undefined,
         bytesSent: 0,
+        bytesUploaded: 0,
+        bytesReused: 0,
         cancellationSuppressed: false,
         chunkCount: 0,
         chunkIndex: -1,
+        chunksAdmitted: 0,
         metadata: undefined,
         decisionHandled: false,
         onProgress: undefined,
@@ -951,7 +1047,12 @@ function progressFor(context) {
         phase: context.phase,
         transactionId: context.transactionId,
         operation: context.operation,
+        // bytesSent is retained for callers using it as completed progress.
+        // Explicit counts distinguish reconstructed bytes from host uploads.
         bytesSent: context.bytesSent,
+        bytesPrepared: context.bytesSent,
+        bytesUploaded: context.bytesUploaded,
+        bytesReused: context.bytesReused,
         totalBytes: context.totalBytes,
         chunkIndex: context.chunkIndex,
         chunkCount: context.chunkCount,

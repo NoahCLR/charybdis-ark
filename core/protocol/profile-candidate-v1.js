@@ -23,6 +23,9 @@ const PROFILE_CANDIDATE_V1 = Object.freeze({
     VALUE_ABORT: 0x14,
     VALUE_STATUS: 0x18,
     CHUNK_MAX: 20,
+    REUSE_MAX: 1024,
+    VALUE_REUSE: 0x1b,
+    VALUE_STREAM_CHUNK: 0x1c,
     MIN_BLOB_SIZE: 8,
     MAX_BLOB_SIZE: 65504,
     STATUS_LAYOUT_VERSION: 1,
@@ -41,6 +44,7 @@ const CANDIDATE_ADMISSION = Object.freeze({
     MALFORMED: 1,
     BUSY: 2,
     UNSUPPORTED: 3,
+    REJECTED: 4,
 });
 
 const CANDIDATE_STATE = Object.freeze({
@@ -68,6 +72,7 @@ const CANDIDATE_OPERATION = Object.freeze({
     VALIDATE: 3,
     ABORT: 4,
     COMMIT: 5,
+    REUSE: 6,
 });
 
 const CANDIDATE_STATUS_FLAGS = Object.freeze({
@@ -180,6 +185,21 @@ function buildCandidateChunkRequest(transactionId, offset, value) {
     return report;
 }
 
+function buildCandidateReuseRequest(transactionId, {offset, sourceOffset, length, source}) {
+    const report = buildMutationHeader(PROFILE_CANDIDATE_V1.VALUE_REUSE, assertU16(transactionId, "Candidate transaction id", {nonzero: true}));
+    offset = assertU16(offset, "Reuse destination offset");
+    sourceOffset = assertU16(sourceOffset, "Reuse source offset");
+    length = assertU16(length, "Reuse length", {nonzero: true});
+    if (length > PROFILE_CANDIDATE_V1.REUSE_MAX || offset + length > PROFILE_CANDIDATE_V1.MAX_BLOB_SIZE || sourceOffset + length > PROFILE_CANDIDATE_V1.MAX_BLOB_SIZE) throw new RangeError("Reuse range exceeds the candidate bounds.");
+    const kind = assertU8(source.kind, "Reuse source kind"), origin = assertU8(source.origin, "Reuse source origin");
+    const generation = assertU32(source.generation, "Reuse source generation");
+    if ((kind === 0 && (origin !== 255 || generation !== 0)) || (kind === 1 && (origin > 1 || generation === 0)) || kind > 1) throw new RangeError("Reuse source must identify compiled defaults or a committed generation.");
+    report.writeUInt16LE(offset, 5); report.writeUInt16LE(sourceOffset, 7); report.writeUInt16LE(length, 9);
+    report.writeUInt32LE(generation, 11); report.writeUInt32LE(assertU32(source.digest, "Reuse source digest"), 15);
+    report.writeUInt32LE(assertU32(source.crc32, "Reuse source CRC32"), 19); report[23] = kind; report[24] = origin;
+    return report;
+}
+
 function buildCandidateValidateRequest(transactionId) {
     return buildMutationHeader(
         PROFILE_CANDIDATE_V1.VALUE_VALIDATE,
@@ -249,6 +269,9 @@ function decodeCandidateAcknowledgement(response, request) {
     if (admission === CANDIDATE_ADMISSION.UNSUPPORTED
         && (errorId !== CANDIDATE_ERROR.UNSUPPORTED_OPERATION || frameOffset !== 0xff)) {
         throw candidateProtocolError("NONCANONICAL_RESPONSE", "An unsupported acknowledgment must report only the unsupported-operation error.");
+    }
+    if (admission === CANDIDATE_ADMISSION.REJECTED && (errorId === CANDIDATE_ERROR.NONE || (frameOffset !== 0xff && frameOffset >= RAW_HID_REPORT_SIZE))) {
+        throw candidateProtocolError("NONCANONICAL_RESPONSE", "A rejected acknowledgment must identify the admission failure.");
     }
     return {
         admission,
@@ -609,6 +632,7 @@ module.exports = {
     buildCandidateAbortRequest,
     buildCandidateBeginRequest,
     buildCandidateChunkRequest,
+    buildCandidateReuseRequest,
     buildCandidateCommitRequest,
     buildCandidateStatusRequest,
     buildCandidateValidateRequest,

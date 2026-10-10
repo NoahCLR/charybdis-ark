@@ -67,6 +67,14 @@ streams to the terminal. A failed runner stops the check and leaves a failed
 report; an incomplete report is not a pass. Do not edit the checkouts during a
 run: this tests working copies, not immutable snapshots or a dirty-tree archive.
 
+The candidate-transfer runner adds Ark upload → production C candidate/store/
+validator checks, including exact reconstructed bytes and corruption rejection,
+in normal and sanitizer builds. When the selected older firmware lacks the
+optional transfer extension, it reports that coverage as skipped; the existing
+full-upload and validator checks still run. New-firmware work must also run this
+runner against the proposed firmware, where it must execute rather than skip.
+Its scan opportunities are simulated and establish no hardware timing.
+
 ## Agreement with a firmware contract
 
 The bridge proves byte-level equivalence of codecs; the agreement check answers
@@ -121,7 +129,7 @@ commits and are retained as artifacts.
 Use `--firmware-ref REV --qmk-ref REV` to check membership in a selected local
 release history; the defaults are the fetched origin trunks.
 Revision pins belong in the integrating CI job; this command neither chooses
-nor updates a known-compatible release automatically. These six checks do not
+nor updates a known-compatible release automatically. These seven checks do not
 replace either repository's full suite or physical-device acceptance.
 
 Firmware's full suite and build are independent of Ark. It uses frozen,

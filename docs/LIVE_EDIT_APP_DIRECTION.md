@@ -47,7 +47,7 @@ matrix.
 | Global policy | Every other portable setting, including startup layers, combo matching and device-reported lighting and key options; unsupported firmware features stay read-only |
 | Backup and restore | Complete current-format snapshots, choose or drop a file for import review against the keyboard, recovery file and verified restore; the preceding eight-layer backup is translated before review (D-L54) |
 | Drafts and Apply | One draft with item-by-item review, discard by edit group, Show, undo/redo and draft history; the review checks reachable actions, confirms active warnings and traps, and blocks profiles the destination cannot save (D-L36); Apply shows its steps and says where a failure happened; one coherent capture supplies the editor and draft, and copy/read status updates retain the active editor (D-L19, D-L23, D-L29, D-L30) |
-| Recovery | Atomic logical Apply, differential transfer, reboot recovery fencing, firmware roll-forward after the decision, resume after a lost or power-cycled peer link, bounded cancel owned by the keyboard (D-L20–D-L22, D-L27, D-L39) |
+| Recovery | Atomic logical Apply, capability-gated differential custom uploads (D-L58), differential VIA transfer, reboot recovery fencing, firmware roll-forward after the decision, resume after a lost or power-cycled peer link, bounded cancel owned by the keyboard (D-L20–D-L22, D-L27, D-L39) |
 | Where it runs | The VS Code extension, and a web page that runs all of Ark in Chrome or Edge over WebHID (D-L52): Choose keyboard, one tab at a time, recovery copies in the browser's storage, a light/dark toggle. A phone gets only a notice that Ark runs on a computer, with links to the repositories; a tablet gets Ark. `npm run build:web` writes the page as static files; a workflow publishes it to Cloudflare Pages: `dev` at `ark-dev.ncleroy.dev`, `main` at `ark.ncleroy.dev` from the first release |
 | Demo without a keyboard | Explore a demo, in both hosts and on a browser without WebHID: the bundled demo profile (`core/data/`) in a real draft under current firmware's capabilities, every screen editable and reviewed; Apply refused, Export saves the draft, Open a profile file replaces it, leaving with edits not exported asks first (D-L53) |
 
@@ -1184,3 +1184,35 @@ preserve it, metadata-only empty slots keep their reserve, and bank accounting
 includes its three bytes while playback accounting excludes it. Portable decode
 preserves overrides without a destination; staging and Apply require the
 capability. The app does not pretend older firmware enforces protection.
+
+### D-L58 — Transfer less, validate the complete saved result
+
+On firmware advertising D-F18's candidate-reuse and streaming capabilities,
+Apply plans changes against the exact raw active profile retained by the coherent
+capture, rather than the portable document's materialized live settings. Domains
+are aligned by identity so resizing one preserves reuse of unchanged later
+ones. Firmware copies unchanged ranges into its inactive candidate; the host
+sends short or changed ranges. A missing or mismatched source uses a full upload.
+Older firmware uses the original chunk path.
+
+Streaming admits at most four host chunks before a completion check, still
+through the serialized connection. A check proves the admitted prefix's exact
+transaction, target digest, length, next offset and operation-sequence advance.
+BUSY drains that prefix before retrying the definitely unadmitted suffix. Lost
+replies remain ambiguous and are not retried blindly. Full firmware validation,
+recovery copies, stale-base checks, both-half durable publication, verification
+and fresh post-Apply editor readback remain required. No app-authored bytes seed
+the payload reader's verified-read cache; a proven Apply result can retain its
+raw target only as the next differential upload's source.
+
+Upload progress separates prepared, uploaded and reused bytes. The legacy
+`bytesSent` field remains an alias for prepared bytes; chunk index and count
+describe actual host data chunks, excluding reuse commands.
+
+The compatibility bridge exercises Ark's uploader against firmware's production
+candidate transaction, dual-slot backend and whole-profile validator, including source
+corruption, in normal and sanitizer builds. Its scheduling is simulated; reduced
+bytes or exchanges do not establish keyboard timings or physical acceptance.
+That probe ends at validation. Firmware's separate host suites cover committed
+reuse through the production owner, both-half saving and reboot, with hardware
+eligibility and the peer VIA bank supplied by their test adapters.

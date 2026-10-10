@@ -27,7 +27,7 @@ const PROFILE_WIRE_STATUS = Object.freeze({
 });
 
 const PROFILE_WIRE_KNOWN_MASKS = Object.freeze({
-    FEATURE_FLAGS: 0x00ffffff,
+    FEATURE_FLAGS: 0x03ffffff,
     // Bits current firmware never advertises. An older image that does still
     // decodes; nothing reads them.
     RETIRED_FEATURES: 1 << 13,
@@ -73,6 +73,8 @@ const PROFILE_WIRE_FEATURES = Object.freeze({
     // Settings scalar 27 names a host layout macro text is typed through.
     HOST_LAYOUTS: HOST_LAYOUT_FEATURE,
     MACRO_PROTECTION: MACRO_PROTECTION_FEATURE,
+    CANDIDATE_REUSE: 1 << 24,
+    CANDIDATE_STREAM: 1 << 25,
 });
 
 const PROFILE_WIRE_DOMAINS = Object.freeze({
@@ -274,6 +276,10 @@ function decodeCapabilityPages(pages) {
     }
     if (hasFeature(PROFILE_WIRE_FEATURES.PERSISTENT_COMMIT) && !hasFeature(PROFILE_WIRE_FEATURES.CANDIDATE_WRITE)) {
         throw new ProfileWireProtocolError("MALFORMED_RESPONSE", "Persistent commit requires candidate-write support.");
+    }
+    if ((hasFeature(PROFILE_WIRE_FEATURES.CANDIDATE_REUSE) || hasFeature(PROFILE_WIRE_FEATURES.CANDIDATE_STREAM))
+        && !hasFeature(PROFILE_WIRE_FEATURES.CANDIDATE_WRITE)) {
+        throw new ProfileWireProtocolError("MALFORMED_RESPONSE", "Candidate transfer extensions require candidate-write support.");
     }
     if (hasFeature(PROFILE_WIRE_FEATURES.RGB_PREVIEW)
         && (!hasFeature(PROFILE_WIRE_FEATURES.CANDIDATE_WRITE) || !hasDomain(PROFILE_WIRE_DOMAINS.RGB))) {
