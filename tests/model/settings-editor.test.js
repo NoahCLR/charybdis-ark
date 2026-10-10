@@ -7,6 +7,52 @@ const {settingsEditorView, editSettings} = require("../../core/model/settings-ed
 const {buildDeviceModel} = require("../../core/session/device-model");
 const {POINTER_DPI} = require("../../core/model/pointer-dpi");
 const snapshot = () => {const value = document(); return {document: value, fingerprint: fingerprint(value), limits: {brightnessMax: 200}};};
+
+test("macOS Unicode warnings follow the effective setup, including legacy US Unicode", () => {
+    const {hostMacros} = require("../fixtures/host-macros");
+    const flags = (1 << 21) | (1 << 22);
+    for (const [word, detected, featureFlags, visible] of [
+        [1 | (3 << 16), 2, flags, true], // Explicit macOS UHI.
+        [3 << 16, 1, flags, true], // Auto detects macOS.
+        [0x101, 2, 1 << 21, true], // Legacy US with Unicode on.
+        [1 | (2 << 16), 1, flags, false], // Dutch uses native entry.
+        [0x101 | (2 << 16), 1, flags, false], // Switch does not enable entry on Dutch.
+        [1, 1, flags, false], // US without entry.
+        [2 | (3 << 16), 1, flags, false], // Effective Windows.
+        [3 << 16, 0, flags, false], // Unknown Auto.
+        [1 | (3 << 16), 1, 0, false], // Unsupported firmware.
+    ]) {
+        const {snapshot, capabilities} = hostMacros(word, []);
+        snapshot.hostOs.detected = detected;
+        capabilities.featureFlags = featureFlags;
+        const host = settingsEditorView(snapshot, capabilities).sections.find(section => section.id === "host");
+        assert.equal(Boolean(host.warning), visible, `Host word ${word}, detected ${detected}, capabilities ${featureFlags}`);
+        if (visible) {
+            assert.match(host.warning, /Option\+Left\/Right for word navigation/);
+            assert.match(host.warning, /Ark does not switch your Mac's input source/);
+        }
+    }
+});
+
+test("WinCompose setup links follow the effective Windows host and enabled Unicode playback", () => {
+    const {hostMacros} = require("../fixtures/host-macros");
+    for (const [word, detected, featureFlags, visible] of [
+        [0x102, 1, 1 << 21, true], // Manual Windows overrides macOS detection.
+        [0x100, 2, 1 << 21, true], // Auto uses Windows detection.
+        [2, 2, 1 << 21, false], // Unicode off.
+        [0x101, 2, 1 << 21, false], // Manual macOS overrides Windows detection.
+        [0x103, 2, 1 << 21, false], // Linux.
+        [0x100, 0, 1 << 21, false], // Unknown Auto.
+        [0x102, 2, 0, false], // Firmware without Unicode support.
+    ]) {
+        const {snapshot, capabilities} = hostMacros(word, []);
+        snapshot.hostOs.detected = detected;
+        capabilities.featureFlags = featureFlags;
+        const host = settingsEditorView(snapshot, capabilities).sections.find(section => section.id === "host");
+        assert.deepEqual(host.githubLink, visible ? {label: "WinCompose on GitHub", url: "https://github.com/samhocevar/wincompose"} : undefined,
+            `Host word ${word}, detected ${detected}, capabilities ${featureFlags}`);
+    }
+});
 function message(current, sectionId, updates = {}) {
     const section = settingsEditorView(current).sections.find(section => section.id === sectionId);
     return {sectionId, expectedFingerprint: current.fingerprint, fields: section.fields.map(field => field.kind === "toggle" ? {macro: field.macro, enabled: updates[field.macro] ?? field.enabled} : {macro: field.macro, value: updates[field.macro] ?? field.value})};

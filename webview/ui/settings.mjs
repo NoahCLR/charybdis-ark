@@ -13,6 +13,7 @@ import {getModel, layers, post, render, state, writable, canEdit as canEditArea}
 import {topbar, unavailable} from "./shell.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {marked} from "./marks.mjs";
+import {githubMark} from "../view/host.mjs";
 
 // The sections a screen draws, by the area the keyboard's model files them in.
 export const sectionsIn = (model, area) => (model?.configDefaults || []).filter((section) => section.area === area);
@@ -124,6 +125,8 @@ export function sectionCard(model, section, fields, canEdit, searching = false) 
             <span class="right tag">${section.fields.length} setting${section.fields.length === 1 ? "" : "s"}</span></summary>
         ${section.description ? `<div class="card-b" style="padding-bottom:0"><p class="note">${esc(section.description)}</p></div>` : ""}
         <div class="rows"></div>
+        ${section.warning ? `<div class="card-b"><div class="callout warn" role="note">${esc(section.warning)}</div></div>` : ""}
+        ${section.githubLink ? `<div class="card-b"><a class="btn tiny ghost" href="${esc(section.githubLink.url)}" target="_blank" rel="noopener">${githubMark("settings-help-mark")}<span>${esc(section.githubLink.label)}</span></a></div>` : ""}
     </details>`);
     const rows = node.querySelector(".rows");
     if (section.expanded === false) node.addEventListener("toggle", () => {

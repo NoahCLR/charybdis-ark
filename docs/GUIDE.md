@@ -564,6 +564,14 @@ left of 1 with the one left of Z, and macros must swap them too. On macOS there
 is no Unicode switch: choose the **Unicode Hex Input** layout for emoji and
 other characters your layout cannot type.
 
+While Unicode Hex Input is active on your Mac, Option symbols and shortcuts
+may stop working, including Option+Left/Right for word navigation. This affects
+ordinary typing, behaviours and macro key steps as well. Host shows a warning
+when its macOS setup uses Unicode entry. Ark does not switch the Mac's input
+source: switch back to your usual source for those keys, and match Ark's layout
+before playing macros. Merely selecting a layout in Ark does not change how
+macOS handles your keys.
+
 Keys are labelled as the layout prints them, on the layout screen, in the
 picker's Keyboard tab and in Review: with German, the key QMK stores as `KC_Y`
 reads `Z` and `KC_SCLN` reads `Ö`, and searching the picker for `ö` finds it.
@@ -585,6 +593,12 @@ and key assignments do not. Auto with an unknown OS uses Alt/GUI names. Both Hos
 travel through Review, undo/redo, readback and backups. Older firmware leaves
 them read-only and keeps ASCII editing; firmware without host layouts leaves
 the layout read-only at US.
+
+When the effective OS is Windows and **Unicode playback** is on, the Host
+section shows **WinCompose on GitHub** with the GitHub icon. The link opens the
+helper's project in your browser; install and run it with Right Alt as Compose.
+Auto uses the detected OS for this link too. It disappears when Unicode playback
+is off or the effective OS changes.
 
 Changing Host rechecks every stored macro against the new typing setup. Review
 lists affected text macros with their old and new entry method and playback
