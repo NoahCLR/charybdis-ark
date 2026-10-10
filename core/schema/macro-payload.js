@@ -1,6 +1,7 @@
 "use strict";
 
 const catalog = require("../data/keycode-catalog");
+const {layoutTypes, US_HOST_LAYOUT} = require("../data/host-layouts");
 const UNICODE_MACRO_FEATURE = 1 << 21;
 const supportsUnicodeMacros = capabilities => Boolean(capabilities?.featureFlags & UNICODE_MACRO_FEATURE);
 const fail = message => Object.assign(new Error(message), {code: "INVALID_MACRO"});
@@ -18,14 +19,14 @@ function macroModifierKeycodes() {
 
 // The existing recorder and step builder use text plus {key}, {+key}, {-key}
 // and {milliseconds}. Doubled braces preserve literal text from device bytes.
-// The keyboard types ASCII text with ordinary keys and only non-ASCII text by
-// host Unicode entry, which an ordinary key held across it would corrupt.
-function parsePayload(payload, {unicode = false, textEntry = false} = {}) {
+// The keyboard types text through the host layout and the rest by host
+// Unicode entry, which an ordinary key held across it would corrupt.
+function parsePayload(payload, {unicode = false, textEntry = false, layout = US_HOST_LAYOUT} = {}) {
     if (typeof payload !== "string" || payload.length > 32768) throw fail("Enter a macro of at most 32,768 characters.");
     const steps = [], held = new Set();
     let text = "";
     const flush = () => {
-        if (textEntry && /[^\x00-\x7F]/u.test(text) && [...held].some(key => key < 0xE0)) throw fail("Release ordinary keys before accented letters, emoji or other non-ASCII text; modifier holds are supported.");
+        if (textEntry && [...text].some(character => !layoutTypes(layout, character)) && [...held].some(key => key < 0xE0)) throw fail("Release ordinary keys before text your keyboard layout cannot type, which needs Unicode entry; modifier holds are supported.");
         if (text) steps.push({kind: "text", text}); text = "";
     };
     for (let index = 0; index < payload.length;) {

@@ -140,3 +140,18 @@ test("canonical names and aliases are one key for holds, releases and chord limi
     assert.match(parseMacro("{KC_LGUI,KC_LEFT_GUI}", {aliases, keys}).error, /distinct/);
     assert.match(parseMacro("{+KC_LGUI}{KC_LEFT_GUI}{-KC_LGUI}", {aliases, keys}).error, /already held/);
 });
+
+test("a held key may span text the host layout types, in preview and host alike", async () => {
+    const {createRequire} = await import("node:module");
+    const require = createRequire(import.meta.url);
+    const {parsePayload, macroKeycodes, macroModifierKeycodes} = require("../core/schema/macro-payload.js");
+    const {hostLayout} = require("../core/data/host-layouts.js");
+    for (const [layout, expected] of [[9, {"{+KC_A}ö{-KC_A}": true, "{+KC_A}🙂{-KC_A}": false}], [2, {"{+KC_A}é€{-KC_A}": true, "{+KC_A}ö{-KC_A}": true}], [0, {"{+KC_A}é{-KC_A}": false}]]) {
+        const hostAccepts = (payload) => { try { parsePayload(payload, {unicode: true, textEntry: true, layout}); return true; } catch { return false; } };
+        const previewAccepts = (payload) => !parseMacro(payload, {unicode: true, textEntry: true, layoutChars: hostLayout(layout).chars, keys: macroKeycodes(), modifierKeys: macroModifierKeycodes()}).error;
+        for (const [payload, accepted] of Object.entries(expected)) {
+            assert.equal(hostAccepts(payload), accepted, `host ${layout}: ${payload}`);
+            assert.equal(previewAccepts(payload), accepted, `preview ${layout}: ${payload}`);
+        }
+    }
+});

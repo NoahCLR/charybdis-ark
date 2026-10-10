@@ -27,6 +27,8 @@ test("every stored enum value has a word", () => {
     coversNumbers(VOCABULARY.pointing.directionOutput, pd.PD_DIRECTION_OUTPUT, "directional output");
     coversNumbers(VOCABULARY.pointing.scrollAxes, pd.PD_SCROLL_AXES, "scroll axes");
     coversNumbers(VOCABULARY.pointing.modifierPolicy, pd.PD_MODIFIERS, "modifier policy");
+    assert.deepEqual(VOCABULARY.hostLayouts.map(([id]) => id), require("../../core/data/host-layouts").hostLayouts().map((layout) => layout.id), "host layouts");
+    assert.ok(VOCABULARY.hostLayouts.some(([, name]) => name === "German (Windows)") && VOCABULARY.hostLayouts[0][1] === "US");
 });
 
 test("an unknown value reads as itself, never as nothing", () => {

@@ -527,8 +527,9 @@ on its second line until the slot is filled in.
 
 ## Host settings
 
-**Settings → Host** stores **Host OS** (Auto, macOS, Windows or Linux) and an
-independent **Unicode playback** switch. Auto uses the keyboard’s USB OS guess,
+**Settings → Host** stores **Host OS** (Auto, macOS, Windows or Linux), the
+**Keyboard layout** your computer types with, and on Windows and Linux a
+**Unicode playback** switch. Auto uses the keyboard’s USB OS guess,
 not the OS running Ark. The section shows the detected and effective OS from
 the last Read keyboard, including while edits are pending. Reading refreshes
 Auto names and Unicode setup without changing those edits or their history.
@@ -537,6 +538,18 @@ through switches/KVMs; choose a manual override when needed. If Auto is unknown,
 Unicode text will not play until detection succeeds or an override is selected.
 Neither OS detection nor selection checks the computer’s input configuration.
 
+**Keyboard layout** lists the layouts for the effective OS, plus US (all of them
+when the OS is unknown): ABC, Dutch, Unicode Hex Input, British, German and
+French on macOS; US International, United Kingdom, German and French on Windows
+and on Linux. Macro text is typed through it, so pick the layout that is active
+on the computer; the keyboard cannot check. US is the default and what older
+firmware assumes. On macOS, **ISO keyboard on macOS** matters if macOS set this
+keyboard up as ISO (its Keyboard Setup Assistant asks): macOS then swaps the key
+left of 1 with the one left of Z, and macros must swap them too. On macOS there
+is no Unicode switch: choose the **Unicode Hex Input** layout for emoji and
+other characters your layout cannot type. The layout only changes how text is
+typed; key assignments and their names stay as they are.
+
 The effective OS names modifier keys consistently in the layout, picker, macros,
 pointing controls and Review: Option/Command on macOS, Alt/Windows on Windows,
 Alt/Super on Linux. Shortcuts, mod-taps, layer-mod keys, Magic actions and
@@ -544,9 +557,10 @@ macro command previews follow the same rule. Display
 names refresh in open editors when the Host setting changes; stored keycodes
 and key assignments do not. Auto with an unknown OS uses Alt/GUI names. Both Host settings
 travel through Review, undo/redo, readback and backups. Older firmware leaves
-them read-only and keeps ASCII editing.
+them read-only and keeps ASCII editing; firmware without host layouts leaves
+the layout read-only at US.
 
-## Unicode text macros
+## Text macros
 
 Each empty macro opens with a **Text** box. Type or paste exactly what you want
 it to type: braces, code, whitespace and line breaks are literal. On supporting
@@ -573,19 +587,19 @@ Valid raw edits read back as editable steps. A raw edit that cannot be completel
 parsed disables step editing until corrected or discarded, preserving its whole
 input. Both views describe the same macro and use the same playback-size limit.
 
-Configure the host before enabling Unicode playback in
-**Settings → Host**: macOS needs Unicode Hex Input enabled and active; Windows
-needs WinCompose running with Right Alt as Compose; Linux needs an input method
-or target application accepting Ctrl+Shift+U entry. Linux support varies by
-application. Ark cannot check the active input source or installed helper.
-Plain ASCII text is always typed with ordinary keys, with Unicode playback on
-or off, so a macro without accented letters, emoji or other non-ASCII
-characters plays on your usual input source. Only those characters use the
-host's Unicode entry and need this setup; on macOS, switch to Unicode Hex
-Input before playing a macro that contains them. A macro may hold an ordinary
-key across ASCII text, but not across non-ASCII text; holding a modifier is
-fine. Unicode off retains ASCII typing, independently of the OS used for display
-names. Unicode edits require a known effective OS and enabled playback.
+Text is typed through the **Keyboard layout** in **Settings → Host**, with the
+keys that layout uses: on German, `z` is the key QMK calls `KC_Y`; on macOS
+Dutch, `é` is Option+E then E and `€` is Option+2. Every layout types all of
+ASCII. A character the layout cannot type, such as an emoji, needs Unicode
+entry: on macOS, the Unicode Hex Input layout, enabled and active as the input
+source; on Windows, Unicode playback with WinCompose running and Right Alt as
+Compose; on Linux, Unicode playback with an input method or application that
+accepts Ctrl+Shift+U entry (support varies by application). Ark cannot check
+the active input source or installed helper. The macro editor says which
+character the layout cannot type and refuses to save it until Unicode entry is
+set up. A macro may hold an ordinary key across text the layout types, but not
+across text that needs Unicode entry; holding a modifier is fine. Unicode
+edits require a known effective OS.
 
 Bank usage counts UTF-8 bytes; compiled usage counts each non-ASCII scalar as
 four bytes and each ASCII run with its instruction headers. The 512-byte

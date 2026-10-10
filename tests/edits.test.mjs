@@ -865,7 +865,7 @@ test("the Host section posts staged settings with Review, undo, redo and backup 
     const doc = pdDocument();
     const draft = new ProfileDraftSession({document: doc, fingerprint: portable.fingerprint(doc), summary: portable.summary(doc), limits: {brightnessMax: 200}, hostOs: {detected: 1}}, "test-device", caps);
     const host = settingsEditorView(draft.current).sections.find(s => s.id === "host");
-    stage(draft, edits.settingsSection(host, field => field.macro === "hostOs" ? "2" : true, portable.fingerprint(draft.document)));
+    stage(draft, edits.settingsSection(host, field => field.macro === "hostOs" ? "2" : field.kind === "toggle" ? true : undefined, portable.fingerprint(draft.document)));
     assert.equal(decoded(draft).settings.values[27], 0x102);
     assert.ok(reviewAreas(draft).includes("Settings"));
     stage(draft, edits.macroMessage("VIA_MACRO_0", "café 🙂 e\u0301", portable.fingerprint(draft.document)));
@@ -878,6 +878,21 @@ test("the Host section posts staged settings with Review, undo, redo and backup 
     draft.redo(draft.revision); draft.redo(draft.revision); assert.deepEqual(draft.document, backup);
 });
 
+
+test("the Host section stages a keyboard layout and the macOS ISO bit on host-layout firmware", () => {
+    const caps = {...capabilities, featureFlags: (1 << 21) | (1 << 22)};
+    const doc = pdDocument();
+    const draft = new ProfileDraftSession({document: doc, fingerprint: portable.fingerprint(doc), summary: portable.summary(doc), limits: {brightnessMax: 200}, hostOs: {detected: 1}}, "test-device", caps);
+    const host = draft.current && settingsEditorView(draft.current, caps).sections.find(s => s.id === "host");
+    assert.deepEqual(host.fields.map(f => f.macro), ["hostOs", "hostLayout", "macosIso"]);
+    const message = edits.settingsSection(host, field => ({hostLayout: "2", macosIso: true})[field.macro], portable.fingerprint(draft.document));
+    assert.deepEqual(message.fields, [{macro: "hostOs", value: "0"}, {macro: "hostLayout", value: "2"}, {macro: "macosIso", enabled: true}]);
+    stage(draft, message);
+    assert.equal(decoded(draft).settings.values[27], (2 << 16) | 0x1000000);
+    stage(draft, edits.macroMessage("VIA_MACRO_0", "café “hello” €", portable.fingerprint(draft.document)));
+    assert.equal(Buffer.from(draft.document.macros[0], "base64").toString("utf8"), "café “hello” €");
+    assert.throws(() => portable.validateSnapshot(JSON.parse(JSON.stringify(draft.document)), {...caps, featureFlags: 1 << 21}), /host keyboard layout/);
+});
 
 test("literal step messages inspect and stage the exact text with undo intact", async () => {
     const {macroStepsInput} = await import("../webview/view/macro.mjs");

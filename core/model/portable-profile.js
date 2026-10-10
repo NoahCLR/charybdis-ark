@@ -11,6 +11,7 @@ const {LAYER_LOCK_BASE, LAYER_LOCK_SLOTS} = require("../data/user-keycodes");
 const {layerName} = require("./vocabulary");
 const {decodeMacroPayload} = require("../schema/macro-payload");
 const {supportsUnicodeMacros} = require("../schema/macro-payload");
+const {hostSettings, supportsHostLayouts, LAYOUT_MASK, MACOS_ISO} = require("../schema/host-settings");
 const {profileDepthOptions} = require("../schema/profile-depth");
 
 // A portable profile is the keyboard's whole configuration in the one format
@@ -46,8 +47,8 @@ function macroSlots(bytes, count) {
     }
     return slots;
 }
-function validateViaMacro(bytes, {unicode = false, textEntry = false} = {}) {
-    decodeMacroPayload(bytes, {unicode, textEntry});
+function validateViaMacro(bytes, {unicode = false, textEntry = false, layout} = {}) {
+    decodeMacroPayload(bytes, {unicode, textEntry, layout});
     const held = new Set(); let index = 0;
     const key = v => (v >= 4 && v <= 0xa4) || (v >= 0xe0 && v <= 0xe7);
     while (index < bytes.length) {
@@ -126,8 +127,12 @@ function validateSnapshot(value, capabilities) {
     const pdModes = decodePdDomain(domains[4].payload);
     const codecOptions = profileDepthOptions(capabilities, domains[0].payload);
     const rgb = decodeRgbDomainV1(domains[0].payload, codecOptions.rgb), behaviors = decodeKeyBehaviorDomain(domains[1].payload, codecOptions.behaviors), combos = decodeComboDomain(domains[2].payload), settings = decodeSettings(domains[3].payload);
-    if (settings.values[SETTING.UNICODE_HOST_MODE] && capabilities && !supportsUnicodeMacros(capabilities)) throw fail("This firmware cannot use Host settings. Update both halves before restoring this profile.");
-    if (settings.values[SETTING.UNICODE_HOST_MODE] & 0x100) for (const macro of macros) validateViaMacro(macro, {unicode: true, textEntry: true});
+    const hostWord = settings.values[SETTING.UNICODE_HOST_MODE];
+    if (hostWord && capabilities && !supportsUnicodeMacros(capabilities)) throw fail("This firmware cannot use Host settings. Update both halves before restoring this profile.");
+    if (hostWord & (LAYOUT_MASK | MACOS_ISO) && capabilities && !supportsHostLayouts(capabilities)) throw fail("This firmware cannot type through a host keyboard layout. Update both halves before restoring this profile.");
+    // With Unicode playback on, a held ordinary key cannot span text the
+    // layout leaves to Unicode entry.
+    if (hostWord & 0x100) for (const macro of macros) validateViaMacro(macro, {unicode: true, textEntry: true, layout: hostSettings(settings.values).layout});
     if (rgb.layerColors.length !== LAYERS || rgb.layerColors.some(row => row.layerId >= LAYERS)) throw fail(`RGB does not cover all ${LAYERS} layers.`);
     // A binding for an empty slot is allowed, because the keyboard allows it:
     // the mode keycodes are a fixed registry, and the runtime refuses to

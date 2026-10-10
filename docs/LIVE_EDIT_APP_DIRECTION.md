@@ -40,7 +40,7 @@ matrix.
 | --- | --- |
 | Layout and 16 layers | Read/write; names and overlay order travel with complete profiles; a reorder renumbers layer keys by default ("Keys follow their layers") |
 | Key behaviours, combos and RGB | Read/write editors over the shared draft; selected keys open an unstored behaviour grid until the first edit; matching Keys reach sections share open state across tabs, open independently, and use the page scrollbar |
-| Macros | 128 named VIA macro slots with literal Text, editable steps, Advanced raw payload, recorder and live validation; capability-gated Unicode text and saved macOS/Windows/Linux host setup; shared-memory and per-macro limits shown and enforced (D-L25, D-L26) |
+| Macros | 128 named VIA macro slots with literal Text, editable steps, Advanced raw payload, recorder and live validation; capability-gated Unicode text, saved macOS/Windows/Linux host setup and a host keyboard layout macro text is typed and checked through (D-L56); shared-memory and per-macro limits shown and enforced (D-L25, D-L26) |
 | Custom keys | 128 named keys that do what their behaviour says: rename, add or open the behaviour, place, see where each is used (D-L42) |
 | Mouse | Pointer and sniping DPI, auto-sniping and auto-mouse: global-policy sections the core files under the Mouse area, so the rail, the review and import counts all place them there. The auto-mouse fade delay is a share of the timeout, edited on its lighting stage (D-L17) |
 | Pointing modes | 32 device-owned slots (sparse PD domain v3, RGB v4); live codecs accept only the current action vocabulary and profile formats (D-L54). See [PD-mode domain v1](../upstream/firmware/docs/architecture/pd-mode-domain-v1.md) |
@@ -437,7 +437,9 @@ Detected OS metadata is volatile: a complete Read keyboard refreshes the
 current draft and its presentation caches without changing stored edits,
 history, revision or conflict fingerprints. Saved OS overrides remain part
 of the document and take precedence over that metadata.
-See the [guide](GUIDE.md#unicode-text-macros). Physical host insertion remains
+Host-layout firmware (feature bit 22) adds the keyboard layout to scalar 27
+(bits 16–23, with bit 24 for a macOS ISO keyboard); see D-L56.
+See the [guide](GUIDE.md#text-macros). Physical host insertion remains
 an acceptance requirement, separate from codec and UI verification.
 
 ### D-L27 — A stale copy on the other half can no longer hold off every later one
@@ -1101,3 +1103,21 @@ key falls through normally; a bypassed custom key produces no output.
 
 The source-layer and gesture capture rules remain firmware-owned in
 [participation-policy.md](../upstream/firmware/docs/architecture/participation-policy.md).
+
+### D-L56 — Macro text is judged against the host's keyboard layout
+
+The keyboard types macro text through a host layout (firmware D-F16): for each
+computer layout, which keys type each character, generated from macOS's and
+Linux's own layout data and QMK's Windows data. Ark vendors the firmware's
+fixture through `upstream/` and generates `core/data/host-layouts.json` from it
+(`scripts/generate-host-layouts.js`, rerun by `npm run upstream`); it reads
+the fixture's character table and never re-derives it, so what the editor
+accepts and what the keyboard types cannot disagree.
+
+Settings → Host offers the layouts of the effective OS, plus US, behind feature
+bit 22; older firmware shows the layout read-only at US. On macOS, Unicode
+entry needs the Unicode Hex Input source, so it is a layout choice there, not a
+switch; the switch stays for Windows and Linux. The macro editor refuses a
+character the layout cannot type unless Unicode entry is available, naming it,
+and refuses an ordinary key held across text that needs Unicode entry, as the
+keyboard's preflight does. Labelling keys by the layout is separate work.

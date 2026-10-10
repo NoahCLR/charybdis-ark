@@ -1,5 +1,6 @@
 "use strict";
 const {UNICODE_MACRO_FEATURE} = require("../schema/macro-payload");
+const {HOST_LAYOUT_FEATURE} = require("../schema/host-settings");
 
 const {isUnhandledEcho, requestHandled} = require("./via-unhandled-v1");
 const {RAW_HID_REPORT_SIZE, normalizeRawHidReport} = require("../transport/device-adapter");
@@ -26,7 +27,7 @@ const PROFILE_WIRE_STATUS = Object.freeze({
 });
 
 const PROFILE_WIRE_KNOWN_MASKS = Object.freeze({
-    FEATURE_FLAGS: 0x003fffff,
+    FEATURE_FLAGS: 0x007fffff,
     // Bits current firmware never advertises. An older image that does still
     // decodes; nothing reads them.
     RETIRED_FEATURES: 1 << 13,
@@ -69,6 +70,8 @@ const PROFILE_WIRE_FEATURES = Object.freeze({
     // placement scopes (participation-policy.md).
     PARTICIPATION_CONTROLS: 1 << 20,
     UNICODE_MACROS: UNICODE_MACRO_FEATURE,
+    // Settings scalar 27 names a host layout macro text is typed through.
+    HOST_LAYOUTS: HOST_LAYOUT_FEATURE,
 });
 
 const PROFILE_WIRE_DOMAINS = Object.freeze({

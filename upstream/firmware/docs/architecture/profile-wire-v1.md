@@ -497,7 +497,9 @@ Capability feature bits are:
 
 | 19 | wide pages: the payload, compiled, combo and settings readbacks (GET `0x04`, `0x05`, `0x06`, `0x07`) take a 16-bit page, request byte 4 its low byte and byte 5 its high byte, with bytes 6–31 reserved; their responses echo bytes 0–4 and the request id correlates them |
 
-| 21 | canonical UTF-8 macro text and settings scalar 27 Host settings and GET 0x0B OS readback; require this bit before writing either extension. See [runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/489603ccb7b7f68117f227e0db4d8900b8bc20fa/docs/architecture/runtime-flow.md) |
+| 21 | canonical UTF-8 macro text and settings scalar 27 Host settings and GET 0x0B OS readback; require this bit before writing either extension. See [runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/da8f53f932f853124a28f06d580cfa4f8707a559/docs/architecture/runtime-flow.md) |
+
+| 22 | host layouts: settings scalar 27 bits 16–23 name a layout from the [host layout catalogue](https://github.com/NoahCLR/charybdis-4x6/blob/da8f53f932f853124a28f06d580cfa4f8707a559/docs/architecture/host-layouts-v1.md) and bit 24 marks a macOS ISO keyboard; macro text is typed through that layout. Require this bit before writing bits 16–24. See [runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/da8f53f932f853124a28f06d580cfa4f8707a559/docs/architecture/runtime-flow.md) |
 
 | 20 | participation controls: behaviour and combo participation at the master, layer, definition and placement scopes ([participation policy](participation-policy.md)) |
 
@@ -1016,8 +1018,8 @@ The usual request ID, status and padding rules apply; only page 0 exists.
 Success carries two bytes: version 1 and the detected OS (0 unknown, 1 macOS,
 2 Windows, 3 Linux). Unknown includes unsupported iOS and unavailable detection.
 This reports QMK’s current USB guess, not the selected override or confirmation
-of host input configuration. Settings scalar 27 stores the override and Unicode
-switch separately; clients derive the effective OS with manual selection first.
+of host input configuration. Settings scalar 27 stores the override, Unicode
+switch and (feature bit 22) host layout separately; clients derive the effective OS with manual selection first.
 The result is volatile and is refreshed by Read keyboard; it is not a profile
 value, backup field or part of the profile fingerprint. Detection may be wrong
 or change after USB setup, particularly with switches/KVMs. Do not infer an OS
