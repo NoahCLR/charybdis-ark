@@ -26,6 +26,7 @@ function fakeService(extra = {}) {
         enumerate: record("enumerate"), connect: record("connect"), refresh: record("refresh"),
         readLayout: record("readLayout"), readCommittedProfile: record("readCommittedProfile"),
         readBaseRgb: record("readBaseRgb"), readCombos: record("readCombos"),
+        readKeyboardProfile: record("readKeyboardProfile", () => service.portable),
         readPortableProfile: record("readPortableProfile", () => service.portable),
         restorePortableProfile: record("restorePortableProfile", async (doc, options) => {
             const path = await options.saveRecovery(doc);
@@ -52,12 +53,12 @@ test("reading the keyboard connects, reads in dependency order and says what it 
     const service = fakeService();
     const session = {service};
     assert.equal(await readKeyboard(session, undefined, host()), true);
-    assert.deepEqual(service.calls, ["enumerate", "refresh", "readLayout", "readCommittedProfile", "readBaseRgb", "readCombos", "readPortableProfile"]);
+    assert.deepEqual(service.calls, ["enumerate", "refresh", "readKeyboardProfile"]);
     assert.match(session.notice, /committed profile generation 7/);
     const empty = {service: fakeService({snapshot: () => ({devices: []})})};
     assert.equal(await readKeyboard(empty, undefined, host()), false);
     assert.match(empty.notice, /No Charybdis Raw HID interface/);
-    const failed = {service: fakeService({readPortableProfile: async () => {throw new Error("interrupted");}})};
+    const failed = {service: fakeService({readKeyboardProfile: async () => {throw new Error("interrupted");}})};
     assert.equal(await readKeyboard(failed, undefined, host()), false);
     assert.match(failed.notice, /Macros and global settings could not be read/);
 });

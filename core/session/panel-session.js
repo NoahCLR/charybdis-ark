@@ -147,6 +147,9 @@ function buildPanelModel(session, state) {
     model.load = {
         state: session.readBusy ? "loading" : readReady ? "ready" : "unavailable",
         phase: state.phase || "idle",
+        operationId: state.operationId,
+        operationBusy: Boolean(state.busy),
+        connectionToken: state.connectionToken,
         progress: state.portableProgress || state.layout?.progress || state.committed?.progress || null,
     };
     return model;

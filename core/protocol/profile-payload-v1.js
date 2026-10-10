@@ -77,16 +77,17 @@ function chunkCount(metadata) {
 }
 
 async function readCommittedPayload(connection, options = {}) {
-    return readProfilePayload(connection, PROFILE_PAYLOAD_V1.VALUE, options);
+    return readProfilePayload(connection, PROFILE_PAYLOAD_V1.VALUE, options, options.previous);
 }
 
 // The compiled defaults carry no generation, so there is nothing for the
 // coherence check to compare; they cannot change while the firmware runs.
 async function readCompiledPayload(connection, options = {}) {
-    return readProfilePayload(connection, PROFILE_PAYLOAD_V1.COMPILED_VALUE, options);
+    return readProfilePayload(connection, PROFILE_PAYLOAD_V1.COMPILED_VALUE, options, options.previous);
 }
 
-async function readProfilePayload(connection, value, options = {}) {
+
+async function readProfilePayload(connection, value, options = {}, previous) {
     assertConnection(connection);
     const retries = normalizeRetryCount(options.generationRetries);
     const requestIds = createRequestIdSource(options);
@@ -94,8 +95,9 @@ async function readProfilePayload(connection, value, options = {}) {
 
     for (let attempt = 0; attempt <= retries; attempt += 1) {
         const metadata = decodePayloadMetadata(await requestPage(connection, value, PROFILE_PAYLOAD_V1.METADATA_PAGE, requestIds, options));
-        const total = chunkCount(metadata);
-        const bytes = Buffer.alloc(metadata.payloadLength);
+        const reused = previous && sameMetadata(previous.metadata, metadata);
+        const total = reused ? 0 : chunkCount(metadata);
+        const bytes = reused ? Buffer.from(previous.bytes) : Buffer.alloc(metadata.payloadLength);
         let written = 0;
 
         for (let chunk = 0; chunk < total; chunk += 1) {
@@ -117,12 +119,13 @@ async function readProfilePayload(connection, value, options = {}) {
         // Re-read the metadata. A generation that has not moved means no commit
         // landed while the chunks were in flight.
         const after = decodePayloadMetadata(await requestPage(connection, value, PROFILE_PAYLOAD_V1.METADATA_PAGE, requestIds, options));
-        if (after.generation !== metadata.generation || after.digest !== metadata.digest) {
+        if (!sameMetadata(after, metadata)) {
             lastMismatch = {expectedGeneration: metadata.generation, actualGeneration: after.generation};
             continue;
         }
 
         verify(bytes, metadata);
+        if (reused) options.onProgress?.({done: bytes.length, total: bytes.length});
         return {metadata, bytes};
     }
 
@@ -132,6 +135,8 @@ async function readProfilePayload(connection, value, options = {}) {
         {...lastMismatch, attempts: retries + 1}
     );
 }
+
+function sameMetadata(left, right) { return JSON.stringify(left) === JSON.stringify(right); }
 
 // Both checks, not one. The CRC catches transport damage; the digest is what
 // the rest of the system identifies a generation by, so a mismatch there means

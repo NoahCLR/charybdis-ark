@@ -403,6 +403,15 @@ combo numbers shift because the device stores them in a packed table.
 After Apply completes, the editor stays visible while the app reads keys,
 profile domains, combos and base lighting back from the keyboard. The bottom
 bar names each read and shows its progress; editing resumes when it finishes.
+You can stay on any screen during this readback, including Macros; the progress
+counter updates without rebuilding the visible editor. An initial keyboard read
+updates its loading message in the same way.
+Keys are read in chunks. Saved profile bytes are read and checked after Apply;
+immutable firmware defaults can be reused within the connection. The initial
+read uses one verified capture for the editor, draft and complete backup, so
+keys, saved profile bytes and combos are downloaded once. The loading message
+names the transfer and shows its byte count. Read-status changes retain the
+editor; changed data or edit permissions redraw it. Reconnecting starts fresh.
 Only that readback is shown as following an Apply. A later read, export or
 discard names what it reads and says nothing about saving, because it writes
 nothing to the keyboard.

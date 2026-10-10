@@ -46,7 +46,7 @@ matrix.
 | Pointing modes | 32 device-owned slots (sparse PD domain v3, RGB v4); live codecs accept only the current action vocabulary and profile formats (D-L54). See [PD-mode domain v1](../upstream/firmware/docs/architecture/pd-mode-domain-v1.md) |
 | Global policy | Every other portable setting, including startup layers, combo matching and device-reported lighting and key options; unsupported firmware features stay read-only |
 | Backup and restore | Complete current-format snapshots, choose or drop a file for import review against the keyboard, recovery file and verified restore; the preceding eight-layer backup is translated before review (D-L54) |
-| Drafts and Apply | One draft with item-by-item review, discard by edit group, Show, undo/redo and draft history; the review checks reachable actions, confirms active warnings and traps, and blocks profiles the destination cannot save (D-L36); Apply shows its steps and says where a failure happened (D-L19, D-L23, D-L29, D-L30) |
+| Drafts and Apply | One draft with item-by-item review, discard by edit group, Show, undo/redo and draft history; the review checks reachable actions, confirms active warnings and traps, and blocks profiles the destination cannot save (D-L36); Apply shows its steps and says where a failure happened; one coherent capture supplies the editor and draft, and copy/read status updates retain the active editor (D-L19, D-L23, D-L29, D-L30) |
 | Recovery | Atomic logical Apply, differential transfer, reboot recovery fencing, firmware roll-forward after the decision, resume after a lost or power-cycled peer link, bounded cancel owned by the keyboard (D-L20–D-L22, D-L27, D-L39) |
 | Where it runs | The VS Code extension, and a web page that runs all of Ark in Chrome or Edge over WebHID (D-L52): Choose keyboard, one tab at a time, recovery copies in the browser's storage, a light/dark toggle. A phone gets only a notice that Ark runs on a computer, with links to the repositories; a tablet gets Ark. `npm run build:web` writes the page as static files; a workflow publishes it to Cloudflare Pages: `dev` at `ark-dev.ncleroy.dev`, `main` at `ark.ncleroy.dev` from the first release |
 | Demo without a keyboard | Explore a demo, in both hosts and on a browser without WebHID: the bundled demo profile (`core/data/`) in a real draft under current firmware's capabilities, every screen editable and reviewed; Apply refused, Export saves the draft, Open a profile file replaces it, leaving with edits not exported asks first (D-L53) |
@@ -360,6 +360,37 @@ full snapshots; progress alone updates the commit bar without rebuilding the
 profile model or the visible editor. Connection, profile and busy-state changes
 still publish full models. The active screen must not add work to each copy
 chunk, including when a macro's local Text or Advanced input is present.
+Read counters use a separate `readProgress` message for layout, profile pages
+and portable capture. The service retains these counters for full snapshots;
+the panel updates its commit bar or initial-read placeholder in place. A read
+message must match the active operation ID, phase, device, connection token
+and draft ID/revision (including an absent draft during the initial read), and
+is ignored once that operation ends. Full models still publish operation
+boundaries, completed data and failures. This rule covers initial reads and
+post-Apply readback in both hosts; progress must not reconstruct the draft's
+presentation model on every device reply.
+Layout reads use the existing VIA buffer command (`0x12`) in 28-byte chunks,
+decode the full 10 × 6 matrix per layer in big-endian keycodes, and expose only
+the pinned visible positions in layout order. Sixteen layers take 69 requests;
+progress counts visible keys, including the final 896-key total.
+Profile payload reuse belongs to the connection's `ProfilePayloadReader`. It
+can retain only bytes actually read and verified by CRC32 and FNV-1a. Compiled
+defaults can be reused while that connection holds. Initial reading uses one
+coherent complete capture for the editor and portable draft: layout, committed
+payload and live combos are downloaded once and installed together after the
+capture's checks pass. Initial committed reads, exports and post-Apply readback
+download bytes afresh. A failed capture leaves independent diagnostics readable
+but never opens an editable draft. Every reuse checks the complete fresh metadata identity before
+and after, verifies both hashes, retries or downloads afresh on a mismatch,
+and retains the capture's status, storage and settings coherence checks.
+Reconnect discards the reader. Authored Apply target bytes never seed its cache:
+the stored metadata alone is not a fresh integrity read of flash. The complete
+macro bank, including unused trailing bytes, remains freshly read because Apply
+compares and verifies the actual stored bank. Portable progress names each read
+and reports transferred bytes. Configure editors retain their DOM when a full
+model changes only transient read status; data, vocabulary, permission or
+connection changes and form-reset/edit replies redraw. New model fields are
+included in this comparison by default; Device and Profile retain full renders.
 After a successful Apply, the app reads layout, committed domains, combos and
 VIA base lighting again. The editor and rail stay visible but busy; the commit
 bar names the current read and its page progress until editing resumes. This

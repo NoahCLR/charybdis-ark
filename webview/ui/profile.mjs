@@ -36,7 +36,7 @@ export function screenProfile() {
     const content = el(`<div class="content"><div class="pad" style="max-width:960px;display:grid;gap:14px"></div></div>`);
     const pad = content.firstElementChild;
 
-    if (portable.progress) pad.appendChild(el(`<div class="profile-progress"><span class="spin"></span><span>${esc(portable.progress)}</span></div>`));
+    pad.appendChild(el(`<div class="profile-progress" ${portable.progress ? "" : "hidden"}><span class="spin"></span><span>${esc(portable.progress)}</span></div>`));
     if (!portable.available) {
         pad.appendChild(el(`<div class="unavailable">${esc("Connect a keyboard with complete-profile firmware to manage its backups and layers.")}</div>`));
     }

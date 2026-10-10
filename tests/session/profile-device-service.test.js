@@ -33,6 +33,31 @@ test("Apply progress has a separate notification and cannot let a closed panel s
     assert.equal(changes, 1, "other service clients keep the complete-snapshot fallback");
 });
 
+test("read counters retain snapshots and notify without copying the profile", async () => {
+    const {service} = profileReadHarness({committed: true});
+    let changes = 0;
+    const reads = [];
+    service.onChange = () => changes++;
+    service.onReadProgress = view => reads.push(view);
+    service.connectionPublicId = "fixture"; service.connectionToken = 8;
+    const state = await service.readCommittedProfile();
+    assert.equal(state.error, null);
+    assert.equal(changes, 2, "only operation start and completion publish full snapshots");
+    assert.ok(reads.length > 100, "the actual payload reader exercises many chunks");
+    assert.ok(reads.every(read => read.source === "profile" && read.operationId === 1 && read.connectionToken === 8));
+    const final = reads.at(-1).progress;
+    assert.equal(final.done, final.total);
+    assert.equal(state.committed.progress, null, "completion keeps its regular full notification");
+    service.reportReadProgress("layout", {done: 1, total: 896});
+    reads.at(-1).progress.done = 99;
+    assert.equal(service.snapshot().layout.progress.done, 1, "progress callbacks receive their own value");
+    service.onReadProgress = () => {throw Error("panel closed");};
+    assert.doesNotThrow(() => service.reportReadProgress("portable", "Reading the complete keyboard configuration"));
+    service.onReadProgress = undefined;
+    service.reportReadProgress("layout", {done: 2, total: 896});
+    assert.equal(changes, 3, "clients without the callback retain full snapshot notifications");
+});
+
 function response(request, payload) {
     const report = Buffer.from(request);
     report.fill(0, 5);
@@ -200,10 +225,15 @@ test("profile read chooses compiled defaults from a fresh status", async () => {
 
 test("a rejected committed payload chunk stays a read failure", async () => {
     const {service, seen} = profileReadHarness({committed: true, rejectChunk: true});
+    const changes = [];
+    service.onReadProgress = () => {};
+    service.onChange = state => changes.push(state);
     service.status = {activeKind: PROFILE_ACTIVE_KIND.COMPILED_ONLY, committedGeneration: 0};
     const state = await service.readCommittedProfile();
     assert.equal(state.error.code, "DEVICE_REJECTED");
     assert.equal(state.committed.state, "reading");
+    assert.equal(changes.at(-1).error.code, "DEVICE_REJECTED", "failed reads still publish a full model");
+    assert.equal(changes.at(-1).busy, false);
     assert.equal(state.status.activeKind, PROFILE_ACTIVE_KIND.COMMITTED, "a failed payload read still reports the fresh device status");
     assert.ok(seen.some(([value]) => value === 4));
     assert.ok(!seen.some(([value]) => value === 5), "a failed committed chunk is not treated as missing storage");
@@ -398,4 +428,23 @@ test("the layout read counts only keys the app cannot name", () => {
     const layers = [{layer: 0, keys: [0x0004, 0x7e42, 0x7e85, 0x7ea3, 0x7ec2, 0x7e90, 0x7ee0].map((keycode) => ({keycode, resolved: keycodes.resolve(keycode)}))}];
     assert.equal(unnamedKeyCount(layers, {actionAbiDigest: 0x837cf479}), 1, "configured or empty pointing slots are named; a code past the blocks is not");
     for (const actionAbiDigest of [0x1d3fcacc, 0x61072732]) assert.equal(unnamedKeyCount(layers, {actionAbiDigest}), 5, "older firmware's user keys are not read as blocks");
+});
+
+// Exercise the actual service after the transaction succeeds, rather than a
+// stubbed restore method in the panel's Apply tests.
+test("successful service restore installs the saved profile and returns normally", async () => {
+    const {fixture} = require("../fixtures/portable-restore");
+    const {fakeKeyboardAdapter} = require("../fixtures/fake-keyboard");
+    const f = fixture(), adapter = fakeKeyboardAdapter({document: f.source});
+    const service = new ProfileDeviceService({adapter, defaultTimeoutMs: 200});
+    try {
+        await service.enumerate(); await service.connect(service.devices[0].id);
+        const result = await service.restorePortableProfile(f.targetDocument, f.options);
+        assert.equal(result.fingerprint, require("../../core/model/portable-profile").fingerprint(f.targetDocument));
+        assert.equal(service.portable, result);
+        assert.equal(service.liveApply.state, "done");
+        assert.equal(service.error, undefined);
+        assert.deepEqual(f.events, ["backup", "stage", "via stage", "commit", "via accepted", "local roll-forward", "both halves"]);
+        assert.deepEqual(adapter.keyboard.mutations, [], "transaction adapters simulate the write; the physical keyboard is never opened");
+    } finally {await service.close();}
 });

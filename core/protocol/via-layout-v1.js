@@ -2,6 +2,7 @@
 const {isUnhandledEcho} = require("./via-unhandled-v1");
 
 const {RAW_HID_REPORT_SIZE, normalizeRawHidReport} = require("../transport/device-adapter");
+const {readRegion, VIA_STORAGE} = require("./via-storage-v1");
 
 const VIA_LAYOUT_COMMANDS = Object.freeze({
     GET_KEYCODE: 0x04,
@@ -55,10 +56,9 @@ async function readViaKeycode(connection, entry, options = {}) {
     return decodeViaGetKeycodeResponse(response, request);
 }
 
-// Reads the whole layout out of the keyboard, one position at a time, because
-// standard VIA has no bulk keycode read. 56 positions per layer, so a five
-// layer board is 280 sequential round trips; the coordinator serialises them
-// and onProgress lets the UI show that it is working rather than hung.
+// VIA's buffer read covers all 10 x 6 matrix coordinates, including the four
+// unused positions per layer. Decode just the visible layout in its authored
+// order. Sixteen layers need 69 reports rather than 896 single-key reads.
 async function readViaLayout(connection, options = {}) {
     assertConnection(connection);
     const layerCount = options.layerCount;
@@ -66,24 +66,26 @@ async function readViaLayout(connection, options = {}) {
         throw new ViaLayoutError("VIA_LAYOUT_INVALID_ARGUMENT", "layerCount must be an integer from 1 through 16.");
     }
 
-    const total = layerCount * CHARYBDIS_4X6_LAYOUT_MATRIX.length;
-    const layers = [];
-    let done = 0;
+    const bytes = await readRegion(connection, VIA_STORAGE.LAYOUT_READ, layerCount * 10 * 6 * 2, {
+        signal: options.signal, timeoutMs: options.timeoutMs,
+        onProgress: progress => {
+            const done = Array.from({length: layerCount}, (_, layer) => CHARYBDIS_4X6_LAYOUT_MATRIX
+                .filter(([row, column]) => ((layer * 10 + row) * 6 + column) * 2 + 2 <= progress.done).length).reduce((sum, count) => sum + count, 0);
+            options.onProgress?.({done, total: layerCount * CHARYBDIS_4X6_LAYOUT_MATRIX.length,
+                layer: Math.min(layerCount - 1, Math.floor(done / CHARYBDIS_4X6_LAYOUT_MATRIX.length))});
+        },
+    });
+    return decodeViaLayout(bytes, layerCount);
+}
 
-    for (let layer = 0; layer < layerCount; layer += 1) {
-        const positions = [];
-        for (let layoutIndex = 0; layoutIndex < CHARYBDIS_4X6_LAYOUT_MATRIX.length; layoutIndex += 1) {
-            const [row, column] = CHARYBDIS_4X6_LAYOUT_MATRIX[layoutIndex];
-            const keycode = await readViaKeycode(connection, {layer, row, column}, options);
-            positions.push({layoutIndex, row, column, keycode});
-            done += 1;
-            if (typeof options.onProgress === "function") {
-                options.onProgress({done, total, layer});
-            }
-        }
-        layers.push({layer, positions});
-    }
-    return layers;
+// The editor and complete capture use the same matrix bytes and ordering.
+function decodeViaLayout(bytes, layerCount) {
+    if (!Number.isInteger(layerCount) || layerCount < 1 || layerCount > 16 || !(bytes instanceof Uint8Array)
+        || bytes.length !== layerCount * 120) throw new ViaLayoutError("VIA_LAYOUT_INVALID_ARGUMENT", "Invalid layout bytes or layer count.");
+    const buffer = Buffer.from(bytes);
+    return Array.from({length: layerCount}, (_, layer) => ({layer,
+        positions: CHARYBDIS_4X6_LAYOUT_MATRIX.map(([row, column], layoutIndex) => ({layoutIndex, row, column,
+            keycode: buffer.readUInt16BE(((layer * 10 + row) * 6 + column) * 2)}))}));
 }
 
 function normalizeEntry(entry, options = {}) {
@@ -144,5 +146,6 @@ module.exports = {
     decodeViaGetKeycodeResponse,
     readViaKeycode,
     readViaLayout,
+    decodeViaLayout,
     viaKeycodeResponseMatcher,
 };

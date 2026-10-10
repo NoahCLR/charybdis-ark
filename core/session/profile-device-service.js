@@ -20,11 +20,11 @@ const {customKeyEditorView} = require("../model/custom-key-editor");
 const {RAW_HID_REPORT_SIZE} = require("../transport/device-adapter");
 const {NodeHidDeviceAdapter} = require("../transport/node-hid-adapter");
 const {DeviceRequestCoordinator} = require("../transport/request-coordinator");
-const {readViaLayout} = require("../protocol/via-layout-v1");
+const {readViaLayout, decodeViaLayout} = require("../protocol/via-layout-v1");
 const keycodeCatalog = require("../data/keycode-catalog");
 const {readViaRgbMatrix} = require("../protocol/via-rgb-matrix-v1");
 const {readDeviceCombos} = require("../protocol/combo-readback-v1");
-const {readCommittedPayload, readCompiledPayload} = require("../protocol/profile-payload-v1");
+const {ProfilePayloadReader} = require("./profile-payload-reader");
 const {PROFILE_DOMAIN_IDS, decodeProfileBlob} = require("../schema/profile-blob-v1");
 const {decodeRgbDomainV1} = require("../schema/rgb-domain-v1");
 const {decodeComboDomain} = require("../schema/combo-domain-v1");
@@ -51,6 +51,7 @@ class ProfileDeviceService {
         });
         this.onChange = typeof options.onChange === "function" ? options.onChange : undefined;
         this.onApplyProgress = typeof options.onApplyProgress === "function" ? options.onApplyProgress : undefined;
+        this.onReadProgress = typeof options.onReadProgress === "function" ? options.onReadProgress : undefined;
         // The wait between polls while reading and saving a profile. A host
         // whose timers are throttled (a background browser tab) passes its
         // own; the timer's is used otherwise.
@@ -73,6 +74,7 @@ class ProfileDeviceService {
         this.scanned = false;
         this.busy = false;
         this.phase = "idle";
+        this.operationId = 0;
         this.capabilities = undefined;
         this.status = undefined;
         this.candidateStatus = undefined;
@@ -194,42 +196,42 @@ class ProfileDeviceService {
             return this.snapshot();
         }
 
+        this.layout = {state: "reading", progress: {done: 0, total: 0}, layers: [], readAt: ""};
         return this.runOperation("reading layout", async () => {
             const connection = this.connection;
-            this.layout = {state: "reading", progress: {done: 0, total: 0}, layers: [], readAt: ""};
-            this.emitChange();
 
             const layers = await readViaLayout(connection, {
                 layerCount,
-                onProgress: (progress) => {
-                    this.layout = {...this.layout, progress};
-                    this.emitChange();
-                },
+                onProgress: progress => this.reportReadProgress("layout", progress),
             });
             if (this.connection !== connection || !connection.connected) {
                 throw new Error("The keyboard disconnected while its layout was being read.");
             }
 
-            this.layout = {
-                state: "read",
-                progress: null,
-                readAt: new Date().toISOString(),
-                catalog: keycodeCatalog.metadata(),
-                layers: layers.map(({layer, positions}) => ({
-                    layer,
-                    keys: positions.map((position) => ({
-                        ...position,
-                        resolved: keycodeCatalog.resolve(position.keycode),
-                    })),
-                })),
-            };
-            const unknown = unnamedKeyCount(this.layout.layers, this.capabilities);
-            this.addDiagnostic(
-                unknown === 0
-                    ? `Read ${layerCount} layers from the keyboard.`
-                    : `Read ${layerCount} layers; ${unknown} keycodes are ones this app cannot name.`
-            );
+            this.#acceptLayout(layers);
         });
+    }
+
+    #acceptLayout(layers) {
+        this.layout = {
+            state: "read",
+            progress: null,
+            readAt: new Date().toISOString(),
+            catalog: keycodeCatalog.metadata(),
+            layers: layers.map(({layer, positions}) => ({
+                layer,
+                keys: positions.map((position) => ({
+                    ...position,
+                    resolved: keycodeCatalog.resolve(position.keycode),
+                })),
+            })),
+        };
+        const unknown = unnamedKeyCount(this.layout.layers, this.capabilities);
+        this.addDiagnostic(
+            unknown === 0
+                ? `Read ${layers.length} layers from the keyboard.`
+                : `Read ${layers.length} layers; ${unknown} keycodes are ones this app cannot name.`
+        );
     }
 
 // Applies layout edits to the keyboard and reads each one back.
@@ -268,11 +270,10 @@ class ProfileDeviceService {
             return this.snapshot();
         }
 
+        this.profileBytes = undefined;
+        this.committed = {state: "reading", progress: {done: 0, total: 0}};
         return this.runOperation("reading profile", async () => {
             const connection = this.connection;
-            this.profileBytes = undefined;
-            this.committed = {state: "reading", progress: {done: 0, total: 0}};
-            this.emitChange();
 
             // Decide from a fresh status before requesting payload pages. A
             // rejected committed chunk can mean a read failed mid-transfer;
@@ -284,63 +285,65 @@ class ProfileDeviceService {
             this.status = status;
             const source = status.activeKind === PROFILE_ACTIVE_KIND.COMPILED_ONLY
                 && !(status.stateFlags & PROFILE_STATE_FLAGS.COMMITTED_VALID) ? "compiled" : "committed";
-            const read = await (source === "compiled" ? readCompiledPayload : readCommittedPayload)(connection, {
+            const reader = this.profilePayloadReader();
+            const readOptions = {
                 nextRequestId: () => this.requestIds.next(),
-                onProgress: (progress) => {
-                    this.committed = {...this.committed, progress};
-                    this.emitChange();
-                },
-            });
-            const {metadata, bytes} = read;
+                onProgress: progress => this.reportReadProgress("profile", progress),
+            };
+            const read = source === "compiled" ? await reader.readCompiled(readOptions) : await reader.readCommitted(readOptions);
             if (this.connection !== connection || !connection.connected) {
                 throw new Error("The keyboard disconnected while its profile was being read.");
             }
-            const blob = decodeProfileBlob(bytes);
-            const depth = profileDepthOptions(this.capabilities, blob.domains.find(domain => domain.id === PROFILE_DOMAIN_IDS.RGB)?.payload);
-            const domains = {};
-            const failures = [];
-            for (const domain of blob.domains) {
-                try {
-                    if (domain.id === PROFILE_DOMAIN_IDS.RGB) {
-                        domains.rgb = decodeRgbDomainV1(domain.payload, depth.rgb);
-                    } else if (domain.id === PROFILE_DOMAIN_IDS.KEY_BEHAVIORS) {
-                        domains.keyBehaviors = decodeKeyBehaviorDomain(domain.payload, depth.behaviors);
-                    } else if (domain.id === PROFILE_DOMAIN_IDS.PD_MODES) {
-                        domains.pdModes = decodePdDomain(domain.payload);
-                    } else if (domain.id === PROFILE_DOMAIN_IDS.SETTINGS) {
-                        domains.settings = decodeSettings(domain.payload);
-                    } else if (domain.id === PROFILE_DOMAIN_IDS.COMBOS) {
-                        domains.combos = decodeComboDomain(domain.payload);
-                    }
-                } catch (error) {
-                    failures.push({domainId: domain.id, message: error instanceof Error ? error.message : String(error)});
-                }
-            }
-
-            this.committed = {
-                state: "read",
-                source,
-                progress: null,
-                readAt: new Date().toISOString(),
-                generation: metadata.generation,
-                digest: metadata.digest,
-                schema: metadata.schema,
-                originHalf: metadata.originHalf,
-                byteLength: bytes.length,
-                domainIds: blob.domains.map((domain) => domain.id),
-                domains,
-                failures,
-            };
-            this.profileBytes = Buffer.from(bytes);
-            const described = source === "compiled"
-                ? "the firmware's compiled defaults"
-                : `committed generation ${metadata.generation}`;
-            this.addDiagnostic(
-                failures.length
-                    ? `Read ${described}; ${failures.length} domain${failures.length === 1 ? "" : "s"} failed to decode.`
-                    : `Read ${described} from the keyboard (${bytes.length} bytes).`
-            );
+            this.#acceptCommitted(read, source);
         });
+    }
+
+    #acceptCommitted({metadata, bytes}, source) {
+        const blob = decodeProfileBlob(bytes);
+        const depth = profileDepthOptions(this.capabilities, blob.domains.find(domain => domain.id === PROFILE_DOMAIN_IDS.RGB)?.payload);
+        const domains = {};
+        const failures = [];
+        for (const domain of blob.domains) {
+            try {
+                if (domain.id === PROFILE_DOMAIN_IDS.RGB) {
+                    domains.rgb = decodeRgbDomainV1(domain.payload, depth.rgb);
+                } else if (domain.id === PROFILE_DOMAIN_IDS.KEY_BEHAVIORS) {
+                    domains.keyBehaviors = decodeKeyBehaviorDomain(domain.payload, depth.behaviors);
+                } else if (domain.id === PROFILE_DOMAIN_IDS.PD_MODES) {
+                    domains.pdModes = decodePdDomain(domain.payload);
+                } else if (domain.id === PROFILE_DOMAIN_IDS.SETTINGS) {
+                    domains.settings = decodeSettings(domain.payload);
+                } else if (domain.id === PROFILE_DOMAIN_IDS.COMBOS) {
+                    domains.combos = decodeComboDomain(domain.payload);
+                }
+            } catch (error) {
+                failures.push({domainId: domain.id, message: error instanceof Error ? error.message : String(error)});
+            }
+        }
+
+        this.committed = {
+            state: "read",
+            source,
+            progress: null,
+            readAt: new Date().toISOString(),
+            generation: metadata.generation,
+            digest: metadata.digest,
+            schema: metadata.schema,
+            originHalf: metadata.originHalf,
+            byteLength: bytes.length,
+            domainIds: blob.domains.map((domain) => domain.id),
+            domains,
+            failures,
+        };
+        this.profileBytes = Buffer.from(bytes);
+        const described = source === "compiled"
+            ? "the firmware's compiled defaults"
+            : `committed generation ${metadata.generation}`;
+        this.addDiagnostic(
+            failures.length
+                ? `Read ${described}; ${failures.length} domain${failures.length === 1 ? "" : "s"} failed to decode.`
+                : `Read ${described} from the keyboard (${bytes.length} bytes).`
+        );
     }
 
     async readCombos() {
@@ -413,20 +416,46 @@ class ProfileDeviceService {
         return this.snapshot();
     }
 
-    async readPortableProfile({forRestore = false} = {}) {
+    // One coherent capture supplies the editor and the draft. Standalone
+    // exports use the same reader without replacing the editor's state.
+    async readKeyboardProfile() {
+        return this.#readCompleteProfile({forEditor: true});
+    }
+
+    async readPortableProfile(options = {}) {
+        return this.#readCompleteProfile(options);
+    }
+
+    async #readCompleteProfile({forRestore = false, reuseReadback = false, forEditor = false} = {}) {
         if (!this.connection?.connected || this.busy) throw new Error("Connect the keyboard and wait for the current operation to finish.");
         let result;
+        this.portableProgress = "";
         await this.runOperation("reading complete profile", async () => {
-            result = await captureProfile(this.connection, this.requestIds, this.capabilities, message => {
-                this.portableProgress = message; this.emitChange();
-            }, false, forRestore, {sleep: this.sleep});
+            const connection = this.connection;
+            const {readback, ...captured} = await captureProfile(connection, this.requestIds, this.capabilities,
+                message => this.reportReadProgress("portable", message), false, forRestore,
+                {sleep: this.sleep, payloadReader: this.profilePayloadReader(), reuseReadback});
+            result = captured;
             result.limits = await readSettingsLimits(this.connection, this.requestIds);
             result.options = await readKeyboardOptions(this.connection, this.requestIds);
             if (supportsUnicodeMacros(this.capabilities)) result.hostOs = await readHostOs(this.connection, this.requestIds);
+            if (forEditor) {
+                let baseRgb;
+                try {baseRgb = {state: "read", ...await readViaRgbMatrix(connection), readAt: new Date().toISOString()};}
+                catch (error) {baseRgb = {state: "unavailable", error: publicError(error)};}
+                if (this.connection !== connection || !connection.connected) throw new Error("The keyboard disconnected while its configuration was being read.");
+                this.#acceptLayout(decodeViaLayout(result.storage.layout, result.document.layers.length));
+                this.#acceptCommitted(readback.active, readback.source);
+                this.status = result.status;
+                this.combos = {state: "read", ...readback.combos, readAt: new Date().toISOString()};
+                this.baseRgb = baseRgb;
+                if (baseRgb.error) this.addDiagnostic(`Base RGB: ${baseRgb.error.message}`);
+            }
             this.portable = result;
             this.macroView = macroEditorView(result, this.capabilities);
             this.customKeyView = customKeyEditorView(result, this.capabilities);
             this.settingsView = settingsEditorView(result, this.capabilities);
+            this.portableProgress = "";
         });
         this.portableProgress = "";
         if (this.error) throw Object.assign(new Error(this.error.message), this.error);
@@ -506,6 +535,7 @@ class ProfileDeviceService {
     snapshot() {
         return {
             phase: this.phase,
+            operationId: this.operationId,
             scanned: this.scanned,
             busy: this.busy,
             connected: Boolean(this.connection?.connected),
@@ -542,6 +572,7 @@ class ProfileDeviceService {
     }
 
     async runOperation(phase, operation) {
+        this.operationId++;
         this.busy = true;
         this.phase = phase;
         this.error = undefined;
@@ -582,6 +613,7 @@ class ProfileDeviceService {
         this.customKeyView = undefined;
         this.settingsView = undefined;
         this.profileBytes = undefined;
+        this.payloadReader = undefined;
         this.layout = undefined;
         this.committed = undefined;
         this.baseRgb = undefined;
@@ -628,6 +660,27 @@ class ProfileDeviceService {
         try { this.onApplyProgress(cloneLiveApply(view)); } catch {
             // A closed or reloading panel must not interrupt the save.
         }
+    }
+
+    // Keep the read's latest counter for snapshots without copying all the
+    // profile data or asking the panel to rebuild its editor for every reply.
+    reportReadProgress(source, progress) {
+        if (source === "layout") this.layout = {...this.layout, progress};
+        else if (source === "profile") this.committed = {...this.committed, progress};
+        else if (source === "portable") this.portableProgress = progress;
+        if (!this.onReadProgress) { this.emitChange(); return; }
+        try {
+            this.onReadProgress({source, progress: typeof progress === "object" ? {...progress} : progress,
+                operationId: this.operationId, phase: this.phase,
+                selectedDeviceId: this.connectionPublicId, connectionToken: this.connectionToken});
+        } catch {
+            // A closed or reloading panel must not interrupt the read.
+        }
+    }
+
+    profilePayloadReader() {
+        if (!this.payloadReader || this.payloadReader.connection !== this.connection) this.payloadReader = new ProfilePayloadReader(this.connection);
+        return this.payloadReader;
     }
 
     emitChange() {

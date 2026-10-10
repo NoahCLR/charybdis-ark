@@ -37,6 +37,33 @@ only the commit bar. Full models still carry the latest Apply view and publish
 on profile, connection and busy-state changes. Service clients without that
 callback retain the full-snapshot notification path.
 
+Layout, profile-page and portable-capture progress similarly use optional
+`onReadProgress`, posted by the loop as `readProgress`. The service stores the
+latest progress in its normal snapshot fields. The panel checks the message
+against the active operation ID and phase, device and connection token, and
+draft identity before updating its counter or loading placeholder in place.
+`model.load` carries that operation identity and whether the device operation
+itself is busy, independently of the panel's surrounding Apply/read control.
+Completion, failure and connection changes still publish full models; clients
+without the callback retain snapshot notifications. Full model updates that
+change only read status keep Configure editors mounted; a conservative view
+comparison includes all new model fields by default. Data, vocabulary,
+permission, connection and form-reset changes rebuild the editor. Device and
+Profile screens still rebuild for their diagnostics and backup state.
+
+`protocol/via-layout-v1.js` reads the matrix through the existing 28-byte VIA
+buffer-read path, then produces visible positions in the pinned layout order.
+`session/profile-payload-reader.js` owns `ProfilePayloadReader`: verified byte
+reuse behind a small interface. Its stateless protocol codec checks complete
+metadata identities, retries coherent reads and verifies CRC/FNV. `ProfileDeviceService` owns one reader per connection;
+`readKeyboardProfile` makes one coherent complete capture and uses its verified
+raw layout, active payload and live combos for the editor as well as the draft.
+It publishes completed data together; a failed capture falls back to independent
+read-only diagnostics and keeps the edit gate closed. Normal committed reads
+always fetch bytes, including initial reads, post-Apply readback and standalone exports. Compiled defaults
+are immutable during a connection and use verified reuse; reconnect drops the
+reader. No Apply target or portable document seeds it.
+
 The complete portable read (`session/portable-profile-session.js`
 `captureProfile`) takes lighting, behaviours and pointing from the running
 profile, or from the compiled defaults (GET `0x05`) when nothing is committed,

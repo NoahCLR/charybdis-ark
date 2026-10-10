@@ -2,7 +2,7 @@
 const {readViaStorage, readRegion, writeRegion, writeViaMacros, changedRanges, viaStorageDigest, VIA_STORAGE, LAYOUT_BYTES} = require("../protocol/via-storage-v1");
 const {readSettings, readStorageStatus, waitForStorage} = require("../protocol/portable-profile-v1");
 const {readProfileStatus, PROFILE_ACTIVE_KIND, PROFILE_STATE_FLAGS} = require("../protocol/profile-wire-v1");
-const {readCommittedPayload, readCompiledPayload} = require("../protocol/profile-payload-v1");
+const {ProfilePayloadReader} = require("./profile-payload-reader");
 const {readDeviceCombos} = require("../protocol/combo-readback-v1");
 const {candidateMetadataForBlob, readCandidatePeerStatus, readCandidateStatus, CANDIDATE_STATE} = require("../protocol/profile-candidate-v1");
 const {ApplyProgress, failureReason} = require("./apply-progress");
@@ -48,16 +48,22 @@ function requireReady(capabilities, writing = false) {
     }
 }
 // `sleep`, here and below, is the host's wait between polls (the timer's when omitted).
-async function captureProfile(connection, ids, capabilities, onProgress = () => {}, allowCandidate = false, allowIncomplete = false, {sleep} = {}) {
+async function captureProfile(connection, ids, capabilities, onProgress = () => {}, allowCandidate = false, allowIncomplete = false,
+    {sleep, payloadReader = new ProfilePayloadReader(connection), reuseReadback = false} = {}) {
     requireReady(capabilities);
+    if (payloadReader.connection !== connection) throw fail("PROFILE_CHANGED", "The profile reader belongs to another connection. Read the keyboard again.");
     const options = {nextRequestId: () => ids.next()};
     onProgress("Reading the complete keyboard configuration");
     const storageBefore = await waitForStorage(connection, ids, {sleep}), before = await readProfileStatus(connection, options);
     if (![PROFILE_ACTIVE_KIND.COMMITTED, PROFILE_ACTIVE_KIND.COMPILED_ONLY].includes(before.activeKind) || !(before.stateFlags & 32) || (before.stateFlags & (allowCandidate ? 8 : 12)) || before.conflictCount) throw fail("KEYBOARD_NOT_READY", "Let both halves finish saving before taking a backup.");
-    const defaults = await readCompiledPayload(connection, options);
-    const active = before.activeKind === PROFILE_ACTIVE_KIND.COMMITTED ? await readCommittedPayload(connection, options) : defaults;
+    const counted = label => progress => onProgress(`${label} · ${progress.done} of ${progress.total} bytes`);
+    const defaults = await payloadReader.readCompiled({...options, onProgress: counted("Reading compiled defaults")});
+    const active = before.activeKind === PROFILE_ACTIVE_KIND.COMMITTED ? await payloadReader.readCommitted({...options, reuse: reuseReadback, onProgress: counted("Reading saved behaviours and lighting")}) : defaults;
+    onProgress("Reading combos and global settings");
     const combos = await readDeviceCombos(connection, options), settings = await readSettings(connection, ids);
-    const via = await readViaStorage(connection, {allowIncomplete});
+    const via = await readViaStorage(connection, {allowIncomplete, onProgress: progress =>
+        counted(progress.region === "layout" ? "Reading keys and layers" : "Reading macros")(progress)});
+    onProgress("Checking the complete read");
     if (!settings.equals(await readSettings(connection, ids))) throw fail("PROFILE_CHANGED", "Keyboard settings changed during the backup. Read it again before continuing.");
     const profile = materializeProfile(active.bytes, defaults.bytes, combos, settings);
     const after = await readProfileStatus(connection, options), storageAfter = await readStorageStatus(connection, ids);
@@ -73,7 +79,7 @@ async function captureProfile(connection, ids, capabilities, onProgress = () => 
     }
     const document = createSnapshot({profile, via, actionAbiDigest: capabilities.actionAbiDigest});
     validateSnapshot(document, capabilities);
-    return {document, fingerprint: fingerprint(document), summary: summary(document), status: after, identity: snapshotIdentity(after, storageAfter, settings), storage: heldStorage(via.layout, via.macros)};
+    return {document, readback: {active, source: before.activeKind === PROFILE_ACTIVE_KIND.COMMITTED ? "committed" : "compiled", combos}, fingerprint: fingerprint(document), summary: summary(document), status: after, identity: snapshotIdentity(after, storageAfter, settings), storage: heldStorage(via.layout, via.macros)};
 }
 async function readIdentity(connection, ids, {allowCandidate = true, sleep} = {}) {
     const options = {nextRequestId: () => ids.next()};
