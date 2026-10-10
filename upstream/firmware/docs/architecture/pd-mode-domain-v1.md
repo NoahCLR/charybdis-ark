@@ -24,7 +24,7 @@ and restore preserve them without the repository.
   stays a layer/CPI policy and uses no slot.
 - There are two engine families, **directional** (four or eight directions,
   single axis or dominant axis; see D-L24 and D-L28 in the
-  [direction](https://github.com/NoahCLR/charybdis-4x6/blob/8e5dd154e4276e6ab2f0c68db05e7278178e068e/docs/LIVE_EDIT_APP_DIRECTION.md)) and **scrolling**. Optional
+  [direction](https://github.com/NoahCLR/charybdis-4x6/blob/489603ccb7b7f68117f227e0db4d8900b8bc20fa/docs/LIVE_EDIT_APP_DIRECTION.md)) and **scrolling**. Optional
   modifier and mouse-button policies cover Arrow and Pinch. No behavior depends
   on a slot's name.
 
@@ -52,7 +52,7 @@ keycode allocation.
 | 7–31 | Empty | Disabled | Inert actions; not stored; retained, editable RGB row |
 
 Dragscroll and Pinch run this repository's
-[`pd_mode_dragscroll.c`](https://github.com/NoahCLR/charybdis-4x6/blob/8e5dd154e4276e6ab2f0c68db05e7278178e068e/users/noah/lib/pointing/modes/pd_mode_dragscroll.c),
+[`pd_mode_dragscroll.c`](https://github.com/NoahCLR/charybdis-4x6/blob/489603ccb7b7f68117f227e0db4d8900b8bc20fa/users/noah/lib/pointing/modes/pd_mode_dragscroll.c),
 not the fork's native `DRAGSCROLL_MODE`; never activate both engines.
 
 ### Slot operations and RGB identity
@@ -265,7 +265,7 @@ A button press a mode consumes never reaches the button's own behavior, and
 its release goes to the mode that took the press, even after another mode
 replaced it; the release of a press the mode did not take stays with the
 behavior. The key runtime owns that routing; see
-[Runtime Flow](https://github.com/NoahCLR/charybdis-4x6/blob/8e5dd154e4276e6ab2f0c68db05e7278178e068e/docs/architecture/runtime-flow.md#key-press-flow).
+[Runtime Flow](https://github.com/NoahCLR/charybdis-4x6/blob/489603ccb7b7f68117f227e0db4d8900b8bc20fa/docs/architecture/runtime-flow.md#key-press-flow).
 
 ## Validation and evidence
 

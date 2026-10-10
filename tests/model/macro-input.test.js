@@ -34,7 +34,9 @@ test("inspection refuses setup and syntax errors without throwing or mutating co
     assert.equal(inspectMacroInput("café", {...context, mode: 0}).code, "UNICODE_SETUP_REQUIRED");
     assert.match(inspectMacroInput("café", {...context, unicode: false}).error, /ASCII/);
     assert.equal(inspectMacroInput("hello", {...context, enabled: false, mode: 0}).error, "");
-    for (const payload of [null, "{KC_NO_SUCH_KEY}", "{65536}", "{KC_A", "{+KC_A}", "{-KC_A}", "{KC_A,KC_A}", "{+KC_A}text{-KC_A}", "\ud800"]) {
+    // ASCII is typed with ordinary keys, so a held key may span it.
+    assert.equal(inspectMacroInput("{+KC_A}text{-KC_A}", context).error, "");
+    for (const payload of [null, "{KC_NO_SUCH_KEY}", "{65536}", "{KC_A", "{+KC_A}", "{-KC_A}", "{KC_A,KC_A}", "{+KC_A}café{-KC_A}", "\ud800"]) {
         assert.ok(inspectMacroInput(payload, context).error, String(payload));
     }
     assert.deepEqual(context, {unicode: true, enabled: true, mode: 1, bankFree: 10327});

@@ -479,8 +479,8 @@ function unicodeSetup(model, canEdit) {
     if (!model?.macroUnicode?.supported) return `<p class="note">Unicode macro text needs newer firmware on both halves.</p>`;
     const mode = model.macroUnicode.mode;
     const setup = ["Unicode playback is off or the host OS is unknown.",
-        "Enable Unicode Hex Input in macOS input sources and keep it active while playing macros. Option shortcuts can behave differently in this input source.",
+        "Enable Unicode Hex Input in macOS input sources and keep it active while playing macros with non-ASCII text. Option shortcuts can behave differently in this input source.",
         "Install and run WinCompose on Windows with Right Alt as its Compose key.",
         "Use an input method or application that accepts Ctrl+Shift+U, hexadecimal digits and Space, such as IBus. This sequence does not work in every Linux application."][mode];
-    return `<div class="field"><span class="note">${esc(setup)} Configure the host and Unicode playback in Settings → Host. The keyboard cannot check your input setup. Avoid typing while a text macro plays.</span><button class="btn tiny ghost" data-host-settings>Open Host settings</button></div>`;
+    return `<div class="field"><span class="note">${esc(setup)} Plain ASCII text types with ordinary keys on any input source; only accented letters, emoji and other non-ASCII characters need this setup. Configure the host and Unicode playback in Settings → Host. The keyboard cannot check your input setup. Avoid typing while a text macro plays.</span><button class="btn tiny ghost" data-host-settings>Open Host settings</button></div>`;
 }
