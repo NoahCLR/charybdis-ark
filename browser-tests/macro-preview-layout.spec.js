@@ -1,9 +1,10 @@
 "use strict";
 const {test, expect} = require("@playwright/test");
+const {openPreview} = require("./host-page");
 
 for (const theme of ["plain", "vscode-dark", "vscode-light"]) {
     test(`long literal macro text stays inside its row (${theme})`, async ({page}) => {
-        await page.goto(`/preview/${theme === "plain" ? "index" : theme}.html`);
+        await openPreview(page, theme);
         await page.evaluate(async () => {
             const store = await import("/webview/store.mjs");
             store.state.screen = "macros"; store.state.macroSlot = "VIA_MACRO_17"; store.render();

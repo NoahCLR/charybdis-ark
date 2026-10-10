@@ -1,6 +1,7 @@
 "use strict";
 const {test, expect} = require("@playwright/test");
 const {dropFiles} = require("./profile-drop");
+const {openPreview} = require("./host-page");
 
 for (const host of ["", "?host=web", "?host=demo"]) {
     test(`Import card posts a dropped file and refuses multiple, oversized and unreadable files (${host || "extension"})`, async ({page}) => {
@@ -84,13 +85,7 @@ for (const theme of ["plain", "vscode-dark", "vscode-light"]) {
     test(`Mouse edit posts its complete section (${theme})`, async ({page}) => {
         const errors = [];
         page.on("pageerror", error => errors.push(error.message));
-        await page.goto("/preview/index.html");
-        if (theme !== "plain") {
-            // Target the documented host-cascade regressions. This is a small
-            // fixture, not a claim to run the VS Code extension host itself.
-            await page.addStyleTag({content: "@layer vscode-host { body { padding: 0 20px; } code { background: red; color: white; padding: 4px; border-radius: 3px; } }"});
-            await page.locator("body").evaluate((body, name) => body.classList.add("vscode-body", name), theme);
-        }
+        await openPreview(page, theme);
         await page.locator('[data-screen="mouse"]').click();
         const field = page.locator('select[data-macro="normalDpi"]');
         await expect(field).toHaveCount(1);

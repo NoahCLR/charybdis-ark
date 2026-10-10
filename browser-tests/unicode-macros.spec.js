@@ -1,8 +1,9 @@
 "use strict";
 const {test, expect} = require("@playwright/test");
+const {openPreview} = require("./host-page");
 for (const theme of ["vscode-dark", "vscode-light"]) {
     test(`Host Settings and literal Text steps post exact content (${theme})`, async ({page}) => {
-        await page.goto(`/preview/${theme}.html`);
+        await openPreview(page, theme);
         await page.evaluate(async () => {
             const store = await import("/webview/store.mjs");
             const model = structuredClone(store.getModel());
