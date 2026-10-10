@@ -13,8 +13,8 @@ Paste text straight into a macro, including code and literal braces, and add
 shortcuts or delays as separate steps. Pick your computer's keyboard layout in
 Settings and macros type through it, accents included; emoji use Unicode entry.
 Switch layouts and Review shows which macros type differently or need a fix.
-Macros can ignore new keypresses during playback, automatically when Unicode
-entry is needed or by your choice per macro.
+Macros can suspend held typing keys and ignore new presses during playback,
+automatically when Unicode entry is needed or by your choice per macro.
 Key and modifier names follow that OS throughout the editors and Review.
 
 ## What you can change

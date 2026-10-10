@@ -630,9 +630,16 @@ Changing the layout rechecks Automatic and lists its effect in Review.
 Protection ignores new keypresses from this keyboard until playback and cleanup
 finish; it does not queue or replay them. Their releases are ignored too, even
 after playback ends, while releases of keys held before playback still work.
-Release ordinary keys before starting. Pointing, input from another keyboard,
-and pending synthetic actions can still affect the host; this is not a host-wide
-input lock. Reset and error cleanup still release the macro's keys. The option
+On firmware with keyboard-output isolation, playback starts immediately and
+suspends ordinary keys already held. Only the macro's keyboard output reaches
+the computer during playback, including its own modifiers. Physical releases
+keep updating internal state; modifiers still held resume after cleanup.
+Ordinary keys remaining held do not resume automatically: release and press them
+again. This avoids an unwanted fresh character when playback ends. Another macro
+can still type the same key. Earlier firmware protects only against new presses;
+Ark explains that limitation and asks you to update both halves.
+Pointing, consumer/media actions and input from another keyboard remain outside
+this keyboard-output protection. Reset and error cleanup still release the macro's keys. The option
 does not change macOS Unicode Hex Input's effect on Option shortcuts.
 
 Text edits and renames preserve the choice. Review, undo/redo, discard, exports

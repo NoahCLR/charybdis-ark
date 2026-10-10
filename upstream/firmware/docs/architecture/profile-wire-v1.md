@@ -497,17 +497,18 @@ Capability feature bits are:
 
 | 19 | wide pages: the payload, compiled, combo and settings readbacks (GET `0x04`, `0x05`, `0x06`, `0x07`) take a 16-bit page, request byte 4 its low byte and byte 5 its high byte, with bytes 6–31 reserved; their responses echo bytes 0–4 and the request id correlates them |
 
-| 21 | canonical UTF-8 macro text and settings scalar 27 Host settings and GET 0x0B OS readback; require this bit before writing either extension. See [runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/9e1970bfbc8c7157a1cdbb8c79965c6726931104/docs/architecture/runtime-flow.md) |
+| 21 | canonical UTF-8 macro text and settings scalar 27 Host settings and GET 0x0B OS readback; require this bit before writing either extension. See [runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/fdced801b37b6be49172e50701a17b6bef78df53/docs/architecture/runtime-flow.md) |
 
-| 22 | host layouts: settings scalar 27 bits 16–23 name a layout from the [host layout catalogue](https://github.com/NoahCLR/charybdis-4x6/blob/9e1970bfbc8c7157a1cdbb8c79965c6726931104/docs/architecture/host-layouts-v1.md) and bit 24 marks a macOS ISO keyboard; macro text is typed through that layout. Require this bit before writing bits 16–24. See [runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/9e1970bfbc8c7157a1cdbb8c79965c6726931104/docs/architecture/runtime-flow.md) |
+| 22 | host layouts: settings scalar 27 bits 16–23 name a layout from the [host layout catalogue](https://github.com/NoahCLR/charybdis-4x6/blob/fdced801b37b6be49172e50701a17b6bef78df53/docs/architecture/host-layouts-v1.md) and bit 24 marks a macOS ISO keyboard; macro text is typed through that layout. Require this bit before writing bits 16–24. See [runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/fdced801b37b6be49172e50701a17b6bef78df53/docs/architecture/runtime-flow.md) |
 
-| 23 | macro input protection: automatic protection when the selected layout needs Unicode entry, with optional per-macro `01 05 01` (On) or `01 05 02` (Off) prefixes. Require this bit before writing a prefix. New physical presses are ignored until released; earlier releases remain admitted. See [runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/9e1970bfbc8c7157a1cdbb8c79965c6726931104/docs/architecture/runtime-flow.md) |
+| 23 | macro input protection: automatic protection when the selected layout needs Unicode entry, with optional per-macro `01 05 01` (On) or `01 05 02` (Off) prefixes. Require this bit before writing a prefix. New physical presses are ignored until released; earlier releases remain admitted. See [runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/fdced801b37b6be49172e50701a17b6bef78df53/docs/architecture/runtime-flow.md) |
 
 | 20 | participation controls: behaviour and combo participation at the master, layer, definition and placement scopes ([participation policy](participation-policy.md)) |
 
 | 24 | candidate reuse: copy bounded ranges from an identified active profile into the inactive candidate (`SET 0x1B`, below) |
 
 | 25 | candidate streaming chunks: admit sequential chunks and prove bounded batches through status (`SET 0x1C`, below) |
+| 26 | protected macro keyboard-output isolation: suspend already-held ordinary keys, send only macro keyboard output, restore current held modifiers and suppress remaining ordinary usages until release; requires bit 23. See [runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/fdced801b37b6be49172e50701a17b6bef78df53/docs/architecture/runtime-flow.md) |
 
 Supported-domain-mask bits 0–3 are RGB, key behaviors, combos and portable
 settings respectively. RGB and behavior domain bits must agree exactly with

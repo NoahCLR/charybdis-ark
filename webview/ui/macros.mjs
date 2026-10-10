@@ -105,10 +105,10 @@ function editor(model, slot, canEdit) {
         <div class="card-b stack">
             ${nameField(model, slot, canEdit)}
             ${placedOn(model, slot)}
-            ${unicodeSetup(model, canEdit)}
+            ${unicodeSetup(model, slot)}
             <label class="field"><span>Uninterruptible playback</span><select class="input" data-protection ${canEdit && model.macroProtectionSupported ? "" : "disabled"}>
                 ${(model.macroProtectionChoices || []).map(({value, label}) => `<option value="${esc(value)}" ${slot.protection === value ? "selected" : ""}>${esc(label)}${value === "auto" ? ` · ${slot.uninterruptible ? "on" : "off"}` : ""}</option>`).join("")}</select></label>
-            <p class="note">${model.macroProtectionSupported ? "Typing during Unicode entry can corrupt the text. Automatic turns protection on when this layout needs Unicode entry. On ignores new keypresses from this keyboard until playback finishes; releases still work. Ignored presses are not replayed. Release ordinary keys before starting; other keyboards can still interfere." : "Update both halves to protect macro playback. This firmware does not support the per-macro setting."}</p>
+            <p class="note">${model.macroProtectionSupported ? (model.macroOutputIsolationSupported ? "Automatic turns protection on when this layout needs Unicode entry. Protected playback starts immediately and suspends ordinary keys already held. Only the macro types; new presses are ignored and releases still work. Held modifiers resume afterward. Suspended ordinary keys need to be released and pressed again; ignored presses are never replayed. Pointing and other keyboards can still interfere." : "Typing during Unicode entry can corrupt the text. Automatic turns protection on when this layout needs Unicode entry. On ignores new keypresses from this keyboard until playback finishes; releases still work. Ignored presses are not replayed. Release ordinary keys before starting; other keyboards can still interfere. Update both halves to suspend keys already held.") : "Update both halves to protect macro playback. This firmware does not support the per-macro setting."}</p>
             <div class="sect-h"><h4>Steps</h4><span class="right note">played from top to bottom</span></div>
             <p class="note">Type or paste exactly what you want in Text. Add keys and delays as separate steps.</p>
             <div data-macro-steps class="stack"></div>
@@ -479,7 +479,7 @@ function onRecordKey(event) {
 }
 
 
-function unicodeSetup(model, canEdit) {
+function unicodeSetup(model, slot) {
     if (!model?.macroUnicode?.supported) return `<p class="note">Unicode macro text needs newer firmware on both halves.</p>`;
     const {mode, os, layouts, layoutName} = model.macroUnicode;
     const typed = layouts
@@ -491,5 +491,6 @@ function unicodeSetup(model, canEdit) {
             "Other characters use Unicode entry: use an input method or application that accepts Ctrl+Shift+U, hexadecimal digits and Space, such as IBus. This sequence does not work in every Linux application."][mode]
         : layouts && os === 1 ? "Characters it cannot type, such as emoji, need the Unicode Hex Input layout."
             : "Characters it cannot type, such as emoji, need Unicode playback on and a known host OS.";
-    return `<div class="field"><span class="note">${esc(typed)} ${esc(entry)} The keyboard cannot check your input setup. Avoid typing while a text macro plays.</span><button class="btn tiny ghost" data-host-settings>Open Host settings</button></div>`;
+    const typing = model.macroOutputIsolationSupported && slot?.uninterruptible ? "" : " Avoid typing while a text macro plays.";
+    return `<div class="field"><span class="note">${esc(typed)} ${esc(entry)} The keyboard cannot check your input setup.${esc(typing)}</span><button class="btn tiny ghost" data-host-settings>Open Host settings</button></div>`;
 }

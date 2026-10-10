@@ -4,7 +4,7 @@ const {MACRO_BANK_BYTES, MACRO_SLOTS, decodedOf, encodeNamedProfile, validateSna
 const {decodeProfileBlob} = require("../schema/profile-blob-v1");
 const {SETTINGS, validName, encodeSettings} = require("../schema/settings-domain-v1");
 const {macroKeycodes, macroModifierKeycodes, encodeMacroPayload, decodeMacroPayload, macroProgramBytes, MACRO_PROGRAM_MAX} = require("../schema/macro-payload");
-const {supportsUnicodeMacros, supportsMacroProtection, macroProtectionOf} = require("../schema/macro-payload");
+const {supportsUnicodeMacros, supportsMacroProtection, supportsMacroOutputIsolation, macroProtectionOf} = require("../schema/macro-payload");
 const {hostSettings, supportsHostLayouts} = require("../schema/host-settings");
 const {hostLayout} = require("../data/host-layouts");
 const {inspectMacroInput, inspectMacroPlayback} = require("./macro-input");
@@ -60,7 +60,7 @@ function macroEditorView(snapshot, capabilities) {
         macroBank: {capacity: budget.capacity, stored: budget.stored, free: budget.free, available: budget.available,
             slots: slots.length, reserveTaps: SLOT_RESERVE_TAPS, programMax: MACRO_PROGRAM_MAX},
         // Every slot can hold a full-length name, whatever the others hold.
-        names: {perName: SETTINGS.NAME_MAX_BYTES}, protectionSupported,
+        names: {perName: SETTINGS.NAME_MAX_BYTES}, protectionSupported, outputIsolationSupported: supportsMacroOutputIsolation(capabilities),
         protectionChoices: VOCABULARY.macroProtection.map(([value, label]) => ({value, label})),
         macroPayloadKeycodes: macroKeycodes(), macroPayloadModifierKeycodes: macroModifierKeycodes()};
 }

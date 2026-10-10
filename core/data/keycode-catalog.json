@@ -1,6 +1,6 @@
 {
   "format": "charybdis-keycode-catalog-v1",
-  "qmkVersion": "0.34.6-155-g79e3f468a8",
+  "qmkVersion": "0.34.6-157-g173eae2b5e",
   "source": "data/constants/keycodes",
   "generatedFrom": [
     "keycodes_us_0.0.1.hjson",

@@ -40,7 +40,7 @@ matrix.
 | --- | --- |
 | Layout and 16 layers | Read/write; key labels and picker legends follow the chosen host layout (D-L56); names and overlay order travel with complete profiles; a reorder renumbers layer keys by default ("Keys follow their layers") |
 | Key behaviours, combos and RGB | Read/write editors over the shared draft; selected keys open an unstored behaviour grid until the first edit; matching Keys reach sections share open state across tabs, open independently, and use the page scrollbar |
-| Macros | 128 named VIA macro slots with literal Text, editable steps, Advanced raw payload, recorder and live validation; capability-gated Unicode text, saved macOS/Windows/Linux host setup and a host keyboard layout macro text is typed and checked through; changing Host rechecks stored playback and reviews affected macros with that setting (D-L56); per-macro input protection defaults on for Unicode entry, with On/Off overrides (D-L57); shared-memory and per-macro limits shown and enforced (D-L25, D-L26) |
+| Macros | 128 named VIA macro slots with literal Text, editable steps, Advanced raw payload, recorder and live validation; capability-gated Unicode text, saved macOS/Windows/Linux host setup and a host keyboard layout macro text is typed and checked through; changing Host rechecks stored playback and reviews affected macros with that setting (D-L56); per-macro input protection defaults on for Unicode entry, with On/Off overrides and capability-gated isolation of held keyboard input (D-L57); shared-memory and per-macro limits shown and enforced (D-L25, D-L26) |
 | Custom keys | 128 named keys that do what their behaviour says: rename, add or open the behaviour, place, see where each is used (D-L42) |
 | Mouse | Pointer and sniping DPI, auto-sniping and auto-mouse: global-policy sections the core files under the Mouse area, so the rail, the review and import counts all place them there. The auto-mouse fade delay is a share of the timeout, edited on its lighting stage (D-L17) |
 | Pointing modes | 32 device-owned slots (sparse PD domain v3, RGB v4); live codecs accept only the current action vocabulary and profile formats (D-L54). See [PD-mode domain v1](../upstream/firmware/docs/architecture/pd-mode-domain-v1.md) |
@@ -1185,7 +1185,13 @@ the selected layout cannot type natively and must enter as Unicode, not merely
 because UTF-8 contains non-ASCII text. Its effective state follows Host changes,
 and Review groups that derived effect with Host; explicit overrides are macro
 changes and discard with their slot. Ignored presses are never replayed, and
-the explanation distinguishes physical-key admission from a host input lock.
+the explanation distinguishes keyboard-output isolation from a host input lock.
+Feature bit 26 extends bit 23 with immediate isolation of already-held ordinary
+keys and unrelated keyboard output. On supporting firmware the explanation says
+that held modifiers resume and suspended ordinary keys require release and a
+fresh press. Older bit-23 firmware retains the earlier warning to release keys
+before starting; neither explanation promises protection from another keyboard,
+pointing or consumer/media actions.
 
 The optional canonical prefix belongs to the macro bytes. Text/name edits
 preserve it, metadata-only empty slots keep their reserve, and bank accounting
