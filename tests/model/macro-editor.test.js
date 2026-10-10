@@ -255,3 +255,14 @@ test("macro text is judged against the host layout the keyboard types through", 
     assert.equal(macroEditorView(current, capabilities).unicode.mode, 1, "Unicode Hex Input enables hex entry by itself");
     assert.doesNotThrow(() => change("🙂"));
 });
+
+test("macro output isolation is reported only when both protection capabilities are present", () => {
+    const {hostMacros} = require("../fixtures/host-macros");
+    const {snapshot, capabilities} = hostMacros(1 | (3 << 16), ["é"]);
+    for (const flags of [0, 1 << 23, 1 << 26, (1 << 23) | (1 << 26)]) {
+        const view = macroEditorView(snapshot, {...capabilities, featureFlags: flags});
+        const expected = flags === ((1 << 23) | (1 << 26));
+        assert.equal(view.outputIsolationSupported, expected);
+        assert.equal(buildDeviceModel({macroView: view}).macroOutputIsolationSupported, expected);
+    }
+});

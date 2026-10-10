@@ -1,5 +1,5 @@
 "use strict";
-const {UNICODE_MACRO_FEATURE, MACRO_PROTECTION_FEATURE} = require("../schema/macro-payload");
+const {UNICODE_MACRO_FEATURE, MACRO_PROTECTION_FEATURE, MACRO_OUTPUT_ISOLATION_FEATURE} = require("../schema/macro-payload");
 const {HOST_LAYOUT_FEATURE} = require("../schema/host-settings");
 
 const {isUnhandledEcho, requestHandled} = require("./via-unhandled-v1");
@@ -27,7 +27,7 @@ const PROFILE_WIRE_STATUS = Object.freeze({
 });
 
 const PROFILE_WIRE_KNOWN_MASKS = Object.freeze({
-    FEATURE_FLAGS: 0x03ffffff,
+    FEATURE_FLAGS: 0x07ffffff,
     // Bits current firmware never advertises. An older image that does still
     // decodes; nothing reads them.
     RETIRED_FEATURES: 1 << 13,
@@ -75,6 +75,7 @@ const PROFILE_WIRE_FEATURES = Object.freeze({
     MACRO_PROTECTION: MACRO_PROTECTION_FEATURE,
     CANDIDATE_REUSE: 1 << 24,
     CANDIDATE_STREAM: 1 << 25,
+    MACRO_OUTPUT_ISOLATION: MACRO_OUTPUT_ISOLATION_FEATURE,
 });
 
 const PROFILE_WIRE_DOMAINS = Object.freeze({
@@ -276,6 +277,9 @@ function decodeCapabilityPages(pages) {
     }
     if (hasFeature(PROFILE_WIRE_FEATURES.PERSISTENT_COMMIT) && !hasFeature(PROFILE_WIRE_FEATURES.CANDIDATE_WRITE)) {
         throw new ProfileWireProtocolError("MALFORMED_RESPONSE", "Persistent commit requires candidate-write support.");
+    }
+    if (hasFeature(PROFILE_WIRE_FEATURES.MACRO_OUTPUT_ISOLATION) && !hasFeature(PROFILE_WIRE_FEATURES.MACRO_PROTECTION)) {
+        throw new ProfileWireProtocolError("MALFORMED_RESPONSE", "Macro output isolation requires macro protection support.");
     }
     if ((hasFeature(PROFILE_WIRE_FEATURES.CANDIDATE_REUSE) || hasFeature(PROFILE_WIRE_FEATURES.CANDIDATE_STREAM))
         && !hasFeature(PROFILE_WIRE_FEATURES.CANDIDATE_WRITE)) {

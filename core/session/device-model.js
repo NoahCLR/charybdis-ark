@@ -102,6 +102,7 @@ function buildDeviceModel(state = {}) {
         hostSettings: state.settingsView?.host || null,
         macroUnicode: state.macroView?.unicode || {supported: false, mode: 0},
         macroProtectionSupported: Boolean(state.macroView?.protectionSupported),
+        macroOutputIsolationSupported: Boolean(state.macroView?.outputIsolationSupported),
         macroProtectionChoices: state.macroView?.protectionChoices || [],
         macroEditing: {identity: state.macroView?.identity || "", writable: Boolean(state.macroView) && state.capabilities?.compiledLayerCount === LAYERS && !state.busy},
         behaviorTimingDefaults: state.settingsView?.timing || {},

@@ -4,9 +4,11 @@ const catalog = require("../data/keycode-catalog");
 const {layoutTypes, US_HOST_LAYOUT} = require("../data/host-layouts");
 const UNICODE_MACRO_FEATURE = 1 << 21;
 const MACRO_PROTECTION_FEATURE = 1 << 23;
+const MACRO_OUTPUT_ISOLATION_FEATURE = 1 << 26;
 const MACRO_PROTECTION = Object.freeze({AUTO: "auto", ON: "on", OFF: "off"});
 const supportsUnicodeMacros = capabilities => Boolean(capabilities?.featureFlags & UNICODE_MACRO_FEATURE);
 const supportsMacroProtection = capabilities => Boolean(capabilities?.featureFlags & MACRO_PROTECTION_FEATURE);
+const supportsMacroOutputIsolation = capabilities => supportsMacroProtection(capabilities) && Boolean(capabilities?.featureFlags & MACRO_OUTPUT_ISOLATION_FEATURE);
 const fail = message => Object.assign(new Error(message), {code: "INVALID_MACRO"});
 const validKey = key => Number.isInteger(key) && ((key >= 4 && key <= 0xa4) || (key >= 0xe0 && key <= 0xe7));
 const escapeText = text => text.replace(/[{}]/g, brace => brace + brace);
@@ -186,4 +188,4 @@ function macroProgramBytes(bytes) {
     return length;
 }
 
-module.exports = {macroModifierKeycodes, UNICODE_MACRO_FEATURE, supportsUnicodeMacros, MACRO_PROTECTION_FEATURE, MACRO_PROTECTION, supportsMacroProtection, macroProtectionOf, macroKeycodes, parsePayload, encodeMacroPayload, decodeMacroPayload, macroProgramBytes, MACRO_PROGRAM_MAX};
+module.exports = {macroModifierKeycodes, UNICODE_MACRO_FEATURE, supportsUnicodeMacros, MACRO_PROTECTION_FEATURE, MACRO_OUTPUT_ISOLATION_FEATURE, supportsMacroOutputIsolation, MACRO_PROTECTION, supportsMacroProtection, macroProtectionOf, macroKeycodes, parsePayload, encodeMacroPayload, decodeMacroPayload, macroProgramBytes, MACRO_PROGRAM_MAX};

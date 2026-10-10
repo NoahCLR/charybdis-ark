@@ -439,3 +439,14 @@ test("feature bit 13 is retired: no feature names it, and an older image that se
     older[0].writeUInt32LE(older[0].readUInt32LE(9) | (1 << 13), 9);
     assert.ok(decodeCapabilityPages(older).featureFlags & (1 << 13));
 });
+
+test("macro output isolation requires protection and stays separate from transfer extensions", () => {
+    assert.equal(PROFILE_WIRE_FEATURES.MACRO_OUTPUT_ISOLATION, 1 << 26);
+    const pages = compiledOnlyPages();
+    pages[0].writeUInt32LE(pages[0].readUInt32LE(9) | (1 << 26), 9);
+    assert.throws(() => decodeCapabilityPages(pages), error => error.code === "MALFORMED_RESPONSE" && /requires macro protection/.test(error.message));
+    pages[0].writeUInt32LE(pages[0].readUInt32LE(9) | (1 << 23), 9);
+    const actual = decodeCapabilityPages(pages);
+    assert.equal(actual.featureFlags & (1 << 26), 1 << 26);
+    assert.equal(actual.featureFlags & (PROFILE_WIRE_FEATURES.CANDIDATE_REUSE | PROFILE_WIRE_FEATURES.CANDIDATE_STREAM), 0);
+});
