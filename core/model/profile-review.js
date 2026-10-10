@@ -236,7 +236,7 @@ function lightingRecords(value) {
 
 // Compare complete validated snapshots. The review describes final differences,
 // rather than a log that would still show edits the user has already undone.
-function profileReview(before, after) {
+function profileReview(before, after, capabilities) {
     // A snapshot may carry its decoded form (`decoded`, read-only); the draft
     // decodes each revision once and hands it on.
     const a = decodedOf(before), b = decodedOf(after), items = [];
@@ -273,7 +273,7 @@ function profileReview(before, after) {
         items.push({area, unit, title, status, fields, place, ...(titleMark ? {titleMark} : {})});
     };
     const layerName = (value, i) => layerCalled(value.settings.names, i);
-    const macrosA = macroEditorView(before), macrosB = macroEditorView(after);
+    const macrosA = macroEditorView(before, capabilities), macrosB = macroEditorView(after, capabilities);
     const namesA = namesIn(a, macrosA, before.hostOs?.detected), namesB = namesIn(b, macrosB, after.hostOs?.detected);
     a.document.layers.forEach((keys, l) => keys.forEach((code, p) => {
         if (code === b.document.layers[l][p]) return;
@@ -313,8 +313,11 @@ function profileReview(before, after) {
     }
     item("Settings", "comboTiming", "Combo timing", comboTimingFields(a.combos), comboTimingFields(b.combos), {kind: "settings", section: "comboSettings", area: "Settings"}, [true, true]);
     macrosA.viaMacros.forEach((slot, i) => {
-        const fields = (macro) => new Map([["Steps", macro.payload || "empty"], ["Name", macro.name || "no name"]]);
-        const old = macrosA.viaMacros[i], next = macrosB.viaMacros[i], has = (macro) => Boolean(macro.payload || macro.name);
+        const protectionShown = macrosB.protectionSupported || slot.protection !== "auto" || macrosB.viaMacros[i].protection !== "auto";
+        const fields = (macro) => new Map([["Steps", macro.payload || "empty"], ["Name", macro.name || "no name"],
+            ...(protectionShown ? [["Uninterruptible playback", {key: macro.protection,
+                text: macro.protection === "auto" && macrosB.protectionSupported ? `${word(VOCABULARY.macroProtection, macro.protection)} · ${macro.uninterruptible ? "on" : "off"}` : word(VOCABULARY.macroProtection, macro.protection)}]] : [])]);
+        const old = macrosA.viaMacros[i], next = macrosB.viaMacros[i], has = (macro) => Boolean(macro.payload || macro.name || macro.protection !== "auto");
         item("Macros", `macro:${i}`, `Macro ${i}${(next.name || old.name) ? ` · ${next.name || old.name}` : ""}`, fields(old), fields(next), {kind: "macro", index: i}, [has(old), has(next)]);
     });
     if (a.settings.values[HOST_SETTING] !== b.settings.values[HOST_SETTING]) {
@@ -339,6 +342,8 @@ function profileReview(before, after) {
                         key: JSON.stringify(playback.typing.filter(route => affected.has(route.character))),
                         detail: `${hostLayout(host.layout).name} · ${typing}${host.macosIso ? " · ISO" : " · ANSI"}`}]] : []),
                     ["Playback", playback.error || "Ready to play"],
+                    ...(macrosB.protectionSupported && macro.protection === "auto"
+                        ? [["Uninterruptible playback", playback.typing.some(route => route.method !== "layout") ? "Automatic · on" : "Automatic · off"]] : []),
                 ]);
             };
             // The effect belongs to Host, so discarding it restores Host and

@@ -601,6 +601,25 @@ buttons on its row. Key pickers offer only the basic keys macros can send;
 a chord takes up to 16 distinct keys, and a press or release takes one.
 Record appends key steps; **Clear take** restores what was there before recording.
 
+**Uninterruptible playback** is saved per macro on supporting firmware.
+**Automatic** turns it on when the selected layout needs Unicode entry for any
+text in the macro. For example, Dutch types `é` natively, so it stays off;
+Unicode Hex Input needs Unicode entry for `é`, so it turns on. **On** protects
+the whole macro, including delays, and **Off** allows ordinary input throughout.
+Changing the layout rechecks Automatic and lists its effect in Review.
+
+Protection ignores new keypresses from this keyboard until playback and cleanup
+finish; it does not queue or replay them. Their releases are ignored too, even
+after playback ends, while releases of keys held before playback still work.
+Release ordinary keys before starting. Pointing, input from another keyboard,
+and pending synthetic actions can still affect the host; this is not a host-wide
+input lock. Reset and error cleanup still release the macro's keys. The option
+does not change macOS Unicode Hex Input's effect on Option shortcuts.
+
+Text edits and renames preserve the choice. Review, undo/redo, discard, exports
+and imports carry it with the macro. Older firmware shows the control read-only;
+a backup containing an explicit override needs firmware supporting the setting.
+
 Playback size and macro-memory usage follow the edit while you type. Valid edits
 enter the draft when you finish editing a field or change a key step. Incomplete,
 invalid or oversized edits stay visible locally with their reason and never

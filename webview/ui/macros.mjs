@@ -106,6 +106,9 @@ function editor(model, slot, canEdit) {
             ${nameField(model, slot, canEdit)}
             ${placedOn(model, slot)}
             ${unicodeSetup(model, canEdit)}
+            <label class="field"><span>Uninterruptible playback</span><select class="input" data-protection ${canEdit && model.macroProtectionSupported ? "" : "disabled"}>
+                ${(model.macroProtectionChoices || []).map(({value, label}) => `<option value="${esc(value)}" ${slot.protection === value ? "selected" : ""}>${esc(label)}${value === "auto" ? ` · ${slot.uninterruptible ? "on" : "off"}` : ""}</option>`).join("")}</select></label>
+            <p class="note">${model.macroProtectionSupported ? "Typing during Unicode entry can corrupt the text. Automatic turns protection on when this layout needs Unicode entry. On ignores new keypresses from this keyboard until playback finishes; releases still work. Ignored presses are not replayed. Release ordinary keys before starting; other keyboards can still interfere." : "Update both halves to protect macro playback. This firmware does not support the per-macro setting."}</p>
             <div class="sect-h"><h4>Steps</h4><span class="right note">played from top to bottom</span></div>
             <p class="note">Type or paste exactly what you want in Text. Add keys and delays as separate steps.</p>
             <div data-macro-steps class="stack"></div>
@@ -129,6 +132,7 @@ function editor(model, slot, canEdit) {
         if (event.target.closest('[data-act="discard"], [data-act="clear"]')) setMacroForm(slot.keycode, {cancelBlur: true});
     });
     card.querySelector("[data-host-settings]")?.addEventListener("click", () => { state.screen = "settings"; render(); });
+    card.querySelector("[data-protection]").addEventListener("change", event => post(edits.macroProtectionMessage(slot.keycode, event.target.value, model.macroEditing.identity)));
     const nameInput = card.querySelector("[data-name]");
     nameInput?.addEventListener("input", () => showCount(card.querySelector("[data-name-count]"), nameInput.value, model.macroNameSpace.perName));
     nameInput?.addEventListener("change", () => post(edits.macroNameMessage(slot.keycode, nameInput.value, getModel()?.macroEditing?.identity)));

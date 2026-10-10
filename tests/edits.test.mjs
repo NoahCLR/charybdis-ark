@@ -26,6 +26,27 @@ const {document: pdDocument} = require(path.join(here, "fixtures", "pd-profile")
 
 const capabilities = {compiledLayerCount: 16, supportedDomainMask: 31, actionAbiDigest: 0x837cf479};
 
+test("the playback protection control stages a portable policy and Review/discard/undo preserve text", () => {
+    const {hostMacros} = require("./fixtures/host-macros");
+    const {macroEditorView} = require("../core/model/macro-editor");
+    const fixture = hostMacros(1 | (3 << 16), ["café🙂"]);
+    fixture.capabilities.featureFlags |= 1 << 23;
+    const draft = new ProfileDraftSession(fixture.snapshot, "test-device", fixture.capabilities);
+    const message = edits.macroProtectionMessage("VIA_MACRO_0", "off", draft.current.fingerprint);
+    assert.deepEqual(message, {type: "updateViaMacro", keycode: "VIA_MACRO_0", protection: "off", expectedFingerprint: draft.current.fingerprint});
+    stage(draft, message);
+    assert.equal(macroEditorView(draft.current, fixture.capabilities).viaMacros[0].uninterruptible, false);
+    const change = draft.changes().find(row => row.unit === "macro:0");
+    assert.deepEqual(change.fields.map(field => [field.label, field.before, field.after]), [["Uninterruptible playback", "Automatic · on", "Off"]]);
+    const exported = JSON.parse(JSON.stringify(draft.document));
+    assert.deepEqual(portable.validateSnapshot(exported).document.macros, draft.document.macros);
+    assert.throws(() => portable.validateSnapshot(exported, {...fixture.capabilities, featureFlags: (1 << 21) | (1 << 22)}), /Update both halves/);
+    draft.discard(draft.revision, change.group);
+    assert.deepEqual(draft.document.macros, fixture.snapshot.document.macros);
+    draft.undo(draft.revision);
+    assert.equal(macroEditorView(draft.current, fixture.capabilities).viaMacros[0].protection, "off");
+});
+
 function session() {
     const doc = pdDocument();
     const snapshot = {document: doc, fingerprint: portable.fingerprint(doc), summary: portable.summary(doc), limits: {brightnessMax: 200}};

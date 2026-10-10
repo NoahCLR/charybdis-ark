@@ -11,6 +11,36 @@ const {buildDeviceModel} = require("../../core/session/device-model");
 const snapshot = value => ({document: value, fingerprint: fingerprint(value)});
 const settingsDomain = value => decodeProfileBlob(Buffer.from(value.profile, "base64")).domains.find(domain => domain.id === 0x40);
 
+test("per-macro protection follows Unicode entry automatically, and explicit policies survive text/name edits", () => {
+    const {hostMacros} = require("../fixtures/host-macros");
+    for (const layout of [2, 3]) {
+        const fixture = hostMacros(1 | (layout << 16), ["é"]);
+        fixture.capabilities.featureFlags |= 1 << 23;
+        let current = fixture.snapshot;
+        const view = () => macroEditorView(current, fixture.capabilities).viaMacros[0];
+        const edit = message => {current = snapshot(editMacro(current, {keycode: "VIA_MACRO_0", expectedFingerprint: current.fingerprint, ...message}, fixture.capabilities));};
+        assert.equal(view().protection, "auto");
+        assert.equal(view().uninterruptible, layout === 3);
+        edit({protection: "off"}); assert.equal(view().uninterruptible, false);
+        edit({payload: "éé", name: "Accent"});
+        assert.equal(view().protection, "off"); assert.equal(view().name, "Accent");
+        edit({protection: "on"}); assert.equal(view().uninterruptible, true);
+        edit({protection: "auto"}); assert.equal(view().uninterruptible, layout === 3);
+        assert.equal(Buffer.from(current.document.macros[0], "base64").toString("utf8"), "éé");
+        assert.throws(() => editMacro(current, {keycode: "VIA_MACRO_0", protection: "on", expectedFingerprint: current.fingerprint}, {...fixture.capabilities, featureFlags: (1 << 21) | (1 << 22)}), /Update both halves/);
+    }
+});
+
+test("an empty macro may store protection and keeps its empty-slot reserve", () => {
+    const {hostMacros} = require("../fixtures/host-macros");
+    const {snapshot: current, capabilities} = hostMacros(1, []); capabilities.featureFlags |= 1 << 23;
+    const protectedEmpty = snapshot(editMacro(current, {keycode: "VIA_MACRO_0", protection: "on", expectedFingerprint: current.fingerprint}, capabilities));
+    const view = macroEditorView(protectedEmpty, capabilities);
+    assert.equal(view.viaMacros[0].empty, true); assert.equal(view.viaMacros[0].protection, "on");
+    assert.equal(view.macroBank.stored, macroEditorView(current, capabilities).macroBank.stored + 3);
+    assert.equal(view.viaMacros[0].program, 0);
+});
+
 test("stored macro status agrees with editing after a host layout change", () => {
     const {hostMacros} = require("../fixtures/host-macros");
     for (const host of [1 | (2 << 16), 1 | (3 << 16)]) {

@@ -11,6 +11,7 @@ const covers = (list, values, label) => assert.deepEqual(list.map(([id]) => id).
 const coversNumbers = (list, values, label) => assert.deepEqual(list.map(([id]) => id).sort(), Object.values(values).sort(), label);
 
 test("every stored enum value has a word", () => {
+    coversNumbers(VOCABULARY.macroProtection, require("../../core/schema/macro-payload").MACRO_PROTECTION, "macro protection");
     covers(VOCABULARY.holdHelpers.hold, KEY_BEHAVIOR_HOLD_MODES, "hold helpers under Hold");
     covers(VOCABULARY.holdHelpers.long, KEY_BEHAVIOR_HOLD_MODES, "hold helpers under Long hold");
     covers(VOCABULARY.holdWithoutLongHold, KEY_BEHAVIOR_HOLD_MODES, "holds without a long hold");

@@ -3,7 +3,10 @@
 const catalog = require("../data/keycode-catalog");
 const {layoutTypes, US_HOST_LAYOUT} = require("../data/host-layouts");
 const UNICODE_MACRO_FEATURE = 1 << 21;
+const MACRO_PROTECTION_FEATURE = 1 << 23;
+const MACRO_PROTECTION = Object.freeze({AUTO: "auto", ON: "on", OFF: "off"});
 const supportsUnicodeMacros = capabilities => Boolean(capabilities?.featureFlags & UNICODE_MACRO_FEATURE);
+const supportsMacroProtection = capabilities => Boolean(capabilities?.featureFlags & MACRO_PROTECTION_FEATURE);
 const fail = message => Object.assign(new Error(message), {code: "INVALID_MACRO"});
 const validKey = key => Number.isInteger(key) && ((key >= 4 && key <= 0xa4) || (key >= 0xe0 && key <= 0xe7));
 const escapeText = text => text.replace(/[{}]/g, brace => brace + brace);
@@ -69,6 +72,12 @@ function parsePayload(payload, {unicode = false, textEntry = false, layout = US_
 // key tap (1), press (2), release (3) or a delay (4, digits, '|').
 function encodeMacroPayload(payload, options) {
     const chunks = [];
+    const protection = options?.protection ?? "auto";
+    if (!Object.values(MACRO_PROTECTION).includes(protection)) throw fail("Choose Automatic, On or Off for uninterruptible playback.");
+    if (protection !== "auto") {
+        if (!options?.protectionSupported) throw fail("Update both halves to set macro playback protection.");
+        chunks.push(Buffer.from([1, 5, protection === "on" ? 1 : 2]));
+    }
     for (const step of parsePayload(payload, options)) {
         if (step.kind === "text") {
             chunks.push(Buffer.from(step.text, "utf8"));
@@ -97,7 +106,11 @@ function decodeMacroPayload(bytes, options) {
             output += escapeText(text); continue;
         }
         op = bytes[offset++];
-        if (op === 4) {
+        if (op === 5) {
+            macroProtectionOf(bytes, options);
+            if (offset !== 2) throw fail("Macro protection must be a single prefix before the steps.");
+            offset++;
+        } else if (op === 4) {
             const end = bytes.indexOf(124, offset);
             if (end < 0) throw fail("Truncated macro delay.");
             output += `{${bytes.subarray(offset, end).toString("ascii")}}`; offset = end + 1;
@@ -113,6 +126,13 @@ function decodeMacroPayload(bytes, options) {
 // The keyboard plays a VIA macro only after compiling its stored bytes into a
 // program of at most this many bytes; a longer one is kept but never plays.
 const MACRO_PROGRAM_MAX = 512;
+
+function macroProtectionOf(bytes, {protectionSupported = false} = {}) {
+    if (bytes[0] !== 1 || bytes[1] !== 5) return "auto";
+    if (!protectionSupported) throw fail("Update both halves to read macro playback protection.");
+    if (bytes[2] !== 1 && bytes[2] !== 2) throw fail("Invalid macro playback protection prefix.");
+    return bytes[2] === 1 ? "on" : "off";
+}
 
 // The program size the firmware's decoder (macro_payload_decode_qmk_stream)
 // produces for well-formed VIA macro bytes. It mirrors that decoder step for
@@ -141,6 +161,7 @@ function macroProgramBytes(bytes) {
         }
         chunk = 0;
         const op = bytes[index++];
+        if (op === 5) { index++; continue; }
         if (op === 4) {
             flush();
             while (index < bytes.length && bytes[index] !== 124) index++;
@@ -165,4 +186,4 @@ function macroProgramBytes(bytes) {
     return length;
 }
 
-module.exports = {macroModifierKeycodes, UNICODE_MACRO_FEATURE, supportsUnicodeMacros, macroKeycodes, parsePayload, encodeMacroPayload, decodeMacroPayload, macroProgramBytes, MACRO_PROGRAM_MAX};
+module.exports = {macroModifierKeycodes, UNICODE_MACRO_FEATURE, supportsUnicodeMacros, MACRO_PROTECTION_FEATURE, MACRO_PROTECTION, supportsMacroProtection, macroProtectionOf, macroKeycodes, parsePayload, encodeMacroPayload, decodeMacroPayload, macroProgramBytes, MACRO_PROGRAM_MAX};
