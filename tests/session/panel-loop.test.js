@@ -24,6 +24,20 @@ test("Apply progress updates do not rebuild or post the complete panel model", (
     assert.deepEqual(loop.session.service.liveApply, apply, "full snapshots retain the latest progress");
 });
 
+test("read progress posts only a small operation-correlated view", () => {
+    const host = fakeHost();
+    const loop = openPanelLoop(host, {adapter: new FakeDeviceAdapter()});
+    loop.session.draft = {id: "draft-777", revision: 3};
+    const service = loop.session.service;
+    service.operationId = 4; service.phase = "reading layout";
+    service.connectionPublicId = "kb"; service.connectionToken = 8;
+    const progress = {done: 8, total: 896};
+    service.reportReadProgress("layout", progress);
+    assert.deepEqual(host.posted, [{type: "readProgress", draftId: "draft-777", draftRevision: 3,
+        read: {source: "layout", progress, operationId: 4, phase: "reading layout", selectedDeviceId: "kb", connectionToken: 8}}]);
+    assert.deepEqual(service.layout.progress, progress);
+});
+
 // A host that records everything the loop hands it.
 function fakeHost(extra = {}) {
     const host = {
@@ -86,6 +100,7 @@ function fakeService(extra = {}) {
         enumerate: record("enumerate"), connect: record("connect"), refresh: record("refresh"),
         readLayout: record("readLayout"), readCommittedProfile: record("readCommittedProfile"),
         readBaseRgb: record("readBaseRgb"), readCombos: record("readCombos"),
+        readKeyboardProfile: record("readKeyboardProfile", () => service.portable),
         readPortableProfile: record("readPortableProfile", () => service.portable),
         close: record("close"),
         ...extra,
@@ -131,7 +146,7 @@ test("a read connects, reads in order and publishes what it read", async () => {
     const service = fakeService();
     const loop = openPanelLoop(host, {service});
     await loop.handleMessage({type: "ready"});
-    assert.deepEqual(service.calls, ["enumerate", "refresh", "readLayout", "readCommittedProfile", "readBaseRgb", "readCombos", "readPortableProfile"]);
+    assert.deepEqual(service.calls, ["enumerate", "refresh", "readKeyboardProfile"]);
     assert.equal(host.posted.length, 1, "one answer");
     assert.match(last(host).notice, /committed profile generation 7/);
     assert.equal(loop.session.readReady, true);

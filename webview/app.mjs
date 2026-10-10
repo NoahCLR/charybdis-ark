@@ -11,6 +11,7 @@ import {closeComboBuilder, getModel, layerName, post, postLeavingDemo, render as
 import {historyAction} from "./view/edits.mjs";
 import {chooseKeyboard, hostOf, otherTheme, setTheme} from "./view/host.mjs";
 import {DEMO_WORDS, demoOf, leaveDemo, openDemo, openDemoProfile} from "./view/demo.mjs";
+import {sameEditorContent} from "./view/render-content.mjs";
 import {readScreen, screenAvailable} from "./view/readiness.mjs";
 import {discardLabel, groupNote, placeState, reviewBlocks, statusSummary, stillShown} from "./view/review.mjs";
 import {bindLayerIndex, hideHover, mountHover} from "./ui/hover.mjs";
@@ -269,7 +270,8 @@ function reviewOverlay() {
     return node;
 }
 
-function render() {
+function render({keepScreen = false} = {}) {
+    const keptScreen = keepScreen && renderedScreen === state.screen ? root.querySelector(".app > .main") : null;
     const scroll = captureContentScroll(root, renderedScreen, state.screen);
     const benchHeight = captureKeysBenchHeight(root, renderedScreen, state.screen, state.resetBenchHeight);
     state.resetBenchHeight = false;
@@ -282,7 +284,12 @@ function render() {
     if (demo.active) app.appendChild(demoBanner(demo));
     app.appendChild(rail());
     const read = screenAvailable(model, state.screen) ? null : readScreen(model, state.screen);
-    const screen = read ? readPlaceholder(read, model) : (SCREENS[state.screen] || screenKeys)();
+    const screen = keptScreen || (read ? readPlaceholder(read, model) : (SCREENS[state.screen] || screenKeys)());
+    if (keptScreen) {
+        keptScreen.querySelector(":scope > .commit")?.remove();
+        const detail = keptScreen.querySelector(".read-placeholder > p");
+        if (read && detail) detail.textContent = read.detail;
+    }
     app.appendChild(screen);
     const bar = commitBar();
     if (bar) screen.appendChild(bar);
@@ -400,9 +407,36 @@ mountHover(root);
 
 let inDemo = false;   // whether the last model was the demo's
 
+function refreshCommitBar() {
+    const main = root.querySelector(".main"), previous = main?.querySelector(":scope > .commit"), next = commitBar();
+    if (previous && next) previous.replaceWith(next);
+    else if (next && main) main.append(next);
+    else previous?.remove();
+}
+
 addEventListener("message", (event) => {
     const message = event.data;
     if (message?.type === "macroValidation") { receiveMacroValidation(message); return; }
+    if (message?.type === "readProgress") {
+        const model = getModel(), read = message.read;
+        if (!model?.device?.connected || !model.load?.operationBusy || !read
+            || read.operationId !== model.load?.operationId || read.phase !== model.load.phase
+            || read.selectedDeviceId !== model.selectedDeviceId || read.connectionToken !== model.load.connectionToken
+            || message.draftId !== model.draft?.id || message.draftRevision !== model.draft?.revision) return;
+        const postApplyRead = model.postApplyRead && read.source === model.postApplyRead.step
+            ? {...model.postApplyRead, progress: read.progress} : model.postApplyRead;
+        setModel({...model, load: {...model.load, progress: read.progress}, postApplyRead,
+            portable: read.source === "portable" ? {...model.portable, progress: read.progress} : model.portable});
+        const portableProgress = root.querySelector(".profile-progress");
+        if (portableProgress && read.source === "portable") {
+            portableProgress.hidden = !read.progress;
+            portableProgress.lastElementChild.textContent = typeof read.progress === "string" ? read.progress : "";
+        }
+        refreshCommitBar();
+        const placeholder = root.querySelector(".read-placeholder > p");
+        if (placeholder) placeholder.textContent = readScreen(getModel(), state.screen).detail;
+        return;
+    }
     if (message?.type === "applyProgress") {
         const model = getModel(), draft = model?.draft;
         if (!draft?.busy || message.draftId !== draft.id || message.draftRevision !== draft.revision
@@ -410,13 +444,13 @@ addEventListener("message", (event) => {
         setModel({...model, apply: message.apply});
         // A copy's byte counter must not rebuild its disabled editors. The
         // same main thread receives HID replies in the browser host.
-        const main = root.querySelector(".main"), previous = main?.querySelector(":scope > .commit"), next = commitBar();
-        if (previous && next) previous.replaceWith(next);
-        else if (next && main) main.append(next);
-        else previous?.remove();
+        refreshCommitBar();
         return;
     }
     if (message?.type !== "model") return;
+    const keepScreen = !["device", "profile"].includes(state.screen) && !state.overlay && !state.picker && !state.combo.awaiting
+        && !message.resetDraftForms && !message.acceptedEdit && !message.notice
+        && sameEditorContent(getModel(), message.model);
     setModel(message.model);
     // Leaving the demo goes back to where a keyboard is connected, or the demo
     // explored again; a screen of the demo's would only say it is unavailable.
@@ -458,7 +492,7 @@ addEventListener("message", (event) => {
     if (state.overlay === "review" && !message.model?.draft?.dirty) state.overlay = null;
     if (state.overlay === "history" && !message.model?.draft) { state.overlay = null; post({type: "closeProfileDraftHistory"}); }
     if (state.overlay === "leaveDemo" && !message.model?.demo?.active) { state.overlay = null; state.leaveDemo = null; }
-    render();
+    render({keepScreen});
 });
 
 // A field that holds text keeps its own undo: ⌘Z there edits the text, not

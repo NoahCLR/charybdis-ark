@@ -67,19 +67,23 @@ async function readKeyboard(session, selectedDeviceId, host = {}) {
         }
     }
     await service.refresh();
-    await run(host, "Reading layout from the keyboard", () => service.readLayout());
-    try {
-        await run(host, "Reading keyboard profile", () => service.readCommittedProfile());
-    } catch (error) {
-        session.notice = `Read the layout. The committed profile could not be read: ${error instanceof Error ? error.message : String(error)}`;
-        return false;
-    }
-    await service.readBaseRgb();
-    await service.readCombos();
     let macroFailure = "", portable;
     if (supportsCompleteProfile(service.capabilities)) {
-        try {portable = await service.readPortableProfile();}
+        try {portable = await run(host, "Reading the complete keyboard configuration", () => service.readKeyboardProfile());}
         catch (error) {macroFailure = " Macros and global settings could not be read: " + error.message;}
+    }
+    if (!portable) {
+        // Older or partially readable firmware still gets its independent
+        // diagnostics. A failed complete capture never opens an editable draft.
+        await run(host, "Reading layout from the keyboard", () => service.readLayout());
+        try {
+            await run(host, "Reading keyboard profile", () => service.readCommittedProfile());
+        } catch (error) {
+            session.notice = `Read the layout. The committed profile could not be read: ${error instanceof Error ? error.message : String(error)}`;
+            return false;
+        }
+        await service.readBaseRgb();
+        await service.readCombos();
     }
     const state = service.snapshot();
     if (state.error || state.committed?.state !== "read") {

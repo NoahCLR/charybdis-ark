@@ -50,7 +50,7 @@ export function readScreen(model, screen = "keys") {
         const progress = model?.load?.progress;
         const count = Number.isInteger(progress?.done) && Number.isInteger(progress?.total) && progress.total > 0
             ? ` · ${progress.done} of ${progress.total}` : "";
-        return {state: "loading", title: "Reading your keyboard", detail: `${PHASES[phase] || "Finishing the read"}${count}`};
+        return {state: "loading", title: "Reading your keyboard", detail: typeof progress === "string" && progress ? progress : `${PHASES[phase] || "Finishing the read"}${count}`};
     }
     if (screen === "profile" && !screenAvailable(model, screen)) return {state: "unavailable", title: "Backups unavailable",
         detail: "Connect a keyboard with complete-profile firmware, then read it to manage backups."};

@@ -46,6 +46,9 @@ function openPanelLoop(host, options = {}) {
         onApplyProgress: apply => {
             void host.post({type: "applyProgress", apply, draftId: session.draft?.id, draftRevision: session.draft?.revision});
         },
+        onReadProgress: read => {
+            void host.post({type: "readProgress", read, draftId: session.draft?.id, draftRevision: session.draft?.revision});
+        },
     });
     return loop;
 }
