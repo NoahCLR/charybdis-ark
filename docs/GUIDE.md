@@ -578,7 +578,13 @@ Configure the host before enabling Unicode playback in
 needs WinCompose running with Right Alt as Compose; Linux needs an input method
 or target application accepting Ctrl+Shift+U entry. Linux support varies by
 application. Ark cannot check the active input source or installed helper.
-Unicode off retains ASCII typing, independently of the OS used for display
+Plain ASCII text is always typed with ordinary keys, with Unicode playback on
+or off, so a macro without accented letters, emoji or other non-ASCII
+characters plays on your usual input source. Only those characters use the
+host's Unicode entry and need this setup; on macOS, switch to Unicode Hex
+Input before playing a macro that contains them. A macro may hold an ordinary
+key across ASCII text, but not across non-ASCII text; holding a modifier is
+fine. Unicode off retains ASCII typing, independently of the OS used for display
 names. Unicode edits require a known effective OS and enabled playback.
 
 Bank usage counts UTF-8 bytes; compiled usage counts each non-ASCII scalar as

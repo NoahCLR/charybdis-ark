@@ -21,7 +21,7 @@ export function parseMacro(payload, options = {}) {
     const keyId = key => options.aliases?.[key] || key;
     let text = "";
     let textHoldError = false;
-    const flush = () => { if (text && options.textEntry && [...held].some(key => options.modifierKeys ? !options.modifierKeys.includes(key) : !/KC_(?:LCTL|LSFT|LALT|LGUI|RCTL|RSFT|RALT|RGUI|LEFT_CTRL|LEFT_SHIFT|LEFT_ALT|LEFT_GUI|RIGHT_CTRL|RIGHT_SHIFT|RIGHT_ALT|RIGHT_GUI)$/.test(key))) textHoldError = true; if (text) steps.push({kind: "text", text}); text = ""; };
+    const flush = () => { if (options.textEntry && /[^\x00-\x7F]/u.test(text) && [...held].some(key => options.modifierKeys ? !options.modifierKeys.includes(key) : !/KC_(?:LCTL|LSFT|LALT|LGUI|RCTL|RSFT|RALT|RGUI|LEFT_CTRL|LEFT_SHIFT|LEFT_ALT|LEFT_GUI|RIGHT_CTRL|RIGHT_SHIFT|RIGHT_ALT|RIGHT_GUI)$/.test(key))) textHoldError = true; if (text) steps.push({kind: "text", text}); text = ""; };
     const source = String(payload ?? "");
     const allowed = options.keys?.length ? new Set(options.keys) : null;
     if (source.length > MAX_CHARACTERS) return fail(steps, "A macro is at most 32,768 characters.");
@@ -63,7 +63,7 @@ export function parseMacro(payload, options = {}) {
         steps.push({kind, keys});
     }
     flush();
-    return textHoldError ? fail(steps, "Release ordinary keys before a Unicode-entry text step; modifier holds are supported.") : {steps, error: ""};
+    return textHoldError ? fail(steps, "Release ordinary keys before accented letters, emoji or other non-ASCII text; modifier holds are supported.") : {steps, error: ""};
 }
 
 const fail = (steps, error) => ({steps, error});

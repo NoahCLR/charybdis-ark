@@ -18,12 +18,14 @@ function macroModifierKeycodes() {
 
 // The existing recorder and step builder use text plus {key}, {+key}, {-key}
 // and {milliseconds}. Doubled braces preserve literal text from device bytes.
+// The keyboard types ASCII text with ordinary keys and only non-ASCII text by
+// host Unicode entry, which an ordinary key held across it would corrupt.
 function parsePayload(payload, {unicode = false, textEntry = false} = {}) {
     if (typeof payload !== "string" || payload.length > 32768) throw fail("Enter a macro of at most 32,768 characters.");
     const steps = [], held = new Set();
     let text = "";
     const flush = () => {
-        if (text && textEntry && [...held].some(key => key < 0xE0)) throw fail("Release ordinary keys before a Unicode-entry text step; modifier holds are supported.");
+        if (textEntry && /[^\x00-\x7F]/u.test(text) && [...held].some(key => key < 0xE0)) throw fail("Release ordinary keys before accented letters, emoji or other non-ASCII text; modifier holds are supported.");
         if (text) steps.push({kind: "text", text}); text = "";
     };
     for (let index = 0; index < payload.length;) {

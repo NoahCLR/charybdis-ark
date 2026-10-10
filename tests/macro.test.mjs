@@ -75,6 +75,21 @@ test("the preview refuses exactly what the host refuses", async () => {
     assert.equal(parseMacro("{KC_NOT_A_KEY}").error, "", "without the host's key list, names are not judged");
 });
 
+test("with Unicode playback on, only non-ASCII text refuses a held ordinary key, in preview and host alike", async () => {
+    const {createRequire} = await import("node:module");
+    const require = createRequire(import.meta.url);
+    const {parsePayload, macroKeycodes, macroModifierKeycodes} = require("../core/schema/macro-payload.js");
+    const options = {unicode: true, textEntry: true};
+    const hostAccepts = (payload) => { try { parsePayload(payload, options); return true; } catch { return false; } };
+    const previewAccepts = (payload) => !parseMacro(payload, {...options, keys: macroKeycodes(), modifierKeys: macroModifierKeycodes()}).error;
+    const expected = {"{+KC_A}text{-KC_A}": true, "{+KC_A}tab\there\n{-KC_A}": true, "{+KC_LSFT}café{-KC_LSFT}": true,
+        "{+KC_A}café{-KC_A}": false, "{+KC_A}🙂{-KC_A}": false};
+    for (const [payload, accepted] of Object.entries(expected)) {
+        assert.equal(hostAccepts(payload), accepted, `host: ${payload}`);
+        assert.equal(previewAccepts(payload), accepted, `preview: ${payload}`);
+    }
+});
+
 test("a macro is found by its name, and by its slot when it has none", () => {
     const named = {keycode: "VIA_MACRO_3", name: "Screenshot area"};
     const unnamed = {keycode: "VIA_MACRO_12", name: ""};
