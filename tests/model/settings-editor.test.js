@@ -187,3 +187,23 @@ test("Key Options follows the effective host vocabulary, including unknown Auto 
         assert.equal(label("swapLeftControlGui"), `Swap left Ctrl and ${gui}`);
     }
 });
+
+test("the Host section offers the effective OS's layouts and gates them on firmware support", () => {
+    const {document} = require("../fixtures/portable-profile");
+    const {fingerprint} = require("../../core/model/portable-profile");
+    const {settingsEditorView} = require("../../core/model/settings-editor");
+    const current = {document: document(), fingerprint: fingerprint(document())};
+    const host = (detected, featureFlags) => settingsEditorView({...current, hostOs: {detected}}, {featureFlags}).sections.find(s => s.id === "host");
+    const fields = section => section.fields.map(field => field.macro);
+    const layouts = (1 << 21) | (1 << 22);
+    const mac = host(1, layouts);
+    assert.deepEqual(fields(mac), ["hostOs", "hostLayout", "macosIso"], "on macOS, Unicode entry is the Unicode Hex Input layout");
+    assert.deepEqual(mac.fields[1].choices.map(choice => choice.label), ["US", "ABC (macOS)", "Dutch (macOS)", "Unicode Hex Input (macOS)", "British (macOS)", "German (macOS)", "French (macOS)"]);
+    const windows = host(2, layouts);
+    assert.deepEqual(fields(windows), ["hostOs", "hostLayout", "unicodeEnabled"]);
+    assert.deepEqual(windows.fields[1].choices.map(choice => choice.value), [0, 7, 8, 9, 10]);
+    assert.equal(host(0, layouts).fields[1].choices.length, 15, "with no known OS, every layout");
+    const legacy = host(1, 1 << 21);
+    assert.equal(legacy.fields.find(field => field.macro === "hostLayout").readOnly, true);
+    assert.ok(fields(legacy).includes("unicodeEnabled"), "older firmware keeps the switch on macOS");
+});

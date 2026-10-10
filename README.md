@@ -8,8 +8,8 @@ back. You don't write C, you don't reflash, and you don't need a firmware
 checkout. Everything Ark shows comes from the keyboard itself.
 
 Paste text straight into a macro, including code and literal braces, and add
-shortcuts or delays as separate steps. Unicode text preserves accents, punctuation
-and emoji on supporting firmware, with host detection, a manual OS override and separate Unicode setup in Settings.
+shortcuts or delays as separate steps. Pick your computer's keyboard layout in
+Settings and macros type through it, accents included; emoji use Unicode entry.
 Key and modifier names follow that OS throughout the editors and Review.
 
 ## What you can change

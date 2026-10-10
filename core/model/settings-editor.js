@@ -6,7 +6,8 @@ const {encodeKeyBehaviorDomain} = require("../schema/key-behavior-domain-v1");
 const {validateSnapshot, decodedOf} = require("./portable-profile");
 const {decodeProfileBlob, encodeProfileBlob} = require("../schema/profile-blob-v1");
 const {SETTING, SETTINGS, encodeSettings, validSetting} = require("../schema/settings-domain-v1");
-const {hostSettings, UNICODE_ENABLED} = require("../schema/host-settings");
+const {hostSettings, supportsHostLayouts, UNICODE_ENABLED, LAYOUT_SHIFT, MACOS_ISO} = require("../schema/host-settings");
+const {hostLayouts} = require("../data/host-layouts");
 const {supportsUnicodeMacros} = require("../schema/macro-payload");
 const {dpiChoices} = require("./pointer-dpi");
 const {hostKeyLabel} = require("./key-names");
@@ -171,23 +172,40 @@ function settingsSections(snapshot, settings, capabilities) {
         options ? optionLabels.map(([macro, label], i) => ({...toggle(macro, 24, hostKeyLabel(label, host.effective)), bitMask: options.keymapMasks[i], readOnly: !(options.supportedKeymapOptions & (1 << i)), hint: options.supportedKeymapOptions & (1 << i) ? "" : "This option is not enabled in the running firmware."})) : []});
     const label = id => VOCABULARY.hostOs.find(([value]) => value === id)?.[1] || "Unknown";
     const available = Boolean(snapshot.hostOs) || supportsUnicodeMacros(capabilities);
-    const setup = ["Select a host OS manually if detection is unknown.", "Enable Unicode Hex Input in macOS and keep it active during playback.", "Install and run WinCompose with Right Alt as Compose.", "Use an input method/application accepting Ctrl+Shift+U, hex digits and Space. Some Linux applications do not support it."][host.effective];
+    const layouts = supportsHostLayouts(capabilities);
+    const macos = host.effective === 1;
+    const setup = ["Select a host OS manually if detection is unknown.",
+        layouts ? "For emoji and other characters your layout cannot type, choose the Unicode Hex Input layout and make it your active input source." : "Enable Unicode Hex Input in macOS and keep it active during playback.",
+        "Install and run WinCompose with Right Alt as Compose.", "Use an input method/application accepting Ctrl+Shift+U, hex digits and Space. Some Linux applications do not support it."][host.effective];
+    // The effective OS's layouts first, then US; with no known OS, all of them.
+    const osName = [null, "macos", "windows", "linux"][host.effective];
+    const offered = hostLayouts().filter(layout => !osName || layout.os === "any" || layout.os === osName || layout.id === host.layout);
+    const layoutWord = id => VOCABULARY.hostLayouts.find(([value]) => value === id)?.[1];
     result.push({id: "host", area: "Settings", label: "Host", description: available
         ? `Detected: ${host.detected ? label(host.detected) : "Unknown"}. Effective: ${host.effective ? label(host.effective) : "Unknown"}. Detection is a best guess; override it if incorrect. ${setup} The keyboard cannot confirm your input setup.`
         : "Update both halves to report their host OS and support these settings.", fields: [
-        {...number("hostOs", SETTING.UNICODE_HOST_MODE, "Host OS", "Auto uses the keyboard’s USB detection. This controls display names and Unicode entry; it does not swap keys.", {max: 3}), bitMask: 3, kind: "number", readOnly: !available,
+        {...number("hostOs", SETTING.UNICODE_HOST_MODE, "Host OS", "Auto uses the keyboard’s USB detection. This controls display names, the layouts offered and Unicode entry; it does not swap keys.", {max: 3}), bitMask: 3, kind: "number", readOnly: !available,
             choices: VOCABULARY.hostOs.map(([value, label]) => ({value, label}))},
-        {...toggle("unicodeEnabled", SETTING.UNICODE_HOST_MODE, "Unicode playback", `${setup} Enable only after configuring the host. Avoid typing during playback.`), bitMask: UNICODE_ENABLED, readOnly: !available},
+        {...byte("hostLayout", SETTING.UNICODE_HOST_MODE, LAYOUT_SHIFT, "Keyboard layout"), kind: "number", readOnly: !layouts,
+            hint: layouts ? "The layout your computer types with. Macros type through it, accents included; pick the one that is active on the computer." : "Update both halves to type macros through your keyboard layout. Until then they assume US.",
+            choices: offered.map(layout => ({value: layout.id, label: layoutWord(layout.id)}))},
+        ...((macos && layouts) || host.macosIso ? [{...toggle("macosIso", SETTING.UNICODE_HOST_MODE, "ISO keyboard on macOS", "Turn on if macOS set this keyboard up as ISO (Keyboard Setup Assistant). macOS then swaps the keys left of 1 and left of Z, so macros must too."), bitMask: MACOS_ISO, readOnly: !layouts}] : []),
+        // On macOS, Unicode entry is the Unicode Hex Input layout, not a switch.
+        ...(layouts && macos && !host.unicodeEnabled ? [] : [{...toggle("unicodeEnabled", SETTING.UNICODE_HOST_MODE, "Unicode playback", layouts && macos
+            ? "On macOS, choose the Unicode Hex Input layout instead; this switch only applies with US."
+            : `${setup} Enable only after configuring the host. Avoid typing during playback.`), bitMask: UNICODE_ENABLED, readOnly: !available}]),
     ]});
     return result;
 }
 
-function settingsEditorView(snapshot) {
+// Capabilities decide which Host fields can be edited; Review and revert read
+// values without them.
+function settingsEditorView(snapshot, capabilities) {
     if (!snapshot?.document || snapshot.incomplete) return null;
     const {settings} = decodedOf(snapshot);
     return {identity: snapshot.fingerprint,
         brightnessMax: snapshot.limits?.brightnessMax,
-        sections: settingsSections(snapshot, settings).map(section => ({...section, fields: section.fields.map(field => {
+        sections: settingsSections(snapshot, settings, capabilities).map(section => ({...section, fields: section.fields.map(field => {
             const value = field.record ? settings.layers[field.layer][field.record] : settingValue(field, settings.values);
             if (field.kind === "share") return {...field, value: String(shareOf(value, settings.values[field.of])),
                 ms: String(value), whole: String(settings.values[field.of])};

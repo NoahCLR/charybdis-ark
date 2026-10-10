@@ -465,7 +465,7 @@ class ProfileDraftSession {
         return {...state, busy: state.busy || this.stale || !state.connected,
             layout: {state: "read", layers: current.document.layers.map((values, layer) => ({layer, keys: CHARYBDIS_4X6_LAYOUT_MATRIX.map(([row, column], layoutIndex) => ({row, column, layoutIndex, keycode: values[row * 6 + column], resolved: keycodes.resolve(values[row * 6 + column])}))}))},
             committed: {...state.committed, state: "read", failures: [], domains: {rgb: value.rgb, keyBehaviors: value.behaviors, settings: value.settings, pdModes: value.pdModes}},
-            baseRgb, combos: this.combos(), macroView: macroEditorView(current, this.capabilities), customKeyView: customKeyEditorView(current, this.capabilities), settingsView: settingsEditorView(current)};
+            baseRgb, combos: this.combos(), macroView: macroEditorView(current, this.capabilities), customKeyView: customKeyEditorView(current, this.capabilities), settingsView: settingsEditorView(current, this.capabilities)};
     }
     view(state) {
         const matching = state.selectedDeviceId === this.deviceId, connected = matching && state.connected;

@@ -59,7 +59,7 @@ export function screenMacros() {
     const changedMacros = draftMarks(model?.draft?.changes).macros;
     bank.forEach((row, index) => {
         if (!macroMatches(row, query)) return;
-        const {steps} = parseMacro(row.payload, {unicode: model?.macroUnicode?.supported, textEntry: Boolean(model?.macroUnicode?.mode), modifierKeys: model?.macroPayloadModifierKeycodes});
+        const {steps} = parseMacro(row.payload, {unicode: model?.macroUnicode?.supported, textEntry: Boolean(model?.macroUnicode?.mode), layoutChars: model?.macroUnicode?.layoutChars, modifierKeys: model?.macroPayloadModifierKeycodes});
         const peek = macroPeek(row.payload, (name) => model?.qmkKeyLabels?.[name] || name);
         const out = row.available === false;
         const tip = out ? `Slot ${index} · no room: the free macro memory is kept for the lower empty slots. Shorten or clear a macro to open it.`
@@ -301,7 +301,7 @@ function paintFeedback(card, model, slot) {
     const form = macroForm(slot.keycode), local = form.draft !== undefined;
     const payload = form.draft ?? slot.payload;
     const parsed = parseMacro(payload, {keys: model?.macroPayloadKeycodes, aliases: model?.qmkKeycodeAliases, unicode: model?.macroUnicode?.supported,
-        textEntry: Boolean(model?.macroUnicode?.enabled), modifierKeys: model?.macroPayloadModifierKeycodes});
+        textEntry: Boolean(model?.macroUnicode?.mode), layoutChars: model?.macroUnicode?.layoutChars, modifierKeys: model?.macroPayloadModifierKeycodes});
     const held = unreleased(parsed.steps, model?.qmkKeycodeAliases);
     const inspection = matchingValidation(form, model, slot) ? form.validation.validation : null;
     const error = form.stepError || parsed.error || (held.length ? `Release ${held.map(key => actionLabel(model, key)).join(", ")} before the macro ends.` : "") || inspection?.error;
@@ -477,10 +477,15 @@ function onRecordKey(event) {
 
 function unicodeSetup(model, canEdit) {
     if (!model?.macroUnicode?.supported) return `<p class="note">Unicode macro text needs newer firmware on both halves.</p>`;
-    const mode = model.macroUnicode.mode;
-    const setup = ["Unicode playback is off or the host OS is unknown.",
-        "Enable Unicode Hex Input in macOS input sources and keep it active while playing macros with non-ASCII text. Option shortcuts can behave differently in this input source.",
-        "Install and run WinCompose on Windows with Right Alt as its Compose key.",
-        "Use an input method or application that accepts Ctrl+Shift+U, hexadecimal digits and Space, such as IBus. This sequence does not work in every Linux application."][mode];
-    return `<div class="field"><span class="note">${esc(setup)} Plain ASCII text types with ordinary keys on any input source; only accented letters, emoji and other non-ASCII characters need this setup. Configure the host and Unicode playback in Settings → Host. The keyboard cannot check your input setup. Avoid typing while a text macro plays.</span><button class="btn tiny ghost" data-host-settings>Open Host settings</button></div>`;
+    const {mode, os, layouts, layoutName} = model.macroUnicode;
+    const typed = layouts
+        ? `Text types through the ${layoutName} layout chosen in Settings → Host, accented letters included; keep that layout active on the computer.`
+        : "Plain ASCII text types with ordinary keys on any input source.";
+    const entry = mode
+        ? ["", "Other characters use Unicode entry: keep Unicode Hex Input active in macOS input sources while macros play. Option shortcuts can behave differently in this input source.",
+            "Other characters use Unicode entry: install and run WinCompose on Windows with Right Alt as its Compose key.",
+            "Other characters use Unicode entry: use an input method or application that accepts Ctrl+Shift+U, hexadecimal digits and Space, such as IBus. This sequence does not work in every Linux application."][mode]
+        : layouts && os === 1 ? "Characters it cannot type, such as emoji, need the Unicode Hex Input layout."
+            : "Characters it cannot type, such as emoji, need Unicode playback on and a known host OS.";
+    return `<div class="field"><span class="note">${esc(typed)} ${esc(entry)} The keyboard cannot check your input setup. Avoid typing while a text macro plays.</span><button class="btn tiny ghost" data-host-settings>Open Host settings</button></div>`;
 }

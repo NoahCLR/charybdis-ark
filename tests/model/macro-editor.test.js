@@ -142,14 +142,17 @@ test("Unicode host setup persists with the profile and gates Unicode edits on le
     const setHost = (mode, enabled) => {
         const section = settingsEditorView({...current, hostOs: {detected: 0}}).sections.find(s => s.id === "host");
         return editSettings(current, {sectionId: "host", expectedFingerprint: current.fingerprint,
-            fields: section.fields.map(f => f.kind === "toggle" ? {macro: f.macro, enabled} : {macro: f.macro, value: String(mode)})}, capabilities);
+            fields: section.fields.map(f => f.kind === "toggle" ? {macro: f.macro, enabled} : {macro: f.macro, value: f.macro === "hostOs" ? String(mode) : f.value})}, capabilities);
     };
     for (const mode of [1, 2, 3]) {
         current = snapshot(setHost(mode, true));
         assert.equal(validateSnapshot(current.document).settings.values[27], 0x100 | mode);
         current = snapshot(change({payload: "café 🙂 e\u0301 👩‍💻"}));
         const view = macroEditorView(current, capabilities);
-        assert.deepEqual(view.unicode, {supported: true, mode, enabled: true});
+        const {layoutChars, ...unicodeView} = view.unicode;
+        // Firmware without host layouts types through US, ASCII only.
+        assert.deepEqual(unicodeView, {supported: true, mode, enabled: true, os: mode, layouts: false, layout: 0, layoutName: "US"});
+        assert.equal(layoutChars.length, 97);
         assert.equal(view.viaMacros[0].payload, "café 🙂 e\u0301 👩‍💻");
         assert.equal(Buffer.from(current.document.macros[0], "base64").toString("utf8"), "café 🙂 e\u0301 👩‍💻");
         assert.throws(() => validateSnapshot(current.document, {...capabilities, featureFlags: 0}), /ASCII/);
@@ -178,4 +181,34 @@ test("live macro inspection and staging agree without inspection changing the sn
         else assert.equal(Buffer.from(editMacro(current, message).macros[17], "base64").length, result.bytes);
     }
     assert.deepEqual(current, before);
+});
+
+test("macro text is judged against the host layout the keyboard types through", () => {
+    const capabilities = {featureFlags: (1 << 21) | (1 << 22), compiledLayerCount: 16, supportedDomainMask: 31, actionAbiDigest: 0x837cf479};
+    let current = snapshot(document());
+    const change = payload => editMacro(current, {keycode: "VIA_MACRO_0", expectedFingerprint: current.fingerprint, payload}, capabilities);
+    const setHost = (os, layout, unicode = false, iso = false) => {
+        const section = settingsEditorView({...current, hostOs: {detected: 0}}, capabilities).sections.find(s => s.id === "host");
+        const shown = {hostOs: String(os), hostLayout: String(layout), unicodeEnabled: unicode, macosIso: iso};
+        current = snapshot(editSettings(current, {sectionId: "host", expectedFingerprint: current.fingerprint,
+            fields: section.fields.map(f => f.kind === "toggle" ? {macro: f.macro, enabled: shown[f.macro]} : {macro: f.macro, value: shown[f.macro]})}, capabilities));
+    };
+    // Settle the OS first so the layouts it offers include the one chosen.
+    setHost(2, 0); setHost(2, 9);
+    assert.equal(validateSnapshot(current.document).settings.values[27], 2 | (9 << 16));
+    assert.doesNotThrow(() => change("zy@ö {+KC_A}ü{-KC_A}"), "German types these with its own keys, so a held key may span them");
+    assert.throws(() => change("🙂"), error => error.code === "UNICODE_SETUP_REQUIRED" && /German layout cannot type “🙂”/.test(error.message) && /Enable Unicode playback/.test(error.message));
+    setHost(2, 9, true);
+    assert.doesNotThrow(() => change("🙂"));
+    assert.throws(() => change("{+KC_A}🙂{-KC_A}"), /Release ordinary keys/);
+    setHost(1, 0); setHost(1, 2, false, true);
+    assert.equal(validateSnapshot(current.document).settings.values[27], 1 | (2 << 16) | 0x1000000);
+    current = snapshot(change("café “hello” €"));
+    const view = macroEditorView(current, capabilities);
+    assert.equal(view.viaMacros[0].needsUnicodeSetup, false);
+    assert.equal(view.unicode.layoutName, "Dutch");
+    assert.throws(() => change("🙂"), error => /Dutch layout cannot type “🙂”/.test(error.message) && /Unicode Hex Input/.test(error.message));
+    setHost(1, 3);
+    assert.equal(macroEditorView(current, capabilities).unicode.mode, 1, "Unicode Hex Input enables hex entry by itself");
+    assert.doesNotThrow(() => change("🙂"));
 });

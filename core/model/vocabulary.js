@@ -9,9 +9,14 @@
 // never name one thing two ways. Lists are ordered as the editors offer them.
 
 const {RGB_STAGE_BITS} = require("../schema/rgb-domain-v1");
+const {hostLayouts} = require("../data/host-layouts");
+
+const OS_WORDS = {macos: "macOS", windows: "Windows", linux: "Linux"};
 
 const VOCABULARY = Object.freeze({
     hostOs: [[0, "Auto"], [1, "macOS"], [2, "Windows"], [3, "Linux"]],
+    // A host layout names its OS, since German on macOS and on Windows differ.
+    hostLayouts: hostLayouts().map(layout => [layout.id, layout.os === "any" ? layout.name : `${layout.name} (${OS_WORDS[layout.os]})`]),
     // How a hold tier runs once its threshold passes, in that tier's words: a
     // helper that names a threshold names the tier's own, the Tap / hold
     // threshold for Hold and the Long hold threshold for Long hold. A tap tier

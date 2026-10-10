@@ -206,7 +206,7 @@ test("an old inspection cannot stage after host setup changes at the same draft 
         window.dispatchEvent = window.__dispatchBeforeHold;
         window.dispatchEvent(new MessageEvent("message", {data: window.__heldInspections[0]}));
     });
-    await expect(page.locator("[data-macro-feedback]")).toContainText("Choose a known host OS");
+    await expect(page.locator("[data-macro-feedback]")).toContainText("cannot type “é”");
     expect(await updates(page)).toHaveLength(0);
     await expect(page.locator("[data-step-text]")).toHaveValue("café");
 });

@@ -1,4 +1,5 @@
 "use strict";
+const {validHostSetting} = require("./host-settings");
 // Settings domain 0x40, version 6, the only one the keyboard stores (firmware
 // D-F14): 31 values, sixteen layer records, then 272 counted names — sixteen
 // layer names, 128 VIA macro names and 128 custom-key names, each a length
@@ -35,7 +36,7 @@ function validSetting(id, v, layers = SETTINGS.LAYERS) {
     if (id === 21) return (v & 255) <= 1;
     if (id === 22) return v <= 0xffffff;
     if (id === 23) return v > 0 && v < bank;
-    if (id === 27) return (v & ~0x103) === 0;
+    if (id === 27) return validHostSetting(v);
     if (id === 29 || id === 30) return v < bank;
     return v <= 65535;
 }
