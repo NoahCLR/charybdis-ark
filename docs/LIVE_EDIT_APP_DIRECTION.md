@@ -40,7 +40,7 @@ matrix.
 | --- | --- |
 | Layout and 16 layers | Read/write; key labels and picker legends follow the chosen host layout (D-L56); names and overlay order travel with complete profiles; a reorder renumbers layer keys by default ("Keys follow their layers") |
 | Key behaviours, combos and RGB | Read/write editors over the shared draft; selected keys open an unstored behaviour grid until the first edit; matching Keys reach sections share open state across tabs, open independently, and use the page scrollbar |
-| Macros | 128 named VIA macro slots with literal Text, editable steps, Advanced raw payload, recorder and live validation; capability-gated Unicode text, saved macOS/Windows/Linux host setup and a host keyboard layout macro text is typed and checked through; changing Host rechecks stored playback and reviews affected macros with that setting (D-L56); shared-memory and per-macro limits shown and enforced (D-L25, D-L26) |
+| Macros | 128 named VIA macro slots with literal Text, editable steps, Advanced raw payload, recorder and live validation; capability-gated Unicode text, saved macOS/Windows/Linux host setup and a host keyboard layout macro text is typed and checked through; changing Host rechecks stored playback and reviews affected macros with that setting (D-L56); per-macro input protection defaults on for Unicode entry, with On/Off overrides (D-L57); shared-memory and per-macro limits shown and enforced (D-L25, D-L26) |
 | Custom keys | 128 named keys that do what their behaviour says: rename, add or open the behaviour, place, see where each is used (D-L42) |
 | Mouse | Pointer and sniping DPI, auto-sniping and auto-mouse: global-policy sections the core files under the Mouse area, so the rail, the review and import counts all place them there. The auto-mouse fade delay is a share of the timeout, edited on its lighting stage (D-L17) |
 | Pointing modes | 32 device-owned slots (sparse PD domain v3, RGB v4); live codecs accept only the current action vocabulary and profile formats (D-L54). See [PD-mode domain v1](../upstream/firmware/docs/architecture/pd-mode-domain-v1.md) |
@@ -1168,3 +1168,19 @@ Macros rows use the Host settings unit: discard restores Host, preserving
 independently edited macro steps and names. Authored text and explicit key steps
 are never rewritten to simulate a layout change. An accepted but unplayable
 macro remains a warning, not a save blocker.
+
+### D-L57 — Macro input protection is automatic with a per-slot override
+
+Feature bit 23 advertises per-macro playback protection (firmware D-F17).
+The Macros editor offers Automatic, On and Off. Automatic turns on for text
+the selected layout cannot type natively and must enter as Unicode, not merely
+because UTF-8 contains non-ASCII text. Its effective state follows Host changes,
+and Review groups that derived effect with Host; explicit overrides are macro
+changes and discard with their slot. Ignored presses are never replayed, and
+the explanation distinguishes physical-key admission from a host input lock.
+
+The optional canonical prefix belongs to the macro bytes. Text/name edits
+preserve it, metadata-only empty slots keep their reserve, and bank accounting
+includes its three bytes while playback accounting excludes it. Portable decode
+preserves overrides without a destination; staging and Apply require the
+capability. The app does not pretend older firmware enforces protection.

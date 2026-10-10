@@ -13,7 +13,7 @@ const ENTRY_SETUP = [
 
 // Inspection and staging use the same codec and limits. A partial or oversized
 // edit remains visible locally; inspection never changes a profile.
-function inspectMacroInput(payload, {unicode = false, mode = 0, enabled = false, layout = US_HOST_LAYOUT, os = 0, macosIso = false, currentBytes = 0, bankFree = 0} = {}) {
+function inspectMacroInput(payload, {unicode = false, mode = 0, enabled = false, layout = US_HOST_LAYOUT, os = 0, macosIso = false, currentBytes = 0, bankFree = 0, protection = "auto", protectionSupported = false} = {}) {
     const result = {bytes: null, program: null, programMax: MACRO_PROGRAM_MAX, availableBytes: currentBytes + bankFree, error: "", code: "", typing: []};
     try {
         // Inspect literal text only, not command spelling or escaped braces.
@@ -25,7 +25,7 @@ function inspectMacroInput(payload, {unicode = false, mode = 0, enabled = false,
         result.typing = [...characters].map(character => layoutTypes(layout, character)
             ? {character, method: "layout", strokes: native.strokes[character].map(swapIso)}
             : {character, method: mode && unicode ? "unicode" : "unavailable", mode: mode && unicode ? mode : 0});
-        const bytes = encodeMacroPayload(payload, {unicode, textEntry: enabled, layout});
+        const bytes = encodeMacroPayload(payload, {unicode, textEntry: enabled, layout, protection, protectionSupported});
         result.bytes = bytes.length;
         result.program = macroProgramBytes(bytes);
         const missing = [...characters].find(character => !layoutTypes(layout, character));

@@ -15,6 +15,7 @@ const OS_WORDS = {macos: "macOS", windows: "Windows", linux: "Linux"};
 
 const VOCABULARY = Object.freeze({
     hostOs: [[0, "Auto"], [1, "macOS"], [2, "Windows"], [3, "Linux"]],
+    macroProtection: [["auto", "Automatic"], ["on", "On"], ["off", "Off"]],
     // A host layout names its OS, since German on macOS and on Windows differ.
     hostLayouts: hostLayouts().map(layout => [layout.id, layout.os === "any" ? layout.name : `${layout.name} (${OS_WORDS[layout.os]})`]),
     // How a hold tier runs once its threshold passes, in that tier's words: a

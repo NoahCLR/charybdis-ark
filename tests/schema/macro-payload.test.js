@@ -3,6 +3,24 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const {encodeMacroPayload, decodeMacroPayload, macroKeycodes, macroProgramBytes, MACRO_PROGRAM_MAX} = require("../../core/schema/macro-payload");
 
+test("protection has one canonical capability-gated prefix and does not consume playback bytes", () => {
+    const {macroProtectionOf} = require("../../core/schema/macro-payload");
+    const context = {unicode: true, protectionSupported: true};
+    for (const protection of ["auto", "on", "off"]) {
+        const payload = "é{KC_A}", bytes = encodeMacroPayload(payload, {...context, protection});
+        assert.equal(decodeMacroPayload(bytes, context), payload);
+        assert.equal(macroProtectionOf(bytes, context), protection);
+        assert.equal(macroProgramBytes(bytes), macroProgramBytes(encodeMacroPayload(payload, context)));
+        if (protection !== "auto") {
+            assert.throws(() => decodeMacroPayload(bytes, {unicode: true}), /Update both halves/);
+            assert.throws(() => encodeMacroPayload(payload, {unicode: true, protection}), /Update both halves/);
+        }
+    }
+    for (const bytes of [[1,5], [1,5,0], [1,5,3], [97,1,5,1], [1,5,1,1,5,2]]) {
+        assert.throws(() => decodeMacroPayload(Buffer.from(bytes), context), /prefix|protection/);
+    }
+});
+
 test("VIA macros round-trip text, literal braces, Cmd+N, holds and delays", () => {
     const payload = 'hello {{"key": 1}}\n{KC_LGUI,KC_N}{250}{+KC_LSFT}{KC_A}{-KC_LSFT}{0}';
     const bytes = encodeMacroPayload(payload);

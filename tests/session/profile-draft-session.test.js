@@ -18,6 +18,21 @@ function settings(draft, id, updates) {
 }
 function stage(draft, edit) {return draft.stage({...edit,draftRevision:draft.revision});}
 
+test("Host changes review automatic protection with Host rather than inventing a macro edit", () => {
+    const {hostMacros} = require("../fixtures/host-macros");
+    const {snapshot, capabilities} = hostMacros(1 | (2 << 16), ["é"]);
+    capabilities.featureFlags |= 1 << 23;
+    const draft = new ProfileDraftSession(snapshot, "board", capabilities);
+    stage(draft, settings(draft, "host", {hostLayout: "3"}));
+    assert.ok(!draft.changes().some(row => row.unit === "macro:0"));
+    const effect = draft.changes().find(row => row.area === "Macros");
+    assert.equal(effect.unit, "settings:host");
+    assert.deepEqual(effect.fields.find(field => field.label === "Uninterruptible playback"),
+        {label: "Uninterruptible playback", status: "changed", before: "Automatic · off", after: "Automatic · on"});
+    draft.discard(draft.revision, effect.group);
+    assert.equal(draft.dirty, false);
+});
+
 test("layout playback effects follow Host through Review, history, undo, redo and discard", () => {
     const {hostMacros} = require("../fixtures/host-macros");
     const {snapshot, capabilities} = hostMacros(1 | (2 << 16), ["café", "{+KC_A}é{-KC_A}"]);

@@ -173,6 +173,7 @@ export const macroMessage = (keycode, payload, identity) => ({type: "updateViaMa
 export const macroValidationMessage = (keycode, payload, requestId) => ({type: "validateViaMacro", keycode, payload, requestId});
 // A VIA macro's name; its steps stay as they are.
 export const macroNameMessage = (keycode, name, identity) => ({type: "updateViaMacro", keycode, name: String(name ?? "").trim(), expectedFingerprint: identity});
+export const macroProtectionMessage = (keycode, protection, identity) => ({type: "updateViaMacro", keycode, protection, expectedFingerprint: identity});
 export const customKeyNameMessage = (keycode, name, identity) => ({type: "updateCustomKey", keycode, name: String(name ?? "").trim(), expectedFingerprint: identity});
 
 export const pdMode = (slot, config, identity) => ({type: "savePdMode", slot, expectedBase: identity, config});

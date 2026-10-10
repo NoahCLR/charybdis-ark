@@ -23,7 +23,7 @@ function profileFindings(decoded, destination = {}) {
     (decoded.document?.macros || []).forEach((encoded, index) => {
         const bytes = Buffer.from(encoded, "base64");
         if (!bytes.length) return;
-        const playback = inspectMacroPlayback(decodeMacroPayload(bytes, {unicode: true}), host);
+        const playback = inspectMacroPlayback(decodeMacroPayload(bytes, {unicode: true, protectionSupported: true}), host);
         if (!playback.error) return;
         findings.push({kind: "unplayableMacro", level: "warning", layers: [], identity: `${index}:${playback.code}:${playback.error}`,
             title: playback.code === "MACRO_TOO_LONG" ? `Macro ${index} is too long to play` : `Macro ${index} cannot play with this Host setup`,

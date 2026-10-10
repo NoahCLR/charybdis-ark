@@ -265,7 +265,7 @@ class ProfileDraftSession {
     describe(document, order) {
         const {snapshot, order: moved} = this.referenceFor(order);
         const after = {...this.snapshotFacts, incomplete: false, document, ...this.decode(document)};
-        return [...(moved ? [layerOrderReview(after, moved)] : []), ...profileReview(snapshot, after)];
+        return [...(moved ? [layerOrderReview(after, moved)] : []), ...profileReview(snapshot, after, this.capabilities)];
     }
     // The review rows, each with the group it belongs to. Rows are grouped by
     // the edits that made them: the units one staged message changed belong
@@ -314,7 +314,7 @@ class ProfileDraftSession {
         const entry = this.history[step], previous = this.history[step - 1], cached = this.stepCache.get(entry);
         if (cached?.previous === previous) return cached.units;
         const snapshot = document => ({...this.snapshotFacts, incomplete: false, document, ...this.decode(document)});
-        const units = [...new Set(profileReview(snapshot(previous), snapshot(entry)).map(row => row.unit))];
+        const units = [...new Set(profileReview(snapshot(previous), snapshot(entry), this.capabilities).map(row => row.unit))];
         this.stepCache.set(entry, {previous, units});
         return units;
     }
@@ -341,8 +341,8 @@ class ProfileDraftSession {
         const snapshot = document => ({...this.snapshotFacts, incomplete: false, document, ...this.decode(document)});
         const back = inverse(before), moved = Object.freeze(after.map(layer => back[layer]));
         const now = snapshot(entry);
-        const rows = isIdentity(moved) ? profileReview(snapshot(previous), now)
-            : [layerOrderReview(now, moved), ...profileReview(snapshot(validateSnapshot(rearranged(previous, moved), this.capabilities).document), now)];
+        const rows = isIdentity(moved) ? profileReview(snapshot(previous), now, this.capabilities)
+            : [layerOrderReview(now, moved), ...profileReview(snapshot(validateSnapshot(rearranged(previous, moved), this.capabilities).document), now, this.capabilities)];
         const shown = rows.map(placed);
         this.reviewCache.set(entry, {previous, before, after, rows: shown});
         return shown;

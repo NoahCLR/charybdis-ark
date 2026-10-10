@@ -7,5 +7,7 @@ export function inspect(message, model) {
     return {...message, type: "macroValidation", validation: inspectMacroInput(message.payload, {
         unicode: model.macroUnicode.supported, mode: model.macroUnicode.mode, enabled: model.macroUnicode.enabled ?? Boolean(model.macroUnicode.mode),
         currentBytes: slot.bytes, bankFree: model.macroBank.free,
+        layout: model.macroUnicode.layout, os: model.macroUnicode.os,
+        protection: slot.protection, protectionSupported: model.macroProtectionSupported,
     })};
 }
