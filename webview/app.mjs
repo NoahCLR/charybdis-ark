@@ -465,9 +465,15 @@ function historyShortcut(event) {
     return true;
 }
 
+// The board's shortcuts take their keys before anything else on the page hears
+// them. An extension that turns Backspace into Back listens on the window from
+// before Ark loads, so Ark's ordinary listener would come too late, and deleting
+// a key would also leave Ark.
+addEventListener("keydown", (event) => {
+    if (historyShortcut(event) || keysShortcut(event)) event.stopImmediatePropagation();
+}, true);
 addEventListener("keydown", (event) => {
     if (trapTab(root, event) || activateOnKey(event)) return;
-    if (historyShortcut(event) || keysShortcut(event)) return;
     if (event.key !== "Escape") return;
     hideHover();
     if (state.picker) { state.picker = null; render(); return; }
