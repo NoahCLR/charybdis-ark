@@ -161,6 +161,7 @@ class ProfileDraftSession {
             this.hostOs = hostOs;
             this.referenceCache = new WeakMap();
             this.reviewCache = new WeakMap();
+            this.checksCache = new WeakMap();
         }
         if (!this.dirty) {
             if (snapshot.fingerprint !== this.base.fingerprint) this.reset(snapshot);
@@ -435,6 +436,7 @@ class ProfileDraftSession {
         const known = this.checksCache.get(draft);
         if (known && known.keyboard === keyboard && known.order === order) return known.checks;
         const checks = draftProfileChecks(keyboard, draft, order, {brightnessMax: this.current.limits?.brightnessMax,
+            detectedHostOs: this.current.hostOs?.detected,
             effects: this.current.options?.effects,
             ownedTapping: Boolean(this.capabilities?.featureFlags & PROFILE_WIRE_FEATURES.OWNED_TAPPING),
             physicalGestureTiming: Boolean(this.capabilities?.featureFlags & PROFILE_WIRE_FEATURES.PHYSICAL_GESTURE_TIMING)});

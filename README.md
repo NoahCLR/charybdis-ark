@@ -10,6 +10,7 @@ checkout. Everything Ark shows comes from the keyboard itself.
 Paste text straight into a macro, including code and literal braces, and add
 shortcuts or delays as separate steps. Pick your computer's keyboard layout in
 Settings and macros type through it, accents included; emoji use Unicode entry.
+Switch layouts and Review shows which macros type differently or need a fix.
 Key and modifier names follow that OS throughout the editors and Review.
 
 ## What you can change

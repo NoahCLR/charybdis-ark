@@ -581,6 +581,13 @@ travel through Review, undo/redo, readback and backups. Older firmware leaves
 them read-only and keeps ASCII editing; firmware without host layouts leaves
 the layout read-only at US.
 
+Changing Host rechecks every stored macro against the new typing setup. Review
+lists affected text macros with their old and new entry method and playback
+status, including a macro that becomes ready or needs a fix. These effects
+discard together with the Host change; separately edited macro text and names
+stay in the draft. Text and key steps are preserved: text uses the new layout's
+keys automatically, while explicit key steps still send the keys you chose.
+
 ## Text macros
 
 Each empty macro opens with a **Text** box. Type or paste exactly what you want
@@ -621,6 +628,13 @@ character the layout cannot type and refuses to save it until Unicode entry is
 set up. A macro may hold an ordinary key across text the layout types, but not
 across text that needs Unicode entry; holding a modifier is fine. Unicode
 edits require a known effective OS.
+
+A layout change can make a stored macro unplayable, for example when an
+ordinary key is held across `é` and the new layout needs Unicode entry for it.
+The slot shows **blocked**, the editor explains the reason, and Review warns
+before Apply. Release that key before the text, or choose a layout that can type
+the character. Characters with no native route or Unicode setup show **setup**.
+Ark cannot repair those sequences without changing what you authored.
 
 Bank usage counts UTF-8 bytes; compiled usage counts each non-ASCII scalar as
 four bytes and each ASCII run with its instruction headers. The 512-byte

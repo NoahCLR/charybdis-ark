@@ -4,6 +4,36 @@ const {profileReview} = require("../../core/model/profile-review");
 const {document} = require("../fixtures/portable-profile");
 const {fingerprint,reorderLayers} = require("../../core/model/portable-profile");
 const snapshot = document => ({document,fingerprint:fingerprint(document)});
+
+test("Host changes review affected text macros while leaving key steps and identical typing routes out", () => {
+    const {hostMacros} = require("../fixtures/host-macros");
+    const payloads = ["café", "hello", "{KC_A}{120}", "{+KC_A}é{-KC_A}"];
+    const before = hostMacros(1 | (2 << 16), payloads).snapshot;
+    const after = hostMacros(1 | (3 << 16), payloads).snapshot;
+    const effects = profileReview(before, after).filter(row => row.area === "Macros");
+    assert.deepEqual(effects.map(row => row.place.index), [0, 3]);
+    for (const row of effects) {
+        assert.equal(row.unit, "settings:host", "the effect discards the host setting, not the macro");
+        assert.match(row.note, /because of Settings → Host/);
+        const typing = row.fields.find(field => field.label === "Text entry");
+        assert.match(typing.before, /layout keys: "é"/);
+        assert.match(typing.after, /Unicode entry \(macOS\): "é"/);
+    }
+    assert.match(effects[1].fields.find(field => field.label === "Playback").after, /Release ordinary keys/);
+    assert.equal(effects[1].fields.find(field => field.label === "Playback").before, "Ready to play");
+    assert.deepEqual(after.document.macros, before.document.macros);
+    assert.equal(profileReview(after, before).filter(row => row.area === "Macros").at(-1).fields.find(field => field.label === "Playback").after, "Ready to play");
+});
+
+test("Review detects native key changes, ISO swaps and loss of Unicode setup", () => {
+    const {hostMacros} = require("../fixtures/host-macros");
+    const review = (oldHost, nextHost, payload) => profileReview(hostMacros(oldHost, [payload]).snapshot, hostMacros(nextHost, [payload]).snapshot).find(row => row.area === "Macros");
+    assert.match(review(2, 2 | (9 << 16), "z").fields[0].after, /German/);
+    const iso = review(1 | (2 << 16), 1 | (2 << 16) | (1 << 24), "~");
+    assert.match(iso.fields[0].before, /ANSI/); assert.match(iso.fields[0].after, /ISO/);
+    assert.match(review(1 | (3 << 16), 1 | (2 << 16), "🙂").fields.find(field => field.label === "Playback").after, /cannot type/);
+    assert.equal(review(1 | (2 << 16), 1 | (2 << 16) | (1 << 24), "hello"), undefined);
+});
 test("unchanged snapshots have no review entries and layer renaming does not invent policy changes", () => {
     const before=snapshot(document()); assert.deepEqual(profileReview(before,before),[]);
     const names=["Base","Numbers","Symbols","Navigation","Mouse","Extra 1","Extra 2","Extra 3",...Array(8).fill("")];

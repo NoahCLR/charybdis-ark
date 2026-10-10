@@ -42,6 +42,9 @@ function buildHostLayouts(fixture) {
             // Every character the layout types, in code point order. Object
             // keys list digit-like keys first, so sort explicitly.
             chars: Object.keys(layout.chars).sort((a, b) => a.codePointAt(0) - b.codePointAt(0)).join(""),
+            // Review compares the exact native strokes, including dead keys;
+            // two layouts can type a character by different keys.
+            strokes: layout.chars,
         })),
     };
 }

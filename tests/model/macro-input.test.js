@@ -1,9 +1,34 @@
 "use strict";
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const {inspectMacroInput} = require("../../core/model/macro-input");
+const {inspectMacroInput, inspectMacroPlayback} = require("../../core/model/macro-input");
 const {encodeMacroPayload, macroProgramBytes} = require("../../core/schema/macro-payload");
 const context = {unicode: true, enabled: true, mode: 1, bankFree: 10327};
+
+test("playback routes use the fixture's native strokes, Unicode entry and macOS ISO swap", () => {
+    const dutch = {layout: 2, effective: 1, unicodeMode: 0};
+    const native = inspectMacroPlayback('café{KC_A}{{KC_A}}', dutch);
+    assert.equal(native.error, "");
+    assert.deepEqual(native.typing.find(route => route.character === "é"), {character: "é", method: "layout", strokes: ["ALGR(KC_E)", "KC_E"]});
+    assert.ok(native.typing.some(route => route.character === "{"), "escaped literal braces are text");
+    assert.deepEqual(inspectMacroPlayback("{KC_A}{120}", dutch).typing, [], "key and delay spelling is not text");
+    const hex = inspectMacroPlayback("é🙂", {...dutch, layout: 3, unicodeMode: 1});
+    assert.deepEqual(hex.typing, ["é", "🙂"].map(character => ({character, method: "unicode", mode: 1})));
+    assert.equal(inspectMacroPlayback("é🙂", dutch).code, "UNICODE_SETUP_REQUIRED");
+    const ansi = inspectMacroPlayback("~", dutch), iso = inspectMacroPlayback("~", {...dutch, macosIso: true});
+    assert.deepEqual(ansi.typing[0].strokes, ["S(KC_GRV)"]);
+    assert.deepEqual(iso.typing[0].strokes, ["S(KC_NUBS)"]);
+});
+
+test("changing from native entry to Unicode rechecks held ordinary keys", () => {
+    const payload = "{+KC_A}é{-KC_A}", host = {layout: 2, effective: 1, unicodeMode: 0};
+    assert.equal(inspectMacroPlayback(payload, host).error, "");
+    const invalid = inspectMacroPlayback(payload, {...host, layout: 3, unicodeMode: 1});
+    assert.equal(invalid.code, "INVALID_MACRO");
+    assert.match(invalid.error, /Release ordinary keys/);
+    assert.deepEqual(invalid.typing, [{character: "é", method: "unicode", mode: 1}]);
+    assert.equal(inspectMacroPlayback("{+KC_LSFT}é{-KC_LSFT}", {...host, layout: 3, unicodeMode: 1}).error, "");
+});
 
 test("inspection counts the bytes the production codec stores and plays", () => {
     for (const payload of ["", "a".repeat(255), "a".repeat(256), "a".repeat(508),

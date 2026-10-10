@@ -1,6 +1,6 @@
 "use strict";
 
-const {encodeMacroPayload, macroProgramBytes, MACRO_PROGRAM_MAX} = require("../schema/macro-payload");
+const {parsePayload, encodeMacroPayload, macroProgramBytes, MACRO_PROGRAM_MAX} = require("../schema/macro-payload");
 const {hostLayout, layoutTypes, US_HOST_LAYOUT} = require("../data/host-layouts");
 
 // What to do when the host layout cannot type a character, by effective OS.
@@ -13,13 +13,22 @@ const ENTRY_SETUP = [
 
 // Inspection and staging use the same codec and limits. A partial or oversized
 // edit remains visible locally; inspection never changes a profile.
-function inspectMacroInput(payload, {unicode = false, mode = 0, enabled = false, layout = US_HOST_LAYOUT, os = 0, currentBytes = 0, bankFree = 0} = {}) {
-    const result = {bytes: null, program: null, programMax: MACRO_PROGRAM_MAX, availableBytes: currentBytes + bankFree, error: "", code: ""};
+function inspectMacroInput(payload, {unicode = false, mode = 0, enabled = false, layout = US_HOST_LAYOUT, os = 0, macosIso = false, currentBytes = 0, bankFree = 0} = {}) {
+    const result = {bytes: null, program: null, programMax: MACRO_PROGRAM_MAX, availableBytes: currentBytes + bankFree, error: "", code: "", typing: []};
     try {
+        // Inspect literal text only, not command spelling or escaped braces.
+        // Keep its typing route even when a held key makes playback invalid.
+        const characters = new Set(parsePayload(payload, {unicode: true}).filter(step => step.kind === "text").flatMap(step => [...step.text]));
+        const native = hostLayout(layout);
+        const swapIso = stroke => macosIso && native?.os === "macos"
+            ? stroke.replace(/KC_GRV|KC_NUBS/g, key => key === "KC_GRV" ? "KC_NUBS" : "KC_GRV") : stroke;
+        result.typing = [...characters].map(character => layoutTypes(layout, character)
+            ? {character, method: "layout", strokes: native.strokes[character].map(swapIso)}
+            : {character, method: mode && unicode ? "unicode" : "unavailable", mode: mode && unicode ? mode : 0});
         const bytes = encodeMacroPayload(payload, {unicode, textEntry: enabled, layout});
         result.bytes = bytes.length;
         result.program = macroProgramBytes(bytes);
-        const missing = [...payload].find(character => !layoutTypes(layout, character));
+        const missing = [...characters].find(character => !layoutTypes(layout, character));
         if (missing && unicode && !mode) {
             result.error = `The ${hostLayout(layout)?.name || "chosen"} layout cannot type “${missing}”. ${ENTRY_SETUP[os] || ENTRY_SETUP[0]}`;
             result.code = "UNICODE_SETUP_REQUIRED";
@@ -37,4 +46,12 @@ function inspectMacroInput(payload, {unicode = false, mode = 0, enabled = false,
     return result;
 }
 
-module.exports = {inspectMacroInput};
+// Stored macros use the same syntax, host setup and playback limits as edits,
+// without judging whether an existing slot fits the bank a second time.
+function inspectMacroPlayback(payload, host, unicode = true) {
+    const {error, code, typing} = inspectMacroInput(payload, {unicode, mode: host.unicodeMode, enabled: Boolean(host.unicodeMode),
+        layout: host.layout, os: host.effective, macosIso: host.macosIso, bankFree: Infinity});
+    return {error, code, typing};
+}
+
+module.exports = {inspectMacroInput, inspectMacroPlayback};

@@ -12,11 +12,60 @@ function fixture() {
     return {snapshot, caps, draft:new ProfileDraftSession(snapshot, "board", caps)};
 }
 function settings(draft, id, updates) {
-    const section = settingsEditorView(draft.current).sections.find(row => row.id === id);
+    const section = settingsEditorView(draft.current, draft.capabilities).sections.find(row => row.id === id);
     return {type:"updateConfigDefaults", sectionId:id, expectedFingerprint:draft.current.fingerprint,
         fields:section.fields.map(field => field.kind === "toggle" ? {macro:field.macro, enabled:updates[field.macro] ?? field.enabled} : {macro:field.macro,value:updates[field.macro] ?? field.value})};
 }
 function stage(draft, edit) {return draft.stage({...edit,draftRevision:draft.revision});}
+
+test("layout playback effects follow Host through Review, history, undo, redo and discard", () => {
+    const {hostMacros} = require("../fixtures/host-macros");
+    const {snapshot, capabilities} = hostMacros(1 | (2 << 16), ["café", "{+KC_A}é{-KC_A}"]);
+    const draft = new ProfileDraftSession(snapshot, "board", capabilities);
+    stage(draft, {type: "updateViaMacro", keycode: "VIA_MACRO_0", payload: "café!", name: "Greeting"});
+    const authored = draft.current.fingerprint;
+    stage(draft, settings(draft, "host", {hostLayout: "3"}));
+    const rows = draft.changes(), host = rows.find(row => row.area === "Settings" && row.unit === "settings:host");
+    const effects = rows.filter(row => row.area === "Macros" && row.unit === "settings:host");
+    assert.equal(effects.length, 2);
+    assert.ok(effects.every(row => row.group === host.group));
+    assert.notEqual(rows.find(row => row.unit === "macro:0").group, host.group);
+    assert.equal(draft.checks().find(check => check.place?.index === 1)?.status, "new");
+    assert.equal(draft.checks().find(check => check.place?.index === 1)?.level, "warning");
+    assert.equal(draft.hasBlockers(), false, "an accepted but inert macro is a warning");
+    assert.equal(draft.steps().at(-1).changes.filter(row => row.area === "Macros").length, 2);
+    draft.undo(draft.revision);
+    assert.equal(draft.current.fingerprint, authored);
+    assert.equal(draft.editingState({connected: true, selectedDeviceId: "board"}).macroView.viaMacros[1].playable, true);
+    draft.redo(draft.revision);
+    assert.equal(draft.editingState({connected: true, selectedDeviceId: "board"}).macroView.viaMacros[1].playable, false);
+    draft.discard(draft.revision, draft.changes().find(row => row.unit === "settings:host").group);
+    assert.equal(draft.current.fingerprint, authored, "discard restores Host and preserves the authored macro edit");
+    assert.deepEqual(draft.changes().map(row => row.unit), ["macro:0"]);
+});
+
+test("switching to a native layout fixes stored text without rewriting it", () => {
+    const {hostMacros} = require("../fixtures/host-macros");
+    const {snapshot, capabilities} = hostMacros(1, ["café"]);
+    const draft = new ProfileDraftSession(snapshot, "board", capabilities);
+    assert.equal(draft.editingState({connected: true, selectedDeviceId: "board"}).macroView.viaMacros[0].playable, false);
+    stage(draft, settings(draft, "host", {hostLayout: "2"}));
+    assert.equal(draft.editingState({connected: true, selectedDeviceId: "board"}).macroView.viaMacros[0].playable, true);
+    assert.deepEqual(draft.document.macros, snapshot.document.macros);
+    assert.equal(draft.checks().find(row => row.kind === "unplayableMacro").status, "fixed");
+    assert.equal(draft.changes().find(row => row.area === "Macros").fields.find(field => field.label === "Playback").after, "Ready to play");
+});
+
+test("stored playback warnings refresh when Auto loses its detected host", () => {
+    const {hostMacros} = require("../fixtures/host-macros");
+    const {snapshot, capabilities} = hostMacros(0x100, ["🙂"]);
+    const draft = new ProfileDraftSession(snapshot, "board", capabilities);
+    assert.ok(!draft.checks().some(row => row.kind === "unplayableMacro"));
+    draft.observe({...snapshot, hostOs: {detected: 0}}, "board");
+    assert.equal(draft.checks().find(row => row.kind === "unplayableMacro").status, "existing");
+    draft.observe(snapshot, "board");
+    assert.ok(!draft.checks().some(row => row.kind === "unplayableMacro"));
+});
 
 test("default timing edits move matching behaviours, report inherited effects, and discard atomically", () => {
     const {draft: seed, caps} = fixture();

@@ -6,8 +6,8 @@ const {SETTINGS, validName, encodeSettings} = require("../schema/settings-domain
 const {macroKeycodes, macroModifierKeycodes, encodeMacroPayload, decodeMacroPayload, macroProgramBytes, MACRO_PROGRAM_MAX} = require("../schema/macro-payload");
 const {supportsUnicodeMacros} = require("../schema/macro-payload");
 const {hostSettings, supportsHostLayouts} = require("../schema/host-settings");
-const {hostLayout, layoutTypes} = require("../data/host-layouts");
-const {inspectMacroInput} = require("./macro-input");
+const {hostLayout} = require("../data/host-layouts");
+const {inspectMacroInput, inspectMacroPlayback} = require("./macro-input");
 const fail = (message, code = "MACRO_EDIT_CONFLICT") => Object.assign(new Error(message), {code});
 
 
@@ -37,11 +37,11 @@ function macroEditorView(snapshot, capabilities) {
         // Presentation preserves valid stored text, including Review without a
         // destination. Editing and Apply gate writes against capabilities.
         const payload = decodeMacroPayload(bytes, {unicode: true});
-        const hasUnicode = /[^\x00-\x7F]/u.test(payload);
-        const needsUnicodeSetup = [...payload].some(character => !layoutTypes(host.layout, character)) && !host.unicodeMode;
+        const playback = inspectMacroPlayback(payload, host, unicode);
+        const needsUnicodeSetup = playback.code === "UNICODE_SETUP_REQUIRED";
         return {kind: "via", keycode: `VIA_MACRO_${index}`, name: names[index],
-            payload, needsUnicodeSetup, empty: bytes.length === 0, bytes: bytes.length,
-            program, playable: program <= MACRO_PROGRAM_MAX && !needsUnicodeSetup && (unicode || !hasUnicode), available: !budget.outOfRoom.has(index),
+            payload, needsUnicodeSetup, playbackError: playback.error, playbackCode: playback.code, empty: bytes.length === 0, bytes: bytes.length,
+            program, playable: !playback.error, available: !budget.outOfRoom.has(index),
             // How many more key taps this macro can take: the smaller of what
             // it may still play and what the bank has free.
             roomTaps: Math.floor(Math.max(0, Math.min(MACRO_PROGRAM_MAX - program, budget.free)) / KEY_TAP_BYTES)};
@@ -68,7 +68,7 @@ function macroInputStatus(snapshot, message, capabilities) {
     const budget = macroBudget(slots, capabilities?.viaMacroBytes ?? MACRO_BANK_BYTES);
     const host = hostSettings(settings.values, snapshot.hostOs?.detected);
     return inspectMacroInput(message.payload, {unicode: supportsUnicodeMacros(capabilities), mode: host.unicodeMode,
-        enabled: Boolean(host.unicodeMode), layout: host.layout, os: host.effective, currentBytes: slots[index].length, bankFree: budget.free});
+        enabled: Boolean(host.unicodeMode), layout: host.layout, os: host.effective, macosIso: host.macosIso, currentBytes: slots[index].length, bankFree: budget.free});
 }
 
 function macroIndex(keycode) {
