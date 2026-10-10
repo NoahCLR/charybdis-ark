@@ -1,5 +1,6 @@
 "use strict";
 const {test, expect} = require("@playwright/test");
+const {openPreview} = require("./host-page");
 const {buildDeviceModel} = require("../core/session/device-model");
 const {resolve} = require("../core/data/keycode-catalog");
 const {hostKeyLabel} = require("../core/model/key-names");
@@ -16,7 +17,7 @@ async function sendHost(page, hostOs) {
 }
 for(const theme of ["vscode-dark","vscode-light"]) {
     test(`open editors refresh names through production model messages (${theme})`,async({page})=>{
-        await page.goto(`/preview/${theme}.html`);
+        await openPreview(page, theme);
         await page.evaluate(async()=>{
             const s=await import('/webview/store.mjs');
             const base=structuredClone(s.getModel());
@@ -77,7 +78,7 @@ for(const theme of ["vscode-dark","vscode-light"]) {
 }
 for(const theme of ['vscode-dark','vscode-light']) {
     test(`behaviour retarget picker keeps current host context and posts its stable assignment (${theme})`,async({page})=>{
-        await page.goto(`/preview/${theme}.html`);
+        await openPreview(page, theme);
         await page.evaluate(async()=>{
             const s=await import('/webview/store.mjs');
             const base=structuredClone(s.getModel());
@@ -104,7 +105,7 @@ for(const theme of ['vscode-dark','vscode-light']) {
 
 for(const theme of ['vscode-dark','vscode-light']) {
     test(`cell-action picker resolves live context and posts the selected code (${theme})`,async({page})=>{
-        await page.goto(`/preview/${theme}.html`);
+        await openPreview(page, theme);
         await page.evaluate(async()=>{
             const s=await import('/webview/store.mjs');
             const base=structuredClone(s.getModel());
