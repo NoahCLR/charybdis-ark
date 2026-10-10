@@ -101,7 +101,7 @@ const fail = (text, code = "DEMO_REFUSED") => Object.assign(new Error(text), {co
 // limits and options a keyboard would have reported beside it.
 function demoSnapshot(value) {
     const {document} = validateSnapshot(translateBackup(value), DEMO_CAPABILITIES);
-    return {document, fingerprint: fingerprint(document), summary: summary(document), limits: {...DEMO_LIMITS}, options: DEMO_OPTIONS};
+    return {document, fingerprint: fingerprint(document), summary: summary(document), limits: {...DEMO_LIMITS}, options: DEMO_OPTIONS, hostOs: {detected: 0}};
 }
 
 // The bundled demo profile, as a fresh copy each time.

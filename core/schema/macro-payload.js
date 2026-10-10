@@ -1,6 +1,8 @@
 "use strict";
 
 const catalog = require("../data/keycode-catalog");
+const UNICODE_MACRO_FEATURE = 1 << 21;
+const supportsUnicodeMacros = capabilities => Boolean(capabilities?.featureFlags & UNICODE_MACRO_FEATURE);
 const fail = message => Object.assign(new Error(message), {code: "INVALID_MACRO"});
 const validKey = key => Number.isInteger(key) && ((key >= 4 && key <= 0xa4) || (key >= 0xe0 && key <= 0xe7));
 const escapeText = text => text.replace(/[{}]/g, brace => brace + brace);
@@ -10,21 +12,29 @@ function macroKeycodes() {
     return catalog.entries().filter(entry => validKey(entry.value)).flatMap(entry => [entry.name, ...entry.aliases]);
 }
 
+function macroModifierKeycodes() {
+    return catalog.entries().filter(entry => entry.value >= 0xE0 && entry.value <= 0xE7).flatMap(entry => [entry.name, ...entry.aliases]);
+}
+
 // The existing recorder and step builder use text plus {key}, {+key}, {-key}
 // and {milliseconds}. Doubled braces preserve literal text from device bytes.
-function parsePayload(payload) {
+function parsePayload(payload, {unicode = false, textEntry = false} = {}) {
     if (typeof payload !== "string" || payload.length > 32768) throw fail("Enter a macro of at most 32,768 characters.");
     const steps = [], held = new Set();
     let text = "";
-    const flush = () => {if (text) steps.push({kind: "text", text}); text = "";};
+    const flush = () => {
+        if (text && textEntry && [...held].some(key => key < 0xE0)) throw fail("Release ordinary keys before a Unicode-entry text step; modifier holds are supported.");
+        if (text) steps.push({kind: "text", text}); text = "";
+    };
     for (let index = 0; index < payload.length;) {
         const char = payload[index++];
         if ((char === "{" || char === "}") && payload[index] === char) {text += char; index++; continue;}
         if (char === "}") throw fail("Unexpected }. Use }} for a literal closing brace.");
         if (char !== "{") {
-            const code = char.charCodeAt(0);
-            if (!(code === 9 || code === 10 || (code >= 32 && code <= 126))) throw fail("Macros support ASCII text, tabs and newlines.");
-            text += char; continue;
+            const code = payload.codePointAt(index - 1);
+            if (!(code === 9 || code === 10 || (code >= 32 && code <= 126) || (unicode && code >= 0xA0 && code <= 0x10FFFF && !(code >= 0xD800 && code <= 0xDFFF)))) throw fail(unicode ? "Macro text must contain valid Unicode characters, tabs or newlines; control characters and unpaired surrogates are unsupported." : "This firmware supports ASCII macro text only. Update both halves for Unicode text.");
+            if (code > 0xFFFF) {text += payload.slice(index - 1, index + 1); index++;} else text += char;
+            continue;
         }
         flush();
         const end = payload.indexOf("}", index);
@@ -54,11 +64,11 @@ function parsePayload(payload) {
 
 // A VIA macro as the bytes QMK stores: text as is, then 1 and an opcode for a
 // key tap (1), press (2), release (3) or a delay (4, digits, '|').
-function encodeMacroPayload(payload) {
+function encodeMacroPayload(payload, options) {
     const chunks = [];
-    for (const step of parsePayload(payload)) {
+    for (const step of parsePayload(payload, options)) {
         if (step.kind === "text") {
-            chunks.push(Buffer.from(step.text, "ascii"));
+            chunks.push(Buffer.from(step.text, "utf8"));
         } else if (step.kind === "delay") {
             chunks.push(Buffer.concat([Buffer.from([1, 4]), Buffer.from(`${step.delay}|`)]));
         } else if (step.kind === "tap" && step.keys.length > 1) {
@@ -71,12 +81,18 @@ function encodeMacroPayload(payload) {
     return Buffer.concat(chunks);
 }
 
-function decodeMacroPayload(bytes) {
+function decodeMacroPayload(bytes, options) {
     if (!Buffer.isBuffer(bytes)) throw fail("Invalid macro bytes.");
     let output = "", offset = 0;
     while (offset < bytes.length) {
         let op = bytes[offset++];
-        if (op !== 1) {output += escapeText(String.fromCharCode(op)); continue;}
+        if (op !== 1) {
+            const start = offset - 1;
+            while (offset < bytes.length && bytes[offset] !== 1) offset++;
+            const raw = bytes.subarray(start, offset), text = raw.toString("utf8");
+            if (!Buffer.from(text, "utf8").equals(raw)) throw fail("Malformed UTF-8 macro text.");
+            output += escapeText(text); continue;
+        }
         op = bytes[offset++];
         if (op === 4) {
             const end = bytes.indexOf(124, offset);
@@ -87,7 +103,7 @@ function decodeMacroPayload(bytes) {
             output += `{${op === 2 ? "+" : op === 3 ? "-" : ""}${keyName(bytes[offset++])}}`;
         }
     }
-    parsePayload(output);
+    parsePayload(output, options);
     return output;
 }
 
@@ -111,6 +127,11 @@ function macroProgramBytes(bytes) {
         const byte = bytes[index++];
         if (byte !== 1) {
             flush();
+            if (byte >= 0x80) {
+                const width = byte < 0xE0 ? 2 : byte < 0xF0 ? 3 : 4;
+                index += width - 1; length += 4; chunk = 0;
+                continue;
+            }
             if (!chunk || chunk === 255) { length += 2; chunk = 0; }
             length++; chunk++;
             continue;
@@ -141,4 +162,4 @@ function macroProgramBytes(bytes) {
     return length;
 }
 
-module.exports = {macroKeycodes, parsePayload, encodeMacroPayload, decodeMacroPayload, macroProgramBytes, MACRO_PROGRAM_MAX};
+module.exports = {macroModifierKeycodes, UNICODE_MACRO_FEATURE, supportsUnicodeMacros, macroKeycodes, parsePayload, encodeMacroPayload, decodeMacroPayload, macroProgramBytes, MACRO_PROGRAM_MAX};

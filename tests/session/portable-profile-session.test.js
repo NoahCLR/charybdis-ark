@@ -358,3 +358,20 @@ test("a capture never reads the retired PD page, even from firmware that still a
     assert.equal(Object.hasOwn(captured.document, "pdModeSource"), false, "no pointing-mode source is written");
     assert.deepEqual(keyboard.unhandled, []);
 });
+
+test("complete capture preserves Unicode bank bytes and still rejects legacy destinations", async () => {
+    const source = backup32();
+    const text = ' café “hello” 🙂 e\u0301 👩‍💻 ';
+    source.macros[0] = Buffer.from(text).toString('base64');
+    const keyboard = fakeKeyboard({document:source});
+    const {connection, ids} = wired(keyboard);
+    const captured = await captureProfile(connection, ids, {...captureCapabilities, featureFlags:captureCapabilities.featureFlags | (1 << 21)});
+    assert.deepEqual(captured.document.macros, source.macros);
+    assert.equal(captured.fingerprint, fingerprint(source));
+    assert.equal(Buffer.from(captured.document.macros[0], 'base64').toString('utf8'), text);
+    assert.throws(() => validateSnapshot(captured.document, captureCapabilities), /ASCII/);
+    assert.deepEqual(keyboard.mutations, []);
+    const malformed = structuredClone(source);
+    malformed.macros[0] = Buffer.from([0xc0,0xaf]).toString('base64');
+    assert.throws(() => validateSnapshot(malformed), /UTF-8/);
+});

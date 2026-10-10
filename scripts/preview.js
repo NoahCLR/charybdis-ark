@@ -118,6 +118,7 @@ function buildModel(host = VSCODE_HOST) {
         fingerprint: portable.fingerprint(doc),
         summary: portable.summary(doc),
         identity: {generation: 42},
+        hostOs: {detected: 1},
     };
     const deviceId = "preview-charybdis";
     const session = new ProfileDraftSession(snapshot, deviceId, capabilities);

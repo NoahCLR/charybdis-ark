@@ -89,7 +89,6 @@ export function screenKeys() {
                 // layers afterwards leaves this input as it is.
                 const answer = comboAnswers(model, layers(), state.layer, heldLayers()).get(index);
                 state.combo.inputs = toggleComboInput(state.combo.inputs, answer);
-                if (answer) state.combo.labels[answer.keycode] = answer.editLabel || answer.display || answer.keycode;
             } else {
                 state.selected = index;
                 // Follow the key the board shows, including one with no
@@ -125,7 +124,7 @@ export function previewFoot(layer, lead = "") {
 function placementBar() {
     const placement = state.placement;
     const node = el(`<div class="pickbar">
-        <span><b>Placing ${esc(placement?.label || placement?.keycode || "keycode")}</b> — choose a layer, then click its destination key</span>
+        <span><b>Placing ${esc(actionLabel(getModel(), placement?.keycode) || "keycode")}</b> — choose a layer, then click its destination key</span>
         <code class="n">${esc(placement?.keycode || "")}</code>
         <span class="right" style="margin-left:auto"><button class="btn tiny ghost" data-act="cancel">Cancel</button></span></div>`);
     node.querySelector('[data-act="cancel"]').addEventListener("click", () => { state.placement = null; render(); });
@@ -635,7 +634,8 @@ function cellEditor(behaviour, step, kind) {
     node.querySelector('[data-act="close"]').addEventListener("click", () => { state.cell = null; render(); });
     node.querySelector('[data-act="pick"]')?.addEventListener("click", () => openPicker({
         title: `${tierName(getModel(), kind)} action`,
-        context: `${behaviour.keycode} · ${branchName(getModel(), step.tapCount + 1)}`,
+        contextKeycode: behaviour.keycode,
+        context: branchName(getModel(), step.tapCount + 1),
         seed: branch?.action ? [branch.action] : [],
         onPick: (expression) => {
             stage(expression);
@@ -767,7 +767,7 @@ function tabCombos(body, right) {
 const sentence = (text) => text.charAt(0).toUpperCase() + text.slice(1);
 // A builder input by the name the host gave its key, as the combo table and
 // the review read it (core/model/key-names.js).
-const comboInputLabel = (model, name) => state.combo.labels[name] ?? actionLabel(model, name);
+const comboInputLabel = (model, name) => actionLabel(model, name);
 
 function comboBuilder(canEdit, holdTerm) {
     const model = getModel();
@@ -1152,7 +1152,7 @@ function cellShortcut(action) {
 function pickBehaviourKey(behaviour) {
     openPicker({
         title: "Key this behaviour listens to",
-        context: actionLabel(getModel(), behaviour.keycode),
+        contextKeycode: behaviour.keycode,
         seed: [behaviour.keycode],
         onPick: (expression) => {
             const model = getModel();

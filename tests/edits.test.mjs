@@ -85,7 +85,7 @@ test("a modifier around a macro or pointing key is refused, not stored as anothe
     const draft = session();
     const before = draft.document.layers[0].slice();
     // the picker builds Cmd + VIA macro 3 as G(VIA_MACRO_3)
-    const picked = edits.pickerExpression({keys: ["VIA_MACRO_3"], mods: ["Cmd"]});
+    const picked = edits.pickerExpression({keys: ["VIA_MACRO_3"], mods: ["G"]});
     assert.equal(picked, "G(VIA_MACRO_3)");
     for (const keycode of [picked, "C(PD_SLOT_0)", "LOCK_LAYER(16)", "LT(60, 0x00)"]) {
         assert.throws(() => stage(draft, edits.setKey("Layer 0", 3, keycode)), /Cannot represent/, keycode);
@@ -114,12 +114,12 @@ test("an edit from a stale form is refused rather than silently rebased", () => 
 test("the picker posts layer keys by index, and wraps the key in modifiers and LT", () => {
     const draft = session();
     assert.equal(edits.pickerExpression({keys: ["MO(1)"]}), "MO(1)");
-    assert.equal(edits.pickerExpression({keys: ["KC_A"], mods: ["Ctrl", "Shift"]}), "S(C(KC_A))");
+    assert.equal(edits.pickerExpression({keys: ["KC_A"], mods: ["C", "S"]}), "S(C(KC_A))");
     assert.equal(edits.pickerExpression({keys: ["KC_A"], layerTap: "2"}), "LT(2, KC_A)");
     assert.equal(edits.pickerExpression({keys: ["KC_A", "KC_B"], mode: "list"}), "KC_A, KC_B");
     assert.equal(edits.pickerExpression({keys: []}), "");
     for (const keycode of ["MO(1)", "LOCK_LAYER(1)", edits.pickerExpression({keys: ["KC_A"], layerTap: "2"}),
-        edits.pickerExpression({keys: ["KC_A"], mods: ["Ctrl", "Shift"]})]) {
+        edits.pickerExpression({keys: ["KC_A"], mods: ["C", "S"]})]) {
         stage(draft, edits.setKey("Layer 0", 5, keycode));
     }
     assert.equal(draft.document.layers[0][slotOf(5)], 0x0304, "C(S(KC_A))");
@@ -858,4 +858,22 @@ test("an old backup opens as a translated import review before replacing the dra
     await portableControl(panel, {type: "restorePortableProfile"});
     assert.equal(draft.document.layers.length, 16); assert.equal(draft.document.macros.length, 128);
     draft.undo(draft.revision); assert.deepEqual(draft.document, before);
+});
+
+test("the Host section posts staged settings with Review, undo, redo and backup intact", () => {
+    const caps = {...capabilities, featureFlags: 1 << 21};
+    const doc = pdDocument();
+    const draft = new ProfileDraftSession({document: doc, fingerprint: portable.fingerprint(doc), summary: portable.summary(doc), limits: {brightnessMax: 200}, hostOs: {detected: 1}}, "test-device", caps);
+    const host = settingsEditorView(draft.current).sections.find(s => s.id === "host");
+    stage(draft, edits.settingsSection(host, field => field.macro === "hostOs" ? "2" : true, portable.fingerprint(draft.document)));
+    assert.equal(decoded(draft).settings.values[27], 0x102);
+    assert.ok(reviewAreas(draft).includes("Settings"));
+    stage(draft, edits.macroMessage("VIA_MACRO_0", "café 🙂 e\u0301", portable.fingerprint(draft.document)));
+    assert.equal(Buffer.from(draft.document.macros[0], "base64").toString("utf8"), "café 🙂 e\u0301");
+    const backup = JSON.parse(JSON.stringify(draft.document));
+    assert.equal(portable.validateSnapshot(backup, caps).settings.values[27], 0x102);
+    assert.throws(() => portable.validateSnapshot(backup, capabilities), /ASCII/);
+    draft.undo(draft.revision); assert.equal(draft.document.macros[0], doc.macros[0]);
+    draft.undo(draft.revision); assert.equal(decoded(draft).settings.values[27], 0);
+    draft.redo(draft.revision); draft.redo(draft.revision); assert.deepEqual(draft.document, backup);
 });

@@ -776,9 +776,9 @@ test("a key cap tells layer keys and mod-taps apart from plain keys", () => {
     assert.equal(face("OSL(3)", "L3").sub, "one-shot");
     assert.equal(face("TT(1)", "L1").sub, "tap-toggle");
     assert.equal(face("DF(0)", "L0").sub, "default");
-    assert.deepEqual(face("MT(MOD_LSFT,KC_A)", "A"), {main: "A", sub: "Shift", kind: "key"});
-    assert.equal(face("MT(MOD_LCTL|MOD_LSFT|MOD_LGUI,KC_A)", "A").sub, "Ctrl+Shift+Cmd");
-    assert.equal(face("MT(MOD_RALT,KC_B)", "B").sub, "RAlt");
+    assert.deepEqual(face("MT(MOD_LSFT,KC_A)", "A"), {main: "A", sub: "MOD_LSFT", kind: "key"});
+    assert.equal(face("MT(MOD_LCTL|MOD_LSFT|MOD_LGUI,KC_A)", "A").sub, "MOD_LCTL|MOD_LSFT|MOD_LGUI");
+    assert.equal(face("MT(MOD_RALT,KC_B)", "B").sub, "MOD_RALT");
     assert.deepEqual(face("KC_A", "A"), {main: "A", sub: "", kind: "key"}, "a plain A has no second line");
 });
 

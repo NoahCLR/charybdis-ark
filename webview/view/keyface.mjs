@@ -25,7 +25,7 @@ export function keyFace(position) {
     // plain A, or MO(1) and TG(1), would be indistinguishable on the board.
     return {
         main: position.display || keycode,
-        sub: layerTap ? position.layerLabel || shortLayer(layerTap[1]) : layerKey ? LAYER_VERBS[layerKey[1]] : modTap ? modTapHold(modTap[1]) : "",
+        sub: layerTap ? position.layerLabel || shortLayer(layerTap[1]) : layerKey ? LAYER_VERBS[layerKey[1]] : modTap ? position.modifierLabel || modTap[1] : "",
         kind: layerTap || layerKey ? "layer" : "key",
     };
 }
@@ -51,13 +51,6 @@ export function keyName(position) {
 }
 
 const LAYER_VERBS = {MO: "momentary", TO: "move", TG: "toggle", OSL: "one-shot", DF: "default", PDF: "default", TT: "tap-toggle"};
-const MOD_WORDS = {CTL: "Ctrl", SFT: "Shift", ALT: "Alt", GUI: "Cmd"};
-// MOD_LCTL|MOD_LSFT → "Ctrl+Shift"; right-hand modifiers are marked R.
-const modTapHold = (mods) => mods.split("|").map((mod) => {
-    const match = /^MOD_([LR])(CTL|SFT|ALT|GUI)$/.exec(mod.trim());
-    return match ? `${match[1] === "R" ? "R" : ""}${MOD_WORDS[match[2]]}` : mod.trim();
-}).join("+");
-
 // Only for a position the host has not named: the layer the keycode holds.
 const shortLayer = (name) => name.replace(/^LAYER_/, "").toLowerCase();
 

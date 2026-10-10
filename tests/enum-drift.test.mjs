@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
 import {AXIS, BUTTON, KIND, MODIFIER_POLICY, SCROLL_AXES} from "../webview/view/pointing-config.mjs";
-import {MODIFIER_BITS} from "../webview/view/keyvalues.mjs";
+import {modifierBits, modifierNames} from "../webview/view/keyvalues.mjs";
 import {TIER_FIELDS} from "../webview/view/edits.mjs";
 import {PD_MODE_IDS} from "../webview/view/lighting.mjs";
 import {NAME_MAX_BYTES} from "../webview/view/names.mjs";
@@ -32,7 +32,9 @@ test("the webview's name limit is the schema's", () => {
 });
 
 test("the webview's modifier bits and names are the vocabulary's", () => {
-    assert.deepEqual(MODIFIER_BITS, VOCABULARY.modifiers);
+    const model = {vocabulary: VOCABULARY};
+    assert.equal(modifierBits(model), VOCABULARY.modifiers);
+    assert.deepEqual(modifierNames(model, 0x84), ["Left Alt", "Right GUI"]);
 });
 
 test("the webview's tiers are the vocabulary's", () => {

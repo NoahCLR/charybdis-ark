@@ -16,7 +16,7 @@ test("Defaults and inherited behaviour timing come entirely from the complete ke
     const current = snapshot(), view = settingsEditorView(current);
     assert.equal(view.brightnessMax, 200);
     const model = buildDeviceModel({settingsView: view, capabilities: {compiledLayerCount: 16}});
-    assert.equal(model.configDefaults.length, 12, "Combos and behaviours each have a section of their own");
+    assert.equal(model.configDefaults.length, 13, "Combos, behaviours and the read-only macro host setup each have a section");
     const fields = model.configDefaults.flatMap(section => section.fields);
     assert.equal(fields.find(field => field.macro === "volumeDpi"), undefined, "a pointing mode's speed is set on its slot, not in settings");
     assert.equal(fields.find(field => field.macro === "mouseLayer").value, "Layer 4");
@@ -172,4 +172,18 @@ test("key options use masks supplied by the keyboard rather than assuming bitfie
     assert.equal(field.enabled, true);
     const next = editSettings(current, message(current, "keyboardOptions", {swapControlCaps:false}));
     assert.equal(validateSnapshot(next).settings.values[24], 0);
+});
+
+test("Key Options follows the effective host vocabulary, including unknown Auto and manual overrides", () => {
+    for (const [detected, selected, alt, gui] of [[0,0,"Alt","GUI"], [1,0,"Option","Command"], [2,0,"Alt","Windows"], [3,0,"Alt","Super"], [1,3,"Alt","Super"]]) {
+        const current = withSettings(settings => {settings.values[27] = selected;});
+        current.capabilities = {featureFlags: 1 << 21};
+        current.hostOs = {detected};
+        const fields = settingsEditorView(current).sections.find(({id}) => id === "keyboardOptions").fields;
+        const label = macro => fields.find(field => field.macro === macro).label;
+        assert.equal(label("swapLeftAltGui"), `Swap left ${alt} and ${gui}`);
+        assert.equal(label("swapRightAltGui"), `Swap right ${alt} and ${gui}`);
+        assert.equal(label("disableGui"), `Disable ${gui} keys`);
+        assert.equal(label("swapLeftControlGui"), `Swap left Ctrl and ${gui}`);
+    }
 });

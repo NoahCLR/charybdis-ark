@@ -2,7 +2,8 @@
 
 const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../data/charybdis-layout");
 const {layerOfRef, nativeCode} = require("../schema/actions");
-const {keyLabel, keyLabelWithName, profileKeyNames} = require("./key-names");
+const {hostKeyLabel, keyLabel, keyLabelWithName, profileKeyNames} = require("./key-names");
+const {hostSettings} = require("../schema/host-settings");
 const {decodedOf} = require("./portable-profile");
 const {settingsEditorView} = require("./settings-editor");
 const {macroEditorView} = require("./macro-editor");
@@ -28,8 +29,8 @@ function action(value, names = {}, withName = false) {
 // An action as a field: shown by its name, compared by what is stored.
 const actionField = (value, names, extra = {}) => ({text: action(value, names), detail: action(value, names, true), key: JSON.stringify(value), ...extra});
 // The names an action can be read by in one snapshot.
-const namesIn = (value, macros) => ({layers: value.settings.names,
-    keys: profileKeyNames({actionsKnown: true, layers: value.settings.names, macros: macros?.viaMacros, behaviors: value.behaviors.rows, pdModes: value.pdModes,
+const namesIn = (value, macros, detected) => ({layers: value.settings.names,
+    keys: profileKeyNames({hostOs: hostSettings(value.settings.values, detected).effective, actionsKnown: true, layers: value.settings.names, macros: macros?.viaMacros, behaviors: value.behaviors.rows, pdModes: value.pdModes,
         customKeys: value.settings.customKeyNames.map((name, slot) => ({slot, name}))})});
 // The mark an action carries: what it reaches, when that has a colour of its
 // own — a pointing mode's light, a layer's colour.
@@ -41,7 +42,7 @@ function pointingFields(slot, names) {
     const P = VOCABULARY.pointing;
     const result = new Map([["Movement", word(P.kinds, slot?.kind || 0)], ["Name", slot?.name || "Empty"]]);
     if (!slot?.kind) return result;
-    const mods = mask => modifierNames(mask).join(" + ") || "None";
+    const mods = mask => modifierNames(mask).map(label => hostKeyLabel(label, names.keys?.hostOs)).join(" + ") || "None";
     const tap = output => !output?.keycode ? "None"
         : `${keyLabel(names.keys, output.keycode)} · ${output.modifierPolicy === 1 ? `${word(P.modifierPolicy, 1)} ${mods(output.mask)}` : word(P.modifierPolicy, output.modifierPolicy)}`;
     result.set("DPI", slot.dpi || "Normal pointer speed");
@@ -268,7 +269,7 @@ function profileReview(before, after) {
     };
     const layerName = (value, i) => layerCalled(value.settings.names, i);
     const macrosA = macroEditorView(before), macrosB = macroEditorView(after);
-    const namesA = namesIn(a, macrosA), namesB = namesIn(b, macrosB);
+    const namesA = namesIn(a, macrosA, before.hostOs?.detected), namesB = namesIn(b, macrosB, after.hostOs?.detected);
     a.document.layers.forEach((keys, l) => keys.forEach((code, p) => {
         if (code === b.document.layers[l][p]) return;
         // Each side reads by its own snapshot's names: a renamed macro is

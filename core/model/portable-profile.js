@@ -9,6 +9,8 @@ const {SETTING, decodeSettings, encodeSettings} = require("../schema/settings-do
 const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../data/charybdis-layout");
 const {LAYER_LOCK_BASE, LAYER_LOCK_SLOTS} = require("../data/user-keycodes");
 const {layerName} = require("./vocabulary");
+const {decodeMacroPayload} = require("../schema/macro-payload");
+const {supportsUnicodeMacros} = require("../schema/macro-payload");
 const {profileDepthOptions} = require("../schema/profile-depth");
 
 // A portable profile is the keyboard's whole configuration in the one format
@@ -32,22 +34,25 @@ function base64(value, max, label) {
     if (bytes.length > max || bytes.toString("base64") !== value) throw fail(`Invalid ${label}.`);
     return bytes;
 }
+// Capture parses the stored format; validateSnapshot gates the destination.
+// Unicode bytes must survive capture even before capability checks run.
 function macroSlots(bytes, count) {
     if (!Buffer.isBuffer(bytes) || bytes.at(-1) !== 0) throw fail("The macro bank has an unfinished write.");
     const slots = []; let offset = 0;
     while (slots.length < count) {
         const end = bytes.indexOf(0, offset);
         if (end < offset || end >= bytes.length - 1) throw fail("The macro bank is missing a slot terminator.");
-        const slot = Buffer.from(bytes.subarray(offset, end)); validateViaMacro(slot); slots.push(slot); offset = end + 1;
+        const slot = Buffer.from(bytes.subarray(offset, end)); validateViaMacro(slot, {unicode: true}); slots.push(slot); offset = end + 1;
     }
     return slots;
 }
-function validateViaMacro(bytes) {
+function validateViaMacro(bytes, {unicode = false, textEntry = false} = {}) {
+    decodeMacroPayload(bytes, {unicode, textEntry});
     const held = new Set(); let index = 0;
     const key = v => (v >= 4 && v <= 0xa4) || (v >= 0xe0 && v <= 0xe7);
     while (index < bytes.length) {
         const b = bytes[index++];
-        if (b !== 1) {if (!(b === 9 || b === 10 || (b >= 32 && b <= 126))) throw fail("Unsupported macro character."); continue;}
+        if (b !== 1) continue;
         const type = bytes[index++];
         if (type === 4) {
             let digits = "";
@@ -110,7 +115,7 @@ function validateSnapshot(value, capabilities) {
     if (Object.keys(value).some(key => !["format", "version", "keyboard", "actionAbiDigest", "layers", "profile", "macros"].includes(key))) throw fail("This profile contains unsupported fields.");
     if (!Array.isArray(value.layers) || value.layers.length !== LAYERS || value.layers.some(keys => !Array.isArray(keys) || keys.length !== MATRIX_KEYS || !keys.every(u16))) throw fail(`A complete profile must contain all ${LAYERS} layers.`);
     if (!Array.isArray(value.macros) || value.macros.length !== MACRO_SLOTS) throw fail(`A complete profile must contain all ${MACRO_SLOTS} macro slots.`);
-    const macros = value.macros.map(slot => {const bytes = base64(slot, MACRO_BANK_BYTES, "macro"); validateViaMacro(bytes); return bytes;});
+    const macros = value.macros.map(slot => {const bytes = base64(slot, MACRO_BANK_BYTES, "macro"); validateViaMacro(bytes, {unicode: capabilities ? supportsUnicodeMacros(capabilities) : true}); return bytes;});
     const profile = base64(value.profile, PROFILE_BLOB_V1.MAX_SIZE, "profile data");
     let domains;
     try {domains = decodeProfileBlob(profile).domains;} catch (error) {
@@ -121,6 +126,8 @@ function validateSnapshot(value, capabilities) {
     const pdModes = decodePdDomain(domains[4].payload);
     const codecOptions = profileDepthOptions(capabilities, domains[0].payload);
     const rgb = decodeRgbDomainV1(domains[0].payload, codecOptions.rgb), behaviors = decodeKeyBehaviorDomain(domains[1].payload, codecOptions.behaviors), combos = decodeComboDomain(domains[2].payload), settings = decodeSettings(domains[3].payload);
+    if (settings.values[SETTING.UNICODE_HOST_MODE] && capabilities && !supportsUnicodeMacros(capabilities)) throw fail("This firmware cannot use Host settings. Update both halves before restoring this profile.");
+    if (settings.values[SETTING.UNICODE_HOST_MODE] & 0x100) for (const macro of macros) validateViaMacro(macro, {unicode: true, textEntry: true});
     if (rgb.layerColors.length !== LAYERS || rgb.layerColors.some(row => row.layerId >= LAYERS)) throw fail(`RGB does not cover all ${LAYERS} layers.`);
     // A binding for an empty slot is allowed, because the keyboard allows it:
     // the mode keycodes are a fixed registry, and the runtime refuses to

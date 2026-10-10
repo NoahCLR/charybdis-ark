@@ -252,3 +252,29 @@ test("a reorder that makes a new base names it first, and says which layer left 
         ["Navigation", "3", "0 · the base"],
     ]);
 });
+
+test("layer-mod labels use each Review side's host vocabulary and profile layer name", () => {
+    for(const [detected,alt,gui] of [[0,'Alt','GUI'],[1,'Option','Command'],[2,'Alt','Windows'],[3,'Alt','Super']]) {
+        const before=snapshot(document()), after=snapshot(document());
+        before.hostOs=after.hostOs={detected};
+        after.document.layers[0][0]=0x502c;
+        const rows=profileReview(before,after);
+        const field=rows.find(row=>row.unit==='layout:0:0').fields[0];
+        assert.equal(field.after,`${validateSnapshot(after.document).settings.names[1]} + ${alt}+${gui}`);
+    }
+});
+
+test("Space Cadet modifiers use current host names on the board and in Review", () => {
+    const {buildDeviceModel}=require('../../core/session/device-model');
+    const {resolve,lookup}=require('../../core/data/keycode-catalog');
+    for(const [detected,alt] of [[0,'Alt'],[1,'Option'],[2,'Alt'],[3,'Alt']]) {
+        const before=snapshot(document()), after=snapshot(document());
+        before.hostOs=after.hostOs={detected};
+        const keys=['SC_LAPO','SC_RAPC'].map(key=>lookup(key).value);
+        after.document.layers[0][0]=keys[0];
+        assert.equal(profileReview(before,after).find(r=>r.unit==='layout:0:0').fields[0].after,`Left ${alt}/(`);
+        const model=buildDeviceModel({settingsView:{host:{effective:detected}},layout:{state:'read',layers:[{layer:0,keys:keys.map((keycode,layoutIndex)=>({keycode,layoutIndex,resolved:resolve(keycode)}))}]}});
+        assert.deepEqual(model.layers[0].positions.map(p=>p.editLabel),[`Left ${alt}/(`,`Right ${alt}/)`]);
+        assert.deepEqual(model.layers[0].positions.map(p=>p.value),keys);
+    }
+});

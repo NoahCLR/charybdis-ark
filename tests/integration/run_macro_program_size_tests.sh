@@ -46,7 +46,9 @@ for (let i = 0; i < 3000; i++) {
     while (held.length) payload += `{-${held.pop()}}`;
     payloads.push(payload);
 }
-const macros = payloads.map(payload => encodeMacroPayload(payload));
+// The new Unicode capability must agree on scalar cost and ASCII boundaries.
+payloads.push("café", "“hello” € 🙂", "e\u0301", "👩‍💻", "a".repeat(254) + "🙂", "a".repeat(255) + "éa", "é".repeat(128), "é".repeat(129), "🙂".repeat(128), "🙂".repeat(129));
+const macros = payloads.map(payload => encodeMacroPayload(payload, {unicode: true}));
 const output = execFileSync(process.argv[3], {input: macros.map(bytes => bytes.toString("hex")).join("\n") + "\n"}).toString().trim().split("\n").map(Number);
 assert.equal(output.length, macros.length);
 let over = 0;

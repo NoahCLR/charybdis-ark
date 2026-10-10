@@ -23,8 +23,8 @@ test("a row carries its key's built-in first tap and hold, named as a person rea
     const rows = byKey(behaviorRowsForView(domain, {physicalGestureTiming: true, ownedTapping: true}));
     assert.deepEqual(rows["MT(MOD_LSFT|MOD_LGUI,KC_S)"], {
         tap: {helper: "TAP_SENDS", action: "KC_S", label: "S"},
-        hold: {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "LSFT(LGUI(KC_NO))", repeatHz: "0", label: "Shift+Cmd"},
-    }, "a modifiers-only hold reads as its modifiers, not Shift+Cmd+N/A");
+        hold: {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "LSFT(LGUI(KC_NO))", repeatHz: "0", label: "Shift+GUI"},
+    }, "a modifiers-only hold reads as its modifiers, not Shift+GUI+N/A");
     assert.deepEqual(rows["LT(3,KC_SLASH)"].hold, {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "MO(3)", repeatHz: "0"});
     assert.deepEqual(rows.KC_LEFT_GUI, {});
     assert.ok(Object.values(byKey(behaviorRowsForView(domain))).every((builtIn) => !Object.keys(builtIn).length),
@@ -104,4 +104,21 @@ test("RGB selectors and disabled stages are displayed without inventing enabled 
     assert.deepEqual(view.layerLedGroups.map(r => r.owner), ["Layer 0", "RGB_LAYER_GROUP_ALL"]);
     assert.equal(view.pdModeLedGroups[0].owner, "PD_MODE_DRAGSCROLL");
     assert.equal(view.keyBehaviorFeedbackLedGroups[0].owner, "KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING");
+});
+
+test("authored and built-in behaviour labels use the profile's host naming rule", () => {
+    const {profileKeyNames} = require("../../core/model/key-names");
+    const domain = decodeKeyBehaviorDomain(encodeKeyBehaviorDomain({rows:[{
+        target:{kind:1, operand:0x1804}, tapHoldTerm:0, longerHoldTerm:0, multiTapTerm:0,
+        steps:[{tapIndex:0, tap:{kind:1, operand:0x1c04}, hold:{mode:1, repeatHz:0, action:{kind:1, operand:0xe6}}}]
+    }]}));
+    for(const [hostOs, alt, gui] of [[0,"Alt","GUI"],[1,"Option","Command"],[2,"Alt","Windows"],[3,"Alt","Super"]]) {
+        const [row] = behaviorRowsForView(domain, {}, profileKeyNames({hostOs}));
+        assert.equal(row.steps[0].tap.label, `Right ${alt}+Right ${gui}+A`);
+        assert.equal(row.steps[0].hold.label, `Right ${alt}`);
+        assert.equal(row.builtIn.tap.label, `Right ${gui}+A`);
+        assert.equal(row.builtIn.hold.label, `Right ${gui}+A`);
+        const builtIn = require("../../core/session/device-profile-view").builtInForView({kind:1, operand:0x3804}, {ownedTapping:true}, profileKeyNames({hostOs}));
+        assert.equal(builtIn.hold.label, `Right ${gui}`);
+    }
 });

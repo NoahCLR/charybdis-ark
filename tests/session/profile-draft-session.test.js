@@ -92,7 +92,7 @@ test("one draft composes every editor without changing its device snapshot", () 
     stage(draft,{type:"saveCombo",id:0,inputs:["KC_A","KC_B"],output:"G(KC_N)",termMs:"60",holdTermMs:"200"});
     const view = draft.view({connected:true,selectedDeviceId:"board"});
     assert.deepEqual(new Set(view.changes.map(c=>c.area)),new Set(["Layout","Macros","Settings","Behaviours","Lighting","Combos"]));
-    assert.match(view.changes.find(c=>c.area==="Combos").fields.find(f=>f.label==="Sends").after,/Cmd\+N/);
+    assert.match(view.changes.find(c=>c.area==="Combos").fields.find(f=>f.label==="Sends").after,/GUI\+N/);
     assert.equal(JSON.stringify(snapshot),original);
     assert.equal(draft.base.fingerprint,snapshot.fingerprint);
     assert.equal(validateSnapshot(draft.document).settings.values[1],175);
@@ -431,5 +431,73 @@ test("draft checks use the connected firmware's physical gesture capability", ()
         const draft = new ProfileDraftSession(snapshot, "board", {...caps, featureFlags: fixed ? 1 << 17 : 0});
         stage(draft, {type: "updateLayoutKeys", layers: [{layer: "Layer 0", changes: [{layoutIndex: 0, keycode: row.keycode}]}]});
         assert.equal(draft.checks().some(check => check.kind === "gestureTiming" && check.place.keycode === row.keycode), !fixed);
+    }
+});
+
+function unicodeDraft(detected = 1) {
+    const {snapshot, caps} = fixture();
+    snapshot.hostOs = {detected}; caps.featureFlags = 1 << 21;
+    return {snapshot, caps, draft:new ProfileDraftSession(snapshot, 'board', caps)};
+}
+test("Unicode survives real draft Review, history, undo/redo and an unrelated edit", () => {
+    const {draft,caps} = unicodeDraft();
+    stage(draft,settings(draft,'host',{hostOs:'0',unicodeEnabled:true}));
+    const text = ' café “hello” 🙂 e\u0301 👩‍💻 ';
+    stage(draft,{type:'updateViaMacro',keycode:'VIA_MACRO_0',payload:text});
+    assert.ok(draft.changes().some(row=>row.unit==='macro:0'));
+    assert.ok(draft.steps().at(-1).changes.some(row=>row.unit==='macro:0'));
+    const encoded = draft.document.macros[0];
+    const {macroEditorView} = require('../../core/model/macro-editor');
+    assert.equal(macroEditorView(draft.current,caps).viaMacros[0].payload,text);
+    draft.undo(draft.revision); assert.notEqual(draft.document.macros[0],encoded);
+    assert.doesNotThrow(()=>draft.steps());
+    draft.redo(draft.revision); assert.equal(draft.document.macros[0],encoded);
+    const next = new ProfileDraftSession(draft.current,'board',caps);
+    stage(next,settings(next,'keyTiming',{tapHoldTerm:'175'}));
+    assert.doesNotThrow(()=>next.changes()); assert.doesNotThrow(()=>next.steps());
+    const {profileReview} = require('../../core/model/profile-review');
+    assert.doesNotThrow(()=>profileReview(next.baseSnapshot,next.current));
+    assert.equal(validateSnapshot(next.document).document.macros[0],encoded);
+    assert.throws(()=>validateSnapshot(next.document,{...caps,featureFlags:0}),/ASCII/);
+});
+test("new detection refreshes dirty draft labels and Unicode gates without altering history or edits", () => {
+    const {draft,snapshot,caps} = unicodeDraft(0);
+    stage(draft,settings(draft,'host',{hostOs:'0',unicodeEnabled:true}));
+    stage(draft,{type:'updateLayoutKeys',layer:'Layer 0',changes:[{layoutIndex:0,keycode:'KC_LGUI'}]});
+    const document = draft.document, revision = draft.revision, history = draft.history.slice();
+    const {macroEditorView} = require('../../core/model/macro-editor');
+    const guiWord = () => draft.steps().at(-1).changes[0].fields[0].after;
+    assert.match(guiWord(),/GUI/); // Populate presentation cache before fresh reads.
+    assert.throws(()=>stage(draft,{type:'updateViaMacro',keycode:'VIA_MACRO_0',payload:'café'}),/setup|Select|host/i);
+    for(const [detected,label] of [[1,'Command'],[2,'Windows'],[3,'Super'],[0,'GUI']]) {
+        draft.observe({...snapshot,hostOs:{detected}},'board');
+        assert.equal(draft.current.hostOs.detected,detected);
+        assert.equal(draft.stale,false);
+        assert.equal(draft.revision,revision);
+        assert.deepEqual(draft.document,document);
+        assert.deepEqual(draft.history,history);
+        assert.equal(macroEditorView(draft.current,caps).unicode.mode,detected);
+        assert.match(guiWord(),new RegExp(label));
+        assert.doesNotThrow(()=>draft.changes());
+    }
+    draft.observe({...snapshot,hostOs:{detected:1}},'board');
+    stage(draft,{type:'updateViaMacro',keycode:'VIA_MACRO_0',payload:'café'});
+    stage(draft,settings(draft,'host',{hostOs:'3',unicodeEnabled:true}));
+    draft.observe({...snapshot,hostOs:{detected:2}},'board');
+    assert.equal(macroEditorView(draft.current,caps).unicode.mode,3,'manual override wins');
+    draft.undo(draft.revision);
+    assert.equal(macroEditorView(draft.current,caps).unicode.mode,2,'undo keeps latest detection');
+    draft.redo(draft.revision);
+    assert.equal(macroEditorView(draft.current,caps).unicode.mode,3);
+});
+
+test("clean drafts also use latest detection, including loss of a known host", () => {
+    const {draft,snapshot} = unicodeDraft(1);
+    for(const detected of [2,0,3]) {
+        draft.observe({...snapshot,hostOs:{detected}},'board');
+        assert.equal(draft.current.hostOs.detected,detected);
+        assert.equal(settingsEditorView(draft.current).host.effective,detected);
+        assert.equal(draft.dirty,false);
+        assert.equal(draft.history.length,1);
     }
 });

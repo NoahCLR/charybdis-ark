@@ -101,6 +101,7 @@ function fakeKeyboard({document, compiled, compiledOnly = false, generation = 42
         [VALUE.COMBOS]: comboPages(held.combos, held.settings.layers.map(record => record.reference)),
         [VALUE.SETTINGS]: storedPages(settings),
         [VALUE.STORAGE]: storage,
+        [0x0b]: [Buffer.from([1, 0])],
         [VALUE.CANDIDATE_STATUS]: candidateStatus,
     };
     const lighting = baseLighting(held.settings.values);

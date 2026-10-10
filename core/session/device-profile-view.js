@@ -4,6 +4,7 @@
 // configuration values and membership always come from the received domain.
 const {actionName, layerRef} = require("../schema/actions");
 const {VOCABULARY, branchName} = require("../model/vocabulary");
+const {keyLabel} = require("../model/key-names");
 const keycodes = require("../data/keycode-catalog");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {KEY_BEHAVIOR_HOLD_MODES} = require("../schema/key-behavior-domain-v1");
@@ -23,16 +24,17 @@ function enumName(values, value) {
 // grid to show. Absent when the catalogue knows the keycode only by itself,
 // and for layer, pointing and macro actions, which the interface names from
 // the profile's own layers, slots and macros.
-function actionDisplay(action) {
+function actionDisplay(action, names) {
     if (action.kind !== ACTION.QMK_KEYCODE) return {};
     const resolved = keycodes.resolve(action.operand);
-    return resolved.known && resolved.label !== resolved.name ? {label: resolved.label} : {};
+    const label = keyLabel(names, action.operand);
+    return resolved.known && label !== resolved.name ? {label} : {};
 }
 
 // A modifiers-only keycode is how a key holds its modifiers; the catalogue
 // names it "Shift+N/A", which reads as a broken key rather than "Shift".
-function builtInDisplay(action) {
-    const display = actionDisplay(action);
+function builtInDisplay(action, names) {
+    const display = actionDisplay(action, names);
     return display.label ? {label: display.label.replace(/\+N\/A$/, "")} : display;
 }
 
@@ -40,26 +42,26 @@ function builtInDisplay(action) {
 // the tiers its row leaves empty (model/built-in-behavior.js). A fallback hold
 // gives way to any authored first-press hold or long hold; `releaseTaps` says
 // a press with only a long hold still taps when released before it.
-function builtInForView(target, features) {
+function builtInForView(target, features, names) {
     const {tap, hold, fallback, releaseTaps} = builtInActions(target, features);
     return {
         ...(releaseTaps ? {releaseTaps: true} : {}),
-        ...(tap ? {tap: {helper: "TAP_SENDS", action: actionName(tap), ...builtInDisplay(tap)}} : {}),
-        ...(hold ? {hold: {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: actionName(hold), repeatHz: "0", ...builtInDisplay(hold),
+        ...(tap ? {tap: {helper: "TAP_SENDS", action: actionName(tap), ...builtInDisplay(tap, names)}} : {}),
+        ...(hold ? {hold: {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: actionName(hold), repeatHz: "0", ...builtInDisplay(hold, names),
             ...(fallback ? {fallback: true} : {})}} : {}),
     };
 }
 
-function behaviorRowsForView(domain, features = {}) {
+function behaviorRowsForView(domain, features = {}, names) {
     const hold = (branch) => branch && ({
         helper: enumName(KEY_BEHAVIOR_HOLD_MODES, branch.mode),
         action: actionName(branch.action),
         repeatHz: String(branch.repeatHz),
-        ...actionDisplay(branch.action),
+        ...actionDisplay(branch.action, names),
     });
     return domain.rows.map((row) => ({
         keycode: actionName(row.target),
-        builtIn: builtInForView(row.target, features),
+        builtIn: builtInForView(row.target, features, names),
         tapHoldTerm: String(row.tapHoldTerm),
         longerHoldTerm: String(row.longerHoldTerm),
         multiTapTerm: String(row.multiTapTerm),
@@ -69,7 +71,7 @@ function behaviorRowsForView(domain, features = {}) {
         steps: row.steps.map((step) => ({
             tapCount: step.tapIndex,
             tapCountName: branchName(step.tapIndex + 1),
-            ...(step.tap ? {tap: {helper: "TAP_SENDS", action: actionName(step.tap), ...actionDisplay(step.tap)}} : {}),
+            ...(step.tap ? {tap: {helper: "TAP_SENDS", action: actionName(step.tap), ...actionDisplay(step.tap, names)}} : {}),
             ...(step.hold ? {hold: hold(step.hold)} : {}),
             ...(step.longHold ? {longHold: hold(step.longHold)} : {}),
         })),
@@ -154,7 +156,7 @@ function combosForView(read, labels) {
     if (read?.state !== "read") return [];
     const resolve = value => {
         const key = keycodes.resolve(value);
-        return {name: key.name, label: labels[key.name] || key.label};
+        return {name: key.name, label: labels[key.name] || keyLabel(undefined, value)};
     };
     return read.rows.map(row => ({
         id: row.id, badge: `C${row.id}`,

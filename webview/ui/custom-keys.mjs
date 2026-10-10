@@ -88,7 +88,7 @@ function editor(model, key, canEdit) {
     });
     nameInput.addEventListener("change", () => post(edits.customKeyNameMessage(key.keycode, nameInput.value, model?.customKeyEditing?.identity)));
     card.querySelector('[data-act="place"]').addEventListener("click", () => {
-        state.placement = {keycode: key.keycode, label: key.name || key.keycode};
+        state.placement = {keycode: key.keycode};
         state.screen = "keys"; state.tab = "key"; render();
     });
     card.querySelector('[data-act="behaviour"]').addEventListener("click", () => {

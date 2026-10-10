@@ -14,7 +14,7 @@ const {VOCABULARY, slotName} = require("../model/vocabulary");
 const keycodeCatalog = require("../data/keycode-catalog");
 const {baseRgbForView, behaviorRowsForView, builtInForView, combosForView, rgbForView} = require("./device-profile-view");
 const {effectiveTimings} = require("../model/gesture-timing");
-const {keyLabel, profileKeyNames} = require("../model/key-names");
+const {hostKeyVocabulary, keyLabel, profileKeyNames} = require("../model/key-names");
 const {layerName} = require("../model/vocabulary");
 const {keycodeAction, knownActionAbi, layerRef, nativeCode} = require("../schema/actions");
 const {dpiChoices} = require("../model/pointer-dpi");
@@ -28,6 +28,7 @@ function buildDeviceModel(state = {}) {
     // What this profile calls its keys, laid over the catalogue: one rule for
     // the screens and the review (model/key-names.js).
     const names = profileKeyNames({
+        hostOs: state.settingsView?.host?.effective,
         layers: state.committed?.domains?.settings?.names,
         actionsKnown: knownActionAbi(state.capabilities?.actionAbiDigest),
         macros: state.macroView?.viaMacros,
@@ -37,7 +38,12 @@ function buildDeviceModel(state = {}) {
     });
     Object.assign(catalog.aliases, names.aliases);
     Object.assign(catalog.labels, names.labels);
-    for (const entry of catalog.entries) if (names.labels[entry.key] !== undefined) entry.label = names.labels[entry.key];
+    for (const entry of catalog.entries) if (names.labels[entry.key] !== undefined) {
+        entry.label = names.labels[entry.key];
+        entry.searchTerms.push(entry.label);
+        entry.search += ` ${entry.label.toLowerCase()}`;
+        entry.searchCompact += entry.label.toLowerCase().replaceAll(" ", "");
+    }
     // A pointing-mode keycode is offered in the picker under its slot.
     for (const {name, native, code, label} of names.pointing) {
         const entry = catalog.entries.find(entry => entry.keycode === code);
@@ -54,10 +60,11 @@ function buildDeviceModel(state = {}) {
     // interface names any of them by keycode and never composes a name itself:
     // a layer-tap cannot be listed ahead of time, one per layer and tap key.
     for (const value of profileKeycodes(state)) catalog.labels[keycodeCatalog.resolve(value).name] = keyLabel(names, value);
+    const hostVocabulary = hostKeyVocabulary(names.hostOs);
     return {
         // The words for every value the keyboard stores, so the interface
         // names things as the review does (model/vocabulary.js).
-        vocabulary: VOCABULARY,
+        vocabulary: {...VOCABULARY, ...hostVocabulary},
         layers: layersFromDevice(state.layout, catalog.labels, catalog.aliases, names.layers),
 
         // Read off the keyboard when the committed profile has been read;
@@ -69,12 +76,12 @@ function buildDeviceModel(state = {}) {
         pdModes: (state.committed?.domains?.pdModes || []).map((slot) => ({...slot, displayName: slotName(slot), binding: PD_SLOT_BINDINGS[slot.id]})),
         pdModeEditing: {writable: Boolean(state.capabilities?.supportedDomainMask & 16) && state.committed?.state === "read" && !state.committed.failures?.length && !state.busy,
             dpiChoices: dpiChoices({normalSpeed: true})},
-        keyBehaviors: committedKeyBehaviors(state.committed, state.capabilities),
+        keyBehaviors: committedKeyBehaviors(state.committed, state.capabilities, names),
         behaviorEditing: {
             busy: Boolean(state.busy),
             writable: Boolean(state.capabilities?.supportedDomainMask & 2) && state.committed?.state === "read" && !state.committed.failures?.length && !state.busy,
             maxTapStepsPerBehavior: state.capabilities?.maxTapStepsPerBehavior || 5,
-            keyDefaults: behaviorDefaults(state, catalog.aliases),
+            keyDefaults: behaviorDefaults(state, catalog.aliases, names),
         },
         profileIdentity: state.committed?.state === "read" ? {source: state.committed.source, generation: state.committed.generation, digest: state.committed.digest, originHalf: state.committed.originHalf} : null,
         rgb: {...committedRgb(state.committed),
@@ -87,6 +94,8 @@ function buildDeviceModel(state = {}) {
         viaMacros: state.macroView?.viaMacros || [],
         macroNameSpace: state.macroView?.names || null,
         macroBank: state.macroView?.macroBank || null,
+        hostSettings: state.settingsView?.host || null,
+        macroUnicode: state.macroView?.unicode || {supported: false, mode: 0},
         macroEditing: {identity: state.macroView?.identity || "", writable: Boolean(state.macroView) && state.capabilities?.compiledLayerCount === LAYERS && !state.busy},
         behaviorTimingDefaults: state.settingsView?.timing || {},
         configDefaults: state.settingsView?.sections || [],
@@ -99,6 +108,7 @@ function buildDeviceModel(state = {}) {
         } : null,
         settingsEditing: {identity: state.settingsView?.identity || "", writable: Boolean(state.settingsView) && state.capabilities?.compiledLayerCount === LAYERS && !state.busy},
         macroPayloadKeycodes: state.macroView?.macroPayloadKeycodes || [],
+        macroPayloadModifierKeycodes: state.macroView?.macroPayloadModifierKeycodes || [],
         // The 128 named custom keys, on a keyboard with the keycode blocks.
         customKeys: state.customKeyView?.keys || [],
         customKeyNameSpace: state.customKeyView?.names || null,
@@ -146,6 +156,7 @@ function layersFromDevice(layout, labels, aliases = {}, layerNames = []) {
                 semantic: aliases[key.resolved.name] || key.resolved.name,
                 display: displayFor(resolved),
                 editLabel: resolved.label,
+                ...(resolved.kind === "mod-tap" ? {modifierLabel: resolved.label.split(" / ").at(-1)} : {}),
                 ...(resolved.layerLabel ? {layerLabel: resolved.layerLabel} : {}),
                 row: key.row,
                 column: key.column,
@@ -181,7 +192,7 @@ function trim(name) {
 }
 
 // Every keycode value the profile stores: on its layers, in its behaviours and
-// in its combos.
+// in its combos and pointing-mode taps.
 function profileKeycodes(state) {
     const values = [];
     if (state.layout?.state === "read") for (const layer of state.layout.layers || []) for (const key of layer.keys) values.push(key.keycode);
@@ -192,6 +203,10 @@ function profileKeycodes(state) {
         }
     }
     if (state.combos?.state === "read") for (const row of state.combos.rows) values.push(...row.inputs, row.output);
+    if (state.committed?.state === "read") for (const slot of state.committed.domains?.pdModes || []) {
+        const taps = [...Object.values(slot.directions || {}), ...Object.values(slot.diagonals || {}), ...(slot.buttons || []).map(button => button.tap)];
+        for (const tap of taps) if (tap) values.push(tap.keycode);
+    }
     return values.filter((value) => Number.isInteger(value));
 }
 
@@ -201,12 +216,12 @@ function committedRgb(committed) {
     return committed?.state === "read" && committed.domains?.rgb ? rgbForView(committed.domains.rgb) : {};
 }
 
-function committedKeyBehaviors(committed, capabilities) {
+function committedKeyBehaviors(committed, capabilities, names) {
     const decoded = committed?.state === "read" ? committed.domains?.keyBehaviors : undefined;
     if (!decoded) {
         return [];
     }
-    return behaviorRowsForView(decoded, behaviorFeatures(capabilities));
+    return behaviorRowsForView(decoded, behaviorFeatures(capabilities), names);
 }
 
 function behaviorFeatures(capabilities) {
@@ -219,7 +234,7 @@ function behaviorFeatures(capabilities) {
 
 // Unstored editor rows need the same built-in actions and timing defaults as
 // saved rows. Publish presentation only; these are not profile behaviours.
-function behaviorDefaults(state, aliases) {
+function behaviorDefaults(state, aliases, names) {
     const defaults = state.settingsView?.timing || {};
     const values = [defaults.tappingTerm, defaults.tapHoldTerm, defaults.longerHoldTerm, defaults.multiTapTerm];
     const features = behaviorFeatures(state.capabilities);
@@ -227,7 +242,7 @@ function behaviorDefaults(state, aliases) {
         const target = keycodeAction(code);
         const name = keycodeCatalog.resolve(code).name;
         const timing = effectiveTimings({target}, values);
-        return [aliases[name] || name, {builtIn: builtInForView(target, features),
+        return [aliases[name] || name, {builtIn: builtInForView(target, features, names),
             timing: {tapHoldTerm: timing.hold, longerHoldTerm: timing.long, multiTapTerm: timing.repeat}}];
     }));
 }

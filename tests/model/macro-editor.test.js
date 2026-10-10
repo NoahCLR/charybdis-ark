@@ -6,6 +6,7 @@ const {document: pdDocument} = require("../fixtures/pd-profile");
 const {fingerprint, validateSnapshot} = require("../../core/model/portable-profile");
 const {macroEditorView, editMacro, macroBudget, SLOT_RESERVE_TAPS} = require("../../core/model/macro-editor");
 const {decodeProfileBlob} = require("../../core/schema/profile-blob-v1");
+const {editSettings, settingsEditorView} = require("../../core/model/settings-editor");
 const {buildDeviceModel} = require("../../core/session/device-model");
 const snapshot = value => ({document: value, fingerprint: fingerprint(value)});
 const settingsDomain = value => decodeProfileBlob(Buffer.from(value.profile, "base64")).domains.find(domain => domain.id === 0x40);
@@ -131,4 +132,38 @@ test("the model reports each macro's program size and the bank; an unplayable ma
     assert.doesNotThrow(() => editMacro(current, {keycode: "VIA_MACRO_2", payload: "{KC_A}".repeat(170), expectedFingerprint: current.fingerprint}));
     assert.throws(() => editMacro(current, {keycode: "VIA_MACRO_2", payload: "{KC_A}".repeat(171), expectedFingerprint: current.fingerprint}),
         error => error.code === "MACRO_TOO_LONG" && /513 bytes/.test(error.message));
+});
+
+test("Unicode host setup persists with the profile and gates Unicode edits on legacy firmware", () => {
+    const capabilities = {featureFlags: 1 << 21, compiledLayerCount: 16, supportedDomainMask: 31, actionAbiDigest: 0x837cf479};
+    let current = snapshot(document());
+    const change = value => editMacro(current, {keycode: "VIA_MACRO_0", expectedFingerprint: current.fingerprint, ...value}, capabilities);
+    assert.throws(() => change({payload: "café 🙂"}), error => error.code === "UNICODE_SETUP_REQUIRED");
+    const setHost = (mode, enabled) => {
+        const section = settingsEditorView({...current, hostOs: {detected: 0}}).sections.find(s => s.id === "host");
+        return editSettings(current, {sectionId: "host", expectedFingerprint: current.fingerprint,
+            fields: section.fields.map(f => f.kind === "toggle" ? {macro: f.macro, enabled} : {macro: f.macro, value: String(mode)})}, capabilities);
+    };
+    for (const mode of [1, 2, 3]) {
+        current = snapshot(setHost(mode, true));
+        assert.equal(validateSnapshot(current.document).settings.values[27], 0x100 | mode);
+        current = snapshot(change({payload: "café 🙂 e\u0301 👩‍💻"}));
+        const view = macroEditorView(current, capabilities);
+        assert.deepEqual(view.unicode, {supported: true, mode, enabled: true});
+        assert.equal(view.viaMacros[0].payload, "café 🙂 e\u0301 👩‍💻");
+        assert.equal(Buffer.from(current.document.macros[0], "base64").toString("utf8"), "café 🙂 e\u0301 👩‍💻");
+        assert.throws(() => validateSnapshot(current.document, {...capabilities, featureFlags: 0}), /ASCII/);
+    }
+    const off = snapshot(setHost(0, false));
+    const offView = macroEditorView(off, capabilities);
+    assert.equal(offView.viaMacros[0].needsUnicodeSetup, true);
+    assert.equal(offView.viaMacros[0].playable, false);
+    assert.throws(() => change({payload: "{+KC_A}é{-KC_A}"}), /Release ordinary keys/);
+    assert.doesNotThrow(() => change({payload: "{+KC_LALT}é{-KC_LALT}"}));
+    assert.throws(() => setHost(4, true), /supported range/);
+    assert.throws(() => change({payload: "é".repeat(129)}), error => error.code === "MACRO_TOO_LONG");
+    const legacy = snapshot(document());
+    assert.throws(() => editMacro(legacy, {keycode: "VIA_MACRO_0", expectedFingerprint: legacy.fingerprint, unicodeHostMode: 1}, {...capabilities, featureFlags: 0}), /steps/);
+    assert.throws(() => editMacro(legacy, {keycode: "VIA_MACRO_0", expectedFingerprint: legacy.fingerprint, payload: "café"}, {...capabilities, featureFlags: 0}), /ASCII/);
+    assert.doesNotThrow(() => editMacro(legacy, {keycode: "VIA_MACRO_0", expectedFingerprint: legacy.fingerprint, payload: "ASCII"}, {...capabilities, featureFlags: 0}));
 });

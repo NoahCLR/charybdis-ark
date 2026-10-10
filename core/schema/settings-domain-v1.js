@@ -15,7 +15,7 @@ const SETTINGS = Object.freeze({VERSION: 6, COUNT: 31, LAYERS: 16, MACRO_NAMES: 
     LAYER_RECORD_SIZE: 17, PLACEMENT_BYTES: 8, PLACEMENT_MAX_POSITIONS: 64, NAME_MAX_BYTES,
     SCALARS_OFFSET: 8, LAYER_RECORDS_OFFSET: 132, FIXED_SIZE: 404, MIN_SIZE: 404 + 272, MAX_SIZE: 404 + 272 * 33});
 // The values that are layer masks or switches (participation-policy.md).
-const SETTING = Object.freeze({COMBOS_ENABLED: 20, DEFAULT_LAYERS: 23, RETIRED_COMBO_REFERENCES: 27, BEHAVIORS_ENABLED: 28, LAYER_BEHAVIORS: 29, LAYER_COMBOS: 30});
+const SETTING = Object.freeze({COMBOS_ENABLED: 20, DEFAULT_LAYERS: 23, RETIRED_COMBO_REFERENCES: 27, UNICODE_HOST_MODE: 27, BEHAVIORS_ENABLED: 28, LAYER_BEHAVIORS: 29, LAYER_COMBOS: 30});
 // This keyboard's matrix: ten rows of six (capability page 2 reports it).
 const MATRIX_POSITIONS = 60;
 const HEADER = Buffer.from([SETTINGS.VERSION, SETTINGS.LAYERS, SETTINGS.COUNT, SETTINGS.MACRO_NAMES, SETTINGS.CUSTOM_KEY_NAMES, 0, 0, 0]);
@@ -35,7 +35,7 @@ function validSetting(id, v, layers = SETTINGS.LAYERS) {
     if (id === 21) return (v & 255) <= 1;
     if (id === 22) return v <= 0xffffff;
     if (id === 23) return v > 0 && v < bank;
-    if (id === 27) return v === 0;
+    if (id === 27) return (v & ~0x103) === 0;
     if (id === 29 || id === 30) return v < bank;
     return v <= 65535;
 }

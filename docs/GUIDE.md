@@ -522,3 +522,45 @@ slot, configured or not: its Pointing modes section lists every slot as a
 row, each with a Hold and a Toggle key, and marks an empty slot's row as doing
 nothing yet. Search finds the same keys as `Slot 6 · hold (empty)`. A board can be laid out before its modes are, and the key says `empty`
 on its second line until the slot is filled in.
+
+## Host settings
+
+**Settings → Host** stores **Host OS** (Auto, macOS, Windows or Linux) and an
+independent **Unicode playback** switch. Auto uses the keyboard’s USB OS guess,
+not the OS running Ark. The section shows the detected and effective OS from
+the last Read keyboard, including while edits are pending. Reading refreshes
+Auto names and Unicode setup without changing those edits or their history.
+Detection may be unknown or incorrect, especially
+through switches/KVMs; choose a manual override when needed. If Auto is unknown,
+Unicode text will not play until detection succeeds or an override is selected.
+Neither OS detection nor selection checks the computer’s input configuration.
+
+The effective OS names modifier keys consistently in the layout, picker, macros,
+pointing controls and Review: Option/Command on macOS, Alt/Windows on Windows,
+Alt/Super on Linux. Shortcuts, mod-taps, layer-mod keys, Magic actions and
+macro command previews follow the same rule. Display
+names refresh in open editors when the Host setting changes; stored keycodes
+and key assignments do not. Auto with an unknown OS uses Alt/GUI names. Both Host settings
+travel through Review, undo/redo, readback and backups. Older firmware leaves
+them read-only and keeps ASCII editing.
+
+## Unicode text macros
+
+On supporting firmware, Text and Payload preserve accents, curly quotes,
+symbols, emoji and combining sequences exactly. Text steps preserve literal
+braces and whitespace. Configure the host before enabling Unicode playback in
+**Settings → Host**: macOS needs Unicode Hex Input enabled and active; Windows
+needs WinCompose running with Right Alt as Compose; Linux needs an input method
+or target application accepting Ctrl+Shift+U entry. Linux support varies by
+application. Ark cannot check the active input source or installed helper.
+Unicode off retains ASCII typing, independently of the OS used for display
+names. Unicode edits require a known effective OS and enabled playback.
+
+Bank usage counts UTF-8 bytes; compiled usage counts each non-ASCII scalar as
+four bytes and each ASCII run with its instruction headers. The 512-byte
+program limit remains. Valid supplementary characters and joined emoji count
+by their scalar sequence, not their apparent glyph count. Unpaired UTF-16
+surrogates, malformed UTF-8 and unsupported control characters are rejected.
+Avoid concurrent typing and release ordinary keys before playback. Cancellation
+can leave text already typed; macOS may commit a partial hex entry. Actual text
+insertion on each host requires physical keyboard acceptance.
