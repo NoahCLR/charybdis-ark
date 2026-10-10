@@ -1207,7 +1207,11 @@ capture, rather than the portable document's materialized live settings. Domains
 are aligned by identity so resizing one preserves reuse of unchanged later
 ones. Firmware copies unchanged ranges into its inactive candidate; the host
 sends short or changed ranges. A missing or mismatched source uses a full upload.
-Older firmware uses the original chunk path.
+Older firmware uses the original chunk path. Compiled defaults are an
+origin-independent reuse source: translate the status page's unused origin to
+REUSE's sentinel `255`, keeping generation zero. Committed sources keep their
+reported generation and physical origin. The captured status and stale-base
+identity remain unchanged.
 
 Streaming admits at most four host chunks before a completion check, still
 through the serialized connection. A check proves the admitted prefix's exact

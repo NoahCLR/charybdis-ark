@@ -32,8 +32,10 @@ function candidateBaseSource(before, capabilities) {
     if (!(capabilities.featureFlags & PROFILE_WIRE_FEATURES.CANDIDATE_REUSE) || !bytes || !status
         || ![PROFILE_ACTIVE_KIND.COMPILED_ONLY, PROFILE_ACTIVE_KIND.COMMITTED].includes(status.activeKind)
         || fnv1a32(bytes) !== status.activeDigest) return undefined;
+    // Compiled GET status has no committed half and leaves origin zero; REUSE
+    // explicitly names that origin-independent source with the sentinel 255.
     return {bytes, kind: status.activeKind, generation: status.activeGeneration, digest: status.activeDigest,
-        crc32: crc32(bytes), origin: status.activeOriginHalf};
+        crc32: crc32(bytes), origin: status.activeKind === PROFILE_ACTIVE_KIND.COMPILED_ONLY ? 255 : status.activeOriginHalf};
 }
 const hasStorage = (snapshot, capabilities) => snapshot?.storage?.layout?.length === LAYOUT_BYTES && snapshot.storage.macros?.length === capabilities.viaMacroBytes;
 function capturedBase(before, capabilities) {

@@ -952,3 +952,40 @@ test("legacy, streaming and reuse progress count actual chunks and separate prep
         for (const report of reports) assert.equal(report.bytesPrepared, report.bytesUploaded + report.bytesReused);
     }
 });
+
+for (const compiledOnly of [true, false]) {
+    test(`Apply from a ${compiledOnly ? "compiled-default" : "committed"} capture sends canonical reuse identity`, async () => {
+        const {captureProfile, restoreProfile} = require("../../core/session/portable-profile-session");
+        const {PROFILE_WIRE_FEATURES} = require("../../core/protocol/profile-wire-v1");
+        const {fixture, capabilities} = require("../fixtures/portable-restore");
+        const {fakeKeyboard} = require("../fixtures/fake-keyboard");
+        const f = fixture();
+        const caps = {...capabilities, featureFlags: capabilities.featureFlags
+            | PROFILE_WIRE_FEATURES.CANDIDATE_REUSE | PROFILE_WIRE_FEATURES.CANDIDATE_STREAM};
+        const keyboard = fakeKeyboard({document: f.source, compiledOnly, generation: f.identity.storageGeneration});
+        let requestId = 0;
+        const captured = await captureProfile({request: async report => keyboard.answer(report)[0]},
+            {next: () => (requestId = requestId % 255 + 1)}, caps);
+        assert.equal(captured.status.activeKind, compiledOnly ? 0 : 1);
+        assert.equal(captured.status.activeGeneration, compiledOnly ? 0 : f.identity.storageGeneration);
+        assert.equal(captured.status.activeOriginHalf, 0);
+        const harness = new CandidateFirmwareHarness({scanBetweenReports: true});
+        const upload = coordinator(harness);
+        // Capture, source planning and upload are real; VIA and commit keep
+        // the restore fixture adapters so this test exercises no hardware.
+        const commit = f.operations.createCoordinator().commit;
+        f.operations.createCoordinator = () => ({upload: upload.upload.bind(upload), commit});
+        f.operations.readIdentity = async () => captured.identity;
+        f.options.baseSnapshot = captured;
+        const result = await restoreProfile({}, {}, caps, f.targetDocument, f.options);
+        assert.equal(result.fingerprint, require("../../core/model/portable-profile").fingerprint(f.targetDocument));
+        const reused = operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_REUSE);
+        assert.ok(reused.length > 0);
+        for (const report of reused) {
+            assert.equal(report[23], compiledOnly ? 0 : 1);
+            assert.equal(report.readUInt32LE(11), captured.status.activeGeneration);
+            assert.equal(report[24], compiledOnly ? 255 : 0, "only committed REUSE has a physical origin");
+        }
+        assert.equal(operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_VALIDATE).length, 1);
+    });
+}
