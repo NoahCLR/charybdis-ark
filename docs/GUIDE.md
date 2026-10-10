@@ -400,8 +400,8 @@ for confirmation when a warning or trap is present and stays disabled until
 destination save blockers are resolved.
 On firmware that supports it, Apply sends changed profile data and lets the
 keyboard copy unchanged data into the new profile. It still checks the complete
-result and saves both halves together. Older compatible firmware uses a full
-profile upload.
+result and saves both halves together, including the first save from firmware
+defaults. Older compatible firmware uses a full profile upload.
 
 Removing one combo appears as one deletion in Review and Draft history; later
 combo numbers shift because the device stores them in a packed table.
