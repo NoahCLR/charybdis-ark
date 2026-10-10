@@ -3,10 +3,12 @@
 const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../data/charybdis-layout");
 const {layerOfRef, nativeCode} = require("../schema/actions");
 const {hostKeyLabel, keyLabel, keyLabelWithName, profileKeyNames} = require("./key-names");
-const {hostSettings} = require("../schema/host-settings");
+const {hostSettings, HOST_SETTING} = require("../schema/host-settings");
 const {decodedOf} = require("./portable-profile");
 const {settingsEditorView} = require("./settings-editor");
 const {macroEditorView} = require("./macro-editor");
+const {inspectMacroPlayback} = require("./macro-input");
+const {hostLayout} = require("../data/host-layouts");
 const rgbEnums = require("../schema/rgb-domain-v1");
 const {KEY_BEHAVIOR_HOLD_MODES} = require("../schema/key-behavior-domain-v1");
 const {effectiveTimings} = require("./gesture-timing");
@@ -315,6 +317,36 @@ function profileReview(before, after) {
         const old = macrosA.viaMacros[i], next = macrosB.viaMacros[i], has = (macro) => Boolean(macro.payload || macro.name);
         item("Macros", `macro:${i}`, `Macro ${i}${(next.name || old.name) ? ` · ${next.name || old.name}` : ""}`, fields(old), fields(next), {kind: "macro", index: i}, [has(old), has(next)]);
     });
+    if (a.settings.values[HOST_SETTING] !== b.settings.values[HOST_SETTING]) {
+        const oldHost = hostSettings(a.settings.values, before.hostOs?.detected), nextHost = hostSettings(b.settings.values, after.hostOs?.detected);
+        macrosB.viaMacros.forEach((macro, index) => {
+            if (!macro.payload) return;
+            // Compare the current authored text under each host setup. An
+            // independent text edit belongs to its own macro change above.
+            const old = inspectMacroPlayback(macro.payload, oldHost), next = inspectMacroPlayback(macro.payload, nextHost);
+            const affected = new Set(next.typing.filter((route, i) => JSON.stringify(route) !== JSON.stringify(old.typing[i])).map(route => route.character));
+            if (!affected.size && old.error === next.error) return;
+            const fields = (playback, host) => {
+                const types = new Map();
+                for (const route of playback.typing.filter(route => affected.has(route.character))) {
+                    const characters = types.get(route.method) || [];
+                    characters.push(route.character); types.set(route.method, characters);
+                }
+                const labels = {layout: "layout keys", unicode: `Unicode entry (${word(VOCABULARY.hostOs, host.unicodeMode)})`, unavailable: "cannot type"};
+                const typing = [...types].map(([method, characters]) => `${labels[method]}: ${JSON.stringify(characters.slice(0, 16).join(""))}${characters.length > 16 ? ` (+${characters.length - 16} more)` : ""}`).join("; ");
+                return new Map([
+                    ...(affected.size ? [["Text entry", {text: `${hostLayout(host.layout).name} · ${typing}`,
+                        key: JSON.stringify(playback.typing.filter(route => affected.has(route.character))),
+                        detail: `${hostLayout(host.layout).name} · ${typing}${host.macosIso ? " · ISO" : " · ANSI"}`}]] : []),
+                    ["Playback", playback.error || "Ready to play"],
+                ]);
+            };
+            // The effect belongs to Host, so discarding it restores Host and
+            // preserves independently edited macro text and names.
+            item("Macros", "settings:host", `Macro ${index}${macro.name ? ` · ${macro.name}` : ""} · host setup`, fields(old, oldHost), fields(next, nextHost), {kind: "macro", index}, [true, true]);
+            items.at(-1).note = "Playback changes because of Settings → Host. Discard together with the Host change.";
+        });
+    }
     // A custom key is its name here; what it does is its behaviour's item.
     const keyNamesA = a.settings.customKeyNames, keyNamesB = b.settings.customKeyNames;
     keyNamesA.forEach((old, i) => {

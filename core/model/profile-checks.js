@@ -6,7 +6,9 @@
 const {gestureTimingFindings} = require("./gesture-timing");
 const {layerReach, compareFindings} = require("./layer-reach");
 const {baseLighting} = require("./settings-editor");
-const {macroProgramBytes, MACRO_PROGRAM_MAX} = require("../schema/macro-payload");
+const {decodeMacroPayload} = require("../schema/macro-payload");
+const {hostSettings} = require("../schema/host-settings");
+const {inspectMacroPlayback} = require("./macro-input");
 
 function profileFindings(decoded, destination = {}) {
     const findings = [...layerReach(decoded, {legacyGestureTiming: destination.physicalGestureTiming === false, legacyOwnedTapping: destination.ownedTapping === false}), ...gestureTimingFindings(decoded)];
@@ -17,15 +19,16 @@ function profileFindings(decoded, destination = {}) {
             detail: "Keys, behaviours or combo outputs still name this empty slot. The keyboard accepts them but does nothing when they run.",
             fix: "Configure the slot or replace the actions that reach it.", place: {kind: "pointing", slot: Number(slot)}});
     }
+    const host = hostSettings(decoded.settings.values, destination.detectedHostOs);
     (decoded.document?.macros || []).forEach((encoded, index) => {
         const bytes = Buffer.from(encoded, "base64");
         if (!bytes.length) return;
-        const size = macroProgramBytes(bytes);
-        if (size <= MACRO_PROGRAM_MAX) return;
-        findings.push({kind: "unplayableMacro", level: "warning", layers: [], identity: `${index}:${size}`,
-            title: `Macro ${index} is too long to play`,
-            detail: `The keyboard stores this macro, but its ${size}-byte program exceeds the ${MACRO_PROGRAM_MAX}-byte playback limit. Pressing it does nothing.`,
-            fix: "Shorten the macro before applying this profile.", place: {kind: "macro", index}});
+        const playback = inspectMacroPlayback(decodeMacroPayload(bytes, {unicode: true}), host);
+        if (!playback.error) return;
+        findings.push({kind: "unplayableMacro", level: "warning", layers: [], identity: `${index}:${playback.code}:${playback.error}`,
+            title: playback.code === "MACRO_TOO_LONG" ? `Macro ${index} is too long to play` : `Macro ${index} cannot play with this Host setup`,
+            detail: `${playback.error} The keyboard stores this macro, but pressing it does nothing.`,
+            fix: "Fix the macro or change Settings → Host before playing it.", place: {kind: "macro", index}});
     });
     const lighting = baseLighting(decoded.settings.values);
     const max = destination.brightnessMax;

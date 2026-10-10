@@ -11,6 +11,19 @@ const {buildDeviceModel} = require("../../core/session/device-model");
 const snapshot = value => ({document: value, fingerprint: fingerprint(value)});
 const settingsDomain = value => decodeProfileBlob(Buffer.from(value.profile, "base64")).domains.find(domain => domain.id === 0x40);
 
+test("stored macro status agrees with editing after a host layout change", () => {
+    const {hostMacros} = require("../fixtures/host-macros");
+    for (const host of [1 | (2 << 16), 1 | (3 << 16)]) {
+        const {snapshot, capabilities} = hostMacros(host, ["{+KC_A}é{-KC_A}"]);
+        const slot = macroEditorView(snapshot, capabilities).viaMacros[0];
+        const status = macroInputStatus(snapshot, {keycode: slot.keycode, payload: slot.payload}, capabilities);
+        assert.equal(slot.playable, !status.error);
+        assert.equal(slot.playbackError, status.error);
+        assert.equal(slot.playbackCode, status.code);
+        assert.equal(slot.program, 8, "the stored program size does not change with its typing method");
+    }
+});
+
 test("the 128 VIA macros populate the model, including empty slots and their names", () => {
     let current = snapshot(pdDocument());
     current = snapshot(editMacro(current, {keycode: "VIA_MACRO_127", payload: "{KC_LGUI,KC_N}", name: "New note", expectedFingerprint: current.fingerprint}));

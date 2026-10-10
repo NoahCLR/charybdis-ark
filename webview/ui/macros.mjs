@@ -67,7 +67,7 @@ export function screenMacros() {
         const cell = el(`<button class="mslot ${row.empty ? "" : "filled"} ${out ? "out" : ""} ${row.playable === false ? "warn" : ""}" data-slot="${esc(row.keycode)}"
             aria-current="${row.keycode === slot?.keycode}" ${out ? "disabled" : ""} data-tip="${esc(tip)}">
             <span class="n">M${index}</span>${changedMacros.has(row.keycode) ? draftDot("Changed in your draft", "corner") : ""}
-            <span class="v">${row.needsUnicodeSetup ? "setup" : row.playable === false ? "too long" : row.name ? esc(row.name.length > 13 ? `${row.name.slice(0, 12)}…` : row.name) : row.empty ? (out ? "no room" : "—") : esc(peek.length > 13 ? `${peek.slice(0, 12)}…` : peek)}</span></button>`);
+            <span class="v">${row.needsUnicodeSetup ? "setup" : row.playable === false ? (row.playbackCode === "MACRO_TOO_LONG" ? "too long" : "blocked") : row.name ? esc(row.name.length > 13 ? `${row.name.slice(0, 12)}…` : row.name) : row.empty ? (out ? "no room" : "—") : esc(peek.length > 13 ? `${peek.slice(0, 12)}…` : peek)}</span></button>`);
         cell.addEventListener("click", () => { state.macroSlot = row.keycode; render(); });
         cells.append(cell);
     });
@@ -304,16 +304,16 @@ function paintFeedback(card, model, slot) {
         textEntry: Boolean(model?.macroUnicode?.mode), layoutChars: model?.macroUnicode?.layoutChars, modifierKeys: model?.macroPayloadModifierKeycodes});
     const held = unreleased(parsed.steps, model?.qmkKeycodeAliases);
     const inspection = matchingValidation(form, model, slot) ? form.validation.validation : null;
-    const error = form.stepError || parsed.error || (held.length ? `Release ${held.map(key => actionLabel(model, key)).join(", ")} before the macro ends.` : "") || inspection?.error;
+    const error = form.stepError || parsed.error || (held.length ? `Release ${held.map(key => actionLabel(model, key)).join(", ")} before the macro ends.` : "") || inspection?.error || (!local && slot.playbackError);
     const program = local ? inspection?.program : slot.program;
     const bytes = local ? inspection?.bytes : slot.bytes;
     const max = model?.macroBank?.programMax ?? 512;
     const feedback = card.querySelector("[data-macro-feedback]");
     feedback.replaceChildren(el(`<div class="stack">
-        ${error ? `<div class="unavailable">${esc(error)} This edit is not staged.</div>` : ""}
+        ${error ? `<div class="unavailable">${esc(error)} ${local ? "This edit is not staged." : "This stored macro cannot play with the current Host settings."}</div>` : ""}
         <div class="meter ${program > max ? "over" : ""}"><i style="width:${Math.min(100, (program ?? 0) / max * 100)}%"></i></div>
         <p class="note" data-macro-size>${program == null ? "Playback size unavailable" : `${esc(program)} of ${esc(max)} playback bytes`} · ${bytes == null ? "macro memory size unavailable" : `${esc(bytes)} bytes of macro memory`}</p>
-        <p class="note">${error ? "Fix this edit before it can be kept in your draft." : local && !inspection ? "Checking this edit…" : "Valid edits are kept in your draft when you finish editing a step."}</p>
+        <p class="note">${error ? (local ? "Fix this edit before it can be kept in your draft." : "Change Host settings or fix the macro before playing it.") : local && !inspection ? "Checking this edit…" : "Valid edits are kept in your draft when you finish editing a step."}</p>
     </div>`));
     const dirty = local && payload !== slot.payload;
     card.querySelector("[data-local-state]").replaceChildren(el(`<i class="dot ${dirty ? "draft" : "on"}"></i>`), document.createTextNode(dirty ? "edited here" : "as read"));
