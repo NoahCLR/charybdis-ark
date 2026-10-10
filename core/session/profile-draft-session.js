@@ -94,6 +94,7 @@ class ProfileDraftSession {
         this.capabilities = copy(capabilities);
         this.base = copy(snapshot);
         this.latest = copy(snapshot);
+        this.hostOs = copy(snapshot.hostOs ?? null);
         this.history = [freeze(copy(snapshot.document))];
         // Why each history entry exists, beside it: "edit" is one staged
         // message, the only kind that ties the units it changed together.
@@ -123,15 +124,18 @@ class ProfileDraftSession {
         }
         return known;
     }
+    // Detection is volatile readback, never a document edit or history entry.
+    // Both Review sides use the latest detection and their own saved override.
+    get snapshotFacts() {return {...this.base, hostOs: this.hostOs};}
     // The draft's revision as a snapshot: the base's keyboard facts with this
     // revision's document, plus its decoded form for read-only consumers.
     get current() {
         const {decoded, fingerprint: print, summary: brief} = this.decode(this.history[this.cursor]);
-        return {...this.base, incomplete: false, document: this.history[this.cursor], fingerprint: print, summary: brief, decoded};
+        return {...this.snapshotFacts, incomplete: false, document: this.history[this.cursor], fingerprint: print, summary: brief, decoded};
     }
     // The keyboard's side as a snapshot, decoded once too.
     get baseSnapshot() {
-        return this.base.incomplete ? this.base : {...this.base, decoded: this.decode(this.base.document).decoded};
+        return this.base.incomplete ? this.base : {...this.snapshotFacts, decoded: this.decode(this.base.document).decoded};
     }
     get dirty() {return this.decode(this.history[this.cursor]).fingerprint !== this.base.fingerprint;}
     get stale() {return Boolean(this.needsRead || this.connectionChanged || this.latest.fingerprint !== this.base.fingerprint);}
@@ -152,6 +156,12 @@ class ProfileDraftSession {
         }
         this.needsRead = false;
         if (snapshot.incomplete) {this.latest = copy(snapshot); return;}
+        const hostOs = copy(snapshot.hostOs ?? null);
+        if (JSON.stringify(hostOs) !== JSON.stringify(this.hostOs)) {
+            this.hostOs = hostOs;
+            this.referenceCache = new WeakMap();
+            this.reviewCache = new WeakMap();
+        }
         if (!this.dirty) {
             if (snapshot.fingerprint !== this.base.fingerprint) this.reset(snapshot);
             else {this.base = copy(snapshot); this.latest = copy(snapshot);}
@@ -163,6 +173,9 @@ class ProfileDraftSession {
     }
     reset(snapshot) {
         this.base = copy(snapshot); this.latest = copy(snapshot);
+        this.hostOs = copy(snapshot.hostOs ?? null);
+        this.referenceCache = new WeakMap();
+        this.reviewCache = new WeakMap();
         this.history = [freeze(copy(snapshot.document))]; this.origins = [null]; this.labels = [null]; this.times = [this.now()]; this.orders = [IDENTITY]; this.cursor = 0;
         this.revision++; this.reviewedRevision = null;
         this.needsRead = false;
@@ -242,7 +255,7 @@ class ProfileDraftSession {
         if (known?.base === this.base) return known.reference;
         const decoded = validateSnapshot(rearranged(this.base.document, order), this.capabilities), print = fingerprintOf(decoded);
         const reference = print === this.base.fingerprint ? {snapshot: base, order: null}
-            : {snapshot: {...this.base, document: decoded.document, decoded, fingerprint: print, summary: summaryOf(decoded)}, order};
+            : {snapshot: {...this.snapshotFacts, document: decoded.document, decoded, fingerprint: print, summary: summaryOf(decoded)}, order};
         this.referenceCache.set(order, {base: this.base, reference});
         return reference;
     }
@@ -250,7 +263,7 @@ class ProfileDraftSession {
     // then everything else compared with the reference.
     describe(document, order) {
         const {snapshot, order: moved} = this.referenceFor(order);
-        const after = {...this.base, incomplete: false, document, ...this.decode(document)};
+        const after = {...this.snapshotFacts, incomplete: false, document, ...this.decode(document)};
         return [...(moved ? [layerOrderReview(after, moved)] : []), ...profileReview(snapshot, after)];
     }
     // The review rows, each with the group it belongs to. Rows are grouped by
@@ -299,7 +312,7 @@ class ProfileDraftSession {
         this.stepCache ??= new WeakMap();
         const entry = this.history[step], previous = this.history[step - 1], cached = this.stepCache.get(entry);
         if (cached?.previous === previous) return cached.units;
-        const snapshot = document => ({...this.base, incomplete: false, document, ...this.decode(document)});
+        const snapshot = document => ({...this.snapshotFacts, incomplete: false, document, ...this.decode(document)});
         const units = [...new Set(profileReview(snapshot(previous), snapshot(entry)).map(row => row.unit))];
         this.stepCache.set(entry, {previous, units});
         return units;
@@ -324,7 +337,7 @@ class ProfileDraftSession {
         const entry = this.history[step], previous = this.history[step - 1], cached = this.reviewCache.get(entry);
         const before = this.orders[step - 1], after = this.orders[step];
         if (cached?.previous === previous && cached.before === before && cached.after === after) return cached.rows;
-        const snapshot = document => ({...this.base, incomplete: false, document, ...this.decode(document)});
+        const snapshot = document => ({...this.snapshotFacts, incomplete: false, document, ...this.decode(document)});
         const back = inverse(before), moved = Object.freeze(after.map(layer => back[layer]));
         const now = snapshot(entry);
         const rows = isIdentity(moved) ? profileReview(snapshot(previous), now)

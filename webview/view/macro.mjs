@@ -10,26 +10,28 @@
 // unreleased() reports it.
 
 const MAX_CHARACTERS = 32768, MAX_DELAY = 65535, MAX_KEYS = 16;
-const printable = (character) => {
-    const code = character.charCodeAt(0);
-    return code === 9 || code === 10 || (code >= 32 && code <= 126);
+const printable = (character, unicode) => {
+    const code = character.codePointAt(0);
+    return code === 9 || code === 10 || (code >= 32 && code <= 126) || (unicode && code >= 0xA0 && code <= 0x10FFFF && !(code >= 0xD800 && code <= 0xDFFF));
 };
 
 export function parseMacro(payload, options = {}) {
     const steps = [];
     const held = new Set();
     let text = "";
-    const flush = () => { if (text) steps.push({kind: "text", text}); text = ""; };
+    let textHoldError = false;
+    const flush = () => { if (text && options.textEntry && [...held].some(key => options.modifierKeys ? !options.modifierKeys.includes(key) : !/KC_(?:LCTL|LSFT|LALT|LGUI|RCTL|RSFT|RALT|RGUI|LEFT_CTRL|LEFT_SHIFT|LEFT_ALT|LEFT_GUI|RIGHT_CTRL|RIGHT_SHIFT|RIGHT_ALT|RIGHT_GUI)$/.test(key))) textHoldError = true; if (text) steps.push({kind: "text", text}); text = ""; };
     const source = String(payload ?? "");
     const allowed = options.keys?.length ? new Set(options.keys) : null;
     if (source.length > MAX_CHARACTERS) return fail(steps, "A macro is at most 32,768 characters.");
 
     for (let index = 0; index < source.length;) {
-        const character = source[index++];
+        const character = String.fromCodePoint(source.codePointAt(index));
+        index += character.length;
         if ((character === "{" || character === "}") && source[index] === character) { text += character; index++; continue; }
         if (character === "}") return fail(steps, "Unexpected } — use }} for a literal closing brace.");
         if (character !== "{") {
-            if (!printable(character)) return fail(steps, "Macros support ASCII text, tabs and newlines.");
+            if (!printable(character, options.unicode)) return fail(steps, options.unicode ? "Use valid Unicode text, tabs or newlines; control characters and unpaired surrogates are unsupported." : "This firmware supports ASCII macro text only. Update both halves for Unicode.");
             text += character; continue;
         }
         flush();
@@ -59,14 +61,14 @@ export function parseMacro(payload, options = {}) {
         steps.push({kind, keys});
     }
     flush();
-    return {steps, error: ""};
+    return textHoldError ? fail(steps, "Release ordinary keys before a Unicode-entry text step; modifier holds are supported.") : {steps, error: ""};
 }
 
 const fail = (steps, error) => ({steps, error});
 
-export const describeStep = (step) => step.kind === "text" ? step.text
+export const describeStep = (step, label = (name) => name) => step.kind === "text" ? step.text
     : step.kind === "delay" ? `${step.delay} ms`
-    : step.keys.join(" + ");
+    : step.keys.map(label).join(" + ");
 
 export function serializeMacroStep(step) {
     if (step.kind === "text") return String(step.text ?? "").replaceAll("{", "{{").replaceAll("}", "}}");
@@ -82,14 +84,14 @@ export const serializeMacro = (steps) => steps.map(serializeMacroStep).join("");
 // with the same modifier press, so the head of the payload makes them all look
 // identical; what tells them apart is the key they actually send.
 export function macroPeek(payload, label = (name) => name) {
-    const {steps} = parseMacro(payload);
+    const {steps} = parseMacro(payload, {unicode: true});
     const text = steps.filter((step) => step.kind === "text").map((step) => step.text).join("").trim();
     if (text) return text;
     const taps = steps.filter((step) => step.kind === "tap").flatMap((step) => step.keys);
     if (taps.length) return taps.map(label).join(" ");
     const held = steps.filter((step) => step.kind === "press").flatMap((step) => step.keys);
     if (held.length) return held.map(label).join(" + ");
-    return steps[0] ? describeStep(steps[0]) : "";
+    return steps[0] ? describeStep(steps[0], label) : "";
 }
 
 // Held keys that are never released leave the keyboard holding them, so the

@@ -6,8 +6,11 @@ const {encodeKeyBehaviorDomain} = require("../schema/key-behavior-domain-v1");
 const {validateSnapshot, decodedOf} = require("./portable-profile");
 const {decodeProfileBlob, encodeProfileBlob} = require("../schema/profile-blob-v1");
 const {SETTING, SETTINGS, encodeSettings, validSetting} = require("../schema/settings-domain-v1");
+const {hostSettings, UNICODE_ENABLED} = require("../schema/host-settings");
+const {supportsUnicodeMacros} = require("../schema/macro-payload");
 const {dpiChoices} = require("./pointer-dpi");
-const {layerName} = require("./vocabulary");
+const {hostKeyLabel} = require("./key-names");
+const {layerName, VOCABULARY} = require("./vocabulary");
 const fail = message => Object.assign(new Error(message), {code: "INVALID_SETTINGS_EDIT"});
 const number = (macro, id, label, hint = "0–65535 ms", extra = {}) => ({macro, id, label, hint, kind: "number", validate: "nonnegative-int", ...extra});
 const toggle = (macro, id, label, hint) => ({macro, id, label, hint, kind: "toggle"});
@@ -78,14 +81,14 @@ const sections = [
 const optionLabels = [
     ["swapControlCaps", "Swap Left Control and Caps Lock"],
     ["capsToControl", "Use Caps Lock as Left Control"],
-    ["swapLeftAltGui", "Swap left Alt / Option and Windows / Command"],
-    ["swapRightAltGui", "Swap right Alt / Option and Windows / Command"],
-    ["disableGui", "Disable Windows / Command keys"],
+    ["swapLeftAltGui", "Swap left Alt and GUI"],
+    ["swapRightAltGui", "Swap right Alt and GUI"],
+    ["disableGui", "Disable GUI keys"],
     ["swapGraveEscape", "Swap backtick and Escape"],
     ["swapBackslashBackspace", "Swap backslash and Backspace"],
     ["nkro", "Allow more than six simultaneous keys"],
-    ["swapLeftControlGui", "Swap left Control and Windows / Command"],
-    ["swapRightControlGui", "Swap right Control and Windows / Command"],
+    ["swapLeftControlGui", "Swap left Control and GUI"],
+    ["swapRightControlGui", "Swap right Control and GUI"],
     ["oneshot", "One-shot modifiers and layers"],
     ["swapEscapeCaps", "Swap Escape and Caps Lock"],
     ["autocorrect", "Autocorrect"],
@@ -114,6 +117,7 @@ function rescaleShares(values, before) {
 }
 function settingValue(field, values) {
     const bits = (values[field.id] & fieldMask(field)) >>> 0;
+    if (field.bitMask && field.kind !== "toggle") return bits;
     if (field.bitMask) return Number(Boolean(bits));
     return field.shift === undefined ? bits : bits >>> field.shift;
 }
@@ -124,11 +128,12 @@ const LIGHTING_FIELDS = {enabled: {id: 21, shift: 0}, effect: {id: 21, shift: 8}
 const baseLighting = values => Object.fromEntries(Object.entries(LIGHTING_FIELDS).map(([name, field]) => [name, settingValue(field, values)]));
 // A field's value placed in its word, leaving every bit it does not own.
 function withSetting(field, word, number) {
-    const bits = field.bitMask ? (number ? field.bitMask : 0) : field.shift === undefined ? number : number << field.shift;
+    const bits = field.bitMask ? (field.kind === "toggle" ? (number ? field.bitMask : 0) : number & field.bitMask) : field.shift === undefined ? number : number << field.shift;
     return ((word & ~fieldMask(field)) | (bits & fieldMask(field))) >>> 0;
 }
-function settingsSections(snapshot, settings) {
+function settingsSections(snapshot, settings, capabilities) {
     const options = snapshot.options;
+    const host = hostSettings(settings.values, snapshot.hostOs?.detected);
     const result = sections.map(section => ({area: "Settings", ...section, fields: section.fields.map(field => ({...field}))}));
     const rgb = result.find(section => section.id === "rgbAppearance");
     const {effect: currentEffect, leds: currentFlags} = baseLighting(settings.values);
@@ -163,7 +168,17 @@ function settingsSections(snapshot, settings) {
     result.push({id: "comboReferences", area: "Settings", label: "Combo Layer Matching", expanded: false, description: "Choose which layer supplies the key assignments used to match combos on each layer. Select the same layer to keep its combos independent.", fields:
         everyLayer(i => ({...layer(`comboReference${i}`, undefined, `Combos on ${name(i)}`), record: "reference", layer: i, governs: {kind: "layer", layer: i}}))});
     result.push({id: "keyboardOptions", area: "Settings", label: "Key Options", expanded: false, description: options ? "Keyboard-wide remapping and typing options. These apply across all layers." : "Update both halves to report their supported key options.", fields:
-        options ? optionLabels.map(([macro, label], i) => ({...toggle(macro, 24, label), bitMask: options.keymapMasks[i], readOnly: !(options.supportedKeymapOptions & (1 << i)), hint: options.supportedKeymapOptions & (1 << i) ? "" : "This option is not enabled in the running firmware."})) : []});
+        options ? optionLabels.map(([macro, label], i) => ({...toggle(macro, 24, hostKeyLabel(label, host.effective)), bitMask: options.keymapMasks[i], readOnly: !(options.supportedKeymapOptions & (1 << i)), hint: options.supportedKeymapOptions & (1 << i) ? "" : "This option is not enabled in the running firmware."})) : []});
+    const label = id => VOCABULARY.hostOs.find(([value]) => value === id)?.[1] || "Unknown";
+    const available = Boolean(snapshot.hostOs) || supportsUnicodeMacros(capabilities);
+    const setup = ["Select a host OS manually if detection is unknown.", "Enable Unicode Hex Input in macOS and keep it active during playback.", "Install and run WinCompose with Right Alt as Compose.", "Use an input method/application accepting Ctrl+Shift+U, hex digits and Space. Some Linux applications do not support it."][host.effective];
+    result.push({id: "host", area: "Settings", label: "Host", description: available
+        ? `Detected: ${host.detected ? label(host.detected) : "Unknown"}. Effective: ${host.effective ? label(host.effective) : "Unknown"}. Detection is a best guess; override it if incorrect. ${setup} The keyboard cannot confirm your input setup.`
+        : "Update both halves to report their host OS and support these settings.", fields: [
+        {...number("hostOs", SETTING.UNICODE_HOST_MODE, "Host OS", "Auto uses the keyboard’s USB detection. This controls display names and Unicode entry; it does not swap keys.", {max: 3}), bitMask: 3, kind: "number", readOnly: !available,
+            choices: VOCABULARY.hostOs.map(([value, label]) => ({value, label}))},
+        {...toggle("unicodeEnabled", SETTING.UNICODE_HOST_MODE, "Unicode playback", `${setup} Enable only after configuring the host. Avoid typing during playback.`), bitMask: UNICODE_ENABLED, readOnly: !available},
+    ]});
     return result;
 }
 
@@ -182,13 +197,14 @@ function settingsEditorView(snapshot) {
                 hint: brightness ? (max === undefined ? "Update both halves to report their brightness limit before editing brightness." : `0–${max}, the brightness limit reported by this keyboard.`) : field.hint,
                 value: field.kind === "layer" ? `Layer ${value}` : String(value), enabled: Boolean(value)};
         })})),
+        host: {...hostSettings(settings.values, snapshot.hostOs?.detected), supported: Boolean(snapshot.hostOs)},
         timing: Object.fromEntries(["tappingTerm", "tapHoldTerm", "longerHoldTerm", "multiTapTerm"].map((key, id) => [key, String(settings.values[id])]))};
 }
 
 function editSettings(snapshot, message, capabilities) {
     if (!snapshot?.document || !message.expectedFingerprint || message.expectedFingerprint !== snapshot.fingerprint) throw fail("The keyboard changed since these settings were opened. Read the keyboard and review your changes before saving again.");
     const value = validateSnapshot(snapshot.document, capabilities);
-    const section = settingsSections(snapshot, value.settings).find(section => section.id === message.sectionId);
+    const section = settingsSections(snapshot, value.settings, capabilities).find(section => section.id === message.sectionId);
     if (!section || !Array.isArray(message.fields) || message.fields.length !== section.fields.length) throw fail("Choose a complete settings section reported by the keyboard.");
     const seen = new Set(), before = value.settings.values.slice();
     for (const input of message.fields) {

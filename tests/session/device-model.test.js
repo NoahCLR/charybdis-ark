@@ -74,7 +74,7 @@ test("device shortcut labels stay complete and semantic names require the advert
         committed: decodedDeviceProfile(), capabilities: {actionAbiDigest: 0x837cf479},
     };
     const model = buildDeviceModel(state);
-    assert.deepEqual(model.layers[0].positions.map(key => key.display), ["Cmd+C", "Shift+Cmd+Z", "Pd slot 0", "Lock Layer 5", "Lock Layer 6", "Custom key 2"],
+    assert.deepEqual(model.layers[0].positions.map(key => key.display), ["GUI+C", "Shift+GUI+Z", "Pd slot 0", "Lock Layer 5", "Lock Layer 6", "Custom key 2"],
         "a layer lock and a custom key are user slots under the native ABI, named by what they are");
     assert.equal(model.layers[0].positions[5].keycode, "0x7F02", "the editable identity still encodes to the original numeric value");
     assert.doesNotMatch(buildDeviceModel({...state, capabilities: {}}).layers[0].positions[5].display, /Custom key/, "an unknown ABI names no custom key");
@@ -398,4 +398,25 @@ test("a behaviour on a key never renames what the vocabulary already names", () 
     assert.equal(labels.QK_MACRO_0, "Macro 0", "the macro screen's name");
     assert.equal(labels["0x7EC2"], "Lock Layer 2", "a bare user slot reads by what it does to which layer");
     assert.equal(labels["LOCK_LAYER(2)"], "Lock Layer 2");
+});
+
+test("effective host names reach keycaps, picker search and modifier controls without changing assignments", () => {
+    const keys = [0xe2, 0xe3, 0x0804, 0x2804];
+    const state = {layout: {state: "read", layers: [{layer:0, keys: keys.map((keycode, layoutIndex) => ({keycode, layoutIndex, resolved:resolve(keycode)}))}]}, settingsView: {host:{effective:1}}};
+    const model = buildDeviceModel(state);
+    assert.deepEqual(model.layers[0].positions.map(p => p.editLabel), ["Left Option", "Left Command", "Command+A", "A / Command"]);
+    assert.equal(model.layers[0].positions[3].modifierLabel, "Command");
+    assert.deepEqual(model.layers[0].positions.map(p => p.value), keys);
+    assert.equal(model.vocabulary.pickerModifiers.find(({value}) => value === "G").label, "Command");
+    assert.equal(model.vocabulary.modifiers.find(([id]) => id === 4)[1], "Left Option");
+    assert.match(model.qmkKeycodes.find(e => e.keycode === 0xe3).search, /command/);
+});
+
+
+test("pointing-only shortcuts enter the shared OS label table", () => {
+    const model = buildDeviceModel({settingsView:{host:{effective:3}}, committed:{state:"read", domains:{pdModes:[
+        {id:0, kind:1, directions:{up:{keycode:0x0804}}, diagonals:{}, buttons:[{tap:{keycode:0x0805}}]}
+    ]}}});
+    assert.equal(model.qmkKeyLabels[resolve(0x0804).name], "Super+A");
+    assert.equal(model.qmkKeyLabels[resolve(0x0805).name], "Super+B");
 });

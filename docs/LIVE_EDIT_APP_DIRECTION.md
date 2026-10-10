@@ -40,7 +40,7 @@ matrix.
 | --- | --- |
 | Layout and 16 layers | Read/write; names and overlay order travel with complete profiles; a reorder renumbers layer keys by default ("Keys follow their layers") |
 | Key behaviours, combos and RGB | Read/write editors over the shared draft; selected keys open an unstored behaviour grid until the first edit; matching Keys reach sections share open state across tabs, open independently, and use the page scrollbar |
-| Macros | 128 named VIA macro slots with builder, recorder and preview; shared-memory and per-macro limits shown and enforced (D-L25, D-L26) |
+| Macros | 128 named VIA macro slots with builder, recorder and preview; capability-gated Unicode text and saved macOS/Windows/Linux host setup; shared-memory and per-macro limits shown and enforced (D-L25, D-L26) |
 | Custom keys | 128 named keys that do what their behaviour says: rename, add or open the behaviour, place, see where each is used (D-L42) |
 | Mouse | Pointer and sniping DPI, auto-sniping and auto-mouse: global-policy sections the core files under the Mouse area, so the rail, the review and import counts all place them there. The auto-mouse fade delay is a share of the timeout, edited on its lighting stage (D-L17) |
 | Pointing modes | 32 device-owned slots (sparse PD domain v3, RGB v4); live codecs accept only the current action vocabulary and profile formats (D-L54). See [PD-mode domain v1](../upstream/firmware/docs/architecture/pd-mode-domain-v1.md) |
@@ -381,7 +381,7 @@ Firmware decision; its text is in the firmware direction.
 ### D-L26 — Macro slots share one visible memory, and every slot says what fits
 
 All 128 slots share the keyboard's macro memory (10,327 bytes on the 16-layer
-geometry; a key tap takes 3 bytes, a typed character 1). A macro plays only if
+geometry; a key tap takes 3 bytes, ASCII text 1 byte per character, Unicode text its UTF-8 bytes). A macro plays only if
 the firmware compiles it into at most 512 bytes (`MACRO_PAYLOAD_IR_MAX_BYTES`),
 about 170 key taps; a longer one used to be accepted and then silently never
 played. The app computes that size exactly (`macroProgramBytes`, checked
@@ -394,6 +394,26 @@ room and cannot be edited until space is freed. The firmware does not enforce th
 app shows what a VIA edit left. Current settings version 6 gives every macro
 name up to 32 UTF-8 bytes, following the shared counted-name contract; see the
 [portable profile](../upstream/firmware/docs/architecture/portable-profile-v1.md).
+
+Unicode-capable firmware (feature bit 21) accepts canonical UTF-8 text and
+settings scalar 27’s Host settings, without changing the settings-v6 shape:
+bits 0..1 select Auto/macOS/Windows/Linux; bit 8 independently enables Unicode.
+Ark requires the capability for Unicode edits and nonzero Host settings, preserving
+legacy ASCII editing. Non-ASCII scalars cost four compiled bytes each; text
+and backups preserve exact scalar sequences. Settings → Host owns both
+controls and shows detected/effective OS from the
+keyboard’s GET 0x0B readback. Auto follows that USB guess, with manual override
+and unknown fallback; it cannot confirm input setup. The macro screen links to
+Host settings. Both choices participate in draft review and history.
+Stored macro decoding and presentation preserve valid Unicode without a
+destination capability context, so capture, backup comparison, Review and
+history can read it. Write validation still enforces the destination capability.
+Detected OS metadata is volatile: a complete Read keyboard refreshes the
+current draft and its presentation caches without changing stored edits,
+history, revision or conflict fingerprints. Saved OS overrides remain part
+of the document and take precedence over that metadata.
+See the [guide](GUIDE.md#unicode-text-macros). Physical host insertion remains
+an acceptance requirement, separate from codec and UI verification.
 
 ### D-L27 — A stale copy on the other half can no longer hold off every later one
 
@@ -544,10 +564,24 @@ sequenced Apply itself. Each rule now has one home:
   found by id, never by label.
 - Key names: `core/model/key-names.js`. The catalogue names what QMK ships;
   the profile names its macros, pointing-mode keys and bare user slots. The
+  effective Host OS also names Alt/Option and GUI/Command/Windows/Super,
+  including modifier wrappers, mod-taps, layer-mod keys, Magic actions and Space Cadet keys,
+  without changing stored keycodes. Macro command previews and held-key
+  warnings resolve those same labels; raw payload editors keep stored codes.
+  Modifier-bearing catalogue labels are identified centrally by their words,
+  independently of picker groups, so another key family inherits the rule. The
   screens' `qmkKeyLabels` and the review are both built from it, each from
   its own snapshot, so a key reads the same in the combo table, the picker and
-  the review. The webview never names a keycode: a form that shows keys, such
-  as the combo builder, carries the host's label with each one. The stored name
+  the review. The webview never names a keycode: a form such as the combo builder
+  stores keycodes and looks up their current labels on each render. It never
+  caches display words across model updates. `hostKeyVocabulary()` in the same
+  module derives all eight modifier controls, their stable picker wrappers,
+  grid headings, summaries and accessibility labels from the modifier
+  vocabulary. Key Options uses the same host naming rule. Auto with an unknown
+  host uses neutral Alt/GUI wording. The webview has no modifier-name table;
+  an unnamed value falls back to its stored code. Host-switch browser checks
+  exercise open behaviour pickers, combo builders, macro previews and pointing
+  editors through the production model-message handler. The stored name
   (`KC_KP_1`) is added only when a review row's two sides would read alike.
   A layer is always named by its name, in the picker's verbs: `MO(3)` reads
   "Hold Navigation", `LT(3,KC_SLASH)` "/ / Navigation", and a layer key's cap

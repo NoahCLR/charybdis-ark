@@ -3,7 +3,9 @@
 const {MACRO_BANK_BYTES, MACRO_SLOTS, decodedOf, encodeNamedProfile, validateSnapshot} = require("./portable-profile");
 const {decodeProfileBlob} = require("../schema/profile-blob-v1");
 const {SETTINGS, validName, encodeSettings} = require("../schema/settings-domain-v1");
-const {macroKeycodes, encodeMacroPayload, decodeMacroPayload, macroProgramBytes, MACRO_PROGRAM_MAX} = require("../schema/macro-payload");
+const {macroKeycodes, macroModifierKeycodes, encodeMacroPayload, decodeMacroPayload, macroProgramBytes, MACRO_PROGRAM_MAX} = require("../schema/macro-payload");
+const {supportsUnicodeMacros} = require("../schema/macro-payload");
+const {hostSettings} = require("../schema/host-settings");
 const fail = (message, code = "MACRO_EDIT_CONFLICT") => Object.assign(new Error(message), {code});
 
 
@@ -23,25 +25,33 @@ function macroBudget(slots, capacity) {
 function macroEditorView(snapshot, capabilities) {
     if (!snapshot?.document || snapshot.incomplete) return null;
     const {document, settings} = decodedOf(snapshot);
+    const unicode = supportsUnicodeMacros(capabilities);
+    const host = hostSettings(settings.values, snapshot.hostOs?.detected);
     const names = settings.macroNames;
     const slots = document.macros.map(value => Buffer.from(value, "base64"));
     const budget = macroBudget(slots, capabilities?.viaMacroBytes ?? MACRO_BANK_BYTES);
     const slot = (bytes, index) => {
         const program = macroProgramBytes(bytes);
+        // Presentation preserves valid stored text, including Review without a
+        // destination. Editing and Apply gate writes against capabilities.
+        const payload = decodeMacroPayload(bytes, {unicode: true});
+        const hasUnicode = /[^\x00-\x7F]/u.test(payload);
+        const needsUnicodeSetup = hasUnicode && !host.unicodeMode;
         return {kind: "via", keycode: `VIA_MACRO_${index}`, name: names[index],
-            payload: decodeMacroPayload(bytes), empty: bytes.length === 0, bytes: bytes.length,
-            program, playable: program <= MACRO_PROGRAM_MAX, available: !budget.outOfRoom.has(index),
+            payload, needsUnicodeSetup, empty: bytes.length === 0, bytes: bytes.length,
+            program, playable: program <= MACRO_PROGRAM_MAX && !needsUnicodeSetup && (unicode || !hasUnicode), available: !budget.outOfRoom.has(index),
             // How many more key taps this macro can take: the smaller of what
             // it may still play and what the bank has free.
             roomTaps: Math.floor(Math.max(0, Math.min(MACRO_PROGRAM_MAX - program, budget.free)) / KEY_TAP_BYTES)};
     };
     return {identity: snapshot.fingerprint,
+        unicode: {supported: unicode, mode: host.unicodeMode, enabled: host.unicodeEnabled},
         viaMacros: slots.map(slot),
         macroBank: {capacity: budget.capacity, stored: budget.stored, free: budget.free, available: budget.available,
             slots: slots.length, reserveTaps: SLOT_RESERVE_TAPS, programMax: MACRO_PROGRAM_MAX},
         // Every slot can hold a full-length name, whatever the others hold.
         names: {perName: SETTINGS.NAME_MAX_BYTES},
-        macroPayloadKeycodes: macroKeycodes()};
+        macroPayloadKeycodes: macroKeycodes(), macroPayloadModifierKeycodes: macroModifierKeycodes()};
 }
 
 // A macro's steps, its name, or both. A name lives in the profile's settings
@@ -55,7 +65,10 @@ function editMacro(snapshot, message, capabilities) {
     const value = validateSnapshot(snapshot.document, capabilities);
     const document = JSON.parse(JSON.stringify(value.document));
     if (message.payload !== undefined) {
-        const bytes = encodeMacroPayload(message.payload), program = macroProgramBytes(bytes);
+        const unicode = supportsUnicodeMacros(capabilities);
+        const host = hostSettings(value.settings.values, snapshot.hostOs?.detected);
+        if (/[^\x00-\x7F]/u.test(message.payload) && unicode && !host.unicodeMode) throw fail("Choose a known host OS and enable Unicode playback in Settings → Host before saving Unicode text.", "UNICODE_SETUP_REQUIRED");
+        const bytes = encodeMacroPayload(message.payload, {unicode, textEntry: host.unicodeEnabled}), program = macroProgramBytes(bytes);
         if (program > MACRO_PROGRAM_MAX) throw fail(`This macro needs ${program} bytes to play and the keyboard plays at most ${MACRO_PROGRAM_MAX}. Shorten it by about ${Math.ceil((program - MACRO_PROGRAM_MAX) / KEY_TAP_BYTES)} key taps.`, "MACRO_TOO_LONG");
         document.macros[index] = bytes.toString("base64");
     }

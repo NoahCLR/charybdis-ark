@@ -1,3 +1,5 @@
+import {vocabulary} from "./vocabulary.mjs";
+
 // Numeric keycodes, named.
 //
 // Pointing-mode slots store their shortcuts as bare numbers, and the profile
@@ -27,9 +29,6 @@ export function keyName(model, code) {
     return `0x${code.toString(16).toUpperCase()}`;
 }
 
-export const MODIFIER_BITS = [
-    [1, "Left Ctrl"], [2, "Left Shift"], [4, "Left Alt"], [8, "Left GUI"],
-    [16, "Right Ctrl"], [32, "Right Shift"], [64, "Right Alt"], [128, "Right GUI"],
-];
-
-export const modifierNames = (mask) => MODIFIER_BITS.filter(([bit]) => mask & bit).map(([, name]) => name);
+// Labels arrive with the current model; never retain a translated name.
+export const modifierBits = (model) => vocabulary(model).modifiers;
+export const modifierNames = (model, mask) => modifierBits(model).filter(([bit]) => mask & bit).map(([, name]) => name);

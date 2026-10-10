@@ -12,6 +12,7 @@
 // Navigation" and LT(3,KC_SLASH) "/ / Navigation". Only the raw keycode, where
 // a screen shows one, keeps the number.
 
+const {VOCABULARY} = require("./vocabulary");
 const {PD_SLOT_BINDINGS} = require("../data/pd-bindings");
 const {CUSTOM_KEY_SLOTS, customKeyCode} = require("../data/user-keycodes");
 const keycodes = require("../data/keycode-catalog");
@@ -44,8 +45,19 @@ function semanticLabel(semantic) {
  * keyboard whose action ABI is known gets the rest from its profile: the
  * user-slot layout they depend on is the ABI's.
  */
-function profileKeyNames({layers, macros = [], customKeys = [], behaviors = [], pdModes = [], actionsKnown = false} = {}) {
+// Catalogue groups describe browsing, not whether a label carries modifiers.
+// Detect modifier words centrally so new modifier-bearing families inherit
+// host naming without requiring another screen or group allowlist.
+const carriesModifiers = entry => ["modifiers", "magic"].includes(entry.group) || /\b[LR]?(?:Ctrl|Shift|Alt|GUI|Cmd)\b/.test(entry.label);
+
+function profileKeyNames({hostOs = 0, layers, macros = [], customKeys = [], behaviors = [], pdModes = [], actionsKnown = false} = {}) {
     const labels = {}, aliases = {}, pointing = [], custom = [];
+    const modifiers = hostKeyVocabulary(hostOs).modifiers;
+    for (const entry of keycodes.entries()) if (carriesModifiers(entry)) {
+        const label = entry.value >= 0xe0 && entry.value <= 0xe7 ? modifiers[entry.value - 0xe0][1] : hostKeyLabel(entry.label, hostOs);
+        labels[entry.name] = label;
+        for (const alias of entry.aliases || []) labels[alias] = label;
+    }
     const count = Math.max(8, layers?.length || 0);
     for (let layer = 0; layer < count; layer++) for (const form of Object.keys(LAYER_VERBS)) {
         const name = `${form}(${layer})`;
@@ -58,7 +70,7 @@ function profileKeyNames({layers, macros = [], customKeys = [], behaviors = [], 
             labels[native] = labels[name] = layerKeyLabel(name, layers);
         }
     }
-    const layered = {labels, aliases, pointing, custom, layers: layers || []};
+    const layered = {labels, aliases, pointing, custom, hostOs, layers: layers || []};
     if (!actionsKnown) return layered;
     for (const slot of macros) {
         const native = keycodes.resolve(resolveNativeQmkExpression(slot.keycode, {})).name;
@@ -116,6 +128,21 @@ function layerKeyLabel(name, layers) {
     return form ? `${LAYER_VERBS[form]} ${layerName(layers, Number(layer))}` : undefined;
 }
 
+function hostKeyLabel(label, hostOs) {
+    const gui = ["GUI", "Command", "Windows", "Super"][hostOs] || "GUI";
+    return String(label).replace(/\b([LR])(Ctrl|Shift|Alt|GUI|Cmd)\b/g, (_, side, name) => `${side === "L" ? "Left" : "Right"} ${name}`).replace(/\bControl\b/g, "Ctrl").replace(/\b(?:GUI|Cmd)\b/g, gui).replace(/\bAlt\b/g, hostOs === 1 ? "Option" : "Alt");
+}
+
+// Every modifier control uses these same names as keys and Review. Picker
+// identifiers are stable edit tokens, not display words; derive their labels
+// from the bit vocabulary rather than maintaining another naming table.
+function hostKeyVocabulary(hostOs = 0) {
+    const modifiers = VOCABULARY.modifiers.map(([bit, label]) => [bit, hostKeyLabel(label, hostOs)]);
+    const wrappers = ["C", "S", "A", "G", "RCTL", "RSFT", "RALT", "RGUI"];
+    const pickerModifiers = modifiers.map(([bit, label], i) => ({bit, value: wrappers[i], label: i < 4 ? label.replace(/^Left /, "") : label}));
+    return {modifiers, pickerModifiers};
+}
+
 // A stored keycode value as it reads in this profile, and as it reads with the
 // name it is stored under too, for the one place two keys can read alike: a
 // review row whose sides would otherwise look the same (KC_1 and KC_KP_1 are
@@ -129,7 +156,11 @@ function keyLabel(names, value) {
         const tap = keycodes.lookup(resolved.tap);
         return `${tap ? keyLabel(names, tap.value) : resolved.tap} / ${layerName(names?.layers, resolved.layer)}`;
     }
-    return resolved.label;
+    if (resolved.kind === "layer-mod") {
+        const modifiers = resolved.label.replace(/^Layer \d+ \+ /, "");
+        return `${layerName(names?.layers, resolved.layer)} + ${hostKeyLabel(modifiers, names?.hostOs)}`;
+    }
+    return carriesModifiers(resolved) ? hostKeyLabel(resolved.label, names?.hostOs) : resolved.label;
 }
 function keyLabelWithName(names, value) {
     const {name} = keycodes.resolve(value);
@@ -137,4 +168,4 @@ function keyLabelWithName(names, value) {
     return label === name ? label : `${label} (${name})`;
 }
 
-module.exports = {keyLabel, keyLabelWithName, layerKeyLabel, profileKeyNames, semanticLabel};
+module.exports = {hostKeyVocabulary, hostKeyLabel, keyLabel, keyLabelWithName, layerKeyLabel, profileKeyNames, semanticLabel};

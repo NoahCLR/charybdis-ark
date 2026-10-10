@@ -4,16 +4,17 @@
 
 import {el, esc} from "../lib/dom.mjs";
 import {getModel, layerName, layers, post, render, state} from "../store.mjs";
+import {actionLabel} from "../view/keyface.mjs";
 import {PICKER_BOARD} from "../view/picker-board.mjs";
-import {PICKER_MODIFIERS, pickerExpression} from "../view/edits.mjs";
+import {pickerExpression} from "../view/edits.mjs";
 import {entriesForPickerSection, pickable, pickerSections} from "../view/picker-sections.mjs";
 import {macroMatches} from "../view/macro.mjs";
 import {vocabulary, word} from "../view/vocabulary.mjs";
 
-const MODIFIERS = PICKER_MODIFIERS;
+const modifierControls = model => vocabulary(model).pickerModifiers || [];
 
-export function openPicker({title, context, seed = [], mode = "single", onPick}) {
-    state.picker = {title, context, mode, section: "board", search: "", mods: [], keys: seed.slice(), layerTap: null, onPick};
+export function openPicker({title, context, contextKeycode, seed = [], mode = "single", onPick}) {
+    state.picker = {title, context, contextKeycode, mode, section: "board", search: "", mods: [], keys: seed.slice(), layerTap: null, onPick};
     render();
 }
 
@@ -62,10 +63,13 @@ function sectionBody(model) {
 
     const section = pickerSections().find((entry) => entry.id === picker.section) || pickerSections()[0];
     if (section.kind === "board") {
-        const keys = PICKER_BOARD.keys.map((key) => {
+        const keys = PICKER_BOARD.keys.map((source) => {
+            const modifier = /^KC_(?:LEFT_|RIGHT_|L|R)(?:CTL|SFT|ALT|GUI)$/.test(source.value);
+            const spoken = model?.qmkKeyLabels?.[source.value];
+            const key = modifier ? {...source, labels: [(spoken || source.value).replace(/^(Left|Right) /, "")]} : source;
             const on = picked(key.value);
             const shifted = key.labels[1] && key.labels[1].length <= 3;
-            return `<g class="pkb-key ${on ? "on" : ""}" data-pick="${esc(key.value)}" tabindex="0" role="button" aria-label="${esc(key.value)}">
+            return `<g class="pkb-key ${on ? "on" : ""}" data-pick="${esc(key.value)}" tabindex="0" role="button" aria-label="${esc(spoken || key.value)}">
                 <rect x="${key.x}" y="${key.y}" width="${key.w}" height="${key.h}" rx="8"></rect>
                 ${shifted
                     ? `<text class="pkb-alt" x="${key.x + key.w / 2}" y="${key.y + key.h * 0.36}">${esc(key.labels[1])}</text>
@@ -74,7 +78,7 @@ function sectionBody(model) {
             </g>`;
         }).join("");
         return `<div class="pk-body"><div class="pkb"><svg viewBox="0 0 ${PICKER_BOARD.width} ${PICKER_BOARD.height}" xmlns="http://www.w3.org/2000/svg">${keys}</svg></div>
-            <p class="note" style="margin-top:12px">Click a key. Modifiers above wrap it, so <code>Cmd</code> + <code>C</code> stores <code>G(KC_C)</code> — identical to <code>LGUI(KC_C)</code>.</p></div>`;
+            <p class="note" style="margin-top:12px">Click a key. Modifiers above wrap it, so <code>${esc(modifierControls(model).find(({value}) => value === "G")?.label || "G")}</code> + <code>C</code> stores <code>G(KC_C)</code> — identical to <code>LGUI(KC_C)</code>.</p></div>`;
     }
     if (section.kind === "layers") {
         // TG(n) is the same lock as LOCK_LAYER(n), so a key storing it lights
@@ -137,13 +141,13 @@ export function pickerOverlay() {
     const node = el(`<div class="scrim"><div class="sheet picker" role="dialog" aria-modal="true" aria-label="Pick a keycode" style="width:min(1180px,100%)">
         <div class="sheet-h">
             <div><h2>Pick a keycode</h2>
-                <p class="note">${picker.mode === "list" ? "Choose one or more keys." : `For <b>${esc(picker.title)}</b> · ${esc(picker.context || "")}`}</p></div>
+                <p class="note">${picker.mode === "list" ? "Choose one or more keys." : `For <b>${esc(picker.title)}</b> · ${esc([picker.contextKeycode ? actionLabel(model, picker.contextKeycode) : "", picker.context].filter(Boolean).join(" · "))}`}</p></div>
             <input class="input" id="pickerSearch" placeholder="Search every section" style="max-width:300px;margin-left:12px" value="${esc(picker.search)}">
             <span class="right" style="margin-left:auto"><button class="btn ghost" data-act="cancel">Cancel</button></span>
         </div>
         ${picker.mode === "list" ? "" : `<div class="pk-mods"><span class="label">Modifiers</span>
-            ${MODIFIERS.map(([name, wrap]) => `<button class="pk-mod ${picker.mods.includes(name) ? "on" : ""}" data-mod="${name}"
-                data-tip="Wraps the picked key as ${wrap}(key).">${name}</button>`).join("")}
+            ${modifierControls(model).map(({value: wrap, label}) => `<button class="pk-mod ${picker.mods.includes(wrap) ? "on" : ""}" data-mod="${wrap}"
+                data-tip="Wraps the picked key as ${wrap}(key).">${esc(label)}</button>`).join("")}
             <span class="note" style="margin-left:auto">held together with the key</span></div>`}
         <div class="sheet-b" style="display:grid;grid-template-columns:186px minmax(0,1fr);align-items:start">
             <div class="picker-side">${pickerSections().map((section) =>

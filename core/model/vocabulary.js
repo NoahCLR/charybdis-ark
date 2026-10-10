@@ -11,6 +11,7 @@
 const {RGB_STAGE_BITS} = require("../schema/rgb-domain-v1");
 
 const VOCABULARY = Object.freeze({
+    hostOs: [[0, "Auto"], [1, "macOS"], [2, "Windows"], [3, "Linux"]],
     // How a hold tier runs once its threshold passes, in that tier's words: a
     // helper that names a threshold names the tier's own, the Tap / hold
     // threshold for Hold and the Long hold threshold for Long hold. A tap tier

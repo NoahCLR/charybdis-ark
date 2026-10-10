@@ -41,3 +41,18 @@ test("a macro's program size is what the keyboard compiles it to", () => {
     assert.equal(size("{KC_A}".repeat(170)), 510, "about 170 taps fit");
     assert.ok(size("{KC_A}".repeat(171)) > MACRO_PROGRAM_MAX);
 });
+
+test("Unicode macros preserve scalars and count UTF-8 bank bytes and compiled scalars", () => {
+    for (const text of ["café", "“hello” € 🙂", "e\u0301", "👩‍💻", " {{json}} 🙂 "]) {
+        const bytes = encodeMacroPayload(text, {unicode: true});
+        assert.equal(bytes.toString("utf8"), text.replaceAll("{{", "{").replaceAll("}}", "}"));
+        assert.equal(decodeMacroPayload(bytes, {unicode: true}), text);
+        assert.throws(() => encodeMacroPayload(text), /ASCII/);
+    }
+    assert.equal(macroProgramBytes(encodeMacroPayload("é".repeat(128), {unicode: true})), 512);
+    assert.equal(macroProgramBytes(encodeMacroPayload("🙂".repeat(128), {unicode: true})), 512);
+    assert.equal(macroProgramBytes(encodeMacroPayload("a".repeat(254) + "🙂", {unicode: true})), 260);
+    assert.equal(macroProgramBytes(encodeMacroPayload("a".repeat(255) + "🙂b", {unicode: true})), 264);
+    for (const text of ["\uD800", "\uDC00", "\u0000", "\u0001", "\u0080", "\u009F"]) assert.throws(() => encodeMacroPayload(text, {unicode: true}), /valid Unicode/);
+    for (const bytes of [[0xC0,0xAF], [0xE0,0x80,0xAF], [0xED,0xA0,0x80], [0xF4,0x90,0x80,0x80], [0xF0,0x9F,0x99], [0x80], [0xFF]]) assert.throws(() => decodeMacroPayload(Buffer.from(bytes), {unicode: true}), /UTF-8/);
+});

@@ -10,7 +10,7 @@ import {css, isOff} from "../lib/colour.mjs";
 import {NAME_MAX_BYTES, NAME_TIP} from "../view/names.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {AXIS, BUTTON, DIAGONALS, DIRECTIONS, KIND, MODIFIER_POLICY, SCROLL_FIELDS, TAP_ROWS, axisReads, dpiOptions, modeDpi, newMode, readConfig, readsHorizontal, readsVertical, scrollAxesOf, settleButtons, settleTaps, startingRecord, thresholdDistance} from "../view/pointing-config.mjs";
-import {MODIFIER_BITS, keyName, modifierNames} from "../view/keyvalues.mjs";
+import {modifierBits, keyName, modifierNames} from "../view/keyvalues.mjs";
 import {bindingsForSlot} from "../view/keyface.mjs";
 import {pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {getModel, post, render, state, writable, canEdit as canEditArea} from "../store.mjs";
@@ -207,15 +207,16 @@ function editor(model, slot, canEdit, slots) {
     // Eight modifiers as a Left / Right by Ctrl / Shift / Alt / GUI grid, so
     // each switch sits under its name instead of wrapping wherever it lands.
     const modifiers = (label, mask, key) => {
-        const columns = [...new Set(MODIFIER_BITS.map(([, name]) => name.replace(/^(Left|Right) /, "")))];
+        const bits = modifierBits(model);
+        const columns = (vocabulary(model).pickerModifiers || []).filter(({bit}) => bit < 16).map(({label}) => label);
         const cell = ([bit, name]) => `<label class="sw" data-tip="${esc(name)}"><input type="checkbox" data-bit="${bit}" aria-label="${esc(name)}"
             ${mask & bit ? "checked" : ""} ${disabled}><span class="track"></span></label>`;
-        const side = (prefix) => MODIFIER_BITS.filter(([, name]) => name.startsWith(prefix));
+        const side = (right) => bits.filter(([bit]) => (bit >= 16) === right);
         const node = el(`<div class="field"><span>${esc(label)}</span>
             <div class="pd-mods" style="grid-template-columns:44px repeat(${columns.length}, 58px)">
                 <span></span>${columns.map((name) => `<span class="h">${esc(name)}</span>`).join("")}
-                <span class="s">Left</span>${side("Left").map(cell).join("")}
-                <span class="s">Right</span>${side("Right").map(cell).join("")}
+                <span class="s">Left</span>${side(false).map(cell).join("")}
+                <span class="s">Right</span>${side(true).map(cell).join("")}
             </div></div>`);
         form[key] = () => [...node.querySelectorAll("[data-bit]")].reduce((total, input) =>
             total | (input.checked ? Number(input.dataset.bit) : 0), 0);
@@ -322,7 +323,7 @@ function editor(model, slot, canEdit, slots) {
         state.screen = "lighting"; state.stage = "pd"; render();
     });
     reach.querySelector('[data-act="place"]').addEventListener("click", () => {
-        state.placement = {keycode: bindingName(slot), label: slot.displayName || `Slot ${slot.id}`};
+        state.placement = {keycode: bindingName(slot)};
         state.screen = "keys";
         state.tab = "key";
         render();
@@ -373,7 +374,7 @@ function editor(model, slot, canEdit, slots) {
                     {tip: "Inherit: modifiers you hold apply to the shortcut, so Shift with an arrow selects. Ignore: the modifiers chosen below are left out while it sends. Exact: it sends exactly its shortcut, whatever you hold."});
                 policy.querySelector("span").classList.add("sr");
                 const masking = tap.modifierPolicy === MODIFIER_POLICY.MASK;
-                const left = masking ? modifierNames(tap.mask).join(", ") || "choose at least one below" : "—";
+                const left = masking ? modifierNames(model, tap.mask).join(", ") || "choose at least one below" : "—";
                 table.append(el(`<span class="n">${ARROWS[name]} ${esc(label)}</span>`), policy, el(`<span class="note">${esc(left)}</span>`));
                 if (masking) {
                     const grid = modifiers(`${label} leaves out`, tap.mask ?? 0, `${prefix}Mask:${name}`);
@@ -432,7 +433,7 @@ function editor(model, slot, canEdit, slots) {
                     typeof button.tap?.keycode === "string" ? {name: button.tap.keycode === "0" ? "" : button.tap.keycode} : {})
                 : el(`<span class="note blank">—</span>`);
             tap.querySelector?.("span")?.classList.add("sr");
-            const held = holding ? modifierNames(button.modifiers).join(", ") || "choose at least one below" : "—";
+            const held = holding ? modifierNames(model, button.modifiers).join(", ") || "choose at least one below" : "—";
             table.append(el(`<span class="n">${index + 1}</span>`), kindSelect, tap,
                 el(`<span class="note"><span class="narrow">Held modifiers: </span>${esc(held)}</span>`));
             if (holding) {

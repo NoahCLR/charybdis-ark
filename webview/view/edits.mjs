@@ -196,11 +196,6 @@ export function settingsSection(section, input, identity) {
 
 // ── the keycode picker ──────────────────────────────────────────────────
 
-export const PICKER_MODIFIERS = [
-    ["Ctrl", "C"], ["Shift", "S"], ["Alt", "A"], ["Cmd", "G"],
-    ["Right Ctrl", "RCTL"], ["Right Shift", "RSFT"], ["Right Alt", "RALT"], ["Right Cmd", "RGUI"],
-];
-
 // What the picker posts: a list for list pickers, otherwise one key wrapped
 // in the chosen modifiers, and in LT(layer, …) when a tap-hold layer is armed.
 // Layers are posted by index, the form the draft encodes.
@@ -208,7 +203,7 @@ export function pickerExpression({keys = [], mods = [], layerTap = null, mode = 
     if (!keys.length) return "";
     if (mode === "list") return keys.join(", ");
     let value = keys[0];
-    for (const name of mods) value = `${PICKER_MODIFIERS.find(([label]) => label === name)[1]}(${value})`;
+    for (const wrapper of mods) value = `${wrapper}(${value})`;
     if (layerTap !== null && layerTap !== undefined && layerTap !== "") value = `LT(${layerTap}, ${value})`;
     return value;
 }

@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {MODIFIER_BITS, keyName, modifierNames} from "../webview/view/keyvalues.mjs";
+import {createRequire} from "node:module";
+const require = createRequire(import.meta.url);
+const {buildDeviceModel} = require("../core/session/device-model");
+import {modifierBits, keyName, modifierNames} from "../webview/view/keyvalues.mjs";
 
 const model = {qmkKeycodes: [
     {keycode: 0x0004, value: "KC_A"},
@@ -27,7 +30,7 @@ test("an unknown value keeps its number rather than gaining an invented name", (
 });
 
 test("modifier masks read back as the names the keyboard holds", () => {
-    assert.deepEqual(modifierNames(0), []);
-    assert.deepEqual(modifierNames(1 | 8), ["Left Ctrl", "Left GUI"]);
-    assert.deepEqual(modifierNames(255), MODIFIER_BITS.map(([, name]) => name));
+    assert.deepEqual(modifierNames(buildDeviceModel(), 0), []);
+    assert.deepEqual(modifierNames(buildDeviceModel(), 1 | 8), ["Left Ctrl", "Left GUI"]);
+    assert.deepEqual(modifierNames(buildDeviceModel(), 255), modifierBits(buildDeviceModel()).map(([, name]) => name));
 });

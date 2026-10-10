@@ -1,7 +1,7 @@
 "use strict";
 const assert = require("node:assert/strict");
 const test = require("node:test");
-const {keyLabel, keyLabelWithName, profileKeyNames} = require("../../core/model/key-names");
+const {hostKeyVocabulary, keyLabel, keyLabelWithName, profileKeyNames} = require("../../core/model/key-names");
 const {decodedDeviceProfile} = require("../fixtures/device-profile");
 const keycodes = require("../../core/data/keycode-catalog");
 const {PD_SLOT_BINDINGS: PD_BINDINGS} = require("../../core/data/pd-bindings");
@@ -64,4 +64,64 @@ test("a layer key names its layer by name; only the raw keycode keeps the number
     assert.equal(profileKeyNames({layers: []}).labels["LOCK_LAYER(1)"], undefined, "a layer lock needs the action ABI");
     const lock = keycodes.resolve(require("../../core/schema/compiled-profile-v1").resolveNativeQmkExpression("LOCK_LAYER(2)", {})).name;
     assert.equal(names.aliases[lock], "LOCK_LAYER(2)", "the user slot a layer lock is stored as is known as the lock");
+});
+
+test("host names preserve modifier keycodes and compose shortcuts and mod-taps", () => {
+    for (const [hostOs, alt, gui] of [[1, "Option", "Command"], [2, "Alt", "Windows"], [3, "Alt", "Super"]]) {
+        const names = profileKeyNames({hostOs});
+        assert.equal(keyLabel(names, 0xe2), `Left ${alt}`);
+        assert.equal(keyLabel(names, 0xe7), `Right ${gui}`);
+        assert.equal(names.labels.KC_LGUI, `Left ${gui}`);
+        assert.equal(keyLabel(names, 0x0804), `${gui}+A`);
+        assert.equal(keyLabel(names, 0x2804), `A / ${gui}`);
+        assert.equal(keycodes.resolve(0x0804).name, "LGUI(KC_A)");
+    }
+});
+
+for (const [hostOs, alt, gui] of [[0, "Alt", "GUI"], [1, "Option", "Command"], [2, "Alt", "Windows"], [3, "Alt", "Super"]]) {
+    test(`host ${hostOs} shares all eight modifier names with basic keys, shortcuts and mod-taps`, () => {
+        const names = profileKeyNames({hostOs});
+        const {modifiers, pickerModifiers} = hostKeyVocabulary(hostOs);
+        assert.deepEqual(modifiers.map(([, label]) => label), ["Left Ctrl", "Left Shift", `Left ${alt}`, `Left ${gui}`, "Right Ctrl", "Right Shift", `Right ${alt}`, `Right ${gui}`]);
+        for (let i = 0; i < 8; i++) {
+            const [bit, label] = modifiers[i];
+            assert.equal(keyLabel(names, 0xe0 + i), label);
+            const control = pickerModifiers[i];
+            assert.equal(control.bit, bit);
+            assert.equal(control.label, i < 4 ? label.replace(/^Left /, "") : label);
+            const encodedMods = i < 4 ? bit : 0x10 | (bit >> 4);
+            const shortcut = keycodes.resolve((encodedMods << 8) | 4);
+            assert.equal(keyLabel(names, shortcut.value), `${control.label}+A`);
+            assert.equal(keyLabel(names, 0x2000 | shortcut.value), `A / ${control.label}`);
+        }
+        assert.deepEqual(pickerModifiers.map(({value}) => value), ["C", "S", "A", "G", "RCTL", "RSFT", "RALT", "RGUI"]);
+    });
+}
+
+test("layer modifiers and Magic actions share host words without rewriting unrelated labels", () => {
+    for(const [hostOs,alt,gui] of [[0,'Alt','GUI'],[1,'Option','Command'],[2,'Alt','Windows'],[3,'Alt','Super']]) {
+        const names=profileKeyNames({hostOs,layers:['Base','Navigation']});
+        assert.equal(keyLabel(names,0x502c),`Navigation + ${alt}+${gui}`);
+        for(const [key,label] of [['QK_MAGIC_SWAP_ALT_GUI',`Swap ${alt}⇄${gui}`],['QK_MAGIC_SWAP_LALT_LGUI',`Swap Left ${alt}⇄Left ${gui}`],['QK_MAGIC_SWAP_RALT_RGUI',`Swap Right ${alt}⇄Right ${gui}`]]) {
+            const entry=keycodes.lookup(key);
+            assert.equal(keyLabel(names,entry.value),label);
+            assert.equal(names.labels[key],label);
+            for(const alias of entry.aliases) assert.equal(names.labels[alias],label);
+        }
+        assert.equal(keyLabel(names,keycodes.lookup('KC_MISSION_CONTROL').value),'Mission Control');
+    }
+});
+
+test("modifier-bearing catalogue families inherit host vocabulary regardless of browsing group", () => {
+    const {hostKeyLabel}=require('../../core/model/key-names');
+    for(const hostOs of [0,1,2,3]) {
+        const names=profileKeyNames({hostOs});
+        for(const entry of keycodes.entries().filter(e=>/\b[LR]?(?:Alt|GUI|Cmd)\b/.test(e.label))) {
+            const label=hostKeyLabel(entry.label,hostOs);
+            assert.equal(keyLabel(names,entry.value),label,entry.name);
+            for(const alias of entry.aliases || []) assert.equal(names.labels[alias],label,alias);
+        }
+        assert.equal(keyLabel(names,keycodes.lookup('SC_LAPO').value),hostKeyLabel('Left Alt/(',hostOs));
+        assert.equal(keyLabel(names,keycodes.lookup('SC_RAPC').value),hostKeyLabel('Right Alt/)',hostOs));
+    }
 });

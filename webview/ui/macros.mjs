@@ -6,8 +6,8 @@
 // real when the slot is staged, and says so if it disagrees.
 
 import {el, esc} from "../lib/dom.mjs";
-import {describeStep, macroMatches, macroPeek, parseMacro, serializeMacro, unreleased} from "../view/macro.mjs";
-import {macroPlacements} from "../view/keyface.mjs";
+import {describeStep, macroMatches, macroPeek, parseMacro, serializeMacro, serializeMacroStep, unreleased} from "../view/macro.mjs";
+import {actionLabel, macroPlacements} from "../view/keyface.mjs";
 import {NAME_TIP, nameCount} from "../view/names.mjs";
 import {setReachGroupOpen} from "../view/reach-groups.mjs";
 import {canEdit as canEditArea, getModel, layerName, layers, macroForm, post, render, setMacroForm, state, writable} from "../store.mjs";
@@ -59,7 +59,7 @@ export function screenMacros() {
     const changedMacros = draftMarks(model?.draft?.changes).macros;
     bank.forEach((row, index) => {
         if (!macroMatches(row, query)) return;
-        const {steps} = parseMacro(row.payload);
+        const {steps} = parseMacro(row.payload, {unicode: model?.macroUnicode?.supported, textEntry: Boolean(model?.macroUnicode?.mode), modifierKeys: model?.macroPayloadModifierKeycodes});
         const peek = macroPeek(row.payload, (name) => model?.qmkKeyLabels?.[name] || name);
         const out = row.available === false;
         const tip = out ? `Slot ${index} · no room: the free macro memory is kept for the lower empty slots. Shorten or clear a macro to open it.`
@@ -67,7 +67,7 @@ export function screenMacros() {
         const cell = el(`<button class="mslot ${row.empty ? "" : "filled"} ${out ? "out" : ""} ${row.playable === false ? "warn" : ""}" data-slot="${esc(row.keycode)}"
             aria-current="${row.keycode === slot?.keycode}" ${out ? "disabled" : ""} data-tip="${esc(tip)}">
             <span class="n">M${index}</span>${changedMacros.has(row.keycode) ? draftDot("Changed in your draft", "corner") : ""}
-            <span class="v">${row.playable === false ? "too long" : row.name ? esc(row.name.length > 13 ? `${row.name.slice(0, 12)}…` : row.name) : row.empty ? (out ? "no room" : "—") : esc(peek.length > 13 ? `${peek.slice(0, 12)}…` : peek)}</span></button>`);
+            <span class="v">${row.needsUnicodeSetup ? "setup" : row.playable === false ? "too long" : row.name ? esc(row.name.length > 13 ? `${row.name.slice(0, 12)}…` : row.name) : row.empty ? (out ? "no room" : "—") : esc(peek.length > 13 ? `${peek.slice(0, 12)}…` : peek)}</span></button>`);
         cell.addEventListener("click", () => { state.macroSlot = row.keycode; render(); });
         cells.append(cell);
     });
@@ -92,7 +92,7 @@ function memoryMeter(memory) {
 function editor(model, slot, canEdit) {
     const draft = macroForm(slot.keycode).draft;
     const payload = draft ?? slot.payload ?? "";
-    const {steps, error} = parseMacro(payload, {keys: model?.macroPayloadKeycodes});
+    const {steps, error} = parseMacro(payload, {keys: model?.macroPayloadKeycodes, unicode: model?.macroUnicode?.supported, textEntry: Boolean(model?.macroUnicode?.mode), modifierKeys: model?.macroPayloadModifierKeycodes});
     const held = unreleased(steps);
     const dirty = draft !== undefined && draft !== slot.payload;
 
@@ -106,10 +106,12 @@ function editor(model, slot, canEdit) {
         <div class="card-b stack">
             ${nameField(model, slot, canEdit)}
             ${placedOn(model, slot)}
+            ${unicodeSetup(model, canEdit)}
             <label class="field"><span>Payload</span>
                 <textarea class="input mono" rows="3" style="height:auto;padding:9px 10px;resize:vertical" ${canEdit ? "" : "disabled"}
                     data-tip="Exactly as the keyboard stores it. Text is literal; {KC_A} taps, {+KC_A} presses, {-KC_A} releases, {120} waits. Use {{ and }} for literal braces.">${esc(payload)}</textarea></label>
         </div></div>`);
+    card.querySelector("[data-host-settings]")?.addEventListener("click", () => { state.screen = "settings"; render(); });
     const textarea = card.querySelector("textarea");
     const nameInput = card.querySelector("[data-name]");
     nameInput?.addEventListener("input", () => showCount(card.querySelector("[data-name-count]"), nameInput.value, model.macroNameSpace.perName));
@@ -124,14 +126,15 @@ function editor(model, slot, canEdit) {
     card.querySelectorAll("[data-goto-layer]").forEach((button) => button.addEventListener("click", () =>
         showOnLayer(slot.keycode, Number(button.dataset.gotoLayer))));
     card.querySelector('[data-act="place"]').addEventListener("click", () => {
-        state.placement = {keycode: slot.keycode, label: slot.keycode};
+        state.placement = {keycode: slot.keycode};
         state.screen = "keys"; state.tab = "key"; render();
     });
 
     const body = card.querySelector(".card-b");
     // A macro the keyboard will not play says so first, above its steps.
     const max = model?.macroBank?.programMax ?? 512;
-    if (slot.playable === false) body.prepend(el(`<div class="unavailable">This macro compiles to ${esc(slot.program)} bytes and the keyboard plays at most ${esc(max)}, so pressing it does nothing. Shorten it by about ${esc(Math.ceil((slot.program - max) / 3))} key taps.</div>`));
+    if (slot.needsUnicodeSetup) body.prepend(el(`<div class="unavailable">This macro has Unicode text. Choose its host setup below before it can play.</div>`));
+    else if (slot.playable === false) body.prepend(el(`<div class="unavailable">This macro compiles to ${esc(slot.program)} bytes and the keyboard plays at most ${esc(max)}, so pressing it does nothing. Shorten it by about ${esc(Math.ceil((slot.program - max) / 3))} key taps.</div>`));
     if (slot.available === false) body.prepend(el(`<div class="unavailable">This slot has no room: the free macro memory is kept for the lower empty slots, each with room for ${esc(model?.macroBank?.reserveTaps ?? 10)} key taps. Shorten or clear another macro to open it.</div>`));
     body.append(stepBuilder(model, slot, canEdit, textarea));
     body.append(preview(model, slot, steps, error, held, payload, canEdit));
@@ -194,7 +197,7 @@ function showOnLayer(keycode, at) {
 }
 
 function stageMacro(model, slot, payload) {
-    const parsed = parseMacro(payload, {keys: model?.macroPayloadKeycodes});
+    const parsed = parseMacro(payload, {keys: model?.macroPayloadKeycodes, unicode: model?.macroUnicode?.supported, textEntry: Boolean(model?.macroUnicode?.mode), modifierKeys: model?.macroPayloadModifierKeycodes});
     if (parsed.error || unreleased(parsed.steps).length) return false;
     setMacroForm(slot.keycode, {draft: payload});
     post(edits.macroMessage(slot.keycode, payload, model?.macroEditing?.identity));
@@ -238,10 +241,10 @@ function stepBuilder(model, slot, canEdit, textarea) {
         },
     }));
     node.querySelector('[data-act="insert"]').addEventListener("click", () => {
-        const text = value.value.trim();
+        const text = kind.value === "text" ? value.value : value.value.trim();
         if (!text) return;
         const keys = text.split(",").map((name) => name.trim()).filter(Boolean).join(",");
-        const addition = kind.value === "text" ? text
+        const addition = kind.value === "text" ? serializeMacroStep({kind: "text", text})
             : kind.value === "delay" ? `{${text.replace(/\D/g, "")}}`
             : kind.value === "press" ? `{+${keys}}`
             : kind.value === "release" ? `{-${keys}}`
@@ -263,11 +266,11 @@ function preview(model, slot, steps, error, held, payload, canEdit) {
     </div>`);
     const max = model?.macroBank?.programMax ?? 512;
     if (error) node.append(el(`<div class="unavailable">${esc(error)} The keyboard would refuse this payload, so it cannot be staged until it reads cleanly.</div>`));
-    if (!error && held.length) node.append(el(`<div class="unavailable">This macro never releases ${esc(held.join(", "))}. The keyboard would keep holding ${held.length === 1 ? "it" : "them"} after the macro ends.</div>`));
+    if (!error && held.length) node.append(el(`<div class="unavailable">This macro never releases ${esc(held.map(key => actionLabel(model, key)).join(", "))}. The keyboard would keep holding ${held.length === 1 ? "it" : "them"} after the macro ends.</div>`));
     if (!steps.length) node.append(el(`<p class="note">This slot is empty. Type a payload, add a step, or record one.</p>`));
     steps.forEach((step, index) => {
         const row = el(`<div class="step"><span class="grip">⠿</span><span class="kind">${esc(step.kind)}</span>
-            <span class="tok">${esc(describeStep(step))}</span><span class="right row" style="gap:4px">
+            <span class="tok">${esc(describeStep(step, key => actionLabel(model, key)))}</span><span class="right row" style="gap:4px">
                 <button class="btn tiny ghost" data-move="-1" ${canEdit && index > 0 ? "" : "disabled"} aria-label="Move step up">↑</button>
                 <button class="btn tiny ghost" data-move="1" ${canEdit && index < steps.length - 1 ? "" : "disabled"} aria-label="Move step down">↓</button>
                 <button class="btn tiny ghost" data-remove ${canEdit ? "" : "disabled"}>Remove</button></span></div>`);
@@ -296,7 +299,7 @@ function preview(model, slot, steps, error, held, payload, canEdit) {
 }
 
 function actions(model, slot, canEdit, dirty, payload) {
-    const {steps, error} = parseMacro(payload, {keys: model?.macroPayloadKeycodes});
+    const {steps, error} = parseMacro(payload, {keys: model?.macroPayloadKeycodes, unicode: model?.macroUnicode?.supported, textEntry: Boolean(model?.macroUnicode?.mode), modifierKeys: model?.macroPayloadModifierKeycodes});
     const blocked = Boolean(error || unreleased(steps).length);
     const node = el(`<div class="row" style="gap:8px">
         <span class="note">${blocked ? "Fix the payload before it can be staged." : "Valid changes are kept in the draft automatically."}</span>
@@ -426,4 +429,15 @@ function onRecordKey(event) {
     })});
     state.recording = {...recording, last: now, captured: true};
     render();
+}
+
+
+function unicodeSetup(model, canEdit) {
+    if (!model?.macroUnicode?.supported) return `<p class="note">Unicode macro text needs newer firmware on both halves.</p>`;
+    const mode = model.macroUnicode.mode;
+    const setup = ["Unicode playback is off or the host OS is unknown.",
+        "Enable Unicode Hex Input in macOS input sources and keep it active while playing macros. Option shortcuts can behave differently in this input source.",
+        "Install and run WinCompose on Windows with Right Alt as its Compose key.",
+        "Use an input method or application that accepts Ctrl+Shift+U, hexadecimal digits and Space, such as IBus. This sequence does not work in every Linux application."][mode];
+    return `<div class="field"><span class="note">${esc(setup)} Configure the host and Unicode playback in Settings → Host. The keyboard cannot check your input setup. Avoid typing while a text macro plays.</span><button class="btn tiny ghost" data-host-settings>Open Host settings</button></div>`;
 }

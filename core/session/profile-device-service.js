@@ -8,6 +8,8 @@ const {pdBindingOfCode} = require("../data/pd-bindings");
 const {layerName} = require("../model/vocabulary");
 const {decodePdDomain} = require("../schema/pd-mode-domain-v1");
 const {readSettingsLimits} = require("../protocol/portable-profile-v1");
+const {readHostOs} = require("../protocol/host-os-v1");
+const {supportsUnicodeMacros} = require("../schema/macro-payload");
 const {readKeyboardOptions} = require("../protocol/keyboard-options-v1");
 const {decodeSettings} = require("../schema/settings-domain-v1");
 const {profileDepthOptions} = require("../schema/profile-depth");
@@ -419,6 +421,7 @@ class ProfileDeviceService {
             }, false, forRestore, {sleep: this.sleep});
             result.limits = await readSettingsLimits(this.connection, this.requestIds);
             result.options = await readKeyboardOptions(this.connection, this.requestIds);
+            if (supportsUnicodeMacros(this.capabilities)) result.hostOs = await readHostOs(this.connection, this.requestIds);
             this.portable = result;
             this.macroView = macroEditorView(result, this.capabilities);
             this.customKeyView = customKeyEditorView(result, this.capabilities);
@@ -464,6 +467,7 @@ class ProfileDeviceService {
             });
             result.limits = limits;
             result.options = keyboardOptions;
+            if (supportsUnicodeMacros(this.capabilities)) result.hostOs = await readHostOs(this.connection, this.requestIds);
             this.portable = result;
             this.macroView = macroEditorView(result, this.capabilities);
             this.customKeyView = customKeyEditorView(result, this.capabilities);

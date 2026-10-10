@@ -3,11 +3,11 @@
   "sources": {
     "firmware": {
       "repository": "https://github.com/NoahCLR/charybdis-4x6",
-      "commit": "df8d6b2ae92af2cd8f46b077fbd248317b6389e9"
+      "commit": "8e5dd154e4276e6ab2f0c68db05e7278178e068e"
     },
     "qmk": {
       "repository": "https://github.com/NoahCLR/bastardkb-qmk",
-      "commit": "d7128b25b47cd7a87c34c48a6b81461916d56b32"
+      "commit": "79e3f468a8685a74f4e214392be8b55f0d62b00c"
     }
   },
   "files": [
@@ -24,7 +24,7 @@
       "source": "firmware",
       "sourcePath": "docs/architecture/device-resident-profile.md",
       "sourceSha256": "aa6a6a8447aeb342ae94e977d1ab6f9aaf1b8206b270ad96432c5a28152ff4ca",
-      "sha256": "2d61aabf11bab08cb0baa539f510658168aaba99aae9701429b3665c256f9072",
+      "sha256": "6a968328c645f00c1a382c6ca7fd0f5e6c0e968e71b56ba14b00785b22e29cc1",
       "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
     },
     {
@@ -64,15 +64,15 @@
       "source": "firmware",
       "sourcePath": "docs/architecture/pd-mode-domain-v1.md",
       "sourceSha256": "ce807d1516ef7bc4d401a293028fe3e4769b57c720cac81b12fa84e374bf373d",
-      "sha256": "8c0b45bba4c8b53b65dfd2dce29b87035eeea763866652a68474b508919daeae",
+      "sha256": "5c0c71cd2eaa4d9df19ba04add9ab4b084959e485fd0da23382cb00e0a4d3cdf",
       "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
     },
     {
       "path": "upstream/firmware/docs/architecture/portable-profile-v1.md",
       "source": "firmware",
       "sourcePath": "docs/architecture/portable-profile-v1.md",
-      "sourceSha256": "f90699d6f68419152ce41e2c30527a40fb32bcd893988573a18b6962baf7366d",
-      "sha256": "f90699d6f68419152ce41e2c30527a40fb32bcd893988573a18b6962baf7366d",
+      "sourceSha256": "5995150bbc08b9d2c1cb5f3531f167f77258bdd77ef531abe57c0147745c2c5f",
+      "sha256": "f013846397742ea040013d295d997520edc16b0489517a30538262b28948c598",
       "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
     },
     {
@@ -87,8 +87,8 @@
       "path": "upstream/firmware/docs/architecture/profile-wire-v1.md",
       "source": "firmware",
       "sourcePath": "docs/architecture/profile-wire-v1.md",
-      "sourceSha256": "8a10099d0764cf9be4329b0b0a1086f3bd0d1ba6781ff70a114ece4197fe899d",
-      "sha256": "8a10099d0764cf9be4329b0b0a1086f3bd0d1ba6781ff70a114ece4197fe899d",
+      "sourceSha256": "ddeda088dff1836f6903c0a1feb046b9c4bdf9e95581565f83899b3cb0b6fa0c",
+      "sha256": "7f953b35651f06ba5a2e2f99d12c31f8bbd6250a109aaf092e4d4392ab532c6f",
       "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
     },
     {
@@ -104,7 +104,7 @@
       "source": "firmware",
       "sourcePath": "docs/architecture/split-activity-sync.md",
       "sourceSha256": "cb59ea91d5adfe570223e34730298095899f941c88ead9e260b5fbd19f5c7c34",
-      "sha256": "9cddacf579ac3505fa3a5b7d92f001e491b495cd8fda76805be3dadf6b8f3c19",
+      "sha256": "d318e8df883c4fbf4e6a8169c2266d46d5c521fe05c43082dddd7a1bfbeabda4",
       "transformation": "Relative Markdown links resolve locally where available, otherwise to pinned upstream URLs."
     },
     {
@@ -518,8 +518,8 @@
       "path": "upstream/qmk/version.txt",
       "source": "qmk",
       "sourcePath": null,
-      "sourceSha256": "bc6fa537bf4bf6e2b7d42ea07894e80ff61fb502b86afaaf435f5682496a8012",
-      "sha256": "bc6fa537bf4bf6e2b7d42ea07894e80ff61fb502b86afaaf435f5682496a8012",
+      "sourceSha256": "ace739a39c2c1ad91b34205cbebd673bd9c9321b7928efe8ac44bf1680553521",
+      "sha256": "ace739a39c2c1ad91b34205cbebd673bd9c9321b7928efe8ac44bf1680553521",
       "transformation": "Version stamp synthesized as `git describe --tags --exclude 'v2*'` of the pinned QMK commit; not an upstream source file."
     }
   ]

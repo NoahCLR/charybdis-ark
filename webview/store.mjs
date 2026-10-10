@@ -34,14 +34,13 @@ export const state = {
     //   inputs      the input names the combo stores, in stored order — never
     //               board positions, which mean another key on every layer
     //               (view/keyface.mjs: toggleComboInput)
-    //   labels      input name → the host's name for that key, as the combo
-    //               table and the review read it; the interface never names a key itself
+    //               Labels are resolved from the current model on every render.
     //   form        the builder's fields, kept across renders; followsDefault
     //               says the window is the keyboard's default, not the combo's own
     //   awaiting    a Keep or Delete posted; the builder closes when the host accepts it
-    combo: {open: false, picking: false, inputs: [], labels: {},
+    combo: {open: false, picking: false, inputs: [],
         form: {output: "", termMs: "", followsDefault: false, mustHold: false, mustTap: false, ordered: false}, awaiting: false, editId: null},
-    placement: null,     // {keycode, label}: next board click places it on the current layer
+    placement: null,     // {keycode}: next board click places it on the current layer
     retarget: null,      // {from, to, existing}: a behaviour move waiting on overwrite / swap / cancel
     keyClipboard: null,  // {keycode, label}: the key ⌘C copied, for ⌘V onto the selected key
     stage: "layers",
@@ -92,7 +91,6 @@ export function openComboBuilder(combo = null, defaultTermMs = "") {
             enabled: combo?.enabled ?? true, allowedLayers: combo?.allowedLayers ?? (2 ** layers().length - 1),
             mustHold: Boolean(combo?.mustHold), mustTap: Boolean(combo?.mustTap), ordered: Boolean(combo?.ordered)},
         inputs: (combo?.inputs || []).slice(),
-        labels: Object.fromEntries((combo?.inputs || []).map((input, index) => [input, combo.inputDisplays?.[index] ?? input])),
     };
 }
 export function closeComboBuilder() {
