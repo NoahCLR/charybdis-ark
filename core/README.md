@@ -30,6 +30,13 @@ is the demo (D-L53): the same draft over the bundled demo profile with no device
 behind it, which the loop answers to in place of the device service's state
 while it is open.
 
+Apply's transfer counters leave `ProfileDeviceService` through its optional
+`onApplyProgress` callback. The panel loop posts that small view as
+`applyProgress`, with the current draft ID and revision; the webview refreshes
+only the commit bar. Full models still carry the latest Apply view and publish
+on profile, connection and busy-state changes. Service clients without that
+callback retain the full-snapshot notification path.
+
 The complete portable read (`session/portable-profile-session.js`
 `captureProfile`) takes lighting, behaviours and pointing from the running
 profile, or from the compiled defaults (GET `0x05`) when nothing is committed,

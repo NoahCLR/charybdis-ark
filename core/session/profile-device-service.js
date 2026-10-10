@@ -50,6 +50,7 @@ class ProfileDeviceService {
             onUnexpectedReport: ({reason}) => this.addDiagnostic(`Ignored an unexpected Raw HID report: ${reason}.`),
         });
         this.onChange = typeof options.onChange === "function" ? options.onChange : undefined;
+        this.onApplyProgress = typeof options.onApplyProgress === "function" ? options.onApplyProgress : undefined;
         // The wait between polls while reading and saving a profile. A host
         // whose timers are throttled (a background browser tab) passes its
         // own; the timer's is used otherwise.
@@ -463,7 +464,7 @@ class ProfileDeviceService {
                 onProgress: message => {this.portableProgress = message;},
                 // The step view the commit bar draws; it outlives the apply
                 // when it failed, so the person can see where and why.
-                onApplyProgress: view => {this.liveApply = view; this.emitChange();},
+                onApplyProgress: view => this.reportApplyProgress(view),
             });
             result.limits = limits;
             result.options = keyboardOptions;
@@ -617,6 +618,16 @@ class ProfileDeviceService {
 
     deviceLabel(publicDeviceId) {
         return this.devices.find((device) => device.id === publicDeviceId)?.label || "Charybdis keyboard";
+    }
+
+    // Transfer progress changes no profile data. Hosts that can display it
+    // separately avoid rebuilding and sending the complete panel per chunk.
+    reportApplyProgress(view) {
+        this.liveApply = view;
+        if (!this.onApplyProgress) { this.emitChange(); return; }
+        try { this.onApplyProgress(cloneLiveApply(view)); } catch {
+            // A closed or reloading panel must not interrupt the save.
+        }
     }
 
     emitChange() {
