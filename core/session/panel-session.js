@@ -282,6 +282,23 @@ function startLayerEdit(before, revision) {
     return {before, revision, order: Array.from({length: before.summary.layers}, (_, id) => id), names: [...before.summary.names], keysFollow: true};
 }
 
+// The edit's document, rewritten with its order and these names (one per layer
+// as it was read). Rewriting is how a name is checked: one the document cannot
+// store is refused here, before it is kept.
+/** @param {LayerEdit} edit @param {readonly string[]} names */
+const rewriteLayers = (edit, names) => reorderLayers(edit.before.document, edit.order, edit.order.map((old) => names[old]), {keysFollow: edit.keysFollow});
+
+/** @param {LayerEdit} edit @param {readonly string[]} names */
+function keepNames(edit, names) {
+    rewriteLayers(edit, names);
+    edit.names = [...names];
+}
+
+// A move or a toggle posts every name the form holds, which is only taken
+// when it is one string per layer; anything else is ignored, not refused.
+/** @param {LayerEdit} edit @param {unknown} names @returns {names is string[]} */
+const postsEveryName = (edit, names) => Array.isArray(names) && names.length === edit.names.length && names.every((name) => typeof name === "string");
+
 // Applies one message from the Rename & Reorder panel to its local state. A name
 // is checked by rewriting the document with it, so an invalid one is refused
 // before it is kept.
@@ -293,19 +310,13 @@ function applyLayerEdit(edit, message) {
         edit.keysFollow = message.keysFollow;
         if (message.type === "editPortableLayer" && message.id === undefined) {
             // The form posts every name with the toggle, as with a move.
-            if (Array.isArray(message.names) && message.names.length === edit.names.length && message.names.every((name) => typeof name === "string")) {
-                const names = message.names;
-                reorderLayers(edit.before.document, edit.order, edit.order.map((old) => names[old]), {keysFollow: edit.keysFollow});
-                edit.names = [...message.names];
-            }
+            if (postsEveryName(edit, message.names)) keepNames(edit, message.names);
             return edit;
         }
     }
     if (message.type === "savePortableLayers" && message.names !== undefined) {
         if (!Array.isArray(message.names) || message.names.length !== edit.names.length) throw new Error("Read the layers again before naming them.");
-        const names = message.names;
-        reorderLayers(edit.before.document, edit.order, edit.order.map((old) => names[old]), {keysFollow: edit.keysFollow});
-        edit.names = [...message.names];
+        keepNames(edit, message.names);
         return edit;
     }
     const id = message.id;
@@ -314,18 +325,13 @@ function applyLayerEdit(edit, message) {
         if (typeof message.name !== "string") throw new Error("Enter a layer name.");
         const names = [...edit.names];
         names[id] = message.name;
-        reorderLayers(edit.before.document, edit.order, edit.order.map((old) => names[old]), {keysFollow: edit.keysFollow});
-        edit.names = names;
+        keepNames(edit, names);
         return edit;
     }
     // The form posts every name with the move, because the rows are rebuilt
     // from this state afterwards: dropping them here would quietly undo
     // whatever was typed before the move.
-    if (Array.isArray(message.names) && message.names.length === edit.names.length && message.names.every((name) => typeof name === "string")) {
-        const names = message.names;
-        reorderLayers(edit.before.document, edit.order, edit.order.map((old) => names[old]), {keysFollow: edit.keysFollow});
-        edit.names = [...message.names];
-    }
+    if (postsEveryName(edit, message.names)) keepNames(edit, message.names);
     // The bottom slot is the base. A layer reaches it only through Make base,
     // which swaps it with the layer there; a move or a drag stays above it.
     const from = edit.order.indexOf(id);
@@ -341,6 +347,6 @@ function applyLayerEdit(edit, message) {
 }
 
 /** @param {LayerEdit} edit */
-const layerEditDocument = (edit) => reorderLayers(edit.before.document, edit.order, edit.order.map((old) => edit.names[old]), {keysFollow: edit.keysFollow !== false});
+const layerEditDocument = (edit) => rewriteLayers(edit, edit.names);
 
 module.exports = {DEMO_MESSAGES, DRAFT_CONTROLS, HOST_WORDS, PORTABLE_MESSAGES, applyLayerEdit, buildPanelModel, hostModel, discardDraftForDevice, layerEditDocument, observePortable, panelRequest, routeMessage, startLayerEdit};

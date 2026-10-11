@@ -326,6 +326,87 @@ test("Rename & Reorder renames and reorders, keeps Base at the bottom, and carri
     assert.equal(saved.settings.names[3], "Symbols+");
 });
 
+test("Rename & Reorder checks every posted name by rewriting the document, and each message keeps or refuses them its own way", () => {
+    const tooLong = "x".repeat(40);
+    const rename = (edit, id, name) => edit.names.map((old, slot) => (slot === id ? name : old));
+
+    // The keys-follow toggle: a boolean only; names posted with it are kept
+    // when they are a full list of strings, and otherwise left alone.
+    const toggle = startLayerEdit(snapshot(), 3);
+    const original = [...toggle.names];
+    assert.throws(() => applyLayerEdit(toggle, {type: "editPortableLayer", keysFollow: "no"}), /^Error: Read the layers again before editing them\.$/);
+    assert.equal(toggle.keysFollow, true);
+    assert.equal(applyLayerEdit(toggle, {type: "editPortableLayer", keysFollow: false}), toggle);
+    assert.equal(toggle.keysFollow, false);
+    assert.deepEqual(toggle.names, original, "a toggle without names keeps them");
+    applyLayerEdit(toggle, {type: "editPortableLayer", keysFollow: true, names: ["short"]});
+    assert.equal(toggle.keysFollow, true);
+    assert.deepEqual(toggle.names, original, "a list of the wrong length is ignored");
+    applyLayerEdit(toggle, {type: "editPortableLayer", keysFollow: false, names: original.map((name, slot) => (slot === 3 ? 3 : name))});
+    assert.deepEqual(toggle.names, original, "a list holding a non-name is ignored");
+    assert.throws(() => applyLayerEdit(toggle, {type: "editPortableLayer", keysFollow: true, names: rename(toggle, 2, tooLong)}), /at most 32 bytes/);
+    assert.equal(toggle.keysFollow, true, "the toggle is taken before the names are refused");
+    assert.deepEqual(toggle.names, original, "a refused name is not kept");
+    const typed = rename(toggle, 2, "Typed");
+    applyLayerEdit(toggle, {type: "editPortableLayer", keysFollow: false, names: typed});
+    assert.deepEqual(toggle.names, typed);
+    assert.notEqual(toggle.names, typed, "the posted list is copied");
+    applyLayerEdit(toggle, {type: "editPortableLayer", id: 2, keysFollow: true, name: "Both"});
+    assert.equal(toggle.keysFollow, true);
+    assert.equal(toggle.names[2], "Both", "a toggle posted with a row's edit also makes that edit");
+
+    // Save: every name, the right number of them, or the editor is stale.
+    const save = startLayerEdit(snapshot(), 3);
+    const saved = [...save.names];
+    assert.throws(() => applyLayerEdit(save, {type: "savePortableLayers", names: ["only one"]}), /^Error: Read the layers again before naming them\.$/);
+    assert.throws(() => applyLayerEdit(save, {type: "savePortableLayers", names: "Base"}), /^Error: Read the layers again before naming them\.$/);
+    assert.throws(() => applyLayerEdit(save, {type: "savePortableLayers", names: rename(save, 3, 7)}), /at most 32 bytes/);
+    assert.throws(() => applyLayerEdit(save, {type: "savePortableLayers", names: rename(save, 3, tooLong)}), /at most 32 bytes/);
+    assert.deepEqual(save.names, saved);
+    assert.throws(() => applyLayerEdit(save, {type: "savePortableLayers"}), /^Error: Read the layers again before editing them\.$/);
+    const final = rename(save, 3, "Final");
+    assert.equal(applyLayerEdit(save, {type: "savePortableLayers", keysFollow: false, names: final}), save);
+    assert.deepEqual(save.names, final);
+    assert.notEqual(save.names, final);
+    assert.equal(save.keysFollow, false);
+
+    // One row's name.
+    const one = startLayerEdit(snapshot(), 3);
+    const names = [...one.names];
+    assert.throws(() => applyLayerEdit(one, {type: "editPortableLayer", id: 2, name: 5}), /^Error: Enter a layer name\.$/);
+    assert.throws(() => applyLayerEdit(one, {type: "editPortableLayer", id: 2, name: tooLong}), /at most 32 bytes/);
+    assert.deepEqual(one.names, names);
+    assert.equal(applyLayerEdit(one, {type: "editPortableLayer", id: 2, name: "Renamed", direction: 1}), one);
+    assert.equal(one.names[2], "Renamed");
+    assert.deepEqual(one.order.slice(0, 4), [0, 1, 2, 3], "a rename does not also move");
+
+    // A move or Make base keeps the names posted with it when they are a full
+    // list of strings, ignores any other list, and refuses a name it cannot store.
+    const move = startLayerEdit(snapshot(), 3);
+    const kept = [...move.names];
+    applyLayerEdit(move, {type: "editPortableLayer", id: 2, direction: 1, names: ["short"]});
+    assert.deepEqual(move.order.slice(0, 4), [0, 1, 3, 2], "the move is made");
+    assert.deepEqual(move.names, kept, "and the wrong-length list ignored");
+    applyLayerEdit(move, {type: "editPortableLayer", id: 2, direction: -1, names: kept.map((name, slot) => (slot === 1 ? null : name))});
+    assert.deepEqual(move.order.slice(0, 4), [0, 1, 2, 3]);
+    assert.deepEqual(move.names, kept, "a list holding a non-name is ignored");
+    assert.throws(() => applyLayerEdit(move, {type: "editPortableLayer", id: 2, to: 5, names: rename(move, 4, tooLong)}), /at most 32 bytes/);
+    assert.deepEqual(move.order.slice(0, 4), [0, 1, 2, 3], "a refused name stops the move");
+    const moved = rename(move, 4, "Moved");
+    applyLayerEdit(move, {type: "editPortableLayer", id: 2, to: 5, names: moved});
+    assert.deepEqual(move.names, moved);
+    assert.notEqual(move.names, moved);
+    const based = rename(move, 6, "New base");
+    applyLayerEdit(move, {type: "editPortableLayer", id: 6, makeBase: true, names: based});
+    assert.deepEqual(move.names, based);
+    assert.equal(move.order[0], 6);
+    assert.throws(() => applyLayerEdit(move, {type: "editPortableLayer", id: 6, makeBase: true, names: rename(move, 6, "Again")}), /^Error: That layer is already the base\.$/);
+    assert.equal(move.names[6], "Again", "names are kept before the move is refused");
+    assert.throws(() => applyLayerEdit(move, {type: "editPortableLayer", id: 3}), /^Error: The base stays at the bottom; use Make base to put another layer there\.$/);
+    assert.throws(() => applyLayerEdit(move, {type: "editPortableLayer", id: 1.5, name: "x"}), /^Error: Read the layers again before editing them\.$/);
+    assert.equal(validateSnapshot(layerEditDocument(move)).settings.names[0], "Again");
+});
+
 test("a layer is dragged to any place above the base, and Make base swaps it with the base", () => {
     const edit = startLayerEdit(snapshot(), 3);
     applyLayerEdit(edit, {type: "editPortableLayer", id: 1, to: 6});
