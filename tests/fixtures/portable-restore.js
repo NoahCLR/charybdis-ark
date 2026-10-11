@@ -2,30 +2,40 @@
 "use strict";
 const assert = require("node:assert/strict");
 const {document32: document} = require("./pd-slots-32");
-const {ACTION_ABI} = require("../../core/schema/actions");
-const {fingerprint, summary, validateSnapshot} = require("../../core/model/portable-profile");
-const {viaStorageDigest} = require("../../core/protocol/via-storage-v1");
-// Current firmware: schema 2.0 with every domain, the 32-slot vocabulary.
-const capabilities = {compiledLayerCount: 16, supportedDomainMask: 31, featureFlags: 1 << 12, actionAbiDigest: ACTION_ABI, candidateChunkMax: 20, viaMacroBytes: 10327};
-function fixture() {
-    const source = document(), targetDocument = structuredClone(source);
-    /** @type {string[]} */
-    const events = [];
+const {fingerprint, validateSnapshot} = require("../../core/model/portable-profile");
+const {captureProfile, restoreProfile} = require("../../core/session/portable-profile-session");
+const {writableKeyboard} = require("./writable-keyboard");
+const {fakeKeyboard} = require("./fake-keyboard");
+const {buildProfileGetRequest, decodeProfileResponse, decodeCapabilityPages} = require("../../core/protocol/profile-wire-v1");
+const capabilityKeyboard = fakeKeyboard({document: document()});
+const capabilities = {...decodeCapabilityPages([0, 1, 2].map(page => {
+    const request = buildProfileGetRequest(1, page, page + 1);
+    return decodeProfileResponse(capabilityKeyboard.answer(request)[0], request);
+})), featureFlags: 1 << 12};
+
+/** @param {{source?: import('../../core/model/types.js').PortableDocument, generation?: number, compiledOnly?: boolean}} [input] */
+function fixture({source = document(), generation = 4, compiledOnly = false} = {}) {
+    const targetDocument = structuredClone(source);
     targetDocument.layers[0][0] ^= 1; targetDocument.macros[0] = Buffer.from("hello").toString("base64");
-    const target = validateSnapshot(targetDocument), identity = {profile: "base", storageGeneration: 4, storageDigest: 5, settingsCrc: 6, settingsDigest: 7};
-    const held = validateSnapshot(source), storage = {layout: held.layout, macros: held.macros};
-    const capture = async () => ({document: source, fingerprint: fingerprint(source), summary: summary(source), identity, storage});
-    const storageDigest = viaStorageDigest(target);
-    /** @type {import("./types.js").RestoreFixtureOperations} */
-    const operations = {capture, readIdentity: async () => identity, readCandidate: async () => ({state: 0}),
-        createCoordinator: () => ({upload: async (bytes, options) => {events.push("stage"); await options.verifyBase(); return {transactionId: 1, metadata: {digest: 42}};}, commit: async (id, options) => {events.push("commit"); await options.afterDecision();}}),
-        createViaCoordinator: () => ({stage: async options => {events.push("via stage"); assert.equal(options.generation, 5); assert.equal(options.digest, storageDigest);}, waitUntilAccepted: async () => {events.push("via accepted");}, abort: async () => {events.push("via abort");}}),
-        rollForwardLocal: async (connection, actualTarget, base, layoutRanges, macroRanges) => {events.push("local roll-forward"); assert.equal(actualTarget.profile.equals(target.profile), true); assert.equal(layoutRanges.length, 1); assert.equal(macroRanges.length, 1);},
-        waitStorage: async () => {events.push("both halves"); return {ready: true, generation: 5, digest: storageDigest};},
-        readStorage: async () => ({ready: true, generation: 5, digest: storageDigest}),
-        readStored: async (connection, command, length, options = {}) => (command === 0x12 ? target.layout : target.macros).subarray(options.startOffset || 0, (options.startOffset || 0) + length),
-        readProfile: async () => ({activeKind: 1, activeDigest: require("../../core/schema/profile-blob-v1").fnv1a32(target.profile), committedDigest: require("../../core/schema/profile-blob-v1").fnv1a32(target.profile), stateFlags: 32, conflictCount: 0})};
-    const options = {operations, expectedFingerprint: fingerprint(source), saveRecovery: async (/** @type {import("../../core/model/types.js").PortableDocument} */ backup) => {assert.equal(fingerprint(backup), fingerprint(source)); events.push("backup"); return "/recovery.json";}};
-    return {source, targetDocument, target, identity, storage, events, operations, options};
+    const target = validateSnapshot(targetDocument);
+    const keyboard = writableKeyboard({document: source, generation, compiledOnly});
+    let id = 0;
+    const ids = {next: () => (id = id % 255 + 1)};
+    /** @type {import('../../core/transport/types.js').RequestConnection} */
+    const connection = {request: async (report, options) => {
+        const response = keyboard.answer(report)[0];
+        if (options?.matchResponse) assert.ok(options.matchResponse(response, Buffer.from(report)), "the response matches the real request matcher");
+        return response;
+    }};
+    /** @type {import('../../core/session/types.js').RestoreOptions} */
+    const options = {expectedFingerprint: fingerprint(source), sleep: async () => {}, saveRecovery: async backup => {
+        assert.equal(fingerprint(backup), fingerprint(source));
+        assert.equal(keyboard.mutations.length, 0, "the recovery copy precedes every mutation");
+        keyboard.events.push("backup"); return "/recovery.json";
+    }};
+    const f = {source, targetDocument, target, keyboard, connection, ids, options,
+        capture: () => captureProfile(connection, ids, capabilities, undefined, false, true),
+        restore: () => restoreProfile(connection, ids, capabilities, f.targetDocument, options)};
+    return f;
 }
 module.exports = {capabilities, fixture};
