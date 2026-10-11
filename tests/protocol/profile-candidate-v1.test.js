@@ -75,7 +75,7 @@ test("JavaScript emits the exact candidate frames consumed by the firmware fixtu
         crc32: 0x11223344,
         digest: 0x88776655,
         actionAbiDigest: 0xccbbaa99,
-        storeFormatVersion: 4,
+        storeFormatVersion: 5,
         viaGeneration: 6,
         viaDigest: 0xabcdef01,
     };
@@ -271,10 +271,10 @@ test("a candidate without a nonzero VIA binding fails before anything is sent", 
     assert.throws(() => buildCandidateBeginRequest(1, {...metadata, viaDigest: 0}), unbound);
 });
 
-test("the custom-only store format 0, and every format but 4, is refused", () => {
+test("the custom-only store format 0, and formats other than 4 and 5 are refused", () => {
     const blob = encodeProfileBlob({schema: SCHEMA_3, domains: []});
     const metadata = candidateMetadataForBlob(blob, {actionAbiDigest: 1, ...binding});
-    for (const storeFormatVersion of [0, 1, 2, 3, 5, undefined]) {
+    for (const storeFormatVersion of [0, 1, 2, 3, 6, undefined]) {
         assert.throws(() => buildCandidateBeginRequest(1, {...metadata, storeFormatVersion}), /store format/);
     }
     // Format 0 carried no binding; dropping it as well changes nothing.
@@ -348,4 +348,15 @@ test("candidate status page 1 reports the copy to the other half, and older firm
         payload[offset] = value;
         await assert.rejects(readCandidatePeerStatus(reply({payload}), {nextRequestId: () => ids++}), pattern);
     }
+});
+
+test("streaming firmware selects format 5 and its smaller payload while legacy candidates keep format 4", () => {
+    const blob = encodeProfileBlob({schema: SCHEMA_3, domains: []});
+    const newer = candidateMetadataForBlob(blob, {actionAbiDigest: 1, ...binding, capabilities: {featureFlags: 1 << 27, maxProfilePayload: 53216}});
+    assert.equal(newer.storeFormatVersion, 5);
+    assert.equal(buildCandidateBeginRequest(1, newer)[23], 5);
+    assert.equal(buildCandidateBeginRequest(1, {...newer, payloadLength: 53216}).readUInt16LE(9), 53216);
+    assert.throws(() => buildCandidateBeginRequest(1, {...newer, payloadLength: 53217}), /format-5 capacity/);
+    const old = candidateMetadataForBlob(blob, {actionAbiDigest: 1, ...binding, capabilities: {featureFlags: 0, maxProfilePayload: 65504}});
+    assert.equal(buildCandidateBeginRequest(1, {...old, payloadLength: 65504})[23], 4);
 });

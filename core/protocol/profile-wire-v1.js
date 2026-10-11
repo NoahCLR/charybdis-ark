@@ -1,5 +1,5 @@
 "use strict";
-const {UNICODE_MACRO_FEATURE, MACRO_PROTECTION_FEATURE, MACRO_OUTPUT_ISOLATION_FEATURE} = require("../schema/macro-payload");
+const {UNICODE_MACRO_FEATURE, MACRO_PROTECTION_FEATURE, MACRO_OUTPUT_ISOLATION_FEATURE, STREAMING_MACRO_FEATURE} = require("../schema/macro-payload");
 const {HOST_LAYOUT_FEATURE} = require("../schema/host-settings");
 
 const {isUnhandledEcho, requestHandled} = require("./via-unhandled-v1");
@@ -27,7 +27,7 @@ const PROFILE_WIRE_STATUS = Object.freeze({
 });
 
 const PROFILE_WIRE_KNOWN_MASKS = Object.freeze({
-    FEATURE_FLAGS: 0x07ffffff,
+    FEATURE_FLAGS: 0x0fffffff,
     // Bits current firmware never advertises. An older image that does still
     // decodes; nothing reads them.
     RETIRED_FEATURES: 1 << 13,
@@ -76,6 +76,7 @@ const PROFILE_WIRE_FEATURES = Object.freeze({
     CANDIDATE_REUSE: 1 << 24,
     CANDIDATE_STREAM: 1 << 25,
     MACRO_OUTPUT_ISOLATION: MACRO_OUTPUT_ISOLATION_FEATURE,
+    STREAMING_MACROS: STREAMING_MACRO_FEATURE,
 });
 
 const PROFILE_WIRE_DOMAINS = Object.freeze({

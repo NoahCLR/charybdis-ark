@@ -9,7 +9,7 @@
 // is not an error here — the step builder passes through that state — and
 // unreleased() reports it.
 
-const MAX_CHARACTERS = 32768, MAX_DELAY = 65535, MAX_KEYS = 16;
+const MAX_DELAY = 65535, MAX_KEYS = 16;
 const printable = (character, unicode) => {
     const code = character.codePointAt(0);
     return code === 9 || code === 10 || (code >= 32 && code <= 126) || (unicode && code >= 0xA0 && code <= 0x10FFFF && !(code >= 0xD800 && code <= 0xDFFF));
@@ -27,7 +27,6 @@ export function parseMacro(payload, options = {}) {
     const flush = () => { if (options.textEntry && [...text].some(needsEntry) && [...held].some(key => options.modifierKeys ? !options.modifierKeys.includes(key) : !/KC_(?:LCTL|LSFT|LALT|LGUI|RCTL|RSFT|RALT|RGUI|LEFT_CTRL|LEFT_SHIFT|LEFT_ALT|LEFT_GUI|RIGHT_CTRL|RIGHT_SHIFT|RIGHT_ALT|RIGHT_GUI)$/.test(key))) textHoldError = true; if (text) steps.push({kind: "text", text}); text = ""; };
     const source = String(payload ?? "");
     const allowed = options.keys?.length ? new Set(options.keys) : null;
-    if (source.length > MAX_CHARACTERS) return fail(steps, "A macro is at most 32,768 characters.");
 
     for (let index = 0; index < source.length;) {
         const character = String.fromCodePoint(source.codePointAt(index));

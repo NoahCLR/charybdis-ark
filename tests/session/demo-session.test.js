@@ -46,7 +46,7 @@ const dpiEdit = {type: "updateConfigDefaults", sectionId: "normalPointerSpeed", 
 
 test("the demo stands in for current firmware: what the 32-slot keyboard reports, less what only a keyboard has", async () => {
     const host = recordingHost();
-    const loop = openPanelLoop(host, {adapter: fakeKeyboardAdapter({document: demoProfile(), brightnessMax: DEMO_LIMITS.brightnessMax}), defaultTimeoutMs: 200});
+    const loop = openPanelLoop(host, {adapter: fakeKeyboardAdapter({document: demoProfile(), streaming: true, brightnessMax: DEMO_LIMITS.brightnessMax}), defaultTimeoutMs: 200});
     try {
         await loop.handleMessage({type: "ready"});
         const {firmwareVersion, compiledDefaultDigest, ...reported} = loop.session.service.capabilities;

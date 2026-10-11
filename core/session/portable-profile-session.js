@@ -72,7 +72,7 @@ async function captureProfile(connection, ids, capabilities, onProgress = () => 
     const active = before.activeKind === PROFILE_ACTIVE_KIND.COMMITTED ? await payloadReader.readCommitted({...options, reuse: reuseReadback, onProgress: counted("Reading saved behaviours and lighting")}) : defaults;
     onProgress("Reading combos and global settings");
     const combos = await readDeviceCombos(connection, options), settings = await readSettings(connection, ids);
-    const via = await readViaStorage(connection, {allowIncomplete, onProgress: progress =>
+    const via = await readViaStorage(connection, {capabilities, allowIncomplete, onProgress: progress =>
         counted(progress.region === "layout" ? "Reading keys and layers" : "Reading macros")(progress)});
     onProgress("Checking the complete read");
     if (!settings.equals(await readSettings(connection, ids))) throw fail("PROFILE_CHANGED", "Keyboard settings changed during the backup. Read it again before continuing.");
@@ -103,11 +103,11 @@ async function readIdentity(connection, ids, {allowCandidate = true, sleep} = {}
 }
 async function verifyRanges(connection, readStored, command, target, ranges, {verifyFinalByte = false} = {}) {
     for (const range of ranges) {
-        const actual = await readStored(connection, command, range.bytes.length, {startOffset: range.offset});
+        const actual = await readStored(connection, command, range.bytes.length, {startOffset: range.offset, capacity: target.length});
         if (!actual.equals(range.bytes)) throw fail("RESTORE_VERIFY_FAILED", "Layout or macro readback did not match the imported profile.");
     }
     if (verifyFinalByte) {
-        const actual = await readStored(connection, command, 1, {startOffset: target.length - 1});
+        const actual = await readStored(connection, command, 1, {startOffset: target.length - 1, capacity: target.length});
         if (actual[0] !== target.at(-1)) throw fail("RESTORE_VERIFY_FAILED", "Layout or macro readback did not match the imported profile.");
     }
 }
@@ -274,7 +274,7 @@ async function restoreProfile(connection, ids, capabilities, document, {expected
             applyProgress.report("upload");
             prepared = await coordinator.upload(target.profile, {baseSource: candidateBaseSource(before, capabilities),
                 streamChunks: Boolean(capabilities.featureFlags & PROFILE_WIRE_FEATURES.CANDIDATE_STREAM),
-                metadata: candidateMetadataForBlob(target.profile, {actionAbiDigest: capabilities.actionAbiDigest, viaGeneration: targetStorageGeneration, viaDigest: expectedStorageDigest}), verifyBase: async () => {
+                metadata: candidateMetadataForBlob(target.profile, {capabilities, actionAbiDigest: capabilities.actionAbiDigest, viaGeneration: targetStorageGeneration, viaDigest: expectedStorageDigest}), verifyBase: async () => {
                 const identity = await currentIdentity(connection, ids, {allowCandidate: true, sleep});
                 if (identityKey(identity) !== identityKey(beforeIdentity)) throw fail("PROFILE_CHANGED", "The keyboard changed before restore could start.");
             }});

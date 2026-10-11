@@ -40,7 +40,7 @@ matrix.
 | --- | --- |
 | Layout and 16 layers | Read/write; key labels and picker legends follow the chosen host layout (D-L56); names and overlay order travel with complete profiles; a reorder renumbers layer keys by default ("Keys follow their layers") |
 | Key behaviours, combos and RGB | Read/write editors over the shared draft; selected keys open an unstored behaviour grid until the first edit; matching Keys reach sections share open state across tabs, open independently, and use the page scrollbar |
-| Macros | 128 named VIA macro slots with literal Text, editable steps, Advanced raw payload, recorder and live validation; capability-gated Unicode text, saved macOS/Windows/Linux host setup and a host keyboard layout macro text is typed and checked through; changing Host rechecks stored playback and reviews affected macros with that setting (D-L56); per-macro input protection defaults on for Unicode entry, with On/Off overrides and capability-gated isolation of held keyboard input (D-L57); shared-memory and per-macro limits shown and enforced (D-L25, D-L26) |
+| Macros | 128 named VIA macro slots with literal Text, editable steps, Advanced raw payload, recorder and live validation; capability-gated Unicode text, saved macOS/Windows/Linux host setup and a host keyboard layout macro text is typed and checked through; changing Host rechecks stored playback and reviews affected macros with that setting (D-L56); per-macro input protection defaults on for Unicode entry, with On/Off overrides and capability-gated isolation of held keyboard input (D-L57); shared memory shown and enforced, and one macro may use all of it on streaming firmware (older firmware keeps the 512-byte playback limit) (D-L25, D-L26) |
 | Custom keys | 128 named keys that do what their behaviour says: rename, add or open the behaviour, place, see where each is used (D-L42) |
 | Mouse | Pointer and sniping DPI, auto-sniping and auto-mouse: global-policy sections the core files under the Mouse area, so the rail, the review and import counts all place them there. The auto-mouse fade delay is a share of the timeout, edited on its lighting stage (D-L17) |
 | Pointing modes | 32 device-owned slots (sparse PD domain v3, RGB v4); live codecs accept only the current action vocabulary and profile formats (D-L54). See [PD-mode domain v1](../upstream/firmware/docs/architecture/pd-mode-domain-v1.md) |
@@ -314,8 +314,9 @@ not unapplied changes. Closing the editor loses the draft.
 
 ### D-L20 — Differential Apply
 
-The VIA macro bank is 10,327 bytes and a 32-byte Raw HID report carries 28 data
-bytes, so one complete macro read is 369 exchanges; the old path read the
+The VIA macro bank is 34,903 bytes (10,327 on earlier firmware) and a 32-byte
+Raw HID report carries 28 data bytes, so one complete macro read is 1,247
+exchanges (369 before); the old path read the
 profile four times and rewrote the whole bank. Apply now verifies and reuses
 the snapshot already loaded as its recovery base, uses custom, VIA and settings
 identities for the compare-and-swap checks, writes only changed 28-byte blocks
@@ -417,13 +418,21 @@ Firmware decision; its text is in the firmware direction.
 
 ### D-L26 — Macro slots share one visible memory, and every slot says what fits
 
-All 128 slots share the keyboard's macro memory (10,327 bytes on the 16-layer
-geometry; a key tap takes 3 bytes, ASCII text 1 byte per character, Unicode text its UTF-8 bytes). A macro plays only if
-the firmware compiles it into at most 512 bytes (`MACRO_PAYLOAD_IR_MAX_BYTES`),
-about 170 key taps; a longer one used to be accepted and then silently never
-played. The app computes that size exactly (`macroProgramBytes`, checked
-against the firmware decoder by `run_macro_program_size_tests.sh`), refuses an
-edit past it, and marks a slot VIA wrote past it as too long.
+All 128 slots share the keyboard's macro memory, whose size the keyboard
+reports (34,903 bytes on current firmware, 10,327 before the macro expansion;
+a key tap takes 3 bytes, ASCII text 1 byte per character, Unicode text its
+UTF-8 bytes). Firmware advertising streaming macro playback (feature bit 27,
+firmware D-F14) plays a stored macro in 512-byte windows, so the only limit on
+one macro is the free memory. Older firmware plays a macro only if it compiles
+into at most 512 bytes (`MACRO_PAYLOAD_IR_MAX_BYTES`), about 170 key taps; for
+it the app computes that size exactly (`macroProgramBytes`, checked against the
+firmware decoder by `run_macro_program_size_tests.sh`), refuses an edit past
+it, and marks a slot VIA wrote past it as too long.
+
+A portable profile stores macro streams, not a bank size. Restore pads them to
+the destination's bank or refuses them, naming how many bytes are over; a
+profile's fingerprint covers the streams, so the same macros match across bank
+sizes.
 
 The primary macro editor is an ordered list of editable Text, tap/chord, delay,
 press and release steps. Empty macros start with Text; it preserves literal

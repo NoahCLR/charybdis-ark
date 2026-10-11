@@ -1,8 +1,8 @@
 # Profile Wire V1
 
 > Current firmware accepts only the formats it writes (D-F10, D-F14): profile
-> schema 3.0; a 65,504-byte custom payload; and logical store format 4
-> (`NS`). Every save binds a nonzero VIA generation and digest. HID and split
+> schema 3.0; a 53,216-byte custom payload; and logical store format 5
+> (`NT`). Every save binds a nonzero VIA generation and digest. HID and split
 > framing remain v1. Older profile/store formats and the legacy GET 9 source
 > page are rejected. Backup translation belongs to the client, before a
 > current-format Apply.
@@ -28,7 +28,7 @@ The blob is independent of Raw HID framing and EEPROM slot metadata.
 | 7 | 1 | flags; bit 0 means canonical encoding, all others reserved |
 
 The transport candidate length or storage header supplies total blob length.
-Schema 3.0 is capped at 65,504 bytes, one 64 KiB slot less its 32-byte header
+Schema 3.0 is capped at 53,216 bytes, one 52 KiB slot less its 32-byte header
 (D-F14); schemas 1 and 2 are refused.
 
 ### Domain Envelope — 4 Bytes Plus Payload
@@ -497,18 +497,19 @@ Capability feature bits are:
 
 | 19 | wide pages: the payload, compiled, combo and settings readbacks (GET `0x04`, `0x05`, `0x06`, `0x07`) take a 16-bit page, request byte 4 its low byte and byte 5 its high byte, with bytes 6–31 reserved; their responses echo bytes 0–4 and the request id correlates them |
 
-| 21 | canonical UTF-8 macro text and settings scalar 27 Host settings and GET 0x0B OS readback; require this bit before writing either extension. See [runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/fdced801b37b6be49172e50701a17b6bef78df53/docs/architecture/runtime-flow.md) |
+| 21 | canonical UTF-8 macro text and settings scalar 27 Host settings and GET 0x0B OS readback; require this bit before writing either extension. See [runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/f08aa5e9b7eb43ed478ca4c4ae898087b22e3d18/docs/architecture/runtime-flow.md) |
 
-| 22 | host layouts: settings scalar 27 bits 16–23 name a layout from the [host layout catalogue](https://github.com/NoahCLR/charybdis-4x6/blob/fdced801b37b6be49172e50701a17b6bef78df53/docs/architecture/host-layouts-v1.md) and bit 24 marks a macOS ISO keyboard; macro text is typed through that layout. Require this bit before writing bits 16–24. See [runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/fdced801b37b6be49172e50701a17b6bef78df53/docs/architecture/runtime-flow.md) |
+| 22 | host layouts: settings scalar 27 bits 16–23 name a layout from the [host layout catalogue](https://github.com/NoahCLR/charybdis-4x6/blob/f08aa5e9b7eb43ed478ca4c4ae898087b22e3d18/docs/architecture/host-layouts-v1.md) and bit 24 marks a macOS ISO keyboard; macro text is typed through that layout. Require this bit before writing bits 16–24. See [runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/f08aa5e9b7eb43ed478ca4c4ae898087b22e3d18/docs/architecture/runtime-flow.md) |
 
-| 23 | macro input protection: automatic protection when the selected layout needs Unicode entry, with optional per-macro `01 05 01` (On) or `01 05 02` (Off) prefixes. Require this bit before writing a prefix. New physical presses are ignored until released; earlier releases remain admitted. See [runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/fdced801b37b6be49172e50701a17b6bef78df53/docs/architecture/runtime-flow.md) |
+| 23 | macro input protection: automatic protection when the selected layout needs Unicode entry, with optional per-macro `01 05 01` (On) or `01 05 02` (Off) prefixes. Require this bit before writing a prefix. New physical presses are ignored until released; earlier releases remain admitted. See [runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/f08aa5e9b7eb43ed478ca4c4ae898087b22e3d18/docs/architecture/runtime-flow.md) |
 
 | 20 | participation controls: behaviour and combo participation at the master, layer, definition and placement scopes ([participation policy](participation-policy.md)) |
 
 | 24 | candidate reuse: copy bounded ranges from an identified active profile into the inactive candidate (`SET 0x1B`, below) |
 
 | 25 | candidate streaming chunks: admit sequential chunks and prove bounded batches through status (`SET 0x1C`, below) |
-| 26 | protected macro keyboard-output isolation: suspend already-held ordinary keys, send only macro keyboard output, restore current held modifiers and suppress remaining ordinary usages until release; requires bit 23. See [runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/fdced801b37b6be49172e50701a17b6bef78df53/docs/architecture/runtime-flow.md) |
+| 26 | protected macro keyboard-output isolation: suspend already-held ordinary keys, send only macro keyboard output, restore current held modifiers and suppress remaining ordinary usages until release; requires bit 23. See [runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/f08aa5e9b7eb43ed478ca4c4ae898087b22e3d18/docs/architecture/runtime-flow.md) |
+| 27 | streaming stored macros: no separate compiled-program ceiling; slot bytes and terminators must fit the advertised VIA macro bank (34,903 bytes in this layout). Without this bit, retain the legacy 512-byte program ceiling. See [runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/f08aa5e9b7eb43ed478ca4c4ae898087b22e3d18/docs/architecture/runtime-flow.md) |
 
 Supported-domain-mask bits 0–3 are RGB, key behaviors, combos and portable
 settings respectively. RGB and behavior domain bits must agree exactly with
@@ -553,7 +554,7 @@ bit rejects the status while it is set, as it rejects any unknown flag.
 
 GET `0x04` reads the committed payload and `0x05` the compiled defaults the
 firmware was built with, through the envelope above with a wide page (feature
-bit 19): a 65,504-byte payload needs 2,621 pages. Page 0 is metadata; page
+bit 19): a 53,216-byte payload needs 2,130 pages. Page 0 is metadata; page
 `n` from 1 carries payload bytes `(n - 1) × 25` onward, at most 25, with the
 payload length byte giving the count. A page past the end answers status `2`;
 status `3` means nothing is committed, or the compiled defaults cannot be
@@ -615,11 +616,11 @@ Begin candidate uses this complete layout:
 | 6 | 1 | schema minor |
 | 7 | 1 | requested-domain mask; bits 0 RGB, 1 key behaviors, 2 combos, 3 settings, and schema-2 bit 4 PD |
 | 8 | 1 | flags, initially zero |
-| 9 | 2 | canonical blob length, `8..65504`, schema 3.0 only |
+| 9 | 2 | canonical blob length, `8..53216`, schema 3.0 only |
 | 11 | 4 | CRC32 of the exact canonical blob |
 | 15 | 4 | FNV-1a digest of the exact canonical blob |
 | 19 | 4 | action-ABI digest used to encode actions |
-| 23 | 1 | store format, exactly `4` |
+| 23 | 1 | store format, exactly `5` |
 | 24 | 4 | nonzero bound VIA generation |
 | 28 | 4 | nonzero bound VIA digest |
 
@@ -693,8 +694,14 @@ to resend a batch blindly.
 
 These operations only reconstruct the candidate. Full checksum and semantic
 validation, peer preparation, marker-last durability, activation, cancellation
-and recovery remain the same. Split transfer still sends the complete custom
-candidate; differential split preparation is not part of this extension.
+and recovery remain the same. The copy to the other half reuses too: the
+firmware remembers the ranges REUSE staged and asks the other half to fill
+them from its own active profile, which it checks against the same source
+identity, and sends only the rest. Where the other half's active profile is
+not that source, it sends the bytes. The other half still receives, validates
+and prepares the complete candidate. This is internal to the firmware
+([split payload reuse](profile-split-v1.md#payload-reuse)); the host sends
+nothing different.
 
 Validate and abort contain only the five-byte common header; bytes 5 through
 31 are reserved and zero. Commit uses the same body-free shape but byte 0 is
@@ -794,7 +801,7 @@ peer is ready. Builds with the live-profile owner answer it; others answer
 | 1 | 1 | peer phase |
 | 2 | 1 | the peer's last split status |
 | 3 | 1 | flags: bit 0 peer cleanup pending, bit 1 this half is transport master, bit 2 waiting for a safe boundary |
-| 4 | 2 | bytes of the profile transferred to the peer |
+| 4 | 2 | bytes of the profile transferred to the peer, including those it copied from its own profile |
 | 6 | 2 | bytes to transfer |
 | 8 | 4 | split retries since boot |
 | 12 | 4 | split transport failures since boot |
@@ -818,7 +825,8 @@ retry), `2` mailbox full (an earlier request is still unprocessed, which, if it
 persists, means the peer is not getting scan time), `3` the peer's store holds
 a different copy, `4` the store is not receiving this copy, `5` the store is
 validating, preparing or committing, `6` the peer is pulling a profile itself,
-and `7` the peer only converges just now. Store states are `0` uninitialized,
+and `7` the peer only converges just now. Copying a split reuse range is reported
+as `5` (store working), keeping the host vocabulary unchanged. Store states are `0` uninitialized,
 `1` idle, `2` receiving, `3` validating, `4` preparing, `5` prepared, `6`
 committing, `7` committed, `8` rejected and `9` reconcile required; transfer
 owners are `0` none, `1` receiving a remote push, `2` pulling. Bytes 19–21

@@ -6,7 +6,7 @@ export function inspect(message, model) {
     const slot = model.viaMacros.find(slot => slot.keycode === message.keycode);
     return {...message, type: "macroValidation", validation: inspectMacroInput(message.payload, {
         unicode: model.macroUnicode.supported, mode: model.macroUnicode.mode, enabled: model.macroUnicode.enabled ?? Boolean(model.macroUnicode.mode),
-        currentBytes: slot.bytes, bankFree: model.macroBank.free,
+        currentBytes: slot.bytes, bankFree: model.macroBank.free, programMax: model.macroBank.programMax,
         layout: model.macroUnicode.layout, os: model.macroUnicode.os,
         protection: slot.protection, protectionSupported: model.macroProtectionSupported,
     })};

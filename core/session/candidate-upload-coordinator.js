@@ -144,6 +144,8 @@ class CandidateUploadCoordinator {
             if (options.metadata === undefined) {
                 context.metadata = candidateMetadataForBlob(context.blob, {
                     actionAbiDigest: options.actionAbiDigest,
+                    storeFormatVersion: options.storeFormatVersion,
+                    capabilities: options.capabilities,
                     requestedDomains: options.requestedDomains,
                     viaGeneration: options.viaGeneration,
                     viaDigest: options.viaDigest,
@@ -152,6 +154,7 @@ class CandidateUploadCoordinator {
                 const supplied = normalizeCandidateMetadata(options.metadata);
                 const derived = candidateMetadataForBlob(context.blob, {
                     actionAbiDigest: supplied.actionAbiDigest,
+                    storeFormatVersion: supplied.storeFormatVersion,
                     requestedDomains: supplied.requestedDomains,
                     viaGeneration: supplied.viaGeneration,
                     viaDigest: supplied.viaDigest,

@@ -3,7 +3,7 @@
 const {MACRO_BANK_BYTES, MACRO_SLOTS, decodedOf, encodeNamedProfile, validateSnapshot} = require("./portable-profile");
 const {decodeProfileBlob} = require("../schema/profile-blob-v1");
 const {SETTINGS, validName, encodeSettings} = require("../schema/settings-domain-v1");
-const {macroKeycodes, macroModifierKeycodes, encodeMacroPayload, decodeMacroPayload, macroProgramBytes, MACRO_PROGRAM_MAX} = require("../schema/macro-payload");
+const {macroKeycodes, macroModifierKeycodes, encodeMacroPayload, decodeMacroPayload, macroProgramBytes, macroProgramLimit} = require("../schema/macro-payload");
 const {supportsUnicodeMacros, supportsMacroProtection, supportsMacroOutputIsolation, macroProtectionOf} = require("../schema/macro-payload");
 const {hostSettings, supportsHostLayouts} = require("../schema/host-settings");
 const {hostLayout} = require("../data/host-layouts");
@@ -29,6 +29,7 @@ function macroEditorView(snapshot, capabilities) {
     if (!snapshot?.document || snapshot.incomplete) return null;
     const {document, settings} = decodedOf(snapshot);
     const unicode = supportsUnicodeMacros(capabilities);
+    const programMax = macroProgramLimit(capabilities);
     const protectionSupported = supportsMacroProtection(capabilities);
     const host = hostSettings(settings.values, snapshot.hostOs?.detected);
     const names = settings.macroNames;
@@ -39,7 +40,7 @@ function macroEditorView(snapshot, capabilities) {
         // Presentation preserves valid stored text, including Review without a
         // destination. Editing and Apply gate writes against capabilities.
         const payload = decodeMacroPayload(bytes, {unicode: true, protectionSupported: true});
-        const playback = inspectMacroPlayback(payload, host, unicode);
+        const playback = inspectMacroPlayback(payload, host, unicode, programMax);
         const protection = macroProtectionOf(bytes, {protectionSupported: true});
         const needsUnicodeEntry = playback.typing.some(route => route.method !== "layout");
         const needsUnicodeSetup = playback.code === "UNICODE_SETUP_REQUIRED";
@@ -49,7 +50,7 @@ function macroEditorView(snapshot, capabilities) {
             program, playable: !playback.error, available: !budget.outOfRoom.has(index),
             // How many more key taps this macro can take: the smaller of what
             // it may still play and what the bank has free.
-            roomTaps: Math.floor(Math.max(0, Math.min(MACRO_PROGRAM_MAX - program, budget.free)) / KEY_TAP_BYTES)};
+            roomTaps: Math.floor(Math.max(0, Math.min(programMax === null ? Infinity : programMax - program, budget.free)) / KEY_TAP_BYTES)};
     };
     return {identity: snapshot.fingerprint,
         // Text types through the host layout; what it cannot type needs Unicode
@@ -58,7 +59,7 @@ function macroEditorView(snapshot, capabilities) {
             layouts: supportsHostLayouts(capabilities), layout: host.layout, layoutFits: host.layoutFits, layoutName: hostLayout(host.layout).name, layoutChars: hostLayout(host.layout).chars},
         viaMacros: slots.map(slot),
         macroBank: {capacity: budget.capacity, stored: budget.stored, free: budget.free, available: budget.available,
-            slots: slots.length, reserveTaps: SLOT_RESERVE_TAPS, programMax: MACRO_PROGRAM_MAX},
+            slots: slots.length, reserveTaps: SLOT_RESERVE_TAPS, programMax},
         // Every slot can hold a full-length name, whatever the others hold.
         names: {perName: SETTINGS.NAME_MAX_BYTES}, protectionSupported, outputIsolationSupported: supportsMacroOutputIsolation(capabilities),
         protectionChoices: VOCABULARY.macroProtection.map(([value, label]) => ({value, label})),
@@ -73,7 +74,7 @@ function macroInputStatus(snapshot, message, capabilities) {
     const slots = document.macros.map(value => Buffer.from(value, "base64"));
     const budget = macroBudget(slots, capabilities?.viaMacroBytes ?? MACRO_BANK_BYTES);
     const host = hostSettings(settings.values, snapshot.hostOs?.detected);
-    return inspectMacroInput(message.payload, {unicode: supportsUnicodeMacros(capabilities), mode: host.unicodeMode,
+    return inspectMacroInput(message.payload, {programMax: macroProgramLimit(capabilities), unicode: supportsUnicodeMacros(capabilities), mode: host.unicodeMode,
         protectionSupported: supportsMacroProtection(capabilities), protection: message.protection ?? macroProtectionOf(slots[index], {protectionSupported: true}),
         enabled: Boolean(host.unicodeMode), layout: host.layout, os: host.effective, macosIso: host.macosIso, currentBytes: slots[index].length, bankFree: budget.free});
 }

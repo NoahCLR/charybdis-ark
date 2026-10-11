@@ -2,7 +2,7 @@
 
 > Current firmware accepts only the formats it writes (D-F10, D-F14): profile
 > schema 3.0; RGB v4, key behaviors v2, combos v3, settings v6 and sparse PD v3;
-> a 65,504-byte custom payload; and logical store format 4 (`NS`). Every save
+> a 53,216-byte custom payload; and logical store format 5 (`NT`). Every save
 > binds a nonzero VIA generation and digest. HID and split framing remain v1.
 > Older profile/store formats and the legacy GET 9 source page are rejected.
 > Backup translation belongs to the client, before a current-format Apply.
@@ -67,7 +67,7 @@ profile keep their values. The NLP1 schema byte becomes 3 and each domain
 moves one version: RGB 3 → 4 ([RGB domain](rgb-domain-v1.md)), key behaviours
 1 → 2, combos 2 → 3 ([Profile Wire](profile-wire-v1.md)), settings 5 → 6
 (below) and pointing 2 → 3 ([PD-mode domain](pd-mode-domain-v1.md)). The
-result must fit the 65,504-byte ceiling. `tests/host/translate_eight_slot_profile.py`
+result must fit the 53,216-byte ceiling. `tests/host/translate_eight_slot_profile.py`
 is the firmware's executable reference for these domain steps; the firmware
 itself never translates.
 
@@ -85,7 +85,7 @@ instructions. Held keys must balance. The bank is reconstructed with zero
 padding and a final zero validity byte. Both macro banks are independent:
 64 VIA slots and 16 user macro slots retain their existing key identities.
 
-See [Unicode macro playback](https://github.com/NoahCLR/charybdis-4x6/blob/fdced801b37b6be49172e50701a17b6bef78df53/docs/architecture/runtime-flow.md) for encoding, compiled size, host setup and cancellation.
+See [Unicode macro playback](https://github.com/NoahCLR/charybdis-4x6/blob/f08aa5e9b7eb43ed478ca4c4ae898087b22e3d18/docs/architecture/runtime-flow.md) for encoding, compiled size, host setup and cancellation.
 
 The reconstructed bank is the document's, not necessarily the keyboard's. A
 valid bank may hold nonzero bytes after its 64th terminator, for instance after
@@ -116,7 +116,7 @@ All multibyte fields are little-endian:
 | 404 | variable | 272 counted names: 16 layer names, then 128 VIA macro names, then 128 custom-key names; each a uint8 length `0..32`, then that many bytes of UTF-8 |
 
 The minimum is 676 bytes (every name empty) and the maximum 9,380 bytes (every
-name 32 bytes). The complete profile shares the 65,504-byte ceiling and
+name 32 bytes). The complete profile shares the 53,216-byte ceiling and
 rejects excess without trimming. Names are profile data for the client. Macro
 content belongs to the bound VIA bank; custom keys execute their behavior rows.
 Validation reads at most 20 settings bytes per step, in one read. Retired per-mode DPI
@@ -152,7 +152,7 @@ a set exclusion bit keeps it out of combos. The
 | 23 | Persistent default-layer bitmask |
 | 24 | QMK keymap options |
 | 25–26 | Auto-mouse activation delay (ms) and movement threshold |
-| 27 | Host settings: bits 0..1 select Auto (0), macOS (1), Windows (2), Linux (3); bit 8 enables Unicode playback; bits 16..23 name the [host layout](https://github.com/NoahCLR/charybdis-4x6/blob/fdced801b37b6be49172e50701a17b6bef78df53/docs/architecture/host-layouts-v1.md) (0 US) and bit 24 marks a macOS ISO keyboard; other bits zero. Nonzero requires feature bit 21, and bits 16..24 feature bit 22. Previously reserved zero after version 5 combo references moved to layer records |
+| 27 | Host settings: bits 0..1 select Auto (0), macOS (1), Windows (2), Linux (3); bit 8 enables Unicode playback; bits 16..23 name the [host layout](https://github.com/NoahCLR/charybdis-4x6/blob/f08aa5e9b7eb43ed478ca4c4ae898087b22e3d18/docs/architecture/host-layouts-v1.md) (0 US) and bit 24 marks a macOS ISO keyboard; other bits zero. Nonzero requires feature bit 21, and bits 16..24 feature bit 22. Previously reserved zero after version 5 combo references moved to layer records |
 | 28 | Behaviour master enable |
 | 29 | Layer behaviours mask, one bit per layer |
 | 30 | Layer combos mask, one bit per layer |
@@ -312,7 +312,7 @@ Physical power-loss acceptance at each durable boundary remains required.
 ## Upgrade and acceptance
 
 Current firmware has sixteen-layer VIA geometry (a 1,920-byte keymap) and
-synchronization metadata schema 4; an older bank is reset, not misread. Older geometry or action vocabulary is incompatible. The old bridge
+synchronization metadata schema 5 with a 34,903-byte macro bank; an older bank is reset, not misread. Older geometry or action vocabulary is incompatible. The old bridge
 is not built or served here: export with matching old firmware, then translate
 the complete backup in the client before restoring through current logical
 Apply. Firmware does not interpret old storage in place.

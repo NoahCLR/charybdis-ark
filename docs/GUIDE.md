@@ -688,8 +688,10 @@ the character. Characters with no native route or Unicode setup show **setup**.
 Ark cannot repair those sequences without changing what you authored.
 
 Bank usage counts UTF-8 bytes; compiled usage counts each non-ASCII scalar as
-four bytes and each ASCII run with its instruction headers. The 512-byte
-program limit remains. Valid supplementary characters and joined emoji count
+four bytes and each ASCII run with its instruction headers. Current firmware
+plays a stored macro in windows, so one macro can use all the free memory;
+firmware from before the larger macro memory keeps the 512-byte program limit.
+Valid supplementary characters and joined emoji count
 by their scalar sequence, not their apparent glyph count. Unpaired UTF-16
 surrogates, malformed UTF-8 and unsupported control characters are rejected.
 Avoid concurrent typing and release ordinary keys before playback. Cancellation

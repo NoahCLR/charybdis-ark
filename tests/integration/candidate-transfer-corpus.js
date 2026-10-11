@@ -9,7 +9,10 @@ const {decodeProfileBlob, encodeProfileBlob, crc32, fnv1a32} = require("../../co
 const {decodeSettings, encodeSettings} = require("../../core/schema/settings-domain-v1");
 const {document32, CAPABILITIES_32} = require("../fixtures/pd-slots-32");
 const {validateSnapshot} = require("../../core/model/portable-profile");
-const [bin, directory] = process.argv.slice(2);
+const [bin, directory, contractFile] = process.argv.slice(2);
+const {decodeCapabilityPages} = require("../../core/protocol/profile-wire-v1");
+const contract = JSON.parse(fs.readFileSync(contractFile, "utf8"));
+const capabilities = decodeCapabilityPages(contract.capabilityPages.map(hex => Buffer.from(hex, "hex")));
 function rename(bytes, name) {
     const profile = decodeProfileBlob(bytes), settings = profile.domains.find(d => d.id === 0x40);
     const decoded = decodeSettings(settings.payload); decoded.names[0] = name;
@@ -45,7 +48,7 @@ async function run(label, source, target, optimized, corruptSource = false) {
         if (corruptSource) assert.equal(await exchange("corrupt 500"), "ok");
         // Simulated scan opportunities, not a prediction of device timings.
         const coordinator = new CandidateUploadCoordinator(connection, {sleep: async () => {assert.equal(await exchange("tick 20"), "ok");}});
-        const uploading = coordinator.upload(target, {actionAbiDigest: CAPABILITIES_32.actionAbiDigest, viaGeneration: 2, viaDigest: 123,
+        const uploading = coordinator.upload(target, {actionAbiDigest: CAPABILITIES_32.actionAbiDigest, capabilities, viaGeneration: 2, viaDigest: 123,
             streamChunks: optimized, ...(optimized ? {baseSource: {bytes: source, kind: 0, origin: 255, generation: 0, crc32: crc32(source), digest: fnv1a32(source)}} : {})});
         if (corruptSource) {
             await assert.rejects(uploading, error => error.code === "DEVICE_REJECTED" && error.deviceError.name === "CHECKSUM_MISMATCH");

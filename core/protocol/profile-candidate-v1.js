@@ -1,5 +1,6 @@
 "use strict";
 
+const {supportsStreamingMacros} = require("../schema/macro-payload");
 const {requestHandled} = require("./via-unhandled-v1");
 const {RAW_HID_REPORT_SIZE, normalizeRawHidReport} = require("../transport/device-adapter");
 const {crc32, decodeProfileBlob, fnv1a32, PROFILE_DOMAIN_IDS} = require("../schema/profile-blob-v1");
@@ -30,10 +31,11 @@ const PROFILE_CANDIDATE_V1 = Object.freeze({
     MAX_BLOB_SIZE: 65504,
     STATUS_LAYOUT_VERSION: 1,
     STATUS_PAYLOAD_SIZE: 25,
-    // Format 4 (`NS`, firmware D-F14): every save is one logical generation
-    // bound to the VIA store's generation and digest, in a 64 KiB slot. The
-    // firmware refuses any other format.
+    // Format 4 (`NS`) uses 64 KiB slots. Streaming firmware advertises bit 27
+    // and uses format 5 (`NT`) with 52 KiB slots. Both bind VIA identity.
     LOGICAL_STORE_FORMAT: 4,
+    STREAMING_STORE_FORMAT: 5,
+    STREAMING_BLOB_SIZE: 53216,
     SCHEMA_MAJOR: 3,
     SCHEMA_MINOR: 0,
     KNOWN_DOMAIN_MASK: PROFILE_WIRE_DOMAINS.RGB | PROFILE_WIRE_DOMAINS.KEY_BEHAVIORS | PROFILE_WIRE_DOMAINS.COMBOS | PROFILE_WIRE_DOMAINS.SETTINGS | PROFILE_WIRE_DOMAINS.PD_MODES,
@@ -447,6 +449,9 @@ async function readCandidatePeerStatus(connection, options = {}) {
 // with: options.viaGeneration and options.viaDigest are required and nonzero.
 function candidateMetadataForBlob(value, options = {}) {
     const blob = copyBytes(value, "Candidate profile blob");
+    const storeFormatVersion = options.storeFormatVersion ?? (supportsStreamingMacros(options.capabilities) ? PROFILE_CANDIDATE_V1.STREAMING_STORE_FORMAT : PROFILE_CANDIDATE_V1.LOGICAL_STORE_FORMAT);
+    const maximum = options.capabilities?.maxProfilePayload ?? (storeFormatVersion === PROFILE_CANDIDATE_V1.STREAMING_STORE_FORMAT ? PROFILE_CANDIDATE_V1.STREAMING_BLOB_SIZE : PROFILE_CANDIDATE_V1.MAX_BLOB_SIZE);
+    if (blob.length > maximum) throw new RangeError(`Candidate profile blob exceeds the keyboard's ${maximum}-byte capacity.`);
     if (blob.length < PROFILE_CANDIDATE_V1.MIN_BLOB_SIZE || blob.length > PROFILE_CANDIDATE_V1.MAX_BLOB_SIZE) {
         throw new RangeError(`Candidate profile blob must contain ${PROFILE_CANDIDATE_V1.MIN_BLOB_SIZE} through ${PROFILE_CANDIDATE_V1.MAX_BLOB_SIZE} bytes.`);
     }
@@ -480,7 +485,7 @@ function candidateMetadataForBlob(value, options = {}) {
         crc32: crc32(blob),
         digest: fnv1a32(blob),
         actionAbiDigest: assertU32(options.actionAbiDigest, "Action-ABI digest"),
-        storeFormatVersion: PROFILE_CANDIDATE_V1.LOGICAL_STORE_FORMAT,
+        storeFormatVersion,
         viaGeneration,
         viaDigest,
     };
@@ -502,9 +507,10 @@ function normalizeCandidateMetadata(metadata) {
     const schemaMinor = assertU8(metadata.schemaMinor, "Candidate schema minor");
     assertCurrentSchema(schemaMajor, schemaMinor);
     const storeFormatVersion = assertU8(metadata.storeFormatVersion, "Candidate store format");
-    if (storeFormatVersion !== PROFILE_CANDIDATE_V1.LOGICAL_STORE_FORMAT) {
-        throw new RangeError(`Candidate store format must be ${PROFILE_CANDIDATE_V1.LOGICAL_STORE_FORMAT}.`);
+    if (![PROFILE_CANDIDATE_V1.LOGICAL_STORE_FORMAT, PROFILE_CANDIDATE_V1.STREAMING_STORE_FORMAT].includes(storeFormatVersion)) {
+        throw new RangeError(`Candidate store format must be 4 or 5.`);
     }
+    if (storeFormatVersion === PROFILE_CANDIDATE_V1.STREAMING_STORE_FORMAT && payloadLength > PROFILE_CANDIDATE_V1.STREAMING_BLOB_SIZE) throw new RangeError(`Candidate payload length exceeds the ${PROFILE_CANDIDATE_V1.STREAMING_BLOB_SIZE}-byte format-5 capacity.`);
     const {viaGeneration, viaDigest} = assertViaBinding(metadata.viaGeneration, metadata.viaDigest);
     return {
         schemaMajor,
