@@ -1,10 +1,10 @@
 // @ts-check
 "use strict";
 
-// Builds the model the webview renders, from device state.
+// Builds the model from a decoded snapshot or independent device readback.
 //
-// The webview never reads a file: it renders `model` and posts typed edits
-// back, and everything in `model` comes from what the keyboard reported.
+// The webview renders `model` and posts typed edits back. Draft content comes
+// from its snapshot; the keyboard header and diagnostics come from real reads.
 //
 // Domains the device cannot report yet come back empty rather than invented.
 // An empty RGB tab is truthful; a tab populated from the authored source would
@@ -13,32 +13,111 @@
 const {PD_SLOT_BINDINGS} = require("../data/pd-bindings");
 const {VOCABULARY, slotName} = require("../model/vocabulary");
 const keycodeCatalog = require("../data/keycode-catalog");
-const {baseRgbForView, behaviorRowsForView, builtInForView, combosForView, rgbForView} = require("./device-profile-view");
+const {baseEffectForView, baseRgbForView, behaviorRowsForView, builtInForView, comboRowsForView, rgbForView} = require("./device-profile-view");
 const {effectiveTimings} = require("../model/gesture-timing");
 const {hostKeyVocabulary, keyLabel, profileKeyNames} = require("../model/key-names");
 const {layerName} = require("../model/vocabulary");
 const {keycodeAction, knownActionAbi, layerRef, nativeCode} = require("../schema/actions");
 const {dpiChoices} = require("../model/pointer-dpi");
-const {LAYERS} = require("../model/portable-profile");
+const {LAYERS, decodedOf} = require("../model/portable-profile");
+const {baseLighting, settingsEditorView} = require("../model/settings-editor");
+const {macroEditorView} = require("../model/macro-editor");
+const {customKeyEditorView} = require("../model/custom-key-editor");
+const {effectiveComboTerm} = require("../schema/combo-domain-v1");
+const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../data/charybdis-layout");
 const {PROFILE_WIRE_FEATURES} = require("../protocol/profile-wire-v1");
 
 const CATALOG_SOURCE = "vendored QMK keycode catalog";
 
+// Internal presentation input: configuration, with no claim that it is a read.
+/**
+ * @typedef {object} Configuration
+ * @property {{layer: number, keys: import("./types.js").LayoutKey[]}[]} layers
+ * @property {import("./types.js").ReadDomains} domains
+ * @property {Extract<import("./types.js").ComboRead, {state: "read"}>["rows"]} comboRows
+ * @property {import("../../contracts/panel.js").PublishedModel["comboReadback"] & {rows?: undefined}} comboInfo
+ * @property {ReturnType<typeof baseRgbForView>} baseEffect
+ * @property {import("./types.js").DeviceModelInput["settingsView"]} settingsView
+ * @property {import("./types.js").DeviceModelInput["macroView"]} macroView
+ * @property {import("./types.js").DeviceModelInput["customKeyView"]} customKeyView
+ * @property {Partial<import("../../contracts/edits.js").BaseIdentity> | null} identity
+ * @typedef {{busy: boolean, behaviors: boolean, pointing: boolean, combos: boolean, macros: boolean, settings: boolean, customKeys: boolean}} Editing
+ */
+
+// Independent readback remains useful on older firmware and partial captures.
 /** @param {import("./types.js").DeviceModelInput} [state] */
 function buildDeviceModel(state = {}) {
+    const committed = state.committed?.state === "read";
+    const domains = committed ? state.committed?.domains || {} : {};
+    const mask = state.capabilities?.supportedDomainMask || 0;
+    const complete = committed && !state.committed?.failures?.length && !state.busy;
+    const currentLayers = state.capabilities?.compiledLayerCount === LAYERS && !state.busy;
+    return {...configurationModel({
+        layers: state.layout?.state === "read" ? state.layout.layers : [], domains,
+        comboRows: state.combos?.state === "read" ? state.combos.rows : [],
+        comboInfo: state.combos ? {...state.combos, rows: undefined} : {state: "unread"},
+        baseEffect: baseRgbForView(state.baseRgb, state.settingsView?.brightnessMax),
+        settingsView: state.settingsView, macroView: state.macroView, customKeyView: state.customKeyView,
+        identity: committed ? {source: state.committed?.source, generation: state.committed?.generation, digest: state.committed?.digest, originHalf: state.committed?.originHalf} : null,
+    }, state.capabilities, {
+        busy: Boolean(state.busy), behaviors: Boolean(mask & 2) && complete,
+        pointing: Boolean(mask & 16) && complete, combos: Boolean(mask & 4) && committed && !state.busy,
+        macros: Boolean(state.macroView) && currentLayers, settings: Boolean(state.settingsView) && currentLayers,
+        customKeys: Boolean(state.customKeyView) && !state.busy,
+    }), ...deviceSummary(state)};
+}
+
+// Drafts render their once-decoded snapshot. Actual device facts describe the
+// keyboard; the centralized binding alone decides the draft's editability.
+/**
+ * @param {import("../model/types.js").CompleteSnapshot} snapshot
+ * @param {import("../model/types.js").ProfileDestination} capabilities
+ * @param {ReturnType<typeof import("./panel-session-state.js").draftBinding>} binding
+ * @param {import("./types.js").DeviceModelInput} [deviceState]
+ */
+function buildSnapshotModel(snapshot, capabilities, binding, deviceState = {}) {
+    const value = decodedOf(snapshot);
+    const current = {...snapshot, decoded: value};
+    const settingsView = settingsEditorView(current, capabilities);
+    const {combos, settings} = value;
+    const max = snapshot.limits?.brightnessMax;
+    const lighting = baseLighting(settings.values);
+    const baseEffect = max === undefined ? baseRgbForView(deviceState.baseRgb) : baseEffectForView({
+        effectId: lighting.enabled ? lighting.effect : 0,
+        brightness: max ? Math.min(255, Math.round(lighting.brightness * 255 / max)) : 0,
+        hue: lighting.hue, saturation: lighting.saturation, speed: lighting.speed,
+    }, max);
+    /** @param {import("../schema/types.js").SemanticAction} action */
+    const native = action => /** @type {number} */ (nativeCode(action));
+    const editable = binding.editable;
+    const model = configurationModel({
+        layers: value.document.layers.map((values, layer) => ({layer, keys: CHARYBDIS_4X6_LAYOUT_MATRIX.map(([row, column], layoutIndex) => ({row, column, layoutIndex, keycode: values[row * 6 + column], resolved: keycodeCatalog.resolve(values[row * 6 + column])}))})),
+        domains: {rgb: value.rgb, keyBehaviors: value.behaviors, settings, pdModes: value.pdModes},
+        comboRows: combos.rows.map(row => ({...row, termMs: effectiveComboTerm(combos, row), followsDefault: row.termMs === null, inputs: row.inputs.map(native), output: native(row.output)})),
+        comboInfo: {state: "read", enabled: Boolean(settings.values[20]), layerReferences: settings.layers.map(record => record.reference),
+            version: combos.version, defaultTermMs: combos.defaultTermMs, holdTermMs: combos.holdTermMs},
+        baseEffect, settingsView, macroView: macroEditorView(current, capabilities), customKeyView: customKeyEditorView(current, capabilities),
+        identity: null,
+    }, capabilities, {busy: !editable, behaviors: editable, pointing: editable, combos: editable, macros: editable, settings: editable, customKeys: editable});
+    model.layers.forEach((layer, index) => {layer.displayName = snapshot.summary.names[index];});
+    return {...model, ...deviceSummary(deviceState)};
+}
+
+/** @param {Configuration} content @param {import("./types.js").DeviceModelInput["capabilities"]} capabilities @param {Editing} editing */
+function configurationModel(content, capabilities, editing) {
     const catalog = catalogViews();
     // What this profile calls its keys, laid over the catalogue: one rule for
     // the screens and the review (model/key-names.js).
     const names = profileKeyNames({
-        hostOs: state.settingsView?.host?.effective,
-        hostLayout: state.settingsView?.host?.layout,
-        macosIso: state.settingsView?.host?.macosIso,
-        layers: state.committed?.domains?.settings?.names,
-        actionsKnown: knownActionAbi(state.capabilities?.actionAbiDigest ?? 0),
-        macros: state.macroView?.viaMacros,
-        customKeys: state.customKeyView?.keys,
-        behaviors: state.committed?.state === "read" ? state.committed.domains?.keyBehaviors?.rows : [],
-        pdModes: state.committed?.domains?.pdModes,
+        hostOs: content.settingsView?.host?.effective,
+        hostLayout: content.settingsView?.host?.layout,
+        macosIso: content.settingsView?.host?.macosIso,
+        layers: content.domains?.settings?.names,
+        actionsKnown: knownActionAbi(capabilities?.actionAbiDigest ?? 0),
+        macros: content.macroView?.viaMacros,
+        customKeys: content.customKeyView?.keys,
+        behaviors: content.domains.keyBehaviors?.rows || [],
+        pdModes: content.domains?.pdModes,
     });
     Object.assign(catalog.aliases, names.aliases);
     Object.assign(catalog.labels, names.labels);
@@ -63,90 +142,81 @@ function buildDeviceModel(state = {}) {
     // Every keycode the profile holds is in the table by its name here, so the
     // interface names any of them by keycode and never composes a name itself:
     // a layer-tap cannot be listed ahead of time, one per layer and tap key.
-    for (const value of profileKeycodes(state)) catalog.labels[keycodeCatalog.resolve(value).name] = keyLabel(names, value);
+    for (const value of profileKeycodes(content, capabilities)) catalog.labels[keycodeCatalog.resolve(value).name] = keyLabel(names, value);
     const hostVocabulary = hostKeyVocabulary(names.hostOs);
     return {
         // The words for every value the keyboard stores, so the interface
         // names things as the review does (model/vocabulary.js).
         vocabulary: {...VOCABULARY, ...hostVocabulary},
-        layers: layersFromDevice(state.layout, catalog.labels, catalog.aliases, names.layers),
+        layers: layersForView(content.layers, catalog.labels, catalog.aliases, names.layers),
         // What each typing key prints: plain, Shift, Option/AltGr, then both,
         // for the picker's board; null on US, whose board is drawn as is.
         hostLayoutLegends: names.legends,
 
-        // Read off the keyboard when the committed profile has been read;
-        // empty rather than fabricated before that.
         // Each slot with the name a person reads for it, one rule for every
         // surface (model/vocabulary.js slotName).
         // and the keycodes that bind it (data/pd-bindings.js), so the interface
         // names and finds a pointing-mode key without a registry of its own.
-        pdModes: (state.committed?.domains?.pdModes || []).map((slot) => ({...slot, displayName: slotName(slot), binding: PD_SLOT_BINDINGS[slot.id]})),
-        pdModeEditing: {writable: Boolean((state.capabilities?.supportedDomainMask || 0) & 16) && state.committed?.state === "read" && !state.committed.failures?.length && !state.busy,
+        pdModes: (content.domains?.pdModes || []).map((slot) => ({...slot, displayName: slotName(slot), binding: PD_SLOT_BINDINGS[slot.id]})),
+        pdModeEditing: {writable: editing.pointing,
             dpiChoices: dpiChoices({normalSpeed: true})},
-        keyBehaviors: committedKeyBehaviors(state.committed, state.capabilities, names),
+        keyBehaviors: content.domains.keyBehaviors ? behaviorRowsForView(content.domains.keyBehaviors, behaviorFeatures(capabilities), names) : [],
         behaviorEditing: {
-            busy: Boolean(state.busy),
-            writable: Boolean((state.capabilities?.supportedDomainMask || 0) & 2) && state.committed?.state === "read" && !state.committed.failures?.length && !state.busy,
-            maxTapStepsPerBehavior: state.capabilities?.maxTapStepsPerBehavior || 5,
-            keyDefaults: behaviorDefaults(state, catalog.aliases, names),
+            busy: editing.busy,
+            writable: editing.behaviors,
+            maxTapStepsPerBehavior: capabilities?.maxTapStepsPerBehavior || 5,
+            keyDefaults: behaviorDefaults(content, capabilities, catalog.aliases, names),
         },
-        profileIdentity: state.committed?.state === "read" ? /** @type {Partial<import("../../contracts/edits.js").BaseIdentity>} */ ({source: state.committed.source, generation: state.committed.generation, digest: state.committed.digest, originHalf: state.committed.originHalf}) : null,
-        rgb: {...committedRgb(state.committed),
-            ...(Number.isInteger(state.settingsView?.brightnessMax) ? {maximumBrightness: state.settingsView?.brightnessMax} : {}),
-            baseEffect: baseRgbForView(state.baseRgb, state.settingsView?.brightnessMax)},
+        profileIdentity: content.identity,
+        rgb: {...(content.domains.rgb ? rgbForView(content.domains.rgb) : {}),
+            ...(Number.isInteger(content.settingsView?.brightnessMax) ? {maximumBrightness: content.settingsView?.brightnessMax} : {}),
+            baseEffect: content.baseEffect},
 
-        // Independently read native combo definitions.
-        combos: combosForView(state.combos, catalog.labels),
-        comboReadback: state.combos ? {...state.combos, rows: undefined, writable: Boolean((state.capabilities?.supportedDomainMask || 0) & 4) && state.committed?.state === "read" && !state.busy} : {state: "unread"},
-        viaMacros: state.macroView?.viaMacros || [],
-        macroNameSpace: state.macroView?.names || null,
-        macroBank: state.macroView?.macroBank || null,
-        hostSettings: state.settingsView?.host || null,
-        macroUnicode: state.macroView?.unicode || {supported: false, mode: 0},
-        macroProtectionSupported: Boolean(state.macroView?.protectionSupported),
-        macroOutputIsolationSupported: Boolean(state.macroView?.outputIsolationSupported),
-        macroProtectionChoices: state.macroView?.protectionChoices || [],
-        macroEditing: {identity: state.macroView?.identity || "", writable: Boolean(state.macroView) && state.capabilities?.compiledLayerCount === LAYERS && !state.busy},
-        behaviorTimingDefaults: state.settingsView?.timing || {},
-        configDefaults: state.settingsView?.sections || [],
-        participation: state.committed?.state === "read" && state.committed.domains?.settings?.values && state.committed.domains.settings.layers ? {
-            behaviorsEnabled: Boolean(state.committed.domains.settings.values[28]),
-            combosEnabled: Boolean(state.committed.domains.settings.values[20]),
-            behaviorLayers: state.committed.domains.settings.values[29],
-            comboLayers: state.committed.domains.settings.values[30],
-            layers: state.committed.domains.settings.layers,
+        // Native combo values, resolved from either capture or snapshot.
+        combos: comboRowsForView(content.comboRows, catalog.labels),
+        comboReadback: {...content.comboInfo, writable: editing.combos},
+        viaMacros: content.macroView?.viaMacros || [],
+        macroNameSpace: content.macroView?.names || null,
+        macroBank: content.macroView?.macroBank || null,
+        hostSettings: content.settingsView?.host || null,
+        macroUnicode: content.macroView?.unicode || {supported: false, mode: 0},
+        macroProtectionSupported: Boolean(content.macroView?.protectionSupported),
+        macroOutputIsolationSupported: Boolean(content.macroView?.outputIsolationSupported),
+        macroProtectionChoices: content.macroView?.protectionChoices || [],
+        macroEditing: {identity: content.macroView?.identity || "", writable: editing.macros},
+        behaviorTimingDefaults: content.settingsView?.timing || {},
+        configDefaults: content.settingsView?.sections || [],
+        participation: content.domains.settings?.values && content.domains.settings.layers ? {
+            behaviorsEnabled: Boolean(content.domains.settings.values[28]),
+            combosEnabled: Boolean(content.domains.settings.values[20]),
+            behaviorLayers: content.domains.settings.values[29],
+            comboLayers: content.domains.settings.values[30],
+            layers: content.domains.settings.layers,
         } : null,
-        settingsEditing: {identity: state.settingsView?.identity || "", writable: Boolean(state.settingsView) && state.capabilities?.compiledLayerCount === LAYERS && !state.busy},
-        macroPayloadKeycodes: state.macroView?.macroPayloadKeycodes || [],
-        macroPayloadModifierKeycodes: state.macroView?.macroPayloadModifierKeycodes || [],
+        settingsEditing: {identity: content.settingsView?.identity || "", writable: editing.settings},
+        macroPayloadKeycodes: content.macroView?.macroPayloadKeycodes || [],
+        macroPayloadModifierKeycodes: content.macroView?.macroPayloadModifierKeycodes || [],
         // The 128 named custom keys, on a keyboard with the keycode blocks.
-        customKeys: state.customKeyView?.keys || [],
-        customKeyNameSpace: state.customKeyView?.names || null,
-        customKeyEditing: {identity: state.customKeyView?.identity || "", writable: Boolean(state.customKeyView) && !state.busy},
+        customKeys: content.customKeyView?.keys || [],
+        customKeyNameSpace: content.customKeyView?.names || null,
+        customKeyEditing: {identity: content.customKeyView?.identity || "", writable: editing.customKeys},
 
         // TT(), OSL() and TO() are offered only by a keyboard that runs them
         // through its own layer ownership (Profile Wire feature bit 14).
-        ownsLayerKeys: Boolean((state.capabilities?.featureFlags || 0) & PROFILE_WIRE_FEATURES.OWNED_LAYER_TOGGLES),
+        ownsLayerKeys: Boolean((capabilities?.featureFlags || 0) & PROFILE_WIRE_FEATURES.OWNED_LAYER_TOGGLES),
         qmkKeycodes: catalog.entries,
         qmkKeyLabels: catalog.labels,
         qmkKeycodeAliases: catalog.aliases,
         qmkKeycodeSource: CATALOG_SOURCE,
 
-        diagnostics: diagnosticsFor(state),
-
-        // The rail's header: which keyboard this is, and its health.
-        device: deviceHeader(state),
     };
 }
 
 // The UI keys layers by name and the device only knows indexes, so synthesise
 // stable names. They are display strings, not identifiers from source.
-/** @param {import("./types.js").LayoutRead | null | undefined} layout @param {Record<string, string>} labels @param {Record<string, string>} [aliases] @param {string[]} [layerNames] */
-function layersFromDevice(layout, labels, aliases = {}, layerNames = []) {
-    if (!layout || layout.state !== "read" || !Array.isArray(layout.layers)) {
-        return [];
-    }
-    const layers = layout.layers.map((entry) => ({
+/** @param {Configuration["layers"]} layout @param {Record<string, string>} labels @param {Record<string, string>} [aliases] @param {string[]} [layerNames] */
+function layersForView(layout, labels, aliases = {}, layerNames = []) {
+    const layers = layout.map((entry) => ({
         name: layerRef(entry.layer),
         index: entry.layer,
         positions: entry.keys.map((key) => {
@@ -208,39 +278,21 @@ function trim(name) {
 
 // Every keycode value the profile stores: on its layers, in its behaviours and
 // in its combos and pointing-mode taps.
-/** @param {import("./types.js").DeviceModelInput} state @returns {number[]} */
-function profileKeycodes(state) {
+/** @param {Configuration} content @param {import("./types.js").DeviceModelInput["capabilities"]} capabilities @returns {number[]} */
+function profileKeycodes(content, capabilities) {
     /** @type {(number | undefined)[]} */
-    const values = [];
-    if (state.layout?.state === "read") for (const layer of state.layout.layers || []) for (const key of layer.keys) values.push(key.keycode);
-    const behaviors = state.committed?.state === "read" ? state.committed.domains?.keyBehaviors?.rows || [] : [];
-    if (knownActionAbi(state.capabilities?.actionAbiDigest ?? 0)) for (const row of behaviors) {
+    const values = content.layers.flatMap(layer => layer.keys.map(key => key.keycode));
+    if (knownActionAbi(capabilities?.actionAbiDigest ?? 0)) for (const row of content.domains.keyBehaviors?.rows || []) {
         for (const action of [row.target, ...row.steps.flatMap((step) => [step.tap, step.hold?.action, step.longHold?.action])]) {
             if (action) values.push(nativeCode(action));
         }
     }
-    if (state.combos?.state === "read") for (const row of state.combos.rows) values.push(...row.inputs, row.output);
-    if (state.committed?.state === "read") for (const slot of state.committed.domains?.pdModes || []) {
+    for (const row of content.comboRows) values.push(...row.inputs, row.output);
+    for (const slot of content.domains.pdModes || []) {
         const taps = [...Object.values(slot.directions || {}), ...Object.values(slot.diagonals || {}), ...(slot.buttons || []).map(button => button.tap)];
         for (const tap of taps) if (tap) values.push(tap.keycode);
     }
     return values.filter(/** @returns {value is number} */ (value) => typeof value === "number" && Number.isInteger(value));
-}
-
-// The decoded domains reach the UI only once the whole payload verified, so a
-// half-read profile is never rendered as if it were the keyboard's state.
-/** @param {import("./types.js").CommittedRead | null | undefined} committed @returns {Partial<import("../../contracts/panel.js").RgbView>} */
-function committedRgb(committed) {
-    return committed?.state === "read" && committed.domains?.rgb ? rgbForView(committed.domains.rgb) : {};
-}
-
-/** @param {import("./types.js").CommittedRead | null | undefined} committed @param {Partial<import("./types.js").DeviceCapabilities> | null | undefined} capabilities @param {import("../../contracts/model.js").ProfileKeyNames} names */
-function committedKeyBehaviors(committed, capabilities, names) {
-    const decoded = committed?.state === "read" ? committed.domains?.keyBehaviors : undefined;
-    if (!decoded) {
-        return [];
-    }
-    return behaviorRowsForView(decoded, behaviorFeatures(capabilities), names);
 }
 
 /** @param {Partial<import("./types.js").DeviceCapabilities> | null | undefined} capabilities */
@@ -254,12 +306,12 @@ function behaviorFeatures(capabilities) {
 
 // Unstored editor rows need the same built-in actions and timing defaults as
 // saved rows. Publish presentation only; these are not profile behaviours.
-/** @param {import("./types.js").DeviceModelInput} state @param {Record<string, string>} aliases @param {import("../../contracts/model.js").ProfileKeyNames} names @returns {Record<string, {builtIn: ReturnType<typeof builtInForView>, timing: {tapHoldTerm: number | string | undefined, longerHoldTerm: number | string | undefined, multiTapTerm: number | string | undefined}}>} */
-function behaviorDefaults(state, aliases, names) {
-    const defaults = state.settingsView?.timing || {};
+/** @param {Configuration} content @param {import("./types.js").DeviceModelInput["capabilities"]} capabilities @param {Record<string, string>} aliases @param {import("../../contracts/model.js").ProfileKeyNames} names @returns {Record<string, {builtIn: ReturnType<typeof builtInForView>, timing: {tapHoldTerm: number | string | undefined, longerHoldTerm: number | string | undefined, multiTapTerm: number | string | undefined}}>} */
+function behaviorDefaults(content, capabilities, aliases, names) {
+    const defaults = content.settingsView?.timing || {};
     const values = [defaults.tappingTerm, defaults.tapHoldTerm, defaults.longerHoldTerm, defaults.multiTapTerm];
-    const features = behaviorFeatures(state.capabilities);
-    return Object.fromEntries([...new Set(profileKeycodes(state))].filter(code => code > 1).map(code => {
+    const features = behaviorFeatures(capabilities);
+    return Object.fromEntries([...new Set(profileKeycodes(content, capabilities))].filter(code => code > 1).map(code => {
         const target = keycodeAction(code);
         const name = keycodeCatalog.resolve(code).name;
         const timing = effectiveTimings({target}, values);
@@ -410,4 +462,4 @@ function catalogViews() {
 /** @param {import("./types.js").DeviceModelInput} [state] */
 const deviceSummary = (state = {}) => ({device: deviceHeader(state), diagnostics: diagnosticsFor(state)});
 
-module.exports = {buildDeviceModel, deviceSummary};
+module.exports = {buildDeviceModel, buildSnapshotModel, deviceSummary};

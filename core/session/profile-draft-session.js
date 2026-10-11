@@ -9,9 +9,9 @@ const {revertUnits} = require("../model/profile-revert");
 const {keyPlacementProblem} = require("../model/profile-placement");
 const {LEVELS: CHECK_LEVELS} = require("../model/layer-reach");
 const {draftProfileChecks} = require("../model/profile-checks");
-const {baseLighting, editSettings, settingsEditorView} = require("../model/settings-editor");
-const {editMacro, macroEditorView} = require("../model/macro-editor");
-const {customKeyEditorView, editCustomKey} = require("../model/custom-key-editor");
+const {editSettings} = require("../model/settings-editor");
+const {editMacro} = require("../model/macro-editor");
+const {editCustomKey} = require("../model/custom-key-editor");
 const {editDeviceProfile, RGB_EDITS, COMBO_EDITS, PD_EDITS} = require("./device-profile-edits");
 const {BEHAVIOR_EDITS} = require("./key-behavior-edits");
 const {actionName, knownActionAbi, layerOfRef, nativeCode} = require("../schema/actions");
@@ -554,20 +554,6 @@ class ProfileDraftSession {
         return {state: "read", enabled: Boolean(settings.values[20]), layerReferences: settings.layers.map(record => record.reference),
             version: combos.version, defaultTermMs: combos.defaultTermMs, holdTermMs: combos.holdTermMs,
             rows: combos.rows.map(row => ({...row, termMs: effectiveComboTerm(combos, row), followsDefault: row.termMs === null, inputs: row.inputs.map(native), output: native(row.output)}))};
-    }
-    /** @template {import("./types.js").DraftDeviceContext} T @param {T} state */
-    editingState(state) {
-        if (state.selectedDeviceId !== this.deviceId) return state;
-        const current = this.current, value = current.decoded, values = value.settings.values;
-        const max = current.limits?.brightnessMax;
-        const lighting = baseLighting(values);
-        /** @type {import("./types.js").BaseRgbRead | null | undefined} */
-        const baseRgb = max === undefined ? state.baseRgb : {state: "read", effectId: lighting.enabled ? lighting.effect : 0,
-            brightness: max ? Math.min(255, Math.round(lighting.brightness * 255 / max)) : 0, hue: lighting.hue, saturation: lighting.saturation, speed: lighting.speed};
-        return {...state, busy: state.busy || this.stale || !state.connected,
-            layout: {state: /** @type {const} */ ("read"), layers: current.document.layers.map((values, layer) => ({layer, keys: CHARYBDIS_4X6_LAYOUT_MATRIX.map(([row, column], layoutIndex) => ({row, column, layoutIndex, keycode: values[row * 6 + column], resolved: keycodes.resolve(values[row * 6 + column])}))}))},
-            committed: {...state.committed, state: /** @type {const} */ ("read"), failures: [], domains: {rgb: value.rgb, keyBehaviors: value.behaviors, settings: value.settings, pdModes: value.pdModes}},
-            baseRgb, combos: this.combos(), macroView: macroEditorView(current, this.capabilities), customKeyView: customKeyEditorView(current, this.capabilities), settingsView: settingsEditorView(current, this.capabilities)};
     }
     /** @param {import("./types.js").DraftDeviceContext} state */
     view(state) {

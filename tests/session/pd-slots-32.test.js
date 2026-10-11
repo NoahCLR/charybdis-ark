@@ -5,7 +5,7 @@ const test = require("node:test"), assert = require("node:assert/strict");
 const {CAPABILITIES_32, document32} = require("../fixtures/pd-slots-32");
 const {ProfileDraftSession} = require("../../core/session/profile-draft-session");
 const {fingerprint, summary, validateSnapshot} = require("../../core/model/portable-profile");
-const {buildDeviceModel} = require("../../core/session/device-model");
+const {buildSnapshotModel} = require("../../core/session/device-model");
 const {editKeyBehaviors} = require("../../core/session/key-behavior-edits");
 const {decodeProfileBlob} = require("../../core/schema/profile-blob-v1");
 
@@ -35,7 +35,7 @@ test("slot 20 is created, bound, lit, reviewed and discarded like any other", ()
     assert.equal(slot.title, "Slot 20 · Desktops");
     assert.ok(view.changes.some(change => change.unit === "rgb:pd:20"), "the colour is its own review row");
 
-    const model = buildDeviceModel({...draft.editingState({connected: true, selectedDeviceId: "board", capabilities: CAPABILITIES_32}), capabilities: CAPABILITIES_32});
+    const model = buildSnapshotModel(draft.current, CAPABILITIES_32, {editable: true, reason: ""});
     assert.equal(model.pdModes.length, 32);
     assert.deepEqual(model.pdModes[20].binding, {slot: 20, hold: "PD_SLOT_20", lock: "PD_SLOT_20_LOCK", holdCode: 0x7e94, lockCode: 0x7eb4});
     assert.ok(model.qmkKeycodes.some(key => key.value === "PD_SLOT_31_LOCK" && key.keycode === 0x7ebf && key.group === "Pointing modes"));

@@ -4,6 +4,7 @@ const {ProfileDraftSession} = require("../../core/session/profile-draft-session"
 const {document} = require("../fixtures/portable-profile");
 const {options} = require("../fixtures/keyboard-options");
 const {fingerprint, reorderLayers, summary, validateSnapshot} = require("../../core/model/portable-profile");
+const {macroEditorView} = require("../../core/model/macro-editor");
 const {settingsEditorView} = require("../../core/model/settings-editor");
 const {behaviorRowsForView} = require("../../core/session/device-profile-view");
 function fixture() {
@@ -51,9 +52,9 @@ test("layout playback effects follow Host through Review, history, undo, redo an
     assert.equal(draft.steps().at(-1).changes.filter(row => row.area === "Macros").length, 2);
     draft.undo(draft.revision);
     assert.equal(draft.current.fingerprint, authored);
-    assert.equal(draft.editingState({connected: true, selectedDeviceId: "board"}).macroView.viaMacros[1].playable, true);
+    assert.equal(macroEditorView(draft.current, draft.capabilities).viaMacros[1].playable, true);
     draft.redo(draft.revision);
-    assert.equal(draft.editingState({connected: true, selectedDeviceId: "board"}).macroView.viaMacros[1].playable, false);
+    assert.equal(macroEditorView(draft.current, draft.capabilities).viaMacros[1].playable, false);
     draft.discard(draft.revision, draft.changes().find(row => row.unit === "settings:host").group);
     assert.equal(draft.current.fingerprint, authored, "discard restores Host and preserves the authored macro edit");
     assert.deepEqual(draft.changes().map(row => row.unit), ["macro:0"]);
@@ -63,9 +64,9 @@ test("switching to a native layout fixes stored text without rewriting it", () =
     const {hostMacros} = require("../fixtures/host-macros");
     const {snapshot, capabilities} = hostMacros(1, ["café"]);
     const draft = new ProfileDraftSession(snapshot, "board", capabilities);
-    assert.equal(draft.editingState({connected: true, selectedDeviceId: "board"}).macroView.viaMacros[0].playable, false);
+    assert.equal(macroEditorView(draft.current, draft.capabilities).viaMacros[0].playable, false);
     stage(draft, settings(draft, "host", {hostLayout: "2"}));
-    assert.equal(draft.editingState({connected: true, selectedDeviceId: "board"}).macroView.viaMacros[0].playable, true);
+    assert.equal(macroEditorView(draft.current, draft.capabilities).viaMacros[0].playable, true);
     assert.deepEqual(draft.document.macros, snapshot.document.macros);
     assert.equal(draft.checks().find(row => row.kind === "unplayableMacro").status, "fixed");
     assert.equal(draft.changes().find(row => row.area === "Macros").fields.find(field => field.label === "Playback").after, "Ready to play");

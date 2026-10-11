@@ -145,7 +145,12 @@ function rgbForView(domain) {
 /** @param {import("./types.js").BaseRgbRead | null | undefined} read @param {number} [maximumBrightness] */
 function baseRgbForView(read, maximumBrightness) {
     if (read?.state !== "read") return {state: read?.state || "unread", message: read?.error?.message || "Base RGB has not been read from the keyboard."};
-    const {effectId, hue, saturation, brightness, speed, readAt} = read;
+    return baseEffectForView(read, maximumBrightness);
+}
+
+/** @param {Pick<Extract<import("./types.js").BaseRgbRead, {state: "read"}>, "effectId" | "hue" | "saturation" | "brightness" | "speed" | "readAt">} lighting @param {number} [maximumBrightness] */
+function baseEffectForView(lighting, maximumBrightness) {
+    const {effectId, hue, saturation, brightness, speed, readAt} = lighting;
     const enabled = effectId !== 0;
     const previewBrightness = typeof maximumBrightness === "number" && Number.isInteger(maximumBrightness)
         ? Math.round(brightness * maximumBrightness / 255)
@@ -166,12 +171,17 @@ function baseRgbForView(read, maximumBrightness) {
 /** @param {import("./types.js").ComboRead | null | undefined} read @param {Record<string, string>} labels */
 function combosForView(read, labels) {
     if (read?.state !== "read") return [];
+    return comboRowsForView(read.rows, labels);
+}
+
+/** @param {Extract<import("./types.js").ComboRead, {state: "read"}>["rows"]} rows @param {Record<string, string>} labels */
+function comboRowsForView(rows, labels) {
     /** @param {number} value */
     const resolve = value => {
         const key = keycodes.resolve(value);
         return {name: key.name, label: labels[key.name] || keyLabel(undefined, value)};
     };
-    return read.rows.map(row => ({
+    return rows.map(row => ({
         id: row.id, badge: `C${row.id}`,
         enabled: row.enabled ?? true, allowedLayers: row.allowedLayers ?? 0xffff,
         inputs: row.inputs.map(value => resolve(value).name),
@@ -182,4 +192,4 @@ function combosForView(read, labels) {
     }));
 }
 
-module.exports = {baseRgbForView, behaviorRowsForView, builtInForView, combosForView, rgbForView};
+module.exports = {baseEffectForView, baseRgbForView, comboRowsForView, behaviorRowsForView, builtInForView, combosForView, rgbForView};

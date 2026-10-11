@@ -5,7 +5,7 @@ const {ProfileDraftSession} = require("../../core/session/profile-draft-session"
 const {fingerprint, summary, validateSnapshot, reorderLayers} = require("../../core/model/portable-profile");
 const {settingsEditorView} = require("../../core/model/settings-editor");
 const {candidateMetadataForBlob, buildCandidateBeginRequest} = require("../../core/protocol/profile-candidate-v1");
-const {buildDeviceModel} = require("../../core/session/device-model");
+const {buildSnapshotModel} = require("../../core/session/device-model");
 function fixture() {
     const value = document(), snapshot = {document: value, fingerprint: fingerprint(value), summary: summary(value)};
     const caps = {compiledLayerCount: 16, supportedDomainMask: 31, actionAbiDigest: value.actionAbiDigest};
@@ -42,7 +42,7 @@ test("create, bind, edit RGB and macros, reorder, review and undo share a PD dra
     assert.equal(field("Name"), "History");
     assert.equal(field("Horizontal movement per tap"), 30);
     assert.match(field("Left"), /Inherit modifiers/);
-    const model = buildDeviceModel({...draft.editingState({connected: true, selectedDeviceId: "board", capabilities: caps}), capabilities: caps});
+    const model = buildSnapshotModel(draft.current, caps, {editable: true, reason: ""});
     assert.equal(model.pdModes[7].name, "History");
     assert(model.qmkKeycodes.some(key => key.value === "PD_SLOT_7" && key.keycode === 0x7e87 && key.label === "History · hold"));
     assert(model.qmkKeycodes.some(key => key.value === "PD_SLOT_7_LOCK" && key.keycode === 0x7ea7 && key.label === "History · toggle"));
@@ -87,7 +87,7 @@ test("a cleared slot keeps its bindings, because the keyboard keeps its keycodes
     // board, not a broken profile — and the validated profile counts what still
     // reaches the empty slot so the interface can say the key does nothing.
     const {draft, stage, caps} = fixture();
-    const modelNow = () => buildDeviceModel({...draft.editingState({connected: true, selectedDeviceId: "board", capabilities: caps}), capabilities: caps});
+    const modelNow = () => buildSnapshotModel(draft.current, caps, {editable: true, reason: ""});
     stage({type: "savePdMode", slot: 7, config: {kind: 1, name: "History", axis: 1, thresholdX: 30,
         directions: {left: {keycode: "LALT(KC_LEFT)"}, right: {keycode: "LALT(KC_RIGHT)"}}}});
     stage({type: "updateLayoutKeys", layers: [{layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "PD_SLOT_7"}]}]});

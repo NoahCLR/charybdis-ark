@@ -3,7 +3,7 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 
-const {buildDeviceModel} = require("../../core/session/device-model");
+const {buildDeviceModel, buildSnapshotModel, deviceSummary} = require("../../core/session/device-model");
 const {decodedDeviceProfile} = require("../fixtures/device-profile");
 const {resolve} = require("../../core/data/keycode-catalog");
 
@@ -419,4 +419,60 @@ test("pointing-only shortcuts enter the shared OS label table", () => {
     ]}}});
     assert.equal(model.qmkKeyLabels[resolve(0x0804).name], "Super+A");
     assert.equal(model.qmkKeyLabels[resolve(0x0805).name], "Super+B");
+});
+
+
+test("snapshot presentation uses its decoded configuration and real device diagnostics", () => {
+    const {ProfileDraftSession} = require("../../core/session/profile-draft-session");
+    const {document, CURRENT_CAPABILITIES} = require("../fixtures/portable-profile");
+    const {fingerprint, summary} = require("../../core/model/portable-profile");
+    const value = document();
+    const capabilities = {...CURRENT_CAPABILITIES, featureFlags: (1 << 17) | (1 << 18)};
+    const draft = new ProfileDraftSession({document: value, fingerprint: fingerprint(value), summary: summary(value), limits: {brightnessMax: 200}}, "board", capabilities);
+    draft.stage({type: "updateLayoutKeys", draftRevision: draft.revision, layer: "Layer 0", changes: [
+        {layoutIndex: 0, keycode: "PD_SLOT_0"}, {layoutIndex: 1, keycode: "VIA_MACRO_0"},
+        {layoutIndex: 2, keycode: "CUSTOM_KEY_0"}, {layoutIndex: 3, keycode: "LT(3,KC_F)"},
+    ]});
+    draft.stage({type: "updateViaMacro", draftRevision: draft.revision, keycode: "VIA_MACRO_0", name: "Sign-off", payload: "hello"});
+    draft.stage({type: "updateCustomKey", draftRevision: draft.revision, keycode: "CUSTOM_KEY_0", name: "Right Thumb"});
+    const state = {capabilities, phase: "reading", error: {message: "Read unavailable"}, committed: {state: "unavailable"},
+        combos: {state: "unavailable", error: {message: "Combo read unavailable"}}};
+    const model = buildSnapshotModel(draft.current, capabilities, {editable: true, reason: ""}, state);
+    assert.deepEqual(model.layers[0].positions.slice(0, 3).map(key => key.semantic), ["PD_SLOT_0", "VIA_MACRO_0", "CUSTOM_KEY_0"]);
+    assert.equal(model.layers[0].positions[1].display, "Sign-off");
+    assert.equal(model.layers[0].positions[2].display, "Right Thumb");
+    assert.equal(model.layers[0].displayName, "Base");
+    assert.equal(model.behaviorEditing.keyDefaults["LT(3,KC_F)"].timing.tapHoldTerm, "200");
+    assert.equal(model.behaviorEditing.keyDefaults["LT(3,KC_F)"].builtIn.hold.action, "MO(3)");
+    assert.equal(model.viaMacros[0].payload, "hello");
+    assert.equal(model.pdModes.length, 32);
+    assert.equal(model.combos[0].termMs, 50);
+    assert.equal(model.combos[0].followsDefault, true);
+    assert.deepEqual(model.participation.layers, draft.current.decoded.settings.layers);
+    assert.deepEqual({device: model.device, diagnostics: model.diagnostics}, deviceSummary(state));
+    assert.match(model.diagnostics.join(" "), /Layout has not been read/);
+    assert.match(model.diagnostics.join(" "), /Combo read unavailable/);
+    assert.equal(model.device.health.error, "Read unavailable");
+});
+
+test("snapshot presentation reuses a matching decode and follows the binding for every editor", () => {
+    const {ProfileDraftSession} = require("../../core/session/profile-draft-session");
+    const {document, CURRENT_CAPABILITIES} = require("../fixtures/portable-profile");
+    const {fingerprint, summary} = require("../../core/model/portable-profile");
+    const value = document();
+    const draft = new ProfileDraftSession({document: value, fingerprint: fingerprint(value), summary: summary(value), limits: {brightnessMax: 0}}, "board", CURRENT_CAPABILITIES);
+    const current = draft.current;
+    const held = {...current.document};
+    Object.defineProperty(held, "profile", {get() {throw new Error("A model publish must not decode profile bytes again");}});
+    const snapshot = {...current, document: held, decoded: {...current.decoded, document: held}};
+    for (const binding of [{editable: true, reason: ""}, ...["busy", "stale", "disconnected", "connection-changed"].map(reason => ({editable: false, reason}))]) {
+        const model = buildSnapshotModel(snapshot, CURRENT_CAPABILITIES, binding);
+        assert.equal(model.rgb.maximumBrightness, 0);
+        assert.equal(model.rgb.baseEffect.brightness, 0);
+        assert.equal(model.rgb.baseEffect.previewColor.v, "0");
+        for (const field of ["behaviorEditing", "pdModeEditing", "comboReadback", "macroEditing", "settingsEditing", "customKeyEditing"]) {
+            assert.equal(model[field].writable, binding.editable, `${field} follows the same binding`);
+        }
+    }
+    assert.equal(draft.current.decoded, current.decoded);
 });

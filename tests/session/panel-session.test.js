@@ -390,3 +390,26 @@ test("no host or firmware brings back the retired PD upgrade export", () => {
     state.capabilities = {...state.capabilities, featureFlags: 1 << 13};
     assert.equal("pdUpgradeAvailable" in buildPanelModel(session, state).portable, false);
 });
+
+
+test("older firmware keeps independent readback while a dirty current draft is retained", () => {
+    const {buildDeviceModel} = require("../../core/session/device-model");
+    const session = panelWithDraft();
+    session.draft.stage({type: "updateLayoutKeys", draftRevision: session.draft.revision, layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_Z"}]});
+    const keycode = 4;
+    const older = connected({capabilities: {...capabilities, compiledLayerCount: 5}, phase: "connected",
+        layout: {state: "read", layers: [{layer: 0, keys: [{layoutIndex: 0, row: 0, column: 0, keycode, resolved: require("../../core/data/keycode-catalog").resolve(keycode)}]}]},
+        committed: {state: "read", source: "compiled", byteLength: 321, domains: {}, failures: [{domainId: 0x10, message: "Earlier RGB format"}]},
+        combos: {state: "unavailable", error: {message: "Earlier combo format"}}});
+    const actual = buildDeviceModel({...older, device});
+    const model = buildPanelModel(session, older);
+    assert.equal(model.draft.reason, "unsupported");
+    assert.equal(model.draft.editable, false);
+    assert.deepEqual(model.layers.map(layer => layer.positions), actual.layers.map(layer => layer.positions));
+    assert.deepEqual(model.keyBehaviors, actual.keyBehaviors);
+    assert.deepEqual(model.rgb, actual.rgb);
+    assert.deepEqual(model.combos, actual.combos);
+    assert.deepEqual(model.device, actual.device);
+    assert.deepEqual(model.diagnostics, actual.diagnostics);
+    assert.match(model.diagnostics.join(" "), /Earlier RGB format/);
+});
