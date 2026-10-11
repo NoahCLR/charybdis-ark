@@ -29,7 +29,7 @@ test("create, bind, edit RGB and macros, reorder, review and undo share a PD dra
     assert.equal(config.directions.left.keycode, "LALT(KC_LEFT)", "shortcut resolution must not mutate the submitted form");
     const created = draft.current.fingerprint;
     assert.equal(validateSnapshot(draft.document).pdModes[7].directions.left.keycode, 0x450);
-    stage({type: "updateLayoutKeys", layers: [{layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "PD_SLOT_7"}]}]});
+    stage({type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "PD_SLOT_7"}]});
 
     stage({type: "updatePdModeColor", pointingMode: "PD_MODE_SLOT_7", h: "64", s: "255", v: "100", locality: "RGB_RIGHT_HALF"});
     stage({type: "updateViaMacro", keycode: "VIA_MACRO_0", payload: "hello", name: "Greeting"});
@@ -90,7 +90,7 @@ test("a cleared slot keeps its bindings, because the keyboard keeps its keycodes
     const modelNow = () => buildSnapshotModel(draft.current, caps, {editable: true, reason: ""});
     stage({type: "savePdMode", slot: 7, config: {kind: 1, name: "History", axis: 1, thresholdX: 30,
         directions: {left: {keycode: "LALT(KC_LEFT)"}, right: {keycode: "LALT(KC_RIGHT)"}}}});
-    stage({type: "updateLayoutKeys", layers: [{layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "PD_SLOT_7"}]}]});
+    stage({type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "PD_SLOT_7"}]});
 
     stage({type: "clearPdMode", slot: 7});
     const cleared = validateSnapshot(draft.document);
@@ -110,6 +110,6 @@ test("a cleared slot keeps its bindings, because the keyboard keeps its keycodes
 test("a layout key the keyboard would not own is refused at the edit", () => {
     const {draft, stage} = fixture();
     const before = draft.current.fingerprint;
-    assert.throws(() => stage({type: "updateLayoutKeys", layers: [{layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "DF(1)"}]}]}), /DF\(1\) is a layer keycode/);
+    assert.throws(() => stage({type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "DF(1)"}]}), /DF\(1\) is a layer keycode/);
     assert.equal(draft.current.fingerprint, before);
 });

@@ -12,8 +12,8 @@ const {draftProfileChecks} = require("../model/profile-checks");
 const {editSettings} = require("../model/settings-editor");
 const {editMacro} = require("../model/macro-editor");
 const {editCustomKey} = require("../model/custom-key-editor");
-const {editDeviceProfile, RGB_EDITS, COMBO_EDITS, PD_EDITS} = require("../model/device-profile-edits");
-const {BEHAVIOR_EDITS} = require("../model/key-behavior-edits");
+const {editDeviceProfile} = require("../model/device-profile-edits");
+const {DRAFT_EDITS, editedBy, draftEditLabel} = require("../model/draft-edits");
 const {actionName, knownActionAbi, layerOfRef, nativeCode} = require("../schema/actions");
 const {effectiveComboTerm} = require("../schema/combo-domain-v1");
 const {resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
@@ -48,35 +48,6 @@ const freeze = value => {
 /** @param {string} text */
 const fail = text => Object.assign(new Error(text), {code: "PROFILE_DRAFT_CONFLICT"});
 
-// What one staged message did, in the words a group of review items is
-// titled with. Only a group of two or more items shows it.
-/** @type {Record<string, string | ((message: Edit) => string)>} */
-const EDIT_LABELS = {
-    retargetBehavior: message => "conflict" in message && message.conflict === "swap" ? "Swapped two behaviours" : "Moved a behaviour",
-    saveBehavior: "Edited a behaviour", addBehavior: "Added a behaviour", deleteBehavior: "Removed a behaviour",
-    addCombo: "Added a combo", saveCombo: "Edited a combo", deleteCombo: "Removed a combo", updateComboHoldTerm: "Changed the combo hold threshold", updateComboDefaultTerm: "Changed the default combo window",
-    savePdMode: "Edited a pointing mode", clearPdMode: "Cleared a pointing mode", duplicatePdMode: "Duplicated a pointing mode",
-    updateConfigDefaults: "Saved a settings section", updateViaMacro: "Edited a macro", updateCustomKey: "Renamed a custom key", applyAllChanges: "Changed keys",
-};
-/** @param {Edit} message @param {Document} document */
-function editLabel(message, document) {
-    if (message.type === "updateLayoutKeys") {
-        const groups = message.layoutGroups || message.layers || [{layer: message.layer, changes: message.changes}];
-        const changes = groups.flatMap(group => (group.changes || []).map(change => ({...change, layer: group.layer})));
-        const [first, second] = changes;
-        /** @param {import("./types.js").LayoutEditGroup["changes"][number] & {layer?: import("../../contracts/edits.js").LayerReference}} change */
-        const stored = change => {
-            const position = CHARYBDIS_4X6_LAYOUT_MATRIX[change.layoutIndex], layer = layerOfRef(change.layer);
-            return position && document.layers[/** @type {number} */ (layer)]?.[position[0] * 6 + position[1]];
-        };
-        if (changes.length === 2 && first.layer === second.layer && keycodes.encode(first.keycode) === stored(second) && keycodes.encode(second.keycode) === stored(first)) return "Swapped two keys";
-        return changes.length > 1 ? `Changed ${changes.length} keys at once` : "Changed a key";
-    }
-    if (RGB_EDITS.has(message.type)) return "Edited lighting";
-    const label = EDIT_LABELS[message.type];
-    return typeof label === "function" ? label(message) : label || "Edited the draft";
-}
-
 // What one Rename & Reorder save did: the order it changed and the names it
 // changed, each named as the layers were called before it.
 /** @param {Order} step @param {string[]} before @param {string[]} after */
@@ -99,7 +70,6 @@ function placed(item) {
     if (place?.kind === "behaviour") return {...review, place: {kind: "behaviour", keycode: actionName(place.target)}};
     return {...review, place};
 }
-const DRAFT_EDITS = new Set([...PD_EDITS, ...RGB_EDITS, ...COMBO_EDITS, ...BEHAVIOR_EDITS, "updatePlacementPolicy", "updateConfigDefaults", "updateViaMacro", "updateCustomKey", "updateLayoutKeys", "applyAllChanges"]);
 
 class ProfileDraftSession {
     /** @param {Snapshot} snapshot @param {string | null | undefined} deviceId @param {import("../model/types.js").ProfileDestination} capabilities @param {import("./types.js").ConnectionToken} [connectionToken] */
@@ -258,17 +228,20 @@ class ProfileDraftSession {
         this.cursor = this.history.length - 1;
         this.revision++; this.reviewedRevision = null;
     }
+    // Each edit goes to the editor model/draft-edits.js names for its type.
+    // The whole-document editors check the form against the draft it was
+    // drawn from, this revision when it names none; the profile's domain
+    // editors check the identity the form was read with.
     /** @param {Edit} message */
     stage(message) {
         this.assertRevision(message.draftRevision);
         const current = this.current, before = current.fingerprint;
         let document;
-        if (message.type === "updateConfigDefaults") document = editSettings(current, {...message, expectedFingerprint: message.expectedFingerprint || before}, this.capabilities);
-        else if (message.type === "updateViaMacro") document = editMacro(current, {...message, expectedFingerprint: message.expectedFingerprint || before}, this.capabilities);
-        else if (message.type === "updateCustomKey") document = editCustomKey(current, {...message, expectedFingerprint: message.expectedFingerprint || before}, this.capabilities);
-        else if (message.type === "updateLayoutKeys" || message.type === "applyAllChanges") document = this.editLayout(message);
-        else {
-            if (!DRAFT_EDITS.has(message.type)) throw fail("Unsupported draft edit.");
+        if (editedBy(message, "settings")) document = editSettings(current, {...message, expectedFingerprint: message.expectedFingerprint || before}, this.capabilities);
+        else if (editedBy(message, "macro")) document = editMacro(current, {...message, expectedFingerprint: message.expectedFingerprint || before}, this.capabilities);
+        else if (editedBy(message, "customKey")) document = editCustomKey(current, {...message, expectedFingerprint: message.expectedFingerprint || before}, this.capabilities);
+        else if (editedBy(message, "layout")) document = this.editLayout(message);
+        else if (editedBy(message, "profile")) {
             const expected = message.expectedBase;
             if (expected && (/** @type {const} */ (["source", "generation", "digest", "originHalf"])).some(key => expected[key] !== this.identity()[key])) throw fail("This form belongs to an older draft. Reload it before keeping changes.");
             document = {...current.document, profile: editDeviceProfile(Buffer.from(current.document.profile, "base64"), message, {
@@ -277,8 +250,8 @@ class ProfileDraftSession {
                     behaviorQmkFunctions: Boolean((this.capabilities.featureFlags || 0) & PROFILE_WIRE_FEATURES.BEHAVIOR_QMK_FUNCTIONS)},
                 combos: this.combos(), maximumBrightness: current.limits?.brightnessMax,
             }).toString("base64")};
-        }
-        this.replace(document, message.draftRevision, "edit", editLabel(message, current.document));
+        } else throw fail("Unsupported draft edit.");
+        this.replace(document, message.draftRevision, "edit", draftEditLabel(message, current.document));
         return {message: copy(message), previousFingerprint: before, fingerprint: this.decode(this.history[this.cursor].document).fingerprint};
     }
     // A Rename & Reorder save: its document, and the order it saved, which
@@ -289,23 +262,20 @@ class ProfileDraftSession {
         const before = this.current.decoded.settings.names, after = validateSnapshot(document, this.capabilities).settings.names;
         this.replace(document, revision, "layers", layersLabel(step, before, after), compose(this.order, step));
     }
-    /** @param {import("./types.js").LayoutEdit} message */
-    editLayout(message) {
-        if (message.adds?.length || message.deletes?.length) throw fail(`Use Manage layers to name or reorder the ${LAYERS} available layers.`);
-        const groups = message.layoutGroups || message.layers || [{layer: message.layer, changes: message.changes}];
-        if (!Array.isArray(groups) || !groups.length) throw fail("Choose keys to change.");
+    // A layout message is untrusted like any other: its layer and every key
+    // are checked before anything is written.
+    /** @param {import("../../contracts/edits.js").EditOf<"updateLayoutKeys">} message */
+    editLayout({layer: reference, changes}) {
+        const layer = layerOfRef(reference);
+        if (layer === undefined || !(layer < LAYERS) || !Array.isArray(changes)) throw fail("Choose a layer reported by this keyboard.");
         const document = this.document;
-        for (const group of groups) {
-            const layer = layerOfRef(group.layer);
-            if (layer === undefined || !(layer < LAYERS) || !Array.isArray(group.changes)) throw fail("Choose a layer reported by this keyboard.");
-            for (const change of group.changes) {
-                const position = Number.isInteger(change.layoutIndex) && CHARYBDIS_4X6_LAYOUT_MATRIX[change.layoutIndex];
-                const code = keycodes.encode(change.keycode) ?? (knownActionAbi(this.capabilities.actionAbiDigest ?? 0) ? resolveNativeQmkExpression(change.keycode, {}) : undefined);
-                if (!position || code === undefined || !Number.isInteger(code)) throw fail(`Cannot represent the key ${change.keycode} on this keyboard.`);
-                const misplaced = keyPlacementProblem(code, {layerCount: this.capabilities.compiledLayerCount ?? LAYERS});
-                if (misplaced) throw fail(misplaced);
-                document.layers[layer][position[0] * 6 + position[1]] = code;
-            }
+        for (const change of changes) {
+            const position = Number.isInteger(change.layoutIndex) && CHARYBDIS_4X6_LAYOUT_MATRIX[change.layoutIndex];
+            const code = keycodes.encode(change.keycode) ?? (knownActionAbi(this.capabilities.actionAbiDigest ?? 0) ? resolveNativeQmkExpression(change.keycode, {}) : undefined);
+            if (!position || code === undefined || !Number.isInteger(code)) throw fail(`Cannot represent the key ${change.keycode} on this keyboard.`);
+            const misplaced = keyPlacementProblem(code, {layerCount: this.capabilities.compiledLayerCount ?? LAYERS});
+            if (misplaced) throw fail(misplaced);
+            document.layers[layer][position[0] * 6 + position[1]] = code;
         }
         return document;
     }
@@ -564,4 +534,5 @@ class ProfileDraftSession {
             checks: this.checks()};
     }
 }
+// The router (panel-session.js) and the web build take the registry's list from here.
 module.exports = {ProfileDraftSession, DRAFT_EDITS};

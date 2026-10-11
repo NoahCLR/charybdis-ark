@@ -213,6 +213,10 @@ TypeScript coverage or changing the check configuration.
 - A stored setting's ID, name and what the firmware accepts → the field table
   in `core/schema/settings-domain-v1.js`, once; its label, kind and section →
   `core/model/settings-editor.js`, which names it through `SETTING`.
+- A new draft edit type → one line in `core/model/draft-edits.js` (its
+  editor, profile domain and history words), its payload in
+  `contracts/edits.d.ts` and its builder in `webview/view/edits.mjs`;
+  `tests/model/draft-edits.test.js` fails until all three agree.
 - Naming an action, its native keycode, decode limits, a "Layer n" reference →
   `core/schema/actions.js`. The pointing-mode keycode registry and the key
   layout are inert data in `core/data/`, readable from every layer; the

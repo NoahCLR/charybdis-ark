@@ -18,7 +18,7 @@ test("slot 20 is created, bound, lit, reviewed and discarded like any other", ()
     const {draft, stage} = draftOf(document32(), CAPABILITIES_32);
     const config = {kind: 1, name: "Desktops", axis: 1, thresholdX: 30, directions: {left: {keycode: "LCTL(KC_LEFT)"}, right: {keycode: "LCTL(KC_RIGHT)"}}};
     stage({type: "savePdMode", slot: 20, config});
-    stage({type: "updateLayoutKeys", layers: [{layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "PD_SLOT_20_LOCK"}]}]});
+    stage({type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "PD_SLOT_20_LOCK"}]});
     stage({type: "updatePdModeColor", pointingMode: "PD_MODE_SLOT_20", h: "64", s: "255", v: "100", locality: "RGB_RIGHT_HALF"});
     stage({type: "addBehavior", behavior: {keycode: "KC_F13", tap: {helper: "TAP_SENDS", action: "PD_SLOT_31"}}});
 

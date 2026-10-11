@@ -19,7 +19,7 @@ function edited() {
         return {type: "updateConfigDefaults", sectionId: id, expectedFingerprint: draft.current.fingerprint,
             fields: section.fields.map((field) => field.kind === "toggle" ? {macro: field.macro, enabled: updates[field.macro] ?? field.enabled} : {macro: field.macro, value: updates[field.macro] ?? field.value})};
     };
-    stage({type: "updateLayoutKeys", layers: [{layer: "Layer 1", changes: [{layoutIndex: 3, keycode: "KC_B"}, {layoutIndex: 4, keycode: "KC_C"}]}]});
+    stage({type: "updateLayoutKeys", layer: "Layer 1", changes: [{layoutIndex: 3, keycode: "KC_B"}, {layoutIndex: 4, keycode: "KC_C"}]});
     stage({type: "updateViaMacro", keycode: "VIA_MACRO_2", payload: "hello"});
     stage({type: "updateViaMacro", keycode: "VIA_MACRO_5", name: "Greeting", expectedFingerprint: draft.current.fingerprint});
     stage(settings("keyTiming", {tapHoldTerm: "175", multiTapTerm: "190"}));
