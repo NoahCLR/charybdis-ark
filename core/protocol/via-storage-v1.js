@@ -2,6 +2,7 @@
 const {isUnhandledEcho, orUnhandled} = require("./via-unhandled-v1");
 
 const {RAW_HID_REPORT_SIZE, normalizeRawHidReport} = require("../transport/device-adapter");
+const {buildProfileGetRequest, decodeProfileResponse, profileResponseMatcher} = require("./profile-wire-v1");
 
 const VIA_STORAGE = Object.freeze({MACRO_COUNT: 0x0c, MACRO_SIZE: 0x0d, MACRO_READ: 0x0e, MACRO_WRITE: 0x0f, LAYER_COUNT: 0x11, LAYOUT_READ: 0x12, LAYOUT_WRITE: 0x13, CHUNK: 28});
 const fail = message => Object.assign(new Error(message), {code: "VIA_STORAGE_INVALID"});
@@ -86,7 +87,57 @@ async function writeRegion(connection, command, bytes, {onProgress = () => {}, s
     }
 }
 
-async function readViaStorage(connection, {capabilities, matrixRows = 10, matrixColumns = 6, allowIncomplete = false, onProgress = () => {}} = {}) {
+// Optional GET 0x0c describes exact nonzero storage, including stale tail
+// bytes. A bitmap omission is a firmware assertion of zero, never a guess
+// based on macro slot contents. Verify the reconstructed whole-store digest.
+async function macroMapPage(connection, page, nextRequestId, optional = false) {
+    const request = buildProfileGetRequest(0x0c, page, nextRequestId());
+    const response = normalizeRawHidReport(await connection.request(request, {matchResponse: orUnhandled(profileResponseMatcher, request)}));
+    if (isUnhandledEcho(response, request)) {
+        if (optional) return null;
+        throw fail("The macro read map became unavailable. Read the keyboard again.");
+    }
+    try { return Buffer.from(decodeProfileResponse(response, request, {allowShortPayload: true})); }
+    catch (error) {
+        if (optional && error.code === "DEVICE_REJECTED" && [2, 3].includes(error.status) && response[6] === 0) return null;
+        throw error;
+    }
+}
+async function readSparseMacros(connection, capacity, layout, {nextRequestId, storageIdentity, onProgress}) {
+    const before = await macroMapPage(connection, 0, nextRequestId, true);
+    if (!before) return null;
+    if (before.length !== 13 || before[0] !== 1 || before.readUInt16LE(1) !== 256 || before.readUInt16LE(3) !== capacity || before.readUInt32LE(5) === 0) throw fail("Invalid macro read map metadata.");
+    if (storageIdentity && (before.readUInt32LE(5) !== storageIdentity.generation || before.readUInt32LE(9) !== storageIdentity.digest)) throw fail("Keyboard storage changed before the macro read. Read the keyboard again.");
+    const blocks = Math.ceil(capacity / 256), bitmapLength = Math.ceil(blocks / 8), parts = [];
+    for (let offset = 0; offset < bitmapLength; offset += 25) {
+        const part = await macroMapPage(connection, 1 + offset / 25, nextRequestId);
+        if (part.length !== Math.min(25, bitmapLength - offset)) throw fail("Truncated macro read map.");
+        parts.push(part);
+    }
+    const bitmap = Buffer.concat(parts);
+    if (blocks % 8 && bitmap.at(-1) & (255 << (blocks % 8))) throw fail("Invalid reserved macro read map bits.");
+    const ranges = [];
+    for (let block = 0; block < blocks; block++) {
+        if (!(bitmap[Math.floor(block / 8)] & (1 << (block % 8)))) continue;
+        const start = block * 256, end = Math.min(capacity, start + 256), prior = ranges.at(-1);
+        if (prior?.end === start) prior.end = end;
+        else ranges.push({start, end});
+    }
+    const total = ranges.reduce((sum, range) => sum + range.end - range.start, 0), bytes = Buffer.alloc(capacity);
+    let done = 0;
+    onProgress({done, total});
+    for (const range of ranges) {
+        const part = await readRegion(connection, VIA_STORAGE.MACRO_READ, range.end - range.start, {startOffset: range.start, capacity,
+            onProgress: progress => onProgress({done: done + progress.done, total})});
+        part.copy(bytes, range.start); done += part.length;
+    }
+    const after = await macroMapPage(connection, 0, nextRequestId);
+    if (!before.equals(after)) throw fail("Keyboard storage changed during the macro read. Read the keyboard again.");
+    if (viaStorageDigest({layout, macros: bytes}) !== before.readUInt32LE(9)) throw fail("The reconstructed macro bank does not match the keyboard's storage digest.");
+    return bytes;
+}
+
+async function readViaStorage(connection, {capabilities, matrixRows = 10, matrixColumns = 6, allowIncomplete = false, onProgress = () => {}, nextRequestId, storageIdentity} = {}) {
     const layers = await scalar(connection, VIA_STORAGE.LAYER_COUNT, 1);
     const macroSlots = await scalar(connection, VIA_STORAGE.MACRO_COUNT, 1);
     const macroCapacity = await scalar(connection, VIA_STORAGE.MACRO_SIZE, 2);
@@ -95,7 +146,10 @@ async function readViaStorage(connection, {capabilities, matrixRows = 10, matrix
         if (capabilities?.[field] !== undefined && capabilities[field] !== value) throw fail("VIA and Profile Wire report different storage geometry.");
     }
     const layout = await readRegion(connection, VIA_STORAGE.LAYOUT_READ, layers * matrixRows * matrixColumns * 2, {capacity: layers * matrixRows * matrixColumns * 2, onProgress: progress => onProgress({region: "layout", ...progress})});
-    const macros = await readRegion(connection, VIA_STORAGE.MACRO_READ, macroCapacity, {capacity: macroCapacity, onProgress: progress => onProgress({region: "macros", ...progress})});
+    let requestId = 0;
+    const macroProgress = progress => onProgress({region: "macros", ...progress});
+    const macros = (capabilities && await readSparseMacros(connection, macroCapacity, layout, {nextRequestId: nextRequestId || (() => requestId = requestId % 255 + 1), storageIdentity, onProgress: macroProgress}))
+        || await readRegion(connection, VIA_STORAGE.MACRO_READ, macroCapacity, {capacity: macroCapacity, onProgress: macroProgress});
     if (!allowIncomplete && macros[macros.length - 1] !== 0) throw fail("A macro write is incomplete. Import your recovery profile before taking another backup.");
     return {layers, macroSlots, macroCapacity, matrixRows, matrixColumns, layout, macros};
 }

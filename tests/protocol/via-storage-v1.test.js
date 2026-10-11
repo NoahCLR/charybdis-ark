@@ -116,6 +116,7 @@ test("the expanded bank is read, hashed and written through its last offset with
     const connection = {async request(request) {
         requests.push(Buffer.from(request));
         const reply = Buffer.from(request);
+        if (request[0] === 8) {reply[0] = 255; return reply;}
         if (request[0] === VIA_STORAGE.LAYER_COUNT) reply[1] = 16;
         else if (request[0] === VIA_STORAGE.MACRO_COUNT) reply[1] = 128;
         else if (request[0] === VIA_STORAGE.MACRO_SIZE) reply.writeUInt16BE(macros.length, 1);
@@ -142,4 +143,116 @@ test("the expanded bank is read, hashed and written through its last offset with
     assert.notEqual(viaStorageDigest({layout, macros}), digest);
     await assert.rejects(readViaStorage(connection, {capabilities: {...capabilities, viaMacroBytes: 10327}}), /different storage geometry/);
     await assert.rejects(writeRegion(connection, VIA_STORAGE.MACRO_WRITE, Buffer.alloc(2), {startOffset: 34902, capacity: 34903}), /payload/);
+});
+
+function sparseKeyboard(capacity = 34903) {
+    const layout = Buffer.alloc(1920), macros = Buffer.alloc(capacity), requests = [];
+    const metadata = () => {
+        const page = Buffer.alloc(13); page[0] = 1; page.writeUInt16LE(256, 1); page.writeUInt16LE(macros.length, 3);
+        page.writeUInt32LE(7, 5); page.writeUInt32LE(viaStorageDigest({layout, macros}), 9); return page;
+    };
+    const bitmap = () => {
+        const page = Buffer.alloc(Math.ceil(Math.ceil(capacity / 256) / 8));
+        for (let i = 0; i < macros.length; i++) if (macros[i]) page[Math.floor(i / 2048)] |= 1 << (Math.floor(i / 256) % 8);
+        return page;
+    };
+    const device = {layout, macros, requests, metadata, bitmap, map: true, mutateReply: reply => reply, async request(request) {
+        requests.push(Buffer.from(request)); const reply = Buffer.from(request);
+        if (request[0] === 8) {
+            if (!device.map) {reply[0] = 255; return reply;}
+            reply.fill(0, 5); const payload = request[4] === 0 ? metadata() : bitmap().subarray((request[4] - 1) * 25, request[4] * 25);
+            reply[6] = payload.length; payload.copy(reply, 7); return device.mutateReply(reply);
+        }
+        if (request[0] === VIA_STORAGE.LAYER_COUNT) reply[1] = 16;
+        else if (request[0] === VIA_STORAGE.MACRO_COUNT) reply[1] = 128;
+        else if (request[0] === VIA_STORAGE.MACRO_SIZE) reply.writeUInt16BE(macros.length, 1);
+        else {
+            const bank = request[0] === VIA_STORAGE.LAYOUT_READ ? layout : macros;
+            const offset = request.readUInt16BE(1), count = request[3]; bank.copy(reply, 4, offset, offset + count);
+        }
+        return device.mutateReply(reply);
+    }};
+    return device;
+}
+test("fresh macro reads skip confirmed zero blocks but preserve the exact full bank", async () => {
+    for (const occupied of [0, 1024, 34903]) {
+        const device = sparseKeyboard(); device.macros.fill(97, 0, occupied); device.macros[34902] = 0;
+        const progress = [], read = await readViaStorage(device, {capabilities: {}, onProgress: value => progress.push(value)});
+        assert.deepEqual(read.macros, device.macros);
+        const transfers = device.requests.filter(request => request[0] === VIA_STORAGE.MACRO_READ);
+        assert.equal(transfers.length, occupied === 0 ? 0 : occupied === 1024 ? 37 : 1247);
+        assert.equal(progress.at(-1).done, progress.at(-1).total);
+    }
+});
+
+test("sparse reads keep stale tail bytes and the incomplete-write marker", async () => {
+    const device = sparseKeyboard(); device.macros.write("hello"); device.macros[30000] = 99;
+    const read = await readViaStorage(device, {capabilities: {}});
+    assert.deepEqual(read.macros, device.macros);
+    assert.equal(device.requests.filter(r => r[0] === VIA_STORAGE.MACRO_READ).length, 20);
+    device.macros[34902] = 1;
+    await assert.rejects(readViaStorage(device, {capabilities: {}}), /incomplete/);
+    assert.deepEqual((await readViaStorage(device, {capabilities: {}, allowIncomplete: true})).macros, device.macros);
+});
+test("legacy and unavailable maps use the full-bank read", async () => {
+    for (const status of [null, 2, 3]) {
+        const device = sparseKeyboard(); device.macros[30000] = 99;
+        if (status === null) device.map = false;
+        else device.mutateReply = r => {if (r[0] === 8) {r.fill(0, 5); r[5] = status;} return r;};
+        assert.deepEqual((await readViaStorage(device, {capabilities: {}})).macros, device.macros);
+        assert.equal(device.requests.filter(r => r[0] === VIA_STORAGE.MACRO_READ).length, 1247);
+    }
+});
+test("malformed maps and false zero claims fail rather than silently falling back", async () => {
+    for (const corrupt of [
+        r => {if (r[4] === 0) r[7] = 2;},
+        r => {if (r[4] === 0) r.writeUInt16LE(128, 8);},
+        r => {if (r[4] === 0) r.writeUInt16LE(10327, 10);},
+        r => {if (r[4] === 0) r.writeUInt32LE(0, 12);},
+        r => {if (r[4] === 1) {r[6] = 17; r[24] = 0;}},
+        r => {if (r[4] === 1) r[24] |= 0x80;},
+        r => {if (r[4] === 1) r[7] = 0;},
+        r => {r[3]++;},
+        r => {r.fill(0, 5); r[5] = 1;},
+    ]) {
+        const device = sparseKeyboard(); device.macros.write("hello");
+        device.mutateReply = r => {if (r[0] === 8) corrupt(r); return r;};
+        await assert.rejects(readViaStorage(device, {capabilities: {}}));
+    }
+});
+test("a changed generation, digest, or captured storage identity rejects a sparse read", async () => {
+    for (const field of [5, 9]) {
+        const device = sparseKeyboard(); let metadataReads = 0;
+        device.mutateReply = r => {if (r[0] === 8 && r[4] === 0 && ++metadataReads === 2) r[7 + field] ^= 1; return r;};
+        await assert.rejects(readViaStorage(device, {capabilities: {}}), /changed during/);
+    }
+    const device = sparseKeyboard();
+    await assert.rejects(readViaStorage(device, {capabilities: {}, storageIdentity: {generation: 8, digest: device.metadata().readUInt32LE(9)}}), /changed before/);
+});
+test("corrupt macro bytes are caught by the complete reconstructed digest", async () => {
+    const device = sparseKeyboard(); device.macros.write("hello");
+    device.mutateReply = r => {if (r[0] === VIA_STORAGE.MACRO_READ) r[4] ^= 1; return r;};
+    await assert.rejects(readViaStorage(device, {capabilities: {}}), /storage digest/);
+});
+
+test("the maximum VIA capacity uses two bitmap pages and preserves its final byte", async () => {
+    const device = sparseKeyboard(65535); device.macros[65533] = 99;
+    assert.deepEqual((await readViaStorage(device, {capabilities: {}})).macros, device.macros);
+    assert.deepEqual(device.requests.filter(r => r[0] === 8).map(r => r[4]), [0, 1, 2, 0]);
+    assert.equal(device.requests.filter(r => r[0] === VIA_STORAGE.MACRO_READ).length, 10);
+});
+
+test("a map that becomes unavailable after admission fails the capture", async () => {
+    for (const status of [null, 2, 3]) {
+        const device = sparseKeyboard(); let mapReads = 0;
+        device.mutateReply = r => {
+            if (r[0] === 8 && ++mapReads === 2) {
+                if (status === null) {r.fill(0, 5); r[0] = 255;}
+                else {r.fill(0, 5); r[5] = status;}
+            }
+            return r;
+        };
+        await assert.rejects(readViaStorage(device, {capabilities: {}}));
+        assert.equal(device.requests.filter(r => r[0] === VIA_STORAGE.MACRO_READ).length, 0);
+    }
 });

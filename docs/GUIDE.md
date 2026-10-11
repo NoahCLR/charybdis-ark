@@ -5,6 +5,13 @@ the interface behaves, what Review checks, what happens while a profile is
 applied, and how backups work. Developing Ark is described in
 [REPOSITORY.md](REPOSITORY.md#development-and-installation).
 
+## Reading the keyboard
+
+Connecting, refreshing and exporting still read and verify the whole saved
+configuration. With supporting firmware, Ark skips macro storage the keyboard
+confirms is empty; progress counts the bytes transferred. Older firmware uses
+the full read. A change during a read fails the capture so you can read again.
+
 ## Installing and upgrading
 
 Installing is described in the [README](../README.md#install). If
