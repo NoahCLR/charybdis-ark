@@ -5,7 +5,9 @@
 //
 // A panel session is a plain object the host keeps per window — the device
 // service, the draft, the layer editor, and the outbox the next model carries
-// (a notice, an accepted edit, a request to reset forms). Everything here is
+// (a notice, an accepted edit, a request to reset forms). Whether its draft
+// may be edited, and the changes that move several of its fields at once, are
+// panel-session-state.js's. Everything here is
 // free of VS Code, so it is tested like the rest of core/; panel-loop.js runs
 // it for every host, and extension.js keeps only VS Code's dialogs, files and
 // progress.
@@ -24,6 +26,7 @@ const {supportsCompleteProfile} = require("./portable-profile-session");
 const {ProfileDraftSession, DRAFT_EDITS} = require("./profile-draft-session");
 const {buildDeviceModel, deviceSummary} = require("./device-model");
 const {demoDiagnostics, demoHeader, demoModel} = require("./demo-session");
+const {assertBound, beginRead, boundDraft, closeEditors, draftBinding, replaceDraft, setDraft} = require("./panel-session-state");
 
 const DRAFT_CONTROLS = new Set([
     "reviewProfileDraft", "undoProfileDraft", "redoProfileDraft", "jumpProfileDraft", "discardProfileDraft", "discardProfileDraftChanges",
@@ -71,27 +74,20 @@ function hostModel(host) {
 /** @param {ModelSession} session @param {State} state */
 function observePortable(session, state) {
     if (session.draft && !session.draft.dirty && state.connected && (state.selectedDeviceId !== session.draft.deviceId || !supportsCompleteProfile(state.capabilities))) {
-        session.draft = undefined;
-        session.resetDraftForms = true;
+        setDraft(session, undefined);
     }
     const portable = session.service.portable;
     if (!portable || portable === session.observedPortable || portable.incomplete || !state.connected || !supportsCompleteProfile(state.capabilities)) return;
-    if (!session.draft) {
-        session.draft = new ProfileDraftSession(portable, state.selectedDeviceId, state.capabilities, state.connectionToken);
-        session.resetDraftForms = true;
-    }
+    if (!session.draft) setDraft(session, new ProfileDraftSession(portable, state.selectedDeviceId, state.capabilities, state.connectionToken));
     else session.draft.observe(portable, state.selectedDeviceId, state.connectionToken);
     session.observedPortable = portable;
 }
 
 /** @param {Session} session @param {State} state @param {Snapshot | undefined} snapshot */
 function discardDraftForDevice(session, state, snapshot) {
-    session.draft = supportsCompleteProfile(state.capabilities)
+    replaceDraft(session, supportsCompleteProfile(state.capabilities)
         ? new ProfileDraftSession(/** @type {Snapshot} */ (snapshot), state.selectedDeviceId, state.capabilities, state.connectionToken)
-        : undefined;
-    session.portableReview = undefined;
-    session.portableLayers = undefined;
-    session.resetDraftForms = true;
+        : undefined);
 }
 
 // The model the webview renders. With a draft open, the editable surfaces come
@@ -110,11 +106,12 @@ function buildPanelModel(session, state) {
     const model = buildDeviceModel({...editing, busy: editing.busy || session.portableBusy || session.readBusy, device});
     const devices = (state.devices || []).map(({id, label}) => ({id, label}));
     const selectedDeviceId = state.selectedDeviceId || "";
+    const binding = draftBinding(session, state);
     /** @type {import("./types.js").PanelDraftView | undefined} */
     let draft;
     if (session.draft) {
         const view = session.draft.view(state);
-        draft = {...view, matching: view.matching && supported, connected: view.connected && supported, busy};
+        draft = {...view, matching: view.matching && supported, connected: view.connected && supported, busy, editable: binding.editable, reason: binding.reason};
         if (session.historyOpen) draft.steps = session.draft.steps();
         if (draft.matching) {
             model.profileIdentity = session.draft.identity();
@@ -156,7 +153,9 @@ function buildPanelModel(session, state) {
         usage: usageOf(session, state, draft),
     };
     if (!draft?.matching) model.layers?.forEach((layer, index) => {layer.displayName = state.portableSummary?.names[index] || layer.name;});
-    const editableDraft = Boolean(draft?.matching && !draft.stale && state.connected);
+    // A read is ready while its draft could be edited once whatever runs now
+    // finishes, so an Apply's readback keeps the editor shown.
+    const editableDraft = binding.editable || binding.reason === "busy";
     const readReady = (session.readReady ?? editableDraft) && editableDraft;
     const host = hostModel(session.host);
     /** @type {import("../../contracts/model.js").LoadView} */
@@ -206,16 +205,6 @@ function importDifferences(session) {
     return review.differences.items;
 }
 
-// What the next model carries once, then forgets.
-/** @param {Pick<Session, "notice" | "acceptedEdit" | "resetDraftForms">} session */
-function takeOutbox(session) {
-    const outbox = {notice: session.notice, acceptedEdit: session.acceptedEdit, resetDraftForms: session.resetDraftForms};
-    session.notice = undefined;
-    session.acceptedEdit = undefined;
-    session.resetDraftForms = undefined;
-    return outbox;
-}
-
 // What the panel posted, as the loop takes it: an object naming its type.
 // Anything else is no request, answered like an unrecognised one. Only the
 // envelope is checked here; each route checks the payload fields it reads
@@ -258,21 +247,25 @@ function routeMessage(session, message, state) {
         if (!session.draft) {
             throw new Error("This keyboard has no editable draft, so the change was not written. Read the keyboard again; if it stays read-only, update both halves to firmware with profile editing.");
         }
-        if (state.busy || !state.connected || !supportsCompleteProfile(state.capabilities) || state.selectedDeviceId !== session.draft.deviceId || (state.connectionToken ?? null) !== session.draft.connectionToken) {
-            throw new Error("Reconnect the keyboard this draft belongs to and wait for its current operation.");
-        }
-        // The command set selects the decoder; stage validates payload values and revision.
-        session.acceptedEdit = session.draft.stage(/** @type {import("./types.js").DraftEdit} */ (message));
+        const draft = boundDraft(session, state, message, "Reconnect the keyboard this draft belongs to and wait for its current operation.");
+        // The command set selects the decoder; stage validates payload values.
+        session.acceptedEdit = draft.stage(/** @type {import("./types.js").DraftEdit} */ (message));
         return "staged";
     }
+    // Apply writes the draft to the keyboard it is bound to, by the same rule
+    // as an edit; the draft checks its revision, review and keyboard again as
+    // it writes (ProfileDraftSession.apply).
+    if (type === "applyProfileDraft" && session.draft) {
+        assertBound(session, state, (reason) => reason === "connection-changed" ? "Review this draft against the connected keyboard before applying it."
+            : "Reconnect the keyboard this draft belongs to and wait for its current operation before applying it.");
+    }
     if (DRAFT_CONTROLS.has(type)) return "draft";
-    if (type === "reviewPortableProfile") {
-        if (!session.draft || message.draftId !== session.draft.id || state.busy || !state.connected
-            || !supportsCompleteProfile(state.capabilities) || state.selectedDeviceId !== session.draft.deviceId
-            || (state.connectionToken ?? null) !== session.draft.connectionToken) {
-            throw new Error("Read the keyboard and wait for its current operation before importing a profile.");
-        }
-        session.draft.assertRevision(message.draftRevision);
+    if (type === "reviewPortableProfile") boundDraft(session, state, message, "Read the keyboard and wait for its current operation before importing a profile.");
+    // A file chooser and the layer editor can also open or keep a review
+    // against the draft. Recovery with no editable draft remains available.
+    if (session.draft && ["choosePortableProfile", "managePortableLayers", "editPortableLayer", "savePortableLayers", "restorePortableProfile"].includes(type)) {
+        assertBound(session, state, "Read the keyboard and wait for its current operation before changing this profile.");
+        session.draft.assertRevision(session.draft.revision);
     }
     if (PORTABLE_MESSAGES.has(type)) return "portable";
     if (type === "ready" || type === "refresh" || type === "selectDevice") {
@@ -280,13 +273,8 @@ function routeMessage(session, message, state) {
         if (type === "selectDevice" && (!state.devices?.some((device) => device.id === message.deviceId) || !message.deviceId)) {
             throw new Error("Choose a keyboard from the current device list.");
         }
-        if (type === "selectDevice" && message.deviceId !== state.selectedDeviceId) {
-            session.portableReview = undefined;
-            session.portableLayers = undefined;
-            session.resetDraftForms = true;
-        }
-        session.readBusy = true;
-        session.readReady = false;
+        if (type === "selectDevice" && message.deviceId !== state.selectedDeviceId) closeEditors(session, {resetForms: true});
+        beginRead(session);
         return "read";
     }
     return "none";
@@ -362,4 +350,4 @@ function applyLayerEdit(edit, message) {
 /** @param {LayerEdit} edit */
 const layerEditDocument = (edit) => reorderLayers(edit.before.document, edit.order, edit.order.map((old) => edit.names[old]), {keysFollow: edit.keysFollow !== false});
 
-module.exports = {DEMO_MESSAGES, DRAFT_CONTROLS, HOST_WORDS, PORTABLE_MESSAGES, applyLayerEdit, buildPanelModel, hostModel, discardDraftForDevice, layerEditDocument, observePortable, panelRequest, routeMessage, startLayerEdit, takeOutbox};
+module.exports = {DEMO_MESSAGES, DRAFT_CONTROLS, HOST_WORDS, PORTABLE_MESSAGES, applyLayerEdit, buildPanelModel, hostModel, discardDraftForDevice, layerEditDocument, observePortable, panelRequest, routeMessage, startLayerEdit};

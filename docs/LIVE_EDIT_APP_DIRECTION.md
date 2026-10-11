@@ -703,6 +703,9 @@ sequenced Apply itself. Each rule now has one home:
   service; the message loop around it, for every host:
   `core/session/panel-loop.js`. `extension.js` supplies dialogs, files,
   progress and toasts as host functions.
+- Whether the draft takes an edit now: `draftBinding` in
+  `core/session/panel-session-state.js`, published as `draft.editable` and
+  `draft.reason`, with the session's compound transitions beside it (D-L60).
 - Interface: `canEdit(area)` for permission, `view/reach-groups.mjs` and
   `ui/groups.mjs` for grouped lists, `slotLight` in `ui/marks.mjs`, one form
   per macro slot and one `state.combo` for the builder.
@@ -1315,3 +1318,30 @@ Types describe application contracts, not proof that device bytes or imported
 files are valid. Defensive decoding, canonical checks, stable errors, firmware
 compatibility tests and physical acceptance keep their existing responsibilities.
 The migration mechanics and the check command live in REPOSITORY.md.
+
+### D-L60 — One draft binding decides editing
+
+Whether the open draft may be changed against the keyboard now is one rule,
+`draftBinding` in `core/session/panel-session-state.js`, answered as
+`{editable, reason}`: the draft is this keyboard's
+(`ProfileDraftSession.bindingTo`: the selected keyboard, connected, over the
+connection it was read through), on firmware that holds a complete profile,
+current with the keyboard, and nothing is running. The demo's draft is bound
+to the demo device, so the rule holds there unchanged (D-L53). The reasons
+come in a fixed order, so `busy` means only an operation in progress stands in
+the way.
+
+Core refuses by it and the interface offers by it. The router stages an edit,
+opens or keeps an import or layer review and routes Apply only for a bound draft; live macro
+validation answers to it; Apply's draft checks its keyboard binding again as it
+writes. The model publishes it as `draft.editable` and `draft.reason`
+(`contracts/panel.d.ts`), and the interface's `writable()`, under `canEdit`,
+reads that value instead of recomputing it. A new connection is therefore
+refused before any model has marked the draft stale.
+
+The same module holds the panel session's compound transitions: opening or
+replacing the draft, closing the import review and layer editor together (and
+resetting the forms when the keyboard or draft under them changes), a read
+beginning and ending, the panel's own operations running, an Apply and its
+readback, and the outbox the next model carries once. The other session
+modules call these rather than setting those fields together themselves.

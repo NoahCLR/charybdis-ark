@@ -28,8 +28,18 @@ export interface CustomKey {slot: number; keycode: string; code: number; name: s
 export type PresentedField = SettingField & {value: string; enabled?: boolean; ms?: string; whole?: string};
 export interface PresentedSection extends Omit<SettingsSection, 'fields'> {fields: PresentedField[]}
 export interface ProfileSummary {layers: number; behaviors: number; combos: number; macros: number; names: string[]}
+/**
+ * Why the open draft takes no edit now, or '' when it does, first match in this order: no draft; another
+ * keyboard is selected; its keyboard is disconnected; it is connected over a new connection; the firmware
+ * cannot hold a complete profile; the draft is stale; an operation is running.
+ */
+export type DraftBlock = '' | 'no-draft' | 'other-keyboard' | 'disconnected' | 'connection-changed' | 'unsupported' | 'stale' | 'busy';
 export interface DraftView {
     id: string; revision: number; dirty: boolean; stale: boolean; connectionChanged: boolean; connected: boolean; matching: boolean; busy: boolean;
+    /** Whether core takes an edit to this draft now (core/session/panel-session-state.js draftBinding); the interface's canEdit reads it. */
+    editable: boolean;
+    /** Why it does not, or '' when it does. */
+    reason: DraftBlock;
     canUndo: boolean; canRedo: boolean; undoLabel: string | null; redoLabel: string | null; historyLength: number; reviewed: boolean;
     changes: ReviewChange[]; checks: Check[]; steps?: HistoryStep[];
 }

@@ -25,6 +25,7 @@ const {FILE_MAX_BYTES} = require("../model/portable-profile");
 const {translateBackup} = require("../model/backup-translation");
 const {DEMO_WORDS, panelCapabilities, panelState} = require("./demo-session");
 const {applyLayerEdit, discardDraftForDevice, layerEditDocument, startLayerEdit} = require("./panel-session");
+const {closeEditors, whileApplying} = require("./panel-session-state");
 const {IDENTITY} = require("../model/layer-order");
 const {LAYERS} = require("../model/portable-profile");
 
@@ -162,22 +163,18 @@ async function draftControl(session, message, host = {}) {
             if (draft.hasChecksToConfirm() && message.confirmChecks !== true) throw new Error("This draft has warnings or traps. Confirm them in the review before applying.");
             // A finished Apply is shown only while this control still runs:
             // a later read or export is not its readback.
-            session.applyRunning = true;
-            try {
+            await whileApplying(session, async (readStep) => {
                 /** @type {string | undefined} */
                 let recovery = "";
                 const result = await run(host, "Applying the complete profile to both halves",
                     () => draft.apply(service, revision, async (document) => (recovery = await saveRecovery(host, document))));
                 session.resetDraftForms = true;
                 await rereadKeyboard(service, (step) => {
-                    session.postApplyReadStep = step;
+                    readStep(step);
                     service.emitChange?.();
                 });
                 session.notice = `${savedNotice(result, "applied to")} Recovery copy: ${recovery}`;
-            } finally {
-                session.applyRunning = false;
-                session.postApplyReadStep = undefined;
-            }
+            });
             return;
         }
         default: throw new Error("Unsupported draft control.");
@@ -193,7 +190,7 @@ async function portableControl(session, message, host = {}) {
     if (message.type === "savePortableLayers" && message.names !== undefined) applyLayerEdit(session.portableLayers, message);
     switch (message.type) {
         case "cancelPortableReview":
-            session.portableReview = undefined; session.portableLayers = undefined;
+            closeEditors(session);
             return;
         case "choosePortableProfile":
         case "reviewPortableProfile": {
@@ -248,15 +245,14 @@ async function portableControl(session, message, host = {}) {
                 // compared slot by slot with the keyboard's.
                 if (entry.kind === "layers") session.draft.editLayers(document, session.draft.revision, entry.editor.order);
                 else session.draft.replace(document, session.draft.revision, "edit", "Imported a profile", IDENTITY);
-                session.portableReview = undefined; session.portableLayers = undefined;
-                session.resetDraftForms = true;
+                closeEditors(session, {resetForms: true});
                 return;
             }
             /** @type {string | undefined} */
             let recovery = "";
             const result = await service.restorePortableProfile(document, {expectedFingerprint: before.fingerprint,
                 saveRecovery: async (copy) => (recovery = await saveRecovery(host, copy))});
-            session.portableReview = undefined; session.portableLayers = undefined;
+            closeEditors(session);
             await rereadKeyboard(service);
             session.notice = savedNotice(result, "saved to") + " " + (before.incomplete ? "Interrupted data retained for diagnosis: " : "Recovery copy: ") + recovery;
             return;

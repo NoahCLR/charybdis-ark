@@ -1,7 +1,7 @@
 "use strict";
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const {applyLayerEdit, buildPanelModel, discardDraftForDevice, layerEditDocument, panelRequest, routeMessage, startLayerEdit, takeOutbox} = require("../../core/session/panel-session");
+const {applyLayerEdit, buildPanelModel, discardDraftForDevice, layerEditDocument, panelRequest, routeMessage, startLayerEdit} = require("../../core/session/panel-session");
 const {fingerprint, summary, validateSnapshot} = require("../../core/model/portable-profile");
 const {document} = require("../fixtures/pd-profile");
 
@@ -141,6 +141,63 @@ test("a new connection blocks draft edits before portable readback finishes", ()
     assert.throws(() => routeMessage(session, {type: "updateLayoutKeys", draftId: session.draft.id, draftRevision: session.draft.revision}, current), /Reconnect/);
 });
 
+// What the model offers and what the router takes are one rule
+// (panel-session-state.js draftBinding): an edit the panel could post from a
+// model is staged exactly when that model says the draft is editable.
+test("the published editability is what the router accepts, connection changes included", () => {
+    const edit = {type: "updateLayoutKeys", layer: "Layer 1", changes: [{layoutIndex: 0, keycode: "KC_B"}]};
+    const other = {id: "other", label: "Another Charybdis"};
+    const unsupported = {...capabilities, actionAbiDigest: 0x1d3fcacc};
+    /** @param {string} label @param {(session: object) => object} arrange returns the state the panel answers to */
+    const agree = (label, arrange, expected) => {
+        const session = {service: {portable: snapshot()}};
+        buildPanelModel(session, connected({connectionToken: 1}));
+        const state = arrange(session);
+        const draft = session.draft;
+        const model = buildPanelModel(session, state);
+        let staged;
+        try {staged = routeMessage(session, {...edit, draftId: draft.id, draftRevision: draft.revision}, state) === "staged";}
+        catch {staged = false;}
+        assert.equal(Boolean(model.draft?.editable), expected, `${label}: the model`);
+        assert.equal(model.draft?.reason === "", expected, `${label}: the model's reason`);
+        assert.equal(staged, expected, `${label}: the router`);
+    };
+    agree("the draft's own keyboard, idle", () => connected({connectionToken: 1}), true);
+    agree("a device operation running", () => connected({connectionToken: 1, busy: true}), false);
+    agree("a backup running", (session) => {session.portableBusy = true; return connected({connectionToken: 1});}, false);
+    agree("another keyboard selected", () => connected({connectionToken: 1, selectedDeviceId: "other", devices: [device, other]}), false);
+    agree("disconnected", () => connected({connectionToken: 1, connected: false}), false);
+    agree("reconnected over a new connection", () => connected({connectionToken: 2}), false);
+    agree("firmware that cannot hold a complete profile", () => connected({connectionToken: 1, capabilities: unsupported}), false);
+    agree("a stale draft", (session) => {session.draft.noteConnection(3); return connected({connectionToken: 1});}, false);
+});
+
+test("Apply is routed only for a draft bound to its keyboard; the draft judges the rest as it writes", () => {
+    const session = {service: {portable: snapshot()}};
+    buildPanelModel(session, connected({connectionToken: 1}));
+    const message = {type: "applyProfileDraft", draftId: session.draft.id, draftRevision: session.draft.revision};
+    assert.equal(routeMessage(session, message, connected({connectionToken: 1})), "draft");
+    assert.throws(() => routeMessage(session, message, connected({connectionToken: 1, connected: false})), /^Error: Reconnect the keyboard this draft belongs to/);
+    assert.throws(() => routeMessage(session, message, connected({connectionToken: 1, busy: true})), /wait for its current operation/);
+    assert.throws(() => routeMessage(session, message, connected({connectionToken: 2})), /Review this draft against the connected keyboard/);
+    session.draft.noteConnection(3);
+    assert.equal(routeMessage(session, message, connected({connectionToken: 1})), "draft", "a stale draft refuses Apply itself, asking for a review");
+    assert.equal(routeMessage({service: {}}, {type: "applyProfileDraft"}, connected()), "draft", "with no draft, the control says so itself");
+});
+
+test("a new connection is refused before any model has noticed it, and the next model agrees", () => {
+    const session = {service: {portable: snapshot()}};
+    buildPanelModel(session, connected({connectionToken: 1}));
+    const draft = session.draft, reconnected = connected({connectionToken: 2});
+    assert.equal(draft.stale, false, "nothing has marked the draft stale yet");
+    assert.throws(() => routeMessage(session, {type: "updateLayoutKeys", layer: "Layer 1", changes: [{layoutIndex: 0, keycode: "KC_B"}],
+        draftId: draft.id, draftRevision: draft.revision}, reconnected), /Reconnect/);
+    assert.equal(draft.dirty, false);
+    const published = buildPanelModel(session, reconnected).draft;
+    assert.equal(published.editable, false);
+    assert.equal(published.reason, "connection-changed");
+});
+
 test("discarding an old draft on a legacy keyboard clears it without opening an eight-layer draft", () => {
     const session = panelWithDraft();
     const legacy = connected({selectedDeviceId: "old", capabilities: {...capabilities, compiledLayerCount: 5}});
@@ -245,12 +302,6 @@ test("the model shows the draft's surfaces but the keyboard's own header", () =>
     assert.equal(model.layers[1].displayName, draft.current.summary.names[1]);
     assert.equal(model.portable.available, true);
     assert.equal(model.portable.layers, null, "the layer editor is closed until Rename & Reorder opens it");
-});
-
-test("the outbox is carried by one model, then forgotten", () => {
-    const session = {notice: "Saved.", acceptedEdit: {revision: 2}, resetDraftForms: true};
-    assert.deepEqual(takeOutbox(session), {notice: "Saved.", acceptedEdit: {revision: 2}, resetDraftForms: true});
-    assert.deepEqual(takeOutbox(session), {notice: undefined, acceptedEdit: undefined, resetDraftForms: undefined});
 });
 
 test("Rename & Reorder renames and reorders, keeps Base at the bottom, and carries names with a move", () => {

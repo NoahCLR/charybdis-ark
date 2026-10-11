@@ -98,6 +98,7 @@ test("with no keyboard the demo opens the bundled profile in a real draft, and n
         assert.equal(model.demo.offered, false);
         assert.equal(model.load.state, "ready");
         assert.equal(model.draft.matching, true);
+        assert.equal(model.draft.editable, true, "the demo's draft takes edits with no keyboard");
         assert.equal(model.draft.dirty, false);
         assert.equal(loop.session.draft.current.fingerprint, fingerprint(demoProfile()));
         // The header and diagnostics say demo: no keyboard, generation or halves.

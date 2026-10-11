@@ -3,6 +3,7 @@ const {test, expect} = require("@playwright/test");
 const {hostMacros} = require("../tests/fixtures/host-macros");
 const {ProfileDraftSession} = require("../core/session/profile-draft-session");
 const {buildDeviceModel} = require("../core/session/device-model");
+const {draftBinding} = require("../core/session/panel-session-state");
 const {openPreview} = require("./host-page");
 const fs = require("node:fs");
 
@@ -13,7 +14,7 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
         const draft = new ProfileDraftSession(snapshot, "board", capabilities);
         const connection = {connected: true, selectedDeviceId: "board", capabilities};
         const publish = async () => {
-            const patch = {...buildDeviceModel(draft.editingState(connection)), draft: draft.view(connection)};
+            const patch = {...buildDeviceModel(draft.editingState(connection)), draft: {...draft.view(connection), ...draftBinding({draft}, connection)}};
             await page.evaluate(async patch => {
                 const store = await import("/webview/store.mjs");
                 store.setModel({...store.getModel(), ...patch}); store.render();
@@ -58,14 +59,14 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
         const previous = {...connection, capabilities: {...capabilities, featureFlags: capabilities.featureFlags & ~(1 << 26)}};
         const previousDraft = new ProfileDraftSession(snapshot, "board", previous.capabilities);
         await page.evaluate(async patch => {const store = await import("/webview/store.mjs"); store.setModel({...store.getModel(), ...patch}); store.render();},
-            {...buildDeviceModel(previousDraft.editingState(previous)), draft: previousDraft.view(previous)});
+            {...buildDeviceModel(previousDraft.editingState(previous)), draft: {...previousDraft.view(previous), ...draftBinding({draft: previousDraft}, previous)}});
         await expect(policy).toBeEnabled();
         await expect(page.locator('[data-macro-editor]')).toContainText("Update both halves to suspend keys already held");
         await expect(page.locator('[data-macro-editor]')).toContainText("Release ordinary keys before starting");
         const legacy = {...connection, capabilities: {...capabilities, featureFlags: (1 << 21) | (1 << 22)}};
         const legacyDraft = new ProfileDraftSession(snapshot, "board", legacy.capabilities);
         await page.evaluate(async patch => {const store = await import("/webview/store.mjs"); store.setModel({...store.getModel(), ...patch}); store.render();},
-            {...buildDeviceModel(legacyDraft.editingState(legacy)), draft: legacyDraft.view(legacy)});
+            {...buildDeviceModel(legacyDraft.editingState(legacy)), draft: {...legacyDraft.view(legacy), ...draftBinding({draft: legacyDraft}, legacy)}});
         await expect(policy).toBeDisabled();
         await expect(page.locator('[data-macro-editor]')).toContainText("Update both halves to protect macro playback");
     });

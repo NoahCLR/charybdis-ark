@@ -25,8 +25,8 @@ export {
     observePortable,
     routeMessage,
     startLayerEdit,
-    takeOutbox,
 } from "../core/session/panel-session.js";
+export {takeOutbox} from "../core/session/panel-session-state.js";
 export {readKeyboard, draftControl, portableControl, rereadKeyboard} from "../core/session/panel-controls.js";
 export {exportedProfile, openPanelLoop} from "../core/session/panel-loop.js";
 export {DEMO_CAPABILITIES, demoUnsaved, openDemo} from "../core/session/demo-session.js";

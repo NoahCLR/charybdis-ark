@@ -31,7 +31,8 @@
  * @typedef {import("../../contracts/messages.js").PanelRequest} Message
  */
 const {ProfileDeviceService} = require("./profile-device-service");
-const {buildPanelModel, panelRequest, routeMessage, takeOutbox} = require("./panel-session");
+const {buildPanelModel, panelRequest, routeMessage} = require("./panel-session");
+const {boundDraft, endRead, takeOutbox, whilePanelBusy} = require("./panel-session-state");
 const {draftControl, portableControl, readKeyboard} = require("./panel-controls");
 const {demoControl, demoExport, leaveDemo, panelState} = require("./demo-session");
 const {macroInputStatus} = require("../model/macro-editor");
@@ -77,12 +78,7 @@ async function handleMessage(session, message, host) {
         const reply = {type: "macroValidation", keycode: message.keycode, payload: message.payload,
             requestId: message.requestId, draftId: message.draftId, draftRevision: message.draftRevision, validation: {error: "", code: ""}};
         try {
-            const draft = session.draft, state = panelState(session);
-            if (!draft || message.draftId !== draft.id || !state.connected || state.selectedDeviceId !== draft.deviceId
-                || state.busy || session.portableBusy || session.readBusy || (state.connectionToken ?? null) !== draft.connectionToken) {
-                throw new Error("Read the keyboard and wait for its current operation before editing this macro.");
-            }
-            draft.assertRevision(message.draftRevision);
+            const draft = boundDraft(session, panelState(session), message, "Read the keyboard and wait for its current operation before editing this macro.");
             reply.validation = macroInputStatus(draft.current, message, draft.capabilities);
         } catch (error) {
             reply.validation = {error: /** @type {import("./types.js").OperationFailure} */ (error).message, code: /** @type {import("./types.js").OperationFailure} */ (error).code || "MACRO_EDIT_CONFLICT"};
@@ -116,52 +112,53 @@ async function handleMessage(session, message, host) {
 // Connect, learn what the keyboard is, and read what it is running.
 /** @param {Session} session @param {string | undefined} selectedDeviceId @param {Host} host */
 async function connectAndRead(session, selectedDeviceId, host) {
+    /** @type {boolean | undefined} */
+    let ready;
     try {
-        session.readReady = await readKeyboard(session, selectedDeviceId, host);
+        ready = await readKeyboard(session, selectedDeviceId, host);
     } finally {
-        session.readBusy = false;
+        endRead(session, ready);
         publish(session, host);
     }
 }
 
 /** @param {Session} session @param {import("../../contracts/messages.js").DraftControl & Partial<import("../../contracts/edits.js").DraftIdentity>} message @param {Host} host */
 async function draftMessage(session, message, host) {
-    session.portableBusy = true;
     try {
-        await draftControl(session, {...message, draftRevision: message.draftRevision ?? NaN}, host);
-    } finally {session.portableBusy = false; publish(session, host);}
+        await whilePanelBusy(session, () => draftControl(session, {...message, draftRevision: message.draftRevision ?? NaN}, host));
+    } finally {publish(session, host);}
 }
 
 // Exporting is split: what to save is decided here, saving it is the host's
 // (a file dialog in VS Code, a download on a web page).
 /** @param {Session} session @param {import("../../contracts/messages.js").PortableControl} message @param {Host} host */
 async function portableMessage(session, message, host) {
-    session.portableBusy = true;
     try {
-        if (message.type === "exportPortableProfile" && session.demo) {
-            const {snapshot, saved} = demoExport(/** @type {Session & import("./types.js").ActiveDemoSession} */ (session));
-            const where = await host.saveExport(exportedProfile(snapshot, new Date(), "charybdis-demo"));
-            if (where) {
-                saved();
-                session.notice = `Demo setup exported to ${where}. Import it on your keyboard to review and apply it.`;
+        await whilePanelBusy(session, async () => {
+            if (message.type === "exportPortableProfile" && session.demo) {
+                const {snapshot, saved} = demoExport(/** @type {Session & import("./types.js").ActiveDemoSession} */ (session));
+                const where = await host.saveExport(exportedProfile(snapshot, new Date(), "charybdis-demo"));
+                if (where) {
+                    saved();
+                    session.notice = `Demo setup exported to ${where}. Import it on your keyboard to review and apply it.`;
+                }
+            } else if (message.type === "exportPortableProfile") {
+                const file = exportedProfile(await session.service.readPortableProfile());
+                const where = await host.saveExport(file);
+                if (where) session.notice = "Complete keyboard profile exported to " + where;
+            } else {
+                await portableControl(session, message, host);
             }
-        } else if (message.type === "exportPortableProfile") {
-            const file = exportedProfile(await session.service.readPortableProfile());
-            const where = await host.saveExport(file);
-            if (where) session.notice = "Complete keyboard profile exported to " + where;
-        } else {
-            await portableControl(session, message, host);
-        }
-    } finally {session.portableBusy = false; publish(session, host);}
+        });
+    } finally {publish(session, host);}
 }
 
 // The demo's controls: open it, open a profile file in it, leave it.
 /** @param {Session} session @param {import("../../contracts/messages.js").DemoControl} message @param {Host} host */
 async function demoMessage(session, message, host) {
-    session.portableBusy = true;
     try {
-        await demoControl(session, message, host, session.service.snapshot());
-    } finally {session.portableBusy = false; publish(session, host);}
+        await whilePanelBusy(session, () => demoControl(session, message, host, session.service.snapshot()));
+    } finally {publish(session, host);}
 }
 
 // What an exported profile file holds, and the name a host may suggest for it.

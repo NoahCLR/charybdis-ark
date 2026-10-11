@@ -5,6 +5,7 @@ const {openPreview} = require("./host-page");
 const {hostMacros} = require("../tests/fixtures/host-macros");
 const {ProfileDraftSession} = require("../core/session/profile-draft-session");
 const {buildDeviceModel} = require("../core/session/device-model");
+const {draftBinding} = require("../core/session/panel-session-state");
 const fs = require("node:fs");
 
 for (const theme of ["vscode-dark", "vscode-light"]) {
@@ -13,7 +14,7 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
         const draft = new ProfileDraftSession(snapshot, "board", capabilities);
         const connection = {connected: true, selectedDeviceId: "board", capabilities};
         const publish = async () => {
-            const patch = {...buildDeviceModel(draft.editingState(connection)), draft: draft.view(connection)};
+            const patch = {...buildDeviceModel(draft.editingState(connection)), draft: {...draft.view(connection), ...draftBinding({draft}, connection)}};
             await page.evaluate(async patch => {
                 const store = await import("/webview/store.mjs");
                 store.setModel({...store.getModel(), ...patch}); store.render();

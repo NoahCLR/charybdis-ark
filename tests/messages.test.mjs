@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 globalThis.acquireVsCodeApi = () => ({postMessage() {}});
-const {getModel, setModel} = await import("../webview/store.mjs");
+const {getModel, setModel, writable} = await import("../webview/store.mjs");
 const {createPanelMessages} = await import("../webview/messages.mjs");
 
 function surface() {
@@ -26,6 +26,15 @@ const reading = () => ({
 });
 const read = (fields = {}) => ({type: "readProgress", draftId: "d1", draftRevision: 2,
     read: {source: "layout", progress: {done: 4, total: 56}, operationId: 3, phase: "layout", selectedDeviceId: "kb", connectionToken: 1, ...fields}});
+
+test("the renderer offers edits by core's published draft binding", () => {
+    setModel({...reading(), draft: {matching: true, stale: false, busy: false, editable: false, reason: "connection-changed"}});
+    assert.equal(writable(), false, "old presentation flags cannot reopen a blocked draft");
+    setModel({...reading(), device: {connected: false}, draft: {editable: true, reason: ""}, demo: {active: true}});
+    assert.equal(writable(), true, "a demo consumes the same binding as a connected draft");
+    setModel({...reading(), draft: undefined});
+    assert.equal(writable(), false);
+});
 
 test("a read counter of the current read updates its progress without a render", () => {
     const {receive, calls} = surface();
