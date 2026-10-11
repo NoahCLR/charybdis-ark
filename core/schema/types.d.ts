@@ -95,6 +95,10 @@ export interface ComboInput {
     rows: ComboRowInput[];
 }
 export interface LayerRecord {reference: number; bypass: number[]; exclude: number[]}
+// What the firmware accepts for one stored settings value; a plain range
+// also carries its bounds.
+export interface SettingRule {valid(v: number, layers: number): boolean; min?: number; max?: number; step?: number}
+export interface SettingField<Name extends string = string> extends SettingRule {id: number; name: Name}
 export interface SettingsDomain {
     formatVersion?: number;
     values: number[];

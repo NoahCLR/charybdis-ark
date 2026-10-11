@@ -6,7 +6,7 @@ const {effectiveTimings} = require("./gesture-timing");
 const {encodeKeyBehaviorDomain} = require("../schema/key-behavior-domain-v1");
 const {validateSnapshot, decodedOf} = require("./portable-profile");
 const {decodeProfileBlob, encodeProfileBlob} = require("../schema/profile-blob-v1");
-const {SETTING, SETTINGS, encodeSettings, validSetting} = require("../schema/settings-domain-v1");
+const {SETTING, SETTING_FIELD, SETTINGS, encodeSettings, validSetting} = require("../schema/settings-domain-v1");
 const {hostSettings, followHostOs, supportsHostLayouts, UNICODE_ENABLED, LAYOUT_SHIFT, MACOS_ISO} = require("../schema/host-settings");
 const {hostLayouts} = require("../data/host-layouts");
 const {supportsUnicodeMacros} = require("../schema/macro-payload");
@@ -33,6 +33,9 @@ const share = (macro, id, of, label, hint) => ({macro, id, of, label, hint, kind
 
 // These are editor definitions, not configuration defaults. Every value below
 // is supplied by the complete device snapshot; absent readback stays absent.
+// Each names the stored value it edits from the schema's table of them
+// (settings-domain-v1.js), which also holds what the keyboard accepts; the
+// words, kinds and grouping are this module's.
 //
 // `area` is the rail screen a section is edited on, and the review area it is
 // listed under; a section without one is a Settings section. Everything the
@@ -41,51 +44,56 @@ const share = (macro, id, of, label, hint) => ({macro, id, of, label, hint, kind
 // `governs` names what a setting is about when that thing has a colour of its
 // own elsewhere — a behaviour tier, a tap-count branch, a pointing slot, a
 // layer — so every surface that shows the setting can mark it the same way.
+//
+// The defaults behaviours inherit, which the editor view also publishes as
+// `timing`.
+/** @type {Omit<import("../../contracts/model.js").SettingsSection, "fields"> & {fields: import("../../contracts/model.js").StoredSettingField[]}} */
+const keyTiming = {id: "keyTiming", label: "Tap & Hold Timing", fields: [
+    number("tappingTerm", SETTING.TAPPING_TERM, "Dual-role tap / hold threshold", "How long LT(), MT(), TT(), OSL() and OSM() keys wait before a press counts as a hold (QMK's tapping term). LT() behaviours with an empty Tap / hold threshold use it too; other behaviours use the Behaviour tap / hold threshold."),
+    number("tapHoldTerm", SETTING.TAP_HOLD_TERM, "Behaviour tap / hold threshold", "Used when a behaviour leaves its Tap / hold threshold empty.", {governs: {kind: "tier", tier: "hold"}}),
+    number("longerHoldTerm", SETTING.LONG_HOLD_TERM, "Long hold threshold", "Used when a behaviour leaves its Long hold threshold empty.", {governs: {kind: "tier", tier: "long"}}),
+    number("multiTapTerm", SETTING.MULTI_TAP_TERM, "Repeated taps", "Maximum gap between repeated taps when a behaviour has no override.", {governs: {kind: "branch", count: 2}}),
+]};
 /** @type {import("../../contracts/model.js").SettingsSection[]} */
 const sections = [
-    {id: "keyTiming", label: "Tap & Hold Timing", fields: [
-        number("tappingTerm", 0, "Dual-role tap / hold threshold", "How long LT(), MT(), TT(), OSL() and OSM() keys wait before a press counts as a hold (QMK's tapping term). LT() behaviours with an empty Tap / hold threshold use it too; other behaviours use the Behaviour tap / hold threshold."),
-        number("tapHoldTerm", 1, "Behaviour tap / hold threshold", "Used when a behaviour leaves its Tap / hold threshold empty.", {governs: {kind: "tier", tier: "hold"}}),
-        number("longerHoldTerm", 2, "Long hold threshold", "Used when a behaviour leaves its Long hold threshold empty.", {governs: {kind: "tier", tier: "long"}}),
-        number("multiTapTerm", 3, "Repeated taps", "Maximum gap between repeated taps when a behaviour has no override.", {governs: {kind: "branch", count: 2}}),
-    ]},
+    keyTiming,
     {id: "normalPointerSpeed", label: "Pointer Speed", area: "Mouse", fields: [
         // Every DPI field offers the one list in pointer-dpi.js. These two are
         // held in the upstream Charybdis config, which the keyboard only
         // accepts in its own steps, so they offer the part of the list the
         // keyboard accepts. A pointing mode's own speed is set on its slot.
-        number("normalDpi", 18, "Normal pointer DPI", "400–3400, in steps of 200: the steps this firmware stores.", {choices: dpiChoices({accepts: v => validSetting(18, v)})}),
-        number("snipingDpi", 19, "Sniping DPI", "100–400: the steps this firmware stores. Lower DPI gives finer pointer control.", {choices: dpiChoices({accepts: v => validSetting(19, v)})}),
+        number("normalDpi", SETTING.DEFAULT_DPI, "Normal pointer DPI", "400–3400, in steps of 200: the steps this firmware stores.", {choices: dpiChoices({accepts: v => validSetting(SETTING.DEFAULT_DPI, v)})}),
+        number("snipingDpi", SETTING.SNIPING_DPI, "Sniping DPI", "100–400: the steps this firmware stores. Lower DPI gives finer pointer control.", {choices: dpiChoices({accepts: v => validSetting(SETTING.SNIPING_DPI, v)})}),
     ]},
     {id: "sniping", label: "Auto-sniping", area: "Mouse", fields: [
-        toggle("autoSniping", 8, "Auto-sniping", "Use sniping speed while the selected layer is active."),
-        layer("snipingLayer", 9, "Auto-sniping layer"),
+        toggle("autoSniping", SETTING.AUTO_SNIPING_ENABLED, "Auto-sniping", "Use sniping speed while the selected layer is active."),
+        layer("snipingLayer", SETTING.AUTO_SNIPING_LAYER, "Auto-sniping layer"),
     ]},
     {id: "autoMouse", label: "Auto-mouse", area: "Mouse", fields: [
-        toggle("autoMouse", 4, "Auto-mouse", "Trackball movement automatically activates the selected layer."),
-        layer("mouseLayer", 5, "Auto-mouse layer"),
-        number("mouseTimeout", 6, "Timeout (ms)", "How long the layer stays active after movement. The lighting fade keeps its share of it (Lighting → Auto-mouse fade).", {min: 1}),
-        number("mouseDebounce", 7, "Movement debounce (ms)", "0–255 ms", {max: 255}),
-        number("mouseDelay", 25, "Delay after typing (ms)", "Wait this long after a key event before movement can activate auto-mouse."),
-        number("mouseThreshold", 26, "Movement threshold", "Movement needed to activate auto-mouse. Higher values require more movement."),
+        toggle("autoMouse", SETTING.AUTO_MOUSE_ENABLED, "Auto-mouse", "Trackball movement automatically activates the selected layer."),
+        layer("mouseLayer", SETTING.AUTO_MOUSE_LAYER, "Auto-mouse layer"),
+        number("mouseTimeout", SETTING.AUTO_MOUSE_TIMEOUT, "Timeout (ms)", "How long the layer stays active after movement. The lighting fade keeps its share of it (Lighting → Auto-mouse fade).", {min: 1}),
+        number("mouseDebounce", SETTING.AUTO_MOUSE_DEBOUNCE, "Movement debounce (ms)", "0–255 ms", {max: SETTING_FIELD.AUTO_MOUSE_DEBOUNCE.max}),
+        number("mouseDelay", SETTING.AUTO_MOUSE_DELAY, "Delay after typing (ms)", "Wait this long after a key event before movement can activate auto-mouse."),
+        number("mouseThreshold", SETTING.AUTO_MOUSE_THRESHOLD, "Movement threshold", "Movement needed to activate auto-mouse. Higher values require more movement."),
     ]},
     // The keyboard stores this as the milliseconds the auto-mouse colour holds
     // before it fades, and refuses a profile where that is not shorter than
     // the timeout. Edited as a share of the timeout, it cannot be: a share is
     // at most 99%, and a new timeout carries the share with it.
     {id: "automouseFade", label: "Auto-mouse fade", area: "Lighting", stage: "auto", fields: [
-        share("mouseFadeHold", 16, 6, "Hold before fading", "The share of the auto-mouse timeout the colour holds before it starts to fade, 0–99%."),
+        share("mouseFadeHold", SETTING.AUTO_MOUSE_DEAD_TIME, SETTING.AUTO_MOUSE_TIMEOUT, "Hold before fading", "The share of the auto-mouse timeout the colour holds before it starts to fade, 0–99%."),
     ]},
     {id: "rgbAppearance", label: "Base Lighting", fields: [
-        {...toggle("lightingEnabled", 21, "Lighting", "Enable the saved base lighting effect."), shift: 0},
-        byte("hue", 22, 0, "Hue"),
-        byte("saturation", 22, 8, "Saturation", "0 is white; 255 is fully saturated."),
-        byte("brightness", 22, 16, "Brightness", "Saved brightness, 0–255. The keyboard applies its hardware brightness limit."),
-        byte("effectSpeed", 21, 16, "Animation speed"),
-        number("lightingTimeout", 17, "Idle timeout (ms)", "0 keeps lighting on. Maximum 86400000 ms (one day).", {max: 86400000}),
+        {...toggle("lightingEnabled", SETTING.RGB_MODE, "Lighting", "Enable the saved base lighting effect."), shift: 0},
+        byte("hue", SETTING.RGB_COLOR, 0, "Hue"),
+        byte("saturation", SETTING.RGB_COLOR, 8, "Saturation", "0 is white; 255 is fully saturated."),
+        byte("brightness", SETTING.RGB_COLOR, 16, "Brightness", "Saved brightness, 0–255. The keyboard applies its hardware brightness limit."),
+        byte("effectSpeed", SETTING.RGB_MODE, 16, "Animation speed"),
+        number("lightingTimeout", SETTING.RGB_TIMEOUT, "Idle timeout (ms)", "0 keeps lighting on. Maximum 86400000 ms (one day).", {max: SETTING_FIELD.RGB_TIMEOUT.max}),
     ]},
     {id: "lightingFeedback", label: "Lighting Feedback", fields: [
-        number("feedbackFlash", 15, "Key feedback flash interval (ms)", "Time for each on or off phase; a full blink takes twice this value.", {min: 1, validate: "positive-int"}),
+        number("feedbackFlash", SETTING.FEEDBACK_PERIOD, "Key feedback flash interval (ms)", "Time for each on or off phase; a full blink takes twice this value.", {min: SETTING_FIELD.FEEDBACK_PERIOD.min, validate: "positive-int"}),
     ]},
 ];
 
@@ -140,8 +148,9 @@ function settingValue(field, values) {
 }
 // The saved base lighting, read out of the two words that pack it by the same
 // field layout the Base Lighting section edits.
-const LIGHTING_FIELDS = {enabled: {id: 21, shift: 0}, effect: {id: 21, shift: 8}, speed: {id: 21, shift: 16}, leds: {id: 21, shift: 24},
-    hue: {id: 22, shift: 0}, saturation: {id: 22, shift: 8}, brightness: {id: 22, shift: 16}};
+const {RGB_MODE, RGB_COLOR} = SETTING;
+const LIGHTING_FIELDS = {enabled: {id: RGB_MODE, shift: 0}, effect: {id: RGB_MODE, shift: 8}, speed: {id: RGB_MODE, shift: 16}, leds: {id: RGB_MODE, shift: 24},
+    hue: {id: RGB_COLOR, shift: 0}, saturation: {id: RGB_COLOR, shift: 8}, brightness: {id: RGB_COLOR, shift: 16}};
 /** @param {readonly number[]} values */
 const baseLighting = values => Object.fromEntries(Object.entries(LIGHTING_FIELDS).map(([name, field]) => [name, settingValue(field, values)]));
 // A field's value placed in its word, leaving every bit it does not own.
@@ -166,8 +175,8 @@ function settingsSections(snapshot, settings, capabilities) {
     if (options) for (let mask = 1; mask < 16; mask++) if (!(mask & ~options.ledFlags)) flags.push({value: mask, label: ledNames.filter(([bit]) => mask & bit).map(([, name]) => name).join(" + ")});
     if (!flags.some(choice => choice.value === currentFlags)) flags.push({value: currentFlags, label: "Current custom LED selection"});
     rgb.fields.splice(1, 0,
-        {...byte("effectMode", 21, 8, "Lighting effect"), choices: effects, readOnly: !options, hint: options ? "Effects available on this keyboard. Layer colours can override the base effect." : "Update both halves to report the available lighting effects."},
-        {...byte("effectLeds", 21, 24, "Apply base effect to"), choices: flags, readOnly: !options, hint: options ? "Choose which LED classes receive the base effect. Layer colours and feedback have their own policies." : "Update both halves to report the LED classes."});
+        {...byte("effectMode", SETTING.RGB_MODE, 8, "Lighting effect"), choices: effects, readOnly: !options, hint: options ? "Effects available on this keyboard. Layer colours can override the base effect." : "Update both halves to report the available lighting effects."},
+        {...byte("effectLeds", SETTING.RGB_MODE, 24, "Apply base effect to"), choices: flags, readOnly: !options, hint: options ? "Choose which LED classes receive the base effect. Layer colours and feedback have their own policies." : "Update both halves to report the LED classes."});
     /** @param {number} i */
     const name = i => layerName(settings.names, i);
     /** @template T @param {(i: number) => T} make */
@@ -192,7 +201,7 @@ function settingsSections(snapshot, settings, capabilities) {
     result.push({id: "comboReferences", area: "Settings", label: "Combo Layer Matching", expanded: false, description: "Choose which layer supplies the key assignments used to match combos on each layer. Select the same layer to keep its combos independent.", fields:
         everyLayer(i => ({...layer(`comboReference${i}`, undefined, `Combos on ${name(i)}`), record: /** @type {const} */ ("reference"), layer: i, governs: {kind: /** @type {const} */ ("layer"), layer: i}}))});
     result.push({id: "keyboardOptions", area: "Settings", label: "Key Options", expanded: false, description: options ? "Keyboard-wide remapping and typing options. These apply across all layers." : "Update both halves to report their supported key options.", fields:
-        options ? optionLabels.map(([macro, label], i) => ({...toggle(macro, 24, hostKeyLabel(label, host.effective)), bitMask: options.keymapMasks[i], readOnly: !(options.supportedKeymapOptions & (1 << i)), hint: options.supportedKeymapOptions & (1 << i) ? "" : "This option is not enabled in the running firmware."})) : []});
+        options ? optionLabels.map(([macro, label], i) => ({...toggle(macro, SETTING.KEYMAP_OPTIONS, hostKeyLabel(label, host.effective)), bitMask: options.keymapMasks[i], readOnly: !(options.supportedKeymapOptions & (1 << i)), hint: options.supportedKeymapOptions & (1 << i) ? "" : "This option is not enabled in the running firmware."})) : []});
     /** @param {number} id */
     const label = id => VOCABULARY.hostOs.find(([value]) => value === id)?.[1] || "Unknown";
     const available = Boolean(snapshot.hostOs) || supportsUnicodeMacros(capabilities);
@@ -251,7 +260,7 @@ function settingsEditorView(snapshot, capabilities) {
                 value: field.kind === "layer" ? `Layer ${value}` : String(value), enabled: Boolean(value)};
         })})),
         host: {...hostSettings(settings.values, snapshot.hostOs?.detected), supported: Boolean(snapshot.hostOs)},
-        timing: Object.fromEntries(["tappingTerm", "tapHoldTerm", "longerHoldTerm", "multiTapTerm"].map((key, id) => [key, String(settings.values[id])]))};
+        timing: Object.fromEntries(keyTiming.fields.map(field => [field.macro, String(settings.values[field.id])]))};
 }
 
 /** @param {import("./types.js").CompleteSnapshot} snapshot @param {import("../../contracts/edits.js").EditOf<"updateConfigDefaults">} message @param {import("./types.js").ProfileDestination} [capabilities] */
@@ -298,7 +307,7 @@ function editSettings(snapshot, message, capabilities) {
     }
     rescaleShares(value.settings.values, before);
     if (section.id === "host") followHostOs(value.settings.values, before, snapshot.hostOs?.detected);
-    if (!value.settings.values[23]) throw fail("Keep at least one startup layer selected.");
+    if (!value.settings.values[SETTING.DEFAULT_LAYERS]) throw fail("Keep at least one startup layer selected.");
     if (!value.settings.values.every((number, id) => validSetting(id, number))) throw fail("A setting is outside the keyboard's supported range.");
     // A timing displayed as default follows that default, including an older
     // profile's explicit value equal to it. Adopt inheritance only for changed
