@@ -709,6 +709,12 @@ sequenced Apply itself. Each rule now has one home:
 - Interface: `canEdit(area)` for permission, `view/reach-groups.mjs` and
   `ui/groups.mjs` for grouped lists, `slotLight` in `ui/marks.mjs`, one form
   per macro slot and one `state.combo` for the builder.
+  Every panel state field declares its initial value and draft-replacement
+  policy together in `store.mjs`; `view/state-fields.mjs` constructs fresh
+  state and resets fields from those declarations. A policy keeps the value,
+  resets it, or computes a replacement from the state before the change.
+  The declaration preserves the existing behavior: pending `cellHow` and the
+  LED group builder (`ledPicks`, `trackball`, `rowColour`, `ledRow`) stay kept.
 
 ### D-L34 — Layer keycodes are owned in the firmware, and the app follows
 
