@@ -16,32 +16,62 @@ const {NAME_MAX_BYTES, validName, nameOfBytes, encodeName} = require("./profile-
 const SETTINGS = Object.freeze({VERSION: 6, COUNT: 31, LAYERS: 16, MACRO_NAMES: 128, CUSTOM_KEY_NAMES: 128,
     LAYER_RECORD_SIZE: 17, PLACEMENT_BYTES: 8, PLACEMENT_MAX_POSITIONS: 64, NAME_MAX_BYTES,
     SCALARS_OFFSET: 8, LAYER_RECORDS_OFFSET: 132, FIXED_SIZE: 404, MIN_SIZE: 404 + 272, MAX_SIZE: 404 + 272 * 33});
-// The values that are layer masks or switches (participation-policy.md).
-const SETTING = Object.freeze({COMBOS_ENABLED: 20, DEFAULT_LAYERS: 23, RETIRED_COMBO_REFERENCES: 27, UNICODE_HOST_MODE: 27, BEHAVIORS_ENABLED: 28, LAYER_BEHAVIORS: 29, LAYER_COMBOS: 30});
 // This keyboard's matrix: ten rows of six (capability page 2 reports it).
 const MATRIX_POSITIONS = 60;
 const HEADER = Buffer.from([SETTINGS.VERSION, SETTINGS.LAYERS, SETTINGS.COUNT, SETTINGS.MACRO_NAMES, SETTINGS.CUSTOM_KEY_NAMES, 0, 0, 0]);
 /** @param {string} message */
 const fail = message => Object.assign(new Error(message), {code: "INVALID_SETTINGS"});
 
+// What the firmware accepts for a value, given that it is a uint32 and the
+// layer count. A plain range also says its bounds, for an editor to offer.
+/** @param {number} min @param {number} max @param {number} [step] @returns {import("./types.js").SettingRule} */
+const range = (min, max, step = 1) => ({min, max, step, valid: v => v >= min && v <= max && v % step === 0});
+/** @param {(v: number, layers: number) => boolean} valid @returns {import("./types.js").SettingRule} */
+const rule = valid => ({valid});
+const UINT16 = range(0, 65535), SWITCH = range(0, 1), RETIRED = range(0, 0);
+const LAYER = rule((v, layers) => v < layers), LAYER_MASK = rule((v, layers) => v < 2 ** layers);
+// The 31 stored values, each once, in ID order: the firmware's name for it
+// (profile_settings_v1.h, without NOAH_SETTING_) and what it accepts
+// (portable-profile-v1.md, "Settings domain 0x40"). The editor's words for
+// them are in model/settings-editor.js.
+const STORED = /** @type {const} */ ([
+    ["TAPPING_TERM", UINT16], ["TAP_HOLD_TERM", UINT16], ["LONG_HOLD_TERM", UINT16], ["MULTI_TAP_TERM", UINT16],
+    ["AUTO_MOUSE_ENABLED", SWITCH], ["AUTO_MOUSE_LAYER", LAYER], ["AUTO_MOUSE_TIMEOUT", UINT16], ["AUTO_MOUSE_DEBOUNCE", range(0, 255)],
+    ["AUTO_SNIPING_ENABLED", SWITCH], ["AUTO_SNIPING_LAYER", LAYER],
+    // Retired per-mode DPI: mode tuning is in domain 0x50.
+    ["DRAGSCROLL_DPI", RETIRED], ["VOLUME_DPI", RETIRED], ["BRIGHTNESS_DPI", RETIRED], ["ZOOM_DPI", RETIRED], ["ARROW_DPI", RETIRED],
+    // A half-period: one on or off phase of the key feedback flash.
+    ["FEEDBACK_PERIOD", range(1, 65535)],
+    // Shorter than the auto-mouse timeout, which encodeSettings checks.
+    ["AUTO_MOUSE_DEAD_TIME", UINT16],
+    // Zero keeps lighting on; at most one day.
+    ["RGB_TIMEOUT", range(0, 86400000)],
+    ["DEFAULT_DPI", range(400, 3400, 200)], ["SNIPING_DPI", range(100, 400, 100)],
+    ["COMBOS_ENABLED", SWITCH],
+    // Enabled, effect, speed and LED flags, a byte each; only the switch is checked.
+    ["RGB_MODE", rule(v => (v & 255) <= 1)],
+    // Hue, saturation and brightness; the high byte zero.
+    ["RGB_COLOR", range(0, 0xffffff)],
+    // At least one startup layer, and none past the bank.
+    ["DEFAULT_LAYERS", rule((v, layers) => v > 0 && v < 2 ** layers)],
+    ["KEYMAP_OPTIONS", UINT16], ["AUTO_MOUSE_DELAY", UINT16], ["AUTO_MOUSE_THRESHOLD", UINT16],
+    // Host OS, Unicode playback, host layout and macOS ISO (host-settings.js).
+    ["UNICODE_HOST_MODE", rule(validHostSetting)],
+    // Participation (participation-policy.md): the behaviour master switch,
+    // then one bit per layer for its behaviours and for its combos.
+    ["BEHAVIORS_ENABLED", SWITCH], ["LAYER_BEHAVIORS", LAYER_MASK], ["LAYER_COMBOS", LAYER_MASK],
+]);
+/** @typedef {typeof STORED[number][0]} SettingName */
+// The stored values in ID order, each by its name, and each ID by its name.
+/** @type {readonly Readonly<import("./types.js").SettingField<SettingName>>[]} */
+const FIELDS = Object.freeze(STORED.map(([name, accepts], id) => Object.freeze({...accepts, id, name})));
+const SETTING_FIELD = Object.freeze(/** @type {Record<SettingName, Readonly<import("./types.js").SettingField<SettingName>>>} */ (Object.fromEntries(FIELDS.map(field => [field.name, field]))));
+const SETTING = Object.freeze(/** @type {Record<SettingName, number>} */ (Object.fromEntries(FIELDS.map(field => [field.name, field.id]))));
+
 /** @param {number} id @param {number} v @param {number} [layers] */
 function validSetting(id, v, layers = SETTINGS.LAYERS) {
     if (!Number.isInteger(v) || v < 0 || v > 0xffffffff) return false;
-    const bank = 2 ** layers;
-    if ([4, 8, 20, 28].includes(id)) return v <= 1;
-    if ([5, 9].includes(id)) return v < layers;
-    if (id === 7) return v <= 255;
-    if (id >= 10 && id <= 14) return v === 0;
-    if (id === 15) return v > 0 && v <= 65535;
-    if (id === 17) return v <= 86400000;
-    if (id === 18) return v >= 400 && v <= 3400 && v % 200 === 0;
-    if (id === 19) return v >= 100 && v <= 400 && v % 100 === 0;
-    if (id === 21) return (v & 255) <= 1;
-    if (id === 22) return v <= 0xffffff;
-    if (id === 23) return v > 0 && v < bank;
-    if (id === 27) return validHostSetting(v);
-    if (id === 29 || id === 30) return v < bank;
-    return v <= 65535;
+    return Number.isInteger(id) && id >= 0 && id < SETTINGS.COUNT ? FIELDS[id].valid(v, layers) : v <= 65535;
 }
 
 // A placement bitmap as its set positions, and back.
@@ -74,7 +104,8 @@ const defaultLayerRecord = layer => ({reference: layer, bypass: [], exclude: []}
 /** @param {import("./types.js").SettingsDomain} value @param {number} [layers] @param {number} [positions] */
 function encodeSettings(value, layers = SETTINGS.LAYERS, positions = MATRIX_POSITIONS) {
     if ((value?.formatVersion ?? SETTINGS.VERSION) !== SETTINGS.VERSION) throw fail("Unsupported settings format.");
-    if (!value || !Array.isArray(value.values) || value.values.length !== SETTINGS.COUNT || !value.values.every((v, id) => validSetting(id, v, layers)) || value.values[6] <= value.values[16]) throw fail("Invalid keyboard settings.");
+    if (!value || !Array.isArray(value.values) || value.values.length !== SETTINGS.COUNT || !value.values.every((v, id) => validSetting(id, v, layers))
+        || value.values[SETTING.AUTO_MOUSE_TIMEOUT] <= value.values[SETTING.AUTO_MOUSE_DEAD_TIME]) throw fail("Invalid keyboard settings.");
     if (!Array.isArray(value.names) || value.names.length !== SETTINGS.LAYERS) throw fail("Missing layer names.");
     if (!Array.isArray(value.layers) || value.layers.length !== SETTINGS.LAYERS) throw fail("Missing layer records.");
     if (!Array.isArray(value.macroNames) || value.macroNames.length !== SETTINGS.MACRO_NAMES) throw fail("Missing macro names.");
@@ -123,4 +154,4 @@ function decodeSettings(bytes, layers = SETTINGS.LAYERS, positions = MATRIX_POSI
     encodeSettings(result, layers, positions);
     return result;
 }
-module.exports = {SETTINGS, SETTING, MATRIX_POSITIONS, validName, validSetting, defaultLayerRecord, encodeSettings, decodeSettings};
+module.exports = {SETTINGS, SETTING, SETTING_FIELD, MATRIX_POSITIONS, validName, validSetting, defaultLayerRecord, encodeSettings, decodeSettings};

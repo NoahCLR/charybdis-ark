@@ -82,6 +82,21 @@ test("every section names the screen it is edited on, and the pointer's own sett
     assert.ok(Object.values(areas).every(area => ["Mouse", "Lighting", "Settings"].includes(area)), "a section with no area of its own is a Settings one");
 });
 
+test("every field edits a stored value the schema names, within what the keyboard accepts", () => {
+    const {SETTINGS, validSetting} = require("../../core/schema/settings-domain-v1");
+    const {CURRENT_CAPABILITIES} = require("../fixtures/portable-profile");
+    const fields = settingsEditorView(snapshot(), CURRENT_CAPABILITIES).sections.flatMap(section => section.fields);
+    for (const field of fields) {
+        if (field.record) continue;
+        assert.ok(Number.isInteger(field.id) && field.id >= 0 && field.id < SETTINGS.COUNT, field.macro);
+        if (field.kind === "share") assert.ok(Number.isInteger(field.of) && field.of < SETTINGS.COUNT, field.macro);
+        // A whole word's own limits are values the keyboard accepts there.
+        if (field.shift !== undefined || field.bitMask || field.kind !== "number") continue;
+        for (const v of [field.min ?? 0, field.max ?? 65535]) assert.ok(validSetting(field.id, v) || field.choices, `${field.macro} offers ${v}`);
+        for (const choice of field.choices || []) assert.ok(validSetting(field.id, typeof choice === "object" ? choice.value : choice), `${field.macro} offers ${JSON.stringify(choice)}`);
+    }
+});
+
 test("every unchanged section is a byte-exact round trip and edits preserve unrelated domains and banks", () => {
     const current = snapshot();
     for (const section of settingsEditorView(current).sections) assert.deepEqual(editSettings(current, message(current, section.id)), current.document);

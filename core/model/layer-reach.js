@@ -39,6 +39,7 @@ const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../data/charybdis-layout");
 const {layerLockOfCode} = require("../data/user-keycodes");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {KEY_BEHAVIOR_HOLD_MODES} = require("../schema/key-behavior-domain-v1");
+const {SETTING} = require("../schema/settings-domain-v1");
 const {actionName, nativeCode} = require("../schema/actions");
 const {layerName} = require("./vocabulary");
 const {analyzeLayerStates} = require("./layer-state-graph");
@@ -61,9 +62,6 @@ const TRANSPARENT = 0x0001;
 const NOTHING = 0x0000;
 // QMK's TAPPING_TOGGLE default (compat/qmk_tapping_contract.h).
 const TAPPING_TOGGLE = 5;
-// Settings the walk reads (users/noah/lib/profile/schema/profile_settings_v1.h).
-const SETTING = Object.freeze({AUTO_MOUSE_ENABLED: 4, AUTO_MOUSE_LAYER: 5, AUTO_SNIPING_ENABLED: 8, AUTO_SNIPING_LAYER: 9,
-    COMBOS_ENABLED: 20, DEFAULT_LAYERS: 23, BEHAVIORS_ENABLED: 28, LAYER_BEHAVIORS: 29, LAYER_COMBOS: 30});
 const LEVELS = Object.freeze(/** @type {const} */ ({TRAP: "trap", WARNING: "warning", NOTICE: "notice"}));
 // Enough to name a way in without listing every superset of one trap.
 const MAX_TRAPS = 4;

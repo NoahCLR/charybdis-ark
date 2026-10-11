@@ -210,6 +210,9 @@ TypeScript coverage or changing the check configuration.
   interface as `model.vocabulary` (read it through `webview/view/vocabulary.mjs`);
   never write an enum-to-words table in a screen. A new enum value without a
   word fails `tests/model/vocabulary.test.js`.
+- A stored setting's ID, name and what the firmware accepts → the field table
+  in `core/schema/settings-domain-v1.js`, once; its label, kind and section →
+  `core/model/settings-editor.js`, which names it through `SETTING`.
 - Naming an action, its native keycode, decode limits, a "Layer n" reference →
   `core/schema/actions.js`. The pointing-mode keycode registry and the key
   layout are inert data in `core/data/`, readable from every layer; the
