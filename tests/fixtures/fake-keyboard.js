@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 
 // A simulated Charybdis that answers the device protocol byte for byte, for
@@ -48,14 +49,18 @@ const CURRENT_DOMAINS = "16:4,32:2,48:3,64:6,80:3";
 // its authored combos and factory settings). `compiledOnly` runs those
 // defaults, with nothing committed; the live combo and settings readbacks
 // still answer from the document.
-function fakeKeyboard({document, compiled, streaming = false, macroReadMap = false, compiledOnly = false, generation = 42, firmwareVersion = 0x00010000, brightnessMax = 255, options = keyboardOptions.wire()} = {}) {
+/** @param {import("./types.js").FakeKeyboardOptions} options @returns {import("./types.js").FakeKeyboard} */
+function fakeKeyboard({document, compiled, streaming = false, macroReadMap = false, compiledOnly = false, generation = 42, firmwareVersion = 0x00010000, brightnessMax = 255, options = keyboardOptions.wire()}) {
     const held = validateSnapshot(document);
     held.macros = require("../../core/model/portable-profile").macroBank(document.macros.map(value => Buffer.from(value, "base64")), streaming ? 34903 : 10327);
     if (document.version !== 3 || document.layers.length !== 16) throw new Error("The fake keyboard runs current firmware: a schema-3, sixteen-layer document.");
+    /** @param {Buffer} blob */
     const versions = blob => decodeProfileBlob(blob).domains.map(domain => `${domain.id}:${domain.version}`).join();
     if (versions(held.profile) !== CURRENT_DOMAINS || (compiled && versions(compiled) !== CURRENT_DOMAINS)) throw new Error("The fake keyboard runs current firmware: RGB 4, key behaviours 2, combos 3, settings 6 and PD 3.");
     const profile = held.profile, digest = fnv1a32(profile), defaults = compiled || profile;
-    const settings = decodeProfileBlob(profile).domains.find(domain => domain.id === PROFILE_DOMAIN_IDS.SETTINGS).payload;
+    const settingsDomain = decodeProfileBlob(profile).domains.find(domain => domain.id === PROFILE_DOMAIN_IDS.SETTINGS);
+    if (!settingsDomain) throw new Error("The fake keyboard fixture must contain settings.");
+    const settings = settingsDomain.payload;
     const storageDigest = viaStorageDigest({layout: held.layout, macros: held.macros});
 
     const capabilities = [page(25, (p) => {
@@ -94,6 +99,7 @@ function fakeKeyboard({document, compiled, streaming = false, macroReadMap = fal
         p.writeUInt32LE(generation, 2); p.writeUInt32LE(storageDigest, 6);
         p.writeUInt32LE(generation, 10); p.writeUInt32LE(storageDigest, 14); p.writeUInt32LE(generation, 18);
     }), Buffer.from([1, brightnessMax]), options.metadata, ...chunks(options.bytes)];
+    /** @type {Partial<Record<number, Buffer[]>>} */
     const values = {
         [VALUE.CAPABILITIES]: capabilities,
         [VALUE.STATUS]: status,
@@ -116,9 +122,12 @@ function fakeKeyboard({document, compiled, streaming = false, macroReadMap = fal
         for (let offset = 0; offset < bitmap.length; offset += 25) values[0x0c].push(bitmap.subarray(offset, offset + 25));
     }
     const lighting = baseLighting(held.settings.values);
+    /** @type {Partial<Record<number, number[]>>} */
     const rgb = {1: [lighting.brightness], 2: [lighting.effect], 3: [lighting.speed], 4: [lighting.hue, lighting.saturation]};
 
+    /** @type {import("./types.js").FakeKeyboard} */
     const keyboard = {requests: [], mutations: [], unhandled: [], answer};
+    /** @param {Uint8Array} report */
     function answer(report) {
         const request = Buffer.alloc(RAW_HID_REPORT_SIZE);
         Buffer.from(report).copy(request);
@@ -130,6 +139,7 @@ function fakeKeyboard({document, compiled, streaming = false, macroReadMap = fal
         const echo = Buffer.from(request); echo[0] = VIA_UNHANDLED;
         return [echo];
     }
+    /** @param {Buffer} request */
     function serve(request) {
         const reply = Buffer.from(request);
         switch (request[0]) {
@@ -160,6 +170,7 @@ function fakeKeyboard({document, compiled, streaming = false, macroReadMap = fal
     }
     // VIA's RGB Matrix channel: brightness, effect, speed and colour, as the
     // document's saved base lighting has them.
+    /** @param {Buffer} request @param {Buffer} reply */
     function rgbValue(request, reply) {
         const bytes = rgb[request[2]];
         if (!bytes) return undefined;
@@ -171,15 +182,18 @@ function fakeKeyboard({document, compiled, streaming = false, macroReadMap = fal
 
 // A Profile Wire answer: the request's correlation header, status OK, the
 // page's length and its bytes.
+/** @param {Buffer | undefined} payload @param {Buffer} reply */
 function profileValue(payload, reply) {
     if (!payload) return undefined;
     reply.fill(0, 5); reply[6] = payload.length; payload.copy(reply, PROFILE_WIRE_V1.PAYLOAD_OFFSET);
     return reply;
 }
+/** @param {Buffer} reply @param {number[]} bytes */
 function scalar(reply, bytes) {
     reply.fill(0, 1); reply.set(bytes, 1);
     return reply;
 }
+/** @param {Buffer} bytes @param {Buffer} request @param {Buffer} reply */
 function region(bytes, request, reply) {
     const offset = request.readUInt16BE(1), count = request[3];
     if (count < 1 || count > VIA_STORAGE.CHUNK || offset + count > bytes.length) return undefined;
@@ -187,15 +201,18 @@ function region(bytes, request, reply) {
     return reply;
 }
 
+/** @param {number} length @param {(bytes: Buffer) => unknown} fill */
 function page(length, fill) {
     const bytes = Buffer.alloc(length); fill(bytes); return bytes;
 }
+/** @param {Buffer} bytes */
 function chunks(bytes) {
     const pages = [];
     for (let offset = 0; offset < bytes.length; offset += PAGE) pages.push(Buffer.from(bytes.subarray(offset, offset + PAGE)));
     return pages;
 }
 // A profile payload: metadata, then the blob in 25-byte pages.
+/** @param {Buffer} blob @param {number} generation */
 function payloadPages(blob, generation) {
     const metadata = page(25, (p) => {
         p.set([PROFILE_PAYLOAD_V1.LAYOUT_VERSION, PAGE]);
@@ -206,6 +223,7 @@ function payloadPages(blob, generation) {
     return [metadata, ...chunks(blob)];
 }
 // Settings: length, CRC and digest, then the bytes.
+/** @param {Buffer} bytes */
 function storedPages(bytes) {
     const metadata = page(12, (p) => {
         p.set([1, PAGE]); p.writeUInt16LE(bytes.length, 2);
@@ -215,6 +233,7 @@ function storedPages(bytes) {
 }
 // The combo table as the keyboard reports it (readout version 3): keycodes,
 // not actions, with each layer's reference from the settings' layer records.
+/** @param {ReturnType<typeof import("../../core/schema/combo-domain-v1.js").decodeComboDomain>} table @param {number[]} references */
 function comboPages(table, references) {
     const rows = table.rows;
     const metadata = page(25, (p) => {
@@ -222,6 +241,7 @@ function comboPages(table, references) {
         p.writeUInt16LE(table.defaultTermMs, 10); p.writeUInt16LE(table.holdTermMs, 12); p[14] = COMBO_READBACK_V1.PAGES_PER_ROW;
     });
     const referencePage = page(25, (p) => p.set(references));
+    /** @param {import("../../core/schema/types.js").SemanticAction} action */
     const code = (action) => {
         const value = nativeCode(action);
         if (value === undefined) throw new Error("A combo in this document has no keycode the keyboard could report.");
@@ -245,8 +265,10 @@ function comboPages(table, references) {
 // A FakeDeviceAdapter wired to a fake keyboard: each written report is
 // answered on a microtask, as a real device answers after the write returns.
 // `adapter.keyboard` is the keyboard, for its records.
-function fakeKeyboardAdapter(options = {}) {
-    const keyboard = options.keyboard || fakeKeyboard(options);
+/** @param {import("./types.js").FakeKeyboardAdapterOptions} options @returns {import("./types.js").FakeKeyboardAdapter} */
+function fakeKeyboardAdapter(options) {
+    const keyboard = options.keyboard || ("document" in options ? fakeKeyboard(options) : undefined);
+    if (!keyboard) throw new Error("A fake keyboard adapter needs a keyboard or document.");
     const adapter = new FakeDeviceAdapter({
         devices: [{id: "fake-charybdis", product: "Charybdis 4x6", manufacturer: "Bastard Keyboards", serialNumber: "FAKE-1"}],
         onWrite({connection, report}) {
@@ -254,8 +276,7 @@ function fakeKeyboardAdapter(options = {}) {
             queueMicrotask(() => responses.forEach((response) => connection.emitReport(response)));
         },
     });
-    adapter.keyboard = keyboard;
-    return adapter;
+    return Object.assign(adapter, {keyboard});
 }
 
 module.exports = {fakeKeyboard, fakeKeyboardAdapter};

@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ]
+  },
+  "include": [
+    "scripts/preview.js",
+    "scripts/preview-macro-host.mjs",
+    "scripts/**/*.d.ts",
+    "tests/types/preview.mts"
+  ]
+}

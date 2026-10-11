@@ -226,6 +226,19 @@ test("the retired PD upgrade export is no message any host runs", async () => {
     assert.deepEqual(host.errors, []);
 });
 
+test("posted data that is no request is answered with the model, never run", async () => {
+    const host = fakeHost(), loop = loopWithDraft(host);
+    const draft = loop.session.draft, revision = draft.revision;
+    const posted = host.posted.length;
+    for (const message of [null, undefined, "ready", 7, [], {}, {type: 7}, {type: null, draftId: draft.id}]) await loop.handleMessage(message);
+    assert.equal(host.posted.length, posted + 8, "each is answered once");
+    assert.ok(host.posted.slice(posted).every((reply) => reply.type === "model" && reply.notice === undefined));
+    assert.equal(loop.session.draft, draft);
+    assert.equal(draft.revision, revision, "nothing was staged");
+    assert.ok(!loop.session.readBusy, "nothing was read");
+    assert.deepEqual(host.errors, []);
+});
+
 test("closing the loop closes the device service", async () => {
     const service = fakeService(), loop = openPanelLoop(fakeHost(), {service});
     await loop.close();

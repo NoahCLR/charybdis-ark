@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 
 // What a key does where its behaviour row leaves a tier empty. The keyboard
@@ -29,9 +30,12 @@ const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {keycodeAction} = require("../schema/actions");
 const {customKeyOfCode} = require("../data/user-keycodes");
 
+/** @param {number} code @param {number} start @param {number} end */
 const within = (code, start, end) => code >= start && code <= end;
+/** @param {number} code */
 const plainKey = (code) => (within(code, 0x0004, 0x00ff) && !within(code, 0x00e0, 0x00e7)) || within(code, 0x0100, 0x1fff);
 
+/** @param {import("../schema/types.js").SemanticAction | null | undefined} target @param {{physicalGestureTiming?: boolean, ownedTapping?: boolean}} [options] @returns {{tap?: import("../schema/types.js").SemanticAction, hold?: import("../schema/types.js").SemanticAction, fallback?: boolean, releaseTaps?: boolean}} */
 function builtInActions(target, {physicalGestureTiming = false, ownedTapping = false} = {}) {
     if (target?.kind === ACTION.CUSTOM_KEY || target?.kind === ACTION.VIA_MACRO) return {releaseTaps: true};
     if (target?.kind !== ACTION.QMK_KEYCODE || !Number.isInteger(target.operand)) return {};

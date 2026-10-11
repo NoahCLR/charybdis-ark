@@ -1,14 +1,17 @@
+// @ts-check
 "use strict";
 
 const {changedRanges} = require("../protocol/via-storage-v1");
 const {LOGICAL_VIA_STAGE_V1, LOGICAL_VIA_STATE, buildLogicalViaBeginRequest, buildLogicalViaChunkRequest, buildLogicalViaVerifyRequest, readLogicalViaStatus, sendLogicalViaMutation} = require("../protocol/logical-via-stage-v1");
 
 const REGIONS = Object.freeze({CONFIG: 1, KEYMAP: 2, MACRO: 4});
+/** @param {number} ms @returns {Promise<void>} */
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 class LogicalViaStageCoordinator {
     // `sleep` waits between polls; a host whose timers are throttled (a
     // background browser tab) passes its own.
+    /** @param {import("../transport/types.js").RequestConnection} connection @param {{requestIds?: import("../protocol/types.js").RequestIds, pollMs?: number, timeoutMs?: number, onProgress?: (progress: {phase: 'staging-via', completed: number, total: number}) => void, sleep?: (ms: number) => Promise<void>}} [options] */
     constructor(connection, {requestIds, pollMs = 20, timeoutMs = 90000, onProgress = () => {}, sleep = delay} = {}) {
         if (!connection || typeof connection.request !== "function" || !requestIds || typeof requestIds.next !== "function") throw new TypeError("Logical VIA staging requires a connection and request ids.");
         this.connection = connection;
@@ -19,6 +22,7 @@ class LogicalViaStageCoordinator {
         this.sleep = typeof sleep === "function" ? sleep : delay;
     }
 
+    /** @param {number} transactionId @param {number} operationSequence @param {readonly number[]} acceptedStates */
     async waitFor(transactionId, operationSequence, acceptedStates) {
         const deadline = Date.now() + this.timeoutMs;
         do {
@@ -33,12 +37,14 @@ class LogicalViaStageCoordinator {
         throw Object.assign(new Error("Timed out while staging the VIA profile on the slave half."), {code: "LOGICAL_VIA_STAGE_TIMEOUT"});
     }
 
+    /** @param {Buffer} request @param {number} transactionId @param {readonly number[]} acceptedStates */
     async operation(request, transactionId, acceptedStates) {
         const before = await readLogicalViaStatus(this.connection, {nextRequestId: () => this.requestIds.next()});
         await sendLogicalViaMutation(this.connection, request);
         return this.waitFor(transactionId, before.operationSequence, acceptedStates);
     }
 
+    /** @param {{transactionId: number, generation: number, digest: number, target: Pick<import("../model/types.js").DecodedProfile, 'layout' | 'macros'>, current: Pick<import("../model/types.js").DecodedProfile, 'layout' | 'macros'>}} input */
     async stage({transactionId, generation, digest, target, current}) {
         await this.operation(buildLogicalViaBeginRequest(transactionId, generation, digest), transactionId, [LOGICAL_VIA_STATE.STAGING]);
         const regions = [
@@ -62,6 +68,7 @@ class LogicalViaStageCoordinator {
         return this.operation(buildLogicalViaVerifyRequest(transactionId, generation, digest), transactionId, [LOGICAL_VIA_STATE.STAGED]);
     }
 
+    /** @param {{transactionId: number, generation: number, digest: number}} identity */
     async waitUntilAccepted({transactionId, generation, digest}) {
         const deadline = Date.now() + this.timeoutMs;
         do {
@@ -70,7 +77,7 @@ class LogicalViaStageCoordinator {
             if (status.state === LOGICAL_VIA_STATE.ERROR) throw Object.assign(new Error(`VIA acceptance on the slave half failed with status ${status.lastStatus}.`), {code: "LOGICAL_VIA_ACCEPT_FAILED", status});
             // IDLE with the exact retained identity means firmware already
             // released the normal-reconciliation fence after local roll-forward.
-            if (exact && !status.pending && [LOGICAL_VIA_STATE.ACCEPTED, LOGICAL_VIA_STATE.IDLE].includes(status.state)) return status;
+            if (exact && !status.pending && /** @type {number[]} */ ([LOGICAL_VIA_STATE.ACCEPTED, LOGICAL_VIA_STATE.IDLE]).includes(status.state)) return status;
             await this.sleep(this.pollMs);
         } while (Date.now() < deadline);
         throw Object.assign(new Error("Timed out waiting for the staged VIA profile to become the recovery authority."), {code: "LOGICAL_VIA_ACCEPT_TIMEOUT"});

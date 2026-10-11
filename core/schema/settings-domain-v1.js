@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 const {validHostSetting} = require("./host-settings");
 // Settings domain 0x40, version 6, the only one the keyboard stores (firmware
@@ -20,8 +21,10 @@ const SETTING = Object.freeze({COMBOS_ENABLED: 20, DEFAULT_LAYERS: 23, RETIRED_C
 // This keyboard's matrix: ten rows of six (capability page 2 reports it).
 const MATRIX_POSITIONS = 60;
 const HEADER = Buffer.from([SETTINGS.VERSION, SETTINGS.LAYERS, SETTINGS.COUNT, SETTINGS.MACRO_NAMES, SETTINGS.CUSTOM_KEY_NAMES, 0, 0, 0]);
+/** @param {string} message */
 const fail = message => Object.assign(new Error(message), {code: "INVALID_SETTINGS"});
 
+/** @param {number} id @param {number} v @param {number} [layers] */
 function validSetting(id, v, layers = SETTINGS.LAYERS) {
     if (!Number.isInteger(v) || v < 0 || v > 0xffffffff) return false;
     const bank = 2 ** layers;
@@ -42,6 +45,7 @@ function validSetting(id, v, layers = SETTINGS.LAYERS) {
 }
 
 // A placement bitmap as its set positions, and back.
+/** @param {Uint8Array} bytes @param {number} positions */
 function positionsOfBitmap(bytes, positions) {
     const set = [];
     for (let position = 0; position < SETTINGS.PLACEMENT_MAX_POSITIONS; position++) {
@@ -52,6 +56,7 @@ function positionsOfBitmap(bytes, positions) {
     }
     return set;
 }
+/** @param {readonly number[] | undefined} list @param {number} positions */
 function bitmapOfPositions(list, positions) {
     const bytes = Buffer.alloc(SETTINGS.PLACEMENT_BYTES);
     for (const position of list ?? []) {
@@ -63,8 +68,10 @@ function bitmapOfPositions(list, positions) {
 
 // A fresh layer record: combos refer to the layer itself, nothing bypassed or
 // excluded, as compiled defaults and translated backups have it.
+/** @param {number} layer @returns {import("./types.js").LayerRecord} */
 const defaultLayerRecord = layer => ({reference: layer, bypass: [], exclude: []});
 
+/** @param {import("./types.js").SettingsDomain} value @param {number} [layers] @param {number} [positions] */
 function encodeSettings(value, layers = SETTINGS.LAYERS, positions = MATRIX_POSITIONS) {
     if ((value?.formatVersion ?? SETTINGS.VERSION) !== SETTINGS.VERSION) throw fail("Unsupported settings format.");
     if (!value || !Array.isArray(value.values) || value.values.length !== SETTINGS.COUNT || !value.values.every((v, id) => validSetting(id, v, layers)) || value.values[6] <= value.values[16]) throw fail("Invalid keyboard settings.");
@@ -82,6 +89,7 @@ function encodeSettings(value, layers = SETTINGS.LAYERS, positions = MATRIX_POSI
         bitmapOfPositions(record.bypass, positions).copy(fixed, at + 1);
         bitmapOfPositions(record.exclude, positions).copy(fixed, at + 1 + SETTINGS.PLACEMENT_BYTES);
     });
+    /** @param {string} name @param {string} what */
     const record = (name, what) => {
         if (!validName(name)) throw fail(`A ${what} name is at most ${NAME_MAX_BYTES} bytes of text, with no control characters.`);
         return encodeName(name);
@@ -89,6 +97,7 @@ function encodeSettings(value, layers = SETTINGS.LAYERS, positions = MATRIX_POSI
     return Buffer.concat([fixed, ...value.names.map(name => record(name, "layer")), ...value.macroNames.map(name => record(name, "macro")), ...value.customKeyNames.map(name => record(name, "custom key"))]);
 }
 
+/** @param {Buffer} bytes @param {number} [layers] @param {number} [positions] */
 function decodeSettings(bytes, layers = SETTINGS.LAYERS, positions = MATRIX_POSITIONS) {
     if (!Buffer.isBuffer(bytes) || bytes.length < SETTINGS.MIN_SIZE || bytes.length > SETTINGS.MAX_SIZE || !bytes.subarray(0, 8).equals(HEADER)) throw fail("Unsupported settings format.");
     const values = Array.from({length: SETTINGS.COUNT}, (_, id) => bytes.readUInt32LE(SETTINGS.SCALARS_OFFSET + id * 4));

@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 
 // Presentation of validated device domains. Names here describe wire IDs;
@@ -14,16 +15,18 @@ const {
     RGB_LOCALITIES, RGB_PD_MODE_IDS, RGB_STAGE_BITS, RGB_TAP_COMMIT_MODES,
 } = require("../schema/rgb-domain-v1");
 
+/** @template {Record<string, number>} T @param {T} values @param {number} value @returns {keyof T & string} */
 function enumName(values, value) {
     const entry = Object.entries(values).find(([, id]) => id === value);
     if (!entry) throw new Error(`Unsupported device enum value ${value}.`);
-    return entry[0];
+    return /** @type {keyof T & string} */ (entry[0]);
 }
 
 // A stored keycode's readable name ("#", "Shift+Enter"), for the behaviour
 // grid to show. Absent when the catalogue knows the keycode only by itself,
 // and for layer, pointing and macro actions, which the interface names from
 // the profile's own layers, slots and macros.
+/** @param {import("../schema/types.js").SemanticAction} action @param {import("../../contracts/model.js").ProfileKeyNames} [names] */
 function actionDisplay(action, names) {
     if (action.kind !== ACTION.QMK_KEYCODE) return {};
     const resolved = keycodes.resolve(action.operand);
@@ -33,6 +36,7 @@ function actionDisplay(action, names) {
 
 // A modifiers-only keycode is how a key holds its modifiers; the catalogue
 // names it "Shift+N/A", which reads as a broken key rather than "Shift".
+/** @param {import("../schema/types.js").SemanticAction} action @param {import("../../contracts/model.js").ProfileKeyNames} [names] */
 function builtInDisplay(action, names) {
     const display = actionDisplay(action, names);
     return display.label ? {label: display.label.replace(/\+N\/A$/, "")} : display;
@@ -42,6 +46,7 @@ function builtInDisplay(action, names) {
 // the tiers its row leaves empty (model/built-in-behavior.js). A fallback hold
 // gives way to any authored first-press hold or long hold; `releaseTaps` says
 // a press with only a long hold still taps when released before it.
+/** @param {import("../schema/types.js").SemanticAction} target @param {Parameters<typeof builtInActions>[1]} features @param {import("../../contracts/model.js").ProfileKeyNames} [names] @returns {import("../../contracts/panel.js").BuiltIn} */
 function builtInForView(target, features, names) {
     const {tap, hold, fallback, releaseTaps} = builtInActions(target, features);
     return {
@@ -52,7 +57,9 @@ function builtInForView(target, features, names) {
     };
 }
 
+/** @param {{rows: import("../schema/types.js").BehaviorRow[]}} domain @param {Parameters<typeof builtInActions>[1]} [features] @param {import("../../contracts/model.js").ProfileKeyNames} [names] @returns {import("../../contracts/panel.js").BehaviorView[]} */
 function behaviorRowsForView(domain, features = {}, names) {
+    /** @param {import("../schema/types.js").HoldBranch | undefined} branch */
     const hold = (branch) => branch && ({
         helper: enumName(KEY_BEHAVIOR_HOLD_MODES, branch.mode),
         action: actionName(branch.action),
@@ -78,9 +85,11 @@ function behaviorRowsForView(domain, features = {}, names) {
     }));
 }
 
+/** @param {import("../schema/types.js").Hsv} color */
 const colorForView = (color) => ({h: String(color.h), s: String(color.s), v: String(color.v)});
 const layerName = layerRef;
 
+/** @param {import("../schema/types.js").RgbProfile} domain */
 function rgbForView(domain) {
     const ledGroups = domain.groups.map((group) => ({
         name: `Group ${group.id}`,
@@ -88,8 +97,9 @@ function rgbForView(domain) {
         ledIndices: [...group.leds],
         expression: `LEDs ${group.leds.join(", ")}`,
         usageCount: 0,
-        usages: [],
+        usages: /** @type {{target: string, owner: string}[]} */ ([]),
     }));
+    /** @template {{groupId: number, color: import("../schema/types.js").Hsv}} T @param {T[]} rows @param {string} target @param {(row: T) => string} [ownerFor] */
     const groupRows = (rows, target, ownerFor) => rows.map((row, index) => {
         const group = ledGroups.find((entry) => entry.id === row.groupId);
         if (!group) throw new Error(`Device LED group ${row.groupId} is missing.`);
@@ -106,7 +116,7 @@ function rgbForView(domain) {
         stageEnableMask: domain.stageEnableMask,
         // Stages by id and bit, in the vocabulary's words; the interface finds
         // a stage by its id, never by what it is called.
-        stages: VOCABULARY.stages.filter((stage) => stage.bit).map(({id, label, bit}) => ({id, label, bit, enabled: Boolean(domain.stageEnableMask & bit)})),
+        stages: VOCABULARY.stages.filter((stage) => stage.bit).map(({id, label, bit}) => ({id, label, bit, enabled: Boolean(domain.stageEnableMask & (bit || 0))})),
         ledGroups,
         layerColors: domain.layerColors.map((row) => ({
             layer: layerName(row.layerId), layerId: row.layerId,
@@ -132,11 +142,12 @@ function rgbForView(domain) {
     };
 }
 
+/** @param {import("./types.js").BaseRgbRead | null | undefined} read @param {number} [maximumBrightness] */
 function baseRgbForView(read, maximumBrightness) {
     if (read?.state !== "read") return {state: read?.state || "unread", message: read?.error?.message || "Base RGB has not been read from the keyboard."};
     const {effectId, hue, saturation, brightness, speed, readAt} = read;
     const enabled = effectId !== 0;
-    const previewBrightness = Number.isInteger(maximumBrightness)
+    const previewBrightness = typeof maximumBrightness === "number" && Number.isInteger(maximumBrightness)
         ? Math.round(brightness * maximumBrightness / 255)
         : brightness;
     return {
@@ -152,8 +163,10 @@ function baseRgbForView(read, maximumBrightness) {
     };
 }
 
+/** @param {import("./types.js").ComboRead | null | undefined} read @param {Record<string, string>} labels */
 function combosForView(read, labels) {
     if (read?.state !== "read") return [];
+    /** @param {number} value */
     const resolve = value => {
         const key = keycodes.resolve(value);
         return {name: key.name, label: labels[key.name] || keyLabel(undefined, value)};

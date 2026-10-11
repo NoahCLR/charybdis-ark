@@ -1,15 +1,29 @@
+// @ts-check
 "use strict";
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const {decodeRgbDomainV1, encodeRgbDomainV1} = require("../../core/schema/rgb-domain-v1");
 // Format 4, the sixteen-layer firmware's, from its own golden compiled domain
 // (rgb_domain_v4.json): the only RGB format it reads.
-const v3 = require(process.argv[2] + "/tests/fixtures/rgb_domain_v4.json");
+/** @type {unknown} */
+const input = require(process.argv[2] + "/tests/fixtures/rgb_domain_v4.json");
+assert(input && typeof input === "object" && "limits" in input && "valid" in input);
+const limits = input.limits, vectors = input.valid;
+assert(limits && typeof limits === "object");
+assert("compiledStageMask" in limits && typeof limits.compiledStageMask === "number");
+assert("logicalLayerCount" in limits && typeof limits.logicalLayerCount === "number");
+assert("maximumBrightness" in limits && typeof limits.maximumBrightness === "number");
+assert("tapBranchColorCount" in limits && typeof limits.tapBranchColorCount === "number");
+assert("supportedPdModeMask" in limits && typeof limits.supportedPdModeMask === "number");
+assert(Array.isArray(vectors) && vectors.every((/** @type {unknown} */ vector) => vector && typeof vector === "object" && "name" in vector && typeof vector.name === "string" && "hex" in vector && typeof vector.hex === "string"));
+const v3 = {limits: {compiledStageMask: limits.compiledStageMask, logicalLayerCount: limits.logicalLayerCount, maximumBrightness: limits.maximumBrightness, tapBranchColorCount: limits.tapBranchColorCount, supportedPdModeMask: limits.supportedPdModeMask}, valid: /** @type {{name: string, hex: string}[]} */ (vectors)};
 const version = 4;
 const options = {compiledStageMask: v3.limits.compiledStageMask, logicalLayerCount: v3.limits.logicalLayerCount,
     maximumBrightness: v3.limits.maximumBrightness, tapBranchColorCount: v3.limits.tapBranchColorCount,
     supportedPdModeIds: Array.from({length: 32}, (_, id) => id).filter(id => (v3.limits.supportedPdModeMask >>> id) & 1)};
-let golden = Buffer.from(v3.valid.find(vector => vector.name === "compiled").hex, "hex");
+const compiled = v3.valid.find(vector => vector.name === "compiled");
+assert(compiled, "The RGB corpus must contain its compiled vector.");
+let golden = Buffer.from(compiled.hex, "hex");
 assert.deepEqual(encodeRgbDomainV1(decodeRgbDomainV1(golden, options), options), golden);
 if (process.argv[4]) {
     const model = decodeRgbDomainV1(golden, options);
@@ -21,8 +35,10 @@ if (process.argv[4]) {
 const config = Buffer.alloc(8);
 config.set([options.compiledStageMask, options.logicalLayerCount, options.maximumBrightness, options.tapBranchColorCount]);
 config.writeUInt32LE(options.supportedPdModeIds.reduce((mask, id) => (mask | (1 << id)) >>> 0, 0), 4);
+/** @type {Buffer[]} */
 const chunks = [config];
 let accepted = 0, rejected = 0;
+/** @param {Buffer} bytes */
 function add(bytes) {
     let valid = 1;
     try {

@@ -1,3 +1,4 @@
+// @ts-check
 // The draft history: every step the draft took, newest first, each with when
 // it was made and what it changed from the step before it.
 //
@@ -7,10 +8,12 @@
 
 import {AREAS} from "./review.mjs";
 
+/** @param {string} area */
 const rank = (area) => (AREAS.indexOf(area) + 1 || AREAS.length + 1);
 
 // Steps newest first; within one, its items in rail order, each noting its
 // area, since a step's items are not sectioned by area as the review's are.
+/** @param {readonly import("../../contracts/model.js").HistoryStep[]} [steps] */
 export function historyEntries(steps = []) {
     return steps.slice().reverse().map((step) => ({
         ...step,
@@ -23,8 +26,10 @@ export function historyEntries(steps = []) {
 
 // When a step was made: close by, how long ago; otherwise the clock time,
 // and the day too once it is not today. `clock` is the exact time, for a tip.
+/** @param {number} at @param {number} [now] */
 export function stepTime(at, now = Date.now()) {
     const when = new Date(at), seconds = Math.max(0, Math.round((now - at) / 1000));
+    /** @param {number} n */
     const pad = (n) => String(n).padStart(2, "0");
     const clock = `${pad(when.getHours())}:${pad(when.getMinutes())}:${pad(when.getSeconds())}`;
     const sameDay = new Date(now).toDateString() === when.toDateString();

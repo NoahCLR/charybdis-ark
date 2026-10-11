@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 
 // Checks that a folder is static files only before it is published to
@@ -27,14 +28,16 @@ const HASHED = /^[a-z]+-[A-Z0-9]{8}\.(js|css)$/;
 const SERVER_CODE = ["_worker.js", "functions", "_routes.json"];
 
 // _headers as {path: [header lines]}, comments and blank lines skipped.
+/** @param {string} text @returns {Map<string, string[]>} */
 function parseHeaders(text) {
+    /** @type {Map<string, string[]>} */
     const rules = new Map();
     let current = null;
     for (const line of text.split(/\r?\n/)) {
         if (!line.trim() || line.trimStart().startsWith("#")) continue;
         if (/^\s/.test(line)) {
             if (!current) throw new Error(`_headers has a header before any path: ${line.trim()}`);
-            rules.get(current).push(line.trim());
+            /** @type {string[]} */ (rules.get(current)).push(line.trim());
         } else {
             current = line.trim();
             if (rules.has(current)) throw new Error(`_headers names ${current} twice`);
@@ -44,10 +47,12 @@ function parseHeaders(text) {
     return rules;
 }
 
+/** @param {string} text @param {readonly string[]} hashedFiles */
 function headerProblems(text, hashedFiles) {
     let rules;
-    try {rules = parseHeaders(text);} catch (error) {return [error.message];}
+    try {rules = parseHeaders(text);} catch (error) {return [error instanceof Error ? error.message : String(error)];}
     const problems = [];
+    /** @param {string} rule */
     const cacheOf = (rule) => (rules.get(rule) || []).filter((line) => /^cache-control:/i.test(line));
     const immutable = [...rules.keys()].filter((rule) => cacheOf(rule).some((line) => /immutable/i.test(line)));
     for (const rule of immutable) {
@@ -60,11 +65,12 @@ function headerProblems(text, hashedFiles) {
         if (!cacheOf(page).some((line) => /no-cache|no-store/i.test(line))) problems.push(`_headers lets ${page} be cached`);
     }
     if (!rules.has("/*")) problems.push("_headers sets no headers for every file (/*)");
-    else if (!rules.get("/*").some((line) => /^x-robots-tag:.*\bnoindex\b/i.test(line))) problems.push("_headers lets search engines index the page: /* sends no X-Robots-Tag: noindex");
+    else if (!(rules.get("/*") || []).some((line) => /^x-robots-tag:.*\bnoindex\b/i.test(line))) problems.push("_headers lets search engines index the page: /* sends no X-Robots-Tag: noindex");
     if (rules.has("/*") && cacheOf("/*").length) problems.push("_headers sets Cache-Control for every file (/*), which joins every other rule's");
     return problems;
 }
 
+/** @param {string} site @param {{project?: string}} [options] */
 function checkStaticSite(site, {project = process.cwd()} = {}) {
     if (!fs.existsSync(site) || !fs.statSync(site).isDirectory()) return [`${site} is not a folder; run npm run build:web first`];
     const problems = [];
@@ -74,6 +80,7 @@ function checkStaticSite(site, {project = process.cwd()} = {}) {
     if (fs.existsSync(path.join(project, "functions"))) problems.push(`${path.join(project, "functions")} would be deployed as Pages Functions`);
 
     const entries = fs.readdirSync(site, {withFileTypes: true});
+    /** @type {string[]} */
     const hashed = [];
     for (const entry of entries) {
         if (SERVER_CODE.includes(entry.name)) continue;

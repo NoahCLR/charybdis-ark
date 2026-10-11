@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 const {hostLayout, hostLayouts, US_HOST_LAYOUT, HOST_LAYOUT_COUNT} = require("../data/host-layouts");
 
@@ -11,16 +12,20 @@ const HOST_SETTING_BITS = 0x103 | LAYOUT_MASK | MACOS_ISO;
 const HOST_LAYOUT_FEATURE = 1 << 22;
 const MACOS = 1;
 const OS_OF = [null, "macos", "windows", "linux"];
-const supportsHostLayouts = capabilities => Boolean(capabilities?.featureFlags & HOST_LAYOUT_FEATURE);
+/** @param {{featureFlags?: number} | null | undefined} capabilities */
+const supportsHostLayouts = capabilities => Boolean((capabilities?.featureFlags ?? 0) & HOST_LAYOUT_FEATURE);
+/** @param {number} v */
 const validHostSetting = v => (v & ~HOST_SETTING_BITS) === 0 && ((v & LAYOUT_MASK) >>> LAYOUT_SHIFT) < HOST_LAYOUT_COUNT;
 
 // How the keyboard will type macro text, as it decides at playback: through
 // the layout, with Unicode entry for the rest when the OS is known and, on
 // macOS, the layout is Unicode Hex Input or US with the switch on.
+/** @param {readonly number[] | null | undefined} values @param {number} [detected] */
 function hostSettings(values, detected = 0) {
     const word = values?.[HOST_SETTING] || 0, selected = word & 3;
     const effective = selected || (Number.isInteger(detected) && detected >= 0 && detected <= 3 ? detected : 0);
     const layout = hostLayout((word & LAYOUT_MASK) >>> LAYOUT_SHIFT) || hostLayout(US_HOST_LAYOUT);
+    if (!layout) throw new Error("The vendored host layouts must include US.");
     const unicodeEnabled = Boolean(word & UNICODE_ENABLED);
     const entry = effective === MACOS ? Boolean(layout.unicodeHexInput) || (layout.id === US_HOST_LAYOUT && unicodeEnabled) : Boolean(effective) && unicodeEnabled;
     return {selected, detected, effective, unicodeEnabled, unicodeMode: entry ? effective : 0,
@@ -30,6 +35,7 @@ function hostSettings(values, detected = 0) {
 // A layout belongs to one OS, US to all of them. The keyboard types through
 // the layout whatever the OS, so another OS's layout types wrong characters;
 // an unknown OS fits every layout.
+/** @param {number} id @param {number} effective */
 function layoutFits(id, effective) {
     const layout = hostLayout(id);
     return !OS_OF[effective] || !layout || layout.os === "any" || layout.os === OS_OF[effective];
@@ -39,18 +45,23 @@ function layoutFits(id, effective) {
 // if it fits, else that OS's layout of the same language, else US.
 // Languages are read from the slug: `macos-german` and `windows-german` match,
 // and macOS's British is the United Kingdom layout elsewhere.
+/** @param {string} slug */
 function language(slug) {
     const name = slug.replace(/^[^-]+-/, "");
     return name === "british" ? "uk" : name;
 }
+/** @param {number} id @param {number} effective */
 function layoutForOs(id, effective) {
     if (layoutFits(id, effective)) return id;
-    const wanted = language(hostLayout(id).slug);
+    const layout = hostLayout(id);
+    if (!layout) return id;
+    const wanted = language(layout.slug);
     return hostLayouts().find(layout => layout.os === OS_OF[effective] && language(layout.slug) === wanted)?.id ?? US_HOST_LAYOUT;
 }
 
 // A Host edit that changes the effective OS carries the layout along
 // (layoutForOs), unless the same edit chose the layout.
+/** @param {number[]} values @param {readonly number[]} before @param {number} [detected] */
 function followHostOs(values, before, detected) {
     const old = hostSettings(before, detected), next = hostSettings(values, detected);
     if (old.effective === next.effective || old.layout !== next.layout) return values;

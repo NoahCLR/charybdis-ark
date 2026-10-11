@@ -1,3 +1,4 @@
+// @ts-check
 // The webview's whole state: what the keyboard said, and where the person is
 // standing in the app. Edits never change the model here — they are posted to
 // the host, which answers with a new model. The draft lives on that side too,
@@ -10,6 +11,7 @@ import {demoOf, leaving} from "./view/demo.mjs";
 
 const vscode = acquireVsCodeApi();
 
+/** @type {import("./state.js").PanelState} */
 export const state = {
     screen: "keys",
     layer: 0,
@@ -83,6 +85,7 @@ export const state = {
 // while picking inputs redraws the whole screen. A new combo starts on the
 // keyboard's default window, shown as a placeholder; on a keyboard without
 // one it starts empty.
+/** @param {import("../contracts/panel.js").ComboView | null} [combo] @param {import("../contracts/edits.js").Scalar} [defaultTermMs] */
 export function openComboBuilder(combo = null, defaultTermMs = "") {
     const follows = combo ? Boolean(combo.followsDefault) : defaultTermMs !== "";
     state.combo = {
@@ -102,7 +105,8 @@ export function closeComboBuilder() {
 // that holds its own unstaged text starts again from the model, so nothing on
 // screen shows an edit the draft no longer has.
 // One macro slot's editor state, and a change to part of it.
-export const macroForm = (keycode) => state.macroForms[keycode] || {};
+export const macroForm = (/** @type {string} */ keycode) => state.macroForms[keycode] || {};
+/** @param {string} keycode @param {import("./state.js").MacroForm} fields */
 export function setMacroForm(keycode, fields) {
     state.macroForms = {...state.macroForms, [keycode]: {...state.macroForms[keycode], ...fields}};
 }
@@ -120,14 +124,16 @@ export function resetDraftForms() {
     closeComboBuilder();
 }
 
+/** @type {import("../contracts/panel.js").PublishedModel | null} */
 let model = null;
 let renderer = () => {};
 
 export const getModel = () => model;
-export const setModel = (next) => { model = next; };
-export const setRenderer = (fn) => { renderer = fn; };
+export const setModel = (/** @type {import("../contracts/panel.js").PublishedModel} */ next) => { model = next; };
+export const setRenderer = (/** @type {() => void} */ fn) => { renderer = fn; };
 export const render = () => renderer();
 
+/** @param {import("../contracts/messages.js").PanelCommand} message */
 export function post(message) {
     const draft = model?.draft;
     vscode.postMessage(draft ? {draftId: draft.id, draftRevision: draft.revision, ...message} : message);
@@ -140,10 +146,12 @@ export const currentLayer = () => layers()[state.layer] || layers()[0];
 export const heldLayers = () => layersOn(state.layer, state.layersOn, layers().length);
 export const previewing = () => heldLayers().length > 0;
 // A plain pick shows one layer; ⌘-click adds or removes one from the preview.
+/** @param {number} index */
 export function showLayer(index) {
     state.layer = index;
     state.layersOn = [];
 }
+/** @param {number} index */
 export function toggleLayerOn(index) {
     const selectedKey = () => behaviourKeyAt(layers(), state.layer, heldLayers(), selectedPosition()?.layoutIndex).keycode;
     const before = selectedKey();
@@ -154,7 +162,8 @@ export function toggleLayerOn(index) {
     if (row === state.behaviourRow) return;
     Object.assign(state, {behaviourRow: row, behaviourRoute: {row, group: "view"}, cell: null, cellHow: null});
 }
-export const layerName = (layer) => layer?.displayName || layer?.name || "";
+export const layerName = (/** @type {Partial<Pick<import("../contracts/panel.js").Layer, "name" | "displayName">> | null | undefined} */ layer) => layer?.displayName || layer?.name || "";
+/** @param {import("../contracts/panel.js").Layer | null | undefined} layer @param {number | undefined} index */
 export const positionAt = (layer, index) =>
     (layer?.positions || []).find((position) => position.layoutIndex === index);
 export const selectedPosition = () => positionAt(currentLayer(), state.selected)
@@ -163,11 +172,14 @@ export const selectedPosition = () => positionAt(currentLayer(), state.selected)
 // Editing is only offered where the keyboard says it is possible; everywhere
 // else the control stays visible and disabled, with the reason. The demo's
 // draft has no keyboard, and is editable all the same (core/session/demo-session.js).
-export const writable = () => Boolean(getModel()?.draft?.matching && !getModel()?.draft.stale && !getModel()?.draft.busy
-    && (getModel()?.device?.connected || demoOf(getModel()).active));
+export const writable = () => {
+    const model = getModel(), draft = model?.draft;
+    return Boolean(draft?.matching && !draft.stale && !draft.busy && (model?.device.connected || demoOf(model).active));
+};
 
 // Posts a message that leaves the demo (or replaces its file), asking first
 // when that would lose edits not exported (view/demo.mjs leaving()).
+/** @param {import("../contracts/messages.js").PanelCommand} message */
 export function postLeavingDemo(message) {
     const leave = leaving(getModel(), message);
     if (!leave.ask) {
@@ -182,6 +194,7 @@ export function postLeavingDemo(message) {
 // Whether an area can be edited now, decided in one place: every edit goes
 // into the draft, so the draft must be this keyboard's, current and idle, and
 // the area's own capability must hold. Exporting only reads the keyboard.
+/** @type {Record<string, (model: import("../contracts/panel.js").PublishedModel | null) => boolean>} */
 const AREA_CAPABILITY = {
     behaviours: (model) => Boolean(model?.behaviorEditing?.writable),
     settings: (model) => Boolean(model?.settingsEditing?.writable),
@@ -192,6 +205,7 @@ const AREA_CAPABILITY = {
     layers: (model) => Boolean(model?.portable?.available && !model.portable.busy),
     import: (model) => Boolean(model?.portable?.available && !model.portable.busy),
 };
+/** @param {string} area */
 export function canEdit(area) {
     const model = getModel();
     if (area === "export") return Boolean(model?.portable?.available && !model.portable.busy);

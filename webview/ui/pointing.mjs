@@ -1,3 +1,4 @@
+// @ts-check
 // Pointing modes: the device-owned slots, eight or 32 as the firmware has them.
 // Each one re-reads the trackball as scrolling or as directional keys while its
 // key is held or toggled.
@@ -6,6 +7,7 @@
 // and keeps thresholds, ratios and button overrides under Advanced, where they
 // belong for the once-a-year visit.
 
+// Selector assertions refer to elements created by this module's authored markup.
 import {css, isOff} from "../lib/colour.mjs";
 import {NAME_MAX_BYTES, NAME_TIP} from "../view/names.mjs";
 import {el, esc} from "../lib/dom.mjs";
@@ -24,13 +26,16 @@ import {topbar, unavailable} from "./shell.mjs";
 
 // The words for movement, axes, buttons and scroll fields come with the
 // model (model.vocabulary.pointing), so this editor and the review agree.
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model */
 const words = (model) => vocabulary(model).pointing;
 // A scroll field's label; a field that shows its unit beside it drops the
 // "(ms)" its label carries elsewhere.
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} key @param {string} [unit] */
 const scrollLabel = (model, key, unit) => {
     const label = word(words(model).scrollFields, key);
     return unit ? label.replace(/\s*\(ms\)$/, "") : label;
 };
+/** @type {Readonly<Record<string, string>>} */
 const ARROWS = {up: "↑", left: "←", right: "→", down: "↓", upLeft: "↖", upRight: "↗", downLeft: "↙", downRight: "↘"};
 
 // The four scroll fields the Scrolling card shows itself. A field rendered
@@ -45,7 +50,9 @@ const SCROLL_RATIOS = [["startNumerator", "startDenominator"], ["sustainNumerato
 // under the configured cards, so 32 slots fit beside the editor.
 const FULL_CARD_SLOTS = 8;
 // A slot's binding keycodes come with the model (data/pd-bindings.js).
+/** @param {import("./surface-types.js").PresentedSlot} slot */
 const bindingName = (slot) => slot.binding?.hold || "";
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {number} axis */
 const axisLabel = (model, axis) => word(words(model).axes, axis);
 
 
@@ -60,9 +67,9 @@ export function screenPointing() {
         slots.length && canEdit ? `<span class="note">Changes stage as you make them</span>` : "",
     )}</div>`);
     const content = el(`<div class="content"><div class="pad pd-page"></div></div>`);
-    const pad = content.firstElementChild;
+    const pad = /** @type {HTMLElement} */ (content.firstElementChild);
 
-    if (!slots.length) {
+    if (!model || !slots.length) {
         pad.classList.remove("pd-page");
         pad.appendChild(el(`<div class="screen-stub"><h3>No pointing modes read</h3>
             <p class="note">${esc(unavailable(model) || "This firmware has fixed pointing modes. The configurable-slot firmware and a migrated profile are needed to edit them.")}</p></div>`));
@@ -73,6 +80,7 @@ export function screenPointing() {
     const compact = slots.length > FULL_CARD_SLOTS;
     const list = el(`<nav class="pd-slots ${compact ? "many" : ""}" aria-label="Pointing slots"></nav>`);
     const changedSlots = draftMarks(model?.draft?.changes).pointing;
+    /** @param {import("./surface-types.js").PresentedSlot} slot */
     const pick = (slot) => { state.pdSlot = slot.id; state.pdKind = null; state.pdButtons = null; state.pdTaps = null; render(); };
     for (const slot of slots) {
         if (compact && !slot.kind) continue;
@@ -100,9 +108,10 @@ export function screenPointing() {
 // The empty slots of a keyboard with many, as one grid of numbered chips: the
 // slot to fill next is a click away without 24 cards saying "Empty slot". A
 // chip marks a draft change, and a slot that keys still reach, as its card would.
+/** @param {import("../../contracts/panel.js").PublishedModel} model @param {import("./surface-types.js").PresentedSlot[]} empties @param {ReadonlySet<number>} changedSlots @param {(slot: import("./surface-types.js").PresentedSlot) => void} pick */
 function emptyChips(model, empties, changedSlots, pick) {
     const node = el(`<div class="pd-empties"><div class="pd-empties-h">Empty slots · ${empties.length}</div><div class="pd-chips"></div></div>`);
-    const grid = node.querySelector(".pd-chips");
+    const grid = /** @type {HTMLElement} */ (node.querySelector(".pd-chips"));
     for (const slot of empties) {
         const {keys, behaviours, combos} = bindingsForSlot(model, slot);
         const inert = keys.length + behaviours.length + combos.length;
@@ -117,6 +126,7 @@ function emptyChips(model, empties, changedSlots, pick) {
 
 // A binding for an empty slot is allowed by the keyboard, so the interface
 // explains the consequence instead of the app refusing the edit.
+/** @param {import("../../contracts/panel.js").PublishedModel} model @param {import("./surface-types.js").PresentedSlot} slot */
 function inertNote(model, slot) {
     const {keys, behaviours, combos, layers} = bindingsForSlot(model, slot);
     if (!keys.length && !behaviours.length && !combos.length) return "";
@@ -127,6 +137,7 @@ function inertNote(model, slot) {
     return `<div class="unavailable">${parts.join(" and ")} still reach this slot. The keyboard refuses to activate an empty slot, so they do nothing until it is configured — they do not need to be removed first.</div>`;
 }
 
+/** @param {import("../../contracts/panel.js").PublishedModel} model @param {import("./surface-types.js").PresentedSlot} slot @param {boolean} canEdit @param {import("./surface-types.js").PresentedSlot[]} slots */
 function emptySlot(model, slot, canEdit, slots) {
     const sources = slots.filter((row) => row.kind);
     const node = el(`<div class="pd-editor stack"><div class="card">
@@ -147,50 +158,56 @@ function emptySlot(model, slot, canEdit, slots) {
             : ""}
         ${canEdit ? "" : `<div class="unavailable">${esc(unavailable(model) || "This firmware cannot store configurable pointing modes.")}</div>`}
     </div></div></div>`);
-    node.querySelectorAll("[data-new]").forEach((button) => button.addEventListener("click", () =>
+    /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-new]")).forEach((button) => button.addEventListener("click", () =>
         post(edits.pdMode(slot.id, newMode(slot, Number(button.dataset.new)), model.profileIdentity))));
-    node.querySelector('[data-act="duplicate"]')?.addEventListener("click", () =>
-        post(edits.duplicatePdMode(slot.id, Number(node.querySelector("[data-source]").value), model.profileIdentity)));
+    /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="duplicate"]'))?.addEventListener("click", () =>
+        post(edits.duplicatePdMode(slot.id, Number(/** @type {HTMLSelectElement} */ (node.querySelector("[data-source]")).value), model.profileIdentity)));
     return node;
 }
 
+/** @param {import("../../contracts/panel.js").PublishedModel} model @param {import("./surface-types.js").PresentedSlot} slot @param {boolean} canEdit @param {import("./surface-types.js").PresentedSlot[]} slots */
 function editor(model, slot, canEdit, slots) {
     // The kind being edited, which is the stored one until the Movement select
     // changes it. The form has to be rebuilt on that change: each section
     // registers the readers for its own fields, so a directional record cannot
     // be read out of a scrolling form.
     const kind = state.pdKind?.slot === slot.id ? state.pdKind.kind : slot.kind;
-    if (kind !== slot.kind) slot = startingRecord(slot, kind);
+    // startingRecord spreads the supplied slot, retaining its presentation fields.
+    if (kind !== slot.kind) slot = /** @type {import("./surface-types.js").PresentedSlot} */ (startingRecord(slot, kind));
     const scrolling = kind === KIND.SCROLLING;
     const light = slotLight(model, slot);
     const wrap = el(`<div class="pd-editor stack"></div>`);
-    const form = {};   // live values, read back whenever a complete field changes
+    /** @type {import("./surface-types.js").FormReaders} */
+    const form = {name: () => slot.name, kind: () => slot.kind, dpi: () => slot.dpi};   // live values, read back whenever a complete field changes
     const disabled = canEdit ? "" : "disabled";
     let stageCurrent = () => {};
 
+    /** @param {string} label @param {import("../../contracts/edits.js").Scalar | null | undefined} value @param {string} key @param {import("./surface-types.js").FieldOptions} [options] */
     const field = (label, value, key, options = {}) => {
         const node = el(`<label class="field"><span>${esc(label)}</span>
             <span class="affix ${options.unit ? "unit" : ""} ${options.wide ? "wide" : ""}"><input class="input mono" value="${esc(value ?? "")}" inputmode="numeric" ${disabled}
             ${options.tip ? `data-tip="${esc(options.tip)}"` : ""}>${options.unit ? `<i>${esc(options.unit)}</i>` : ""}</span></label>`);
-        form[key] = () => node.querySelector("input").value;
+        form[key] = () => /** @type {HTMLInputElement} */ (node.querySelector("input")).value;
         return node;
     };
+    /** @param {string} label @param {readonly (readonly [number, string])[]} choices @param {import("../../contracts/edits.js").Scalar | undefined} current @param {string} key @param {import("./surface-types.js").SelectOptions} [options] */
     const select = (label, choices, current, key, options = {}) => {
         const node = el(`<label class="field ${options.inline ? "inline" : ""}"><span>${esc(label)}</span>
             <select class="input" ${disabled} ${options.tip ? `data-tip="${esc(options.tip)}"` : ""}>
             ${choices.map(([value, text]) => `<option value="${value}" ${String(value) === String(current) ? "selected" : ""}>${esc(text)}</option>`).join("")}</select></label>`);
-        form[key] = () => Number(node.querySelector("select").value);
-        if (options.onChange) node.querySelector("select").addEventListener("change", options.onChange);
+        form[key] = () => Number(/** @type {HTMLSelectElement} */ (node.querySelector("select")).value);
+        if (options.onChange) /** @type {HTMLSelectElement} */ (node.querySelector("select")).addEventListener("change", options.onChange);
         return node;
     };
+    /** @param {string} label @param {import("../../contracts/edits.js").Scalar | undefined} code @param {string} key @param {import("./surface-types.js").ShortcutOptions} [options] */
     const shortcut = (label, code, key, options = {}) => {
-        const name = options.name ?? keyName(model, code);
+        const name = options.name ?? keyName(model, Number(code ?? 0));
         const node = el(`<label class="field ${options.klass || ""}"><span>${options.labelHtml || esc(label)}</span>
             <div class="input-row"><input class="input mono" value="${esc(name)}" placeholder="nothing" ${disabled}>
             <button class="btn" data-pick ${disabled}>Pick…</button></div></label>`);
-        const input = node.querySelector("input");
+        const input = /** @type {HTMLInputElement} */ (node.querySelector("input"));
         form[key] = () => input.value.trim();
-        node.querySelector("[data-pick]").addEventListener("click", (event) => {
+        /** @type {HTMLButtonElement} */ (node.querySelector("[data-pick]")).addEventListener("click", (event) => {
             event.preventDefault();   // inside a <label>, a click would also focus the input
             openPicker({
                 title: label, context: `${slot.name} · slot ${slot.id}`,
@@ -206,11 +223,14 @@ function editor(model, slot, canEdit, slots) {
     };
     // Eight modifiers as a Left / Right by Ctrl / Shift / Alt / GUI grid, so
     // each switch sits under its name instead of wrapping wherever it lands.
+    /** @param {string} label @param {number} mask @param {string} key */
     const modifiers = (label, mask, key) => {
         const bits = modifierBits(model);
         const columns = (vocabulary(model).pickerModifiers || []).filter(({bit}) => bit < 16).map(({label}) => label);
+        /** @param {readonly [number, string]} entry */
         const cell = ([bit, name]) => `<label class="sw" data-tip="${esc(name)}"><input type="checkbox" data-bit="${bit}" aria-label="${esc(name)}"
             ${mask & bit ? "checked" : ""} ${disabled}><span class="track"></span></label>`;
+        /** @param {boolean} right */
         const side = (right) => bits.filter(([bit]) => (bit >= 16) === right);
         const node = el(`<div class="field"><span>${esc(label)}</span>
             <div class="pd-mods" style="grid-template-columns:44px repeat(${columns.length}, 58px)">
@@ -218,7 +238,7 @@ function editor(model, slot, canEdit, slots) {
                 <span class="s">Left</span>${side(false).map(cell).join("")}
                 <span class="s">Right</span>${side(true).map(cell).join("")}
             </div></div>`);
-        form[key] = () => [...node.querySelectorAll("[data-bit]")].reduce((total, input) =>
+        form[key] = () => [.../** @type {NodeListOf<HTMLInputElement>} */ (node.querySelectorAll("[data-bit]"))].reduce((total, input) =>
             total | (input.checked ? Number(input.dataset.bit) : 0), 0);
         return node;
     };
@@ -236,16 +256,16 @@ function editor(model, slot, canEdit, slots) {
                     data-tip="Empty this slot. Keys bound to it stay on the board and do nothing until it is configured again.">Clear slot</button>
             </span></div>
         <div class="card-b pd-identity"></div></div>`);
-    const headBody = head.querySelector(".card-b");
+    const headBody = /** @type {HTMLElement} */ (head.querySelector(".card-b"));
     const name = el(`<label class="field"><span>Name</span>
         <input class="input" value="${esc(slot.name)}" maxlength="${NAME_MAX_BYTES}" data-tip="${esc(NAME_TIP)}" ${disabled}></label>`);
-    form.name = () => name.querySelector("input").value.trim();
+    form.name = () => /** @type {HTMLInputElement} */ (name.querySelector("input")).value.trim();
     headBody.append(name);
     headBody.append(select("Movement", words(model).kinds.filter(([value]) => value), kind, "kind",
         // Switching movement only redraws the form for the other kind: its
         // fields start empty, so staging now would post an invalid record.
         // The slot is staged once a field of the new form is changed.
-        {onChange: (event) => { event.stopPropagation(); state.pdKind = {slot: slot.id, kind: Number(event.target.value)}; render(); }}));
+        {onChange: (event) => { event.stopPropagation(); state.pdKind = {slot: slot.id, kind: Number(/** @type {HTMLSelectElement} */ (event.target).value)}; render(); }}));
     headBody.append(select("Pointer speed while active", dpiOptions(model.pdModeEditing?.dpiChoices, slot.dpi), slot.dpi ?? 0, "dpi",
         {tip: "Sensor DPI while this mode runs. Normal pointer speed keeps the DPI set in Mouse → Pointer Speed."}));
     wrap.append(head);
@@ -256,9 +276,9 @@ function editor(model, slot, canEdit, slots) {
         const card = el(`<div class="card">
             <div class="card-h"><h3>What each direction sends</h3><span class="right" data-axis></span></div>
             <div class="card-b stack"><div class="pd-cross ${slot.axis === AXIS.EIGHT ? "eight" : reads.length === 4 ? "" : reads.includes("up") ? "vertical" : "horizontal"}"></div></div></div>`);
-        card.querySelector("[data-axis]").append(select("Reads", words(model).axes, slot.axis, "axis", {inline: true,
+        /** @type {HTMLElement} */ (card.querySelector("[data-axis]")).append(select("Reads", words(model).axes, slot.axis, "axis", {inline: true,
             tip: "Which movement this mode turns into keys. Switching to one axis empties the other axis's shortcuts."}));
-        const cross = card.querySelector(".pd-cross");
+        const cross = /** @type {HTMLElement} */ (card.querySelector(".pd-cross"));
         for (const [direction, label] of DIRECTIONS) {
             if (reads.includes(direction)) {
                 cross.append(shortcut(label, slot.directions?.[direction]?.keycode, `dir:${direction}`, {
@@ -275,9 +295,9 @@ function editor(model, slot, canEdit, slots) {
         }
         // Every directional mode: what moving toward a direction with no
         // shortcut does.
-        card.querySelector(".card-b").append(select("When a direction is empty", words(model).emptyDirection, slot.emptyDirection ?? 0, "emptyDirection",
+        /** @type {HTMLElement} */ (card.querySelector(".card-b")).append(select("When a direction is empty", words(model).emptyDirection, slot.emptyDirection ?? 0, "emptyDirection",
             {tip: "Moving toward a direction with no shortcut: its neighbours take over its share; both neighbours are sent (a diagonal's two straight directions, a straight direction's two diagonals, so in eight directions only); or the move does nothing."}));
-        card.querySelector(".card-b").append(select("How often it sends", words(model).directionOutput, slot.directionOutput ?? 0, "directionOutput",
+        /** @type {HTMLElement} */ (card.querySelector(".card-b")).append(select("How often it sends", words(model).directionOutput, slot.directionOutput ?? 0, "directionOutput",
             {tip: "Every step sends the shortcut again each time the ball moves a threshold further. Once per movement sends it once, however far the ball goes; it sends again when the ball moves back the other way, or after a 150 ms pause. Turning toward another direction sends nothing more."}));
         cross.append(el(`<div class="hub" aria-hidden="true"><svg viewBox="0 0 64 64">
             <circle cx="32" cy="32" r="22"/><circle cx="32" cy="32" r="3"/>
@@ -290,9 +310,9 @@ function editor(model, slot, canEdit, slots) {
         const card = el(`<div class="card">
             <div class="card-h"><h3>Scrolling</h3></div>
             <div class="card-b stack"><div class="pd-grid4"></div><div class="pd-split"></div></div></div>`);
-        const steps = card.querySelector(".pd-grid4");
+        const steps = /** @type {HTMLElement} */ (card.querySelector(".pd-grid4"));
         for (const [key, unit] of SCROLL_LEAD) steps.append(field(scrollLabel(model, key, unit), slot.scroll?.[key], `scroll:${key}`, {unit}));
-        const lower = card.querySelector(".pd-split");
+        const lower = /** @type {HTMLElement} */ (card.querySelector(".pd-split"));
         lower.append(select("Scrolls", words(model).scrollAxes, scrollAxesOf(slot), "scrollAxes",
             {tip: "Which way this mode scrolls. With one axis, a swipe the other way does nothing, and its slight drift does not scroll the allowed axis."}));
         lower.append(select("Reverse scrolling", words(model).invert, slot.scroll?.invert, "invert"));
@@ -319,10 +339,10 @@ function editor(model, slot, canEdit, slots) {
             <button class="btn tiny" data-act="lighting">Edit in Lighting</button>
             <p class="note foot">Clearing the slot leaves its keys where they are. The keyboard keeps its mode keycodes whatever a slot holds, and refuses to activate an empty one — so they do nothing until this slot is configured again.</p>
         </div></div>`);
-    reach.querySelector('[data-act="lighting"]').addEventListener("click", () => {
+    /** @type {HTMLButtonElement} */ (reach.querySelector('[data-act="lighting"]')).addEventListener("click", () => {
         state.screen = "lighting"; state.stage = "pd"; render();
     });
-    reach.querySelector('[data-act="place"]').addEventListener("click", () => {
+    /** @type {HTMLButtonElement} */ (reach.querySelector('[data-act="place"]')).addEventListener("click", () => {
         state.placement = {keycode: bindingName(slot)};
         state.screen = "keys";
         state.tab = "key";
@@ -331,10 +351,11 @@ function editor(model, slot, canEdit, slots) {
     wrap.append(reach);
 
     // ── advanced ──────────────────────────────────────────────────────────
-    const advanced = el(`<details class="card pd-advanced" ${state.pdAdvanced ? "open" : ""}><summary class="card-h">
+    const advanced = /** @type {HTMLDetailsElement} */ (el(`<details class="card pd-advanced" ${state.pdAdvanced ? "open" : ""}><summary class="card-h">
         <svg class="chev" viewBox="0 0 10 10" aria-hidden="true"><path d="M3.5 2l3 3-3 3"/></svg><h3>Advanced</h3><span class="right note">thresholds, ratios, mouse buttons</span></summary>
-        <div class="card-b stack"></div></details>`);
-    const advancedBody = advanced.querySelector(".card-b");
+        <div class="card-b stack"></div></details>`));
+    const advancedBody = /** @type {HTMLElement} */ (advanced.querySelector(".card-b"));
+    /** @param {string} title */
     const section = (title) => {
         const node = el(`<section class="pd-sect"><div class="sect-h"><h4>${esc(title)}</h4></div></section>`);
         advancedBody.append(node);
@@ -348,6 +369,7 @@ function editor(model, slot, canEdit, slots) {
         // once per movement, the threshold is how far a movement has to go.
         const per = slot.directionOutput === 1 ? "movement before it sends" : "movement per tap";
         const dpi = modeDpi(slot, model.configDefaults);
+        /** @param {number} counts */
         const distance = (counts) => {
             const shown = thresholdDistance(counts, dpi);
             return shown ? {unit: shown.short, wide: true, tip: shown.long} : {tip: "Sensor counts at this mode's pointer speed."};
@@ -368,11 +390,11 @@ function editor(model, slot, canEdit, slots) {
         if (rows.length) {
             const table = el(`<div class="pd-taps"><span class="h">Direction</span><span class="h">While modifiers are held</span><span class="h">Left out</span></div>`);
             for (const {key, group, name, label} of rows) {
-                const tap = unfinished[key] || slot[group][name];
+                const tap = unfinished[key] || /** @type {import("../../contracts/edits.js").PdTap} */ (slot[group]?.[name]);
                 const prefix = group === "diagonals" ? "diag" : "dir";
                 const policy = select(`${label} with held modifiers`, words(model).modifierPolicy, tap.modifierPolicy ?? 0, `${prefix}Policy:${name}`,
                     {tip: "Inherit: modifiers you hold apply to the shortcut, so Shift with an arrow selects. Ignore: the modifiers chosen below are left out while it sends. Exact: it sends exactly its shortcut, whatever you hold."});
-                policy.querySelector("span").classList.add("sr");
+                /** @type {HTMLElement} */ (policy.querySelector("span")).classList.add("sr");
                 const masking = tap.modifierPolicy === MODIFIER_POLICY.MASK;
                 const left = masking ? modifierNames(model, tap.mask).join(", ") || "choose at least one below" : "—";
                 table.append(el(`<span class="n">${ARROWS[name]} ${esc(label)}</span>`), policy, el(`<span class="note">${esc(left)}</span>`));
@@ -398,10 +420,10 @@ function editor(model, slot, canEdit, slots) {
         for (const [top, bottom] of SCROLL_RATIOS) {
             const label = scrollLabel(model, top).replace(/\s*·\s*numerator$/, "");
             const pair = el(`<div class="field"><span>${esc(label)}</span><div class="pd-ratio"></div></div>`);
-            const inputs = pair.querySelector(".pd-ratio");
+            const inputs = /** @type {HTMLElement} */ (pair.querySelector(".pd-ratio"));
             for (const [index, key] of [top, bottom].entries()) {
-                const input = el(`<input class="input mono" value="${esc(slot.scroll?.[key] ?? "")}" inputmode="numeric"
-                    aria-label="${esc(`${label} ${index ? "denominator" : "numerator"}`)}" ${disabled}>`);
+                const input = /** @type {HTMLInputElement} */ (el(`<input class="input mono" value="${esc(slot.scroll?.[key] ?? "")}" inputmode="numeric"
+                    aria-label="${esc(`${label} ${index ? "denominator" : "numerator"}`)}" ${disabled}>`));
                 form[`scroll:${key}`] = () => input.value;
                 if (index) inputs.append(el(`<i>:</i>`));
                 inputs.append(input);
@@ -426,7 +448,7 @@ function editor(model, slot, canEdit, slots) {
         (slot.buttons || []).forEach((stored, index) => {
             const button = unfinished[index] || stored;
             const kindSelect = select(`Button ${index + 1}`, words(model).buttons, button.kind, `button:${index}:kind`);
-            kindSelect.querySelector("span").classList.add("sr");
+            /** @type {HTMLElement} */ (kindSelect.querySelector("span")).classList.add("sr");
             const tapping = button.kind === BUTTON.TAP, holding = button.kind === BUTTON.HOLD_MODIFIERS;
             const tap = tapping
                 ? shortcut(`Button ${index + 1} shortcut`, button.tap?.keycode, `button:${index}:tap`,
@@ -465,17 +487,17 @@ function editor(model, slot, canEdit, slots) {
         if (holding || held) render();
     };
     wrap.addEventListener("change", (event) => {
-        if (!event.target.matches("input, select")) return;
+        if (!/** @type {Element} */ (event.target).matches("input, select")) return;
         stageCurrent();
     });
 
-    head.querySelector('[data-act="clear"]').addEventListener("click", () => {
+    /** @type {HTMLButtonElement} */ (head.querySelector('[data-act="clear"]')).addEventListener("click", () => {
         state.pdKind = null;
         state.pdButtons = null;
         state.pdTaps = null;
         post(edits.clearPdMode(slot.id, model.profileIdentity));
     });
-    head.querySelector('[data-act="duplicate"]')?.addEventListener("click", () => {
+    /** @type {HTMLButtonElement | null} */ (head.querySelector('[data-act="duplicate"]'))?.addEventListener("click", () => {
         const target = slots.find((candidate) => !candidate.kind);
         if (!target) return;
         state.pdSlot = target.id;
@@ -487,6 +509,7 @@ function editor(model, slot, canEdit, slots) {
 // Counted through the slot's values rather than its names: a layout position
 // carries whatever the keyboard calls the keycode, which is a bare user keycode
 // or plain hex, not the name this app prints.
+/** @param {import("../../contracts/panel.js").PublishedModel} model @param {import("./surface-types.js").PresentedSlot} slot */
 function placedOn(model, slot) {
     const counts = new Map();
     for (const {layer} of bindingsForSlot(model, slot).keys) {

@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 const assert = require("node:assert/strict"), fs = require("node:fs");
 const {readViaStorage, VIA_STORAGE, viaStorageDigest} = require("../../core/protocol/via-storage-v1");
@@ -8,7 +9,9 @@ assert.equal(compatible, mode === "nonstandard" ? 0 : 1);
 const metadata = Buffer.alloc(13); metadata[0] = 1; metadata.writeUInt16LE(256, 1); metadata.writeUInt16LE(capacity, 3);
 metadata.writeUInt32LE(7, 5); metadata.writeUInt32LE(digest, 9);
 let exchanges = 0;
-const device = {async request(request) {
+/** @type {import("../../core/transport/types.js").RequestConnection} */
+const device = {async request(report) {
+    const request = Buffer.from(report);
     const reply = Buffer.from(request);
     if (request[0] === 8) {
         reply.fill(0, 5);

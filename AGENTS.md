@@ -85,6 +85,7 @@ core/               the app, with no host dependency
   model/            complete portable documents and layer-reference rewrites
   session/          stateful orchestration across a connection
   data/             vendored data, e.g. the keycode catalog
+contracts/          shared panel data declarations, types only, no runtime code
 webview/            the interface: browser ES modules, no build step
   lib/              colour and DOM helpers (pure)
   view/             model → presentation (pure, tested)
@@ -188,6 +189,13 @@ stop and reconsider, not to work around. `tests/layering.test.js` enforces it.
 
 Every layer may also import from itself.
 
+Type-only imports follow the same layer rules. Every layer and host may also
+use `contracts/`, which contains inert declarations importing only from itself.
+The webview shares these posted-data contracts with the host; it still imports
+nothing from `core/`, including types. Put internal types beside their owning
+layer. See [REPOSITORY.md](docs/REPOSITORY.md#type-checking) before extending
+TypeScript coverage or changing the check configuration.
+
 ## Where new work goes
 
 - A new device command or wire format → `protocol/`
@@ -257,7 +265,7 @@ Every layer may also import from itself.
 ## Verification
 
 ```sh
-npm run check                 # syntax across the tree, then all tests
+npm run check                 # syntax across the tree, strict types, then all tests
 npm run keycodes -- --check   # fails if the vendored catalog has drifted
 npm run test:browser          # fixture browser smoke, Chromium required
 npm run preview               # then serve the folder and open preview/index.html

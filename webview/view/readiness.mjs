@@ -1,6 +1,11 @@
+// @ts-check
 // The Configure screens show a board only after a complete editable read.
 // The host keeps the gate closed across the small gaps between HID requests.
 
+/** @typedef {import("../../contracts/model.js").StatusModel} StatusModel */
+/** @typedef {import("../../contracts/model.js").CountedProgress} CountedProgress */
+
+/** @type {Readonly<Record<string, string>>} */
 const PHASES = {
     enumerating: "Looking for a keyboard",
     connecting: "Connecting to the keyboard",
@@ -10,6 +15,7 @@ const PHASES = {
     "reading complete profile": "Reading the complete profile",
 };
 
+/** @type {Readonly<Record<string, string>>} */
 const POST_APPLY_READ = {
     layout: "Reading keys and layers",
     profile: "Reading saved lighting, behaviours and settings",
@@ -17,24 +23,29 @@ const POST_APPLY_READ = {
     baseRgb: "Checking base lighting",
 };
 
+/** @param {{step: string, progress?: CountedProgress | null} | null | undefined} read */
 export function postApplyReadText(read) {
-    const label = POST_APPLY_READ[read?.step] || "Confirming the completed save";
+    const label = (read ? POST_APPLY_READ[read.step] : undefined) || "Confirming the completed save";
     const progress = read?.progress;
-    return Number.isInteger(progress?.done) && Number.isInteger(progress?.total) && progress.total > 0
+    return progress && Number.isInteger(progress.done) && Number.isInteger(progress?.total) && progress.total > 0
         ? `${label} · ${progress.done} of ${progress.total}` : label;
 }
 
 // The commit bar while the keyboard is busy with anything but an Apply: what
 // is happening in words, and whether it writes to the keyboard. Reads and
 // exports save nothing, so they make no claim about the saved profile.
+/** @type {Readonly<Record<string, string>>} */
 const BUSY = {...PHASES, "restoring complete profile": "Saving the profile to both halves"};
 
+/** @param {string} phase */
 export function busyText(phase) {
     return {detail: BUSY[phase] || "Finishing the current step", writes: phase === "restoring complete profile"};
 }
 
+/** @param {StatusModel | null | undefined} model */
 export const configureReady = (model) => model?.load?.state === "ready";
 
+/** @param {StatusModel | null | undefined} model @param {string} screen */
 export function screenAvailable(model, screen) {
     if (!model || model.load?.state === "loading") return false;
     if (screen === "device") return Boolean(model.device?.connected || model.demo?.active);
@@ -42,13 +53,14 @@ export function screenAvailable(model, screen) {
     return configureReady(model);
 }
 
+/** @param {StatusModel | null | undefined} model @param {string} [screen] */
 export function readScreen(model, screen = "keys") {
     // A host that cannot reach a keyboard at all says why, in place of reading.
     if (model?.host?.blocked) return {state: "blocked", title: model.host.blocked.title, detail: model.host.blocked.detail};
     if (!model || model.load?.state === "loading") {
         const phase = model?.load?.phase || "enumerating";
         const progress = model?.load?.progress;
-        const count = Number.isInteger(progress?.done) && Number.isInteger(progress?.total) && progress.total > 0
+        const count = progress && typeof progress !== "string" && Number.isInteger(progress.done) && Number.isInteger(progress.total) && progress.total > 0
             ? ` · ${progress.done} of ${progress.total}` : "";
         return {state: "loading", title: "Reading your keyboard", detail: typeof progress === "string" && progress ? progress : `${PHASES[phase] || "Finishing the read"}${count}`};
     }

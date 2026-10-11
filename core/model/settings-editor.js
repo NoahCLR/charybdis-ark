@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 
 const {layerOfRef} = require("../schema/actions");
@@ -12,14 +13,22 @@ const {supportsUnicodeMacros} = require("../schema/macro-payload");
 const {dpiChoices} = require("./pointer-dpi");
 const {hostKeyLabel} = require("./key-names");
 const {layerName, VOCABULARY} = require("./vocabulary");
+/** @param {string} message */
 const fail = message => Object.assign(new Error(message), {code: "INVALID_SETTINGS_EDIT"});
+/** @param {string} macro @param {number} id @param {string} label @param {string} [hint] @param {Partial<import("../../contracts/model.js").StoredSettingField>} [extra] @returns {import("../../contracts/model.js").StoredSettingField} */
 const number = (macro, id, label, hint = "0–65535 ms", extra = {}) => ({macro, id, label, hint, kind: "number", validate: "nonnegative-int", ...extra});
+/** @param {string} macro @param {number} id @param {string} label @param {string} [hint] @returns {import("../../contracts/model.js").StoredSettingField} */
 const toggle = (macro, id, label, hint) => ({macro, id, label, hint, kind: "toggle"});
-const layer = (macro, id, label) => ({macro, id, label, kind: "layer", validate: "layer"});
+/** @overload @param {string} macro @param {number} id @param {string} label @returns {import("../../contracts/model.js").StoredSettingField} */
+/** @overload @param {string} macro @param {undefined} id @param {string} label @returns {Omit<import("../../contracts/model.js").LayerSettingField, 'record' | 'layer'>} */
+/** @param {string} macro @param {number | undefined} id @param {string} label @returns {import("../../contracts/model.js").SettingFieldBase & {id: number | undefined, kind: 'layer', validate: string}} */
+function layer(macro, id, label) {return {macro, id, label, kind: "layer", validate: "layer"};}
+/** @param {string} macro @param {number} id @param {number} shift @param {string} label @param {string} [hint] */
 const byte = (macro, id, shift, label, hint) => number(macro, id, label, hint || "0–255", {shift, max: 255, validate: "uint8"});
 // A duration the keyboard stores in milliseconds but that only means anything
 // as a share of another one, `of`: it is edited as a whole percentage of that
 // one, and keeps its share when that one changes (see `rescaleShares`).
+/** @param {string} macro @param {number} id @param {number} of @param {string} label @param {string} hint @returns {import("../../contracts/model.js").ShareSettingField} */
 const share = (macro, id, of, label, hint) => ({macro, id, of, label, hint, kind: "share", max: 99, validate: "percent"});
 
 // These are editor definitions, not configuration defaults. Every value below
@@ -32,6 +41,7 @@ const share = (macro, id, of, label, hint) => ({macro, id, of, label, hint, kind
 // `governs` names what a setting is about when that thing has a colour of its
 // own elsewhere — a behaviour tier, a tap-count branch, a pointing slot, a
 // layer — so every surface that shows the setting can mark it the same way.
+/** @type {import("../../contracts/model.js").SettingsSection[]} */
 const sections = [
     {id: "keyTiming", label: "Tap & Hold Timing", fields: [
         number("tappingTerm", 0, "Dual-role tap / hold threshold", "How long LT(), MT(), TT(), OSL() and OSM() keys wait before a press counts as a hold (QMK's tapping term). LT() behaviours with an empty Tap / hold threshold use it too; other behaviours use the Behaviour tap / hold threshold."),
@@ -79,6 +89,7 @@ const sections = [
     ]},
 ];
 
+/** @type {[string, string][]} */
 const optionLabels = [
     ["swapControlCaps", "Swap Left Control and Caps Lock"],
     ["capsToControl", "Use Caps Lock as Left Control"],
@@ -97,6 +108,7 @@ const optionLabels = [
 // Which bits of its settings word a field owns: one flag, a shifted byte or
 // nibble, or the whole word. Reading, writing and putting a field back to the
 // keyboard's value all go through this.
+/** @param {import("../../contracts/model.js").SettingBits} field */
 function fieldMask(field) {
     if (field.bitMask) return field.bitMask >>> 0;
     if (field.shift === undefined) return 0xffffffff;
@@ -104,18 +116,22 @@ function fieldMask(field) {
 }
 // A stored duration as a whole percentage of the one it is a share of, and
 // back. Below 100 whatever the rounding, so a share is always shorter.
+/** @param {number} part @param {number} whole */
 const shareOf = (part, whole) => whole ? Math.min(99, Math.round(part * 100 / whole)) : 0;
+/** @param {number} percent @param {number} whole */
 const shareAt = (percent, whole) => Math.min(whole - 1, Math.round(percent * whole / 100));
 const SHARES = sections.flatMap(section => section.fields).filter(field => field.kind === "share");
 // When a duration changes, every share of it is rescaled to the same exact
 // ratio it had, so the ordering the keyboard insists on still holds. The
 // duration's own field has a minimum of 1, so there is always room below it.
+/** @param {number[]} values @param {readonly number[]} before */
 function rescaleShares(values, before) {
     for (const field of SHARES) {
         const whole = values[field.of], previous = before[field.of];
         if (whole !== previous) values[field.id] = Math.min(whole - 1, Math.round(values[field.id] * whole / previous));
     }
 }
+/** @param {import("../../contracts/model.js").SettingBits & {id: number}} field @param {readonly number[]} values */
 function settingValue(field, values) {
     const bits = (values[field.id] & fieldMask(field)) >>> 0;
     if (field.bitMask && field.kind !== "toggle") return bits;
@@ -126,20 +142,25 @@ function settingValue(field, values) {
 // field layout the Base Lighting section edits.
 const LIGHTING_FIELDS = {enabled: {id: 21, shift: 0}, effect: {id: 21, shift: 8}, speed: {id: 21, shift: 16}, leds: {id: 21, shift: 24},
     hue: {id: 22, shift: 0}, saturation: {id: 22, shift: 8}, brightness: {id: 22, shift: 16}};
+/** @param {readonly number[]} values */
 const baseLighting = values => Object.fromEntries(Object.entries(LIGHTING_FIELDS).map(([name, field]) => [name, settingValue(field, values)]));
 // A field's value placed in its word, leaving every bit it does not own.
+/** @param {import("../../contracts/model.js").SettingBits} field @param {number} word @param {number} number */
 function withSetting(field, word, number) {
     const bits = field.bitMask ? (field.kind === "toggle" ? (number ? field.bitMask : 0) : number & field.bitMask) : field.shift === undefined ? number : number << field.shift;
     return ((word & ~fieldMask(field)) | (bits & fieldMask(field))) >>> 0;
 }
+/** @param {import("./types.js").SnapshotFacts} snapshot @param {import("../schema/types.js").SettingsDomain} settings @param {import("./types.js").ProfileDestination} [capabilities] */
 function settingsSections(snapshot, settings, capabilities) {
     const options = snapshot.options;
     const host = hostSettings(settings.values, snapshot.hostOs?.detected);
+    /** @type {import("../../contracts/model.js").SettingsSection[]} */
     const result = sections.map(section => ({area: "Settings", ...section, fields: section.fields.map(field => ({...field}))}));
-    const rgb = result.find(section => section.id === "rgbAppearance");
+    const rgb = /** @type {import("../../contracts/model.js").SettingsSection} */ (result.find(section => section.id === "rgbAppearance"));
     const {effect: currentEffect, leds: currentFlags} = baseLighting(settings.values);
     const effects = options?.effects.map(effect => ({value: effect.id, label: effect.name.toLowerCase().replace(/_/g, " ").replace(/^./, c => c.toUpperCase())})) || [];
     if (!effects.some(effect => effect.value === currentEffect)) effects.push({value: currentEffect, label: `Current effect (${currentEffect})`});
+    /** @type {[number, string][]} */
     const ledNames = [[1, "Modifiers"], [2, "Underlighting"], [4, "Keys"], [8, "Indicators"]];
     const flags = [{value: 255, label: "All LEDs"}, {value: 0, label: "No LEDs"}];
     if (options) for (let mask = 1; mask < 16; mask++) if (!(mask & ~options.ledFlags)) flags.push({value: mask, label: ledNames.filter(([bit]) => mask & bit).map(([, name]) => name).join(" + ")});
@@ -147,10 +168,12 @@ function settingsSections(snapshot, settings, capabilities) {
     rgb.fields.splice(1, 0,
         {...byte("effectMode", 21, 8, "Lighting effect"), choices: effects, readOnly: !options, hint: options ? "Effects available on this keyboard. Layer colours can override the base effect." : "Update both halves to report the available lighting effects."},
         {...byte("effectLeds", 21, 24, "Apply base effect to"), choices: flags, readOnly: !options, hint: options ? "Choose which LED classes receive the base effect. Layer colours and feedback have their own policies." : "Update both halves to report the LED classes."});
+    /** @param {number} i */
     const name = i => layerName(settings.names, i);
+    /** @template T @param {(i: number) => T} make */
     const everyLayer = make => Array.from({length: SETTINGS.LAYERS}, (_, i) => make(i));
     result.push({id: "startupLayers", area: "Settings", label: "Startup Layers", expanded: false, description: "Choose the layers active when the keyboard starts. Keep at least one selected; higher layers take priority.", fields:
-        everyLayer(i => ({...toggle(`startupLayer${i}`, SETTING.DEFAULT_LAYERS, name(i), `Layer ${i}`), bitMask: 2 ** i, governs: {kind: "layer", layer: i}}))});
+        everyLayer(i => ({...toggle(`startupLayer${i}`, SETTING.DEFAULT_LAYERS, name(i), `Layer ${i}`), bitMask: 2 ** i, governs: {kind: /** @type {const} */ ("layer"), layer: i}}))});
     // Behaviours and combos each have a master switch and one per layer
     // (participation-policy.md): a key takes part only where every switch that
     // applies is on, judged by the layer its key came from. Each behaviour and
@@ -158,18 +181,19 @@ function settingsSections(snapshot, settings, capabilities) {
     // own in the key's editor.
     result.push({id: "behaviorSettings", area: "Settings", label: "Behaviours", fields:
         [toggle("behaviorsEnabled", SETTING.BEHAVIORS_ENABLED, "Enabled", "Turn every behaviour on or off. Off, each key does what it would without one: a plain key, or its own LT() or MT()."),
-            ...everyLayer(i => ({...toggle(`behaviorsOnLayer${i}`, SETTING.LAYER_BEHAVIORS, `On ${name(i)}`, "Keys that come from this layer use their behaviours."), bitMask: 2 ** i, governs: {kind: "layer", layer: i}}))]});
+            ...everyLayer(i => ({...toggle(`behaviorsOnLayer${i}`, SETTING.LAYER_BEHAVIORS, `On ${name(i)}`, "Keys that come from this layer use their behaviours."), bitMask: 2 ** i, governs: {kind: /** @type {const} */ ("layer"), layer: i}}))]});
     // Combos get a section of their own beside their layer matching. The
     // Settings screen adds the default window and hold threshold to it, which
     // the keyboard stores with the combos rather than here.
     result.push({id: "comboSettings", area: "Settings", label: "Combos", fields:
         [toggle("combosEnabled", SETTING.COMBOS_ENABLED, "Enabled", "Turn every combo on or off. Each combo's own window and conditions are set in Keys · Combos."),
-            ...everyLayer(i => ({...toggle(`combosOnLayer${i}`, SETTING.LAYER_COMBOS, `On ${name(i)}`, "Keys that come from this layer can join combos."), bitMask: 2 ** i, governs: {kind: "layer", layer: i}}))]});
+            ...everyLayer(i => ({...toggle(`combosOnLayer${i}`, SETTING.LAYER_COMBOS, `On ${name(i)}`, "Keys that come from this layer can join combos."), bitMask: 2 ** i, governs: {kind: /** @type {const} */ ("layer"), layer: i}}))]});
     // A layer's combo reference is in its layer record, not a setting value.
     result.push({id: "comboReferences", area: "Settings", label: "Combo Layer Matching", expanded: false, description: "Choose which layer supplies the key assignments used to match combos on each layer. Select the same layer to keep its combos independent.", fields:
-        everyLayer(i => ({...layer(`comboReference${i}`, undefined, `Combos on ${name(i)}`), record: "reference", layer: i, governs: {kind: "layer", layer: i}}))});
+        everyLayer(i => ({...layer(`comboReference${i}`, undefined, `Combos on ${name(i)}`), record: /** @type {const} */ ("reference"), layer: i, governs: {kind: /** @type {const} */ ("layer"), layer: i}}))});
     result.push({id: "keyboardOptions", area: "Settings", label: "Key Options", expanded: false, description: options ? "Keyboard-wide remapping and typing options. These apply across all layers." : "Update both halves to report their supported key options.", fields:
         options ? optionLabels.map(([macro, label], i) => ({...toggle(macro, 24, hostKeyLabel(label, host.effective)), bitMask: options.keymapMasks[i], readOnly: !(options.supportedKeymapOptions & (1 << i)), hint: options.supportedKeymapOptions & (1 << i) ? "" : "This option is not enabled in the running firmware."})) : []});
+    /** @param {number} id */
     const label = id => VOCABULARY.hostOs.find(([value]) => value === id)?.[1] || "Unknown";
     const available = Boolean(snapshot.hostOs) || supportsUnicodeMacros(capabilities);
     const layouts = supportsHostLayouts(capabilities);
@@ -180,6 +204,7 @@ function settingsSections(snapshot, settings, capabilities) {
     // The effective OS's layouts first, then US; with no known OS, all of them.
     const osName = [null, "macos", "windows", "linux"][host.effective];
     const offered = hostLayouts().filter(layout => !osName || layout.os === "any" || layout.os === osName || layout.id === host.layout);
+    /** @param {number} id */
     const layoutWord = id => VOCABULARY.hostLayouts.find(([value]) => value === id)?.[1];
     result.push({id: "host", area: "Settings", label: "Host",
         ...(supportsUnicodeMacros(capabilities) && host.effective === 2 && host.unicodeEnabled
@@ -209,6 +234,7 @@ function settingsSections(snapshot, settings, capabilities) {
 
 // Capabilities decide which Host fields can be edited; Review and revert read
 // values without them.
+/** @param {import("./types.js").ProfileSnapshot | null | undefined} snapshot @param {import("./types.js").ProfileDestination} [capabilities] */
 function settingsEditorView(snapshot, capabilities) {
     if (!snapshot?.document || snapshot.incomplete) return null;
     const {settings} = decodedOf(snapshot);
@@ -228,6 +254,7 @@ function settingsEditorView(snapshot, capabilities) {
         timing: Object.fromEntries(["tappingTerm", "tapHoldTerm", "longerHoldTerm", "multiTapTerm"].map((key, id) => [key, String(settings.values[id])]))};
 }
 
+/** @param {import("./types.js").CompleteSnapshot} snapshot @param {import("../../contracts/edits.js").EditOf<"updateConfigDefaults">} message @param {import("./types.js").ProfileDestination} [capabilities] */
 function editSettings(snapshot, message, capabilities) {
     if (!snapshot?.document || !message.expectedFingerprint || message.expectedFingerprint !== snapshot.fingerprint) throw fail("The keyboard changed since these settings were opened. Read the keyboard and review your changes before saving again.");
     const value = validateSnapshot(snapshot.document, capabilities);
@@ -238,12 +265,13 @@ function editSettings(snapshot, message, capabilities) {
         const field = section.fields.find(field => field.macro === input?.macro);
         if (!field || seen.has(input.macro)) throw fail("Unknown or repeated settings field.");
         seen.add(input.macro);
+        /** @type {number} */
         let number;
         if (field.kind === "toggle") {
             if (typeof input.enabled !== "boolean") throw fail(`${field.label} must be enabled or disabled.`);
             number = Number(input.enabled);
         } else {
-            const text = field.kind === "layer" ? (layer => layer < SETTINGS.LAYERS ? String(layer) : undefined)(layerOfRef(input.value)) : input.value;
+            const text = field.kind === "layer" ? (layer => layer !== undefined && layer < SETTINGS.LAYERS ? String(layer) : undefined)(layerOfRef(input.value)) : input.value;
             if (typeof text !== "string" || !/^\d+$/.test(text)) throw fail(`${field.label} needs a whole number${field.kind === "layer" ? " identifying a layer" : ""}.`);
             number = Number(text);
             if (field.macro === "brightness" && number !== baseLighting(value.settings.values).brightness) {
@@ -279,7 +307,7 @@ function editSettings(snapshot, message, capabilities) {
     for (const row of value.behaviors.rows) {
         const old = effectiveTimings({...row, tapHoldTerm: 0, longerHoldTerm: 0, multiTapTerm: 0}, before);
         const next = effectiveTimings({...row, tapHoldTerm: 0, longerHoldTerm: 0, multiTapTerm: 0}, value.settings.values);
-        for (const [field, term] of [["tapHoldTerm", "hold"], ["longerHoldTerm", "long"], ["multiTapTerm", "repeat"]]) {
+        for (const [field, term] of /** @type {const} */ ([["tapHoldTerm", "hold"], ["longerHoldTerm", "long"], ["multiTapTerm", "repeat"]])) {
             if (old[term] !== next[term] && row[field] !== 0 && row[field] === old[term]) {
                 row[field] = 0;
                 behaviorsChanged = true;

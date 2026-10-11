@@ -1,4 +1,6 @@
+// @ts-check
 // Permissions follow the layer supplying a key, including transparent keys.
+/** @param {{participation?: import("../../contracts/model.js").Participation | null} | null | undefined} model @param {number} layer @param {{row: number, column: number}} position @param {{enabled?: boolean, allowedLayers?: number} | null | undefined} definition @param {"behavior" | "combo"} [kind] */
 export function participationAt(model, layer, position, definition, kind = "behavior") {
     const policy = model?.participation;
     if (!policy) return null;

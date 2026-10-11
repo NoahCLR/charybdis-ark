@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 
 const {parsePayload, encodeMacroPayload, macroProgramBytes, MACRO_PROGRAM_MAX} = require("../schema/macro-payload");
@@ -13,19 +14,24 @@ const ENTRY_SETUP = [
 
 // Inspection and staging use the same codec and limits. A partial or oversized
 // edit remains visible locally; inspection never changes a profile.
+/** @param {unknown} payload @param {import("../schema/types.js").MacroOptions & {mode?: number, enabled?: boolean, os?: number, macosIso?: boolean, currentBytes?: number, bankFree?: number, programMax?: number | null}} [options] @returns {import("../../contracts/model.js").MacroInspection} */
 function inspectMacroInput(payload, {unicode = false, mode = 0, enabled = false, layout = US_HOST_LAYOUT, os = 0, macosIso = false, currentBytes = 0, bankFree = 0, protection = "auto", protectionSupported = false, programMax = MACRO_PROGRAM_MAX} = {}) {
+    /** @type {import("../../contracts/model.js").MacroInspection} */
     const result = {bytes: null, program: null, programMax, availableBytes: currentBytes + bankFree, error: "", code: "", typing: []};
     try {
         // Inspect literal text only, not command spelling or escaped braces.
         // Keep its typing route even when a held key makes playback invalid.
         const characters = new Set(parsePayload(payload, {unicode: true}).filter(step => step.kind === "text").flatMap(step => [...step.text]));
         const native = hostLayout(layout);
+        /** @param {string} stroke */
         const swapIso = stroke => macosIso && native?.os === "macos"
             ? stroke.replace(/KC_GRV|KC_NUBS/g, key => key === "KC_GRV" ? "KC_NUBS" : "KC_GRV") : stroke;
-        result.typing = [...characters].map(character => layoutTypes(layout, character)
-            ? {character, method: "layout", strokes: native.strokes[character].map(swapIso)}
+        // Generated typeable characters come from this same stroke table.
+        result.typing = [...characters].map(/** @returns {import("../../contracts/model.js").MacroTypingRoute} */ character => layoutTypes(layout, character)
+            ? {character, method: "layout", strokes: /** @type {string[]} */ (native?.strokes[character]).map(swapIso)}
             : {character, method: mode && unicode ? "unicode" : "unavailable", mode: mode && unicode ? mode : 0});
-        const bytes = encodeMacroPayload(payload, {unicode, textEntry: enabled, layout, protection, protectionSupported});
+        // parsePayload above established that this input is text.
+        const bytes = encodeMacroPayload(/** @type {string} */ (payload), {unicode, textEntry: enabled, layout, protection, protectionSupported});
         result.bytes = bytes.length;
         result.program = macroProgramBytes(bytes);
         const missing = [...characters].find(character => !layoutTypes(layout, character));
@@ -40,14 +46,15 @@ function inspectMacroInput(payload, {unicode = false, mode = 0, enabled = false,
             result.code = "MACRO_BANK_FULL";
         }
     } catch (error) {
-        result.error = error.message;
-        result.code = error.code || "INVALID_MACRO";
+        result.error = error instanceof Error ? error.message : String(error);
+        result.code = error instanceof Error && "code" in error && typeof error.code === "string" ? error.code : "INVALID_MACRO";
     }
     return result;
 }
 
 // Stored macros use the same syntax, host setup and playback limits as edits,
 // without judging whether an existing slot fits the bank a second time.
+/** @param {string} payload @param {{unicodeMode: number, layout: number, effective: number, macosIso?: boolean}} host @param {boolean} [unicode] @param {number | null} [programMax] */
 function inspectMacroPlayback(payload, host, unicode = true, programMax = MACRO_PROGRAM_MAX) {
     const {error, code, typing} = inspectMacroInput(payload, {unicode, mode: host.unicodeMode, enabled: Boolean(host.unicodeMode),
         layout: host.layout, os: host.effective, macosIso: host.macosIso, bankFree: Infinity, programMax});

@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 
 // The words this app uses for what the keyboard stores, in one place.
@@ -11,13 +12,15 @@
 const {RGB_STAGE_BITS} = require("../schema/rgb-domain-v1");
 const {hostLayouts} = require("../data/host-layouts");
 
+/** @type {Readonly<Record<string, string>>} */
 const OS_WORDS = {macos: "macOS", windows: "Windows", linux: "Linux"};
 
-const VOCABULARY = Object.freeze({
+/** @type {Readonly<import("../../contracts/model.js").Vocabulary>} */
+const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.js").Vocabulary} */ ({
     hostOs: [[0, "Auto"], [1, "macOS"], [2, "Windows"], [3, "Linux"]],
     macroProtection: [["auto", "Automatic"], ["on", "On"], ["off", "Off"]],
     // A host layout names its OS, since German on macOS and on Windows differ.
-    hostLayouts: hostLayouts().map(layout => [layout.id, layout.os === "any" ? layout.name : `${layout.name} (${OS_WORDS[layout.os]})`]),
+    hostLayouts: hostLayouts().map(/** @returns {[number, string]} */ layout => [layout.id, layout.os === "any" ? layout.name : `${layout.name} (${OS_WORDS[layout.os]})`]),
     // How a hold tier runs once its threshold passes, in that tier's words: a
     // helper that names a threshold names the tier's own, the Tap / hold
     // threshold for Hold and the Long hold threshold for Long hold. A tap tier
@@ -109,17 +112,22 @@ const VOCABULARY = Object.freeze({
     modifiers: [[1, "Left Ctrl"], [2, "Left Shift"], [4, "Left Alt"], [8, "Left GUI"],
         [16, "Right Ctrl"], [32, "Right Shift"], [64, "Right Alt"], [128, "Right GUI"]],
     comboOptions: {mustHold: "must be held", mustTap: "tap only", ordered: "keys in order"},
-});
+}));
 
 // A word from one of the ordered lists, by the key the keyboard uses; an
 // unknown key reads as itself rather than disappearing.
-const word = (list, key) => (list.find(([id]) => id === key) || [, String(key ?? "")])[1];
+/** @param {import("../../contracts/model.js").WordList<unknown>} list @param {unknown} key @returns {string} */
+const word = (list, key) => (list.find(([id]) => id === key)?.[1] ?? String(key ?? ""));
 
 // The names a person reads for a layer and a pointing slot that have none of
 // their own. Layer 0 is the base layer.
+/** @param {readonly string[] | null | undefined} names @param {number} index */
 const layerName = (names, index) => names?.[index] || (index ? `Layer ${index}` : "Base");
+/** @param {{id: number, kind: number, name: string} | null | undefined} slot @param {number} [id] */
 const slotName = (slot, id = slot?.id) => (slot?.kind && slot.name) || `Slot ${id}`;
+/** @param {number} count */
 const branchName = (count) => VOCABULARY.branches[count - 1] || `${count} taps`;
+/** @param {number} mask */
 const modifierNames = (mask) => VOCABULARY.modifiers.filter(([bit]) => mask & bit).map(([, name]) => name);
 
 module.exports = {VOCABULARY, word, layerName, slotName, branchName, modifierNames};

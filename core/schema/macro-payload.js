@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 
 const catalog = require("../data/keycode-catalog");
@@ -6,12 +7,19 @@ const UNICODE_MACRO_FEATURE = 1 << 21;
 const MACRO_PROTECTION_FEATURE = 1 << 23;
 const MACRO_OUTPUT_ISOLATION_FEATURE = 1 << 26;
 const MACRO_PROTECTION = Object.freeze({AUTO: "auto", ON: "on", OFF: "off"});
-const supportsUnicodeMacros = capabilities => Boolean(capabilities?.featureFlags & UNICODE_MACRO_FEATURE);
-const supportsMacroProtection = capabilities => Boolean(capabilities?.featureFlags & MACRO_PROTECTION_FEATURE);
-const supportsMacroOutputIsolation = capabilities => supportsMacroProtection(capabilities) && Boolean(capabilities?.featureFlags & MACRO_OUTPUT_ISOLATION_FEATURE);
+/** @param {{featureFlags?: number} | null | undefined} capabilities */
+const supportsUnicodeMacros = capabilities => Boolean((capabilities?.featureFlags ?? 0) & UNICODE_MACRO_FEATURE);
+/** @param {{featureFlags?: number} | null | undefined} capabilities */
+const supportsMacroProtection = capabilities => Boolean((capabilities?.featureFlags ?? 0) & MACRO_PROTECTION_FEATURE);
+/** @param {{featureFlags?: number} | null | undefined} capabilities */
+const supportsMacroOutputIsolation = capabilities => supportsMacroProtection(capabilities) && Boolean((capabilities?.featureFlags ?? 0) & MACRO_OUTPUT_ISOLATION_FEATURE);
+/** @param {string} message */
 const fail = message => Object.assign(new Error(message), {code: "INVALID_MACRO"});
-const validKey = key => Number.isInteger(key) && ((key >= 4 && key <= 0xa4) || (key >= 0xe0 && key <= 0xe7));
+/** @param {unknown} key @returns {key is number} */
+const validKey = key => typeof key === "number" && Number.isInteger(key) && ((key >= 4 && key <= 0xa4) || (key >= 0xe0 && key <= 0xe7));
+/** @param {string} text */
 const escapeText = text => text.replace(/[{}]/g, brace => brace + brace);
+/** @param {number} key */
 const keyName = key => catalog.resolve(key).name;
 
 function macroKeycodes() {
@@ -26,9 +34,13 @@ function macroModifierKeycodes() {
 // and {milliseconds}. Doubled braces preserve literal text from device bytes.
 // The keyboard types text through the host layout and the rest by host
 // Unicode entry, which an ordinary key held across it would corrupt.
+/** @param {unknown} payload @param {import("./types.js").MacroOptions} [options] @returns {import("./types.js").MacroStep[]} */
 function parsePayload(payload, {unicode = false, textEntry = false, layout = US_HOST_LAYOUT} = {}) {
     if (typeof payload !== "string") throw fail("Enter a macro as text.");
-    const steps = [], held = new Set();
+    /** @type {import("./types.js").MacroStep[]} */
+    const steps = [];
+    /** @type {Set<number>} */
+    const held = new Set();
     let text = "";
     const flush = () => {
         if (textEntry && [...text].some(character => !layoutTypes(layout, character)) && [...held].some(key => key < 0xE0)) throw fail("Release ordinary keys before text your keyboard layout cannot type, which needs Unicode entry; modifier holds are supported.");
@@ -39,7 +51,8 @@ function parsePayload(payload, {unicode = false, textEntry = false, layout = US_
         if ((char === "{" || char === "}") && payload[index] === char) {text += char; index++; continue;}
         if (char === "}") throw fail("Unexpected }. Use }} for a literal closing brace.");
         if (char !== "{") {
-            const code = payload.codePointAt(index - 1);
+            // The loop has just read this character, so its index is in range.
+            const code = /** @type {number} */ (payload.codePointAt(index - 1));
             if (!(code === 9 || code === 10 || (code >= 32 && code <= 126) || (unicode && code >= 0xA0 && code <= 0x10FFFF && !(code >= 0xD800 && code <= 0xDFFF)))) throw fail(unicode ? "Macro text must contain valid Unicode characters, tabs or newlines; control characters and unpaired surrogates are unsupported." : "This firmware supports ASCII macro text only. Update both halves for Unicode text.");
             if (code > 0xFFFF) {text += payload.slice(index - 1, index + 1); index++;} else text += char;
             continue;
@@ -56,7 +69,7 @@ function parsePayload(payload, {unicode = false, textEntry = false, layout = US_
         const kind = command[0] === "+" ? "down" : command[0] === "-" ? "up" : "tap";
         const names = (kind === "tap" ? command : command.slice(1)).split(",").map(name => name.trim());
         const keys = names.map(name => catalog.encode(name));
-        if (!keys.length || keys.length > 16 || keys.some(key => !validKey(key)) || new Set(keys).size !== keys.length || (kind !== "tap" && keys.length !== 1)) throw fail("Choose up to 16 distinct basic keys for a chord, or one key for a press or release.");
+        if (!keys.length || keys.length > 16 || !keys.every(validKey) || new Set(keys).size !== keys.length || (kind !== "tap" && keys.length !== 1)) throw fail("Choose up to 16 distinct basic keys for a chord, or one key for a press or release.");
         if (kind === "up") {
             if (!held.delete(keys[0])) throw fail("A macro releases a key that is not held.");
         } else {
@@ -72,7 +85,9 @@ function parsePayload(payload, {unicode = false, textEntry = false, layout = US_
 
 // A VIA macro as the bytes QMK stores: text as is, then 1 and an opcode for a
 // key tap (1), press (2), release (3) or a delay (4, digits, '|').
+/** @param {string} payload @param {import("./types.js").MacroOptions} [options] */
 function encodeMacroPayload(payload, options) {
+    /** @type {Buffer[]} */
     const chunks = [];
     const protection = options?.protection ?? "auto";
     if (!Object.values(MACRO_PROTECTION).includes(protection)) throw fail("Choose Automatic, On or Off for uninterruptible playback.");
@@ -95,6 +110,7 @@ function encodeMacroPayload(payload, options) {
     return Buffer.concat(chunks);
 }
 
+/** @param {Buffer} bytes @param {import("./types.js").MacroOptions} [options] */
 function decodeMacroPayload(bytes, options) {
     if (!Buffer.isBuffer(bytes)) throw fail("Invalid macro bytes.");
     let output = "", offset = 0;
@@ -129,10 +145,13 @@ function decodeMacroPayload(bytes, options) {
 // firmware preflights and refills windows, so only the shared bank bounds it.
 const MACRO_PROGRAM_MAX = 512;
 const STREAMING_MACRO_FEATURE = 1 << 27;
-const supportsStreamingMacros = capabilities => Boolean(capabilities?.featureFlags & STREAMING_MACRO_FEATURE);
+/** @param {{featureFlags?: number} | null | undefined} capabilities */
+const supportsStreamingMacros = capabilities => Boolean((capabilities?.featureFlags ?? 0) & STREAMING_MACRO_FEATURE);
 // null means the shared bank is the only size limit.
+/** @param {{featureFlags?: number} | null | undefined} capabilities */
 const macroProgramLimit = capabilities => supportsStreamingMacros(capabilities) ? null : MACRO_PROGRAM_MAX;
 
+/** @param {Uint8Array} bytes @param {import("./types.js").MacroOptions} [options] @returns {"auto" | "on" | "off"} */
 function macroProtectionOf(bytes, {protectionSupported = false} = {}) {
     if (bytes[0] !== 1 || bytes[1] !== 5) return "auto";
     if (!protectionSupported) throw fail("Update both halves to read macro playback protection.");
@@ -145,9 +164,14 @@ function macroProtectionOf(bytes, {protectionSupported = false} = {}) {
 // step: text runs cost 2 bytes per 255 characters plus one per character; a
 // tap 3; a held key's press and release 2 each; a chord of held keys closed
 // around one tap becomes one tap list; a delay 3.
+/** @param {Buffer} bytes */
 function macroProgramBytes(bytes) {
     if (!Buffer.isBuffer(bytes)) throw fail("Invalid macro bytes.");
-    let length = 0, chunk = 0, downs = [], tap = null, matched = 0;
+    let length = 0, chunk = 0, matched = 0;
+    /** @type {number[]} */
+    let downs = [];
+    /** @type {number | null} */
+    let tap = null;
     const flush = () => {
         length += 2 * downs.length + (tap === null ? 0 : 3) + 2 * matched;
         downs = []; tap = null; matched = 0;

@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 
 // The panel's HTML shell. This is host code, not page code: it is the only
@@ -14,8 +15,9 @@ function nonce() {
     return value;
 }
 
+/** @param {import("vscode").Webview} webview @param {import("vscode").Uri} extensionUri */
 function getHtml(webview, extensionUri) {
-    const uri = (...parts) => webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, "webview", ...parts));
+    const uri = (/** @type {string[]} */ ...parts) => webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, "webview", ...parts));
     const id = nonce();
     return `<!doctype html>
 <html lang="en">

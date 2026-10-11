@@ -261,11 +261,12 @@ The UI should branch on `error.code`, not error message text.
 ## Tests
 
 ```sh
-npm run check   # syntax across the tree, then every test
+npm run check   # syntax, strict types, then every test
 npm test        # the tests alone
 ```
 
-The tests use Node's built-in runner and the fake adapter. Golden vectors are
-read from the firmware repository's `tests/fixtures/` and the upstream
-`keyboard.json` in `../bastardkb-qmk`, so the suite expects this checkout's
-sibling layout; the app itself never reads either at runtime.
+The tests use Node's built-in runner and the fake adapter. Golden vectors and
+layout inputs come from the pinned snapshots under `upstream/`; ordinary app
+tests require no sibling checkout. Strict checking uses the layer's local
+declarations and the shared posted-data contracts under `contracts/` (see
+[Type checking](../docs/REPOSITORY.md#type-checking)).

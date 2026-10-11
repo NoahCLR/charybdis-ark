@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 
 const {requestHandled} = require("./via-unhandled-v1");
@@ -38,6 +39,7 @@ const PROFILE_PAYLOAD_V1 = Object.freeze({
     MAX_CHUNKS: 0xffff,
 });
 
+/** @param {unknown} payload */
 function decodePayloadMetadata(payload) {
     const page = normalizePayload(payload, "profile payload metadata page");
     const decoded = {
@@ -72,25 +74,30 @@ function decodePayloadMetadata(payload) {
     return decoded;
 }
 
+/** @param {{payloadLength: number, chunkSize: number}} metadata */
 function chunkCount(metadata) {
     return Math.ceil(metadata.payloadLength / metadata.chunkSize);
 }
 
+/** @param {import("../transport/types.js").RequestConnection} connection @param {import("./types.js").PayloadReadOptions} [options] */
 async function readCommittedPayload(connection, options = {}) {
     return readProfilePayload(connection, PROFILE_PAYLOAD_V1.VALUE, options, options.previous);
 }
 
 // The compiled defaults carry no generation, so there is nothing for the
 // coherence check to compare; they cannot change while the firmware runs.
+/** @param {import("../transport/types.js").RequestConnection} connection @param {import("./types.js").PayloadReadOptions} [options] */
 async function readCompiledPayload(connection, options = {}) {
     return readProfilePayload(connection, PROFILE_PAYLOAD_V1.COMPILED_VALUE, options, options.previous);
 }
 
 
+/** @param {import("../transport/types.js").RequestConnection} connection @param {number} value @param {import("./types.js").PayloadReadOptions} [options] @param {import("./types.js").PayloadRead} [previous] */
 async function readProfilePayload(connection, value, options = {}, previous) {
     assertConnection(connection);
     const retries = normalizeRetryCount(options.generationRetries);
     const requestIds = createRequestIdSource(options);
+    /** @type {{expectedGeneration: number, actualGeneration: number} | undefined} */
     let lastMismatch;
 
     for (let attempt = 0; attempt <= retries; attempt += 1) {
@@ -136,11 +143,13 @@ async function readProfilePayload(connection, value, options = {}, previous) {
     );
 }
 
+/** @param {import("./types.js").PayloadMetadata} left @param {import("./types.js").PayloadMetadata} right */
 function sameMetadata(left, right) { return JSON.stringify(left) === JSON.stringify(right); }
 
 // Both checks, not one. The CRC catches transport damage; the digest is what
 // the rest of the system identifies a generation by, so a mismatch there means
 // this payload is not the generation the device claimed.
+/** @param {Uint8Array} bytes @param {import("./types.js").PayloadMetadata} metadata */
 function verify(bytes, metadata) {
     const actualCrc = crc32(bytes);
     if (actualCrc !== metadata.crc32) {
@@ -158,6 +167,7 @@ function verify(bytes, metadata) {
     }
 }
 
+/** @param {import("../transport/types.js").RequestConnection} connection @param {number} value @param {number} page @param {import("./types.js").RequestIds} requestIds @param {import("./types.js").PayloadReadOptions} options */
 async function requestPage(connection, value, page, requestIds, options) {
     const request = buildProfileGetRequest(value, page, requestIds.next());
     const response = await requestHandled(connection, request, {
@@ -168,6 +178,7 @@ async function requestPage(connection, value, page, requestIds, options) {
     return Buffer.from(decodeProfileResponse(response, request, {allowShortPayload: true}));
 }
 
+/** @param {unknown} value @param {string} label */
 function normalizePayload(value, label) {
     if (!(value instanceof Uint8Array) || value.byteLength < PROFILE_PAYLOAD_V1.METADATA_SIZE) {
         throw protocolError("MALFORMED_RESPONSE", `${label} is shorter than its ${PROFILE_PAYLOAD_V1.METADATA_SIZE}-byte layout.`);
@@ -175,6 +186,7 @@ function normalizePayload(value, label) {
     return Buffer.from(value.buffer, value.byteOffset, value.byteLength);
 }
 
+/** @param {Uint8Array} buffer @param {number} start @param {number} end @param {string} label */
 function assertZeroRange(buffer, start, end, label) {
     for (let index = start; index < Math.min(end, buffer.length); index += 1) {
         if (buffer[index] !== 0) {
@@ -183,6 +195,7 @@ function assertZeroRange(buffer, start, end, label) {
     }
 }
 
+/** @param {import("./types.js").ReadOptions} options */
 function createRequestIdSource(options) {
     if (options.nextRequestId !== undefined) {
         if (typeof options.nextRequestId !== "function") {
@@ -200,6 +213,7 @@ function createRequestIdSource(options) {
     };
 }
 
+/** @param {number} [value] */
 function normalizeRetryCount(value) {
     if (value === undefined) {
         return PROFILE_PAYLOAD_V1.DEFAULT_GENERATION_RETRIES;
@@ -210,24 +224,29 @@ function normalizeRetryCount(value) {
     return value;
 }
 
+/** @param {import("../transport/types.js").RequestConnection} connection */
 function assertConnection(connection) {
     if (!connection || typeof connection.request !== "function") {
         throw new TypeError("connection must provide request(report, options).");
     }
 }
 
+/** @param {Uint8Array} buffer @param {number} offset */
 function readU16(buffer, offset) {
     return buffer[offset] | (buffer[offset + 1] << 8);
 }
 
+/** @param {Uint8Array} buffer @param {number} offset */
 function readU32(buffer, offset) {
     return (buffer[offset] | (buffer[offset + 1] << 8) | (buffer[offset + 2] << 16) | (buffer[offset + 3] << 24)) >>> 0;
 }
 
+/** @param {number} value */
 function hex(value) {
     return `0x${(value >>> 0).toString(16).toUpperCase().padStart(8, "0")}`;
 }
 
+/** @param {string} code @param {string} message @param {Record<string, unknown>} [details] */
 function protocolError(code, message, details = {}) {
     return new ProfileWireProtocolError(code, message, details);
 }

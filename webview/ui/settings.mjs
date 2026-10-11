@@ -1,3 +1,4 @@
+// @ts-check
 // Settings: the keyboard's global policy, exactly as it reports it.
 //
 // The sections, fields, hints and limits all come from the device snapshot, so
@@ -7,6 +8,7 @@
 // this one draws the Settings sections, and Mouse draws its own with the same
 // cards.
 
+// Selector assertions refer to elements created by this module's authored markup.
 import * as edits from "../view/edits.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {getModel, layers, post, render, state, writable, canEdit as canEditArea} from "../store.mjs";
@@ -16,6 +18,7 @@ import {marked} from "./marks.mjs";
 import {githubMark} from "../view/host.mjs";
 
 // The sections a screen draws, by the area the keyboard's model files them in.
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} area */
 export const sectionsIn = (model, area) => (model?.configDefaults || []).filter((section) => section.area === area);
 
 export function screenSettings() {
@@ -29,7 +32,7 @@ export function screenSettings() {
     )}</div>`);
 
     const content = el(`<div class="content"><div class="pad" style="max-width:980px"></div></div>`);
-    const pad = content.firstElementChild;
+    const pad = /** @type {HTMLElement} */ (content.firstElementChild);
     if (!sections.length) {
         pad.appendChild(el(`<div class="screen-stub"><h3>No settings read</h3>
             <p class="note">${esc(unavailable(model) || "Choose Read keyboard to load this keyboard's policy.")}</p></div>`));
@@ -40,6 +43,7 @@ export function screenSettings() {
     }
 
     const query = (state.settingsSearch || "").trim().toLowerCase();
+    /** @param {import("../../contracts/panel.js").PresentedSection} section */
     const matching = (section) => query ? section.fields.filter((field) => matches(field, query)) : section.fields;
     for (const section of sections) {
         const fields = matching(section);
@@ -47,8 +51,8 @@ export function screenSettings() {
         if (!fields.length && !timing.length) continue;
         const card = sectionCard(model, section, fields, canEdit, Boolean(query));
         if (section.id === "comboSettings") {
-            for (const entry of timing) card.querySelector(".rows").appendChild(comboTimingRow(model, entry));
-            card.querySelector(".card-h .tag").textContent = `${section.fields.length + COMBO_TIMING.length} settings`;
+            for (const entry of timing) /** @type {HTMLElement} */ (card.querySelector(".rows")).appendChild(comboTimingRow(model, entry));
+            /** @type {HTMLElement} */ (card.querySelector(".card-h .tag")).textContent = `${section.fields.length + COMBO_TIMING.length} settings`;
         }
         pad.appendChild(card);
     }
@@ -58,16 +62,16 @@ export function screenSettings() {
         const note = el(`<div class="callout row" style="gap:10px;align-items:center">
             <span>${elsewhere} matching setting${elsewhere === 1 ? " is" : "s are"} on the Mouse screen.</span>
             <button class="btn tiny" data-act="mouse">Open Mouse</button></div>`);
-        note.querySelector('[data-act="mouse"]').addEventListener("click", () => { state.screen = "mouse"; render(); });
+        /** @type {HTMLButtonElement} */ (note.querySelector('[data-act="mouse"]')).addEventListener("click", () => { state.screen = "mouse"; render(); });
         pad.appendChild(note);
     }
 
     main.appendChild(content);
-    const search = main.querySelector("#settingsSearch");
+    const search = /** @type {HTMLInputElement} */ (main.querySelector("#settingsSearch"));
     search.addEventListener("input", () => {
         state.settingsSearch = search.value;
         render();
-        const again = document.querySelector("#settingsSearch");
+        const again = /** @type {HTMLInputElement | null} */ (document.querySelector("#settingsSearch"));
         if (again) { again.focus(); again.setSelectionRange(again.value.length, again.value.length); }
     });
     return main;
@@ -86,6 +90,7 @@ export function screenSettings() {
 const COMBO_DEFAULT = {label: "Default combo window", hint: "How close together a combo's keys must be pressed, for every combo without its own window. New combos start on it, and the combos that follow it change with it."};
 const COMBO_HOLD = {label: "Combo hold threshold", hint: "How long a combo that must be held, or is tap only, waits to tell a hold from a tap: this, or its combo window if that is longer. Other combos ignore it. 0 adds no wait beyond the window."};
 const COMBO_TIMING = [COMBO_DEFAULT, COMBO_HOLD];
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {{label: string, hint: string}} entry */
 function comboTimingRow(model, entry) {
     const readback = model?.comboReadback || {};
     const stores = readback.version === 2;
@@ -104,31 +109,33 @@ function comboTimingRow(model, entry) {
     // Posted on its own rather than riding along with whichever combo is saved
     // next. The keyboard always stores a number, so an emptied field is put
     // back rather than read as some default.
-    row.querySelector("input").addEventListener("change", (event) => {
-        const written = event.target.value.trim();
-        if (!written) { event.target.value = stored; return; }
+    /** @type {HTMLInputElement} */ (row.querySelector("input")).addEventListener("change", (event) => {
+        const written = /** @type {HTMLInputElement} */ (event.target).value.trim();
+        if (!written) { /** @type {HTMLInputElement} */ (event.target).value = stored; return; }
         if (written === stored) return;
-        post(hold ? edits.comboHoldTerm(written, model.profileIdentity) : edits.comboDefaultTerm(written, model.profileIdentity));
+        post(hold ? edits.comboHoldTerm(written, model?.profileIdentity) : edits.comboDefaultTerm(written, model?.profileIdentity));
     });
     return row;
 }
 
+/** @param {{label: string, hint?: string}} field @param {string} query */
 const matches = (field, query) => `${field.label} ${field.hint || ""}`.toLowerCase().includes(query);
 
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/panel.js").PresentedSection} section @param {import("../../contracts/panel.js").PresentedField[]} fields @param {boolean} canEdit @param {boolean} [searching] */
 export function sectionCard(model, section, fields, canEdit, searching = false) {
     // A folded section stays open once opened, by hand or by the review's
     // Show, instead of folding again on the next render.
     const opened = (state.settingsOpen || []).includes(section.id);
     const open = searching || section.expanded !== false || opened;
-    const node = el(`<details class="card settings-group" data-section="${esc(section.id)}" ${open ? "open" : ""}>
+    const node = /** @type {HTMLDetailsElement} */ (el(`<details class="card settings-group" data-section="${esc(section.id)}" ${open ? "open" : ""}>
         <summary class="card-h" style="cursor:pointer;list-style:none"><h3>${esc(section.label)}${draftMarks(model?.draft?.changes).settings.has(section.id) ? draftDot() : ""}</h3>
             <span class="right tag">${section.fields.length} setting${section.fields.length === 1 ? "" : "s"}</span></summary>
         ${section.description ? `<div class="card-b" style="padding-bottom:0"><p class="note">${esc(section.description)}</p></div>` : ""}
         <div class="rows"></div>
         ${section.warning ? `<div class="card-b"><div class="callout warn" role="note">${esc(section.warning)}</div></div>` : ""}
         ${section.githubLink ? `<div class="card-b"><a class="btn tiny ghost" href="${esc(section.githubLink.url)}" target="_blank" rel="noopener">${githubMark("settings-help-mark")}<span>${esc(section.githubLink.label)}</span></a></div>` : ""}
-    </details>`);
-    const rows = node.querySelector(".rows");
+    </details>`));
+    const rows = /** @type {HTMLElement} */ (node.querySelector(".rows"));
     if (section.expanded === false) node.addEventListener("toggle", () => {
         const others = (state.settingsOpen || []).filter((id) => id !== section.id);
         state.settingsOpen = node.open ? [...others, section.id] : others;
@@ -137,9 +144,9 @@ export function sectionCard(model, section, fields, canEdit, searching = false) 
     // A section is saved whole: the core validates the complete set, so every
     // field travels together and one changed value cannot half-write a section.
     const submit = () => post(edits.settingsSection(section, (field) => {
-        const input = node.querySelector(`[data-macro="${cssEscape(field.macro)}"]`);
+        const input = /** @type {HTMLInputElement | HTMLSelectElement | null} */ (node.querySelector(`[data-macro="${cssEscape(field.macro)}"]`));
         if (!input) return undefined;
-        return field.kind === "toggle" ? input.checked : input.value;
+        return field.kind === "toggle" ? /** @type {HTMLInputElement} */ (input).checked : input.value;
     }, model?.settingsEditing?.identity));
 
     for (const field of section.fields) {
@@ -149,13 +156,14 @@ export function sectionCard(model, section, fields, canEdit, searching = false) 
     return node;
 }
 
+/** @param {import("../../contracts/panel.js").PresentedField} field @param {boolean} canEdit @param {() => void} submit @param {boolean} hidden @param {boolean} slot */
 function fieldRow(field, canEdit, submit, hidden, slot) {
     const editable = canEdit && !field.readOnly;
     const row = el(`<div class="setrow ${field.readOnly ? "ro" : ""}" ${hidden ? 'style="display:none"' : ""}>
         <div><div class="nm">${marked(getModel(), field.governs, field.label, {slot})}</div>${field.hint ? `<div class="hint">${esc(field.hint)}</div>` : ""}</div>
         <div class="control"></div>
     </div>`);
-    const control = row.querySelector(".control");
+    const control = /** @type {HTMLElement} */ (row.querySelector(".control"));
 
     if (field.readOnly) {
         control.appendChild(el(`<span class="chip"
@@ -165,7 +173,7 @@ function fieldRow(field, canEdit, submit, hidden, slot) {
     if (field.kind === "toggle") {
         const node = el(`<label class="sw"><input type="checkbox" data-macro="${esc(field.macro)}" ${field.enabled ? "checked" : ""} ${editable ? "" : "disabled"}>
             <span class="track"></span><span class="txt muted">${field.enabled ? "On" : "Off"}</span></label>`);
-        node.querySelector("input").addEventListener("change", submit);
+        /** @type {HTMLInputElement} */ (node.querySelector("input")).addEventListener("change", submit);
         control.appendChild(node);
         return row;
     }
@@ -188,9 +196,10 @@ function fieldRow(field, canEdit, submit, hidden, slot) {
     }
     const node = el(`<div class="input-row"><input class="input mono" data-macro="${esc(field.macro)}" value="${esc(field.value)}" ${editable ? "" : "disabled"}>
         ${/ms\b/.test(field.hint || "") || /\(ms\)/.test(field.label) ? `<span class="chip">ms</span>` : ""}</div>`);
-    node.querySelector("input").addEventListener("change", submit);
+    /** @type {HTMLInputElement} */ (node.querySelector("input")).addEventListener("change", submit);
     control.appendChild(node);
     return row;
 }
 
+/** @param {string} value */
 const cssEscape = (value) => String(value).replace(/["\\]/g, "\\$&");

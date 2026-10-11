@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 
 const {MACRO_BANK_BYTES, MACRO_SLOTS, decodedOf, encodeNamedProfile, validateSnapshot} = require("./portable-profile");
@@ -9,6 +10,7 @@ const {hostSettings, supportsHostLayouts} = require("../schema/host-settings");
 const {hostLayout} = require("../data/host-layouts");
 const {inspectMacroInput, inspectMacroPlayback} = require("./macro-input");
 const {VOCABULARY} = require("./vocabulary");
+/** @param {string} message @param {string} [code] */
 const fail = (message, code = "MACRO_EDIT_CONFLICT") => Object.assign(new Error(message), {code});
 
 
@@ -17,6 +19,7 @@ const fail = (message, code = "MACRO_EDIT_CONFLICT") => Object.assign(new Error(
 // empty slot, the highest-numbered empty slots are shown as out of room.
 const SLOT_RESERVE_TAPS = 10, KEY_TAP_BYTES = 3;
 
+/** @param {Buffer[]} slots @param {number} capacity */
 function macroBudget(slots, capacity) {
     const stored = slots.reduce((total, bytes) => total + bytes.length + 1, 1);
     const free = Math.max(0, capacity - stored);
@@ -25,6 +28,7 @@ function macroBudget(slots, capacity) {
     return {capacity, stored, free, outOfRoom: new Set(empty.slice(room)), available: slots.length - (empty.length - room)};
 }
 
+/** @param {import("./types.js").ProfileSnapshot | null | undefined} snapshot @param {import("./types.js").ProfileDestination} [capabilities] */
 function macroEditorView(snapshot, capabilities) {
     if (!snapshot?.document || snapshot.incomplete) return null;
     const {document, settings} = decodedOf(snapshot);
@@ -33,8 +37,11 @@ function macroEditorView(snapshot, capabilities) {
     const protectionSupported = supportsMacroProtection(capabilities);
     const host = hostSettings(settings.values, snapshot.hostOs?.detected);
     const names = settings.macroNames;
+    // hostSettings selects an existing layout, with US as its fallback.
+    const layout = /** @type {NonNullable<ReturnType<typeof hostLayout>>} */ (hostLayout(host.layout));
     const slots = document.macros.map(value => Buffer.from(value, "base64"));
     const budget = macroBudget(slots, capabilities?.viaMacroBytes ?? MACRO_BANK_BYTES);
+    /** @param {Buffer} bytes @param {number} index */
     const slot = (bytes, index) => {
         const program = macroProgramBytes(bytes);
         // Presentation preserves valid stored text, including Review without a
@@ -56,7 +63,7 @@ function macroEditorView(snapshot, capabilities) {
         // Text types through the host layout; what it cannot type needs Unicode
         // entry (mode). The interface judges held keys against layoutChars.
         unicode: {supported: unicode, mode: host.unicodeMode, enabled: host.unicodeEnabled, os: host.effective,
-            layouts: supportsHostLayouts(capabilities), layout: host.layout, layoutFits: host.layoutFits, layoutName: hostLayout(host.layout).name, layoutChars: hostLayout(host.layout).chars},
+            layouts: supportsHostLayouts(capabilities), layout: host.layout, layoutFits: host.layoutFits, layoutName: layout.name, layoutChars: layout.chars},
         viaMacros: slots.map(slot),
         macroBank: {capacity: budget.capacity, stored: budget.stored, free: budget.free, available: budget.available,
             slots: slots.length, reserveTaps: SLOT_RESERVE_TAPS, programMax},
@@ -68,6 +75,7 @@ function macroEditorView(snapshot, capabilities) {
 
 // A macro's steps, its name, or both. A name lives in the profile's settings
 // domain.
+/** @param {import("./types.js").CompleteSnapshot} snapshot @param {{keycode: string, payload?: string, protection?: 'auto' | 'on' | 'off'}} message @param {import("./types.js").ProfileDestination} [capabilities] */
 function macroInputStatus(snapshot, message, capabilities) {
     const index = macroIndex(message.keycode);
     const {document, settings} = decodedOf(snapshot);
@@ -79,18 +87,21 @@ function macroInputStatus(snapshot, message, capabilities) {
         enabled: Boolean(host.unicodeMode), layout: host.layout, os: host.effective, macosIso: host.macosIso, currentBytes: slots[index].length, bankFree: budget.free});
 }
 
+/** @param {string} keycode */
 function macroIndex(keycode) {
     const match = /^VIA_MACRO_(\d+)$/.exec(keycode || "");
-    const index = match && Number(match[1]);
+    const index = match ? Number(match[1]) : -1;
     if (!match || index >= MACRO_SLOTS || String(index) !== match[1]) throw fail("Choose a macro slot reported by the keyboard.");
     return index;
 }
 
+/** @param {import("./types.js").CompleteSnapshot} snapshot @param {import("../../contracts/edits.js").EditPayloads['updateViaMacro'] & {expectedFingerprint: string}} message @param {import("./types.js").ProfileDestination} [capabilities] */
 function editMacro(snapshot, message, capabilities) {
     if (!snapshot?.document || !message.expectedFingerprint || message.expectedFingerprint !== snapshot.fingerprint) throw fail("The keyboard changed since this macro draft was opened. Read the keyboard and review the draft before saving again.");
     const index = macroIndex(message.keycode);
     if (message.payload === undefined && message.name === undefined && message.protection === undefined) throw fail("Send the macro's steps, its name or its playback protection.");
     const value = validateSnapshot(snapshot.document, capabilities);
+    /** @type {import("./types.js").PortableDocument} */
     const document = JSON.parse(JSON.stringify(value.document));
     if (message.payload !== undefined) {
         const unicode = supportsUnicodeMacros(capabilities);

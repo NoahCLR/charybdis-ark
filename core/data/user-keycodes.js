@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 
 // The keyboard's userspace keycodes: fixed blocks the firmware owns, one per
@@ -15,13 +16,18 @@ const CUSTOM_KEY_SLOTS = 128, LAYER_LOCK_SLOTS = 16;
 // Where custom keys were before D-F14: a backup from then names them here.
 const RETIRED_CUSTOM_KEY_BASE = 0x7e40, RETIRED_CUSTOM_KEY_SLOTS = 64;
 
+/** @param {number} slot */
 const customKeyCode = slot => CUSTOM_KEY_BASE + slot;
+/** @param {number} code */
 const customKeyOfCode = code => Number.isInteger(code) && code >= CUSTOM_KEY_BASE && code < CUSTOM_KEY_BASE + CUSTOM_KEY_SLOTS ? code - CUSTOM_KEY_BASE : undefined;
+/** @param {unknown} name */
 const customKeyOfName = name => {
     const match = /^CUSTOM_KEY_(\d+)$/.exec(String(name ?? ""));
     return match && Number(match[1]) < CUSTOM_KEY_SLOTS ? Number(match[1]) : undefined;
 };
+/** @param {number} layer */
 const layerLockCode = layer => LAYER_LOCK_BASE + layer;
+/** @param {number} code */
 const layerLockOfCode = code => Number.isInteger(code) && code >= LAYER_LOCK_BASE && code < LAYER_LOCK_BASE + LAYER_LOCK_SLOTS ? code - LAYER_LOCK_BASE : undefined;
 
 module.exports = {

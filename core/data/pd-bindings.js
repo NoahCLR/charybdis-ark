@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 
 // The keyboard's pointing-mode keycodes: a fixed registry the firmware owns.
@@ -21,6 +22,7 @@ const PD_SLOT_BINDINGS = Object.freeze(Array.from({length: PD_SLOT_CAPACITY}, (_
 })));
 
 // The slot a native keycode or a binding name reaches, and whether it locks.
+/** @param {number} code */
 const pdBindingOfCode = code => {
     for (const binding of PD_SLOT_BINDINGS) {
         if (code === binding.holdCode) return {slot: binding.slot, locked: false};
@@ -28,6 +30,7 @@ const pdBindingOfCode = code => {
     }
     return undefined;
 };
+/** @param {string} name */
 const pdBindingOfName = name => {
     for (const binding of PD_SLOT_BINDINGS) {
         if (name === binding.hold) return {slot: binding.slot, locked: false};

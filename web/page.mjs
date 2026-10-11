@@ -1,3 +1,4 @@
+// @ts-check
 // The web page's host, started with the page's own globals. The build bundles
 // this file and names the worker, the panel and the build it came from
 // (scripts/build-web.js). It loads the panel itself, once the host is running:
@@ -13,7 +14,7 @@ const matchMedia = globalThis.matchMedia?.bind(globalThis);
 
 if (isPhone({matchMedia, screen: globalThis.screen})) {
     document.documentElement.dataset.theme = initialTheme(undefined, Boolean(matchMedia?.("(prefers-color-scheme: light)")?.matches));
-    showPhoneNotice({document, root: document.getElementById("root"), address: location.host, build});
+    showPhoneNotice({document, root: /** @type {HTMLElement} */ (document.getElementById("root")), address: location.host, build});
 } else {
     // WebHID exists only in a secure context (HTTPS or localhost).
     const hid = globalThis.isSecureContext ? navigator.hid : undefined;

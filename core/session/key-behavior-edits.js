@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 
 const {nativeCode} = require("../schema/actions");
@@ -10,11 +11,21 @@ const {behaviorPlacementProblem} = require("../model/profile-placement");
 const {PROFILE_WIRE_FEATURES} = require("../protocol/profile-wire-v1");
 const {profileDepthOptions} = require("../schema/profile-depth");
 
+/**
+ * @typedef {import("../schema/types.js").SemanticAction} Action
+ * @typedef {import("../schema/types.js").BehaviorRow} Row
+ * @typedef {import("../../contracts/edits.js").BehaviorBranch} Branch
+ * @typedef {Omit<import("../../contracts/edits.js").Behavior, 'steps'> & {steps?: import("../../contracts/edits.js").BehaviorStep[], tap?: Branch, hold?: Branch, longHold?: Branch}} BehaviorInput
+ * @typedef {Extract<import("../../contracts/edits.js").PanelEdit, {type: 'deleteBehavior' | 'retargetBehavior'}> | {type: 'saveBehavior' | 'addBehavior', behavior: BehaviorInput}} BehaviorEdit
+ */
 const BEHAVIOR_EDITS = new Set(["saveBehavior", "addBehavior", "deleteBehavior", "retargetBehavior"]);
 const RETARGET_CONFLICTS = new Set(["overwrite", "swap"]);
+/** @param {string} message */
 const invalid = message => Object.assign(new Error(message), {code: "INVALID_BEHAVIOR_EDIT"});
+/** @param {unknown} value */
 const normalized = value => String(value ?? "").replace(/\s+/g, "");
 
+/** @param {unknown} value @param {number} max @param {string} label @param {boolean} [optional] */
 function integer(value, max, label, optional = false) {
     if (optional && (value === undefined || value === null || String(value).trim() === "")) return 0;
     if (!["string", "number"].includes(typeof value) || !/^\d+$/.test(String(value).trim())) throw invalid(`${label} must be a whole number.`);
@@ -23,39 +34,47 @@ function integer(value, max, label, optional = false) {
     return result;
 }
 
+/** @param {Buffer} payload @param {BehaviorEdit} message @param {import("../model/types.js").ProfileDestination} [capabilities] */
 function editKeyBehaviors(payload, message, capabilities = {}) {
-    if (!(capabilities.supportedDomainMask & 2)) throw invalid("This firmware does not support saving key behaviours.");
+    if (!((capabilities.supportedDomainMask || 0) & 2)) throw invalid("This firmware does not support saving key behaviours.");
     const maxPdModes = PD_SLOT_COUNT;
+    /** @type {{rows: Row[]}} */
     const {rows} = decodeKeyBehaviorDomain(payload, profileDepthOptions(capabilities).behaviors);
-    const knownAbi = knownActionAbi(capabilities.actionAbiDigest);
-    const ownsLayerKeys = Boolean(capabilities.featureFlags & PROFILE_WIRE_FEATURES.OWNED_LAYER_TOGGLES);
-    const behaviorQmkFunctions = Boolean(capabilities.featureFlags & PROFILE_WIRE_FEATURES.BEHAVIOR_QMK_FUNCTIONS);
+    const knownAbi = knownActionAbi(capabilities.actionAbiDigest ?? 0);
+    const ownsLayerKeys = Boolean((capabilities.featureFlags || 0) & PROFILE_WIRE_FEATURES.OWNED_LAYER_TOGGLES);
+    const behaviorQmkFunctions = Boolean((capabilities.featureFlags || 0) & PROFILE_WIRE_FEATURES.BEHAVIOR_QMK_FUNCTIONS);
+    /** @param {Action} action */
     const native = action => action.kind === ACTION.QMK_KEYCODE ? action.operand
         : knownAbi ? nativeCode(action) : undefined;
+    /** @param {Action} left @param {Action} right */
     const equivalent = (left, right) => (left.kind === right.kind && left.operand === right.operand)
         || (native(left) !== undefined && native(left) === native(right));
     // The keyboard refuses a profile whose actions sit where it cannot run
     // them, so every row is checked, not only the one being edited.
     const layerCount = capabilities.compiledLayerCount ?? 16;
+    /** @param {Row[]} rows */
     const checkPlacements = (rows) => {
         const problem = behaviorPlacementProblem(rows, {layerCount, behaviorQmkFunctions});
         if (problem) throw invalid(problem);
     };
+    /** @param {Row[]} rows */
     const encode = (rows) => checkPlacements(rows) ?? encodeKeyBehaviorDomain({rows}, {
         limits: {maxRows: capabilities.maxBehaviorRows, maxPopulatedSteps: capabilities.maxPopulatedBehaviorSteps, maxTapStepsPerBehavior: capabilities.maxTapStepsPerBehavior},
         actionLimits: {maxPdModes, maxLogicalLayers: capabilities.compiledLayerCount, maxViaMacroSlots: capabilities.viaMacroSlots, maxCustomKeys: capabilities.customKeySlots},
     });
+    /** @param {unknown} value @param {Action} [previous] @returns {Action} */
     const action = (value, previous) => {
         const name = String(value ?? "").trim();
         if (!name) throw invalid("Choose an action for each enabled behaviour branch.");
         if (previous && normalized(name) === normalized(actionName(previous))) return previous;
+        /** @type {Action} */
         let result;
         const encoded = keycodes.encode(name);
         if (encoded !== undefined && !/^MO\s*\(/.test(name)) {
             // Where an owned layer keycode may go is checked with the rest of the
             // row (behaviorPlacementProblem); only keycodes the keyboard does not
             // run through its layer ownership are refused here.
-            if (keycodes.resolve(encoded).kind === "layer" && !(ownsLayerKeys && isOwnedLayerCode(encoded, capabilities.compiledLayerCount))) {
+            if (keycodes.resolve(encoded).kind === "layer" && !(ownsLayerKeys && isOwnedLayerCode(encoded, capabilities.compiledLayerCount ?? 0))) {
                 throw invalid(ownsLayerKeys
                     ? "DF and PDF are not supported: layer 0 stays the base. Use MO, TG, TO, TT, OSL or LOCK_LAYER."
                     : "Use MO(layer) or LOCK_LAYER(layer) so the keyboard can track layer ownership.");
@@ -72,11 +91,13 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
         }
         return previous && equivalent(previous, result) ? previous : result;
     };
+    /** @param {string} keycode */
     const rowFor = (keycode) => {
         const named = rows.find(row => normalized(actionName(row.target)) === normalized(keycode));
         const target = action(keycode, named?.target);
         return {target, index: rows.findIndex(row => equivalent(row.target, target))};
     };
+    /** @param {Action} target */
     const checkTarget = target => {
         if (native(target) === 0 || native(target) === 1) throw invalid("Transparent keys and KC_NO cannot have a behaviour.");
     };
@@ -90,7 +111,7 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
         checkTarget(to.target);
         if (to.index === from.index) throw invalid("This behaviour already listens to that key.");
         if (to.index >= 0) {
-            if (!RETARGET_CONFLICTS.has(message.conflict)) throw invalid("That key already has a behaviour. Choose to overwrite it or swap the two.");
+            if ((!message.conflict || !RETARGET_CONFLICTS.has(message.conflict))) throw invalid("That key already has a behaviour. Choose to overwrite it or swap the two.");
             if (message.conflict === "swap") {
                 checkTarget(rows[from.index].target);
                 rows[to.index] = {...rows[to.index], target: rows[from.index].target};
@@ -105,6 +126,7 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
         return encode(rows);
     }
 
+    /** @type {BehaviorInput} */
     const form = message.type === "deleteBehavior" ? {keycode: message.keycode} : message.behavior;
     if (!form || typeof form !== "object") throw invalid("Choose a behaviour row to save.");
     const named = rows.find(row => normalized(actionName(row.target)) === normalized(form.keycode));
@@ -121,6 +143,7 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
         const suppliedSteps = message.type === "addBehavior" && form.steps === undefined
             ? [{tapCount: 0, tap: form.tap, hold: form.hold, longHold: form.longHold}] : form.steps;
         if (!Array.isArray(suppliedSteps)) throw invalid("A behaviour must include its tap branches.");
+        /** @type {import("../schema/types.js").BehaviorStep[]} */
         const steps = [];
         const seen = new Set();
         for (const step of suppliedSteps) {
@@ -128,8 +151,9 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
             if (seen.has(tapIndex)) throw invalid("A behaviour cannot repeat a tap branch index.");
             seen.add(tapIndex);
             const oldStep = previous?.steps.find(row => row.tapIndex === tapIndex);
+            /** @type {import("../schema/types.js").BehaviorStep} */
             const next = {tapIndex};
-            for (const field of ["tap", "hold", "longHold"]) {
+            for (const field of /** @type {const} */ (["tap", "hold", "longHold"])) {
                 const branch = step[field];
                 if (!branch) continue;
                 const helper = String(branch.helper ?? "").trim();
@@ -143,7 +167,7 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
                 } else {
                     if (!Object.hasOwn(KEY_BEHAVIOR_HOLD_MODES, helper)) throw invalid(`Unknown hold helper: ${helper}.`);
                     next[field] = {
-                        mode: KEY_BEHAVIOR_HOLD_MODES[helper],
+                        mode: KEY_BEHAVIOR_HOLD_MODES[/** @type {keyof typeof KEY_BEHAVIOR_HOLD_MODES} */ (helper)],
                         repeatHz: helper === "REPEAT_WHILE_HELD" ? integer(branch.repeatHz, 100, "Repeat frequency") : 0,
                         action: action(branch.action, oldStep?.[field]?.action),
                     };

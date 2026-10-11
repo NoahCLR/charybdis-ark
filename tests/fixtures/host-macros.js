@@ -1,9 +1,11 @@
+// @ts-check
 "use strict";
 
 const {compiled, settings, CURRENT_CAPABILITIES} = require("./portable-profile");
 const {encodeMacroPayload} = require("../../core/schema/macro-payload");
 const {fingerprint} = require("../../core/model/portable-profile");
 
+/** @param {number} hostWord @param {string[]} payloads */
 function hostMacros(hostWord, payloads) {
     const policy = settings();
     policy.values[27] = hostWord;

@@ -1,33 +1,53 @@
+// @ts-check
 "use strict";
 const fs = require("node:fs");
 const path = require("node:path");
 const assert = require("node:assert/strict");
 const {spawn} = require("node:child_process");
 const {createInterface} = require("node:readline");
-const {CandidateUploadCoordinator} = require("../../core/session/candidate-upload-coordinator");
+const {CandidateUploadCoordinator, CandidateUploadError} = require("../../core/session/candidate-upload-coordinator");
 const {decodeProfileBlob, encodeProfileBlob, crc32, fnv1a32} = require("../../core/schema/profile-blob-v1");
 const {decodeSettings, encodeSettings} = require("../../core/schema/settings-domain-v1");
 const {document32, CAPABILITIES_32} = require("../fixtures/pd-slots-32");
 const {validateSnapshot} = require("../../core/model/portable-profile");
 const [bin, directory, contractFile] = process.argv.slice(2);
 const {decodeCapabilityPages} = require("../../core/protocol/profile-wire-v1");
-const contract = JSON.parse(fs.readFileSync(contractFile, "utf8"));
+/** @type {unknown} */
+const parsedContract = JSON.parse(fs.readFileSync(contractFile, "utf8"));
+assert(parsedContract && typeof parsedContract === "object" && "capabilityPages" in parsedContract);
+const pages = parsedContract.capabilityPages;
+assert(Array.isArray(pages) && pages.every((/** @type {unknown} */ hex) => typeof hex === "string"));
+const contract = {capabilityPages: /** @type {string[]} */ (pages)};
 const capabilities = decodeCapabilityPages(contract.capabilityPages.map(hex => Buffer.from(hex, "hex")));
+/** @param {Buffer} bytes @param {string} name */
 function rename(bytes, name) {
     const profile = decodeProfileBlob(bytes), settings = profile.domains.find(d => d.id === 0x40);
+    assert(settings, "The profile corpus must contain settings.");
     const decoded = decodeSettings(settings.payload); decoded.names[0] = name;
     settings.payload = encodeSettings(decoded);
     return encodeProfileBlob(profile);
 }
+/** @param {string} label @param {Buffer} source @param {Buffer} target @param {boolean} optimized @param {boolean} [corruptSource] */
 async function run(label, source, target, optimized, corruptSource = false) {
     const input = path.join(directory, `${label}-source.bin`), output = path.join(directory, `${label}-result.bin`);
     fs.writeFileSync(input, source);
     const child = spawn(bin, [input, output, String(CAPABILITIES_32.actionAbiDigest)], {stdio: ["pipe", "pipe", "inherit"]});
+    /** @type {Promise<string> | undefined} */
     let pending;
-    const lines = [], listeners = [];
-    const next = () => lines.length ? Promise.resolve(lines.shift()) : new Promise((resolve, reject) => listeners.push({resolve, reject}));
+    /** @type {string[]} */
+    const lines = [];
+    /** @type {{resolve: (line: string) => void, reject: (error: Error) => void}[]} */
+    const listeners = [];
+    const next = () => {
+        const line = lines.shift();
+        return line !== undefined ? Promise.resolve(line) : new Promise((resolve, reject) => listeners.push({resolve, reject}));
+    };
     const reader = createInterface({input: child.stdout});
-    reader.on("line", line => listeners.length ? listeners.shift().resolve(line) : lines.push(line));
+    reader.on("line", line => {
+        const listener = listeners.shift();
+        if (listener) listener.resolve(line); else lines.push(line);
+    });
+    /** @type {Promise<void>} */
     const closed = new Promise((resolve, reject) => {
         child.on("error", error => {for (const listener of listeners.splice(0)) listener.reject(error); reject(error);});
         child.on("exit", code => {for (const listener of listeners.splice(0)) listener.reject(Error(`Probe exited ${code}`)); code === 0 ? resolve() : reject(Error(`Probe exited ${code}`));});
@@ -36,12 +56,16 @@ async function run(label, source, target, optimized, corruptSource = false) {
     closed.catch(() => {});
     assert.equal(await next(), "ready");
     let requests = 0, uploaded = 0, reused = 0;
+    /** @param {string} line */
     const exchange = async line => {assert.equal(pending, undefined); pending = next(); child.stdin.write(line + "\n"); try {return await pending;} finally {pending = undefined;}};
-    const connection = {request: async (frame, options) => {
+    /** @type {import("../../core/transport/types.js").RequestConnection} */
+    const connection = {request: async (report, options) => {
+        const frame = Buffer.from(report);
         requests++;
         if (frame[0] === 7 && [0x11, 0x1c].includes(frame[2])) uploaded += frame[7];
         if (frame[0] === 7 && frame[2] === 0x1b) reused += frame.readUInt16LE(9);
         const response = Buffer.from(await exchange(frame.toString("hex")), "hex");
+        assert(options?.matchResponse, "The coordinator must supply a response matcher.");
         assert.equal(options.matchResponse(response, frame), true); return response;
     }};
     try {
@@ -51,7 +75,7 @@ async function run(label, source, target, optimized, corruptSource = false) {
         const uploading = coordinator.upload(target, {actionAbiDigest: CAPABILITIES_32.actionAbiDigest, capabilities, viaGeneration: 2, viaDigest: 123,
             streamChunks: optimized, ...(optimized ? {baseSource: {bytes: source, kind: 0, origin: 255, generation: 0, crc32: crc32(source), digest: fnv1a32(source)}} : {})});
         if (corruptSource) {
-            await assert.rejects(uploading, error => error.code === "DEVICE_REJECTED" && error.deviceError.name === "CHECKSUM_MISMATCH");
+            await assert.rejects(uploading, error => error instanceof CandidateUploadError && error.code === "DEVICE_REJECTED" && error.deviceError?.name === "CHECKSUM_MISMATCH");
             return;
         }
         const result = await uploading;
@@ -64,11 +88,16 @@ async function run(label, source, target, optimized, corruptSource = false) {
 (async () => {
     const ordinary = validateSnapshot(document32(), CAPABILITIES_32).profile;
     const fixture = fs.readFileSync(path.join(__dirname, "../../upstream/firmware/tests/fixtures/maximum_profile_v3.fixture"), "utf8");
-    const maximum = Buffer.from(fixture.match(/^profile\.hex=(.*)$/m)[1], "hex");
-    for (const [label, source, target] of [["ordinary-name", ordinary, rename(ordinary, "Fast Apply")],
-        ["maximum-name", maximum, rename(maximum, "Changed name")], ["unchanged-custom", maximum, maximum]]) {
+    const match = fixture.match(/^profile\.hex=(.*)$/m);
+    assert(match, "The maximum profile fixture must contain profile.hex.");
+    const maximum = Buffer.from(match[1], "hex");
+    /** @type {[string, Buffer, Buffer][]} */
+    const cases = [["ordinary-name", ordinary, rename(ordinary, "Fast Apply")],
+        ["maximum-name", maximum, rename(maximum, "Changed name")], ["unchanged-custom", maximum, maximum]];
+    for (const [label, source, target] of cases) {
         if (label !== "unchanged-custom") assert.ok(!source.equals(target), "name edit must change the stored profile");
         const before = await run(label + "-full", source, target, false), after = await run(label + "-delta", source, target, true);
+        assert(before && after, "Successful corpus uploads must return transfer counters.");
         assert.ok(after.uploaded < before.uploaded / 5);
         assert.ok(after.requests < before.requests / 2);
         console.log(`${label}: custom bytes ${before.uploaded} -> ${after.uploaded}; HID exchanges ${before.requests} -> ${after.requests}; reused ${after.reused}; exact C readback and full validation passed`);

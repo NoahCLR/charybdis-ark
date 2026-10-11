@@ -1,7 +1,10 @@
+// @ts-check
 // Lighting: the same shape as Keys. The board is the constant, with the layer
 // tabs on it, and each stage owns a full-width surface in the workbench, whose
 // tabs are the stages in the order the firmware paints them.
 
+// Selector assertions refer to elements created by this module's authored markup.
+import * as controls from "../view/controls.mjs";
 import {css, isOff, label as hsvLabel} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {LED_INDEX, TRACKBALL_LED} from "../view/geometry.mjs";
@@ -19,12 +22,14 @@ import {sectionsIn} from "./settings.mjs";
 import {shareHold} from "../view/share.mjs";
 
 // The key-feedback colour rows, named as their feedback owners are.
+/** @type {{id: import("../../contracts/edits.js").FeedbackColourField, owner: string}[]} */
 const SEMANTIC_ROWS = [
     {id: "tapCommittedColor", owner: "KEY_FEEDBACK_GROUP_TAP_COMMITTED"},
     {id: "holdActiveColor", owner: "KEY_FEEDBACK_GROUP_HOLD_ACTIVE"},
     {id: "longHoldActiveColor", owner: "KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE"},
 ];
 
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} id */
 const stageBit = (model, id) => (model?.rgb?.stages || []).find((stage) => stage.id === id)?.bit;
 
 export function screenLighting() {
@@ -41,10 +46,10 @@ export function screenLighting() {
         "The only colour in this app is colour the keyboard emits. Stages paint in order, and the board below is the result — your draft's result, before anything is applied.",
         `<button class="btn ghost" data-act="read" ${model?.device?.health?.busy ? "disabled" : ""}>Read lighting</button>`,
     )}</div>`);
-    main.querySelector('[data-act="read"]').addEventListener("click", () => post({type: "refresh"}));
+    /** @type {HTMLButtonElement} */ (main.querySelector('[data-act="read"]')).addEventListener("click", () => post(controls.control("refresh")));
 
     const content = el(`<div class="content"><div class="pad keys-pad"></div></div>`);
-    const pad = content.firstElementChild;
+    const pad = /** @type {HTMLElement} */ (content.firstElementChild);
     // The board, what it is showing and the layer tabs under them are one
     // card, as on Keys; on LED groups the board is the LED selector instead.
     const card = el(`<div class="board-card"></div>`);
@@ -79,8 +84,8 @@ export function screenLighting() {
                 data-tip="Add or remove the trackball LED, index ${TRACKBALL_LED}, from this selection.">Trackball LED</button></span>`
             : ""}
     </div>`));
-    card.querySelector('[data-act="clearleds"]')?.addEventListener("click", () => { state.ledPicks = []; render(); });
-    card.querySelector('[data-act="trackball"]')?.addEventListener("click", () => { state.trackball = !state.trackball; render(); });
+    /** @type {HTMLButtonElement | null} */ (card.querySelector('[data-act="clearleds"]'))?.addEventListener("click", () => { state.ledPicks = []; render(); });
+    /** @type {HTMLButtonElement | null} */ (card.querySelector('[data-act="trackball"]'))?.addEventListener("click", () => { state.trackball = !state.trackball; render(); });
     card.append(layerBar());
     pad.appendChild(card);
 
@@ -89,6 +94,7 @@ export function screenLighting() {
     // them, each in the colour it paints now, a stage that is off drawn off.
     // LED groups is no stage; every stage can draw on them.
     const stages = stageOrder(model);
+    /** @param {{id: string, label: string}} stage @param {number} index */
     const stageTab = (stage, index) => {
         const on = stageInEffect(model, stage.id), colour = stageColour(model, stage.id), lit = on && colour && !isOff(colour);
         const idle = stageIdle(model, stage.id);
@@ -106,15 +112,15 @@ export function screenLighting() {
         </div>
         <div class="bench-body" id="benchBody"></div>
     </div>`);
-    bench.querySelectorAll("[data-ltab]").forEach((button) => button.addEventListener("click", () => {
-        state.stage = button.dataset.ltab;
+    /** @type {NodeListOf<HTMLElement>} */ (bench.querySelectorAll("[data-ltab]")).forEach((button) => button.addEventListener("click", () => {
+        state.stage = /** @type {string} */ (button.dataset.ltab);
         render();
     }));
-    const right = bench.querySelector("#benchRight");
+    const right = /** @type {HTMLElement} */ (bench.querySelector("#benchRight"));
     const bit = stageBit(model, state.stage);
     if (bit !== undefined) right.appendChild(stageSwitch(model, state.stage, bit));
-    stageBody(bench.querySelector("#benchBody"));
-    keepInView(bench.querySelector(".bench-tablist"));
+    stageBody(/** @type {HTMLElement} */ (bench.querySelector("#benchBody")));
+    keepInView(/** @type {HTMLElement} */ (bench.querySelector(".bench-tablist")));
     pad.appendChild(bench);
 
     main.appendChild(content);
@@ -122,37 +128,41 @@ export function screenLighting() {
 }
 
 const slotName = slotCalled;
+/** @param {string | undefined} value */
 const localityLabel = (value) => word(vocabulary(getModel()).localities, value);
 
+/** @param {import("../../contracts/panel.js").PublishedModel} model @param {string} id @param {number} bit */
 function stageSwitch(model, id, bit) {
     const on = stageEnabled(model, id);
     const node = el(`<label class="sw" data-tip="Turn this whole stage off without losing the colours it stores.">
         <input type="checkbox" ${on ? "checked" : ""} ${writable() ? "" : "disabled"}><span class="track"></span>
         <span class="txt">${on ? "Stage on" : "Stage off"}</span></label>`);
-    node.querySelector("input").addEventListener("change", (event) => {
+    /** @type {HTMLInputElement} */ (node.querySelector("input")).addEventListener("change", (event) => {
         const mask = model.rgb.stageEnableMask ?? 0;
-        post(edits.rgbStages(mask, bit, event.target.checked));
+        post(edits.rgbStages(mask, bit, /** @type {HTMLInputElement} */ (event.target).checked));
     });
     return node;
 }
 
 // The colour a stage paints now, for its tab: the layer shown, the pointing
 // mode picked, the hold colour for key feedback.
+/** @param {import("../../contracts/panel.js").PublishedModel} model @param {string} id */
 function stageColour(model, id) {
-    return {
+    return /** @type {Record<string, () => import("../../contracts/edits.js").Colour | null | undefined>} */ ({
         base: () => baseColour(model),
         layers: () => layerColourRow(model, currentLayer()?.index)?.color,
         auto: () => model.rgb.automouseFade?.end_color,
         pd: () => pdColourRow(model, state.pdSlot)?.color,
         combo: () => model.rgb.comboFeedback?.color,
         key: () => feedbackColours(model).hold,
-    }[id]?.();
+    })[id]?.();
 }
 
 // How long the auto-mouse colour holds before it fades, as a share of the
 // timeout. The keyboard stores milliseconds and keeps them with its global
 // policy, so this is a settings section, saved whole; a share cannot outlast
 // the timeout, and a new timeout on Mouse carries it along.
+/** @param {import("../../contracts/panel.js").PublishedModel} model @param {string | null} idle */
 function fadeTiming(model, idle) {
     const section = sectionsIn(model, "Lighting").find((entry) => entry.stage === "auto");
     const node = el(`<section><div class="sect-h"><h4>Timing${section && draftMarks(model?.draft?.changes).settings.has(section.id) ? draftDot() : ""}</h4></div></section>`);
@@ -169,13 +179,13 @@ function fadeTiming(model, idle) {
     const control = el(`<label class="field share-field"><span>${esc(field.label)}<b class="mono" data-readout></b></span>
         <input type="range" class="share-range" min="0" max="${esc(field.max)}" step="1" value="${esc(field.value)}" data-macro="${esc(field.macro)}"
             aria-valuetext="" ${editable ? "" : "disabled"} data-tip="${esc(field.hint)}"></label>`);
-    const range = control.querySelector("input");
+    const range = /** @type {HTMLInputElement} */ (control.querySelector("input"));
     const note = el(`<p class="note"></p>`);
     const preview = () => {
-        const percent = Number(range.value), hold = shareHold(field, percent);
+        const percent = Number(range.value), hold = shareHold(/** @type {import("../../contracts/panel.js").PresentedField & {whole: string, ms: string}} */ (field), percent);
         range.style.setProperty("--share", `${percent}%`);
         range.setAttribute("aria-valuetext", `${percent}%, ${hold} ms`);
-        control.querySelector("[data-readout]").textContent = `${percent}%`;
+        /** @type {HTMLElement} */ (control.querySelector("[data-readout]")).textContent = `${percent}%`;
         note.textContent = `Of the ${whole} ms timeout, the colour holds for ${hold} ms, then fades over the last ${whole - hold} ms. The timeout is set on Mouse; changing it keeps this share.`;
     };
     preview();
@@ -192,13 +202,18 @@ function fadeTiming(model, idle) {
 }
 
 /* ── the stage surfaces ────────────────────────────────────────────────── */
+/** @param {HTMLElement} body */
 function stageBody(body) {
     const model = getModel();
+    if (!model) return;
     const canEdit = writable();
     const marks = draftMarks(model?.draft?.changes);
+    /** @param {Parameters<typeof colourEditor>[0]} options */
     const colourControl = (options) => colourEditor({maximumBrightness: model.rgb.maximumBrightness, ...options});
     const node = el(`<div></div>`);
+    /** @param {...Node} nodes */
     const stack = (...nodes) => { const box = el(`<div class="stack" style="gap:12px"></div>`); box.append(...nodes); return box; };
+    /** @param {string} title @param {string} [extra] */
     const section = (title, extra = "") => el(`<section><div class="sect-h"><h4>${esc(title)}</h4>${extra}</div></section>`);
 
     if (state.stage === "base") {
@@ -243,25 +258,26 @@ function stageBody(body) {
         colour.append(colourControl({
             colour: row?.color, canEdit, title: `${layerName(layer)} layer`,
             offNote: "No colour is stored for this layer, so the base effect shows through wherever it would paint.",
-            onChange: (next) => post(edits.layerColour(row.layer, row.mode, next)),
+            onChange: (next) => { if (row) post(edits.layerColour(row.layer, row.mode, next)); },
         }));
         const where = section("Where it paints");
         const mode = el(`<label class="field"><span>Which keys light up</span>
             <select class="input" ${canEdit ? "" : "disabled"}>
                 ${vocabulary(model).paintModes.map(([id, text]) => `<option value="${id}" ${(row?.mode || "KEYS_MAPPED_ON_THIS_LAYER_ONLY") === id ? "selected" : ""}>${esc(text)}</option>`).join("")}
             </select></label>`);
-        mode.querySelector("select").addEventListener("change", (event) =>
-            post(edits.layerColour(row.layer, event.target.value, row.color)));
+        /** @type {HTMLSelectElement} */ (mode.querySelector("select")).addEventListener("change", (event) =>
+            { if (row) post(edits.layerColour(row.layer, /** @type {HTMLSelectElement} */ (event.target).value, row.color)); });
         where.append(stack(mode, el(`<p class="note">Pass-through leaves whatever is underneath visible; transparent keys keep their ▽ on the board either way. The board above is already showing this.</p>`)));
         const overrides = section("LED overrides on this layer", `<span class="right"><button class="btn tiny ghost" data-act="groups">Edit groups</button></span>`);
         overrides.className = "span";
         overrides.append(groupRowsTable(model.rgb.layerLedGroups, "layer"));
-        overrides.querySelector('[data-act="groups"]').addEventListener("click", () => { state.stage = "groups"; render(); });
+        /** @type {HTMLButtonElement} */ (overrides.querySelector('[data-act="groups"]')).addEventListener("click", () => { state.stage = "groups"; render(); });
         main.append(colour, where, overrides);
         node.append(list, main);
     }
 
     if (state.stage === "auto") {
+        /** @type {Partial<import("../../contracts/panel.js").RgbView["automouseFade"]>} */
         const fade = model.rgb.automouseFade || {};
         node.className = "tab-grid three";
         // With auto-mouse off the fade never runs, so its controls are shown
@@ -273,14 +289,14 @@ function stageBody(body) {
             node.classList.add("idle");
             const notice = el(`<div class="unavailable span"><span>${esc(idle)} A pointer layer turned on by hand shows its own layer lighting. The fade settings below are kept for when auto-mouse is back on.</span>
                 <button class="btn tiny" style="justify-self:start">Open Mouse → Auto-mouse</button></div>`);
-            notice.querySelector("button").addEventListener("click", () => { state.screen = "mouse"; state.reveal = '.settings-group[data-section="autoMouse"]'; render(); });
+            /** @type {HTMLButtonElement} */ (notice.querySelector("button")).addEventListener("click", () => { state.screen = "mouse"; state.reveal = '.settings-group[data-section="autoMouse"]'; render(); });
             node.append(notice);
         }
         const policy = section("Fade");
         const select = el(`<label class="field"><span>Fade mode</span><select class="input" ${editFade ? "" : "disabled"}>
             ${vocabulary(model).fadeModes.map(([id, text]) => `<option value="${id}" ${fade.mode === id ? "selected" : ""}>${text}</option>`).join("")}</select></label>`);
-        select.querySelector("select").addEventListener("change", (event) =>
-            post(edits.automouseFade(event.target.value, fade.end_color)));
+        /** @type {HTMLSelectElement} */ (select.querySelector("select")).addEventListener("change", (event) =>
+            { if (fade.end_color) post(edits.automouseFade(/** @type {HTMLSelectElement} */ (event.target).value, fade.end_color)); });
         policy.append(stack(select, el(`<p class="note">Where the fade lands once the auto-mouse layer drops out. The board shows the destination, not the animation.</p>`)));
         const endColour = section("End colour");
         const unused = fade.mode === "FOLLOW_REAL_DESTINATION";
@@ -288,7 +304,7 @@ function stageBody(body) {
             ? el(`<div class="row" style="gap:10px;opacity:.5"><span class="swatch-lg ${isOff(fade.end_color) ? "swatch-off" : ""}" style="width:34px;height:34px;${isOff(fade.end_color) ? "" : `background:${css(fade.end_color)}`}"></span>
                 <div><div style="font-size:12.5px">Unused in this mode</div><div class="note mono">${esc(hsvLabel(fade.end_color))}</div></div></div>`)
             : colourControl({colour: fade.end_color, canEdit: editFade, title: "Fade destination",
-                onChange: (next) => post(edits.automouseFade(fade.mode, next))}));
+                onChange: (next) => { if (fade.mode !== undefined) post(edits.automouseFade(fade.mode, next)); }}));
         if (unused) endColour.append(el(`<p class="note" style="margin-top:10px">Follow-the-real-destination lands on whatever the board would show once the auto-mouse layer drops out, so the end colour is not read. It stays disabled rather than pretending to matter.</p>`));
         node.append(policy, endColour, fadeTiming(model, idle));
     }
@@ -312,18 +328,18 @@ function stageBody(body) {
         colour.append(colourControl({
             colour: row?.color, canEdit, title: `${slotName(model, state.pdSlot)} while active`,
             offNote: "No colour is stored, so this mode paints nothing while it runs.",
-            onChange: (next) => post(edits.pdModeColour(PD_MODE_IDS[state.pdSlot], row.locality, next)),
+            onChange: (next) => { if (row) post(edits.pdModeColour(PD_MODE_IDS[state.pdSlot], row.locality, next)); },
         }));
         const where = section("Where it paints");
         const locality = el(`<label class="field"><span>Locality</span>
             <select class="input" ${canEdit ? "" : "disabled"}
                 data-tip="The overlay is not drawn on the key that binds the mode; it paints this region while the mode runs.">
             ${vocabulary(model).localities.map(([id, text]) => `<option value="${id}" ${row?.locality === id ? "selected" : ""}>${text}</option>`).join("")}</select></label>`);
-        locality.querySelector("select").addEventListener("change", (event) =>
-            post(edits.pdModeColour(PD_MODE_IDS[state.pdSlot], event.target.value, row.color)));
+        /** @type {HTMLSelectElement} */ (locality.querySelector("select")).addEventListener("change", (event) =>
+            { if (row) post(edits.pdModeColour(PD_MODE_IDS[state.pdSlot], /** @type {HTMLSelectElement} */ (event.target).value, row.color)); });
         const previewSwitch = el(`<label class="sw"><input type="checkbox" ${state.pdPreview ? "checked" : ""}><span class="track"></span>
             <span class="txt">Preview it active on the board</span></label>`);
-        previewSwitch.querySelector("input").addEventListener("change", (event) => { state.pdPreview = event.target.checked; render(); });
+        /** @type {HTMLInputElement} */ (previewSwitch.querySelector("input")).addEventListener("change", (event) => { state.pdPreview = /** @type {HTMLInputElement} */ (event.target).checked; render(); });
         where.append(stack(locality, previewSwitch));
         const note = section("What this stage does");
         note.className = "span";
@@ -334,19 +350,20 @@ function stageBody(body) {
     }
 
     if (state.stage === "combo") {
+        /** @type {Partial<import("../../contracts/panel.js").RgbView["comboFeedback"]>} */
         const combo = model.rgb.comboFeedback || {};
         node.className = "tab-grid three";
         const colour = section("Colour");
         colour.append(colourControl({
             colour: combo.color, canEdit, title: "Combo feedback",
             offNote: "No colour is stored, so combo keys are not repainted while their inputs are held.",
-            onChange: (next) => post(edits.comboFeedback(combo.locality, next)),
+            onChange: (next) => { if (combo.locality !== undefined) post(edits.comboFeedback(combo.locality, next)); },
         }));
         const where = section("Where it paints");
         const locality = el(`<label class="field"><span>Locality</span><select class="input" ${canEdit ? "" : "disabled"}>
             ${vocabulary(model).localities.map(([id, text]) => `<option value="${id}" ${combo.locality === id ? "selected" : ""}>${text}</option>`).join("")}</select></label>`);
-        locality.querySelector("select").addEventListener("change", (event) =>
-            post(edits.comboFeedback(event.target.value, combo.color)));
+        /** @type {HTMLSelectElement} */ (locality.querySelector("select")).addEventListener("change", (event) =>
+            { if (combo.color) post(edits.comboFeedback(/** @type {HTMLSelectElement} */ (event.target).value, combo.color)); });
         where.append(stack(locality));
         const onBoard = section("On the board");
         onBoard.append(el(`<div class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:10px">${(model.combos || []).slice(0, 8).map((row) =>
@@ -357,10 +374,12 @@ function stageBody(body) {
     }
 
     if (state.stage === "key") {
+        /** @type {Partial<import("../../contracts/edits.js").KeyFeedback<import("../../contracts/edits.js").Colour>>} */
         const feedback = model.rgb.keyBehaviorFeedback || {};
+        /** @type {{id: import("../../contracts/edits.js").FeedbackRow, label: string, colour: import("../../contracts/edits.js").Colour | undefined}[]} */
         const rows = [
             ...SEMANTIC_ROWS.map((row) => ({...row, label: word(vocabulary(model).feedbackOwners, row.owner), colour: feedback[row.id]})),
-            ...(feedback.tapBranchColors || []).map((colour, index) => ({id: `branch:${index}`, label: branchName(model, index + 2), colour})),
+            ...(feedback.tapBranchColors || []).map((colour, index) => ({id: /** @type {const} */ (`branch:${index}`), label: branchName(model, index + 2), colour})),
         ];
         if (!rows.some((row) => row.id === state.feedbackRow)) state.feedbackRow = rows[0]?.id;
         const current = rows.find((row) => row.id === state.feedbackRow) || rows[0];
@@ -379,21 +398,22 @@ function stageBody(body) {
         colour.append(colourControl({
             colour: current?.colour, canEdit, title: current?.label || "",
             offNote: "No colour is stored for this semantic, so the keyboard flashes nothing for it.",
-            onChange: (next) => post(edits.keyFeedback(model.rgb.keyBehaviorFeedback, current.id, next)),
+            onChange: (next) => { if (current) post(edits.keyFeedback(model.rgb.keyBehaviorFeedback, current.id, next)); },
         }));
         const policy = section("Policy");
         const commit = el(`<label class="field"><span>Tap commit</span><select class="input" ${canEdit ? "" : "disabled"}>
             ${vocabulary(model).tapCommit.map(([id, text]) => `<option value="${id}" ${feedback.tapCommitMode === id ? "selected" : ""}>${text}</option>`).join("")}</select></label>`);
-        commit.querySelector("select").addEventListener("change", (event) =>
-            post(edits.keyFeedback(model.rgb.keyBehaviorFeedback, null, null, {tapCommitMode: event.target.value})));
+        /** @type {HTMLSelectElement} */ (commit.querySelector("select")).addEventListener("change", (event) =>
+            post(edits.keyFeedback(model.rgb.keyBehaviorFeedback, null, null, {tapCommitMode: /** @type {HTMLSelectElement} */ (event.target).value})));
         const locality = el(`<label class="field"><span>Where</span><select class="input" ${canEdit ? "" : "disabled"}>
             ${vocabulary(model).localities.map(([id, text]) => `<option value="${id}" ${feedback.locality === id ? "selected" : ""}>${text}</option>`).join("")}</select></label>`);
-        locality.querySelector("select").addEventListener("change", (event) =>
-            post(edits.keyFeedback(model.rgb.keyBehaviorFeedback, null, null, {locality: event.target.value})));
+        /** @type {HTMLSelectElement} */ (locality.querySelector("select")).addEventListener("change", (event) =>
+            post(edits.keyFeedback(model.rgb.keyBehaviorFeedback, null, null, {locality: /** @type {HTMLSelectElement} */ (event.target).value})));
         policy.append(stack(commit, locality, el(`<p class="note">The flash interval lives in Settings → Lighting feedback, because the keyboard stores it with its timing.</p>`)));
         const onBoard = section("On the board");
         onBoard.className = "span";
         const colours = feedbackColours(model);
+        /** @param {import("../../contracts/edits.js").Colour} colour */
         const dot = (colour) => `<i class="fbdot" style="${stageEnabled(model, "key") && !isOff(colour) ? `background:${css(colour)}` : "background:none;border-style:dashed"}"></i>`;
         onBoard.append(el(`<div class="row" style="gap:12px;flex-wrap:wrap;margin-bottom:10px">
             <span class="chip">${dot(colours.tap)} tap branch</span>
@@ -417,15 +437,18 @@ function stageBody(body) {
 // A row's owner by the name its dropdown offers, with the owner's mark —
 // the layer's colour, the pointing mode's light, the feedback tier's dot —
 // as the review shows the same row.
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} target @param {string} owner */
 function ownerCell(model, target, owner) {
     const name = rowOwners(model, target).find(([value]) => value === owner)?.[1] ?? owner ?? "—";
     const layer = target === "layer" && /^Layer (\d+)$/.exec(owner || "");
-    const slot = target === "pdMode" ? (model.rgb.pdModeColors || []).findIndex((row) => row.pointingMode === owner) : -1;
+    const slot = target === "pdMode" ? (model?.rgb.pdModeColors || []).findIndex((row) => row.pointingMode === owner) : -1;
     const tier = target === "keyBehavior" && {KEY_FEEDBACK_GROUP_TAP_COMMITTED: "tap", KEY_FEEDBACK_GROUP_HOLD_ACTIVE: "hold", KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE: "long"}[owner];
+    /** @type {import("../../contracts/model.js").ReviewMark | null} */
     const markOf = layer ? {kind: "layer", layer: Number(layer[1])} : slot >= 0 ? {kind: "pointing", slot} : tier ? {kind: "tier", tier} : null;
     return marked(model, markOf, name);
 }
 
+/** @param {import("../../contracts/panel.js").LedRow[] | undefined} rows @param {string} target */
 function groupRowsTable(rows, target) {
     const model = getModel();
     if (!rows?.length) return el(`<p class="note" style="margin-top:8px">No LED override rows in this table. Rows override the stage colour on the LEDs they name.</p>`);
@@ -436,7 +459,7 @@ function groupRowsTable(rows, target) {
             <td><span class="swatch-lg ${isOff(row.color) ? "swatch-off" : ""}" style="width:13px;height:13px;border-radius:4px;display:inline-block;vertical-align:-2px;${isOff(row.color) ? "" : `background:${css(row.color)}`}"></span>
                 <code class="dim" style="margin-left:6px">${esc(hsvLabel(row.color))}</code>${isOff(row.color) ? ` <span class="note">inherits the stage colour</span>` : ""}</td>
             <td style="text-align:right"><button class="btn tiny ghost" data-remove="${index}" ${writable() ? "" : "disabled"}>Remove</button></td></tr>`).join("")}</tbody></table>`);
-    node.querySelectorAll("[data-remove]").forEach((button) => button.addEventListener("click", () =>
+    /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-remove]")).forEach((button) => button.addEventListener("click", () =>
         post(edits.deleteLedRow(target, Number(button.dataset.remove)))));
     return node;
 }
@@ -444,20 +467,23 @@ function groupRowsTable(rows, target) {
 // Who a row belongs to depends on its table: a layer, a pointing mode, a key
 // feedback state, or — for combo feedback — nobody, since every combo shares
 // one colour. The values are the names the host's RGB enums use.
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} target @returns {readonly (readonly [string, string])[]} */
 function rowOwners(model, target) {
-    if (target === "layer") return [...layers().map((layer) => [`Layer ${layer.index}`, layerName(layer)]), ["RGB_LAYER_GROUP_ALL", "All layers"]];
-    if (target === "pdMode") return [...(model.rgb.pdModeColors || []).map((row, index) =>
-        [row.pointingMode, slotCalled(model, index)]), ["RGB_PD_MODE_GROUP_ALL", "All pointing modes"]];
+    if (target === "layer") return [...layers().map((layer) => /** @type {[string, string]} */ ([`Layer ${layer.index}`, layerName(layer)])), ["RGB_LAYER_GROUP_ALL", "All layers"]];
+    if (target === "pdMode") return [...(model?.rgb.pdModeColors || []).map((row, index) =>
+        /** @type {[string, string]} */ ([row.pointingMode, slotCalled(model, index)])), ["RGB_PD_MODE_GROUP_ALL", "All pointing modes"]];
     if (target === "keyBehavior") return vocabulary(model).feedbackOwners;
     return [];
 }
 
+/** @param {import("../../contracts/panel.js").PublishedModel} model @param {boolean} canEdit */
 function groupBuilder(model, canEdit) {
     const groups = model.rgb.ledGroups || [];
     const draft = state.ledRow;
     const owners = rowOwners(model, draft.target);
     if (!owners.some(([value]) => value === draft.owner)) draft.owner = owners[0]?.[0] ?? "";
     if (draft.source && !groups.some((group) => group.name === draft.source)) draft.source = "";
+    /** @param {string} value @param {string} text @param {string} current */
     const option = (value, text, current) => `<option value="${esc(value)}" ${value === current ? "selected" : ""}>${esc(text)}</option>`;
     const node = el(`<aside class="stack" style="gap:12px">
         <div class="sect-h"><h4>New row from the selection</h4><span class="right tag">${state.ledPicks.length} LEDs</span></div>
@@ -470,9 +496,9 @@ function groupBuilder(model, canEdit) {
             ${option("", "Inline selection from the board", draft.source)}
             ${groups.map((group) => option(group.name, `${group.name} · ${group.ledIndices.length} LEDs`, draft.source)).join("")}</select></label>
     </aside>`);
-    node.querySelector("[data-target]").addEventListener("change", (event) => { draft.target = event.target.value; draft.owner = ""; render(); });
-    node.querySelector("[data-owner]")?.addEventListener("change", (event) => { draft.owner = event.target.value; });
-    node.querySelector("[data-source]").addEventListener("change", (event) => { draft.source = event.target.value; });
+    /** @type {HTMLElement} */ (node.querySelector("[data-target]")).addEventListener("change", (event) => { draft.target = /** @type {HTMLSelectElement} */ (event.target).value; draft.owner = ""; render(); });
+    /** @type {HTMLElement | null} */ (node.querySelector("[data-owner]"))?.addEventListener("change", (event) => { draft.owner = /** @type {HTMLSelectElement} */ (event.target).value; });
+    /** @type {HTMLElement} */ (node.querySelector("[data-source]")).addEventListener("change", (event) => { draft.source = /** @type {HTMLSelectElement} */ (event.target).value; });
     node.append(colourEditor({
         colour: state.rowColour || {h: "0", s: "0", v: "0"}, canEdit, title: "Row colour",
         maximumBrightness: model.rgb.maximumBrightness,
@@ -484,10 +510,10 @@ function groupBuilder(model, canEdit) {
             data-tip="Pick LEDs on the board, or choose a saved group, to give the row something to paint.">Keep row in draft</button>
         <button class="btn ghost" data-act="save" ${canEdit ? "" : "disabled"}
             data-tip="Store this selection as a named group other rows can point at.">Save selection as a group</button></div>`);
-    actions.querySelector('[data-act="keep"]').addEventListener("click", () => {
+    /** @type {HTMLButtonElement} */ (actions.querySelector('[data-act="keep"]')).addEventListener("click", () => {
         post(edits.ledRow(draft, ledIndices(), state.rowColour));
     });
-    actions.querySelector('[data-act="save"]').addEventListener("click", () =>
+    /** @type {HTMLButtonElement} */ (actions.querySelector('[data-act="save"]')).addEventListener("click", () =>
         post(edits.saveLedGroup(ledIndices())));
     node.append(actions);
     node.append(el(`<p class="note">Rows are applied in device order, so a later row wins on the LEDs it shares.</p>`));
@@ -499,6 +525,7 @@ const ledIndices = () => {
     return state.trackball ? [...indices, TRACKBALL_LED] : indices;
 };
 
+/** @param {import("../../contracts/panel.js").PublishedModel} model @param {boolean} canEdit */
 function groupTables(model, canEdit) {
     const groups = model.rgb.ledGroups || [];
     const node = el(`<div class="stack" style="gap:16px"></div>`);
@@ -511,14 +538,14 @@ function groupTables(model, canEdit) {
                     ${canEdit && !group.usageCount ? "" : "disabled"}
                     data-tip="${group.usageCount ? "Rows still refer to this group, so it cannot be deleted." : "Delete this group."}">Remove</button></td></tr>`).join("")}
             </tbody></table>` : `<p class="note">This keyboard has no reusable LED groups yet.</p>`}</div>`));
-    node.querySelectorAll("[data-delete]").forEach((button) => button.addEventListener("click", () =>
-        post(edits.deleteLedGroup(button.dataset.delete))));
-    for (const [title, rows, target] of [
+    /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-delete]")).forEach((button) => button.addEventListener("click", () =>
+        post(edits.deleteLedGroup(/** @type {string} */ (button.dataset.delete)))));
+    for (const [title, rows, target] of /** @type {[string, import("../../contracts/panel.js").LedRow[] | undefined, string][]} */ ([
         ["Rows in the layer table", model.rgb.layerLedGroups, "layer"],
         ["Rows in the pointing-mode table", model.rgb.pdModeLedGroups, "pdMode"],
         ["Rows in the combo table", model.rgb.comboFeedbackLedGroups, "combo"],
         ["Rows in the key feedback table", model.rgb.keyBehaviorFeedbackLedGroups, "keyBehavior"],
-    ]) {
+    ])) {
         const box = el(`<div><div class="sect-h"><h4>${title}</h4><span class="right tag">${rows?.length || 0} rows</span></div></div>`);
         box.append(groupRowsTable(rows, target));
         node.append(box);

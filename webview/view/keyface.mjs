@@ -1,3 +1,16 @@
+// @ts-check
+/** @typedef {import("../../contracts/panel.js").ComboView} ComboView */
+/** @typedef {import("../../contracts/panel.js").BehaviorView} BehaviorView */
+/** @typedef {import("../../contracts/panel.js").Layer} Layer */
+/** @typedef {import("../../contracts/panel.js").Position} Position */
+/** @typedef {import("./keyface-types.js").PointingSlot} PointingSlot */
+/** @typedef {import("./keyface-types.js").ComboGroupEntry} ComboGroupEntry */
+/** @typedef {import("./keyface-types.js").ComboGroups} ComboGroups */
+/** @typedef {import("./keyface-types.js").BehaviorCombo} BehaviorCombo */
+/** @typedef {import("./keyface-types.js").ComboRoute} ComboRoute */
+/** @typedef {import("./keyface-types.js").ReachEntry} ReachEntry */
+/** @typedef {import("./keyface-types.js").ResolvedKey} ResolvedKey */
+/** @typedef {import("./keyface-types.js").ViewModel} ViewModel */
 // What a key shows: its legend, and the marks for everything it reaches.
 //
 // The model already resolved each position to a display label; this adds the
@@ -6,7 +19,8 @@
 const TRANSPARENT = new Set(["KC_TRANSPARENT", "KC_TRNS", "_______"]);
 const DISABLED = new Set(["KC_NO", "XXXXXXX"]);
 
-export function keyFace(position) {
+/** @returns {import("./keyface-types.js").KeyFace} */
+export function keyFace(/** @type {import("../../contracts/panel.js").Position | null | undefined} */ position) {
     if (!position) return {main: "", sub: "", kind: "none"};
     const keycode = position.keycode || "";
     if (TRANSPARENT.has(keycode)) return {main: "▽", sub: "", kind: "transparent"};
@@ -34,8 +48,9 @@ export function keyFace(position) {
 // and LT(3,KC_F) all name layer 3. A stored name the host knows by a semantic
 // one (QK_USER_31 → LOCK_LAYER(3)) is read by that. Null for any other key.
 const LAYER_KEYCODE = /^(?:MO|TG|TT|OSL|TO|DF|PDF|LOCK_LAYER)\(\s*(\d+)\s*\)$|^LT\(\s*(\d+)\s*,/;
+/** @param {ViewModel} model @param {string} keycode */
 export function layerOfKeycode(model, keycode) {
-    const name = model?.qmkKeycodeAliases?.[keycode] ?? keycode;
+    const name = model?.qmkKeycodeAliases?.[keycode ?? ""] ?? keycode;
     const match = LAYER_KEYCODE.exec(String(name ?? ""));
     return match ? Number(match[1] ?? match[2]) : null;
 }
@@ -43,15 +58,18 @@ export function layerOfKeycode(model, keycode) {
 // A key by its whole name, for anything that is not a key cap. A cap shows what
 // fits — "F" over "Navigation" — and the name is the host's for the keycode,
 // "F / Navigation" (core/model/key-names.js).
+/** @param {Position | null | undefined} position */
 export function keyName(position) {
     const face = keyFace(position);
     if (face.kind === "transparent") return "Transparent";
     if (face.kind === "disabled" || face.kind === "none") return "Unmapped";
-    return position.editLabel || face.main || position.keycode || "";
+    return position?.editLabel || face.main || position?.keycode || "";
 }
 
+/** @type {Record<string, string>} */
 const LAYER_VERBS = {MO: "momentary", TO: "move", TG: "toggle", OSL: "one-shot", DF: "default", PDF: "default", TT: "tap-toggle"};
 // Only for a position the host has not named: the layer the keycode holds.
+/** @param {string} name */
 const shortLayer = (name) => name.replace(/^LAYER_/, "").toLowerCase();
 
 // A position carries two names: the one the keyboard stores (`QK_USER_16`, or
@@ -59,11 +77,12 @@ const shortLayer = (name) => name.replace(/^LAYER_/, "").toLowerCase();
 // of the profile uses (`PD_SLOT_0`, `VIA_MACRO_0`, `LEFT_THUMB`). Behaviour
 // rows, macro slots and pointing slots are all keyed by the second, so every
 // lookup from a key to what it reaches goes through this.
-export const keyMeaning = (position) => position?.semantic || position?.keycode || "";
+export const keyMeaning = (/** @type {import("../../contracts/panel.js").Position | null | undefined} */ position) => position?.semantic || position?.keycode || "";
 
 // Macro slots have one profile name across all 64 slots, even though QMK's
 // catalogue names only the first 32 native values. Keep position.keycode for
 // round-trip edits; use this when a screen prints that keycode to a person.
+/** @param {ViewModel} model @param {string} name */
 export const visibleKeycode = (model, name) => {
     const semantic = model?.qmkKeycodeAliases?.[name] || name || "";
     return /^VIA_MACRO_(?:[0-9]|[1-5][0-9]|6[0-3])$/.test(semantic) ? semantic : name || "";
@@ -73,8 +92,9 @@ export const visibleKeycode = (model, name) => {
 // vocabulary gives it, so a behaviour row, a reach line and the key cap all
 // call one key the same thing. Names the vocabulary does not cover — a device
 // action outside the advertised ABI — keep their numeric identity.
+/** @param {ViewModel} model @param {string} name */
 export const actionLabel = (model, name) => model?.qmkKeyLabels?.[name]
-    || model?.qmkKeyLabels?.[model?.qmkKeycodeAliases?.[name]]
+    || model?.qmkKeyLabels?.[model?.qmkKeycodeAliases?.[name] ?? ""]
     || String(name ?? "");
 
 // What a behaviour cell reads as in the grid: the name a person knows the key
@@ -82,12 +102,14 @@ export const actionLabel = (model, name) => model?.qmkKeyLabels?.[name]
 // stores KC_HASH, LSFT(KC_ENTER) and MO(1). Every name comes from the host
 // (core/model/key-names.js); with none, the keycode is the label. The cell
 // editor keeps the keycode.
+/** @param {ViewModel} model @param {import("../../contracts/panel.js").Branch | null | undefined} branch */
 export function cellLabel(model, branch) {
     const action = String(branch?.action ?? "");
     const named = actionLabel(model, action);
     return named !== action ? named : branch?.label || action;
 }
 
+/** @param {ViewModel} model @param {string} keycode */
 export const behaviourFor = (model, keycode) =>
     (model?.keyBehaviors || []).find((row) => row.keycode === keycode);
 
@@ -95,6 +117,7 @@ export const behaviourFor = (model, keycode) =>
 // row says KC_ENTER and LGUI(KC_C), and an expression may or may not space its
 // arguments or nest two modifiers either way round. Every name goes through the
 // keyboard's alias table, and every modifier wrapper becomes one ordered set.
+/** @type {Record<string, string[]>} */
 const WRAPPER_MODS = {
     C: ["LCTL"], LCTL: ["LCTL"], S: ["LSFT"], LSFT: ["LSFT"], A: ["LALT"], LALT: ["LALT"], LOPT: ["LALT"],
     G: ["LGUI"], LGUI: ["LGUI"], LCMD: ["LGUI"], LWIN: ["LGUI"],
@@ -103,8 +126,9 @@ const WRAPPER_MODS = {
     LAG: ["LALT", "LGUI"], LCAG: ["LCTL", "LALT", "LGUI"], MEH: ["LCTL", "LSFT", "LALT"], HYPR: ["LCTL", "LSFT", "LALT", "LGUI"],
 };
 const MOD_ORDER = ["LCTL", "LSFT", "LALT", "LGUI", "RCTL", "RSFT", "RALT", "RGUI"];
-export function canonicalKeycode(model, expression) {
+export function canonicalKeycode(/** @type {Partial<import("../../contracts/panel.js").PublishedModel> | null | undefined} */ model, /** @type {string} */ expression) {
     let text = String(expression ?? "").replace(/\s+/g, "");
+    /** @type {Set<string>} */
     const mods = new Set();
     for (let match; (match = /^([A-Z]+)\((.*)\)$/.exec(text)) && WRAPPER_MODS[match[1]];) {
         WRAPPER_MODS[match[1]].forEach((mod) => mods.add(mod));
@@ -115,7 +139,7 @@ export function canonicalKeycode(model, expression) {
 }
 
 // The behaviour row a picked expression would land on, however it is spelled.
-export const behaviourListeningTo = (model, expression) => {
+export const behaviourListeningTo = (/** @type {Partial<import("../../contracts/panel.js").PublishedModel> | null | undefined} */ model, /** @type {string} */ expression) => {
     const wanted = canonicalKeycode(model, expression);
     return (model?.keyBehaviors || []).find((row) => canonicalKeycode(model, row.keycode) === wanted);
 };
@@ -130,11 +154,14 @@ export const behaviourListeningTo = (model, expression) => {
 // the firmware falls back to when nothing active answers, so the set of layers
 // that can answer is right either way — only whether an answer needs a layer
 // held would be misread, and only on a keyboard whose default has moved.
+/** @param {number} at */
 export function activations(at) {
     return activationSets(Array.from({length: Math.max(0, at - 1)}, (_, index) => index + 1));
 }
 
+/** @param {number[]} layers */
 function activationSets(layers) {
+    /** @type {number[][]} */
     const sets = [[]];
     for (const layer of layers) {
         for (const held of [...sets]) sets.push([...held, layer]);
@@ -150,7 +177,7 @@ function activationSets(layers) {
  * layer is skipped entirely — it neither answers nor blocks — so `held` names
  * the layers on besides layer 0 and this one.
  */
-export function resolvedPositions(stack, at, held = []) {
+export function resolvedPositions(/** @type {import("../../contracts/panel.js").Layer[]} */ stack, /** @type {number} */ at, /** @type {number[]} */ held = []) {
     const active = new Set([0, at, ...held]);
     const resolved = [];
     for (const position of stack[at]?.positions || []) {
@@ -185,6 +212,7 @@ export function resolvedPositions(stack, at, held = []) {
  * inputs have to answer at the same time, under one activation, so they
  * enumerate instead.
  */
+/** @param {Layer[]} stack @param {number} at */
 export function reachablePositions(stack, at) {
     const reachable = [];
     for (const position of stack[at]?.positions || []) {
@@ -207,12 +235,14 @@ export function reachablePositions(stack, at) {
 // layers sorts by the nearest one to the default, which is also the layer its
 // row names first. Sorting is stable, so entries from one layer keep the order
 // the board gave them.
+/** @param {import("./keyface-types.js").SortableReach} entry */
 const sourceRank = (entry) => Math.min(
     entry.layer ? entry.layer.index ?? 0 : Infinity,
     ...(entry.keys || []).filter((key) => key.fellThrough).map((key) => key.layer?.index ?? 0),
-    ...(entry.behaviours || []).filter((row) => row.layer).map((row) => row.layer.index ?? 0),
+    ...(entry.behaviours || []).filter((row) => row.layer).map((row) => row.layer?.index ?? 0),
     ...(entry.combos || []).flatMap((route) => route.keys).filter((key) => key.fellThrough).map((key) => key.layer?.index ?? 0),
 );
+/** @template {import("./keyface-types.js").SortableReach} T @param {T[]} entries */
 const downTheStack = (entries) => [...entries].sort((one, other) => sourceRank(one) - sourceRank(other));
 
 /**
@@ -223,6 +253,7 @@ const downTheStack = (entries) => [...entries].sort((one, other) => sourceRank(o
  * through. For anything a combo sends, the keys you chord to fire it. A key answered from a layer below keeps its physical position, which
  * is what the board draws.
  */
+/** @param {Layer[]} stack @param {number} at @param {Partial<Pick<ReachEntry, "keys" | "behaviours" | "combos">> | null | undefined} entry @param {number[] | null} [held] */
 export function reachKeys(stack, at, entry, held = null) {
     const indexes = new Set([...(entry?.keys || []), ...(entry?.combos || []).flatMap((route) => route.keys)]
         .map((key) => key.position.layoutIndex));
@@ -238,6 +269,7 @@ export function reachKeys(stack, at, entry, held = null) {
 // The view is one actual activation: the selected layer plus the layers the
 // user has previewed under it. Keep it separate from the layer reach lists,
 // which deliberately include every *possible* activation of that layer.
+/** @param {ViewModel} model @param {Layer[]} stack @param {number} at @param {number[]} held */
 function comboAnswerEntries(model, stack, at, held) {
     const reference = comboReferenceLayer(model, at);
     const referenced = reference !== at && stack[reference];
@@ -247,21 +279,27 @@ function comboAnswerEntries(model, stack, at, held) {
         : resolvedPositions(stack, at, held);
 }
 
+/** @param {ViewModel} model @param {Layer[]} stack @param {number} at @param {number[]} [held] */
 export function combosInView(model, stack, at, held = []) {
     const resolved = comboAnswerEntries(model, stack, at, held);
+    // comboKeysAmong returns positions from these exact entries, so every lookup exists.
     const answering = new Map(resolved.map((entry) => [entry.position, entry]));
     return (model?.combos || []).flatMap((combo) => {
         const found = comboKeysAmong(resolved.map((entry) => entry.position), combo);
         return (combo.inputs || []).length && found.covered >= combo.inputs.length
-            ? [{combo, keys: found.keys.map((position) => answering.get(position))}] : [];
+            ? [{combo, keys: found.keys.map((position) => /** @type {ResolvedKey} */ (answering.get(position)))}] : [];
     });
 }
 
+/** @param {ViewModel} model @param {Layer[]} stack @param {number} at @param {number[]} [held] */
 export function behavioursInView(model, stack, at, held = []) {
+    /** @type {Map<string, {row: BehaviorView; keys: ResolvedKey[]; combos: ComboRoute[]}>} */
     const found = new Map();
+    /** @param {BehaviorView} row */
     const add = (row) => {
         if (!found.has(row.keycode)) found.set(row.keycode, {row, keys: [], combos: []});
-        return found.get(row.keycode);
+        // The entry was inserted above whenever it was absent.
+        return /** @type {NonNullable<ReturnType<typeof found.get>>} */ (found.get(row.keycode));
     };
     for (const key of resolvedPositions(stack, at, held)) {
         const row = behaviourFor(model, keyMeaning(key.position));
@@ -276,12 +314,17 @@ export function behavioursInView(model, stack, at, held = []) {
 
 // Macros and pointing modes share the same view routes: a visible key, a
 // behaviour on a visible key, or a combo that fires under this exact stack.
+/** @param {ViewModel} model @param {Layer[]} stack @param {number} at @param {number[]} held @param {import("./keyface-types.js").NamesOf} namesOf */
 export function reachInView(model, stack, at, held, namesOf) {
+    /** @type {Map<string, ReachEntry>} */
     const found = new Map();
+    /** @param {string} name */
     const add = (name) => {
         if (!found.has(name)) found.set(name, {name, keys: [], behaviours: [], combos: []});
-        return found.get(name);
+        // The entry was inserted above whenever it was absent.
+        return /** @type {NonNullable<ReturnType<typeof found.get>>} */ (found.get(name));
     };
+    /** @param {BehaviorView} row @param {(action: string) => void} record */
     const branchActions = (row, record) => {
         for (const step of row.steps || []) for (const tier of [step.tap, step.hold, step.longHold]) {
             if (tier?.action) record(tier.action);
@@ -300,6 +343,7 @@ export function reachInView(model, stack, at, held, namesOf) {
     }
     for (const {combo, keys} of combosInView(model, stack, at, held)) {
         const output = comboOutput(model, combo);
+        /** @param {string} action @param {string | null} [via] */
         const sent = (action, via = null) => {
             for (const name of namesOf(action)) {
                 const entry = add(name);
@@ -324,8 +368,12 @@ export function reachInView(model, stack, at, held, namesOf) {
  * keycode fires it too, with no key carrying it at all. Everything else the
  * profile carries is somewhere this layer never reaches.
  */
+/** @param {ViewModel} model @param {Layer[]} stack @param {number} at */
 export function behaviourGroups(model, stack, at) {
-    const here = [], through = [];
+    /** @type {BehaviorView[]} */
+    const here = [];
+    /** @type {{row: BehaviorView; layer: Layer; whileHeld: boolean}[]} */
+    const through = [];
     for (const {position, layer, fellThrough, whileHeld} of reachablePositions(stack, at)) {
         const row = behaviourFor(model, keyMeaning(position));
         if (!row) continue;
@@ -337,9 +385,14 @@ export function behaviourGroups(model, stack, at) {
     // behaviour's keycode fires it though no key carries it. A combo chorded on
     // this layer's own keys is this layer's; one needing a transparent key is
     // reached down the stack.
-    const combos = [], combosBelow = [];
+    /** @type {BehaviorCombo[]} */
+    const combos = [];
+    /** @type {BehaviorCombo[]} */
+    const combosBelow = [];
     const groupsOfCombos = comboGroups(model, stack, at);
-    for (const [entries, list] of [[groupsOfCombos.onKeys, combos], [groupsOfCombos.throughKeys, combosBelow]]) {
+    /** @type {[ComboGroupEntry[], BehaviorCombo[]][]} */
+    const routes = [[groupsOfCombos.onKeys, combos], [groupsOfCombos.throughKeys, combosBelow]];
+    for (const [entries, list] of routes) {
         for (const {combo, keys} of entries) {
             const row = behaviourFor(model, comboOutput(model, combo));
             if (!row) continue;
@@ -365,10 +418,12 @@ export function behaviourGroups(model, stack, at) {
  * key that happens to fall through to it. With no route, every way this layer
  * reaches it.
  */
+/** @param {ViewModel} model @param {Layer[]} stack @param {number} at @param {string} keycode @param {import("./keyface-types.js").BehaviorRoute | null} [route] @param {number[]} [held] */
 export function behaviourRouteKeys(model, stack, at, keycode, route = null, held = []) {
     if (!keycode) return [];
     const carrying = reachablePositions(stack, at).filter(({position}) => keyMeaning(position) === keycode);
     const groups = behaviourGroups(model, stack, at);
+    /** @param {BehaviorCombo[]} entries */
     const chorded = (entries) => entries.filter((entry) => entry.row.keycode === keycode)
         .flatMap((entry) => entry.combos).flatMap((combo) => combo.keys);
     const keys = {
@@ -385,19 +440,24 @@ export function behaviourRouteKeys(model, stack, at, keycode, route = null, held
 
 // One dot per tier the behaviour uses anywhere, carrying how many branches use
 // it — the same shape the feedback stage flashes.
+/** @param {BehaviorView | null | undefined} behaviour */
 export function behaviourTiers(behaviour) {
     if (!behaviour) return [];
-    const count = (pick) => (behaviour.steps || []).filter((step) => step[pick]).length;
-    return [
+    /** @param {"tap" | "hold" | "longHold"} pick */
+    const count = (pick) => (behaviour?.steps || []).filter((step) => step[pick]).length;
+    /** @type {{kind: import("./keyface-types.js").Tier; count: number}[]} */
+    const tiers = [
         {kind: "tap", count: count("tap")},
         {kind: "hold", count: count("hold")},
         {kind: "long", count: count("longHold")},
-    ].filter((tier) => tier.count > 0);
+    ];
+    return tiers.filter((tier) => tier.count > 0);
 }
 
 // The device stores only populated tap steps, but the editor is a matrix of
 // every step the firmware supports. Keep empty columns visible so a one-step
 // behaviour can grow without first inventing data for the other columns.
+/** @param {BehaviorView | null | undefined} behaviour @param {number} [advertisedMaximum] */
 export function behaviourGridSteps(behaviour, advertisedMaximum = 5) {
     const requested = Number(advertisedMaximum);
     const maximum = Number.isInteger(requested) && requested > 0 ? Math.min(requested, 5) : 5;
@@ -412,12 +472,13 @@ export function behaviourGridSteps(behaviour, advertisedMaximum = 5) {
 // separate, shorter gestures, so those cells stay empty. The built-in hold
 // belongs to the first press, and a fallback hold also gives way to an authored
 // long hold there. An authored cell and a key with nothing built in inherit nothing.
+/** @param {BehaviorView | null | undefined} behaviour @param {import("./keyface-types.js").BehaviorStep | null | undefined} step @param {import("./keyface-types.js").Tier} kind @returns {import("./keyface-types.js").InheritedBranch | null} */
 export function inheritedBranch(behaviour, step, kind) {
     const builtIn = behaviour?.builtIn || {};
     if (!step || !Number.isInteger(step.tapCount)) return null;
     if (kind === "tap") {
         if (!builtIn.tap || step.tap) return null;
-        const authored = (behaviour.steps || []).filter((entry) => entry.tap || entry.hold || entry.longHold);
+        const authored = (behaviour?.steps || []).filter((entry) => entry.tap || entry.hold || entry.longHold);
         const depth = Math.max(1, ...authored.map((entry) => entry.tapCount + 1));
         if (step.tapCount >= depth) return null;
         return step.tapCount ? {...builtIn.tap, times: step.tapCount + 1} : builtIn.tap;
@@ -436,6 +497,7 @@ export function inheritedBranch(behaviour, step, kind) {
 // in its tap window until Long hold, so a release in between sends the tap
 // that count would send, set or built in, on keys whose tap survives a hold
 // (`releaseTaps`): `tapsBeforeLong`. Otherwise the cell is simply empty.
+/** @param {BehaviorView | null | undefined} behaviour @param {import("./keyface-types.js").BehaviorStep | null | undefined} step @param {import("./keyface-types.js").Tier} kind @returns {import("./keyface-types.js").ImpliedBranch | null} */
 export function impliedBranch(behaviour, step, kind) {
     if (!step || !Number.isInteger(step.tapCount)) return null;
     if (kind === "long") {
@@ -455,15 +517,18 @@ export function impliedBranch(behaviour, step, kind) {
 // input references only when its firmware tracks them, so this falls back to
 // the keycodes themselves — and everything that answers "is this combo on this
 // layer" goes through here, or the board's badges and the combo table disagree.
+/** @param {ComboView} combo @param {Position} position */
 const comboTouches = (combo, position) => Array.isArray(combo?.inputPositions) && combo.inputPositions.length
     ? combo.inputPositions.includes(position.layoutIndex)
     : (combo?.inputs || []).some((input) => inputOn(input, position));
 // Whether a key presses the input a combo stores by this name: by the keycode
 // it stores, or by what that keycode means.
+/** @param {string} name @param {Position} position */
 const inputOn = (name, position) => name === position.keycode || name === keyMeaning(position);
 
 // The matching rule alone, for one key, with no layer in view. Screens ask
 // combosAt(), which applies it the way the keyboard does on the layer shown.
+/** @param {ViewModel} model @param {Position | null | undefined} position */
 export function combosForKey(model, position) {
     if (!position) return [];
     return (model?.combos || []).filter((combo) => comboTouches(combo, position));
@@ -473,9 +538,12 @@ export function combosForKey(model, position) {
 // many distinct inputs they cover. A combo fires from the keycodes the active
 // layer produces, so all of its inputs have to be covered; an input placed on
 // two keys can be pressed on either, so both are its keys.
+/** @param {Position[]} positions @param {ComboView} combo */
 function comboKeysAmong(positions, combo) {
     const inputs = combo?.inputs || [];
-    const keys = [], covered = new Set();
+    const keys = [];
+    /** @type {Set<string>} */
+    const covered = new Set();
     for (const position of positions) {
         if (!comboTouches(combo, position)) continue;
         keys.push(position);
@@ -501,20 +569,23 @@ function comboKeysAmong(positions, combo) {
 // top layer — the keyboard's Combo Layer Matching setting. The draft's settings
 // section is read first, so an edit there shows here before it is applied;
 // the combo readback is the keyboard's own answer when settings are absent.
+/** @param {ViewModel} model @param {number} at */
 export function comboReferenceLayer(model, at) {
     const section = (model?.configDefaults || []).find((row) => row.id === "comboReferences");
     const field = section?.fields?.find((row) => row.macro === `comboReference${at}`);
     const written = /^Layer (\d+)$/.exec(String(field?.value ?? ""));
     if (written) return Number(written[1]);
     const read = model?.comboReadback?.layerReferences?.[at];
-    return Number.isInteger(read) ? read : at;
+    return typeof read === "number" && Number.isInteger(read) ? read : at;
 }
 
 // Every reach list asks for the combos — the Combos tab, the board's badges,
 // and the macros and pointing modes a combo sends — and the Macros screen asks
 // for every layer at once. Enumerating activations is the costly part, so each
 // (model, stack, layer) is grouped once. The model is replaced, never mutated.
+/** @type {WeakMap<Partial<import("../../contracts/panel.js").PublishedModel>, Map<number, {stack: Layer[]; groups: ComboGroups}>>} */
 const comboGroupsByModel = new WeakMap();
+/** @param {ViewModel} model @param {Layer[]} stack @param {number} at @returns {ComboGroups} */
 export function comboGroups(model, stack, at) {
     if (!model) return groupCombos(model, stack, at);
     let perLayer = comboGroupsByModel.get(model);
@@ -526,6 +597,7 @@ export function comboGroups(model, stack, at) {
     return groups;
 }
 
+/** @param {ViewModel} model @param {Layer[]} stack @param {number} at @returns {ComboGroups} */
 function groupCombos(model, stack, at) {
     if (!model?.combos?.length) return {onKeys: [], throughKeys: [], fromBranches: [], fromBranchesBelow: [], elsewhere: []};
     // QMK matches combos against the reference layer's raw keycodes whenever
@@ -548,13 +620,19 @@ function groupCombos(model, stack, at) {
             return {held, resolved, answering: new Map(resolved.map((entry) => [entry.position, entry]))};
         });
 
-    const onKeys = [], throughKeys = [], elsewhere = [];
+    /** @type {ComboGroupEntry[]} */
+    const onKeys = [];
+    /** @type {ComboGroupEntry[]} */
+    const throughKeys = [];
+    /** @type {ComboGroupEntry[]} */
+    const elsewhere = [];
     for (const combo of model?.combos || []) {
         const inputs = (combo.inputs || []).length;
         let fires = null, most = null;
         for (const {held, resolved, answering} of tries) {
             const found = comboKeysAmong(resolved.map((entry) => entry.position), combo);
-            const keys = found.keys.map((position) => answering.get(position));
+            // Every found position belongs to resolved, which built answering.
+            const keys = found.keys.map((position) => /** @type {ResolvedKey} */ (answering.get(position)));
             if (!most || found.covered > most.covered) most = {keys, held, covered: found.covered};
             if (inputs && found.covered >= inputs && (!fires || held.length < fires.held.length)) fires = {keys, held, covered: found.covered};
         }
@@ -569,6 +647,7 @@ function groupCombos(model, stack, at) {
 // lower layer matters if it answers any such position, including KC_NO: that
 // blocks an input below. Omitting every other layer preserves all answers and
 // their smallest held sets, without enumerating duplicate views of the board.
+/** @param {Layer[]} stack @param {number} at */
 function comboActivations(stack, at) {
     const transparent = new Set((stack[at]?.positions || [])
         .filter(position => keyFace(position).kind === "transparent").map(position => position.layoutIndex));
@@ -589,7 +668,9 @@ function comboActivations(stack, at) {
 // combo that can never fire here is not marked — and under Combo Layer
 // Matching the keys whose position the reference layer supplies are. The
 // board asks once per key, so each (model, layer) is grouped once.
+/** @type {WeakMap<Partial<import("../../contracts/panel.js").PublishedModel>, Map<number, {stack: Layer[]; keys: Map<number, ComboView[]>}>>} */
 const combosByModel = new WeakMap();
+/** @param {ViewModel} model @param {Layer[]} stack @param {number} at @returns {Map<number, ComboView[]>} */
 export function combosOnLayer(model, stack, at) {
     if (!model) return new Map();
     let perLayer = combosByModel.get(model);
@@ -598,6 +679,7 @@ export function combosOnLayer(model, stack, at) {
     if (cached?.stack === stack) return cached.keys;
     const {onKeys, throughKeys} = comboGroups(model, stack, at);
     const order = new Map((model.combos || []).map((combo, index) => [combo, index]));
+    /** @type {Map<number, ComboView[]>} */
     const keys = new Map();
     for (const entry of [...onKeys, ...throughKeys]) {
         for (const key of entry.keys) {
@@ -607,10 +689,11 @@ export function combosOnLayer(model, stack, at) {
             keys.set(key.position.layoutIndex, combos);
         }
     }
-    for (const combos of keys.values()) combos.sort((a, b) => order.get(a) - order.get(b));
+    for (const combos of keys.values()) combos.sort((a, b) => (order.get(a) ?? 0) - (order.get(b) ?? 0));
     perLayer.set(at, {stack, keys});
     return keys;
 }
+/** @param {ViewModel} model @param {Layer[]} stack @param {number} at @param {number} layoutIndex */
 export const combosAt = (model, stack, at, layoutIndex) => combosOnLayer(model, stack, at).get(layoutIndex) || [];
 
 // The combos the board marks while `held` are previewed on under `at`. A key
@@ -620,7 +703,9 @@ export const combosAt = (model, stack, at, layoutIndex) => combosOnLayer(model, 
 // that key as an input. Under Combo Layer Matching the keyboard matches the
 // reference layer's raw keycodes, never an answer from below, so the layer's
 // own marks already say it all. Each (model, layer, preview) is grouped once.
+/** @type {WeakMap<Partial<import("../../contracts/panel.js").PublishedModel>, Map<string, {stack: Layer[]; keys: Map<number, ComboView[]>}>>} */
 const previewCombosByModel = new WeakMap();
+/** @param {ViewModel} model @param {Layer[]} stack @param {number} at @param {number[]} held */
 export function combosInPreview(model, stack, at, held) {
     const own = combosOnLayer(model, stack, at);
     if (!model || !held?.length || comboReferenceLayer(model, at) !== at) return own;
@@ -639,10 +724,11 @@ export function combosInPreview(model, stack, at, held) {
         }
     }
     const order = new Map((model.combos || []).map((combo, index) => [combo, index]));
-    for (const combos of keys.values()) combos.sort((a, b) => order.get(a) - order.get(b));
+    for (const combos of keys.values()) combos.sort((a, b) => (order.get(a) ?? 0) - (order.get(b) ?? 0));
     perView.set(view, {stack, keys});
     return keys;
 }
+/** @param {ViewModel} model @param {Layer[]} stack @param {number} at @param {number[]} held @param {number} layoutIndex */
 export const combosShownAt = (model, stack, at, held, layoutIndex) =>
     combosInPreview(model, stack, at, held).get(layoutIndex) || [];
 
@@ -657,6 +743,7 @@ export const combosShownAt = (model, stack, at, held, layoutIndex) =>
 // answers — the highest active layer that is not transparent, which is the
 // default layer when nothing else is previewed on. Keyed by layout index; a
 // position nothing answers is absent.
+/** @param {ViewModel} model @param {Layer[]} stack @param {number} at @param {number[]} [held] */
 export function comboAnswers(model, stack, at, held = []) {
     return new Map(comboAnswerEntries(model, stack, at, held)
         .map(({position}) => [position.layoutIndex, position]));
@@ -665,6 +752,7 @@ export function comboAnswers(model, stack, at, held = []) {
 // The board keys that press one of the builder's inputs from this view. An
 // input placed on two keys rings both; one no key here presses rings nothing,
 // and stays an input.
+/** @param {ViewModel} model @param {Layer[]} stack @param {number} at @param {number[]} held @param {string[]} inputs */
 export function comboInputKeys(model, stack, at, held, inputs) {
     return [...comboAnswers(model, stack, at, held)]
         .filter(([, position]) => inputs.some((name) => inputOn(name, position)))
@@ -672,6 +760,7 @@ export function comboInputKeys(model, stack, at, held, inputs) {
 }
 
 // Whether a builder input is pressed by any key in this view.
+/** @param {ViewModel} model @param {Layer[]} stack @param {number} at @param {number[]} held @param {string} name */
 export const comboInputShown = (model, stack, at, held, name) =>
     [...comboAnswers(model, stack, at, held).values()].some((position) => inputOn(name, position));
 
@@ -679,6 +768,7 @@ export const comboInputShown = (model, stack, at, held, name) =>
 // board shows: `at` on top with `held` previewed on under it, so a transparent
 // key asks about what shows through it, as picking it would (comboAnswers).
 // `position` is that key, or null where nothing answers.
+/** @param {ViewModel} model @param {Layer[]} stack @param {number} at @param {number[]} held @param {number} layoutIndex */
 export function combosOnKey(model, stack, at, held, layoutIndex) {
     const position = comboAnswers(model, stack, at, held).get(layoutIndex) || null;
     return {position, combos: combosForKey(model, position)};
@@ -689,6 +779,7 @@ export function combosOnKey(model, stack, at, held, layoutIndex) {
 // under the keycode the keyboard stores for that key. One removed and picked
 // again therefore counts as added. A position nothing answers, or a disabled
 // key, is not an input.
+/** @param {string[]} inputs @param {Position | null | undefined} position */
 export function toggleComboInput(inputs, position) {
     if (!position || keyFace(position).kind === "disabled") return inputs;
     return inputs.some((name) => inputOn(name, position))
@@ -696,6 +787,7 @@ export function toggleComboInput(inputs, position) {
         : [...inputs, position.keycode];
 }
 
+/** @param {string | undefined} keycode */
 export const macroKeycodes = (keycode) =>
     [...String(keycode || "").matchAll(/\b((?:VIA_)?MACRO_\d+)\b/g)].map((match) => match[1]);
 
@@ -709,24 +801,35 @@ export const macroKeycodes = (keycode) =>
  * listed for that layer, not repeated for every layer above it. `at` is the
  * layer's position in the stack, which is how a screen selects it.
  */
+/** @param {ViewModel} model @param {Layer[]} stack @param {string} keycode */
 export const macroPlacements = (model, stack, keycode) => placementsVia(macroReach, model, stack, keycode);
 
+/** @param {string | undefined} keycode */
 export const customKeyKeycodes = (keycode) =>
     [...String(keycode || "").matchAll(/\b(CUSTOM_KEY_\d+)\b/g)].map((match) => match[1]);
 
 // A custom key is reached by a key carrying it or a combo sending it; no
 // behaviour branch can send one.
+/** @param {ViewModel} model @param {Layer[]} stack @param {number} at */
 export const customKeyReach = (model, stack, at) => reachGroups(model, stack, at, customKeyKeycodes,
     (model?.customKeys || []).filter((key) => key.name || key.hasBehavior).map((key) => key.keycode));
+/** @param {ViewModel} model @param {Layer[]} stack @param {string} keycode */
 export const customKeyPlacements = (model, stack, keycode) => placementsVia(customKeyReach, model, stack, keycode);
 
+/** @param {import("./keyface-types.js").ReachOf} reachOf @param {ViewModel} model @param {Layer[]} stack @param {string} keycode */
 function placementsVia(reachOf, model, stack, keycode) {
     return (stack || []).map((layer, at) => {
         const reach = reachOf(model, stack, at);
-        const routes = [["here", reach.onKeys], ["branches", reach.fromBranches], ["combos", reach.fromCombos]]
+        /** @type {['here' | 'branches' | 'combos', ReachEntry[]][]} */
+        const groups = [["here", reach.onKeys], ["branches", reach.fromBranches], ["combos", reach.fromCombos]];
+        const routes = groups
             .map(([group, entries]) => ({group, entry: entries.find((entry) => entry.name === keycode)}))
-            .filter((route) => route.entry)
-            .map((route) => ({...route, keys: reachKeys(stack, at, route.entry)}));
+            .filter((route) => route.entry !== undefined)
+            .map((route) => {
+                // The preceding filter kept only routes with an entry.
+                const entry = /** @type {ReachEntry} */ (route.entry);
+                return {...route, entry, keys: reachKeys(stack, at, entry)};
+            });
         return {layer, at, routes};
     }).filter((placement) => placement.routes.length);
 }
@@ -734,6 +837,7 @@ function placementsVia(reachOf, model, stack, keycode) {
 // What a combo sends, by what it means: the combo reports the catalogue's name
 // for its output (`QK_MACRO_0`, `QK_USER_16`), and every domain it could reach
 // is keyed by the semantic one.
+/** @param {ViewModel} model @param {ComboView} combo */
 export const comboOutput = (model, combo) =>
     model?.qmkKeycodeAliases?.[combo?.output] ?? combo?.output ?? "";
 
@@ -760,11 +864,15 @@ export const comboOutput = (model, combo) =>
  * of the things a keycode names, as stable string keys, and `all` is every name
  * worth reporting as unreached.
  */
+/** @param {ViewModel} model @param {Layer[]} stack @param {number} at @param {import("./keyface-types.js").NamesOf} namesOf @param {string[]} all @returns {import("./keyface-types.js").ReachGroup} */
 export function reachGroups(model, stack, at, namesOf, all) {
+    /** @type {Map<string, import("./keyface-types.js").ReachRecord>} */
     const found = new Map();
+    /** @param {string} name */
     const reachOf = (name) => {
         if (!found.has(name)) found.set(name, {directKeys: [], fellKeys: [], directRows: [], belowRows: [], directCombos: [], belowCombos: []});
-        return found.get(name);
+        // The entry was inserted above whenever it was absent.
+        return /** @type {NonNullable<ReturnType<typeof found.get>>} */ (found.get(name));
     };
 
     for (const {position, layer, fellThrough, whileHeld} of reachablePositions(stack, at)) {
@@ -781,7 +889,8 @@ export function reachGroups(model, stack, at, namesOf, all) {
         ...through.map((item) => ({row: item.row, from: item.layer, whileHeld: item.whileHeld}))]) {
         for (const step of row.steps || []) {
             for (const tier of [step.tap, step.hold, step.longHold]) {
-                for (const name of namesOf(tier?.action)) {
+                if (!tier) continue;
+                for (const name of namesOf(tier.action)) {
                     const rows = reachOf(name)[from ? "belowRows" : "directRows"];
                     // The action matters as well as the behaviour: a pointing
                     // mode answers to two keycodes, and which one a branch
@@ -799,9 +908,12 @@ export function reachGroups(model, stack, at, namesOf, all) {
     // branches send. A combo firing from this layer's own keys is this layer's;
     // one that needs a transparent key is reached down the stack.
     const combos = comboGroups(model, stack, at);
-    for (const [entries, below] of [[combos.onKeys, false], [combos.throughKeys, true]]) {
+    /** @type {[ComboGroupEntry[], boolean][]} */
+    const comboRoutes = [[combos.onKeys, false], [combos.throughKeys, true]];
+    for (const [entries, below] of comboRoutes) {
         for (const {combo, keys} of entries) {
             const output = comboOutput(model, combo);
+            /** @type {{action: string; via: string | null}[]} */
             const sends = [{action: output, via: null}];
             for (const step of behaviourFor(model, output)?.steps || []) {
                 for (const tier of [step.tap, step.hold, step.longHold]) {
@@ -846,6 +958,7 @@ export function reachGroups(model, stack, at, namesOf, all) {
  * the key cap carries the behaviour, not what its branches send. The rest are
  * slots holding a payload nothing here reaches.
  */
+/** @param {ViewModel} model @param {Layer[]} stack @param {number} at */
 export const macroReach = (model, stack, at) => reachGroups(model, stack, at, macroKeycodes,
     (model?.viaMacros || [])
         // An empty slot is not a macro this layer is missing, it is a slot.
@@ -856,6 +969,7 @@ export const macroReach = (model, stack, at) => reachGroups(model, stack, at, ma
  * holds or toggles it, by a transparent key letting a lower one do so, or by a
  * behaviour branch that sends its keycode.
  */
+/** @param {ViewModel} model @param {Layer[]} stack @param {number} at */
 export const pointingReach = (model, stack, at) => reachGroups(model, stack, at,
     (keycode) => { const slot = pointingSlotFor(model, keycode); return slot ? [String(slot.id)] : []; },
     // A slot with no movement cannot be activated, so it is not a mode this
@@ -868,9 +982,10 @@ export const pointingReach = (model, stack, at) => reachGroups(model, stack, at,
 // vocabulary does not name at all, its hex. So resolve the alias the model
 // published first, then fall back to the number: an empty slot has no name to
 // match on, and its keycodes exist regardless.
+/** @param {ViewModel} model @param {string | number | undefined} keycode */
 export function pointingSlotFor(model, keycode) {
     const slots = model?.pdModes || [];
-    const alias = model?.qmkKeycodeAliases?.[keycode] ?? keycode;
+    const alias = model?.qmkKeycodeAliases?.[keycode ?? ""] ?? keycode;
     const named = slots.find((slot) => slot.binding && [slot.binding.hold, slot.binding.lock].includes(String(alias || "")));
     if (named) return named;
     const value = typeof keycode === "number" ? keycode : /^0x[0-9a-f]+$/i.test(String(keycode)) ? Number(keycode) : NaN;
@@ -880,8 +995,9 @@ export function pointingSlotFor(model, keycode) {
 // Which of a slot's two keycodes this is. Everything else about the mode is the
 // same either way, so holding it or toggling it on is the only thing a route
 // has to carry beyond the slot itself.
+/** @param {ViewModel} model @param {string | number | undefined} keycode */
 export function pointingVariant(model, keycode) {
-    const alias = model?.qmkKeycodeAliases?.[keycode] ?? keycode;
+    const alias = model?.qmkKeycodeAliases?.[keycode ?? ""] ?? keycode;
     if (/_LOCK$/.test(String(alias))) return "toggle";
     const slot = pointingSlotFor(model, keycode);
     const value = typeof keycode === "number" ? keycode
@@ -894,6 +1010,7 @@ export function pointingVariant(model, keycode) {
 // name it goes by, and whether the key holds the mode or toggles it on. Null
 // for any other action. An empty slot keeps its keycodes, so it still
 // resolves, marked empty.
+/** @param {ViewModel} model @param {string} action */
 export function pointingAction(model, action) {
     const slot = pointingSlotFor(model, action);
     if (!slot) return null;
@@ -908,6 +1025,7 @@ export function pointingAction(model, action) {
 // A branch or combo action read as the macro it plays: the slot and the name
 // it was given, or its number when it has none. Null for anything but a bare
 // macro keycode.
+/** @param {ViewModel} model @param {string} action */
 export function macroAction(model, action) {
     const [keycode] = macroKeycodes(action);
     if (!keycode || keycode !== String(action).trim()) return null;
@@ -918,6 +1036,7 @@ export function macroAction(model, action) {
 // An action that names something the person set up — a pointing mode or a
 // macro — as that thing: what kind it is, its name, and the tags that qualify
 // it. Null for a plain keycode, which reads as itself.
+/** @param {ViewModel} model @param {string} action @returns {import("./keyface-types.js").NamedAction | null} */
 export function namedAction(model, action) {
     const pd = pointingAction(model, action);
     if (pd) return {kind: "pointing", word: "pointing mode", name: pd.name, slot: pd.slot, tags: [pd.how, ...(pd.empty ? ["empty"] : [])]};
@@ -930,32 +1049,36 @@ export function namedAction(model, action) {
 // registry gives them. Matching on the numbers rather than on names matters
 // for an empty slot, whose record carries no name for the model to resolve —
 // the keycode exists on the keyboard either way.
+/** @param {PointingSlot} slot */
 export const slotKeycodes = (slot) => slot.binding ? [slot.binding.holdCode, slot.binding.lockCode] : [];
 
 // What still reaches a pointing slot. The keyboard keeps its mode keycodes
 // whatever a slot holds, so a key bound to an empty slot is inert rather than
 // invalid — and the interface has to say which keys those are.
+/** @param {ViewModel} model @param {PointingSlot | null | undefined} slot */
 export function bindingsForSlot(model, slot) {
     if (!slot) return {keys: [], behaviours: [], combos: [], layers: []};
     const values = new Set(slotKeycodes(slot));
-    const names = new Set([slot.binding?.hold, slot.binding?.lock].filter(Boolean));
+    const names = new Set([slot.binding?.hold, slot.binding?.lock].filter((name) => name !== undefined));
     for (const entry of model?.qmkKeycodes || []) {
         if (values.has(entry.keycode)) names.add(entry.value);
     }
     const keys = [];
+    /** @type {Set<string>} */
     const layers = new Set();
     for (const layer of model?.layers || []) {
         for (const position of layer.positions || []) {
-            if (!names.has(position.keycode) && !values.has(position.value)) continue;
+            if (!names.has(position.keycode) && !(position.value !== undefined && values.has(position.value))) continue;
             keys.push({layer, position});
             layers.add(layer.displayName || layer.name);
         }
     }
     const behaviours = (model?.keyBehaviors || []).filter((row) => (row.steps || []).some((step) =>
-        ["tap", "hold", "longHold"].some((tier) => names.has(step[tier]?.action))));
+        [step.tap, step.hold, step.longHold].some((tier) => (tier?.action !== undefined && names.has(tier.action)))));
     const combos = (model?.combos || []).filter((row) => names.has(row.output));
     return {keys, behaviours, combos, layers: [...layers]};
 }
 
 // The keycode name that holds a slot's mode.
+/** @param {PointingSlot} slot */
 export const bindingKeycode = (slot) => slot.binding?.hold || "";

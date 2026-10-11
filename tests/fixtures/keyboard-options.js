@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 function options() {
     return {effects: [{id: 1, name: "SOLID_COLOR"}, {id: 2, name: "BREATHING"}, {id: 3, name: "CYCLE_ALL"}],

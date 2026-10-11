@@ -1,4 +1,7 @@
+// @ts-check
 "use strict";
+
+/** @typedef {{qmkKeycodeValues?: Record<string, number>, layers?: {name: string}[]}} ExpressionModel */
 
 // Expressions as the keyboard's vocabulary spells them — KC_A, LT(1, KC_A),
 // PD_SLOT_0, VIA_MACRO_3 — resolved to profile actions and native keycodes.
@@ -8,6 +11,7 @@ const {customKeyCode, customKeyOfName, layerLockCode, LAYER_LOCK_SLOTS} = requir
 const {PROFILE_ACTION_KINDS} = require("./profile-blob-v1");
 
 const QMK_MACRO_BASE = 0x7700;
+/** @type {Readonly<Record<string, number>>} */
 const CHARYBDIS_KEYCODE_VALUES = Object.freeze({
     DPI_MOD: 0x7e00,
     DPI_RMOD: 0x7e01,
@@ -20,7 +24,9 @@ const CHARYBDIS_KEYCODE_VALUES = Object.freeze({
 });
 
 // Every pointing-mode binding as the action a behaviour or combo stores.
+/** @type {Readonly<Record<string, import("./types.js").SemanticAction>>} */
 const PD_ACTIONS = Object.freeze(Object.fromEntries(PD_SLOT_BINDINGS.flatMap(({slot, hold, lock}) => {
+    /** @type {[string, import("./types.js").SemanticAction][]} */
     const entries = [
         [hold, {kind: PROFILE_ACTION_KINDS.PD_MODE_MOMENTARY, operand: slot}],
         [lock, {kind: PROFILE_ACTION_KINDS.PD_MODE_LOCK, operand: slot}],
@@ -32,6 +38,7 @@ const PD_ACTIONS = Object.freeze(Object.fromEntries(PD_SLOT_BINDINGS.flatMap(({s
     return entries;
 })));
 
+/** @type {Readonly<Record<string, number>>} */
 const MODIFIER_WRAPPERS = Object.freeze({
     C: 0x0100, LCTL: 0x0100,
     S: 0x0200, LSFT: 0x0200,
@@ -43,6 +50,7 @@ const MODIFIER_WRAPPERS = Object.freeze({
     RCTL: 0x1100, RSFT: 0x1200, RALT: 0x1400, RGUI: 0x1800,
 });
 
+/** @type {Readonly<Record<string, number>>} */
 const MODIFIER_BITS = Object.freeze({
     MOD_LCTL: 0x01, MOD_LSFT: 0x02, MOD_LALT: 0x04, MOD_LGUI: 0x08,
     MOD_RCTL: 0x11, MOD_RSFT: 0x12, MOD_RALT: 0x14, MOD_RGUI: 0x18,
@@ -50,6 +58,7 @@ const MODIFIER_BITS = Object.freeze({
 });
 
 class ProfileExpressionError extends Error {
+    /** @param {string} code @param {string} message @param {Record<string, unknown>} [details] */
     constructor(code, message, details = {}) {
         super(message);
         this.name = "ProfileExpressionError";
@@ -58,6 +67,7 @@ class ProfileExpressionError extends Error {
     }
 }
 
+/** @param {unknown} value @param {ExpressionModel} model @param {string} [label] @returns {import("./types.js").SemanticAction} */
 function semanticActionForExpression(value, model, label = "Action") {
     const expression = normalizeExpression(value);
     if (!expression) throw compileError("UNSUPPORTED_ACTION", `${label} is empty.`, {expression});
@@ -82,6 +92,7 @@ function semanticActionForExpression(value, model, label = "Action") {
 
 const QK_MODS_MAX = 0x1fff;
 
+/** @param {unknown} value @param {ExpressionModel} model @returns {number | undefined} */
 function resolveNativeQmkExpression(value, model) {
     const expression = normalizeExpression(value);
     if (/^(?:0x[0-9a-f]+|\d+)$/i.test(expression)) {
@@ -106,6 +117,7 @@ function resolveNativeQmkExpression(value, model) {
     if (!call) return undefined;
     if (["TO", "MO", "DF", "TG", "OSL"].includes(call.name) && call.args.length === 1) {
         const layer = layerIdOrUndefined(call.args[0], model);
+        /** @type {Record<string, number>} */
         const bases = {TO: 0x5200, MO: 0x5220, DF: 0x5240, TG: 0x5260, OSL: 0x5280};
         return layer === undefined || layer > 0x1f ? undefined : bases[call.name] | layer;
     }
@@ -141,6 +153,7 @@ function resolveNativeQmkExpression(value, model) {
     return undefined;
 }
 
+/** @param {unknown} value */
 function resolveModifierBits(value) {
     const parts = normalizeExpression(value).split("|").map((part) => part.trim()).filter(Boolean);
     if (!parts.length) return undefined;
@@ -152,12 +165,14 @@ function resolveModifierBits(value) {
     return result & 0x1f;
 }
 
+/** @param {unknown} value @param {ExpressionModel} model @param {string} label */
 function layerId(value, model, label) {
     const id = layerIdOrUndefined(value, model);
     if (id === undefined) throw compileError("UNKNOWN_LAYER", `${label} references unknown layer ${normalizeExpression(value) || "<empty>"}.`, {expression: value});
     return id;
 }
 
+/** @param {unknown} value @param {ExpressionModel} model */
 function layerIdOrUndefined(value, model) {
     const expression = normalizeExpression(value);
     if (/^\d+$/.test(expression)) return Number(expression);
@@ -166,6 +181,7 @@ function layerIdOrUndefined(value, model) {
     return index < 0 ? undefined : index;
 }
 
+/** @param {unknown} value */
 function parseCall(value) {
     const expression = normalizeExpression(value);
     const match = expression.match(/^([A-Z][A-Z0-9_]*)\((.*)\)$/);
@@ -173,6 +189,7 @@ function parseCall(value) {
     return {name: match[1], args: splitArguments(match[2])};
 }
 
+/** @param {string} value */
 function splitArguments(value) {
     const parts = [];
     let depth = 0;
@@ -191,14 +208,17 @@ function splitArguments(value) {
     return parts;
 }
 
+/** @param {unknown} value */
 function normalizeExpression(value) {
     return String(value ?? "").replace(/\s+/g, " ").replace(/\s*,\s*/g, ",").trim();
 }
 
+/** @param {string} label @param {string} expression */
 function unsupportedAction(label, expression) {
     return compileError("UNSUPPORTED_ACTION", `${label} expression ${expression} cannot be represented by the stable live-profile action schema.`, {expression});
 }
 
+/** @param {string} code @param {string} message @param {Record<string, unknown>} [details] */
 function compileError(code, message, details = {}) {
     return new ProfileExpressionError(code, message, details);
 }

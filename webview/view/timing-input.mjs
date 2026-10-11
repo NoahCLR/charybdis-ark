@@ -1,5 +1,7 @@
+// @ts-check
 // Default-looking timings are placeholders, not entered values. Keep the
 // stored value separately so rendering never changes inheritance or overrides.
+/** @param {unknown} value @param {unknown} fallback @param {boolean} [followsDefault] */
 export function timingInput(value, fallback, followsDefault = false) {
     const entered = String(value ?? "");
     const defaultValue = String(fallback ?? "");

@@ -1,3 +1,4 @@
+// @ts-check
 // The board: the one constant surface. It paints the light the keyboard would
 // show for this layer, draws the legend on top in whichever of black or white
 // stays readable, and marks what each key reaches.
@@ -12,6 +13,7 @@
 // preview (combosInPreview). Selection and
 // edits still name this layer's own position.
 
+// Selector assertions refer to elements created by this module's authored markup.
 import {css, idealText, isOff} from "../lib/colour.mjs";
 import {GEO, LED_INDEX, TRACKBALL_LED, fitText, keyFaceRows, keyVisual} from "../view/geometry.mjs";
 import {behaviourFor, behaviourTiers, combosShownAt, keyFace, keyMeaning, resolvedPositions} from "../view/keyface.mjs";
@@ -19,13 +21,14 @@ import {keyLight, ownLight, stageEnabled, tierColour, trackballLight} from "../v
 import {el, esc} from "../lib/dom.mjs";
 import {hideHover} from "./hover.mjs";
 
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/panel.js").Layer | undefined} layer @param {import("./surface-types.js").BoardOptions} [options] */
 export function board(model, layer, options = {}) {
     const {selected, mode = "light", picks = [], reach = [], pdActive = null, drafted = null,
         faces = true, trackball = false, held = [], onKey, onOpen, onSwap, onTrackball} = options;
     const positions = layer?.positions || [];
     const stack = model?.layers || [];
     const heldIds = held.map((at) => stack[at]?.index).filter((id) => id !== undefined);
-    const answering = held.length && mode !== "leds"
+    const answering = layer && held.length && mode !== "leds"
         ? new Map(resolvedPositions(stack, stack.indexOf(layer), held).map((entry) => [entry.position.layoutIndex, entry]))
         : null;
     const feedbackOn = stageEnabled(model, "key");
@@ -76,7 +79,7 @@ export function board(model, layer, options = {}) {
                 return `<circle cx="${x}" cy="${rows.tierY}" r="3.9" fill="none" stroke="${text || "rgba(255,255,255,.9)"}" stroke-width="1.1" stroke-dasharray="2 1.6"></circle>`;
             }
             return `<circle cx="${x}" cy="${rows.tierY}" r="3.9" fill="${css(colour)}" stroke="${text || "rgba(255,255,255,.9)"}" stroke-width="1.1"></circle>`
-                + (tier.count > 1 ? `<text x="${x}" y="${rows.tierY + 0.5}" class="kc-dotn" fill="${idealText(colour)}">${tier.count}</text>` : "");
+                + (tier.count > 1 ? `<text x="${x}" y="${/** @type {number} */ (rows.tierY) + 0.5}" class="kc-dotn" fill="${idealText(colour)}">${tier.count}</text>` : "");
         }).join("");
 
         if (combos.length) {
@@ -94,7 +97,7 @@ export function board(model, layer, options = {}) {
             marks += combos.map((combo, order) => {
                 const width = widths[order];
                 const badge = `<rect x="${x}" y="${rows.comboY}" width="${width}" height="${rows.comboHeight}" rx="${rows.comboHeight * 0.22}" fill="rgba(8,8,10,.86)" stroke="${comboLit ? css(comboColour) : "rgba(245,245,243,.7)"}" stroke-width="${rows.comboHeight * 0.08}"></rect>`
-                    + `<text x="${x + width / 2}" y="${rows.comboY + rows.comboHeight / 2 + 0.1}" class="kc-badgetext" font-size="${fontSize}">${esc(combo.badge || "C")}</text>`;
+                    + `<text x="${x + width / 2}" y="${/** @type {number} */ (rows.comboY) + rows.comboHeight / 2 + 0.1}" class="kc-badgetext" font-size="${fontSize}">${esc(combo.badge || "C")}</text>`;
                 x += width + gap;
                 return badge;
             }).join("");
@@ -102,6 +105,7 @@ export function board(model, layer, options = {}) {
 
         // The selection and indication rings ride on top: the light owns the key
         // face, so state is never told by recolouring it.
+        /** @param {string} name */
         const ring = (name) => `<rect class="${name}" x="${visual.x + 1.4}" y="${visual.y + 1.4}" width="${GEO.keyW - 2.8}" height="${GEO.keyH - 2.8}" rx="${GEO.radius - 1}"></rect>`;
         const main = mode === "leds" ? String(LED_INDEX[index] ?? index) : face.main;
         const above = (tiers.length ? 1 : 0) + (combos.length ? 1 : 0);
@@ -113,6 +117,7 @@ export function board(model, layer, options = {}) {
         const subFit = sub ? fitText(sub, above
             ? {max: 6.4, min: 5.2, width: GEO.keyW - 12}
             : {max: 8, min: 6.2, width: GEO.keyW - 12}) : null;
+        /** @param {ReturnType<typeof fitText>} fit */
         const squeeze = (fit) => fit.squeeze ? ` textLength="${fit.squeeze}" lengthAdjust="spacingAndGlyphs"` : "";
 
         keys += `<g class="${classes}${selected === index ? " sel" : ""}" data-key="${index}" tabindex="0" role="button"
@@ -124,7 +129,7 @@ export function board(model, layer, options = {}) {
             ${drafted?.has(index) ? `<circle class="kc-draft" cx="${visual.x + GEO.keyW - 5.5}" cy="${visual.y + 5.5}" r="2.6"></circle>` : ""}
             ${sub ? `<line class="kc-sep" x1="${visual.x + 8}" y1="${rows.separatorY}" x2="${visual.x + GEO.keyW - 8}" y2="${rows.separatorY}" stroke="${text || "rgba(255,255,255,.9)"}" stroke-width="1"></line>` : ""}
             <text class="kc-label" x="${cx}" y="${rows.mainY}" font-size="${mainFit.size}"${squeeze(mainFit)}${text ? ` style="fill:${text}"` : ""}>${esc(main)}</text>
-            ${sub ? `<text class="kc-sub" x="${cx}" y="${rows.subY}" font-size="${subFit.size}"${squeeze(subFit)}${text ? ` style="fill:${text}"` : ""}>${esc(sub)}</text>` : ""}
+            ${subFit ? `<text class="kc-sub" x="${cx}" y="${rows.subY}" font-size="${subFit.size}"${squeeze(subFit)}${text ? ` style="fill:${text}"` : ""}>${esc(sub)}</text>` : ""}
         </g>`;
     }
 
@@ -133,16 +138,16 @@ export function board(model, layer, options = {}) {
     // outline of where the ball sits.
     const ball = trackballGlyph(model, layer, {mode, pdActive, held: heldIds, trackball, clickable: Boolean(onTrackball)});
     if (ball.glow) glow += ball.glow;
-    const node = el(`<div class="board ${options.picking ? "picking" : ""}">
-        <svg viewBox="${GEO.viewBox}" xmlns="http://www.w3.org/2000/svg">${glow}${ball.markup}${keys}</svg></div>`);
+    const node = /** @type {import("./surface-types.js").BoardNode} */ (el(`<div class="board ${options.picking ? "picking" : ""}">
+        <svg viewBox="${GEO.viewBox}" xmlns="http://www.w3.org/2000/svg">${glow}${ball.markup}${keys}</svg></div>`));
 
-    node.querySelectorAll("[data-key]").forEach((group) => {
+    /** @type {NodeListOf<SVGGElement>} */ (node.querySelectorAll("[data-key]")).forEach((group) => {
         const index = Number(group.dataset.key);
         if (onKey) group.addEventListener("click", () => { if (!node.justDragged) onKey(index); });
         if (onOpen) group.addEventListener("dblclick", () => onOpen(index));
         if (onSwap) dragToSwap(node, group, index, onSwap);
     });
-    node.querySelector("[data-trackball]")?.addEventListener("click", () => onTrackball());
+    /** @type {SVGGElement | null} */ (node.querySelector("[data-trackball]"))?.addEventListener("click", () => onTrackball?.());
     return node;
 }
 
@@ -151,16 +156,20 @@ export function board(model, layer, options = {}) {
 // lands; a press that never moves stays a click.
 const DRAG_THRESHOLD = 4;
 
+/** @param {import("./surface-types.js").BoardNode} node @param {SVGGElement} group @param {number} index @param {(from: number, to: number) => void} onSwap */
 function dragToSwap(node, group, index, onSwap) {
-    const svg = node.querySelector("svg");
+    const svg = /** @type {SVGSVGElement} */ (node.querySelector("svg"));
     const resting = group.getAttribute("transform") || "";
+    /** @type {import("./surface-types.js").KeyDrag | null} */
     let drag = null;
 
+    /** @param {PointerEvent} event @returns {SVGGElement | null} */
     const targetAt = (event) => document.elementsFromPoint(event.clientX, event.clientY)
-        .map((hit) => hit.closest?.("[data-key]"))
+        .map((hit) => /** @type {SVGGElement | null} */ (hit.closest("[data-key]")))
         .find((hit) => hit && hit !== group) || null;
+    /** @param {SVGGElement | null} target */
     const mark = (target) => {
-        if (drag.target === target) return;
+        if (!drag || drag.target === target) return;
         drag.target?.classList.remove("drop-target");
         target?.classList.add("drop-target");
         drag.target = target;
@@ -215,6 +224,7 @@ function dragToSwap(node, group, index, onSwap) {
 // A mapped-keys-only layer never reaches it, since no key maps to it. In the LED
 // selector it shows its index and whether the pending group has picked it, the
 // same two things every key shows there.
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/panel.js").Layer | undefined} layer @param {import("./surface-types.js").TrackballOptions} options */
 function trackballGlyph(model, layer, {mode, pdActive, held, trackball, clickable}) {
     const {x, y, r} = GEO.trackball;
     const light = trackballLight(model, layer, {pdActive, held});

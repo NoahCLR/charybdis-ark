@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 "use strict";
+// @ts-check
 
 // Generates the vendored keycode catalog from QMK's own constant data.
 //
@@ -29,6 +30,7 @@ const KEYBOARD_KEYCODE_ENUM = "charybdis_keycodes";
 // CHARYBDIS_DRAGSCROLL_DPI, and the Pointing modes settings do not reach it,
 // so it is named apart from the DRAGSCROLL pointing mode; the picker does not
 // offer it, but a key holding one must still read back truthfully.
+/** @type {Readonly<Record<string, string | undefined>>} */
 const KEYBOARD_KEYCODE_LABELS = Object.freeze({
     POINTER_DEFAULT_DPI_FORWARD: "Default DPI up",
     POINTER_DEFAULT_DPI_REVERSE: "Default DPI down",
@@ -40,10 +42,14 @@ const KEYBOARD_KEYCODE_LABELS = Object.freeze({
     DRAGSCROLL_MODE_TOGGLE: "Built-in drag scroll toggle",
 });
 // Wrappers the layout extras key their shifted symbols by, e.g. "S(KC_1)".
+/** @type {Readonly<Record<string, number | undefined>>} */
 const EXTRA_WRAPPERS = Object.freeze({S: 0x0200});
 const OUTPUT_RELATIVE_PATH = path.join("core", "data", "keycode-catalog.json");
 const CATALOG_FORMAT = "charybdis-keycode-catalog-v1";
 
+/**
+ * @param {string[]} argv
+ */
 function main(argv) {
     const flags = parseArguments(argv);
     const appRoot = path.resolve(__dirname, "..");
@@ -77,6 +83,10 @@ function main(argv) {
     );
 }
 
+/**
+ * @param {string} qmkRoot
+ * @returns {import("./contract-types.js").KeycodeCatalog}
+ */
 function buildCatalog(qmkRoot) {
     const keycodeDir = path.join(qmkRoot, KEYCODE_DATA_RELATIVE_PATH);
     const files = listKeycodeDataFiles(keycodeDir);
@@ -87,11 +97,13 @@ function buildCatalog(qmkRoot) {
     // QMK applies revision resets within a fragment (midi, basic, etc.),
     // before combining fragments. A global overwrite leaves removed numeric
     // IDs around, sometimes pointing to a name that now means another value.
+    /** @type {Map<string, Map<number, import("./contract-types.js").CatalogEntry>>} */
     const fragments = new Map();
     for (const file of files) {
         const fragment = path.basename(file).replace(/_\d+\.\d+\.\d+/, "");
         if (!fragments.has(fragment)) fragments.set(fragment, new Map());
-        const byValue = fragments.get(fragment);
+        // The fragment was inserted immediately above.
+        const byValue = /** @type {Map<number, import("./contract-types.js").CatalogEntry>} */ (fragments.get(fragment));
         const text = readHjson(file);
         const body = findSectionBody(text, "keycodes");
         if (/^\s*"!reset!"\s*:/.test(body)) byValue.clear();
@@ -132,10 +144,17 @@ function buildCatalog(qmkRoot) {
 
 // Block comments can hold keyboard diagrams whose lone quotes would unbalance
 // the string-aware brace matching below, e.g. the US extras' │ " │ key.
+/**
+ * @param {string} file
+ */
 const readHjson = (file) => fs.readFileSync(file, "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
 
 // Entries live under "keycodes" and "aliases" maps whose own keys are the
 // numeric code, e.g. "0x0004": {"key": "KC_A", ...}.
+/**
+ * @param {string} text
+ * @returns {import("./contract-types.js").CatalogEntry[]}
+ */
 function parseKeycodeEntries(text) {
     const entries = [];
     for (const section of ["keycodes", "aliases"]) {
@@ -171,6 +190,11 @@ function parseKeycodeEntries(text) {
 // Layout extras spell a shifted symbol as a wrapped basic keycode, for example
 // "S(KC_1)": {"key": "KC_EXLM"}. Its value is the wrapper's modifier bits over
 // the basic keycode, so a device reading back S(KC_1) finds KC_EXLM.
+/**
+ * @param {string} text
+ * @param {Map<number, import("./contract-types.js").CatalogEntry>} byValue
+ * @returns {import("./contract-types.js").CatalogEntry[]}
+ */
 function parseWrappedEntries(text, byValue) {
     const byName = new Map([...byValue.values()].map((entry) => [entry.name, entry]));
     const entries = [];
@@ -200,6 +224,10 @@ function parseWrappedEntries(text, byValue) {
 // POINTER_DEFAULT_DPI_FORWARD = QK_KB_0, with the header's short #define
 // (DPI_MOD) as the name a keymap spells it by. The generic QK_KB_n stays an
 // alias so either spelling resolves.
+/**
+ * @param {string} text
+ * @param {Map<number, import("./contract-types.js").CatalogEntry>} byValue
+ */
 function nameKeyboardKeycodes(text, byValue) {
     const body = new RegExp(`enum\\s+${KEYBOARD_KEYCODE_ENUM}\\s*\\{([^}]*)\\}`).exec(text)?.[1];
     if (!body) throw new Error(`${KEYBOARD_KEYCODE_HEADER} no longer declares enum ${KEYBOARD_KEYCODE_ENUM}`);
@@ -227,8 +255,14 @@ function nameKeyboardKeycodes(text, byValue) {
     }
 }
 
+/**
+ * @param {string} name
+ */
 const spelledLabel = (name) => name.charAt(0) + name.slice(1).replace(/_/g, " ").toLowerCase();
 
+/**
+ * @param {import("./contract-types.js").CatalogEntry} entry
+ */
 function shouldSkip(entry) {
     if (!entry.name || entry.name === "SAFE_RANGE") {
         return true;
@@ -237,6 +271,10 @@ function shouldSkip(entry) {
     return entry.name.endsWith("_MIN") || entry.name.endsWith("_MAX");
 }
 
+/**
+ * @param {string} text
+ * @param {string} sectionName
+ */
 function findSectionBody(text, sectionName) {
     const marker = new RegExp(`"${sectionName}"\\s*:\\s*\\{`);
     const match = marker.exec(text);
@@ -248,6 +286,12 @@ function findSectionBody(text, sectionName) {
     return close === -1 ? "" : text.slice(open + 1, close);
 }
 
+/**
+ * @param {string} text
+ * @param {number} start
+ * @param {string} openChar
+ * @param {string} closeChar
+ */
 function findMatching(text, start, openChar, closeChar) {
     let depth = 0;
     let inString = false;
@@ -275,11 +319,21 @@ function findMatching(text, start, openChar, closeChar) {
     return -1;
 }
 
+/**
+ * @param {string} body
+ * @param {string} field
+ * @returns {string}
+ */
 function stringField(body, field) {
     const match = body.match(new RegExp(`"${field}"\\s*:\\s*"((?:\\\\.|[^"\\\\])*)"`));
     return match ? decodeString(match[1]) : "";
 }
 
+/**
+ * @param {string} body
+ * @param {string} field
+ * @returns {string[]}
+ */
 function stringListField(body, field) {
     const match = body.match(new RegExp(`"${field}"\\s*:\\s*\\[([\\s\\S]*?)\\]`));
     if (!match) {
@@ -288,14 +342,22 @@ function stringListField(body, field) {
     return Array.from(match[1].matchAll(/"((?:\\.|[^"\\])*)"/g)).map((item) => decodeString(item[1]));
 }
 
+/**
+ * @param {string} value
+ * @returns {string}
+ */
 function decodeString(value) {
     try {
-        return JSON.parse(`"${value}"`);
+        // The regular expression has selected a JSON string, not arbitrary JSON.
+        return /** @type {string} */ (JSON.parse(`"${value}"`));
     } catch {
         return value;
     }
 }
 
+/**
+ * @param {string} keycodeDir
+ */
 function listKeycodeDataFiles(keycodeDir) {
     if (!fs.existsSync(keycodeDir)) {
         return [];
@@ -319,6 +381,9 @@ function listKeycodeDataFiles(keycodeDir) {
 
 // The point of the stamp is to make drift visible, so prefer the identity of
 // the actual checkout over a file QMK does not always ship.
+/**
+ * @param {string} qmkRoot
+ */
 function readQmkVersion(qmkRoot) {
     const versionFile = path.join(qmkRoot, "version.txt");
     if (fs.existsSync(versionFile)) {
@@ -337,6 +402,9 @@ function readQmkVersion(qmkRoot) {
     }
 }
 
+/**
+ * @param {string[]} argv
+ */
 function parseArguments(argv) {
     const flags = {qmk: "", check: false};
     for (let index = 0; index < argv.length; index += 1) {
@@ -361,7 +429,7 @@ if (require.main === module) {
     try {
         main(process.argv.slice(2));
     } catch (error) {
-        process.stderr.write(`generate-keycode-catalog failed: ${error.message}\n`);
+        process.stderr.write(`generate-keycode-catalog failed: ${(error instanceof Error ? error.message : String(error))}\n`);
         process.exitCode = 1;
     }
 }

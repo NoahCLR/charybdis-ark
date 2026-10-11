@@ -1,7 +1,9 @@
+// @ts-check
 // What the Profile memory card says: the profile's bytes by area, the counted
 // limits beside them, and the separate macro bank. Pure, so the words and the
 // warning threshold are tested without a screen.
 
+/** @type {Readonly<Record<string, string>>} */
 const AREA_WORDS = {
     behaviours: "Behaviours",
     combos: "Combos",
@@ -10,6 +12,7 @@ const AREA_WORDS = {
     pointing: "Pointing modes",
     settings: "Settings and headers",
 };
+/** @type {Readonly<Record<string, string>>} */
 const COUNT_WORDS = {
     behaviours: "Behaviours",
     behaviourSteps: "Behaviour steps",
@@ -22,11 +25,14 @@ const COUNT_WORDS = {
 // refused here; the edit itself is refused at the limit.
 export const NEARLY_FULL = 0.9;
 
+/** @param {number} used @param {number} capacity */
 const share = (used, capacity) => (capacity > 0 ? Math.min(1, used / capacity) : 0);
+/** @param {number} part @param {number} whole */
 const percent = (part, whole) => (whole > 0 ? Math.round((part / whole) * 100) : 0);
 
 // The card's figures, or null when the host sent none (no keyboard, or
 // firmware that does not advertise its profile size).
+/** @param {import("../../contracts/model.js").ProfileUsage | null | undefined} usage @param {{stored: number, capacity: number} | null} [macroBank] */
 export function profileUsageView(usage, macroBank) {
     if (!usage) return null;
     const fraction = share(usage.used, usage.capacity);

@@ -1,3 +1,4 @@
+// @ts-check
 // What the keyboard would light, from what the keyboard reported.
 //
 // Every surface that shows colour asks this module, so the board, the key
@@ -7,6 +8,13 @@
 import {isOff} from "../lib/colour.mjs";
 import {LED_INDEX, TRACKBALL_LED, inLocality, trackballInLocality} from "./geometry.mjs";
 
+/**
+ * @typedef {Partial<import("../../contracts/panel.js").PublishedModel> | null | undefined} Model
+ * @typedef {import("../../contracts/panel.js").Layer | null | undefined} Layer
+ * @typedef {import("../../contracts/panel.js").Position | undefined} Position
+ * @typedef {import("../../contracts/edits.js").Colour} Colour
+ * @typedef {import("./types.js").LightOptions} LightOptions
+ */
 const OFF = {h: "0", s: "0", v: "0"};
 
 
@@ -19,6 +27,7 @@ export const PD_MODE_IDS = [
     ...Array.from({length: 24}, (_, index) => `PD_MODE_SLOT_${index + 8}`),
 ];
 
+/** @param {Model} model @param {string} id */
 export function stageEnabled(model, id) {
     if (id === "base") return Boolean(model?.rgb?.baseEffect?.enabled);
     // A stage is found by its id, never by what it is called.
@@ -31,6 +40,7 @@ export function stageEnabled(model, id) {
 // turned on by hand shows its own lighting. This answers why, or null; the
 // stored switch is left as it is, so turning auto-mouse back on restores it.
 // Without settings readback nothing is claimed.
+/** @param {Model} model @param {string} id */
 export function stageIdle(model, id) {
     if (id !== "auto" || !stageEnabled(model, id)) return null;
     const field = (model?.configDefaults || []).find((section) => section.id === "autoMouse")
@@ -38,54 +48,66 @@ export function stageIdle(model, id) {
     return field && !field.enabled ? "Auto-mouse is off, so this stage paints nothing." : null;
 }
 
+/** @param {Model} model @param {string} id */
 export const stageInEffect = (model, id) => stageEnabled(model, id) && !stageIdle(model, id);
 
 // The base effect is a VIA read, not part of the profile. Only a solid colour
 // can be drawn honestly; any other effect has no single colour to show.
+/** @param {Model} model */
 export function baseColour(model) {
     const base = model?.rgb?.baseEffect;
     if (!base || base.state !== "read" || !base.enabled || !base.previewColor) return null;
     return base.previewColor;
 }
 
+/** @param {Model} model @param {number} layerId */
 export const layerColourRow = (model, layerId) =>
     (model?.rgb?.layerColors || []).find((row) => row.layerId === layerId);
 
+/** @param {Model} model @param {number} slotId */
 export const pdColourRow = (model, slotId) =>
     (model?.rgb?.pdModeColors || []).find((row) => row.pointingMode === PD_MODE_IDS[slotId]);
 
+/** @param {Model} model */
 export function feedbackColours(model) {
-    const feedback = model?.rgb?.keyBehaviorFeedback || {};
+    const feedback = model?.rgb?.keyBehaviorFeedback;
     return {
-        tap: feedback.tapCommittedColor || OFF,
-        hold: feedback.holdActiveColor || OFF,
-        long: feedback.longHoldActiveColor || OFF,
-        branches: feedback.tapBranchColors || [],
+        tap: feedback?.tapCommittedColor || OFF,
+        hold: feedback?.holdActiveColor || OFF,
+        long: feedback?.longHoldActiveColor || OFF,
+        branches: feedback?.tapBranchColors || [],
     };
 }
 
+/** @param {Model} model @param {import("../../contracts/edits.js").Tier} kind */
 export const tierColour = (model, kind) => feedbackColours(model)[kind] || OFF;
 
 // A key counts as mapped on a layer when it stores something of its own;
 // transparent and disabled positions keep the layer underneath.
+/** @param {Position} position */
 export const isMapped = (position) =>
-    Boolean(position?.keycode) && !["KC_TRANSPARENT", "KC_TRNS", "_______", "KC_NO", "XXXXXXX"].includes(position.keycode);
+    Boolean(position?.keycode) && !["KC_TRANSPARENT", "KC_TRNS", "_______", "KC_NO", "XXXXXXX"].includes(position?.keycode || "");
 
+/** @param {Layer} layer */
 export const mappedKeyCount = (layer) => (layer?.positions || []).filter(isMapped).length;
 
 // Two firmware rules for "no colour": a layer colour is skipped only when both
 // saturation and value are 0 (rgb_layer_stage.c), and a group row stored as
 // HSV(0, 0, 0) inherits its stage colour instead of painting black
 // (rgb_helpers.h rgb_hsv_is_inherit_color).
-const solid = (colour) => Boolean(colour) && !(Number(colour.s) === 0 && Number(colour.v) === 0);
-const inherits = (colour) => !colour || (Number(colour.h) === 0 && Number(colour.s) === 0 && Number(colour.v) === 0);
+/** @param {Colour | null | undefined} colour */
+const solid = (colour) => Boolean(colour) && !(Number(colour?.s) === 0 && Number(colour?.v) === 0);
+/** @param {Colour | null | undefined} colour */
+const inherits = (colour) => !colour || (Number(colour?.h) === 0 && Number(colour?.s) === 0 && Number(colour?.v) === 0);
 
 // The indicator stages only run under a live effect: with the matrix off the
 // firmware reports effect 0 and paints nothing at all (rgb_matrix.c).
+/** @param {Model} model */
 const matrixOff = (model) => model?.rgb?.baseEffect?.state === "read" && !model.rgb.baseEffect.enabled;
 
 // Whether a key stores something of its own on layer l. The viewed layer's
 // position is passed in; any other layer is looked up at the same place.
+/** @param {Model} model @param {Layer} layer @param {number} l @param {Position} position */
 function mappedOn(model, layer, l, position) {
     if (!position) return false;
     if (l === layer?.index) return isMapped(position);
@@ -114,10 +136,16 @@ function mappedOn(model, layer, l, position) {
  * does. A pointing-mode colour is an overlay that exists only while its mode
  * runs, so it is painted only when the caller asks for that preview.
  */
+/** @param {Model} model @param {Layer} layer @param {number | undefined} led @param {Position} position @param {LightOptions} [options] @returns {import("./types.js").LedLight} */
 function ledLight(model, layer, led, position, options = {}) {
     if (matrixOff(model)) return {colour: OFF, source: "off"};
     const base = stageEnabled(model, "base") ? baseColour(model) : null;
-    let colour = base || OFF, source = base ? "base" : "off", painter = null;
+    /** @type {Colour} */
+    let colour = base || OFF;
+    let source = base ? "base" : "off";
+    /** @type {number | null} */
+    let painter = null;
+    /** @param {Colour} next @param {string} from @param {number | null} [by] */
     const paint = (next, from, by = null) => { colour = next; source = from; painter = by; };
 
     if (stageEnabled(model, "layers")) {
@@ -128,7 +156,7 @@ function ledLight(model, layer, led, position, options = {}) {
             if (row.mode === "ALL_KEYS" || mappedOn(model, layer, l, position)) paint(row.color, "layer", l);
         }
         for (const group of model?.rgb?.layerLedGroups || []) {
-            if (!(group.ledIndices || []).includes(led)) continue;
+            if (!(group.ledIndices || []).includes(led ?? -1)) continue;
             const owners = group.owner === "RGB_LAYER_GROUP_ALL" ? active : active.filter((l) => group.owner === `Layer ${l}`);
             for (const l of owners) {
                 const row = layerColourRow(model, l);
@@ -144,7 +172,7 @@ function ledLight(model, layer, led, position, options = {}) {
             : trackballInLocality(preview.locality, preview.triggerIndex);
         if (!isOff(preview.color) && reaches) paint(preview.color, "pointing");
         for (const group of model?.rgb?.pdModeLedGroups || []) {
-            if (!(group.ledIndices || []).includes(led)) continue;
+            if (!(group.ledIndices || []).includes(led ?? -1)) continue;
             if (group.owner !== "RGB_PD_MODE_GROUP_ALL" && group.owner !== preview.mode) continue;
             paint(inherits(group.color) ? preview.color : group.color, "pointing");
         }
@@ -152,11 +180,13 @@ function ledLight(model, layer, led, position, options = {}) {
     return {colour, source, layer: painter};
 }
 
+/** @param {Model} model @param {Layer} layer @param {Position} position @param {LightOptions} [options] */
 export function keyLight(model, layer, position, options = {}) {
-    return ledLight(model, layer, LED_INDEX[position?.layoutIndex], position, options);
+    return ledLight(model, layer, LED_INDEX[position?.layoutIndex ?? -1], position, options);
 }
 
 // The trackball LED is LED 56, soldered on the right half and wired to no key.
+/** @param {Model} model @param {Layer} layer @param {LightOptions} [options] */
 export function trackballLight(model, layer, options = {}) {
     return ledLight(model, layer, TRACKBALL_LED, undefined, options);
 }
@@ -165,5 +195,6 @@ export function trackballLight(model, layer, options = {}) {
 // from beneath: that layer or a previewed pointing mode painted it last, or the
 // viewed layer is base, which nothing lies under — the base effect is the floor
 // base sits on, always on with it, not a layer below it.
+/** @param {import("./types.js").LedLight | null | undefined} light @param {number} [layerId] */
 export const ownLight = (light, layerId = 0) =>
     layerId === 0 || light?.source === "pointing" || (light?.source === "layer" && light.layer === layerId);

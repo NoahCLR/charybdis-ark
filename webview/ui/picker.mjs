@@ -1,9 +1,16 @@
+// @ts-check
+/**
+ * @typedef {import("../../contracts/panel.js").PublishedModel | null} Model
+ * @typedef {import("../../contracts/panel.js").MacroSlot} MacroSlot
+ */
+// Selector assertions describe the authored sheet; click targets can be SVG
+// board keys, whose nearest data-bearing ancestor supplies the same dataset.
 // The keycode picker: a real keyboard first, then the sections this keyboard
 // actually has — its layers, its pointing slots, its macro banks — and the
 // vendored QMK catalogue behind a search.
 
 import {el, esc} from "../lib/dom.mjs";
-import {getModel, layerName, layers, post, render, state} from "../store.mjs";
+import {getModel, layerName, layers, render, state} from "../store.mjs";
 import {actionLabel} from "../view/keyface.mjs";
 import {PICKER_BOARD, pickerBoardKey} from "../view/picker-board.mjs";
 import {pickerExpression} from "../view/edits.mjs";
@@ -11,8 +18,10 @@ import {entriesForPickerSection, pickable, pickerSections} from "../view/picker-
 import {macroMatches} from "../view/macro.mjs";
 import {vocabulary, word} from "../view/vocabulary.mjs";
 
+/** @param {Model} model */
 const modifierControls = model => vocabulary(model).pickerModifiers || [];
 
+/** @param {import("./editor-types.js").PickerOptions} options */
 export function openPicker({title, context, contextKeycode, seed = [], mode = "single", allowedKeys = null, maxKeys = Infinity, onPick}) {
     const keys = allowedKeys ? seed.map(key => getModel()?.qmkKeycodeAliases?.[key] || key) : seed.slice();
     state.picker = {title, context, contextKeycode, mode, allowedKeys, maxKeys, section: "board", search: "", mods: [], keys, layerTap: null, onPick};
@@ -21,20 +30,26 @@ export function openPicker({title, context, contextKeycode, seed = [], mode = "s
 
 // Layer keycodes are posted by index — MO(1), LOCK_LAYER(1), LT(1, KC_A) —
 // the form the keyboard reports and the draft encodes; the name is display.
+/** @param {string | number} index */
 const layerTapName = (index) => layerName(layers()[Number(index)]) || `Layer ${index}`;
 
 export const closePicker = () => { state.picker = null; render(); };
 
-const pickValue = (value) => state.picker.allowedKeys ? getModel()?.qmkKeycodeAliases?.[value] || value : value;
-const allowed = (value) => !state.picker.allowedKeys || state.picker.allowedKeys.includes(value);
-const sections = (model) => pickerSections().filter(section => !state.picker.allowedKeys || section.kind === "board"
+/** @param {string} value */
+const pickValue = (value) => state.picker?.allowedKeys ? getModel()?.qmkKeycodeAliases?.[value] || value : value;
+/** @param {string} value */
+const allowed = (value) => !state.picker?.allowedKeys || state.picker?.allowedKeys?.includes(value);
+/** @param {Model} model */
+const sections = (model) => pickerSections().filter(section => !state.picker?.allowedKeys || section.kind === "board"
     || entriesForPickerSection(model?.qmkKeycodes || [], section).some(entry => allowed(entry.value)));
 
 const expression = () => state.picker ? pickerExpression(state.picker) : "";
 
+/** @template T @param {T[]} values @param {number} size */
 const chunk = (values, size) => values.reduce((rows, value, index) =>
-    (index % size ? rows[rows.length - 1].push(value) : rows.push([value]), rows), []);
+    (index % size ? rows[rows.length - 1].push(value) : rows.push([value]), rows), /** @type {T[][]} */ ([]));
 
+/** @param {Pick<import("../../contracts/panel.js").CatalogEntry, "value" | "label">} entry @param {boolean} picked */
 function keyButton(entry, picked) {
     return `<button class="pk ${picked ? "on" : ""}" data-pick="${esc(entry.value)}">
         <span class="l">${esc(entry.label || entry.value)}</span><span class="c">${esc(entry.value)}</span></button>`;
@@ -42,15 +57,19 @@ function keyButton(entry, picked) {
 
 // A macro slot shows by its name when it has one, with its slot and size
 // underneath, so a named macro is recognisable wherever it is offered.
+/** @param {MacroSlot} slot @param {boolean} picked */
 function macroButton(slot, picked) {
     return `<button class="pk ${slot.name ? "wide" : ""} ${picked ? "on" : ""}" data-pick="${esc(slot.keycode)}" data-tip="${esc(slot.keycode)}">
         <span class="l">${esc(slot.name || slot.keycode.replace(/^VIA_MACRO_/, "M"))}</span>
         <span class="c">${slot.name ? `M${esc(slot.keycode.split("_").at(-1))} · ` : ""}${slot.empty ? "empty" : `${slot.bytes} B`}</span></button>`;
 }
 
+/** @param {Model} model */
 function sectionBody(model) {
     const picker = state.picker;
+    if (!picker) return "";
     const catalogue = model?.qmkKeycodes || [];
+    /** @param {string} value */
     const picked = (value) => picker.keys.includes(pickValue(value));
 
     if (picker.search) {
@@ -95,6 +114,7 @@ function sectionBody(model) {
         // TG(n) is the same lock as LOCK_LAYER(n), so a key storing it lights
         // Lock rather than getting a button of its own.
         const owned = Boolean(model?.ownsLayerKeys);
+        /** @param {string} value @param {string} label @param {string} tip */
         const button = (value, label, tip, on = picked(value)) =>
             `<button class="pk wide ${on ? "on" : ""}" data-pick="${value}" data-tip="${esc(tip)}"><span class="l">${label}</span><span class="c">${value}</span></button>`;
         return `<div class="pk-body"><div class="pk-layers ${owned ? "owned" : ""}">${layers().map((layer) => `
@@ -121,6 +141,7 @@ function sectionBody(model) {
         const rows = many ? ` style="grid-template-rows:repeat(${Math.ceil(slots.length / 2)}, auto)"` : "";
         if (!slots.length) return `<p class="note" style="padding:18px">This keyboard has not reported its pointing modes.</p>`;
         const kinds = vocabulary(model).pointing.kinds;
+        /** @param {string} value @param {string} label @param {string} tip */
         const button = (value, label, tip) =>
             `<button class="pk wide ${picked(value) ? "on" : ""}" data-pick="${esc(value)}" data-tip="${esc(tip)}"><span class="l">${label}</span><span class="c">${esc(value)}</span></button>`;
         return `<div class="pk-body"><div class="pk-layers modes ${many ? "many" : ""}"${rows}>${slots.map((slot) => `
@@ -178,33 +199,33 @@ export function pickerOverlay() {
     </div></div>`);
 
     node.addEventListener("click", (event) => {
-        if (event.target === node || event.target.closest('[data-act="cancel"]')) return closePicker();
-        const section = event.target.closest("[data-sec]");
-        if (section) { picker.section = section.dataset.sec; picker.search = ""; return render(); }
-        const modifier = event.target.closest("[data-mod]");
+        if (event.target === node || /** @type {HTMLElement | null} */ (/** @type {Element} */ (event.target).closest('[data-act="cancel"]'))) return closePicker();
+        const section = /** @type {HTMLElement | null} */ (/** @type {Element} */ (event.target).closest("[data-sec]"));
+        if (section) { picker.section = section.dataset.sec || "board"; picker.search = ""; return render(); }
+        const modifier = /** @type {HTMLElement | null} */ (/** @type {Element} */ (event.target).closest("[data-mod]"));
         if (modifier) {
-            const name = modifier.dataset.mod;
+            const name = modifier.dataset.mod || "";
             picker.mods = picker.mods.includes(name) ? picker.mods.filter((value2) => value2 !== name) : [...picker.mods, name];
             return render();
         }
-        const layerTap = event.target.closest("[data-lt]");
-        if (layerTap) { picker.layerTap = picker.layerTap === layerTap.dataset.lt ? null : layerTap.dataset.lt; return render(); }
-        if (event.target.closest('[data-act="clearlt"]')) { picker.layerTap = null; return render(); }
-        if (event.target.closest('[data-act="clear"]')) { picker.keys = []; picker.mods = []; picker.layerTap = null; return render(); }
-        const remove = event.target.closest("[data-remove]");
+        const layerTap = /** @type {HTMLElement | null} */ (/** @type {Element} */ (event.target).closest("[data-lt]"));
+        if (layerTap) { picker.layerTap = picker.layerTap === layerTap.dataset.lt ? null : layerTap.dataset.lt || null; return render(); }
+        if (/** @type {HTMLElement | null} */ (/** @type {Element} */ (event.target).closest('[data-act="clearlt"]'))) { picker.layerTap = null; return render(); }
+        if (/** @type {HTMLElement | null} */ (/** @type {Element} */ (event.target).closest('[data-act="clear"]'))) { picker.keys = []; picker.mods = []; picker.layerTap = null; return render(); }
+        const remove = /** @type {HTMLElement | null} */ (/** @type {Element} */ (event.target).closest("[data-remove]"));
         if (remove) { picker.keys.splice(Number(remove.dataset.remove), 1); return render(); }
         // The picker closes itself before handing the choice on, so every
         // caller only says what the choice does.
-        if (event.target.closest('[data-act="use"]')) {
+        if (/** @type {HTMLElement | null} */ (/** @type {Element} */ (event.target).closest('[data-act="use"]'))) {
             const chosen = expression();
             if (!chosen) return;
             state.picker = null;
             picker.onPick?.(chosen);
             return render();
         }
-        const pick = event.target.closest("[data-pick]");
+        const pick = /** @type {HTMLElement | SVGElement | null} */ (/** @type {Element} */ (event.target).closest("[data-pick]"));
         if (pick) {
-            const chosen = pickValue(pick.dataset.pick);
+            const chosen = pickValue(pick.dataset.pick || "");
             if (!allowed(chosen)) return;
             if (picker.mode === "list" && !picker.keys.includes(chosen) && picker.keys.length >= picker.maxKeys && picker.maxKeys !== 1) return;
             picker.keys = picker.mode === "list"
@@ -213,11 +234,11 @@ export function pickerOverlay() {
             render();
         }
     });
-    const search = node.querySelector("#pickerSearch");
+    const search = /** @type {HTMLInputElement} */ (node.querySelector("#pickerSearch"));
     search.addEventListener("input", () => {
         picker.search = search.value;
         render();
-        const again = document.querySelector("#pickerSearch");
+        const again = /** @type {HTMLInputElement | null} */ (document.querySelector("#pickerSearch"));
         if (again) { again.focus(); again.setSelectionRange(again.value.length, again.value.length); }
     });
     return node;

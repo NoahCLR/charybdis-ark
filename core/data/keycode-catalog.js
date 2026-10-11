@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 
 // Resolves the numeric keycodes a device reports into something a person
@@ -13,6 +14,7 @@
 const catalog = require("./keycode-catalog.json");
 
 const BY_VALUE = new Map(catalog.entries.map((entry) => [entry.value, entry]));
+/** @type {Map<string, typeof catalog.entries[number]>} */
 const BY_NAME = new Map();
 for (const entry of catalog.entries) {
     BY_NAME.set(entry.name, entry);
@@ -53,6 +55,7 @@ const MODIFIER_WRAPPERS = new Map(Object.entries({
     RCSG: 0x1b, RCAG: 0x1d, RSAG: 0x1e,
 }));
 
+/** @param {number} bits */
 function modifiers(bits) {
     const side = bits & 0x10 ? "R" : "L";
     return MODIFIERS.filter(mod => bits & mod.bit).map(mod => ({
@@ -60,6 +63,7 @@ function modifiers(bits) {
     }));
 }
 
+/** @param {number} value @returns {import("./types.js").ResolvedKeycode} */
 function resolve(value) {
     if (!Number.isInteger(value) || value < 0 || value > 0xffff) {
         return unknown(value);
@@ -119,6 +123,7 @@ function resolve(value) {
 }
 
 // MO/TG/OSL/TO carry the layer in the low bits of a fixed base.
+/** @param {number} value @returns {import("./types.js").ResolvedKeycode | undefined} */
 function resolveLayerKeycode(value) {
     for (const form of LAYER_FORMS) {
         const layer = value - form.base;
@@ -139,6 +144,7 @@ function resolveLayerKeycode(value) {
 
 // LT(layer, kc) and mod-tap share a shape: a behaviour in the high nibble, a
 // basic keycode in the low byte.
+/** @param {number} value @returns {import("./types.js").ResolvedKeycode | undefined} */
 function resolveTapHold(value) {
     const tapped = BY_VALUE.get(value & 0xff);
     if (!tapped) return undefined;
@@ -169,6 +175,7 @@ function resolveTapHold(value) {
     };
 }
 
+/** @param {number} value @returns {import("./types.js").ResolvedKeycode} */
 function unknown(value) {
     const hex = Number.isInteger(value) ? `0x${(value >>> 0).toString(16).toUpperCase().padStart(4, "0")}` : String(value);
     return {value, name: hex, label: hex, group: "unknown", kind: "unknown", known: false};
@@ -177,6 +184,7 @@ function unknown(value) {
 // The inverse of resolve(): turn an authored expression back into the uint16
 // the device stores. Returns undefined rather than guessing, so a caller can
 // refuse the write instead of sending a wrong keycode to the keyboard.
+/** @param {unknown} expression @returns {number | undefined} */
 function encode(expression) {
     const text = String(expression || "").trim();
     if (!text) {
@@ -191,14 +199,16 @@ function encode(expression) {
     const layerForm = text.match(/^(MO|TG|OSL|TO|DF|TT|PDF)\(\s*(\d+)\s*\)$/);
     if (layerForm) {
         const layer = Number(layerForm[2]);
-        return layer < 32 ? LAYER_FORMS.find(form => form.name === layerForm[1]).base + layer : undefined;
+        const form = LAYER_FORMS.find(form => form.name === layerForm[1]);
+        return layer < 32 && form ? form.base + layer : undefined;
     }
 
     const wrapper = text.match(/^([A-Z]+)\(\s*(.+)\s*\)$/);
-    if (wrapper && MODIFIER_WRAPPERS.has(wrapper[1])) {
+    const modifier = wrapper ? MODIFIER_WRAPPERS.get(wrapper[1]) : undefined;
+    if (wrapper && modifier !== undefined) {
         const key = encode(wrapper[2]);
         if (key === undefined || key > 0x1fff) return undefined;
-        return key | (MODIFIER_WRAPPERS.get(wrapper[1]) << 8);
+        return key | (modifier << 8);
     }
     const modTap = text.match(/^MT\(\s*([^,]+)\s*,\s*([A-Za-z0-9_]+)\s*\)$/);
     if (modTap) {
@@ -237,16 +247,20 @@ function encode(expression) {
     return undefined;
 }
 
+/** @param {string} expression */
 function encodeModifiers(expression) {
     let bits = 0;
     for (const part of expression.split("|")) {
         const match = part.trim().match(/^MOD_([LR])(CTL|SFT|ALT|GUI)$/);
         if (!match) return undefined;
-        bits |= MODIFIERS.find(mod => mod.name === match[2]).bit | (match[1] === "R" ? 0x10 : 0);
+        const modifier = MODIFIERS.find(mod => mod.name === match[2]);
+        if (!modifier) return undefined;
+        bits |= modifier.bit | (match[1] === "R" ? 0x10 : 0);
     }
     return bits;
 }
 
+/** @param {string} name */
 function lookup(name) {
     return BY_NAME.get(name);
 }
@@ -254,6 +268,7 @@ function lookup(name) {
 // QMK's alias table: every name and alias mapping to its canonical keycode
 // name, built from the vendored catalog.
 function aliasTable() {
+    /** @type {Record<string, string>} */
     const aliases = {};
     for (const entry of catalog.entries) {
         aliases[entry.name] = entry.name;

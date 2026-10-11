@@ -1,5 +1,15 @@
+// @ts-check
 "use strict";
 
+/**
+ * @typedef {import("./types.js").DeviceConnection} Connection
+ * @typedef {import("./types.js").DeviceCapabilities} Caps
+ * @typedef {import("./types.js").ProfileStatus} Status
+ * @typedef {import("./types.js").CapturedProfile} Capture
+ * @typedef {import("./types.js").CompleteCapture} CompleteCapture
+ * @typedef {import("./types.js").RestoredProfile} Restored
+ * @typedef {import("./types.js").PublicError & Partial<Record<'step' | 'stepLabel' | 'reason' | 'saved', string>>} PublishedError
+ */
 const {baseLighting} = require("../model/settings-editor");
 const {profilePlacementProblem} = require("../model/profile-placement");
 const {knownActionAbi} = require("../schema/actions");
@@ -13,7 +23,7 @@ const {supportsUnicodeMacros} = require("../schema/macro-payload");
 const {readKeyboardOptions} = require("../protocol/keyboard-options-v1");
 const {decodeSettings} = require("../schema/settings-domain-v1");
 const {profileDepthOptions} = require("../schema/profile-depth");
-const {captureProfile, restoreProfile, validateSnapshot} = require("./portable-profile-session");
+const {captureProfile, restoreProfile, validateSnapshot, requireReady} = require("./portable-profile-session");
 const {settingsEditorView} = require("../model/settings-editor");
 const {macroEditorView} = require("../model/macro-editor");
 const {customKeyEditorView} = require("../model/custom-key-editor");
@@ -32,6 +42,9 @@ const {decodeKeyBehaviorDomain} = require("../schema/key-behavior-domain-v1");
 const {CANDIDATE_STATE_NAMES, readCandidateStatus} = require("../protocol/profile-candidate-v1");
 const {PROFILE_ACTIVE_KIND, PROFILE_STATE_FLAGS, PROFILE_WIRE_KNOWN_MASKS, PROFILE_WIRE_FEATURES, PROFILE_WIRE_V1, VIA_READS, readProfileCapabilities, readProfileStatus, readViaIdentity} = require("../protocol/profile-wire-v1");
 
+/** @type {(capabilities: Partial<Caps> | null | undefined, writing?: boolean) => asserts capabilities is Partial<Caps>} */
+const checkReady = requireReady;
+
 const PROFILE_STUDIO_PROTOCOL = Object.freeze({major: 1, minor: 0});
 const PROFILE_STUDIO_SCHEMA = Object.freeze({major: 3, minor: 0});
 const PROFILE_DOMAIN_FLAGS = Object.freeze({RGB: 1 << 0, KEY_BEHAVIORS: 1 << 1});
@@ -43,6 +56,7 @@ const REQUIRED_LIVE_MUTATION_FEATURES = PROFILE_WIRE_FEATURES.CANDIDATE_WRITE
     | PROFILE_WIRE_FEATURES.ATOMIC_LOGICAL_APPLY;
 
 class ProfileDeviceService {
+    /** @param {import("./types.js").DeviceServiceOptions} [options] */
     constructor(options = {}) {
         const adapter = options.adapter || new NodeHidDeviceAdapter();
         this.coordinator = options.coordinator || new DeviceRequestCoordinator(adapter, {
@@ -61,36 +75,68 @@ class ProfileDeviceService {
         this.readCandidateStatus = typeof options.readCandidateStatus === "function"
             ? options.readCandidateStatus
             : readCandidateStatus;
+        /** @type {(import("../transport/types.js").DeviceDescriptor & {label: string})[]} */
         this.devices = [];
+        /** @type {Map<string, string>} */
         this.adapterIdsByPublicId = new Map();
+        /** @type {Map<string, string>} */
         this.publicIdsByAdapterIdentity = new Map();
         this.nextPublicDeviceId = 1;
+        /** @type {Connection | undefined} */
         this.connection = undefined;
         this.connectionPublicId = "";
         this.connectionSequence = 0;
+        /** @type {number | null} */
         this.connectionToken = null;
+        /** @type {(() => void) | undefined} */
         this.disposeConnectionListener = undefined;
         this.disconnecting = false;
         this.scanned = false;
         this.busy = false;
         this.phase = "idle";
         this.operationId = 0;
+        /** @type {Caps | undefined} */
         this.capabilities = undefined;
+        /** @type {Status | undefined} */
         this.status = undefined;
+        /** @type {import("./types.js").CandidateStatus | undefined} */
         this.candidateStatus = undefined;
+        /** @type {Awaited<ReturnType<typeof readViaIdentity>> | undefined} */
         this.viaIdentity = undefined;
+        /** @type {import("../protocol/types.js").RequestIds | undefined} */
         this.requestIds = undefined;
+        /** @type {PublishedError | undefined} */
         this.error = undefined;
+        /** @type {string[]} */
         this.diagnostics = [];
         this.lastRefreshedAt = "";
+        /** @type {NonNullable<import("./types.js").DeviceModelInput["liveApply"]>} */
         this.liveApply = {state: "idle"};
+        /** @type {import("./types.js").LayoutRead | undefined} */
         this.layout = undefined;
+        /** @type {import("./types.js").CommittedRead | undefined} */
         this.committed = undefined;
+        /** @type {Buffer | undefined} */
         this.profileBytes = undefined;
+        /** @type {import("./types.js").BaseRgbRead | undefined} */
         this.baseRgb = undefined;
+        /** @type {import("./types.js").ComboRead | undefined} */
         this.combos = undefined;
+        /** @type {Capture | Restored | undefined} */
+        this.portable = undefined;
+        this.portableProgress = "";
+        /** @type {ReturnType<typeof macroEditorView> | undefined} */
+        this.macroView = undefined;
+        /** @type {ReturnType<typeof customKeyEditorView> | undefined} */
+        this.customKeyView = undefined;
+        /** @type {ReturnType<typeof settingsEditorView> | undefined} */
+        this.settingsView = undefined;
+        /** @type {InstanceType<typeof ProfilePayloadReader> | undefined} */
+        this.payloadReader = undefined;
+
     }
 
+    /** @param {import("./types.js").DeviceServiceOptions["profileSummary"]} summary */
     setProfileSummary(summary) {
         this.profileSummary = normalizeProfileSummary(summary);
         this.emitChange();
@@ -121,6 +167,7 @@ class ProfileDeviceService {
         });
     }
 
+    /** @param {string} publicDeviceId */
     async connect(publicDeviceId) {
         const adapterDeviceId = this.adapterIdsByPublicId.get(String(publicDeviceId || ""));
         if (!adapterDeviceId) {
@@ -154,12 +201,12 @@ class ProfileDeviceService {
             return this.snapshot();
         }
         return this.runOperation("refreshing", async () => {
-            const connection = this.connection;
+            const connection = this.connectedConnection();
             const viaIdentity = await readViaIdentity(connection);
-            const capabilities = await readProfileCapabilities(connection, {nextRequestId: () => this.requestIds.next()});
-            const status = await readProfileStatus(connection, {nextRequestId: () => this.requestIds.next()});
+            const capabilities = await readProfileCapabilities(connection, {nextRequestId: () => this.nextRequestId()});
+            const status = await readProfileStatus(connection, {nextRequestId: () => this.nextRequestId()});
             const candidateStatus = (capabilities.featureFlags & PROFILE_WIRE_FEATURES.CANDIDATE_WRITE) !== 0
-                ? await this.readCandidateStatus(connection, {nextRequestId: () => this.requestIds.next()})
+                ? await this.readCandidateStatus(connection, {nextRequestId: () => this.nextRequestId()})
                 : undefined;
             if (this.connection !== connection || !connection.connected) {
                 throw new Error("The keyboard disconnected while live state was being refreshed.");
@@ -190,7 +237,7 @@ class ProfileDeviceService {
             return this.snapshot();
         }
         const layerCount = this.capabilities?.compiledLayerCount;
-        if (!Number.isInteger(layerCount) || layerCount < 1) {
+        if (typeof layerCount !== "number" || !Number.isInteger(layerCount) || layerCount < 1) {
             this.setError(new Error("Refresh capabilities before reading the layout."));
             this.emitChange();
             return this.snapshot();
@@ -198,7 +245,7 @@ class ProfileDeviceService {
 
         this.layout = {state: "reading", progress: {done: 0, total: 0}, layers: [], readAt: ""};
         return this.runOperation("reading layout", async () => {
-            const connection = this.connection;
+            const connection = this.connectedConnection();
 
             const layers = await readViaLayout(connection, {
                 layerCount,
@@ -212,6 +259,7 @@ class ProfileDeviceService {
         });
     }
 
+    /** @param {Awaited<ReturnType<typeof readViaLayout>>} layers */
     #acceptLayout(layers) {
         this.layout = {
             state: "read",
@@ -235,6 +283,7 @@ class ProfileDeviceService {
     }
 
 // Applies layout edits to the keyboard and reads each one back.
+    /** @param {unknown} name */
     layerIndexFor(name) {
         const match = String(name || "").match(/(\d+)/);
         if (!match) {
@@ -247,6 +296,7 @@ class ProfileDeviceService {
 
     // Keep the cached layout in step with the device so the UI does not need a
     // full re-read after every edit.
+    /** @param {{layer: number, layoutIndex: number}} entry @param {number} keycode */
     applyLayoutKey(entry, keycode) {
         const layer = this.layout?.layers?.find((candidate) => candidate.layer === entry.layer);
         const key = layer?.keys?.find((candidate) => candidate.layoutIndex === entry.layoutIndex);
@@ -273,12 +323,12 @@ class ProfileDeviceService {
         this.profileBytes = undefined;
         this.committed = {state: "reading", progress: {done: 0, total: 0}};
         return this.runOperation("reading profile", async () => {
-            const connection = this.connection;
+            const connection = this.connectedConnection();
 
             // Decide from a fresh status before requesting payload pages. A
             // rejected committed chunk can mean a read failed mid-transfer;
             // it must not be interpreted as proof that nothing is committed.
-            const status = await readProfileStatus(connection, {nextRequestId: () => this.requestIds.next()});
+            const status = await readProfileStatus(connection, {nextRequestId: () => this.nextRequestId()});
             if (this.connection !== connection || !connection.connected) {
                 throw new Error("The keyboard disconnected while its profile status was being read.");
             }
@@ -286,8 +336,9 @@ class ProfileDeviceService {
             const source = status.activeKind === PROFILE_ACTIVE_KIND.COMPILED_ONLY
                 && !(status.stateFlags & PROFILE_STATE_FLAGS.COMMITTED_VALID) ? "compiled" : "committed";
             const reader = this.profilePayloadReader();
+            /** @type {import("../protocol/types.js").ReadOptions & {onProgress: (progress: import("../../contracts/model.js").CountedProgress) => void}} */
             const readOptions = {
-                nextRequestId: () => this.requestIds.next(),
+                nextRequestId: () => this.nextRequestId(),
                 onProgress: progress => this.reportReadProgress("profile", progress),
             };
             const read = source === "compiled" ? await reader.readCompiled(readOptions) : await reader.readCommitted(readOptions);
@@ -298,9 +349,11 @@ class ProfileDeviceService {
         });
     }
 
+    /** @param {import("../protocol/types.js").PayloadRead} read @param {string} source */
     #acceptCommitted({metadata, bytes}, source) {
         const blob = decodeProfileBlob(bytes);
         const depth = profileDepthOptions(this.capabilities, blob.domains.find(domain => domain.id === PROFILE_DOMAIN_IDS.RGB)?.payload);
+        /** @type {import("./types.js").ReadDomains} */
         const domains = {};
         const failures = [];
         for (const domain of blob.domains) {
@@ -352,7 +405,7 @@ class ProfileDeviceService {
         this.emitChange();
         try {
             if (!connection?.connected) throw new Error("Connect to a keyboard before reading combos.");
-            const read = await readDeviceCombos(connection, {nextRequestId: () => this.requestIds.next()});
+            const read = await readDeviceCombos(connection, {nextRequestId: () => this.nextRequestId()});
             if (this.connection !== connection || !connection.connected) return this.snapshot();
             this.combos = {state: "read", ...read, readAt: new Date().toISOString()};
         } catch (error) {
@@ -380,7 +433,7 @@ class ProfileDeviceService {
                 // This optional read must not discard a usable profile or
                 // mask an earlier layout/profile error. Clear stale colour.
                 this.baseRgb = {state: "unavailable", error: publicError(error)};
-                this.addDiagnostic(`Base RGB: ${this.baseRgb.error.message}`);
+                this.addDiagnostic(`Base RGB: ${this.baseRgb.error?.message}`);
             }
         }
         this.emitChange();
@@ -418,36 +471,48 @@ class ProfileDeviceService {
 
     // One coherent capture supplies the editor and the draft. Standalone
     // exports use the same reader without replacing the editor's state.
+    /** @returns {Promise<import("./types.js").CompleteCapture>} */
     async readKeyboardProfile() {
-        return this.#readCompleteProfile({forEditor: true});
+        const read = await this.#readCompleteProfile({forEditor: true});
+        if (read.incomplete) throw new Error("The keyboard did not return a complete editor profile.");
+        return read;
     }
 
+    /** @overload @param {{forRestore: true; reuseReadback?: boolean}} options @returns {Promise<import("./types.js").CapturedProfile>} */
+    /** @overload @param {{forRestore?: false; reuseReadback?: boolean}} [options] @returns {Promise<import("./types.js").CompleteCapture>} */
+    /** @param {{forRestore?: boolean; reuseReadback?: boolean}} [options] @returns {Promise<import("./types.js").CapturedProfile>} */
     async readPortableProfile(options = {}) {
         return this.#readCompleteProfile(options);
     }
 
+    /** @param {{forRestore?: boolean; reuseReadback?: boolean; forEditor?: boolean}} [options] @returns {Promise<Capture>} */
     async #readCompleteProfile({forRestore = false, reuseReadback = false, forEditor = false} = {}) {
         if (!this.connection?.connected || this.busy) throw new Error("Connect the keyboard and wait for the current operation to finish.");
+        /** @type {Capture | undefined} */
         let result;
         this.portableProgress = "";
         await this.runOperation("reading complete profile", async () => {
-            const connection = this.connection;
-            const {readback, ...captured} = await captureProfile(connection, this.requestIds, this.capabilities,
+            const connection = this.connectedConnection();
+            const capabilities = this.profileCapabilities();
+            const capture = await captureProfile(connection, this.requestSequence(), capabilities,
                 message => this.reportReadProgress("portable", message), false, forRestore,
                 {sleep: this.sleep, payloadReader: this.profilePayloadReader(), reuseReadback});
+            const {readback, ...captured} = capture;
             result = captured;
-            result.limits = await readSettingsLimits(this.connection, this.requestIds);
-            result.options = await readKeyboardOptions(this.connection, this.requestIds);
-            if (supportsUnicodeMacros(this.capabilities)) result.hostOs = await readHostOs(this.connection, this.requestIds);
+            result.limits = await readSettingsLimits(connection, this.requestSequence());
+            result.options = await readKeyboardOptions(connection, this.requestSequence());
+            if (supportsUnicodeMacros(this.capabilities)) result.hostOs = await readHostOs(connection, this.requestSequence());
             if (forEditor) {
+                if (capture.incomplete) throw new Error("The keyboard did not return a complete editor profile.");
+                /** @type {import("./types.js").BaseRgbRead} */
                 let baseRgb;
                 try {baseRgb = {state: "read", ...await readViaRgbMatrix(connection), readAt: new Date().toISOString()};}
                 catch (error) {baseRgb = {state: "unavailable", error: publicError(error)};}
                 if (this.connection !== connection || !connection.connected) throw new Error("The keyboard disconnected while its configuration was being read.");
-                this.#acceptLayout(decodeViaLayout(result.storage.layout, result.document.layers.length));
-                this.#acceptCommitted(readback.active, readback.source);
+                this.#acceptLayout(decodeViaLayout(capture.storage.layout, capture.document.layers.length));
+                this.#acceptCommitted(capture.readback.active, capture.readback.source);
                 this.status = result.status;
-                this.combos = {state: "read", ...readback.combos, readAt: new Date().toISOString()};
+                this.combos = {state: "read", ...capture.readback.combos, readAt: new Date().toISOString()};
                 this.baseRgb = baseRgb;
                 if (baseRgb.error) this.addDiagnostic(`Base RGB: ${baseRgb.error.message}`);
             }
@@ -459,35 +524,41 @@ class ProfileDeviceService {
         });
         this.portableProgress = "";
         if (this.error) throw Object.assign(new Error(this.error.message), this.error);
+        if (!result) throw new Error("The keyboard operation returned no verified profile.");
         return result;
     }
 
+    /** @param {import("../model/types.js").PortableDocument} document @param {import("./types.js").RestoreOptions} options @returns {Promise<import("./types.js").RestoredProfile>} */
     async restorePortableProfile(document, options) {
         if (!this.connection?.connected || this.busy) throw new Error("Connect the keyboard and wait for the current operation to finish.");
-        let result, started = false;
+        /** @type {Restored | undefined} */
+        let result;
+        let started = false;
         this.liveApply = {state: "idle"};
         await this.runOperation("restoring complete profile", async () => {
+            const connection = this.connectedConnection();
+            const capabilities = this.profileCapabilities();
             const cachedBase = options?.expectedFingerprint && this.portable?.fingerprint === options.expectedFingerprint
                 ? this.portable
                 : undefined;
-            const limits = cachedBase?.limits || await readSettingsLimits(this.connection, this.requestIds);
+            const limits = cachedBase?.limits || await readSettingsLimits(connection, this.requestSequence());
             // What is checked is what would be written: an older backup as
             // this keyboard numbers its keys.
             const target = validateSnapshot(document, this.capabilities);
             const lighting = baseLighting(target.settings.values);
             const brightness = lighting.brightness;
-            if (limits && brightness > limits.brightnessMax) throw Object.assign(new Error(`This profile's brightness exceeds the keyboard's reported limit of ${limits.brightnessMax}. Lower the brightness before restoring it.`), {code: "SETTINGS_LIMIT_EXCEEDED"});
-            const keyboardOptions = cachedBase?.options || await readKeyboardOptions(this.connection, this.requestIds);
+            if (limits && limits.brightnessMax !== undefined && brightness > limits.brightnessMax) throw Object.assign(new Error(`This profile's brightness exceeds the keyboard's reported limit of ${limits.brightnessMax}. Lower the brightness before restoring it.`), {code: "SETTINGS_LIMIT_EXCEEDED"});
+            const keyboardOptions = cachedBase?.options || await readKeyboardOptions(connection, this.requestSequence());
             const effect = lighting.effect;
             if (keyboardOptions && !keyboardOptions.effects.some(item => item.id === effect)) throw Object.assign(new Error("This profile uses a lighting effect unavailable on this keyboard."), {code: "SETTINGS_LIMIT_EXCEEDED"});
             // The keyboard refuses a profile whose actions sit where it cannot
             // run them; say which one before anything is sent.
             const misplaced = profilePlacementProblem(Buffer.from(target.document.profile, "base64"), {layerCount: this.capabilities?.compiledLayerCount ?? 8,
                 capabilities: this.capabilities,
-                behaviorQmkFunctions: Boolean(this.capabilities?.featureFlags & PROFILE_WIRE_FEATURES.BEHAVIOR_QMK_FUNCTIONS)});
+                behaviorQmkFunctions: Boolean((this.capabilities?.featureFlags || 0) & PROFILE_WIRE_FEATURES.BEHAVIOR_QMK_FUNCTIONS)});
             if (misplaced) throw Object.assign(new Error(`${misplaced} Fix it before saving this profile.`), {code: "PLACEMENT_REFUSED"});
             started = true;
-            result = await restoreProfile(this.connection, this.requestIds, this.capabilities, document, {...options,
+            result = await restoreProfile(connection, this.requestSequence(), capabilities, document, {...options,
                 baseSnapshot: cachedBase,
                 sleep: this.sleep,
                 onProgress: message => {this.portableProgress = message;},
@@ -497,7 +568,7 @@ class ProfileDeviceService {
             });
             result.limits = limits;
             result.options = keyboardOptions;
-            if (supportsUnicodeMacros(this.capabilities)) result.hostOs = await readHostOs(this.connection, this.requestIds);
+            if (supportsUnicodeMacros(this.capabilities)) result.hostOs = await readHostOs(connection, this.requestSequence());
             this.portable = result;
             this.macroView = macroEditorView(result, this.capabilities);
             this.customKeyView = customKeyEditorView(result, this.capabilities);
@@ -517,6 +588,7 @@ class ProfileDeviceService {
             this.emitChange();
         }
         if (this.error) throw Object.assign(new Error(this.error.message), this.error);
+        if (!result) throw new Error("The keyboard operation returned no verified profile.");
         return result;
     }
 
@@ -532,6 +604,7 @@ class ProfileDeviceService {
         }
     }
 
+    /** @returns {import("./types.js").ServiceSnapshot} */
     snapshot() {
         return {
             phase: this.phase,
@@ -557,20 +630,21 @@ class ProfileDeviceService {
             ),
             portableSummary: this.committed?.domains?.settings ? {names: this.committed.domains.settings.names.map((name, index, names) => layerName(names, index))} : this.portable?.summary || null,
             portableProgress: this.portableProgress || "",
-            settingsView: this.settingsView ? JSON.parse(JSON.stringify(this.settingsView)) : null,
-            macroView: this.macroView ? JSON.parse(JSON.stringify(this.macroView)) : null,
-            customKeyView: this.customKeyView ? JSON.parse(JSON.stringify(this.customKeyView)) : null,
+            settingsView: this.settingsView ? clone(this.settingsView) : null,
+            macroView: this.macroView ? clone(this.macroView) : null,
+            customKeyView: this.customKeyView ? clone(this.customKeyView) : null,
             liveApply: cloneLiveApply(this.liveApply),
-            layout: this.layout ? JSON.parse(JSON.stringify(this.layout)) : null,
-            committed: this.committed ? JSON.parse(JSON.stringify(this.committed)) : null,
-            baseRgb: this.baseRgb ? JSON.parse(JSON.stringify(this.baseRgb)) : null,
-            combos: this.combos ? JSON.parse(JSON.stringify(this.combos)) : null,
+            layout: this.layout ? clone(this.layout) : null,
+            committed: this.committed ? clone(this.committed) : null,
+            baseRgb: this.baseRgb ? clone(this.baseRgb) : null,
+            combos: this.combos ? clone(this.combos) : null,
             error: this.error ? {...this.error} : null,
             diagnostics: this.diagnostics.slice(),
             lastRefreshedAt: this.lastRefreshedAt,
         };
     }
 
+    /** @param {string} phase @param {() => Promise<unknown>} operation */
     async runOperation(phase, operation) {
         this.operationId++;
         this.busy = true;
@@ -594,6 +668,7 @@ class ProfileDeviceService {
         return this.snapshot();
     }
 
+    /** @param {unknown} reason */
     handleDisconnect(reason) {
         if (this.disconnecting) {
             return;
@@ -632,11 +707,13 @@ class ProfileDeviceService {
         this.liveApply = {state: "idle"};
     }
 
+    /** @param {unknown} error */
     setError(error) {
         this.error = publicError(error);
         this.addDiagnostic(`${this.error.code}: ${this.error.message}`);
     }
 
+    /** @param {string} message */
     addDiagnostic(message) {
         const text = String(message || "").trim();
         if (!text || this.diagnostics[this.diagnostics.length - 1] === text) {
@@ -648,29 +725,33 @@ class ProfileDeviceService {
         }
     }
 
+    /** @param {string} publicDeviceId */
     deviceLabel(publicDeviceId) {
         return this.devices.find((device) => device.id === publicDeviceId)?.label || "Charybdis keyboard";
     }
 
     // Transfer progress changes no profile data. Hosts that can display it
     // separately avoid rebuilding and sending the complete panel per chunk.
+    /** @param {import("../../contracts/model.js").ApplyView} view */
     reportApplyProgress(view) {
         this.liveApply = view;
         if (!this.onApplyProgress) { this.emitChange(); return; }
-        try { this.onApplyProgress(cloneLiveApply(view)); } catch {
+        try { this.onApplyProgress(clone(view)); } catch {
             // A closed or reloading panel must not interrupt the save.
         }
     }
 
     // Keep the read's latest counter for snapshots without copying all the
     // profile data or asking the panel to rebuild its editor for every reply.
-    reportReadProgress(source, progress) {
+    /** @param {[source: 'layout' | 'profile', progress: import("../../contracts/model.js").CountedProgress] | [source: 'portable', progress: string]} args */
+    reportReadProgress(...args) {
+        const [source, progress] = args;
         if (source === "layout") this.layout = {...this.layout, progress};
         else if (source === "profile") this.committed = {...this.committed, progress};
         else if (source === "portable") this.portableProgress = progress;
         if (!this.onReadProgress) { this.emitChange(); return; }
         try {
-            this.onReadProgress({source, progress: typeof progress === "object" ? {...progress} : progress,
+            this.onReadProgress({...(source === "portable" ? {source, progress} : {source, progress: {...progress}}),
                 operationId: this.operationId, phase: this.phase,
                 selectedDeviceId: this.connectionPublicId, connectionToken: this.connectionToken});
         } catch {
@@ -678,8 +759,23 @@ class ProfileDeviceService {
         }
     }
 
+    connectedConnection() {
+        if (!this.connection?.connected) throw new Error("The keyboard disconnected before its operation could start.");
+        return this.connection;
+    }
+    requestSequence() {
+        if (!this.requestIds) throw new Error("The keyboard disconnected before its operation could start.");
+        return this.requestIds;
+    }
+    nextRequestId() {return this.requestSequence().next();}
+    profileCapabilities() {
+        const capabilities = this.capabilities;
+        checkReady(capabilities);
+        return capabilities;
+    }
+
     profilePayloadReader() {
-        if (!this.payloadReader || this.payloadReader.connection !== this.connection) this.payloadReader = new ProfilePayloadReader(this.connection);
+        if (!this.payloadReader || this.payloadReader.connection !== this.connection) this.payloadReader = new ProfilePayloadReader(this.connectedConnection());
         return this.payloadReader;
     }
 
@@ -697,9 +793,9 @@ class ProfileDeviceService {
     async refreshStatus() {
         if (!this.connection?.connected || !this.requestIds) return;
         try {
-            this.status = await readProfileStatus(this.connection, {nextRequestId: () => this.requestIds.next()});
+            this.status = await readProfileStatus(this.connection, {nextRequestId: () => this.nextRequestId()});
             this.candidateStatus = await this.readCandidateStatus(this.connection, {
-                nextRequestId: () => this.requestIds.next(),
+                nextRequestId: () => this.nextRequestId(),
             });
             this.lastRefreshedAt = new Date().toISOString();
         } catch {
@@ -708,6 +804,7 @@ class ProfileDeviceService {
     }
 }
 
+/** @param {string} id @param {import("../transport/types.js").DeviceDescriptor} descriptor @param {number} index */
 function publicDeviceDescriptor(id, descriptor, index) {
     const product = cleanText(descriptor.product) || "Charybdis 4x6";
     const serial = cleanText(descriptor.serialNumber);
@@ -721,25 +818,31 @@ function publicDeviceDescriptor(id, descriptor, index) {
     };
 }
 
+/** @param {unknown} value */
 function cleanText(value) {
     return typeof value === "string" ? value.trim() : "";
 }
 
-function publicError(error) {
+/** @param {unknown} value @returns {PublishedError} */
+function publicError(value) {
+    const error = /** @type {Partial<Error> & Record<string, unknown> | null | undefined} */ (value);
+    /** @type {PublishedError} */
     const result = {
         code: cleanText(error?.code) || cleanText(error?.name) || "LIVE_LINK_ERROR",
         message: cleanText(error?.message) || String(error || "Unknown live-link error."),
     };
     // Where an Apply failed, why, and what was saved (see apply-progress.js).
-    for (const key of ["step", "stepLabel", "reason", "saved"]) {
+    for (const key of /** @type {const} */ (["step", "stepLabel", "reason", "saved"])) {
         if (typeof error?.[key] === "string" && error[key]) result[key] = cleanText(error[key]);
     }
     return result;
 }
 
+/** @param {import("./types.js").DeviceServiceOptions["profileSummary"]} [summary] @returns {import("./types.js").SourceProfileSummary} */
 function normalizeProfileSummary(summary = {}) {
-    const normalized = {};
-    for (const key of [
+    /** @type {import("./types.js").SourceProfileSummary} */
+    const normalized = {layerCount: 0, behaviorRows: 0, maxTapStepsPerBehavior: 0, populatedBehaviorSteps: 0, comboCount: 0, maxKeysPerCombo: 0, reusableRgbGroups: 0, rgbStageGroupRows: 0, highestLedIndex: 0};
+    for (const key of /** @type {const} */ ([
         "layerCount",
         "behaviorRows",
         "maxTapStepsPerBehavior",
@@ -749,13 +852,14 @@ function normalizeProfileSummary(summary = {}) {
         "reusableRgbGroups",
         "rgbStageGroupRows",
         "highestLedIndex",
-    ]) {
+    ])) {
         const value = Number(summary?.[key]);
         normalized[key] = Number.isInteger(value) && value >= 0 ? value : 0;
     }
     return normalized;
 }
 
+/** @param {Partial<Caps> | null | undefined} capabilities @param {import("./types.js").DeviceServiceOptions["profileSummary"]} [summary] @param {Partial<Awaited<ReturnType<typeof readViaIdentity>>> | null} [viaIdentity] */
 function evaluateProfileCompatibility(capabilities, summary = {}, viaIdentity = {}) {
     const source = normalizeProfileSummary(summary);
     const checks = [
@@ -799,6 +903,7 @@ class ProfileRequestIdSequence {
     }
 }
 
+/** @param {unknown} value */
 function normalizeRequestId(value) {
     const requestId = Number(value);
     if (!Number.isInteger(requestId) || requestId < 1 || requestId > 0xff) {
@@ -807,35 +912,41 @@ function normalizeRequestId(value) {
     return requestId;
 }
 
+/** @param {string} label @param {number | undefined} actual @param {number | undefined} expected */
 function equalityCheck(label, actual, expected) {
     const ok = Number(actual) === Number(expected);
     return {label, ok, actual, limit: expected, message: ok ? "" : `${label} is ${actual}; Charybdis Ark requires ${expected}.`};
 }
 
+/** @param {string} label @param {number | undefined} actual @param {readonly number[]} accepted */
 function oneOfCheck(label, actual, accepted) {
     const ok = accepted.includes(Number(actual));
     return {label, ok, actual, limit: accepted, message: ok ? "" : `${label} is ${actual}; Charybdis Ark supports ${accepted.join(" or ")}.`};
 }
 
+/** @param {string} label @param {number | undefined} actual @param {number} expected */
 function minimumCheck(label, actual, expected) {
-    const ok = Number.isInteger(actual) && actual >= expected;
+    const ok = typeof actual === "number" && Number.isInteger(actual) && actual >= expected;
     return {label, ok, actual, limit: expected, message: ok ? "" : `${label} is ${actual}; at least ${expected} is required.`};
 }
 
+/** @param {string} label @param {number | undefined} actual @param {number} expected */
 function maskCheck(label, actual, expected) {
     const numeric = Number(actual) || 0;
     const ok = (numeric & expected) === expected;
     return {label, ok, actual: numeric, limit: expected, message: ok ? "" : `${label} mask 0x${numeric.toString(16)} does not include required mask 0x${expected.toString(16)}.`};
 }
 
+/** @param {string} label @param {number} actual @param {number | undefined} limit */
 function capacityCheck(label, actual, limit) {
-    const ok = Number.isInteger(limit) && actual <= limit;
+    const ok = typeof limit === "number" && Number.isInteger(limit) && actual <= limit;
     return {label, ok, actual, limit, message: ok ? "" : `${label} needs ${actual}; firmware capacity is ${limit}.`};
 }
 
+/** @param {number} highestLedIndex @param {number | undefined} physicalLedCount */
 function ledIndexCheck(highestLedIndex, physicalLedCount) {
-    const limit = Number.isInteger(physicalLedCount) ? Math.max(0, physicalLedCount - 1) : physicalLedCount;
-    const ok = highestLedIndex === 0 || (Number.isInteger(limit) && highestLedIndex <= limit);
+    const limit = typeof physicalLedCount === "number" && Number.isInteger(physicalLedCount) ? Math.max(0, physicalLedCount - 1) : physicalLedCount;
+    const ok = highestLedIndex === 0 || (typeof limit === "number" && Number.isInteger(limit) && highestLedIndex <= limit);
     return {
         label: "Highest RGB LED index",
         ok,
@@ -845,6 +956,7 @@ function ledIndexCheck(highestLedIndex, physicalLedCount) {
     };
 }
 
+/** @param {Partial<Caps> | null | undefined} capabilities @param {Pick<ReturnType<typeof evaluateProfileCompatibility>, "compatible" | "reasons"> | null | undefined} compatibility @param {boolean} [connected] @param {Partial<Status> | null | undefined} [status] */
 function evaluateLiveMutationCompatibility(capabilities, compatibility, connected = true, status) {
     const reasons = [];
     if (!connected) reasons.push("Connect to the keyboard before applying a live profile.");
@@ -853,7 +965,7 @@ function evaluateLiveMutationCompatibility(capabilities, compatibility, connecte
     if ((flags & REQUIRED_LIVE_MUTATION_FEATURES) !== REQUIRED_LIVE_MUTATION_FEATURES) {
         reasons.push(`Firmware mutation flags 0x${flags.toString(16)} do not include required persistent split apply mask 0x${REQUIRED_LIVE_MUTATION_FEATURES.toString(16)}.`);
     }
-    if (!Number.isInteger(capabilities?.candidateChunkMax) || capabilities.candidateChunkMax < 1) {
+    if (!Number.isInteger(capabilities?.candidateChunkMax) || (capabilities?.candidateChunkMax ?? 0) < 1) {
         reasons.push("Firmware does not advertise a candidate upload chunk size.");
     }
     if (connected && !status) {
@@ -872,27 +984,32 @@ function evaluateLiveMutationCompatibility(capabilities, compatibility, connecte
     };
 }
 
+/** @param {NonNullable<import("./types.js").DeviceModelInput["liveApply"]>} value */
 function cloneLiveApply(value) {
-    return value && value.state !== "idle" ? JSON.parse(JSON.stringify(value)) : {state: "idle"};
+    return value && value.state !== "idle" ? clone(value) : {state: /** @type {const} */ ("idle")};
 }
 
+/** @param {import("./types.js").CandidateStatus} status */
 function cloneCandidateStatus(status) {
     return {
         ...status,
-        error: status?.error ? {...status.error} : null,
+        error: status.error ? {...status.error} : null,
         stateName: candidateStateName(status?.state),
     };
 }
 
 // Keys neither QMK's catalogue nor the keyboard's own blocks name. The
 // catalogue ends at QK_USER_31; the blocks count only on the ABI the app knows.
+/** @param {Extract<import("./types.js").LayoutRead, {state: "read"}>["layers"]} layers @param {Partial<Caps> | null | undefined} capabilities */
 function unnamedKeyCount(layers, capabilities) {
-    const ownBlocks = knownActionAbi(capabilities?.actionAbiDigest);
+    const ownBlocks = knownActionAbi(capabilities?.actionAbiDigest ?? 0);
+    /** @param {import("./types.js").LayoutKey} key */
     const named = ({keycode, resolved}) => resolved.known
         || ownBlocks && (customKeyOfCode(keycode) !== undefined || layerLockOfCode(keycode) !== undefined || pdBindingOfCode(keycode) !== undefined);
     return layers.flatMap((entry) => entry.keys).filter((key) => !named(key)).length;
 }
 
+/** @param {number} state */
 function candidateStateName(state) {
     return CANDIDATE_STATE_NAMES[state] || `UNKNOWN_${state}`;
 }
@@ -910,3 +1027,6 @@ module.exports = {
     normalizeProfileSummary,
     unnamedKeyCount,
 };
+
+/** @template T @param {T} value @returns {T} */
+function clone(value) {return JSON.parse(JSON.stringify(value));}

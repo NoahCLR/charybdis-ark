@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 
 // PD domain codec, version 3, the only one the keyboard stores (firmware
@@ -29,21 +30,26 @@ const DIAGONALS = ["upLeft", "upRight", "downLeft", "downRight"];
 const SCROLL_U16 = ["thresholdH", "thresholdV", "divisorH", "divisorV", "intervalMs", "expireMs", "lockMs"];
 const SCROLL_U8 = ["startNumerator", "startDenominator", "sustainNumerator", "sustainDenominator", "decayDivisor", "invert"];
 
+/** @param {string} code @param {number} offset @param {string} message @returns {never} */
 function fail(code, offset, message) {
     throw Object.assign(new Error(message), {code, offset});
 }
+/** @param {Uint8Array} bytes */
 function zero(bytes) { return bytes.every(byte => byte === 0); }
+/** @param {number} keycode */
 function isPdTapKey(keycode) {
     if (!Number.isInteger(keycode) || keycode < 0 || keycode > 0xffff) return false;
     if (keycode >= 4 && keycode <= 0xc2) return true;
     const mods = keycode >>> 8, key = keycode & 255;
     return mods <= 0x1f && (mods & 15) !== 0 && key >= 4 && key <= 0xa4;
 }
+/** @param {Buffer} bytes */
 function validTap(bytes) {
     if (bytes.readUInt16LE(0) === 0) return zero(bytes);
     return isPdTapKey(bytes.readUInt16LE(0)) && (bytes[2] === PD_MODIFIERS.MASK
-        ? bytes[3] !== 0 : [PD_MODIFIERS.INHERIT, PD_MODIFIERS.EXACT].includes(bytes[2]) && bytes[3] === 0);
+        ? bytes[3] !== 0 : /** @type {number[]} */ ([PD_MODIFIERS.INHERIT, PD_MODIFIERS.EXACT]).includes(bytes[2]) && bytes[3] === 0);
 }
+/** @param {Buffer} p @param {number} offset */
 function readName(p, offset) {
     const length = p[8], text = length <= NAME_MAX_BYTES ? nameOfBytes(p.subarray(PD_DOMAIN.NAME_OFFSET, PD_DOMAIN.NAME_OFFSET + length)) : undefined;
     if (text === undefined || !zero(p.subarray(PD_DOMAIN.NAME_OFFSET + length))) {
@@ -51,7 +57,9 @@ function readName(p, offset) {
     }
     return text;
 }
+/** @param {Buffer} p @param {number} slot @param {number} offset @param {number} [slots] */
 function validateRecord(p, slot, offset, slots = PD_DOMAIN.SLOTS) {
+    /** @param {string} code @param {number} at @param {string} message @returns {never} */
     const reject = (code, at, message) => fail(code, offset + at, message);
     if (p[0] !== slot) reject("INVALID_ID", 0, `PD slots must appear exactly once in ID order 0–${slots - 1}.`);
     if (p[7] || !zero(p.subarray(90, PD_DOMAIN.NAME_OFFSET))) reject("RESERVED", p[7] ? 7 : 90, "Reserved PD bytes must be zero.");
@@ -99,31 +107,36 @@ function validateRecord(p, slot, offset, slots = PD_DOMAIN.SLOTS) {
     }
 }
 
+/** @param {Buffer} bytes @param {number} at */
 function tapFromBytes(bytes, at) {
     return {keycode: bytes.readUInt16LE(at), modifierPolicy: bytes[at + 2], mask: bytes[at + 3]};
 }
+/** @param {Buffer} p @param {number} id @param {number} offset @returns {import("./types.js").PdSlot} */
 function slotOfRecord(p, id, offset) {
     return {
         id, kind: p[1], pointerLayer: p[2], axis: p[3], dpi: p.readUInt16LE(4), heldModifiers: p[6], name: readName(p, offset),
         thresholdX: p.readUInt16LE(32), thresholdY: p.readUInt16LE(34),
-        directions: Object.fromEntries(DIRECTIONS.map((name, i) => [name, tapFromBytes(p, 36 + i * 4)])),
+        directions: Object.fromEntries(DIRECTIONS.map(/** @returns {[string, import("./types.js").PdTap]} */ (name, i) => [name, tapFromBytes(p, 36 + i * 4)])),
         buttons: Array.from({length: 3}, (_, i) => ({kind: p[52 + i * 6], modifiers: p[53 + i * 6], tap: tapFromBytes(p, 54 + i * 6)})),
         // Bytes 70..90 are scroll settings only in a scrolling mode.
-        scroll: Object.fromEntries([...SCROLL_U16.map((name, i) => [name, p[1] === PD_KIND.SCROLLING ? p.readUInt16LE(70 + i * 2) : 0]), ...SCROLL_U8.map((name, i) => [name, p[1] === PD_KIND.SCROLLING ? p[84 + i] : 0])]),
-        diagonals: Object.fromEntries(DIAGONALS.map((name, i) => [name, p[1] === PD_KIND.DIRECTIONAL ? tapFromBytes(p, 70 + i * 4) : {keycode: 0, modifierPolicy: 0, mask: 0}])),
+        scroll: Object.fromEntries([...SCROLL_U16.map(/** @returns {[string, number]} */ (name, i) => [name, p[1] === PD_KIND.SCROLLING ? p.readUInt16LE(70 + i * 2) : 0]), ...SCROLL_U8.map(/** @returns {[string, number]} */ (name, i) => [name, p[1] === PD_KIND.SCROLLING ? p[84 + i] : 0])]),
+        diagonals: Object.fromEntries(DIAGONALS.map(/** @returns {[string, import("./types.js").PdTap]} */ (name, i) => [name, p[1] === PD_KIND.DIRECTIONAL ? tapFromBytes(p, 70 + i * 4) : {keycode: 0, modifierPolicy: 0, mask: 0}])),
         emptyDirection: p[1] === PD_KIND.DIRECTIONAL ? p[86] : 0,
         directionOutput: p[1] === PD_KIND.DIRECTIONAL ? p[87] : 0,
     };
 }
 // A slot the sparse format leaves out: disabled, with no name.
+/** @param {number} id */
 function omittedSlot(id) {
     const p = Buffer.alloc(PD_DOMAIN.RECORD_SIZE);
     p[0] = id;
     return slotOfRecord(p, id, 0);
 }
 // Whether a slot needs a record of its own in the sparse format.
+/** @param {{kind: number, name: string}} slot */
 const storesRecord = slot => slot.kind !== PD_KIND.DISABLED || slot.name !== "";
 
+/** @param {unknown} bytes */
 function decodePdDomain(bytes) {
     if (!Buffer.isBuffer(bytes)) fail("INVALID_ARGUMENT", 0, "PD domain must be a Buffer.");
     const {HEADER_SIZE, RECORD_SIZE, SLOTS, VERSION} = PD_DOMAIN;
@@ -150,33 +163,38 @@ function decodePdDomain(bytes) {
     return slots;
 }
 
+/** @template {object} T @param {T} value @param {readonly string[]} keys @param {string} label @returns {T} */
 function object(value, keys, label) {
     if (!value || typeof value !== "object" || Array.isArray(value) || Object.keys(value).some(key => !keys.includes(key))) {
         fail("INVALID_ARGUMENT", 0, `${label} must be an object with supported fields.`);
     }
     return value;
 }
+/** @template T @param {T | undefined} value @param {T} fallback @returns {T} */
 function optional(value, fallback) { return value === undefined ? fallback : value; }
+/** @param {number} value @param {number} max */
 function integer(value, max) {
     if (!Number.isInteger(value) || value < 0 || value > max) fail("INVALID_PARAMETER", 0, `PD value must be an integer from 0 to ${max}.`);
     return value;
 }
+/** @param {Buffer} p @param {number} at @param {Partial<import("./types.js").PdTap>} [value] */
 function writeTap(p, at, value = {}) {
     object(value, ["keycode", "modifierPolicy", "mask"], "Tap");
     p.writeUInt16LE(integer(optional(value.keycode, 0), 65535), at);
     p[at + 2] = integer(optional(value.modifierPolicy, 0), 255);
     p[at + 3] = integer(optional(value.mask, 0), 255);
 }
+/** @param {Buffer} p @param {import("./types.js").PdSlotInput} input @param {number} id */
 function writeRecord(p, input, id) {
     const slot = object(input, ["id", "kind", "pointerLayer", "axis", "dpi", "heldModifiers", "name", "thresholdX", "thresholdY", "directions", "buttons", "scroll", "diagonals", "emptyDirection", "directionOutput"], "Slot");
     p[0] = integer(slot.id, 255);
-    for (const [at, name] of [[1, "kind"], [2, "pointerLayer"], [3, "axis"], [6, "heldModifiers"]]) p[at] = integer(optional(slot[name], 0), 255);
-    for (const [at, name] of [[4, "dpi"], [32, "thresholdX"], [34, "thresholdY"]]) p.writeUInt16LE(integer(optional(slot[name], 0), 65535), at);
+    for (const [at, name] of /** @type {[number, 'kind' | 'pointerLayer' | 'axis' | 'heldModifiers'][]} */ ([[1, "kind"], [2, "pointerLayer"], [3, "axis"], [6, "heldModifiers"]])) p[at] = integer(optional(slot[name], 0), 255);
+    for (const [at, name] of /** @type {[number, 'dpi' | 'thresholdX' | 'thresholdY'][]} */ ([[4, "dpi"], [32, "thresholdX"], [34, "thresholdY"]])) p.writeUInt16LE(integer(optional(slot[name], 0), 65535), at);
     if (!validName(slot.name)) {
         fail("INVALID_NAME", PD_DOMAIN.HEADER_SIZE + id * PD_DOMAIN.RECORD_SIZE + 8, `Names must fit ${NAME_MAX_BYTES} UTF-8 bytes and contain no ASCII controls.`);
     }
     p[8] = p.write(slot.name, PD_DOMAIN.NAME_OFFSET, NAME_MAX_BYTES, "utf8");
-    const directions = object(optional(slot.directions, {}), DIRECTIONS, "Directions");
+    const directions = object(optional(slot.directions, /** @type {Record<string, Partial<import("./types.js").PdTap>>} */ ({})), DIRECTIONS, "Directions");
     DIRECTIONS.forEach((name, i) => writeTap(p, 36 + i * 4, directions[name]));
     const buttons = optional(slot.buttons, [{}, {}, {}]);
     if (!Array.isArray(buttons) || buttons.length !== 3) fail("INVALID_LENGTH", 0, "Exactly three button overrides are required.");
@@ -186,8 +204,8 @@ function writeRecord(p, input, id) {
         p[53 + i * 6] = integer(optional(button.modifiers, 0), 255);
         writeTap(p, 54 + i * 6, button.tap);
     }
-    const scroll = object(optional(slot.scroll, {}), [...SCROLL_U16, ...SCROLL_U8], "Scroll settings");
-    const diagonals = object(optional(slot.diagonals, {}), DIAGONALS, "Diagonals");
+    const scroll = object(optional(slot.scroll, /** @type {Record<string, number>} */ ({})), [...SCROLL_U16, ...SCROLL_U8], "Scroll settings");
+    const diagonals = object(optional(slot.diagonals, /** @type {Record<string, Partial<import("./types.js").PdTap>>} */ ({})), DIAGONALS, "Diagonals");
     if (slot.kind === PD_KIND.DIRECTIONAL) {
         // A directional record's bytes 70..90 hold diagonals or nothing.
         DIAGONALS.forEach((name, i) => writeTap(p, 70 + i * 4, diagonals[name]));
@@ -199,6 +217,7 @@ function writeRecord(p, input, id) {
     }
 }
 // The 32 slots, with only the records the sparse format needs.
+/** @param {import("./types.js").PdSlotInput[]} slots */
 function encodePdDomain(slots) {
     if (!Array.isArray(slots) || slots.length !== PD_DOMAIN.SLOTS) fail("INVALID_LENGTH", 0, `Exactly ${PD_DOMAIN.SLOTS} PD slots are required.`);
     const {RECORD_SIZE, SLOTS, VERSION} = PD_DOMAIN;
@@ -220,11 +239,13 @@ function encodePdDomain(slots) {
 // One 128-byte record, and its rules, alone. The firmware's frozen record
 // corpus is wrapped in the retired eight-slot envelope; the cross-language
 // runner checks its records with these, and no profile carries that envelope.
+/** @param {import("./types.js").PdSlotInput} slot @param {number} [id] */
 function encodePdRecord(slot, id = slot?.id) {
     const p = Buffer.alloc(PD_DOMAIN.RECORD_SIZE);
     writeRecord(p, slot, id);
     return p;
 }
+/** @param {unknown} bytes @param {number} id @param {number} [offset] */
 function validatePdRecord(bytes, id, offset = 0) {
     if (!Buffer.isBuffer(bytes) || bytes.length !== PD_DOMAIN.RECORD_SIZE) fail("INVALID_LENGTH", offset, `A PD record is ${PD_DOMAIN.RECORD_SIZE} bytes.`);
     validateRecord(bytes, id, offset);

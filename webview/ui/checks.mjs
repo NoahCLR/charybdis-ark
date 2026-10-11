@@ -1,3 +1,4 @@
+// @ts-check
 // The Checks section at the top of the review (view/checks.mjs): profiles
 // that cannot apply, actions that cannot run, and layer reachability.
 
@@ -6,6 +7,7 @@ import {checkGroups, checkTags} from "../view/checks.mjs";
 
 // One check: its level and title, what it means, the steps into it, and the
 // way out. `show(check)` returns the Show button for one that has a place.
+/** @param {import("../../contracts/model.js").Check} check @param {(check: import("../../contracts/model.js").Check) => string} show @param {(check: import("../../contracts/model.js").Check) => string} source */
 function checkItem(check, show, source) {
     const path = check.path?.length
         ? `<ol class="ck-path">${check.path.map((step) => `<li>${esc(step)}</li>`).join("")}</ol>` : "";
@@ -17,6 +19,7 @@ function checkItem(check, show, source) {
 }
 
 // The section, or nothing when the walk found nothing.
+/** @param {readonly import("../../contracts/model.js").Check[]} checks @param {(check: import("../../contracts/model.js").Check) => string} show @param {(check: import("../../contracts/model.js").Check) => string} [source] */
 export function checksSection(checks, show, source = () => "") {
     const groups = checkGroups(checks);
     if (!groups.length) return "";

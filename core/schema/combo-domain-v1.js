@@ -1,5 +1,7 @@
+// @ts-check
 "use strict";
 const {encodeSemanticAction, decodeSemanticAction} = require("./profile-blob-v1");
+/** @param {string} message */
 const fail = message => Object.assign(new Error(message), {code: "INVALID_COMBO_DOMAIN"});
 
 // Domain 0x30, version 3, the only one the keyboard stores (firmware D-F14).
@@ -15,9 +17,12 @@ const ROW_FIXED_SIZE = 12;
 const COMBO_LIMITS = Object.freeze({maxRows: 128, maxInputs: 16, maxLayers: 16});
 const FLAG = Object.freeze({HOLD: 1, TAP: 2, ORDERED: 4, DISABLED: 8});
 const ALL_LAYERS = 2 ** COMBO_LIMITS.maxLayers - 1;
-const ms = (value, min) => Number.isInteger(value) && value >= min && value <= 65535;
+/** @param {number | null} value @param {number} min @returns {value is number} */
+const ms = (value, min) => typeof value === "number" && Number.isInteger(value) && value >= min && value <= 65535;
+/** @param {number} inputs */
 const rowSize = inputs => ROW_FIXED_SIZE + 4 * inputs;
 
+/** @param {import("./types.js").ComboInput} table @param {import("./types.js").ActionOptions} [options] */
 function encodeComboDomain(table, options = {}) {
     const {version = COMBO_DOMAIN_VERSION, defaultTermMs = null, holdTermMs = null, rows} = table || {};
     if (version !== COMBO_DOMAIN_VERSION) throw fail(`Unknown combo format version ${version}.`);
@@ -56,6 +61,7 @@ function encodeComboDomain(table, options = {}) {
     return Buffer.concat([header, ...encoded]);
 }
 
+/** @param {Uint8Array} value @param {import("./types.js").ActionOptions} [options] */
 function decodeComboDomain(value, options = {}) {
     const bytes = Buffer.from(value);
     if (bytes.length < HEADER_SIZE || bytes[0] > COMBO_LIMITS.maxRows || bytes[1] || bytes[2] || bytes[3]) throw fail("Malformed combo header.");
@@ -63,6 +69,7 @@ function decodeComboDomain(value, options = {}) {
     const rows = Array.from({length: bytes[0]}, (_, id) => {
         const count = bytes[offset];
         if (offset + ROW_FIXED_SIZE > bytes.length || count < 2 || count > COMBO_LIMITS.maxInputs || offset + rowSize(count) > bytes.length || bytes[offset + 1] & ~15) throw fail("Malformed combo row.");
+        /** @param {number} start */
         const readAction = start => decodeSemanticAction(bytes.subarray(start, start + 4), options);
         const termMs = bytes.readUInt16LE(offset + 2), flags = bytes[offset + 1];
         const row = {id, inputs: Array.from({length: count}, (_, slot) => readAction(offset + ROW_FIXED_SIZE + slot * 4)), output: readAction(offset + 8),
@@ -72,12 +79,13 @@ function decodeComboDomain(value, options = {}) {
         return row;
     });
     if (offset !== bytes.length) throw fail("Combo rows do not end at the domain's end.");
-    const table = {version: COMBO_DOMAIN_VERSION, defaultTermMs: bytes.readUInt16LE(4), holdTermMs: bytes.readUInt16LE(6), rows};
+    const table = {version: /** @type {typeof COMBO_DOMAIN_VERSION} */ (COMBO_DOMAIN_VERSION), defaultTermMs: bytes.readUInt16LE(4), holdTermMs: bytes.readUInt16LE(6), rows};
     if (!encodeComboDomain(table, options).equals(bytes)) throw fail("Noncanonical combo data.");
     return table;
 }
 
 // The window a row runs with.
+/** @param {{defaultTermMs: number}} table @param {{termMs: number | null}} row */
 const effectiveComboTerm = (table, row) => row.termMs ?? table.defaultTermMs;
 
 module.exports = {COMBO_DOMAIN_VERSION, COMBO_LIMITS, ALL_LAYERS, encodeComboDomain, decodeComboDomain, effectiveComboTerm};

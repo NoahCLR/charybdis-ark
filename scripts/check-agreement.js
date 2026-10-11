@@ -1,4 +1,5 @@
 "use strict";
+// @ts-check
 // Developer and CI tool: does this Ark agree with a firmware's contract?
 //
 //   node scripts/check-agreement.js --firmware PATH --qmk PATH
@@ -26,11 +27,23 @@ const {PROFILE_BLOB_V1} = require("../core/schema/profile-blob-v1");
 const FIRMWARE = "https://github.com/NoahCLR/charybdis-4x6";
 const QMK = "https://github.com/NoahCLR/bastardkb-qmk";
 const PROTOCOL_MAJORS = [1];
+/** @type {number[]} */
 const SCHEMA_MAJORS = [PROFILE_BLOB_V1.SCHEMA_MAJOR];
 
+/**
+ * @param {string | NodeJS.ArrayBufferView} bytes
+ */
 const sha256 = bytes => createHash("sha256").update(bytes).digest("hex");
+/**
+ * @param {number} value
+ */
 const hex = value => `0x${(value >>> 0).toString(16).padStart(8, "0")}`;
 
+/**
+ * @param {string} firmwareRoot
+ * @param {string} qmkRoot
+ * @returns {import("./contract-types.js").FirmwareContract}
+ */
 function readContract(firmwareRoot, qmkRoot) {
     const probe = path.join(firmwareRoot, "tests/host/run_contract_probe.sh");
     if (!fs.existsSync(probe)) throw new Error(`firmware at ${firmwareRoot} cannot state its contract (no tests/host/run_contract_probe.sh); it predates the agreement check`);
@@ -38,14 +51,28 @@ function readContract(firmwareRoot, qmkRoot) {
     try {
         const output = path.join(dir, "contract.json");
         execFileSync("sh", [probe, "--output", output], {env: {...process.env, QMK_ROOT: qmkRoot}, stdio: ["ignore", "ignore", "inherit"]});
-        return JSON.parse(fs.readFileSync(output, "utf8"));
+        // Produced by the explicitly selected firmware contract probe. Ark
+        // still decodes and checks its capability bytes below.
+        return /** @type {import("./contract-types.js").FirmwareContract} */ (JSON.parse(fs.readFileSync(output, "utf8")));
     } finally {
         fs.rmSync(dir, {recursive: true, force: true});
     }
 }
 
+/**
+ * @param {import("./contract-types.js").FirmwareContract} contract
+ * @param {import("./contract-types.js").UpstreamManifest} manifest
+ * @param {string} qmkRoot
+ * @returns {import("./contract-types.js").AgreementReport}
+ */
 function judge(contract, manifest, qmkRoot) {
+    /** @type {import("./contract-types.js").AgreementCheck[]} */
     const checks = [];
+    /**
+     * @param {string} name
+     * @param {boolean} ok
+     * @param {string} detail
+     */
     const add = (name, ok, detail) => checks.push({name, ok, detail});
     let decoded = null;
     try {
@@ -53,7 +80,7 @@ function judge(contract, manifest, qmkRoot) {
         decoded = decodeCapabilityPages(pages);
         add("Profile Wire capability pages decode with Ark's decoder", true, `${pages.length} pages`);
     } catch (error) {
-        add("Profile Wire capability pages decode with Ark's decoder", false, error.message);
+        add("Profile Wire capability pages decode with Ark's decoder", false, (error instanceof Error ? error.message : String(error)));
     }
     if (decoded) {
         add("Profile Wire protocol is one Ark speaks", PROTOCOL_MAJORS.includes(decoded.protocol.major),
@@ -66,7 +93,9 @@ function judge(contract, manifest, qmkRoot) {
 
     // BK inputs: Ark's keycode and layout snapshots against firmware's BK pin.
     const pin = contract.qmkPin && contract.qmkPin.commit;
-    const qmkFiles = manifest.files.filter(file => manifest.sources[file.source].repository === QMK && file.sourcePath);
+    const qmkFiles = manifest.files.filter(
+        /** @returns {file is import("./contract-types.js").UpstreamFile & {sourcePath: string}} */
+        file => manifest.sources[file.source].repository === QMK && Boolean(file.sourcePath));
     const bkDiffers = [];
     for (const file of qmkFiles) {
         let bytes;
@@ -82,12 +111,17 @@ function judge(contract, manifest, qmkRoot) {
         !pin ? "firmware names no BK pin" : bkDiffers.length ? `differ: ${bkDiffers.join(", ")}` : `${qmkFiles.length} files at ${pin.slice(0, 10)}`);
 
     // Fixtures: Ark's pinned golden bytes against the firmware's current ones.
-    const fixtures = manifest.files.filter(file => manifest.sources[file.source].repository === FIRMWARE && file.sourcePath.startsWith("tests/fixtures/"));
+    // Only the QMK version stamp has a null source path. Firmware entries
+    // mirror committed source files, and fixtures are selected by that path.
+    const fixtures = manifest.files.filter(
+        /** @returns {file is import("./contract-types.js").UpstreamFile & {sourcePath: string}} */
+        file => manifest.sources[file.source].repository === FIRMWARE && /** @type {string} */ (file.sourcePath).startsWith("tests/fixtures/"));
     const fixtureDiffers = fixtures.filter(file => contract.fixtures[file.sourcePath] !== file.sourceSha256)
         .map(file => file.sourcePath + (contract.fixtures[file.sourcePath] ? "" : " (missing)"));
     add("Ark's pinned fixtures equal the firmware's", fixtureDiffers.length === 0,
         fixtureDiffers.length ? `differ: ${fixtureDiffers.join(", ")}` : `${fixtures.length} fixtures`);
 
+    /** @type {Record<string, string | number>} */
     const info = decoded ? {
         "firmware commit": contract.firmwareCommit ? contract.firmwareCommit.slice(0, 12) : "unknown",
         "BK pin": pin ? pin.slice(0, 12) : "none",
@@ -102,6 +136,9 @@ function judge(contract, manifest, qmkRoot) {
     return {format: 1, agrees: checks.every(check => check.ok), checks, info};
 }
 
+/**
+ * @param {import("./contract-types.js").AgreementReport} result
+ */
 function markdown(result) {
     const lines = [`**Ark ↔ firmware agreement: ${result.agrees ? "agrees" : "DOES NOT AGREE"}**`, "",
         "| Check | Result | Detail |", "| --- | --- | --- |"];
@@ -113,8 +150,14 @@ function markdown(result) {
     return lines.join("\n") + "\n";
 }
 
+/**
+ * @param {string[]} argv
+ * @returns {{firmware: string, qmk: string, report?: string, markdown?: string}}
+ */
 function parse(argv) {
+    /** @type {Record<string, string | undefined>} */
     const flags = {};
+    /** @type {Record<string, string | undefined>} */
     const names = {"--firmware": "firmware", "--qmk": "qmk", "--report": "report", "--markdown": "markdown"};
     for (let i = 0; i < argv.length; i += 2) {
         const name = names[argv[i]];
@@ -122,11 +165,17 @@ function parse(argv) {
         flags[name] = argv[i + 1];
     }
     if (!flags.firmware || !flags.qmk) throw new Error("Pass --firmware PATH --qmk PATH [--report FILE] [--markdown FILE]");
-    return flags;
+    // Required paths have been checked; the remaining named options are strings.
+    return /** @type {{firmware: string, qmk: string, report?: string, markdown?: string}} */ (flags);
 }
 
+/**
+ * @param {string[]} argv
+ * @param {string} arkRoot
+ */
 function run(argv, arkRoot = path.resolve(__dirname, "..")) {
     const flags = parse(argv);
+    /** @type {import("./contract-types.js").UpstreamManifest} */
     const manifest = JSON.parse(fs.readFileSync(path.join(arkRoot, "upstream/manifest.json"), "utf8"));
     const result = judge(readContract(path.resolve(flags.firmware), path.resolve(flags.qmk)), manifest, path.resolve(flags.qmk));
     const text = markdown(result);
@@ -137,6 +186,6 @@ function run(argv, arkRoot = path.resolve(__dirname, "..")) {
 }
 
 if (require.main === module) {
-    try {process.exitCode = run(process.argv.slice(2));} catch (error) {console.error(error.message); process.exitCode = 1;}
+    try {process.exitCode = run(process.argv.slice(2));} catch (error) {console.error((error instanceof Error ? error.message : String(error))); process.exitCode = 1;}
 }
 module.exports = {judge, markdown, run};

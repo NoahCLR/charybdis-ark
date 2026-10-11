@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 
 // Which layers a profile lets you reach, and whether you can always get back.
@@ -42,6 +43,19 @@ const {actionName, nativeCode} = require("../schema/actions");
 const {layerName} = require("./vocabulary");
 const {analyzeLayerStates} = require("./layer-state-graph");
 
+/**
+ * @typedef {import("./types.js").LayerEffect} LayerEffect
+ * @typedef {import("./types.js").OfferedLayerEffect} OfferedEffect
+ * @typedef {import("./types.js").WalkLayerEffect} WalkEffect
+ * @typedef {import("./types.js").LayerCondition} Condition
+ * @typedef {import("../schema/types.js").BehaviorRow} BehaviorRow
+ * @typedef {import("../schema/types.js").SemanticAction} Action
+ * @typedef {import("../../contracts/model.js").Finding} Finding
+ * @typedef {ReturnType<typeof profileFacts>} Facts
+ * @typedef {OfferedEffect & {when: Condition}} Transition
+ * @typedef {Extract<import("./types.js").LayerAnalysisResult<Transition>, {reachedLayers: number}> & {symbolic: true, cache: Map<number, OfferedEffect[]>, reachableCombos: Set<number>, parent?: undefined, edges?: undefined, home?: undefined, affectedLayers?: number, uncertainty?: undefined}} SymbolicWalk
+ * @typedef {import("./types.js").BoundedLayerWalk | SymbolicWalk} Walk
+ */
 const LAYERS = 16;
 const TRANSPARENT = 0x0001;
 const NOTHING = 0x0000;
@@ -50,7 +64,7 @@ const TAPPING_TOGGLE = 5;
 // Settings the walk reads (users/noah/lib/profile/schema/profile_settings_v1.h).
 const SETTING = Object.freeze({AUTO_MOUSE_ENABLED: 4, AUTO_MOUSE_LAYER: 5, AUTO_SNIPING_ENABLED: 8, AUTO_SNIPING_LAYER: 9,
     COMBOS_ENABLED: 20, DEFAULT_LAYERS: 23, BEHAVIORS_ENABLED: 28, LAYER_BEHAVIORS: 29, LAYER_COMBOS: 30});
-const LEVELS = Object.freeze({TRAP: "trap", WARNING: "warning", NOTICE: "notice"});
+const LEVELS = Object.freeze(/** @type {const} */ ({TRAP: "trap", WARNING: "warning", NOTICE: "notice"}));
 // Enough to name a way in without listing every superset of one trap.
 const MAX_TRAPS = 4;
 // Each layer has independent held and locked bits: sixteen layers cannot be
@@ -59,18 +73,24 @@ const MAX_TRAPS = 4;
 const MAX_WALK_STATES = 4096, MAX_WALK_EDGES = 65536;
 const GRAPH_FINDINGS = new Set(["trap", "trapOverflow", "unreachable", "unreachableCombo"]);
 
+/** @param {number} layer */
 const bit = (layer) => 1 << layer;
+/** @param {number} mask */
 const layersIn = (mask) => Array.from({length: LAYERS}, (_, layer) => layer).filter((layer) => mask & bit(layer));
+/** @param {number} code */
+// All semantic actions in a validated current-ABI profile have native keycodes.
 const codeName = (code) => (layerLockOfCode(code) !== undefined ? `LOCK_LAYER(${layerLockOfCode(code)})`
     : keycodes.resolve(code)?.name || `0x${code.toString(16).toUpperCase().padStart(4, "0")}`);
 
 // What a native keycode does to the layers, if anything. `unowned` is a layer
 // keycode the keyboard leaves to QMK (DF, PDF, a layer past the bank).
+/** @param {number} code @returns {LayerEffect[]} */
 function layerEffects(code) {
+    /** @param {number} layer @param {LayerEffect[]} effects @returns {LayerEffect[]} */
     const within = (layer, effects) => (layer < LAYERS ? effects : [{kind: "unowned", layer}]);
     if (code >= 0x4000 && code <= 0x4fff) return within((code >> 8) & 15, [{kind: "hold", layer: (code >> 8) & 15}]);
     if (code >= 0x5000 && code <= 0x51ff) return within((code >> 5) & 15, [{kind: "hold", layer: (code >> 5) & 15}]);
-    if (layerLockOfCode(code) !== undefined) return [{kind: "lock", layer: layerLockOfCode(code)}];
+    if (layerLockOfCode(code) !== undefined) return [{kind: "lock", layer: /** @type {number} */ (layerLockOfCode(code))}];
     if (code < 0x5200 || code >= 0x5300) return [];
     const layer = code & 31;
     switch (code & ~31) {
@@ -85,6 +105,7 @@ function layerEffects(code) {
 }
 
 // What a stored action does to the layers.
+/** @param {Action | undefined} action @returns {LayerEffect[]} */
 function actionEffects(action) {
     if (!action) return [];
     if (action.kind === ACTION.LAYER_MOMENTARY) return action.operand < LAYERS ? [{kind: "hold", layer: action.operand}] : [];
@@ -95,14 +116,18 @@ function actionEffects(action) {
 
 // A branch as the taps and holds that reach it: tapIndex 0 is the first tap.
 const TAP_WORDS = ["Tap", "Double-tap", "Triple-tap"];
+/** @param {number} index @param {string} name */
 const tapPhrase = (index, name) => (TAP_WORDS[index] ? `${TAP_WORDS[index]} ${name}` : `Tap ${name} ${index + 1} times`);
+/** @param {number} index @param {string} name @param {boolean} longer */
 const holdPhrase = (index, name, longer) => `${index === 0 ? `Hold ${name}` : `Tap ${name}${index > 1 ? ` ${index} times` : ""}, then hold it`}${longer ? " longer" : ""}`;
 
 // Every layer effect one key offers once it resolves to `code`: its own
 // action, less the parts its behaviour row replaces, and each branch of that
 // row. A hold branch that presses and holds until release holds the layer; any
 // other hold, like a tap, sends the action once.
+/** @param {number} code @param {BehaviorRow | undefined} row @param {readonly number[]} [values] @returns {(LayerEffect & {how: string, note?: string})[]} */
 function keyEffects(code, row, values) {
+    /** @type {(LayerEffect & {how: string, note?: string})[]} */
     const effects = [];
     const first = row?.steps.find((step) => step.tapIndex === 0);
     for (const effect of layerEffects(code)) {
@@ -111,17 +136,18 @@ function keyEffects(code, row, values) {
         effects.push({...effect, how: effect.taps ? `Tap ${codeName(code)} ${effect.taps} times` : effect.kind === "hold" && !effect.oneShot ? `Hold ${codeName(code)}` : `Tap ${codeName(code)}`});
     }
     for (const step of row?.steps || []) {
-        const sends = (action) => `its behaviour sends ${actionName(action)}`;
+        /** @param {Action | undefined} action */
+        const sends = (action) => `its behaviour sends ${actionName(/** @type {Action} */ (action))}`;
         for (const effect of actionEffects(step.tap)) {
             if (effect.kind !== "hold" || effect.oneShot) effects.push({...effect, how: tapPhrase(step.tapIndex, codeName(code)), note: sends(step.tap)});
         }
-        for (const [part, longer] of [["hold", false], ["longHold", true]]) {
-            if (part === "hold" && values && releaseHoldUnreachable(step, effectiveTimings(row, values))) continue;
+        for (const [part, longer] of /** @type {const} */ ([["hold", false], ["longHold", true]])) {
+            if (part === "hold" && values && row && releaseHoldUnreachable(step, effectiveTimings(row, values))) continue;
             const hold = step[part];
             for (const effect of actionEffects(hold?.action)) {
-                const press = hold.mode === KEY_BEHAVIOR_HOLD_MODES.PRESS_AND_HOLD_UNTIL_RELEASE;
+                const press = hold?.mode === KEY_BEHAVIOR_HOLD_MODES.PRESS_AND_HOLD_UNTIL_RELEASE;
                 if (effect.kind === "hold" && !press) continue;
-                effects.push({...effect, how: holdPhrase(step.tapIndex, codeName(code), longer), note: sends(hold.action)});
+                effects.push({...effect, how: holdPhrase(step.tapIndex, codeName(code), longer), note: sends(hold?.action)});
             }
         }
     }
@@ -130,27 +156,33 @@ function keyEffects(code, row, values) {
 
 // The parts of a validated profile (portable-profile.validateSnapshot) the
 // walk reads, in its own terms.
+/** @param {import("./types.js").DecodedProfile} decoded */
 function profileFacts(decoded) {
     const values = decoded.settings.values;
     const names = decoded.settings.names;
     const layers = decoded.document.layers.map((codes) => CHARYBDIS_4X6_LAYOUT_MATRIX.map(([row, column]) => codes[row * 6 + column]));
+    /** @type {Map<number, BehaviorRow>} */
     const rows = new Map();
     for (const row of decoded.behaviors?.rows || []) {
         const code = row.target.kind === ACTION.QMK_KEYCODE ? row.target.operand : nativeCode(row.target);
-        if (Number.isInteger(code) && !rows.has(code)) rows.set(code, row);
+        if (code !== undefined && Number.isInteger(code) && !rows.has(code)) rows.set(code, row);
     }
     const records = decoded.settings.layers;
     const combos = values[SETTING.COMBOS_ENABLED] ? (decoded.combos?.rows || []).map((combo, index) => ({index,
-        inputs: combo.inputs.map((input) => (input.kind === ACTION.QMK_KEYCODE ? input.operand : nativeCode(input))),
+        inputs: combo.inputs.map((input) => (input.kind === ACTION.QMK_KEYCODE ? input.operand : /** @type {number} */ (nativeCode(input)))),
         output: combo.output, enabled: combo.enabled !== false, allowedLayers: combo.allowedLayers ?? 0xffff})).filter((combo) => combo.enabled) : [];
     // Participation (participation-policy.md), judged by the layer a key came
     // from and its matrix position.
+    /** @param {number} layoutIndex */
     const matrixOf = (layoutIndex) => {const [row, column] = CHARYBDIS_4X6_LAYOUT_MATRIX[layoutIndex]; return row * 6 + column;};
-    const behaviorUsed = (row, layer, layoutIndex) => Boolean(row) && values[SETTING.BEHAVIORS_ENABLED] !== 0 && Boolean(values[SETTING.LAYER_BEHAVIORS] & bit(layer))
-        && row.enabled !== false && Boolean((row.allowedLayers ?? 0xffff) & bit(layer)) && !records?.[layer]?.bypass.includes(matrixOf(layoutIndex));
+    /** @param {BehaviorRow | undefined} row @param {number} layer @param {number} layoutIndex */
+    const behaviorUsed = (row, layer, layoutIndex) => Boolean(row && values[SETTING.BEHAVIORS_ENABLED] !== 0 && Boolean(values[SETTING.LAYER_BEHAVIORS] & bit(layer))
+        && row.enabled !== false && Boolean((row.allowedLayers ?? 0xffff) & bit(layer)) && !records?.[layer]?.bypass.includes(matrixOf(layoutIndex)));
+    /** @param {number} layer @param {number} layoutIndex */
     const comboPress = (layer, layoutIndex) => Boolean(values[SETTING.LAYER_COMBOS] & bit(layer)) && !records?.[layer]?.exclude.includes(matrixOf(layoutIndex));
     // Generated outputs have no physical placement and do not consult the
     // source-layer behaviour switch. Their row uses the declared owner's origin.
+    /** @param {BehaviorRow | undefined} row */
     const generatedLayers = (row) => row && values[SETTING.BEHAVIORS_ENABLED] !== 0 && row.enabled !== false ? (row.allowedLayers ?? 0xffff) : 0;
     const pointer = values[SETTING.AUTO_MOUSE_ENABLED] ? values[SETTING.AUTO_MOUSE_LAYER] : undefined;
     const sniping = values[SETTING.AUTO_SNIPING_ENABLED] ? values[SETTING.AUTO_SNIPING_LAYER] : undefined;
@@ -158,11 +190,13 @@ function profileFacts(decoded) {
     return {names, layers, rows, combos, allCombos, pointer, sniping, values, behaviorUsed, comboPress, generatedLayers,
         // Base is always on, and so are the default layers the keyboard keeps.
         always: (1 | (values[SETTING.DEFAULT_LAYERS] & 0xffff)) >>> 0,
+        /** @param {number} layer */
         comboLayer: (layer) => records?.[layer]?.reference ?? layer};
 }
 
 // The code a key answers with while `active` layers are on, and the layer it
 // comes from; null when every layer is transparent there.
+/** @param {Facts} facts @param {number} active @param {number} position */
 function resolve(facts, active, position) {
     for (let layer = LAYERS - 1; layer >= 0; layer--) {
         if (!(active & bit(layer))) continue;
@@ -178,8 +212,11 @@ function resolve(facts, active, position) {
 // only as its source layer and position allow, and the reference never
 // replaces that source (participation-policy.md). Maps each code a press can
 // offer to the source layers it can come from.
+/** @param {Facts} facts @param {number} active */
 function comboCodes(facts, active) {
-    const top = highest(active), reference = facts.comboLayer(top), codes = new Map();
+    const top = highest(active), reference = facts.comboLayer(top);
+    /** @type {Map<number | undefined, number[]>} */
+    const codes = new Map();
     if (reference >= LAYERS) return codes;
     facts.layers[0].forEach((_, position) => {
         const at = resolve(facts, active, position);
@@ -190,12 +227,15 @@ function comboCodes(facts, active) {
     return codes;
 }
 
+/** @param {number} mask */
 const highest = (mask) => 31 - Math.clz32(mask);
 
 // Everything that changes the layers from one state, each with where it came
 // from so a path can be told.
+/** @param {Facts} facts @param {number} active @param {Map<number, OfferedEffect[]>} cache @returns {OfferedEffect[]} */
 function offers(facts, active, cache) {
-    if (cache.has(active)) return cache.get(active);
+    const cached = cache.get(active); if (cached) return cached;
+    /** @type {OfferedEffect[]} */
     const found = [];
     facts.layers[0].forEach((_, position) => {
         const at = resolve(facts, active, position);
@@ -210,7 +250,7 @@ function offers(facts, active, cache) {
         const present = comboCodes(facts, active);
         for (const combo of facts.combos) {
             if (!combo.inputs.length || !combo.inputs.every((code) => (present.get(code) || []).some((layer) => combo.allowedLayers & bit(layer)))) continue;
-            const outputCode = nativeCode(combo.output);
+            const outputCode = /** @type {number} */ (nativeCode(combo.output));
             // The last declared member owns the output regardless of press
             // order. Duplicate placements are choices of that member, never
             // permissions borrowed from another declared input.
@@ -240,8 +280,15 @@ function offers(facts, active, cache) {
 // on active layers. A transparent overlay contributes no condition at all;
 // independently available layer controls therefore share one decision rather
 // than expanding every hold/lock combination.
+/** @param {Facts} facts @param {boolean} legacyTiming @returns {SymbolicWalk | Extract<import("./types.js").LayerAnalysisResult<Transition>, {reachedLayers?: undefined}>} */
 function compactWalk(facts, legacyTiming) {
-    const transitions = [], queries = [], sources = [];
+    /** @type {Transition[]} */
+    const transitions = [];
+    /** @type {Condition[]} */
+    const queries = [];
+    /** @typedef {{position: number, layer: number, code: number, when: Condition}} Source */
+    /** @type {Source[]} */
+    const sources = [];
     facts.layers[0].forEach((_, position) => {
         let covered = 0;
         for (let layer = LAYERS - 1; layer >= 0; layer--) {
@@ -258,7 +305,10 @@ function compactWalk(facts, legacyTiming) {
     });
     const tops = Array.from({length: LAYERS}, (_, layer) => ({layer, when: {on: bit(layer), off: (0xffff << (layer + 1)) & 0xffff}}));
     const selfReferences = tops.every(({layer}) => facts.comboLayer(layer) === layer);
-    const present = new Map(), needed = new Set(facts.combos.flatMap(combo => combo.inputs));
+    /** @type {Map<number | undefined, Map<number, Condition[]>>} */
+    const present = new Map();
+    const needed = new Set(facts.combos.flatMap(combo => combo.inputs));
+    /** @param {number} code @param {Source} source @param {Condition} when */
     const include = (code, source, when) => {
         if (!needed.has(code) || !facts.comboPress(source.layer, source.position)) return;
         const byLayer = present.get(code) || new Map(), cases = byLayer.get(source.layer) || [];
@@ -280,13 +330,14 @@ function compactWalk(facts, legacyTiming) {
             else for (const top of tops) if (top.layer >= source.layer) queries.push({all: [source.when, top.when]});
         }
     }
+    /** @param {number | undefined} code @param {number} allowed @returns {Condition} */
     const presence = (code, allowed) => ({any: [...(present.get(code) || [])]
         .filter(([layer]) => allowed & bit(layer)).flatMap(([, cases]) => cases)});
     const comboQueries = [];
     for (const combo of facts.combos) {
         const when = combo.inputs.length ? {all: combo.inputs.map(code => presence(code, combo.allowedLayers))} : false;
         comboQueries.push({index: combo.index, query: queries.length}); queries.push(when);
-        const outputCode = nativeCode(combo.output), row = facts.rows.get(outputCode);
+        const outputCode = /** @type {number} */ (nativeCode(combo.output)), row = facts.rows.get(outputCode);
         const allowed = facts.generatedLayers(row), owner = combo.inputs.at(-1);
         // Both variants can exist when the owner code has several placements.
         // Bind each to its own source-resolution/participation conditions;
@@ -303,16 +354,20 @@ function compactWalk(facts, legacyTiming) {
         from: {trackball: true}, how: `Move the trackball, which turns on ${layerName(facts.names, facts.pointer)}`});
     const result = analyzeLayerStates({always: facts.always, transitions, queries, trapLimit: MAX_TRAPS});
     if (!result.complete && !result.reachabilityComplete) return result;
-    return {...result, symbolic: true,
+    return {...result, symbolic: /** @type {const} */ (true),
         reachableCombos: new Set(comboQueries.filter(({query}) => result.queries[query]).map(({index}) => index)),
         cache: new Map([...result.witnesses].map(active => [active, offers(facts, active, new Map())]))};
 }
 
 // A state is its locks and the layers held on top, sixteen bits each.
+/** @param {number} locks @param {number} held */
 const stateOf = (locks, held) => (locks | (held << 16)) >>> 0;
+/** @param {number} state */
 const locksOf = (state) => state & 0xffff;
+/** @param {number} state */
 const heldOf = (state) => state >>> 16;
 
+/** @param {number} state @param {WalkEffect} effect */
 function step(state, effect) {
     const locks = locksOf(state), held = heldOf(state);
     switch (effect.kind) {
@@ -325,13 +380,20 @@ function step(state, effect) {
 
 // Walks every state reachable from rest. `edges` keeps, for each state, where
 // each effect leads; `parent` the first way each state was reached.
+/** @param {Facts} facts @returns {import("./types.js").BoundedLayerWalk} */
 function boundedWalk(facts) {
-    const cache = new Map(), edges = new Map(), parent = new Map([[0, null]]);
+    /** @type {Map<number, OfferedEffect[]>} */
+    const cache = new Map();
+    /** @type {import("./types.js").BoundedLayerWalk['edges']} */
+    const edges = new Map();
+    /** @type {import("./types.js").BoundedLayerWalk['parent']} */
+    const parent = new Map([[0, null]]);
     const queue = [0];
     let edgeCount = 0, complete = true;
     states: for (let next = 0; next < queue.length; next++) {
         const state = queue[next];
         const active = facts.always | locksOf(state) | heldOf(state);
+        /** @type {{to: number, effect: WalkEffect}[]} */
         const out = [];
         for (const effect of offers(facts, active, cache)) {
             if (effect.kind === "unowned") continue;
@@ -350,36 +412,50 @@ function boundedWalk(facts) {
     }
     if (!complete) return {cache, edges, parent, home: new Set(), complete};
     // The states that can still get back to rest, walking the edges backwards.
+    /** @type {Map<number, number[]>} */
     const back = new Map();
-    for (const [from, out] of edges) for (const {to} of out) (back.get(to) || back.set(to, []).get(to)).push(from);
+    for (const [from, out] of edges) for (const {to} of out) /** @type {number[]} */ (back.get(to) || back.set(to, []).get(to)).push(from);
     const home = new Set([0]), pending = [0];
-    while (pending.length) for (const from of back.get(pending.pop()) || []) if (!home.has(from)) {home.add(from); pending.push(from);}
+    while (pending.length) for (const from of back.get(/** @type {number} */ (pending.pop())) || []) if (!home.has(from)) {home.add(from); pending.push(from);}
     return {cache, edges, parent, home, complete};
 }
 
 // How to get from rest to a state, in steps a person takes; releases are not
 // steps.
+/** @param {import("./types.js").BoundedLayerWalk["parent"]} parent @param {number} state */
 function pathTo(parent, state) {
+    /** @type {WalkEffect[]} */
     const steps = [];
     for (let at = parent.get(state); at; at = parent.get(at.from)) if (at.effect.kind !== "release") steps.unshift(at.effect);
     return steps;
 }
 
+/** @param {Facts} facts @param {number} mask */
 const namesOf = (facts, mask) => layersIn(mask).map((layer) => layerName(facts.names, layer));
+/** @param {readonly string[]} words */
 const listed = (words) => (words.length < 2 ? words.join("") : `${words.slice(0, -1).join(", ")} and ${words[words.length - 1]}`);
 // Where a finding is edited, in the review's place shapes (profile-review.js):
 // a key on a layer slot of this profile, a combo, or a settings section.
+/** @param {number} layer @param {number} [layoutIndex] @returns {import("../../contracts/model.js").FindingPlace} */
 const keyPlace = (layer, layoutIndex) => ({kind: "key", layer, layoutIndex});
-const placeOf = (from) => (Number.isInteger(from?.layoutIndex) ? keyPlace(from.layer, from.layoutIndex)
-    : Number.isInteger(from?.combo) ? {kind: "combo", index: from.combo} : undefined);
+/** @param {import("./types.js").LayerEffectSource | undefined} from @returns {import("../../contracts/model.js").FindingPlace | undefined} */
+const placeOf = (from) => (from && typeof from.layer === "number" && Number.isInteger(from.layoutIndex) ? keyPlace(from.layer, from.layoutIndex)
+    : from && typeof from.combo === "number" && Number.isInteger(from.combo) ? {kind: "combo", index: from.combo} : undefined);
 
+/** @param {Facts} facts @param {import("./types.js").BoundedLayerWalk | Extract<SymbolicWalk, {complete: true}>} walked @returns {Finding[]} */
 function traps(facts, walked) {
-    const {edges, parent, home} = walked;
+    const {edges} = walked;
+    // Symbolic walks supply traps directly; the bounded helpers run only over explicit edges.
+    const parent = /** @type {import("./types.js").BoundedLayerWalk['parent']} */ (walked.parent);
+    const home = /** @type {Set<number>} */ (walked.home);
     // A set of locks is a trap once every key is let go and Base cannot be
     // reached from it; the way in is the lock that first leaves a state that
     // could still get home.
+    /** @param {number} locks */
     const trapped = (locks) => parent.has(stateOf(locks, 0)) && !home.has(stateOf(locks, 0));
+    /** @type {Map<number, {from: number, effect: WalkEffect}>} */
     const found = new Map();
+    /** @param {number} state */
     const depth = (state) => pathTo(parent, state).length;
     for (const [from, out] of edges || []) {
         if (trapped(locksOf(from))) continue;
@@ -390,13 +466,14 @@ function traps(facts, walked) {
             if (!known || depth(from) < depth(known.from)) found.set(locks, {from, effect});
         }
     }
+    /** @type {[number, {from: number, effect: WalkEffect}][]} */
     const sorted = [];
     for (const entry of [...found].sort(([a], [b]) => layersIn(a).length - layersIn(b).length || a - b)) {
         if (!sorted.some(([mask]) => (entry[0] & mask) === mask)) sorted.push(entry);
     }
     const entries = walked.symbolic ? walked.traps : sorted.slice(0, MAX_TRAPS).map(([locks, entry]) => ({locks,
         effect: entry.effect, path: [...pathTo(parent, entry.from), entry.effect]}));
-    const named = entries.map(({locks, effect, path}) => {
+    const named = entries.map(/** @returns {Finding} */ ({locks, effect, path}) => {
         const top = highest(locks);
         const names = namesOf(facts, locks);
         return {kind: "trap", level: LEVELS.TRAP, layers: layersIn(locks),
@@ -414,12 +491,14 @@ function traps(facts, walked) {
     return named;
 }
 
+/** @param {Facts} facts @param {Walk} walked @returns {Finding[]} */
 function findings(facts, walked) {
     const reachabilityComplete = walked.reachabilityComplete ?? walked.complete;
     const uncertain = walked.uncertainty ?? walked;
     const involved = layersIn(uncertain.affectedLayers ?? 0).filter(layer => layer !== 0);
     const names = involved.map(layer => layerName(facts.names, layer));
     const shortNames = names.length > 3 ? `${names.slice(0, 3).join(", ")} and ${names.length - 3} other layers` : listed(names);
+    /** @type {Finding[]} */
     const results = walked.complete ? [...traps(facts, walked)] : [{kind: "reachabilityIncomplete", level: LEVELS.WARNING, layers: involved,
         scope: reachabilityComplete ? "escapes" : "reachability",
         title: names.length ? `Check ${reachabilityComplete ? "a way home when" : "how"} ${shortNames} combine` : "Check the layer controls together",
@@ -430,6 +509,7 @@ function findings(facts, walked) {
         place: involved.length ? keyPlace(involved[0]) : undefined}];
     const reached = walked.reachedLayers ?? [...walked.parent.keys()].reduce((mask, state) => mask | locksOf(state) | heldOf(state), facts.always);
     // A layer of transparent keys and KC_NO has nothing of its own to use.
+    /** @param {number} layer */
     const hasKeys = (layer) => facts.layers[layer].some((code) => code !== TRANSPARENT && code !== NOTHING);
 
     for (let layer = 1; layer < LAYERS; layer++) {
@@ -442,6 +522,7 @@ function findings(facts, walked) {
     }
 
     // Layer keys that reach a layer with no keys of its own, once per layer.
+    /** @type {Map<number, OfferedEffect>} */
     const empty = new Map();
     for (const effect of walked.effects ?? [...walked.cache.values()].flat()) {
         if (effect.kind === "unowned" || effect.from.trackball || effect.layer === 0 || hasKeys(effect.layer) || empty.has(effect.layer)) continue;
@@ -473,14 +554,16 @@ function findings(facts, walked) {
     // Holding, toggling or locking a layer that is always on does nothing;
     // only TO() means something there. Every key, branch and combo output is
     // counted, reachable or not.
+    /** @param {LayerEffect[]} effects */
     const idle = (effects) => effects.some((effect) => effect.kind !== "move" && effect.kind !== "unowned" && facts.always & bit(effect.layer));
+    /** @type {{name: string, place: import("../../contracts/model.js").FindingPlace}[]} */
     const idlePlaces = [];
     facts.layers.forEach((codes, layer) => codes.forEach((code, position) => {
         if (idle(layerEffects(code))) idlePlaces.push({name: codeName(code), place: keyPlace(layer, position)});
     }));
     for (const [code, row] of facts.rows) for (const step of row.steps) {
         for (const action of [step.tap, step.hold?.action, step.longHold?.action]) {
-            if (idle(actionEffects(action))) idlePlaces.push({name: `${actionName(action)} in the behaviour on ${codeName(code)}`, place: {kind: "behaviour", keycode: codeName(code)}});
+            if (idle(actionEffects(action))) idlePlaces.push({name: `${actionName(/** @type {Action} */ (action))} in the behaviour on ${codeName(code)}`, place: {kind: "behaviour", keycode: codeName(code)}});
         }
     }
     for (const combo of facts.allCombos) {
@@ -496,6 +579,7 @@ function findings(facts, walked) {
             place: idlePlaces[0].place});
     }
 
+    /** @param {number} code */
     const emptyBase = (code) => facts.layers[0].map((value, position) => value === code ? position : -1).filter(position => position >= 0);
     const transparent = emptyBase(TRANSPARENT);
     if (transparent.length) {
@@ -541,14 +625,16 @@ function findings(facts, walked) {
 // QMK buffers a matching member even when the remaining chord members are
 // absent. Match each reachable physical position through its reference layer;
 // the behavior still belongs to the key resolved on the active layer stack.
+/** @param {import("./types.js").DecodedProfile} decoded @param {Facts} facts @param {Walk} walked @param {boolean} legacyGestureTiming @param {boolean} legacyOwnedTapping @returns {Finding[]} */
 function gestureTimingFindings(decoded, facts, walked, legacyGestureTiming, legacyOwnedTapping) {
+    /** @type {Map<number, {row: BehaviorRow, nativeLayerTap: boolean, nativeWait: boolean, combos: Set<number>}>} */
     const affected = new Map();
     for (const active of walked.cache.keys()) {
         const reference = facts.comboLayer(highest(active));
         facts.layers[0].forEach((_, position) => {
             const key = resolve(facts, active, position);
-            const row = facts.rows.get(key?.code);
-            if (!row) return;
+            const row = key ? facts.rows.get(key.code) : undefined;
+            if (!row || !key) return;
             const nativeLayerTap = key.code >= 0x4000 && key.code <= 0x4fff;
             const otherTapping = (key.code >= 0x2000 && key.code <= 0x3fff) || (key.code >= 0x5280 && key.code <= 0x52df);
             const nativeWait = (nativeLayerTap && legacyGestureTiming) || (otherTapping && legacyOwnedTapping);
@@ -580,9 +666,11 @@ function gestureTimingFindings(decoded, facts, walked, legacyGestureTiming, lega
 // is about, named by the keyboard layer each slot holds (`order[slot]`, as
 // model/layer-order.js keeps it).
 const IDENTITY = Object.freeze(Array.from({length: LAYERS}, (_, layer) => layer));
+/** @param {Finding} finding @param {readonly number[]} [order] */
 const findingKey = (finding, order = IDENTITY) => `${finding.kind}:${finding.layers.map((slot) => order[slot]).sort((a, b) => a - b).join(",")}${finding.identity === undefined ? "" : `:${finding.identity}`}`;
 
 // The findings for a validated profile.
+/** @param {import("./types.js").DecodedProfile} decoded @param {{legacyGestureTiming?: boolean, legacyOwnedTapping?: boolean}} [options] @returns {Finding[]} */
 function layerReach(decoded, {legacyGestureTiming = false, legacyOwnedTapping = legacyGestureTiming} = {}) {
     if (decoded?.document?.layers?.length !== LAYERS) return [];
     const facts = profileFacts(decoded);
@@ -598,17 +686,19 @@ function layerReach(decoded, {legacyGestureTiming = false, legacyOwnedTapping = 
 // the old one unreached); `order` says which keyboard layer each draft slot
 // holds, so the two are matched layer with layer. Traps always ask to be
 // confirmed.
+/** @param {readonly Finding[]} before @param {readonly Finding[]} after @param {readonly number[]} [order] @returns {import("../../contracts/model.js").Check[]} */
 function compareFindings(before, after, order = IDENTITY) {
     const known = new Set(before.map((finding) => findingKey(finding))), still = new Set(after.map((finding) => findingKey(finding, order)));
     const incomplete = after.find(finding => finding.kind === "reachabilityIncomplete");
     const uncertainKinds = incomplete?.scope === "escapes" ? new Set(["trap", "trapOverflow"]) : GRAPH_FINDINGS;
     return [
-        ...after.map((finding) => ({...finding, key: findingKey(finding, order), status: known.has(findingKey(finding, order)) ? "existing" : "new"})),
+        ...after.map(/** @returns {import("../../contracts/model.js").Check} */ (finding) => ({...finding, key: findingKey(finding, order), status: known.has(findingKey(finding, order)) ? "existing" : "new"})),
         ...before.filter((finding) => !still.has(findingKey(finding)) && !(incomplete && uncertainKinds.has(finding.kind)))
-            .map((finding) => ({...finding, key: findingKey(finding), status: "fixed", place: undefined})),
+            .map(/** @returns {import("../../contracts/model.js").Check} */ (finding) => ({...finding, key: findingKey(finding), status: "fixed", place: undefined})),
     ];
 }
 
+/** @param {import("./types.js").DecodedProfile | null} keyboard @param {import("./types.js").DecodedProfile} draft @param {readonly number[]} [order] */
 function draftChecks(keyboard, draft, order = IDENTITY) {
     return compareFindings(keyboard ? layerReach(keyboard) : [], layerReach(draft), order);
 }

@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 // The 32 pointing slots of current firmware's compiled profile
 // (portable-profile.js), with a slot past the first eight configured.
@@ -18,11 +19,14 @@ function document32({highSlot = true} = {}) {
     if (!highSlot) return doc;
     const blob = decodeProfileBlob(Buffer.from(doc.profile, "base64"));
     const pd = blob.domains.find(domain => domain.id === 0x50), rgbDomain = blob.domains.find(domain => domain.id === 0x10);
+    if (!pd || !rgbDomain) throw new Error("The compiled profile fixture must contain PD and RGB domains.");
     const slots = decodePdDomain(pd.payload);
     slots[12] = {...structuredClone(slots[1]), id: 12, name: "Tabs"};
     pd.payload = encodePdDomain(slots);
     const rgb = decodeRgbDomainV1(rgbDomain.payload);
-    rgb.pdModeColors.find(row => row.pdModeId === 12).color = {h: 200, s: 255, v: 200};
+    const color = rgb.pdModeColors.find(row => row.pdModeId === 12);
+    if (!color) throw new Error("The compiled RGB fixture must contain pointing slot 12.");
+    color.color = {h: 200, s: 255, v: 200};
     rgbDomain.payload = encodeRgbDomainV1(rgb);
     doc.profile = encodeProfileBlob(blob).toString("base64");
     validateSnapshot(doc, CAPABILITIES_32);

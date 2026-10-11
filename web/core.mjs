@@ -1,3 +1,4 @@
+// @ts-check
 // What a browser host needs from core/, as one module: the web build bundles
 // this file (scripts/build-web.js) and the page imports the bundle. It is a
 // build entry, not part of the extension, which requires core/ directly.
@@ -44,15 +45,24 @@ export {
 export {WEBHID_DEVICE_FILTERS, WebHidDeviceAdapter} from "../core/transport/webhid-adapter.js";
 export {VOCABULARY, word, layerName} from "../core/model/vocabulary.js";
 
-export * as portable from "../core/model/portable-profile.js";
-export * as actions from "../core/schema/actions.js";
-export * as profileBlob from "../core/schema/profile-blob-v1.js";
-export * as rgbDomain from "../core/schema/rgb-domain-v1.js";
-export * as keyBehaviorDomain from "../core/schema/key-behavior-domain-v1.js";
-export * as comboDomain from "../core/schema/combo-domain-v1.js";
-export * as settingsDomain from "../core/schema/settings-domain-v1.js";
-export * as pdModeDomain from "../core/schema/pd-mode-domain-v1.js";
-export * as keycodes from "../core/data/keycode-catalog.js";
+import * as portable from "../core/model/portable-profile.js";
+export {portable};
+import * as actions from "../core/schema/actions.js";
+export {actions};
+import * as profileBlob from "../core/schema/profile-blob-v1.js";
+export {profileBlob};
+import * as rgbDomain from "../core/schema/rgb-domain-v1.js";
+export {rgbDomain};
+import * as keyBehaviorDomain from "../core/schema/key-behavior-domain-v1.js";
+export {keyBehaviorDomain};
+import * as comboDomain from "../core/schema/combo-domain-v1.js";
+export {comboDomain};
+import * as settingsDomain from "../core/schema/settings-domain-v1.js";
+export {settingsDomain};
+import * as pdModeDomain from "../core/schema/pd-mode-domain-v1.js";
+export {pdModeDomain};
+import * as keycodes from "../core/data/keycode-catalog.js";
+export {keycodes};
 
 // The Buffer core/ runs on: Node's own under Node, the `buffer` package in the
 // bundle (web/buffer.mjs). A host turns device bytes into one with it.

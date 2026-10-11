@@ -132,6 +132,8 @@ ownership and where new plans or specifications belong.
   system.
 - `tests/` — mirrors `core/`, plus the view modules and the payloads the
   interface posts.
+- `contracts/` — declarations for data posted between the host and panel,
+  shared by their type checks; no executable code or core imports.
 - `web/` — the [web page](#the-web-build): its HTML, the browser host that
   does in a page what `extension.js` does in VS Code, what that host takes from
   `core/`, and the stand-ins the bundle uses in place of Node's `Buffer` and the
@@ -148,7 +150,8 @@ checkouts; ordinary app checks remain self-contained.
 
 ```sh
 npm ci
-npm run check           # syntax across the tree, then all tests
+npm run check           # syntax across the tree, strict types, then all tests
+npm run typecheck       # the strict TypeScript checks alone, emitting no files
 npm run preview         # build preview/model.json from the test fixtures
 npm run preview -- --device  # …or from the keyboard that is plugged in, read-only
 npm run preview -- --vscode  # also write preview/vscode-{dark,light}.html, as the panel renders
@@ -159,6 +162,67 @@ npm run build:web          # build the web page into dist/web/
 npm run web                # …then serve it at http://localhost:8975/
 npm run check:site         # check dist/web/ is static files only, ready to publish
 ```
+
+### Type checking
+
+Ark uses strict TypeScript checking without a compile step in the extension
+(D-L59). `npm run typecheck` checks declarations, compile-time contract tests
+and every application runtime module, using the pinned compiler. It is part of
+`npm run check`, so the ordinary CI gate runs it too. `checkJs` is enabled in
+each application environment; new modules enter checking automatically.
+Developer scripts, reusable fixtures under `tests/fixtures/`, integration
+corpus generators and the separate branch-window tool are also checked.
+Individual unit and browser test implementations retain syntax and runtime
+checks.
+
+`tsconfig.foundation.json` checks `core/` and `contracts/` alone, with Node
+types and no DOM. `tsconfig.json` adds the extension shell, under the VS Code
+types pinned to its minimum supported host version; its `vscode` import brings
+global types (such as `Thenable`) that only the foundation check keeps out of
+core. The renderer check keeps Node types out of the interface. The
+browser-host check (`tsconfig.hosts.json`) combines page APIs with the core the
+web build bundles, and has no Node globals: `process`, `setImmediate` or
+`__dirname` in `web/` fails it. Its one Node-shaped global is `Buffer`, which
+the build injects from the `buffer` package (`web/buffer.mjs`);
+`web/bundled-buffer.d.ts` declares the members core uses, so a new one is
+added there. Where the build puts `web/no-native-hid.js` in place of the
+native HID adapter, the check resolves `core/transport/node-hid-adapter.browser.d.ts`
+instead (`moduleSuffixes`), so node-hid stays out of it too. The clock worker
+has its own WebWorker configuration, with neither Node globals nor a page DOM.
+`tsconfig.developer.json` checks Node-only scripts and shared fixtures. The
+preview builder imports browser-host APIs, so `tsconfig.preview.json` checks
+it and the browser macro inspector with Node and DOM declarations.
+`tsconfig.branch-window.json` checks the separate developer extension against
+its own minimum VS Code version (1.85), independently of Ark's 1.90 SDK pin.
+
+Shared posted data lives in `contracts/messages.d.ts` and
+`contracts/panel.d.ts`. Both hosts, the renderer store, reply handler, pure
+edit/control builders and screen implementations consume those contracts.
+Compile-time cases check actual core publication against them and reject
+incomplete model replies, commands without payloads and invalid view inputs.
+
+Use JSDoc for module interfaces and local annotations where inference needs
+help. A type import names its file with the runtime extension
+(`import("./types.js")` for `types.d.ts`, `.mjs` for an ES module), which
+NodeNext requires in ES modules and accepts in CommonJS, and uses its file's
+quotes: double in JavaScript, single in TypeScript declarations and type
+tests. Put shared internal declarations in the layer that owns them. The posted
+panel data is declared under `contracts/`: neither it nor the interface imports
+core types. Runtime and type dependencies obey the same layer rules. A type
+declaration describes a value after validation; device bytes and imported files
+still require the runtime validators.
+
+Extend coverage by adding a complete module to the configuration for its
+environment, marking it `// @ts-check`, and resolving its strict errors. The
+configuration's `checkJs` is what `npm run typecheck` uses; the pragma is what
+the editor uses, because VS Code only finds `tsconfig.json`, so without it the
+interface, browser host and tool modules show no errors while being edited.
+Keep checking enabled for covered modules. Use concrete types or `unknown` at
+unvalidated inputs; assertions need a checked invariant, such as a known DOM
+selector or a validated encoding. Compile-time acceptance and rejection cases
+live under `tests/types/`; rejection cases use `@ts-expect-error` so a missing
+error fails the check. Runtime fixtures and test code continue to run directly
+with Node, and the web build continues to bundle the same JavaScript sources.
 
 ### The web build
 

@@ -1,9 +1,11 @@
+// @ts-check
+/** @typedef {Partial<import("../../contracts/panel.js").PublishedModel> | null | undefined} Model */
 // The ANSI board the keycode picker draws, taken from the app that ships it so
 // a second interface cannot teach a different keyboard.
 
 // Layout legends already carry dead-key marks and the macOS ISO swap from the
 // model. Keep the stored value and board geometry while choosing what to draw.
-export function pickerBoardKey(source, model) {
+export function pickerBoardKey(/** @type {{x: number, y: number, w: number, h: number, value: string, labels: string[]}} */ source, /** @type {Model} */ model) {
   const spoken = model?.qmkKeyLabels?.[source.value];
   const modifier = /^KC_(?:LEFT_|RIGHT_|L|R)(?:CTL|SFT|ALT|GUI)$/.test(source.value);
   const legend = model?.hostLayoutLegends?.[source.value];
@@ -13,7 +15,7 @@ export function pickerBoardKey(source, model) {
 export const PICKER_BOARD = {
   width: 1563.3125,
   height: 466.2,
-  keys: [
+  keys: /** @type {[number, number, number, number, string, string | string[]][]} */ ([
     [24.658, 24.929, 61.203, 61.203, "KC_ESC", "Esc"],
     [159.658, 24.929, 61.203, 61.203, "KC_F1", "F1"],
     [227.161, 24.929, 61.203, 61.203, "KC_F2", "F2"],
@@ -118,5 +120,5 @@ export const PICKER_BOARD = {
     [1477.28, 312.524, 61.452, 129.032, "KC_PENT", "Enter"],
     [1274.643, 380.058, 129.227, 61.359, "KC_P0", ["0", "Ins"]],
     [1409.78, 380.058, 61.452, 61.359, "KC_PDOT", [".", "Del"]],
-  ].map(([x, y, w, h, value, label]) => ({x, y, w, h, value, labels: Array.isArray(label) ? label : [label]})),
+  ]).map(([x, y, w, h, value, label]) => ({x, y, w, h, value, labels: Array.isArray(label) ? label : [label]})),
 };

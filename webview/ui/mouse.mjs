@@ -1,3 +1,4 @@
+// @ts-check
 // Mouse: how the trackball moves the pointer — its speed, sniping, and the
 // layer movement turns on by itself.
 //
@@ -7,6 +8,7 @@
 // ones; this screen adds none of its own. Pointing modes, which re-read the
 // trackball as scrolling or keys, keep their own screen.
 
+// Selector assertions refer to elements created by this module's authored markup.
 import {el, esc} from "../lib/dom.mjs";
 import {getModel, render, state, canEdit as canEditArea} from "../store.mjs";
 import {topbar, unavailable} from "./shell.mjs";
@@ -21,10 +23,10 @@ export function screenMouse() {
         "How the trackball moves the pointer: its speed, sniping for fine control, and the mouse layer that movement turns on by itself.",
         `<button class="btn" data-act="pointing" data-tip="Modes that re-read the trackball as scrolling or as keys while their key is held.">Pointing modes</button>`,
     )}</div>`);
-    main.querySelector('[data-act="pointing"]').addEventListener("click", () => { state.screen = "pointing"; render(); });
+    /** @type {HTMLButtonElement} */ (main.querySelector('[data-act="pointing"]')).addEventListener("click", () => { state.screen = "pointing"; render(); });
 
     const content = el(`<div class="content"><div class="pad" style="max-width:980px"></div></div>`);
-    const pad = content.firstElementChild;
+    const pad = /** @type {HTMLElement} */ (content.firstElementChild);
     if (!sections.length) {
         pad.appendChild(el(`<div class="screen-stub"><h3>No mouse settings read</h3>
             <p class="note">${esc(unavailable(model) || "Choose Read keyboard to load this keyboard's pointer settings.")}</p></div>`));

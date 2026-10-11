@@ -37,14 +37,19 @@
     "test:browser": "playwright test",
     "pins": "node scripts/check-pins.js",
     "upstream": "node scripts/refresh-upstream.js",
-    "agreement": "node scripts/check-agreement.js"
+    "agreement": "node scripts/check-agreement.js",
+    "typecheck": "tsc -p tsconfig.foundation.json && tsc -p tsconfig.json && tsc -p tsconfig.hosts.json && tsc -p tsconfig.webview.json && tsc -p tsconfig.worker.json && tsc -p tsconfig.developer.json && tsc -p tsconfig.preview.json && tsc -p tsconfig.branch-window.json"
   },
   "dependencies": {
     "node-hid": "^3.4.0"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",
+    "@types/node": "26.6.5",
+    "@types/vscode": "1.90.0",
+    "@types/vscode-branch": "npm:@types/vscode@1.85.0",
     "buffer": "6.0.3",
-    "esbuild": "0.28.2"
+    "esbuild": "0.28.2",
+    "typescript": "7.0.2"
   }
 }

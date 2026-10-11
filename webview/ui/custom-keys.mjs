@@ -1,3 +1,8 @@
+// @ts-check
+/**
+ * @typedef {import("../../contracts/panel.js").PublishedModel | null} Model
+ */
+// Selector assertions describe the controls authored in these templates.
 // Custom keys: the keyboard's 128 named keys that do only what their behaviour
 // says. A key here is its name; what it does is its behaviour, edited on the
 // Keys screen like any other. Place one on a layer or send it from a combo.
@@ -12,6 +17,7 @@ import {layerSwatch} from "./layerbar.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {topbar, unavailable} from "./shell.mjs";
 
+/** @type {Record<string, string>} */
 const ROUTE_WORDS = {here: "key", combos: "combo"};
 
 export function screenCustomKeys() {
@@ -25,10 +31,10 @@ export function screenCustomKeys() {
         "Named keys that do only what their behaviour says. Place one on a key or send it from a combo; a behaviour cannot send one.",
         keys.length ? `<input class="input" id="customKeySearch" type="search" placeholder="Search custom keys by name" style="width:220px" value="${esc(state.customKeySearch || "")}">` : "",
     )}</div>`);
-    main.querySelector("#customKeySearch")?.addEventListener("input", (event) => { state.customKeySearch = event.target.value; render(); });
+    /** @type {HTMLInputElement | null} */ (main.querySelector("#customKeySearch"))?.addEventListener("input", (event) => { state.customKeySearch = /** @type {HTMLInputElement} */ (event.target).value; render(); });
 
     const content = el(`<div class="content"><div class="pad" style="display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:20px;align-items:start"></div></div>`);
-    const pad = content.firstElementChild;
+    const pad = /** @type {HTMLElement} */ (content.firstElementChild);
     if (!keys.length) {
         pad.style.display = "block";
         pad.appendChild(el(`<div class="screen-stub"><h3>No custom keys read</h3>
@@ -41,8 +47,9 @@ export function screenCustomKeys() {
     const grid = el(`<div class="card"><div class="card-h"><h3>Keys</h3>
         <span class="right tag">${named} of ${keys.length} named</span></div>
         <div class="card-b"><div class="macro-grid"></div></div></div>`);
-    const cells = grid.querySelector(".macro-grid");
+    const cells = /** @type {HTMLElement} */ (grid.querySelector(".macro-grid"));
     const query = (state.customKeySearch || "").trim().toLowerCase();
+    /** @param {import("../../contracts/panel.js").CustomKey} row */
     const matches = (row) => !query || row.name.toLowerCase().includes(query) || String(row.slot) === query;
     if (!keys.some(matches)) cells.replaceWith(el(`<p class="note">No custom key is named “${esc(query)}”.</p>`));
     const changed = draftMarks(model?.draft?.changes).customKeys;
@@ -62,6 +69,7 @@ export function screenCustomKeys() {
     return main;
 }
 
+/** @param {Model} model @param {import("../../contracts/panel.js").CustomKey} key @param {boolean} canEdit */
 function editor(model, key, canEdit) {
     const space = model?.customKeyNameSpace || {perName: NAME_MAX_BYTES};
     const count = nameCount(key.name, space.perName);
@@ -80,30 +88,31 @@ function editor(model, key, canEdit) {
                 <span class="note">${key.hasBehavior ? "Its behaviour: open it to see and change what each tap and hold sends." : "Nothing yet. Add a behaviour to give it taps and holds."}</span></div>
             ${placedOn(model, key)}
         </div></div>`);
-    const nameInput = card.querySelector("[data-name]");
+    const nameInput = /** @type {HTMLInputElement} */ (card.querySelector("[data-name]"));
     nameInput.addEventListener("input", () => {
-        const now = nameCount(nameInput.value, space.perName), node = card.querySelector("[data-name-count]");
+        const now = nameCount(nameInput.value, space.perName), node = /** @type {HTMLElement} */ (card.querySelector("[data-name-count]"));
         node.textContent = now.label;
         node.classList.toggle("warn", now.over);
     });
     nameInput.addEventListener("change", () => post(edits.customKeyNameMessage(key.keycode, nameInput.value, model?.customKeyEditing?.identity)));
-    card.querySelector('[data-act="place"]').addEventListener("click", () => {
+    /** @type {HTMLElement} */ (card.querySelector('[data-act="place"]')).addEventListener("click", () => {
         state.placement = {keycode: key.keycode};
         state.screen = "keys"; state.tab = "key"; render();
     });
-    card.querySelector('[data-act="behaviour"]').addEventListener("click", () => {
+    /** @type {HTMLElement} */ (card.querySelector('[data-act="behaviour"]')).addEventListener("click", () => {
         Object.assign(state, {screen: "keys", tab: "behaviours", behaviourRow: key.keycode});
         state.cell = null;
         state.cellHow = null;
         render();
     });
-    card.querySelectorAll("[data-goto-layer]").forEach((button) => button.addEventListener("click", () =>
+    /** @type {NodeListOf<HTMLElement>} */ (card.querySelectorAll("[data-goto-layer]")).forEach((button) => button.addEventListener("click", () =>
         showOnLayer(key.keycode, Number(button.dataset.gotoLayer))));
     return card;
 }
 
 // The layers where a key carries this custom key or a combo sends it, each in
 // its layer colour; a click shows that layer with the key picked.
+/** @param {Model} model @param {import("../../contracts/panel.js").CustomKey} key */
 function placedOn(model, key) {
     const chips = customKeyPlacements(model, layers(), key.keycode).map(({layer, at, routes}) => {
         const swatch = layerSwatch(model, layer);
@@ -117,6 +126,7 @@ function placedOn(model, key) {
             : `<span class="note">No key or combo sends this custom key. Place it on a key to use it.</span>`}</div>`;
 }
 
+/** @param {string} keycode @param {number} at */
 function showOnLayer(keycode, at) {
     const placement = customKeyPlacements(getModel(), layers(), keycode).find((entry) => entry.at === at);
     const route = placement?.routes[0];

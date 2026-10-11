@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 // Current firmware's compiled profile with every pointing slot from 6 on empty,
 // so creation and duplication have destinations, whatever the compiled
@@ -12,6 +13,7 @@ const {compiled} = require("./portable-profile");
 function document() {
     const doc = compiled();
     const blob = decodeProfileBlob(Buffer.from(doc.profile, "base64"));
+    /** @param {import("../../core/schema/types.js").SemanticAction | undefined} action */
     const reachesExtension = action => action && [4, 5].includes(action.kind) && action.operand >= 6;
     const profile = encodeProfileBlob({domains: blob.domains.map(domain => {
         if (domain.id === 0x50) return {...domain, payload: encodePdDomain(decodePdDomain(domain.payload).map(slot => slot.id < 6 ? slot : {id: slot.id, kind: 0, name: ""}))};

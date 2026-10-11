@@ -1,3 +1,4 @@
+// @ts-check
 // The physical keyboard: where each of the 56 positions sits, which LED it
 // carries, and which half it belongs to. Lifted from the app's own board so a
 // second interface cannot teach a different keyboard.
@@ -11,6 +12,7 @@ export const GEO = {
     viewBox: "20 96 1082 478",
     leftX: [36, 102, 168, 234, 300, 366], leftTopY: [118, 118, 78, 54, 78, 78],
     rightX: [698, 764, 830, 896, 962, 1028], rightTopY: [78, 78, 54, 78, 118, 118],
+    /** @type {Record<number, {x: number, y: number, angle: number}>} */
     thumbs: {
         48: {x: 328, y: 354, angle: 0}, 49: {x: 396, y: 350, angle: 10}, 50: {x: 468, y: 358, angle: 17},
         51: {x: 576, y: 358, angle: -17}, 52: {x: 648, y: 350, angle: -10}, 53: {x: 398, y: 432, angle: 9},
@@ -19,6 +21,7 @@ export const GEO = {
     trackball: {x: 776, y: 480, r: 58},
 };
 
+/** @type {Readonly<Record<number, number>>} */
 export const LED_INDEX = {
     0: 0, 1: 7, 2: 8, 3: 15, 4: 16, 5: 20,
     12: 1, 13: 6, 14: 9, 15: 14, 16: 17, 17: 21,
@@ -35,11 +38,13 @@ export const TRACKBALL_LED = 56;
 
 const RIGHT_THUMBS = new Set([51, 52, 55]);
 
+/** @param {number} layoutIndex */
 export const isRightHalf = (layoutIndex) =>
     layoutIndex < 48 ? layoutIndex % 12 >= 6 : RIGHT_THUMBS.has(layoutIndex);
 
 // Where an overlay paints. RGB_KEY_HALF and RGB_KEYS_ONLY depend on the key
 // that triggered the mode, so they are answered against that trigger.
+/** @param {number} layoutIndex @param {string} locality @param {number} [triggerIndex] */
 export function inLocality(layoutIndex, locality, triggerIndex) {
     switch (locality) {
         case "RGB_LEFT_HALF": return !isRightHalf(layoutIndex);
@@ -51,6 +56,7 @@ export function inLocality(layoutIndex, locality, triggerIndex) {
     }
 }
 
+/** @param {number} layoutIndex */
 export function keyVisual(layoutIndex) {
     const thumb = GEO.thumbs[layoutIndex];
     if (thumb) return {x: thumb.x, y: thumb.y + GEO.yOffset, angle: thumb.angle};
@@ -63,6 +69,7 @@ export function keyVisual(layoutIndex) {
 // The trackball LED answers localities on its own terms: it is soldered on the
 // right half, and no key maps to it, so a locality that names the trigger key
 // never reaches it.
+/** @param {string} locality @param {number} [triggerIndex] */
 export function trackballInLocality(locality, triggerIndex) {
     switch (locality) {
         case "RGB_LEFT_HALF": return false;
@@ -79,7 +86,9 @@ export function trackballInLocality(locality, triggerIndex) {
 // a running offset: how far the legend drops depends on how many rows sit above
 // it, and each case was tuned against the others. Lifted from the app's own
 // board, so the two cannot drift.
+/** @param {number} y @param {{tiers?: boolean, combos?: boolean, sub?: boolean}} [options] */
 export function keyFaceRows(y, {tiers = false, combos = false, sub = false} = {}) {
+    /** @type {Partial<import("./types.js").FaceRows> & {comboHeight: number}} */
     const rows = {comboHeight: 8.2};
     if (tiers && combos) { rows.tierY = y + 6.3; rows.comboY = y + 14.2; }
     else if (tiers) { rows.tierY = y + 7.5; }
@@ -93,11 +102,13 @@ export function keyFaceRows(y, {tiers = false, combos = false, sub = false} = {}
     } else {
         rows.mainY = [y + GEO.keyH / 2, y + 36, y + 40.4][above];
     }
-    return rows;
+    // Every layout above sets mainY; the other rows exist only when drawn.
+    return /** @type {import("./types.js").FaceRows} */ (rows);
 }
 
 // Roughly how wide a legend runs, so a label can be sized to fit its row rather
 // than bucketed by how many characters it happens to have.
+/** @param {string} char */
 const charWidth = (char) => {
     if (char === " ") return 0.32;
     if (/[.,:;!'|]/.test(char)) return 0.26;
@@ -113,6 +124,7 @@ const charWidth = (char) => {
  * below `min`. `squeeze` is set when even the smallest size overruns, and is
  * the width to compress the glyphs into rather than let them spill off the cap.
  */
+/** @param {unknown} text @param {{max: number, min: number, width: number}} bounds */
 export function fitText(text, {max, min, width}) {
     const unit = [...String(text || "")].reduce((total, char) => total + charWidth(char), 0);
     const preferred = unit > 0 ? Math.min(max, width / unit) : max;

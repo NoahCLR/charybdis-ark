@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 
 // Developer preview: render the interface against a profile from the test
@@ -33,8 +34,10 @@ const PREVIEW_BASE = [
 // (slots 0 and 12), empty slots (6 and 20), a VIA macro and a custom key. The
 // preview carries them because they are the values whose stored name and
 // semantic name differ.
+/** @type {Record<number, number>} */
 const PREVIEW_PD_BINDINGS = {50: 0x7e80, 52: 0x7e86, 48: 0x7700, 49: 0x7f00, 53: 0x7e8c, 54: 0x7eb4};
 
+/** @param {import("../core/model/types.js").PortableDocument} document */
 function fillPreviewLayer(document) {
     for (const [layoutIndex, code] of Object.entries(PREVIEW_PD_BINDINGS)) {
         const position = CHARYBDIS_4X6_LAYOUT_MATRIX[Number(layoutIndex)];
@@ -44,11 +47,12 @@ function fillPreviewLayer(document) {
         if (PREVIEW_PD_BINDINGS[layoutIndex] !== undefined) return;
         const position = CHARYBDIS_4X6_LAYOUT_MATRIX[layoutIndex];
         const code = keycodes.encode(name);
-        if (position && Number.isInteger(code)) document.layers[0][position[0] * 6 + position[1]] = code;
+        if (position && typeof code === "number" && Number.isInteger(code)) document.layers[0][position[0] * 6 + position[1]] = code;
     });
     return document;
 }
 
+/** @type {Partial<import("../core/session/types.js").DeviceCapabilities> & {brightnessMax: number}} */
 const capabilities = {
     compiledLayerCount: 16,
     supportedDomainMask: 31,
@@ -76,10 +80,13 @@ const capabilities = {
 // the web page's says what the page offers, in its words (web/web-host.mjs),
 // with no keyboard yet, or in a browser without WebHID. preview/index.html
 // shows the extension's; ?host=web, web-none or web-unsupported the others.
+/** @type {import("../core/session/types.js").PanelHost} */
 const VSCODE_HOST = {};
+/** @returns {Promise<Record<string, import("../core/session/types.js").PanelHost>>} */
 async function webHosts() {
     const {BLOCKED, WEB_WORDS} = await import("../web/web-host.mjs");
     const {version} = require("../package.json");
+    /** @type {Partial<import("../contracts/model.js").HostPanel>} */
     const offered = {chooseKeyboard: true, theme: "dark", build: {version, commit: "preview"}, recoveries: [
         {id: 2, name: "recovery-2026-10-06T09-14-03-512Z.charybdis.json", savedAt: "2026-10-06T09:14:03.512Z"},
         {id: 1, name: "recovery-2026-10-01T18-40-55-020Z.charybdis.json", savedAt: "2026-10-01T18:40:55.020Z"},
@@ -95,6 +102,7 @@ async function webHosts() {
 }
 
 // No keyboard: what a host publishes before one is chosen or connected.
+/** @param {import("../core/session/types.js").PanelHost} host */
 function emptyModel(host) {
     return buildPanelModel({service: {portable: null}, host}, {connected: false, busy: false, devices: [], phase: "empty"});
 }
@@ -102,15 +110,27 @@ function emptyModel(host) {
 // The demo, as the host loop opens it: the bundled demo profile in a real
 // draft (core/session/demo-session.js), and with `edits` staged in it, so the
 // review and leaving with edits not exported can be looked at.
+/**
+ * @param {import("../core/session/types.js").PanelHost} host
+ * @param {Exclude<import("../contracts/edits.js").PanelEdit, {type: "reviewPortableProfile" | "validateViaMacro"}>[]} [edits]
+ */
 function demoModel(host, edits = []) {
     const {openDemo, panelState} = require("../core/session/demo-session");
+    /** @type {import("../core/session/types.js").PanelSession} */
     const session = {service: {portable: null, snapshot: () => ({connected: false, busy: false, devices: []})}, host};
     openDemo(session, session.service.snapshot());
-    for (const edit of edits) session.draft.stage({...edit, draftId: session.draft.id, draftRevision: session.draft.revision});
+    // openDemo synchronously created this draft from its validated fixture.
+    const draft = /** @type {InstanceType<typeof ProfileDraftSession>} */ (session.draft);
+    for (const edit of edits) {
+        const message = {...edit, draftId: draft.id, draftRevision: draft.revision};
+        draft.stage(message);
+    }
     return buildPanelModel(session, panelState(session));
 }
+/** @type {Extract<import("../contracts/edits.js").PanelEdit, {type: "updateConfigDefaults"}>} */
 const DEMO_EDIT = {type: "updateConfigDefaults", sectionId: "normalPointerSpeed", fields: [{macro: "normalDpi", value: "1400"}, {macro: "snipingDpi", value: "200"}]};
 
+/** @param {import("../core/session/types.js").PanelHost} [host] */
 function buildModel(host = VSCODE_HOST) {
     const doc = fillPreviewLayer(document32());
     const snapshot = {
@@ -122,6 +142,7 @@ function buildModel(host = VSCODE_HOST) {
     };
     const deviceId = "preview-charybdis";
     const session = new ProfileDraftSession(snapshot, deviceId, capabilities);
+    /** @type {import("../core/session/types.js").PanelDeviceState} */
     const state = {
         selectedDeviceId: deviceId,
         connected: true,
@@ -158,9 +179,10 @@ async function deviceModel() {
         await service.readCommittedProfile();
         await service.readBaseRgb();
         await service.readCombos();
-        if ((service.capabilities?.supportedDomainMask & 15) === 15) await service.readPortableProfile();
+        if (((service.capabilities?.supportedDomainMask ?? 0) & 15) === 15) await service.readPortableProfile();
 
         // Exactly the model the panel would build for this keyboard.
+        /** @type {import("../core/session/types.js").PanelSession} */
         const panel = {service, host: VSCODE_HOST};
         const model = buildPanelModel(panel, service.snapshot());
         if (panel.draft) panel.portableLayers = startLayerEdit(panel.draft.current, panel.draft.revision);
@@ -176,6 +198,7 @@ const model = process.argv.includes("--device") ? deviceModel() : buildModel();
 // puts its own stylesheet in front of this one (a cascade layer that dresses
 // <code> and pads the body) and hangs its theme class on <body>. Both of those
 // have broken this interface before, and neither is visible in preview/index.html.
+/** @param {string} page */
 function writeHostPages(page) {
     const root = "/Applications/Visual Studio Code.app/Contents/Resources/app";
     const shell = path.join(root, "out/vs/workbench/contrib/webview/browser/pre/index.html");
@@ -186,7 +209,9 @@ function writeHostPages(page) {
     const source = fs.readFileSync(shell, "utf8");
     const opening = source.indexOf("defaultStyles.textContent = `") + "defaultStyles.textContent = `".length;
     const hostStyles = source.slice(opening, source.indexOf("`;", opening));
+    /** @param {string} name @returns {Record<string, string>} */
     const theme = (name) => {
+        /** @type {import("./preview-types.js").ThemeFile} */
         const data = JSON.parse(fs.readFileSync(path.join(root, "extensions/theme-defaults/themes", name), "utf8"));
         const inherited = data.include ? theme(data.include.replace(/^\.\//, "")) : {};
         return {...inherited, ...(data.colors || {})};
@@ -269,4 +294,8 @@ console.log("layers", model.layers.length,
     "· settings sections", model.configDefaults.length,
     "· rgb layer rows", model.rgb.layerColors?.length);
 console.log("written preview/index.html");
-}).catch((error) => {console.error(String(error.message || error)); process.exit(1);});
+}).catch(/** @param {unknown} error */ (error) => {
+    const message = error && typeof error === "object" && "message" in error ? error.message : undefined;
+    console.error(String(message || error));
+    process.exit(1);
+});

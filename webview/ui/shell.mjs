@@ -1,6 +1,9 @@
+// @ts-check
 // The shell: who the keyboard is, where you are, and the one gate every change
 // passes through on its way to the device.
 
+// Selector assertions refer to elements created by this module's authored markup.
+import * as controls from "../view/controls.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {getModel, post, postLeavingDemo, render, state} from "../store.mjs";
 import {statusSummary} from "../view/review.mjs";
@@ -12,10 +15,11 @@ import {openHistory} from "./history.mjs";
 // The review opens at once; the host marks it reviewed when it answers.
 function openReview() {
     state.overlay = "review";
-    post({type: "reviewProfileDraft"});
+    post(controls.control("reviewProfileDraft"));
     render();
 }
 
+/** @type {Readonly<Record<string, string>>} */
 const ICONS = {
     keys: '<svg viewBox="0 0 16 16"><rect x="1.5" y="3.5" width="13" height="9" rx="2"/><path d="M4 6.5h.01M6.5 6.5h.01M9 6.5h.01M11.5 6.5h.01M5 9.5h6"/></svg>',
     mouse: '<svg viewBox="0 0 16 16"><rect x="4" y="1.5" width="8" height="13" rx="4"/><path d="M8 1.5v4.5"/></svg>',
@@ -46,7 +50,9 @@ export const SCREENS = [
 
 export function rail() {
     const model = getModel();
+    /** @type {Partial<import("../../contracts/panel.js").PublishedModel["device"]>} */
     const device = model?.device || {};
+    /** @type {Partial<import("../../contracts/panel.js").PublishedModel["device"]["health"]>} */
     const health = device.health || {};
     const draft = model?.draft;
     const host = hostOf(model);
@@ -54,8 +60,9 @@ export function rail() {
     const devices = model?.devices || [];
     const selector = devices.length > 1 ? `<label class="rail-picker-label" for="rail-device-picker">Keyboard</label>
             <select class="input rail-picker" id="rail-device-picker" data-act="select-device" ${health.busy ? "disabled" : ""}>
-                ${devices.map((entry) => `<option value="${esc(entry.id)}" ${entry.id === model.selectedDeviceId ? "selected" : ""}>${esc(entry.label)} · ${esc(entry.id)}</option>`).join("")}
+                ${devices.map((entry) => `<option value="${esc(entry.id)}" ${entry.id === model?.selectedDeviceId ? "selected" : ""}>${esc(entry.label)} · ${esc(entry.id)}</option>`).join("")}
             </select>` : "";
+    /** @param {string} tone @param {string} text @param {string} tip */
     const line = (tone, text, tip) =>
         `<div class="stat" data-tip="${esc(tip)}"><i class="dot ${tone}"></i> ${esc(text)}</div>`;
 
@@ -102,7 +109,7 @@ export function rail() {
         ${railMessage()}
         <div class="rail-foot">
             <button class="btn tiny ghost rail-history" data-act="history" ${draft ? "" : "disabled"}
-                data-tip="Every step of the draft, newest first, with what each one changed. Go back or forward to any of them.">Draft history${draft?.historyLength > 1 ? ` <span class="c">${draft.historyLength - 1}</span>` : ""}</button>
+                data-tip="Every step of the draft, newest first, with what each one changed. Go back or forward to any of them.">Draft history${draft && draft.historyLength > 1 ? ` <span class="c">${draft.historyLength - 1}</span>` : ""}</button>
             <button class="btn tiny ghost icon" data-act="undo" ${draft?.canUndo ? "" : "disabled"}
                 data-tip="${esc(draft?.undoLabel ? `Undo: ${draft.undoLabel} (⌘Z)` : "Undo the last edit in the draft (⌘Z). The keyboard is not touched until you apply.")}">↺</button>
             <button class="btn tiny ghost icon" data-act="redo" ${draft?.canRedo ? "" : "disabled"}
@@ -111,24 +118,25 @@ export function rail() {
         ${railBuild(host.build)}
     </aside>`);
 
-    node.querySelectorAll("[data-screen]").forEach((button) => button.addEventListener("click", () => {
-        state.screen = button.dataset.screen;
+    /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-screen]")).forEach((button) => button.addEventListener("click", () => {
+        state.screen = /** @type {string} */ (button.dataset.screen);
         render();
     }));
-    node.querySelector('[data-act="dismiss"]')?.addEventListener("click", () => { state.notice = ""; state.error = ""; render(); });
+    /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="dismiss"]'))?.addEventListener("click", () => { state.notice = ""; state.error = ""; render(); });
     // From the demo, reading or choosing a keyboard leaves it, asking first.
-    node.querySelector('[data-act="refresh"]').addEventListener("click", () => postLeavingDemo({type: "refresh"}));
-    node.querySelector('[data-act="choose-keyboard"]')?.addEventListener("click", () => postLeavingDemo(chooseKeyboard()));
-    node.querySelector('[data-act="select-device"]')?.addEventListener("change", (event) => post({type: "selectDevice", deviceId: event.target.value}));
-    node.querySelector('[data-act="open-review"]')?.addEventListener("click", openReview);
-    node.querySelector('[data-act="history"]').addEventListener("click", openHistory);
-    node.querySelector('[data-act="undo"]').addEventListener("click", () => post({type: "undoProfileDraft"}));
-    node.querySelector('[data-act="redo"]').addEventListener("click", () => post({type: "redoProfileDraft"}));
+    /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="refresh"]')).addEventListener("click", () => postLeavingDemo(controls.control("refresh")));
+    /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="choose-keyboard"]'))?.addEventListener("click", () => postLeavingDemo(chooseKeyboard()));
+    /** @type {HTMLSelectElement | null} */ (node.querySelector('[data-act="select-device"]'))?.addEventListener("change", (event) => post(controls.selectDevice(/** @type {HTMLSelectElement} */ (event.target).value)));
+    /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="open-review"]'))?.addEventListener("click", openReview);
+    /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="history"]')).addEventListener("click", openHistory);
+    /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="undo"]')).addEventListener("click", () => post(controls.control("undoProfileDraft")));
+    /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="redo"]')).addEventListener("click", () => post(controls.control("redoProfileDraft")));
     return node;
 }
 
 // A host that leaves the theme to the panel (a web page) gets its toggle at
 // the top right of every screen; in VS Code the panel follows VS Code's theme.
+/** @param {string} title @param {string} subtitle @param {string} [actions] */
 export const topbar = (title, subtitle, actions = "") => `<header class="topbar">
     <div><h1>${esc(title)}</h1><p class="sub">${esc(subtitle)}</p></div>
     <div class="topbar-actions">${actions}${themeToggle()}</div>
@@ -150,6 +158,7 @@ function themeToggle() {
 // worked in, and below the navigation so nothing moves when it appears.
 // The build the page came from, as a link to its commit on GitHub, in a new
 // tab so the draft stays where it is.
+/** @param {import("../../contracts/model.js").HostPanel["build"]} build */
 function railBuild(build) {
     if (!build) return "";
     const url = commitUrl(build);
@@ -170,6 +179,7 @@ function railMessage() {
 
 // One Apply's steps, as the keyboard reports them. The running step carries
 // what it is doing now and, where there is one, how many bytes are through.
+/** @param {import("../../contracts/model.js").ApplyView} apply */
 function applySteps(apply) {
     const rows = apply.steps.map((step) => {
         const current = step.state === "active";
@@ -186,10 +196,11 @@ function applySteps(apply) {
 // The host republishes the panel for every read page. Start each replacement
 // at the same document-time phase so the spinner keeps rotating smoothly.
 function spinner() {
-    const time = document.timeline?.currentTime ?? performance.now();
+    const time = Number(document.timeline?.currentTime ?? performance.now());
     return `<span class="spin" aria-hidden="true" style="animation-delay:-${Math.round(time % 800)}ms"></span>`;
 }
 
+/** @type {Readonly<Record<string, string>>} */
 const SAVED_VERDICT = {
     none: "Nothing was saved. The keyboard kept the profile it had.",
     unknown: "The keyboard may have saved part of it. Read the keyboard to see what it runs now.",
@@ -219,17 +230,17 @@ export function commitBar() {
     // stopped and why can be read after the fact.
     if (!draft.busy && apply?.state === "failed" && state.applyDismissed !== apply.id) {
         const node = el(`<div class="commit ap failed">
-            <div class="ap-head"><i class="dot err"></i><strong>Apply stopped at: ${esc(apply.failure.label)}</strong></div>
-            <p class="ap-reason">${esc(apply.failure.reason)}</p>
-            <p class="ap-saved">${esc(SAVED_VERDICT[apply.failure.saved] || SAVED_VERDICT.unknown)}</p>
+            <div class="ap-head"><i class="dot err"></i><strong>Apply stopped at: ${esc(apply.failure?.label)}</strong></div>
+            <p class="ap-reason">${esc(apply.failure?.reason)}</p>
+            <p class="ap-saved">${esc(SAVED_VERDICT[apply.failure?.saved ?? ""] || SAVED_VERDICT.unknown)}</p>
             ${applySteps(apply)}
             <div class="ap-actions"><button class="btn ghost tiny" data-act="dismiss">Dismiss</button>
                 <button class="btn tiny" data-act="read">Read keyboard</button></div></div>`);
-        node.querySelector('[data-act="dismiss"]').addEventListener("click", () => {
+        /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="dismiss"]')).addEventListener("click", () => {
             state.applyDismissed = apply.id;
             render();
         });
-        node.querySelector('[data-act="read"]').addEventListener("click", () => post({type: "refresh"}));
+        /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="read"]')).addEventListener("click", () => post(controls.control("refresh")));
         return node;
     }
 
@@ -247,7 +258,7 @@ export function commitBar() {
             <span class="muted">${draft.changes.length} change${draft.changes.length === 1 ? "" : "s"} kept locally. Select that keyboard to continue${model?.device?.connected ? ", or discard the draft here" : ""}.</span></span>
             <span class="sep"></span>
             ${model?.device?.connected ? '<button class="btn ghost" data-act="discard">Discard draft</button>' : ""}</div>`);
-        node.querySelector('[data-act="discard"]')?.addEventListener("click", () => post({type: "discardProfileDraft"}));
+        /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="discard"]'))?.addEventListener("click", () => post(controls.control("discardProfileDraft")));
         return node;
     }
     if (draft.stale) {
@@ -257,8 +268,8 @@ export function commitBar() {
             <span class="sep"></span>
             <button class="btn" data-act="rebase">Review against the keyboard</button>
             <button class="btn ghost" data-act="discard">Discard draft</button></div>`);
-        node.querySelector('[data-act="rebase"]').addEventListener("click", () => post({type: "rebaseProfileDraft"}));
-        node.querySelector('[data-act="discard"]').addEventListener("click", () => post({type: "discardProfileDraft"}));
+        /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="rebase"]')).addEventListener("click", () => post(controls.control("rebaseProfileDraft")));
+        /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="discard"]')).addEventListener("click", () => post(controls.control("discardProfileDraft")));
         return node;
     }
     if (!draft.dirty) return null;
@@ -276,12 +287,13 @@ export function commitBar() {
             data-tip="${demo ? "Put every change back to the demo setup." : "Put every change back to what the keyboard holds."} Undo (⌘Z) brings them back.">Discard all</button>
         <button class="btn primary" data-act="review"
             data-tip="${demo ? "See every change and what the checks find. Apply needs a keyboard; Export saves the setup." : "See every change, then write the draft to both halves as one generation."}">${demo ? "Review changes" : "Review and apply"}</button></div>`);
-    node.querySelector('[data-act="review"]').addEventListener("click", openReview);
-    node.querySelector('[data-act="discard"]').addEventListener("click", () => post({type: "discardProfileDraft"}));
+    /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="review"]')).addEventListener("click", openReview);
+    /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="discard"]')).addEventListener("click", () => post(controls.control("discardProfileDraft")));
     return node;
 }
 
 // Read-only reasons, said plainly where the control is.
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model */
 export function unavailable(model) {
     if (!model?.device?.connected && !demoOf(model).active) return hostOf(model).blocked?.title || hostOf(model).words.noKeyboard || "";
     if (!model?.layers?.length) return "Nothing has been read from the keyboard yet. Choose Read keyboard.";

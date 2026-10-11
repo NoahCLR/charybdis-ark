@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 const {readViaStorage, readRegion, writeRegion, writeViaMacros, changedRanges, viaStorageDigest, VIA_STORAGE, LAYOUT_BYTES} = require("../protocol/via-storage-v1");
 const {readSettings, readStorageStatus, waitForStorage} = require("../protocol/portable-profile-v1");
@@ -13,10 +14,24 @@ const {translateBackup} = require("../model/backup-translation");
 const {knownActionAbi} = require("../schema/actions");
 const {encodeSettings} = require("../schema/settings-domain-v1");
 const {crc32, fnv1a32} = require("../schema/profile-blob-v1");
+/**
+ * @typedef {import("../transport/types.js").RequestConnection} Connection
+ * @typedef {import("../protocol/types.js").RequestIds} Ids
+ * @typedef {import("./types.js").DeviceCapabilities} Caps
+ * @typedef {import("./types.js").CapturedProfile} Capture
+ * @typedef {import("./types.js").OperationFailure} Failure
+ * @typedef {import("../protocol/types.js").StorageRange[]} Ranges
+ * @typedef {Pick<import("../model/types.js").DecodedProfile, 'profile' | 'layout' | 'macros'>} BaseBytes
+ */
+/** @param {string} code @param {string} message */
 const fail = (code, message) => Object.assign(new Error(message), {code});
+/** @param {import("./types.js").ProfileStatus} s */
 const statusKey = s => JSON.stringify([s.activeKind, s.activeDigest, s.activeGeneration, s.activeOriginHalf, s.committedDigest, s.committedGeneration, s.stateFlags]);
+/** @param {import("./types.js").ProfileStatus} s */
 const identityStatusKey = s => JSON.stringify([s.activeKind, s.activeDigest, s.activeGeneration, s.activeOriginHalf, s.committedDigest, s.committedGeneration, s.stateFlags & ~4]);
+/** @param {import("./types.js").CaptureIdentity} identity */
 const identityKey = identity => JSON.stringify(identity);
+/** @param {import("./types.js").ProfileStatus} profile @param {Awaited<ReturnType<typeof readStorageStatus>>} storage @param {Buffer} settings */
 const snapshotIdentity = (profile, storage, settings) => ({profile: identityStatusKey(profile), storageGeneration: storage.generation, storageDigest: storage.digest, settingsCrc: crc32(settings), settingsDigest: fnv1a32(settings)});
 // The bytes the keyboard's VIA bank holds, which differential transfer must
 // compare with. A document keeps only the 128 macro streams, and a valid bank
@@ -25,25 +40,32 @@ const snapshotIdentity = (profile, storage, settings) => ({profile: identityStat
 // zeros, send no write for them, and fail the whole-bank digest. So a capture
 // keeps what it read beside the identity it verified, and an Apply result
 // keeps the target it proved the keyboard holds.
+/** @param {Buffer} layout @param {Buffer} macros @param {Buffer} [profile] */
 const heldStorage = (layout, macros, profile) => ({layout: Buffer.from(layout), macros: Buffer.from(macros),
     ...(profile ? {profile: Buffer.from(profile)} : {})});
+/** @param {Capture} before @param {Caps} capabilities @returns {import("./types.js").CandidateBaseSource | undefined} */
 function candidateBaseSource(before, capabilities) {
     const bytes = before.storage?.profile, status = before.status;
     if (!(capabilities.featureFlags & PROFILE_WIRE_FEATURES.CANDIDATE_REUSE) || !bytes || !status
-        || ![PROFILE_ACTIVE_KIND.COMPILED_ONLY, PROFILE_ACTIVE_KIND.COMMITTED].includes(status.activeKind)
+        || !(/** @type {number[]} */ ([PROFILE_ACTIVE_KIND.COMPILED_ONLY, PROFILE_ACTIVE_KIND.COMMITTED])).includes(status.activeKind)
         || fnv1a32(bytes) !== status.activeDigest) return undefined;
     // Compiled GET status has no committed half and leaves origin zero; REUSE
     // explicitly names that origin-independent source with the sentinel 255.
     return {bytes, kind: status.activeKind, generation: status.activeGeneration, digest: status.activeDigest,
         crc32: crc32(bytes), origin: status.activeKind === PROFILE_ACTIVE_KIND.COMPILED_ONLY ? 255 : status.activeOriginHalf};
 }
+/** @param {Capture | null | undefined} snapshot @param {Caps} capabilities */
 const hasStorage = (snapshot, capabilities) => snapshot?.storage?.layout?.length === LAYOUT_BYTES && snapshot.storage.macros?.length === capabilities.viaMacroBytes;
+/** @param {Capture} before @param {Caps} capabilities @returns {BaseBytes} */
 function capturedBase(before, capabilities) {
     if (!before.incomplete) {
         const base = validateSnapshot(before.document, capabilities);
         if (!hasStorage(before, capabilities)) throw fail("BASE_STORAGE_UNAVAILABLE", "The keyboard read did not include its stored keys and macros. Read the keyboard again before saving.");
-        return {...base, layout: before.storage.layout, macros: before.storage.macros};
+        // hasStorage verified both buffers above.
+        const storage = /** @type {import("./types.js").HeldStorage} */ (before.storage);
+        return {...base, layout: storage.layout, macros: storage.macros};
     }
+    /** @param {"profile" | "layout" | "macros"} field */
     const decode = field => Buffer.from(before.document[field], "base64");
     const base = {profile: decode("profile"), layout: decode("layout"), macros: decode("macros")};
     if (base.layout.length !== LAYOUT_BYTES || base.macros.length !== capabilities.viaMacroBytes || base.profile.length < 1) throw fail("INVALID_RECOVERY_CAPTURE", "The interrupted recovery capture is malformed.");
@@ -51,14 +73,17 @@ function capturedBase(before, capabilities) {
 }
 // A complete profile is the sixteen layers and every domain; saving one needs
 // atomic logical Apply on both halves.
+/** @param {Partial<Caps> | null | undefined} capabilities @returns {capabilities is Partial<Caps>} */
 const supportsCompleteProfile = capabilities => capabilities?.compiledLayerCount === LAYERS
-    && (capabilities?.supportedDomainMask & 31) === 31 && knownActionAbi(capabilities?.actionAbiDigest);
+    && ((capabilities?.supportedDomainMask || 0) & 31) === 31 && knownActionAbi(capabilities?.actionAbiDigest ?? 0);
+/** @param {Partial<Caps> | null | undefined} capabilities @param {boolean} [writing] @returns {asserts capabilities is Partial<Caps>} */
 function requireReady(capabilities, writing = false) {
-    if (!supportsCompleteProfile(capabilities) || (writing && !(capabilities?.featureFlags & (1 << 12)))) {
+    if (!supportsCompleteProfile(capabilities) || (writing && !((capabilities?.featureFlags || 0) & (1 << 12)))) {
         throw fail("FIRMWARE_UPDATE_REQUIRED", "Complete profile backup and Apply need current firmware on both halves. Your current keyboard configuration has not been changed.");
     }
 }
 // `sleep`, here and below, is the host's wait between polls (the timer's when omitted).
+/** @param {Connection} connection @param {Ids} ids @param {Caps} capabilities @param {(text: string) => void} [onProgress] @param {boolean} [allowCandidate] @param {boolean} [allowIncomplete] @param {import("./types.js").CaptureOptions} [options] @returns {Promise<import("./types.js").VerifiedCapture>} */
 async function captureProfile(connection, ids, capabilities, onProgress = () => {}, allowCandidate = false, allowIncomplete = false,
     {sleep, payloadReader = new ProfilePayloadReader(connection), reuseReadback = false} = {}) {
     requireReady(capabilities);
@@ -66,8 +91,9 @@ async function captureProfile(connection, ids, capabilities, onProgress = () => 
     const options = {nextRequestId: () => ids.next()};
     onProgress("Reading the complete keyboard configuration");
     const storageBefore = await waitForStorage(connection, ids, {sleep}), before = await readProfileStatus(connection, options);
-    if (![PROFILE_ACTIVE_KIND.COMMITTED, PROFILE_ACTIVE_KIND.COMPILED_ONLY].includes(before.activeKind) || !(before.stateFlags & 32) || (before.stateFlags & (allowCandidate ? 8 : 12)) || before.conflictCount) throw fail("KEYBOARD_NOT_READY", "Let both halves finish saving before taking a backup.");
-    const counted = label => progress => onProgress(`${label} · ${progress.done} of ${progress.total} bytes`);
+    if (!(/** @type {number[]} */ ([PROFILE_ACTIVE_KIND.COMMITTED, PROFILE_ACTIVE_KIND.COMPILED_ONLY])).includes(before.activeKind) || !(before.stateFlags & 32) || (before.stateFlags & (allowCandidate ? 8 : 12)) || before.conflictCount) throw fail("KEYBOARD_NOT_READY", "Let both halves finish saving before taking a backup.");
+    /** @param {string} label */
+    const counted = label => /** @param {import("../../contracts/model.js").CountedProgress} progress */ progress => onProgress(`${label} · ${progress.done} of ${progress.total} bytes`);
     const defaults = await payloadReader.readCompiled({...options, onProgress: counted("Reading compiled defaults")});
     const active = before.activeKind === PROFILE_ACTIVE_KIND.COMMITTED ? await payloadReader.readCommitted({...options, reuse: reuseReadback, onProgress: counted("Reading saved behaviours and lighting")}) : defaults;
     onProgress("Reading combos and global settings");
@@ -92,6 +118,7 @@ async function captureProfile(connection, ids, capabilities, onProgress = () => 
     validateSnapshot(document, capabilities);
     return {document, readback: {active, source: before.activeKind === PROFILE_ACTIVE_KIND.COMMITTED ? "committed" : "compiled", combos}, fingerprint: fingerprint(document), summary: summary(document), status: after, identity: snapshotIdentity(after, storageAfter, settings), storage: heldStorage(via.layout, via.macros, active.bytes)};
 }
+/** @param {Connection} connection @param {Ids} ids @param {{allowCandidate?: boolean, sleep?: (ms: number) => Promise<void>}} [options] */
 async function readIdentity(connection, ids, {allowCandidate = true, sleep} = {}) {
     const options = {nextRequestId: () => ids.next()};
     const storageBefore = await waitForStorage(connection, ids, {sleep}), before = await readProfileStatus(connection, options);
@@ -101,6 +128,7 @@ async function readIdentity(connection, ids, {allowCandidate = true, sleep} = {}
     if (statusKey(before) !== statusKey(after) || !storageAfter.ready || storageBefore.generation !== storageAfter.generation || storageBefore.digest !== storageAfter.digest) throw fail("PROFILE_CHANGED", "The keyboard changed before the save could start.");
     return snapshotIdentity(after, storageAfter, settings);
 }
+/** @param {Connection} connection @param {typeof readRegion} readStored @param {number} command @param {Buffer} target @param {Ranges} ranges @param {{verifyFinalByte?: boolean}} [options] */
 async function verifyRanges(connection, readStored, command, target, ranges, {verifyFinalByte = false} = {}) {
     for (const range of ranges) {
         const actual = await readStored(connection, command, range.bytes.length, {startOffset: range.offset, capacity: target.length});
@@ -112,6 +140,7 @@ async function verifyRanges(connection, readStored, command, target, ranges, {ve
     }
 }
 
+/** @param {Connection} connection @param {import("../model/types.js").DecodedProfile} target @param {BaseBytes} base @param {Ranges} layoutRanges @param {Ranges} macroRanges @param {(progress: {completed: number, total: number}) => void} onProgress */
 async function rollForwardLocalStorage(connection, target, base, layoutRanges, macroRanges, onProgress) {
     const layoutBytes = layoutRanges.reduce((sum, range) => sum + range.bytes.length, 0);
     const macroBytes = macroRanges.reduce((sum, range) => sum + range.bytes.length, 0);
@@ -143,6 +172,7 @@ async function rollForwardLocalStorage(connection, target, base, layoutRanges, m
 // A peer that never acknowledged a cancelled save keeps its lease until it
 // restarts, and the keyboard refuses new saves until then. Best effort: the
 // save has already failed, so an unreadable status only loses the hint.
+/** @param {Connection} connection @param {typeof readProfileStatus} readProfile @param {import("../protocol/types.js").ReadOptions} options */
 async function peerRestartGuidance(connection, readProfile, options) {
     try {
         const status = await readProfile(connection, options);
@@ -152,6 +182,7 @@ async function peerRestartGuidance(connection, readProfile, options) {
 }
 // What the keyboard is doing for the "Copy the profile to the slave half" step,
 // from candidate status page 1.
+/** @type {Readonly<Record<string, string>>} */
 const PEER_DETAIL = Object.freeze({
     BINDING: "Binding keys and macros to the new profile",
     BEGINNING: "Starting the copy",
@@ -164,6 +195,7 @@ const PEER_DETAIL = Object.freeze({
 });
 // What the slave half says it is waiting on, once it has said BUSY a few
 // times in a row; a single BUSY is the routine first answer to a request.
+/** @type {Readonly<Record<string, string>>} */
 const PEER_BUSY_DETAIL = Object.freeze({
     MAILBOX_FULL: "the slave half has not handled the last request yet",
     OTHER_COPY: "the slave half still holds an earlier copy",
@@ -172,6 +204,7 @@ const PEER_BUSY_DETAIL = Object.freeze({
     PULLING: "the slave half is fetching a profile itself",
     CONVERGENCE_ONLY: "the slave half is finishing another save",
 });
+/** @param {import("./types.js").CandidatePeer | null | undefined} peer @returns {{detail: string, completed?: number, total?: number}} */
 function peerReport(peer) {
     if (!peer) return {detail: "Waiting for the slave half"};
     if (peer.waitingSafeBoundary) return {detail: "Release held keys and turn off locked layers or pointer modes to finish saving"};
@@ -181,6 +214,7 @@ function peerReport(peer) {
     return report;
 }
 // The coordinators report phases; each lands on the step it belongs to.
+/** @param {import("./types.js").CandidateProgress} progress @param {InstanceType<typeof ApplyProgress>} applyProgress */
 function coordinatorReport(progress, applyProgress) {
     const state = progress.status?.state;
     if (["preflight", "begin", "writing"].includes(progress.phase)) applyProgress.report("upload", {completed: progress.bytesSent, total: progress.totalBytes});
@@ -191,6 +225,7 @@ function coordinatorReport(progress, applyProgress) {
     else if (state === CANDIDATE_STATE.ACTIVATING) applyProgress.report("verify", {detail: "Switching to the new profile"});
 }
 // The step view as one line, for the Profile screen and notifications.
+/** @param {import("../../contracts/model.js").ApplyView} view */
 function progressText(view) {
     if (view.failure) return `Failed at: ${view.failure.label}`;
     const step = view.steps.find(item => item.id === view.current);
@@ -200,13 +235,15 @@ function progressText(view) {
 
 // Every failure leaves with the step it happened in, the keyboard's reason,
 // and what can honestly be said about what was saved.
+/** @param {Failure} error @param {InstanceType<typeof ApplyProgress>} applyProgress @param {string} saved */
 function withFailure(error, applyProgress, saved) {
     const cause = error.cause || error;
     const failure = applyProgress.fail({reason: failureReason(cause, cause.progress?.peer), saved});
     return Object.assign(error, {step: failure.step, stepLabel: failure.label, reason: failure.reason, saved: failure.saved});
 }
 
-async function restoreProfile(connection, ids, capabilities, document, {expectedFingerprint, saveRecovery, baseSnapshot, onProgress = () => {}, onApplyProgress = () => {}, operations = {}, sleep} = {}) {
+/** @param {Connection} connection @param {Ids} ids @param {Caps} capabilities @param {unknown} input @param {import("./types.js").RestoreOptions} [options] */
+async function restoreProfile(connection, ids, capabilities, input, {expectedFingerprint, saveRecovery, baseSnapshot, onProgress = () => {}, onApplyProgress = () => {}, operations = {}, sleep} = {}) {
     const applyProgress = new ApplyProgress(view => {
         onApplyProgress(view);
         onProgress(progressText(view));
@@ -218,15 +255,15 @@ async function restoreProfile(connection, ids, capabilities, document, {expected
     } catch (error) {
         // Nothing reached the keyboard before the upload; after it, the
         // inner handler has already said whether anything was saved.
-        throw withFailure(error, applyProgress, !mutated || error.code === "RESTORE_NOT_SAVED" ? "none" : "unknown");
+        throw withFailure(/** @type {Failure} */ (error), applyProgress, !mutated || /** @type {Failure} */ (error).code === "RESTORE_NOT_SAVED" ? "none" : "unknown");
     }
 
     async function restoreSteps() {
         const startedAt = Date.now();
         requireReady(capabilities);
         requireReady(capabilities, true);
-        const target = validateSnapshot(translateBackup(document), capabilities);
-        document = target.document;
+        const target = validateSnapshot(translateBackup(input), capabilities);
+        const document = target.document;
         const capture = operations.capture || captureProfile;
         const currentIdentity = operations.readIdentity || readIdentity;
         const readCandidate = operations.readCandidate || readCandidateStatus;
@@ -234,10 +271,13 @@ async function restoreProfile(connection, ids, capabilities, document, {expected
         const readStorage = operations.readStorage || readStorageStatus;
         const readStored = operations.readStored || readRegion;
         const readProfile = operations.readProfile || readProfileStatus;
+        /** @type {NonNullable<import("./types.js").RestoreOperations["createCoordinator"]>} */
         const createCoordinator = operations.createCoordinator || ((c, options) => new CandidateUploadCoordinator(c, options));
         const createViaCoordinator = operations.createViaCoordinator || ((c, options) => new LogicalViaStageCoordinator(c, options));
         const rollForwardLocal = operations.rollForwardLocal || rollForwardLocalStorage;
-        if (typeof saveRecovery !== "function") throw fail("RECOVERY_REQUIRED", "Save a recovery copy before restoring this keyboard.");
+        const saveCopy = saveRecovery;
+        if (typeof saveCopy !== "function") throw fail("RECOVERY_REQUIRED", "Save a recovery copy before restoring this keyboard.");
+        /** @type {Capture} */
         let before;
         // A reviewed snapshot is reused only with the exact bank it was read
         // from; one without it (an older cache) is read again instead.
@@ -252,7 +292,7 @@ async function restoreProfile(connection, ids, capabilities, document, {expected
         }
         if (expectedFingerprint && before.fingerprint !== expectedFingerprint) throw fail("PROFILE_CHANGED", "The keyboard changed since the restore was reviewed. Review it again.");
         applyProgress.report("backup");
-        const recovery = await saveRecovery(before.document);
+        const recovery = await saveCopy(before.document);
         if (!recovery) throw fail("RECOVERY_REQUIRED", "A recovery copy could not be saved. The keyboard has not been changed.");
         const options = {nextRequestId: () => ids.next()};
         const base = capturedBase(before, capabilities);
@@ -269,7 +309,9 @@ async function restoreProfile(connection, ids, capabilities, document, {expected
         const targetStorageGeneration = beforeIdentity.storageGeneration + 1;
         const macroRanges = changedRanges(base.macros, target.macros, {end: target.macros.length - 1});
         const layoutRanges = changedRanges(base.layout, target.layout);
-        let prepared, decisionObserved = false, commitRequested = false;
+        /** @type {import("./types.js").PreparedCandidate | undefined} */
+        let prepared;
+        let decisionObserved = false, commitRequested = false;
         try {
             applyProgress.report("upload");
             prepared = await coordinator.upload(target.profile, {baseSource: candidateBaseSource(before, capabilities),
@@ -278,6 +320,7 @@ async function restoreProfile(connection, ids, capabilities, document, {expected
                 const identity = await currentIdentity(connection, ids, {allowCandidate: true, sleep});
                 if (identityKey(identity) !== identityKey(beforeIdentity)) throw fail("PROFILE_CHANGED", "The keyboard changed before restore could start.");
             }});
+            const candidate = prepared;
             mutated = true;
             applyProgress.report("stage");
             await viaCoordinator.stage({transactionId: prepared.transactionId, generation: targetStorageGeneration, digest: expectedStorageDigest, target, current: base});
@@ -286,7 +329,7 @@ async function restoreProfile(connection, ids, capabilities, document, {expected
             await coordinator.commit(prepared.transactionId, {digest: prepared.metadata.digest, afterDecision: async () => {
                 decisionObserved = true;
                 applyProgress.report("converge", {detail: "Waiting for the slave half's copy of keys and macros"});
-                await viaCoordinator.waitUntilAccepted({transactionId: prepared.transactionId, generation: targetStorageGeneration, digest: expectedStorageDigest});
+                await viaCoordinator.waitUntilAccepted({transactionId: candidate.transactionId, generation: targetStorageGeneration, digest: expectedStorageDigest});
                 applyProgress.report("local");
                 await rollForwardLocal(connection, target, base, layoutRanges, macroRanges, counted => applyProgress.report("local", counted));
             }});
@@ -324,13 +367,13 @@ async function restoreProfile(connection, ids, capabilities, document, {expected
             // Before the commit was sent, or once the keyboard confirmed the
             // cancel, the profile it had is still the one it runs.
             if (!decisionObserved && (!commitRequested || cancelled)) {
-                throw Object.assign(fail("RESTORE_NOT_SAVED", `Nothing was saved: the keyboard kept the profile it had. ${error.message}${restart}`), {cause: error});
+                throw Object.assign(fail("RESTORE_NOT_SAVED", `Nothing was saved: the keyboard kept the profile it had. ${/** @type {Error} */ (error).message}${restart}`), {cause: error});
             }
             // After the decision the keyboard owns the outcome: once this app
             // stops writing, it copies the slave half's complete target itself.
             const finishing = decisionObserved ? "The keyboard had already decided to save it and finishes from the slave half's copy by itself, about 15 seconds after both halves are connected; read the keyboard again then. Only if it still shows the old profile: " : "";
-            throw Object.assign(fail("RESTORE_INCOMPLETE", `Restore was interrupted. Keep both halves connected. ${finishing}${before.incomplete ? `Import your original complete backup again. Interrupted data was saved for diagnosis at ${recovery}.` : `Import the recovery file ${recovery}.`} ${error.message}${restart}`), {cause: error});
+            throw Object.assign(fail("RESTORE_INCOMPLETE", `Restore was interrupted. Keep both halves connected. ${finishing}${before.incomplete ? `Import your original complete backup again. Interrupted data was saved for diagnosis at ${recovery}.` : `Import the recovery file ${recovery}.`} ${/** @type {Error} */ (error).message}${restart}`), {cause: error});
         }
     }
 }
-module.exports = {supportsCompleteProfile, captureProfile, readIdentity, restoreProfile, validateSnapshot, summary, fingerprint, reorderLayers, peerReport};
+module.exports = {requireReady, supportsCompleteProfile, captureProfile, readIdentity, restoreProfile, validateSnapshot, summary, fingerprint, reorderLayers, peerReport};

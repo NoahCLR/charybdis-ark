@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 
 // Charybdis Ark — extension host.
@@ -25,6 +26,7 @@ const VIEW_TYPE = "charybdisArk.panel";
 // Charybdis Live (D-L47). Its recovery copies are adopted from these folders.
 const FORMER_IDENTITIES = ["noah.charybdis-live", "noah.charybdis-live-v2"];
 
+/** @param {import("vscode").ExtensionContext} context */
 function activate(context) {
     context.subscriptions.push(
         vscode.commands.registerCommand("charybdisArk.open", () => openPanel(context))
@@ -44,21 +46,23 @@ function activate(context) {
 
 // Copies, never moves or overwrites: the originals stay where they were, and a
 // name already here is left alone, so running this on every start is safe.
+/** @param {string} target */
 async function adoptFormerRecoveries(target) {
     await fs.promises.mkdir(target, {recursive: true});
     for (const identity of FORMER_IDENTITIES) {
         const source = path.join(path.dirname(target), identity);
         let names;
-        try {names = await fs.promises.readdir(source);} catch (error) {if (error.code === "ENOENT") continue; throw error;}
+        try {names = await fs.promises.readdir(source);} catch (error) {if (/** @type {NodeJS.ErrnoException} */ (error).code === "ENOENT") continue; throw error;}
         for (const name of names.filter((entry) => /^recovery-.+\.json$/.test(entry))) {
             try {await fs.promises.copyFile(path.join(source, name), path.join(target, name), fs.constants.COPYFILE_EXCL);}
-            catch (error) {if (error.code !== "EEXIST") throw error;}
+            catch (error) {if (/** @type {NodeJS.ErrnoException} */ (error).code !== "EEXIST") throw error;}
         }
     }
 }
 
 function deactivate() {}
 
+/** @param {import("vscode").ExtensionContext} context */
 function openPanel(context) {
     const panel = vscode.window.createWebviewPanel(VIEW_TYPE, "Charybdis Ark", vscode.ViewColumn.One, {
         enableScripts: true,
@@ -68,7 +72,8 @@ function openPanel(context) {
 
     const loop = openPanelLoop(vscodeHost(panel, context.globalStorageUri));
     panel.webview.html = getHtml(panel.webview, context.extensionUri);
-    panel.webview.onDidReceiveMessage((message) => loop.handleMessage(message));
+    // IPC is untrusted; the shared loop validates the selected command and its payload.
+    panel.webview.onDidReceiveMessage((/** @type {unknown} */ message) => loop.handleMessage(message));
     panel.onDidDispose(() => {
         void loop.close();
     });
@@ -77,11 +82,12 @@ function openPanel(context) {
 // What only VS Code has, handed to core/session/panel-loop.js, which lists
 // what each of these does: the panel, toasts, progress, the recovery copy on
 // disk, and the files the person chooses.
+/** @param {import("vscode").WebviewPanel} panel @param {import("vscode").Uri} recoveryRoot @returns {import("./core/session/types.js").LoopHost} */
 function vscodeHost(panel, recoveryRoot) {
     return {
         post: (message) => panel.webview.postMessage(message),
         showError: (text) => vscode.window.showErrorMessage(`Charybdis Ark: ${text}`),
-        progress: (title, work) => vscode.window.withProgress({location: vscode.ProgressLocation.Notification, title}, work),
+        progress: async (title, work) => await vscode.window.withProgress({location: vscode.ProgressLocation.Notification, title}, work),
         saveRecovery: (document) => saveRecoveryFile(recoveryRoot, document),
         chooseProfile: async () => {
             const files = await vscode.window.showOpenDialog({title: "Choose a keyboard profile", canSelectMany: false, filters: {"Charybdis profile": ["charybdis.json", "json"]}});
@@ -101,6 +107,7 @@ function vscodeHost(panel, recoveryRoot) {
 
 module.exports = {activate, deactivate, adoptFormerRecoveries};
 
+/** @param {import("vscode").Uri} recoveryRoot @param {Parameters<NonNullable<import("./core/session/types.js").LoopHost["saveRecovery"]>>[0]} document */
 async function saveRecoveryFile(recoveryRoot, document) {
     await vscode.workspace.fs.createDirectory(recoveryRoot);
     const suffix = document.format === "charybdis-profile" ? ".charybdis.json" : ".diagnostic.json";

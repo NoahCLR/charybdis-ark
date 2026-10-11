@@ -1,7 +1,7 @@
 "use strict";
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const {applyLayerEdit, buildPanelModel, discardDraftForDevice, layerEditDocument, routeMessage, startLayerEdit, takeOutbox} = require("../../core/session/panel-session");
+const {applyLayerEdit, buildPanelModel, discardDraftForDevice, layerEditDocument, panelRequest, routeMessage, startLayerEdit, takeOutbox} = require("../../core/session/panel-session");
 const {fingerprint, summary, validateSnapshot} = require("../../core/model/portable-profile");
 const {document} = require("../fixtures/pd-profile");
 
@@ -57,6 +57,13 @@ test("the model carries the draft's steps only while the history sheet is open",
     session.readBusy = true;
     routeMessage(session, {type: "closeProfileDraftHistory"}, connected());
     assert.equal(session.historyOpen, false, "closing is heard even while the keyboard is being read");
+});
+
+test("only an object naming its type is taken as a panel request", () => {
+    const request = {type: "jumpProfileDraft", step: 1, draftId: "d", draftRevision: 2};
+    assert.equal(panelRequest(request), request, "taken as posted; each route checks its own payload");
+    assert.deepEqual(panelRequest({type: "somethingElse"}), {type: "somethingElse"}, "an unknown type is still answered by the router");
+    for (const value of [null, undefined, "ready", 7, [], {}, {type: 7}, {type: null}]) assert.equal(panelRequest(value), null);
 });
 
 test("every other message names the handler that answers it", () => {

@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 const fs = require("node:fs");
 const path = require("node:path");
@@ -10,10 +11,12 @@ function fixturePages(version = 3) {
 }
 // Version 3's digest covers every metadata byte but the digest itself (bytes
 // 6..9), then every later page.
+/** @param {Buffer[]} pages */
 function rehash(pages) {
     pages[0].writeUInt32LE(fnv1a32(Buffer.concat([pages[0].subarray(0, 6), pages[0].subarray(10), ...pages.slice(1)])), 6);
     return pages;
 }
+/** @param {Buffer} request @param {Buffer[]} pages */
 function responseFor(request, pages) {
     const response = Buffer.alloc(32);
     request.copy(response, 0, 0, 5);
