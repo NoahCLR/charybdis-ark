@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 const fixture = require("./device-profile-readback.json");
 const {decodeProfileBlob} = require("../../core/schema/profile-blob-v1");

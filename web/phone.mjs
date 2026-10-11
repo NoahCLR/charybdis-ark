@@ -1,3 +1,4 @@
+// @ts-check
 // What a phone gets instead of Ark: a notice that Ark runs on a computer, with
 // the repositories, and nothing of the interface. No phone browser has WebHID,
 // and the interface needs a computer's screen. A tablet is not a phone: it gets
@@ -30,6 +31,7 @@ export const PHONE_SELLER = Object.freeze({
     href: "https://bastardkb.com/",
 });
 
+/** @param {{matchMedia?: (query: string) => {matches: boolean}; screen?: Pick<Screen, 'width' | 'height'>}} [environment] */
 export function isPhone({matchMedia, screen} = {}) {
     const touchOnly = Boolean(matchMedia?.("(hover: none) and (pointer: coarse)")?.matches);
     const shorter = Math.min(Number(screen?.width) || Infinity, Number(screen?.height) || Infinity);
@@ -37,7 +39,9 @@ export function isPhone({matchMedia, screen} = {}) {
 }
 
 // Fills `root` with the notice. Text goes in as text, never as markup.
+/** @param {{document: Document; root: Element; address?: string; build?: import("../contracts/model.js").BuildInfo}} options */
 export function showPhoneNotice({document, root, address, build}) {
+    /** @template {keyof HTMLElementTagNameMap} K @param {K} tag @param {string} className @param {string} [text] @returns {HTMLElementTagNameMap[K]} */
     const make = (tag, className, text) => {
         const node = document.createElement(tag);
         if (className) node.className = className;
@@ -55,6 +59,7 @@ export function showPhoneNotice({document, root, address, build}) {
         there.append(make("span", "mono", address));
         notice.append(there);
     }
+    /** @param {readonly {label: string; href: string; github?: boolean}[]} list */
     const links = (list) => {
         const nav = make("nav", "phone-links");
         for (const {label, href, github} of list) {
@@ -69,7 +74,8 @@ export function showPhoneNotice({document, root, address, build}) {
     const url = commitUrl(build);
     const built = make(url ? "a" : "p", "phone-build mono");
     if (url) {
-        built.href = url;
+        // A commit URL creates the anchor variant above.
+        /** @type {HTMLAnchorElement} */ (built).href = url;
         built.append(githubMarkOf(document, "phone-build-mark"));
     }
     built.append(document.createTextNode(buildLine(build)));
@@ -78,6 +84,7 @@ export function showPhoneNotice({document, root, address, build}) {
     return notice;
 }
 
+/** @param {Document} document @param {string} className */
 function githubMarkOf(document, className) {
     const svg = document.createElementNS(SVG, "svg");
     svg.setAttribute("class", className);
@@ -91,7 +98,9 @@ function githubMarkOf(document, className) {
 
 // The board's shape alone: every key and the trackball where the panel's
 // board puts them (webview/view/geometry.mjs), with no legends.
+/** @param {Document} document */
 export function boardOutline(document) {
+    /** @template {keyof SVGElementTagNameMap} K @param {K} tag @param {Record<string, string | number>} attributes @returns {SVGElementTagNameMap[K]} */
     const make = (tag, attributes) => {
         const node = document.createElementNS(SVG, tag);
         for (const [name, value] of Object.entries(attributes)) node.setAttribute(name, String(value));

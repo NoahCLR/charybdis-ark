@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 
 // Conservative timing facts. Only an empty release interval is a proof of
@@ -7,13 +8,21 @@ const {KEY_BEHAVIOR_HOLD_MODES: MODE} = require("../schema/key-behavior-domain-v
 const {effectiveComboTerm} = require("../schema/combo-domain-v1");
 const {nativeCode, actionName} = require("../schema/actions");
 
+/**
+ * @typedef {import("../schema/types.js").BehaviorStep} BehaviorStep
+ * @typedef {{hold: number, long: number, repeat: number}} Timings
+ */
+
 const SHORT_WINDOW_MS = 50; // advisory comfort heuristic, never a validity limit
+/** @param {import("../schema/types.js").SemanticAction} action */
 const transparent = action => nativeCode(action) === 1;
+/** @template {number | string | undefined} T @param {Pick<import("../schema/types.js").BehaviorRow, 'target'> & Partial<Pick<import("../schema/types.js").BehaviorRow, 'tapHoldTerm' | 'longerHoldTerm' | 'multiTapTerm'>>} row @param {readonly T[]} values @returns {{hold: number | T, long: number | T, repeat: number | T}} */
 function effectiveTimings(row, values) {
     const code = nativeCode(row.target);
-    return {hold: row.tapHoldTerm || values[code >= 0x4000 && code <= 0x4fff ? 0 : 1],
+    return {hold: row.tapHoldTerm || values[code !== undefined && code >= 0x4000 && code <= 0x4fff ? 0 : 1],
         long: row.longerHoldTerm || values[2], repeat: row.multiTapTerm || values[3]};
 }
+/** @param {BehaviorStep} step @param {Timings} terms @returns {step is BehaviorStep & {hold: import("../schema/types.js").HoldBranch, longHold: import("../schema/types.js").HoldBranch}} */
 function releaseHoldUnreachable(step, terms) {
     return step.hold?.mode === MODE.TAP_ON_RELEASE_AFTER_HOLD
         && step.longHold?.mode === MODE.TAP_ON_RELEASE_AFTER_HOLD
@@ -21,10 +30,13 @@ function releaseHoldUnreachable(step, terms) {
         && !transparent(step.hold.action) && !transparent(step.longHold.action)
         && Number.isInteger(terms.hold) && Number.isInteger(terms.long) && terms.long <= terms.hold;
 }
+/** @param {import("./types.js").DecodedProfile} decoded */
 function gestureTimingFindings(decoded) {
+    /** @type {import("../../contracts/model.js").Finding[]} */
     const results = [];
     for (const row of decoded.behaviors?.rows || []) {
         const keycode = actionName(row.target), terms = effectiveTimings(row, decoded.settings.values);
+        /** @param {string} id @param {string} title @param {string} detail @param {string} fix @param {import("../../contracts/model.js").FindingLevel} [level] */
         const add = (id, title, detail, fix, level = "warning") => results.push({kind: "gestureTiming", level, layers: [],
             identity: `${nativeCode(row.target)}:${id}`, title: `${keycode}: ${title}`, detail, fix, place: {kind: "behaviour", keycode}});
         for (const step of row.steps) {
@@ -44,7 +56,7 @@ function gestureTimingFindings(decoded) {
             }
         }
         if (row.steps.some(step => step.tapIndex > 0)) {
-            for (const [name, value] of [["first-press tap", terms.hold], ["released repeat gap", terms.repeat]]) {
+            for (const [name, value] of /** @type {[string, number][]} */ ([["first-press tap", terms.hold], ["released repeat gap", terms.repeat]])) {
                 if (Number.isInteger(value) && value > 0 && value < SHORT_WINDOW_MS) add(`short:${name}`, `short ${name}`,
                     `The ${name} window is ${value} ms. This can be physically demanding even though the firmware accepts it.`,
                     "Increase the timing if you cannot perform the gesture comfortably. This is advice, not proof of unreachability.", "notice");

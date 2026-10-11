@@ -1,8 +1,13 @@
+// @ts-check
 "use strict";
 const {isUnhandledEcho, orUnhandled, unhandledError} = require("./via-unhandled-v1");
 const {buildProfileGetRequest, decodeProfileResponse, profileResponseMatcher} = require("./profile-wire-v1");
+/** @param {string} message */
 const fail = message => Object.assign(new Error(message), {code: "INVALID_KEYBOARD_OPTIONS"});
 
+/** @overload @param {import("../transport/types.js").RequestConnection} connection @param {import("./types.js").RequestIds} ids @param {number} page @param {false} [optional] @returns {Promise<Buffer>} */
+/** @overload @param {import("../transport/types.js").RequestConnection} connection @param {import("./types.js").RequestIds} ids @param {number} page @param {boolean} optional @returns {Promise<Buffer | null>} */
+/** @param {import("../transport/types.js").RequestConnection} connection @param {import("./types.js").RequestIds} ids @param {number} page @param {boolean} [optional] */
 async function readPage(connection, ids, page, optional = false) {
     const request = buildProfileGetRequest(8, page, ids.next());
     const response = await connection.request(request, {matchResponse: orUnhandled(profileResponseMatcher, request)});
@@ -13,10 +18,11 @@ async function readPage(connection, ids, page, optional = false) {
     }
     try {return Buffer.from(decodeProfileResponse(response, request, {allowShortPayload: true}));}
     catch (error) {
-        if (optional && error.code === "DEVICE_REJECTED" && error.status === 2 && response[6] === 0) return null;
+        if (optional && error instanceof Error && "code" in error && error.code === "DEVICE_REJECTED" && "status" in error && error.status === 2 && response[6] === 0) return null;
         throw error;
     }
 }
+/** @param {import("../transport/types.js").RequestConnection} connection @param {import("./types.js").RequestIds} ids */
 async function readKeyboardOptions(connection, ids) {
     const metadata = await readPage(connection, ids, 2, true);
     if (!metadata) return null;

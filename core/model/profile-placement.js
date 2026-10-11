@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 
 // Whether a profile's actions sit where the keyboard can run them. The
@@ -6,16 +7,20 @@
 // encode, and an upload is checked before it starts, with a message naming the
 // row instead of the keyboard's bare rejection.
 
+/** @typedef {{layerCount?: number, behaviorQmkFunctions?: boolean, capabilities?: import("./types.js").ProfileDestination}} PlacementOptions */
+
 const {PLACEMENT, actionName, behaviorEmitProblem, keycodeAction, placementProblem} = require("../schema/actions");
 const {decodeProfileBlob, PROFILE_DOMAIN_IDS} = require("../schema/profile-blob-v1");
 const {decodeKeyBehaviorDomain, KEY_BEHAVIOR_HOLD_MODES} = require("../schema/key-behavior-domain-v1");
 const {decodeComboDomain} = require("../schema/combo-domain-v1");
 const {profileDepthOptions} = require("../schema/profile-depth");
 
+/** @param {import("../schema/types.js").BehaviorRow[]} rows @param {PlacementOptions} [options] */
 function behaviorPlacementProblem(rows, options) {
     for (const row of rows) {
         const where = `The behaviour on ${actionName(row.target)}`;
         // The target is sent too: a tap with no branch of its own sends the key.
+        /** @param {import("../schema/types.js").SemanticAction} action @param {(typeof PLACEMENT)[keyof typeof PLACEMENT]} placement */
         const at = (action, placement) => placementProblem(action, placement, options) || behaviorEmitProblem(action, options);
         const problem = at(row.target, PLACEMENT.KEY)
             || row.steps.map(step => (step.tap && at(step.tap, PLACEMENT.TAP))
@@ -27,6 +32,7 @@ function behaviorPlacementProblem(rows, options) {
     return undefined;
 }
 
+/** @param {{output: import("../schema/types.js").SemanticAction}[]} rows @param {PlacementOptions} [options] */
 function comboPlacementProblem(rows, options) {
     for (const [index, row] of rows.entries()) {
         const problem = placementProblem(row.output, PLACEMENT.COMBO_OUTPUT, options);
@@ -39,11 +45,14 @@ function comboPlacementProblem(rows, options) {
 // covers behaviours and combos only; a layout key it does not own (DF(), PDF(),
 // a layer past the bank) would reach QMK's own layer code, so the editors
 // refuse to place one.
+/** @param {number} code @param {PlacementOptions} [options] */
 const keyPlacementProblem = (code, options) => placementProblem(keycodeAction(code), PLACEMENT.KEY, options);
 
 // The first misplaced action in an encoded profile, or undefined.
+/** @param {Uint8Array} bytes @param {PlacementOptions} [options] */
 function profilePlacementProblem(bytes, options) {
     const profile = decodeProfileBlob(bytes);
+    /** @param {number} id */
     const domain = id => profile.domains.find(row => row.id === id);
     const behaviors = domain(PROFILE_DOMAIN_IDS.KEY_BEHAVIORS)?.payload;
     const combos = domain(PROFILE_DOMAIN_IDS.COMBOS);

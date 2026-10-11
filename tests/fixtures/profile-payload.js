@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 const assert = require("node:assert/strict");
 const {RAW_HID_REPORT_SIZE} = require("../../core/transport/device-adapter");
@@ -8,6 +9,7 @@ const {crc32, fnv1a32} = require("../../core/schema/profile-blob-v1");
 // A reference encoder for the firmware page layout in
 // users/noah/lib/compat/qmk_via_profile_channel.c. Written independently of
 // the decoder so these tests check the contract rather than restate the code.
+/** @param {import("./types.js").PayloadState} state */
 function metadataPage(state) {
     const page = Buffer.alloc(PROFILE_WIRE_V1.PAYLOAD_SIZE);
     page[0] = state.layoutVersion ?? PROFILE_PAYLOAD_V1.LAYOUT_VERSION;
@@ -24,17 +26,21 @@ function metadataPage(state) {
     return page;
 }
 
+/** @param {number} length */
 function payloadOf(length) {
     return Buffer.from(Array.from({length}, (unused, index) => (index * 7 + 3) & 0xff));
 }
 
 // Serves pages the way the firmware does, including a short final chunk.
+/** @param {import("./types.js").PayloadState | import("./types.js").PayloadState[]} states @param {number} [value] */
 function payloadDevice(states, value = PROFILE_PAYLOAD_V1.VALUE) {
     const snapshots = Array.isArray(states) ? states : [states];
+    /** @type {number[]} */
     const requests = [];
     let served = 0;
     return {
         requests,
+        /** @param {Uint8Array} report */
         async request(report) {
             const request = Buffer.from(report);
             assert.equal(request[2], value);

@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 
 // The web build: the web version of Ark as a complete static site in
@@ -40,6 +41,7 @@ const esbuild = require("esbuild");
 const APP_ROOT = path.resolve(__dirname, "..");
 const OUTDIR = path.join(APP_ROOT, "dist", "web");
 // Beside the site it describes, so publishing the folder never publishes it.
+/** @param {string} outdir */
 const manifestFileFor = (outdir) => path.join(path.dirname(outdir), `${path.basename(outdir)}-manifest.json`);
 const NODE_HID_ADAPTER = path.join(APP_ROOT, "core", "transport", "node-hid-adapter.js");
 const NO_NATIVE_HID = path.join(APP_ROOT, "web", "no-native-hid.js");
@@ -49,6 +51,7 @@ const TARGET = ["chrome120"];
 const NODE_BUILTINS = new Set(builtinModules);
 const HOST_PACKAGES = ["vscode", "node-hid"];
 // What a bundle may take from node_modules: the buffer package and its two dependencies.
+/** @type {Record<"core" | "panel" | "worker", string[]>} */
 const PACKAGES = {core: ["buffer", "base64-js", "ieee754"], panel: [], worker: []};
 
 // The page's policy: scripts, styles and the worker from the page's own origin,
@@ -65,6 +68,7 @@ const headerPolicy = () => [...POLICY, ...HEADER_ONLY_POLICY].join("; ");
 // and a release shows on the next load).
 const IMMUTABLE = "public, max-age=31536000, immutable";
 
+/** @type {import("esbuild").Plugin} */
 const browserOnly = {
     name: "browser-only",
     setup(build) {
@@ -85,6 +89,7 @@ const browserOnly = {
 
 // The metafile names every input a bundle took. A package that is not listed,
 // or the node-hid adapter, fails the build even if it resolved quietly.
+/** @param {import("esbuild").Metafile} metafile @param {keyof typeof PACKAGES} bundle */
 function checkInputs(metafile, bundle) {
     const problems = [];
     for (const input of Object.keys(metafile.inputs)) {
@@ -97,7 +102,9 @@ function checkInputs(metafile, bundle) {
 }
 
 // The written file for each entry, by the entry's name.
+/** @param {import("esbuild").Metafile} metafile @param {string} outdir @returns {Record<string, string>} */
 function outputsOf(metafile, outdir) {
+    /** @type {Record<string, string>} */
     const names = {};
     for (const [file, output] of Object.entries(metafile.outputs)) {
         if (!output.entryPoint) continue;
@@ -107,6 +114,12 @@ function outputsOf(metafile, outdir) {
     return names;
 }
 
+/**
+ * @param {keyof typeof PACKAGES} name
+ * @param {NonNullable<import("esbuild").BuildOptions["entryPoints"]>} entryPoints
+ * @param {string} outdir
+ * @param {Omit<import("esbuild").BuildOptions, "metafile"> & {metafile?: true}} [options]
+ */
 async function bundle(name, entryPoints, outdir, options = {}) {
     const result = await esbuild.build({
         absWorkingDir: APP_ROOT,
@@ -127,9 +140,13 @@ async function bundle(name, entryPoints, outdir, options = {}) {
 }
 
 // What the page says it was built from.
+/** @param {NodeJS.ProcessEnv} [env] @returns {import("../contracts/model.js").BuildInfo} */
 function buildInfo(env = process.env) {
+    // The committed package manifest owns this required version string.
+    /** @type {Pick<typeof import("../package.json"), "version">} */
     const {version} = JSON.parse(fs.readFileSync(path.join(APP_ROOT, "package.json"), "utf8"));
     if (env.ARK_COMMIT) return {version, commit: env.ARK_COMMIT};
+    /** @param {...string} args */
     const git = (...args) => execFileSync("git", args, {cwd: APP_ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"]}).trim();
     try {
         const dirty = git("status", "--porcelain", "--untracked-files=no") !== "";
@@ -140,6 +157,12 @@ function buildInfo(env = process.env) {
 }
 
 // Fills a {{name}} template from `names`; a name the build does not write fails it.
+/**
+ * @param {string} template
+ * @param {string} file
+ * @param {Record<string, string>} names
+ * @param {(value: string) => string} [escape]
+ */
 function fill(template, file, names, escape = (value) => value) {
     return template.replace(/\{\{(\w+)\}\}/g, (match, name) => {
         if (names[name] === undefined) throw new Error(`${file} names ${match}, which the build does not write`);
@@ -149,15 +172,18 @@ function fill(template, file, names, escape = (value) => value) {
 
 // _headers for the hashed files the build wrote: one exact rule each, so no
 // splat can ever mark a file immutable whose name does not change with it.
+/** @param {Iterable<string>} hashedFiles */
 function headersFile(hashedFiles) {
     const hashed = [...hashedFiles].sort().map((file) => `/${file}\n  Cache-Control: ${IMMUTABLE}`).join("\n");
     return fill(fs.readFileSync(path.join(APP_ROOT, "web", "_headers"), "utf8"), "web/_headers", {csp: headerPolicy(), hashed});
 }
 
+/** @param {string} value */
 const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (character) => `&#${character.charCodeAt(0)};`);
 
 // Builds into `outdir`, emptied first so no earlier release's file lingers, and
 // returns the manifest it wrote.
+/** @param {import("./build-types.js").WebBuildOptions} [options] */
 async function buildWeb({outdir = OUTDIR, manifestFile = manifestFileFor(outdir), entries = {core: "web/core.mjs", host: "web/page.mjs"}, build = buildInfo()} = {}) {
     fs.rmSync(outdir, {recursive: true, force: true});
     fs.rmSync(manifestFile, {force: true});
@@ -193,8 +219,13 @@ if (require.main === module) {
     buildWeb().then((manifest) => {
         for (const [name, file] of Object.entries(manifest)) console.log(`${name.padEnd(7)}${path.relative(APP_ROOT, path.join(OUTDIR, file))}`);
         console.log(`written ${path.relative(APP_ROOT, path.join(OUTDIR, "index.html"))}, _headers and ${path.relative(APP_ROOT, manifestFileFor(OUTDIR))}`);
-    }).catch((error) => {
-        console.error(error.errors?.length ? error.errors.map((entry) => entry.text).join("\n") : String(error.message || error));
+    }).catch(/** @param {unknown} error */ (error) => {
+        const details = error && typeof error === "object" ? error : {};
+        const errors = "errors" in details ? details.errors : undefined;
+        const message = "message" in details ? details.message : undefined;
+        console.error(Array.isArray(errors) && errors.length
+            ? errors.map(/** @param {unknown} entry */ (entry) => entry && typeof entry === "object" && "text" in entry ? entry.text : undefined).join("\n")
+            : String(message || error));
         process.exit(1);
     });
 }

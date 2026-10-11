@@ -1,0 +1,25 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "types": [],
+    "moduleSuffixes": [
+      ".browser",
+      ""
+    ],
+    "checkJs": true
+  },
+  "include": [
+    "web/**/*.mjs",
+    "web/**/*.js",
+    "web/**/*.d.ts",
+    "tests/types/hosts.mts"
+  ],
+  "exclude": [
+    "web/sleep-worker.js"
+  ]
+}

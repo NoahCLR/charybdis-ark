@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// @ts-check
 "use strict";
 
 const {
@@ -16,6 +17,7 @@ const TARGET = Object.freeze({
     usage: QMK_RAW_HID_USAGE,
 });
 
+/** @param {{argv?: string[], stdout?: Pick<NodeJS.WritableStream, "write">, adapter?: Pick<import("../core/transport/types.js").DeviceAdapter, "listDevices">}} [options] */
 async function main(options = {}) {
     const argv = options.argv || process.argv.slice(2);
     const stdout = options.stdout || process.stdout;
@@ -37,6 +39,7 @@ async function main(options = {}) {
     return result;
 }
 
+/** @param {readonly string[]} argv */
 function parseArguments(argv) {
     const flags = {help: false, json: false};
     for (const argument of argv) {
@@ -51,6 +54,7 @@ function parseArguments(argv) {
     return flags;
 }
 
+/** @param {Pick<NodeJS.WritableStream, "write">} stream @param {{devices: import("../core/transport/types.js").DeviceDescriptor[]}} result */
 function writeHumanResult(stream, result) {
     stream.write(
         "Charybdis Raw HID target: " +
@@ -81,6 +85,7 @@ function usage() {
     ].join("\n");
 }
 
+/** @param {number} value @param {number} width */
 function hex(value, width) {
     return value.toString(16).toUpperCase().padStart(width, "0");
 }

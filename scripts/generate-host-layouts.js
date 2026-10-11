@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 "use strict";
+// @ts-check
 
 // Generates core/data/host-layouts.json from the firmware's host layout
 // fixture, pinned in upstream/firmware/tests/fixtures/host_layouts_v1.json.
@@ -22,11 +23,18 @@ const HOST_LAYOUTS_FORMAT = "charybdis-host-layouts-v1";
 
 // A dead key's legend is the character it types before Space, the accent it
 // stands for; the stroke that types it is the keyboard's business.
+/**
+ * @param {import("./contract-types.js").FixtureCell} cell
+ * @param {import("./contract-types.js").FixtureHostLayout["dead"]} dead
+ */
 function legend(cell, dead) {
     if (cell && typeof cell === "object") return {dead: dead[cell.dead]?.space ?? ""};
     return cell;
 }
 
+/**
+ * @param {import("./contract-types.js").HostLayoutFixture} fixture
+ */
 function buildHostLayouts(fixture) {
     if (fixture?.format !== 1 || !Array.isArray(fixture.layouts)) throw new Error("Unsupported host layout fixture.");
     return {
@@ -40,8 +48,9 @@ function buildHostLayouts(fixture) {
             ...(layout.unicodeHexInput ? {unicodeHexInput: true} : {}),
             keys: Object.fromEntries(Object.entries(layout.keys).map(([key, cells]) => [key, cells.map((cell) => legend(cell, layout.dead))])),
             // Every character the layout types, in code point order. Object
-            // keys list digit-like keys first, so sort explicitly.
-            chars: Object.keys(layout.chars).sort((a, b) => a.codePointAt(0) - b.codePointAt(0)).join(""),
+            // keys list digit-like keys first, so sort explicitly. Character keys
+            // in this generated fixture each contain at least one code point.
+            chars: Object.keys(layout.chars).sort((a, b) => /** @type {number} */ (a.codePointAt(0)) - /** @type {number} */ (b.codePointAt(0))).join(""),
             // Review compares the exact native strokes, including dead keys;
             // two layouts can type a character by different keys.
             strokes: layout.chars,
@@ -49,8 +58,13 @@ function buildHostLayouts(fixture) {
     };
 }
 
+/**
+ * @param {string[]} argv
+ */
 function main(argv) {
     const check = argv.includes("--check");
+    // Pinned generator output: its detailed schema is the firmware fixture contract.
+    /** @type {import("./contract-types.js").HostLayoutFixture} */
     const fixture = JSON.parse(fs.readFileSync(path.join(APP_ROOT, FIXTURE_RELATIVE_PATH), "utf8"));
     const serialized = `${JSON.stringify(buildHostLayouts(fixture), null, 1)}\n`;
     const outputPath = path.join(APP_ROOT, OUTPUT_RELATIVE_PATH);

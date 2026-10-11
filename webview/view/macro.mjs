@@ -1,3 +1,4 @@
+// @ts-check
 // Reading a macro payload for display.
 //
 // The keyboard stores a macro as text: literal characters, {KC_X} to tap,
@@ -9,27 +10,37 @@
 // is not an error here — the step builder passes through that state — and
 // unreleased() reports it.
 
+/** @typedef {import("./types.js").MacroStep} MacroStep */
+
 const MAX_DELAY = 65535, MAX_KEYS = 16;
+/** @param {string} character @param {boolean | undefined} unicode */
 const printable = (character, unicode) => {
     const code = character.codePointAt(0);
+    if (code === undefined) return false;
     return code === 9 || code === 10 || (code >= 32 && code <= 126) || (unicode && code >= 0xA0 && code <= 0x10FFFF && !(code >= 0xD800 && code <= 0xDFFF));
 };
 
+/** @param {unknown} payload @param {import("./types.js").MacroOptions} [options] */
 export function parseMacro(payload, options = {}) {
+    /** @type {MacroStep[]} */
     const steps = [];
+    /** @type {Set<string>} */
     const held = new Set();
+    /** @param {string} key */
     const keyId = key => options.aliases?.[key] || key;
     let text = "";
     let textHoldError = false;
     // Text the host layout cannot type needs Unicode entry, which a held
     // ordinary key would corrupt; without a layout, that is any non-ASCII text.
+    /** @param {string} character */
     const needsEntry = character => options.layoutChars ? !options.layoutChars.includes(character) : /[^\x00-\x7F]/u.test(character);
     const flush = () => { if (options.textEntry && [...text].some(needsEntry) && [...held].some(key => options.modifierKeys ? !options.modifierKeys.includes(key) : !/KC_(?:LCTL|LSFT|LALT|LGUI|RCTL|RSFT|RALT|RGUI|LEFT_CTRL|LEFT_SHIFT|LEFT_ALT|LEFT_GUI|RIGHT_CTRL|RIGHT_SHIFT|RIGHT_ALT|RIGHT_GUI)$/.test(key))) textHoldError = true; if (text) steps.push({kind: "text", text}); text = ""; };
     const source = String(payload ?? "");
     const allowed = options.keys?.length ? new Set(options.keys) : null;
 
     for (let index = 0; index < source.length;) {
-        const character = String.fromCodePoint(source.codePointAt(index));
+        // The loop bounds guarantee a code point at this index.
+        const character = String.fromCodePoint(/** @type {number} */ (source.codePointAt(index)));
         index += character.length;
         if ((character === "{" || character === "}") && source[index] === character) { text += character; index++; continue; }
         if (character === "}") return fail(steps, "Unexpected } — use }} for a literal closing brace.");
@@ -68,12 +79,15 @@ export function parseMacro(payload, options = {}) {
     return textHoldError ? fail(steps, "Release ordinary keys before text your keyboard layout cannot type, which needs Unicode entry; modifier holds are supported.") : {steps, error: ""};
 }
 
+/** @param {MacroStep[]} steps @param {string} error */
 const fail = (steps, error) => ({steps, error});
 
+/** @param {MacroStep} step @param {(name: string) => string} [label] */
 export const describeStep = (step, label = (name) => name) => step.kind === "text" ? step.text
     : step.kind === "delay" ? `${step.delay} ms`
     : step.keys.map(label).join(" + ");
 
+/** @param {MacroStep} step */
 export function serializeMacroStep(step) {
     if (step.kind === "text") return String(step.text ?? "").replaceAll("{", "{{").replaceAll("}", "}}");
     if (step.kind === "delay") return `{${Math.max(0, Number(step.delay) || 0)}}`;
@@ -82,10 +96,12 @@ export function serializeMacroStep(step) {
     return step.kind === "press" ? `{+${keys}}` : step.kind === "release" ? `{-${keys}}` : `{${keys}}`;
 }
 
+/** @param {readonly MacroStep[]} steps */
 export const serializeMacro = (steps) => steps.map(serializeMacroStep).join("");
 
 // Editable steps retain incomplete fields locally. The raw view must reflect
 // them verbatim, while incomplete commands are never posted for staging.
+/** @param {readonly MacroStep[]} steps */
 export function macroStepsInput(steps) {
     let error = "";
     const payload = steps.map(step => {
@@ -103,6 +119,7 @@ export function macroStepsInput(steps) {
 // What a slot shows on its cell. Every macro on a real keyboard tends to open
 // with the same modifier press, so the head of the payload makes them all look
 // identical; what tells them apart is the key they actually send.
+/** @param {unknown} payload @param {(name: string) => string} [label] */
 export function macroPeek(payload, label = (name) => name) {
     const {steps} = parseMacro(payload, {unicode: true});
     const text = steps.filter((step) => step.kind === "text").map((step) => step.text).join("").trim();
@@ -116,10 +133,12 @@ export function macroPeek(payload, label = (name) => name) {
 
 // Held keys that are never released leave the keyboard holding them, so the
 // preview says so rather than letting it through quietly.
+/** @param {readonly MacroStep[]} steps @param {Readonly<Record<string, string>>} [aliases] */
 export function unreleased(steps, aliases = {}) {
+    /** @type {string[]} */
     const held = [];
     for (const step of steps) {
-        const keys = step.keys?.map(key => aliases[key] || key) || [];
+        const keys = step.kind === "text" || step.kind === "delay" ? [] : step.keys.map(key => aliases[key] || key);
         if (step.kind === "press") held.push(...keys);
         if (step.kind === "release") for (const key of keys) {
             const at = held.indexOf(key);
@@ -132,6 +151,7 @@ export function unreleased(steps, aliases = {}) {
 // Whether a slot answers a search. A macro is found by the name it was given,
 // and by the slot it sits in as the screens label it — "M3", "Macro 3" or its
 // keycode — so an unnamed macro can still be found. Case is ignored.
+/** @param {{keycode?: string, name?: string} | null | undefined} slot @param {unknown} query */
 export function macroMatches(slot, query) {
     const needle = String(query ?? "").trim().toLowerCase();
     if (!needle) return true;

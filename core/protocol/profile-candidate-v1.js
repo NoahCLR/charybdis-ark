@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 
 const {supportsStreamingMacros} = require("../schema/macro-payload");
@@ -5,6 +6,7 @@ const {requestHandled} = require("./via-unhandled-v1");
 const {RAW_HID_REPORT_SIZE, normalizeRawHidReport} = require("../transport/device-adapter");
 const {crc32, decodeProfileBlob, fnv1a32, PROFILE_DOMAIN_IDS} = require("../schema/profile-blob-v1");
 const {
+    ProfileWireProtocolError,
     PROFILE_WIRE_DOMAINS,
     PROFILE_WIRE_STATUS,
     PROFILE_WIRE_V1,
@@ -120,6 +122,7 @@ const CANDIDATE_ADMISSION_NAMES = Object.freeze(Object.fromEntries(
 ));
 
 class ProfileCandidateProtocolError extends Error {
+    /** @param {string} code @param {string} message @param {Record<string, unknown>} [details] */
     constructor(code, message, details = {}) {
         super(message);
         this.name = "ProfileCandidateProtocolError";
@@ -129,6 +132,7 @@ class ProfileCandidateProtocolError extends Error {
 }
 
 class CandidateTransactionIdSequence {
+    /** @param {number} [start] */
     constructor(start = 1) {
         this.value = assertU16(start, "Candidate transaction id", {nonzero: true});
     }
@@ -141,6 +145,7 @@ class CandidateTransactionIdSequence {
 }
 
 class CandidateRequestIdSequence {
+    /** @param {number} [start] */
     constructor(start = 1) {
         this.value = assertU8(start, "Candidate status request id", {nonzero: true});
     }
@@ -152,6 +157,7 @@ class CandidateRequestIdSequence {
     }
 }
 
+/** @param {number} transactionId @param {import("./types.js").CandidateMetadataInput} metadata */
 function buildCandidateBeginRequest(transactionId, metadata) {
     const normalizedTransactionId = assertU16(transactionId, "Candidate transaction id", {nonzero: true});
     const normalized = normalizeCandidateMetadata(metadata);
@@ -170,6 +176,7 @@ function buildCandidateBeginRequest(transactionId, metadata) {
     return report;
 }
 
+/** @param {number} transactionId @param {number} offset @param {Uint8Array} value */
 function buildCandidateChunkRequest(transactionId, offset, value) {
     const normalizedTransactionId = assertU16(transactionId, "Candidate transaction id", {nonzero: true});
     const normalizedOffset = assertU16(offset, "Candidate chunk offset");
@@ -187,6 +194,7 @@ function buildCandidateChunkRequest(transactionId, offset, value) {
     return report;
 }
 
+/** @param {number} transactionId @param {{offset: number, sourceOffset: number, length: number, source: import("./types.js").ReuseSource}} range */
 function buildCandidateReuseRequest(transactionId, {offset, sourceOffset, length, source}) {
     const report = buildMutationHeader(PROFILE_CANDIDATE_V1.VALUE_REUSE, assertU16(transactionId, "Candidate transaction id", {nonzero: true}));
     offset = assertU16(offset, "Reuse destination offset");
@@ -202,6 +210,7 @@ function buildCandidateReuseRequest(transactionId, {offset, sourceOffset, length
     return report;
 }
 
+/** @param {number} transactionId */
 function buildCandidateValidateRequest(transactionId) {
     return buildMutationHeader(
         PROFILE_CANDIDATE_V1.VALUE_VALIDATE,
@@ -209,6 +218,7 @@ function buildCandidateValidateRequest(transactionId) {
     );
 }
 
+/** @param {number} transactionId */
 function buildCandidateCommitRequest(transactionId) {
     return buildMutationHeader(
         PROFILE_CANDIDATE_V1.VALUE_COMMIT,
@@ -217,6 +227,7 @@ function buildCandidateCommitRequest(transactionId) {
     );
 }
 
+/** @param {number} transactionId */
 function buildCandidateAbortRequest(transactionId) {
     return buildMutationHeader(
         PROFILE_CANDIDATE_V1.VALUE_ABORT,
@@ -224,6 +235,7 @@ function buildCandidateAbortRequest(transactionId) {
     );
 }
 
+/** @param {number} requestId */
 function buildCandidateStatusRequest(requestId) {
     return buildProfileGetRequest(
         PROFILE_CANDIDATE_V1.VALUE_STATUS,
@@ -232,6 +244,7 @@ function buildCandidateStatusRequest(requestId) {
     );
 }
 
+/** @param {Uint8Array} response @param {Uint8Array} request */
 function candidateMutationResponseMatcher(response, request) {
     const actual = normalizeRawHidReport(response, "Candidate mutation response");
     const expected = normalizeRawHidReport(request, "Candidate mutation request");
@@ -242,6 +255,7 @@ function candidateMutationResponseMatcher(response, request) {
         && actual[4] === expected[4];
 }
 
+/** @param {Uint8Array} response @param {Uint8Array} request */
 function decodeCandidateAcknowledgement(response, request) {
     const report = Buffer.from(normalizeRawHidReport(response, "Candidate mutation response"));
     if (!candidateMutationResponseMatcher(report, request)) {
@@ -254,7 +268,7 @@ function decodeCandidateAcknowledgement(response, request) {
     const admission = report[5];
     const errorId = report[6];
     const frameOffset = report[7];
-    if (!Object.values(CANDIDATE_ADMISSION).includes(admission)) {
+    if (!/** @type {number[]} */ (Object.values(CANDIDATE_ADMISSION)).includes(admission)) {
         throw candidateProtocolError("MALFORMED_RESPONSE", `Unknown candidate admission id ${admission}.`);
     }
     assertKnownCandidateError(errorId);
@@ -286,6 +300,7 @@ function decodeCandidateAcknowledgement(response, request) {
     };
 }
 
+/** @param {Uint8Array} response @param {Uint8Array} request */
 function decodeCandidateStatusResponse(response, request) {
     const payload = decodeProfileResponse(response, request);
     if (payload.length !== PROFILE_CANDIDATE_V1.STATUS_PAYLOAD_SIZE) {
@@ -298,10 +313,10 @@ function decodeCandidateStatusResponse(response, request) {
     const lastOperation = payload[2];
     const flags = payload[3];
     const errorId = payload[14];
-    if (!Object.values(CANDIDATE_STATE).includes(state)) {
+    if (!/** @type {number[]} */ (Object.values(CANDIDATE_STATE)).includes(state)) {
         throw candidateProtocolError("INCOMPATIBLE_RESPONSE", `Unknown candidate state ${state}.`);
     }
-    if (!Object.values(CANDIDATE_OPERATION).includes(lastOperation)) {
+    if (!/** @type {number[]} */ (Object.values(CANDIDATE_OPERATION)).includes(lastOperation)) {
         throw candidateProtocolError("INCOMPATIBLE_RESPONSE", `Unknown candidate operation ${lastOperation}.`);
     }
     if ((flags & ~CANDIDATE_STATUS_FLAGS.KNOWN_MASK) !== 0) {
@@ -344,6 +359,7 @@ function decodeCandidateStatusResponse(response, request) {
     };
 }
 
+/** @param {import("../transport/types.js").RequestConnection} connection @param {import("./types.js").ReadOptions} [options] */
 async function readCandidateStatus(connection, options = {}) {
     if (!connection || typeof connection.request !== "function") {
         throw new TypeError("connection must provide request(report, options).");
@@ -381,10 +397,12 @@ const PEER_TRANSFER_OWNER_NAMES = Object.freeze(["NONE", "REMOTE_PUSH", "LOCAL_P
 // noah_profile_storage_admission_owner_t: who holds the peer's storage.
 const PEER_ADMISSION_NAMES = Object.freeze(["NONE", "HOST", "PEER"]);
 
+/** @param {number} requestId */
 function buildCandidatePeerStatusRequest(requestId) {
     return buildProfileGetRequest(PROFILE_CANDIDATE_V1.VALUE_STATUS, 1, assertU8(requestId, "Candidate peer status request id", {nonzero: true}));
 }
 
+/** @param {Uint8Array} response @param {Uint8Array} request */
 function decodeCandidatePeerStatusResponse(response, request) {
     const payload = decodeProfileResponse(response, request);
     if (payload.length !== PROFILE_CANDIDATE_V1.STATUS_PAYLOAD_SIZE || payload[0] !== 1) {
@@ -433,6 +451,7 @@ function decodeCandidatePeerStatusResponse(response, request) {
 
 // Firmware before page 1 answers UNKNOWN_PAGE; that is "not reported", not a
 // failure, and resolves to null.
+/** @param {import("../transport/types.js").RequestConnection} connection @param {import("./types.js").ReadOptions} [options] */
 async function readCandidatePeerStatus(connection, options = {}) {
     if (typeof options.nextRequestId !== "function") throw new TypeError("nextRequestId must be a function.");
     const request = buildCandidatePeerStatusRequest(assertNextRequestId(options.nextRequestId));
@@ -440,13 +459,15 @@ async function readCandidatePeerStatus(connection, options = {}) {
     try {
         return decodeCandidatePeerStatusResponse(response, request);
     } catch (error) {
-        if (error?.code === "DEVICE_REJECTED" && error.status === PROFILE_WIRE_STATUS.UNKNOWN_PAGE) return null;
+        if (error instanceof ProfileWireProtocolError && error.code === "DEVICE_REJECTED" && "status" in error && error.status === PROFILE_WIRE_STATUS.UNKNOWN_PAGE) return null;
         throw error;
     }
 }
 
 // A candidate is always bound to the VIA store generation it will publish
 // with: options.viaGeneration and options.viaDigest are required and nonzero.
+/** @overload @param {Uint8Array} value @param {import("./types.js").CandidateBlobOptions} options @returns {import("./types.js").CandidateMetadata} */
+/** @param {Uint8Array} value @param {Partial<import("./types.js").CandidateBlobOptions>} [options] @returns {import("./types.js").CandidateMetadata} */
 function candidateMetadataForBlob(value, options = {}) {
     const blob = copyBytes(value, "Candidate profile blob");
     const storeFormatVersion = options.storeFormatVersion ?? (supportsStreamingMacros(options.capabilities) ? PROFILE_CANDIDATE_V1.STREAMING_STORE_FORMAT : PROFILE_CANDIDATE_V1.LOGICAL_STORE_FORMAT);
@@ -491,6 +512,7 @@ function candidateMetadataForBlob(value, options = {}) {
     };
 }
 
+/** @param {import("./types.js").CandidateMetadataInput} metadata @returns {import("./types.js").CandidateMetadata} */
 function normalizeCandidateMetadata(metadata) {
     if (!metadata || typeof metadata !== "object") {
         throw new TypeError("Candidate metadata must be an object.");
@@ -507,7 +529,7 @@ function normalizeCandidateMetadata(metadata) {
     const schemaMinor = assertU8(metadata.schemaMinor, "Candidate schema minor");
     assertCurrentSchema(schemaMajor, schemaMinor);
     const storeFormatVersion = assertU8(metadata.storeFormatVersion, "Candidate store format");
-    if (![PROFILE_CANDIDATE_V1.LOGICAL_STORE_FORMAT, PROFILE_CANDIDATE_V1.STREAMING_STORE_FORMAT].includes(storeFormatVersion)) {
+    if (!/** @type {number[]} */ ([PROFILE_CANDIDATE_V1.LOGICAL_STORE_FORMAT, PROFILE_CANDIDATE_V1.STREAMING_STORE_FORMAT]).includes(storeFormatVersion)) {
         throw new RangeError(`Candidate store format must be 4 or 5.`);
     }
     if (storeFormatVersion === PROFILE_CANDIDATE_V1.STREAMING_STORE_FORMAT && payloadLength > PROFILE_CANDIDATE_V1.STREAMING_BLOB_SIZE) throw new RangeError(`Candidate payload length exceeds the ${PROFILE_CANDIDATE_V1.STREAMING_BLOB_SIZE}-byte format-5 capacity.`);
@@ -527,12 +549,14 @@ function normalizeCandidateMetadata(metadata) {
     };
 }
 
+/** @param {number} major @param {number} minor */
 function assertCurrentSchema(major, minor) {
     if (major !== PROFILE_CANDIDATE_V1.SCHEMA_MAJOR || minor !== PROFILE_CANDIDATE_V1.SCHEMA_MINOR) {
         throw candidateProtocolError("INCOMPATIBLE_SCHEMA", `Candidates use profile schema ${PROFILE_CANDIDATE_V1.SCHEMA_MAJOR}.${PROFILE_CANDIDATE_V1.SCHEMA_MINOR}; this blob is ${major}.${minor}.`);
     }
 }
 
+/** @param {number | undefined} generation @param {number | undefined} digest */
 function assertViaBinding(generation, digest) {
     if (generation === undefined || digest === undefined) {
         throw candidateProtocolError("VIA_BINDING_REQUIRED", "A candidate must be bound to the VIA store generation and digest it publishes with.");
@@ -545,6 +569,7 @@ function assertViaBinding(generation, digest) {
     return {viaGeneration, viaDigest};
 }
 
+/** @param {number} valueId @param {number} transactionId @param {number} [command] */
 function buildMutationHeader(valueId, transactionId, command = PROFILE_CANDIDATE_V1.COMMAND_SET) {
     const report = Buffer.alloc(RAW_HID_REPORT_SIZE);
     report[0] = command;
@@ -554,6 +579,7 @@ function buildMutationHeader(valueId, transactionId, command = PROFILE_CANDIDATE
     return report;
 }
 
+/** @param {number} value */
 function assertDomainMask(value) {
     const mask = assertU8(value, "Candidate requested-domain mask");
     if ((mask & ~PROFILE_CANDIDATE_V1.KNOWN_DOMAIN_MASK) !== 0) {
@@ -562,12 +588,14 @@ function assertDomainMask(value) {
     return mask;
 }
 
+/** @param {number} value */
 function assertKnownCandidateError(value) {
     if (!Object.prototype.hasOwnProperty.call(CANDIDATE_ERROR_NAMES, value)) {
         throw candidateProtocolError("INCOMPATIBLE_RESPONSE", `Unknown candidate error id ${value}.`);
     }
 }
 
+/** @param {() => number} nextRequestId */
 function assertNextRequestId(nextRequestId) {
     if (typeof nextRequestId !== "function") {
         throw new TypeError("nextRequestId must be a function.");
@@ -575,6 +603,7 @@ function assertNextRequestId(nextRequestId) {
     return assertU8(nextRequestId(), "Candidate status request id", {nonzero: true});
 }
 
+/** @param {Uint8Array} buffer @param {number} start @param {number} end @param {string} label */
 function assertZeroRange(buffer, start, end, label) {
     for (let index = start; index < end; index += 1) {
         if (buffer[index] !== 0) {
@@ -583,6 +612,7 @@ function assertZeroRange(buffer, start, end, label) {
     }
 }
 
+/** @param {Uint8Array} value @param {string} label */
 function copyBytes(value, label) {
     if (!(value instanceof Uint8Array)) {
         throw new TypeError(`${label} must be a Buffer or Uint8Array.`);
@@ -590,6 +620,7 @@ function copyBytes(value, label) {
     return Buffer.from(value.buffer, value.byteOffset, value.byteLength);
 }
 
+/** @param {unknown} value @param {string} label @param {{nonzero?: boolean}} [options] */
 function assertU8(value, label, options = {}) {
     const number = Number(value);
     if (!Number.isInteger(number) || number < (options.nonzero ? 1 : 0) || number > 0xff) {
@@ -598,6 +629,7 @@ function assertU8(value, label, options = {}) {
     return number;
 }
 
+/** @param {unknown} value @param {string} label @param {{nonzero?: boolean}} [options] */
 function assertU16(value, label, options = {}) {
     const number = Number(value);
     if (!Number.isInteger(number) || number < (options.nonzero ? 1 : 0) || number > 0xffff) {
@@ -606,6 +638,7 @@ function assertU16(value, label, options = {}) {
     return number;
 }
 
+/** @param {unknown} value @param {string} label */
 function assertU32(value, label) {
     const number = Number(value);
     if (!Number.isInteger(number) || number < 0 || number > 0xffffffff) {
@@ -614,6 +647,7 @@ function assertU32(value, label) {
     return number >>> 0;
 }
 
+/** @param {string} code @param {string} message @param {Record<string, unknown>} [details] */
 function candidateProtocolError(code, message, details) {
     return new ProfileCandidateProtocolError(code, message, details);
 }

@@ -1,5 +1,7 @@
+// @ts-check
 // The layer tabs, and the swatch a layer is shown with wherever it is named.
 
+// Selector assertions refer to elements created by this module's authored markup.
 import {css, isOff, label as hsvLabel} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {getModel, heldLayers, layerName, layers, previewing, render, showLayer, state, toggleLayerOn} from "../store.mjs";
@@ -8,6 +10,7 @@ import {draftMarks} from "../view/review.mjs";
 
 // A layer's swatch and how it is lit, the same wherever a layer is named: a
 // layer whose colour is off, or whose stage is off, shows as unlit.
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {Pick<import("../../contracts/panel.js").Layer, "index"> & Partial<import("../../contracts/panel.js").Layer>} layer */
 export function layerSwatch(model, layer) {
     const row = layerColourRow(model, layer.index);
     const lit = stageEnabled(model, "layers") && row && !isOff(row.color);
@@ -49,18 +52,19 @@ export function layerBar(trailing = "") {
             <span>${esc(layerName(layer))}</span><span class="idx">${layer.index}</span>${drafted.has(layer.index) ? '<i class="draft-dot"></i>' : ""}</button>`;
     }).join("");
     const node = el(`<div class="layerbar-wrap"><div class="layer-tabs" role="tablist" aria-label="Layers">${tabs}${trailing}</div></div>`);
-    node.querySelectorAll("[data-layer]").forEach((button) => button.addEventListener("click", (event) => {
+    /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-layer]")).forEach((button) => button.addEventListener("click", (event) => {
         if (event.metaKey || event.ctrlKey) toggleLayerOn(Number(button.dataset.layer));
         else showLayer(Number(button.dataset.layer));
         render();
     }));
-    keepInView(node.querySelector(".layer-tabs"));
+    keepInView(/** @type {HTMLElement} */ (node.querySelector(".layer-tabs")));
     return node;
 }
 
 // A strip of tabs too long for its width scrolls sideways; every render
 // builds it afresh, so it brings its picked tab back into view once drawn,
 // and fades the edge that has more tabs beyond it.
+/** @param {HTMLElement | null} strip */
 export function keepInView(strip) {
     if (!strip) return;
     const edges = () => {
@@ -69,7 +73,7 @@ export function keepInView(strip) {
     };
     strip.addEventListener("scroll", edges, {passive: true});
     requestAnimationFrame(() => {
-        const tab = strip.isConnected && strip.querySelector('[aria-selected="true"]');
+        const tab = strip.isConnected && /** @type {HTMLSelectElement} */ (strip.querySelector('[aria-selected="true"]'));
         if (!tab) return;
         const left = tab.offsetLeft - 28, right = tab.offsetLeft + tab.offsetWidth + 28;
         if (left < strip.scrollLeft) strip.scrollLeft = left;

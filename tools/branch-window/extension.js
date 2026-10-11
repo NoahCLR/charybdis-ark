@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 
 // Charybdis Ark Branch — a developer tool, not part of Ark.
@@ -14,6 +15,7 @@ const vscode = require("vscode");
 
 const {listCheckouts} = require("./checkouts");
 
+/** @param {import("vscode").ExtensionContext} context */
 function activate(context) {
     context.subscriptions.push(vscode.commands.registerCommand("charybdisArkBranch.open", pickAndOpen));
     const status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 1);
@@ -30,7 +32,7 @@ async function pickAndOpen() {
         // This folder sits in an Ark checkout; git lists all of its worktrees from any of them.
         checkouts = listCheckouts(__dirname);
     } catch (error) {
-        vscode.window.showErrorMessage(`Charybdis Ark Branch could not list Ark's branches: ${error.message}`);
+        vscode.window.showErrorMessage(`Charybdis Ark Branch could not list Ark's branches: ${error instanceof Error ? error.message : String(error)}`);
         return;
     }
     const picked = await vscode.window.showQuickPick(checkouts.map((checkout) => ({
@@ -42,10 +44,11 @@ async function pickAndOpen() {
     if (picked) openWindow(picked.checkout.path);
 }
 
+/** @param {string} checkout */
 function openWindow(checkout) {
     const cli = path.join(vscode.env.appRoot, "bin", process.platform === "win32" ? "code.cmd" : "code");
     const child = childProcess.spawn(cli, ["--new-window", `--extensionDevelopmentPath=${checkout}`], {detached: true, stdio: "ignore"});
-    child.on("error", (error) => vscode.window.showErrorMessage(`Charybdis Ark Branch could not open a window: ${error.message}`));
+    child.on("error", (error) => vscode.window.showErrorMessage(`Charybdis Ark Branch could not open a window: ${error instanceof Error ? error.message : String(error)}`));
     child.unref();
 }
 

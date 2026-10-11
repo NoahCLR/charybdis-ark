@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 // Current firmware's profile as Ark's tests build it: the pinned compiled
 // profile (compiled_profile_pd_v2.fixture: schema 3.0, RGB 4, key behaviours 2,
@@ -17,18 +18,25 @@ const CURRENT_CAPABILITIES = Object.freeze({compiledLayerCount: 16, supportedDom
 // Settings v6: values 10..14 are the retired pointing DPI and 27 the retired
 // combo references, all zero; behaviours and combos are on everywhere; every
 // layer refers combos to itself; every macro and custom key name is empty.
+/** @returns {import("../../core/schema/types.js").SettingsDomain} */
 function settings() {
     const values = [200, 150, 400, 150, 1, 4, 1200, 25, 1, 3, 0, 0, 0, 0, 0, 200, 400, 900000, 1200, 200, 1, 257, 0xc8ff00, 1, 0, 200, 10, 0, 1, 0xffff, 0xffff];
     const layers = Array.from({length: 16}, (_, layer) => ({...defaultLayerRecord(layer), reference: layer}));
     return {values, names: ["Base", "Numbers", "Symbols", "Navigation", "Pointer", "Extra 1", "Extra 2", "Extra 3", ...Array(8).fill("")], layers,
         macroNames: Array(128).fill(""), customKeyNames: Array(128).fill(""), formatVersion: 6};
 }
-const compiledBytes = () => Buffer.from(fs.readFileSync(FIXTURE, "utf8").match(/^profile.full.hex=(.+)$/m)[1], "hex");
+const compiledBytes = () => {
+    const match = fs.readFileSync(FIXTURE, "utf8").match(/^profile.full.hex=(.+)$/m);
+    if (!match) throw new Error("The compiled profile fixture has no profile.full.hex.");
+    return Buffer.from(match[1], "hex");
+};
 
 // The compiled profile with an empty layout and no combos, unless given.
+/** @param {import("./types.js").CompiledOptions} [options] */
 function compiled({combos = [], layout = Buffer.alloc(1920), policy = settings()} = {}) {
     const bytes = compiledBytes();
-    const profile = materializeProfile(bytes, bytes, {version: 3, defaultTermMs: 50, holdTermMs: 200, rows: combos}, encodeSettings(policy));
+    const table = {version: 3, defaultTermMs: 50, holdTermMs: 200, rows: combos};
+    const profile = materializeProfile(bytes, bytes, table, encodeSettings(policy));
     return createSnapshot({profile, actionAbiDigest: ACTION_ABI, via: {layers: 16, layout, macros: Buffer.alloc(10327), macroSlots: 128}});
 }
 

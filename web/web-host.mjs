@@ -1,3 +1,4 @@
+// @ts-check
 // The browser host: in a page, what extension.js does in VS Code. It runs the
 // shared host loop (core/session/panel-loop.js) over WebHID and hands the
 // panel what a browser has — Chrome's keyboard picker, IndexedDB for recovery
@@ -35,33 +36,46 @@ export const THEME_KEY = "charybdis-ark.theme";
 const LOCK = "charybdis-ark.keyboard";
 
 // A saved choice wins; otherwise the system's setting.
+/** @param {string | null | undefined} saved @param {boolean} prefersLight @returns {"light" | "dark"} */
 export function initialTheme(saved, prefersLight) {
     return saved === "light" || saved === "dark" ? saved : prefersLight ? "light" : "dark";
 }
 
 // Whether leaving the page would lose something: unapplied edits (in the
 // demo, edits not exported since), or an Apply (or a restore) part way through.
+/** @param {import("../core/session/types.js").PanelSession & {service: {phase?: string}}} session */
 export function leaving(session) {
     const edits = session.demo ? demoUnsaved(session) : session.draft?.dirty;
     return Boolean(edits || session.applyRunning || session.service?.phase === "restoring complete profile");
 }
 
 // A chosen profile file as the loop takes it, refused when it is too large.
+/** @param {Pick<File, "size" | "text" | "name"> | undefined} file */
 export async function readProfileFile(file) {
     if (!file) return undefined;
     if (file.size > PROFILE_FILE_LIMIT) throw new Error("This profile file is too large.");
     return {text: await file.text(), name: file.name};
 }
 
+/** @param {import("./types.js").WebEnvironment} env */
 export function startWebHost(env) {
     const {hid, locks, storage, indexedDB, localStorage, matchMedia, document, window, worker, build} = env;
     const recoveries = openRecoveries(indexedDB);
     const adapter = new WebHidDeviceAdapter({hid});
+    /** @type {import("../contracts/model.js").HostPanel["blocked"]} */
     let blocked = hid ? null : BLOCKED.unsupported;
     let theme = initialTheme(safely(() => localStorage?.getItem(THEME_KEY)), Boolean(matchMedia?.("(prefers-color-scheme: light)")?.matches));
-    let recoveryList = [], progress = null, picking, choosing;
+    /** @type {import("../contracts/model.js").RecoveryCopy[]} */
+    let recoveryList = [];
+    /** @type {string | null} */
+    let progress = null;
+    /** @type {Promise<(Error & {code?: string}) | null> | undefined} */
+    let picking;
+    /** @type {ReturnType<typeof readProfileFile> | undefined} */
+    let choosing;
     document.documentElement.dataset.theme = theme;
 
+    /** @type {import("../core/session/types.js").LoopHost} */
     const host = {
         post: (message) => panel.post(message),
         progress: async (title, work) => {
@@ -94,6 +108,7 @@ export function startWebHost(env) {
     // Chrome opens its picker and file chooser only inside the click, so they
     // start here, before the message reaches the loop; the loop then waits
     // for what was picked.
+    /** @param {import("../contracts/messages.js").PanelRequest} message */
     function gesture(message) {
         if (message?.type === "chooseKeyboard" && hid && !blocked) {
             picking = adapter.requestDevice().then(() => null, (error) => error);
@@ -114,7 +129,7 @@ export function startWebHost(env) {
     }).then((held) => {
         if (held) return true;
         blocked = BLOCKED.otherTab;
-        locks.request(LOCK, () => {
+        locks?.request(LOCK, () => {
             blocked = null;
             void loop.handleMessage({type: "refresh"});
             return new Promise(() => {});
@@ -122,6 +137,7 @@ export function startWebHost(env) {
         return false;
     });
 
+    /** @param {import("../contracts/messages.js").PanelRequest} message */
     async function receive(message) {
         switch (message?.type) {
             case "setTheme":
@@ -172,15 +188,18 @@ export function startWebHost(env) {
     return {loop, panel, api: panel.api};
 }
 
+/** @template T @param {() => T} read @returns {T | undefined} */
 function safely(read) {
     try {return read();} catch {return undefined;}
 }
 
 // Chrome's file chooser, opened from the click that asked for it.
+/** @param {Document} document */
 function chooseFile(document) {
     const input = document.createElement("input");
     input.type = "file";
     input.accept = ".json,application/json";
+    /** @type {Promise<File | undefined>} */
     const chosen = new Promise((resolve) => {
         input.addEventListener("change", () => resolve(input.files?.[0]), {once: true});
         input.addEventListener("cancel", () => resolve(undefined), {once: true});
@@ -189,6 +208,7 @@ function chooseFile(document) {
     return chosen.then(readProfileFile);
 }
 
+/** @param {Document} document @param {import("./types.js").WebEnvironment["window"]} window @param {string} name @param {string} text */
 function download(document, window, name, text) {
     const url = window.URL.createObjectURL(new window.Blob([text], {type: "application/json"}));
     const link = document.createElement("a");

@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 
 // Whole-profile findings shown before Apply. Layer reachability lives in its
@@ -10,7 +11,9 @@ const {decodeMacroPayload, macroProgramLimit} = require("../schema/macro-payload
 const {hostSettings} = require("../schema/host-settings");
 const {inspectMacroPlayback} = require("./macro-input");
 
+/** @param {import("./types.js").DecodedProfile} decoded @param {import("./types.js").ProfileDestination} [destination] @returns {import("../../contracts/model.js").Finding[]} */
 function profileFindings(decoded, destination = {}) {
+    /** @type {import("../../contracts/model.js").Finding[]} */
     const findings = [...layerReach(decoded, {legacyGestureTiming: destination.physicalGestureTiming === false, legacyOwnedTapping: destination.ownedTapping === false}), ...gestureTimingFindings(decoded)];
     for (const [slot, count] of Object.entries(decoded.danglingPdBindings || {})) {
         if (!count) continue;
@@ -32,7 +35,7 @@ function profileFindings(decoded, destination = {}) {
     });
     const lighting = baseLighting(decoded.settings.values);
     const max = destination.brightnessMax;
-    if (Number.isInteger(max) && lighting.brightness > max) {
+    if (max !== undefined && Number.isInteger(max) && lighting.brightness > max) {
         findings.push({kind: "brightnessBlocker", level: "blocker", layers: [], identity: String(lighting.brightness),
             title: `Base brightness exceeds this keyboard's limit of ${max}`,
             detail: `This profile stores brightness ${lighting.brightness}; the keyboard accepts at most ${max}. Apply will refuse the profile.`,
@@ -47,6 +50,7 @@ function profileFindings(decoded, destination = {}) {
     return findings;
 }
 
+/** @param {import("./types.js").DecodedProfile | null} keyboard @param {import("./types.js").DecodedProfile} draft @param {readonly number[] | undefined} order @param {import("./types.js").ProfileDestination} [destination] @returns {import("../../contracts/model.js").Check[]} */
 function draftProfileChecks(keyboard, draft, order, destination) {
     return compareFindings(keyboard ? profileFindings(keyboard, destination) : [], profileFindings(draft, destination), order);
 }

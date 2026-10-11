@@ -1,6 +1,9 @@
+// @ts-check
 // Human-facing keycode sections. QMK's source groups are useful provenance,
 // but they are not a useful first navigation model for somebody configuring a
 // keyboard, so the picker presents task-shaped categories instead.
+
+/** @typedef {Pick<import("../../contracts/panel.js").CatalogEntry, "group"> & {value?: string, key?: string, name?: string}} Entry */
 
 const SYMBOLS = new Set([
     "KC_GRAVE", "KC_MINUS", "KC_EQUAL", "KC_LEFT_BRACKET", "KC_RIGHT_BRACKET",
@@ -12,7 +15,9 @@ const NAVIGATION = new Set([
     "KC_RIGHT", "KC_LEFT", "KC_DOWN", "KC_UP", "KC_PRINT_SCREEN", "KC_SCROLL_LOCK", "KC_PAUSE",
 ]);
 
+/** @param {Entry} entry */
 const valueOf = (entry) => entry.value || entry.key || entry.name || "";
+/** @param {string[]} groups @returns {(entry: Entry) => boolean} */
 const inGroups = (...groups) => (entry) => groups.includes(entry.group);
 // Macro slots are offered by their VIA_MACRO_n names in the Macros section.
 const NATIVE_MACRO = /^QK_MACRO_\d+$/;
@@ -37,22 +42,30 @@ const UNBUILT = new RegExp("^(?:" + [
     // The QK_KB slots the Charybdis leaves unnamed.
     "QK_KB_\\d+$",
 ].join("|") + ")");
+/** @param {Entry} entry */
 const unbuilt = (entry) => UNBUILT_GROUPS.has(entry.group) || UNBUILT.test(valueOf(entry));
 // Whether the picker offers an entry at all, in any section or search.
+/** @param {Entry} entry */
 export const pickable = (entry) => !NATIVE_MACRO.test(valueOf(entry)) && !UNSUPPORTED.has(valueOf(entry)) && !unbuilt(entry);
 // The Charybdis's own keys: DPI and sniping.
 const isKeyboardKey = inGroups("kb");
 // The keyboard's 64 custom keys, by the names the model gives them, with the
 // bare user slots a keyboard of unknown vocabulary reports and KC_NO/KC_TRNS.
 const isCustom = inGroups("Custom keys", "user", "internal");
+/** @param {Entry} entry */
 const isSymbol = (entry) => entry.group === "shifted" || (entry.group === "basic" && SYMBOLS.has(valueOf(entry)));
+/** @param {Entry} entry */
 const isNavigation = (entry) => entry.group === "basic" && NAVIGATION.has(valueOf(entry));
+/** @param {Entry} entry */
 const isNumpad = (entry) => entry.group === "basic" && /^KC_(?:KP|NUMPAD)_/.test(valueOf(entry));
+/** @param {Entry} entry */
 const isFunction = (entry) => entry.group === "basic" && /^KC_F(?:[1-9]|1\d|2[0-4])$/.test(valueOf(entry));
+/** @param {Entry} entry */
 const isMoreKey = (entry) => entry.group === "modifiers" || (entry.group === "basic"
     && !isSymbol(entry) && !isNavigation(entry) && !isNumpad(entry)
     && (isFunction(entry) || !/^KC_(?:[A-Z]|[0-9])$/.test(valueOf(entry))));
 
+/** @returns {import("./types.js").PickerSection[]} */
 export function pickerSections() {
     return [
         {id: "board", label: "Keyboard", kind: "board"},
@@ -75,5 +88,6 @@ export function pickerSections() {
     ];
 }
 
+/** @template {Entry} T @param {T[]} catalogue @param {import("./types.js").PickerSection | undefined} section */
 export const entriesForPickerSection = (catalogue, section) =>
     section?.kind === "catalogue" ? catalogue.filter((entry) => pickable(entry) && section.filter(entry)) : [];

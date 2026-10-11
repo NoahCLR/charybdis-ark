@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 
 // The name a key reads by, in one profile (D-L33). The vendored catalogue names
@@ -24,10 +25,12 @@ const {hostLayout, US_HOST_LAYOUT} = require("../data/host-layouts");
 
 // What a layer key does to its layer, in the picker's words. TG is a lock on
 // this firmware (D-L34).
+/** @type {Readonly<Record<string, string>>} */
 const LAYER_VERBS = {MO: "Hold", TG: "Lock", LOCK_LAYER: "Lock", TT: "Tap-toggle", OSL: "One-shot", TO: "Move to", DF: "Default", PDF: "Default"};
 const LAYER_KEY = /^(MO|TG|TT|OSL|TO|DF|PDF|LOCK_LAYER)\((\d+)\)$/;
 
 // LOCK_LAYER(2) → "Lock layer 2".
+/** @param {string} semantic */
 function semanticLabel(semantic) {
     const [, name, args] = /^([A-Z][A-Z0-9_]*)(?:\((.*)\))?$/.exec(semantic) || [, semantic, undefined];
     const words = name.replace(/_/g, " ").toLowerCase();
@@ -49,6 +52,7 @@ function semanticLabel(semantic) {
 // Catalogue groups describe browsing, not whether a label carries modifiers.
 // Detect modifier words centrally so new modifier-bearing families inherit
 // host naming without requiring another screen or group allowlist.
+/** @param {Pick<import("../data/types.js").ResolvedKeycode, "group" | "label">} entry */
 const carriesModifiers = entry => ["modifiers", "magic"].includes(entry.group) || /\b[LR]?(?:Ctrl|Shift|Alt|GUI|Cmd)\b/.test(entry.label);
 
 // A key as the host layout prints it (data/host-layouts.js): a letter as its
@@ -56,16 +60,22 @@ const carriesModifiers = entry => ["modifiers", "magic"].includes(entry.group) |
 // its accent. Shifted symbol keycodes (KC_EXLM is S(KC_1)) read as what the
 // layout types with Shift. US keeps the catalogue's own labels. Stored
 // keycodes never change, only what they are called.
+/** @param {number} layoutId @param {boolean} macosIso @returns {{labels: Record<string, string>, legends: Record<string, string[]> | null}} */
 function hostLayoutNames(layoutId, macosIso) {
     const layout = hostLayout(layoutId);
     if (!layout || layoutId === US_HOST_LAYOUT) return {labels: {}, legends: null};
     const swapIso = macosIso && layout.os === "macos";
-    const labels = {}, legends = {};
+    /** @type {Record<string, string>} */
+    const labels = {};
+    /** @type {Record<string, string[]>} */
+    const legends = {};
+    /** @param {import("../data/types.js").HostLayoutCell | undefined} cell */
     const text = cell => cell && typeof cell === "object" ? `${cell.dead} ◌` : cell || "";
+    /** @param {import("../data/types.js").ResolvedKeycode} resolved @param {string} label */
     const name = (resolved, label) => {
         const entry = keycodes.lookup(resolved.name) || resolved;
         labels[entry.name] = label;
-        for (const alias of entry.aliases || []) labels[alias] = label;
+        for (const alias of ("aliases" in entry ? entry.aliases : [])) labels[alias] = label;
     };
     for (const key of Object.keys(layout.keys)) {
         const source = swapIso && key === "KC_GRV" ? "KC_NUBS" : swapIso && key === "KC_NUBS" ? "KC_GRV" : key;
@@ -82,33 +92,43 @@ function hostLayoutNames(layoutId, macosIso) {
     return {labels, legends};
 }
 
+/**
+ * @param {{hostOs?: number, hostLayout?: number, macosIso?: boolean, layers?: string[], macros?: {keycode: string, name?: string}[], customKeys?: {slot: number, name?: string}[], behaviors?: Pick<import("../schema/types.js").BehaviorRow, 'target'>[], pdModes?: Pick<import("../schema/types.js").PdSlot, 'id' | 'name' | 'kind'>[], actionsKnown?: boolean}} [options]
+ * @returns {import("../../contracts/model.js").ProfileKeyNames}
+ */
 function profileKeyNames({hostOs = 0, hostLayout: layoutId = US_HOST_LAYOUT, macosIso = false, layers, macros = [], customKeys = [], behaviors = [], pdModes = [], actionsKnown = false} = {}) {
     const typed = hostLayoutNames(layoutId, macosIso);
-    const labels = {...typed.labels}, aliases = {}, pointing = [], custom = [];
+    const labels = {...typed.labels};
+    /** @type {Record<string, string>} */
+    const aliases = {};
+    /** @type {import("../../contracts/model.js").NamedKey[]} */
+    const pointing = [];
+    /** @type {import("../../contracts/model.js").NamedKey[]} */
+    const custom = [];
     const modifiers = hostKeyVocabulary(hostOs).modifiers;
     for (const entry of keycodes.entries()) if (carriesModifiers(entry)) {
         let label = entry.value >= 0xe0 && entry.value <= 0xe7 ? modifiers[entry.value - 0xe0][1] : hostKeyLabel(entry.label, hostOs);
         const base = typed.labels[keycodes.resolve(entry.value & 0xff).name];
-        if (entry.kind === "modified" && base !== undefined) label = label.replace(/\+[^+]+$/, () => `+${base}`);
+        if ("kind" in entry && entry.kind === "modified" && base !== undefined) label = label.replace(/\+[^+]+$/, () => `+${base}`);
         labels[entry.name] = label;
-        for (const alias of entry.aliases || []) labels[alias] = label;
+        for (const alias of ("aliases" in entry ? entry.aliases : [])) labels[alias] = label;
     }
     const count = Math.max(8, layers?.length || 0);
     for (let layer = 0; layer < count; layer++) for (const form of Object.keys(LAYER_VERBS)) {
         const name = `${form}(${layer})`;
-        if (form !== "LOCK_LAYER") labels[name] = layerKeyLabel(name, layers);
+        if (form !== "LOCK_LAYER") labels[name] = /** @type {string} */ (layerKeyLabel(name, layers));
         else if (actionsKnown) {
             const value = resolveNativeQmkExpression(name, {});
             if (value === undefined) continue;
             const native = keycodes.resolve(value).name;
             aliases[native] = name;
-            labels[native] = labels[name] = layerKeyLabel(name, layers);
+            labels[native] = labels[name] = /** @type {string} */ (layerKeyLabel(name, layers));
         }
     }
     const layered = {labels, aliases, pointing, custom, hostOs, legends: typed.legends, layers: layers || []};
     if (!actionsKnown) return layered;
     for (const slot of macros) {
-        const native = keycodes.resolve(resolveNativeQmkExpression(slot.keycode, {})).name;
+        const native = keycodes.resolve(/** @type {number} */ (resolveNativeQmkExpression(slot.keycode, {}))).name;
         const label = slot.name || `Macro ${slot.keycode.split("_").at(-1)}`;
         aliases[native] = slot.keycode;
         labels[native] = label;
@@ -158,21 +178,24 @@ function profileKeyNames({hostOs = 0, hostLayout: layoutId = US_HOST_LAYOUT, mac
 }
 
 // A layer key by what it does and the name of its layer.
+/** @param {string} name @param {readonly string[]} [layers] */
 function layerKeyLabel(name, layers) {
     const [, form, layer] = LAYER_KEY.exec(name) || [];
     return form ? `${LAYER_VERBS[form]} ${layerName(layers, Number(layer))}` : undefined;
 }
 
+/** @param {string} label @param {number} [hostOs] */
 function hostKeyLabel(label, hostOs) {
-    const gui = ["GUI", "Command", "Windows", "Super"][hostOs] || "GUI";
+    const gui = ["GUI", "Command", "Windows", "Super"][hostOs ?? 0] || "GUI";
     return String(label).replace(/\b([LR])(Ctrl|Shift|Alt|GUI|Cmd)\b/g, (_, side, name) => `${side === "L" ? "Left" : "Right"} ${name}`).replace(/\bControl\b/g, "Ctrl").replace(/\b(?:GUI|Cmd)\b/g, gui).replace(/\bAlt\b/g, hostOs === 1 ? "Option" : "Alt");
 }
 
 // Every modifier control uses these same names as keys and Review. Picker
 // identifiers are stable edit tokens, not display words; derive their labels
 // from the bit vocabulary rather than maintaining another naming table.
+/** @param {number} [hostOs] */
 function hostKeyVocabulary(hostOs = 0) {
-    const modifiers = VOCABULARY.modifiers.map(([bit, label]) => [bit, hostKeyLabel(label, hostOs)]);
+    const modifiers = VOCABULARY.modifiers.map(/** @returns {[number, string]} */ ([bit, label]) => [bit, hostKeyLabel(label, hostOs)]);
     const wrappers = ["C", "S", "A", "G", "RCTL", "RSFT", "RALT", "RGUI"];
     const pickerModifiers = modifiers.map(([bit, label], i) => ({bit, value: wrappers[i], label: i < 4 ? label.replace(/^Left /, "") : label}));
     return {modifiers, pickerModifiers};
@@ -182,21 +205,22 @@ function hostKeyVocabulary(hostOs = 0) {
 // name it is stored under too, for the one place two keys can read alike: a
 // review row whose sides would otherwise look the same (KC_1 and KC_KP_1 are
 // both "1").
+/** @param {Partial<import("../../contracts/model.js").ProfileKeyNames> | null | undefined} names @param {number} value @returns {string} */
 function keyLabel(names, value) {
     const resolved = keycodes.resolve(value);
     const named = names?.labels?.[resolved.name];
     if (named !== undefined) return named;
     // A layer-tap is a tap key and a layer, both named: "/ / Navigation".
     if (resolved.kind === "layer-tap") {
-        const tap = keycodes.lookup(resolved.tap);
-        return `${tap ? keyLabel(names, tap.value) : resolved.tap} / ${layerName(names?.layers, resolved.layer)}`;
+        const tap = keycodes.lookup(/** @type {string} */ (resolved.tap));
+        return `${tap ? keyLabel(names, tap.value) : resolved.tap} / ${layerName(names?.layers, /** @type {number} */ (resolved.layer))}`;
     }
     if (resolved.kind === "layer-mod") {
         const modifiers = resolved.label.replace(/^Layer \d+ \+ /, "");
-        return `${layerName(names?.layers, resolved.layer)} + ${hostKeyLabel(modifiers, names?.hostOs)}`;
+        return `${layerName(names?.layers, /** @type {number} */ (resolved.layer))} + ${hostKeyLabel(modifiers, names?.hostOs)}`;
     }
     if (resolved.kind === "mod-tap") {
-        const tap = keycodes.lookup(resolved.tap);
+        const tap = keycodes.lookup(/** @type {string} */ (resolved.tap));
         return hostKeyLabel(resolved.label, names?.hostOs).replace(/^[^/]+ \/ /, () => `${tap ? keyLabel(names, tap.value) : resolved.tap} / `);
     }
     if (resolved.kind === "modified") {
@@ -205,6 +229,7 @@ function keyLabel(names, value) {
     }
     return carriesModifiers(resolved) ? hostKeyLabel(resolved.label, names?.hostOs) : resolved.label;
 }
+/** @param {Partial<import("../../contracts/model.js").ProfileKeyNames> | null | undefined} names @param {number} value */
 function keyLabelWithName(names, value) {
     const {name} = keycodes.resolve(value);
     const label = keyLabel(names, value);

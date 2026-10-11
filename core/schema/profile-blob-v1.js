@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 
 // The one profile format the keyboard stores: schema 3.0, up to 65,504 bytes
@@ -26,6 +27,7 @@ const PROFILE_DOMAIN_IDS = Object.freeze({
 
 // Each domain's one version, as the firmware's registry has them
 // (profile_domain_registry.h).
+/** @type {Readonly<Record<number, number>>} */
 const PROFILE_DOMAIN_VERSIONS = Object.freeze({
     [PROFILE_DOMAIN_IDS.RGB]: 4,
     [PROFILE_DOMAIN_IDS.KEY_BEHAVIORS]: 2,
@@ -33,6 +35,7 @@ const PROFILE_DOMAIN_VERSIONS = Object.freeze({
     [PROFILE_DOMAIN_IDS.SETTINGS]: 6,
     [PROFILE_DOMAIN_IDS.PD_MODES]: 3,
 });
+/** @param {number} major @param {number} minor */
 function assertSchema(major, minor) {
     if (major !== PROFILE_BLOB_V1.SCHEMA_MAJOR || minor !== PROFILE_BLOB_V1.SCHEMA_MINOR) {
         throw profileBlobError("INCOMPATIBLE_SCHEMA", `Profile blob schema ${major}.${minor} is not supported.`);
@@ -61,6 +64,7 @@ const PROFILE_ACTION_LIMITS = Object.freeze({
 const MAGIC_BYTES = Buffer.from(PROFILE_BLOB_V1.MAGIC, "ascii");
 
 class ProfileBlobProtocolError extends Error {
+    /** @param {string} code @param {string} message @param {Record<string, unknown>} [details] */
     constructor(code, message, details = {}) {
         super(message);
         this.name = "ProfileBlobProtocolError";
@@ -69,6 +73,7 @@ class ProfileBlobProtocolError extends Error {
     }
 }
 
+/** @param {import("./types.js").BlobInput} [profile] @param {import("./types.js").BlobOptions} [options] */
 function encodeProfileBlob(profile = {}, options = {}) {
     if (!profile || typeof profile !== "object") {
         throw new TypeError("Profile blob input must be an object.");
@@ -98,6 +103,7 @@ function encodeProfileBlob(profile = {}, options = {}) {
     output[5] = PROFILE_BLOB_V1.SCHEMA_MINOR;
     output[6] = domains.length;
     output[7] = PROFILE_BLOB_V1.CANONICAL_FLAG;
+    /** @type {number} */
     let offset = PROFILE_BLOB_V1.HEADER_SIZE;
     for (const domain of encodedDomains) {
         domain.copy(output, offset);
@@ -106,6 +112,7 @@ function encodeProfileBlob(profile = {}, options = {}) {
     return output;
 }
 
+/** @param {unknown} value @param {import("./types.js").BlobOptions} [options] */
 function decodeProfileBlob(value, options = {}) {
     const bytes = copyBytes(value, "Profile blob");
 
@@ -129,6 +136,7 @@ function decodeProfileBlob(value, options = {}) {
 
     const domainCount = bytes[6];
     const domains = [];
+    /** @type {number} */
     let offset = PROFILE_BLOB_V1.HEADER_SIZE;
     let previousId = -1;
     for (let index = 0; index < domainCount; index += 1) {
@@ -157,6 +165,7 @@ function decodeProfileBlob(value, options = {}) {
     };
 }
 
+/** @param {import("./types.js").DomainInput} domain @param {import("./types.js").BlobOptions} [options] */
 function encodeDomainEnvelope(domain, options = {}) {
     const domainVersions = normalizeDomainVersions(options.domainVersions);
     const normalized = normalizeDomain(domain, domainVersions);
@@ -168,6 +177,7 @@ function encodeDomainEnvelope(domain, options = {}) {
     return output;
 }
 
+/** @param {unknown} value @param {import("./types.js").BlobOptions} [options] */
 function decodeDomainEnvelope(value, options = {}) {
     const bytes = copyBytes(value, "Profile domain envelope");
     const decoded = readDomainEnvelope(bytes, 0, options);
@@ -177,6 +187,7 @@ function decodeDomainEnvelope(value, options = {}) {
     return decoded.domain;
 }
 
+/** @param {unknown} value @param {number} [offset] @param {import("./types.js").BlobOptions} [options] */
 function readDomainEnvelope(value, offset = 0, options = {}) {
     const bytes = value instanceof Buffer ? value : copyBytes(value, "Profile domain data");
     const domainVersions = normalizeDomainVersions(options.domainVersions);
@@ -204,6 +215,7 @@ function readDomainEnvelope(value, offset = 0, options = {}) {
     };
 }
 
+/** @param {import("./types.js").ActionInput} action @param {import("./types.js").ActionOptions} [options] */
 function encodeSemanticAction(action, options = {}) {
     const normalized = normalizeSemanticAction(action, options);
     const output = Buffer.alloc(PROFILE_BLOB_V1.ACTION_SIZE);
@@ -213,6 +225,7 @@ function encodeSemanticAction(action, options = {}) {
     return output;
 }
 
+/** @param {unknown} value @param {import("./types.js").ActionOptions} [options] */
 function decodeSemanticAction(value, options = {}) {
     const bytes = copyBytes(value, "Semantic action");
     if (bytes.length !== PROFILE_BLOB_V1.ACTION_SIZE) {
@@ -221,6 +234,7 @@ function decodeSemanticAction(value, options = {}) {
     return readSemanticAction(bytes, 0, options).action;
 }
 
+/** @param {unknown} value @param {number} [offset] @param {import("./types.js").ActionOptions} [options] */
 function readSemanticAction(value, offset = 0, options = {}) {
     const bytes = value instanceof Buffer ? value : copyBytes(value, "Semantic action data");
     if (!Number.isInteger(offset) || offset < 0 || offset > bytes.length) {
@@ -237,6 +251,7 @@ function readSemanticAction(value, offset = 0, options = {}) {
     return {action, nextOffset: offset + PROFILE_BLOB_V1.ACTION_SIZE};
 }
 
+/** @param {import("./types.js").DomainInput} domain @param {Map<number, Set<number>>} domainVersions */
 function normalizeDomain(domain, domainVersions) {
     const id = assertU8(domain?.id, "Domain id");
     const version = assertU8(domain?.version, "Domain version");
@@ -248,6 +263,7 @@ function normalizeDomain(domain, domainVersions) {
     return {id, version, payload};
 }
 
+/** @param {import("./types.js").ActionInput} action @param {import("./types.js").ActionOptions} [options] @returns {import("./types.js").SemanticAction & {flags: 0}} */
 function normalizeSemanticAction(action, options = {}) {
     const limits = normalizeActionLimits(options.actionLimits || options);
     const kind = assertU8(action?.kind, "Action kind");
@@ -284,9 +300,12 @@ function normalizeSemanticAction(action, options = {}) {
     return {kind, flags, operand};
 }
 
+/** @param {Partial<import("./types.js").ActionLimits>} [options] */
 function normalizeActionLimits(options = {}) {
-    const limits = {};
-    for (const [name, fallback] of Object.entries(PROFILE_ACTION_LIMITS)) {
+    /** @type {import("./types.js").ActionLimits} */
+    const limits = {...PROFILE_ACTION_LIMITS};
+    for (const name of /** @type {(keyof import("./types.js").ActionLimits)[]} */ (Object.keys(PROFILE_ACTION_LIMITS))) {
+        const fallback = PROFILE_ACTION_LIMITS[name];
         const value = options[name] === undefined ? fallback : Number(options[name]);
         if (!Number.isInteger(value) || value < 0 || value > 0x10000) {
             throw new RangeError(`${name} must be an integer from 0 through 65536.`);
@@ -296,9 +315,11 @@ function normalizeActionLimits(options = {}) {
     return limits;
 }
 
+/** @param {import("./types.js").DomainVersions} [value] */
 function normalizeDomainVersions(value) {
     const source = value === undefined ? PROFILE_DOMAIN_VERSIONS : value;
     const entries = source instanceof Map ? Array.from(source.entries()) : Object.entries(source || {});
+    /** @type {Map<number, Set<number>>} */
     const versions = new Map();
     for (const [rawId, rawVersion] of entries) {
         const id = assertU8(Number(rawId), "Registered domain id");
@@ -314,6 +335,7 @@ function normalizeDomainVersions(value) {
     return versions;
 }
 
+/** @param {number} id @param {number} version @param {Map<number, Set<number>>} domainVersions */
 function assertKnownDomain(id, version, domainVersions) {
     const acceptedVersions = domainVersions.get(id);
     if (!acceptedVersions) {
@@ -324,6 +346,7 @@ function assertKnownDomain(id, version, domainVersions) {
     }
 }
 
+/** @param {import("./types.js").ProfileDomain[]} domains */
 function assertUniqueDomains(domains) {
     for (let index = 1; index < domains.length; index += 1) {
         if (domains[index - 1].id === domains[index].id) {
@@ -332,12 +355,14 @@ function assertUniqueDomains(domains) {
     }
 }
 
+/** @param {number} kind @param {number} operand @param {number} count @param {string} label */
 function assertOperandSlot(kind, operand, count, label) {
     if (operand >= count) {
         throw profileBlobError("INVALID_OPERAND", `Semantic action kind ${kind} references ${label} ${operand}; valid range is ${count ? `0..${count - 1}` : "empty"}.`, {kind, operand, capacity: count});
     }
 }
 
+/** @param {unknown} value */
 function fnv1a32(value) {
     const bytes = asBytes(value, "FNV-1a input");
     let hash = 0x811c9dc5;
@@ -348,6 +373,7 @@ function fnv1a32(value) {
     return hash >>> 0;
 }
 
+/** @param {unknown} value */
 function crc32(value) {
     const bytes = asBytes(value, "CRC32 input");
     let crc = 0xffffffff;
@@ -360,6 +386,7 @@ function crc32(value) {
     return (crc ^ 0xffffffff) >>> 0;
 }
 
+/** @param {unknown} value @param {string} label */
 function asBytes(value, label) {
     if (!(value instanceof Uint8Array)) {
         throw new TypeError(`${label} must be a Buffer or Uint8Array.`);
@@ -367,10 +394,12 @@ function asBytes(value, label) {
     return Buffer.from(value.buffer, value.byteOffset, value.byteLength);
 }
 
+/** @param {unknown} value @param {string} label */
 function copyBytes(value, label) {
     return Buffer.from(asBytes(value, label));
 }
 
+/** @param {unknown} value @param {string} label */
 function assertU8(value, label) {
     const number = Number(value);
     if (!Number.isInteger(number) || number < 0 || number > 0xff) {
@@ -379,6 +408,7 @@ function assertU8(value, label) {
     return number;
 }
 
+/** @param {unknown} value @param {string} label */
 function assertU16(value, label) {
     const number = Number(value);
     if (!Number.isInteger(number) || number < 0 || number > 0xffff) {
@@ -387,10 +417,12 @@ function assertU16(value, label) {
     return number;
 }
 
+/** @param {string} code @param {string} message @param {Record<string, unknown>} [details] */
 function profileBlobError(code, message, details) {
     return new ProfileBlobProtocolError(code, message, details);
 }
 
+/** @param {number} value */
 function hexByte(value) {
     return Number(value).toString(16).padStart(2, "0");
 }

@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 
 // A browser has no native HID module. The web build puts this file in place of

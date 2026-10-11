@@ -1,6 +1,7 @@
 // The payloads this interface posts have to be the ones the tested core
 // accepts. Every screen builds its messages with webview/view/edits.mjs (and
-// pointing records with view/pointing-config.mjs); these tests stage exactly
+// pointing records with view/pointing-config.mjs, layer-panel controls with
+// view/controls.mjs); these tests stage exactly
 // what those builders return against a real draft session, so a change of
 // message shape fails here rather than on a keyboard.
 
@@ -10,6 +11,7 @@ import {createRequire} from "node:module";
 import path from "node:path";
 import {fileURLToPath} from "node:url";
 import * as edits from "../webview/view/edits.mjs";
+import * as controls from "../webview/view/controls.mjs";
 import {behaviourEditorRow, behaviourTimingEdit, behaviourTimingField} from "../webview/view/behavior-editor.mjs";
 import {shareHold} from "../webview/view/share.mjs";
 import {AXIS, BUTTON, DIRECTIONAL_STARTER_THRESHOLD, KIND, MODIFIER_POLICY, SCROLL_AXES, SCROLL_STARTER, dpiOptions, modeDpi, newMode, readConfig, settleButtons, settleTaps, startingRecord, thresholdDistance} from "../webview/view/pointing-config.mjs";
@@ -927,6 +929,38 @@ test("literal step messages inspect and stage the exact text with undo intact", 
     stage(draft, edits.macroMessage(message.keycode, message.payload, draft.current.fingerprint));
     assert.equal(Buffer.from(draft.document.macros[17], "base64").subarray(0, Buffer.byteLength(text)).toString(), text);
     assert.ok(reviewAreas(draft).includes("Macros"));
+    draft.undo(draft.revision);
+    assert.deepEqual(draft.document, before);
+});
+
+test("the layer panel's toggle, moves and save reach the draft through the real layer editor", async () => {
+    const {portableControl} = require("../core/session/panel-controls");
+    const {routeMessage} = require("../core/session/panel-session");
+    const draft = session(), before = draft.document;
+    const state = {selectedDeviceId: "test-device", connected: true, capabilities};
+    const panel = {draft, service: {snapshot: () => state}};
+    const send = async (message) => {
+        const payload = {draftId: draft.id, draftRevision: draft.revision, ...message};
+        assert.equal(routeMessage(panel, payload, state), "portable");
+        await portableControl(panel, payload);
+    };
+    await send(controls.control("managePortableLayers"));
+    const typed = [...panel.portableLayers.names];
+    typed[2] = "777";
+    await send(controls.layersFollow(false, typed));
+    assert.equal(panel.portableLayers.keysFollow, false);
+    assert.equal(panel.portableLayers.names[2], "777", "the toggle keeps the names typed with it");
+    await send(controls.moveLayer(4, {direction: -1}, panel.portableLayers.names));
+    await send(controls.moveLayer(1, {to: 3}, panel.portableLayers.names));
+    await send(controls.moveLayer(5, {makeBase: true}, panel.portableLayers.names));
+    const order = [5, 2, 4, 1, 3, 0, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+    assert.deepEqual(panel.portableLayers.order, order);
+    assert.deepEqual(draft.document, before, "the layer panel stages nothing until it is saved");
+    await send(controls.saveLayers(panel.portableLayers.names));
+    assert.equal(panel.portableLayers, undefined);
+    assert.deepEqual(draft.order, order);
+    assert.equal(draft.current.summary.names[1], "777", "the renamed layer moved to its new slot");
+    assert.deepEqual(draft.document.layers[0], before.layers[5], "Make base put layer 5's keys at the bottom");
     draft.undo(draft.revision);
     assert.deepEqual(draft.document, before);
 });

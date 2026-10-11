@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 // Backups from the firmware before sixteen layers (schema 2.0, action ABI
 // 0xf79c6151) translated into the format the keyboard stores now (firmware
@@ -34,13 +35,16 @@ const PREVIOUS_ACTION_ABI = 0xf79c6151;
 const PREVIOUS = Object.freeze({SCHEMA: 2, LAYERS: 8, MACROS: 64});
 const PREVIOUS_ACTION_LIMITS = Object.freeze({maxLogicalLayers: 8, maxViaMacroSlots: 64, maxCustomKeys: 64, maxPdModes: 32});
 const LAYERS = 16, MACROS = 128, MATRIX_KEYS = 60, TRANSPARENT = 0x0001;
+/** @param {string} message */
 const fail = message => Object.assign(new Error(message), {code: "INVALID_PORTABLE_PROFILE"});
 // A new layer: transparent on every physical key, nothing in the matrix slots
 // no key sits on, as the compiled layers 8..15 are.
 const PHYSICAL = new Set(CHARYBDIS_4X6_LAYOUT_MATRIX.map(([row, column]) => row * 6 + column));
 const EMPTY_LAYER = Array.from({length: MATRIX_KEYS}, (_, slot) => (PHYSICAL.has(slot) ? TRANSPARENT : 0));
+/** @param {Buffer} bytes @param {number} at */
 const u32 = (bytes, at) => bytes.readUInt32LE(at);
 
+/** @param {Buffer} payload */
 function rgbV4(payload) {
     if (payload.length < 16 || payload[0] !== 3) throw fail("The backup's lighting is in an unknown format.");
     const original = Buffer.from(payload); original[0] = 4;
@@ -56,6 +60,7 @@ function rgbV4(payload) {
     return Buffer.concat([header, payload.subarray(16, end), added, payload.subarray(end)]);
 }
 
+/** @param {Buffer} payload */
 function behaviorsV2(payload) {
     if (payload.length < 4 || payload[0] > 64 || payload[1] > 128 || payload[2] || payload[3]) throw fail("The backup's behaviours are in an unknown format.");
     const parts = [Buffer.from([payload[0], 0, payload[1], 0])];
@@ -76,6 +81,7 @@ function behaviorsV2(payload) {
     return widened;
 }
 
+/** @param {Buffer} payload */
 function combosV3(payload) {
     const count = payload[0];
     if (payload.length < 8 || count > 32 || payload[1] || payload[2] || payload[3] || payload.length !== 8 + count * 28) throw fail("The backup's combos are in an unknown format.");
@@ -89,6 +95,7 @@ function combosV3(payload) {
     return widened;
 }
 
+/** @param {Buffer} payload */
 function settingsV6(payload) {
     if (payload.length < 440 || payload.length > 312 + 128 * 21 || !payload.subarray(0, 8).equals(Buffer.from([5, 8, 28, 64, 64, 0, 0, 0]))) throw fail("The backup's settings are in an unknown format.");
     const scalars = Array.from({length: 28}, (_, id) => u32(payload, 8 + id * 4));
@@ -121,6 +128,7 @@ function settingsV6(payload) {
     return Buffer.concat([fixed, ...names, ...macros, empty, ...custom, empty]);
 }
 
+/** @param {Buffer} payload */
 function pdV3(payload) {
     const count = payload[3];
     if (!payload.subarray(0, 3).equals(Buffer.from([2, 32, 96])) || payload.length !== 8 + 96 * count || payload.subarray(4, 8).some(byte => byte)) throw fail("The backup's pointing modes are in an unknown format.");
@@ -138,22 +146,28 @@ function pdV3(payload) {
     return Buffer.concat([Buffer.from([3, 32, 128, count, 0, 0, 0, 0]), ...records]);
 }
 
+/** @type {Record<number, [number, (payload: Buffer) => Buffer]>} */
 const STEPS = {0x10: [3, rgbV4], 0x20: [1, behaviorsV2], 0x30: [2, combosV3], 0x40: [5, settingsV6], 0x50: [2, pdV3]};
 
 // An old custom key's keycode as its new one; every other keycode unchanged.
+/** @param {number} code */
 const movedKeycode = code => code >= RETIRED_CUSTOM_KEY_BASE && code < RETIRED_CUSTOM_KEY_BASE + RETIRED_CUSTOM_KEY_SLOTS ? CUSTOM_KEY_BASE + (code - RETIRED_CUSTOM_KEY_BASE) : code;
+/** @param {unknown} value */
 function moveActions(value) {
     if (!value || typeof value !== "object") return;
-    if (Number.isInteger(value.kind) && Number.isInteger(value.operand)) {
-        if (value.kind === ACTION.QMK_KEYCODE) value.operand = movedKeycode(value.operand);
+    const record = /** @type {Record<string, unknown>} */ (value);
+    if (typeof record.kind === "number" && Number.isInteger(record.kind) && typeof record.operand === "number" && Number.isInteger(record.operand)) {
+        if (record.kind === ACTION.QMK_KEYCODE) record.operand = movedKeycode(record.operand);
         return;
     }
     for (const child of Object.values(value)) if (child && typeof child === "object") moveActions(child);
 }
 
 // The profile blob in the current schema.
+/** @param {Buffer} bytes */
 function translateProfileUnchecked(bytes) {
     if (bytes.length < 8 || bytes.length > 5088 || bytes.toString("ascii", 0, 4) !== "NLP1" || bytes[4] !== PREVIOUS.SCHEMA || bytes[5] !== 0 || bytes[6] !== 5 || bytes[7] !== 1) throw fail("The backup's profile is not one this app can translate.");
+    /** @type {import("../schema/types.js").ProfileDomain[]} */
     const domains = [];
     let offset = 8;
     for (let index = 0; index < bytes[6]; index++) {
@@ -175,18 +189,29 @@ function translateProfileUnchecked(bytes) {
     })});
 }
 
+/** @param {Buffer} bytes */
 function translateProfile(bytes) {
     try {return translateProfileUnchecked(bytes);} catch (error) {
-        if (error.code === "INVALID_PORTABLE_PROFILE") throw error;
-        throw fail(`The preceding backup is invalid: ${error.message}`);
+        const failure = /** @type {Error & {code?: string}} */ (error);
+        if (failure.code === "INVALID_PORTABLE_PROFILE") throw error;
+        throw fail(`The preceding backup is invalid: ${failure.message}`);
     }
 }
 
 // Whether a parsed document is a backup from before sixteen layers.
-const isPreviousBackup = value => value?.format === "charybdis-profile" && value.version === PREVIOUS.SCHEMA && value.actionAbiDigest === PREVIOUS_ACTION_ABI;
+/**
+ * This identifies the revision only; translateBackup validates its contents.
+ * @typedef {{format: 'charybdis-profile', version: 2, actionAbiDigest: number, keyboard?: unknown, layers?: unknown, profile?: unknown, macros?: unknown}} PreviousBackupCandidate
+ */
+/** @param {unknown} value @returns {value is PreviousBackupCandidate} */
+function isPreviousBackup(value) {
+    const candidate = /** @type {Partial<PreviousBackupCandidate> | null | undefined} */ (value);
+    return candidate?.format === "charybdis-profile" && candidate.version === PREVIOUS.SCHEMA && candidate.actionAbiDigest === PREVIOUS_ACTION_ABI;
+}
 
 // A backup from before sixteen layers as one in the current format, or the
 // document unchanged when it is not one.
+/** @param {unknown} value @returns {unknown} */
 function translateBackup(value) {
     if (typeof value === "string") {
         if (Buffer.byteLength(value) > FILE_MAX_BYTES) throw fail("This profile file is too large.");
@@ -195,6 +220,8 @@ function translateBackup(value) {
     if (!isPreviousBackup(value)) return value;
     if (value.keyboard !== "charybdis-4x6" || Object.keys(value).some(key => !["format", "version", "keyboard", "actionAbiDigest", "layers", "profile", "macros"].includes(key))) throw fail("The backup contains unsupported fields.");
     if (!Array.isArray(value.layers) || value.layers.length !== PREVIOUS.LAYERS || value.layers.some(keys => !Array.isArray(keys) || keys.length !== MATRIX_KEYS || keys.some(code => !Number.isInteger(code) || code < 0 || code > 65535))) throw fail("The backup is missing layers.");
+    // The complete matrix above has been checked before it is retargeted.
+    const layers = /** @type {number[][]} */ (value.layers);
     if (!Array.isArray(value.macros) || value.macros.length !== PREVIOUS.MACROS) throw fail("The backup is missing macros.");
     try {
         const macros = value.macros.map(text => {
@@ -204,13 +231,13 @@ function translateBackup(value) {
             validateViaMacro(bytes); return bytes;
         });
         macroBank(macros, 7191);
-    } catch (error) {throw fail(`The preceding backup's macros are invalid: ${error.message}`);}
+    } catch (error) {throw fail(`The preceding backup's macros are invalid: ${/** @type {Error} */ (error).message}`);}
     if (typeof value.profile !== "string") throw fail("The backup is missing its profile.");
     const oldProfile = Buffer.from(value.profile, "base64");
     if (oldProfile.toString("base64") !== value.profile) throw fail("The backup's profile is not canonical base64.");
     const translated = {
         format: value.format, version: 3, keyboard: value.keyboard, actionAbiDigest: ACTION_ABI,
-        layers: [...value.layers.map(keys => keys.map(movedKeycode)), ...Array.from({length: LAYERS - PREVIOUS.LAYERS}, () => EMPTY_LAYER.slice())],
+        layers: [...layers.map(keys => keys.map(movedKeycode)), ...Array.from({length: LAYERS - PREVIOUS.LAYERS}, () => EMPTY_LAYER.slice())],
         profile: translateProfile(oldProfile).toString("base64"),
         macros: [...value.macros, ...Array(MACROS - PREVIOUS.MACROS).fill("")],
     };

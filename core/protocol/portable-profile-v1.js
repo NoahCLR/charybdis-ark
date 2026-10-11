@@ -1,15 +1,19 @@
+// @ts-check
 "use strict";
 const {isUnhandledEcho, orUnhandled} = require("./via-unhandled-v1");
-const {buildProfileGetRequest, decodeProfileResponse, profileResponseMatcher} = require("./profile-wire-v1");
+const {ProfileWireProtocolError, buildProfileGetRequest, decodeProfileResponse, profileResponseMatcher} = require("./profile-wire-v1");
 const {crc32, fnv1a32} = require("../schema/profile-blob-v1");
 const {SETTINGS, decodeSettings} = require("../schema/settings-domain-v1");
+/** @param {string} message */
 const fail = message => Object.assign(new Error(message), {code: "PORTABLE_PROFILE_UNAVAILABLE"});
+/** @param {import("../transport/types.js").RequestConnection} connection @param {number} value @param {number} pageIndex @param {import("./types.js").RequestIds} ids */
 async function page(connection, value, pageIndex, ids) {
     const request = buildProfileGetRequest(value, pageIndex, ids.next());
     const response = await connection.request(request, {matchResponse: orUnhandled(profileResponseMatcher, request)});
     if (isUnhandledEcho(response, request) || response[5] !== 0) throw fail("Update both halves to firmware with complete profile backup support, then read the keyboard again.");
     return Buffer.from(decodeProfileResponse(response, request, {allowShortPayload: true}));
 }
+/** @param {import("../transport/types.js").RequestConnection} connection @param {import("./types.js").RequestIds} ids */
 async function readSettings(connection, ids) {
     const before = await page(connection, 7, 0, ids);
     if (before.length !== 12 || before[0] !== 1 || before[1] !== 25) throw fail("Invalid settings metadata.");
@@ -25,13 +29,15 @@ async function readSettings(connection, ids) {
     if (!before.equals(after) || crc32(bytes) !== before.readUInt32LE(4) || fnv1a32(bytes) !== before.readUInt32LE(8)) throw fail("Keyboard settings changed during the read. Try again.");
     decodeSettings(bytes); return bytes;
 }
+/** @param {import("../transport/types.js").RequestConnection} connection @param {import("./types.js").RequestIds} ids */
 async function readStorageStatus(connection, ids) {
     const bytes = await page(connection, 8, 0, ids);
     if (bytes.length !== 25 || bytes[0] !== 1 || (bytes[1] & ~31)) throw fail("Invalid storage status.");
-    const result = {flags: bytes[1], generation: bytes.readUInt32LE(2), digest: bytes.readUInt32LE(6), peerGeneration: bytes.readUInt32LE(10), peerDigest: bytes.readUInt32LE(14), acknowledgedGeneration: bytes.readUInt32LE(18), error: bytes[22], conflicts: bytes.readUInt16LE(23)};
+    const result = {ready: false, flags: bytes[1], generation: bytes.readUInt32LE(2), digest: bytes.readUInt32LE(6), peerGeneration: bytes.readUInt32LE(10), peerDigest: bytes.readUInt32LE(14), acknowledgedGeneration: bytes.readUInt32LE(18), error: bytes[22], conflicts: bytes.readUInt16LE(23)};
     result.ready = result.flags === 4 && !result.error && !result.conflicts && result.generation === result.peerGeneration && result.digest === result.peerDigest;
     return result;
 }
+/** @param {import("../transport/types.js").RequestConnection} connection @param {import("./types.js").RequestIds} ids */
 async function readSettingsLimits(connection, ids) {
     const request = buildProfileGetRequest(8, 1, ids.next());
     const response = await connection.request(request, {matchResponse: orUnhandled(profileResponseMatcher, request)});
@@ -42,14 +48,16 @@ async function readSettingsLimits(connection, ids) {
     catch (error) {
         // Earlier complete-profile images reject this optional page. Other
         // failures remain errors, including malformed or uncorrelated replies.
-        if (error.code === "DEVICE_REJECTED" && error.status === 2 && response[6] === 0) return null;
+        if (error instanceof ProfileWireProtocolError && error.code === "DEVICE_REJECTED" && "status" in error && error.status === 2 && response[6] === 0) return null;
         throw error;
     }
     if (bytes.length !== 2 || bytes[0] !== 1) throw fail("Unsupported keyboard settings limits.");
     return {brightnessMax: bytes[1]};
 }
+/** @param {number} ms @returns {Promise<void>} */
 const defaultSleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 // `sleep` waits between polls; a host whose timers are throttled passes its own.
+/** @param {import("../transport/types.js").RequestConnection} connection @param {import("./types.js").RequestIds} ids @param {{timeoutMs?: number, pollMs?: number, sleep?: (ms: number) => Promise<void>}} [options] */
 async function waitForStorage(connection, ids, {timeoutMs = 90000, pollMs = 150, sleep = defaultSleep} = {}) {
     const deadline = Date.now() + timeoutMs;
     do {

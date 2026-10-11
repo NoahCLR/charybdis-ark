@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 
 const {
@@ -15,11 +16,14 @@ const NODE_HID_REPORT_ID = 0;
 const NODE_HID_REPORT_SIZE = RAW_HID_REPORT_SIZE + 1;
 
 class NodeHidDeviceAdapter {
+    /** @param {{hidModule?: import("./types.js").NativeHidModule, loadHid?: () => import("./types.js").MaybePromise<import("./types.js").NativeHidModule>, platform?: string}} [options] */
     constructor(options = {}) {
         this.hidModule = options.hidModule;
         this.loadHid = options.loadHid || loadNodeHid;
         this.platform = options.platform || process.platform;
+        /** @type {Promise<import("./types.js").NativeHidModule> | undefined} */
         this.hidModulePromise = undefined;
+        /** @type {Map<string, ReturnType<typeof deviceDescriptor>>} */
         this.knownDevices = new Map();
     }
 
@@ -60,6 +64,7 @@ class NodeHidDeviceAdapter {
         return matches;
     }
 
+    /** @param {string} deviceId */
     async connect(deviceId) {
         const id = normalizeDeviceId(deviceId);
         let descriptor = this.knownDevices.get(id);
@@ -126,6 +131,7 @@ class NodeHidDeviceAdapter {
 }
 
 class NodeHidConnectedDevice {
+    /** @param {import("./types.js").NativeHidDevice} nativeDevice @param {string} deviceId */
     constructor(nativeDevice, deviceId) {
         if (!nativeDevice || typeof nativeDevice.write !== "function" ||
             typeof nativeDevice.close !== "function" || typeof nativeDevice.on !== "function") {
@@ -137,12 +143,18 @@ class NodeHidConnectedDevice {
         }
         this.nativeDevice = nativeDevice;
         this.deviceId = deviceId;
+        /** @type {Set<import("./types.js").ReportListener>} */
         this.reportListeners = new Set();
+        /** @type {Set<import("./types.js").DisconnectListener>} */
         this.disconnectListeners = new Set();
         this.disconnected = false;
+        /** @type {InstanceType<typeof LiveLinkTransportError> | undefined} */
         this.disconnectReason = undefined;
+        /** @type {Promise<unknown> | undefined} */
         this.closePromise = undefined;
+        /** @param {unknown} data */
         this.handleData = (data) => this.receiveNativeReport(data);
+        /** @param {unknown} cause */
         this.handleError = (cause) => this.fail(liveLinkError(
             LIVE_LINK_ERROR_CODES.DISCONNECTED,
             `Charybdis Raw HID interface ${this.deviceId} disconnected.`,
@@ -152,6 +164,7 @@ class NodeHidConnectedDevice {
         this.nativeDevice.on("error", this.handleError);
     }
 
+    /** @param {Uint8Array} report */
     async write(report) {
         if (this.disconnected) {
             throw liveLinkError(
@@ -172,6 +185,7 @@ class NodeHidConnectedDevice {
         }
     }
 
+    /** @param {import("./types.js").ReportListener} listener */
     onReport(listener) {
         if (typeof listener !== "function") {
             throw new TypeError("report listener must be a function.");
@@ -182,6 +196,7 @@ class NodeHidConnectedDevice {
         return () => this.reportListeners.delete(listener);
     }
 
+    /** @param {import("./types.js").DisconnectListener} listener */
     onDisconnect(listener) {
         if (typeof listener !== "function") {
             throw new TypeError("disconnect listener must be a function.");
@@ -209,6 +224,7 @@ class NodeHidConnectedDevice {
         return this.closePromise;
     }
 
+    /** @param {unknown} data */
     receiveNativeReport(data) {
         if (this.disconnected) {
             return;
@@ -233,6 +249,7 @@ class NodeHidConnectedDevice {
         }
     }
 
+    /** @param {InstanceType<typeof LiveLinkTransportError>} reason */
     fail(reason) {
         if (this.disconnected) {
             return;
@@ -262,6 +279,7 @@ function loadNodeHid() {
     return require("node-hid");
 }
 
+/** @param {import("./types.js").NativeHidModule} hid */
 function validateHidModule(hid) {
     if (!hid || typeof hid.devicesAsync !== "function" || typeof hid.HIDAsync?.open !== "function") {
         throw liveLinkError(
@@ -272,6 +290,7 @@ function validateHidModule(hid) {
     return hid;
 }
 
+/** @param {Partial<import("node-hid").Device> | null | undefined} device */
 function isCharybdisRawHidDevice(device) {
     return Number(device?.vendorId) === CHARYBDIS_VENDOR_ID &&
         Number(device?.productId) === CHARYBDIS_PRODUCT_ID &&
@@ -279,6 +298,7 @@ function isCharybdisRawHidDevice(device) {
         Number(device?.usage) === QMK_RAW_HID_USAGE;
 }
 
+/** @param {import("node-hid").Device} device @param {string} path */
 function deviceDescriptor(device, path) {
     return {
         id: path,
@@ -295,14 +315,17 @@ function deviceDescriptor(device, path) {
     };
 }
 
+/** @param {unknown} value */
 function optionalString(value) {
     return typeof value === "string" ? value : undefined;
 }
 
+/** @param {number | undefined} value */
 function optionalNumber(value) {
     return Number.isInteger(value) ? value : undefined;
 }
 
+/** @param {unknown} deviceId */
 function normalizeDeviceId(deviceId) {
     const id = typeof deviceId === "string" ? deviceId.trim() : "";
     if (!id) {
@@ -311,6 +334,7 @@ function normalizeDeviceId(deviceId) {
     return id;
 }
 
+/** @param {Uint8Array} report */
 function addNodeHidReportId(report) {
     const frame = normalizeRawHidReport(report, "Raw HID output report");
     const nativeReport = Buffer.alloc(NODE_HID_REPORT_SIZE);
@@ -319,6 +343,7 @@ function addNodeHidReportId(report) {
     return nativeReport;
 }
 
+/** @param {unknown} report */
 function normalizeNodeHidInputReport(report) {
     if (!(report instanceof Uint8Array)) {
         throw liveLinkError(
@@ -339,6 +364,7 @@ function normalizeNodeHidInputReport(report) {
     );
 }
 
+/** @param {import("./types.js").NativeHidDevice} device @param {string} eventName @param {(value: unknown) => void} listener */
 function removeNativeListener(device, eventName, listener) {
     if (typeof device.off === "function") {
         device.off(eventName, listener);
@@ -347,6 +373,7 @@ function removeNativeListener(device, eventName, listener) {
     }
 }
 
+/** @param {import("./types.js").NativeHidDevice} device */
 function closeNativeDevice(device) {
     if (!device || typeof device.close !== "function") {
         return Promise.resolve();

@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 
 // Put chosen units of a draft back to what the keyboard holds.
@@ -19,11 +20,30 @@ const {decodeSettings, encodeSettings} = require("../schema/settings-domain-v1")
 const {decodePdDomain, encodePdDomain} = require("../schema/pd-mode-domain-v1");
 const {singleComboRemovalIndex} = require("./profile-review");
 
+/** @template T @param {T} value @returns {T} */
 const copy = value => JSON.parse(JSON.stringify(value));
+/** @param {string} text */
 const fail = text => Object.assign(new Error(text), {code: "PROFILE_REVERT_UNSUPPORTED"});
-const GROUP_TABLES = ["groups", "layerGroupRows", "pdModeGroupRows", "comboGroupRows", "keyGroupRows"];
+const GROUP_TABLES = /** @type {const} */ (["groups", "layerGroupRows", "pdModeGroupRows", "comboGroupRows", "keyGroupRows"]);
+/**
+ * @typedef {{16: import("../schema/types.js").RgbProfile, 32: import("../schema/types.js").BehaviorRow[], 48: ReturnType<typeof decodeComboDomain>, 64: import("../schema/types.js").SettingsDomain, 80: import("../schema/types.js").PdSlot[]}} DomainModels
+ */
+/** @typedef {keyof DomainModels} DomainId */
+/**
+ * @template {DomainId} K
+ * @typedef {{mine: DomainModels[K], theirs: DomainModels[K]}} DomainPair
+ */
+/** @template {keyof import("../schema/types.js").RgbProfile} K @param {import("../schema/types.js").RgbProfile} mine @param {import("../schema/types.js").RgbProfile} theirs @param {K} table */
+function restoreRgbTable(mine, theirs, table) {mine[table] = theirs[table];}
+/** @template T @template {keyof T} K @param {T[]} mine @param {T[]} theirs @param {K} key @param {number} id */
+function restoreColor(mine, theirs, key, id) {
+    const stored = theirs.find(row => row[key] === id), index = mine.findIndex(row => row[key] === id);
+    if (!stored || index < 0) throw fail("This lighting change cannot be discarded on its own.");
+    mine[index] = stored;
+}
 
 
+/** @param {import("./types.js").CompleteSnapshot} before @param {import("./types.js").CompleteSnapshot} after @param {Set<string>} units @param {import("./types.js").ProfileDestination} [capabilities] */
 function revertUnits(before, after, units, capabilities) {
     const a = validateSnapshot(before.document, capabilities), b = validateSnapshot(after.document, capabilities);
     if (units.has("profile")) return copy(a.document);
@@ -32,6 +52,7 @@ function revertUnits(before, after, units, capabilities) {
     const baseBlob = decodeProfileBlob(Buffer.from(a.document.profile, "base64"));
     const rgbOptions = {maximumBrightness: after.limits?.brightnessMax ?? 255, ...b.codecOptions.rgb};
     // Each domain is decoded once, edited for every unit, and encoded once.
+    /** @type {{[K in DomainId]: [(payload: Buffer) => DomainModels[K], (value: DomainModels[K]) => Buffer]}} */
     const codecs = {
         [PROFILE_DOMAIN_IDS.RGB]: [payload => decodeRgbDomainV1(payload, rgbOptions), value => encodeRgbDomainV1(value, rgbOptions)],
         [PROFILE_DOMAIN_IDS.KEY_BEHAVIORS]: [payload => decodeKeyBehaviorDomain(payload, b.codecOptions.behaviors).rows, rows => encodeKeyBehaviorDomain({rows}, b.codecOptions.behaviors)],
@@ -39,7 +60,9 @@ function revertUnits(before, after, units, capabilities) {
         [PROFILE_DOMAIN_IDS.SETTINGS]: [payload => decodeSettings(payload), value => encodeSettings(value)],
         [PROFILE_DOMAIN_IDS.PD_MODES]: [payload => decodePdDomain(payload), slots => encodePdDomain(slots)],
     };
+    /** @type {Map<DomainId, DomainPair<DomainId>>} */
     const open = new Map();
+    /** @template {DomainId} K @param {K} id @returns {DomainPair<K>} */
     const domain = id => {
         if (!open.has(id)) {
             const [decode] = codecs[id];
@@ -47,9 +70,13 @@ function revertUnits(before, after, units, capabilities) {
             if (!mine || !theirs) throw fail("This change cannot be discarded on its own.");
             open.set(id, {mine: decode(mine.payload), theirs: decode(theirs.payload)});
         }
-        return open.get(id);
+        // The cache is populated by this id's decoder above.
+        return /** @type {DomainPair<K>} */ (open.get(id));
     };
-    const sections = new Map(settingsEditorView(before).sections.map(section => [section.id, section.fields]));
+    // Both inputs are complete snapshots; their settings views are available.
+    const settingsView = /** @type {NonNullable<ReturnType<typeof settingsEditorView>>} */ (settingsEditorView(before));
+    const sections = new Map(settingsView.sections.map(section => [section.id, section.fields]));
+    /** @param {DomainPair<64>} settings @param {number} id @param {number} mask */
     const settingBits = (settings, id, mask) => {
         settings.mine.values[id] = ((settings.mine.values[id] & ~mask) | (settings.theirs.values[id] & mask)) >>> 0;
     };
@@ -82,19 +109,20 @@ function revertUnits(before, after, units, capabilities) {
                 if (!fields) throw fail("These settings cannot be discarded on their own.");
                 for (const field of fields) {
                     if (field.record) settings.mine.layers[field.layer][field.record] = copy(settings.theirs.layers[field.layer][field.record]);
-                    else if (Number.isInteger(field.id)) settingBits(settings, field.id, fieldMask(field));
+                    else if ("id" in field && Number.isInteger(field.id)) settingBits(settings, field.id, fieldMask(field));
                     else throw fail("These settings cannot be discarded on their own.");
                 }
             }
         } else if (kind === "placement") {
             const settings = domain(PROFILE_DOMAIN_IDS.SETTINGS), [layer, position] = parts.map(Number);
-            for (const field of ["bypass", "exclude"]) {
+            for (const field of /** @type {const} */ (["bypass", "exclude"])) {
                 const set = new Set(settings.mine.layers[layer][field]);
                 if (settings.theirs.layers[layer][field].includes(position)) set.add(position); else set.delete(position);
                 settings.mine.layers[layer][field] = [...set].sort((a, b) => a - b);
             }
         } else if (kind === "behavior") {
             const behaviors = domain(PROFILE_DOMAIN_IDS.KEY_BEHAVIORS);
+            /** @param {import("../schema/types.js").BehaviorRow} row */
             const same = row => JSON.stringify(row.target) === rest;
             const kept = behaviors.mine.filter(row => !same(row)), stored = behaviors.theirs.find(same);
             behaviors.mine = stored ? [...kept, stored] : kept;
@@ -119,20 +147,21 @@ function revertUnits(before, after, units, capabilities) {
             else if (rest === "automouse") mine.automouseFade = theirs.automouseFade;
             else if (rest === "combo") mine.comboFeedback = theirs.comboFeedback;
             else if (rest === "key") mine.keyFeedback = theirs.keyFeedback;
-            else if (rest === "groups") for (const table of GROUP_TABLES) mine[table] = theirs[table];
+            else if (rest === "groups") for (const table of GROUP_TABLES) restoreRgbTable(mine, theirs, table);
             else if (parts[0] === "layer" || parts[0] === "pd") {
-                const [table, key] = parts[0] === "layer" ? ["layerColors", "layerId"] : ["pdModeColors", "pdModeId"];
-                const id = Number(parts[1]), stored = theirs[table].find(row => row[key] === id);
-                const index = mine[table].findIndex(row => row[key] === id);
-                if (!stored || index < 0) throw fail("This lighting change cannot be discarded on its own.");
-                mine[table][index] = stored;
+                const id = Number(parts[1]);
+                if (parts[0] === "layer") restoreColor(mine.layerColors, theirs.layerColors, "layerId", id);
+                else restoreColor(mine.pdModeColors, theirs.pdModeColors, "pdModeId", id);
             } else throw fail("This lighting change cannot be discarded on its own.");
         } else throw fail("This change cannot be discarded on its own.");
     }
 
     for (const [id, {mine}] of open) {
         const row = blob.domains.find(entry => entry.id === id);
-        row.payload = codecs[id][1](mine);
+        // Opening a domain required the matching blob row to exist.
+        /** @template {DomainId} K @param {K} id @param {DomainModels[K]} value */
+        const encode = (id, value) => codecs[id][1](value);
+        /** @type {import("../schema/types.js").ProfileDomain} */ (row).payload = encode(id, mine);
     }
     if (open.size) document.profile = encodeProfileBlob(blob).toString("base64");
     return document;

@@ -1,6 +1,8 @@
+// @ts-check
 // The board's hover card: everything a key reaches, without clicking and
 // without leaving the layer you are reading.
 
+// Selector assertions refer to elements created by this module's authored markup.
 import {el, esc} from "../lib/dom.mjs";
 import {actionLabel, behaviourFor, behaviourTiers, combosAt, combosShownAt, keyMeaning, keyName, macroKeycodes, pointingSlotFor, resolvedPositions, visibleKeycode} from "../view/keyface.mjs";
 import {pdColourRow, stageEnabled} from "../view/lighting.mjs";
@@ -12,14 +14,15 @@ const tip = el(`<div class="tip" hidden></div>`);
 const card = el(`<div class="hovercard" hidden></div>`);
 let timer = 0;
 
+/** @param {HTMLElement} root */
 export function mountHover(root) {
     document.body.append(tip, card);
     root.addEventListener("mouseover", (event) => {
-        const key = event.target.closest?.("[data-key]");
-        const hinted = event.target.closest?.("[data-tip]");
+        const key = /** @type {SVGElement | null} */ (/** @type {Element} */ (event.target).closest("[data-key]"));
+        const hinted = /** @type {HTMLElement | null} */ (/** @type {Element} */ (event.target).closest("[data-tip]"));
         clearTimeout(timer);
         // A key being dragged to a swap is not a key being read.
-        if (document.querySelector(".kc.dragging")) { hideHover(); return; }
+        if (/** @type {HTMLElement | null} */ (document.querySelector(".kc.dragging"))) { hideHover(); return; }
         if (key) {
             const rect = key.getBoundingClientRect();
             timer = setTimeout(() => { card.innerHTML = keyCard(Number(key.dataset.key)); place(card, rect, 14, true); }, 140);
@@ -29,7 +32,7 @@ export function mountHover(root) {
         card.hidden = true;
         if (hinted) {
             const rect = hinted.getBoundingClientRect();
-            timer = setTimeout(() => { tip.textContent = hinted.dataset.tip; place(tip, rect, 8); }, 260);
+            timer = setTimeout(() => { tip.textContent = hinted.dataset.tip ?? ""; place(tip, rect, 8); }, 260);
             return;
         }
         tip.hidden = true;
@@ -40,6 +43,7 @@ export function mountHover(root) {
 
 export function hideHover() { clearTimeout(timer); tip.hidden = true; card.hidden = true; }
 
+/** @param {HTMLElement} node @param {DOMRect} rect @param {number} [gap] @param {boolean} [beside] */
 function place(node, rect, gap = 10, beside = false) {
     node.hidden = false;
     const box = node.getBoundingClientRect();
@@ -58,6 +62,7 @@ function place(node, rect, gap = 10, beside = false) {
 }
 
 
+/** @param {number} index */
 function keyCard(index) {
     const model = getModel();
     const stack = model?.layers || [];
@@ -74,6 +79,7 @@ function keyCard(index) {
 // In a layer preview, a key transparent on the viewed layer is answered by the
 // highest layer below that is on. The card still reads the viewed layer's own
 // key first, then what the answering key does, as the keyboard would run it.
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/panel.js").Layer[]} stack @param {number} index */
 function seenThrough(model, stack, index) {
     const held = heldLayers();
     if (!held.length) return "";
@@ -91,6 +97,7 @@ function seenThrough(model, stack, index) {
 // What one stored key reaches: its behaviour, macros, pointing mode and the
 // combos on its layer at this position — or, for a key seen through a preview,
 // the combos the board badges it with there. Empty when it reaches none of them.
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/panel.js").Layer} layer @param {import("../../contracts/panel.js").Position} position @param {number} index @param {import("../../contracts/panel.js").ComboView[]} [combos] */
 function reachSections(model, layer, position, index,
     combos = combosAt(model, model?.layers || [], layer?.index ?? 0, index)) {
     const behaviour = behaviourFor(model, keyMeaning(position));
@@ -100,11 +107,12 @@ function reachSections(model, layer, position, index,
     const sections = [];
     if (behaviour) {
         const branches = (behaviour.steps || []).map((step) => {
-            const rows = [["tap", tierName(model, "tap"), step.tap], ["hold", tierName(model, "hold"), step.hold], ["long", tierName(model, "long"), step.longHold]]
-                .filter(([, , branch]) => branch)
-                .map(([kind, name, branch]) => `<div class="hc-act"><span class="hc-stage">${tierDot(model, kind)}${name}</span>
+            /** @type {[import("../../contracts/edits.js").Tier, string, import("../../contracts/panel.js").Branch | undefined][]} */
+            const tiers = [["tap", tierName(model, "tap"), step.tap], ["hold", tierName(model, "hold"), step.hold], ["long", tierName(model, "long"), step.longHold]];
+            const rows = tiers
+                .map(([kind, name, branch]) => branch ? `<div class="hc-act"><span class="hc-stage">${tierDot(model, kind)}${name}</span>
                     <span>${sends(model, branch.action) || `<span class="hc-target">${esc(branch.action)}</span>`}
-                    <span class="hc-life${sendsKind(model, branch.action) ? " hc-under" : ""}">${esc(described(sendsKind(model, branch.action), helperText(kind, branch.helper)))}</span></span></div>`).join("");
+                    <span class="hc-life${sendsKind(model, branch.action) ? " hc-under" : ""}">${esc(described(sendsKind(model, branch.action), helperText(kind, branch.helper)))}</span></span></div>` : "").join("");
             return `<div class="hc-branch">${branchBadge(model, step.tapCount + 1).replace('class="bn"', 'class="bn hc-n"')}<div>${rows}</div></div>`;
         }).join("");
         sections.push(`<div class="hc-sect"><div class="hc-h">Key behaviour</div>
@@ -141,15 +149,20 @@ function reachSections(model, layer, position, index,
     return sections;
 }
 
-const helperText = (kind, helper) => helperWord(getModel(), kind, helper);
+/** @param {import("../../contracts/edits.js").Tier} kind @param {string | undefined} helper */
+const helperText = (kind, helper) => helperWord(getModel(), kind, helper ?? "");
+/** @param {string} what @param {string} how */
 const described = (what, how) => [what, how].filter(Boolean).join(" · ");
 
+/** @param {import("../../contracts/edits.js").Scalar | undefined} value */
 const timing = (value) => Number(value) ? `${value} ms` : "keyboard default";
 
 // Where a colour paints, in the vocabulary's words, read inside a sentence.
+/** @param {string | undefined} locality */
 const localityText = (locality) => locality ? word(vocabulary(getModel()).localities, locality).toLowerCase() : "its locality";
 
 // The card is drawn for whichever layer the screen is showing.
 let layerIndex = () => 0;
+/** @param {() => number} fn */
 export const bindLayerIndex = (fn) => { layerIndex = fn; };
 const state = () => layerIndex();

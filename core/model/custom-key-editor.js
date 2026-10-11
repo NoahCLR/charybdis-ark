@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 
 // The 128 custom keys: named keys that do only what their behaviour says. A key
@@ -11,12 +12,15 @@ const {decodeProfileBlob, PROFILE_ACTION_KINDS: ACTION} = require("../schema/pro
 const {SETTINGS, validName, encodeSettings} = require("../schema/settings-domain-v1");
 const {knownActionAbi} = require("../schema/actions");
 const {CUSTOM_KEY_SLOTS, customKeyCode} = require("../data/user-keycodes");
+/** @param {string} message @param {string} [code] */
 const fail = (message, code = "CUSTOM_KEY_EDIT_CONFLICT") => Object.assign(new Error(message), {code});
 
 // A keyboard with the userspace keycode blocks has custom keys: its action ABI
 // is the one the app knows.
-const customKeysSupported = (document, capabilities) => Boolean(document) && knownActionAbi(capabilities?.actionAbiDigest ?? document.actionAbiDigest);
+/** @param {import("./types.js").PortableDocument | null | undefined} document @param {import("./types.js").ProfileDestination} [capabilities] */
+const customKeysSupported = (document, capabilities) => Boolean(document && knownActionAbi(capabilities?.actionAbiDigest ?? document.actionAbiDigest));
 
+/** @param {import("./types.js").ProfileSnapshot | null | undefined} snapshot @param {import("./types.js").ProfileDestination} [capabilities] */
 function customKeyEditorView(snapshot, capabilities) {
     if (!snapshot?.document || snapshot.incomplete || !customKeysSupported(snapshot.document, capabilities)) return null;
     const {settings, behaviors} = decodedOf(snapshot);
@@ -29,10 +33,11 @@ function customKeyEditorView(snapshot, capabilities) {
 }
 
 // A custom key's name. Names live in the profile's settings domain.
+/** @param {import("./types.js").CompleteSnapshot} snapshot @param {import("../../contracts/edits.js").EditPayloads['updateCustomKey'] & {expectedFingerprint: string}} message @param {import("./types.js").ProfileDestination} [capabilities] */
 function editCustomKey(snapshot, message, capabilities) {
     if (!snapshot?.document || !message.expectedFingerprint || message.expectedFingerprint !== snapshot.fingerprint) throw fail("The keyboard changed since this draft was opened. Read the keyboard and review the draft before saving again.");
     const match = /^CUSTOM_KEY_(\d+)$/.exec(message.keycode || "");
-    const slot = match && Number(match[1]);
+    const slot = match ? Number(match[1]) : -1;
     if (!match || slot >= CUSTOM_KEY_SLOTS || String(slot) !== match[1]) throw fail("Choose a custom key the keyboard has.");
     if (typeof message.name !== "string") throw fail("A custom key name must be text.");
     if (!customKeysSupported(snapshot.document, capabilities)) throw fail("Custom keys need firmware with the userspace keycode blocks.", "CUSTOM_KEYS_UNSUPPORTED");
@@ -40,6 +45,7 @@ function editCustomKey(snapshot, message, capabilities) {
     const name = message.name.trim();
     if (!validName(name)) throw fail(`A custom key name is up to ${SETTINGS.NAME_MAX_BYTES} bytes of text, with no control characters. Accented letters and symbols take two to four bytes each.`, "CUSTOM_KEY_NAME_INVALID");
     if (name === value.settings.customKeyNames[slot]) return value.document;
+    /** @type {import("./types.js").PortableDocument} */
     const document = JSON.parse(JSON.stringify(value.document));
     const settings = structuredClone(value.settings);
     settings.customKeyNames[slot] = name;

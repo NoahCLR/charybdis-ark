@@ -1,12 +1,22 @@
+// @ts-check
 // The offline preview's read-only macro inspector runs the production codec.
 // It answers inspection only; posted edits remain in window.__posted.
 import {inspectMacroInput} from "../core/model/macro-input.js";
 
+/**
+ * @param {Extract<import("../contracts/messages.js").PanelRequest, {type: "validateViaMacro"}>} message
+ * @param {import("../contracts/panel.js").PublishedModel} model
+ * @returns {Extract<import("../contracts/messages.js").PanelResponse, {type: "macroValidation"}>}
+ */
 export function inspect(message, model) {
-    const slot = model.viaMacros.find(slot => slot.keycode === message.keycode);
+    // The preview forwards only the macro editor's inspection requests: its
+    // selected keycode belongs to the published macro bank.
+    const slot = /** @type {import("../contracts/panel.js").MacroSlot} */ (model.viaMacros.find(slot => slot.keycode === message.keycode));
+    // The macro editor is available only after this fixture bank was read.
+    const bank = /** @type {NonNullable<typeof model.macroBank>} */ (model.macroBank);
     return {...message, type: "macroValidation", validation: inspectMacroInput(message.payload, {
         unicode: model.macroUnicode.supported, mode: model.macroUnicode.mode, enabled: model.macroUnicode.enabled ?? Boolean(model.macroUnicode.mode),
-        currentBytes: slot.bytes, bankFree: model.macroBank.free, programMax: model.macroBank.programMax,
+        currentBytes: slot.bytes, bankFree: bank.free, programMax: bank.programMax,
         layout: model.macroUnicode.layout, os: model.macroUnicode.os,
         protection: slot.protection, protectionSupported: model.macroProtectionSupported,
     })};

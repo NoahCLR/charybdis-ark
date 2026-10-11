@@ -1,5 +1,6 @@
 #!/bin/sh
-# Syntax across everything this app ships, then the whole test suite.
+# Syntax across everything this app ships, the strict type checks
+# (npm run typecheck), then the whole test suite.
 set -eu
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 cd "$ROOT"
@@ -10,4 +11,5 @@ done
 find core tests tools web -name "*.js" -print0 | xargs -0 -n1 node --check
 find webview tests web -name "*.mjs" -print0 | xargs -0 -n1 node --check
 for file in tests/integration/*.sh; do sh -n "$file"; done
+npm run typecheck
 node --test tests/

@@ -1,0 +1,11 @@
+// core/ and contracts/ alone, with Node types and nothing else. tsconfig.json
+// adds the extension shell, whose `vscode` import brings global types (such as
+// Thenable) that core/ must not lean on; this check fails if it does.
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "core/**/*.js",
+    "core/**/*.d.ts",
+    "contracts/**/*.d.ts"
+  ]
+}

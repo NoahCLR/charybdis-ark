@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 const {UNICODE_MACRO_FEATURE, MACRO_PROTECTION_FEATURE, MACRO_OUTPUT_ISOLATION_FEATURE, STREAMING_MACRO_FEATURE} = require("../schema/macro-payload");
 const {HOST_LAYOUT_FEATURE} = require("../schema/host-settings");
@@ -121,6 +122,7 @@ const VIA_READS = Object.freeze({
 });
 
 class ProfileWireProtocolError extends Error {
+    /** @param {string} code @param {string} message @param {Record<string, unknown>} [details] */
     constructor(code, message, details = {}) {
         super(message);
         this.name = "ProfileWireProtocolError";
@@ -129,6 +131,7 @@ class ProfileWireProtocolError extends Error {
     }
 }
 
+/** @param {number} value @param {string} label @param {{nonzero?: boolean}} [options] */
 function assertByte(value, label, {nonzero = false} = {}) {
     if (!Number.isInteger(value) || value < (nonzero ? 1 : 0) || value > 0xff) {
         throw new RangeError(`${label} must be ${nonzero ? "a nonzero " : "an "}8-bit integer.`);
@@ -139,6 +142,7 @@ function assertByte(value, label, {nonzero = false} = {}) {
 // A page above 255 is a wide page: its high byte goes in request byte 5, which
 // only the wide readbacks (feature bit 19) read; every other value's byte 5
 // stays zero.
+/** @param {number} valueId @param {number} page @param {number} requestId */
 function buildProfileGetRequest(valueId, page, requestId) {
     const report = Buffer.alloc(RAW_HID_REPORT_SIZE);
     report[0] = PROFILE_WIRE_V1.COMMAND_GET;
@@ -151,6 +155,7 @@ function buildProfileGetRequest(valueId, page, requestId) {
     return report;
 }
 
+/** @param {Uint8Array} response @param {Uint8Array} request */
 function profileResponseMatcher(response, request) {
     const actual = normalizeRawHidReport(response, "Profile Wire response");
     const expected = normalizeRawHidReport(request, "Profile Wire request");
@@ -165,6 +170,7 @@ function profileResponseMatcher(response, request) {
 // partial, such as the tail chunk of a committed payload. It stays opt-in so
 // the fixed-size status and capability pages keep failing on a short read,
 // where a short page really does mean something is wrong.
+/** @param {Uint8Array} response @param {Uint8Array} request @param {{allowShortPayload?: boolean}} [options] */
 function decodeProfileResponse(response, request, options = {}) {
     const report = Buffer.from(normalizeRawHidReport(response, "Profile Wire response"));
     if (!profileResponseMatcher(report, request)) {
@@ -195,10 +201,12 @@ function decodeProfileResponse(response, request, options = {}) {
     return report.subarray(PROFILE_WIRE_V1.PAYLOAD_OFFSET, PROFILE_WIRE_V1.PAYLOAD_OFFSET + payloadLength);
 }
 
+/** @param {Uint8Array} buffer @param {number} offset */
 function readU16(buffer, offset) {
     return buffer[offset] | (buffer[offset + 1] << 8);
 }
 
+/** @param {Uint8Array} buffer @param {number} offset */
 function readU32(buffer, offset) {
     return (
         buffer[offset]
@@ -208,6 +216,7 @@ function readU32(buffer, offset) {
     ) >>> 0;
 }
 
+/** @param {Uint8Array[]} pages */
 function decodeCapabilityPages(pages) {
     assertPageSet(pages, PROFILE_WIRE_V1.CAPABILITY_PAGE_COUNT, "capability");
     const identity = pages[0];
@@ -267,7 +276,9 @@ function decodeCapabilityPages(pages) {
     if (decoded.candidateChunkMax > 20) {
         throw new ProfileWireProtocolError("MALFORMED_RESPONSE", "Candidate chunk capacity exceeds the 32-byte Profile Wire frame.");
     }
+    /** @param {number} feature */
     const hasFeature = (feature) => (decoded.featureFlags & feature) !== 0;
+    /** @param {number} domain */
     const hasDomain = (domain) => (decoded.supportedDomainMask & domain) !== 0;
     if (hasFeature(PROFILE_WIRE_FEATURES.CANDIDATE_WRITE) !== (decoded.candidateChunkMax > 0)) {
         throw new ProfileWireProtocolError("MALFORMED_RESPONSE", "Candidate-write support and candidate chunk capacity disagree.");
@@ -313,6 +324,7 @@ function decodeCapabilityPages(pages) {
     return decoded;
 }
 
+/** @param {Uint8Array[]} pages */
 function decodeStatusPages(pages) {
     assertPageSet(pages, PROFILE_WIRE_V1.STATUS_PAGE_COUNT, "status");
     const identity = pages[0];
@@ -342,27 +354,30 @@ function decodeStatusPages(pages) {
         validationState: generation[21],
         lastError: generation[22],
     };
-    decoded.candidatePending = (decoded.stateFlags & PROFILE_STATE_FLAGS.CANDIDATE_PENDING) !== 0;
-    decoded.peerKnown = (decoded.stateFlags & PROFILE_STATE_FLAGS.PEER_KNOWN) !== 0;
-    decoded.peerConverged = (decoded.stateFlags & PROFILE_STATE_FLAGS.PEER_CONVERGED) !== 0;
-    decoded.waitingSafeBoundary = (decoded.stateFlags & PROFILE_STATE_FLAGS.WAITING_SAFE_BOUNDARY) !== 0;
-    decoded.peerCleanupPending = (decoded.stateFlags & PROFILE_STATE_FLAGS.PEER_CLEANUP_PENDING) !== 0;
     assertKnownMask(decoded.stateFlags, PROFILE_WIRE_KNOWN_MASKS.STATE_FLAGS, "status state flags");
-    if (!Object.values(PROFILE_ACTIVE_KIND).includes(decoded.activeKind)) {
+    if (!/** @type {number[]} */ (Object.values(PROFILE_ACTIVE_KIND)).includes(decoded.activeKind)) {
         throw new ProfileWireProtocolError("INCOMPATIBLE_RESPONSE", `Unknown active profile kind ${decoded.activeKind}.`);
     }
-    for (const [label, value] of [
+    for (const [label, value] of /** @type {[string, number][]} */ ([
         ["active origin half", decoded.activeOriginHalf],
         ["committed origin half", decoded.committedOriginHalf],
         ["peer origin half", decoded.peerOriginHalf],
-    ]) {
+    ])) {
         if (value > 1) {
             throw new ProfileWireProtocolError("MALFORMED_RESPONSE", `${label} must be 0 or 1.`);
         }
     }
-    return decoded;
+    return {
+        ...decoded,
+        candidatePending: (decoded.stateFlags & PROFILE_STATE_FLAGS.CANDIDATE_PENDING) !== 0,
+        peerKnown: (decoded.stateFlags & PROFILE_STATE_FLAGS.PEER_KNOWN) !== 0,
+        peerConverged: (decoded.stateFlags & PROFILE_STATE_FLAGS.PEER_CONVERGED) !== 0,
+        waitingSafeBoundary: (decoded.stateFlags & PROFILE_STATE_FLAGS.WAITING_SAFE_BOUNDARY) !== 0,
+        peerCleanupPending: (decoded.stateFlags & PROFILE_STATE_FLAGS.PEER_CLEANUP_PENDING) !== 0,
+    };
 }
 
+/** @param {import("../transport/types.js").RequestConnection} connection @param {number} valueId @param {number} pageCount @param {import("./types.js").ReadOptions} [options] */
 async function readProfilePages(connection, valueId, pageCount, options = {}) {
     if (!connection || typeof connection.request !== "function") {
         throw new TypeError("connection must provide request(report, options).");
@@ -402,12 +417,14 @@ function buildViaFirmwareVersionRequest() {
     return report;
 }
 
+/** @param {Uint8Array} response @param {Uint8Array} request */
 function viaReadResponseMatcher(response, request) {
     const actual = normalizeRawHidReport(response, "VIA read response");
     const expected = normalizeRawHidReport(request, "VIA read request");
     return actual[0] === expected[0] || isUnhandledEcho(actual, expected);
 }
 
+/** @param {Uint8Array} response */
 function decodeViaProtocolVersion(response) {
     const report = Buffer.from(normalizeRawHidReport(response, "VIA protocol-version response"));
     assertViaHandled(report, VIA_READS.COMMAND_GET_PROTOCOL_VERSION);
@@ -415,6 +432,7 @@ function decodeViaProtocolVersion(response) {
     return (report[1] << 8) | report[2];
 }
 
+/** @param {Uint8Array} response */
 function decodeViaFirmwareVersion(response) {
     const report = Buffer.from(normalizeRawHidReport(response, "VIA firmware-version response"));
     assertViaHandled(report, VIA_READS.COMMAND_GET_KEYBOARD_VALUE);
@@ -425,6 +443,7 @@ function decodeViaFirmwareVersion(response) {
     return ((report[2] << 24) | (report[3] << 16) | (report[4] << 8) | report[5]) >>> 0;
 }
 
+/** @param {import("../transport/types.js").RequestConnection} connection @param {import("./types.js").ReadOptions} [options] */
 async function readViaIdentity(connection, options = {}) {
     if (!connection || typeof connection.request !== "function") {
         throw new TypeError("connection must provide request(report, options).");
@@ -447,20 +466,24 @@ async function readViaIdentity(connection, options = {}) {
     };
 }
 
+/** @param {import("../transport/types.js").RequestConnection} connection @param {import("./types.js").ReadOptions} [options] */
 async function readProfileCapabilities(connection, options) {
     return decodeCapabilityPages(await readProfilePages(connection, PROFILE_WIRE_V1.VALUE_CAPABILITIES, PROFILE_WIRE_V1.CAPABILITY_PAGE_COUNT, options));
 }
 
+/** @param {import("../transport/types.js").RequestConnection} connection @param {import("./types.js").ReadOptions} [options] */
 async function readProfileStatus(connection, options) {
     return decodeStatusPages(await readProfilePages(connection, PROFILE_WIRE_V1.VALUE_STATUS, PROFILE_WIRE_V1.STATUS_PAGE_COUNT, options));
 }
 
+/** @param {Uint8Array[]} pages @param {number} count @param {string} label */
 function assertPageSet(pages, count, label) {
     if (!Array.isArray(pages) || pages.length !== count || pages.some((page) => !(page instanceof Uint8Array) || page.byteLength !== PROFILE_WIRE_V1.PAYLOAD_SIZE)) {
         throw new ProfileWireProtocolError("MALFORMED_RESPONSE", `Profile Wire ${label} response requires ${count} complete pages.`);
     }
 }
 
+/** @param {Uint8Array} buffer @param {number} start @param {number} end @param {string} label */
 function assertZeroRange(buffer, start, end, label) {
     for (let index = start; index < end; index += 1) {
         if (buffer[index] !== 0) {
@@ -469,6 +492,7 @@ function assertZeroRange(buffer, start, end, label) {
     }
 }
 
+/** @param {number} value @param {number} knownMask @param {string} label */
 function assertKnownMask(value, knownMask, label) {
     const unknown = (Number(value) >>> 0) & (~knownMask >>> 0);
     if (unknown !== 0) {
@@ -476,6 +500,7 @@ function assertKnownMask(value, knownMask, label) {
     }
 }
 
+/** @param {Uint8Array} report @param {number} command */
 function assertViaHandled(report, command) {
     if (report[0] === VIA_READS.UNHANDLED) {
         throw new ProfileWireProtocolError("DEVICE_REJECTED", "Firmware rejected a standard VIA identity read.");

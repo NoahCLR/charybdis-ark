@@ -1,4 +1,13 @@
+// @ts-check
 "use strict";
+
+/**
+ * @typedef {import("../../contracts/model.js").ApplyView} ApplyView
+ * @typedef {import("../../contracts/model.js").ApplyStep} ApplyStep
+ * @typedef {{name?: string, domainId?: number, rowIndex?: number}} DeviceFailure
+ * @typedef {{message?: string, deviceError?: DeviceFailure, status?: {error?: DeviceFailure}}} FailureDetails
+ * @typedef {{waitingSafeBoundary?: boolean, lastStatusName?: string, busyStreak?: number, busyReason?: string, transportFailureCount?: number}} PeerFailure
+ */
 
 // The steps of one Apply, as the person watching it sees them.
 //
@@ -8,7 +17,8 @@
 // keeps arriving while the connected half writes its keys). A failure is
 // pinned to the step that was running, with the reason the keyboard gave.
 
-const APPLY_STEPS = Object.freeze([
+/** @type {readonly {id: ApplyStep, label: string}[]} */
+const APPLY_STEPS = Object.freeze(/** @type {const} */ ([
     {id: "check", label: "Check the keyboard"},
     {id: "backup", label: "Save a recovery copy"},
     {id: "upload", label: "Send the profile"},
@@ -19,7 +29,8 @@ const APPLY_STEPS = Object.freeze([
     {id: "converge", label: "Finish the slave half"},
     {id: "local", label: "Write keys and macros on the master half"},
     {id: "verify", label: "Check both halves"},
-]);
+]));
+/** @type {Readonly<Record<string, number>>} */
 const STEP_INDEX = Object.freeze(Object.fromEntries(APPLY_STEPS.map((step, index) => [step.id, index])));
 
 // Up to this step nothing reaches durable storage; the commit decision is made
@@ -27,13 +38,15 @@ const STEP_INDEX = Object.freeze(Object.fromEntries(APPLY_STEPS.map((step, index
 // about what was saved, together with whether the keyboard confirmed a cancel.
 const LAST_UNSAVED_STEP = STEP_INDEX.peer;
 
+/** @param {number | undefined} completed @param {number | undefined} total */
 function bytes(completed, total) {
-    return Number.isInteger(completed) && Number.isInteger(total) && total > 0 ? {completed: Math.min(completed, total), total} : null;
+    return typeof completed === "number" && typeof total === "number" && Number.isInteger(completed) && Number.isInteger(total) && total > 0 ? {completed: Math.min(completed, total), total} : null;
 }
 
 let applySequence = 0;
 
 class ApplyProgress {
+    /** @param {(view: ApplyView) => void} [onChange] */
     constructor(onChange = () => {}) {
         this.onChange = onChange;
         // Tells one Apply's view from the next, so a dismissed failure stays
@@ -41,12 +54,15 @@ class ApplyProgress {
         this.id = ++applySequence;
         this.index = -1;
         this.detail = "";
+        /** @type {{completed: number, total: number} | null} */
         this.bytes = null;
+        /** @type {import("../../contracts/model.js").ApplyFailure | null} */
         this.failure = null;
         this.finished = false;
     }
 
     // Moves to `step` (never backwards) and records what it is doing now.
+    /** @param {ApplyStep} step @param {{detail?: string, completed?: number, total?: number}} [progress] */
     report(step, {detail = "", completed, total} = {}) {
         const index = STEP_INDEX[step];
         if (index === undefined) throw new RangeError(`Unknown Apply step ${step}.`);
@@ -70,6 +86,7 @@ class ApplyProgress {
         return this.index <= LAST_UNSAVED_STEP;
     }
 
+    /** @param {{reason?: string, saved?: string}} [failure] */
     fail({reason = "", saved = "unknown"} = {}) {
         if (this.failure) return this.failure;
         const step = APPLY_STEPS[Math.max(this.index, 0)];
@@ -86,12 +103,13 @@ class ApplyProgress {
         this.onChange(this.view());
     }
 
+    /** @returns {ApplyView} */
     view() {
         const failedAt = this.failure ? STEP_INDEX[this.failure.step] : -1;
         return {
             id: this.id,
             state: this.failure ? "failed" : this.finished ? "done" : "applying",
-            steps: APPLY_STEPS.map((step, index) => ({
+            steps: APPLY_STEPS.map(/** @returns {ApplyView["steps"][number]} */ (step, index) => ({
                 id: step.id,
                 label: step.label,
                 state: index === failedAt ? "failed"
@@ -106,10 +124,12 @@ class ApplyProgress {
     }
 }
 
+/** @type {Readonly<Record<number, string>>} */
 const DOMAIN_NAMES = Object.freeze({0x10: "lighting", 0x20: "key behaviours", 0x30: "combos", 0x40: "settings", 0x50: "pointing modes"});
 
 // What the keyboard's candidate error means, in the words of the person who
 // pressed Apply. Unlisted errors fall back to their wire name.
+/** @type {Readonly<Record<string, string>>} */
 const DEVICE_REASONS = Object.freeze({
     CAPACITY_EXCEEDED: "The profile is larger than the keyboard can store.",
     INCOMPATIBLE_SCHEMA: "The keyboard's firmware does not accept this profile format.",
@@ -130,6 +150,7 @@ const DEVICE_REASONS = Object.freeze({
 
 // The slave half's last answer to the split transfer, when the keyboard
 // reports it (candidate status page 1).
+/** @type {Readonly<Record<string, string>>} */
 const PEER_REASONS = Object.freeze({
     BUSY: "The slave half kept answering that it was busy.",
     STALE: "The slave half already had a newer profile.",
@@ -143,6 +164,7 @@ const PEER_REASONS = Object.freeze({
     INVALID_FRAME: "The link between the halves garbled a message.",
 });
 
+/** @param {DeviceFailure | null | undefined} error */
 function locate(error) {
     if (!error || error.domainId === 0xff || error.domainId === undefined) return "";
     const domain = DOMAIN_NAMES[error.domainId] || `domain 0x${error.domainId.toString(16)}`;
@@ -150,6 +172,7 @@ function locate(error) {
 }
 
 // Why the slave half kept answering BUSY, when it said.
+/** @type {Readonly<Record<string, string>>} */
 const PEER_BUSY_REASONS = Object.freeze({
     MAILBOX_FULL: "The slave half stopped handling requests from the master half.",
     OTHER_COPY: "The slave half was still holding an earlier, unfinished copy.",
@@ -161,6 +184,7 @@ const PEER_BUSY_REASONS = Object.freeze({
 
 // The keyboard's own reason when it gave one, else the slave half's last
 // answer, else the host's message.
+/** @param {FailureDetails | null | undefined} error @param {PeerFailure | null | undefined} peer */
 function failureReason(error, peer) {
     const device = error?.deviceError || error?.status?.error;
     if (device?.name && device.name !== "NONE") {
@@ -172,9 +196,9 @@ function failureReason(error, peer) {
         if (known) return device.name === "VALIDATION_REJECTED" ? `${known}${locate(device)}.` : known;
         return `The keyboard reported ${device.name}.`;
     }
-    if (peer && peer.busyStreak >= 3 && PEER_BUSY_REASONS[peer.busyReason]) return PEER_BUSY_REASONS[peer.busyReason];
+    if (peer && (peer.busyStreak ?? 0) >= 3 && peer.busyReason && PEER_BUSY_REASONS[peer.busyReason]) return PEER_BUSY_REASONS[peer.busyReason];
     if (peer && peer.lastStatusName && peer.lastStatusName !== "OK" && PEER_REASONS[peer.lastStatusName]) return PEER_REASONS[peer.lastStatusName];
-    if (peer && peer.transportFailureCount > 0 && /progress|timed out|timeout/i.test(error?.message || "")) return "The link between the halves stopped answering.";
+    if (peer && (peer.transportFailureCount ?? 0) > 0 && /progress|timed out|timeout/i.test(error?.message || "")) return "The link between the halves stopped answering.";
     return error?.message || "The keyboard stopped answering.";
 }
 

@@ -1,3 +1,4 @@
+// @ts-check
 // Which layers the board shows on at once.
 //
 // The board normally shows one layer as it is stored. ⌘-clicking more layer
@@ -12,10 +13,12 @@
 // over base alone: `on` is then `[0]`. With other layers on, base stays on,
 // and a layer added while base is the top goes on over it.
 
+/** @type {readonly number[]} */
 export const EMPTY = Object.freeze([]);
 
 // The layers still worth previewing from a remembered set, in a stack of
 // `count` layers.
+/** @param {number} top @param {readonly number[] | null | undefined} on @param {number} count */
 export const layersOn = (top, on, count) =>
     (on || EMPTY).filter((index) => index >= 0 && index < top && index < count);
 
@@ -23,6 +26,7 @@ export const layersOn = (top, on, count) =>
 // top; with none left, base is shown on its own. Base toggles only while no
 // other layer is on under the top: once one is, base is on regardless. From
 // base, a layer added goes on over base rather than replacing it.
+/** @param {number} top @param {readonly number[] | null | undefined} on @param {number} index */
 export function toggleLayer(top, on, index) {
     const held = [...(on || EMPTY)];
     if (index <= 0) {

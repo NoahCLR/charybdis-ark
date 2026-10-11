@@ -1,9 +1,11 @@
+// @ts-check
 "use strict";
 const {isUnhandledEcho, orUnhandled} = require("./via-unhandled-v1");
 const {buildProfileGetRequest, decodeProfileResponse, profileResponseMatcher} = require("./profile-wire-v1");
 const {fnv1a32} = require("../schema/profile-blob-v1");
 
 const COMBO_READBACK_V1 = Object.freeze({VALUE: 0x06, VERSION: 3, MAX_ROWS: 128, MAX_INPUTS: 16, MAX_LAYERS: 16, PAGES_PER_ROW: 2});
+/** @param {string} code @param {string} message */
 const fail = (code, message) => Object.assign(new Error(message), {code});
 
 // Version 3, the only one the keyboard reports (firmware D-F14). Page 0 is
@@ -13,6 +15,7 @@ const fail = (code, message) => Object.assign(new Error(message), {code});
 // bit 4 disabled), allowed layers and inputs 0..6; page B inputs 7..15. The
 // digest covers metadata bytes 0..5 and 10..24, then every later page in order.
 // `pages` is the reference page followed by each row's two pages.
+/** @param {Uint8Array} metadata @param {Uint8Array[]} pages */
 function decodeComboPages(metadata, pages) {
     if (!(metadata instanceof Uint8Array) || metadata.length !== 25) throw fail("COMBO_MALFORMED", "Invalid combo metadata length.");
     const data = Buffer.from(metadata), version = data[0];
@@ -51,8 +54,10 @@ function decodeComboPages(metadata, pages) {
     return {version, defaultTermMs, holdTermMs, rows, enabled: Boolean(enabled), noTimer: Boolean(flags & 1), strictTimer: Boolean(flags & 2), customTrigger: Boolean(flags & 4), customRelease: Boolean(flags & 8), customRepress: Boolean(flags & 16), fixedReference: Boolean(flags & 32), layerReferences, digest};
 }
 
+/** @param {import("../transport/types.js").RequestConnection} connection @param {import("./types.js").ReadOptions} [options] */
 async function readDeviceCombos(connection, options = {}) {
     let nextId = 0;
+    /** @param {number} page */
     const read = async page => {
         const id = options.nextRequestId ? options.nextRequestId() : (nextId = nextId % 255 + 1);
         const request = buildProfileGetRequest(COMBO_READBACK_V1.VALUE, page, id);

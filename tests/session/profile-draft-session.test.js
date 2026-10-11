@@ -270,6 +270,14 @@ test("interrupted apply retains the full target and can review against an incomp
     await draft.apply({...service,restorePortableProfile:async(document,options)=>{assert.equal(options.expectedFingerprint,"incomplete:device");return draft.current;}},draft.revision,()=>"recovery");
     assert.equal(draft.dirty,false);
 });
+test("comparing against an incomplete recovery base fails with the draft's stable error", () => {
+    const {draft} = fixture(); stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_2",payload:"retained"});
+    draft.observe({incomplete:true,fingerprint:"incomplete:device",document:{format:"charybdis-recovery-capture"}},"board");
+    draft.rebase(draft.revision);
+    const refused = {code:"PROFILE_DRAFT_CONFLICT", message:/Read a complete profile before comparing/};
+    assert.throws(() => draft.referenceFor(draft.order), refused);
+    assert.throws(() => draft.describe(draft.document, draft.order), refused);
+});
 test("layer reordering is undoable and updates layout and settings references together", () => {
     const {draft,snapshot} = fixture();
     draft.replace(reorderLayers(draft.document,[0,2,1,3,4,5,6,7,8,9,10,11,12,13,14,15],["Base","Symbols","Numbers","Navigation","Pointer","Extra 1","Extra 2","Extra 3",...Array(8).fill("")]),draft.revision);

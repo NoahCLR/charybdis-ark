@@ -1,5 +1,16 @@
+// @ts-check
 "use strict";
 
+/**
+ * @typedef {import("./candidate-upload-types.js").UploadContext} Context
+ * @typedef {import("./candidate-upload-types.js").OperationContext} OperationContext
+ * @typedef {import("./candidate-upload-types.js").CommitContext} CommitContext
+ * @typedef {import("./candidate-upload-types.js").TransferContext} TransferContext
+ * @typedef {import("./candidate-upload-types.js").MutationDetails} Details
+ * @typedef {import("./types.js").CandidateStatus} Status
+ * @typedef {import("./types.js").CandidateProgress} Progress
+ * @typedef {import("./candidate-upload-types.js").FailureDetails} FailureDetails
+ */
 const {isUnhandledEcho, orUnhandled} = require("../protocol/via-unhandled-v1");
 const {
     CANDIDATE_ADMISSION,
@@ -44,6 +55,7 @@ const DEFAULT_STATUS_TIMEOUT_SAFETY_MS = 1000;
 const VALIDATION_BYTES_PER_STEP = 4;
 const DEFAULT_VALIDATION_STEP_ALLOWANCE_MS = 5;
 
+/** @type {readonly number[]} */
 const COMMIT_IN_PROGRESS_STATES = Object.freeze([
     CANDIDATE_STATE.PREPARING_PEER,
     CANDIDATE_STATE.COMMITTING,
@@ -65,6 +77,7 @@ const UPLOAD_PHASE = Object.freeze({
 });
 
 class CandidateUploadError extends Error {
+    /** @param {string} code @param {string} message @param {FailureDetails} [details] */
     constructor(code, message, details = {}) {
         super(message);
         this.name = "CandidateUploadError";
@@ -84,6 +97,7 @@ class CandidateUploadError extends Error {
 }
 
 class CandidateUploadCoordinator {
+    /** @param {import("./candidate-upload-types.js").Connection} connection @param {import("./candidate-upload-types.js").CoordinatorOptions} [options] */
     constructor(connection, options = {}) {
         if (!connection || typeof connection.request !== "function") {
             throw new TypeError("connection must provide request(report, options).");
@@ -128,6 +142,8 @@ class CandidateUploadCoordinator {
         this.uploading = false;
     }
 
+    /** @overload @param {Uint8Array} value @param {import("./candidate-upload-types.js").UploadCallOptions} options @returns {Promise<import("./types.js").PreparedCandidate>} */
+    /** @param {Uint8Array} value @param {import("./candidate-upload-types.js").UploadOptions} [options] @returns {Promise<import("./types.js").PreparedCandidate>} */
     async upload(value, options = {}) {
         if (this.uploading) {
             throw new CandidateUploadError("UPLOAD_BUSY", "A candidate upload is already active.", {
@@ -142,14 +158,16 @@ class CandidateUploadCoordinator {
             context.blob = copyBytes(value, "Candidate profile blob");
             context.totalBytes = context.blob.length;
             if (options.metadata === undefined) {
-                context.metadata = candidateMetadataForBlob(context.blob, {
+                // Authored uploads supply VIA identity; the codec validates every value,
+                // including absent fields from an untyped caller, before returning metadata.
+                context.metadata = candidateMetadataForBlob(context.blob, /** @type {import("../protocol/types.js").CandidateBlobOptions} */ ({
                     actionAbiDigest: options.actionAbiDigest,
                     storeFormatVersion: options.storeFormatVersion,
                     capabilities: options.capabilities,
                     requestedDomains: options.requestedDomains,
                     viaGeneration: options.viaGeneration,
                     viaDigest: options.viaDigest,
-                });
+                }));
             } else {
                 const supplied = normalizeCandidateMetadata(options.metadata);
                 const derived = candidateMetadataForBlob(context.blob, {
@@ -159,7 +177,7 @@ class CandidateUploadCoordinator {
                     viaGeneration: supplied.viaGeneration,
                     viaDigest: supplied.viaDigest,
                 });
-                for (const field of ["schemaMajor", "schemaMinor", "requestedDomains", "flags", "payloadLength", "crc32", "digest", "actionAbiDigest", "storeFormatVersion"]) {
+                for (const field of /** @type {const} */ (["schemaMajor", "schemaMinor", "requestedDomains", "flags", "payloadLength", "crc32", "digest", "actionAbiDigest", "storeFormatVersion"])) {
                     if (supplied[field] !== derived[field]) {
                         throw new RangeError(`Candidate metadata ${field} does not match the exact candidate blob.`);
                     }
@@ -183,6 +201,7 @@ class CandidateUploadCoordinator {
             context.transactionId = options.transactionId === undefined
                 ? allocateTransactionId(this.transactionIds)
                 : normalizeTransactionId(options.transactionId);
+            assertTransferContext(context);
             this.emitProgress(context);
 
             context.phase = UPLOAD_PHASE.BEGIN;
@@ -202,6 +221,7 @@ class CandidateUploadCoordinator {
             for (const part of plan) {
                 throwIfCancelled(context);
                 if (part.kind === "reuse") {
+                    if (!base) throw new TypeError("Reuse requires the reviewed source bytes.");
                     context.operation = CANDIDATE_OPERATION.REUSE;
                     context.status = await this.performMutation(buildCandidateReuseRequest(context.transactionId, {...part, source: base}), context, part);
                     context.bytesSent = part.offset + part.length;
@@ -271,7 +291,7 @@ class CandidateUploadCoordinator {
             const abortResult = context.abortNeeded
                 ? await this.bestEffortAbort(context)
                 : {attempted: false, succeeded: undefined};
-            throw uploadError(context.abortNeeded ? "UPLOAD_FAILED" : "INVALID_CANDIDATE", cause?.message || "Candidate upload failed.", context, {
+            throw uploadError(context.abortNeeded ? "UPLOAD_FAILED" : "INVALID_CANDIDATE", /** @type {Error | null | undefined} */ (cause)?.message || "Candidate upload failed.", context, {
                 abortAttempted: abortResult.attempted,
                 abortSucceeded: abortResult.succeeded,
                 ambiguous: abortResult.attempted && abortResult.succeeded !== true,
@@ -283,6 +303,7 @@ class CandidateUploadCoordinator {
         }
     }
 
+    /** @param {number} transactionId @param {import("./candidate-upload-types.js").CommitOptions} [options] */
     async commit(transactionId, options = {}) {
         if (this.uploading) {
             throw new CandidateUploadError("UPLOAD_BUSY", "A candidate operation is already active.", {
@@ -303,11 +324,13 @@ class CandidateUploadCoordinator {
             throwIfCancelled(context);
             context.phase = UPLOAD_PHASE.COMMIT_PREFLIGHT;
             context.status = await this.readStatus(context, {ambiguous: false});
+            assertOperationContext(context);
             assertCandidateIdentity(context.status, context);
             if (context.expectedDigest !== undefined && context.status.digest !== context.expectedDigest) {
                 throw uploadError("CANDIDATE_IDENTITY_MISMATCH", "Prepared candidate digest does not match the requested commit.", context, {safeToRetry: false});
             }
             context.expectedDigest = context.status.digest;
+            assertCommitContext(context);
             if (commitIsComplete(context.status, context)) {
                 assertNoDeviceError(context.status, context);
                 context.phase = UPLOAD_PHASE.COMPLETE;
@@ -345,7 +368,7 @@ class CandidateUploadCoordinator {
             return commitResult(context);
         } catch (cause) {
             if (cause instanceof CandidateUploadError) throw cause;
-            throw uploadError("COMMIT_FAILED", cause?.message || "Candidate commit failed.", context, {
+            throw uploadError("COMMIT_FAILED", /** @type {Error | null | undefined} */ (cause)?.message || "Candidate commit failed.", context, {
                 ambiguous: context.phase !== UPLOAD_PHASE.COMMIT_PREFLIGHT,
                 cause,
                 safeToRetry: context.operation === CANDIDATE_OPERATION.COMMIT,
@@ -355,6 +378,7 @@ class CandidateUploadCoordinator {
         }
     }
 
+    /** @param {number} transactionId */
     async abort(transactionId) {
         if (this.uploading) throw new CandidateUploadError("UPLOAD_BUSY", "A candidate operation is already active.", {phase: UPLOAD_PHASE.ABORTING, safeToRetry: true});
         const context = createUploadContext();
@@ -370,6 +394,7 @@ class CandidateUploadCoordinator {
         }
     }
 
+    /** @param {TransferContext} context @param {Extract<import("../protocol/types.js").CandidateTransferRange, {kind: "write"}>} part */
     async writeChunkRange(context, part) {
         let offset = part.offset;
         while (offset < part.offset + part.length) {
@@ -411,6 +436,7 @@ class CandidateUploadCoordinator {
         }
     }
 
+    /** @param {TransferContext} context @param {Status} baseline @param {number} end @param {number} admitted */
     async waitForChunkBatch(context, baseline, end, admitted) {
         const budget = this.createStatusBudget(context, baseline);
         const sequence = (baseline.operationSequence + admitted) & 0xffff;
@@ -434,6 +460,7 @@ class CandidateUploadCoordinator {
         throw uploadError("OPERATION_OUTCOME_AMBIGUOUS", "Streaming chunks did not confirm their exact accepted prefix.", context, {ambiguous: true, safeToRetry: false});
     }
 
+    /** @param {Buffer} frame @param {Context} context */
     async admitMutation(frame, context) {
         let response;
         try {
@@ -466,7 +493,7 @@ class CandidateUploadCoordinator {
         try {
             acknowledgment = decodeCandidateAcknowledgement(response, frame);
         } catch (cause) {
-            throw uploadError("PROTOCOL_ERROR", cause.message, context, {
+            throw uploadError("PROTOCOL_ERROR", /** @type {Error} */ (cause).message, context, {
                 ambiguous: true,
                 cause,
                 safeToRetry: false,
@@ -476,6 +503,7 @@ class CandidateUploadCoordinator {
         return acknowledgment;
     }
 
+    /** @param {Buffer} frame @param {OperationContext} context @param {Details} [operationDetails] */
     async performMutation(frame, context, operationDetails = {}) {
         let baseline = context.status;
         let busyResubmissions = 0;
@@ -526,6 +554,7 @@ class CandidateUploadCoordinator {
         }
     }
 
+    /** @param {OperationContext} context @param {Status} baseline @param {Details} operationDetails */
     async waitForProcessedOperation(context, baseline, operationDetails) {
         const budget = this.createStatusBudget(context, baseline);
         while (true) {
@@ -556,6 +585,7 @@ class CandidateUploadCoordinator {
         );
     }
 
+    /** @param {OperationContext} context @param {Status} baseline @param {Details} operationDetails */
     async waitUntilBusyCanResolve(context, baseline, operationDetails) {
         const budget = this.createStatusBudget(context, baseline);
         while (true) {
@@ -585,6 +615,7 @@ class CandidateUploadCoordinator {
         });
     }
 
+    /** @param {OperationContext} context */
     async waitForValidation(context) {
         const budget = this.createStatusBudget(context, context.status);
         while (true) {
@@ -618,6 +649,7 @@ class CandidateUploadCoordinator {
         });
     }
 
+    /** @param {CommitContext} context */
     async waitForCommit(context) {
         const budget = this.createStatusBudget(context, context.status);
         let first = true;
@@ -667,6 +699,7 @@ class CandidateUploadCoordinator {
         });
     }
 
+    /** @param {Context} context @param {{ambiguous: boolean}} options */
     async readStatus(context, options) {
         try {
             return await readCandidateStatus(this.connection, {
@@ -686,6 +719,7 @@ class CandidateUploadCoordinator {
         }
     }
 
+    /** @param {Context} context @param {Status | undefined} baseline */
     createStatusBudget(context, baseline) {
         const timeoutMs = this.statusStallTimeoutMs === undefined
             ? candidateStatusStallTimeoutMs(candidatePayloadLength(context), baseline?.state)
@@ -701,6 +735,7 @@ class CandidateUploadCoordinator {
         };
     }
 
+    /** @param {Context} context */
     async refreshPeerStatus(context) {
         if (!this.readPeerStatus || context.peerUnsupported) return;
         try {
@@ -712,6 +747,7 @@ class CandidateUploadCoordinator {
         }
     }
 
+    /** @param {import("./candidate-upload-types.js").StatusBudget} budget @param {Status | undefined} status @param {string} [extra] */
     statusBudgetAllowsAnotherPoll(budget, status, extra = "") {
         const now = this.now();
         const fingerprint = `${statusProgressFingerprint(status)}|${extra}`;
@@ -727,6 +763,7 @@ class CandidateUploadCoordinator {
         return now < budget.deadline;
     }
 
+    /** @param {Context} context */
     async waitBeforePoll(context) {
         throwIfCancelled(context);
         if (this.pollIntervalMs > 0) {
@@ -735,6 +772,7 @@ class CandidateUploadCoordinator {
         throwIfCancelled(context);
     }
 
+    /** @param {Context} context */
     async bestEffortAbort(context) {
         const result = {attempted: true, succeeded: false};
         const previousPhase = context.phase;
@@ -746,6 +784,7 @@ class CandidateUploadCoordinator {
             if (!context.status) {
                 context.status = await this.readStatus(context, {ambiguous: false});
             }
+            assertOperationContext(context);
             context.status = await this.performMutation(
                 buildCandidateAbortRequest(context.transactionId),
                 context
@@ -761,6 +800,7 @@ class CandidateUploadCoordinator {
         return result;
     }
 
+    /** @param {Context} context */
     emitProgress(context) {
         const listener = typeof context.onProgress === "function" ? context.onProgress : this.onProgress;
         if (!listener) return;
@@ -772,6 +812,7 @@ class CandidateUploadCoordinator {
     }
 }
 
+/** @param {Status} status @param {Context} context @param {Details} operationDetails */
 function assertSuccessfulOperationStatus(status, context, operationDetails) {
     if (status.error.id !== CANDIDATE_ERROR.NONE || status.state === CANDIDATE_STATE.REJECTED || status.state === CANDIDATE_STATE.AUTHORITY_FAILED) {
         throw deviceRejection(status, context);
@@ -781,14 +822,14 @@ function assertSuccessfulOperationStatus(status, context, operationDetails) {
         case CANDIDATE_OPERATION.BEGIN:
             if (status.state !== CANDIDATE_STATE.RECEIVING
                 || status.nextOffset !== 0
-                || status.payloadLength !== operationDetails.metadata.payloadLength
-                || status.digest !== operationDetails.metadata.digest) {
+                || status.payloadLength !== beginMetadata(operationDetails).payloadLength
+                || status.digest !== beginMetadata(operationDetails).digest) {
                 throw operationStatusMismatch(status, context, "begin metadata/state did not match");
             }
             break;
         case CANDIDATE_OPERATION.REUSE:
         case CANDIDATE_OPERATION.CHUNK: {
-            const expectedOffset = operationDetails.offset + operationDetails.length;
+            const expectedOffset = mutationEnd(operationDetails);
             const expectedState = expectedOffset === status.payloadLength
                 ? CANDIDATE_STATE.COMPLETE
                 : CANDIDATE_STATE.RECEIVING;
@@ -798,7 +839,7 @@ function assertSuccessfulOperationStatus(status, context, operationDetails) {
             break;
         }
         case CANDIDATE_OPERATION.VALIDATE:
-            if (![CANDIDATE_STATE.VALIDATING, CANDIDATE_STATE.VALIDATED].includes(status.state)) {
+            if (!(/** @type {number[]} */ ([CANDIDATE_STATE.VALIDATING, CANDIDATE_STATE.VALIDATED])).includes(status.state)) {
                 throw operationStatusMismatch(status, context, `validation entered state ${status.state}`);
             }
             break;
@@ -817,18 +858,19 @@ function assertSuccessfulOperationStatus(status, context, operationDetails) {
     }
 }
 
+/** @param {Status} status @param {Context} context @param {Details} operationDetails */
 function operationStatusCouldBeOurs(status, context, operationDetails) {
     if (status.transactionId !== context.transactionId) return false;
     if (status.error.id !== CANDIDATE_ERROR.NONE) return true;
     switch (context.operation) {
         case CANDIDATE_OPERATION.BEGIN:
-            return status.payloadLength === operationDetails.metadata.payloadLength
-                && status.digest === operationDetails.metadata.digest;
+            return status.payloadLength === beginMetadata(operationDetails).payloadLength
+                && status.digest === beginMetadata(operationDetails).digest;
         case CANDIDATE_OPERATION.REUSE:
         case CANDIDATE_OPERATION.CHUNK:
-            return !status.mailboxPending && status.nextOffset === operationDetails.offset + operationDetails.length;
+            return !status.mailboxPending && status.nextOffset === mutationEnd(operationDetails);
         case CANDIDATE_OPERATION.VALIDATE:
-            return [CANDIDATE_STATE.VALIDATING, CANDIDATE_STATE.VALIDATED, CANDIDATE_STATE.REJECTED].includes(status.state);
+            return (/** @type {number[]} */ ([CANDIDATE_STATE.VALIDATING, CANDIDATE_STATE.VALIDATED, CANDIDATE_STATE.REJECTED])).includes(status.state);
         case CANDIDATE_OPERATION.COMMIT:
             return [...COMMIT_IN_PROGRESS_STATES, CANDIDATE_STATE.IDLE, CANDIDATE_STATE.REJECTED, CANDIDATE_STATE.AUTHORITY_FAILED].includes(status.state);
         case CANDIDATE_OPERATION.ABORT:
@@ -838,6 +880,7 @@ function operationStatusCouldBeOurs(status, context, operationDetails) {
     }
 }
 
+/** @param {Status} status @param {Context} context @param {Details} operationDetails */
 function canSafelyResubmit(status, context, operationDetails) {
     if (status.mailboxPending) return false;
     if (context.operation === CANDIDATE_OPERATION.ABORT) {
@@ -850,10 +893,10 @@ function canSafelyResubmit(status, context, operationDetails) {
         case CANDIDATE_OPERATION.REUSE:
         case CANDIDATE_OPERATION.CHUNK: {
             if (status.transactionId !== context.transactionId
-                || ![CANDIDATE_STATE.RECEIVING, CANDIDATE_STATE.COMPLETE].includes(status.state)) {
+                || !(/** @type {number[]} */ ([CANDIDATE_STATE.RECEIVING, CANDIDATE_STATE.COMPLETE])).includes(status.state)) {
                 return false;
             }
-            const end = operationDetails.offset + operationDetails.length;
+            const end = mutationEnd(operationDetails);
             return status.nextOffset === operationDetails.offset || status.nextOffset === end;
         }
         case CANDIDATE_OPERATION.VALIDATE:
@@ -867,6 +910,7 @@ function canSafelyResubmit(status, context, operationDetails) {
     }
 }
 
+/** @param {Status} status @param {Context} context */
 function assertCandidateIdentity(status, context) {
     if (status.transactionId !== context.transactionId) {
         throw uploadError(
@@ -878,6 +922,7 @@ function assertCandidateIdentity(status, context) {
     }
 }
 
+/** @param {Status} status @param {Context} context */
 function commitIsComplete(status, context) {
     return status.state === CANDIDATE_STATE.IDLE
         && status.lastOperation === CANDIDATE_OPERATION.COMMIT
@@ -885,6 +930,7 @@ function commitIsComplete(status, context) {
         && status.digest === context.expectedDigest;
 }
 
+/** @param {CommitContext} context */
 function commitResult(context) {
     return {
         transactionId: context.transactionId,
@@ -894,12 +940,14 @@ function commitResult(context) {
     };
 }
 
+/** @param {Status} status @param {Context} context */
 function assertNoDeviceError(status, context) {
     if (status.error.id !== CANDIDATE_ERROR.NONE) {
         throw deviceRejection(status, context);
     }
 }
 
+/** @param {Status} status @param {Context} context */
 function deviceRejection(status, context) {
     if (status.error.id === CANDIDATE_ERROR.DURABILITY_UNKNOWN) {
         return uploadError(
@@ -925,6 +973,7 @@ function deviceRejection(status, context) {
     );
 }
 
+/** @param {Status} status @param {Context} context @param {string} reason */
 function operationStatusMismatch(status, context, reason) {
     return uploadError(
         "OPERATION_STATUS_MISMATCH",
@@ -934,6 +983,7 @@ function operationStatusMismatch(status, context, reason) {
     );
 }
 
+/** @param {AbortSignal} [signal] @returns {Context} */
 function createUploadContext(signal) {
     if (signal !== undefined && !isAbortSignal(signal)) {
         throw new TypeError("upload signal must be an AbortSignal.");
@@ -961,6 +1011,7 @@ function createUploadContext(signal) {
     };
 }
 
+/** @param {Context} context */
 function candidatePayloadLength(context) {
     return context.metadata?.payloadLength
         ?? context.status?.payloadLength
@@ -980,6 +1031,7 @@ function candidatePayloadLength(context) {
 // renews the firmware's lease each step, so no precommit cleanup runs while it
 // works, and a large profile may validate for longer than the cleanup window.
 // It gets an allowance proportional to the candidate.
+/** @param {number} payloadLength @param {number | undefined} state */
 function candidateStatusStallTimeoutMs(payloadLength, state) {
     if (state === CANDIDATE_STATE.PREPARING_PEER) {
         return FIRMWARE_PREPARING_PEER_NO_PROGRESS_TIMEOUT_MS
@@ -1004,6 +1056,7 @@ function candidateStatusStallTimeoutMs(payloadLength, state) {
     );
 }
 
+/** @param {Status | undefined} status */
 function statusProgressFingerprint(status) {
     if (!status) return "none";
     return [
@@ -1016,20 +1069,24 @@ function statusProgressFingerprint(status) {
     ].join(":");
 }
 
+/** @param {Context} context */
 function throwIfCancelled(context) {
     if (!context.cancellationSuppressed && context.signal?.aborted) {
         throw uploadError("CANCELLED", "Candidate upload was cancelled.", context, {safeToRetry: false});
     }
 }
 
+/** @param {unknown} cause @param {Context} context */
 function isCancellation(cause, context) {
-    return cause?.code === "CANCELLED" || (!context.cancellationSuppressed && context.signal?.aborted);
+    return /** @type {{code?: string} | null | undefined} */ (cause)?.code === "CANCELLED" || (!context.cancellationSuppressed && context.signal?.aborted);
 }
 
+/** @param {import("../protocol/types.js").RequestIds} sequence */
 function allocateTransactionId(sequence) {
     return normalizeTransactionId(sequence.next());
 }
 
+/** @param {Status} status */
 function assertNoActiveCandidate(status) {
     if (status.state !== CANDIDATE_STATE.IDLE) {
         throw new CandidateUploadError(
@@ -1040,10 +1097,12 @@ function assertNoActiveCandidate(status) {
     }
 }
 
+/** @param {import("./types.js").CandidatePeer | undefined} peer */
 function peerProgressFingerprint(peer) {
     return peer ? [peer.phase, peer.transferOffset, peer.lastStatus].join(":") : "";
 }
 
+/** @param {Context} context @returns {Progress} */
 function progressFor(context) {
     return {
         peer: context.peer ? {...context.peer} : null,
@@ -1063,6 +1122,7 @@ function progressFor(context) {
     };
 }
 
+/** @param {Progress} progress @returns {Progress} */
 function cloneProgress(progress) {
     return {
         ...progress,
@@ -1070,6 +1130,7 @@ function cloneProgress(progress) {
     };
 }
 
+/** @param {Status} status @returns {Status} */
 function cloneStatus(status) {
     return {
         ...status,
@@ -1077,6 +1138,7 @@ function cloneStatus(status) {
     };
 }
 
+/** @param {string} code @param {string} message @param {Context} context @param {FailureDetails} [details] */
 function uploadError(code, message, context, details = {}) {
     return new CandidateUploadError(code, message, {
         phase: context.phase,
@@ -1088,10 +1150,12 @@ function uploadError(code, message, context, details = {}) {
     });
 }
 
+/** @param {number} operation */
 function operationLabel(operation) {
     return Object.entries(CANDIDATE_OPERATION).find(([, value]) => value === operation)?.[0].toLowerCase() || `operation ${operation}`;
 }
 
+/** @param {unknown} value */
 function normalizeTransactionId(value) {
     const number = Number(value);
     if (!Number.isInteger(number) || number < 1 || number > 0xffff) {
@@ -1100,6 +1164,7 @@ function normalizeTransactionId(value) {
     return number;
 }
 
+/** @param {unknown} value @param {string} label @param {number} minimum @param {number} maximum */
 function normalizeInteger(value, label, minimum, maximum) {
     const number = Number(value);
     if (!Number.isInteger(number) || number < minimum || number > maximum) {
@@ -1108,12 +1173,14 @@ function normalizeInteger(value, label, minimum, maximum) {
     return number;
 }
 
+/** @param {import("../protocol/types.js").RequestIds} value @param {string} label */
 function assertIdSequence(value, label) {
     if (!value || typeof value.next !== "function") {
         throw new TypeError(`${label} must provide next().`);
     }
 }
 
+/** @param {unknown} value @param {string} label */
 function copyBytes(value, label) {
     if (!(value instanceof Uint8Array)) {
         throw new TypeError(`${label} must be a Buffer or Uint8Array.`);
@@ -1121,25 +1188,30 @@ function copyBytes(value, label) {
     return Buffer.from(value);
 }
 
+/** @param {Context} context */
 function requestSignal(context) {
     return context.cancellationSuppressed ? undefined : context.signal;
 }
 
+/** @param {AbortSignal | undefined} value */
 function isAbortSignal(value) {
     return value && typeof value.aborted === "boolean"
         && typeof value.addEventListener === "function"
         && typeof value.removeEventListener === "function";
 }
 
+/** @param {number} milliseconds @returns {Promise<void>} */
 function defaultSleep(milliseconds) {
     return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
-async function uploadProfileCandidate(connection, blob, options = {}) {
+/** @param {import("./candidate-upload-types.js").Connection} connection @param {Uint8Array} blob @param {import("./candidate-upload-types.js").UploadCallOptions & import("./candidate-upload-types.js").CoordinatorOptions} options */
+async function uploadProfileCandidate(connection, blob, options) {
     const coordinator = new CandidateUploadCoordinator(connection, options);
     return coordinator.upload(blob, options);
 }
 
+/** @param {import("./candidate-upload-types.js").Connection} connection @param {number} transactionId @param {import("./candidate-upload-types.js").CommitOptions & import("./candidate-upload-types.js").CoordinatorOptions} [options] */
 async function commitPreparedCandidate(connection, transactionId, options = {}) {
     const coordinator = new CandidateUploadCoordinator(connection, options);
     return coordinator.commit(transactionId, options);
@@ -1157,3 +1229,29 @@ module.exports = {
     commitPreparedCandidate,
     uploadProfileCandidate,
 };
+
+/** @param {Context} context @returns {asserts context is OperationContext} */
+function assertOperationContext(context) {
+    if (context.transactionId === undefined || !context.status) throw new TypeError("Candidate operation requires its transaction and read status.");
+}
+/** @param {Context} context @returns {asserts context is TransferContext} */
+function assertTransferContext(context) {
+    assertOperationContext(context);
+    if (!context.blob || !context.metadata) throw new TypeError("Candidate transfer requires its validated bytes and metadata.");
+}
+
+/** @param {Context} context @returns {asserts context is CommitContext} */
+function assertCommitContext(context) {
+    assertOperationContext(context);
+    if (context.expectedDigest === undefined) throw new TypeError("Candidate commit requires its expected digest.");
+}
+/** @param {Details} details */
+function beginMetadata(details) {
+    if (!details.metadata) throw new TypeError("Candidate begin requires its validated metadata.");
+    return details.metadata;
+}
+/** @param {Details} details */
+function mutationEnd(details) {
+    if (details.offset === undefined || details.length === undefined) throw new TypeError("Candidate range requires its offset and length.");
+    return details.offset + details.length;
+}

@@ -1,5 +1,7 @@
+// @ts-check
 "use strict";
 const {buildProfileGetRequest, decodeProfileResponse, profileResponseMatcher} = require("./profile-wire-v1");
+/** @param {import("../transport/types.js").RequestConnection} connection @param {import("./types.js").RequestIds} ids */
 async function readHostOs(connection, ids) {
     const request = buildProfileGetRequest(0x0b, 0, ids.next());
     const response = await connection.request(request, {matchResponse: profileResponseMatcher});

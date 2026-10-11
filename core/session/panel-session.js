@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 
 // The panel's side of a session: what extension.js used to decide inline.
@@ -9,6 +10,13 @@
 // it for every host, and extension.js keeps only VS Code's dialogs, files and
 // progress.
 
+/**
+ * @typedef {import("./types.js").PanelSession} Session
+ * @typedef {import("./types.js").PanelModelSession} ModelSession
+ * @typedef {import("./types.js").PanelDeviceState} State
+ * @typedef {import("./types.js").LayerEditState} LayerEdit
+ * @typedef {import("../model/types.js").CompleteSnapshot} Snapshot
+ */
 const {fingerprint, summary, reorderLayers} = require("../model/portable-profile");
 const {profileReview} = require("../model/profile-review");
 const {profileUsage} = require("../model/profile-usage");
@@ -44,6 +52,7 @@ const HOST_WORDS = Object.freeze({
     noKeyboard: "No keyboard is connected. Connect one and choose Read keyboard.",
     connectHint: "Connect a Charybdis, then read it to begin editing.",
 });
+/** @param {import("./types.js").PanelHost | null | undefined} host @returns {import("../../contracts/model.js").HostPanel} */
 function hostModel(host) {
     const offered = host?.panel?.() || {};
     return {
@@ -59,6 +68,7 @@ function hostModel(host) {
 
 // A complete read of a supported keyboard opens the draft, or refreshes the
 // one already open against what the keyboard now holds.
+/** @param {ModelSession} session @param {State} state */
 function observePortable(session, state) {
     if (session.draft && !session.draft.dirty && state.connected && (state.selectedDeviceId !== session.draft.deviceId || !supportsCompleteProfile(state.capabilities))) {
         session.draft = undefined;
@@ -74,9 +84,10 @@ function observePortable(session, state) {
     session.observedPortable = portable;
 }
 
+/** @param {Session} session @param {State} state @param {Snapshot | undefined} snapshot */
 function discardDraftForDevice(session, state, snapshot) {
     session.draft = supportsCompleteProfile(state.capabilities)
-        ? new ProfileDraftSession(snapshot, state.selectedDeviceId, state.capabilities, state.connectionToken)
+        ? new ProfileDraftSession(/** @type {Snapshot} */ (snapshot), state.selectedDeviceId, state.capabilities, state.connectionToken)
         : undefined;
     session.portableReview = undefined;
     session.portableLayers = undefined;
@@ -88,21 +99,24 @@ function discardDraftForDevice(session, state, snapshot) {
 // own: the rail describes the keyboard, not the draft. In the demo, `state` is
 // the demo's (demo-session.js panelState), and the header says demo: no
 // keyboard is read, so none is described.
+/** @param {ModelSession} session @param {State} state @returns {ReturnType<typeof buildDeviceModel> & import("./types.js").PanelModelExtras} */
 function buildPanelModel(session, state) {
     if (!session.demo) observePortable(session, state);
-    if (session.draft && state.connected && state.selectedDeviceId === session.draft.deviceId) session.draft.noteConnection(state.connectionToken);
+    if (session.draft && state.connected && state.selectedDeviceId === session.draft.deviceId) session.draft.noteConnection(state.connectionToken ?? null);
     const device = state.devices?.find((entry) => entry.id === state.selectedDeviceId);
     const busy = Boolean(state.busy || session.portableBusy || session.readBusy);
     const supported = supportsCompleteProfile(state.capabilities);
     const editing = session.draft && supported ? session.draft.editingState(state) : state;
     const model = buildDeviceModel({...editing, busy: editing.busy || session.portableBusy || session.readBusy, device});
-    model.devices = (state.devices || []).map(({id, label}) => ({id, label}));
-    model.selectedDeviceId = state.selectedDeviceId || "";
+    const devices = (state.devices || []).map(({id, label}) => ({id, label}));
+    const selectedDeviceId = state.selectedDeviceId || "";
+    /** @type {import("./types.js").PanelDraftView | undefined} */
+    let draft;
     if (session.draft) {
         const view = session.draft.view(state);
-        model.draft = {...view, matching: view.matching && supported, connected: view.connected && supported, busy};
-        if (session.historyOpen) model.draft.steps = session.draft.steps();
-        if (model.draft.matching) {
+        draft = {...view, matching: view.matching && supported, connected: view.connected && supported, busy};
+        if (session.historyOpen) draft.steps = session.draft.steps();
+        if (draft.matching) {
             model.profileIdentity = session.draft.identity();
             const names = session.draft.current.summary.names;
             model.layers?.forEach((layer, index) => {layer.displayName = names[index];});
@@ -114,37 +128,39 @@ function buildPanelModel(session, state) {
         });
         model.device = actual.device;
         model.diagnostics = actual.diagnostics;
-        if (model.draft.dirty && model.draft.matching) model.device.subtitle = "Showing your local draft · the keyboard still runs the last applied profile";
+        if (draft.dirty && draft.matching) model.device.subtitle = "Showing your local draft · the keyboard still runs the last applied profile";
     }
     // The last Apply's steps: live while it runs, kept when it failed. A
     // successful one lasts only until its readback ends, so a later busy
     // operation is not drawn as reading back an Apply.
     if (session.demo) {
-        model.device = demoHeader(session, busy);
-        model.diagnostics = demoDiagnostics(session);
+        model.device = demoHeader({demo: session.demo}, busy);
+        model.diagnostics = demoDiagnostics({demo: session.demo});
     }
-    model.demo = demoModel(session, state);
+    const demo = demoModel(session, state);
     const live = state.liveApply;
-    model.apply = live && (live.state === "applying" || live.state === "failed" || (live.state === "done" && session.applyRunning)) ? live : null;
-    model.postApplyRead = session.postApplyReadStep ? {
+    const apply = live && (live.state === "applying" || live.state === "failed" || (live.state === "done" && session.applyRunning)) ? live : null;
+    const postApplyRead = session.postApplyReadStep ? {
         step: session.postApplyReadStep,
         progress: session.postApplyReadStep === "layout" ? state.layout?.progress
             : session.postApplyReadStep === "profile" ? state.committed?.progress : null,
     } : null;
-    model.portable = {
+    /** @type {import("./types.js").PanelModelExtras["portable"]} */
+    const portable = {
         available: Boolean(state.connected && supportsCompleteProfile(state.capabilities)),
         busy,
         progress: state.portableProgress,
         review: session.portableReview ? {incoming: summary(session.portableReview.document), current: session.portableReview.before.summary,
-            fileName: session.portableReview.fileName || null, differences: importDifferences(session)} : null,
+            fileName: session.portableReview.fileName || null, differences: importDifferences({...session, portableReview: session.portableReview})} : null,
         layers: session.portableLayers ? {key: session.portableLayers.before.fingerprint, order: session.portableLayers.order, names: session.portableLayers.names, keysFollow: session.portableLayers.keysFollow !== false} : null,
-        usage: usageOf(session, state, model.draft),
+        usage: usageOf(session, state, draft),
     };
-    if (!model.draft?.matching) model.layers?.forEach((layer, index) => {layer.displayName = state.portableSummary?.names[index] || layer.name;});
-    const editableDraft = Boolean(model.draft?.matching && !model.draft.stale && state.connected);
+    if (!draft?.matching) model.layers?.forEach((layer, index) => {layer.displayName = state.portableSummary?.names[index] || layer.name;});
+    const editableDraft = Boolean(draft?.matching && !draft.stale && state.connected);
     const readReady = (session.readReady ?? editableDraft) && editableDraft;
-    model.host = hostModel(session.host);
-    model.load = {
+    const host = hostModel(session.host);
+    /** @type {import("../../contracts/model.js").LoadView} */
+    const load = {
         state: session.readBusy ? "loading" : readReady ? "ready" : "unavailable",
         phase: state.phase || "idle",
         operationId: state.operationId,
@@ -152,17 +168,18 @@ function buildPanelModel(session, state) {
         connectionToken: state.connectionToken,
         progress: state.portableProgress || state.layout?.progress || state.committed?.progress || null,
     };
-    return model;
+    return {...model, devices, selectedDeviceId, ...(draft ? {draft} : {}), demo, apply, postApplyRead, portable, host, load};
 }
 
 // How full the profile is: the draft's, when one is open for this keyboard,
 // otherwise what the keyboard runs. Nothing without a connected keyboard. In
 // the demo, an unedited draft is the demo setup.
+/** @param {ModelSession} session @param {State} state @param {import("./types.js").PanelDraftView | undefined} draft @returns {import("../../contracts/model.js").ProfileUsage | null} */
 function usageOf(session, state, draft) {
     if (!state.connected) return null;
     const fromDraft = Boolean(session.draft && draft?.matching);
-    const usage = profileUsage(fromDraft ? session.draft.current : session.service?.portable, state.capabilities);
-    return usage && {...usage, source: fromDraft && session.draft.dirty ? "draft" : session.demo ? "demo" : "keyboard"};
+    const usage = profileUsage(fromDraft && session.draft ? session.draft.current : session.service?.portable, state.capabilities || undefined);
+    return usage && {...usage, source: fromDraft && session.draft?.dirty ? "draft" : session.demo ? "demo" : "keyboard"};
 }
 
 // A chosen profile file against what the keyboard holds, not the draft: that
@@ -171,12 +188,18 @@ function usageOf(session, state, draft) {
 // its fields wait for the draft's own review. Nothing, when the keyboard holds an interrupted
 // configuration there is no comparing with. Kept with the review, for the
 // keyboard it was made against.
+/** @param {ModelSession & {portableReview: import("./types.js").PortableReview}} session */
 function importDifferences(session) {
     const review = session.portableReview, keyboard = session.draft ? session.draft.baseSnapshot : review.before;
     if (!keyboard || keyboard.incomplete) return null;
     if (review.differences?.against !== keyboard.fingerprint) {
         const file = {...keyboard, document: review.document, decoded: undefined, fingerprint: fingerprint(review.document)};
-        const where = ({target, ...place}) => place;
+        /** @param {import("../model/types.js").ModelReviewPlace} place */
+        const where = (place) => {
+            if (place.kind !== "behaviour") return place;
+            const {target, ...location} = place;
+            return location;
+        };
         review.differences = {against: keyboard.fingerprint, items: profileReview(keyboard, file).map((item) => ({unit: item.unit, title: item.title,
             status: item.status, place: item.place ? where(item.place) : null}))};
     }
@@ -184,12 +207,23 @@ function importDifferences(session) {
 }
 
 // What the next model carries once, then forgets.
+/** @param {Pick<Session, "notice" | "acceptedEdit" | "resetDraftForms">} session */
 function takeOutbox(session) {
     const outbox = {notice: session.notice, acceptedEdit: session.acceptedEdit, resetDraftForms: session.resetDraftForms};
     session.notice = undefined;
     session.acceptedEdit = undefined;
     session.resetDraftForms = undefined;
     return outbox;
+}
+
+// What the panel posted, as the loop takes it: an object naming its type.
+// Anything else is no request, answered like an unrecognised one. Only the
+// envelope is checked here; each route checks the payload fields it reads
+// (the draft's decoders, applyLayerEdit, the macro inspection).
+/** @param {unknown} value @returns {import("../../contracts/messages.js").PanelRequest | null} */
+function panelRequest(value) {
+    if (typeof value !== "object" || value === null || !("type" in value) || typeof value.type !== "string") return null;
+    return /** @type {import("../../contracts/messages.js").PanelRequest} */ (value);
 }
 
 /**
@@ -199,8 +233,10 @@ function takeOutbox(session) {
  * "none" for a message that only needs an answer. Every refusal throws, and
  * the host turns it into a notice.
  */
+/** @param {Session} session @param {import("./types.js").PanelMessage | null | undefined} message @param {State} state */
 function routeMessage(session, message, state) {
-    const type = message?.type;
+    if (!message) return "none";
+    const type = message.type;
     // The draft history sheet is only a view: while it is open the model
     // carries every step, and only then, since that is the whole history.
     if (type === "openProfileDraftHistory" || type === "closeProfileDraftHistory") {
@@ -225,7 +261,8 @@ function routeMessage(session, message, state) {
         if (state.busy || !state.connected || !supportsCompleteProfile(state.capabilities) || state.selectedDeviceId !== session.draft.deviceId || (state.connectionToken ?? null) !== session.draft.connectionToken) {
             throw new Error("Reconnect the keyboard this draft belongs to and wait for its current operation.");
         }
-        session.acceptedEdit = session.draft.stage(message);
+        // The command set selects the decoder; stage validates payload values and revision.
+        session.acceptedEdit = session.draft.stage(/** @type {import("./types.js").DraftEdit} */ (message));
         return "staged";
     }
     if (DRAFT_CONTROLS.has(type)) return "draft";
@@ -259,6 +296,7 @@ function routeMessage(session, message, state) {
 
 // keysFollow: whether moving a layer renumbers the layer keys that reach it
 // (the default), or leaves them reaching whatever layer takes its place.
+/** @param {Snapshot} before @param {number | undefined} revision @returns {LayerEdit} */
 function startLayerEdit(before, revision) {
     return {before, revision, order: Array.from({length: before.summary.layers}, (_, id) => id), names: [...before.summary.names], keysFollow: true};
 }
@@ -266,6 +304,7 @@ function startLayerEdit(before, revision) {
 // Applies one message from the Rename & Reorder panel to its local state. A name
 // is checked by rewriting the document with it, so an invalid one is refused
 // before it is kept.
+/** @param {LayerEdit | null | undefined} edit @param {import("./types.js").LayerEditMessage} message */
 function applyLayerEdit(edit, message) {
     if (!edit) throw new Error("Read the layers again before editing them.");
     if (message.keysFollow !== undefined) {
@@ -274,7 +313,8 @@ function applyLayerEdit(edit, message) {
         if (message.type === "editPortableLayer" && message.id === undefined) {
             // The form posts every name with the toggle, as with a move.
             if (Array.isArray(message.names) && message.names.length === edit.names.length && message.names.every((name) => typeof name === "string")) {
-                reorderLayers(edit.before.document, edit.order, edit.order.map((old) => message.names[old]), {keysFollow: edit.keysFollow});
+                const names = message.names;
+                reorderLayers(edit.before.document, edit.order, edit.order.map((old) => names[old]), {keysFollow: edit.keysFollow});
                 edit.names = [...message.names];
             }
             return edit;
@@ -282,12 +322,13 @@ function applyLayerEdit(edit, message) {
     }
     if (message.type === "savePortableLayers" && message.names !== undefined) {
         if (!Array.isArray(message.names) || message.names.length !== edit.names.length) throw new Error("Read the layers again before naming them.");
-        reorderLayers(edit.before.document, edit.order, edit.order.map((old) => message.names[old]), {keysFollow: edit.keysFollow});
+        const names = message.names;
+        reorderLayers(edit.before.document, edit.order, edit.order.map((old) => names[old]), {keysFollow: edit.keysFollow});
         edit.names = [...message.names];
         return edit;
     }
     const id = message.id;
-    if (!Number.isInteger(id) || id < 0 || id >= edit.order.length) throw new Error("Read the layers again before editing them.");
+    if (typeof id !== "number" || !Number.isInteger(id) || id < 0 || id >= edit.order.length) throw new Error("Read the layers again before editing them.");
     if (message.name !== undefined) {
         if (typeof message.name !== "string") throw new Error("Enter a layer name.");
         const names = [...edit.names];
@@ -300,7 +341,8 @@ function applyLayerEdit(edit, message) {
     // from this state afterwards: dropping them here would quietly undo
     // whatever was typed before the move.
     if (Array.isArray(message.names) && message.names.length === edit.names.length && message.names.every((name) => typeof name === "string")) {
-        reorderLayers(edit.before.document, edit.order, edit.order.map((old) => message.names[old]), {keysFollow: edit.keysFollow});
+        const names = message.names;
+        reorderLayers(edit.before.document, edit.order, edit.order.map((old) => names[old]), {keysFollow: edit.keysFollow});
         edit.names = [...message.names];
     }
     // The bottom slot is the base. A layer reaches it only through Make base,
@@ -311,12 +353,13 @@ function applyLayerEdit(edit, message) {
         [edit.order[0], edit.order[from]] = [edit.order[from], edit.order[0]];
         return edit;
     }
-    const to = Number.isInteger(message.to) ? message.to : Number.isInteger(message.direction) && [1, -1].includes(message.direction) ? from + message.direction : NaN;
+    const to = typeof message.to === "number" && Number.isInteger(message.to) ? message.to : typeof message.direction === "number" && Number.isInteger(message.direction) && [1, -1].includes(message.direction) ? from + message.direction : NaN;
     if (from < 1 || !(to >= 1 && to < edit.order.length)) throw new Error("The base stays at the bottom; use Make base to put another layer there.");
     edit.order.splice(to, 0, ...edit.order.splice(from, 1));
     return edit;
 }
 
+/** @param {LayerEdit} edit */
 const layerEditDocument = (edit) => reorderLayers(edit.before.document, edit.order, edit.order.map((old) => edit.names[old]), {keysFollow: edit.keysFollow !== false});
 
-module.exports = {DEMO_MESSAGES, DRAFT_CONTROLS, HOST_WORDS, PORTABLE_MESSAGES, applyLayerEdit, buildPanelModel, hostModel, discardDraftForDevice, layerEditDocument, observePortable, routeMessage, startLayerEdit, takeOutbox};
+module.exports = {DEMO_MESSAGES, DRAFT_CONTROLS, HOST_WORDS, PORTABLE_MESSAGES, applyLayerEdit, buildPanelModel, hostModel, discardDraftForDevice, layerEditDocument, observePortable, panelRequest, routeMessage, startLayerEdit, takeOutbox};

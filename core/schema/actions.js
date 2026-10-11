@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 
 // Profile actions: their names, their native keycodes, and the limits that
@@ -21,12 +22,14 @@ const {resolveNativeQmkExpression} = require("./compiled-profile-v1");
 // neither names its keys nor edits it.
 const ACTION_ABI = 0x837cf479;
 const KNOWN_ACTION_ABIS = Object.freeze([ACTION_ABI]);
+/** @param {number} value */
 const knownActionAbi = value => KNOWN_ACTION_ABIS.includes(value);
 
 // The keyboard's pointing slots: all 32 of the keycode blocks.
 const PD_SLOT_COUNT = PD_SLOT_CAPACITY;
 
 // An action's name, the one every edit message and row lookup uses.
+/** @param {import("./types.js").SemanticAction} action */
 function actionName(action) {
     switch (action.kind) {
         case ACTION.NONE: return "KC_NO";
@@ -46,15 +49,20 @@ function actionName(action) {
 }
 
 // The native keycode an action is stored as on a VIA layer, when it has one.
+/** @param {import("./types.js").SemanticAction} action */
 const nativeCode = action => action.kind === ACTION.QMK_KEYCODE ? action.operand : resolveNativeQmkExpression(actionName(action), {});
 // A native keycode as the action a profile stores for it.
+/** @param {number} operand @returns {import("./types.js").SemanticAction} */
 const keycodeAction = operand => ({kind: ACTION.QMK_KEYCODE, operand});
 
 // The pointing slot a native keycode binds, if it is a pointing-mode key.
+/** @param {number} code */
 const pdSlotOfCode = code => pdBindingOfCode(code)?.slot;
 
 // A layer as edit messages and group rows name it, and back.
+/** @param {number} index @returns {import("../../contracts/edits.js").LayerReference} */
 const layerRef = index => `Layer ${index}`;
+/** @param {unknown} text */
 const layerOfRef = text => {
     const match = /^Layer ([0-9]+)$/.exec(String(text ?? ""));
     return match ? Number(match[1]) : undefined;
@@ -66,6 +74,7 @@ const layerOfRef = text => {
 // whose fifth tap locks, OSL as a one-shot). Where each may go is
 // placementProblem's to say.
 const OWNED_LAYER_BASES = Object.freeze([0x5200, 0x5260, 0x5280, 0x52c0]); // TO, TG, OSL, TT
+/** @param {number} code @param {number} layerCount */
 const isOwnedLayerCode = (code, layerCount) =>
     OWNED_LAYER_BASES.includes(code & ~0x1f) && (code & 0x1f) < layerCount;
 
@@ -77,9 +86,12 @@ const isOwnedLayerCode = (code, layerCount) =>
 // TO() and LOCK_LAYER() go anywhere; DF() and PDF(), which the keyboard does not
 // own, go nowhere. A custom key does what its own behaviour says, so it is a
 // key or a combo output, never a step. Returns what is wrong, or undefined.
+/** @typedef {'key' | 'tap' | 'holdPress' | 'holdOther' | 'comboOutput'} Placement */
 const PLACEMENT = Object.freeze({KEY: "key", TAP: "tap", HOLD_PRESS: "holdPress", HOLD_OTHER: "holdOther", COMBO_OUTPUT: "comboOutput"});
 
+/** @param {number} code @param {number} layerCount @returns {{kind: string, places: Placement[]} | undefined} */
 function layerRuleOf(code, layerCount) {
+    /** @param {number} base @param {number} [span] */
     const range = (base, span = 0x20) => code >= base && code < base + span;
     const layer = code & 0x1f;
     if (range(0x4000, 0x1000)) return ((code >> 8) & 0x0f) < layerCount ? {kind: "layerTap", places: [PLACEMENT.KEY]} : {kind: "unowned", places: []};
@@ -92,9 +104,10 @@ function layerRuleOf(code, layerCount) {
     return undefined;
 }
 
+/** @param {import("./types.js").SemanticAction} action @param {Placement} placement @param {{layerCount?: number}} [options] */
 function placementProblem(action, placement, {layerCount = 16} = {}) {
     if (action.kind === ACTION.CUSTOM_KEY || (action.kind === ACTION.QMK_KEYCODE && customKeyOfCode(action.operand) !== undefined)) {
-        return [PLACEMENT.KEY, PLACEMENT.COMBO_OUTPUT].includes(placement) ? undefined
+        return /** @type {Placement[]} */ ([PLACEMENT.KEY, PLACEMENT.COMBO_OUTPUT]).includes(placement) ? undefined
             : `${actionName(action)} is a custom key: it does what its own behaviour says, so it works as a key or a combo output, not inside a behaviour.`;
     }
     const code = action.kind === ACTION.LAYER_MOMENTARY ? 0x5220 | action.operand : nativeCode(action);
@@ -118,7 +131,9 @@ function placementProblem(action, placement, {layerCount = 16} = {}) {
 // a synthetic QMK record, so they work there as on a key. An older one sends
 // them through tap_code16(), which keeps only the low byte (DRGSCRL, 0x7E06,
 // types C), so there they belong on a key or a combo only.
+/** @param {number} code */
 const isQmkFunction = code => code > 0x52ff && code < 0x7e40 && !(code >= 0x7700 && code < 0x7780);
+/** @param {import("./types.js").SemanticAction} action @param {{behaviorQmkFunctions?: boolean}} [options] */
 function behaviorEmitProblem(action, {behaviorQmkFunctions = false} = {}) {
     const code = nativeCode(action);
     if (behaviorQmkFunctions || code === undefined || !isQmkFunction(code)) return undefined;

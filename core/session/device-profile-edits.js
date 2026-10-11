@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 const {encodePdDomain, decodePdDomain} = require("../schema/pd-mode-domain-v1");
 const {decodeProfileBlob, encodeProfileBlob, PROFILE_DOMAIN_IDS} = require("../schema/profile-blob-v1");
@@ -13,19 +14,31 @@ const {BEHAVIOR_EDITS, editKeyBehaviors} = require("./key-behavior-edits");
 const {decodeSettings, encodeSettings} = require("../schema/settings-domain-v1");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../data/charybdis-layout");
 const {profileDepthOptions} = require("../schema/profile-depth");
+/**
+ * @typedef {Extract<import("../../contracts/edits.js").PanelEdit, {type: 'addCombo' | 'saveCombo' | 'deleteCombo' | 'updateComboHoldTerm' | 'updateComboDefaultTerm'}>} ComboEdit
+ * @typedef {Extract<import("../../contracts/edits.js").PanelEdit, {type: 'updatePlacementPolicy' | 'savePdMode' | 'clearPdMode' | 'duplicatePdMode' | 'saveBehavior' | 'addBehavior' | 'deleteBehavior' | 'retargetBehavior' | 'updateLayerColor' | 'updatePdModeColor' | 'updateAutomouseFade' | 'updateComboFeedback' | 'updateKeyBehaviorFeedback' | 'updateRgbStages' | 'saveRgbReusableLedGroup' | 'deleteRgbReusableLedGroup' | 'addRgbLedGroup' | 'deleteRgbLedGroup'}> | ComboEdit} ProfileEdit
+ * @typedef {{capabilities?: import("../model/types.js").ProfileDestination, combos?: import("./types.js").ComboRead, maximumBrightness?: number}} EditContext
+ * @typedef {Omit<import("../schema/types.js").ComboRowInput, 'inputs' | 'output'> & {inputs: import("../schema/types.js").SemanticAction[], output: import("../schema/types.js").SemanticAction}} SemanticComboRow
+ * @typedef {import("../schema/types.js").RgbProfile} Rgb
+ * @typedef {Partial<import("../../contracts/edits.js").PdConfig> & {id: number, kind: number, name: string}} EditablePointing
+ * @typedef {import("../../contracts/edits.js").Colour & {hue?: import("../../contracts/edits.js").Scalar, sat?: import("../../contracts/edits.js").Scalar, val?: import("../../contracts/edits.js").Scalar}} ColourInput
+ */
 const COMBO_EDITS = new Set(["addCombo", "saveCombo", "deleteCombo", "updateComboHoldTerm", "updateComboDefaultTerm"]);
 
 const PD_EDITS = new Set(["savePdMode", "clearPdMode", "duplicatePdMode"]);
 const RGB_EDITS = new Set(["updateLayerColor", "updatePdModeColor", "updateAutomouseFade", "updateComboFeedback", "updateKeyBehaviorFeedback", "updateRgbStages", "saveRgbReusableLedGroup", "deleteRgbReusableLedGroup", "addRgbLedGroup", "deleteRgbLedGroup"]);
+/** @param {string} message */
 const invalid = message => Object.assign(new Error(message), {code: "INVALID_PROFILE_EDIT"});
 // QMK fires a combo only when its keys land within the window, so a 0 ms
 // window never fires; the keyboard would store it, but nothing is gained.
+/** @param {unknown} value @param {string} [label] */
 function comboWindow(value, label = "Combo window") {
     const ms = integer(value, 65535, label);
     if (ms === 0) throw invalid(`${label} must be at least 1 ms: a 0 ms combo never fires.`);
     return ms;
 }
 
+/** @param {unknown} value @param {number} max @param {string} label */
 function integer(value, max, label) {
     if (typeof value === "string" && !/^\d+$/.test(value.trim())) throw invalid(`${label} must be a whole number.`);
     if (typeof value !== "string" && typeof value !== "number") throw invalid(`${label} must be a whole number.`);
@@ -33,13 +46,16 @@ function integer(value, max, label) {
     if (!Number.isInteger(number) || number < 0 || number > max) throw invalid(`${label} must be between 0 and ${max}.`);
     return number;
 }
+/** @param {string | undefined} value @param {Record<string, number>} values @param {string} label */
 function enumValue(value, values, label) {
-    if (!Object.hasOwn(values, value)) throw invalid(`Unknown ${label}: ${value}.`);
+    if (value === undefined || !Object.hasOwn(values, value)) throw invalid(`Unknown ${label}: ${value}.`);
     return values[value];
 }
+/** @param {ColourInput} value @param {number} [maximumBrightness] */
 function color(value, maximumBrightness = 255) {
     return {h: integer(value.h ?? value.hue, 255, "Hue"), s: integer(value.s ?? value.sat, 255, "Saturation"), v: integer(value.v ?? value.val, maximumBrightness, "Brightness")};
 }
+/** @param {unknown} value @param {string} prefix */
 function namedId(value, prefix) {
     const match = String(value).match(new RegExp(`^${prefix} (\\d+)$`));
     if (!match) throw invalid(`Choose a reported ${prefix.toLowerCase()}.`);
@@ -47,19 +63,26 @@ function namedId(value, prefix) {
 }
 // A group is its set of LEDs, so two groups never hold the same set: a row
 // or a saved selection that matches an existing group reuses it.
+/** @param {number[]} leds */
 const ledSet = leds => [...new Set(leds)].sort((left, right) => left - right).join(",");
+/** @param {number[]} left @param {number[]} right */
 const sameLeds = (left, right) => ledSet(left) === ledSet(right);
+/** @param {Rgb} rgb @param {number[]} leds */
 function groupFor(rgb, leds) {
     const found = rgb.groups.find(row => sameLeds(row.leds, leds));
     if (found) return found.id;
     rgb.groups.push({id: rgb.groups.length, leds});
     return rgb.groups.length - 1;
 }
+/** @param {Rgb} rgb @param {string} target */
 function groupRows(rgb, target) {
-    const table = {layer: "layerGroupRows", pdMode: "pdModeGroupRows", combo: "comboGroupRows", keyBehavior: "keyGroupRows"}[target];
+    /** @type {Record<string, "layerGroupRows" | "pdModeGroupRows" | "comboGroupRows" | "keyGroupRows">} */
+    const tables = {layer: "layerGroupRows", pdMode: "pdModeGroupRows", combo: "comboGroupRows", keyBehavior: "keyGroupRows"};
+    const table = tables[target];
     if (!table) throw invalid("Unknown LED group target.");
     return rgb[table];
 }
+/** @template T @param {T[]} rows @param {(row: T) => boolean} predicate @param {string} label @returns {T} */
 function existing(rows, predicate, label) {
     const row = rows.find(predicate);
     if (!row) throw invalid(`${label} is absent from the keyboard read.`);
@@ -68,6 +91,7 @@ function existing(rows, predicate, label) {
 
 // Every catalog name and alias by its keycode value, built once: a pointing
 // mode's shortcuts resolve through it on every save.
+/** @type {Record<string, number> | undefined} */
 let keycodeValueCache;
 const keycodeValues = () => {
     if (!keycodeValueCache) {
@@ -77,6 +101,7 @@ const keycodeValues = () => {
     return keycodeValueCache;
 };
 
+/** @param {Buffer} bytes @param {ProfileEdit} message @param {EditContext} [context] */
 function editDeviceProfile(bytes, message, context = {}) {
     if (message.type === "updatePlacementPolicy") {
         const profile = decodeProfileBlob(bytes);
@@ -86,7 +111,7 @@ function editDeviceProfile(bytes, message, context = {}) {
         const index = integer(message.layoutIndex, CHARYBDIS_4X6_LAYOUT_MATRIX.length - 1, "Key position");
         if (typeof message.useBehavior !== "boolean" || typeof message.joinCombos !== "boolean") throw invalid("Choose both placement switches.");
         const [row, column] = CHARYBDIS_4X6_LAYOUT_MATRIX[index], position = row * 6 + column;
-        for (const [field, on] of [["bypass", message.useBehavior], ["exclude", message.joinCombos]]) {
+        for (const [field, on] of /** @type {const} */ ([["bypass", message.useBehavior], ["exclude", message.joinCombos]])) {
             const set = new Set(settings.layers[layer][field]);
             if (on) set.delete(position); else set.add(position);
             settings.layers[layer][field] = [...set].sort((a, b) => a - b);
@@ -94,10 +119,11 @@ function editDeviceProfile(bytes, message, context = {}) {
         domain.payload = encodeSettings(settings);
         return encodeProfileBlob(profile);
     }
-    if (PD_EDITS.has(message.type)) {
-        if (!(context.capabilities?.supportedDomainMask & 16)) throw invalid("PD editing needs firmware with configurable pointing slots.");
+    if (message.type === "savePdMode" || message.type === "clearPdMode" || message.type === "duplicatePdMode") {
+        if (!((context.capabilities?.supportedDomainMask || 0) & 16)) throw invalid("PD editing needs firmware with configurable pointing slots.");
         const profile = decodeProfileBlob(bytes);
         const domain = existing(profile.domains, row => row.id === 80, "Pointing modes");
+        /** @type {EditablePointing[]} */
         const slots = decodePdDomain(domain.payload);
         const id = integer(message.slot, slots.length - 1, "Slot");
         if (message.type === "clearPdMode") slots[id] = {id, kind: 0, name: ""};
@@ -107,6 +133,7 @@ function editDeviceProfile(bytes, message, context = {}) {
             slots[id] = {...slots[source], id};
         } else slots[id] = {...structuredClone(message.config), id};
         const keyValues = keycodeValues();
+        /** @param {import("../../contracts/edits.js").PdTap | undefined} tap */
         const convertTap = tap => {
             if (!tap || typeof tap.keycode !== "string") return;
             const native = resolveNativeQmkExpression(tap.keycode, {qmkKeycodeValues: keyValues});
@@ -116,11 +143,12 @@ function editDeviceProfile(bytes, message, context = {}) {
         Object.values(slots[id].directions || {}).forEach(convertTap);
         Object.values(slots[id].diagonals || {}).forEach(convertTap);
         slots[id].buttons?.forEach(button => convertTap(button.tap));
-        domain.payload = encodePdDomain(slots);
+        // Every textual shortcut was resolved above; the encoder validates the remaining fields.
+        domain.payload = encodePdDomain(/** @type {import("../schema/types.js").PdSlotInput[]} */ (slots));
         return encodeProfileBlob(profile);
     }
-    if (COMBO_EDITS.has(message.type)) return editCombos(bytes, message, context);
-    if (BEHAVIOR_EDITS.has(message.type)) {
+    if (message.type === "addCombo" || message.type === "saveCombo" || message.type === "deleteCombo" || message.type === "updateComboHoldTerm" || message.type === "updateComboDefaultTerm") return editCombos(bytes, message, context);
+    if (message.type === "saveBehavior" || message.type === "addBehavior" || message.type === "deleteBehavior" || message.type === "retargetBehavior") {
         const profile = decodeProfileBlob(bytes);
         const domain = existing(profile.domains, row => row.id === PROFILE_DOMAIN_IDS.KEY_BEHAVIORS, "Key behaviours");
         domain.payload = editKeyBehaviors(domain.payload, message, context.capabilities);
@@ -132,6 +160,7 @@ function editDeviceProfile(bytes, message, context = {}) {
     const maximumBrightness = context.maximumBrightness ?? 255;
     const rgbOptions = {maximumBrightness, ...profileDepthOptions(context.capabilities, domain.payload).rgb};
     const rgb = decodeRgbDomainV1(domain.payload, rgbOptions);
+    /** @param {ColourInput} value */
     const editColor = (value) => color(value, maximumBrightness);
     switch (message.type) {
         case "updateLayerColor": {
@@ -152,7 +181,7 @@ function editDeviceProfile(bytes, message, context = {}) {
         case "updateRgbStages": rgb.stageEnableMask = integer(message.stageEnableMask, 31, "RGB stage mask"); break;
         case "saveRgbReusableLedGroup": {
             const group = message.group;
-            const leds = group.ledIndices.map(value => integer(value, 57, "LED index"));
+            const leds = (/** @type {number[]} */ (group.ledIndices)).map(value => integer(value, 57, "LED index"));
             if (group.originalName) {
                 const target = existing(rgb.groups, row => row.id === namedId(group.originalName, "Group"), "LED group");
                 const twin = rgb.groups.find(row => row !== target && sameLeds(row.leds, leds));
@@ -171,19 +200,19 @@ function editDeviceProfile(bytes, message, context = {}) {
             rgb.groups = rgb.groups.filter(row => row.id !== id);
             const renumbered = new Map(rgb.groups.map((row, index) => [row.id, index]));
             rgb.groups.forEach((row, index) => {row.id = index;});
-            for (const row of references) row.groupId = renumbered.get(row.groupId);
+            for (const row of references) row.groupId = /** @type {number} */ (renumbered.get(row.groupId));
             break;
         }
         case "addRgbLedGroup": {
             const group = message.group;
             let groupId;
             if (group.ledGroupName) groupId = existing(rgb.groups, row => row.id === namedId(group.ledGroupName, "Group"), "LED group").id;
-            else groupId = groupFor(rgb, group.ledIndices.map(value => integer(value, 57, "LED index")));
+            else groupId = groupFor(rgb, (/** @type {number[]} */ (group.ledIndices)).map(value => integer(value, 57, "LED index")));
             const row = {color: editColor(group), groupId};
-            if (group.target === "layer") row.selector = group.owner === "RGB_LAYER_GROUP_ALL" ? 255 : namedId(group.owner, "Layer");
-            if (group.target === "pdMode") row.selector = group.owner === "RGB_PD_MODE_GROUP_ALL" ? 255 : enumValue(group.owner, RGB_PD_MODE_IDS, "pointing mode");
-            if (group.target === "keyBehavior") row.semantic = enumValue(group.owner, RGB_KEY_SEMANTICS, "key feedback type");
-            groupRows(rgb, group.target).push(row); break;
+            if (group.target === "layer") rgb.layerGroupRows.push({...row, selector: group.owner === "RGB_LAYER_GROUP_ALL" ? 255 : namedId(group.owner, "Layer")});
+            else if (group.target === "pdMode") rgb.pdModeGroupRows.push({...row, selector: group.owner === "RGB_PD_MODE_GROUP_ALL" ? 255 : enumValue(group.owner, RGB_PD_MODE_IDS, "pointing mode")});
+            else if (group.target === "keyBehavior") rgb.keyGroupRows.push({...row, semantic: enumValue(group.owner, RGB_KEY_SEMANTICS, "key feedback type")});
+            else {groupRows(rgb, group.target); rgb.comboGroupRows.push(row);} break;
         }
         case "deleteRgbLedGroup": {
             const rows = groupRows(rgb, message.target);
@@ -197,24 +226,27 @@ function editDeviceProfile(bytes, message, context = {}) {
 
 // A combo either follows the default window (termMs null) or has its own.
 // A form sends an empty window, or followsDefault, to follow it.
+/** @param {Buffer} bytes @param {ComboEdit} message @param {EditContext} context */
 function editCombos(bytes, message, context) {
-    if (!(context.capabilities?.supportedDomainMask & 4)) throw invalid("This firmware can read combos but cannot save them. Flash the updated firmware pair first.");
+    if (!((context.capabilities?.supportedDomainMask || 0) & 4)) throw invalid("This firmware can read combos but cannot save them. Flash the updated firmware pair first.");
     const read = context.combos;
     if (read?.state !== "read") throw invalid("Read the keyboard's combos before saving.");
     if (read.noTimer || read.customTrigger || read.customRelease || read.customRepress) throw invalid("This firmware has custom combo hooks or disabled timing that the profile editor cannot replace.");
     const profile = decodeProfileBlob(bytes);
     const domain = profile.domains.find(row => row.id === PROFILE_DOMAIN_IDS.COMBOS);
     const nativeAction = keycodeAction;
+    /** @type {Omit<import("../schema/types.js").ComboInput, "rows"> & {version: number, rows: SemanticComboRow[]}} */
     const table = domain ? decodeComboDomain(domain.payload) : comboTableOf(read);
+    /** @param {unknown} value */
     const expression = value => {
         const name = String(value).trim();
         if (/^MO\(/.test(name)) return semanticActionForExpression(name, {});
         const native = keycodes.encode(name);
         if (native !== undefined) return nativeAction(native);
-        if (!knownActionAbi(context.capabilities.actionAbiDigest)) throw invalid("Named custom actions require a matching keyboard action vocabulary.");
+        if (!knownActionAbi(context.capabilities?.actionAbiDigest ?? 0)) throw invalid("Named custom actions require a matching keyboard action vocabulary.");
         return semanticActionForExpression(name, {layers: Array.from({length: read.layerReferences.length}, (_, id) => ({name: layerRef(id)}))});
     };
-    const followsDefault = message.followsDefault === true || String(message.termMs ?? "").trim() === "";
+    const followsDefault = "followsDefault" in message && message.followsDefault === true || String("termMs" in message ? message.termMs ?? "" : "").trim() === "";
     if (message.type === "updateComboHoldTerm") {
         table.holdTermMs = integer(message.holdTermMs, 65535, "Hold threshold");
     } else if (message.type === "updateComboDefaultTerm") {
@@ -222,11 +254,11 @@ function editCombos(bytes, message, context) {
     } else if (message.type === "deleteCombo") {
         table.rows.splice(integer(message.id, table.rows.length - 1, "Combo index"), 1);
     } else {
-        if (!Array.isArray(message.inputs) || message.inputs.length < 2 || message.inputs.length > (context.capabilities.maxKeysPerCombo ?? 16)) throw invalid("Choose between two inputs and the keyboard's combo input limit.");
+        if (!Array.isArray(message.inputs) || message.inputs.length < 2 || message.inputs.length > (context.capabilities?.maxKeysPerCombo ?? 16)) throw invalid("Choose between two inputs and the keyboard's combo input limit.");
         const previous = message.type === "saveCombo" ? table.rows[integer(message.id, table.rows.length - 1, "Combo index")] : null;
         const enabled = message.enabled ?? previous?.enabled ?? true;
         if (typeof enabled !== "boolean") throw invalid("The combo must be enabled or disabled.");
-        const bank = 2 ** (context.capabilities.compiledLayerCount ?? 16) - 1;
+        const bank = 2 ** (context.capabilities?.compiledLayerCount ?? 16) - 1;
         const row = {inputs: message.inputs.map(expression), output: expression(message.output), termMs: followsDefault ? null : comboWindow(message.termMs), mustHold: message.mustHold === true, mustTap: message.mustTap === true, ordered: message.ordered === true,
             enabled, allowedLayers: integer(message.allowedLayers ?? previous?.allowedLayers ?? bank, bank, "Allowed layers")};
         if (message.type === "saveCombo") table.rows[integer(message.id, table.rows.length - 1, "Combo index")] = row;
@@ -234,7 +266,7 @@ function editCombos(bytes, message, context) {
     }
     // The keyboard refuses a combo table with an output it cannot run, so every
     // row is checked, not only the one being edited.
-    const problem = comboPlacementProblem(table.rows, {layerCount: context.capabilities.compiledLayerCount ?? 16});
+    const problem = comboPlacementProblem(table.rows, {layerCount: context.capabilities?.compiledLayerCount ?? 16});
     if (problem) throw invalid(problem);
     const payload = encodeComboDomain(table);
     if (domain) Object.assign(domain, {version: table.version, payload});
@@ -244,6 +276,7 @@ function editCombos(bytes, message, context) {
 
 // The stored table against what the keyboard now runs: every window as it
 // resolves, which combos follow the default, and the shared values.
+/** @param {Buffer} bytes @param {import("./types.js").ComboRead | null | undefined} read */
 function assertEffectiveCombos(bytes, read) {
     const profile = decodeProfileBlob(bytes);
     const domain = profile.domains.find(row => row.id === PROFILE_DOMAIN_IDS.COMBOS);
@@ -252,7 +285,7 @@ function assertEffectiveCombos(bytes, read) {
     const table = decodeComboDomain(domain.payload);
     const expected = table.rows.map(row => ({...row, termMs: effectiveComboTerm(table, row), followsDefault: row.termMs === null, inputs: row.inputs.map(nativeCode), output: nativeCode(row.output)}));
     const shared = table.defaultTermMs === read.defaultTermMs && table.holdTermMs === read.holdTermMs;
-    if (!shared || expected.length !== read.rows.length || expected.some((row, index) => { const actual = read.rows[index]; return ["id", "output", "termMs", "followsDefault", "mustHold", "mustTap", "ordered", "enabled", "allowedLayers"].some(key => row[key] !== actual[key]) || JSON.stringify(row.inputs) !== JSON.stringify(actual.inputs); })) throw invalid("The saved combo profile does not match the running combo table. Flash the current firmware pair and read from keyboard again.");
+    if (!shared || expected.length !== read.rows.length || expected.some((row, index) => { const actual = read.rows[index]; return (/** @type {const} */ (["id", "output", "termMs", "followsDefault", "mustHold", "mustTap", "ordered", "enabled", "allowedLayers"])).some(key => row[key] !== actual[key]) || JSON.stringify(row.inputs) !== JSON.stringify(actual.inputs); })) throw invalid("The saved combo profile does not match the running combo table. Flash the current firmware pair and read from keyboard again.");
 }
 
 module.exports = {PD_EDITS, RGB_EDITS, COMBO_EDITS, editDeviceProfile, assertEffectiveCombos};

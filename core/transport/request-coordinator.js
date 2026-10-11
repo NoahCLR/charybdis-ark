@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 
 const {
@@ -13,6 +14,7 @@ const {
 const DEFAULT_REQUEST_TIMEOUT_MS = 1000;
 
 class DeviceRequestCoordinator {
+    /** @param {import("./types.js").DeviceAdapter} adapter @param {import("./types.js").CoordinatorOptions} [options] */
     constructor(adapter, options = {}) {
         this.adapter = assertDeviceAdapter(adapter);
         this.defaultTimeoutMs = normalizeTimeout(
@@ -21,6 +23,7 @@ class DeviceRequestCoordinator {
         this.onUnexpectedReport = typeof options.onUnexpectedReport === "function"
             ? options.onUnexpectedReport
             : undefined;
+        /** @type {Map<string, CoordinatedDeviceConnection>} */
         this.connections = new Map();
         this.connecting = new Set();
     }
@@ -29,6 +32,7 @@ class DeviceRequestCoordinator {
         return normalizeDeviceDescriptors(await this.adapter.listDevices());
     }
 
+    /** @param {string} deviceId */
     async connect(deviceId) {
         const normalizedDeviceId = normalizeDeviceId(deviceId);
         if (this.connections.has(normalizedDeviceId) || this.connecting.has(normalizedDeviceId)) {
@@ -71,10 +75,12 @@ class DeviceRequestCoordinator {
         return connection;
     }
 
+    /** @param {string} deviceId */
     getConnection(deviceId) {
         return this.connections.get(normalizeDeviceId(deviceId));
     }
 
+    /** @param {string} deviceId */
     async disconnect(deviceId) {
         const connection = this.getConnection(deviceId);
         if (connection) {
@@ -89,6 +95,7 @@ class DeviceRequestCoordinator {
 }
 
 class CoordinatedDeviceConnection {
+    /** @param {import("./types.js").ConnectedDevice} device @param {string} deviceId @param {import("./types.js").CoordinatedConnectionOptions} options */
     constructor(device, deviceId, options) {
         this.device = device;
         this.deviceId = deviceId;
@@ -96,11 +103,17 @@ class CoordinatedDeviceConnection {
         this.onUnexpectedReport = options.onUnexpectedReport;
         this.onClosed = options.onClosed;
         this.state = "created";
+        /** @type {import("./types.js").RequestOperation[]} */
         this.queue = [];
+        /** @type {import("./types.js").RequestOperation | undefined} */
         this.active = undefined;
+        /** @type {Set<import("./types.js").DisconnectListener>} */
         this.disconnectListeners = new Set();
+        /** @type {import("./types.js").Disposer | undefined} */
         this.disposeReportListener = undefined;
+        /** @type {import("./types.js").Disposer | undefined} */
         this.disposeDisconnectListener = undefined;
+        /** @type {Promise<unknown> | undefined} */
         this.closePromise = undefined;
     }
 
@@ -131,6 +144,7 @@ class CoordinatedDeviceConnection {
         return this.state === "connected";
     }
 
+    /** @param {Uint8Array} report @param {import("./types.js").RequestOptions} [options] @returns {Promise<Buffer>} */
     request(report, options = {}) {
         let normalizedReport;
         try {
@@ -172,6 +186,7 @@ class CoordinatedDeviceConnection {
         }
 
         return new Promise((resolve, reject) => {
+            /** @type {import("./types.js").RequestOperation} */
             const operation = {
                 matchResponse,
                 reject,
@@ -192,6 +207,7 @@ class CoordinatedDeviceConnection {
         });
     }
 
+    /** @param {import("./types.js").DisconnectListener} listener */
     onDisconnect(listener) {
         if (typeof listener !== "function") {
             throw new TypeError("disconnect listener must be a function.");
@@ -216,7 +232,7 @@ class CoordinatedDeviceConnection {
 
         while (this.queue.length && !this.active) {
             const operation = this.queue.shift();
-            if (operation.settled) {
+            if (!operation || operation.settled) {
                 continue;
             }
             if (operation.signal?.aborted) {
@@ -239,6 +255,7 @@ class CoordinatedDeviceConnection {
         }
     }
 
+    /** @param {unknown} report */
     handleReport(report) {
         if (!this.connected) {
             return;
@@ -294,6 +311,7 @@ class CoordinatedDeviceConnection {
         queueMicrotask(() => this.pump());
     }
 
+    /** @param {Buffer} report @param {string} reason */
     reportUnexpected(report, reason) {
         if (!this.onUnexpectedReport) {
             return;
@@ -309,6 +327,7 @@ class CoordinatedDeviceConnection {
         }
     }
 
+    /** @param {unknown} reason */
     handleDeviceDisconnect(reason) {
         const error = liveLinkError(
             LIVE_LINK_ERROR_CODES.DISCONNECTED,
@@ -318,6 +337,7 @@ class CoordinatedDeviceConnection {
         void this.terminate(error, {activeError: error, closeDevice: false, queuedError: error});
     }
 
+    /** @param {import("./types.js").RequestOperation} operation */
     timeoutOperation(operation) {
         if (!this.connected || this.active !== operation || operation.settled) {
             return;
@@ -334,6 +354,7 @@ class CoordinatedDeviceConnection {
         });
     }
 
+    /** @param {import("./types.js").RequestOperation} operation */
     cancelOperation(operation) {
         if (operation.settled) {
             return;
@@ -355,6 +376,7 @@ class CoordinatedDeviceConnection {
         this.settle(operation, "reject", error);
     }
 
+    /** @param {import("./types.js").RequestOperation} operation @param {unknown} cause */
     failWrite(operation, cause) {
         if (!this.connected || this.active !== operation || operation.settled) {
             return;
@@ -371,6 +393,9 @@ class CoordinatedDeviceConnection {
         });
     }
 
+    /** @overload @param {import("./types.js").RequestOperation | undefined} operation @param {'resolve'} method @param {Buffer} value @returns {void} */
+    /** @overload @param {import("./types.js").RequestOperation | undefined} operation @param {'reject'} method @param {unknown} value @returns {void} */
+    /** @param {import("./types.js").RequestOperation | undefined} operation @param {'resolve' | 'reject'} method @param {unknown} value */
     settle(operation, method, value) {
         if (!operation || operation.settled) {
             return;
@@ -383,9 +408,11 @@ class CoordinatedDeviceConnection {
         if (operation.signal && operation.abortListener) {
             operation.signal.removeEventListener("abort", operation.abortListener);
         }
-        operation[method](value);
+        // The overloads require a report for resolve; reject accepts any cause.
+        operation[method](/** @type {Buffer} */ (value));
     }
 
+    /** @param {unknown} reason @param {import("./types.js").TerminationOptions} [options] */
     terminate(reason, options = {}) {
         if (this.state === "disconnected") {
             return this.closePromise || Promise.resolve();
@@ -425,6 +452,7 @@ class CoordinatedDeviceConnection {
     }
 }
 
+/** @param {unknown} deviceId */
 function normalizeDeviceId(deviceId) {
     const value = typeof deviceId === "string" ? deviceId.trim() : "";
     if (!value) {
@@ -433,6 +461,7 @@ function normalizeDeviceId(deviceId) {
     return value;
 }
 
+/** @param {unknown} value */
 function normalizeTimeout(value) {
     const timeout = Number(value);
     if (!Number.isInteger(timeout) || timeout <= 0) {
@@ -441,12 +470,14 @@ function normalizeTimeout(value) {
     return timeout;
 }
 
+/** @param {AbortSignal | null | undefined} value */
 function isAbortSignal(value) {
     return value && typeof value.aborted === "boolean" &&
         typeof value.addEventListener === "function" &&
         typeof value.removeEventListener === "function";
 }
 
+/** @param {import("./types.js").Subscription} value @returns {import("./types.js").Disposer} */
 function normalizeDisposer(value) {
     if (typeof value === "function") {
         return value;
@@ -457,10 +488,12 @@ function normalizeDisposer(value) {
     return () => undefined;
 }
 
+/** @param {Uint8Array} response @param {Uint8Array} request */
 function defaultResponseMatcher(response, request) {
     return response[0] === request[0];
 }
 
+/** @param {string} deviceId */
 function cancelledError(deviceId) {
     return liveLinkError(
         LIVE_LINK_ERROR_CODES.CANCELLED,
@@ -469,6 +502,7 @@ function cancelledError(deviceId) {
     );
 }
 
+/** @param {string} deviceId @param {InstanceType<typeof LiveLinkTransportError>} cause */
 function disconnectedAfter(deviceId, cause) {
     return liveLinkError(
         LIVE_LINK_ERROR_CODES.DISCONNECTED,

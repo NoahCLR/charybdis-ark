@@ -1,3 +1,12 @@
+// @ts-check
+/**
+ * @typedef {import("../../contracts/panel.js").PublishedModel | null} Model
+ * @typedef {import("../../contracts/panel.js").MacroSlot} MacroSlot
+ * @typedef {import("../view/types.js").MacroStep} MacroStep
+ */
+// Authored selectors below describe controls in these templates. A name
+// input exists only when the model supplies its naming capacity. Inspection
+// sizing fields belong only to replies containing a complete inspection.
 // Macros: the keyboard's macro slots, edited as literal text and key steps, each
 // with an optional name kept in the keyboard's profile. The slots share one
 // block of macro memory; the host says which still have room.
@@ -18,6 +27,7 @@ import {draftDot, draftMarks} from "../view/review.mjs";
 import {vocabulary, word} from "../view/vocabulary.mjs";
 import {topbar, unavailable} from "./shell.mjs";
 
+/** @type {[MacroStep["kind"], string][]} */
 const STEP_KINDS = [
     ["text", "Text"], ["tap", "Tap key or chord"], ["delay", "Delay"],
     ["press", "Press and hold"], ["release", "Release"],
@@ -35,10 +45,10 @@ export function screenMacros() {
         "Macro slots on the keyboard. A named macro shows by its name on keys, in the picker and in the key card.",
         bank.length ? `<input class="input" id="macroSearch" type="search" placeholder="Search macros by name" style="width:220px" value="${esc(state.macroSearch || "")}">` : "",
     )}</div>`);
-    main.querySelector("#macroSearch")?.addEventListener("input", (event) => { state.macroSearch = event.target.value; render(); });
+    /** @type {HTMLInputElement | null} */ (main.querySelector("#macroSearch"))?.addEventListener("input", (event) => { state.macroSearch = /** @type {HTMLInputElement} */ (event.target).value; render(); });
 
     const content = el(`<div class="content"><div class="pad" style="display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:20px;align-items:start"></div></div>`);
-    const pad = content.firstElementChild;
+    const pad = /** @type {HTMLElement} */ (content.firstElementChild);
     if (!bank.length) {
         pad.style.display = "block";
         pad.appendChild(el(`<div class="screen-stub"><h3>No macro banks read</h3>
@@ -52,7 +62,7 @@ export function screenMacros() {
     const grid = el(`<div class="card"><div class="card-h"><h3>Slots</h3>
         <span class="right tag" data-tip="${filled} filled">${available} of ${bank.length} available</span></div>
         <div class="card-b"><div class="macro-grid"></div>${memoryMeter(memory)}</div></div>`);
-    const cells = grid.querySelector(".macro-grid");
+    const cells = /** @type {HTMLElement} */ (grid.querySelector(".macro-grid"));
     const query = state.macroSearch || "";
     if (!bank.some((row) => macroMatches(row, query))) {
         cells.replaceWith(el(`<p class="note">No macro is named “${esc(query.trim())}”.</p>`));
@@ -73,13 +83,14 @@ export function screenMacros() {
         cells.append(cell);
     });
     pad.appendChild(grid);
-    pad.appendChild(slot ? editor(model, slot, canEdit) : el(`<div class="empty-card"><p class="note">Pick a slot.</p></div>`));
+    pad.appendChild(slot ? editor(/** @type {import("../../contracts/panel.js").PublishedModel} */ (model), slot, canEdit) : el(`<div class="empty-card"><p class="note">Pick a slot.</p></div>`));
     main.appendChild(content);
     return main;
 }
 
 // All slots share one block of macro memory. Each empty slot keeps room for
 // a few key taps; when that runs out the highest empty slots close.
+/** @param {import("../../contracts/panel.js").PublishedModel["macroBank"] | undefined} memory */
 function memoryMeter(memory) {
     if (!memory) return "";
     const used = memory.stored, share = Math.min(100, (used / memory.capacity) * 100);
@@ -90,10 +101,12 @@ function memoryMeter(memory) {
         <p class="note" style="margin-top:6px">A key tap takes 3 bytes; text uses its UTF-8 bytes. Every empty slot keeps room for ${memory.reserveTaps} key taps${closed ? `; ${closed} slot${closed === 1 ? " has" : "s have"} no room left` : ""}.</p>`;
 }
 
+/** @param {import("../../contracts/panel.js").PublishedModel} model @param {MacroSlot} slot @param {boolean} canEdit */
 function editor(model, slot, canEdit) {
     const form = macroForm(slot.keycode);
     const payload = form.draft ?? slot.payload ?? "";
     const parsed = parseMacro(payload, {unicode: true, keys: model?.macroPayloadKeycodes, aliases: model?.qmkKeycodeAliases});
+    /** @type {MacroStep[]} */
     let steps = form.steps ?? (parsed.steps.length ? parsed.steps : [{kind: "text", text: ""}]);
     const editable = canEdit && !state.recording && (!parsed.error || Boolean(form.steps));
     const dirty = form.draft !== undefined && payload !== slot.payload;
@@ -130,25 +143,26 @@ function editor(model, slot, canEdit) {
     // Pointer actions that discard/clear this input take precedence over the
     // change event caused by leaving its field.
     card.addEventListener("pointerdown", event => {
-        if (event.target.closest('[data-act="discard"], [data-act="clear"]')) setMacroForm(slot.keycode, {cancelBlur: true});
+        if (/** @type {HTMLElement | null} */ (/** @type {Element} */ (event.target).closest('[data-act="discard"], [data-act="clear"]'))) setMacroForm(slot.keycode, {cancelBlur: true});
     });
-    card.querySelector("[data-host-settings]")?.addEventListener("click", () => { state.screen = "settings"; render(); });
-    card.querySelector("[data-protection]").addEventListener("change", event => post(edits.macroProtectionMessage(slot.keycode, event.target.value, model.macroEditing.identity)));
-    const nameInput = card.querySelector("[data-name]");
-    nameInput?.addEventListener("input", () => showCount(card.querySelector("[data-name-count]"), nameInput.value, model.macroNameSpace.perName));
+    /** @type {HTMLElement | null} */ (card.querySelector("[data-host-settings]"))?.addEventListener("click", () => { state.screen = "settings"; render(); });
+    /** @type {HTMLSelectElement} */ (card.querySelector("[data-protection]")).addEventListener("change", event => post(edits.macroProtectionMessage(slot.keycode, /** @type {"auto" | "on" | "off"} */ (/** @type {HTMLSelectElement} */ (event.target).value), model.macroEditing.identity)));
+    const nameInput = /** @type {HTMLInputElement | null} */ (card.querySelector("[data-name]"));
+    nameInput?.addEventListener("input", () => showCount(/** @type {HTMLElement} */ (card.querySelector("[data-name-count]")), nameInput.value, /** @type {{perName: number}} */ (model.macroNameSpace).perName));
     nameInput?.addEventListener("change", () => post(edits.macroNameMessage(slot.keycode, nameInput.value, getModel()?.macroEditing?.identity)));
-    card.querySelectorAll("[data-goto-layer]").forEach(button => button.addEventListener("click", () => showOnLayer(slot.keycode, Number(button.dataset.gotoLayer))));
-    card.querySelector('[data-act="place"]').addEventListener("click", () => {
+    /** @type {NodeListOf<HTMLElement>} */ (card.querySelectorAll("[data-goto-layer]")).forEach(button => button.addEventListener("click", () => showOnLayer(slot.keycode, Number(button.dataset.gotoLayer))));
+    /** @type {HTMLButtonElement} */ (card.querySelector('[data-act="place"]')).addEventListener("click", () => {
         state.placement = {keycode: slot.keycode}; state.screen = "keys"; state.tab = "key"; render();
     });
-    steps.forEach((step, index) => card.querySelector("[data-macro-steps]").append(stepEditor(model, slot, steps, step, index, editable)));
-    const kind = card.querySelector("[data-kind]");
-    kind.addEventListener("change", () => setMacroForm(slot.keycode, {newKind: kind.value}));
-    card.querySelector('[data-act="insert"]').addEventListener("click", () => {
-        const step = kind.value === "text" ? {kind: "text", text: ""} : kind.value === "delay" ? {kind: "delay", delay: 120} : {kind: kind.value, keys: []};
+    steps.forEach((step, index) => /** @type {HTMLElement} */ (card.querySelector("[data-macro-steps]")).append(stepEditor(model, slot, steps, step, index, editable)));
+    const kind = /** @type {HTMLSelectElement} */ (card.querySelector("[data-kind]"));
+    kind.addEventListener("change", () => setMacroForm(slot.keycode, {newKind: /** @type {MacroStep["kind"]} */ (kind.value)}));
+    /** @type {HTMLButtonElement} */ (card.querySelector('[data-act="insert"]')).addEventListener("click", () => {
+        /** @type {MacroStep} */
+        const step = kind.value === "text" ? {kind: "text", text: ""} : kind.value === "delay" ? {kind: "delay", delay: 120} : {kind: /** @type {"tap" | "press" | "release"} */ (kind.value), keys: []};
         saveSteps(slot, [...(macroForm(slot.keycode).steps ?? steps), step], true); render();
     });
-    const raw = card.querySelector("[data-raw-payload]");
+    const raw = /** @type {HTMLTextAreaElement} */ (card.querySelector("[data-raw-payload]"));
     raw.addEventListener("input", () => {
         setMacroForm(slot.keycode, {draft: raw.value, steps: undefined, stepError: "", cancelBlur: false});
         inspectEdit(slot, false);
@@ -158,22 +172,22 @@ function editor(model, slot, canEdit) {
         const editable = canEdit && !state.recording && (!parsed.error || Boolean(current.steps));
         // Refresh while typing in raw text. Blur happens between pointerdown
         // and click, so it must preserve every control the user can press.
-        card.querySelector("[data-macro-steps]").replaceChildren(...steps.map((step, index) => stepEditor(model, slot, steps, step, index, editable)));
+        /** @type {HTMLElement} */ (card.querySelector("[data-macro-steps]")).replaceChildren(...steps.map((step, index) => stepEditor(model, slot, steps, step, index, editable)));
         kind.disabled = !editable;
-        card.querySelector('[data-act="insert"]').disabled = !editable;
+        /** @type {HTMLButtonElement} */ (card.querySelector('[data-act="insert"]')).disabled = !editable;
     });
     raw.addEventListener("change", () => inspectEdit(slot, true));
-    card.querySelector("[data-raw]").addEventListener("toggle", event => {
-        if (event.target.isConnected) setMacroForm(slot.keycode, {rawOpen: event.target.open});
+    /** @type {HTMLDetailsElement} */ (card.querySelector("[data-raw]")).addEventListener("toggle", event => {
+        if (/** @type {Element} */ (event.target).isConnected) setMacroForm(slot.keycode, {rawOpen: /** @type {HTMLDetailsElement} */ (event.target).open});
     });
-    card.querySelector('[data-act="discard"]').addEventListener("click", () => {
-        setMacroForm(slot.keycode, {draft: undefined, steps: undefined, stepError: "", validation: null, wantsStage: false, cancelBlur: false}); render();
+    /** @type {HTMLButtonElement} */ (card.querySelector('[data-act="discard"]')).addEventListener("click", () => {
+        setMacroForm(slot.keycode, {draft: undefined, steps: undefined, stepError: "", validation: undefined, wantsStage: false, cancelBlur: false}); render();
     });
-    card.querySelector('[data-act="clear"]').addEventListener("click", () => {
+    /** @type {HTMLButtonElement} */ (card.querySelector('[data-act="clear"]')).addEventListener("click", () => {
         setMacroForm(slot.keycode, {cancelBlur: false});
         saveSteps(slot, [{kind: "text", text: ""}], true); render();
     });
-    if (slot.available === false) card.querySelector(".card-b").prepend(el(`<div class="unavailable">This slot has no room. Shorten or clear another macro to open it.</div>`));
+    if (slot.available === false) /** @type {HTMLElement} */ (card.querySelector(".card-b")).prepend(el(`<div class="unavailable">This slot has no room. Shorten or clear another macro to open it.</div>`));
     paintFeedback(card, model, slot);
     if (form.draft !== undefined && !matchingValidation(form, model, slot) && !form.stepError) requestInspection(slot);
     wrap.append(card, recorder(model, slot, canEdit));
@@ -183,6 +197,7 @@ function editor(model, slot, canEdit) {
 // Every slot can hold a full-length name. The host enforces the rule; the
 // counter says where the name stands in bytes, which is what the keyboard
 // counts.
+/** @param {Model} model @param {MacroSlot} slot @param {boolean} canEdit */
 function nameField(model, slot, canEdit) {
     const space = model?.macroNameSpace;
     if (!space) return "";
@@ -192,6 +207,7 @@ function nameField(model, slot, canEdit) {
             data-tip="${esc(NAME_TIP)}">
         <span class="note${count.over ? " warn" : ""}" data-name-count>${esc(count.label)}</span></label>`;
 }
+/** @param {HTMLElement} node @param {string} text @param {number} max */
 function showCount(node, text, max) {
     const count = nameCount(text, max);
     node.textContent = count.label;
@@ -203,8 +219,10 @@ function showCount(node, text, max) {
 // in its layer colour and naming how. A click opens that layer in Keys with
 // this macro picked in its Macros tab, on the row for the first of those
 // routes, so the board rings its keys and the table marks the row.
+/** @type {Record<string, string>} */
 const ROUTE_WORDS = {here: "key", branches: "behaviour", combos: "combo"};
 
+/** @param {Model} model @param {MacroSlot} slot */
 function placedOn(model, slot) {
     const chips = macroPlacements(model, layers(), slot.keycode).map(({layer, at, routes}) => {
         const swatch = layerSwatch(model, layer);
@@ -221,6 +239,7 @@ function placedOn(model, slot) {
             : `<span class="note">No key, behaviour or combo sets this macro off. Place it on a key to use it.</span>`}</div>`;
 }
 
+/** @param {string} keycode @param {number} at */
 function showOnLayer(keycode, at) {
     const placement = macroPlacements(getModel(), layers(), keycode).find((entry) => entry.at === at);
     const route = placement?.routes[0];
@@ -235,14 +254,19 @@ function showOnLayer(keycode, at) {
 // Input remains local until the host has inspected this exact payload under
 // the current draft. A late reply can never stage a newer or discarded edit.
 let nextInspection = 0;
+/** @type {Map<string, {context: string, payload: string, requestId: number}>} */
 const pendingInspections = new Map();
+/** @param {Model} model @param {MacroSlot} slot */
 const inspectionContext = (model, slot) => JSON.stringify([model?.draft?.id, model?.draft?.revision,
     model?.macroUnicode, slot?.bytes, model?.macroBank?.free, canEditArea("macros")]);
-const matchingValidation = (form, model, slot) => Boolean(form.validation) && form.validation.payload === form.draft &&
+/** @param {import("../state.js").MacroForm} form @param {Model} model @param {MacroSlot} slot */
+const matchingValidation = (form, model, slot) => form.validation != null && form.validation.payload === form.draft &&
     form.validation.context === inspectionContext(model, slot);
 
+/** @param {string} keycode */
 function currentSlot(keycode) { return getModel()?.viaMacros?.find(slot => slot.keycode === keycode); }
 
+/** @param {MacroSlot} slot */
 function requestInspection(slot) {
     const form = macroForm(slot.keycode), model = getModel();
     if (form.draft === undefined || form.stepError || !canEditArea("macros")) return;
@@ -255,6 +279,7 @@ function requestInspection(slot) {
     post(edits.macroValidationMessage(slot.keycode, form.draft, requestId));
 }
 
+/** @param {MacroSlot} slot @param {boolean} stage */
 function inspectEdit(slot, stage) {
     slot = currentSlot(slot.keycode) || slot;
     if (stage && macroForm(slot.keycode).cancelBlur) {
@@ -268,13 +293,15 @@ function inspectEdit(slot, stage) {
     refreshFeedback(slot.keycode);
 }
 
+/** @param {MacroSlot} slot */
 function keepValidated(slot) {
     const model = getModel(), form = macroForm(slot.keycode);
-    if (!canEditArea("macros") || slot.available === false || !form.wantsStage || form.stepError || state.recording || !matchingValidation(form, model, slot) || form.validation.validation.error) return;
+    if (!canEditArea("macros") || slot.available === false || !form.wantsStage || form.stepError || state.recording || !matchingValidation(form, model, slot) || form.validation?.validation.error) return;
     setMacroForm(slot.keycode, {wantsStage: false});
-    if (form.draft !== slot.payload) post(edits.macroMessage(slot.keycode, form.draft, model?.macroEditing?.identity));
+    if (form.draft !== slot.payload) post(edits.macroMessage(slot.keycode, form.draft ?? slot.payload, model?.macroEditing?.identity));
 }
 
+/** @param {Extract<import("../../contracts/messages.js").PanelResponse, {type: "macroValidation"}>} message */
 export function receiveMacroValidation(message) {
     const form = macroForm(message.keycode), model = getModel();
     if (form.requestId !== message.requestId || form.draft !== message.payload || message.draftId !== model?.draft?.id || message.draftRevision !== model?.draft?.revision) return;
@@ -289,43 +316,49 @@ export function receiveMacroValidation(message) {
     refreshFeedback(message.keycode);
 }
 
+/** @param {MacroSlot} slot @param {MacroStep[]} steps */
 function saveSteps(slot, steps, stage = false) {
     const {payload, error} = macroStepsInput(steps);
     setMacroForm(slot.keycode, {steps, draft: payload, stepError: error, cancelBlur: false});
-    const raw = document.querySelector(`[data-raw-payload="${slot.keycode}"]`);
+    const raw = /** @type {HTMLTextAreaElement | null} */ (document.querySelector(`[data-raw-payload="${slot.keycode}"]`));
     if (raw && document.activeElement !== raw) raw.value = payload;
     inspectEdit(slot, stage);
 }
 
+/** @param {string} keycode */
 function refreshFeedback(keycode) {
-    const card = document.querySelector(`[data-macro-editor="${keycode}"]`), slot = currentSlot(keycode);
+    const card = /** @type {HTMLElement | null} */ (document.querySelector(`[data-macro-editor="${keycode}"]`)), slot = currentSlot(keycode);
     if (card && slot) paintFeedback(card, getModel(), slot);
 }
 
+/** @param {HTMLElement} card @param {Model} model @param {MacroSlot} slot */
 function paintFeedback(card, model, slot) {
     const form = macroForm(slot.keycode), local = form.draft !== undefined;
     const payload = form.draft ?? slot.payload;
     const parsed = parseMacro(payload, {keys: model?.macroPayloadKeycodes, aliases: model?.qmkKeycodeAliases, unicode: model?.macroUnicode?.supported,
         textEntry: Boolean(model?.macroUnicode?.mode), layoutChars: model?.macroUnicode?.layoutChars, modifierKeys: model?.macroPayloadModifierKeycodes});
     const held = unreleased(parsed.steps, model?.qmkKeycodeAliases);
-    const inspection = matchingValidation(form, model, slot) ? form.validation.validation : null;
+    /** @type {import("../../contracts/messages.js").MacroValidation | null | undefined} */
+    const inspection = matchingValidation(form, model, slot) ? form.validation?.validation : null;
     const error = form.stepError || parsed.error || (held.length ? `Release ${held.map(key => actionLabel(model, key)).join(", ")} before the macro ends.` : "") || inspection?.error || (!local && slot.playbackError);
-    const program = local ? inspection?.program : slot.program;
-    const bytes = local ? inspection?.bytes : slot.bytes;
+    const measured = inspection && "bytes" in inspection ? /** @type {import("../../contracts/model.js").MacroInspection} */ (inspection) : null;
+    const program = local ? measured?.program : slot.program;
+    const bytes = local ? measured?.bytes : slot.bytes;
     const max = model?.macroBank?.programMax === null ? null : model?.macroBank?.programMax ?? 512;
-    const available = inspection?.availableBytes ?? (slot.bytes + (model?.macroBank?.free ?? 0));
-    const feedback = card.querySelector("[data-macro-feedback]");
+    const available = measured?.availableBytes ?? (slot.bytes + (model?.macroBank?.free ?? 0));
+    const feedback = /** @type {HTMLElement} */ (card.querySelector("[data-macro-feedback]"));
     feedback.replaceChildren(el(`<div class="stack">
         ${error ? `<div class="unavailable">${esc(error)} ${local ? "This edit is not staged." : "This stored macro cannot play with the current Host settings."}</div>` : ""}
-        ${max === null ? "" : `<div class="meter ${program > max ? "over" : ""}"><i style="width:${Math.min(100, (program ?? 0) / max * 100)}%"></i></div>`}
+        ${max === null ? "" : `<div class="meter ${program != null && program > max ? "over" : ""}"><i style="width:${Math.min(100, (program ?? 0) / max * 100)}%"></i></div>`}
         <p class="note" data-macro-size>${max === null ? "" : `${program == null ? "Playback size unavailable" : `${esc(program)} of ${esc(max)} playback bytes`} · `}${bytes == null ? "Macro memory size unavailable" : `${esc(bytes)} bytes of macro memory`}${max === null ? ` · ${esc(available)} available for this macro` : ""}</p>
         <p class="note">${error ? (local ? "Fix this edit before it can be kept in your draft." : "Change Host settings or fix the macro before playing it.") : local && !inspection ? "Checking this edit…" : "Valid edits are kept in your draft when you finish editing a step."}</p>
     </div>`));
     const dirty = local && payload !== slot.payload;
-    card.querySelector("[data-local-state]").replaceChildren(el(`<i class="dot ${dirty ? "draft" : "on"}"></i>`), document.createTextNode(dirty ? "edited here" : "as read"));
-    card.querySelector('[data-act="discard"]').disabled = form.draft === undefined || form.draft === slot.payload;
+    /** @type {HTMLElement} */ (card.querySelector("[data-local-state]")).replaceChildren(el(`<i class="dot ${dirty ? "draft" : "on"}"></i>`), document.createTextNode(dirty ? "edited here" : "as read"));
+    /** @type {HTMLButtonElement} */ (card.querySelector('[data-act="discard"]')).disabled = form.draft === undefined || form.draft === slot.payload;
 }
 
+/** @param {import("../../contracts/panel.js").PublishedModel} model @param {MacroSlot} slot @param {MacroStep[]} steps @param {MacroStep} step @param {number} index @param {boolean} canEdit */
 function stepEditor(model, slot, steps, step, index, canEdit) {
     const label = STEP_KINDS.find(([kind]) => kind === step.kind)?.[1] || step.kind;
     const node = el(`<div class="macro-step" data-step="${index}">
@@ -337,24 +370,24 @@ function stepEditor(model, slot, steps, step, index, canEdit) {
             : step.kind === "delay" ? `<label class="field"><span>Milliseconds</span><input class="input mono" data-step-delay="${index}" type="number" min="0" max="65535" value="${esc(step.delay)}" ${canEdit ? "" : "disabled"}></label>`
             : `<div class="row"><span class="tok">${esc(describeStep(step, key => actionLabel(model, key))) || "Choose keys"}</span><button class="btn" data-pick-step ${canEdit ? "" : "disabled"}>Pick…</button></div>`}
     </div>`);
-    const input = node.querySelector("textarea, input");
+    const input = /** @type {HTMLTextAreaElement | HTMLInputElement | null} */ (node.querySelector("textarea, input"));
     input?.addEventListener("input", () => {
         const next = macroForm(slot.keycode).steps ?? steps;
         saveSteps(slot, next.map((item, at) => at === index ? {...item, ...(step.kind === "text" ? {text: input.value} : {delay: input.value})} : item));
     });
     input?.addEventListener("change", () => inspectEdit(slot, true));
-    node.querySelector("[data-pick-step]")?.addEventListener("click", () => openPicker({
-        title: label, contextKeycode: slot.keycode, mode: "list", seed: step.keys, allowedKeys: model.macroPayloadKeycodes, maxKeys: step.kind === "tap" ? 16 : 1,
+    /** @type {HTMLElement | null} */ (node.querySelector("[data-pick-step]"))?.addEventListener("click", () => openPicker({
+        title: label, contextKeycode: slot.keycode, mode: "list", seed: "keys" in step ? step.keys : [], allowedKeys: model.macroPayloadKeycodes, maxKeys: step.kind === "tap" ? 16 : 1,
         onPick: expression => {
             const next = macroForm(slot.keycode).steps ?? steps;
             saveSteps(slot, next.map((item, at) => at === index ? {...item, keys: expression.split(",").map(key => key.trim()).filter(Boolean)} : item), true); render();
         },
     }));
-    node.querySelector("[data-remove]").addEventListener("click", () => {
+    /** @type {HTMLElement} */ (node.querySelector("[data-remove]")).addEventListener("click", () => {
         const next = (macroForm(slot.keycode).steps ?? steps).filter((_, at) => at !== index);
         saveSteps(slot, next.length ? next : [{kind: "text", text: ""}], true); render();
     });
-    node.querySelectorAll("[data-move]").forEach(button => button.addEventListener("click", () => {
+    /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-move]")).forEach(button => button.addEventListener("click", () => {
         const next = (macroForm(slot.keycode).steps ?? steps).slice(), target = index + Number(button.dataset.move);
         [next[index], next[target]] = [next[target], next[index]];
         saveSteps(slot, next, true); render();
@@ -362,12 +395,14 @@ function stepEditor(model, slot, steps, step, index, canEdit) {
     return node;
 }
 
+/** @param {Model} model @param {MacroSlot} slot @param {string} payload */
 function stageMacro(model, slot, payload) {
     setMacroForm(slot.keycode, {draft: payload, steps: undefined, stepError: ""});
     inspectEdit(slot, true);
 }
 
 /* ── the recorder ──────────────────────────────────────────────────────── */
+/** @type {Record<string, string>} */
 const EVENT_CODES = {
     Space: "KC_SPC", Enter: "KC_ENT", Tab: "KC_TAB", Backspace: "KC_BSPC", Escape: "KC_ESC",
     Minus: "KC_MINS", Equal: "KC_EQL", BracketLeft: "KC_LBRC", BracketRight: "KC_RBRC",
@@ -377,11 +412,13 @@ const EVENT_CODES = {
     AltLeft: "KC_LALT", AltRight: "KC_RALT", MetaLeft: "KC_LGUI", MetaRight: "KC_RGUI",
     ArrowUp: "KC_UP", ArrowDown: "KC_DOWN", ArrowLeft: "KC_LEFT", ArrowRight: "KC_RGHT",
 };
+/** @param {string} code */
 const codeToKeycode = (code) => EVENT_CODES[code]
     || (/^Key([A-Z])$/.test(code) ? `KC_${code.slice(3)}` : "")
     || (/^Digit(\d)$/.test(code) ? `KC_${code.slice(5)}` : "")
     || (/^F(\d{1,2})$/.test(code) ? `KC_${code}` : "");
 
+/** @param {Model} model @param {MacroSlot} slot @param {boolean} canEdit */
 function recorder(model, slot, canEdit) {
     const recording = state.recording?.slot === slot.keycode;
     const node = el(`<div class="card">
@@ -404,18 +441,18 @@ function recorder(model, slot, canEdit) {
             </div>
         </div></div>`);
 
-    node.querySelector("[data-mode]").addEventListener("change", (event) => { state.recordMode = event.target.value; });
-    node.querySelector("[data-delays]").addEventListener("change", (event) => { state.recordDelays = event.target.checked; render(); });
-    node.querySelector("[data-threshold]").addEventListener("change", (event) => {
-        state.recordDelayThreshold = Math.max(0, Number(event.target.value) || 0);
+    /** @type {HTMLSelectElement} */ (node.querySelector("[data-mode]")).addEventListener("change", (event) => { state.recordMode = /** @type {HTMLSelectElement} */ (event.target).value; });
+    /** @type {HTMLInputElement} */ (node.querySelector("[data-delays]")).addEventListener("change", (event) => { state.recordDelays = /** @type {HTMLInputElement} */ (event.target).checked; render(); });
+    /** @type {HTMLInputElement} */ (node.querySelector("[data-threshold]")).addEventListener("change", (event) => {
+        state.recordDelayThreshold = Math.max(0, Number(/** @type {HTMLInputElement} */ (event.target).value) || 0);
     });
-    node.querySelector("[data-round]").addEventListener("change", (event) => {
-        state.recordDelayRound = Math.max(1, Number(event.target.value) || 1);
+    /** @type {HTMLInputElement} */ (node.querySelector("[data-round]")).addEventListener("change", (event) => {
+        state.recordDelayRound = Math.max(1, Number(/** @type {HTMLInputElement} */ (event.target).value) || 1);
     });
     // Clear take puts the payload back to what it was before Record. A take
     // still in progress was never staged; a finished one was, so its restore
     // is staged too, rather than only rewriting the text on screen.
-    node.querySelector('[data-act="clear-take"]').addEventListener("click", () => {
+    /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="clear-take"]')).addEventListener("click", () => {
         const take = state.recording?.slot === slot.keycode ? state.recording
             : state.lastTake?.slot === slot.keycode ? state.lastTake : null;
         if (!take) return;
@@ -428,7 +465,7 @@ function recorder(model, slot, canEdit) {
         if (staged) stageMacro(model, slot, take.before);
         render();
     });
-    node.querySelector('[data-act="record"]').addEventListener("click", () => {
+    /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="record"]')).addEventListener("click", () => {
         if (recording) { stopRecording(model, slot); return; }
         startRecording(slot, macroForm(slot.keycode).draft ?? slot.payload ?? "");
     });
@@ -438,6 +475,7 @@ function recorder(model, slot, canEdit) {
 // A take appends to what the payload held when Record was pressed. The
 // recording state exists only while keys are being captured, so everything
 // that pauses for a recording — undo, the key shortcuts — resumes on Stop.
+/** @param {MacroSlot} slot @param {string} before */
 function startRecording(slot, before) {
     state.lastTake = null;
     setMacroForm(slot.keycode, {draft: before, steps: undefined, stepError: ""});
@@ -447,11 +485,12 @@ function startRecording(slot, before) {
     render();
 }
 
+/** @param {Model} model @param {MacroSlot | null} slot */
 function stopRecording(model = getModel(), slot = null) {
     const recordedSlot = state.recording?.slot;
     document.removeEventListener("keydown", onRecordKey, true);
     document.removeEventListener("keyup", onRecordKey, true);
-    state.lastTake = state.recording ? {slot: recordedSlot, before: state.recording.before} : null;
+    state.lastTake = state.recording ? {slot: state.recording.slot, before: state.recording.before} : null;
     state.recording = null;
     const target = slot || (model?.viaMacros || [])
         .find((candidate) => candidate.keycode === recordedSlot);
@@ -459,6 +498,7 @@ function stopRecording(model = getModel(), slot = null) {
     render();
 }
 
+/** @param {KeyboardEvent} event */
 function onRecordKey(event) {
     const recording = state.recording;
     if (!recording?.slot) return;
@@ -481,6 +521,7 @@ function onRecordKey(event) {
 }
 
 
+/** @param {Model} model @param {MacroSlot} slot */
 function unicodeSetup(model, slot) {
     if (!model?.macroUnicode?.supported) return `<p class="note">Unicode macro text needs newer firmware on both halves.</p>`;
     const {mode, os, layouts, layout, layoutFits, layoutName} = model.macroUnicode;

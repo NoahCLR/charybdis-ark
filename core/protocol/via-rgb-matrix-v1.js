@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 const {isUnhandledEcho, orUnhandled} = require("./via-unhandled-v1");
 
@@ -6,19 +7,25 @@ const {RAW_HID_REPORT_SIZE, normalizeRawHidReport} = require("../transport/devic
 // Standard VIA RGB Matrix channel. These are GETs of the current QMK
 // settings, independent of the generation-owned custom profile.
 const VIA_RGB_MATRIX = Object.freeze({GET: 0x08, CHANNEL: 3, UNHANDLED: 0xff});
+/** @typedef {{brightness: number, effectId: number, speed: number, hue: number, saturation: number}} RgbSample */
+/** @type {readonly ['brightness' | 'effectId' | 'speed' | 'color', number, number][]} */
 const VALUES = [["brightness", 1, 1], ["effectId", 2, 1], ["speed", 3, 1], ["color", 4, 2]];
 
+/** @param {string} code @param {string} message */
 function failure(code, message) {
     return Object.assign(new Error(message), {code});
 }
 
+/** @param {import("../transport/types.js").RequestConnection} connection @returns {Promise<RgbSample>} */
 async function readSample(connection) {
+    /** @type {Partial<RgbSample>} */
     const sample = {};
     for (const [name, id, count] of VALUES) {
         const request = Buffer.alloc(RAW_HID_REPORT_SIZE);
         request[0] = VIA_RGB_MATRIX.GET;
         request[1] = VIA_RGB_MATRIX.CHANNEL;
         request[2] = id;
+        /** @param {Uint8Array} response */
         const matches = response => response[0] === request[0] && response[1] === request[1] && response[2] === id;
         const response = normalizeRawHidReport(await connection.request(request, {matchResponse: orUnhandled(matches, request)}), "VIA RGB Matrix response");
         if (isUnhandledEcho(response, request)) {
@@ -32,9 +39,11 @@ async function readSample(connection) {
             sample.saturation = response[4];
         } else sample[name] = response[3];
     }
-    return sample;
+    // Each required channel was read above, with color supplying two values.
+    return /** @type {RgbSample} */ (sample);
 }
 
+/** @param {import("../transport/types.js").RequestConnection} connection */
 async function readViaRgbMatrix(connection) {
     // VIA has no atomic settings snapshot. Two matching consecutive samples
     // detect ordinary changes during readback; bounded retry avoids chasing

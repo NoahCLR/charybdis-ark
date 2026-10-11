@@ -1,17 +1,19 @@
+// @ts-check
 // Charybdis Ark — the webview.
 //
 // It renders the `model` the host posts and posts typed edits back. It holds
 // no device state of its own: the draft lives in the host, so what is drawn is
 // always what would be applied.
 
+import {createPanelMessages} from "./messages.mjs";
+import * as controls from "./view/controls.mjs";
 import {el, esc} from "./lib/dom.mjs";
 import {captureContentScroll, captureKeysBenchHeight, revealSelectedContentRow, restoreContentScroll, restoreKeysBenchHeight} from "./lib/scroll.mjs";
 import {activateOnKey, captureFocus, focusDialog, restoreFocus, trapTab} from "./lib/focus.mjs";
-import {closeComboBuilder, getModel, layerName, post, postLeavingDemo, render as rerender, resetDraftForms, setModel, setRenderer, state, writable} from "./store.mjs";
+import {closeComboBuilder, getModel, post, postLeavingDemo, render as rerender, setRenderer, state, writable} from "./store.mjs";
 import {historyAction} from "./view/edits.mjs";
 import {chooseKeyboard, hostOf, otherTheme, setTheme} from "./view/host.mjs";
 import {DEMO_WORDS, demoOf, leaveDemo, openDemo, openDemoProfile} from "./view/demo.mjs";
-import {sameEditorContent} from "./view/render-content.mjs";
 import {readScreen, screenAvailable} from "./view/readiness.mjs";
 import {discardLabel, groupNote, placeState, reviewBlocks, statusSummary, stillShown} from "./view/review.mjs";
 import {bindLayerIndex, hideHover, mountHover} from "./ui/hover.mjs";
@@ -31,10 +33,11 @@ import {screenCustomKeys} from "./ui/custom-keys.mjs";
 import {screenProfile} from "./ui/profile.mjs";
 import {commitBar, rail, topbar, unavailable} from "./ui/shell.mjs";
 
-const root = document.getElementById("root");
-let lastStackKey = null;   // the keyboard and layer stack the previewed layer set was picked on
+const root = /** @type {HTMLElement} */ (document.getElementById("root"));
+/** @type {string | null} */
 let renderedScreen = null;
 
+/** @type {Record<string, () => HTMLElement>} */
 const SCREENS = {
     keys: screenKeys,
     lighting: screenLighting,
@@ -47,8 +50,10 @@ const SCREENS = {
     profile: screenProfile,
 };
 
+/** @param {readonly (readonly [string, unknown])[]} rows */
 const kv = (rows) => `<dl class="kv" style="grid-template-columns:170px 1fr">${rows
     .map(([key, value]) => `<dt>${esc(key)}</dt><dd>${esc(value ?? "—")}</dd>`).join("")}</dl>`;
+/** @param {import("../contracts/panel.js").PublishedModel | null} model */
 const whatWasRead = (model) => `<div class="card"><div class="card-h"><h3>What was read</h3></div>
     <div class="list">${(model?.diagnostics || []).map((note) =>
         `<div class="list-row" style="grid-template-columns:1fr"><span class="note">${esc(note)}</span></div>`).join("")
@@ -57,51 +62,52 @@ const whatWasRead = (model) => `<div class="card"><div class="card-h"><h3>What w
 function screenDevice() {
     const model = getModel();
     if (demoOf(model).active) return screenDemoDevice(model);
-    const device = model?.device || {};
+    const device = model?.device;
     const main = el(`<div class="main">${topbar(
         "Device",
         "What the keyboard says about itself. Everything this app shows comes from here — it never reads a firmware repository.",
-        `<button class="btn" data-act="read" ${device.health?.busy ? "disabled" : ""}>Read from keyboard</button>`,
+        `<button class="btn" data-act="read" ${device?.health?.busy ? "disabled" : ""}>Read from keyboard</button>`,
     )}
         <div class="content"><div class="pad" style="max-width:940px;display:grid;gap:14px">
             <div class="grid2">
                 <div class="card"><div class="card-h"><h3>Connection</h3>
-                    <span class="right"><span class="chip"><i class="dot ${device.connected ? "on" : "err"}"></i>${device.connected ? "connected" : "disconnected"}</span></span></div>
+                    <span class="right"><span class="chip"><i class="dot ${device?.connected ? "on" : "err"}"></i>${device?.connected ? "connected" : "disconnected"}</span></span></div>
                     <div class="card-b">${kv([
-                        ["Product", device.label],
-                        ["Status", device.subtitle],
-                        ["Phase", device.health?.phase],
+                        ["Product", device?.label],
+                        ["Status", device?.subtitle],
+                        ["Phase", device?.health?.phase],
                     ])}<p class="note">The master half connects over USB; the slave half connects to it through the cable between the halves.</p></div></div>
                 <div class="card"><div class="card-h"><h3>Committed profile</h3>
-                    <span class="right"><span class="chip"><i class="dot ${device.health?.converged ? "on" : "draft"}"></i>${device.health?.converged ? "both halves agree" : "halves not converged"}</span></span></div>
+                    <span class="right"><span class="chip"><i class="dot ${device?.health?.converged ? "on" : "draft"}"></i>${device?.health?.converged ? "both halves agree" : "halves not converged"}</span></span></div>
                     <div class="card-b">${kv([
-                        ["Generation and digest", device.summary],
-                        ["Recovery", device.health?.recoveryPending ? "pending" : "clear"],
+                        ["Generation and digest", device?.summary],
+                        ["Recovery", device?.health?.recoveryPending ? "pending" : "clear"],
                         ["Draft", model?.draft ? `${model.draft.changes.length} change${model.draft.changes.length === 1 ? "" : "s"}` : "none"],
                     ])}</div></div>
             </div>
             ${whatWasRead(model)}
         </div></div></div>`);
-    main.querySelector('[data-act="read"]').addEventListener("click", () => post({type: "refresh"}));
+    /** @type {HTMLButtonElement} */ (main.querySelector('[data-act="read"]')).addEventListener("click", () => post(controls.control("refresh")));
     return main;
 }
 
 // The Device screen in the demo: what stands in for a keyboard, and that it
 // is not one. Reading a keyboard from here leaves the demo, asking first.
+/** @param {import("../contracts/panel.js").PublishedModel | null} model */
 function screenDemoDevice(model) {
-    const device = model?.device || {}, demo = demoOf(model);
+    const device = model?.device, demo = demoOf(model);
     const main = el(`<div class="main">${topbar(
         "Device",
         "No keyboard is connected. The demo stands in for one running current firmware, so every screen works; nothing here reaches a keyboard.",
-        `<button class="btn" data-act="read" ${device.health?.busy ? "disabled" : ""}>Read from keyboard</button>`,
+        `<button class="btn" data-act="read" ${device?.health?.busy ? "disabled" : ""}>Read from keyboard</button>`,
     )}
         <div class="content"><div class="pad" style="max-width:940px;display:grid;gap:14px">
             <div class="grid2">
                 <div class="card"><div class="card-h"><h3>Connection</h3>
                     <span class="right"><span class="chip"><i class="dot demo"></i>no keyboard</span></span></div>
                     <div class="card-b">${kv([
-                        ["Product", device.label],
-                        ["Status", device.subtitle],
+                        ["Product", device?.label],
+                        ["Status", device?.subtitle],
                     ])}</div></div>
                 <div class="card"><div class="card-h"><h3>Demo setup</h3>
                     <span class="right"><span class="chip"><i class="dot demo"></i>demo</span></span></div>
@@ -112,37 +118,43 @@ function screenDemoDevice(model) {
             </div>
             ${whatWasRead(model)}
         </div></div></div>`);
-    main.querySelector('[data-act="read"]').addEventListener("click", () => postLeavingDemo({type: "refresh"}));
+    /** @type {HTMLButtonElement} */ (main.querySelector('[data-act="read"]')).addEventListener("click", () => postLeavingDemo(controls.control("refresh")));
     return main;
 }
 
 function reviewOverlay() {
     const model = getModel();
     const draft = model?.draft;
-    if (state.overlay !== "review" || !draft?.dirty) return null;
+    if (!model || state.overlay !== "review" || !draft?.dirty) return null;
     // Discarding goes back to the keyboard's value; it waits while the draft
     // is out of step with the keyboard or busy, as editing does.
     const canDiscard = writable();
-    const sourceByCheck = new Map(), sourceCounts = new Map();
+    /** @type {Map<import("../contracts/model.js").Check, number | undefined>} */
+    const sourceByCheck = new Map();
+    /** @type {Map<number | null | undefined, {warning: number, trap: number}>} */
+    const sourceCounts = new Map();
     for (const check of draft.checks) {
         const group = checkSourceGroup(check, draft.changes);
         if (group === null) continue;
         sourceByCheck.set(check, group);
         const count = sourceCounts.get(group) || {warning: 0, trap: 0};
-        count[check.level] += check.kind === "trapOverflow" ? check.count : 1;
+        if (check.level === "warning" || check.level === "trap") count[check.level] += check.kind === "trapOverflow" ? (check.count ?? 1) : 1;
         sourceCounts.set(group, count);
     }
+    /** @param {number | null | undefined} group */
     const sourceLabel = (group) => {
         const count = sourceCounts.get(group);
         if (!count) return "";
         return `Source of ${[count.trap && `${count.trap} trap${count.trap === 1 ? "" : "s"}`, count.warning && `${count.warning} warning${count.warning === 1 ? "" : "s"}`].filter(Boolean).join(" and ")}`;
     };
+    /** @param {import("../contracts/model.js").ReviewChange} entry @param {number} index @param {string} discard @param {boolean} titleSlot @param {string} source */
     const item = (entry, index, discard, titleSlot, source) => reviewItem(model, entry, {discard, titleSlot, sourceLabel: source,
         show: stillShown(entry) && placeState(entry.place, model.layers) ? `<button class="btn tiny ghost" data-show="${index}"
             data-tip="Close the review and open this where it is edited.">Show</button>` : ""});
     const demo = demoOf(model);
     const columns = reviewColumns("What changes", demo.active ? "In the demo setup" : "On the keyboard", "In your draft");
     const discardable = draft.changes.every((change) => Number.isInteger(change.group));
+    /** @type {import("../contracts/model.js").ReviewChange[]} */
     const shown = [];
     const sections = reviewBlocks(draft.changes).map(({area, blocks, count}) => `<section class="rv-sect">
         <div class="sect-h"><h4>${esc(area)}</h4><span class="right tag">${count}</span></div>
@@ -161,6 +173,7 @@ function reviewOverlay() {
         }).join(""))(blocks.some((block) => block.items.some((entry) => entry.titleMark)))}</section>`).join("");
     const summary = statusSummary(draft.changes);
     // Checks that point at a key or a combo open it as review items do.
+    /** @type {import("../contracts/model.js").Check[]} */
     const checked = [];
     const checks = checksSection(draft.checks, (check) => check.status !== "fixed" && placeState(check.place, model.layers)
         ? `<button class="btn tiny ghost" data-show-check="${checked.push(check) - 1}" data-tip="Close the review and open this where it is edited.">Show</button>` : "",
@@ -168,6 +181,7 @@ function reviewOverlay() {
         const group = sourceByCheck.get(check);
         if (group === undefined) return "";
         const change = draft.changes.find((entry) => entry.group === group);
+        if (!change) return "";
         return `<button class="ck-source" data-check-source="${group}" type="button">From draft: ${esc(change.groupTitle || change.title)} ↓</button>`;
     });
     // Ask about active warnings and traps for this revision before writing.
@@ -200,29 +214,31 @@ function reviewOverlay() {
     </div></div>`);
     // Pointing at a group's Discard lights what it takes back, in every area
     // the group reaches.
-    node.querySelectorAll(".rv-block.grouped [data-discard]").forEach((button) => {
+    /** @type {NodeListOf<HTMLButtonElement>} */ (node.querySelectorAll(".rv-block.grouped [data-discard]")).forEach((button) => {
         const parts = node.querySelectorAll(`.rv-block.grouped[data-group="${button.dataset.discard}"]`);
         button.addEventListener("mouseenter", () => parts.forEach((part) => part.classList.add("lit")));
         button.addEventListener("mouseleave", () => parts.forEach((part) => part.classList.remove("lit")));
     });
     node.addEventListener("click", (event) => {
-        if (event.target.closest('[data-act="export"]')) {
-            post({type: "exportPortableProfile"});
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        if (target.closest('[data-act="export"]')) {
+            post(controls.control("exportPortableProfile"));
             return;
         }
-        const discard = event.target.closest("[data-discard]");
+        const discard = /** @type {HTMLButtonElement | null} */ (target.closest("[data-discard]"));
         if (discard) {
-            post({type: "discardProfileDraftChanges", group: Number(discard.dataset.discard)});
+            post(controls.discardChanges(Number(discard.dataset.discard)));
             return;
         }
-        const showCheck = event.target.closest("[data-show-check]");
+        const showCheck = /** @type {HTMLButtonElement | null} */ (target.closest("[data-show-check]"));
         if (showCheck) {
             Object.assign(state, placeState(checked[Number(showCheck.dataset.showCheck)].place, model.layers), {overlay: null, confirmChecks: null});
-            post({type: "closeProfileDraftReview"});
+            post(controls.control("closeProfileDraftReview"));
             rerender();
             return;
         }
-        const source = event.target.closest("[data-check-source]");
+        const source = /** @type {HTMLButtonElement | null} */ (target.closest("[data-check-source]"));
         if (source) {
             const parts = node.querySelectorAll(`.rv-block[data-group="${source.dataset.checkSource}"]`);
             parts[0]?.scrollIntoView({behavior: "smooth", block: "center"});
@@ -230,46 +246,47 @@ function reviewOverlay() {
             setTimeout(() => parts.forEach((part) => part.classList.remove("source-focus")), 2000);
             return;
         }
-        if (event.target.closest('[data-act="unconfirm"]')) {
+        if (target.closest('[data-act="unconfirm"]')) {
             state.confirmChecks = null;
             rerender();
             return;
         }
-        if (event.target.closest('[data-act="apply-anyway"]')) {
+        if (target.closest('[data-act="apply-anyway"]')) {
             state.overlay = null;
             state.confirmChecks = null;
-            post({type: "applyProfileDraft", confirmChecks: true});
+            post(controls.applyDraft(true));
             rerender();
             return;
         }
-        const show = event.target.closest("[data-show]");
+        const show = /** @type {HTMLButtonElement | null} */ (target.closest("[data-show]"));
         if (show) {
             Object.assign(state, placeState(shown[Number(show.dataset.show)].place, model.layers), {overlay: null});
-            post({type: "closeProfileDraftReview"});
+            post(controls.control("closeProfileDraftReview"));
             rerender();
             return;
         }
         // The sheet closes at once; the host's answer only refreshes what it says.
-        if (event.target === node || event.target.closest('[data-act="close"]')) {
+        if (event.target === node || target.closest('[data-act="close"]')) {
             state.overlay = null;
             state.confirmChecks = null;
-            post({type: "closeProfileDraftReview"});
+            post(controls.control("closeProfileDraftReview"));
             rerender();
         }
-        if (event.target.closest('[data-act="apply"]')) {
+        if (target.closest('[data-act="apply"]')) {
             if (confirmChecks.length) {
                 state.confirmChecks = draft.revision;
                 rerender();
                 return;
             }
             state.overlay = null;
-            post({type: "applyProfileDraft"});
+            post(controls.applyDraft());
             rerender();
         }
     });
     return node;
 }
 
+/** @param {{keepScreen?: boolean}} [options] */
 function render({keepScreen = false} = {}) {
     const keptScreen = keepScreen && renderedScreen === state.screen ? root.querySelector(".app > .main") : null;
     const scroll = captureContentScroll(root, renderedScreen, state.screen);
@@ -314,6 +331,7 @@ function render({keepScreen = false} = {}) {
     reveal();
 }
 
+/** @param {NonNullable<ReturnType<typeof readScreen>>} read @param {import("../contracts/panel.js").PublishedModel | null} model */
 function readPlaceholder(read, model) {
     const loading = read.state === "loading";
     // Without a keyboard, a host with a picker offers it first.
@@ -339,15 +357,17 @@ function readPlaceholder(read, model) {
         </div></div></div></div>`);
     screen.querySelector('[data-act="explore-demo"]')?.addEventListener("click", () => post(openDemo()));
     screen.querySelector('[data-act="choose-keyboard"]')?.addEventListener("click", () => post(chooseKeyboard()));
-    screen.querySelector('[data-act="retry"]')?.addEventListener("click", () => post({type: "refresh"}));
-    screen.querySelector('[data-act="secondary"]')?.addEventListener("click", () => {state.screen = secondary.screen; render();});
+    screen.querySelector('[data-act="retry"]')?.addEventListener("click", () => post(controls.control("refresh")));
+    screen.querySelector('[data-act="secondary"]')?.addEventListener("click", () => {if (!secondary) return; state.screen = secondary.screen; render();});
     return screen;
 }
 
+/** @param {string} tone */
 const exploreButton = (tone) => `<button class="btn ${tone}" data-act="explore-demo" data-tip="${esc(DEMO_WORDS.exploreTip)}">${esc(DEMO_WORDS.explore)}</button>`;
 
 // The demo's strip across the window: it is a demo, nothing is connected, and
 // the two things only the demo has, another file and the way out.
+/** @param {ReturnType<typeof demoOf>} demo */
 function demoBanner(demo) {
     const node = el(`<div class="demo-banner" role="status">
         <i class="dot demo" aria-hidden="true"></i><strong>${esc(DEMO_WORDS.status)}</strong>
@@ -356,8 +376,8 @@ function demoBanner(demo) {
                 data-tip="Open one of your exported .charybdis.json profiles in the demo, in place of this setup.">Open a profile file…</button>
             <button class="btn tiny ghost" data-act="leave-demo" data-tip="Close the demo and go back to connecting a keyboard.">Leave demo</button></span>
     </div>`);
-    node.querySelector('[data-act="open-demo-profile"]').addEventListener("click", () => postLeavingDemo(openDemoProfile()));
-    node.querySelector('[data-act="leave-demo"]').addEventListener("click", () => postLeavingDemo(leaveDemo()));
+    /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="open-demo-profile"]')).addEventListener("click", () => postLeavingDemo(openDemoProfile()));
+    /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="leave-demo"]')).addEventListener("click", () => postLeavingDemo(leaveDemo()));
     return node;
 }
 
@@ -375,11 +395,13 @@ function leaveDemoOverlay() {
     </div></div>`);
     const close = () => {state.overlay = null; state.leaveDemo = null; rerender();};
     node.addEventListener("click", (event) => {
-        if (event.target === node || event.target.closest('[data-act="stay"]')) close();
-        else if (event.target.closest('[data-act="export"]')) {
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        if (event.target === node || target.closest('[data-act="stay"]')) close();
+        else if (target.closest('[data-act="export"]')) {
             close();
-            post({type: "exportPortableProfile"});
-        } else if (event.target.closest('[data-act="confirm-leave"]')) {
+            post(controls.control("exportPortableProfile"));
+        } else if (target.closest('[data-act="confirm-leave"]')) {
             // Posted from this click, so a host that opens a picker or a file
             // chooser for it still can.
             post(leave.message);
@@ -405,8 +427,6 @@ setRenderer(render);
 bindLayerIndex(() => state.layer);
 mountHover(root);
 
-let inDemo = false;   // whether the last model was the demo's
-
 function refreshCommitBar() {
     const main = root.querySelector(".main"), previous = main?.querySelector(":scope > .commit"), next = commitBar();
     if (previous && next) previous.replaceWith(next);
@@ -414,101 +434,27 @@ function refreshCommitBar() {
     else previous?.remove();
 }
 
-addEventListener("message", (event) => {
-    const message = event.data;
-    if (message?.type === "macroValidation") { receiveMacroValidation(message); return; }
-    if (message?.type === "readProgress") {
-        const model = getModel(), read = message.read;
-        if (!model?.device?.connected || !model.load?.operationBusy || !read
-            || read.operationId !== model.load?.operationId || read.phase !== model.load.phase
-            || read.selectedDeviceId !== model.selectedDeviceId || read.connectionToken !== model.load.connectionToken
-            || message.draftId !== model.draft?.id || message.draftRevision !== model.draft?.revision) return;
-        const postApplyRead = model.postApplyRead && read.source === model.postApplyRead.step
-            ? {...model.postApplyRead, progress: read.progress} : model.postApplyRead;
-        setModel({...model, load: {...model.load, progress: read.progress}, postApplyRead,
-            portable: read.source === "portable" ? {...model.portable, progress: read.progress} : model.portable});
-        const portableProgress = root.querySelector(".profile-progress");
-        if (portableProgress && read.source === "portable") {
-            portableProgress.hidden = !read.progress;
-            portableProgress.lastElementChild.textContent = typeof read.progress === "string" ? read.progress : "";
-        }
-        refreshCommitBar();
-        const placeholder = root.querySelector(".read-placeholder > p");
-        if (placeholder) placeholder.textContent = readScreen(getModel(), state.screen).detail;
-        return;
-    }
-    if (message?.type === "applyProgress") {
-        const model = getModel(), draft = model?.draft;
-        if (!draft?.busy || message.draftId !== draft.id || message.draftRevision !== draft.revision
-            || !message.apply || (model.apply && message.apply.id < model.apply.id)) return;
-        setModel({...model, apply: message.apply});
-        // A copy's byte counter must not rebuild its disabled editors. The
-        // same main thread receives HID replies in the browser host.
-        refreshCommitBar();
-        return;
-    }
-    if (message?.type !== "model") return;
-    const keepScreen = !["device", "profile"].includes(state.screen) && !state.overlay && !state.picker && !state.combo.awaiting
-        && !message.resetDraftForms && !message.acceptedEdit && !message.notice
-        && sameEditorContent(getModel(), message.model);
-    setModel(message.model);
-    // Leaving the demo goes back to where a keyboard is connected, or the demo
-    // explored again; a screen of the demo's would only say it is unavailable.
-    const demoNow = Boolean(message.model?.demo?.active);
-    if (inDemo && !demoNow) state.screen = "keys";
-    inDemo = demoNow;
-    // A host that leaves the theme to the panel says which; otherwise the
-    // host's own theme (VS Code's body class) holds.
-    const theme = hostOf(message.model).theme;
-    if (theme) document.documentElement.dataset.theme = theme;
-    else delete document.documentElement.dataset.theme;
-    // The host reports a refused edit as a notice prefixed "Failed"; that is a
-    // failure, so it is shown as one rather than as a neutral message.
-    if (message.notice) {
-        const failed = /^Failed/.test(message.notice);
-        state.error = failed ? message.notice : "";
-        state.notice = failed ? "" : message.notice;
-    }
-    if (message.resetDraftForms) resetDraftForms();
-    // A combo builder waiting on Keep or Delete closes when the host accepts
-    // the edit, and stays open with its fields when the host refuses it. A
-    // builder for a combo that no longer exists closes too.
-    if (state.combo.awaiting) {
-        if (/^Failed/.test(message.notice || "")) state.combo.awaiting = false;
-        else closeComboBuilder();
-    }
-    if (state.combo.editId !== null && !(message.model?.combos || []).some((combo) => combo.id === state.combo.editId)) closeComboBuilder();
-    const layerCount = message.model?.layers?.length || 0;
-    if (state.layer >= layerCount) state.layer = 0;
-    // A previewed set names layers by their place in the stack, so it is
-    // dropped when the keyboard or the order under it changes.
-    const stackKey = `${message.model?.device?.label || ""}|${message.model?.device?.connected ? 1 : 0}|${(message.model?.layers || []).map(layerName).join("\u0001")}`;
-    if (stackKey !== lastStackKey) state.layersOn = [];
-    lastStackKey = stackKey;
-    const positions = message.model?.layers?.[state.layer]?.positions || [];
-    if (!positions.some((position) => position.layoutIndex === state.selected)) {
-        state.selected = positions[0]?.layoutIndex ?? 0;
-    }
-    if (state.overlay === "review" && !message.model?.draft?.dirty) state.overlay = null;
-    if (state.overlay === "history" && !message.model?.draft) { state.overlay = null; post({type: "closeProfileDraftHistory"}); }
-    if (state.overlay === "leaveDemo" && !message.model?.demo?.active) { state.overlay = null; state.leaveDemo = null; }
-    render({keepScreen});
-});
+const receivePanelMessage = createPanelMessages({root, refreshCommitBar, render, receiveMacroValidation});
+// Host replies cross the message boundary as copies; their authored shapes are
+// checked in both hosts. Device values have already passed core's validators.
+addEventListener("message", (event) => receivePanelMessage(/** @type {import("../contracts/messages.js").PanelResponse} */ (event.data)));
 
 // A field that holds text keeps its own undo: ⌘Z there edits the text, not
 // the draft. Everywhere else it steps the draft, as the ↺ ↻ buttons do.
 const TEXT_INPUTS = new Set(["text", "search", "number", "email", "url", "tel", "password"]);
-const editsText = (target) => Boolean(target?.closest?.("textarea, [contenteditable]:not([contenteditable=\"false\"])"))
-    || (target?.tagName === "INPUT" && TEXT_INPUTS.has(target.type));
+/** @param {EventTarget | null} target */
+const editsText = (target) => Boolean(target instanceof Element && target.closest("textarea, [contenteditable]:not([contenteditable=\"false\"])"))
+    || (target instanceof HTMLInputElement && TEXT_INPUTS.has(target.type));
 
+/** @param {KeyboardEvent} event */
 function historyShortcut(event) {
     const action = historyAction(event, {editingText: editsText(event.target), busy: Boolean(state.recording || state.retarget)});
     if (!action) return false;
     event.preventDefault();
     const draft = getModel()?.draft;
     if (!draft || draft.busy) return true;
-    if (action === "undo" && draft.canUndo) post({type: "undoProfileDraft"});
-    if (action === "redo" && draft.canRedo) post({type: "redoProfileDraft"});
+    if (action === "undo" && draft.canUndo) post(controls.control("undoProfileDraft"));
+    if (action === "redo" && draft.canRedo) post(controls.control("redoProfileDraft"));
     return true;
 }
 
@@ -528,22 +474,22 @@ addEventListener("keydown", (event) => {
     if (state.layersOpen) { closeLayers(); render(); return; }
     if (state.overlay) {
         // Leaving the review by Esc is leaving it by Keep editing.
-        if (state.overlay === "review") post({type: "closeProfileDraftReview"});
-        if (state.overlay === "history") post({type: "closeProfileDraftHistory"});
+        if (state.overlay === "review") post(controls.control("closeProfileDraftReview"));
+        if (state.overlay === "history") post(controls.control("closeProfileDraftHistory"));
         state.overlay = null;
         state.leaveDemo = null;
         render();
     }
 });
 addEventListener("resize", () => {
-    root.querySelector(".keys-pad .bench")?.style.removeProperty("min-height");
+    /** @type {HTMLElement | null} */ (root.querySelector(".keys-pad .bench"))?.style.removeProperty("min-height");
 });
 
 // A dropped file must never navigate away from Ark and lose the draft,
 // including outside the Import card or while that card is disabled.
-for (const type of ["dragover", "drop"]) addEventListener(type, (event) => {
+for (const type of /** @type {const} */ (["dragover", "drop"])) addEventListener(type, (event) => {
     if (Array.from(event.dataTransfer?.types || []).includes("Files")) event.preventDefault();
 });
 
 render();
-post({type: "ready"});
+post(controls.control("ready"));

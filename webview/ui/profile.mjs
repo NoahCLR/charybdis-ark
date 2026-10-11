@@ -1,3 +1,4 @@
+// @ts-check
 // Profile & backups: the whole keyboard as one file.
 //
 // Layer names and priority are edited beside the board, in Keys → Layers, where
@@ -7,6 +8,8 @@
 // lighting and settings. Restoring one replaces all of that, so the card counts, area
 // by area, what the file changes on the keyboard before anything is written.
 
+// Selector assertions refer to elements created by this module's authored markup.
+import * as controls from "../view/controls.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {getModel, post, canEdit as canEditArea} from "../store.mjs";
 import {topbar} from "./shell.mjs";
@@ -19,7 +22,9 @@ import {reviewPortableProfile} from "../view/edits.mjs";
 
 export function screenProfile() {
     const model = getModel();
+    /** @type {Partial<import("../../contracts/panel.js").PublishedModel["portable"]>} */
     const portable = model?.portable || {};
+    /** @type {Partial<import("../../contracts/panel.js").PublishedModel["device"]["health"]>} */
     const health = model?.device?.health || {};
     const busy = Boolean(portable.busy);
     const canExport = canEditArea("export");
@@ -34,13 +39,13 @@ export function screenProfile() {
     )}</div>`);
 
     const content = el(`<div class="content"><div class="pad" style="max-width:960px;display:grid;gap:14px"></div></div>`);
-    const pad = content.firstElementChild;
+    const pad = /** @type {HTMLElement} */ (content.firstElementChild);
 
     pad.appendChild(el(`<div class="profile-progress" ${portable.progress ? "" : "hidden"}><span class="spin"></span><span>${esc(portable.progress)}</span></div>`));
     if (!portable.available) {
         pad.appendChild(el(`<div class="unavailable">${esc("Connect a keyboard with complete-profile firmware to manage its backups and layers.")}</div>`));
     }
-    if (portable.review) pad.appendChild(reviewCard(model, portable, busy));
+    if (portable.review) pad.appendChild(reviewCard(model, {...portable, review: portable.review}, busy));
 
     const actions = el(`<div class="profile-actions">
         <div class="card profile-action" data-profile-drop aria-disabled="${!canImport}">
@@ -63,9 +68,9 @@ export function screenProfile() {
             </div>
         </div>
     </div>`);
-    actions.querySelector('[data-act="export"]').addEventListener("click", () => post({type: "exportPortableProfile"}));
-    actions.querySelector('[data-act="import"]').addEventListener("click", () => post({type: "choosePortableProfile"}));
-    wireProfileDrop(actions.querySelector("[data-profile-drop]"));
+    /** @type {HTMLButtonElement} */ (actions.querySelector('[data-act="export"]')).addEventListener("click", () => post(controls.control("exportPortableProfile")));
+    /** @type {HTMLButtonElement} */ (actions.querySelector('[data-act="import"]')).addEventListener("click", () => post(controls.control("choosePortableProfile")));
+    wireProfileDrop(/** @type {HTMLElement} */ (actions.querySelector("[data-profile-drop]")));
     pad.appendChild(actions);
 
     const usage = portable.available ? profileUsageView(portable.usage, model?.macroBank) : null;
@@ -86,32 +91,36 @@ export function screenProfile() {
     return main;
 }
 
+/** @param {HTMLElement} card */
 function wireProfileDrop(card) {
-    const status = card.querySelector(".profile-drop-status");
-    const choose = card.querySelector('[data-act="import"]');
+    const status = /** @type {HTMLElement} */ (card.querySelector(".profile-drop-status"));
+    const choose = /** @type {HTMLButtonElement} */ (card.querySelector('[data-act="import"]'));
     let reading = false;
     const available = () => !reading && canEditArea("import");
+    /** @param {string} text */
     const tell = (text) => {status.textContent = text; status.hidden = !text;};
+    /** @param {DragEvent} event */
     const files = (event) => Array.from(event.dataTransfer?.types || []).includes("Files");
-    for (const type of ["dragenter", "dragover"]) card.addEventListener(type, (event) => {
+    for (const type of /** @type {const} */ (["dragenter", "dragover"])) card.addEventListener(type, (event) => {
         if (!files(event)) return;
         event.preventDefault();
-        event.dataTransfer.dropEffect = available() ? "copy" : "none";
+        /** @type {DataTransfer} */ (event.dataTransfer).dropEffect = available() ? "copy" : "none";
         card.classList.toggle("drag-over", available());
     });
     card.addEventListener("dragleave", (event) => {
-        if (!card.contains(event.relatedTarget)) card.classList.remove("drag-over");
+        if (!card.contains(/** @type {Node | null} */ (event.relatedTarget))) card.classList.remove("drag-over");
     });
     card.addEventListener("drop", async (event) => {
         if (!files(event)) return;
         event.preventDefault();
         card.classList.remove("drag-over");
         if (!available()) return;
-        const dropped = Array.from(event.dataTransfer.files);
+        const dropped = Array.from(/** @type {DataTransfer} */ (event.dataTransfer).files);
         if (dropped.length !== 1) {tell("Drop one profile file at a time."); return;}
         const file = dropped[0];
         if (file.size > 262144) {tell("This profile file is too large."); return;}
         const draft = getModel()?.draft;
+        if (!draft) return;
         const {id, revision} = draft;
         reading = true;
         choose.disabled = true;
@@ -136,6 +145,7 @@ function wireProfileDrop(card) {
 
 // The recovery copies a host keeps where no file can be opened (a browser's
 // storage), each downloadable as the file the extension would have written.
+/** @param {import("../../contracts/model.js").RecoveryCopy[]} recoveries */
 function recoveriesCard(recoveries) {
     const node = el(`<div class="card recoveries">
         <div class="card-h"><h3>Recovery copies</h3><span class="right note">${recoveries.length} in this browser</span></div>
@@ -144,15 +154,18 @@ function recoveriesCard(recoveries) {
             <button class="btn tiny" data-recovery="${esc(copy.id)}">Download</button></div>`).join("")}</div>` : ""}
         <div class="card-b"><p class="note">${recoveries.length ? "" : "None yet. "}Apply and Import save a copy of what the keyboard held here before they write anything. They stay in this browser until you clear the site's data, which deletes them too, so download any you want to keep.</p></div>
     </div>`);
-    node.querySelectorAll("[data-recovery]").forEach((button) => button.addEventListener("click", () => {
-        post(downloadRecovery(recoveries.find((copy) => String(copy.id) === button.dataset.recovery).id));
+    /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-recovery]")).forEach((button) => button.addEventListener("click", () => {
+        const copy = recoveries.find((copy) => String(copy.id) === button.dataset.recovery);
+        if (copy) post(downloadRecovery(copy.id));
     }));
     return node;
 }
 
 // How full the profile is, area by area, with the counted limits beside it.
 // Every area shares the one block, so the bar is what an edit can run into.
+/** @param {NonNullable<ReturnType<typeof profileUsageView>>} usage */
 function usageCard(usage) {
+    /** @param {number} value */
     const bytes = (value) => value.toLocaleString("en-US");
     return el(`<div class="card usage">
         <div class="card-h"><h3>Profile memory</h3><span class="right note">${esc(usage.source)}</span></div>
@@ -177,6 +190,7 @@ function usageCard(usage) {
 // The file against the keyboard, counted area by area: enough to decide
 // whether to take it. What each difference is waits for the draft's own
 // review, which the file becomes.
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {Partial<import("../../contracts/panel.js").PublishedModel["portable"]> & {review: NonNullable<import("../../contracts/panel.js").PublishedModel["portable"]["review"]>}} portable @param {boolean} busy */
 function reviewCard(model, portable, busy) {
     const {incoming, current, fileName, differences} = portable.review;
     const draft = model?.draft;
@@ -204,7 +218,7 @@ function reviewCard(model, portable, busy) {
                 <button class="btn primary" data-act="restore" ${busy || same ? "disabled" : ""}>${draft ? "Use as draft" : "Restore profile"}</button>
                 <button class="btn ghost" data-act="cancel" ${busy ? "disabled" : ""}>Cancel</button></div>
         </div></div>`);
-    node.querySelector('[data-act="restore"]').addEventListener("click", () => post({type: "restorePortableProfile"}));
-    node.querySelector('[data-act="cancel"]').addEventListener("click", () => post({type: "cancelPortableReview"}));
+    /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="restore"]')).addEventListener("click", () => post(controls.control("restorePortableProfile")));
+    /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="cancel"]')).addEventListener("click", () => post(controls.control("cancelPortableReview")));
     return node;
 }

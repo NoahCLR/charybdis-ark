@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 
 // Ark without a keyboard: the demo (D-L53).
@@ -17,6 +18,12 @@
 // the device is demoHeader(): no keyboard, no generation, no halves. The
 // device service stays as it was, for when the demo is left.
 
+/**
+ * @typedef {import("./types.js").DemoSession} Session
+ * @typedef {import("./types.js").PanelDeviceState} State
+ * @typedef {Pick<import("../../contracts/messages.js").DemoControl, 'discardDemo'>} CloseOptions
+ * @typedef {Session & {demo: import("./types.js").DemoMetadata}} OpenSession
+ */
 const {ProfileDraftSession} = require("./profile-draft-session");
 const {validateSnapshot, fingerprint, summary} = require("./portable-profile-session");
 const {translateBackup} = require("../model/backup-translation");
@@ -94,22 +101,26 @@ const DEMO_WORDS = Object.freeze({
     applyNeedsKeyboard: "Apply needs a keyboard. Export this setup, then import it on your keyboard to review and apply it there.",
 });
 
+/** @param {string} text @param {string} [code] */
 const fail = (text, code = "DEMO_REFUSED") => Object.assign(new Error(text), {code});
 
 // A document as the demo's keyboard side: checked as Import checks a file
 // against current firmware, with the
 // limits and options a keyboard would have reported beside it.
+/** @param {unknown} value @returns {import("../model/types.js").CompleteSnapshot} */
 function demoSnapshot(value) {
     const {document} = validateSnapshot(translateBackup(value), DEMO_CAPABILITIES);
     return {document, fingerprint: fingerprint(document), summary: summary(document), limits: {...DEMO_LIMITS}, options: DEMO_OPTIONS, hostOs: {detected: 0}};
 }
 
 // The bundled demo profile, as a fresh copy each time.
+/** @returns {unknown} */
 const demoProfile = () => JSON.parse(JSON.stringify(DEMO_PROFILE));
 
 // Whether the demo may open now, given the device service's state: never over
 // a keyboard that is connected or busy, or over unapplied edits to one. A
 // refusal says which.
+/** @param {Pick<Session, "demo" | "draft" | "readBusy">} session @param {State} state */
 function demoRefusal(session, state) {
     if (state.connected) return "A keyboard is connected. Disconnect it to explore the demo instead.";
     if (state.busy || session.readBusy) return "Ark is working with a keyboard. Wait for it to finish.";
@@ -119,10 +130,12 @@ function demoRefusal(session, state) {
 
 // Edits made in the demo and not exported since are lost when it is left or
 // replaced.
+/** @param {Pick<Session, "demo" | "draft">} session */
 const demoUnsaved = (session) => Boolean(session.demo && session.draft?.dirty && session.draft.current.fingerprint !== session.demo.exported);
 
 // The panel asks before losing them and then says so with `discardDemo`; a
 // message without it is refused.
+/** @param {Session} session @param {CloseOptions | null | undefined} message */
 function assertDemoMayClose(session, message) {
     if (demoUnsaved(session) && message?.discardDemo !== true) {
         throw fail("The demo has edits that were not exported. Export them first, or confirm leaving them behind.", "DEMO_UNSAVED");
@@ -132,6 +145,7 @@ function assertDemoMayClose(session, message) {
 // Opens the demo over `value` (the bundled profile when omitted), or replaces
 // the one open. The file is checked before anything is replaced, so a file
 // that is refused leaves the demo as it was.
+/** @param {Session} session @param {State} state @param {{value?: unknown; fileName?: string | null}} [options] */
 function openDemo(session, state, {value, fileName = null} = {}) {
     if (!session.demo) {
         const refused = demoRefusal(session, state);
@@ -149,6 +163,7 @@ function openDemo(session, state, {value, fileName = null} = {}) {
 
 // Leaves the demo for no keyboard, as before it opened. The caller reads a
 // keyboard next, or not.
+/** @param {Session} session @param {CloseOptions | null | undefined} message */
 function leaveDemo(session, message) {
     if (!session.demo) return;
     assertDemoMayClose(session, message);
@@ -164,6 +179,7 @@ function leaveDemo(session, message) {
 
 // The demo's own controls. `host.chooseProfile` is the same file chooser
 // Import uses; what it returns is checked as Import checks it.
+/** @param {Session} session @param {import("../../contracts/messages.js").DemoControl} message @param {import("./types.js").ProfileChooser} host @param {State} state */
 async function demoControl(session, message, host, state) {
     switch (message.type) {
         case "openDemo":
@@ -194,6 +210,7 @@ async function demoControl(session, message, host, state) {
 // Exporting from the demo saves the draft, edits and all: there is no keyboard
 // whose profile it could be. What was exported is remembered, so leaving
 // afterwards does not ask about edits that are already in a file.
+/** @param {import("./types.js").ActiveDemoSession} session */
 function demoExport(session) {
     const snapshot = session.draft.current;
     return {snapshot, saved: () => {session.demo.exported = snapshot.fingerprint;}};
@@ -201,6 +218,7 @@ function demoExport(session) {
 
 // The state a demo's model is built from: the demo as the draft's device,
 // with the capabilities of current firmware, and nothing else a keyboard has.
+/** @returns {State & {demo: true}} */
 function demoState() {
     return {
         phase: "demo",
@@ -222,18 +240,21 @@ function demoState() {
 
 // The state everything in the panel answers to: the demo's in the demo, the
 // device service's otherwise.
+/** @param {Session} session */
 const panelState = (session) => (session.demo ? demoState() : session.service.snapshot());
+/** @param {Session} session */
 const panelCapabilities = (session) => (session.demo ? DEMO_CAPABILITIES : session.service.capabilities);
 
 // The demo as the model carries it (`model.demo`): whether it is open, or
 // offered, what it was opened from, and whether leaving would lose edits.
+/** @param {Pick<Session, "demo" | "draft" | "readBusy">} session @param {State} state */
 function demoModel(session, state) {
     const active = Boolean(session.demo);
     return {
         active,
         offered: !active && !demoRefusal(session, state),
-        name: active ? session.demo.name : null,
-        fileName: active ? session.demo.fileName : null,
+        name: session.demo ? session.demo.name : null,
+        fileName: session.demo ? session.demo.fileName : null,
         unsaved: demoUnsaved(session),
         applyNeedsKeyboard: DEMO_WORDS.applyNeedsKeyboard,
     };
@@ -241,6 +262,7 @@ function demoModel(session, state) {
 
 // The rail's header in the demo, in the device's place: no keyboard, no
 // generation, no halves to agree.
+/** @param {Pick<OpenSession, "demo">} session @param {boolean} busy */
 function demoHeader(session, busy) {
     return {
         connected: false,
@@ -252,6 +274,7 @@ function demoHeader(session, busy) {
     };
 }
 
+/** @param {Pick<OpenSession, "demo">} session */
 function demoDiagnostics(session) {
     return [
         `No keyboard is connected. The demo opened ${session.demo.name} as current firmware would hold it: sixteen layers, 32 pointing slots, 128 macros and 128 custom keys.`,

@@ -1,3 +1,4 @@
+// @ts-check
 // One mark per thing that has a colour of its own, drawn the same everywhere.
 //
 // A behaviour tier is the dot the keyboard flashes when it resolves, a tap
@@ -15,18 +16,21 @@ import {layerSwatch} from "./layerbar.mjs";
 
 // A branch's badge as the grid heads its column: from 2× on, tinted with the
 // tap-branch colour the keyboard shows while that branch is pending.
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {number} count */
 export function branchBadge(model, count) {
     const colour = feedbackColours(model).branches[count - 2];
     const lit = count > 1 && stageEnabled(model, "key") && colour && !isOff(colour);
     return `<span class="bn" style="${lit ? `border-color:${css(colour)};color:${css(colour)}` : ""}">${count}×</span>`;
 }
 
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} kind */
 export function tierDot(model, kind) {
-    const colour = feedbackColours(model)[kind];
+    const colour = feedbackColours(model)[/** @type {import("../../contracts/edits.js").Tier} */ (kind)];
     const lit = stageEnabled(model, "key") && !isOff(colour);
     return `<i class="fbdot" style="${lit ? `background:${css(colour)}` : "background:none;border-style:dashed"}"></i>`;
 }
 
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} [badge] */
 export function comboBadge(model, badge = "C") {
     const colour = model?.rgb?.comboFeedback?.color;
     const lit = stageEnabled(model, "combo") && colour && !isOff(colour);
@@ -35,11 +39,12 @@ export function comboBadge(model, badge = "C") {
 
 // A pointing slot's light, as the keyboard would show it: a stage that is off
 // looks off. Every surface that shows a pointing mode draws it from here.
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {{id: number}} slot */
 export function slotLight(model, slot) {
     const row = pdColourRow(model, slot.id);
     const lit = Boolean(row && !isOff(row.color) && stageEnabled(model, "pd"));
     return {row, lit, swatch: (klass = "") => `<span class="pd-swatch ${klass} ${lit ? "" : "swatch-off"}"
-        ${lit ? `style="background:${css(row.color)}"` : ""}></span>`};
+        ${lit && row ? `style="background:${css(row.color)}"` : ""}></span>`};
 }
 
 // An action that names a pointing mode or a macro, as that thing: a pointing
@@ -47,17 +52,20 @@ export function slotLight(model, slot) {
 // plain keycode, so the caller draws the keycode as it is. `sendsKind` is the
 // word the line describing the branch leads with, so the kind is said, not
 // only inferred from a swatch.
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} action */
 export function sends(model, action) {
     const named = namedAction(model, action);
     if (!named) return "";
     return `<span class="sends">${named.kind === "pointing" ? slotLight(model, named.slot).swatch("mk-swatch") : ""}`
         + `<span class="sends-name">${esc(named.name)}</span>${named.tags.map((tag) => `<span class="sends-tag">${tag}</span>`).join("")}</span>`;
 }
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} action */
 export const sendsKind = (model, action) => namedAction(model, action)?.word || "";
 
 // A mark as the host describes it: {kind: "tier", tier, branch?} · {kind:
 // "branch", count} · {kind: "layer", layer} · {kind: "pointing", slot} ·
 // {kind: "combo", badge?} · {kind: "stage", on}. Anything else draws nothing.
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/model.js").ReviewMark | null | undefined} value */
 export function mark(model, value) {
     switch (value?.kind) {
         case "tier": return `${value.branch ? branchBadge(model, value.branch) : ""}${tierDot(model, value.tier)}`;
@@ -73,18 +81,20 @@ export function mark(model, value) {
 // A key's name with the layer it acts on marked where the name says it:
 // "F / ■ Navigation", "Hold ■ Navigation". Every key name ends in its layer's
 // name (core/model/key-names.js); one that does not is left as it is.
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} text @param {string} keycode */
 export function keyNameMarked(model, text, keycode) {
     const at = layerOfKeycode(model, keycode);
     const layer = at === null ? null : model?.layers?.[at];
     const name = layer ? layer.displayName || layer.name : "";
     const label = String(text ?? "");
-    if (!name || !label.endsWith(name)) return esc(label);
+    if (!layer || !name || !label.endsWith(name)) return esc(label);
     return `${esc(label.slice(0, -name.length))}${marked(model, {kind: "layer", layer: layer.index}, name)}`;
 }
 
 // A label with its mark in front, as a label reads everywhere. Where marked
 // and unmarked labels share a column, `slot` gives every one of them the same
 // mark slot, so their words start at one edge and the dots line up.
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/model.js").ReviewMark | null | undefined} value @param {string} text @param {{slot?: boolean}} [options] */
 export const marked = (model, value, text, {slot = false} = {}) => {
     const shown = mark(model, value);
     if (slot) return `<span class="mk"><span class="mk-slot">${shown}</span><span>${esc(text)}</span></span>`;

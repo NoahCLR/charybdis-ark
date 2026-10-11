@@ -1,3 +1,11 @@
+// @ts-check
+/**
+ * @typedef {import("../../contracts/panel.js").PublishedModel | null} Model
+ * @typedef {NonNullable<ReturnType<typeof behaviourEditorRow>>} EditorBehavior
+ */
+// Authored selectors and dataset values below refer to controls in these
+// templates. Placement coordinates come from the published board model; a
+// writable draft supplies the complete profile identity used by edit builders.
 // Keys: the board stays on screen and the workbench below it switches between
 // the key, its behaviour, its combos, and what this layer reaches.
 
@@ -25,6 +33,7 @@ import {branchBadge, comboBadge, keyNameMarked, sends, sendsKind, slotLight, tie
 import {branchName, helperWord, holdHelpers, tierName, vocabulary, word} from "../view/vocabulary.mjs";
 import {topbar, unavailable} from "./shell.mjs";
 
+/** @type {{id: "key" | "behaviours" | "combos" | "macros" | "pointing", label: string}[]} */
 const TABS = [
     {id: "key", label: "Key"},
     {id: "behaviours", label: "Behaviours"},
@@ -34,7 +43,8 @@ const TABS = [
 ];
 
 // How a tier runs, as the vocabulary words it.
-const helperLabel = (kind, helper) => helperWord(getModel(), kind, helper);
+/** @param {import("../../contracts/edits.js").Tier} kind @param {string | undefined} helper */
+const helperLabel = (kind, helper) => helperWord(getModel(), kind, helper || "");
 
 const {TIER_FIELDS, DEFAULT_REPEAT_HZ} = edits;
 
@@ -57,7 +67,7 @@ export function screenKeys() {
     const bar = layerBar();
     attachLayersControl(bar);
     const content = el(`<div class="content"><div class="pad keys-pad"></div></div>`);
-    const pad = content.firstElementChild;
+    const pad = /** @type {HTMLElement} */ (content.firstElementChild);
 
     // The board, how that layer is lit and the layer tabs under them are one
     // card; the legend reads under it. The tabs sit at the card's foot, next to
@@ -77,7 +87,7 @@ export function screenKeys() {
         reach: building ? comboInputKeys(model, layers(), state.layer, heldLayers(), state.combo.inputs) : reachHighlight(model),
         picking: state.combo.picking || Boolean(state.placement),
         held: heldLayers(),
-        onKey: (index) => {
+        onKey: (/** @type {number} */ index) => {
             if (state.placement) {
                 const placement = state.placement;
                 state.placement = null;
@@ -97,8 +107,8 @@ export function screenKeys() {
             }
             render();
         },
-        onOpen: writable() ? (index) => pickKeycodeFor(index) : undefined,
-        onSwap: writable() ? (from, to) => swapKeys(from, to) : undefined,
+        onOpen: writable() ? (/** @type {number} */ index) => pickKeycodeFor(index) : undefined,
+        onSwap: writable() ? (/** @type {number} */ from, /** @type {number} */ to) => swapKeys(from, to) : undefined,
     }));
     card.appendChild(previewing() ? previewFoot(layer) : el(`<div class="board-foot"><span class="board-foot-text">${lit
         ? `lit ${esc(hsvLabel(row.color))} on ${row.mode === "ALL_KEYS" ? "every key" : "keys mapped here"}`
@@ -112,6 +122,7 @@ export function screenKeys() {
 
 // The caption while layers are previewed on together: which ones, in the
 // order they win. Clicking any tab goes back to one layer.
+/** @param {import("../../contracts/panel.js").Layer} layer */
 export function previewFoot(layer, lead = "") {
     const under = heldLayers().filter((at) => at > 0).reverse().map((at) => layerName(layers()[at]));
     const text = `${layerName(layer)} on top of ${[...under, layerName(layers()[0])].join(", ")}`
@@ -124,16 +135,18 @@ export function previewFoot(layer, lead = "") {
 function placementBar() {
     const placement = state.placement;
     const node = el(`<div class="pickbar">
-        <span><b>Placing ${esc(actionLabel(getModel(), placement?.keycode) || "keycode")}</b> — choose a layer, then click its destination key</span>
+        <span><b>Placing ${esc(actionLabel(getModel(), placement?.keycode || "") || "keycode")}</b> — choose a layer, then click its destination key</span>
         <code class="n">${esc(placement?.keycode || "")}</code>
         <span class="right" style="margin-left:auto"><button class="btn tiny ghost" data-act="cancel">Cancel</button></span></div>`);
-    node.querySelector('[data-act="cancel"]').addEventListener("click", () => { state.placement = null; render(); });
+    /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="cancel"]')).addEventListener("click", () => { state.placement = null; render(); });
     return node;
 }
 
+/** @param {Model} model */
 function legend(model) {
     const colours = feedbackColours(model);
     const on = stageEnabled(model, "key");
+    /** @param {import("../../contracts/edits.js").Colour} colour */
     const dot = (colour) => `<i class="ldot" style="${on && !isOff(colour) ? `background:${css(colour)}` : "background:none;border-style:dashed"}"></i>`;
     return el(`<div class="board-legend">
         <span class="legend-item">the board shows the light this layer paints</span>
@@ -158,23 +171,25 @@ function pickBar() {
         <span class="right" style="margin-left:auto;display:flex;gap:6px">
             <button class="btn tiny ghost" data-act="clear">Clear</button>
             <button class="btn tiny" data-act="done">Done</button></span></div>`);
-    node.querySelector('[data-act="clear"]').addEventListener("click", () => { state.combo.inputs = []; render(); });
-    node.querySelector('[data-act="done"]').addEventListener("click", () => { state.combo.picking = false; render(); });
+    /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="clear"]')).addEventListener("click", () => { state.combo.inputs = []; render(); });
+    /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="done"]')).addEventListener("click", () => { state.combo.picking = false; render(); });
     return node;
 }
 
 // The keys the board rings: the ones that reach whatever row is picked in the
 // open tab. A behaviour is found on the keys carrying it; anything a branch
 // sends is found on the same keys, which is the whole point of saying so.
+/** @param {Model} model */
 function reachHighlight(model) {
     const stack = layers(), at = state.layer;
+    /** @param {Partial<ReturnType<typeof macroReach>> & {inView?: ReturnType<typeof reachInView>}} groups @param {string} picked */
     const found = (groups, picked) => {
         const [group, ...rest] = String(picked).split(":");
         const name = rest.join(":");
         return reachEntries(groups, group).find((entry) => String(entry.name) === name);
     };
-    if (state.tab === "behaviours") return behaviourRouteKeys(model, stack, at, state.behaviourRow, behaviourRoute(), heldLayers());
-    const picked = state.reachRow[state.tab];
+    if (state.tab === "behaviours") return behaviourRouteKeys(model, stack, at, state.behaviourRow || "", behaviourRoute(), heldLayers());
+    const picked = state.reachRow[/** @type {keyof typeof state.reachRow} */ (state.tab)];
     if (!picked) return [];
     if (state.tab === "combos") {
         if (picked.startsWith("view:")) {
@@ -195,15 +210,19 @@ function reachHighlight(model) {
 
 // A tab's number counts what the selected layer stores, not the selected key
 // position or actions reached only through transparent keys on lower layers.
+/** @param {ReturnType<typeof macroReach>} reach */
 const storedCount = (reach) =>
     new Set([...reach.onKeys, ...reach.fromBranches, ...reach.fromCombos].map((entry) => entry.name)).size;
+/** @param {Model} model */
 const macroView = (model) => reachInView(model, layers(), state.layer, heldLayers(), macroKeycodes);
+/** @param {Model} model */
 const pointingView = (model) => reachInView(model, layers(), state.layer, heldLayers(),
-    (keycode) => { const slot = pointingSlotFor(model, keycode); return slot ? [String(slot.id)] : []; });
+    (/** @type {string | undefined} */ keycode) => { const slot = pointingSlotFor(model, keycode); return slot ? [String(slot.id)] : []; });
 
 function bench() {
     const model = getModel();
     const layer = currentLayer();
+    /** @type {Record<string, string>} */
     const counts = {
         key: String(mappedKeyCount(layer)),
         behaviours: String((({here, combos}) => new Set([...here, ...combos.map((entry) => entry.row)]).size)(behaviourGroups(model, layers(), state.layer))),
@@ -213,6 +232,7 @@ function bench() {
     };
     // A tab whose list holds something the draft changed says so.
     const marks = draftMarks(model?.draft?.changes);
+    /** @type {Record<string, boolean>} */
     const drafted = {key: Boolean(marks.keys.get(currentLayer()?.index)?.has(state.selected)), behaviours: marks.behaviours.size > 0,
         combos: marks.combos.size > 0, macros: marks.macros.size > 0, pointing: marks.pointing.size > 0};
     const node = el(`<div class="card bench">
@@ -223,19 +243,21 @@ function bench() {
         </div>
         <div class="bench-body" id="benchBody"></div>
     </div>`);
-    node.querySelectorAll("[data-tab]").forEach((button) => button.addEventListener("click", () => {
-        state.tab = button.dataset.tab;
+    /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-tab]")).forEach((button) => button.addEventListener("click", () => {
+        state.tab = button.dataset.tab || "key";
         if (state.tab === "behaviours") selectBehaviourKey(behaviourKey(selectedPosition()?.layoutIndex).keycode);
         state.cell = null;
         render();
     }));
-    keepInView(node.querySelector(".bench-tablist"));
-    const body = node.querySelector("#benchBody"), right = node.querySelector("#benchRight");
-    ({key: tabKey, behaviours: tabBehaviours, combos: tabCombos, macros: tabMacros, pointing: tabPointing}[state.tab] || tabKey)(body, right);
+    keepInView(/** @type {HTMLElement} */ (node.querySelector(".bench-tablist")));
+    const body = /** @type {HTMLElement} */ (node.querySelector("#benchBody")), right = /** @type {HTMLElement} */ (node.querySelector("#benchRight"));
+    const tabs = /** @type {Record<string, (body: HTMLElement, right: HTMLElement) => void>} */ ({key: tabKey, behaviours: tabBehaviours, combos: tabCombos, macros: tabMacros, pointing: tabPointing});
+    (tabs[state.tab] || tabKey)(body, right);
     return node;
 }
 
 /* ── the selected key ──────────────────────────────────────────────────── */
+/** @param {HTMLElement} body */
 function tabKey(body) {
     const model = getModel();
     const layer = currentLayer();
@@ -274,7 +296,7 @@ function tabKey(body) {
                     <span class="swatch-lg ${lit ? "" : "swatch-off"}" style="width:12px;height:12px;border-radius:4px;${lit ? `background:${css(row.color)}` : ""}"></span>
                     <span class="nm">${esc(layerName(other))}</span>
                     <span class="val ${through ? "dim" : ""}">${through ? "falls through" : esc(otherFace.main || "nothing")}</span>
-                    <code class="dim">${esc(visibleKeycode(model, there?.keycode))}</code></button>`;
+                    <code class="dim">${esc(visibleKeycode(model, there?.keycode || ""))}</code></button>`;
             }).join("")}</div>
             <p class="note" style="margin-top:8px">Higher layers win, and only among the layers held at the time. A transparent key is answered by the highest layer below that is also held — ${esc(layerName(layers()[0]))} always is, so a layer in between answers only when you hold it too.</p>
         </section>
@@ -294,18 +316,18 @@ function tabKey(body) {
             </div>
         </section>
     </div>`);
-    node.querySelector('[data-act="pick"]')?.addEventListener("click", () => pickKeycodeFor(position.layoutIndex));
-    node.querySelector("#keycodeField")?.addEventListener("change", (event) => {
-        const written = event.target.value.trim();
+    /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="pick"]'))?.addEventListener("click", () => pickKeycodeFor(position.layoutIndex));
+    /** @type {HTMLInputElement | null} */ (node.querySelector("#keycodeField"))?.addEventListener("change", (event) => {
+        const written = /** @type {HTMLInputElement} */ (event.target).value.trim();
         if (!written || written === keyMeaning(position)) return;
         post(edits.setKey(layer.name, position.layoutIndex, written));
     });
-    node.querySelectorAll("[data-golayer]").forEach((button) => button.addEventListener("click", () => {
+    /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-golayer]")).forEach((button) => button.addEventListener("click", () => {
         showLayer(Number(button.dataset.golayer));
         render();
     }));
-    node.querySelectorAll("[data-goto]").forEach((button) => button.addEventListener("click", () => {
-        state.tab = button.dataset.goto;
+    /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-goto]")).forEach((button) => button.addEventListener("click", () => {
+        state.tab = button.dataset.goto || "key";
         if (state.tab === "behaviours") selectBehaviourKey(followed.keycode);
         if (state.tab === "combos" && !combos.length) openComboBuilder(null, edits.comboDefaultTermValue(getModel()));
         render();
@@ -314,8 +336,8 @@ function tabKey(body) {
     if (answer && model?.participation) {
         const source = answer.layer, key = answer.position;
         const behavior = behaviourFor(model, keyMeaning(key));
-        const bp = participationAt(model, source.index, key, behavior);
-        const cp = participationAt(model, source.index, key, undefined, "combo");
+        const bp = /** @type {NonNullable<ReturnType<typeof participationAt>>} */ (participationAt(model, source.index, /** @type {import("../../contracts/panel.js").Position & {row: number, column: number}} */ (key), behavior));
+        const cp = /** @type {NonNullable<ReturnType<typeof participationAt>>} */ (participationAt(model, source.index, /** @type {import("../../contracts/panel.js").Position & {row: number, column: number}} */ (key), undefined, "combo"));
         const inherited = source.index !== layer.index;
         const controls = el(`<div class="stack" style="gap:9px;margin-top:16px">
             <h4>Participation · ${esc(layerName(source))}</h4>
@@ -325,16 +347,17 @@ function tabKey(body) {
             <p class="note">Behaviour: ${esc(bp.reasons.length ? bp.reasons.join("; ") : behavior ? "all permissions allow it" : "no shared definition")}. Combos: ${esc(cp.reasons.length ? cp.reasons.join("; ") : "placement is eligible; each combo also has its own permissions")}.</p>
             ${/^CUSTOM_KEY_\d+$/.test(canonicalKeycode(model, keyMeaning(key))) ? `<p class="note">A custom key has no normal output when its behaviour is bypassed or disabled. Map a plain keycode on a gaming layer that needs direct output.</p>` : ""}
         </div>`);
-        controls.querySelector("[data-source-layer]")?.addEventListener("click", () => {showLayer(layers().indexOf(source)); render();});
-        controls.querySelectorAll("input").forEach(input => input.addEventListener("change", () => post(edits.placementPolicy(source.index, key.layoutIndex,
-            controls.querySelector("[data-use-behavior]").checked, controls.querySelector("[data-join-combos]").checked))));
-        node.querySelector("section").appendChild(controls);
+        /** @type {HTMLElement | null} */ (controls.querySelector("[data-source-layer]"))?.addEventListener("click", () => {showLayer(layers().indexOf(source)); render();});
+        /** @type {NodeListOf<HTMLInputElement>} */ (controls.querySelectorAll("input")).forEach(input => input.addEventListener("change", () => post(edits.placementPolicy(source.index, key.layoutIndex,
+            /** @type {HTMLInputElement} */ (controls.querySelector("[data-use-behavior]")).checked, /** @type {HTMLInputElement} */ (controls.querySelector("[data-join-combos]")).checked))));
+        /** @type {HTMLElement} */ (node.querySelector("section")).appendChild(controls);
     }
     body.replaceChildren(node);
 }
 
 // In a layer preview, the selected key may be answered by a layer below: say
 // so, and that what is set here is stored on this layer and wins over it.
+/** @param {import("../../contracts/panel.js").Layer} layer @param {import("../../contracts/panel.js").Position | undefined} position */
 function answeredBelow(layer, position) {
     if (!previewing() || !position) return "";
     const answer = resolvedPositions(layers(), state.layer, heldLayers())
@@ -349,17 +372,20 @@ function answeredBelow(layer, position) {
 // The group the picked behaviour was picked in, while it is still the picked
 // one. A behaviour selected any other way — a fresh one, a moved one, the Key
 // tab's link — has no route, and every way to it counts.
+/** @returns {import("../view/keyface-types.js").BehaviorRoute | null} */
 const behaviourRoute = () =>
-    state.behaviourRoute?.row === state.behaviourRow ? state.behaviourRoute.group : null;
+    state.behaviourRoute && state.behaviourRoute.row === state.behaviourRow ? /** @type {import("../view/keyface-types.js").BehaviorRoute} */ (state.behaviourRoute.group) : null;
 
 // The combos that send a behaviour, by badge and chord; one that needs a
 // transparent key names the layer answering for it. Plain text: the row
 // escapes its note.
+/** @param {Pick<ReturnType<typeof behavioursInView>[number], "combos">} entry */
 const comboNote = (entry) => entry.combos.map(({combo, keys}) => {
     const sources = [...new Set(keys.filter((key) => key.fellThrough)
         .map((key) => layerName(key.layer) + (key.whileHeld ? " when held" : "")))];
     return `combo ${combo.badge} · ${(combo.inputDisplays || combo.inputs || []).join(" + ")}${sources.length ? ` · on ${sources.join(", ")}` : ""}`;
 }).join(", ");
+/** @param {ReturnType<typeof behavioursInView>[number]} entry */
 const viewBehaviourNote = (entry) => {
     const indexes = [...new Set(entry.keys.map((key) => key.position.layoutIndex))];
     const sources = [...new Set(entry.keys.filter((key) => key.fellThrough).map((key) => layerName(key.layer)))];
@@ -368,11 +394,13 @@ const viewBehaviourNote = (entry) => {
 };
 // The key a board position opens in Behaviours: in a layer preview, a
 // transparent key follows the key answered from below.
+/** @param {number | undefined} index */
 const behaviourKey = (index) => behaviourKeyAt(layers(), state.layer, heldLayers(), index);
 
 // When the open row is the one the selected transparent key shows through,
 // say which layer supplies it and that the row belongs to that keycode, so an
 // edit here is not mistaken for one local to this position.
+/** @param {EditorBehavior} behaviour */
 function followedBelow(behaviour) {
     const position = selectedPosition();
     const followed = behaviourKey(position?.layoutIndex);
@@ -384,6 +412,7 @@ function followedBelow(behaviour) {
         this is ${esc(name)}’s, and a change here applies wherever ${esc(name)} is pressed, not only at this position.</p>`;
 }
 
+/** @param {string} keycode */
 function selectBehaviourKey(keycode) {
     state.behaviourRow = keycode;
     state.behaviourRoute = {row: keycode, group: "view"};
@@ -391,17 +420,19 @@ function selectBehaviourKey(keycode) {
     state.cellHow = null;
 }
 
+/** @param {HTMLElement} body @param {HTMLElement} right */
 function tabBehaviours(body, right) {
     const model = getModel();
     const {here, through, combos, combosBelow, elsewhere} = behaviourGroups(model, layers(), state.layer);
     const inView = behavioursInView(model, layers(), state.layer, heldLayers());
     if (!state.behaviourRow) selectBehaviourKey(behaviourKey(selectedPosition()?.layoutIndex).keycode);
-    const behaviour = behaviourEditorRow(model, state.behaviourRow);
+    const behaviour = behaviourEditorRow(model, state.behaviourRow || "");
 
     right.replaceChildren();
 
     const route = behaviourRoute();
     const changed = draftMarks(model?.draft?.changes).behaviours;
+    /** @param {string} group @param {import("../../contracts/panel.js").BehaviorView} row @param {string} note */
     const item = (group, row, note) => `<button class="rowitem ${row.keycode === state.behaviourRow && (!route || route === group) ? "on" : ""} ${note ? "quiet" : ""}" data-row="${esc(row.keycode)}" data-route="${group}">
         <span class="t">${esc(actionLabel(model, row.keycode))}${actionLabel(model, row.keycode) === row.keycode ? ""
             : ` <code class="dim">${esc(row.keycode)}</code>`}${changed.has(row.keycode) ? draftDot() : ""}</span>
@@ -432,6 +463,7 @@ function tabBehaviours(body, right) {
         state.behaviourRowShown = state.behaviourRow;
     }
 
+    /** @param {{id: string, rows: {row: import("../../contracts/panel.js").BehaviorView, note: string}[], empty: string}} group */
     const section = (group) => `<div class="rowgroup">
         ${groupHeader("behaviours", group.id, group.rows.length, group.rows.some(({row}) => changed.has(row.keycode)))}
         ${groupOpen("behaviours", group.id)
@@ -446,14 +478,14 @@ function tabBehaviours(body, right) {
         <div class="beh-main"></div>
     </div>`);
     attachGroupToggles(node);
-    node.querySelectorAll("[data-row]").forEach((button) => button.addEventListener("click", () => {
-        state.behaviourRow = button.dataset.row;
-        state.behaviourRoute = {row: button.dataset.row, group: button.dataset.route};
-        state.behaviourRowShown = button.dataset.row;
+    /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-row]")).forEach((button) => button.addEventListener("click", () => {
+        state.behaviourRow = button.dataset.row || "";
+        state.behaviourRoute = {row: button.dataset.row || "", group: button.dataset.route || "view"};
+        state.behaviourRowShown = button.dataset.row || "";
         state.cell = null;
         render();
     }));
-    const main = node.querySelector(".beh-main");
+    const main = /** @type {HTMLElement} */ (node.querySelector(".beh-main"));
     if (behaviour) {
         const followed = followedBelow(behaviour);
         if (followed) main.appendChild(el(followed));
@@ -465,6 +497,7 @@ function tabBehaviours(body, right) {
 
 // An empty timing field falls back to the keyboard's own default, which it
 // reports and Settings · Tap & Hold Timing edits — so the note names both.
+/** @param {EditorBehavior} behaviour */
 function timingDefaultsNote(behaviour) {
     const defaults = behaviour.timingDefaults;
     const values = [["multi tap window", defaults.multiTapTerm], ["tap / hold threshold", defaults.tapHoldTerm], ["long hold threshold", defaults.longerHoldTerm]]
@@ -475,10 +508,12 @@ function timingDefaultsNote(behaviour) {
         : "Clear a timing override to follow the keyboard default from Settings · Tap & Hold Timing.";
 }
 
+/** @param {EditorBehavior} behaviour */
 function behaviourEditor(behaviour) {
     const model = getModel();
     const steps = behaviourGridSteps(behaviour, model?.behaviorEditing?.maxTapStepsPerBehavior);
     const canEdit = canEditArea("behaviours");
+    /** @param {"tapHoldTerm" | "longerHoldTerm" | "multiTapTerm"} name @param {string} label */
     const timingControl = (name, label) => {
         const field = behaviourTimingField(behaviour, name);
         return `<label class="field bterm-field"><span>${esc(label)} · ms</span>
@@ -486,6 +521,7 @@ function behaviourEditor(behaviour) {
                 placeholder="${esc(field.fallback === "" ? "default unavailable" : field.placeholder)}" ${canEdit ? "" : "disabled"}></label>`;
     };
 
+    /** @param {import("../../contracts/panel.js").BehaviorView["steps"][number]} step @param {import("../../contracts/edits.js").Tier} kind */
     const cellFor = (step, kind) => {
         const branch = step[TIER_FIELDS[kind]];
         const id = `${step.tapCount}-${kind}`;
@@ -501,7 +537,7 @@ function behaviourEditor(behaviour) {
                 <span class="bk named">${esc(label)}</span>
                 <span class="bl">${esc(["built in", `${helperLabel(kind, inherited.helper)}${times}`].join(" · "))}</span></button>`;
         }
-        const implied = !branch && impliedBranch(behaviour, step, kind);
+        const implied = branch ? null : impliedBranch(behaviour, step, kind);
         if (implied?.meaning === "continues") {
             // Past Long hold the Hold carries on; one that fired at its own
             // threshold has nothing left to do.
@@ -529,7 +565,7 @@ function behaviourEditor(behaviour) {
             <span class="bl">${esc([sendsKind(model, branch.action), helperLabel(kind, branch.helper)].filter(Boolean).join(" · "))}</span></button>`;
     };
 
-    const dashed = steps.some((step) => ["tap", "hold", "long"].some((kind) => !step[TIER_FIELDS[kind]]
+    const dashed = steps.some((step) => /** @type {import("../../contracts/edits.js").Tier[]} */ (["tap", "hold", "long"]).some((kind) => !step[TIER_FIELDS[kind]]
         && (inheritedBranch(behaviour, step, kind) || impliedBranch(behaviour, step, kind))));
     const node = el(`<div>
         <div class="beh-head">
@@ -555,7 +591,7 @@ function behaviourEditor(behaviour) {
         ${behaviourTimingChecks(model, behaviour.keycode).map(check => `<p class="note" role="status" style="margin-bottom:12px"><strong>${check.level === "notice" ? "Timing advice." : "Timing warning."}</strong> ${esc(check.detail)} ${esc(check.fix)}</p>`).join("")}
         <div class="bgrid">
             <span></span>
-            ${["tap", "hold", "long"].map((kind) => `<div class="btier">${tierDot(model, kind)}${tierName(model, kind)}</div>`).join("")}
+            ${/** @type {import("../../contracts/edits.js").Tier[]} */ (["tap", "hold", "long"]).map((kind) => `<div class="btier">${tierDot(model, kind)}${tierName(model, kind)}</div>`).join("")}
             ${timingControl("multiTapTerm", "Multi tap window")}
             <p class="bterm">On release, before the Tap / hold threshold</p>
             ${timingControl("tapHoldTerm", "Tap / hold threshold")}
@@ -563,40 +599,43 @@ function behaviourEditor(behaviour) {
             ${steps.map((step) => `
                 <div class="bhead">${branchBadge(model, step.tapCount + 1)}
                     <span>${esc(branchName(model, step.tapCount + 1))}</span></div>
-                ${["tap", "hold", "long"].map((kind) => cellFor(step, kind)).join("")}`).join("")}
+                ${/** @type {import("../../contracts/edits.js").Tier[]} */ (["tap", "hold", "long"]).map((kind) => cellFor(step, kind)).join("")}`).join("")}
         </div>
         <div id="cellEditor"></div>
         <p class="note" style="margin-top:12px">Every cell is one action: what it sends, and how it runs once its threshold passes. Empty cells are dropped when the profile is applied.${dashed ? " A dashed cell is what the keyboard does there with nothing set: the key's own action, or the other hold tier carrying on. It is not stored, and setting an action there replaces it." : ""}</p>
     </div>`);
 
-    node.querySelectorAll("[data-cell]").forEach((button) => button.addEventListener("click", () => {
-        state.cell = state.cell === button.dataset.cell ? null : button.dataset.cell;
+    /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-cell]")).forEach((button) => button.addEventListener("click", () => {
+        state.cell = state.cell === button.dataset.cell ? null : button.dataset.cell || null;
         state.cellHow = null;
         render();
     }));
     if (state.cell) {
-        const [tapCount, kind] = state.cell.split("-");
+        const [tapCount, tier] = state.cell.split("-");
+        const kind = /** @type {import("../../contracts/edits.js").Tier} */ (tier);
         const step = steps.find((row) => String(row.tapCount) === tapCount);
-        if (step) node.querySelector("#cellEditor").appendChild(cellEditor(behaviour, step, kind));
+        if (step) /** @type {HTMLElement} */ (node.querySelector("#cellEditor")).appendChild(cellEditor(behaviour, step, kind));
     }
-    node.querySelector('[data-act="rekey"]')?.addEventListener("click", () => pickBehaviourKey(behaviour));
+    /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="rekey"]'))?.addEventListener("click", () => pickBehaviourKey(behaviour));
     if (state.retarget?.from === behaviour.keycode) node.append(retargetPrompt(behaviour));
-    node.querySelector('[data-act="remove"]')?.addEventListener("click", () =>
-        post(edits.deleteBehaviour(behaviour.keycode, model.profileIdentity)));
+    /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="remove"]'))?.addEventListener("click", () =>
+        post(edits.deleteBehaviour(behaviour.keycode, model?.profileIdentity)));
     const commit = () => saveBehaviour(node, behaviour);
-    node.querySelectorAll("[data-term]").forEach((input) => input.addEventListener("change", () => {
-        input.dataset.stored = behaviourTimingEdit(input.value, behaviourTimingField(behaviour, input.dataset.term));
+    /** @type {NodeListOf<HTMLInputElement>} */ (node.querySelectorAll("[data-term]")).forEach((input) => input.addEventListener("change", () => {
+        const term = /** @type {"tapHoldTerm" | "longerHoldTerm" | "multiTapTerm"} */ (input.dataset.term);
+        input.dataset.stored = behaviourTimingEdit(input.value, behaviourTimingField(behaviour, term));
         commit();
-        input.value = behaviourTimingField({...behaviour, [input.dataset.term]: input.dataset.stored}, input.dataset.term).value;
+        input.value = behaviourTimingField({...behaviour, [term]: input.dataset.stored}, term).value;
     }));
-    node.querySelector("[data-anchor]")?.addEventListener("change", commit);
-    node.querySelector(".beh-intro").appendChild(definitionControls(layers().map(layer => ({...layer, label: layerName(layer)})), behaviour, canEdit, permissions => {
-        const message = edits.saveBehaviour(behaviour, permissions, model.profileIdentity);
+    /** @type {HTMLInputElement | null} */ (node.querySelector("[data-anchor]"))?.addEventListener("change", commit);
+    /** @type {HTMLElement} */ (node.querySelector(".beh-intro")).appendChild(definitionControls(layers().map(layer => ({...layer, label: layerName(layer)})), behaviour, canEdit, (/** @type {{enabled: boolean, allowedLayers: number}} */ permissions) => {
+        const message = edits.saveBehaviour(behaviour, permissions, model?.profileIdentity);
         if (message) post(message);
     }));
     return node;
 }
 
+/** @param {EditorBehavior} behaviour @param {import("../../contracts/panel.js").BehaviorView["steps"][number]} step @param {import("../../contracts/edits.js").Tier} kind */
 function cellEditor(behaviour, step, kind) {
     const branch = step[TIER_FIELDS[kind]];
     const cell = `${step.tapCount}-${kind}`;
@@ -618,21 +657,21 @@ function cellEditor(behaviour, step, kind) {
                     ${holdHelpers(getModel(), kind).map(([value, text]) => `<option value="${value}" ${shown?.helper === value ? "selected" : ""}>${text}</option>`).join("")}
                 </select></label>`}
             ${kind === "tap" ? "<span></span>" : `<label class="field" data-repeat-field ${shown?.helper === "REPEAT_WHILE_HELD" ? "" : "hidden"}><span>Repeat rate · Hz</span>
-                <input class="input mono" type="number" min="1" max="100" step="1" data-repeat value="${esc(Number(shown?.repeatHz) > 0 ? shown.repeatHz : DEFAULT_REPEAT_HZ)}" ${canEdit ? "" : "disabled"}></label>`}
+                <input class="input mono" type="number" min="1" max="100" step="1" data-repeat value="${esc(Number(shown?.repeatHz) > 0 ? shown?.repeatHz : DEFAULT_REPEAT_HZ)}" ${canEdit ? "" : "disabled"}></label>`}
             <div class="row" style="gap:8px;align-items:end">
                 ${branch ? `<button class="btn ghost" data-act="clear" ${canEdit ? "" : "disabled"}>Remove tier</button>` : ""}
                 <span class="note">Changes are kept in the draft automatically.</span>
             </div>
         </div>
     </div>`);
-    const stage = (action = node.querySelector("[data-action]").value.trim()) => {
+    const stage = (action = /** @type {HTMLInputElement} */ (node.querySelector("[data-action]")).value.trim()) => {
         const edit = edits.cellEdit(kind, {stored: Boolean(branch), action,
-            helper: node.querySelector("[data-helper]")?.value, repeatHz: node.querySelector("[data-repeat]")?.value});
+            helper: /** @type {import("../../contracts/edits.js").BranchHelper | undefined} */ (/** @type {HTMLSelectElement | null} */ (node.querySelector("[data-helper]"))?.value), repeatHz: /** @type {HTMLInputElement | null} */ (node.querySelector("[data-repeat]"))?.value});
         state.cellHow = edit.pending ? {cell, keycode: behaviour.keycode, ...edit.pending} : null;
-        if (!edit.pending) saveBehaviour(document, behaviour, {tapCount: step.tapCount, kind, branch: edit.branch});
+        if (!edit.pending) saveBehaviour(document, behaviour, {tapCount: step.tapCount, kind, branch: edit.branch || null});
     };
-    node.querySelector('[data-act="close"]').addEventListener("click", () => { state.cell = null; render(); });
-    node.querySelector('[data-act="pick"]')?.addEventListener("click", () => openPicker({
+    /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="close"]')).addEventListener("click", () => { state.cell = null; render(); });
+    /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="pick"]'))?.addEventListener("click", () => openPicker({
         title: `${tierName(getModel(), kind)} action`,
         contextKeycode: behaviour.keycode,
         context: branchName(getModel(), step.tapCount + 1),
@@ -642,31 +681,33 @@ function cellEditor(behaviour, step, kind) {
             render();
         },
     }));
-    node.querySelector("[data-helper]")?.addEventListener("change", (event) => {
-        const field = node.querySelector("[data-repeat-field]");
-        if (field) field.hidden = event.target.value !== "REPEAT_WHILE_HELD";
+    /** @type {HTMLSelectElement | null} */ (node.querySelector("[data-helper]"))?.addEventListener("change", (event) => {
+        const field = /** @type {HTMLElement} */ (node.querySelector("[data-repeat-field]"));
+        if (field) field.hidden = /** @type {HTMLInputElement} */ (event.target).value !== "REPEAT_WHILE_HELD";
     });
-    node.querySelectorAll("[data-action], [data-helper], [data-repeat]").forEach((field) =>
+    /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-action], [data-helper], [data-repeat]")).forEach((field) =>
         field.addEventListener("change", () => stage()));
-    node.querySelector('[data-act="clear"]')?.addEventListener("click", () =>
+    /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="clear"]'))?.addEventListener("click", () =>
         saveBehaviour(document, behaviour, {tapCount: step.tapCount, kind, branch: null}));
     return node;
 }
 
 // One behaviour row, posted whole: the timing fields and the anchor switch
 // as they are on screen, with one cell replaced.
+/** @param {ParentNode} root @param {EditorBehavior} behaviour @param {NonNullable<Parameters<typeof edits.saveBehaviour>[1]>["change"]} [change] */
 function saveBehaviour(root, behaviour, change) {
     const terms = Object.fromEntries(["tapHoldTerm", "longerHoldTerm", "multiTapTerm"].flatMap((name) => {
-        const field = root.querySelector?.(`[data-term="${name}"]`);
+        const field = /** @type {HTMLInputElement | null} */ (root.querySelector(`[data-term="${name}"]`));
         return field ? [[name, field.dataset.stored]] : [];
     }));
-    const anchorField = root.querySelector?.("[data-anchor]");
-    const message = edits.saveBehaviour(behaviour, {terms, anchored: anchorField ? anchorField.checked : undefined, change}, getModel().profileIdentity);
+    const anchorField = /** @type {HTMLInputElement | null} */ (root.querySelector("[data-anchor]"));
+    const message = edits.saveBehaviour(behaviour, {terms, anchored: anchorField ? anchorField.checked : undefined, change}, getModel()?.profileIdentity);
     if (message) post(message);
 }
 
 /* ── combos ────────────────────────────────────────────────────────────── */
 
+/** @param {HTMLElement} body @param {HTMLElement} right */
 function tabCombos(body, right) {
     const model = getModel();
     const combos = model?.combos || [];
@@ -695,15 +736,16 @@ function tabCombos(body, right) {
     // this layer, and that group opens so the row is there to see.
     if (state.pickCombo !== null) {
         const id = String(state.pickCombo);
-        const route = [["view", inView], ["here", groupsOf.onKeys], ["through", groupsOf.throughKeys], ["elsewhere", groupsOf.elsewhere]]
+        const route = /** @type {[string, import("../view/keyface-types.js").ComboRoute[]][]} */ ([["view", inView], ["here", groupsOf.onKeys], ["through", groupsOf.throughKeys], ["elsewhere", groupsOf.elsewhere]])
             .find(([, entries]) => entries.some((entry) => String(entry.combo.id) === id))?.[0];
         state.pickCombo = null;
         state.reachRow.combos = route ? `${route}:${id}` : null;
         if (route) state.reachGroups = setReachGroupOpen(state.reachGroups, route, true);
     }
+    /** @param {string} group @param {Pick<ReturnType<typeof comboGroups>["onKeys"][number], "combo">} entry @param {string} reachedBy */
     const row = (group, entry, reachedBy) => {
         const combo = entry.combo;
-        const requires = ["mustHold", "mustTap", "ordered"].filter((flag) => combo[flag]).map((flag) => vocabulary(model).comboOptions[flag]).join(" · ") || "—";
+        const requires = /** @type {("mustHold" | "mustTap" | "ordered")[]} */ (["mustHold", "mustTap", "ordered"]).filter((flag) => combo[flag]).map((flag) => vocabulary(model).comboOptions[flag]).join(" · ") || "—";
         return `<tr${reachAttrs("combos", group, combo.id)} data-combo="${esc(String(combo.id))}"><td>${comboBadge(model, combo.badge)}${changedCombos.has(combo.id) ? draftDot() : ""}</td>
             <td>${(combo.inputs || []).map((input, at) => `<span class="tok">${keyNameMarked(model, combo.inputDisplays?.[at] ?? input, input)}</span>`).join(" + ")}</td>
             <td class="mono">${esc(combo.outputDisplay || combo.output)}</td>
@@ -711,14 +753,15 @@ function tabCombos(body, right) {
             <td class="muted">${esc(requires)}</td>
             <td class="muted">${reachedBy}</td></tr>`;
     };
+    /** @param {string} group @param {ReturnType<typeof comboGroups>["onKeys"][number] & {inputs?: number, covered?: number}} entry */
     const reachedBy = (group, entry) => group !== "elsewhere" ? keysReach(entry.keys)
         : entry.inputs ? `${entry.covered} of ${entry.inputs} inputs, never at once` : "no inputs";
     // The selected key as the layers in view answer it, and every combo that
     // takes it as an input. Each row still says how this layer reaches that
     // combo, from the group that lists it.
     const onKey = combosOnKey(model, layers(), state.layer, heldLayers(), state.selected);
-    const listed = [["here", groupsOf.onKeys], ["through", groupsOf.throughKeys], ["elsewhere", groupsOf.elsewhere]]
-        .flatMap(([group, entries]) => entries.map((entry) => [entry.combo.id, {group, entry}]));
+    const listed = /** @type {[string, import("../view/keyface-types.js").ComboGroupEntry[]][]} */ ([["here", groupsOf.onKeys], ["through", groupsOf.throughKeys], ["elsewhere", groupsOf.elsewhere]])
+        .flatMap(([group, entries]) => entries.map((entry) => /** @type {[number, {group: string, entry: import("../view/keyface-types.js").ComboGroupEntry}]} */ ([entry.combo.id, {group, entry}])));
     const routes = new Map(listed);
     const comboGroupRows = [
         {id: "key", detail: onKey.position ? onKey.position.editLabel || onKey.position.display || onKey.position.keycode : "nothing answers here",
@@ -741,36 +784,40 @@ function tabCombos(body, right) {
     const comboTable = reachTable("combos", comboGroupRows, [
         ["", "7%"], ["Inputs", "31%"], ["Sends", "15%"], ["Window", "10%"],
         ["Conditions", "13%"], ["Reached by", "24%"]]);
-    node.querySelector("#comboTable").replaceWith(comboTable);
+    /** @type {HTMLElement} */ (node.querySelector("#comboTable")).replaceWith(comboTable);
 
     // A combo row is picked like any reach row — its keys ring on the board —
     // and opens in the builder beside the table. Clicking the row whose combo
     // is open lets go of both; a picked row whose builder was closed opens it.
-    comboTable.querySelectorAll("[data-reach]").forEach((tr) => tr.addEventListener("click", () => {
+    /** @type {NodeListOf<HTMLElement>} */ (comboTable.querySelectorAll("[data-reach]")).forEach((tr) => tr.addEventListener("click", () => {
         const combo = combos.find((entry) => String(entry.id) === tr.dataset.combo);
         const editing = state.combo.open && state.combo.editId === combo?.id;
         if (state.reachRow.combos === tr.dataset.reach && (editing || !canEdit)) {
             state.reachRow.combos = null;
             if (editing) closeComboBuilder();
         } else {
-            state.reachRow.combos = tr.dataset.reach;
+            state.reachRow.combos = tr.dataset.reach || null;
             if (canEdit && combo && !editing) openComboBuilder(combo);
         }
         render();
     }));
-    const side = node.querySelector("#comboSide");
-    side.appendChild(state.combo.open ? comboBuilder(canEdit, () => edits.comboHoldTermValue(model)) : el(`<div class="empty-card">
+    const side = /** @type {HTMLElement} */ (node.querySelector("#comboSide"));
+    side.appendChild(state.combo.open ? comboBuilder(canEdit, () => edits.comboHoldTermValue(model, undefined)) : el(`<div class="empty-card">
         <p class="note">Pick <b>New combo</b> to build one: choose what it sends, then click its input keys straight on the board.</p></div>`));
     body.replaceChildren(node);
 }
 
+/** @param {string} text */
 const sentence = (text) => text.charAt(0).toUpperCase() + text.slice(1);
 // A builder input by the name the host gave its key, as the combo table and
 // the review read it (core/model/key-names.js).
+/** @param {Model} model @param {string} name */
 const comboInputLabel = (model, name) => actionLabel(model, name);
 
+/** @param {boolean} canEdit @param {() => string} holdTerm */
 function comboBuilder(canEdit, holdTerm) {
     const model = getModel();
+    /** @param {string} name */
     const shown = (name) => comboInputShown(model, layers(), state.layer, heldLayers(), name);
     const editing = state.combo.editId !== null;
     const original = (model?.combos || []).find((combo) => combo.id === state.combo.editId);
@@ -807,7 +854,7 @@ function comboBuilder(canEdit, holdTerm) {
                 ${[["mustHold", "Fires only once its keys are held past the combo hold threshold (Settings · Combos). Released sooner, the keys type themselves."],
                    ["mustTap", "Fires only if its keys are released before the combo hold threshold. Held longer, the keys type themselves."],
                    ["ordered", "Fires only if its keys are pressed in the order listed above."]].map(([flag, tip]) =>
-                    `<label class="sw" data-tip="${esc(tip)}"><input type="checkbox" data-${flag.toLowerCase()} ${form[flag] ? "checked" : ""} ${canEdit ? "" : "disabled"}><span class="track"></span><span class="txt">${esc(sentence(vocabulary(model).comboOptions[flag]))}</span></label>`).join("")}
+                    `<label class="sw" data-tip="${esc(tip)}"><input type="checkbox" data-${flag.toLowerCase()} ${form[/** @type {"mustHold" | "mustTap" | "ordered"} */ (flag)] ? "checked" : ""} ${canEdit ? "" : "disabled"}><span class="track"></span><span class="txt">${esc(sentence(vocabulary(model).comboOptions[flag]))}</span></label>`).join("")}
             </div>
             <div class="row" style="gap:8px">
                 <button class="btn primary" data-act="keep" ${canEdit && !state.combo.awaiting ? "" : "disabled"}>Keep combo in draft</button>
@@ -816,69 +863,71 @@ function comboBuilder(canEdit, holdTerm) {
             <p class="note">A combo needs its output and at least two inputs, so this form keeps its own state until you keep it.</p>
         </div></div>`);
 
-    node.querySelector(".card-b").insertBefore(definitionControls(layers().map(layer => ({...layer, label: layerName(layer)})), form, canEdit,
-        permissions => Object.assign(form, permissions)), node.querySelector(".card-b").firstChild);
-    node.querySelectorAll("[data-remove]").forEach((button) => button.addEventListener("click", () => {
+    /** @type {HTMLElement} */ (node.querySelector(".card-b")).insertBefore(definitionControls(layers().map(layer => ({...layer, label: layerName(layer)})), form, canEdit,
+        (/** @type {{enabled: boolean, allowedLayers: number}} */ permissions) => Object.assign(form, permissions)), /** @type {HTMLElement} */ (node.querySelector(".card-b")).firstChild);
+    /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-remove]")).forEach((button) => button.addEventListener("click", () => {
         state.combo.inputs = state.combo.inputs.filter((input) => input !== button.dataset.remove);
         render();
     }));
-    node.querySelector('[data-act="pickboard"]')?.addEventListener("click", () => {
+    /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="pickboard"]'))?.addEventListener("click", () => {
         const starting = !state.combo.picking;
         state.combo.picking = starting;
         render();
         if (starting) scrollContentTo(document, ".board-card");
     });
-    node.querySelector('[data-act="pickout"]')?.addEventListener("click", () => openPicker({
+    /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="pickout"]'))?.addEventListener("click", () => openPicker({
         title: "Combo output", context: editing ? original?.badge : "new combo",
         seed: form.output ? [form.output] : [],
         onPick: (expression) => { form.output = expression; },
     }));
     // Typing and ticking land in state as they happen, so a board click that
     // redraws the screen keeps them.
-    node.querySelector("[data-output]").addEventListener("input", (event) => { form.output = event.target.value; });
+    /** @type {HTMLInputElement} */ (node.querySelector("[data-output]")).addEventListener("input", (event) => { form.output = /** @type {HTMLInputElement} */ (event.target).value; });
     // Typing a window gives the combo its own; emptying the field, or Use
     // default, has it follow the keyboard's default again. The button changes
     // in place, and matching defaults become placeholders after editing.
+    /** @param {boolean} follows */
     const followed = (follows) => {
         form.followsDefault = follows;
-        const button = node.querySelector('[data-act="usedefault"]');
+        const button = /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="usedefault"]'));
         if (button) button.hidden = follows;
     };
-    node.querySelector("[data-term]").addEventListener("input", (event) => {
-        form.termMs = event.target.value;
-        if (fallback) followed(event.target.value.trim() === "");
+    /** @type {HTMLInputElement} */ (node.querySelector("[data-term]")).addEventListener("input", (event) => {
+        form.termMs = /** @type {HTMLInputElement} */ (event.target).value;
+        if (fallback) followed(/** @type {HTMLInputElement} */ (event.target).value.trim() === "");
     });
-    node.querySelector("[data-term]").addEventListener("change", (event) => {
-        event.target.value = timingInput(form.termMs, fallback, form.followsDefault && fallback !== "").value;
+    /** @type {HTMLInputElement} */ (node.querySelector("[data-term]")).addEventListener("change", (event) => {
+        /** @type {HTMLInputElement} */ (event.target).value = timingInput(form.termMs, fallback, form.followsDefault && fallback !== "").value;
     });
-    node.querySelector('[data-act="usedefault"]')?.addEventListener("click", (event) => {
+    /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="usedefault"]'))?.addEventListener("click", (event) => {
         event.preventDefault();
         form.termMs = fallback;
-        node.querySelector("[data-term]").value = "";
+        /** @type {HTMLInputElement} */ (node.querySelector("[data-term]")).value = "";
         followed(true);
     });
     // A combo cannot both need a hold and refuse one — the keyboard rejects it,
     // and QMK would never fire it — so turning one on turns the other off.
+    /** @type {Partial<Record<"mustHold" | "mustTap" | "ordered", "mustHold" | "mustTap">>} */
     const opposite = {mustHold: "mustTap", mustTap: "mustHold"};
-    for (const field of ["mustHold", "mustTap", "ordered"]) {
-        node.querySelector(`[data-${field.toLowerCase()}]`).addEventListener("change", (event) => {
-            form[field] = event.target.checked;
+    for (const field of /** @type {("mustHold" | "mustTap" | "ordered")[]} */ (["mustHold", "mustTap", "ordered"])) {
+        /** @type {HTMLInputElement} */ (node.querySelector(`[data-${field.toLowerCase()}]`)).addEventListener("change", (event) => {
+            form[field] = /** @type {HTMLInputElement} */ (event.target).checked;
             const other = opposite[field];
-            if (other && event.target.checked && form[other]) {
+            if (other && /** @type {HTMLInputElement} */ (event.target).checked && form[other]) {
                 form[other] = false;
-                node.querySelector(`[data-${other.toLowerCase()}]`).checked = false;
+                /** @type {HTMLInputElement} */ (node.querySelector(`[data-${other.toLowerCase()}]`)).checked = false;
             }
         });
     }
-    node.querySelector('[data-act="cancel"]').addEventListener("click", () => { closeComboBuilder(); render(); });
+    /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="cancel"]')).addEventListener("click", () => { closeComboBuilder(); render(); });
     // Keep and Delete close the builder once the host accepts them, so a
     // second press cannot add the combo twice, and a refused combo keeps its
     // fields for fixing.
-    node.querySelector('[data-act="delete"]')?.addEventListener("click", () => {
+    /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="delete"]'))?.addEventListener("click", () => {
         state.combo.awaiting = true;
-        post(edits.deleteCombo(state.combo.editId));
+        post(edits.deleteCombo(/** @type {number} */ (state.combo.editId)));
     });
-    node.querySelector('[data-act="keep"]')?.addEventListener("click", () => {
+    /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="keep"]'))?.addEventListener("click", () => {
         state.combo.awaiting = true;
         post(edits.comboMessage(editing ? state.combo.editId : null, {
             ...form,
@@ -891,17 +940,18 @@ function comboBuilder(canEdit, holdTerm) {
 }
 
 /* ── what this layer reaches ───────────────────────────────────────────── */
+/** @param {HTMLElement} body @param {HTMLElement} right */
 function tabMacros(body, right) {
     const model = getModel();
     const slots = model?.viaMacros || [];
-    const reach = macroReach(model, layers(), state.layer);
-    reach.inView = macroView(model);
+    const reach = {...macroReach(model, layers(), state.layer), inView: macroView(model)};
     right.replaceChildren();
     const open = el(`<button class="btn tiny ghost">Open the Macros view</button>`);
     open.addEventListener("click", () => { state.screen = "macros"; render(); });
     right.appendChild(open);
 
     const changedMacros = draftMarks(model?.draft?.changes).macros;
+    /** @param {string} group @param {string} keycode @param {string} reachedBy */
     const row = (group, keycode, reachedBy) => {
         const slot = slots.find((entry) => entry.keycode === keycode);
         return `<tr${reachAttrs("macros", group, keycode)}>
@@ -910,6 +960,7 @@ function tabMacros(body, right) {
             <td class="muted">${reachedBy}</td>
             <td style="text-align:right">${slot ? `<button class="btn tiny ghost" data-editmacro="${esc(keycode)}">Edit</button>` : ""}</td></tr>`;
     };
+    /** @type {{id: string, rows: string[], empty: string, drafted?: boolean, ids?: string[]}[]} */
     const groups = [
         {id: "view", rows: reach.inView.map((entry) => row("view", entry.name, reachLabel(model, entry))),
             empty: "No macro is reached by the layers in this view."},
@@ -934,9 +985,9 @@ function tabMacros(body, right) {
         .some((keycode) => changedMacros.has(keycode));
     const node = reachTable("macros", groups, [["Slot", "24%"], ["Payload", "44%"], ["Reached by", "24%"], ["", "8%"]]);
     attachReachRows(node, "macros");
-    node.querySelectorAll("[data-editmacro]").forEach((button) => button.addEventListener("click", () => {
+    /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-editmacro]")).forEach((button) => button.addEventListener("click", () => {
         const keycode = button.dataset.editmacro;
-        state.macroSlot = keycode;
+        state.macroSlot = keycode || null;
         state.screen = "macros";
         render();
     }));
@@ -946,9 +997,11 @@ function tabMacros(body, right) {
 // Where a reach came from, in the words of the thing that reaches it. A
 // transparent key can be answered by more than one layer, so each is named —
 // the default layer always answers, any other only while it is held too.
+/** @param {{layer: import("../../contracts/panel.js").Layer | null, whileHeld?: boolean}} entry */
 const sourceLabel = (entry) =>
     esc(layerName(entry.layer)) + (entry.whileHeld ? " when held" : "");
 
+/** @param {(ReturnType<typeof resolvedPositions>[number] & {reference?: boolean})[]} keys */
 const keysReach = (keys) => {
     const indexes = [...new Set(keys.map((entry) => entry.position.layoutIndex))];
     const sources = [...new Set(keys.filter((entry) => entry.fellThrough).map(sourceLabel))];
@@ -964,10 +1017,12 @@ const keysReach = (keys) => {
 // which of its two keycodes a branch sends is the whole point.
 // A key named in a reach reads as it does in the table's first column: its
 // name, with the keycode beside it when the two differ.
+/** @param {Model} model @param {string} keycode */
 const namedKey = (model, keycode) => {
     const label = actionLabel(model, keycode);
     return label === String(keycode) ? esc(label) : `${esc(label)} <code class="dim">${esc(keycode)}</code>`;
 };
+/** @param {Model} model @param {ReturnType<typeof reachInView>[number]} entry */
 const branchReach = (model, entry, showSends = true) => entry.behaviours.map((row) => {
     const from = `from ${namedKey(model, row.keycode)}`
         + (row.layer ? ` · on ${sourceLabel(row)}` : "");
@@ -978,6 +1033,7 @@ const branchReach = (model, entry, showSends = true) => entry.behaviours.map((ro
 // A combo is named by its badge and the keys chorded to fire it; one that
 // fires a behaviour says so, since its branch is what sends the thing, and one
 // that needs a transparent key names the layer answering for it.
+/** @param {Model} model @param {ReturnType<typeof reachInView>[number]} entry */
 const comboReach = (model, entry, showSends = true) => entry.combos.map(({combo, via, action, keys}) => {
     const inputs = (combo.inputDisplays || combo.inputs || []).join(" + ");
     const sources = [...new Set(keys.filter((key) => key.fellThrough).map(sourceLabel))];
@@ -991,16 +1047,17 @@ const comboReach = (model, entry, showSends = true) => entry.combos.map(({combo,
 // A macro can sit on a key here *and* be fired from a behaviour's branch; the
 // board rings both sets of keys, so the row has to name both or the two
 // disagree about the same entry.
+/** @param {Model} model @param {ReturnType<typeof reachInView>[number]} entry */
 const reachLabel = (model, entry) => [
     entry.keys?.length ? keysReach(entry.keys) : "",
     entry.behaviours?.length ? branchReach(model, entry) : "",
     entry.combos?.length ? comboReach(model, entry) : "",
 ].filter(Boolean).join(" · ");
 
+/** @param {HTMLElement} body @param {HTMLElement} right */
 function tabPointing(body, right) {
     const model = getModel();
-    const reach = pointingReach(model, layers(), state.layer);
-    reach.inView = pointingView(model);
+    const reach = {...pointingReach(model, layers(), state.layer), inView: pointingView(model)};
     right.replaceChildren();
     const open = el(`<button class="btn tiny ghost">Open the Pointing modes view</button>`);
     open.addEventListener("click", () => { state.screen = "pointing"; render(); });
@@ -1009,6 +1066,7 @@ function tabPointing(body, right) {
     const changedSlots = draftMarks(model?.draft?.changes).pointing;
     // One row per slot, in the table every reach tab uses: the slot with its
     // light, what the mode does, and how this layer reaches it.
+    /** @param {string} group @param {string | number} slotId @param {string} reachedBy @param {string} [variant] */
     const card = (group, slotId, reachedBy, variant) => {
         const slot = (model?.pdModes || []).find((entry) => entry.id === Number(slotId));
         if (!slot) return "";
@@ -1029,7 +1087,8 @@ function tabPointing(body, right) {
     // Holding a mode and toggling it on are the same mode reached two ways, so
     // the card is named for the one its route uses. A route that uses both
     // keeps them in the line beneath, where they can be told apart per key.
-    const reachCard = (group) => (entry) => {
+    /** @param {string} group */
+    const reachCard = (group) => (/** @type {ReturnType<typeof reachInView>[number]} */ entry) => {
         const variants = [...new Set([
             ...entry.keys.map((key) => pointingVariant(model, keyMeaning(key.position))),
             ...(entry.behaviours || []).map((row) => pointingVariant(model, row.action)),
@@ -1043,6 +1102,7 @@ function tabPointing(body, right) {
         ].filter(Boolean).join(" · "), only);
     };
 
+    /** @type {{id: string, rows: string[], empty: string, drafted?: boolean, ids?: string[]}[]} */
     const groups = [
         {id: "view", rows: reach.inView.map(reachCard("view")),
             empty: "No pointing mode is reached by the layers in this view."},
@@ -1066,7 +1126,7 @@ function tabPointing(body, right) {
         .some((id) => changedSlots.has(Number(id)));
     const node = reachTable("pointing", groups, [["Slot", "30%"], ["Mode", "26%"], ["Reached by", "36%"], ["", "8%"]]);
     attachReachRows(node, "pointing");
-    node.querySelectorAll("[data-editpd]").forEach((button) => button.addEventListener("click", () => {
+    /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-editpd]")).forEach((button) => button.addEventListener("click", () => {
         state.pdSlot = Number(button.dataset.editpd);
         state.pdKind = null;
         state.screen = "pointing";
@@ -1076,9 +1136,11 @@ function tabPointing(body, right) {
 }
 
 /* ── key edits ─────────────────────────────────────────────────────────── */
+/** @param {number} layoutIndex */
 function pickKeycodeFor(layoutIndex) {
     if (!writable()) return;
     const layer = currentLayer();
+    if (!layer) return;
     const position = positionAt(layer, layoutIndex);
     state.selected = layoutIndex;
     openPicker({
@@ -1094,18 +1156,21 @@ function pickKeycodeFor(layoutIndex) {
 // ⌘C copies the selected key's keycode and ⌘V stores it on the selected key,
 // on any layer; Delete or Backspace makes it transparent. Text fields keep
 // their own copy, paste and delete.
+/** @param {KeyboardEvent} event */
 export function keysShortcut(event) {
     if (state.screen !== "keys" || state.overlay || state.picker || state.retarget || state.recording || state.combo.picking) return false;
     const action = edits.keyAction(event);
     if (!action) return false;
-    if (event.target.closest?.("input, textarea, select, [contenteditable]")) return false;
+    if (/** @type {HTMLElement} */ (event.target).closest?.("input, textarea, select, [contenteditable]")) return false;
     if (action === "copy" && String(getSelection?.() || "")) return false;
     if (cellShortcut(action)) { event.preventDefault(); return true; }
     const layer = currentLayer();
+    if (!layer) return false;
     const position = positionAt(layer, state.selected);
     if (!position) return false;
 
     event.preventDefault();
+    /** @param {ReturnType<typeof edits.layoutKeys>} message */
     const store = (message) => {
         if (writable() && message.changes[0].keycode !== position.keycode) post(message);
     };
@@ -1124,14 +1189,17 @@ export function keysShortcut(event) {
 // With a behaviour cell open, the board shortcuts act on that cell rather than
 // on the key under it: Delete removes the tier, ⌘C copies what it sends, and
 // ⌘V makes it send the copied key, running as it already does or as chosen.
+/** @param {"copy" | "paste" | "clear"} action */
 function cellShortcut(action) {
     if (state.tab !== "behaviours" || !state.cell) return false;
-    const behaviour = behaviourEditorRow(getModel(), state.behaviourRow);
-    const [tapCount, kind] = state.cell.split("-");
+    const behaviour = behaviourEditorRow(getModel(), state.behaviourRow || "");
+    const [tapCount, tier] = state.cell.split("-");
+    const kind = /** @type {import("../../contracts/edits.js").Tier} */ (tier);
     const step = behaviour && behaviourGridSteps(behaviour, getModel()?.behaviorEditing?.maxTapStepsPerBehavior)
         .find((row) => String(row.tapCount) === tapCount);
-    if (!step) return false;
+    if (!step || !behaviour) return false;
     const branch = step[TIER_FIELDS[kind]];
+    /** @param {import("../../contracts/edits.js").BehaviorBranch | null} next */
     const change = (next) => saveBehaviour(document, behaviour, {tapCount: step.tapCount, kind, branch: next});
     if (action === "clear") {
         if (branch && canEditArea("behaviours")) change(null);
@@ -1139,9 +1207,10 @@ function cellShortcut(action) {
         if (branch) { state.keyClipboard = {keycode: branch.action, label: branch.action}; navigator.clipboard?.writeText(branch.action).catch(() => {}); render(); }
     } else if (state.keyClipboard && canEditArea("behaviours")) {
         const pending = state.cellHow?.cell === state.cell && state.cellHow.keycode === behaviour.keycode ? state.cellHow : null;
-        const how = branch || pending || {helper: holdHelpers(getModel(), kind)[0]?.[0]};
+        /** @type {Pick<import("../../contracts/edits.js").BehaviorBranch, "helper" | "repeatHz">} */
+        const how = branch || pending || {helper: /** @type {import("../../contracts/edits.js").BranchHelper | undefined} */ (holdHelpers(getModel(), kind)[0]?.[0])};
         const edit = edits.cellEdit(kind, {stored: Boolean(branch), action: state.keyClipboard.keycode, helper: how.helper, repeatHz: how.repeatHz});
-        if (!edit.pending && edit.branch?.action !== branch?.action) { state.cellHow = null; change(edit.branch); }
+        if (!edit.pending && edit.branch?.action !== branch?.action) { state.cellHow = null; change(edit.branch || null); }
     }
     return true;
 }
@@ -1149,6 +1218,7 @@ function cellShortcut(action) {
 // A behaviour belongs to the key it listens to, so changing that key moves the
 // whole row. A key that already has a row is never replaced silently: the
 // person chooses to overwrite it, swap the two, or leave both alone.
+/** @param {EditorBehavior} behaviour */
 function pickBehaviourKey(behaviour) {
     openPicker({
         title: "Key this behaviour listens to",
@@ -1165,20 +1235,23 @@ function pickBehaviourKey(behaviour) {
     });
 }
 
+/** @param {string} from @param {string} to @param {"swap" | "overwrite"} [conflict] */
 function retargetBehaviour(from, to, conflict) {
     const model = getModel();
     state.retarget = null;
     state.behaviourRow = conflict === "swap" || conflict === "overwrite"
-        ? behaviourListeningTo(model, to).keycode : canonicalKeycode(model, to);
+        ? behaviourListeningTo(model, to)?.keycode || canonicalKeycode(model, to) : canonicalKeycode(model, to);
     state.behaviourRowShown = null;
     state.cell = null;
-    post(edits.retargetBehaviour(from, to, model.profileIdentity, conflict));
+    post(edits.retargetBehaviour(from, to, model?.profileIdentity, conflict));
     render();
 }
 
+/** @param {EditorBehavior} behaviour */
 function retargetPrompt(behaviour) {
     const model = getModel();
-    const {to, existing} = state.retarget;
+    const {to, existing} = /** @type {NonNullable<typeof state.retarget>} */ (state.retarget);
+    /** @param {string} keycode */
     const name = (keycode) => `<b>${esc(actionLabel(model, keycode))}</b> <code class="dim">${esc(keycode)}</code>`;
     const node = el(`<div class="scrim"><div class="sheet" role="alertdialog" aria-modal="true" aria-label="Key already has a behaviour" style="width:min(520px,100%)">
         <div class="sheet-h"><h2>${esc(actionLabel(model, existing))} already has a behaviour</h2></div>
@@ -1193,16 +1266,18 @@ function retargetPrompt(behaviour) {
                 <button class="btn primary" data-act="overwrite">Overwrite</button></span></div>
     </div></div>`);
     node.addEventListener("click", (event) => {
-        const act = event.target === node ? "cancel" : event.target.closest("[data-act]")?.dataset.act;
+        const act = event.target === node ? "cancel" : /** @type {HTMLElement | null} */ (/** @type {Element} */ (event.target).closest("[data-act]"))?.dataset.act;
         if (act === "cancel") { state.retarget = null; render(); }
         if (act === "swap" || act === "overwrite") retargetBehaviour(behaviour.keycode, to, act);
     });
-    queueMicrotask(() => node.querySelector('[data-act="cancel"]')?.focus());
+    queueMicrotask(() => /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="cancel"]'))?.focus());
     return node;
 }
 
+/** @param {number} from @param {number} to */
 function swapKeys(from, to) {
     const layer = currentLayer();
+    if (!layer) return;
     const a = positionAt(layer, from), b = positionAt(layer, to);
     if (!a || !b) return;
     state.selected = to;

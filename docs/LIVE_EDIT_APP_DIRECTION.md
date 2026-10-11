@@ -204,6 +204,10 @@ are in [`AGENTS.md`](../AGENTS.md).
 The structure exists because the thing it replaced was a 14,539-line file that
 grew one convenience at a time.
 
+Type-only dependencies follow these same rules. Shared declarations for posted
+panel data live outside core in `contracts/` (D-L59), so the interface can share
+the host's contract while remaining independent of the core.
+
 ### D-L11 — Current state comes from the keyboard, including compiled defaults
 
 The app parses no C file and reads no repository file at runtime;
@@ -1283,3 +1287,31 @@ bytes or exchanges do not establish keyboard timings or physical acceptance.
 That probe ends at validation. Firmware's separate host suites cover committed
 reuse through the production owner, both-half saving and reboot, with hardware
 eligibility and the peer VIA bank supplied by their test adapters.
+
+### D-L59 — Strict types at the existing seams, source execution retained
+
+Ark uses strict TypeScript checking over its JavaScript sources. The extension
+and fixture interface continue to execute source directly; type checking emits
+no files and is part of the ordinary app check gate. Every application runtime
+module is checked automatically, including new modules. Core, extension,
+browser host, renderer and dedicated-worker checks use their own environments.
+Developer scripts, shared fixtures and integration corpus generators also
+enter strict checking automatically. The preview builder includes the browser
+API declarations its imports need, and the independent branch-window tool
+checks against its own minimum VS Code version. Individual test cases retain
+their runtime checks.
+
+Types describing a module's internal interface live in its owning layer.
+Posted panel data has one shared contract under `contracts/`, containing only
+inert declarations with dependencies confined to itself. Hosts, core and the
+interface may take those types; the interface still imports no core module or
+core type. This extends D-L10's layer rules to type-only dependencies without
+introducing a runtime connection between renderer and core. The renderer
+store and reply handler consume the same published-model and message contracts
+as both hosts; pure control builders sit beside the edit builders. Progress
+replies keep the existing read/draft identity checks before changing the model.
+
+Types describe application contracts, not proof that device bytes or imported
+files are valid. Defensive decoding, canonical checks, stable errors, firmware
+compatibility tests and physical acceptance keep their existing responsibilities.
+The migration mechanics and the check command live in REPOSITORY.md.

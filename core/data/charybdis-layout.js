@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 
 // The Charybdis 4x6 key layout: inert data every layer may read.

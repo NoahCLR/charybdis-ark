@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 
 const {LAYERS, validateSnapshot, fingerprint, fingerprintOf, summaryOf} = require("../model/portable-profile");
@@ -19,35 +20,53 @@ const {resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../data/charybdis-layout");
 const keycodes = require("../data/keycode-catalog");
 const {PROFILE_WIRE_FEATURES} = require("../protocol/profile-wire-v1");
+/**
+ * @typedef {import("../model/types.js").PortableDocument} Document
+ * @typedef {import("../model/types.js").ProfileSnapshot} Snapshot
+ * @typedef {import("../model/types.js").CompleteSnapshot} Complete
+ * @typedef {import("../model/types.js").DecodedProfile} Decoded
+ * @typedef {import("../../contracts/model.js").ReviewChange} Review
+ * @typedef {import("../model/types.js").ModelReviewChange} ModelReview
+ * @typedef {import("./types.js").DraftEdit} Edit
+ * @typedef {readonly number[]} Order
+ * @typedef {{decoded: Decoded, fingerprint: string, summary: import("../model/types.js").ProfileSummary}} DecodeEntry
+ * @typedef {{snapshot: Complete, order: Order | null}} Reference
+ */
+/** @template T @param {T} value @returns {T} */
 const copy = value => JSON.parse(JSON.stringify(value));
 // History entries are frozen: they are handed out by reference, decoded once
 // and kept, so nothing may edit one in place.
+/** @template T @param {T} value @returns {T} */
 const freeze = value => {
     if (value && typeof value === "object" && !Object.isFrozen(value)) {
-        Object.values(value).forEach(freeze);
+        Object.values(value).forEach(child => freeze(child));
         Object.freeze(value);
     }
     return value;
 };
+/** @param {string} text */
 const fail = text => Object.assign(new Error(text), {code: "PROFILE_DRAFT_CONFLICT"});
 
 // What one staged message did, in the words a group of review items is
 // titled with. Only a group of two or more items shows it.
+/** @type {Record<string, string | ((message: Edit) => string)>} */
 const EDIT_LABELS = {
-    retargetBehavior: message => message.conflict === "swap" ? "Swapped two behaviours" : "Moved a behaviour",
+    retargetBehavior: message => "conflict" in message && message.conflict === "swap" ? "Swapped two behaviours" : "Moved a behaviour",
     saveBehavior: "Edited a behaviour", addBehavior: "Added a behaviour", deleteBehavior: "Removed a behaviour",
     addCombo: "Added a combo", saveCombo: "Edited a combo", deleteCombo: "Removed a combo", updateComboHoldTerm: "Changed the combo hold threshold", updateComboDefaultTerm: "Changed the default combo window",
     savePdMode: "Edited a pointing mode", clearPdMode: "Cleared a pointing mode", duplicatePdMode: "Duplicated a pointing mode",
     updateConfigDefaults: "Saved a settings section", updateViaMacro: "Edited a macro", updateCustomKey: "Renamed a custom key", applyAllChanges: "Changed keys",
 };
+/** @param {Edit} message @param {Document} document */
 function editLabel(message, document) {
     if (message.type === "updateLayoutKeys") {
         const groups = message.layoutGroups || message.layers || [{layer: message.layer, changes: message.changes}];
         const changes = groups.flatMap(group => (group.changes || []).map(change => ({...change, layer: group.layer})));
         const [first, second] = changes;
+        /** @param {import("./types.js").LayoutEditGroup["changes"][number] & {layer?: import("../../contracts/edits.js").LayerReference}} change */
         const stored = change => {
             const position = CHARYBDIS_4X6_LAYOUT_MATRIX[change.layoutIndex], layer = layerOfRef(change.layer);
-            return position && document.layers[layer]?.[position[0] * 6 + position[1]];
+            return position && document.layers[/** @type {number} */ (layer)]?.[position[0] * 6 + position[1]];
         };
         if (changes.length === 2 && first.layer === second.layer && keycodes.encode(first.keycode) === stored(second) && keycodes.encode(second.keycode) === stored(first)) return "Swapped two keys";
         return changes.length > 1 ? `Changed ${changes.length} keys at once` : "Changed a key";
@@ -59,6 +78,7 @@ function editLabel(message, document) {
 
 // What one Rename & Reorder save did: the order it changed and the names it
 // changed, each named as the layers were called before it.
+/** @param {Order} step @param {string[]} before @param {string[]} after */
 function layersLabel(step, before, after) {
     const moved = step.map((from, slot) => slot).filter(slot => step[slot] !== slot);
     const renamed = step.map((from, slot) => [from, slot]).filter(([from, slot]) => layerCalled(before, from) !== layerCalled(after, slot));
@@ -72,18 +92,21 @@ function layersLabel(step, before, after) {
 
 // Review items name what the model cannot: the keycode a behaviour is listed
 // under, the name its edit messages use, so the review can go there.
+/** @param {ModelReview} item @returns {Review} */
 function placed(item) {
-    if (item.place?.kind === "behaviour") return {...item, place: {kind: "behaviour", keycode: actionName(item.place.target)}};
-    return item;
+    const {place, ...review} = item;
+    if (place?.kind === "behaviour") return {...review, place: {kind: "behaviour", keycode: actionName(place.target)}};
+    return {...review, place};
 }
 const DRAFT_EDITS = new Set([...PD_EDITS, ...RGB_EDITS, ...COMBO_EDITS, ...BEHAVIOR_EDITS, "updatePlacementPolicy", "updateConfigDefaults", "updateViaMacro", "updateCustomKey", "updateLayoutKeys", "applyAllChanges"]);
 
 class ProfileDraftSession {
+    /** @param {Snapshot} snapshot @param {string | null | undefined} deviceId @param {import("../model/types.js").ProfileDestination} capabilities @param {import("./types.js").ConnectionToken} [connectionToken] */
     constructor(snapshot, deviceId, capabilities, connectionToken = null) {
         if (!deviceId || snapshot.incomplete || capabilities.compiledLayerCount !== LAYERS) throw fail(`Read a complete ${LAYERS}-layer profile before editing.`);
         // Every edit reads or writes keycodes, which only firmware numbering its
         // keys as this app does can be trusted with.
-        if (!knownActionAbi(capabilities.actionAbiDigest)) throw fail("This keyboard's firmware numbers its keys differently from this app. Update both halves before editing.");
+        if (!knownActionAbi(capabilities.actionAbiDigest ?? 0)) throw fail("This keyboard's firmware numbers its keys differently from this app. Update both halves before editing.");
         validateSnapshot(snapshot.document, capabilities);
         this.deviceId = deviceId;
         this.connectionToken = connectionToken ?? null;
@@ -92,13 +115,17 @@ class ProfileDraftSession {
         // Web Crypto, which Node and the browser both have, so one line serves both hosts.
         this.id = globalThis.crypto.randomUUID();
         this.capabilities = copy(capabilities);
+        /** @type {Snapshot} */
         this.base = copy(snapshot);
+        /** @type {Snapshot} */
         this.latest = copy(snapshot);
         this.hostOs = copy(snapshot.hostOs ?? null);
         this.history = [freeze(copy(snapshot.document))];
         // Why each history entry exists, beside it: "edit" is one staged
         // message, the only kind that ties the units it changed together.
+        /** @type {(string | null)[]} */
         this.origins = [null];
+        /** @type {(string | null)[]} */
         this.labels = [null];
         // When each entry was made, for the draft history.
         this.times = [this.now()];
@@ -106,14 +133,28 @@ class ProfileDraftSession {
         this.orders = [IDENTITY];
         this.cursor = 0;
         this.revision = 1;
+        /** @type {number | null} */
         this.reviewedRevision = null;
     }
+    /** @type {WeakMap<Document, DecodeEntry> | undefined} */
+    decodeCache;
+    /** @type {WeakMap<Order, {base: Snapshot, reference: Reference}> | undefined} */
+    referenceCache;
+    /** @type {WeakMap<Document, {previous: Document, before: Order, after: Order, rows: Review[]}> | undefined} */
+    reviewCache;
+    /** @type {WeakMap<Document, {previous: Document, units: string[]}> | undefined} */
+    stepCache;
+    /** @type {WeakMap<Decoded, {keyboard: Decoded | null | undefined, order: Order, checks: import("../../contracts/model.js").Check[]}> | undefined} */
+    checksCache;
+    /** @type {boolean | undefined} */
+    needsRead;
     now() {return Date.now();}
     get document() {return copy(this.history[this.cursor]);}
     get order() {return this.orders[this.cursor];}
     // A history entry decoded once: its validated form (read-only), its
     // fingerprint and summary. Entries are never edited in place, so the
     // answer is kept with the entry for as long as the entry exists.
+    /** @param {Document} document @returns {DecodeEntry} */
     decode(document) {
         this.decodeCache ??= new WeakMap();
         let known = this.decodeCache.get(document);
@@ -129,16 +170,28 @@ class ProfileDraftSession {
     get snapshotFacts() {return {...this.base, hostOs: this.hostOs};}
     // The draft's revision as a snapshot: the base's keyboard facts with this
     // revision's document, plus its decoded form for read-only consumers.
+    /** @returns {Complete & {decoded: Decoded}} */
     get current() {
         const {decoded, fingerprint: print, summary: brief} = this.decode(this.history[this.cursor]);
         return {...this.snapshotFacts, incomplete: false, document: this.history[this.cursor], fingerprint: print, summary: brief, decoded};
     }
     // The keyboard's side as a snapshot, decoded once too.
     get baseSnapshot() {
-        return this.base.incomplete ? this.base : {...this.snapshotFacts, decoded: this.decode(this.base.document).decoded};
+        const base = this.base;
+        return base.incomplete ? base : {...base, hostOs: this.hostOs, decoded: this.decode(base.document).decoded};
+    }
+    // The keyboard's side when it is complete, for a comparison with the draft.
+    // Review and discard turn a recovery base away before they compare, so
+    // reaching this with one is a mistake, not a state to show.
+    /** @returns {Complete & {decoded: Decoded}} */
+    get completeBase() {
+        const base = this.baseSnapshot;
+        if (base.incomplete) throw fail("Read a complete profile before comparing it with the draft.");
+        return base;
     }
     get dirty() {return this.decode(this.history[this.cursor]).fingerprint !== this.base.fingerprint;}
     get stale() {return Boolean(this.needsRead || this.connectionChanged || this.latest.fingerprint !== this.base.fingerprint);}
+    /** @param {import("./types.js").ConnectionToken} connectionToken */
     noteConnection(connectionToken) {
         const token = connectionToken ?? null;
         if (token !== this.connectionToken && token !== this.latestConnectionToken) {
@@ -146,6 +199,7 @@ class ProfileDraftSession {
             this.needsRead = true;
         }
     }
+    /** @param {Snapshot | null | undefined} snapshot @param {string | null | undefined} deviceId @param {import("./types.js").ConnectionToken} [connectionToken] */
     observe(snapshot, deviceId, connectionToken = null) {
         if (!snapshot || deviceId !== this.deviceId) return;
         const token = connectionToken ?? null;
@@ -168,10 +222,12 @@ class ProfileDraftSession {
             else {this.base = copy(snapshot); this.latest = copy(snapshot);}
         } else this.latest = copy(snapshot);
     }
+    /** @param {number | undefined} revision @param {{allowStale?: boolean}} [options] */
     assertRevision(revision, {allowStale = false} = {}) {
         if (revision !== this.revision) throw fail("The draft changed. Review the current changes before continuing.");
         if (this.stale && !allowStale) throw fail("The keyboard changed. Review your draft against the latest keyboard state before continuing.");
     }
+    /** @param {Complete} snapshot */
     reset(snapshot) {
         this.base = copy(snapshot); this.latest = copy(snapshot);
         this.hostOs = copy(snapshot.hostOs ?? null);
@@ -183,6 +239,7 @@ class ProfileDraftSession {
         this.connectionChanged = false;
     }
     // A new entry keeps the entry's layer order unless it says otherwise.
+    /** @param {Document} document @param {number} revision @param {string} [origin] @param {string | null} [label] @param {Order} [order] */
     replace(document, revision, origin = "edit", label = null, order = this.order) {
         this.assertRevision(revision);
         const valid = validateSnapshot(document, this.capabilities).document;
@@ -201,6 +258,7 @@ class ProfileDraftSession {
         this.cursor = this.history.length - 1;
         this.revision++; this.reviewedRevision = null;
     }
+    /** @param {Edit} message */
     stage(message) {
         this.assertRevision(message.draftRevision);
         const current = this.current, before = current.fingerprint;
@@ -208,10 +266,11 @@ class ProfileDraftSession {
         if (message.type === "updateConfigDefaults") document = editSettings(current, {...message, expectedFingerprint: message.expectedFingerprint || before}, this.capabilities);
         else if (message.type === "updateViaMacro") document = editMacro(current, {...message, expectedFingerprint: message.expectedFingerprint || before}, this.capabilities);
         else if (message.type === "updateCustomKey") document = editCustomKey(current, {...message, expectedFingerprint: message.expectedFingerprint || before}, this.capabilities);
-        else if (["updateLayoutKeys", "applyAllChanges"].includes(message.type)) document = this.editLayout(message);
+        else if (message.type === "updateLayoutKeys" || message.type === "applyAllChanges") document = this.editLayout(message);
         else {
             if (!DRAFT_EDITS.has(message.type)) throw fail("Unsupported draft edit.");
-            if (message.expectedBase && ["source", "generation", "digest", "originHalf"].some(key => message.expectedBase[key] !== this.identity()[key])) throw fail("This form belongs to an older draft. Reload it before keeping changes.");
+            const expected = message.expectedBase;
+            if (expected && (/** @type {const} */ (["source", "generation", "digest", "originHalf"])).some(key => expected[key] !== this.identity()[key])) throw fail("This form belongs to an older draft. Reload it before keeping changes.");
             document = {...current.document, profile: editDeviceProfile(Buffer.from(current.document.profile, "base64"), message, {
                 capabilities: this.capabilities, combos: this.combos(), maximumBrightness: current.limits?.brightnessMax,
             }).toString("base64")};
@@ -222,10 +281,12 @@ class ProfileDraftSession {
     // A Rename & Reorder save: its document, and the order it saved, which
     // rearranges this revision. An order and each name are separate
     // decisions, so the step links nothing in the review.
+    /** @param {Document} document @param {number} revision @param {Order} step */
     editLayers(document, revision, step) {
         const before = this.current.decoded.settings.names, after = validateSnapshot(document, this.capabilities).settings.names;
         this.replace(document, revision, "layers", layersLabel(step, before, after), compose(this.order, step));
     }
+    /** @param {import("./types.js").LayoutEdit} message */
     editLayout(message) {
         if (message.adds?.length || message.deletes?.length) throw fail(`Use Manage layers to name or reorder the ${LAYERS} available layers.`);
         const groups = message.layoutGroups || message.layers || [{layer: message.layer, changes: message.changes}];
@@ -233,11 +294,11 @@ class ProfileDraftSession {
         const document = this.document;
         for (const group of groups) {
             const layer = layerOfRef(group.layer);
-            if (!(layer < LAYERS) || !Array.isArray(group.changes)) throw fail("Choose a layer reported by this keyboard.");
+            if (layer === undefined || !(layer < LAYERS) || !Array.isArray(group.changes)) throw fail("Choose a layer reported by this keyboard.");
             for (const change of group.changes) {
                 const position = Number.isInteger(change.layoutIndex) && CHARYBDIS_4X6_LAYOUT_MATRIX[change.layoutIndex];
-                const code = keycodes.encode(change.keycode) ?? (knownActionAbi(this.capabilities.actionAbiDigest) ? resolveNativeQmkExpression(change.keycode, {}) : undefined);
-                if (!position || !Number.isInteger(code)) throw fail(`Cannot represent the key ${change.keycode} on this keyboard.`);
+                const code = keycodes.encode(change.keycode) ?? (knownActionAbi(this.capabilities.actionAbiDigest ?? 0) ? resolveNativeQmkExpression(change.keycode, {}) : undefined);
+                if (!position || code === undefined || !Number.isInteger(code)) throw fail(`Cannot represent the key ${change.keycode} on this keyboard.`);
                 const misplaced = keyPlacementProblem(code, {layerCount: this.capabilities.compiledLayerCount ?? LAYERS});
                 if (misplaced) throw fail(misplaced);
                 document.layers[layer][position[0] * 6 + position[1]] = code;
@@ -248,22 +309,26 @@ class ProfileDraftSession {
     // The keyboard's profile rearranged into an order, with the order it
     // stands for; the keyboard's own profile, and no order, when the order
     // moves nothing, including a reorder nothing can tell apart.
+    /** @param {Order} order @returns {Reference} */
     referenceFor(order) {
-        const base = this.baseSnapshot;
-        if (this.base.incomplete || isIdentity(order)) return {snapshot: base, order: null};
+        const base = this.completeBase;
+        if (isIdentity(order)) return {snapshot: base, order: null};
         this.referenceCache ??= new WeakMap();
         const known = this.referenceCache.get(order);
         if (known?.base === this.base) return known.reference;
-        const decoded = validateSnapshot(rearranged(this.base.document, order), this.capabilities), print = fingerprintOf(decoded);
+        const decoded = validateSnapshot(rearranged(base.document, order), this.capabilities), print = fingerprintOf(decoded);
+        /** @type {Reference} */
         const reference = print === this.base.fingerprint ? {snapshot: base, order: null}
-            : {snapshot: {...this.snapshotFacts, document: decoded.document, decoded, fingerprint: print, summary: summaryOf(decoded)}, order};
+            : {snapshot: {...base, document: decoded.document, decoded, fingerprint: print, summary: summaryOf(decoded)}, order};
         this.referenceCache.set(order, {base: this.base, reference});
         return reference;
     }
     // What a document in an order differs from the keyboard by: the order,
     // then everything else compared with the reference.
+    /** @param {Document} document @param {Order} order @returns {ModelReview[]} */
     describe(document, order) {
         const {snapshot, order: moved} = this.referenceFor(order);
+        /** @type {Complete} */
         const after = {...this.snapshotFacts, incomplete: false, document, ...this.decode(document)};
         return [...(moved ? [layerOrderReview(after, moved)] : []), ...profileReview(snapshot, after, this.capabilities)];
     }
@@ -276,6 +341,7 @@ class ProfileDraftSession {
     // the bounded history leave their units on their own. Units link by the
     // layer they belong to, not the slot, so a reorder between two edits
     // never ties two different layers' keys.
+    /** @returns {Review[]} */
     changes() {
         if (!this.dirty) return [];
         const current = this.current;
@@ -283,7 +349,8 @@ class ProfileDraftSession {
             fields: [{label: "", before: "Interrupted configuration; a full comparison is unavailable", after: `${current.summary.layers} layers, ${current.summary.behaviors} behaviours, ${current.summary.combos} combos, ${current.summary.macros} macros with content, lighting and settings`}]}];
         const rows = this.describe(current.document, this.order), shown = new Set(rows.map(row => layerUnit(row.unit, this.order)));
         const parent = new Map([...shown].map(unit => [unit, unit]));
-        const find = unit => {while (parent.get(unit) !== unit) unit = parent.get(unit); return unit;};
+        /** @param {string} unit @returns {string} */
+        const find = unit => {while (parent.get(unit) !== unit) unit = /** @type {string} */ (parent.get(unit)); return unit;};
         const steps = [];
         for (let step = 1; step <= this.cursor; step++) {
             if (this.origins[step] !== "edit") continue;
@@ -293,12 +360,14 @@ class ProfileDraftSession {
         }
         // A group is titled by the edits that made it, in the order they were
         // made: one edit by its own words, several by the first and a count.
+        /** @type {Map<string, string[]>} */
         const titles = new Map();
         for (const {label, unit} of steps) {
             const root = find(unit), list = titles.get(root) || [];
             if (label && !list.includes(label)) list.push(label);
             titles.set(root, list);
         }
+        /** @param {string[] | undefined} list */
         const title = list => !list?.length ? null : list.length === 1 ? list[0] : `${list[0]} and ${list.length - 1} more edit${list.length === 2 ? "" : "s"}`;
         const groups = new Map();
         return rows.map(row => {
@@ -309,10 +378,12 @@ class ProfileDraftSession {
     }
     // The units one history step changed, remembered with the entry: history
     // entries are never edited in place, so the answer never goes stale.
+    /** @param {number} step @returns {string[]} */
     stepUnits(step) {
         this.stepCache ??= new WeakMap();
         const entry = this.history[step], previous = this.history[step - 1], cached = this.stepCache.get(entry);
         if (cached?.previous === previous) return cached.units;
+        /** @param {Document} document @returns {Complete} */
         const snapshot = document => ({...this.snapshotFacts, incomplete: false, document, ...this.decode(document)});
         const units = [...new Set(profileReview(snapshot(previous), snapshot(entry), this.capabilities).map(row => row.unit))];
         this.stepCache.set(entry, {previous, units});
@@ -333,11 +404,13 @@ class ProfileDraftSession {
             changes: step ? this.stepReview(step) : null,
         }));
     }
+    /** @param {number} step @returns {Review[]} */
     stepReview(step) {
         this.reviewCache ??= new WeakMap();
         const entry = this.history[step], previous = this.history[step - 1], cached = this.reviewCache.get(entry);
         const before = this.orders[step - 1], after = this.orders[step];
         if (cached?.previous === previous && cached.before === before && cached.after === after) return cached.rows;
+        /** @param {Document} document @returns {Complete} */
         const snapshot = document => ({...this.snapshotFacts, incomplete: false, document, ...this.decode(document)});
         const back = inverse(before), moved = Object.freeze(after.map(layer => back[layer]));
         const now = snapshot(entry);
@@ -350,10 +423,11 @@ class ProfileDraftSession {
     // Discard one group of review rows: its units go back to what the keyboard
     // holds, as one more undoable step. A review that was current stays
     // current, since what is left is part of what was reviewed.
+    /** @param {number} revision @param {number} group */
     discard(revision, group) {
         this.assertRevision(revision);
         if (this.base.incomplete) throw fail("Review this recovery as a whole; its changes cannot be discarded one by one.");
-        const items = this.changes().filter(row => row.group === group), units = new Set(items.map(row => row.unit));
+        const items = this.changes().filter(row => row.group === group), units = new Set(items.map(row => /** @type {string} */ (row.unit)));
         if (!units.size) throw fail("That change is no longer in the draft.");
         const reviewed = this.reviewedRevision === revision;
         // The order goes back by moving the layers back, so everything else
@@ -375,6 +449,7 @@ class ProfileDraftSession {
     }
     // Discard the whole draft as one more step, so undo brings it back: the
     // keyboard is not read again, since nothing about it changed.
+    /** @param {number} revision */
     discardAll(revision) {
         this.assertRevision(revision);
         if (this.base.incomplete) throw fail("Read the keyboard again to discard a recovery draft.");
@@ -382,17 +457,23 @@ class ProfileDraftSession {
         const count = this.changes().length;
         this.replace(validateSnapshot(this.base.document, this.capabilities).document, revision, "discard", `Discarded the draft (${count} change${count === 1 ? "" : "s"})`, IDENTITY);
     }
+    /** @param {number} revision */
     undo(revision) {this.assertRevision(revision); if (this.cursor) {this.cursor--; this.revision++; this.reviewedRevision = null;}}
+    /** @param {number} revision */
     redo(revision) {this.assertRevision(revision); if (this.cursor + 1 < this.history.length) {this.cursor++; this.revision++; this.reviewedRevision = null;}}
     // Several undos or redos at once: straight to one entry of the history.
+    /** @param {number} revision @param {number} step */
     jump(revision, step) {
         this.assertRevision(revision);
         if (!Number.isInteger(step) || step < 0 || step >= this.history.length) throw fail("That step is no longer in the draft history.");
         if (step !== this.cursor) {this.cursor = step; this.revision++; this.reviewedRevision = null;}
     }
+    /** @param {number} revision */
     review(revision) {this.assertRevision(revision); this.reviewedRevision = this.revision;}
     // Leaving the review un-reviews the draft, even one gone stale meanwhile.
+    /** @param {number} revision */
     closeReview(revision) {this.assertRevision(revision, {allowStale: true}); this.reviewedRevision = null;}
+    /** @param {number} revision */
     rebase(revision) {
         this.assertRevision(revision, {allowStale: true});
         if (this.needsRead) throw fail("Read the latest keyboard state before reviewing this draft again.");
@@ -409,6 +490,7 @@ class ProfileDraftSession {
         this.replace(target, this.revision, "rebase", null, order);
         this.reviewedRevision = this.revision;
     }
+    /** @param {import("./types.js").DraftApplyService} service @param {number} revision @param {import("./types.js").SaveRecovery} saveRecovery */
     async apply(service, revision, saveRecovery) {
         this.assertRevision(revision);
         if (!this.dirty || this.reviewedRevision !== revision) throw fail("Review the current draft before applying it.");
@@ -421,7 +503,7 @@ class ProfileDraftSession {
             this.reset(result);
             return result;
         } catch (error) {
-            if (["RESTORE_INCOMPLETE", "RESTORE_NOT_SAVED", "PROFILE_CHANGED", "RESTORE_VERIFY_FAILED"].includes(error.code)) this.needsRead = true;
+            if (["RESTORE_INCOMPLETE", "RESTORE_NOT_SAVED", "PROFILE_CHANGED", "RESTORE_VERIFY_FAILED"].includes(/** @type {Error & {code: string}} */ (error).code)) this.needsRead = true;
             throw error;
         }
     }
@@ -435,41 +517,47 @@ class ProfileDraftSession {
         this.checksCache ??= new WeakMap();
         const known = this.checksCache.get(draft);
         if (known && known.keyboard === keyboard && known.order === order) return known.checks;
-        const checks = draftProfileChecks(keyboard, draft, order, {brightnessMax: this.current.limits?.brightnessMax,
+        const checks = draftProfileChecks(keyboard ?? null, draft, order, {brightnessMax: this.current.limits?.brightnessMax,
             detectedHostOs: this.current.hostOs?.detected,
             featureFlags: this.capabilities?.featureFlags,
             effects: this.current.options?.effects,
-            ownedTapping: Boolean(this.capabilities?.featureFlags & PROFILE_WIRE_FEATURES.OWNED_TAPPING),
-            physicalGestureTiming: Boolean(this.capabilities?.featureFlags & PROFILE_WIRE_FEATURES.PHYSICAL_GESTURE_TIMING)});
+            ownedTapping: Boolean((this.capabilities?.featureFlags || 0) & PROFILE_WIRE_FEATURES.OWNED_TAPPING),
+            physicalGestureTiming: Boolean((this.capabilities?.featureFlags || 0) & PROFILE_WIRE_FEATURES.PHYSICAL_GESTURE_TIMING)});
         this.checksCache.set(draft, {keyboard, order, checks});
         return checks;
     }
     // Whether Apply has to be confirmed: active traps and warnings matter
     // whether the draft introduced them or the keyboard already has them.
-    hasChecksToConfirm() {return this.checks().some(check => check.status !== "fixed" && [CHECK_LEVELS.TRAP, CHECK_LEVELS.WARNING].includes(check.level));}
+    hasChecksToConfirm() {return this.checks().some(check => check.status !== "fixed" && (/** @type {string[]} */ ([CHECK_LEVELS.TRAP, CHECK_LEVELS.WARNING])).includes(check.level));}
     hasBlockers() {return this.checks().some(check => check.status !== "fixed" && check.level === "blocker");}
     identity() {return {source: "draft", generation: this.revision, digest: this.decode(this.history[this.cursor]).fingerprint, originHalf: this.deviceId};}
     // The draft's combos as the keyboard would report them: every window as
     // it resolves, and whether it follows the default.
+    /** @returns {Extract<import("./types.js").ComboRead, {state: "read"}>} */
     combos() {
         const {combos, settings} = this.decode(this.history[this.cursor]).decoded;
-        const native = nativeCode;
+        // The constructor gates the action ABI, and all stored actions have native codes.
+        /** @param {import("../schema/types.js").SemanticAction} action */
+        const native = action => /** @type {number} */ (nativeCode(action));
         return {state: "read", enabled: Boolean(settings.values[20]), layerReferences: settings.layers.map(record => record.reference),
             version: combos.version, defaultTermMs: combos.defaultTermMs, holdTermMs: combos.holdTermMs,
             rows: combos.rows.map(row => ({...row, termMs: effectiveComboTerm(combos, row), followsDefault: row.termMs === null, inputs: row.inputs.map(native), output: native(row.output)}))};
     }
+    /** @template {import("./types.js").DraftDeviceContext} T @param {T} state */
     editingState(state) {
         if (state.selectedDeviceId !== this.deviceId) return state;
         const current = this.current, value = current.decoded, values = value.settings.values;
         const max = current.limits?.brightnessMax;
         const lighting = baseLighting(values);
+        /** @type {import("./types.js").BaseRgbRead | null | undefined} */
         const baseRgb = max === undefined ? state.baseRgb : {state: "read", effectId: lighting.enabled ? lighting.effect : 0,
             brightness: max ? Math.min(255, Math.round(lighting.brightness * 255 / max)) : 0, hue: lighting.hue, saturation: lighting.saturation, speed: lighting.speed};
         return {...state, busy: state.busy || this.stale || !state.connected,
-            layout: {state: "read", layers: current.document.layers.map((values, layer) => ({layer, keys: CHARYBDIS_4X6_LAYOUT_MATRIX.map(([row, column], layoutIndex) => ({row, column, layoutIndex, keycode: values[row * 6 + column], resolved: keycodes.resolve(values[row * 6 + column])}))}))},
-            committed: {...state.committed, state: "read", failures: [], domains: {rgb: value.rgb, keyBehaviors: value.behaviors, settings: value.settings, pdModes: value.pdModes}},
+            layout: {state: /** @type {const} */ ("read"), layers: current.document.layers.map((values, layer) => ({layer, keys: CHARYBDIS_4X6_LAYOUT_MATRIX.map(([row, column], layoutIndex) => ({row, column, layoutIndex, keycode: values[row * 6 + column], resolved: keycodes.resolve(values[row * 6 + column])}))}))},
+            committed: {...state.committed, state: /** @type {const} */ ("read"), failures: [], domains: {rgb: value.rgb, keyBehaviors: value.behaviors, settings: value.settings, pdModes: value.pdModes}},
             baseRgb, combos: this.combos(), macroView: macroEditorView(current, this.capabilities), customKeyView: customKeyEditorView(current, this.capabilities), settingsView: settingsEditorView(current, this.capabilities)};
     }
+    /** @param {import("./types.js").DraftDeviceContext} state */
     view(state) {
         const matching = state.selectedDeviceId === this.deviceId, connected = matching && state.connected;
         return {id: this.id, revision: this.revision, dirty: this.dirty, stale: this.stale, connectionChanged: this.connectionChanged, connected, matching,

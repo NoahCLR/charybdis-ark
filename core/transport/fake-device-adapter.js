@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 
 const {
@@ -7,11 +8,13 @@ const {
 } = require("./device-adapter");
 
 class FakeDeviceAdapter {
+    /** @param {{devices?: import("./types.js").DeviceDescriptor[], onWrite?: (write: {connection: FakeConnectedDevice, deviceId: string, report: Buffer, writeIndex: number}) => import("./types.js").MaybePromise<unknown>}} [options] */
     constructor(options = {}) {
         this.devices = Array.isArray(options.devices)
             ? options.devices.map((device) => ({...device}))
             : [{id: "fake-charybdis", product: "Fake Charybdis"}];
         this.onWrite = typeof options.onWrite === "function" ? options.onWrite : undefined;
+        /** @type {FakeConnectedDevice[]} */
         this.connectionHistory = [];
     }
 
@@ -19,6 +22,7 @@ class FakeDeviceAdapter {
         return this.devices.map((device) => ({...device}));
     }
 
+    /** @param {string} deviceId */
     async connect(deviceId) {
         if (!this.devices.some((device) => device.id === deviceId)) {
             throw liveLinkError(
@@ -32,10 +36,12 @@ class FakeDeviceAdapter {
         return connection;
     }
 
+    /** @param {string} deviceId */
     connectionsFor(deviceId) {
         return this.connectionHistory.filter((connection) => connection.deviceId === deviceId);
     }
 
+    /** @param {string} [deviceId] */
     lastConnection(deviceId) {
         const matches = deviceId === undefined
             ? this.connectionHistory
@@ -45,15 +51,20 @@ class FakeDeviceAdapter {
 }
 
 class FakeConnectedDevice {
+    /** @param {FakeDeviceAdapter} adapter @param {string} deviceId */
     constructor(adapter, deviceId) {
         this.adapter = adapter;
         this.deviceId = deviceId;
         this.closed = false;
+        /** @type {Buffer[]} */
         this.writes = [];
+        /** @type {Set<import("./types.js").ReportListener>} */
         this.reportListeners = new Set();
+        /** @type {Set<import("./types.js").DisconnectListener>} */
         this.disconnectListeners = new Set();
     }
 
+    /** @param {Uint8Array} report */
     async write(report) {
         if (this.closed) {
             throw liveLinkError(
@@ -74,16 +85,19 @@ class FakeConnectedDevice {
         }
     }
 
+    /** @param {import("./types.js").ReportListener} listener */
     onReport(listener) {
         this.reportListeners.add(listener);
         return () => this.reportListeners.delete(listener);
     }
 
+    /** @param {import("./types.js").DisconnectListener} listener */
     onDisconnect(listener) {
         this.disconnectListeners.add(listener);
         return () => this.disconnectListeners.delete(listener);
     }
 
+    /** @param {Uint8Array} report */
     emitReport(report) {
         if (this.closed) {
             return false;
@@ -95,6 +109,7 @@ class FakeConnectedDevice {
         return true;
     }
 
+    /** @param {unknown} [reason] */
     emitDisconnect(reason = new Error("Fake device unplugged.")) {
         if (this.closed) {
             return false;
