@@ -128,6 +128,22 @@ test("reading with no keyboard attached answers with a notice through the host",
     await loop.close();
 });
 
+test("an export refused after disconnect reports the same failure in the notice and device diagnostics", async () => {
+    const host = fakeHost();
+    const loop = openPanelLoop(host, {adapter: new FakeDeviceAdapter()});
+    try {
+        loop.session.service.setError(new Error("Earlier failure"));
+        await loop.handleMessage({type: "exportPortableProfile"});
+        const reply = last(host), error = loop.session.service.snapshot().error;
+        assert.equal(error.message, "Connect the keyboard and wait for the current operation to finish.");
+        assert.equal(reply.notice, `Failed [${error.code}]: ${error.message}`);
+        assert.equal(reply.model.device.health.error, error.message);
+        assert.match(loop.session.service.snapshot().diagnostics.at(-1), /Connect the keyboard and wait/);
+        assert.deepEqual(host.exports, []);
+        assert.equal(loop.session.portableBusy, false);
+    } finally {await loop.close();}
+});
+
 test("a keyboard that never answers becomes a failure notice and a host error", async () => {
     const host = fakeHost();
     const adapter = new FakeDeviceAdapter();
@@ -135,8 +151,7 @@ test("a keyboard that never answers becomes a failure notice and a host error", 
     await loop.handleMessage({type: "refresh"});
     assert.ok(adapter.lastConnection().writes.length, "the loop reached the device through the injected adapter");
     assert.equal(host.errors.length, 1);
-    assert.match(last(host).notice, /^Failed: /);
-    assert.equal(last(host).notice, `Failed: ${host.errors[0]}`);
+    assert.equal(last(host).notice, `Failed [TIMEOUT]: ${host.errors[0]}`, "the failed connection's own error, with its code");
     assert.equal(loop.session.readBusy, false, "a failed read leaves the panel free to try again");
     await loop.close();
 });

@@ -190,6 +190,11 @@ export type PanelModelExtras = Pick<import('../../contracts/panel.js').Published
 
 export type CompleteCapture = Extract<CapturedProfile, import('../model/types.js').CompleteSnapshot>;
 export type RestoredProfile = Awaited<ReturnType<typeof import('./portable-profile-session.js').restoreProfile>> & import('../model/types.js').SnapshotFacts;
+/**
+ * The device service as the panel's controls use it. A failed operation
+ * rejects (and leaves its error in `snapshot().error`); `readCombos` and
+ * `readBaseRgb` are optional reads that never reject.
+ */
 export interface ControlService extends DraftApplyService {
     capabilities?: Partial<DeviceCapabilities> | null;
     phase?: string;
@@ -230,11 +235,8 @@ export interface DeviceServiceOptions {
     onChange?: (state?: PanelDeviceState) => void;
     onApplyProgress?: (view: import('../../contracts/model.js').ApplyView) => void;
     onReadProgress?: (view: import('../../contracts/messages.js').ReadProgress) => void;
-    profileSummary?: Partial<Record<ProfileCapacity, unknown>>;
 }
 
-export type ProfileCapacity = 'layerCount' | 'behaviorRows' | 'maxTapStepsPerBehavior' | 'populatedBehaviorSteps' | 'comboCount' | 'maxKeysPerCombo' | 'reusableRgbGroups' | 'rgbStageGroupRows' | 'highestLedIndex';
-export type SourceProfileSummary = Record<ProfileCapacity, number>;
 export type DeviceConnection = Awaited<ReturnType<InstanceType<typeof import('../transport/request-coordinator.js').DeviceRequestCoordinator>['connect']>>;
 export interface ServiceSnapshot extends PanelDeviceState {
     devices: (import('../transport/types.js').DeviceDescriptor & {label: string})[];
