@@ -602,6 +602,13 @@ badges of the combos On this view lists it in (`combosInPreview` in
 webview/view/keyface.mjs). Under Combo Layer Matching the reference layer's keys
 are matched instead, so no answer from below adds a badge.
 
+Combo grouping skips activation enumeration when there are no combos. For
+current-layer matching it enumerates only lower layers that can answer a
+transparent position on the top layer, including disabled keys that block an
+input below. Other holds cannot change the answer and are omitted, preserving
+the smallest held set for each route. This keeps a first Macros open from
+enumerating every combination of all 16 layers just to list its placements.
+
 The reach sections have one open state by section identity across those four
 tabs. Opening one does not close another. A section unique to one tab keeps its
 own state; sections absent from another tab retain their state until shown
