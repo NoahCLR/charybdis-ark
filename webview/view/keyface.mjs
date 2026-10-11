@@ -122,8 +122,8 @@ export const behaviourListeningTo = (model, expression) => {
 
 // Every activation this layer can be the top of: layer 0 is always on, this
 // layer is held, and any set of the layers between may be held alongside.
-// Eight layers make at most 64 of them, so the ones that need exact answers
-// simply enumerate.
+// Sixteen layers make up to 16,384 sets. Combo grouping excludes layers that
+// cannot change an answer before enumerating them.
 //
 // Layer 0 stands in for the default layer. The keyboard can move that with
 // NOAH_SETTING_DEFAULT_LAYERS and does not report it, but layer 0 is also what
@@ -131,8 +131,12 @@ export const behaviourListeningTo = (model, expression) => {
 // that can answer is right either way — only whether an answer needs a layer
 // held would be misread, and only on a keyboard whose default has moved.
 export function activations(at) {
+    return activationSets(Array.from({length: Math.max(0, at - 1)}, (_, index) => index + 1));
+}
+
+function activationSets(layers) {
     const sets = [[]];
-    for (let layer = 1; layer < at; layer += 1) {
+    for (const layer of layers) {
         for (const held of [...sets]) sets.push([...held, layer]);
     }
     return sets;
@@ -523,6 +527,7 @@ export function comboGroups(model, stack, at) {
 }
 
 function groupCombos(model, stack, at) {
+    if (!model?.combos?.length) return {onKeys: [], throughKeys: [], fromBranches: [], fromBranchesBelow: [], elsewhere: []};
     // QMK matches combos against the reference layer's raw keycodes whenever
     // that layer is not the top one (process_combo.c: keymap_key_to_keycode on
     // ref_layer, no transparency). Then there is exactly one way to press the
@@ -538,7 +543,7 @@ function groupCombos(model, stack, at) {
                 ({position, layer: referenced, fellThrough: false, whileHeld: false, reference: true}));
             return {held: [], resolved, answering: new Map(resolved.map((entry) => [entry.position, entry]))};
         })()]
-        : activations(at).map((held) => {
+        : comboActivations(stack, at).map((held) => {
             const resolved = resolvedPositions(stack, at, held);
             return {held, resolved, answering: new Map(resolved.map((entry) => [entry.position, entry]))};
         });
@@ -558,6 +563,22 @@ function groupCombos(model, stack, at) {
         (entry.keys.every((key) => !key.fellThrough) ? onKeys : throughKeys).push(entry);
     }
     return {onKeys, throughKeys: downTheStack(throughKeys), fromBranches: [], fromBranchesBelow: [], elsewhere};
+}
+
+// Only a transparent key on the top layer can change with a lower hold. A
+// lower layer matters if it answers any such position, including KC_NO: that
+// blocks an input below. Omitting every other layer preserves all answers and
+// their smallest held sets, without enumerating duplicate views of the board.
+function comboActivations(stack, at) {
+    const transparent = new Set((stack[at]?.positions || [])
+        .filter(position => keyFace(position).kind === "transparent").map(position => position.layoutIndex));
+    if (!transparent.size) return [[]];
+    const relevant = [];
+    for (let layer = 1; layer < at; layer++) {
+        if ((stack[layer]?.positions || []).some(position => transparent.has(position.layoutIndex)
+            && keyFace(position).kind !== "transparent")) relevant.push(layer);
+    }
+    return activationSets(relevant);
 }
 
 // The combos a key carries on this layer, keyed by layout index. The board

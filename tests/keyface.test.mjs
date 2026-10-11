@@ -832,6 +832,34 @@ test("a combo reaches the pointing mode it sends", () => {
     assert.deepEqual(reach.elsewhere, []);
 });
 
+test("cold macro placement lookup avoids combinations of layers that cannot change combo answers", () => {
+    for (const combos of [[], [{id: 0, inputs: ["KC_A", "KC_B"], output: "VIA_MACRO_0"}]]) {
+        let reads = 0;
+        const stack = Array.from({length: 16}, (_, index) => ({index, get positions() {
+            reads++;
+            return [{layoutIndex: 0, keycode: "KC_A"}, {layoutIndex: 1, keycode: "KC_B"}];
+        }}));
+        const placements = macroPlacements({combos}, stack, "VIA_MACRO_0");
+        assert.equal(placements.length, combos.length ? 16 : 0);
+        assert.ok(reads < 1000, `cold lookup read layers ${reads} times`);
+    }
+});
+
+test("combo grouping skips irrelevant holds but keeps layers that block transparent answers", () => {
+    let reads = 0;
+    const stack = Array.from({length: 16}, (_, index) => ({index, get positions() {
+        reads++;
+        const key = index === 0 ? "KC_A" : index === 7 ? "KC_B" : index === 13 ? "KC_NO" : "KC_TRANSPARENT";
+        return [{layoutIndex: 0, keycode: key}, {layoutIndex: 1, keycode: index === 15 ? "KC_C" : "KC_TRANSPARENT"}];
+    }}));
+    const combo = {id: 0, inputs: ["KC_B", "KC_C"], output: "VIA_MACRO_0"};
+    const groups = comboGroups({combos: [combo]}, stack, 15);
+    assert.deepEqual(groups.throughKeys[0].held, [stack[7]]);
+    assert.deepEqual(groups.throughKeys[0].keys.map(key => key.layer.index), [7, 15]);
+    assert.ok(reads < 1000, `combo grouping read layers ${reads} times`);
+    assert.equal(combosInView({combos: [combo]}, stack, 15, [7, 13]).length, 0, "a disabled key blocks the lower input");
+});
+
 test("a macro's layers are the ones that hold a way to it themselves", () => {
     const at = (layoutIndex, keycode, semantic) => ({layoutIndex, keycode, semantic, display: keycode});
     const model = {
