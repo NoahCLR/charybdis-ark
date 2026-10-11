@@ -434,6 +434,24 @@ test("a macro name is posted without its steps, and review shows the rename", ()
     assert.ok(draft.view({selectedDeviceId: "test-device", connected: true}).changes.some((change) => change.unit === "macro:5" && change.fields.some((field) => field.label === "Name" && field.after === "Sign-off")));
 });
 
+test("a custom key's name is posted trimmed against the draft it was read from, and review shows the rename", () => {
+    const draft = session(), read = draft.current.fingerprint, layers = draft.document.layers;
+    const message = edits.customKeyNameMessage("CUSTOM_KEY_2", "  Click Spam ", read);
+    assert.deepEqual(message, {type: "updateCustomKey", keycode: "CUSTOM_KEY_2", name: "Click Spam", expectedFingerprint: read});
+    stage(draft, message);
+    assert.equal(decoded(draft).settings.customKeyNames[2], "Click Spam");
+    assert.deepEqual(draft.document.layers, layers, "a name moves no key");
+    const view = draft.view({selectedDeviceId: "test-device", connected: true});
+    assert.ok(view.changes.some((change) => change.unit === "customKey:2" && change.fields.some((field) => field.label === "Name" && field.after === "Click Spam")));
+    assert.equal(view.undoLabel, "Renamed a custom key");
+    assert.throws(() => stage(draft, edits.customKeyNameMessage("CUSTOM_KEY_3", "Late", read)), /keyboard changed/, "a form read before the last edit is refused");
+    stage(draft, edits.customKeyNameMessage("CUSTOM_KEY_3", "Thumb"));
+    assert.equal(decoded(draft).settings.customKeyNames[3], "Thumb", "a form that names no identity is checked against this revision");
+    assert.throws(() => stage(draft, edits.customKeyNameMessage("CUSTOM_KEY_128", "Gone", draft.current.fingerprint)), /custom key the keyboard has/);
+    draft.undo(draft.revision); draft.undo(draft.revision);
+    assert.equal(decoded(draft).settings.customKeyNames[2], "");
+});
+
 test("a macro left holding a key is refused, and macro and custom keys land as the keyboard's own values", () => {
     const draft = session();
     assert.throws(() => stage(draft, edits.macroMessage("VIA_MACRO_0", "{+KC_A}", draft.current.fingerprint)), /Release/);

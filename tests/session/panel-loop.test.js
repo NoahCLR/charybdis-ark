@@ -171,7 +171,7 @@ test("a read connects, reads in order and publishes what it read", async () => {
 test("a staged edit is answered with the model and the accepted edit", async () => {
     const host = fakeHost(), loop = loopWithDraft(host), draft = loop.session.draft;
     await loop.handleMessage({type: "updateLayoutKeys", draftId: draft.id, draftRevision: draft.revision,
-        layers: [{layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_A"}]}]});
+        layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_A"}]});
     assert.equal(host.posted.length, 1);
     assert.ok(last(host).acceptedEdit, "the panel learns its edit was accepted");
     assert.equal(last(host).model.draft.dirty, true);
@@ -182,7 +182,7 @@ test("a staged edit is answered with the model and the accepted edit", async () 
 test("a refused edit is answered too, with the refusal as a notice", async () => {
     const host = fakeHost(), loop = loopWithDraft(host), draft = loop.session.draft;
     await loop.handleMessage({type: "updateLayoutKeys", draftId: "an older draft", draftRevision: draft.revision,
-        layers: [{layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_A"}]}]});
+        layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_A"}]});
     assert.equal(host.posted.length, 1, "a refusal still publishes, so the panel is not left waiting");
     assert.equal(last(host).acceptedEdit, undefined);
     assert.match(last(host).notice, /^Failed: This edit belongs to an older draft/);
@@ -329,7 +329,7 @@ test("live macro validation replies inline without staging, history, toasts or d
 // an edit, a macro check, an import review and Apply.
 test("the published binding is what edits, macro checks, imports and Apply answer to", async () => {
     const edit = (draft) => ({type: "updateLayoutKeys", draftId: draft.id, draftRevision: draft.revision,
-        layers: [{layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_A"}]}]});
+        layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_A"}]});
     const cases = [
         ["idle", {}, ""],
         ["another keyboard selected", {selectedDeviceId: "other", devices: [device, {...device, id: "other"}]}, "other-keyboard"],
@@ -355,7 +355,7 @@ test("the published binding is what edits, macro checks, imports and Apply answe
         if (!reason) continue;
         // What core takes, asked before any model has noticed (the connection token).
         host.posted.length = 0;
-        await loop.handleMessage({...edit(draft), layers: [{layer: "Layer 0", changes: [{layoutIndex: 1, keycode: "KC_B"}]}]});
+        await loop.handleMessage({...edit(draft), layer: "Layer 0", changes: [{layoutIndex: 1, keycode: "KC_B"}]});
         assert.match(last(host).notice, /^Failed/, `${label}: the edit is refused`);
         await loop.handleMessage({type: "validateViaMacro", keycode: "VIA_MACRO_1", payload: "hi", requestId: 1, draftId: draft.id, draftRevision: draft.revision});
         assert.ok(last(host).validation.error, `${label}: the macro check is refused`);

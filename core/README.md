@@ -103,8 +103,11 @@ the form was built from).
 The macro inspector (`model/macro-input.js`, through `model/macro-editor.js`) shares
 staging's codec and limits. `validateViaMacro` receives a correlated
 `macroValidation` reply without an edit, toast or device call; only a subsequent
-`updateViaMacro` stages anything. The domain edits themselves live in
-`model/device-profile-edits.js` and
+`updateViaMacro` stages anything. `model/draft-edits.js` registers every edit
+type once: the editor it goes to, the profile domain it rewrites and the words
+its history step is recorded with. The router's `DRAFT_EDITS`, `stage()`'s
+dispatch and the profile editor's domains all read it. The domain edits
+themselves live in `model/device-profile-edits.js` and
 `model/key-behavior-edits.js`.
 Their destination facts include the behaviour capabilities decoded by the
 session; pure domain presentation lives beside them in `model/device-profile-view.js`.

@@ -18,13 +18,7 @@ export interface DraftApplyService {
     snapshot(): DraftDeviceContext;
     restorePortableProfile(document: import('../model/types.js').PortableDocument, options: {expectedFingerprint?: string; saveRecovery: SaveRecovery}): Promise<import('../model/types.js').CompleteSnapshot & {peerUnseen?: boolean}>;
 }
-export interface LayoutEditGroup {
-    layer: import('../../contracts/edits.js').LayerReference;
-    changes: {layoutIndex: number; keycode: string}[];
-}
-/** Older bulk layout messages remain accepted by the draft. */
-export type LayoutEdit = ({type: 'updateLayoutKeys'} | {type: 'applyAllChanges'}) & { layer?: import('../../contracts/edits.js').LayerReference; changes?: LayoutEditGroup['changes']; layoutGroups?: LayoutEditGroup[]; layers?: LayoutEditGroup[]; adds?: unknown[]; deletes?: unknown[]};
-export type DraftEdit = (Exclude<import('../../contracts/edits.js').PanelEdit, {type: 'reviewPortableProfile' | 'validateViaMacro' | 'updateLayoutKeys'}> | LayoutEdit) & {draftRevision: number; expectedBase?: Partial<import('../../contracts/edits.js').BaseIdentity>};
+export type DraftEdit = Extract<import('../../contracts/edits.js').PanelEdit, {type: import('../../contracts/edits.js').DraftEditType}> & {draftRevision: number; expectedBase?: Partial<import('../../contracts/edits.js').BaseIdentity>};
 
 export type DeviceCapabilities = ReturnType<typeof import('../protocol/profile-wire-v1.js').decodeCapabilityPages>;
 export type ProfileStatus = ReturnType<typeof import('../protocol/profile-wire-v1.js').decodeStatusPages>;

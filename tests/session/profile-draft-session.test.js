@@ -147,7 +147,7 @@ test("review blockers stop Apply before a recovery copy or device write", async 
 });
 test("one draft composes every editor without changing its device snapshot", () => {
     const {draft,snapshot} = fixture(), original = JSON.stringify(snapshot);
-    stage(draft,{type:"updateLayoutKeys",layers:[{layer:"Layer 0",changes:[{layoutIndex:0,keycode:"KC_A"}]}]});
+    stage(draft,{type:"updateLayoutKeys",layer:"Layer 0",changes:[{layoutIndex:0,keycode:"KC_A"}]});
     stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_0",payload:"hello"});
     stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_1",payload:"{KC_LGUI,KC_N}"});
     stage(draft,settings(draft,"keyTiming",{tapHoldTerm:"175"}));
@@ -270,7 +270,7 @@ test("draft staging translates the connected firmware's behaviour capabilities i
 });
 test("invalid edits and obsolete revisions cannot partially change the draft", () => {
     const {draft,snapshot} = fixture();
-    assert.throws(()=>stage(draft,{type:"updateLayoutKeys",layers:[{layer:"Layer 0",changes:[{layoutIndex:0,keycode:"KC_A"},{layoutIndex:1,keycode:"NOT_A_KEY"}]}]}));
+    assert.throws(()=>stage(draft,{type:"updateLayoutKeys",layer:"Layer 0",changes:[{layoutIndex:0,keycode:"KC_A"},{layoutIndex:1,keycode:"NOT_A_KEY"}]}));
     assert.equal(draft.current.fingerprint,snapshot.fingerprint);
     assert.throws(()=>draft.stage({type:"updateViaMacro",keycode:"VIA_MACRO_0",payload:"text",draftRevision:0}),/draft changed/);
     assert.equal(draft.history.length,1);
@@ -346,25 +346,25 @@ test("layer reordering is undoable and updates layout and settings references to
 
 // ── discarding from the review ──────────────────────────────────────────
 
-const key = (layoutIndex, keycode, layer = "Layer 0") => ({type:"updateLayoutKeys",layers:[{layer,changes:[{layoutIndex,keycode}]}]});
+const key = (layoutIndex, keycode, layer = "Layer 0") => ({type:"updateLayoutKeys",layer,changes:[{layoutIndex,keycode}]});
 const groupOf = (draft, unit) => draft.changes().find(row => row.unit === unit)?.group;
 const unitsOf = (draft, group) => draft.changes().filter(row => row.group === group).map(row => row.unit).sort();
 test("rows are grouped by the edit that made them, and by any later edit that joins them", () => {
     const {draft} = fixture();
-    stage(draft,{type:"updateLayoutKeys",layers:[{layer:"Layer 1",changes:[{layoutIndex:0,keycode:"KC_A"},{layoutIndex:1,keycode:"KC_B"}]}]});
+    stage(draft,{type:"updateLayoutKeys",layer:"Layer 1",changes:[{layoutIndex:0,keycode:"KC_A"},{layoutIndex:1,keycode:"KC_B"}]});
     stage(draft,key(2,"KC_C","Layer 1"));
     stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_0",payload:"alone"});
     assert.deepEqual(unitsOf(draft,groupOf(draft,"layout:1:0")),["layout:1:0","layout:1:1"],"one message is one group");
     assert.notEqual(groupOf(draft,"layout:1:2"),groupOf(draft,"layout:1:0"),"a separate edit stays apart");
     assert.notEqual(groupOf(draft,"macro:0"),groupOf(draft,"layout:1:0"));
-    stage(draft,{type:"updateLayoutKeys",layers:[{layer:"Layer 1",changes:[{layoutIndex:1,keycode:"KC_D"},{layoutIndex:2,keycode:"KC_E"}]}]});
+    stage(draft,{type:"updateLayoutKeys",layer:"Layer 1",changes:[{layoutIndex:1,keycode:"KC_D"},{layoutIndex:2,keycode:"KC_E"}]});
     assert.deepEqual(unitsOf(draft,groupOf(draft,"layout:1:0")),["layout:1:0","layout:1:1","layout:1:2"],"a later edit touching both joins them");
 });
 test("a unit edited back to the keyboard's value no longer ties anything together", () => {
     const {draft,snapshot} = fixture();
     const original = snapshot.document.layers[1][1];
-    stage(draft,{type:"updateLayoutKeys",layers:[{layer:"Layer 1",changes:[{layoutIndex:0,keycode:"KC_A"},{layoutIndex:1,keycode:"KC_B"}]}]});
-    stage(draft,{type:"updateLayoutKeys",layers:[{layer:"Layer 1",changes:[{layoutIndex:1,keycode:"KC_Z"},{layoutIndex:2,keycode:"KC_C"}]}]});
+    stage(draft,{type:"updateLayoutKeys",layer:"Layer 1",changes:[{layoutIndex:0,keycode:"KC_A"},{layoutIndex:1,keycode:"KC_B"}]});
+    stage(draft,{type:"updateLayoutKeys",layer:"Layer 1",changes:[{layoutIndex:1,keycode:"KC_Z"},{layoutIndex:2,keycode:"KC_C"}]});
     assert.equal(unitsOf(draft,groupOf(draft,"layout:1:0")).length,3);
     draft.replace({...draft.document,layers:draft.document.layers.map((keys,l)=>l===1?keys.map((code,p)=>p===1?original:code):keys)},draft.revision);
     assert.equal(groupOf(draft,"layout:1:1"),undefined,"the key is back");
@@ -372,7 +372,7 @@ test("a unit edited back to the keyboard's value no longer ties anything togethe
 });
 test("discarding a group puts every row of it back, as one undoable step, and leaves the rest", () => {
     const {draft,snapshot} = fixture();
-    stage(draft,{type:"updateLayoutKeys",layers:[{layer:"Layer 1",changes:[{layoutIndex:0,keycode:"KC_A"},{layoutIndex:1,keycode:"KC_B"}]}]});
+    stage(draft,{type:"updateLayoutKeys",layer:"Layer 1",changes:[{layoutIndex:0,keycode:"KC_A"},{layoutIndex:1,keycode:"KC_B"}]});
     stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_0",payload:"kept"});
     const kept = draft.document.macros[0];
     draft.discard(draft.revision,groupOf(draft,"layout:1:1"));
@@ -413,7 +413,7 @@ test("a rebase does not tie together everything it carried over", () => {
 });
 test("discarding the whole draft is a step undo takes back, and undo says what it undoes", () => {
     const {draft,snapshot} = fixture();
-    stage(draft,{type:"updateLayoutKeys",layers:[{layer:"Layer 1",changes:[{layoutIndex:0,keycode:"KC_A"},{layoutIndex:1,keycode:"KC_B"}]}]});
+    stage(draft,{type:"updateLayoutKeys",layer:"Layer 1",changes:[{layoutIndex:0,keycode:"KC_A"},{layoutIndex:1,keycode:"KC_B"}]});
     stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_0",payload:"kept"});
     assert.equal(draft.view({}).undoLabel,"Edited a macro");
     const target = draft.current.fingerprint;
@@ -428,7 +428,7 @@ test("discarding the whole draft is a step undo takes back, and undo says what i
 });
 test("a revision is decoded once and its history entry cannot be edited in place", () => {
     const {draft} = fixture();
-    stage(draft,{type:"updateLayoutKeys",layers:[{layer:"Layer 0",changes:[{layoutIndex:0,keycode:"KC_A"}]}]});
+    stage(draft,{type:"updateLayoutKeys",layer:"Layer 0",changes:[{layoutIndex:0,keycode:"KC_A"}]});
     assert.equal(draft.current.decoded, draft.current.decoded, "the same decode serves every read of this revision");
     assert.equal(draft.current.document, draft.current.decoded.document, "and belongs to the document it is handed with");
     assert.throws(() => { "use strict"; draft.current.document.layers[0][0] = 5; }, TypeError, "history is frozen");
@@ -544,7 +544,7 @@ test("undo and redo carry the order; a rebase keeps it; an import and a whole di
 });
 test("edits link by the layer they touched, so a reorder between them ties nothing new", () => {
     const {draft} = fixture();
-    const both = layer => ({type:"updateLayoutKeys",layers:[{layer,changes:[{layoutIndex:0,keycode:"KC_A"},{layoutIndex:1,keycode:"KC_B"}]}]});
+    const both = layer => ({type:"updateLayoutKeys",layer,changes:[{layoutIndex:0,keycode:"KC_A"},{layoutIndex:1,keycode:"KC_B"}]});
     stage(draft,both("Layer 2"));
     layers(draft);
     stage(draft,both("Layer 2"));
@@ -559,7 +559,7 @@ test("draft checks use the connected firmware's physical gesture capability", ()
     assert.ok(row, "fixture includes an authored layer-tap");
     for (const fixed of [false, true]) {
         const draft = new ProfileDraftSession(snapshot, "board", {...caps, featureFlags: fixed ? 1 << 17 : 0});
-        stage(draft, {type: "updateLayoutKeys", layers: [{layer: "Layer 0", changes: [{layoutIndex: 0, keycode: row.keycode}]}]});
+        stage(draft, {type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: row.keycode}]});
         assert.equal(draft.checks().some(check => check.kind === "gestureTiming" && check.place.keycode === row.keycode), !fixed);
     }
 });

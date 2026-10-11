@@ -42,7 +42,7 @@ for (const [name, document] of [["the compiled pointing profile", document32()],
 
             const draft = model.draft;
             await loop.handleMessage({type: "updateLayoutKeys", draftId: draft.id, draftRevision: draft.revision,
-                layers: [{layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_B"}]}]});
+                layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_B"}]});
             assert.ok(last(host).acceptedEdit);
             assert.equal(last(host).model.draft.dirty, true);
 

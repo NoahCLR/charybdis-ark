@@ -17,7 +17,6 @@ const {profileDepthOptions} = require("../schema/profile-depth");
  * @typedef {Omit<import("../../contracts/edits.js").Behavior, 'steps'> & {steps?: import("../../contracts/edits.js").BehaviorStep[], tap?: Branch, hold?: Branch, longHold?: Branch}} BehaviorInput
  * @typedef {Extract<import("../../contracts/edits.js").PanelEdit, {type: 'deleteBehavior' | 'retargetBehavior'}> | {type: 'saveBehavior' | 'addBehavior', behavior: BehaviorInput}} BehaviorEdit
  */
-const BEHAVIOR_EDITS = new Set(["saveBehavior", "addBehavior", "deleteBehavior", "retargetBehavior"]);
 const RETARGET_CONFLICTS = new Set(["overwrite", "swap"]);
 /** @param {string} message */
 const invalid = message => Object.assign(new Error(message), {code: "INVALID_BEHAVIOR_EDIT"});
@@ -194,4 +193,4 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
     return encode(rows);
 }
 
-module.exports = {BEHAVIOR_EDITS, editKeyBehaviors};
+module.exports = {editKeyBehaviors};

@@ -10,23 +10,20 @@ const {decodeComboDomain, encodeComboDomain, effectiveComboTerm} = require("../s
 const {actionName, keycodeAction, knownActionAbi, layerRef, nativeCode} = require("../schema/actions");
 const {comboPlacementProblem} = require("./profile-placement");
 const {comboTableOf} = require("./portable-profile");
-const {BEHAVIOR_EDITS, editKeyBehaviors} = require("./key-behavior-edits");
+const {editKeyBehaviors} = require("./key-behavior-edits");
+const {inDomain} = require("./draft-edits");
 const {decodeSettings, encodeSettings} = require("../schema/settings-domain-v1");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../data/charybdis-layout");
 const {profileDepthOptions} = require("../schema/profile-depth");
 /**
- * @typedef {Extract<import("../../contracts/edits.js").PanelEdit, {type: 'addCombo' | 'saveCombo' | 'deleteCombo' | 'updateComboHoldTerm' | 'updateComboDefaultTerm'}>} ComboEdit
- * @typedef {Extract<import("../../contracts/edits.js").PanelEdit, {type: 'updatePlacementPolicy' | 'savePdMode' | 'clearPdMode' | 'duplicatePdMode' | 'saveBehavior' | 'addBehavior' | 'deleteBehavior' | 'retargetBehavior' | 'updateLayerColor' | 'updatePdModeColor' | 'updateAutomouseFade' | 'updateComboFeedback' | 'updateKeyBehaviorFeedback' | 'updateRgbStages' | 'saveRgbReusableLedGroup' | 'deleteRgbReusableLedGroup' | 'addRgbLedGroup' | 'deleteRgbLedGroup'}> | ComboEdit} ProfileEdit
+ * @typedef {Extract<import("../../contracts/edits.js").PanelEdit, {type: import("./draft-edits.js").InDomain<"combos">}>} ComboEdit
+ * @typedef {Extract<import("../../contracts/edits.js").PanelEdit, {type: import("./draft-edits.js").EditedBy<"profile">}>} ProfileEdit
  * @typedef {{capabilities?: import("./types.js").ProfileDestination, combos?: import("./types.js").ComboRead, maximumBrightness?: number}} EditContext
  * @typedef {Omit<import("../schema/types.js").ComboRowInput, 'inputs' | 'output'> & {inputs: import("../schema/types.js").SemanticAction[], output: import("../schema/types.js").SemanticAction}} SemanticComboRow
  * @typedef {import("../schema/types.js").RgbProfile} Rgb
  * @typedef {Partial<import("../../contracts/edits.js").PdConfig> & {id: number, kind: number, name: string}} EditablePointing
  * @typedef {import("../../contracts/edits.js").Colour & {hue?: import("../../contracts/edits.js").Scalar, sat?: import("../../contracts/edits.js").Scalar, val?: import("../../contracts/edits.js").Scalar}} ColourInput
  */
-const COMBO_EDITS = new Set(["addCombo", "saveCombo", "deleteCombo", "updateComboHoldTerm", "updateComboDefaultTerm"]);
-
-const PD_EDITS = new Set(["savePdMode", "clearPdMode", "duplicatePdMode"]);
-const RGB_EDITS = new Set(["updateLayerColor", "updatePdModeColor", "updateAutomouseFade", "updateComboFeedback", "updateKeyBehaviorFeedback", "updateRgbStages", "saveRgbReusableLedGroup", "deleteRgbReusableLedGroup", "addRgbLedGroup", "deleteRgbLedGroup"]);
 /** @param {string} message */
 const invalid = message => Object.assign(new Error(message), {code: "INVALID_PROFILE_EDIT"});
 // QMK fires a combo only when its keys land within the window, so a 0 ms
@@ -101,9 +98,10 @@ const keycodeValues = () => {
     return keycodeValueCache;
 };
 
+// One profile edit, sent to its domain as model/draft-edits.js files it.
 /** @param {Buffer} bytes @param {ProfileEdit} message @param {EditContext} [context] */
 function editDeviceProfile(bytes, message, context = {}) {
-    if (message.type === "updatePlacementPolicy") {
+    if (inDomain(message, "placement")) {
         const profile = decodeProfileBlob(bytes);
         const domain = existing(profile.domains, row => row.id === PROFILE_DOMAIN_IDS.SETTINGS, "Settings");
         const settings = decodeSettings(domain.payload);
@@ -119,7 +117,7 @@ function editDeviceProfile(bytes, message, context = {}) {
         domain.payload = encodeSettings(settings);
         return encodeProfileBlob(profile);
     }
-    if (message.type === "savePdMode" || message.type === "clearPdMode" || message.type === "duplicatePdMode") {
+    if (inDomain(message, "pointing")) {
         if (!((context.capabilities?.supportedDomainMask || 0) & 16)) throw invalid("PD editing needs firmware with configurable pointing slots.");
         const profile = decodeProfileBlob(bytes);
         const domain = existing(profile.domains, row => row.id === 80, "Pointing modes");
@@ -147,14 +145,14 @@ function editDeviceProfile(bytes, message, context = {}) {
         domain.payload = encodePdDomain(/** @type {import("../schema/types.js").PdSlotInput[]} */ (slots));
         return encodeProfileBlob(profile);
     }
-    if (message.type === "addCombo" || message.type === "saveCombo" || message.type === "deleteCombo" || message.type === "updateComboHoldTerm" || message.type === "updateComboDefaultTerm") return editCombos(bytes, message, context);
-    if (message.type === "saveBehavior" || message.type === "addBehavior" || message.type === "deleteBehavior" || message.type === "retargetBehavior") {
+    if (inDomain(message, "combos")) return editCombos(bytes, message, context);
+    if (inDomain(message, "behaviours")) {
         const profile = decodeProfileBlob(bytes);
         const domain = existing(profile.domains, row => row.id === PROFILE_DOMAIN_IDS.KEY_BEHAVIORS, "Key behaviours");
         domain.payload = editKeyBehaviors(domain.payload, message, context.capabilities);
         return encodeProfileBlob(profile);
     }
-    if (!RGB_EDITS.has(message.type)) throw invalid("Unsupported profile edit.");
+    if (!inDomain(message, "lighting")) throw invalid("Unsupported profile edit.");
     const profile = decodeProfileBlob(bytes);
     const domain = existing(profile.domains, row => row.id === PROFILE_DOMAIN_IDS.RGB, "RGB");
     const maximumBrightness = context.maximumBrightness ?? 255;
@@ -219,6 +217,7 @@ function editDeviceProfile(bytes, message, context = {}) {
             const index = integer(message.index, rows.length - 1, "Assignment index");
             rows.splice(index, 1); break;
         }
+        default: throw invalid("Unsupported profile edit.");
     }
     domain.payload = encodeRgbDomainV1(rgb, rgbOptions);
     return encodeProfileBlob(profile);
@@ -288,4 +287,4 @@ function assertEffectiveCombos(bytes, read) {
     if (!shared || expected.length !== read.rows.length || expected.some((row, index) => { const actual = read.rows[index]; return (/** @type {const} */ (["id", "output", "termMs", "followsDefault", "mustHold", "mustTap", "ordered", "enabled", "allowedLayers"])).some(key => row[key] !== actual[key]) || JSON.stringify(row.inputs) !== JSON.stringify(actual.inputs); })) throw invalid("The saved combo profile does not match the running combo table. Flash the current firmware pair and read from keyboard again.");
 }
 
-module.exports = {PD_EDITS, RGB_EDITS, COMBO_EDITS, editDeviceProfile, assertEffectiveCombos};
+module.exports = {editDeviceProfile, assertEffectiveCombos};

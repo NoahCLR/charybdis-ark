@@ -104,6 +104,8 @@ export interface EditPayloads {
 
 export type EditOf<K extends keyof EditPayloads> = {type: K} & EditPayloads[K];
 export type PanelEdit = {[K in keyof EditPayloads]: EditOf<K>}[keyof EditPayloads];
+/** Every posted edit the draft stages: an import opens a review and a macro check is answered, neither an edit. core/model/draft-edits.js registers each one. */
+export type DraftEditType = Exclude<keyof EditPayloads, 'reviewPortableProfile' | 'validateViaMacro'>;
 
 /** A dense decoded slot has values even for inactive fields. */
 export interface PdSlot extends PdConfig {

@@ -86,7 +86,7 @@ test("apply writes a recovery copy through the host, then reads the keyboard aga
     const session = sessionWithDraft(), draft = session.draft, h = host();
     const readSteps = [];
     session.service.emitChange = () => readSteps.push([session.postApplyReadStep, session.applyRunning]);
-    stage(session, {type: "updateLayoutKeys", layers: [{layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_A"}]}]});
+    stage(session, {type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_A"}]});
     draft.review(draft.revision);
     session.service.calls.length = 0;
     await draftControl(session, {type: "applyProfileDraft", draftRevision: draft.revision}, h);
@@ -102,7 +102,7 @@ test("apply writes a recovery copy through the host, then reads the keyboard aga
 
 test("a failed post-Apply read clears its progress stage and is said after the save", async () => {
     const session = sessionWithDraft();
-    stage(session, {type: "updateLayoutKeys", layers: [{layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_A"}]}]});
+    stage(session, {type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_A"}]});
     session.draft.review(session.draft.revision);
     session.service.readCommittedProfile = async () => {throw new Error("readback interrupted");};
     await draftControl(session, {type: "applyProfileDraft", draftRevision: session.draft.revision}, host());
@@ -126,10 +126,8 @@ test("a destination blocker refuses Apply before recovery or HID", async () => {
 
 test("a draft that can lock a layer with no way back applies only once the trap is confirmed", async () => {
     const session = sessionWithDraft(), draft = session.draft, h = host();
-    stage(session, {type: "updateLayoutKeys", layers: [
-        {layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "TG(1)"}]},
-        {layer: "Layer 1", changes: [{layoutIndex: 0, keycode: "KC_B"}]},
-    ]});
+    stage(session, {type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "TG(1)"}]});
+    stage(session, {type: "updateLayoutKeys", layer: "Layer 1", changes: [{layoutIndex: 0, keycode: "KC_B"}]});
     const trap = draft.view({}).checks.find((check) => check.level === "trap");
     assert.equal(trap.status, "new");
     assert.deepEqual(trap.layers, [1]);
@@ -145,7 +143,7 @@ test("a draft that can lock a layer with no way back applies only once the trap 
 
 test("a draft with a warning requires confirmation before writing a recovery copy or HID", async () => {
     const session = sessionWithDraft(), draft = session.draft, h = host();
-    stage(session, {type: "updateLayoutKeys", layers: [{layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_A"}]}]});
+    stage(session, {type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_A"}]});
     draft.checks = () => [{level: "warning", status: "new", title: "Nothing reaches Number"}];
     draft.review(draft.revision);
     session.service.calls.length = 0;
@@ -160,7 +158,7 @@ test("an apply that finished with the slave half unplugged says so instead of cl
     const session = sessionWithDraft(), draft = session.draft, h = host();
     const restore = session.service.restorePortableProfile;
     session.service.restorePortableProfile = async (doc, options) => ({...await restore(doc, options), peerUnseen: true});
-    stage(session, {type: "updateLayoutKeys", layers: [{layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_A"}]}]});
+    stage(session, {type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_A"}]});
     draft.review(draft.revision);
     await draftControl(session, {type: "applyProfileDraft", draftRevision: draft.revision}, h);
     assert.match(session.notice, /slave half confirmed its copy but is not connected now/);
@@ -169,7 +167,7 @@ test("an apply that finished with the slave half unplugged says so instead of cl
 
 test("discarding the draft of an unchanged keyboard is an undoable step, and leaving review un-reviews", async () => {
     const session = sessionWithDraft(), draft = session.draft;
-    stage(session, {type: "updateLayoutKeys", layers: [{layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_A"}]}]});
+    stage(session, {type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_A"}]});
     draft.review(draft.revision);
     await draftControl(session, {type: "closeProfileDraftReview", draftRevision: draft.revision});
     assert.equal(draft.view({}).reviewed, false);
@@ -243,7 +241,7 @@ test("the layer panel's keys-follow toggle decides whether layer keys are renumb
     // Base gets MO(4) and TG(1); layer 4 then moves down to 1, swapping past 3 and 2.
     const moveLayer4Down = async (keysFollow) => {
         const session = sessionWithDraft(), draft = session.draft;
-        stage(session, {type: "updateLayoutKeys", layers: [{layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "MO(4)"}, {layoutIndex: 1, keycode: "TG(1)"}]}]});
+        stage(session, {type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "MO(4)"}, {layoutIndex: 1, keycode: "TG(1)"}]});
         await portableControl(session, {type: "managePortableLayers"});
         assert.equal(session.portableLayers.keysFollow, true, "on by default");
         const layer4Name = session.portableLayers.names[4];

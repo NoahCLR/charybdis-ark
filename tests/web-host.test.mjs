@@ -23,16 +23,16 @@ test("the stand-in delivers both ways later and as copies, and shows the click i
     target.addEventListener("message", (event) => shown.push(event.data));
     const panel = connectPanel({receive: (message) => received.push(message), gesture: (message) => gestures.push(message), target});
     try {
-        const sent = {type: "updateLayoutKeys", layers: [{layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_A"}]}]};
+        const sent = {type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_A"}]};
         panel.api.postMessage(sent);
         assert.equal(gestures.length, 1, "the host sees the message inside the click");
         assert.deepEqual(gestures[0], sent);
         assert.notEqual(gestures[0], sent, "as a copy");
         assert.deepEqual(received, [], "the message itself arrives later, as in VS Code");
-        sent.layers[0].changes[0].keycode = "KC_B";
+        sent.changes[0].keycode = "KC_B";
         await delivered(received);
         assert.equal(received.length, 1);
-        assert.equal(received[0].layers[0].changes[0].keycode, "KC_A", "the panel cannot change what the host was sent");
+        assert.equal(received[0].changes[0].keycode, "KC_A", "the panel cannot change what the host was sent");
 
         const model = {type: "model", model: {draft: {dirty: false}}};
         await panel.post(model);
