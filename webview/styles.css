@@ -178,6 +178,8 @@ a.rail-build:hover { color: var(--text-2); }
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 .topbar > div:first-child { min-width: 0; }
 .topbar-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; flex: none; }
+.topbar-actions .search { width: 220px; }
+.topbar-actions .search.short { width: 200px; }
 .theme-toggle svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.4; }
 .content { flex: 1; overflow: auto; min-height: 0; }
 .pad { padding: 20px 24px 120px; }
@@ -241,6 +243,8 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 .sw input:checked + .track { background: var(--inv-bg); border-color: transparent; }
 .sw input:checked + .track::after { transform: translateX(12px); background: var(--inv-text); }
 .sw .txt { font-size: 12.5px; }
+/* Switches folded under a summary, in a row that wraps. */
+.sw-group { flex-wrap: wrap; margin-top: 10px; }
 
 .chip {
   display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 8px;
@@ -254,12 +258,19 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 .card-h { display: flex; align-items: center; gap: 10px; padding: 13px 15px; border-bottom: 1px solid var(--line); }
 .card-h h3 { font-size: 13px; }
 .card-h .right { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+.card-h .right.actions { gap: 8px; }
 .card-b { padding: 15px; }
 .row { display: flex; align-items: center; gap: 12px; }
 .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }
 .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; }
 .stack { display: grid; gap: 14px; }
 .hr { height: 1px; background: var(--line); margin: 14px -15px; }
+/* A row or stack spaced off its default; declared after them so it wins. */
+.gap-8 { gap: 8px; }
+.gap-10 { gap: 10px; }
+.gap-12 { gap: 12px; }
+.gap-16 { gap: 16px; }
+.self-start { justify-self: start; }
 
 /* ── the board card: the board, a caption, the layer tabs under them ── */
 /* The tabs hang from the card's foot, next to the workbench where edits
@@ -318,6 +329,7 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 .layer-chip.link:hover { border-color: var(--line-3); background: var(--surface-3); }
 .layer-chip.dirty::after { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--draft); }
 .layer-chip.staged { border-style: dashed; border-color: var(--draft); }
+.layer-chips { gap: 6px; flex-wrap: wrap; }
 /* Rename & Reorder is a tab at the strip's end, set off from the layers by a
    hairline: it opens onto the tabs themselves, not a layer. Open, it is the
    panel's own surface, joined to it as the picked layer's tab is to the board:
@@ -360,12 +372,15 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 /* When the panel is capped, only the list scrolls: the heading and the toggle
    and buttons stay put, and the scrollbar runs beside the rows, clear of the
    corner the button joins. */
-.layerpanel-body { display: flex; flex-direction: column; min-height: 0; }
+.layerpanel-body { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
 .layerpanel-body > .list {
   flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
   scrollbar-width: thin; scrollbar-color: var(--line-2) transparent;
 }
-.layerpanel-actions { margin: 0 -14px -14px; padding: 10px 14px 14px; border-top: 1px solid var(--line); }
+.layerpanel-actions { gap: 10px; margin: 0 -14px -14px; padding: 10px 14px 14px; border-top: 1px solid var(--line); }
+.layerpanel-actions > .stack { gap: 4px; }
+.layerpanel-actions > .row { gap: 8px; }
+.layerpanel > .note { padding: 4px 2px; }
 .layerflow { display: flex; align-items: center; gap: 14px; padding: 11px 24px; border-bottom: 1px solid var(--line);
   background: var(--surface-2); }
 
@@ -407,6 +422,10 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 .kc-glow.kc-glow-trns { opacity: .28; }
 .kc-none .kc-rect { fill: transparent; stroke: var(--line); }
 .kc.sel .kc-rect { stroke: var(--text); stroke-width: 2; fill: var(--key-hi); }
+/* Picking LEDs: a picked key reads as selected, lit or not, hovered or not. */
+.kc .kc-rect.picked { fill: var(--key-hi); stroke: var(--text); stroke-width: 2; }
+.kc-ball.leds circle { fill: var(--key); stroke: var(--text); stroke-width: 1; }
+.kc-ball.leds.sel circle { fill: var(--key-hi); stroke-width: 2; }
 .board.picking { box-shadow: inset 0 0 0 1px var(--line-2); }
 .kc.pickable { cursor: crosshair; }
 .kc.pickable .kc-rect { stroke-dasharray: 0; }
@@ -477,6 +496,7 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 .kv dt { color: var(--text-3); }
 .kv dd { margin: 0; font-family: var(--mono); font-size: 11.5px; }
 .kv.device-kv { grid-template-columns: 170px 1fr; }
+.kv.wide { grid-template-columns: 150px 1fr; }
 
 /* ── behaviour timeline ──────────────────────────────────────────────── */
 .branch { border: 1px solid var(--line); border-radius: 9px; background: var(--surface-2); overflow: hidden; }
@@ -613,6 +633,7 @@ button.tier:hover { background: var(--surface-3); }
 .rowlist .group-h:hover { background: var(--surface-3); }
 .rowlist .group-h[aria-expanded="false"] { border-bottom: 0; }
 .rowlist .rowgroup + .rowgroup .group-h { border-top: 1px solid var(--line); }
+.reach-table { padding: 2px 0; }
 
 .beh-head { display: flex; align-items: flex-start; gap: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
 .beh-intro { display: flex; align-items: flex-start; gap: 18px; padding: 13px 0 16px; }
@@ -690,6 +711,7 @@ table.t td { padding: 9px 12px; border-top: 1px solid var(--line); vertical-alig
 table.t td.mono { font-family: var(--mono); font-size: 11.5px; }
 table.t td.t-group { padding: 0; }
 table.t.fixed { table-layout: fixed; }
+table.t td.t-act { text-align: right; }
 /* The rail's change count opens the review. */
 .stat.link { background: none; border: 0; padding: 0; font-family: inherit; color: inherit; cursor: pointer; text-align: left; }
 .stat.link:hover { color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
@@ -759,6 +781,9 @@ table.t.fixed { table-layout: fixed; }
 .sends-tag { flex: none; font-family: var(--mono); font-size: 9px; font-weight: 500; letter-spacing: .06em; text-transform: uppercase;
   color: var(--text-2); border: 1px solid var(--line-2); border-radius: 4px; padding: 0 4px; line-height: 14px; }
 .mk-swatch { width: 11px; height: 11px; border-radius: 3px; border: 1px solid var(--line-2); flex: none; display: inline-block; }
+.mk-swatch.lead { vertical-align: -1px; margin-right: 7px; }
+/* A tier whose colour is off, or whose stage is off, is drawn hollow. */
+.fbdot.off { background: none; border-style: dashed; }
 .mk-badge { display: inline-grid; place-items: center; min-width: 26px; height: 18px; padding: 0 5px; border-radius: 4px; flex: none; vertical-align: middle;
   border: 1.2px solid rgba(245,245,243,.7); background: rgba(8,8,10,.86); color: #f5f5f3;
   font-family: var(--mono); font-size: 10px; line-height: 1; font-weight: 700; font-style: normal; }
@@ -831,6 +856,9 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .commit .n { display: flex; align-items: center; gap: 9px; font-size: 12.5px; white-space: nowrap; }
 .commit .peek { display: flex; gap: 6px; overflow: hidden; max-width: 320px; }
 .commit .sep { width: 1px; height: 20px; background: var(--line); }
+.commit .peek .note { white-space: nowrap; }
+/* A draft that cannot go on as it is: another keyboard's, or a stale one. */
+.commit.draft { border-color: var(--draft); }
 .commit.applying { border-color: var(--line-3); }
 .commit.readback { display: grid; grid-template-columns: 14px minmax(0, 1fr); column-gap: 10px; row-gap: 4px;
   width: min(510px, calc(100% - 48px)); padding: 12px 15px; }
@@ -916,6 +944,9 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .hc-sect:last-child { border-bottom: 0; }
 .hc-h { font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--text-3); font-weight: 600; margin-bottom: 7px; }
 .hc-sub { font-size: 11px; color: var(--text-2); margin-bottom: 7px; }
+/* A note closing a section, under its branches or its mode. */
+.hc-foot { margin: 7px 0 0; }
+.hc-flow + .hc-foot { margin-top: 6px; }
 .hc-branch { display: grid; grid-template-columns: 22px minmax(0,1fr); gap: 8px; align-items: start; }
 .hc-branch + .hc-branch { margin-top: 7px; padding-top: 7px; border-top: 1px dashed var(--line); }
 .hc-n { font-family: var(--mono); font-size: 9.5px; color: var(--text-3); border: 1px solid var(--line); border-radius: 4px; text-align: center; padding: 1px 0; }
@@ -941,7 +972,11 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .hc-through { background: var(--surface-2); }
 
 /* ── picker ──────────────────────────────────────────────────────────── */
-.sheet.picker .sheet-b { padding: 0; }
+.sheet.picker { width: min(1180px, 100%); }
+.sheet.picker .sheet-b { padding: 0; display: grid; grid-template-columns: 186px minmax(0, 1fr); align-items: start; }
+.pk-search { max-width: 300px; margin-left: 12px; }
+.pk-mods .note { margin-left: auto; }
+.pk-value { margin-left: 10px; color: var(--text); }
 .pk-mods { display: flex; align-items: center; gap: 6px; padding: 11px 18px; border-bottom: 1px solid var(--line); background: var(--surface-2); }
 .pk-mod { height: 26px; padding: 0 11px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); font-size: 12px; color: var(--text-2); }
 .pk-mod:hover { border-color: var(--line-3); color: var(--text); }
@@ -951,6 +986,11 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .picker-side button:hover { background: var(--surface-2); color: var(--text); }
 .picker-side button[aria-current="true"] { background: var(--surface-3); color: var(--text); }
 .pk-body { padding: 16px 18px 20px; }
+.pk-empty { padding: 18px; }
+.pk-count { margin-bottom: 10px; }
+.pk-label { margin-bottom: 6px; }
+.pk-rows.pk-macros { margin-bottom: 12px; }
+.pk-note { margin-top: 12px; }
 .pk-rows { display: grid; gap: 6px; }
 .pk-row { display: flex; gap: 6px; flex-wrap: wrap; }
 .pk {
@@ -1027,6 +1067,7 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
    panel can be much narrower than the screen it sits on. */
 .pd-editor { container: pd / inline-size; min-width: 0; }
 .pd-editor .card-h .tag { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.pd-empty-note { max-width: 64ch; }
 .pd-identity { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, .8fr); gap: 12px; }
 .pd-grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-items: end; }
 .pd-grid4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; align-items: end; }
@@ -1119,6 +1160,11 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .meter { height: 4px; border-radius: 2px; background: var(--surface-3); overflow: hidden; }
 .meter i { display: block; height: 100%; background: var(--text-2); }
 .macro-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 5px; }
+/* Macros and Custom keys: the list beside the one it opens. */
+.pad.library { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 20px; align-items: start; }
+.sect-h.memory-h { margin-top: 14px; }
+/* What a memory meter counts, said under it. */
+.meter-note { margin-top: 6px; }
 .mslot { height: 46px; border-radius: 7px; border: 1px solid var(--line); background: var(--surface-2); display: grid; place-items: center; align-content: center; gap: 2px; }
 .mslot .n { font-family: var(--mono); font-size: 10px; color: var(--text-3); }
 .mslot .v { font-size: 11.5px; }
@@ -1140,6 +1186,9 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .macro-step .tok { display: block; flex: 1; min-width: 0; height: auto; min-height: 22px; padding: 3px 7px; overflow-wrap: anywhere; }
 .macro-add, .macro-actions { flex-wrap: wrap; }
 .macro-add select.input { width: auto; }
+.record-opts { gap: 12px; align-items: end; flex-wrap: wrap; }
+.record-opts .capture-field { min-width: 190px; }
+.record-opts .ms-field { width: 120px; }
 [data-raw] summary { cursor: pointer; color: var(--text-2); font-size: 12px; }
 [data-raw] > .field { margin-top: 10px; }
 [data-raw] > .note { margin-top: 8px; }
@@ -1160,6 +1209,10 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .stagecard .nm { font-size: 12.5px; font-weight: 520; }
 .stagecard .note { grid-column: 2 / -1; font-size: 11px; color: var(--text-3); line-height: 1.35; }
 .settings-group + .settings-group { margin-top: 14px; }
+.pad.settings-pad { max-width: 980px; }
+.settings-pad > .unavailable { margin-bottom: 14px; }
+.settings-group > summary { cursor: pointer; list-style: none; }
+.card-b.settings-intro { padding-bottom: 0; }
 .import-diff td:first-child { white-space: nowrap; }
 .import-diff td:last-child { white-space: nowrap; text-align: right; }
 .import-diff tr.cat td:first-child { font-weight: 600; }
@@ -1180,6 +1233,8 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .profile-recovery { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
 .profile-recovery .copy { display: grid; gap: 2px; }
 .profile-recovery .state { margin-left: auto; }
+.profile-recovery > .dot { margin-top: 6px; }
+.pad.profile-pad { max-width: 960px; }
 .setrow { display: grid; grid-template-columns: minmax(0,1fr) 190px; gap: 16px; align-items: center; padding: 12px 15px; border-bottom: 1px solid var(--line); }
 .setrow:last-child { border-bottom: 0; }
 .setrow.ro { opacity: .72; }
@@ -1191,6 +1246,21 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .hue-ramp .thumb { position: absolute; top: -3px; bottom: -3px; width: 4px; border-radius: 3px; background: var(--text); box-shadow: 0 0 0 2px var(--surface); }
 .sv-field { height: 92px; border-radius: 8px; border: 1px solid var(--line); position: relative; }
 .sv-field .thumb { position: absolute; width: 11px; height: 11px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.5); transform: translate(-50%,-50%); }
+.swatch-pick .label { width: 34px; }
+/* The colour an editor edits, large, beside its name and value. */
+.colour-head { gap: 10px; }
+.colour-head .swatch-lg { width: 34px; height: 34px; }
+.colour-head .colour-title { font-size: 12.5px; }
+.colour-head > .btn { margin-left: auto; }
+.colour-head.unused { opacity: .5; }
+.colour-head.unused + .note { margin-top: 10px; }
+/* Lighting's stage surfaces. */
+.tab-grid.stage-detail { gap: 22px; }
+.stage-about { max-width: 96ch; }
+.stage-chips { flex-wrap: wrap; margin-bottom: 10px; }
+.led-rows { margin-top: 8px; }
+.led-swatch { width: 13px; height: 13px; border-radius: 4px; border: 1px solid var(--line-2); flex: none; display: inline-block; vertical-align: -2px; }
+.led-swatch + code { margin-left: 6px; }
 .note { font-size: 11.5px; color: var(--text-3); line-height: 1.5; }
 .note.warn { color: var(--warning); }
 .callout { border: 1px solid var(--line); border-left: 2px solid var(--line-3); border-radius: 0 8px 8px 0; padding: 11px 13px; background: var(--surface-2); font-size: 12px; color: var(--text-2); }

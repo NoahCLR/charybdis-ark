@@ -190,10 +190,10 @@ function fadeTiming(model, idle) {
     };
     preview();
     range.addEventListener("input", preview);
-    const open = el(`<button class="btn tiny" style="justify-self:start">Open Mouse → Auto-mouse</button>`);
+    const open = el(`<button class="btn tiny self-start">Open Mouse → Auto-mouse</button>`);
     open.addEventListener("click", () => { state.screen = "mouse"; state.reveal = '.settings-group[data-section="autoMouse"]'; render(); });
     range.addEventListener("change", () => post(edits.settingsSection(section, () => range.value, model.settingsEditing?.identity)));
-    const box = el(`<div class="stack" style="gap:12px"></div>`);
+    const box = el(`<div class="stack gap-12"></div>`);
     box.append(control, note);
     if (!idle) box.append(open);
     if (!editable && !idle) box.append(el(`<div class="unavailable">${esc(unavailable(model) || "This firmware reports the fade timing but cannot save it.")}</div>`));
@@ -212,7 +212,7 @@ function stageBody(body) {
     const colourControl = (options) => colourEditor({maximumBrightness: model.rgb.maximumBrightness, ...options});
     const node = el(`<div></div>`);
     /** @param {...Node} nodes */
-    const stack = (...nodes) => { const box = el(`<div class="stack" style="gap:12px"></div>`); box.append(...nodes); return box; };
+    const stack = (...nodes) => { const box = el(`<div class="stack gap-12"></div>`); box.append(...nodes); return box; };
     /** @param {string} title @param {string} [extra] */
     const section = (title, extra = "") => el(`<section><div class="sect-h"><h4>${esc(title)}</h4>${extra}</div></section>`);
 
@@ -226,14 +226,14 @@ function stageBody(body) {
             ? colourControl({colour: base.previewColor, title: "Base effect", canEdit: false})
             : el(`<div class="callout">${esc(base.enabled === false ? "The base effect is switched off." : "This effect animates, so it has no single colour to show.")}</div>`));
         const facts = section("What the keyboard reports");
-        facts.append(el(`<dl class="kv" style="grid-template-columns:150px 1fr">
+        facts.append(el(`<dl class="kv wide">
             <dt>Effect</dt><dd>${esc(base.effectName || "—")}</dd>
             <dt>Hue</dt><dd>${esc(base.hue ?? "—")}</dd>
             <dt>Saturation</dt><dd>${esc(base.saturation ?? "—")}</dd>
             <dt>Brightness</dt><dd>${esc(base.brightness ?? "—")}${base.brightnessPercent !== undefined ? ` · ${base.brightnessPercent}%` : ""}</dd>
             <dt>Speed</dt><dd>${esc(base.speed ?? "—")}</dd></dl>`));
         const where = section("Where it is edited");
-        const jump = el(`<button class="btn" style="justify-self:start">Open Settings → Base lighting</button>`);
+        const jump = el(`<button class="btn self-start">Open Settings → Base lighting</button>`);
         jump.addEventListener("click", () => { state.screen = "settings"; render(); });
         where.append(el(`<p class="note">The base effect is not part of the profile: the keyboard keeps it with its global policy, and both halves report it. Editing it there keeps one value in one place; this board paints whatever it says.</p>`), jump);
         node.append(colour, facts, where);
@@ -246,14 +246,14 @@ function stageBody(body) {
             const row = layerColourRow(model, layer.index);
             const lit = row && !isOff(row.color);
             const item = el(`<button class="rowitem ${index === state.layer ? "on" : ""}" data-layer="${index}">
-                <span class="t"><span class="swatch-lg ${lit ? "" : "swatch-off"}" style="width:11px;height:11px;border-radius:3px;display:inline-block;vertical-align:-1px;margin-right:7px;${lit ? `background:${css(row.color)}` : ""}"></span>${esc(layerName(layer))}${marks.lightingLayers.has(layer.index) ? draftDot() : ""}</span>
+                <span class="t"><span class="mk-swatch lead ${lit ? "" : "swatch-off"}" style="${lit ? `background:${css(row.color)}` : ""}"></span>${esc(layerName(layer))}${marks.lightingLayers.has(layer.index) ? draftDot() : ""}</span>
                 <span class="m mono">${esc(row ? hsvLabel(row.color) : "not reported")} · ${esc(word(vocabulary(model).paintModes, row?.mode).toLowerCase())}</span></button>`);
             item.addEventListener("click", () => { showLayer(index); render(); });
             list.append(item);
         });
         const layer = currentLayer();
         const row = layerColourRow(model, layer?.index);
-        const main = el(`<div class="tab-grid two" style="gap:22px"></div>`);
+        const main = el(`<div class="tab-grid two stage-detail"></div>`);
         const colour = section(`${layerName(layer)} colour`);
         colour.append(colourControl({
             colour: row?.color, canEdit, title: `${layerName(layer)} layer`,
@@ -288,7 +288,7 @@ function stageBody(body) {
         if (idle) {
             node.classList.add("idle");
             const notice = el(`<div class="unavailable span"><span>${esc(idle)} A pointer layer turned on by hand shows its own layer lighting. The fade settings below are kept for when auto-mouse is back on.</span>
-                <button class="btn tiny" style="justify-self:start">Open Mouse → Auto-mouse</button></div>`);
+                <button class="btn tiny self-start">Open Mouse → Auto-mouse</button></div>`);
             /** @type {HTMLButtonElement} */ (notice.querySelector("button")).addEventListener("click", () => { state.screen = "mouse"; state.reveal = '.settings-group[data-section="autoMouse"]'; render(); });
             node.append(notice);
         }
@@ -301,11 +301,11 @@ function stageBody(body) {
         const endColour = section("End colour");
         const unused = fade.mode === "FOLLOW_REAL_DESTINATION";
         endColour.append(unused
-            ? el(`<div class="row" style="gap:10px;opacity:.5"><span class="swatch-lg ${isOff(fade.end_color) ? "swatch-off" : ""}" style="width:34px;height:34px;${isOff(fade.end_color) ? "" : `background:${css(fade.end_color)}`}"></span>
-                <div><div style="font-size:12.5px">Unused in this mode</div><div class="note mono">${esc(hsvLabel(fade.end_color))}</div></div></div>`)
+            ? el(`<div class="row colour-head unused"><span class="swatch-lg ${isOff(fade.end_color) ? "swatch-off" : ""}" style="${isOff(fade.end_color) ? "" : `background:${css(fade.end_color)}`}"></span>
+                <div><div class="colour-title">Unused in this mode</div><div class="note mono">${esc(hsvLabel(fade.end_color))}</div></div></div>`)
             : colourControl({colour: fade.end_color, canEdit: editFade, title: "Fade destination",
                 onChange: (next) => { if (fade.mode !== undefined) post(edits.automouseFade(fade.mode, next)); }}));
-        if (unused) endColour.append(el(`<p class="note" style="margin-top:10px">Follow-the-real-destination lands on whatever the board would show once the auto-mouse layer drops out, so the end colour is not read. It stays disabled rather than pretending to matter.</p>`));
+        if (unused) endColour.append(el(`<p class="note">Follow-the-real-destination lands on whatever the board would show once the auto-mouse layer drops out, so the end colour is not read. It stays disabled rather than pretending to matter.</p>`));
         node.append(policy, endColour, fadeTiming(model, idle));
     }
 
@@ -317,13 +317,13 @@ function stageBody(body) {
             const row = pdColourRow(model, slot.id);
             const lit = row && !isOff(row.color);
             const item = el(`<button class="rowitem ${slot.id === state.pdSlot ? "on" : ""} ${slot.kind ? "" : "quiet"}" data-slot="${slot.id}">
-                <span class="t"><span class="swatch-lg ${lit ? "" : "swatch-off"}" style="width:11px;height:11px;border-radius:3px;display:inline-block;vertical-align:-1px;margin-right:7px;${lit ? `background:${css(row.color)}` : ""}"></span>${esc(slot.displayName || `Slot ${slot.id}`)}${marks.lightingSlots.has(slot.id) ? draftDot() : ""}</span>
+                <span class="t"><span class="mk-swatch lead ${lit ? "" : "swatch-off"}" style="${lit ? `background:${css(row.color)}` : ""}"></span>${esc(slot.displayName || `Slot ${slot.id}`)}${marks.lightingSlots.has(slot.id) ? draftDot() : ""}</span>
                 <span class="m mono">${esc(row ? hsvLabel(row.color) : "not reported")} · ${esc(localityLabel(row?.locality).toLowerCase())}</span></button>`);
             item.addEventListener("click", () => { state.pdSlot = slot.id; render(); });
             list.append(item);
         });
         const row = pdColourRow(model, state.pdSlot);
-        const main = el(`<div class="tab-grid two" style="gap:22px"></div>`);
+        const main = el(`<div class="tab-grid two stage-detail"></div>`);
         const colour = section(`${slotName(model, state.pdSlot)} colour`);
         colour.append(colourControl({
             colour: row?.color, canEdit, title: `${slotName(model, state.pdSlot)} while active`,
@@ -343,7 +343,7 @@ function stageBody(body) {
         where.append(stack(locality, previewSwitch));
         const note = section("What this stage does");
         note.className = "span";
-        note.append(el(`<p class="note" style="max-width:96ch">A pointing-mode colour is an overlay that exists only while the mode is held or toggled. It replaces whatever the layer paints inside its locality for as long as the mode runs — it is never painted on the key that binds it.</p>`));
+        note.append(el(`<p class="note stage-about">A pointing-mode colour is an overlay that exists only while the mode is held or toggled. It replaces whatever the layer paints inside its locality for as long as the mode runs — it is never painted on the key that binds it.</p>`));
         note.append(groupRowsTable(model.rgb.pdModeLedGroups, "pdMode"));
         main.append(colour, where, note);
         node.append(list, main);
@@ -366,7 +366,7 @@ function stageBody(body) {
             { if (combo.color) post(edits.comboFeedback(/** @type {HTMLSelectElement} */ (event.target).value, combo.color)); });
         where.append(stack(locality));
         const onBoard = section("On the board");
-        onBoard.append(el(`<div class="row" style="gap:8px;flex-wrap:wrap;margin-bottom:10px">${(model.combos || []).slice(0, 8).map((row) =>
+        onBoard.append(el(`<div class="row gap-8 stage-chips">${(model.combos || []).slice(0, 8).map((row) =>
             `<span class="chip">${comboBadge(model, row.badge || "C")}
             ${esc((row.inputDisplays || row.inputs || []).join(" + "))}</span>`).join("") || `<span class="note">No combos are stored.</span>`}</div>`));
         onBoard.append(el(`<p class="note">While a combo's inputs are held, its keys wear this colour. The badges on the key faces take their outline from it, so an off stage shows plain badges.</p>`));
@@ -388,12 +388,12 @@ function stageBody(body) {
         rows.forEach((row) => {
             const lit = !isOff(row.colour);
             const item = el(`<button class="rowitem ${row.id === current?.id ? "on" : ""}" data-row="${esc(row.id)}">
-                <span class="t"><span class="swatch-lg ${lit ? "" : "swatch-off"}" style="width:11px;height:11px;border-radius:3px;display:inline-block;vertical-align:-1px;margin-right:7px;${lit ? `background:${css(row.colour)}` : ""}"></span>${esc(row.label)}</span>
+                <span class="t"><span class="mk-swatch lead ${lit ? "" : "swatch-off"}" style="${lit ? `background:${css(row.colour)}` : ""}"></span>${esc(row.label)}</span>
                 <span class="m mono">${esc(hsvLabel(row.colour))}</span></button>`);
             item.addEventListener("click", () => { state.feedbackRow = row.id; render(); });
             list.append(item);
         });
-        const main = el(`<div class="tab-grid two" style="gap:22px"></div>`);
+        const main = el(`<div class="tab-grid two stage-detail"></div>`);
         const colour = section(current?.label || "Feedback");
         colour.append(colourControl({
             colour: current?.colour, canEdit, title: current?.label || "",
@@ -414,8 +414,11 @@ function stageBody(body) {
         onBoard.className = "span";
         const colours = feedbackColours(model);
         /** @param {import("../../contracts/edits.js").Colour} colour */
-        const dot = (colour) => `<i class="fbdot" style="${stageEnabled(model, "key") && !isOff(colour) ? `background:${css(colour)}` : "background:none;border-style:dashed"}"></i>`;
-        onBoard.append(el(`<div class="row" style="gap:12px;flex-wrap:wrap;margin-bottom:10px">
+        const dot = (colour) => {
+            const lit = stageEnabled(model, "key") && !isOff(colour);
+            return `<i class="fbdot${lit ? "" : " off"}"${lit ? ` style="background:${css(colour)}"` : ""}></i>`;
+        };
+        onBoard.append(el(`<div class="row gap-12 stage-chips">
             <span class="chip">${dot(colours.tap)} tap branch</span>
             <span class="chip">${dot(colours.hold)} hold branch</span>
             <span class="chip">${dot(colours.long)} long hold branch</span>
@@ -451,14 +454,14 @@ function ownerCell(model, target, owner) {
 /** @param {import("../../contracts/panel.js").LedRow[] | undefined} rows @param {string} target */
 function groupRowsTable(rows, target) {
     const model = getModel();
-    if (!rows?.length) return el(`<p class="note" style="margin-top:8px">No LED override rows in this table. Rows override the stage colour on the LEDs they name.</p>`);
-    const node = el(`<table class="t" style="margin-top:8px"><thead><tr><th>Owner</th><th>LEDs</th><th>Colour</th><th></th></tr></thead>
+    if (!rows?.length) return el(`<p class="note led-rows">No LED override rows in this table. Rows override the stage colour on the LEDs they name.</p>`);
+    const node = el(`<table class="t led-rows"><thead><tr><th>Owner</th><th>LEDs</th><th>Colour</th><th></th></tr></thead>
         <tbody>${rows.map((row, index) => `<tr>
             <td>${target === "combo" ? "All combos" : ownerCell(model, target, row.owner)}</td>
             <td class="mono">${esc(row.ledGroup)} · ${row.ledIndices.length} LED${row.ledIndices.length === 1 ? "" : "s"}</td>
-            <td><span class="swatch-lg ${isOff(row.color) ? "swatch-off" : ""}" style="width:13px;height:13px;border-radius:4px;display:inline-block;vertical-align:-2px;${isOff(row.color) ? "" : `background:${css(row.color)}`}"></span>
-                <code class="dim" style="margin-left:6px">${esc(hsvLabel(row.color))}</code>${isOff(row.color) ? ` <span class="note">inherits the stage colour</span>` : ""}</td>
-            <td style="text-align:right"><button class="btn tiny ghost" data-remove="${index}" ${writable() ? "" : "disabled"}>Remove</button></td></tr>`).join("")}</tbody></table>`);
+            <td><span class="led-swatch ${isOff(row.color) ? "swatch-off" : ""}" style="${isOff(row.color) ? "" : `background:${css(row.color)}`}"></span>
+                <code class="dim">${esc(hsvLabel(row.color))}</code>${isOff(row.color) ? ` <span class="note">inherits the stage colour</span>` : ""}</td>
+            <td class="t-act"><button class="btn tiny ghost" data-remove="${index}" ${writable() ? "" : "disabled"}>Remove</button></td></tr>`).join("")}</tbody></table>`);
     /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-remove]")).forEach((button) => button.addEventListener("click", () =>
         post(edits.deleteLedRow(target, Number(button.dataset.remove)))));
     return node;
@@ -485,7 +488,7 @@ function groupBuilder(model, canEdit) {
     if (draft.source && !groups.some((group) => group.name === draft.source)) draft.source = "";
     /** @param {string} value @param {string} text @param {string} current */
     const option = (value, text, current) => `<option value="${esc(value)}" ${value === current ? "selected" : ""}>${esc(text)}</option>`;
-    const node = el(`<aside class="stack" style="gap:12px">
+    const node = el(`<aside class="stack gap-12">
         <div class="sect-h"><h4>New row from the selection</h4><span class="right tag">${state.ledPicks.length} LEDs</span></div>
         <label class="field"><span>Table</span><select class="input" data-target ${canEdit ? "" : "disabled"}>
             ${[["layer", "Layer LED groups"], ["pdMode", "Pointing-mode LED groups"], ["combo", "Combo feedback LED groups"], ["keyBehavior", "Key feedback LED groups"]]
@@ -505,7 +508,7 @@ function groupBuilder(model, canEdit) {
         offNote: "A row stored as HSV(0, 0, 0) inherits its stage colour instead of painting its own.",
         onChange: (next) => { state.rowColour = {h: String(next.h), s: String(next.s), v: String(next.v)}; render(); },
     }));
-    const actions = el(`<div class="row" style="gap:8px">
+    const actions = el(`<div class="row gap-8">
         <button class="btn primary" data-act="keep" ${canEdit && (draft.source || state.ledPicks.length) ? "" : "disabled"}
             data-tip="Pick LEDs on the board, or choose a saved group, to give the row something to paint.">Keep row in draft</button>
         <button class="btn ghost" data-act="save" ${canEdit ? "" : "disabled"}
@@ -528,13 +531,13 @@ const ledIndices = () => {
 /** @param {import("../../contracts/panel.js").PublishedModel} model @param {boolean} canEdit */
 function groupTables(model, canEdit) {
     const groups = model.rgb.ledGroups || [];
-    const node = el(`<div class="stack" style="gap:16px"></div>`);
+    const node = el(`<div class="stack gap-16"></div>`);
     node.append(el(`<div><div class="sect-h"><h4>Reusable groups</h4><span class="right note">one named set, used by many rows</span></div>
         ${groups.length ? `<table class="t"><thead><tr><th>Group</th><th>LEDs</th><th>Used by</th><th></th></tr></thead><tbody>
             ${groups.map((group) => `<tr><td>${esc(group.name)}</td>
                 <td class="mono">${esc(group.ledIndices.join(", "))} · ${group.ledIndices.length} LEDs</td>
                 <td class="muted">${group.usageCount ? esc(group.usages.map((usage) => `${usage.target}${usage.owner ? ` · ${usage.owner}` : ""}`).join(" · ")) : "not used yet"}</td>
-                <td style="text-align:right"><button class="btn tiny ghost" data-delete="${esc(group.name)}"
+                <td class="t-act"><button class="btn tiny ghost" data-delete="${esc(group.name)}"
                     ${canEdit && !group.usageCount ? "" : "disabled"}
                     data-tip="${group.usageCount ? "Rows still refer to this group, so it cannot be deleted." : "Delete this group."}">Remove</button></td></tr>`).join("")}
             </tbody></table>` : `<p class="note">This keyboard has no reusable LED groups yet.</p>`}</div>`));

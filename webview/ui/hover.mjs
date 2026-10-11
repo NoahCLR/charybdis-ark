@@ -118,7 +118,7 @@ function reachSections(model, layer, position, index,
         sections.push(`<div class="hc-sect"><div class="hc-h">Key behaviour</div>
             <div class="hc-sub">${keyNameMarked(model, actionLabel(model, behaviour.keycode), behaviour.keycode)} · ${behaviour.steps.length} branch${behaviour.steps.length === 1 ? "" : "es"} · tap/hold ${timing(behaviour.tapHoldTerm)}${behaviour.keepsAutoMouseAnchored ? " · keeps auto-mouse anchored" : ""}</div>
             ${branches}
-            <div class="hc-sub" style="margin:7px 0 0">${lit
+            <div class="hc-sub hc-foot">${lit
                 ? "The dot beside each tier is the colour the keyboard flashes on this key when that tier resolves."
                 : "Key feedback is switched off, so none of these flash on the keyboard."}</div></div>`);
     }
@@ -136,7 +136,7 @@ function reachSections(model, layer, position, index,
             <div class="hc-flow">${mark(model, {kind: "pointing", slot: slot.id})}
             <span>${esc(slot.displayName || `Slot ${slot.id}`)}</span>
             <span class="hc-life">${slot.kind === 2 ? "scrolling" : slot.kind ? "directional" : "empty slot"}</span></div>
-            <div class="hc-sub" style="margin:6px 0 0">${slot.kind
+            <div class="hc-sub hc-foot">${slot.kind
                 ? `Its colour paints ${esc(localityText(row?.locality))} while the mode runs — not this key.`
                 : "This slot is empty, so the key does nothing until it is configured. The keyboard keeps the keycode either way."}</div></div>`);
     }

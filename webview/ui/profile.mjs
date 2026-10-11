@@ -38,7 +38,7 @@ export function screenProfile() {
         "A complete backup is everything the keyboard stores: layers, behaviours, combos, macros, pointing modes, lighting and settings.",
     )}</div>`);
 
-    const content = el(`<div class="content"><div class="pad" style="max-width:960px;display:grid;gap:14px"></div></div>`);
+    const content = el(`<div class="content"><div class="pad stack profile-pad"></div></div>`);
     const pad = /** @type {HTMLElement} */ (content.firstElementChild);
 
     pad.appendChild(el(`<div class="profile-progress" ${portable.progress ? "" : "hidden"}><span class="spin"></span><span>${esc(portable.progress)}</span></div>`));
@@ -77,7 +77,7 @@ export function screenProfile() {
     if (usage) pad.appendChild(usageCard(usage));
 
     if (!demo) pad.appendChild(el(`<div class="profile-recovery">
-        <i class="dot ${health.recoveryPending ? "draft" : "on"}" style="margin-top:6px"></i>
+        <i class="dot ${health.recoveryPending ? "draft" : "on"}"></i>
         <div class="copy"><b>Automatic recovery</b><p class="note">${health.recoveryPending
             ? "An apply was interrupted. The keyboard is still running its last complete profile; the recovery copy restores it, and Apply retries from there."
             : "A recovery copy is written before every apply and released once both halves confirm. Nothing is outstanding."}</p></div>
@@ -169,7 +169,7 @@ function usageCard(usage) {
     const bytes = (value) => value.toLocaleString("en-US");
     return el(`<div class="card usage">
         <div class="card-h"><h3>Profile memory</h3><span class="right note">${esc(usage.source)}</span></div>
-        <div class="card-b" style="display:grid;gap:12px">
+        <div class="card-b stack gap-12">
             <div><div class="sect-h"><h4>Profile</h4>
                 <span class="right note">${bytes(usage.used)} of ${bytes(usage.capacity)} bytes used · ${bytes(usage.free)} free</span></div>
                 <div class="meter ${usage.nearlyFull ? "near" : ""}" data-tip="${Math.round(usage.share * 100)}% used"><i style="width:${usage.share * 100}%"></i></div></div>
@@ -183,7 +183,7 @@ function usageCard(usage) {
             ${usage.macros ? `<div><div class="sect-h"><h4>Macro memory (separate)</h4>
                 <span class="right note">${bytes(usage.macros.used)} of ${bytes(usage.macros.capacity)} bytes used</span></div>
                 <div class="meter"><i style="width:${usage.macros.share * 100}%"></i></div>
-                <p class="note" style="margin-top:6px">Macro steps are stored apart from the profile and counted slot by slot on Macros. Macro names count in the profile above.</p></div>` : ""}
+                <p class="note meter-note">Macro steps are stored apart from the profile and counted slot by slot on Macros. Macro names count in the profile above.</p></div>` : ""}
         </div></div>`);
 }
 
@@ -207,14 +207,14 @@ function reviewCard(model, portable, busy) {
     const node = el(`<div class="card">
         <div class="card-h"><h3>${draft ? "Use this profile as your draft?" : "Restore this profile?"}</h3>
             ${fileName ? `<span class="right note mono">${esc(fileName)}</span>` : ""}</div>
-        <div class="card-b" style="display:grid;gap:12px">
+        <div class="card-b stack gap-12">
             ${counted ? `<p class="note">${esc(counted)}</p>` : ""}
             ${same ? `<div class="callout">This file holds exactly what ${demoOf(model).active ? "the demo setup holds" : "the keyboard runs"}. Using it changes nothing.</div>` : ""}
             ${summary.length ? `<table class="t import-diff"><thead><tr><th>What this file changes</th><th>Differences</th><th></th></tr></thead>
                 <tbody>${summary.map((group) => `<tr class="cat"><td>${esc(group.category)}</td><td class="mono">${group.count}</td><td class="note">${esc(group.status)}</td></tr>
                     ${group.rows.map((row) => `<tr class="sub"><td>${esc(row.label)}</td><td class="mono">${row.count}</td><td></td></tr>`).join("")}`).join("")}</tbody></table>` : ""}
             ${same ? "" : `<div class="callout warn">${esc(callout)}</div>`}
-            <div class="row" style="gap:8px">
+            <div class="row gap-8">
                 <button class="btn primary" data-act="restore" ${busy || same ? "disabled" : ""}>${draft ? "Use as draft" : "Restore profile"}</button>
                 <button class="btn ghost" data-act="cancel" ${busy ? "disabled" : ""}>Cancel</button></div>
         </div></div>`);

@@ -61,7 +61,7 @@ export function historyOverlay() {
     const node = el(`<div class="scrim"><div class="sheet" role="dialog" aria-modal="true" aria-label="Draft history">
         <div class="sheet-h"><h2>Draft history</h2>
             <span class="note">${count ? `${count} step${count === 1 ? "" : "s"} · each compared with the step before it` : "No edits yet"}</span>
-            <span class="right" style="margin-left:auto"><button class="btn ghost" data-act="close">Close</button></span></div>
+            <span class="right"><button class="btn ghost" data-act="close">Close</button></span></div>
         <div class="sheet-b rv hs">
             ${entries ? `<div class="hs-cols">${reviewColumns("What changed", "Before", "After")}</div>
                 ${entries.map((entry) => stepCard(model, entry, now)).join("")}`

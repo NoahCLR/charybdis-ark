@@ -65,7 +65,7 @@ export function reachTable(tab, groups, columns) {
             ? (group.rows.length ? group.rows.join("")
                 : `<tr><td colspan="${columns.length}"><p class="note">${esc(group.empty)}</p></td></tr>`)
             : ""}</tbody>`;
-    const node = el(`<div style="padding:2px 0"><table class="t fixed">
+    const node = el(`<div class="reach-table"><table class="t fixed">
         <colgroup>${columns.map(([, width]) => `<col style="width:${width}">`).join("")}</colgroup>
         <thead><tr>${columns.map(([name]) => `<th>${esc(name)}</th>`).join("")}</tr></thead>
         ${inGroupOrder(groups).map(section).join("")}

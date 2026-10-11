@@ -27,7 +27,7 @@ export function branchBadge(model, count) {
 export function tierDot(model, kind) {
     const colour = feedbackColours(model)[/** @type {import("../../contracts/edits.js").Tier} */ (kind)];
     const lit = stageEnabled(model, "key") && !isOff(colour);
-    return `<i class="fbdot" style="${lit ? `background:${css(colour)}` : "background:none;border-style:dashed"}"></i>`;
+    return `<i class="fbdot${lit ? "" : " off"}"${lit ? ` style="background:${css(colour)}"` : ""}></i>`;
 }
 
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} [badge] */

@@ -28,17 +28,17 @@ export function screenSettings() {
     const main = el(`<div class="main">${topbar(
         "Settings",
         "The keyboard's global policy: every value it stores that applies on all layers. Values this firmware cannot report stay read-only rather than disappearing.",
-        `<input class="input" id="settingsSearch" placeholder="Search settings" style="width:200px" value="${esc(state.settingsSearch || "")}">`,
+        `<input class="input search short" id="settingsSearch" placeholder="Search settings" value="${esc(state.settingsSearch || "")}">`,
     )}</div>`);
 
-    const content = el(`<div class="content"><div class="pad" style="max-width:980px"></div></div>`);
+    const content = el(`<div class="content"><div class="pad settings-pad"></div></div>`);
     const pad = /** @type {HTMLElement} */ (content.firstElementChild);
     if (!sections.length) {
         pad.appendChild(el(`<div class="screen-stub"><h3>No settings read</h3>
             <p class="note">${esc(unavailable(model) || "Choose Read keyboard to load this keyboard's policy.")}</p></div>`));
     }
     if (!canEdit && sections.length) {
-        pad.appendChild(el(`<div class="unavailable" style="margin-bottom:14px">${esc(unavailable(model)
+        pad.appendChild(el(`<div class="unavailable">${esc(unavailable(model)
             || "This firmware reports its settings but cannot save them. Flash the complete-profile pair to edit them here.")}</div>`));
     }
 
@@ -59,7 +59,7 @@ export function screenSettings() {
     // A search for something that moved to Mouse says where it went.
     const elsewhere = query ? sectionsIn(model, "Mouse").reduce((total, section) => total + matching(section).length, 0) : 0;
     if (elsewhere) {
-        const note = el(`<div class="callout row" style="gap:10px;align-items:center">
+        const note = el(`<div class="callout row gap-10">
             <span>${elsewhere} matching setting${elsewhere === 1 ? " is" : "s are"} on the Mouse screen.</span>
             <button class="btn tiny" data-act="mouse">Open Mouse</button></div>`);
         /** @type {HTMLButtonElement} */ (note.querySelector('[data-act="mouse"]')).addEventListener("click", () => { state.screen = "mouse"; render(); });
@@ -128,9 +128,9 @@ export function sectionCard(model, section, fields, canEdit, searching = false) 
     const opened = (state.settingsOpen || []).includes(section.id);
     const open = searching || section.expanded !== false || opened;
     const node = /** @type {HTMLDetailsElement} */ (el(`<details class="card settings-group" data-section="${esc(section.id)}" ${open ? "open" : ""}>
-        <summary class="card-h" style="cursor:pointer;list-style:none"><h3>${esc(section.label)}${draftMarks(model?.draft?.changes).settings.has(section.id) ? draftDot() : ""}</h3>
+        <summary class="card-h"><h3>${esc(section.label)}${draftMarks(model?.draft?.changes).settings.has(section.id) ? draftDot() : ""}</h3>
             <span class="right tag">${section.fields.length} setting${section.fields.length === 1 ? "" : "s"}</span></summary>
-        ${section.description ? `<div class="card-b" style="padding-bottom:0"><p class="note">${esc(section.description)}</p></div>` : ""}
+        ${section.description ? `<div class="card-b settings-intro"><p class="note">${esc(section.description)}</p></div>` : ""}
         <div class="rows"></div>
         ${section.warning ? `<div class="card-b"><div class="callout warn" role="note">${esc(section.warning)}</div></div>` : ""}
         ${section.githubLink ? `<div class="card-b"><a class="btn tiny ghost" href="${esc(section.githubLink.url)}" target="_blank" rel="noopener">${githubMark("settings-help-mark")}<span>${esc(section.githubLink.label)}</span></a></div>` : ""}
@@ -159,7 +159,7 @@ export function sectionCard(model, section, fields, canEdit, searching = false) 
 /** @param {import("../../contracts/panel.js").PresentedField} field @param {boolean} canEdit @param {() => void} submit @param {boolean} hidden @param {boolean} slot */
 function fieldRow(field, canEdit, submit, hidden, slot) {
     const editable = canEdit && !field.readOnly;
-    const row = el(`<div class="setrow ${field.readOnly ? "ro" : ""}" ${hidden ? 'style="display:none"' : ""}>
+    const row = el(`<div class="setrow ${field.readOnly ? "ro" : ""}" ${hidden ? "hidden" : ""}>
         <div><div class="nm">${marked(getModel(), field.governs, field.label, {slot})}</div>${field.hint ? `<div class="hint">${esc(field.hint)}</div>` : ""}</div>
         <div class="control"></div>
     </div>`);
