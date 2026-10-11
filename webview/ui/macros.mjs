@@ -64,7 +64,7 @@ export function screenMacros() {
         const peek = macroPeek(row.payload, (name) => model?.qmkKeyLabels?.[name] || name);
         const out = row.available === false;
         const tip = out ? `Slot ${index} · no room: the free macro memory is kept for the lower empty slots. Shorten or clear a macro to open it.`
-            : row.empty ? `Slot ${index} · empty` : `Slot ${index} · ${steps.length} step${steps.length === 1 ? "" : "s"} · ${row.program} of ${memory?.programMax ?? 512} bytes to play · ${row.payload}`;
+            : row.empty ? `Slot ${index} · empty` : `Slot ${index} · ${steps.length} step${steps.length === 1 ? "" : "s"}${memory?.programMax === null ? "" : ` · ${row.program} of ${memory?.programMax ?? 512} bytes to play`} · ${row.payload}`;
         const cell = el(`<button class="mslot ${row.empty ? "" : "filled"} ${out ? "out" : ""} ${row.playable === false ? "warn" : ""}" data-slot="${esc(row.keycode)}"
             aria-current="${row.keycode === slot?.keycode}" ${out ? "disabled" : ""} data-tip="${esc(tip)}">
             <span class="n">M${index}</span>${changedMacros.has(row.keycode) ? draftDot("Changed in your draft", "corner") : ""}
@@ -85,7 +85,7 @@ function memoryMeter(memory) {
     const used = memory.stored, share = Math.min(100, (used / memory.capacity) * 100);
     const closed = memory.slots - memory.available;
     return `<div class="sect-h" style="margin-top:14px"><h4>Macro memory</h4>
-            <span class="right note">${used.toLocaleString("en-US")} of ${memory.capacity.toLocaleString("en-US")} bytes used</span></div>
+            <span class="right note">${used.toLocaleString("en-US")} of ${memory.capacity.toLocaleString("en-US")} bytes used · ${memory.free.toLocaleString("en-US")} free</span></div>
         <div class="meter"><i style="width:${share}%"></i></div>
         <p class="note" style="margin-top:6px">A key tap takes 3 bytes; text uses its UTF-8 bytes. Every empty slot keeps room for ${memory.reserveTaps} key taps${closed ? `; ${closed} slot${closed === 1 ? " has" : "s have"} no room left` : ""}.</p>`;
 }
@@ -312,12 +312,13 @@ function paintFeedback(card, model, slot) {
     const error = form.stepError || parsed.error || (held.length ? `Release ${held.map(key => actionLabel(model, key)).join(", ")} before the macro ends.` : "") || inspection?.error || (!local && slot.playbackError);
     const program = local ? inspection?.program : slot.program;
     const bytes = local ? inspection?.bytes : slot.bytes;
-    const max = model?.macroBank?.programMax ?? 512;
+    const max = model?.macroBank?.programMax === null ? null : model?.macroBank?.programMax ?? 512;
+    const available = inspection?.availableBytes ?? (slot.bytes + (model?.macroBank?.free ?? 0));
     const feedback = card.querySelector("[data-macro-feedback]");
     feedback.replaceChildren(el(`<div class="stack">
         ${error ? `<div class="unavailable">${esc(error)} ${local ? "This edit is not staged." : "This stored macro cannot play with the current Host settings."}</div>` : ""}
-        <div class="meter ${program > max ? "over" : ""}"><i style="width:${Math.min(100, (program ?? 0) / max * 100)}%"></i></div>
-        <p class="note" data-macro-size>${program == null ? "Playback size unavailable" : `${esc(program)} of ${esc(max)} playback bytes`} · ${bytes == null ? "macro memory size unavailable" : `${esc(bytes)} bytes of macro memory`}</p>
+        ${max === null ? "" : `<div class="meter ${program > max ? "over" : ""}"><i style="width:${Math.min(100, (program ?? 0) / max * 100)}%"></i></div>`}
+        <p class="note" data-macro-size>${max === null ? "" : `${program == null ? "Playback size unavailable" : `${esc(program)} of ${esc(max)} playback bytes`} · `}${bytes == null ? "Macro memory size unavailable" : `${esc(bytes)} bytes of macro memory`}${max === null ? ` · ${esc(available)} available for this macro` : ""}</p>
         <p class="note">${error ? (local ? "Fix this edit before it can be kept in your draft." : "Change Host settings or fix the macro before playing it.") : local && !inspection ? "Checking this edit…" : "Valid edits are kept in your draft when you finish editing a step."}</p>
     </div>`));
     const dirty = local && payload !== slot.payload;

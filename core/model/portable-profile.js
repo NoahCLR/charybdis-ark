@@ -73,9 +73,11 @@ function validateViaMacro(bytes, {unicode = false, textEntry = false, layout, pr
 // The macro bank the sixteen-layer storage geometry has, when no keyboard says:
 // a 12 KiB VIA region less config and the 1,920-byte keymap (D-F14).
 const MACRO_BANK_BYTES = 10327;
+const MACRO_BANK_MAX_BYTES = 65535;
 function macroBank(slots, capacity) {
     const size = slots.reduce((total, bytes) => total + bytes.length + 1, 1);
-    if (size > capacity) throw fail(`Macros need ${size} bytes; this keyboard has ${capacity}.`);
+    if (!Number.isInteger(capacity) || capacity < MACRO_SLOTS + 1 || capacity > MACRO_BANK_MAX_BYTES) throw fail("Unsupported macro storage capacity.");
+    if (size > capacity) throw fail(`Macros need ${size} bytes; this keyboard has ${capacity}, so they are ${size - capacity} bytes over. Shorten or clear macros before restoring.`);
     const result = Buffer.alloc(capacity); let offset = 0;
     for (const slot of slots) {slot.copy(result, offset); offset += slot.length + 1;}
     return result;
@@ -117,8 +119,9 @@ function validateSnapshot(value, capabilities) {
     if (Object.keys(value).some(key => !["format", "version", "keyboard", "actionAbiDigest", "layers", "profile", "macros"].includes(key))) throw fail("This profile contains unsupported fields.");
     if (!Array.isArray(value.layers) || value.layers.length !== LAYERS || value.layers.some(keys => !Array.isArray(keys) || keys.length !== MATRIX_KEYS || !keys.every(u16))) throw fail(`A complete profile must contain all ${LAYERS} layers.`);
     if (!Array.isArray(value.macros) || value.macros.length !== MACRO_SLOTS) throw fail(`A complete profile must contain all ${MACRO_SLOTS} macro slots.`);
-    const macros = value.macros.map(slot => {const bytes = base64(slot, MACRO_BANK_BYTES, "macro"); validateViaMacro(bytes, {unicode: capabilities ? supportsUnicodeMacros(capabilities) : true, protectionSupported: capabilities ? supportsMacroProtection(capabilities) : true}); return bytes;});
+    const macros = value.macros.map(slot => {const bytes = base64(slot, MACRO_BANK_MAX_BYTES, "macro"); validateViaMacro(bytes, {unicode: capabilities ? supportsUnicodeMacros(capabilities) : true, protectionSupported: capabilities ? supportsMacroProtection(capabilities) : true}); return bytes;});
     const profile = base64(value.profile, PROFILE_BLOB_V1.MAX_SIZE, "profile data");
+    if (capabilities?.maxProfilePayload !== undefined && profile.length > capabilities.maxProfilePayload) throw fail(`The profile needs ${profile.length} bytes; this keyboard holds ${capabilities.maxProfilePayload}.`);
     let domains;
     try {domains = decodeProfileBlob(profile).domains;} catch (error) {
         if (["INCOMPATIBLE_SCHEMA", "UNKNOWN_DOMAIN_VERSION"].includes(error.code)) throw fail("This profile is from older firmware, in a format the keyboard no longer stores. Export a new backup from current firmware.");
@@ -157,7 +160,10 @@ function validateSnapshot(value, capabilities) {
     walkActions(behaviors, checkAction); walkActions(combos, checkAction);
     const layout = Buffer.alloc(LAYERS * MATRIX_KEYS * 2); value.layers.flat().forEach((v, id) => layout.writeUInt16BE(v, id * 2));
     if (capabilities && (value.actionAbiDigest !== capabilities.actionAbiDigest || capabilities.compiledLayerCount !== LAYERS || (capabilities.supportedDomainMask & 31) !== 31)) throw fail(`The connected firmware does not support this profile's action vocabulary or ${LAYERS}-layer storage.`);
-    const bank = macroBank(macros, capabilities?.viaMacroBytes ?? MACRO_BANK_BYTES);
+    // A portable file stores streams, not a bank geometry. Without a device,
+    // preserve larger backups; a destination pads or refuses them by its size.
+    const stored = macros.reduce((total, bytes) => total + bytes.length + 1, 1);
+    const bank = macroBank(macros, capabilities?.viaMacroBytes ?? (capabilities ? MACRO_BANK_BYTES : Math.max(MACRO_BANK_BYTES, stored)));
     return {document: value, profile, layout, macros: bank, settings, rgb, behaviors, combos, pdModes, codecOptions, danglingPdBindings: Object.fromEntries(danglingPdBindings)};
 }
 
@@ -181,7 +187,13 @@ function walkActions(value, action) {
 // The fingerprint and summary of a document, from its decoded form when the
 // caller already has it, so a document decoded once is not decoded again.
 function fingerprintOf({document, profile, layout, macros}) {
-    const bytes = Buffer.concat([profile, layout, macros]);
+    // Bank padding is destination geometry, not part of a portable edit.
+    // Retain legacy fingerprints for small profiles and normalize larger ones
+    // to their streams plus terminators and validity byte.
+    const length = Math.max(MACRO_BANK_BYTES, document.macros.reduce((sum, encoded) => sum + Buffer.byteLength(encoded, "base64") + 1, 1));
+    const canonical = macros.length === length ? macros : Buffer.alloc(length);
+    if (canonical !== macros) macros.copy(canonical, 0, 0, Math.min(length, macros.length));
+    const bytes = Buffer.concat([profile, layout, canonical]);
     return `${document.actionAbiDigest}:${crc32(bytes)}:${fnv1a32(bytes)}`;
 }
 const fingerprint = document => fingerprintOf(validateSnapshot(document));
@@ -276,4 +288,4 @@ function summaryOf(value) {
         macros: value.document.macros.filter(Boolean).length,
         names: value.settings.names.map((name, index) => layerName(value.settings.names, index))};
 }
-module.exports = {LAYERS, MACRO_SLOTS, MACRO_BANK_BYTES, FILE_MAX_BYTES, encodeNamedProfile, comboTableOf, createSnapshot, validateSnapshot, materializeProfile, macroSlots, macroBank, validateViaMacro, fingerprint, fingerprintOf, decodedOf, reorderLayers, summary, summaryOf};
+module.exports = {LAYERS, MACRO_SLOTS, MACRO_BANK_BYTES, MACRO_BANK_MAX_BYTES, FILE_MAX_BYTES, encodeNamedProfile, comboTableOf, createSnapshot, validateSnapshot, materializeProfile, macroSlots, macroBank, validateViaMacro, fingerprint, fingerprintOf, decodedOf, reorderLayers, summary, summaryOf};

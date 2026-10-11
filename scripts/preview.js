@@ -61,7 +61,7 @@ const capabilities = {
     reportSize: 32,
     brightnessMax: 255,
     // The sizes current firmware advertises, so Profile & backups shows its meter.
-    maxProfilePayload: 65504,
+    maxProfilePayload: 53216,
     maxBehaviorRows: 128,
     maxPopulatedBehaviorSteps: 640,
     maxCombos: 128,
@@ -69,7 +69,7 @@ const capabilities = {
     maxTapStepsPerBehavior: 5,
     maxReusableRgbGroups: 16,
     maxRgbStageGroupRows: 32,
-    viaMacroBytes: 10327,
+    viaMacroBytes: 34903,
 };
 
 // The hosts the preview stands in for. The extension's is what it always was;

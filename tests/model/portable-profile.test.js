@@ -210,3 +210,21 @@ test("partial, incompatible, over-capacity and malformed profiles fail before re
     assert.throws(() => reorderLayers(source, [1, 1, 2, 3, 4, 5, 6, 7]), /every layer once/);
 });
 module.exports = {settings, document};
+
+test("portable streams restore across bank sizes with stable fingerprints and explicit over-capacity errors", () => {
+    const {document: make, CURRENT_CAPABILITIES} = require("../fixtures/portable-profile");
+    const {fingerprintOf, fingerprint, validateSnapshot} = require("../../core/model/portable-profile");
+    const source = make();
+    source.macros[127] = Buffer.from("a".repeat(9000)).toString("base64");
+    const old = validateSnapshot(source, {...CURRENT_CAPABILITIES, viaMacroBytes: 10327});
+    const next = validateSnapshot(source, {...CURRENT_CAPABILITIES, featureFlags: 1 << 27, viaMacroBytes: 34903, maxProfilePayload: 53216});
+    assert.equal(next.macros.length, 34903);
+    assert.deepEqual(next.macros.subarray(0, old.macros.length), old.macros);
+    assert.ok(next.macros.subarray(old.macros.length).every(byte => byte === 0));
+    assert.equal(fingerprintOf(next), fingerprintOf(old));
+    assert.equal(fingerprintOf(next), fingerprint(source));
+    source.macros[127] = Buffer.from("a".repeat(20000)).toString("base64");
+    assert.equal(validateSnapshot(source).document.macros[127], source.macros[127], "a large backup is read without a destination");
+    assert.throws(() => validateSnapshot(source, {...CURRENT_CAPABILITIES, viaMacroBytes: 10327}), /9802 bytes over/);
+    assert.equal(validateSnapshot(source, {...CURRENT_CAPABILITIES, featureFlags: 1 << 27, viaMacroBytes: 34903}).macros.length, 34903);
+});

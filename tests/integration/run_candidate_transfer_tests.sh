@@ -19,6 +19,8 @@ cleanup() {
 
 trap cleanup EXIT INT TERM
 
+sh "$ROOT/tests/host/run_contract_probe.sh" --output "$BUILD_DIR/contract.json"
+
 build_and_run() {
     name="$1"
     shift
@@ -49,7 +51,7 @@ build_and_run() {
         "$ROOT/users/noah/lib/profile/storage/profile_candidate_transaction.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_candidate_store_backend.c" \
         -o "$BUILD_DIR/profile_candidate_store_backend_test_$name"
-    node "$CHARYBDIS_ARK_ROOT/tests/integration/candidate-transfer-corpus.js" "$BUILD_DIR/profile_candidate_store_backend_test_$name" "$BUILD_DIR"
+    node "$CHARYBDIS_ARK_ROOT/tests/integration/candidate-transfer-corpus.js" "$BUILD_DIR/profile_candidate_store_backend_test_$name" "$BUILD_DIR" "$BUILD_DIR/contract.json"
 }
 
 build_and_run normal

@@ -48,8 +48,9 @@ const CURRENT_DOMAINS = "16:4,32:2,48:3,64:6,80:3";
 // its authored combos and factory settings). `compiledOnly` runs those
 // defaults, with nothing committed; the live combo and settings readbacks
 // still answer from the document.
-function fakeKeyboard({document, compiled, compiledOnly = false, generation = 42, firmwareVersion = 0x00010000, brightnessMax = 255, options = keyboardOptions.wire()} = {}) {
+function fakeKeyboard({document, compiled, streaming = false, compiledOnly = false, generation = 42, firmwareVersion = 0x00010000, brightnessMax = 255, options = keyboardOptions.wire()} = {}) {
     const held = validateSnapshot(document);
+    held.macros = require("../../core/model/portable-profile").macroBank(document.macros.map(value => Buffer.from(value, "base64")), streaming ? 34903 : 10327);
     if (document.version !== 3 || document.layers.length !== 16) throw new Error("The fake keyboard runs current firmware: a schema-3, sixteen-layer document.");
     const versions = blob => decodeProfileBlob(blob).domains.map(domain => `${domain.id}:${domain.version}`).join();
     if (versions(held.profile) !== CURRENT_DOMAINS || (compiled && versions(compiled) !== CURRENT_DOMAINS)) throw new Error("The fake keyboard runs current firmware: RGB 4, key behaviours 2, combos 3, settings 6 and PD 3.");
@@ -59,17 +60,17 @@ function fakeKeyboard({document, compiled, compiledOnly = false, generation = 42
 
     const capabilities = [page(25, (p) => {
         p.set([2, 3, 1, 0, 3, 0, RAW_HID_REPORT_SIZE, PROFILE_CANDIDATE_V1.CHUNK_MAX, PROFILE_WIRE_V1.STATUS_PAGE_COUNT]);
-        p.writeUInt32LE(FEATURES, 9); p.writeUInt32LE(document.actionAbiDigest, 13);
+        p.writeUInt32LE(streaming ? FEATURES : FEATURES & ~(1 << 27), 9); p.writeUInt32LE(document.actionAbiDigest, 13);
         p.writeUInt32LE(firmwareVersion, 17); p.writeUInt32LE(fnv1a32(defaults), 21);
     }), page(25, (p) => {
         // Layers, behaviour rows, tap depth, (steps on page 2), combos, keys
         // per combo, RGB groups, stage rows, LEDs, LED bitmap, custom keys, macros.
         p.set([16, 16, 128, 5, 0, 128, 16, 16, 32, 58, 8, 128, 128]);
-        p.writeUInt16LE(65504, 13); p.writeUInt16LE(65504, 15);
+        p.writeUInt16LE(streaming ? 53216 : 65504, 13); p.writeUInt16LE(streaming ? 53216 : 65504, 15);
         p.writeUInt16LE(held.macros.length, 19); p[21] = 31;
     }), page(25, (p) => {
         // Populated steps, tap depth, slot size, name bytes, mask bits, positions.
-        p.writeUInt16LE(640, 0); p[2] = 5; p.writeUInt32LE(65536, 3); p.set([32, 32, 60], 7);
+        p.writeUInt16LE(640, 0); p[2] = 5; p.writeUInt32LE(streaming ? 53248 : 65536, 3); p.set([32, 32, 60], 7);
     })];
     // Committed (or running its defaults), converged with the other half,
     // nothing pending.

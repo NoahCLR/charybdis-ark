@@ -21,9 +21,14 @@ cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     "$ROOT/users/noah/lib/macro/macro_payload_parse.c" \
     "$ROOT/users/noah/lib/macro/macro_payload_encode.c" \
     -o "$BUILD_DIR/probe"
-node - "$ROOT" "$BUILD_DIR/probe" <<'JS'
+sh "$ROOT/tests/host/run_contract_probe.sh" --output "$BUILD_DIR/contract.json"
+node - "$ROOT" "$BUILD_DIR/probe" "$BUILD_DIR/contract.json" <<'JS'
 const assert = require("node:assert/strict"), {execFileSync} = require("node:child_process");
-const {encodeMacroPayload, macroProgramBytes, MACRO_PROGRAM_MAX} = require(process.env.CHARYBDIS_ARK_ROOT + "/core/schema/macro-payload");
+const {encodeMacroPayload, macroProgramBytes, MACRO_PROGRAM_MAX, supportsStreamingMacros} = require(process.env.CHARYBDIS_ARK_ROOT + "/core/schema/macro-payload");
+const {decodeCapabilityPages} = require(process.env.CHARYBDIS_ARK_ROOT + "/core/protocol/profile-wire-v1");
+const contract = JSON.parse(require("node:fs").readFileSync(process.argv[4], "utf8"));
+const capabilities = decodeCapabilityPages(contract.capabilityPages.map(hex => Buffer.from(hex, "hex")));
+const streaming = supportsStreamingMacros(capabilities);
 // Fixed edge cases, then seeded random macros built from every step kind.
 const payloads = ["", "a", "a".repeat(255), "a".repeat(256), "a".repeat(600), "{KC_A}", "{KC_A}".repeat(170), "{KC_A}".repeat(171),
     "{120}", "{0}", "{65535}", "a{KC_A}b", "{KC_LGUI,KC_N}", "{KC_LCTL,KC_LSFT,KC_4}", "{+KC_LSFT}{KC_A}{-KC_LSFT}",
@@ -60,10 +65,16 @@ assert.equal(output.length, macros.length);
 let over = 0;
 macros.forEach((bytes, index) => {
     const size = macroProgramBytes(bytes);
-    // The firmware refuses exactly the macros whose program would not fit.
-    if (size > MACRO_PROGRAM_MAX) { over++; assert.equal(output[index], -1, payloads[index]); }
+    // Legacy firmware refuses exactly the macros whose program would not fit.
+    // Streaming firmware plays them in windows; a text run split across a
+    // window boundary repeats its header, so the summed program can only grow.
+    if (size > MACRO_PROGRAM_MAX) {
+        over++;
+        if (streaming) assert.ok(output[index] >= size, `${payloads[index]}: ${output[index]} < ${size}`);
+        else assert.equal(output[index], -1, payloads[index]);
+    }
     else assert.equal(size, output[index], payloads[index]);
 });
 assert.ok(over > 0, "the corpus reaches past the 512-byte program cap");
-console.log(`app macro program size matches the firmware decoder for ${macros.length} macros (${over} over the cap)`);
+console.log(`app macro program size matches the firmware decoder for ${macros.length} macros (${over} past a single window, ${streaming ? "streaming" : "legacy"} firmware)`);
 JS

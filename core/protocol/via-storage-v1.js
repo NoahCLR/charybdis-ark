@@ -5,11 +5,12 @@ const {RAW_HID_REPORT_SIZE, normalizeRawHidReport} = require("../transport/devic
 
 const VIA_STORAGE = Object.freeze({MACRO_COUNT: 0x0c, MACRO_SIZE: 0x0d, MACRO_READ: 0x0e, MACRO_WRITE: 0x0f, LAYER_COUNT: 0x11, LAYOUT_READ: 0x12, LAYOUT_WRITE: 0x13, CHUNK: 28});
 const fail = message => Object.assign(new Error(message), {code: "VIA_STORAGE_INVALID"});
-// The sixteen-layer VIA region (firmware D-F14): 12 KiB, holding a 1,920-byte
-// keymap and a 10,327-byte macro bank. No VIA read or write reaches past it.
+// Legacy defaults for callers without a device. Live transfers use the bank
+// capacity reported by VIA and checked against Profile Wire; offsets are
+// relative to that bank and fit the protocol's 16-bit field.
 const VIA_REGION_BYTES = 12288, LAYOUT_BYTES = 1920, MACRO_BANK_BYTES = 10327;
 function viaStorageDigest({layout, macros}) {
-    if (!Buffer.isBuffer(layout) || layout.length !== LAYOUT_BYTES || !Buffer.isBuffer(macros) || macros.length !== MACRO_BANK_BYTES) throw fail("Unsupported keyboard storage geometry.");
+    if (!Buffer.isBuffer(layout) || layout.length !== LAYOUT_BYTES || !Buffer.isBuffer(macros) || (macros.length < 129 || macros.length > 65535)) throw fail("Unsupported keyboard storage geometry.");
     let hash = 2166136261;
     const hashByte = byte => {hash = Math.imul((hash ^ byte) >>> 0, 16777619) >>> 0;};
     for (const [id, bytes] of [[1, Buffer.from([1, 0])], [2, layout], [3, Buffer.alloc(0)], [4, macros]]) {
@@ -32,8 +33,8 @@ async function scalar(connection, command, width) {
     return width === 1 ? response[1] : response.readUInt16BE(1);
 }
 
-async function readRegion(connection, command, length, {startOffset = 0, onProgress = () => {}, signal, timeoutMs} = {}) {
-    if (!Number.isInteger(length) || length < 1 || length > VIA_REGION_BYTES || !Number.isInteger(startOffset) || startOffset < 0 || startOffset + length > VIA_REGION_BYTES) throw fail("Invalid storage size.");
+async function readRegion(connection, command, length, {startOffset = 0, capacity = VIA_REGION_BYTES, onProgress = () => {}, signal, timeoutMs} = {}) {
+    if (!Number.isInteger(capacity) || capacity < 1 || capacity > 65535 || !Number.isInteger(length) || length < 1 || length > capacity || !Number.isInteger(startOffset) || startOffset < 0 || startOffset + length > capacity) throw fail("Invalid storage size.");
     const bytes = Buffer.alloc(length);
     for (let offset = 0; offset < length; offset += VIA_STORAGE.CHUNK) {
         const count = Math.min(VIA_STORAGE.CHUNK, length - offset);
@@ -61,19 +62,19 @@ function changedRanges(current, target, {end = target?.length} = {}) {
     return ranges;
 }
 
-async function writeChangedRegion(connection, command, target, current, {onProgress = () => {}, end = target?.length} = {}) {
+async function writeChangedRegion(connection, command, target, current, {onProgress = () => {}, end = target?.length, capacity = target?.length} = {}) {
     const ranges = changedRanges(current, target, {end});
     const total = ranges.reduce((sum, range) => sum + range.bytes.length, 0);
     let completed = 0;
     for (const range of ranges) {
-        await writeRegion(connection, command, range.bytes, {startOffset: range.offset, onProgress: progress => onProgress({completed: completed + progress.completed, total})});
+        await writeRegion(connection, command, range.bytes, {startOffset: range.offset, capacity, onProgress: progress => onProgress({completed: completed + progress.completed, total})});
         completed += range.bytes.length;
     }
     return ranges;
 }
 
-async function writeRegion(connection, command, bytes, {onProgress = () => {}, startOffset = 0} = {}) {
-    if (!Buffer.isBuffer(bytes) || bytes.length < 1 || bytes.length > VIA_REGION_BYTES || !Number.isInteger(startOffset) || startOffset < 0 || startOffset + bytes.length > VIA_REGION_BYTES) throw fail("Invalid storage payload.");
+async function writeRegion(connection, command, bytes, {onProgress = () => {}, startOffset = 0, capacity = VIA_REGION_BYTES} = {}) {
+    if (!Number.isInteger(capacity) || capacity < 1 || capacity > 65535 || !Buffer.isBuffer(bytes) || bytes.length < 1 || bytes.length > capacity || !Number.isInteger(startOffset) || startOffset < 0 || startOffset + bytes.length > capacity) throw fail("Invalid storage payload.");
     for (let offset = 0; offset < bytes.length; offset += VIA_STORAGE.CHUNK) {
         const count = Math.min(VIA_STORAGE.CHUNK, bytes.length - offset);
         const request = Buffer.alloc(RAW_HID_REPORT_SIZE);
@@ -85,13 +86,16 @@ async function writeRegion(connection, command, bytes, {onProgress = () => {}, s
     }
 }
 
-async function readViaStorage(connection, {matrixRows = 10, matrixColumns = 6, allowIncomplete = false, onProgress = () => {}} = {}) {
+async function readViaStorage(connection, {capabilities, matrixRows = 10, matrixColumns = 6, allowIncomplete = false, onProgress = () => {}} = {}) {
     const layers = await scalar(connection, VIA_STORAGE.LAYER_COUNT, 1);
     const macroSlots = await scalar(connection, VIA_STORAGE.MACRO_COUNT, 1);
     const macroCapacity = await scalar(connection, VIA_STORAGE.MACRO_SIZE, 2);
-    if (layers < 1 || layers > 16 || macroSlots < 1 || macroSlots > 128 || macroCapacity < macroSlots + 1 || macroCapacity > VIA_REGION_BYTES || matrixRows !== 10 || matrixColumns !== 6) throw fail("Unsupported keyboard storage geometry.");
-    const layout = await readRegion(connection, VIA_STORAGE.LAYOUT_READ, layers * matrixRows * matrixColumns * 2, {onProgress: progress => onProgress({region: "layout", ...progress})});
-    const macros = await readRegion(connection, VIA_STORAGE.MACRO_READ, macroCapacity, {onProgress: progress => onProgress({region: "macros", ...progress})});
+    if (layers < 1 || layers > 16 || macroSlots < 1 || macroSlots > 128 || macroCapacity < macroSlots + 1 || macroCapacity > 65535 || matrixRows !== 10 || matrixColumns !== 6) throw fail("Unsupported keyboard storage geometry.");
+    for (const [field, value] of [["compiledLayerCount", layers], ["viaMacroSlots", macroSlots], ["viaMacroBytes", macroCapacity]]) {
+        if (capabilities?.[field] !== undefined && capabilities[field] !== value) throw fail("VIA and Profile Wire report different storage geometry.");
+    }
+    const layout = await readRegion(connection, VIA_STORAGE.LAYOUT_READ, layers * matrixRows * matrixColumns * 2, {capacity: layers * matrixRows * matrixColumns * 2, onProgress: progress => onProgress({region: "layout", ...progress})});
+    const macros = await readRegion(connection, VIA_STORAGE.MACRO_READ, macroCapacity, {capacity: macroCapacity, onProgress: progress => onProgress({region: "macros", ...progress})});
     if (!allowIncomplete && macros[macros.length - 1] !== 0) throw fail("A macro write is incomplete. Import your recovery profile before taking another backup.");
     return {layers, macroSlots, macroCapacity, matrixRows, matrixColumns, layout, macros};
 }
@@ -100,16 +104,16 @@ async function writeViaMacros(connection, bytes, {current, onProgress = () => {}
     if (!Buffer.isBuffer(bytes) || bytes.length < 2 || bytes.at(-1) !== 0) throw fail("Invalid macro bank.");
     if (current !== undefined && (!Buffer.isBuffer(current) || current.length !== bytes.length)) throw fail("Invalid current macro bank.");
     if (current?.equals(bytes)) return [];
-    await writeRegion(connection, VIA_STORAGE.MACRO_WRITE, Buffer.from([1]), {startOffset: bytes.length - 1});
+    await writeRegion(connection, VIA_STORAGE.MACRO_WRITE, Buffer.from([1]), {startOffset: bytes.length - 1, capacity: bytes.length});
     let ranges;
     if (current) {
         ranges = await writeChangedRegion(connection, VIA_STORAGE.MACRO_WRITE, bytes, current, {end: bytes.length - 1, onProgress});
     } else {
         const pending = Buffer.from(bytes); pending[pending.length - 1] = 1;
-        await writeRegion(connection, VIA_STORAGE.MACRO_WRITE, pending, {onProgress});
+        await writeRegion(connection, VIA_STORAGE.MACRO_WRITE, pending, {onProgress, capacity: bytes.length});
         ranges = [{offset: 0, bytes: bytes.subarray(0, -1)}];
     }
-    await writeRegion(connection, VIA_STORAGE.MACRO_WRITE, Buffer.from([0]), {startOffset: bytes.length - 1});
+    await writeRegion(connection, VIA_STORAGE.MACRO_WRITE, Buffer.from([0]), {startOffset: bytes.length - 1, capacity: bytes.length});
     return ranges;
 }
 

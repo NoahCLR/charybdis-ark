@@ -266,3 +266,40 @@ test("macro output isolation is reported only when both protection capabilities 
         assert.equal(buildDeviceModel({macroView: view}).macroOutputIsolationSupported, expected);
     }
 });
+
+test("streaming macros use the free bank and filled high slots survive lower empty slots running out of room", () => {
+    const capabilities = {compiledLayerCount: 16, supportedDomainMask: 31, actionAbiDigest: document().actionAbiDigest,
+        featureFlags: 1 << 27, viaMacroBytes: 34903, maxProfilePayload: 53216};
+    let current = snapshot(document());
+    const update = payload => {current = snapshot(editMacro(current, {keycode: "VIA_MACRO_127", payload, expectedFingerprint: current.fingerprint}, capabilities));};
+    const free = macroEditorView(current, capabilities).macroBank.free;
+    update("a".repeat(free));
+    let view = macroEditorView(current, capabilities);
+    assert.equal(view.macroBank.programMax, null);
+    assert.equal(view.macroBank.free, 0);
+    assert.equal(view.macroBank.available, 1);
+    assert.equal(view.viaMacros[127].available, true);
+    assert.equal(view.viaMacros[127].playable, true);
+    assert.ok(view.viaMacros.slice(0, 127).every(slot => slot.empty && !slot.available));
+    assert.equal(macroInputStatus(current, {keycode: "VIA_MACRO_127", payload: "b".repeat(free)}, capabilities).error, "");
+    assert.equal(macroInputStatus(current, {keycode: "VIA_MACRO_127", payload: "a".repeat(free + 1)}, capabilities).code, "MACRO_BANK_FULL");
+    update("a".repeat(free - 60));
+    view = macroEditorView(current, capabilities);
+    assert.equal(view.macroBank.available, 3);
+    assert.equal(view.viaMacros[0].available, true);
+    assert.equal(view.viaMacros[1].available, true);
+    assert.equal(view.viaMacros[2].available, false);
+    assert.equal(view.viaMacros[127].available, true);
+    update("");
+    assert.equal(macroEditorView(current, capabilities).macroBank.available, 128);
+});
+
+test("the streaming flag removes the program limit while legacy firmware retains it", () => {
+    const current = snapshot(document()), payload = "a".repeat(600);
+    const old = macroInputStatus(current, {keycode: "VIA_MACRO_0", payload}, {viaMacroBytes: 10327});
+    const next = macroInputStatus(current, {keycode: "VIA_MACRO_0", payload}, {featureFlags: 1 << 27, viaMacroBytes: 34903});
+    assert.equal(old.code, "MACRO_TOO_LONG");
+    assert.equal(old.programMax, 512);
+    assert.equal(next.error, "");
+    assert.equal(next.programMax, null);
+});

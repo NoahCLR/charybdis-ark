@@ -1,13 +1,17 @@
 "use strict";
 const {test, expect} = require("@playwright/test");
 
-async function editor(page) {
+// The preview runs current firmware, which streams macro playback; `legacy`
+// stands in for firmware that plays one 512-byte program.
+async function editor(page, {legacy = false} = {}) {
     await page.goto("/preview/index.html");
-    await page.evaluate(async () => {
+    await page.evaluate(async legacy => {
         const store = await import("/webview/store.mjs");
+        const model = store.getModel();
+        if (legacy) store.setModel({...model, macroBank: {...model.macroBank, programMax: 512}});
         store.state.screen = "macros"; store.state.macroSlot = "VIA_MACRO_17"; store.render();
         window.__posted.length = 0;
-    });
+    }, legacy);
 }
 const updates = page => page.evaluate(() => window.__posted.filter(m => m.type === "updateViaMacro"));
 async function add(page, kind) {
@@ -33,8 +37,24 @@ test("Text accepts code literally and live counters describe pending input befor
     await expect(page.locator("[data-local-state]")).toHaveText("edited here");
 });
 
-test("oversized text remains editable, reports its size and recovers as soon as it fits", async ({page}) => {
+test("a macro past 512 playback bytes stages on streaming firmware, up to the free memory", async ({page}) => {
     await editor(page);
+    const field = page.locator("[data-step-text]");
+    await field.fill("a".repeat(2000));
+    await expect(page.locator("[data-macro-size]")).toContainText("2000 bytes of macro memory");
+    await expect(page.locator("[data-macro-size]")).not.toContainText("playback bytes");
+    await field.dispatchEvent("change");
+    await expect.poll(() => updates(page).then(rows => rows.length)).toBe(1);
+    const available = Number((await page.locator("[data-macro-size]").textContent()).match(/(\d+) available/)[1]);
+    await field.fill("a".repeat(available + 1));
+    await field.dispatchEvent("change");
+    await expect(page.locator("[data-macro-feedback]")).toContainText(`${available} are available for this slot`);
+    await expect(page.locator("[data-macro-feedback]")).toContainText("This edit is not staged");
+    expect(await updates(page)).toHaveLength(1);
+});
+
+test("oversized text remains editable, reports its size and recovers as soon as it fits", async ({page}) => {
+    await editor(page, {legacy: true});
     const field = page.locator("[data-step-text]");
     await field.fill("a".repeat(509));
     await field.dispatchEvent("change");

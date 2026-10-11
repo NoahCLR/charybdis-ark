@@ -24,7 +24,7 @@ and restore preserve them without the repository.
   stays a layer/CPI policy and uses no slot.
 - There are two engine families, **directional** (four or eight directions,
   single axis or dominant axis; see D-L24 and D-L28 in the
-  [direction](https://github.com/NoahCLR/charybdis-4x6/blob/fdced801b37b6be49172e50701a17b6bef78df53/docs/LIVE_EDIT_APP_DIRECTION.md)) and **scrolling**. Optional
+  [direction](https://github.com/NoahCLR/charybdis-4x6/blob/f08aa5e9b7eb43ed478ca4c4ae898087b22e3d18/docs/LIVE_EDIT_APP_DIRECTION.md)) and **scrolling**. Optional
   modifier and mouse-button policies cover Arrow and Pinch. No behavior depends
   on a slot's name.
 
@@ -52,7 +52,7 @@ keycode allocation.
 | 7–31 | Empty | Disabled | Inert actions; not stored; retained, editable RGB row |
 
 Dragscroll and Pinch run this repository's
-[`pd_mode_dragscroll.c`](https://github.com/NoahCLR/charybdis-4x6/blob/fdced801b37b6be49172e50701a17b6bef78df53/users/noah/lib/pointing/modes/pd_mode_dragscroll.c),
+[`pd_mode_dragscroll.c`](https://github.com/NoahCLR/charybdis-4x6/blob/f08aa5e9b7eb43ed478ca4c4ae898087b22e3d18/users/noah/lib/pointing/modes/pd_mode_dragscroll.c),
 not the fork's native `DRAGSCROLL_MODE`; never activate both engines.
 
 ### Slot operations and RGB identity
@@ -265,7 +265,7 @@ A button press a mode consumes never reaches the button's own behavior, and
 its release goes to the mode that took the press, even after another mode
 replaced it; the release of a press the mode did not take stays with the
 behavior. The key runtime owns that routing; see
-[Runtime Flow](https://github.com/NoahCLR/charybdis-4x6/blob/fdced801b37b6be49172e50701a17b6bef78df53/docs/architecture/runtime-flow.md#key-press-flow).
+[Runtime Flow](https://github.com/NoahCLR/charybdis-4x6/blob/f08aa5e9b7eb43ed478ca4c4ae898087b22e3d18/docs/architecture/runtime-flow.md#key-press-flow).
 
 ## Validation and evidence
 
@@ -311,9 +311,9 @@ Current firmware uses one geometry:
 
 | Range | Bytes | Owner |
 | --- | ---: | --- |
-| `0x00000..0x02fff` | 12,288 | QMK/VIA allocation |
-| `0x03000..0x12fff` | 65,536 | Profile slot A, 32-byte header + 65,504-byte payload |
-| `0x13000..0x22fff` | 65,536 | Profile slot B, same layout |
+| `0x00000..0x08fff` | 36,864 | QMK/VIA allocation |
+| `0x09000..0x15fff` | 53,248 | Profile slot A, 32-byte header + 53,216-byte payload |
+| `0x16000..0x22fff` | 53,248 | Profile slot B, same layout |
 
 Logical EEPROM is 143,360 bytes; RP2040 wear-level backing is 286,720 bytes
 (D-F14). Older layouts are not interpreted in place. Keep a complete backup and
@@ -324,9 +324,9 @@ belongs to [memory budgets](memory-budgets.md).
 
 ## Integration and identity gates
 
-Schema 3.0 includes domain `0x50`, advertised by domain-mask bit 4. Format 4
-(`NS`) stores five domain bits, origin in bit 5, flags in bit 6 and reserved
-bit 7. It binds schema 3.0 and nonzero VIA identity. `NP`, `NQ` and `NR`
+Schema 3.0 includes domain `0x50`, advertised by domain-mask bit 4. Format 5
+(`NT`) stores five domain bits, origin in bit 5, flags in bit 6 and reserved
+bit 7. It binds schema 3.0 and nonzero VIA identity. `NP`, `NQ`, `NR` and `NS`
 headers are rejected. Header CRC, marker-last publication and bounded I/O remain unchanged.
 
 Synchronous validation, bounded boot scanning and commit shape validation
@@ -342,7 +342,7 @@ The current action-ABI digest is the one capability page 0 reports; it covers
 the layer count, so the sixteen-layer bank changed it (D-F14). Older action
 vocabularies require client translation before a current-format Apply.
 Candidate metadata, owner, peer storage and background stale-peer repair all
-use format 4 and require a
+use format 5 and require a
 correlated VIA bind before PREPARE_BEGIN. Retry preserves the bind for that exact
 generation/digest. Incompatible peers cannot Apply.
 

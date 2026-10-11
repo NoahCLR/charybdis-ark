@@ -326,7 +326,7 @@ function profileReview(before, after, capabilities) {
             if (!macro.payload) return;
             // Compare the current authored text under each host setup. An
             // independent text edit belongs to its own macro change above.
-            const old = inspectMacroPlayback(macro.payload, oldHost), next = inspectMacroPlayback(macro.payload, nextHost);
+            const old = inspectMacroPlayback(macro.payload, oldHost, true, macrosB.macroBank.programMax), next = inspectMacroPlayback(macro.payload, nextHost, true, macrosB.macroBank.programMax);
             const affected = new Set(next.typing.filter((route, i) => JSON.stringify(route) !== JSON.stringify(old.typing[i])).map(route => route.character));
             if (!affected.size && old.error === next.error) return;
             const fields = (playback, host) => {

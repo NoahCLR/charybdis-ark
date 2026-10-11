@@ -7,6 +7,10 @@ for (const theme of ["plain", "vscode-dark", "vscode-light"]) {
         await openPreview(page, theme);
         await page.evaluate(async () => {
             const store = await import("/webview/store.mjs");
+            // Firmware that plays one 512-byte program, so the long texts
+            // show their error feedback beside the field.
+            const model = store.getModel();
+            store.setModel({...model, macroBank: {...model.macroBank, programMax: 512}});
             store.state.screen = "macros"; store.state.macroSlot = "VIA_MACRO_17"; store.render();
             window.__posted.length = 0;
         });

@@ -28,7 +28,8 @@ Key and modifier names follow that OS throughout the editors and Review.
   count, in one grid with its timing. Keep up to 128 definitions with five tap
   counts each, and choose which layers and placements use them.
 - **Combos, macros and custom keys.** Build combos, write named macros or
-  record them, and name your own custom keys. There are 128 slots in each bank;
+  record them, and name your own custom keys. Macros share the keyboard's
+  macro memory, and on current firmware one macro can use all of it. There are 128 slots in each bank;
   a combo can have up to 16 inputs, with its own enable and layer controls.
 - **Lighting.** Set layer and mode colours, combo and key feedback, and the
   auto-mouse fade. The board on screen is painted the way the keyboard will

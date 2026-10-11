@@ -249,23 +249,32 @@ paths only and are not runtime high-water evidence.
 
 ### Schema-3 geometry (D-F14)
 
-Format-4 `NS` keeps the `NR` header layout: identity byte 2 holds domain bits
+Format-5 `NT` keeps the `NR` header layout: identity byte 2 holds domain bits
 0–4, origin bit 5 and override bit 6; payload length stays a 16-bit field
-because a slot payload is at most 65,504 bytes. Storage addresses are 32 bits
-(`noah_profile_storage_address_t`), since slot B ends at `0x22FFF`. Format 4
+because a slot payload is at most 53,216 bytes. Storage addresses are 32 bits
+(`noah_profile_storage_address_t`), since slot B ends at `0x22FFF`. Format 5
 binds schema 3.0 and accepts only RGB v4, key-behavior v2, combo v3, settings
 v6 and sparse PD v3.
 
 | Range | Bytes | Owner |
 | --- | ---: | --- |
-| `0x00000–0x02FFF` | 12,288 | QMK EECONFIG, VIA config, dynamic keymap, VIA macros |
-| `0x03000–0x12FFF` | 65,536 | Live-profile slot A |
-| `0x13000–0x22FFF` | 65,536 | Live-profile slot B |
+| `0x00000–0x08FFF` | 36,864 | QMK EECONFIG, VIA config, dynamic keymap, VIA macros |
+| `0x09000–0x15FFF` | 53,248 | Live-profile slot A |
+| `0x16000–0x22FFF` | 53,248 | Live-profile slot B |
 
 Logical EEPROM is 140 KiB and wear-level backing 280 KiB at the top of flash.
 QMK mirrors the logical EEPROM in SRAM0–3; see
 [memory budgets](memory-budgets.md#bigger-profile-storage--d-f14). Geometry
 moves the flash base, so the previous 18 KiB contents are never read.
+
+The macro expansion keeps that flash base and the 140 KiB RAM mirror unchanged.
+VIA sync metadata schema 5 refuses schema 4, so the existing recovery path
+resets VIA and seeds authored defaults before declaring authority. Logical
+store format 5 uses `NT` magic; old `NS` headers are refused even if old payload
+bytes happen to land on a new slot boundary. There is no in-place migration.
+The 41-byte configuration and 1,920-byte keymap leave 34,903 macro-bank bytes.
+All 128 slot terminators count toward that bank; a single macro can use the
+remaining space without a separate compiled-program limit (feature bit 27).
 
 ### Schema-3 ceilings and the maximum profile
 
@@ -279,24 +288,34 @@ moves the flash base, so the previous 18 KiB contents are never read.
 | Names | 32 bytes of UTF-8 each |
 | Reusable RGB groups / stage-group rows | 16 / 32 aggregate |
 | Pointing slots | 32 |
-| Canonical profile payload | 65,504 bytes |
+| Canonical profile payload | 53,216 bytes |
 
 Unlike the V1 ceilings above, every one of these is reachable at once.
 `tests/fixtures/maximum_profile_v3.fixture`, written by
 `tests/host/make_maximum_profile.py` from the byte specs, holds every table at
 its maximum and every name at 32 bytes: 37,667 bytes (RGB 591, behaviours
 13,828, combos 9,736, settings 9,380, pointing 4,104, plus 28 bytes of
-header and envelopes). That leaves 27,837 bytes of the slot, more than the
+header and envelopes). That leaves 15,549 bytes of the slot, more than the
 12 KiB reserved for future payload. The fixture is the maximum for the
 encodings, not a limit the firmware checks: a larger profile is refused only
 by a table's own ceiling or the slot.
 
 The owner validates one step a matrix scan, each step one read of at most 20
 bytes. The maximum profile validates in 7,429 scans, a boot that adopts it
-publishes after 9,912, and a peer's prepared copy spends 11,104 scans
-validating without transfer progress, which the split harness's conservative
+publishes after 9,912, and a peer's prepared copy spends 9,504 scans
+validating and preparing without transfer progress (its steps read 20 bytes
+like the owner's; they read the 14-byte split chunk size before framing
+version 2), which the split harness's conservative
 5 ms scan keeps inside the owner's 60-second no-progress window. Real
 durations depend on the scan rate and are hardware acceptance evidence.
+
+Split framing version 2 retains bounded mailbox, duplicate-request and outbound
+chunk buffers of at most 128 bytes, plus reuse source/progress state; it never
+keeps a full profile in the reconciler. Its 32-bit state regression allowance
+is 896 bytes (previously 768). The owner's 11,264-byte state allowance and the
+209,920-byte schema-3 static-data tripwire remain unchanged. These allowances
+are engineering policies; acceptance still requires fresh linked memory and
+reviewed-path stack checks for each half, and hardware high-water evidence.
 `run_profile_domain_owner_round_trip_tests.sh` saves, boots, publishes,
 refuses over-limit and truncated copies of, and cuts power through a save of
 this profile; `run_profile_split_reconciler_tests.sh` prepares and commits it

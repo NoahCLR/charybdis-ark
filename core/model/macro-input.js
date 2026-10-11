@@ -13,8 +13,8 @@ const ENTRY_SETUP = [
 
 // Inspection and staging use the same codec and limits. A partial or oversized
 // edit remains visible locally; inspection never changes a profile.
-function inspectMacroInput(payload, {unicode = false, mode = 0, enabled = false, layout = US_HOST_LAYOUT, os = 0, macosIso = false, currentBytes = 0, bankFree = 0, protection = "auto", protectionSupported = false} = {}) {
-    const result = {bytes: null, program: null, programMax: MACRO_PROGRAM_MAX, availableBytes: currentBytes + bankFree, error: "", code: "", typing: []};
+function inspectMacroInput(payload, {unicode = false, mode = 0, enabled = false, layout = US_HOST_LAYOUT, os = 0, macosIso = false, currentBytes = 0, bankFree = 0, protection = "auto", protectionSupported = false, programMax = MACRO_PROGRAM_MAX} = {}) {
+    const result = {bytes: null, program: null, programMax, availableBytes: currentBytes + bankFree, error: "", code: "", typing: []};
     try {
         // Inspect literal text only, not command spelling or escaped braces.
         // Keep its typing route even when a held key makes playback invalid.
@@ -32,8 +32,8 @@ function inspectMacroInput(payload, {unicode = false, mode = 0, enabled = false,
         if (missing && unicode && !mode) {
             result.error = `The ${hostLayout(layout)?.name || "chosen"} layout cannot type “${missing}”. ${ENTRY_SETUP[os] || ENTRY_SETUP[0]}`;
             result.code = "UNICODE_SETUP_REQUIRED";
-        } else if (result.program > MACRO_PROGRAM_MAX) {
-            result.error = `This macro needs ${result.program} bytes to play; the keyboard plays at most ${MACRO_PROGRAM_MAX}. Shorten the text or remove steps.`;
+        } else if (programMax !== null && result.program > programMax) {
+            result.error = `This macro needs ${result.program} bytes to play; the keyboard plays at most ${programMax}. Shorten the text or remove steps.`;
             result.code = "MACRO_TOO_LONG";
         } else if (bytes.length > result.availableBytes) {
             result.error = `This macro needs ${bytes.length} bytes of macro memory; ${result.availableBytes} are available for this slot. Shorten it or clear another macro.`;
@@ -48,9 +48,9 @@ function inspectMacroInput(payload, {unicode = false, mode = 0, enabled = false,
 
 // Stored macros use the same syntax, host setup and playback limits as edits,
 // without judging whether an existing slot fits the bank a second time.
-function inspectMacroPlayback(payload, host, unicode = true) {
+function inspectMacroPlayback(payload, host, unicode = true, programMax = MACRO_PROGRAM_MAX) {
     const {error, code, typing} = inspectMacroInput(payload, {unicode, mode: host.unicodeMode, enabled: Boolean(host.unicodeMode),
-        layout: host.layout, os: host.effective, macosIso: host.macosIso, bankFree: Infinity});
+        layout: host.layout, os: host.effective, macosIso: host.macosIso, bankFree: Infinity, programMax});
     return {error, code, typing};
 }
 

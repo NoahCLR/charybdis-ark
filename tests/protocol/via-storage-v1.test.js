@@ -40,7 +40,7 @@ test("computes the firmware's canonical digest for the complete VIA store", () =
     assert.throws(() => viaStorageDigest({layout: Buffer.alloc(1), macros: device.macros}), /geometry/);
     // The eight-layer geometry (960-byte keymap, 7,191-byte macro bank) is refused.
     assert.throws(() => viaStorageDigest({layout: Buffer.alloc(960, 1), macros: device.macros}), /geometry/);
-    assert.throws(() => viaStorageDigest({layout: device.layout, macros: Buffer.alloc(7191)}), /geometry/);
+    assert.throws(() => viaStorageDigest({layout: device.layout, macros: Buffer.alloc(128)}), /geometry/);
 });
 test("writes across chunk and final partial boundaries with exact acknowledgements", async () => {
     const device = keyboard(), bytes = Buffer.alloc(1920, 17), progress = [];
@@ -99,7 +99,7 @@ test("rejects unhandled commands, bad capacities and malformed write echoes", as
         [0x0d, r => {r.writeUInt16BE(VIA_REGION_BYTES + 1, 1);}], [0x0d, r => {r.writeUInt16BE(128, 1);}],
     ]) {
         device.request = async data => {const r = await request(data); if (r[0] === command) mutate(r); return r;};
-        await assert.rejects(readViaStorage(device), /geometry/);
+        await assert.rejects(readViaStorage(device, {capabilities: {compiledLayerCount: 16, viaMacroSlots: 128, viaMacroBytes: 10327}}), /geometry/);
     }
     // Every read and write stays inside the 12 KiB region; its last chunk is reachable.
     const edge = {request: async data => Buffer.from(data)};
@@ -108,4 +108,38 @@ test("rejects unhandled commands, bad capacities and malformed write echoes", as
     await assert.rejects(readRegion(edge, VIA_STORAGE.MACRO_READ, 2, {startOffset: VIA_REGION_BYTES - 1}), /size/);
     await assert.rejects(writeRegion(edge, VIA_STORAGE.MACRO_WRITE, Buffer.alloc(2), {startOffset: VIA_REGION_BYTES - 1}), /payload/);
     await assert.rejects(writeRegion({request: async data => {const r = Buffer.from(data); r[4]++; return r;}}, 0x13, Buffer.alloc(30)), /acknowledge/);
+});
+
+test("the expanded bank is read, hashed and written through its last offset with bounded ranges", async () => {
+    // Use an independent device adapter with the larger backing allocation.
+    const layout = Buffer.alloc(1920), macros = Buffer.alloc(34903), requests = [];
+    const connection = {async request(request) {
+        requests.push(Buffer.from(request));
+        const reply = Buffer.from(request);
+        if (request[0] === VIA_STORAGE.LAYER_COUNT) reply[1] = 16;
+        else if (request[0] === VIA_STORAGE.MACRO_COUNT) reply[1] = 128;
+        else if (request[0] === VIA_STORAGE.MACRO_SIZE) reply.writeUInt16BE(macros.length, 1);
+        else {
+            const bank = [VIA_STORAGE.LAYOUT_READ, VIA_STORAGE.LAYOUT_WRITE].includes(request[0]) ? layout : macros;
+            const offset = request.readUInt16BE(1), count = request[3];
+            assert.ok(offset + count <= bank.length);
+            if ([VIA_STORAGE.LAYOUT_READ, VIA_STORAGE.MACRO_READ].includes(request[0])) bank.copy(reply, 4, offset, offset + count);
+            else request.copy(bank, offset, 4, count + 4);
+        }
+        return reply;
+    }};
+    const capabilities = {compiledLayerCount: 16, viaMacroSlots: 128, viaMacroBytes: macros.length};
+    const read = await readViaStorage(connection, {capabilities});
+    assert.equal(read.macros.length, 34903);
+    const digest = viaStorageDigest(read);
+    const target = Buffer.from(read.macros); target[30000] = 97;
+    requests.length = 0;
+    await writeViaMacros(connection, target, {current: read.macros});
+    assert.deepEqual(macros, target);
+    assert.ok(requests.length <= 3, "a late edit writes one changed chunk and two validity bytes");
+    assert.equal(requests[0].readUInt16BE(1), 34902);
+    assert.equal(requests.at(-1).readUInt16BE(1), 34902);
+    assert.notEqual(viaStorageDigest({layout, macros}), digest);
+    await assert.rejects(readViaStorage(connection, {capabilities: {...capabilities, viaMacroBytes: 10327}}), /different storage geometry/);
+    await assert.rejects(writeRegion(connection, VIA_STORAGE.MACRO_WRITE, Buffer.alloc(2), {startOffset: 34902, capacity: 34903}), /payload/);
 });

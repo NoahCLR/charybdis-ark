@@ -27,7 +27,7 @@ function macroModifierKeycodes() {
 // The keyboard types text through the host layout and the rest by host
 // Unicode entry, which an ordinary key held across it would corrupt.
 function parsePayload(payload, {unicode = false, textEntry = false, layout = US_HOST_LAYOUT} = {}) {
-    if (typeof payload !== "string" || payload.length > 32768) throw fail("Enter a macro of at most 32,768 characters.");
+    if (typeof payload !== "string") throw fail("Enter a macro as text.");
     const steps = [], held = new Set();
     let text = "";
     const flush = () => {
@@ -125,9 +125,13 @@ function decodeMacroPayload(bytes, options) {
     return output;
 }
 
-// The keyboard plays a VIA macro only after compiling its stored bytes into a
-// program of at most this many bytes; a longer one is kept but never plays.
+// Legacy firmware compiles a stored macro into one bounded program. Streaming
+// firmware preflights and refills windows, so only the shared bank bounds it.
 const MACRO_PROGRAM_MAX = 512;
+const STREAMING_MACRO_FEATURE = 1 << 27;
+const supportsStreamingMacros = capabilities => Boolean(capabilities?.featureFlags & STREAMING_MACRO_FEATURE);
+// null means the shared bank is the only size limit.
+const macroProgramLimit = capabilities => supportsStreamingMacros(capabilities) ? null : MACRO_PROGRAM_MAX;
 
 function macroProtectionOf(bytes, {protectionSupported = false} = {}) {
     if (bytes[0] !== 1 || bytes[1] !== 5) return "auto";
@@ -188,4 +192,4 @@ function macroProgramBytes(bytes) {
     return length;
 }
 
-module.exports = {macroModifierKeycodes, UNICODE_MACRO_FEATURE, supportsUnicodeMacros, MACRO_PROTECTION_FEATURE, MACRO_OUTPUT_ISOLATION_FEATURE, supportsMacroOutputIsolation, MACRO_PROTECTION, supportsMacroProtection, macroProtectionOf, macroKeycodes, parsePayload, encodeMacroPayload, decodeMacroPayload, macroProgramBytes, MACRO_PROGRAM_MAX};
+module.exports = {STREAMING_MACRO_FEATURE, supportsStreamingMacros, macroProgramLimit, macroModifierKeycodes, UNICODE_MACRO_FEATURE, supportsUnicodeMacros, MACRO_PROTECTION_FEATURE, MACRO_OUTPUT_ISOLATION_FEATURE, supportsMacroOutputIsolation, MACRO_PROTECTION, supportsMacroProtection, macroProtectionOf, macroKeycodes, parsePayload, encodeMacroPayload, decodeMacroPayload, macroProgramBytes, MACRO_PROGRAM_MAX};
