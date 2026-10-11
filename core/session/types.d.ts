@@ -110,26 +110,12 @@ export interface CaptureFacts {
 }
 export type CapturedProfile = (import('../model/types.js').CompleteSnapshot & CaptureFacts) | (import('../model/types.js').IncompleteSnapshot & CaptureFacts & {document: import('../model/types.js').RecoveryCaptureDocument; fingerprint: string});
 export interface CaptureOptions {sleep?: (ms: number) => Promise<void>; payloadReader?: InstanceType<typeof import('./profile-payload-reader.js').ProfilePayloadReader>; reuseReadback?: boolean}
-export interface RestoreOperations {
-    capture?: typeof import('./portable-profile-session.js').captureProfile;
-    readIdentity?: typeof import('./portable-profile-session.js').readIdentity;
-    readCandidate?: typeof import('../protocol/profile-candidate-v1.js').readCandidateStatus;
-    waitStorage?: typeof import('../protocol/portable-profile-v1.js').waitForStorage;
-    readStorage?: typeof import('../protocol/portable-profile-v1.js').readStorageStatus;
-    readStored?: typeof import('../protocol/via-storage-v1.js').readRegion;
-    readProfile?: typeof import('../protocol/profile-wire-v1.js').readProfileStatus;
-    createCoordinator?: (connection: import('../transport/types.js').RequestConnection, options: CandidateDriverOptions) => CandidateDriver;
-    createViaCoordinator?: (connection: import('../transport/types.js').RequestConnection, options: ConstructorParameters<typeof import('./logical-via-stage-coordinator.js').LogicalViaStageCoordinator>[1]) => InstanceType<typeof import('./logical-via-stage-coordinator.js').LogicalViaStageCoordinator>;
-    readPeerStatus?: CandidateDriverOptions['readPeerStatus'];
-    rollForwardLocal?: (connection: import('../transport/types.js').RequestConnection, target: import('../model/types.js').DecodedProfile, base: Pick<import('../model/types.js').DecodedProfile, 'layout' | 'macros' | 'profile'>, layoutRanges: import('../protocol/types.js').StorageRange[], macroRanges: import('../protocol/types.js').StorageRange[], onProgress: (progress: {completed: number; total: number}) => void) => Promise<void>;
-}
 export interface RestoreOptions {
     expectedFingerprint?: string;
     saveRecovery?: SaveRecovery;
     baseSnapshot?: CapturedProfile;
     onProgress?: (text: string) => void;
     onApplyProgress?: (view: import('../../contracts/model.js').ApplyView) => void;
-    operations?: RestoreOperations;
     sleep?: (ms: number) => Promise<void>;
 }
 export interface OperationFailure extends Error {code?: string; cause?: OperationFailure; progress?: CandidateProgress}

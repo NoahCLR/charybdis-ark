@@ -80,6 +80,17 @@ into Ark's storage on start (D-L47).
 Normal tests use injected HID adapters. `npm run probe:live-link` additionally
 loads the native HID module and enumerates matching devices without opening or
 writing them. A successful enumeration is not an Apply/recovery hardware test.
+
+Restore tests call `restoreProfile` with a request connection, the same interface
+used by both hosts. `tests/fixtures/writable-keyboard.js` answers candidate and
+logical VIA staging reports, keeps separate local and peer banks, and admits
+local VIA writes only after the durable decision and peer acceptance. Its
+report-level faults exercise BUSY, lost replies, cancellation and disconnected
+recovery; assertions inspect bank bytes, identities and fresh captures. Restore
+does not expose its internal coordinators or readers as replaceable options.
+The read-only fake remains the preview adapter. These fakes model protocol state
+and transfer correctness, not flash durability, split scheduling or physical
+interruption acceptance.
 The check workflow runs app checks, catalog verification, preview generation
 and native module loading; it contains no publishing job. Publishing the web
 page is its own workflow ([below](#publishing-the-web-page)).

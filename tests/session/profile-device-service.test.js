@@ -462,7 +462,7 @@ test("the layout read counts only keys the app cannot name", () => {
 test("successful service restore installs the saved profile and returns normally", async () => {
     const {fixture} = require("../fixtures/portable-restore");
     const {fakeKeyboardAdapter} = require("../fixtures/fake-keyboard");
-    const f = fixture(), adapter = fakeKeyboardAdapter({document: f.source});
+    const f = fixture(), adapter = fakeKeyboardAdapter({keyboard: f.keyboard});
     const service = new ProfileDeviceService({adapter, defaultTimeoutMs: 200});
     try {
         await service.enumerate(); await service.connect(service.devices[0].id);
@@ -471,7 +471,11 @@ test("successful service restore installs the saved profile and returns normally
         assert.equal(service.portable, result);
         assert.equal(service.liveApply.state, "done");
         assert.equal(service.error, undefined);
-        assert.deepEqual(f.events, ["backup", "stage", "via stage", "commit", "via accepted", "local roll-forward", "both halves"]);
-        assert.deepEqual(adapter.keyboard.mutations, [], "transaction adapters simulate the write; the physical keyboard is never opened");
+        assert.equal(f.keyboard.events[0], "backup");
+        assert.ok(f.keyboard.events.includes("decision") && f.keyboard.events.includes("activated"));
+        assert.ok(adapter.keyboard.mutations.length > 0, "the real service sends all writes through its request coordinator");
+        assert.deepEqual(f.keyboard.local.macros, f.target.macros);
+        assert.deepEqual(f.keyboard.peer.macros, f.target.macros);
+        assert.equal(service.portable.fingerprint, result.fingerprint, "the service's post-Apply capture sees the saved target");
     } finally {await service.close();}
 });
