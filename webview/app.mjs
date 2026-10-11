@@ -51,74 +51,72 @@ const SCREENS = {
 };
 
 /** @param {readonly (readonly [string, unknown])[]} rows */
-const kv = (rows) => `<dl class="kv" style="grid-template-columns:170px 1fr">${rows
+const kv = (rows) => `<dl class="kv device-kv">${rows
     .map(([key, value]) => `<dt>${esc(key)}</dt><dd>${esc(value ?? "—")}</dd>`).join("")}</dl>`;
 /** @param {import("../contracts/panel.js").PublishedModel | null} model */
 const whatWasRead = (model) => `<div class="card"><div class="card-h"><h3>What was read</h3></div>
     <div class="list">${(model?.diagnostics || []).map((note) =>
-        `<div class="list-row" style="grid-template-columns:1fr"><span class="note">${esc(note)}</span></div>`).join("")
+        `<div class="list-row note-row"><span class="note">${esc(note)}</span></div>`).join("")
         || `<div class="list-row"><span class="note">Nothing has been read yet.</span></div>`}</div></div>`;
+/** @param {string} dot @param {string} words */
+const chip = (dot, words) => `<span class="right"><span class="chip"><i class="dot ${esc(dot)}"></i>${esc(words)}</span></span>`;
 
+// The Device screen: what the keyboard says about itself, in two cards (its
+// connection, and the setup it holds) over what was read. In the demo it says
+// what stands in for a keyboard, and that it is not one; reading a keyboard
+// from there leaves the demo, asking first.
 function screenDevice() {
     const model = getModel();
-    if (demoOf(model).active) return screenDemoDevice(model);
-    const device = model?.device;
-    const main = el(`<div class="main">${topbar(
-        "Device",
-        "What the keyboard says about itself. Everything this app shows comes from here — it never reads a firmware repository.",
-        `<button class="btn" data-act="read" ${device?.health?.busy ? "disabled" : ""}>Read from keyboard</button>`,
-    )}
-        <div class="content"><div class="pad" style="max-width:940px;display:grid;gap:14px">
-            <div class="grid2">
-                <div class="card"><div class="card-h"><h3>Connection</h3>
-                    <span class="right"><span class="chip"><i class="dot ${device?.connected ? "on" : "err"}"></i>${device?.connected ? "connected" : "disconnected"}</span></span></div>
-                    <div class="card-b">${kv([
-                        ["Product", device?.label],
-                        ["Status", device?.subtitle],
-                        ["Phase", device?.health?.phase],
-                    ])}<p class="note">The master half connects over USB; the slave half connects to it through the cable between the halves.</p></div></div>
-                <div class="card"><div class="card-h"><h3>Committed profile</h3>
-                    <span class="right"><span class="chip"><i class="dot ${device?.health?.converged ? "on" : "draft"}"></i>${device?.health?.converged ? "both halves agree" : "halves not converged"}</span></span></div>
-                    <div class="card-b">${kv([
-                        ["Generation and digest", device?.summary],
-                        ["Recovery", device?.health?.recoveryPending ? "pending" : "clear"],
-                        ["Draft", model?.draft ? `${model.draft.changes.length} change${model.draft.changes.length === 1 ? "" : "s"}` : "none"],
-                    ])}</div></div>
-            </div>
-            ${whatWasRead(model)}
-        </div></div></div>`);
-    /** @type {HTMLButtonElement} */ (main.querySelector('[data-act="read"]')).addEventListener("click", () => post(controls.control("refresh")));
-    return main;
-}
-
-// The Device screen in the demo: what stands in for a keyboard, and that it
-// is not one. Reading a keyboard from here leaves the demo, asking first.
-/** @param {import("../contracts/panel.js").PublishedModel | null} model */
-function screenDemoDevice(model) {
     const device = model?.device, demo = demoOf(model);
+    const changes = model?.draft ? `${model.draft.changes.length} change${model.draft.changes.length === 1 ? "" : "s"}` : "none";
+    const page = demo.active ? {
+        sub: "No keyboard is connected. The demo stands in for one running current firmware, so every screen works; nothing here reaches a keyboard.",
+        connectionChip: chip("demo", "no keyboard"),
+        connectionBody: kv([
+            ["Product", device?.label],
+            ["Status", device?.subtitle],
+        ]),
+        setupTitle: "Demo setup",
+        setupChip: chip("demo", "demo"),
+        setupBody: kv([
+            ["Opened", demo.fileName || demo.name],
+            ["Draft", changes],
+        ]),
+        read: () => postLeavingDemo(controls.control("refresh")),
+    } : {
+        sub: "What the keyboard says about itself. Everything this app shows comes from here — it never reads a firmware repository.",
+        connectionChip: chip(device?.connected ? "on" : "err", device?.connected ? "connected" : "disconnected"),
+        connectionBody: `${kv([
+            ["Product", device?.label],
+            ["Status", device?.subtitle],
+            ["Phase", device?.health?.phase],
+        ])}<p class="note">The master half connects over USB; the slave half connects to it through the cable between the halves.</p>`,
+        setupTitle: "Committed profile",
+        setupChip: chip(device?.health?.converged ? "on" : "draft", device?.health?.converged ? "both halves agree" : "halves not converged"),
+        setupBody: kv([
+            ["Generation and digest", device?.summary],
+            ["Recovery", device?.health?.recoveryPending ? "pending" : "clear"],
+            ["Draft", changes],
+        ]),
+        read: () => post(controls.control("refresh")),
+    };
     const main = el(`<div class="main">${topbar(
         "Device",
-        "No keyboard is connected. The demo stands in for one running current firmware, so every screen works; nothing here reaches a keyboard.",
+        page.sub,
         `<button class="btn" data-act="read" ${device?.health?.busy ? "disabled" : ""}>Read from keyboard</button>`,
     )}
-        <div class="content"><div class="pad" style="max-width:940px;display:grid;gap:14px">
+        <div class="content"><div class="pad stack device-pad">
             <div class="grid2">
                 <div class="card"><div class="card-h"><h3>Connection</h3>
-                    <span class="right"><span class="chip"><i class="dot demo"></i>no keyboard</span></span></div>
-                    <div class="card-b">${kv([
-                        ["Product", device?.label],
-                        ["Status", device?.subtitle],
-                    ])}</div></div>
-                <div class="card"><div class="card-h"><h3>Demo setup</h3>
-                    <span class="right"><span class="chip"><i class="dot demo"></i>demo</span></span></div>
-                    <div class="card-b">${kv([
-                        ["Opened", demo.fileName || demo.name],
-                        ["Draft", model?.draft ? `${model.draft.changes.length} change${model.draft.changes.length === 1 ? "" : "s"}` : "none"],
-                    ])}</div></div>
+                    ${page.connectionChip}</div>
+                    <div class="card-b">${page.connectionBody}</div></div>
+                <div class="card"><div class="card-h"><h3>${page.setupTitle}</h3>
+                    ${page.setupChip}</div>
+                    <div class="card-b">${page.setupBody}</div></div>
             </div>
             ${whatWasRead(model)}
         </div></div></div>`);
-    /** @type {HTMLButtonElement} */ (main.querySelector('[data-act="read"]')).addEventListener("click", () => postLeavingDemo(controls.control("refresh")));
+    /** @type {HTMLButtonElement} */ (main.querySelector('[data-act="read"]')).addEventListener("click", page.read);
     return main;
 }
 
@@ -193,11 +191,11 @@ function reviewOverlay() {
     const node = el(`<div class="scrim"><div class="sheet" role="dialog" aria-modal="true" aria-label="Review changes">
         <div class="sheet-h"><h2>Review ${draft.changes.length} change${draft.changes.length === 1 ? "" : "s"}</h2>
             ${summary ? `<span class="note">${esc(summary)}</span>` : ""}
-            <span class="right" style="margin-left:auto"><button class="btn ghost" data-act="close">Keep editing</button></span></div>
+            <span class="right"><button class="btn ghost" data-act="close">Keep editing</button></span></div>
         <div class="sheet-b rv">
             ${checks}
             ${sections}
-            <div style="padding:14px 18px 18px"><div class="callout warn">${demo.active ? esc(demo.applyNeedsKeyboard)
+            <div class="rv-apply-note"><div class="callout warn">${demo.active ? esc(demo.applyNeedsKeyboard)
                 : "Apply writes a recovery copy, stages the changed blocks on both halves, then publishes one generation. The keyboard keeps running its saved profile until both halves confirm. If it is interrupted, the recovery copy restores it."}</div></div>
         </div>
         ${demo.active ? `<div class="sheet-f demo-apply"><span class="note"><i class="dot demo"></i> ${esc(DEMO_WORDS.status)}</span>

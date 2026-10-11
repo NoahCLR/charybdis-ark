@@ -181,6 +181,7 @@ a.rail-build:hover { color: var(--text-2); }
 .theme-toggle svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.4; }
 .content { flex: 1; overflow: auto; min-height: 0; }
 .pad { padding: 20px 24px 120px; }
+.device-pad { max-width: 940px; }
 
 /* ── controls ────────────────────────────────────────────────────────── */
 .btn {
@@ -475,6 +476,7 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 .kv { display: grid; grid-template-columns: 96px 1fr; gap: 4px 10px; font-size: 12px; }
 .kv dt { color: var(--text-3); }
 .kv dd { margin: 0; font-family: var(--mono); font-size: 11.5px; }
+.kv.device-kv { grid-template-columns: 170px 1fr; }
 
 /* ── behaviour timeline ──────────────────────────────────────────────── */
 .branch { border: 1px solid var(--line); border-radius: 9px; background: var(--surface-2); overflow: hidden; }
@@ -677,6 +679,7 @@ button.tier:hover { background: var(--surface-3); }
 .list-row:last-child { border-bottom: 0; }
 .list-row:hover { background: var(--surface-2); }
 .list-row[aria-current="true"] { background: var(--surface-3); }
+.list-row.note-row { grid-template-columns: 1fr; }
 .recovery-row { grid-template-columns: minmax(0, 1fr) auto auto; }
 .recovery-row .mono { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .swatch-lg { width: 26px; height: 26px; border-radius: 6px; border: 1px solid var(--line-2); flex: none; }
@@ -885,7 +888,9 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .sheet { width: min(980px, 100%); max-height: 100%; display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--line-2); border-radius: 14px; box-shadow: var(--shadow); overflow: hidden; }
 .sheet-h { display: flex; align-items: center; gap: 12px; padding: 16px 18px; border-bottom: 1px solid var(--line); }
 .sheet-h h2 { font-size: 15px; }
+.sheet-h .right { margin-left: auto; }
 .sheet-b { overflow: auto; padding: 0 0 6px; }
+.rv-apply-note { padding: 14px 18px 18px; }
 .sheet-f { display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-top: 1px solid var(--line); background: var(--surface-2); }
 .sheet-f .right { margin-left: auto; display: flex; gap: 8px; }
 
