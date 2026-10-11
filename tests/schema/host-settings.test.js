@@ -1,6 +1,7 @@
 "use strict";
 const test = require("node:test"), assert = require("node:assert/strict");
-const {hostSettings, supportsHostLayouts, MACOS_ISO, HOST_LAYOUT_FEATURE} = require("../../core/schema/host-settings");
+const {hostSettings, supportsHostLayouts, layoutFits, layoutForOs, MACOS_ISO, HOST_LAYOUT_FEATURE} = require("../../core/schema/host-settings");
+const {hostLayouts} = require("../../core/data/host-layouts");
 const {validSetting} = require("../../core/schema/settings-domain-v1");
 test("host override and Unicode enablement are independent and unknown never guesses", () => {
     for (const selected of [0,1,2,3]) for (const detected of [0,1,2,3]) for (const enabled of [false,true]) {
@@ -31,4 +32,20 @@ test("Unicode entry follows the layout: on macOS only Unicode Hex Input, or US w
     assert.equal(host(0, 9, true).unicodeMode, 0, "an unknown OS has no entry method");
     assert.equal(host(0, 9, true, 2).unicodeMode, 2);
     assert.deepEqual([host(1, 5, false).layout, hostSettings(Object.assign([], {27: MACOS_ISO})).macosIso], [5, true]);
+});
+
+test("a layout fits its own OS, US fits all, and another OS takes the same language or US", () => {
+    for (const layout of hostLayouts()) for (const os of [0, 1, 2, 3]) {
+        const fits = os === 0 || layout.os === "any" || layout.os === ["", "macos", "windows", "linux"][os];
+        assert.equal(layoutFits(layout.id, os), fits, `${layout.slug} on ${os}`);
+        const next = layoutForOs(layout.id, os);
+        assert(layoutFits(next, os), `${layout.slug} moves to a layout that fits ${os}`);
+        if (fits) assert.equal(next, layout.id);
+    }
+    assert.deepEqual([5, 6, 4].map(id => layoutForOs(id, 2)), [9, 10, 8], "German, French, British → Windows");
+    assert.deepEqual([9, 7, 8].map(id => layoutForOs(id, 3)), [13, 11, 12], "Windows → Linux");
+    assert.deepEqual([12, 8].map(id => layoutForOs(id, 1)), [4, 4], "United Kingdom → British on macOS");
+    assert.deepEqual([1, 2, 3].map(id => layoutForOs(id, 2)), [0, 0, 0], "ABC, Dutch and Unicode Hex Input → US");
+    assert.equal(layoutForOs(7, 1), 0, "US International has no macOS layout");
+    assert.equal(hostSettings(Object.assign([], {27: 2 | (5 << 16)})).layoutFits, false);
 });

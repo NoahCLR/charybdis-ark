@@ -6,7 +6,7 @@ const {encodeKeyBehaviorDomain} = require("../schema/key-behavior-domain-v1");
 const {validateSnapshot, decodedOf} = require("./portable-profile");
 const {decodeProfileBlob, encodeProfileBlob} = require("../schema/profile-blob-v1");
 const {SETTING, SETTINGS, encodeSettings, validSetting} = require("../schema/settings-domain-v1");
-const {hostSettings, supportsHostLayouts, UNICODE_ENABLED, LAYOUT_SHIFT, MACOS_ISO} = require("../schema/host-settings");
+const {hostSettings, followHostOs, supportsHostLayouts, UNICODE_ENABLED, LAYOUT_SHIFT, MACOS_ISO} = require("../schema/host-settings");
 const {hostLayouts} = require("../data/host-layouts");
 const {supportsUnicodeMacros} = require("../schema/macro-payload");
 const {dpiChoices} = require("./pointer-dpi");
@@ -184,7 +184,11 @@ function settingsSections(snapshot, settings, capabilities) {
     result.push({id: "host", area: "Settings", label: "Host",
         ...(supportsUnicodeMacros(capabilities) && host.effective === 2 && host.unicodeEnabled
             ? {githubLink: {label: "WinCompose on GitHub", url: "https://github.com/samhocevar/wincompose"}} : {}),
-        ...(supportsUnicodeMacros(capabilities) && macos && host.unicodeMode
+        // Auto can follow detection onto another OS than the layout's; a
+        // Host OS chosen here carries the layout along (followHostOs).
+        ...(layouts && !host.layoutFits
+            ? {warning: `${layoutWord(host.layout)} is not a ${label(host.effective)} layout, so macros may type the wrong characters on ${label(host.effective)}. Choose a ${label(host.effective)} layout, or set Host OS to the computer you use.`}
+            : supportsUnicodeMacros(capabilities) && macos && host.unicodeMode
             ? {warning: "While Unicode Hex Input is active on your Mac, Option-based symbols and shortcuts may stop working, including Option+Left/Right for word navigation. This affects ordinary typing and key-step shortcuts too. Ark does not switch your Mac's input source; switch back to your usual source when you need those keys, and match the layout here before playing macros."} : {}),
         description: available
         ? `Detected: ${host.detected ? label(host.detected) : "Unknown"}. Effective: ${host.effective ? label(host.effective) : "Unknown"}. Detection is a best guess; override it if incorrect. ${setup} The keyboard cannot confirm your input setup.`
@@ -265,6 +269,7 @@ function editSettings(snapshot, message, capabilities) {
         value.settings.values[field.id] = withSetting(field, value.settings.values[field.id], number);
     }
     rescaleShares(value.settings.values, before);
+    if (section.id === "host") followHostOs(value.settings.values, before, snapshot.hostOs?.detected);
     if (!value.settings.values[23]) throw fail("Keep at least one startup layer selected.");
     if (!value.settings.values.every((number, id) => validSetting(id, number))) throw fail("A setting is outside the keyboard's supported range.");
     // A timing displayed as default follows that default, including an older

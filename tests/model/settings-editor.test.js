@@ -18,7 +18,7 @@ test("macOS Unicode warnings follow the effective setup, including legacy US Uni
         [1 | (2 << 16), 1, flags, false], // Dutch uses native entry.
         [0x101 | (2 << 16), 1, flags, false], // Switch does not enable entry on Dutch.
         [1, 1, flags, false], // US without entry.
-        [2 | (3 << 16), 1, flags, false], // Effective Windows.
+        [2 | (3 << 16), 1, flags, false], // Effective Windows: the layout mismatch warns instead.
         [3 << 16, 0, flags, false], // Unknown Auto.
         [1 | (3 << 16), 1, 0, false], // Unsupported firmware.
     ]) {
@@ -26,7 +26,7 @@ test("macOS Unicode warnings follow the effective setup, including legacy US Uni
         snapshot.hostOs.detected = detected;
         capabilities.featureFlags = featureFlags;
         const host = settingsEditorView(snapshot, capabilities).sections.find(section => section.id === "host");
-        assert.equal(Boolean(host.warning), visible, `Host word ${word}, detected ${detected}, capabilities ${featureFlags}`);
+        assert.equal(/Option\+Left/.test(host.warning || ""), visible, `Host word ${word}, detected ${detected}, capabilities ${featureFlags}`);
         if (visible) {
             assert.match(host.warning, /Option\+Left\/Right for word navigation/);
             assert.match(host.warning, /Ark does not switch your Mac's input source/);
@@ -252,4 +252,42 @@ test("the Host section offers the effective OS's layouts and gates them on firmw
     const legacy = host(1, 1 << 21);
     assert.equal(legacy.fields.find(field => field.macro === "hostLayout").readOnly, true);
     assert.ok(fields(legacy).includes("unicodeEnabled"), "older firmware keeps the switch on macOS");
+});
+
+test("choosing a Host OS carries the layout to that OS, and a mismatch left by Auto warns", () => {
+    const {hostMacros} = require("../fixtures/host-macros");
+    const flags = (1 << 21) | (1 << 22);
+    const host = (current, capabilities) => settingsEditorView(current, capabilities).sections.find(section => section.id === "host");
+    const choose = (word, detected, shown) => {
+        const {snapshot: current, capabilities} = hostMacros(word, []);
+        current.hostOs.detected = detected;
+        const section = host(current, capabilities);
+        const next = editSettings(current, {sectionId: "host", expectedFingerprint: current.fingerprint,
+            fields: section.fields.map(f => f.kind === "toggle" ? {macro: f.macro, enabled: f.enabled} : {macro: f.macro, value: shown[f.macro] ?? f.value})}, capabilities);
+        return validateSnapshot(next).settings.values[27];
+    };
+    // Auto on a Mac with German, then Windows chosen: Windows German.
+    assert.equal(choose(5 << 16, 1, {hostOs: "2"}), 2 | (9 << 16));
+    assert.equal(choose(4 << 16, 1, {hostOs: "3"}), 3 | (12 << 16), "British is the United Kingdom layout on Linux");
+    assert.equal(choose(1 | (3 << 16), 1, {hostOs: "2"}), 2, "Unicode Hex Input has no Windows counterpart, so US");
+    assert.equal(choose(2 | (7 << 16) | 0x100, 2, {hostOs: "1"}), 1 | 0x100, "US International falls back to US and keeps the switch");
+    assert.equal(choose(2 | (9 << 16), 1, {hostOs: "0"}), 5 << 16, "back to Auto follows the detected Mac");
+    assert.equal(choose(1 | (2 << 16), 1, {hostOs: "0"}), 2 << 16, "the effective OS is unchanged, so the layout stays");
+    assert.equal(choose(2 << 16, 0, {hostOs: "2"}), 2, "Dutch has no Windows counterpart");
+    assert.equal(choose(2 | (8 << 16), 2, {hostOs: "0"}), 8 << 16, "Auto with no detection fits every layout");
+    assert.equal(choose(1 | (5 << 16), 1, {hostOs: "2", hostLayout: "6"}), 2 | (6 << 16), "a layout changed in the same edit is kept");
+
+    // Auto keeps the layout when detection moves to another OS; Host and the
+    // macro editor say so instead.
+    const {snapshot: current, capabilities} = hostMacros(5 << 16, []);
+    current.hostOs.detected = 2;
+    assert.match(host(current, capabilities).warning, /^German \(macOS\) is not a Windows layout, so macros may type the wrong characters on Windows/);
+    const {macroEditorView} = require("../../core/model/macro-editor");
+    assert.equal(macroEditorView(current, capabilities).unicode.layoutFits, false);
+    current.hostOs.detected = 1;
+    assert.equal(macroEditorView(current, capabilities).unicode.layoutFits, true);
+    assert.equal(host(current, capabilities).warning, undefined);
+    capabilities.featureFlags = 1 << 21;
+    current.hostOs.detected = 2;
+    assert.equal(host(current, capabilities).warning, undefined, "firmware without layouts types US");
 });

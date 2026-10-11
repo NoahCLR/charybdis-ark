@@ -55,7 +55,7 @@ function macroEditorView(snapshot, capabilities) {
         // Text types through the host layout; what it cannot type needs Unicode
         // entry (mode). The interface judges held keys against layoutChars.
         unicode: {supported: unicode, mode: host.unicodeMode, enabled: host.unicodeEnabled, os: host.effective,
-            layouts: supportsHostLayouts(capabilities), layout: host.layout, layoutName: hostLayout(host.layout).name, layoutChars: hostLayout(host.layout).chars},
+            layouts: supportsHostLayouts(capabilities), layout: host.layout, layoutFits: host.layoutFits, layoutName: hostLayout(host.layout).name, layoutChars: hostLayout(host.layout).chars},
         viaMacros: slots.map(slot),
         macroBank: {capacity: budget.capacity, stored: budget.stored, free: budget.free, available: budget.available,
             slots: slots.length, reserveTaps: SLOT_RESERVE_TAPS, programMax: MACRO_PROGRAM_MAX},
