@@ -45,8 +45,8 @@ const {PROFILE_ACTIVE_KIND, PROFILE_STATE_FLAGS, PROFILE_WIRE_KNOWN_MASKS, PROFI
 /** @type {(capabilities: Partial<Caps> | null | undefined, writing?: boolean) => asserts capabilities is Partial<Caps>} */
 const checkReady = requireReady;
 
-const PROFILE_STUDIO_PROTOCOL = Object.freeze({major: 1, minor: 0});
-const PROFILE_STUDIO_SCHEMA = Object.freeze({major: 3, minor: 0});
+const SUPPORTED_PROFILE_PROTOCOL = Object.freeze({major: 1, minor: 0});
+const SUPPORTED_PROFILE_SCHEMA = Object.freeze({major: 3, minor: 0});
 const PROFILE_DOMAIN_FLAGS = Object.freeze({RGB: 1 << 0, KEY_BEHAVIORS: 1 << 1});
 const REQUIRED_PROFILE_DOMAIN_MASK = PROFILE_DOMAIN_FLAGS.RGB | PROFILE_DOMAIN_FLAGS.KEY_BEHAVIORS;
 const REQUIRED_LIVE_MUTATION_FEATURES = PROFILE_WIRE_FEATURES.CANDIDATE_WRITE
@@ -55,6 +55,23 @@ const REQUIRED_LIVE_MUTATION_FEATURES = PROFILE_WIRE_FEATURES.CANDIDATE_WRITE
     | PROFILE_WIRE_FEATURES.PEER_RECONCILIATION
     | PROFILE_WIRE_FEATURES.ATOMIC_LOGICAL_APPLY;
 
+// The connected keyboard: scanning, connecting, and every read and save.
+//
+// What it holds is published as `snapshot()`, through `onChange`, so the panel
+// draws the keyboard as the service last saw it, failures included.
+//
+// One convention for failure. An operation that fails rejects, with the error
+// it records: `snapshot().error` (code, message and, for a save, where it
+// stopped) and a line in `diagnostics`, so the published model shows the
+// failure whoever awaited it. This holds for enumerate, connect, refresh,
+// readLayout, readCommittedProfile, the complete reads (readKeyboardProfile,
+// readPortableProfile) and restorePortableProfile; a refusal before one
+// starts (not connected, not yet refreshed, busy) rejects too. Two reads are
+// optional and degrade instead: readCombos and readBaseRgb never reject, and
+// record a failure as their own `{state: "unavailable", error}` so it neither
+// discards a usable profile nor masks an earlier error. disconnect() always
+// leaves the keyboard disconnected and resolves, recording a failure to close
+// it cleanly.
 class ProfileDeviceService {
     /** @param {import("./types.js").DeviceServiceOptions} [options] */
     constructor(options = {}) {
@@ -70,7 +87,6 @@ class ProfileDeviceService {
         // whose timers are throttled (a background browser tab) passes its
         // own; the timer's is used otherwise.
         this.sleep = typeof options.sleep === "function" ? options.sleep : undefined;
-        this.profileSummary = normalizeProfileSummary(options.profileSummary);
         this.requestIdStart = normalizeRequestId(options.requestIdStart === undefined ? 1 : options.requestIdStart);
         this.readCandidateStatus = typeof options.readCandidateStatus === "function"
             ? options.readCandidateStatus
@@ -116,8 +132,6 @@ class ProfileDeviceService {
         this.layout = undefined;
         /** @type {import("./types.js").CommittedRead | undefined} */
         this.committed = undefined;
-        /** @type {Buffer | undefined} */
-        this.profileBytes = undefined;
         /** @type {import("./types.js").BaseRgbRead | undefined} */
         this.baseRgb = undefined;
         /** @type {import("./types.js").ComboRead | undefined} */
@@ -133,14 +147,6 @@ class ProfileDeviceService {
         this.settingsView = undefined;
         /** @type {InstanceType<typeof ProfilePayloadReader> | undefined} */
         this.payloadReader = undefined;
-
-    }
-
-    /** @param {import("./types.js").DeviceServiceOptions["profileSummary"]} summary */
-    setProfileSummary(summary) {
-        this.profileSummary = normalizeProfileSummary(summary);
-        this.emitChange();
-        return this.snapshot();
     }
 
     async enumerate() {
@@ -170,15 +176,11 @@ class ProfileDeviceService {
     /** @param {string} publicDeviceId */
     async connect(publicDeviceId) {
         const adapterDeviceId = this.adapterIdsByPublicId.get(String(publicDeviceId || ""));
-        if (!adapterDeviceId) {
-            this.setError(new Error("Select a keyboard from the latest scan before connecting."));
-            this.emitChange();
-            return this.snapshot();
-        }
+        if (!adapterDeviceId) this.refuse("Select a keyboard from the latest scan before connecting.");
         if (this.connection) {
             await this.disconnect();
         }
-        const result = await this.runOperation("connecting", async () => {
+        await this.runOperation("connecting", async () => {
             const connection = await this.coordinator.connect(adapterDeviceId);
             this.connection = connection;
             this.requestIds = new ProfileRequestIdSequence(this.requestIdStart);
@@ -188,18 +190,11 @@ class ProfileDeviceService {
             this.disposeConnectionListener = connection.onDisconnect((reason) => this.handleDisconnect(reason));
             this.addDiagnostic(`Connected to ${this.deviceLabel(this.connectionPublicId)}.`);
         });
-        if (this.connection && !this.error) {
-            return this.refresh();
-        }
-        return result;
+        return this.refresh();
     }
 
     async refresh() {
-        if (!this.connection?.connected) {
-            this.setError(new Error("Connect to a keyboard before refreshing live capabilities."));
-            this.emitChange();
-            return this.snapshot();
-        }
+        if (!this.connection?.connected) this.refuse("Connect to a keyboard before refreshing live capabilities.");
         return this.runOperation("refreshing", async () => {
             const connection = this.connectedConnection();
             const viaIdentity = await readViaIdentity(connection);
@@ -217,30 +212,24 @@ class ProfileDeviceService {
             this.viaIdentity = viaIdentity;
             this.lastRefreshedAt = new Date().toISOString();
             this.phase = "connected";
-            const compatibility = evaluateProfileCompatibility(capabilities, this.profileSummary, viaIdentity);
+            const compatibility = evaluateProfileCompatibility(capabilities, viaIdentity);
             this.addDiagnostic(
                 compatibility.compatible
-                    ? "Live profile schema and current source capacities are compatible."
+                    ? "Live protocol, schema, VIA identity and required features are compatible."
                     : `Live compatibility check found ${compatibility.reasons.length} blocking issue${compatibility.reasons.length === 1 ? "" : "s"}.`
             );
         });
     }
 
-// Reads the layout the keyboard is actually running and resolves each
+    // Reads the layout the keyboard is actually running and resolves each
     // keycode through the vendored catalog. This is device-first: nothing here
     // consults the authored source. Layer count comes from the firmware's own
     // advertised capacity rather than from a compiled constant.
     async readLayout() {
-        if (!this.connection?.connected) {
-            this.setError(new Error("Connect to a keyboard before reading its layout."));
-            this.emitChange();
-            return this.snapshot();
-        }
+        if (!this.connection?.connected) this.refuse("Connect to a keyboard before reading its layout.");
         const layerCount = this.capabilities?.compiledLayerCount;
         if (typeof layerCount !== "number" || !Number.isInteger(layerCount) || layerCount < 1) {
-            this.setError(new Error("Refresh capabilities before reading the layout."));
-            this.emitChange();
-            return this.snapshot();
+            this.refuse("Refresh capabilities before reading the layout.");
         }
 
         this.layout = {state: "reading", progress: {done: 0, total: 0}, layers: [], readAt: ""};
@@ -282,31 +271,7 @@ class ProfileDeviceService {
         );
     }
 
-// Applies layout edits to the keyboard and reads each one back.
-    /** @param {unknown} name */
-    layerIndexFor(name) {
-        const match = String(name || "").match(/(\d+)/);
-        if (!match) {
-            return undefined;
-        }
-        const index = Number(match[1]);
-        const known = this.layout?.layers?.some((entry) => entry.layer === index);
-        return known ? index : undefined;
-    }
-
-    // Keep the cached layout in step with the device so the UI does not need a
-    // full re-read after every edit.
-    /** @param {{layer: number, layoutIndex: number}} entry @param {number} keycode */
-    applyLayoutKey(entry, keycode) {
-        const layer = this.layout?.layers?.find((candidate) => candidate.layer === entry.layer);
-        const key = layer?.keys?.find((candidate) => candidate.layoutIndex === entry.layoutIndex);
-        if (key) {
-            key.keycode = keycode;
-            key.resolved = keycodeCatalog.resolve(keycode);
-        }
-    }
-
-// Reads the committed profile off the keyboard and decodes it.
+    // Reads the committed profile off the keyboard and decodes it.
     //
     // This is the read D-026 requires and the first time the app can show RGB
     // and key behaviours as the device actually holds them, rather than as the
@@ -314,13 +279,8 @@ class ProfileDeviceService {
     // reported as such and leaves the others readable; the alternative is
     // discarding a whole profile because one section drifted.
     async readCommittedProfile() {
-        if (!this.connection?.connected) {
-            this.setError(new Error("Connect to a keyboard before reading its profile."));
-            this.emitChange();
-            return this.snapshot();
-        }
+        if (!this.connection?.connected) this.refuse("Connect to a keyboard before reading its profile.");
 
-        this.profileBytes = undefined;
         this.committed = {state: "reading", progress: {done: 0, total: 0}};
         return this.runOperation("reading profile", async () => {
             const connection = this.connectedConnection();
@@ -388,7 +348,6 @@ class ProfileDeviceService {
             domains,
             failures,
         };
-        this.profileBytes = Buffer.from(bytes);
         const described = source === "compiled"
             ? "the firmware's compiled defaults"
             : `committed generation ${metadata.generation}`;
@@ -399,6 +358,8 @@ class ProfileDeviceService {
         );
     }
 
+    // Optional: never rejects. A failure while connected is recorded as
+    // `combos: {state: "unavailable", error}`; a lost connection clears it.
     async readCombos() {
         const connection = this.connection;
         this.combos = {state: "reading"};
@@ -416,6 +377,9 @@ class ProfileDeviceService {
         return this.snapshot();
     }
 
+    // Optional: never rejects. A failure while connected is recorded as
+    // `baseRgb: {state: "unavailable", error}` and a diagnostic, leaving
+    // `error` and the profile alone; a lost connection clears it.
     async readBaseRgb() {
         const connection = this.connection;
         this.baseRgb = {state: "reading"};
@@ -440,6 +404,8 @@ class ProfileDeviceService {
         return this.snapshot();
     }
 
+    // Always ends disconnected and resolves; a failure to close the handle
+    // cleanly is recorded in `error`.
     async disconnect() {
         const connection = this.connection;
         if (!connection) {
@@ -487,7 +453,7 @@ class ProfileDeviceService {
 
     /** @param {{forRestore?: boolean; reuseReadback?: boolean; forEditor?: boolean}} [options] @returns {Promise<Capture>} */
     async #readCompleteProfile({forRestore = false, reuseReadback = false, forEditor = false} = {}) {
-        if (!this.connection?.connected || this.busy) throw new Error("Connect the keyboard and wait for the current operation to finish.");
+        if (!this.connection?.connected || this.busy) this.refuse("Connect the keyboard and wait for the current operation to finish.");
         /** @type {Capture | undefined} */
         let result;
         this.portableProgress = "";
@@ -521,16 +487,14 @@ class ProfileDeviceService {
             this.customKeyView = customKeyEditorView(result, this.capabilities);
             this.settingsView = settingsEditorView(result, this.capabilities);
             this.portableProgress = "";
-        });
-        this.portableProgress = "";
-        if (this.error) throw Object.assign(new Error(this.error.message), this.error);
+        }).finally(() => {this.portableProgress = "";});
         if (!result) throw new Error("The keyboard operation returned no verified profile.");
         return result;
     }
 
     /** @param {import("../model/types.js").PortableDocument} document @param {import("./types.js").RestoreOptions} options @returns {Promise<import("./types.js").RestoredProfile>} */
     async restorePortableProfile(document, options) {
-        if (!this.connection?.connected || this.busy) throw new Error("Connect the keyboard and wait for the current operation to finish.");
+        if (!this.connection?.connected || this.busy) this.refuse("Connect the keyboard and wait for the current operation to finish.");
         /** @type {Restored | undefined} */
         let result;
         let started = false;
@@ -577,17 +541,17 @@ class ProfileDeviceService {
                 const seconds = (result.performance.elapsedMs / 1000).toFixed(1);
                 this.addDiagnostic(`Saved the complete profile in ${seconds} s; transferred ${result.performance.layoutBytes} changed layout bytes and ${result.performance.macroBytes} changed macro bytes.`);
             }
+        }).finally(async () => {
+            this.portableProgress = "";
+            // Once the restore has started — landed, failed, or stopped past
+            // the point of no return — the health the panel shows must be the
+            // keyboard's now, not the status read before the apply began. A
+            // refusal before the first write changed nothing, so it reads nothing.
+            if (started) {
+                await this.refreshStatus();
+                this.emitChange();
+            }
         });
-        this.portableProgress = "";
-        // Once the restore has started — landed, failed, or stopped past the
-        // point of no return — the health the panel shows must be the
-        // keyboard's now, not the status read before the apply began. A
-        // refusal before the first write changed nothing, so it reads nothing.
-        if (started) {
-            await this.refreshStatus();
-            this.emitChange();
-        }
-        if (this.error) throw Object.assign(new Error(this.error.message), this.error);
         if (!result) throw new Error("The keyboard operation returned no verified profile.");
         return result;
     }
@@ -620,11 +584,11 @@ class ProfileDeviceService {
             candidateStatus: this.candidateStatus ? cloneCandidateStatus(this.candidateStatus) : null,
             viaIdentity: this.viaIdentity ? {...this.viaIdentity} : null,
             compatibility: this.capabilities
-                ? evaluateProfileCompatibility(this.capabilities, this.profileSummary, this.viaIdentity)
+                ? evaluateProfileCompatibility(this.capabilities, this.viaIdentity)
                 : null,
             mutationCompatibility: evaluateLiveMutationCompatibility(
                 this.capabilities,
-                this.capabilities ? evaluateProfileCompatibility(this.capabilities, this.profileSummary, this.viaIdentity) : null,
+                this.capabilities ? evaluateProfileCompatibility(this.capabilities, this.viaIdentity) : null,
                 Boolean(this.connection?.connected),
                 this.status
             ),
@@ -644,6 +608,8 @@ class ProfileDeviceService {
         };
     }
 
+    // Runs one operation: busy while it runs, then its failure recorded,
+    // published and rejected with (see the class comment).
     /** @param {string} phase @param {() => Promise<unknown>} operation */
     async runOperation(phase, operation) {
         this.operationId++;
@@ -651,10 +617,13 @@ class ProfileDeviceService {
         this.phase = phase;
         this.error = undefined;
         this.emitChange();
+        /** @type {PublishedError | undefined} */
+        let failure;
         try {
             await operation();
         } catch (error) {
             this.setError(error);
+            failure = this.error;
             if (!this.connection?.connected) {
                 this.clearConnection();
             }
@@ -665,7 +634,17 @@ class ProfileDeviceService {
             this.busy = false;
             this.emitChange();
         }
+        if (failure) throw rejection(failure);
         return this.snapshot();
+    }
+
+    // Refuses an operation before it starts: recorded and published like a
+    // failure, and rejected with.
+    /** @param {string} message @returns {never} */
+    refuse(message) {
+        this.setError(new Error(message));
+        this.emitChange();
+        throw rejection(/** @type {PublishedError} */ (this.error));
     }
 
     /** @param {unknown} reason */
@@ -687,7 +666,6 @@ class ProfileDeviceService {
         this.macroView = undefined;
         this.customKeyView = undefined;
         this.settingsView = undefined;
-        this.profileBytes = undefined;
         this.payloadReader = undefined;
         this.layout = undefined;
         this.committed = undefined;
@@ -838,48 +816,28 @@ function publicError(value) {
     return result;
 }
 
-/** @param {import("./types.js").DeviceServiceOptions["profileSummary"]} [summary] @returns {import("./types.js").SourceProfileSummary} */
-function normalizeProfileSummary(summary = {}) {
-    /** @type {import("./types.js").SourceProfileSummary} */
-    const normalized = {layerCount: 0, behaviorRows: 0, maxTapStepsPerBehavior: 0, populatedBehaviorSteps: 0, comboCount: 0, maxKeysPerCombo: 0, reusableRgbGroups: 0, rgbStageGroupRows: 0, highestLedIndex: 0};
-    for (const key of /** @type {const} */ ([
-        "layerCount",
-        "behaviorRows",
-        "maxTapStepsPerBehavior",
-        "populatedBehaviorSteps",
-        "comboCount",
-        "maxKeysPerCombo",
-        "reusableRgbGroups",
-        "rgbStageGroupRows",
-        "highestLedIndex",
-    ])) {
-        const value = Number(summary?.[key]);
-        normalized[key] = Number.isInteger(value) && value >= 0 ? value : 0;
-    }
-    return normalized;
+// What a failed operation rejects with: the error it recorded, as a thrown
+// Error carrying the same code and fields.
+/** @param {PublishedError} error */
+function rejection(error) {
+    return Object.assign(new Error(error.message), error);
 }
 
-/** @param {Partial<Caps> | null | undefined} capabilities @param {import("./types.js").DeviceServiceOptions["profileSummary"]} [summary] @param {Partial<Awaited<ReturnType<typeof readViaIdentity>>> | null} [viaIdentity] */
-function evaluateProfileCompatibility(capabilities, summary = {}, viaIdentity = {}) {
-    const source = normalizeProfileSummary(summary);
+// Whether this app can read the keyboard at all: its protocol and schema,
+// VIA identity, report framing, and the features and domains every read
+// needs. Capacities are not compared here: the keyboard advertises its own,
+// and the editors and Apply hold a profile to them.
+/** @param {Partial<Caps> | null | undefined} capabilities @param {Partial<Awaited<ReturnType<typeof readViaIdentity>>> | null} [viaIdentity] */
+function evaluateProfileCompatibility(capabilities, viaIdentity = {}) {
     const checks = [
-        equalityCheck("Protocol major", capabilities?.protocol?.major, PROFILE_STUDIO_PROTOCOL.major),
-        equalityCheck("Schema major", capabilities?.schema?.major, PROFILE_STUDIO_SCHEMA.major),
+        equalityCheck("Protocol major", capabilities?.protocol?.major, SUPPORTED_PROFILE_PROTOCOL.major),
+        equalityCheck("Schema major", capabilities?.schema?.major, SUPPORTED_PROFILE_SCHEMA.major),
         oneOfCheck("VIA protocol version", viaIdentity?.protocolVersion, VIA_READS.SUPPORTED_PROTOCOL_VERSIONS),
         equalityCheck("VIA firmware version", viaIdentity?.firmwareVersion, capabilities?.firmwareVersion),
         equalityCheck("Raw HID report size", capabilities?.reportSize, RAW_HID_REPORT_SIZE),
         minimumCheck("Status pages", capabilities?.statusPageCount, PROFILE_WIRE_V1.STATUS_PAGE_COUNT),
         maskCheck("Required Profile Wire features", capabilities?.featureFlags, PROFILE_WIRE_KNOWN_MASKS.REQUIRED_READ_FEATURES),
-        maskCheck("Milestone A domains", capabilities?.supportedDomainMask, REQUIRED_PROFILE_DOMAIN_MASK),
-        capacityCheck("Logical layers", source.layerCount, capabilities?.maxLogicalLayers),
-        capacityCheck("Key behavior rows", source.behaviorRows, capabilities?.maxBehaviorRows),
-        capacityCheck("Tap steps per behavior", source.maxTapStepsPerBehavior, capabilities?.maxTapStepsPerBehavior),
-        capacityCheck("Populated behavior steps", source.populatedBehaviorSteps, capabilities?.maxPopulatedBehaviorSteps),
-        capacityCheck("Combos", source.comboCount, capabilities?.maxCombos),
-        capacityCheck("Keys per combo", source.maxKeysPerCombo, capabilities?.maxKeysPerCombo),
-        capacityCheck("Reusable RGB groups", source.reusableRgbGroups, capabilities?.maxReusableRgbGroups),
-        capacityCheck("RGB stage-group rows", source.rgbStageGroupRows, capabilities?.maxRgbStageGroupRows),
-        ledIndexCheck(source.highestLedIndex, capabilities?.physicalLedCount),
+        maskCheck("Required profile domains", capabilities?.supportedDomainMask, REQUIRED_PROFILE_DOMAIN_MASK),
     ];
     const reasons = checks.filter((check) => !check.ok).map((check) => check.message);
     return {
@@ -887,7 +845,6 @@ function evaluateProfileCompatibility(capabilities, summary = {}, viaIdentity = 
         reasons,
         checks,
         requiredDomainMask: REQUIRED_PROFILE_DOMAIN_MASK,
-        source,
     };
 }
 
@@ -935,25 +892,6 @@ function maskCheck(label, actual, expected) {
     const numeric = Number(actual) || 0;
     const ok = (numeric & expected) === expected;
     return {label, ok, actual: numeric, limit: expected, message: ok ? "" : `${label} mask 0x${numeric.toString(16)} does not include required mask 0x${expected.toString(16)}.`};
-}
-
-/** @param {string} label @param {number} actual @param {number | undefined} limit */
-function capacityCheck(label, actual, limit) {
-    const ok = typeof limit === "number" && Number.isInteger(limit) && actual <= limit;
-    return {label, ok, actual, limit, message: ok ? "" : `${label} needs ${actual}; firmware capacity is ${limit}.`};
-}
-
-/** @param {number} highestLedIndex @param {number | undefined} physicalLedCount */
-function ledIndexCheck(highestLedIndex, physicalLedCount) {
-    const limit = typeof physicalLedCount === "number" && Number.isInteger(physicalLedCount) ? Math.max(0, physicalLedCount - 1) : physicalLedCount;
-    const ok = highestLedIndex === 0 || (typeof limit === "number" && Number.isInteger(limit) && highestLedIndex <= limit);
-    return {
-        label: "Highest RGB LED index",
-        ok,
-        actual: highestLedIndex,
-        limit,
-        message: ok ? "" : `RGB data references LED ${highestLedIndex}; firmware ends at LED ${limit}.`,
-    };
 }
 
 /** @param {Partial<Caps> | null | undefined} capabilities @param {Pick<ReturnType<typeof evaluateProfileCompatibility>, "compatible" | "reasons"> | null | undefined} compatibility @param {boolean} [connected] @param {Partial<Status> | null | undefined} [status] */
@@ -1016,15 +954,14 @@ function candidateStateName(state) {
 
 module.exports = {
     PROFILE_DOMAIN_FLAGS,
-    PROFILE_STUDIO_PROTOCOL,
-    PROFILE_STUDIO_SCHEMA,
+    SUPPORTED_PROFILE_PROTOCOL,
+    SUPPORTED_PROFILE_SCHEMA,
     ProfileRequestIdSequence,
     ProfileDeviceService,
     REQUIRED_PROFILE_DOMAIN_MASK,
     REQUIRED_LIVE_MUTATION_FEATURES,
     evaluateProfileCompatibility,
     evaluateLiveMutationCompatibility,
-    normalizeProfileSummary,
     unnamedKeyCount,
 };
 

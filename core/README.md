@@ -33,6 +33,14 @@ is the demo (D-L53): the same draft over the bundled demo profile with no device
 behind it, which the loop answers to in place of the device service's state
 while it is open.
 
+A device operation that fails rejects, with the error it also records in the
+snapshot (`error`, and a line in `diagnostics`), so the panel shows the failure
+whoever awaited it; a refusal before one starts (not connected, not refreshed,
+busy) rejects too. Callers catch what they can recover from and let the rest
+become the panel's notice. Two reads are optional and never reject: base RGB
+and combos record a failure as their own `{state: "unavailable"}`.
+`disconnect()` always ends disconnected.
+
 Apply's transfer counters leave `ProfileDeviceService` through its optional
 `onApplyProgress` callback. The panel loop posts that small view as
 `applyProgress`, with the current draft ID and revision; the webview refreshes

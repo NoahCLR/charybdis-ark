@@ -38,9 +38,14 @@ const run = (host, title, work) => host.progress ? host.progress(title, work) : 
 const savedNotice = (result, verb) => result?.peerUnseen
     ? `Complete profile ${verb} both halves and active. The slave half confirmed its copy but is not connected now; plug the cable between the halves back in.`
     : `Complete profile ${verb} both halves and verified.`;
+// The profile is saved whatever the read after it does, so a failed read is
+// said after the save rather than in place of it.
+/** @param {unknown} error */
+const rereadFailure = (error) => `Reading the keyboard again failed: ${(error instanceof Error ? error.message : String(error)).replace(/\.$/, "")}. `;
 
 // After the keyboard stores a new profile, everything the panel shows about
-// it is read again, in the order the reads depend on.
+// it is read again, in the order the reads depend on. Like every device read,
+// it rejects with what failed.
 /** @param {import("./types.js").ControlService} service @param {(step: import("../../contracts/messages.js").ReadStep) => void} [onStep] */
 async function rereadKeyboard(service, onStep = () => {}) {
     onStep("layout");
@@ -53,9 +58,12 @@ async function rereadKeyboard(service, onStep = () => {}) {
     await service.readBaseRgb();
 }
 
-// Connect if needed, then read what the keyboard runs. The notice says what
-// was read and what could not be; a keyboard with no committed profile is a
-// normal state, so that failure keeps the layout that was read.
+// Connect if needed, then read what the keyboard runs. Each device read
+// rejects with what failed (and leaves it in the keyboard's state), which
+// fails the read and becomes the panel's notice. The notice says what was
+// read and what could not be: a failed complete capture falls back to the
+// independent reads, and a failed committed-profile read keeps the layout and
+// the optional reads.
 /** @param {Session} session @param {string | undefined} selectedDeviceId @param {Host} [host] */
 async function readKeyboard(session, selectedDeviceId, host = {}) {
     const service = session.service;
@@ -71,10 +79,6 @@ async function readKeyboard(session, selectedDeviceId, host = {}) {
     if (!service.snapshot().connected || (selectedDeviceId && service.snapshot().selectedDeviceId !== selectedDeviceId)) {
         const deviceId = selectedDeviceId || devices[0].id;
         await service.connect(deviceId);
-        const connected = service.snapshot();
-        if (!connected.connected || connected.selectedDeviceId !== deviceId) {
-            throw new Error(connected.error?.message || "Could not connect to the selected keyboard.");
-        }
     }
     await service.refresh();
     let macroFailure = "", portable;
@@ -86,12 +90,8 @@ async function readKeyboard(session, selectedDeviceId, host = {}) {
         // Older or partially readable firmware still gets its independent
         // diagnostics. A failed complete capture never opens an editable draft.
         await run(host, "Reading layout from the keyboard", () => service.readLayout());
-        try {
-            await run(host, "Reading keyboard profile", () => service.readCommittedProfile());
-        } catch (error) {
-            session.notice = `Read the layout. The committed profile could not be read: ${error instanceof Error ? error.message : String(error)}`;
-            return false;
-        }
+        // A failure stays in the keyboard's state, said below.
+        await run(host, "Reading keyboard profile", () => service.readCommittedProfile()).catch(() => {});
         await service.readBaseRgb();
         await service.readCombos();
     }
@@ -169,11 +169,12 @@ async function draftControl(session, message, host = {}) {
                 const result = await run(host, "Applying the complete profile to both halves",
                     () => draft.apply(service, revision, async (document) => (recovery = await saveRecovery(host, document))));
                 session.resetDraftForms = true;
+                let reread = "";
                 await rereadKeyboard(service, (step) => {
                     readStep(step);
                     service.emitChange?.();
-                });
-                session.notice = `${savedNotice(result, "applied to")} Recovery copy: ${recovery}`;
+                }).catch((error) => {reread = rereadFailure(error);});
+                session.notice = `${savedNotice(result, "applied to")} ${reread}Recovery copy: ${recovery}`;
             });
             return;
         }
@@ -253,8 +254,9 @@ async function portableControl(session, message, host = {}) {
             const result = await service.restorePortableProfile(document, {expectedFingerprint: before.fingerprint,
                 saveRecovery: async (copy) => (recovery = await saveRecovery(host, copy))});
             closeEditors(session);
-            await rereadKeyboard(service);
-            session.notice = savedNotice(result, "saved to") + " " + (before.incomplete ? "Interrupted data retained for diagnosis: " : "Recovery copy: ") + recovery;
+            let reread = "";
+            await rereadKeyboard(service).catch((error) => {reread = rereadFailure(error);});
+            session.notice = savedNotice(result, "saved to") + " " + reread + (before.incomplete ? "Interrupted data retained for diagnosis: " : "Recovery copy: ") + recovery;
             return;
         }
         default: throw new Error("Unsupported portable control.");

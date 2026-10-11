@@ -160,17 +160,6 @@ function serviceHarness(options = {}) {
         onChange(snapshot) {
             changes.push(snapshot);
         },
-        profileSummary: {
-            layerCount: 5,
-            behaviorRows: 5,
-            maxTapStepsPerBehavior: 3,
-            populatedBehaviorSteps: 8,
-            comboCount: 4,
-            maxKeysPerCombo: 2,
-            reusableRgbGroups: 5,
-            rgbStageGroupRows: 12,
-            highestLedIndex: 57,
-        },
         readCandidateStatus: options.readCandidateStatus || (async () => candidateStatus(options.candidateStatus)),
     });
     return {adapter, changes, service};
@@ -229,7 +218,8 @@ test("a rejected committed payload chunk stays a read failure", async () => {
     service.onReadProgress = () => {};
     service.onChange = state => changes.push(state);
     service.status = {activeKind: PROFILE_ACTIVE_KIND.COMPILED_ONLY, committedGeneration: 0};
-    const state = await service.readCommittedProfile();
+    await assert.rejects(service.readCommittedProfile(), {code: "DEVICE_REJECTED"}, "a failed read rejects with the error it records");
+    const state = service.snapshot();
     assert.equal(state.error.code, "DEVICE_REJECTED");
     assert.equal(state.committed.state, "reading");
     assert.equal(changes.at(-1).error.code, "DEVICE_REJECTED", "failed reads still publish a full model");
@@ -252,6 +242,7 @@ test("service exposes opaque descriptors and performs only capability/status rea
     assert.equal(connected.capabilities.schema.major, 3);
     assert.equal(connected.status.activeKind, 0);
     assert.equal(connected.compatibility.compatible, true);
+    assert.ok(connected.diagnostics.includes("Live protocol, schema, VIA identity and required features are compatible."));
     assert.equal(adapter.lastConnection().writes.length, 7);
     assert.deepEqual(adapter.lastConnection().writes.map((report) => report[0]), [1, 2, 8, 8, 8, 8, 8]);
     assert.deepEqual(adapter.lastConnection().writes.slice(2).map((report) => report[2]), [1, 1, 1, 2, 2]);
@@ -271,7 +262,9 @@ test("rescans keep each interface ID and never give a replacement the old draft 
     adapter.devices = [{id: "/native/second/path", product: "Charybdis 4x6", serialNumber: "SERIAL-2"}];
     const second = (await service.enumerate()).devices[0].id;
     assert.notEqual(second, first);
-    assert.equal((await service.connect(first)).connected, false, "a removed interface cannot be selected from the latest scan");
+    await assert.rejects(service.connect(first), /latest scan/, "a removed interface cannot be selected from the latest scan");
+    assert.equal(service.snapshot().connected, false);
+    assert.match(service.snapshot().error.message, /latest scan/, "the refusal is recorded like a failure");
     adapter.devices = [
         {id: "/native/second/path", product: "Charybdis 4x6", serialNumber: "SERIAL-2"},
         {id: "/native/raw/hid/path", product: "Charybdis 4x6", serialNumber: "SERIAL-1"},
@@ -280,49 +273,83 @@ test("rescans keep each interface ID and never give a replacement the old draft 
     assert.deepEqual(rescanned.map((entry) => entry.id), [second, first], "enumeration order does not change identities");
 });
 
-test("compatibility reports schema and source-capacity blockers", async () => {
-    const {service} = serviceHarness({schemaMajor: 1, maxLayers: 8});
-    const scanned = await service.enumerate();
-    await service.connect(scanned.devices[0].id);
-    const changed = service.setProfileSummary({layerCount: 9});
-    assert.equal(changed.compatibility.compatible, false);
-    assert.match(changed.compatibility.reasons.join("\n"), /Schema major/);
-    assert.match(changed.compatibility.reasons.join("\n"), /Logical layers needs 9/);
+test("a read refused before it starts rejects and is recorded like a failure", async () => {
+    const changes = [];
+    const service = new ProfileDeviceService({adapter: new FakeDeviceAdapter(), onChange: (state) => changes.push(state)});
+    await assert.rejects(service.readLayout(), /Connect to a keyboard before reading its layout/);
+    await assert.rejects(service.refresh(), /Connect to a keyboard before refreshing/);
+    assert.match(changes.at(-1).error.message, /before refreshing/, "the refusal is published");
+    assert.equal(changes.at(-1).busy, false);
+    const optional = await service.readBaseRgb();
+    assert.equal(optional.baseRgb, null, "an optional read resolves, and without a connection holds nothing");
 });
 
-test("compatibility is recomputed when the active source profile changes", async () => {
-    const {service} = serviceHarness({maxLayers: 8});
+for (const method of ["readKeyboardProfile", "readPortableProfile", "restorePortableProfile"]) {
+    for (const state of ["disconnected", "busy"]) {
+        test(`${method} publishes its ${state} refusal without starting an operation`, async () => {
+            const {adapter, changes, service} = serviceHarness();
+            let release, pending, recoveries = 0;
+            try {
+                if (state === "busy") {
+                    const scanned = await service.enumerate();
+                    await service.connect(scanned.devices[0].id);
+                    pending = service.runOperation("existing operation", () => new Promise(resolve => {release = resolve;}));
+                }
+                service.setError(new Error("Earlier failure"));
+                const before = service.snapshot(), writes = adapter.lastConnection()?.writes.length || 0;
+                changes.length = 0;
+                await assert.rejects(service[method](document(), {saveRecovery: async () => {recoveries++;}}), error => {
+                    assert.ok(error instanceof Error);
+                    assert.equal(error.message, "Connect the keyboard and wait for the current operation to finish.");
+                    assert.deepEqual(service.snapshot().error, {code: error.code, message: error.message}, "the rejection and recorded failure agree");
+                    return true;
+                });
+                const after = service.snapshot();
+                assert.equal(changes.length, 1, "subscribers receive the refusal");
+                assert.deepEqual(changes[0].error, after.error);
+                assert.match(after.diagnostics.at(-1), /Connect the keyboard and wait/);
+                assert.equal(after.operationId, before.operationId);
+                assert.equal(after.phase, before.phase);
+                assert.equal(after.busy, before.busy, "a refused call cannot finish the operation already running");
+                assert.equal(adapter.lastConnection()?.writes.length || 0, writes, "no HID request is sent");
+                assert.equal(recoveries, 0, "restore does not write a recovery file");
+            } finally {
+                release?.();
+                await pending;
+                await service.close();
+            }
+        });
+    }
+}
+
+test("compatibility reports a schema blocker, and the diagnostic says what was checked", async () => {
+    const {service} = serviceHarness({schemaMajor: 1});
     const scanned = await service.enumerate();
-    await service.connect(scanned.devices[0].id);
-    const changed = service.setProfileSummary({layerCount: 9});
-    assert.equal(changed.compatibility.compatible, false);
-    assert.match(changed.compatibility.reasons[0], /Logical layers/);
+    const connected = await service.connect(scanned.devices[0].id);
+    assert.equal(connected.compatibility.compatible, false);
+    assert.match(connected.compatibility.reasons.join("\n"), /Schema major/);
+    assert.match(connected.diagnostics.join("\n"), /found \d+ blocking issue/);
 });
 
-test("compatibility checks Milestone A domains and fixed report framing", () => {
+test("compatibility compares only what the keyboard reports with what this app reads", () => {
     const compatibility = evaluateProfileCompatibility({
         protocol: {major: 1},
         schema: {major: 1},
         reportSize: 31,
         statusPageCount: 2,
         supportedDomainMask: 1,
-        maxLogicalLayers: 8,
-        maxBehaviorRows: 64,
-        maxTapStepsPerBehavior: 5,
-        maxPopulatedBehaviorSteps: 128,
-        maxCombos: 32,
-        maxKeysPerCombo: 4,
-        maxReusableRgbGroups: 16,
-        maxRgbStageGroupRows: 32,
-        physicalLedCount: 58,
-    }, {}, {protocolVersion: 12, firmwareVersion: 0});
+    }, {protocolVersion: 12, firmwareVersion: 0});
     assert.equal(compatibility.compatible, false);
     assert.match(compatibility.reasons.join("\n"), /Raw HID report size/);
-    assert.match(compatibility.reasons.join("\n"), /Milestone A domains/);
+    assert.match(compatibility.reasons.join("\n"), /Required profile domains/);
+    assert.deepEqual(compatibility.checks.map((check) => check.label), [
+        "Protocol major", "Schema major", "VIA protocol version", "VIA firmware version",
+        "Raw HID report size", "Status pages", "Required Profile Wire features", "Required profile domains",
+    ], "no capacity is compared: the keyboard advertises its own and nothing here has another to compare");
 });
 
 test("compatibility accepts VIA 12 and 13 and nothing else", () => {
-    const via = (protocolVersion) => evaluateProfileCompatibility({}, {}, {protocolVersion, firmwareVersion: 0})
+    const via = (protocolVersion) => evaluateProfileCompatibility({}, {protocolVersion, firmwareVersion: 0})
         .checks.find((check) => check.label === "VIA protocol version");
     // Released firmware reports 12; QMK 0.34.6 and later report 13.
     assert.equal(via(12).ok, true);

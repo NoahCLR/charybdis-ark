@@ -88,8 +88,8 @@ test("profile verification reads fresh committed bytes, reuses immutable default
             if (request[0] === 0x08 && request[2] === 4 && request[4] === 1) responses[0][7] ^= 1;
             return responses;
         };
-        const failed = await service.readCommittedProfile();
-        assert.equal(failed.error.code, "PAYLOAD_CORRUPT", "cached metadata cannot hide damaged post-Apply readback bytes");
+        await assert.rejects(service.readCommittedProfile(), {code: "PAYLOAD_CORRUPT"}, "cached metadata cannot hide damaged post-Apply readback bytes");
+        assert.equal(service.snapshot().error.code, "PAYLOAD_CORRUPT");
         adapter.keyboard.answer = originalAnswer;
         await service.disconnect();
         assert.equal(service.payloadReader, undefined);

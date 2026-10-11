@@ -61,6 +61,25 @@ test("reading the keyboard connects, reads in dependency order and says what it 
     const failed = {service: fakeService({readKeyboardProfile: async () => {throw new Error("interrupted");}})};
     assert.equal(await readKeyboard(failed, undefined, host()), false);
     assert.match(failed.notice, /Macros and global settings could not be read/);
+    assert.deepEqual(failed.service.calls, ["enumerate", "refresh", "readLayout", "readCommittedProfile", "readBaseRgb", "readCombos"]);
+});
+
+test("a failed committed-profile read keeps the layout and the optional reads, and says what failed", async () => {
+    const state = {connected: true, selectedDeviceId: "kb", devices: [device], capabilities: {...capabilities, supportedDomainMask: 3},
+        layout: {state: "read", layers: []}, committed: {state: "reading"}, error: null};
+    const service = fakeService({snapshot: () => state, capabilities: state.capabilities,
+        readCommittedProfile: async () => {state.error = {code: "TIMEOUT", message: "no answer"}; throw new Error("no answer");}});
+    service.calls.length = 0;
+    const session = {service};
+    assert.equal(await readKeyboard(session, undefined, host()), false);
+    assert.deepEqual(service.calls, ["enumerate", "refresh", "readLayout", "readBaseRgb", "readCombos"]);
+    assert.equal(session.notice, "The keyboard profile could not be read: no answer.");
+});
+
+test("a failed device read fails the whole read with its own error", async () => {
+    const service = fakeService({refresh: async () => {throw Object.assign(new Error("lost"), {code: "DISCONNECTED"});}});
+    await assert.rejects(readKeyboard({service}, undefined, host()), {code: "DISCONNECTED"});
+    assert.deepEqual(service.calls, ["enumerate"]);
 });
 
 test("apply writes a recovery copy through the host, then reads the keyboard again", async () => {
@@ -81,14 +100,15 @@ test("apply writes a recovery copy through the host, then reads the keyboard aga
     assert.equal(session.resetDraftForms, true);
 });
 
-test("a failed post-Apply read clears its progress stage", async () => {
+test("a failed post-Apply read clears its progress stage and is said after the save", async () => {
     const session = sessionWithDraft();
     stage(session, {type: "updateLayoutKeys", layers: [{layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_A"}]}]});
     session.draft.review(session.draft.revision);
     session.service.readCommittedProfile = async () => {throw new Error("readback interrupted");};
-    await assert.rejects(draftControl(session, {type: "applyProfileDraft", draftRevision: session.draft.revision}, host()), /readback interrupted/);
+    await draftControl(session, {type: "applyProfileDraft", draftRevision: session.draft.revision}, host());
     assert.equal(session.postApplyReadStep, undefined);
     assert.equal(session.applyRunning, false);
+    assert.match(session.notice, /^Complete profile applied to both halves and verified\. Reading the keyboard again failed: readback interrupted\. Recovery copy: \/recovery\/1\.json$/);
 });
 
 test("a destination blocker refuses Apply before recovery or HID", async () => {
