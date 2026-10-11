@@ -686,6 +686,52 @@ button.tier:hover { background: var(--surface-3); }
 .reach.static { cursor: default; }
 .reach .rl { font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); }
 .reach .ra { font-size: 11.5px; color: var(--text-2); }
+
+/* ── Keys screen spacing (ui/keys.mjs, ui/keys/) ─────────────────────────
+   The fixed sizes and gaps its templates used to carry inline. Colours the
+   model supplies stay inline. These follow .row, .stack, .card and
+   .swatch-lg so they win where they meet. */
+/* The board card and its legend read as one, closer than the pad's rhythm. */
+.keys-stage { gap: 10px; }
+.pickbar .right { margin-left: auto; }
+.pickbar .pickbar-actions { display: flex; gap: 6px; }
+/* A legend dot for a tier whose colour is off, or while key feedback is off. */
+.legend-item .ldot.off { background: none; border-style: dashed; }
+/* The Key tab (ui/keys/key-tab.mjs): the position's details, the stack's
+   note and swatches, what the key reaches and its participation. */
+.key-details, .key-unavailable, .answered-below { margin-top: 12px; }
+.stack-note { margin-top: 8px; }
+.stackrow .swatch-lg { width: 12px; height: 12px; border-radius: 4px; }
+.key-reaches { gap: 8px; }
+.key-participation { gap: 9px; margin-top: 16px; }
+/* The Behaviours tab: an empty group, and the open behaviour's title, its
+   keycode, the notes under them and its actions (ui/keys/behaviour-editor.mjs). */
+.rowgroup-empty { padding: 10px 12px; }
+.beh-empty { padding: 16px; }
+.beh-title { gap: 9px; }
+.beh-title h3 { font-size: 15px; }
+.beh-head .note { margin-top: 3px; }
+.beh-actions { gap: 8px; margin-left: auto; }
+.beh-note { margin-bottom: 12px; }
+.beh-foot { margin-top: 12px; }
+.ce-actions { gap: 8px; align-items: end; }
+/* Moving a behaviour onto a key that has one asks first (ui/keys/retarget.mjs). */
+.sheet.retarget { width: min(520px, 100%); }
+.sheet.retarget .sheet-b { padding: 16px 18px; }
+.sheet.retarget .sheet-b > p { font-size: 13px; line-height: 1.55; }
+.sheet.retarget .sheet-b > ul { margin: 10px 0 0 18px; line-height: 1.7; }
+/* The combo builder beside the Combos table (ui/keys/combo-builder.mjs): a
+   raised card, tighter than a screen's, its fields one grid. */
+.combo-builder { background: var(--surface-2); }
+.combo-builder > .card-h { padding: 11px 13px; }
+.combo-builder > .card-b { padding: 13px; display: grid; gap: 11px; }
+.combo-inputs { gap: 6px; flex-wrap: wrap; }
+.combo-inputs button { color: var(--text-3); }
+.combo-pick { gap: 6px; margin-top: 4px; }
+.combo-flags { gap: 14px; flex-wrap: wrap; }
+.combo-actions { gap: 8px; }
+/* A reach table's last column holds the row's Edit, at its end. */
+.reach-edit { text-align: right; }
 @media (max-width: 1180px) {
   .tab-grid.three { grid-template-columns: minmax(0, 1fr); }
   .tab-split, .tab-split.wide { grid-template-columns: minmax(0, 1fr); }
