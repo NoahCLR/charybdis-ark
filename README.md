@@ -46,7 +46,8 @@ about a layer you could lock yourself into, combos that can't fire and macros
 that are too long to play. **Apply** saves a recovery copy, writes both halves
 and reads the result back to prove it. You can stay in the editor while it copies
 and reads the keyboard back. One verified read supplies the editor and backup, with keys fetched in chunks
-and firmware defaults reused while connected.
+and firmware defaults reused while connected. With supporting firmware, reads
+also skip confirmed empty macro storage while checking the complete result.
 
 **Export profile** saves your whole setup as one file. **Import profile**
 takes a current-format backup by choosing a file or dropping it onto the Import

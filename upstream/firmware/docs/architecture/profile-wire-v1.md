@@ -497,19 +497,19 @@ Capability feature bits are:
 
 | 19 | wide pages: the payload, compiled, combo and settings readbacks (GET `0x04`, `0x05`, `0x06`, `0x07`) take a 16-bit page, request byte 4 its low byte and byte 5 its high byte, with bytes 6–31 reserved; their responses echo bytes 0–4 and the request id correlates them |
 
-| 21 | canonical UTF-8 macro text and settings scalar 27 Host settings and GET 0x0B OS readback; require this bit before writing either extension. See [runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/f08aa5e9b7eb43ed478ca4c4ae898087b22e3d18/docs/architecture/runtime-flow.md) |
+| 21 | canonical UTF-8 macro text and settings scalar 27 Host settings and GET 0x0B OS readback; require this bit before writing either extension. See [runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/399fa55981041867c8326dd607372015a005a3e5/docs/architecture/runtime-flow.md) |
 
-| 22 | host layouts: settings scalar 27 bits 16–23 name a layout from the [host layout catalogue](https://github.com/NoahCLR/charybdis-4x6/blob/f08aa5e9b7eb43ed478ca4c4ae898087b22e3d18/docs/architecture/host-layouts-v1.md) and bit 24 marks a macOS ISO keyboard; macro text is typed through that layout. Require this bit before writing bits 16–24. See [runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/f08aa5e9b7eb43ed478ca4c4ae898087b22e3d18/docs/architecture/runtime-flow.md) |
+| 22 | host layouts: settings scalar 27 bits 16–23 name a layout from the [host layout catalogue](https://github.com/NoahCLR/charybdis-4x6/blob/399fa55981041867c8326dd607372015a005a3e5/docs/architecture/host-layouts-v1.md) and bit 24 marks a macOS ISO keyboard; macro text is typed through that layout. Require this bit before writing bits 16–24. See [runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/399fa55981041867c8326dd607372015a005a3e5/docs/architecture/runtime-flow.md) |
 
-| 23 | macro input protection: automatic protection when the selected layout needs Unicode entry, with optional per-macro `01 05 01` (On) or `01 05 02` (Off) prefixes. Require this bit before writing a prefix. New physical presses are ignored until released; earlier releases remain admitted. See [runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/f08aa5e9b7eb43ed478ca4c4ae898087b22e3d18/docs/architecture/runtime-flow.md) |
+| 23 | macro input protection: automatic protection when the selected layout needs Unicode entry, with optional per-macro `01 05 01` (On) or `01 05 02` (Off) prefixes. Require this bit before writing a prefix. New physical presses are ignored until released; earlier releases remain admitted. See [runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/399fa55981041867c8326dd607372015a005a3e5/docs/architecture/runtime-flow.md) |
 
 | 20 | participation controls: behaviour and combo participation at the master, layer, definition and placement scopes ([participation policy](participation-policy.md)) |
 
 | 24 | candidate reuse: copy bounded ranges from an identified active profile into the inactive candidate (`SET 0x1B`, below) |
 
 | 25 | candidate streaming chunks: admit sequential chunks and prove bounded batches through status (`SET 0x1C`, below) |
-| 26 | protected macro keyboard-output isolation: suspend already-held ordinary keys, send only macro keyboard output, restore current held modifiers and suppress remaining ordinary usages until release; requires bit 23. See [runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/f08aa5e9b7eb43ed478ca4c4ae898087b22e3d18/docs/architecture/runtime-flow.md) |
-| 27 | streaming stored macros: no separate compiled-program ceiling; slot bytes and terminators must fit the advertised VIA macro bank (34,903 bytes in this layout). Without this bit, retain the legacy 512-byte program ceiling. See [runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/f08aa5e9b7eb43ed478ca4c4ae898087b22e3d18/docs/architecture/runtime-flow.md) |
+| 26 | protected macro keyboard-output isolation: suspend already-held ordinary keys, send only macro keyboard output, restore current held modifiers and suppress remaining ordinary usages until release; requires bit 23. See [runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/399fa55981041867c8326dd607372015a005a3e5/docs/architecture/runtime-flow.md) |
+| 27 | streaming stored macros: no separate compiled-program ceiling; slot bytes and terminators must fit the advertised VIA macro bank (34,903 bytes in this layout). Without this bit, retain the legacy 512-byte program ceiling. See [runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/399fa55981041867c8326dd607372015a005a3e5/docs/architecture/runtime-flow.md) |
 
 Supported-domain-mask bits 0–3 are RGB, key behaviors, combos and portable
 settings respectively. RGB and behavior domain bits must agree exactly with
@@ -549,6 +549,54 @@ marker exists on either half, and durable authority is unchanged. Until the
 peer acknowledges the retried ABORT, the keyboard starts no new save or split
 transfer; a peer that never does needs a restart. A decoder that predates the
 bit rejects the status while it is set, as it rejects any unknown flag.
+
+### Sparse VIA Macro Read Map — Optional GET Value `0x0c`
+
+Channel 0, value `0x0c`, uses the ordinary byte page and nonzero request ID;
+request bytes 5–31 are reserved zero. It is optional without a new capability
+bit, so existing clients remain compatible. Unsupported firmware returns its
+unhandled echo or UNKNOWN_PAGE; a bank without a completed clean local checksum
+returns UNAVAILABLE. The map also returns UNAVAILABLE unless the checksum worker
+hashed the standard board's exact two-byte VIA config `[1,0]` (valid EEPROM,
+zero layout options). QMK permits another client to set nonzero layout options;
+that clean state remains readable through the full VIA path. Compatibility is
+recorded in the same completed cursor as the hash and bitmap, rather than
+sampling current config during GET. A client may use the full VIA read when page 0 is unavailable
+or unsupported. Once a map is accepted, an unavailable or malformed later page
+fails that read rather than substituting data from another generation.
+
+Page 0 has exactly 13 bytes, with multibyte integers little-endian:
+
+| Offset | Bytes | Meaning |
+| --- | --- | --- |
+| 0 | 1 | Map layout version, `1` |
+| 1 | 2 | Block size, `256` bytes |
+| 3 | 2 | Full VIA macro capacity, including the write-validity byte |
+| 5 | 4 | Nonzero local storage generation |
+| 9 | 4 | Canonical full VIA-store FNV-1a digest |
+
+Pages 1 onward carry up to 25 bitmap bytes each, exactly
+`ceil(ceil(capacity / 256) / 8)` bytes altogether. Bit `block % 8` of byte
+`floor(block / 8)` marks a block containing at least one nonzero byte; every
+unmarked block is exactly zero. Unused high bits and response padding are zero.
+There are 18 bitmap bytes at capacity 34,903, and at most 32 at capacity 65,535.
+Past-end pages return UNKNOWN_PAGE with no payload.
+
+The checksum worker gathers these bits from the same bytes it hashes, within
+its existing 224-byte scan budget and 14-byte read workspace. The map is published
+with that checksum and invalidated with it on every mutation or remote apply;
+GET copies only metadata or bitmap bytes and never walks the bank. Both locally
+computed and receiver-verified identities carry their own matching bitmap.
+
+A client reads page 0, the bitmap, the marked ranges through ordinary VIA
+MACRO_READ, and page 0 again. It requires identical metadata, checks geometry
+against VIA and Profile Wire, reconstructs omitted bytes as zero, and verifies
+the full canonical VIA digest using its freshly read layout and the standard
+board's fixed VIA config. Complete capture also matches the map identity to its
+initial storage status and retains its final profile/storage/settings coherence
+checks. Stale bytes after the final macro and a nonzero write-validity marker
+are included like any other stored bytes. This is a lossless transport change;
+storage, backup, Apply and recovery formats do not change.
 
 ### Payload Readback — GET Values `0x04` And `0x05`
 
@@ -811,6 +859,36 @@ peer is ready. Builds with the live-profile owner answer it; others answer
 | 20 | 1 | the peer's transfer owner in its last BUSY |
 | 21 | 1 | who held the peer's storage admission in its last BUSY: `0` none, `1` host, `2` peer |
 | 22 | 3 | reserved, zero |
+
+Page 2 is a read-only peer-copy diagnostic. Older firmware answers
+`UNKNOWN_PAGE`; existing pages and their reserved bytes are unchanged. Its
+25-byte payload is:
+
+| Payload offset | Size | Field |
+| ---: | ---: | --- |
+| 0 | 1 | layout version, `1` |
+| 1 | 1 | flags: bit 0 reuse became unavailable; other bits zero |
+| 2 | 2 | bytes acknowledged as copied from the peer's own source |
+| 4 | 2 | PAYLOAD_REUSE RPC attempts, including repeated progress polls and transport failures |
+| 6 | 2 | correlated SOURCE_UNAVAILABLE replies accepted by the sender |
+| 8 | 4 | sender reconciler scan invocations during the prepared push |
+| 12 | 4 | all RPC attempts during the prepared push, including failed attempts |
+| 16 | 2 | current reconciler transfer offset, as on page 1 |
+| 18 | 2 | current reconciler transfer length, as on page 1 |
+| 20 | 5 | reserved, zero |
+
+Counters saturate at their field widths, reset when a new prepared push is
+accepted, and remain available after it ends. They include validation,
+preparation, commit and retries, so take differences at the phase boundaries
+to isolate sending. Reconciler invocations include visits during retry waits;
+they are not all QMK matrix scans, since another durable-I/O subsystem may
+own a scan. An RPC attempt is QMK's complete info/request/execute/reply
+sequence, not one serial subtransaction. Reused bytes advance on a range's
+acknowledgement or source-unavailable reply, not each in-flight copy step.
+Read page 1 before and after page 2 and discard a sample crossing a phase or
+transfer change; the two reports are individually coherent, not one atomic
+capture. A later background repair can change the current offset and length
+without resetting the last prepared push's counters.
 
 Flag bit 2 (added 2026-09-25) means the commit decision, or the VIA ACCEPT
 that follows it, is waiting for this half to go idle: no held key, pending

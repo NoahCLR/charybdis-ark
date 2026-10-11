@@ -75,6 +75,17 @@ full-upload and validator checks still run. New-firmware work must also run this
 runner against the proposed firmware, where it must execute rather than skip.
 Its scan opportunities are simulated and establish no hardware timing.
 
+The macro-read-map runner exercises firmware's production checksum worker
+against Ark's sparse reader, in normal and sanitizer builds, with empty,
+sparse (including stale tail bytes) and dense banks at both 34,903 and 65,535
+bytes. It requires exact reconstructed bytes and matching whole-store digests,
+and full-read fallback when firmware's hashed VIA config has nonzero layout
+options. The complete-capture regression also retains that actual storage identity.
+It skips only when the selected firmware predates the optional read-map
+extension; work adding that extension must also run against the proposed
+firmware, where this coverage must execute. Transfer counts are not hardware
+read timings.
+
 ## Agreement with a firmware contract
 
 The bridge proves byte-level equivalence of codecs; the agreement check answers

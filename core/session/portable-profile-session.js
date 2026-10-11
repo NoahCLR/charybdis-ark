@@ -72,7 +72,7 @@ async function captureProfile(connection, ids, capabilities, onProgress = () => 
     const active = before.activeKind === PROFILE_ACTIVE_KIND.COMMITTED ? await payloadReader.readCommitted({...options, reuse: reuseReadback, onProgress: counted("Reading saved behaviours and lighting")}) : defaults;
     onProgress("Reading combos and global settings");
     const combos = await readDeviceCombos(connection, options), settings = await readSettings(connection, ids);
-    const via = await readViaStorage(connection, {capabilities, allowIncomplete, onProgress: progress =>
+    const via = await readViaStorage(connection, {capabilities, allowIncomplete, nextRequestId: options.nextRequestId, storageIdentity: storageBefore, onProgress: progress =>
         counted(progress.region === "layout" ? "Reading keys and layers" : "Reading macros")(progress)});
     onProgress("Checking the complete read");
     if (!settings.equals(await readSettings(connection, ids))) throw fail("PROFILE_CHANGED", "Keyboard settings changed during the backup. Read it again before continuing.");

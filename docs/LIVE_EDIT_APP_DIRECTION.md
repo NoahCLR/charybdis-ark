@@ -45,7 +45,7 @@ matrix.
 | Mouse | Pointer and sniping DPI, auto-sniping and auto-mouse: global-policy sections the core files under the Mouse area, so the rail, the review and import counts all place them there. The auto-mouse fade delay is a share of the timeout, edited on its lighting stage (D-L17) |
 | Pointing modes | 32 device-owned slots (sparse PD domain v3, RGB v4); live codecs accept only the current action vocabulary and profile formats (D-L54). See [PD-mode domain v1](../upstream/firmware/docs/architecture/pd-mode-domain-v1.md) |
 | Global policy | Every other portable setting, including startup layers, combo matching and device-reported lighting and key options; Windows Unicode setup links to WinCompose and macOS Unicode setup warns about Option shortcuts (D-L56); unsupported firmware features stay read-only |
-| Backup and restore | Complete current-format snapshots, choose or drop a file for import review against the keyboard, recovery file and verified restore; the preceding eight-layer backup is translated before review (D-L54) |
+| Backup and restore | Complete current-format snapshots, choose or drop a file for import review against the keyboard, recovery file and verified restore; reads skip firmware-confirmed zero macro blocks while preserving exact storage and full integrity checks (D-L23); the preceding eight-layer backup is translated before review (D-L54) |
 | Drafts and Apply | One draft with item-by-item review, discard by edit group, Show, undo/redo and draft history; the review checks reachable actions, confirms active warnings and traps, and blocks profiles the destination cannot save (D-L36); Apply names the master and slave halves in its steps and says where a failure happened; one coherent capture supplies the editor and draft, and copy/read status updates retain the active editor (D-L19, D-L23, D-L29, D-L30) |
 | Recovery | Atomic logical Apply, capability-gated differential custom uploads (D-L58), differential VIA transfer, reboot recovery fencing, firmware roll-forward after the decision, resume after a lost or power-cycled peer link, bounded cancel owned by the keyboard (D-L20–D-L22, D-L27, D-L39) |
 | Where it runs | The VS Code extension, and a web page that runs all of Ark in Chrome or Edge over WebHID (D-L52): Choose keyboard, one tab at a time, recovery copies in the browser's storage, a light/dark toggle. A phone gets only a notice that Ark runs on a computer, with links to the repositories; a tablet gets Ark. `npm run build:web` writes the page as static files; a workflow publishes it to Cloudflare Pages: `dev` at `ark-dev.ncleroy.dev`, `main` at `ark.ncleroy.dev` from the first release |
@@ -71,6 +71,11 @@ Remaining before calling the product complete:
 - the open issues below.
 
 ## Open Issues
+
+- **Sparse macro read timing needs hardware acceptance (D-L23).** Compare
+  first read, Refresh and Export with mostly empty and full macro banks, and
+  after shortening a macro. Automated counts prove reduced transfer volume;
+  they do not measure USB latency or typing/pointing cadence.
 
 - **The picker's list of unbuilt QMK features is written by hand** (D-L05).
   `webview/view/picker-sections.mjs` hides keycodes for features this build
@@ -388,8 +393,10 @@ and after, verifies both hashes, retries or downloads afresh on a mismatch,
 and retains the capture's status, storage and settings coherence checks.
 Reconnect discards the reader. Authored Apply target bytes never seed its cache:
 the stored metadata alone is not a fresh integrity read of flash. The complete
-macro bank, including unused trailing bytes, remains freshly read because Apply
-compares and verifies the actual stored bank. Portable progress names each read
+macro bank, including unused trailing bytes, remains freshly verified because
+Apply compares the actual stored bank. Optional macro read maps reconstruct
+firmware-confirmed zero blocks and download every marked block; older firmware
+keeps the full read (D-L23). Portable progress names each read
 and reports transferred bytes. Configure editors retain their DOM when a full
 model changes only transient read status; data, vocabulary, permission or
 connection changes and form-reset/edit replies redraw. New model fields are
@@ -409,6 +416,25 @@ reports the peer phase, transferred bytes and the peer's last split status. The
 host counts its movement as progress while the keyboard is `PREPARING_PEER`, so
 a slow copy no longer runs into the stall window. Firmware without page 1
 answers `UNKNOWN_PAGE` and keeps the old behaviour.
+
+When a keyboard implements optional Profile Wire GET `0x0c`, a complete capture
+reads its macro map and storage identity, downloads marked 256-byte blocks,
+reconstructs omitted blocks as zero, rereads the metadata and verifies the
+canonical full VIA-store digest. The map must match the capture's initial
+storage identity; the final profile, storage and settings checks stay in place.
+Adjacent blocks share one transfer range. Progress counts bytes actually
+transferred, and an empty bank completes with zero macro data exchanges.
+
+A stale nonzero tail is included even when it belongs to no macro. The final
+write-validity byte is included in the map and retains its incomplete-write
+check. Unsupported or initially unavailable maps use the full-bank reader,
+including clean nonzero VIA layout options written by another client;
+malformed maps, later unavailability, changed identities and corruption fail
+the read. Freshness and exact stored bytes are preserved for initial capture,
+Refresh, Export, recovery and differential Apply. Storage and backup formats
+stay unchanged. The firmware owns the
+[wire contract](../upstream/firmware/docs/architecture/profile-wire-v1.md#sparse-via-macro-read-map--optional-get-value-0x0c),
+imported from its published implementation.
 
 ### D-L24 — Directional modes can read eight directions
 

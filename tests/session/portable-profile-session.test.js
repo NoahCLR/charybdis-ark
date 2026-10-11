@@ -337,7 +337,43 @@ test("a capture never reads the retired PD page, even from firmware that still a
     const captured = await captureProfile(connection, ids, {...captureCapabilities, featureFlags: (1 << 12) | (1 << 13)});
     assert.equal(keyboard.requests.some(r => r[0] === 0x08 && r[1] === 0 && r[2] === 0x09), false, "no GET 0x09");
     assert.equal(Object.hasOwn(captured.document, "pdModeSource"), false, "no pointing-mode source is written");
+    assert.deepEqual(keyboard.unhandled.map(r => [r[0], r[1], r[2], r[4]]), [[8, 0, 0x0c, 0]], "only the optional macro read map is unsupported");
+});
+
+test("a complete fresh capture uses sparse macros without changing the backup or held bank", async () => {
+    const source = backup32(), keyboard = fakeKeyboard({document: source, streaming: true, macroReadMap: true});
+    const {connection, ids} = wired(keyboard);
+    const captured = await captureProfile(connection, ids, {...captureCapabilities, viaMacroBytes: 34903, featureFlags: captureCapabilities.featureFlags | (1 << 27)});
+    assert.equal(captured.fingerprint, fingerprint(source));
+    assert.deepEqual(captured.document.macros, source.macros);
+    assert.equal(captured.storage.macros.length, 34903);
+    assert.ok(keyboard.requests.filter(r => r[0] === 0x0e).length < 100, "macro transfer follows occupied storage");
     assert.deepEqual(keyboard.unhandled, []);
+});
+
+test("clean nonzero VIA layout options retain complete capture through full-read fallback", async () => {
+    const source = backup32(), keyboard = fakeKeyboard({document: source});
+    const held = validateSnapshot(source);
+    // Independent canonical storage digest for config [valid, options] = [1,1].
+    const frame = (id, bytes) => [id, bytes.length & 255, bytes.length >>> 8, ...bytes];
+    const digest = [...frame(1, [1, 1]), ...frame(2, held.layout), ...frame(3, []), ...frame(4, held.macros)]
+        .reduce((hash, byte) => Math.imul((hash ^ byte) >>> 0, 16777619) >>> 0, 2166136261);
+    const {connection, ids} = wired(keyboard), request = connection.request;
+    connection.request = async report => {
+        if (report[0] === 8 && report[2] === 0x0c) {
+            const response = Buffer.from(report); response.fill(0, 5); response[5] = 3; return response;
+        }
+        const response = await request(report);
+        if (report[0] === 8 && report[2] === 8 && report[4] === 0) {
+            response.writeUInt32LE(digest, 13); response.writeUInt32LE(digest, 21);
+        }
+        return response;
+    };
+    const captured = await captureProfile(connection, ids, captureCapabilities);
+    assert.equal(captured.fingerprint, fingerprint(source));
+    assert.equal(captured.identity.storageDigest, digest);
+    assert.deepEqual(captured.storage.macros, held.macros);
+    assert.equal(keyboard.requests.filter(r => r[0] === 0x0e).length, 369);
 });
 
 test("complete capture preserves Unicode bank bytes and still rejects legacy destinations", async () => {

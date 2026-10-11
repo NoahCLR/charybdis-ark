@@ -48,7 +48,7 @@ const CURRENT_DOMAINS = "16:4,32:2,48:3,64:6,80:3";
 // its authored combos and factory settings). `compiledOnly` runs those
 // defaults, with nothing committed; the live combo and settings readbacks
 // still answer from the document.
-function fakeKeyboard({document, compiled, streaming = false, compiledOnly = false, generation = 42, firmwareVersion = 0x00010000, brightnessMax = 255, options = keyboardOptions.wire()} = {}) {
+function fakeKeyboard({document, compiled, streaming = false, macroReadMap = false, compiledOnly = false, generation = 42, firmwareVersion = 0x00010000, brightnessMax = 255, options = keyboardOptions.wire()} = {}) {
     const held = validateSnapshot(document);
     held.macros = require("../../core/model/portable-profile").macroBank(document.macros.map(value => Buffer.from(value, "base64")), streaming ? 34903 : 10327);
     if (document.version !== 3 || document.layers.length !== 16) throw new Error("The fake keyboard runs current firmware: a schema-3, sixteen-layer document.");
@@ -105,6 +105,16 @@ function fakeKeyboard({document, compiled, streaming = false, compiledOnly = fal
         [0x0b]: [Buffer.from([1, 0])],
         [VALUE.CANDIDATE_STATUS]: candidateStatus,
     };
+    if (macroReadMap) {
+        const metadata = page(13, p => {
+            p[0] = 1; p.writeUInt16LE(256, 1); p.writeUInt16LE(held.macros.length, 3);
+            p.writeUInt32LE(generation, 5); p.writeUInt32LE(storageDigest, 9);
+        });
+        const bitmap = Buffer.alloc(Math.ceil(Math.ceil(held.macros.length / 256) / 8));
+        for (let i = 0; i < held.macros.length; i++) if (held.macros[i]) bitmap[Math.floor(i / 2048)] |= 1 << (Math.floor(i / 256) % 8);
+        values[0x0c] = [metadata];
+        for (let offset = 0; offset < bitmap.length; offset += 25) values[0x0c].push(bitmap.subarray(offset, offset + 25));
+    }
     const lighting = baseLighting(held.settings.values);
     const rgb = {1: [lighting.brightness], 2: [lighting.effect], 3: [lighting.speed], 4: [lighting.hue, lighting.saturation]};
 
