@@ -6,6 +6,7 @@
 // deliberately not collapsed into the same rule.
 const {KEY_BEHAVIOR_HOLD_MODES: MODE} = require("../schema/key-behavior-domain-v1");
 const {effectiveComboTerm} = require("../schema/combo-domain-v1");
+const {SETTING} = require("../schema/settings-domain-v1");
 const {nativeCode, actionName} = require("../schema/actions");
 
 /**
@@ -19,8 +20,8 @@ const transparent = action => nativeCode(action) === 1;
 /** @template {number | string | undefined} T @param {Pick<import("../schema/types.js").BehaviorRow, 'target'> & Partial<Pick<import("../schema/types.js").BehaviorRow, 'tapHoldTerm' | 'longerHoldTerm' | 'multiTapTerm'>>} row @param {readonly T[]} values @returns {{hold: number | T, long: number | T, repeat: number | T}} */
 function effectiveTimings(row, values) {
     const code = nativeCode(row.target);
-    return {hold: row.tapHoldTerm || values[code !== undefined && code >= 0x4000 && code <= 0x4fff ? 0 : 1],
-        long: row.longerHoldTerm || values[2], repeat: row.multiTapTerm || values[3]};
+    return {hold: row.tapHoldTerm || values[code !== undefined && code >= 0x4000 && code <= 0x4fff ? SETTING.TAPPING_TERM : SETTING.TAP_HOLD_TERM],
+        long: row.longerHoldTerm || values[SETTING.LONG_HOLD_TERM], repeat: row.multiTapTerm || values[SETTING.MULTI_TAP_TERM]};
 }
 /** @param {BehaviorStep} step @param {Timings} terms @returns {step is BehaviorStep & {hold: import("../schema/types.js").HoldBranch, longHold: import("../schema/types.js").HoldBranch}} */
 function releaseHoldUnreachable(step, terms) {
@@ -63,7 +64,7 @@ function gestureTimingFindings(decoded) {
             }
         }
     }
-    if (decoded.settings.values[20]) (decoded.combos?.rows || []).forEach((combo, index) => {
+    if (decoded.settings.values[SETTING.COMBOS_ENABLED]) (decoded.combos?.rows || []).forEach((combo, index) => {
         const term = effectiveComboTerm(decoded.combos, combo);
         if (term >= SHORT_WINDOW_MS) return;
         results.push({kind: "comboTiming", level: "notice", layers: [], identity: String(index),

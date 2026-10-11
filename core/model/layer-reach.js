@@ -648,7 +648,7 @@ function gestureTimingFindings(decoded, facts, walked, legacyGestureTiming, lega
         });
     }
     return [...affected].map(([code, {row, nativeLayerTap, nativeWait, combos}]) => {
-        const repeat = row.multiTapTerm || decoded.settings.values[3];
+        const repeat = row.multiTapTerm || decoded.settings.values[SETTING.MULTI_TAP_TERM];
         const hold = row.tapHoldTerm || decoded.settings.values[nativeLayerTap ? 0 : 1];
         const competing = [...combos].sort((a,b) => a-b).map(index => `combo ${index} (${effectiveComboTerm(decoded.combos, decoded.combos.rows[index])} ms)`);
         const reason = competing.length ? `This key also waits for ${competing.join(", ")}. ` : "";
