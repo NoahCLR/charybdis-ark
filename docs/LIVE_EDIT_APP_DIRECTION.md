@@ -38,18 +38,18 @@ matrix.
 
 | Product surface | Current state |
 | --- | --- |
-| Layout and 16 layers | Read/write; key labels and picker legends follow the chosen host layout (D-L56); names and overlay order travel with complete profiles; a reorder renumbers layer keys by default ("Keys follow their layers") |
-| Key behaviours, combos and RGB | Read/write editors over the shared draft; selected keys open an unstored behaviour grid until the first edit; matching Keys reach sections share open state across tabs, open independently, and use the page scrollbar |
-| Macros | 128 named VIA macro slots with literal Text, editable steps, Advanced raw payload, recorder and live validation; capability-gated Unicode text, saved macOS/Windows/Linux host setup and a host keyboard layout macro text is typed and checked through; changing Host rechecks stored playback and reviews affected macros with that setting (D-L56); per-macro input protection defaults on for Unicode entry, with On/Off overrides and capability-gated isolation of held keyboard input (D-L57); shared memory shown and enforced, and one macro may use all of it on streaming firmware (older firmware keeps the 512-byte playback limit) (D-L25, D-L26) |
+| Layout and 16 layers | Read/write keys, layer names and order; a reorder renumbers layer keys by default, any layer can be the base, and key labels follow the host layout (D-L15, D-L29, D-L37, D-L56) |
+| Key behaviours, combos and RGB | Read/write editors over the shared draft, with participation controls at every scope (D-L12, D-L32, D-L49, D-L55) |
+| Macros | 128 named VIA macros with Text, steps, Advanced raw payload, recorder and live validation; capability-gated Unicode text, typed and checked through the host's OS and keyboard layout; per-macro input protection; one shared memory, shown and enforced (D-L25, D-L26, D-L56, D-L57) |
 | Custom keys | 128 named keys that do what their behaviour says: rename, add or open the behaviour, place, see where each is used (D-L42) |
-| Mouse | Pointer and sniping DPI, auto-sniping and auto-mouse: global-policy sections the core files under the Mouse area, so the rail, the review and import counts all place them there. The auto-mouse fade delay is a share of the timeout, edited on its lighting stage (D-L17) |
-| Pointing modes | 32 device-owned slots (sparse PD domain v3, RGB v4); live codecs accept only the current action vocabulary and profile formats (D-L54). See [PD-mode domain v1](../upstream/firmware/docs/architecture/pd-mode-domain-v1.md) |
-| Global policy | Every other portable setting, including startup layers, combo matching and device-reported lighting and key options; Windows Unicode setup links to WinCompose and macOS Unicode setup warns about Option shortcuts (D-L56); unsupported firmware features stay read-only |
-| Backup and restore | Complete current-format snapshots, choose or drop a file for import review against the keyboard, recovery file and verified restore; reads skip firmware-confirmed zero macro blocks while preserving exact storage and full integrity checks (D-L23); the preceding eight-layer backup is translated before review (D-L54) |
-| Drafts and Apply | One draft with item-by-item review, discard by edit group, Show, undo/redo and draft history; the review checks reachable actions, confirms active warnings and traps, and blocks profiles the destination cannot save (D-L36); Apply names the master and slave halves in its steps and says where a failure happened; one coherent capture supplies the editor and draft, which renders its decoded snapshot directly (D-L61), and copy/read status updates retain the active editor (D-L19, D-L23, D-L29, D-L30) |
-| Recovery | Atomic logical Apply, capability-gated differential custom uploads (D-L58), differential VIA transfer, reboot recovery fencing, firmware roll-forward after the decision, resume after a lost or power-cycled peer link, bounded cancel owned by the keyboard (D-L20–D-L22, D-L27, D-L39) |
-| Where it runs | The VS Code extension, and a web page that runs all of Ark in Chrome or Edge over WebHID (D-L52): Choose keyboard, one tab at a time, recovery copies in the browser's storage, a light/dark toggle. A phone gets only a notice that Ark runs on a computer, with links to the repositories; a tablet gets Ark. `npm run build:web` writes the page as static files; a workflow publishes it to Cloudflare Pages: `dev` at `ark-dev.ncleroy.dev`, `main` at `ark.ncleroy.dev` from the first release |
-| Demo without a keyboard | Explore a demo, in both hosts and on a browser without WebHID: the bundled demo profile (`core/data/`) in a real draft under current firmware's capabilities, every screen editable and reviewed; Apply refused, Export saves the draft, Open a profile file replaces it, leaving with edits not exported asks first (D-L53) |
+| Mouse | Pointer and sniping DPI, auto-sniping and auto-mouse, settings the core files under Mouse, so the rail, the review and import counts all place them there; the auto-mouse fade is a share of the timeout, edited on its lighting stage (D-L17) |
+| Pointing modes | 32 device-owned slots in the sparse PD domain (D-L41, D-L54); see [PD-mode domain v1](../upstream/firmware/docs/architecture/pd-mode-domain-v1.md) |
+| Global policy | Every other portable setting, including startup layers, combo matching, Host and device-reported lighting and key options; unsupported firmware features stay read-only (D-L18, D-L56) |
+| Backup and restore | Complete current-format snapshots, import review against the keyboard, recovery file and verified restore; the preceding eight-layer backup is translated before review (D-L15, D-L23, D-L54) |
+| Drafts and Apply | One draft with item-by-item review, discard by edit group, Show, undo/redo and history; the review checks reachable actions, confirms warnings and traps and blocks what the destination cannot save; Apply names its steps and halves and says where a failure happened (D-L19, D-L23, D-L29, D-L30, D-L36, D-L60, D-L61) |
+| Recovery | Atomic logical Apply, differential custom and VIA transfer, reboot recovery fencing, firmware roll-forward after the decision, resume after a lost or power-cycled peer link, bounded cancel owned by the keyboard (D-L20–D-L22, D-L27, D-L39, D-L58) |
+| Where it runs | The VS Code extension, and a web page in Chrome or Edge over WebHID, published from `dev` to `ark-dev.ncleroy.dev` and from `main` to `ark.ncleroy.dev`; a phone gets only a notice (D-L02, D-L52) |
+| Demo without a keyboard | The bundled demo profile in a real draft, in both hosts: every screen editable and reviewed, Apply refused, Export saves the draft (D-L53) |
 
 The rail's health strip shows connection, both-half convergence, draft state
 and recovery state. Convergence needs the firmware's peer-known and
@@ -67,7 +67,6 @@ Remaining before calling the product complete:
   USB role migration is untested: on the normal pair the left half exposes no
   Raw HID interface (`FORCE_SLAVE`/`usb_disconnect`), so it needs role-switching
   firmware;
-- the web page's first release to `ark.ncleroy.dev` (D-L52);
 - the open issues below.
 
 ## Open Issues
@@ -76,7 +75,6 @@ Remaining before calling the product complete:
   first read, Refresh and Export with mostly empty and full macro banks, and
   after shortening a macro. Automated counts prove reduced transfer volume;
   they do not measure USB latency or typing/pointing cadence.
-
 - **The picker's list of unbuilt QMK features is written by hand** (D-L05).
   `webview/view/picker-sections.mjs` hides keycodes for features this build
   does not include, matched against its rules files and QMK's defaults. It
@@ -91,10 +89,8 @@ Remaining before calling the product complete:
 
 - **Charybdis Ark** (this repository) is the app and the only one
   developed (D-L35). Nothing at runtime reads the firmware repository.
-- The first live app (v1, which lived at the same path) ported Studio's interface
-  (D-L06). It was frozen by D-L35 and then removed; the profiles it wrote remain
-  a firmware compatibility check in
-  `tests/fixtures/stored_profile_live_v1.fixture`.
+- The first live app, v1, is removed; see
+  [Historical decisions](#historical-decisions).
 
 ## Remaining Load-Bearing Contracts
 
@@ -105,11 +101,10 @@ which is not yet built.
 
 ## Decisions
 
-Numbers are stable and cited from code and docs. D-L01 (branch from
-`refactor/live_edit`, revert only Studio's shell) and D-L03 (move `live-link/`
-into Ark, since layered into `core/` by D-L10) were branch setup and
-are complete. D-L16 wired Studio's macro UI into v1 and went with it (D-L35).
+Numbers are stable and cited from code and docs.
 Firmware decisions keep their heading here and their text in the firmware direction.
+Decisions about the retired v1 app, and the numbers retired without a heading,
+are under [Historical decisions](#historical-decisions) at the end.
 
 ### D-L02 — Ark is a VS Code extension for now
 
@@ -167,16 +162,6 @@ back by name.
 VIA macro slots appear as `VIA_MACRO_0`–`VIA_MACRO_63` throughout the app.
 Their QMK numeric identities still round-trip, but the picker does not offer
 duplicate `QK_MACRO_n` names from the first 32 slots.
-
-### D-L06 — v1 ported Studio's whole UI and rebuilt only the model source
-
-*Superseded by D-L35.* Studio's webview does no file access: the host posts a
-`model`, the webview renders it, and edits come back as typed messages. The
-reusable seam was therefore the model, not the widgets, so v1 took Studio's UI
-verbatim and supplied the model from the keyboard. The original plan, forking
-the presentation and rebuilding the state, misread where that seam sits;
-lifting "the presentation" out of 534 functions in one template literal was
-impossible. v2 then replaced the ported UI with its own.
 
 ### D-L07 — Specs are promoted, process is deleted
 
@@ -726,19 +711,6 @@ sequenced Apply itself. Each rule now has one home:
 ### D-L34 — Layer keycodes are owned in the firmware, and the app follows
 
 Firmware decision; its text is in the firmware direction.
-
-### D-L35 — Charybdis Live v2 is the app
-
-*Numbered D-L21 when written, alongside the atomic-Apply decision.* v2 was
-built beside v1 as `tools/charybdis-live-v2/`, and took over the plain name
-`tools/charybdis-live/` once v1 was removed. It keeps v1's core, its layering and the one rule
-(nothing reads the firmware repository), and replaces v1's ported Studio
-interface with its own: browser ES modules with pure, tested `view/` modules,
-every posted edit built by `webview/view/edits.mjs` and staged against a real
-draft in `tests/edits.test.mjs`, and a board that shows what the firmware does.
-Edits exist only as a reviewed draft; a keyboard the app cannot open a draft for
-is read-only, and the host refuses edits rather than writing them directly. v1
-was frozen by this decision and has since been removed.
 
 ### D-L36 — The review checks reachable actions and save blockers
 
@@ -1359,7 +1331,6 @@ beginning and ending, the panel's own operations running, an Apply and its
 readback, and the outbox the next model carries once. The other session
 modules call these rather than setting those fields together themselves.
 
-
 ### D-L61 — Draft presentation consumes snapshots, device health consumes reads
 
 The editable configuration model is built directly from a complete snapshot
@@ -1379,3 +1350,38 @@ diagnostics use the actual device state throughout; local changes only add
 the existing draft subtitle. The demo supplies its own explicit header and
 diagnostics (D-L53). Earlier firmware keeps its independent read-only view
 and domain failures even when a dirty draft is retained.
+
+## Historical decisions
+
+These describe the retired v1 app; their lasting rules are stated in the
+decisions above, the [guide](GUIDE.md) and [`AGENTS.md`](../AGENTS.md). D-L01
+(branch from `refactor/live_edit`, revert only Studio's shell) and D-L03 (move
+`live-link/` into Ark, since layered into `core/` by D-L10) were branch setup
+and are complete. D-L16 wired Studio's macro UI into v1 and went with it
+(D-L35). The first live app (v1, which lived at the same path) ported Studio's
+interface (D-L06). It was frozen by D-L35 and then removed; the profiles it
+wrote remain a compatibility check in the firmware's
+`tests/fixtures/stored_profile_live_v1.fixture`.
+
+### D-L06 — v1 ported Studio's whole UI and rebuilt only the model source
+
+*Superseded by D-L35.* Studio's webview does no file access: the host posts a
+`model`, the webview renders it, and edits come back as typed messages. The
+reusable seam was therefore the model, not the widgets, so v1 took Studio's UI
+verbatim and supplied the model from the keyboard. The original plan, forking
+the presentation and rebuilding the state, misread where that seam sits;
+lifting "the presentation" out of 534 functions in one template literal was
+impossible. v2 then replaced the ported UI with its own.
+
+### D-L35 — Charybdis Live v2 is the app
+
+*Numbered D-L21 when written, alongside the atomic-Apply decision.* v2 was
+built beside v1 as `tools/charybdis-live-v2/`, and took over the plain name
+`tools/charybdis-live/` once v1 was removed. It keeps v1's core, its layering and the one rule
+(nothing reads the firmware repository), and replaces v1's ported Studio
+interface with its own: browser ES modules with pure, tested `view/` modules,
+every posted edit built by `webview/view/edits.mjs` and staged against a real
+draft in `tests/edits.test.mjs`, and a board that shows what the firmware does.
+Edits exist only as a reviewed draft; a keyboard the app cannot open a draft for
+is read-only, and the host refuses edits rather than writing them directly. v1
+was frozen by this decision and has since been removed.
