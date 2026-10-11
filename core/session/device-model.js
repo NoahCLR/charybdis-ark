@@ -13,7 +13,7 @@
 const {PD_SLOT_BINDINGS} = require("../data/pd-bindings");
 const {VOCABULARY, slotName} = require("../model/vocabulary");
 const keycodeCatalog = require("../data/keycode-catalog");
-const {baseEffectForView, baseRgbForView, behaviorRowsForView, builtInForView, comboRowsForView, rgbForView} = require("./device-profile-view");
+const {baseEffectForView, baseRgbForView, behaviorRowsForView, builtInForView, comboRowsForView, rgbForView} = require("../model/device-profile-view");
 const {effectiveTimings} = require("../model/gesture-timing");
 const {hostKeyVocabulary, keyLabel, profileKeyNames} = require("../model/key-names");
 const {layerName} = require("../model/vocabulary");

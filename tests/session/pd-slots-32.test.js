@@ -6,7 +6,7 @@ const {CAPABILITIES_32, document32} = require("../fixtures/pd-slots-32");
 const {ProfileDraftSession} = require("../../core/session/profile-draft-session");
 const {fingerprint, summary, validateSnapshot} = require("../../core/model/portable-profile");
 const {buildSnapshotModel} = require("../../core/session/device-model");
-const {editKeyBehaviors} = require("../../core/session/key-behavior-edits");
+const {editKeyBehaviors} = require("../../core/model/key-behavior-edits");
 const {decodeProfileBlob} = require("../../core/schema/profile-blob-v1");
 
 function draftOf(value, caps) {

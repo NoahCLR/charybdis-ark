@@ -15,7 +15,7 @@ import {profileReview} from '../../core/model/profile-review.js';
 import {revertUnits} from '../../core/model/profile-revert.js';
 import {translateBackup} from '../../core/model/backup-translation.js';
 import {ProfileDraftSession} from '../../core/session/profile-draft-session.js';
-import {editDeviceProfile} from '../../core/session/device-profile-edits.js';
+import {editDeviceProfile} from '../../core/model/device-profile-edits.js';
 import {ApplyProgress} from '../../core/session/apply-progress.js';
 import {ProfilePayloadReader} from '../../core/session/profile-payload-reader.js';
 import {candidateMetadataForBlob} from '../../core/protocol/profile-candidate-v1.js';

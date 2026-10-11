@@ -86,10 +86,9 @@ function exerciseCore(core, inputs) {
     // two things two runs may not share.
     const {document, capabilities, messages, deviceId} = inputs.draft;
     const snapshot = {document, fingerprint: portable.fingerprint(document), summary: portable.summary(document), identity: {generation: 42}};
-    const draft = new core.ProfileDraftSession(snapshot, deviceId, capabilities);
+    class DeterministicDraft extends core.ProfileDraftSession {now() {return 0;}}
+    const draft = new DeterministicDraft(snapshot, deviceId, capabilities);
     draft.id = "draft";
-    draft.now = () => 0;
-    draft.times = draft.times.map(() => 0);
     const staged = messages.map((message) => attempt(() => draft.stage({draftId: draft.id, draftRevision: draft.revision, ...message})));
     const state = {selectedDeviceId: deviceId, connected: true, busy: false, capabilities,
         status: {committedGeneration: 42, committedDigest: 0x9ac31b70, activeGeneration: 42, peerGeneration: 42},

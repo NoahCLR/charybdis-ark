@@ -1,7 +1,7 @@
 "use strict";
 const assert = require("node:assert/strict");
 const test = require("node:test");
-const {behaviorRowsForView, rgbForView} = require("../../core/session/device-profile-view");
+const {behaviorRowsForView, rgbForView} = require("../../core/model/device-profile-view");
 const {actionName} = require("../../core/schema/actions");
 const {encodeKeyBehaviorDomain, decodeKeyBehaviorDomain} = require("../../core/schema/key-behavior-domain-v1");
 const {decodedDeviceProfile, capabilities} = require("../fixtures/device-profile");
@@ -118,7 +118,7 @@ test("authored and built-in behaviour labels use the profile's host naming rule"
         assert.equal(row.steps[0].hold.label, `Right ${alt}`);
         assert.equal(row.builtIn.tap.label, `Right ${gui}+A`);
         assert.equal(row.builtIn.hold.label, `Right ${gui}+A`);
-        const builtIn = require("../../core/session/device-profile-view").builtInForView({kind:1, operand:0x3804}, {ownedTapping:true}, profileKeyNames({hostOs}));
+        const builtIn = require("../../core/model/device-profile-view").builtInForView({kind:1, operand:0x3804}, {ownedTapping:true}, profileKeyNames({hostOs}));
         assert.equal(builtIn.hold.label, `Right ${gui}`);
     }
 });

@@ -4,10 +4,10 @@ const test = require("node:test");
 const {bytes, capabilities} = require("../fixtures/device-profile");
 const {decodeProfileBlob} = require("../../core/schema/profile-blob-v1");
 const {decodeKeyBehaviorDomain} = require("../../core/schema/key-behavior-domain-v1");
-const {behaviorRowsForView} = require("../../core/session/device-profile-view");
+const {behaviorRowsForView} = require("../../core/model/device-profile-view");
 const {ACTION_ABI, actionName} = require("../../core/schema/actions");
-const {editDeviceProfile} = require("../../core/session/device-profile-edits");
-const {editKeyBehaviors} = require("../../core/session/key-behavior-edits");
+const {editDeviceProfile} = require("../../core/model/device-profile-edits");
+const {editKeyBehaviors} = require("../../core/model/key-behavior-edits");
 
 const payload = decodeProfileBlob(bytes).domains[1].payload;
 const original = decodeKeyBehaviorDomain(payload);
@@ -148,7 +148,7 @@ test("retargeting refuses a missing row, its own key and raw layer keycodes", ()
 });
 
 test("a keyboard reporting behaviour QMK functions accepts DPI and other QMK functions in every behaviour position", () => {
-    const sending = {...capabilities, featureFlags: (capabilities.featureFlags || 0) | (1 << 15)};
+    const sending = {...capabilities, behaviorQmkFunctions: true};
     const save = (step, caps) => edit({type: "saveBehavior", behavior: {...form(), steps: [{tapCount: 0, ...step}]}}, caps);
     const stepOf = (output) => rowFor(output, "KC_A").steps[0];
     for (const [name, code] of [["DPI_MOD", 0x7e00], ["S_D_RMOD", 0x7e03], ["QK_RGB_MATRIX_TOGGLE", 0x7842], ["QK_BOOT", 0x7c00]]) {
@@ -160,7 +160,7 @@ test("a keyboard reporting behaviour QMK functions accepts DPI and other QMK fun
 });
 
 test("a keyboard that owns its layer keys accepts TG, TO, TT and OSL in behaviours where they can run", () => {
-    const owning = {...capabilities, featureFlags: (capabilities.featureFlags || 0) | (1 << 14)};
+    const owning = {...capabilities, ownedLayerToggles: true};
     const save = (step, caps) => edit({type: "saveBehavior", behavior: {...form(), steps: [{tapCount: 0, ...step}]}}, caps);
     const tap = action => ({tap: {helper: "TAP_SENDS", action}});
     const hold = (helper, action) => ({hold: {helper, action, repeatHz: ""}});

@@ -312,6 +312,9 @@ Firmware decision; its text is in the firmware direction.
 
 A complete device snapshot seeds one window-local draft. Every editor, import
 and layer edit updates it, with one undo history. Keep does not write HID.
+Each frozen history entry holds its document, edit origin, label, time and
+layer order together; branching and trimming move the whole entry, while its
+document retains its cached decode.
 Apply requires the exact reviewed draft revision and the matching connected
 device; draft revisions are never device generations. Unfinished forms survive
 keeping another section and re-reading the device; undo, redo and review
@@ -697,6 +700,10 @@ sequenced Apply itself. Each rule now has one home:
   `core/schema/actions.js`; the pointing registry and key layout are data.
 - Decoding: once per draft revision, carried as `decoded` and taken through
   `decodedOf`; history entries are frozen.
+- Pure domain edits and presentation: `core/model/device-profile-edits.js`,
+  `core/model/key-behavior-edits.js` and `core/model/device-profile-view.js`.
+  The session translates wire capability bits into the model's destination
+  facts before staging; the model imports no session or protocol modules.
 - Settings bits and base lighting: `fieldMask` and `baseLighting` in
   `core/model/settings-editor.js`.
 - Panel sequencing: `core/session/panel-controls.js`, tested with a fake

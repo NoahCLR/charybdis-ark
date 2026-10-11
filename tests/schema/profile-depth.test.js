@@ -7,7 +7,7 @@ const {encodeKeyBehaviorDomain} = require("../../core/schema/key-behavior-domain
 const {encodeRgbDomainV1} = require("../../core/schema/rgb-domain-v1");
 const {ProfileDraftSession} = require("../../core/session/profile-draft-session");
 const {profileDepthOptions} = require("../../core/schema/profile-depth");
-const {behaviorRowsForView} = require("../../core/session/device-profile-view");
+const {behaviorRowsForView} = require("../../core/model/device-profile-view");
 const {settingsEditorView} = require("../../core/model/settings-editor");
 
 test("tap depth uses destination limits before offline palette counts and rejects invalid limits", () => {

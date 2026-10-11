@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 const {ProfileDeviceService} = require("../../core/session/profile-device-service");
 const {buildDeviceModel} = require("../../core/session/device-model");
-const {baseRgbForView} = require("../../core/session/device-profile-view");
+const {baseRgbForView} = require("../../core/model/device-profile-view");
 
 test("base RGB survives independently of the profile, but never survives failure or disconnect", async () => {
     const service = new ProfileDeviceService();
