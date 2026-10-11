@@ -46,7 +46,7 @@ matrix.
 | Pointing modes | 32 device-owned slots (sparse PD domain v3, RGB v4); live codecs accept only the current action vocabulary and profile formats (D-L54). See [PD-mode domain v1](../upstream/firmware/docs/architecture/pd-mode-domain-v1.md) |
 | Global policy | Every other portable setting, including startup layers, combo matching and device-reported lighting and key options; Windows Unicode setup links to WinCompose and macOS Unicode setup warns about Option shortcuts (D-L56); unsupported firmware features stay read-only |
 | Backup and restore | Complete current-format snapshots, choose or drop a file for import review against the keyboard, recovery file and verified restore; reads skip firmware-confirmed zero macro blocks while preserving exact storage and full integrity checks (D-L23); the preceding eight-layer backup is translated before review (D-L54) |
-| Drafts and Apply | One draft with item-by-item review, discard by edit group, Show, undo/redo and draft history; the review checks reachable actions, confirms active warnings and traps, and blocks profiles the destination cannot save (D-L36); Apply names the master and slave halves in its steps and says where a failure happened; one coherent capture supplies the editor and draft, and copy/read status updates retain the active editor (D-L19, D-L23, D-L29, D-L30) |
+| Drafts and Apply | One draft with item-by-item review, discard by edit group, Show, undo/redo and draft history; the review checks reachable actions, confirms active warnings and traps, and blocks profiles the destination cannot save (D-L36); Apply names the master and slave halves in its steps and says where a failure happened; one coherent capture supplies the editor and draft, which renders its decoded snapshot directly (D-L61), and copy/read status updates retain the active editor (D-L19, D-L23, D-L29, D-L30) |
 | Recovery | Atomic logical Apply, capability-gated differential custom uploads (D-L58), differential VIA transfer, reboot recovery fencing, firmware roll-forward after the decision, resume after a lost or power-cycled peer link, bounded cancel owned by the keyboard (D-L20–D-L22, D-L27, D-L39) |
 | Where it runs | The VS Code extension, and a web page that runs all of Ark in Chrome or Edge over WebHID (D-L52): Choose keyboard, one tab at a time, recovery copies in the browser's storage, a light/dark toggle. A phone gets only a notice that Ark runs on a computer, with links to the repositories; a tablet gets Ark. `npm run build:web` writes the page as static files; a workflow publishes it to Cloudflare Pages: `dev` at `ark-dev.ncleroy.dev`, `main` at `ark.ncleroy.dev` from the first release |
 | Demo without a keyboard | Explore a demo, in both hosts and on a browser without WebHID: the bundled demo profile (`core/data/`) in a real draft under current firmware's capabilities, every screen editable and reviewed; Apply refused, Export saves the draft, Open a profile file replaces it, leaving with edits not exported asks first (D-L53) |
@@ -1351,3 +1351,24 @@ resetting the forms when the keyboard or draft under them changes), a read
 beginning and ending, the panel's own operations running, an Apply and its
 readback, and the outbox the next model carries once. The other session
 modules call these rather than setting those fields together themselves.
+
+
+### D-L61 — Draft presentation consumes snapshots, device health consumes reads
+
+The editable configuration model is built directly from a complete snapshot
+and its matching decoded form (`buildSnapshotModel` in
+`core/session/device-model.js`). A publish uses `decodedOf(snapshot)`, so a
+frozen draft history entry is not decoded again. Layer positions, names,
+behaviours, pointing slots, combos, macros, host layout, settings and lighting
+all come from that snapshot; its capture facts supply host detection and
+brightness/options limits. Draft presentation takes editability from D-L60's
+binding, rather than inferring it from simulated read success.
+
+The same module adapts independent device reads for an earlier firmware or
+partial capture (`buildDeviceModel`). Both inputs share configuration
+presentation, but a draft never fabricates a `LayoutRead`, `CommittedRead` or
+base RGB read to pass through the device adapter. The keyboard header and
+diagnostics use the actual device state throughout; local changes only add
+the existing draft subtitle. The demo supplies its own explicit header and
+diagnostics (D-L53). Earlier firmware keeps its independent read-only view
+and domain failures even when a dirty draft is retained.

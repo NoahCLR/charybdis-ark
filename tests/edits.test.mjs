@@ -21,7 +21,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const {ProfileDraftSession} = require(path.join(here, "..", "core", "session", "profile-draft-session"));
 const portable = require(path.join(here, "..", "core", "model", "portable-profile"));
 const {settingsEditorView} = require(path.join(here, "..", "core", "model", "settings-editor"));
-const {buildDeviceModel} = require(path.join(here, "..", "core", "session", "device-model"));
+const {buildDeviceModel, buildSnapshotModel} = require(path.join(here, "..", "core", "session", "device-model"));
 const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require(path.join(here, "..", "core", "protocol", "via-layout-v1"));
 const {RGB_LOCALITIES} = require(path.join(here, "..", "core", "schema", "rgb-domain-v1"));
 const {document: pdDocument} = require(path.join(here, "fixtures", "pd-profile"));
@@ -363,7 +363,7 @@ test("key feedback posts the whole record with one colour or policy replaced", (
     const draft = session();
     // the screen redraws from the new model after each edit, so each message
     // is built from the record as it stands then
-    const feedback = () => buildDeviceModel(draft.editingState({selectedDeviceId: "test-device"})).rgb.keyBehaviorFeedback;
+    const feedback = () => buildSnapshotModel(draft.current, draft.capabilities, {editable: true, reason: ""}).rgb.keyBehaviorFeedback;
     stage(draft, edits.keyFeedback(feedback(), "holdActiveColor", {h: 99, s: 255, v: 150}));
     stage(draft, edits.keyFeedback(feedback(), "branch:0", {h: 12, s: 200, v: 100}));
     const stored = decoded(draft).rgb.keyFeedback;
@@ -772,7 +772,7 @@ test("the fade slider previews exactly what the keyboard will store for every sh
 test("behaviour timing defaults follow the draft's Key Timing, and its undo", () => {
     const draft = session();
     // what extension.js builds the webview's model from while a draft is open
-    const timing = () => buildDeviceModel(draft.editingState({selectedDeviceId: "test-device"})).behaviorTimingDefaults;
+    const timing = () => buildSnapshotModel(draft.current, draft.capabilities, {editable: true, reason: ""}).behaviorTimingDefaults;
     const before = timing().tapHoldTerm;
     assert.match(before, /^\d+$/, "the keyboard reports its default");
     const section = settingsEditorView(draft.current).sections.find((row) => row.id === "keyTiming");
@@ -823,7 +823,7 @@ test("participation controls preserve definitions, review their scopes, and undo
     let change = draft.view({selectedDeviceId: "test-device", connected: true}).changes.find(row => row.unit.startsWith("placement:"));
     assert.equal(change.fields.length, 2);
     draft.discard(draft.revision, change.group); assert.deepEqual(draft.document, base);
-    const model = buildDeviceModel(draft.editingState({selectedDeviceId: "test-device", connected: true, capabilities}));
+    const model = buildSnapshotModel(draft.current, capabilities, {editable: true, reason: ""});
     const behavior = model.keyBehaviors[0], original = decoded(draft).behaviors.rows[0];
     stage(draft, edits.saveBehaviour(behavior, {enabled: false, allowedLayers: 2 ** 15}, draft.identity()));
     let stored = decoded(draft).behaviors.rows.find(row => JSON.stringify(row.target) === JSON.stringify(original.target));

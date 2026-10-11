@@ -24,7 +24,7 @@ const {profileReview} = require("../model/profile-review");
 const {profileUsage} = require("../model/profile-usage");
 const {supportsCompleteProfile} = require("./portable-profile-session");
 const {ProfileDraftSession, DRAFT_EDITS} = require("./profile-draft-session");
-const {buildDeviceModel, deviceSummary} = require("./device-model");
+const {buildDeviceModel, buildSnapshotModel} = require("./device-model");
 const {demoDiagnostics, demoHeader, demoModel} = require("./demo-session");
 const {assertBound, beginRead, boundDraft, closeEditors, draftBinding, replaceDraft, setDraft} = require("./panel-session-state");
 
@@ -102,11 +102,13 @@ function buildPanelModel(session, state) {
     const device = state.devices?.find((entry) => entry.id === state.selectedDeviceId);
     const busy = Boolean(state.busy || session.portableBusy || session.readBusy);
     const supported = supportsCompleteProfile(state.capabilities);
-    const editing = session.draft && supported ? session.draft.editingState(state) : state;
-    const model = buildDeviceModel({...editing, busy: editing.busy || session.portableBusy || session.readBusy, device});
+    const binding = draftBinding(session, state);
+    const actual = {...state, busy, device};
+    const model = session.draft && supported && state.selectedDeviceId === session.draft.deviceId
+        ? buildSnapshotModel(session.draft.current, session.draft.capabilities, binding, actual)
+        : buildDeviceModel(actual);
     const devices = (state.devices || []).map(({id, label}) => ({id, label}));
     const selectedDeviceId = state.selectedDeviceId || "";
-    const binding = draftBinding(session, state);
     /** @type {import("./types.js").PanelDraftView | undefined} */
     let draft;
     if (session.draft) {
@@ -115,16 +117,7 @@ function buildPanelModel(session, state) {
         if (session.historyOpen) draft.steps = session.draft.steps();
         if (draft.matching) {
             model.profileIdentity = session.draft.identity();
-            const names = session.draft.current.summary.names;
-            model.layers?.forEach((layer, index) => {layer.displayName = names[index];});
         }
-        const actual = deviceSummary({
-            capabilities: state.capabilities, status: state.status, layout: state.layout, committed: state.committed,
-            baseRgb: state.baseRgb, combos: state.combos, macroView: state.macroView, customKeyView: state.customKeyView, settingsView: state.settingsView,
-            busy, device,
-        });
-        model.device = actual.device;
-        model.diagnostics = actual.diagnostics;
         if (draft.dirty && draft.matching) model.device.subtitle = "Showing your local draft · the keyboard still runs the last applied profile";
     }
     // The last Apply's steps: live while it runs, kept when it failed. A

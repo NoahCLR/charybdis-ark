@@ -13,8 +13,11 @@ native paths and handles out of the webview, and reads what the keyboard says
 about itself: VIA and firmware versions, the Profile Wire capability and status
 pages, the layout, the committed profile, combos, macro banks, settings,
 keyboard options and the base RGB effect. It publishes a sanitized snapshot;
-`session/device-model.js` turns that into the `model` the webview renders, and
-`session/panel-session.js` adds the draft and the panel's own state to it,
+`session/device-model.js` adapts those independent reads for the read-only
+view. With a draft open, its `buildSnapshotModel` renders the complete snapshot
+and its cached decoded form directly, taking editability from the draft binding;
+the real device state supplies the keyboard header and diagnostics (D-L61).
+Both inputs share configuration presentation. `session/panel-session.js` adds the draft and the panel's own state to it,
 routes each message the webview posts, and runs the Rename & Reorder panel.
 `session/panel-session-state.js` decides whether the draft takes an edit now
 (`draftBinding`, published as `draft.editable` and `draft.reason`) and holds
