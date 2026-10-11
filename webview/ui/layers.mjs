@@ -54,7 +54,7 @@ export function attachLayersControl(bar) {
 
     const panel = el(`<div class="layerpanel" role="dialog" aria-label="Layers"></div>`);
     if (!portable.layers) {
-        panel.append(el(`<p class="note" style="padding:4px 2px">${esc(canEdit ? "Reading the layer stack…"
+        panel.append(el(`<p class="note">${esc(canEdit ? "Reading the layer stack…"
             : "Connect a keyboard with complete-profile firmware to rename or reorder its layers.")}</p>`));
         // One request per opening: the stack is read from the keyboard, or
         // lifted from the draft when one is open.
@@ -101,18 +101,18 @@ function editor(model, portable, busy) {
     const names = [...portable.layers.names];
     const order = [...portable.layers.order].reverse();
     const follow = portable.layers.keysFollow !== false;
-    const node = el(`<div class="layerpanel-body" style="gap:10px">
+    const node = el(`<div class="layerpanel-body">
         <div class="sect-h"><h4>Layers</h4><span class="note">higher layers win · drag a row to move it</span></div>
         <div class="list"></div>
-        <div class="stack layerpanel-actions" style="gap:10px">
-            <div class="stack" style="gap:4px">
+        <div class="stack layerpanel-actions">
+            <div class="stack">
                 <label class="sw"><input type="checkbox" id="layerKeysFollow" data-act="follow" ${follow ? "checked" : ""} ${busy ? "disabled" : ""}>
                     <span class="track"></span><span class="txt">Keys follow their layers</span></label>
                 <span class="note">${follow
                     ? "Layer keys (MO, LT, TG, TO, TT, OSL…) are renumbered with the move, so each still reaches the same layer. Make base swaps the two roles: a key that reached the new base reaches the old one."
                     : "Layer keys keep their numbers: a key set to MO(1) reaches whatever layer is now 1. Names, colours and the pointer and sniping settings still move with their layer, and Make base still swaps the keys that reach the two layers."}</span>
             </div>
-            <div class="row" style="gap:8px;align-items:center">
+            <div class="row">
                 <button class="btn primary" data-act="save" ${busy ? "disabled" : ""}>Keep layers in draft</button>
                 <button class="btn ghost" data-act="cancel" ${busy ? "disabled" : ""}>Discard</button>
             </div>

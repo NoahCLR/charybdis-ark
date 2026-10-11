@@ -29,14 +29,14 @@ export function screenCustomKeys() {
     const main = el(`<div class="main">${topbar(
         "Custom keys",
         "Named keys that do only what their behaviour says. Place one on a key or send it from a combo; a behaviour cannot send one.",
-        keys.length ? `<input class="input" id="customKeySearch" type="search" placeholder="Search custom keys by name" style="width:220px" value="${esc(state.customKeySearch || "")}">` : "",
+        keys.length ? `<input class="input search" id="customKeySearch" type="search" placeholder="Search custom keys by name" value="${esc(state.customKeySearch || "")}">` : "",
     )}</div>`);
     /** @type {HTMLInputElement | null} */ (main.querySelector("#customKeySearch"))?.addEventListener("input", (event) => { state.customKeySearch = /** @type {HTMLInputElement} */ (event.target).value; render(); });
 
-    const content = el(`<div class="content"><div class="pad" style="display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:20px;align-items:start"></div></div>`);
+    const content = el(`<div class="content"><div class="pad library"></div></div>`);
     const pad = /** @type {HTMLElement} */ (content.firstElementChild);
     if (!keys.length) {
-        pad.style.display = "block";
+        pad.classList.remove("library");
         pad.appendChild(el(`<div class="screen-stub"><h3>No custom keys read</h3>
             <p class="note">${esc(unavailable(model) || "This firmware has no custom keys, or its profile has not been read.")}</p></div>`));
         main.appendChild(content);
@@ -76,7 +76,7 @@ function editor(model, key, canEdit) {
     const card = el(`<div class="card">
         <div class="card-h"><h3>${esc(key.name || `Custom key ${key.slot}`)}</h3>
             <span class="tag" data-tip="${esc(key.keycode)}">Key ${esc(key.slot)}</span>
-            <span class="right row" style="gap:8px">
+            <span class="right row actions">
                 <button class="btn tiny ghost" data-act="behaviour" ${canEditArea("behaviours") ? "" : "disabled"}>Open behaviour…</button>
                 <button class="btn tiny ghost" data-act="place" ${writable() ? "" : "disabled"}>Place on a key…</button></span></div>
         <div class="card-b stack">
@@ -122,7 +122,7 @@ function placedOn(model, key) {
             <span>${esc(layerName(layer))}</span><span class="idx">${esc(how)}</span></button>`;
     }).join("");
     return `<div class="field"><span>On layers</span>
-        ${chips ? `<div class="row" style="gap:6px;flex-wrap:wrap">${chips}</div>`
+        ${chips ? `<div class="row layer-chips">${chips}</div>`
             : `<span class="note">No key or combo sends this custom key. Place it on a key to use it.</span>`}</div>`;
 }
 

@@ -13,27 +13,27 @@ import {el, esc} from "../lib/dom.mjs";
 export function colourEditor({colour, title, canEdit = true, onChange, offNote, maximumBrightness}) {
     const [h, s, v] = hsv(colour);
     const maximum = brightnessLimit(maximumBrightness);
-    const node = el(`<div class="stack" style="gap:12px"></div>`);
+    const node = el(`<div class="stack gap-12"></div>`);
     /** @param {number[]} next */
     const commit = (next) => onChange?.(clampHsv(next, maximum));
 
     if (isOff(colour)) {
-        node.append(el(`<div class="row" style="gap:10px"><span class="swatch-lg swatch-off" style="width:34px;height:34px"></span>
-            <div><div style="font-size:12.5px">${esc(title)}</div><div class="note mono">HSV(0, 0, 0)</div></div></div>`));
+        node.append(el(`<div class="row colour-head"><span class="swatch-lg swatch-off"></span>
+            <div><div class="colour-title">${esc(title)}</div><div class="note mono">HSV(0, 0, 0)</div></div></div>`));
         node.append(el(`<div class="callout">${esc(offNote || "No colour is stored, so this stage leaves whatever is underneath visible.")}</div>`));
         if (canEdit) {
-            const give = el(`<button class="btn" style="justify-self:start">Give it a colour</button>`);
+            const give = el(`<button class="btn self-start">Give it a colour</button>`);
             give.addEventListener("click", () => commit([140, 255, Math.min(200, maximum)]));
             node.append(give);
         }
         return node;
     }
 
-    const head = el(`<div class="row" style="gap:10px">
-        <span class="swatch-lg" style="width:34px;height:34px;background:${css(colour)}"></span>
-        <div><div style="font-size:12.5px">${esc(title)}</div>
+    const head = el(`<div class="row colour-head">
+        <span class="swatch-lg" style="background:${css(colour)}"></span>
+        <div><div class="colour-title">${esc(title)}</div>
             <div class="note mono">${esc(hsvLabel(colour))} · rgb(${rgb(colour).join(", ")})</div></div>
-        ${canEdit ? `<button class="btn tiny ghost" data-off style="margin-left:auto"
+        ${canEdit ? `<button class="btn tiny ghost" data-off
             data-tip="Store HSV(0, 0, 0) so this stage stops painting and lets what is underneath show.">Turn off</button>` : ""}</div>`);
     node.append(head);
     /** @type {HTMLElement | null} */ (head.querySelector("[data-off]"))?.addEventListener("click", () => commit([0, 0, 0]));
@@ -45,7 +45,7 @@ export function colourEditor({colour, title, canEdit = true, onChange, offNote, 
         <span class="thumb" style="left:${(s / 255) * 100}%;top:${100 - valuePercent(v, maximum)}%"></span></div>`);
     node.append(field);
 
-    const ramp = el(`<div class="swatch-pick"><span class="label" style="width:34px">Hue</span>
+    const ramp = el(`<div class="swatch-pick"><span class="label">Hue</span>
         <span class="hue-ramp"><span class="thumb" style="left:${(h / 255) * 100}%"></span></span></div>`);
     node.append(ramp);
 

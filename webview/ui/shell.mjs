@@ -253,7 +253,7 @@ export function commitBar() {
             <span class="note">the keyboard keeps running its saved profile until both halves confirm</span>` : ""}</div>`);
     }
     if (!draft.matching) {
-        const node = el(`<div class="commit" style="border-color:var(--draft)">
+        const node = el(`<div class="commit draft">
             <span class="n"><i class="dot draft"></i> <strong>Draft belongs to another keyboard</strong>
             <span class="muted">${draft.changes.length} change${draft.changes.length === 1 ? "" : "s"} kept locally. Select that keyboard to continue${model?.device?.connected ? ", or discard the draft here" : ""}.</span></span>
             <span class="sep"></span>
@@ -262,7 +262,7 @@ export function commitBar() {
         return node;
     }
     if (draft.stale) {
-        const node = el(`<div class="commit" style="border-color:var(--draft)">
+        const node = el(`<div class="commit draft">
             <span class="n"><i class="dot draft"></i> <strong>${draft.connectionChanged ? "Keyboard connection changed" : "The keyboard changed"}</strong>
             <span class="muted">${draft.connectionChanged ? "Review the current keyboard before continuing" : "since this draft began"} — your ${draft.changes.length} change${draft.changes.length === 1 ? "" : "s"} are kept</span></span>
             <span class="sep"></span>
@@ -281,7 +281,7 @@ export function commitBar() {
     const node = el(`<div class="commit">
         <span class="n"><i class="dot draft"></i> <strong>${draft.changes.length} change${draft.changes.length === 1 ? "" : "s"}</strong>
         <span class="muted">in your draft</span></span>
-        <span class="peek"><span class="note" style="white-space:nowrap">${esc(statusSummary(draft.changes))}</span></span>
+        <span class="peek"><span class="note">${esc(statusSummary(draft.changes))}</span></span>
         <span class="sep"></span>
         <button class="btn ghost tiny" data-act="discard"
             data-tip="${demo ? "Put every change back to the demo setup." : "Put every change back to what the keyboard holds."} Undo (⌘Z) brings them back.">Discard all</button>

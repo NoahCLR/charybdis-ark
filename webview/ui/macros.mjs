@@ -43,14 +43,14 @@ export function screenMacros() {
     const main = el(`<div class="main">${topbar(
         "Macros",
         "Macro slots on the keyboard. A named macro shows by its name on keys, in the picker and in the key card.",
-        bank.length ? `<input class="input" id="macroSearch" type="search" placeholder="Search macros by name" style="width:220px" value="${esc(state.macroSearch || "")}">` : "",
+        bank.length ? `<input class="input search" id="macroSearch" type="search" placeholder="Search macros by name" value="${esc(state.macroSearch || "")}">` : "",
     )}</div>`);
     /** @type {HTMLInputElement | null} */ (main.querySelector("#macroSearch"))?.addEventListener("input", (event) => { state.macroSearch = /** @type {HTMLInputElement} */ (event.target).value; render(); });
 
-    const content = el(`<div class="content"><div class="pad" style="display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:20px;align-items:start"></div></div>`);
+    const content = el(`<div class="content"><div class="pad library"></div></div>`);
     const pad = /** @type {HTMLElement} */ (content.firstElementChild);
     if (!bank.length) {
-        pad.style.display = "block";
+        pad.classList.remove("library");
         pad.appendChild(el(`<div class="screen-stub"><h3>No macro banks read</h3>
             <p class="note">${esc(unavailable(model) || "This firmware has not reported its macro banks.")}</p></div>`));
         main.appendChild(content);
@@ -95,10 +95,10 @@ function memoryMeter(memory) {
     if (!memory) return "";
     const used = memory.stored, share = Math.min(100, (used / memory.capacity) * 100);
     const closed = memory.slots - memory.available;
-    return `<div class="sect-h" style="margin-top:14px"><h4>Macro memory</h4>
+    return `<div class="sect-h memory-h"><h4>Macro memory</h4>
             <span class="right note">${used.toLocaleString("en-US")} of ${memory.capacity.toLocaleString("en-US")} bytes used · ${memory.free.toLocaleString("en-US")} free</span></div>
         <div class="meter"><i style="width:${share}%"></i></div>
-        <p class="note" style="margin-top:6px">A key tap takes 3 bytes; text uses its UTF-8 bytes. Every empty slot keeps room for ${memory.reserveTaps} key taps${closed ? `; ${closed} slot${closed === 1 ? " has" : "s have"} no room left` : ""}.</p>`;
+        <p class="note meter-note">A key tap takes 3 bytes; text uses its UTF-8 bytes. Every empty slot keeps room for ${memory.reserveTaps} key taps${closed ? `; ${closed} slot${closed === 1 ? " has" : "s have"} no room left` : ""}.</p>`;
 }
 
 /** @param {import("../../contracts/panel.js").PublishedModel} model @param {MacroSlot} slot @param {boolean} canEdit */
@@ -235,7 +235,7 @@ function placedOn(model, slot) {
             <span>${esc(layerName(layer))}</span><span class="idx">${esc(how)}</span></button>`;
     }).join("");
     return `<div class="field"><span>On layers</span>
-        ${chips ? `<div class="row" style="gap:6px;flex-wrap:wrap">${chips}</div>`
+        ${chips ? `<div class="row layer-chips">${chips}</div>`
             : `<span class="note">No key, behaviour or combo sets this macro off. Place it on a key to use it.</span>`}</div>`;
 }
 
@@ -423,20 +423,20 @@ function recorder(model, slot, canEdit) {
     const recording = state.recording?.slot === slot.keycode;
     const node = el(`<div class="card">
         <div class="card-h"><h3>Record</h3><span class="right"><span class="tag">${recording ? "recording" : "idle"}</span></span></div>
-        <div class="card-b" style="display:grid;gap:14px">
-            <div class="row" style="gap:12px;align-items:end;flex-wrap:wrap">
-                <label class="field" style="min-width:190px"><span>Capture style</span><select class="input" data-mode ${recording ? "disabled" : ""}>
+        <div class="card-b stack">
+            <div class="row record-opts">
+                <label class="field capture-field"><span>Capture style</span><select class="input" data-mode ${recording ? "disabled" : ""}>
                     <option value="compact" ${state.recordMode !== "explicit" ? "selected" : ""}>Compact taps</option>
                     <option value="explicit" ${state.recordMode === "explicit" ? "selected" : ""}>Explicit press and release</option>
                 </select></label>
                 <label class="sw"><input type="checkbox" data-delays ${state.recordDelays !== false ? "checked" : ""}>
                     <span class="track"></span><span class="txt">Record delays</span></label>
-                <label class="field" style="width:120px"><span>After (ms)</span><input class="input mono" data-threshold value="${esc(state.recordDelayThreshold)}" ${state.recordDelays === false ? "disabled" : ""}></label>
-                <label class="field" style="width:120px"><span>Round to (ms)</span><input class="input mono" data-round value="${esc(state.recordDelayRound)}" ${state.recordDelays === false ? "disabled" : ""}></label>
+                <label class="field ms-field"><span>After (ms)</span><input class="input mono" data-threshold value="${esc(state.recordDelayThreshold)}" ${state.recordDelays === false ? "disabled" : ""}></label>
+                <label class="field ms-field"><span>Round to (ms)</span><input class="input mono" data-round value="${esc(state.recordDelayRound)}" ${state.recordDelays === false ? "disabled" : ""}></label>
             </div>
-            <div class="row" style="gap:8px">
+            <div class="row gap-8">
                 <span class="note">${recording ? "Typing in this window is captured. Press Escape or Stop when the take is done." : "Appends key steps captured in this window."}</span>
-                <span class="right row" style="gap:8px"><button class="btn ghost" data-act="clear-take" ${recording || state.lastTake?.slot === slot.keycode ? "" : "disabled"}>Clear take</button>
+                <span class="right row gap-8"><button class="btn ghost" data-act="clear-take" ${recording || state.lastTake?.slot === slot.keycode ? "" : "disabled"}>Clear take</button>
                 <button class="btn ${recording ? "" : "primary"}" data-act="record" ${canEdit ? "" : "disabled"}>${recording ? "Stop" : "● Record"}</button></span>
             </div>
         </div></div>`);

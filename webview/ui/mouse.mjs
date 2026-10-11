@@ -25,13 +25,13 @@ export function screenMouse() {
     )}</div>`);
     /** @type {HTMLButtonElement} */ (main.querySelector('[data-act="pointing"]')).addEventListener("click", () => { state.screen = "pointing"; render(); });
 
-    const content = el(`<div class="content"><div class="pad" style="max-width:980px"></div></div>`);
+    const content = el(`<div class="content"><div class="pad settings-pad"></div></div>`);
     const pad = /** @type {HTMLElement} */ (content.firstElementChild);
     if (!sections.length) {
         pad.appendChild(el(`<div class="screen-stub"><h3>No mouse settings read</h3>
             <p class="note">${esc(unavailable(model) || "Choose Read keyboard to load this keyboard's pointer settings.")}</p></div>`));
     } else if (!canEdit) {
-        pad.appendChild(el(`<div class="unavailable" style="margin-bottom:14px">${esc(unavailable(model)
+        pad.appendChild(el(`<div class="unavailable">${esc(unavailable(model)
             || "This firmware reports its pointer settings but cannot save them. Flash the complete-profile pair to edit them here.")}</div>`));
     }
     for (const section of sections) if (section.fields.length) pad.appendChild(sectionCard(model, section, section.fields, canEdit));

@@ -52,9 +52,9 @@ export function board(model, layer, options = {}) {
             from ? "kc-under" : "",
             options.picking ? "pickable" : ""].filter(Boolean).join(" ");
 
-        let fill = "", text = "";
+        let fill = "", text = "", picked = "";
         if (mode === "leds") {
-            fill = picks.includes(index) ? ` style="fill:var(--key-hi);stroke:var(--text);stroke-width:2"` : "";
+            picked = picks.includes(index) ? " picked" : "";
         } else {
             const light = keyLight(model, layer, position, {pdActive, held: heldIds});
             text = idealText(light.colour);
@@ -122,7 +122,7 @@ export function board(model, layer, options = {}) {
 
         keys += `<g class="${classes}${selected === index ? " sel" : ""}" data-key="${index}" tabindex="0" role="button"
             aria-label="${esc(keyMeaning(shown))} at index ${index}${from ? `, from ${esc(from.displayName || from.name || `layer ${from.index}`)}` : ""}"${transform}>
-            <rect class="kc-rect" x="${visual.x}" y="${visual.y}" width="${GEO.keyW}" height="${GEO.keyH}" rx="${GEO.radius}"${fill}></rect>
+            <rect class="kc-rect${picked}" x="${visual.x}" y="${visual.y}" width="${GEO.keyW}" height="${GEO.keyH}" rx="${GEO.radius}"${fill}></rect>
             ${selected === index ? ring("kc-ring") : ""}
             ${reach.includes(index) ? `<rect class="kc-reach" x="${visual.x - 3}" y="${visual.y - 3}" width="${GEO.keyW + 6}" height="${GEO.keyH + 6}" rx="${GEO.radius + 2}"></rect>` : ""}
             ${marks}
@@ -230,12 +230,11 @@ function trackballGlyph(model, layer, {mode, pdActive, held, trackball, clickabl
     const light = trackballLight(model, layer, {pdActive, held});
     const paint = css(light.colour);
     const glass = mode !== "leds" && !ownLight(light, layer?.index ?? 0);
-    const picked = mode === "leds"
-        ? `fill:${trackball ? "var(--key-hi)" : "var(--key)"};stroke:var(--text);stroke-width:${trackball ? 2 : 1}`
-        : `fill:${paint};stroke:${glass ? "none" : "rgba(255,255,255,.3)"}`;
-    const markup = `<g class="kc kc-ball${glass ? " glass" : ""}${trackball ? " sel" : ""}"${clickable ? ' data-trackball="1" tabindex="0" role="button"' : ""}
+    // Picking LEDs, the ball is drawn like a key (.kc-ball.leds); otherwise in its light.
+    const lit = mode === "leds" ? "" : ` style="fill:${paint};stroke:${glass ? "none" : "rgba(255,255,255,.3)"}"`;
+    const markup = `<g class="kc kc-ball${glass ? " glass" : ""}${trackball ? " sel" : ""}${mode === "leds" ? " leds" : ""}"${clickable ? ' data-trackball="1" tabindex="0" role="button"' : ""}
         aria-label="Trackball LED ${TRACKBALL_LED}">
-        <circle cx="${x}" cy="${y}" r="${r}" style="${picked}"></circle>
+        <circle cx="${x}" cy="${y}" r="${r}"${lit}></circle>
         ${mode === "leds" ? `<text class="kc-label sm" x="${x}" y="${y}">${TRACKBALL_LED}</text>` : ""}</g>`;
     return {
         markup,

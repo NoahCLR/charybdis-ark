@@ -144,9 +144,9 @@ function emptySlot(model, slot, canEdit, slots) {
         <div class="card-h">${slotLight(model, slot).swatch("lg")}<h3>Slot ${slot.id} is empty</h3>
             <span class="tag">${esc(bindingName(slot))}</span></div>
         <div class="card-b stack">
-        <p class="note" style="max-width:64ch">Nothing is stored here. Start a new mode, or copy a configured one and change what you need — its binding keycode is <code>${esc(bindingName(slot))}</code>, and <code>${esc(slot.binding?.lock || "")}</code> toggles it.</p>
+        <p class="note pd-empty-note">Nothing is stored here. Start a new mode, or copy a configured one and change what you need — its binding keycode is <code>${esc(bindingName(slot))}</code>, and <code>${esc(slot.binding?.lock || "")}</code> toggles it.</p>
         ${inertNote(model, slot)}
-        <div class="row" style="gap:8px">
+        <div class="row gap-8">
             <button class="btn primary" data-new="${KIND.DIRECTIONAL}" ${canEdit ? "" : "disabled"}
                 data-tip="Arrow-style keys or shortcuts, starting on the dominant axis with no shortcuts set.">New directional mode</button>
             <button class="btn" data-new="${KIND.SCROLLING}" ${canEdit ? "" : "disabled"}
