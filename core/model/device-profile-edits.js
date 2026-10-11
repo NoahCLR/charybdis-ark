@@ -8,8 +8,8 @@ const keycodes = require("../data/keycode-catalog");
 const {semanticActionForExpression, resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
 const {decodeComboDomain, encodeComboDomain, effectiveComboTerm} = require("../schema/combo-domain-v1");
 const {actionName, keycodeAction, knownActionAbi, layerRef, nativeCode} = require("../schema/actions");
-const {comboPlacementProblem} = require("../model/profile-placement");
-const {comboTableOf} = require("../model/portable-profile");
+const {comboPlacementProblem} = require("./profile-placement");
+const {comboTableOf} = require("./portable-profile");
 const {BEHAVIOR_EDITS, editKeyBehaviors} = require("./key-behavior-edits");
 const {decodeSettings, encodeSettings} = require("../schema/settings-domain-v1");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../data/charybdis-layout");
@@ -17,7 +17,7 @@ const {profileDepthOptions} = require("../schema/profile-depth");
 /**
  * @typedef {Extract<import("../../contracts/edits.js").PanelEdit, {type: 'addCombo' | 'saveCombo' | 'deleteCombo' | 'updateComboHoldTerm' | 'updateComboDefaultTerm'}>} ComboEdit
  * @typedef {Extract<import("../../contracts/edits.js").PanelEdit, {type: 'updatePlacementPolicy' | 'savePdMode' | 'clearPdMode' | 'duplicatePdMode' | 'saveBehavior' | 'addBehavior' | 'deleteBehavior' | 'retargetBehavior' | 'updateLayerColor' | 'updatePdModeColor' | 'updateAutomouseFade' | 'updateComboFeedback' | 'updateKeyBehaviorFeedback' | 'updateRgbStages' | 'saveRgbReusableLedGroup' | 'deleteRgbReusableLedGroup' | 'addRgbLedGroup' | 'deleteRgbLedGroup'}> | ComboEdit} ProfileEdit
- * @typedef {{capabilities?: import("../model/types.js").ProfileDestination, combos?: import("./types.js").ComboRead, maximumBrightness?: number}} EditContext
+ * @typedef {{capabilities?: import("./types.js").ProfileDestination, combos?: import("./types.js").ComboRead, maximumBrightness?: number}} EditContext
  * @typedef {Omit<import("../schema/types.js").ComboRowInput, 'inputs' | 'output'> & {inputs: import("../schema/types.js").SemanticAction[], output: import("../schema/types.js").SemanticAction}} SemanticComboRow
  * @typedef {import("../schema/types.js").RgbProfile} Rgb
  * @typedef {Partial<import("../../contracts/edits.js").PdConfig> & {id: number, kind: number, name: string}} EditablePointing

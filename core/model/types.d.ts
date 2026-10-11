@@ -32,6 +32,8 @@ export interface ProfileDestination extends Partial<ActionLimits> {
     effects?: {id: number; name: string}[];
     physicalGestureTiming?: boolean;
     ownedTapping?: boolean;
+    ownedLayerToggles?: boolean;
+    behaviorQmkFunctions?: boolean;
     detectedHostOs?: number;
 }
 
@@ -182,3 +184,20 @@ export interface BoundedLayerWalk {
 /** Reviews retain semantic targets until the panel model resolves key names. */
 export type ModelReviewPlace = Exclude<import('../../contracts/model.js').ReviewPlace, {kind: 'behaviour'}> | {kind: 'behaviour'; target: import('../schema/types.js').SemanticAction};
 export interface ModelReviewChange extends Omit<import('../../contracts/model.js').ReviewChange, 'place' | 'unit'> {unit: string; place?: ModelReviewPlace | null}
+
+/** Presentation/edit inputs describe received facts without importing session or wire modules. */
+export interface PendingProfileRead {
+    state?: 'unread' | 'reading' | 'unavailable';
+    error?: {message: string; code?: string};
+}
+export type BaseRgbRead = PendingProfileRead | {
+    state: 'read'; effectId: number; hue: number; saturation: number; brightness: number; speed: number; readAt?: string;
+};
+export type ComboRead = PendingProfileRead | (Omit<NativeComboTable, 'rows'> & {
+    state: 'read';
+    layerReferences: number[];
+    rows: (NativeComboTable['rows'][number] & {
+        id: number; followsDefault: boolean; mustHold: boolean; mustTap: boolean; ordered: boolean;
+        enabled: boolean; allowedLayers: number;
+    })[];
+});

@@ -104,8 +104,12 @@ The macro inspector (`model/macro-input.js`, through `model/macro-editor.js`) sh
 staging's codec and limits. `validateViaMacro` receives a correlated
 `macroValidation` reply without an edit, toast or device call; only a subsequent
 `updateViaMacro` stages anything. The domain edits themselves live in
-`session/device-profile-edits.js` and
-`session/key-behavior-edits.js`.
+`model/device-profile-edits.js` and
+`model/key-behavior-edits.js`.
+Their destination facts include the behaviour capabilities decoded by the
+session; pure domain presentation lives beside them in `model/device-profile-view.js`.
+Draft history keeps each frozen document and its origin, label, time and layer
+order in one entry, so branching and trimming preserve them together.
 
 Apply goes through `session/portable-profile-session.js`: a recovery copy is
 written before the first device write, the profile is staged on both halves

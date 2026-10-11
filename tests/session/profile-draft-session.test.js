@@ -6,7 +6,7 @@ const {options} = require("../fixtures/keyboard-options");
 const {fingerprint, reorderLayers, summary, validateSnapshot} = require("../../core/model/portable-profile");
 const {macroEditorView} = require("../../core/model/macro-editor");
 const {settingsEditorView} = require("../../core/model/settings-editor");
-const {behaviorRowsForView} = require("../../core/session/device-profile-view");
+const {behaviorRowsForView} = require("../../core/model/device-profile-view");
 function fixture() {
     const value = document(), snapshot = {document:value, fingerprint:fingerprint(value), summary:summary(value), limits:{brightnessMax:200}, options:options()};
     const caps = {compiledLayerCount:16,supportedDomainMask:31,actionAbiDigest:value.actionAbiDigest};
@@ -210,6 +210,63 @@ test("the history lists every step, when it was made, and what it changed from t
     clock = 5000; stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_1",payload:"x"});
     draft.jump(draft.revision,1); clock = 6000; stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_2",payload:"y"});
     assert.deepEqual(draft.steps().map(entry=>entry.at).slice(1),[2000,6000],"a new edit after going back drops the undone steps and their times");
+});
+test("bounded history and a new branch retain each step's time, label, document and layer order", () => {
+    const {draft, snapshot} = fixture();
+    const {encodeMacroPayload} = require("../../core/schema/macro-payload");
+    const order = [0, 2, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+    draft.editLayers(reorderLayers(draft.document, order), draft.revision, order);
+    let clock = 0;
+    draft.now = () => clock;
+    const replaceMacro = (text, label) => {
+        const next = draft.document;
+        next.macros[0] = encodeMacroPayload(text).toString("base64");
+        draft.replace(next, draft.revision, "edit", label);
+    };
+    let oldestDecode;
+    for (clock = 1; clock <= 105; clock++) {
+        replaceMacro(`value ${clock}`, `Macro ${clock}`);
+        if (clock === 5) oldestDecode = draft.current.decoded;
+    }
+    const steps = draft.steps();
+    assert.equal(steps.length, 101);
+    assert.deepEqual(steps.map(step => [step.at, step.label]), Array.from({length: 101}, (_, i) => [i + 5, `Macro ${i + 5}`]));
+    assert.equal(steps[0].changes, null, "the oldest retained step has no preceding comparison");
+    assert.deepEqual(steps[1].changes.map(row => row.unit), ["macro:0"]);
+    assert.equal(draft.base.fingerprint, snapshot.fingerprint, "trimming does not move the saved keyboard baseline");
+    draft.jump(draft.revision, 0);
+    assert.equal(draft.current.decoded, oldestDecode, "moving an entry preserves its cached decode");
+    assert.deepEqual(draft.order, order);
+    assert.equal(draft.view({}).redoLabel, "Macro 6");
+    clock = 200;
+    replaceMacro("branch", "New branch");
+    assert.deepEqual(draft.steps().map(step => [step.at, step.label]), [[5, "Macro 5"], [200, "New branch"]]);
+    assert.equal(draft.view({}).canRedo, false);
+    assert.deepEqual(draft.order, order, "a new branch carries the retained entry's order");
+    draft.undo(draft.revision);
+    assert.equal(draft.current.decoded, oldestDecode);
+    draft.redo(draft.revision);
+    assert.equal(macroEditorView(draft.current, draft.capabilities).viaMacros[0].payload, "branch");
+});
+
+test("draft staging translates the connected firmware's behaviour capabilities into model facts", () => {
+    const {snapshot, caps} = fixture();
+    const {PROFILE_WIRE_FEATURES} = require("../../core/protocol/profile-wire-v1");
+    for (const [flag, name, code, refusal] of [
+        [PROFILE_WIRE_FEATURES.OWNED_LAYER_TOGGLES, "TG(2)", 0x5262, /MO\(layer\)/],
+        [PROFILE_WIRE_FEATURES.BEHAVIOR_QMK_FUNCTIONS, "DPI_MOD", 0x7e00, /only works as a key or a combo/],
+    ]) {
+        const edit = {type: "saveBehavior", behavior: {keycode: "KC_F24", steps: [{tapCount: 0, tap: {helper: "TAP_SENDS", action: name}}]}};
+        const blocked = new ProfileDraftSession(snapshot, "board", {...caps, featureFlags: 0});
+        assert.throws(() => stage(blocked, edit), refusal);
+        assert.equal(blocked.current.fingerprint, snapshot.fingerprint);
+        const allowed = new ProfileDraftSession(snapshot, "board", {...caps, featureFlags: flag});
+        stage(allowed, edit);
+        const row = allowed.current.decoded.behaviors.rows.find(row => row.target.operand === 0x73);
+        assert.ok(row, "the authored KC_F24 row is stored");
+        assert.equal(row.steps[0].tap.kind, 1);
+        assert.equal(row.steps[0].tap.operand, code);
+    }
 });
 test("invalid edits and obsolete revisions cannot partially change the draft", () => {
     const {draft,snapshot} = fixture();

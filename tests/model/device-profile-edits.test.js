@@ -1,7 +1,7 @@
 "use strict";
 const assert = require("node:assert/strict");
 const test = require("node:test");
-const {editDeviceProfile} = require("../../core/session/device-profile-edits");
+const {editDeviceProfile} = require("../../core/model/device-profile-edits");
 const {decodeProfileBlob} = require("../../core/schema/profile-blob-v1");
 const {decodeRgbDomainV1} = require("../../core/schema/rgb-domain-v1");
 const {bytes} = require("../fixtures/device-profile");
@@ -33,7 +33,7 @@ test("LED membership edits preserve references and refuse deleting an assigned g
 const {decodeComboDomain} = require("../../core/schema/combo-domain-v1");
 const {decodeComboPages} = require("../../core/protocol/combo-readback-v1");
 const {fixturePages} = require("../fixtures/device-combos");
-const {assertEffectiveCombos} = require("../../core/session/device-profile-edits");
+const {assertEffectiveCombos} = require("../../core/model/device-profile-edits");
 const readOf = pages => ({state: "read", ...decodeComboPages(pages[0], pages.slice(1))});
 const pages = fixturePages();
 const context = {capabilities: {supportedDomainMask: 7, actionAbiDigest: 0x837cf479}, combos: readOf(pages)};

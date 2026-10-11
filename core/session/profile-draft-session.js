@@ -12,8 +12,8 @@ const {draftProfileChecks} = require("../model/profile-checks");
 const {editSettings} = require("../model/settings-editor");
 const {editMacro} = require("../model/macro-editor");
 const {editCustomKey} = require("../model/custom-key-editor");
-const {editDeviceProfile, RGB_EDITS, COMBO_EDITS, PD_EDITS} = require("./device-profile-edits");
-const {BEHAVIOR_EDITS} = require("./key-behavior-edits");
+const {editDeviceProfile, RGB_EDITS, COMBO_EDITS, PD_EDITS} = require("../model/device-profile-edits");
+const {BEHAVIOR_EDITS} = require("../model/key-behavior-edits");
 const {actionName, knownActionAbi, layerOfRef, nativeCode} = require("../schema/actions");
 const {effectiveComboTerm} = require("../schema/combo-domain-v1");
 const {resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
@@ -29,6 +29,7 @@ const {PROFILE_WIRE_FEATURES} = require("../protocol/profile-wire-v1");
  * @typedef {import("../model/types.js").ModelReviewChange} ModelReview
  * @typedef {import("./types.js").DraftEdit} Edit
  * @typedef {readonly number[]} Order
+ * @typedef {{readonly document: Document, readonly origin: string | null, readonly label: string | null, readonly at: number, readonly order: Order}} HistoryEntry
  * @typedef {{decoded: Decoded, fingerprint: string, summary: import("../model/types.js").ProfileSummary}} DecodeEntry
  * @typedef {{snapshot: Complete, order: Order | null}} Reference
  */
@@ -120,17 +121,7 @@ class ProfileDraftSession {
         /** @type {Snapshot} */
         this.latest = copy(snapshot);
         this.hostOs = copy(snapshot.hostOs ?? null);
-        this.history = [freeze(copy(snapshot.document))];
-        // Why each history entry exists, beside it: "edit" is one staged
-        // message, the only kind that ties the units it changed together.
-        /** @type {(string | null)[]} */
-        this.origins = [null];
-        /** @type {(string | null)[]} */
-        this.labels = [null];
-        // When each entry was made, for the draft history.
-        this.times = [this.now()];
-        // Which keyboard layer each slot of the entry holds (layer-order.js).
-        this.orders = [IDENTITY];
+        this.history = [this.historyEntry(snapshot.document)];
         this.cursor = 0;
         this.revision = 1;
         /** @type {number | null} */
@@ -149,8 +140,14 @@ class ProfileDraftSession {
     /** @type {boolean | undefined} */
     needsRead;
     now() {return Date.now();}
-    get document() {return copy(this.history[this.cursor]);}
-    get order() {return this.orders[this.cursor];}
+    // A step keeps its document, edit grouping, words, time and layer order
+    // together. All of them stay fixed as undo, branching and trimming move it.
+    /** @param {Document} document @param {string | null} [origin] @param {string | null} [label] @param {Order} [order] @returns {HistoryEntry} */
+    historyEntry(document, origin = null, label = null, order = IDENTITY) {
+        return freeze({document: copy(document), origin, label, at: this.now(), order: [...order]});
+    }
+    get document() {return copy(this.history[this.cursor].document);}
+    get order() {return this.history[this.cursor].order;}
     // A history entry decoded once: its validated form (read-only), its
     // fingerprint and summary. Entries are never edited in place, so the
     // answer is kept with the entry for as long as the entry exists.
@@ -172,8 +169,8 @@ class ProfileDraftSession {
     // revision's document, plus its decoded form for read-only consumers.
     /** @returns {Complete & {decoded: Decoded}} */
     get current() {
-        const {decoded, fingerprint: print, summary: brief} = this.decode(this.history[this.cursor]);
-        return {...this.snapshotFacts, incomplete: false, document: this.history[this.cursor], fingerprint: print, summary: brief, decoded};
+        const {decoded, fingerprint: print, summary: brief} = this.decode(this.history[this.cursor].document);
+        return {...this.snapshotFacts, incomplete: false, document: this.history[this.cursor].document, fingerprint: print, summary: brief, decoded};
     }
     // The keyboard's side as a snapshot, decoded once too.
     get baseSnapshot() {
@@ -189,7 +186,7 @@ class ProfileDraftSession {
         if (base.incomplete) throw fail("Read a complete profile before comparing it with the draft.");
         return base;
     }
-    get dirty() {return this.decode(this.history[this.cursor]).fingerprint !== this.base.fingerprint;}
+    get dirty() {return this.decode(this.history[this.cursor].document).fingerprint !== this.base.fingerprint;}
     get stale() {return Boolean(this.needsRead || this.connectionChanged || this.latest.fingerprint !== this.base.fingerprint);}
     /** @param {import("./types.js").ConnectionToken} connectionToken */
     noteConnection(connectionToken) {
@@ -244,7 +241,7 @@ class ProfileDraftSession {
         this.hostOs = copy(snapshot.hostOs ?? null);
         this.referenceCache = new WeakMap();
         this.reviewCache = new WeakMap();
-        this.history = [freeze(copy(snapshot.document))]; this.origins = [null]; this.labels = [null]; this.times = [this.now()]; this.orders = [IDENTITY]; this.cursor = 0;
+        this.history = [this.historyEntry(snapshot.document)]; this.cursor = 0;
         this.revision++; this.reviewedRevision = null;
         this.needsRead = false;
         this.connectionChanged = false;
@@ -254,18 +251,10 @@ class ProfileDraftSession {
     replace(document, revision, origin = "edit", label = null, order = this.order) {
         this.assertRevision(revision);
         const valid = validateSnapshot(document, this.capabilities).document;
-        if (fingerprint(valid) === this.decode(this.history[this.cursor]).fingerprint) return;
+        if (fingerprint(valid) === this.decode(this.history[this.cursor].document).fingerprint) return;
         this.history = this.history.slice(0, this.cursor + 1);
-        this.origins = this.origins.slice(0, this.cursor + 1);
-        this.labels = this.labels.slice(0, this.cursor + 1);
-        this.times = this.times.slice(0, this.cursor + 1);
-        this.orders = this.orders.slice(0, this.cursor + 1);
-        this.history.push(freeze(copy(valid)));
-        this.origins.push(origin);
-        this.labels.push(label);
-        this.times.push(this.now());
-        this.orders.push(Object.freeze([...order]));
-        if (this.history.length > 101) {this.history.shift(); this.origins.shift(); this.labels.shift(); this.times.shift(); this.orders.shift();}
+        this.history.push(this.historyEntry(valid, origin, label, order));
+        if (this.history.length > 101) this.history.shift();
         this.cursor = this.history.length - 1;
         this.revision++; this.reviewedRevision = null;
     }
@@ -283,11 +272,14 @@ class ProfileDraftSession {
             const expected = message.expectedBase;
             if (expected && (/** @type {const} */ (["source", "generation", "digest", "originHalf"])).some(key => expected[key] !== this.identity()[key])) throw fail("This form belongs to an older draft. Reload it before keeping changes.");
             document = {...current.document, profile: editDeviceProfile(Buffer.from(current.document.profile, "base64"), message, {
-                capabilities: this.capabilities, combos: this.combos(), maximumBrightness: current.limits?.brightnessMax,
+                capabilities: {...this.capabilities,
+                    ownedLayerToggles: Boolean((this.capabilities.featureFlags || 0) & PROFILE_WIRE_FEATURES.OWNED_LAYER_TOGGLES),
+                    behaviorQmkFunctions: Boolean((this.capabilities.featureFlags || 0) & PROFILE_WIRE_FEATURES.BEHAVIOR_QMK_FUNCTIONS)},
+                combos: this.combos(), maximumBrightness: current.limits?.brightnessMax,
             }).toString("base64")};
         }
         this.replace(document, message.draftRevision, "edit", editLabel(message, current.document));
-        return {message: copy(message), previousFingerprint: before, fingerprint: this.decode(this.history[this.cursor]).fingerprint};
+        return {message: copy(message), previousFingerprint: before, fingerprint: this.decode(this.history[this.cursor].document).fingerprint};
     }
     // A Rename & Reorder save: its document, and the order it saved, which
     // rearranges this revision. An order and each name are separate
@@ -364,10 +356,10 @@ class ProfileDraftSession {
         const find = unit => {while (parent.get(unit) !== unit) unit = /** @type {string} */ (parent.get(unit)); return unit;};
         const steps = [];
         for (let step = 1; step <= this.cursor; step++) {
-            if (this.origins[step] !== "edit") continue;
-            const touched = this.stepUnits(step).map(unit => layerUnit(unit, this.orders[step])).filter(unit => shown.has(unit));
+            if (this.history[step].origin !== "edit") continue;
+            const touched = this.stepUnits(step).map(unit => layerUnit(unit, this.history[step].order)).filter(unit => shown.has(unit));
             for (const unit of touched.slice(1)) parent.set(find(unit), find(touched[0]));
-            if (touched.length) steps.push({label: this.labels[step], unit: touched[0]});
+            if (touched.length) steps.push({label: this.history[step].label, unit: touched[0]});
         }
         // A group is titled by the edits that made it, in the order they were
         // made: one edit by its own words, several by the first and a count.
@@ -392,7 +384,7 @@ class ProfileDraftSession {
     /** @param {number} step @returns {string[]} */
     stepUnits(step) {
         this.stepCache ??= new WeakMap();
-        const entry = this.history[step], previous = this.history[step - 1], cached = this.stepCache.get(entry);
+        const entry = this.history[step].document, previous = this.history[step - 1].document, cached = this.stepCache.get(entry);
         if (cached?.previous === previous) return cached.units;
         /** @param {Document} document @returns {Complete} */
         const snapshot = document => ({...this.snapshotFacts, incomplete: false, document, ...this.decode(document)});
@@ -409,8 +401,8 @@ class ProfileDraftSession {
     // the bounded history still keeps.
     steps() {
         return this.history.map((entry, step) => ({
-            step, at: this.times[step], origin: this.origins[step],
-            label: this.labels[step] || (step ? "Reviewed against the keyboard" : "Read from the keyboard"),
+            step, at: entry.at, origin: entry.origin,
+            label: entry.label || (step ? "Reviewed against the keyboard" : "Read from the keyboard"),
             current: step === this.cursor, undone: step > this.cursor,
             changes: step ? this.stepReview(step) : null,
         }));
@@ -418,8 +410,8 @@ class ProfileDraftSession {
     /** @param {number} step @returns {Review[]} */
     stepReview(step) {
         this.reviewCache ??= new WeakMap();
-        const entry = this.history[step], previous = this.history[step - 1], cached = this.reviewCache.get(entry);
-        const before = this.orders[step - 1], after = this.orders[step];
+        const entry = this.history[step].document, previous = this.history[step - 1].document, cached = this.reviewCache.get(entry);
+        const before = this.history[step - 1].order, after = this.history[step].order;
         if (cached?.previous === previous && cached.before === before && cached.after === after) return cached.rows;
         /** @param {Document} document @returns {Complete} */
         const snapshot = document => ({...this.snapshotFacts, incomplete: false, document, ...this.decode(document)});
@@ -490,7 +482,7 @@ class ProfileDraftSession {
         if (this.needsRead) throw fail("Read the latest keyboard state before reviewing this draft again.");
         const target = this.document, order = this.order;
         if (this.latest.incomplete) {
-            this.base = copy(this.latest); this.history = [freeze(target)]; this.origins = [null]; this.labels = [null]; this.times = [this.now()]; this.orders = [IDENTITY]; this.cursor = 0;
+            this.base = copy(this.latest); this.history = [this.historyEntry(target)]; this.cursor = 0;
             this.connectionToken = this.latestConnectionToken; this.connectionChanged = false;
             this.revision++; this.reviewedRevision = this.revision; return;
         }
@@ -542,12 +534,12 @@ class ProfileDraftSession {
     // whether the draft introduced them or the keyboard already has them.
     hasChecksToConfirm() {return this.checks().some(check => check.status !== "fixed" && (/** @type {string[]} */ ([CHECK_LEVELS.TRAP, CHECK_LEVELS.WARNING])).includes(check.level));}
     hasBlockers() {return this.checks().some(check => check.status !== "fixed" && check.level === "blocker");}
-    identity() {return {source: "draft", generation: this.revision, digest: this.decode(this.history[this.cursor]).fingerprint, originHalf: this.deviceId};}
+    identity() {return {source: "draft", generation: this.revision, digest: this.decode(this.history[this.cursor].document).fingerprint, originHalf: this.deviceId};}
     // The draft's combos as the keyboard would report them: every window as
     // it resolves, and whether it follows the default.
     /** @returns {Extract<import("./types.js").ComboRead, {state: "read"}>} */
     combos() {
-        const {combos, settings} = this.decode(this.history[this.cursor]).decoded;
+        const {combos, settings} = this.decode(this.history[this.cursor].document).decoded;
         // The constructor gates the action ABI, and all stored actions have native codes.
         /** @param {import("../schema/types.js").SemanticAction} action */
         const native = action => /** @type {number} */ (nativeCode(action));
@@ -562,8 +554,8 @@ class ProfileDraftSession {
             canUndo: this.cursor > 0, canRedo: this.cursor + 1 < this.history.length,
             // What undo and redo would take back or bring back, in the words
             // the step was recorded with.
-            undoLabel: this.cursor > 0 ? this.labels[this.cursor] : null,
-            redoLabel: this.cursor + 1 < this.history.length ? this.labels[this.cursor + 1] : null,
+            undoLabel: this.cursor > 0 ? this.history[this.cursor].label : null,
+            redoLabel: this.cursor + 1 < this.history.length ? this.history[this.cursor + 1].label : null,
             // How many steps the history holds; the steps themselves come
             // only while the history sheet is open (steps()).
             historyLength: this.history.length,

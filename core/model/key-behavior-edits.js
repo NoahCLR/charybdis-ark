@@ -7,8 +7,7 @@ const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {decodeKeyBehaviorDomain, encodeKeyBehaviorDomain, KEY_BEHAVIOR_HOLD_MODES} = require("../schema/key-behavior-domain-v1");
 const {semanticActionForExpression, resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
 const {PD_SLOT_COUNT, actionName, isOwnedLayerCode, knownActionAbi} = require("../schema/actions");
-const {behaviorPlacementProblem} = require("../model/profile-placement");
-const {PROFILE_WIRE_FEATURES} = require("../protocol/profile-wire-v1");
+const {behaviorPlacementProblem} = require("./profile-placement");
 const {profileDepthOptions} = require("../schema/profile-depth");
 
 /**
@@ -34,15 +33,15 @@ function integer(value, max, label, optional = false) {
     return result;
 }
 
-/** @param {Buffer} payload @param {BehaviorEdit} message @param {import("../model/types.js").ProfileDestination} [capabilities] */
+/** @param {Buffer} payload @param {BehaviorEdit} message @param {import("./types.js").ProfileDestination} [capabilities] */
 function editKeyBehaviors(payload, message, capabilities = {}) {
     if (!((capabilities.supportedDomainMask || 0) & 2)) throw invalid("This firmware does not support saving key behaviours.");
     const maxPdModes = PD_SLOT_COUNT;
     /** @type {{rows: Row[]}} */
     const {rows} = decodeKeyBehaviorDomain(payload, profileDepthOptions(capabilities).behaviors);
     const knownAbi = knownActionAbi(capabilities.actionAbiDigest ?? 0);
-    const ownsLayerKeys = Boolean((capabilities.featureFlags || 0) & PROFILE_WIRE_FEATURES.OWNED_LAYER_TOGGLES);
-    const behaviorQmkFunctions = Boolean((capabilities.featureFlags || 0) & PROFILE_WIRE_FEATURES.BEHAVIOR_QMK_FUNCTIONS);
+    const ownsLayerKeys = Boolean(capabilities.ownedLayerToggles);
+    const behaviorQmkFunctions = Boolean(capabilities.behaviorQmkFunctions);
     /** @param {Action} action */
     const native = action => action.kind === ACTION.QMK_KEYCODE ? action.operand
         : knownAbi ? nativeCode(action) : undefined;

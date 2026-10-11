@@ -4,12 +4,12 @@
 // Presentation of validated device domains. Names here describe wire IDs;
 // configuration values and membership always come from the received domain.
 const {actionName, layerRef} = require("../schema/actions");
-const {VOCABULARY, branchName} = require("../model/vocabulary");
-const {keyLabel} = require("../model/key-names");
+const {VOCABULARY, branchName} = require("./vocabulary");
+const {keyLabel} = require("./key-names");
 const keycodes = require("../data/keycode-catalog");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {KEY_BEHAVIOR_HOLD_MODES} = require("../schema/key-behavior-domain-v1");
-const {builtInActions} = require("../model/built-in-behavior");
+const {builtInActions} = require("./built-in-behavior");
 const {
     RGB_AUTOMOUSE_MODES, RGB_DOMAIN_V1, RGB_KEY_SEMANTICS, RGB_LAYER_MODES,
     RGB_LOCALITIES, RGB_PD_MODE_IDS, RGB_STAGE_BITS, RGB_TAP_COMMIT_MODES,
