@@ -5,6 +5,8 @@ import {placeState} from '../../webview/view/review.mjs';
 import {participationAt} from '../../webview/view/participation.mjs';
 import * as edits from '../../webview/view/edits.mjs';
 import {newMode, readConfig} from '../../webview/view/pointing-config.mjs';
+import {kept, resets, resetsTo} from '../../webview/view/state-fields.mjs';
+import type {StateFields} from '../../webview/view/state-fields.mjs';
 import type {PanelEdit, PdSlot, BaseIdentity} from '../../contracts/edits.js';
 
 function contracts(slot: PdSlot, identity: BaseIdentity) {
@@ -139,3 +141,19 @@ function rendererViews(model: PublishedModel, position: Position) {
     void [kind, names, comboKeys, summary, missingLayer, routeName];
 }
 void rendererViews;
+
+function stateDeclarations() {
+    type Panel = {screen: string; focus?: number; form: string[] | null};
+    const declared: StateFields<Panel> = {screen: kept('keys'), focus: kept(undefined), form: resets(null)};
+    // @ts-expect-error Every field, optional ones too, declares what a draft change does to it.
+    const undeclared: StateFields<Panel> = {screen: kept('keys'), form: resets(null)};
+    // @ts-expect-error A starting value has the field's type.
+    const mistyped: StateFields<Panel> = {screen: kept(0), focus: kept(undefined), form: resets(null)};
+    // @ts-expect-error A field states its decision rather than holding a bare value.
+    const bare: StateFields<Panel> = {screen: 'keys', focus: kept(undefined), form: resets(null)};
+    // A field's own rule reads the state before the change.
+    const ruled: StateFields<Panel> = {screen: kept('keys'), focus: kept(undefined),
+        form: resetsTo<Panel['form'], Panel>(null, (form, before) => before.screen === 'keys' ? form : null)};
+    void [declared, undeclared, mistyped, bare, ruled];
+}
+void stateDeclarations;
