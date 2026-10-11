@@ -1146,7 +1146,12 @@ the fixture's character table and never re-derives it, so what the editor
 accepts and what the keyboard types cannot disagree.
 
 Settings → Host offers the layouts of the effective OS, plus US, behind feature
-bit 22; older firmware shows the layout read-only at US. On macOS, Unicode
+bit 22; older firmware shows the layout read-only at US. The keyboard types
+through the layout whatever the OS, so a Host edit that changes the effective
+OS carries the layout along (`followHostOs` in `core/schema/host-settings.js`):
+kept if it is US or that OS's, else that OS's layout of the same language, else
+US. Detection is not an edit, so Auto never rewrites the layout; Host and the
+macro editor warn while the layout belongs to another OS than the effective one. On macOS, Unicode
 entry needs the Unicode Hex Input source, so it is a layout choice there, not a
 switch; the switch stays for Windows and Linux. The macro editor refuses a
 character the layout cannot type unless Unicode entry is available, naming it,

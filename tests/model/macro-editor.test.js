@@ -194,7 +194,7 @@ test("Unicode host setup persists with the profile and gates Unicode edits on le
         const view = macroEditorView(current, capabilities);
         const {layoutChars, ...unicodeView} = view.unicode;
         // Firmware without host layouts types through US, ASCII only.
-        assert.deepEqual(unicodeView, {supported: true, mode, enabled: true, os: mode, layouts: false, layout: 0, layoutName: "US"});
+        assert.deepEqual(unicodeView, {supported: true, mode, enabled: true, os: mode, layouts: false, layout: 0, layoutFits: true, layoutName: "US"});
         assert.equal(layoutChars.length, 97);
         assert.equal(view.viaMacros[0].payload, "café 🙂 e\u0301 👩‍💻");
         assert.equal(Buffer.from(current.document.macros[0], "base64").toString("utf8"), "café 🙂 e\u0301 👩‍💻");

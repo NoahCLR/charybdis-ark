@@ -558,7 +558,13 @@ when the OS is unknown): ABC, Dutch, Unicode Hex Input, British, German and
 French on macOS; US International, United Kingdom, German and French on Windows
 and on Linux. Macro text is typed through it, so pick the layout that is active
 on the computer; the keyboard cannot check. US is the default and what older
-firmware assumes. On macOS, **ISO keyboard on macOS** matters if macOS set this
+firmware assumes. Choosing a **Host OS** brings the layout along: it stays if
+it belongs to that OS (US belongs to all of them), and otherwise becomes that
+OS's layout of the same language (German, French, British or United Kingdom),
+or US. It is one change, so one undo restores both. Auto cannot do this for
+you: when the keyboard is detected on another OS than its layout's, for example
+plugged into another computer, the layout stays, and Host and the macro editor
+warn that macros may type the wrong characters until it matches. On macOS, **ISO keyboard on macOS** matters if macOS set this
 keyboard up as ISO (its Keyboard Setup Assistant asks): macOS then swaps the key
 left of 1 with the one left of Z, and macros must swap them too. On macOS there
 is no Unicode switch: choose the **Unicode Hex Input** layout for emoji and

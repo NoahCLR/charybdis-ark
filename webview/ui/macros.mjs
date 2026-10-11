@@ -15,6 +15,7 @@ import * as edits from "../view/edits.mjs";
 import {layerSwatch} from "./layerbar.mjs";
 import {openPicker} from "./picker.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
+import {vocabulary, word} from "../view/vocabulary.mjs";
 import {topbar, unavailable} from "./shell.mjs";
 
 const STEP_KINDS = [
@@ -481,8 +482,10 @@ function onRecordKey(event) {
 
 function unicodeSetup(model, slot) {
     if (!model?.macroUnicode?.supported) return `<p class="note">Unicode macro text needs newer firmware on both halves.</p>`;
-    const {mode, os, layouts, layoutName} = model.macroUnicode;
-    const typed = layouts
+    const {mode, os, layouts, layout, layoutFits, layoutName} = model.macroUnicode;
+    const typed = layouts && layoutFits === false
+        ? `Text types through ${word(vocabulary(model).hostLayouts, layout)}, chosen in Settings → Host, which is not a ${word(vocabulary(model).hostOs, os)} layout: macros may type the wrong characters until the layout matches the computer.`
+        : layouts
         ? `Text types through the ${layoutName} layout chosen in Settings → Host, accented letters included; keep that layout active on the computer.`
         : "Plain ASCII text types with ordinary keys on any input source.";
     const entry = mode
