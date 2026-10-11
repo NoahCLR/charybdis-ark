@@ -46,7 +46,7 @@ matrix.
 | Pointing modes | 32 device-owned slots (sparse PD domain v3, RGB v4); live codecs accept only the current action vocabulary and profile formats (D-L54). See [PD-mode domain v1](../upstream/firmware/docs/architecture/pd-mode-domain-v1.md) |
 | Global policy | Every other portable setting, including startup layers, combo matching and device-reported lighting and key options; Windows Unicode setup links to WinCompose and macOS Unicode setup warns about Option shortcuts (D-L56); unsupported firmware features stay read-only |
 | Backup and restore | Complete current-format snapshots, choose or drop a file for import review against the keyboard, recovery file and verified restore; the preceding eight-layer backup is translated before review (D-L54) |
-| Drafts and Apply | One draft with item-by-item review, discard by edit group, Show, undo/redo and draft history; the review checks reachable actions, confirms active warnings and traps, and blocks profiles the destination cannot save (D-L36); Apply shows its steps and says where a failure happened; one coherent capture supplies the editor and draft, and copy/read status updates retain the active editor (D-L19, D-L23, D-L29, D-L30) |
+| Drafts and Apply | One draft with item-by-item review, discard by edit group, Show, undo/redo and draft history; the review checks reachable actions, confirms active warnings and traps, and blocks profiles the destination cannot save (D-L36); Apply names the master and slave halves in its steps and says where a failure happened; one coherent capture supplies the editor and draft, and copy/read status updates retain the active editor (D-L19, D-L23, D-L29, D-L30) |
 | Recovery | Atomic logical Apply, capability-gated differential custom uploads (D-L58), differential VIA transfer, reboot recovery fencing, firmware roll-forward after the decision, resume after a lost or power-cycled peer link, bounded cancel owned by the keyboard (D-L20–D-L22, D-L27, D-L39) |
 | Where it runs | The VS Code extension, and a web page that runs all of Ark in Chrome or Edge over WebHID (D-L52): Choose keyboard, one tab at a time, recovery copies in the browser's storage, a light/dark toggle. A phone gets only a notice that Ark runs on a computer, with links to the repositories; a tablet gets Ark. `npm run build:web` writes the page as static files; a workflow publishes it to Cloudflare Pages: `dev` at `ark-dev.ncleroy.dev`, `main` at `ark.ncleroy.dev` from the first release |
 | Demo without a keyboard | Explore a demo, in both hosts and on a browser without WebHID: the bundled demo profile (`core/data/`) in a real draft under current firmware's capabilities, every screen editable and reviewed; Apply refused, Export saves the draft, Open a profile file replaces it, leaving with edits not exported asks first (D-L53) |
@@ -349,11 +349,13 @@ Firmware decision; its text is in the firmware direction.
 
 `core/session/apply-progress.js` names the ten steps of an Apply and tracks
 them forward only: check the keyboard, save a recovery copy, send the profile,
-keyboard checks it, stage keys and macros on the other half, copy the profile
-to the other half, save it on this half, finish the other half, write keys and
-macros on this half, check both halves. `restoreProfile()` reports at each real
-boundary with byte counts. A failure keeps its step, a reason from the
-keyboard's own error (or the other half's last answer), and whether anything
+keyboard checks it, stage keys and macros on the slave half, copy the profile
+to the slave half, save it on the master half, finish the slave half, write keys
+and macros on the master half, check both halves. The master half is the one
+connected over USB; the slave half is its partner over the split cable. These
+roles do not imply left or right, and the Device screen explains them.
+`restoreProfile()` reports at each real boundary with byte counts. A failure keeps its step, a reason from the
+keyboard's own error (or the slave half's last answer), and whether anything
 was saved. The commit bar keeps a failed Apply on screen until dismissed.
 Transfer progress uses a separate `applyProgress` panel message, correlated to
 the current draft ID and revision. The service retains the latest view for

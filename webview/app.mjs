@@ -71,7 +71,7 @@ function screenDevice() {
                         ["Product", device.label],
                         ["Status", device.subtitle],
                         ["Phase", device.health?.phase],
-                    ])}</div></div>
+                    ])}<p class="note">The master half connects over USB; the slave half connects to it through the cable between the halves.</p></div></div>
                 <div class="card"><div class="card-h"><h3>Committed profile</h3>
                     <span class="right"><span class="chip"><i class="dot ${device.health?.converged ? "on" : "draft"}"></i>${device.health?.converged ? "both halves agree" : "halves not converged"}</span></span></div>
                     <div class="card-b">${kv([

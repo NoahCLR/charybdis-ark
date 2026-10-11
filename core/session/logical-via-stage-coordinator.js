@@ -23,14 +23,14 @@ class LogicalViaStageCoordinator {
         const deadline = Date.now() + this.timeoutMs;
         do {
             const status = await readLogicalViaStatus(this.connection, {nextRequestId: () => this.requestIds.next()});
-            if (status.state === LOGICAL_VIA_STATE.ERROR) throw Object.assign(new Error(`Peer VIA staging failed with status ${status.lastStatus}.`), {code: "LOGICAL_VIA_STAGE_FAILED", status});
+            if (status.state === LOGICAL_VIA_STATE.ERROR) throw Object.assign(new Error(`VIA staging on the slave half failed with status ${status.lastStatus}.`), {code: "LOGICAL_VIA_STAGE_FAILED", status});
             // The keyboard ends a staging only together with its profile
             // candidate, e.g. when the candidate's lease ran out.
             if (status.transactionId === transactionId && !status.pending && status.state === LOGICAL_VIA_STATE.ABORTED) throw Object.assign(new Error("The keyboard cancelled this save before it was committed."), {code: "LOGICAL_VIA_STAGE_CANCELLED", status});
             if (status.transactionId === transactionId && !status.pending && status.operationSequence !== operationSequence && acceptedStates.includes(status.state)) return status;
             await this.sleep(this.pollMs);
         } while (Date.now() < deadline);
-        throw Object.assign(new Error("Timed out while staging the VIA profile on the other half."), {code: "LOGICAL_VIA_STAGE_TIMEOUT"});
+        throw Object.assign(new Error("Timed out while staging the VIA profile on the slave half."), {code: "LOGICAL_VIA_STAGE_TIMEOUT"});
     }
 
     async operation(request, transactionId, acceptedStates) {
@@ -67,7 +67,7 @@ class LogicalViaStageCoordinator {
         do {
             const status = await readLogicalViaStatus(this.connection, {nextRequestId: () => this.requestIds.next()});
             const exact = status.transactionId === transactionId && status.generation === generation && status.digest === digest;
-            if (status.state === LOGICAL_VIA_STATE.ERROR) throw Object.assign(new Error(`Peer VIA acceptance failed with status ${status.lastStatus}.`), {code: "LOGICAL_VIA_ACCEPT_FAILED", status});
+            if (status.state === LOGICAL_VIA_STATE.ERROR) throw Object.assign(new Error(`VIA acceptance on the slave half failed with status ${status.lastStatus}.`), {code: "LOGICAL_VIA_ACCEPT_FAILED", status});
             // IDLE with the exact retained identity means firmware already
             // released the normal-reconciliation fence after local roll-forward.
             if (exact && !status.pending && [LOGICAL_VIA_STATE.ACCEPTED, LOGICAL_VIA_STATE.IDLE].includes(status.state)) return status;

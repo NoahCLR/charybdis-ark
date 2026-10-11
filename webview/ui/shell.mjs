@@ -91,7 +91,7 @@ export function rail() {
                         "Edits waiting in this window. The keyboard still runs its saved profile.")}
                 ${demo.active ? "" : health.restartNeeded
                     ? line("err", "Restart the keyboard",
-                        "The other half did not confirm a cancelled save, so the keyboard refuses new saves. Unplug the USB cable (not the cable between the halves), wait a few seconds and plug it back in. Nothing was lost.")
+                        "The slave half did not confirm a cancelled save, so the keyboard refuses new saves. Unplug the USB cable (not the cable between the halves), wait a few seconds and plug it back in. Nothing was lost.")
                     : line(health.recoveryPending ? "draft" : device.connected ? "on" : "",
                         health.recoveryPending ? "Recovery pending" : device.connected ? "Recovery clear" : "Recovery unknown",
                         "A recovery copy is written before every apply.")}

@@ -24,11 +24,11 @@ const {IDENTITY} = require("../model/layer-order");
 const {LAYERS} = require("../model/portable-profile");
 
 const run = (host, title, work) => host.progress ? host.progress(title, work) : work();
-// The other half confirmed its copy before the keyboard switched, but the
+// The slave half confirmed its copy before the keyboard switched, but the
 // cable between the halves may have come out since; say so instead of
 // claiming a readback of both halves that did not happen.
 const savedNotice = (result, verb) => result?.peerUnseen
-    ? `Complete profile ${verb} both halves and active. The other half confirmed its copy but is not connected now; plug the cable between the halves back in.`
+    ? `Complete profile ${verb} both halves and active. The slave half confirmed its copy but is not connected now; plug the cable between the halves back in.`
     : `Complete profile ${verb} both halves and verified.`;
 
 // After the keyboard stores a new profile, everything the panel shows about

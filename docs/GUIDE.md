@@ -390,6 +390,11 @@ every gesture is physically practical.
 
 ## Applying changes
 
+Ark calls the half connected over USB the **master half**, and its partner the
+**slave half**. These names describe their connection roles, whichever side
+holds each role. Device explains the names; Apply progress, failures and
+recovery notices use them consistently.
+
 Every edit goes into one local draft with undo, redo and a history, and reaches
 the keyboard only through **Review and apply**. Apply
 saves a recovery copy, then commits the complete profile to both halves as one
@@ -432,17 +437,17 @@ What to expect while it applies:
   profile unchanged. A save the app abandoned before the decision is cancelled
   by the keyboard within about 15 seconds, and the next save can start once
   both halves are connected.
-- It then holds key input for the few moments while this half's keys and
+- It then holds key input for the few moments while the master half's keys and
   macros are rewritten and the new profile activates. If the app is closed in
-  that window, the keyboard finishes the save on its own from the other half's
+  that window, the keyboard finishes the save on its own from the slave half's
   copy within about 15 seconds.
-- If the cable between the halves comes out after the decision, the USB half
+- If the cable between the halves comes out after the decision, the master half
   keeps typing the old profile until the rewrite starts, and the save resumes
-  when the cable goes back in. If it comes out during the rewrite, the USB half
-  finishes and switches to the new profile, and the app says the other half is
-  not connected.
-- After power loss in the middle of a save, the USB half types nothing until
-  its keys and macros are one complete version again, which may need the other
+  when the cable goes back in. If it comes out during the rewrite, the master
+  half finishes and switches to the new profile, and the app says the slave
+  half is not connected.
+- After power loss in the middle of a save, the master half types nothing until
+  its keys and macros are one complete version again, which may need the slave
   half connected.
 
 Drafts live in the editor window (in Chrome, the tab); closing it loses
