@@ -5,6 +5,7 @@ const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../data/charybdis-layout");
 const {layerOfRef, nativeCode} = require("../schema/actions");
 const {hostKeyLabel, keyLabel, keyLabelWithName, profileKeyNames} = require("./key-names");
 const {hostSettings, HOST_SETTING} = require("../schema/host-settings");
+const {SETTING} = require("../schema/settings-domain-v1");
 const {decodedOf} = require("./portable-profile");
 const {settingsEditorView} = require("./settings-editor");
 const {macroEditorView} = require("./macro-editor");
@@ -481,8 +482,8 @@ function profileReview(before, after, capabilities) {
         if (affected.size) timingChange.note = `${affected.size} behaviour${affected.size === 1 ? " follows" : "s follow"} the changed defaults; effective times are listed below.`;
     }
     const masks = after.options?.keymapMasks.reduce((mask, value) => mask | value, 0) || 0;
-    item("Settings", "settings:otherKeyOptions", "Other key options", new Map([["Stored bits", `0x${(a.settings.values[24] & ~masks).toString(16)}`]]),
-        new Map([["Stored bits", `0x${(b.settings.values[24] & ~masks).toString(16)}`]]), {kind: "settings"}, [true, true]);
+    item("Settings", "settings:otherKeyOptions", "Other key options", new Map([["Stored bits", `0x${(a.settings.values[SETTING.KEYMAP_OPTIONS] & ~masks).toString(16)}`]]),
+        new Map([["Stored bits", `0x${(b.settings.values[SETTING.KEYMAP_OPTIONS] & ~masks).toString(16)}`]]), {kind: "settings"}, [true, true]);
     for (let id = 0; id < Math.max(a.pdModes?.length || 0, b.pdModes?.length || 0); id++) {
         const old = a.pdModes?.[id], next = b.pdModes?.[id];
         item("Pointing modes", `pd:${id}`, `Slot ${id}${(next?.name || old?.name) ? ` · ${next?.kind ? next.name : old?.name}` : ""}`,

@@ -278,9 +278,9 @@ without changing the draft. File drops never navigate away from Ark.
 
 Before a file becomes the draft or is restored, its card compares it with what
 the keyboard holds, since that is what applying it would write, counting the
-differences by what they configure: Keys, Lighting, Macros and Pointing modes,
-each with added, changed and removed totals. It names no single difference;
-that is the draft's review. A file identical to the keyboard says so and cannot
+differences by what they configure: Keys, Lighting, Macros, Mouse and Pointing
+modes (anything else under Other), each with added, changed and removed
+totals. It names no single difference; that is the draft's review. A file identical to the keyboard says so and cannot
 be used. A file carries no layer order, so it is compared slot by slot. See
 `importDifferences` in `core/session/panel-session.js` and `categorySummary`
 in `webview/view/review.mjs`.

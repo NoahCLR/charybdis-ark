@@ -1,8 +1,10 @@
 "use strict";
 const test = require("node:test"), assert = require("node:assert/strict");
-const {hostSettings, supportsHostLayouts, layoutFits, layoutForOs, MACOS_ISO, HOST_LAYOUT_FEATURE} = require("../../core/schema/host-settings");
+const {HOST_SETTING, hostSettings, supportsHostLayouts, layoutFits, layoutForOs, MACOS_ISO, HOST_LAYOUT_FEATURE} = require("../../core/schema/host-settings");
 const {hostLayouts} = require("../../core/data/host-layouts");
-const {validSetting} = require("../../core/schema/settings-domain-v1");
+const {SETTING, validSetting} = require("../../core/schema/settings-domain-v1");
+// The settings domain requires host-settings, so it keeps its own copy of the ID.
+test("the host word is the settings table's Unicode host mode", () => assert.equal(HOST_SETTING, SETTING.UNICODE_HOST_MODE));
 test("host override and Unicode enablement are independent and unknown never guesses", () => {
     for (const selected of [0,1,2,3]) for (const detected of [0,1,2,3]) for (const enabled of [false,true]) {
         const values = []; values[27] = selected | (enabled ? 0x100 : 0);

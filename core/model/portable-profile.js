@@ -298,7 +298,7 @@ function reorderLayers(document, order, names, {keysFollow = true} = {}) {
         // Validation requires a row for every layer, and order is a permutation.
         const oldBase = /** @type {typeof rgb.layerColors[number]} */ (rgb.layerColors.find(row => row.layerId === remap[0]));
         if (oldBase.color.s === 0 && oldBase.color.v === 0) {
-            const hsv = settings.values[22];
+            const hsv = settings.values[SETTING.RGB_COLOR];
             oldBase.color = {h: hsv & 0xff, s: (hsv >>> 8) & 0xff, v: (hsv >>> 16) & 0xff};
             oldBase.mode = 0; // ALL_KEYS: the base effect covered the whole layer.
         }
@@ -309,8 +309,9 @@ function reorderLayers(document, order, names, {keysFollow = true} = {}) {
     /** @param {string} name @param {number} old */
     const unnamed = (name, old) => name === layerName([], old) && settings.names[old] === "";
     settings.names = names ? names.map((name, next) => (unnamed(name, order[next]) ? "" : name)) : order.map(old => settings.names[old]);
-    settings.values[5] = remap[settings.values[5]]; settings.values[9] = remap[settings.values[9]];
-    settings.values[23] = remap.reduce((mask, next, old) => (mask | ((settings.values[23] >>> old) & 1) << reach(old)) >>> 0, 0);
+    settings.values[SETTING.AUTO_MOUSE_LAYER] = remap[settings.values[SETTING.AUTO_MOUSE_LAYER]];
+    settings.values[SETTING.AUTO_SNIPING_LAYER] = remap[settings.values[SETTING.AUTO_SNIPING_LAYER]];
+    settings.values[SETTING.DEFAULT_LAYERS] = remap.reduce((mask, next, old) => (mask | ((settings.values[SETTING.DEFAULT_LAYERS] >>> old) & 1) << reach(old)) >>> 0, 0);
     // Each layer's switches, placements and combo reference go with it; a
     // reference names a layer by what it holds, so it follows that layer.
     /** @param {number} mask */

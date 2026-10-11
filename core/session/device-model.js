@@ -24,6 +24,7 @@ const {baseLighting, settingsEditorView} = require("../model/settings-editor");
 const {macroEditorView} = require("../model/macro-editor");
 const {customKeyEditorView} = require("../model/custom-key-editor");
 const {effectiveComboTerm} = require("../schema/combo-domain-v1");
+const {SETTING} = require("../schema/settings-domain-v1");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../data/charybdis-layout");
 const {PROFILE_WIRE_FEATURES} = require("../protocol/profile-wire-v1");
 
@@ -94,7 +95,7 @@ function buildSnapshotModel(snapshot, capabilities, binding, deviceState = {}) {
         layers: value.document.layers.map((values, layer) => ({layer, keys: CHARYBDIS_4X6_LAYOUT_MATRIX.map(([row, column], layoutIndex) => ({row, column, layoutIndex, keycode: values[row * 6 + column], resolved: keycodeCatalog.resolve(values[row * 6 + column])}))})),
         domains: {rgb: value.rgb, keyBehaviors: value.behaviors, settings, pdModes: value.pdModes},
         comboRows: combos.rows.map(row => ({...row, termMs: effectiveComboTerm(combos, row), followsDefault: row.termMs === null, inputs: row.inputs.map(native), output: native(row.output)})),
-        comboInfo: {state: "read", enabled: Boolean(settings.values[20]), layerReferences: settings.layers.map(record => record.reference),
+        comboInfo: {state: "read", enabled: Boolean(settings.values[SETTING.COMBOS_ENABLED]), layerReferences: settings.layers.map(record => record.reference),
             version: combos.version, defaultTermMs: combos.defaultTermMs, holdTermMs: combos.holdTermMs},
         baseEffect, settingsView, macroView: macroEditorView(current, capabilities), customKeyView: customKeyEditorView(current, capabilities),
         identity: null,
@@ -187,10 +188,10 @@ function configurationModel(content, capabilities, editing) {
         behaviorTimingDefaults: content.settingsView?.timing || {},
         configDefaults: content.settingsView?.sections || [],
         participation: content.domains.settings?.values && content.domains.settings.layers ? {
-            behaviorsEnabled: Boolean(content.domains.settings.values[28]),
-            combosEnabled: Boolean(content.domains.settings.values[20]),
-            behaviorLayers: content.domains.settings.values[29],
-            comboLayers: content.domains.settings.values[30],
+            behaviorsEnabled: Boolean(content.domains.settings.values[SETTING.BEHAVIORS_ENABLED]),
+            combosEnabled: Boolean(content.domains.settings.values[SETTING.COMBOS_ENABLED]),
+            behaviorLayers: content.domains.settings.values[SETTING.LAYER_BEHAVIORS],
+            comboLayers: content.domains.settings.values[SETTING.LAYER_COMBOS],
             layers: content.domains.settings.layers,
         } : null,
         settingsEditing: {identity: content.settingsView?.identity || "", writable: editing.settings},

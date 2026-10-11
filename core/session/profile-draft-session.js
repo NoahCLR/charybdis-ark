@@ -16,6 +16,7 @@ const {editDeviceProfile} = require("../model/device-profile-edits");
 const {DRAFT_EDITS, editedBy, draftEditLabel} = require("../model/draft-edits");
 const {actionName, knownActionAbi, layerOfRef, nativeCode} = require("../schema/actions");
 const {effectiveComboTerm} = require("../schema/combo-domain-v1");
+const {SETTING} = require("../schema/settings-domain-v1");
 const {resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../data/charybdis-layout");
 const keycodes = require("../data/keycode-catalog");
@@ -513,7 +514,7 @@ class ProfileDraftSession {
         // The constructor gates the action ABI, and all stored actions have native codes.
         /** @param {import("../schema/types.js").SemanticAction} action */
         const native = action => /** @type {number} */ (nativeCode(action));
-        return {state: "read", enabled: Boolean(settings.values[20]), layerReferences: settings.layers.map(record => record.reference),
+        return {state: "read", enabled: Boolean(settings.values[SETTING.COMBOS_ENABLED]), layerReferences: settings.layers.map(record => record.reference),
             version: combos.version, defaultTermMs: combos.defaultTermMs, holdTermMs: combos.holdTermMs,
             rows: combos.rows.map(row => ({...row, termMs: effectiveComboTerm(combos, row), followsDefault: row.termMs === null, inputs: row.inputs.map(native), output: native(row.output)}))};
     }
