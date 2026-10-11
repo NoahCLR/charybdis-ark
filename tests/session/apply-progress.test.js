@@ -26,8 +26,8 @@ test("a failure is pinned to the running step, and nothing moves after it", () =
     const progress = new ApplyProgress();
     progress.report("peer");
     assert.equal(progress.beforeDecision, true, "the peer copy comes before the commit decision");
-    const failure = progress.fail({reason: "The other half kept answering that it was busy.", saved: "none"});
-    assert.deepEqual(failure, {step: "peer", label: "Copy the profile to the other half", reason: "The other half kept answering that it was busy.", saved: "none"});
+    const failure = progress.fail({reason: "The slave half kept answering that it was busy.", saved: "none"});
+    assert.deepEqual(failure, {step: "peer", label: "Copy the profile to the slave half", reason: "The slave half kept answering that it was busy.", saved: "none"});
     progress.report("commit");
     const view = progress.view();
     assert.equal(view.state, "failed");
@@ -48,28 +48,28 @@ test("a finished Apply shows every step done", () => {
     assert.notEqual(new ApplyProgress().view().id, progress.view().id, "each Apply is told apart from the next");
 });
 
-test("the reason is the keyboard's own when it gave one, else the other half's last answer", () => {
+test("the reason is the keyboard's own when it gave one, else the slave half's last answer", () => {
     assert.equal(failureReason({deviceError: {name: "VALIDATION_REJECTED", domainId: 0x20, rowIndex: 4}}),
         "The keyboard rejected the profile in key behaviours, row 5.");
     assert.equal(failureReason({status: {error: {name: "STORAGE_FAILURE"}}}), "The keyboard could not write its storage.");
     assert.equal(failureReason({deviceError: {name: "SOMETHING_NEW"}}), "The keyboard reported SOMETHING_NEW.");
-    assert.equal(failureReason({message: "made no observable progress"}, {lastStatusName: "BUSY"}), "The other half kept answering that it was busy.");
+    assert.equal(failureReason({message: "made no observable progress"}, {lastStatusName: "BUSY"}), "The slave half kept answering that it was busy.");
     assert.equal(failureReason({message: "made no observable progress"}, {lastStatusName: "OK", transportFailureCount: 3}), "The link between the halves stopped answering.");
     assert.equal(failureReason({message: "disconnected"}), "disconnected");
 });
 
-test("a copy that stopped on the other half names its answer", () => {
-    assert.equal(failureReason({deviceError: {name: "PEER_TRANSFER_FAILED"}}, {lastStatusName: "STORAGE_ERROR"}), "The other half could not store the profile, even after trying again.");
-    assert.equal(failureReason({deviceError: {name: "PEER_TRANSFER_FAILED"}}, null), "The other half could not take the profile.");
+test("a copy that stopped on the slave half names its answer", () => {
+    assert.equal(failureReason({deviceError: {name: "PEER_TRANSFER_FAILED"}}, {lastStatusName: "STORAGE_ERROR"}), "The slave half could not store the profile, even after trying again.");
+    assert.equal(failureReason({deviceError: {name: "PEER_TRANSFER_FAILED"}}, null), "The slave half could not take the profile.");
 });
 
-test("a copy the other half keeps refusing says what it is waiting on", () => {
+test("a copy the slave half keeps refusing says what it is waiting on", () => {
     const stalled = {message: "made no observable progress"};
-    assert.equal(failureReason(stalled, {lastStatusName: "OK", busyStreak: 40, busyReason: "OTHER_COPY"}), "The other half was still holding an earlier, unfinished copy.");
-    assert.equal(failureReason(stalled, {lastStatusName: "OK", busyStreak: 40, busyReason: "MAILBOX_FULL"}), "The other half stopped handling requests from this half.");
-    assert.equal(failureReason(stalled, {lastStatusName: "BUSY", busyStreak: 1, busyReason: "OTHER_COPY"}), "The other half kept answering that it was busy.", "one BUSY is routine");
+    assert.equal(failureReason(stalled, {lastStatusName: "OK", busyStreak: 40, busyReason: "OTHER_COPY"}), "The slave half was still holding an earlier, unfinished copy.");
+    assert.equal(failureReason(stalled, {lastStatusName: "OK", busyStreak: 40, busyReason: "MAILBOX_FULL"}), "The slave half stopped handling requests from the master half.");
+    assert.equal(failureReason(stalled, {lastStatusName: "BUSY", busyStreak: 1, busyReason: "OTHER_COPY"}), "The slave half kept answering that it was busy.", "one BUSY is routine");
     const {peerReport} = require("../../core/session/portable-profile-session");
-    assert.equal(peerReport({phaseName: "BEGINNING", transferOffset: 0, transferLength: 2520, busyStreak: 12, busyReason: "OTHER_COPY"}).detail, "Starting the copy · the other half still holds an earlier copy");
+    assert.equal(peerReport({phaseName: "BEGINNING", transferOffset: 0, transferLength: 2520, busyStreak: 12, busyReason: "OTHER_COPY"}).detail, "Starting the copy · the slave half still holds an earlier copy");
     assert.equal(peerReport({phaseName: "SENDING", transferOffset: 28, transferLength: 2520, busyStreak: 1, busyReason: "ADMITTED"}).detail, "Sending");
     assert.match(peerReport({phaseName: "PREPARED", waitingSafeBoundary: true}).detail, /Release held keys/);
     assert.match(failureReason({deviceError: {name: "TIMEOUT"}}, {waitingSafeBoundary: true}), /stayed locked.*Nothing changed/);

@@ -13,11 +13,11 @@ const APPLY_STEPS = Object.freeze([
     {id: "backup", label: "Save a recovery copy"},
     {id: "upload", label: "Send the profile"},
     {id: "validate", label: "Keyboard checks the profile"},
-    {id: "stage", label: "Stage keys and macros on the other half"},
-    {id: "peer", label: "Copy the profile to the other half"},
-    {id: "commit", label: "Save it on this half"},
-    {id: "converge", label: "Finish the other half"},
-    {id: "local", label: "Write keys and macros on this half"},
+    {id: "stage", label: "Stage keys and macros on the slave half"},
+    {id: "peer", label: "Copy the profile to the slave half"},
+    {id: "commit", label: "Save it on the master half"},
+    {id: "converge", label: "Finish the slave half"},
+    {id: "local", label: "Write keys and macros on the master half"},
     {id: "verify", label: "Check both halves"},
 ]);
 const STEP_INDEX = Object.freeze(Object.fromEntries(APPLY_STEPS.map((step, index) => [step.id, index])));
@@ -121,25 +121,25 @@ const DEVICE_REASONS = Object.freeze({
     ACTIVATION_FAILED: "The keyboard saved the profile but could not start using it.",
     DURABILITY_UNKNOWN: "The keyboard could not confirm whether the save was written.",
     TIMEOUT: "The keyboard gave up waiting for this save.",
-    PEER_SUPERSEDED: "The other half already had a newer profile.",
-    PEER_PREPARE_YIELDED: "The other half was saving a profile of its own at the same time.",
-    POSTCOMMIT_AUTHORITY_LOST: "The other half reported a newer profile after this half saved.",
+    PEER_SUPERSEDED: "The slave half already had a newer profile.",
+    PEER_PREPARE_YIELDED: "The slave half was saving a profile of its own at the same time.",
+    POSTCOMMIT_AUTHORITY_LOST: "The slave half reported a newer profile after the master half saved.",
     PEER_COMMIT_CONFLICT: "The two halves disagree about which profile is current.",
-    PEER_TRANSFER_FAILED: "The other half could not take the profile.",
+    PEER_TRANSFER_FAILED: "The slave half could not take the profile.",
 });
 
-// The other half's last answer to the split transfer, when the keyboard
+// The slave half's last answer to the split transfer, when the keyboard
 // reports it (candidate status page 1).
 const PEER_REASONS = Object.freeze({
-    BUSY: "The other half kept answering that it was busy.",
-    STALE: "The other half already had a newer profile.",
-    CONFLICT: "The other half holds a conflicting profile.",
-    CORRUPT: "The other half's copy was damaged.",
-    INCOMPATIBLE: "The other half runs incompatible firmware.",
-    STORAGE_ERROR: "The other half could not store the profile, even after trying again.",
-    VALIDATION_ERROR: "The other half rejected the profile.",
-    DIGEST_MISMATCH: "The copy on the other half did not match what was sent.",
-    RANGE_ERROR: "The copy to the other half went out of order.",
+    BUSY: "The slave half kept answering that it was busy.",
+    STALE: "The slave half already had a newer profile.",
+    CONFLICT: "The slave half holds a conflicting profile.",
+    CORRUPT: "The slave half's copy was damaged.",
+    INCOMPATIBLE: "The slave half runs incompatible firmware.",
+    STORAGE_ERROR: "The slave half could not store the profile, even after trying again.",
+    VALIDATION_ERROR: "The slave half rejected the profile.",
+    DIGEST_MISMATCH: "The copy on the slave half did not match what was sent.",
+    RANGE_ERROR: "The copy to the slave half went out of order.",
     INVALID_FRAME: "The link between the halves garbled a message.",
 });
 
@@ -149,24 +149,24 @@ function locate(error) {
     return error.rowIndex !== 0xffff && error.rowIndex !== undefined ? ` in ${domain}, row ${error.rowIndex + 1}` : ` in ${domain}`;
 }
 
-// Why the other half kept answering BUSY, when it said.
+// Why the slave half kept answering BUSY, when it said.
 const PEER_BUSY_REASONS = Object.freeze({
-    MAILBOX_FULL: "The other half stopped handling requests from this half.",
-    OTHER_COPY: "The other half was still holding an earlier, unfinished copy.",
-    NO_LEASE: "The other half dropped the copy partway and did not take it up again.",
-    STORE_WORKING: "The other half did not finish storing its copy.",
-    PULLING: "The other half was fetching a profile of its own.",
-    CONVERGENCE_ONLY: "The other half was finishing another save.",
+    MAILBOX_FULL: "The slave half stopped handling requests from the master half.",
+    OTHER_COPY: "The slave half was still holding an earlier, unfinished copy.",
+    NO_LEASE: "The slave half dropped the copy partway and did not take it up again.",
+    STORE_WORKING: "The slave half did not finish storing its copy.",
+    PULLING: "The slave half was fetching a profile of its own.",
+    CONVERGENCE_ONLY: "The slave half was finishing another save.",
 });
 
-// The keyboard's own reason when it gave one, else the other half's last
+// The keyboard's own reason when it gave one, else the slave half's last
 // answer, else the host's message.
 function failureReason(error, peer) {
     const device = error?.deviceError || error?.status?.error;
     if (device?.name && device.name !== "NONE") {
-        // The copy was ready; the save waited for this half to go idle.
+        // The copy was ready; the save waited for the master half to go idle.
         if (device.name === "TIMEOUT" && peer?.waitingSafeBoundary) return "A key stayed held, or a layer or pointer mode stayed locked, so the keyboard did not save. Nothing changed.";
-        // The copy to the other half stopped: its last answer says why.
+        // The copy to the slave half stopped: its last answer says why.
         if (device.name === "PEER_TRANSFER_FAILED" && peer?.lastStatusName && PEER_REASONS[peer.lastStatusName]) return PEER_REASONS[peer.lastStatusName];
         const known = DEVICE_REASONS[device.name];
         if (known) return device.name === "VALIDATION_REJECTED" ? `${known}${locate(device)}.` : known;

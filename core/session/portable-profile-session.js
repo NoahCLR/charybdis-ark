@@ -146,37 +146,37 @@ async function rollForwardLocalStorage(connection, target, base, layoutRanges, m
 async function peerRestartGuidance(connection, readProfile, options) {
     try {
         const status = await readProfile(connection, options);
-        if (status?.peerCleanupPending) return " The other half did not confirm the cancel. Unplug the USB cable (not the cable between the halves), wait a few seconds and plug it back in before saving again.";
+        if (status?.peerCleanupPending) return " The slave half did not confirm the cancel. Unplug the USB cable (not the cable between the halves), wait a few seconds and plug it back in before saving again.";
     } catch {}
     return "";
 }
-// What the keyboard is doing for the "Copy the profile to the other half" step,
+// What the keyboard is doing for the "Copy the profile to the slave half" step,
 // from candidate status page 1.
 const PEER_DETAIL = Object.freeze({
     BINDING: "Binding keys and macros to the new profile",
     BEGINNING: "Starting the copy",
     SENDING: "Sending",
-    PREPARING: "The other half is checking and storing its copy",
-    PREPARED: "The other half is ready",
-    COMMITTING: "The other half is saving",
-    ABORTING: "Cancelling the copy on the other half",
+    PREPARING: "The slave half is checking and storing its copy",
+    PREPARED: "The slave half is ready",
+    COMMITTING: "The slave half is saving",
+    ABORTING: "Cancelling the copy on the slave half",
     WAITING: "Waiting for the link between the halves",
 });
-// What the other half says it is waiting on, once it has said BUSY a few
+// What the slave half says it is waiting on, once it has said BUSY a few
 // times in a row; a single BUSY is the routine first answer to a request.
 const PEER_BUSY_DETAIL = Object.freeze({
-    MAILBOX_FULL: "the other half has not handled the last request yet",
-    OTHER_COPY: "the other half still holds an earlier copy",
-    NO_LEASE: "the other half dropped this copy; starting it again",
-    STORE_WORKING: "the other half is still storing",
-    PULLING: "the other half is fetching a profile itself",
-    CONVERGENCE_ONLY: "the other half is finishing another save",
+    MAILBOX_FULL: "the slave half has not handled the last request yet",
+    OTHER_COPY: "the slave half still holds an earlier copy",
+    NO_LEASE: "the slave half dropped this copy; starting it again",
+    STORE_WORKING: "the slave half is still storing",
+    PULLING: "the slave half is fetching a profile itself",
+    CONVERGENCE_ONLY: "the slave half is finishing another save",
 });
 function peerReport(peer) {
-    if (!peer) return {detail: "Waiting for the other half"};
+    if (!peer) return {detail: "Waiting for the slave half"};
     if (peer.waitingSafeBoundary) return {detail: "Release held keys and turn off locked layers or pointer modes to finish saving"};
-    const busy = peer.busyStreak >= 3 ? ` · ${PEER_BUSY_DETAIL[peer.busyReason] || "the other half is busy"}` : "";
-    const report = {detail: `${PEER_DETAIL[peer.phaseName] || "Waiting for the other half"}${busy}`};
+    const busy = peer.busyStreak >= 3 ? ` · ${PEER_BUSY_DETAIL[peer.busyReason] || "the slave half is busy"}` : "";
+    const report = {detail: `${PEER_DETAIL[peer.phaseName] || "Waiting for the slave half"}${busy}`};
     if (peer.phaseName === "SENDING" || peer.phaseName === "BEGINNING") Object.assign(report, {completed: peer.transferOffset, total: peer.transferLength});
     return report;
 }
@@ -285,7 +285,7 @@ async function restoreProfile(connection, ids, capabilities, document, {expected
             commitRequested = true;
             await coordinator.commit(prepared.transactionId, {digest: prepared.metadata.digest, afterDecision: async () => {
                 decisionObserved = true;
-                applyProgress.report("converge", {detail: "Waiting for the other half's copy of keys and macros"});
+                applyProgress.report("converge", {detail: "Waiting for the slave half's copy of keys and macros"});
                 await viaCoordinator.waitUntilAccepted({transactionId: prepared.transactionId, generation: targetStorageGeneration, digest: expectedStorageDigest});
                 applyProgress.report("local");
                 await rollForwardLocal(connection, target, base, layoutRanges, macroRanges, counted => applyProgress.report("local", counted));
@@ -299,7 +299,7 @@ async function restoreProfile(connection, ids, capabilities, document, {expected
             await verifyRanges(connection, readStored, VIA_STORAGE.MACRO_READ, target.macros, macroRanges, {verifyFinalByte: macroRanges.length > 0});
             const status = await readProfile(connection, options);
             const storageAfter = await readStorage(connection, ids);
-            // The keyboard activates only after the other half confirmed its
+            // The keyboard activates only after the slave half confirmed its
             // copy, so an active target is saved on both halves even when the
             // cable between them came out after that confirmation.
             const peerUnseen = !(status.stateFlags & PROFILE_STATE_FLAGS.PEER_CONVERGED);
@@ -314,7 +314,7 @@ async function restoreProfile(connection, ids, capabilities, document, {expected
             if (prepared && !decisionObserved) {
                 // The keyboard returns to idle on ABORT only while no commit
                 // marker exists, so a completed abort proves nothing was saved.
-                // It cancels the other half's staged keys and macros with it;
+                // It cancels the slave half's staged keys and macros with it;
                 // this app never cancels them itself, because a decision it
                 // failed to see may already make them the recovery copy.
                 try { await coordinator.abort(prepared.transactionId); cancelled = true; } catch {}
@@ -327,8 +327,8 @@ async function restoreProfile(connection, ids, capabilities, document, {expected
                 throw Object.assign(fail("RESTORE_NOT_SAVED", `Nothing was saved: the keyboard kept the profile it had. ${error.message}${restart}`), {cause: error});
             }
             // After the decision the keyboard owns the outcome: once this app
-            // stops writing, it copies the other half's complete target itself.
-            const finishing = decisionObserved ? "The keyboard had already decided to save it and finishes from the other half's copy by itself, about 15 seconds after both halves are connected; read the keyboard again then. Only if it still shows the old profile: " : "";
+            // stops writing, it copies the slave half's complete target itself.
+            const finishing = decisionObserved ? "The keyboard had already decided to save it and finishes from the slave half's copy by itself, about 15 seconds after both halves are connected; read the keyboard again then. Only if it still shows the old profile: " : "";
             throw Object.assign(fail("RESTORE_INCOMPLETE", `Restore was interrupted. Keep both halves connected. ${finishing}${before.incomplete ? `Import your original complete backup again. Interrupted data was saved for diagnosis at ${recovery}.` : `Import the recovery file ${recovery}.`} ${error.message}${restart}`), {cause: error});
         }
     }

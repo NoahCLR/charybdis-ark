@@ -90,8 +90,8 @@ test("a failure carries the step it happened in, why, and what was saved", async
         abort: async () => ({transactionId: 1, status: {state: 0}}),
     });
     await assert.rejects(restoreProfile({}, {}, capabilities, f.targetDocument, f.options), error => error.code === "RESTORE_NOT_SAVED"
-        && error.step === "peer" && error.stepLabel === "Copy the profile to the other half"
-        && error.reason === "The other half kept answering that it was busy." && error.saved === "none");
+        && error.step === "peer" && error.stepLabel === "Copy the profile to the slave half"
+        && error.reason === "The slave half kept answering that it was busy." && error.saved === "none");
     assert.equal(views.at(-1).state, "failed");
     assert.equal(views.at(-1).failure.step, "peer");
 
@@ -110,7 +110,7 @@ test("a sent commit the keyboard then cancels is reported as not saved", async (
 test("a sent commit the keyboard never confirms cancelling stays an interrupted restore with its recovery file", async () => {
     const f = fixture(); stalledCommit(f, {abortConfirmed: false});
     await assert.rejects(restoreProfile({}, {}, capabilities, f.targetDocument, f.options), error => error.code === "RESTORE_INCOMPLETE" && error.message.includes("/recovery.json")
-        && !/finishes from the other half's copy/.test(error.message), "no decision was seen, so the keyboard may not finish it");
+        && !/finishes from the slave half's copy/.test(error.message), "no decision was seen, so the keyboard may not finish it");
 });
 test("a peer that never confirmed the cancel adds restart guidance", async () => {
     const f = fixture(); stalledCommit(f, {abortConfirmed: true});
@@ -121,15 +121,15 @@ test("a peer that never confirmed the cancel adds restart guidance", async () =>
     await assert.rejects(restoreProfile({}, {}, capabilities, f.targetDocument, f.options), error => error.code === "RESTORE_NOT_SAVED" && !/Unplug/.test(error.message),
         "an unreadable status only loses the hint");
 });
-test("an active target with the other half out of sight is a completed save, reported as such", async () => {
+test("an active target with the slave half out of sight is a completed save, reported as such", async () => {
     const f = fixture();
     const read = f.operations.readProfile;
     f.operations.readProfile = async () => ({...await read(), stateFlags: 0});
     const result = await restoreProfile({}, {}, capabilities, f.targetDocument, f.options);
-    assert.equal(result.peerUnseen, true, "the keyboard switched only after the other half confirmed");
+    assert.equal(result.peerUnseen, true, "the keyboard switched only after the slave half confirmed");
     f.operations.readProfile = read;
     assert.equal((await restoreProfile({}, {}, capabilities, f.targetDocument, f.options)).peerUnseen, false);
-    // The other half being out of sight never excuses a wrong active profile.
+    // The slave half being out of sight never excuses a wrong active profile.
     f.operations.readProfile = async () => ({...await read(), stateFlags: 0, activeDigest: 1});
     await assert.rejects(restoreProfile({}, {}, capabilities, f.targetDocument, f.options), /did not confirm the imported profile/);
 });
@@ -137,7 +137,7 @@ test("a post-decision local-write interruption preserves the peer recovery copy"
     const f = fixture();
     f.operations.rollForwardLocal = async () => {f.events.push("local roll-forward"); throw Error("disconnected");};
     await assert.rejects(restoreProfile({}, {}, capabilities, f.targetDocument, f.options), error => error.code === "RESTORE_INCOMPLETE" && error.message.includes("/recovery.json")
-        && /finishes from the other half's copy/.test(error.message), "after the decision the keyboard finishes the save itself");
+        && /finishes from the slave half's copy/.test(error.message), "after the decision the keyboard finishes the save itself");
     assert.deepEqual(f.events, ["backup", "stage", "via stage", "commit", "via accepted", "local roll-forward"]);
 });
 test("mismatching final hardware readback fails verification", async () => {
@@ -181,7 +181,7 @@ test("older firmware is rejected before any device read or write", async () => {
 });
 // The commit marker became durable, then a status read failed before the app
 // saw CONVERGING_PEER. The app asks the keyboard to cancel, which the keyboard
-// refuses after its decision; it never cancels the other half's staged keys
+// refuses after its decision; it never cancels the slave half's staged keys
 // and macros itself, which are then the recovery copy the keyboard finishes from.
 test("an unobserved decision is left to the keyboard to finish", async () => {
     const f = fixture();
