@@ -170,8 +170,10 @@ within the panel, so replacing one keyboard cannot reuse its draft by list order
 Switching keyboards closes an open layer editor or import review; reopen it on
 the selected keyboard before keeping changes.
 After a disconnect, a retained dirty draft requires **Review against the
-keyboard** before editing or applying, even if the HID path and saved profile
-look unchanged.
+keyboard** before editing, checking a macro, keeping an import or layer review,
+or applying, even if the HID path and saved profile look unchanged. These
+controls wait for a complete, current read on the draft's own keyboard; the
+demo remains editable without a keyboard.
 
 Macro keycodes are shown as `VIA_MACRO_0` through `VIA_MACRO_127` in the live
 editor, including slots whose QMK values have no named constant.

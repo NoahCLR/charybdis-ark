@@ -143,6 +143,8 @@ export interface PanelDeviceState extends DeviceModelInput, Omit<DraftDeviceCont
     operationId?: number;
     diagnostics?: string[];
 }
+/** Why the open draft takes no edit now, or '' when it does (panel-session-state.js draftBinding). */
+export type DraftBlock = import('../../contracts/panel.js').DraftBlock;
 export interface DemoMetadata {name: string; fileName: string | null; exported: string | null}
 /** The demo owns these fields; the panel owns the review and layer-editor values. */
 export interface DemoSession {
@@ -182,7 +184,7 @@ export type PanelModelSession = Omit<PanelSession, 'service'> & {service: Pick<P
 /** The router only consumes the envelope; draft validators check each payload. */
 export interface PanelEnvelope {type: string; draftId?: string; draftRevision?: number; deviceId?: string}
 export type PanelMessage = PanelEnvelope | (DraftEdit & {draftId?: string});
-export type PanelDraftView = ReturnType<NonNullable<DemoSession['draft']>['view']> & {busy: boolean; steps?: import('../../contracts/model.js').HistoryStep[]};
+export type PanelDraftView = ReturnType<NonNullable<DemoSession['draft']>['view']> & {busy: boolean; editable: boolean; reason: DraftBlock; steps?: import('../../contracts/model.js').HistoryStep[]};
 /** What the panel adds to the device model; the posted shape is the contract's. */
 export type PanelModelExtras = Pick<import('../../contracts/panel.js').PublishedModel, 'devices' | 'selectedDeviceId' | 'demo' | 'apply' | 'postApplyRead' | 'portable' | 'host' | 'load'> & {draft?: PanelDraftView};
 

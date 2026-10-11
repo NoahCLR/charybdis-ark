@@ -7,7 +7,7 @@
 import {behaviourKeyAt, behaviourRowAfterPreview} from "./view/behavior-editor.mjs";
 import {layersOn, toggleLayer} from "./view/layer-set.mjs";
 import {initialReachGroups} from "./view/reach-groups.mjs";
-import {demoOf, leaving} from "./view/demo.mjs";
+import {leaving} from "./view/demo.mjs";
 
 const vscode = acquireVsCodeApi();
 
@@ -170,12 +170,10 @@ export const selectedPosition = () => positionAt(currentLayer(), state.selected)
     || (currentLayer()?.positions || [])[0];
 
 // Editing is only offered where the keyboard says it is possible; everywhere
-// else the control stays visible and disabled, with the reason. The demo's
-// draft has no keyboard, and is editable all the same (core/session/demo-session.js).
-export const writable = () => {
-    const model = getModel(), draft = model?.draft;
-    return Boolean(draft?.matching && !draft.stale && !draft.busy && (model?.device.connected || demoOf(model).active));
-};
+// else the control stays visible and disabled, with the reason. Whether the
+// draft takes an edit is core's to say (`draft.editable`), so what is offered
+// is what the host accepts; the demo's draft, with no keyboard, takes them too.
+export const writable = () => Boolean(getModel()?.draft?.editable);
 
 // Posts a message that leaves the demo (or replaces its file), asking first
 // when that would lose edits not exported (view/demo.mjs leaving()).

@@ -57,8 +57,17 @@ test("dropping respects every Import gate and cancels a read when the surface ch
         window.__posted.length = 0;
     });
     const file = {name: "profile.json", text: "{}"};
-    for (const patch of [{device: {connected: false}}, {draft: {matching: false}}, {draft: {stale: true}},
-        {draft: {busy: true}}, {portable: {busy: true}}]) {
+    // Simulate the coherent binding core publishes for each read-only state.
+    // Presentation flags alone no longer decide whether a draft takes edits.
+    for (const patch of [
+        {device: {connected: false}, draft: {editable: false, reason: "disconnected"}},
+        {draft: {matching: false, editable: false, reason: "other-keyboard"}},
+        {draft: {stale: true, editable: false, reason: "stale"}},
+        {draft: {busy: true, editable: false, reason: "busy"}},
+        {draft: {editable: false, reason: "connection-changed"}},
+        {draft: {editable: false, reason: "unsupported"}},
+        {portable: {busy: true}, draft: {editable: false, reason: "busy"}},
+    ]) {
         await page.evaluate((patch) => window.__setDropModel(patch), patch);
         await expect(page.locator('[data-act="import"]')).toBeDisabled();
         expect(await dropFiles(page, [file])).toBe(true);

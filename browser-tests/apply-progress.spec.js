@@ -11,6 +11,8 @@ for (const screen of ["macros", "keys", "device"]) {
             const store = await import("/webview/store.mjs"), core = await import(`/dist/web/${coreFile}`);
             const model = structuredClone(store.getModel());
             model.draft.busy = true;
+            model.draft.editable = false;
+            model.draft.reason = "busy";
             model.device.health.busy = true;
             model.macroUnicode = {supported: true, mode: 1, enabled: true};
             const text = ' {"key": "{KC_A}"}\ncafé “hello” 🙂. ';
@@ -47,7 +49,7 @@ for (const screen of ["macros", "keys", "device"]) {
             progress.finish(); loop.session.service.reportApplyProgress(progress.view());
             const readback = document.querySelector(".commit.readback")?.textContent;
             // A late update after the busy state ends must not resurrect a save.
-            const ended = {...store.getModel(), apply: null, draft: {...model.draft, busy: false}};
+            const ended = {...store.getModel(), apply: null, draft: {...model.draft, busy: false, editable: true, reason: ""}};
             window.dispatchEvent(new MessageEvent("message", {data: {type: "model", model: ended}}));
             stale.draftRevision = model.draft.revision;
             window.dispatchEvent(new MessageEvent("message", {data: stale}));

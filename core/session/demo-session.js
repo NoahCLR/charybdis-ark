@@ -25,6 +25,7 @@
  * @typedef {Session & {demo: import("./types.js").DemoMetadata}} OpenSession
  */
 const {ProfileDraftSession} = require("./profile-draft-session");
+const {replaceDraft} = require("./panel-session-state");
 const {validateSnapshot, fingerprint, summary} = require("./portable-profile-session");
 const {translateBackup} = require("../model/backup-translation");
 const {ACTION_ABI} = require("../schema/actions");
@@ -152,13 +153,17 @@ function openDemo(session, state, {value, fileName = null} = {}) {
         if (refused) throw fail(refused);
     }
     const snapshot = demoSnapshot(value === undefined ? demoProfile() : value);
-    session.draft = new ProfileDraftSession(snapshot, DEMO_DEVICE_ID, DEMO_CAPABILITIES);
     session.demo = {name: fileName || DEMO_WORDS.bundled, fileName, exported: null};
-    session.portableReview = undefined;
-    session.portableLayers = undefined;
+    replaceDemoDraft(session, new ProfileDraftSession(snapshot, DEMO_DEVICE_ID, DEMO_CAPABILITIES));
+}
+
+// Entering or leaving the demo, the draft is no longer one a keyboard read
+// opened: the next complete read opens its own.
+/** @param {Session} session @param {Session["draft"]} draft */
+function replaceDemoDraft(session, draft) {
+    replaceDraft(session, draft);
     session.observedPortable = undefined;
     session.readReady = undefined;
-    session.resetDraftForms = true;
 }
 
 // Leaves the demo for no keyboard, as before it opened. The caller reads a
@@ -168,13 +173,8 @@ function leaveDemo(session, message) {
     if (!session.demo) return;
     assertDemoMayClose(session, message);
     session.demo = undefined;
-    session.draft = undefined;
-    session.portableReview = undefined;
-    session.portableLayers = undefined;
-    session.observedPortable = undefined;
     session.historyOpen = false;
-    session.readReady = undefined;
-    session.resetDraftForms = true;
+    replaceDemoDraft(session, undefined);
 }
 
 // The demo's own controls. `host.chooseProfile` is the same file chooser

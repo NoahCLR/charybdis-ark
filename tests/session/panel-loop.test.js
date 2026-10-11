@@ -308,6 +308,73 @@ test("live macro validation replies inline without staging, history, toasts or d
     assert.ok(host.posted.every(reply => reply.type === "macroValidation"));
 });
 
+// One rule decides whether the draft may be changed against the keyboard
+// (panel-session-state.js draftBinding). The model publishes it, and every
+// request that would change the draft or write it answers to the same rule:
+// an edit, a macro check, an import review and Apply.
+test("the published binding is what edits, macro checks, imports and Apply answer to", async () => {
+    const edit = (draft) => ({type: "updateLayoutKeys", draftId: draft.id, draftRevision: draft.revision,
+        layers: [{layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_A"}]}]});
+    const cases = [
+        ["idle", {}, ""],
+        ["another keyboard selected", {selectedDeviceId: "other", devices: [device, {...device, id: "other"}]}, "other-keyboard"],
+        ["disconnected", {connected: false}, "disconnected"],
+        ["a device operation running", {busy: true}, "busy"],
+        ["reconnected over a new connection", {connectionToken: "new"}, "connection-changed"],
+        ["firmware without complete profile editing", {capabilities: {...capabilities, compiledLayerCount: 8}}, "unsupported"],
+    ];
+    for (const [label, blocked, reason] of cases) {
+        const service = fakeService(), host = fakeHost(), loop = openPanelLoop(host, {service});
+        loop.publish();
+        const draft = loop.session.draft;
+        // A reviewed draft with one change, so only the binding stands between it and Apply.
+        await loop.handleMessage(edit(draft));
+        await loop.handleMessage({type: "reviewProfileDraft", draftId: draft.id, draftRevision: draft.revision});
+        assert.equal(draft.reviewedRevision, draft.revision, `${label}: reviewed`);
+        Object.assign(service.snapshot(), blocked);
+        const revision = draft.revision, document = structuredClone(draft.document);
+        // What the panel is told.
+        loop.publish();
+        assert.equal(last(host).model.draft.editable, !reason, `${label}: model.draft.editable`);
+        assert.equal(last(host).model.draft.reason, reason, `${label}: model.draft.reason`);
+        if (!reason) continue;
+        // What core takes, asked before any model has noticed (the connection token).
+        host.posted.length = 0;
+        await loop.handleMessage({...edit(draft), layers: [{layer: "Layer 0", changes: [{layoutIndex: 1, keycode: "KC_B"}]}]});
+        assert.match(last(host).notice, /^Failed/, `${label}: the edit is refused`);
+        await loop.handleMessage({type: "validateViaMacro", keycode: "VIA_MACRO_1", payload: "hi", requestId: 1, draftId: draft.id, draftRevision: draft.revision});
+        assert.ok(last(host).validation.error, `${label}: the macro check is refused`);
+        await loop.handleMessage({type: "reviewPortableProfile", text: JSON.stringify(document), name: "a.charybdis.json", draftId: draft.id, draftRevision: draft.revision});
+        assert.match(last(host).notice, /^Failed/, `${label}: the import is refused`);
+        await loop.handleMessage({type: "applyProfileDraft", confirmChecks: true, draftId: draft.id, draftRevision: draft.revision});
+        assert.match(last(host).notice, /^Failed: (Reconnect|Review this draft against|The keyboard changed)/, `${label}: Apply is refused`);
+        assert.equal(draft.revision, revision, `${label}: nothing was staged`);
+        assert.deepEqual(draft.document, document);
+        assert.equal(loop.session.portableReview, undefined);
+        assert.deepEqual(host.recoveries, [], `${label}: Apply wrote no recovery copy`);
+        assert.equal(service.calls.includes("restorePortableProfile"), false);
+    }
+});
+
+test("a reconnect refuses keeping an already-open import or layer review", async () => {
+    for (const type of ["restorePortableProfile", "savePortableLayers"]) {
+        const service = fakeService(), host = fakeHost(), loop = openPanelLoop(host, {service});
+        loop.publish();
+        const draft = loop.session.draft;
+        await loop.handleMessage(type === "savePortableLayers" ? {type: "managePortableLayers"}
+            : {type: "reviewPortableProfile", text: JSON.stringify(draft.document), draftId: draft.id, draftRevision: draft.revision});
+        const editor = type === "savePortableLayers" ? loop.session.portableLayers : loop.session.portableReview;
+        assert.ok(editor, "the review opened before reconnecting");
+        service.snapshot().connectionToken = "new";
+        const revision = draft.revision;
+        await loop.handleMessage({type});
+        assert.match(last(host).notice, /^Failed: Read the keyboard/);
+        assert.equal(draft.revision, revision);
+        assert.deepEqual(host.recoveries, []);
+        assert.equal(service.calls.includes("restorePortableProfile"), false);
+    }
+});
+
 test("demo macros use the same live validation without a keyboard", async () => {
     const service = fakeService(), host = fakeHost(), loop = openPanelLoop(host, {service});
     await loop.handleMessage({type: "openDemo"});

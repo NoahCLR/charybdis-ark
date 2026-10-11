@@ -113,6 +113,8 @@ test("read phase changes keep the editor, while content and permissions redraw i
         store.state.screen = "macros";
         const model = structuredClone(store.getModel());
         model.draft.busy = true;
+        model.draft.editable = false;
+        model.draft.reason = "busy";
         model.device.health.busy = true;
         model.portable.busy = true;
         window.dispatchEvent(new MessageEvent("message", {data: {type: "model", model}}));
@@ -130,7 +132,10 @@ test("read phase changes keep the editor, while content and permissions redraw i
         window.dispatchEvent(new MessageEvent("message", {data: {type: "model", model: keyNames}}));
         const namesRedraw = editor !== document.querySelector(".content");
         const afterNames = document.querySelector(".content");
-        const idle = structuredClone(keyNames); idle.draft.busy = false;
+        const idle = structuredClone(keyNames);
+        Object.assign(idle.draft, {busy: false, editable: true, reason: ""});
+        idle.portable.busy = false;
+        idle.device.health.busy = false;
         window.dispatchEvent(new MessageEvent("message", {data: {type: "model", model: idle}}));
         return {preserved, namesRedraw, permissionRedraw: afterNames !== document.querySelector(".content"),
             formKept: store.macroForm("VIA_MACRO_17").draft === 'literal café “hello” 🙂'};

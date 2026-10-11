@@ -16,6 +16,9 @@ keyboard options and the base RGB effect. It publishes a sanitized snapshot;
 `session/device-model.js` turns that into the `model` the webview renders, and
 `session/panel-session.js` adds the draft and the panel's own state to it,
 routes each message the webview posts, and runs the Rename & Reorder panel.
+`session/panel-session-state.js` decides whether the draft takes an edit now
+(`draftBinding`, published as `draft.editable` and `draft.reason`) and holds
+the session's compound transitions and outbox (D-L60).
 `session/panel-loop.js` is the loop every host runs around them: route a
 message, run it, publish the model, turn a failure into the panel's notice,
 and decide what an export holds. A host passes in only its own functions

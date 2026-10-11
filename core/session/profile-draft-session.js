@@ -199,6 +199,17 @@ class ProfileDraftSession {
             this.needsRead = true;
         }
     }
+    // Whether this draft belongs to the keyboard `state` describes: the one it
+    // was read from, connected through the connection it was read over. ""
+    // when it does, otherwise why not. Apply asks it of the device service;
+    // the panel adds what it knows besides (panel-session-state.js draftBinding).
+    /** @param {import("./types.js").DraftDeviceContext} state @returns {"" | "other-keyboard" | "disconnected" | "connection-changed"} */
+    bindingTo(state) {
+        if (state.selectedDeviceId !== this.deviceId) return "other-keyboard";
+        if (!state.connected) return "disconnected";
+        if ((state.connectionToken ?? null) !== this.connectionToken) return "connection-changed";
+        return "";
+    }
     /** @param {Snapshot | null | undefined} snapshot @param {string | null | undefined} deviceId @param {import("./types.js").ConnectionToken} [connectionToken] */
     observe(snapshot, deviceId, connectionToken = null) {
         if (!snapshot || deviceId !== this.deviceId) return;
@@ -495,8 +506,9 @@ class ProfileDraftSession {
         this.assertRevision(revision);
         if (!this.dirty || this.reviewedRevision !== revision) throw fail("Review the current draft before applying it.");
         if (this.hasBlockers()) throw fail("Resolve the review's blockers before applying this profile.");
-        if (!service.snapshot().connected || service.snapshot().selectedDeviceId !== this.deviceId) throw fail("Reconnect the keyboard this draft belongs to.");
-        if ((service.snapshot().connectionToken ?? null) !== this.connectionToken) throw fail("Review this draft against the connected keyboard before applying it.");
+        const bound = this.bindingTo(service.snapshot());
+        if (bound === "connection-changed") throw fail("Review this draft against the connected keyboard before applying it.");
+        if (bound) throw fail("Reconnect the keyboard this draft belongs to.");
         try {
             const result = await service.restorePortableProfile(this.document, {expectedFingerprint: this.base.fingerprint, saveRecovery});
             if (result.fingerprint !== this.current.fingerprint) {this.needsRead = true; throw fail("The saved profile did not match the draft. Keep the recovery copy and read the keyboard again.");}

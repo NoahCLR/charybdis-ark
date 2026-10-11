@@ -230,7 +230,10 @@ TypeScript coverage or changing the check configuration.
 - A webview number that is also a wire number (pointing kinds, axes, buttons,
   modifier bits) is pinned to its schema by `tests/enum-drift.test.mjs`.
 - Whether an area can be edited is `canEdit(area)` in `webview/store.mjs`,
-  nowhere else.
+  nowhere else. Whether the draft takes an edit at all is core's
+  `draftBinding` (`core/session/panel-session-state.js`), which the router,
+  macro validation and Apply refuse by and the model publishes as
+  `draft.editable`; `canEdit` reads that, never recomputes it.
 
 - Every `core/` module gets a test in the matching `tests/` directory.
 - Every edit the webview posts is built by a pure function in
