@@ -50,7 +50,7 @@ matrix.
 | Backup and restore | Complete current-format snapshots, import review against the keyboard, recovery file and verified restore; the preceding eight-layer backup is translated before review (D-L15, D-L23, D-L54) |
 | Drafts and Apply | One draft with item-by-item review, discard by edit group, Show, undo/redo and history; the review checks reachable actions, confirms warnings and traps and blocks what the destination cannot save; Apply names its steps and halves and says where a failure happened (D-L19, D-L23, D-L29, D-L30, D-L36, D-L60, D-L61) |
 | Recovery | Atomic logical Apply, differential custom and VIA transfer, reboot recovery fencing, firmware roll-forward after the decision, resume after a lost or power-cycled peer link, bounded cancel owned by the keyboard (D-L20–D-L22, D-L27, D-L39, D-L58) |
-| Where it runs | The VS Code extension, and a web page in Chrome or Edge over WebHID, published from `dev` to `ark-dev.ncleroy.dev` and from `main` to `ark.ncleroy.dev`; a phone gets only a notice (D-L02, D-L52) |
+| Where it runs | The VS Code extension, and a web page in Chrome or Edge over WebHID; Cloudflare Git integration publishes `dev` to `ark-dev.ncleroy.dev`, `main` to `ark.ncleroy.dev`, and task branches to PR previews; a phone gets only a notice (D-L02, D-L52) |
 | Demo without a keyboard | The bundled demo profile in a real draft, in both hosts: every screen editable and reviewed, Apply refused, Export saves the draft (D-L53) |
 
 The rail's health strip shows connection, both-half convergence, draft state
@@ -742,8 +742,9 @@ contract before publication. Nightly checks report development drift and
 published incompatibility without blocking development.
 
 This keeps the development loop local while protecting the two published
-products against contract drift. Web-page publication is the `dev`-push
-exception (D-L52); its checks gate that upload alone. Job names, partner selection
+products against contract drift. Cloudflare's Git-triggered page builds and PR
+previews are separate from these GitHub Actions jobs (D-L52); Cloudflare's build
+result gates publication alone. Job names, partner selection
 and branch protections live in [CI and publishing](REPOSITORY.md#ci-and-publishing).
 The development and publication process is governed by [AGENTS.md](../AGENTS.md),
 which points to the work-queue tools.
@@ -777,14 +778,23 @@ whose shorter side is under 600 pixels, decided once as the page loads: a tablet
 gets Ark, where it offers the demo, and turning a phone or resizing a desktop
 window never swaps Ark out from under a draft.
 
-The page is published to Cloudflare Pages from GitHub Actions, as the folder
-the build writes and nothing else (`.github/workflows/publish-web.yml`): `dev`
+The page is published by Cloudflare Pages' Git integration, as the folder
+the build writes and nothing else: `dev`
 to the preview address `ark-dev.ncleroy.dev` for testing, `main`, the
-project's production branch, to `ark.ncleroy.dev`. Each run builds the page,
-tests those built files in Chrome and checks they are static files only, with
-no Pages Functions or `_worker.js`, before Wrangler uploads them. This is
-D-L51's one exception: it runs on `dev` pushes, and its tests gate only the
-publish, never a merge or a release. The build's `_headers` sends the page's
+project's production branch, to `ark.ncleroy.dev`. Cloudflare installs the locked
+dependencies, builds the static page and publishes it. Testing belongs to local
+verification before opening the draft PR and to the release/nightly GitHub
+Actions jobs (D-L51); Cloudflare does not rerun those checks. Build tests cover
+the static-only output contract, including the absence of Pages Functions and
+`_worker.js`. Task branches get
+preview URLs in their draft pull requests, and a handoff includes the successful
+preview for that PR's head commit. Cloudflare is the automatic publisher;
+GitHub Actions continues to own the release and nightly checks (D-L51).
+Cloudflare's successful build gates publication; its preview status reports a
+published build, not a test-suite result or release approval.
+Build configuration and retry instructions live in
+[Publishing the web page](REPOSITORY.md#publishing-the-web-page).
+The build's `_headers` sends the page's
 policy with `frame-ancestors 'none'`, which only a header can set,
 `Permissions-Policy: hid=(self)`, `nosniff` and `no-referrer`; the page is
 revalidated on every load and each hashed file cached for good, so a release

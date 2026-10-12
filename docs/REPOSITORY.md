@@ -318,30 +318,35 @@ that no request went anywhere but the page's own files.
 
 ### Publishing the web page
 
-`.github/workflows/publish-web.yml` publishes the page to Cloudflare Pages
-whenever `dev` or `main` moves. It builds the page (`npm ci`, then the web
-build, with `ARK_COMMIT` set to the pushed commit), runs the page's browser
-tests (`web-page.spec.js` and `web-build.spec.js`) against exactly those files
-(`ARK_WEB_BUILT=1` stops Playwright rebuilding them), checks they are static
-files only (`scripts/check-static-site.js`), and only then uploads `dist/web/`
-with Wrangler (`cloudflare/wrangler-action`, pinned to a commit) as
-`pages deploy dist/web --project-name=charybdis-ark --branch=<dev|main>`. A
-failed build, test or check publishes nothing, and the address keeps the page
-it had. The project name is the workflow's `PAGES_PROJECT`.
+Cloudflare Pages' Git integration publishes the `NoahCLR/charybdis-ark`
+repository. The `charybdis-ark` project installs the locked dependencies, builds
+a pushed commit and publishes `dist/web/`. A failed build stops publication; the branch address
+keeps the previous successful deployment.
 
 | Branch | Where it goes |
 | --- | --- |
-| `dev` | a preview deployment, at `https://ark-dev.ncleroy.dev` (and `dev.charybdis-ark.pages.dev`), for testing |
-| `main` | the production deployment, at `https://ark.ncleroy.dev` (and `charybdis-ark.pages.dev`) |
+| `main` | Production: `https://ark.ncleroy.dev` (and `charybdis-ark.pages.dev`) |
+| `dev` | Preview: `https://ark-dev.ncleroy.dev` (and `dev.charybdis-ark.pages.dev`) |
+| Task branches | PR previews with their own deployment URLs and branch aliases |
 
-The workflow has `contents: read` only, never runs on pull requests, and
-publishes one run at a time per branch (a newer push waits; an upload is never
-cancelled). It is D-L51's one exception: it runs on `dev` pushes, and its tests
-gate only the publish. Its job is not one of `main`'s required checks and is
-deliberately not named like them. If `CLOUDFLARE_API_TOKEN` or
-`CLOUDFLARE_ACCOUNT_ID` is missing, the run still builds and tests the page,
-then fails at "Require the Cloudflare credentials", naming the missing secret:
-a red run, rather than a green one that left the address on an old page.
+Cloudflare owns automatic page publication. The GitHub Actions workflows own
+release and nightly checks (D-L51), not page uploads. Cloudflare's page-build
+check is not one of `main`'s required checks; it gates only publication.
+Cloudflare runs `npm ci` and `npm run build:web`, without running tests or
+installing a browser. The work-queue `verify` gates opening the draft PR and
+selects the relevant browser checks; release and nightly GitHub Actions jobs
+run their existing checks. `npm run check` includes the real-build tests for
+the static-only output contract (`tests/scripts/web-build.test.js` and
+`tests/scripts/check-static-site.test.js`). Cloudflare's green status means
+the page built and published; it does not stand in for verification or release
+CI.
+
+Cloudflare posts the preview link on the PR and reports the build status in
+GitHub. A PR handoff includes a **Try this PR** link only after that head's
+Cloudflare build succeeds and the live page's footer reports that commit.
+Retrieve it from Cloudflare's PR comment or deployment check, rather than
+constructing a URL from the branch name. A preview tests the browser host;
+**Ark branch** still opens the VS Code extension from a worktree.
 
 `_headers` sends, for every file, the page's Content Security Policy with
 `frame-ancestors 'none'`, `Permissions-Policy: hid=(self)`,
@@ -361,41 +366,61 @@ mixes with an old one's, and no file whose name stays the same is ever marked
 immutable. Pages joins a header named by two matching rules, so nothing sets
 `Cache-Control` under `/*`.
 
-**One-time setup, before the first run (Noah):**
+**Cloudflare project settings (Noah):**
 
-1. In Cloudflare, create a Pages project named `charybdis-ark` for direct
-   upload, not a Git connection, with `main` as its production branch:
-   `npx wrangler pages project create charybdis-ark --production-branch=main`,
-   or in the dashboard Workers & Pages, Create, Pages, *Upload assets*. Any
-   other name works if `PAGES_PROJECT` in the workflow says the same.
-2. Add the custom domains `ark.ncleroy.dev` and `ark-dev.ncleroy.dev` to the
-   project, under Custom domains, and wait for both to show Active (until then
-   Pages answers 522). `README.md` gives the first. Then, in the `ncleroy.dev`
-   zone's DNS, change the `ark-dev` CNAME's target to
-   `dev.charybdis-ark.pages.dev` and keep it proxied. A branch's own domain
-   works only through a proxied record in a zone on Cloudflare; with other DNS,
-   or unproxied, it serves the production page instead.
-3. Create an API token with only *Account, Cloudflare Pages, Edit*, for this
-   account.
-4. In GitHub (Settings, Secrets and variables, Actions), add the token as
-   `CLOUDFLARE_API_TOKEN` and the account id (shown on the account's overview)
-   as `CLOUDFLARE_ACCOUNT_ID`.
+1. In the `charybdis-ark` Pages project's **Settings → Build → Git repository**,
+   connect `NoahCLR/charybdis-ark`. Authorize the Cloudflare GitHub app for this
+   repository. Set **Production branch** to `main`, **Framework preset** to
+   `None`, **Build output directory** to `dist/web`, and leave **Root directory**
+   blank (the repository root).
+2. Use this **Build command**, as one line:
 
-**Publishing by hand.** To publish `dev` or `main` again without a push, run
-the workflow from the Actions tab (*Publish the web page*, Run workflow, pick
-the branch) or with `gh workflow run publish-web.yml --ref dev`. Other branches
-are refused. Without GitHub, from a clean checkout of the branch, run the same
-steps locally and upload with Wrangler, logged in with `npx wrangler login`:
+   ```sh
+   npm ci && npm run build:web
+   ```
+
+3. Set `SKIP_DEPENDENCY_INSTALL=1` for both Production and Preview, so the
+   command's `npm ci` owns installation. The repository's `.nvmrc` pins Node.
+   Enable build comments and automatic production deployments; under **Branch
+   control**, enable previews for all non-production branches, including `dev`
+   and task branches. Build watch paths include `*`.
+4. Keep the custom domains `ark.ncleroy.dev` and `ark-dev.ncleroy.dev` on this
+   project. The proxied `ark-dev` CNAME targets `dev.charybdis-ark.pages.dev`.
+   A branch's custom domain requires that proxied record; otherwise it serves
+   the production page. Connecting Git does not require moving these domains.
+
+The [Cloudflare build settings](https://developers.cloudflare.com/pages/configuration/build-image/)
+explain Node version selection and `SKIP_DEPENDENCY_INSTALL`;
+[GitHub integration](https://developers.cloudflare.com/pages/configuration/git-integration/github-integration/)
+owns preview comments and branch controls. Browser installation and test
+execution stay in the existing local verification and GitHub Actions paths;
+the Cloudflare build environment needs only the build toolchain.
+
+**Retrying a deployment.** Use **Retry deployment** on the Git-triggered build
+in Cloudflare's Deployments page. Its build log includes dependency installation
+and web bundling. Keep GitHub release checks and
+Cloudflare page-build failures distinct when diagnosing a red status.
+
+The former GitHub Actions publisher is removed from a branch only when that
+branch contains this migration. After it lands on `dev`, `main` retains the old
+workflow until the normal release promotes that tree. Until then a `main` push
+can also trigger the old uploader. The old `CLOUDFLARE_API_TOKEN` and
+`CLOUDFLARE_ACCOUNT_ID` GitHub secrets are no longer used by the new tree;
+remove them after both branches have migrated and no other workflow uses them.
+
+**Manual fallback.** From a clean checkout of the intended branch, build and
+check the same output before uploading with Wrangler (authenticated with
+`npx wrangler login`):
 
 ```sh
 npm ci && npm run build:web
-npx playwright test browser-tests/web-page.spec.js browser-tests/web-build.spec.js
+npx playwright install chromium
+ARK_WEB_BUILT=1 npx playwright test browser-tests/web-page.spec.js browser-tests/web-build.spec.js
 npm run check:site
 npx wrangler pages deploy dist/web --project-name=charybdis-ark --branch=dev   # or main
 ```
 
-Locally Playwright rebuilds `dist/web/` before testing it; that is the same
-build, as long as nothing changed in between.
+The manual upload is a fallback, not a second automatic publisher.
 
 ### Trying a branch before it lands
 
@@ -445,10 +470,10 @@ checkout or app dependencies.
 
 ### CI and publishing
 
-Development is verified locally, so CI does not run on `dev` or on pull requests
-into it (D-L51). The one exception is [publishing the web page](#publishing-the-web-page),
-which builds and tests the page on each `dev` and `main` push before it
-uploads it, and gates nothing else. A release's `dev` → `main` pull request runs the independent app
+Development is verified locally, so the GitHub Actions checks do not run on
+`dev` or on pull requests into it (D-L51). Cloudflare separately
+[builds and publishes the web page](#publishing-the-web-page) on Git pushes,
+including task-branch previews; that build result gates only publication. A release's `dev` → `main` pull request runs the independent app
 suite on Linux and macOS, loads the native HID module, runs the browser smoke,
 checks every imported source pin against its published trunk, runs the
 [compatibility bridge](COMPATIBILITY.md) at the pins and judges the firmware
