@@ -354,7 +354,14 @@ function profileReview(before, after, capabilities) {
         item("Layout", `layout:${l}:${p}`, `${layerName(b, l)} · ${positionName(p)}`, new Map([["", values(code, namesA)]]), new Map([["", values(b.document.layers[l][p], namesB)]]),
             {kind: "key", layer: l, layoutIndex: LAYOUT_INDEX.get(p)}, undefined, {kind: "layer", layer: l});
     }));
-    a.settings.names.forEach((name, i) => item("Layers", `layerName:${i}`, `Layer ${i}`, new Map([["Name", layerCalled(a.settings.names, i)]]), new Map([["Name", layerCalled(b.settings.names, i)]]), {kind: "layers"}, undefined, {kind: "layer", layer: i}));
+    a.settings.names.forEach((name, i) => {
+        // A stored name can equal the fallback name. Clearing it still
+        // changes the document and must have its own discardable item.
+        /** @param {string[]} names @returns {Fields} */
+        const fields = names => new Map([["Name", {text: layerCalled(names, i), key: names[i],
+            detail: `${layerCalled(names, i)} · ${names[i] ? `stored name ${JSON.stringify(names[i])}` : "no stored name"}`}]]);
+        item("Layers", `layerName:${i}`, `Layer ${i}`, fields(a.settings.names), fields(b.settings.names), {kind: "layers"}, undefined, {kind: "layer", layer: i});
+    });
     a.settings.layers.forEach((record, layer) => {
         for (const layoutIndex of CHARYBDIS_4X6_LAYOUT_MATRIX.keys()) {
             const position = matrixPosition(layoutIndex);
@@ -487,7 +494,7 @@ function profileReview(before, after, capabilities) {
     for (let id = 0; id < Math.max(a.pdModes?.length || 0, b.pdModes?.length || 0); id++) {
         const old = a.pdModes?.[id], next = b.pdModes?.[id];
         item("Pointing modes", `pd:${id}`, `Slot ${id}${(next?.name || old?.name) ? ` · ${next?.kind ? next.name : old?.name}` : ""}`,
-            pointingFields(old, namesA), pointingFields(next, namesB), {kind: "pointing", slot: id}, [Boolean(old?.kind), Boolean(next?.kind)], {kind: "pointing", slot: id});
+            pointingFields(old, namesA), pointingFields(next, namesB), {kind: "pointing", slot: id}, [Boolean(old?.kind || old?.name), Boolean(next?.kind || next?.name)], {kind: "pointing", slot: id});
     }
     const lightA = lightingRecords(a), lightB = lightingRecords(b);
     for (const [unit, record] of lightB) {
