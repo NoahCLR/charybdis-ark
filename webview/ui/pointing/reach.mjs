@@ -1,0 +1,58 @@
+// @ts-check
+import {el, esc} from "../../lib/dom.mjs";
+import {bindingsForSlot} from "../../view/reach.mjs";
+import {stageEnabled} from "../../view/lighting.mjs";
+import {vocabulary, word} from "../../view/vocabulary.mjs";
+import {render, state} from "../../store.mjs";
+import {slotLight} from "../marks.mjs";
+import {bindingName} from "./common.mjs";
+
+/** @param {import("../../../contracts/panel.js").PublishedModel} model @param {import("../surface-types.js").PresentedSlot} slot @param {boolean} canEdit */
+export function slotReach(model, slot, canEdit) {
+    const light = slotLight(model, slot);
+    const disabled = canEdit ? "" : "disabled";
+    // ── how it is reached ─────────────────────────────────────────────────
+    const {row} = light;
+    const lightText = row
+        ? `HSV(${[row.color.h, row.color.s, row.color.v].join(", ")}) · ${esc(word(vocabulary(model).localities, row.locality).toLowerCase())}${stageEnabled(model, "pd") ? "" : " · stage off"}`
+        : "no colour reported";
+    const reach = el(`<div class="card">
+        <div class="card-h"><h3>How it is reached</h3></div>
+        <div class="card-b pd-lines">
+            <span class="lbl">Keys</span>
+            <div class="val">
+                <span class="act"><span class="k">${esc(bindingName(slot))}</span><span class="how">hold</span></span>
+                <span class="act"><span class="k">${esc(slot.binding?.lock || "")}</span><span class="how">toggle</span></span>
+                <span class="note">${esc(placedOn(model, slot))}</span></div>
+            <button class="btn tiny" data-act="place" ${disabled}>Place on a layer…</button>
+            <span class="lbl">Light</span>
+            <div class="val">${light.swatch()}<span class="note mono">${lightText}</span></div>
+            <button class="btn tiny" data-act="lighting">Edit in Lighting</button>
+            <p class="note foot">Clearing the slot leaves its keys where they are. The keyboard keeps its mode keycodes whatever a slot holds, and refuses to activate an empty one — so they do nothing until this slot is configured again.</p>
+        </div></div>`);
+    /** @type {HTMLButtonElement} */ (reach.querySelector('[data-act="lighting"]')).addEventListener("click", () => {
+        state.screen = "lighting"; state.stage = "pd"; render();
+    });
+    /** @type {HTMLButtonElement} */ (reach.querySelector('[data-act="place"]')).addEventListener("click", () => {
+        state.placement = {keycode: bindingName(slot)};
+        state.screen = "keys";
+        state.tab = "key";
+        render();
+    });
+    return reach;
+
+}
+
+// Counted through the slot's values rather than its names: a layout position
+// carries whatever the keyboard calls the keycode, which is a bare user keycode
+// or plain hex, not the name this app prints.
+/** @param {import("../../../contracts/panel.js").PublishedModel} model @param {import("../surface-types.js").PresentedSlot} slot */
+function placedOn(model, slot) {
+    const counts = new Map();
+    for (const {layer} of bindingsForSlot(model, slot).keys) {
+        const name = layer.displayName || layer.name;
+        counts.set(name, (counts.get(name) || 0) + 1);
+    }
+    const places = [...counts].map(([name, count]) => `${name} · ${count} key${count === 1 ? "" : "s"}`);
+    return places.length ? `on ${places.join(", ")}` : "not placed on any layer";
+}
