@@ -66,8 +66,12 @@ Reference remapping changes the matched code, never that physical source.
 When the owner code has several eligible placements, each placement's source
 conditions separately admit the row or its native fallback; another member's
 permissions cannot admit the output behaviour. Generated outputs have no
-physical placement: only the behaviour master and row enable/allowed-layer
-mask apply, as the firmware's participation contract defines.
+physical placement: the behaviour master, global combo-output permission,
+per-combo output permission and behaviour row enable/allowed-origin-layer mask
+all apply. Layer behaviour switches and physical placement bypasses remain
+physical-only. A bypassed native output keeps its native effects; a bypassed
+custom output supplies no escape. Both exhaustive and symbolic reach analysis
+follow this policy, as the firmware's participation contract defines.
 
 Feature bit 18 identifies runtime-owned tapping, extending bit 17's authored LT
 bypass to every handled key (including authored MT/OSM and owned TT/OSL). Ark

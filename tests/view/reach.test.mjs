@@ -409,6 +409,17 @@ test("a combo reaches the macro it sends, and what a behaviour it sends reaches"
     assert.deepEqual(above.fromCombos, [], "on Numbers C1 needs the transparent J, so it is not this layer's own");
     assert.deepEqual(above.fromCombosBelow.map((entry) => entry.name), ["VIA_MACRO_0"]);
     assert.deepEqual(above.elsewhere, ["VIA_MACRO_1", "VIA_MACRO_2"], "C2 needs L, and Numbers stores 1 there");
+    model.combos[1].useOutputBehavior = false;
+    assert.deepEqual(macroReach(model, stack, 0).fromCombos.map(entry => entry.name), ["VIA_MACRO_0"]);
+    assert.deepEqual(behaviourGroups(model, stack, 0).combos, []);
+    assert.deepEqual(behavioursInView(model, stack, 0).filter(entry => entry.combos.length), []);
+    model.combos[1].useOutputBehavior = true;
+    model.participation = {comboOutputBehaviors: false};
+    assert.deepEqual(macroReach(model, stack, 0).fromCombos.map(entry => entry.name), ["VIA_MACRO_0"], "global bypass retains the directly sent macro");
+    assert.deepEqual(reachInView(model, stack, 0, [], macroKeycodes).map(entry => entry.name), ["VIA_MACRO_0"]);
+    model.participation.comboOutputBehaviors = true;
+    assert.deepEqual(macroReach(model, stack, 0).fromCombos.map(entry => entry.name), ["VIA_MACRO_0", "VIA_MACRO_1"]);
+
 });
 
 test("a combo reaches the pointing mode it sends", () => {
@@ -479,4 +490,32 @@ test("a custom key's layers are the ones where a key carries it or a combo sends
     assert.deepEqual(summary("CUSTOM_KEY_0"), [["Base", 0, [["here", [0]]]]], "Numbers only falls through to Base's");
     assert.deepEqual(summary("CUSTOM_KEY_1"), [["Numbers", 1, [["here", [1]]]]]);
     assert.deepEqual(summary("CUSTOM_KEY_2"), [["Base", 0, [["combos", [1, 2]]]]], "a combo firing from Base's keys sends it");
+});
+
+
+test("generated behaviour lists use the declared owner's physical source rather than reference or other member", () => {
+    const at = (layoutIndex, keycode) => ({layoutIndex, keycode, display: keycode});
+    const row = {keycode: "CUSTOM_KEY_0", enabled: true, allowedLayers: 1,
+        steps: [{tapCount: 1, tap: {action: "VIA_MACRO_0"}}]};
+    const combo = {id: 0, inputs: ["KC_A", "KC_B"], output: "CUSTOM_KEY_0"};
+    const model = {keyBehaviors: [row], combos: [combo],
+        participation: {behaviorsEnabled: true, comboOutputBehaviors: true, behaviorLayers: 0, layers: []},
+        viaMacros: [{keycode: "VIA_MACRO_0", empty: false}]};
+    const stack = withAnswers([
+        {index: 0, name: "Base", positions: [at(0, "KC_C"), at(1, "KC_B")]},
+        {index: 1, name: "Overlay", positions: [at(0, "KC_A"), at(1, "KC_TRANSPARENT")]},
+        {index: 2, name: "Reference", positions: [at(0, "KC_A"), at(1, "KC_B")]},
+    ]);
+    assert.equal(behavioursInView(model, stack, 1).length, 1, "B owns Base policy despite A coming from Overlay");
+    combo.inputs.reverse();
+    assert.equal(behavioursInView(model, stack, 1).length, 0, "A becomes the declared owner, so B cannot lend its allowance");
+    combo.inputs.reverse();
+    model.configDefaults = [{id: "comboReferences", fields: [{macro: "comboReference1", value: "Layer 2"}]}];
+    assert.equal(behavioursInView(model, stack, 1).length, 1, "reference remapping retains Base's physical origin");
+    row.allowedLayers = 4;
+    assert.equal(behavioursInView(model, stack, 1).length, 0, "a reference-layer allowance cannot enable the output");
+    row.allowedLayers = 1; row.enabled = false;
+    assert.equal(behavioursInView(model, stack, 1).length, 0);
+    row.enabled = true; model.participation.behaviorsEnabled = false;
+    assert.equal(behavioursInView(model, stack, 1).length, 0);
 });

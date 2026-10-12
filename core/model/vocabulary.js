@@ -151,7 +151,7 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     },
     modifiers: [[1, "Left Ctrl"], [2, "Left Shift"], [4, "Left Alt"], [8, "Left GUI"],
         [16, "Right Ctrl"], [32, "Right Shift"], [64, "Right Alt"], [128, "Right GUI"]],
-    comboOptions: {mustHold: "must be held", mustTap: "tap only", ordered: "keys in order"},
+    comboOptions: {useOutputBehavior: "use output behaviour", mustHold: "must be held", mustTap: "tap only", ordered: "keys in order"},
 }));
 
 // A word from one of the ordered lists, by the key the keyboard uses; an

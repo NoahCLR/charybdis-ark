@@ -87,6 +87,12 @@ test("every field edits a stored value the schema names, within what the keyboar
     const {CURRENT_CAPABILITIES} = require("../fixtures/portable-profile");
     const fields = settingsEditorView(snapshot(), CURRENT_CAPABILITIES).sections.flatMap(section => section.fields);
     for (const field of fields) {
+        if (field.header) {
+            assert.equal(field.header, "comboOutputBehaviors");
+            assert.equal(field.id, undefined);
+            assert.equal(field.kind, "toggle");
+            continue;
+        }
         if (field.record) continue;
         assert.ok(Number.isInteger(field.id) && field.id >= 0 && field.id < SETTINGS.COUNT, field.macro);
         if (field.kind === "share") assert.ok(Number.isInteger(field.of) && field.of < SETTINGS.COUNT, field.macro);

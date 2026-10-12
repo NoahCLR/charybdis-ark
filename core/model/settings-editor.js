@@ -10,6 +10,7 @@ const {SETTING, SETTING_FIELD, SETTING_FIELDS, SETTINGS, encodeSettings, validSe
 const {hostSettings, followHostOs, supportsHostLayouts, UNICODE_ENABLED, LAYOUT_SHIFT, MACOS_ISO} = require("../schema/host-settings");
 const {hostLayouts} = require("../data/host-layouts");
 const {supportsUnicodeMacros} = require("../schema/macro-payload");
+const {supportsComboOutputBehaviors} = require("../schema/combo-domain-v1");
 const {dpiChoices} = require("./pointer-dpi");
 const {hostKeyLabel} = require("./key-names");
 const {layerName, VOCABULARY} = require("./vocabulary");
@@ -209,6 +210,10 @@ function settingsSections(snapshot, settings, capabilities) {
     // the keyboard stores with the combos rather than here.
     result.push({id: "comboSettings", comboTiming: COMBO_TIMING, area: "Settings", label: "Combos", fields:
         [toggle("combosEnabled", SETTING.COMBOS_ENABLED, "Enabled", "Turn every combo on or off. Each combo's own window and conditions are set in Keys · Combos."),
+            {macro: "comboOutputBehaviors", header: "comboOutputBehaviors", kind: "toggle", label: "Combo outputs use behaviours",
+                readOnly: !supportsComboOutputBehaviors(capabilities), hint: supportsComboOutputBehaviors(capabilities)
+                    ? "Off, combos still fire but use their normal output action. Physical-key behaviours stay eligible. Custom keys have no native action and send nothing when bypassed."
+                    : "Update both halves to control combo output behaviours. This firmware has no separate combo-output switch."},
             ...everyLayer(i => ({...toggle(`combosOnLayer${i}`, SETTING.LAYER_COMBOS, `On ${name(i)}`, "Keys that come from this layer can join combos."), bitMask: 2 ** i, governs: {kind: /** @type {const} */ ("layer"), layer: i}}))]});
     // A layer's combo reference is in its layer record, not a setting value.
     result.push({id: "comboReferences", area: "Settings", label: "Combo Layer Matching", expanded: false, description: "Choose which layer supplies the key assignments used to match combos on each layer. Select the same layer to keep its combos independent.", fields:
@@ -263,7 +268,7 @@ function settingsEditorView(snapshot, capabilities) {
     return {identity: snapshot.fingerprint,
         brightnessMax: snapshot.limits?.brightnessMax,
         sections: settingsSections(snapshot, settings, capabilities).map(section => ({...section, fields: section.fields.map(field => {
-            const value = field.record ? settings.layers[field.layer][field.record] : settingValue(field, settings.values);
+            const value = field.header ? Number(settings[field.header] !== false) : field.record ? settings.layers[field.layer][field.record] : settingValue(field, settings.values);
             if (field.kind === "share") return {...field, value: String(shareOf(value, settings.values[field.of])),
                 ms: String(value), whole: String(settings.values[field.of])};
             const brightness = field.macro === "brightness";
@@ -307,6 +312,12 @@ function editSettings(snapshot, message, capabilities) {
         if (field.kind === "share") {
             const whole = value.settings.values[field.of], stored = value.settings.values[field.id];
             if (number !== shareOf(stored, whole)) value.settings.values[field.id] = shareAt(number, whole);
+            continue;
+        }
+        if (field.header) {
+            const previous = Number(value.settings[field.header] !== false);
+            if (field.readOnly && number !== previous) throw fail(`${field.label} cannot be changed with this firmware. ${field.hint || ""}`);
+            value.settings[field.header] = Boolean(number);
             continue;
         }
         if (field.record) {

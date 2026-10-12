@@ -79,6 +79,7 @@ export interface BehaviorRow {
 }
 
 export interface ComboRowInput {
+    useOutputBehavior?: boolean;
     inputs: ActionInput[];
     output: ActionInput;
     termMs: number | null;
@@ -100,6 +101,7 @@ export interface LayerRecord {reference: number; bypass: number[]; exclude: numb
 export interface SettingRule {valid(v: number, layers: number): boolean; min?: number; max?: number; step?: number; layerReference?: 'layer' | 'mask'; layerReorder?: 'storage' | 'reach'}
 export interface SettingField<Name extends string = string> extends SettingRule {id: number; name: Name}
 export interface SettingsDomain {
+    comboOutputBehaviors?: boolean;
     formatVersion?: number;
     values: number[];
     names: string[];

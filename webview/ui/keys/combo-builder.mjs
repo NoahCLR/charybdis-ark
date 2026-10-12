@@ -33,6 +33,7 @@ export function comboBuilder(canEdit, holdTerm) {
     const editing = state.combo.editId !== null;
     const original = (model?.combos || []).find((combo) => combo.id === state.combo.editId);
     const form = state.combo.form;
+    const outputSupported = model?.participation?.comboOutputBehaviorsSupported === true;
     // The keyboard's default window; empty on a keyboard that has none, where
     // every combo keeps its own.
     const fallback = edits.comboDefaultTermValue(model);
@@ -61,6 +62,11 @@ export function comboBuilder(canEdit, holdTerm) {
                 <div class="input-row"><input class="input mono" data-f="combo:${esc(state.combo.editId ?? 'new')}:term" data-term value="${esc(windowField.value)}" placeholder="${esc(windowField.placeholder)}" ${canEdit ? "" : "disabled"}>
                 ${fallback ? `<button class="btn tiny ghost" data-act="usedefault" ${canEdit ? "" : "disabled"} ${form.followsDefault ? "hidden" : ""}
                     data-tip="Follow the default combo window (Settings · Combos) again, so this combo changes with it.">Use default · ${esc(fallback)} ms</button>` : ""}</div></label>
+            <div class="field">
+                <label class="sw"><input type="checkbox" data-output-behavior data-f="combo:${esc(state.combo.editId ?? 'new')}:use-output-behavior" ${form.useOutputBehavior !== false ? "checked" : ""} ${canEdit && outputSupported ? "" : "disabled"}>
+                    <span class="track"></span><span class="txt">${esc(sentence(vocabulary(model).comboOptions.useOutputBehavior))}</span></label>
+                <p class="note">${outputSupported ? "Off, this combo still fires and sends its normal output action. A custom key has no native action and sends nothing when bypassed. The behaviour master and Settings · Combos · Combo outputs use behaviours must also be on." : "Update both halves to control whether this combo uses its output behaviour."}</p>
+            </div>
             <div class="row combo-flags">
                 ${[["mustHold", "Fires only once its keys are held past the combo hold threshold (Settings · Combos). Released sooner, the keys type themselves."],
                    ["mustTap", "Fires only if its keys are released before the combo hold threshold. Held longer, the keys type themselves."],
@@ -115,6 +121,9 @@ export function comboBuilder(canEdit, holdTerm) {
         form.termMs = fallback;
         /** @type {HTMLInputElement} */ (node.querySelector("[data-term]")).value = "";
         followed(true);
+    });
+    /** @type {HTMLInputElement} */ (node.querySelector("[data-output-behavior]")).addEventListener("change", event => {
+        form.useOutputBehavior = /** @type {HTMLInputElement} */ (event.target).checked;
     });
     // A combo cannot both need a hold and refuse one — the keyboard rejects it,
     // and QMK would never fire it — so turning one on turns the other off.

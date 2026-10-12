@@ -95,8 +95,9 @@ function revertUnits(before, after, units, capabilities) {
                 const fields = sections.get(rest);
                 if (!fields) throw fail("These settings cannot be discarded on their own.");
                 for (const field of fields) {
-                    if (field.record) settings.mine.layers[field.layer][field.record] = copy(settings.theirs.layers[field.layer][field.record]);
-                    else if ("id" in field && Number.isInteger(field.id)) settingBits(settings, field.id, fieldMask(field));
+                    if (field.header) settings.mine[field.header] = settings.theirs[field.header];
+                    else if (field.record) settings.mine.layers[field.layer][field.record] = copy(settings.theirs.layers[field.layer][field.record]);
+                    else if (typeof field.id === "number" && Number.isInteger(field.id)) settingBits(settings, field.id, fieldMask(field));
                     else throw fail("These settings cannot be discarded on their own.");
                 }
             }

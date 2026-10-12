@@ -22,6 +22,7 @@ export interface Behavior {
     stored?: boolean;
 }
 export interface Combo {
+    useOutputBehavior?: boolean;
     output: string;
     inputs: string[];
     termMs?: Scalar | null;

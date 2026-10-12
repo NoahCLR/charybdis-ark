@@ -134,7 +134,7 @@ test("effective combo verification includes definition enable and allowed source
     const current = editDeviceProfile(bytes, {type: "updateComboHoldTerm", holdTermMs: 300}, context);
     const read = {...context.combos, holdTermMs: 300};
     assert.doesNotThrow(() => assertEffectiveCombos(current, read));
-    for (const patch of [{enabled: false}, {allowedLayers: 32767}]) {
+    for (const patch of [{enabled: false}, {allowedLayers: 32767}, {useOutputBehavior: false}]) {
         assert.throws(() => assertEffectiveCombos(current, {...read, rows: read.rows.map((row, index) => index ? row : {...row, ...patch})}), /running combo/);
     }
 });

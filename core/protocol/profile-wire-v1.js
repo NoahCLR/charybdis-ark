@@ -3,6 +3,7 @@
 const {PROFILE_WIRE_DOMAINS, PROFILE_DOMAIN_MASK} = require("../schema/profile-domains");
 const {UNICODE_MACRO_FEATURE, MACRO_PROTECTION_FEATURE, MACRO_OUTPUT_ISOLATION_FEATURE, STREAMING_MACRO_FEATURE} = require("../schema/macro-payload");
 const {HOST_LAYOUT_FEATURE} = require("../schema/host-settings");
+const {COMBO_OUTPUT_BEHAVIORS_FEATURE} = require("../schema/combo-domain-v1");
 const {PD_CLICK_FEATURE, PD_MACRO_FEATURE} = require("../schema/pd-mode-domain-v1");
 
 const {isUnhandledEcho, requestHandled} = require("./via-unhandled-v1");
@@ -30,7 +31,7 @@ const PROFILE_WIRE_STATUS = Object.freeze({
 });
 
 const PROFILE_WIRE_KNOWN_MASKS = Object.freeze({
-    FEATURE_FLAGS: 0x3fffffff,
+    FEATURE_FLAGS: 0x7fffffff,
     // Bits current firmware never advertises. An older image that does still
     // decodes; nothing reads them.
     RETIRED_FEATURES: 1 << 13,
@@ -83,6 +84,7 @@ const PROFILE_WIRE_FEATURES = Object.freeze({
     // A pointing-mode tap may click a plain mouse button 1–8.
     POINTING_CLICKS: PD_CLICK_FEATURE,
     POINTING_MACROS: PD_MACRO_FEATURE,
+    COMBO_OUTPUT_BEHAVIORS: COMBO_OUTPUT_BEHAVIORS_FEATURE,
 });
 
 const PROFILE_ACTIVE_KIND = Object.freeze({

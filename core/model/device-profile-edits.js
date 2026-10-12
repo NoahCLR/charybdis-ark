@@ -270,11 +270,13 @@ function editCombos(bytes, message, context) {
     } else {
         if (!Array.isArray(message.inputs) || message.inputs.length < 2 || message.inputs.length > (context.capabilities?.maxKeysPerCombo ?? 16)) throw invalid("Choose between two inputs and the keyboard's combo input limit.");
         const previous = message.type === "saveCombo" ? table.rows[integer(message.id, table.rows.length - 1, "Combo index")] : null;
+        if (message.useOutputBehavior !== undefined && typeof message.useOutputBehavior !== "boolean") throw invalid("Output behaviour permission must be on or off.");
+        const useOutputBehavior = message.useOutputBehavior ?? previous?.useOutputBehavior ?? true;
         const enabled = message.enabled ?? previous?.enabled ?? true;
         if (typeof enabled !== "boolean") throw invalid("The combo must be enabled or disabled.");
         const bank = 2 ** (context.capabilities?.compiledLayerCount ?? 16) - 1;
         const row = {inputs: message.inputs.map(expression), output: expression(message.output), termMs: followsDefault ? null : comboWindow(message.termMs), mustHold: message.mustHold === true, mustTap: message.mustTap === true, ordered: message.ordered === true,
-            enabled, allowedLayers: integer(message.allowedLayers ?? previous?.allowedLayers ?? bank, bank, "Allowed layers")};
+            enabled, useOutputBehavior, allowedLayers: integer(message.allowedLayers ?? previous?.allowedLayers ?? bank, bank, "Allowed layers")};
         if (message.type === "saveCombo") table.rows[integer(message.id, table.rows.length - 1, "Combo index")] = row;
         else table.rows.push(row);
     }
@@ -299,7 +301,7 @@ function assertEffectiveCombos(bytes, read) {
     const table = decodeComboDomain(domain.payload);
     const expected = runningComboRows(table);
     const shared = table.defaultTermMs === read.defaultTermMs && table.holdTermMs === read.holdTermMs;
-    if (!shared || expected.length !== read.rows.length || expected.some((row, index) => { const actual = read.rows[index]; return (/** @type {const} */ (["id", "output", "termMs", "followsDefault", "mustHold", "mustTap", "ordered", "enabled", "allowedLayers"])).some(key => row[key] !== actual[key]) || JSON.stringify(row.inputs) !== JSON.stringify(actual.inputs); })) throw invalid("The saved combo profile does not match the running combo table. Flash the current firmware pair and read from keyboard again.");
+    if (!shared || expected.length !== read.rows.length || expected.some((row, index) => { const actual = read.rows[index]; return row.useOutputBehavior !== (actual.useOutputBehavior ?? true) || (/** @type {const} */ (["id", "output", "termMs", "followsDefault", "mustHold", "mustTap", "ordered", "enabled", "allowedLayers"])).some(key => row[key] !== actual[key]) || JSON.stringify(row.inputs) !== JSON.stringify(actual.inputs); })) throw invalid("The saved combo profile does not match the running combo table. Flash the current firmware pair and read from keyboard again.");
 }
 
 module.exports = {editDeviceProfile, assertEffectiveCombos};

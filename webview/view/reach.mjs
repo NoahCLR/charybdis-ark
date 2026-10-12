@@ -1,7 +1,7 @@
 // @ts-check
 import {behaviourFor, keyMeaning} from "./keyface.mjs";
 import {reachablePositions, resolvedPositions, downTheStack} from "./layer-resolution.mjs";
-import {comboGroups, comboOutput, combosInView} from "./combo-reach.mjs";
+import {comboGroups, comboOutput, combosInView, comboInputOn} from "./combo-reach.mjs";
 /** @typedef {import("../../contracts/panel.js").BehaviorView} BehaviorView */
 /** @typedef {import("../../contracts/panel.js").Layer} Layer */
 /** @typedef {import("./keyface-types.js").PointingSlot} PointingSlot */
@@ -11,6 +11,23 @@ import {comboGroups, comboOutput, combosInView} from "./combo-reach.mjs";
 /** @typedef {import("./keyface-types.js").ReachEntry} ReachEntry */
 /** @typedef {import("./keyface-types.js").ResolvedKey} ResolvedKey */
 /** @typedef {import("./keyface-types.js").ViewModel} ViewModel */
+// Generated outputs use the last declared input's physical source, even
+// when matching uses another reference layer. Physical bypass/layer switches
+// never veto a generated output. Several owner placements remain alternatives.
+/** @param {ViewModel} model @param {import("../../contracts/panel.js").ComboView} combo @param {ResolvedKey[]} keys @param {Layer[]} stack @param {number} at @param {number[]} [held] */
+function comboBehaviourFor(model, combo, keys, stack, at, held = []) {
+    if (combo.useOutputBehavior === false || model?.participation?.comboOutputBehaviors === false || model?.participation?.behaviorsEnabled === false) return undefined;
+    const row = behaviourFor(model, comboOutput(model, combo));
+    if (!row || row.enabled === false) return undefined;
+    const owner = combo.inputs?.at(-1);
+    const placements = keys.filter(({position}) => owner !== undefined && comboInputOn(owner, position));
+    const physical = placements.some(key => key.reference) ? resolvedPositions(stack, at, held) : [];
+    const permitted = placements.some(key => {
+        const source = key.reference ? physical.find(entry => entry.position.layoutIndex === key.position.layoutIndex)?.layer : key.layer;
+        return source && ((row.allowedLayers ?? 0xffff) & (2 ** source.index));
+    });
+    return permitted ? row : undefined;
+}
 /**
  * Where to press for this, on this layer.
  *
@@ -47,7 +64,7 @@ export function behavioursInView(model, stack, at, held = []) {
         if (row) add(row).keys.push(key);
     }
     for (const route of combosInView(model, stack, at, held)) {
-        const row = behaviourFor(model, comboOutput(model, route.combo));
+        const row = comboBehaviourFor(model, route.combo, route.keys, stack, at, held);
         if (row) add(row).combos.push(route);
     }
     return [...found.values()];
@@ -93,7 +110,7 @@ export function reachInView(model, stack, at, held, namesOf) {
             }
         };
         sent(output);
-        const row = behaviourFor(model, output);
+        const row = comboBehaviourFor(model, combo, keys, stack, at, held);
         if (row) branchActions(row, (action) => sent(action, output));
     }
     return [...found.values()];
@@ -134,8 +151,8 @@ export function behaviourGroups(model, stack, at) {
     /** @type {[ComboGroupEntry[], BehaviorCombo[]][]} */
     const routes = [[groupsOfCombos.onKeys, combos], [groupsOfCombos.throughKeys, combosBelow]];
     for (const [entries, list] of routes) {
-        for (const {combo, keys} of entries) {
-            const row = behaviourFor(model, comboOutput(model, combo));
+        for (const {combo, keys, held} of entries) {
+            const row = comboBehaviourFor(model, combo, keys, stack, at, held.map(layer => layer.index));
             if (!row) continue;
             const entry = list.find((candidate) => candidate.row === row);
             if (entry) entry.combos.push({combo, keys});
@@ -295,11 +312,11 @@ export function reachGroups(model, stack, at, namesOf, all) {
     /** @type {[ComboGroupEntry[], boolean][]} */
     const comboRoutes = [[combos.onKeys, false], [combos.throughKeys, true]];
     for (const [entries, below] of comboRoutes) {
-        for (const {combo, keys} of entries) {
+        for (const {combo, keys, held} of entries) {
             const output = comboOutput(model, combo);
             /** @type {{action: string; via: string | null}[]} */
             const sends = [{action: output, via: null}];
-            for (const step of behaviourFor(model, output)?.steps || []) {
+            for (const step of comboBehaviourFor(model, combo, keys, stack, at, held.map(layer => layer.index))?.steps || []) {
                 for (const tier of [step.tap, step.hold, step.longHold]) {
                     if (tier?.action) sends.push({action: tier.action, via: output});
                 }

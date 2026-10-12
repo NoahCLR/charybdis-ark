@@ -9,7 +9,7 @@
  */
 const {keycodeAction, knownActionAbi, pdSlotOfCode} = require("../schema/actions");
 const {decodeProfileBlob, encodeProfileBlob, crc32, fnv1a32, PROFILE_BLOB_V1, PROFILE_DOMAIN_VERSIONS, ProfileBlobProtocolError} = require("../schema/profile-blob-v1");
-const {ALL_LAYERS, COMBO_DOMAIN_VERSION, encodeComboDomain} = require("../schema/combo-domain-v1");
+const {supportsComboOutputBehaviors, ALL_LAYERS, COMBO_DOMAIN_VERSION, encodeComboDomain} = require("../schema/combo-domain-v1");
 const {SETTING, SETTING_FIELDS, decodeSettings, encodeSettings} = require("../schema/settings-domain-v1");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX, LAYERS, MATRIX_KEYS, matrixPosition} = require("../data/charybdis-layout");
 const {LAYER_LOCK_BASE, LAYER_LOCK_SLOTS} = require("../data/user-keycodes");
@@ -118,7 +118,7 @@ function comboTableOf(combos) {
     return {version: COMBO_DOMAIN_VERSION, defaultTermMs: combos.defaultTermMs, holdTermMs: combos.holdTermMs,
         rows: combos.rows.map(row => ({inputs: row.inputs.map(keycodeAction), output: keycodeAction(row.output),
             termMs: row.followsDefault ? null : row.termMs, mustHold: row.mustHold, mustTap: row.mustTap, ordered: row.ordered,
-            enabled: row.enabled ?? true, allowedLayers: row.allowedLayers ?? ALL_LAYERS}))};
+            enabled: row.enabled ?? true, useOutputBehavior: row.useOutputBehavior ?? true, allowedLayers: row.allowedLayers ?? ALL_LAYERS}))};
 }
 /** @param {{profile: Buffer, via: {layers: number, layout: Buffer, macros: Buffer, macroSlots: number}, actionAbiDigest: number}} snapshot */
 function createSnapshot({profile, via, actionAbiDigest}) {
@@ -158,6 +158,7 @@ function validateSnapshot(value, capabilities) {
     const codecOptions = profileDepthOptions(capabilities, payload("rgb"));
     const rgb = domainCodec("rgb").decode(payload("rgb"), codecOptions), behaviors = domainCodec("behaviors").decode(payload("behaviors"), codecOptions),
         combos = domainCodec("combos").decode(payload("combos")), settings = domainCodec("settings").decode(payload("settings"));
+    if (capabilities && !supportsComboOutputBehaviors(capabilities) && (settings.comboOutputBehaviors === false || combos.rows.some(row => !row.useOutputBehavior))) throw fail("This firmware cannot bypass combo output behaviours. Update both halves before restoring this profile.");
     const hostWord = settings.values[SETTING.UNICODE_HOST_MODE];
     if (hostWord && capabilities && !supportsUnicodeMacros(capabilities)) throw fail("This firmware cannot use Host settings. Update both halves before restoring this profile.");
     if (hostWord & (LAYOUT_MASK | MACOS_ISO) && capabilities && !supportsHostLayouts(capabilities)) throw fail("This firmware cannot type through a host keyboard layout. Update both halves before restoring this profile.");

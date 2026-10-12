@@ -204,7 +204,7 @@ function comboFields(row, table, names) {
     return new Map(/** @type {[string, Field][]} */ ([["Keys", {text: row.inputs.map(input => action(input, names)).join(" + "),
         detail: row.inputs.map(input => action(input, names, true)).join(" + "), key: JSON.stringify(row.inputs)}],
         ["Sends", actionField(row.output, names, {mark: actionMark(row.output)})], ["Window", window], ["Conditions", options || "none"],
-        ["Enabled", row.enabled ? "on" : "off"],
+        ["Enabled", row.enabled ? "on" : "off"], ["Use output behaviour", row.useOutputBehavior ? "on" : "off"],
         ["Allowed layers", {text: names.layers.filter((_, i) => row.allowedLayers & 2 ** i).join(", ") || "none", key: row.allowedLayers}]]));
 }
 // The two values every combo shares. A version 1 table has no default window,

@@ -122,7 +122,7 @@ function comboBuilder(combo = null, defaultTermMs = "") {
     return {
         open: true, picking: false, awaiting: false, editId: combo?.id ?? null,
         form: {output: combo?.output || "", termMs: String(combo?.termMs ?? defaultTermMs), followsDefault: follows,
-            enabled: combo?.enabled ?? true, allowedLayers: combo?.allowedLayers ?? (2 ** layers().length - 1),
+            useOutputBehavior: combo?.useOutputBehavior ?? true, enabled: combo?.enabled ?? true, allowedLayers: combo?.allowedLayers ?? (2 ** layers().length - 1),
             mustHold: Boolean(combo?.mustHold), mustTap: Boolean(combo?.mustTap), ordered: Boolean(combo?.ordered)},
         inputs: (combo?.inputs || []).slice(),
     };

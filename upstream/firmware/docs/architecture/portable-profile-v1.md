@@ -85,7 +85,7 @@ instructions. Held keys must balance. The bank is reconstructed with zero
 padding and a final zero validity byte. Both macro banks are independent:
 64 VIA slots and 16 user macro slots retain their existing key identities.
 
-See [Unicode macro playback](https://github.com/NoahCLR/charybdis-4x6/blob/71f7a51062aa18fe6b76797a234196212a7cf8b0/docs/architecture/runtime-flow.md) for encoding, compiled size, host setup and cancellation.
+See [Unicode macro playback](https://github.com/NoahCLR/charybdis-4x6/blob/5b8ed14be240462b6eab50d89cd45942fc428f64/docs/architecture/runtime-flow.md) for encoding, compiled size, host setup and cancellation.
 
 The reconstructed bank is the document's, not necessarily the keyboard's. A
 valid bank may hold nonzero bytes after its 64th terminator, for instance after
@@ -113,7 +113,7 @@ All multibyte fields are little-endian:
 
 | Offset | Bytes | Contents |
 | ---: | ---: | --- |
-| 0 | 8 | `[6, 16, 31, 128, 128, 0, 0, 0]`: version, layer count, scalar count, macro-name count, custom-key-name count, reserved zeros |
+| 0 | 8 | `[6, 16, 31, 128, 128, flags, 0, 0]`: version, layer count, scalar count, macro-name count, custom-key-name count, flags, reserved zeros |
 | 8 | 124 | 31 uint32 scalar values |
 | 132 | 272 | 16 layer records of 17 bytes, layer 0 first: byte 0 the layer's combo reference layer (below 16); bytes 1–8 its behaviour-bypass placement bitmap; bytes 9–16 its combo-exclusion placement bitmap |
 | 404 | variable | 272 counted names: 16 layer names, then 128 VIA macro names, then 128 custom-key names; each a uint8 length `0..32`, then that many bytes of UTF-8 |
@@ -124,6 +124,17 @@ rejects excess without trimming. Names are profile data for the client. Macro
 content belongs to the bound VIA bank; custom keys execute their behavior rows.
 Validation reads at most 20 settings bytes per step, in one read. Retired per-mode DPI
 scalars 10–14 must be zero; mode tuning is in domain `0x50`.
+
+Settings header byte 5 bit 0 bypasses shared behaviours for every combo output
+while physical-key behaviours remain eligible. Other header flag bits are
+zero. Require capability feature bit 30 before setting it. Zero means **Combo
+outputs use behaviours** is on, preserving existing v6 profiles and compiled
+defaults. The corresponding per-combo switch is combo v3 row flag bit 4;
+[participation policy](participation-policy.md#combo-output-behaviour-permission)
+defines their vetoes, origin context and release pairing. An older backup's
+translation leaves both flags zero. An export preserves them; importing to a
+keyboard without feature bit 30 must refuse nonzero flags instead of dropping
+them. Neither extension changes domain versions, offsets or the action ABI.
 
 Every name in this domain follows one rule: at most 32 encoded bytes of
 well-formed UTF-8 (no overlong forms, no surrogates, nothing past U+10FFFF), no
@@ -155,7 +166,7 @@ a set exclusion bit keeps it out of combos. The
 | 23 | Persistent default-layer bitmask |
 | 24 | QMK keymap options |
 | 25–26 | Auto-mouse activation delay (ms) and movement threshold |
-| 27 | Host settings: bits 0..1 select Auto (0), macOS (1), Windows (2), Linux (3); bit 8 enables Unicode playback; bits 16..23 name the [host layout](https://github.com/NoahCLR/charybdis-4x6/blob/71f7a51062aa18fe6b76797a234196212a7cf8b0/docs/architecture/host-layouts-v1.md) (0 US) and bit 24 marks a macOS ISO keyboard; other bits zero. Nonzero requires feature bit 21, and bits 16..24 feature bit 22. Previously reserved zero after version 5 combo references moved to layer records |
+| 27 | Host settings: bits 0..1 select Auto (0), macOS (1), Windows (2), Linux (3); bit 8 enables Unicode playback; bits 16..23 name the [host layout](https://github.com/NoahCLR/charybdis-4x6/blob/5b8ed14be240462b6eab50d89cd45942fc428f64/docs/architecture/host-layouts-v1.md) (0 US) and bit 24 marks a macOS ISO keyboard; other bits zero. Nonzero requires feature bit 21, and bits 16..24 feature bit 22. Previously reserved zero after version 5 combo references moved to layer records |
 | 28 | Behaviour master enable |
 | 29 | Layer behaviours mask, one bit per layer |
 | 30 | Layer combos mask, one bit per layer |
