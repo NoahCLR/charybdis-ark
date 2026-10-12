@@ -152,6 +152,25 @@ test("reading with no keyboard attached answers with a notice through the host",
     await loop.close();
 });
 
+test("an overlapping panel read answers with a busy refusal while the first read stays active", async () => {
+    let enter, finish;
+    const entered = new Promise(resolve => {enter = resolve;}), gate = new Promise(resolve => {finish = resolve;});
+    const host = fakeHost();
+    const service = fakeService({readKeyboardProfile: async () => {enter(); await gate; return service.portable;}});
+    const loop = openPanelLoop(host, {service});
+    loop.serviceChanged();
+    const owner = loop.handleMessage({type: "refresh"});
+    await entered;
+    try {
+        const calls = service.calls.slice();
+        await loop.handleMessage({type: "refresh"});
+        assert.match(last(host).notice, /Failed.*current operation/);
+        assert.equal(last(host).model.load.state, "loading");
+        assert.equal(loop.session.readBusy, true);
+        assert.deepEqual(service.calls, calls, "the refusal starts no service request");
+    } finally {finish(); await owner; await loop.close();}
+});
+
 test("an export refused after disconnect reports the same failure in the notice and device diagnostics", async () => {
     const host = fakeHost();
     const loop = openPanelLoop(host, {adapter: new FakeDeviceAdapter()});

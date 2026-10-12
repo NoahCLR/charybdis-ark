@@ -63,6 +63,18 @@ become the panel's notice. Two reads are optional and never reject: base RGB
 and combos record a failure as their own `{state: "unavailable"}`.
 `disconnect()` always ends disconnected.
 
+The service runs one device operation at a time. `runOperation` holds its own
+lock for the whole operation, including restore's trailing health read, and
+the optional reads go through it too. `busy` is derived from that lock and an
+explicit disconnect, so a keyboard unplugged mid-operation stays busy until
+the operation unwinds. A required operation that overlaps rejects with
+`SERVICE_BUSY` and changes nothing; an optional read that overlaps resolves,
+leaves the earlier error alone and records a diagnostic. The panel refuses
+the same overlap first, out loud: an edit or a draft, backup, demo or read
+control posted while a read or backup runs answers with a notice. A reloaded
+panel's `ready` and host controls start nothing, so they are answered with
+the model.
+
 Panel controls are registered in `session/panel-control-registry.js`:
 route, binding, demo policy, execution phase and named action. The router and
 controllers consume it; the contract's payload groups and all handler names

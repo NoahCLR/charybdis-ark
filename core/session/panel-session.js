@@ -34,6 +34,9 @@ const {controlsOn, panelControl} = require("./panel-control-registry");
 const DRAFT_CONTROLS = controlsOn("draft");
 const PORTABLE_MESSAGES = controlsOn("portable");
 const DEMO_MESSAGES = controlsOn("demo");
+// The routes that start work, which wait for the current operation.
+const WORK_ROUTES = new Set(["draft", "portable", "demo", "read"]);
+const BUSY_REFUSAL = "Wait for the current operation to finish before starting another.";
 
 // What the panel says and offers that depends on its host, published as
 // `model.host`, so the panel never asks which host it is in. A host passes
@@ -227,7 +230,13 @@ function routeMessage(session, message, state) {
         session.historyOpen = control.action === "openHistory";
         return "none";
     }
-    if (session.portableBusy || session.readBusy) return "none";
+    // Nothing starts while a read or backup runs, and a request that would is
+    // refused out loud (panel-loop.js). A webview that loads again only asks
+    // for the model, and host controls start nothing here, so both are answered.
+    if (session.portableBusy || session.readBusy) {
+        if (type === "ready" || !(DRAFT_EDITS.has(type) || WORK_ROUTES.has(control?.route || ""))) return "none";
+        throw new Error(BUSY_REFUSAL);
+    }
     if (control?.route === "demo") return "demo";
     // A panel that loads again in the demo stays in it; reading a keyboard
     // leaves it first (panel-loop.js), so nothing reads one from here.
@@ -265,7 +274,10 @@ function routeMessage(session, message, state) {
     if (control?.route === "portable") return "portable";
     if (control?.route === "read") {
         const {deviceId} = /** @type {import("./types.js").PanelEnvelope} */ (message);
-        if (state.busy) return "none";
+        if (state.busy) {
+            if (type === "ready") return "none";
+            throw new Error(BUSY_REFUSAL);
+        }
         if (control.action === "select" && (!state.devices?.some((device) => device.id === deviceId) || !deviceId)) {
             throw new Error("Choose a keyboard from the current device list.");
         }

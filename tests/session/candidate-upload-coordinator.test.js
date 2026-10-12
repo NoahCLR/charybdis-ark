@@ -606,33 +606,6 @@ test("busy polling refuses a partial-overlap chunk resubmission", async () => {
     assert.equal(harness.status.state, CANDIDATE_STATE.IDLE);
 });
 
-test("cancellation after staging starts performs a best-effort idempotent abort", async () => {
-    const harness = new CandidateFirmwareHarness();
-    const controller = new AbortController();
-    const upload = coordinator(harness).upload(representativeBlob(), {
-        ...BINDING, actionAbiDigest: 1,
-        signal: controller.signal,
-        onProgress(progress) {
-            if (progress.phase === "writing" && progress.bytesSent === 20) controller.abort();
-        },
-    });
-    await assert.rejects(upload, (error) => {
-        assert.ok(error instanceof CandidateUploadError);
-        assert.equal(error.code, "CANCELLED");
-        assert.equal(error.phase, "writing");
-        assert.equal(error.progress.bytesSent, 20);
-        assert.equal(error.abortAttempted, true);
-        assert.equal(error.abortSucceeded, true);
-        return true;
-    });
-    assert.equal(operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_ABORT).length, 1);
-    assert.equal(harness.status.state, CANDIDATE_STATE.IDLE);
-    const abortIndex = harness.writes.findIndex((report) => report[0] === PROFILE_CANDIDATE_V1.COMMAND_SET
-        && report[2] === PROFILE_CANDIDATE_V1.VALUE_ABORT);
-    assert.equal(harness.requestOptions.slice(0, abortIndex).some((options) => options.signal === controller.signal), true);
-    assert.equal(harness.requestOptions[abortIndex].signal, undefined);
-});
-
 for (const transportErrorCode of ["TIMEOUT", "DISCONNECTED"]) {
     test(`${transportErrorCode.toLowerCase()} during a mutation is ambiguous and is never silently retried`, async () => {
         const harness = new CandidateFirmwareHarness({
@@ -895,18 +868,6 @@ test("a lost streaming acknowledgement stops without replaying the ambiguous chu
     assert.equal(operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_COMMIT).length, 0);
     assert.equal(harness.status.state, CANDIDATE_STATE.RECEIVING);
     assert.equal(harness.status.nextOffset, 20);
-});
-test("cancelling a confirmed streaming prefix aborts before the next batch", async () => {
-    const harness = new CandidateFirmwareHarness({scanBetweenReports: true});
-    const controller = new AbortController();
-    await assert.rejects(coordinator(harness).upload(representativeBlob(401), {...BINDING, actionAbiDigest: 1,
-        streamChunks: true, signal: controller.signal,
-        onProgress(progress) { if (progress.phase === "writing" && progress.bytesSent === 80) controller.abort(); }}),
-        error => error.code === "CANCELLED" && error.abortSucceeded === true);
-    assert.equal(operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_STREAM_CHUNK).length, 4);
-    assert.equal(operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_VALIDATE).length, 0);
-    assert.equal(operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_COMMIT).length, 0);
-    assert.equal(harness.status.state, CANDIDATE_STATE.IDLE);
 });
 test("reuse describes the verified source and still validates the entire target", async () => {
     const {crc32, fnv1a32} = require("../../core/schema/profile-blob-v1");

@@ -17,7 +17,6 @@ export interface UploadOptions extends Partial<CandidateBlobOptions> {
     metadata?: CandidateMetadataInput;
     baseSource?: CandidateBaseSource;
     streamChunks?: boolean;
-    signal?: AbortSignal;
     transactionId?: number;
     verifyBase?: () => Promise<void>;
     onProgress?: (progress: CandidateProgress) => void;
@@ -25,7 +24,7 @@ export interface UploadOptions extends Partial<CandidateBlobOptions> {
 /** Authored uploads either provide metadata or the identity needed to derive it. */
 export type UploadCallOptions = UploadOptions & ({metadata: CandidateMetadataInput} | CandidateBlobOptions);
 export interface CommitDecision {transactionId: number; digest: number; status: CandidateStatus}
-export interface CommitOptions {signal?: AbortSignal; onProgress?: (progress: CandidateProgress) => void; digest?: number; afterDecision?: (decision: CommitDecision) => Promise<void>}
+export interface CommitOptions {onProgress?: (progress: CandidateProgress) => void; digest?: number; afterDecision?: (decision: CommitDecision) => Promise<void>}
 export interface UploadContext {
     abortNeeded: boolean;
     afterDecision?: CommitOptions['afterDecision'];
@@ -33,7 +32,6 @@ export interface UploadContext {
     bytesSent: number;
     bytesUploaded: number;
     bytesReused: number;
-    cancellationSuppressed: boolean;
     chunkCount: number;
     chunkIndex: number;
     chunksAdmitted: number;
@@ -42,7 +40,6 @@ export interface UploadContext {
     onProgress?: (progress: CandidateProgress) => void;
     operation: number;
     phase: string;
-    signal?: AbortSignal;
     status?: CandidateStatus;
     totalBytes: number;
     transactionId?: number;
