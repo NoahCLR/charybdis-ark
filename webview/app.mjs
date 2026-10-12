@@ -16,6 +16,7 @@ import {chooseKeyboard, hostOf, otherTheme, setTheme} from "./view/host.mjs";
 import {DEMO_WORDS, demoOf, leaveDemo, openDemo, openDemoProfile} from "./view/demo.mjs";
 import {phaseWords} from "./view/vocabulary.mjs";
 import {readScreen, screenAvailable} from "./view/readiness.mjs";
+import {SCREENS, screenDefinition, secondaryScreen} from "./view/screens.mjs";
 import {discardLabel, groupNote, placeState, reviewBlocks, statusSummary, stillShown} from "./view/review.mjs";
 import {bindLayerIndex, hideHover, mountHover} from "./ui/hover.mjs";
 import {pickerOverlay} from "./ui/picker.mjs";
@@ -35,20 +36,12 @@ import {screenProfile} from "./ui/profile.mjs";
 import {commitBar, rail, topbar, unavailable} from "./ui/shell.mjs";
 
 const root = /** @type {HTMLElement} */ (document.getElementById("root"));
-/** @type {string | null} */
+/** @type {import("./view/screens.mjs").ScreenId | null} */
 let renderedScreen = null;
 
-/** @type {Record<string, () => HTMLElement>} */
-const SCREENS = {
-    keys: screenKeys,
-    lighting: screenLighting,
-    settings: screenSettings,
-    device: screenDevice,
-    mouse: screenMouse,
-    pointing: screenPointing,
-    macros: screenMacros,
-    customKeys: screenCustomKeys,
-    profile: screenProfile,
+const SCREEN_RENDERERS = {
+    screenKeys, screenLighting, screenSettings, screenDevice, screenMouse,
+    screenPointing, screenMacros, screenCustomKeys, screenProfile,
 };
 
 /** @param {readonly (readonly [string, unknown])[]} rows */
@@ -300,7 +293,7 @@ function render({keepScreen = false} = {}) {
     if (demo.active) app.appendChild(demoBanner(demo));
     app.appendChild(rail());
     const read = screenAvailable(model, state.screen) ? null : readScreen(model, state.screen);
-    const screen = keptScreen || (read ? readPlaceholder(read, model) : (SCREENS[state.screen] || screenKeys)());
+    const screen = keptScreen || (read ? readPlaceholder(read, model) : SCREENS[state.screen].render(SCREEN_RENDERERS));
     if (keptScreen) {
         keptScreen.querySelector(":scope > .commit")?.remove();
         const detail = keptScreen.querySelector(".read-placeholder > p");
@@ -338,11 +331,8 @@ function readPlaceholder(read, model) {
     // Without a keyboard the demo is offered beside it; a host that cannot
     // reach one at all still offers it, where the host says so.
     const demoHere = demoOf(model).offered && (read.state !== "blocked" || Boolean(hostOf(model).blocked?.demo));
-    const screenTitle = state.screen === "profile" ? "Profile & backups" : state.screen === "device" ? "Device" : "Keyboard";
-    const secondary = screenAvailable(model, "profile") && state.screen !== "profile"
-        ? {screen: "profile", label: "Profile & backups"}
-        : screenAvailable(model, "device") && state.screen !== "device"
-            ? {screen: "device", label: "Device details"} : null;
+    const screenTitle = screenDefinition(state.screen)?.title || "Keyboard";
+    const secondary = secondaryScreen(model, state.screen);
     const screen = el(`<div class="main">${topbar(screenTitle, "The keyboard's current data appears here when this screen is available.")}
         <div class="content"><div class="pad"><div class="read-placeholder" role="status" aria-live="polite">
             ${loading ? '<span class="spin" aria-hidden="true"></span>' : '<i class="dot err" aria-hidden="true"></i>'}

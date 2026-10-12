@@ -157,3 +157,19 @@ function stateDeclarations() {
     void [declared, undeclared, mistyped, bare, ruled];
 }
 void stateDeclarations;
+
+import {SCREENS, isScreenId} from '../../webview/view/screens.mjs';
+import type {ScreenRenderers} from '../../webview/view/screens.mjs';
+import type {PanelState} from '../../webview/state.js';
+function screenRegistry(state: PanelState, renderers: ScreenRenderers, id: unknown) {
+    state.screen = 'lighting';
+    if (isScreenId(id)) state.screen = id;
+    SCREENS[state.screen].render(renderers);
+    // @ts-expect-error Screen state accepts only IDs authored by the registry.
+    state.screen = 'unknown';
+    // @ts-expect-error An arbitrary string is not a checked screen ID.
+    state.screen = String(id);
+    // @ts-expect-error Rendering requires every registered screen implementation.
+    SCREENS.keys.render({screenKeys: () => document.createElement('main')});
+}
+void screenRegistry;

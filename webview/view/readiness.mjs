@@ -2,6 +2,9 @@
 // The Configure screens show a board only after a complete editable read.
 // The host keeps the gate closed across the small gaps between HID requests.
 
+import {configureReady, screenAvailable, screenDefinition} from "./screens.mjs";
+export {configureReady, screenAvailable};
+
 /** @typedef {import("../../contracts/model.js").StatusModel} StatusModel */
 /** @typedef {import("../../contracts/model.js").CountedProgress} CountedProgress */
 
@@ -32,19 +35,11 @@ export function busyText(phase, model) {
     return {detail: words?.busy || "Finishing the current step", writes: words?.writes || false};
 }
 
-/** @param {StatusModel | null | undefined} model */
-export const configureReady = (model) => model?.load?.state === "ready";
-
-/** @param {StatusModel | null | undefined} model @param {string} screen */
-export function screenAvailable(model, screen) {
-    if (!model || model.load?.state === "loading") return false;
-    if (screen === "device") return Boolean(model.device?.connected || model.demo?.active);
-    if (screen === "profile") return Boolean(model.portable?.available);
-    return configureReady(model);
-}
-
 /** @param {StatusModel | null | undefined} model @param {string} [screen] */
 export function readScreen(model, screen = "keys") {
+    const definition = screenDefinition(screen);
+    if (!definition) return {state: "unavailable", title: "Screen unavailable",
+        detail: "Choose a screen from the menu to continue."};
     // A host that cannot reach a keyboard at all says why, in place of reading.
     if (model?.host?.blocked) return {state: "blocked", title: model.host.blocked.title, detail: model.host.blocked.detail};
     if (!model || model.load?.state === "loading") {
@@ -54,10 +49,7 @@ export function readScreen(model, screen = "keys") {
             ? ` · ${progress.done} of ${progress.total}` : "";
         return {state: "loading", title: "Reading your keyboard", detail: typeof progress === "string" && progress ? progress : `${phaseWords(model, phase)?.read || (!phase ? "Looking for a keyboard" : "Finishing the read")}${count}`};
     }
-    if (screen === "profile" && !screenAvailable(model, screen)) return {state: "unavailable", title: "Backups unavailable",
-        detail: "Connect a keyboard with complete-profile firmware, then read it to manage backups."};
-    if (screen === "device" && !screenAvailable(model, screen)) return {state: "unavailable", title: "Device status unavailable",
-        detail: "Read the keyboard to see its connection and diagnostics."};
+    if (!screenAvailable(model, screen) && definition.unavailable) return {state: "unavailable", ...definition.unavailable};
     if (configureReady(model)) return null;
     const device = model.device || {};
     if (!device.connected) return {state: "unavailable", title: "Connect your keyboard",

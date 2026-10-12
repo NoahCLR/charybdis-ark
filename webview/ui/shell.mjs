@@ -9,6 +9,7 @@ import {getModel, post, postLeavingDemo, render, state} from "../store.mjs";
 import {phaseWords} from "../view/vocabulary.mjs";
 import {statusSummary} from "../view/review.mjs";
 import {busyText, postApplyReadText, screenAvailable} from "../view/readiness.mjs";
+import {isScreenId, screenGroups} from "../view/screens.mjs";
 import {buildLine, chooseKeyboard, commitUrl, githubMark, hostOf, themeLabel} from "../view/host.mjs";
 import {DEMO_WORDS, demoOf} from "../view/demo.mjs";
 import {openHistory} from "./history.mjs";
@@ -19,35 +20,6 @@ function openReview() {
     post(controls.control("reviewProfileDraft"));
     render();
 }
-
-/** @type {Readonly<Record<string, string>>} */
-const ICONS = {
-    keys: '<svg viewBox="0 0 16 16"><rect x="1.5" y="3.5" width="13" height="9" rx="2"/><path d="M4 6.5h.01M6.5 6.5h.01M9 6.5h.01M11.5 6.5h.01M5 9.5h6"/></svg>',
-    mouse: '<svg viewBox="0 0 16 16"><rect x="4" y="1.5" width="8" height="13" rx="4"/><path d="M8 1.5v4.5"/></svg>',
-    pointing: '<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5"/><path d="M8 2.5v11M2.5 8h11"/></svg>',
-    lighting: '<svg viewBox="0 0 16 16"><path d="M8 1.8v1.6M13 3l-1.1 1.1M14.2 8h-1.6M3 13l1.1-1.1M2 8h1.6M3 3l1.1 1.1"/><circle cx="8" cy="8.4" r="3.2"/></svg>',
-    macros: '<svg viewBox="0 0 16 16"><path d="M2.5 4.5h11M2.5 8h7M2.5 11.5h9"/></svg>',
-    customKeys: '<svg viewBox="0 0 16 16"><rect x="2.5" y="2.5" width="11" height="11" rx="2.5"/><path d="M5.5 8h5M8 5.5v5"/></svg>',
-    settings: '<svg viewBox="0 0 16 16"><path d="M2.5 5h11M2.5 11h11"/><circle cx="6" cy="5" r="1.8"/><circle cx="10.5" cy="11" r="1.8"/></svg>',
-    profile: '<svg viewBox="0 0 16 16"><path d="M8 1.8v8.4M5 7.4 8 10.4l3-3M2.8 12.2v1.4h10.4v-1.4"/></svg>',
-    device: '<svg viewBox="0 0 16 16"><rect x="2.5" y="2.5" width="11" height="11" rx="2.5"/><path d="M6 6.5h4v3H6z"/></svg>',
-};
-
-export const SCREENS = [
-    {group: "Configure", items: [
-        {id: "keys", label: "Keys", icon: "keys"},
-        {id: "lighting", label: "Lighting", icon: "lighting"},
-        {id: "macros", label: "Macros", icon: "macros"},
-        {id: "customKeys", label: "Custom keys", icon: "customKeys"},
-        {id: "mouse", label: "Mouse", icon: "mouse"},
-        {id: "pointing", label: "Pointing modes", icon: "pointing"},
-        {id: "settings", label: "Settings", icon: "settings"},
-    ]},
-    {group: "Keyboard", items: [
-        {id: "profile", label: "Profile & backups", icon: "profile"},
-        {id: "device", label: "Device", icon: "device"},
-    ]},
-];
 
 export function rail() {
     const model = getModel();
@@ -67,10 +39,10 @@ export function rail() {
     const line = (tone, text, tip) =>
         `<div class="stat" data-tip="${esc(tip)}"><i class="dot ${tone}"></i> ${esc(text)}</div>`;
 
-    const nav = SCREENS.map((group) => `<div class="rail-group">${group.group}</div>` + group.items.map((item) => `
-        <button class="nav-item" data-screen="${item.id}" aria-current="${state.screen === item.id}"
-            ${screenAvailable(model, item.id) ? "" : "disabled"}>
-            ${ICONS[item.icon]}<span>${item.label}</span>
+    const nav = screenGroups().map((group) => `<div class="rail-group">${esc(group.group)}</div>` + group.items.map(({id, definition}) => `
+        <button class="nav-item" data-screen="${id}" aria-current="${state.screen === id}"
+            ${screenAvailable(model, id) ? "" : "disabled"}>
+            ${definition.icon}<span>${esc(definition.label)}</span>
         </button>`).join("")).join("");
 
     const node = el(`<aside class="rail">
@@ -120,7 +92,9 @@ export function rail() {
     </aside>`);
 
     /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-screen]")).forEach((button) => button.addEventListener("click", () => {
-        state.screen = /** @type {string} */ (button.dataset.screen);
+        const id = button.dataset.screen;
+        if (!isScreenId(id)) return;
+        state.screen = id;
         render();
     }));
     /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="dismiss"]'))?.addEventListener("click", () => { state.notice = ""; state.error = ""; render(); });

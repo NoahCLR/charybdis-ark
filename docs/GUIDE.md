@@ -242,6 +242,8 @@ if the keyboard reported its capabilities. Profile & backups opens when a
 connected keyboard runs current firmware with complete-profile
 backup. The Configure
 menus open only with an editable draft.
+If a screen cannot be identified, Ark shows **Screen unavailable**; choose a
+screen from the menu to continue.
 
 Underneath it, one workbench whose tabs are the key, its behaviour, its combos,
 and the macros and pointing modes the layer reaches. A behaviour is tap count ×
