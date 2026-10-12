@@ -151,7 +151,7 @@ class CandidateUploadCoordinator {
                 safeToRetry: true,
             });
         }
-        const context = createUploadContext(options.signal);
+        const context = createUploadContext();
         this.uploading = true;
         context.onProgress = typeof options.onProgress === "function" ? options.onProgress : undefined;
         try {
@@ -193,10 +193,8 @@ class CandidateUploadCoordinator {
             context.chunkCount = plan.filter(part => part.kind === "write")
                 .reduce((count, part) => count + Math.ceil(part.length / this.chunkSize), 0);
 
-            throwIfCancelled(context);
             context.phase = UPLOAD_PHASE.PREFLIGHT;
             context.status = await this.readStatus(context, {ambiguous: false});
-            throwIfCancelled(context);
             assertNoActiveCandidate(context.status);
             context.transactionId = options.transactionId === undefined
                 ? allocateTransactionId(this.transactionIds)
@@ -219,7 +217,6 @@ class CandidateUploadCoordinator {
 
             context.phase = UPLOAD_PHASE.WRITING;
             for (const part of plan) {
-                throwIfCancelled(context);
                 if (part.kind === "reuse") {
                     if (!base) throw new TypeError("Reuse requires the reviewed source bytes.");
                     context.operation = CANDIDATE_OPERATION.REUSE;
@@ -244,7 +241,6 @@ class CandidateUploadCoordinator {
                 }
             }
 
-            throwIfCancelled(context);
             context.phase = UPLOAD_PHASE.VALIDATE;
             context.operation = CANDIDATE_OPERATION.VALIDATE;
             context.status = await this.performMutation(
@@ -266,18 +262,6 @@ class CandidateUploadCoordinator {
                 progress: progressFor(context),
             };
         } catch (cause) {
-            if (isCancellation(cause, context)) {
-                const abortResult = context.abortNeeded
-                    ? await this.bestEffortAbort(context)
-                    : {attempted: false, succeeded: undefined};
-                throw uploadError("CANCELLED", "Candidate upload was cancelled.", context, {
-                    abortAttempted: abortResult.attempted,
-                    abortSucceeded: abortResult.succeeded,
-                    ambiguous: abortResult.attempted && abortResult.succeeded !== true,
-                    cause: cause instanceof Error ? cause : undefined,
-                    safeToRetry: abortResult.succeeded === true,
-                });
-            }
             if (cause instanceof CandidateUploadError) {
                 if (context.abortNeeded && !cause.ambiguous) {
                     const abortResult = await this.bestEffortAbort(context);
@@ -311,7 +295,7 @@ class CandidateUploadCoordinator {
                 safeToRetry: true,
             });
         }
-        const context = createUploadContext(options.signal);
+        const context = createUploadContext();
         context.transactionId = normalizeTransactionId(transactionId);
         context.onProgress = typeof options.onProgress === "function" ? options.onProgress : undefined;
         context.expectedDigest = options.digest === undefined ? undefined : normalizeInteger(options.digest, "Candidate digest", 0, 0xffffffff);
@@ -321,7 +305,6 @@ class CandidateUploadCoordinator {
         context.afterDecision = options.afterDecision;
         this.uploading = true;
         try {
-            throwIfCancelled(context);
             context.phase = UPLOAD_PHASE.COMMIT_PREFLIGHT;
             context.status = await this.readStatus(context, {ambiguous: false});
             assertOperationContext(context);
@@ -353,7 +336,6 @@ class CandidateUploadCoordinator {
                 throw uploadError("CANDIDATE_NOT_VALIDATED", "Only the matching validated candidate can be committed.", context, {safeToRetry: false});
             }
 
-            throwIfCancelled(context);
             context.phase = UPLOAD_PHASE.COMMIT;
             context.operation = CANDIDATE_OPERATION.COMMIT;
             context.status = await this.performMutation(
@@ -401,7 +383,6 @@ class CandidateUploadCoordinator {
             const baseline = context.status;
             let admitted = 0;
             while (admitted < 4 && offset < part.offset + part.length) {
-                throwIfCancelled(context);
                 const bytes = context.blob.subarray(offset, Math.min(offset + this.chunkSize, part.offset + part.length));
                 const frame = buildCandidateChunkRequest(context.transactionId, offset, bytes);
                 frame[2] = PROFILE_CANDIDATE_V1.VALUE_STREAM_CHUNK;
@@ -441,7 +422,6 @@ class CandidateUploadCoordinator {
         const budget = this.createStatusBudget(context, baseline);
         const sequence = (baseline.operationSequence + admitted) & 0xffff;
         while (true) {
-            throwIfCancelled(context);
             const status = await this.readStatus(context, {ambiguous: true});
             context.status = status;
             assertCandidateIdentity(status, context);
@@ -466,7 +446,6 @@ class CandidateUploadCoordinator {
         try {
             response = await this.connection.request(frame, {
                 matchResponse: orUnhandled(candidateMutationResponseMatcher, frame),
-                signal: requestSignal(context),
                 timeoutMs: this.requestTimeoutMs,
             });
         } catch (cause) {
@@ -499,7 +478,6 @@ class CandidateUploadCoordinator {
                 safeToRetry: false,
             });
         }
-        throwIfCancelled(context);
         return acknowledgment;
     }
 
@@ -508,7 +486,6 @@ class CandidateUploadCoordinator {
         let baseline = context.status;
         let busyResubmissions = 0;
         while (true) {
-            throwIfCancelled(context);
             const acknowledgment = await this.admitMutation(frame, context);
 
             if (acknowledgment.admission === CANDIDATE_ADMISSION.QUEUED) {
@@ -558,7 +535,6 @@ class CandidateUploadCoordinator {
     async waitForProcessedOperation(context, baseline, operationDetails) {
         const budget = this.createStatusBudget(context, baseline);
         while (true) {
-            throwIfCancelled(context);
             const status = await this.readStatus(context, {ambiguous: true});
             context.status = status;
             this.emitProgress(context);
@@ -589,7 +565,6 @@ class CandidateUploadCoordinator {
     async waitUntilBusyCanResolve(context, baseline, operationDetails) {
         const budget = this.createStatusBudget(context, baseline);
         while (true) {
-            throwIfCancelled(context);
             const status = await this.readStatus(context, {ambiguous: false});
             context.status = status;
             this.emitProgress(context);
@@ -619,7 +594,6 @@ class CandidateUploadCoordinator {
     async waitForValidation(context) {
         const budget = this.createStatusBudget(context, context.status);
         while (true) {
-            throwIfCancelled(context);
             const status = context.status?.state === CANDIDATE_STATE.VALIDATED
                 || context.status?.state === CANDIDATE_STATE.REJECTED
                 ? context.status
@@ -654,7 +628,6 @@ class CandidateUploadCoordinator {
         const budget = this.createStatusBudget(context, context.status);
         let first = true;
         while (true) {
-            throwIfCancelled(context);
             const status = first
                 ? context.status
                 : await this.readStatus(context, {ambiguous: true});
@@ -704,7 +677,6 @@ class CandidateUploadCoordinator {
         try {
             return await readCandidateStatus(this.connection, {
                 nextRequestId: () => this.requestIds.next(),
-                signal: requestSignal(context),
                 timeoutMs: this.requestTimeoutMs,
             });
         } catch (cause) {
@@ -739,7 +711,7 @@ class CandidateUploadCoordinator {
     async refreshPeerStatus(context) {
         if (!this.readPeerStatus || context.peerUnsupported) return;
         try {
-            const peer = await this.readPeerStatus(this.connection, {nextRequestId: () => this.requestIds.next(), signal: requestSignal(context), timeoutMs: this.requestTimeoutMs});
+            const peer = await this.readPeerStatus(this.connection, {nextRequestId: () => this.requestIds.next(), timeoutMs: this.requestTimeoutMs});
             if (peer === null) context.peerUnsupported = true;
             else context.peer = peer;
         } catch {
@@ -765,11 +737,9 @@ class CandidateUploadCoordinator {
 
     /** @param {Context} context */
     async waitBeforePoll(context) {
-        throwIfCancelled(context);
         if (this.pollIntervalMs > 0) {
             await this.sleep(this.pollIntervalMs);
         }
-        throwIfCancelled(context);
     }
 
     /** @param {Context} context */
@@ -780,7 +750,6 @@ class CandidateUploadCoordinator {
         try {
             context.phase = UPLOAD_PHASE.ABORTING;
             context.operation = CANDIDATE_OPERATION.ABORT;
-            context.cancellationSuppressed = true;
             if (!context.status) {
                 context.status = await this.readStatus(context, {ambiguous: false});
             }
@@ -793,7 +762,6 @@ class CandidateUploadCoordinator {
         } catch {
             result.succeeded = false;
         } finally {
-            context.cancellationSuppressed = false;
             context.phase = previousPhase;
             context.operation = previousOperation;
         }
@@ -983,11 +951,8 @@ function operationStatusMismatch(status, context, reason) {
     );
 }
 
-/** @param {AbortSignal} [signal] @returns {Context} */
-function createUploadContext(signal) {
-    if (signal !== undefined && !isAbortSignal(signal)) {
-        throw new TypeError("upload signal must be an AbortSignal.");
-    }
+/** @returns {Context} */
+function createUploadContext() {
     return {
         abortNeeded: false,
         afterDecision: undefined,
@@ -995,7 +960,6 @@ function createUploadContext(signal) {
         bytesSent: 0,
         bytesUploaded: 0,
         bytesReused: 0,
-        cancellationSuppressed: false,
         chunkCount: 0,
         chunkIndex: -1,
         chunksAdmitted: 0,
@@ -1004,7 +968,6 @@ function createUploadContext(signal) {
         onProgress: undefined,
         operation: CANDIDATE_OPERATION.NONE,
         phase: UPLOAD_PHASE.PREFLIGHT,
-        signal,
         status: undefined,
         totalBytes: 0,
         transactionId: undefined,
@@ -1067,18 +1030,6 @@ function statusProgressFingerprint(status) {
         status.nextOffset,
         status.error?.id,
     ].join(":");
-}
-
-/** @param {Context} context */
-function throwIfCancelled(context) {
-    if (!context.cancellationSuppressed && context.signal?.aborted) {
-        throw uploadError("CANCELLED", "Candidate upload was cancelled.", context, {safeToRetry: false});
-    }
-}
-
-/** @param {unknown} cause @param {Context} context */
-function isCancellation(cause, context) {
-    return /** @type {{code?: string} | null | undefined} */ (cause)?.code === "CANCELLED" || (!context.cancellationSuppressed && context.signal?.aborted);
 }
 
 /** @param {import("../protocol/types.js").RequestIds} sequence */
@@ -1188,33 +1139,9 @@ function copyBytes(value, label) {
     return Buffer.from(value);
 }
 
-/** @param {Context} context */
-function requestSignal(context) {
-    return context.cancellationSuppressed ? undefined : context.signal;
-}
-
-/** @param {AbortSignal | undefined} value */
-function isAbortSignal(value) {
-    return value && typeof value.aborted === "boolean"
-        && typeof value.addEventListener === "function"
-        && typeof value.removeEventListener === "function";
-}
-
 /** @param {number} milliseconds @returns {Promise<void>} */
 function defaultSleep(milliseconds) {
     return new Promise((resolve) => setTimeout(resolve, milliseconds));
-}
-
-/** @param {import("./candidate-upload-types.js").Connection} connection @param {Uint8Array} blob @param {import("./candidate-upload-types.js").UploadCallOptions & import("./candidate-upload-types.js").CoordinatorOptions} options */
-async function uploadProfileCandidate(connection, blob, options) {
-    const coordinator = new CandidateUploadCoordinator(connection, options);
-    return coordinator.upload(blob, options);
-}
-
-/** @param {import("./candidate-upload-types.js").Connection} connection @param {number} transactionId @param {import("./candidate-upload-types.js").CommitOptions & import("./candidate-upload-types.js").CoordinatorOptions} [options] */
-async function commitPreparedCandidate(connection, transactionId, options = {}) {
-    const coordinator = new CandidateUploadCoordinator(connection, options);
-    return coordinator.commit(transactionId, options);
 }
 
 module.exports = {
@@ -1226,8 +1153,6 @@ module.exports = {
     CandidateUploadError,
     UPLOAD_PHASE,
     candidateStatusStallTimeoutMs,
-    commitPreparedCandidate,
-    uploadProfileCandidate,
 };
 
 /** @param {Context} context @returns {asserts context is OperationContext} */

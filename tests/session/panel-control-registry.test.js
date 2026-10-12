@@ -63,7 +63,9 @@ test("every control keeps its route, including history before the busy guard", (
         const route = ["view", "host", "inspect"].includes(entry.route) ? "none" : entry.route;
         assert.equal(routeMessage(current, message, state()), route, type);
         const busy = {...session(), readBusy: true};
-        assert.equal(routeMessage(busy, request(type, busy), state()), "none", type);
+        // Work waits out loud; a model request and host controls are answered.
+        if (["draft", "portable", "demo", "read"].includes(entry.route) && type !== "ready") assert.throws(() => routeMessage(busy, request(type, busy), state()), /current operation/, type);
+        else assert.equal(routeMessage(busy, request(type, busy), state()), "none", type);
         if (entry.route === "view") assert.equal(busy.historyOpen, entry.action === "openHistory", type);
     }
 });

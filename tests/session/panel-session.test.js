@@ -98,7 +98,9 @@ test("every other message names the handler that answers it", () => {
     assert.equal(routeMessage(session, {type: "choosePortableProfile"}, connected()), "portable");
     assert.equal(routeMessage(session, {type: "refresh"}, connected()), "read");
     assert.equal(session.readBusy, true);
-    assert.equal(routeMessage(session, {type: "ready"}, connected()), "none", "a second read cannot overlap the first");
+    assert.throws(() => routeMessage(session, {type: "refresh"}, connected()), /current operation/, "a second read is refused explicitly");
+    assert.equal(routeMessage(session, {type: "ready"}, connected()), "none", "a reloaded panel is answered with the model");
+    assert.equal(routeMessage(session, {type: "setTheme", theme: "dark"}, connected()), "none", "a host control starts nothing, so it is answered");
     session.readBusy = false;
     assert.equal(routeMessage(session, {type: "ready"}, connected()), "read");
     session.readBusy = false;
@@ -112,9 +114,10 @@ test("every other message names the handler that answers it", () => {
     assert.equal(session.portableLayers, undefined, "a layer editor belongs to the previous keyboard");
     session.readBusy = false;
     assert.throws(() => routeMessage(session, {type: "selectDevice", deviceId: "missing"}, connected()), /current device list/);
-    assert.equal(routeMessage(session, {type: "refresh"}, connected({busy: true})), "none", "another device operation blocks readback");
+    assert.throws(() => routeMessage(session, {type: "refresh"}, connected({busy: true})), /current operation/, "another device operation blocks readback explicitly");
+    assert.equal(routeMessage(session, {type: "ready"}, connected({busy: true})), "none", "a reloaded panel waits on the model, not a refusal");
     assert.equal(routeMessage(session, {type: "somethingNew"}, connected()), "none");
-    assert.equal(routeMessage({...session, portableBusy: true}, {type: "refresh"}, connected()), "none", "a busy backup answers without starting anything");
+    assert.throws(() => routeMessage({...session, portableBusy: true}, {type: "refresh"}, connected()), /current operation/, "a busy backup returns an explicit refusal");
 });
 
 test("switching keyboards preserves a dirty draft without showing it as editable on the other device", () => {
@@ -262,7 +265,7 @@ test("an in-flight read keeps the panel busy across service operation gaps", () 
     assert.equal(model.device.health.busy, true);
     assert.equal(model.portable.busy, true);
     assert.equal(model.draft.busy, true);
-    assert.equal(routeMessage(session, {type: "refresh"}, connected()), "none");
+    assert.throws(() => routeMessage(session, {type: "refresh"}, connected()), /current operation/);
     session.readBusy = false;
     assert.equal(buildPanelModel(session, connected({busy: false})).device.health.busy, false);
 });

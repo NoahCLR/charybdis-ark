@@ -1012,7 +1012,8 @@ Panel controls are registered once in
 identity and binding rule, demo policy, execution phase and named action.
 The router, operation wrappers and demo refusals consume those policies;
 controller modules implement the actions. History and local macro inspection
-remain available before the ordinary busy guard. Read-only recovery paths
+remain available before the ordinary busy guard, which refuses work with a
+notice rather than dropping it. Read-only recovery paths
 remain available without a draft. Closing a browser tab warns for unapplied
 edits, an active Apply or an active device restore, rather than every portable
 operation. The keyed payload groups in `contracts/messages.d.ts` are inert
