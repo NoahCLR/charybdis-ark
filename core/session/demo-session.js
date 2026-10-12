@@ -25,6 +25,7 @@ const {LAYERS} = require("../data/charybdis-layout");
  * @typedef {Pick<import("../../contracts/messages.js").DemoControl, 'discardDemo'>} CloseOptions
  * @typedef {Session & {demo: import("./types.js").DemoMetadata}} OpenSession
  */
+const {panelControl} = require("./panel-control-registry");
 const {ProfileDraftSession} = require("./profile-draft-session");
 const {replaceDraft} = require("./panel-session-state");
 const {validateSnapshot, fingerprint, summary} = require("./portable-profile-session");
@@ -180,32 +181,37 @@ function leaveDemo(session, message) {
 
 // The demo's own controls. `host.chooseProfile` is the same file chooser
 // Import uses; what it returns is checked as Import checks it.
-/** @param {Session} session @param {import("../../contracts/messages.js").DemoControl} message @param {import("./types.js").ProfileChooser} host @param {State} state */
-async function demoControl(session, message, host, state) {
-    switch (message.type) {
-        case "openDemo":
-            if (session.demo) return;
-            openDemo(session, state);
-            return;
-        case "openDemoProfile": {
-            if (session.demo) assertDemoMayClose(session, message);
-            else {
-                const refused = demoRefusal(session, state);
-                if (refused) throw fail(refused);
-            }
-            const chosen = await host.chooseProfile?.();
-            if (chosen === undefined) return;
-            const name = typeof chosen === "string" ? null : chosen.name || null;
-            openDemo(session, state, {value: typeof chosen === "string" ? chosen : chosen.text, fileName: name});
-            session.notice = `Opened ${name || "the profile file"} in the demo.`;
-            return;
+/** @typedef {{session: Session, message: import('../../contracts/messages.js').DemoControl, host: import('./types.js').ProfileChooser, state: State}} DemoContext */
+/** @type {Readonly<Record<string, (context: DemoContext) => void | Promise<void>>>} */
+const DEMO_ACTIONS = Object.freeze({
+    open: ({session, state}) => {
+        if (!session.demo) openDemo(session, state);
+    },
+    leave: ({session, message}) => {
+        leaveDemo(session, message);
+        session.notice = "Left the demo.";
+    },
+    openProfile: async ({session, message, host, state}) => {
+        if (session.demo) assertDemoMayClose(session, message);
+        else {
+            const refused = demoRefusal(session, state);
+            if (refused) throw fail(refused);
         }
-        case "leaveDemo":
-            leaveDemo(session, message);
-            session.notice = "Left the demo.";
-            return;
-        default: throw fail("Unsupported demo control.");
-    }
+        const chosen = await host.chooseProfile?.();
+        if (chosen === undefined) return;
+        const name = typeof chosen === "string" ? null : chosen.name || null;
+        openDemo(session, state, {value: typeof chosen === "string" ? chosen : chosen.text, fileName: name});
+        session.notice = `Opened ${name || "the profile file"} in the demo.`;
+        return;
+    },
+});
+
+/** @param {Session} session @param {import('../../contracts/messages.js').DemoControl} message @param {import('./types.js').ProfileChooser} host @param {State} state */
+async function demoControl(session, message, host, state) {
+    const control = panelControl(message.type);
+    const action = control?.route === "demo" ? DEMO_ACTIONS[control.action] : undefined;
+    if (!action) throw fail("Unsupported demo control.");
+    await action({session, message, host, state});
 }
 
 // Exporting from the demo saves the draft, edits and all: there is no keyboard
@@ -284,6 +290,7 @@ function demoDiagnostics(session) {
 }
 
 module.exports = {
+    DEMO_ACTIONS,
     DEMO_CAPABILITIES, DEMO_DEVICE_ID, DEMO_LIMITS, DEMO_OPTIONS, DEMO_WORDS,
     assertDemoMayClose, demoControl, demoDiagnostics, demoExport, demoHeader, demoModel, demoProfile, demoRefusal, demoSnapshot,
     demoState, demoUnsaved, leaveDemo, openDemo, panelCapabilities, panelState,
