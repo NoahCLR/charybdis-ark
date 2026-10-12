@@ -1,5 +1,6 @@
 // @ts-check
 "use strict";
+const {LAYERS, MATRIX_KEYS} = require("../data/charybdis-layout");
 const {validHostSetting} = require("./host-settings");
 // Settings domain 0x40, version 6, the only one the keyboard stores (firmware
 // D-F14): 31 values, sixteen layer records, then 272 counted names — sixteen
@@ -13,11 +14,11 @@ const {validHostSetting} = require("./host-settings");
 // set positions (row × columns + column).
 const {NAME_MAX_BYTES, validName, nameOfBytes, encodeName} = require("./profile-name");
 
-const SETTINGS = Object.freeze({VERSION: 6, COUNT: 31, LAYERS: 16, MACRO_NAMES: 128, CUSTOM_KEY_NAMES: 128,
+const SETTINGS = Object.freeze({VERSION: 6, COUNT: 31, LAYERS, MACRO_NAMES: 128, CUSTOM_KEY_NAMES: 128,
     LAYER_RECORD_SIZE: 17, PLACEMENT_BYTES: 8, PLACEMENT_MAX_POSITIONS: 64, NAME_MAX_BYTES,
     SCALARS_OFFSET: 8, LAYER_RECORDS_OFFSET: 132, FIXED_SIZE: 404, MIN_SIZE: 404 + 272, MAX_SIZE: 404 + 272 * 33});
 // This keyboard's matrix: ten rows of six (capability page 2 reports it).
-const MATRIX_POSITIONS = 60;
+const MATRIX_POSITIONS = MATRIX_KEYS;
 const HEADER = Buffer.from([SETTINGS.VERSION, SETTINGS.LAYERS, SETTINGS.COUNT, SETTINGS.MACRO_NAMES, SETTINGS.CUSTOM_KEY_NAMES, 0, 0, 0]);
 /** @param {string} message */
 const fail = message => Object.assign(new Error(message), {code: "INVALID_SETTINGS"});

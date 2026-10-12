@@ -12,7 +12,7 @@
 // the domain named here, so a new edit is one line and its handler. The
 // contract's EditPayloads names the same types (tests/model/draft-edits.test.js).
 
-const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../data/charybdis-layout");
+const {CHARYBDIS_4X6_LAYOUT_MATRIX, matrixPosition} = require("../data/charybdis-layout");
 const keycodes = require("../data/keycode-catalog");
 const {layerOfRef} = require("../schema/actions");
 
@@ -40,7 +40,7 @@ function layoutLabel({layer, changes}, document) {
     /** @param {{layoutIndex: number}} change */
     const stored = change => {
         const position = CHARYBDIS_4X6_LAYOUT_MATRIX[change.layoutIndex];
-        return position && document.layers[/** @type {number} */ (layerOfRef(layer))]?.[position[0] * 6 + position[1]];
+        return position && document.layers[/** @type {number} */ (layerOfRef(layer))]?.[matrixPosition(change.layoutIndex)];
     };
     if (changes.length === 2 && keycodes.encode(first.keycode) === stored(second) && keycodes.encode(second.keycode) === stored(first)) return "Swapped two keys";
     return changes.length > 1 ? `Changed ${changes.length} keys at once` : "Changed a key";

@@ -1,5 +1,6 @@
 // @ts-check
 "use strict";
+const {LAYERS, MATRIX_ROWS, MATRIX_COLUMNS} = require("../data/charybdis-layout");
 const {isUnhandledEcho, orUnhandled} = require("./via-unhandled-v1");
 
 const {RAW_HID_REPORT_SIZE, normalizeRawHidReport} = require("../transport/device-adapter");
@@ -152,11 +153,11 @@ async function readSparseMacros(connection, capacity, layout, {nextRequestId, st
 }
 
 /** @param {import("../transport/types.js").RequestConnection} connection @param {import("./types.js").StorageReadOptions} [options] */
-async function readViaStorage(connection, {capabilities, matrixRows = 10, matrixColumns = 6, allowIncomplete = false, onProgress = () => {}, nextRequestId, storageIdentity} = {}) {
+async function readViaStorage(connection, {capabilities, matrixRows = MATRIX_ROWS, matrixColumns = MATRIX_COLUMNS, allowIncomplete = false, onProgress = () => {}, nextRequestId, storageIdentity} = {}) {
     const layers = await scalar(connection, VIA_STORAGE.LAYER_COUNT, 1);
     const macroSlots = await scalar(connection, VIA_STORAGE.MACRO_COUNT, 1);
     const macroCapacity = await scalar(connection, VIA_STORAGE.MACRO_SIZE, 2);
-    if (layers < 1 || layers > 16 || macroSlots < 1 || macroSlots > 128 || macroCapacity < macroSlots + 1 || macroCapacity > 65535 || matrixRows !== 10 || matrixColumns !== 6) throw fail("Unsupported keyboard storage geometry.");
+    if (layers < 1 || layers > LAYERS || macroSlots < 1 || macroSlots > 128 || macroCapacity < macroSlots + 1 || macroCapacity > 65535 || matrixRows !== MATRIX_ROWS || matrixColumns !== MATRIX_COLUMNS) throw fail("Unsupported keyboard storage geometry.");
     for (const [field, value] of /** @type {[keyof import("./types.js").StorageCapabilities, number][]} */ ([["compiledLayerCount", layers], ["viaMacroSlots", macroSlots], ["viaMacroBytes", macroCapacity]])) {
         if (capabilities?.[field] !== undefined && capabilities[field] !== value) throw fail("VIA and Profile Wire report different storage geometry.");
     }

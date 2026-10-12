@@ -35,7 +35,7 @@
 const {effectiveTimings, releaseHoldUnreachable} = require("./gesture-timing");
 const {effectiveComboTerm} = require("../schema/combo-domain-v1");
 const keycodes = require("../data/keycode-catalog");
-const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../data/charybdis-layout");
+const {CHARYBDIS_4X6_LAYOUT_MATRIX, LAYERS, matrixPosition} = require("../data/charybdis-layout");
 const {layerLockOfCode} = require("../data/user-keycodes");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {KEY_BEHAVIOR_HOLD_MODES} = require("../schema/key-behavior-domain-v1");
@@ -57,7 +57,6 @@ const {analyzeLayerStates} = require("./layer-state-graph");
  * @typedef {Extract<import("./types.js").LayerAnalysisResult<Transition>, {reachedLayers: number}> & {symbolic: true, cache: Map<number, OfferedEffect[]>, reachableCombos: Set<number>, parent?: undefined, edges?: undefined, home?: undefined, affectedLayers?: number, uncertainty?: undefined}} SymbolicWalk
  * @typedef {import("./types.js").BoundedLayerWalk | SymbolicWalk} Walk
  */
-const LAYERS = 16;
 const TRANSPARENT = 0x0001;
 const NOTHING = 0x0000;
 // QMK's TAPPING_TOGGLE default (compat/qmk_tapping_contract.h).
@@ -158,7 +157,7 @@ function keyEffects(code, row, values) {
 function profileFacts(decoded) {
     const values = decoded.settings.values;
     const names = decoded.settings.names;
-    const layers = decoded.document.layers.map((codes) => CHARYBDIS_4X6_LAYOUT_MATRIX.map(([row, column]) => codes[row * 6 + column]));
+    const layers = decoded.document.layers.map((codes) => CHARYBDIS_4X6_LAYOUT_MATRIX.map((position, layoutIndex) => codes[matrixPosition(layoutIndex)]));
     /** @type {Map<number, BehaviorRow>} */
     const rows = new Map();
     for (const row of decoded.behaviors?.rows || []) {
@@ -172,7 +171,7 @@ function profileFacts(decoded) {
     // Participation (participation-policy.md), judged by the layer a key came
     // from and its matrix position.
     /** @param {number} layoutIndex */
-    const matrixOf = (layoutIndex) => {const [row, column] = CHARYBDIS_4X6_LAYOUT_MATRIX[layoutIndex]; return row * 6 + column;};
+    const matrixOf = matrixPosition;
     /** @param {BehaviorRow | undefined} row @param {number} layer @param {number} layoutIndex */
     const behaviorUsed = (row, layer, layoutIndex) => Boolean(row && values[SETTING.BEHAVIORS_ENABLED] !== 0 && Boolean(values[SETTING.LAYER_BEHAVIORS] & bit(layer))
         && row.enabled !== false && Boolean((row.allowedLayers ?? 0xffff) & bit(layer)) && !records?.[layer]?.bypass.includes(matrixOf(layoutIndex)));

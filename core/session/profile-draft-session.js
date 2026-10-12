@@ -18,7 +18,7 @@ const {actionName, knownActionAbi, layerOfRef, nativeCode} = require("../schema/
 const {effectiveComboTerm} = require("../schema/combo-domain-v1");
 const {SETTING} = require("../schema/settings-domain-v1");
 const {resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
-const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../data/charybdis-layout");
+const {CHARYBDIS_4X6_LAYOUT_MATRIX, matrixPosition} = require("../data/charybdis-layout");
 const keycodes = require("../data/keycode-catalog");
 const {PROFILE_WIRE_FEATURES} = require("../protocol/profile-wire-v1");
 /**
@@ -276,7 +276,7 @@ class ProfileDraftSession {
             if (!position || code === undefined || !Number.isInteger(code)) throw fail(`Cannot represent the key ${change.keycode} on this keyboard.`);
             const misplaced = keyPlacementProblem(code, {layerCount: this.capabilities.compiledLayerCount ?? LAYERS});
             if (misplaced) throw fail(misplaced);
-            document.layers[layer][position[0] * 6 + position[1]] = code;
+            document.layers[layer][matrixPosition(change.layoutIndex)] = code;
         }
         return document;
     }

@@ -67,6 +67,9 @@ Profile screens still rebuild for their diagnostics and backup state.
 
 `protocol/via-layout-v1.js` reads the matrix through the existing 28-byte VIA
 buffer-read path, then produces visible positions in the pinned layout order.
+`data/charybdis-layout.js` owns the layer count and matrix geometry alongside
+that layout. `matrixPosition(layoutIndex)` translates a visible key into its
+stored matrix slot for reads, edits, participation and review.
 `session/profile-payload-reader.js` owns `ProfilePayloadReader`: verified byte
 reuse behind a small interface. Its stateless protocol codec checks complete
 metadata identities, retries coherent reads and verifies CRC/FNV. `ProfileDeviceService` owns one reader per connection;
@@ -130,6 +133,10 @@ on both halves. A keyboard the app cannot open a draft for is read-only; the
 host refuses edits rather than writing them directly.
 
 ## Byte formats
+
+`schema/bytes.js` owns integer bounds, byte views and copies, reserved-byte
+checks and protocol error construction. Codecs keep their existing error names,
+codes and location fields; a caller chooses whether bytes are viewed or copied.
 
 `schema/profile-blob-v1.js` encodes and strictly decodes the `NLP1` header and
 its ordered domain envelopes, the four-byte semantic action values, and the

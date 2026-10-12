@@ -14,7 +14,7 @@ const {decodeRgbDomainV1, encodeRgbDomainV1} = require("../schema/rgb-domain-v1"
 const {decodeKeyBehaviorDomain, encodeKeyBehaviorDomain} = require("../schema/key-behavior-domain-v1");
 const {ALL_LAYERS, COMBO_DOMAIN_VERSION, decodeComboDomain, encodeComboDomain} = require("../schema/combo-domain-v1");
 const {SETTING, decodeSettings, encodeSettings} = require("../schema/settings-domain-v1");
-const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../data/charybdis-layout");
+const {CHARYBDIS_4X6_LAYOUT_MATRIX, LAYERS, MATRIX_KEYS, matrixPosition} = require("../data/charybdis-layout");
 const {LAYER_LOCK_BASE, LAYER_LOCK_SLOTS} = require("../data/user-keycodes");
 const {layerName} = require("./vocabulary");
 const {decodeMacroPayload} = require("../schema/macro-payload");
@@ -28,7 +28,7 @@ const {profileDepthOptions} = require("../schema/profile-depth");
 // action vocabulary Ark knows (firmware D-F14). The keyboard migrates nothing:
 // a backup in an older format is refused here, and translated by
 // backup-translation.js before anything else reads it.
-const LAYERS = 16, MACRO_SLOTS = 128, MATRIX_KEYS = 60;
+const MACRO_SLOTS = 128;
 // A file holds at most a full 65,504-byte profile in base64, sixteen layers of
 // keys and a full macro bank; this ceiling leaves room for all three.
 const FILE_MAX_BYTES = 262144;
@@ -39,7 +39,7 @@ const domain = (id, payload) => ({id, version: PROFILE_DOMAIN_VERSIONS[id], payl
 const fail = message => Object.assign(new Error(message), {code: "INVALID_PORTABLE_PROFILE"});
 /** @param {unknown} value @returns {value is number} */
 const u16 = value => typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 65535;
-const PHYSICAL_MATRIX_SLOTS = new Set(CHARYBDIS_4X6_LAYOUT_MATRIX.map(([row, column]) => row * 6 + column));
+const PHYSICAL_MATRIX_SLOTS = new Set(CHARYBDIS_4X6_LAYOUT_MATRIX.map((position, layoutIndex) => matrixPosition(layoutIndex)));
 /** @param {unknown} value @param {number} max @param {string} label */
 function base64(value, max, label) {
     if (typeof value !== "string" || value.length > Math.ceil(max / 3) * 4 || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value)) throw fail(`Invalid ${label}.`);

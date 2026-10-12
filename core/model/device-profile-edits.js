@@ -13,7 +13,7 @@ const {comboTableOf} = require("./portable-profile");
 const {editKeyBehaviors} = require("./key-behavior-edits");
 const {inDomain} = require("./draft-edits");
 const {decodeSettings, encodeSettings} = require("../schema/settings-domain-v1");
-const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../data/charybdis-layout");
+const {CHARYBDIS_4X6_LAYOUT_MATRIX, matrixPosition} = require("../data/charybdis-layout");
 const {profileDepthOptions} = require("../schema/profile-depth");
 /**
  * @typedef {Extract<import("../../contracts/edits.js").PanelEdit, {type: import("./draft-edits.js").InDomain<"combos">}>} ComboEdit
@@ -108,7 +108,7 @@ function editDeviceProfile(bytes, message, context = {}) {
         const layer = integer(message.layer, settings.layers.length - 1, "Layer");
         const index = integer(message.layoutIndex, CHARYBDIS_4X6_LAYOUT_MATRIX.length - 1, "Key position");
         if (typeof message.useBehavior !== "boolean" || typeof message.joinCombos !== "boolean") throw invalid("Choose both placement switches.");
-        const [row, column] = CHARYBDIS_4X6_LAYOUT_MATRIX[index], position = row * 6 + column;
+        const position = matrixPosition(index);
         for (const [field, on] of /** @type {const} */ ([["bypass", message.useBehavior], ["exclude", message.joinCombos]])) {
             const set = new Set(settings.layers[layer][field]);
             if (on) set.delete(position); else set.add(position);

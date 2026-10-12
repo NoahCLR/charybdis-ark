@@ -1,6 +1,9 @@
 // @ts-check
 "use strict";
 
+const LAYERS = 16, MATRIX_ROWS = 10, MATRIX_COLUMNS = 6;
+const MATRIX_KEYS = MATRIX_ROWS * MATRIX_COLUMNS;
+
 // The Charybdis 4x6 key layout: inert data every layer may read.
 //
 // QMK keyboard.json -> layouts.LAYOUT.layout, in the same order as the
@@ -18,4 +21,12 @@ const CHARYBDIS_4X6_LAYOUT_MATRIX = Object.freeze([
     [4, 3], [4, 4], [4, 1], [9, 1], [9, 3], [4, 5], [4, 2], [9, 5],
 ].map((position) => Object.freeze(position)));
 
-module.exports = {CHARYBDIS_4X6_LAYOUT_MATRIX};
+// Visible layout order and stored matrix order differ on the right half and
+// thumbs. Callers name a visible key by its layout index, then read this slot.
+/** @param {number} layoutIndex */
+function matrixPosition(layoutIndex) {
+    const [row, column] = CHARYBDIS_4X6_LAYOUT_MATRIX[layoutIndex];
+    return row * MATRIX_COLUMNS + column;
+}
+
+module.exports = {CHARYBDIS_4X6_LAYOUT_MATRIX, LAYERS, MATRIX_ROWS, MATRIX_COLUMNS, MATRIX_KEYS, matrixPosition};

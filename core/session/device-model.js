@@ -25,7 +25,7 @@ const {macroEditorView} = require("../model/macro-editor");
 const {customKeyEditorView} = require("../model/custom-key-editor");
 const {effectiveComboTerm} = require("../schema/combo-domain-v1");
 const {SETTING} = require("../schema/settings-domain-v1");
-const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../data/charybdis-layout");
+const {CHARYBDIS_4X6_LAYOUT_MATRIX, matrixPosition} = require("../data/charybdis-layout");
 const {PROFILE_WIRE_FEATURES} = require("../protocol/profile-wire-v1");
 
 const CATALOG_SOURCE = "vendored QMK keycode catalog";
@@ -92,7 +92,7 @@ function buildSnapshotModel(snapshot, capabilities, binding, deviceState = {}) {
     const native = action => /** @type {number} */ (nativeCode(action));
     const editable = binding.editable;
     const model = configurationModel({
-        layers: value.document.layers.map((values, layer) => ({layer, keys: CHARYBDIS_4X6_LAYOUT_MATRIX.map(([row, column], layoutIndex) => ({row, column, layoutIndex, keycode: values[row * 6 + column], resolved: keycodeCatalog.resolve(values[row * 6 + column])}))})),
+        layers: value.document.layers.map((values, layer) => ({layer, keys: CHARYBDIS_4X6_LAYOUT_MATRIX.map(([row, column], layoutIndex) => ({row, column, layoutIndex, keycode: values[matrixPosition(layoutIndex)], resolved: keycodeCatalog.resolve(values[matrixPosition(layoutIndex)])}))})),
         domains: {rgb: value.rgb, keyBehaviors: value.behaviors, settings, pdModes: value.pdModes},
         comboRows: combos.rows.map(row => ({...row, termMs: effectiveComboTerm(combos, row), followsDefault: row.termMs === null, inputs: row.inputs.map(native), output: native(row.output)})),
         comboInfo: {state: "read", enabled: Boolean(settings.values[SETTING.COMBOS_ENABLED]), layerReferences: settings.layers.map(record => record.reference),

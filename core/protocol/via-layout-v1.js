@@ -13,7 +13,7 @@ const VIA_LAYOUT_COMMANDS = Object.freeze({
 
 // The board's layout lives in data/, where every layer can read it; the wire
 // codec below keeps using it under the same name.
-const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../data/charybdis-layout");
+const {CHARYBDIS_4X6_LAYOUT_MATRIX, LAYERS, MATRIX_KEYS, matrixPosition} = require("../data/charybdis-layout");
 
 class ViaLayoutError extends Error {
     /** @param {string} code @param {string} message @param {Record<string, unknown>} [details] */
@@ -69,15 +69,15 @@ async function readViaKeycode(connection, entry, options = {}) {
 async function readViaLayout(connection, options = {}) {
     assertConnection(connection);
     const layerCount = options.layerCount;
-    if (layerCount === undefined || !Number.isInteger(layerCount) || layerCount < 1 || layerCount > 16) {
+    if (layerCount === undefined || !Number.isInteger(layerCount) || layerCount < 1 || layerCount > LAYERS) {
         throw new ViaLayoutError("VIA_LAYOUT_INVALID_ARGUMENT", "layerCount must be an integer from 1 through 16.");
     }
 
-    const bytes = await readRegion(connection, VIA_STORAGE.LAYOUT_READ, layerCount * 10 * 6 * 2, {
+    const bytes = await readRegion(connection, VIA_STORAGE.LAYOUT_READ, layerCount * MATRIX_KEYS * 2, {
         signal: options.signal, timeoutMs: options.timeoutMs,
         onProgress: progress => {
             const done = Array.from({length: layerCount}, (_, layer) => CHARYBDIS_4X6_LAYOUT_MATRIX
-                .filter(([row, column]) => ((layer * 10 + row) * 6 + column) * 2 + 2 <= progress.done).length).reduce((sum, count) => sum + count, 0);
+                .filter((position, layoutIndex) => (layer * MATRIX_KEYS + matrixPosition(layoutIndex)) * 2 + 2 <= progress.done).length).reduce((sum, count) => sum + count, 0);
             options.onProgress?.({done, total: layerCount * CHARYBDIS_4X6_LAYOUT_MATRIX.length,
                 layer: Math.min(layerCount - 1, Math.floor(done / CHARYBDIS_4X6_LAYOUT_MATRIX.length))});
         },
@@ -88,12 +88,12 @@ async function readViaLayout(connection, options = {}) {
 // The editor and complete capture use the same matrix bytes and ordering.
 /** @param {Uint8Array} bytes @param {number} layerCount */
 function decodeViaLayout(bytes, layerCount) {
-    if (layerCount === undefined || !Number.isInteger(layerCount) || layerCount < 1 || layerCount > 16 || !(bytes instanceof Uint8Array)
-        || bytes.length !== layerCount * 120) throw new ViaLayoutError("VIA_LAYOUT_INVALID_ARGUMENT", "Invalid layout bytes or layer count.");
+    if (layerCount === undefined || !Number.isInteger(layerCount) || layerCount < 1 || layerCount > LAYERS || !(bytes instanceof Uint8Array)
+        || bytes.length !== layerCount * MATRIX_KEYS * 2) throw new ViaLayoutError("VIA_LAYOUT_INVALID_ARGUMENT", "Invalid layout bytes or layer count.");
     const buffer = Buffer.from(bytes);
     return Array.from({length: layerCount}, (_, layer) => ({layer,
         positions: CHARYBDIS_4X6_LAYOUT_MATRIX.map(([row, column], layoutIndex) => ({layoutIndex, row, column,
-            keycode: buffer.readUInt16BE(((layer * 10 + row) * 6 + column) * 2)}))}));
+            keycode: buffer.readUInt16BE((layer * MATRIX_KEYS + matrixPosition(layoutIndex)) * 2)}))}));
 }
 
 /** @param {import("./types.js").ViaPosition} entry @param {{requireKeycode?: boolean}} [options] */
