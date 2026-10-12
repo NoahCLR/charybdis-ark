@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 const {test, expect} = require("@playwright/test");
 const {hostMacros} = require("../tests/fixtures/host-macros");

@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 // The web build in Chrome: the bundled core/ must decode, encode and stage
 // exactly as Node's core/ does, and the bundled panel must render the model it

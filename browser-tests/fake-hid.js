@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 
 // A fake navigator.hid for the web page, installed before the page loads

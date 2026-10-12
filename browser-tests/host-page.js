@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 
 // The panel as the extension host dresses it, without needing VS Code: the host
