@@ -31,7 +31,7 @@ export function tabKey(body) {
         <section>
             <div class="sect-h"><h4>This position on ${esc(layerName(layer))}</h4></div>
             <div class="field"><span>Keycode</span>
-                <div class="input-row"><input class="input mono" id="keycodeField" value="${esc(keyMeaning(position))}" ${writable() ? "" : "disabled"}>
+                <div class="input-row"><input class="input mono" id="keycodeField" data-f="key:${layer.index}:${position?.layoutIndex}:keycode" value="${esc(keyMeaning(position))}" ${writable() ? "" : "disabled"}>
                 <button class="btn" data-act="pick" ${writable() ? "" : "disabled"}>Pick…</button></div></div>
             <dl class="kv key-details">
                 <dt>Resolves to</dt><dd>${esc(position ? keyName(position) : "—")}</dd>
@@ -101,8 +101,8 @@ export function tabKey(body) {
         const controls = el(`<div class="stack key-participation">
             <h4>Participation · ${esc(layerName(source))}</h4>
             ${inherited ? `<p class="note">This transparent key inherits its permissions from ${esc(layerName(source))}.</p><button class="btn tiny" data-source-layer>Open source placement</button>` : `
-            <label class="sw"><input type="checkbox" data-use-behavior ${bp.placementOn ? "checked" : ""} ${writable() ? "" : "disabled"}><span class="track"></span><span class="txt">Use behaviour</span></label>
-            <label class="sw"><input type="checkbox" data-join-combos ${cp.placementOn ? "checked" : ""} ${writable() ? "" : "disabled"}><span class="track"></span><span class="txt">Join combos</span></label>`}
+            <label class="sw"><input type="checkbox" data-f="key:${source.index}:${key.layoutIndex}:behaviour" data-use-behavior ${bp.placementOn ? "checked" : ""} ${writable() ? "" : "disabled"}><span class="track"></span><span class="txt">Use behaviour</span></label>
+            <label class="sw"><input type="checkbox" data-f="key:${source.index}:${key.layoutIndex}:combos" data-join-combos ${cp.placementOn ? "checked" : ""} ${writable() ? "" : "disabled"}><span class="track"></span><span class="txt">Join combos</span></label>`}
             <p class="note">Behaviour: ${esc(bp.reasons.length ? bp.reasons.join("; ") : behavior ? "all permissions allow it" : "no shared definition")}. Combos: ${esc(cp.reasons.length ? cp.reasons.join("; ") : "placement is eligible; each combo also has its own permissions")}.</p>
             ${/^CUSTOM_KEY_\d+$/.test(canonicalKeycode(model, keyMeaning(key))) ? `<p class="note">A custom key has no normal output when its behaviour is bypassed or disabled. Map a plain keycode on a gaming layer that needs direct output.</p>` : ""}
         </div>`);

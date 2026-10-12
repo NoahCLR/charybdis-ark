@@ -226,6 +226,10 @@ Apply, including switches and layer allowances.
 
 ## The interface
 
+When an accepted edit redraws the screen, the same field keeps keyboard focus
+and its text selection while it remains available. Search fields also keep
+the caret where you are editing, including when filtering Settings.
+
 After the complete keyboard read opens an editable draft, the board stays on
 screen, full width, painted with the light the keyboard would actually show for
 that layer — the base effect, then

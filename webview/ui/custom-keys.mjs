@@ -27,7 +27,7 @@ export function screenCustomKeys() {
     const main = el(`<div class="main">${topbar(
         "Custom keys",
         "Named keys that do only what their behaviour says. Place one on a key or send it from a combo; a behaviour cannot send one.",
-        keys.length ? `<input class="input search" id="customKeySearch" type="search" placeholder="Search custom keys by name" value="${esc(state.customKeySearch || "")}">` : "",
+        keys.length ? `<input class="input search" id="customKeySearch" data-f="custom-keys:search" type="search" placeholder="Search custom keys by name" value="${esc(state.customKeySearch || "")}">` : "",
     )}</div>`);
     /** @type {HTMLInputElement | null} */ (main.querySelector("#customKeySearch"))?.addEventListener("input", (event) => { state.customKeySearch = /** @type {HTMLInputElement} */ (event.target).value; render(); });
 
@@ -79,7 +79,7 @@ function editor(model, key, canEdit) {
                 <button class="btn tiny ghost" data-act="place" ${writable() ? "" : "disabled"}>Place on a key…</button></span></div>
         <div class="card-b stack">
             <label class="field"><span>Name</span>
-                <input class="input" data-name value="${esc(key.name)}" placeholder="Custom key ${esc(key.slot)}" ${canEdit ? "" : "disabled"}
+                <input data-f="custom-key:${key.slot}:name" class="input" data-name value="${esc(key.name)}" placeholder="Custom key ${esc(key.slot)}" ${canEdit ? "" : "disabled"}
                     data-tip="${esc(NAME_TIP)}">
                 <span class="note${count.over ? " warn" : ""}" data-name-count>${esc(count.label)}</span></label>
             <div class="field"><span>What it does</span>

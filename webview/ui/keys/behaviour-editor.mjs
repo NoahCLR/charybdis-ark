@@ -46,7 +46,7 @@ export function behaviourEditor(behaviour) {
     const timingControl = (name, label) => {
         const field = behaviourTimingField(behaviour, name);
         return `<label class="field bterm-field"><span>${esc(label)} · ms</span>
-            <input class="input mono" data-term="${name}" data-stored="${esc(field.stored)}" value="${esc(field.value)}"
+            <input class="input mono" data-f="behaviour:${esc(behaviour.keycode)}:timing:${name}" data-term="${name}" data-stored="${esc(field.stored)}" value="${esc(field.value)}"
                 placeholder="${esc(field.fallback === "" ? "default unavailable" : field.placeholder)}" ${canEdit ? "" : "disabled"}></label>`;
     };
 
@@ -114,7 +114,7 @@ export function behaviourEditor(behaviour) {
         <div class="beh-intro">
             <p class="note">Multi tap window is the time allowed from releasing the key to pressing it again. The Tap / hold threshold separates a tap from a hold. Double hold means press, release, then press and keep holding.</p>
             <label class="sw" data-tip="Treat this row as a mouse gesture, so pressing it keeps the pointer layer up instead of letting auto-mouse reset.">
-                <input type="checkbox" data-anchor ${behaviour.keepsAutoMouseAnchored ? "checked" : ""} ${canEdit ? "" : "disabled"}>
+                <input type="checkbox" data-f="behaviour:${esc(behaviour.keycode)}:anchor" data-anchor ${behaviour.keepsAutoMouseAnchored ? "checked" : ""} ${canEdit ? "" : "disabled"}>
                 <span class="track"></span><span class="txt">Keeps auto-mouse anchored</span></label>
         </div>
         ${behaviourTimingChecks(model, behaviour.keycode).map(check => `<p class="note beh-note" role="status"><strong>${check.level === "notice" ? "Timing advice." : "Timing warning."}</strong> ${esc(check.detail)} ${esc(check.fix)}</p>`).join("")}
@@ -160,6 +160,6 @@ export function behaviourEditor(behaviour) {
     /** @type {HTMLElement} */ (node.querySelector(".beh-intro")).appendChild(definitionControls(layers().map(layer => ({...layer, label: layerName(layer)})), behaviour, canEdit, (/** @type {{enabled: boolean, allowedLayers: number}} */ permissions) => {
         const message = edits.saveBehaviour(behaviour, permissions, model?.profileIdentity);
         if (message) post(message);
-    }));
+    }, `behaviour:${behaviour.keycode}:definition`));
     return node;
 }

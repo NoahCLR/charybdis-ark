@@ -5,6 +5,8 @@ export interface MacroForm {
     draft?: string; steps?: MacroStep[]; stepError?: string; cancelBlur?: boolean; wantsStage?: boolean; requestId?: number;
     validation?: Extract<PanelResponse, {type: 'macroValidation'}> & {context: string};
     view?: string; newKind?: MacroStep['kind']; rawOpen?: boolean;
+    /** Focus metadata only; untouched steps still come from the host payload. */
+    stepFocus?: MacroStep[];
 }
 export interface PickerState {title: string; context?: string; contextKeycode?: string; mode: 'single' | 'list'; allowedKeys: string[] | null; maxKeys: number; section: string; search: string; mods: string[]; keys: string[]; layerTap: string | null; onPick?: (expression: string) => void}
 export interface PanelState {

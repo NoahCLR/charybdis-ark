@@ -1,12 +1,12 @@
 import type {Scalar} from '../../contracts/edits.js';
 
 /** Editable macro fields retain incomplete values until they can be staged. */
-export type MacroStep =
+export type MacroStep = ({focusId?: string} & (
     | {kind: 'text'; text: string}
     | {kind: 'delay'; delay: Scalar}
     | {kind: 'tap'; keys: string[]}
     | {kind: 'press'; keys: string[]}
-    | {kind: 'release'; keys: string[]};
+    | {kind: 'release'; keys: string[]}));
 export interface MacroOptions {
     unicode?: boolean;
     textEntry?: boolean;

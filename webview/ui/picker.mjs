@@ -174,7 +174,7 @@ export function pickerOverlay() {
         <div class="sheet-h">
             <div><h2>Pick a keycode</h2>
                 <p class="note">${picker.mode === "list" ? picker.maxKeys === 1 ? "Choose one key." : Number.isFinite(picker.maxKeys) ? `Choose up to ${picker.maxKeys} keys to send together.` : "Choose one or more keys." : `For <b>${esc(picker.title)}</b> · ${esc([picker.contextKeycode ? actionLabel(model, picker.contextKeycode) : "", picker.context].filter(Boolean).join(" · "))}`}</p></div>
-            <input class="input pk-search" id="pickerSearch" placeholder="Search every section" value="${esc(picker.search)}">
+            <input class="input pk-search" id="pickerSearch" data-f="picker:search" placeholder="Search every section" value="${esc(picker.search)}">
             <span class="right"><button class="btn ghost" data-act="cancel">Cancel</button></span>
         </div>
         ${picker.mode === "list" ? "" : `<div class="pk-mods"><span class="label">Modifiers</span>

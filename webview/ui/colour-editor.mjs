@@ -9,8 +9,8 @@
 import {brightnessLimit, clampHsv, css, hsv, isOff, label as hsvLabel, rgb, valuePercent} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
 
-/** @param {{colour: import("../../contracts/edits.js").Colour | null | undefined, title: string, canEdit?: boolean, onChange?: (colour: import("../../contracts/edits.js").Colour) => void, offNote?: string, maximumBrightness?: number}} options */
-export function colourEditor({colour, title, canEdit = true, onChange, offNote, maximumBrightness}) {
+/** @param {{identity: string, colour: import("../../contracts/edits.js").Colour | null | undefined, title: string, canEdit?: boolean, onChange?: (colour: import("../../contracts/edits.js").Colour) => void, offNote?: string, maximumBrightness?: number}} options */
+export function colourEditor({identity, colour, title, canEdit = true, onChange, offNote, maximumBrightness}) {
     const [h, s, v] = hsv(colour);
     const maximum = brightnessLimit(maximumBrightness);
     const node = el(`<div class="stack gap-12"></div>`);
@@ -51,7 +51,7 @@ export function colourEditor({colour, title, canEdit = true, onChange, offNote, 
 
     const fields = el(`<div class="grid3">
         ${[["H", h, 255], ["S", s, 255], [`V · max ${maximum}`, v, maximum]].map(([name, value, max], index) =>
-            `<label class="field"><span>${name}</span><input type="number" min="0" max="${max}" step="1" class="input mono" value="${value}" data-channel="${index}" ${canEdit ? "" : "disabled"}></label>`).join("")}</div>`);
+            `<label class="field"><span>${name}</span><input type="number" min="0" max="${max}" step="1" class="input mono" value="${value}" data-f="${esc(identity)}:colour:${index}" data-channel="${index}" ${canEdit ? "" : "disabled"}></label>`).join("")}</div>`);
     /** @type {NodeListOf<HTMLInputElement>} */ (fields.querySelectorAll("[data-channel]")).forEach((input) => input.addEventListener("change", () => {
         const next = [h, s, v];
         next[Number(input.dataset.channel)] = Number(input.value) || 0;

@@ -116,3 +116,33 @@ only vertical scroller.
   resets it, or computes a replacement from the state before the change.
   The declaration preserves the existing behavior: pending `cellHow` and the
   LED group builder (`ledPicks`, `trackball`, `rowColour`, `ledRow`) stay kept.
+
+## Focus across renders
+
+Every form control (`input`, `select`, `textarea`) authors a nonempty `data-f`
+identity. It is unique across the complete rendered surface, including an
+underlying screen and its open picker or dialog. A field's identity includes
+its semantic owner and field: pointing slot and setting, lighting stage and
+layer/slot/channel, key position and layer, or macro slot and step. Reordering
+an item carries its identity with it. Labels and current array positions do
+not identify reorderable items.
+
+The shared `webview/lib/focus.mjs` path captures that identity and the text
+selection before a render, and restores them only when exactly one matching
+form control remains. Removed or ambiguous identities receive no replacement
+focus. A disclosure enclosing the restored field stays open so it remains
+reachable. Buttons and SVG keyboard keys retain their authored action hooks.
+Search uses this same path, including Settings filtering.
+
+Macro steps have no identity in the stored format. The editor assigns local
+opaque step IDs; `webview/view/macro-focus.mjs` carries them through edits and
+reorders, and reconciles fresh host steps with matching prior values once per
+step. The metadata names controls only. It is excluded from serialization and
+posted edits; untouched step contents still come from the host payload rather
+than a cached editor copy. Newly inserted or replaced steps receive fresh IDs.
+
+A source guard requires every authored form control to name its identity.
+Browser traversal checks nonempty, unique identities on screens and dialogs
+and forces accepted-model DOM replacements to check focus restoration. The
+Pointing caret and Settings-search regressions exercise text selection, and
+macro checks exercise repeated and reordered steps.
