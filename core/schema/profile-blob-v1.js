@@ -1,5 +1,7 @@
 // @ts-check
 "use strict";
+const {LAYERS} = require("../data/charybdis-layout");
+const {u8: assertU8, u16: assertU16, asBytes, copyBytes, protocolError} = require("./bytes");
 
 // The one profile format the keyboard stores: schema 3.0, up to 65,504 bytes
 // (one 64 KiB slot less its header, firmware D-F14).
@@ -55,7 +57,7 @@ const PROFILE_ACTION_KINDS = Object.freeze({
 });
 
 const PROFILE_ACTION_LIMITS = Object.freeze({
-    maxLogicalLayers: 16,
+    maxLogicalLayers: LAYERS,
     maxPdModes: 32,
     maxViaMacroSlots: 128,
     maxCustomKeys: 128,
@@ -63,15 +65,7 @@ const PROFILE_ACTION_LIMITS = Object.freeze({
 
 const MAGIC_BYTES = Buffer.from(PROFILE_BLOB_V1.MAGIC, "ascii");
 
-class ProfileBlobProtocolError extends Error {
-    /** @param {string} code @param {string} message @param {Record<string, unknown>} [details] */
-    constructor(code, message, details = {}) {
-        super(message);
-        this.name = "ProfileBlobProtocolError";
-        this.code = code;
-        Object.assign(this, details);
-    }
-}
+const ProfileBlobProtocolError = protocolError("ProfileBlobProtocolError");
 
 /** @param {import("./types.js").BlobInput} [profile] @param {import("./types.js").BlobOptions} [options] */
 function encodeProfileBlob(profile = {}, options = {}) {
@@ -384,37 +378,6 @@ function crc32(value) {
         }
     }
     return (crc ^ 0xffffffff) >>> 0;
-}
-
-/** @param {unknown} value @param {string} label */
-function asBytes(value, label) {
-    if (!(value instanceof Uint8Array)) {
-        throw new TypeError(`${label} must be a Buffer or Uint8Array.`);
-    }
-    return Buffer.from(value.buffer, value.byteOffset, value.byteLength);
-}
-
-/** @param {unknown} value @param {string} label */
-function copyBytes(value, label) {
-    return Buffer.from(asBytes(value, label));
-}
-
-/** @param {unknown} value @param {string} label */
-function assertU8(value, label) {
-    const number = Number(value);
-    if (!Number.isInteger(number) || number < 0 || number > 0xff) {
-        throw new RangeError(`${label} must be an 8-bit integer.`);
-    }
-    return number;
-}
-
-/** @param {unknown} value @param {string} label */
-function assertU16(value, label) {
-    const number = Number(value);
-    if (!Number.isInteger(number) || number < 0 || number > 0xffff) {
-        throw new RangeError(`${label} must be a 16-bit integer.`);
-    }
-    return number;
 }
 
 /** @param {string} code @param {string} message @param {Record<string, unknown>} [details] */

@@ -1,7 +1,7 @@
 // @ts-check
 "use strict";
 
-const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../data/charybdis-layout");
+const {CHARYBDIS_4X6_LAYOUT_MATRIX, matrixPosition} = require("../data/charybdis-layout");
 const {layerOfRef, nativeCode} = require("../schema/actions");
 const {hostKeyLabel, keyLabel, keyLabelWithName, profileKeyNames} = require("./key-names");
 const {hostSettings, HOST_SETTING} = require("../schema/host-settings");
@@ -105,16 +105,16 @@ const hsv = c => `HSV(${c.h}, ${c.s}, ${c.v})`;
 
 // A matrix slot as a person finds it on the board: the half, then its row and
 // its column counted from the outer edge, or its place in the thumb cluster.
-const LAYOUT_INDEX = new Map(CHARYBDIS_4X6_LAYOUT_MATRIX.map(([row, column], layoutIndex) => [row * 6 + column, layoutIndex]));
+const LAYOUT_INDEX = new Map(CHARYBDIS_4X6_LAYOUT_MATRIX.map((position, layoutIndex) => [matrixPosition(layoutIndex), layoutIndex]));
 const THUMBS = (() => {
     /** @type {Map<number, string>} */
     const names = new Map();
     /** @type {Partial<Record<"Left" | "Right", number>>} */
     const counts = {};
-    for (const [row, column] of CHARYBDIS_4X6_LAYOUT_MATRIX) {
+    for (const [layoutIndex, [row]] of CHARYBDIS_4X6_LAYOUT_MATRIX.entries()) {
         if (row % 5 !== 4) continue;
         const half = row < 5 ? "Left" : "Right";
-        names.set(row * 6 + column, `${half} thumb ${counts[half] = (counts[half] || 0) + 1}`);
+        names.set(matrixPosition(layoutIndex), `${half} thumb ${counts[half] = (counts[half] || 0) + 1}`);
     }
     return names;
 })();
@@ -356,8 +356,8 @@ function profileReview(before, after, capabilities) {
     }));
     a.settings.names.forEach((name, i) => item("Layers", `layerName:${i}`, `Layer ${i}`, new Map([["Name", layerCalled(a.settings.names, i)]]), new Map([["Name", layerCalled(b.settings.names, i)]]), {kind: "layers"}, undefined, {kind: "layer", layer: i}));
     a.settings.layers.forEach((record, layer) => {
-        for (const [row, column] of CHARYBDIS_4X6_LAYOUT_MATRIX) {
-            const position = row * 6 + column;
+        for (const layoutIndex of CHARYBDIS_4X6_LAYOUT_MATRIX.keys()) {
+            const position = matrixPosition(layoutIndex);
             /** @param {import("../schema/types.js").LayerRecord} entry @returns {Fields} */
             const fields = entry => new Map([["Use shared behaviour", entry.bypass.includes(position) ? "off" : "on"], ["Join combos", entry.exclude.includes(position) ? "off" : "on"]]);
             item("Layout", `placement:${layer}:${position}`, `Participation · ${layerCalled(b.settings.names, layer)} · key ${LAYOUT_INDEX.get(position)}`, fields(record), fields(b.settings.layers[layer]),

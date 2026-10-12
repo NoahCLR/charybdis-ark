@@ -26,7 +26,7 @@ const {decodeComboDomain, encodeComboDomain} = require("../schema/combo-domain-v
 const {decodeRgbDomainV1} = require("../schema/rgb-domain-v1");
 const {validSetting} = require("../schema/settings-domain-v1");
 const {CUSTOM_KEY_BASE, RETIRED_CUSTOM_KEY_BASE, RETIRED_CUSTOM_KEY_SLOTS} = require("../data/user-keycodes");
-const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../data/charybdis-layout");
+const {CHARYBDIS_4X6_LAYOUT_MATRIX, LAYERS, MATRIX_KEYS, matrixPosition} = require("../data/charybdis-layout");
 const {FILE_MAX_BYTES, validateSnapshot, validateViaMacro, macroBank} = require("./portable-profile");
 
 // The action ABI of the firmware before D-F14: eight layers, 64 macros and
@@ -34,12 +34,12 @@ const {FILE_MAX_BYTES, validateSnapshot, validateViaMacro, macroBank} = require(
 const PREVIOUS_ACTION_ABI = 0xf79c6151;
 const PREVIOUS = Object.freeze({SCHEMA: 2, LAYERS: 8, MACROS: 64});
 const PREVIOUS_ACTION_LIMITS = Object.freeze({maxLogicalLayers: 8, maxViaMacroSlots: 64, maxCustomKeys: 64, maxPdModes: 32});
-const LAYERS = 16, MACROS = 128, MATRIX_KEYS = 60, TRANSPARENT = 0x0001;
+const MACROS = 128, TRANSPARENT = 0x0001;
 /** @param {string} message */
 const fail = message => Object.assign(new Error(message), {code: "INVALID_PORTABLE_PROFILE"});
 // A new layer: transparent on every physical key, nothing in the matrix slots
 // no key sits on, as the compiled layers 8..15 are.
-const PHYSICAL = new Set(CHARYBDIS_4X6_LAYOUT_MATRIX.map(([row, column]) => row * 6 + column));
+const PHYSICAL = new Set(CHARYBDIS_4X6_LAYOUT_MATRIX.map((position, layoutIndex) => matrixPosition(layoutIndex)));
 const EMPTY_LAYER = Array.from({length: MATRIX_KEYS}, (_, slot) => (PHYSICAL.has(slot) ? TRANSPARENT : 0));
 /** @param {Buffer} bytes @param {number} at */
 const u32 = (bytes, at) => bytes.readUInt32LE(at);

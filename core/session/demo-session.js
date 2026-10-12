@@ -1,5 +1,6 @@
 // @ts-check
 "use strict";
+const {LAYERS} = require("../data/charybdis-layout");
 
 // Ark without a keyboard: the demo (D-L53).
 //
@@ -50,7 +51,7 @@ const DEMO_CAPABILITIES = Object.freeze({
     featureFlags: PROFILE_WIRE_KNOWN_MASKS.FEATURE_FLAGS & ~PROFILE_WIRE_KNOWN_MASKS.RETIRED_FEATURES,
     actionAbiDigest: ACTION_ABI,
     compiledLayerCount: 16,
-    maxLogicalLayers: 16,
+    maxLogicalLayers: LAYERS,
     maxBehaviorRows: 128,
     maxTapStepsPerBehavior: 5,
     maxPopulatedBehaviorSteps: 640,

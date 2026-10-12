@@ -7,7 +7,8 @@
 // layers ({on, off}, {all}, {any}, {not}); callers own keyboard semantics.
 // The result contains proved reachability, traps and concrete paths, never the
 // decision graph. A budget failure is explicit and carries no absence claims.
-const LAYERS = 16, LOCK_BITS = 0x55555555, HOLD_BITS = 0xaaaaaaaa;
+const {LAYERS} = require("../data/charybdis-layout");
+const LOCK_BITS = 0x55555555, HOLD_BITS = 0xaaaaaaaa;
 const LIMIT = Symbol("layer analysis budget");
 /** @typedef {{v: number, lo: number, hi: number}} Decision */
 class StateSets {

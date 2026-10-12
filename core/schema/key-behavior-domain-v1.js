@@ -1,5 +1,7 @@
 // @ts-check
 "use strict";
+const {LAYERS} = require("../data/charybdis-layout");
+const {u8: assertU8, u16: assertU16, asBytes: copyBytes} = require("./bytes");
 
 /**
  * @typedef {{tapIndex: number, tap?: ReturnType<typeof normalizeAction>, hold?: ReturnType<typeof normalizeHold>, longHold?: ReturnType<typeof normalizeHold>}} NormalizedStep
@@ -48,7 +50,7 @@ const KEY_BEHAVIOR_LIMITS = Object.freeze({
     maxRows: 128,
     maxPopulatedSteps: 640,
     maxTapStepsPerBehavior: 5,
-    maxLayers: 16,
+    maxLayers: LAYERS,
     maxRepeatHz: 100,
     maxPayloadSize: PROFILE_BLOB_V1.MAX_SIZE - PROFILE_BLOB_V1.HEADER_SIZE - PROFILE_BLOB_V1.DOMAIN_HEADER_SIZE,
 });
@@ -428,20 +430,6 @@ function normalizeLimits(value) {
     return limits;
 }
 
-/** @param {unknown} value @param {string} label */
-function assertU8(value, label) {
-    const number = Number(value);
-    if (!Number.isInteger(number) || number < 0 || number > 0xff) throw new RangeError(`${label} must be an 8-bit integer.`);
-    return number;
-}
-
-/** @param {unknown} value @param {string} label */
-function assertU16(value, label) {
-    const number = Number(value);
-    if (!Number.isInteger(number) || number < 0 || number > 0xffff) throw new RangeError(`${label} must be a 16-bit integer.`);
-    return number;
-}
-
 // Every layer of the bank: what a row allows unless it says otherwise.
 /** @param {import("./types.js").BehaviorLimits} limits */
 const allLayers = limits => 2 ** limits.maxLayers - 1;
@@ -457,12 +445,6 @@ function assertLayerMask(value, limits, rowIndex) {
 function assertBoolean(value, label) {
     if (typeof value !== "boolean") throw new TypeError(`${label} must be boolean.`);
     return value;
-}
-
-/** @param {unknown} value @param {string} label */
-function copyBytes(value, label) {
-    if (!(value instanceof Uint8Array)) throw new TypeError(`${label} must be a Buffer or Uint8Array.`);
-    return Buffer.from(value.buffer, value.byteOffset, value.byteLength);
 }
 
 /** @param {string} code @param {string} message @param {Record<string, unknown>} [details] */

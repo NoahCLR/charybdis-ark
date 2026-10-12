@@ -1,5 +1,6 @@
 // @ts-check
 "use strict";
+const {u8: assertU8, u16: assertU16, asBytes: copyBytes, protocolError, zeroRange} = require("../schema/bytes");
 
 const {supportsStreamingMacros} = require("../schema/macro-payload");
 const {requestHandled} = require("./via-unhandled-v1");
@@ -121,15 +122,7 @@ const CANDIDATE_ADMISSION_NAMES = Object.freeze(Object.fromEntries(
     Object.entries(CANDIDATE_ADMISSION).map(([name, value]) => [value, name])
 ));
 
-class ProfileCandidateProtocolError extends Error {
-    /** @param {string} code @param {string} message @param {Record<string, unknown>} [details] */
-    constructor(code, message, details = {}) {
-        super(message);
-        this.name = "ProfileCandidateProtocolError";
-        this.code = code;
-        Object.assign(this, details);
-    }
-}
+const ProfileCandidateProtocolError = protocolError("ProfileCandidateProtocolError");
 
 class CandidateTransactionIdSequence {
     /** @param {number} [start] */
@@ -605,37 +598,7 @@ function assertNextRequestId(nextRequestId) {
 
 /** @param {Uint8Array} buffer @param {number} start @param {number} end @param {string} label */
 function assertZeroRange(buffer, start, end, label) {
-    for (let index = start; index < end; index += 1) {
-        if (buffer[index] !== 0) {
-            throw candidateProtocolError("NONCANONICAL_RESPONSE", `${label} has nonzero reserved byte ${index}.`, {frameOffset: index});
-        }
-    }
-}
-
-/** @param {Uint8Array} value @param {string} label */
-function copyBytes(value, label) {
-    if (!(value instanceof Uint8Array)) {
-        throw new TypeError(`${label} must be a Buffer or Uint8Array.`);
-    }
-    return Buffer.from(value.buffer, value.byteOffset, value.byteLength);
-}
-
-/** @param {unknown} value @param {string} label @param {{nonzero?: boolean}} [options] */
-function assertU8(value, label, options = {}) {
-    const number = Number(value);
-    if (!Number.isInteger(number) || number < (options.nonzero ? 1 : 0) || number > 0xff) {
-        throw new RangeError(`${label} must be ${options.nonzero ? "a nonzero " : "an "}8-bit integer.`);
-    }
-    return number;
-}
-
-/** @param {unknown} value @param {string} label @param {{nonzero?: boolean}} [options] */
-function assertU16(value, label, options = {}) {
-    const number = Number(value);
-    if (!Number.isInteger(number) || number < (options.nonzero ? 1 : 0) || number > 0xffff) {
-        throw new RangeError(`${label} must be ${options.nonzero ? "a nonzero " : "an "}16-bit integer.`);
-    }
-    return number;
+    zeroRange(buffer, start, end, index => candidateProtocolError("NONCANONICAL_RESPONSE", `${label} has nonzero reserved byte ${index}.`, {frameOffset: index}));
 }
 
 /** @param {unknown} value @param {string} label */

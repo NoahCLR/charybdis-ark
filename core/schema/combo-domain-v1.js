@@ -1,5 +1,6 @@
 // @ts-check
 "use strict";
+const {LAYERS} = require("../data/charybdis-layout");
 const {encodeSemanticAction, decodeSemanticAction} = require("./profile-blob-v1");
 /** @param {string} message */
 const fail = message => Object.assign(new Error(message), {code: "INVALID_COMBO_DOMAIN"});
@@ -14,7 +15,7 @@ const fail = message => Object.assign(new Error(message), {code: "INVALID_COMBO_
 const COMBO_DOMAIN_VERSION = 3;
 const HEADER_SIZE = 8;
 const ROW_FIXED_SIZE = 12;
-const COMBO_LIMITS = Object.freeze({maxRows: 128, maxInputs: 16, maxLayers: 16});
+const COMBO_LIMITS = Object.freeze({maxRows: 128, maxInputs: 16, maxLayers: LAYERS});
 const FLAG = Object.freeze({HOLD: 1, TAP: 2, ORDERED: 4, DISABLED: 8});
 const ALL_LAYERS = 2 ** COMBO_LIMITS.maxLayers - 1;
 /** @param {number | null} value @param {number} min @returns {value is number} */

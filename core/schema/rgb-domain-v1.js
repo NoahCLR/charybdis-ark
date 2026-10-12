@@ -1,5 +1,7 @@
 // @ts-check
 "use strict";
+const {LAYERS} = require("../data/charybdis-layout");
+const {u8: assertU8, u16: assertU16, asBytes: copyBytes, protocolError} = require("./bytes");
 
 /**
  * @typedef {ReturnType<typeof normalizeOptions>} Limits
@@ -21,7 +23,7 @@ const RGB_DOMAIN_V1 = Object.freeze({
     PHYSICAL_LED_COUNT: 58,
     LED_BITMAP_SIZE: 8,
     MAX_GROUPS: 16,
-    MAX_LOGICAL_LAYERS: 16,
+    MAX_LOGICAL_LAYERS: LAYERS,
     MAX_STAGE_GROUP_ROWS: 32,
     MAX_TAP_BRANCH_COLORS: 4,
     MAX_PAYLOAD_SIZE: PROFILE_BLOB_V1.MAX_SIZE - PROFILE_BLOB_V1.HEADER_SIZE - PROFILE_BLOB_V1.DOMAIN_HEADER_SIZE,
@@ -80,15 +82,7 @@ const RGB_PD_MODE_IDS = Object.freeze({
 
 const BLACK = Object.freeze({h: 0, s: 0, v: 0});
 
-class RgbDomainProtocolError extends Error {
-    /** @param {string} code @param {string} message @param {Record<string, unknown>} [details] */
-    constructor(code, message, details = {}) {
-        super(message);
-        this.name = "RgbDomainProtocolError";
-        this.code = code;
-        Object.assign(this, details);
-    }
-}
+const RgbDomainProtocolError = protocolError("RgbDomainProtocolError");
 
 /** @param {import("./types.js").RgbInput} profile @param {import("./types.js").RgbOptions} [options] */
 function encodeRgbDomainV1(profile, options = {}) {
@@ -688,20 +682,6 @@ function requiredArray(value, label) {
     return value;
 }
 
-/** @param {unknown} value @param {string} label */
-function assertU8(value, label) {
-    const number = Number(value);
-    if (!Number.isInteger(number) || number < 0 || number > 0xff) throw new RangeError(`${label} must be an 8-bit integer.`);
-    return number;
-}
-
-/** @param {unknown} value @param {string} label */
-function assertU16(value, label) {
-    const number = Number(value);
-    if (!Number.isInteger(number) || number < 0 || number > 0xffff) throw new RangeError(`${label} must be a 16-bit integer.`);
-    return number;
-}
-
 /** @param {number} value */
 function assertTapBranchColorCount(value) {
     const count = assertU8(value, "tapBranchColorCount");
@@ -719,12 +699,6 @@ function sameNumbers(left, right) {
 /** @param {import("./types.js").Hsv} color */
 function isBlack(color) {
     return color.h === 0 && color.s === 0 && color.v === 0;
-}
-
-/** @param {unknown} value @param {string} label */
-function copyBytes(value, label) {
-    if (!(value instanceof Uint8Array)) throw new TypeError(`${label} must be a Buffer or Uint8Array.`);
-    return Buffer.from(value.buffer, value.byteOffset, value.byteLength);
 }
 
 /** @param {string} code @param {string} message @param {Record<string, unknown>} [details] */
