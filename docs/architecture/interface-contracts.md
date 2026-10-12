@@ -77,6 +77,12 @@ only vertical scroller.
   LED groups. Shared colour controls retain the stored owner's focus identity;
   LED override tables share their owner presentation. Stage modules read the
   published model and post the same pure edit builders as other screens.
+- Pointing: `webview/ui/pointing.mjs` owns slot selection; `ui/pointing/`
+  composes the slot editor from movement, reach and Advanced surfaces, with an
+  empty-slot surface for creation and copying. Its form controls register one
+  reader per rendered field, sharing the editor's complete-record staging
+  callback. Switching movement rebuilds the readers for the new kind; pending
+  button and modifier choices stay with the editor until a valid record posts.
 - Key names: `core/model/key-names.js`. The catalogue names what QMK ships;
   the profile names its macros, pointing-mode keys and bare user slots. The
   effective Host OS also names Alt/Option and GUI/Command/Windows/Super,
