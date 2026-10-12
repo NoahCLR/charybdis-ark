@@ -1,5 +1,6 @@
 // @ts-check
 "use strict";
+const {PROFILE_DOMAIN_VERSIONS, PROFILE_DOMAIN_IDS} = require("./profile-domains");
 
 // PD domain codec, version 3, the only one the keyboard stores (firmware
 // D-F14): a header naming its capacity (32 slots) and record count, then only
@@ -9,7 +10,7 @@
 // follows the shared rule (profile-name.js): its length at byte 8, bytes 9..31
 // zero, its UTF-8 at bytes 96..127, zero after it.
 const {NAME_MAX_BYTES, validName, nameOfBytes} = require("./profile-name");
-const PD_DOMAIN = Object.freeze({ID: 0x50, VERSION: 3, SLOTS: 32, HEADER_SIZE: 8, RECORD_SIZE: 128, NAME_OFFSET: 96, NAME_MAX_BYTES, MAX_SIZE: 8 + 32 * 128});
+const PD_DOMAIN = Object.freeze({ID: PROFILE_DOMAIN_IDS.PD_MODES, VERSION: PROFILE_DOMAIN_VERSIONS[PROFILE_DOMAIN_IDS.PD_MODES], SLOTS: 32, HEADER_SIZE: 8, RECORD_SIZE: 128, NAME_OFFSET: 96, NAME_MAX_BYTES, MAX_SIZE: 8 + 32 * 128});
 const PD_KIND = Object.freeze({DISABLED: 0, DIRECTIONAL: 1, SCROLLING: 2});
 const PD_AXIS = Object.freeze({VERTICAL: 0, HORIZONTAL: 1, DOMINANT: 2, EIGHT: 3});
 // Which axes a scrolling mode scrolls, in the same byte (firmware D-F08).

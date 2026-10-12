@@ -19,12 +19,13 @@
 // Custom keys moved from 0x7e40 + n to 0x7f00 + n. They are named by their
 // stable slot, so the backup's keys, behaviour targets and combo inputs and
 // outputs that named slot n by its old keycode name it by the new one.
+const {PROFILE_DOMAIN_IDS, PROFILE_DOMAINS} = require("../schema/profile-domains");
 const {ACTION_ABI} = require("../schema/actions");
 const {PROFILE_ACTION_KINDS: ACTION, decodeProfileBlob, encodeProfileBlob, PROFILE_DOMAIN_VERSIONS} = require("../schema/profile-blob-v1");
 const {decodeKeyBehaviorDomain, encodeKeyBehaviorDomain} = require("../schema/key-behavior-domain-v1");
 const {decodeComboDomain, encodeComboDomain} = require("../schema/combo-domain-v1");
 const {decodeRgbDomainV1} = require("../schema/rgb-domain-v1");
-const {validSetting} = require("../schema/settings-domain-v1");
+const {SETTINGS, validSetting} = require("../schema/settings-domain-v1");
 const {CUSTOM_KEY_BASE, RETIRED_CUSTOM_KEY_BASE, RETIRED_CUSTOM_KEY_SLOTS} = require("../data/user-keycodes");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX, LAYERS, MATRIX_KEYS, matrixPosition} = require("../data/charybdis-layout");
 const {FILE_MAX_BYTES, validateSnapshot, validateViaMacro, macroBank} = require("./portable-profile");
@@ -103,10 +104,10 @@ function settingsV6(payload) {
     const references = scalars[27];
     for (let layer = 0; layer < PREVIOUS.LAYERS; layer++) if (((references >>> (4 * layer)) & 15) >= PREVIOUS.LAYERS) throw fail("The backup's combo reference is outside its layer bank.");
     scalars.splice(27, 1, 0, 1, 0xffff, 0xffff);
-    const fixed = Buffer.alloc(404);
-    Buffer.from([6, LAYERS, 31, MACROS, MACROS, 0, 0, 0]).copy(fixed);
-    scalars.forEach((value, id) => fixed.writeUInt32LE(value >>> 0, 8 + id * 4));
-    for (let layer = 0; layer < LAYERS; layer++) fixed[132 + layer * 17] = layer < PREVIOUS.LAYERS ? (references >>> (4 * layer)) & 15 : layer;
+    const fixed = Buffer.alloc(SETTINGS.FIXED_SIZE);
+    Buffer.from([SETTINGS.VERSION, SETTINGS.LAYERS, SETTINGS.COUNT, SETTINGS.MACRO_NAMES, SETTINGS.CUSTOM_KEY_NAMES, 0, 0, 0]).copy(fixed);
+    scalars.forEach((value, id) => fixed.writeUInt32LE(value >>> 0, SETTINGS.SCALARS_OFFSET + id * 4));
+    for (let layer = 0; layer < LAYERS; layer++) fixed[SETTINGS.LAYER_RECORDS_OFFSET + layer * SETTINGS.LAYER_RECORD_SIZE] = layer < PREVIOUS.LAYERS ? (references >>> (4 * layer)) & 15 : layer;
     const names = Array.from({length: LAYERS}, (_, layer) => {
         if (layer >= PREVIOUS.LAYERS) return Buffer.from([0]);
         const field = payload.subarray(120 + 24 * layer, 144 + 24 * layer), end = field.indexOf(0);
@@ -147,7 +148,7 @@ function pdV3(payload) {
 }
 
 /** @type {Record<number, [number, (payload: Buffer) => Buffer]>} */
-const STEPS = {0x10: [3, rgbV4], 0x20: [1, behaviorsV2], 0x30: [2, combosV3], 0x40: [5, settingsV6], 0x50: [2, pdV3]};
+const STEPS = {[PROFILE_DOMAIN_IDS.RGB]: [3, rgbV4], [PROFILE_DOMAIN_IDS.KEY_BEHAVIORS]: [1, behaviorsV2], [PROFILE_DOMAIN_IDS.COMBOS]: [2, combosV3], [PROFILE_DOMAIN_IDS.SETTINGS]: [5, settingsV6], [PROFILE_DOMAIN_IDS.PD_MODES]: [2, pdV3]};
 
 // An old custom key's keycode as its new one; every other keycode unchanged.
 /** @param {number} code */
@@ -173,7 +174,7 @@ function translateProfileUnchecked(bytes) {
     for (let index = 0; index < bytes[6]; index++) {
         if (offset + 4 > bytes.length) throw fail("The backup's profile is truncated.");
         const id = bytes[offset], version = bytes[offset + 1], length = bytes.readUInt16LE(offset + 2);
-        if (id !== (index + 1) * 16) throw fail("The backup's domains are not complete and canonical.");
+        if (id !== PROFILE_DOMAINS[index].id) throw fail("The backup's domains are not complete and canonical.");
         const payload = bytes.subarray(offset + 4, offset + 4 + length);
         const step = STEPS[id];
         if (!step || step[0] !== version || payload.length !== length) throw fail("The backup's profile holds a domain this app cannot translate.");
@@ -183,8 +184,8 @@ function translateProfileUnchecked(bytes) {
     if (offset !== bytes.length) throw fail("The backup's profile has trailing data.");
     const blob = decodeProfileBlob(encodeProfileBlob({domains}));
     return encodeProfileBlob({domains: blob.domains.map(domain => {
-        if (domain.id === 0x20) {const value = decodeKeyBehaviorDomain(domain.payload); moveActions(value.rows); return {...domain, payload: encodeKeyBehaviorDomain(value)};}
-        if (domain.id === 0x30) {const value = decodeComboDomain(domain.payload); moveActions(value.rows); return {...domain, payload: encodeComboDomain(value)};}
+        if (domain.id === PROFILE_DOMAIN_IDS.KEY_BEHAVIORS) {const value = decodeKeyBehaviorDomain(domain.payload); moveActions(value.rows); return {...domain, payload: encodeKeyBehaviorDomain(value)};}
+        if (domain.id === PROFILE_DOMAIN_IDS.COMBOS) {const value = decodeComboDomain(domain.payload); moveActions(value.rows); return {...domain, payload: encodeComboDomain(value)};}
         return domain;
     })});
 }

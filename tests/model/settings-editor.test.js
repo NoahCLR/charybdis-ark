@@ -97,6 +97,18 @@ test("every field edits a stored value the schema names, within what the keyboar
     }
 });
 
+test("range hints and numeric bounds follow the stored field rules", () => {
+    const {SETTING_FIELD} = require("../../core/schema/settings-domain-v1");
+    const fields = settingsEditorView(snapshot()).sections.flatMap(section => section.fields);
+    for (const [macro, rule, unit] of [["normalDpi", SETTING_FIELD.DEFAULT_DPI, ""], ["snipingDpi", SETTING_FIELD.SNIPING_DPI, ""], ["mouseDebounce", SETTING_FIELD.AUTO_MOUSE_DEBOUNCE, " ms"]]) {
+        const field = fields.find(field => field.macro === macro);
+        assert.deepEqual([field.min, field.max], [rule.min, rule.max], macro);
+        assert.equal(field.hint, `${rule.min}–${rule.max}${unit}${rule.step > 1 ? ", in steps of " + rule.step : ""}`, macro);
+    }
+    const next = editSettings(snapshot(), message(snapshot(), "rgbAppearance", {lightingTimeout: "86400000"}));
+    assert.equal(validateSnapshot(next).settings.values[SETTING_FIELD.RGB_TIMEOUT.id], SETTING_FIELD.RGB_TIMEOUT.max, "a uint32 duration is not constrained by an unrelated uint16 fallback");
+});
+
 test("every unchanged section is a byte-exact round trip and edits preserve unrelated domains and banks", () => {
     const current = snapshot();
     for (const section of settingsEditorView(current).sections) assert.deepEqual(editSettings(current, message(current, section.id)), current.document);

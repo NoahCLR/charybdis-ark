@@ -2,13 +2,13 @@
 "use strict";
 const {u8: assertU8, u16: assertU16, asBytes: copyBytes, protocolError, zeroRange} = require("../schema/bytes");
 
+const {profileDomain, PROFILE_DOMAIN_MASK} = require("../schema/profile-domains");
 const {supportsStreamingMacros} = require("../schema/macro-payload");
 const {requestHandled} = require("./via-unhandled-v1");
 const {RAW_HID_REPORT_SIZE, normalizeRawHidReport} = require("../transport/device-adapter");
-const {crc32, decodeProfileBlob, fnv1a32, PROFILE_DOMAIN_IDS} = require("../schema/profile-blob-v1");
+const {crc32, decodeProfileBlob, fnv1a32} = require("../schema/profile-blob-v1");
 const {
     ProfileWireProtocolError,
-    PROFILE_WIRE_DOMAINS,
     PROFILE_WIRE_STATUS,
     PROFILE_WIRE_V1,
     buildProfileGetRequest,
@@ -41,7 +41,7 @@ const PROFILE_CANDIDATE_V1 = Object.freeze({
     STREAMING_BLOB_SIZE: 53216,
     SCHEMA_MAJOR: 3,
     SCHEMA_MINOR: 0,
-    KNOWN_DOMAIN_MASK: PROFILE_WIRE_DOMAINS.RGB | PROFILE_WIRE_DOMAINS.KEY_BEHAVIORS | PROFILE_WIRE_DOMAINS.COMBOS | PROFILE_WIRE_DOMAINS.SETTINGS | PROFILE_WIRE_DOMAINS.PD_MODES,
+    KNOWN_DOMAIN_MASK: PROFILE_DOMAIN_MASK,
 });
 
 const CANDIDATE_ADMISSION = Object.freeze({
@@ -474,11 +474,7 @@ function candidateMetadataForBlob(value, options = {}) {
     const {viaGeneration, viaDigest} = assertViaBinding(options.viaGeneration, options.viaDigest);
     let derivedDomains = 0;
     for (const domain of decoded.domains) {
-        if (domain.id === PROFILE_DOMAIN_IDS.RGB) derivedDomains |= PROFILE_WIRE_DOMAINS.RGB;
-        if (domain.id === PROFILE_DOMAIN_IDS.KEY_BEHAVIORS) derivedDomains |= PROFILE_WIRE_DOMAINS.KEY_BEHAVIORS;
-        if (domain.id === PROFILE_DOMAIN_IDS.SETTINGS) derivedDomains |= PROFILE_WIRE_DOMAINS.SETTINGS;
-        if (domain.id === PROFILE_DOMAIN_IDS.PD_MODES) derivedDomains |= PROFILE_WIRE_DOMAINS.PD_MODES;
-        if (domain.id === PROFILE_DOMAIN_IDS.COMBOS) derivedDomains |= PROFILE_WIRE_DOMAINS.COMBOS;
+        derivedDomains |= profileDomain(domain.id)?.wireBit ?? 0;
     }
     const requestedDomains = options.requestedDomains === undefined
         ? derivedDomains

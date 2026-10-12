@@ -1,5 +1,6 @@
 // @ts-check
 "use strict";
+const {PROFILE_DOMAIN_VERSIONS} = require("./profile-domains");
 const {LAYERS} = require("../data/charybdis-layout");
 const {u8: assertU8, u16: assertU16, asBytes: copyBytes} = require("./bytes");
 
@@ -24,7 +25,7 @@ const {
 // tap depth (five by default), a u16 step count, and per row an enabled flag and the layers it may
 // act on (participation-policy.md).
 const KEY_BEHAVIOR_DOMAIN_V1 = Object.freeze({
-    VERSION: 2,
+    VERSION: PROFILE_DOMAIN_VERSIONS[PROFILE_DOMAIN_IDS.KEY_BEHAVIORS],
     HEADER_SIZE: 4,
     ROW_LENGTH_SIZE: 2,
     ROW_FIXED_SIZE: 16,
