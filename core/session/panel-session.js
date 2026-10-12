@@ -28,16 +28,11 @@ const {buildDeviceModel, buildSnapshotModel} = require("./device-model");
 const {demoDiagnostics, demoHeader, demoModel} = require("./demo-session");
 const {assertBound, beginRead, boundDraft, closeEditors, draftBinding, replaceDraft, setDraft} = require("./panel-session-state");
 
-const DRAFT_CONTROLS = new Set([
-    "reviewProfileDraft", "undoProfileDraft", "redoProfileDraft", "jumpProfileDraft", "discardProfileDraft", "discardProfileDraftChanges",
-    "applyProfileDraft", "rebaseProfileDraft", "closeProfileDraftReview",
-]);
-const PORTABLE_MESSAGES = new Set([
-    "exportPortableProfile", "choosePortableProfile", "reviewPortableProfile", "restorePortableProfile",
-    "managePortableLayers", "editPortableLayer", "savePortableLayers", "cancelPortableReview",
-]);
-// The demo's own controls (demo-session.js).
-const DEMO_MESSAGES = new Set(["openDemo", "openDemoProfile", "leaveDemo"]);
+const {controlsOn, panelControl} = require("./panel-control-registry");
+// Retained exports for hosts that inspect the routes; never hand-maintained.
+const DRAFT_CONTROLS = controlsOn("draft");
+const PORTABLE_MESSAGES = controlsOn("portable");
+const DEMO_MESSAGES = controlsOn("demo");
 
 // What the panel says and offers that depends on its host, published as
 // `model.host`, so the panel never asks which host it is in. A host passes
@@ -224,19 +219,19 @@ function panelRequest(value) {
 /** @param {Session} session @param {import("./types.js").PanelMessage | null | undefined} message @param {State} state */
 function routeMessage(session, message, state) {
     if (!message) return "none";
-    const type = message.type;
+    const type = message.type, control = panelControl(type);
     // The draft history sheet is only a view: while it is open the model
     // carries every step, and only then, since that is the whole history.
-    if (type === "openProfileDraftHistory" || type === "closeProfileDraftHistory") {
-        session.historyOpen = type === "openProfileDraftHistory";
+    if (control?.route === "view") {
+        session.historyOpen = control.action === "openHistory";
         return "none";
     }
     if (session.portableBusy || session.readBusy) return "none";
-    if (DEMO_MESSAGES.has(type)) return "demo";
+    if (control?.route === "demo") return "demo";
     // A panel that loads again in the demo stays in it; reading a keyboard
     // leaves it first (panel-loop.js), so nothing reads one from here.
-    if (session.demo && (type === "ready" || type === "refresh" || type === "selectDevice")) return "none";
-    if (session.draft && (DRAFT_EDITS.has(type) || DRAFT_CONTROLS.has(type)) && message.draftId !== session.draft.id) {
+    if (session.demo && control?.route === "read") return "none";
+    if (session.draft && (DRAFT_EDITS.has(type) || control?.identity) && message.draftId !== session.draft.id) {
         throw new Error("This edit belongs to an older draft. Read the keyboard before continuing.");
     }
     if (DRAFT_EDITS.has(type)) {
@@ -254,25 +249,26 @@ function routeMessage(session, message, state) {
     // Apply writes the draft to the keyboard it is bound to, by the same rule
     // as an edit; the draft checks its revision, review and keyboard again as
     // it writes (ProfileDraftSession.apply).
-    if (type === "applyProfileDraft" && session.draft) {
+    if (control?.binding === "apply" && session.draft) {
         assertBound(session, state, (reason) => reason === "connection-changed" ? "Review this draft against the connected keyboard before applying it."
             : "Reconnect the keyboard this draft belongs to and wait for its current operation before applying it.");
     }
-    if (DRAFT_CONTROLS.has(type)) return "draft";
-    if (type === "reviewPortableProfile") boundDraft(session, state, message, "Read the keyboard and wait for its current operation before importing a profile.");
+    if (control?.route === "draft") return "draft";
+    if (control?.binding === "import") boundDraft(session, state, message, "Read the keyboard and wait for its current operation before importing a profile.");
     // A file chooser and the layer editor can also open or keep a review
     // against the draft. Recovery with no editable draft remains available.
-    if (session.draft && ["choosePortableProfile", "managePortableLayers", "editPortableLayer", "savePortableLayers", "restorePortableProfile"].includes(type)) {
+    if (session.draft && control?.binding === "profile") {
         assertBound(session, state, "Read the keyboard and wait for its current operation before changing this profile.");
         session.draft.assertRevision(session.draft.revision);
     }
-    if (PORTABLE_MESSAGES.has(type)) return "portable";
-    if (type === "ready" || type === "refresh" || type === "selectDevice") {
+    if (control?.route === "portable") return "portable";
+    if (control?.route === "read") {
+        const {deviceId} = /** @type {import("./types.js").PanelEnvelope} */ (message);
         if (state.busy) return "none";
-        if (type === "selectDevice" && (!state.devices?.some((device) => device.id === message.deviceId) || !message.deviceId)) {
+        if (control.action === "select" && (!state.devices?.some((device) => device.id === deviceId) || !deviceId)) {
             throw new Error("Choose a keyboard from the current device list.");
         }
-        if (type === "selectDevice" && message.deviceId !== state.selectedDeviceId) closeEditors(session, {resetForms: true});
+        if (control.action === "select" && deviceId !== state.selectedDeviceId) closeEditors(session, {resetForms: true});
         beginRead(session);
         return "read";
     }

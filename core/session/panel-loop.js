@@ -30,6 +30,7 @@
  * @typedef {import("./types.js").LoopHost} Host
  * @typedef {import("../../contracts/messages.js").PanelRequest} Message
  */
+const {panelControl} = require("./panel-control-registry");
 const {ProfileDeviceService} = require("./profile-device-service");
 const {buildPanelModel, observeService, panelRequest, routeMessage} = require("./panel-session");
 const {boundDraft, endRead, takeOutbox, whilePanelBusy} = require("./panel-session-state");
@@ -81,13 +82,14 @@ function publish(session, host) {
 // as a notice rather than as silence.
 /** @param {Session} session @param {Message | null | undefined} message @param {Host} host */
 async function handleMessage(session, message, host) {
-    if (message?.type === "validateViaMacro") {
+    if (message && panelControl(message.type)?.action === "validateMacro") {
+        const inspection = /** @type {Extract<Message, {type: "validateViaMacro"}>} */ (message);
         /** @type {Extract<import("../../contracts/messages.js").PanelResponse, {type: "macroValidation"}>} */
-        const reply = {type: "macroValidation", keycode: message.keycode, payload: message.payload,
-            requestId: message.requestId, draftId: message.draftId, draftRevision: message.draftRevision, validation: {error: "", code: ""}};
+        const reply = {type: "macroValidation", keycode: inspection.keycode, payload: inspection.payload,
+            requestId: inspection.requestId, draftId: message.draftId, draftRevision: message.draftRevision, validation: {error: "", code: ""}};
         try {
             const draft = boundDraft(session, panelState(session), message, "Read the keyboard and wait for its current operation before editing this macro.");
-            reply.validation = macroInputStatus(draft.current, message, draft.capabilities);
+            reply.validation = macroInputStatus(draft.current, inspection, draft.capabilities);
         } catch (error) {
             reply.validation = {error: /** @type {import("./types.js").OperationFailure} */ (error).message, code: /** @type {import("./types.js").OperationFailure} */ (error).code || "MACRO_EDIT_CONFLICT"};
         }
@@ -96,7 +98,7 @@ async function handleMessage(session, message, host) {
         return;
     }
     try {
-        if (session.demo && message && (message.type === "refresh" || message.type === "selectDevice") && !session.portableBusy) leaveDemo(session, message);
+        if (session.demo && message && panelControl(message.type)?.demo === "leave" && !session.portableBusy) leaveDemo(session, /** @type {import("../../contracts/messages.js").DemoControl} */ (message));
         const route = routeMessage(session, message, panelState(session));
         if (route === "draft") await draftMessage(session, /** @type {import("../../contracts/messages.js").DraftControl & Partial<import("../../contracts/edits.js").DraftIdentity>} */ (message), host);
         else if (route === "demo") await demoMessage(session, /** @type {import("../../contracts/messages.js").DemoControl} */ (message), host);
@@ -137,7 +139,7 @@ async function connectAndRead(session, selectedDeviceId, host) {
 /** @param {Session} session @param {import("../../contracts/messages.js").DraftControl & Partial<import("../../contracts/edits.js").DraftIdentity>} message @param {Host} host */
 async function draftMessage(session, message, host) {
     try {
-        await whilePanelBusy(session, () => draftControl(session, {...message, draftRevision: message.draftRevision ?? NaN}, host));
+        await controlOperation(session, message, () => draftControl(session, {...message, draftRevision: message.draftRevision ?? NaN}, host));
     } finally {publish(session, host);}
 }
 
@@ -146,15 +148,15 @@ async function draftMessage(session, message, host) {
 /** @param {Session} session @param {import("../../contracts/messages.js").PortableControl} message @param {Host} host */
 async function portableMessage(session, message, host) {
     try {
-        await whilePanelBusy(session, async () => {
-            if (message.type === "exportPortableProfile" && session.demo) {
+        await controlOperation(session, message, async () => {
+            if (panelControl(message.type)?.action === "export" && session.demo) {
                 const {snapshot, saved} = demoExport(/** @type {Session & import("./types.js").ActiveDemoSession} */ (session));
                 const where = await host.saveExport(exportedProfile(snapshot, new Date(), "charybdis-demo"));
                 if (where) {
                     saved();
                     session.notice = `Demo setup exported to ${where}. Import it on your keyboard to review and apply it.`;
                 }
-            } else if (message.type === "exportPortableProfile") {
+            } else if (panelControl(message.type)?.action === "export") {
                 const file = exportedProfile(await session.service.readPortableProfile());
                 const where = await host.saveExport(file);
                 if (where) session.notice = "Complete keyboard profile exported to " + where;
@@ -165,11 +167,17 @@ async function portableMessage(session, message, host) {
     } finally {publish(session, host);}
 }
 
+/** @template T @param {Session} session @param {Message} message @param {() => Promise<T>} work */
+function controlOperation(session, message, work) {
+    const phase = panelControl(message.type)?.phase;
+    return phase === "panel" || phase === "apply" || phase === "restore" ? whilePanelBusy(session, work) : work();
+}
+
 // The demo's controls: open it, open a profile file in it, leave it.
 /** @param {Session} session @param {import("../../contracts/messages.js").DemoControl} message @param {Host} host */
 async function demoMessage(session, message, host) {
     try {
-        await whilePanelBusy(session, () => demoControl(session, message, host, session.service.snapshot()));
+        await controlOperation(session, message, () => demoControl(session, message, host, session.service.snapshot()));
     } finally {publish(session, host);}
 }
 

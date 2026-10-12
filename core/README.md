@@ -63,6 +63,11 @@ become the panel's notice. Two reads are optional and never reject: base RGB
 and combos record a failure as their own `{state: "unavailable"}`.
 `disconnect()` always ends disconnected.
 
+Panel controls are registered in `session/panel-control-registry.js`:
+route, binding, demo policy, execution phase and named action. The router and
+controllers consume it; the contract's payload groups and all handler names
+are checked against that registry. Existing exported route sets are derived.
+
 Apply's transfer counters leave `ProfileDeviceService` through its optional
 `onApplyProgress` callback. The panel loop posts that small view as
 `applyProgress`, with the current draft ID and revision; the webview refreshes

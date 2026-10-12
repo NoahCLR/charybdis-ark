@@ -19,6 +19,7 @@
  * @typedef {import("./types.js").RunningPanelSession} Session
  * @typedef {import("./types.js").ControlHost} Host
  */
+const {panelControl} = require("./panel-control-registry");
 const {canEdit, hasCurrentLayers} = require("./firmware-support");
 const {validateSnapshot, FILE_MAX_BYTES} = require("../model/portable-profile");
 const {translateBackup} = require("../model/backup-translation");
@@ -110,155 +111,168 @@ async function readKeyboard(session, selectedDeviceId, host = {}) {
 
 // The draft's own controls. Each leaves the session's outbox (notice, form
 // reset) saying what happened; the caller publishes.
-/** @param {Session} session @param {import("../../contracts/messages.js").DraftControl & {draftRevision: number}} message @param {Host} [host] */
+/** @typedef {import('../../contracts/messages.js').DraftControl & {draftRevision: number}} DraftMessage */
+/** @typedef {{session: Session, draft: NonNullable<Session['draft']>, service: Session['service'], revision: number, message: DraftMessage, host: Host}} DraftContext */
+/** @type {Readonly<Record<string, (context: DraftContext) => void | Promise<void>>>} */
+const DRAFT_ACTIONS = Object.freeze({
+    review: ({draft, revision}) => {draft.review(revision);},
+    closeReview: ({draft, revision}) => {draft.closeReview(revision);},
+    undo: ({draft, revision, session}) => {draft.undo(revision); session.resetDraftForms = true;},
+    redo: ({draft, revision, session}) => {draft.redo(revision); session.resetDraftForms = true;},
+    jump: ({draft, revision, message, session}) => {
+        draft.jump(revision, /** @type {Extract<DraftMessage, {type: 'jumpProfileDraft'}>} */ (message).step);
+        session.resetDraftForms = true;
+    },
+    discardChanges: ({draft, revision, message, session}) => {
+        draft.discard(revision, /** @type {Extract<DraftMessage, {type: 'discardProfileDraftChanges'}>} */ (message).group);
+        session.resetDraftForms = true;
+    },
+    discard: async ({draft, revision, session, service}) => {
+        // The draft's own keyboard, unchanged: discarding is an undoable
+        // step. Otherwise the keyboard is read again and the draft starts
+        // over from it.
+        if (!draft.stale && !draft.base.incomplete && panelState(session).selectedDeviceId === draft.deviceId) {
+            draft.discardAll(revision);
+            session.resetDraftForms = true;
+            session.notice = "Draft discarded. Undo (⌘Z) brings it back.";
+            return;
+        }
+        draft.assertRevision(revision, {allowStale: true});
+        const state = service.snapshot();
+        if (!state.connected) throw new Error("Reconnect and read the keyboard before discarding its draft.");
+        const complete = hasCurrentLayers(state.capabilities);
+        discardDraftForDevice(session, state, complete ? await service.readPortableProfile() : undefined);
+        session.notice = complete ? "Draft discarded. Showing the saved keyboard configuration." : "Draft discarded. This keyboard remains read-only.";
+        return;
+    },
+    rebase: async ({draft, revision, session, service}) => {
+        draft.assertRevision(revision, {allowStale: true});
+        if (service.snapshot().selectedDeviceId !== draft.deviceId) throw new Error("Reconnect the keyboard this draft belongs to.");
+        const snapshot = await service.readPortableProfile({forRestore: true});
+        observePortable(session, service.snapshot(), snapshot);
+        draft.rebase(revision);
+        session.resetDraftForms = true;
+        session.notice = "Review now compares your draft with the latest keyboard state. Apply will replace the differences shown.";
+        return;
+    },
+    apply: async ({draft, revision, message, session, service, host}) => {
+        // The interface asks about active traps and warnings; the host
+        // enforces that decision before writing a recovery copy or HID.
+        if (draft.hasBlockers()) throw new Error("Resolve the blockers in Checks before applying this profile.");
+        if (draft.hasChecksToConfirm() && /** @type {Extract<DraftMessage, {type: 'applyProfileDraft'}>} */ (message).confirmChecks !== true) throw new Error("This draft has warnings or traps. Confirm them in the review before applying.");
+        // A finished Apply is shown only while this control still runs:
+        // a later read or export is not its readback.
+        await whileApplying(session, async (readStep) => {
+            /** @type {string | undefined} */
+            let recovery = "";
+            const result = await run(host, "Applying the complete profile to both halves",
+                () => draft.apply(service, revision, async (document) => (recovery = await saveRecovery(host, document))));
+            session.resetDraftForms = true;
+            let reread = "";
+            await rereadKeyboard(service, (step) => {
+                readStep(step);
+                service.emitChange?.();
+            }).catch((error) => {reread = rereadFailure(error);});
+            session.notice = `${savedNotice(result, "applied to")} ${reread}Recovery copy: ${recovery}`;
+        });
+        return;
+    },
+});
+
+/** @param {Session} session @param {DraftMessage} message @param {Host} [host] */
 async function draftControl(session, message, host = {}) {
     const draft = session.draft, service = session.service;
     if (!draft) throw new Error("Read a complete keyboard profile before editing.");
-    const revision = message.draftRevision;
-    // The demo has no keyboard to write or to review against.
-    if (session.demo && (message.type === "applyProfileDraft" || message.type === "rebaseProfileDraft")) {
+    const control = panelControl(message.type);
+    if (session.demo && control?.demo === "refuse") {
         throw Object.assign(new Error(DEMO_WORDS.applyNeedsKeyboard), {code: "DEMO_REFUSED"});
     }
-    switch (message.type) {
-        case "reviewProfileDraft": draft.review(revision); return;
-        case "closeProfileDraftReview": draft.closeReview(revision); return;
-        case "undoProfileDraft": draft.undo(revision); session.resetDraftForms = true; return;
-        case "redoProfileDraft": draft.redo(revision); session.resetDraftForms = true; return;
-        case "jumpProfileDraft": draft.jump(revision, message.step); session.resetDraftForms = true; return;
-        case "discardProfileDraftChanges": draft.discard(revision, message.group); session.resetDraftForms = true; return;
-        case "discardProfileDraft": {
-            // The draft's own keyboard, unchanged: discarding is an undoable
-            // step. Otherwise the keyboard is read again and the draft starts
-            // over from it.
-            if (!draft.stale && !draft.base.incomplete && panelState(session).selectedDeviceId === draft.deviceId) {
-                draft.discardAll(revision);
-                session.resetDraftForms = true;
-                session.notice = "Draft discarded. Undo (⌘Z) brings it back.";
-                return;
-            }
-            draft.assertRevision(revision, {allowStale: true});
-            const state = service.snapshot();
-            if (!state.connected) throw new Error("Reconnect and read the keyboard before discarding its draft.");
-            const complete = hasCurrentLayers(state.capabilities);
-            discardDraftForDevice(session, state, complete ? await service.readPortableProfile() : undefined);
-            session.notice = complete ? "Draft discarded. Showing the saved keyboard configuration." : "Draft discarded. This keyboard remains read-only.";
-            return;
-        }
-        case "rebaseProfileDraft": {
-            draft.assertRevision(revision, {allowStale: true});
-            if (service.snapshot().selectedDeviceId !== draft.deviceId) throw new Error("Reconnect the keyboard this draft belongs to.");
-            const snapshot = await service.readPortableProfile({forRestore: true});
-            observePortable(session, service.snapshot(), snapshot);
-            draft.rebase(revision);
-            session.resetDraftForms = true;
-            session.notice = "Review now compares your draft with the latest keyboard state. Apply will replace the differences shown.";
-            return;
-        }
-        case "applyProfileDraft": {
-            // The interface asks about active traps and warnings; the host
-            // enforces that decision before writing a recovery copy or HID.
-            if (draft.hasBlockers()) throw new Error("Resolve the blockers in Checks before applying this profile.");
-            if (draft.hasChecksToConfirm() && message.confirmChecks !== true) throw new Error("This draft has warnings or traps. Confirm them in the review before applying.");
-            // A finished Apply is shown only while this control still runs:
-            // a later read or export is not its readback.
-            await whileApplying(session, async (readStep) => {
-                /** @type {string | undefined} */
-                let recovery = "";
-                const result = await run(host, "Applying the complete profile to both halves",
-                    () => draft.apply(service, revision, async (document) => (recovery = await saveRecovery(host, document))));
-                session.resetDraftForms = true;
-                let reread = "";
-                await rereadKeyboard(service, (step) => {
-                    readStep(step);
-                    service.emitChange?.();
-                }).catch((error) => {reread = rereadFailure(error);});
-                session.notice = `${savedNotice(result, "applied to")} ${reread}Recovery copy: ${recovery}`;
-            });
-            return;
-        }
-        default: throw new Error("Unsupported draft control.");
-    }
+    const action = control?.route === "draft" ? DRAFT_ACTIONS[control.action] : undefined;
+    if (!action) throw new Error("Unsupported draft control.");
+    await action({draft, service, session, message, revision: message.draftRevision, host});
 }
 
 // The portable flows that are not just file dialogs: reviewing an import,
 // editing layer names and order, and keeping either in the draft — or, on a
 // keyboard with no draft, restoring it to the keyboard.
-/** @param {Session} session @param {import("../../contracts/messages.js").PortableControl} message @param {Host} [host] */
+/** @typedef {import('../../contracts/messages.js').PortableControl} PortableMessage */
+/** @typedef {{session: Session, message: PortableMessage, host: Host, service: Session['service']}} PortableContext */
+/** @type {Readonly<Record<string, (context: PortableContext) => void | Promise<void>>>} */
+const PORTABLE_ACTIONS = Object.freeze({
+    cancel: ({session}) => {closeEditors(session);},
+    choose: context => PORTABLE_ACTIONS.reviewImport(context),
+    editLayer: ({session, message}) => {applyLayerEdit(session.portableLayers, /** @type {import('../../contracts/messages.js').LayerEditControl} */ (message));},
+    saveLayers: context => PORTABLE_ACTIONS.restore(context),
+    reviewImport: async ({session, message, host, service}) => {
+        // The host answers with the file's text, and its name when it has one.
+        // A drop carries those same values directly from the panel.
+        const chosen = message.type === "reviewPortableProfile" ? message : await host.chooseProfile?.();
+        if (chosen === undefined) return;
+        const text = typeof chosen === "string" ? chosen : chosen.text;
+        if (typeof text !== "string") throw new Error("This profile file could not be read.");
+        if (Buffer.byteLength(text, "utf8") > FILE_MAX_BYTES) throw new Error("This profile file is too large.");
+        const value = validateSnapshot(translateBackup(text), panelCapabilities(session) || undefined);
+        session.portableReview = {document: value.document, fileName: typeof chosen === "string" ? null : chosen.name || null,
+            before: session.draft?.current || await service.readPortableProfile({forRestore: true}), revision: session.draft?.revision,
+            deviceId: panelState(session).selectedDeviceId, draftId: session.draft?.id};
+        session.portableLayers = undefined;
+        return;
+    },
+    manageLayers: async ({session, service}) => {
+        const before = session.draft?.current || await service.readPortableProfile();
+        session.portableReview = undefined;
+        session.portableLayers = startLayerEdit(before, session.draft?.revision);
+        session.portableLayers.deviceId = panelState(session).selectedDeviceId;
+        session.portableLayers.draftId = session.draft?.id;
+        return;
+    },
+    restore: async ({session, message, host, service}) => {
+        const layers = message.type === "savePortableLayers";
+        const entry = layers
+            ? {kind: /** @type {const} */ ("layers"), editor: requireReview(session.portableLayers)}
+            : {kind: /** @type {const} */ ("profile"), editor: requireReview(session.portableReview)};
+        const editor = entry.editor, before = editor.before;
+        if (!before) throw new Error("Review the profile before restoring it.");
+        const editorDeviceId = editor.deviceId;
+        const selectedDeviceId = panelState(session).selectedDeviceId;
+        if (editorDeviceId !== undefined && editorDeviceId !== selectedDeviceId) {
+            throw new Error("This profile review belongs to another keyboard. Open it again on the selected keyboard.");
+        }
+        if (session.draft && (editor.revision !== session.draft.revision ||
+            editor.draftId !== session.draft.id)) {
+            throw new Error("This profile review belongs to an older draft. Open it again on the selected keyboard.");
+        }
+        if (session.draft && selectedDeviceId !== session.draft.deviceId) {
+            throw new Error("This profile review belongs to another keyboard. Open it again on the selected keyboard.");
+        }
+        const document = entry.kind === "layers" ? layerEditDocument(entry.editor) : entry.editor.document;
+        if (session.draft) {
+            // An import has no layer order to keep: its layers are
+            // compared slot by slot with the keyboard's.
+            if (entry.kind === "layers") session.draft.editLayers(document, session.draft.revision, entry.editor.order);
+            else session.draft.replace(document, session.draft.revision, "edit", "Imported a profile", IDENTITY);
+            closeEditors(session, {resetForms: true});
+            return;
+        }
+        /** @type {string | undefined} */
+        let recovery = "";
+        const result = await service.restorePortableProfile(document, {expectedFingerprint: before.fingerprint,
+            saveRecovery: async (copy) => (recovery = await saveRecovery(host, copy))});
+        closeEditors(session);
+        let reread = "";
+        await rereadKeyboard(service).catch((error) => {reread = rereadFailure(error);});
+        session.notice = savedNotice(result, "saved to") + " " + reread + (before.incomplete ? "Interrupted data retained for diagnosis: " : "Recovery copy: ") + recovery;
+        return;
+    },
+});
+
+/** @param {Session} session @param {PortableMessage} message @param {Host} [host] */
 async function portableControl(session, message, host = {}) {
-    const service = session.service;
     if (message.type === "savePortableLayers" && message.names !== undefined) applyLayerEdit(session.portableLayers, message);
-    switch (message.type) {
-        case "cancelPortableReview":
-            closeEditors(session);
-            return;
-        case "choosePortableProfile":
-        case "reviewPortableProfile": {
-            // The host answers with the file's text, and its name when it has one.
-            // A drop carries those same values directly from the panel.
-            const chosen = message.type === "reviewPortableProfile" ? message : await host.chooseProfile?.();
-            if (chosen === undefined) return;
-            const text = typeof chosen === "string" ? chosen : chosen.text;
-            if (typeof text !== "string") throw new Error("This profile file could not be read.");
-            if (Buffer.byteLength(text, "utf8") > FILE_MAX_BYTES) throw new Error("This profile file is too large.");
-            const value = validateSnapshot(translateBackup(text), panelCapabilities(session) || undefined);
-            session.portableReview = {document: value.document, fileName: typeof chosen === "string" ? null : chosen.name || null,
-                before: session.draft?.current || await service.readPortableProfile({forRestore: true}), revision: session.draft?.revision,
-                deviceId: panelState(session).selectedDeviceId, draftId: session.draft?.id};
-            session.portableLayers = undefined;
-            return;
-        }
-        case "managePortableLayers": {
-            const before = session.draft?.current || await service.readPortableProfile();
-            session.portableReview = undefined;
-            session.portableLayers = startLayerEdit(before, session.draft?.revision);
-            session.portableLayers.deviceId = panelState(session).selectedDeviceId;
-            session.portableLayers.draftId = session.draft?.id;
-            return;
-        }
-        case "editPortableLayer":
-            applyLayerEdit(session.portableLayers, message);
-            return;
-        case "savePortableLayers":
-        case "restorePortableProfile": {
-            const layers = message.type === "savePortableLayers";
-            const entry = layers
-                ? {kind: /** @type {const} */ ("layers"), editor: requireReview(session.portableLayers)}
-                : {kind: /** @type {const} */ ("profile"), editor: requireReview(session.portableReview)};
-            const editor = entry.editor, before = editor.before;
-            if (!before) throw new Error("Review the profile before restoring it.");
-            const editorDeviceId = editor.deviceId;
-            const selectedDeviceId = panelState(session).selectedDeviceId;
-            if (editorDeviceId !== undefined && editorDeviceId !== selectedDeviceId) {
-                throw new Error("This profile review belongs to another keyboard. Open it again on the selected keyboard.");
-            }
-            if (session.draft && (editor.revision !== session.draft.revision ||
-                editor.draftId !== session.draft.id)) {
-                throw new Error("This profile review belongs to an older draft. Open it again on the selected keyboard.");
-            }
-            if (session.draft && selectedDeviceId !== session.draft.deviceId) {
-                throw new Error("This profile review belongs to another keyboard. Open it again on the selected keyboard.");
-            }
-            const document = entry.kind === "layers" ? layerEditDocument(entry.editor) : entry.editor.document;
-            if (session.draft) {
-                // An import has no layer order to keep: its layers are
-                // compared slot by slot with the keyboard's.
-                if (entry.kind === "layers") session.draft.editLayers(document, session.draft.revision, entry.editor.order);
-                else session.draft.replace(document, session.draft.revision, "edit", "Imported a profile", IDENTITY);
-                closeEditors(session, {resetForms: true});
-                return;
-            }
-            /** @type {string | undefined} */
-            let recovery = "";
-            const result = await service.restorePortableProfile(document, {expectedFingerprint: before.fingerprint,
-                saveRecovery: async (copy) => (recovery = await saveRecovery(host, copy))});
-            closeEditors(session);
-            let reread = "";
-            await rereadKeyboard(service).catch((error) => {reread = rereadFailure(error);});
-            session.notice = savedNotice(result, "saved to") + " " + reread + (before.incomplete ? "Interrupted data retained for diagnosis: " : "Recovery copy: ") + recovery;
-            return;
-        }
-        default: throw new Error("Unsupported portable control.");
-    }
+    const control = panelControl(message.type);
+    const action = control?.route === "portable" ? PORTABLE_ACTIONS[control.action] : undefined;
+    if (!action) throw new Error("Unsupported portable control.");
+    await action({session, message, host, service: session.service});
 }
 
 /** @template T @param {T | null | undefined} value @returns {T} */
@@ -273,4 +287,4 @@ function saveRecovery(host, document) {
     return host.saveRecovery(document);
 }
 
-module.exports = {readKeyboard, draftControl, portableControl, rereadKeyboard};
+module.exports = {readKeyboard, draftControl, portableControl, rereadKeyboard, DRAFT_ACTIONS, PORTABLE_ACTIONS};

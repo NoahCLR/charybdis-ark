@@ -70,3 +70,5 @@ export {keycodes};
 // bundle (web/buffer.mjs). A host turns device bytes into one with it.
 const NodeOrBundledBuffer = Buffer;
 export {NodeOrBundledBuffer as Buffer};
+
+export {CONTROLS, panelControl, writingProfile} from "../core/session/panel-control-registry.js";

@@ -1007,6 +1007,18 @@ writes. The model publishes it as `draft.editable` and `draft.reason`
 reads that value instead of recomputing it. A new connection is therefore
 refused before any model has marked the draft stale.
 
+Panel controls are registered once in
+`core/session/panel-control-registry.js` (`CONTROLS`): their route, draft
+identity and binding rule, demo policy, execution phase and named action.
+The router, operation wrappers and demo refusals consume those policies;
+controller modules implement the actions. History and local macro inspection
+remain available before the ordinary busy guard. Read-only recovery paths
+remain available without a draft. Closing a browser tab warns for unapplied
+edits, an active Apply or an active device restore, rather than every portable
+operation. The keyed payload groups in `contracts/messages.d.ts` are inert
+posted-data declarations; a registry test holds their control names and routes
+to the runtime table. Route sets retained for hosts are derived from it.
+
 The same module holds the panel session's compound transitions: opening or
 replacing the draft, closing the import review and layer editor together (and
 resetting the forms when the keyboard or draft under them changes), a read

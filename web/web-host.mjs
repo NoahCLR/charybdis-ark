@@ -6,7 +6,7 @@
 // errors. web/page.mjs starts it with the page's own globals; everything it
 // touches comes in through `env`, so it can be started with stand-ins.
 
-import {demoUnsaved, FILE_MAX_BYTES, openPanelLoop, WebHidDeviceAdapter} from "./core.mjs";
+import {demoUnsaved, FILE_MAX_BYTES, openPanelLoop, WebHidDeviceAdapter, writingProfile} from "./core.mjs";
 import {connectPanel} from "./panel-channel.mjs";
 import {openRecoveries} from "./recoveries.mjs";
 import {workerSleep} from "./sleep.mjs";
@@ -46,7 +46,7 @@ export function initialTheme(saved, prefersLight) {
 /** @param {import("../core/session/types.js").PanelSession & {service: {phase?: string}}} session */
 export function leaving(session) {
     const edits = session.demo ? demoUnsaved(session) : session.draft?.dirty;
-    return Boolean(edits || session.applyRunning || session.service?.phase === "restoring complete profile");
+    return Boolean(edits || writingProfile(session));
 }
 
 // A chosen profile file as the loop takes it, refused when it is too large.
