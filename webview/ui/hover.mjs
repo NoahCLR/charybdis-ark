@@ -4,7 +4,10 @@
 
 // Selector assertions refer to elements created by this module's authored markup.
 import {el, esc} from "../lib/dom.mjs";
-import {actionLabel, behaviourFor, behaviourTiers, combosAt, combosShownAt, keyMeaning, keyName, macroKeycodes, pointingSlotFor, resolvedPositions, visibleKeycode} from "../view/keyface.mjs";
+import {actionLabel, behaviourFor, behaviourTiers, keyMeaning, keyName, visibleKeycode} from "../view/keyface.mjs";
+import {combosAt, combosShownAt} from "../view/combo-reach.mjs";
+import {macroKeycodes, pointingSlotFor} from "../view/reach.mjs";
+import {resolvedPositions} from "../view/layer-resolution.mjs";
 import {pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {getModel, heldLayers, layerName, positionAt} from "../store.mjs";
 import {branchBadge, comboBadge, keyNameMarked, mark, marked, sends, sendsKind, tierDot} from "./marks.mjs";

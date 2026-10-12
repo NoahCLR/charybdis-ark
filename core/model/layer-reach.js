@@ -43,6 +43,7 @@ const {SETTING} = require("../schema/settings-domain-v1");
 const {actionName, nativeCode} = require("../schema/actions");
 const {layerName} = require("./vocabulary");
 const {analyzeLayerStates} = require("./layer-state-graph");
+const {compileLayerAnswers, answeringLayer} = require("./layer-resolution");
 
 /**
  * @typedef {import("./types.js").LayerEffect} LayerEffect
@@ -184,7 +185,7 @@ function profileFacts(decoded) {
     const pointer = values[SETTING.AUTO_MOUSE_ENABLED] ? values[SETTING.AUTO_MOUSE_LAYER] : undefined;
     const sniping = values[SETTING.AUTO_SNIPING_ENABLED] ? values[SETTING.AUTO_SNIPING_LAYER] : undefined;
     const allCombos = (decoded.combos?.rows || []).map((combo, index) => ({index, output: combo.output}));
-    return {names, layers, rows, combos, allCombos, pointer, sniping, values, behaviorUsed, comboPress, generatedLayers,
+    return {names, layers, answers: compileLayerAnswers(layers), rows, combos, allCombos, pointer, sniping, values, behaviorUsed, comboPress, generatedLayers,
         // Base is always on, and so are the default layers the keyboard keeps.
         always: (1 | (values[SETTING.DEFAULT_LAYERS] & 0xffff)) >>> 0,
         /** @param {number} layer */
@@ -195,12 +196,8 @@ function profileFacts(decoded) {
 // comes from; null when every layer is transparent there.
 /** @param {Facts} facts @param {number} active @param {number} position */
 function resolve(facts, active, position) {
-    for (let layer = LAYERS - 1; layer >= 0; layer--) {
-        if (!(active & bit(layer))) continue;
-        const code = facts.layers[layer][position];
-        if (code !== TRANSPARENT) return {layer, code};
-    }
-    return null;
+    const layer = answeringLayer(facts.answers[highest(active)]?.[position], active);
+    return layer === null ? null : {layer, code: facts.layers[layer][position]};
 }
 
 // QMK uses the raw reference layer only when it differs from the highest

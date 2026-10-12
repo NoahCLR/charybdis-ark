@@ -6,7 +6,10 @@
 // tab counts, and the "Reached by" words every reach table shares.
 
 import {esc} from "../../lib/dom.mjs";
-import {actionLabel, behaviourRouteKeys, comboGroups, combosInView, macroKeycodes, macroReach, pointingReach, pointingSlotFor, reachInView, reachKeys, resolvedPositions} from "../../view/keyface.mjs";
+import {actionLabel} from "../../view/keyface.mjs";
+import {behaviourRouteKeys, macroKeycodes, macroReach, pointingReach, pointingSlotFor, reachInView, reachKeys} from "../../view/reach.mjs";
+import {comboGroups, combosInView} from "../../view/combo-reach.mjs";
+import {resolvedPositions} from "../../view/layer-resolution.mjs";
 import {heldLayers, layerName, layers, state} from "../../store.mjs";
 import {reachEntries} from "../../view/reach-groups.mjs";
 import {comboBadge} from "../marks.mjs";

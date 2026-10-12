@@ -3,7 +3,7 @@
 // builder beside the table.
 
 import {el, esc} from "../../lib/dom.mjs";
-import {comboGroups, combosInView, combosOnKey} from "../../view/keyface.mjs";
+import {comboGroups, combosInView, combosOnKey} from "../../view/combo-reach.mjs";
 import {closeComboBuilder, getModel, heldLayers, layers, openComboBuilder, render, state, canEdit as canEditArea} from "../../store.mjs";
 import * as edits from "../../view/edits.mjs";
 import {draftMarks, draftDot} from "../../view/review.mjs";

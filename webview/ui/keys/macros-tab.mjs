@@ -3,7 +3,8 @@
 // to its slot in the Macros view.
 
 import {el, esc} from "../../lib/dom.mjs";
-import {actionLabel, macroReach} from "../../view/keyface.mjs";
+import {actionLabel} from "../../view/keyface.mjs";
+import {macroReach} from "../../view/reach.mjs";
 import {getModel, layers, render, state} from "../../store.mjs";
 import {draftDot, draftMarks} from "../../view/review.mjs";
 import {attachReachRows, reachAttrs, reachTable} from "../groups.mjs";

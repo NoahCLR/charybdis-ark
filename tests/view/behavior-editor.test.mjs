@@ -1,3 +1,4 @@
+import {withAnswers} from "../fixtures/layer-answers.mjs";
 import assert from "node:assert/strict";
 import test from "node:test";
 import {behaviourEditorRow, behaviourKeyAt, behaviourRowAfterPreview, behaviourTimingEdit, behaviourTimingField, canHaveBehaviour} from "../../webview/view/behavior-editor.mjs";
@@ -36,11 +37,11 @@ test("transparent and disabled key aliases never open a behaviour editor", () =>
 
 test("a transparent key in a layer preview opens the key answered from below", () => {
     const at = (layoutIndex, keycode, semantic) => ({layoutIndex, keycode, semantic, display: keycode});
-    const stack = [
+    const stack = withAnswers([
         {index: 0, name: "Base", positions: [at(0, "KC_A"), at(1, "KC_B"), at(2, "KC_C"), at(3, "QK_USER_0", "CUSTOM_KEY_0")]},
         {index: 3, name: "Navigation", positions: [at(0, "KC_DELETE"), at(1, "KC_NO"), at(2, "KC_TRANSPARENT"), at(3, "KC_TRANSPARENT")]},
         {index: 4, name: "Pointing", positions: [at(0, "KC_TRANSPARENT"), at(1, "KC_TRANSPARENT"), at(2, "KC_TRANSPARENT"), at(3, "KC_TRANSPARENT")]},
-    ];
+    ]);
     const key = (held, index) => {
         const found = behaviourKeyAt(stack, 2, held, index);
         return [found.keycode, found.from?.name ?? null];
@@ -55,7 +56,7 @@ test("a transparent key in a layer preview opens the key answered from below", (
     assert.deepEqual(behaviourKeyAt(stack, 1, [], 0), {keycode: "KC_DELETE", from: null}, "a mapped key opens its own row");
     assert.deepEqual(behaviourKeyAt(stack, 1, [], 9), {keycode: "", from: null}, "no position, no key");
 
-    const hollow = [{index: 0, name: "Base", positions: [at(0, "KC_TRANSPARENT")]}, {index: 1, name: "Top", positions: [at(0, "KC_TRANSPARENT")]}];
+    const hollow = withAnswers([{index: 0, name: "Base", positions: [at(0, "KC_TRANSPARENT")]}, {index: 1, name: "Top", positions: [at(0, "KC_TRANSPARENT")]}]);
     assert.deepEqual(behaviourKeyAt(hollow, 1, [0], 0), {keycode: "KC_TRANSPARENT", from: null}, "nothing mapped below");
 });
 

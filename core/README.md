@@ -159,6 +159,13 @@ review-completeness test mutates every editable decoded field shape and every
 stored setting ID through its real codec, requiring a specific review item;
 canonical identities, codec versions and derived counts are explicitly exempt.
 
+`model/layer-resolution.js` compiles each position's possible source layers
+and the active-layer conditions that select them. Layer reach uses those facts,
+and `session/device-model.js` publishes them as each layer's `answers`, indexed
+by layout position. They come from the layout values already decoded; model
+building does not decode again. The webview selects these facts for its preview
+instead of implementing the highest-active-non-transparent rule again.
+
 The macro inspector (`model/macro-input.js`, through `model/macro-editor.js`) shares
 staging's codec and limits. `validateViaMacro` receives a correlated
 `macroValidation` reply without an edit, toast or device call; only a subsequent

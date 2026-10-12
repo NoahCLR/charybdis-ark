@@ -8,7 +8,7 @@
 
 import {isOff, label as hsvLabel} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
-import {comboAnswers, comboInputKeys, toggleComboInput} from "../view/keyface.mjs";
+import {comboAnswers, comboInputKeys, toggleComboInput} from "../view/combo-reach.mjs";
 import {layerColourRow, stageEnabled} from "../view/lighting.mjs";
 import {currentLayer, getModel, heldLayers, layers, post, previewing, render, state, writable} from "../store.mjs";
 import * as edits from "../view/edits.mjs";

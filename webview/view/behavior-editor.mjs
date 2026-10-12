@@ -1,6 +1,7 @@
 // @ts-check
 /** @typedef {Partial<import("../../contracts/panel.js").PublishedModel> | null | undefined} Model */
-import {behaviourListeningTo, canonicalKeycode, keyFace, keyMeaning, resolvedPositions} from "./keyface.mjs";
+import {behaviourListeningTo, canonicalKeycode, keyFace, keyMeaning} from "./keyface.mjs";
+import {resolvedPositions} from "./layer-resolution.mjs";
 import {timingInput} from "./timing-input.mjs";
 
 export function canHaveBehaviour(/** @type {Model} */ model, /** @type {string} */ keycode) {

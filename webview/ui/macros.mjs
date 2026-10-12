@@ -17,7 +17,8 @@
 import {el, esc} from "../lib/dom.mjs";
 import {describeStep, macroMatches, macroPeek, parseMacro, macroStepsInput, unreleased} from "../view/macro.mjs";
 import {withStepFocus} from "../view/macro-focus.mjs";
-import {actionLabel, macroPlacements} from "../view/keyface.mjs";
+import {actionLabel} from "../view/keyface.mjs";
+import {macroPlacements} from "../view/reach.mjs";
 import {NAME_TIP, nameCount} from "../view/names.mjs";
 import {ROUTE_WORDS, setReachGroupOpen} from "../view/reach-groups.mjs";
 import {canEdit as canEditArea, getModel, layerName, layers, macroForm, post, render, setMacroForm, state, writable} from "../store.mjs";

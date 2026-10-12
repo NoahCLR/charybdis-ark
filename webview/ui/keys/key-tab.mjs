@@ -5,7 +5,10 @@
 import {css, isOff} from "../../lib/colour.mjs";
 import {el, esc} from "../../lib/dom.mjs";
 import {LED_INDEX} from "../../view/geometry.mjs";
-import {actionLabel, behaviourFor, canonicalKeycode, combosAt, keyFace, keyMeaning, keyName, pointingSlotFor, resolvedPositions, visibleKeycode} from "../../view/keyface.mjs";
+import {actionLabel, behaviourFor, canonicalKeycode, keyFace, keyMeaning, keyName, visibleKeycode} from "../../view/keyface.mjs";
+import {combosAt} from "../../view/combo-reach.mjs";
+import {pointingSlotFor} from "../../view/reach.mjs";
+import {resolvedPositions} from "../../view/layer-resolution.mjs";
 import {layerColourRow, stageEnabled} from "../../view/lighting.mjs";
 import {currentLayer, getModel, heldLayers, layerName, layers, openComboBuilder, positionAt, post, previewing, render, selectedPosition, showLayer, state, writable} from "../../store.mjs";
 import {participationAt} from "../../view/participation.mjs";

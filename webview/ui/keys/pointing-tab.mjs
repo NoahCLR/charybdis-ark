@@ -3,7 +3,8 @@
 // how, each linking to its slot in the Pointing modes view.
 
 import {el, esc} from "../../lib/dom.mjs";
-import {keyMeaning, pointingReach, pointingVariant, reachInView} from "../../view/keyface.mjs";
+import {keyMeaning} from "../../view/keyface.mjs";
+import {pointingReach, pointingVariant, reachInView} from "../../view/reach.mjs";
 import {pdColourRow} from "../../view/lighting.mjs";
 import {getModel, layers, render, state} from "../../store.mjs";
 import {draftDot, draftMarks} from "../../view/review.mjs";
