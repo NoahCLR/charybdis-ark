@@ -7,6 +7,9 @@
 // functions in keyface.mjs return one list per group; these name the groups,
 // order them, and say which list each reads.
 
+/** @type {Readonly<Record<string, string>>} */
+export const ROUTE_WORDS = Object.freeze({here: "key", branches: "behaviour", combos: "combo"});
+
 export const GROUP_TITLES = {
     // The Combos tab's one cut across the others: what the selected key takes
     // part in, in the view the board shows.

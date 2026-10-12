@@ -140,7 +140,7 @@ commits and are retained as artifacts.
 Use `--firmware-ref REV --qmk-ref REV` to check membership in a selected local
 release history; the defaults are the fetched origin trunks.
 Revision pins belong in the integrating CI job; this command neither chooses
-nor updates a known-compatible release automatically. These seven checks do not
+nor updates a known-compatible release automatically. These checks do not
 replace either repository's full suite or physical-device acceptance.
 
 Firmware's full suite and build are independent of Ark. It uses frozen,

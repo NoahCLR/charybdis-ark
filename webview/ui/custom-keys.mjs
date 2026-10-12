@@ -10,15 +10,13 @@
 import {el, esc} from "../lib/dom.mjs";
 import {customKeyPlacements} from "../view/keyface.mjs";
 import {NAME_MAX_BYTES, NAME_TIP, nameCount} from "../view/names.mjs";
-import {setReachGroupOpen} from "../view/reach-groups.mjs";
+import {ROUTE_WORDS, setReachGroupOpen} from "../view/reach-groups.mjs";
 import {canEdit as canEditArea, getModel, layerName, layers, post, render, state, writable} from "../store.mjs";
 import * as edits from "../view/edits.mjs";
 import {layerSwatch} from "./layerbar.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {topbar, unavailable} from "./shell.mjs";
 
-/** @type {Record<string, string>} */
-const ROUTE_WORDS = {here: "key", combos: "combo"};
 
 export function screenCustomKeys() {
     const model = getModel();

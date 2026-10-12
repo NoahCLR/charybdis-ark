@@ -18,7 +18,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const vscode = require("vscode");
 
-const {openPanelLoop} = require("./core/session/panel-loop");
+const {openPanelLoop, FILE_MAX_BYTES} = require("./core/session/panel-loop");
 const {getHtml} = require("./panel-html");
 
 const VIEW_TYPE = "charybdisArk.panel";
@@ -92,7 +92,7 @@ function vscodeHost(panel, recoveryRoot) {
         chooseProfile: async () => {
             const files = await vscode.window.showOpenDialog({title: "Choose a keyboard profile", canSelectMany: false, filters: {"Charybdis profile": ["charybdis.json", "json"]}});
             if (!files?.length) return undefined;
-            if ((await vscode.workspace.fs.stat(files[0])).size > 100000) throw new Error("This profile file is too large.");
+            if ((await vscode.workspace.fs.stat(files[0])).size > FILE_MAX_BYTES) throw new Error("This profile file is too large.");
             const name = files[0].path.split("/").pop();
             return {text: Buffer.from(await vscode.workspace.fs.readFile(files[0])).toString("utf8"), name};
         },

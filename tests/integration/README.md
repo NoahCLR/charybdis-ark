@@ -1,6 +1,6 @@
 # Ark-owned firmware integration
 
-These seven shell runners are invoked only by `npm run test:compat`, not by
+These shell runners are invoked only by `npm run test:compat`, not by
 ordinary app checks or firmware's suite. The bridge supplies absolute
 `FIRMWARE_ROOT`, `CHARYBDIS_ARK_ROOT` and `QMK_ROOT` paths. Never guess sibling
 paths. The selected Ark checkout owns these runners; firmware supplies the C

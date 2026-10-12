@@ -9,6 +9,7 @@ import {pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {getModel, heldLayers, layerName, positionAt} from "../store.mjs";
 import {branchBadge, comboBadge, keyNameMarked, mark, marked, sends, sendsKind, tierDot} from "./marks.mjs";
 import {helperWord, tierName, vocabulary, word} from "../view/vocabulary.mjs";
+import {KIND} from "../view/pointing-config.mjs";
 
 const tip = el(`<div class="tip" hidden></div>`);
 const card = el(`<div class="hovercard" hidden></div>`);
@@ -110,10 +111,10 @@ function reachSections(model, layer, position, index,
             /** @type {[import("../../contracts/edits.js").Tier, string, import("../../contracts/panel.js").Branch | undefined][]} */
             const tiers = [["tap", tierName(model, "tap"), step.tap], ["hold", tierName(model, "hold"), step.hold], ["long", tierName(model, "long"), step.longHold]];
             const rows = tiers
-                .map(([kind, name, branch]) => branch ? `<div class="hc-act"><span class="hc-stage">${tierDot(model, kind)}${name}</span>
+                .map(([kind, name, branch]) => branch ? `<div class="hc-act"><span class="hc-stage">${tierDot(model, kind)}${esc(name)}</span>
                     <span>${sends(model, branch.action) || `<span class="hc-target">${esc(branch.action)}</span>`}
                     <span class="hc-life${sendsKind(model, branch.action) ? " hc-under" : ""}">${esc(described(sendsKind(model, branch.action), helperText(kind, branch.helper)))}</span></span></div>` : "").join("");
-            return `<div class="hc-branch">${branchBadge(model, step.tapCount + 1).replace('class="bn"', 'class="bn hc-n"')}<div>${rows}</div></div>`;
+            return `<div class="hc-branch">${branchBadge(model, step.tapCount + 1, "hc-n")}<div>${rows}</div></div>`;
         }).join("");
         sections.push(`<div class="hc-sect"><div class="hc-h">Key behaviour</div>
             <div class="hc-sub">${keyNameMarked(model, actionLabel(model, behaviour.keycode), behaviour.keycode)} · ${behaviour.steps.length} branch${behaviour.steps.length === 1 ? "" : "es"} · tap/hold ${timing(behaviour.tapHoldTerm)}${behaviour.keepsAutoMouseAnchored ? " · keeps auto-mouse anchored" : ""}</div>
@@ -135,7 +136,7 @@ function reachSections(model, layer, position, index,
         sections.push(`<div class="hc-sect"><div class="hc-h">Pointing mode</div>
             <div class="hc-flow">${mark(model, {kind: "pointing", slot: slot.id})}
             <span>${esc(slot.displayName || `Slot ${slot.id}`)}</span>
-            <span class="hc-life">${slot.kind === 2 ? "scrolling" : slot.kind ? "directional" : "empty slot"}</span></div>
+            <span class="hc-life">${slot.kind === KIND.SCROLLING ? "scrolling" : slot.kind ? "directional" : "empty slot"}</span></div>
             <div class="hc-sub hc-foot">${slot.kind
                 ? `Its colour paints ${esc(localityText(row?.locality))} while the mode runs — not this key.`
                 : "This slot is empty, so the key does nothing until it is configured. The keyboard keeps the keycode either way."}</div></div>`);

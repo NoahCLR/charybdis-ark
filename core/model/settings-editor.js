@@ -16,7 +16,7 @@ const {layerName, VOCABULARY} = require("./vocabulary");
 /** @param {string} message */
 const fail = message => Object.assign(new Error(message), {code: "INVALID_SETTINGS_EDIT"});
 /** @param {string} macro @param {number} id @param {string} label @param {string} [hint] @param {Partial<import("../../contracts/model.js").StoredSettingField>} [extra] @returns {import("../../contracts/model.js").StoredSettingField} */
-const number = (macro, id, label, hint = "0–65535 ms", extra = {}) => ({macro, id, label, hint, kind: "number", validate: "nonnegative-int", ...extra});
+const number = (macro, id, label, hint = "0–65535 ms", extra = {}) => ({macro, id, label, hint, unit: "ms", kind: "number", validate: "nonnegative-int", ...extra});
 /** @param {string} macro @param {number} id @param {string} label @param {string} [hint] @returns {import("../../contracts/model.js").StoredSettingField} */
 const toggle = (macro, id, label, hint) => ({macro, id, label, hint, kind: "toggle"});
 /** @overload @param {string} macro @param {number} id @param {string} label @returns {import("../../contracts/model.js").StoredSettingField} */
@@ -24,12 +24,19 @@ const toggle = (macro, id, label, hint) => ({macro, id, label, hint, kind: "togg
 /** @param {string} macro @param {number | undefined} id @param {string} label @returns {import("../../contracts/model.js").SettingFieldBase & {id: number | undefined, kind: 'layer', validate: string}} */
 function layer(macro, id, label) {return {macro, id, label, kind: "layer", validate: "layer"};}
 /** @param {string} macro @param {number} id @param {number} shift @param {string} label @param {string} [hint] */
-const byte = (macro, id, shift, label, hint) => number(macro, id, label, hint || "0–255", {shift, max: 255, validate: "uint8"});
+const byte = (macro, id, shift, label, hint) => number(macro, id, label, hint || "0–255", {shift, max: 255, unit: undefined, validate: "uint8"});
 // A duration the keyboard stores in milliseconds but that only means anything
 // as a share of another one, `of`: it is edited as a whole percentage of that
 // one, and keeps its share when that one changes (see `rescaleShares`).
 /** @param {string} macro @param {number} id @param {number} of @param {string} label @param {string} hint @returns {import("../../contracts/model.js").ShareSettingField} */
 const share = (macro, id, of, label, hint) => ({macro, id, of, label, hint, kind: "share", max: 99, validate: "percent"});
+
+// Combo timing is stored in its own domain, but presented with global policy.
+/** @type {readonly import("../../contracts/model.js").ComboTimingField[]} */
+const COMBO_TIMING = Object.freeze([
+    {id: "default", label: "Default combo window", hint: "How close together a combo's keys must be pressed, for every combo without its own window. New combos start on it, and the combos that follow it change with it."},
+    {id: "hold", label: "Combo hold threshold", hint: "How long a combo that must be held, or is tap only, waits to tell a hold from a tap: this, or its combo window if that is longer. Other combos ignore it. 0 adds no wait beyond the window."},
+]);
 
 // These are editor definitions, not configuration defaults. Every value below
 // is supplied by the complete device snapshot; absent readback stays absent.
@@ -62,8 +69,8 @@ const sections = [
         // held in the upstream Charybdis config, which the keyboard only
         // accepts in its own steps, so they offer the part of the list the
         // keyboard accepts. A pointing mode's own speed is set on its slot.
-        number("normalDpi", SETTING.DEFAULT_DPI, "Normal pointer DPI", "400–3400, in steps of 200: the steps this firmware stores.", {choices: dpiChoices({accepts: v => validSetting(SETTING.DEFAULT_DPI, v)})}),
-        number("snipingDpi", SETTING.SNIPING_DPI, "Sniping DPI", "100–400: the steps this firmware stores. Lower DPI gives finer pointer control.", {choices: dpiChoices({accepts: v => validSetting(SETTING.SNIPING_DPI, v)})}),
+        number("normalDpi", SETTING.DEFAULT_DPI, "Normal pointer DPI", "400–3400, in steps of 200: the steps this firmware stores.", {unit: undefined, choices: dpiChoices({accepts: v => validSetting(SETTING.DEFAULT_DPI, v)})}),
+        number("snipingDpi", SETTING.SNIPING_DPI, "Sniping DPI", "100–400: the steps this firmware stores. Lower DPI gives finer pointer control.", {unit: undefined, choices: dpiChoices({accepts: v => validSetting(SETTING.SNIPING_DPI, v)})}),
     ]},
     {id: "sniping", label: "Auto-sniping", area: "Mouse", fields: [
         toggle("autoSniping", SETTING.AUTO_SNIPING_ENABLED, "Auto-sniping", "Use sniping speed while the selected layer is active."),
@@ -75,7 +82,7 @@ const sections = [
         number("mouseTimeout", SETTING.AUTO_MOUSE_TIMEOUT, "Timeout (ms)", "How long the layer stays active after movement. The lighting fade keeps its share of it (Lighting → Auto-mouse fade).", {min: 1}),
         number("mouseDebounce", SETTING.AUTO_MOUSE_DEBOUNCE, "Movement debounce (ms)", "0–255 ms", {max: SETTING_FIELD.AUTO_MOUSE_DEBOUNCE.max}),
         number("mouseDelay", SETTING.AUTO_MOUSE_DELAY, "Delay after typing (ms)", "Wait this long after a key event before movement can activate auto-mouse."),
-        number("mouseThreshold", SETTING.AUTO_MOUSE_THRESHOLD, "Movement threshold", "Movement needed to activate auto-mouse. Higher values require more movement."),
+        number("mouseThreshold", SETTING.AUTO_MOUSE_THRESHOLD, "Movement threshold", "Movement needed to activate auto-mouse. Higher values require more movement.", {unit: undefined}),
     ]},
     // The keyboard stores this as the milliseconds the auto-mouse colour holds
     // before it fades, and refuses a profile where that is not shorter than
@@ -192,9 +199,9 @@ function settingsSections(snapshot, settings, capabilities) {
         [toggle("behaviorsEnabled", SETTING.BEHAVIORS_ENABLED, "Enabled", "Turn every behaviour on or off. Off, each key does what it would without one: a plain key, or its own LT() or MT()."),
             ...everyLayer(i => ({...toggle(`behaviorsOnLayer${i}`, SETTING.LAYER_BEHAVIORS, `On ${name(i)}`, "Keys that come from this layer use their behaviours."), bitMask: 2 ** i, governs: {kind: /** @type {const} */ ("layer"), layer: i}}))]});
     // Combos get a section of their own beside their layer matching. The
-    // Settings screen adds the default window and hold threshold to it, which
+    // Interface adds the default window and hold threshold to it, which
     // the keyboard stores with the combos rather than here.
-    result.push({id: "comboSettings", area: "Settings", label: "Combos", fields:
+    result.push({id: "comboSettings", comboTiming: COMBO_TIMING, area: "Settings", label: "Combos", fields:
         [toggle("combosEnabled", SETTING.COMBOS_ENABLED, "Enabled", "Turn every combo on or off. Each combo's own window and conditions are set in Keys · Combos."),
             ...everyLayer(i => ({...toggle(`combosOnLayer${i}`, SETTING.LAYER_COMBOS, `On ${name(i)}`, "Keys that come from this layer can join combos."), bitMask: 2 ** i, governs: {kind: /** @type {const} */ ("layer"), layer: i}}))]});
     // A layer's combo reference is in its layer record, not a setting value.
@@ -227,7 +234,7 @@ function settingsSections(snapshot, settings, capabilities) {
         description: available
         ? `Detected: ${host.detected ? label(host.detected) : "Unknown"}. Effective: ${host.effective ? label(host.effective) : "Unknown"}. Detection is a best guess; override it if incorrect. ${setup} The keyboard cannot confirm your input setup.`
         : "Update both halves to report their host OS and support these settings.", fields: [
-        {...number("hostOs", SETTING.UNICODE_HOST_MODE, "Host OS", "Auto uses the keyboard’s USB detection. This controls display names, the layouts offered and Unicode entry; it does not swap keys.", {max: 3}), bitMask: 3, kind: "number", readOnly: !available,
+        {...number("hostOs", SETTING.UNICODE_HOST_MODE, "Host OS", "Auto uses the keyboard’s USB detection. This controls display names, the layouts offered and Unicode entry; it does not swap keys.", {max: 3, unit: undefined}), bitMask: 3, kind: "number", readOnly: !available,
             choices: VOCABULARY.hostOs.map(([value, label]) => ({value, label}))},
         {...byte("hostLayout", SETTING.UNICODE_HOST_MODE, LAYOUT_SHIFT, "Keyboard layout"), kind: "number", readOnly: !layouts,
             hint: layouts ? "The layout your computer types with. Macros type through it, accents included; pick the one that is active on the computer." : "Update both halves to type macros through your keyboard layout. Until then they assume US.",

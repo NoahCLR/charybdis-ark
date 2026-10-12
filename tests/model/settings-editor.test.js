@@ -306,3 +306,19 @@ test("choosing a Host OS carries the layout to that OS, and a mismatch left by A
     current.hostOs.detected = 2;
     assert.equal(host(current, capabilities).warning, undefined, "firmware without layouts types US");
 });
+
+
+test("settings presentation owns combo timing words and explicit duration units", () => {
+    const view = settingsEditorView(snapshot());
+    const combos = view.sections.find(section => section.id === "comboSettings");
+    assert.deepEqual(combos.comboTiming.map(field => [field.id, field.label]),
+        [["default", "Default combo window"], ["hold", "Combo hold threshold"]]);
+    assert.ok(combos.comboTiming.every(field => field.hint));
+    const fields = view.sections.flatMap(section => section.fields);
+    for (const macro of ["tappingTerm", "tapHoldTerm", "longerHoldTerm", "multiTapTerm", "mouseTimeout", "mouseDebounce", "mouseDelay", "lightingTimeout", "feedbackFlash"]) {
+        assert.equal(fields.find(field => field.macro === macro).unit, "ms", macro);
+    }
+    for (const macro of ["normalDpi", "snipingDpi", "mouseThreshold", "hue", "brightness", "hostOs"]) {
+        assert.equal(fields.find(field => field.macro === macro).unit, undefined, macro);
+    }
+});

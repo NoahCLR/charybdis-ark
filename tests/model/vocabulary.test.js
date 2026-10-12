@@ -47,3 +47,8 @@ test("one rule names an unnamed layer, slot, branch and modifier set", () => {
     assert.equal(branchName(2), "Double tap");
     assert.deepEqual(modifierNames(2 | 128), ["Left Shift", "Right GUI"]);
 });
+
+
+test("macro playback statuses have one set of presentation words", () => {
+    assert.deepEqual(VOCABULARY.macroPlayback, {setup: "setup", tooLong: "too long", blocked: "blocked", noRoom: "no room"});
+});

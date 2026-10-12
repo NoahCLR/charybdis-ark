@@ -16,11 +16,11 @@ import {layerSwatch} from "./layerbar.mjs";
 
 // A branch's badge as the grid heads its column: from 2× on, tinted with the
 // tap-branch colour the keyboard shows while that branch is pending.
-/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {number} count */
-export function branchBadge(model, count) {
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {number} count @param {string} [className] */
+export function branchBadge(model, count, className = "") {
     const colour = feedbackColours(model).branches[count - 2];
     const lit = count > 1 && stageEnabled(model, "key") && colour && !isOff(colour);
-    return `<span class="bn" style="${lit ? `border-color:${css(colour)};color:${css(colour)}` : ""}">${count}×</span>`;
+    return `<span class="bn${className ? ` ${esc(className)}` : ""}" style="${lit ? `border-color:${css(colour)};color:${css(colour)}` : ""}">${count}×</span>`;
 }
 
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} kind */
@@ -70,7 +70,7 @@ export function mark(model, value) {
     switch (value?.kind) {
         case "tier": return `${value.branch ? branchBadge(model, value.branch) : ""}${tierDot(model, value.tier)}`;
         case "branch": return branchBadge(model, value.count);
-        case "layer": return layerSwatch(model, {index: value.layer}).html.replace('class="swatch', 'class="mk-swatch swatch');
+        case "layer": return layerSwatch(model, {index: value.layer}, "mk-swatch").html;
         case "pointing": return slotLight(model, {id: value.slot}).swatch("mk-swatch");
         case "combo": return comboBadge(model, value.badge);
         case "stage": return `<i class="stagedot ${value.on ? "on" : ""}"></i>`;

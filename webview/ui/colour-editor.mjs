@@ -41,7 +41,7 @@ export function colourEditor({colour, title, canEdit = true, onChange, offNote, 
     const topWhite = css({h: "0", s: "0", v: String(maximum)});
     const topHue = css({h: String(h), s: "255", v: String(maximum)});
     const field = el(`<div class="sv-field" data-tip="Brightness is limited to ${maximum}, as reported by this keyboard."
-        style="background:linear-gradient(to top, #000, transparent), linear-gradient(to right, ${topWhite}, ${topHue})">
+        style="background:linear-gradient(to top, ${css({h: "0", s: "0", v: "0"})}, transparent), linear-gradient(to right, ${topWhite}, ${topHue})">
         <span class="thumb" style="left:${(s / 255) * 100}%;top:${100 - valuePercent(v, maximum)}%"></span></div>`);
     node.append(field);
 
@@ -72,7 +72,7 @@ export function colourEditor({colour, title, canEdit = true, onChange, offNote, 
             const shown = {h: String(dh), s: String(ds), v: String(dv)};
             /** @type {HTMLElement} */ (head.querySelector(".swatch-lg")).style.background = css(shown);
             /** @type {HTMLElement} */ (head.querySelector(".note")).textContent = `${hsvLabel(shown)} · rgb(${rgb(shown).join(", ")})`;
-            field.style.background = `linear-gradient(to top, #000, transparent), linear-gradient(to right, ${topWhite}, ${css({h: String(dh), s: "255", v: String(maximum)})})`;
+            field.style.background = `linear-gradient(to top, ${css({h: "0", s: "0", v: "0"})}, transparent), linear-gradient(to right, ${topWhite}, ${css({h: String(dh), s: "255", v: String(maximum)})})`;
             /** @type {HTMLElement} */ (field.querySelector(".thumb")).style.left = `${(ds / 255) * 100}%`;
             /** @type {HTMLElement} */ (field.querySelector(".thumb")).style.top = `${100 - valuePercent(dv, maximum)}%`;
             /** @type {HTMLElement} */ (hueRamp.querySelector(".thumb")).style.left = `${(dh / 255) * 100}%`;

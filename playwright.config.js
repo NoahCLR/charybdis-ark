@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 const {defineConfig} = require("@playwright/test");
 // The tests build the web page first, unless ARK_WEB_BUILT says dist/web/ is

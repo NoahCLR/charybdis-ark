@@ -105,8 +105,9 @@ dist/               ignored web build output (`npm run build:web`)
 
 Use [docs/README.md](docs/README.md) to place new documentation. Update the
 existing governing document first. Product behavior changes update
-[docs/GUIDE.md](docs/GUIDE.md) and the relevant spec in the same pass, and
-`README.md` when what a user can do changes. `README.md` is a short pitch for
+[docs/GUIDE.md](docs/GUIDE.md), `README.md` and the relevant spec in the same
+pass. Keep the short README at capability level; detailed behavior belongs in
+the guide and spec. `README.md` is a short pitch for
 Charybdis owners, in Noah's personal voice: what you can change, that nothing
 is saved until reviewed, installing, and links; keep it short. `docs/GUIDE.md`
 is for people using Ark in depth: how each screen, review, apply and backups
@@ -115,7 +116,7 @@ compatibility and release mechanics go in
 [docs/REPOSITORY.md](docs/REPOSITORY.md#development-and-installation).
 Architecture decisions update the direction or an app-owned spec. Keep Current Product Status and Open Issues accurate.
 Each decision has one home: app decisions continue the D-L series here, while a
-D-L heading marked as a firmware decision is only a pointer to the firmware
+D-L identifier marked as a firmware decision is only a pointer to the firmware
 repository's direction, which owns that text. Change a firmware decision there,
 as firmware work, not here.
 Do not put app plans or new app specifications under `upstream/`.
@@ -151,8 +152,10 @@ through pull requests and is never pushed directly. `main` is the released line 
 landed commit's message ends with what verify ran, and the firmware and QMK
 commits it was tested against are the pins in its own `upstream/manifest.json`.
 Push only to `NoahCLR/charybdis-ark`. The work-queue vault's
-`_agents/bin/verify` runs this file's checks for what a branch changed
-(adding the compatibility bridge for wire, schema or `upstream/` changes),
+`_agents/bin/verify` always installs dependencies and runs the independent
+app checks, upstream reproduction, compatibility bridge and agreement against
+the pins, including for docs-only changes; changed paths additionally select
+preview and browser checks,
 and `_agents/bin/land` merges a branch's pull request into `dev` after verifying
 it. A pin to firmware or QMK names a commit on that repository's trunk, taken
 after its landing (firmware squashes, so a landed commit has a new hash).
@@ -281,15 +284,21 @@ npm run test:browser          # fixture browser smoke, Chromium required
 npm run preview               # then serve the folder and open preview/index.html
 ```
 
-Run `npm ci` when dependencies change. Run targeted tests during development,
+For development, run `npm ci` when dependencies change. Run targeted tests during development,
 then `npm run check`, `npm run keycodes -- --check`, and `git diff --check`
 before handing code changes back. For preview/setup changes also run
-`npm run preview`. Docs-only changes may skip runtime checks; say so.
-Firmware host tests and QMK compilation are not this repository's build gates.
+`npm run preview`. Targeted development checks for docs-only work may skip runtime checks;
+say so. Before a draft PR, the vault's `verify` always runs `npm ci`,
+`npm run check`, catalog reproduction, upstream reproduction, the C
+compatibility bridge and agreement against pinned firmware/QMK, even for
+docs-only and UI-only work. It selects preview and browser smoke by changed
+paths (`--full` also runs those). This is the handoff gate; the scoped checks
+below describe development needs. The firmware full host suite and flashable
+QMK pair build are not Ark gates.
 Before merging wire/schema or cross-language codec changes, run
 `npm run test:compat -- --firmware PATH --ark PATH --qmk PATH --report NEW_FILE`
-as described in [COMPATIBILITY.md](docs/COMPATIBILITY.md). UI-only changes need
-only the independent app checks. Wire/schema changes require this bridge;
+as described in [COMPATIBILITY.md](docs/COMPATIBILITY.md). UI-only development needs
+only the independent app checks; PR verification still runs the bridge. Wire/schema changes require this bridge;
 see [`upstream/README.md`](upstream/README.md). Local work may pin a
 firmware commit that has not landed yet; before landing a change that moves a
 pin, fetch the firmware checkout and run the bridge with `--publish` (`land`

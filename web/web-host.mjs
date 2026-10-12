@@ -6,7 +6,7 @@
 // errors. web/page.mjs starts it with the page's own globals; everything it
 // touches comes in through `env`, so it can be started with stand-ins.
 
-import {demoUnsaved, openPanelLoop, WebHidDeviceAdapter} from "./core.mjs";
+import {demoUnsaved, FILE_MAX_BYTES, openPanelLoop, WebHidDeviceAdapter} from "./core.mjs";
 import {connectPanel} from "./panel-channel.mjs";
 import {openRecoveries} from "./recoveries.mjs";
 import {workerSleep} from "./sleep.mjs";
@@ -30,8 +30,8 @@ export const BLOCKED = Object.freeze({
         detail: "One tab holds the keyboard at a time. Keep working in the other Ark tab, or close it: this tab takes over when it does."}),
 });
 
-// The same limit the extension sets on a chosen profile file.
-export const PROFILE_FILE_LIMIT = 262144;
+// Both hosts use the portable document's byte ceiling.
+export const PROFILE_FILE_LIMIT = FILE_MAX_BYTES;
 export const THEME_KEY = "charybdis-ark.theme";
 const LOCK = "charybdis-ark.keyboard";
 

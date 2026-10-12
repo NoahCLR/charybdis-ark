@@ -18,7 +18,7 @@ import {el, esc} from "../lib/dom.mjs";
 import {describeStep, macroMatches, macroPeek, parseMacro, macroStepsInput, unreleased} from "../view/macro.mjs";
 import {actionLabel, macroPlacements} from "../view/keyface.mjs";
 import {NAME_TIP, nameCount} from "../view/names.mjs";
-import {setReachGroupOpen} from "../view/reach-groups.mjs";
+import {ROUTE_WORDS, setReachGroupOpen} from "../view/reach-groups.mjs";
 import {canEdit as canEditArea, getModel, layerName, layers, macroForm, post, render, setMacroForm, state, writable} from "../store.mjs";
 import * as edits from "../view/edits.mjs";
 import {layerSwatch} from "./layerbar.mjs";
@@ -78,7 +78,7 @@ export function screenMacros() {
         const cell = el(`<button class="mslot ${row.empty ? "" : "filled"} ${out ? "out" : ""} ${row.playable === false ? "warn" : ""}" data-slot="${esc(row.keycode)}"
             aria-current="${row.keycode === slot?.keycode}" ${out ? "disabled" : ""} data-tip="${esc(tip)}">
             <span class="n">M${index}</span>${changedMacros.has(row.keycode) ? draftDot("Changed in your draft", "corner") : ""}
-            <span class="v">${row.needsUnicodeSetup ? "setup" : row.playable === false ? (row.playbackCode === "MACRO_TOO_LONG" ? "too long" : "blocked") : row.name ? esc(row.name.length > 13 ? `${row.name.slice(0, 12)}…` : row.name) : row.empty ? (out ? "no room" : "—") : esc(peek.length > 13 ? `${peek.slice(0, 12)}…` : peek)}</span></button>`);
+            <span class="v">${row.needsUnicodeSetup ? vocabulary(model).macroPlayback?.setup : row.playable === false ? (row.playbackCode === "MACRO_TOO_LONG" ? vocabulary(model).macroPlayback?.tooLong : vocabulary(model).macroPlayback?.blocked) : row.name ? esc(row.name.length > 13 ? `${row.name.slice(0, 12)}…` : row.name) : row.empty ? (out ? vocabulary(model).macroPlayback?.noRoom : "—") : esc(peek.length > 13 ? `${peek.slice(0, 12)}…` : peek)}</span></button>`);
         cell.addEventListener("click", () => { state.macroSlot = row.keycode; render(); });
         cells.append(cell);
     });
@@ -219,8 +219,6 @@ function showCount(node, text, max) {
 // in its layer colour and naming how. A click opens that layer in Keys with
 // this macro picked in its Macros tab, on the row for the first of those
 // routes, so the board rings its keys and the table marks the row.
-/** @type {Record<string, string>} */
-const ROUTE_WORDS = {here: "key", branches: "behaviour", combos: "combo"};
 
 /** @param {Model} model @param {MacroSlot} slot */
 function placedOn(model, slot) {

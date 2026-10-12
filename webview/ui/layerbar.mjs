@@ -10,12 +10,12 @@ import {draftMarks} from "../view/review.mjs";
 
 // A layer's swatch and how it is lit, the same wherever a layer is named: a
 // layer whose colour is off, or whose stage is off, shows as unlit.
-/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {Pick<import("../../contracts/panel.js").Layer, "index"> & Partial<import("../../contracts/panel.js").Layer>} layer */
-export function layerSwatch(model, layer) {
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {Pick<import("../../contracts/panel.js").Layer, "index"> & Partial<import("../../contracts/panel.js").Layer>} layer @param {string} [className] */
+export function layerSwatch(model, layer, className = "") {
     const row = layerColourRow(model, layer.index);
     const lit = stageEnabled(model, "layers") && row && !isOff(row.color);
     return {
-        html: `<span class="swatch ${lit ? "" : "swatch-off"}" style="${lit ? `background:${css(row.color)}` : ""}"></span>`,
+        html: `<span class="${className ? `${esc(className)} ` : ""}swatch ${lit ? "" : "swatch-off"}" style="${lit ? `background:${css(row.color)}` : ""}"></span>`,
         tip: `${layerName(layer)} · ${lit ? hsvLabel(row.color) : "no layer colour"}`,
         colour: lit ? css(row.color) : null,
     };
