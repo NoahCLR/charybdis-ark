@@ -486,7 +486,11 @@ What to expect while it applies:
   half connected.
 
 Drafts live in the editor window (in Chrome, the tab); closing it loses
-unapplied changes. The
+unapplied changes. In VS Code one Ark panel holds the keyboard in a window:
+**Open Charybdis Ark** again shows the panel already open. VS Code cannot ask
+before a panel closes, so closing it during Apply does not stop the save: Ark
+finishes it, says so, and lets go of the keyboard afterwards. Keep the keyboard
+connected until then, and open Ark again to see the result. The
 transaction and recovery contract is specified in
 [`docs/architecture/logical-profile-transaction-v1.md`](../upstream/firmware/docs/architecture/logical-profile-transaction-v1.md).
 Physical power-loss acceptance across every decision boundary is still in

@@ -135,14 +135,27 @@ function assertByte(value, label, {nonzero = false} = {}) {
 // A page above 255 is a wide page: its high byte goes in request byte 5, which
 // only the wide readbacks (feature bit 19) read; every other value's byte 5
 // stays zero.
-/** @param {number} valueId @param {number} page @param {number} requestId */
-function buildProfileGetRequest(valueId, page, requestId) {
+/** @param {{featureFlags?: number} | null | undefined} capabilities */
+const supportsWidePages = capabilities => Boolean((capabilities?.featureFlags ?? 0) & PROFILE_WIRE_FEATURES.WIDE_PAGES);
+const PAGE_MAX = 0xff;
+// A read past page 255 on firmware without wide pages would ask for a page it
+// cannot address. `widePages` false refuses it in words; undefined is a caller
+// that has no capabilities to say, as in the protocol's own tests.
+/** @param {number} pages @param {boolean | undefined} widePages */
+function assertPagesReachable(pages, widePages) {
+    if (widePages === false && pages - 1 > PAGE_MAX) {
+        throw new ProfileWireProtocolError("WIDE_PAGES_UNSUPPORTED", `This read needs ${pages} pages and the keyboard's firmware addresses at most ${PAGE_MAX + 1}. Update both halves to current firmware.`, {pages});
+    }
+}
+/** @param {number} valueId @param {number} page @param {number} requestId @param {{widePages?: boolean}} [options] */
+function buildProfileGetRequest(valueId, page, requestId, {widePages} = {}) {
     const report = Buffer.alloc(RAW_HID_REPORT_SIZE);
     report[0] = PROFILE_WIRE_V1.COMMAND_GET;
     report[1] = PROFILE_WIRE_V1.CHANNEL;
     report[2] = assertByte(valueId, "valueId");
     report[3] = assertByte(requestId, "requestId", {nonzero: true});
     if (!Number.isInteger(page) || page < 0 || page > 0xffff) throw new RangeError("page must be a 16-bit integer.");
+    assertPagesReachable(page + 1, widePages);
     report[4] = page & 0xff;
     report[5] = page >> 8;
     return report;
@@ -513,6 +526,7 @@ module.exports = {
     PROFILE_WIRE_V1,
     ProfileWireProtocolError,
     VIA_READS,
+    assertPagesReachable,
     buildProfileGetRequest,
     buildViaFirmwareVersionRequest,
     buildViaProtocolVersionRequest,
@@ -526,5 +540,6 @@ module.exports = {
     readProfilePages,
     readProfileStatus,
     readViaIdentity,
+    supportsWidePages,
     viaReadResponseMatcher,
 };

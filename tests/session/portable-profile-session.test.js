@@ -232,6 +232,19 @@ test("recovery retries capture an incomplete bank and prove its repaired final b
     await f.restore(); assertTarget(f);
     assert.equal(f.keyboard.mutations.filter(r => r[0] === VIA_STORAGE.MACRO_WRITE).at(-1)[4], 0);
 });
+test("recovery over a bank interrupted before any macro byte still clears its final marker", async () => {
+    // Only the layout differs: the macros match the target but for the marker
+    // an interrupted write left in the bank's last byte.
+    const f = fixture(); f.targetDocument.macros = structuredClone(f.source.macros); f.target = validateSnapshot(f.targetDocument);
+    f.keyboard.local.macros[f.keyboard.local.macros.length - 1] = 1;
+    f.keyboard.peer.macros[f.keyboard.peer.macros.length - 1] = 1;
+    const snapshot = await f.capture(); assert.equal(snapshot.incomplete, true);
+    f.options.expectedFingerprint = snapshot.fingerprint;
+    f.options.saveRecovery = async () => "/interrupted.diagnostic.json";
+    await f.restore(); assertTarget(f);
+    const macroWrites = f.keyboard.mutations.filter(r => r[0] === VIA_STORAGE.MACRO_WRITE);
+    assert.equal(macroWrites.at(-1)[4], 0, "the marker is cleared last");
+});
 test("a schema-1 backup and incompatible firmware are refused before any report", async () => {
     const f = fixture(), target = structuredClone(f.targetDocument), blob = Buffer.from(target.profile, "base64");
     blob[4] = 1; target.profile = blob.toString("base64"); target.version = 1;

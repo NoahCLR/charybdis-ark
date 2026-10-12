@@ -753,8 +753,9 @@ The page is static files with no server code: `npm run build:web` writes the
 complete site, hashed names and all, and after it loads the page makes no
 network request (its policy says `connect-src 'none'`). The keyboard is reached
 only through WebHID, after the person picks it in Chrome's picker. One tab holds
-the keyboard (a Web Lock); leaving with unapplied edits or during Apply asks
-first; Apply's waits run on a worker's clock, so a background tab does not slow
+the keyboard (a Web Lock), as one panel does in a VS Code window; leaving with
+unapplied edits or during Apply asks first (a VS Code panel cannot ask, so one
+closed during Apply finishes the save before it releases the keyboard); Apply's waits run on a worker's clock, so a background tab does not slow
 it. Recovery copies are kept in the browser's storage (IndexedDB), listed on
 Profile & backups with a download each; clearing the site's data deletes them.
 

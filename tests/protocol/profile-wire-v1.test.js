@@ -93,6 +93,10 @@ test("Profile Wire get requests are canonical 32-byte frames", () => {
     assert.deepEqual(Array.from(wide.subarray(4, 6)), [2621 & 0xff, 2621 >> 8]);
     assert.equal(wide.subarray(6).every((byte) => byte === 0), true);
     assert.throws(() => buildProfileGetRequest(4, 0x10000, 1), RangeError);
+    // Without wide pages a page past 255 is refused, never sent as another page.
+    assert.equal(buildProfileGetRequest(4, 255, 1, {widePages: false})[4], 255);
+    assert.throws(() => buildProfileGetRequest(4, 256, 1, {widePages: false}), (error) => error.code === "WIDE_PAGES_UNSUPPORTED");
+    assert.equal(buildProfileGetRequest(4, 256, 1, {widePages: true})[5], 1);
 });
 
 test("JavaScript consumes the same golden reports as the C firmware codec", () => {
