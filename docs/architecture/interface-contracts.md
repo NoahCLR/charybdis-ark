@@ -83,6 +83,11 @@ only vertical scroller.
   reader per rendered field, sharing the editor's complete-record staging
   callback. Switching movement rebuilds the readers for the new kind; pending
   button and modifier choices stay with the editor until a valid record posts.
+- App surfaces: `webview/ui/device.mjs` owns device facts;
+  `ui/review-overlay.mjs` owns the review sheet, check confirmation, Show and
+  Discard listeners; `ui/leave-demo.mjs` owns the unsaved-demo dialog. The app
+  composes these surfaces and keeps message routing, screen rendering, shared
+  focus/scroll restoration and window keyboard handlers.
 - Key names: `core/model/key-names.js`. The catalogue names what QMK ships;
   the profile names its macros, pointing-mode keys and bare user slots. The
   effective Host OS also names Alt/Option and GUI/Command/Windows/Super,
