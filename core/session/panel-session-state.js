@@ -29,7 +29,7 @@
  * @typedef {Pick<import("./types.js").PanelDeviceState, "connected" | "selectedDeviceId" | "connectionToken" | "busy" | "capabilities">} BindingState
  * @typedef {string | ((reason: DraftBlock) => string)} Refusal
  */
-const {supportsCompleteProfile} = require("./portable-profile-session");
+const {canEdit} = require("./firmware-support");
 
 /**
  * Whether the open draft may be edited against what the panel answers to now
@@ -48,7 +48,7 @@ function draftBinding(session, state) {
     const draft = session.draft;
     /** @type {DraftBlock} */
     const reason = !draft ? "no-draft"
-        : draft.bindingTo(state) || (!supportsCompleteProfile(state.capabilities) ? "unsupported"
+        : draft.bindingTo(state) || (!canEdit(state.capabilities) ? "unsupported"
             : draft.stale ? "stale"
             : state.busy || session.portableBusy || session.readBusy ? "busy" : "");
     return {editable: !reason, reason};

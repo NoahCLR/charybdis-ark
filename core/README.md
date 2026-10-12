@@ -36,6 +36,25 @@ is the demo (D-L53): the same draft over the bundled demo profile with no device
 behind it, which the loop answers to in place of the device service's state
 while it is open.
 
+`session/firmware-support.js` owns the firmware gates and their diagnostics.
+They answer different questions and retain different requirements:
+
+| Predicate | Requirements |
+| --- | --- |
+| `canRead` / `evaluateProfileCompatibility` | Supported protocol/schema and VIA identity, report framing, status pages, read features, RGB and behaviour domains; advertised capacities and the action ABI are not compared |
+| `canEdit` (also exported as `supportsCompleteProfile`) | Current layer count, every registered profile domain and a known action ABI |
+| `canApply` | The complete-document gate plus atomic logical Apply support |
+| `evaluateLiveMutationCompatibility` | Connection and established read compatibility, persistent split mutation features, candidate chunk size, known and converged peer; it publishes the existing ordered reasons and recovery facts |
+| `editableDomains` | Independent view gates: complete idle read for behaviours/pointing, committed idle read for combos, current layers and the corresponding idle view for macros/settings, and an idle custom-key view |
+
+`canCapture` and `canReadIdentity` distinguish a stable backup from a base read
+under a candidate lease. Both reject previews and conflicts; a backup also
+requires an active compiled/committed profile and the convergence flag.
+`identityStateFlags` ignores only the pending-candidate flag in the base's
+identity. All masks use named schema/protocol flags. The panel imports this
+small support module directly; portable-session and service exports retain
+their existing entry points for callers.
+
 A device operation that fails rejects, with the error it also records in the
 snapshot (`error`, and a line in `diagnostics`), so the panel shows the failure
 whoever awaited it; a refusal before one starts (not connected, not refreshed,

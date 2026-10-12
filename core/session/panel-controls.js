@@ -19,15 +19,13 @@
  * @typedef {import("./types.js").RunningPanelSession} Session
  * @typedef {import("./types.js").ControlHost} Host
  */
-const {supportsCompleteProfile} = require("./portable-profile-session");
-const {validateSnapshot} = require("./portable-profile-session");
-const {FILE_MAX_BYTES} = require("../model/portable-profile");
+const {canEdit, hasCurrentLayers} = require("./firmware-support");
+const {validateSnapshot, FILE_MAX_BYTES} = require("../model/portable-profile");
 const {translateBackup} = require("../model/backup-translation");
 const {DEMO_WORDS, panelCapabilities, panelState} = require("./demo-session");
 const {applyLayerEdit, discardDraftForDevice, layerEditDocument, startLayerEdit} = require("./panel-session");
 const {closeEditors, whileApplying} = require("./panel-session-state");
 const {IDENTITY} = require("../model/layer-order");
-const {LAYERS} = require("../model/portable-profile");
 
 /** @template T @param {Host} host @param {string} title @param {() => Promise<T>} work */
 const run = (host, title, work) => host.progress ? host.progress(title, work) : work();
@@ -82,7 +80,7 @@ async function readKeyboard(session, selectedDeviceId, host = {}) {
     }
     await service.refresh();
     let macroFailure = "", portable;
-    if (supportsCompleteProfile(service.capabilities)) {
+    if (canEdit(service.capabilities)) {
         try {portable = await run(host, "Reading the complete keyboard configuration", () => service.readKeyboardProfile());}
         catch (error) {macroFailure = " Macros and global settings could not be read: " + /** @type {Error} */ (error).message;}
     }
@@ -107,7 +105,7 @@ async function readKeyboard(session, selectedDeviceId, host = {}) {
     }
     if (macroFailure) session.notice += macroFailure;
     return Boolean(!state.error && state.committed?.state === "read" && state.layout?.state === "read"
-        && state.capabilities?.compiledLayerCount === LAYERS && portable && !portable.incomplete);
+        && hasCurrentLayers(state.capabilities) && portable && !portable.incomplete);
 }
 
 // The draft's own controls. Each leaves the session's outbox (notice, form
@@ -141,7 +139,7 @@ async function draftControl(session, message, host = {}) {
             draft.assertRevision(revision, {allowStale: true});
             const state = service.snapshot();
             if (!state.connected) throw new Error("Reconnect and read the keyboard before discarding its draft.");
-            const complete = state.capabilities?.compiledLayerCount === LAYERS;
+            const complete = hasCurrentLayers(state.capabilities);
             discardDraftForDevice(session, state, complete ? await service.readPortableProfile() : undefined);
             session.notice = complete ? "Draft discarded. Showing the saved keyboard configuration." : "Draft discarded. This keyboard remains read-only.";
             return;
