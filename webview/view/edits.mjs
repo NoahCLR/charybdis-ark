@@ -3,7 +3,7 @@
 //
 // The screens gather what the person chose and call these; the host stages
 // what they return against the draft. Keeping the builders pure is what lets
-// tests/edits.test.mjs stage the exact messages the screens send, so a change
+// tests/view/edits.test.mjs stage the exact messages the screens send, so a change
 // of shape fails there rather than on a keyboard.
 
 import {hsv} from "../lib/colour.mjs";

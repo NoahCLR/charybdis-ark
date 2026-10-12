@@ -1,7 +1,7 @@
 // @ts-check
 // A pointing slot as a record the keyboard stores, built from its form.
 //
-// Pure, so the posted record is testable: tests/edits.test.mjs stages what
+// Pure, so the posted record is testable: tests/view/edits.test.mjs stages what
 // readConfig() returns against a real draft.
 
 /**

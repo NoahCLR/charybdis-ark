@@ -96,7 +96,7 @@ upstream/           pinned external contracts and inputs; read its AGENTS.md
 web/                web build entries: what a browser host takes from core/
 scripts/            developer entry points and build steps
 tools/              developer tools outside the app, e.g. the branch-window extension
-tests/              mirrors core/, plus the view modules and the posted payloads
+tests/              mirrors core/; view/ tests the interface, scripts/ the developer tools
 preview/            ignored generated previews, never authoritative source
 dist/               ignored web build output (`npm run build:web`)
 ```
@@ -238,7 +238,7 @@ TypeScript coverage or changing the check configuration.
   document is not the one it was decoded from. Draft history entries are
   frozen and decoded once each, so a model publish decodes nothing new.
 - A webview number that is also a wire number (pointing kinds, axes, buttons,
-  modifier bits) is pinned to its schema by `tests/enum-drift.test.mjs`.
+  modifier bits) is pinned to its schema by `tests/view/enum-drift.test.mjs`.
 - Whether an area can be edited is `canEdit(area)` in `webview/store.mjs`,
   nowhere else. Whether the draft takes an edit at all is core's
   `draftBinding` (`core/session/panel-session-state.js`), which the router,
@@ -249,7 +249,7 @@ TypeScript coverage or changing the check configuration.
 - Every edit the webview posts is built by a pure function in
   `webview/view/edits.mjs` (pointing records by `view/pointing-config.mjs`),
   and screens post what those return rather than assembling objects inline.
-  `tests/edits.test.mjs` stages each builder's output against a real
+  `tests/view/edits.test.mjs` stages each builder's output against a real
   `ProfileDraftSession`, so a change of message shape fails there rather than
   on a keyboard.
 - Markup is built with `el()` from template strings, so every value from the
@@ -337,7 +337,7 @@ JSON.stringify(window.__posted).includes("777");
 Two failures this catches, both of which once shipped unnoticed: a field with
 no listener at all, and a field rendered twice, where the second registration
 silently wins and edits to the visible one are dropped. Then add the payload to
-`tests/edits.test.mjs` so its shape is pinned for good.
+`tests/view/edits.test.mjs` so its shape is pinned for good.
 
 ### Publishing protected main
 
