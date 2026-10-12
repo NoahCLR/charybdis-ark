@@ -1,20 +1,20 @@
 "use strict";
 const assert = require("node:assert/strict");
 const test = require("node:test");
-const {ProfileDeviceService} = require("../../core/session/profile-device-service");
+const {connectedService} = require("../fixtures/connected-service");
 const {buildDeviceModel} = require("../../core/session/device-model");
 const {baseRgbForView} = require("../../core/model/device-profile-view");
 
-test("base RGB survives independently of the profile, but never survives failure or disconnect", async () => {
-    const service = new ProfileDeviceService();
+test("base RGB survives independently of the profile, but never survives failure or disconnect", async t => {
+    const {service, adapter} = await connectedService(t);
     let fail = false;
-    service.connection = {connected: true, async request(request) {
+    adapter.keyboard = {...adapter.keyboard, answer(request) {
         const response = Buffer.from(request);
         if (fail) response[0] = 0xff;
         else response.set({1: [255], 2: [1], 3: [32], 4: [0, 255]}[request[2]], 3);
-        return response;
+        return [response];
     }};
-    service.error = {message: "Earlier profile failure"};
+    service.setError(Error("Earlier profile failure"));
     let state = await service.readBaseRgb();
     assert.equal(state.baseRgb.state, "read");
     assert.equal(state.error.message, "Earlier profile failure");
@@ -32,7 +32,7 @@ test("base RGB survives independently of the profile, but never survives failure
     assert.equal(state.baseRgb.state, "unavailable");
     assert.equal(buildDeviceModel(state).rgb.baseEffect.previewColor, undefined);
     assert.equal(state.error.message, "Earlier profile failure");
-    service.handleDisconnect(new Error("Unplugged"));
+    adapter.lastConnection().emitDisconnect(Error("Unplugged"));
     assert.equal(service.snapshot().baseRgb, null);
 });
 

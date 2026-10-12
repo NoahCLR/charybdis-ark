@@ -264,19 +264,20 @@ function comboPages(table, references) {
 
 // A FakeDeviceAdapter wired to a fake keyboard: each written report is
 // answered on a microtask, as a real device answers after the write returns.
-// `adapter.keyboard` is the keyboard, for its records.
+// `adapter.keyboard` is the keyboard, for its records; replacing it answers
+// from then on as that keyboard, as if the keyboard changed while connected.
 /** @param {import("./types.js").FakeKeyboardAdapterOptions} options @returns {import("./types.js").FakeKeyboardAdapter} */
 function fakeKeyboardAdapter(options) {
     const keyboard = options.keyboard || ("document" in options ? fakeKeyboard(options) : undefined);
     if (!keyboard) throw new Error("A fake keyboard adapter needs a keyboard or document.");
-    const adapter = new FakeDeviceAdapter({
+    const adapter = Object.assign(new FakeDeviceAdapter({
         devices: [{id: "fake-charybdis", product: "Charybdis 4x6", manufacturer: "Bastard Keyboards", serialNumber: "FAKE-1"}],
         onWrite({connection, report}) {
-            const responses = keyboard.answer(report);
+            const responses = adapter.keyboard.answer(report);
             queueMicrotask(() => responses.forEach((response) => connection.emitReport(response)));
         },
-    });
-    return Object.assign(adapter, {keyboard});
+    }), {keyboard});
+    return adapter;
 }
 
 module.exports = {fakeKeyboard, fakeKeyboardAdapter};

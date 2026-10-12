@@ -1,7 +1,7 @@
 "use strict";
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const {encodeComboDomain, decodeComboDomain, effectiveComboTerm, COMBO_LIMITS} = require("../../core/schema/combo-domain-v1");
+const {encodeComboDomain, decodeComboDomain, effectiveComboTerm, runningComboRows, COMBO_LIMITS} = require("../../core/schema/combo-domain-v1");
 const fs = require("node:fs"), path = require("node:path");
 const golden = fs.readFileSync(path.resolve(__dirname, "../../upstream/firmware/tests/fixtures/combo_domain_v3.fixture"), "utf8").trim();
 const key = operand => ({kind: 1, operand, flags: 0});
@@ -55,6 +55,12 @@ test("combo domain v3 stores the default window and hold threshold once, and a r
     assert.deepEqual(decoded, withIds(table));
     assert.equal(effectiveComboTerm(decoded, decoded.rows[0]), 60);
     assert.equal(effectiveComboTerm(decoded, decoded.rows[1]), 45);
+    // As the keyboard reports them running: the window each runs with, and
+    // native keycodes.
+    const running = runningComboRows(decoded);
+    assert.deepEqual(running.map(entry => [entry.termMs, entry.followsDefault]), [[60, true], [45, false]]);
+    assert.deepEqual(running[1].inputs, [4, 6]);
+    assert.equal(typeof running[0].output, "number");
     // An empty table keeps both values.
     assert.deepEqual(decodeComboDomain(encodeComboDomain(v3([]))), v3([]));
 });

@@ -3,6 +3,7 @@
 const {PROFILE_DOMAIN_VERSIONS, PROFILE_DOMAIN_IDS} = require("./profile-domains");
 const {LAYERS} = require("../data/charybdis-layout");
 const {encodeSemanticAction, decodeSemanticAction} = require("./profile-blob-v1");
+const {nativeCode} = require("./actions");
 /** @param {string} message */
 const fail = message => Object.assign(new Error(message), {code: "INVALID_COMBO_DOMAIN"});
 
@@ -90,4 +91,10 @@ function decodeComboDomain(value, options = {}) {
 /** @param {{defaultTermMs: number}} table @param {{termMs: number | null}} row */
 const effectiveComboTerm = (table, row) => row.termMs ?? table.defaultTermMs;
 
-module.exports = {COMBO_DOMAIN_VERSION, COMBO_LIMITS, ALL_LAYERS, encodeComboDomain, decodeComboDomain, effectiveComboTerm};
+// The rows as the keyboard reports them running: each with the window it
+// runs with, whether that follows the default, and native keycodes.
+/** @param {ReturnType<typeof decodeComboDomain>} table */
+const runningComboRows = table => table.rows.map(row => ({...row, termMs: effectiveComboTerm(table, row), followsDefault: row.termMs === null,
+    inputs: row.inputs.map(action => /** @type {number} */ (nativeCode(action))), output: /** @type {number} */ (nativeCode(row.output))}));
+
+module.exports = {COMBO_DOMAIN_VERSION, COMBO_LIMITS, ALL_LAYERS, encodeComboDomain, decodeComboDomain, effectiveComboTerm, runningComboRows};

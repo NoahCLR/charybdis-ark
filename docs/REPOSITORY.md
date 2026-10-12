@@ -77,7 +77,12 @@ identify device profiles or recovery files. Recovery files saved under the
 former identities `noah.charybdis-live` and `noah.charybdis-live-v2` are copied
 into Ark's storage on start (D-L47).
 
-Normal tests use injected HID adapters. `npm run probe:live-link` additionally
+Normal tests use injected HID adapters. A test that needs a connected
+`ProfileDeviceService` starts from `tests/fixtures/connected-service.js`, which
+scans and connects to the fake keyboard the way the panel does, rather than
+assigning the service's connection, capabilities or status. Replacing the
+adapter's `keyboard` makes it answer as another keyboard from then on.
+`npm run probe:live-link` additionally
 loads the native HID module and enumerates matching devices without opening or
 writing them. A successful enumeration is not an Apply/recovery hardware test.
 
