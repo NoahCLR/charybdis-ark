@@ -1,7 +1,8 @@
 "use strict";
 const test = require("node:test"), assert = require("node:assert/strict");
 const previous = require("../fixtures/previous-profile.charybdis.json");
-const {translateBackup, translateProfile, PREVIOUS_ACTION_ABI} = require("../../core/model/backup-translation");
+const {translateBackup, translateProfile, translateDomain, DOMAIN_TRANSLATIONS, PREVIOUS_ACTION_ABI} = require("../../core/model/backup-translation");
+const {PROFILE_DOMAIN_IDS, PROFILE_DOMAIN_VERSIONS} = require("../../core/schema/profile-domains");
 const {validateSnapshot} = require("../../core/model/portable-profile");
 const {decodeProfileBlob} = require("../../core/schema/profile-blob-v1");
 const {document} = require("../fixtures/portable-profile");
@@ -17,6 +18,90 @@ function changedDomain(id, change) {
     }
     return {...structuredClone(previous), profile: Buffer.concat(parts).toString("base64")};
 }
+
+test("every preceding domain has a step keyed by its produced version", () => {
+    assert.deepEqual(Object.entries(DOMAIN_TRANSLATIONS).map(([id, steps]) => [Number(id), Object.keys(steps).map(Number)]), [
+        [16, [4]], [32, [2]], [48, [3]], [64, [6]], [80, [3]],
+    ]);
+    const bytes = Buffer.from(previous.profile, "base64");
+    let at = 8;
+    for (let n = 0; n < bytes[6]; n++) {
+        const id = bytes[at], version = bytes[at + 1], size = bytes.readUInt16LE(at + 2);
+        const payload = bytes.subarray(at + 4, at + 4 + size), original = Buffer.from(payload);
+        const result = translateDomain({id, version, payload});
+        assert.equal(result.version, PROFILE_DOMAIN_VERSIONS[id]);
+        assert.ok(Buffer.isBuffer(result.payload));
+        assert.deepEqual(payload, original, `domain ${id} leaves its source bytes unchanged`);
+        assert.ok(Object.isFrozen(DOMAIN_TRANSLATIONS[id]));
+        at += 4 + size;
+    }
+    assert.ok(Object.isFrozen(DOMAIN_TRANSLATIONS));
+});
+
+test("appending a settings step receives version 6 bytes without rewriting the historical step", () => {
+    const bytes = Buffer.from(previous.profile, "base64");
+    let at = 8;
+    while (bytes[at] !== PROFILE_DOMAIN_IDS.SETTINGS) at += 4 + bytes.readUInt16LE(at + 2);
+    const domain = {id: PROFILE_DOMAIN_IDS.SETTINGS, version: bytes[at + 1], payload: bytes.subarray(at + 4, at + 4 + bytes.readUInt16LE(at + 2))};
+    const {decodeSettings} = require("../../core/schema/settings-domain-v1");
+    let calls = 0;
+    const result = translateDomain(domain, 7, {...DOMAIN_TRANSLATIONS[domain.id], 7: payload => {
+        calls++;
+        assert.equal(payload[0], 6);
+        const value = decodeSettings(payload);
+        assert.deepEqual(value.names.slice(0, 8), ["Base", "Number", "Symbol", "Navigation", "Pointing", "Function", "Game", "Extra"]);
+        assert.equal(value.layers.length, 16);
+        assert.equal(value.macroNames.length, 128);
+        return Buffer.concat([Buffer.from([7]), payload.subarray(1)]);
+    }});
+    assert.equal(calls, 1);
+    assert.equal(result.version, 7);
+    assert.equal(result.payload[0], 7);
+});
+
+test("a later domain version composes every intervening step in order", () => {
+    const calls = [], payload = Buffer.from([10]);
+    const steps = {4: bytes => {calls.push([4, [...bytes]]); return Buffer.from([bytes[0] + 1]);},
+        5: bytes => {calls.push([5, [...bytes]]); return Buffer.from([bytes[0] * 2]);}};
+    const result = translateDomain({id: PROFILE_DOMAIN_IDS.RGB, version: 3, payload}, 5, steps);
+    assert.deepEqual(result, {id: PROFILE_DOMAIN_IDS.RGB, version: 5, payload: Buffer.from([22])});
+    assert.deepEqual(calls, [[4, [10]], [5, [11]]]);
+    assert.deepEqual(payload, Buffer.from([10]));
+    const current = translateDomain(result, 5, {});
+    assert.equal(current.payload, result.payload, "a domain already at its target is not rewritten");
+});
+
+test("domain chains refuse missing intermediate steps, unknown targets and downgrades", () => {
+    let calls = 0;
+    const domain = {id: PROFILE_DOMAIN_IDS.RGB, version: 3, payload: Buffer.from([10])};
+    const step = bytes => {calls++; return bytes;};
+    for (const [version, target, steps] of [[3, 5, {5: step}], [4, 3, {4: step}], [0, 4, {4: step}], [3, undefined, {}], [3, 4.5, {4: step}]]) {
+        assert.throws(() => translateDomain({...domain, version, id: target === undefined ? 255 : domain.id}, target, steps), {
+            code: "INVALID_PORTABLE_PROFILE", message: "The backup's profile holds a domain this app cannot translate.",
+        });
+    }
+    assert.equal(calls, 0, "a missing step cannot be skipped in favour of a later one");
+    const failure = new Error("bad intermediate payload");
+    assert.throws(() => translateDomain(domain, 4, {4: () => {throw failure;}}), error => error === failure);
+});
+
+test("the chain preserves the exact preceding fixture document and rejects other version labels", () => {
+    const {createHash} = require("node:crypto");
+    assert.equal(createHash("sha256").update(JSON.stringify(translateBackup(previous))).digest("hex"),
+        "3ca7e5d7b6b5ccdcdccafa9c8c15d87a09fcaf99a0f9fdb57bd0d562ee4405c2", "the pre-refactor translated document is byte-for-byte unchanged");
+    const bytes = Buffer.from(previous.profile, "base64");
+    let at = 8;
+    for (let n = 0; n < bytes[6]; n++) {
+        const sourceVersion = bytes[at + 1];
+        for (const version of [sourceVersion - 1, sourceVersion + 1, 255]) {
+            const unsupported = Buffer.from(bytes); unsupported[at + 1] = version;
+            assert.throws(() => translateProfile(unsupported), {
+                code: "INVALID_PORTABLE_PROFILE", message: "The backup's profile holds a domain this app cannot translate.",
+            }, `domain ${bytes[at]} version ${version} is not admitted by schema 2`);
+        }
+        at += 4 + bytes.readUInt16LE(at + 2);
+    }
+});
 
 test("invalid preceding capacities and semantic references reject before expansion", () => {
     const overCount = changedDomain(48, p => {p[0] = 33; return Buffer.concat([p.subarray(0, 8), ...Array.from({length: 33}, () => p.subarray(8, 36))]);});

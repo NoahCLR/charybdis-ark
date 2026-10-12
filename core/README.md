@@ -156,8 +156,14 @@ its ordered domain envelopes, the four-byte semantic action values, and the
 FNV-1a 32-bit and CRC32 helpers. It accepts schema 3.0 only; unknown domains
 and retired domain versions are rejected. Complete snapshots use sixteen layers
 and the current 32-slot action vocabulary. The preceding eight-layer format is
-translated before import review by `model/backup-translation.js` (D-L54). The domain
-codecs — `rgb-domain-v1.js`, `key-behavior-domain-v1.js`,
+translated before import review by `model/backup-translation.js` (D-L54). Its
+backup-revision metadata admits the historical schema and domain versions;
+each admitted domain then follows consecutive translation steps keyed by the
+version each step produces, ending at the domain registry's current version.
+A later domain bump adds a step to that chain. Historical steps retain their
+own output layouts. Missing intermediate steps and future versions are refused;
+current documents still bypass translation. The domain codecs —
+`rgb-domain-v1.js`, `key-behavior-domain-v1.js`,
 `combo-domain-v1.js`, `pd-mode-domain-v1.js`, `settings-domain-v1.js` — are
 exact inverses of their decoders and enforce the firmware's limits. The RGB
 byte contract is frozen in [`rgb-domain-v1.md`](../upstream/firmware/docs/architecture/rgb-domain-v1.md), a pinned firmware spec;

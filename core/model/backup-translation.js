@@ -19,13 +19,13 @@
 // Custom keys moved from 0x7e40 + n to 0x7f00 + n. They are named by their
 // stable slot, so the backup's keys, behaviour targets and combo inputs and
 // outputs that named slot n by its old keycode name it by the new one.
-const {PROFILE_DOMAIN_IDS, PROFILE_DOMAINS} = require("../schema/profile-domains");
+const {PROFILE_DOMAIN_IDS} = require("../schema/profile-domains");
 const {ACTION_ABI} = require("../schema/actions");
 const {PROFILE_ACTION_KINDS: ACTION, decodeProfileBlob, encodeProfileBlob, PROFILE_DOMAIN_VERSIONS} = require("../schema/profile-blob-v1");
 const {decodeKeyBehaviorDomain, encodeKeyBehaviorDomain} = require("../schema/key-behavior-domain-v1");
 const {decodeComboDomain, encodeComboDomain} = require("../schema/combo-domain-v1");
 const {decodeRgbDomainV1} = require("../schema/rgb-domain-v1");
-const {SETTINGS, validSetting} = require("../schema/settings-domain-v1");
+const {validSetting} = require("../schema/settings-domain-v1");
 const {CUSTOM_KEY_BASE, RETIRED_CUSTOM_KEY_BASE, RETIRED_CUSTOM_KEY_SLOTS} = require("../data/user-keycodes");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX, LAYERS, MATRIX_KEYS, matrixPosition} = require("../data/charybdis-layout");
 const {FILE_MAX_BYTES, validateSnapshot, validateViaMacro, macroBank} = require("./portable-profile");
@@ -33,9 +33,16 @@ const {FILE_MAX_BYTES, validateSnapshot, validateViaMacro, macroBank} = require(
 // The action ABI of the firmware before D-F14: eight layers, 64 macros and
 // custom keys at 0x7e40.
 const PREVIOUS_ACTION_ABI = 0xf79c6151;
-const PREVIOUS = Object.freeze({SCHEMA: 2, LAYERS: 8, MACROS: 64});
+const PREVIOUS = Object.freeze({SCHEMA: 2, LAYERS: 8, MACROS: 64, domains: Object.freeze([
+    Object.freeze({id: PROFILE_DOMAIN_IDS.RGB, version: 3}), Object.freeze({id: PROFILE_DOMAIN_IDS.KEY_BEHAVIORS, version: 1}),
+    Object.freeze({id: PROFILE_DOMAIN_IDS.COMBOS, version: 2}), Object.freeze({id: PROFILE_DOMAIN_IDS.SETTINGS, version: 5}),
+    Object.freeze({id: PROFILE_DOMAIN_IDS.PD_MODES, version: 2}),
+])});
 const PREVIOUS_ACTION_LIMITS = Object.freeze({maxLogicalLayers: 8, maxViaMacroSlots: 64, maxCustomKeys: 64, maxPdModes: 32});
 const MACROS = 128, TRANSPARENT = 0x0001;
+// These are historical step outputs, independent of the registry's eventual
+// target. A later geometry or settings version gets another translation step.
+const RGB_V4_LAYERS = 16, SETTINGS_V6_LAYERS = 16;
 /** @param {string} message */
 const fail = message => Object.assign(new Error(message), {code: "INVALID_PORTABLE_PROFILE"});
 // A new layer: transparent on every physical key, nothing in the matrix slots
@@ -54,10 +61,10 @@ function rgbV4(payload) {
     decodeRgbDomainV1(original, {logicalLayerCount: PREVIOUS.LAYERS, maxLogicalLayers: PREVIOUS.LAYERS});
     const groups = payload[4], layerColors = payload[5], end = 16 + groups * 9 + layerColors * 5;
     if (layerColors > PREVIOUS.LAYERS) throw fail("The backup's lighting has too many layer colours.");
-    const added = layerColors ? Buffer.concat(Array.from({length: LAYERS - layerColors}, (_, i) => Buffer.from([layerColors + i, 0, 0, 0, 1]))) : Buffer.alloc(0);
+    const added = layerColors ? Buffer.concat(Array.from({length: RGB_V4_LAYERS - layerColors}, (_, i) => Buffer.from([layerColors + i, 0, 0, 0, 1]))) : Buffer.alloc(0);
     const header = Buffer.from(payload.subarray(0, 16));
     header[0] = 4;
-    if (layerColors) header[5] = LAYERS;
+    if (layerColors) header[5] = RGB_V4_LAYERS;
     return Buffer.concat([header, payload.subarray(16, end), added, payload.subarray(end)]);
 }
 
@@ -104,11 +111,12 @@ function settingsV6(payload) {
     const references = scalars[27];
     for (let layer = 0; layer < PREVIOUS.LAYERS; layer++) if (((references >>> (4 * layer)) & 15) >= PREVIOUS.LAYERS) throw fail("The backup's combo reference is outside its layer bank.");
     scalars.splice(27, 1, 0, 1, 0xffff, 0xffff);
-    const fixed = Buffer.alloc(SETTINGS.FIXED_SIZE);
-    Buffer.from([SETTINGS.VERSION, SETTINGS.LAYERS, SETTINGS.COUNT, SETTINGS.MACRO_NAMES, SETTINGS.CUSTOM_KEY_NAMES, 0, 0, 0]).copy(fixed);
-    scalars.forEach((value, id) => fixed.writeUInt32LE(value >>> 0, SETTINGS.SCALARS_OFFSET + id * 4));
-    for (let layer = 0; layer < LAYERS; layer++) fixed[SETTINGS.LAYER_RECORDS_OFFSET + layer * SETTINGS.LAYER_RECORD_SIZE] = layer < PREVIOUS.LAYERS ? (references >>> (4 * layer)) & 15 : layer;
-    const names = Array.from({length: LAYERS}, (_, layer) => {
+    const scalarOffset = 8, recordSize = 1 + 2 * 8, recordsOffset = scalarOffset + scalars.length * 4;
+    const fixed = Buffer.alloc(recordsOffset + SETTINGS_V6_LAYERS * recordSize);
+    Buffer.from([6, SETTINGS_V6_LAYERS, scalars.length, MACROS, MACROS, 0, 0, 0]).copy(fixed);
+    scalars.forEach((value, id) => fixed.writeUInt32LE(value >>> 0, scalarOffset + id * 4));
+    for (let layer = 0; layer < SETTINGS_V6_LAYERS; layer++) fixed[recordsOffset + layer * recordSize] = layer < PREVIOUS.LAYERS ? (references >>> (4 * layer)) & 15 : layer;
+    const names = Array.from({length: SETTINGS_V6_LAYERS}, (_, layer) => {
         if (layer >= PREVIOUS.LAYERS) return Buffer.from([0]);
         const field = payload.subarray(120 + 24 * layer, 144 + 24 * layer), end = field.indexOf(0);
         if (end < 0 || field.subarray(end).some(byte => byte)) throw fail("The backup's layer name is not canonical.");
@@ -147,8 +155,33 @@ function pdV3(payload) {
     return Buffer.concat([Buffer.from([3, 32, 128, count, 0, 0, 0, 0]), ...records]);
 }
 
-/** @type {Record<number, [number, (payload: Buffer) => Buffer]>} */
-const STEPS = {[PROFILE_DOMAIN_IDS.RGB]: [3, rgbV4], [PROFILE_DOMAIN_IDS.KEY_BEHAVIORS]: [1, behaviorsV2], [PROFILE_DOMAIN_IDS.COMBOS]: [2, combosV3], [PROFILE_DOMAIN_IDS.SETTINGS]: [5, settingsV6], [PROFILE_DOMAIN_IDS.PD_MODES]: [2, pdV3]};
+// A step is keyed by the version it produces and receives the immediately
+// preceding version. A future domain bump adds one step; earlier backups
+// traverse every intervening version rather than jumping to the newest one.
+/** @typedef {Readonly<Record<number, (payload: Buffer) => Buffer>>} DomainTranslations */
+/** @type {Readonly<Record<number, DomainTranslations>>} */
+const DOMAIN_TRANSLATIONS = Object.freeze({
+    [PROFILE_DOMAIN_IDS.RGB]: Object.freeze({4: rgbV4}),
+    [PROFILE_DOMAIN_IDS.KEY_BEHAVIORS]: Object.freeze({2: behaviorsV2}),
+    [PROFILE_DOMAIN_IDS.COMBOS]: Object.freeze({3: combosV3}),
+    [PROFILE_DOMAIN_IDS.SETTINGS]: Object.freeze({6: settingsV6}),
+    [PROFILE_DOMAIN_IDS.PD_MODES]: Object.freeze({3: pdV3}),
+});
+
+// Schema admission belongs to the backup revision. Once admitted, a domain
+// follows its own version chain to the registry's current target.
+/** @param {import("../schema/types.js").ProfileDomain} domain @param {number} [targetVersion] @param {DomainTranslations} [translations] @returns {import("../schema/types.js").ProfileDomain} */
+function translateDomain(domain, targetVersion = PROFILE_DOMAIN_VERSIONS[domain.id], translations = DOMAIN_TRANSLATIONS[domain.id]) {
+    let {version, payload} = domain;
+    if (!Number.isInteger(version) || !Number.isInteger(targetVersion) || version < 1 || version > targetVersion) throw fail("The backup's profile holds a domain this app cannot translate.");
+    while (version < targetVersion) {
+        const next = version + 1, step = translations?.[next];
+        if (!step) throw fail("The backup's profile holds a domain this app cannot translate.");
+        payload = step(payload);
+        version = next;
+    }
+    return {id: domain.id, version, payload};
+}
 
 // An old custom key's keycode as its new one; every other keycode unchanged.
 /** @param {number} code */
@@ -167,18 +200,17 @@ function moveActions(value) {
 // The profile blob in the current schema.
 /** @param {Buffer} bytes */
 function translateProfileUnchecked(bytes) {
-    if (bytes.length < 8 || bytes.length > 5088 || bytes.toString("ascii", 0, 4) !== "NLP1" || bytes[4] !== PREVIOUS.SCHEMA || bytes[5] !== 0 || bytes[6] !== 5 || bytes[7] !== 1) throw fail("The backup's profile is not one this app can translate.");
+    if (bytes.length < 8 || bytes.length > 5088 || bytes.toString("ascii", 0, 4) !== "NLP1" || bytes[4] !== PREVIOUS.SCHEMA || bytes[5] !== 0 || bytes[6] !== PREVIOUS.domains.length || bytes[7] !== 1) throw fail("The backup's profile is not one this app can translate.");
     /** @type {import("../schema/types.js").ProfileDomain[]} */
     const domains = [];
     let offset = 8;
     for (let index = 0; index < bytes[6]; index++) {
         if (offset + 4 > bytes.length) throw fail("The backup's profile is truncated.");
         const id = bytes[offset], version = bytes[offset + 1], length = bytes.readUInt16LE(offset + 2);
-        if (id !== PROFILE_DOMAINS[index].id) throw fail("The backup's domains are not complete and canonical.");
+        if (id !== PREVIOUS.domains[index].id) throw fail("The backup's domains are not complete and canonical.");
         const payload = bytes.subarray(offset + 4, offset + 4 + length);
-        const step = STEPS[id];
-        if (!step || step[0] !== version || payload.length !== length) throw fail("The backup's profile holds a domain this app cannot translate.");
-        domains.push({id, version: PROFILE_DOMAIN_VERSIONS[id], payload: step[1](payload)});
+        if (version !== PREVIOUS.domains[index].version || payload.length !== length) throw fail("The backup's profile holds a domain this app cannot translate.");
+        domains.push(translateDomain({id, version, payload}));
         offset += 4 + length;
     }
     if (offset !== bytes.length) throw fail("The backup's profile has trailing data.");
@@ -246,4 +278,4 @@ function translateBackup(value) {
     return translated;
 }
 
-module.exports = {PREVIOUS_ACTION_ABI, isPreviousBackup, translateBackup, translateProfile};
+module.exports = {PREVIOUS_ACTION_ABI, DOMAIN_TRANSLATIONS, translateDomain, isPreviousBackup, translateBackup, translateProfile};
