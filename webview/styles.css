@@ -27,6 +27,11 @@
   /* Rings ride on top of the light a key emits, so they are the one colour
      that has to stay legible against any of it. */
   --ring: #ffffff;
+  /* Fixed contrast ink over device light, independent of the host theme. */
+  --light-outline: rgba(255,255,255,.3);
+  --light-detail: rgba(255,255,255,.9);
+  --badge-ink: rgba(8,8,10,.86);
+  --badge-outline: rgba(245,245,243,.7);
   --draft: #e3b341;
   --warning: #f2a544;
   --danger: #ff6b5e;

@@ -119,7 +119,7 @@ written before the first device write, the profile is staged on both halves
 through the candidate mailbox (`protocol/profile-candidate-v1.js`,
 `session/candidate-upload-coordinator.js`) and the peer VIA stage
 (`session/logical-via-stage-coordinator.js`), and one generation is published.
-Every candidate is schema 2.0 in logical store format 3 (`NR`), bound to the
+Every candidate is schema 3.0 in logical store format 3 (`NR`), bound to the
 VIA store generation and digest it publishes with: `candidateMetadataForBlob`
 refuses a missing binding or a zero generation or digest before anything is
 sent, and there is no custom-only format 0.
@@ -133,9 +133,10 @@ host refuses edits rather than writing them directly.
 
 `schema/profile-blob-v1.js` encodes and strictly decodes the `NLP1` header and
 its ordered domain envelopes, the four-byte semantic action values, and the
-FNV-1a 32-bit and CRC32 helpers. It accepts schema 2.0 only; unknown domains
-and retired domain versions are rejected. Complete snapshots use eight layers
-and the current 32-slot action vocabulary, with no backup-upgrade chain (D-L54). The domain
+FNV-1a 32-bit and CRC32 helpers. It accepts schema 3.0 only; unknown domains
+and retired domain versions are rejected. Complete snapshots use sixteen layers
+and the current 32-slot action vocabulary. The preceding eight-layer format is
+translated before import review by `model/backup-translation.js` (D-L54). The domain
 codecs — `rgb-domain-v1.js`, `key-behavior-domain-v1.js`,
 `combo-domain-v1.js`, `pd-mode-domain-v1.js`, `settings-domain-v1.js` — are
 exact inverses of their decoders and enforce the firmware's limits. The RGB

@@ -36,6 +36,7 @@ const {boundDraft, endRead, takeOutbox, whilePanelBusy} = require("./panel-sessi
 const {draftControl, portableControl, readKeyboard} = require("./panel-controls");
 const {demoControl, demoExport, leaveDemo, panelState} = require("./demo-session");
 const {macroInputStatus} = require("../model/macro-editor");
+const {FILE_MAX_BYTES} = require("../model/portable-profile");
 
 // Reading a keyboard leaves the demo first (asking about unexported edits is
 // the panel's, and a message that has not asked is refused).
@@ -170,4 +171,4 @@ function exportedProfile(snapshot, now = new Date(), stem = "charybdis") {
     };
 }
 
-module.exports = {exportedProfile, openPanelLoop};
+module.exports = {exportedProfile, openPanelLoop, FILE_MAX_BYTES};

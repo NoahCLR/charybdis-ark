@@ -7,6 +7,7 @@ import {esc} from "../lib/dom.mjs";
 import {css, isOff} from "../lib/colour.mjs";
 import {FIELDS_SHOWN} from "../view/review.mjs";
 import {mark, marked} from "./marks.mjs";
+import {tierName} from "../view/vocabulary.mjs";
 
 // A colour is shown as the keyboard would light it, beside its value; an
 // off colour is drawn off, as it is everywhere else.
@@ -21,13 +22,11 @@ const value = (model, text, klass, colour, marker) => text === null ? ""
     : `<span class="rv-val">${swatch(colour)}${mark(model, marker)}<span class="${klass}">${esc(text)}</span></span>`;
 // A behaviour tier is labelled as the grid heads it: the branch badge,
 // the tier's dot, then the tier's name.
-/** @type {Readonly<Record<string, string>>} */
-const TIER_NAMES = {tap: "tap", hold: "hold", long: "long hold"};
 // Within an item, marked and unmarked labels share one mark slot, so the
 // words start at one edge and the tier dots line up in a column.
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/model.js").ReviewField} entry @param {boolean} slot */
 const fieldLabel = (model, entry, slot) => {
-    const text = entry.labelMark?.kind === "tier" && entry.labelMark.branch ? TIER_NAMES[entry.labelMark.tier] : entry.label;
+    const text = entry.labelMark?.kind === "tier" && entry.labelMark.branch ? tierName(model, /** @type {import("../../contracts/edits.js").Tier} */ (entry.labelMark.tier)).toLowerCase() : entry.label;
     return text ? marked(model, entry.labelMark, text, {slot}) : "";
 };
 // Every field is one row of the same three columns — what, before, after —

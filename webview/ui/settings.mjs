@@ -47,12 +47,12 @@ export function screenSettings() {
     const matching = (section) => query ? section.fields.filter((field) => matches(field, query)) : section.fields;
     for (const section of sections) {
         const fields = matching(section);
-        const timing = section.id === "comboSettings" ? COMBO_TIMING.filter((entry) => !query || matches(entry, query)) : [];
+        const timing = section.id === "comboSettings" ? (section.comboTiming || []).filter((entry) => !query || matches(entry, query)) : [];
         if (!fields.length && !timing.length) continue;
         const card = sectionCard(model, section, fields, canEdit, Boolean(query));
         if (section.id === "comboSettings") {
             for (const entry of timing) /** @type {HTMLElement} */ (card.querySelector(".rows")).appendChild(comboTimingRow(model, entry));
-            /** @type {HTMLElement} */ (card.querySelector(".card-h .tag")).textContent = `${section.fields.length + COMBO_TIMING.length} settings`;
+            /** @type {HTMLElement} */ (card.querySelector(".card-h .tag")).textContent = `${section.fields.length + (section.comboTiming || []).length} settings`;
         }
         pad.appendChild(card);
     }
@@ -87,14 +87,11 @@ export function screenSettings() {
 // re-times those combos. QMK waits for the hold threshold only on combos that
 // must be held or are tap only — the longer of it and the combo's own window
 // — and every other combo ignores it.
-const COMBO_DEFAULT = {label: "Default combo window", hint: "How close together a combo's keys must be pressed, for every combo without its own window. New combos start on it, and the combos that follow it change with it."};
-const COMBO_HOLD = {label: "Combo hold threshold", hint: "How long a combo that must be held, or is tap only, waits to tell a hold from a tap: this, or its combo window if that is longer. Other combos ignore it. 0 adds no wait beyond the window."};
-const COMBO_TIMING = [COMBO_DEFAULT, COMBO_HOLD];
-/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {{label: string, hint: string}} entry */
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/model.js").ComboTimingField} entry */
 function comboTimingRow(model, entry) {
     const readback = model?.comboReadback || {};
     const stores = readback.version === 2;
-    const hold = entry === COMBO_HOLD;
+    const hold = entry.id === "hold";
     const value = hold ? readback.holdTermMs : readback.defaultTermMs;
     const stored = String(value ?? "");
     const combos = model?.combos || [];
@@ -195,7 +192,7 @@ function fieldRow(field, canEdit, submit, hidden, slot) {
         return row;
     }
     const node = el(`<div class="input-row"><input class="input mono" data-macro="${esc(field.macro)}" value="${esc(field.value)}" ${editable ? "" : "disabled"}>
-        ${/ms\b/.test(field.hint || "") || /\(ms\)/.test(field.label) ? `<span class="chip">ms</span>` : ""}</div>`);
+        ${field.unit ? `<span class="chip">${esc(field.unit)}</span>` : ""}</div>`);
     /** @type {HTMLInputElement} */ (node.querySelector("input")).addEventListener("change", submit);
     control.appendChild(node);
     return row;

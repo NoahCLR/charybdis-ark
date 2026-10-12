@@ -59,7 +59,7 @@ export function board(model, layer, options = {}) {
             const light = keyLight(model, layer, position, {pdActive, held: heldIds});
             text = idealText(light.colour);
             const paint = css(light.colour);
-            fill = ` style="fill:${paint};stroke:${glass ? "none" : "rgba(255,255,255,.3)"}"`;
+            fill = ` style="fill:${paint};stroke:${glass ? "none" : "var(--light-outline)"}"`;
             glow += `<rect class="kc-glow${glass ? " kc-glow-trns" : ""}" x="${visual.x}" y="${visual.y}" width="${GEO.keyW}" height="${GEO.keyH}" rx="${GEO.radius}" fill="${paint}"${transform}></rect>`;
         }
 
@@ -76,9 +76,9 @@ export function board(model, layer, options = {}) {
             const x = startX + order * step;
             const colour = tierColour(model, tier.kind);
             if (!feedbackOn || isOff(colour)) {
-                return `<circle cx="${x}" cy="${rows.tierY}" r="3.9" fill="none" stroke="${text || "rgba(255,255,255,.9)"}" stroke-width="1.1" stroke-dasharray="2 1.6"></circle>`;
+                return `<circle cx="${x}" cy="${rows.tierY}" r="3.9" fill="none" stroke="${text || "var(--light-detail)"}" stroke-width="1.1" stroke-dasharray="2 1.6"></circle>`;
             }
-            return `<circle cx="${x}" cy="${rows.tierY}" r="3.9" fill="${css(colour)}" stroke="${text || "rgba(255,255,255,.9)"}" stroke-width="1.1"></circle>`
+            return `<circle cx="${x}" cy="${rows.tierY}" r="3.9" fill="${css(colour)}" stroke="${text || "var(--light-detail)"}" stroke-width="1.1"></circle>`
                 + (tier.count > 1 ? `<text x="${x}" y="${/** @type {number} */ (rows.tierY) + 0.5}" class="kc-dotn" fill="${idealText(colour)}">${tier.count}</text>` : "");
         }).join("");
 
@@ -96,7 +96,7 @@ export function board(model, layer, options = {}) {
             let x = cx - (widths.reduce((sum, width) => sum + width, 0) + between) / 2;
             marks += combos.map((combo, order) => {
                 const width = widths[order];
-                const badge = `<rect x="${x}" y="${rows.comboY}" width="${width}" height="${rows.comboHeight}" rx="${rows.comboHeight * 0.22}" fill="rgba(8,8,10,.86)" stroke="${comboLit ? css(comboColour) : "rgba(245,245,243,.7)"}" stroke-width="${rows.comboHeight * 0.08}"></rect>`
+                const badge = `<rect x="${x}" y="${rows.comboY}" width="${width}" height="${rows.comboHeight}" rx="${rows.comboHeight * 0.22}" fill="var(--badge-ink)" stroke="${comboLit ? css(comboColour) : "var(--badge-outline)"}" stroke-width="${rows.comboHeight * 0.08}"></rect>`
                     + `<text x="${x + width / 2}" y="${/** @type {number} */ (rows.comboY) + rows.comboHeight / 2 + 0.1}" class="kc-badgetext" font-size="${fontSize}">${esc(combo.badge || "C")}</text>`;
                 x += width + gap;
                 return badge;
@@ -127,7 +127,7 @@ export function board(model, layer, options = {}) {
             ${reach.includes(index) ? `<rect class="kc-reach" x="${visual.x - 3}" y="${visual.y - 3}" width="${GEO.keyW + 6}" height="${GEO.keyH + 6}" rx="${GEO.radius + 2}"></rect>` : ""}
             ${marks}
             ${drafted?.has(index) ? `<circle class="kc-draft" cx="${visual.x + GEO.keyW - 5.5}" cy="${visual.y + 5.5}" r="2.6"></circle>` : ""}
-            ${sub ? `<line class="kc-sep" x1="${visual.x + 8}" y1="${rows.separatorY}" x2="${visual.x + GEO.keyW - 8}" y2="${rows.separatorY}" stroke="${text || "rgba(255,255,255,.9)"}" stroke-width="1"></line>` : ""}
+            ${sub ? `<line class="kc-sep" x1="${visual.x + 8}" y1="${rows.separatorY}" x2="${visual.x + GEO.keyW - 8}" y2="${rows.separatorY}" stroke="${text || "var(--light-detail)"}" stroke-width="1"></line>` : ""}
             <text class="kc-label" x="${cx}" y="${rows.mainY}" font-size="${mainFit.size}"${squeeze(mainFit)}${text ? ` style="fill:${text}"` : ""}>${esc(main)}</text>
             ${subFit ? `<text class="kc-sub" x="${cx}" y="${rows.subY}" font-size="${subFit.size}"${squeeze(subFit)}${text ? ` style="fill:${text}"` : ""}>${esc(sub)}</text>` : ""}
         </g>`;
@@ -231,7 +231,7 @@ function trackballGlyph(model, layer, {mode, pdActive, held, trackball, clickabl
     const paint = css(light.colour);
     const glass = mode !== "leds" && !ownLight(light, layer?.index ?? 0);
     // Picking LEDs, the ball is drawn like a key (.kc-ball.leds); otherwise in its light.
-    const lit = mode === "leds" ? "" : ` style="fill:${paint};stroke:${glass ? "none" : "rgba(255,255,255,.3)"}"`;
+    const lit = mode === "leds" ? "" : ` style="fill:${paint};stroke:${glass ? "none" : "var(--light-outline)"}"`;
     const markup = `<g class="kc kc-ball${glass ? " glass" : ""}${trackball ? " sel" : ""}${mode === "leds" ? " leds" : ""}"${clickable ? ' data-trackball="1" tabindex="0" role="button"' : ""}
         aria-label="Trackball LED ${TRACKBALL_LED}">
         <circle cx="${x}" cy="${y}" r="${r}"${lit}></circle>

@@ -53,6 +53,7 @@ export type WordList<T = Scalar> = readonly (readonly [T, string])[];
 export interface Vocabulary {
     pickerModifiers?: {bit: number; value: string; label: string}[];
     hostOs: WordList<number>;
+    macroPlayback?: Readonly<Record<string, string>>;
     macroProtection: WordList<'auto' | 'on' | 'off'>;
     hostLayouts: WordList<number>;
     holdHelpers: {hold: WordList<string>; long: WordList<string>};
@@ -197,6 +198,7 @@ export interface SettingFieldBase extends SettingBits {
     macro: string;
     label: string;
     hint?: string;
+    unit?: string;
     validate?: string;
     min?: number;
     max?: number;
@@ -226,6 +228,7 @@ export interface LayerSettingField extends SettingFieldBase {
     of?: undefined;
 }
 export type SettingField = StoredSettingField | ShareSettingField | LayerSettingField;
+export interface ComboTimingField {id: 'default' | 'hold'; label: string; hint: string}
 export interface SettingsSection {
     id: string;
     label: string;
@@ -236,4 +239,5 @@ export interface SettingsSection {
     warning?: string;
     githubLink?: {label: string; url: string};
     fields: SettingField[];
+    comboTiming?: readonly ComboTimingField[];
 }
