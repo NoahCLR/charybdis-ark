@@ -135,7 +135,7 @@ const localityLabel = (value) => word(vocabulary(getModel()).localities, value);
 function stageSwitch(model, id, bit) {
     const on = stageEnabled(model, id);
     const node = el(`<label class="sw" data-tip="Turn this whole stage off without losing the colours it stores.">
-        <input type="checkbox" ${on ? "checked" : ""} ${writable() ? "" : "disabled"}><span class="track"></span>
+        <input data-f="lighting:${esc(id)}:enabled" type="checkbox" ${on ? "checked" : ""} ${writable() ? "" : "disabled"}><span class="track"></span>
         <span class="txt">${on ? "Stage on" : "Stage off"}</span></label>`);
     /** @type {HTMLInputElement} */ (node.querySelector("input")).addEventListener("change", (event) => {
         const mask = model.rgb.stageEnableMask ?? 0;
@@ -177,7 +177,7 @@ function fadeTiming(model, idle) {
     // after. Dragging previews here and commits once on release, since every
     // commit redraws this control and is a step in the draft's history.
     const control = el(`<label class="field share-field"><span>${esc(field.label)}<b class="mono" data-readout></b></span>
-        <input type="range" class="share-range" min="0" max="${esc(field.max)}" step="1" value="${esc(field.value)}" data-macro="${esc(field.macro)}"
+        <input type="range" class="share-range" min="0" max="${esc(field.max)}" step="1" value="${esc(field.value)}" data-f="lighting:auto:${esc(field.macro)}" data-macro="${esc(field.macro)}"
             aria-valuetext="" ${editable ? "" : "disabled"} data-tip="${esc(field.hint)}"></label>`);
     const range = /** @type {HTMLInputElement} */ (control.querySelector("input"));
     const note = el(`<p class="note"></p>`);
@@ -208,8 +208,8 @@ function stageBody(body) {
     if (!model) return;
     const canEdit = writable();
     const marks = draftMarks(model?.draft?.changes);
-    /** @param {Parameters<typeof colourEditor>[0]} options */
-    const colourControl = (options) => colourEditor({maximumBrightness: model.rgb.maximumBrightness, ...options});
+    /** @param {Omit<Parameters<typeof colourEditor>[0], "identity">} options */
+    const colourControl = (options) => colourEditor({identity: `lighting:${state.stage}:${state.stage === "layers" ? currentLayer()?.index : state.stage === "pd" ? state.pdSlot : state.stage === "key" ? state.feedbackRow : "stage"}`, maximumBrightness: model.rgb.maximumBrightness, ...options});
     const node = el(`<div></div>`);
     /** @param {...Node} nodes */
     const stack = (...nodes) => { const box = el(`<div class="stack gap-12"></div>`); box.append(...nodes); return box; };
@@ -262,7 +262,7 @@ function stageBody(body) {
         }));
         const where = section("Where it paints");
         const mode = el(`<label class="field"><span>Which keys light up</span>
-            <select class="input" ${canEdit ? "" : "disabled"}>
+            <select data-f="lighting:layer:${layer?.index}:mode" class="input" ${canEdit ? "" : "disabled"}>
                 ${vocabulary(model).paintModes.map(([id, text]) => `<option value="${id}" ${(row?.mode || "KEYS_MAPPED_ON_THIS_LAYER_ONLY") === id ? "selected" : ""}>${esc(text)}</option>`).join("")}
             </select></label>`);
         /** @type {HTMLSelectElement} */ (mode.querySelector("select")).addEventListener("change", (event) =>
@@ -293,7 +293,7 @@ function stageBody(body) {
             node.append(notice);
         }
         const policy = section("Fade");
-        const select = el(`<label class="field"><span>Fade mode</span><select class="input" ${editFade ? "" : "disabled"}>
+        const select = el(`<label class="field"><span>Fade mode</span><select data-f="lighting:auto:fade-mode" class="input" ${editFade ? "" : "disabled"}>
             ${vocabulary(model).fadeModes.map(([id, text]) => `<option value="${id}" ${fade.mode === id ? "selected" : ""}>${text}</option>`).join("")}</select></label>`);
         /** @type {HTMLSelectElement} */ (select.querySelector("select")).addEventListener("change", (event) =>
             { if (fade.end_color) post(edits.automouseFade(/** @type {HTMLSelectElement} */ (event.target).value, fade.end_color)); });
@@ -332,12 +332,12 @@ function stageBody(body) {
         }));
         const where = section("Where it paints");
         const locality = el(`<label class="field"><span>Locality</span>
-            <select class="input" ${canEdit ? "" : "disabled"}
+            <select data-f="lighting:pointing:${state.pdSlot}:locality" class="input" ${canEdit ? "" : "disabled"}
                 data-tip="The overlay is not drawn on the key that binds the mode; it paints this region while the mode runs.">
             ${vocabulary(model).localities.map(([id, text]) => `<option value="${id}" ${row?.locality === id ? "selected" : ""}>${text}</option>`).join("")}</select></label>`);
         /** @type {HTMLSelectElement} */ (locality.querySelector("select")).addEventListener("change", (event) =>
             { if (row) post(edits.pdModeColour(PD_MODE_IDS[state.pdSlot], /** @type {HTMLSelectElement} */ (event.target).value, row.color)); });
-        const previewSwitch = el(`<label class="sw"><input type="checkbox" ${state.pdPreview ? "checked" : ""}><span class="track"></span>
+        const previewSwitch = el(`<label class="sw"><input data-f="lighting:pointing:${state.pdSlot}:preview" type="checkbox" ${state.pdPreview ? "checked" : ""}><span class="track"></span>
             <span class="txt">Preview it active on the board</span></label>`);
         /** @type {HTMLInputElement} */ (previewSwitch.querySelector("input")).addEventListener("change", (event) => { state.pdPreview = /** @type {HTMLInputElement} */ (event.target).checked; render(); });
         where.append(stack(locality, previewSwitch));
@@ -360,7 +360,7 @@ function stageBody(body) {
             onChange: (next) => { if (combo.locality !== undefined) post(edits.comboFeedback(combo.locality, next)); },
         }));
         const where = section("Where it paints");
-        const locality = el(`<label class="field"><span>Locality</span><select class="input" ${canEdit ? "" : "disabled"}>
+        const locality = el(`<label class="field"><span>Locality</span><select data-f="lighting:combo:locality" class="input" ${canEdit ? "" : "disabled"}>
             ${vocabulary(model).localities.map(([id, text]) => `<option value="${id}" ${combo.locality === id ? "selected" : ""}>${text}</option>`).join("")}</select></label>`);
         /** @type {HTMLSelectElement} */ (locality.querySelector("select")).addEventListener("change", (event) =>
             { if (combo.color) post(edits.comboFeedback(/** @type {HTMLSelectElement} */ (event.target).value, combo.color)); });
@@ -401,11 +401,11 @@ function stageBody(body) {
             onChange: (next) => { if (current) post(edits.keyFeedback(model.rgb.keyBehaviorFeedback, current.id, next)); },
         }));
         const policy = section("Policy");
-        const commit = el(`<label class="field"><span>Tap commit</span><select class="input" ${canEdit ? "" : "disabled"}>
+        const commit = el(`<label class="field"><span>Tap commit</span><select data-f="lighting:key:tap-commit" class="input" ${canEdit ? "" : "disabled"}>
             ${vocabulary(model).tapCommit.map(([id, text]) => `<option value="${id}" ${feedback.tapCommitMode === id ? "selected" : ""}>${text}</option>`).join("")}</select></label>`);
         /** @type {HTMLSelectElement} */ (commit.querySelector("select")).addEventListener("change", (event) =>
             post(edits.keyFeedback(model.rgb.keyBehaviorFeedback, null, null, {tapCommitMode: /** @type {HTMLSelectElement} */ (event.target).value})));
-        const locality = el(`<label class="field"><span>Where</span><select class="input" ${canEdit ? "" : "disabled"}>
+        const locality = el(`<label class="field"><span>Where</span><select data-f="lighting:key:locality" class="input" ${canEdit ? "" : "disabled"}>
             ${vocabulary(model).localities.map(([id, text]) => `<option value="${id}" ${feedback.locality === id ? "selected" : ""}>${text}</option>`).join("")}</select></label>`);
         /** @type {HTMLSelectElement} */ (locality.querySelector("select")).addEventListener("change", (event) =>
             post(edits.keyFeedback(model.rgb.keyBehaviorFeedback, null, null, {locality: /** @type {HTMLSelectElement} */ (event.target).value})));
@@ -490,19 +490,19 @@ function groupBuilder(model, canEdit) {
     const option = (value, text, current) => `<option value="${esc(value)}" ${value === current ? "selected" : ""}>${esc(text)}</option>`;
     const node = el(`<aside class="stack gap-12">
         <div class="sect-h"><h4>New row from the selection</h4><span class="right tag">${state.ledPicks.length} LEDs</span></div>
-        <label class="field"><span>Table</span><select class="input" data-target ${canEdit ? "" : "disabled"}>
+        <label class="field"><span>Table</span><select class="input" data-f="lighting:groups:target" data-target ${canEdit ? "" : "disabled"}>
             ${[["layer", "Layer LED groups"], ["pdMode", "Pointing-mode LED groups"], ["combo", "Combo feedback LED groups"], ["keyBehavior", "Key feedback LED groups"]]
                 .map(([value, text]) => option(value, text, draft.target)).join("")}</select></label>
-        ${owners.length ? `<label class="field"><span>Owner</span><select class="input" data-owner ${canEdit ? "" : "disabled"}>
+        ${owners.length ? `<label class="field"><span>Owner</span><select class="input" data-f="lighting:groups:owner" data-owner ${canEdit ? "" : "disabled"}>
             ${owners.map(([value, text]) => option(value, text, draft.owner)).join("")}</select></label>` : ""}
-        <label class="field"><span>LEDs</span><select class="input" data-source ${canEdit ? "" : "disabled"}>
+        <label class="field"><span>LEDs</span><select class="input" data-f="lighting:groups:source" data-source ${canEdit ? "" : "disabled"}>
             ${option("", "Inline selection from the board", draft.source)}
             ${groups.map((group) => option(group.name, `${group.name} · ${group.ledIndices.length} LEDs`, draft.source)).join("")}</select></label>
     </aside>`);
     /** @type {HTMLElement} */ (node.querySelector("[data-target]")).addEventListener("change", (event) => { draft.target = /** @type {HTMLSelectElement} */ (event.target).value; draft.owner = ""; render(); });
     /** @type {HTMLElement | null} */ (node.querySelector("[data-owner]"))?.addEventListener("change", (event) => { draft.owner = /** @type {HTMLSelectElement} */ (event.target).value; });
     /** @type {HTMLElement} */ (node.querySelector("[data-source]")).addEventListener("change", (event) => { draft.source = /** @type {HTMLSelectElement} */ (event.target).value; });
-    node.append(colourEditor({
+    node.append(colourEditor({identity: "lighting:groups:draft",
         colour: state.rowColour || {h: "0", s: "0", v: "0"}, canEdit, title: "Row colour",
         maximumBrightness: model.rgb.maximumBrightness,
         offNote: "A row stored as HSV(0, 0, 0) inherits its stage colour instead of painting its own.",

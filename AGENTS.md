@@ -255,6 +255,13 @@ TypeScript coverage or changing the check configuration.
 - Markup is built with `el()` from template strings, so every value from the
   keyboard or the host goes through `esc()` (or `textContent`) — including in
   attributes. Nothing unescaped reaches `el()` or `innerHTML`.
+- Every `input`, `select` and `textarea` has an explicit `data-f` identity,
+  unique across the rendered surface, including dialogs. Scope it by the
+  stored owner and field; a reorderable item keeps its identity when moved.
+  Use the shared `webview/lib/focus.mjs` path to preserve focus and caret
+  across renders. The [interface specification](docs/architecture/interface-contracts.md#focus-across-renders)
+  owns the identity and macro-step metadata rules; source and browser guards
+  enforce coverage and uniqueness.
 - Decode defensively. Everything arriving from a device is untrusted input:
   validate length, reject noncanonical encodings, and fail with a stable code
   rather than a guess.

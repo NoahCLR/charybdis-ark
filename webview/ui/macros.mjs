@@ -16,6 +16,7 @@
 
 import {el, esc} from "../lib/dom.mjs";
 import {describeStep, macroMatches, macroPeek, parseMacro, macroStepsInput, unreleased} from "../view/macro.mjs";
+import {withStepFocus} from "../view/macro-focus.mjs";
 import {actionLabel, macroPlacements} from "../view/keyface.mjs";
 import {NAME_TIP, nameCount} from "../view/names.mjs";
 import {ROUTE_WORDS, setReachGroupOpen} from "../view/reach-groups.mjs";
@@ -43,7 +44,7 @@ export function screenMacros() {
     const main = el(`<div class="main">${topbar(
         "Macros",
         "Macro slots on the keyboard. A named macro shows by its name on keys, in the picker and in the key card.",
-        bank.length ? `<input class="input search" id="macroSearch" type="search" placeholder="Search macros by name" value="${esc(state.macroSearch || "")}">` : "",
+        bank.length ? `<input class="input search" id="macroSearch" data-f="macros:search" type="search" placeholder="Search macros by name" value="${esc(state.macroSearch || "")}">` : "",
     )}</div>`);
     /** @type {HTMLInputElement | null} */ (main.querySelector("#macroSearch"))?.addEventListener("input", (event) => { state.macroSearch = /** @type {HTMLInputElement} */ (event.target).value; render(); });
 
@@ -107,7 +108,7 @@ function editor(model, slot, canEdit) {
     const payload = form.draft ?? slot.payload ?? "";
     const parsed = parseMacro(payload, {unicode: true, keys: model?.macroPayloadKeycodes, aliases: model?.qmkKeycodeAliases});
     /** @type {MacroStep[]} */
-    let steps = form.steps ?? (parsed.steps.length ? parsed.steps : [{kind: "text", text: ""}]);
+    let steps = focusSteps(slot, form.steps ?? (parsed.steps.length ? parsed.steps : [{kind: "text", text: ""}]));
     const editable = canEdit && !state.recording && (!parsed.error || Boolean(form.steps));
     const dirty = form.draft !== undefined && payload !== slot.payload;
     const wrap = el(`<div class="stack"></div>`);
@@ -120,19 +121,19 @@ function editor(model, slot, canEdit) {
             ${nameField(model, slot, canEdit)}
             ${placedOn(model, slot)}
             ${unicodeSetup(model, slot)}
-            <label class="field"><span>Uninterruptible playback</span><select class="input" data-protection ${canEdit && model.macroProtectionSupported ? "" : "disabled"}>
+            <label class="field"><span>Uninterruptible playback</span><select class="input" data-f="macro:${esc(slot.keycode)}:protection" data-protection ${canEdit && model.macroProtectionSupported ? "" : "disabled"}>
                 ${(model.macroProtectionChoices || []).map(({value, label}) => `<option value="${esc(value)}" ${slot.protection === value ? "selected" : ""}>${esc(label)}${value === "auto" ? ` · ${slot.uninterruptible ? "on" : "off"}` : ""}</option>`).join("")}</select></label>
             <p class="note">${model.macroProtectionSupported ? (model.macroOutputIsolationSupported ? "Automatic turns protection on when this layout needs Unicode entry. Protected playback starts immediately and suspends ordinary keys already held. Only the macro types; new presses are ignored and releases still work. Held modifiers resume afterward. Suspended ordinary keys need to be released and pressed again; ignored presses are never replayed. Pointing and other keyboards can still interfere." : "Typing during Unicode entry can corrupt the text. Automatic turns protection on when this layout needs Unicode entry. On ignores new keypresses from this keyboard until playback finishes; releases still work. Ignored presses are not replayed. Release ordinary keys before starting; other keyboards can still interfere. Update both halves to suspend keys already held.") : "Update both halves to protect macro playback. This firmware does not support the per-macro setting."}</p>
             <div class="sect-h"><h4>Steps</h4><span class="right note">played from top to bottom</span></div>
             <p class="note">Type or paste exactly what you want in Text. Add keys and delays as separate steps.</p>
             <div data-macro-steps class="stack"></div>
             <div data-macro-feedback role="status" aria-live="polite"></div>
-            <div class="row macro-add"><select class="input" data-kind aria-label="New step type" ${editable ? "" : "disabled"}>
+            <div class="row macro-add"><select class="input" data-f="macro:${esc(slot.keycode)}:new-kind" data-kind aria-label="New step type" ${editable ? "" : "disabled"}>
                 ${STEP_KINDS.map(([value, text]) => `<option value="${value}" ${value === (form.newKind || "text") ? "selected" : ""}>${text}</option>`).join("")}</select>
                 <button class="btn" data-act="insert" ${editable ? "" : "disabled"}>Add a step</button></div>
             <details data-raw ${form.rawOpen || (parsed.error && !form.steps) ? "open" : ""}>
                 <summary>Advanced · Raw payload</summary>
-                <label class="field"><span>Raw payload</span><textarea class="input mono" rows="3" data-raw-payload="${esc(slot.keycode)}" ${canEdit && !state.recording ? "" : "disabled"}>${esc(payload)}</textarea></label>
+                <label class="field"><span>Raw payload</span><textarea class="input mono" rows="3" data-f="macro:${esc(slot.keycode)}:raw" data-raw-payload="${esc(slot.keycode)}" ${canEdit && !state.recording ? "" : "disabled"}>${esc(payload)}</textarea></label>
                 <p class="note">Commands use {KC_A}, {+KC_A}, {-KC_A} and {120}. Literal braces use {{ and }}. Text steps escape them automatically.</p>
             </details>
             <div class="row macro-actions">
@@ -168,7 +169,7 @@ function editor(model, slot, canEdit) {
         inspectEdit(slot, false);
         const current = macroForm(slot.keycode);
         const parsed = parseMacro(current.draft ?? slot.payload ?? "", {unicode: true, keys: model?.macroPayloadKeycodes, aliases: model?.qmkKeycodeAliases});
-        steps = current.steps ?? (parsed.steps.length ? parsed.steps : [{kind: "text", text: ""}]);
+        steps = focusSteps(slot, current.steps ?? (parsed.steps.length ? parsed.steps : [{kind: "text", text: ""}]));
         const editable = canEdit && !state.recording && (!parsed.error || Boolean(current.steps));
         // Refresh while typing in raw text. Blur happens between pointerdown
         // and click, so it must preserve every control the user can press.
@@ -203,7 +204,7 @@ function nameField(model, slot, canEdit) {
     if (!space) return "";
     const count = nameCount(slot.name || "", space.perName);
     return `<label class="field"><span>Name</span>
-        <input class="input" data-name value="${esc(slot.name || "")}" placeholder="Macro ${esc(slot.keycode.split("_").at(-1))}" ${canEdit ? "" : "disabled"}
+        <input class="input" data-f="macro:${esc(slot.keycode)}:name" data-name value="${esc(slot.name || "")}" placeholder="Macro ${esc(slot.keycode.split("_").at(-1))}" ${canEdit ? "" : "disabled"}
             data-tip="${esc(NAME_TIP)}">
         <span class="note${count.over ? " warn" : ""}" data-name-count>${esc(count.label)}</span></label>`;
 }
@@ -316,11 +317,19 @@ export function receiveMacroValidation(message) {
 
 /** @param {MacroSlot} slot @param {MacroStep[]} steps */
 function saveSteps(slot, steps, stage = false) {
+    steps = focusSteps(slot, steps);
     const {payload, error} = macroStepsInput(steps);
     setMacroForm(slot.keycode, {steps, draft: payload, stepError: error, cancelBlur: false});
     const raw = /** @type {HTMLTextAreaElement | null} */ (document.querySelector(`[data-raw-payload="${slot.keycode}"]`));
     if (raw && document.activeElement !== raw) raw.value = payload;
     inspectEdit(slot, stage);
+}
+
+/** @param {MacroSlot} slot @param {MacroStep[]} steps */
+function focusSteps(slot, steps) {
+    const identified = withStepFocus(steps, macroForm(slot.keycode).stepFocus, () => crypto.randomUUID());
+    setMacroForm(slot.keycode, {stepFocus: identified});
+    return identified;
 }
 
 /** @param {string} keycode */
@@ -364,8 +373,8 @@ function stepEditor(model, slot, steps, step, index, canEdit) {
             <button class="btn tiny ghost" data-move="-1" ${canEdit && index > 0 ? "" : "disabled"} aria-label="Move step up">↑</button>
             <button class="btn tiny ghost" data-move="1" ${canEdit && index < steps.length - 1 ? "" : "disabled"} aria-label="Move step down">↓</button>
             <button class="btn tiny ghost" data-remove ${canEdit ? "" : "disabled"}>Remove</button></span></div>
-        ${step.kind === "text" ? `<label class="field"><textarea aria-label="Text for step ${index + 1}" class="input" rows="3" data-step-text="${index}" placeholder="Type or paste text" ${canEdit ? "" : "disabled"}>${esc(step.text)}</textarea></label>`
-            : step.kind === "delay" ? `<label class="field"><span>Milliseconds</span><input class="input mono" data-step-delay="${index}" type="number" min="0" max="65535" value="${esc(step.delay)}" ${canEdit ? "" : "disabled"}></label>`
+        ${step.kind === "text" ? `<label class="field"><textarea data-f="macro:${esc(slot.keycode)}:step:${esc(step.focusId)}:text" aria-label="Text for step ${index + 1}" class="input" rows="3" data-step-text="${index}" placeholder="Type or paste text" ${canEdit ? "" : "disabled"}>${esc(step.text)}</textarea></label>`
+            : step.kind === "delay" ? `<label class="field"><span>Milliseconds</span><input data-f="macro:${esc(slot.keycode)}:step:${esc(step.focusId)}:delay" class="input mono" data-step-delay="${index}" type="number" min="0" max="65535" value="${esc(step.delay)}" ${canEdit ? "" : "disabled"}></label>`
             : `<div class="row"><span class="tok">${esc(describeStep(step, key => actionLabel(model, key))) || "Choose keys"}</span><button class="btn" data-pick-step ${canEdit ? "" : "disabled"}>Pick…</button></div>`}
     </div>`);
     const input = /** @type {HTMLTextAreaElement | HTMLInputElement | null} */ (node.querySelector("textarea, input"));
@@ -423,14 +432,14 @@ function recorder(model, slot, canEdit) {
         <div class="card-h"><h3>Record</h3><span class="right"><span class="tag">${recording ? "recording" : "idle"}</span></span></div>
         <div class="card-b stack">
             <div class="row record-opts">
-                <label class="field capture-field"><span>Capture style</span><select class="input" data-mode ${recording ? "disabled" : ""}>
+                <label class="field capture-field"><span>Capture style</span><select class="input" data-f="macro:${esc(slot.keycode)}:record-mode" data-mode ${recording ? "disabled" : ""}>
                     <option value="compact" ${state.recordMode !== "explicit" ? "selected" : ""}>Compact taps</option>
                     <option value="explicit" ${state.recordMode === "explicit" ? "selected" : ""}>Explicit press and release</option>
                 </select></label>
-                <label class="sw"><input type="checkbox" data-delays ${state.recordDelays !== false ? "checked" : ""}>
+                <label class="sw"><input type="checkbox" data-f="macro:${esc(slot.keycode)}:record-delays" data-delays ${state.recordDelays !== false ? "checked" : ""}>
                     <span class="track"></span><span class="txt">Record delays</span></label>
-                <label class="field ms-field"><span>After (ms)</span><input class="input mono" data-threshold value="${esc(state.recordDelayThreshold)}" ${state.recordDelays === false ? "disabled" : ""}></label>
-                <label class="field ms-field"><span>Round to (ms)</span><input class="input mono" data-round value="${esc(state.recordDelayRound)}" ${state.recordDelays === false ? "disabled" : ""}></label>
+                <label class="field ms-field"><span>After (ms)</span><input class="input mono" data-f="macro:${esc(slot.keycode)}:record-threshold" data-threshold value="${esc(state.recordDelayThreshold)}" ${state.recordDelays === false ? "disabled" : ""}></label>
+                <label class="field ms-field"><span>Round to (ms)</span><input class="input mono" data-f="macro:${esc(slot.keycode)}:record-round" data-round value="${esc(state.recordDelayRound)}" ${state.recordDelays === false ? "disabled" : ""}></label>
             </div>
             <div class="row gap-8">
                 <span class="note">${recording ? "Typing in this window is captured. Press Escape or Stop when the take is done." : "Appends key steps captured in this window."}</span>

@@ -28,7 +28,7 @@ export function screenSettings() {
     const main = el(`<div class="main">${topbar(
         "Settings",
         "The keyboard's global policy: every value it stores that applies on all layers. Values this firmware cannot report stay read-only rather than disappearing.",
-        `<input class="input search short" id="settingsSearch" placeholder="Search settings" value="${esc(state.settingsSearch || "")}">`,
+        `<input class="input search short" id="settingsSearch" data-f="settings:search" placeholder="Search settings" value="${esc(state.settingsSearch || "")}">`,
     )}</div>`);
 
     const content = el(`<div class="content"><div class="pad settings-pad"></div></div>`);
@@ -71,8 +71,6 @@ export function screenSettings() {
     search.addEventListener("input", () => {
         state.settingsSearch = search.value;
         render();
-        const again = /** @type {HTMLInputElement | null} */ (document.querySelector("#settingsSearch"));
-        if (again) { again.focus(); again.setSelectionRange(again.value.length, again.value.length); }
     });
     return main;
 }
@@ -101,7 +99,7 @@ function comboTimingRow(model, entry) {
     const row = el(`<div class="setrow">
         <div><div class="nm">${esc(entry.label)}</div>
             <div class="hint">${esc(hint)}</div></div>
-        <div class="control"><div class="input-row"><input class="input mono" id="${hold ? "comboHoldTerm" : "comboDefaultTerm"}" value="${esc(stored)}" ${editable ? "" : "disabled"}></div></div>
+        <div class="control"><div class="input-row"><input class="input mono" id="${hold ? "comboHoldTerm" : "comboDefaultTerm"}" data-f="settings:combo:${hold ? "hold" : "default"}" value="${esc(stored)}" ${editable ? "" : "disabled"}></div></div>
     </div>`);
     // Posted on its own rather than riding along with whichever combo is saved
     // next. The keyboard always stores a number, so an emptied field is put
@@ -168,14 +166,14 @@ function fieldRow(field, canEdit, submit, hidden, slot) {
         return row;
     }
     if (field.kind === "toggle") {
-        const node = el(`<label class="sw"><input type="checkbox" data-macro="${esc(field.macro)}" ${field.enabled ? "checked" : ""} ${editable ? "" : "disabled"}>
+        const node = el(`<label class="sw"><input type="checkbox" data-macro="${esc(field.macro)}" data-f="setting:${esc(field.macro)}" ${field.enabled ? "checked" : ""} ${editable ? "" : "disabled"}>
             <span class="track"></span><span class="txt muted">${field.enabled ? "On" : "Off"}</span></label>`);
         /** @type {HTMLInputElement} */ (node.querySelector("input")).addEventListener("change", submit);
         control.appendChild(node);
         return row;
     }
     if (field.kind === "layer") {
-        const node = el(`<select class="input" data-macro="${esc(field.macro)}" ${editable ? "" : "disabled"}>
+        const node = el(`<select class="input" data-macro="${esc(field.macro)}" data-f="setting:${esc(field.macro)}" ${editable ? "" : "disabled"}>
             ${layers().map((layer) => `<option value="Layer ${layer.index}" ${field.value === `Layer ${layer.index}` ? "selected" : ""}>${esc(layer.displayName || layer.name)}</option>`).join("")}</select>`);
         node.addEventListener("change", submit);
         control.appendChild(node);
@@ -184,14 +182,14 @@ function fieldRow(field, canEdit, submit, hidden, slot) {
     if (field.choices?.length) {
         const choices = field.choices.map((choice) => typeof choice === "object" ? choice : {value: choice, label: String(choice)});
         const known = choices.some((choice) => String(choice.value) === String(field.value));
-        const node = el(`<select class="input" data-macro="${esc(field.macro)}" ${editable ? "" : "disabled"}>
+        const node = el(`<select class="input" data-macro="${esc(field.macro)}" data-f="setting:${esc(field.macro)}" ${editable ? "" : "disabled"}>
             ${known ? "" : `<option value="${esc(field.value)}" selected>${esc(field.value)} · as stored</option>`}
             ${choices.map((choice) => `<option value="${esc(choice.value)}" ${String(choice.value) === String(field.value) ? "selected" : ""}>${esc(choice.label)}</option>`).join("")}</select>`);
         node.addEventListener("change", submit);
         control.appendChild(node);
         return row;
     }
-    const node = el(`<div class="input-row"><input class="input mono" data-macro="${esc(field.macro)}" value="${esc(field.value)}" ${editable ? "" : "disabled"}>
+    const node = el(`<div class="input-row"><input class="input mono" data-macro="${esc(field.macro)}" data-f="setting:${esc(field.macro)}" value="${esc(field.value)}" ${editable ? "" : "disabled"}>
         ${field.unit ? `<span class="chip">${esc(field.unit)}</span>` : ""}</div>`);
     /** @type {HTMLInputElement} */ (node.querySelector("input")).addEventListener("change", submit);
     control.appendChild(node);

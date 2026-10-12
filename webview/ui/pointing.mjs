@@ -152,7 +152,7 @@ function emptySlot(model, slot, canEdit, slots) {
             <button class="btn" data-new="${KIND.SCROLLING}" ${canEdit ? "" : "disabled"}
                 data-tip="Scrolling, starting from Dragscroll's tuning.">New scrolling mode</button></div>
         ${sources.length ? `<div class="pd-copy">
-            <label class="field"><span>Copy from</span><select class="input" data-source ${canEdit ? "" : "disabled"}>
+            <label class="field"><span>Copy from</span><select class="input" data-f="pointing:${slot.id}:copy" data-source ${canEdit ? "" : "disabled"}>
                 ${sources.map((row) => `<option value="${row.id}">Slot ${row.id} · ${esc(row.name)}</option>`).join("")}</select></label>
             <button class="btn" data-act="duplicate" ${canEdit ? "" : "disabled"}>Duplicate into this slot</button></div>`
             : ""}
@@ -185,7 +185,7 @@ function editor(model, slot, canEdit, slots) {
     /** @param {string} label @param {import("../../contracts/edits.js").Scalar | null | undefined} value @param {string} key @param {import("./surface-types.js").FieldOptions} [options] */
     const field = (label, value, key, options = {}) => {
         const node = el(`<label class="field"><span>${esc(label)}</span>
-            <span class="affix ${options.unit ? "unit" : ""} ${options.wide ? "wide" : ""}"><input class="input mono" value="${esc(value ?? "")}" inputmode="numeric" ${disabled}
+            <span class="affix ${options.unit ? "unit" : ""} ${options.wide ? "wide" : ""}"><input data-f="pointing:${slot.id}:${esc(key)}" class="input mono" value="${esc(value ?? "")}" inputmode="numeric" ${disabled}
             ${options.tip ? `data-tip="${esc(options.tip)}"` : ""}>${options.unit ? `<i>${esc(options.unit)}</i>` : ""}</span></label>`);
         form[key] = () => /** @type {HTMLInputElement} */ (node.querySelector("input")).value;
         return node;
@@ -193,7 +193,7 @@ function editor(model, slot, canEdit, slots) {
     /** @param {string} label @param {readonly (readonly [number, string])[]} choices @param {import("../../contracts/edits.js").Scalar | undefined} current @param {string} key @param {import("./surface-types.js").SelectOptions} [options] */
     const select = (label, choices, current, key, options = {}) => {
         const node = el(`<label class="field ${options.inline ? "inline" : ""}"><span>${esc(label)}</span>
-            <select class="input" ${disabled} ${options.tip ? `data-tip="${esc(options.tip)}"` : ""}>
+            <select data-f="pointing:${slot.id}:${esc(key)}" class="input" ${disabled} ${options.tip ? `data-tip="${esc(options.tip)}"` : ""}>
             ${choices.map(([value, text]) => `<option value="${value}" ${String(value) === String(current) ? "selected" : ""}>${esc(text)}</option>`).join("")}</select></label>`);
         form[key] = () => Number(/** @type {HTMLSelectElement} */ (node.querySelector("select")).value);
         if (options.onChange) /** @type {HTMLSelectElement} */ (node.querySelector("select")).addEventListener("change", options.onChange);
@@ -203,7 +203,7 @@ function editor(model, slot, canEdit, slots) {
     const shortcut = (label, code, key, options = {}) => {
         const name = options.name ?? keyName(model, Number(code ?? 0));
         const node = el(`<label class="field ${options.klass || ""}"><span>${options.labelHtml || esc(label)}</span>
-            <div class="input-row"><input class="input mono" value="${esc(name)}" placeholder="nothing" ${disabled}>
+            <div class="input-row"><input data-f="pointing:${slot.id}:${esc(key)}" class="input mono" value="${esc(name)}" placeholder="nothing" ${disabled}>
             <button class="btn" data-pick ${disabled}>Pick…</button></div></label>`);
         const input = /** @type {HTMLInputElement} */ (node.querySelector("input"));
         form[key] = () => input.value.trim();
@@ -228,7 +228,7 @@ function editor(model, slot, canEdit, slots) {
         const bits = modifierBits(model);
         const columns = (vocabulary(model).pickerModifiers || []).filter(({bit}) => bit < 16).map(({label}) => label);
         /** @param {readonly [number, string]} entry */
-        const cell = ([bit, name]) => `<label class="sw" data-tip="${esc(name)}"><input type="checkbox" data-bit="${bit}" aria-label="${esc(name)}"
+        const cell = ([bit, name]) => `<label class="sw" data-tip="${esc(name)}"><input data-f="pointing:${slot.id}:${esc(key)}:modifier:${bit}" type="checkbox" data-bit="${bit}" aria-label="${esc(name)}"
             ${mask & bit ? "checked" : ""} ${disabled}><span class="track"></span></label>`;
         /** @param {boolean} right */
         const side = (right) => bits.filter(([bit]) => (bit >= 16) === right);
@@ -258,7 +258,7 @@ function editor(model, slot, canEdit, slots) {
         <div class="card-b pd-identity"></div></div>`);
     const headBody = /** @type {HTMLElement} */ (head.querySelector(".card-b"));
     const name = el(`<label class="field"><span>Name</span>
-        <input class="input" value="${esc(slot.name)}" maxlength="${NAME_MAX_BYTES}" data-tip="${esc(NAME_TIP)}" ${disabled}></label>`);
+        <input data-f="pointing:${slot.id}:name" class="input" value="${esc(slot.name)}" maxlength="${NAME_MAX_BYTES}" data-tip="${esc(NAME_TIP)}" ${disabled}></label>`);
     form.name = () => /** @type {HTMLInputElement} */ (name.querySelector("input")).value.trim();
     headBody.append(name);
     headBody.append(select("Movement", words(model).kinds.filter(([value]) => value), kind, "kind",
@@ -422,7 +422,7 @@ function editor(model, slot, canEdit, slots) {
             const pair = el(`<div class="field"><span>${esc(label)}</span><div class="pd-ratio"></div></div>`);
             const inputs = /** @type {HTMLElement} */ (pair.querySelector(".pd-ratio"));
             for (const [index, key] of [top, bottom].entries()) {
-                const input = /** @type {HTMLInputElement} */ (el(`<input class="input mono" value="${esc(slot.scroll?.[key] ?? "")}" inputmode="numeric"
+                const input = /** @type {HTMLInputElement} */ (el(`<input data-f="pointing:${slot.id}:scroll:${esc(key)}" class="input mono" value="${esc(slot.scroll?.[key] ?? "")}" inputmode="numeric"
                     aria-label="${esc(`${label} ${index ? "denominator" : "numerator"}`)}" ${disabled}>`));
                 form[`scroll:${key}`] = () => input.value;
                 if (index) inputs.append(el(`<i>:</i>`));

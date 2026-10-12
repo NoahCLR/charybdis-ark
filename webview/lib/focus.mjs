@@ -3,14 +3,14 @@
 //
 // Every render replaces the whole app, so the focused element is thrown away
 // with it. Before the redraw the focused control is remembered by the stable
-// attribute that names it — the same data-* hooks the screens wire their
-// handlers to — and afterwards the control that carries that name again gets
+// data-f identity authored on every form control. Other focusable elements
+// keep their existing authored hooks. Afterwards the matching control gets
 // focus back, with its caret where it was.
 
-/** @typedef {{selector: string, index: number, caret: [number, number | null] | null}} CapturedFocus */
+/** @typedef {{selector: string, index: number, unique: boolean, caret: [number, number | null] | null}} CapturedFocus */
 /** @typedef {HTMLElement & {selectionStart?: number | null, selectionEnd?: number | null, setSelectionRange?: (start: number, end: number | null) => void}} FocusControl */
 
-const NAMES = [
+const ACTION_NAMES = [
     "id", "data-key", "data-trackball", "data-cell", "data-term", "data-macro", "data-channel", "data-row",
     "data-edit", "data-editmacro", "data-editpd", "data-pick", "data-lt", "data-mod", "data-screen", "data-tab",
     "data-ltab", "data-slot", "data-b", "data-helper", "data-repeat", "data-output", "data-target", "data-owner",
@@ -21,22 +21,34 @@ const NAMES = [
 export function captureFocus(root) {
     const active = /** @type {FocusControl | null} */ (root.ownerDocument?.activeElement);
     if (!active || active === root.ownerDocument.body || !root.contains(active)) return null;
-    const name = NAMES.find((attribute) => active.hasAttribute(attribute));
-    if (!name) return null;
+    const name = active.matches("input, select, textarea") ? "data-f"
+        : ACTION_NAMES.find((attribute) => active.hasAttribute(attribute));
+    if (!name || !active.hasAttribute(name)) return null;
     const value = active.getAttribute(name) ?? "";
     const selector = name === "id" ? `#${CSS.escape(value)}` : `${active.tagName.toLowerCase()}[${name}="${CSS.escape(value)}"]`;
-    const index = [...root.querySelectorAll(selector)].indexOf(active);
+    const matches = [...root.querySelectorAll(selector)];
+    const unique = name === "data-f";
+    if (unique && matches.length !== 1) return null;
+    const index = matches.indexOf(active);
     /** @type {CapturedFocus["caret"]} */
     const caret = typeof active.selectionStart === "number" ? [active.selectionStart, active.selectionEnd ?? null] : null;
-    return {selector, index, caret};
+    return {selector, index, unique, caret};
 }
 
 /** @param {Element} root @param {CapturedFocus | null} captured */
 export function restoreFocus(root, captured) {
     if (!captured) return;
     const matches = root.querySelectorAll(captured.selector);
+    if (captured.unique && matches.length !== 1) return;
     const target = /** @type {FocusControl | undefined} */ (matches[captured.index] || matches[0]);
     if (!target || typeof target.focus !== "function") return;
+    // A redraw may rebuild a disclosure closed. The field that had focus
+    // stays reachable inside it, just as before that redraw.
+    if (captured.unique) {
+        for (let ancestor = target.parentElement; ancestor && ancestor !== root; ancestor = ancestor.parentElement) {
+            if (ancestor instanceof HTMLDetailsElement) ancestor.open = true;
+        }
+    }
     target.focus({preventScroll: true});
     if (captured.caret && typeof target.setSelectionRange === "function") {
         try { target.setSelectionRange(...captured.caret); } catch { /* a number input has no caret */ }

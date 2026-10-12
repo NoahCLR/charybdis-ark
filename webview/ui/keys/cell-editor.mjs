@@ -29,14 +29,14 @@ export function cellEditor(behaviour, step, kind) {
             <span class="right"><button class="btn tiny ghost" data-act="close">Done</button></span></div>
         <div class="ce-body">
             <label class="field"><span>Sends</span>
-                <div class="input-row"><input class="input mono" data-action value="${esc(branch?.action || "")}" placeholder="nothing" ${canEdit ? "" : "disabled"}>
+                <div class="input-row"><input class="input mono" data-f="behaviour:${esc(behaviour.keycode)}:${cell}:action" data-action value="${esc(branch?.action || "")}" placeholder="nothing" ${canEdit ? "" : "disabled"}>
                 <button class="btn" data-act="pick" ${canEdit ? "" : "disabled"}>Pick…</button></div></label>
             ${kind === "tap" ? "<span></span>" : `<label class="field"><span>How it runs</span>
-                <select class="input" data-helper ${canEdit ? "" : "disabled"}>
+                <select class="input" data-f="behaviour:${esc(behaviour.keycode)}:${cell}:helper" data-helper ${canEdit ? "" : "disabled"}>
                     ${holdHelpers(getModel(), kind).map(([value, text]) => `<option value="${value}" ${shown?.helper === value ? "selected" : ""}>${text}</option>`).join("")}
                 </select></label>`}
             ${kind === "tap" ? "<span></span>" : `<label class="field" data-repeat-field ${shown?.helper === "REPEAT_WHILE_HELD" ? "" : "hidden"}><span>Repeat rate · Hz</span>
-                <input class="input mono" type="number" min="1" max="100" step="1" data-repeat value="${esc(Number(shown?.repeatHz) > 0 ? shown?.repeatHz : DEFAULT_REPEAT_HZ)}" ${canEdit ? "" : "disabled"}></label>`}
+                <input class="input mono" type="number" min="1" max="100" step="1" data-f="behaviour:${esc(behaviour.keycode)}:${cell}:repeat" data-repeat value="${esc(Number(shown?.repeatHz) > 0 ? shown?.repeatHz : DEFAULT_REPEAT_HZ)}" ${canEdit ? "" : "disabled"}></label>`}
             <div class="row ce-actions">
                 ${branch ? `<button class="btn ghost" data-act="clear" ${canEdit ? "" : "disabled"}>Remove tier</button>` : ""}
                 <span class="note">Changes are kept in the draft automatically.</span>

@@ -60,7 +60,7 @@ export function rail() {
     const demo = demoOf(model);
     const devices = model?.devices || [];
     const selector = devices.length > 1 ? `<label class="rail-picker-label" for="rail-device-picker">Keyboard</label>
-            <select class="input rail-picker" id="rail-device-picker" data-act="select-device" ${health.busy ? "disabled" : ""}>
+            <select class="input rail-picker" id="rail-device-picker" data-f="rail:device" data-act="select-device" ${health.busy ? "disabled" : ""}>
                 ${devices.map((entry) => `<option value="${esc(entry.id)}" ${entry.id === model?.selectedDeviceId ? "selected" : ""}>${esc(entry.label)} · ${esc(entry.id)}</option>`).join("")}
             </select>` : "";
     /** @param {string} tone @param {string} text @param {string} tip */

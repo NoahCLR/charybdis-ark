@@ -106,7 +106,7 @@ function editor(model, portable, busy) {
         <div class="list"></div>
         <div class="stack layerpanel-actions">
             <div class="stack">
-                <label class="sw"><input type="checkbox" id="layerKeysFollow" data-act="follow" ${follow ? "checked" : ""} ${busy ? "disabled" : ""}>
+                <label class="sw"><input type="checkbox" id="layerKeysFollow" data-f="layers:keys-follow" data-act="follow" ${follow ? "checked" : ""} ${busy ? "disabled" : ""}>
                     <span class="track"></span><span class="txt">Keys follow their layers</span></label>
                 <span class="note">${follow
                     ? "Layer keys (MO, LT, TG, TO, TT, OSL…) are renumbered with the move, so each still reaches the same layer. Make base swaps the two roles: a key that reached the new base reaches the old one."
@@ -130,7 +130,7 @@ function editor(model, portable, busy) {
                 : `<button class="lp-grip" data-grip="${layerId}" ${busy ? "disabled" : ""} aria-label="Move ${esc(label)}: drag, or press the up and down arrows"
                     data-tip="Drag to move this layer, or focus it and press ↑ ↓.">${GRIP}</button>`}
             <span class="note mono">${layerId}</span>
-            <input class="input" value="${esc(names[layerId])}" data-name="${layerId}" maxlength="${NAME_MAX_BYTES}" ${busy ? "disabled" : ""} data-tip="${esc(NAME_TIP)}"
+            <input data-f="layer:${layerId}:name" class="input" value="${esc(names[layerId])}" data-name="${layerId}" maxlength="${NAME_MAX_BYTES}" ${busy ? "disabled" : ""} data-tip="${esc(NAME_TIP)}"
                 aria-label="${layerId ? `Name for layer ${layerId}` : "Base layer name"}">
             <span class="note ${mapped ? "" : "dim"}">${mapped ? `${mapped} key${mapped === 1 ? "" : "s"}` : "nothing mapped"}</span>
             ${base ? `<span class="tag lp-base" data-tip="Always on, and what every transparent key falls through to.">base</span>`
