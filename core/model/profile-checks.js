@@ -10,6 +10,8 @@ const {baseLighting} = require("./settings-editor");
 const {decodeMacroPayload, macroProgramLimit} = require("../schema/macro-payload");
 const {hostSettings} = require("../schema/host-settings");
 const {inspectMacroPlayback} = require("./macro-input");
+const {pointingClicks} = require("./pointing-taps");
+const {supportsPdClicks} = require("../schema/pd-mode-domain-v1");
 
 /** @param {import("./types.js").DecodedProfile} decoded @param {import("./types.js").ProfileDestination} [destination] @returns {import("../../contracts/model.js").Finding[]} */
 function profileFindings(decoded, destination = {}) {
@@ -33,6 +35,16 @@ function profileFindings(decoded, destination = {}) {
             detail: `${playback.error} The keyboard stores this macro, but pressing it does nothing.`,
             fix: "Fix the macro or change Settings → Host before playing it.", place: {kind: "macro", index}});
     });
+    // A keyboard that does not click refuses a pointing mode that does; a
+    // profile read elsewhere or restored from a file can still hold one.
+    if (typeof destination.featureFlags === "number" && !supportsPdClicks(destination)) {
+        for (const click of pointingClicks(decoded.pdModes || [])) {
+            findings.push({kind: "pointingClickBlocker", level: "blocker", layers: [], identity: `${click.slot}:${click.label}:${click.button}`,
+                title: `${click.name} clicks mouse button ${click.button} on ${click.label}`,
+                detail: "This keyboard's firmware cannot click a mouse button from a pointing mode. Apply will refuse the profile.",
+                fix: "Update the firmware, or give that direction or button another shortcut.", place: {kind: "pointing", slot: click.slot}});
+        }
+    }
     const lighting = baseLighting(decoded.settings.values);
     const max = destination.brightnessMax;
     if (max !== undefined && Number.isInteger(max) && lighting.brightness > max) {

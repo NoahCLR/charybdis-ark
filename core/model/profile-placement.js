@@ -14,6 +14,8 @@ const {decodeProfileBlob, PROFILE_DOMAIN_IDS} = require("../schema/profile-blob-
 const {decodeKeyBehaviorDomain, KEY_BEHAVIOR_HOLD_MODES} = require("../schema/key-behavior-domain-v1");
 const {decodeComboDomain} = require("../schema/combo-domain-v1");
 const {profileDepthOptions} = require("../schema/profile-depth");
+const {decodePdDomain} = require("../schema/pd-mode-domain-v1");
+const {pointingClickProblem} = require("./pointing-taps");
 
 /** @param {import("../schema/types.js").BehaviorRow[]} rows @param {PlacementOptions} [options] */
 function behaviorPlacementProblem(rows, options) {
@@ -48,7 +50,9 @@ function comboPlacementProblem(rows, options) {
 /** @param {number} code @param {PlacementOptions} [options] */
 const keyPlacementProblem = (code, options) => placementProblem(keycodeAction(code), PLACEMENT.KEY, options);
 
-// The first misplaced action in an encoded profile, or undefined.
+// The first misplaced action in an encoded profile, or undefined: a
+// pointing mode's mouse-button click is misplaced on a keyboard that does not
+// click.
 /** @param {Uint8Array} bytes @param {PlacementOptions} [options] */
 function profilePlacementProblem(bytes, options) {
     const profile = decodeProfileBlob(bytes);
@@ -56,9 +60,11 @@ function profilePlacementProblem(bytes, options) {
     const domain = id => profile.domains.find(row => row.id === id);
     const behaviors = domain(PROFILE_DOMAIN_IDS.KEY_BEHAVIORS)?.payload;
     const combos = domain(PROFILE_DOMAIN_IDS.COMBOS);
+    const pointing = domain(PROFILE_DOMAIN_IDS.PD_MODES)?.payload;
     const depth = profileDepthOptions(options?.capabilities, domain(PROFILE_DOMAIN_IDS.RGB)?.payload);
     return (behaviors && behaviorPlacementProblem(decodeKeyBehaviorDomain(behaviors, depth.behaviors).rows, options))
         || (combos && comboPlacementProblem(decodeComboDomain(combos.payload).rows, options))
+        || (pointing && pointingClickProblem(decodePdDomain(pointing), options?.capabilities))
         || undefined;
 }
 

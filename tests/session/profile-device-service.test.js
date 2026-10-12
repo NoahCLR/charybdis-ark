@@ -46,6 +46,28 @@ test("a restore reads what the keyboard accepts, including its host OS, before w
     assert.deepEqual(keyboard.mutations, [], "a failed facts read refuses before the first write");
 });
 
+test("direct restore refuses pointing clicks on legacy firmware before recovery or any write", async t => {
+    const {editDeviceProfile} = require("../../core/model/device-profile-edits");
+    const source = fakeKeyboard({document: document()});
+    const keyboard = {...source, answer: report => {
+        const responses = source.answer(report);
+        if (report[0] === PROFILE_WIRE_V1.COMMAND_GET && report[2] === PROFILE_WIRE_V1.VALUE_CAPABILITIES && report[4] === 0) {
+            for (const response of responses) response.writeUInt32LE(response.readUInt32LE(16) & ~(1 << 28), 16);
+        }
+        return responses;
+    }};
+    const {service} = await connectedService(t, {keyboard});
+    assert.equal(service.capabilities.featureFlags & (1 << 28), 0);
+    const target = document();
+    target.profile = editDeviceProfile(Buffer.from(target.profile, "base64"), {type: "savePdMode", slot: 7,
+        config: {kind: 1, name: "Clicks", axis: 1, thresholdX: 40, directions: {left: {keycode: "MS_BTN3"}}}},
+    {capabilities: {...service.capabilities, featureFlags: service.capabilities.featureFlags | (1 << 28)}}).toString("base64");
+    let recovery = 0;
+    await assert.rejects(service.restorePortableProfile(target, {saveRecovery: () => {recovery++;}}), error => error.code === "PLACEMENT_REFUSED" && /firmware cannot click/.test(error.message));
+    assert.equal(recovery, 0);
+    assert.deepEqual(source.mutations, []);
+});
+
 test("an editor read and a restore attach the same device facts and rebuild the editor views", async t => {
     const {fixture} = require("../fixtures/portable-restore");
     const {editorViews} = require("../../core/session/device-model");

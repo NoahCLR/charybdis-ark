@@ -560,6 +560,33 @@ keeps its own Hold and Toggle key (`PD_SLOT_n`, `PD_SLOT_n_LOCK`) and lighting
 row. An empty slot takes no room in the profile, so 32 slots cost only what you
 configure.
 
+### Pointing-mode clicks
+
+On supporting firmware, a straight direction, diagonal or physical-button tap
+override can send a plain **Mouse Button 1–8**, including buttons 3 and 4.
+Use **Pick…** or enter its QMK name, such as `MS_BTN3`. The pointing picker
+offers only outputs that field accepts: keyboard keys and shortcuts, media
+and system keys, and supported mouse buttons. Pointer movement, wheel,
+acceleration, layer controls, macros and mode controls are refused. Mouse
+buttons and media/system keys must be plain keycodes; modifier wrappers such
+as `C(MS_BTN3)` are refused.
+
+A click is one press and release. It counts as one output for **How often it
+sends**, the per-report limit and empty-direction handling. It uses the same
+held-modifier policies as a keyboard tap: **Inherit** keeps held modifiers,
+**Ignore** leaves out the selected modifiers, and **Exact** sends without held
+modifiers. It does not run the clicked button's behaviour or this mode's button
+overrides, so an override may click its own number. If another source already
+holds that button, the click adds no new press edge and leaves it held. The
+computer decides what a button number means; buttons 3 and 4 do not necessarily
+mean Back and Forward.
+
+Ark checks the keyboard's reported support. Older firmware keeps its existing
+pointing editors but offers no mouse-click outputs and explains why. A backup
+containing clicks keeps them exactly through import review, draft history and
+undo/redo; Review blocks Apply on a keyboard without support. Update its
+firmware or replace those outputs before saving.
+
 ### Upgrading from eight-layer firmware
 
 Export your saved setup with the previous Ark before flashing. Keep that file

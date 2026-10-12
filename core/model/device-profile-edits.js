@@ -1,7 +1,7 @@
 // @ts-check
 "use strict";
 const {PROFILE_WIRE_DOMAINS} = require("../schema/profile-domains");
-const {encodePdDomain, decodePdDomain} = require("../schema/pd-mode-domain-v1");
+const {encodePdDomain, decodePdDomain, pdTapProblem, supportsPdClicks} = require("../schema/pd-mode-domain-v1");
 const {decodeProfileBlob, encodeProfileBlob, PROFILE_DOMAIN_IDS} = require("../schema/profile-blob-v1");
 const {decodeRgbDomainV1, encodeRgbDomainV1, RGB_LAYER_MODES, RGB_LOCALITIES, RGB_AUTOMOUSE_MODES, RGB_TAP_COMMIT_MODES, RGB_PD_MODE_IDS, RGB_KEY_SEMANTICS} = require("../schema/rgb-domain-v1");
 
@@ -10,6 +10,7 @@ const {semanticActionForExpression, resolveNativeQmkExpression} = require("../sc
 const {decodeComboDomain, encodeComboDomain, runningComboRows} = require("../schema/combo-domain-v1");
 const {actionName, keycodeAction, knownActionAbi, layerRef} = require("../schema/actions");
 const {comboPlacementProblem} = require("./profile-placement");
+const {pointingTaps} = require("./pointing-taps");
 const {comboTableOf} = require("./portable-profile");
 const {editKeyBehaviors} = require("./key-behavior-edits");
 const {inDomain} = require("./draft-edits");
@@ -125,6 +126,7 @@ function editDeviceProfile(bytes, message, context = {}) {
         /** @type {EditablePointing[]} */
         const slots = decodePdDomain(domain.payload);
         const id = integer(message.slot, slots.length - 1, "Slot");
+        const before = /** @type {import("../schema/types.js").PdSlot} */ (slots[id]);
         if (message.type === "clearPdMode") slots[id] = {id, kind: 0, name: ""};
         else if (message.type === "duplicatePdMode") {
             const source = integer(message.source, slots.length - 1, "Source slot");
@@ -142,6 +144,17 @@ function editDeviceProfile(bytes, message, context = {}) {
         Object.values(slots[id].directions || {}).forEach(convertTap);
         Object.values(slots[id].diagonals || {}).forEach(convertTap);
         slots[id].buttons?.forEach(button => convertTap(button.tap));
+        // Each shortcut is one the keyboard can send, said in words before the
+        // encoder's bare refusal. A click needs firmware that clicks, unless
+        // the slot already stored that click there: an imported click is not
+        // rewritten, and removing another one must stay possible.
+        const clicks = supportsPdClicks(context.capabilities);
+        for (const {label, tap, stored} of pointingTaps(slots[id], before)) {
+            const code = tap?.keycode;
+            if (typeof code !== "number" || !Number.isInteger(code) || code === 0) continue;
+            const problem = pdTapProblem(code, {clicks: clicks || code === stored?.keycode});
+            if (problem) throw invalid(`${label}: ${problem}`);
+        }
         // Every textual shortcut was resolved above; the encoder validates the remaining fields.
         domain.payload = encodePdDomain(/** @type {import("../schema/types.js").PdSlotInput[]} */ (slots));
         return encodeProfileBlob(profile);

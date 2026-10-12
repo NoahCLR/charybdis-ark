@@ -35,6 +35,11 @@ export function movement(model, slot, scrolling, {field, select, shortcut, modif
             {tip: "Moving toward a direction with no shortcut: its neighbours take over its share; both neighbours are sent (a diagonal's two straight directions, a straight direction's two diagonals, so in eight directions only); or the move does nothing."}));
         /** @type {HTMLElement} */ (card.querySelector(".card-b")).append(select("How often it sends", words(model).directionOutput, slot.directionOutput ?? 0, "directionOutput",
             {tip: "Every step sends the shortcut again each time the ball moves a threshold further. Once per movement sends it once, however far the ball goes; it sends again when the ball moves back the other way, or after a 150 ms pause. Turning toward another direction sends nothing more."}));
+        // Newer firmware also clicks mouse buttons 1–8; on older firmware the
+        // picker leaves them out, and this says why.
+        /** @type {HTMLElement} */ (card.querySelector(".card-b")).append(el(model.pdModeEditing?.clicks
+            ? `<p class="note">Directions can also click mouse buttons 1–8. A button already held gets no new click and stays held; the computer decides what each button does.</p>`
+            : `<p class="note">This keyboard's firmware cannot click mouse buttons from a pointing mode. Update the firmware to send buttons 1–8 here.</p>`));
         cross.append(el(`<div class="hub" aria-hidden="true"><svg viewBox="0 0 64 64">
             <circle cx="32" cy="32" r="22"/><circle cx="32" cy="32" r="3"/>
             ${reads.includes("up") ? `<path d="M32 4l-4 5h8z"/>` : ""}${reads.includes("down") ? `<path d="M32 60l-4-5h8z"/>` : ""}
