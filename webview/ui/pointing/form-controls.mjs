@@ -37,9 +37,14 @@ export function formControls(model, slot, canEdit, stageCurrent) {
         form[key] = () => input.value.trim();
         /** @type {HTMLButtonElement} */ (node.querySelector("[data-pick]")).addEventListener("click", (event) => {
             event.preventDefault();   // inside a <label>, a click would also focus the input
+            // Only what the keyboard sends from a pointing mode is offered
+            // (model.pdModeEditing.tapKeys); a key typed instead is checked
+            // when it is staged.
             openPicker({
                 title: label, context: `${slot.name} · slot ${slot.id}`,
                 seed: name ? [name] : [],
+                allowedKeys: model.pdModeEditing?.tapKeys?.plain ?? null,
+                modifiable: model.pdModeEditing?.tapKeys?.modified ?? null,
                 onPick: (expression) => {
                     input.value = expression;
                     stageCurrent();

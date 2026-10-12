@@ -23,9 +23,9 @@ import {vocabulary, word} from "../view/vocabulary.mjs";
 const modifierControls = model => vocabulary(model).pickerModifiers || [];
 
 /** @param {import("./editor-types.js").PickerOptions} options */
-export function openPicker({title, context, contextKeycode, seed = [], mode = "single", allowedKeys = null, maxKeys = Infinity, onPick}) {
+export function openPicker({title, context, contextKeycode, seed = [], mode = "single", allowedKeys = null, modifiable = null, maxKeys = Infinity, onPick}) {
     const keys = allowedKeys ? seed.map(key => getModel()?.qmkKeycodeAliases?.[key] || key) : seed.slice();
-    state.picker = {title, context, contextKeycode, mode, allowedKeys, maxKeys, section: "board", search: "", mods: [], keys, layerTap: null, onPick};
+    state.picker = {title, context, contextKeycode, mode, allowedKeys, modifiable, maxKeys, section: "board", search: "", mods: [], keys, layerTap: null, onPick};
     render();
 }
 

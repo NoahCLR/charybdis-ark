@@ -2,7 +2,8 @@
 const {test} = require("node:test");
 const assert = require("node:assert/strict");
 const fixture = require("../../upstream/firmware/tests/fixtures/pd_mode_domain_v1.json");
-const {PD_DOMAIN, encodePdDomain, decodePdDomain, isPdTapKey} = require("../../core/schema/pd-mode-domain-v1");
+const {PD_DOMAIN, PD_CLICK_FEATURE, encodePdDomain, decodePdDomain, isPdTapKey, pdTapProblem, supportsPdClicks} = require("../../core/schema/pd-mode-domain-v1");
+const {PROFILE_WIRE_FEATURES} = require("../../core/protocol/profile-wire-v1");
 const {decodeProfileBlob, encodeProfileBlob} = require("../../core/schema/profile-blob-v1");
 // The firmware's eight-slot record fixture as the 32 slots the keyboard has:
 // slot 6 disabled but named, so it keeps a record, and the rest empty. The
@@ -76,9 +77,9 @@ test("PD decoder rejects malformed framing, hidden disabled state and noncanonic
     reject(() => encodePdDomain(slots().slice(0, 7)), "INVALID_LENGTH");
 });
 
-test("directional output vocabulary excludes controls, mouse actions, macros and recursive mode actions", () => {
-    for (const key of [4, 0xa4, 0xa5, 0xc2, 0x082e, 0x114f, 0x1f50]) assert.ok(isPdTapKey(key));
-    for (const key of [0, 1, 3, 0xc3, 0xd1, 0xe0, 0x1004, 0x08aa, 0x2004, 0x5220, 0x7700, 0x7e80, 0x7e40, 0x7c00, -1, 65536, NaN]) assert.equal(isPdTapKey(key), false);
+test("directional output vocabulary excludes controls, mouse movement, macros and recursive mode actions", () => {
+    for (const key of [4, 0xa4, 0xa5, 0xc2, 0x082e, 0x114f, 0x1f50, 0xd1, 0xd3, 0xd4, 0xd8]) assert.ok(isPdTapKey(key));
+    for (const key of [0, 1, 3, 0xc3, 0xcd, 0xd0, 0xd9, 0xdf, 0xe0, 0xd1 + 0.5, 0x01d3, 0x11d1, 0x1004, 0x08aa, 0x2004, 0x5220, 0x7700, 0x7e80, 0x7e40, 0x7c00, -1, 65536, NaN]) assert.equal(isPdTapKey(key), false);
     for (const tap of [{keycode: 0x7e80}, {keycode: 0, mask: 1}, {keycode: 4, modifierPolicy: 1},
         {keycode: 4, modifierPolicy: 2, mask: 8}, {keycode: 4, modifierPolicy: 3}]) {
         const value = slots(); value[1].directions.up = tap;
@@ -86,6 +87,48 @@ test("directional output vocabulary excludes controls, mouse actions, macros and
     }
     const value = slots(); value[1].directions.left = {keycode: 4};
     reject(() => encodePdDomain(value), "INVALID_PARAMETER");
+});
+
+// Firmware D-F22: a tap may click a plain mouse button 1–8, the keyboard says
+// so with feature bit 28, and the record is unchanged.
+test("mouse buttons 1–8 click from a direction, a diagonal and a button override under every modifier policy", () => {
+    assert.equal(PD_CLICK_FEATURE, 1 << 28);
+    assert.equal(PROFILE_WIRE_FEATURES.POINTING_CLICKS, PD_CLICK_FEATURE);
+    assert.equal(supportsPdClicks({featureFlags: 1 << 28}), true);
+    assert.equal(supportsPdClicks({featureFlags: 0x0fffffff}), false);
+    assert.equal(supportsPdClicks(undefined), false);
+    const value = slots();
+    Object.assign(value[4], {axis: 3, thresholdX: 40, thresholdY: 40,
+        directions: {up: {keycode: 0xd3}, down: {keycode: 0xd4, modifierPolicy: 1, mask: 2}, left: {keycode: 0xd1, modifierPolicy: 2}, right: {keycode: 0xd8}},
+        diagonals: {upLeft: {keycode: 0xd2}, upRight: {keycode: 0xd5, modifierPolicy: 2}, downLeft: {keycode: 0}, downRight: {keycode: 0xd7, modifierPolicy: 1, mask: 0x10}},
+        buttons: [{kind: 2, tap: {keycode: 0xd1}}, {kind: 2, tap: {keycode: 0xd4, modifierPolicy: 2}}, {kind: 2, tap: {keycode: 0xd6, modifierPolicy: 1, mask: 1}}]});
+    const decoded = decodePdDomain(encodePdDomain(value));
+    assert.deepEqual(decoded[4].directions.up, {keycode: 0xd3, modifierPolicy: 0, mask: 0});
+    assert.deepEqual(decoded[4].directions.down, {keycode: 0xd4, modifierPolicy: 1, mask: 2});
+    assert.deepEqual(decoded[4].diagonals.downRight, {keycode: 0xd7, modifierPolicy: 1, mask: 0x10});
+    assert.deepEqual(decoded[4].buttons[1].tap, {keycode: 0xd4, modifierPolicy: 2, mask: 0});
+    assert.deepEqual(encodePdDomain(decoded), encodePdDomain(value), "round trip");
+    // The policies are unchanged: masking needs a mask, the others refuse one.
+    for (const tap of [{keycode: 0xd3, modifierPolicy: 1}, {keycode: 0xd3, modifierPolicy: 2, mask: 1}, {keycode: 0xd3, modifierPolicy: 3},
+        {keycode: 0xcd}, {keycode: 0xd0}, {keycode: 0xd9}, {keycode: 0xdf}, {keycode: 0x01d3}]) {
+        const bad = slots(); bad[1].directions.up = tap;
+        reject(() => encodePdDomain(bad), "INVALID_ACTION");
+    }
+});
+
+test("a refused tap is explained by what it is, and a click by whether the keyboard clicks", () => {
+    for (const code of [4, 0xa5, 0x0204, 0xd3]) assert.equal(pdTapProblem(code, {clicks: true}), "", code.toString(16));
+    assert.match(pdTapProblem(0xd3, {clicks: false}), /firmware cannot click/);
+    assert.equal(pdTapProblem(4, {clicks: false}), "");
+    for (const code of [0xcd, 0xd0, 0xd9, 0xdf]) assert.match(pdTapProblem(code, {clicks: true}), /not move the pointer, scroll or change mouse acceleration/);
+    assert.match(pdTapProblem(0x01d3, {clicks: true}), /cannot carry modifiers/);
+    assert.match(pdTapProblem(0x02ae, {clicks: true}), /Only keyboard keys take modifiers/);
+    for (const code of [1, 0x7e80, 0x7700, 0x41d1, 0xe0]) assert.match(pdTapProblem(code, {clicks: true}), /not layer, pointing-mode, macro or keyboard controls/);
+    // Every keycode the problem accepts is one the record takes, and only those.
+    for (let code = 1; code <= 0xffff; code++) {
+        assert.equal(pdTapProblem(code, {clicks: true}) === "", isPdTapKey(code), code.toString(16));
+        assert.equal(pdTapProblem(code, {clicks: false}) === "", isPdTapKey(code) && !(code >= 0xd1 && code <= 0xd8), code.toString(16));
+    }
 });
 
 test("scroll validation rejects bad timing and ratios before they reach arithmetic", () => {

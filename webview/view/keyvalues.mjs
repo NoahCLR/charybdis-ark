@@ -40,9 +40,14 @@ export const modifierNames = (/** @type {Model} */ model, /** @type {number} */ 
 // Picker controls carry the full eight-bit modifier mask from the model.
 // Compact keycodes can store modifiers from only one side. Include a shifted
 // catalogue key's own modifiers (e.g. KC_EXLM), not just the selected controls.
-/** @param {Model} model @param {{keys: string[], mods: string[], mode: 'single' | 'list'}} picker */
+// A field that lets only some keys take modifiers (a pointing mode's shortcut)
+// names them, and the others are refused with the controls on.
+/** @param {Model} model @param {{keys: string[], mods: string[], mode: 'single' | 'list', modifiable?: string[] | null}} picker */
 export function pickerModifierProblem(model, picker) {
     if (picker.mode === "list") return "";
+    if (picker.modifiable && picker.mods.length && picker.keys.length && !picker.modifiable.includes(picker.keys[0])) {
+        return "Only keyboard keys take modifiers here. Send this key on its own, or clear the modifiers.";
+    }
     let mask = picker.mods.reduce((bits, wrapper) => bits | ((vocabulary(model).pickerModifiers || []).find(entry => entry.value === wrapper)?.bit ?? 0), 0);
     const selected = model?.qmkKeycodeAliases?.[picker.keys[0]] || picker.keys[0];
     const code = model?.qmkKeycodes?.find(entry => entry.value === selected)?.keycode;

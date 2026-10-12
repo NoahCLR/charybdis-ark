@@ -104,6 +104,23 @@ for (const vector of [...v2.valid, ...v2.invalid]) {
     addV2(vector.name, bytes);
     if (!lines.at(-1).startsWith(expected + " ")) throw new Error(`Ark disagrees with firmware vector ${vector.name}: ${lines.at(-1).split(" ").slice(0, 2).join(" ")}, firmware ${expected}`);
 }
+// Plain mouse buttons are taps in every output place, under every modifier
+// policy. Ark owns this corpus independently of the imported golden vectors.
+for (const keycode of [0xd1, 0xd3, 0xd4, 0xd8]) {
+    for (const modifierPolicy of [0, 1, 2]) {
+        const tap = {keycode, modifierPolicy, mask: modifierPolicy === 1 ? 2 : 0};
+        const record = encodePdRecord({id: 7, kind: 1, name: "Clicks", axis: 3, thresholdX: 40, thresholdY: 40,
+            directions: {left: tap}, diagonals: {upLeft: tap}, buttons: [{kind: 2, tap}, {}, {}]});
+        const bytes = Buffer.concat([Buffer.from([3, 32, 128, 0, 1, 0, 0, 0]), record]);
+        addV2(`ark-click-${keycode}-${modifierPolicy}`, bytes);
+        // Mutate the straight, diagonal and button-tap code separately, so the
+        // two validators also agree on the rejected vocabulary and offset.
+        for (const offset of [36, 54, 70]) for (const code of [0xcd, 0xd0, 0xd9, 0xdf, 0x01d3, 0xe0, 0x7700, 0x7e80]) {
+            const bad = Buffer.from(bytes); bad.writeUInt16LE(code, 8 + offset);
+            addV2(`ark-click-rejected-${keycode}-${modifierPolicy}-${offset}-${code}`, bad);
+        }
+    }
+}
 const presets = Buffer.from(v2.valid.find(vector => vector.name === "presets").hex, "hex");
 for (let offset = 0; offset < 8 + 2 * 128; offset++) {
     for (const value of [0, 1, 2, 0x20, 0x21, 0x60, 0x7f, 0xff]) {

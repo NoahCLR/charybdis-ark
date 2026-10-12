@@ -669,6 +669,79 @@ test("each direction posts what held modifiers do to it, and an empty direction 
     assert.equal(decoded(draft).pdModes[4].diagonals.upLeft.modifierPolicy, MODIFIER_POLICY.EXACT);
 });
 
+test("mouse buttons 3/4 stage with modifier policies, review, undo and complete backup import intact", async () => {
+    const value = pdDocument();
+    const caps = {...capabilities, featureFlags: 1 << 28};
+    const snapshot = {document: value, fingerprint: portable.fingerprint(value), summary: portable.summary(value)};
+    const draft = new ProfileDraftSession(snapshot, "test-device", caps);
+    const before = decoded(draft).pdModes[4];
+    const config = readConfig(before, formOf({kind: KIND.DIRECTIONAL, name: before.name, dpi: before.dpi,
+        axis: AXIS.EIGHT, "dir:left": "QK_MOUSE_BUTTON_3", "dir:right": "MS_BTN4",
+        "dirPolicy:left": MODIFIER_POLICY.INHERIT, "dirPolicy:right": MODIFIER_POLICY.MASK, "dirMask:right": 2,
+        "diag:upLeft": "0x00d3", "diagPolicy:upLeft": MODIFIER_POLICY.EXACT,
+        "button:0:kind": BUTTON.TAP, "button:0:tap": "QK_MOUSE_BUTTON_1"}));
+    stage(draft, edits.pdMode(4, config, draft.identity()));
+    const after = decoded(draft).pdModes[4];
+    assert.deepEqual(after.directions.left, {keycode: 0xd3, modifierPolicy: 0, mask: 0});
+    assert.deepEqual(after.directions.right, {keycode: 0xd4, modifierPolicy: 1, mask: 2});
+    assert.deepEqual(after.diagonals.upLeft, {keycode: 0xd3, modifierPolicy: 2, mask: 0});
+    assert.equal(after.buttons[0].tap.keycode, 0xd1, "an override may click its own physical button");
+    const fields = draft.changes().find(change => change.unit === "pd:4").fields;
+    assert.match(fields.find(field => field.label === "Left").after, /Mouse Button 3.*Inherit/);
+    assert.match(fields.find(field => field.label === "Right").after, /Mouse Button 4.*Ignore/);
+    draft.review(draft.revision);
+    assert.equal(draft.hasBlockers(), false);
+    const backup = JSON.stringify(draft.document), savedProfile = draft.document.profile;
+    draft.undo(draft.revision);
+    assert.deepEqual(decoded(draft).pdModes[4], before);
+    draft.redo(draft.revision);
+    assert.equal(draft.document.profile, savedProfile);
+    const restored = new ProfileDraftSession(snapshot, "test-device", caps);
+    restored.replace(portable.validateSnapshot(backup, caps).document, restored.revision, "edit", "Imported a profile");
+    assert.equal(restored.document.profile, savedProfile, "complete backup keeps the exact bytes");
+    assert.deepEqual(decoded(restored).pdModes[4], after);
+
+    // A legacy destination preserves the file and explains every click; Apply
+    // is blocked until the unsupported outputs are removed.
+    const legacy = new ProfileDraftSession(snapshot, "test-device", {...caps, featureFlags: 0});
+    legacy.replace(portable.validateSnapshot(backup).document, legacy.revision, "edit", "Imported a profile");
+    assert.equal(legacy.document.profile, savedProfile);
+    assert.equal(legacy.hasBlockers(), true);
+    assert.equal(legacy.checks().filter(check => check.kind === "pointingClickBlocker").length, 4);
+    legacy.review(legacy.revision);
+    await assert.rejects(legacy.apply({restorePortableProfile: () => {throw Error("must not write");}}, legacy.revision, () => {}), /Resolve the review's blockers/);
+    assert.throws(() => stage(legacy, edits.duplicatePdMode(7, 4, legacy.identity())), /firmware cannot click/);
+    const retained = decoded(legacy).pdModes[4];
+    stage(legacy, edits.pdMode(4, readConfig(retained, formOf({kind: retained.kind, name: retained.name, dpi: retained.dpi, "dir:left": "KC_LEFT"})), legacy.identity()));
+    assert.deepEqual(decoded(legacy).pdModes[4].directions.right, after.directions.right, "fixing one click retains the others verbatim");
+    assert.equal(legacy.checks().filter(check => check.kind === "pointingClickBlocker" && check.status !== "fixed").length, 3);
+    stage(legacy, edits.clearPdMode(4, legacy.identity()));
+    assert.equal(legacy.hasBlockers(), false);
+});
+
+test("pointing text entry refuses unsupported mouse/control outputs without changing the draft", () => {
+    for (const featureFlags of [0, 1 << 28]) {
+        const value = pdDocument();
+        const caps = {...capabilities, featureFlags};
+        const draft = new ProfileDraftSession({document: value, fingerprint: portable.fingerprint(value), summary: portable.summary(value)}, "test-device", caps);
+        const slot = decoded(draft).pdModes[4];
+        const before = draft.current.fingerprint;
+        const set = key => edits.pdMode(4, readConfig(slot, formOf({kind: slot.kind, name: slot.name, dpi: slot.dpi, "dir:left": key})), draft.identity());
+        for (const key of ["MS_UP", "MS_WHLD", "MS_ACL0", "C(MS_BTN3)", "PD_SLOT_0", "VIA_MACRO_0", "MO(1)", "QK_BOOTLOADER"]) {
+            assert.throws(() => stage(draft, set(key)), /Left:.*(pointing mode|keyboard keys|mouse-button click)/, key);
+            assert.equal(draft.current.fingerprint, before);
+        }
+        if (!featureFlags) {
+            for (const key of ["MS_BTN3", "QK_MOUSE_BUTTON_4", "0x00d8"]) assert.throws(() => stage(draft, set(key)), /firmware cannot click/);
+            stage(draft, set("G(KC_C)"));
+            assert.equal(decoded(draft).pdModes[4].directions.left.keycode, 0x0806, "existing shortcuts remain editable");
+        }
+        const model = buildSnapshotModel(draft.current, caps, {editable: true, reason: ""});
+        assert.equal(model.pdModeEditing.clicks, Boolean(featureFlags));
+        assert.equal(model.pdModeEditing.tapKeys.plain.includes("QK_MOUSE_BUTTON_3"), Boolean(featureFlags));
+    }
+});
+
 test("a threshold reads as ball movement at the mode's pointer speed", () => {
     const defaults = [{id: "normalPointerSpeed", fields: [{macro: "normalDpi", value: "1200"}]}];
     assert.equal(modeDpi({dpi: 400}, defaults), 400);

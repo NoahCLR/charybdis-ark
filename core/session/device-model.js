@@ -19,6 +19,7 @@ const {hostKeyVocabulary, keyLabel, profileKeyNames} = require("../model/key-nam
 const {layerName} = require("../model/vocabulary");
 const {keycodeAction, knownActionAbi, layerRef, nativeCode} = require("../schema/actions");
 const {dpiChoices} = require("../model/pointer-dpi");
+const {pointingTapKeys} = require("../model/pointing-taps");
 const {decodedOf} = require("../model/portable-profile");
 const {baseLighting, settingsEditorView} = require("../model/settings-editor");
 const {macroEditorView} = require("../model/macro-editor");
@@ -162,7 +163,13 @@ function configurationModel(content, capabilities, editing) {
         // names and finds a pointing-mode key without a registry of its own.
         pdModes: (content.domains?.pdModes || []).map((slot) => ({...slot, displayName: slotName(slot), binding: PD_SLOT_BINDINGS[slot.id]})),
         pdModeEditing: {writable: editing.pointing,
-            dpiChoices: dpiChoices({normalSpeed: true})},
+            dpiChoices: dpiChoices({normalSpeed: true}),
+            // Whether a direction or button override may click a mouse
+            // button 1–8 (Profile Wire feature bit 28).
+            clicks: Boolean((capabilities?.featureFlags || 0) & PROFILE_WIRE_FEATURES.POINTING_CLICKS),
+            // The keys a direction or button override may send, so the
+            // picker offers only those (model/pointing-taps.js).
+            tapKeys: pointingTapKeys(Boolean((capabilities?.featureFlags || 0) & PROFILE_WIRE_FEATURES.POINTING_CLICKS))},
         keyBehaviors: content.domains.keyBehaviors ? behaviorRowsForView(content.domains.keyBehaviors, behaviorFeatures(capabilities), names) : [],
         behaviorEditing: {
             busy: editing.busy,

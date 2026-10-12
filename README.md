@@ -37,7 +37,8 @@ Key and modifier names follow that OS throughout the editors and Review.
   light up, with black overlays kept distinct from inherited colours.
 - **Trackball.** Set pointer speed, sniping and auto-mouse, and 32 pointing
   slots (scroll, volume, zoom, arrows, your own
-  shortcuts…), with their keys.
+  shortcuts…), with their keys. On supporting firmware, directions and button
+  overrides can click mouse buttons 1–8 too.
 
 ## Nothing is saved until you say so
 

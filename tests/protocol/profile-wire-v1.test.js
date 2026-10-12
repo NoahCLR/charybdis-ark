@@ -82,6 +82,15 @@ test("candidate transfer extensions require candidate-write capability", () => {
     }
 });
 
+test("pointing click support decodes on bit 28 without accepting unknown future features", () => {
+    const pages = compiledOnlyPages();
+    assert.equal(decodeCapabilityPages(pages).featureFlags & PROFILE_WIRE_FEATURES.POINTING_CLICKS, 0);
+    pages[0].writeUInt32LE(pages[0].readUInt32LE(9) | (1 << 28), 9);
+    assert.equal(decodeCapabilityPages(pages).featureFlags & PROFILE_WIRE_FEATURES.POINTING_CLICKS, 1 << 28);
+    pages[0].writeUInt32LE(pages[0].readUInt32LE(9) | (1 << 29), 9);
+    assert.throws(() => decodeCapabilityPages(pages), error => error.code === "INCOMPATIBLE_RESPONSE");
+});
+
 test("Profile Wire get requests are canonical 32-byte frames", () => {
     const request = buildProfileGetRequest(PROFILE_WIRE_V1.VALUE_CAPABILITIES, 1, 0x42);
     assert.equal(request.length, 32);

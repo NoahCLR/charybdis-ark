@@ -61,6 +61,29 @@ only vertical scroller.
 - Where marked and unmarked labels share a column, every label gets the same
   mark slot (`marked(…, {slot: true})` in `webview/ui/marks.mjs`).
 
+## Pointing tap outputs
+
+Straight directions, diagonals and physical-button tap overrides use one tap
+vocabulary, owned by `core/schema/pd-mode-domain-v1.js`. Plain mouse buttons
+1–8 (`0x00d1..0x00d8`) require the keyboard's Profile Wire feature bit 28.
+The domain version and record layout stay unchanged. Mouse movement, wheel,
+acceleration and modifier-wrapped mouse codes remain invalid. The firmware
+owns the click runtime contract (D-F22); the [guide](../GUIDE.md#pointing-mode-clicks)
+describes its effect for users.
+
+`core/model/pointing-taps.js` supplies the allowed picker names and aliases,
+separates keys that may carry modifier wrappers, and finds stored clicks for
+destination checks. The panel receives this through `pdModeEditing`; it does
+not duplicate the schema's allowlist. All three tap field families use these
+restrictions. Typed names, aliases and numeric codes are resolved and checked
+before staging, with a reason for unsupported outputs.
+
+Backups retain click records independently of destination support. Import may
+stage them for review on older firmware, with blockers naming the slot and
+output place; Apply and direct restore refuse them before writing. Existing
+clicks may be retained while fixing a slot, but new click outputs need support.
+No field, history step or import silently substitutes a keyboard shortcut.
+
 ## Shared rule ownership
 
 - Screens: `webview/view/screens.mjs` owns their IDs, labels, icons, rail
