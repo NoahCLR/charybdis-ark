@@ -100,6 +100,8 @@ test("every field edits a stored value the schema names, within what the keyboar
 test("range hints and numeric bounds follow the stored field rules", () => {
     const {SETTING_FIELD} = require("../../core/schema/settings-domain-v1");
     const fields = settingsEditorView(snapshot()).sections.flatMap(section => section.fields);
+    const timeout = fields.find(field => field.macro === "lightingTimeout");
+    assert.deepEqual([timeout.label, timeout.presentation, timeout.unit, timeout.min, timeout.max], ["Idle timeout", "duration", "ms", 0, 86400000]);
     for (const [macro, rule, unit] of [["normalDpi", SETTING_FIELD.DEFAULT_DPI, ""], ["snipingDpi", SETTING_FIELD.SNIPING_DPI, ""], ["mouseDebounce", SETTING_FIELD.AUTO_MOUSE_DEBOUNCE, " ms"]]) {
         const field = fields.find(field => field.macro === macro);
         assert.deepEqual([field.min, field.max], [rule.min, rule.max], macro);
