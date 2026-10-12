@@ -223,8 +223,8 @@ export interface ServiceSnapshot extends PanelDeviceState {
     scanned: boolean;
     candidateStatus: (Omit<CandidateStatus, 'error'> & {stateName: string; error: CandidateStatus['error'] | null}) | null;
     viaIdentity: Awaited<ReturnType<typeof import('../protocol/profile-wire-v1.js').readViaIdentity>> | null;
-    compatibility: ReturnType<typeof import('./profile-device-service.js').evaluateProfileCompatibility> | null;
-    mutationCompatibility: ReturnType<typeof import('./profile-device-service.js').evaluateLiveMutationCompatibility>;
+    compatibility: ReturnType<typeof import('./firmware-support.js').evaluateProfileCompatibility> | null;
+    mutationCompatibility: ReturnType<typeof import('./firmware-support.js').evaluateLiveMutationCompatibility>;
     lastRefreshedAt: string;
 }
 

@@ -19,7 +19,7 @@ const {hostKeyVocabulary, keyLabel, profileKeyNames} = require("../model/key-nam
 const {layerName} = require("../model/vocabulary");
 const {keycodeAction, knownActionAbi, layerRef, nativeCode} = require("../schema/actions");
 const {dpiChoices} = require("../model/pointer-dpi");
-const {LAYERS, decodedOf} = require("../model/portable-profile");
+const {decodedOf} = require("../model/portable-profile");
 const {baseLighting, settingsEditorView} = require("../model/settings-editor");
 const {macroEditorView} = require("../model/macro-editor");
 const {customKeyEditorView} = require("../model/custom-key-editor");
@@ -27,6 +27,9 @@ const {effectiveComboTerm} = require("../schema/combo-domain-v1");
 const {SETTING} = require("../schema/settings-domain-v1");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX, matrixPosition} = require("../data/charybdis-layout");
 const {PROFILE_WIRE_FEATURES} = require("../protocol/profile-wire-v1");
+const {PROFILE_WIRE_DOMAINS} = require("../schema/profile-domains");
+
+const {editableDomains} = require("./firmware-support");
 
 const CATALOG_SOURCE = "vendored QMK keycode catalog";
 
@@ -50,9 +53,6 @@ const CATALOG_SOURCE = "vendored QMK keycode catalog";
 function buildDeviceModel(state = {}) {
     const committed = state.committed?.state === "read";
     const domains = committed ? state.committed?.domains || {} : {};
-    const mask = state.capabilities?.supportedDomainMask || 0;
-    const complete = committed && !state.committed?.failures?.length && !state.busy;
-    const currentLayers = state.capabilities?.compiledLayerCount === LAYERS && !state.busy;
     return {...configurationModel({
         layers: state.layout?.state === "read" ? state.layout.layers : [], domains,
         comboRows: state.combos?.state === "read" ? state.combos.rows : [],
@@ -60,12 +60,7 @@ function buildDeviceModel(state = {}) {
         baseEffect: baseRgbForView(state.baseRgb, state.settingsView?.brightnessMax),
         settingsView: state.settingsView, macroView: state.macroView, customKeyView: state.customKeyView,
         identity: committed ? {source: state.committed?.source, generation: state.committed?.generation, digest: state.committed?.digest, originHalf: state.committed?.originHalf} : null,
-    }, state.capabilities, {
-        busy: Boolean(state.busy), behaviors: Boolean(mask & 2) && complete,
-        pointing: Boolean(mask & 16) && complete, combos: Boolean(mask & 4) && committed && !state.busy,
-        macros: Boolean(state.macroView) && currentLayers, settings: Boolean(state.settingsView) && currentLayers,
-        customKeys: Boolean(state.customKeyView) && !state.busy,
-    }), ...deviceSummary(state)};
+    }, state.capabilities, editableDomains(state)), ...deviceSummary(state)};
 }
 
 // Drafts render their once-decoded snapshot. Actual device facts describe the
@@ -423,7 +418,7 @@ function diagnosticsFor(state) {
     }
     if (state.combos?.state === "read") notes.push(`${state.combos.rows.length} combos read from the keyboard. Combos are ${state.combos.enabled ? "enabled" : "disabled"}.`);
     else notes.push(state.combos?.error?.message || "Combos have not been read from the keyboard yet.");
-    notes.push((state.capabilities?.supportedDomainMask || 0) & 8 ? "Complete profile backups include both macro banks and global keyboard settings." : "Macro payloads and policy defaults need the complete-profile firmware update.");
+    notes.push((state.capabilities?.supportedDomainMask || 0) & PROFILE_WIRE_DOMAINS.SETTINGS ? "Complete profile backups include both macro banks and global keyboard settings." : "Macro payloads and policy defaults need the complete-profile firmware update.");
     return notes;
 }
 

@@ -22,7 +22,7 @@
 const {fingerprint, summary, reorderLayers} = require("../model/portable-profile");
 const {profileReview} = require("../model/profile-review");
 const {profileUsage} = require("../model/profile-usage");
-const {supportsCompleteProfile} = require("./portable-profile-session");
+const {canEdit} = require("./firmware-support");
 const {ProfileDraftSession, DRAFT_EDITS} = require("./profile-draft-session");
 const {buildDeviceModel, buildSnapshotModel} = require("./device-model");
 const {demoDiagnostics, demoHeader, demoModel} = require("./demo-session");
@@ -73,11 +73,11 @@ function hostModel(host) {
 // one already open against what the keyboard now holds.
 /** @param {ModelSession} session @param {State} state */
 function observePortable(session, state) {
-    if (session.draft && !session.draft.dirty && state.connected && (state.selectedDeviceId !== session.draft.deviceId || !supportsCompleteProfile(state.capabilities))) {
+    if (session.draft && !session.draft.dirty && state.connected && (state.selectedDeviceId !== session.draft.deviceId || !canEdit(state.capabilities))) {
         setDraft(session, undefined);
     }
     const portable = session.service.portable;
-    if (!portable || portable === session.observedPortable || portable.incomplete || !state.connected || !supportsCompleteProfile(state.capabilities)) return;
+    if (!portable || portable === session.observedPortable || portable.incomplete || !state.connected || !canEdit(state.capabilities)) return;
     if (!session.draft) setDraft(session, new ProfileDraftSession(portable, state.selectedDeviceId, state.capabilities, state.connectionToken));
     else session.draft.observe(portable, state.selectedDeviceId, state.connectionToken);
     session.observedPortable = portable;
@@ -85,7 +85,7 @@ function observePortable(session, state) {
 
 /** @param {Session} session @param {State} state @param {Snapshot | undefined} snapshot */
 function discardDraftForDevice(session, state, snapshot) {
-    replaceDraft(session, supportsCompleteProfile(state.capabilities)
+    replaceDraft(session, canEdit(state.capabilities)
         ? new ProfileDraftSession(/** @type {Snapshot} */ (snapshot), state.selectedDeviceId, state.capabilities, state.connectionToken)
         : undefined);
 }
@@ -101,7 +101,7 @@ function buildPanelModel(session, state) {
     if (session.draft && state.connected && state.selectedDeviceId === session.draft.deviceId) session.draft.noteConnection(state.connectionToken ?? null);
     const device = state.devices?.find((entry) => entry.id === state.selectedDeviceId);
     const busy = Boolean(state.busy || session.portableBusy || session.readBusy);
-    const supported = supportsCompleteProfile(state.capabilities);
+    const supported = canEdit(state.capabilities);
     const binding = draftBinding(session, state);
     const actual = {...state, busy, device};
     const model = session.draft && supported && state.selectedDeviceId === session.draft.deviceId
@@ -137,7 +137,7 @@ function buildPanelModel(session, state) {
     } : null;
     /** @type {import("./types.js").PanelModelExtras["portable"]} */
     const portable = {
-        available: Boolean(state.connected && supportsCompleteProfile(state.capabilities)),
+        available: Boolean(state.connected && canEdit(state.capabilities)),
         busy,
         progress: state.portableProgress,
         review: session.portableReview ? {incoming: summary(session.portableReview.document), current: session.portableReview.before.summary,

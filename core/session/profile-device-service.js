@@ -10,6 +10,9 @@
  * @typedef {import("./types.js").RestoredProfile} Restored
  * @typedef {import("./types.js").PublicError & Partial<Record<'step' | 'stepLabel' | 'reason' | 'saved', string>>} PublishedError
  */
+const {requireReady, PROFILE_DOMAIN_FLAGS, SUPPORTED_PROFILE_PROTOCOL, SUPPORTED_PROFILE_SCHEMA,
+    REQUIRED_PROFILE_DOMAIN_MASK, REQUIRED_LIVE_MUTATION_FEATURES,
+    evaluateProfileCompatibility, evaluateLiveMutationCompatibility} = require("./firmware-support");
 const {baseLighting} = require("../model/settings-editor");
 const {profilePlacementProblem} = require("../model/profile-placement");
 const {knownActionAbi} = require("../schema/actions");
@@ -22,11 +25,10 @@ const {supportsUnicodeMacros} = require("../schema/macro-payload");
 const {readKeyboardOptions} = require("../protocol/keyboard-options-v1");
 const {profileDomain} = require("../schema/profile-domains");
 const {profileDepthOptions} = require("../schema/profile-depth");
-const {captureProfile, restoreProfile, validateSnapshot, requireReady} = require("./portable-profile-session");
+const {captureProfile, restoreProfile, validateSnapshot} = require("./portable-profile-session");
 const {settingsEditorView} = require("../model/settings-editor");
 const {macroEditorView} = require("../model/macro-editor");
 const {customKeyEditorView} = require("../model/custom-key-editor");
-const {RAW_HID_REPORT_SIZE} = require("../transport/device-adapter");
 const {NodeHidDeviceAdapter} = require("../transport/node-hid-adapter");
 const {DeviceRequestCoordinator} = require("../transport/request-coordinator");
 const {readViaLayout, decodeViaLayout} = require("../protocol/via-layout-v1");
@@ -36,20 +38,10 @@ const {readDeviceCombos} = require("../protocol/combo-readback-v1");
 const {ProfilePayloadReader} = require("./profile-payload-reader");
 const {PROFILE_DOMAIN_IDS, decodeProfileBlob} = require("../schema/profile-blob-v1");
 const {CANDIDATE_STATE_NAMES, readCandidateStatus} = require("../protocol/profile-candidate-v1");
-const {PROFILE_ACTIVE_KIND, PROFILE_STATE_FLAGS, PROFILE_WIRE_KNOWN_MASKS, PROFILE_WIRE_FEATURES, PROFILE_WIRE_V1, VIA_READS, readProfileCapabilities, readProfileStatus, readViaIdentity} = require("../protocol/profile-wire-v1");
+const {PROFILE_ACTIVE_KIND, PROFILE_STATE_FLAGS, PROFILE_WIRE_FEATURES, readProfileCapabilities, readProfileStatus, readViaIdentity} = require("../protocol/profile-wire-v1");
 
 /** @type {(capabilities: Partial<Caps> | null | undefined, writing?: boolean) => asserts capabilities is Partial<Caps>} */
 const checkReady = requireReady;
-
-const SUPPORTED_PROFILE_PROTOCOL = Object.freeze({major: 1, minor: 0});
-const SUPPORTED_PROFILE_SCHEMA = Object.freeze({major: 3, minor: 0});
-const PROFILE_DOMAIN_FLAGS = Object.freeze({RGB: 1 << 0, KEY_BEHAVIORS: 1 << 1});
-const REQUIRED_PROFILE_DOMAIN_MASK = PROFILE_DOMAIN_FLAGS.RGB | PROFILE_DOMAIN_FLAGS.KEY_BEHAVIORS;
-const REQUIRED_LIVE_MUTATION_FEATURES = PROFILE_WIRE_FEATURES.CANDIDATE_WRITE
-    | PROFILE_WIRE_FEATURES.PERSISTENT_COMMIT
-    | PROFILE_WIRE_FEATURES.RUNTIME_ACTIVATION
-    | PROFILE_WIRE_FEATURES.PEER_RECONCILIATION
-    | PROFILE_WIRE_FEATURES.ATOMIC_LOGICAL_APPLY;
 
 // The connected keyboard: scanning, connecting, and every read and save.
 //
@@ -810,31 +802,6 @@ function rejection(error) {
     return Object.assign(new Error(error.message), error);
 }
 
-// Whether this app can read the keyboard at all: its protocol and schema,
-// VIA identity, report framing, and the features and domains every read
-// needs. Capacities are not compared here: the keyboard advertises its own,
-// and the editors and Apply hold a profile to them.
-/** @param {Partial<Caps> | null | undefined} capabilities @param {Partial<Awaited<ReturnType<typeof readViaIdentity>>> | null} [viaIdentity] */
-function evaluateProfileCompatibility(capabilities, viaIdentity = {}) {
-    const checks = [
-        equalityCheck("Protocol major", capabilities?.protocol?.major, SUPPORTED_PROFILE_PROTOCOL.major),
-        equalityCheck("Schema major", capabilities?.schema?.major, SUPPORTED_PROFILE_SCHEMA.major),
-        oneOfCheck("VIA protocol version", viaIdentity?.protocolVersion, VIA_READS.SUPPORTED_PROTOCOL_VERSIONS),
-        equalityCheck("VIA firmware version", viaIdentity?.firmwareVersion, capabilities?.firmwareVersion),
-        equalityCheck("Raw HID report size", capabilities?.reportSize, RAW_HID_REPORT_SIZE),
-        minimumCheck("Status pages", capabilities?.statusPageCount, PROFILE_WIRE_V1.STATUS_PAGE_COUNT),
-        maskCheck("Required Profile Wire features", capabilities?.featureFlags, PROFILE_WIRE_KNOWN_MASKS.REQUIRED_READ_FEATURES),
-        maskCheck("Required profile domains", capabilities?.supportedDomainMask, REQUIRED_PROFILE_DOMAIN_MASK),
-    ];
-    const reasons = checks.filter((check) => !check.ok).map((check) => check.message);
-    return {
-        compatible: reasons.length === 0,
-        reasons,
-        checks,
-        requiredDomainMask: REQUIRED_PROFILE_DOMAIN_MASK,
-    };
-}
-
 class ProfileRequestIdSequence {
     constructor(start = 1) {
         this.value = normalizeRequestId(start);
@@ -855,60 +822,6 @@ function normalizeRequestId(value) {
     }
     return requestId;
 }
-
-/** @param {string} label @param {number | undefined} actual @param {number | undefined} expected */
-function equalityCheck(label, actual, expected) {
-    const ok = Number(actual) === Number(expected);
-    return {label, ok, actual, limit: expected, message: ok ? "" : `${label} is ${actual}; Charybdis Ark requires ${expected}.`};
-}
-
-/** @param {string} label @param {number | undefined} actual @param {readonly number[]} accepted */
-function oneOfCheck(label, actual, accepted) {
-    const ok = accepted.includes(Number(actual));
-    return {label, ok, actual, limit: accepted, message: ok ? "" : `${label} is ${actual}; Charybdis Ark supports ${accepted.join(" or ")}.`};
-}
-
-/** @param {string} label @param {number | undefined} actual @param {number} expected */
-function minimumCheck(label, actual, expected) {
-    const ok = typeof actual === "number" && Number.isInteger(actual) && actual >= expected;
-    return {label, ok, actual, limit: expected, message: ok ? "" : `${label} is ${actual}; at least ${expected} is required.`};
-}
-
-/** @param {string} label @param {number | undefined} actual @param {number} expected */
-function maskCheck(label, actual, expected) {
-    const numeric = Number(actual) || 0;
-    const ok = (numeric & expected) === expected;
-    return {label, ok, actual: numeric, limit: expected, message: ok ? "" : `${label} mask 0x${numeric.toString(16)} does not include required mask 0x${expected.toString(16)}.`};
-}
-
-/** @param {Partial<Caps> | null | undefined} capabilities @param {Pick<ReturnType<typeof evaluateProfileCompatibility>, "compatible" | "reasons"> | null | undefined} compatibility @param {boolean} [connected] @param {Partial<Status> | null | undefined} [status] */
-function evaluateLiveMutationCompatibility(capabilities, compatibility, connected = true, status) {
-    const reasons = [];
-    if (!connected) reasons.push("Connect to the keyboard before applying a live profile.");
-    if (!compatibility?.compatible) reasons.push(...(compatibility?.reasons || ["Read compatibility has not been established."]));
-    const flags = Number(capabilities?.featureFlags) || 0;
-    if ((flags & REQUIRED_LIVE_MUTATION_FEATURES) !== REQUIRED_LIVE_MUTATION_FEATURES) {
-        reasons.push(`Firmware mutation flags 0x${flags.toString(16)} do not include required persistent split apply mask 0x${REQUIRED_LIVE_MUTATION_FEATURES.toString(16)}.`);
-    }
-    if (!Number.isInteger(capabilities?.candidateChunkMax) || (capabilities?.candidateChunkMax ?? 0) < 1) {
-        reasons.push("Firmware does not advertise a candidate upload chunk size.");
-    }
-    if (connected && !status) {
-        reasons.push("Live profile status has not been read yet.");
-    } else if (status && !status.peerKnown) {
-        reasons.push("The second keyboard half has not been detected over the split link.");
-    } else if (status && !status.peerConverged) {
-        reasons.push("The two keyboard halves have not established a converged profile state yet.");
-    }
-    return {
-        available: reasons.length === 0,
-        reasons,
-        requiredFeatureMask: REQUIRED_LIVE_MUTATION_FEATURES,
-        peerReady: Boolean(status?.peerKnown && status?.peerConverged),
-        recoveryPending: Boolean(status?.candidatePending),
-    };
-}
-
 /** @param {NonNullable<import("./types.js").DeviceModelInput["liveApply"]>} value */
 function cloneLiveApply(value) {
     return value && value.state !== "idle" ? clone(value) : {state: /** @type {const} */ ("idle")};

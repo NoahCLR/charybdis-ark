@@ -9,9 +9,9 @@ const {candidateMetadataForBlob, readCandidatePeerStatus, readCandidateStatus, C
 const {ApplyProgress, failureReason} = require("./apply-progress");
 const {CandidateUploadCoordinator} = require("./candidate-upload-coordinator");
 const {LogicalViaStageCoordinator} = require("./logical-via-stage-coordinator");
-const {LAYERS, createSnapshot, validateSnapshot, materializeProfile, fingerprint, summary, reorderLayers} = require("../model/portable-profile");
+const {createSnapshot, validateSnapshot, materializeProfile, fingerprint, summary, reorderLayers} = require("../model/portable-profile");
 const {translateBackup} = require("../model/backup-translation");
-const {knownActionAbi} = require("../schema/actions");
+const {requireReady: checkFirmwareReady, supportsCompleteProfile, canCapture, canReadIdentity, identityStateFlags} = require("./firmware-support");
 const {encodeSettings} = require("../schema/settings-domain-v1");
 const {crc32, fnv1a32} = require("../schema/profile-blob-v1");
 /**
@@ -23,12 +23,14 @@ const {crc32, fnv1a32} = require("../schema/profile-blob-v1");
  * @typedef {import("../protocol/types.js").StorageRange[]} Ranges
  * @typedef {Pick<import("../model/types.js").DecodedProfile, 'profile' | 'layout' | 'macros'>} BaseBytes
  */
+/** @type {(capabilities: Partial<Caps> | null | undefined, writing?: boolean) => asserts capabilities is Partial<Caps>} */
+const requireReady = checkFirmwareReady;
 /** @param {string} code @param {string} message */
 const fail = (code, message) => Object.assign(new Error(message), {code});
 /** @param {import("./types.js").ProfileStatus} s */
 const statusKey = s => JSON.stringify([s.activeKind, s.activeDigest, s.activeGeneration, s.activeOriginHalf, s.committedDigest, s.committedGeneration, s.stateFlags]);
 /** @param {import("./types.js").ProfileStatus} s */
-const identityStatusKey = s => JSON.stringify([s.activeKind, s.activeDigest, s.activeGeneration, s.activeOriginHalf, s.committedDigest, s.committedGeneration, s.stateFlags & ~4]);
+const identityStatusKey = s => JSON.stringify([s.activeKind, s.activeDigest, s.activeGeneration, s.activeOriginHalf, s.committedDigest, s.committedGeneration, identityStateFlags(s)]);
 /** @param {import("./types.js").CaptureIdentity} identity */
 const identityKey = identity => JSON.stringify(identity);
 /** @param {import("./types.js").ProfileStatus} profile @param {Awaited<ReturnType<typeof readStorageStatus>>} storage @param {Buffer} settings */
@@ -71,17 +73,6 @@ function capturedBase(before, capabilities) {
     if (base.layout.length !== LAYOUT_BYTES || base.macros.length !== capabilities.viaMacroBytes || base.profile.length < 1) throw fail("INVALID_RECOVERY_CAPTURE", "The interrupted recovery capture is malformed.");
     return base;
 }
-// A complete profile is the sixteen layers and every domain; saving one needs
-// atomic logical Apply on both halves.
-/** @param {Partial<Caps> | null | undefined} capabilities @returns {capabilities is Partial<Caps>} */
-const supportsCompleteProfile = capabilities => capabilities?.compiledLayerCount === LAYERS
-    && ((capabilities?.supportedDomainMask || 0) & 31) === 31 && knownActionAbi(capabilities?.actionAbiDigest ?? 0);
-/** @param {Partial<Caps> | null | undefined} capabilities @param {boolean} [writing] @returns {asserts capabilities is Partial<Caps>} */
-function requireReady(capabilities, writing = false) {
-    if (!supportsCompleteProfile(capabilities) || (writing && !((capabilities?.featureFlags || 0) & (1 << 12)))) {
-        throw fail("FIRMWARE_UPDATE_REQUIRED", "Complete profile backup and Apply need current firmware on both halves. Your current keyboard configuration has not been changed.");
-    }
-}
 // `sleep`, here and below, is the host's wait between polls (the timer's when omitted).
 /** @param {Connection} connection @param {Ids} ids @param {Caps} capabilities @param {(text: string) => void} [onProgress] @param {boolean} [allowCandidate] @param {boolean} [allowIncomplete] @param {import("./types.js").CaptureOptions} [options] @returns {Promise<import("./types.js").VerifiedCapture>} */
 async function captureProfile(connection, ids, capabilities, onProgress = () => {}, allowCandidate = false, allowIncomplete = false,
@@ -91,7 +82,7 @@ async function captureProfile(connection, ids, capabilities, onProgress = () => 
     const options = {nextRequestId: () => ids.next()};
     onProgress("Reading the complete keyboard configuration");
     const storageBefore = await waitForStorage(connection, ids, {sleep}), before = await readProfileStatus(connection, options);
-    if (!(/** @type {number[]} */ ([PROFILE_ACTIVE_KIND.COMMITTED, PROFILE_ACTIVE_KIND.COMPILED_ONLY])).includes(before.activeKind) || !(before.stateFlags & 32) || (before.stateFlags & (allowCandidate ? 8 : 12)) || before.conflictCount) throw fail("KEYBOARD_NOT_READY", "Let both halves finish saving before taking a backup.");
+    if (!canCapture(before, allowCandidate)) throw fail("KEYBOARD_NOT_READY", "Let both halves finish saving before taking a backup.");
     /** @param {string} label */
     const counted = label => /** @param {import("../../contracts/model.js").CountedProgress} progress */ progress => onProgress(`${label} · ${progress.done} of ${progress.total} bytes`);
     const defaults = await payloadReader.readCompiled({...options, onProgress: counted("Reading compiled defaults")});
@@ -122,7 +113,7 @@ async function captureProfile(connection, ids, capabilities, onProgress = () => 
 async function readIdentity(connection, ids, {allowCandidate = true, sleep} = {}) {
     const options = {nextRequestId: () => ids.next()};
     const storageBefore = await waitForStorage(connection, ids, {sleep}), before = await readProfileStatus(connection, options);
-    if ((before.stateFlags & (allowCandidate ? 8 : 12)) || before.conflictCount) throw fail("KEYBOARD_NOT_READY", "The keyboard changed before the save could start.");
+    if (!canReadIdentity(before, allowCandidate)) throw fail("KEYBOARD_NOT_READY", "The keyboard changed before the save could start.");
     const settings = await readSettings(connection, ids);
     const after = await readProfileStatus(connection, options), storageAfter = await readStorageStatus(connection, ids);
     if (statusKey(before) !== statusKey(after) || !storageAfter.ready || storageBefore.generation !== storageAfter.generation || storageBefore.digest !== storageAfter.digest) throw fail("PROFILE_CHANGED", "The keyboard changed before the save could start.");
