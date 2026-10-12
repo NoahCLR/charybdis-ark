@@ -1025,6 +1025,13 @@ all come from that snapshot; its capture facts supply host detection and
 brightness/options limits. Draft presentation takes editability from D-L60's
 binding, rather than inferring it from simulated read success.
 
+Building the panel model is a projection: it does not open, close, observe or
+mark a draft stale. The panel loop explicitly observes service changes before
+publishing their model. Rebase uses that same observation step, so a completed
+capture is observed once. A standalone export captures the current keyboard
+without replacing the editor snapshot or its views; this keeps an export from
+moving the draft's comparison behind the user's edits.
+
 The same module adapts independent device reads for an earlier firmware or
 partial capture (`buildDeviceModel`). Both inputs share configuration
 presentation, but a draft never fabricates a `LayoutRead`, `CommittedRead` or

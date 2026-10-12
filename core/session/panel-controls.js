@@ -23,7 +23,7 @@ const {canEdit, hasCurrentLayers} = require("./firmware-support");
 const {validateSnapshot, FILE_MAX_BYTES} = require("../model/portable-profile");
 const {translateBackup} = require("../model/backup-translation");
 const {DEMO_WORDS, panelCapabilities, panelState} = require("./demo-session");
-const {applyLayerEdit, discardDraftForDevice, layerEditDocument, startLayerEdit} = require("./panel-session");
+const {applyLayerEdit, discardDraftForDevice, layerEditDocument, observePortable, startLayerEdit} = require("./panel-session");
 const {closeEditors, whileApplying} = require("./panel-session-state");
 const {IDENTITY} = require("../model/layer-order");
 
@@ -148,7 +148,7 @@ async function draftControl(session, message, host = {}) {
             draft.assertRevision(revision, {allowStale: true});
             if (service.snapshot().selectedDeviceId !== draft.deviceId) throw new Error("Reconnect the keyboard this draft belongs to.");
             const snapshot = await service.readPortableProfile({forRestore: true});
-            draft.observe(snapshot, draft.deviceId, service.snapshot().connectionToken);
+            observePortable(session, service.snapshot(), snapshot);
             draft.rebase(revision);
             session.resetDraftForms = true;
             session.notice = "Review now compares your draft with the latest keyboard state. Apply will replace the differences shown.";

@@ -10,7 +10,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const {ProfileDraftSession} = require("../core/session/profile-draft-session");
-const {buildPanelModel, startLayerEdit} = require("../core/session/panel-session");
+const {buildPanelModel, observeService, startLayerEdit} = require("../core/session/panel-session");
 const portable = require("../core/model/portable-profile");
 const keycodes = require("../core/data/keycode-catalog");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../core/protocol/via-layout-v1");
@@ -179,11 +179,12 @@ async function deviceModel() {
         await service.readCommittedProfile();
         await service.readBaseRgb();
         await service.readCombos();
-        if (((service.capabilities?.supportedDomainMask ?? 0) & 15) === 15) await service.readPortableProfile();
+        if (require("../core/session/firmware-support").canEdit(service.capabilities)) await service.readKeyboardProfile();
 
         // Exactly the model the panel would build for this keyboard.
         /** @type {import("../core/session/types.js").PanelSession} */
         const panel = {service, host: VSCODE_HOST};
+        observeService(panel, service.snapshot());
         const model = buildPanelModel(panel, service.snapshot());
         if (panel.draft) panel.portableLayers = startLayerEdit(panel.draft.current, panel.draft.revision);
         model.portable.layers = panel.portableLayers ? {key: panel.portableLayers.before.fingerprint, order: panel.portableLayers.order, names: panel.portableLayers.names, keysFollow: panel.portableLayers.keysFollow !== false} : null;

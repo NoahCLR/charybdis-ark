@@ -1,7 +1,7 @@
 "use strict";
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const {applyLayerEdit, buildPanelModel, discardDraftForDevice, layerEditDocument, panelRequest, routeMessage, startLayerEdit} = require("../../core/session/panel-session");
+const {applyLayerEdit, buildPanelModel: projectPanelModel, observeService, discardDraftForDevice, layerEditDocument, panelRequest, routeMessage, startLayerEdit} = require("../../core/session/panel-session");
 const {fingerprint, summary, validateSnapshot} = require("../../core/model/portable-profile");
 const {document} = require("../fixtures/pd-profile");
 
@@ -13,6 +13,10 @@ const snapshot = () => {
 const device = {id: "kb", manufacturer: "Bastard Keyboards", product: "Charybdis 4x6"};
 const connected = (extra = {}) => ({connected: true, busy: false, selectedDeviceId: "kb", devices: [device], capabilities, ...extra});
 
+// Lifecycle cases use the same explicit notification then projection as the
+// panel loop. Their existing state and editability assertions remain intact.
+const buildPanelModel = (session, state) => {observeService(session, state); return projectPanelModel(session, state);};
+
 // A panel session exactly as panel-loop.js keeps one, with the first complete
 // read already in: publishing it opens the draft.
 function panelWithDraft() {
@@ -21,6 +25,22 @@ function panelWithDraft() {
     buildPanelModel(session, connected());
     return session;
 }
+
+test("projecting a model does not open a draft or observe a new connection", () => {
+    const session = {service: {portable: snapshot()}};
+    projectPanelModel(session, connected({connectionToken: 1}));
+    assert.equal(session.draft, undefined, "projection cannot open a draft");
+    observeService(session, connected({connectionToken: 1}));
+    session.draft.stage({type: "updateLayoutKeys", draftRevision: session.draft.revision, layer: "Layer 1", changes: [{layoutIndex: 0, keycode: "KC_B"}]});
+    const before = session.draft.view(connected({connectionToken: 1}));
+    projectPanelModel(session, connected({connectionToken: 2}));
+    assert.deepEqual(session.draft.view(connected({connectionToken: 1})), before, "projection cannot mark a retained draft stale");
+    const changed = structuredClone(session.draft.document); changed.macros[0] = Buffer.from("test").toString("base64");
+    session.portableReview = Object.freeze({document: changed, before: snapshot()});
+    const first = projectPanelModel(session, connected({connectionToken: 1}));
+    const second = projectPanelModel(session, connected({connectionToken: 1}));
+    assert.deepEqual(first, second, "repeated projection preserves the model and leaves the import review untouched");
+});
 
 test("a complete read opens one draft, and later publishes keep it", () => {
     const session = panelWithDraft();

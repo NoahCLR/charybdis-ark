@@ -31,7 +31,7 @@
  * @typedef {import("../../contracts/messages.js").PanelRequest} Message
  */
 const {ProfileDeviceService} = require("./profile-device-service");
-const {buildPanelModel, panelRequest, routeMessage} = require("./panel-session");
+const {buildPanelModel, observeService, panelRequest, routeMessage} = require("./panel-session");
 const {boundDraft, endRead, takeOutbox, whilePanelBusy} = require("./panel-session-state");
 const {draftControl, portableControl, readKeyboard} = require("./panel-controls");
 const {demoControl, demoExport, leaveDemo, panelState} = require("./demo-session");
@@ -46,11 +46,12 @@ function openPanelLoop(host, options = {}) {
     let session;
     const loop = {
         publish: () => publish(session, host),
+        serviceChanged: () => serviceChanged(session, host),
         handleMessage: /** @param {unknown} posted */ (posted) => handleMessage(session, panelRequest(posted), host),
         close: () => session.service.close(),
     };
     const {service, ...device} = options;
-    const activeService = service || new ProfileDeviceService({...device, onChange: loop.publish,
+    const activeService = service || new ProfileDeviceService({...device, onChange: loop.serviceChanged,
         onApplyProgress: apply => {
             void host.post({type: "applyProgress", apply, draftId: session.draft?.id, draftRevision: session.draft?.revision});
         },
@@ -60,6 +61,12 @@ function openPanelLoop(host, options = {}) {
     });
     session = {service: activeService, notice: undefined, host};
     return {session, ...loop};
+}
+
+/** @param {Session} session @param {Host} host */
+function serviceChanged(session, host) {
+    observeService(session, panelState(session));
+    publish(session, host);
 }
 
 /** @param {Session} session @param {Host} host */
@@ -118,6 +125,10 @@ async function connectAndRead(session, selectedDeviceId, host) {
     try {
         ready = await readKeyboard(session, selectedDeviceId, host);
     } finally {
+        // Injected services need not emit notifications, and a failed read
+        // may still have changed connection facts. Observe once at this
+        // explicit operation boundary before projecting the reply.
+        observeService(session, panelState(session));
         endRead(session, ready);
         publish(session, host);
     }

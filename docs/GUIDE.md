@@ -491,7 +491,11 @@ progress, so keep the recovery file that Apply creates.
 Charybdis Ark's **Export profile** saves the configuration read from the
 keyboard: every layer and key position, behaviours, combos, named VIA macros,
 lighting and global settings. Flashed defaults and live edits become one
-portable file. **Import profile** shows a review, saves a recovery copy, restores
+portable file.
+Export leaves the editor and any local draft unchanged, even if the keyboard
+has changed since its last editor read.
+
+**Import profile** shows a review, saves a recovery copy, restores
 both halves and verifies the complete readback. A failed or interrupted restore
 reports the saved recovery file instead of claiming success. Recovery files are
 kept in the extension's local storage; the app shows their full path. In
