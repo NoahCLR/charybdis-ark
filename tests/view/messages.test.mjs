@@ -5,15 +5,16 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 globalThis.acquireVsCodeApi = () => ({postMessage() {}});
-const {getModel, setModel, writable} = await import("../../webview/store.mjs");
+const {getModel, setModel, writable, state} = await import("../../webview/store.mjs");
 const {createPanelMessages} = await import("../../webview/messages.mjs");
+const {SCREENS} = await import("../../webview/view/screens.mjs");
 
 function surface() {
-    const calls = {refresh: 0, render: 0, validations: []};
+    const calls = {refresh: 0, render: 0, validations: [], renders: []};
     const receive = createPanelMessages({
         root: {querySelector: () => null},
         refreshCommitBar: () => { calls.refresh++; },
-        render: () => { calls.render++; },
+        render: (options) => { calls.render++; calls.renders.push(options); },
         receiveMacroValidation: (message) => { calls.validations.push(message); },
     });
     return {receive, calls};
@@ -23,6 +24,25 @@ const reading = () => ({
     load: {state: "loading", phase: "layout", operationId: 3, operationBusy: true, connectionToken: 1, progress: null},
     draft: {id: "d1", revision: 2, busy: true}, apply: null,
     postApplyRead: {step: "layout", progress: null}, portable: {available: true, busy: false, review: null, layers: null, usage: null},
+});
+
+test("model publishes follow each registered screen's redraw policy, while accepted edits rebuild", (t) => {
+    const previousDocument = globalThis.document;
+    globalThis.document = {documentElement: {dataset: {}}};
+    t.after(() => { globalThis.document = previousDocument; state.screen = "keys"; });
+    const {receive, calls} = surface();
+    const model = {...reading(), load: {state: "ready"}, draft: {id: "d1", revision: 2}};
+    state.overlay = null;
+    state.picker = null;
+    state.combo.awaiting = false;
+    for (const [id, definition] of Object.entries(SCREENS)) {
+        state.screen = id;
+        setModel(model);
+        receive({type: "model", model});
+        assert.equal(calls.renders.at(-1).keepScreen, definition.keepOnPublish, id);
+        receive({type: "model", model, acceptedEdit: true});
+        assert.equal(calls.renders.at(-1).keepScreen, false, `${id} accepted edit`);
+    }
 });
 const read = (fields = {}) => ({type: "readProgress", draftId: "d1", draftRevision: 2,
     read: {source: "layout", progress: {done: 4, total: 56}, operationId: 3, phase: "layout", selectedDeviceId: "kb", connectionToken: 1, ...fields}});

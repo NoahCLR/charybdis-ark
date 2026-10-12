@@ -5,6 +5,7 @@ import {closeComboBuilder, getModel, layerName, post, resetDraftForms, setModel,
 import {control} from "./view/controls.mjs";
 import {hostOf} from "./view/host.mjs";
 import {readScreen} from "./view/readiness.mjs";
+import {screenDefinition} from "./view/screens.mjs";
 import {sameEditorContent} from "./view/render-content.mjs";
 
 /**
@@ -51,7 +52,7 @@ export function createPanelMessages({root, refreshCommitBar, render, receiveMacr
             return;
         }
         if (message?.type !== "model") return;
-        const keepScreen = !["device", "profile"].includes(state.screen) && !state.overlay && !state.picker && !state.combo.awaiting
+        const keepScreen = Boolean(screenDefinition(state.screen)?.keepOnPublish) && !state.overlay && !state.picker && !state.combo.awaiting
             && !message.resetDraftForms && !message.acceptedEdit && !message.notice
             && sameEditorContent(getModel(), message.model);
         setModel(message.model);

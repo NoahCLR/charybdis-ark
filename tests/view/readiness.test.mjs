@@ -83,3 +83,9 @@ test("unknown and missing phase facts use the existing honest fallbacks", () => 
     assert.equal(readScreen({vocabulary: VOCABULARY, load: {state: "loading", phase: "unknown"}}).detail, "Finishing the read");
     assert.equal(readScreen(null).detail, "Looking for a keyboard");
 });
+
+test("unknown screen IDs show a recoverable unavailable surface", () => {
+    assert.deepEqual(readScreen({load: {state: "ready"}}, "unknown-screen"), {
+        state: "unavailable", title: "Screen unavailable", detail: "Choose a screen from the menu to continue.",
+    });
+});

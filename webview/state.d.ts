@@ -1,6 +1,7 @@
 import type {BranchHelper, Combo, PdButton, PdTap, Scalar} from '../contracts/edits.js';
 import type {PanelCommand, PanelResponse} from '../contracts/messages.js';
 import type {MacroStep} from './view/types.js';
+import type {ScreenId} from './view/screens.mjs';
 export interface MacroForm {
     draft?: string; steps?: MacroStep[]; stepError?: string; cancelBlur?: boolean; wantsStage?: boolean; requestId?: number;
     validation?: Extract<PanelResponse, {type: 'macroValidation'}> & {context: string};
@@ -10,7 +11,7 @@ export interface MacroForm {
 }
 export interface PickerState {title: string; context?: string; contextKeycode?: string; mode: 'single' | 'list'; allowedKeys: string[] | null; maxKeys: number; section: string; search: string; mods: string[]; keys: string[]; layerTap: string | null; onPick?: (expression: string) => void}
 export interface PanelState {
-    screen: string; layer: number; layersOn: number[]; selected: number; tab: string;
+    screen: ScreenId; layer: number; layersOn: number[]; selected: number; tab: string;
     behaviourRow: string | null; behaviourRowShown: string | null; behaviourRoute: {row: string; group: string} | null;
     reachGroups: Record<string, boolean>; resetBenchHeight: boolean; reachRow: {macros: string | null; combos: string | null; pointing: string | null};
     cell: string | null; reveal: string | null; pickCombo: number | null; settingsOpen: string[];

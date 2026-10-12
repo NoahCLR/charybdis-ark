@@ -63,6 +63,12 @@ only vertical scroller.
 
 ## Shared rule ownership
 
+- Screens: `webview/view/screens.mjs` owns their IDs, labels, icons, rail
+  groups, availability, placeholder titles, renderer dispatch and redraw
+  policy. The app supplies render functions to keep this registry pure.
+  `PanelState.screen` takes its ID union from the registry's keys; a new
+  screen cannot add a second ID list elsewhere. Unknown IDs show an
+  unavailable surface with a menu recovery path rather than another screen.
 - Words: `core/model/vocabulary.js`, sent as `model.vocabulary`; stages are
   found by id, never by label.
 - Key names: `core/model/key-names.js`. The catalogue names what QMK ships;
