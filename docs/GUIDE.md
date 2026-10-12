@@ -386,6 +386,15 @@ Every Keys workbench tab is at least as tall as Behaviours, so switching tabs
 keeps the page at the same scroll position. If an editor grows taller, that
 height stays while switching tabs.
 
+Repeated badges, tier dots and draft marks have fixed positions, including an
+empty mark slot when neighboring labels have marks. Review and Draft history
+keep title marks separate from their names. Review fields line up as the
+change sign, label, value on the keyboard and value in the draft; an absent
+value shows a dash. Show and Discard stay at the edge, and a destructive action
+is last in its row. A removed item keeps its mark and Show only when its editor
+still shows that slot, such as a cleared pointing or macro slot. Owner selectors
+use their displayed names and marks.
+
 ## Timing checks
 
 Review and the behaviour editor explain combo/tap timing risks on older
@@ -435,6 +444,14 @@ editor; changed data or edit permissions redraw it. Reconnecting starts fresh.
 Only that readback is shown as following an Apply. A later read, export or
 discard names what it reads and says nothing about saving, because it writes
 nothing to the keyboard.
+
+Apply reports the transaction's steps in order: check the keyboard, save a
+recovery copy, send the profile, let the keyboard check it, stage keys and
+macros on the slave half, copy the profile to that half, save on the master
+half, finish the slave half, write the master's keys and macros, then check
+both halves. A failure keeps its step, the keyboard's reason and whether
+anything was saved on screen until you dismiss it. The later editor readback
+is separate from those transaction steps.
 
 What to expect while it applies:
 

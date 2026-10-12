@@ -17,9 +17,11 @@ its runtime, stored profile, wire and split protocols, its specs (pinned here
 under [`upstream/`](../upstream/README.md)) and the decisions that constrain it,
 in its `docs/LIVE_EDIT_APP_DIRECTION.md`, "the firmware direction" below.
 
-Each decision has one home. Both direction documents keep every D-L heading, so
-a citation resolves in either repository, but only the owner holds the text and
-the other keeps a one-line pointer. Change a decision where its text lives. New
+Each decision has one home. D-L identifiers and their original heading anchors
+remain findable in both repositories, but only the owner holds the text. This
+document groups firmware-owned decisions in the
+[pointer table](#firmware-decision-pointers). Change a decision where its text
+lives. New
 app decisions continue the D-L series here; firmware numbers its own from D-F01.
 
 ## The Direction In One Sentence
@@ -99,23 +101,55 @@ canonical profile format (D-L15), one logical generation across the VIA and
 custom stores (D-L21), and adopting or surfacing writes by external VIA clients,
 which is not yet built.
 
+## Firmware decision pointers
+
+These decisions are owned by the firmware direction. Each identifier and its
+original heading anchor remain here so existing citations resolve; change the
+text in the firmware repository.
+
+| Decision | Subject | Owner |
+| --- | --- | --- |
+| <a id="d-l07--specs-are-promoted-process-is-deleted"></a>D-L07 | Specs are promoted, process is deleted | [Firmware direction](https://github.com/NoahCLR/charybdis-4x6/blob/dev/docs/LIVE_EDIT_APP_DIRECTION.md#d-l07--specs-are-promoted-process-is-deleted) |
+| <a id="d-l08--the-live-profile-owner-is-on-by-default"></a>D-L08 | The live-profile owner is on by default | [Firmware direction](https://github.com/NoahCLR/charybdis-4x6/blob/dev/docs/LIVE_EDIT_APP_DIRECTION.md#d-l08--the-live-profile-owner-is-on-by-default) |
+| <a id="d-l13--combo-readback-is-device-data"></a>D-L13 | Combo readback is device data | [Firmware direction](https://github.com/NoahCLR/charybdis-4x6/blob/dev/docs/LIVE_EDIT_APP_DIRECTION.md#d-l13--combo-readback-is-device-data) |
+| <a id="d-l14--device-edits-are-saved-as-a-complete-generation-bound-profile"></a>D-L14 | Device edits are saved as a complete, generation-bound profile | [Firmware direction](https://github.com/NoahCLR/charybdis-4x6/blob/dev/docs/LIVE_EDIT_APP_DIRECTION.md#d-l14--device-edits-are-saved-as-a-complete-generation-bound-profile) |
+| <a id="d-l17--the-keyboard-reports-its-brightness-limit"></a>D-L17 | The keyboard reports its brightness limit | [Firmware direction](https://github.com/NoahCLR/charybdis-4x6/blob/dev/docs/LIVE_EDIT_APP_DIRECTION.md#d-l17--the-keyboard-reports-its-brightness-limit) |
+| <a id="d-l18--native-settings-use-device-reported-capabilities"></a>D-L18 | Native settings use device-reported capabilities | [Firmware direction](https://github.com/NoahCLR/charybdis-4x6/blob/dev/docs/LIVE_EDIT_APP_DIRECTION.md#d-l18--native-settings-use-device-reported-capabilities) |
+| <a id="d-l21--apply-publishes-one-atomic-logical-generation"></a>D-L21 | Apply publishes one atomic logical generation | [Firmware direction](https://github.com/NoahCLR/charybdis-4x6/blob/dev/docs/LIVE_EDIT_APP_DIRECTION.md#d-l21--apply-publishes-one-atomic-logical-generation) |
+| <a id="d-l22--a-cancelled-save-ends-in-bounded-time-and-says-why-it-ended"></a>D-L22 | A cancelled save ends in bounded time, and says why it ended | [Firmware direction](https://github.com/NoahCLR/charybdis-4x6/blob/dev/docs/LIVE_EDIT_APP_DIRECTION.md#d-l22--a-cancelled-save-ends-in-bounded-time-and-says-why-it-ended) |
+| <a id="d-l24--directional-modes-can-read-eight-directions"></a>D-L24 | Directional modes can read eight directions | [Firmware direction](https://github.com/NoahCLR/charybdis-4x6/blob/dev/docs/LIVE_EDIT_APP_DIRECTION.md#d-l24--directional-modes-can-read-eight-directions) |
+| <a id="d-l25--via-macros-have-names-user-macros-are-retired"></a>D-L25 | VIA macros have names; user macros are retired | [Firmware direction](https://github.com/NoahCLR/charybdis-4x6/blob/dev/docs/LIVE_EDIT_APP_DIRECTION.md#d-l25--via-macros-have-names-user-macros-are-retired) |
+| <a id="d-l27--a-stale-copy-on-the-other-half-can-no-longer-hold-off-every-later-one"></a>D-L27 | A stale copy on the other half can no longer hold off every later one | [Firmware direction](https://github.com/NoahCLR/charybdis-4x6/blob/dev/docs/LIVE_EDIT_APP_DIRECTION.md#d-l27--a-stale-copy-on-the-other-half-can-no-longer-hold-off-every-later-one) |
+| <a id="d-l28--dominant-axis-and-eight-directions-are-one-directional-engine"></a>D-L28 | Dominant axis and eight directions are one directional engine | [Firmware direction](https://github.com/NoahCLR/charybdis-4x6/blob/dev/docs/LIVE_EDIT_APP_DIRECTION.md#d-l28--dominant-axis-and-eight-directions-are-one-directional-engine) |
+| <a id="d-l34--layer-keycodes-are-owned-in-the-firmware-and-the-app-follows"></a>D-L34 | Layer keycodes are owned in the firmware, and the app follows | [Firmware direction](https://github.com/NoahCLR/charybdis-4x6/blob/dev/docs/LIVE_EDIT_APP_DIRECTION.md#d-l34--layer-keycodes-are-owned-in-the-firmware-and-the-app-follows) |
+| <a id="d-l38--the-dual-role-setting-is-qmks-tapping-term"></a>D-L38 | The dual-role setting is QMK's tapping term | [Firmware direction](https://github.com/NoahCLR/charybdis-4x6/blob/dev/docs/LIVE_EDIT_APP_DIRECTION.md#d-l38--the-dual-role-setting-is-qmks-tapping-term) |
+| <a id="d-l39--only-the-keyboard-ends-a-staging-together-with-its-candidate"></a>D-L39 | Only the keyboard ends a staging, together with its candidate | [Firmware direction](https://github.com/NoahCLR/charybdis-4x6/blob/dev/docs/LIVE_EDIT_APP_DIRECTION.md#d-l39--only-the-keyboard-ends-a-staging-together-with-its-candidate) |
+| <a id="d-l40--firmware-builds-use-only-the-eight-slot-pointing-engine"></a>D-L40 | Firmware builds use only the eight-slot pointing engine | [Firmware direction](https://github.com/NoahCLR/charybdis-4x6/blob/dev/docs/LIVE_EDIT_APP_DIRECTION.md#d-l40--firmware-builds-use-only-the-eight-slot-pointing-engine) |
+| <a id="d-l41--pointing-keycodes-name-slots-not-factory-presets"></a>D-L41 | Pointing keycodes name slots, not factory presets | [Firmware direction](https://github.com/NoahCLR/charybdis-4x6/blob/dev/docs/LIVE_EDIT_APP_DIRECTION.md#d-l41--pointing-keycodes-name-slots-not-factory-presets) |
+| <a id="d-l42--userspace-keycodes-sit-in-fixed-blocks-and-custom-keys-are-named"></a>D-L42 | Userspace keycodes sit in fixed blocks, and custom keys are named | [Firmware direction](https://github.com/NoahCLR/charybdis-4x6/blob/dev/docs/LIVE_EDIT_APP_DIRECTION.md#d-l42--userspace-keycodes-sit-in-fixed-blocks-and-custom-keys-are-named) |
+| <a id="d-l43--split-activity-optimization-at-qmks-default-baud"></a>D-L43 | Split activity optimization, at QMK's default baud | [Firmware direction](https://github.com/NoahCLR/charybdis-4x6/blob/dev/docs/LIVE_EDIT_APP_DIRECTION.md#d-l43--split-activity-optimization-at-qmks-default-baud) |
+| <a id="d-l46--firmware-has-no-reverse-dependency-on-ark"></a>D-L46 | Firmware has no reverse dependency on Ark | [Firmware direction](https://github.com/NoahCLR/charybdis-4x6/blob/dev/docs/LIVE_EDIT_APP_DIRECTION.md#d-l46--firmware-has-no-reverse-dependency-on-ark) |
+
 ## Decisions
 
 Numbers are stable and cited from code and docs.
-Firmware decisions keep their heading here and their text in the firmware direction.
+Firmware decisions are indexed in the [pointer table](#firmware-decision-pointers);
+the firmware direction owns their text.
 Decisions about the retired v1 app, and the numbers retired without a heading,
 are under [Historical decisions](#historical-decisions) at the end.
 
-### D-L02 — Ark is a VS Code extension for now
+<a id="d-l02--ark-is-a-vs-code-extension-for-now"></a>
 
-It ships as its own extension.
-Its `core/` has no `vscode` imports, so repackaging as a standalone desktop app
-is a shell and adapter swap rather than a rewrite. The independent repository
-needs no firmware workspace (D-L44); requiring VS Code remains a distribution
-limitation. The trigger to repackage is the first non-developer user.
+### D-L02 — Ark runs in VS Code and a web page
 
-Amended by D-L52: the second host is a web page, beside the extension rather
-than instead of it, so using Ark no longer requires VS Code.
+Ark ships as its own VS Code extension and as a web page beside it (D-L52).
+Both hosts run the same core and interface, and neither requires a firmware
+workspace (D-L44). The core has no `vscode` imports: a host supplies its device
+adapter and shell without rewriting the app.
+
+The web host lets people use Ark without installing VS Code, while keeping the
+extension available for those who already use it. A standalone desktop host
+remains a shell and adapter choice rather than a reason to fork the app.
 
 ### D-L04 — The source editor is retired
 
@@ -162,14 +196,6 @@ back by name.
 VIA macro slots appear as `VIA_MACRO_0`–`VIA_MACRO_63` throughout the app.
 Their QMK numeric identities still round-trip, but the picker does not offer
 duplicate `QK_MACRO_n` names from the first 32 slots.
-
-### D-L07 — Specs are promoted, process is deleted
-
-Firmware decision; its text is in the firmware direction.
-
-### D-L08 — The live-profile owner is on by default
-
-Firmware decision; its text is in the firmware direction.
 
 ### D-L09 — Ark owns a canonical profile format, not `.c`
 
@@ -246,14 +272,6 @@ telemetry: brightness is scaled to a ceiling, and effects, animation phase,
 active layers and transient feedback are not reported. Exact live appearance
 would need a future device-frame readout, not host reconstruction.
 
-### D-L13 — Combo readback is device data
-
-Firmware decision; its text is in the firmware direction.
-
-### D-L14 — Device edits are saved as a complete, generation-bound profile
-
-Firmware decision; its text is in the firmware direction.
-
 ### D-L15 — A portable profile is the complete effective configuration
 
 Export and import own the whole keyboard snapshot. Flashed and committed
@@ -284,14 +302,6 @@ totals. It names no single difference; that is the draft's review. A file identi
 be used. A file carries no layer order, so it is compared slot by slot. See
 `importDifferences` in `core/session/panel-session.js` and `categorySummary`
 in `webview/view/review.mjs`.
-
-### D-L17 — The keyboard reports its brightness limit
-
-Firmware decision; its text is in the firmware direction.
-
-### D-L18 — Native settings use device-reported capabilities
-
-Firmware decision; its text is in the firmware direction.
 
 ### D-L19 — One whole-profile draft and review
 
@@ -334,107 +344,18 @@ gets one bounded 5 ms retry; a peer that stays busy still enters the
 100–1000 ms backoff and transport failures keep the 50–1000 ms path. On
 hardware this took a layer-name-only Apply from 13.05 s to 5.51 s.
 
-### D-L21 — Apply publishes one atomic logical generation
-
-Firmware decision; its text is in the firmware direction.
-
-### D-L22 — A cancelled save ends in bounded time, and says why it ended
-
-Firmware decision; its text is in the firmware direction.
-
 ### D-L23 — Apply shows its steps, and a failure says where, why and what was saved
 
-`core/session/apply-progress.js` names the ten steps of an Apply and tracks
-them forward only: check the keyboard, save a recovery copy, send the profile,
-keyboard checks it, stage keys and macros on the slave half, copy the profile
-to the slave half, save it on the master half, finish the slave half, write keys
-and macros on the master half, check both halves. The master half is the one
-connected over USB; the slave half is its partner over the split cable. These
-roles do not imply left or right, and the Device screen explains them.
-`restoreProfile()` reports at each real boundary with byte counts. A failure keeps its step, a reason from the
-keyboard's own error (or the slave half's last answer), and whether anything
-was saved. The commit bar keeps a failed Apply on screen until dismissed.
-Transfer progress uses a separate `applyProgress` panel message, correlated to
-the current draft ID and revision. The service retains the latest view for
-full snapshots; progress alone updates the commit bar without rebuilding the
-profile model or the visible editor. Connection, profile and busy-state changes
-still publish full models. The active screen must not add work to each copy
-chunk, including when a macro's local Text or Advanced input is present.
-Read counters use a separate `readProgress` message for layout, profile pages
-and portable capture. The service retains these counters for full snapshots;
-the panel updates its commit bar or initial-read placeholder in place. A read
-message must match the active operation ID, phase, device, connection token
-and draft ID/revision (including an absent draft during the initial read), and
-is ignored once that operation ends. Full models still publish operation
-boundaries, completed data and failures. This rule covers initial reads and
-post-Apply readback in both hosts; progress must not reconstruct the draft's
-presentation model on every device reply.
-Layout reads use the existing VIA buffer command (`0x12`) in 28-byte chunks,
-decode the full 10 × 6 matrix per layer in big-endian keycodes, and expose only
-the pinned visible positions in layout order. Sixteen layers take 69 requests;
-progress counts visible keys, including the final 896-key total.
-Profile payload reuse belongs to the connection's `ProfilePayloadReader`. It
-can retain only bytes actually read and verified by CRC32 and FNV-1a. Compiled
-defaults can be reused while that connection holds. Initial reading uses one
-coherent complete capture for the editor and portable draft: layout, committed
-payload and live combos are downloaded once and installed together after the
-capture's checks pass. Initial committed reads, exports and post-Apply readback
-download bytes afresh. A failed capture leaves independent diagnostics readable
-but never opens an editable draft. Every reuse checks the complete fresh metadata identity before
-and after, verifies both hashes, retries or downloads afresh on a mismatch,
-and retains the capture's status, storage and settings coherence checks.
-Reconnect discards the reader. Authored Apply target bytes never seed its cache:
-the stored metadata alone is not a fresh integrity read of flash. The complete
-macro bank, including unused trailing bytes, remains freshly verified because
-Apply compares the actual stored bank. Optional macro read maps reconstruct
-firmware-confirmed zero blocks and download every marked block; older firmware
-keeps the full read (D-L23). Portable progress names each read
-and reports transferred bytes. Configure editors retain their DOM when a full
-model changes only transient read status; data, vocabulary, permission or
-connection changes and form-reset/edit replies redraw. New model fields are
-included in this comparison by default; Device and Profile retain full renders.
-After a successful Apply, the app reads layout, committed domains, combos and
-VIA base lighting again. The editor and rail stay visible but busy; the commit
-bar names the current read and its page progress until editing resumes. This
-readback is separate from the ten transaction steps and does not claim another
-two-half verification. A finished Apply reaches the model only while its own
-control still runs; any later busy operation (read, export, discard, review
-against the keyboard) gets the generic busy bar, which names the operation and
-mentions the saved profile only while a profile is being written.
+Apply and readback expose their actual steps, and a failed Apply retains its
+step, the keyboard's reason and whether anything was saved. Progress updates
+must preserve the visible editor and remain bound to the operation that made
+them. A complete coherent capture opens the draft; fresh integrity checks and
+exact stored bytes remain required wherever the contract calls for a new read.
 
-Candidate status page 1 (see
-[Profile Wire V1](../upstream/firmware/docs/architecture/profile-wire-v1.md#candidate-operation-status))
-reports the peer phase, transferred bytes and the peer's last split status. The
-host counts its movement as progress while the keyboard is `PREPARING_PEER`, so
-a slow copy no longer runs into the stall window. Firmware without page 1
-answers `UNKNOWN_PAGE` and keeps the old behaviour.
-
-When a keyboard implements optional Profile Wire GET `0x0c`, a complete capture
-reads its macro map and storage identity, downloads marked 256-byte blocks,
-reconstructs omitted blocks as zero, rereads the metadata and verifies the
-canonical full VIA-store digest. The map must match the capture's initial
-storage identity; the final profile, storage and settings checks stay in place.
-Adjacent blocks share one transfer range. Progress counts bytes actually
-transferred, and an empty bank completes with zero macro data exchanges.
-
-A stale nonzero tail is included even when it belongs to no macro. The final
-write-validity byte is included in the map and retains its incomplete-write
-check. Unsupported or initially unavailable maps use the full-bank reader,
-including clean nonzero VIA layout options written by another client;
-malformed maps, later unavailability, changed identities and corruption fail
-the read. Freshness and exact stored bytes are preserved for initial capture,
-Refresh, Export, recovery and differential Apply. Storage and backup formats
-stay unchanged. The firmware owns the
-[wire contract](../upstream/firmware/docs/architecture/profile-wire-v1.md#sparse-via-macro-read-map--optional-get-value-0x0c),
-imported from its published implementation.
-
-### D-L24 — Directional modes can read eight directions
-
-Firmware decision; its text is in the firmware direction.
-
-### D-L25 — VIA macros have names; user macros are retired
-
-Firmware decision; its text is in the firmware direction.
+This makes a slow or failed operation explainable without allowing progress
+traffic or cached authored bytes to change the draft's meaning. The detailed
+contract is [Profile capture and operation progress](architecture/profile-capture-and-progress.md);
+the user flow is in the [guide](GUIDE.md#applying-changes).
 
 ### D-L26 — Macro slots share one visible memory, and every slot says what fits
 
@@ -501,14 +422,6 @@ Host-layout firmware (feature bit 22) adds the keyboard layout to scalar 27
 (bits 16–23, with bit 24 for a macOS ISO keyboard); see D-L56.
 See the [guide](GUIDE.md#text-macros). Physical host insertion remains
 an acceptance requirement, separate from codec and UI verification.
-
-### D-L27 — A stale copy on the other half can no longer hold off every later one
-
-Firmware decision; its text is in the firmware direction.
-
-### D-L28 — Dominant axis and eight directions are one directional engine
-
-Firmware decision; its text is in the firmware direction.
 
 ### D-L29 — The review lists items, discarded in the groups their edits made
 
@@ -596,121 +509,26 @@ so a dark one reads dark.
 
 ### D-L32 — Things sit in fixed places
 
-A repeated element sits in the same place every time it appears, so a screen
-reads as a grid rather than as text that wraps wherever it lands.
-Review and Draft history reserve separate positions for tap-count badges and
-tier dots, including when either is absent; title slots fit a full combo badge
-with space before its name.
-The Keys workbench tabs count what the selected layer stores. The Key tab counts
-mapped keys, excluding transparent and disabled positions; its selected key's
-layout index belongs in the key details. Every Keys tab is at least as tall as
-the Behaviours tab; a taller editor carries its height across tab changes, so
-changing tabs does not move the page's scroll position.
-The Behaviours, Combos, Macros and Pointing modes reach lists lead with **On
-this view**, calculated for the selected layer plus exactly the lower layers
-currently previewed on. **On this layer** means a key stored on the selected
-layer, and the other route groups describe ways it can reach an item under
-different activations. The view can therefore overlap those groups; it is the
-current activation, not another storage location. A combo in the view requires
-all inputs in that activation and uses the configured Combo Layer Matching
-reference when one is set. Tab counts still count the selected layer's stored
-routes. On the board, a key the selected layer stores keeps its own marks; a
-transparent key answered from below wears that key's behaviour dots and the
-badges of the combos On this view lists it in (`combosInPreview` in
-webview/view/keyface.mjs). Under Combo Layer Matching the reference layer's keys
-are matched instead, so no answer from below adds a badge.
+Repeated elements reserve fixed positions, and the interface distinguishes
+stored placements from routes in a composed layer view. Shared reach sections
+keep their identity across the workbench tabs.
 
-Combo grouping skips activation enumeration when there are no combos. For
-current-layer matching it enumerates only lower layers that can answer a
-transparent position on the top layer, including disabled keys that block an
-input below. Other holds cannot change the answer and are omitted, preserving
-the smallest held set for each route. This keeps a first Macros open from
-enumerating every combination of all 16 layers just to list its placements.
-
-The reach sections have one open state by section identity across those four
-tabs. Opening one does not close another. A section unique to one tab keeps its
-own state; sections absent from another tab retain their state until shown
-again. The Behaviours rail grows with its rows, so the Keys content pane is its
-only vertical scroller.
-
-- The review is one grid: a status gutter, the title with its area underneath
-  when outside its section, the fields as sign · label · on the keyboard · in
-  your draft, then Show and Discard at the edge. A field is marked as a diff
-  marks a line: + added, − removed, nothing for changed. A side with nothing
-  shows a dash in its own column.
-- A destructive action is the last thing in its row.
-- The draft's dot follows a row's label; on a tile it has one fixed spot.
-- A removed thing keeps its mark and Show only where it is still on screen (a
-  cleared pointing slot, an emptied macro slot).
-- A table's owner reads by the name its dropdown offers, with its mark, never
-  an enum.
-- Where marked and unmarked labels share a column, every label gets the same
-  mark slot (`marked(…, {slot: true})` in `webview/ui/marks.mjs`).
+Stable positions let people compare rows and switch editors without losing
+their place. Keeping storage and activation distinct prevents a preview from
+misreporting what an edit changes. Rendering and reach rules live in
+[Interface rendering and rule ownership](architecture/interface-contracts.md#fixed-positions-and-composed-reach);
+the [guide](GUIDE.md#the-interface) describes the workbench.
 
 ### D-L33 — One home for each rule the app needs twice
 
-Knowledge kept in several places drifted: stored values had different words in
-the review and the screens, the pointing-mode keycode registry was written six
-times, a dirty draft was decoded 10–16 times per publish, and the host
-sequenced Apply itself. Each rule now has one home:
+Every shared rule has one owning module, and the host publishes its meaning to
+the interface. Screens do not rebuild vocabulary, device policy or draft state.
 
-- Words: `core/model/vocabulary.js`, sent as `model.vocabulary`; stages are
-  found by id, never by label.
-- Key names: `core/model/key-names.js`. The catalogue names what QMK ships;
-  the profile names its macros, pointing-mode keys and bare user slots. The
-  effective Host OS also names Alt/Option and GUI/Command/Windows/Super,
-  including modifier wrappers, mod-taps, layer-mod keys, Magic actions and Space Cadet keys,
-  without changing stored keycodes. Macro command previews and held-key
-  warnings resolve those same labels; raw payload editors keep stored codes.
-  Modifier-bearing catalogue labels are identified centrally by their words,
-  independently of picker groups, so another key family inherits the rule. The
-  screens' `qmkKeyLabels` and the review are both built from it, each from
-  its own snapshot, so a key reads the same in the combo table, the picker and
-  the review. The webview never names a keycode: a form such as the combo builder
-  stores keycodes and looks up their current labels on each render. It never
-  caches display words across model updates. `hostKeyVocabulary()` in the same
-  module derives all eight modifier controls, their stable picker wrappers,
-  grid headings, summaries and accessibility labels from the modifier
-  vocabulary. Key Options uses the same host naming rule. Auto with an unknown
-  host uses neutral Alt/GUI wording. The webview has no modifier-name table;
-  an unnamed value falls back to its stored code. Host-switch browser checks
-  exercise open behaviour pickers, combo builders, macro previews and pointing
-  editors through the production model-message handler. The stored name
-  (`KC_KP_1`) is added only when a review row's two sides would read alike.
-  A layer is always named by its name, in the picker's verbs: `MO(3)` reads
-  "Hold Navigation", `LT(3,KC_SLASH)` "/ / Navigation", and a layer key's cap
-  shows the layer's name. Only a raw keycode, where one is shown, keeps the
-  number.
-- Actions, native keycodes, decode limits, layer references:
-  `core/schema/actions.js`; the pointing registry and key layout are data.
-- Decoding: once per draft revision, carried as `decoded` and taken through
-  `decodedOf`; history entries are frozen.
-- Pure domain edits and presentation: `core/model/device-profile-edits.js`,
-  `core/model/key-behavior-edits.js` and `core/model/device-profile-view.js`.
-  The session translates wire capability bits into the model's destination
-  facts before staging; the model imports no session or protocol modules.
-- Settings bits and base lighting: `fieldMask` and `baseLighting` in
-  `core/model/settings-editor.js`.
-- Panel sequencing: `core/session/panel-controls.js`, tested with a fake
-  service; the message loop around it, for every host:
-  `core/session/panel-loop.js`. `extension.js` supplies dialogs, files,
-  progress and toasts as host functions.
-- Whether the draft takes an edit now: `draftBinding` in
-  `core/session/panel-session-state.js`, published as `draft.editable` and
-  `draft.reason`, with the session's compound transitions beside it (D-L60).
-- Interface: `canEdit(area)` for permission, `view/reach-groups.mjs` and
-  `ui/groups.mjs` for grouped lists, `slotLight` in `ui/marks.mjs`, one form
-  per macro slot and one `state.combo` for the builder.
-  Every panel state field declares its initial value and draft-replacement
-  policy together in `store.mjs`; `view/state-fields.mjs` constructs fresh
-  state and resets fields from those declarations. A policy keeps the value,
-  resets it, or computes a replacement from the state before the change.
-  The declaration preserves the existing behavior: pending `cellHow` and the
-  LED group builder (`ledPicks`, `trackball`, `rowColour`, `ledRow`) stay kept.
-
-### D-L34 — Layer keycodes are owned in the firmware, and the app follows
-
-Firmware decision; its text is in the firmware direction.
+Duplicated knowledge drifted: stored values had different words in review and
+screens, the pointing keycode registry was written six times, a dirty draft was
+decoded 10–16 times per publish, and the host sequenced Apply itself. The ownership
+contract is [Interface rendering and rule ownership](architecture/interface-contracts.md#shared-rule-ownership);
+[AGENTS.md](../AGENTS.md) governs dependencies and where new work belongs.
 
 ### D-L36 — The review checks reachable actions and save blockers
 
@@ -812,30 +630,6 @@ order, so what a reorder makes or mends is reported as new or fixed. The
 review's Layer priority item names the new base first. See
 `reorderLayers` in `core/model/portable-profile.js`.
 
-### D-L38 — The dual-role setting is QMK's tapping term
-
-Firmware decision; its text is in the firmware direction.
-
-### D-L39 — Only the keyboard ends a staging, together with its candidate
-
-Firmware decision; its text is in the firmware direction.
-
-### D-L40 — Firmware builds use only the eight-slot pointing engine
-
-Firmware decision; its text is in the firmware direction.
-
-### D-L41 — Pointing keycodes name slots, not factory presets
-
-Firmware decision; its text is in the firmware direction.
-
-### D-L42 — Userspace keycodes sit in fixed blocks, and custom keys are named
-
-Firmware decision; its text is in the firmware direction.
-
-### D-L43 — Split activity optimization, at QMK's default baud
-
-Firmware decision; its text is in the firmware direction.
-
 ### D-L44 — The app has its own repository and pinned firmware inputs
 
 Charybdis Ark owns its code, contributor instructions, tests, preview and
@@ -860,10 +654,6 @@ any committed firmware revision; a pushed pin names a commit on firmware's
 remote `dev`, its trunk, which `--publish` enforces. Firmware `main` moves
 only by promotion merges of `dev`, so a published pin stays reachable from both. See
 [compatibility workflow](COMPATIBILITY.md).
-
-### D-L46 — Firmware has no reverse dependency on Ark
-
-Firmware decision; its text is in the firmware direction.
 
 ### D-L47 — The app is named Ark
 
@@ -903,130 +693,17 @@ is separate from recognition of its advertised policy.
 
 ### D-L49 — Timing findings constrain the reachability graph conservatively
 
-Ark resolves each row's timing overrides against the connected settings, including
-the dual-role default for authored LT rows. A Hold and Long hold that both
-tap on release ("tap on release after Tap / hold threshold", "… after Long
-hold threshold") have
-an impossible Hold branch when Long hold is
-at or before Tap / hold: no release interval selects Hold. Review and the
-behaviour editor warn, and the layer graph removes that proven-impossible edge,
-including behaviours reached through combo outputs. Global-default edits are
-analyzed in the same draft, with new/existing/fixed findings.
+Timing findings remove only proven-impossible branches from the layer graph.
+Unknown paths remain possible. Warnings describe legal but risky relationships;
+comfort notices never become validity rules or silently rewrite values.
+Built-in branches and inherited defaults are resolved once from the profile and
+advertised firmware semantics for the editor and review alike.
 
-Other equal or reversed thresholds warn about overlapping tiers without claiming
-which action is impossible: immediate actions, scan order and release modes
-matter. Positive hold-tier gaps under 50 ms, first-tap and repeat windows under
-50 ms, and enabled combo windows under 50 ms receive notices. This is an explicit
-comfort heuristic, never a validity rule or a model of the person's dexterity.
-Warnings remain confirmable and notices need no confirmation. No values change
-automatically. Combo waits are not subtracted from physical repeat windows.
-
-This is conservative static analysis, not a complete input-state simulator.
-Stored layer-source resolution and participation policies are modeled; pointing
-interception, interruption, host bindings, scan cadence, fingers and overlapping
-chord sequences are not proven feasible.
-Unknown paths remain in the graph rather than inventing traps. Invalid timing
-relationships are reported even for unplaced rows so moving one later cannot
-hide the problem. Revisit the rule against firmware release-matrix tests when
-release precedence changes.
-
-Ark checks sets of held/locked states through shared Boolean decisions, so
-independent layer controls do not expand into an exponential list of states.
-A permanently available TO(0), or universally available toggles for every
-lockable layer, proves a way home directly. Other profiles receive complete
-forward reachability and backward escape checks under the same conservative
-action model. A held layer can be released; traps concern locks that remain
-after release. Two separately escapable layers can still cover each other's
-exits together, so those interactions remain part of the check.
-
-Review reports the smallest trapping layer combinations, with concrete entry
-paths and repairs. Unrelated safe locks do not multiply one trap into thousands
-of findings. Paths include a hold release when it is needed to reach a later
-action. Up to four trapping combinations are named; any additional minimal
-combinations are counted. New, existing and fixed findings continue to follow
-layer identity through reordering.
-
-Memory and work budgets keep checks responsive. If the compact proof cannot
-finish, a bounded explicit walk may still resolve a small graph (4,096 states,
-65,536 edges). Any remaining warning names the involved layers and opens one
-for inspection. If reachability was established but escape was not, layer and
-combo reachability findings remain valid and only escape is marked uncertain.
-A partial check never reports an unproved absence or marks an earlier finding
-fixed in the area that remains uncertain.
-Generated combo-output behaviours honor the source layer of the last declared
-combo member, which owns the output independently of physical press order.
-Reference remapping changes the matched code, never that physical source.
-When the owner code has several eligible placements, each placement's source
-conditions separately admit the row or its native fallback; another member's
-permissions cannot admit the output behaviour. Generated outputs have no
-physical placement: only the behaviour master and row enable/allowed-layer
-mask apply, as the firmware's participation contract defines.
-
-Feature bit 18 identifies runtime-owned tapping, extending bit 17's authored LT
-bypass to every handled key (including authored MT/OSM and owned TT/OSL). Ark
-keeps native-buffering warnings for those families on bit-17-only firmware.
-Neither capability changes stored profile bytes. Firmware owns that policy and
-its native-key controls; Ark owns these findings and their presentation.
-
-An empty tap or first-press hold is not "nothing": the keyboard runs the key's
-own action there. The behaviour grid shows it as a dashed "built in" cell,
-derived from the stored keycode. An empty tap sends the key's own tap once per
-press, so it is claimed at every tap count up to the row's deepest stored step
-and marked `×N` past a single tap; deeper counts are separate gestures and stay
-empty. The hold belongs to the first press. A plain key (a basic keycode, alone
-or with modifiers) taps itself and holds itself down as a fallback that any
-first-press hold or long hold replaces; every firmware with a Profile Wire does
-this. Bare modifiers are buffered, not tapped, and claim nothing. Dual-role
-keys are claimed only where firmware advertises them: an LT() row's tap and
-layer hold on bit 17, an MT() or OSM() row's tap and modifier hold on bit 18.
-Older firmware classified those keys in QMK first, so Ark claims nothing there.
-The other hold tier also fills a cell. With no Long hold, nothing happens at
-its threshold and a release never selects it, so the press's Hold, set or
-built in, carries on as its helper runs (held, repeating, sending on release,
-or already sent at the Tap / hold threshold); the vocabulary's `holdWithoutLongHold`
-words it. With a Long hold and no Hold at all, the press stays in its tap
-window until Long hold, and a release in between sends that count's tap, set
-or built in; Ark claims this for plain keys, custom keys and macros
-(`releaseTaps`), not for layer keys (no tap once held past Tap / hold),
-pointing keys (their own hold) or bare modifiers.
-A dashed cell is display only; setting an action in it authors the tier
-(core/model/built-in-behavior.js, `impliedBranch` in webview/view/keyface.mjs).
-New behaviour editors start with no authored branches, preserving these defaults.
-Selecting a key opens its row or an unstored grid; only an action, timing override
-or anchor change creates a draft row. Previews never enter the host model's stored
-behaviour list, counts or board marks. Transparent keys and `KC_NO` have no
-behaviour editor, and the host rejects them as new or retargeted row targets.
-Behaviour rows are keyed by keycode, so in a layer preview selecting a
-transparent position opens the keycode the board shows there, answered from
-below (`behaviourKeyAt` in webview/view/behavior-editor.mjs), naming the layer
-that supplies it and that the row is shared by that keycode. A position answered
-by `KC_NO`, by nothing, or shown alone outside a preview keeps no editor.
-Changing the previewed layers re-resolves a row opened from the selected key; a
-row picked from the list stays (`toggleLayerOn` in webview/store.mjs).
-Opening a custom key's behaviour follows the same rule.
-The timing controls lead with **Multi tap window** (release to next press),
-followed by Tap / hold and Long hold. Behaviour and combo timing inputs show
-inherited or default-matching values as muted placeholders (`150 · default`),
-with no default/custom marker after `ms` in the label. Other values remain entered.
-Presentation alone never rewrites an explicit override that matches the default.
-When a behaviour timing default changes, explicit row values equal to that
-specific old default become inheritance zeros in the same draft step. Existing
-zeros follow naturally; distinct custom values stay fixed. LT's Tap / hold follows
-the dual-role default, other rows the normal threshold. Unchanged defaults and
-unrelated settings edits do not normalize rows.
-Review lists each inherited effective-time change under Tap & Hold Timing, with
-the affected behaviour and old/new milliseconds. Explicit matches adopting
-inheritance appear as stored behaviour changes grouped with the settings edit.
-Inherited effects are not independent discard units, so discarding the default
-does not discard unrelated edits on rows that already inherited it. Undo restores
-the entire step, including any former explicit values.
-The host supplies per-key defaults using the same timing
-resolution as review, including LT's dual-role threshold. Displaying a default
-keeps the stored inheritance zero; changing another field never freezes it as an
-override. Clearing an override restores the default. An unchanged empty preview
-posts nothing.
-The target is a lookup key, not an implicit authored tap action: copying an
-`LT()` target into a tap branch would fail the firmware's placement rules.
+A conservative graph avoids invented traps while still identifying locks with
+no escape. Bounded checks must report uncertainty rather than claim a proof
+they could not finish. The detailed contract and its analysis limits are in
+[Timing, built-in branches and reachability](architecture/timing-and-reachability.md);
+the [guide](GUIDE.md#timing-checks) explains what the findings mean.
 
 ### D-L50 — Ark agrees with firmware by contract; `main` is a released stack
 
@@ -1036,25 +713,31 @@ firmware are in sync when the contract agrees, not when commits match. The
 agreement check (`npm run agreement`) decodes the pages firmware states with
 Ark's own runtime decoder and gating, and requires Ark's BK keycode and layout
 inputs and pinned fixtures to equal firmware's (file equality, not commit
-equality); keymap values are reported, never gating. It is required on `main`.
-`dev` tests against Ark's own pins; `main` moves only by a release, which tests
-that exact stack and its agreement and publishes the table in the notes
-(firmware D-F04). See [agreement](COMPATIBILITY.md#agreement-with-a-firmware-contract).
+equality); keymap values are reported, never gating.
+
+Development tests against Ark's own pins. Ark and firmware release separately,
+and together when the contract between them changes (firmware D-F06). A release
+must agree with the firmware it will sit next to, retaining compatible older
+pins when appropriate; equal commit dates or newest pins are not the criterion.
+This permits independent app releases without weakening the published contract.
+See [agreement](COMPATIBILITY.md#agreement-with-a-firmware-contract) for the check
+and [CI facts](REPOSITORY.md#ci-and-publishing) for when it runs.
 
 ### D-L51 — CI runs for releases; agreement judges the other release
 
-Development is verified locally (the work-queue vault's `verify`), so CI does not
-run on `dev` or on pull requests into it. A release's `dev` → `main` pull request
-runs everything `main` requires (`check` on Linux and macOS, `browser`,
-`compatibility` at the pins and `agreement`). `agreement` judges the firmware
-Ark will be released next to: firmware `main`, or firmware `dev` when the
-pull request's hidden release marker names a joint release; the release command
-re-checks it when it merges. Nightly runs check `dev`, warn early about firmware
-`dev`, and raise an alarm if the published Ark `main` and firmware `main` ever
-disagree; none of them blocks. The one workflow that does run on `dev` pushes
-is publishing the web page (D-L52), whose tests gate only that publish. This replaces D-L50's "required on `main`" and
-release-stack wording where they differ: Ark and firmware release separately,
-and together only when the contract between them changes (firmware D-F06).
+Local verification owns development checks. CI runs on promotions to `main`
+and nightly, rather than on task pull requests into `dev`. Promotion agreement
+judges the firmware Ark will be released next to: firmware `main`, or the
+prepared partner for a joint release. The publication command rechecks that
+contract before publication. Nightly checks report development drift and
+published incompatibility without blocking development.
+
+This keeps the development loop local while protecting the two published
+products against contract drift. Web-page publication is the `dev`-push
+exception (D-L52); its checks gate that upload alone. Job names, partner selection
+and branch protections live in [CI and publishing](REPOSITORY.md#ci-and-publishing).
+The development and publication process is governed by [AGENTS.md](../AGENTS.md),
+which points to the work-queue tools.
 
 ### D-L52 — Ark is also a web page
 
@@ -1381,7 +1064,7 @@ built beside v1 as `tools/charybdis-live-v2/`, and took over the plain name
 (nothing reads the firmware repository), and replaces v1's ported Studio
 interface with its own: browser ES modules with pure, tested `view/` modules,
 every posted edit built by `webview/view/edits.mjs` and staged against a real
-draft in `tests/edits.test.mjs`, and a board that shows what the firmware does.
+draft in `tests/view/edits.test.mjs`, and a board that shows what the firmware does.
 Edits exist only as a reviewed draft; a keyboard the app cannot open a draft for
 is read-only, and the host refuses edits rather than writing them directly. v1
 was frozen by this decision and has since been removed.

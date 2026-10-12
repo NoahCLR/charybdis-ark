@@ -18,10 +18,20 @@ source and worktrees; `upstream/` is the pinned baseline, not that checkout.
 | [LIVE_EDIT_APP_DIRECTION.md](LIVE_EDIT_APP_DIRECTION.md) | Product status, open issues and the app's D-L decisions; firmware decisions are pointers to the firmware direction | Changing behavior or architecture |
 | [REPOSITORY.md](REPOSITORY.md) | Repository ownership, source provenance, development setup, commands, CI and publishing | Starting in a new checkout |
 | [COMPATIBILITY.md](COMPATIBILITY.md) | Explicit cross-repository integration workflow | Changing wire formats, schemas or shared codec assumptions |
+| [architecture/profile-capture-and-progress.md](architecture/profile-capture-and-progress.md) | Coherent captures, operation-correlated progress and Apply readback | Changing reads, progress or capture reuse |
+| [architecture/interface-contracts.md](architecture/interface-contracts.md) | Fixed rendering positions, composed reach and shared rule ownership | Changing presentation or moving shared rules |
+| [architecture/timing-and-reachability.md](architecture/timing-and-reachability.md) | Conservative timing/layer analysis, built-in branches and inherited defaults | Changing behaviour presentation or review findings |
 | [core/README.md](../core/README.md) | Runtime data flow and adapter contract | Working in core or the extension shell |
 | [upstream/README.md](../upstream/README.md) | Imported inputs, provenance and update procedure | Reading or updating firmware/QMK contracts |
 
 ## Where new documents belong
+
+Product behaviour changes update [GUIDE.md](GUIDE.md) and the relevant spec in
+the same pass; update the root [README.md](../README.md) when what a user can do
+changes. README stays the short product pitch and installation entry point;
+GUIDE owns the detailed screen and workflow behaviour. This repository's
+[documentation ownership rule](../AGENTS.md#documentation-ownership) governs
+these updates, including when a work-queue reminder is broader.
 
 Extend an existing document when it already owns the subject. Use these
 locations only when a new document is warranted; create directories as needed.
