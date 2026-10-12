@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 
 // One run through core/: decode every input, encode it again, stage edits in a

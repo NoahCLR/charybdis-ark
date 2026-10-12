@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 
 // Browser-native File/DataTransfer values, as an operating-system file drop

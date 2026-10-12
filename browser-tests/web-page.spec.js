@@ -1,3 +1,4 @@
+// @ts-check
 "use strict";
 // The web page as built (dist/web/), served over http://127.0.0.1 — a secure
 // context, as localhost is — with a fake navigator.hid whose keyboard is
