@@ -143,7 +143,8 @@ test("the previous complete backup preserves its keys, names, macros and definit
     assert.deepEqual(value.settings.values.slice(27), [0, 1, 65535, 65535]);
     assert.ok(value.settings.layers.every(row => !row.bypass.length && !row.exclude.length));
     assert.ok(value.behaviors.rows.every(row => row.enabled && row.allowedLayers === 65535));
-    assert.ok(value.combos.rows.every(row => row.enabled && row.allowedLayers === 65535));
+    assert.ok(value.combos.rows.every(row => row.enabled && row.allowedLayers === 65535 && row.useOutputBehavior));
+    assert.equal(value.settings.comboOutputBehaviors, true, "translated backups keep output behaviours enabled");
     assert.equal(value.rgb.layerColors.length, 16);
     assert.ok(value.rgb.layerColors.slice(8).every(row => row.color.v === 0));
     assert.equal(value.pdModes.length, 32);

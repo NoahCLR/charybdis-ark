@@ -45,6 +45,7 @@ const comboTouches = (combo, position) => Array.isArray(combo?.inputPositions) &
 // it stores, or by what that keycode means.
 /** @param {string} name @param {Position} position */
 const inputOn = (name, position) => name === position.keycode || name === keyMeaning(position);
+export const comboInputOn = inputOn;
 
 // The matching rule alone, for one key, with no layer in view. Screens ask
 // combosAt(), which applies it the way the keyboard does on the layer shown.

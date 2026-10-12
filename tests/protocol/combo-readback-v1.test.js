@@ -18,7 +18,7 @@ test("the firmware fixture decodes native inputs, output and timing without a re
         assert.equal(options.matchResponse(stale, request), false);
         return response;
     }});
-    assert.deepEqual(actual.rows[0], {id: 0, inputs: [7, 0x4109], output: 0x2b, termMs: 50, followsDefault: true, mustHold: false, mustTap: false, ordered: false, enabled: true, allowedLayers: 0xffff});
+    assert.deepEqual(actual.rows[0], {id: 0, inputs: [7, 0x4109], output: 0x2b, termMs: 50, followsDefault: true, mustHold: false, mustTap: false, ordered: false, enabled: true, useOutputBehavior: true, allowedLayers: 0xffff});
     assert.equal(actual.version, 3);
     assert.equal(actual.defaultTermMs, 50);
     assert.equal(actual.holdTermMs, 200);
@@ -66,7 +66,7 @@ test("combo policy flags, callback output, timing zeros and a disabled empty tab
     const actual = decode(rehash(pages));
     assert.equal(actual.enabled, false);
     for (const key of ["noTimer", "strictTimer", "customTrigger", "customRelease", "customRepress", "fixedReference"]) assert.equal(actual[key], true);
-    assert.deepEqual(actual.rows[0], {id: 0, inputs: [7, 0x4109], output: 0, termMs: 0, followsDefault: false, mustHold: true, mustTap: true, ordered: true, enabled: true, allowedLayers: 0xffff});
+    assert.deepEqual(actual.rows[0], {id: 0, inputs: [7, 0x4109], output: 0, termMs: 0, followsDefault: false, mustHold: true, mustTap: true, ordered: true, enabled: true, useOutputBehavior: true, allowedLayers: 0xffff});
     pages[0][1] = 0;
     assert.deepEqual(decode(rehash(pages.slice(0, 2))).rows, []);
     // Firmware without combos reports no default and no threshold.
@@ -82,7 +82,7 @@ test("malformed limits, row shape, duplicates and reserved bytes are rejected be
         pages => {pages[0][5] = 32;},
         pages => {pages[1][0] = 16;}, pages => {pages[1][16] = 1;},
         pages => {pages[2][0] = 1;}, pages => {pages[2][1] = 1;}, pages => {pages[2][1] = 17;},
-        pages => {pages[2][6] = 32;}, pages => {pages[2].writeUInt32LE(0x10000, 7);}, pages => {pages[2][15] = 1;}, pages => {pages[3][24] = 1;}, pages => {pages[3][0] = 1;},
+        pages => {pages[2][6] = 64;}, pages => {pages[2].writeUInt32LE(0x10000, 7);}, pages => {pages[2][15] = 1;}, pages => {pages[3][24] = 1;}, pages => {pages[3][0] = 1;},
         pages => {pages[2][4] = 51;},
         pages => {pages[2].writeUInt16LE(7, 13);}, pages => {pages[2].writeUInt16LE(0, 11);},
     ]) {
@@ -122,4 +122,14 @@ test("older firmware is explicitly unsupported and changing readout has a bounde
         return response;
     }}), {code: "COMBO_CHANGED"});
     assert.equal(calls, 14);
+});
+
+
+test("native readback retains independent permissions for combos sharing an output", () => {
+    const pages = fixturePages();
+    pages[4].writeUInt16LE(pages[2].readUInt16LE(2), 2);
+    pages[4][6] |= 32;
+    const rows = decode(rehash(pages)).rows;
+    assert.equal(rows[0].output, rows[1].output);
+    assert.deepEqual(rows.map(row => row.useOutputBehavior), [true, false]);
 });

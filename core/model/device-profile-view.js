@@ -183,7 +183,7 @@ function comboRowsForView(rows, labels) {
     };
     return rows.map(row => ({
         id: row.id, badge: `C${row.id}`,
-        enabled: row.enabled ?? true, allowedLayers: row.allowedLayers ?? 0xffff,
+        useOutputBehavior: row.useOutputBehavior ?? true, enabled: row.enabled ?? true, allowedLayers: row.allowedLayers ?? 0xffff,
         inputs: row.inputs.map(value => resolve(value).name),
         inputDisplays: row.inputs.map(value => resolve(value).label),
         output: resolve(row.output).name,

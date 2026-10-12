@@ -91,6 +91,7 @@ export interface NativeComboTable {
         output: number;
         termMs: number;
         followsDefault?: boolean;
+        useOutputBehavior?: boolean;
         mustHold?: boolean;
         mustTap?: boolean;
         ordered?: boolean;

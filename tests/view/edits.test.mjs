@@ -1120,3 +1120,62 @@ test("pointing macros stage inherit-only outputs and survive review, history and
         assert.throws(() => stage(draft, edits.pdMode(4, bad, draft.identity())), /must inherit held modifiers/);
     }
 });
+
+
+test("combo-output permissions post, review, discard and survive backups and layer reorder", () => {
+    const caps = {...capabilities, featureFlags: 1 << 30};
+    const doc = require("../fixtures/portable-profile").document();
+    const base = {document: doc, fingerprint: portable.fingerprint(doc), summary: portable.summary(doc)};
+    const draft = new ProfileDraftSession(base, "test-device", caps);
+    const initial = decoded(draft);
+    const combo = buildSnapshotModel(draft.current, caps, {editable: true, reason: ""}).combos[0];
+    stage(draft, edits.comboMessage(0, {...combo, useOutputBehavior: false}));
+    const stored = decoded(draft).combos.rows[0];
+    assert.deepEqual({...stored, useOutputBehavior: true}, initial.combos.rows[0]);
+    let change = draft.changes().find(row => row.unit === "combo:0");
+    assert.deepEqual(change.fields.map(field => [field.label, field.before, field.after]), [["Use output behaviour", "on", "off"]]);
+    draft.discard(draft.revision, change.group);
+    assert.deepEqual(draft.document, base.document);
+    draft.undo(draft.revision);
+    assert.equal(decoded(draft).combos.rows[0].useOutputBehavior, false);
+    draft.redo(draft.revision);
+    assert.equal(decoded(draft).combos.rows[0].useOutputBehavior, true);
+    draft.undo(draft.revision);
+    // An older form that omits the new field must preserve the stored veto.
+    const {useOutputBehavior, ...oldForm} = combo;
+    stage(draft, edits.comboMessage(0, oldForm));
+    assert.equal(decoded(draft).combos.rows[0].useOutputBehavior, false);
+    const section = settingsEditorView(draft.current, caps).sections.find(row => row.id === "comboSettings");
+    stage(draft, edits.settingsSection(section, field => field.macro === "comboOutputBehaviors" ? false : undefined));
+    const changed = decoded(draft);
+    assert.equal(changed.settings.comboOutputBehaviors, false);
+    assert.deepEqual(changed.settings.values, initial.settings.values);
+    assert.deepEqual(changed.settings.layers, initial.settings.layers);
+    const exported = JSON.parse(JSON.stringify(draft.document));
+    assert.equal(portable.validateSnapshot(exported, caps).settings.comboOutputBehaviors, false);
+    assert.equal(portable.validateSnapshot(exported, caps).combos.rows[0].useOutputBehavior, false);
+    assert.throws(() => portable.validateSnapshot(exported, capabilities), /Update both halves/);
+    const order = Array.from({length: 16}, (_, i) => 15 - i);
+    const reordered = portable.validateSnapshot(portable.reorderLayers(exported, order), caps);
+    assert.equal(reordered.settings.comboOutputBehaviors, false);
+    assert.equal(reordered.combos.rows[0].useOutputBehavior, false);
+    change = draft.changes().find(row => row.unit === "settings:comboSettings");
+    assert.deepEqual(change.fields.map(field => [field.label, field.before, field.after]), [["Combo outputs use behaviours", "on", "off"]]);
+    draft.discard(draft.revision, change.group);
+    assert.equal(decoded(draft).settings.comboOutputBehaviors, true);
+    assert.equal(decoded(draft).combos.rows[0].useOutputBehavior, false);
+});
+
+test("older firmware shows the switches read-only and rejects bypass edits without changing the draft", () => {
+    const doc = require("../fixtures/portable-profile").document();
+    const base = {document: doc, fingerprint: portable.fingerprint(doc), summary: portable.summary(doc)};
+    const draft = new ProfileDraftSession(base, "test-device", capabilities), before = draft.document;
+    const section = settingsEditorView(draft.current, capabilities).sections.find(row => row.id === "comboSettings");
+    assert.equal(section.fields.find(field => field.macro === "comboOutputBehaviors").readOnly, true);
+    assert.throws(() => stage(draft, edits.settingsSection(section, field => field.macro === "comboOutputBehaviors" ? false : undefined)), /cannot be changed/);
+    const combo = buildSnapshotModel(draft.current, capabilities, {editable: true, reason: ""}).combos[0];
+    assert.throws(() => stage(draft, edits.comboMessage(0, {...combo, useOutputBehavior: false})), /Update both halves/);
+    assert.deepEqual(draft.document, before);
+    stage(draft, edits.settingsSection(section, field => field.macro === "combosEnabled" ? false : undefined));
+    assert.equal(decoded(draft).settings.values[20], 0, "existing combo switches remain editable");
+});

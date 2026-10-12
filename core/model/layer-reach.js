@@ -168,7 +168,7 @@ function profileFacts(decoded) {
     const records = decoded.settings.layers;
     const combos = values[SETTING.COMBOS_ENABLED] ? (decoded.combos?.rows || []).map((combo, index) => ({index,
         inputs: combo.inputs.map((input) => (input.kind === ACTION.QMK_KEYCODE ? input.operand : /** @type {number} */ (nativeCode(input)))),
-        output: combo.output, enabled: combo.enabled !== false, allowedLayers: combo.allowedLayers ?? 0xffff})).filter((combo) => combo.enabled) : [];
+        output: combo.output, useOutputBehavior: combo.useOutputBehavior !== false && decoded.settings.comboOutputBehaviors !== false, enabled: combo.enabled !== false, allowedLayers: combo.allowedLayers ?? 0xffff})).filter((combo) => combo.enabled) : [];
     // Participation (participation-policy.md), judged by the layer a key came
     // from and its matrix position.
     /** @param {number} layoutIndex */
@@ -180,8 +180,8 @@ function profileFacts(decoded) {
     const comboPress = (layer, layoutIndex) => Boolean(values[SETTING.LAYER_COMBOS] & bit(layer)) && !records?.[layer]?.exclude.includes(matrixOf(layoutIndex));
     // Generated outputs have no physical placement and do not consult the
     // source-layer behaviour switch. Their row uses the declared owner's origin.
-    /** @param {BehaviorRow | undefined} row */
-    const generatedLayers = (row) => row && values[SETTING.BEHAVIORS_ENABLED] !== 0 && row.enabled !== false ? (row.allowedLayers ?? 0xffff) : 0;
+    /** @param {BehaviorRow | undefined} row @param {{useOutputBehavior: boolean}} combo */
+    const generatedLayers = (row, combo) => combo.useOutputBehavior && row && values[SETTING.BEHAVIORS_ENABLED] !== 0 && row.enabled !== false ? (row.allowedLayers ?? 0xffff) : 0;
     const pointer = values[SETTING.AUTO_MOUSE_ENABLED] ? values[SETTING.AUTO_MOUSE_LAYER] : undefined;
     const sniping = values[SETTING.AUTO_SNIPING_ENABLED] ? values[SETTING.AUTO_SNIPING_LAYER] : undefined;
     const allCombos = (decoded.combos?.rows || []).map((combo, index) => ({index, output: combo.output}));
@@ -248,7 +248,7 @@ function offers(facts, active, cache) {
             // The last declared member owns the output regardless of press
             // order. Duplicate placements are choices of that member, never
             // permissions borrowed from another declared input.
-            const row = facts.rows.get(outputCode), allowed = facts.generatedLayers(row);
+            const row = facts.rows.get(outputCode), allowed = facts.generatedLayers(row, combo);
             const origins = (present.get(combo.inputs.at(-1)) || []).filter(layer => combo.allowedLayers & bit(layer));
             const effects = [
                 ...(origins.some(layer => allowed & bit(layer)) ? keyEffects(outputCode, row, facts.values) : []),
@@ -332,7 +332,7 @@ function compactWalk(facts, legacyTiming) {
         const when = combo.inputs.length ? {all: combo.inputs.map(code => presence(code, combo.allowedLayers))} : false;
         comboQueries.push({index: combo.index, query: queries.length}); queries.push(when);
         const outputCode = /** @type {number} */ (nativeCode(combo.output)), row = facts.rows.get(outputCode);
-        const allowed = facts.generatedLayers(row), owner = combo.inputs.at(-1);
+        const allowed = facts.generatedLayers(row, combo), owner = combo.inputs.at(-1);
         // Both variants can exist when the owner code has several placements.
         // Bind each to its own source-resolution/participation conditions;
         // absence of an eligible owner is not the condition for a bypassed one.

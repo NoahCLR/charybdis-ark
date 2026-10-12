@@ -5,7 +5,7 @@ const {encodeComboDomain, decodeComboDomain, effectiveComboTerm, runningComboRow
 const fs = require("node:fs"), path = require("node:path");
 const golden = fs.readFileSync(path.resolve(__dirname, "../../upstream/firmware/tests/fixtures/combo_domain_v3.fixture"), "utf8").trim();
 const key = operand => ({kind: 1, operand, flags: 0});
-const row = {inputs: [key(4), key(5)], output: key(41), termMs: 45, mustHold: false, mustTap: false, ordered: false, enabled: true, allowedLayers: 0xffff};
+const row = {inputs: [key(4), key(5)], output: key(41), termMs: 45, mustHold: false, mustTap: false, ordered: false, useOutputBehavior: true, enabled: true, allowedLayers: 0xffff};
 const v3 = rows => ({version: 3, defaultTermMs: 60, holdTermMs: 150, rows});
 const withIds = table => ({...table, rows: table.rows.map((value, id) => ({id, ...value}))});
 
@@ -74,7 +74,7 @@ test("combo domain rejects malformed, ambiguous and noncanonical records", () =>
     assert.throws(() => encodeComboDomain({...v3([row]), holdTermMs: null}));
     for (const version of [1, 2, 4]) assert.throws(() => encodeComboDomain({...v3([row]), version}), /Unknown combo format/);
     const current = encodeComboDomain(v3([row]));
-    for (const [index, value] of [[1, 1], [2, 1], [3, 1], [4, 0], [8, 1], [8, 17], [8 + 1, 16], [8 + 1, 3], [8 + 12, 0]]) {
+    for (const [index, value] of [[1, 1], [2, 1], [3, 1], [4, 0], [8, 1], [8, 17], [8 + 1, 32], [8 + 1, 3], [8 + 12, 0]]) {
         const bad = Buffer.from(current); bad[index] = value; if (index === 4) bad[5] = 0;
         assert.throws(() => decodeComboDomain(bad), `byte ${index}`);
     }
@@ -83,4 +83,21 @@ test("combo domain rejects malformed, ambiguous and noncanonical records", () =>
     // The retired version 2 table: fixed 28-byte rows of four inputs.
     const v2 = Buffer.alloc(8 + 28); v2[0] = 1; v2.writeUInt16LE(60, 4); v2[8] = 2;
     assert.throws(() => decodeComboDomain(v2));
+});
+
+
+test("combo output permission follows the firmware vector without changing timing or row geometry", () => {
+    const bytes = Buffer.from(fs.readFileSync(path.resolve(__dirname, "../../upstream/firmware/tests/fixtures/combo_output_behaviors_v1.fixture"), "utf8").trim(), "hex");
+    const table = decodeComboDomain(bytes);
+    assert.deepEqual(table.rows.map(row => row.useOutputBehavior), [true, false]);
+    assert.deepEqual(table.rows.map(row => row.output), [key(41), key(41)]);
+    assert.deepEqual(table.rows.map(row => [row.termMs, row.mustTap, row.ordered]), [[null, false, false], [45, true, true]]);
+    assert.deepEqual(encodeComboDomain(table), bytes);
+    const enabled = encodeComboDomain(v3([row]));
+    const bypassed = encodeComboDomain(v3([{...row, useOutputBehavior: false}]));
+    assert.deepEqual([...bypassed].flatMap((byte, i) => byte === enabled[i] ? [] : [i]), [9]);
+    assert.equal(bypassed[9], 16);
+    const {useOutputBehavior, ...oldRow} = row;
+    assert.deepEqual(encodeComboDomain(v3([oldRow])), enabled, "zero-default backups still opt in");
+    for (const invalid of [0, 1, "false", null]) assert.throws(() => encodeComboDomain(v3([{...row, useOutputBehavior: invalid}])));
 });

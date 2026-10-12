@@ -82,7 +82,7 @@ test("candidate transfer extensions require candidate-write capability", () => {
     }
 });
 
-test("pointing click and macro support decode on bits 28 and 29 without accepting unknown future features", () => {
+test("pointing and combo-output support decode through bit 30 without accepting unknown future features", () => {
     const pages = compiledOnlyPages();
     assert.equal(decodeCapabilityPages(pages).featureFlags & PROFILE_WIRE_FEATURES.POINTING_CLICKS, 0);
     pages[0].writeUInt32LE(pages[0].readUInt32LE(9) | (1 << 28), 9);
@@ -90,6 +90,8 @@ test("pointing click and macro support decode on bits 28 and 29 without acceptin
     pages[0].writeUInt32LE(pages[0].readUInt32LE(9) | (1 << 29), 9);
     assert.equal(decodeCapabilityPages(pages).featureFlags & PROFILE_WIRE_FEATURES.POINTING_MACROS, 1 << 29);
     pages[0].writeUInt32LE(pages[0].readUInt32LE(9) | (1 << 30), 9);
+    assert.equal(decodeCapabilityPages(pages).featureFlags & PROFILE_WIRE_FEATURES.COMBO_OUTPUT_BEHAVIORS, 1 << 30);
+    pages[0].writeUInt32LE((pages[0].readUInt32LE(9) | 0x80000000) >>> 0, 9);
     assert.throws(() => decodeCapabilityPages(pages), error => error.code === "INCOMPATIBLE_RESPONSE");
 });
 
@@ -126,7 +128,7 @@ test("JavaScript consumes the same golden reports as the C firmware codec", () =
         reportSize: 32,
         candidateChunkMax: 0,
         statusPageCount: 2,
-        featureFlags: 0x08080c1f,
+        featureFlags: 0x48080c1f,
         actionAbiDigest: 0x12345678,
         firmwareVersion: 0x00010000,
         compiledDefaultDigest: 0x89abcdef,

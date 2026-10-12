@@ -192,6 +192,8 @@ export interface HistoryStep {
     changes: ReviewChange[] | null;
 }
 export interface Participation {
+    comboOutputBehaviors?: boolean;
+    comboOutputBehaviorsSupported?: boolean;
     behaviorsEnabled: boolean;
     combosEnabled: boolean;
     behaviorLayers: number;
@@ -214,6 +216,7 @@ export interface SettingFieldBase extends SettingBits {
     governs?: {kind: 'tier'; tier: string} | {kind: 'branch'; count: number} | {kind: 'layer'; layer: number};
 }
 export interface StoredSettingField extends SettingFieldBase {
+    header?: undefined;
     id: number;
     kind: 'number' | 'toggle' | 'layer';
     record?: undefined;
@@ -221,6 +224,7 @@ export interface StoredSettingField extends SettingFieldBase {
     of?: undefined;
 }
 export interface ShareSettingField extends SettingFieldBase {
+    header?: undefined;
     id: number;
     kind: 'share';
     of: number;
@@ -228,13 +232,22 @@ export interface ShareSettingField extends SettingFieldBase {
     layer?: undefined;
 }
 export interface LayerSettingField extends SettingFieldBase {
+    header?: undefined;
     id?: undefined;
     kind: 'layer';
     record: 'reference';
     layer: number;
     of?: undefined;
 }
-export type SettingField = StoredSettingField | ShareSettingField | LayerSettingField;
+export interface HeaderSettingField extends SettingFieldBase {
+    header: 'comboOutputBehaviors';
+    id?: undefined;
+    kind: 'toggle';
+    record?: undefined;
+    layer?: undefined;
+    of?: undefined;
+}
+export type SettingField = StoredSettingField | ShareSettingField | LayerSettingField | HeaderSettingField;
 export interface ComboTimingField {id: 'default' | 'hold'; label: string; hint: string}
 export interface SettingsSection {
     id: string;

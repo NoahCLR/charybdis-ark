@@ -26,9 +26,9 @@ function profile({keys = {}, fill = {}, rows = [], combos = [], settings = {}} =
     // unless `references` says otherwise.
     const values = Array(31).fill(0);
     values[23] = 1; values[20] = 1; values[28] = 1; values[29] = 0xffff; values[30] = 0xffff;
-    for (const [id, value] of Object.entries(settings)) if (id !== "references" && id !== "layers") values[id] = value;
+    for (const [id, value] of Object.entries(settings)) if (id !== "references" && id !== "layers" && id !== "comboOutputBehaviors") values[id] = value;
     const records = Array.from({length: 16}, (_, layer) => ({reference: settings.references?.[layer] ?? layer, bypass: [], exclude: [], ...settings.layers?.[layer]}));
-    return {document: {layers}, settings: {values, layers: records, names: ["Base", "Numbers", "Symbols", "Navigation", "Pointer", "Extra 1", "Extra 2", "Extra 3", ...Array(8).fill("")]},
+    return {document: {layers}, settings: {values, layers: records, comboOutputBehaviors: settings.comboOutputBehaviors, names: ["Base", "Numbers", "Symbols", "Navigation", "Pointer", "Extra 1", "Extra 2", "Extra 3", ...Array(8).fill("")]},
         behaviors: {rows}, combos: {version: 3, defaultTermMs: 50, holdTermMs: 200, rows: combos}};
 }
 const traps = (value) => layerReach(value).filter((finding) => finding.level === LEVELS.TRAP);
@@ -520,7 +520,7 @@ test("compiled source and declared-owner conditions agree with an exhaustive pro
                     // member; each choice independently owns its generated row.
                     for (const owner of members.filter(key => key.code === combo.inputs[combo.inputs.length - 1].operand
                         && (combo.allowedLayers & (1 << key.layer)))) {
-                        const usesRow = p.behaviors.rows.length && p.settings.values[28] && row.enabled && (row.allowedLayers & (1 << owner.layer));
+                        const usesRow = p.combos.rows[0].useOutputBehavior !== false && p.settings.comboOutputBehaviors !== false && p.behaviors.rows.length && p.settings.values[28] && row.enabled && (row.allowedLayers & (1 << owner.layer));
                         effects.push(...nativeEffects(usesRow ? row.steps[0].tap.operand : combo.output.kind === 1 ? combo.output.operand : NO));
                     }
                 }
@@ -548,4 +548,34 @@ test("compiled source and declared-owner conditions agree with an exhaustive pro
         assert.deepEqual(findings.filter(f => f.kind === "unreachable").flatMap(f => f.layers), unreachable);
         assert.equal(findings.some(f => f.kind === "unreachableCombo"), !comboReached.has(0));
     }
+});
+
+
+test("global and per-combo bypass remove generated custom escapes while preserving physical behaviours", () => {
+    const custom = {kind: 7, flags: 0, operand: 0};
+    const row = {target: custom, enabled: true, allowedLayers: 2, steps: [{tapIndex: 0, tap: code(TO(0))}]};
+    const combo = {inputs: [code(KC_A), code(KC_B)], output: custom, allowedLayers: 2};
+    const p = profile({keys: {"0:0": TG(1), "1:1": KC_A, "1:2": KC_B}, fill: {1: NO}, rows: [row], combos: [combo]});
+    p.settings.values[29] = 0;
+    p.settings.layers[1].bypass = [1, 2];
+    assert.deepEqual(traps(p), [], "physical-layer and placement switches do not veto a generated output");
+    combo.useOutputBehavior = false;
+    assert.deepEqual(traps(p).map(f => f.layers), [[1]]);
+    combo.useOutputBehavior = true; p.settings.comboOutputBehaviors = false;
+    assert.deepEqual(traps(p).map(f => f.layers), [[1]]);
+    p.settings.values[29] = 0xffff;
+    p.document.layers[1][3] = 0x7f00;
+    assert.deepEqual(traps(p), [], "the global switch leaves a physical custom-key escape eligible");
+});
+
+test("bypassed normal combo outputs retain their native layer escape", () => {
+    const output = code(TO(0));
+    const row = {target: output, enabled: true, allowedLayers: 2, steps: [{tapIndex: 0, tap: code(KC_ESC)}]};
+    const combo = {inputs: [code(KC_A), code(KC_B)], output, allowedLayers: 2};
+    const p = profile({keys: {"0:0": TG(1), "1:1": KC_A, "1:2": KC_B}, fill: {1: NO}, rows: [row], combos: [combo]});
+    assert.deepEqual(traps(p).map(f => f.layers), [[1]], "the eligible behaviour replaces native TO(0)");
+    combo.useOutputBehavior = false;
+    assert.deepEqual(traps(p), []);
+    combo.useOutputBehavior = true; p.settings.comboOutputBehaviors = false;
+    assert.deepEqual(traps(p), []);
 });

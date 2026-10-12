@@ -11,6 +11,7 @@ const {decodeMacroPayload, macroProgramLimit} = require("../schema/macro-payload
 const {hostSettings} = require("../schema/host-settings");
 const {inspectMacroPlayback} = require("./macro-input");
 const {pointingClicks, pointingMacros} = require("./pointing-taps");
+const {supportsComboOutputBehaviors} = require("../schema/combo-domain-v1");
 const {supportsPdClicks, supportsPdMacros} = require("../schema/pd-mode-domain-v1");
 
 /** @param {import("./types.js").DecodedProfile} decoded @param {import("./types.js").ProfileDestination} [destination] @returns {import("../../contracts/model.js").Finding[]} */
@@ -23,6 +24,16 @@ function profileFindings(decoded, destination = {}) {
             title: `${count} action${count === 1 ? "" : "s"} reach empty pointing slot ${Number(slot) + 1}`,
             detail: "Keys, behaviours or combo outputs still name this empty slot. The keyboard accepts them but does nothing when they run.",
             fix: "Configure the slot or replace the actions that reach it.", place: {kind: "pointing", slot: Number(slot)}});
+    }
+    if (typeof destination.featureFlags === "number" && !supportsComboOutputBehaviors(destination)) {
+        const detail = "This firmware cannot bypass shared behaviours for combo outputs. Apply will refuse the profile.";
+        const fix = "Update both halves, or turn output behaviour permissions back on.";
+        if (decoded.settings.comboOutputBehaviors === false) findings.push({kind: "comboOutputBehaviorBlocker", level: "blocker", layers: [], identity: "global",
+            title: "Combo outputs bypass behaviours globally", detail, fix, place: {kind: "settings", area: "Settings", section: "comboSettings"}});
+        decoded.combos.rows.forEach((row, index) => {
+            if (!row.useOutputBehavior) findings.push({kind: "comboOutputBehaviorBlocker", level: "blocker", layers: [], identity: `combo:${index}`,
+                title: `Combo ${index} bypasses its output behaviour`, detail, fix, place: {kind: "combo", index}});
+        });
     }
     const host = hostSettings(decoded.settings.values, destination.detectedHostOs);
     const emptyMacros = new Set();

@@ -198,6 +198,8 @@ function configurationModel(content, capabilities, editing) {
         behaviorTimingDefaults: content.settingsView?.timing || {},
         configDefaults: content.settingsView?.sections || [],
         participation: content.domains.settings?.values && content.domains.settings.layers ? {
+            comboOutputBehaviors: content.domains.settings.comboOutputBehaviors !== false,
+            comboOutputBehaviorsSupported: Boolean((capabilities?.featureFlags || 0) & PROFILE_WIRE_FEATURES.COMBO_OUTPUT_BEHAVIORS),
             behaviorsEnabled: Boolean(content.domains.settings.values[SETTING.BEHAVIORS_ENABLED]),
             combosEnabled: Boolean(content.domains.settings.values[SETTING.COMBOS_ENABLED]),
             behaviorLayers: content.domains.settings.values[SETTING.LAYER_BEHAVIORS],

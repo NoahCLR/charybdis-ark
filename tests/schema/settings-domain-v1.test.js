@@ -6,7 +6,7 @@ const {SETTINGS, SETTING, SETTING_FIELD, SETTING_FIELDS, MATRIX_POSITIONS, valid
 // Compiled defaults as the firmware sets them (portable-profile-v1.md):
 // scalar 27 retired at zero, behaviours on, every layer in both masks, every
 // layer referring combos to itself with nothing bypassed or excluded.
-const defaults = () => ({values: [200,150,400,150,1,4,1200,25,1,3,0,0,0,0,0,200,400,900000,1200,200,1,257,0xc8ff00,1,0,200,10,0,1,0xffff,0xffff],
+const defaults = () => ({comboOutputBehaviors: true, values: [200,150,400,150,1,4,1200,25,1,3,0,0,0,0,0,200,400,900000,1200,200,1,257,0xc8ff00,1,0,200,10,0,1,0xffff,0xffff],
     names: Array.from({length: 16}, (_, id) => id < 8 ? `Layer ${id}` : ""), layers: Array.from({length: 16}, (_, layer) => defaultLayerRecord(layer)),
     macroNames: Array(128).fill(""), customKeyNames: Array(128).fill(""), formatVersion: 6});
 const thirtyTwo = (seed, fill) => `${seed}`.padEnd(32, fill);
@@ -185,7 +185,7 @@ test("only version 6 is read or written: the retired versions and reserved bytes
     for (const formatVersion of [5, 4, 7]) assert.throws(() => encodeSettings({...defaults(), formatVersion}), /Unsupported settings format/);
     const bytes = encodeSettings(defaults());
     for (const header of [[5, 8, 28, 64, 64], [4, 8, 28, 64, 0], [3, 8, 28, 64, 0], [2, 8, 28, 16, 0], [1, 8, 28, 16, 0], [6, 8, 31, 128, 128], [6, 16, 28, 128, 128], [6, 16, 31, 64, 128], [6, 16, 31, 128, 64],
-        [6, 16, 31, 128, 128, 1], [6, 16, 31, 128, 128, 0, 0, 1]]) {
+        [6, 16, 31, 128, 128, 2], [6, 16, 31, 128, 128, 0, 0, 1]]) {
         const relabelled = Buffer.from(bytes); relabelled.set(header);
         assert.throws(() => decodeSettings(relabelled), /Unsupported settings format/, header.join());
     }
@@ -193,4 +193,20 @@ test("only version 6 is read or written: the retired versions and reserved bytes
     assert.throws(() => decodeSettings(bytes.subarray(0, SETTINGS.MIN_SIZE - 1)), /Unsupported settings format/);
     assert.throws(() => decodeSettings(Buffer.concat([encodeSettings(full()), Buffer.from([0])])), /Unsupported settings format/);
     assert.throws(() => decodeSettings([...bytes]), /Unsupported settings format/);
+});
+
+
+test("the global combo-output permission changes only header byte 5 and defaults on", () => {
+    const enabled = encodeSettings(defaults());
+    const bypassed = encodeSettings({...defaults(), comboOutputBehaviors: false});
+    assert.deepEqual([...bypassed].flatMap((byte, i) => byte === enabled[i] ? [] : [i]), [5]);
+    assert.equal(bypassed[5], 1);
+    assert.equal(decodeSettings(bypassed).comboOutputBehaviors, false);
+    const {comboOutputBehaviors, ...oldSettings} = defaults();
+    assert.deepEqual(encodeSettings(oldSettings), enabled);
+    for (const invalid of [0, 1, "false", null]) assert.throws(() => encodeSettings({...defaults(), comboOutputBehaviors: invalid}));
+    for (let flag = 2; flag <= 255; flag++) {
+        const bytes = Buffer.from(enabled); bytes[5] = flag;
+        assert.throws(() => decodeSettings(bytes), /Unsupported settings format/);
+    }
 });

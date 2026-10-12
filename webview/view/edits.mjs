@@ -135,11 +135,12 @@ export function saveBehaviour(behaviour, {terms = {}, anchored, enabled, allowed
 // A combo follows the default window unless it has its own: followsDefault,
 // or an empty window, says it follows.
 /** @param {number | null | undefined} id @param {import("../../contracts/edits.js").Combo} combo @returns {import("../../contracts/edits.js").EditOf<'addCombo'> | import("../../contracts/edits.js").EditOf<'saveCombo'>} */
-export function comboMessage(id, {output, inputs, termMs, followsDefault, holdTermMs, mustHold, mustTap, ordered, enabled, allowedLayers}) {
+export function comboMessage(id, {output, inputs, termMs, followsDefault, holdTermMs, mustHold, mustTap, ordered, enabled, allowedLayers, useOutputBehavior}) {
     /** @type {import("../../contracts/edits.js").Combo} */
     const payload = {output: String(output ?? "").trim(), inputs, termMs, followsDefault: Boolean(followsDefault), holdTermMs, mustHold: Boolean(mustHold), mustTap: Boolean(mustTap), ordered: Boolean(ordered)};
     if (enabled !== undefined) payload.enabled = enabled;
     if (allowedLayers !== undefined) payload.allowedLayers = allowedLayers;
+    if (useOutputBehavior !== undefined) payload.useOutputBehavior = useOutputBehavior;
     return id === null || id === undefined ? {type: "addCombo", ...payload} : {type: "saveCombo", id, ...payload};
 }
 /** @param {number} id @returns {import("../../contracts/edits.js").EditOf<'deleteCombo'>} */

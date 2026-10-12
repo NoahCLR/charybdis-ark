@@ -223,10 +223,18 @@ input to be eligible. A gesture already in progress completes under the
 policy captured when it started.
 
 A combo output uses the source layer of its last declared input, regardless
-of which input you press last. Its behaviour follows the master switch and
-the definition's enabled and allowed-layer controls; physical placement
+of which input you press last. Its behaviour follows the behaviour master,
+**Combo outputs use behaviours** in Settings → Combos, **Use output behaviour**
+in that combo's editor, and the behaviour definition's enabled and allowed-layer controls; physical placement
 controls and source-layer behaviour switches do not apply to that generated
 output. Another input's allowance cannot enable it.
+
+The two output switches default on and require supporting firmware on both
+halves. Turning either off keeps the combo active and sends its normal action;
+a custom key has no native action, so it sends nothing when bypassed. These
+switches keep inputs, outputs, timing and layer permissions intact. Older
+firmware shows them read-only, and Ark refuses a backup containing a bypass
+until both halves support it. Earlier backups keep output behaviours on.
 
 The profile holds up to 128 shared behaviour definitions and 128 combos with
 up to 16 inputs each. Firmware normally provides five tap steps per behaviour

@@ -29,7 +29,7 @@ for suffix in .pd .pd3 .pd4 .pd5; do
     cp "$ROOT/tests/fixtures/client-regression/portable.bin$suffix" "$BUILD_DIR/portable.bin$suffix"
 done
 
-node - "$BUILD_DIR/current.bin" "$BUILD_DIR/translated.bin" "$BUILD_DIR/maximum.bin" <<'JS'
+node - "$BUILD_DIR/current.bin" "$BUILD_DIR/translated.bin" "$BUILD_DIR/maximum.bin" "$BUILD_DIR/combo-permissions" <<'JS'
 const fs = require("node:fs");
 const app = process.env.CHARYBDIS_ARK_ROOT;
 const {fingerprint, validateSnapshot} = require(app + "/core/model/portable-profile");
@@ -52,6 +52,24 @@ const maximum = Buffer.from(fixture.match(/^profile\.hex=(.*)$/m)[1], "hex");
 const {decodeProfileBlob, encodeProfileBlob} = require(app + "/core/schema/profile-blob-v1");
 if (!encodeProfileBlob(decodeProfileBlob(maximum)).equals(maximum)) throw new Error("Maximum profile does not round-trip through Ark");
 fs.writeFileSync(process.argv[4], maximum);
+// The unchanged domain versions admit both output permission bits. Exercise
+// Ark-produced bytes through the firmware validator, normally and sanitized.
+const {decodeSettings, encodeSettings} = require(app + "/core/schema/settings-domain-v1");
+const {decodeComboDomain, encodeComboDomain} = require(app + "/core/schema/combo-domain-v1");
+const comboVector = Buffer.from(fs.readFileSync(app + "/upstream/firmware/tests/fixtures/combo_output_behaviors_v1.fixture", "utf8").trim(), "hex");
+for (const [name, global, perCombo] of [["global", false, true], ["row", true, false], ["both", false, false]]) {
+    const blob = decodeProfileBlob(validateSnapshot(current).profile);
+    const settingsDomain = blob.domains.find(domain => domain.id === 0x40);
+    settingsDomain.payload = encodeSettings({...decodeSettings(settingsDomain.payload), comboOutputBehaviors: global});
+    const combos = decodeComboDomain(comboVector);
+    combos.rows[1].useOutputBehavior = perCombo;
+    blob.domains.find(domain => domain.id === 0x30).payload = encodeComboDomain(combos);
+    const document = {...current, profile: encodeProfileBlob(blob).toString("base64")};
+    const checked = validateSnapshot(document, {...CAPABILITIES_32, featureFlags: 1 << 30});
+    if (checked.settings.comboOutputBehaviors !== global || checked.combos.rows[1].useOutputBehavior !== perCombo) throw new Error("Permission lost before firmware validation");
+    fs.writeFileSync(`${process.argv[5]}.${name}.bin`, checked.profile);
+}
+
 JS
 
 build_and_run() {
@@ -106,6 +124,9 @@ build_and_run() {
         "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --import-profile "$BUILD_DIR/current.bin"
         "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --import-profile "$BUILD_DIR/translated.bin"
         "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --import-profile "$BUILD_DIR/maximum.bin"
+        for permission in global row both; do
+            "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --import-profile "$BUILD_DIR/combo-permissions.$permission.bin"
+        done
         if [ -n "${NOAH_TEST_PD_IMPORT:-}" ]; then
             "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --import-profile "$NOAH_TEST_PD_IMPORT"
         fi

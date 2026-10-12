@@ -243,3 +243,21 @@ Browser traversal checks nonempty, unique identities on screens and dialogs
 and forces accepted-model DOM replacements to check focus restoration. The
 Pointing caret and Settings-search regressions exercise text selection, and
 macro checks exercise repeated and reordered steps.
+
+
+## Combo output behaviour permissions
+
+Settings → Combos exposes **Combo outputs use behaviours**; each combo builder
+exposes **Use output behaviour**. Both default on. Switching either off changes
+output processing while preserving the chord, timing and participation policy.
+Explain the native fallback and custom-key no-action consequence beside the
+controls. Firmware feature bit 30 enables editing; without it the controls are
+read-only and unsupported bypass bytes are refused on import and staging.
+
+The global value is a tagged header field in the existing Settings section,
+not another scalar ID. Review and section Discard include it. Per-combo edits,
+Review, Undo/Redo, backup/export/import and layer rewriting preserve the row
+permission. Current zero-default and translated preceding backups opt in.
+Native readback compares the permission as well as inputs, output and timing.
+Combo-derived behaviour and macro/pointing reach lists honour the two output
+permissions while retaining normal native outputs.

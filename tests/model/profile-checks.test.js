@@ -48,3 +48,13 @@ test("timing changes report new, existing and fixed findings, including inherite
     assert.equal(checks(draft, draft)[0].status, "existing");
     assert.equal(checks(draft, keyboard)[0].status, "fixed");
 });
+
+
+test("destination checks block each unsupported combo-output permission without treating defaults as incompatible", () => {
+    const decoded = validateSnapshot(document());
+    const blockers = flags => profileFindings(decoded, {featureFlags: flags}).filter(row => row.kind === "comboOutputBehaviorBlocker");
+    assert.deepEqual(blockers(0), []);
+    decoded.settings.comboOutputBehaviors = false; decoded.combos.rows[0].useOutputBehavior = false;
+    assert.deepEqual(blockers(0).map(row => [row.level, row.identity, row.place.kind]), [["blocker", "global", "settings"], ["blocker", "combo:0", "combo"]]);
+    assert.deepEqual(blockers(1 << 30), []);
+});

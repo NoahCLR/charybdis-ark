@@ -69,6 +69,7 @@ const SETTINGS = Object.freeze({VERSION: PROFILE_DOMAIN_VERSIONS[PROFILE_DOMAIN_
     LAYER_RECORD_SIZE, PLACEMENT_BYTES, PLACEMENT_MAX_POSITIONS: PLACEMENT_BYTES * 8, NAME_MAX_BYTES,
     SCALARS_OFFSET, LAYER_RECORDS_OFFSET, FIXED_SIZE, MIN_SIZE: FIXED_SIZE + NAME_COUNT, MAX_SIZE: FIXED_SIZE + NAME_COUNT * (NAME_MAX_BYTES + 1)});
 const MATRIX_POSITIONS = MATRIX_KEYS;
+const SETTINGS_HEADER_FLAGS = Object.freeze({OFFSET: 5, COMBO_OUTPUT_BYPASS: 1, KNOWN: 1});
 const HEADER = Buffer.from([SETTINGS.VERSION, SETTINGS.LAYERS, SETTINGS.COUNT, SETTINGS.MACRO_NAMES, SETTINGS.CUSTOM_KEY_NAMES, 0, 0, 0]);
 
 /** @typedef {typeof STORED[number][0]} SettingName */
@@ -122,6 +123,8 @@ function encodeSettings(value, layers = SETTINGS.LAYERS, positions = MATRIX_POSI
     if (!Array.isArray(value.customKeyNames) || value.customKeyNames.length !== SETTINGS.CUSTOM_KEY_NAMES) throw fail("Missing custom key names.");
     const fixed = Buffer.alloc(SETTINGS.FIXED_SIZE);
     HEADER.copy(fixed);
+    if (value.comboOutputBehaviors !== undefined && typeof value.comboOutputBehaviors !== "boolean") throw fail("Combo output behaviour permission must be on or off.");
+    fixed[SETTINGS_HEADER_FLAGS.OFFSET] = value.comboOutputBehaviors === false ? SETTINGS_HEADER_FLAGS.COMBO_OUTPUT_BYPASS : 0;
     value.values.forEach((v, id) => fixed.writeUInt32LE(v, SETTINGS.SCALARS_OFFSET + id * 4));
     value.layers.forEach((record, layer) => {
         const at = SETTINGS.LAYER_RECORDS_OFFSET + layer * SETTINGS.LAYER_RECORD_SIZE;
@@ -140,7 +143,7 @@ function encodeSettings(value, layers = SETTINGS.LAYERS, positions = MATRIX_POSI
 
 /** @param {Buffer} bytes @param {number} [layers] @param {number} [positions] */
 function decodeSettings(bytes, layers = SETTINGS.LAYERS, positions = MATRIX_POSITIONS) {
-    if (!Buffer.isBuffer(bytes) || bytes.length < SETTINGS.MIN_SIZE || bytes.length > SETTINGS.MAX_SIZE || !bytes.subarray(0, 8).equals(HEADER)) throw fail("Unsupported settings format.");
+    if (!Buffer.isBuffer(bytes) || bytes.length < SETTINGS.MIN_SIZE || bytes.length > SETTINGS.MAX_SIZE || HEADER.some((byte, offset) => offset === SETTINGS_HEADER_FLAGS.OFFSET ? Boolean(bytes[offset] & ~SETTINGS_HEADER_FLAGS.KNOWN) : bytes[offset] !== byte)) throw fail("Unsupported settings format.");
     const values = Array.from({length: SETTINGS.COUNT}, (_, id) => bytes.readUInt32LE(SETTINGS.SCALARS_OFFSET + id * 4));
     const layerRecords = Array.from({length: SETTINGS.LAYERS}, (_, layer) => {
         const at = SETTINGS.LAYER_RECORDS_OFFSET + layer * SETTINGS.LAYER_RECORD_SIZE;
@@ -160,7 +163,7 @@ function decodeSettings(bytes, layers = SETTINGS.LAYERS, positions = MATRIX_POSI
     const macroNames = Array.from({length: SETTINGS.MACRO_NAMES}, nameRecord);
     const customKeyNames = Array.from({length: SETTINGS.CUSTOM_KEY_NAMES}, nameRecord);
     if (offset !== bytes.length) throw fail("Unexpected settings data.");
-    const result = {values, names, layers: layerRecords, macroNames, customKeyNames, formatVersion: SETTINGS.VERSION};
+    const result = {comboOutputBehaviors: !(bytes[SETTINGS_HEADER_FLAGS.OFFSET] & SETTINGS_HEADER_FLAGS.COMBO_OUTPUT_BYPASS), values, names, layers: layerRecords, macroNames, customKeyNames, formatVersion: SETTINGS.VERSION};
     return canonical(bytes, result, value => encodeSettings(value, layers, positions), () => fail("Noncanonical settings data."));
 }
-module.exports = {SETTINGS, SETTING, SETTING_FIELD, SETTING_FIELDS: FIELDS, MATRIX_POSITIONS, validName, validSetting, defaultLayerRecord, encodeSettings, decodeSettings};
+module.exports = {SETTINGS_HEADER_FLAGS, SETTINGS, SETTING, SETTING_FIELD, SETTING_FIELDS: FIELDS, MATRIX_POSITIONS, validName, validSetting, defaultLayerRecord, encodeSettings, decodeSettings};

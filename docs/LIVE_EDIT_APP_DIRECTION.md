@@ -41,7 +41,7 @@ matrix.
 | Product surface | Current state |
 | --- | --- |
 | Layout and 16 layers | Read/write keys, layer names and order; a reorder renumbers layer keys by default, any layer can be the base, and key labels follow the host layout (D-L15, D-L29, D-L37, D-L56) |
-| Key behaviours, combos and RGB | Read/write editors over the shared draft, with participation controls at every scope (D-L12, D-L32, D-L49, D-L55) |
+| Key behaviours, combos and RGB | Read/write editors over the shared draft, with participation controls at every scope and capability-gated global/per-combo output behaviour permissions (D-L12, D-L32, D-L49, D-L55) |
 | Macros | 128 named VIA macros with Text, steps, Advanced raw payload, recorder and live validation; capability-gated Unicode text, typed and checked through the host's OS and keyboard layout; per-macro input protection; one shared memory, shown and enforced (D-L25, D-L26, D-L56, D-L57) |
 | Custom keys | 128 named keys that do what their behaviour says: rename, add or open the behaviour, place, see where each is used (D-L42) |
 | Mouse | Pointer and sniping DPI, auto-sniping and auto-mouse, settings the core files under Mouse, so the rail, the review and import counts all place them there; the auto-mouse fade is a share of the timeout, edited on its lighting stage (D-L17) |
@@ -72,6 +72,10 @@ Remaining before calling the product complete:
 - the open issues below.
 
 ## Open Issues
+
+- **Combo output permissions need keyboard acceptance (D-L55).** Confirm global
+  and per-combo bypass, including two combos sharing an output, custom outputs
+  and unchanged physical behaviours, after reading and saving both halves.
 
 - **Sparse macro read timing needs hardware acceptance (D-L23).** Compare
   first read, Refresh and Export with mostly empty and full macro banks, and
@@ -871,6 +875,16 @@ stage ordinary profile edits; Review and partial Discard preserve other fields,
 Undo/Redo restore policy, and layer reordering moves masks and placement bits
 with their layers. Disabling retains definitions and timing. A bypassed native
 key falls through normally; a bypassed custom key produces no output.
+
+Supporting firmware also exposes a default-on global **Combo outputs use
+behaviours** switch in Settings → Combos and **Use output behaviour** per combo.
+These veto shared behaviour use by generated outputs independently of chord
+participation. Native outputs fall through; custom outputs have no native action.
+Zero-default and preceding backups retain the former opt-in behaviour. Feature
+bit 30 gates editing and restoration of bypasses; no domain version, scalar
+count or action ABI changes. Review, history, section Discard, backups, layer
+rewrites and reach checks preserve both permissions. See
+[interface-contracts.md](architecture/interface-contracts.md#combo-output-behaviour-permissions).
 
 The source-layer and gesture capture rules remain firmware-owned in
 [participation-policy.md](../upstream/firmware/docs/architecture/participation-policy.md).

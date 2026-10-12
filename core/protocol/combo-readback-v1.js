@@ -38,13 +38,13 @@ function decodeComboPages(metadata, pages) {
         const a = Buffer.from(pages[1 + 2 * id]), b = Buffer.from(pages[2 + 2 * id]);
         const inputCount = a[1], rowFlags = a[6], allowedLayers = a.readUInt32LE(7);
         const slots = Buffer.concat([a.subarray(11, 25), b.subarray(0, 18)]);
-        if (a[0] !== id || inputCount < 2 || inputCount > COMBO_READBACK_V1.MAX_INPUTS || rowFlags & ~31 || allowedLayers >= bank || slots.subarray(2 * inputCount).some(Boolean) || b.subarray(18).some(Boolean)) {
+        if (a[0] !== id || inputCount < 2 || inputCount > COMBO_READBACK_V1.MAX_INPUTS || rowFlags & ~63 || allowedLayers >= bank || slots.subarray(2 * inputCount).some(Boolean) || b.subarray(18).some(Boolean)) {
             throw fail("COMBO_MALFORMED", "Invalid combo row index, input count, flags, layers or padding.");
         }
         const inputs = Array.from({length: inputCount}, (_, index) => slots.readUInt16LE(2 * index));
         if (inputs.includes(0) || new Set(inputs).size !== inputs.length) throw fail("COMBO_MALFORMED", "Combo inputs must be distinct nonzero keycodes.");
         return {id, inputs, output: a.readUInt16LE(2), termMs: a.readUInt16LE(4), followsDefault: Boolean(rowFlags & 8), mustHold: Boolean(rowFlags & 1), mustTap: Boolean(rowFlags & 2), ordered: Boolean(rowFlags & 4),
-            enabled: !(rowFlags & 16), allowedLayers};
+            enabled: !(rowFlags & 16), useOutputBehavior: !(rowFlags & 32), allowedLayers};
     });
     const defaultTermMs = data.readUInt16LE(10), holdTermMs = data.readUInt16LE(12);
     if (rows.some(row => row.followsDefault && row.termMs !== defaultTermMs)) throw fail("COMBO_MALFORMED", "A combo that follows the default window reports another.");
