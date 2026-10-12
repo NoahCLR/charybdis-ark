@@ -77,6 +77,10 @@ only vertical scroller.
   LED groups. Shared colour controls retain the stored owner's focus identity;
   LED override tables share their owner presentation. Stage modules read the
   published model and post the same pure edit builders as other screens.
+  Zero brightness never replaces the stored hue or saturation with zeros or
+  hides those channels. `view/lighting.mjs` owns layer pass-through (zero
+  saturation and brightness) and LED-row inheritance (all three channels
+  zero); an explicit black row remains distinct from an inherited colour.
 - Pointing: `webview/ui/pointing.mjs` owns slot selection; `ui/pointing/`
   composes the slot editor from movement, reach and Advanced surfaces, with an
   empty-slot surface for creation and copying. Its form controls register one
@@ -105,7 +109,11 @@ only vertical scroller.
   grid headings, summaries and accessibility labels from the modifier
   vocabulary. Key Options uses the same host naming rule. Auto with an unknown
   host uses neutral Alt/GUI wording. The webview has no modifier-name table;
-  an unnamed value falls back to its stored code. Host-switch browser checks
+  an unnamed value falls back to its stored code. Compact keycodes have one
+  modifier-side flag: the picker checks its model-supplied modifier bits and
+  the selected key's existing mask, and refuses mixed left/right selections.
+  Both native expression encoders refuse those combinations too; numeric
+  stored values keep their exact interpretation. Host-switch browser checks
   exercise open behaviour pickers, combo builders, macro previews and pointing
   editors through the production model-message handler. The stored name
   (`KC_KP_1`) is added only when a review row's two sides would read alike.

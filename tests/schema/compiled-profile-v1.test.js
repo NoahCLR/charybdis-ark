@@ -107,3 +107,19 @@ test("the native resolver refuses expressions whose bits would land on another k
         assert.equal(resolve(expression, {}), undefined, expression);
     }
 });
+
+
+test("authored compact expressions cannot silently switch a modifier's side", () => {
+    const {resolveNativeQmkExpression: resolve} = require("../../core/schema/compiled-profile-v1");
+    const model = {qmkKeycodeValues: {KC_A: 4, KC_EXLM: 0x021e}};
+    for (const expression of ["RSFT(C(KC_A))", "C(RSFT(KC_A))", "RALT(KC_EXLM)",
+        "MT(MOD_LCTL|MOD_RSFT, KC_A)", "OSM(MOD_RSFT|MOD_LCTL)"]) {
+        assert.equal(resolve(expression, model), undefined, expression);
+        assert.throws(() => semanticActionForExpression(expression, model), /cannot be represented/);
+    }
+    assert.equal(resolve("S(C(KC_A))", model), 0x0304);
+    assert.equal(resolve("RSFT(RCTL(KC_A))", model), 0x1304);
+    assert.equal(resolve("MT(MOD_RCTL|MOD_RSFT, KC_A)", model), 0x3304);
+    assert.equal(resolve("OSM(MOD_RCTL|MOD_RSFT)", model), 0x52b3);
+    assert.equal(resolve("0x1304", model), 0x1304);
+});

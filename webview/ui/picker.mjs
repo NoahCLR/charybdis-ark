@@ -14,6 +14,7 @@ import {getModel, layerName, layers, render, state} from "../store.mjs";
 import {actionLabel} from "../view/keyface.mjs";
 import {PICKER_BOARD, pickerBoardKey} from "../view/picker-board.mjs";
 import {pickerExpression} from "../view/edits.mjs";
+import {pickerModifierProblem} from "../view/keyvalues.mjs";
 import {entriesForPickerSection, pickable, pickerSections} from "../view/picker-sections.mjs";
 import {macroMatches} from "../view/macro.mjs";
 import {vocabulary, word} from "../view/vocabulary.mjs";
@@ -170,6 +171,7 @@ export function pickerOverlay() {
     if (!picker) return null;
     const model = getModel();
     const value = expression();
+    const problem = pickerModifierProblem(model, picker);
     const node = el(`<div class="scrim"><div class="sheet picker" role="dialog" aria-modal="true" aria-label="Pick a keycode">
         <div class="sheet-h">
             <div><h2>Pick a keycode</h2>
@@ -194,8 +196,9 @@ export function pickerOverlay() {
             <code class="mono pk-value">${esc(value || "—")}</code>
             <span class="right"><button class="btn ghost" data-act="clear">Clear</button>
                 <button class="btn ghost" data-act="cancel">Cancel</button>
-                <button class="btn primary" data-act="use" ${value ? "" : "disabled"}>Use keycode</button></span>
+                <button class="btn primary" data-act="use" ${value && !problem ? "" : "disabled"}>Use keycode</button></span>
         </div>
+        ${problem ? `<div class="note pk-problem" role="status">${esc(problem)}</div>` : ""}
     </div></div>`);
 
     node.addEventListener("click", (event) => {
@@ -218,7 +221,7 @@ export function pickerOverlay() {
         // caller only says what the choice does.
         if (/** @type {HTMLElement | null} */ (/** @type {Element} */ (event.target).closest('[data-act="use"]'))) {
             const chosen = expression();
-            if (!chosen) return;
+            if (!chosen || pickerModifierProblem(getModel(), picker)) return;
             state.picker = null;
             picker.onPick?.(chosen);
             return render();

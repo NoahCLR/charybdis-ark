@@ -3,7 +3,7 @@ import test from "node:test";
 import {createRequire} from "node:module";
 const require = createRequire(import.meta.url);
 const {buildDeviceModel} = require("../../core/session/device-model");
-import {modifierBits, keyName, modifierNames} from "../../webview/view/keyvalues.mjs";
+import {modifierBits, keyName, modifierNames, pickerModifierProblem} from "../../webview/view/keyvalues.mjs";
 
 const model = {qmkKeycodes: [
     {keycode: 0x0004, value: "KC_A"},
@@ -44,4 +44,16 @@ test("the picker finds a key by what the host layout prints on it", () => {
     assert.ok(entry.search.includes("ö"));
     assert.deepEqual(model.hostLayoutLegends.KC_Y, ["Z", "", "", ""]);
     assert.equal(buildDeviceModel().hostLayoutLegends, null);
+});
+
+
+test("picker modifier checks include both selected sides and a shifted key's stored mask", () => {
+    const model = buildDeviceModel();
+    const problem = (keys, mods, mode = "single") => pickerModifierProblem(model, {keys, mods, mode});
+    assert.match(problem(["KC_A"], ["C", "RSFT"]), /one side/);
+    assert.match(problem(["KC_EXLM"], ["RALT"]), /one side/);
+    assert.equal(problem(["KC_A"], ["C", "S"]), "");
+    assert.equal(problem(["KC_A"], ["RCTL", "RSFT"]), "");
+    assert.equal(problem(["KC_EXLM"], ["A"]), "");
+    assert.equal(problem(["KC_A"], ["C", "RSFT"], "list"), "", "macro chords have separate key instructions");
 });

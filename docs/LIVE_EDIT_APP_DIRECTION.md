@@ -272,6 +272,12 @@ telemetry: brightness is scaled to a ceiling, and effects, animation phase,
 active layers and transient feedback are not reported. Exact live appearance
 would need a future device-frame readout, not host reconstruction.
 
+Colour editors retain every stored channel at zero brightness. A saturated
+layer colour at zero brightness paints black; a layer colour with zero
+saturation and brightness paints nothing. LED-row inheritance requires all
+three channels to be zero. The editor never substitutes the inheritance
+sentinel for an explicit black colour.
+
 ### D-L15 — A portable profile is the complete effective configuration
 
 Export and import own the whole keyboard snapshot. Flashed and committed
@@ -369,6 +375,9 @@ into at most 512 bytes (`MACRO_PAYLOAD_IR_MAX_BYTES`), about 170 key taps; for
 it the app computes that size exactly (`macroProgramBytes`, checked against the
 firmware decoder by `run_macro_program_size_tests.sh`), refuses an edit past
 it, and marks a slot VIA wrote past it as too long.
+Reviewing a retained draft against a reconnected keyboard adopts the current
+firmware's capabilities and invalidates the draft's cached decoding and checks,
+so an upgrade or downgrade changes these limits before editing resumes.
 
 A portable profile stores macro streams, not a bank size. Restore pads them to
 the destination's bank or refuses them, naming how many bytes are over; a

@@ -21,7 +21,7 @@ Key and modifier names follow that OS throughout the editors and Review.
 ## What you can change
 
 - **Keys and layers.** Pick keys from a board labelled for your keyboard layout
-  or search all of QMK. Drag
+  or search all of QMK, with modifier combinations the keyboard can store. Drag
   one key onto another to swap them. Rename, reorder and re-base layers, and
   preview several of the 16 layers stacked the way the keyboard would resolve them.
 - **Behaviours.** Set what a key does on tap, hold and long hold, for each tap
@@ -33,7 +33,7 @@ Key and modifier names follow that OS throughout the editors and Review.
   a combo can have up to 16 inputs, with its own enable and layer controls.
 - **Lighting.** Set layer and mode colours, combo and key feedback, and the
   auto-mouse fade. The board on screen is painted the way the keyboard will
-  light up.
+  light up, with black overlays kept distinct from inherited colours.
 - **Trackball.** Set pointer speed, sniping and auto-mouse, and 32 pointing
   slots (scroll, volume, zoom, arrows, your own
   shortcuts…), with their keys.

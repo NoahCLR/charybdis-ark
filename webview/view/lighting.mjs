@@ -96,9 +96,9 @@ export const mappedKeyCount = (layer) => (layer?.positions || []).filter(isMappe
 // HSV(0, 0, 0) inherits its stage colour instead of painting black
 // (rgb_helpers.h rgb_hsv_is_inherit_color).
 /** @param {Colour | null | undefined} colour */
-const solid = (colour) => Boolean(colour) && !(Number(colour?.s) === 0 && Number(colour?.v) === 0);
+export const layerPaints = (colour) => Boolean(colour) && !(Number(colour?.s) === 0 && Number(colour?.v) === 0);
 /** @param {Colour | null | undefined} colour */
-const inherits = (colour) => !colour || (Number(colour?.h) === 0 && Number(colour?.s) === 0 && Number(colour?.v) === 0);
+export const inheritsStageColour = (colour) => !colour || (Number(colour?.h) === 0 && Number(colour?.s) === 0 && Number(colour?.v) === 0);
 
 // The indicator stages only run under a live effect: with the matrix off the
 // firmware reports effect 0 and paints nothing at all (rgb_matrix.c).
@@ -152,7 +152,7 @@ function ledLight(model, layer, led, position, options = {}) {
         const active = [...new Set([0, layer?.index ?? 0, ...(options.held || [])])].sort((a, b) => a - b);
         for (const l of active) {
             const row = layerColourRow(model, l);
-            if (!row || !solid(row.color)) continue;
+            if (!row || !layerPaints(row.color)) continue;
             if (row.mode === "ALL_KEYS" || mappedOn(model, layer, l, position)) paint(row.color, "layer", l);
         }
         for (const group of model?.rgb?.layerLedGroups || []) {
@@ -160,8 +160,8 @@ function ledLight(model, layer, led, position, options = {}) {
             const owners = group.owner === "RGB_LAYER_GROUP_ALL" ? active : active.filter((l) => group.owner === `Layer ${l}`);
             for (const l of owners) {
                 const row = layerColourRow(model, l);
-                if (!inherits(group.color)) paint(group.color, "layer", l);
-                else if (row && solid(row.color)) paint(row.color, "layer", l);
+                if (!inheritsStageColour(group.color)) paint(group.color, "layer", l);
+                else if (row && layerPaints(row.color)) paint(row.color, "layer", l);
             }
         }
     }
@@ -174,7 +174,7 @@ function ledLight(model, layer, led, position, options = {}) {
         for (const group of model?.rgb?.pdModeLedGroups || []) {
             if (!(group.ledIndices || []).includes(led ?? -1)) continue;
             if (group.owner !== "RGB_PD_MODE_GROUP_ALL" && group.owner !== preview.mode) continue;
-            paint(inherits(group.color) ? preview.color : group.color, "pointing");
+            paint(inheritsStageColour(group.color) ? preview.color : group.color, "pointing");
         }
     }
     return {colour, source, layer: painter};

@@ -36,3 +36,20 @@ export function keyName(/** @type {Model} */ model, /** @type {number} */ code) 
 // Labels arrive with the current model; never retain a translated name.
 export const modifierBits = (/** @type {Model} */ model) => vocabulary(model).modifiers;
 export const modifierNames = (/** @type {Model} */ model, /** @type {number} */ mask) => modifierBits(model).filter(([bit]) => mask & bit).map(([, name]) => name);
+
+// Picker controls carry the full eight-bit modifier mask from the model.
+// Compact keycodes can store modifiers from only one side. Include a shifted
+// catalogue key's own modifiers (e.g. KC_EXLM), not just the selected controls.
+/** @param {Model} model @param {{keys: string[], mods: string[], mode: 'single' | 'list'}} picker */
+export function pickerModifierProblem(model, picker) {
+    if (picker.mode === "list") return "";
+    let mask = picker.mods.reduce((bits, wrapper) => bits | ((vocabulary(model).pickerModifiers || []).find(entry => entry.value === wrapper)?.bit ?? 0), 0);
+    const selected = model?.qmkKeycodeAliases?.[picker.keys[0]] || picker.keys[0];
+    const code = model?.qmkKeycodes?.find(entry => entry.value === selected)?.keycode;
+    if (code !== undefined && code <= 0x1fff) {
+        const compact = (code >> 8) & 0x1f;
+        mask |= compact & 0x10 ? (compact & 0x0f) << 4 : compact & 0x0f;
+    }
+    return (mask & 0x0f) && (mask & 0xf0)
+        ? "A keycode can hold left modifiers or right modifiers together. Choose modifiers from one side." : "";
+}

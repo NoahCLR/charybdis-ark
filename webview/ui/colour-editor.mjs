@@ -6,7 +6,8 @@
 // came back in the model, so the board and this control cannot disagree.
 
 // Selector assertions refer to elements created by this module's authored markup.
-import {brightnessLimit, clampHsv, css, hsv, isOff, label as hsvLabel, rgb, valuePercent} from "../lib/colour.mjs";
+import {brightnessLimit, clampHsv, css, hsv, label as hsvLabel, rgb, valuePercent} from "../lib/colour.mjs";
+import {inheritsStageColour} from "../view/lighting.mjs";
 import {el, esc} from "../lib/dom.mjs";
 
 /** @param {{identity: string, colour: import("../../contracts/edits.js").Colour | null | undefined, title: string, canEdit?: boolean, onChange?: (colour: import("../../contracts/edits.js").Colour) => void, offNote?: string, maximumBrightness?: number}} options */
@@ -17,10 +18,10 @@ export function colourEditor({identity, colour, title, canEdit = true, onChange,
     /** @param {number[]} next */
     const commit = (next) => onChange?.(clampHsv(next, maximum));
 
-    if (isOff(colour)) {
+    if (inheritsStageColour(colour)) {
         node.append(el(`<div class="row colour-head"><span class="swatch-lg swatch-off"></span>
-            <div><div class="colour-title">${esc(title)}</div><div class="note mono">HSV(0, 0, 0)</div></div></div>`));
-        node.append(el(`<div class="callout">${esc(offNote || "No colour is stored, so this stage leaves whatever is underneath visible.")}</div>`));
+            <div><div class="colour-title">${esc(title)}</div><div class="note mono">${esc(hsvLabel(colour))}</div></div></div>`));
+        node.append(el(`<div class="callout">${esc(offNote || "This colour has zero brightness.")}</div>`));
         if (canEdit) {
             const give = el(`<button class="btn self-start">Give it a colour</button>`);
             give.addEventListener("click", () => commit([140, 255, Math.min(200, maximum)]));
@@ -36,6 +37,7 @@ export function colourEditor({identity, colour, title, canEdit = true, onChange,
         ${canEdit ? `<button class="btn tiny ghost" data-off
             data-tip="Store HSV(0, 0, 0) so this stage stops painting and lets what is underneath show.">Turn off</button>` : ""}</div>`);
     node.append(head);
+    if (v === 0) node.append(el(`<p class="note">Brightness is zero. Hue and saturation are retained; raise brightness to use this colour again.</p>`));
     /** @type {HTMLElement | null} */ (head.querySelector("[data-off]"))?.addEventListener("click", () => commit([0, 0, 0]));
 
     const topWhite = css({h: "0", s: "0", v: String(maximum)});

@@ -4,9 +4,14 @@ set -eu
 
 ROOT="${FIRMWARE_ROOT:?Set FIRMWARE_ROOT}"
 : "${CHARYBDIS_ARK_ROOT:?Set CHARYBDIS_ARK_ROOT}"
-if ! rg -q NOAH_PROFILE_CANDIDATE_V1_VALUE_REUSE "$ROOT/users/noah/lib/profile/protocol/profile_candidate_v1.h"; then
+if grep -q NOAH_PROFILE_CANDIDATE_V1_VALUE_REUSE "$ROOT/users/noah/lib/profile/protocol/profile_candidate_v1.h"; then
+    :
+elif [ "$?" -eq 1 ]; then
     echo "Candidate transfer bridge skipped: selected firmware predates differential candidate transfer."
     exit 0
+else
+    echo "Cannot inspect the selected firmware contract." >&2
+    exit 1
 fi
 BUILD_DIR="$(mktemp -d)"
 
