@@ -3,6 +3,8 @@ import type {RequestOptions} from '../transport/types.js';
 export interface ReadOptions extends Pick<RequestOptions, 'signal' | 'timeoutMs'> {
     requestId?: number;
     nextRequestId?: () => number;
+    /** Whether the keyboard reads past page 255 (feature bit 19); false refuses such a read. */
+    widePages?: boolean;
 }
 
 export interface RequestIds {next(): number}

@@ -37,7 +37,7 @@ const {readDeviceCombos} = require("../protocol/combo-readback-v1");
 const {ProfilePayloadReader} = require("./profile-payload-reader");
 const {PROFILE_DOMAIN_IDS, decodeProfileBlob} = require("../schema/profile-blob-v1");
 const {CANDIDATE_STATE_NAMES, readCandidateStatus} = require("../protocol/profile-candidate-v1");
-const {PROFILE_ACTIVE_KIND, PROFILE_STATE_FLAGS, PROFILE_WIRE_FEATURES, readProfileCapabilities, readProfileStatus, readViaIdentity} = require("../protocol/profile-wire-v1");
+const {PROFILE_ACTIVE_KIND, PROFILE_STATE_FLAGS, PROFILE_WIRE_FEATURES, readProfileCapabilities, readProfileStatus, readViaIdentity, supportsWidePages} = require("../protocol/profile-wire-v1");
 
 /** @type {(capabilities: Partial<Caps> | null | undefined, writing?: boolean) => asserts capabilities is Partial<Caps>} */
 const checkReady = requireReady;
@@ -289,6 +289,7 @@ class ProfileDeviceService {
             /** @type {import("../protocol/types.js").ReadOptions & {onProgress: (progress: import("../../contracts/model.js").CountedProgress) => void}} */
             const readOptions = {
                 nextRequestId: () => this.nextRequestId(),
+                widePages: this.widePages(),
                 onProgress: progress => this.reportReadProgress("profile", progress),
             };
             const read = source === "compiled" ? await reader.readCompiled(readOptions) : await reader.readCommitted(readOptions);
@@ -346,7 +347,7 @@ class ProfileDeviceService {
             const connection = this.connection;
             try {
                 if (!connection?.connected) throw new Error("Connect to a keyboard before reading combos.");
-                const read = await readDeviceCombos(connection, {nextRequestId: () => this.nextRequestId()});
+                const read = await readDeviceCombos(connection, {nextRequestId: () => this.nextRequestId(), widePages: this.widePages()});
                 if (this.connection !== connection || !connection.connected) return this.snapshot();
                 this.combos = {state: "read", ...read, readAt: new Date().toISOString()};
             } catch (error) {
@@ -761,6 +762,8 @@ class ProfileDeviceService {
         return this.requestIds;
     }
     nextRequestId() {return this.requestSequence().next();}
+    // Whether reads may go past page 255; unknown until capabilities are read.
+    widePages() {return this.capabilities ? supportsWidePages(this.capabilities) : undefined;}
     profileCapabilities() {
         const capabilities = this.capabilities;
         checkReady(capabilities);

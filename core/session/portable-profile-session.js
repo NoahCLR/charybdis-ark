@@ -2,7 +2,7 @@
 "use strict";
 const {readViaStorage, readRegion, writeRegion, writeViaMacros, changedRanges, viaStorageDigest, VIA_STORAGE, LAYOUT_BYTES} = require("../protocol/via-storage-v1");
 const {readSettings, readStorageStatus, waitForStorage} = require("../protocol/portable-profile-v1");
-const {readProfileStatus, PROFILE_ACTIVE_KIND, PROFILE_STATE_FLAGS, PROFILE_WIRE_FEATURES} = require("../protocol/profile-wire-v1");
+const {readProfileStatus, supportsWidePages, PROFILE_ACTIVE_KIND, PROFILE_STATE_FLAGS, PROFILE_WIRE_FEATURES} = require("../protocol/profile-wire-v1");
 const {ProfilePayloadReader} = require("./profile-payload-reader");
 const {readDeviceCombos} = require("../protocol/combo-readback-v1");
 const {candidateMetadataForBlob, readCandidatePeerStatus, readCandidateStatus, CANDIDATE_STATE} = require("../protocol/profile-candidate-v1");
@@ -79,7 +79,7 @@ async function captureProfile(connection, ids, capabilities, onProgress = () => 
     {sleep, payloadReader = new ProfilePayloadReader(connection), reuseReadback = false} = {}) {
     requireReady(capabilities);
     if (payloadReader.connection !== connection) throw fail("PROFILE_CHANGED", "The profile reader belongs to another connection. Read the keyboard again.");
-    const options = {nextRequestId: () => ids.next()};
+    const options = {nextRequestId: () => ids.next(), widePages: supportsWidePages(capabilities)};
     onProgress("Reading the complete keyboard configuration");
     const storageBefore = await waitForStorage(connection, ids, {sleep}), before = await readProfileStatus(connection, options);
     if (!canCapture(before, allowCandidate)) throw fail("KEYBOARD_NOT_READY", "Let both halves finish saving before taking a backup.");
@@ -88,11 +88,11 @@ async function captureProfile(connection, ids, capabilities, onProgress = () => 
     const defaults = await payloadReader.readCompiled({...options, onProgress: counted("Reading compiled defaults")});
     const active = before.activeKind === PROFILE_ACTIVE_KIND.COMMITTED ? await payloadReader.readCommitted({...options, reuse: reuseReadback, onProgress: counted("Reading saved behaviours and lighting")}) : defaults;
     onProgress("Reading combos and global settings");
-    const combos = await readDeviceCombos(connection, options), settings = await readSettings(connection, ids);
+    const combos = await readDeviceCombos(connection, options), settings = await readSettings(connection, ids, options);
     const via = await readViaStorage(connection, {capabilities, allowIncomplete, nextRequestId: options.nextRequestId, storageIdentity: storageBefore, onProgress: progress =>
         counted(progress.region === "layout" ? "Reading keys and layers" : "Reading macros")(progress)});
     onProgress("Checking the complete read");
-    if (!settings.equals(await readSettings(connection, ids))) throw fail("PROFILE_CHANGED", "Keyboard settings changed during the backup. Read it again before continuing.");
+    if (!settings.equals(await readSettings(connection, ids, options))) throw fail("PROFILE_CHANGED", "Keyboard settings changed during the backup. Read it again before continuing.");
     const profile = materializeProfile(active.bytes, defaults.bytes, combos, settings);
     const after = await readProfileStatus(connection, options), storageAfter = await readStorageStatus(connection, ids);
     if (statusKey(before) !== statusKey(after) || !storageAfter.ready || storageBefore.generation !== storageAfter.generation || storageBefore.digest !== storageAfter.digest) throw fail("PROFILE_CHANGED", "The keyboard changed during the backup. Read it again before continuing.");
@@ -109,12 +109,12 @@ async function captureProfile(connection, ids, capabilities, onProgress = () => 
     validateSnapshot(document, capabilities);
     return {document, readback: {active, source: before.activeKind === PROFILE_ACTIVE_KIND.COMMITTED ? "committed" : "compiled", combos}, fingerprint: fingerprint(document), summary: summary(document), status: after, identity: snapshotIdentity(after, storageAfter, settings), storage: heldStorage(via.layout, via.macros, active.bytes)};
 }
-/** @param {Connection} connection @param {Ids} ids @param {{allowCandidate?: boolean, sleep?: (ms: number) => Promise<void>}} [options] */
-async function readIdentity(connection, ids, {allowCandidate = true, sleep} = {}) {
+/** @param {Connection} connection @param {Ids} ids @param {{allowCandidate?: boolean, sleep?: (ms: number) => Promise<void>, widePages?: boolean}} [options] */
+async function readIdentity(connection, ids, {allowCandidate = true, sleep, widePages} = {}) {
     const options = {nextRequestId: () => ids.next()};
     const storageBefore = await waitForStorage(connection, ids, {sleep}), before = await readProfileStatus(connection, options);
     if (!canReadIdentity(before, allowCandidate)) throw fail("KEYBOARD_NOT_READY", "The keyboard changed before the save could start.");
-    const settings = await readSettings(connection, ids);
+    const settings = await readSettings(connection, ids, {widePages});
     const after = await readProfileStatus(connection, options), storageAfter = await readStorageStatus(connection, ids);
     if (statusKey(before) !== statusKey(after) || !storageAfter.ready || storageBefore.generation !== storageAfter.generation || storageBefore.digest !== storageAfter.digest) throw fail("PROFILE_CHANGED", "The keyboard changed before the save could start.");
     return snapshotIdentity(after, storageAfter, settings);
@@ -131,6 +131,9 @@ async function verifyRanges(connection, command, target, ranges, {verifyFinalByt
     }
 }
 
+/** @param {Pick<BaseBytes, 'macros'>} base @param {Pick<BaseBytes, 'macros'>} target @param {Ranges} macroRanges */
+const macroWriteNeeded = (base, target, macroRanges) => macroRanges.length > 0 || base.macros.at(-1) !== target.macros.at(-1);
+
 /** @param {Connection} connection @param {import("../model/types.js").DecodedProfile} target @param {BaseBytes} base @param {Ranges} layoutRanges @param {Ranges} macroRanges @param {(progress: {completed: number, total: number}) => void} onProgress */
 async function rollForwardLocalStorage(connection, target, base, layoutRanges, macroRanges, onProgress) {
     const layoutBytes = layoutRanges.reduce((sum, range) => sum + range.bytes.length, 0);
@@ -144,14 +147,18 @@ async function rollForwardLocalStorage(connection, target, base, layoutRanges, m
         });
         completed += range.bytes.length;
     }
-    if (macroRanges.length) {
+    // The bank's last byte is the in-progress marker, left out of the ranges.
+    // An interrupted earlier write can leave it set over otherwise matching
+    // macros; writing the bank is what clears it.
+    const macrosNeeded = macroWriteNeeded(base, target, macroRanges);
+    if (macrosNeeded) {
         await writeViaMacros(connection, target.macros, {
             current: base.macros,
             onProgress: progress => onProgress({completed: completed + progress.completed, total}),
         });
         completed += macroBytes;
     }
-    if (!layoutRanges.length && !macroRanges.length) {
+    if (!layoutRanges.length && !macrosNeeded) {
         // A custom-only change still advances the bound VIA generation. A
         // verified no-op keycode write gives QMK's normal mutation tracker the
         // durable generation transition without changing the layout.
@@ -264,7 +271,7 @@ async function restoreProfile(connection, ids, capabilities, input, {expectedFin
         if (baseSnapshot?.document && baseSnapshot.identity && (baseSnapshot.incomplete || hasStorage(baseSnapshot, capabilities)) && (!expectedFingerprint || baseSnapshot.fingerprint === expectedFingerprint)) {
             if (!baseSnapshot.incomplete) validateSnapshot(baseSnapshot.document, capabilities);
             applyProgress.report("check", {detail: "Comparing with the reviewed profile"});
-            const liveIdentity = await readIdentity(connection, ids, {allowCandidate: false, sleep});
+            const liveIdentity = await readIdentity(connection, ids, {allowCandidate: false, sleep, widePages: supportsWidePages(capabilities)});
             if (identityKey(liveIdentity) !== identityKey(baseSnapshot.identity)) throw fail("PROFILE_CHANGED", "The keyboard changed since the restore was reviewed. Review it again.");
             before = baseSnapshot;
         } else {
@@ -297,7 +304,7 @@ async function restoreProfile(connection, ids, capabilities, input, {expectedFin
             prepared = await coordinator.upload(target.profile, {baseSource: candidateBaseSource(before, capabilities),
                 streamChunks: Boolean(capabilities.featureFlags & PROFILE_WIRE_FEATURES.CANDIDATE_STREAM),
                 metadata: candidateMetadataForBlob(target.profile, {capabilities, actionAbiDigest: capabilities.actionAbiDigest, viaGeneration: targetStorageGeneration, viaDigest: expectedStorageDigest}), verifyBase: async () => {
-                const identity = await readIdentity(connection, ids, {allowCandidate: true, sleep});
+                const identity = await readIdentity(connection, ids, {allowCandidate: true, sleep, widePages: supportsWidePages(capabilities)});
                 if (identityKey(identity) !== identityKey(beforeIdentity)) throw fail("PROFILE_CHANGED", "The keyboard changed before restore could start.");
             }});
             const candidate = prepared;
@@ -315,11 +322,11 @@ async function restoreProfile(connection, ids, capabilities, input, {expectedFin
             }});
             const macroBytes = macroRanges.reduce((sum, range) => sum + range.bytes.length, 0);
             const layoutBytes = layoutRanges.reduce((sum, range) => sum + range.bytes.length, 0);
-            const macroWriteNeeded = macroRanges.length > 0 || base.macros.at(-1) !== target.macros.at(-1);
+            const macrosWritten = macroWriteNeeded(base, target, macroRanges);
             applyProgress.report("verify", {detail: "Reading back both halves"});
             const storage = await waitForStorage(connection, ids, {sleep});
             await verifyRanges(connection, VIA_STORAGE.LAYOUT_READ, target.layout, layoutRanges);
-            await verifyRanges(connection, VIA_STORAGE.MACRO_READ, target.macros, macroRanges, {verifyFinalByte: macroRanges.length > 0});
+            await verifyRanges(connection, VIA_STORAGE.MACRO_READ, target.macros, macroRanges, {verifyFinalByte: macrosWritten});
             const status = await readProfileStatus(connection, options);
             const storageAfter = await readStorageStatus(connection, ids);
             // The keyboard activates only after the slave half confirmed its
@@ -331,7 +338,7 @@ async function restoreProfile(connection, ids, capabilities, input, {expectedFin
             applyProgress.finish();
             // Both halves were just proved to hold the whole target bank.
             return {document, fingerprint: resultFingerprint, summary: summary(document), status, identity: snapshotIdentity(status, storageAfter, encodeSettings(target.settings)), storage: heldStorage(target.layout, target.macros, target.profile), recovery, peerUnseen,
-                performance: {elapsedMs: Date.now() - startedAt, baseSource: before === baseSnapshot ? "verified-cache" : "device-read", layoutBytes, macroBytes, viaConfigReports: 1, layoutReports: layoutRanges.reduce((sum, range) => sum + Math.ceil(range.bytes.length / 12), 0), macroReports: macroWriteNeeded ? macroRanges.reduce((sum, range) => sum + Math.ceil(range.bytes.length / 12), 0) : 0}};
+                performance: {elapsedMs: Date.now() - startedAt, baseSource: before === baseSnapshot ? "verified-cache" : "device-read", layoutBytes, macroBytes, viaConfigReports: 1, layoutReports: layoutRanges.reduce((sum, range) => sum + Math.ceil(range.bytes.length / 12), 0), macroReports: macrosWritten ? macroRanges.reduce((sum, range) => sum + Math.ceil(range.bytes.length / 12), 0) : 0}};
         } catch (error) {
             let cancelled = false;
             if (prepared && !decisionObserved) {

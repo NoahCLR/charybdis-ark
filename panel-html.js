@@ -6,13 +6,13 @@
 // sits beside extension.js rather than inside the directory that must stay
 // pure browser modules.
 
+const {randomBytes} = require("node:crypto");
 const vscode = require("vscode");
 
+// The script nonce must be unguessable, so it comes from the system's
+// cryptographic source rather than Math.random.
 function nonce() {
-    const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-    let value = "";
-    for (let index = 0; index < 32; index += 1) value += alphabet[Math.floor(Math.random() * alphabet.length)];
-    return value;
+    return randomBytes(24).toString("base64");
 }
 
 /** @param {import("vscode").Webview} webview @param {import("vscode").Uri} extensionUri */

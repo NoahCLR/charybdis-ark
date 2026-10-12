@@ -19,6 +19,7 @@ const path = require("node:path");
 const vscode = require("vscode");
 
 const {openPanelLoop, FILE_MAX_BYTES} = require("./core/session/panel-loop");
+const {writingProfile} = require("./core/session/panel-control-registry");
 const {getHtml} = require("./panel-html");
 
 const VIEW_TYPE = "charybdisArk.panel";
@@ -62,30 +63,63 @@ async function adoptFormerRecoveries(target) {
 
 function deactivate() {}
 
+// One panel holds the keyboard in a window, as one tab does on the web page.
+// A second panel would open the same keyboard over its own connection and
+// read it alongside the first, even while the first is applying.
+/** @type {import("vscode").WebviewPanel | undefined} */
+let openedPanel;
+// A closed panel's connection stays open until the operation it started
+// ends, so a save carries on to its end rather than being cut off mid-write.
+/** @type {Promise<unknown> | undefined} */
+let closing;
+
 /** @param {import("vscode").ExtensionContext} context */
 function openPanel(context) {
+    if (openedPanel) {
+        openedPanel.reveal();
+        return;
+    }
+    if (closing) {
+        void vscode.window.showInformationMessage("Charybdis Ark is finishing what it was doing with the keyboard. Open it again in a moment.");
+        return;
+    }
     const panel = vscode.window.createWebviewPanel(VIEW_TYPE, "Charybdis Ark", vscode.ViewColumn.One, {
         enableScripts: true,
         retainContextWhenHidden: true,
         localResourceRoots: [vscode.Uri.joinPath(context.extensionUri, "webview")],
     });
+    openedPanel = panel;
+    let disposed = false;
 
-    const loop = openPanelLoop(vscodeHost(panel, context.globalStorageUri));
+    const loop = openPanelLoop(vscodeHost(panel, context.globalStorageUri, () => disposed));
+    /** @type {Set<Promise<unknown>>} */
+    const running = new Set();
     panel.webview.html = getHtml(panel.webview, context.extensionUri);
     // IPC is untrusted; the shared loop validates the selected command and its payload.
-    panel.webview.onDidReceiveMessage((/** @type {unknown} */ message) => loop.handleMessage(message));
+    panel.webview.onDidReceiveMessage((/** @type {unknown} */ message) => {
+        const work = loop.handleMessage(message);
+        running.add(work);
+        void work.finally(() => running.delete(work));
+    });
     panel.onDidDispose(() => {
-        void loop.close();
+        disposed = true;
+        openedPanel = undefined;
+        if (writingProfile(loop.session)) {
+            void vscode.window.showWarningMessage("Charybdis Ark keeps saving the profile to the keyboard. Keep it connected until the save finishes; open Ark again afterwards to see the result.");
+        }
+        const done = closing = Promise.allSettled([...running]).then(() => loop.close()).catch(() => undefined)
+            .finally(() => {if (closing === done) closing = undefined;});
     });
 }
 
 // What only VS Code has, handed to core/session/panel-loop.js, which lists
 // what each of these does: the panel, toasts, progress, the recovery copy on
-// disk, and the files the person chooses.
-/** @param {import("vscode").WebviewPanel} panel @param {import("vscode").Uri} recoveryRoot @returns {import("./core/session/types.js").LoopHost} */
-function vscodeHost(panel, recoveryRoot) {
+// disk, and the files the person chooses. Once the panel is closed nothing is
+// posted to it, while what it started finishes.
+/** @param {import("vscode").WebviewPanel} panel @param {import("vscode").Uri} recoveryRoot @param {() => boolean} [disposed] @returns {import("./core/session/types.js").LoopHost} */
+function vscodeHost(panel, recoveryRoot, disposed = () => false) {
     return {
-        post: (message) => panel.webview.postMessage(message),
+        post: (message) => disposed() ? Promise.resolve(false) : panel.webview.postMessage(message),
         showError: (text) => vscode.window.showErrorMessage(`Charybdis Ark: ${text}`),
         progress: async (title, work) => await vscode.window.withProgress({location: vscode.ProgressLocation.Notification, title}, work),
         saveRecovery: (document) => saveRecoveryFile(recoveryRoot, document),
@@ -105,7 +139,7 @@ function vscodeHost(panel, recoveryRoot) {
     };
 }
 
-module.exports = {activate, deactivate, adoptFormerRecoveries};
+module.exports = {activate, deactivate, adoptFormerRecoveries, openPanel};
 
 /** @param {import("vscode").Uri} recoveryRoot @param {Parameters<NonNullable<import("./core/session/types.js").LoopHost["saveRecovery"]>>[0]} document */
 async function saveRecoveryFile(recoveryRoot, document) {

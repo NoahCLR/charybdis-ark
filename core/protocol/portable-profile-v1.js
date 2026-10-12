@@ -1,27 +1,28 @@
 // @ts-check
 "use strict";
 const {isUnhandledEcho, orUnhandled} = require("./via-unhandled-v1");
-const {ProfileWireProtocolError, buildProfileGetRequest, decodeProfileResponse, profileResponseMatcher} = require("./profile-wire-v1");
+const {ProfileWireProtocolError, assertPagesReachable, buildProfileGetRequest, decodeProfileResponse, profileResponseMatcher} = require("./profile-wire-v1");
 const {crc32, fnv1a32} = require("../schema/profile-blob-v1");
 const {SETTINGS, decodeSettings} = require("../schema/settings-domain-v1");
 /** @param {string} message */
 const fail = message => Object.assign(new Error(message), {code: "PORTABLE_PROFILE_UNAVAILABLE"});
-/** @param {import("../transport/types.js").RequestConnection} connection @param {number} value @param {number} pageIndex @param {import("./types.js").RequestIds} ids */
-async function page(connection, value, pageIndex, ids) {
-    const request = buildProfileGetRequest(value, pageIndex, ids.next());
+/** @param {import("../transport/types.js").RequestConnection} connection @param {number} value @param {number} pageIndex @param {import("./types.js").RequestIds} ids @param {{widePages?: boolean}} [options] */
+async function page(connection, value, pageIndex, ids, options = {}) {
+    const request = buildProfileGetRequest(value, pageIndex, ids.next(), options);
     const response = await connection.request(request, {matchResponse: orUnhandled(profileResponseMatcher, request)});
     if (isUnhandledEcho(response, request) || response[5] !== 0) throw fail("Update both halves to firmware with complete profile backup support, then read the keyboard again.");
     return Buffer.from(decodeProfileResponse(response, request, {allowShortPayload: true}));
 }
-/** @param {import("../transport/types.js").RequestConnection} connection @param {import("./types.js").RequestIds} ids */
-async function readSettings(connection, ids) {
+/** @param {import("../transport/types.js").RequestConnection} connection @param {import("./types.js").RequestIds} ids @param {{widePages?: boolean}} [options] */
+async function readSettings(connection, ids, options = {}) {
     const before = await page(connection, 7, 0, ids);
     if (before.length !== 12 || before[0] !== 1 || before[1] !== 25) throw fail("Invalid settings metadata.");
     const length = before.readUInt16LE(2);
     if (length < SETTINGS.MIN_SIZE || length > SETTINGS.MAX_SIZE) throw fail("Invalid settings capacity.");
+    assertPagesReachable(1 + Math.ceil(length / 25), options.widePages);
     const chunks = [];
     for (let offset = 0; offset < length; offset += 25) {
-        const bytes = await page(connection, 7, 1 + offset / 25, ids);
+        const bytes = await page(connection, 7, 1 + offset / 25, ids, options);
         if (bytes.length !== Math.min(25, length - offset)) throw fail("Truncated settings read.");
         chunks.push(bytes);
     }
