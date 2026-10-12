@@ -2,7 +2,7 @@
 "use strict";
 const {PROFILE_DOMAIN_VERSIONS} = require("./profile-domains");
 const {LAYERS} = require("../data/charybdis-layout");
-const {u8: assertU8, u16: assertU16, asBytes: copyBytes} = require("./bytes");
+const {u8: assertU8, u16: assertU16, asBytes: copyBytes, canonical} = require("./bytes");
 
 /**
  * @typedef {{tapIndex: number, tap?: ReturnType<typeof normalizeAction>, hold?: ReturnType<typeof normalizeHold>, longHold?: ReturnType<typeof normalizeHold>}} NormalizedStep
@@ -205,7 +205,8 @@ function decodeKeyBehaviorDomain(value, options = {}) {
     if (actualStepCount !== declaredStepCount) {
         throw behaviorError("COUNT_MISMATCH", "Key-behavior populated-step count does not match its rows.");
     }
-    return {rows, rowCount, populatedStepCount: actualStepCount, byteLength: bytes.length};
+    return canonical(bytes, {rows, rowCount, populatedStepCount: actualStepCount, byteLength: bytes.length}, table => encodeKeyBehaviorDomain(table, options),
+        () => behaviorError("NONCANONICAL", "Key-behavior domain does not use its canonical representation."));
 }
 
 /** @param {{rows: import("./types.js").BehaviorRowInput[]}} value @param {import("./types.js").BehaviorOptions} [options] */

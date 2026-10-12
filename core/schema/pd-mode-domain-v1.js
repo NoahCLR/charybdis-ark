@@ -10,6 +10,7 @@ const {PROFILE_DOMAIN_VERSIONS, PROFILE_DOMAIN_IDS} = require("./profile-domains
 // follows the shared rule (profile-name.js): its length at byte 8, bytes 9..31
 // zero, its UTF-8 at bytes 96..127, zero after it.
 const {NAME_MAX_BYTES, validName, nameOfBytes} = require("./profile-name");
+const {canonical} = require("./bytes");
 const PD_DOMAIN = Object.freeze({ID: PROFILE_DOMAIN_IDS.PD_MODES, VERSION: PROFILE_DOMAIN_VERSIONS[PROFILE_DOMAIN_IDS.PD_MODES], SLOTS: 32, HEADER_SIZE: 8, RECORD_SIZE: 128, NAME_OFFSET: 96, NAME_MAX_BYTES, MAX_SIZE: 8 + 32 * 128});
 const PD_KIND = Object.freeze({DISABLED: 0, DIRECTIONAL: 1, SCROLLING: 2});
 const PD_AXIS = Object.freeze({VERTICAL: 0, HORIZONTAL: 1, DOMINANT: 2, EIGHT: 3});
@@ -161,7 +162,7 @@ function decodePdDomain(bytes) {
         slots[id] = slot;
         prior = id;
     }
-    return slots;
+    return canonical(bytes, slots, writePdDomain, () => fail("NONCANONICAL", 0, "PD domain does not use its canonical representation."));
 }
 
 /** @template {object} T @param {T} value @param {readonly string[]} keys @param {string} label @returns {T} */
@@ -217,9 +218,17 @@ function writeRecord(p, input, id) {
         SCROLL_U8.forEach((name, i) => { p[84 + i] = integer(optional(scroll[name], 0), 255); });
     }
 }
-// The 32 slots, with only the records the sparse format needs.
+// The 32 slots, with only the records the sparse format needs. The bytes
+// are checked by decoding them, so the decoder's own canonical check writes
+// with writePdDomain rather than encoding again.
 /** @param {import("./types.js").PdSlotInput[]} slots */
 function encodePdDomain(slots) {
+    const bytes = writePdDomain(slots);
+    decodePdDomain(bytes);
+    return bytes;
+}
+/** @param {import("./types.js").PdSlotInput[]} slots */
+function writePdDomain(slots) {
     if (!Array.isArray(slots) || slots.length !== PD_DOMAIN.SLOTS) fail("INVALID_LENGTH", 0, `Exactly ${PD_DOMAIN.SLOTS} PD slots are required.`);
     const {RECORD_SIZE, SLOTS, VERSION} = PD_DOMAIN;
     const records = [];
@@ -232,9 +241,7 @@ function encodePdDomain(slots) {
         writeRecord(p, slot, id);
         records.push(p);
     }
-    const bytes = Buffer.concat([Buffer.from([VERSION, SLOTS, RECORD_SIZE, records.length, 0, 0, 0, 0]), ...records]);
-    decodePdDomain(bytes);
-    return bytes;
+    return Buffer.concat([Buffer.from([VERSION, SLOTS, RECORD_SIZE, records.length, 0, 0, 0, 0]), ...records]);
 }
 
 // One 128-byte record, and its rules, alone. The firmware's frozen record

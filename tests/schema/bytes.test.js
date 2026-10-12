@@ -2,7 +2,7 @@
 
 const assert = require("node:assert/strict");
 const test = require("node:test");
-const {asBytes, copyBytes, u8, u16, zeroRange, protocolError} = require("../../core/schema/bytes");
+const {asBytes, copyBytes, u8, u16, zeroRange, protocolError, canonical} = require("../../core/schema/bytes");
 
 test("wire integers retain numeric coercion, ceilings and nonzero requirements", () => {
     for (const [integer, ceiling, width] of [[u8, 255, 8], [u16, 65535, 16]]) {
@@ -42,4 +42,16 @@ test("reserved ranges report the first offending offset with the caller's error 
         assert.equal(failure.frameOffset, 2);
         return true;
     });
+});
+
+test("the canonical check returns the value only when it encodes back to the bytes it was read from", () => {
+    const DomainError = protocolError("ExampleDomainError");
+    const refuse = () => new DomainError("NONCANONICAL", "Not canonical.");
+    const value = {n: 7};
+    assert.equal(canonical(new Uint8Array([7]), value, v => Buffer.from([v.n]), refuse), value);
+    assert.throws(() => canonical(Buffer.from([7, 0]), value, v => Buffer.from([v.n]), refuse), {name: "ExampleDomainError", code: "NONCANONICAL"});
+    assert.throws(() => canonical(Buffer.from([8]), value, v => new Uint8Array([v.n]), refuse), {code: "NONCANONICAL"});
+    // An encoder that refuses the value refuses the bytes in its own words.
+    const invalid = Object.assign(new Error("Invalid."), {code: "INVALID"});
+    assert.throws(() => canonical(Buffer.from([7]), value, () => {throw invalid;}, refuse), error => error === invalid);
 });

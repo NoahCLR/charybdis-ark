@@ -54,4 +54,14 @@ function zeroRange(bytes, start, end, error) {
     }
 }
 
-module.exports = {asBytes, copyBytes, u8, u16, zeroRange, protocolError};
+// The check every profile domain decoder ends with: what it read must encode
+// back to exactly the bytes it read. The decoder passes its own encoder, with
+// the options it decoded under, and its own refusal; an encoder that refuses
+// the value refuses the bytes with its own error.
+/** @template T @param {Uint8Array} bytes @param {T} value @param {(value: T) => Uint8Array} encode @param {() => Error} refuse @returns {T} */
+function canonical(bytes, value, encode, refuse) {
+    if (Buffer.compare(encode(value), bytes) !== 0) throw refuse();
+    return value;
+}
+
+module.exports = {asBytes, copyBytes, u8, u16, zeroRange, protocolError, canonical};
