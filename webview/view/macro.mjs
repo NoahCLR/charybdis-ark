@@ -122,6 +122,11 @@ export function macroStepsInput(steps) {
 /** @param {unknown} payload @param {(name: string) => string} [label] */
 export function macroPeek(payload, label = (name) => name) {
     const {steps} = parseMacro(payload, {unicode: true});
+    return macroPeekSteps(steps, label);
+}
+
+/** @param {MacroStep[]} steps @param {(name: string) => string} [label] */
+export function macroPeekSteps(steps, label = (name) => name) {
     const text = steps.filter((step) => step.kind === "text").map((step) => step.text).join("").trim();
     if (text) return text;
     const taps = steps.filter((step) => step.kind === "tap").flatMap((step) => step.keys);

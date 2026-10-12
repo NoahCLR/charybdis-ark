@@ -147,6 +147,14 @@ only vertical scroller.
 
 ## Focus across renders
 
+The Macros screen composes `ui/macros/editor.mjs`, `steps.mjs`, `recorder.mjs`
+and `validation.mjs`. Validation retains the payload, request and draft-context
+checks before staging. `view/macro-cache.mjs` retains only the latest parsed
+payload for each slot and reading purpose on one published model; a replacement
+model uses fresh host parsing options. Labels are resolved while rendering.
+Parsed host steps carry no local focus metadata: step identity is assigned to
+copies by the existing focus path, and serialization excludes that identity.
+
 Every form control (`input`, `select`, `textarea`) authors a nonempty `data-f`
 identity. It is unique across the complete rendered surface, including an
 underlying screen and its open picker or dialog. A field's identity includes
