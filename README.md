@@ -21,7 +21,7 @@ Key and modifier names follow that OS throughout the editors and Review.
 ## What you can change
 
 - **Keys and layers.** Pick keys from a board labelled for your keyboard layout
-  or search all of QMK, with modifier combinations the keyboard can store. Drag
+  or search supported QMK keys, with modifier combinations the keyboard can store. Drag
   one key onto another to swap them. Rename, reorder and re-base layers, and
   preview several of the 16 layers stacked the way the keyboard would resolve them.
 - **Behaviours.** Set what a key does on tap, hold and long hold, for each tap
@@ -38,7 +38,7 @@ Key and modifier names follow that OS throughout the editors and Review.
 - **Trackball.** Set pointer speed, sniping and auto-mouse, and 32 pointing
   slots (scroll, volume, zoom, arrows, your own
   shortcuts…), with their keys. On supporting firmware, directions and button
-  overrides can click mouse buttons 1–8 too.
+  overrides can click mouse buttons 1–8 or run a macro too.
 
 ## Nothing is saved until you say so
 

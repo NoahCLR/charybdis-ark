@@ -42,6 +42,7 @@ const pickValue = (value) => state.picker?.allowedKeys ? getModel()?.qmkKeycodeA
 const allowed = (value) => !state.picker?.allowedKeys || state.picker?.allowedKeys?.includes(value);
 /** @param {Model} model */
 const sections = (model) => pickerSections().filter(section => !state.picker?.allowedKeys || section.kind === "board"
+    || (section.kind === "macros" && (model?.viaMacros || []).some(slot => allowed(slot.keycode)))
     || entriesForPickerSection(model?.qmkKeycodes || [], section).some(entry => allowed(entry.value)));
 
 const expression = () => state.picker ? pickerExpression(state.picker) : "";
@@ -155,7 +156,7 @@ function sectionBody(model) {
             <p class="note pk-note">Hold re-reads the trackball while the key is down. Toggle keeps the mode on until the key is pressed again. A key for an empty slot does nothing until the slot is configured.</p></div>`;
     }
     if (section.kind === "macros") {
-        const slots = model?.viaMacros || [];
+        const slots = (model?.viaMacros || []).filter(slot => allowed(slot.keycode));
         if (!slots.length) return `<p class="note pk-empty">This keyboard has not reported its macros.</p>`;
         return `<div class="pk-body"><div class="pk-rows">${chunk(slots, 8).map((row) => `<div class="pk-row">${row.map((slot) =>
             macroButton(slot, picked(slot.keycode))).join("")}</div>`).join("")}</div></div>`;

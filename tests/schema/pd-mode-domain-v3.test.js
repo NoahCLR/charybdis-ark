@@ -22,7 +22,7 @@ const denseOf = stored => Array.from({length: golden.slotCount}, (_, id) => stru
 
 test("every firmware vector decodes, and its slots encode to exactly its bytes", () => {
     assert.deepEqual([golden.slotCount, golden.recordSize, golden.headerSize], [PD_DOMAIN.SLOTS, 128, 8]);
-    assert.deepEqual(golden.valid.map(vector => vector.name), ["empty", "presets", "gap", "full", "longest-name", "mouse-buttons"]);
+    assert.deepEqual(golden.valid.map(vector => vector.name), ["empty", "presets", "gap", "full", "longest-name", "mouse-buttons", "via-macros"]);
     for (const vector of golden.valid) {
         const bytes = Buffer.from(vector.hex, "hex");
         const decoded = decodePdDomain(bytes);

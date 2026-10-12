@@ -12,6 +12,8 @@
  * @typedef {import("../../contracts/edits.js").Scalar} Scalar
  */
 
+import {macroIndex} from "./keyvalues.mjs";
+
 export const KIND = {DIRECTIONAL: 1, SCROLLING: 2};
 export const BUTTON = {PASS_THROUGH: 0, CONSUME: 1, TAP: 2, HOLD_MODIFIERS: 3};
 // What a direction's shortcut does with modifiers held while it sends: they
@@ -163,6 +165,7 @@ export function readConfig(slot, form) {
 /** @param {Partial<PdTap>} tap */
 export function tapRecord({keycode, modifierPolicy, mask}) {
     const code = String(keycode ?? "").trim() || "0";
+    if (macroIndex(code) !== null) return {keycode: code, modifierPolicy: MODIFIER_POLICY.INHERIT, mask: 0};
     if (code === "0") return {keycode: "0", modifierPolicy: MODIFIER_POLICY.INHERIT, mask: 0};
     const policy = Number(modifierPolicy) || MODIFIER_POLICY.INHERIT;
     return {keycode: code, modifierPolicy: policy, mask: policy === MODIFIER_POLICY.MASK ? Number(mask) || 0 : 0};
@@ -221,7 +224,7 @@ export function buttonRecord({kind, modifiers, tap}) {
         kind,
         modifiers: kind === BUTTON.HOLD_MODIFIERS ? Number(modifiers) || 0 : 0,
         tap: kind === BUTTON.TAP
-            ? {keycode: String(tap?.keycode ?? "").trim() || "0", modifierPolicy: tap?.modifierPolicy ?? 0, mask: tap?.mask ?? 0}
+            ? tapRecord(tap || {})
             : {keycode: "0", modifierPolicy: 0, mask: 0},
     };
 }

@@ -15,7 +15,7 @@ const {decodeKeyBehaviorDomain, KEY_BEHAVIOR_HOLD_MODES} = require("../schema/ke
 const {decodeComboDomain} = require("../schema/combo-domain-v1");
 const {profileDepthOptions} = require("../schema/profile-depth");
 const {decodePdDomain} = require("../schema/pd-mode-domain-v1");
-const {pointingClickProblem} = require("./pointing-taps");
+const {pointingClickProblem, pointingMacroProblem} = require("./pointing-taps");
 
 /** @param {import("../schema/types.js").BehaviorRow[]} rows @param {PlacementOptions} [options] */
 function behaviorPlacementProblem(rows, options) {
@@ -61,10 +61,12 @@ function profilePlacementProblem(bytes, options) {
     const behaviors = domain(PROFILE_DOMAIN_IDS.KEY_BEHAVIORS)?.payload;
     const combos = domain(PROFILE_DOMAIN_IDS.COMBOS);
     const pointing = domain(PROFILE_DOMAIN_IDS.PD_MODES)?.payload;
+    const slots = pointing ? decodePdDomain(pointing) : undefined;
     const depth = profileDepthOptions(options?.capabilities, domain(PROFILE_DOMAIN_IDS.RGB)?.payload);
     return (behaviors && behaviorPlacementProblem(decodeKeyBehaviorDomain(behaviors, depth.behaviors).rows, options))
         || (combos && comboPlacementProblem(decodeComboDomain(combos.payload).rows, options))
-        || (pointing && pointingClickProblem(decodePdDomain(pointing), options?.capabilities))
+        || (slots && pointingClickProblem(slots, options?.capabilities))
+        || (slots && pointingMacroProblem(slots, options?.capabilities))
         || undefined;
 }
 

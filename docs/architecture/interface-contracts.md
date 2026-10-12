@@ -66,22 +66,34 @@ only vertical scroller.
 Straight directions, diagonals and physical-button tap overrides use one tap
 vocabulary, owned by `core/schema/pd-mode-domain-v1.js`. Plain mouse buttons
 1–8 (`0x00d1..0x00d8`) require the keyboard's Profile Wire feature bit 28.
-The domain version and record layout stay unchanged. Mouse movement, wheel,
+VIA macro outputs (`0x7700..0x777f`) require feature bit 29, inherit policy
+and mask zero (firmware D-F23). The domain version and record layout stay
+unchanged. Mouse movement, wheel,
 acceleration and modifier-wrapped mouse codes remain invalid. The firmware
 owns the click runtime contract (D-F22); the [guide](../GUIDE.md#pointing-mode-clicks)
 describes its effect for users.
 
 `core/model/pointing-taps.js` supplies the allowed picker names and aliases,
-separates keys that may carry modifier wrappers, and finds stored clicks for
-destination checks. The panel receives this through `pdModeEditing`; it does
+separates keys that may carry modifier wrappers, and finds stored clicks and
+macro outputs for destination checks. The panel receives this through `pdModeEditing`; it does
 not duplicate the schema's allowlist. All three tap field families use these
 restrictions. Typed names, aliases and numeric codes are resolved and checked
 before staging, with a reason for unsupported outputs.
 
-Backups retain click records independently of destination support. Import may
+The picker offers all 128 VIA macros by their current profile names when
+supported, even though QMK's catalogue names only slots 0–31. The pure
+`webview/view/keyvalues.mjs` helper resolves macro identities and presentation;
+its numbers are checked against the schema. Every tap form uses
+`tapRecord` to reset a newly chosen macro to inherit and zero mask. The host
+refuses noncanonical policy bytes. Held-modifier rows show fixed Inherit with
+the reason; Every step outputs show the drop-while-busy tip, and empty slots
+show that they do nothing yet.
+
+Backups retain click and macro records independently of destination support.
+Import may
 stage them for review on older firmware, with blockers naming the slot and
 output place; Apply and direct restore refuse them before writing. Existing
-clicks may be retained while fixing a slot, but new click outputs need support.
+outputs may be retained while fixing a slot, but new outputs need support.
 No field, history step or import silently substitutes a keyboard shortcut.
 
 ## Shared rule ownership
@@ -144,6 +156,12 @@ No field, history step or import silently substitutes a keyboard shortcut.
   "Hold Navigation", `LT(3,KC_SLASH)` "/ / Navigation", and a layer key's cap
   shows the layer's name. Only a raw keycode, where one is shown, keeps the
   number.
+- Picker selection: `webview/view/picker-sections.mjs` owns `pickable` for
+  every catalogue section and search. Inert `QK_USER_0`–`QK_USER_31` entries
+  stay in the catalogue for exact readback and backups, but are never offered.
+  Current named `CUSTOM_KEY_n`, N/A and Transparent remain selectable where
+  the field supports them. Selection policy never rewrites stored identities
+  or changes preceding-backup translation.
 - Actions, native keycodes, decode limits, layer references:
   `core/schema/actions.js`; the pointing registry and key layout are data.
 - Decoding: once per draft revision, carried as `decoded` and taken through

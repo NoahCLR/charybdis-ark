@@ -1,7 +1,7 @@
 "use strict";
 const test = require("node:test"), assert = require("node:assert/strict");
-const {pointingTaps, pointingClicks, pointingClickProblem, pointingTapKeys} = require("../../core/model/pointing-taps");
-const {isPdTapKey, isPdClick} = require("../../core/schema/pd-mode-domain-v1");
+const {pointingTaps, pointingClicks, pointingClickProblem, pointingTapKeys, pointingMacros, pointingMacroProblem} = require("../../core/model/pointing-taps");
+const {isPdTapKey, isPdClick, isPdMacro} = require("../../core/schema/pd-mode-domain-v1");
 const catalog = require("../../core/data/keycode-catalog");
 
 test("click discovery preserves each direction, diagonal and physical override's place", () => {
@@ -22,11 +22,11 @@ test("click discovery preserves each direction, diagonal and physical override's
 });
 
 test("pointing picker names and aliases follow the tap allowlist and the advertised click gate", () => {
-    const modern = pointingTapKeys(true), legacy = pointingTapKeys(false);
+    const modern = pointingTapKeys(true, true), legacy = pointingTapKeys(false);
     for (const entry of catalog.entries()) {
         for (const name of [entry.name, ...entry.aliases]) {
             assert.equal(modern.plain.includes(name), isPdTapKey(entry.value), name);
-            assert.equal(legacy.plain.includes(name), isPdTapKey(entry.value) && !isPdClick(entry.value), name);
+            assert.equal(legacy.plain.includes(name), isPdTapKey(entry.value) && !isPdClick(entry.value) && !isPdMacro(entry.value), name);
         }
     }
     for (const name of ["QK_MOUSE_BUTTON_1", "QK_MOUSE_BUTTON_3", "MS_BTN4", "QK_MOUSE_BUTTON_8"]) {
@@ -36,4 +36,21 @@ test("pointing picker names and aliases follow the tap allowlist and the adverti
     }
     assert.ok(modern.modified.includes("KC_A"));
     for (const name of ["KC_VOLU", "MS_UP", "MS_WHLD", "PD_SLOT_0", "QK_BOOTLOADER"]) assert.ok(!modern.modified.includes(name), name);
+});
+
+test("macro outputs keep their place and require advertised support", () => {
+    const slot = {id: 4, name: "Macros", kind: 1, directions: {left: {keycode: 0x7700}}, diagonals: {upLeft: {keycode: 0x777f}}, buttons: [{tap: {keycode: 0x7701}}]};
+    assert.deepEqual(pointingMacros([slot]), [
+        {slot: 4, name: "Macros", label: "Left", macro: 0},
+        {slot: 4, name: "Macros", label: "Up-left", macro: 127},
+        {slot: 4, name: "Macros", label: "Button 1", macro: 1},
+    ]);
+    assert.equal(pointingMacroProblem([slot], {featureFlags: 1 << 29}), undefined);
+    assert.match(pointingMacroProblem([slot], {featureFlags: 0}), /macro 0 on Left.*cannot run a macro/);
+    assert.deepEqual(pointingMacros([{...slot, kind: 0}]), []);
+    for (const name of ["QK_MACRO_0", "MC_31", "VIA_MACRO_127"]) {
+        assert.ok(pointingTapKeys(false, true).plain.includes(name));
+        assert.ok(!pointingTapKeys(true, false).plain.includes(name));
+        assert.ok(!pointingTapKeys(true, true).modified.includes(name));
+    }
 });

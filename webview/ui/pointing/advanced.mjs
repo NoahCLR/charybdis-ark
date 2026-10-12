@@ -1,7 +1,8 @@
 // @ts-check
 import {el, esc} from "../../lib/dom.mjs";
 import {AXIS, BUTTON, MODIFIER_POLICY, SCROLL_FIELDS, TAP_ROWS, axisReads, modeDpi, readsHorizontal, readsVertical, thresholdDistance} from "../../view/pointing-config.mjs";
-import {modifierNames} from "../../view/keyvalues.mjs";
+import {modifierNames, pointingMacro} from "../../view/keyvalues.mjs";
+import {word} from "../../view/vocabulary.mjs";
 import {state} from "../../store.mjs";
 import {ARROWS, SCROLL_LEAD, SCROLL_RATIOS, SCROLL_SINGLES, scrollLabel, words} from "./common.mjs";
 
@@ -50,6 +51,12 @@ export function advancedControls(model, slot, scrolling, {form, disabled, field,
             for (const {key, group, name, label} of rows) {
                 const tap = unfinished[key] || /** @type {import("../../../contracts/edits.js").PdTap} */ (slot[group]?.[name]);
                 const prefix = group === "diagonals" ? "diag" : "dir";
+                const macro = pointingMacro(model, tap.keycode);
+                if (macro) {
+                    table.append(el(`<span class="n">${ARROWS[name]} ${esc(label)}</span>`),
+                        el(`<span class="note">${esc(word(words(model).modifierPolicy, MODIFIER_POLICY.INHERIT))}</span>`), el(`<span class="note">The macro continues after its trigger.</span>`));
+                    continue;
+                }
                 const policy = select(`${label} with held modifiers`, words(model).modifierPolicy, tap.modifierPolicy ?? 0, `${prefix}Policy:${name}`,
                     {tip: "Inherit: modifiers you hold apply to the shortcut, so Shift with an arrow selects. Ignore: the modifiers chosen below are left out while it sends. Exact: it sends exactly its shortcut, whatever you hold."});
                 /** @type {HTMLElement} */ (policy.querySelector("span")).classList.add("sr");
@@ -116,7 +123,8 @@ export function advancedControls(model, slot, scrolling, {form, disabled, field,
                     typeof button.tap?.keycode === "string" ? {name: button.tap.keycode === "0" ? "" : button.tap.keycode} : {})
                 : el(`<span class="note blank">—</span>`);
             tap.querySelector?.("span")?.classList.add("sr");
-            const held = holding ? modifierNames(model, button.modifiers).join(", ") || "choose at least one below" : "—";
+            const macro = tapping ? pointingMacro(model, button.tap?.keycode) : null;
+            const held = macro ? `${word(words(model).modifierPolicy, MODIFIER_POLICY.INHERIT)} · the macro continues after its trigger` : holding ? modifierNames(model, button.modifiers).join(", ") || "choose at least one below" : "—";
             table.append(el(`<span class="n">${index + 1}</span>`), kindSelect, tap,
                 el(`<span class="note"><span class="narrow">Held modifiers: </span>${esc(held)}</span>`));
             if (holding) {

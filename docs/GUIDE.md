@@ -121,12 +121,16 @@ Every screen is drawn and wired to the host:
 The keycode picker leads with a board labelled for your host keyboard layout
 (ANSI for US; see [Host settings](#host-settings)), then task-shaped Symbols,
 Navigation, Numpad, Layers, Pointing modes, Macros, Mouse, Media, Lighting,
-Magic and Custom sections. The complete QMK catalogue remains available under
-More keys, Other QMK and All keycodes, and search spans all of it — named
+Magic and Custom sections. Keys supported by this firmware are available under
+More keys, Other QMK and All keycodes, and search spans those entries — named
 macros included, found by the name they were given. Layers offers each layer
 as Hold (`MO`), Lock (`LOCK_LAYER`, the same lock as QMK's `TG`) and Tap-hold
 (`LT`); a keyboard that owns its layer keys adds Tap-toggle (`TT`), One-shot
 (`OSL`) and Move (`TO`).
+The retired **User 0–31** keys are hidden from every picker section and search
+because they do nothing on current firmware. Choose the named **Custom keys**,
+including Right Thumb, Left Thumb and Click Spam, instead. Existing retired
+assignments keep their stored names and bytes when read or backed up.
 Modifier combinations must use one side: all left or all right. Mixing the
 two cannot be stored in one keycode, so the picker explains it and disables
 **Use keycode**. A symbol's built-in Shift counts toward that choice too.
@@ -567,7 +571,8 @@ override can send a plain **Mouse Button 1–8**, including buttons 3 and 4.
 Use **Pick…** or enter its QMK name, such as `MS_BTN3`. The pointing picker
 offers only outputs that field accepts: keyboard keys and shortcuts, media
 and system keys, and supported mouse buttons. Pointer movement, wheel,
-acceleration, layer controls, macros and mode controls are refused. Mouse
+acceleration, layer controls and mode controls are refused. Supported macros
+are offered too ([below](#pointing-mode-macros)). Mouse
 buttons and media/system keys must be plain keycodes; modifier wrappers such
 as `C(MS_BTN3)` are refused.
 
@@ -586,6 +591,28 @@ pointing editors but offers no mouse-click outputs and explains why. A backup
 containing clicks keeps them exactly through import review, draft history and
 undo/redo; Review blocks Apply on a keyboard without support. Update its
 firmware or replace those outputs before saving.
+
+### Pointing-mode macros
+
+On firmware that reports support, **Pick… → Macros** offers all 128 VIA slots
+by their names for a direction, diagonal or button tap override. The output
+shows the name beside its stored keycode. An empty macro is allowed and marked
+**does nothing yet**; add its steps on Macros. It sends nothing and leaves a
+Once per movement gesture available.
+
+Macro outputs always **Inherit** held modifiers. Playback continues across
+scans, so Ignore and Exact cannot cover it; the macro's own input protection
+still applies. A mouse click inside a macro bypasses this mode's button
+overrides and reaches the host as the macro normally would.
+
+The keyboard runs one macro at a time. Triggers while it is busy are dropped,
+never queued. **Every step** is allowed; its macro output carries a tip pointing
+to **Once per movement**, usually a better fit for a longer sequence.
+
+Older firmware offers no new macro outputs. Backups and imports keep them
+exactly, with Review blockers until the destination supports them or you
+replace them. You can fix one output while retaining the others. Apply and
+direct restore refuse unsupported records before writing.
 
 ### Upgrading from eight-layer firmware
 

@@ -21,6 +21,9 @@ const valueOf = (entry) => entry.value || entry.key || entry.name || "";
 const inGroups = (...groups) => (entry) => groups.includes(entry.group);
 // Macro slots are offered by their VIA_MACRO_n names in the Macros section.
 const NATIVE_MACRO = /^QK_MACRO_\d+$/;
+// QMK's User 0–31 entries occupy the retired, inert custom-key block.
+// Keep their catalogue names for readback; current custom keys have their own names.
+const RETIRED_USER = /^QK_USER_(?:[0-9]|[12][0-9]|3[01])$/;
 // Charybdis's own drag scroll ignores the pointing-mode settings; drag scroll
 // is the factory dragscroll pointing slot. A key already holding one still reads back
 // by name, but the picker does not offer it.
@@ -46,12 +49,11 @@ const UNBUILT = new RegExp("^(?:" + [
 const unbuilt = (entry) => UNBUILT_GROUPS.has(entry.group) || UNBUILT.test(valueOf(entry));
 // Whether the picker offers an entry at all, in any section or search.
 /** @param {Entry} entry */
-export const pickable = (entry) => !NATIVE_MACRO.test(valueOf(entry)) && !UNSUPPORTED.has(valueOf(entry)) && !unbuilt(entry);
+export const pickable = (entry) => !NATIVE_MACRO.test(valueOf(entry)) && !RETIRED_USER.test(valueOf(entry)) && !UNSUPPORTED.has(valueOf(entry)) && !unbuilt(entry);
 // The Charybdis's own keys: DPI and sniping.
 const isKeyboardKey = inGroups("kb");
-// The keyboard's 64 custom keys, by the names the model gives them, with the
-// bare user slots a keyboard of unknown vocabulary reports and KC_NO/KC_TRNS.
-const isCustom = inGroups("Custom keys", "user", "internal");
+// The keyboard's 128 custom keys, by the names the model gives them, and KC_NO/KC_TRNS.
+const isCustom = inGroups("Custom keys", "internal");
 /** @param {Entry} entry */
 const isSymbol = (entry) => entry.group === "shifted" || (entry.group === "basic" && SYMBOLS.has(valueOf(entry)));
 /** @param {Entry} entry */
