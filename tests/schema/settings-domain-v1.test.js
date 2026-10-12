@@ -1,7 +1,7 @@
 "use strict";
 const {test} = require("node:test");
 const assert = require("node:assert/strict");
-const {SETTINGS, SETTING, SETTING_FIELD, MATRIX_POSITIONS, validSetting, defaultLayerRecord, encodeSettings, decodeSettings} = require("../../core/schema/settings-domain-v1");
+const {SETTINGS, SETTING, SETTING_FIELD, SETTING_FIELDS, MATRIX_POSITIONS, validSetting, defaultLayerRecord, encodeSettings, decodeSettings} = require("../../core/schema/settings-domain-v1");
 
 // Compiled defaults as the firmware sets them (portable-profile-v1.md):
 // scalar 27 retired at zero, behaviours on, every layer in both masks, every
@@ -21,6 +21,17 @@ test("the layout constants are the firmware's version 6 domain", () => {
     assert.deepEqual([SETTING.UNICODE_HOST_MODE, SETTING.BEHAVIORS_ENABLED, SETTING.LAYER_BEHAVIORS, SETTING.LAYER_COMBOS], [27, 28, 29, 30]);
     assert.equal(MATRIX_POSITIONS, 60);
     assert.deepEqual(defaultLayerRecord(9), {reference: 9, bypass: [], exclude: []});
+});
+
+test("the stored field table determines scalar geometry and layer-reference rewrites", () => {
+    assert.equal(SETTINGS.COUNT, SETTING_FIELDS.length);
+    assert.equal(SETTINGS.LAYER_RECORDS_OFFSET, SETTINGS.SCALARS_OFFSET + SETTING_FIELDS.length * 4);
+    assert.equal(SETTINGS.FIXED_SIZE, SETTINGS.LAYER_RECORDS_OFFSET + SETTINGS.LAYERS * SETTINGS.LAYER_RECORD_SIZE);
+    assert.deepEqual(SETTING_FIELDS.filter(field => field.layerReference).map(field => [field.name, field.layerReference, field.layerReorder]), [
+        ["AUTO_MOUSE_LAYER", "layer", "storage"], ["AUTO_SNIPING_LAYER", "layer", "storage"],
+        ["DEFAULT_LAYERS", "mask", "reach"], ["LAYER_BEHAVIORS", "mask", "storage"], ["LAYER_COMBOS", "mask", "storage"],
+    ]);
+    assert.ok(Object.isFrozen(SETTING_FIELDS));
 });
 
 // Every stored value by the firmware's name (profile_settings_v1.h), with the

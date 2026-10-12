@@ -1,8 +1,8 @@
 // @ts-check
 "use strict";
+const {PROFILE_DOMAIN_IDS, replaceDomain} = require("../schema/profile-domains");
 
 const {MACRO_BANK_BYTES, MACRO_SLOTS, decodedOf, encodeNamedProfile, validateSnapshot} = require("./portable-profile");
-const {decodeProfileBlob} = require("../schema/profile-blob-v1");
 const {SETTINGS, validName, encodeSettings} = require("../schema/settings-domain-v1");
 const {macroKeycodes, macroModifierKeycodes, encodeMacroPayload, decodeMacroPayload, macroProgramBytes, macroProgramLimit} = require("../schema/macro-payload");
 const {supportsUnicodeMacros, supportsMacroProtection, supportsMacroOutputIsolation, macroProtectionOf} = require("../schema/macro-payload");
@@ -124,8 +124,7 @@ function editMacro(snapshot, message, capabilities) {
         if (!validName(message.name.trim())) throw fail(`A macro name is up to ${SETTINGS.NAME_MAX_BYTES} bytes of text, with no control characters. Accented letters and symbols take two to four bytes each.`, "MACRO_NAME_INVALID");
         const settings = structuredClone(value.settings);
         settings.macroNames[index] = message.name.trim();
-        const domains = decodeProfileBlob(value.profile).domains.map(domain => domain.id === 0x40 ? {...domain, payload: encodeSettings(settings)} : domain);
-        document.profile = encodeNamedProfile({domains}).toString("base64");
+        document.profile = replaceDomain(value.profile, PROFILE_DOMAIN_IDS.SETTINGS, () => encodeSettings(settings), encodeNamedProfile).toString("base64");
     }
     validateSnapshot(document, capabilities);
     return document;

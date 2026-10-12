@@ -8,12 +8,9 @@
  * @typedef {{kind: number, operand: number}} WalkAction
  */
 const {keycodeAction, knownActionAbi, pdSlotOfCode} = require("../schema/actions");
-const {decodePdDomain, encodePdDomain} = require("../schema/pd-mode-domain-v1");
 const {decodeProfileBlob, encodeProfileBlob, crc32, fnv1a32, PROFILE_BLOB_V1, PROFILE_DOMAIN_VERSIONS, ProfileBlobProtocolError} = require("../schema/profile-blob-v1");
-const {decodeRgbDomainV1, encodeRgbDomainV1} = require("../schema/rgb-domain-v1");
-const {decodeKeyBehaviorDomain, encodeKeyBehaviorDomain} = require("../schema/key-behavior-domain-v1");
-const {ALL_LAYERS, COMBO_DOMAIN_VERSION, decodeComboDomain, encodeComboDomain} = require("../schema/combo-domain-v1");
-const {SETTING, decodeSettings, encodeSettings} = require("../schema/settings-domain-v1");
+const {ALL_LAYERS, COMBO_DOMAIN_VERSION, encodeComboDomain} = require("../schema/combo-domain-v1");
+const {SETTING, SETTING_FIELDS, decodeSettings, encodeSettings} = require("../schema/settings-domain-v1");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX, LAYERS, MATRIX_KEYS, matrixPosition} = require("../data/charybdis-layout");
 const {LAYER_LOCK_BASE, LAYER_LOCK_SLOTS} = require("../data/user-keycodes");
 const {layerName} = require("./vocabulary");
@@ -32,7 +29,8 @@ const MACRO_SLOTS = 128;
 // A file holds at most a full 65,504-byte profile in base64, sixteen layers of
 // keys and a full macro bank; this ceiling leaves room for all three.
 const FILE_MAX_BYTES = 262144;
-const DOMAIN_IDS = Object.keys(PROFILE_DOMAIN_VERSIONS).map(Number).sort((a, b) => a - b);
+const {PROFILE_DOMAINS, PROFILE_DOMAIN_IDS, PROFILE_DOMAIN_MASK, domainCodec, encodeProfileDomains} = require("../schema/profile-domains");
+const DOMAIN_IDS = PROFILE_DOMAINS.map(domain => domain.id);
 /** @param {number} id @param {Buffer} payload */
 const domain = (id, payload) => ({id, version: PROFILE_DOMAIN_VERSIONS[id], payload});
 /** @param {string} message */
@@ -103,14 +101,14 @@ function materializeProfile(active, defaults, combos, settings) {
     if (!combos || combos.noTimer || combos.customTrigger || combos.customRelease || combos.customRepress || combos.strictTimer || combos.fixedReference) throw fail("This keyboard uses combo hooks or timing that cannot be represented by a portable profile.");
     const live = decodeProfileBlob(active), fallback = decodeProfileBlob(defaults);
     /** @type {import("../schema/types.js").ProfileDomain[]} */
-    const domains = [0x10, 0x20, 0x50].map(id => {
+    const domains = [PROFILE_DOMAIN_IDS.RGB, PROFILE_DOMAIN_IDS.KEY_BEHAVIORS, PROFILE_DOMAIN_IDS.PD_MODES].map(id => {
         const found = live.domains.find(d => d.id === id) || fallback.domains.find(d => d.id === id);
         if (!found) throw fail("The keyboard did not report every profile domain.");
         return found;
     });
     const table = comboTableOf(combos);
     decodeSettings(settings);
-    domains.push(domain(0x30, encodeComboDomain(table)), domain(0x40, settings));
+    domains.push(domain(PROFILE_DOMAIN_IDS.COMBOS, encodeComboDomain(table)), domain(PROFILE_DOMAIN_IDS.SETTINGS, settings));
     return encodeProfileBlob({domains});
 }
 // The combo table the keyboard runs, as it stores it: which combos follow the
@@ -154,9 +152,12 @@ function validateSnapshot(value, capabilities) {
         throw error;
     }
     if (domains.map(d => d.id).join() !== DOMAIN_IDS.join()) throw fail("The profile is missing configuration. Partial profiles cannot be restored as a complete backup.");
-    const pdModes = decodePdDomain(domains[4].payload);
-    const codecOptions = profileDepthOptions(capabilities, domains[0].payload);
-    const rgb = decodeRgbDomainV1(domains[0].payload, codecOptions.rgb), behaviors = decodeKeyBehaviorDomain(domains[1].payload, codecOptions.behaviors), combos = decodeComboDomain(domains[2].payload), settings = decodeSettings(domains[3].payload);
+    /** @param {import("../schema/profile-domains-types.js").DomainKey} key */
+    const payload = key => /** @type {import("../schema/types.js").ProfileDomain} */ (domains.find(domain => domain.id === domainCodec(key).id)).payload;
+    const pdModes = domainCodec("pdModes").decode(payload("pdModes"));
+    const codecOptions = profileDepthOptions(capabilities, payload("rgb"));
+    const rgb = domainCodec("rgb").decode(payload("rgb"), codecOptions), behaviors = domainCodec("behaviors").decode(payload("behaviors"), codecOptions),
+        combos = domainCodec("combos").decode(payload("combos")), settings = domainCodec("settings").decode(payload("settings"));
     const hostWord = settings.values[SETTING.UNICODE_HOST_MODE];
     if (hostWord && capabilities && !supportsUnicodeMacros(capabilities)) throw fail("This firmware cannot use Host settings. Update both halves before restoring this profile.");
     if (hostWord & (LAYOUT_MASK | MACOS_ISO) && capabilities && !supportsHostLayouts(capabilities)) throw fail("This firmware cannot type through a host keyboard layout. Update both halves before restoring this profile.");
@@ -189,7 +190,7 @@ function validateSnapshot(value, capabilities) {
     };
     walkActions(behaviors, checkAction); walkActions(combos, checkAction);
     const layout = Buffer.alloc(LAYERS * MATRIX_KEYS * 2); layers.flat().forEach((v, id) => layout.writeUInt16BE(v, id * 2));
-    if (capabilities && (candidate.actionAbiDigest !== capabilities.actionAbiDigest || capabilities.compiledLayerCount !== LAYERS || ((capabilities.supportedDomainMask ?? 0) & 31) !== 31)) throw fail(`The connected firmware does not support this profile's action vocabulary or ${LAYERS}-layer storage.`);
+    if (capabilities && (candidate.actionAbiDigest !== capabilities.actionAbiDigest || capabilities.compiledLayerCount !== LAYERS || ((capabilities.supportedDomainMask ?? 0) & PROFILE_DOMAIN_MASK) !== PROFILE_DOMAIN_MASK)) throw fail(`The connected firmware does not support this profile's action vocabulary or ${LAYERS}-layer storage.`);
     // A portable file stores streams, not a bank geometry. Without a device,
     // preserve larger backups; a destination pads or refuses them by its size.
     const stored = macros.reduce((total, bytes) => total + bytes.length + 1, 1);
@@ -309,23 +310,25 @@ function reorderLayers(document, order, names, {keysFollow = true} = {}) {
     /** @param {string} name @param {number} old */
     const unnamed = (name, old) => name === layerName([], old) && settings.names[old] === "";
     settings.names = names ? names.map((name, next) => (unnamed(name, order[next]) ? "" : name)) : order.map(old => settings.names[old]);
-    settings.values[SETTING.AUTO_MOUSE_LAYER] = remap[settings.values[SETTING.AUTO_MOUSE_LAYER]];
-    settings.values[SETTING.AUTO_SNIPING_LAYER] = remap[settings.values[SETTING.AUTO_SNIPING_LAYER]];
-    settings.values[SETTING.DEFAULT_LAYERS] = remap.reduce((mask, next, old) => (mask | ((settings.values[SETTING.DEFAULT_LAYERS] >>> old) & 1) << reach(old)) >>> 0, 0);
+
     // Each layer's switches, placements and combo reference go with it; a
     // reference names a layer by what it holds, so it follows that layer.
     /** @param {number} mask */
     const follow = mask => remap.reduce((moved, next, old) => (moved | ((mask >>> old) & 1) << next) >>> 0, 0);
-    settings.values[SETTING.LAYER_BEHAVIORS] = follow(settings.values[SETTING.LAYER_BEHAVIORS]);
-    settings.values[SETTING.LAYER_COMBOS] = follow(settings.values[SETTING.LAYER_COMBOS]);
+    for (const field of SETTING_FIELDS) {
+        if (field.layerReference === "layer") settings.values[field.id] = remap[settings.values[field.id]];
+        else if (field.layerReference === "mask") {
+            /** @type {(old: number) => number} */
+            const move = field.layerReorder === "reach" ? reach : old => remap[old];
+            const mask = settings.values[field.id];
+            settings.values[field.id] = remap.reduce((result, next, old) => (result | ((mask >>> old) & 1) << move(old)) >>> 0, 0);
+        }
+    }
     settings.layers = order.map(old => ({...settings.layers[old], reference: remap[settings.layers[old].reference]}));
     // The layers a behaviour or combo may act on are layers by what they hold.
     behaviors.rows.forEach(row => {row.allowedLayers = follow(row.allowedLayers);});
     combos.rows.forEach(row => {row.allowedLayers = follow(row.allowedLayers);});
-    result.profile = encodeProfileBlob({domains: [
-        domain(16, encodeRgbDomainV1(rgb, validated.codecOptions.rgb)), domain(32, encodeKeyBehaviorDomain(behaviors, validated.codecOptions.behaviors)), domain(48, encodeComboDomain(combos)),
-        domain(64, encodeSettings(settings)), domain(80, encodePdDomain(pdModes)),
-    ]}).toString("base64");
+    result.profile = encodeProfileBlob({domains: encodeProfileDomains({rgb, behaviors, combos, settings, pdModes}, validated.codecOptions)}).toString("base64");
     validateSnapshot(result); return result;
 }
 /** @param {unknown} document */

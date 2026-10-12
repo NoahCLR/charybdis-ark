@@ -16,12 +16,11 @@ const {knownActionAbi} = require("../schema/actions");
 const {customKeyOfCode, layerLockOfCode} = require("../data/user-keycodes");
 const {pdBindingOfCode} = require("../data/pd-bindings");
 const {layerName} = require("../model/vocabulary");
-const {decodePdDomain} = require("../schema/pd-mode-domain-v1");
 const {readSettingsLimits} = require("../protocol/portable-profile-v1");
 const {readHostOs} = require("../protocol/host-os-v1");
 const {supportsUnicodeMacros} = require("../schema/macro-payload");
 const {readKeyboardOptions} = require("../protocol/keyboard-options-v1");
-const {decodeSettings} = require("../schema/settings-domain-v1");
+const {profileDomain} = require("../schema/profile-domains");
 const {profileDepthOptions} = require("../schema/profile-depth");
 const {captureProfile, restoreProfile, validateSnapshot, requireReady} = require("./portable-profile-session");
 const {settingsEditorView} = require("../model/settings-editor");
@@ -36,9 +35,6 @@ const {readViaRgbMatrix} = require("../protocol/via-rgb-matrix-v1");
 const {readDeviceCombos} = require("../protocol/combo-readback-v1");
 const {ProfilePayloadReader} = require("./profile-payload-reader");
 const {PROFILE_DOMAIN_IDS, decodeProfileBlob} = require("../schema/profile-blob-v1");
-const {decodeRgbDomainV1} = require("../schema/rgb-domain-v1");
-const {decodeComboDomain} = require("../schema/combo-domain-v1");
-const {decodeKeyBehaviorDomain} = require("../schema/key-behavior-domain-v1");
 const {CANDIDATE_STATE_NAMES, readCandidateStatus} = require("../protocol/profile-candidate-v1");
 const {PROFILE_ACTIVE_KIND, PROFILE_STATE_FLAGS, PROFILE_WIRE_KNOWN_MASKS, PROFILE_WIRE_FEATURES, PROFILE_WIRE_V1, VIA_READS, readProfileCapabilities, readProfileStatus, readViaIdentity} = require("../protocol/profile-wire-v1");
 
@@ -318,17 +314,8 @@ class ProfileDeviceService {
         const failures = [];
         for (const domain of blob.domains) {
             try {
-                if (domain.id === PROFILE_DOMAIN_IDS.RGB) {
-                    domains.rgb = decodeRgbDomainV1(domain.payload, depth.rgb);
-                } else if (domain.id === PROFILE_DOMAIN_IDS.KEY_BEHAVIORS) {
-                    domains.keyBehaviors = decodeKeyBehaviorDomain(domain.payload, depth.behaviors);
-                } else if (domain.id === PROFILE_DOMAIN_IDS.PD_MODES) {
-                    domains.pdModes = decodePdDomain(domain.payload);
-                } else if (domain.id === PROFILE_DOMAIN_IDS.SETTINGS) {
-                    domains.settings = decodeSettings(domain.payload);
-                } else if (domain.id === PROFILE_DOMAIN_IDS.COMBOS) {
-                    domains.combos = decodeComboDomain(domain.payload);
-                }
+                const registered = profileDomain(domain.id);
+                if (registered) Object.assign(domains, {[registered.readKey]: registered.decode(domain.payload, depth)});
             } catch (error) {
                 failures.push({domainId: domain.id, message: error instanceof Error ? error.message : String(error)});
             }

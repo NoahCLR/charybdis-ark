@@ -1,5 +1,6 @@
 // @ts-check
 "use strict";
+const {PROFILE_DOMAIN_VERSIONS, PROFILE_DOMAIN_IDS} = require("./profile-domains");
 const {LAYERS, MATRIX_KEYS} = require("../data/charybdis-layout");
 const {validHostSetting} = require("./host-settings");
 // Settings domain 0x40, version 6, the only one the keyboard stores (firmware
@@ -14,12 +15,6 @@ const {validHostSetting} = require("./host-settings");
 // set positions (row × columns + column).
 const {NAME_MAX_BYTES, validName, nameOfBytes, encodeName} = require("./profile-name");
 
-const SETTINGS = Object.freeze({VERSION: 6, COUNT: 31, LAYERS, MACRO_NAMES: 128, CUSTOM_KEY_NAMES: 128,
-    LAYER_RECORD_SIZE: 17, PLACEMENT_BYTES: 8, PLACEMENT_MAX_POSITIONS: 64, NAME_MAX_BYTES,
-    SCALARS_OFFSET: 8, LAYER_RECORDS_OFFSET: 132, FIXED_SIZE: 404, MIN_SIZE: 404 + 272, MAX_SIZE: 404 + 272 * 33});
-// This keyboard's matrix: ten rows of six (capability page 2 reports it).
-const MATRIX_POSITIONS = MATRIX_KEYS;
-const HEADER = Buffer.from([SETTINGS.VERSION, SETTINGS.LAYERS, SETTINGS.COUNT, SETTINGS.MACRO_NAMES, SETTINGS.CUSTOM_KEY_NAMES, 0, 0, 0]);
 /** @param {string} message */
 const fail = message => Object.assign(new Error(message), {code: "INVALID_SETTINGS"});
 
@@ -30,7 +25,8 @@ const range = (min, max, step = 1) => ({min, max, step, valid: v => v >= min && 
 /** @param {(v: number, layers: number) => boolean} valid @returns {import("./types.js").SettingRule} */
 const rule = valid => ({valid});
 const UINT16 = range(0, 65535), SWITCH = range(0, 1), RETIRED = range(0, 0);
-const LAYER = rule((v, layers) => v < layers), LAYER_MASK = rule((v, layers) => v < 2 ** layers);
+const LAYER = {...rule((v, layers) => v < layers), layerReference: /** @type {const} */ ("layer"), layerReorder: /** @type {const} */ ("storage")};
+const LAYER_MASK = {...rule((v, layers) => v < 2 ** layers), layerReference: /** @type {const} */ ("mask"), layerReorder: /** @type {const} */ ("storage")};
 // The 31 stored values, each once, in ID order: the firmware's name for it
 // (profile_settings_v1.h, without NOAH_SETTING_) and what it accepts
 // (portable-profile-v1.md, "Settings domain 0x40"). The editor's words for
@@ -54,7 +50,7 @@ const STORED = /** @type {const} */ ([
     // Hue, saturation and brightness; the high byte zero.
     ["RGB_COLOR", range(0, 0xffffff)],
     // At least one startup layer, and none past the bank.
-    ["DEFAULT_LAYERS", rule((v, layers) => v > 0 && v < 2 ** layers)],
+    ["DEFAULT_LAYERS", {...rule((v, layers) => v > 0 && v < 2 ** layers), layerReference: /** @type {const} */ ("mask"), layerReorder: /** @type {const} */ ("reach")}],
     ["KEYMAP_OPTIONS", UINT16], ["AUTO_MOUSE_DELAY", UINT16], ["AUTO_MOUSE_THRESHOLD", UINT16],
     // Host OS, Unicode playback, host layout and macOS ISO (host-settings.js).
     ["UNICODE_HOST_MODE", rule(validHostSetting)],
@@ -62,6 +58,18 @@ const STORED = /** @type {const} */ ([
     // then one bit per layer for its behaviours and for its combos.
     ["BEHAVIORS_ENABLED", SWITCH], ["LAYER_BEHAVIORS", LAYER_MASK], ["LAYER_COMBOS", LAYER_MASK],
 ]);
+// Geometry follows the field table: adding a scalar moves the records and
+// names without updating parallel byte offsets.
+const SCALARS_OFFSET = 8, PLACEMENT_BYTES = 8, LAYER_RECORD_SIZE = 1 + 2 * PLACEMENT_BYTES;
+const LAYER_RECORDS_OFFSET = SCALARS_OFFSET + STORED.length * 4;
+const FIXED_SIZE = LAYER_RECORDS_OFFSET + LAYERS * LAYER_RECORD_SIZE;
+const MACRO_NAMES = 128, CUSTOM_KEY_NAMES = 128, NAME_COUNT = LAYERS + MACRO_NAMES + CUSTOM_KEY_NAMES;
+const SETTINGS = Object.freeze({VERSION: PROFILE_DOMAIN_VERSIONS[PROFILE_DOMAIN_IDS.SETTINGS], COUNT: STORED.length, LAYERS, MACRO_NAMES, CUSTOM_KEY_NAMES,
+    LAYER_RECORD_SIZE, PLACEMENT_BYTES, PLACEMENT_MAX_POSITIONS: PLACEMENT_BYTES * 8, NAME_MAX_BYTES,
+    SCALARS_OFFSET, LAYER_RECORDS_OFFSET, FIXED_SIZE, MIN_SIZE: FIXED_SIZE + NAME_COUNT, MAX_SIZE: FIXED_SIZE + NAME_COUNT * (NAME_MAX_BYTES + 1)});
+const MATRIX_POSITIONS = MATRIX_KEYS;
+const HEADER = Buffer.from([SETTINGS.VERSION, SETTINGS.LAYERS, SETTINGS.COUNT, SETTINGS.MACRO_NAMES, SETTINGS.CUSTOM_KEY_NAMES, 0, 0, 0]);
+
 /** @typedef {typeof STORED[number][0]} SettingName */
 // The stored values in ID order, each by its name, and each ID by its name.
 /** @type {readonly Readonly<import("./types.js").SettingField<SettingName>>[]} */
@@ -155,4 +163,4 @@ function decodeSettings(bytes, layers = SETTINGS.LAYERS, positions = MATRIX_POSI
     encodeSettings(result, layers, positions);
     return result;
 }
-module.exports = {SETTINGS, SETTING, SETTING_FIELD, MATRIX_POSITIONS, validName, validSetting, defaultLayerRecord, encodeSettings, decodeSettings};
+module.exports = {SETTINGS, SETTING, SETTING_FIELD, SETTING_FIELDS: FIELDS, MATRIX_POSITIONS, validName, validSetting, defaultLayerRecord, encodeSettings, decodeSettings};

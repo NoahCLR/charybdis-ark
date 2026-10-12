@@ -134,6 +134,19 @@ host refuses edits rather than writing them directly.
 
 ## Byte formats
 
+`schema/profile-domains.js` owns each domain's ID, model key, version, wire
+capability bit, review area and codecs. Envelope validation, candidate masks,
+portable encoding, device decoding, usage and partial reverts read that registry.
+Codec loading is deferred so this metadata stays available to the envelope and
+the codecs themselves. `replaceDomain` rewrites one payload while preserving
+the other envelopes and their canonical validation.
+
+The stored field table in `schema/settings-domain-v1.js` supplies settings
+count and byte offsets, numeric bounds and range hints, and the layer references
+that follow a reorder. Startup layers follow reach when keys stay put; the
+per-layer policy masks follow storage. Editor labels and grouping still belong
+to `model/settings-editor.js`.
+
 `schema/bytes.js` owns integer bounds, byte views and copies, reserved-byte
 checks and protocol error construction. Codecs keep their existing error names,
 codes and location fields; a caller chooses whether bytes are viewed or copied.

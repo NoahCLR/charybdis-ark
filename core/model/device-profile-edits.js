@@ -1,5 +1,6 @@
 // @ts-check
 "use strict";
+const {PROFILE_WIRE_DOMAINS} = require("../schema/profile-domains");
 const {encodePdDomain, decodePdDomain} = require("../schema/pd-mode-domain-v1");
 const {decodeProfileBlob, encodeProfileBlob, PROFILE_DOMAIN_IDS} = require("../schema/profile-blob-v1");
 const {decodeRgbDomainV1, encodeRgbDomainV1, RGB_LAYER_MODES, RGB_LOCALITIES, RGB_AUTOMOUSE_MODES, RGB_TAP_COMMIT_MODES, RGB_PD_MODE_IDS, RGB_KEY_SEMANTICS} = require("../schema/rgb-domain-v1");
@@ -118,9 +119,9 @@ function editDeviceProfile(bytes, message, context = {}) {
         return encodeProfileBlob(profile);
     }
     if (inDomain(message, "pointing")) {
-        if (!((context.capabilities?.supportedDomainMask || 0) & 16)) throw invalid("PD editing needs firmware with configurable pointing slots.");
+        if (!((context.capabilities?.supportedDomainMask || 0) & PROFILE_WIRE_DOMAINS.PD_MODES)) throw invalid("PD editing needs firmware with configurable pointing slots.");
         const profile = decodeProfileBlob(bytes);
-        const domain = existing(profile.domains, row => row.id === 80, "Pointing modes");
+        const domain = existing(profile.domains, row => row.id === PROFILE_DOMAIN_IDS.PD_MODES, "Pointing modes");
         /** @type {EditablePointing[]} */
         const slots = decodePdDomain(domain.payload);
         const id = integer(message.slot, slots.length - 1, "Slot");
@@ -227,7 +228,7 @@ function editDeviceProfile(bytes, message, context = {}) {
 // A form sends an empty window, or followsDefault, to follow it.
 /** @param {Buffer} bytes @param {ComboEdit} message @param {EditContext} context */
 function editCombos(bytes, message, context) {
-    if (!((context.capabilities?.supportedDomainMask || 0) & 4)) throw invalid("This firmware can read combos but cannot save them. Flash the updated firmware pair first.");
+    if (!((context.capabilities?.supportedDomainMask || 0) & PROFILE_WIRE_DOMAINS.COMBOS)) throw invalid("This firmware can read combos but cannot save them. Flash the updated firmware pair first.");
     const read = context.combos;
     if (read?.state !== "read") throw invalid("Read the keyboard's combos before saving.");
     if (read.noTimer || read.customTrigger || read.customRelease || read.customRepress) throw invalid("This firmware has custom combo hooks or disabled timing that the profile editor cannot replace.");

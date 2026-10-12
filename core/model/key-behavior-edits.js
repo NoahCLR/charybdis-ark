@@ -1,5 +1,6 @@
 // @ts-check
 "use strict";
+const {PROFILE_WIRE_DOMAINS} = require("../schema/profile-domains");
 
 const {nativeCode} = require("../schema/actions");
 const keycodes = require("../data/keycode-catalog");
@@ -34,7 +35,7 @@ function integer(value, max, label, optional = false) {
 
 /** @param {Buffer} payload @param {BehaviorEdit} message @param {import("./types.js").ProfileDestination} [capabilities] */
 function editKeyBehaviors(payload, message, capabilities = {}) {
-    if (!((capabilities.supportedDomainMask || 0) & 2)) throw invalid("This firmware does not support saving key behaviours.");
+    if (!((capabilities.supportedDomainMask || 0) & PROFILE_WIRE_DOMAINS.KEY_BEHAVIORS)) throw invalid("This firmware does not support saving key behaviours.");
     const maxPdModes = PD_SLOT_COUNT;
     /** @type {{rows: Row[]}} */
     const {rows} = decodeKeyBehaviorDomain(payload, profileDepthOptions(capabilities).behaviors);

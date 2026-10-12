@@ -2,11 +2,11 @@
 "use strict";
 
 const {layerOfRef} = require("../schema/actions");
+const {PROFILE_DOMAIN_IDS, replaceDomain} = require("../schema/profile-domains");
 const {effectiveTimings} = require("./gesture-timing");
 const {encodeKeyBehaviorDomain} = require("../schema/key-behavior-domain-v1");
 const {validateSnapshot, decodedOf} = require("./portable-profile");
-const {decodeProfileBlob, encodeProfileBlob} = require("../schema/profile-blob-v1");
-const {SETTING, SETTING_FIELD, SETTINGS, encodeSettings, validSetting} = require("../schema/settings-domain-v1");
+const {SETTING, SETTING_FIELD, SETTING_FIELDS, SETTINGS, encodeSettings, validSetting} = require("../schema/settings-domain-v1");
 const {hostSettings, followHostOs, supportsHostLayouts, UNICODE_ENABLED, LAYOUT_SHIFT, MACOS_ISO} = require("../schema/host-settings");
 const {hostLayouts} = require("../data/host-layouts");
 const {supportsUnicodeMacros} = require("../schema/macro-payload");
@@ -16,7 +16,13 @@ const {layerName, VOCABULARY} = require("./vocabulary");
 /** @param {string} message */
 const fail = message => Object.assign(new Error(message), {code: "INVALID_SETTINGS_EDIT"});
 /** @param {string} macro @param {number} id @param {string} label @param {string} [hint] @param {Partial<import("../../contracts/model.js").StoredSettingField>} [extra] @returns {import("../../contracts/model.js").StoredSettingField} */
-const number = (macro, id, label, hint = "0–65535 ms", extra = {}) => ({macro, id, label, hint, unit: "ms", kind: "number", validate: "nonnegative-int", ...extra});
+function number(macro, id, label, hint, extra = {}) {
+    const rule = SETTING_FIELDS[id];
+    const unit = "unit" in extra ? extra.unit : "ms";
+    const range = rule.min !== undefined && rule.max !== undefined
+        ? `${rule.min}–${rule.max}${unit ? " " + unit : ""}${rule.step && rule.step > 1 ? ", in steps of " + rule.step : ""}` : "";
+    return {macro, id, label, hint: hint ?? range, min: rule.min, max: rule.max, unit, kind: "number", validate: "nonnegative-int", ...extra};
+}
 /** @param {string} macro @param {number} id @param {string} label @param {string} [hint] @returns {import("../../contracts/model.js").StoredSettingField} */
 const toggle = (macro, id, label, hint) => ({macro, id, label, hint, kind: "toggle"});
 /** @overload @param {string} macro @param {number} id @param {string} label @returns {import("../../contracts/model.js").StoredSettingField} */
@@ -69,8 +75,8 @@ const sections = [
         // held in the upstream Charybdis config, which the keyboard only
         // accepts in its own steps, so they offer the part of the list the
         // keyboard accepts. A pointing mode's own speed is set on its slot.
-        number("normalDpi", SETTING.DEFAULT_DPI, "Normal pointer DPI", "400–3400, in steps of 200: the steps this firmware stores.", {unit: undefined, choices: dpiChoices({accepts: v => validSetting(SETTING.DEFAULT_DPI, v)})}),
-        number("snipingDpi", SETTING.SNIPING_DPI, "Sniping DPI", "100–400: the steps this firmware stores. Lower DPI gives finer pointer control.", {unit: undefined, choices: dpiChoices({accepts: v => validSetting(SETTING.SNIPING_DPI, v)})}),
+        number("normalDpi", SETTING.DEFAULT_DPI, "Normal pointer DPI", undefined, {unit: undefined, choices: dpiChoices({accepts: v => validSetting(SETTING.DEFAULT_DPI, v)})}),
+        number("snipingDpi", SETTING.SNIPING_DPI, "Sniping DPI", undefined, {unit: undefined, choices: dpiChoices({accepts: v => validSetting(SETTING.SNIPING_DPI, v)})}),
     ]},
     {id: "sniping", label: "Auto-sniping", area: "Mouse", fields: [
         toggle("autoSniping", SETTING.AUTO_SNIPING_ENABLED, "Auto-sniping", "Use sniping speed while the selected layer is active."),
@@ -80,7 +86,7 @@ const sections = [
         toggle("autoMouse", SETTING.AUTO_MOUSE_ENABLED, "Auto-mouse", "Trackball movement automatically activates the selected layer."),
         layer("mouseLayer", SETTING.AUTO_MOUSE_LAYER, "Auto-mouse layer"),
         number("mouseTimeout", SETTING.AUTO_MOUSE_TIMEOUT, "Timeout (ms)", "How long the layer stays active after movement. The lighting fade keeps its share of it (Lighting → Auto-mouse fade).", {min: 1}),
-        number("mouseDebounce", SETTING.AUTO_MOUSE_DEBOUNCE, "Movement debounce (ms)", "0–255 ms", {max: SETTING_FIELD.AUTO_MOUSE_DEBOUNCE.max}),
+        number("mouseDebounce", SETTING.AUTO_MOUSE_DEBOUNCE, "Movement debounce (ms)", undefined),
         number("mouseDelay", SETTING.AUTO_MOUSE_DELAY, "Delay after typing (ms)", "Wait this long after a key event before movement can activate auto-mouse."),
         number("mouseThreshold", SETTING.AUTO_MOUSE_THRESHOLD, "Movement threshold", "Movement needed to activate auto-mouse. Higher values require more movement.", {unit: undefined}),
     ]},
@@ -97,7 +103,7 @@ const sections = [
         byte("saturation", SETTING.RGB_COLOR, 8, "Saturation", "0 is white; 255 is fully saturated."),
         byte("brightness", SETTING.RGB_COLOR, 16, "Brightness", "Saved brightness, 0–255. The keyboard applies its hardware brightness limit."),
         byte("effectSpeed", SETTING.RGB_MODE, 16, "Animation speed"),
-        number("lightingTimeout", SETTING.RGB_TIMEOUT, "Idle timeout (ms)", "0 keeps lighting on. Maximum 86400000 ms (one day).", {max: SETTING_FIELD.RGB_TIMEOUT.max}),
+        number("lightingTimeout", SETTING.RGB_TIMEOUT, "Idle timeout (ms)", `0 keeps lighting on. Maximum ${SETTING_FIELD.RGB_TIMEOUT.max} ms (one day).`),
     ]},
     {id: "lightingFeedback", label: "Lighting Feedback", fields: [
         number("feedbackFlash", SETTING.FEEDBACK_PERIOD, "Key feedback flash interval (ms)", "Time for each on or off phase; a full blink takes twice this value.", {min: SETTING_FIELD.FEEDBACK_PERIOD.min, validate: "positive-int"}),
@@ -294,7 +300,7 @@ function editSettings(snapshot, message, capabilities) {
                 if (snapshot.limits?.brightnessMax === undefined) throw fail("Read the keyboard's brightness limit before changing brightness. Update both halves if this field is unavailable.");
                 if (number > snapshot.limits.brightnessMax) throw fail(`Brightness must be between 0 and ${snapshot.limits.brightnessMax}, the keyboard's reported limit.`);
             }
-            if (number < (field.min ?? 0) || number > (field.max ?? 65535) || (field.choices && !field.choices.some(choice => (typeof choice === "object" ? choice.value : choice) === number))) throw fail(`${field.label} is outside the keyboard's supported range${field.hint ? ": " + field.hint : "."}`);
+            if ((field.min !== undefined && number < field.min) || (field.max !== undefined && number > field.max) || (field.choices && !field.choices.some(choice => (typeof choice === "object" ? choice.value : choice) === number))) throw fail(`${field.label} is outside the keyboard's supported range${field.hint ? ": " + field.hint : "."}`);
         }
         // A share that still reads as what was shown keeps its exact stored
         // milliseconds, so saving an unchanged section changes nothing.
@@ -330,9 +336,9 @@ function editSettings(snapshot, message, capabilities) {
             }
         }
     }
-    const domains = decodeProfileBlob(value.profile).domains.map(domain => domain.id === 0x40 ? {...domain, payload: encodeSettings(value.settings)}
-        : domain.id === 0x20 && behaviorsChanged ? {...domain, payload: encodeKeyBehaviorDomain(value.behaviors, value.codecOptions.behaviors)} : domain);
-    const document = {...value.document, profile: encodeProfileBlob({domains}).toString("base64")};
+    let profile = replaceDomain(value.profile, PROFILE_DOMAIN_IDS.SETTINGS, () => encodeSettings(value.settings));
+    if (behaviorsChanged) profile = replaceDomain(profile, PROFILE_DOMAIN_IDS.KEY_BEHAVIORS, () => encodeKeyBehaviorDomain(value.behaviors, value.codecOptions.behaviors));
+    const document = {...value.document, profile: profile.toString("base64")};
     validateSnapshot(document, capabilities);
     return document;
 }

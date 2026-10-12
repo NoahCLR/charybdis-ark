@@ -1,5 +1,6 @@
 // @ts-check
 "use strict";
+const {PROFILE_DOMAIN_IDS, replaceDomain} = require("../schema/profile-domains");
 
 // The 128 custom keys: named keys that do only what their behaviour says. A key
 // has an identity (CUSTOM_KEY_n, keycode 0x7f00 + n) and a name; what it does
@@ -8,7 +9,7 @@
 // a combo.
 
 const {decodedOf, encodeNamedProfile, validateSnapshot} = require("./portable-profile");
-const {decodeProfileBlob, PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
+const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {SETTINGS, validName, encodeSettings} = require("../schema/settings-domain-v1");
 const {knownActionAbi} = require("../schema/actions");
 const {CUSTOM_KEY_SLOTS, customKeyCode} = require("../data/user-keycodes");
@@ -49,8 +50,7 @@ function editCustomKey(snapshot, message, capabilities) {
     const document = JSON.parse(JSON.stringify(value.document));
     const settings = structuredClone(value.settings);
     settings.customKeyNames[slot] = name;
-    const domains = decodeProfileBlob(value.profile).domains.map(domain => domain.id === 0x40 ? {...domain, payload: encodeSettings(settings)} : domain);
-    document.profile = encodeNamedProfile({domains}).toString("base64");
+    document.profile = replaceDomain(value.profile, PROFILE_DOMAIN_IDS.SETTINGS, () => encodeSettings(settings), encodeNamedProfile).toString("base64");
     validateSnapshot(document, capabilities);
     return document;
 }

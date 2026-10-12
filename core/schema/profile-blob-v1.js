@@ -19,24 +19,7 @@ const PROFILE_BLOB_V1 = Object.freeze({
     MAX_SIZE: 65504,
 });
 
-const PROFILE_DOMAIN_IDS = Object.freeze({
-    RGB: 0x10,
-    KEY_BEHAVIORS: 0x20,
-    COMBOS: 0x30,
-    SETTINGS: 0x40,
-    PD_MODES: 0x50,
-});
-
-// Each domain's one version, as the firmware's registry has them
-// (profile_domain_registry.h).
-/** @type {Readonly<Record<number, number>>} */
-const PROFILE_DOMAIN_VERSIONS = Object.freeze({
-    [PROFILE_DOMAIN_IDS.RGB]: 4,
-    [PROFILE_DOMAIN_IDS.KEY_BEHAVIORS]: 2,
-    [PROFILE_DOMAIN_IDS.COMBOS]: 3,
-    [PROFILE_DOMAIN_IDS.SETTINGS]: 6,
-    [PROFILE_DOMAIN_IDS.PD_MODES]: 3,
-});
+const {PROFILE_DOMAIN_IDS, PROFILE_DOMAIN_VERSIONS} = require("./profile-domains");
 /** @param {number} major @param {number} minor */
 function assertSchema(major, minor) {
     if (major !== PROFILE_BLOB_V1.SCHEMA_MAJOR || minor !== PROFILE_BLOB_V1.SCHEMA_MINOR) {

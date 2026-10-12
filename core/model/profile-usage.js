@@ -14,14 +14,7 @@ const {decodedOf} = require("./portable-profile");
 const {PROFILE_BLOB_V1, PROFILE_DOMAIN_IDS} = require("../schema/profile-blob-v1");
 const {SETTINGS} = require("../schema/settings-domain-v1");
 
-/** @type {Readonly<Record<number, string>>} */
-const AREA_OF_DOMAIN = {
-    [PROFILE_DOMAIN_IDS.RGB]: "lighting",
-    [PROFILE_DOMAIN_IDS.KEY_BEHAVIORS]: "behaviours",
-    [PROFILE_DOMAIN_IDS.COMBOS]: "combos",
-    [PROFILE_DOMAIN_IDS.SETTINGS]: "settings",
-    [PROFILE_DOMAIN_IDS.PD_MODES]: "pointing",
-};
+const {profileDomain} = require("../schema/profile-domains");
 // The order the areas are listed in: what an edit most often grows first.
 const AREAS = ["behaviours", "combos", "names", "lighting", "pointing", "settings"];
 
@@ -60,7 +53,7 @@ function profileUsage(snapshot, capabilities) {
     for (let offset = /** @type {number} */ (PROFILE_BLOB_V1.HEADER_SIZE); offset < profile.length;) {
         const id = profile[offset], length = profile.readUInt16LE(offset + 2), end = offset + PROFILE_BLOB_V1.DOMAIN_HEADER_SIZE + length;
         if (id === PROFILE_DOMAIN_IDS.RGB) rgb = profile.subarray(end - length, end);
-        bytes[AREA_OF_DOMAIN[id]] += end - offset;
+        bytes[/** @type {NonNullable<ReturnType<typeof profileDomain>>} */ (profileDomain(id)).area] += end - offset;
         offset = end;
     }
     const names = nameBytes(decoded.settings);

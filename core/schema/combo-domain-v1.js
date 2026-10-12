@@ -1,5 +1,6 @@
 // @ts-check
 "use strict";
+const {PROFILE_DOMAIN_VERSIONS, PROFILE_DOMAIN_IDS} = require("./profile-domains");
 const {LAYERS} = require("../data/charybdis-layout");
 const {encodeSemanticAction, decodeSemanticAction} = require("./profile-blob-v1");
 /** @param {string} message */
@@ -12,7 +13,7 @@ const fail = message => Object.assign(new Error(message), {code: "INVALID_COMBO_
 // 12 + 4 × inputs bytes: count, flags, window, the layers it may fire on,
 // output, then its two to sixteen inputs. A disabled combo keeps everything
 // it holds (participation-policy.md).
-const COMBO_DOMAIN_VERSION = 3;
+const COMBO_DOMAIN_VERSION = PROFILE_DOMAIN_VERSIONS[PROFILE_DOMAIN_IDS.COMBOS];
 const HEADER_SIZE = 8;
 const ROW_FIXED_SIZE = 12;
 const COMBO_LIMITS = Object.freeze({maxRows: 128, maxInputs: 16, maxLayers: LAYERS});
