@@ -7,7 +7,7 @@ const {LIVE_LINK_ERROR_CODES, liveLinkError} = require("../../core/transport/dev
 const {fingerprint, summary} = require("../../core/model/portable-profile");
 const {document} = require("../fixtures/pd-profile");
 const {document: currentDocument} = require("../fixtures/portable-profile");
-const {fakeKeyboardAdapter} = require("../fixtures/fake-keyboard");
+const {fakeKeyboardAdapter, fakeKeyboard} = require("../fixtures/fake-keyboard");
 const {PHASE} = require("../../core/model/vocabulary");
 
 const capabilities = {compiledLayerCount: 16, supportedDomainMask: 31, actionAbiDigest: 0x837cf479, featureFlags: 0};
@@ -457,4 +457,36 @@ test("demo macros use the same live validation without a keyboard", async () => 
     assert.equal(last(host).type, "macroValidation");
     assert.equal(last(host).validation.error, "");
     assert.deepEqual(service.calls, []);
+});
+
+
+test("a retained dirty draft adopts the reconnected firmware's macro limits at rebase", async t => {
+    const host = fakeHost();
+    const adapter = fakeKeyboardAdapter({document: currentDocument(), streaming: false});
+    const loop = openPanelLoop(host, {adapter, defaultTimeoutMs: 200});
+    t.after(() => loop.close());
+    await loop.handleMessage({type: "refresh"});
+    const draft = loop.session.draft;
+    await loop.handleMessage({type: "updateLayoutKeys", draftId: draft.id, draftRevision: draft.revision,
+        layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_A"}]});
+    assert.equal(last(host).model.macroBank.programMax, 512);
+    for (const streaming of [true, false]) {
+        await loop.session.service.disconnect();
+        adapter.keyboard = fakeKeyboard({document: currentDocument(), streaming});
+        await loop.handleMessage({type: "refresh"});
+        assert.equal(loop.session.draft, draft, "reconnect preserves the authored draft");
+        await loop.handleMessage({type: "rebaseProfileDraft", draftId: draft.id, draftRevision: draft.revision});
+        const model = last(host).model;
+        assert.equal(model.draft.editable, true);
+        assert.equal(model.macroBank.capacity, streaming ? 34903 : 10327);
+        assert.equal(model.macroBank.programMax, streaming ? null : 512);
+        await loop.handleMessage({type: "updateViaMacro", draftId: draft.id, draftRevision: draft.revision,
+            keycode: "VIA_MACRO_0", payload: "a".repeat(600)});
+        if (streaming) assert.equal(last(host).model.viaMacros[0].payload.length, 600);
+        else {
+            assert.match(last(host).notice, /512/);
+            assert.equal(last(host).model.viaMacros[0].payload.length, 600, "the refused edit keeps the earlier macro");
+            assert.equal(last(host).model.viaMacros[0].playable, false, "recomputed playback uses the smaller firmware limit");
+        }
+    }
 });

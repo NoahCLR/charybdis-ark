@@ -18,6 +18,8 @@ repository roots. Use a new report filename for each run, outside the checkouts.
 Git, Node, Python 3, a C compiler with the runners' sanitizer support, and the selected
 QMK tree are required. Missing checkouts or required integration inputs fail before any tests run. No dependency installation, fetching, device
 access or firmware flashing occurs.
+Optional-feature runners skip only when a readable contract lacks the feature.
+A missing search tool or an unreadable contract fails the runner and the bridge.
 
 It first compares every firmware input (including aliased sources) pinned in `upstream/manifest.json` with
 the selected firmware working copy. A pinned fixture that differs or is missing

@@ -1028,6 +1028,7 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .pk-search { max-width: 300px; margin-left: 12px; }
 .pk-mods .note { margin-left: auto; }
 .pk-value { margin-left: 10px; color: var(--text); }
+.pk-problem { padding: 0 18px 14px; background: var(--surface-2); }
 .pk-mods { display: flex; align-items: center; gap: 6px; padding: 11px 18px; border-bottom: 1px solid var(--line); background: var(--surface-2); }
 .pk-mod { height: 26px; padding: 0 11px; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); font-size: 12px; color: var(--text-2); }
 .pk-mod:hover { border-color: var(--line-3); color: var(--text); }

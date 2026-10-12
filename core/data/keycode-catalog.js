@@ -208,7 +208,8 @@ function encode(expression) {
     if (wrapper && modifier !== undefined) {
         const key = encode(wrapper[2]);
         if (key === undefined || key > 0x1fff) return undefined;
-        return key | (modifier << 8);
+        const bits = combineModifiers((key >> 8) & 0x1f, modifier);
+        return bits === undefined ? undefined : (key & 0xff) | (bits << 8);
     }
     const modTap = text.match(/^MT\(\s*([^,]+)\s*,\s*([A-Za-z0-9_]+)\s*\)$/);
     if (modTap) {
@@ -255,9 +256,19 @@ function encodeModifiers(expression) {
         if (!match) return undefined;
         const modifier = MODIFIERS.find(mod => mod.name === match[2]);
         if (!modifier) return undefined;
-        bits |= modifier.bit | (match[1] === "R" ? 0x10 : 0);
+        const combined = combineModifiers(bits, modifier.bit | (match[1] === "R" ? 0x10 : 0));
+        if (combined === undefined) return undefined;
+        bits = combined;
     }
     return bits;
+}
+
+// QMK has one side flag for every modifier in a compact keycode. Combining
+// left and right masks would silently move all of them to the right.
+/** @param {number} before @param {number} added @returns {number | undefined} */
+function combineModifiers(before, added) {
+    return (before & 0x0f) && (added & 0x0f) && ((before ^ added) & 0x10)
+        ? undefined : before | added;
 }
 
 /** @param {string} name */
@@ -297,4 +308,4 @@ function metadata() {
     };
 }
 
-module.exports = {aliasTable, encode, entries, lookup, metadata, resolve};
+module.exports = {aliasTable, combineModifiers, encode, entries, lookup, metadata, resolve};

@@ -127,9 +127,16 @@ macros included, found by the name they were given. Layers offers each layer
 as Hold (`MO`), Lock (`LOCK_LAYER`, the same lock as QMK's `TG`) and Tap-hold
 (`LT`); a keyboard that owns its layer keys adds Tap-toggle (`TT`), One-shot
 (`OSL`) and Move (`TO`).
+Modifier combinations must use one side: all left or all right. Mixing the
+two cannot be stored in one keycode, so the picker explains it and disables
+**Use keycode**. A symbol's built-in Shift counts toward that choice too.
 
 Colour on any screen comes from the model, never from a constant, and a stage
 that is switched off is drawn as off — hollow dots, plain badges, unlit keys.
+Lowering a colour's brightness to zero keeps its hue and saturation visible
+and editable. A layer colour with nonzero saturation paints black at zero
+brightness; only zero saturation and brightness let underlying lighting show
+through. An LED override row inherits its stage colour only at HSV(0, 0, 0).
 
 Every edit is kept in a local draft and reaches the keyboard only through
 review and apply. Review lists each changed thing once, under the area it is
@@ -176,7 +183,8 @@ After a disconnect, a retained dirty draft requires **Review against the
 keyboard** before editing, checking a macro, keeping an import or layer review,
 or applying, even if the HID path and saved profile look unchanged. These
 controls wait for a complete, current read on the draft's own keyboard; the
-demo remains editable without a keyboard.
+review adopts that firmware's reported capacities and features, including its
+macro memory and playback limits. The demo remains editable without a keyboard.
 
 Macro keycodes are shown as `VIA_MACRO_0` through `VIA_MACRO_127` in the live
 editor, including slots whose QMK values have no named constant.
@@ -309,7 +317,8 @@ of the board card, next to the workbench, the picked one opening into the board
 it shows, on Keys and on Lighting alike; **Rename & Reorder** stays at the end
 of those tabs, outside what scrolls, and opens upward over the board, so a layer
 is renamed and reordered where its keys are on screen. Drag a row by the grip
-on its left to move it, or focus the grip and press ↑ ↓. The bottom row is the
+on its left to move it within the full sixteen-layer stack, or focus the grip
+and press ↑ ↓. The bottom row is the
 base: always on, and what every transparent key falls through to. It is not
 dragged; **Make base** on another row swaps that layer into it, and the old
 base takes its place. **Keys follow their layers** (on by

@@ -87,6 +87,7 @@ class ProfileDraftSession {
         // Web Crypto, which Node and the browser both have, so one line serves both hosts.
         this.id = globalThis.crypto.randomUUID();
         this.capabilities = copy(capabilities);
+        this.latestCapabilities = copy(capabilities);
         /** @type {Snapshot} */
         this.base = copy(snapshot);
         /** @type {Snapshot} */
@@ -178,13 +179,20 @@ class ProfileDraftSession {
         if ((state.connectionToken ?? null) !== this.connectionToken) return "connection-changed";
         return "";
     }
-    /** @param {Snapshot | null | undefined} snapshot @param {string | null | undefined} deviceId @param {import("./types.js").ConnectionToken} [connectionToken] */
-    observe(snapshot, deviceId, connectionToken = null) {
+    /** @param {Snapshot | null | undefined} snapshot @param {string | null | undefined} deviceId @param {import("./types.js").ConnectionToken} [connectionToken] @param {import("../model/types.js").ProfileDestination} [capabilities] */
+    observe(snapshot, deviceId, connectionToken = null, capabilities = this.capabilities) {
         if (!snapshot || deviceId !== this.deviceId) return;
+        this.latestCapabilities = copy(capabilities);
+        const dirty = this.dirty;
+        if (!dirty && !snapshot.incomplete && JSON.stringify(capabilities) !== JSON.stringify(this.capabilities)) {
+            validateSnapshot(snapshot.document, capabilities);
+            this.acceptCapabilities(capabilities);
+            this.reset(snapshot);
+        }
         const token = connectionToken ?? null;
         this.latestConnectionToken = token;
         if (token !== this.connectionToken) {
-            if (this.dirty) this.connectionChanged = true;
+            if (dirty) this.connectionChanged = true;
             else {this.connectionToken = token; this.connectionChanged = false;}
         }
         this.needsRead = false;
@@ -196,7 +204,7 @@ class ProfileDraftSession {
             this.reviewCache = new WeakMap();
             this.checksCache = new WeakMap();
         }
-        if (!this.dirty) {
+        if (!dirty) {
             if (snapshot.fingerprint !== this.base.fingerprint) this.reset(snapshot);
             else {this.base = copy(snapshot); this.latest = copy(snapshot);}
         } else this.latest = copy(snapshot);
@@ -216,6 +224,19 @@ class ProfileDraftSession {
         this.revision++; this.reviewedRevision = null;
         this.needsRead = false;
         this.connectionChanged = false;
+    }
+    // A retained dirty draft keeps its original interpretation until rebase.
+    // Once the current keyboard is accepted, no cached decode or review may
+    // retain the old firmware's capacities or optional features.
+    /** @param {import("../model/types.js").ProfileDestination} capabilities */
+    acceptCapabilities(capabilities) {
+        if (JSON.stringify(capabilities) === JSON.stringify(this.capabilities)) return;
+        this.capabilities = copy(capabilities);
+        this.decodeCache = new WeakMap();
+        this.referenceCache = new WeakMap();
+        this.reviewCache = new WeakMap();
+        this.stepCache = new WeakMap();
+        this.checksCache = new WeakMap();
     }
     // A new entry keeps the entry's layer order unless it says otherwise.
     /** @param {Document} document @param {number} revision @param {string} [origin] @param {string | null} [label] @param {Order} [order] */
@@ -452,6 +473,10 @@ class ProfileDraftSession {
         this.assertRevision(revision, {allowStale: true});
         if (this.needsRead) throw fail("Read the latest keyboard state before reviewing this draft again.");
         const target = this.document, order = this.order;
+        // Check before changing the draft, so a smaller destination preserves
+        // the retained edits and their original interpretation on refusal.
+        validateSnapshot(target, this.latestCapabilities);
+        this.acceptCapabilities(this.latestCapabilities);
         if (this.latest.incomplete) {
             this.base = copy(this.latest); this.history = [this.historyEntry(target)]; this.cursor = 0;
             this.connectionToken = this.latestConnectionToken; this.connectionChanged = false;

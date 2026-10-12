@@ -78,7 +78,7 @@ function observePortable(session, state, portable = session.service.portable) {
     if (!portable || portable === session.observedPortable || !state.connected || !canEdit(state.capabilities)) return;
     if (portable.incomplete && !session.draft) return;
     if (!session.draft) setDraft(session, new ProfileDraftSession(portable, state.selectedDeviceId, state.capabilities, state.connectionToken));
-    else session.draft.observe(portable, state.selectedDeviceId, state.connectionToken);
+    else session.draft.observe(portable, state.selectedDeviceId, state.connectionToken, state.capabilities);
     session.observedPortable = portable;
 }
 

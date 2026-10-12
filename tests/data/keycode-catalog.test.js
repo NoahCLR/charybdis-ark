@@ -263,3 +263,18 @@ test("every resolved uint16 can be written back without changing its value", () 
         assert.equal(encode(decoded.name), value, `${value}: ${decoded.name}`);
     }
 });
+
+
+test("compact keycodes refuse mixed modifier sides without changing valid masks", () => {
+    for (const expression of ["RSFT(C(KC_A))", "C(RSFT(KC_A))", "RALT(KC_EXLM)",
+        "MT(MOD_LCTL|MOD_RSFT, KC_A)", "OSM(MOD_RSFT|MOD_LCTL)", "LM(1, MOD_LCTL|MOD_RSFT)"]) {
+        assert.equal(encode(expression), undefined, expression);
+    }
+    assert.equal(encode("S(C(KC_A))"), 0x0304);
+    assert.equal(encode("RSFT(RCTL(KC_A))"), 0x1304);
+    assert.equal(encode("RSFT(KC_RALT)"), 0x12e6, "a basic modifier key can be the key itself");
+    assert.equal(encode("MT(MOD_RCTL|MOD_RSFT, KC_A)"), 0x3304);
+    assert.equal(encode("OSM(MOD_RCTL|MOD_RSFT)"), 0x52b3);
+    assert.equal(encode("LM(1, MOD_RCTL|MOD_RSFT)"), 0x5033);
+    assert.equal(encode("0x1304"), 0x1304, "stored numeric keycodes remain accepted");
+});

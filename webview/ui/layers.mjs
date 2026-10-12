@@ -187,7 +187,7 @@ const GRIP = `<svg viewBox="0 0 10 16" aria-hidden="true">${[3, 8, 13].map((y) =
 // Drags a row by its grip. The row follows the pointer and the others make
 // room as it passes their middles; the base row stays put below them. On
 // release the row's place is posted as the slot it lands in: rows read top
-// down from the highest slot, 7, so the nth row above the base is slot 7 - n.
+// down from the highest slot, with the base below every draggable row.
 /** @param {PointerEvent} event @param {HTMLElement} list @param {number} id @param {(to: number) => void} drop */
 function dragRow(event, list, id, drop) {
     if (event.button !== 0) return;
@@ -223,7 +223,7 @@ function dragRow(event, list, id, drop) {
         list.classList.remove("sorting");
         row.style.transform = "";
         const index = rows().indexOf(row);
-        if (moved && index !== start) drop(7 - index);
+        if (moved && index !== start) drop(rows().length - index);
     };
     // The window hears the pointer wherever it goes, off the grip included.
     window.addEventListener("pointermove", onMove);

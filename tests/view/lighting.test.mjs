@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {isOff} from "../../webview/lib/colour.mjs";
-import {baseColour, feedbackColours, keyLight, mappedKeyCount, ownLight, pdColourRow, stageEnabled, stageIdle, stageInEffect, trackballLight} from "../../webview/view/lighting.mjs";
+import {baseColour, feedbackColours, inheritsStageColour, layerPaints, keyLight, mappedKeyCount, ownLight, pdColourRow, stageEnabled, stageIdle, stageInEffect, trackballLight} from "../../webview/view/lighting.mjs";
 
 const colour = (h, s, v) => ({h: String(h), s: String(s), v: String(v)});
 const position = (layoutIndex, keycode) => ({layoutIndex, keycode});
@@ -228,4 +228,17 @@ test("LED group rows paint their LEDs, inheriting their stage colour when stored
     const pdActive = {mode: "PD_MODE_DRAGSCROLL", color: colour(21, 255, 200), locality: "RGB_RIGHT_HALF"};
     assert.deepEqual(keyLight(m, layer, position(13, "KC_UP"), {pdActive}).colour, colour(21, 255, 200),
         "a pointing group row paints the mode colour on the left half too");
+});
+
+
+test("zero brightness keeps explicit black distinct from layer pass-through and group inheritance", () => {
+    const black = colour(140, 255, 0), skipped = colour(140, 0, 0);
+    assert.equal(layerPaints(black), true);
+    assert.equal(layerPaints(skipped), false);
+    assert.equal(inheritsStageColour(black), false);
+    assert.equal(inheritsStageColour(skipped), false, "group inheritance requires all three channels zero");
+    assert.equal(inheritsStageColour(colour(0, 0, 0)), true);
+    const m = model();
+    m.rgb.layerColors[1].color = black;
+    assert.deepEqual(keyLight(m, {index: 3}, position(13, "KC_A")), {colour: black, source: "layer", layer: 3});
 });

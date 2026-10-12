@@ -7,6 +7,7 @@
 // PD_SLOT_0, VIA_MACRO_3 — resolved to profile actions and native keycodes.
 
 const {PD_SLOT_BINDINGS, FORMER_NAMES, pdBindingOfName} = require("../data/pd-bindings");
+const {combineModifiers} = require("../data/keycode-catalog");
 const {customKeyCode, customKeyOfName, layerLockCode, LAYER_LOCK_SLOTS} = require("../data/user-keycodes");
 const {PROFILE_ACTION_KINDS} = require("./profile-blob-v1");
 
@@ -132,7 +133,9 @@ function resolveNativeQmkExpression(value, model) {
     // an unrelated keycode, e.g. C(VIA_MACRO_3) into a macro without Ctrl.
     if (MODIFIER_WRAPPERS[call.name] !== undefined && call.args.length === 1) {
         const keycode = resolveNativeQmkExpression(call.args[0], model);
-        return keycode === undefined || keycode > QK_MODS_MAX ? undefined : MODIFIER_WRAPPERS[call.name] | keycode;
+        if (keycode === undefined || keycode > QK_MODS_MAX) return undefined;
+        const mods = combineModifiers((keycode >> 8) & 0x1f, MODIFIER_WRAPPERS[call.name] >> 8);
+        return mods === undefined ? undefined : (mods << 8) | (keycode & 0xff);
     }
     if (call.name === "OSM" && call.args.length === 1) {
         const mods = resolveModifierBits(call.args[0]);
@@ -160,7 +163,9 @@ function resolveModifierBits(value) {
     let result = 0;
     for (const part of parts) {
         if (MODIFIER_BITS[part] === undefined) return undefined;
-        result |= MODIFIER_BITS[part];
+        const combined = combineModifiers(result, MODIFIER_BITS[part]);
+        if (combined === undefined) return undefined;
+        result = combined;
     }
     return result & 0x1f;
 }
