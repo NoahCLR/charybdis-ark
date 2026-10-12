@@ -32,6 +32,7 @@ Key and modifier names follow that OS throughout the editors and Review.
   macro memory, and on current firmware one macro can use all of it. There are 128 slots in each bank;
   a combo can have up to 16 inputs, with its own enable and layer controls.
 - **Lighting.** Set layer and mode colours, combo and key feedback, and the
+  idle timeout in seconds or minutes. Tune the
   auto-mouse fade. The board on screen is painted the way the keyboard will
   light up, with black overlays kept distinct from inherited colours.
 - **Trackball.** Set pointer speed, sniping and auto-mouse, and 32 pointing

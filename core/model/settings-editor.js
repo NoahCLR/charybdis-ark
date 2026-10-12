@@ -103,7 +103,7 @@ const sections = [
         byte("saturation", SETTING.RGB_COLOR, 8, "Saturation", "0 is white; 255 is fully saturated."),
         byte("brightness", SETTING.RGB_COLOR, 16, "Brightness", "Saved brightness, 0–255. The keyboard applies its hardware brightness limit."),
         byte("effectSpeed", SETTING.RGB_MODE, 16, "Animation speed"),
-        number("lightingTimeout", SETTING.RGB_TIMEOUT, "Idle timeout (ms)", `0 keeps lighting on. Maximum ${SETTING_FIELD.RGB_TIMEOUT.max} ms (one day).`),
+        number("lightingTimeout", SETTING.RGB_TIMEOUT, "Idle timeout", "Time without activity before lighting turns off. 0 keeps lighting on. Maximum 24 hours.", {presentation: "duration"}),
     ]},
     {id: "lightingFeedback", label: "Lighting Feedback", fields: [
         number("feedbackFlash", SETTING.FEEDBACK_PERIOD, "Key feedback flash interval (ms)", "Time for each on or off phase; a full blink takes twice this value.", {min: SETTING_FIELD.FEEDBACK_PERIOD.min, validate: "positive-int"}),

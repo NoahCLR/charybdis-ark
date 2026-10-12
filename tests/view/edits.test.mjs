@@ -14,9 +14,11 @@ import * as edits from "../../webview/view/edits.mjs";
 import * as controls from "../../webview/view/controls.mjs";
 import {behaviourEditorRow, behaviourTimingEdit, behaviourTimingField} from "../../webview/view/behavior-editor.mjs";
 import {shareHold} from "../../webview/view/share.mjs";
+import {durationMilliseconds, durationValue} from "../../webview/view/duration.mjs";
 import {AXIS, BUTTON, DIRECTIONAL_STARTER_THRESHOLD, KIND, MODIFIER_POLICY, SCROLL_AXES, SCROLL_STARTER, dpiOptions, modeDpi, newMode, readConfig, settleButtons, settleTaps, startingRecord, thresholdDistance} from "../../webview/view/pointing-config.mjs";
 
 const require = createRequire(import.meta.url);
+const {SETTING} = require("../../core/schema/settings-domain-v1");
 const here = path.dirname(fileURLToPath(import.meta.url));
 const {ProfileDraftSession} = require(path.join(here, "..", "..", "core", "session", "profile-draft-session"));
 const portable = require(path.join(here, "..", "..", "core", "model", "portable-profile"));
@@ -742,6 +744,24 @@ test("duplicating needs a configured source and an empty destination", () => {
 });
 
 // ── settings ────────────────────────────────────────────────────────────
+
+test("human timeout units stage milliseconds and keep the rest of Base Lighting", () => {
+    const draft = session();
+    for (const [value, unit, expected] of [["777", "seconds", 777000], ["1.5", "minutes", 90000], ["0.777", "seconds", 777], ["0", "minutes", 0], ["1440", "minutes", 86400000]]) {
+        const section = settingsEditorView(draft.current).sections.find(row => row.id === "rgbAppearance");
+        const before = decoded(draft).settings.values.slice();
+        const message = edits.settingsSection(section, field => field.macro === "lightingTimeout" ? durationMilliseconds(value, unit) : undefined, draft.current.fingerprint);
+        stage(draft, message);
+        assert.equal(decoded(draft).settings.values[SETTING.RGB_TIMEOUT], expected);
+        before[SETTING.RGB_TIMEOUT] = expected;
+        assert.deepEqual(decoded(draft).settings.values, before);
+    }
+    const section = settingsEditorView(draft.current).sections.find(row => row.id === "rgbAppearance");
+    const timeout = section.fields.find(field => field.macro === "lightingTimeout");
+    const before = draft.document;
+    stage(draft, edits.settingsSection(section, field => field.macro === "lightingTimeout" ? durationMilliseconds(durationValue(timeout.value, "minutes"), "minutes") : undefined, draft.current.fingerprint));
+    assert.deepEqual(draft.document, before);
+});
 
 test("a settings section is posted whole, and a partial section is refused", () => {
     const draft = session();

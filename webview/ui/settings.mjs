@@ -16,6 +16,7 @@ import {topbar, unavailable} from "./shell.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {marked} from "./marks.mjs";
 import {githubMark} from "../view/host.mjs";
+import {durationControl} from "./duration.mjs";
 
 // The sections a screen draws, by the area the keyboard's model files them in.
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} area */
@@ -138,21 +139,28 @@ export function sectionCard(model, section, fields, canEdit, searching = false) 
 
     // A section is saved whole: the core validates the complete set, so every
     // field travels together and one changed value cannot half-write a section.
-    const submit = () => post(edits.settingsSection(section, (field) => {
-        const input = /** @type {HTMLInputElement | HTMLSelectElement | null} */ (node.querySelector(`[data-macro="${cssEscape(field.macro)}"]`));
-        if (!input) return undefined;
-        return field.kind === "toggle" ? /** @type {HTMLInputElement} */ (input).checked : input.value;
-    }, model?.settingsEditing?.identity));
+    /** @type {Map<string, ReturnType<typeof durationControl>>} */
+    const durations = new Map();
+    const submit = () => {
+        for (const duration of durations.values()) if (duration.read() === null) { duration.reportValidity(); return; }
+        post(edits.settingsSection(section, (field) => {
+            const duration = durations.get(field.macro);
+            if (duration) return duration.read() ?? undefined;
+            const input = /** @type {HTMLInputElement | HTMLSelectElement | null} */ (node.querySelector(`[data-macro="${cssEscape(field.macro)}"]`));
+            if (!input) return undefined;
+            return field.kind === "toggle" ? /** @type {HTMLInputElement} */ (input).checked : input.value;
+        }, model?.settingsEditing?.identity));
+    };
 
     for (const field of section.fields) {
         const hidden = !fields.includes(field);
-        rows.appendChild(fieldRow(field, canEdit, submit, hidden, section.fields.some((entry) => entry.governs)));
+        rows.appendChild(fieldRow(field, canEdit, submit, hidden, section.fields.some((entry) => entry.governs), durations));
     }
     return node;
 }
 
-/** @param {import("../../contracts/panel.js").PresentedField} field @param {boolean} canEdit @param {() => void} submit @param {boolean} hidden @param {boolean} slot */
-function fieldRow(field, canEdit, submit, hidden, slot) {
+/** @param {import("../../contracts/panel.js").PresentedField} field @param {boolean} canEdit @param {() => void} submit @param {boolean} hidden @param {boolean} slot @param {Map<string, ReturnType<typeof durationControl>>} durations */
+function fieldRow(field, canEdit, submit, hidden, slot, durations) {
     const editable = canEdit && !field.readOnly;
     const row = el(`<div class="setrow ${field.readOnly ? "ro" : ""}" ${hidden ? "hidden" : ""}>
         <div><div class="nm">${marked(getModel(), field.governs, field.label, {slot})}</div>${field.hint ? `<div class="hint">${esc(field.hint)}</div>` : ""}</div>
@@ -163,6 +171,12 @@ function fieldRow(field, canEdit, submit, hidden, slot) {
     if (field.readOnly) {
         control.appendChild(el(`<span class="chip"
             data-tip="The connected firmware does not report this option, so it is shown as the keyboard has it and cannot be edited here.">read-only · ${esc(field.kind === "toggle" ? (field.enabled ? "on" : "off") : field.value)}</span>`));
+        return row;
+    }
+    if (field.presentation === "duration") {
+        const duration = durationControl(field, editable, submit);
+        control.appendChild(duration.node);
+        durations.set(field.macro, duration);
         return row;
     }
     if (field.kind === "toggle") {

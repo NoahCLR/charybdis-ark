@@ -449,6 +449,14 @@ function profileReview(before, after, capabilities) {
     const sections = (snapshot, settings) => /** @type {NonNullable<ReturnType<typeof settingsEditorView>>} */ (settingsEditorView(snapshot)).sections.map(section => ({id: section.id, label: section.label, area: section.area, stage: section.stage,
         fields: new Map(section.fields.map(/** @returns {[string, Field]} */ field => {
             let value = field.value;
+            if (field.presentation === "duration") {
+                const ms = Number(value);
+                const minutes = ms >= 60000 && ms % 60000 === 0;
+                const amount = ms / (minutes ? 60000 : 1000);
+                const unit = minutes ? "minute" : "second";
+                return [field.macro, {label: field.label, text: ms === 0 ? "Always on" : `${amount} ${unit}${amount === 1 ? "" : "s"}`,
+                    key: field.value, labelMark: field.governs}];
+            }
             // A share is compared by the milliseconds stored, so a timeout
             // that rescales it shows here too, and read as both.
             if (field.kind === "share") return [field.macro, {label: field.label, text: `${value}% · ${field.ms} ms`, key: field.ms, labelMark: field.governs}];

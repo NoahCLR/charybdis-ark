@@ -205,6 +205,7 @@ export interface SettingFieldBase extends SettingBits {
     label: string;
     hint?: string;
     unit?: string;
+    presentation?: 'duration';
     validate?: string;
     min?: number;
     max?: number;

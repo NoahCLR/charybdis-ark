@@ -141,6 +141,13 @@ only vertical scroller.
   composes behaviour, macro and pointing routes from those answers.
 - Settings bits and base lighting: `fieldMask` and `baseLighting` in
   `core/model/settings-editor.js`.
+  The idle lighting timeout is published and staged in milliseconds, with
+  duration presentation metadata. `view/duration.mjs` converts the editor's
+  seconds or minutes to the nearest millisecond; whole-minute values initially
+  use minutes, other values use seconds. The unit preference survives renders
+  and changing it stages nothing. Empty or invalid text cannot save a section;
+  zero stays visible and means lighting stays on. Review compares stored
+  milliseconds and names the time in human units.
 - Panel sequencing: `core/session/panel-controls.js`, tested with a fake
   service; the message loop around it, for every host:
   `core/session/panel-loop.js`. `extension.js` supplies dialogs, files,

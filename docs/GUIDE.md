@@ -238,6 +238,12 @@ When an accepted edit redraws the screen, the same field keeps keyboard focus
 and its text selection while it remains available. Search fields also keep
 the caret where you are editing, including when filtering Settings.
 
+The lighting **Idle timeout** uses seconds or minutes: `60000` milliseconds
+reads as `1` minute. Choose the unit beside the value; changing units alone
+does not edit the draft. Fractions are accepted and rounded to the nearest
+millisecond. `0` keeps lighting on, and the maximum is 24 hours (1440 minutes).
+Review names the time in seconds or minutes, or **Always on** for zero.
+
 After the complete keyboard read opens an editable draft, the board stays on
 screen, full width, painted with the light the keyboard would actually show for
 that layer — the base effect, then

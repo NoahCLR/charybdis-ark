@@ -49,7 +49,7 @@ const KEPT = [
     "keyClipboard", "stage", "layersOpen", "layersAsked", "pdSlot", "pdAdvanced", "applyDismissed", "pdPreview", "feedbackRow",
     "macroSlot", "macroSearch", "customKey", "customKeySearch", "recording", "recordDelays", "recordMode", "recordDelayThreshold",
     "recordDelayRound", "ledPicks", "trackball", "rowColour", "ledRow", "settingsSearch", "overlay", "leaveDemo", "confirmChecks",
-    "picker", "notice", "error",
+    "picker", "notice", "error", "settingsDurationUnits",
 ];
 
 test("every panel state field declares what a draft change does to it", () => {

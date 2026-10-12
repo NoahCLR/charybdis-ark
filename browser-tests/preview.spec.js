@@ -110,6 +110,56 @@ for (const theme of ["plain", "vscode-dark", "vscode-light"]) {
     });
 }
 
+for (const theme of ["plain", "vscode-dark", "vscode-light"]) {
+    test(`idle timeout units post milliseconds without changing other settings (${theme})`, async ({page}) => {
+        await openPreview(page, theme);
+        await page.evaluate(async () => {
+            const store = await import("/webview/store.mjs");
+            const model = structuredClone(store.getModel());
+            model.configDefaults.find(section => section.id === "rgbAppearance").fields.find(field => field.macro === "lightingTimeout").value = "60000";
+            store.setModel(model);
+            store.state.screen = "settings";
+            store.state.settingsOpen = ["rgbAppearance"];
+            store.render();
+            window.__posted.length = 0;
+        });
+        const input = page.getByRole("textbox", {name: "Idle timeout", exact: true});
+        const unit = page.getByRole("combobox", {name: "Idle timeout unit"});
+        await expect(input).toHaveValue("1");
+        await expect(unit).toHaveValue("minutes");
+        await unit.selectOption("seconds");
+        await expect(input).toHaveValue("60");
+        expect(await page.evaluate(() => window.__posted)).toEqual([]);
+        for (const [units, value, ms] of [["seconds", "777", "777000"], ["minutes", "1.5", "90000"], ["seconds", "0.777", "777"], ["minutes", "0", "0"], ["minutes", "1440", "86400000"]]) {
+            await unit.selectOption(units);
+            await page.evaluate(() => {window.__posted.length = 0;});
+            await input.fill(value);
+            await input.blur();
+            await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([
+                expect.objectContaining({type: "updateConfigDefaults", sectionId: "rgbAppearance", fields: expect.arrayContaining([{macro: "lightingTimeout", value: ms}])}),
+            ]);
+            const posted = await page.evaluate(() => window.__posted[0].fields);
+            expect(posted).toHaveLength(8);
+            expect(posted.find(field => field.macro === "brightness").value).toBe("200");
+        }
+        for (const invalid of ["", "no time", "-1", "1441"]) {
+            await page.evaluate(() => {window.__posted.length = 0;});
+            await input.fill(invalid);
+            await input.blur();
+            expect(await page.evaluate(() => window.__posted)).toEqual([]);
+            expect(await input.evaluate(node => node.validity.valid)).toBe(false);
+        }
+        await input.fill("1");
+        await input.blur();
+        await input.focus();
+        await input.evaluate(node => node.setSelectionRange(0, 1));
+        await page.evaluate(async () => (await import("/webview/store.mjs")).render());
+        await expect(unit).toHaveValue("minutes");
+        await expect(input).toBeFocused();
+        expect(await input.evaluate(node => [node.selectionStart, node.selectionEnd])).toEqual([0, 1]);
+    });
+}
+
 // The web page's controls, where the model offers them (?host=web is the web
 // host's model, scripts/preview.js). Each has to post what it says it does.
 test("the web host's controls post their messages", async ({page}) => {

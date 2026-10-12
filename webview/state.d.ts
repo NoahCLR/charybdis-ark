@@ -26,6 +26,7 @@ export interface PanelState {
     recordDelays: boolean; recordMode: string; recordDelayThreshold: number; recordDelayRound: number;
     ledPicks: number[]; trackball: boolean; rowColour: {h: string; s: string; v: string}; ledRow: {target: string; owner: string; source: string};
     settingsSearch: string; overlay: string | null;
+    settingsDurationUnits: Record<string, 'seconds' | 'minutes'>;
     leaveDemo: {ask: {title: string; detail: string; confirm: string}; message: PanelCommand} | null;
     confirmChecks: number | null; picker: PickerState | null; notice: string; error: string;
 }

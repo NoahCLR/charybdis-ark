@@ -231,6 +231,8 @@ a.rail-build:hover { color: var(--text-2); }
 select.input { background-image: linear-gradient(45deg, transparent 50%, var(--text-3) 50%), linear-gradient(135deg, var(--text-3) 50%, transparent 50%); background-position: calc(100% - 15px) 14px, calc(100% - 10px) 14px; background-size: 5px 5px; background-repeat: no-repeat; padding-right: 28px; }
 .input-row { display: flex; gap: 6px; }
 .input-row .input { flex: 1; }
+.duration-control input { min-width: 0; }
+.duration-control select.input { flex: 0 0 auto; width: auto; }
 
 /* The hidden input must stay beside its visible switch when the editor scrolls;
    focusing an absolutely positioned input elsewhere can move the viewport. */
