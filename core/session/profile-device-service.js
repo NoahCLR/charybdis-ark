@@ -21,15 +21,13 @@ const {customKeyOfCode, layerLockOfCode} = require("../data/user-keycodes");
 const {pdBindingOfCode} = require("../data/pd-bindings");
 const {layerName} = require("../model/vocabulary");
 const {readSettingsLimits} = require("../protocol/portable-profile-v1");
+const {editorViews} = require("./device-model");
 const {readHostOs} = require("../protocol/host-os-v1");
 const {supportsUnicodeMacros} = require("../schema/macro-payload");
 const {readKeyboardOptions} = require("../protocol/keyboard-options-v1");
 const {profileDomain} = require("../schema/profile-domains");
 const {profileDepthOptions} = require("../schema/profile-depth");
 const {captureProfile, restoreProfile, validateSnapshot} = require("./portable-profile-session");
-const {settingsEditorView} = require("../model/settings-editor");
-const {macroEditorView} = require("../model/macro-editor");
-const {customKeyEditorView} = require("../model/custom-key-editor");
 const {NodeHidDeviceAdapter} = require("../transport/node-hid-adapter");
 const {DeviceRequestCoordinator} = require("../transport/request-coordinator");
 const {readViaLayout, decodeViaLayout} = require("../protocol/via-layout-v1");
@@ -132,11 +130,11 @@ class ProfileDeviceService {
         /** @type {Capture | Restored | undefined} */
         this.portable = undefined;
         this.portableProgress = "";
-        /** @type {ReturnType<typeof macroEditorView> | undefined} */
+        /** @type {ReturnType<typeof editorViews>["macroView"] | undefined} */
         this.macroView = undefined;
-        /** @type {ReturnType<typeof customKeyEditorView> | undefined} */
+        /** @type {ReturnType<typeof editorViews>["customKeyView"] | undefined} */
         this.customKeyView = undefined;
-        /** @type {ReturnType<typeof settingsEditorView> | undefined} */
+        /** @type {ReturnType<typeof editorViews>["settingsView"] | undefined} */
         this.settingsView = undefined;
         /** @type {InstanceType<typeof ProfilePayloadReader> | undefined} */
         this.payloadReader = undefined;
@@ -445,9 +443,7 @@ class ProfileDeviceService {
                     {sleep: this.sleep, payloadReader: this.profilePayloadReader(), reuseReadback});
                 const {readback, ...captured} = capture;
                 result = captured;
-                result.limits = await readSettingsLimits(connection, this.requestSequence());
-                result.options = await readKeyboardOptions(connection, this.requestSequence());
-                if (supportsUnicodeMacros(this.capabilities)) result.hostOs = await readHostOs(connection, this.requestSequence());
+                Object.assign(result, await this.#readDeviceFacts(connection));
                 if (forEditor) {
                     if (capture.incomplete) throw new Error("The keyboard did not return a complete editor profile.");
                     /** @type {import("./types.js").BaseRgbRead} */
@@ -464,17 +460,30 @@ class ProfileDeviceService {
                 }
                 // Export is an independent capture. Only an editor read or a
                 // restore/rebase read changes the state the editor follows.
-                if (forEditor || forRestore) {
-                    this.portable = result;
-                    this.macroView = macroEditorView(result, this.capabilities);
-                    this.customKeyView = customKeyEditorView(result, this.capabilities);
-                    this.settingsView = settingsEditorView(result, this.capabilities);
-                }
+                if (forEditor || forRestore) this.#adoptPortable(result);
                 this.portableProgress = "";
             } finally {this.portableProgress = "";}
         });
         if (!result) throw new Error("The keyboard operation returned no verified profile.");
         return result;
+    }
+
+    // What the keyboard accepts beside its profile: its settings limits, its
+    // lighting effects and, where it plays Unicode macros, the host OS it
+    // detected. A profile already read from this connection supplies the first
+    // two; the host OS is always read fresh. Read before anything is written.
+    /** @param {Connection} connection @param {Pick<Capture, "limits" | "options">} [known] */
+    async #readDeviceFacts(connection, known) {
+        const limits = known?.limits || await readSettingsLimits(connection, this.requestSequence());
+        const options = known?.options || await readKeyboardOptions(connection, this.requestSequence());
+        return {limits, options, ...(supportsUnicodeMacros(this.capabilities) ? {hostOs: await readHostOs(connection, this.requestSequence())} : {})};
+    }
+
+    // The profile the editors follow, with their views (device-model.js).
+    /** @param {Capture} result */
+    #adoptPortable(result) {
+        this.portable = result;
+        ({settingsView: this.settingsView, macroView: this.macroView, customKeyView: this.customKeyView} = editorViews(result, this.capabilities));
     }
 
     /** @param {import("../model/types.js").PortableDocument} document @param {import("./types.js").RestoreOptions} options @returns {Promise<import("./types.js").RestoredProfile>} */
@@ -491,14 +500,14 @@ class ProfileDeviceService {
                 const cachedBase = options?.expectedFingerprint && this.portable?.fingerprint === options.expectedFingerprint
                     ? this.portable
                     : undefined;
-                const limits = cachedBase?.limits || await readSettingsLimits(connection, this.requestSequence());
+                const facts = await this.#readDeviceFacts(connection, cachedBase);
+                const {limits, options: keyboardOptions} = facts;
                 // What is checked is what would be written: an older backup as
                 // this keyboard numbers its keys.
                 const target = validateSnapshot(document, this.capabilities);
                 const lighting = baseLighting(target.settings.values);
                 const brightness = lighting.brightness;
                 if (limits && limits.brightnessMax !== undefined && brightness > limits.brightnessMax) throw Object.assign(new Error(`This profile's brightness exceeds the keyboard's reported limit of ${limits.brightnessMax}. Lower the brightness before restoring it.`), {code: "SETTINGS_LIMIT_EXCEEDED"});
-                const keyboardOptions = cachedBase?.options || await readKeyboardOptions(connection, this.requestSequence());
                 const effect = lighting.effect;
                 if (keyboardOptions && !keyboardOptions.effects.some(item => item.id === effect)) throw Object.assign(new Error("This profile uses a lighting effect unavailable on this keyboard."), {code: "SETTINGS_LIMIT_EXCEEDED"});
                 // The keyboard refuses a profile whose actions sit where it cannot
@@ -516,13 +525,8 @@ class ProfileDeviceService {
                     // when it failed, so the person can see where and why.
                     onApplyProgress: view => this.reportApplyProgress(view),
                 });
-                result.limits = limits;
-                result.options = keyboardOptions;
-                if (supportsUnicodeMacros(this.capabilities)) result.hostOs = await readHostOs(connection, this.requestSequence());
-                this.portable = result;
-                this.macroView = macroEditorView(result, this.capabilities);
-                this.customKeyView = customKeyEditorView(result, this.capabilities);
-                this.settingsView = settingsEditorView(result, this.capabilities);
+                Object.assign(result, facts);
+                this.#adoptPortable(result);
                 if (result.performance) {
                     const seconds = (result.performance.elapsedMs / 1000).toFixed(1);
                     this.addDiagnostic(`Saved the complete profile in ${seconds} s; transferred ${result.performance.layoutBytes} changed layout bytes and ${result.performance.macroBytes} changed macro bytes.`);

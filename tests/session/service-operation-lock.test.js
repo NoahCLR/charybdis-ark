@@ -1,11 +1,9 @@
 "use strict";
 const assert = require("node:assert/strict");
 const test = require("node:test");
-const {ProfileDeviceService} = require("../../core/session/profile-device-service");
 const {PHASE} = require("../../core/model/vocabulary");
-const {fakeKeyboardAdapter} = require("../fixtures/fake-keyboard");
-const {document} = require("../fixtures/portable-profile");
 const {fixture} = require("../fixtures/portable-restore");
+const {connectedService} = require("../fixtures/connected-service");
 const {PROFILE_WIRE_V1} = require("../../core/protocol/profile-wire-v1");
 
 function deferred() {
@@ -13,14 +11,7 @@ function deferred() {
     const promise = new Promise(done => { resolve = done; });
     return {promise, resolve};
 }
-async function connected(t, keyboard, options = {}) {
-    const adapter = fakeKeyboardAdapter(keyboard ? {keyboard} : {document: document()});
-    const service = new ProfileDeviceService({adapter, defaultTimeoutMs: 200, ...options});
-    t.after(() => service.close());
-    const scanned = await service.enumerate();
-    await service.connect(scanned.devices[0].id);
-    return {service, adapter, id: scanned.devices[0].id};
-}
+const connected = (t, keyboard, options) => connectedService(t, keyboard ? {keyboard} : {}, options);
 
 test("required overlap refuses before changing the owner's read state or sending requests", async t => {
     const {service, adapter, id} = await connected(t);

@@ -23,7 +23,7 @@ const {decodedOf} = require("../model/portable-profile");
 const {baseLighting, settingsEditorView} = require("../model/settings-editor");
 const {macroEditorView} = require("../model/macro-editor");
 const {customKeyEditorView} = require("../model/custom-key-editor");
-const {effectiveComboTerm} = require("../schema/combo-domain-v1");
+const {runningComboRows} = require("../schema/combo-domain-v1");
 const {SETTING} = require("../schema/settings-domain-v1");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX, matrixPosition} = require("../data/charybdis-layout");
 const {PROFILE_WIRE_FEATURES} = require("../protocol/profile-wire-v1");
@@ -63,6 +63,14 @@ function buildDeviceModel(state = {}) {
     }, state.capabilities, editableDomains(state)), ...deviceSummary(state)};
 }
 
+// The three editor views of a complete snapshot, built here only: the
+// service keeps them for the profile it read, and a draft builds its own.
+/** @param {import("../model/types.js").ProfileSnapshot} snapshot @param {import("../model/types.js").ProfileDestination} [capabilities] */
+function editorViews(snapshot, capabilities) {
+    return {settingsView: settingsEditorView(snapshot, capabilities), macroView: macroEditorView(snapshot, capabilities),
+        customKeyView: customKeyEditorView(snapshot, capabilities)};
+}
+
 // Drafts render their once-decoded snapshot. Actual device facts describe the
 // keyboard; the centralized binding alone decides the draft's editability.
 /**
@@ -74,7 +82,7 @@ function buildDeviceModel(state = {}) {
 function buildSnapshotModel(snapshot, capabilities, binding, deviceState = {}) {
     const value = decodedOf(snapshot);
     const current = {...snapshot, decoded: value};
-    const settingsView = settingsEditorView(current, capabilities);
+    const views = editorViews(current, capabilities);
     const {combos, settings} = value;
     const max = snapshot.limits?.brightnessMax;
     const lighting = baseLighting(settings.values);
@@ -83,16 +91,14 @@ function buildSnapshotModel(snapshot, capabilities, binding, deviceState = {}) {
         brightness: max ? Math.min(255, Math.round(lighting.brightness * 255 / max)) : 0,
         hue: lighting.hue, saturation: lighting.saturation, speed: lighting.speed,
     }, max);
-    /** @param {import("../schema/types.js").SemanticAction} action */
-    const native = action => /** @type {number} */ (nativeCode(action));
     const editable = binding.editable;
     const model = configurationModel({
         layers: value.document.layers.map((values, layer) => ({layer, keys: CHARYBDIS_4X6_LAYOUT_MATRIX.map(([row, column], layoutIndex) => ({row, column, layoutIndex, keycode: values[matrixPosition(layoutIndex)], resolved: keycodeCatalog.resolve(values[matrixPosition(layoutIndex)])}))})),
         domains: {rgb: value.rgb, keyBehaviors: value.behaviors, settings, pdModes: value.pdModes},
-        comboRows: combos.rows.map(row => ({...row, termMs: effectiveComboTerm(combos, row), followsDefault: row.termMs === null, inputs: row.inputs.map(native), output: native(row.output)})),
+        comboRows: runningComboRows(combos),
         comboInfo: {state: "read", enabled: Boolean(settings.values[SETTING.COMBOS_ENABLED]), layerReferences: settings.layers.map(record => record.reference),
             version: combos.version, defaultTermMs: combos.defaultTermMs, holdTermMs: combos.holdTermMs},
-        baseEffect, settingsView, macroView: macroEditorView(current, capabilities), customKeyView: customKeyEditorView(current, capabilities),
+        baseEffect, ...views,
         identity: null,
     }, capabilities, {busy: !editable, behaviors: editable, pointing: editable, combos: editable, macros: editable, settings: editable, customKeys: editable});
     model.layers.forEach((layer, index) => {layer.displayName = snapshot.summary.names[index];});
@@ -458,4 +464,4 @@ function catalogViews() {
 /** @param {import("./types.js").DeviceModelInput} [state] */
 const deviceSummary = (state = {}) => ({device: deviceHeader(state), diagnostics: diagnosticsFor(state)});
 
-module.exports = {buildDeviceModel, buildSnapshotModel, deviceSummary};
+module.exports = {buildDeviceModel, buildSnapshotModel, deviceSummary, editorViews};

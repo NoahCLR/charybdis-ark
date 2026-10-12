@@ -17,6 +17,12 @@ keyboard options and the base RGB effect. It publishes a sanitized snapshot;
 view. With a draft open, its `buildSnapshotModel` renders the complete snapshot
 and its cached decoded form directly, taking editability from the draft binding;
 the real device state supplies the keyboard header and diagnostics (D-L61).
+The settings, macro and custom-key editor views are built only by
+`device-model.js` (`editorViews`): the service keeps them for the profile the
+editors follow, and a draft builds its own. An editor read and a restore
+attach the same device facts to that profile in one read before anything is
+written: settings limits, keyboard options and, where Unicode macros play,
+the detected host OS.
 Both inputs share configuration presentation. `session/panel-session.js` adds the draft and the panel's own state to it,
 routes each message the webview posts, and runs the Rename & Reorder panel.
 `session/panel-session-state.js` decides whether the draft takes an edit now

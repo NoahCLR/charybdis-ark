@@ -6,6 +6,9 @@ const {FakeDeviceAdapter} = require("../../core/transport/fake-device-adapter");
 const {LIVE_LINK_ERROR_CODES, liveLinkError} = require("../../core/transport/device-adapter");
 const {fingerprint, summary} = require("../../core/model/portable-profile");
 const {document} = require("../fixtures/pd-profile");
+const {document: currentDocument} = require("../fixtures/portable-profile");
+const {fakeKeyboardAdapter} = require("../fixtures/fake-keyboard");
+const {PHASE} = require("../../core/model/vocabulary");
 
 const capabilities = {compiledLayerCount: 16, supportedDomainMask: 31, actionAbiDigest: 0x837cf479, featureFlags: 0};
 const snapshot = () => {
@@ -24,18 +27,28 @@ test("Apply progress updates do not rebuild or post the complete panel model", (
     assert.deepEqual(loop.session.service.liveApply, apply, "full snapshots retain the latest progress");
 });
 
-test("read progress posts only a small operation-correlated view", () => {
+test("read progress posts only a small operation-correlated view", async t => {
     const host = fakeHost();
-    const loop = openPanelLoop(host, {adapter: new FakeDeviceAdapter()});
-    loop.session.draft = {id: "draft-777", revision: 3};
+    const loop = openPanelLoop(host, {adapter: fakeKeyboardAdapter({document: currentDocument()}), defaultTimeoutMs: 200});
+    t.after(() => loop.close());
     const service = loop.session.service;
-    service.operationId = 4; service.phase = "read-layout";
-    service.connectionPublicId = "kb"; service.connectionToken = 8;
-    const progress = {done: 8, total: 896};
-    service.reportReadProgress("layout", progress);
-    assert.deepEqual(host.posted, [{type: "readProgress", draftId: "draft-777", draftRevision: 3,
-        read: {source: "layout", progress, operationId: 4, phase: "read-layout", selectedDeviceId: "kb", connectionToken: 8}}]);
-    assert.deepEqual(service.layout.progress, progress);
+    await loop.handleMessage({type: "refresh"});
+    const draft = loop.session.draft, deviceId = service.snapshot().selectedDeviceId;
+    assert.ok(draft, "a complete read opens the draft");
+    const reads = [];
+    const post = host.post;
+    host.post = message => {if (message.type === "readProgress") reads.push(message); return post(message);};
+    const state = await service.readLayout();
+    assert.ok(reads.length > 1, "the layout read reports its counter as it goes");
+    for (const message of reads) {
+        assert.deepEqual(Object.keys(message).sort(), ["draftId", "draftRevision", "read", "type"]);
+        assert.deepEqual({...message.read, progress: undefined}, {source: "layout", progress: undefined, operationId: state.operationId,
+            phase: PHASE.READ_LAYOUT, selectedDeviceId: deviceId, connectionToken: state.connectionToken});
+        assert.equal(message.draftId, draft.id);
+        assert.equal(message.draftRevision, draft.revision);
+    }
+    const final = reads.at(-1).read.progress;
+    assert.equal(final.done, final.total);
 });
 
 // A host that records everything the loop hands it.

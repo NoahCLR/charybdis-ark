@@ -7,8 +7,8 @@ const {decodeRgbDomainV1, encodeRgbDomainV1, RGB_LAYER_MODES, RGB_LOCALITIES, RG
 
 const keycodes = require("../data/keycode-catalog");
 const {semanticActionForExpression, resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
-const {decodeComboDomain, encodeComboDomain, effectiveComboTerm} = require("../schema/combo-domain-v1");
-const {actionName, keycodeAction, knownActionAbi, layerRef, nativeCode} = require("../schema/actions");
+const {decodeComboDomain, encodeComboDomain, runningComboRows} = require("../schema/combo-domain-v1");
+const {actionName, keycodeAction, knownActionAbi, layerRef} = require("../schema/actions");
 const {comboPlacementProblem} = require("./profile-placement");
 const {comboTableOf} = require("./portable-profile");
 const {editKeyBehaviors} = require("./key-behavior-edits");
@@ -283,7 +283,7 @@ function assertEffectiveCombos(bytes, read) {
     if (!domain) return;
     if (read?.state !== "read") throw invalid("The profile was saved, but the running combos could not be verified. Read from keyboard before retrying.");
     const table = decodeComboDomain(domain.payload);
-    const expected = table.rows.map(row => ({...row, termMs: effectiveComboTerm(table, row), followsDefault: row.termMs === null, inputs: row.inputs.map(nativeCode), output: nativeCode(row.output)}));
+    const expected = runningComboRows(table);
     const shared = table.defaultTermMs === read.defaultTermMs && table.holdTermMs === read.holdTermMs;
     if (!shared || expected.length !== read.rows.length || expected.some((row, index) => { const actual = read.rows[index]; return (/** @type {const} */ (["id", "output", "termMs", "followsDefault", "mustHold", "mustTap", "ordered", "enabled", "allowedLayers"])).some(key => row[key] !== actual[key]) || JSON.stringify(row.inputs) !== JSON.stringify(actual.inputs); })) throw invalid("The saved combo profile does not match the running combo table. Flash the current firmware pair and read from keyboard again.");
 }

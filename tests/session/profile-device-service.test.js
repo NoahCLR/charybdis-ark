@@ -14,6 +14,9 @@ const {
 } = require("../../core/session/profile-device-service");
 const {PROFILE_ACTIVE_KIND, PROFILE_WIRE_FEATURES, PROFILE_WIRE_STATUS, PROFILE_WIRE_V1, VIA_READS} = require("../../core/protocol/profile-wire-v1");
 const {document} = require("../fixtures/pd-profile");
+const {fakeKeyboard} = require("../fixtures/fake-keyboard");
+const {connectedService} = require("../fixtures/connected-service");
+const {PROFILE_PAYLOAD_V1} = require("../../core/protocol/profile-payload-v1");
 
 test("Apply progress has a separate notification and cannot let a closed panel stop a save", () => {
     let changes = 0;
@@ -33,18 +36,45 @@ test("Apply progress has a separate notification and cannot let a closed panel s
     assert.equal(changes, 1, "other service clients keep the complete-snapshot fallback");
 });
 
-test("read counters retain snapshots and notify without copying the profile", async () => {
-    const {service} = profileReadHarness({committed: true});
+test("a restore reads what the keyboard accepts, including its host OS, before writing anything", async t => {
+    const {service, adapter, keyboard} = await connectedService(t, {document: document()});
+    // The keyboard stops answering its host OS after connecting.
+    adapter.keyboard = {...keyboard, answer: report => report[0] === PROFILE_WIRE_V1.COMMAND_GET && report[2] === 0x0b
+        ? [Object.assign(Buffer.from(report), {0: 0xff})] : keyboard.answer(report)};
+    const target = document(); target.layers[0][0] = 5;
+    await assert.rejects(service.restorePortableProfile(target, {saveRecovery: () => {throw Error("must not start restore");}}));
+    assert.deepEqual(keyboard.mutations, [], "a failed facts read refuses before the first write");
+});
+
+test("an editor read and a restore attach the same device facts and rebuild the editor views", async t => {
+    const {fixture} = require("../fixtures/portable-restore");
+    const {editorViews} = require("../../core/session/device-model");
+    const f = fixture(), {service} = await connectedService(t, {keyboard: f.keyboard});
+    const facts = ({limits, options, hostOs}) => ({limits, options, hostOs});
+    const views = () => {const {settingsView, macroView, customKeyView} = service.snapshot(); return {settingsView, macroView, customKeyView};};
+    // Snapshots carry JSON copies.
+    const built = snapshot => JSON.parse(JSON.stringify(editorViews(snapshot, service.capabilities)));
+    await service.readKeyboardProfile();
+    const read = service.portable;
+    assert.ok(read.limits && read.options && read.hostOs, "limits, options and host OS travel with the profile");
+    assert.deepEqual(views(), built(read));
+    await service.restorePortableProfile(f.targetDocument, f.options);
+    assert.notEqual(service.portable.fingerprint, read.fingerprint, "the restored profile is the one the editors follow");
+    assert.deepEqual(facts(service.portable), facts(read));
+    assert.deepEqual(views(), built(service.portable));
+});
+
+test("read counters retain snapshots and notify without copying the profile", async t => {
     let changes = 0;
     const reads = [];
-    service.onChange = () => changes++;
-    service.onReadProgress = view => reads.push(view);
-    service.connectionPublicId = "fixture"; service.connectionToken = 8;
+    const {service, id} = await connectedService(t, {document: document()}, {onChange: () => changes++, onReadProgress: view => reads.push(view)});
+    changes = 0;
     const state = await service.readCommittedProfile();
     assert.equal(state.error, null);
     assert.equal(changes, 2, "only operation start and completion publish full snapshots");
     assert.ok(reads.length > 100, "the actual payload reader exercises many chunks");
-    assert.ok(reads.every(read => read.source === "profile" && read.operationId === 1 && read.connectionToken === 8));
+    assert.ok(reads.every(read => read.source === "profile" && read.operationId === state.operationId
+        && read.selectedDeviceId === id && read.connectionToken === state.connectionToken));
     const final = reads.at(-1).progress;
     assert.equal(final.done, final.total);
     assert.equal(state.committed.progress, null, "completion keeps its regular full notification");
@@ -165,59 +195,41 @@ function serviceHarness(options = {}) {
     return {adapter, changes, service};
 }
 
-function profileReadHarness({committed, rejectChunk = false}) {
-    const bytes = Buffer.from(document().profile, "base64");
-    const seen = [];
-    const identity = Buffer.alloc(25), generation = Buffer.alloc(25);
-    identity[0] = 1; identity[1] = 2;
-    identity.writeUInt16LE(committed ? 0x32 : 0x31, 2);
-    identity[24] = committed ? PROFILE_ACTIVE_KIND.COMMITTED : PROFILE_ACTIVE_KIND.COMPILED_ONLY;
-    if (committed) {
-        generation.writeUInt32LE(4, 0);
-        generation.writeUInt32LE(4, 5);
-        generation.writeUInt32LE(4, 10);
-    }
-    const metadata = Buffer.alloc(25);
-    metadata[0] = 1; metadata[1] = 25;
-    metadata.writeUInt16LE(bytes.length, 2);
-    metadata.writeUInt32LE(committed ? 4 : 0, 4);
-    metadata.writeUInt32LE(fnv1a32(bytes), 8);
-    metadata.writeUInt32LE(crc32(bytes), 12);
-    metadata[16] = 2; metadata[18] = 31;
-    const connection = {connected: true, async request(request) {
-        seen.push([request[2], request[4]]);
-        if (request[2] === PROFILE_WIRE_V1.VALUE_STATUS) return response(request, request[4] ? generation : identity);
-        if (rejectChunk && request[4] === 1) {
-            const rejected = response(request, Buffer.alloc(0));
+// Connected to a keyboard in one state, which then answers in another: the
+// status the service holds from connecting is stale by the time it reads.
+// `seen` lists the [value, page] of each Profile Wire read after connecting.
+async function profileRead(t, {connectedCommitted, committed, rejectChunk = false}, options = {}) {
+    const {service, adapter} = await connectedService(t, {document: document(), compiledOnly: !connectedCommitted}, options);
+    const fresh = fakeKeyboard({document: document(), compiledOnly: !committed}), seen = [];
+    adapter.keyboard = {...fresh, answer(report) {
+        if (report[0] === PROFILE_WIRE_V1.COMMAND_GET) seen.push([report[2], report[4]]);
+        if (rejectChunk && report[0] === PROFILE_WIRE_V1.COMMAND_GET && report[2] === PROFILE_PAYLOAD_V1.VALUE && report[4] === 1) {
+            const rejected = response(report, Buffer.alloc(0));
             rejected[5] = PROFILE_WIRE_STATUS.UNAVAILABLE;
-            return rejected;
+            return [rejected];
         }
-        return response(request, request[4] ? bytes.subarray((request[4] - 1) * 25, request[4] * 25) : metadata);
+        return fresh.answer(report);
     }};
-    const service = new ProfileDeviceService({adapter: new FakeDeviceAdapter()});
-    service.connection = connection;
-    service.requestIds = new ProfileRequestIdSequence();
     return {service, seen};
 }
 
-test("profile read chooses compiled defaults from a fresh status", async () => {
-    const {service, seen} = profileReadHarness({committed: false});
-    service.status = {activeKind: PROFILE_ACTIVE_KIND.COMMITTED, committedGeneration: 9};
+test("profile read chooses compiled defaults from a fresh status", async t => {
+    const {service, seen} = await profileRead(t, {connectedCommitted: true, committed: false});
+    assert.equal(service.snapshot().status.activeKind, PROFILE_ACTIVE_KIND.COMMITTED, "the held status is stale");
     const state = await service.readCommittedProfile();
     assert.equal(state.error, null);
     assert.equal(state.committed.source, "compiled");
     assert.equal(state.committed.state, "read");
     assert.equal(state.status.activeKind, PROFILE_ACTIVE_KIND.COMPILED_ONLY);
-    assert.ok(seen.some(([value]) => value === 5));
-    assert.ok(!seen.some(([value]) => value === 4));
+    assert.ok(seen.some(([value]) => value === PROFILE_PAYLOAD_V1.COMPILED_VALUE));
+    assert.ok(!seen.some(([value]) => value === PROFILE_PAYLOAD_V1.VALUE));
 });
 
-test("a rejected committed payload chunk stays a read failure", async () => {
-    const {service, seen} = profileReadHarness({committed: true, rejectChunk: true});
+test("a rejected committed payload chunk stays a read failure", async t => {
     const changes = [];
-    service.onReadProgress = () => {};
-    service.onChange = state => changes.push(state);
-    service.status = {activeKind: PROFILE_ACTIVE_KIND.COMPILED_ONLY, committedGeneration: 0};
+    const {service, seen} = await profileRead(t, {connectedCommitted: false, committed: true, rejectChunk: true},
+        {onReadProgress: () => {}, onChange: state => changes.push(state)});
+    assert.equal(service.snapshot().status.activeKind, PROFILE_ACTIVE_KIND.COMPILED_ONLY, "the held status is stale");
     await assert.rejects(service.readCommittedProfile(), {code: "DEVICE_REJECTED"}, "a failed read rejects with the error it records");
     const state = service.snapshot();
     assert.equal(state.error.code, "DEVICE_REJECTED");
@@ -225,8 +237,8 @@ test("a rejected committed payload chunk stays a read failure", async () => {
     assert.equal(changes.at(-1).error.code, "DEVICE_REJECTED", "failed reads still publish a full model");
     assert.equal(changes.at(-1).busy, false);
     assert.equal(state.status.activeKind, PROFILE_ACTIVE_KIND.COMMITTED, "a failed payload read still reports the fresh device status");
-    assert.ok(seen.some(([value]) => value === 4));
-    assert.ok(!seen.some(([value]) => value === 5), "a failed committed chunk is not treated as missing storage");
+    assert.ok(seen.some(([value]) => value === PROFILE_PAYLOAD_V1.VALUE));
+    assert.ok(!seen.some(([value]) => value === PROFILE_PAYLOAD_V1.COMPILED_VALUE), "a failed committed chunk is not treated as missing storage");
 });
 
 test("service exposes opaque descriptors and performs only capability/status reads", async () => {
