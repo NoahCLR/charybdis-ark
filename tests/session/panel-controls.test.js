@@ -2,7 +2,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const {draftControl, portableControl, readKeyboard, rereadKeyboard} = require("../../core/session/panel-controls");
-const {buildPanelModel} = require("../../core/session/panel-session");
+const {buildPanelModel, observeService} = require("../../core/session/panel-session");
 const {ProfileDraftSession} = require("../../core/session/profile-draft-session");
 const {fingerprint, summary} = require("../../core/model/portable-profile");
 const {document} = require("../fixtures/pd-profile");
@@ -44,6 +44,7 @@ const host = () => {
 function sessionWithDraft() {
     const service = fakeService();
     const session = {service};
+    observeService(session, service.snapshot());
     buildPanelModel(session, service.snapshot());
     return session;
 }
@@ -82,6 +83,19 @@ test("a failed device read fails the whole read with its own error", async () =>
     assert.deepEqual(service.calls, ["enumerate"]);
 });
 
+test("rebasing against an incomplete recovery capture retains the authored draft", async () => {
+    const session = sessionWithDraft(), draft = session.draft;
+    stage(session, {type: "updateLayoutKeys", layer: "Layer 1", changes: [{layoutIndex: 0, keycode: "KC_B"}]});
+    const document = structuredClone(draft.document);
+    const recovery = {incomplete: true, fingerprint: "incomplete:device", document: {format: "charybdis-recovery-capture"}};
+    session.service.readPortableProfile = async () => recovery;
+    await draftControl(session, {type: "rebaseProfileDraft", draftRevision: draft.revision}, host());
+    assert.equal(draft.baseSnapshot.incomplete, true);
+    assert.deepEqual(draft.document, document);
+    assert.equal(draft.stale, false);
+    assert.equal(draft.view(session.service.snapshot()).reviewed, true);
+});
+
 test("apply writes a recovery copy through the host, then reads the keyboard again", async () => {
     const session = sessionWithDraft(), draft = session.draft, h = host();
     const readSteps = [];
@@ -115,6 +129,7 @@ test("a destination blocker refuses Apply before recovery or HID", async () => {
     const service = fakeService(), h = host();
     service.portable.limits.brightnessMax = 50;
     const session = {service};
+    observeService(session, service.snapshot());
     buildPanelModel(session, service.snapshot());
     stage(session, {type: "updateViaMacro", keycode: "VIA_MACRO_0", payload: "hello"});
     session.draft.review(session.draft.revision);

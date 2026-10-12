@@ -461,10 +461,14 @@ class ProfileDeviceService {
                 this.baseRgb = baseRgb;
                 if (baseRgb.error) this.addDiagnostic(`Base RGB: ${baseRgb.error.message}`);
             }
-            this.portable = result;
-            this.macroView = macroEditorView(result, this.capabilities);
-            this.customKeyView = customKeyEditorView(result, this.capabilities);
-            this.settingsView = settingsEditorView(result, this.capabilities);
+            // Export is an independent capture. Only an editor read or a
+            // restore/rebase read changes the state the editor follows.
+            if (forEditor || forRestore) {
+                this.portable = result;
+                this.macroView = macroEditorView(result, this.capabilities);
+                this.customKeyView = customKeyEditorView(result, this.capabilities);
+                this.settingsView = settingsEditorView(result, this.capabilities);
+            }
             this.portableProgress = "";
         }).finally(() => {this.portableProgress = "";});
         if (!result) throw new Error("The keyboard operation returned no verified profile.");

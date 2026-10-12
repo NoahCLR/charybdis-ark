@@ -58,7 +58,7 @@ test("dropped files use the chooser's validation and review without opening a ho
     const service = fakeService();
     const host = fakeHost({chooseProfile: () => {throw new Error("a drop must not open a chooser");}});
     const loop = openPanelLoop(host, {service});
-    loop.publish();
+    loop.serviceChanged();
     const draft = loop.session.draft;
     const message = (text) => ({type: "reviewPortableProfile", text, name: "desk.charybdis.json",
         draftId: draft.id, draftRevision: draft.revision});
@@ -109,11 +109,35 @@ function fakeService(extra = {}) {
 }
 function loopWithDraft(host = fakeHost(), extra) {
     const loop = openPanelLoop(host, {service: fakeService(extra)});
-    loop.publish();
+    loop.serviceChanged();
     assert.ok(loop.session.draft, "the first publish of a complete read opens the draft");
     host.posted.length = 0;
     return loop;
 }
+
+test("fresh reads follow clean drafts, retain dirty edits, and rebase only the comparison", async () => {
+    const host = fakeHost(), service = fakeService(), loop = openPanelLoop(host, {service});
+    loop.serviceChanged();
+    const draft = loop.session.draft, id = draft.id;
+    const next = structuredClone(draft.document); next.layers[0][0] = 5;
+    service.portable = {...snapshot(), document: next, fingerprint: fingerprint(next), summary: summary(next)};
+    loop.serviceChanged();
+    assert.equal(loop.session.draft, draft);
+    assert.equal(draft.id, id);
+    assert.deepEqual(draft.document, next, "a clean draft follows what was freshly read");
+    await loop.handleMessage({type: "updateLayoutKeys", draftId: id, draftRevision: draft.revision,
+        layer: "Layer 1", changes: [{layoutIndex: 0, keycode: "KC_B"}]});
+    const edits = structuredClone(draft.document);
+    service.portable = snapshot();
+    loop.serviceChanged();
+    assert.equal(draft.dirty, true);
+    assert.equal(draft.stale, true);
+    assert.deepEqual(draft.document, edits, "another read preserves local edits");
+    await loop.handleMessage({type: "rebaseProfileDraft", draftId: id, draftRevision: draft.revision});
+    assert.equal(draft.stale, false);
+    assert.equal(last(host).model.draft.reviewed, true);
+    assert.deepEqual(draft.document, edits, "rebase changes the comparison, not the authored draft");
+});
 
 test("reading with no keyboard attached answers with a notice through the host", async () => {
     const host = fakeHost();
@@ -285,14 +309,14 @@ test("messages meant for a host's own controls are answered, never run", async (
 
 test("the panel offers no PD upgrade export", async () => {
     const host = fakeHost(), loop = loopWithDraft(host);
-    loop.publish();
+    loop.serviceChanged();
     assert.equal("pdUpgradeAvailable" in last(host).model.portable, false);
 });
 
 
 test("live macro validation replies inline without staging, history, toasts or device calls", async () => {
     const service = fakeService(), host = fakeHost(), loop = openPanelLoop(host, {service});
-    loop.publish(); host.posted.length = 0;
+    loop.serviceChanged(); host.posted.length = 0;
     const draft = loop.session.draft, before = structuredClone(draft.document), revision = draft.revision;
     const message = {type: "validateViaMacro", keycode: "VIA_MACRO_17", payload: "{{KC_A}}\nhello", requestId: 777,
         draftId: draft.id, draftRevision: revision};
@@ -340,7 +364,7 @@ test("the published binding is what edits, macro checks, imports and Apply answe
     ];
     for (const [label, blocked, reason] of cases) {
         const service = fakeService(), host = fakeHost(), loop = openPanelLoop(host, {service});
-        loop.publish();
+        loop.serviceChanged();
         const draft = loop.session.draft;
         // A reviewed draft with one change, so only the binding stands between it and Apply.
         await loop.handleMessage(edit(draft));
@@ -349,7 +373,7 @@ test("the published binding is what edits, macro checks, imports and Apply answe
         Object.assign(service.snapshot(), blocked);
         const revision = draft.revision, document = structuredClone(draft.document);
         // What the panel is told.
-        loop.publish();
+        loop.serviceChanged();
         assert.equal(last(host).model.draft.editable, !reason, `${label}: model.draft.editable`);
         assert.equal(last(host).model.draft.reason, reason, `${label}: model.draft.reason`);
         if (!reason) continue;
@@ -374,7 +398,7 @@ test("the published binding is what edits, macro checks, imports and Apply answe
 test("a reconnect refuses keeping an already-open import or layer review", async () => {
     for (const type of ["restorePortableProfile", "savePortableLayers"]) {
         const service = fakeService(), host = fakeHost(), loop = openPanelLoop(host, {service});
-        loop.publish();
+        loop.serviceChanged();
         const draft = loop.session.draft;
         await loop.handleMessage(type === "savePortableLayers" ? {type: "managePortableLayers"}
             : {type: "reviewPortableProfile", text: JSON.stringify(draft.document), draftId: draft.id, draftRevision: draft.revision});
@@ -392,8 +416,10 @@ test("a reconnect refuses keeping an already-open import or layer review", async
 
 test("demo macros use the same live validation without a keyboard", async () => {
     const service = fakeService(), host = fakeHost(), loop = openPanelLoop(host, {service});
+    service.snapshot().connected = false;
     await loop.handleMessage({type: "openDemo"});
     const draft = loop.session.draft;
+    assert.ok(loop.session.demo, "validation is exercised in the demo, not a keyboard draft");
     await loop.handleMessage({type: "validateViaMacro", keycode: "VIA_MACRO_17", payload: "literal {{braces}}", requestId: 1,
         draftId: draft.id, draftRevision: draft.revision});
     assert.equal(last(host).type, "macroValidation");

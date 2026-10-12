@@ -23,6 +23,7 @@ export {
     discardDraftForDevice,
     layerEditDocument,
     observePortable,
+    observeService,
     routeMessage,
     startLayerEdit,
 } from "../core/session/panel-session.js";

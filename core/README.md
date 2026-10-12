@@ -120,7 +120,12 @@ portable profile (`model/portable-profile.js`) with undo and redo history, a
 review built by `model/profile-review.js`, the checks of what the layers let
 you reach from `model/layer-reach.js` (a trap has to be confirmed before
 Apply), and staleness checks on every message (draft id, revision, and the base
-the form was built from). Review compares stored values, including names that
+the form was built from). `buildPanelModel` projects the state; the panel loop's
+`serviceChanged` step observes fresh portable captures and connection facts
+before publishing. Repeated projection never changes the draft lifecycle.
+Standalone exports return a fresh capture without installing editor state.
+
+Review compares stored values, including names that
 match a fallback label and names retained by disabled pointing slots. The
 review-completeness test mutates every editable decoded field shape and every
 stored setting ID through its real codec, requiring a specific review item;

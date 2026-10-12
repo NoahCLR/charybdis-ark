@@ -77,7 +77,7 @@ for (const {screen, source, initial} of [
             store.state.screen = screen;
             const localText = ' {{"key": "{{KC_A}}"}}\ncafé “hello” 🙂. ';
             store.state.macroSlot = "VIA_MACRO_17";
-            loop.publish();
+            loop.serviceChanged();
             store.setMacroForm("VIA_MACRO_17", {draft: localText}); store.render();
             const start = performance.now();
             if (source === "layout") await service.readLayout();

@@ -479,3 +479,24 @@ test("successful service restore installs the saved profile and returns normally
         assert.equal(service.portable.fingerprint, result.fingerprint, "the service's post-Apply capture sees the saved target");
     } finally {await service.close();}
 });
+
+test("standalone export reads the current keyboard without replacing its editor snapshot", async () => {
+    const {fixture} = require("../fixtures/portable-restore");
+    const {fakeKeyboardAdapter} = require("../fixtures/fake-keyboard");
+    const f = fixture(), adapter = fakeKeyboardAdapter({keyboard: f.keyboard});
+    const service = new ProfileDeviceService({adapter, defaultTimeoutMs: 200, sleep: async () => {}});
+    try {
+        await service.enumerate(); await service.connect(service.devices[0].id);
+        const editor = await service.readKeyboardProfile();
+        const state = service.snapshot();
+        // Another client has changed a key since the editor read. Export
+        // captures it, but must leave the already published editor alone.
+        f.keyboard.local.layout[1] ^= 1; f.keyboard.peer.layout[1] ^= 1;
+        const exported = await service.readPortableProfile();
+        assert.notEqual(exported.fingerprint, editor.fingerprint);
+        assert.equal(service.portable, editor);
+        for (const field of ["layout", "committed", "combos", "baseRgb", "macroView", "customKeyView", "settingsView"]) {
+            assert.deepEqual(service.snapshot()[field], state[field], `${field} is still the editor read`);
+        }
+    } finally {await service.close();}
+});

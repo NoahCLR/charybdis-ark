@@ -71,16 +71,24 @@ function hostModel(host) {
 
 // A complete read of a supported keyboard opens the draft, or refreshes the
 // one already open against what the keyboard now holds.
-/** @param {ModelSession} session @param {State} state */
-function observePortable(session, state) {
+/** @param {ModelSession} session @param {State} state @param {import("../model/types.js").ProfileSnapshot | null | undefined} [portable] */
+function observePortable(session, state, portable = session.service.portable) {
     if (session.draft && !session.draft.dirty && state.connected && (state.selectedDeviceId !== session.draft.deviceId || !canEdit(state.capabilities))) {
         setDraft(session, undefined);
     }
-    const portable = session.service.portable;
-    if (!portable || portable === session.observedPortable || portable.incomplete || !state.connected || !canEdit(state.capabilities)) return;
+    if (!portable || portable === session.observedPortable || !state.connected || !canEdit(state.capabilities)) return;
+    if (portable.incomplete && !session.draft) return;
     if (!session.draft) setDraft(session, new ProfileDraftSession(portable, state.selectedDeviceId, state.capabilities, state.connectionToken));
     else session.draft.observe(portable, state.selectedDeviceId, state.connectionToken);
     session.observedPortable = portable;
+}
+
+// A service notification advances the draft lifecycle explicitly. Rendering
+// the same state again is only a projection and cannot perform this step.
+/** @param {ModelSession} session @param {State} state */
+function observeService(session, state) {
+    if (!session.demo) observePortable(session, state);
+    if (session.draft && state.connected && state.selectedDeviceId === session.draft.deviceId) session.draft.noteConnection(state.connectionToken ?? null);
 }
 
 /** @param {Session} session @param {State} state @param {Snapshot | undefined} snapshot */
@@ -97,8 +105,6 @@ function discardDraftForDevice(session, state, snapshot) {
 // keyboard is read, so none is described.
 /** @param {ModelSession} session @param {State} state @returns {ReturnType<typeof buildDeviceModel> & import("./types.js").PanelModelExtras} */
 function buildPanelModel(session, state) {
-    if (!session.demo) observePortable(session, state);
-    if (session.draft && state.connected && state.selectedDeviceId === session.draft.deviceId) session.draft.noteConnection(state.connectionToken ?? null);
     const device = state.devices?.find((entry) => entry.id === state.selectedDeviceId);
     const busy = Boolean(state.busy || session.portableBusy || session.readBusy);
     const supported = canEdit(state.capabilities);
@@ -192,8 +198,8 @@ function importDifferences(session) {
             const {target, ...location} = place;
             return location;
         };
-        review.differences = {against: keyboard.fingerprint, items: profileReview(keyboard, file).map((item) => ({unit: item.unit, title: item.title,
-            status: item.status, place: item.place ? where(item.place) : null}))};
+        return profileReview(keyboard, file).map((item) => ({unit: item.unit, title: item.title,
+            status: item.status, place: item.place ? where(item.place) : null}));
     }
     return review.differences.items;
 }
@@ -349,4 +355,4 @@ function applyLayerEdit(edit, message) {
 /** @param {LayerEdit} edit */
 const layerEditDocument = (edit) => rewriteLayers(edit, edit.names);
 
-module.exports = {DEMO_MESSAGES, DRAFT_CONTROLS, HOST_WORDS, PORTABLE_MESSAGES, applyLayerEdit, buildPanelModel, hostModel, discardDraftForDevice, layerEditDocument, observePortable, panelRequest, routeMessage, startLayerEdit};
+module.exports = {DEMO_MESSAGES, DRAFT_CONTROLS, HOST_WORDS, PORTABLE_MESSAGES, applyLayerEdit, buildPanelModel, hostModel, discardDraftForDevice, layerEditDocument, observePortable, observeService, panelRequest, routeMessage, startLayerEdit};
