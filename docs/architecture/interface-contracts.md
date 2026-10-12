@@ -71,6 +71,12 @@ only vertical scroller.
   unavailable surface with a menu recovery path rather than another screen.
 - Words: `core/model/vocabulary.js`, sent as `model.vocabulary`; stages are
   found by id, never by label.
+- Lighting: `webview/ui/lighting.mjs` owns the board, stage tabs and switches.
+  Its `ui/lighting/` modules each own one stage's surface and listeners: base,
+  layers, auto-mouse fade, pointing overlays, combo feedback, key feedback and
+  LED groups. Shared colour controls retain the stored owner's focus identity;
+  LED override tables share their owner presentation. Stage modules read the
+  published model and post the same pure edit builders as other screens.
 - Key names: `core/model/key-names.js`. The catalogue names what QMK ships;
   the profile names its macros, pointing-mode keys and bare user slots. The
   effective Host OS also names Alt/Option and GUI/Command/Windows/Super,
