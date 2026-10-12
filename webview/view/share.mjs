@@ -3,7 +3,7 @@
 // a share of the timeout): what a share would store, in milliseconds.
 //
 // The core decides what is stored; this previews it while a slider moves, so
-// it follows the same rule, and tests/edits.test.mjs holds the two together.
+// it follows the same rule, and tests/view/edits.test.mjs holds the two together.
 // The share that was read is shown exactly as stored, not as it rounds.
 /** @param {{whole: string | number, value: string | number, ms: string | number}} field @param {number} percent */
 export function shareHold(field, percent) {
