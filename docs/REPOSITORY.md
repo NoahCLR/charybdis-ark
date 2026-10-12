@@ -117,8 +117,8 @@ extension supplies its own **Charybdis Ark** status-bar button; the shared
 parent workspace does not add a duplicate or a test button.
 
 [`upstream/README.md`](../upstream/README.md) explains the imported test vectors,
-protocol references and QMK catalog inputs. [`docs/REPOSITORY.md`](REPOSITORY.md)
-records source provenance and the repository boundary.
+protocol references and QMK catalog inputs. The [documentation map](README.md)
+defines reading order and document ownership.
 
 For local firmware development, the active checkout is `charybdis-4x6` in the
 workspace; see the
@@ -126,7 +126,7 @@ workspace; see the
 inspect it while the app and its ordinary tests remain self-contained.
 
 New contributors and agents should start with [AGENTS.md](../AGENTS.md) and the
-[documentation map](../README.md), which defines reading order, document
+[documentation map](README.md), which defines reading order, document
 ownership and where new plans or specifications belong.
 
 ### The code's layout
@@ -431,7 +431,9 @@ two fixture keyboards in the VS Code themed preview.
 
 For protocol changes, run the separate [firmware compatibility check](COMPATIBILITY.md)
 against explicit firmware, Ark and QMK checkouts before merging. UI-only work
-continues to use the independent app checks.
+uses the independent app checks during development; the shared handoff verifier
+also runs the pinned compatibility bridge and agreement for every Ark branch
+([verification boundaries](#verification-boundaries)).
 Ark owns these integration runners under `tests/integration/`; they read the
 selected firmware sources. Firmware's own tests and build require no Ark
 checkout or app dependencies.
@@ -445,7 +447,9 @@ uploads it, and gates nothing else. A release's `dev` → `main` pull request ru
 suite on Linux and macOS, loads the native HID module, runs the browser smoke,
 checks every imported source pin against its published trunk, runs the
 [compatibility bridge](COMPATIBILITY.md) at the pins and judges the firmware
-contract Ark will sit next to (`agreement`). Nightly, never blocking, CI checks
+contract Ark will sit next to (`agreement`): firmware `main`, or firmware `dev`
+when the promotion's hidden release marker names a joint release. Nightly,
+never blocking, CI checks
 `dev` (app suite, browser, early-warning bridge and agreement with firmware
 `dev`) and whether the published mains still agree. Reports are retained in
 Actions.
@@ -457,31 +461,27 @@ and the built page against a fake keyboard. Install its browser once with `npx p
 The small host-style fixture covers known padding/cascade regressions; it is not
 a VS Code extension-host or physical-device acceptance test.
 
-The shared vault tools own publication: `verify` records a pass for the tested
-tree and the pinned firmware and QMK commits; `land` merges the task's pull
-request for exactly the verified commit, with verify's summary in its message.
-The installed pre-push hook
-refuses direct pushes to `dev` and `main`. `release` prepares a release and
-`release --publish` publishes it (below). They never apply a profile to the
-keyboard.
+Development and publication procedures are governed by [AGENTS.md](../AGENTS.md),
+which points to the work-queue tools. This section records the CI jobs and
+GitHub protections.
 
 ## Verification boundaries
 
-App changes require the app suite, relevant targeted tests and whitespace
-checks. Changes to preview/setup also require fixture preview generation.
-Imported data changes require catalog/hash checks as appropriate. Firmware
-host tests, compilation and physical-device acceptance are separate integration
-gates for coordinated firmware or protocol changes; see the upstream guide.
-No test here may silently substitute an adjacent firmware or QMK checkout for
-the pinned inputs.
+[AGENTS.md](../AGENTS.md#verification) governs required checks and the shared
+verification command. The independent app suite, fixture preview and catalog
+checks run from this checkout. The shared verifier additionally checks pinned
+firmware/QMK inputs through the compatibility bridge and agreement, including
+for documentation-only branches. That integration work does not make sibling
+checkouts a dependency of ordinary app tests. Physical-device acceptance remains
+separate; no automated pass establishes it. No test may silently substitute an
+adjacent firmware or QMK checkout for pinned inputs.
 
 The explicit [compatibility bridge](COMPATIBILITY.md) tests selected working
 copies together; it is separate from the independent app suite.
 
 ### Protected main promotions
 
-`main` moves only by the shared vault's `release`, so every `main` is a
-released, tested stack. GitHub `main` requires a pull request and these checks,
+GitHub `main` requires a pull request and these checks,
 including for administrators: `Promotion from dev`, and this repository's CI on
 the promotion pull request itself: `check (ubuntu-latest)`, `check (macos-latest)`,
 `browser`, `compatibility` and `agreement`. `Promotion from dev` accepts only
@@ -489,15 +489,6 @@ this repository's `dev` branch and a merge tree identical to that branch. Force
 pushes and deletion are blocked. Promotions merge as merge commits, so the
 promoted development history stays reachable; task pull requests into `dev` are
 squashed.
-
-`release` prepares a release: it decides from the agreement check whether Ark
-releases alone, after firmware or together with it, lands Ark's version through
-its own pull request, drafts the notes and opens the `dev` → `main` pull request.
-`release --publish` waits for the required checks, re-checks agreement against
-firmware's `main` as it is then (its prepared `dev` in a joint release), merges
-the pull request for exactly the prepared `dev` head, tags it and publishes the
-GitHub release. Direct `main` pushes are rejected by the local hook as well.
-Normal task development reaches `dev` through task pull requests.
 
 `dev` cannot be force-pushed or deleted on GitHub and accepts changes only
 through pull requests, and published `v*` release tags cannot be moved or
