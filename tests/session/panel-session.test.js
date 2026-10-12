@@ -284,7 +284,7 @@ test("a finished Apply is shown only during its own readback", () => {
     assert.equal(buildPanelModel(session, connected({busy: true, liveApply: done})).apply, done, "the readback after Apply is drawn as such");
     session.applyRunning = false;
     session.portableBusy = true;
-    const exporting = buildPanelModel(session, connected({busy: true, phase: "reading complete profile", liveApply: done}));
+    const exporting = buildPanelModel(session, connected({busy: true, phase: "read-complete", liveApply: done}));
     assert.equal(exporting.draft.busy, true);
     assert.equal(exporting.apply, null, "a later export is not drawn as reading back the Apply");
     session.portableBusy = false;

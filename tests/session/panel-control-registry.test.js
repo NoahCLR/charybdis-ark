@@ -103,8 +103,8 @@ test("demo refusals and read policies come from the registry", async () => {
 test("registered write phases warn only while Apply or device restore is active", () => {
     assert.equal(writingProfile({}), false);
     assert.equal(writingProfile({applyRunning: true}), true);
-    assert.equal(writingProfile({service: {phase: "restoring complete profile"}}), true);
-    for (const phase of ["reading complete profile", "reading layout", "refreshing", "connected", "idle"]) assert.equal(writingProfile({service: {phase}}), false, phase);
+    assert.equal(writingProfile({service: {phase: "restore-complete"}}), true);
+    for (const phase of ["read-complete", "read-layout", "refresh", "connected", "idle"]) assert.equal(writingProfile({service: {phase}}), false, phase);
     assert.equal(CONTROLS.applyProfileDraft.phase, "apply");
     assert.equal(CONTROLS.restorePortableProfile.phase, "restore");
     assert.equal(CONTROLS.savePortableLayers.phase, "restore");

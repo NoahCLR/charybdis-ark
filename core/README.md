@@ -68,6 +68,11 @@ route, binding, demo policy, execution phase and named action. The router and
 controllers consume it; the contract's payload groups and all handler names
 are checked against that registry. Existing exported route sets are derived.
 
+Device phase IDs and their words are owned by `model/vocabulary.js`:
+`PHASE` identifies operations, while `VOCABULARY.phases` names them and marks
+whether they write. Load, health and read-progress contracts carry `PhaseId`;
+status presentation and the browser close warning use the shared phase facts.
+
 Apply's transfer counters leave `ProfileDeviceService` through its optional
 `onApplyProgress` callback. The panel loop posts that small view as
 `applyProgress`, with the current draft ID and revision; the webview refreshes

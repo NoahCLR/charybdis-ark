@@ -1,5 +1,5 @@
 import type {PanelEdit, DraftIdentity} from './edits.js';
-import type {ApplyView, CountedProgress, MacroInspection} from './model.js';
+import type {ApplyView, CountedProgress, MacroInspection, PhaseId} from './model.js';
 
 /** Every field a layer-editor message may carry; a shape leaves the ones it does not name absent. */
 type LayerFields = {keysFollow?: never; names?: never; id?: never; name?: never; makeBase?: never; to?: never; direction?: never};
@@ -71,7 +71,7 @@ export type LayerSaveControl = Extract<PortableControl, {type: 'savePortableLaye
 export type PanelCommand = PanelEdit | PanelControl;
 export type PanelRequest = PanelCommand & Partial<DraftIdentity>;
 export type ReadStep = 'layout' | 'profile' | 'combos' | 'baseRgb';
-export type ReadProgress = ({source: 'layout' | 'profile'; progress: CountedProgress} | {source: 'portable'; progress: string}) & {operationId: number; phase: string; selectedDeviceId: string; connectionToken: number | string | null};
+export type ReadProgress = ({source: 'layout' | 'profile'; progress: CountedProgress} | {source: 'portable'; progress: string}) & {operationId: number; phase: PhaseId; selectedDeviceId: string; connectionToken: number | string | null};
 export type MacroValidation = MacroInspection | {error: string; code: string};
 export type PanelResponse<M = import('./panel.js').PublishedModel> =
     | {type: 'model'; model: M; notice?: string; resetDraftForms?: boolean; acceptedEdit?: {message: {type: string}; previousFingerprint: string; fingerprint: string}}

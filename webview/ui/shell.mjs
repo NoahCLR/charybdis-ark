@@ -6,6 +6,7 @@
 import * as controls from "../view/controls.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {getModel, post, postLeavingDemo, render, state} from "../store.mjs";
+import {phaseWords} from "../view/vocabulary.mjs";
 import {statusSummary} from "../view/review.mjs";
 import {busyText, postApplyReadText, screenAvailable} from "../view/readiness.mjs";
 import {buildLine, chooseKeyboard, commitUrl, githubMark, hostOf, themeLabel} from "../view/host.mjs";
@@ -85,7 +86,7 @@ export function rail() {
             <div class="rail-status">
                 ${demo.active ? line("demo", DEMO_WORDS.status, "Nothing is connected. The demo runs Ark's own draft over a demo setup; only Apply needs a keyboard.") : ""}
                 ${demo.active ? "" : line(device.connected ? "on" : "err",
-                    device.connected ? (health.busy ? health.phase || "Working" : "Connected") : "Disconnected",
+                    device.connected ? (health.busy ? phaseWords(model, health.phase)?.label || "Working" : "Connected") : "Disconnected",
                     "Whether this window is talking to a keyboard.")}
                 ${demo.active ? "" : line(health.profile === "synced" ? "on" : health.profile === "attention" ? "draft" : "",
                     health.profile === "synced" ? "Both halves agree" : health.profile === "attention" ? "Halves need attention"
@@ -245,7 +246,7 @@ export function commitBar() {
     }
 
     if (draft.busy) {
-        const busy = busyText(model?.device?.health?.phase);
+        const busy = busyText(model?.device?.health?.phase, model);
         return el(`<div class="commit applying">
             <span class="n">${spinner()} <strong>Working with the keyboard</strong>
             <span class="muted">${esc(busy.detail)}</span></span>

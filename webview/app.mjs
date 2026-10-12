@@ -14,6 +14,7 @@ import {closeComboBuilder, getModel, post, postLeavingDemo, render as rerender, 
 import {historyAction} from "./view/edits.mjs";
 import {chooseKeyboard, hostOf, otherTheme, setTheme} from "./view/host.mjs";
 import {DEMO_WORDS, demoOf, leaveDemo, openDemo, openDemoProfile} from "./view/demo.mjs";
+import {phaseWords} from "./view/vocabulary.mjs";
 import {readScreen, screenAvailable} from "./view/readiness.mjs";
 import {discardLabel, groupNote, placeState, reviewBlocks, statusSummary, stillShown} from "./view/review.mjs";
 import {bindLayerIndex, hideHover, mountHover} from "./ui/hover.mjs";
@@ -89,7 +90,7 @@ function screenDevice() {
         connectionBody: `${kv([
             ["Product", device?.label],
             ["Status", device?.subtitle],
-            ["Phase", device?.health?.phase],
+            ["Phase", phaseWords(model, device?.health?.phase)?.label],
         ])}<p class="note">The master half connects over USB; the slave half connects to it through the cable between the halves.</p>`,
         setupTitle: "Committed profile",
         setupChip: chip(device?.health?.converged ? "on" : "draft", device?.health?.converged ? "both halves agree" : "halves not converged"),

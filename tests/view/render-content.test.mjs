@@ -3,13 +3,13 @@ import assert from "node:assert/strict";
 import {sameEditorContent} from "../../webview/view/render-content.mjs";
 
 test("only explicitly transient read status can keep an editor", () => {
-    const before = {load: {state: "ready", phase: "reading layout", operationId: 1}, device: {connected: true, health: {busy: true}},
+    const before = {load: {state: "ready", phase: "read-layout", operationId: 1}, device: {connected: true, health: {busy: true}},
         draft: {id: "draft", revision: 3, busy: true}, vocabulary: {host: "macos"}, layers: [], diagnostics: [],
         portable: {busy: true}, host: {theme: "dark"}};
     const next = structuredClone(before);
     Object.assign(next, {diagnostics: ["New read"], apply: {id: 1}, postApplyRead: {step: "profile"}});
-    Object.assign(next.load, {phase: "reading profile", operationId: 2, progress: {done: 25, total: 100}});
-    next.device.health.phase = "reading profile";
+    Object.assign(next.load, {phase: "read-profile", operationId: 2, progress: {done: 25, total: 100}});
+    next.device.health.phase = "read-profile";
     next.portable.progress = "Reading macros";
     next.host.progress = "Reading";
     assert.equal(sameEditorContent(before, next), true);

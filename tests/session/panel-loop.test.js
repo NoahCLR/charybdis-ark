@@ -29,12 +29,12 @@ test("read progress posts only a small operation-correlated view", () => {
     const loop = openPanelLoop(host, {adapter: new FakeDeviceAdapter()});
     loop.session.draft = {id: "draft-777", revision: 3};
     const service = loop.session.service;
-    service.operationId = 4; service.phase = "reading layout";
+    service.operationId = 4; service.phase = "read-layout";
     service.connectionPublicId = "kb"; service.connectionToken = 8;
     const progress = {done: 8, total: 896};
     service.reportReadProgress("layout", progress);
     assert.deepEqual(host.posted, [{type: "readProgress", draftId: "draft-777", draftRevision: 3,
-        read: {source: "layout", progress, operationId: 4, phase: "reading layout", selectedDeviceId: "kb", connectionToken: 8}}]);
+        read: {source: "layout", progress, operationId: 4, phase: "read-layout", selectedDeviceId: "kb", connectionToken: 8}}]);
     assert.deepEqual(service.layout.progress, progress);
 });
 

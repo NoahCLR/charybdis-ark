@@ -1,5 +1,5 @@
 import type {BaseIdentity, Behavior, BehaviorBranch, Combo, Colour, KeyFeedback, LayerReference, PdSlot, Scalar} from './edits.js';
-import type {ApplyView, Check, DemoView, HistoryStep, HostPanel, LoadView, Participation, ProfileUsage, ReviewChange, SettingField, SettingsSection, Vocabulary} from './model.js';
+import type {ApplyView, Check, DemoView, HistoryStep, HostPanel, LoadView, Participation, PhaseId, ProfileUsage, ReviewChange, SettingField, SettingsSection, Vocabulary} from './model.js';
 
 export interface Position {
     layoutIndex: number;
@@ -96,7 +96,7 @@ export interface PublishedModel {
     qmkKeycodeAliases: Record<string, string>;
     qmkKeycodeSource: string;
     diagnostics: string[];
-    device: {connected: boolean; label: string; summary: string; subtitle: string; health: {profile: string; converged: boolean; recoveryPending: boolean; restartNeeded: boolean; busy: boolean; phase: string; error: string}};
+    device: {connected: boolean; label: string; summary: string; subtitle: string; health: {profile: string; converged: boolean; recoveryPending: boolean; restartNeeded: boolean; busy: boolean; phase: PhaseId; error: string}};
     devices: {id: string; label: string}[];
     selectedDeviceId: string;
     draft?: DraftView;

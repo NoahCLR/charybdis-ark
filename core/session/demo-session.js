@@ -1,5 +1,6 @@
 // @ts-check
 "use strict";
+const {PHASE} = require("../model/vocabulary");
 const {LAYERS} = require("../data/charybdis-layout");
 
 // Ark without a keyboard: the demo (D-L53).
@@ -228,7 +229,7 @@ function demoExport(session) {
 /** @returns {State & {demo: true}} */
 function demoState() {
     return {
-        phase: "demo",
+        phase: PHASE.DEMO,
         busy: false,
         connected: true,
         demo: true,
@@ -277,7 +278,7 @@ function demoHeader(session, busy) {
         label: DEMO_WORDS.label,
         summary: `No keyboard · ${session.demo.name}`,
         subtitle: "Nothing here was read from a keyboard, and nothing can be applied to one.",
-        health: {profile: "demo", converged: false, recoveryPending: false, restartNeeded: false, busy: Boolean(busy), phase: "demo", error: ""},
+        health: {profile: "demo", converged: false, recoveryPending: false, restartNeeded: false, busy: Boolean(busy), phase: PHASE.DEMO, error: ""},
     };
 }
 

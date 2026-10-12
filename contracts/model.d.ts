@@ -1,5 +1,9 @@
 import type {Scalar} from './edits.js';
 
+/** Device operation identity is stable when presentation words change. */
+export type PhaseId = 'idle' | 'available' | 'empty' | 'connected' | 'demo' | 'enumerate' | 'connect' | 'refresh' | 'read-layout' | 'read-profile' | 'read-complete' | 'restore-complete' | 'disconnect' | 'read-combos' | 'read-base-rgb';
+export interface PhaseWords {label: string; read?: string; busy?: string; writes: boolean}
+
 export interface CountedProgress {done: number; total: number}
 export interface BuildInfo {version: string; commit: string}
 export interface RecoveryCopy {id: string | number; name: string; savedAt: string}
@@ -22,15 +26,16 @@ export interface DemoView {
 }
 export interface LoadView {
     state: 'loading' | 'ready' | 'unavailable';
-    phase: string;
+    phase: PhaseId;
     operationId?: number;
     operationBusy?: boolean;
     connectionToken?: number | string | null;
     progress?: CountedProgress | string | null;
 }
 export interface StatusModel {
+    vocabulary?: Pick<Vocabulary, 'phases'>;
     load?: LoadView;
-    device?: {connected?: boolean; health?: {error?: string; phase?: string}};
+    device?: {connected?: boolean; health?: {error?: string; phase?: PhaseId}};
     host?: HostPanel;
     demo?: DemoView;
     portable?: {available?: boolean; progress?: CountedProgress | string | null};
@@ -51,6 +56,7 @@ export interface ApplyView {
 
 export type WordList<T = Scalar> = readonly (readonly [T, string])[];
 export interface Vocabulary {
+    phases: Readonly<Record<PhaseId, Readonly<PhaseWords>>>;
     pickerModifiers?: {bit: number; value: string; label: string}[];
     hostOs: WordList<number>;
     macroPlayback?: Readonly<Record<string, string>>;

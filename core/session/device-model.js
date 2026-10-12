@@ -11,7 +11,7 @@
 // be a lie about what the keyboard is running.
 
 const {PD_SLOT_BINDINGS} = require("../data/pd-bindings");
-const {VOCABULARY, slotName} = require("../model/vocabulary");
+const {PHASE, VOCABULARY, slotName} = require("../model/vocabulary");
 const keycodeCatalog = require("../data/keycode-catalog");
 const {baseEffectForView, baseRgbForView, behaviorRowsForView, builtInForView, comboRowsForView, rgbForView} = require("../model/device-profile-view");
 const {effectiveTimings} = require("../model/gesture-timing");
@@ -331,7 +331,7 @@ function deviceHeader(state) {
                 recoveryPending: false,
                 restartNeeded: false,
                 busy: false,
-                phase: state.phase || "idle",
+                phase: state.phase || PHASE.IDLE,
                 error: state.error?.message || "",
             },
         };
@@ -370,7 +370,7 @@ function deviceHeader(state) {
             // releases it, and the keyboard refuses new saves until then.
             restartNeeded: Boolean(status?.peerCleanupPending),
             busy: Boolean(state.busy),
-            phase: state.phase || "connected",
+            phase: state.phase || PHASE.CONNECTED,
             error: state.error?.message || state.liveApply?.failure?.reason || "",
         },
     };
