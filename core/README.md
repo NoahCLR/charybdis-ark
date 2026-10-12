@@ -211,8 +211,24 @@ per-layer policy masks follow storage. Editor labels and grouping still belong
 to `model/settings-editor.js`.
 
 `schema/bytes.js` owns integer bounds, byte views and copies, reserved-byte
-checks and protocol error construction. Codecs keep their existing error names,
-codes and location fields; a caller chooses whether bytes are viewed or copied.
+checks, protocol error construction and the canonical check. Codecs keep their
+existing error names, codes and location fields; a caller chooses whether bytes
+are viewed or copied.
+
+Every registered domain codec has one contract: `decode(bytes, options) →
+value` and `encode(value, options) → Buffer`, where a decoded value is an
+encoder input and encodes back to exactly the bytes it was read from. Each
+domain decoder ends with `canonical` from `bytes.js`: it re-encodes what it
+read, with the options it read under, and refuses bytes that come out
+differently. An encoder that refuses the value refuses the bytes in its own
+words. The pointing decoder writes with `writePdDomain`, because its encoder
+checks its output by decoding it. The codecs share this check, not an error
+class: RGB throws `RgbDomainProtocolError`, behaviours
+`ProfileBlobProtocolError`, combos and settings a plain `Error` with one code
+each (`INVALID_COMBO_DOMAIN`, `INVALID_SETTINGS`), and pointing a plain `Error`
+with a code per cause and the byte offset. Every byte-level refusal carries a
+string `code`; `tests/schema/profile-domains.test.js` pins the contract and
+these identities for every registered domain.
 
 `schema/profile-blob-v1.js` encodes and strictly decodes the `NLP1` header and
 its ordered domain envelopes, the four-byte semantic action values, and the
@@ -228,7 +244,8 @@ own output layouts. Missing intermediate steps and future versions are refused;
 current documents still bypass translation. The domain codecs —
 `rgb-domain-v1.js`, `key-behavior-domain-v1.js`,
 `combo-domain-v1.js`, `pd-mode-domain-v1.js`, `settings-domain-v1.js` — are
-exact inverses of their decoders and enforce the firmware's limits. The RGB
+exact inverses of their decoders, under the canonical check above, and enforce
+the firmware's limits. The RGB
 byte contract is frozen in [`rgb-domain-v1.md`](../upstream/firmware/docs/architecture/rgb-domain-v1.md), a pinned firmware spec;
 its firmware counterpart is `users/noah/lib/profile/schema/profile_rgb_v1.c`.
 `schema/compiled-profile-v1.js` resolves expressions in the keyboard's

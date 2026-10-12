@@ -49,6 +49,93 @@ test("registered codecs round-trip every fixture domain without changing canonic
     assert.deepEqual(encodeProfileBlob({domains: encodeProfileDomains(snapshot, snapshot.codecOptions)}), snapshot.profile);
 });
 
+// Each domain's error identity as it stands: the codecs share the canonical
+// check, not an error class, so these are pinned rather than unified.
+const ERROR_NAMES = {rgb: ["RgbDomainProtocolError"], behaviors: ["ProfileBlobProtocolError"], combos: ["Error", "ProfileBlobProtocolError"], settings: ["Error"], pdModes: ["Error"]};
+// One encoding of each domain that its encoder would never write, made from
+// the fixture's own payload, and the refusal it meets.
+const NONCANONICAL = {
+    // The two LED groups swapped: ids still count from zero, but the
+    // dictionary is not in bitmap order.
+    rgb: payload => {
+        const bytes = Buffer.from(payload);
+        payload.copy(bytes, 17, 26, 34); payload.copy(bytes, 26, 17, 25);
+        return {bytes, refusal: {name: "RgbDomainProtocolError", code: "NONCANONICAL"}};
+    },
+    // The first two rows swapped out of target order.
+    behaviors: payload => {
+        const first = payload.readUInt16LE(4) + 2;
+        const second = payload.readUInt16LE(4 + first) + 2;
+        const bytes = Buffer.concat([payload.subarray(0, 4), payload.subarray(4 + first, 4 + first + second), payload.subarray(4, 4 + first), payload.subarray(4 + first + second)]);
+        return {bytes, refusal: {name: "ProfileBlobProtocolError", code: "ROW_ORDER"}};
+    },
+    // The one combo's second input repeating its first.
+    combos: payload => {
+        const bytes = Buffer.from(payload);
+        payload.copy(bytes, 24, 20, 24);
+        return {bytes, refusal: {name: "Error", code: "INVALID_COMBO_DOMAIN", message: "Combo inputs must be distinct."}};
+    },
+    // Layer 0's name "Base" with its B written as an overlong UTF-8 sequence.
+    settings: payload => {
+        const {SETTINGS} = require("../../core/schema/settings-domain-v1");
+        const at = SETTINGS.FIXED_SIZE, length = payload[at];
+        const bytes = Buffer.concat([payload.subarray(0, at), Buffer.from([length + 1, 0xc1, 0x80 | (payload[at + 1] & 0x3f)]), payload.subarray(at + 2)]);
+        return {bytes, refusal: {name: "Error", code: "INVALID_SETTINGS", message: "Invalid name encoding."}};
+    },
+    // A disabled, nameless slot 31 stored as a record instead of left out.
+    pdModes: payload => {
+        const record = Buffer.alloc(128); record[0] = 31;
+        const bytes = Buffer.concat([payload, record]); bytes[3] += 1;
+        return {bytes, refusal: {name: "Error", code: "NONCANONICAL", offset: payload.length + 1}};
+    },
+};
+
+test("every registered codec decodes bytes to a value, encodes it back exactly, and refuses a noncanonical encoding", () => {
+    const snapshot = validateSnapshot(fixture.document());
+    const blob = decodeProfileBlob(snapshot.profile);
+    assert.deepEqual(Object.keys(NONCANONICAL), PROFILE_DOMAINS.map(domain => domain.key));
+    for (const codec of PROFILE_DOMAINS) {
+        const payload = /** @type {Buffer} */ (blob.domains.find(domain => domain.id === codec.id)?.payload);
+        assert.equal(typeof codec.decode, "function", codec.key);
+        assert.equal(typeof codec.encode, "function", codec.key);
+        for (const options of [snapshot.codecOptions, undefined]) {
+            const value = codec.decode(payload, options);
+            const bytes = codec.encode(value, options);
+            assert.ok(Buffer.isBuffer(bytes), codec.key);
+            assert.deepEqual(bytes, payload, codec.key);
+            assert.deepEqual(codec.decode(bytes, options), value, codec.key);
+        }
+        const {bytes, refusal} = NONCANONICAL[codec.key](payload);
+        assert.notDeepEqual(bytes, payload, codec.key);
+        assert.throws(() => codec.decode(bytes, snapshot.codecOptions), refusal, codec.key);
+    }
+});
+
+test("every registered codec accepts only bytes it would write itself, and refuses the rest with a stable code", () => {
+    const snapshot = validateSnapshot(fixture.document());
+    const blob = decodeProfileBlob(snapshot.profile);
+    for (const codec of PROFILE_DOMAINS) {
+        const payload = /** @type {Buffer} */ (blob.domains.find(domain => domain.id === codec.id)?.payload);
+        let accepted = 0, refused = 0;
+        for (let at = 0; at < payload.length; at++) {
+            for (const value of new Set([0, 0xff, (payload[at] + 1) & 0xff])) {
+                if (value === payload[at]) continue;
+                const bytes = Buffer.from(payload); bytes[at] = value;
+                let decoded;
+                try {decoded = codec.decode(bytes, snapshot.codecOptions);} catch (error) {
+                    refused++;
+                    assert.ok(error instanceof Error && ERROR_NAMES[codec.key].includes(error.name), `${codec.key} byte ${at}: ${error}`);
+                    assert.equal(typeof /** @type {{code?: unknown}} */ (error).code, "string", `${codec.key} byte ${at}: ${error.message}`);
+                    continue;
+                }
+                accepted++;
+                assert.deepEqual(codec.encode(decoded, snapshot.codecOptions), bytes, `${codec.key} byte ${at} = ${value}`);
+            }
+        }
+        assert.ok(accepted > 0 && refused > 0, codec.key);
+    }
+});
+
 test("metadata can be imported before any codec, avoiding partially initialized envelope imports", () => {
     const source = `const assert = require('node:assert/strict');
         const registry = require('./core/schema/profile-domains');

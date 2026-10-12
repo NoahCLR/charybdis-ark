@@ -3,6 +3,7 @@
 const {PROFILE_DOMAIN_VERSIONS, PROFILE_DOMAIN_IDS} = require("./profile-domains");
 const {LAYERS, MATRIX_KEYS} = require("../data/charybdis-layout");
 const {validHostSetting} = require("./host-settings");
+const {canonical} = require("./bytes");
 // Settings domain 0x40, version 6, the only one the keyboard stores (firmware
 // D-F14): 31 values, sixteen layer records, then 272 counted names — sixteen
 // layer names, 128 VIA macro names and 128 custom-key names, each a length
@@ -160,7 +161,6 @@ function decodeSettings(bytes, layers = SETTINGS.LAYERS, positions = MATRIX_POSI
     const customKeyNames = Array.from({length: SETTINGS.CUSTOM_KEY_NAMES}, nameRecord);
     if (offset !== bytes.length) throw fail("Unexpected settings data.");
     const result = {values, names, layers: layerRecords, macroNames, customKeyNames, formatVersion: SETTINGS.VERSION};
-    encodeSettings(result, layers, positions);
-    return result;
+    return canonical(bytes, result, value => encodeSettings(value, layers, positions), () => fail("Noncanonical settings data."));
 }
 module.exports = {SETTINGS, SETTING, SETTING_FIELD, SETTING_FIELDS: FIELDS, MATRIX_POSITIONS, validName, validSetting, defaultLayerRecord, encodeSettings, decodeSettings};

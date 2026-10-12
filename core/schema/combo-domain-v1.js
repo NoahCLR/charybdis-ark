@@ -4,6 +4,7 @@ const {PROFILE_DOMAIN_VERSIONS, PROFILE_DOMAIN_IDS} = require("./profile-domains
 const {LAYERS} = require("../data/charybdis-layout");
 const {encodeSemanticAction, decodeSemanticAction} = require("./profile-blob-v1");
 const {nativeCode} = require("./actions");
+const {canonical} = require("./bytes");
 /** @param {string} message */
 const fail = message => Object.assign(new Error(message), {code: "INVALID_COMBO_DOMAIN"});
 
@@ -83,8 +84,7 @@ function decodeComboDomain(value, options = {}) {
     });
     if (offset !== bytes.length) throw fail("Combo rows do not end at the domain's end.");
     const table = {version: /** @type {typeof COMBO_DOMAIN_VERSION} */ (COMBO_DOMAIN_VERSION), defaultTermMs: bytes.readUInt16LE(4), holdTermMs: bytes.readUInt16LE(6), rows};
-    if (!encodeComboDomain(table, options).equals(bytes)) throw fail("Noncanonical combo data.");
-    return table;
+    return canonical(bytes, table, value => encodeComboDomain(value, options), () => fail("Noncanonical combo data."));
 }
 
 // The window a row runs with.

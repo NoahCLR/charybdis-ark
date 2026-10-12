@@ -2,7 +2,7 @@
 "use strict";
 const {PROFILE_DOMAIN_VERSIONS} = require("./profile-domains");
 const {LAYERS} = require("../data/charybdis-layout");
-const {u8: assertU8, u16: assertU16, asBytes: copyBytes, protocolError} = require("./bytes");
+const {u8: assertU8, u16: assertU16, asBytes: copyBytes, protocolError, canonical} = require("./bytes");
 
 /**
  * @typedef {ReturnType<typeof normalizeOptions>} Limits
@@ -279,11 +279,8 @@ function decodeRgbDomainV1(value, options = {}) {
         keyFeedback,
         keyGroupRows,
     };
-    const normalized = normalizeProfile(decoded, limits);
-    if (!encodeRgbDomainV1(normalized, limits).equals(bytes)) {
-        throw rgbError("NONCANONICAL", "RGB domain does not use its canonical representation.");
-    }
-    return normalized;
+    return canonical(bytes, normalizeProfile(decoded, limits), value => encodeRgbDomainV1(value, limits),
+        () => rgbError("NONCANONICAL", "RGB domain does not use its canonical representation."));
 }
 
 /** @param {import("./types.js").RgbInput} profile @param {import("./types.js").RgbOptions} [options] */
