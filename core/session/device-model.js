@@ -167,9 +167,10 @@ function configurationModel(content, capabilities, editing) {
             // Whether a direction or button override may click a mouse
             // button 1–8 (Profile Wire feature bit 28).
             clicks: Boolean((capabilities?.featureFlags || 0) & PROFILE_WIRE_FEATURES.POINTING_CLICKS),
+            macros: Boolean((capabilities?.featureFlags || 0) & PROFILE_WIRE_FEATURES.POINTING_MACROS),
             // The keys a direction or button override may send, so the
             // picker offers only those (model/pointing-taps.js).
-            tapKeys: pointingTapKeys(Boolean((capabilities?.featureFlags || 0) & PROFILE_WIRE_FEATURES.POINTING_CLICKS))},
+            tapKeys: pointingTapKeys(Boolean((capabilities?.featureFlags || 0) & PROFILE_WIRE_FEATURES.POINTING_CLICKS), Boolean((capabilities?.featureFlags || 0) & PROFILE_WIRE_FEATURES.POINTING_MACROS))},
         keyBehaviors: content.domains.keyBehaviors ? behaviorRowsForView(content.domains.keyBehaviors, behaviorFeatures(capabilities), names) : [],
         behaviorEditing: {
             busy: editing.busy,

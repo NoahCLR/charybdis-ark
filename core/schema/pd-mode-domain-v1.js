@@ -42,6 +42,12 @@ function zero(bytes) { return bytes.every(byte => byte === 0); }
 // the domain version are unchanged: older firmware refuses these keycodes, and
 // capability feature bit 28 is how Ark learns a keyboard takes them.
 const PD_CLICK_FEATURE = 1 << 28;
+const PD_MACRO_FEATURE = 1 << 29;
+const PD_MACROS = Object.freeze({FIRST: 0x7700, LAST: 0x777f});
+/** @param {{featureFlags?: number} | null | undefined} capabilities */
+const supportsPdMacros = capabilities => Boolean((capabilities?.featureFlags ?? 0) & PD_MACRO_FEATURE);
+/** @param {number} keycode */
+const isPdMacro = keycode => Number.isInteger(keycode) && keycode >= PD_MACROS.FIRST && keycode <= PD_MACROS.LAST;
 const PD_CLICKS = Object.freeze({FIRST: 0xd1, LAST: 0xd8});
 /** @param {{featureFlags?: number} | null | undefined} capabilities */
 const supportsPdClicks = capabilities => Boolean((capabilities?.featureFlags ?? 0) & PD_CLICK_FEATURE);
@@ -50,14 +56,15 @@ const isPdClick = keycode => Number.isInteger(keycode) && keycode >= PD_CLICKS.F
 /** @param {number} keycode */
 function isPdTapKey(keycode) {
     if (!Number.isInteger(keycode) || keycode < 0 || keycode > 0xffff) return false;
-    if ((keycode >= 4 && keycode <= 0xc2) || isPdClick(keycode)) return true;
+    if ((keycode >= 4 && keycode <= 0xc2) || isPdClick(keycode) || isPdMacro(keycode)) return true;
     const mods = keycode >>> 8, key = keycode & 255;
     return mods <= 0x1f && (mods & 15) !== 0 && key >= 4 && key <= 0xa4;
 }
 // Why a keycode cannot be a pointing-mode tap for a keyboard that does or does
 // not click, or "" when it can. The words name what a person would have picked.
-/** @param {number} keycode @param {{clicks: boolean}} options */
-function pdTapProblem(keycode, {clicks}) {
+/** @param {number} keycode @param {{clicks: boolean, macros?: boolean}} options */
+function pdTapProblem(keycode, {clicks, macros = false}) {
+    if (isPdMacro(keycode)) return macros ? "" : "This keyboard's firmware cannot run a macro from a pointing mode. Update the firmware to use one.";
     if (isPdClick(keycode)) return clicks ? "" : "This keyboard's firmware cannot click a mouse button from a pointing mode. Update the firmware to use one.";
     if (isPdTapKey(keycode)) return "";
     const key = keycode & 255, modified = keycode > 0xff;
@@ -66,11 +73,12 @@ function pdTapProblem(keycode, {clicks}) {
             : "A pointing mode can click mouse buttons 1–8, but not move the pointer, scroll or change mouse acceleration.";
     }
     if (modified && keycode <= 0x1fff && key > 0xa4 && key <= 0xc2) return "Only keyboard keys take modifiers in a pointing mode; send a media or system key on its own.";
-    return "A pointing mode sends keys, shortcuts, media and system keys, and mouse buttons 1–8, not layer, pointing-mode, macro or keyboard controls.";
+    return "A pointing mode sends keys, shortcuts, media and system keys, mouse buttons 1–8 and supported macros, not layer, pointing-mode or keyboard controls.";
 }
 /** @param {Buffer} bytes */
 function validTap(bytes) {
     if (bytes.readUInt16LE(0) === 0) return zero(bytes);
+    if (isPdMacro(bytes.readUInt16LE(0))) return bytes[2] === PD_MODIFIERS.INHERIT && bytes[3] === 0;
     return isPdTapKey(bytes.readUInt16LE(0)) && (bytes[2] === PD_MODIFIERS.MASK
         ? bytes[3] !== 0 : /** @type {number[]} */ ([PD_MODIFIERS.INHERIT, PD_MODIFIERS.EXACT]).includes(bytes[2]) && bytes[3] === 0);
 }
@@ -282,4 +290,4 @@ function validatePdRecord(bytes, id, offset = 0) {
     validateRecord(bytes, id, offset);
 }
 
-module.exports = {PD_DOMAIN, PD_KIND, PD_AXIS, PD_SCROLL_AXES, PD_EMPTY_DIRECTION, PD_DIRECTION_OUTPUT, PD_MODIFIERS, PD_BUTTON, DIAGONALS, PD_CLICK_FEATURE, PD_CLICKS, supportsPdClicks, isPdClick, isPdTapKey, pdTapProblem, encodePdDomain, decodePdDomain, encodePdRecord, validatePdRecord};
+module.exports = {PD_DOMAIN, PD_KIND, PD_AXIS, PD_SCROLL_AXES, PD_EMPTY_DIRECTION, PD_DIRECTION_OUTPUT, PD_MODIFIERS, PD_BUTTON, DIAGONALS, PD_CLICK_FEATURE, PD_CLICKS, supportsPdClicks, isPdClick, PD_MACRO_FEATURE, PD_MACROS, supportsPdMacros, isPdMacro, isPdTapKey, pdTapProblem, encodePdDomain, decodePdDomain, encodePdRecord, validatePdRecord};

@@ -6,7 +6,7 @@
 // only when it advertises it (schema/pd-mode-domain-v1.js), so a profile that
 // holds one is checked against the keyboard before it is applied.
 
-const {PD_KIND, isPdClick, isPdTapKey, pdTapProblem, supportsPdClicks} = require("../schema/pd-mode-domain-v1");
+const {PD_KIND, isPdClick, isPdTapKey, pdTapProblem, supportsPdClicks, isPdMacro, supportsPdMacros, PD_MACROS} = require("../schema/pd-mode-domain-v1");
 const catalog = require("../data/keycode-catalog");
 
 /** @typedef {{keycode?: unknown, modifierPolicy?: unknown, mask?: unknown}} TapLike */
@@ -46,14 +46,28 @@ function pointingClickProblem(slots, capabilities) {
     return first && `Pointing mode ${first.slot} (${first.name}) clicks mouse button ${first.button} on ${first.label}, and this keyboard's firmware cannot click from a pointing mode.`;
 }
 
+// Each configured slot's macro outputs, with their stored slot identity.
+/** @param {Parameters<typeof pointingClicks>[0]} slots */
+function pointingMacros(slots) {
+    return slots.filter(slot => slot.kind !== PD_KIND.DISABLED).flatMap(slot => pointingTaps(slot)
+        .filter(({tap}) => typeof tap?.keycode === "number" && isPdMacro(tap.keycode))
+        .map(({label, tap}) => ({slot: slot.id, name: slot.name, label, macro: /** @type {number} */ (tap?.keycode) - PD_MACROS.FIRST})));
+}
+/** @param {Parameters<typeof pointingClicks>[0]} slots @param {{featureFlags?: number} | null | undefined} capabilities */
+function pointingMacroProblem(slots, capabilities) {
+    if (typeof capabilities?.featureFlags !== "number" || supportsPdMacros(capabilities)) return undefined;
+    const [first] = pointingMacros(slots);
+    return first && `Pointing mode ${first.slot} (${first.name}) runs macro ${first.macro} on ${first.label}, and this keyboard's firmware cannot run a macro from a pointing mode.`;
+}
+
 // The catalogue keys a pointing shortcut may send on a keyboard that does or
 // does not click, by every name the picker knows them by: alone, and wrapped
 // in modifiers, which only keyboard keys take.
-/** @param {boolean} clicks */
-function pointingTapKeys(clicks) {
+/** @param {boolean} clicks @param {boolean} [macros] */
+function pointingTapKeys(clicks, macros = false) {
     /** @param {(code: number) => boolean} keep */
     const names = keep => catalog.entries().filter(entry => keep(entry.value)).flatMap(entry => [entry.name, ...entry.aliases]);
-    return {plain: names(code => code > 0 && !pdTapProblem(code, {clicks})), modified: names(code => code > 0 && code <= 0x1fff && isPdTapKey(code | 0x100))};
+    return {plain: [...names(code => code > 0 && !pdTapProblem(code, {clicks, macros})), ...(macros ? Array.from({length: 128}, (_, index) => `VIA_MACRO_${index}`) : [])], modified: names(code => code > 0 && code <= 0x1fff && isPdTapKey(code | 0x100))};
 }
 
-module.exports = {pointingTaps, pointingClicks, pointingClickProblem, pointingTapKeys};
+module.exports = {pointingTaps, pointingClicks, pointingClickProblem, pointingTapKeys, pointingMacros, pointingMacroProblem};

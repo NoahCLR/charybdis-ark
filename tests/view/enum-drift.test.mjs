@@ -46,3 +46,9 @@ test("the webview names every pointing slot's lighting row as the RGB schema doe
     assert.deepEqual(PD_MODE_IDS.map((name) => RGB_PD_MODE_IDS[name]), PD_MODE_IDS.map((_, id) => id));
     assert.equal(Object.keys(RGB_PD_MODE_IDS).length, PD_SLOT_CAPACITY);
 });
+
+test("pointing macro identities follow the schema's complete native range", async () => {
+    const {macroIndex} = await import("../../webview/view/keyvalues.mjs");
+    const {isPdMacro} = require("../../core/schema/pd-mode-domain-v1");
+    for (let code = 0; code <= 0xffff; code++) assert.equal(macroIndex(code) !== null, isPdMacro(code), code.toString(16));
+});

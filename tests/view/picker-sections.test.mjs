@@ -39,9 +39,9 @@ test("curated picker sections route representative keycodes", () => {
     assert.deepEqual(entriesForPickerSection(catalogue, section("lighting")).map((entry) => entry.value), ["QK_RGB_MATRIX_TOGGLE"]);
     // The keyboard's own pointer keys sit with the mouse; its unnamed slots do nothing.
     assert.deepEqual(entriesForPickerSection(catalogue, section("mouse")).map((entry) => entry.value), ["QK_MOUSE_BUTTON_1", "DPI_MOD"]);
-    assert.deepEqual(entriesForPickerSection(catalogue, section("custom")).map((entry) => entry.value), ["CUSTOM_KEY_0", "QK_USER_20"]);
+    assert.deepEqual(entriesForPickerSection(catalogue, section("custom")).map((entry) => entry.value), ["CUSTOM_KEY_0"]);
     assert.deepEqual(entriesForPickerSection(catalogue, section("other")).map((entry) => entry.value), ["QK_BOOT"]);
-    assert.equal(entriesForPickerSection(catalogue, section("all")).length, catalogue.length - 4, "macro slots appear only under their VIA names");
+    assert.equal(entriesForPickerSection(catalogue, section("all")).length, catalogue.length - 5, "native macros, retired user keys and unsupported keyboard slots are excluded");
     assert.equal(pickable({value: "QK_MACRO_9", group: "macro"}), false);
 });
 
@@ -74,4 +74,27 @@ test("keycodes for QMK features this firmware does not build are offered nowhere
     for (const entry of unbuilt) assert.ok(!pickable(entry), entry.value);
     const all = pickerSections().find((section) => section.id === "all");
     assert.equal(entriesForPickerSection([...built, ...unbuilt], all).length, built.length);
+});
+
+test("all 32 retired user entries stay in the catalogue but are absent from sections and search", async () => {
+    const {createRequire} = await import("node:module");
+    const require = createRequire(import.meta.url);
+    const catalog = require("../../core/data/keycode-catalog");
+    const retired = Array.from({length: 32}, (_, index) => {
+        const entry = catalog.resolve(0x7e40 + index);
+        assert.equal(entry.name, `QK_USER_${index}`);
+        return {value: entry.name, group: "user", search: `${entry.name} ${entry.label}`.toLowerCase()};
+    });
+    for (const entry of retired) {
+        assert.equal(pickable(entry), false, entry.value);
+        assert.equal(pickable({name: entry.value, group: "user"}), false);
+        assert.equal(pickable({key: entry.value, group: "user"}), false);
+    }
+    for (const section of pickerSections()) assert.deepEqual(entriesForPickerSection(retired, section), [], section.id);
+    assert.deepEqual(retired.filter(pickable).filter(entry => entry.search.includes("user")), []);
+    for (const value of ["CUSTOM_KEY_0", "CUSTOM_KEY_127", "KC_NO", "KC_TRANSPARENT"]) {
+        const entry = {value, group: value.startsWith("CUSTOM") ? "Custom keys" : "internal"};
+        assert.ok(pickable(entry), value);
+        assert.deepEqual(entriesForPickerSection([entry], pickerSections().find(section => section.id === "custom")), [entry]);
+    }
 });

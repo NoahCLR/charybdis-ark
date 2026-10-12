@@ -1075,3 +1075,48 @@ test("the layer panel's toggle, moves and save reach the draft through the real 
     draft.undo(draft.revision);
     assert.deepEqual(draft.document, before);
 });
+
+test("pointing macros stage inherit-only outputs and survive review, history and backup import", async () => {
+    const value = pdDocument();
+    const caps = {...capabilities, featureFlags: 1 << 29};
+    const snapshot = {document: value, fingerprint: portable.fingerprint(value), summary: portable.summary(value)};
+    const draft = new ProfileDraftSession(snapshot, "test-device", caps);
+    const before = decoded(draft).pdModes[4];
+    stage(draft, {type: "updateViaMacro", keycode: "VIA_MACRO_0", payload: "Hi"});
+    stage(draft, edits.macroNameMessage("VIA_MACRO_0", "Greeting", draft.current.fingerprint));
+    const config = readConfig(before, formOf({kind: 1, name: before.name, dpi: before.dpi, axis: AXIS.EIGHT,
+        "dir:left": "VIA_MACRO_0", "dirPolicy:left": MODIFIER_POLICY.EXACT,
+        "dir:right": "VIA_MACRO_127", "dirPolicy:right": MODIFIER_POLICY.MASK, "dirMask:right": 2,
+        "diag:upLeft": "MC_0", "button:0:kind": BUTTON.TAP, "button:0:tap": "0x7700"}));
+    stage(draft, edits.pdMode(4, config, draft.identity()));
+    const after = decoded(draft).pdModes[4];
+    assert.deepEqual(after.directions.left, {keycode: 0x7700, modifierPolicy: 0, mask: 0});
+    assert.deepEqual(after.directions.right, {keycode: 0x777f, modifierPolicy: 0, mask: 0});
+    assert.equal(after.diagonals.upLeft.keycode, 0x7700);
+    assert.deepEqual(after.buttons[0].tap, after.directions.left);
+    const fields = draft.changes().find(change => change.unit === "pd:4").fields;
+    assert.match(fields.find(field => field.label === "Left").after, /Greeting.*Inherit/);
+    assert.equal(draft.checks().filter(check => check.kind === "inertPointingMacro").length, 1);
+    assert.equal(draft.hasBlockers(), false);
+    const backup = JSON.stringify(draft.document);
+    draft.undo(draft.revision); assert.deepEqual(decoded(draft).pdModes[4], before);
+    draft.redo(draft.revision); assert.deepEqual(decoded(draft).pdModes[4], after);
+    const legacy = new ProfileDraftSession(snapshot, "test-device", {...caps, featureFlags: 0});
+    legacy.replace(portable.validateSnapshot(backup).document, legacy.revision, "edit", "Imported profile");
+    assert.deepEqual(decoded(legacy).pdModes[4], after);
+    assert.equal(legacy.checks().filter(check => check.kind === "pointingMacroBlocker").length, 4);
+    legacy.review(legacy.revision);
+    await assert.rejects(legacy.apply({restorePortableProfile: () => {throw Error("must not write");}}, legacy.revision, () => {}), /Resolve the review's blockers/);
+    assert.throws(() => stage(legacy, edits.duplicatePdMode(7, 4, legacy.identity())), /firmware cannot run a macro/);
+    stage(legacy, edits.pdMode(4, readConfig(after, formOf({kind: 1, name: after.name, dpi: after.dpi, "dir:left": "KC_LEFT"})), legacy.identity()));
+    assert.equal(decoded(legacy).pdModes[4].directions.right.keycode, 0x777f);
+    assert.equal(legacy.checks().filter(check => check.kind === "pointingMacroBlocker" && check.status !== "fixed").length, 3);
+    stage(legacy, edits.clearPdMode(4, legacy.identity())); assert.equal(legacy.hasBlockers(), false);
+    const model = buildSnapshotModel(draft.current, caps, {editable: true, reason: ""});
+    assert.equal(model.pdModeEditing.macros, true);
+    assert.ok(model.pdModeEditing.tapKeys.plain.includes("VIA_MACRO_127"));
+    for (const [modifierPolicy, mask] of [[1, 2], [2, 0], [0, 2]]) {
+        const bad = structuredClone(config); bad.directions.left = {keycode: "VIA_MACRO_0", modifierPolicy, mask};
+        assert.throws(() => stage(draft, edits.pdMode(4, bad, draft.identity())), /must inherit held modifiers/);
+    }
+});

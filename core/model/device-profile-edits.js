@@ -1,7 +1,7 @@
 // @ts-check
 "use strict";
 const {PROFILE_WIRE_DOMAINS} = require("../schema/profile-domains");
-const {encodePdDomain, decodePdDomain, pdTapProblem, supportsPdClicks} = require("../schema/pd-mode-domain-v1");
+const {encodePdDomain, decodePdDomain, pdTapProblem, supportsPdClicks, supportsPdMacros, isPdMacro} = require("../schema/pd-mode-domain-v1");
 const {decodeProfileBlob, encodeProfileBlob, PROFILE_DOMAIN_IDS} = require("../schema/profile-blob-v1");
 const {decodeRgbDomainV1, encodeRgbDomainV1, RGB_LAYER_MODES, RGB_LOCALITIES, RGB_AUTOMOUSE_MODES, RGB_TAP_COMMIT_MODES, RGB_PD_MODE_IDS, RGB_KEY_SEMANTICS} = require("../schema/rgb-domain-v1");
 
@@ -148,12 +148,13 @@ function editDeviceProfile(bytes, message, context = {}) {
         // encoder's bare refusal. A click needs firmware that clicks, unless
         // the slot already stored that click there: an imported click is not
         // rewritten, and removing another one must stay possible.
-        const clicks = supportsPdClicks(context.capabilities);
+        const clicks = supportsPdClicks(context.capabilities), macros = supportsPdMacros(context.capabilities);
         for (const {label, tap, stored} of pointingTaps(slots[id], before)) {
             const code = tap?.keycode;
             if (typeof code !== "number" || !Number.isInteger(code) || code === 0) continue;
-            const problem = pdTapProblem(code, {clicks: clicks || code === stored?.keycode});
+            const problem = pdTapProblem(code, {clicks: clicks || code === stored?.keycode, macros: macros || code === stored?.keycode});
             if (problem) throw invalid(`${label}: ${problem}`);
+            if (isPdMacro(code) && (Number(tap?.modifierPolicy || 0) !== 0 || Number(tap?.mask || 0) !== 0)) throw invalid(`${label}: A macro must inherit held modifiers, with no mask, because playback continues across scans.`);
         }
         // Every textual shortcut was resolved above; the encoder validates the remaining fields.
         domain.payload = encodePdDomain(/** @type {import("../schema/types.js").PdSlotInput[]} */ (slots));

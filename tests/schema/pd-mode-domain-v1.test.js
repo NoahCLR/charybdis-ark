@@ -2,7 +2,7 @@
 const {test} = require("node:test");
 const assert = require("node:assert/strict");
 const fixture = require("../../upstream/firmware/tests/fixtures/pd_mode_domain_v1.json");
-const {PD_DOMAIN, PD_CLICK_FEATURE, encodePdDomain, decodePdDomain, isPdTapKey, pdTapProblem, supportsPdClicks} = require("../../core/schema/pd-mode-domain-v1");
+const {PD_DOMAIN, PD_CLICK_FEATURE, encodePdDomain, decodePdDomain, isPdTapKey, isPdMacro, PD_MACRO_FEATURE, pdTapProblem, supportsPdClicks} = require("../../core/schema/pd-mode-domain-v1");
 const {PROFILE_WIRE_FEATURES} = require("../../core/protocol/profile-wire-v1");
 const {decodeProfileBlob, encodeProfileBlob} = require("../../core/schema/profile-blob-v1");
 // The firmware's eight-slot record fixture as the 32 slots the keyboard has:
@@ -77,9 +77,9 @@ test("PD decoder rejects malformed framing, hidden disabled state and noncanonic
     reject(() => encodePdDomain(slots().slice(0, 7)), "INVALID_LENGTH");
 });
 
-test("directional output vocabulary excludes controls, mouse movement, macros and recursive mode actions", () => {
-    for (const key of [4, 0xa4, 0xa5, 0xc2, 0x082e, 0x114f, 0x1f50, 0xd1, 0xd3, 0xd4, 0xd8]) assert.ok(isPdTapKey(key));
-    for (const key of [0, 1, 3, 0xc3, 0xcd, 0xd0, 0xd9, 0xdf, 0xe0, 0xd1 + 0.5, 0x01d3, 0x11d1, 0x1004, 0x08aa, 0x2004, 0x5220, 0x7700, 0x7e80, 0x7e40, 0x7c00, -1, 65536, NaN]) assert.equal(isPdTapKey(key), false);
+test("directional output vocabulary accepts macros and excludes controls, mouse movement and recursive mode actions", () => {
+    for (const key of [4, 0xa4, 0xa5, 0xc2, 0x082e, 0x114f, 0x1f50, 0x7700, 0x777f, 0xd1, 0xd3, 0xd4, 0xd8]) assert.ok(isPdTapKey(key));
+    for (const key of [0, 1, 3, 0xc3, 0xcd, 0xd0, 0xd9, 0xdf, 0xe0, 0xd1 + 0.5, 0x01d3, 0x11d1, 0x1004, 0x08aa, 0x2004, 0x5220, 0x7780, 0x7e80, 0x7e40, 0x7c00, -1, 65536, NaN]) assert.equal(isPdTapKey(key), false);
     for (const tap of [{keycode: 0x7e80}, {keycode: 0, mask: 1}, {keycode: 4, modifierPolicy: 1},
         {keycode: 4, modifierPolicy: 2, mask: 8}, {keycode: 4, modifierPolicy: 3}]) {
         const value = slots(); value[1].directions.up = tap;
@@ -123,11 +123,12 @@ test("a refused tap is explained by what it is, and a click by whether the keybo
     for (const code of [0xcd, 0xd0, 0xd9, 0xdf]) assert.match(pdTapProblem(code, {clicks: true}), /not move the pointer, scroll or change mouse acceleration/);
     assert.match(pdTapProblem(0x01d3, {clicks: true}), /cannot carry modifiers/);
     assert.match(pdTapProblem(0x02ae, {clicks: true}), /Only keyboard keys take modifiers/);
-    for (const code of [1, 0x7e80, 0x7700, 0x41d1, 0xe0]) assert.match(pdTapProblem(code, {clicks: true}), /not layer, pointing-mode, macro or keyboard controls/);
+    assert.match(pdTapProblem(0x7700, {clicks: true}), /cannot run a macro/);
+    for (const code of [1, 0x7e80, 0x41d1, 0xe0]) assert.match(pdTapProblem(code, {clicks: true}), /not layer, pointing-mode or keyboard controls/);
     // Every keycode the problem accepts is one the record takes, and only those.
     for (let code = 1; code <= 0xffff; code++) {
-        assert.equal(pdTapProblem(code, {clicks: true}) === "", isPdTapKey(code), code.toString(16));
-        assert.equal(pdTapProblem(code, {clicks: false}) === "", isPdTapKey(code) && !(code >= 0xd1 && code <= 0xd8), code.toString(16));
+        assert.equal(pdTapProblem(code, {clicks: true, macros: true}) === "", isPdTapKey(code), code.toString(16));
+        assert.equal(pdTapProblem(code, {clicks: false, macros: true}) === "", isPdTapKey(code) && !(code >= 0xd1 && code <= 0xd8), code.toString(16));
     }
 });
 
@@ -200,4 +201,21 @@ test("a profile carries the PD domain only as version 3, and the retired payload
     const envelope = Buffer.from([0x4e, 0x4c, 0x50, 0x31, 3, 0, 1, 1, 0x50, 1, 8, 3]);
     reject(() => decodeProfileBlob(Buffer.concat([envelope, Buffer.from(fixture.hex, "hex")])), "UNKNOWN_DOMAIN_VERSION");
     assert.throws(() => decodePdDomain(Buffer.from(fixture.hex, "hex")), error => error.code === "INVALID_HEADER" && error.offset === 0);
+});
+
+test("macro records round trip every tap place, inherit only", () => {
+    assert.equal(PROFILE_WIRE_FEATURES.POINTING_MACROS, PD_MACRO_FEATURE);
+    for (const keycode of [0x7700, 0x777f]) {
+        assert.ok(isPdMacro(keycode));
+        const modes = slots();
+        modes[7] = {id: 7, kind: 1, name: "Macros", axis: 3, thresholdX: 40, thresholdY: 40,
+            directions: {left: {keycode}}, diagonals: {upLeft: {keycode}}, buttons: [{kind: 2, tap: {keycode}}, {kind: 0}, {kind: 0}]};
+        const bytes = encodePdDomain(modes);
+        assert.deepEqual(encodePdDomain(decodePdDomain(bytes)), bytes);
+        for (const at of [36, 70, 54]) for (const [policy, mask] of [[1, 2], [2, 0], [0, 2]]) {
+            const bad = Buffer.from(bytes); bad[8 + 7 * 128 + at + 2] = policy; bad[8 + 7 * 128 + at + 3] = mask;
+            reject(() => decodePdDomain(bad), "INVALID_ACTION");
+        }
+    }
+    assert.equal(isPdMacro(0x76ff), false); assert.equal(isPdMacro(0x7780), false);
 });

@@ -40,6 +40,7 @@ export function movement(model, slot, scrolling, {field, select, shortcut, modif
         /** @type {HTMLElement} */ (card.querySelector(".card-b")).append(el(model.pdModeEditing?.clicks
             ? `<p class="note">Directions can also click mouse buttons 1–8. A button already held gets no new click and stays held; the computer decides what each button does.</p>`
             : `<p class="note">This keyboard's firmware cannot click mouse buttons from a pointing mode. Update the firmware to send buttons 1–8 here.</p>`));
+        if (!model.pdModeEditing?.macros) /** @type {HTMLElement} */ (card.querySelector(".card-b")).append(el(`<p class="note">This keyboard's firmware cannot run macros from pointing modes. Update the firmware to choose one here.</p>`));
         cross.append(el(`<div class="hub" aria-hidden="true"><svg viewBox="0 0 64 64">
             <circle cx="32" cy="32" r="22"/><circle cx="32" cy="32" r="3"/>
             ${reads.includes("up") ? `<path d="M32 4l-4 5h8z"/>` : ""}${reads.includes("down") ? `<path d="M32 60l-4-5h8z"/>` : ""}

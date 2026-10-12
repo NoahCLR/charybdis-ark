@@ -59,3 +59,16 @@ test("a behaviour refuses QMK and keyboard functions on a keyboard that would se
         assert.equal(comboPlacementProblem([combo], options), undefined, `${name} as a combo output`);
     }
 });
+
+test("direct restore rejects unsupported pointing macro outputs before writing", () => {
+    const {decodeProfileBlob} = require("../../core/schema/profile-blob-v1");
+    const {decodePdDomain, encodePdDomain} = require("../../core/schema/pd-mode-domain-v1");
+    const document = require("../fixtures/pd-profile").document();
+    const profile = decodeProfileBlob(Buffer.from(document.profile, "base64")), domain = profile.domains.find(domain => domain.id === PROFILE_DOMAIN_IDS.PD_MODES);
+    const slots = decodePdDomain(domain.payload);
+    slots[1].directions.up = {keycode: 0x777f, modifierPolicy: 0, mask: 0};
+    domain.payload = encodePdDomain(slots);
+    const encoded = encodeProfileBlob(profile);
+    assert.match(profilePlacementProblem(encoded, {capabilities: {featureFlags: 0}}), /macro 127 on Up.*cannot run a macro/);
+    assert.equal(profilePlacementProblem(encoded, {capabilities: {featureFlags: 1 << 29}}), undefined);
+});

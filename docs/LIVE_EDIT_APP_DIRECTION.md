@@ -45,7 +45,7 @@ matrix.
 | Macros | 128 named VIA macros with Text, steps, Advanced raw payload, recorder and live validation; capability-gated Unicode text, typed and checked through the host's OS and keyboard layout; per-macro input protection; one shared memory, shown and enforced (D-L25, D-L26, D-L56, D-L57) |
 | Custom keys | 128 named keys that do what their behaviour says: rename, add or open the behaviour, place, see where each is used (D-L42) |
 | Mouse | Pointer and sniping DPI, auto-sniping and auto-mouse, settings the core files under Mouse, so the rail, the review and import counts all place them there; the auto-mouse fade is a share of the timeout, edited on its lighting stage (D-L17) |
-| Pointing modes | 32 device-owned slots in the sparse PD domain (D-L41, D-L54); capability-gated mouse-button 1–8 clicks from directions, diagonals and tap overrides, with destination blockers in Review; see [the editor contract](architecture/interface-contracts.md#pointing-tap-outputs) and [PD-mode domain v1](../upstream/firmware/docs/architecture/pd-mode-domain-v1.md) |
+| Pointing modes | 32 device-owned slots in the sparse PD domain (D-L41, D-L54); capability-gated mouse-button 1–8 clicks and VIA macro outputs from directions, diagonals and tap overrides, with destination blockers in Review; see [the editor contract](architecture/interface-contracts.md#pointing-tap-outputs) and [PD-mode domain v1](../upstream/firmware/docs/architecture/pd-mode-domain-v1.md) |
 | Global policy | Every other portable setting, including startup layers, combo matching, Host and device-reported lighting and key options; the lighting idle timeout is edited in seconds or minutes; unsupported firmware features stay read-only (D-L18, D-L56) |
 | Backup and restore | Complete current-format snapshots, import review against the keyboard, recovery file and verified restore; the preceding eight-layer backup is translated before review (D-L15, D-L23, D-L54) |
 | Drafts and Apply | One draft with item-by-item review, discard by edit group, Show, undo/redo and history; the review checks reachable actions, confirms warnings and traps and blocks what the destination cannot save; Apply names its steps and halves and says where a failure happened (D-L19, D-L23, D-L29, D-L30, D-L36, D-L60, D-L61) |
@@ -189,11 +189,12 @@ against a keyboard without bit 15 the app refuses them in a behaviour's target,
 tap or hold (`behaviorEmitProblem` in `core/schema/actions.js`).
 
 The picker offers only what does something on this keyboard. It leaves out
-retired user macros, the Charybdis drag scroll and unnamed `QK_KB` slots, and
+retired user macros and inert `QK_USER_0`–`QK_USER_31` entries, the Charybdis
+drag scroll and unnamed `QK_KB` slots, and
 keycodes for QMK features the build does not include (MIDI, audio, RGBLight,
 Caps Word, Repeat…); see Open Issues. A key that already holds one still reads
 back by name.
-VIA macro slots appear as `VIA_MACRO_0`–`VIA_MACRO_63` throughout the app.
+VIA macro slots appear as `VIA_MACRO_0`–`VIA_MACRO_127` throughout the app.
 Their QMK numeric identities still round-trip, but the picker does not offer
 duplicate `QK_MACRO_n` names from the first 32 slots.
 

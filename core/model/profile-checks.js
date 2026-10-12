@@ -10,8 +10,8 @@ const {baseLighting} = require("./settings-editor");
 const {decodeMacroPayload, macroProgramLimit} = require("../schema/macro-payload");
 const {hostSettings} = require("../schema/host-settings");
 const {inspectMacroPlayback} = require("./macro-input");
-const {pointingClicks} = require("./pointing-taps");
-const {supportsPdClicks} = require("../schema/pd-mode-domain-v1");
+const {pointingClicks, pointingMacros} = require("./pointing-taps");
+const {supportsPdClicks, supportsPdMacros} = require("../schema/pd-mode-domain-v1");
 
 /** @param {import("./types.js").DecodedProfile} decoded @param {import("./types.js").ProfileDestination} [destination] @returns {import("../../contracts/model.js").Finding[]} */
 function profileFindings(decoded, destination = {}) {
@@ -25,10 +25,13 @@ function profileFindings(decoded, destination = {}) {
             fix: "Configure the slot or replace the actions that reach it.", place: {kind: "pointing", slot: Number(slot)}});
     }
     const host = hostSettings(decoded.settings.values, destination.detectedHostOs);
+    const emptyMacros = new Set();
     (decoded.document?.macros || []).forEach((encoded, index) => {
         const bytes = Buffer.from(encoded, "base64");
-        if (!bytes.length) return;
-        const playback = inspectMacroPlayback(decodeMacroPayload(bytes, {unicode: true, protectionSupported: true}), host, true, macroProgramLimit(destination));
+        if (!bytes.length) { emptyMacros.add(index); return; }
+        const payload = decodeMacroPayload(bytes, {unicode: true, protectionSupported: true});
+        if (!payload) emptyMacros.add(index);
+        const playback = inspectMacroPlayback(payload, host, true, macroProgramLimit(destination));
         if (!playback.error) return;
         findings.push({kind: "unplayableMacro", level: "warning", layers: [], identity: `${index}:${playback.code}:${playback.error}`,
             title: playback.code === "MACRO_TOO_LONG" ? `Macro ${index} is too long to play` : `Macro ${index} cannot play with this Host setup`,
@@ -43,6 +46,21 @@ function profileFindings(decoded, destination = {}) {
                 title: `${click.name} clicks mouse button ${click.button} on ${click.label}`,
                 detail: "This keyboard's firmware cannot click a mouse button from a pointing mode. Apply will refuse the profile.",
                 fix: "Update the firmware, or give that direction or button another shortcut.", place: {kind: "pointing", slot: click.slot}});
+        }
+    }
+    for (const output of pointingMacros(decoded.pdModes || [])) {
+        const where = {kind: /** @type {const} */ ("pointing"), slot: output.slot};
+        if (typeof destination.featureFlags === "number" && !supportsPdMacros(destination)) {
+            findings.push({kind: "pointingMacroBlocker", level: "blocker", layers: [], identity: `${output.slot}:${output.label}:${output.macro}`,
+                title: `${output.name} runs macro ${output.macro} on ${output.label}`,
+                detail: "This keyboard's firmware cannot run a macro from a pointing mode. Apply will refuse the profile.",
+                fix: "Update the firmware, or give that direction or button another shortcut.", place: where});
+        }
+        if (emptyMacros.has(output.macro)) {
+            findings.push({kind: "inertPointingMacro", level: "warning", layers: [], identity: `${output.slot}:${output.label}:${output.macro}`,
+                title: `${output.name}: ${output.label} runs empty macro ${output.macro}`,
+                detail: "This macro has no steps, so it does nothing yet and leaves a once-per-movement gesture available.",
+                fix: "Add steps in Macros, or choose another output.", place: where});
         }
     }
     const lighting = baseLighting(decoded.settings.values);

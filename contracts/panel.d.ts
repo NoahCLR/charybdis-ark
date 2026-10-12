@@ -67,7 +67,7 @@ export interface PublishedModel {
     layers: Layer[];
     hostLayoutLegends: Record<string, string[]> | null;
     pdModes: (PdSlot & {displayName: string; binding: {slot: number; hold: string; lock: string; holdCode: number; lockCode: number}})[];
-    pdModeEditing: {writable: boolean; dpiChoices: {value: number; label: string}[]; clicks: boolean; tapKeys: {plain: string[]; modified: string[]}};
+    pdModeEditing: {writable: boolean; dpiChoices: {value: number; label: string}[]; clicks: boolean; macros: boolean; tapKeys: {plain: string[]; modified: string[]}};
     keyBehaviors: BehaviorView[];
     behaviorEditing: {busy: boolean; writable: boolean; maxTapStepsPerBehavior: number; keyDefaults: Record<string, {builtIn: BuiltIn; timing: Record<string, Scalar | undefined>}>};
     profileIdentity: Partial<BaseIdentity> | null;

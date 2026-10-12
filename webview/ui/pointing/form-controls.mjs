@@ -1,6 +1,6 @@
 // @ts-check
 import {el, esc} from "../../lib/dom.mjs";
-import {keyName, modifierBits} from "../../view/keyvalues.mjs";
+import {keyName, modifierBits, pointingMacro} from "../../view/keyvalues.mjs";
 import {vocabulary} from "../../view/vocabulary.mjs";
 import {render} from "../../store.mjs";
 import {openPicker} from "../picker.mjs";
@@ -33,6 +33,11 @@ export function formControls(model, slot, canEdit, stageCurrent) {
         const node = el(`<label class="field ${options.klass || ""}"><span>${options.labelHtml || esc(label)}</span>
             <div class="input-row"><input data-f="pointing:${slot.id}:${esc(key)}" class="input mono" value="${esc(name)}" placeholder="nothing" ${disabled}>
             <button class="btn" data-pick ${disabled}>Pick…</button></div></label>`);
+        const macro = pointingMacro(model, code);
+        if (macro) {
+            node.append(el(`<span class="note">${esc(macro.name)}${macro.empty ? " · empty: does nothing yet" : ""}</span>`));
+            if (!key.startsWith("button:") && slot.directionOutput === 0) node.append(el(`<span class="note" data-tip="Triggers while a macro is playing are dropped. Choose Once per movement under How often it sends for a longer macro.">Busy triggers are dropped · try Once per movement</span>`));
+        }
         const input = /** @type {HTMLInputElement} */ (node.querySelector("input"));
         form[key] = () => input.value.trim();
         /** @type {HTMLButtonElement} */ (node.querySelector("[data-pick]")).addEventListener("click", (event) => {

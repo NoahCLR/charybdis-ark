@@ -228,3 +228,16 @@ test("portable streams restore across bank sizes with stable fingerprints and ex
     assert.throws(() => validateSnapshot(source, {...CURRENT_CAPABILITIES, viaMacroBytes: 10327}), /9802 bytes over/);
     assert.equal(validateSnapshot(source, {...CURRENT_CAPABILITIES, featureFlags: 1 << 27, viaMacroBytes: 34903}).macros.length, 34903);
 });
+
+test("current backups preserve retired user assignments without reinterpreting them as custom keys", () => {
+    const source = document();
+    const codes = Array.from({length: 32}, (_, index) => 0x7e40 + index);
+    source.layers[0].splice(0, codes.length, ...codes);
+    const restored = validateSnapshot(JSON.stringify(source));
+    assert.deepEqual(restored.document.layers[0].slice(0, 32), codes);
+    assert.deepEqual(validateSnapshot(JSON.stringify(restored.document)).layout, restored.layout);
+    const {profileKeyNames, keyLabel} = require("../../core/model/key-names");
+    const names = profileKeyNames({actionsKnown: true, customKeys: [{slot: 0, name: "Right Thumb"}]});
+    for (let index = 0; index < 32; index++) assert.equal(keyLabel(names, codes[index]), `User ${index}`);
+    assert.equal(keyLabel(names, 0x7f00), "Right Thumb");
+});
