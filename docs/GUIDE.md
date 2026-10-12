@@ -134,7 +134,10 @@ that is switched off is drawn as off — hollow dots, plain badges, unlit keys.
 Every edit is kept in a local draft and reaches the keyboard only through
 review and apply. Review lists each changed thing once, under the area it is
 edited in, with the fields that changed, can open it where it is edited, and
-can discard part of the draft. In Review and Draft history, combo badges have
+can discard part of the draft. Stored names are compared even when clearing
+one leaves the same default label; Review explains the stored name and its
+fallback separately. A disabled pointing slot's retained name is reviewed too.
+In Review and Draft history, combo badges have
 space before their names, and tap-count badges and tier dots occupy separate
 aligned positions. Things made by the same edit (a key swap, a
 moved behaviour) go back together, as one undoable step. Layers are compared
