@@ -31,7 +31,7 @@ reference when one is set. Tab counts still count the selected layer's stored
 routes. On the board, a key the selected layer stores keeps its own marks; a
 transparent key answered from below wears that key's behaviour dots and the
 badges of the combos On this view lists it in (`combosInPreview` in
-webview/view/keyface.mjs). Under Combo Layer Matching the reference layer's keys
+webview/view/combo-reach.mjs). Under Combo Layer Matching the reference layer's keys
 are matched instead, so no answer from below adds a badge.
 
 Combo grouping skips activation enumeration when there are no combos. For
@@ -104,6 +104,16 @@ only vertical scroller.
   `core/model/key-behavior-edits.js` and `core/model/device-profile-view.js`.
   The session translates wire capability bits into the model's destination
   facts before staging; the model imports no session or protocol modules.
+- Layer answers: `core/model/layer-resolution.js` compiles possible answers
+  and their active-layer conditions from decoded layout values. Layer reach
+  and the published panel model use the same compiler. Each panel layer's
+  `answers[layoutIndex]` names source stack slots with required and blocked
+  active-layer masks; disabled keys are answers that block lower keys.
+  `webview/view/layer-resolution.mjs` selects those facts for the preview and
+  lists possible answers without resolving transparency again. Absent facts
+  provide no answer. `view/keyface.mjs` owns labels and tier presentation,
+  `view/combo-reach.mjs` owns combo matching and badges, and `view/reach.mjs`
+  composes behaviour, macro and pointing routes from those answers.
 - Settings bits and base lighting: `fieldMask` and `baseLighting` in
   `core/model/settings-editor.js`.
 - Panel sequencing: `core/session/panel-controls.js`, tested with a fake

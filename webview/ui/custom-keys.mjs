@@ -8,7 +8,7 @@
 // Keys screen like any other. Place one on a layer or send it from a combo.
 
 import {el, esc} from "../lib/dom.mjs";
-import {customKeyPlacements} from "../view/keyface.mjs";
+import {customKeyPlacements} from "../view/reach.mjs";
 import {NAME_MAX_BYTES, NAME_TIP, nameCount} from "../view/names.mjs";
 import {ROUTE_WORDS, setReachGroupOpen} from "../view/reach-groups.mjs";
 import {canEdit as canEditArea, getModel, layerName, layers, post, render, state, writable} from "../store.mjs";

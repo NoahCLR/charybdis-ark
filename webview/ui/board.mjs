@@ -16,7 +16,9 @@
 // Selector assertions refer to elements created by this module's authored markup.
 import {css, idealText, isOff} from "../lib/colour.mjs";
 import {GEO, LED_INDEX, TRACKBALL_LED, fitText, keyFaceRows, keyVisual} from "../view/geometry.mjs";
-import {behaviourFor, behaviourTiers, combosShownAt, keyFace, keyMeaning, resolvedPositions} from "../view/keyface.mjs";
+import {behaviourFor, behaviourTiers, keyFace, keyMeaning} from "../view/keyface.mjs";
+import {combosShownAt} from "../view/combo-reach.mjs";
+import {resolvedPositions} from "../view/layer-resolution.mjs";
 import {keyLight, ownLight, stageEnabled, tierColour, trackballLight} from "../view/lighting.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {hideHover} from "./hover.mjs";

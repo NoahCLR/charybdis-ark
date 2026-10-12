@@ -13,7 +13,7 @@ import {NAME_MAX_BYTES, NAME_TIP} from "../view/names.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {AXIS, BUTTON, DIAGONALS, DIRECTIONS, KIND, MODIFIER_POLICY, SCROLL_FIELDS, TAP_ROWS, axisReads, dpiOptions, modeDpi, newMode, readConfig, readsHorizontal, readsVertical, scrollAxesOf, settleButtons, settleTaps, startingRecord, thresholdDistance} from "../view/pointing-config.mjs";
 import {modifierBits, keyName, modifierNames} from "../view/keyvalues.mjs";
-import {bindingsForSlot} from "../view/keyface.mjs";
+import {bindingsForSlot} from "../view/reach.mjs";
 import {pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {getModel, post, render, state, writable, canEdit as canEditArea} from "../store.mjs";
 import * as edits from "../view/edits.mjs";

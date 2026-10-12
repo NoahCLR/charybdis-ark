@@ -10,7 +10,8 @@
 
 import {css, isOff} from "../lib/colour.mjs";
 import {esc} from "../lib/dom.mjs";
-import {layerOfKeycode, namedAction} from "../view/keyface.mjs";
+import {layerOfKeycode} from "../view/keyface.mjs";
+import {namedAction} from "../view/reach.mjs";
 import {feedbackColours, pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {layerSwatch} from "./layerbar.mjs";
 

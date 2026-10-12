@@ -157,6 +157,19 @@ test("device layers become the layer model the UI keys on", () => {
     });
     // Transparent gets a glyph rather than the word, to fit a key cap.
     assert.equal(model.layers[0].positions[1].display, "▽");
+    assert.deepEqual(model.layers[0].answers, [[{layer: 0, active: 1, blocked: 0}], []]);
+});
+
+test("published layer answers name exact source slots through transparent and disabled keys", () => {
+    const codes = [[4, 5], [6, 0], [1, 1]];
+    const layout = {state: "read", layers: codes.map((values, layer) => ({layer,
+        keys: values.map((keycode, layoutIndex) => ({layoutIndex, keycode, resolved: resolve(keycode)}))}))};
+    const model = buildDeviceModel({layout});
+    assert.deepEqual(model.layers[2].answers, [
+        [{layer: 1, active: 2, blocked: 0}, {layer: 0, active: 1, blocked: 2}],
+        [{layer: 1, active: 2, blocked: 0}, {layer: 0, active: 1, blocked: 2}],
+    ]);
+    assert.deepEqual(model.layers[1].answers[1], [{layer: 1, active: 2, blocked: 0}]);
 });
 
 test("layer and tap-hold keys name their layer without losing the expression", () => {

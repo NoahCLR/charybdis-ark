@@ -1,6 +1,7 @@
 // @ts-check
 "use strict";
 const {test, expect} = require("@playwright/test");
+const {compileLayerAnswers} = require("../core/model/layer-resolution");
 
 test("participation controls post placements, shared definitions and master/source-layer settings", async ({page}) => {
     const errors = [];
@@ -51,13 +52,25 @@ test("participation controls post placements, shared definitions and master/sour
 test("a transparent late-layer key explains its source and opens that placement", async ({page}) => {
     await page.goto("/preview/index.html");
     await page.locator('[data-screen="keys"]').click();
-    await page.evaluate(async () => {
+    const model = await page.evaluate(async () => {
         const store = await import("/webview/store.mjs");
         const model = structuredClone(store.getModel());
         const key = model.layers[15].positions[0];
         Object.assign(key, {keycode: "KC_TRNS", semantic: "KC_TRNS", value: 1, display: "Transparent"});
-        store.setModel(model); store.showLayer(15); store.render();
+        return model;
     });
+    // This fixture changes a native layout value, so republish the same core
+    // facts the production host regenerates after accepting that edit.
+    const answers = compileLayerAnswers(model.layers.map(layer => {
+        const codes = [];
+        for (const key of layer.positions) codes[key.layoutIndex] = key.value;
+        return codes;
+    }));
+    model.layers.forEach((layer, at) => { layer.answers = answers[at]; });
+    await page.evaluate(async model => {
+        const store = await import("/webview/store.mjs");
+        store.setModel(model); store.showLayer(15); store.render();
+    }, model);
     await expect(page.locator('[data-source-layer]')).toBeVisible();
     await expect(page.locator('.bench-body')).toContainText("This transparent key inherits its permissions");
     await expect(page.locator('[data-use-behavior]')).toHaveCount(0);

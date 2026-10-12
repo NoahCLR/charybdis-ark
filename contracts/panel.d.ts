@@ -13,7 +13,9 @@ export interface Position {
     column?: number;
     value?: number;
 }
-export interface Layer {name: LayerReference; index: number; positions: Position[]; displayName?: string}
+/** One possible answer, while its layer is active and higher answering layers are absent. */
+export interface LayerAnswer {layer: number; active: number; blocked: number}
+export interface Layer {name: LayerReference; index: number; positions: Position[]; displayName?: string; answers: LayerAnswer[][]}
 export interface Branch extends BehaviorBranch { label?: string; fallback?: boolean}
 export interface BuiltIn {tap?: Branch; hold?: Branch; releaseTaps?: boolean}
 export interface BehaviorView extends Omit<Behavior, 'steps'> {

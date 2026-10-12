@@ -49,7 +49,7 @@ export const STATE_FIELDS = {
     // The combo builder, opened and closed as one (openComboBuilder):
     //   inputs      the input names the combo stores, in stored order — never
     //               board positions, which mean another key on every layer
-    //               (view/keyface.mjs: toggleComboInput)
+    //               (view/combo-reach.mjs: toggleComboInput)
     //               Labels are resolved from the current model on every render.
     //   form        the builder's fields, kept across renders; followsDefault
     //               says the window is the keyboard's default, not the combo's own

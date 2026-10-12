@@ -4,7 +4,7 @@
 // Every tab that answers "what does this layer reach" groups its rows the
 // same way and in the same order: what the layer holds itself, then what it
 // only reaches under a transparent key, then the rest of the board. The reach
-// functions in keyface.mjs return one list per group; these name the groups,
+// functions in reach.mjs return one list per group; these name the groups,
 // order them, and say which list each reads.
 
 /** @type {Readonly<Record<string, string>>} */

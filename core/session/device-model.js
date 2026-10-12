@@ -27,6 +27,7 @@ const {runningComboRows} = require("../schema/combo-domain-v1");
 const {SETTING} = require("../schema/settings-domain-v1");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX, matrixPosition} = require("../data/charybdis-layout");
 const {PROFILE_WIRE_FEATURES} = require("../protocol/profile-wire-v1");
+const {compileLayerAnswers} = require("../model/layer-resolution");
 const {PROFILE_WIRE_DOMAINS} = require("../schema/profile-domains");
 
 const {editableDomains} = require("./firmware-support");
@@ -218,9 +219,17 @@ function configurationModel(content, capabilities, editing) {
 // stable names. They are display strings, not identifiers from source.
 /** @param {Configuration["layers"]} layout @param {Record<string, string>} labels @param {Record<string, string>} [aliases] @param {string[]} [layerNames] */
 function layersForView(layout, labels, aliases = {}, layerNames = []) {
-    const layers = layout.map((entry) => ({
+    const codes = layout.map(entry => {
+        /** @type {(number | undefined)[]} */
+        const positions = [];
+        for (const key of entry.keys) positions[key.layoutIndex] = key.keycode;
+        return positions;
+    });
+    const answers = compileLayerAnswers(codes);
+    const layers = layout.map((entry, at) => ({
         name: layerRef(entry.layer),
         index: entry.layer,
+        answers: answers[at],
         positions: entry.keys.map((key) => {
             /** @type {import("../data/types.js").ResolvedKeycode & {tapLabel?: string, layerLabel?: string}} */
             const resolved = {...key.resolved, label: labels[key.resolved.name] || key.resolved.label};

@@ -8,7 +8,8 @@
 
 import {el, esc} from "../../lib/dom.mjs";
 import {scrollContentTo} from "../../lib/scroll.mjs";
-import {actionLabel, comboInputShown, visibleKeycode} from "../../view/keyface.mjs";
+import {actionLabel, visibleKeycode} from "../../view/keyface.mjs";
+import {comboInputShown} from "../../view/combo-reach.mjs";
 import {closeComboBuilder, getModel, heldLayers, layerName, layers, post, render, state} from "../../store.mjs";
 import {definitionControls} from "../participation.mjs";
 import * as edits from "../../view/edits.mjs";

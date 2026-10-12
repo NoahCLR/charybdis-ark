@@ -3,7 +3,8 @@
 // and the macros and pointing modes this layer reaches.
 
 import {el, esc} from "../../lib/dom.mjs";
-import {behaviourGroups, comboGroups, macroReach, pointingReach} from "../../view/keyface.mjs";
+import {behaviourGroups, macroReach, pointingReach} from "../../view/reach.mjs";
+import {comboGroups} from "../../view/combo-reach.mjs";
 import {mappedKeyCount} from "../../view/lighting.mjs";
 import {currentLayer, getModel, layers, render, selectedPosition, state} from "../../store.mjs";
 import {draftDot, draftMarks} from "../../view/review.mjs";

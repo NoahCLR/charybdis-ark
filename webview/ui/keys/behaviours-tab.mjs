@@ -6,7 +6,8 @@
 // the open one's editor beside them.
 
 import {el, esc} from "../../lib/dom.mjs";
-import {actionLabel, behaviourGroups, behavioursInView, behaviourTiers} from "../../view/keyface.mjs";
+import {actionLabel, behaviourTiers} from "../../view/keyface.mjs";
+import {behaviourGroups, behavioursInView} from "../../view/reach.mjs";
 import {currentLayer, getModel, heldLayers, layerName, layers, render, selectedPosition, state} from "../../store.mjs";
 import {behaviourEditorRow} from "../../view/behavior-editor.mjs";
 import {draftDot, draftMarks} from "../../view/review.mjs";
