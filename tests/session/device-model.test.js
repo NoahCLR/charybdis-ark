@@ -254,7 +254,7 @@ test("the header exposes one health model for connection, convergence and recove
     const connected = buildDeviceModel({
         capabilities: {},
         busy: true,
-        phase: "reading profile",
+        phase: "read-profile",
         status: {committedGeneration: 4, activeGeneration: 4, peerGeneration: 4, committedDigest: 1, candidatePending: true, peerKnown: true, peerConverged: true},
         mutationCompatibility: {recoveryPending: true},
     }).device;
@@ -262,7 +262,7 @@ test("the header exposes one health model for connection, convergence and recove
     assert.equal(connected.health.converged, true);
     assert.equal(connected.health.recoveryPending, true);
     assert.equal(connected.health.busy, true);
-    assert.equal(connected.health.phase, "reading profile");
+    assert.equal(connected.health.phase, "read-profile");
     assert.equal(connected.health.restartNeeded, false);
     const wedged = buildDeviceModel({
         capabilities: {compiledLayerCount: 16},

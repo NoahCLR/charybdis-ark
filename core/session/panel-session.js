@@ -1,5 +1,6 @@
 // @ts-check
 "use strict";
+const {PHASE} = require("../model/vocabulary");
 
 // The panel's side of a session: what extension.js used to decide inline.
 //
@@ -155,7 +156,7 @@ function buildPanelModel(session, state) {
     /** @type {import("../../contracts/model.js").LoadView} */
     const load = {
         state: session.readBusy ? "loading" : readReady ? "ready" : "unavailable",
-        phase: state.phase || "idle",
+        phase: state.phase || PHASE.IDLE,
         operationId: state.operationId,
         operationBusy: Boolean(state.busy),
         connectionToken: state.connectionToken,

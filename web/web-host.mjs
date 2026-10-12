@@ -43,7 +43,7 @@ export function initialTheme(saved, prefersLight) {
 
 // Whether leaving the page would lose something: unapplied edits (in the
 // demo, edits not exported since), or an Apply (or a restore) part way through.
-/** @param {import("../core/session/types.js").PanelSession & {service: {phase?: string}}} session */
+/** @param {import("../core/session/types.js").PanelSession & {service: {phase?: import("../contracts/model.js").PhaseId}}} session */
 export function leaving(session) {
     const edits = session.demo ? demoUnsaved(session) : session.draft?.dirty;
     return Boolean(edits || writingProfile(session));

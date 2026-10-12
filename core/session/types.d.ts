@@ -57,7 +57,7 @@ export interface DeviceModelInput {
     macroView?: null | ReturnType<typeof import('../model/macro-editor.js').macroEditorView>;
     customKeyView?: null | ReturnType<typeof import('../model/custom-key-editor.js').customKeyEditorView>;
     device?: import('../transport/types.js').DeviceDescriptor;
-    phase?: string;
+    phase?: import('../../contracts/model.js').PhaseId;
     busy?: boolean;
     error?: {message: string} | null;
     mutationCompatibility?: {recoveryPending?: boolean} | null;
@@ -177,7 +177,7 @@ export type RestoredProfile = Awaited<ReturnType<typeof import('./portable-profi
  */
 export interface ControlService extends DraftApplyService {
     capabilities?: Partial<DeviceCapabilities> | null;
-    phase?: string;
+    phase?: import('../../contracts/model.js').PhaseId;
     portable?: import('../model/types.js').ProfileSnapshot | null;
     snapshot(): PanelDeviceState & {devices: (import('../transport/types.js').DeviceDescriptor & {label: string})[]};
     enumerate(): Promise<unknown>;

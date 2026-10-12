@@ -52,3 +52,35 @@ test("one rule names an unnamed layer, slot, branch and modifier set", () => {
 test("macro playback statuses have one set of presentation words", () => {
     assert.deepEqual(VOCABULARY.macroPlayback, {setup: "setup", tooLong: "too long", blocked: "blocked", noRoom: "no room"});
 });
+
+
+test("every stable device phase has immutable words and matches the posted PhaseId contract", () => {
+    const {PHASE, PHASE_WORDS} = require("../../core/model/vocabulary");
+    const fs = require("node:fs"), path = require("node:path");
+    const declarations = fs.readFileSync(path.join(__dirname, "../../contracts/model.d.ts"), "utf8");
+    const declaration = /export type PhaseId = ([^;]+);/.exec(declarations);
+    assert.ok(declaration);
+    const ids = [...declaration[1].matchAll(/'([^']+)'/g)].map(match => match[1]).sort();
+    assert.deepEqual(Object.values(PHASE).sort(), ids);
+    assert.deepEqual(Object.keys(PHASE_WORDS).sort(), ids);
+    assert.equal(VOCABULARY.phases, PHASE_WORDS);
+    for (const id of ids) {
+        const words = PHASE_WORDS[id];
+        assert.ok(words.label.trim(), id);
+        assert.equal(typeof words.writes, "boolean", id);
+        assert.ok(Object.isFrozen(words), id);
+        if (words.read) assert.ok(words.read.trim(), id);
+        if (words.busy) assert.ok(words.busy.trim(), id);
+    }
+    assert.deepEqual(ids.filter(id => PHASE_WORDS[id].writes), [PHASE.RESTORE_COMPLETE]);
+});
+
+test("device phase identities are independent of their existing display labels", () => {
+    const {PHASE, PHASE_WORDS} = require("../../core/model/vocabulary");
+    assert.equal(PHASE_WORDS[PHASE.READ_LAYOUT].label, "reading layout");
+    assert.equal(PHASE_WORDS[PHASE.RESTORE_COMPLETE].label, "restoring complete profile");
+    assert.notEqual(PHASE.READ_LAYOUT, PHASE_WORDS[PHASE.READ_LAYOUT].label);
+    assert.notEqual(PHASE.RESTORE_COMPLETE, PHASE_WORDS[PHASE.RESTORE_COMPLETE].label);
+    assert.equal(PHASE_WORDS[PHASE.READ_COMBOS].read, "Checking active combos");
+    assert.equal(PHASE_WORDS[PHASE.READ_BASE_RGB].read, "Checking base lighting");
+});

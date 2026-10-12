@@ -1,12 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import {VOCABULARY} from "../../core/model/vocabulary.js";
 import {busyText, configureReady, postApplyReadText, readScreen, screenAvailable} from "../../webview/view/readiness.mjs";
 
 test("loading names the active read and never claims the board is ready", () => {
     assert.deepEqual(readScreen(null), {state: "loading", title: "Reading your keyboard", detail: "Looking for a keyboard"});
-    assert.match(readScreen({load: {state: "loading", phase: "reading layout", progress: {done: 5, total: 8}}}).detail,
+    assert.match(readScreen({vocabulary: VOCABULARY, load: {state: "loading", phase: "read-layout", progress: {done: 5, total: 8}}}).detail,
         /Reading keys and layers · 5 of 8/);
-    assert.match(readScreen({load: {state: "loading", phase: "reading complete profile"}}).detail, /Reading the complete profile/);
+    assert.match(readScreen({vocabulary: VOCABULARY, load: {state: "loading", phase: "read-complete"}}).detail, /Reading the complete profile/);
 });
 
 test("only a ready model releases Configure screens", () => {
@@ -50,10 +51,10 @@ test("post-Apply readback names the current data instead of a generic operation"
 });
 
 test("a read or export names what it reads and claims nothing about saving", () => {
-    assert.deepEqual(busyText("reading complete profile"), {detail: "Reading the complete profile", writes: false});
-    assert.deepEqual(busyText("refreshing"), {detail: "Checking both halves", writes: false});
-    assert.deepEqual(busyText("connected"), {detail: "Finishing the current step", writes: false}, "a raw phase is never shown");
-    assert.deepEqual(busyText("restoring complete profile"), {detail: "Saving the profile to both halves", writes: true});
+    assert.deepEqual(busyText("read-complete", {vocabulary: VOCABULARY}), {detail: "Reading the complete profile", writes: false});
+    assert.deepEqual(busyText("refresh", {vocabulary: VOCABULARY}), {detail: "Checking both halves", writes: false});
+    assert.deepEqual(busyText("connected", {vocabulary: VOCABULARY}), {detail: "Finishing the current step", writes: false}, "a raw phase is never shown");
+    assert.deepEqual(busyText("restore-complete", {vocabulary: VOCABULARY}), {detail: "Saving the profile to both halves", writes: true});
 });
 
 test("a host that cannot reach a keyboard says why, and a host's words say how to connect", () => {
@@ -63,4 +64,22 @@ test("a host that cannot reach a keyboard says why, and a host's words say how t
     const web = {host: {words: {connectHint: "Choose keyboard and pick it."}}, load: {state: "unavailable"}, device: {connected: false}};
     assert.equal(readScreen(web).detail, "Choose keyboard and pick it.");
     assert.equal(readScreen({...web, device: {connected: false, health: {error: "Unplugged."}}}).detail, "Unplugged.", "what the keyboard said comes first");
+});
+
+
+test("phase presentation consumes the published vocabulary rather than labels as identities", () => {
+    const model = {vocabulary: {...VOCABULARY, phases: {...VOCABULARY.phases,
+        "read-layout": {label: "Changed read label", read: "Changed read detail", busy: "Changed busy detail", writes: false},
+        "restore-complete": {label: "Changed restore label", busy: "Changed saving detail", writes: true},
+    }}, load: {state: "loading", phase: "read-layout", progress: {done: 2, total: 4}}};
+    assert.equal(readScreen(model).detail, "Changed read detail · 2 of 4");
+    assert.deepEqual(busyText("read-layout", model), {detail: "Changed busy detail", writes: false});
+    assert.deepEqual(busyText("restore-complete", model), {detail: "Changed saving detail", writes: true});
+});
+
+test("unknown and missing phase facts use the existing honest fallbacks", () => {
+    assert.deepEqual(busyText("unknown", {vocabulary: VOCABULARY}), {detail: "Finishing the current step", writes: false});
+    assert.deepEqual(busyText(undefined, null), {detail: "Finishing the current step", writes: false});
+    assert.equal(readScreen({vocabulary: VOCABULARY, load: {state: "loading", phase: "unknown"}}).detail, "Finishing the read");
+    assert.equal(readScreen(null).detail, "Looking for a keyboard");
 });

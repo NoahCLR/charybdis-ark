@@ -9,6 +9,7 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
+const {PHASE} = require("../core/model/vocabulary");
 const {ProfileDraftSession} = require("../core/session/profile-draft-session");
 const {buildPanelModel, observeService, startLayerEdit} = require("../core/session/panel-session");
 const portable = require("../core/model/portable-profile");
@@ -104,7 +105,7 @@ async function webHosts() {
 // No keyboard: what a host publishes before one is chosen or connected.
 /** @param {import("../core/session/types.js").PanelHost} host */
 function emptyModel(host) {
-    return buildPanelModel({service: {portable: null}, host}, {connected: false, busy: false, devices: [], phase: "empty"});
+    return buildPanelModel({service: {portable: null}, host}, {connected: false, busy: false, devices: [], phase: PHASE.EMPTY});
 }
 
 // The demo, as the host loop opens it: the bundled demo profile in a real

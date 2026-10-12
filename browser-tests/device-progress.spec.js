@@ -122,8 +122,8 @@ test("read phase changes keep the editor, while content and permissions redraw i
         const editor = document.querySelector(".content");
         store.setMacroForm("VIA_MACRO_17", {draft: 'literal café “hello” 🙂'});
         const phase = structuredClone(model);
-        phase.device.health.phase = "reading profile";
-        phase.load.phase = "reading profile"; phase.load.operationId++;
+        phase.device.health.phase = "read-profile";
+        phase.load.phase = "read-profile"; phase.load.operationId++;
         phase.diagnostics = ["Updated read diagnostics"];
         phase.postApplyRead = {step: "profile", progress: {done: 25, total: 100}};
         window.dispatchEvent(new MessageEvent("message", {data: {type: "model", model: phase}}));
@@ -142,4 +142,34 @@ test("read phase changes keep the editor, while content and permissions redraw i
             formKept: store.macroForm("VIA_MACRO_17").draft === 'literal café “hello” 🙂'};
     });
     expect(result).toEqual({preserved: true, namesRedraw: true, permissionRedraw: true, formKept: true});
+});
+
+
+test("phase words render from the model while progress and saving use stable IDs", async ({page}) => {
+    await page.goto("/preview/index.html");
+    const result = await page.evaluate(async () => {
+        const store = await import("/webview/store.mjs");
+        const original = structuredClone(store.getModel());
+        const loading = structuredClone(original);
+        loading.vocabulary.phases["read-layout"].read = "Published read words";
+        Object.assign(loading.load, {state: "loading", phase: "read-layout", progress: {done: 2, total: 4}});
+        window.dispatchEvent(new MessageEvent("message", {data: {type: "model", model: loading}}));
+        const read = document.querySelector(".read-placeholder").textContent;
+        const saving = structuredClone(original);
+        saving.vocabulary.phases["restore-complete"].label = "Published restore label";
+        saving.vocabulary.phases["restore-complete"].busy = "Published saving words";
+        Object.assign(saving.draft, {busy: true, editable: false, reason: "busy"});
+        Object.assign(saving.device.health, {busy: true, phase: "restore-complete"});
+        window.dispatchEvent(new MessageEvent("message", {data: {type: "model", model: saving}}));
+        const commit = document.querySelector(".commit").textContent;
+        const rail = document.querySelector(".rail-status").textContent;
+        store.state.screen = "device"; store.render();
+        const device = document.querySelector(".content").textContent;
+        return {read, commit, rail, device};
+    });
+    expect(result.read).toContain("Published read words · 2 of 4");
+    expect(result.commit).toContain("Published saving words");
+    expect(result.commit).toContain("until both halves confirm");
+    expect(result.rail).toContain("Published restore label");
+    expect(result.device).toContain("Published restore label");
 });

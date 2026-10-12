@@ -5,15 +5,7 @@
 /** @typedef {import("../../contracts/model.js").StatusModel} StatusModel */
 /** @typedef {import("../../contracts/model.js").CountedProgress} CountedProgress */
 
-/** @type {Readonly<Record<string, string>>} */
-const PHASES = {
-    enumerating: "Looking for a keyboard",
-    connecting: "Connecting to the keyboard",
-    refreshing: "Checking both halves",
-    "reading layout": "Reading keys and layers",
-    "reading profile": "Reading lighting and behaviours",
-    "reading complete profile": "Reading the complete profile",
-};
+import {phaseWords} from "./vocabulary.mjs";
 
 /** @type {Readonly<Record<string, string>>} */
 const POST_APPLY_READ = {
@@ -34,12 +26,10 @@ export function postApplyReadText(read) {
 // The commit bar while the keyboard is busy with anything but an Apply: what
 // is happening in words, and whether it writes to the keyboard. Reads and
 // exports save nothing, so they make no claim about the saved profile.
-/** @type {Readonly<Record<string, string>>} */
-const BUSY = {...PHASES, "restoring complete profile": "Saving the profile to both halves"};
-
-/** @param {string} phase */
-export function busyText(phase) {
-    return {detail: BUSY[phase] || "Finishing the current step", writes: phase === "restoring complete profile"};
+/** @param {import("../../contracts/model.js").PhaseId | undefined} phase @param {StatusModel | null | undefined} model */
+export function busyText(phase, model) {
+    const words = phaseWords(model, phase);
+    return {detail: words?.busy || "Finishing the current step", writes: words?.writes || false};
 }
 
 /** @param {StatusModel | null | undefined} model */
@@ -58,11 +48,11 @@ export function readScreen(model, screen = "keys") {
     // A host that cannot reach a keyboard at all says why, in place of reading.
     if (model?.host?.blocked) return {state: "blocked", title: model.host.blocked.title, detail: model.host.blocked.detail};
     if (!model || model.load?.state === "loading") {
-        const phase = model?.load?.phase || "enumerating";
+        const phase = model?.load?.phase;
         const progress = model?.load?.progress;
         const count = progress && typeof progress !== "string" && Number.isInteger(progress.done) && Number.isInteger(progress.total) && progress.total > 0
             ? ` · ${progress.done} of ${progress.total}` : "";
-        return {state: "loading", title: "Reading your keyboard", detail: typeof progress === "string" && progress ? progress : `${PHASES[phase] || "Finishing the read"}${count}`};
+        return {state: "loading", title: "Reading your keyboard", detail: typeof progress === "string" && progress ? progress : `${phaseWords(model, phase)?.read || (!phase ? "Looking for a keyboard" : "Finishing the read")}${count}`};
     }
     if (screen === "profile" && !screenAvailable(model, screen)) return {state: "unavailable", title: "Backups unavailable",
         detail: "Connect a keyboard with complete-profile firmware, then read it to manage backups."};

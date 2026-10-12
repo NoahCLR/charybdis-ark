@@ -1019,6 +1019,15 @@ operation. The keyed payload groups in `contracts/messages.d.ts` are inert
 posted-data declarations; a registry test holds their control names and routes
 to the runtime table. Route sets retained for hosts are derived from it.
 
+Device operation phases have stable IDs (`PHASE` in
+`core/model/vocabulary.js`), typed as `PhaseId` in the posted contracts.
+Their status labels, read and busy words and write fact live beside those IDs
+and reach the interface as `model.vocabulary.phases`. The interface displays
+those words; progress correlation continues comparing IDs. The browser's
+active-restore warning uses the write fact. Changing presentation words cannot
+change routing, progress acceptance or which operation writes to the keyboard.
+Apply steps and candidate-transfer progress keep their separate identities.
+
 The same module holds the panel session's compound transitions: opening or
 replacing the draft, closing the import review and layer editor together (and
 resetting the forms when the keyboard or draft under them changes), a read

@@ -1,5 +1,5 @@
 // @ts-check
-// The words for what the keyboard stores, as the host sends them.
+// The words for keyboard values and operations, as the host sends them.
 //
 // `model.vocabulary` is core/model/vocabulary.js: the one table the review is
 // written from. Every editor names things from here too, so a dropdown, a
@@ -9,7 +9,7 @@
 /** @typedef {{vocabulary?: import("../../contracts/model.js").Vocabulary, pdModes?: {id: number, displayName: string}[]}} VocabularyModel */
 
 /** @type {import("../../contracts/model.js").Vocabulary} */
-const NONE = {hostOs: [], macroProtection: [], hostLayouts: [], tapSends: "", holdHelpers: {hold: [], long: []}, holdWithoutLongHold: [], tiers: {}, branches: [], localities: [], paintModes: [], fadeModes: [], tapCommit: [],
+const NONE = {phases: /** @type {import("../../contracts/model.js").Vocabulary["phases"]} */ ({}), hostOs: [], macroProtection: [], hostLayouts: [], tapSends: "", holdHelpers: {hold: [], long: []}, holdWithoutLongHold: [], tiers: {}, branches: [], localities: [], paintModes: [], fadeModes: [], tapCommit: [],
     feedbackOwners: [], stages: [], pointing: {kinds: [], axes: [], invert: [], pointerLayer: [], buttons: [],
         emptyDirection: [], directionOutput: [], scrollAxes: [], modifierPolicy: [], scrollFields: [], heldModifiers: ""}, modifiers: [], comboOptions: {}};
 
@@ -42,3 +42,7 @@ export const helperWord = (model, kind, helper) => kind === "tap"
 // A tier's name: Tap, Hold, Long hold.
 /** @param {VocabularyModel | null | undefined} model @param {import("../../contracts/edits.js").Tier} kind */
 export const tierName = (model, kind) => vocabulary(model).tiers[kind] || kind;
+
+// Device progress is matched by id. Labels and write facts come from core.
+/** @param {{vocabulary?: Pick<import('../../contracts/model.js').Vocabulary, 'phases'>} | null | undefined} model @param {import("../../contracts/model.js").PhaseId | undefined} phase */
+export const phaseWords = (model, phase) => phase ? model?.vocabulary?.phases?.[/** @type {import('../../contracts/model.js').PhaseId} */ (phase)] : undefined;

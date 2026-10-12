@@ -77,8 +77,8 @@ test("leaving asks first with unapplied edits or an Apply running", () => {
     assert.equal(leaving({draft: {dirty: false}}), false);
     assert.equal(leaving({draft: {dirty: true}}), true);
     assert.equal(leaving({applyRunning: true}), true);
-    assert.equal(leaving({service: {phase: "restoring complete profile"}}), true);
-    assert.equal(leaving({service: {phase: "reading layout"}}), false);
+    assert.equal(leaving({service: {phase: "restore-complete"}}), true);
+    assert.equal(leaving({service: {phase: "read-layout"}}), false);
 });
 
 test("in the demo, leaving asks only about edits not exported", () => {

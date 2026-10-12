@@ -1,7 +1,7 @@
 // @ts-check
 "use strict";
 
-// The words this app uses for what the keyboard stores, in one place.
+// The words this app uses for keyboard values and operations, in one place.
 //
 // The model names enum values the way the keyboard does (`RGB_LEFT_HALF`,
 // `REPEAT_WHILE_HELD`); these are the words a person reads for them. The
@@ -12,11 +12,50 @@
 const {RGB_STAGE_BITS} = require("../schema/rgb-domain-v1");
 const {hostLayouts} = require("../data/host-layouts");
 
+// Device phases are identities, never their presentation labels. The same
+// words serve progress, status and the browser's active-write warning.
+const PHASE = Object.freeze({
+    IDLE: "idle",
+    AVAILABLE: "available",
+    EMPTY: "empty",
+    CONNECTED: "connected",
+    DEMO: "demo",
+    ENUMERATE: "enumerate",
+    CONNECT: "connect",
+    REFRESH: "refresh",
+    READ_LAYOUT: "read-layout",
+    READ_PROFILE: "read-profile",
+    READ_COMPLETE: "read-complete",
+    RESTORE_COMPLETE: "restore-complete",
+    DISCONNECT: "disconnect",
+    READ_COMBOS: "read-combos",
+    READ_BASE_RGB: "read-base-rgb",
+});
+/** @type {Readonly<Record<import('../../contracts/model.js').PhaseId, Readonly<import('../../contracts/model.js').PhaseWords>>>} */
+const PHASE_WORDS = Object.freeze({
+    [PHASE.IDLE]: Object.freeze({label: "idle", writes: false}),
+    [PHASE.AVAILABLE]: Object.freeze({label: "available", writes: false}),
+    [PHASE.EMPTY]: Object.freeze({label: "empty", writes: false}),
+    [PHASE.CONNECTED]: Object.freeze({label: "connected", writes: false}),
+    [PHASE.DEMO]: Object.freeze({label: "demo", writes: false}),
+    [PHASE.ENUMERATE]: Object.freeze({label: "enumerating", read: "Looking for a keyboard", busy: "Looking for a keyboard", writes: false}),
+    [PHASE.CONNECT]: Object.freeze({label: "connecting", read: "Connecting to the keyboard", busy: "Connecting to the keyboard", writes: false}),
+    [PHASE.REFRESH]: Object.freeze({label: "refreshing", read: "Checking both halves", busy: "Checking both halves", writes: false}),
+    [PHASE.READ_LAYOUT]: Object.freeze({label: "reading layout", read: "Reading keys and layers", busy: "Reading keys and layers", writes: false}),
+    [PHASE.READ_PROFILE]: Object.freeze({label: "reading profile", read: "Reading lighting and behaviours", busy: "Reading lighting and behaviours", writes: false}),
+    [PHASE.READ_COMPLETE]: Object.freeze({label: "reading complete profile", read: "Reading the complete profile", busy: "Reading the complete profile", writes: false}),
+    [PHASE.RESTORE_COMPLETE]: Object.freeze({label: "restoring complete profile", busy: "Saving the profile to both halves", writes: true}),
+    [PHASE.DISCONNECT]: Object.freeze({label: "disconnecting", writes: false}),
+    [PHASE.READ_COMBOS]: Object.freeze({label: "reading combos", read: "Checking active combos", busy: "Checking active combos", writes: false}),
+    [PHASE.READ_BASE_RGB]: Object.freeze({label: "reading base RGB", read: "Checking base lighting", busy: "Checking base lighting", writes: false}),
+});
+
 /** @type {Readonly<Record<string, string>>} */
 const OS_WORDS = {macos: "macOS", windows: "Windows", linux: "Linux"};
 
 /** @type {Readonly<import("../../contracts/model.js").Vocabulary>} */
 const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.js").Vocabulary} */ ({
+    phases: PHASE_WORDS,
     hostOs: [[0, "Auto"], [1, "macOS"], [2, "Windows"], [3, "Linux"]],
     macroPlayback: {setup: "setup", tooLong: "too long", blocked: "blocked", noRoom: "no room"},
     macroProtection: [["auto", "Automatic"], ["on", "On"], ["off", "Off"]],
@@ -131,4 +170,4 @@ const branchName = (count) => VOCABULARY.branches[count - 1] || `${count} taps`;
 /** @param {number} mask */
 const modifierNames = (mask) => VOCABULARY.modifiers.filter(([bit]) => mask & bit).map(([, name]) => name);
 
-module.exports = {VOCABULARY, word, layerName, slotName, branchName, modifierNames};
+module.exports = {PHASE, PHASE_WORDS, VOCABULARY, word, layerName, slotName, branchName, modifierNames};

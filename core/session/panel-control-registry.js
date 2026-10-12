@@ -1,5 +1,6 @@
 // @ts-check
 "use strict";
+const {PHASE, PHASE_WORDS} = require("../model/vocabulary");
 
 // Panel controls have one policy: where they run, what they bind to, what
 // the demo permits and which operation surrounds them. The actions themselves
@@ -48,9 +49,9 @@ const controlsOn = (route) => new Set(Object.entries(CONTROLS).filter(([, contro
 
 // Only the active write states warn on closing a browser tab. A portable
 // control may merely stage a draft, choose a file or export; it is not a write.
-/** @param {{applyRunning?: boolean, service?: {phase?: string}}} session */
+/** @param {{applyRunning?: boolean, service?: {phase?: import("../../contracts/model.js").PhaseId}}} session */
 function writingProfile(session) {
     return Object.values(CONTROLS).some(control => control.phase === "apply" && session.applyRunning
-        || control.phase === "restore" && session.service?.phase === "restoring complete profile");
+        || control.phase === "restore" && Boolean(PHASE_WORDS[session.service?.phase || PHASE.IDLE]?.writes));
 }
 module.exports = {CONTROLS, panelControl, controlsOn, writingProfile};

@@ -44,7 +44,7 @@ export {
     normalizeRawHidReport,
 } from "../core/transport/device-adapter.js";
 export {WEBHID_DEVICE_FILTERS, WebHidDeviceAdapter} from "../core/transport/webhid-adapter.js";
-export {VOCABULARY, word, layerName} from "../core/model/vocabulary.js";
+export {PHASE, PHASE_WORDS, VOCABULARY, word, layerName} from "../core/model/vocabulary.js";
 export {FILE_MAX_BYTES} from "../core/model/portable-profile.js";
 
 import * as portable from "../core/model/portable-profile.js";

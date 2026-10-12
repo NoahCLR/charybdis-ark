@@ -1,5 +1,6 @@
 // @ts-check
 "use strict";
+const {PHASE} = require("../model/vocabulary");
 
 /**
  * @typedef {import("./types.js").DeviceConnection} Connection
@@ -97,7 +98,8 @@ class ProfileDeviceService {
         this.disconnecting = false;
         this.scanned = false;
         this.busy = false;
-        this.phase = "idle";
+        /** @type {import("../../contracts/model.js").PhaseId} */
+        this.phase = PHASE.IDLE;
         this.operationId = 0;
         /** @type {Caps | undefined} */
         this.capabilities = undefined;
@@ -138,7 +140,7 @@ class ProfileDeviceService {
     }
 
     async enumerate() {
-        return this.runOperation("enumerating", async () => {
+        return this.runOperation(PHASE.ENUMERATE, async () => {
             const descriptors = await this.coordinator.listDevices();
             this.adapterIdsByPublicId.clear();
             this.devices = descriptors.map((descriptor, index) => {
@@ -152,7 +154,7 @@ class ProfileDeviceService {
                 return publicDeviceDescriptor(id, descriptor, index);
             });
             this.scanned = true;
-            this.phase = this.connection ? "connected" : this.devices.length ? "available" : "empty";
+            this.phase = this.connection ? PHASE.CONNECTED : this.devices.length ? PHASE.AVAILABLE : PHASE.EMPTY;
             this.addDiagnostic(
                 this.devices.length
                     ? `Found ${this.devices.length} compatible Charybdis Raw HID interface${this.devices.length === 1 ? "" : "s"}.`
@@ -168,13 +170,13 @@ class ProfileDeviceService {
         if (this.connection) {
             await this.disconnect();
         }
-        await this.runOperation("connecting", async () => {
+        await this.runOperation(PHASE.CONNECT, async () => {
             const connection = await this.coordinator.connect(adapterDeviceId);
             this.connection = connection;
             this.requestIds = new ProfileRequestIdSequence(this.requestIdStart);
             this.connectionPublicId = String(publicDeviceId);
             this.connectionToken = ++this.connectionSequence;
-            this.phase = "connected";
+            this.phase = PHASE.CONNECTED;
             this.disposeConnectionListener = connection.onDisconnect((reason) => this.handleDisconnect(reason));
             this.addDiagnostic(`Connected to ${this.deviceLabel(this.connectionPublicId)}.`);
         });
@@ -183,7 +185,7 @@ class ProfileDeviceService {
 
     async refresh() {
         if (!this.connection?.connected) this.refuse("Connect to a keyboard before refreshing live capabilities.");
-        return this.runOperation("refreshing", async () => {
+        return this.runOperation(PHASE.REFRESH, async () => {
             const connection = this.connectedConnection();
             const viaIdentity = await readViaIdentity(connection);
             const capabilities = await readProfileCapabilities(connection, {nextRequestId: () => this.nextRequestId()});
@@ -199,7 +201,7 @@ class ProfileDeviceService {
             this.candidateStatus = candidateStatus;
             this.viaIdentity = viaIdentity;
             this.lastRefreshedAt = new Date().toISOString();
-            this.phase = "connected";
+            this.phase = PHASE.CONNECTED;
             const compatibility = evaluateProfileCompatibility(capabilities, viaIdentity);
             this.addDiagnostic(
                 compatibility.compatible
@@ -221,7 +223,7 @@ class ProfileDeviceService {
         }
 
         this.layout = {state: "reading", progress: {done: 0, total: 0}, layers: [], readAt: ""};
-        return this.runOperation("reading layout", async () => {
+        return this.runOperation(PHASE.READ_LAYOUT, async () => {
             const connection = this.connectedConnection();
 
             const layers = await readViaLayout(connection, {
@@ -270,7 +272,7 @@ class ProfileDeviceService {
         if (!this.connection?.connected) this.refuse("Connect to a keyboard before reading its profile.");
 
         this.committed = {state: "reading", progress: {done: 0, total: 0}};
-        return this.runOperation("reading profile", async () => {
+        return this.runOperation(PHASE.READ_PROFILE, async () => {
             const connection = this.connectedConnection();
 
             // Decide from a fresh status before requesting payload pages. A
@@ -388,12 +390,12 @@ class ProfileDeviceService {
     async disconnect() {
         const connection = this.connection;
         if (!connection) {
-            this.phase = this.scanned ? (this.devices.length ? "available" : "empty") : "idle";
+            this.phase = this.scanned ? (this.devices.length ? PHASE.AVAILABLE : PHASE.EMPTY) : PHASE.IDLE;
             this.emitChange();
             return this.snapshot();
         }
         this.busy = true;
-        this.phase = "disconnecting";
+        this.phase = PHASE.DISCONNECT;
         this.error = undefined;
         this.emitChange();
         this.disconnecting = true;
@@ -407,7 +409,7 @@ class ProfileDeviceService {
             this.disconnecting = false;
             this.clearConnection();
             this.busy = false;
-            this.phase = this.scanned ? (this.devices.length ? "available" : "empty") : "idle";
+            this.phase = this.scanned ? (this.devices.length ? PHASE.AVAILABLE : PHASE.EMPTY) : PHASE.IDLE;
             this.addDiagnostic("Disconnected from the live keyboard.");
             this.emitChange();
         }
@@ -436,7 +438,7 @@ class ProfileDeviceService {
         /** @type {Capture | undefined} */
         let result;
         this.portableProgress = "";
-        await this.runOperation("reading complete profile", async () => {
+        await this.runOperation(PHASE.READ_COMPLETE, async () => {
             const connection = this.connectedConnection();
             const capabilities = this.profileCapabilities();
             const capture = await captureProfile(connection, this.requestSequence(), capabilities,
@@ -482,7 +484,7 @@ class ProfileDeviceService {
         let result;
         let started = false;
         this.liveApply = {state: "idle"};
-        await this.runOperation("restoring complete profile", async () => {
+        await this.runOperation(PHASE.RESTORE_COMPLETE, async () => {
             const connection = this.connectedConnection();
             const capabilities = this.profileCapabilities();
             const cachedBase = options?.expectedFingerprint && this.portable?.fingerprint === options.expectedFingerprint
@@ -593,7 +595,7 @@ class ProfileDeviceService {
 
     // Runs one operation: busy while it runs, then its failure recorded,
     // published and rejected with (see the class comment).
-    /** @param {string} phase @param {() => Promise<unknown>} operation */
+    /** @param {import("../../contracts/model.js").PhaseId} phase @param {() => Promise<unknown>} operation */
     async runOperation(phase, operation) {
         this.operationId++;
         this.busy = true;
@@ -611,8 +613,8 @@ class ProfileDeviceService {
                 this.clearConnection();
             }
             this.phase = this.connection?.connected
-                ? "connected"
-                : this.scanned ? (this.devices.length ? "available" : "empty") : "idle";
+                ? PHASE.CONNECTED
+                : this.scanned ? (this.devices.length ? PHASE.AVAILABLE : PHASE.EMPTY) : PHASE.IDLE;
         } finally {
             this.busy = false;
             this.emitChange();
@@ -638,7 +640,7 @@ class ProfileDeviceService {
         const label = this.deviceLabel(this.connectionPublicId);
         this.clearConnection();
         this.busy = false;
-        this.phase = this.scanned ? (this.devices.length ? "available" : "empty") : "idle";
+        this.phase = this.scanned ? (this.devices.length ? PHASE.AVAILABLE : PHASE.EMPTY) : PHASE.IDLE;
         this.setError(reason instanceof Error ? reason : new Error(`${label} disconnected.`));
         this.addDiagnostic(`${label} disconnected; reconnect before sending another read request.`);
         this.emitChange();
