@@ -233,6 +233,9 @@ export const macroNameMessage = (keycode, name, identity) => ({type: "updateViaM
 export const macroProtectionMessage = (keycode, protection, identity) => ({type: "updateViaMacro", keycode, protection, expectedFingerprint: identity});
 /** @param {string} keycode @param {string} name @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'updateCustomKey'>} */
 export const customKeyNameMessage = (keycode, name, identity) => ({type: "updateCustomKey", keycode, name: String(name ?? "").trim(), expectedFingerprint: identity});
+// The keyboard's own name; empty gives it back its built-in name.
+/** @param {string} name @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'renameKeyboard'>} */
+export const keyboardNameMessage = (name, identity) => ({type: "renameKeyboard", name: String(name ?? "").trim(), expectedFingerprint: identity});
 
 /** @param {number} slot @param {import("../../contracts/edits.js").PdConfig} config @param {Partial<BaseIdentity> | null} [identity] @returns {import("../../contracts/edits.js").EditOf<'savePdMode'>} */
 export const pdMode = (slot, config, identity) => ({type: "savePdMode", slot, expectedBase: identity ?? undefined, config});

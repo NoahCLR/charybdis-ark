@@ -25,11 +25,12 @@ const {profileReview} = require("../model/profile-review");
 const {profileUsage} = require("../model/profile-usage");
 const {canEdit} = require("./firmware-support");
 const {ProfileDraftSession, DRAFT_EDITS} = require("./profile-draft-session");
-const {buildDeviceModel, buildSnapshotModel} = require("./device-model");
+const {buildDeviceModel, buildSnapshotModel, deviceLabels} = require("./device-model");
 const {demoDiagnostics, demoHeader, demoModel} = require("./demo-session");
 const {assertBound, beginRead, boundDraft, closeEditors, draftBinding, replaceDraft, setDraft} = require("./panel-session-state");
 
 const {controlsOn, panelControl} = require("./panel-control-registry");
+const {RECONNECT_WORDS} = require("./keyboard-reconnect");
 // Retained exports for hosts that inspect the routes; never hand-maintained.
 const DRAFT_CONTROLS = controlsOn("draft");
 const PORTABLE_MESSAGES = controlsOn("portable");
@@ -112,7 +113,13 @@ function buildPanelModel(session, state) {
     const model = session.draft && supported && state.selectedDeviceId === session.draft.deviceId
         ? buildSnapshotModel(session.draft.current, session.draft.capabilities, binding, actual)
         : buildDeviceModel(actual);
-    const devices = (state.devices || []).map(({id, label}) => ({id, label}));
+    // The connected keyboard is called by the name it stores once that is
+    // read, so a new name shows as soon as it is applied, before the keyboard
+    // reconnects under it.
+    const stored = state.connected ? state.storedKeyboardName : "";
+    const listed = state.devices || [];
+    const labels = deviceLabels(listed.map((entry) => ({...entry, product: entry.product || entry.label, name: entry.id === state.selectedDeviceId && stored ? stored : ""})));
+    const devices = listed.map(({id}, index) => ({id, label: labels[index]}));
     const selectedDeviceId = state.selectedDeviceId || "";
     /** @type {import("./types.js").PanelDraftView | undefined} */
     let draft;
@@ -156,16 +163,19 @@ function buildPanelModel(session, state) {
     const editableDraft = binding.editable || binding.reason === "busy";
     const readReady = (session.readReady ?? editableDraft) && editableDraft;
     const host = hostModel(session.host);
+    // A renamed keyboard that has gone to take its new name is coming back:
+    // the panel waits for it as for a read, rather than asking to connect one.
+    const reconnecting = session.reconnect && !state.connected ? {name: session.reconnect.name} : null;
     /** @type {import("../../contracts/model.js").LoadView} */
     const load = {
-        state: session.readBusy ? "loading" : readReady ? "ready" : "unavailable",
+        state: session.readBusy || reconnecting ? "loading" : readReady ? "ready" : "unavailable",
         phase: state.phase || PHASE.IDLE,
         operationId: state.operationId,
         operationBusy: Boolean(state.busy),
         connectionToken: state.connectionToken,
-        progress: state.portableProgress || state.layout?.progress || state.committed?.progress || null,
+        progress: reconnecting && !session.readBusy ? RECONNECT_WORDS.waiting : state.portableProgress || state.layout?.progress || state.committed?.progress || null,
     };
-    return {...model, devices, selectedDeviceId, ...(draft ? {draft} : {}), demo, apply, postApplyRead, portable, host, load};
+    return {...model, devices, selectedDeviceId, ...(draft ? {draft} : {}), demo, apply, postApplyRead, portable, host, load, reconnecting};
 }
 
 // How full the profile is: the draft's, when one is open for this keyboard,

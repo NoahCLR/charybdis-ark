@@ -57,6 +57,8 @@ export interface DeviceModelInput {
     macroView?: null | ReturnType<typeof import('../model/macro-editor.js').macroEditorView>;
     customKeyView?: null | ReturnType<typeof import('../model/custom-key-editor.js').customKeyEditorView>;
     device?: import('../transport/types.js').DeviceDescriptor;
+    /** The keyboard's name as the connected keyboard stores it, '' for its built-in name; undefined until its profile is read. */
+    storedKeyboardName?: string;
     phase?: import('../../contracts/model.js').PhaseId;
     busy?: boolean;
     error?: {message: string} | null;
@@ -117,7 +119,7 @@ export interface OperationFailure extends Error {code?: string; cause?: Operatio
 /** State presented to the panel, including a disconnected or demo source. */
 export interface PanelDeviceState extends DeviceModelInput, Omit<DraftDeviceContext, "committed"> {
     connected: boolean;
-    devices?: (import('../transport/types.js').DeviceDescriptor & {label: string})[];
+    devices?: (import('../transport/types.js').DeviceDescriptor & {label: string; number?: number})[];
     portableSummary?: Pick<import('../model/types.js').ProfileSummary, 'names'> | null;
     portableProgress?: string;
     operationId?: number;
@@ -157,6 +159,7 @@ export interface PanelSession extends DemoSession {
     acceptedEdit?: ReturnType<NonNullable<DemoSession['draft']>['stage']>;
     applyRunning?: boolean;
     postApplyReadStep?: import('../../contracts/messages.js').ReadStep;
+    reconnect?: ExpectedReconnect;
     service: DemoSession['service'] & {portable?: import('../model/types.js').ProfileSnapshot | null};
 }
 /** Model publication reads portable data without invoking device operations. */
@@ -166,7 +169,7 @@ export interface PanelEnvelope {type: string; draftId?: string; draftRevision?: 
 export type PanelMessage = PanelEnvelope | (DraftEdit & {draftId?: string});
 export type PanelDraftView = ReturnType<NonNullable<DemoSession['draft']>['view']> & {busy: boolean; editable: boolean; reason: DraftBlock; steps?: import('../../contracts/model.js').HistoryStep[]};
 /** What the panel adds to the device model; the posted shape is the contract's. */
-export type PanelModelExtras = Pick<import('../../contracts/panel.js').PublishedModel, 'devices' | 'selectedDeviceId' | 'demo' | 'apply' | 'postApplyRead' | 'portable' | 'host' | 'load'> & {draft?: PanelDraftView};
+export type PanelModelExtras = Pick<import('../../contracts/panel.js').PublishedModel, 'devices' | 'selectedDeviceId' | 'demo' | 'apply' | 'postApplyRead' | 'portable' | 'host' | 'load' | 'reconnecting'> & {draft?: PanelDraftView};
 
 export type CompleteCapture = Extract<CapturedProfile, import('../model/types.js').CompleteSnapshot>;
 export type RestoredProfile = Awaited<ReturnType<typeof import('./portable-profile-session.js').restoreProfile>> & import('../model/types.js').SnapshotFacts;
@@ -179,7 +182,7 @@ export interface ControlService extends DraftApplyService {
     capabilities?: Partial<DeviceCapabilities> | null;
     phase?: import('../../contracts/model.js').PhaseId;
     portable?: import('../model/types.js').ProfileSnapshot | null;
-    snapshot(): PanelDeviceState & {devices: (import('../transport/types.js').DeviceDescriptor & {label: string})[]};
+    snapshot(): PanelDeviceState & {devices: (import('../transport/types.js').DeviceDescriptor & {label: string; number?: number})[]};
     enumerate(): Promise<unknown>;
     connect(id: string): Promise<unknown>;
     disconnect(): Promise<unknown>;
@@ -194,7 +197,11 @@ export interface ControlService extends DraftApplyService {
     restorePortableProfile(document: import('../model/types.js').PortableDocument, options: RestoreOptions): Promise<RestoredProfile>;
     close(): Promise<void>;
     emitChange?(): void;
+    /** A save renamed the keyboard: its coming disconnect is expected (keyboard-reconnect.js). */
+    expectReconnect?(expected: boolean): void;
 }
+/** A renamed keyboard the panel waits to see again (keyboard-reconnect.js). */
+export interface ExpectedReconnect {deviceId: string; serialNumber: string; name: string; otherDevices: readonly {id: string; product?: string}[]; startedAt: number; dropped: boolean; saved?: string}
 export interface ControlHost extends PanelHost {
     progress?: <T>(title: string, work: () => Promise<T>) => Promise<T>;
     saveRecovery?: SaveRecovery;
@@ -220,7 +227,7 @@ export interface DeviceServiceOptions {
 
 export type DeviceConnection = Awaited<ReturnType<InstanceType<typeof import('../transport/request-coordinator.js').DeviceRequestCoordinator>['connect']>>;
 export interface ServiceSnapshot extends PanelDeviceState {
-    devices: (import('../transport/types.js').DeviceDescriptor & {label: string})[];
+    devices: (import('../transport/types.js').DeviceDescriptor & {label: string; number?: number})[];
     scanned: boolean;
     candidateStatus: (Omit<CandidateStatus, 'error'> & {stateName: string; error: CandidateStatus['error'] | null}) | null;
     viaIdentity: Awaited<ReturnType<typeof import('../protocol/profile-wire-v1.js').readViaIdentity>> | null;

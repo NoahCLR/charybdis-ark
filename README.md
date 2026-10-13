@@ -35,6 +35,8 @@ Key and modifier names follow that OS throughout the editors and Review.
   idle timeout in seconds or minutes. Tune the
   auto-mouse fade. The board on screen is painted the way the keyboard will
   light up, with black overlays kept distinct from inherited colours.
+- **Its name.** Call the keyboard what you like, and that is the name your
+  computer, Chrome and Ark show once it is applied.
 - **Trackball.** Set pointer speed, sniping and auto-mouse, and 32 pointing
   slots (scroll, volume, zoom, arrows, your own
   shortcuts…), with their keys. On supporting firmware, directions and button

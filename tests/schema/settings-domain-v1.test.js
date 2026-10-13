@@ -8,16 +8,18 @@ const {SETTINGS, SETTING, SETTING_FIELD, SETTING_FIELDS, MATRIX_POSITIONS, valid
 // layer referring combos to itself with nothing bypassed or excluded.
 const defaults = () => ({comboOutputBehaviors: true, values: [200,150,400,150,1,4,1200,25,1,3,0,0,0,0,0,200,400,900000,1200,200,1,257,0xc8ff00,1,0,200,10,0,1,0xffff,0xffff],
     names: Array.from({length: 16}, (_, id) => id < 8 ? `Layer ${id}` : ""), layers: Array.from({length: 16}, (_, layer) => defaultLayerRecord(layer)),
-    macroNames: Array(128).fill(""), customKeyNames: Array(128).fill(""), formatVersion: 6});
+    macroNames: Array(128).fill(""), customKeyNames: Array(128).fill(""), keyboardName: "", formatVersion: 7});
 const thirtyTwo = (seed, fill) => `${seed}`.padEnd(32, fill);
 const full = () => ({...defaults(), names: Array.from({length: 16}, (_, i) => thirtyTwo(`L${i}`, "-")),
-    macroNames: Array.from({length: 128}, (_, i) => thirtyTwo(i, "~")), customKeyNames: Array.from({length: 128}, (_, i) => thirtyTwo(`Key ${i}`, "!"))});
+    macroNames: Array.from({length: 128}, (_, i) => thirtyTwo(i, "~")), customKeyNames: Array.from({length: 128}, (_, i) => thirtyTwo(`Key ${i}`, "!")),
+    keyboardName: thirtyTwo("Charybdis", "*")});
 const withValue = (id, v) => { const value = defaults(); value.values[id] = v; return value; };
 const withLayer = (layer, record) => { const value = defaults(); value.layers[layer] = {...value.layers[layer], ...record}; return value; };
 
-test("the layout constants are the firmware's version 6 domain", () => {
-    assert.deepEqual([SETTINGS.VERSION, SETTINGS.COUNT, SETTINGS.LAYERS, SETTINGS.MACRO_NAMES, SETTINGS.CUSTOM_KEY_NAMES], [6, 31, 16, 128, 128]);
-    assert.deepEqual([SETTINGS.SCALARS_OFFSET, SETTINGS.LAYER_RECORDS_OFFSET, SETTINGS.FIXED_SIZE, SETTINGS.MIN_SIZE, SETTINGS.MAX_SIZE], [8, 132, 404, 676, 9380]);
+test("the layout constants are the firmware's version 7 domain", () => {
+    assert.deepEqual([SETTINGS.VERSION, SETTINGS.COUNT, SETTINGS.LAYERS, SETTINGS.MACRO_NAMES, SETTINGS.CUSTOM_KEY_NAMES], [7, 31, 16, 128, 128]);
+    // 273 counted names: 16 layers, 128 macros, 128 custom keys and the keyboard.
+    assert.deepEqual([SETTINGS.SCALARS_OFFSET, SETTINGS.LAYER_RECORDS_OFFSET, SETTINGS.FIXED_SIZE, SETTINGS.MIN_SIZE, SETTINGS.MAX_SIZE], [8, 132, 404, 677, 9413]);
     assert.deepEqual([SETTING.UNICODE_HOST_MODE, SETTING.BEHAVIORS_ENABLED, SETTING.LAYER_BEHAVIORS, SETTING.LAYER_COMBOS], [27, 28, 29, 30]);
     assert.equal(MATRIX_POSITIONS, 60);
     assert.deepEqual(defaultLayerRecord(9), {reference: 9, bypass: [], exclude: []});
@@ -71,19 +73,22 @@ test("every stored value is named once, in ID order, and accepts only what the f
     assert.deepEqual([SETTING_FIELD.DEFAULT_DPI.min, SETTING_FIELD.DEFAULT_DPI.max, SETTING_FIELD.DEFAULT_DPI.step], [400, 3400, 200]);
 });
 
-test("settings v6 round-trip Unicode names, layer records, zero settings and every name", () => {
+test("settings v7 round-trip Unicode names, layer records, zero settings and every name", () => {
     const value = defaults(); value.names[1] = "Édition ⌘"; value.names[15] = "Top"; value.macroNames[3] = "Sign-off"; value.macroNames[127] = "Last macro";
-    value.customKeyNames[127] = "Last key";
+    value.customKeyNames[127] = "Last key"; value.keyboardName = "Noah’s Charybdis";
     value.layers[2] = {reference: 0, bypass: [0, 7, 8, 59], exclude: [12, 33]};
     value.layers[15] = {reference: 14, bypass: [], exclude: [59]};
     const bytes = encodeSettings(value);
-    assert.deepEqual([...bytes.subarray(0, 8)], [6, 16, 31, 128, 128, 0, 0, 0]);
-    const nameBytes = [...value.names, ...value.macroNames, ...value.customKeyNames].reduce((sum, name) => sum + Buffer.byteLength(name), 0);
+    assert.deepEqual([...bytes.subarray(0, 8)], [7, 16, 31, 128, 128, 0, 0, 0]);
+    const nameBytes = [...value.names, ...value.macroNames, ...value.customKeyNames, value.keyboardName].reduce((sum, name) => sum + Buffer.byteLength(name), 0);
     assert.equal(bytes.length, SETTINGS.MIN_SIZE + nameBytes);
     const layer2 = SETTINGS.LAYER_RECORDS_OFFSET + 2 * SETTINGS.LAYER_RECORD_SIZE;
     assert.deepEqual([...bytes.subarray(layer2, layer2 + 17)], [0, 0x81, 0x01, 0, 0, 0, 0, 0, 0x08, 0, 0x10, 0, 0, 2, 0, 0, 0]);
     assert.equal(bytes.readUInt32LE(SETTINGS.SCALARS_OFFSET + 29 * 4), 0xffff);
     assert.deepEqual(decodeSettings(bytes), value);
+    // The keyboard's name is the last record: its length, then its text.
+    const keyboard = Buffer.from(value.keyboardName);
+    assert.deepEqual([...bytes.subarray(bytes.length - keyboard.length - 1)], [keyboard.length, ...keyboard]);
     const empty = encodeSettings({...defaults(), names: Array(16).fill("")});
     assert.equal(empty.length, SETTINGS.MIN_SIZE);
     assert.deepEqual(decodeSettings(empty), {...defaults(), names: Array(16).fill("")});
@@ -157,7 +162,11 @@ test("names are 32 bytes of UTF-8 at most: full tables fit, longer or control na
         assert.throws(() => encodeSettings({...full(), names: full().names.map((n, i) => i ? n : name)}), /layer name/);
         assert.throws(() => encodeSettings({...full(), macroNames: full().macroNames.map((n, i) => i ? n : name)}), /macro name/);
         assert.throws(() => encodeSettings({...full(), customKeyNames: full().customKeyNames.map((n, i) => i ? n : name)}), /custom key name/);
+        assert.throws(() => encodeSettings({...full(), keyboardName: name}), /keyboard name/);
     }
+    assert.equal(decodeSettings(encodeSettings({...defaults(), keyboardName: multibyte})).keyboardName, multibyte);
+    assert.equal(decodeSettings(encodeSettings({...defaults(), keyboardName: euros})).keyboardName, euros);
+    for (const missing of [undefined, null, ["Charybdis"]]) assert.throws(() => encodeSettings({...full(), keyboardName: missing}), /keyboard name/);
     assert.throws(() => encodeSettings({...full(), names: full().names.slice(1)}), /layer names/);
     assert.throws(() => encodeSettings({...full(), customKeyNames: full().customKeyNames.slice(1)}), /custom key names/);
     assert.throws(() => encodeSettings({...full(), macroNames: undefined}), /macro names/);
@@ -179,13 +188,26 @@ test("decoded names must be well-formed, counted and within 32 bytes", () => {
     const past = Buffer.from(one); past[one.length - 1] = 5;
     assert.throws(() => decodeSettings(past), /Invalid name length/);
     assert.throws(() => decodeSettings(one.subarray(0, one.length - 1)), /Missing name|Unsupported settings format/);
+    // The keyboard name is read by the same rule, and is required.
+    const named = encodeSettings({...defaults(), keyboardName: "éx"}), last = named.length - 4;
+    assert.equal(named[last], 3);
+    for (const [label, patch] of [["cut multibyte", b => { b[last] = 1; }], ["control", b => { b[last + 3] = 0x1f; }], ["DEL", b => { b[last + 3] = 0x7f; }]]) {
+        const bytes = Buffer.from(named); patch(bytes);
+        assert.throws(() => decodeSettings(bytes), /Invalid name encoding|Unexpected settings data|Invalid name length/, `keyboard name: ${label}`);
+    }
+    const overlong = Buffer.concat([named.subarray(0, last), Buffer.from([33]), Buffer.alloc(33, 0x61)]);
+    assert.throws(() => decodeSettings(overlong), /Invalid name length/);
+    // A version 6 body (272 names) relabelled 7 lacks the keyboard name.
+    const six = encodeSettings({...defaults(), names: Array(16).fill("")}).subarray(0, SETTINGS.MIN_SIZE - 1);
+    assert.throws(() => decodeSettings(six), /Unsupported settings format/);
 });
 
-test("only version 6 is read or written: the retired versions and reserved bytes are refused", () => {
-    for (const formatVersion of [5, 4, 7]) assert.throws(() => encodeSettings({...defaults(), formatVersion}), /Unsupported settings format/);
+test("only version 7 is read or written: the retired versions and reserved bytes are refused", () => {
+    for (const formatVersion of [6, 5, 4, 8]) assert.throws(() => encodeSettings({...defaults(), formatVersion}), /Unsupported settings format/);
     const bytes = encodeSettings(defaults());
-    for (const header of [[5, 8, 28, 64, 64], [4, 8, 28, 64, 0], [3, 8, 28, 64, 0], [2, 8, 28, 16, 0], [1, 8, 28, 16, 0], [6, 8, 31, 128, 128], [6, 16, 28, 128, 128], [6, 16, 31, 64, 128], [6, 16, 31, 128, 64],
-        [6, 16, 31, 128, 128, 2], [6, 16, 31, 128, 128, 0, 0, 1]]) {
+    for (const header of [[5, 8, 28, 64, 64], [4, 8, 28, 64, 0], [3, 8, 28, 64, 0], [2, 8, 28, 16, 0], [1, 8, 28, 16, 0], [6, 16, 31, 128, 128], [8, 16, 31, 128, 128],
+        [7, 8, 31, 128, 128], [7, 16, 28, 128, 128], [7, 16, 31, 64, 128], [7, 16, 31, 128, 64],
+        [7, 16, 31, 128, 128, 2], [7, 16, 31, 128, 128, 0, 0, 1]]) {
         const relabelled = Buffer.from(bytes); relabelled.set(header);
         assert.throws(() => decodeSettings(relabelled), /Unsupported settings format/, header.join());
     }

@@ -155,6 +155,8 @@ function buildModel(host = VSCODE_HOST) {
             ...(process.argv.includes("--multiple") ? [{id: "preview-second", label: "Charybdis 4x6 · second", manufacturer: "Bastard Keyboards", product: "Charybdis 4x6"}] : []),
         ],
         baseRgb: {state: "read", effectId: 1, brightness: 180, hue: 140, saturation: 210, speed: 60},
+        // No name of its own: the keyboard reports its built-in one.
+        storedKeyboardName: "",
     };
     // The host's own model builder, so the preview cannot drift from it. The
     // layer editor is open so Rename & Reorder has something to show.

@@ -27,6 +27,7 @@ const {DEMO_WORDS, panelCapabilities, panelState} = require("./demo-session");
 const {applyLayerEdit, discardDraftForDevice, layerEditDocument, observePortable, startLayerEdit} = require("./panel-session");
 const {closeEditors, whileApplying} = require("./panel-session-state");
 const {IDENTITY} = require("../model/layer-order");
+const {RECONNECT_WORDS, expectReconnect, renamedTo} = require("./keyboard-reconnect");
 
 /** @template T @param {Host} host @param {string} title @param {() => Promise<T>} work */
 const run = (host, title, work) => host.progress ? host.progress(title, work) : work();
@@ -41,6 +42,20 @@ const savedNotice = (result, verb) => result?.peerUnseen
 // said after the save rather than in place of it.
 /** @param {unknown} error */
 const rereadFailure = (error) => `Reading the keyboard again failed: ${(error instanceof Error ? error.message : String(error)).replace(/\.$/, "")}. `;
+
+// A save that renamed the keyboard is followed by the keyboard reconnecting
+// under its new name. Its readback may be cut short by that: the keyboard is
+// read again once it is back, so that is said instead of a failure.
+/** @param {Session} session @param {import("../model/types.js").ProfileSnapshot | null | undefined} before @param {import("../model/types.js").ProfileSnapshot} after */
+const reconnectAfter = (session, before, after) => expectReconnect(session, renamedTo(before, after));
+/** @param {Session} session @param {ReturnType<typeof reconnectAfter>} expected @param {unknown} error */
+const rereadOutcome = (session, expected, error) => expected && session.reconnect === expected && !session.service.snapshot().connected ? "" : rereadFailure(error);
+/** @param {ReturnType<typeof reconnectAfter>} expected @param {string} notice */
+function reconnectNotice(expected, notice) {
+    if (!expected) return notice;
+    expected.saved = notice;
+    return `${notice} ${RECONNECT_WORDS.waiting}`;
+}
 
 // After the keyboard stores a new profile, everything the panel shows about
 // it is read again, in the order the reads depend on. Like every device read,
@@ -169,15 +184,17 @@ const DRAFT_ACTIONS = Object.freeze({
         await whileApplying(session, async (readStep) => {
             /** @type {string | undefined} */
             let recovery = "";
+            const before = draft.base;
             const result = await run(host, "Applying the complete profile to both halves",
                 () => draft.apply(service, revision, async (document) => (recovery = await saveRecovery(host, document))));
             session.resetDraftForms = true;
+            const expected = reconnectAfter(session, before, result);
             let reread = "";
             await rereadKeyboard(service, (step) => {
                 readStep(step);
                 service.emitChange?.();
-            }).catch((error) => {reread = rereadFailure(error);});
-            session.notice = `${savedNotice(result, "applied to")} ${reread}Recovery copy: ${recovery}`;
+            }).catch((error) => {reread = rereadOutcome(session, expected, error);});
+            session.notice = reconnectNotice(expected, `${savedNotice(result, "applied to")} ${reread}Recovery copy: ${recovery}`);
         });
         return;
     },
@@ -263,9 +280,10 @@ const PORTABLE_ACTIONS = Object.freeze({
         const result = await service.restorePortableProfile(document, {expectedFingerprint: before.fingerprint,
             saveRecovery: async (copy) => (recovery = await saveRecovery(host, copy))});
         closeEditors(session);
+        const expected = reconnectAfter(session, before, result);
         let reread = "";
-        await rereadKeyboard(service).catch((error) => {reread = rereadFailure(error);});
-        session.notice = savedNotice(result, "saved to") + " " + reread + (before.incomplete ? "Interrupted data retained for diagnosis: " : "Recovery copy: ") + recovery;
+        await rereadKeyboard(service).catch((error) => {reread = rereadOutcome(session, expected, error);});
+        session.notice = reconnectNotice(expected, savedNotice(result, "saved to") + " " + reread + (before.incomplete ? "Interrupted data retained for diagnosis: " : "Recovery copy: ") + recovery);
         return;
     },
 });

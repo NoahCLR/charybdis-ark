@@ -32,8 +32,10 @@ export function rail() {
     const host = hostOf(model);
     const demo = demoOf(model);
     const devices = model?.devices || [];
+    // A keyboard that went to take its new name is shown under it, coming back.
+    const reconnecting = model?.reconnecting;
     // With more than one keyboard, the keyboard's name is where to pick another.
-    const name = devices.length > 1 ? `<select class="rail-product rail-picker" id="rail-device-picker" data-f="rail:device" data-act="select-device"
+    const name = reconnecting ? `<span class="rail-product">${esc(reconnecting.name || "Charybdis")}</span>` : devices.length > 1 ? `<select class="rail-product rail-picker" id="rail-device-picker" data-f="rail:device" data-act="select-device"
                 aria-label="Keyboard" title="${esc(device.label || "")}" ${health.busy ? "disabled" : ""}>
                 ${devices.map((entry) => `<option value="${esc(entry.id)}" ${entry.id === model?.selectedDeviceId ? "selected" : ""}>${esc(entry.label)}</option>`).join("")}
             </select>` : `<span class="rail-product">${esc(device.label || "No keyboard connected")}</span>`;
@@ -48,6 +50,7 @@ export function rail() {
     const halves = halvesWords(model, health.halves);
     const keyboardDot = demo.active
         ? {tone: "demo", tip: "Nothing is connected. The demo runs Ark's own draft over a demo setup; only Apply needs a keyboard."}
+        : reconnecting ? {tone: "", tip: "Reconnecting so the keyboard takes its new name. It comes back by itself in a moment."}
         : !device.connected ? {tone: "err", tip: "No keyboard is connected."}
         : {tone: health.halves === "agree" ? "ok" : health.halves === "unread" ? "" : "warn", tip: `${busyWords}${halves.label}. ${halves.detail}`};
 
@@ -62,7 +65,7 @@ export function rail() {
             ${boardOutlineMarkup("rail-board")}
             <div class="rail-mark">Charybdis Ark</div>
             <div class="rail-keyboard">
-                <i class="dot ${keyboardDot.tone}${health.busy && !demo.active ? " busy" : ""}" data-tip="${esc(keyboardDot.tip)}"></i>
+                <i class="dot ${keyboardDot.tone}${(health.busy || reconnecting) && !demo.active ? " busy" : ""}" data-tip="${esc(keyboardDot.tip)}"></i>
                 ${name}</div>
             ${host.chooseKeyboard ? `<div class="rail-choose">
                 <button class="btn tiny" data-act="choose-keyboard" ${health.busy ? "disabled" : ""}

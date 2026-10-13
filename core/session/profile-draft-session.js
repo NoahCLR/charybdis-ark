@@ -12,6 +12,7 @@ const {draftProfileChecks} = require("../model/profile-checks");
 const {editSettings} = require("../model/settings-editor");
 const {editMacro} = require("../model/macro-editor");
 const {editCustomKey} = require("../model/custom-key-editor");
+const {editKeyboardName} = require("../model/keyboard-name");
 const {editDeviceProfile} = require("../model/device-profile-edits");
 const {DRAFT_EDITS, editedBy, draftEditLabel} = require("../model/draft-edits");
 const {actionName, knownActionAbi, layerOfRef, nativeCode} = require("../schema/actions");
@@ -262,6 +263,7 @@ class ProfileDraftSession {
         if (editedBy(message, "settings")) document = editSettings(current, {...message, expectedFingerprint: message.expectedFingerprint || before}, this.capabilities);
         else if (editedBy(message, "macro")) document = editMacro(current, {...message, expectedFingerprint: message.expectedFingerprint || before}, this.capabilities);
         else if (editedBy(message, "customKey")) document = editCustomKey(current, {...message, expectedFingerprint: message.expectedFingerprint || before}, this.capabilities);
+        else if (editedBy(message, "keyboardName")) document = editKeyboardName(current, {...message, expectedFingerprint: message.expectedFingerprint || before}, this.capabilities);
         else if (editedBy(message, "layout")) document = this.editLayout(message);
         else if (editedBy(message, "profile")) {
             const expected = message.expectedBase;

@@ -44,8 +44,9 @@ it opens, without asking again. **Choose keyboard**, under the keyboard's name,
 lets the page open another one and switches to whichever you pick. The page
 follows what Chrome allows it to open: one allowed keyboard is connected,
 several fill the rail's selector, and plugging one in or out updates both at
-once. A browser shows no serial numbers, so keyboards with the same name are
-numbered. **Disconnect** lets go of the keyboard and takes back the page's
+once. Keyboards are listed by their names ([Naming the
+keyboard](#naming-the-keyboard)); a browser shows no serial numbers, so two
+with the same name are numbered. **Disconnect** lets go of the keyboard and takes back the page's
 permission to open it, so it is not reopened until you choose it again; if the
 page may still open another keyboard, Ark connects that one.
 
@@ -130,7 +131,7 @@ Every screen is drawn and wired to the host:
 | Macros | Named slots: literal Text, editable key/delay/press/release steps, reorder/remove controls, Advanced raw payload, live size feedback, configurable recorder and placement; search by name, and the layers that set each macro off — by key, behaviour or combo — in their layer colour, each opening that layer in Keys with the macro picked |
 | Mouse | Pointer speed, sniping and auto-mouse — the Settings sections the keyboard's model files under Mouse, drawn with the same cards and posted whole |
 | Pointing modes | All 32 slots: movement, speed, direction shortcuts and how often they send (every step, or once per movement until the ball pauses or moves back the other way), scroll tuning and which way a scrolling mode scrolls (both axes, horizontal only or vertical only), what each direction's shortcut does with held modifiers, thresholds shown as ball movement at the mode's DPI, buttons, bindings, placement, clear and duplicate |
-| Settings | Every other section the keyboard reports, posted whole, read-only where the firmware cannot report; the Combos section also carries the default combo window and the combo hold threshold, which the keyboard stores with its combos |
+| Settings | The keyboard's own name, then every other section the keyboard reports, posted whole, read-only where the firmware cannot report; the Combos section also carries the default combo window and the combo hold threshold, which the keyboard stores with its combos |
 | Profile & backups | Import (the file against the keyboard, counted by what it configures — keys, lighting, macros, mouse, pointing — before it becomes the draft), export, profile memory, recovery state |
 | Device | Read-only: connection, committed generation, what was read |
 
@@ -196,7 +197,9 @@ A keyboard whose slave half is not connected cannot give a complete read: Ark
 says so at once and shows the layout it could read, rather than waiting for
 the halves to agree.
 When more than one compatible keyboard is connected, the selector at the top
-left chooses which one to read and edit. Switching keeps a dirty draft attached
+left chooses which one to read and edit. Each is listed by the name it reports;
+two with the same name add their serial number, or a number where the host
+shows none. Switching keeps a dirty draft attached
 to its original keyboard; the other keyboard stays read-only until you switch
 back or discard that draft. Device choices keep their identity across rescans
 within the panel, so replacing one keyboard cannot reuse its draft by list order.
@@ -215,6 +218,24 @@ editor, including slots whose QMK values have no named constant.
 behaviour, place it on a key, and see where it is used; the key picker offers
 them in its own Custom keys section. Their names are stored on the keyboard; a
 keyboard with none stored reports the names authored in `keymap.c`.
+
+## Naming the keyboard
+
+**Settings → Keyboard → Name** gives the keyboard a name of your own. It is
+what Chrome's keyboard chooser, your computer's list of devices and Ark's
+keyboard menu call it. Leave it empty for the firmware's built-in name
+(Charybdis (4x6) Splinky), which the field shows greyed when the keyboard
+reports it. A name is up to 32 bytes of UTF-8, counted as you type; accented
+letters take two.
+
+The name is stored in the keyboard's profile, so it is a draft edit like any
+other: Review lists it as **Keyboard name**, Undo and Discard take it back,
+and backups carry it. Older backups have none, so they keep the built-in
+name. Ark calls the keyboard by its new name as soon as the Apply is read
+back; the computer and Chrome see it once the keyboard has reconnected
+([below](#applying-changes)). The serial number does not change, so Chrome
+keeps its permission to open the keyboard. Naming needs current firmware on
+both halves.
 
 ## Choosing where behaviours and combos run
 
@@ -259,7 +280,7 @@ The profile holds up to 128 shared behaviour definitions and 128 combos with
 up to 16 inputs each. Firmware normally provides five tap steps per behaviour
 (640 steps total); Ark uses the connected keyboard's advertised tap depth and
 matching tap-feedback colours when firmware is configured for more. Layer, macro,
-custom-key and pointing-mode names allow up to 32 UTF-8 bytes; accented letters
+custom-key, pointing-mode and keyboard names allow up to 32 UTF-8 bytes; accented letters
 can use more than one byte. All edits go through the draft, Review, Undo and
 Apply, including switches and layer allowances.
 
@@ -532,6 +553,19 @@ What to expect while it applies:
 - After power loss in the middle of a save, the master half types nothing until
   its keys and macros are one complete version again, which may need the slave
   half connected.
+- After an Apply that changes the keyboard's name, the master half restarts its
+  USB connection by itself once it is safe: both halves hold the new profile,
+  no key is held, no macro runs and Ark has been quiet for a second. The
+  keyboard is gone for well under a second and comes back under the new name.
+  Ark expects this: it says it is reconnecting rather than reporting an error,
+  then connects the same keyboard again, reads it and says it is back. With
+  another keyboard it cannot tell apart, it leaves the choice to you in the
+  keyboard menu. In Chrome, clearing the name can also need that choice,
+  because Ark may not know the built-in name. Held keys or macros can delay
+  the restart for as long as they need; the 10-second return timeout starts
+  only when the keyboard disconnects. If it does not return in that time,
+  Ark says so and you read it again. The notice keeps the recovery-copy
+  location even if reconnecting fails.
 
 Drafts live in the editor window (in Chrome, the tab); closing it loses
 unapplied changes. In VS Code one Ark panel holds the keyboard in a window:
@@ -568,9 +602,9 @@ draft is unavailable, stale or busy. Multiple, unreadable, invalid and oversized
 files are refused without replacing your draft.
 
 **Profile memory** shows how full the profile is. Behaviours, combos,
-lighting, pointing modes, settings and every layer, macro and custom-key name
-share one block on the keyboard: 65,504 bytes on current firmware, the size the
-keyboard reports. The card lists what uses it, area by area, and the counted
+lighting, pointing modes, settings, every layer, macro and custom-key name and
+the keyboard's own name share one block on the keyboard: 65,504 bytes on
+current firmware, the size the keyboard reports. The card lists what uses it, area by area, and the counted
 limits beside it: behaviours, behaviour steps, combos, lighting groups and
 lighting group rows. Each area can stay under its own limit and the profile
 still fill up, so a full profile can refuse an edit in any of them. The bar

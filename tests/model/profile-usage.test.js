@@ -32,7 +32,7 @@ test("a populated profile's areas add up to the bytes Apply writes", () => {
     assert.deepEqual(usage.areas.map(entry => entry.id), AREAS);
     const {behaviors, combos, pdModes} = validateSnapshot(value);
     assert.equal(area(usage, "pointing"), 4 + 8 + 128 * pdModes.filter(slot => slot.kind || slot.name).length, "a record per stored slot");
-    assert.equal(area(usage, "names"), validateSnapshot(value).settings.names.reduce((sum, name) => sum + 1 + Buffer.byteLength(name), 256), "counted UTF-8 names in all three banks");
+    assert.equal(area(usage, "names"), validateSnapshot(value).settings.names.reduce((sum, name) => sum + 1 + Buffer.byteLength(name), 256 + 1), "counted UTF-8 names in all three banks and the keyboard's own");
     assert.deepEqual(count(usage, "behaviours"), {id: "behaviours", used: behaviors.rows.length, limit: 64});
     assert.deepEqual(count(usage, "behaviourSteps"), {id: "behaviourSteps", used: behaviors.populatedStepCount, limit: 128});
     assert.equal(count(usage, "combos").used, combos.rows.length);
@@ -53,6 +53,15 @@ test("naming a macro moves its bytes into names", () => {
     const a = profileUsage(before, schema2), b = profileUsage(after, schema2);
     // The name adds its 9 characters to the length byte every name has.
     assert.equal(area(b, "names") - area(a, "names"), 9);
+    assert.equal(total(b), b.used);
+});
+
+test("naming the keyboard moves its bytes into names", () => {
+    const {editKeyboardName} = require("../../core/model/keyboard-name");
+    const before = snapshot(pdDocument());
+    const after = snapshot(editKeyboardName(before, {name: "Noah’s board", expectedFingerprint: before.fingerprint}));
+    const a = profileUsage(before, schema2), b = profileUsage(after, schema2);
+    assert.equal(area(b, "names") - area(a, "names"), Buffer.byteLength("Noah’s board"));
     assert.equal(total(b), b.used);
 });
 

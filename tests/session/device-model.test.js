@@ -230,6 +230,36 @@ test("the header reports the keyboard, not a profile directory", () => {
     assert.equal(connected.label, "bastardkb Charybdis 4x6");
     assert.match(connected.summary, /generation 7/);
     assert.match(connected.summary, /0xABCD1234/);
+    const state = {capabilities: {}, device: {manufacturer: "bastardkb", product: "Charybdis 4x6"}};
+    assert.equal(buildDeviceModel({...state, storedKeyboardName: ""}).device.label, "bastardkb Charybdis 4x6", "the built-in name keeps its maker");
+    assert.equal(buildDeviceModel({...state, storedKeyboardName: "Noah’s board"}).device.label, "Noah’s board", "a name the person gave stands alone");
+});
+
+test("listed keyboards read by name, told apart by serial or number only where two read alike", () => {
+    const {deviceLabels} = require("../../core/session/device-model");
+    assert.deepEqual(deviceLabels([]), []);
+    assert.deepEqual(deviceLabels([{product: "Charybdis", serialNumber: "E4", number: 1}]), ["Charybdis"]);
+    assert.deepEqual(deviceLabels([{product: "Charybdis", number: 1}, {product: "Charybdis", number: 2}, {product: "Desk", number: 3}]),
+        ["Keyboard 1 · Charybdis", "Keyboard 2 · Charybdis", "Desk"]);
+    assert.deepEqual(deviceLabels([{product: "Charybdis", serialNumber: "E4"}, {product: "Charybdis", serialNumber: "DE"}]), ["Charybdis · E4", "Charybdis · DE"]);
+    assert.deepEqual(deviceLabels([{product: "Charybdis", name: "Desk", number: 1}, {product: "Charybdis", number: 2}]), ["Desk", "Charybdis"],
+        "a stored name the keyboard has not reconnected under yet already tells it apart");
+    assert.deepEqual(deviceLabels([{product: "Desk", number: 1}, {product: "Charybdis", name: "Desk", number: 2}]), ["Keyboard 1 · Desk", "Keyboard 2 · Desk"]);
+    assert.deepEqual(deviceLabels([{number: 4}]), ["Charybdis 4x6"]);
+});
+
+test("the Settings card gets the stored name, and the built-in one only while the keyboard reports it", () => {
+    const {buildSnapshotModel} = require("../../core/session/device-model");
+    const {document} = require("../fixtures/portable-profile");
+    const {fingerprint, summary} = require("../../core/model/portable-profile");
+    const value = document(), snapshot = {document: value, fingerprint: fingerprint(value), summary: summary(value)};
+    const caps = {compiledLayerCount: 16, supportedDomainMask: 31, actionAbiDigest: 0x837cf479};
+    const binding = {editable: true, reason: ""}, device = {product: "Charybdis (4x6) Splinky"};
+    assert.deepEqual(buildSnapshotModel(snapshot, caps, binding, {device, storedKeyboardName: ""}).keyboardName,
+        {name: "", builtIn: "Charybdis (4x6) Splinky", identity: snapshot.fingerprint, perName: 32});
+    assert.equal(buildSnapshotModel(snapshot, caps, binding, {device, storedKeyboardName: "Old name"}).keyboardName.builtIn, "", "a renamed keyboard reports its name, not the built-in one");
+    assert.equal(buildSnapshotModel(snapshot, caps, binding, {device}).keyboardName.builtIn, "", "unknown until the keyboard's profile is read");
+    assert.equal(buildDeviceModel({capabilities: {}}).keyboardName, null, "independent reads offer no rename");
 });
 
 test("half divergence is stated plainly rather than shown as healthy", () => {

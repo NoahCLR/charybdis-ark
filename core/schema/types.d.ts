@@ -108,6 +108,8 @@ export interface SettingsDomain {
     layers: LayerRecord[];
     macroNames: string[];
     customKeyNames: string[];
+    /** The keyboard's own name, its USB product string; empty for the firmware's built-in name. */
+    keyboardName: string;
 }
 
 export type MacroStep =

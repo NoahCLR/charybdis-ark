@@ -114,6 +114,47 @@ test("apply writes a recovery copy through the host, then reads the keyboard aga
     assert.equal(session.resetDraftForms, true);
 });
 
+test("an Apply that renames the keyboard expects it to reconnect, and a readback its restart cuts short is no failure", async () => {
+    const {RECONNECT_WORDS} = require("../../core/session/keyboard-reconnect");
+    for (const name of ["Desk", device.product]) for (const interrupted of [false, true]) {
+        const session = sessionWithDraft(), expecting = [];
+        session.service.expectReconnect = (on) => {expecting.push(on);};
+        if (interrupted) session.service.readCommittedProfile = async () => {session.service.snapshot().connected = false; throw new Error("The keyboard disconnected while its profile was being read.");};
+        stage(session, {type: "renameKeyboard", name});
+        session.draft.review(session.draft.revision);
+        await draftControl(session, {type: "applyProfileDraft", draftRevision: session.draft.revision}, host());
+        assert.deepEqual(session.reconnect, {deviceId: "kb", serialNumber: "", name, otherDevices: [], startedAt: session.reconnect.startedAt, dropped: false,
+            saved: "Complete profile applied to both halves and verified. Recovery copy: /recovery/1.json"});
+        assert.deepEqual(expecting, [true]);
+        assert.equal(session.notice, `Complete profile applied to both halves and verified. Recovery copy: /recovery/1.json ${RECONNECT_WORDS.waiting}`,
+            interrupted ? "the keyboard is read again once it is back, so the cut-short read is not reported" : "");
+    }
+    // A save that leaves the name alone expects nothing.
+    const session = sessionWithDraft();
+    stage(session, {type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_A"}]});
+    session.draft.review(session.draft.revision);
+    await draftControl(session, {type: "applyProfileDraft", draftRevision: session.draft.revision}, host());
+    assert.equal(session.reconnect, undefined);
+    assert.doesNotMatch(session.notice, /Reconnecting/);
+});
+
+test("restoring a named backup over an incomplete capture expects the safe USB restart", async () => {
+    const {RECONNECT_WORDS} = require("../../core/session/keyboard-reconnect");
+    const {editKeyboardName} = require("../../core/model/keyboard-name");
+    const service = fakeService(), before = {...service.portable, incomplete: true};
+    const named = editKeyboardName(service.portable, {name: "Desk", expectedFingerprint: service.portable.fingerprint});
+    const session = {service, portableReview: {before, document: named}};
+    const expecting = [];
+    service.expectReconnect = (on) => {expecting.push(on);};
+    service.readCommittedProfile = async () => {service.snapshot().connected = false; throw new Error("USB restarted");};
+    await portableControl(session, {type: "restorePortableProfile"}, host());
+    assert.equal(session.reconnect?.name, "Desk");
+    assert.deepEqual(expecting, [true]);
+    assert.match(session.notice, /Interrupted data retained for diagnosis: \/recovery\/1\.json/);
+    assert.ok(session.notice.endsWith(RECONNECT_WORDS.waiting));
+    assert.doesNotMatch(session.notice, /Reading the keyboard again failed/);
+});
+
 test("a failed post-Apply read clears its progress stage and is said after the save", async () => {
     const session = sessionWithDraft();
     stage(session, {type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_A"}]});

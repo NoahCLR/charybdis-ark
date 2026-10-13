@@ -5,7 +5,7 @@
 //
 // A unit is what a review item is (profile-review.js): a key, a layer name,
 // a behaviour, a combo, the combo timing, a macro with its name, a custom
-// key's name, one settings
+// key's name, the keyboard's name, one settings
 // section, a pointing slot, or one lighting record. Each is copied from `before` into `after` at the
 // level the keyboard stores it, and every domain it touched is encoded again,
 // so the result passes the same validation as any other edit.
@@ -83,6 +83,9 @@ function revertUnits(before, after, units, capabilities) {
         } else if (kind === "customKey") {
             const settings = domain("settings"), index = Number(rest);
             settings.mine.customKeyNames[index] = settings.theirs.customKeyNames[index];
+        } else if (kind === "keyboardName") {
+            const settings = domain("settings");
+            settings.mine.keyboardName = settings.theirs.keyboardName;
         } else if (kind === "layerName") {
             const settings = domain("settings");
             settings.mine.names[Number(rest)] = settings.theirs.names[Number(rest)];

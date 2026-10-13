@@ -92,6 +92,8 @@ export interface PublishedModel {
     customKeys: CustomKey[];
     customKeyNameSpace: {perName: number} | null;
     customKeyEditing: {identity: string; writable: boolean};
+    /** The keyboard's own name: '' for the firmware's built-in one, which `builtIn` gives when the host knows it. */
+    keyboardName: {name: string; builtIn: string; identity: string; perName: number} | null;
     ownsLayerKeys: boolean;
     qmkKeycodes: CatalogEntry[];
     qmkKeyLabels: Record<string, string>;
@@ -109,4 +111,6 @@ export interface PublishedModel {
     portable: {available: boolean; busy: boolean; progress?: string; review: {incoming: ProfileSummary; current?: ProfileSummary | null; fileName: string | null; differences: import('./model.js').ReviewSummary[] | null} | null; layers: {key: string; order: number[]; names: string[]; keysFollow: boolean} | null; usage: ProfileUsage | null};
     host: HostPanel;
     load: LoadView;
+    /** A renamed keyboard that disconnected to take its new name, which the panel waits to see again. */
+    reconnecting: {name: string} | null;
 }

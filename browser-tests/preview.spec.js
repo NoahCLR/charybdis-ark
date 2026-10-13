@@ -162,6 +162,26 @@ for (const theme of ["plain", "vscode-dark", "vscode-light"]) {
 
 // The web page's controls, where the model offers them (?host=web is the web
 // host's model, scripts/preview.js). Each has to post what it says it does.
+for (const theme of ["plain", "vscode-dark", "vscode-light"]) {
+    test(`the keyboard's name is posted on change, with its byte count kept live (${theme})`, async ({page}) => {
+        await openPreview(page, theme);
+        await page.locator('[data-screen="settings"]').click();
+        const field = page.getByRole("textbox", {name: "Keyboard name", exact: true});
+        await expect(field).toHaveAttribute("placeholder", "Charybdis 4x6");
+        await expect(page.locator(".settings-pad > .card").first()).toHaveAttribute("data-section", "keyboard");
+        await page.evaluate(() => {window.__posted.length = 0;});
+        await field.fill("777 · é");
+        await expect(page.locator('[data-section="keyboard"] [data-name-count]')).toHaveText("9 / 32 bytes");
+        expect(await page.evaluate(() => window.__posted)).toEqual([], "typing posts nothing");
+        await field.blur();
+        await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([
+            expect.objectContaining({type: "renameKeyboard", name: "777 · é", expectedFingerprint: expect.any(String), draftId: expect.any(String)}),
+        ]);
+        await field.fill("x".repeat(33));
+        await expect(page.locator('[data-section="keyboard"] [data-name-count]')).toHaveClass(/warn/);
+    });
+}
+
 test("the web host's controls post their messages", async ({page}) => {
     const errors = [];
     page.on("pageerror", error => errors.push(error.message));
