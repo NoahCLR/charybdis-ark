@@ -331,11 +331,11 @@ test("the host's words say no keyboard was found, and its sleep reaches the devi
 
 test("messages meant for a host's own controls are answered, never run", async () => {
     const host = fakeHost(), loop = loopWithDraft(host);
-    for (const message of [{type: "chooseKeyboard"}, {type: "setTheme", theme: "light"}, {type: "downloadRecovery", id: 1}]) {
+    for (const message of [{type: "chooseKeyboard"}, {type: "forgetKeyboard"}, {type: "setTheme", theme: "light"}, {type: "downloadRecovery", id: 1}]) {
         await loop.handleMessage(message);
         assert.equal(last(host).type, "model");
     }
-    assert.equal(host.posted.length, 3);
+    assert.equal(host.posted.length, 4);
     assert.deepEqual(host.errors, []);
 });
 
@@ -489,4 +489,26 @@ test("a retained dirty draft adopts the reconnected firmware's macro limits at r
             assert.equal(last(host).model.viaMacros[0].playable, false, "recomputed playback uses the smaller firmware limit");
         }
     }
+});
+
+test("a read lets go of a keyboard that left the list and connects the one listed", async () => {
+    const host = fakeHost();
+    const chosen = {...device, id: "chosen"};
+    const service = fakeService();
+    service.snapshot().devices = [chosen];
+    service.connect = async (id) => {service.calls.push(`connect ${id}`);};
+    const loop = openPanelLoop(host, {service});
+    await loop.handleMessage({type: "refresh"});
+    assert.deepEqual(service.calls.slice(0, 2), ["enumerate", "connect chosen"]);
+    await loop.close();
+});
+
+test("a read keeps the connected keyboard while it is still listed", async () => {
+    const host = fakeHost();
+    const service = fakeService();
+    service.snapshot().devices = [{...device, id: "other"}, device];
+    const loop = openPanelLoop(host, {service});
+    await loop.handleMessage({type: "refresh"});
+    assert.ok(!service.calls.includes("connect"), "VS Code's chosen keyboard stays chosen");
+    await loop.close();
 });

@@ -198,7 +198,9 @@ test("Lighting preview switches and screen links navigate without posting edits"
     await expect(page.locator(".main h1")).toHaveText("Settings");
     expect(await posted(page)).toEqual([]);
     await page.locator('[data-screen="lighting"]').click();
+    await expect(page.locator('.topbar [data-act="read"]')).toHaveCount(0);
+    await page.locator('[data-screen="device"]').click();
     await clearPosts(page);
-    await page.locator('.topbar [data-act="read"]').click();
+    await page.locator('.main [data-act="read"]').click();
     await expectPost(page, {type: "refresh"});
 });

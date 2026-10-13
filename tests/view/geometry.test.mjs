@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {GEO, LED_INDEX, TRACKBALL_LED, fitText, inLocality, isRightHalf, keyFaceRows, keyVisual, trackballInLocality} from "../../webview/view/geometry.mjs";
+import {GEO, LED_INDEX, boardOutlineMarkup, TRACKBALL_LED, fitText, inLocality, isRightHalf, keyFaceRows, keyVisual, trackballInLocality} from "../../webview/view/geometry.mjs";
 
 test("the board splits into halves the way the LED numbering does", () => {
     assert.equal(isRightHalf(0), false, "left home column");
@@ -97,4 +97,12 @@ test("a legend is sized to its row rather than bucketed by length", () => {
     assert.ok(fitText("MMMMMMMM", row).size < fitText("iiiiiiii", row).size);
     assert.equal(fitText("", row).size, 12, "an empty legend has nothing to fit");
     assert.equal(fitText("Left Control", {max: 12, min: 11, width: 48}).size, 11, "the floor holds");
+});
+
+test("the board outline draws every key and the trackball", () => {
+    const markup = boardOutlineMarkup("mark");
+    assert.match(markup, /^<svg class="mark" viewBox="20 96 1082 478"/);
+    assert.equal(markup.match(/<rect /g)?.length, 56);
+    assert.equal(markup.match(/<circle /g)?.length, 1);
+    assert.equal(markup.match(/rotate\(/g)?.length, 7, "the angled thumb keys stay angled");
 });

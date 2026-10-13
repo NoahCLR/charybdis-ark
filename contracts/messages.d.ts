@@ -51,6 +51,7 @@ export interface ControlPayloads {
     };
     host: {
         chooseKeyboard: {discardDemo?: boolean};
+        forgetKeyboard: Record<never, never>;
         setTheme: {theme: 'light' | 'dark'};
         downloadRecovery: {id: string | number};
     };

@@ -11,7 +11,7 @@
 // be a lie about what the keyboard is running.
 
 const {PD_SLOT_BINDINGS} = require("../data/pd-bindings");
-const {PHASE, VOCABULARY, slotName} = require("../model/vocabulary");
+const {PHASE, VOCABULARY, HALVES_WORDS, slotName} = require("../model/vocabulary");
 const keycodeCatalog = require("../data/keycode-catalog");
 const {baseEffectForView, baseRgbForView, behaviorRowsForView, builtInForView, comboRowsForView, rgbForView} = require("../model/device-profile-view");
 const {effectiveTimings} = require("../model/gesture-timing");
@@ -353,6 +353,7 @@ function deviceHeader(state) {
             health: {
                 profile: "unavailable",
                 converged: false,
+                halves: /** @type {import("../../contracts/model.js").HalvesId} */ ("unread"),
                 recoveryPending: false,
                 restartNeeded: false,
                 busy: false,
@@ -390,8 +391,9 @@ function deviceHeader(state) {
         health: {
             profile: !status ? "unread" : converged ? "synced" : "attention",
             converged,
+            halves: halvesState(status),
             recoveryPending: Boolean(state.mutationCompatibility?.recoveryPending || status?.candidatePending),
-            // The other half never confirmed a cancelled save. Only a restart
+            // The slave half never confirmed a cancelled save. Only a restart
             // releases it, and the keyboard refuses new saves until then.
             restartNeeded: Boolean(status?.peerCleanupPending),
             busy: Boolean(state.busy),
@@ -405,7 +407,16 @@ function deviceHeader(state) {
 // gets said plainly rather than hidden behind a green chip.
 /** @param {Partial<import("./types.js").ProfileStatus> | null | undefined} status */
 function convergence(status) {
-    return halvesConverged(status) ? "both halves agree" : "halves not converged";
+    return HALVES_WORDS[halvesState(status)].label.toLowerCase();
+}
+
+// Which of the halves' words applies: agreeing, the slave half not seen over
+// the split link at all, or seen but holding something else.
+/** @param {Partial<import("./types.js").ProfileStatus> | null | undefined} status @returns {import("../../contracts/model.js").HalvesId} */
+function halvesState(status) {
+    if (!status) return "unread";
+    if (halvesConverged(status)) return "agree";
+    return status.peerKnown ? "apart" : "alone";
 }
 
 /** @param {Partial<import("./types.js").ProfileStatus> | null | undefined} status */

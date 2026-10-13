@@ -50,12 +50,29 @@ const PHASE_WORDS = Object.freeze({
     [PHASE.READ_BASE_RGB]: Object.freeze({label: "reading base RGB", read: "Checking base lighting", busy: "Checking base lighting", writes: false}),
 });
 
+// Whether the two halves agree, in words for someone who has never heard of
+// generations or a split link. The device model decides which applies. The
+// halves are always the master half (on USB) and the slave half, as in the
+// firmware and on the board itself: never "the other" or "the second" half.
+/** @type {Readonly<Record<import('../../contracts/model.js').HalvesId, Readonly<{label: string, detail: string}>>>} */
+const HALVES_WORDS = Object.freeze({
+    agree: Object.freeze({label: "Both halves connected",
+        detail: "The master and slave halves are connected and hold the same saved settings."}),
+    alone: Object.freeze({label: "Slave half not found",
+        detail: "The master half can't see the slave half. Check the cable between the halves, then read the keyboard again. Until then Ark can't read or save the whole setup."}),
+    apart: Object.freeze({label: "Halves out of sync",
+        detail: "The master and slave halves hold different saved settings, or the slave half is still copying them. Wait a moment and read the keyboard again; if it stays like this, reconnect the cable between the halves."}),
+    unread: Object.freeze({label: "Not read yet",
+        detail: "Ark hasn't read this keyboard yet."}),
+});
+
 /** @type {Readonly<Record<string, string>>} */
 const OS_WORDS = {macos: "macOS", windows: "Windows", linux: "Linux"};
 
 /** @type {Readonly<import("../../contracts/model.js").Vocabulary>} */
 const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.js").Vocabulary} */ ({
     phases: PHASE_WORDS,
+    halves: HALVES_WORDS,
     hostOs: [[0, "Auto"], [1, "macOS"], [2, "Windows"], [3, "Linux"]],
     macroPlayback: {setup: "setup", tooLong: "too long", blocked: "blocked", noRoom: "no room"},
     macroProtection: [["auto", "Automatic"], ["on", "On"], ["off", "Off"]],
@@ -170,4 +187,4 @@ const branchName = (count) => VOCABULARY.branches[count - 1] || `${count} taps`;
 /** @param {number} mask */
 const modifierNames = (mask) => VOCABULARY.modifiers.filter(([bit]) => mask & bit).map(([, name]) => name);
 
-module.exports = {PHASE, PHASE_WORDS, VOCABULARY, word, layerName, slotName, branchName, modifierNames};
+module.exports = {PHASE, PHASE_WORDS, HALVES_WORDS, VOCABULARY, word, layerName, slotName, branchName, modifierNames};

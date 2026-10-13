@@ -161,9 +161,24 @@ export function startWebHost(env) {
                     loop.session.notice = failure.code === "CANCELLED" ? "No keyboard was chosen." : `Failed: ${failure.message}`;
                     return loop.publish();
                 }
-                // Choosing a keyboard from the demo leaves it, as the panel
-                // asked; the read below does that.
-                return loop.handleMessage({type: "refresh", ...(message.discardDemo === true ? {discardDemo: true} : {})});
+                // The chosen keyboard lists first; select it by that, so the
+                // read opens it even while another one is connected. Choosing
+                // from the demo leaves it, as the panel asked; the read does that.
+                await loop.session.service.enumerate();
+                const chosen = loop.session.service.snapshot().devices[0]?.id;
+                const leave = message.discardDemo === true ? {discardDemo: true} : {};
+                return loop.handleMessage(chosen ? {type: "selectDevice", deviceId: chosen, ...leave} : {type: "refresh", ...leave});
+            }
+            case "forgetKeyboard": {
+                const service = loop.session.service;
+                if (service.snapshot().busy) {
+                    loop.session.notice = "Wait for the keyboard to finish before disconnecting it.";
+                    return loop.publish();
+                }
+                await service.disconnect();
+                await adapter.forget();
+                loop.session.notice = "Disconnected. This page will not open that keyboard again until you choose it.";
+                return followAllowed();
             }
             case "ready": case "refresh": case "selectDevice":
                 await holding;
@@ -172,6 +187,41 @@ export function startWebHost(env) {
             default:
                 return loop.handleMessage(message);
         }
+    }
+
+    // What the page shows follows what Chrome lets it open. Plugging in an
+    // allowed keyboard, unplugging one or disconnecting one lists them again,
+    // and with none open the first one left is connected: an allowed keyboard
+    // is always either the connected one or in the selector. The demo stays
+    // the demo; its selector still follows.
+    let following = false;
+    async function followAllowed() {
+        const service = loop.session.service;
+        if (following || blocked || !hid) return loop.publish();
+        // A running read or Apply lists the keyboards itself; look again after it.
+        if (service.snapshot().busy) {
+            setTimeout(() => void followAllowed(), 500);
+            return;
+        }
+        following = true;
+        try {
+            await service.enumerate();
+            const state = service.snapshot();
+            if (!state.connected && state.devices.length && !loop.session.demo) return await loop.handleMessage({type: "refresh"});
+            loop.publish();
+        } catch {
+            loop.publish();
+        } finally {
+            following = false;
+        }
+    }
+    if (hid) {
+        // After every listener on the event, so a keyboard that left has
+        // already let go of its connection.
+        /** @param {"connect" | "disconnect"} type */
+        const follow = (type) => hid.addEventListener(type, () => setTimeout(() => void holding.then(followAllowed), 0));
+        follow("connect");
+        follow("disconnect");
     }
 
     window.addEventListener("beforeunload", (event) => {

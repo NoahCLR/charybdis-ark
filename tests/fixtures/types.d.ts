@@ -26,6 +26,7 @@ export interface FakeKeyboardOptions {
     streaming?: boolean;
     macroReadMap?: boolean;
     compiledOnly?: boolean;
+    peerKnown?: boolean;
     generation?: number;
     firmwareVersion?: number;
     brightnessMax?: number;

@@ -182,6 +182,7 @@ export interface ControlService extends DraftApplyService {
     snapshot(): PanelDeviceState & {devices: (import('../transport/types.js').DeviceDescriptor & {label: string})[]};
     enumerate(): Promise<unknown>;
     connect(id: string): Promise<unknown>;
+    disconnect(): Promise<unknown>;
     refresh(): Promise<unknown>;
     readLayout(): Promise<unknown>;
     readCommittedProfile(): Promise<unknown>;

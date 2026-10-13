@@ -20,10 +20,8 @@ export function screenMouse() {
     const canEdit = canEditArea("settings");
     const main = el(`<div class="main">${topbar(
         "Mouse",
-        "How the trackball moves the pointer: its speed, sniping for fine control, and the mouse layer that movement turns on by itself.",
-        `<button class="btn" data-act="pointing" data-tip="Modes that re-read the trackball as scrolling or as keys while their key is held.">Pointing modes</button>`,
+        "How the trackball moves the pointer: its speed, sniping for fine control, and the mouse layer that movement turns on by itself."
     )}</div>`);
-    /** @type {HTMLButtonElement} */ (main.querySelector('[data-act="pointing"]')).addEventListener("click", () => { state.screen = "pointing"; render(); });
 
     const content = el(`<div class="content"><div class="pad settings-pad"></div></div>`);
     const pad = /** @type {HTMLElement} */ (content.firstElementChild);

@@ -28,8 +28,7 @@ export function screenSettings() {
     const canEdit = canEditArea("settings");
     const main = el(`<div class="main">${topbar(
         "Settings",
-        "The keyboard's global policy: every value it stores that applies on all layers. Values this firmware cannot report stay read-only rather than disappearing.",
-        `<input class="input search short" id="settingsSearch" data-f="settings:search" placeholder="Search settings" value="${esc(state.settingsSearch || "")}">`,
+        "The keyboard's global policy: every value it stores that applies on all layers. Values this firmware cannot report stay read-only rather than disappearing."
     )}</div>`);
 
     const content = el(`<div class="content"><div class="pad settings-pad"></div></div>`);
@@ -43,6 +42,14 @@ export function screenSettings() {
             || "This firmware reports its settings but cannot save them. Flash the complete-profile pair to edit them here.")}</div>`));
     }
 
+    if (sections.length) {
+        const search = el(`<input class="input search settings-search" id="settingsSearch" data-f="settings:search" type="search" placeholder="Search settings" value="${esc(state.settingsSearch || "")}">`);
+        search.addEventListener("input", () => {
+            state.settingsSearch = /** @type {HTMLInputElement} */ (search).value;
+            render();
+        });
+        pad.appendChild(search);
+    }
     const query = (state.settingsSearch || "").trim().toLowerCase();
     /** @param {import("../../contracts/panel.js").PresentedSection} section */
     const matching = (section) => query ? section.fields.filter((field) => matches(field, query)) : section.fields;
@@ -68,11 +75,6 @@ export function screenSettings() {
     }
 
     main.appendChild(content);
-    const search = /** @type {HTMLInputElement} */ (main.querySelector("#settingsSearch"));
-    search.addEventListener("input", () => {
-        state.settingsSearch = search.value;
-        render();
-    });
     return main;
 }
 

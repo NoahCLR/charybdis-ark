@@ -236,19 +236,26 @@ test("half divergence is stated plainly rather than shown as healthy", () => {
     const converged = buildDeviceModel({
         capabilities: {}, status: {committedGeneration: 4, activeGeneration: 4, peerGeneration: 4, committedDigest: 1, peerKnown: true, peerConverged: true},
     }).device;
-    assert.match(converged.summary, /both halves agree/);
+    assert.match(converged.summary, /both halves connected/);
+    assert.equal(converged.health.halves, "agree");
 
     const diverged = buildDeviceModel({
         capabilities: {}, status: {committedGeneration: 4, activeGeneration: 4, peerGeneration: 3, committedDigest: 1, peerKnown: true, peerConverged: false},
     }).device;
-    assert.match(diverged.summary, /not converged/);
+    assert.match(diverged.summary, /halves out of sync/);
+    assert.equal(diverged.health.halves, "apart");
 
-    for (const peer of [{peerKnown: false, peerConverged: false}, {peerKnown: true, peerConverged: false}, {peerKnown: true, peerConverged: true, conflictCount: 1}]) {
+    for (const [peer, halves, words] of [
+        [{peerKnown: false, peerConverged: false}, "alone", /slave half not found/],
+        [{peerKnown: true, peerConverged: false}, "apart", /halves out of sync/],
+        [{peerKnown: true, peerConverged: true, conflictCount: 1}, "apart", /halves out of sync/],
+    ]) {
         const absentOrUnready = buildDeviceModel({capabilities: {}, status: {
             committedGeneration: 0, activeGeneration: 0, peerGeneration: 0, committedDigest: 0, ...peer,
         }}).device;
         assert.equal(absentOrUnready.health.converged, false);
-        assert.match(absentOrUnready.summary, /not converged/);
+        assert.equal(absentOrUnready.health.halves, halves, "the slave half missing reads apart from halves disagreeing");
+        assert.match(absentOrUnready.summary, words);
     }
 });
 
@@ -257,6 +264,7 @@ test("the header exposes one health model for connection, convergence and recove
     assert.deepEqual(disconnected.health, {
         profile: "unavailable",
         converged: false,
+        halves: "unread",
         recoveryPending: false,
         restartNeeded: false,
         busy: false,

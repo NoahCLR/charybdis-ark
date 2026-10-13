@@ -22,6 +22,9 @@ const WEBHID_DEVICE_FILTERS = Object.freeze([Object.freeze({
     usage: QMK_RAW_HID_USAGE,
 })]);
 
+// The keyboard last picked in Chrome's list comes first, so a read after
+// Choose keyboard opens that one rather than whichever Chrome lists first.
+//
 // A WebHID device has no path. Chrome hands back the same HIDDevice object for
 // an interface for as long as it stays plugged in, so each object gets an id
 // the first time it is seen and keeps it; a replugged keyboard is a new object
@@ -35,6 +38,10 @@ class WebHidDeviceAdapter {
         /** @type {Map<string, import("./types.js").WebHidDevice>} */
         this.knownDevices = new Map();
         this.nextDeviceId = 1;
+        /** @type {import("./types.js").WebHidDevice | undefined} */
+        this.chosen = undefined;
+        /** @type {import("./types.js").WebHidDevice | undefined} */
+        this.opened = undefined;
     }
 
     // The interfaces this page has already been allowed to open. Chrome lists
@@ -58,7 +65,13 @@ class WebHidDeviceAdapter {
             );
         }
         this.knownDevices.clear();
-        return this.remember(devices);
+        const listed = this.remember(devices);
+        const chosen = this.chosen && this.idsByDevice.get(this.chosen);
+        if (!chosen || !listed.some((descriptor) => descriptor.id === chosen)) {
+            this.chosen = undefined;
+            return listed;
+        }
+        return [...listed.filter((descriptor) => descriptor.id === chosen), ...listed.filter((descriptor) => descriptor.id !== chosen)];
     }
 
     // Opens Chrome's picker, filtered to the Charybdis Raw HID interface. It
@@ -84,10 +97,11 @@ class WebHidDeviceAdapter {
                 {cause}
             );
         }
-        const chosen = this.remember(Array.isArray(devices) ? devices : []);
+        const chosen = this.remember(Array.isArray(devices) ? devices : []).slice(0, 1);
         if (!chosen.length) {
             throw liveLinkError(LIVE_LINK_ERROR_CODES.CANCELLED, "No Charybdis was chosen.");
         }
+        this.chosen = this.knownDevices.get(chosen[0].id);
         return chosen;
     }
 
@@ -112,6 +126,7 @@ class WebHidDeviceAdapter {
             if (!device.opened) {
                 await device.open();
             }
+            this.opened = device;
         } catch (cause) {
             throw liveLinkError(
                 LIVE_LINK_ERROR_CODES.CONNECT_FAILED,
@@ -133,6 +148,18 @@ class WebHidDeviceAdapter {
                 {cause, deviceId: id}
             );
         }
+    }
+
+    // Lets go of the keyboard last opened, and takes back the page's
+    // permission to open it, so the page stops reconnecting to it. Choosing it
+    // in Chrome's list again restores both. Close the connection first.
+    async forget() {
+        const device = this.opened;
+        this.opened = undefined;
+        if (this.chosen === device) this.chosen = undefined;
+        if (!device) return;
+        await closeWebHidDevice(device);
+        await device.forget?.().catch(() => {});
     }
 
     getHid() {

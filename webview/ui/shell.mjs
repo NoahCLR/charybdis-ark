@@ -6,12 +6,13 @@
 import * as controls from "../view/controls.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {getModel, post, postLeavingDemo, render, state} from "../store.mjs";
-import {phaseWords} from "../view/vocabulary.mjs";
+import {halvesWords, phaseWords} from "../view/vocabulary.mjs";
 import {statusSummary} from "../view/review.mjs";
 import {busyText, postApplyReadText, screenAvailable} from "../view/readiness.mjs";
 import {isScreenId, screenGroups} from "../view/screens.mjs";
-import {buildLine, chooseKeyboard, commitUrl, githubMark, hostOf, themeLabel} from "../view/host.mjs";
-import {DEMO_WORDS, demoOf} from "../view/demo.mjs";
+import {buildLine, chooseKeyboard, forgetKeyboard, commitUrl, githubMark, hostOf, themeLabel} from "../view/host.mjs";
+import {boardOutlineMarkup} from "../view/geometry.mjs";
+import {demoOf} from "../view/demo.mjs";
 import {openHistory} from "./history.mjs";
 
 // The review opens at once; the host marks it reviewed when it answers.
@@ -31,13 +32,24 @@ export function rail() {
     const host = hostOf(model);
     const demo = demoOf(model);
     const devices = model?.devices || [];
-    const selector = devices.length > 1 ? `<label class="rail-picker-label" for="rail-device-picker">Keyboard</label>
-            <select class="input rail-picker" id="rail-device-picker" data-f="rail:device" data-act="select-device" ${health.busy ? "disabled" : ""}>
-                ${devices.map((entry) => `<option value="${esc(entry.id)}" ${entry.id === model?.selectedDeviceId ? "selected" : ""}>${esc(entry.label)} · ${esc(entry.id)}</option>`).join("")}
-            </select>` : "";
+    // With more than one keyboard, the keyboard's name is where to pick another.
+    const name = devices.length > 1 ? `<select class="rail-product rail-picker" id="rail-device-picker" data-f="rail:device" data-act="select-device"
+                aria-label="Keyboard" title="${esc(device.label || "")}" ${health.busy ? "disabled" : ""}>
+                ${devices.map((entry) => `<option value="${esc(entry.id)}" ${entry.id === model?.selectedDeviceId ? "selected" : ""}>${esc(entry.label)}</option>`).join("")}
+            </select>` : `<span class="rail-product">${esc(device.label || "No keyboard connected")}</span>`;
     /** @param {string} tone @param {string} text @param {string} tip */
     const line = (tone, text, tip) =>
         `<div class="stat" data-tip="${esc(tip)}"><i class="dot ${tone}"></i> ${esc(text)}</div>`;
+
+    // The keyboard's line never changes shape: what it is doing and whether
+    // its halves agree are the dot's colour, said in words on hover. The
+    // screen and the Device tab say the rest, with Read where it helps.
+    const busyWords = health.busy ? `${phaseWords(model, health.phase)?.label || "Working"}. ` : "";
+    const halves = halvesWords(model, health.halves);
+    const keyboardDot = demo.active
+        ? {tone: "demo", tip: "Nothing is connected. The demo runs Ark's own draft over a demo setup; only Apply needs a keyboard."}
+        : !device.connected ? {tone: "err", tip: "No keyboard is connected."}
+        : {tone: health.halves === "agree" ? "ok" : health.halves === "unread" ? "" : "warn", tip: `${busyWords}${halves.label}. ${halves.detail}`};
 
     const nav = screenGroups().map((group) => `<div class="rail-group">${esc(group.group)}</div>` + group.items.map(({id, definition}) => `
         <button class="nav-item" data-screen="${id}" aria-current="${state.screen === id}"
@@ -47,34 +59,24 @@ export function rail() {
 
     const node = el(`<aside class="rail">
         <div class="rail-device">
-            <div class="rail-mark"><span class="mark-glyph">C</span> <span class="nm">Charybdis Ark</span>
-                <button class="btn tiny ghost" data-act="refresh" aria-label="Read keyboard" ${health.busy || host.blocked ? "disabled" : ""}
-                    data-tip="Read the connected keyboard again while keeping your draft.">Read</button></div>
-            ${selector}
-            <div class="rail-product">${esc(device.label || "No keyboard connected")}</div>
-            <div class="rail-meta">${esc(device.summary || "—")}</div>
-            ${host.chooseKeyboard ? `<button class="btn tiny rail-choose" data-act="choose-keyboard" ${health.busy ? "disabled" : ""}
-                data-tip="Pick a Charybdis in the browser's list. Once chosen, it reconnects by itself next time.">Choose keyboard</button>` : ""}
+            ${boardOutlineMarkup("rail-board")}
+            <div class="rail-mark">Charybdis Ark</div>
+            <div class="rail-keyboard">
+                <i class="dot ${keyboardDot.tone}${health.busy && !demo.active ? " busy" : ""}" data-tip="${esc(keyboardDot.tip)}"></i>
+                ${name}</div>
+            ${host.chooseKeyboard ? `<div class="rail-choose">
+                <button class="btn tiny" data-act="choose-keyboard" ${health.busy ? "disabled" : ""}
+                    data-tip="Pick a Charybdis in the browser's list. Once chosen, it reconnects by itself next time.">Choose keyboard</button>
+                ${device.connected && !demo.active ? `<button class="btn tiny" data-act="forget-keyboard" ${health.busy ? "disabled" : ""}
+                    data-tip="Let go of this keyboard. The page will not open it again until you choose it.">Disconnect</button>` : ""}</div>` : ""}
             <div class="rail-status">
-                ${demo.active ? line("demo", DEMO_WORDS.status, "Nothing is connected. The demo runs Ark's own draft over a demo setup; only Apply needs a keyboard.") : ""}
-                ${demo.active ? "" : line(device.connected ? "on" : "err",
-                    device.connected ? (health.busy ? phaseWords(model, health.phase)?.label || "Working" : "Connected") : "Disconnected",
-                    "Whether this window is talking to a keyboard.")}
-                ${demo.active ? "" : line(health.profile === "synced" ? "on" : health.profile === "attention" ? "draft" : "",
-                    health.profile === "synced" ? "Both halves agree" : health.profile === "attention" ? "Halves need attention"
-                        : health.profile === "unread" ? "Profile not read" : "Profile unavailable",
-                    "The committed generation and digest each half reports.")}
-                ${draft?.dirty && draft.matching && !draft.stale
+                ${!draft?.dirty ? "" : draft.matching && !draft.stale
                     ? `<button class="stat link" data-act="open-review" data-tip="Edits waiting in this window. The keyboard still runs its saved profile. Open the review to see them."><i class="dot draft"></i> ${draft.changes.length} change${draft.changes.length === 1 ? "" : "s"} in draft</button>`
-                    : line(draft?.dirty ? "draft" : "on",
-                        draft ? (draft.dirty ? `${draft.changes.length} change${draft.changes.length === 1 ? "" : "s"} in draft` : "Draft clean") : "No draft",
-                        "Edits waiting in this window. The keyboard still runs its saved profile.")}
+                    : line("draft", `${draft.changes.length} change${draft.changes.length === 1 ? "" : "s"} in draft`, "Edits waiting in this window. The keyboard still runs its saved profile.")}
                 ${demo.active ? "" : health.restartNeeded
                     ? line("err", "Restart the keyboard",
                         "The slave half did not confirm a cancelled save, so the keyboard refuses new saves. Unplug the USB cable (not the cable between the halves), wait a few seconds and plug it back in. Nothing was lost.")
-                    : line(health.recoveryPending ? "draft" : device.connected ? "on" : "",
-                        health.recoveryPending ? "Recovery pending" : device.connected ? "Recovery clear" : "Recovery unknown",
-                        "A recovery copy is written before every apply.")}
+                    : health.recoveryPending ? line("draft", "Recovery pending", "A recovery copy is written before every apply.") : ""}
             </div>
         </div>
         <nav class="rail-nav">${nav}</nav>
@@ -99,8 +101,8 @@ export function rail() {
     }));
     /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="dismiss"]'))?.addEventListener("click", () => { state.notice = ""; state.error = ""; render(); });
     // From the demo, reading or choosing a keyboard leaves it, asking first.
-    /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="refresh"]')).addEventListener("click", () => postLeavingDemo(controls.control("refresh")));
     /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="choose-keyboard"]'))?.addEventListener("click", () => postLeavingDemo(chooseKeyboard()));
+    /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="forget-keyboard"]'))?.addEventListener("click", () => post(forgetKeyboard()));
     /** @type {HTMLSelectElement | null} */ (node.querySelector('[data-act="select-device"]'))?.addEventListener("change", (event) => post(controls.selectDevice(/** @type {HTMLSelectElement} */ (event.target).value)));
     /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="open-review"]'))?.addEventListener("click", openReview);
     /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="history"]')).addEventListener("click", openHistory);

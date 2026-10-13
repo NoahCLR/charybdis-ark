@@ -89,3 +89,13 @@ test("unknown screen IDs show a recoverable unavailable surface", () => {
         state: "unavailable", title: "Screen unavailable", detail: "Choose a screen from the menu to continue.",
     });
 });
+
+test("a keyboard whose halves are not together says what is wrong and what to do", async () => {
+    const {halvesWords} = await import("../../webview/view/vocabulary.mjs");
+    const model = (halves, error = "") => ({vocabulary: VOCABULARY, load: {state: "unavailable"}, device: {connected: true, health: {halves, error}}});
+    assert.equal(readScreen(model("alone", "The slave half is not connected.")).detail, VOCABULARY.halves.alone.detail);
+    assert.equal(readScreen(model("apart")).detail, VOCABULARY.halves.apart.detail);
+    assert.equal(readScreen(model("agree", "Read failed.")).detail, "Read failed.", "halves that agree leave the keyboard's own words");
+    assert.deepEqual(halvesWords({vocabulary: VOCABULARY}, "alone"), VOCABULARY.halves.alone);
+    assert.deepEqual(halvesWords(null, "alone"), {label: "alone", detail: ""}, "an unknown table reads as the state itself");
+});

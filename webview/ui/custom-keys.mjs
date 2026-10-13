@@ -27,9 +27,7 @@ export function screenCustomKeys() {
     const main = el(`<div class="main">${topbar(
         "Custom keys",
         "Named keys that do only what their behaviour says. Place one on a key or send it from a combo; a behaviour cannot send one.",
-        keys.length ? `<input class="input search" id="customKeySearch" data-f="custom-keys:search" type="search" placeholder="Search custom keys by name" value="${esc(state.customKeySearch || "")}">` : "",
     )}</div>`);
-    /** @type {HTMLInputElement | null} */ (main.querySelector("#customKeySearch"))?.addEventListener("input", (event) => { state.customKeySearch = /** @type {HTMLInputElement} */ (event.target).value; render(); });
 
     const content = el(`<div class="content"><div class="pad library"></div></div>`);
     const pad = /** @type {HTMLElement} */ (content.firstElementChild);
@@ -43,8 +41,10 @@ export function screenCustomKeys() {
 
     const named = keys.filter((row) => row.name).length;
     const grid = el(`<div class="card"><div class="card-h"><h3>Keys</h3>
-        <span class="right tag">${named} of ${keys.length} named</span></div>
+        <input class="input search card-search" id="customKeySearch" data-f="custom-keys:search" type="search" placeholder="Search by name" value="${esc(state.customKeySearch || "")}">
+        <span class="tag">${named} of ${keys.length} named</span></div>
         <div class="card-b"><div class="macro-grid"></div></div></div>`);
+    /** @type {HTMLInputElement} */ (grid.querySelector("#customKeySearch")).addEventListener("input", (event) => { state.customKeySearch = /** @type {HTMLInputElement} */ (event.target).value; render(); });
     const cells = /** @type {HTMLElement} */ (grid.querySelector(".macro-grid"));
     const query = (state.customKeySearch || "").trim().toLowerCase();
     /** @param {import("../../contracts/panel.js").CustomKey} row */

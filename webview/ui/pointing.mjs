@@ -31,8 +31,7 @@ export function screenPointing() {
 
     const main = el(`<div class="main">${topbar(
         "Pointing modes",
-        `${slots.length && slots.length !== 8 ? slots.length : "Eight"} device-owned slots. Each re-reads the trackball while its key is held or toggled — as scrolling, or as directional keys and shortcuts.`,
-        slots.length && canEdit ? `<span class="note">Changes stage as you make them</span>` : "",
+        `${slots.length && slots.length !== 8 ? slots.length : "Eight"} device-owned slots. Each re-reads the trackball while its key is held or toggled — as scrolling, or as directional keys and shortcuts.`
     )}</div>`);
     const content = el(`<div class="content"><div class="pad pd-page"></div></div>`);
     const pad = /** @type {HTMLElement} */ (content.firstElementChild);

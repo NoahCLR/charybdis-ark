@@ -75,7 +75,11 @@ async function readKeyboard(session, selectedDeviceId, host = {}) {
     if (selectedDeviceId && !devices.some((device) => device.id === selectedDeviceId)) {
         throw new Error("The selected keyboard is no longer available. Read the device list again.");
     }
-    if (!service.snapshot().connected || (selectedDeviceId && service.snapshot().selectedDeviceId !== selectedDeviceId)) {
+    // A keyboard that left the list is let go: on the web page, choosing
+    // another keyboard lists only that one, and reading connects it.
+    const current = service.snapshot();
+    if (!current.connected || !devices.some((device) => device.id === current.selectedDeviceId)
+        || (selectedDeviceId && current.selectedDeviceId !== selectedDeviceId)) {
         const deviceId = selectedDeviceId || devices[0].id;
         await service.connect(deviceId);
     }

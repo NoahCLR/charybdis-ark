@@ -129,7 +129,7 @@ test("live mutation readiness keeps its additional transfer and peer diagnostic 
     ]);
     assert.equal(support.evaluateLiveMutationCompatibility(caps, compatible, true).reasons.at(-1), "Live profile status has not been read yet.");
     assert.equal(support.evaluateLiveMutationCompatibility(caps, compatible, true, {...status, peerKnown: false}).reasons.at(-1),
-        "The second keyboard half has not been detected over the split link.");
+        "The slave half has not been detected over the cable between the halves.");
     assert.equal(support.evaluateLiveMutationCompatibility(caps, compatible, true, {...status, peerConverged: false}).reasons.at(-1),
         "The two keyboard halves have not established a converged profile state yet.");
 });

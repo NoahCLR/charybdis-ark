@@ -15,14 +15,14 @@ const PAGE = "/dist/web/index.html";
 
 // A browser context with the fake keyboard plugged in, recording every request
 // any of its pages or workers makes.
-async function withKeyboard(context, baseURL) {
+async function withKeyboard(context, baseURL, keyboards = 1) {
     const keyboard = fakeKeyboard({document: pdDocument()});
     await context.exposeFunction("__fakeKeyboard", (reportId, bytes) => {
         if (reportId !== 0) throw new Error(`unexpected report id ${reportId}`);
         return keyboard.answer(Buffer.from(bytes)).map((reply) => Array.from(reply));
     });
     await context.addInitScript(installFakeHid, {vendorId: CHARYBDIS_VENDOR_ID, productId: CHARYBDIS_PRODUCT_ID,
-        usagePage: QMK_RAW_HID_USAGE_PAGE, usage: QMK_RAW_HID_USAGE, bridge: "__fakeKeyboard"});
+        usagePage: QMK_RAW_HID_USAGE_PAGE, usage: QMK_RAW_HID_USAGE, bridge: "__fakeKeyboard", keyboards});
     const requests = [];
     context.on("request", (request) => requests.push(request.url()));
     // Nothing but the page's own files: no fetch, no connection, no manifest.
@@ -178,7 +178,7 @@ test("a second tab is refused, and takes over when the first closes", async ({pa
     await expect(placeholder.locator("h2")).toHaveText("Ark is open in another tab");
     await expect(placeholder.locator("button")).toHaveCount(0);
     await expect(second.locator('.rail [data-act="choose-keyboard"]')).toHaveCount(0);
-    await expect(second.locator('.rail [data-act="refresh"]')).toBeDisabled();
+    await expect(second.locator('.rail [data-act="refresh"]')).toHaveCount(0);
     expect(await second.evaluate(() => window.__fakeHid.opened)).toBe(0);
 
     await page.close();
@@ -225,7 +225,7 @@ test("explore the demo: edit on several screens, review with no Apply, export, o
     await expect(banner).toContainText("Demo · no keyboard");
     await expect(banner).toContainText("No keyboard is connected");
     await expect(page.locator(".rail-product")).toHaveText("Demo");
-    await expect(page.locator(".rail-status")).toContainText("Demo · no keyboard");
+    await expect(page.locator(".rail-keyboard .dot.demo")).toHaveCount(1);
     await expect(page.locator(".rail-status")).not.toContainText(/Connected|halves|Recovery/);
 
     // Mouse: a pointer speed.
@@ -268,7 +268,7 @@ test("explore the demo: edit on several screens, review with no Apply, export, o
     await chooser.setFiles({name: "mine.charybdis.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(replacement))});
     await expect(page.locator(".rail-message")).toContainText("Opened mine.charybdis.json in the demo.");
     await expect(banner).toContainText("mine.charybdis.json");
-    await expect(page.locator(".rail-status")).toContainText("Draft clean");
+    await expect(page.locator(".rail-status")).not.toContainText(/in draft/);
 
     // The exported file is one Import takes, as on a keyboard.
     await page.locator('[data-screen="profile"]').click();
@@ -390,7 +390,7 @@ test("literal macro steps stage through the real web host, export exactly, undo 
     const text = ' {"key": "{KC_A}"}\nhello ';
     await page.locator("[data-step-text]").fill(text);
     await expect(page.locator("[data-macro-size]")).toContainText(`${Buffer.byteLength(text)} bytes of macro memory`);
-    await expect(page.locator(".rail-status")).toContainText("Draft clean");
+    await expect(page.locator(".rail-status")).not.toContainText(/in draft/);
     await page.locator("[data-step-text]").dispatchEvent("change");
     await expect(page.locator(".rail-status")).toContainText("1 change in draft");
     await page.locator('.commit [data-act="review"]').click();
@@ -405,4 +405,56 @@ test("literal macro steps stage through the real web host, export exactly, undo 
     expect(keyboard.requests).toEqual([]);
     expect(errors).toEqual([]);
     ownFilesOnly();
+});
+
+test("Disconnect lets go of the keyboard, and the page does not reopen it", async ({page, context, baseURL}) => {
+    await withKeyboard(context, baseURL);
+    await open(page);
+    await page.locator('.read-placeholder [data-act="choose-keyboard"]').click();
+    await ready(page);
+    await page.locator('.rail [data-act="forget-keyboard"]').click();
+    await expect(page.locator(".rail-product")).toHaveText("No keyboard connected");
+    await expect(page.locator('.rail [data-act="forget-keyboard"]')).toHaveCount(0);
+    await expect(page.locator(".rail-message")).toContainText("Disconnected");
+    expect(await page.evaluate(() => window.__fakeHid.forgotten)).toBe(1);
+
+    await page.reload();
+    await expect(page.locator(".read-placeholder h2")).toHaveText("Connect your keyboard");
+    expect(await page.evaluate(() => window.__fakeHid.opened)).toBe(0);
+});
+
+test("every keyboard Chrome allows is the connected one or in the selector, as they come and go", async ({page, context, baseURL}) => {
+    await withKeyboard(context, baseURL, 2);
+    await open(page);
+    const picker = page.locator("select#rail-device-picker");
+    const name = page.locator(".rail-keyboard");
+
+    // Allow both; the second chosen is the one connected, the selector holds both.
+    await page.locator('.read-placeholder [data-act="choose-keyboard"]').click();
+    await ready(page);
+    await expect(picker).toHaveCount(0);
+    await page.evaluate(() => {window.__fakeHidPick = 1;});
+    await page.locator('.rail [data-act="choose-keyboard"]').click();
+    await expect(picker.locator("option")).toHaveCount(2);
+    await expect(name.locator(".dot.ok")).toHaveCount(1);
+
+    // Unplugged, a keyboard leaves the selector; plugged back in, it returns.
+    await page.evaluate(() => window.__fakeHidPlug(0, false));
+    await expect(picker).toHaveCount(0);
+    await expect(name.locator(".dot.ok")).toHaveCount(1);
+    await page.evaluate(() => window.__fakeHidPlug(0, true));
+    await expect(picker.locator("option")).toHaveCount(2);
+
+    // Disconnecting one connects the one still allowed, not "No keyboard".
+    await page.locator('.rail [data-act="forget-keyboard"]').click();
+    await expect(picker).toHaveCount(0);
+    await expect(name.locator(".dot.ok")).toHaveCount(1);
+    await expect(page.locator(".rail-product")).not.toHaveText("No keyboard connected");
+
+    // Unplugging the connected one leaves nothing; plugging it in connects it.
+    const left = await page.evaluate(() => JSON.parse(localStorage.getItem("fake-hid-granted"))[0]);
+    await page.evaluate((index) => window.__fakeHidPlug(index, false), left);
+    await expect(page.locator(".rail-product")).toHaveText("No keyboard connected");
+    await page.evaluate((index) => window.__fakeHidPlug(index, true), left);
+    await expect(name.locator(".dot.ok")).toHaveCount(1);
 });

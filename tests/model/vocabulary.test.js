@@ -84,3 +84,12 @@ test("device phase identities are independent of their existing display labels",
     assert.equal(PHASE_WORDS[PHASE.READ_COMBOS].read, "Checking active combos");
     assert.equal(PHASE_WORDS[PHASE.READ_BASE_RGB].read, "Checking base lighting");
 });
+
+test("every state of the two halves has a label and words saying what to do", () => {
+    assert.deepEqual(Object.keys(VOCABULARY.halves).sort(), ["agree", "alone", "apart", "unread"]);
+    for (const [id, {label, detail}] of Object.entries(VOCABULARY.halves)) {
+        assert.ok(label && detail, id);
+        assert.doesNotMatch(`${label} ${detail}`, /converge|generation|peer|digest/i, `${id} is said without the protocol's words`);
+    }
+    assert.match(VOCABULARY.halves.alone.detail, /cable between the halves/);
+});

@@ -429,3 +429,13 @@ test("raw custom bytes that differ from the reviewed active identity fall back t
     await restoreProfile(f.connection, f.ids, {...capabilities, featureFlags: capabilities.featureFlags | FEATURES.CANDIDATE_REUSE}, f.targetDocument, f.options);
     assert.equal(candidateMutations(f).some(r => r[2] === C.VALUE_REUSE), false); assertTarget(f);
 });
+
+test("a keyboard without its slave half refuses a capture at once, without waiting for the halves", async () => {
+    const source = backup32();
+    const keyboard = fakeKeyboard({document: source, compiled: factoryProfile(source), peerKnown: false});
+    const {connection, ids} = wired(keyboard);
+    let waits = 0;
+    await assert.rejects(captureProfile(connection, ids, captureCapabilities, undefined, false, false, {sleep: async () => {waits += 1;}}),
+        {code: "KEYBOARD_NOT_READY", message: /slave half is not connected/});
+    assert.equal(waits, 0, "no poll for the halves to agree");
+});

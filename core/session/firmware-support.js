@@ -150,7 +150,7 @@ function evaluateLiveMutationCompatibility(capabilities, compatibility, connecte
     if (connected && !status) {
         reasons.push("Live profile status has not been read yet.");
     } else if (status && !status.peerKnown) {
-        reasons.push("The second keyboard half has not been detected over the split link.");
+        reasons.push("The slave half has not been detected over the cable between the halves.");
     } else if (status && !status.peerConverged) {
         reasons.push("The two keyboard halves have not established a converged profile state yet.");
     }

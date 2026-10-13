@@ -9,7 +9,7 @@
 /** @typedef {{vocabulary?: import("../../contracts/model.js").Vocabulary, pdModes?: {id: number, displayName: string}[]}} VocabularyModel */
 
 /** @type {import("../../contracts/model.js").Vocabulary} */
-const NONE = {phases: /** @type {import("../../contracts/model.js").Vocabulary["phases"]} */ ({}), hostOs: [], macroProtection: [], hostLayouts: [], tapSends: "", holdHelpers: {hold: [], long: []}, holdWithoutLongHold: [], tiers: {}, branches: [], localities: [], paintModes: [], fadeModes: [], tapCommit: [],
+const NONE = {phases: /** @type {import("../../contracts/model.js").Vocabulary["phases"]} */ ({}), halves: /** @type {import("../../contracts/model.js").Vocabulary["halves"]} */ ({}), hostOs: [], macroProtection: [], hostLayouts: [], tapSends: "", holdHelpers: {hold: [], long: []}, holdWithoutLongHold: [], tiers: {}, branches: [], localities: [], paintModes: [], fadeModes: [], tapCommit: [],
     feedbackOwners: [], stages: [], pointing: {kinds: [], axes: [], invert: [], pointerLayer: [], buttons: [],
         emptyDirection: [], directionOutput: [], scrollAxes: [], modifierPolicy: [], scrollFields: [], heldModifiers: ""}, modifiers: [], comboOptions: {}};
 
@@ -46,3 +46,8 @@ export const tierName = (model, kind) => vocabulary(model).tiers[kind] || kind;
 // Device progress is matched by id. Labels and write facts come from core.
 /** @param {{vocabulary?: Pick<import('../../contracts/model.js').Vocabulary, 'phases'>} | null | undefined} model @param {import("../../contracts/model.js").PhaseId | undefined} phase */
 export const phaseWords = (model, phase) => phase ? model?.vocabulary?.phases?.[/** @type {import('../../contracts/model.js').PhaseId} */ (phase)] : undefined;
+
+// Whether the two halves agree, in the words core chose. A state the table
+// does not know reads as itself.
+/** @param {{vocabulary?: Partial<Pick<import('../../contracts/model.js').Vocabulary, 'halves'>>} | null | undefined} model @param {import("../../contracts/model.js").HalvesId | undefined} halves @returns {{label: string, detail: string}} */
+export const halvesWords = (model, halves) => (halves && model?.vocabulary?.halves?.[halves]) || {label: String(halves ?? ""), detail: ""};
