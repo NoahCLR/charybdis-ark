@@ -3,7 +3,9 @@
 // Backups from the firmware before sixteen layers (schema 2.0, action ABI
 // 0xf79c6151) translated into the format the keyboard stores now (firmware
 // D-F14), so an old backup restores without loss. The firmware never reads
-// the old format; translation is the client's (firmware D-F10).
+// the old format; translation is the client's (firmware D-F10). A backup in
+// the current schema whose domains predate the keyboard's current versions
+// is brought forward by the same steps (translateCurrentBackup).
 //
 // Each domain moves one version forward exactly as the firmware's documented
 // translation says (its specs, and tests/host/translate_eight_slot_profile.py
@@ -14,18 +16,20 @@
 // counts the layer names and adds 64 empty macro and custom-key names; PD
 // v2 → v3 moves each name to the counted rule. Layers 8..15 start transparent
 // and unnamed, macros 64..127 empty, and every participation control on, so
-// the restored keyboard behaves as the backup did.
+// the restored keyboard behaves as the backup did. Settings v6 → v7 adds the
+// keyboard's own name, empty: the firmware's built-in name.
 //
 // Custom keys moved from 0x7e40 + n to 0x7f00 + n. They are named by their
 // stable slot, so the backup's keys, behaviour targets and combo inputs and
 // outputs that named slot n by its old keycode name it by the new one.
 const {PROFILE_DOMAIN_IDS} = require("../schema/profile-domains");
 const {ACTION_ABI} = require("../schema/actions");
-const {PROFILE_ACTION_KINDS: ACTION, decodeProfileBlob, encodeProfileBlob, PROFILE_DOMAIN_VERSIONS} = require("../schema/profile-blob-v1");
+const {PROFILE_ACTION_KINDS: ACTION, PROFILE_BLOB_V1, decodeProfileBlob, encodeProfileBlob, PROFILE_DOMAIN_VERSIONS} = require("../schema/profile-blob-v1");
 const {decodeKeyBehaviorDomain, encodeKeyBehaviorDomain} = require("../schema/key-behavior-domain-v1");
 const {decodeComboDomain, encodeComboDomain} = require("../schema/combo-domain-v1");
 const {decodeRgbDomainV1} = require("../schema/rgb-domain-v1");
 const {validSetting} = require("../schema/settings-domain-v1");
+const {NAME_MAX_BYTES, nameOfBytes} = require("../schema/profile-name");
 const {CUSTOM_KEY_BASE, RETIRED_CUSTOM_KEY_BASE, RETIRED_CUSTOM_KEY_SLOTS} = require("../data/user-keycodes");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX, LAYERS, MATRIX_KEYS, matrixPosition} = require("../data/charybdis-layout");
 const {FILE_MAX_BYTES, validateSnapshot, validateViaMacro, macroBank} = require("./portable-profile");
@@ -137,6 +141,28 @@ function settingsV6(payload) {
     return Buffer.concat([fixed, ...names, ...macros, empty, ...custom, empty]);
 }
 
+// Settings v6 → v7: the keyboard's own name follows the custom-key names, as
+// one more counted name. A v6 backup names none, so it gets the empty name,
+// which means the firmware's built-in one: one zero length byte. The v6 body
+// is checked here only for its shape (header and 272 well-formed names); the
+// complete document is validated once it is current.
+/** @param {Buffer} payload */
+function settingsV7(payload) {
+    const scalars = 31, fixed = 8 + scalars * 4 + 16 * 17, names = 16 + 128 + 128;
+    if (payload.length < fixed + names || payload.length > fixed + names * (1 + NAME_MAX_BYTES)
+        || !payload.subarray(0, 5).equals(Buffer.from([6, 16, scalars, 128, 128])) || payload[5] & ~1 || payload[6] || payload[7]) throw fail("The backup's settings are in an unknown format.");
+    let offset = fixed;
+    for (let name = 0; name < names; name++) {
+        const length = payload[offset];
+        if (length === undefined || offset + 1 + length > payload.length || nameOfBytes(payload.subarray(offset + 1, offset + 1 + length)) === undefined) throw fail("The backup's settings hold a name that is not well-formed.");
+        offset += 1 + length;
+    }
+    if (offset !== payload.length) throw fail("The backup's settings have trailing data.");
+    const translated = Buffer.concat([payload, Buffer.from([0])]);
+    translated[0] = 7;
+    return translated;
+}
+
 /** @param {Buffer} payload */
 function pdV3(payload) {
     const count = payload[3];
@@ -164,7 +190,7 @@ const DOMAIN_TRANSLATIONS = Object.freeze({
     [PROFILE_DOMAIN_IDS.RGB]: Object.freeze({4: rgbV4}),
     [PROFILE_DOMAIN_IDS.KEY_BEHAVIORS]: Object.freeze({2: behaviorsV2}),
     [PROFILE_DOMAIN_IDS.COMBOS]: Object.freeze({3: combosV3}),
-    [PROFILE_DOMAIN_IDS.SETTINGS]: Object.freeze({6: settingsV6}),
+    [PROFILE_DOMAIN_IDS.SETTINGS]: Object.freeze({6: settingsV6, 7: settingsV7}),
     [PROFILE_DOMAIN_IDS.PD_MODES]: Object.freeze({3: pdV3}),
 });
 
@@ -231,6 +257,37 @@ function translateProfile(bytes) {
     }
 }
 
+// The domain versions the current schema (3.0) began with: a current-format
+// backup holds these or later ones, and each later version has a step above.
+const CURRENT_SCHEMA_FIRST = Object.freeze({[PROFILE_DOMAIN_IDS.RGB]: 4, [PROFILE_DOMAIN_IDS.KEY_BEHAVIORS]: 2,
+    [PROFILE_DOMAIN_IDS.COMBOS]: 3, [PROFILE_DOMAIN_IDS.SETTINGS]: 6, [PROFILE_DOMAIN_IDS.PD_MODES]: 3});
+const CURRENT_SCHEMA_VERSIONS = new Map(Object.entries(CURRENT_SCHEMA_FIRST).map(([id, first]) => [Number(id),
+    Array.from({length: PROFILE_DOMAIN_VERSIONS[Number(id)] - first + 1}, (_, index) => first + index)]));
+
+// A current-format backup with every domain at the keyboard's current
+// version, or the document unchanged when it is not one this can bring
+// forward (validation then says what is wrong with it). Only the profile
+// blob's domains change; keys and macros are the same in every version.
+/** @param {unknown} value @returns {unknown} */
+function translateCurrentBackup(value) {
+    const candidate = /** @type {{format?: unknown, version?: unknown, profile?: unknown} | null | undefined} */ (value);
+    if (candidate?.format !== "charybdis-profile" || candidate.version !== PROFILE_BLOB_V1.SCHEMA_MAJOR || typeof candidate.profile !== "string") return value;
+    const bytes = Buffer.from(candidate.profile, "base64");
+    if (bytes.toString("base64") !== candidate.profile) return value;
+    /** @type {ReturnType<typeof decodeProfileBlob>} */
+    let blob;
+    try {blob = decodeProfileBlob(bytes, {domainVersions: CURRENT_SCHEMA_VERSIONS});} catch {return value;}
+    if (blob.domains.every(domain => domain.version === PROFILE_DOMAIN_VERSIONS[domain.id])) return value;
+    try {
+        const domains = blob.domains.map(domain => translateDomain(domain));
+        return {...candidate, profile: encodeProfileBlob({domains}).toString("base64")};
+    } catch (error) {
+        const failure = /** @type {Error & {code?: string}} */ (error);
+        if (failure.code === "INVALID_PORTABLE_PROFILE") throw error;
+        throw fail(`The backup is invalid: ${failure.message}`);
+    }
+}
+
 // Whether a parsed document is a backup from before sixteen layers.
 /**
  * This identifies the revision only; translateBackup validates its contents.
@@ -242,15 +299,15 @@ function isPreviousBackup(value) {
     return candidate?.format === "charybdis-profile" && candidate.version === PREVIOUS.SCHEMA && candidate.actionAbiDigest === PREVIOUS_ACTION_ABI;
 }
 
-// A backup from before sixteen layers as one in the current format, or the
-// document unchanged when it is not one.
+// A backup from before sixteen layers, or a current-format one with older
+// domain versions, as one in the current format; any other document unchanged.
 /** @param {unknown} value @returns {unknown} */
 function translateBackup(value) {
     if (typeof value === "string") {
         if (Buffer.byteLength(value) > FILE_MAX_BYTES) throw fail("This profile file is too large.");
         try {value = JSON.parse(value);} catch {return value;}
     }
-    if (!isPreviousBackup(value)) return value;
+    if (!isPreviousBackup(value)) return translateCurrentBackup(value);
     if (value.keyboard !== "charybdis-4x6" || Object.keys(value).some(key => !["format", "version", "keyboard", "actionAbiDigest", "layers", "profile", "macros"].includes(key))) throw fail("The backup contains unsupported fields.");
     if (!Array.isArray(value.layers) || value.layers.length !== PREVIOUS.LAYERS || value.layers.some(keys => !Array.isArray(keys) || keys.length !== MATRIX_KEYS || keys.some(code => !Number.isInteger(code) || code < 0 || code > 65535))) throw fail("The backup is missing layers.");
     // The complete matrix above has been checked before it is retargeted.
@@ -278,4 +335,4 @@ function translateBackup(value) {
     return translated;
 }
 
-module.exports = {PREVIOUS_ACTION_ABI, DOMAIN_TRANSLATIONS, translateDomain, isPreviousBackup, translateBackup, translateProfile};
+module.exports = {PREVIOUS_ACTION_ABI, DOMAIN_TRANSLATIONS, translateDomain, isPreviousBackup, translateBackup, translateCurrentBackup, translateProfile};

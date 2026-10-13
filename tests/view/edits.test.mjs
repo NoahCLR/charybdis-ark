@@ -454,6 +454,25 @@ test("a custom key's name is posted trimmed against the draft it was read from, 
     assert.equal(decoded(draft).settings.customKeyNames[2], "");
 });
 
+test("the keyboard's name is posted trimmed against the draft it was read from, and review shows the rename", () => {
+    const draft = session(), read = draft.current.fingerprint, layers = draft.document.layers;
+    const message = edits.keyboardNameMessage("  Noah’s Charybdis ", read);
+    assert.deepEqual(message, {type: "renameKeyboard", name: "Noah’s Charybdis", expectedFingerprint: read});
+    stage(draft, message);
+    assert.equal(decoded(draft).settings.keyboardName, "Noah’s Charybdis");
+    assert.deepEqual(draft.document.layers, layers, "a name moves no key");
+    const view = draft.view({selectedDeviceId: "test-device", connected: true});
+    assert.ok(view.changes.some((change) => change.unit === "keyboardName" && change.fields.some((field) => field.label === "Name" && field.before === "built-in name" && field.after === "Noah’s Charybdis")));
+    assert.equal(view.undoLabel, "Renamed the keyboard");
+    assert.throws(() => stage(draft, edits.keyboardNameMessage("Late", read)), /keyboard changed/, "a form read before the last edit is refused");
+    assert.throws(() => stage(draft, edits.keyboardNameMessage("x".repeat(33), draft.current.fingerprint)), /32 bytes/, "more than 32 bytes is refused");
+    assert.throws(() => stage(draft, edits.keyboardNameMessage("a\u0007b")), /control characters/);
+    stage(draft, edits.keyboardNameMessage(""));
+    assert.equal(decoded(draft).settings.keyboardName, "", "an empty name gives back the built-in one");
+    draft.undo(draft.revision);
+    assert.equal(decoded(draft).settings.keyboardName, "Noah’s Charybdis");
+});
+
 test("a macro left holding a key is refused, and macro and custom keys land as the keyboard's own values", () => {
     const draft = session();
     assert.throws(() => stage(draft, edits.macroMessage("VIA_MACRO_0", "{+KC_A}", draft.current.fingerprint)), /Release/);

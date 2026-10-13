@@ -19,10 +19,10 @@ const {profileDomain} = require("../schema/profile-domains");
 const AREAS = ["behaviours", "combos", "names", "lighting", "pointing", "settings"];
 
 // Bytes the settings domain spends on names: a length byte plus the text of
-// each layer, macro and custom-key name.
-/** @param {Pick<import("../schema/types.js").SettingsDomain, 'names' | 'macroNames' | 'customKeyNames'>} settings */
+// each layer, macro and custom-key name, and the keyboard's own.
+/** @param {Pick<import("../schema/types.js").SettingsDomain, 'names' | 'macroNames' | 'customKeyNames' | 'keyboardName'>} settings */
 function nameBytes(settings) {
-    const records = [...settings.names, ...settings.macroNames, ...settings.customKeyNames];
+    const records = [...settings.names, ...settings.macroNames, ...settings.customKeyNames, settings.keyboardName];
     return records.reduce((total, name) => total + 1 + Buffer.byteLength(name), 0);
 }
 

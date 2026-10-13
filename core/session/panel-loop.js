@@ -24,6 +24,8 @@
 // core/README.md; the native one when omitted) and `sleep(ms)` the wait between
 // polls while reading and saving (the timer's when omitted; a browser tab passes
 // one its throttling cannot slow). Tests may pass a ready-made `service` instead.
+// `reconnect` tunes the wait for a renamed keyboard to come back
+// (keyboard-reconnect.js): its `sleep`, `now`, `waitMs` and `pollMs`.
 
 /**
  * @typedef {import("./types.js").RunningPanelSession} Session
@@ -33,7 +35,8 @@
 const {panelControl} = require("./panel-control-registry");
 const {ProfileDeviceService} = require("./profile-device-service");
 const {buildPanelModel, observeService, panelRequest, routeMessage} = require("./panel-session");
-const {boundDraft, endRead, takeOutbox, whilePanelBusy} = require("./panel-session-state");
+const {beginRead, boundDraft, closeEditors, endRead, takeOutbox, whilePanelBusy} = require("./panel-session-state");
+const {awaitReconnect, endReconnect} = require("./keyboard-reconnect");
 const {draftControl, portableControl, readKeyboard} = require("./panel-controls");
 const {demoControl, demoExport, leaveDemo, panelState} = require("./demo-session");
 const {macroInputStatus} = require("../model/macro-editor");
@@ -41,17 +44,27 @@ const {FILE_MAX_BYTES} = require("../model/portable-profile");
 
 // Reading a keyboard leaves the demo first (asking about unexported edits is
 // the panel's, and a message that has not asked is refused).
-/** @param {Host} host @param {import("./types.js").DeviceServiceOptions & {service?: import("./types.js").ControlService}} [options] */
+/** @typedef {{sleep?: (ms: number) => Promise<void>, now?: () => number, waitMs?: number, pollMs?: number}} ReconnectTiming */
+/** @param {Host} host @param {import("./types.js").DeviceServiceOptions & {service?: import("./types.js").ControlService, reconnect?: ReconnectTiming}} [options] */
 function openPanelLoop(host, options = {}) {
     /** @type {Session} */
     let session;
+    const {service, reconnect: timing = {}, ...device} = options;
+    const waiting = {timing: {sleep: device.sleep, ...timing}, running: /** @type {Promise<void> | undefined} */ (undefined)};
     const loop = {
         publish: () => publish(session, host),
         serviceChanged: () => serviceChanged(session, host),
-        handleMessage: /** @param {unknown} posted */ (posted) => handleMessage(session, panelRequest(posted), host),
-        close: () => session.service.close(),
+        handleMessage: /** @param {unknown} posted */ async (posted) => {
+            await handleMessage(session, panelRequest(posted), host);
+            followReconnect(session, host, waiting);
+        },
+        // Settles when a wait for a renamed keyboard ends, at once without one.
+        reconnected: () => waiting.running || Promise.resolve(),
+        close: () => {
+            if (session.reconnect) endReconnect(session, session.reconnect);
+            return session.service.close();
+        },
     };
-    const {service, ...device} = options;
     const activeService = service || new ProfileDeviceService({...device, onChange: loop.serviceChanged,
         onApplyProgress: apply => {
             void host.post({type: "applyProgress", apply, draftId: session.draft?.id, draftRevision: session.draft?.revision});
@@ -97,6 +110,10 @@ async function handleMessage(session, message, host) {
         await host.post(reply);
         return;
     }
+    // Reading or choosing a keyboard is the person's choice: a wait for a
+    // renamed keyboard gives way to it.
+    const route = message && panelControl(message.type)?.route;
+    if (session.reconnect && (route === "read" || route === "host" && /Keyboard$/.test(message?.type || ""))) endReconnect(session, session.reconnect);
     try {
         if (session.demo && message && panelControl(message.type)?.demo === "leave" && !session.portableBusy) leaveDemo(session, /** @type {import("../../contracts/messages.js").DemoControl} */ (message));
         const route = routeMessage(session, message, panelState(session));
@@ -117,6 +134,26 @@ async function handleMessage(session, message, host) {
         session.notice = `Failed${code}: ${text}`;
         publish(session, host);
     }
+}
+
+// After a save that renamed the keyboard, wait for it to come back under its
+// new name and read it again (keyboard-reconnect.js), once at a time.
+/** @param {Session} session @param {Host} host @param {{timing: ReconnectTiming, running: Promise<void> | undefined}} waiting */
+function followReconnect(session, host, waiting) {
+    const expected = session.reconnect;
+    if (!expected || waiting.running) return;
+    const read = /** @param {string} deviceId */ async (deviceId) => {
+        if (deviceId !== session.service.snapshot().selectedDeviceId) closeEditors(session, {resetForms: true});
+        beginRead(session);
+        await connectAndRead(session, deviceId, host);
+    };
+    waiting.running = awaitReconnect(session, expected, {...waiting.timing, read, publish: () => publish(session, host)})
+        .catch(() => {endReconnect(session, expected); publish(session, host);})
+        .finally(() => {
+            waiting.running = undefined;
+            // A save during the wait may have renamed it again.
+            if (session.reconnect && session.reconnect !== expected) followReconnect(session, host, waiting);
+        });
 }
 
 // Connect, learn what the keyboard is, and read what it is running.

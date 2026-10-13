@@ -14,6 +14,7 @@ for variant in normal sanitized; do
         "$ROOT/tests/host/qmk_portable_profile_test.c" \
         "$ROOT/users/noah/lib/compat/qmk_portable_profile.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_settings_defaults.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_settings_v1.c" \
         "$ROOT/users/noah/lib/profile/runtime/effective_settings_runtime.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_reader.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_blob_v1.c" \
@@ -48,6 +49,9 @@ function read(path) {
     assert.deepEqual(authored.macroNames.filter(Boolean), ["Drag Screenshot", "Thirty-two bytes of name, exact!"]);
     assert.deepEqual([authored.names[0], authored.names[1], authored.names[7], authored.names[15]], ["Base", "", "Été", "Thirty-two bytes of name, exact!"]);
     assert.deepEqual(authored.customKeyNames.filter(Boolean), ["Right Thumb", "Last"]);
+    // Settings v7: the keyboard's own name follows, empty for the built-in one.
+    assert.equal(authored.keyboardName, "");
+    assert.equal((await read(process.argv[3])).keyboardName, "");
     console.log("app reads the firmware's streamed settings and its macro and layer names");
 })().catch(error => {console.error(error); process.exitCode = 1;});
 JS

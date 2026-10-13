@@ -47,6 +47,7 @@ matrix.
 | Mouse | Pointer and sniping DPI, auto-sniping and auto-mouse, settings the core files under Mouse, so the rail, the review and import counts all place them there; the auto-mouse fade is a share of the timeout, edited on its lighting stage (D-L17) |
 | Pointing modes | 32 device-owned slots in the sparse PD domain (D-L41, D-L54); capability-gated mouse-button 1–8 clicks and VIA macro outputs from directions, diagonals and tap overrides, with destination blockers in Review; see [the editor contract](architecture/interface-contracts.md#pointing-tap-outputs) and [PD-mode domain v1](../upstream/firmware/docs/architecture/pd-mode-domain-v1.md) |
 | Global policy | Every other portable setting, including startup layers, combo matching, Host and device-reported lighting and key options; the lighting idle timeout is edited in seconds or minutes; unsupported firmware features stay read-only (D-L18, D-L56) |
+| Keyboard name | The keyboard's own name, its USB product string, edited on Settings and stored in settings v7; an Apply that renames it is followed through the keyboard's USB restart (D-L62) |
 | Backup and restore | Complete current-format snapshots, import review against the keyboard, recovery file and verified restore; the preceding eight-layer backup is translated before review (D-L15, D-L23, D-L54) |
 | Drafts and Apply | One draft with item-by-item review, discard by edit group, Show, undo/redo and history; the review checks reachable actions, confirms warnings and traps and blocks what the destination cannot save; Apply names its steps and halves and says where a failure happened (D-L19, D-L23, D-L29, D-L30, D-L36, D-L60, D-L61) |
 | Recovery | Atomic logical Apply, differential custom and VIA transfer, reboot recovery fencing, firmware roll-forward after the decision, resume after a lost or power-cycled peer link, bounded cancel owned by the keyboard (D-L20–D-L22, D-L27, D-L39, D-L58) |
@@ -58,8 +59,10 @@ words on hover; the rail lists draft state
 and recovery state. Convergence needs the firmware's peer-known and
 peer-converged flags, not just matching generations. With several compatible
 keyboards connected, a selector picks one (on the web page among those
-the page may open, the one last chosen first); a dirty draft stays bound to its
-keyboard, and a reconnect requires an explicit review before Apply.
+the page may open, the one last chosen first), each listed by its name and
+told apart by serial number or a number only where two read alike (D-L62); a
+dirty draft stays bound to its keyboard, and a reconnect requires an explicit
+review before Apply.
 
 Remaining before calling the product complete:
 
@@ -78,6 +81,14 @@ Remaining before calling the product complete:
 - **Combo output permissions need keyboard acceptance (D-L55).** Confirm global
   and per-combo bypass, including two combos sharing an output, custom outputs
   and unchanged physical behaviours, after reading and saving both halves.
+
+- **Renaming the keyboard needs broader hardware acceptance (D-L62).** Apply a new
+  name and an empty one, in VS Code and in Chrome, with one keyboard and with
+  two: confirm the restart, that Ark follows the same keyboard back, that
+  Chrome keeps its permission and that the OS and chooser show the new name.
+  Include a restart delayed beyond 10 seconds, explicit built-in text, a
+  recovery restore, and another keyboard already using the target name.
+  Automated tests use fake adapters only.
 
 - **Sparse macro read timing needs hardware acceptance (D-L23).** Compare
   first read, Refresh and Export with mostly empty and full macro banks, and
@@ -413,12 +424,12 @@ replacing the field, preserving native editing and composition.
 Every empty slot keeps room for ten key taps (30 bytes); when free memory
 cannot keep that for every empty slot, the highest-numbered empty slots show no
 room and cannot be edited until space is freed. The firmware does not enforce the reserve, so the
-app shows what a VIA edit left. Current settings version 6 gives every macro
+app shows what a VIA edit left. Current settings version 7 gives every macro
 name up to 32 UTF-8 bytes, following the shared counted-name contract; see the
 [portable profile](../upstream/firmware/docs/architecture/portable-profile-v1.md).
 
 Unicode-capable firmware (feature bit 21) accepts canonical UTF-8 text and
-settings scalar 27’s Host settings, without changing the settings-v6 shape:
+settings scalar 27’s Host settings, without changing the settings shape:
 bits 0..1 select Auto/macOS/Windows/Linux; bit 8 independently enables Unicode.
 Ark requires the capability for Unicode edits and nonzero Host settings, preserving
 legacy ASCII editing. Non-ASCII scalars cost four compiled bytes each; text
@@ -1099,6 +1110,55 @@ diagnostics use the actual device state throughout; local changes only add
 the existing draft subtitle. The demo supplies its own explicit header and
 diagnostics (D-L53). Earlier firmware keeps its independent read-only view
 and domain failures even when a dirty draft is retained.
+
+### D-L62 — The keyboard is named in its profile, and its restart is expected
+
+The keyboard's own name is the 273rd counted name in settings domain 0x40,
+version 7 (firmware D-F14's name rule: up to 32 bytes of UTF-8, no control
+characters), after the layer, macro and custom-key names. Empty means the
+firmware's built-in name (QMK `keyboard_name`); the firmware serves the
+effective name as its USB product string. Because it is profile data, it is
+edited in the draft (`renameKeyboard`, `core/model/keyboard-name.js`), reviewed
+as Keyboard name, discarded on its own and kept in backups. A settings v6
+document, from the eight-layer translation or a current-format backup, gains an
+empty name in one translation step (`core/model/backup-translation.js`); a
+keyboard still storing v6 is older firmware, refused as any older domain
+version is.
+
+Labels follow one rule (`deviceLabels` in `core/session/device-model.js`): a
+listed keyboard is called by the product name it reports, and the connected
+one by the name it stores once that is read, so a new name shows as soon as it
+is applied. A serial number, or the listed number where the host shows none,
+is added only where two labels would otherwise match. The header shows a
+stored name alone, and the manufacturer and product otherwise.
+
+After a save that changes the stored name, the firmware's master half restarts
+USB by itself once the transaction is idle on both halves, nothing is held, no
+macro runs and Raw HID has been quiet for a second. Ark expects it
+(`core/session/keyboard-reconnect.js`): the device service records the drop,
+and a readback it cuts short, as diagnostics rather than errors; the panel
+shows it reconnecting. Waiting for the safe departure has no timeout: held
+keys and macros may delay it. Once the connection drops, the panel loop polls
+the device list for at most 10 s in both hosts. The web page stops connecting
+the first allowed keyboard throughout the expectation.
+
+A known serial number must match (node-hid; the master half's hardware ID
+survives the restart); Ark never falls back from a known serial to a name.
+Without a serial, Ark remembers the other keyboards listed before the save
+and excludes their IDs. It reconnects only to one candidate reporting the new
+name, and only when no other keyboard already had that name before the save.
+An unknown built-in name after clearing the stored name, or ambiguous identity,
+leaves the choice to the person in the keyboard menu. A sole listed keyboard
+is not enough to establish identity. Once found it is connected and read
+again, and the notice says it is back. Timeout, ambiguity and read failure
+notices retain the save result and recovery-copy location.
+
+Firmware compares stored names, so changing the empty built-in-name sentinel
+to its explicit text may restart even though the USB product text is unchanged;
+Ark expects that too. A recovery restore whose previous name is unreadable may
+also restart, so Ark expects it conservatively. Reading or choosing a keyboard
+during the wait ends it; this also ends an expectation if a repaired keyboard
+kept its name and never needed to restart.
 
 ## Historical decisions
 

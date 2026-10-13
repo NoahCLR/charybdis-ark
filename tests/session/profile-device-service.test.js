@@ -547,6 +547,22 @@ test("keyboards without a serial number are numbered by their id, the number fir
     const serial = new Service({adapter: new Fake({devices: [{id: "a", product: "Charybdis", serialNumber: "E4"}, {id: "b", product: "Charybdis", serialNumber: "DE"}]})});
     await serial.enumerate();
     assert.deepEqual(serial.snapshot().devices.map((device) => device.label), ["Charybdis · E4", "Charybdis · DE"]);
+    const alone = new Service({adapter: new Fake({devices: [{id: "a", product: "Charybdis", serialNumber: "E4"}]})});
+    await alone.enumerate();
+    assert.deepEqual(alone.snapshot().devices.map((device) => device.label), ["Charybdis"], "a serial number only tells two of the same name apart");
+});
+
+test("keyboards with names of their own are listed by them, numbered only where two read alike", async () => {
+    const {ProfileDeviceService: Service} = require("../../core/session/profile-device-service");
+    const {FakeDeviceAdapter: Fake} = require("../../core/transport/fake-device-adapter");
+    const adapter = new Fake({devices: [{id: "a", product: "Work board"}, {id: "b", product: "Charybdis (4x6) Splinky"}, {id: "c", product: "Charybdis (4x6) Splinky"}]});
+    const service = new Service({adapter});
+    await service.enumerate();
+    assert.deepEqual(service.snapshot().devices.map((device) => device.label), ["Work board", "Keyboard 2 · Charybdis (4x6) Splinky", "Keyboard 3 · Charybdis (4x6) Splinky"]);
+    // One reconnects under a new name: nothing reads alike any more.
+    adapter.devices = [{id: "a", product: "Work board"}, {id: "b", product: "Charybdis (4x6) Splinky"}, {id: "d", product: "Home board"}];
+    await service.enumerate();
+    assert.deepEqual(service.snapshot().devices.map((device) => device.label), ["Work board", "Charybdis (4x6) Splinky", "Home board"]);
 });
 
 test("a replugged keyboard takes back the number that came free, so two keyboards are always 1 and 2", async () => {

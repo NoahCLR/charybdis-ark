@@ -21,7 +21,7 @@ const PROFILE_DOMAINS = Object.freeze([
         encode: value => require("./combo-domain-v1").encodeComboDomain(value),
         /** @param {Uint8Array} bytes @param {DomainOptions} [_options] @returns {import("./profile-domains-types.js").DomainModels["combos"]} */
         decode: (bytes, _options = {}) => require("./combo-domain-v1").decodeComboDomain(bytes)}),
-    Object.freeze({name: "SETTINGS", id: 0x40, key: "settings", readKey: "settings", version: 6, wireBit: 1 << 3, area: "settings",
+    Object.freeze({name: "SETTINGS", id: 0x40, key: "settings", readKey: "settings", version: 7, wireBit: 1 << 3, area: "settings",
         /** @param {import("./types.js").SettingsDomain} value @returns {Buffer} */
         encode: value => require("./settings-domain-v1").encodeSettings(value),
         /** @param {Buffer} bytes @param {DomainOptions} [_options] @returns {import("./profile-domains-types.js").DomainModels["settings"]} */

@@ -17,6 +17,7 @@ import {draftDot, draftMarks} from "../view/review.mjs";
 import {marked} from "./marks.mjs";
 import {githubMark} from "../view/host.mjs";
 import {durationControl} from "./duration.mjs";
+import {NAME_MAX_BYTES, NAME_TIP, nameCount} from "../view/names.mjs";
 
 // The sections a screen draws, by the area the keyboard's model files them in.
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} area */
@@ -51,6 +52,7 @@ export function screenSettings() {
         pad.appendChild(search);
     }
     const query = (state.settingsSearch || "").trim().toLowerCase();
+    if (model?.keyboardName && (!query || matches(KEYBOARD_NAME, query))) pad.appendChild(keyboardCard(model, model.keyboardName, canEdit));
     /** @param {import("../../contracts/panel.js").PresentedSection} section */
     const matching = (section) => query ? section.fields.filter((field) => matches(field, query)) : section.fields;
     for (const section of sections) {
@@ -118,6 +120,33 @@ function comboTimingRow(model, entry) {
 
 /** @param {{label: string, hint?: string}} field @param {string} query */
 const matches = (field, query) => `${field.label} ${field.hint || ""}`.toLowerCase().includes(query);
+
+// The keyboard's own name, which it stores with its settings and reports over
+// USB. Empty is the firmware's built-in name, shown as the placeholder when
+// the keyboard reports it. Changing it is one draft edit, posted on change.
+const KEYBOARD_NAME = {label: "Keyboard name",
+    hint: "Shown in Chrome's keyboard chooser, your computer's list of devices and Ark's keyboard menu. Leave it empty for the built-in name. After Apply the keyboard reconnects for a moment to take its new name."};
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {NonNullable<import("../../contracts/panel.js").PublishedModel["keyboardName"]>} keyboard @param {boolean} canEdit */
+function keyboardCard(model, keyboard, canEdit) {
+    const count = nameCount(keyboard.name, keyboard.perName || NAME_MAX_BYTES);
+    const node = el(`<section class="card settings-group" data-section="keyboard">
+        <div class="card-h"><h3>Keyboard${draftMarks(model?.draft?.changes).settings.has("keyboard") ? draftDot() : ""}</h3></div>
+        <div class="rows"><div class="setrow">
+            <div><div class="nm">Name</div><div class="hint">${esc(KEYBOARD_NAME.hint)}</div></div>
+            <div class="control field"><input class="input" data-f="settings:keyboard-name" data-keyboard-name value="${esc(keyboard.name)}"
+                placeholder="${esc(keyboard.builtIn || "Built-in name")}" aria-label="Keyboard name" data-tip="${esc(NAME_TIP)}" ${canEdit ? "" : "disabled"}>
+                <span class="note${count.over ? " warn" : ""}" data-name-count>${esc(count.label)}</span></div>
+        </div></div>
+    </section>`);
+    const input = /** @type {HTMLInputElement} */ (node.querySelector("[data-keyboard-name]"));
+    input.addEventListener("input", () => {
+        const now = nameCount(input.value, keyboard.perName || NAME_MAX_BYTES), counter = /** @type {HTMLElement} */ (node.querySelector("[data-name-count]"));
+        counter.textContent = now.label;
+        counter.classList.toggle("warn", now.over);
+    });
+    input.addEventListener("change", () => post(edits.keyboardNameMessage(input.value, keyboard.identity)));
+    return node;
+}
 
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/panel.js").PresentedSection} section @param {import("../../contracts/panel.js").PresentedField[]} fields @param {boolean} canEdit @param {boolean} [searching] */
 export function sectionCard(model, section, fields, canEdit, searching = false) {

@@ -20,7 +20,7 @@ test("all 128 custom keys are listed, and a name changes nothing else", () => {
     assert.deepEqual(view.names, {perName: 32}, "a name is counted in bytes of UTF-8");
     const named = editCustomKey(before, {keycode: "CUSTOM_KEY_2", name: " Click Spam ", expectedFingerprint: before.fingerprint}, capabilities);
     const after = validateSnapshot(named, capabilities);
-    assert.equal(after.settings.formatVersion, 6);
+    assert.equal(after.settings.formatVersion, 7);
     assert.equal(after.settings.customKeyNames[2], "Click Spam", "trimmed");
     assert.deepEqual(after.settings.macroNames, validateSnapshot(before.document).settings.macroNames, "the macros keep their names");
     assert.deepEqual(named.layers, before.document.layers);
@@ -40,7 +40,7 @@ test("a macro name edit keeps the custom-key names", () => {
     current = snapshot(editCustomKey(current, {keycode: "CUSTOM_KEY_0", name: "Right Thumb", expectedFingerprint: current.fingerprint}, capabilities));
     current = snapshot(editMacro(current, {keycode: "VIA_MACRO_3", name: "OCR Copy", expectedFingerprint: current.fingerprint}, capabilities));
     const settings = validateSnapshot(current.document).settings;
-    assert.equal(settings.formatVersion, 6);
+    assert.equal(settings.formatVersion, 7);
     assert.equal(settings.customKeyNames[0], "Right Thumb");
     assert.equal(macroEditorView(current).viaMacros[3].name, "OCR Copy");
 });
@@ -54,7 +54,7 @@ test("an imported profile without custom-key names can take one name back from t
     assert.deepEqual(profileReview(keyboard, imported).filter(row => row.unit.startsWith("customKey:")).map(row => row.unit), ["customKey:0", "customKey:1"]);
     const kept = snapshot(revertUnits(keyboard, imported, new Set(["customKey:0"]), capabilities));
     const settings = validateSnapshot(kept.document, capabilities).settings;
-    assert.equal(settings.formatVersion, 6);
+    assert.equal(settings.formatVersion, 7);
     assert.deepEqual(settings.customKeyNames.slice(0, 2), ["Right Thumb", ""]);
     assert.deepEqual(settings.macroNames, validateSnapshot(imported.document).settings.macroNames, "the imported macro names stay");
     assert.deepEqual(profileReview(keyboard, kept).filter(row => row.unit.startsWith("customKey:")).map(row => row.unit), ["customKey:1"]);
@@ -82,6 +82,6 @@ test("wrong keys, stale drafts, long names and older firmware are refused", () =
 
 test("a name that meets the profile's ceiling says the profile is full", () => {
     const {encodeNamedProfile} = require("../../core/model/portable-profile");
-    assert.throws(() => encodeNamedProfile({schema: {major: 3, minor: 0}, domains: [{id: 0x40, version: 6, payload: Buffer.alloc(65500)}]}),
+    assert.throws(() => encodeNamedProfile({schema: {major: 3, minor: 0}, domains: [{id: 0x40, version: 7, payload: Buffer.alloc(65500)}]}),
         error => error.code === "PROFILE_FULL" && /profile is full/.test(error.message));
 });

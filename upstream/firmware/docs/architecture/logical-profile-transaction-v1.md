@@ -1,7 +1,7 @@
 # Logical Profile Transaction V1
 
 > Current firmware accepts only the formats it writes (D-F10, D-F14): profile
-> schema 3.0; RGB v4, key behaviors v2, combos v3, settings v6 and sparse PD v3;
+> schema 3.0; RGB v4, key behaviors v2, combos v3, settings v7 and sparse PD v3;
 > a 53,216-byte custom payload; and logical store format 5 (`NT`). Every save
 > binds a nonzero VIA generation and digest. HID and split framing remain v1.
 > Older profile/store formats and the legacy GET 9 source page are rejected.
@@ -236,6 +236,12 @@ progress: the next owner scan counts it as host activity, so a staging longer
 than the 15-second lease keeps its candidate. Status polls on either channel
 are not progress, so abandoned staging still expires with its candidate. From
 COMMITTING on nothing expires or cancels.
+A BEGIN retry with the current transaction ID and different metadata is refused
+as `CONFLICTING_RETRY`; it cannot replace a durable-phase state with `REJECTED`
+or change the decided identity. Identical retries remain idempotent. After
+ACCEPT, the owner keeps its output fence until complete activation resets the
+barrier; command errors and transaction status changes cannot lift it.
+
 
 ## External VIA Writers
 

@@ -21,7 +21,8 @@ const {customKeyOfCode, layerLockOfCode} = require("../data/user-keycodes");
 const {pdBindingOfCode} = require("../data/pd-bindings");
 const {layerName} = require("../model/vocabulary");
 const {readSettingsLimits} = require("../protocol/portable-profile-v1");
-const {editorViews} = require("./device-model");
+const {deviceLabels, editorViews} = require("./device-model");
+const {storedKeyboardName} = require("../model/keyboard-name");
 const {readHostOs} = require("../protocol/host-os-v1");
 const {supportsUnicodeMacros} = require("../schema/macro-payload");
 const {readKeyboardOptions} = require("../protocol/keyboard-options-v1");
@@ -103,6 +104,9 @@ class ProfileDeviceService {
         /** @type {(() => void) | undefined} */
         this.disposeConnectionListener = undefined;
         this.disconnecting = false;
+        // A save renamed the keyboard, which then restarts USB by itself
+        // (keyboard-reconnect.js): losing the connection is no failure.
+        this.reconnectExpected = false;
         this.scanned = false;
         /** @type {import("../../contracts/model.js").PhaseId} */
         this.phase = PHASE.IDLE;
@@ -167,8 +171,10 @@ class ProfileDeviceService {
                 while (taken.has(number)) number += 1;
                 this.numbersByPublicId.set(id, number);
             }
-            this.devices = descriptors.map((descriptor, index) =>
-                publicDeviceDescriptor(ids[index], descriptor, descriptors.length, /** @type {number} */ (this.numbersByPublicId.get(ids[index]))));
+            const devices = descriptors.map((descriptor, index) =>
+                publicDeviceDescriptor(ids[index], descriptor, /** @type {number} */ (this.numbersByPublicId.get(ids[index]))));
+            const labels = deviceLabels(devices);
+            this.devices = devices.map((device, index) => ({...device, label: labels[index]}));
             this.scanned = true;
             this.phase = this.connection ? PHASE.CONNECTED : this.devices.length ? PHASE.AVAILABLE : PHASE.EMPTY;
             this.addDiagnostic(
@@ -190,6 +196,7 @@ class ProfileDeviceService {
         await this.runOperation(PHASE.CONNECT, async () => {
             const connection = await this.coordinator.connect(adapterDeviceId);
             this.connection = connection;
+            this.reconnectExpected = false;
             this.requestIds = new ProfileRequestIdSequence(this.requestIdStart);
             this.connectionPublicId = String(publicDeviceId);
             this.connectionToken = ++this.connectionSequence;
@@ -599,6 +606,7 @@ class ProfileDeviceService {
                 Boolean(this.connection?.connected),
                 this.status
             ),
+            storedKeyboardName: storedKeyboardName(this.portable) ?? this.committed?.domains?.settings?.keyboardName,
             portableSummary: this.committed?.domains?.settings ? {names: this.committed.domains.settings.names.map((name, index, names) => layerName(names, index))} : this.portable?.summary || null,
             portableProgress: this.portableProgress || "",
             settingsView: this.settingsView ? clone(this.settingsView) : null,
@@ -631,8 +639,15 @@ class ProfileDeviceService {
             this.emitChange();
             await operation();
         } catch (error) {
-            this.setError(error);
-            failure = this.error;
+            if (this.reconnectExpected && !this.connection?.connected) {
+                // The keyboard went away to take its new name; the operation
+                // still rejects, but the keyboard is not reported as failing.
+                failure = publicError(error);
+                this.addDiagnostic(`${failure.code}: ${failure.message} (the keyboard is reconnecting under its new name)`);
+            } else {
+                this.setError(error);
+                failure = this.error;
+            }
             if (!this.connection?.connected) {
                 this.clearConnection();
             }
@@ -687,9 +702,20 @@ class ProfileDeviceService {
         const label = this.deviceLabel(this.connectionPublicId);
         this.clearConnection();
         this.phase = this.scanned ? (this.devices.length ? PHASE.AVAILABLE : PHASE.EMPTY) : PHASE.IDLE;
-        this.setError(reason instanceof Error ? reason : new Error(`${label} disconnected.`));
-        this.addDiagnostic(`${label} disconnected; reconnect before sending another read request.`);
+        if (this.reconnectExpected) {
+            this.addDiagnostic(`${label} disconnected to take its new name.`);
+        } else {
+            this.setError(reason instanceof Error ? reason : new Error(`${label} disconnected.`));
+            this.addDiagnostic(`${label} disconnected; reconnect before sending another read request.`);
+        }
         this.emitChange();
+    }
+
+    // Whether the next loss of the connection is the keyboard restarting USB
+    // to take a new name (keyboard-reconnect.js), rather than a failure.
+    /** @param {boolean} expected */
+    expectReconnect(expected) {
+        this.reconnectExpected = Boolean(expected);
     }
 
     clearConnection() {
@@ -815,20 +841,18 @@ class ProfileDeviceService {
     }
 }
 
-/** @param {string} id @param {import("../transport/types.js").DeviceDescriptor} descriptor @param {number} count @param {number} number */
-function publicDeviceDescriptor(id, descriptor, count, number) {
-    const product = cleanText(descriptor.product) || "Charybdis 4x6";
-    const serial = cleanText(descriptor.serialNumber);
-    // Without a serial number (a browser shows none) two keyboards would read
-    // the same, so each shows its number (see numbersByPublicId). The number
-    // leads, so a shortened label keeps it.
-    const label = serial ? `${product} · ${serial}` : count > 1 ? `Keyboard ${number} · ${product}` : product;
+// A listed keyboard as the panel sees it. Its label is the product name it
+// reports, told apart from another of the same name by its serial number or,
+// where there is none (a browser shows none), its number (deviceLabels).
+/** @param {string} id @param {import("../transport/types.js").DeviceDescriptor} descriptor @param {number} number */
+function publicDeviceDescriptor(id, descriptor, number) {
     return {
         id,
-        label,
-        product,
-        serialNumber: serial,
+        label: "",
+        product: cleanText(descriptor.product) || "Charybdis 4x6",
+        serialNumber: cleanText(descriptor.serialNumber),
         manufacturer: cleanText(descriptor.manufacturer),
+        number,
     };
 }
 

@@ -4,11 +4,13 @@ const {PROFILE_DOMAIN_VERSIONS, PROFILE_DOMAIN_IDS} = require("./profile-domains
 const {LAYERS, MATRIX_KEYS} = require("../data/charybdis-layout");
 const {validHostSetting} = require("./host-settings");
 const {canonical} = require("./bytes");
-// Settings domain 0x40, version 6, the only one the keyboard stores (firmware
-// D-F14): 31 values, sixteen layer records, then 272 counted names — sixteen
-// layer names, 128 VIA macro names and 128 custom-key names, each a length
-// byte and up to 32 bytes of UTF-8 (profile-name.js). Earlier versions are
-// refused, as the firmware refuses them.
+// Settings domain 0x40, version 7, the only one the keyboard stores (firmware
+// D-F14): 31 values, sixteen layer records, then 273 counted names — sixteen
+// layer names, 128 VIA macro names, 128 custom-key names and the keyboard's
+// own name, each a length byte and up to 32 bytes of UTF-8 (profile-name.js).
+// An empty keyboard name means the firmware's built-in name; a stored one is
+// the USB product string the computer sees. Earlier versions are refused, as
+// the firmware refuses them; a backup's are translated (backup-translation.js).
 //
 // A layer record is its combo reference layer and two placement bitmaps:
 // positions whose behaviour is bypassed, and positions kept out of combos
@@ -64,7 +66,7 @@ const STORED = /** @type {const} */ ([
 const SCALARS_OFFSET = 8, PLACEMENT_BYTES = 8, LAYER_RECORD_SIZE = 1 + 2 * PLACEMENT_BYTES;
 const LAYER_RECORDS_OFFSET = SCALARS_OFFSET + STORED.length * 4;
 const FIXED_SIZE = LAYER_RECORDS_OFFSET + LAYERS * LAYER_RECORD_SIZE;
-const MACRO_NAMES = 128, CUSTOM_KEY_NAMES = 128, NAME_COUNT = LAYERS + MACRO_NAMES + CUSTOM_KEY_NAMES;
+const MACRO_NAMES = 128, CUSTOM_KEY_NAMES = 128, KEYBOARD_NAMES = 1, NAME_COUNT = LAYERS + MACRO_NAMES + CUSTOM_KEY_NAMES + KEYBOARD_NAMES;
 const SETTINGS = Object.freeze({VERSION: PROFILE_DOMAIN_VERSIONS[PROFILE_DOMAIN_IDS.SETTINGS], COUNT: STORED.length, LAYERS, MACRO_NAMES, CUSTOM_KEY_NAMES,
     LAYER_RECORD_SIZE, PLACEMENT_BYTES, PLACEMENT_MAX_POSITIONS: PLACEMENT_BYTES * 8, NAME_MAX_BYTES,
     SCALARS_OFFSET, LAYER_RECORDS_OFFSET, FIXED_SIZE, MIN_SIZE: FIXED_SIZE + NAME_COUNT, MAX_SIZE: FIXED_SIZE + NAME_COUNT * (NAME_MAX_BYTES + 1)});
@@ -121,6 +123,7 @@ function encodeSettings(value, layers = SETTINGS.LAYERS, positions = MATRIX_POSI
     if (!Array.isArray(value.layers) || value.layers.length !== SETTINGS.LAYERS) throw fail("Missing layer records.");
     if (!Array.isArray(value.macroNames) || value.macroNames.length !== SETTINGS.MACRO_NAMES) throw fail("Missing macro names.");
     if (!Array.isArray(value.customKeyNames) || value.customKeyNames.length !== SETTINGS.CUSTOM_KEY_NAMES) throw fail("Missing custom key names.");
+    if (typeof value.keyboardName !== "string") throw fail("Missing keyboard name.");
     const fixed = Buffer.alloc(SETTINGS.FIXED_SIZE);
     HEADER.copy(fixed);
     if (value.comboOutputBehaviors !== undefined && typeof value.comboOutputBehaviors !== "boolean") throw fail("Combo output behaviour permission must be on or off.");
@@ -138,7 +141,7 @@ function encodeSettings(value, layers = SETTINGS.LAYERS, positions = MATRIX_POSI
         if (!validName(name)) throw fail(`A ${what} name is at most ${NAME_MAX_BYTES} bytes of text, with no control characters.`);
         return encodeName(name);
     };
-    return Buffer.concat([fixed, ...value.names.map(name => record(name, "layer")), ...value.macroNames.map(name => record(name, "macro")), ...value.customKeyNames.map(name => record(name, "custom key"))]);
+    return Buffer.concat([fixed, ...value.names.map(name => record(name, "layer")), ...value.macroNames.map(name => record(name, "macro")), ...value.customKeyNames.map(name => record(name, "custom key")), record(value.keyboardName, "keyboard")]);
 }
 
 /** @param {Buffer} bytes @param {number} [layers] @param {number} [positions] */
@@ -162,8 +165,9 @@ function decodeSettings(bytes, layers = SETTINGS.LAYERS, positions = MATRIX_POSI
     const names = Array.from({length: SETTINGS.LAYERS}, nameRecord);
     const macroNames = Array.from({length: SETTINGS.MACRO_NAMES}, nameRecord);
     const customKeyNames = Array.from({length: SETTINGS.CUSTOM_KEY_NAMES}, nameRecord);
+    const keyboardName = nameRecord();
     if (offset !== bytes.length) throw fail("Unexpected settings data.");
-    const result = {comboOutputBehaviors: !(bytes[SETTINGS_HEADER_FLAGS.OFFSET] & SETTINGS_HEADER_FLAGS.COMBO_OUTPUT_BYPASS), values, names, layers: layerRecords, macroNames, customKeyNames, formatVersion: SETTINGS.VERSION};
+    const result = {comboOutputBehaviors: !(bytes[SETTINGS_HEADER_FLAGS.OFFSET] & SETTINGS_HEADER_FLAGS.COMBO_OUTPUT_BYPASS), values, names, layers: layerRecords, macroNames, customKeyNames, keyboardName, formatVersion: SETTINGS.VERSION};
     return canonical(bytes, result, value => encodeSettings(value, layers, positions), () => fail("Noncanonical settings data."));
 }
 module.exports = {SETTINGS_HEADER_FLAGS, SETTINGS, SETTING, SETTING_FIELD, SETTING_FIELDS: FIELDS, MATRIX_POSITIONS, validName, validSetting, defaultLayerRecord, encodeSettings, decodeSettings};

@@ -423,6 +423,20 @@ test("Disconnect lets go of the keyboard, and the page does not reopen it", asyn
     expect(await page.evaluate(() => window.__fakeHid.opened)).toBe(0);
 });
 
+test("a keyboard that restarts under a new name is followed, and called by it", async ({page, context, baseURL}) => {
+    await withKeyboard(context, baseURL);
+    const errors = await open(page);
+    await page.locator('.read-placeholder [data-act="choose-keyboard"]').click();
+    await ready(page);
+    await expect(page.locator(".rail-product")).toHaveText("Charybdis 4x6");
+    await page.evaluate(() => window.__fakeHidReenumerate(0, "Desk board"));
+    await expect(page.locator(".rail-product")).toHaveText("Desk board");
+    await expect(page.locator(".rail-keyboard .dot.ok")).toHaveCount(1);
+    await ready(page);
+    expect(await page.evaluate(() => window.__fakeHid.requested)).toBe(1, "no second trip to Chrome's picker");
+    expect(errors).toEqual([]);
+});
+
 test("every keyboard Chrome allows is the connected one or in the selector, as they come and go", async ({page, context, baseURL}) => {
     await withKeyboard(context, baseURL, 2);
     await open(page);

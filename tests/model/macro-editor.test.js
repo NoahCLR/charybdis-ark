@@ -77,18 +77,19 @@ test("the 128 VIA macros populate the model, including empty slots and their nam
 
 test("naming a macro changes its name and nothing else", () => {
     const source = pdDocument(), current = snapshot(source);
-    assert.equal(settingsDomain(source).version, 6);
+    assert.equal(settingsDomain(source).version, 7);
     const named = editMacro(current, {keycode: "VIA_MACRO_3", name: "  Zoom mute ", expectedFingerprint: current.fingerprint});
     assert.deepEqual(named.macros, source.macros, "a rename leaves every macro's steps alone");
     const domain = settingsDomain(named);
-    assert.equal(domain.version, 6);
-    assert.equal(domain.payload[0], 6, "the payload repeats the envelope's version");
+    assert.equal(domain.version, 7);
+    assert.equal(domain.payload[0], 7, "the payload repeats the envelope's version");
     const settings = validateSnapshot(named).settings, before = validateSnapshot(source).settings;
     assert.equal(settings.macroNames[3], "Zoom mute", "names are trimmed");
     assert.deepEqual(settings.values, before.values);
     assert.deepEqual(settings.names, before.names);
     assert.deepEqual(settings.layers, before.layers);
     assert.deepEqual(settings.customKeyNames, before.customKeyNames);
+    assert.equal(settings.keyboardName, before.keyboardName);
     const before3 = decodeProfileBlob(Buffer.from(source.profile, "base64")).domains, after3 = decodeProfileBlob(Buffer.from(named.profile, "base64")).domains;
     assert.deepEqual(after3.filter(d => d.id !== 0x40), before3.filter(d => d.id !== 0x40), "other domains are byte-identical");
     // Steps and name together, then clearing the name.
@@ -120,7 +121,7 @@ test("every one of the 128 names can be 32 bytes of text at once", () => {
     const settings = validateSnapshot(current.document).settings;
     assert.equal(settings.macroNames.filter(name => name.length === 32).length, 128);
     const layerNames = settings.names.reduce((total, name) => total + 1 + Buffer.byteLength(name), 0);
-    assert.equal(settingsDomain(current.document).payload.length, 404 + layerNames + 128 * 33 + 128, "the settings hold them all, beside 128 empty custom-key names");
+    assert.equal(settingsDomain(current.document).payload.length, 404 + layerNames + 128 * 33 + 128 + 1, "the settings hold them all, beside 128 empty custom-key names and an empty keyboard name");
 });
 
 test("stale drafts and wrong slots are rejected before a write", () => {

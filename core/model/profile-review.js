@@ -444,6 +444,12 @@ function profileReview(before, after, capabilities) {
         const fields = name => new Map([["Name", name || "no name"]]);
         item("Custom keys", `customKey:${i}`, `Custom key ${i}${(next || old) ? ` · ${next || old}` : ""}`, fields(old), fields(next), {kind: "customKey", index: i}, [Boolean(old), Boolean(next)]);
     });
+    // The keyboard's own name, edited on Settings' Keyboard card. Empty is the
+    // firmware's built-in name, which the keyboard then reports over USB.
+    /** @param {string} name @returns {Fields} */
+    const keyboardFields = name => new Map([["Name", name || "built-in name"]]);
+    item("Settings", "keyboardName", "Keyboard name", keyboardFields(a.settings.keyboardName), keyboardFields(b.settings.keyboardName),
+        {kind: "settings", section: "keyboard", area: "Settings"}, [true, true]);
     // Settings are saved a section at a time, so a section is one item.
     /** @param {Snapshot} snapshot @param {import("../schema/types.js").SettingsDomain} settings */
     const sections = (snapshot, settings) => /** @type {NonNullable<ReturnType<typeof settingsEditorView>>} */ (settingsEditorView(snapshot)).sections.map(section => ({id: section.id, label: section.label, area: section.area, stage: section.stage,

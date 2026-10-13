@@ -42,7 +42,7 @@ test("the registry, the contract and the interface's builders name the same edit
 
 test("every registered edit names its editor, its words and, on the profile, its domain", () => {
     for (const [type, entry] of Object.entries(DRAFT_EDIT_TYPES)) {
-        assert.ok(["layout", "settings", "macro", "customKey", "profile"].includes(entry.editor), type);
+        assert.ok(["layout", "settings", "macro", "customKey", "keyboardName", "profile"].includes(entry.editor), type);
         assert.equal("domain" in entry, entry.editor === "profile", type);
         if (entry.editor === "profile") assert.ok(["placement", "pointing", "combos", "behaviours", "lighting"].includes(entry.domain), type);
         assert.ok(typeof entry.label === "function" || (typeof entry.label === "string" && entry.label), type);
@@ -86,6 +86,7 @@ test("each edit is recorded in its own words", () => {
     assert.equal(draftEditLabel({type: "retargetBehavior", keycode: "KC_A", target: "KC_B"}, document), "Moved a behaviour");
     assert.equal(draftEditLabel({type: "updateRgbStages", stageEnableMask: 0}, document), "Edited lighting");
     assert.equal(draftEditLabel({type: "updateCustomKey", keycode: "CUSTOM_KEY_0", name: "Thumb"}, document), "Renamed a custom key");
+    assert.equal(draftEditLabel({type: "renameKeyboard", name: "Board"}, document), "Renamed the keyboard");
 
     session.stage({type: "updateLayoutKeys", draftRevision: session.revision, layer: "Layer 1", changes: [{layoutIndex: 0, keycode: "KC_A"}]});
     assert.equal(session.view({}).undoLabel, "Changed a key", "the draft records the step in the same words");

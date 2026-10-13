@@ -5,7 +5,7 @@ const {encodeProfileBlob} = require("../../core/schema/profile-blob-v1");
 const {candidateTransferPlan} = require("../../core/protocol/candidate-transfer-plan");
 
 const blob = (first = Buffer.alloc(200, 1), second = Buffer.alloc(3000, 2)) => encodeProfileBlob({domains: [
-    {id: 0x10, version: 4, payload: first}, {id: 0x40, version: 6, payload: second},
+    {id: 0x10, version: 4, payload: first}, {id: 0x40, version: 7, payload: second},
 ]});
 function reconstruct(target, source) {
     const plan = candidateTransferPlan(target, source);
@@ -40,5 +40,5 @@ test("mixed edits and domain removal always reconstruct the exact target", () =>
         const first = Buffer.alloc(length, 1); first[length >> 1] = 8;
         reconstruct(blob(first), source);
     }
-    reconstruct(encodeProfileBlob({domains: [{id: 0x40, version: 6, payload: Buffer.alloc(3000, 2)}]}), source);
+    reconstruct(encodeProfileBlob({domains: [{id: 0x40, version: 7, payload: Buffer.alloc(3000, 2)}]}), source);
 });

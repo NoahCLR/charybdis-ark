@@ -198,6 +198,10 @@ export function startWebHost(env) {
     async function followAllowed() {
         const service = loop.session.service;
         if (following || blocked || !hid) return loop.publish();
+        // A keyboard renamed by a save drops off and comes back under its new
+        // name; the loop waits for that one (keyboard-reconnect.js) and must
+        // not have another connected in its place.
+        if (loop.session.reconnect) return loop.publish();
         // A running read or Apply lists the keyboards itself; look again after it.
         if (service.snapshot().busy) {
             setTimeout(() => void followAllowed(), 500);

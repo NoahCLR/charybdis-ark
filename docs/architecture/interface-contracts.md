@@ -261,3 +261,31 @@ permission. Current zero-default and translated preceding backups opt in.
 Native readback compares the permission as well as inputs, output and timing.
 Combo-derived behaviour and macro/pointing reach lists honour the two output
 permissions while retaining normal native outputs.
+
+## Keyboard name
+
+Settings opens with a **Keyboard** card (`.settings-group[data-section="keyboard"]`)
+holding one text field, `data-f="settings:keyboard-name"`, in the ordinary
+(not monospace) face, with a live byte count against the 32-byte name rule.
+Its placeholder is `model.keyboardName.builtIn`, the firmware's built-in name
+while the connected keyboard stores none and reports it over USB, else
+"Built-in name". It follows `canEdit("settings")` and the Settings search.
+
+On `change` it posts `renameKeyboard` built by `keyboardNameMessage` in
+`webview/view/edits.mjs`: `{name, expectedFingerprint}`, the name trimmed. Core
+(`core/model/keyboard-name.js`) refuses names past 32 bytes or with control
+characters; an empty name gives the keyboard back its built-in one. The review
+item is `keyboardName` in Settings, with place `{kind: "settings", section:
+"keyboard"}`, so Show opens the card and the draft mark is the section's.
+
+While a renamed keyboard is restarting (D-L62) the model carries
+`reconnecting: {name}` and a loading `load` whose progress names the wait; the
+rail shows that name with a pulsing dot instead of "No keyboard connected".
+
+The safe departure may wait for held keys or macros without a timeout. The
+10-second return wait starts when the connection drops. Reconnection requires
+the original serial when known; without one, known other keyboards are
+excluded and a unique, unshared target name identifies the returning device.
+An unknown built-in name or ambiguous identity leaves selection to the user.
+Recovery restores also expect a possible rename when the previous name was
+unreadable. An explicit built-in name can restart even with unchanged USB text.

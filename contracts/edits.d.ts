@@ -97,6 +97,7 @@ export interface EditPayloads {
     );
     validateViaMacro: {keycode: string; payload: string; requestId: number};
     updateCustomKey: {keycode: string; name: string; expectedFingerprint?: string};
+    renameKeyboard: {name: string; expectedFingerprint?: string};
     savePdMode: {slot: number; config: PdConfig; expectedBase?: Partial<BaseIdentity>};
     clearPdMode: {slot: number; expectedBase?: Partial<BaseIdentity>};
     duplicatePdMode: {slot: number; source: number; expectedBase?: Partial<BaseIdentity>};

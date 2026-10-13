@@ -42,7 +42,7 @@ const MUTATING_COMMANDS = new Set([0x03, 0x05, 0x06, 0x07, 0x09, 0x0a, 0x0b, 0x0
 const FEATURES = PROFILE_WIRE_KNOWN_MASKS.FEATURE_FLAGS & ~PROFILE_WIRE_KNOWN_MASKS.RETIRED_FEATURES;
 
 // The domain versions current firmware stores, and refuses any other.
-const CURRENT_DOMAINS = "16:4,32:2,48:3,64:6,80:3";
+const CURRENT_DOMAINS = "16:4,32:2,48:3,64:7,80:3";
 
 // `compiled` is the profile it was built with, which GET 0x05 serves: the
 // document's own unless given (current firmware's carries every domain, with
@@ -56,7 +56,7 @@ function fakeKeyboard({document, compiled, streaming = false, macroReadMap = fal
     if (document.version !== 3 || document.layers.length !== 16) throw new Error("The fake keyboard runs current firmware: a schema-3, sixteen-layer document.");
     /** @param {Buffer} blob */
     const versions = blob => decodeProfileBlob(blob).domains.map(domain => `${domain.id}:${domain.version}`).join();
-    if (versions(held.profile) !== CURRENT_DOMAINS || (compiled && versions(compiled) !== CURRENT_DOMAINS)) throw new Error("The fake keyboard runs current firmware: RGB 4, key behaviours 2, combos 3, settings 6 and PD 3.");
+    if (versions(held.profile) !== CURRENT_DOMAINS || (compiled && versions(compiled) !== CURRENT_DOMAINS)) throw new Error("The fake keyboard runs current firmware: RGB 4, key behaviours 2, combos 3, settings 7 and PD 3.");
     const profile = held.profile, digest = fnv1a32(profile), defaults = compiled || profile;
     const settingsDomain = decodeProfileBlob(profile).domains.find(domain => domain.id === PROFILE_DOMAIN_IDS.SETTINGS);
     if (!settingsDomain) throw new Error("The fake keyboard fixture must contain settings.");

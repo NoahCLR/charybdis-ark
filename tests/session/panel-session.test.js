@@ -120,6 +120,20 @@ test("every other message names the handler that answers it", () => {
     assert.throws(() => routeMessage({...session, portableBusy: true}, {type: "refresh"}, connected()), /current operation/, "a busy backup returns an explicit refusal");
 });
 
+test("the connected keyboard is listed by the name it stores, before it reconnects under it", () => {
+    const session = panelWithDraft();
+    const two = {devices: [{...device, label: "Charybdis 4x6"}, {id: "other", product: "Charybdis 4x6", label: "Charybdis 4x6"}]};
+    const labels = (extra) => buildPanelModel(session, connected({...two, ...extra})).devices.map(({label}) => label);
+    assert.deepEqual(labels({}), ["Keyboard 1 · Charybdis 4x6", "Keyboard 2 · Charybdis 4x6"], "unread, two keyboards of one name are numbered");
+    assert.deepEqual(labels({storedKeyboardName: ""}), ["Keyboard 1 · Charybdis 4x6", "Keyboard 2 · Charybdis 4x6"], "the built-in name changes nothing");
+    assert.deepEqual(labels({storedKeyboardName: "Desk"}), ["Desk", "Charybdis 4x6"], "a stored name tells it apart");
+    const model = buildPanelModel(session, connected({storedKeyboardName: "Desk"}));
+    assert.equal(model.device.label, "Desk");
+    assert.equal(model.keyboardName.name, "", "the card shows the draft's name");
+    assert.deepEqual(labels({storedKeyboardName: "Desk", selectedDeviceId: "other"}), ["Charybdis 4x6", "Desk"], "only the connected keyboard's name is known");
+    assert.deepEqual(labels({storedKeyboardName: "Desk", connected: false}), ["Keyboard 1 · Charybdis 4x6", "Keyboard 2 · Charybdis 4x6"]);
+});
+
 test("switching keyboards preserves a dirty draft without showing it as editable on the other device", () => {
     const session = panelWithDraft();
     const original = session.draft;

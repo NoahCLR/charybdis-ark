@@ -24,6 +24,7 @@ const {decodedOf} = require("../model/portable-profile");
 const {baseLighting, settingsEditorView} = require("../model/settings-editor");
 const {macroEditorView} = require("../model/macro-editor");
 const {customKeyEditorView} = require("../model/custom-key-editor");
+const {keyboardNameView} = require("../model/keyboard-name");
 const {runningComboRows} = require("../schema/combo-domain-v1");
 const {SETTING} = require("../schema/settings-domain-v1");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX, matrixPosition} = require("../data/charybdis-layout");
@@ -46,6 +47,7 @@ const CATALOG_SOURCE = "vendored QMK keycode catalog";
  * @property {import("./types.js").DeviceModelInput["settingsView"]} settingsView
  * @property {import("./types.js").DeviceModelInput["macroView"]} macroView
  * @property {import("./types.js").DeviceModelInput["customKeyView"]} customKeyView
+ * @property {ReturnType<typeof keyboardNameView>} [keyboardNameView]
  * @property {Partial<import("../../contracts/edits.js").BaseIdentity> | null} identity
  * @typedef {{busy: boolean, behaviors: boolean, pointing: boolean, combos: boolean, macros: boolean, settings: boolean, customKeys: boolean}} Editing
  */
@@ -101,6 +103,9 @@ function buildSnapshotModel(snapshot, capabilities, binding, deviceState = {}) {
         comboInfo: {state: "read", enabled: Boolean(settings.values[SETTING.COMBOS_ENABLED]), layerReferences: settings.layers.map(record => record.reference),
             version: combos.version, defaultTermMs: combos.defaultTermMs, holdTermMs: combos.holdTermMs},
         baseEffect, ...views,
+        // The firmware's built-in name is what a keyboard with no stored name
+        // reports over USB, so it is known only while that is the case.
+        keyboardNameView: keyboardNameView(current, deviceState.storedKeyboardName === "" ? deviceState.device?.product || "" : ""),
         identity: null,
     }, capabilities, {busy: !editable, behaviors: editable, pointing: editable, combos: editable, macros: editable, settings: editable, customKeys: editable});
     model.layers.forEach((layer, index) => {layer.displayName = snapshot.summary.names[index];});
@@ -213,6 +218,8 @@ function configurationModel(content, capabilities, editing) {
         customKeys: content.customKeyView?.keys || [],
         customKeyNameSpace: content.customKeyView?.names || null,
         customKeyEditing: {identity: content.customKeyView?.identity || "", writable: editing.customKeys},
+        // The keyboard's own name, edited on Settings with the other settings.
+        keyboardName: content.keyboardNameView || null,
 
         // TT(), OSL() and TO() are offered only by a keyboard that runs them
         // through its own layer ownership (Profile Wire feature bit 14).
@@ -362,7 +369,9 @@ function deviceHeader(state) {
             },
         };
     }
-    const label = [state.device?.manufacturer, state.device?.product].filter(Boolean).join(" ") || "Charybdis";
+    // A name the person gave the keyboard stands alone; otherwise the
+    // manufacturer and product it reports over USB.
+    const label = state.storedKeyboardName || [state.device?.manufacturer, state.device?.product].filter(Boolean).join(" ") || "Charybdis";
     const status = state.status;
     // Say plainly when nothing is committed. "generation 0" reads like a real
     // generation and it is not one.
@@ -494,4 +503,16 @@ function catalogViews() {
 /** @param {import("./types.js").DeviceModelInput} [state] */
 const deviceSummary = (state = {}) => ({device: deviceHeader(state), diagnostics: diagnosticsFor(state)});
 
-module.exports = {buildDeviceModel, buildSnapshotModel, deviceSummary, editorViews};
+// What each listed keyboard is called: the product name it reports over USB,
+// which is a renamed keyboard's new name once it has reconnected, or `name`
+// where the panel already knows a newer stored one. Two that would read alike
+// are told apart by serial number, or else by the number each keeps while it
+// is listed; the number leads, so a shortened label keeps it.
+/** @param {readonly {product?: string, serialNumber?: string, number?: number, name?: string}[]} devices @returns {string[]} */
+function deviceLabels(devices) {
+    const bases = devices.map(device => device.name || device.product || "Charybdis 4x6");
+    return bases.map((base, index) => bases.indexOf(base) === bases.lastIndexOf(base) ? base
+        : devices[index].serialNumber ? `${base} · ${devices[index].serialNumber}` : `Keyboard ${devices[index].number ?? index + 1} · ${base}`);
+}
+
+module.exports = {buildDeviceModel, buildSnapshotModel, deviceLabels, deviceSummary, editorViews};

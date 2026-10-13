@@ -12,6 +12,10 @@
 // answered by the same fake. The picker returns `window.__fakeHidPick` (the
 // first by default), and `window.__fakeHidPlug(index, plugged)` plugs one in or
 // out, with Chrome's connect or disconnect event for an allowed one.
+// `window.__fakeHidReenumerate(index, productName)` restarts one's USB as a
+// renamed keyboard does: the old device leaves, and a new device object with
+// the new product name arrives, still allowed (Chrome keys its permission to
+// the serial number, which does not change).
 function installFakeHid({vendorId, productId, usagePage, usage, bridge, keyboards = 1}) {
     const granted = "fake-hid-granted";
     /** @returns {number[]} */
@@ -22,9 +26,9 @@ function installFakeHid({vendorId, productId, usagePage, usage, bridge, keyboard
     const allow = (list) => list.length ? localStorage.setItem(granted, JSON.stringify(list)) : localStorage.removeItem(granted);
     const log = (globalThis.__fakeHid = {requested: 0, refusedWithoutClick: 0, opened: 0});
     class FakeHidDevice extends EventTarget {
-        constructor() {
+        constructor(productName = "Charybdis 4x6") {
             super();
-            Object.assign(this, {vendorId, productId, productName: "Charybdis 4x6", opened: false, collections: [{usagePage, usage}]});
+            Object.assign(this, {vendorId, productId, productName, opened: false, collections: [{usagePage, usage}]});
         }
         async open() {this.opened = true; log.opened += 1;}
         async close() {this.opened = false;}
@@ -67,6 +71,11 @@ function installFakeHid({vendorId, productId, usagePage, usage, bridge, keyboard
         const device = devices[index];
         if (on) plugged.add(index); else {plugged.delete(index); device.opened = false;}
         if (allowed().includes(index)) hid.dispatchEvent(Object.assign(new Event(on ? "connect" : "disconnect"), {device}));
+    };
+    globalThis.__fakeHidReenumerate = (index, productName) => {
+        globalThis.__fakeHidPlug(index, false);
+        devices[index] = new FakeHidDevice(productName);
+        globalThis.__fakeHidPlug(index, true);
     };
 }
 
