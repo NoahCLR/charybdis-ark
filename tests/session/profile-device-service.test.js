@@ -428,7 +428,7 @@ test("persistent live apply requires a detected and converged second half", () =
         {peerKnown: false, peerConverged: false, candidatePending: false}
     );
     assert.equal(peerMissing.available, false);
-    assert.match(peerMissing.reasons.join("\n"), /second keyboard half has not been detected/);
+    assert.match(peerMissing.reasons.join("\n"), /slave half has not been detected/);
 
     const unconverged = evaluateLiveMutationCompatibility(
         capabilities,
@@ -533,4 +533,32 @@ test("standalone export reads the current keyboard without replacing its editor 
             assert.deepEqual(service.snapshot()[field], state[field], `${field} is still the editor read`);
         }
     } finally {await service.close();}
+});
+
+test("keyboards without a serial number are numbered by their id, the number first", async () => {
+    const {ProfileDeviceService: Service} = require("../../core/session/profile-device-service");
+    const {FakeDeviceAdapter: Fake} = require("../../core/transport/fake-device-adapter");
+    const one = new Service({adapter: new Fake({devices: [{id: "a", product: "Charybdis (4x6) Splinky"}]})});
+    await one.enumerate();
+    assert.deepEqual(one.snapshot().devices.map((device) => device.label), ["Charybdis (4x6) Splinky"], "alone, no number");
+    const two = new Service({adapter: new Fake({devices: [{id: "a", product: "Charybdis (4x6) Splinky"}, {id: "b", product: "Charybdis (4x6) Splinky"}]})});
+    await two.enumerate();
+    assert.deepEqual(two.snapshot().devices.map((device) => device.label), ["Keyboard 1 · Charybdis (4x6) Splinky", "Keyboard 2 · Charybdis (4x6) Splinky"]);
+    const serial = new Service({adapter: new Fake({devices: [{id: "a", product: "Charybdis", serialNumber: "E4"}, {id: "b", product: "Charybdis", serialNumber: "DE"}]})});
+    await serial.enumerate();
+    assert.deepEqual(serial.snapshot().devices.map((device) => device.label), ["Charybdis · E4", "Charybdis · DE"]);
+});
+
+test("a replugged keyboard takes back the number that came free, so two keyboards are always 1 and 2", async () => {
+    const {ProfileDeviceService: Service} = require("../../core/session/profile-device-service");
+    const {FakeDeviceAdapter: Fake} = require("../../core/transport/fake-device-adapter");
+    const adapter = new Fake({devices: [{id: "a", product: "Charybdis"}, {id: "b", product: "Charybdis"}]});
+    const service = new Service({adapter});
+    const labels = async () => {await service.enumerate(); return service.snapshot().devices.map((device) => device.label);};
+    assert.deepEqual(await labels(), ["Keyboard 1 · Charybdis", "Keyboard 2 · Charybdis"]);
+    adapter.devices = [{id: "b", product: "Charybdis"}];
+    assert.deepEqual(await labels(), ["Charybdis"], "alone, no number");
+    // Replugged, a keyboard is a new device to the browser.
+    adapter.devices = [{id: "b", product: "Charybdis"}, {id: "c", product: "Charybdis"}];
+    assert.deepEqual(await labels(), ["Keyboard 2 · Charybdis", "Keyboard 1 · Charybdis"], "the one still listed keeps its number");
 });

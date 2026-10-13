@@ -89,6 +89,11 @@ class ProfileDeviceService {
         /** @type {Map<string, string>} */
         this.publicIdsByAdapterIdentity = new Map();
         this.nextPublicDeviceId = 1;
+        // The number a keyboard shows while it is listed: the smallest free
+        // one when it appears, so two keyboards are always 1 and 2, and a
+        // replugged one takes back a number that came free.
+        /** @type {Map<string, number>} */
+        this.numbersByPublicId = new Map();
         /** @type {Connection | undefined} */
         this.connection = undefined;
         this.connectionPublicId = "";
@@ -144,7 +149,7 @@ class ProfileDeviceService {
         return this.runOperation(PHASE.ENUMERATE, async () => {
             const descriptors = await this.coordinator.listDevices();
             this.adapterIdsByPublicId.clear();
-            this.devices = descriptors.map((descriptor, index) => {
+            const ids = descriptors.map((descriptor) => {
                 const identity = JSON.stringify([descriptor.id, cleanText(descriptor.serialNumber)]);
                 let id = this.publicIdsByAdapterIdentity.get(identity);
                 if (!id) {
@@ -152,8 +157,18 @@ class ProfileDeviceService {
                     this.publicIdsByAdapterIdentity.set(identity, id);
                 }
                 this.adapterIdsByPublicId.set(id, descriptor.id);
-                return publicDeviceDescriptor(id, descriptor, index);
+                return id;
             });
+            for (const id of [...this.numbersByPublicId.keys()]) if (!ids.includes(id)) this.numbersByPublicId.delete(id);
+            for (const id of ids) {
+                if (this.numbersByPublicId.has(id)) continue;
+                const taken = new Set(this.numbersByPublicId.values());
+                let number = 1;
+                while (taken.has(number)) number += 1;
+                this.numbersByPublicId.set(id, number);
+            }
+            this.devices = descriptors.map((descriptor, index) =>
+                publicDeviceDescriptor(ids[index], descriptor, descriptors.length, /** @type {number} */ (this.numbersByPublicId.get(ids[index]))));
             this.scanned = true;
             this.phase = this.connection ? PHASE.CONNECTED : this.devices.length ? PHASE.AVAILABLE : PHASE.EMPTY;
             this.addDiagnostic(
@@ -800,14 +815,17 @@ class ProfileDeviceService {
     }
 }
 
-/** @param {string} id @param {import("../transport/types.js").DeviceDescriptor} descriptor @param {number} index */
-function publicDeviceDescriptor(id, descriptor, index) {
+/** @param {string} id @param {import("../transport/types.js").DeviceDescriptor} descriptor @param {number} count @param {number} number */
+function publicDeviceDescriptor(id, descriptor, count, number) {
     const product = cleanText(descriptor.product) || "Charybdis 4x6";
     const serial = cleanText(descriptor.serialNumber);
-    const suffix = serial ? ` · ${serial}` : index ? ` · interface ${index + 1}` : "";
+    // Without a serial number (a browser shows none) two keyboards would read
+    // the same, so each shows its number (see numbersByPublicId). The number
+    // leads, so a shortened label keeps it.
+    const label = serial ? `${product} · ${serial}` : count > 1 ? `Keyboard ${number} · ${product}` : product;
     return {
         id,
-        label: product + suffix,
+        label,
         product,
         serialNumber: serial,
         manufacturer: cleanText(descriptor.manufacturer),

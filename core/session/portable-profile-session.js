@@ -73,6 +73,14 @@ function capturedBase(before, capabilities) {
     if (base.layout.length !== LAYOUT_BYTES || base.macros.length !== capabilities.viaMacroBytes || base.profile.length < 1) throw fail("INVALID_RECOVERY_CAPTURE", "The interrupted recovery capture is malformed.");
     return base;
 }
+// Waiting for the halves to agree is pointless while the slave half is not
+// there at all: it would only time out, and hold the keyboard until it did.
+/** @param {Connection} connection @param {{nextRequestId: () => number}} options */
+async function requirePeer(connection, options) {
+    if (!(await readProfileStatus(connection, options)).peerKnown) {
+        throw fail("KEYBOARD_NOT_READY", "The slave half is not connected. Connect the cable between the halves and read again.");
+    }
+}
 // `sleep`, here and below, is the host's wait between polls (the timer's when omitted).
 /** @param {Connection} connection @param {Ids} ids @param {Caps} capabilities @param {(text: string) => void} [onProgress] @param {boolean} [allowCandidate] @param {boolean} [allowIncomplete] @param {import("./types.js").CaptureOptions} [options] @returns {Promise<import("./types.js").VerifiedCapture>} */
 async function captureProfile(connection, ids, capabilities, onProgress = () => {}, allowCandidate = false, allowIncomplete = false,
@@ -81,6 +89,7 @@ async function captureProfile(connection, ids, capabilities, onProgress = () => 
     if (payloadReader.connection !== connection) throw fail("PROFILE_CHANGED", "The profile reader belongs to another connection. Read the keyboard again.");
     const options = {nextRequestId: () => ids.next(), widePages: supportsWidePages(capabilities)};
     onProgress("Reading the complete keyboard configuration");
+    await requirePeer(connection, options);
     const storageBefore = await waitForStorage(connection, ids, {sleep}), before = await readProfileStatus(connection, options);
     if (!canCapture(before, allowCandidate)) throw fail("KEYBOARD_NOT_READY", "Let both halves finish saving before taking a backup.");
     /** @param {string} label */
@@ -112,6 +121,7 @@ async function captureProfile(connection, ids, capabilities, onProgress = () => 
 /** @param {Connection} connection @param {Ids} ids @param {{allowCandidate?: boolean, sleep?: (ms: number) => Promise<void>, widePages?: boolean}} [options] */
 async function readIdentity(connection, ids, {allowCandidate = true, sleep, widePages} = {}) {
     const options = {nextRequestId: () => ids.next()};
+    await requirePeer(connection, options);
     const storageBefore = await waitForStorage(connection, ids, {sleep}), before = await readProfileStatus(connection, options);
     if (!canReadIdentity(before, allowCandidate)) throw fail("KEYBOARD_NOT_READY", "The keyboard changed before the save could start.");
     const settings = await readSettings(connection, ids, {widePages});

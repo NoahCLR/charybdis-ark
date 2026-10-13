@@ -33,6 +33,7 @@
   --badge-ink: rgba(8,8,10,.86);
   --badge-outline: rgba(245,245,243,.7);
   --draft: #e3b341;
+  --ok: #3fb950;
   --warning: #f2a544;
   --danger: #ff6b5e;
   --shadow: 0 1px 2px rgba(0,0,0,.6), 0 12px 32px rgba(0,0,0,.45);
@@ -62,6 +63,7 @@
   --inv-bg: #0c0c0e;
   --inv-text: #ffffff;
   --draft: #9a6b00;
+  --ok: #1a7f37;
   --warning: #a45400;
   --danger: #c0392b;
   --shadow: 0 1px 2px rgba(0,0,0,.08), 0 10px 30px rgba(0,0,0,.08);
@@ -111,24 +113,36 @@ code { color: inherit; background: none; padding: 0; border-radius: 0; }
   padding: 18px 18px 16px;
   border-bottom: 1px solid var(--line);
 }
+/* Ark's mark: the board and its name, one block above the keyboard it edits. */
+.rail-board {
+  width: 100%; height: auto; display: block;
+  padding: 4px 6px 0; box-sizing: border-box;
+  fill: var(--text); stroke: none;
+}
 .rail-mark {
-  display: flex; align-items: center; gap: 9px;
-  font-size: 13px; font-weight: 600; letter-spacing: -0.02em;
+  margin-top: 12px; text-align: center;
+  font-size: 10px; font-weight: 600; letter-spacing: .2em; text-transform: uppercase; color: var(--text-3);
 }
-.mark-glyph {
-  width: 22px; height: 22px; border-radius: 6px;
-  background: var(--inv-bg); color: var(--inv-text);
-  display: grid; place-items: center;
-  font-family: var(--mono); font-size: 11px; font-weight: 700;
+/* The keyboard, whether it is connected, and reading it again sit on one line,
+   so a stale panel is corrected where it is noticed. */
+.rail-keyboard { margin-top: 18px; display: flex; align-items: flex-start; gap: 8px; }
+.rail-keyboard .dot { width: 6px; height: 6px; margin-top: 6px; }
+.rail-product { flex: 1; min-width: 0; font-size: 12.5px; font-weight: 560; line-height: 1.4; overflow-wrap: anywhere; }
+/* Reading pulses the dot instead of adding a line. */
+.rail-keyboard .dot.busy { animation: dot-busy 1.4s ease-in-out infinite; }
+@keyframes dot-busy { 50% { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { .rail-keyboard .dot.busy { animation: none; opacity: .5; } }
+/* The name as a picker: the same words, with a chevron that says it opens. */
+select.rail-picker {
+  appearance: none; -webkit-appearance: none; margin: -3px 0 0 -6px; padding: 2px 20px 2px 6px;
+  border: 1px solid transparent; border-radius: 6px; background-color: transparent; color: var(--text);
+  font-family: inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer;
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position: right 10px top 50%, right 6px top 50%; background-size: 4px 4px; background-repeat: no-repeat;
 }
-/* Reading the keyboard again sits with what it says about the keyboard, so a
-   stale panel is corrected where it is noticed. */
-.rail-mark .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rail-mark .btn { margin-left: auto; flex: none; }
-.rail-picker-label { display: block; margin-top: 12px; margin-bottom: 5px; font-size: 10px; color: var(--text-3); text-transform: uppercase; letter-spacing: .08em; }
-.rail-picker { width: 100%; font-size: 11px; }
-.rail-product { margin-top: 12px; font-size: 12.5px; font-weight: 520; }
-.rail-meta { margin-top: 3px; font-size: 11px; color: var(--text-3); font-family: var(--mono); }
+select.rail-picker:hover, select.rail-picker:focus-visible { background-color: var(--surface-2); border-color: var(--line); outline: none; }
+select.rail-picker:disabled { cursor: default; opacity: .6; }
+.rail-status:not(:has(*)) { display: none; }
 .rail-status { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
 .rail-message { margin: 0 12px 12px; flex: none; display: flex; align-items: flex-start; gap: 6px; padding: 7px 6px 7px 9px;
   border-left: 2px solid var(--text-2); border-radius: 0 7px 7px 0; background: var(--surface-2);
@@ -139,6 +153,7 @@ code { color: inherit; background: none; padding: 0; border-radius: 0; }
 .stat { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--text-2); }
 .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--text-3); flex: none; }
 .dot.on { background: var(--text); }
+.dot.ok { background: var(--ok); }
 .dot.draft { background: var(--draft); }
 .dot.warn { background: var(--warning); }
 .dot.err { background: var(--danger); }
@@ -161,7 +176,8 @@ code { color: inherit; background: none; padding: 0; border-radius: 0; }
 .rail-history .c { font-family: var(--mono); font-size: 10.5px; color: var(--text-3); margin-left: 5px; }
 /* What a web page's host adds to the rail: its picker, what it is doing, and
    the build it is. The extension has none of them. */
-.rail-choose { margin-top: 10px; }
+.rail-choose { margin-top: 12px; display: flex; gap: 6px; }
+.rail-choose .btn { flex: 1; justify-content: center; }
 .rail-progress { margin: 0 12px 10px; display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--text-2); }
 .rail-build { display: flex; align-items: center; gap: 6px; padding: 0 12px 10px; font-size: 10.5px; font-family: var(--mono); color: var(--text-3); text-decoration: none; white-space: nowrap; }
 .rail-build span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
@@ -183,8 +199,10 @@ a.rail-build:hover { color: var(--text-2); }
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 .topbar > div:first-child { min-width: 0; }
 .topbar-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; flex: none; }
-.topbar-actions .search { width: 220px; }
-.topbar-actions .search.short { width: 200px; }
+/* A search sits in the panel it filters. */
+.card-h .card-search { margin-left: auto; width: 150px; min-width: 0; }
+.card-h .card-search + .tag { white-space: nowrap; }
+.pad .settings-search { width: 280px; max-width: 100%; margin-bottom: 4px; }
 .theme-toggle svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.4; }
 .content { flex: 1; overflow: auto; min-height: 0; }
 .pad { padding: 20px 24px 120px; }

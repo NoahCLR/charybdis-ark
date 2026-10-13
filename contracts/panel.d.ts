@@ -98,7 +98,7 @@ export interface PublishedModel {
     qmkKeycodeAliases: Record<string, string>;
     qmkKeycodeSource: string;
     diagnostics: string[];
-    device: {connected: boolean; label: string; summary: string; subtitle: string; health: {profile: string; converged: boolean; recoveryPending: boolean; restartNeeded: boolean; busy: boolean; phase: PhaseId; error: string}};
+    device: {connected: boolean; label: string; summary: string; subtitle: string; health: {profile: string; converged: boolean; halves: import('./model.js').HalvesId; recoveryPending: boolean; restartNeeded: boolean; busy: boolean; phase: PhaseId; error: string}};
     devices: {id: string; label: string}[];
     selectedDeviceId: string;
     draft?: DraftView;

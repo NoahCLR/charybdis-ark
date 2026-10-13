@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {buildLine, chooseKeyboard, commitUrl, downloadRecovery, githubMark, hostOf, otherTheme, savedWhen, setTheme, themeLabel} from "../../webview/view/host.mjs";
+import {buildLine, chooseKeyboard, forgetKeyboard, commitUrl, downloadRecovery, githubMark, hostOf, otherTheme, savedWhen, setTheme, themeLabel} from "../../webview/view/host.mjs";
 
 test("a model without a host description offers nothing extra", () => {
     assert.deepEqual(hostOf(undefined), {chooseKeyboard: false, blocked: null, theme: null, recoveries: null, build: null, progress: null, words: {}});
@@ -11,6 +11,7 @@ test("a model without a host description offers nothing extra", () => {
 
 test("the host's controls post these messages", () => {
     assert.deepEqual(chooseKeyboard(), {type: "chooseKeyboard"});
+    assert.deepEqual(forgetKeyboard(), {type: "forgetKeyboard"});
     assert.deepEqual(setTheme("light"), {type: "setTheme", theme: "light"});
     assert.deepEqual(downloadRecovery(3), {type: "downloadRecovery", id: 3});
 });

@@ -40,10 +40,14 @@ keyboard, and Ark's screens need a computer's.
 **Choosing the keyboard.** A page sees only the keyboards you have let it open.
 The first time, choose **Choose keyboard** and pick your Charybdis in Chrome's
 list; Ark then reads it. After that the page reconnects to it by itself whenever
-it opens, without asking again. **Choose keyboard** stays in the rail, under the
-keyboard's name, for letting the page open another one; with two, the rail's
-selector switches between them. Chrome's site settings forget a keyboard you no
-longer want the page to open.
+it opens, without asking again. **Choose keyboard**, under the keyboard's name,
+lets the page open another one and switches to whichever you pick. The page
+follows what Chrome allows it to open: one allowed keyboard is connected,
+several fill the rail's selector, and plugging one in or out updates both at
+once. A browser shows no serial numbers, so keyboards with the same name are
+numbered. **Disconnect** lets go of the keyboard and takes back the page's
+permission to open it, so it is not reopened until you choose it again; if the
+page may still open another keyboard, Ark connects that one.
 
 **One tab at a time.** Only one Ark tab holds the keyboard. A second one says
 Ark is open in another tab, and takes over when that tab closes. Closing or
@@ -55,6 +59,18 @@ Apply keeps its pace in a background tab, but keep the tab open until it ends.
 between a light and a dark theme. Ark starts from your system's setting and
 remembers your choice in this browser. In VS Code there is no toggle; the panel
 follows VS Code's theme.
+
+**The rail and the top bar stay quiet.** The rail opens with the board and
+Ark's name. Under them is the keyboard, and only its dot changes: green when it
+is connected with both halves together, orange when the slave half is not found
+or the halves are out of sync, red with no keyboard, hollow in the demo, and
+pulsing while a read runs. Hovering it says which, in plain words and with what
+to do: check the cable between the halves, or wait and read again. With more
+than one keyboard its name is the selector. The web page adds **Choose
+keyboard** and **Disconnect** beneath. Below that the rail lists only changes
+in the draft, a pending recovery or a restart. The screen and the Device tab
+say what is wrong and offer **Read** to read the keyboard again. A screen's top
+bar holds only the theme button; a search sits in the panel it filters.
 
 **Recovery copies and files.** Apply and Import save a recovery copy in the
 browser's storage before they write anything, and refuse to write if it cannot
@@ -80,8 +96,8 @@ as it would on a keyboard; undo, redo, Discard, the draft history, Rename &
 Reorder and Import all work on it.
 
 It never claims to be a keyboard. A strip across the top of the window says
-**Demo · no keyboard** on every screen; the rail names it Demo, with no
-connection, halves or recovery to report, and the Device screen says what it
+**Demo · no keyboard** on every screen; the rail names it Demo, with a hollow
+dot and no connection, halves or recovery to report, and the Device screen says what it
 stands in for. Nothing in it reaches a keyboard, and nothing is kept: the demo
 lives in this window until it is left or closed.
 
@@ -171,11 +187,14 @@ TO(0) escape accessible through every overlay. If Ark checked reachability but
 could not establish every escape, the warning says so; the completed checks
 still appear.
 
-**Read from keyboard** runs one complete read at a time. The health strip says
-both halves agree only after the firmware reports a known, converged peer;
+**Read from keyboard** runs one complete read at a time. Ark says both halves
+are connected only after the firmware reports a known, converged peer;
 matching generation numbers alone are insufficient. A failed committed-profile
 read remains an error instead of being labelled as compiled defaults. Those
 defaults are shown only when fresh device status reports no committed profile.
+A keyboard whose slave half is not connected cannot give a complete read: Ark
+says so at once and shows the layout it could read, rather than waiting for
+the halves to agree.
 When more than one compatible keyboard is connected, the selector at the top
 left chooses which one to read and edit. Switching keeps a dirty draft attached
 to its original keyboard; the other keyboard stays read-only until you switch
@@ -391,7 +410,9 @@ the draft, the check links to that change and the change is highlighted. If
 several edits could be responsible, the review leaves the source unlabeled.
 
 Every colour on screen is a colour the keyboard emits; one amber signal marks
-work that has not reached the keyboard yet. Complete edits stage into one draft
+work that has not reached the keyboard yet. The one exception is the
+connection's status dot: green, orange or red for a keyboard that is ready,
+needs its halves seen to, or is not there. Complete edits stage into one draft
 as they are made; incomplete builders such as a new combo keep their local form
 until it is valid. The floating bar is the only way changes leave the window.
 After Apply completes, it reports the keys, profile, combos and base lighting

@@ -13,6 +13,8 @@ export const hostOf = (model) => ({...NONE, ...model?.host, words: {...model?.ho
 // The messages these controls post. They are for the host, not the draft.
 /** @returns {{type: "chooseKeyboard"}} */
 export const chooseKeyboard = () => ({type: "chooseKeyboard"});
+/** @returns {{type: "forgetKeyboard"}} */
+export const forgetKeyboard = () => ({type: "forgetKeyboard"});
 /** @param {'light' | 'dark'} theme @returns {{type: 'setTheme', theme: 'light' | 'dark'}} */
 export const setTheme = (theme) => ({type: "setTheme", theme});
 /** @param {string | number} id @returns {{type: 'downloadRecovery', id: string | number}} */

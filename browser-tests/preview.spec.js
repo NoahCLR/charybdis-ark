@@ -200,7 +200,7 @@ test("with no keyboard the web host offers its picker first, and without WebHID 
     await page.goto("/preview/index.html?host=web-unsupported");
     await expect(page.locator(".read-placeholder h2")).toHaveText("Ark needs Chrome or Edge");
     await expect(page.locator('[data-act="choose-keyboard"]')).toHaveCount(0);
-    await expect(page.locator('.rail [data-act="refresh"]')).toBeDisabled();
+    await expect(page.locator('.rail [data-act="refresh"]')).toHaveCount(0);
 });
 
 test("the extension's panel has no theme toggle, picker, build line or browser recovery list", async ({page}) => {
@@ -269,7 +269,7 @@ test("the demo's controls post their messages", async ({page}) => {
     await page.locator('.sheet [data-act="close"]').first().click();
 
     for (const [control, type] of [['.demo-banner [data-act="leave-demo"]', "leaveDemo"], ['.demo-banner [data-act="open-demo-profile"]', "openDemoProfile"],
-        ['.rail [data-act="choose-keyboard"]', "chooseKeyboard"], ['.rail [data-act="refresh"]', "refresh"]]) {
+        ['.rail [data-act="choose-keyboard"]', "chooseKeyboard"]]) {
         await clear();
         await page.locator(control).click();
         const ask = page.locator(".sheet.leave-demo");

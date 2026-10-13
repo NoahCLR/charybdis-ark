@@ -34,9 +34,7 @@ export function screenMacros() {
     const main = el(`<div class="main">${topbar(
         "Macros",
         "Macro slots on the keyboard. A named macro shows by its name on keys, in the picker and in the key card.",
-        bank.length ? `<input class="input search" id="macroSearch" data-f="macros:search" type="search" placeholder="Search macros by name" value="${esc(state.macroSearch || "")}">` : "",
     )}</div>`);
-    /** @type {HTMLInputElement | null} */ (main.querySelector("#macroSearch"))?.addEventListener("input", (event) => { state.macroSearch = /** @type {HTMLInputElement} */ (event.target).value; render(); });
 
     const content = el(`<div class="content"><div class="pad library"></div></div>`);
     const pad = /** @type {HTMLElement} */ (content.firstElementChild);
@@ -51,8 +49,10 @@ export function screenMacros() {
     const filled = bank.filter((row) => !row.empty).length;
     const available = memory?.available ?? bank.length;
     const grid = el(`<div class="card"><div class="card-h"><h3>Slots</h3>
-        <span class="right tag" data-tip="${filled} filled">${available} of ${bank.length} available</span></div>
+        <input class="input search card-search" id="macroSearch" data-f="macros:search" type="search" placeholder="Search by name" value="${esc(state.macroSearch || "")}">
+        <span class="tag" data-tip="${filled} filled">${available} of ${bank.length} available</span></div>
         <div class="card-b"><div class="macro-grid"></div>${memoryMeter(memory)}</div></div>`);
+    /** @type {HTMLInputElement} */ (grid.querySelector("#macroSearch")).addEventListener("input", (event) => { state.macroSearch = /** @type {HTMLInputElement} */ (event.target).value; render(); });
     const cells = /** @type {HTMLElement} */ (grid.querySelector(".macro-grid"));
     const query = state.macroSearch || "";
     if (!bank.some((row) => macroMatches(row, query))) {

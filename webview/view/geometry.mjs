@@ -66,6 +66,19 @@ export function keyVisual(layoutIndex) {
         : {x: GEO.rightX[column - 6], y: GEO.rightTopY[column - 6] + row * GEO.rowStep + GEO.yOffset, angle: 0};
 }
 
+// The board's shape alone, every key and the trackball with no legends: Ark's
+// mark in the rail. Only numbers from GEO reach the markup.
+/** @param {string} className */
+export function boardOutlineMarkup(className) {
+    const {x, y, r} = GEO.trackball;
+    const keys = Array.from({length: 56}, (_, index) => {
+        const visual = keyVisual(index);
+        const turn = visual.angle ? ` transform="rotate(${visual.angle} ${visual.x + GEO.keyW / 2} ${visual.y + GEO.keyH / 2})"` : "";
+        return `<rect x="${visual.x}" y="${visual.y}" width="${GEO.keyW}" height="${GEO.keyH}" rx="${GEO.radius}"${turn}/>`;
+    });
+    return `<svg class="${className}" viewBox="${GEO.viewBox}" aria-hidden="true"><circle cx="${x}" cy="${y}" r="${r}"/>${keys.join("")}</svg>`;
+}
+
 // The trackball LED answers localities on its own terms: it is soldered on the
 // right half, and no key maps to it, so a locality that names the trigger key
 // never reaches it.

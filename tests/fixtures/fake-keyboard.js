@@ -50,7 +50,7 @@ const CURRENT_DOMAINS = "16:4,32:2,48:3,64:6,80:3";
 // defaults, with nothing committed; the live combo and settings readbacks
 // still answer from the document.
 /** @param {import("./types.js").FakeKeyboardOptions} options @returns {import("./types.js").FakeKeyboard} */
-function fakeKeyboard({document, compiled, streaming = false, macroReadMap = false, compiledOnly = false, generation = 42, firmwareVersion = 0x00010000, brightnessMax = 255, options = keyboardOptions.wire()}) {
+function fakeKeyboard({document, compiled, streaming = false, macroReadMap = false, compiledOnly = false, peerKnown = true, generation = 42, firmwareVersion = 0x00010000, brightnessMax = 255, options = keyboardOptions.wire()}) {
     const held = validateSnapshot(document);
     held.macros = require("../../core/model/portable-profile").macroBank(document.macros.map(value => Buffer.from(value, "base64")), streaming ? 34903 : 10327);
     if (document.version !== 3 || document.layers.length !== 16) throw new Error("The fake keyboard runs current firmware: a schema-3, sixteen-layer document.");
@@ -77,11 +77,11 @@ function fakeKeyboard({document, compiled, streaming = false, macroReadMap = fal
         // Populated steps, tap depth, slot size, name bytes, mask bits, positions.
         p.writeUInt16LE(640, 0); p[2] = 5; p.writeUInt32LE(streaming ? 53248 : 65536, 3); p.set([32, 32, 60], 7);
     })];
-    // Committed (or running its defaults), converged with the other half,
+    // Committed (or running its defaults), converged with the slave half,
     // nothing pending.
     const status = [page(25, (p) => {
         p.set([1, 2]);
-        p.writeUInt16LE((compiledOnly ? PROFILE_STATE_FLAGS.ACTIVE_IS_COMPILED_DEFAULT : PROFILE_STATE_FLAGS.COMMITTED_VALID) | PROFILE_STATE_FLAGS.PEER_KNOWN | PROFILE_STATE_FLAGS.PEER_CONVERGED, 2);
+        p.writeUInt16LE((compiledOnly ? PROFILE_STATE_FLAGS.ACTIVE_IS_COMPILED_DEFAULT : PROFILE_STATE_FLAGS.COMMITTED_VALID) | (peerKnown ? PROFILE_STATE_FLAGS.PEER_KNOWN | PROFILE_STATE_FLAGS.PEER_CONVERGED : 0), 2);
         for (const offset of [4, 8]) p.writeUInt32LE(fnv1a32(defaults), offset);
         p.writeUInt32LE(compiledOnly ? fnv1a32(defaults) : digest, 12);
         if (!compiledOnly) p.writeUInt32LE(digest, 20);

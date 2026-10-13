@@ -54,6 +54,9 @@ export function readScreen(model, screen = "keys") {
     const device = model.device || {};
     if (!device.connected) return {state: "unavailable", title: "Connect your keyboard",
         detail: device.health?.error || model.host?.words?.connectHint || "Connect a Charybdis, then read it to begin editing."};
+    // Halves that are not together are the usual reason, and say what to do.
+    const halves = device.health?.halves;
+    const halvesDetail = halves === "alone" || halves === "apart" ? model.vocabulary?.halves?.[halves]?.detail : "";
     return {state: "unavailable", title: "Keyboard not ready for edits",
-        detail: device.health?.error || "A complete profile could not be read. Read the keyboard again to retry."};
+        detail: halvesDetail || device.health?.error || "A complete profile could not be read. Read the keyboard again to retry."};
 }

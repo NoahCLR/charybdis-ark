@@ -35,6 +35,7 @@ const CONTROLS = Object.freeze({
     openProfileDraftHistory: Object.freeze({route: "view", action: "openHistory", binding: "none", demo: "allow", phase: "view", identity: false}),
     closeProfileDraftHistory: Object.freeze({route: "view", action: "closeHistory", binding: "none", demo: "allow", phase: "view", identity: false}),
     chooseKeyboard: Object.freeze({route: "host", action: "chooseKeyboard", binding: "none", demo: "host-leave", phase: "host", identity: false}),
+    forgetKeyboard: Object.freeze({route: "host", action: "forgetKeyboard", binding: "none", demo: "allow", phase: "host", identity: false}),
     setTheme: Object.freeze({route: "host", action: "setTheme", binding: "none", demo: "allow", phase: "host", identity: false}),
     downloadRecovery: Object.freeze({route: "host", action: "downloadRecovery", binding: "none", demo: "allow", phase: "host", identity: false}),
     validateViaMacro: Object.freeze({route: "inspect", action: "validateMacro", binding: "inspect", demo: "allow", phase: "inspect", identity: false}),

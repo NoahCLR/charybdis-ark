@@ -4,7 +4,6 @@
 // tabs are the stages in the order the firmware paints them.
 
 // Selector assertions refer to elements created by this module's authored markup.
-import * as controls from "../view/controls.mjs";
 import {css, isOff} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {TRACKBALL_LED} from "../view/geometry.mjs";
@@ -33,10 +32,8 @@ export function screenLighting() {
     const layer = currentLayer();
     const main = el(`<div class="main">${topbar(
         "Lighting",
-        "The only colour in this app is colour the keyboard emits. Stages paint in order, and the board below is the result — your draft's result, before anything is applied.",
-        `<button class="btn ghost" data-act="read" ${model?.device?.health?.busy ? "disabled" : ""}>Read lighting</button>`,
+        "The only colour in this app is colour the keyboard emits. Stages paint in order, and the board below is the result — your draft's result, before anything is applied."
     )}</div>`);
-    /** @type {HTMLButtonElement} */ (main.querySelector('[data-act="read"]')).addEventListener("click", () => post(controls.control("refresh")));
 
     const content = el(`<div class="content"><div class="pad keys-pad"></div></div>`);
     const pad = /** @type {HTMLElement} */ (content.firstElementChild);

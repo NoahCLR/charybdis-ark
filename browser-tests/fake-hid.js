@@ -8,8 +8,18 @@
 // the exposed binding `bridge`, where tests/fixtures/fake-keyboard.js answers
 // it byte for byte. The function runs in the page, so it uses nothing from here.
 
-function installFakeHid({vendorId, productId, usagePage, usage, bridge}) {
+// `keyboards` plugs in that many identical keyboards (one by default), all
+// answered by the same fake. The picker returns `window.__fakeHidPick` (the
+// first by default), and `window.__fakeHidPlug(index, plugged)` plugs one in or
+// out, with Chrome's connect or disconnect event for an allowed one.
+function installFakeHid({vendorId, productId, usagePage, usage, bridge, keyboards = 1}) {
     const granted = "fake-hid-granted";
+    /** @returns {number[]} */
+    const allowed = () => {
+        const value = localStorage.getItem(granted);
+        return value === "1" ? [0] : value ? JSON.parse(value) : [];
+    };
+    const allow = (list) => list.length ? localStorage.setItem(granted, JSON.stringify(list)) : localStorage.removeItem(granted);
     const log = (globalThis.__fakeHid = {requested: 0, refusedWithoutClick: 0, opened: 0});
     class FakeHidDevice extends EventTarget {
         constructor() {
@@ -18,6 +28,12 @@ function installFakeHid({vendorId, productId, usagePage, usage, bridge}) {
         }
         async open() {this.opened = true; log.opened += 1;}
         async close() {this.opened = false;}
+        // Chrome's forget(): closes the device and takes back the permission.
+        async forget() {
+            this.opened = false;
+            allow(allowed().filter((index) => index !== devices.indexOf(this)));
+            log.forgotten = (log.forgotten || 0) + 1;
+        }
         async sendReport(reportId, data) {
             if (!this.opened) throw new DOMException("The device must be opened first.", "InvalidStateError");
             const bytes = Array.from(new Uint8Array(data.buffer, data.byteOffset, data.byteLength));
@@ -27,9 +43,10 @@ function installFakeHid({vendorId, productId, usagePage, usage, bridge}) {
             }
         }
     }
-    const device = new FakeHidDevice();
+    const devices = Array.from({length: keyboards}, () => new FakeHidDevice());
+    const plugged = new Set(devices.keys());
     class FakeHid extends EventTarget {
-        async getDevices() {return localStorage.getItem(granted) ? [device] : [];}
+        async getDevices() {return allowed().filter((index) => plugged.has(index)).map((index) => devices[index]);}
         async requestDevice({filters}) {
             log.requested += 1;
             // Chrome shows its picker only while a click is being handled.
@@ -38,12 +55,19 @@ function installFakeHid({vendorId, productId, usagePage, usage, bridge}) {
                 throw new DOMException("Must be handling a user gesture to show a permission request.", "SecurityError");
             }
             if (!filters.some((filter) => filter.vendorId === vendorId && filter.productId === productId)) return [];
-            localStorage.setItem(granted, "1");
-            return [device];
+            const index = globalThis.__fakeHidPick ?? 0;
+            if (!plugged.has(index)) return [];
+            allow([...new Set([...allowed(), index])]);
+            return [devices[index]];
         }
     }
     Object.defineProperty(Navigator.prototype, "hid", {configurable: true, get: () => hid});
     const hid = new FakeHid();
+    globalThis.__fakeHidPlug = (index, on) => {
+        const device = devices[index];
+        if (on) plugged.add(index); else {plugged.delete(index); device.opened = false;}
+        if (allowed().includes(index)) hid.dispatchEvent(Object.assign(new Event(on ? "connect" : "disconnect"), {device}));
+    };
 }
 
 module.exports = {installFakeHid};

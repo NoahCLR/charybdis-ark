@@ -53,10 +53,12 @@ matrix.
 | Where it runs | The VS Code extension, and a web page in Chrome or Edge over WebHID; Cloudflare Git integration publishes `dev` to `ark-dev.ncleroy.dev`, `main` to `ark.ncleroy.dev`, and task branches to PR previews; a phone gets only a notice (D-L02, D-L52) |
 | Demo without a keyboard | The bundled demo profile in a real draft, in both hosts: every screen editable and reviewed, Apply refused, Export saves the draft (D-L53) |
 
-The rail's health strip shows connection, both-half convergence, draft state
+The rail's keyboard dot shows connection and both-half convergence, in plain
+words on hover; the rail lists draft state
 and recovery state. Convergence needs the firmware's peer-known and
 peer-converged flags, not just matching generations. With several compatible
-keyboards connected, a selector picks one; a dirty draft stays bound to its
+keyboards connected, a selector picks one (on the web page among those
+the page may open, the one last chosen first); a dirty draft stays bound to its
 keyboard, and a reconnect requires an explicit review before Apply.
 
 Remaining before calling the product complete:

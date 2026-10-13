@@ -33,9 +33,9 @@ export interface LoadView {
     progress?: CountedProgress | string | null;
 }
 export interface StatusModel {
-    vocabulary?: Pick<Vocabulary, 'phases'>;
+    vocabulary?: Pick<Vocabulary, 'phases'> & Partial<Pick<Vocabulary, 'halves'>>;
     load?: LoadView;
-    device?: {connected?: boolean; health?: {error?: string; phase?: PhaseId}};
+    device?: {connected?: boolean; health?: {error?: string; phase?: PhaseId; halves?: HalvesId}};
     host?: HostPanel;
     demo?: DemoView;
     portable?: {available?: boolean; progress?: CountedProgress | string | null};
@@ -55,8 +55,10 @@ export interface ApplyView {
 }
 
 export type WordList<T = Scalar> = readonly (readonly [T, string])[];
+export type HalvesId = 'agree' | 'alone' | 'apart' | 'unread';
 export interface Vocabulary {
     phases: Readonly<Record<PhaseId, Readonly<PhaseWords>>>;
+    halves: Readonly<Record<HalvesId, Readonly<{label: string; detail: string}>>>;
     pickerModifiers?: {bit: number; value: string; label: string}[];
     hostOs: WordList<number>;
     macroPlayback?: Readonly<Record<string, string>>;

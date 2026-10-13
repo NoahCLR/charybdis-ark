@@ -3,7 +3,7 @@ import * as controls from "../view/controls.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {getModel, post, postLeavingDemo} from "../store.mjs";
 import {demoOf} from "../view/demo.mjs";
-import {phaseWords} from "../view/vocabulary.mjs";
+import {halvesWords, phaseWords} from "../view/vocabulary.mjs";
 import {topbar} from "./shell.mjs";
 
 /** @param {readonly (readonly [string, unknown])[]} rows */
@@ -41,31 +41,31 @@ export function screenDevice() {
         read: () => postLeavingDemo(controls.control("refresh")),
     } : {
         sub: "What the keyboard says about itself. Everything this app shows comes from here — it never reads a firmware repository.",
-        connectionChip: chip(device?.connected ? "on" : "err", device?.connected ? "connected" : "disconnected"),
+        connectionChip: chip(device?.connected ? "ok" : "err", device?.connected ? "connected" : "disconnected"),
         connectionBody: `${kv([
             ["Product", device?.label],
             ["Status", device?.subtitle],
             ["Phase", phaseWords(model, device?.health?.phase)?.label],
         ])}<p class="note">The master half connects over USB; the slave half connects to it through the cable between the halves.</p>`,
         setupTitle: "Committed profile",
-        setupChip: chip(device?.health?.converged ? "on" : "draft", device?.health?.converged ? "both halves agree" : "halves not converged"),
-        setupBody: kv([
+        setupChip: chip(device?.health?.halves === "agree" ? "ok" : "warn", halvesWords(model, device?.health?.halves).label.toLowerCase()),
+        setupBody: `${kv([
             ["Generation and digest", device?.summary],
             ["Recovery", device?.health?.recoveryPending ? "pending" : "clear"],
             ["Draft", changes],
-        ]),
+        ])}${["alone", "apart"].includes(device?.health?.halves || "") ? `<p class="note">${esc(halvesWords(model, device?.health?.halves).detail)}</p>` : ""}`,
         read: () => post(controls.control("refresh")),
     };
     const main = el(`<div class="main">${topbar(
         "Device",
-        page.sub,
-        `<button class="btn" data-act="read" ${device?.health?.busy ? "disabled" : ""}>Read from keyboard</button>`,
+        page.sub
     )}
         <div class="content"><div class="pad stack device-pad">
             <div class="grid2">
                 <div class="card"><div class="card-h"><h3>Connection</h3>
                     ${page.connectionChip}</div>
-                    <div class="card-b">${page.connectionBody}</div></div>
+                    <div class="card-b">${page.connectionBody}
+                        <button class="btn" data-act="read" ${device?.health?.busy ? "disabled" : ""}>Read from keyboard</button></div></div>
                 <div class="card"><div class="card-h"><h3>${page.setupTitle}</h3>
                     ${page.setupChip}</div>
                     <div class="card-b">${page.setupBody}</div></div>

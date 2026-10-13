@@ -162,7 +162,7 @@ test("phase words render from the model while progress and saving use stable IDs
         Object.assign(saving.device.health, {busy: true, phase: "restore-complete"});
         window.dispatchEvent(new MessageEvent("message", {data: {type: "model", model: saving}}));
         const commit = document.querySelector(".commit").textContent;
-        const rail = document.querySelector(".rail-status").textContent;
+        const rail = document.querySelector(".rail-keyboard .dot.busy")?.getAttribute("data-tip") || "";
         store.state.screen = "device"; store.render();
         const device = document.querySelector(".content").textContent;
         return {read, commit, rail, device};

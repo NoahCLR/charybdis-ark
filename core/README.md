@@ -307,9 +307,11 @@ takes the `hid` object (`navigator.hid`) as an option and never names
 `navigator` itself; without one, every call fails with
 `NATIVE_MODULE_UNAVAILABLE`.
 
-`listDevices()` returns only the interfaces this page has already been allowed
-to open (`getDevices()`) whose collections carry the Raw HID usage page and
-usage. `requestDevice()` opens Chrome's picker filtered to all four
+`listDevices()` returns the interfaces this page has already been allowed to
+open (`getDevices()`) whose collections carry the Raw HID usage page and
+usage, the one last chosen in `requestDevice()` first. `forget()` closes the
+interface last opened and calls `HIDDevice.forget()`, so the page may not open
+it again until it is chosen. `requestDevice()` opens Chrome's picker filtered to all four
 identifiers and must run from a user gesture; a dismissed picker fails with
 `CANCELLED`. WebHID has no device path, so each `HIDDevice` object gets an id
 (`webhid:1`, `webhid:2`, …) the first time the adapter sees it and keeps it

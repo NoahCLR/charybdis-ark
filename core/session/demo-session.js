@@ -278,7 +278,7 @@ function demoHeader(session, busy) {
         label: DEMO_WORDS.label,
         summary: `No keyboard · ${session.demo.name}`,
         subtitle: "Nothing here was read from a keyboard, and nothing can be applied to one.",
-        health: {profile: "demo", converged: false, recoveryPending: false, restartNeeded: false, busy: Boolean(busy), phase: PHASE.DEMO, error: ""},
+        health: {profile: "demo", converged: false, halves: /** @type {import("../../contracts/model.js").HalvesId} */ ("unread"), recoveryPending: false, restartNeeded: false, busy: Boolean(busy), phase: PHASE.DEMO, error: ""},
     };
 }
 

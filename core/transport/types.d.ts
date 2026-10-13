@@ -135,6 +135,7 @@ export interface WebHidDevice {
     opened: boolean;
     open(): Promise<void>;
     close(): Promise<void>;
+    forget?(): Promise<void>;
     sendReport(reportId: number, data: Uint8Array<ArrayBuffer>): Promise<void>;
     addEventListener(type: 'inputreport', listener: (event: WebHidInputReport) => void): void;
     removeEventListener(type: 'inputreport', listener: (event: WebHidInputReport) => void): void;
@@ -143,6 +144,6 @@ export interface WebHidDevice {
 export interface WebHid {
     getDevices(): Promise<WebHidDevice[]>;
     requestDevice(options: {filters: {vendorId: number; productId: number; usagePage: number; usage: number}[]}): Promise<WebHidDevice[]>;
-    addEventListener(type: 'disconnect', listener: (event: {device: WebHidDevice}) => void): void;
-    removeEventListener(type: 'disconnect', listener: (event: {device: WebHidDevice}) => void): void;
+    addEventListener(type: 'connect' | 'disconnect', listener: (event: {device: WebHidDevice}) => void): void;
+    removeEventListener(type: 'connect' | 'disconnect', listener: (event: {device: WebHidDevice}) => void): void;
 }
