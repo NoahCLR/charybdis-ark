@@ -31,7 +31,7 @@ for (const [screen, state] of surfaces) {
                 store.openComboBuilder(store.getModel().combos[0]); store.render();
             });
         }
-        if (screen === "macros") await page.locator("[data-raw] summary").click();
+        if (screen === "macros") await page.locator("[data-raw-toggle]").click();
         // Visit the complete forms, including collapsed settings, modifier
         // masks, diagonals and tuning controls that are absent by default.
         if (screen === "pointing" && state.pdSlot === 4) {
@@ -117,17 +117,18 @@ test("picker search has a unique identity beside its underlying editor", async (
 
 test("macro step identity moves with the step and survives edits and accepted models", async ({page}) => {
     await openControls(page, "macros", {macroSlot: "VIA_MACRO_17"});
+    await page.locator('[data-insert-kind="text"]').click();
     await page.locator("[data-step-text]").fill("First");
     await page.locator("[data-step-text]").dispatchEvent("change");
     const firstId = await page.locator("[data-step-text]").getAttribute("data-f");
-    await page.locator("[data-kind]").selectOption("text");
-    await page.locator('[data-act="insert"]').click();
+    await page.locator('[data-insert-kind="text"]').click();
     await page.locator('[data-step-text="1"]').fill("Second");
     await page.locator('[data-step-text="1"]').dispatchEvent("change");
     const secondId = await page.locator('[data-step-text="1"]').getAttribute("data-f");
     await page.locator('[data-step="1"] [data-move="-1"]').click();
     expect(await page.locator('[data-step-text="0"]').getAttribute("data-f")).toBe(secondId);
     expect(await page.locator('[data-step-text="1"]').getAttribute("data-f")).toBe(firstId);
+    await page.locator('[data-step-tile="1"]').click();
     const first = page.locator(`[data-f=${JSON.stringify(firstId)}]`);
     await first.focus();
     await first.evaluate(node => node.setSelectionRange(1, 3));

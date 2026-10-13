@@ -276,24 +276,12 @@ export function pickerExpression({keys = [], mods = [], layerTap = null, mode = 
     return value;
 }
 
-// ── the macro recorder ──────────────────────────────────────────────────
-
-// One captured key event appended to a take. The pause before the first key
-// is the time it took to start typing, so only later gaps become delays, and
-// only above the threshold, rounded as configured.
-/** @param {string} current @param {{keycode: string, type: string, gap: number, captured: boolean | number, delays?: boolean, threshold?: Scalar, round?: Scalar, explicit?: boolean}} event */
-export function recordedPayload(current, {keycode, type, gap, captured, delays = true, threshold = 0, round = 1, explicit = false}) {
-    const step = Math.max(1, Number(round) || 1);
-    const delay = captured && delays && gap > Math.max(0, Number(threshold) || 0) ? `{${Math.round(gap / step) * step}}` : "";
-    const command = explicit ? `{${type === "keydown" ? "+" : "-"}${keycode}}` : `{${keycode}}`;
-    return `${current}${delay}${command}`;
-}
-
 // ── keyboard shortcuts ──────────────────────────────────────────────────
 
-// ⌘Z / Ctrl+Z undoes the draft, ⇧⌘Z and ⌘Y redo it — unless the keys belong
+// ⌘Z / Ctrl+Z requests undo, ⇧⌘Z and ⌘Y redo — the focused editor or draft
+// owns the command, unless the keys belong
 // to something else: a text field keeps its own undo, and a recording or an
-// open prompt is not the draft.
+// open prompt keeps its keys.
 /** @param {{key: string, metaKey?: boolean, ctrlKey?: boolean, altKey?: boolean, shiftKey?: boolean}} event @param {{editingText?: boolean, busy?: boolean}} [context] */
 export function historyAction({key, metaKey, ctrlKey, altKey, shiftKey}, {editingText = false, busy = false} = {}) {
     if (!(metaKey || ctrlKey) || altKey || editingText || busy) return null;

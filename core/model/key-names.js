@@ -190,6 +190,28 @@ function hostKeyLabel(label, hostOs) {
     return String(label).replace(/\b([LR])(Ctrl|Shift|Alt|GUI|Cmd)\b/g, (_, side, name) => `${side === "L" ? "Left" : "Right"} ${name}`).replace(/\bControl\b/g, "Ctrl").replace(/\b(?:GUI|Cmd)\b/g, gui).replace(/\bAlt\b/g, hostOs === 1 ? "Option" : "Alt");
 }
 
+// Compact faces are another spelling of the same host-resolved basic key.
+// Keep modifier side, layout characters and stored keycodes intact. Unknown
+// names stay whole; fixed-size faces can clip them with the full name on hover.
+/** @param {string} label */
+function compactKeyLabel(label) {
+    const basic = {Spacebar: "Space", Backspace: "Bksp", Escape: "Esc", "Page Up": "PgUp", "Page Down": "PgDn", "Print Screen": "PrtSc", "Scroll Lock": "ScrLk", "Caps Lock": "Caps", "Num Lock": "NumL"};
+    return /** @type {Record<string, string>} */ (basic)[label] || label
+        .replace(/^(Left|Right) /, (_, side) => `${side === "Left" ? "L" : "R"} `)
+        .replace(/\bCommand\b/g, "Cmd").replace(/\bOption\b/g, "Opt").replace(/\bWindows\b/g, "Win");
+}
+
+/** @param {Record<string, string>} labels @returns {Record<string, string>} */
+function compactKeyLabels(labels) {
+    /** @type {Record<string, string>} */
+    const short = {};
+    for (const entry of keycodes.entries()) {
+        if (entry.value > 0xff) continue;
+        for (const name of [entry.name, ...entry.aliases]) short[name] = compactKeyLabel(labels[name] || entry.label);
+    }
+    return short;
+}
+
 // Every modifier control uses these same names as keys and Review. Picker
 // identifiers are stable edit tokens, not display words; derive their labels
 // from the bit vocabulary rather than maintaining another naming table.
@@ -236,4 +258,4 @@ function keyLabelWithName(names, value) {
     return label === name ? label : `${label} (${name})`;
 }
 
-module.exports = {hostKeyVocabulary, hostKeyLabel, keyLabel, keyLabelWithName, layerKeyLabel, profileKeyNames, semanticLabel};
+module.exports = {compactKeyLabel, compactKeyLabels, hostKeyVocabulary, hostKeyLabel, keyLabel, keyLabelWithName, layerKeyLabel, profileKeyNames, semanticLabel};

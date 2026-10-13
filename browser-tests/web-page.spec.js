@@ -387,9 +387,10 @@ test("literal macro steps stage through the real web host, export exactly, undo 
     await ready(page);
     await page.locator('[data-screen="macros"]').click();
     await page.locator('[data-slot="VIA_MACRO_17"]').click();
+    await page.locator('[data-insert-kind="text"]').click();
     const text = ' {"key": "{KC_A}"}\nhello ';
     await page.locator("[data-step-text]").fill(text);
-    await expect(page.locator("[data-macro-size]")).toContainText(`${Buffer.byteLength(text)} bytes of macro memory`);
+    await expect(page.locator("[data-macro-feedback]")).toBeHidden();
     await expect(page.locator(".rail-status")).not.toContainText(/in draft/);
     await page.locator("[data-step-text]").dispatchEvent("change");
     await expect(page.locator(".rail-status")).toContainText("1 change in draft");
@@ -399,9 +400,20 @@ test("literal macro steps stage through the real web host, export exactly, undo 
     expect(Buffer.from(file.macros[17], "base64").toString("utf8")).toBe(text);
     await page.locator('.sheet [data-act="close"]').first().click();
     await page.locator('.rail [data-act="undo"]').click();
-    await expect(page.locator("[data-step-text]")).toHaveValue("");
+    await expect(page.locator(".macro-empty")).toBeVisible();
+    await expect(page.locator("[data-step-text]")).toHaveCount(0);
     await page.locator('.rail [data-act="redo"]').click();
     await expect(page.locator("[data-step-text]")).toHaveValue(text);
+    // Step history must also work after the real host accepts a deletion.
+    await page.locator('[data-step-tile="0"]').click(); await page.keyboard.press('Delete');
+    await expect(page.locator('.macro-empty')).toBeVisible();
+    await expect(page.locator('.macro-titlebar [data-local-state]')).toHaveText('as read');
+    await page.keyboard.press('Control+z');
+    await expect(page.locator('[data-step-text]')).toHaveValue(text);
+    await expect(page.locator('.macro-titlebar [data-local-state]')).toHaveText('as read');
+    await page.keyboard.press('Control+Shift+z');
+    await expect(page.locator('.macro-empty')).toBeVisible();
+    await expect(page.locator('.macro-titlebar [data-local-state]')).toHaveText('as read');
     expect(keyboard.requests).toEqual([]);
     expect(errors).toEqual([]);
     ownFilesOnly();

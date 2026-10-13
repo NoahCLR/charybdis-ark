@@ -176,8 +176,8 @@ select.rail-picker:disabled { cursor: default; opacity: .6; }
 .rail-history .c { font-family: var(--mono); font-size: 10.5px; color: var(--text-3); margin-left: 5px; }
 /* What a web page's host adds to the rail: its picker, what it is doing, and
    the build it is. The extension has none of them. */
-.rail-choose { margin-top: 12px; display: flex; gap: 6px; }
-.rail-choose .btn { flex: 1; justify-content: center; }
+.rail-choose { margin-top: 16px; display: grid; gap: 8px; }
+.rail-choose .btn { width: 100%; justify-content: center; min-height: 28px; }
 .rail-progress { margin: 0 12px 10px; display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--text-2); }
 .rail-build { display: flex; align-items: center; gap: 6px; padding: 0 12px 10px; font-size: 10.5px; font-family: var(--mono); color: var(--text-3); text-decoration: none; white-space: nowrap; }
 .rail-build span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
@@ -1234,6 +1234,16 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .macro-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 5px; }
 /* Macros and Custom keys: the list beside the one it opens. */
 .pad.library { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 20px; align-items: start; }
+.pad.library.macros-library { grid-template-columns: minmax(170px, 240px) minmax(0, 1fr); gap: 18px; }
+.macros-library > .card:first-child { position: sticky; top: 14px; }
+.macros-library .macro-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); max-height: 540px; overflow-y: auto; scrollbar-width: thin; padding: 2px; }
+.macros-library .card-search { min-width: 0; }
+.macros-library > .card:first-child .card-h { flex-wrap: wrap; }
+.macros-library > .card:first-child .card-search { flex: 1 1 100%; }
+.macros-library .mslot { min-width: 0; }
+.macros-library .mslot .v { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 980px) { .pad.library.macros-library { grid-template-columns: 170px minmax(0, 1fr); gap: 12px; } }
+@media (max-width: 720px) { .pad.library.macros-library { grid-template-columns: 1fr; }.macros-library > .card:first-child { position: static; }.macros-library .macro-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); max-height: 150px; } }
 .sect-h.memory-h { margin-top: 14px; }
 /* What a memory meter counts, said under it. */
 .meter-note { margin-top: 6px; }
@@ -1251,6 +1261,88 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .usage-tables { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
 .tok { display: inline-flex; align-items: center; height: 22px; padding: 0 7px; border-radius: 5px; background: var(--surface-3); border: 1px solid var(--line); font-family: var(--mono); font-size: 11px; }
 .macro-step { display: grid; gap: 10px; min-width: 0; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); }
+.macro-step[hidden] { display: none; }
+.macro-titlebar { gap: 10px; flex-wrap: wrap; padding: 18px; }
+.macro-title-control { flex: 1 1 180px; min-width: 0; position: relative; }
+.macro-title-input { display: block; width: 100%; min-width: 0; font: 550 19px/1.3 var(--sans); letter-spacing: -.025em; color: var(--text); background: transparent; padding: 3px 5px; border: 1px solid transparent; border-radius: 5px; }
+.macro-title-input::placeholder { color: var(--text); opacity: 1; }
+.macro-title-input:not(:disabled):hover { border-color: var(--line-2); background: var(--surface-2); }
+.macro-title-input:focus { border-color: var(--line-3); outline: none; background: var(--surface-2); }
+.macro-name-count { position: absolute; top: 100%; left: 6px; opacity: 0; pointer-events: none; font-size: 10px; }
+.macro-title-control:focus-within .macro-name-count, .macro-name-count.warn { opacity: 1; }
+.macro-context { display: flex; gap: 10px 20px; flex-wrap: wrap; align-items: center; justify-content: space-between; padding-bottom: 15px; border-bottom: 1px solid var(--line); }
+.macro-protection { display: flex; align-items: center; gap: 9px; font-size: 11px; color: var(--text-2); }
+.macro-protection select.input { width: auto; min-width: 135px; height: 30px; padding: 4px 26px 4px 8px; font-size: 11px; }
+.macro-sequence-heading { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
+.macro-sequence-heading h4 { font-size: 10px; text-transform: uppercase; letter-spacing: .1em; color: var(--text-3); }
+.macro-sequence-heading .note { font-size: 10px; }
+.macro-insert-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.macro-insert-tools .btn { height: 36px; padding: 0 14px; }
+.macro-raw-toggle { margin-left: auto; font-size: 11px; white-space: nowrap; }
+.macro-raw-toggle input { inset: 0; width: 100%; height: 100%; margin: 0; pointer-events: auto; cursor: pointer; }
+.macro-raw:not([open]) { display: none; }
+.macro-sequence { display: flex; flex-wrap: wrap; gap: 24px 0; padding: 28px 18px 18px; min-width: 0; min-height: 128px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; }
+.macro-sequence.empty { align-items: center; justify-content: center; padding: 23px 16px; min-height: 180px; }
+.macro-empty { display: grid; gap: 8px; text-align: center; justify-items: center; }
+.macro-empty strong { font-size: 13px; font-weight: 500; }
+.macro-empty .note { max-width: 340px; line-height: 1.5; }
+.macro-empty-mark { font-size: 24px; font-weight: 300; color: var(--text-3); }
+.macro-token-wrap { position: relative; display: flex; flex: none; align-items: center; }
+.macro-token { position: relative; display: grid; grid-template-rows: 24px 22px 12px; gap: 3px; align-content: center; justify-items: center;
+  width: 64px; height: 80px; padding: 7px 5px; border: 1px solid var(--line-2); border-radius: 7px; background: var(--surface-2); color: var(--text); text-align: center; }
+.macro-token.wide { width: 144px; grid-template-rows: 18px 32px 12px; gap: 4px; }
+.macro-token[draggable="true"] { cursor: grab; }
+.macro-token[draggable="true"]:active { cursor: grabbing; }
+.macro-token:hover { border-color: var(--line-3); background: var(--surface-3); }
+.macro-token:focus, .macro-token:focus-visible { outline: none; }
+.macro-sequence:focus { outline: none; }
+.macro-token[aria-pressed="true"] { border-color: var(--text-2); box-shadow: 0 0 0 1px var(--text-2); }
+.macro-token.invalid { border-color: var(--danger); }
+.macro-token-index { position: absolute; top: -16px; font: 9px var(--mono); color: var(--text-3); }
+.macro-token-mark { display: grid; place-items: center; width: 22px; height: 22px; font: 600 18px/1 var(--sans); color: var(--text); }
+.macro-token.press .macro-token-mark, .macro-token.release .macro-token-mark { background: var(--surface-3); border-radius: 4px; }
+.macro-tap-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--text-2); }
+.macro-token-mark svg { width: 17px; height: 17px; stroke: var(--text-2); fill: none; stroke-width: 1.5; }
+.macro-token.text .macro-token-mark { color: var(--text-2); }
+.macro-token-label { display: block; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font: 12px/22px var(--mono); }
+.macro-token.wide .macro-token-label { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; font-size: 11px; line-height: 16px; white-space: normal; overflow-wrap: anywhere; }
+.macro-token.text .macro-token-label { font-family: var(--sans); text-align: left; padding: 0 4px; }
+.macro-token-unit { font-size: 9px; color: var(--text-2); }
+.macro-token.delay .macro-token-label { font-size: 11px; }
+.macro-chord-part { display: inline-block; white-space: nowrap; max-width: 100%; }
+.macro-token:not(.wide) .macro-chord-part { display: block; overflow: hidden; text-overflow: ellipsis; }
+.macro-token-kind { font-size: 9px; line-height: 12px; color: var(--text-3); }
+.macro-token.delay { background: transparent; border-style: dashed; }
+.macro-token-error { position: absolute; right: 4px; top: 3px; color: var(--danger); font-size: 10px; font-weight: 600; }
+.macro-connector { width: 12px; text-align: center; color: var(--line-3); font-size: 12px; }
+.macro-token.dragging { opacity: .3; }
+.macro-token-wrap.drop-before::before, .macro-token-wrap.drop-after::after { content: ""; position: absolute; top: -5px; bottom: -5px; width: 3px; background: var(--text); border-radius: 2px; z-index: 1; }
+.macro-token-wrap.drop-before::before { left: -5px; }
+.macro-token-wrap.drop-after::after { right: 4px; }
+.macro-token-wrap:last-child.drop-after::after { right: -5px; }
+.macro-legend { display: flex; flex-wrap: wrap; gap: 7px 12px; margin: 10px 0; }
+.macro-legend span { font-size: 10px; }
+.macro-utilities { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 18px; }
+.macro-footer { border-top: 1px solid var(--line); padding-top: 14px; }
+.macro-help-link { font-size: 11px; color: var(--text-3); text-decoration: none; }
+.macro-help-link:hover { color: var(--text-2); }
+.macro-guidance { border-radius: 7px; padding: 12px; background: var(--surface-2); }
+.macro-guidance:not([open]) { display: none; }
+.macro-guidance summary { font-size: 11px; color: var(--text-2); cursor: pointer; }
+.macro-guidance .note { margin-top: 10px; line-height: 1.55; }
+.macro-editor-card .macro-actions { gap: 8px; }
+.macro-editor-card .macro-actions .btn { height: 36px; padding: 0 14px; }
+.macro-editor-card .macro-actions .btn svg { width: 15px; height: 15px; }
+.macro-editor-card .macro-actions [data-act="clear"] { color: var(--danger); }
+.macro-editor-card [data-recorder] { border: 0; border-top: 1px solid var(--line); border-radius: 0; background: transparent; padding-top: 14px; }
+.macro-editor-card [data-recorder] .card-h { border-bottom: 0; padding: 0; margin-bottom: 12px; }
+.macro-editor-card [data-recorder] .card-b { padding: 0; gap: 10px; }
+.macro-editor-card [data-recorder] [data-act="record"] { height: 42px; min-width: 116px; justify-content: center; padding: 0 20px; font-size: 14px; }
+.macro-editor-card [data-recorder] .record-opts { gap: 10px 16px; }
+.macro-editor-card [data-recorder] .note { font-size: 10px; }
+.macro-editor-card [data-recorder] .row > .right { margin-left: auto; }
+[data-sequence-notice]:empty { display: none; }
+[data-step-inspectors] { margin-top: 12px; }
 .macro-step-head { flex-wrap: wrap; }
 .macro-step-head > .right { margin-left: auto; }
 .macro-step .kind { font-size: 11px; color: var(--text-2); }
@@ -1259,8 +1351,7 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .macro-add, .macro-actions { flex-wrap: wrap; }
 .macro-add select.input { width: auto; }
 .record-opts { gap: 12px; align-items: end; flex-wrap: wrap; }
-.record-opts .capture-field { min-width: 190px; }
-.record-opts .ms-field { width: 120px; }
+.record-opts .ms-field { width: 88px; }
 [data-raw] summary { cursor: pointer; color: var(--text-2); font-size: 12px; }
 [data-raw] > .field { margin-top: 10px; }
 [data-raw] > .note { margin-top: 8px; }

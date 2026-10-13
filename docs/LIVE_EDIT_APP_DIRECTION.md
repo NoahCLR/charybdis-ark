@@ -42,7 +42,7 @@ matrix.
 | --- | --- |
 | Layout and 16 layers | Read/write keys, layer names and order; a reorder renumbers layer keys by default, any layer can be the base, and key labels follow the host layout (D-L15, D-L29, D-L37, D-L56) |
 | Key behaviours, combos and RGB | Read/write editors over the shared draft, with participation controls at every scope and capability-gated global/per-combo output behaviour permissions (D-L12, D-L32, D-L49, D-L55) |
-| Macros | 128 named VIA macros with Text, steps, Advanced raw payload, recorder and live validation; capability-gated Unicode text, typed and checked through the host's OS and keyboard layout; per-macro input protection; one shared memory, shown and enforced (D-L25, D-L26, D-L56, D-L57) |
+| Macros | 128 VIA macros renamed directly through their titles; empty canvas with direct step actions, fixed-size sequence tiles, drag reordering across the whole sequence, Delete/Backspace step removal, per-slot step undo/redo and a shared step clipboard, a selected-step editor, a raw-payload toolbar toggle and live validation, including visible invalid hold order; recorder scoped to its visible slot with taps/chords by default and optional hold timing alongside its other settings; capability-gated Unicode text, typed and checked through the host's OS and keyboard layout; per-macro input protection; one shared memory, shown and enforced (D-L25, D-L26, D-L56, D-L57) |
 | Custom keys | 128 named keys that do what their behaviour says: rename, add or open the behaviour, place, see where each is used (D-L42) |
 | Mouse | Pointer and sniping DPI, auto-sniping and auto-mouse, settings the core files under Mouse, so the rail, the review and import counts all place them there; the auto-mouse fade is a share of the timeout, edited on its lighting stage (D-L17) |
 | Pointing modes | 32 device-owned slots in the sparse PD domain (D-L41, D-L54); capability-gated mouse-button 1–8 clicks and VIA macro outputs from directions, diagonals and tap overrides, with destination blockers in Review; see [the editor contract](architecture/interface-contracts.md#pointing-tap-outputs) and [PD-mode domain v1](../upstream/firmware/docs/architecture/pd-mode-domain-v1.md) |
@@ -403,9 +403,11 @@ profile's fingerprint covers the streams, so the same macros match across bank
 sizes.
 
 The primary macro editor is an ordered list of editable Text, tap/chord, delay,
-press and release steps. Empty macros start with Text; it preserves literal
-braces, whitespace and Unicode without exposing command syntax. Raw commands
-remain under Advanced and round-trip to the same steps. Incomplete step fields
+press and release steps, shown as fixed-size sequence tiles. Empty macros start
+with no steps; direct add actions create Text, tap/chord, delay, press or release
+steps. Text preserves literal braces, whitespace and Unicode without exposing
+command syntax. A Raw payload toggle beside the add actions exposes raw commands
+that round-trip to the same steps. Incomplete step fields
 remain local instead of being silently removed or coerced. Unparseable raw input
 is retained whole and blocks step editing so rebuilding a partial parse cannot
 lose its tail. Text fields contain long input without overlapping feedback or

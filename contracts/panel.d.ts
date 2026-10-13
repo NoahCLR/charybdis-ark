@@ -97,6 +97,7 @@ export interface PublishedModel {
     ownsLayerKeys: boolean;
     qmkKeycodes: CatalogEntry[];
     qmkKeyLabels: Record<string, string>;
+    qmkKeyShortLabels: Record<string, string>;
     qmkKeycodeAliases: Record<string, string>;
     qmkKeycodeSource: string;
     diagnostics: string[];

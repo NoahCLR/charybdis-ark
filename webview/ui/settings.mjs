@@ -101,7 +101,7 @@ function comboTimingRow(model, entry) {
     const editable = canEditArea("combos") && (stores || (hold && combos.length > 0));
     const hint = stores ? entry.hint : hold ? (combos.length ? entry.hint : "Stored with the combos, so it can be set once the keyboard has one. Flash the updated firmware pair to set it without one.")
         : "This keyboard keeps each combo's own window. Flash the updated firmware pair to set a default.";
-    const row = el(`<div class="setrow">
+    const row = el(`<div class="setrow" data-tip="${esc(hint)}">
         <div><div class="nm">${esc(entry.label)}</div>
             <div class="hint">${esc(hint)}</div></div>
         <div class="control"><div class="input-row"><input class="input mono" id="${hold ? "comboHoldTerm" : "comboDefaultTerm"}" data-f="settings:combo:${hold ? "hold" : "default"}" value="${esc(stored)}" ${editable ? "" : "disabled"}></div></div>
@@ -131,10 +131,10 @@ function keyboardCard(model, keyboard, canEdit) {
     const count = nameCount(keyboard.name, keyboard.perName || NAME_MAX_BYTES);
     const node = el(`<section class="card settings-group" data-section="keyboard">
         <div class="card-h"><h3>Keyboard${draftMarks(model?.draft?.changes).settings.has("keyboard") ? draftDot() : ""}</h3></div>
-        <div class="rows"><div class="setrow">
+        <div class="rows"><div class="setrow" data-tip="${esc(KEYBOARD_NAME.hint)}">
             <div><div class="nm">Name</div><div class="hint">${esc(KEYBOARD_NAME.hint)}</div></div>
             <div class="control field"><input class="input" data-f="settings:keyboard-name" data-keyboard-name value="${esc(keyboard.name)}"
-                placeholder="${esc(keyboard.builtIn || "Built-in name")}" aria-label="Keyboard name" data-tip="${esc(NAME_TIP)}" ${canEdit ? "" : "disabled"}>
+                placeholder="${esc(keyboard.builtIn || "Built-in name")}" aria-label="Keyboard name" data-tip="${esc(KEYBOARD_NAME.hint + " " + NAME_TIP)}" ${canEdit ? "" : "disabled"}>
                 <span class="note${count.over ? " warn" : ""}" data-name-count>${esc(count.label)}</span></div>
         </div></div>
     </section>`);
@@ -193,7 +193,7 @@ export function sectionCard(model, section, fields, canEdit, searching = false) 
 /** @param {import("../../contracts/panel.js").PresentedField} field @param {boolean} canEdit @param {() => void} submit @param {boolean} hidden @param {boolean} slot @param {Map<string, ReturnType<typeof durationControl>>} durations */
 function fieldRow(field, canEdit, submit, hidden, slot, durations) {
     const editable = canEdit && !field.readOnly;
-    const row = el(`<div class="setrow ${field.readOnly ? "ro" : ""}" ${hidden ? "hidden" : ""}>
+    const row = el(`<div class="setrow ${field.readOnly ? "ro" : ""}" data-tip="${esc([field.tooltip, field.hint].filter(Boolean).join(" "))}" ${hidden ? "hidden" : ""}>
         <div><div class="nm">${marked(getModel(), field.governs, field.label, {slot})}</div>${field.hint ? `<div class="hint">${esc(field.hint)}</div>` : ""}</div>
         <div class="control"></div>
     </div>`);
@@ -201,7 +201,7 @@ function fieldRow(field, canEdit, submit, hidden, slot, durations) {
 
     if (field.readOnly) {
         control.appendChild(el(`<span class="chip"
-            data-tip="The connected firmware does not report this option, so it is shown as the keyboard has it and cannot be edited here.">read-only · ${esc(field.kind === "toggle" ? (field.enabled ? "on" : "off") : field.value)}</span>`));
+            data-tip="${esc([field.tooltip, field.hint, "This setting cannot be edited with the connected firmware."].filter(Boolean).join(" "))}">read-only · ${esc(field.kind === "toggle" ? (field.enabled ? "on" : "off") : field.value)}</span>`));
         return row;
     }
     if (field.presentation === "duration") {

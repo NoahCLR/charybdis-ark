@@ -205,6 +205,7 @@ export interface Participation {
 
 export interface SettingBits {bitMask?: number; shift?: number; width?: number; kind?: string}
 export interface SettingFieldBase extends SettingBits {
+    tooltip?: string;
     macro: string;
     label: string;
     hint?: string;

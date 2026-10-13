@@ -28,7 +28,7 @@ Key and modifier names follow that OS throughout the editors and Review.
   count, in one grid with its timing. Keep up to 128 definitions with five tap
   counts each, and choose which layers and placements use them.
 - **Combos, macros and custom keys.** Build combos, write named macros or
-  record them, and name your own custom keys. Macros share the keyboard's
+  record taps and chords with optional hold timing, build, reorder, copy and paste compact macro steps with their own undo/redo, and name your own custom keys. Macros share the keyboard's
   macro memory, and on current firmware one macro can use all of it. There are 128 slots in each bank;
   a combo can have up to 16 inputs, with its own enable and layer controls. On supporting firmware, choose whether all combo outputs use shared behaviours, or bypass the behaviour for one combo while keeping its chord active.
 - **Lighting.** Set layer and mode colours, combo and key feedback, and the
@@ -40,7 +40,8 @@ Key and modifier names follow that OS throughout the editors and Review.
 - **Trackball.** Set pointer speed, sniping and auto-mouse, and 32 pointing
   slots (scroll, volume, zoom, arrows, your own
   shortcuts…), with their keys. On supporting firmware, directions and button
-  overrides can click mouse buttons 1–8 or run a macro too.
+  overrides can click mouse buttons 1–8 or run a macro too. Mouse and Settings
+  explain each control on hover.
 
 ## Nothing is saved until you say so
 

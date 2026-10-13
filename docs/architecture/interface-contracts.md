@@ -98,6 +98,12 @@ No field, history step or import silently substitutes a keyboard shortcut.
 
 ## Shared rule ownership
 
+- Settings help: `core/model/settings-editor.js` owns the descriptions for its
+  Mouse and Settings fields. `hint` remains visible; optional `tooltip` adds
+  an explanation where the hint is a numeric range. The shared setting-row
+  renderer combines them for `data-tip`, including read-only reasons. Keyboard
+  name and combo timing rows use the same hover path. `ui/hover.mjs` displays
+  all of them; screens do not maintain separate tooltip catalogues.
 - Screens: `webview/view/screens.mjs` owns their IDs, labels, icons, rail
   groups, availability, placeholder titles, renderer dispatch and redraw
   policy. The app supplies render functions to keep this registry pure.
@@ -133,6 +139,12 @@ No field, history step or import silently substitutes a keyboard shortcut.
   including modifier wrappers, mod-taps, layer-mod keys, Magic actions and Space Cadet keys,
   without changing stored keycodes. Macro command previews and held-key
   warnings resolve those same labels; raw payload editors keep stored codes.
+  Basic-key compact labels are also derived there, from host-resolved full names,
+  and published as `qmkKeyShortLabels`: modifiers retain L/R and the effective
+  host's Cmd/Opt, Win/Alt, Super/Alt or neutral GUI/Alt wording. Layout legends
+  and stored keycodes do not change. The sequence renderer reads that map on
+  every render and keeps full names in hover and accessibility labels; unknown
+  compact names fall back to the full published name or stored identity.
   Modifier-bearing catalogue labels are identified centrally by their words,
   independently of picker groups, so another key family inherits the rule. The
   screens' `qmkKeyLabels` and the review are both built from it, each from
@@ -215,6 +227,129 @@ payload for each slot and reading purpose on one published model; a replacement
 model uses fresh host parsing options. Labels are resolved while rendering.
 Parsed host steps carry no local focus metadata: step identity is assigned to
 copies by the existing focus path, and serialization excludes that identity.
+
+The macro title itself is the sole name field, with the same stable `data-f`
+identity and host-posted name edit. Enter blurs/commits it, Escape restores the
+model's name, and the byte counter appears on focus or when over the limit.
+An empty macro has zero editor steps. Direct Text, Key/chord, Delay, Press and
+Release actions replace the step-type selector. Text and Delay focus their
+fields; key actions open the existing basic-key picker before inserting a step,
+so cancellation leaves no incomplete placeholder. `appendSequenceStep()` replaces
+only a sole empty Text step; literal whitespace and later Text blocks are retained.
+Removing the last step or clearing the macro returns to the empty canvas.
+
+`view/macro-history.mjs` owns bounded immutable step-history transitions; the
+`ui/macros/history.mjs` module integrates them with selection, the clipboard,
+normal inspection/staging and focused shortcut routing. Each slot stores at most
+100 undo entries in its MacroForm, including payload, incomplete steps and local
+focus/selection IDs. Selection alone is not an edit. Continuous input for one
+field coalesces until change/blur or a structural command. A new edit clears
+redo; native field undo returning to the group origin drops that no-op group.
+Add, remove, reorder, key/text/delay/raw edits, Clear, local discard and a finished
+take use the same tracker. Undo/redo restores local editor snapshots and posts
+valid payloads through inspection, never an undoProfileDraft/redoProfileDraft
+command. Invalid intermediate snapshots remain editable locally. Rename and
+protection are not step-history entries. Accepted model publishes preserve
+history; resetDraftForms drops it with the existing macroForms reset policy.
+
+Step Undo/Redo shortcuts take precedence over draft history only while focus
+belongs to the macro editor, and never fall through when its tracker is empty
+or read-only. Text inputs retain native undo/copy/paste, and open dialogs keep
+their own keys: the global history router checks dialog ownership before draft
+Undo/Redo, including button focus. Undo/redo/copy/paste are keyboard-only, with no dedicated
+buttons; focusing the sequence accesses step history after typing. Selection
+uses click, Shift-click range, Ctrl/Meta-click toggle and Ctrl/Meta+A; Copy
+retains selected steps in sequence order without local IDs. The in-memory
+step clipboard is shared between slots and independent of the board clipboard.
+Paste assigns fresh IDs, inserts after the last selected step or appends without
+selection, selects the pasted group and records one history entry. Group deletion
+is one entry. A sole blank Text starter is replaced on paste. Invalid raw input
+cannot accept pasted steps. Recording suspends editor commands and records their
+key chords normally; stopping records the completed take once rather than each
+captured event. Read-only editors permit copying, but not undo/redo or paste.
+
+The macro sequence uses two fixed tile sizes: 64 × 80 CSS pixels for one key
+or a delay and 144 × 80 for a chord or text, at every layout width. Content
+wraps/clips inside those sizes; it never determines tile dimensions. Press and
+release use small down/up marks, taps a dot and delays inline milliseconds.
+Reading order is left to right, then the next row. Selecting a tile reveals
+its existing editor beneath the sequence. Selection follows its local focus ID,
+not its index. Tiles keep their selected border without an additional native
+focus outline. Delete/Backspace removes the focused tile, or the selected step
+from a button in its inspector, through the same validated path as Remove. It
+then focuses the next surviving step after the focused removed step, counting
+only survivors before it (previous at the end), or the first add action when
+empty. Form fields retain ordinary editing keys; modified keys, composition,
+read-only mode, dialogs and recording cannot trigger deletion. Auto-repeat is
+consumed without deleting more steps. Drag insertion and Earlier/Later share the pure
+`view/macro-sequence.mjs` move rule, preserve step objects and metadata, and post
+through the existing validation/staging path. The complete sequence is the drop
+surface: its leading/trailing whitespace and gaps between wrapped rows use
+`sequenceInsertionAt()` to find the nearest row and insertion position. Drops
+recompute their target from the actual drop coordinates, not a stale hover marker;
+leaving the sequence clears the marker. Read-only and recording sequences
+do not offer dragging. The name, protection, placement, recorder, clear/discard,
+raw input, shared bank-memory feedback and draft history paths remain available.
+The sequence leads the editor; lengthy typing/protection guidance is a separate
+disclosure in the footer below the recorder, beside Host settings. Add-step and
+Discard/Clear macro controls use bordered 36 px buttons; Record/Stop uses a
+42 px button with the same dimensions in either state. Raw payload has a persistent
+checkbox toggle at the right of the add-step row; its panel opens above the
+sequence, including automatically for an unparseable payload. Protection and all
+recorder settings stay visible. The macro bank has its own scroll area, so a
+slot change does not require scrolling past the editor. The shared scroll path
+captures and restores both the bank and outer content positions during same-screen
+renders, including slot selection, accepted edits and captured recording events.
+
+The same view module diagnoses orphan releases, repeated holds/taps of held keys
+and unfinished holds by canonical key identity, marking affected tiles and
+showing a reason before staging. Invalid intermediate orders remain editable
+locally; no automatic sorting or encoding changes repair them. Host inspection
+still judges the complete payload and prevents invalid, unsupported or oversized
+edits from replacing the last valid draft. Local step diagnostics do not replace
+the firmware decoder or the host's validation authority. Routine per-macro memory
+and successful-staging notes are omitted; the feedback area collapses when there
+is no error or pending inspection on streaming firmware. Shared bank memory
+remains visible, and earlier firmware retains its fixed playback-size meter.
+
+`recorder.mjs` owns capture listeners and finishes a take when its slot is no
+longer the editable, visible Macros slot, a dialog opens, or the user clicks
+outside the recorder. The app reconciles this ownership before rendering, so
+rail navigation and editor jumps share the same policy. Finishing removes
+capture listeners and stages through the original slot's normal host validation;
+another selected slot never receives the take. Discard explicitly cancels its
+active capture and detaches listeners before resetting the form; the outside
+click handler cannot stage that discarded take. Explicit takes release any
+captured held keys before validation. Outside clicks keep their intended action,
+including native disclosure toggles, before the editor redraws.
+
+`view/macro-recording.mjs` owns captured-event normalization and macro encoding,
+without DOM or host access. The recorder defaults to taps and chords, with no
+capture-style selector. All recorder settings are visible, including **Preserve
+hold timing**, off by default and disabled during a take. The boolean preference
+survives renders and draft changes. Enabling the preference
+selects explicit encoding and forces effective delay recording on; disabling it
+restores the stored delay preference. The control shows the effective delay
+choice and retains the existing threshold/rounding controls. Both encodings
+observe down and up events.
+Compact capture groups an overlap into a chord only when every press precedes
+the first release. A modifier held around several complete groups joins each
+shortcut; nested modifier holds follow the same rule. Other rolling overlaps
+retain their original explicit sequence. No transitive overlap becomes a chord.
+Explicit capture keeps each event and its timing. Duplicate downs and releases
+of keys not captured by this take add nothing. Pending compact groups render
+as a provisional chord; pending explicit groups retain held presses, and
+finishing supplies any missing releases in reverse press order. The UI passes
+the take end timestamp so synthetic releases preserve the last hold duration;
+rounding, thresholds and delay splitting apply normally. Earlier end timestamps
+are clamped to the last event, and a take with all physical releases gets no
+extra trailing delay.
+
+Compact delays measure gaps between completed groups; explicit delays measure
+event gaps. The first event has no leading delay. Threshold and rounding apply
+before pauses longer than 65,535 ms split into supported delay steps. Existing
+payload text is retained verbatim before the take; host validation still decides
+whether the resulting macro can be staged.
 
 Every form control (`input`, `select`, `textarea`) authors a nonempty `data-f`
 identity. It is unique across the complete rendered surface, including an

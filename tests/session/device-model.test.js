@@ -40,7 +40,7 @@ test("behaviour rows claim built-in first actions from the keyboard's advertised
 
 const MODEL_FIELDS = [
     "layers", "keyBehaviors", "combos", "viaMacros", "macroNameSpace", "behaviorTimingDefaults",
-    "configDefaults", "rgb", "qmkKeycodes", "qmkKeyLabels", "qmkKeycodeAliases",
+    "configDefaults", "rgb", "qmkKeycodes", "qmkKeyLabels", "qmkKeyShortLabels", "qmkKeycodeAliases",
     "qmkKeycodeSource", "macroPayloadKeycodes", "diagnostics", "ownsLayerKeys",
 ];
 

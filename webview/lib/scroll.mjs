@@ -2,23 +2,34 @@
 // Keep a person's place when the current screen is rebuilt. Every edit comes
 // back through the host model and the webview deliberately redraws from that
 // model, but replacing `.content` must not make an ordinary click feel like
-// navigation. Moving to another screen still starts at its top.
+// navigation. The macro bank keeps its independent scroll position too.
+// Moving to another screen still starts at its top.
+
+/** @typedef {{top: number, left: number}} ScrollOffset */
+/** @typedef {ScrollOffset & {macroBank?: ScrollOffset}} ContentScroll */
 
 /** @param {Element} root @param {string | null} previousScreen @param {string} nextScreen */
 export function captureContentScroll(root, previousScreen, nextScreen) {
     if (previousScreen !== nextScreen) return null;
     const content = root.querySelector(".content");
     if (!content) return null;
-    return {top: content.scrollTop, left: content.scrollLeft};
+    const bank = root.querySelector(".macros-library .macro-grid");
+    return {top: content.scrollTop, left: content.scrollLeft,
+        ...(bank ? {macroBank: {top: bank.scrollTop, left: bank.scrollLeft}} : {})};
 }
 
-/** @param {Element} root @param {{top: number, left: number} | null} scroll */
+/** @param {Element} root @param {ContentScroll | null} scroll */
 export function restoreContentScroll(root, scroll) {
     if (!scroll) return;
     const content = root.querySelector(".content");
     if (!content) return;
     content.scrollTop = scroll.top;
     content.scrollLeft = scroll.left;
+    const bank = root.querySelector(".macros-library .macro-grid");
+    if (bank && scroll.macroBank) {
+        bank.scrollTop = scroll.macroBank.top;
+        bank.scrollLeft = scroll.macroBank.left;
+    }
 }
 
 // The common Keys floor keeps ordinary tabs level. If one editor grows beyond

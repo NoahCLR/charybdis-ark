@@ -90,15 +90,15 @@ export function paintFeedback(card, model, slot) {
     const error = form.stepError || parsed.error || (held.length ? `Release ${held.map(key => actionLabel(model, key)).join(", ")} before the macro ends.` : "") || inspection?.error || (!local && slot.playbackError);
     const measured = inspection && "bytes" in inspection ? /** @type {import("../../../contracts/model.js").MacroInspection} */ (inspection) : null;
     const program = local ? measured?.program : slot.program;
-    const bytes = local ? measured?.bytes : slot.bytes;
     const max = model?.macroBank?.programMax === null ? null : model?.macroBank?.programMax ?? 512;
-    const available = measured?.availableBytes ?? (slot.bytes + (model?.macroBank?.free ?? 0));
+    const note = error ? (local ? "Fix this edit before it can be kept in your draft." : "Change Host settings or fix the macro before playing it.") : local && !inspection ? "Checking this edit…" : "";
     const feedback = /** @type {HTMLElement} */ (card.querySelector("[data-macro-feedback]"));
+    feedback.hidden = !error && !note && max === null;
     feedback.replaceChildren(el(`<div class="stack">
         ${error ? `<div class="unavailable">${esc(error)} ${local ? "This edit is not staged." : "This stored macro cannot play with the current Host settings."}</div>` : ""}
         ${max === null ? "" : `<div class="meter ${program != null && program > max ? "over" : ""}"><i style="width:${Math.min(100, (program ?? 0) / max * 100)}%"></i></div>`}
-        <p class="note" data-macro-size>${max === null ? "" : `${program == null ? "Playback size unavailable" : `${esc(program)} of ${esc(max)} playback bytes`} · `}${bytes == null ? "Macro memory size unavailable" : `${esc(bytes)} bytes of macro memory`}${max === null ? ` · ${esc(available)} available for this macro` : ""}</p>
-        <p class="note">${error ? (local ? "Fix this edit before it can be kept in your draft." : "Change Host settings or fix the macro before playing it.") : local && !inspection ? "Checking this edit…" : "Valid edits are kept in your draft when you finish editing a step."}</p>
+        ${max === null ? "" : `<p class="note" data-macro-size>${program == null ? "Playback size unavailable" : `${esc(program)} of ${esc(max)} playback bytes`}</p>`}
+        ${note ? `<p class="note">${esc(note)}</p>` : ""}
     </div>`));
     const dirty = local && payload !== slot.payload;
     /** @type {HTMLElement} */ (card.querySelector("[data-local-state]")).replaceChildren(el(`<i class="dot ${dirty ? "draft" : "on"}"></i>`), document.createTextNode(dirty ? "edited here" : "as read"));

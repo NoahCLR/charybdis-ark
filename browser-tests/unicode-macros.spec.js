@@ -30,6 +30,7 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
             model.macroUnicode = {supported:true,mode:1,enabled:true};
             store.setModel(model); store.state.screen = "macros"; store.state.macroSlot = "VIA_MACRO_17"; store.render(); window.__posted.length = 0;
         });
+        await page.locator('[data-insert-kind="text"]').click();
         const text = ' {"café": “hello”} 🙂 e\u0301 👩‍💻 ';
         await page.locator('[data-step-text]').fill(text);
         await page.locator('[data-step-text]').dispatchEvent('change');
