@@ -10,6 +10,7 @@ import test from "node:test";
 import {createRequire} from "node:module";
 import path from "node:path";
 import {fileURLToPath} from "node:url";
+import {recordedTakePayload} from "../../webview/view/macro-recording.mjs";
 import * as edits from "../../webview/view/edits.mjs";
 import * as controls from "../../webview/view/controls.mjs";
 import {behaviourEditorRow, behaviourTimingEdit, behaviourTimingField} from "../../webview/view/behavior-editor.mjs";
@@ -483,14 +484,12 @@ test("a macro left holding a key is refused, and macro and custom keys land as t
 });
 
 test("a recorded take appends to what the payload held, with no pause before the first key", () => {
-    let payload = "{KC_H}";
-    payload = edits.recordedPayload(payload, {keycode: "KC_A", type: "keydown", gap: 900, captured: false, threshold: 30, round: 10});
-    assert.equal(payload, "{KC_H}{KC_A}", "the time it took to start typing is not part of the macro");
-    payload = edits.recordedPayload(payload, {keycode: "KC_B", type: "keydown", gap: 124, captured: true, threshold: 30, round: 10});
-    assert.equal(payload, "{KC_H}{KC_A}{120}{KC_B}");
-    payload = edits.recordedPayload(payload, {keycode: "KC_C", type: "keydown", gap: 20, captured: true, threshold: 30, round: 10});
+    const payload = recordedTakePayload("{KC_H}", [
+        {keycode: "KC_A", type: "keydown", time: 900}, {keycode: "KC_A", type: "keyup", time: 950},
+        {keycode: "KC_B", type: "keydown", time: 1074}, {keycode: "KC_B", type: "keyup", time: 1124},
+        {keycode: "KC_C", type: "keydown", time: 1144}, {keycode: "KC_C", type: "keyup", time: 1194},
+    ], {threshold: 30, round: 10});
     assert.equal(payload, "{KC_H}{KC_A}{120}{KC_B}{KC_C}", "gaps under the threshold are dropped");
-    assert.equal(edits.recordedPayload("", {keycode: "KC_LSFT", type: "keyup", gap: 5, captured: true, threshold: 30, explicit: true}), "{-KC_LSFT}");
     const draft = session();
     stage(draft, edits.macroMessage("VIA_MACRO_1", payload, draft.current.fingerprint));
     assert.equal(draft.dirty, true);

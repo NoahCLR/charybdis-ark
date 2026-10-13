@@ -11,7 +11,7 @@ async function sendHost(page, hostOs) {
     const patch = buildDeviceModel({settingsView:{host:{effective:hostOs}},layout:{state:"read",layers:[{layer:0,keys:keycodes.map((keycode,layoutIndex)=>({keycode,layoutIndex,resolved:resolve(keycode)}))}]}});
     await page.evaluate(patch => {
         const model=structuredClone(window.__hostBase);
-        for(const key of ["vocabulary","qmkKeyLabels","qmkKeycodes","qmkKeycodeAliases"]) model[key]=patch[key];
+        for(const key of ["vocabulary","qmkKeyLabels","qmkKeyShortLabels","qmkKeycodes","qmkKeycodeAliases"]) model[key]=patch[key];
         window.dispatchEvent(new MessageEvent("message",{data:{type:"model",model}}));
     },patch);
     return patch;
@@ -69,6 +69,8 @@ for(const theme of ["vscode-dark","vscode-light"]) {
             await expect(page.locator('.macro-step .tok').nth(0)).toHaveText(hostKeyLabel('Right GUI',host));
             await expect(page.locator('.macro-step .tok').nth(1)).toHaveText(`${hostKeyLabel('Left GUI',host)} + ${hostKeyLabel('Right Alt',host)}`);
             await expect(page.locator('.macro-step .tok').nth(2)).toHaveText(hostKeyLabel('Right GUI',host));
+            await expect(page.locator('[data-step-tile="0"]')).toHaveAccessibleName(new RegExp(hostKeyLabel('Right GUI',host)));
+            await expect(page.locator('[data-step-tile="0"] .macro-token-label')).toHaveText(host === 1 ? 'R Cmd' : host === 2 ? 'R Win' : host === 3 ? 'R Super' : 'R GUI');
         }
         await page.evaluate(async()=>{const s=await import('/webview/store.mjs');s.setMacroForm('VIA_MACRO_0',{draft:'{+KC_RALT}'});s.render();});
         for(const host of [1,2,3,0]) {

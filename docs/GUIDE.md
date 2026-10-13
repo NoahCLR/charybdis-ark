@@ -128,7 +128,7 @@ Every screen is drawn and wired to the host:
 | --- | --- |
 | Keys | Layout keys, key behaviours, combos, layer names and priority; reachable behaviours, macros and pointing modes are shown in place, whether a key, a behaviour branch or a combo reaches them |
 | Lighting | Six stages, the stage mask, layer and pointing-mode colours with their localities, combo and key feedback, auto-mouse fade with its hold as a share of the timeout, LED group rows and reusable groups |
-| Macros | Named slots: literal Text, editable key/delay/press/release steps, reorder/remove controls, Advanced raw payload, live size feedback, configurable recorder and placement; search by name, and the layers that set each macro off — by key, behaviour or combo — in their layer colour, each opening that layer in Keys with the macro picked |
+| Macros | Named slots: literal Text, a compact sequence of key/delay/press/release tiles, drag reordering and a selected-step editor, raw payload, live size feedback, configurable recorder and placement; search by name, and the layers that set each macro off — by key, behaviour or combo — in their layer colour, each opening that layer in Keys with the macro picked |
 | Mouse | Pointer speed, sniping and auto-mouse — the Settings sections the keyboard's model files under Mouse, drawn with the same cards and posted whole |
 | Pointing modes | All 32 slots: movement, speed, direction shortcuts and how often they send (every step, or once per movement until the ball pauses or moves back the other way), scroll tuning and which way a scrolling mode scrolls (both axes, horizontal only or vertical only), what each direction's shortcut does with held modifiers, thresholds shown as ball movement at the mode's DPI, buttons, bindings, placement, clear and duplicate |
 | Settings | The keyboard's own name, then every other section the keyboard reports, posted whole, read-only where the firmware cannot report; the Combos section also carries the default combo window and the combo hold threshold, which the keyboard stores with its combos |
@@ -286,6 +286,16 @@ Apply, including switches and layer allowances.
 
 ## The interface
 
+On the web page, **Choose keyboard** fills the sidebar's action row;
+**Disconnect** sits underneath as a secondary action. Before a keyboard is
+chosen, the screen offers **Choose keyboard** and **Explore a demo**. **Read
+keyboard** is available when a connected keyboard needs a retry; the VS Code
+extension also uses it to find a keyboard.
+
+Hover over a setting's label or control on Mouse or Settings to see what it
+does. Read-only settings also explain why they cannot be edited. Visible
+hints and numeric limits stay beside the setting.
+
 When an accepted edit redraws the screen, the same field keeps keyboard focus
 and its text selection while it remains available. Search fields also keep
 the caret where you are editing, including when filtering Settings.
@@ -362,8 +372,9 @@ behaviour takes QMK's layer keys where the keyboard can run them: `TG()`,
 and `DF()`/`PDF()` are refused.
 On the board, drag one key onto another to swap them, ⌘C and ⌘V copy a key
 onto the selected key, and Delete or Backspace makes it transparent. ⌘Z undoes
-and ⇧⌘Z or ⌘Y redoes the draft everywhere except inside a text field, which
-keeps its own undo. **Draft history** in the rail opens every step of the
+and ⇧⌘Z or ⌘Y redoes the draft outside the macro editor. A focused macro
+editor uses its own step history, while a text field keeps its native text undo. Open dialogs keep their keyboard shortcuts; Undo/Redo
+there does not move draft history. **Draft history** in the rail opens every step of the
 draft, newest first, each with when it was made and what it changed from the
 step before it (not from the keyboard, as the review compares); go straight
 back or forward to any of them. Board keys work from the keyboard too: Space or Enter
@@ -795,16 +806,97 @@ keys automatically, while explicit key steps still send the keys you chose.
 
 ## Text macros
 
-Each empty macro opens with a **Text** box. Type or paste exactly what you want
-it to type: braces, code, whitespace and line breaks are literal. On supporting
+An empty macro starts with no steps. Choose **Text**, **Key / chord**, **Delay**,
+**Press** or **Release** above the sequence, or start **Record** below it.
+Key actions open their picker immediately; cancelling leaves the sequence
+unchanged. Text opens and focuses its text box, and Delay opens its millisecond
+field. Adding another first action replaces a sole empty Text step, so there
+is no placeholder to remove; written text, including whitespace, stays intact.
+Type or paste exactly what you want Text
+to type: braces, code, whitespace and line breaks are literal. On supporting
 firmware, accents, curly quotes, symbols, emoji and combining sequences are
 preserved too. Typing `{KC_A}` in Text types those six characters.
 
-Use **Add a step** for another Text block, a key or chord, a delay, a press and
-hold, or a release. Edit each step directly and move or remove it with the
-buttons on its row. Key pickers offer only the basic keys macros can send;
+Use those same actions for another Text block, a key or chord, a delay, a press and
+hold, or a release. Click the macro's title to rename it directly; Enter finishes
+the edit and Escape cancels it. The byte count appears while editing the title.
+The sequence plays left to right, continuing on the next
+row. Individual keys and delays use one fixed tile size; chords and text use
+a wider size with the same height. A down arrow means press, an up arrow means
+release, and a dot means tap. Delays show their milliseconds inline. Long labels
+and text stay within the tile; hover shows the full value. Short modifier names
+keep their side and follow Host settings, such as L Cmd on macOS and L Win on Windows.
+Click a tile to open its editor underneath, including the full Text box or key
+picker. Drag any tile anywhere in the sequence to reorder: the beginning,
+row gaps and the space after the last tile accept drops too, with an insertion
+marker. Or use **Earlier** / **Later**
+and **Remove** in its editor. Delete or Backspace removes the focused tile (or the selected
+step while a button in its editor has focus), then focuses the next tile or the
+previous one at the end, accounting for every removed step in a group. In text
+and number fields these keys edit the value as usual.
+Each slot has its own keyboard undo/redo for step edits:
+additions, deletion, reordering, changed keys, text/delays, raw edits, Clear and
+finished recordings. With focus in the macro editor, ⌘/Ctrl+Z undoes steps;
+⇧⌘/Ctrl+Z or ⌘/Ctrl+Y redoes them. An empty step history does not undo another
+part of the draft. Text fields retain native typing undo and text copy/paste;
+focus the sequence to undo or redo whole step edits. Continuous field edits form one history item
+until you leave the field. Renaming and playback protection use the draft as usual.
+
+Click to select one tile, Shift-click a range, or ⌘/Ctrl-click to add/remove a
+selection. ⌘/Ctrl+A selects all steps. ⌘/Ctrl+C copies the selection
+in sequence order; ⌘/Ctrl+V inserts new steps after the last selected
+step, or at the end without a selection. The step clipboard works between macro
+slots in this Ark window. Delete/Backspace removes the selected group when a
+selected tile has focus. Pasting and group deletion each take one undo item.
+History survives accepted edits, rerenders and slot switches; replacing the
+draft through draft Undo/Redo, import, Apply or changing keyboard starts fresh.
+
+The editor follows a moved step. A release before
+that key's press, a repeated press of a held key, or an unfinished hold marks the
+affected tiles and stays local for correction; it never replaces the valid draft.
+Uninterruptible playback and placement stay beside the title and context.
+The sequence and add actions come first, with validation errors shown underneath;
+**Typing & playback help** opens the longer explanation.
+Host settings and that help sit at the bottom, below the recorder. Add-step actions
+and Discard / Clear macro use larger, bordered buttons; Record / Stop is the
+prominent recording action. The **Raw payload** toggle sits at the right of
+the add-step row and reveals its editor above the sequence. All recorder options remain
+visible below. The slot bank scrolls independently of the editor and keeps its
+position when selecting a slot, editing or recording.
+Key pickers offer only the basic keys macros can send;
 a chord takes up to 16 distinct keys, and a press or release takes one.
 Record appends key steps; **Clear take** restores what was there before recording.
+**Discard local edits** cancels an active take and returns to the draft macro
+without keeping the recorded keys.
+During recording, step Undo/Redo/Copy/Paste and selection shortcuts are suspended.
+Their chords are captured as ordinary macro keys.
+Recording groups keys pressed together into one editable
+chord. For example, holding Command, pressing A and releasing both records
+Command+A, rather than a Command tap followed by an A tap. A modifier held
+across several shortcuts joins each chord. Overlaps in which a new key arrives
+after another key has already been released keep their press/release sequence,
+so Ark does not turn keys that were never all held together into a chord.
+For a macro that needs keys held for a particular time, turn on **Preserve
+hold timing** beside the other recorder settings. It keeps each press and
+release separately, preserving how long keys are held. A shortcut then appears
+as press/release steps rather than one chord step. This option is off by default
+and cannot change during a take.
+
+**Record delays** keeps pauses above **After (ms)**, rounded to **Round to
+(ms)**. Normal recording keeps pauses between completed taps/chords.
+**Preserve hold timing** keeps Record delays on and records gaps between
+individual events, including holds, with that same threshold and rounding.
+Turning it off restores your previous delay choice. Neither records the wait
+before the first key. Long pauses use several delay steps if needed.
+
+Recording belongs to the selected slot while its recorder is open. **Stop**,
+Escape, switching slots, leaving Macros, opening a dialog, or clicking outside
+the recorder finishes the take in that original slot. Recorder options and
+ordinary redraws keep it running. With **Preserve hold timing** on,
+finishing also releases any keys captured as still held, preserving their hold
+duration up to the moment the take ends. Otherwise, it finishes
+the pending tap or chord. Incomplete or invalid
+takes remain local for correction and are not kept in the draft.
 
 **Uninterruptible playback** is saved per macro on supporting firmware.
 **Automatic** turns it on when the selected layout needs Unicode entry for any
@@ -832,14 +924,16 @@ Text edits and renames preserve the choice. Review, undo/redo, discard, exports
 and imports carry it with the macro. Older firmware shows the control read-only;
 a backup containing an explicit override needs firmware supporting the setting.
 
-Playback size and macro-memory usage follow the edit while you type. Valid edits
-enter the draft when you finish editing a field or change a key step. Incomplete,
+Shared macro memory stays in the slot bank; the editor shows checking status and
+validation errors without routine memory or staging notes. Earlier firmware also
+shows its fixed playback-size limit. Valid edits enter the draft when you finish editing a field or change a key step. Incomplete,
 invalid or oversized edits stay visible locally with their reason and never
 replace the last valid draft. **Discard local edits** returns to the draft's
-current macro; use draft Undo to reverse an edit already kept there. Text boxes
-keep long content inside their rows, with scrolling and preserved line breaks.
+current macro; use step Undo while editing the macro, or draft Undo from the rail
+to reverse a draft change. Text boxes
+keep long content inside their step editor, with scrolling and preserved line breaks.
 
-**Advanced → Raw payload** offers the existing command syntax: `{KC_A}` taps a
+**Raw payload** offers the existing command syntax: `{KC_A}` taps a
 key, `{+KC_A}` presses it, `{-KC_A}` releases it, and `{120}` waits 120 ms.
 Literal braces there must be doubled as `{{` and `}}`; Text escapes them for you.
 Valid raw edits read back as editable steps. A raw edit that cannot be completely

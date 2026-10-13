@@ -8,6 +8,22 @@ const {PD_SLOT_BINDINGS: PD_BINDINGS} = require("../../core/data/pd-bindings");
 
 const PD_SLOT_0 = PD_BINDINGS[0].holdCode;
 
+test("compact basic-key labels retain modifier side, host and layout naming under every alias", () => {
+    const {compactKeyLabels, compactKeyLabel} = require("../../core/model/key-names");
+    for (const [hostOs, gui, alt] of [[0, "GUI", "Alt"], [1, "Cmd", "Opt"], [2, "Win", "Alt"], [3, "Super", "Alt"]]) {
+        const full = profileKeyNames({hostOs, hostLayout: 9}).labels;
+        const compact = compactKeyLabels(full);
+        assert.equal(compact.KC_LGUI, `L ${gui}`);
+        assert.equal(compact.KC_RIGHT_GUI, `R ${gui}`);
+        assert.equal(compact.KC_RALT, `R ${alt}`);
+        assert.equal(compact.KC_Y, "Z", "German host naming survives shortening");
+        assert.equal(full.KC_LGUI, `Left ${hostOs === 1 ? "Command" : hostOs === 2 ? "Windows" : gui}`, "full names remain untouched");
+    }
+    assert.equal(compactKeyLabels({}).KC_SPC, "Space");
+    assert.equal(compactKeyLabel("An unfamiliar long name"), "An unfamiliar long name");
+    assert.equal(compactKeyLabels({}).VIA_MACRO_0, undefined, "profile names are not shortened");
+});
+
 test("semantic target aliases link the native ABI and stay absent for an unknown one", () => {
     const behaviors = decodedDeviceProfile().domains.keyBehaviors.rows;
     const {aliases} = profileKeyNames({behaviors, actionsKnown: true});

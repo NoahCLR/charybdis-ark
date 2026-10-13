@@ -36,7 +36,7 @@ export function screenMacros() {
         "Macro slots on the keyboard. A named macro shows by its name on keys, in the picker and in the key card.",
     )}</div>`);
 
-    const content = el(`<div class="content"><div class="pad library"></div></div>`);
+    const content = el(`<div class="content"><div class="pad library macros-library"></div></div>`);
     const pad = /** @type {HTMLElement} */ (content.firstElementChild);
     if (!bank.length) {
         pad.classList.remove("library");

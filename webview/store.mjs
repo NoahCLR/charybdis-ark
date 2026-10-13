@@ -61,6 +61,7 @@ export const STATE_FIELDS = {
     () => closedComboBuilder()),
     placement: kept(null),     // {keycode}: next board click places it on the current layer
     retarget: resets(null),    // {from, to, existing}: a behaviour move waiting on overwrite / swap / cancel
+    macroClipboard: kept(null), // copied macro steps, shared between slots in this Ark window
     keyClipboard: kept(null),  // {keycode, label}: the key ⌘C copied, for ⌘V onto the selected key
     stage: kept("layers"),
     layersOpen: kept(false),  // the layer-stack panel on the layer row
@@ -84,10 +85,10 @@ export const STATE_FIELDS = {
         const take = before.recording?.slot;
         return take && forms[take] ? {[take]: {draft: forms[take].draft}} : {};
     }),
-    recording: kept(null),     // {slot, before, last, captured} only while a take is being captured; a draft change does not stop it
+    recording: kept(null),     // {slot, before} only while a take is being captured; a draft change does not stop it
     lastTake: resets(null),    // {slot, before}: the finished take Clear take can undo
     recordDelays: kept(true),
-    recordMode: kept("compact"),
+    recordPreserveHoldTiming: kept(false),
     recordDelayThreshold: kept(30),
     recordDelayRound: kept(10),
     // The LED group row being built on LED groups: the LEDs picked on the

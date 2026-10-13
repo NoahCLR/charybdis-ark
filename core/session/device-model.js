@@ -15,7 +15,7 @@ const {PHASE, VOCABULARY, HALVES_WORDS, slotName} = require("../model/vocabulary
 const keycodeCatalog = require("../data/keycode-catalog");
 const {baseEffectForView, baseRgbForView, behaviorRowsForView, builtInForView, comboRowsForView, rgbForView} = require("../model/device-profile-view");
 const {effectiveTimings} = require("../model/gesture-timing");
-const {hostKeyVocabulary, keyLabel, profileKeyNames} = require("../model/key-names");
+const {compactKeyLabels, hostKeyVocabulary, keyLabel, profileKeyNames} = require("../model/key-names");
 const {layerName} = require("../model/vocabulary");
 const {keycodeAction, knownActionAbi, layerRef, nativeCode} = require("../schema/actions");
 const {dpiChoices} = require("../model/pointer-dpi");
@@ -226,6 +226,7 @@ function configurationModel(content, capabilities, editing) {
         ownsLayerKeys: Boolean((capabilities?.featureFlags || 0) & PROFILE_WIRE_FEATURES.OWNED_LAYER_TOGGLES),
         qmkKeycodes: catalog.entries,
         qmkKeyLabels: catalog.labels,
+        qmkKeyShortLabels: compactKeyLabels(catalog.labels),
         qmkKeycodeAliases: catalog.aliases,
         qmkKeycodeSource: CATALOG_SOURCE,
 

@@ -46,8 +46,8 @@ const CUSTOM = ["combo", "macroForms"];
 const KEPT = [
     "screen", "layer", "layersOn", "layerGripFocus", "selected", "tab", "behaviourRow", "behaviourRowShown", "behaviourRoute",
     "reachGroups", "resetBenchHeight", "reachRow", "cell", "reveal", "pickCombo", "settingsOpen", "cellHow", "placement",
-    "keyClipboard", "stage", "layersOpen", "layersAsked", "pdSlot", "pdAdvanced", "applyDismissed", "pdPreview", "feedbackRow",
-    "macroSlot", "macroSearch", "customKey", "customKeySearch", "recording", "recordDelays", "recordMode", "recordDelayThreshold",
+    "macroClipboard", "keyClipboard", "stage", "layersOpen", "layersAsked", "pdSlot", "pdAdvanced", "applyDismissed", "pdPreview", "feedbackRow",
+    "macroSlot", "macroSearch", "customKey", "customKeySearch", "recording", "recordDelays", "recordPreserveHoldTiming", "recordDelayThreshold",
     "recordDelayRound", "ledPicks", "trackball", "rowColour", "ledRow", "settingsSearch", "overlay", "leaveDemo", "confirmChecks",
     "picker", "notice", "error", "settingsDurationUnits",
 ];
@@ -69,7 +69,7 @@ test("a draft change resets the existing forms and preserves historically kept p
         cellHow: {cell: "0-hold", keycode: "QK_USER_16", helper: "REPEAT_WHILE_HELD", repeatHz: "20"},
         placement: {keycode: "VIA_MACRO_1"}, keyClipboard: {keycode: "KC_A", label: "A"}, pdSlot: 2, macroSlot: "VIA_MACRO_0",
         macroSearch: "hello", ledPicks: [1, 4], trackball: true, rowColour: {h: "10", s: "20", v: "30"},
-        ledRow: {target: "pdMode", owner: "PD_SLOT_0", source: "Thumbs"}, recordMode: "explicit", overlay: "history",
+        ledRow: {target: "pdMode", owner: "PD_SLOT_0", source: "Thumbs"}, recordPreserveHoldTiming: true, overlay: "history",
         notice: "Saved.", recording: null,
     };
     Object.assign(state, standing, {
@@ -107,7 +107,7 @@ test("a draft change closes the combo builder exactly as Close does", () => {
 
 test("a take being recorded keeps the text it is building on, and nothing else of its slot or others", () => {
     Object.assign(state, {
-        recording: {slot: "VIA_MACRO_1", before: "ab", last: 0, captured: true},
+        recording: {slot: "VIA_MACRO_1", before: "ab"},
         lastTake: {slot: "VIA_MACRO_0", before: "x"},
         macroForms: {
             VIA_MACRO_0: {draft: "other", steps: []},

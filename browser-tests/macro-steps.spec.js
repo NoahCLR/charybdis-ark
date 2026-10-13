@@ -13,23 +13,29 @@ async function editor(page, {legacy = false} = {}) {
         store.state.screen = "macros"; store.state.macroSlot = "VIA_MACRO_17"; store.render();
         window.__posted.length = 0;
     }, legacy);
+    await page.locator('[data-insert-kind="text"]').click();
 }
+const inspection = page => page.evaluate(async () => (await import('/webview/store.mjs')).macroForm('VIA_MACRO_17').validation?.validation);
 const updates = page => page.evaluate(() => window.__posted.filter(m => m.type === "updateViaMacro"));
 async function add(page, kind) {
-    await page.locator("[data-kind]").selectOption(kind);
-    await page.locator('[data-act="insert"]').click();
+    await page.locator(`[data-insert-kind="${kind}"]`).click();
 }
 async function pick(page, index, keys) {
-    await page.locator(`[data-step="${index}"] [data-pick-step]`).click();
+    if (!await page.locator(".picker").count()) {
+        await page.locator(`[data-step-tile="${index}"]`).click();
+        await page.locator(`[data-step="${index}"] [data-pick-step]`).click();
+    }
     for (const key of keys) await page.locator(`.pkb-key[data-pick="${key}"]`).click();
     await page.locator('.picker [data-act="use"]').click();
 }
 
-test("Text accepts code literally and live counters describe pending input before blur", async ({page}) => {
+test("Text accepts code literally and inspection measures pending input without static editor notes", async ({page}) => {
     await editor(page);
     const text = ' {"key": "{KC_A}"}\n\thello ';
     await page.locator("[data-step-text]").fill(text);
-    await expect(page.locator("[data-macro-size]")).toContainText(`${Buffer.byteLength(text)} bytes of macro memory`);
+    await expect.poll(() => inspection(page).then(value => value?.bytes)).toBe(Buffer.byteLength(text));
+    await expect(page.locator("[data-macro-feedback]")).toBeHidden();
+    await expect(page.locator('[data-macro-editor]')).not.toContainText('Valid edits are kept in your draft');
     expect(await updates(page)).toHaveLength(0);
     await page.locator("[data-step-text]").dispatchEvent("change");
     await expect.poll(() => updates(page).then(rows => rows.at(-1)?.payload)).toBe(text.replaceAll("{", "{{").replaceAll("}", "}}"));
@@ -42,11 +48,11 @@ test("a macro past 512 playback bytes stages on streaming firmware, up to the fr
     await editor(page);
     const field = page.locator("[data-step-text]");
     await field.fill("a".repeat(2000));
-    await expect(page.locator("[data-macro-size]")).toContainText("2000 bytes of macro memory");
-    await expect(page.locator("[data-macro-size]")).not.toContainText("playback bytes");
+    await expect.poll(() => inspection(page).then(value => value?.bytes)).toBe(2000);
+    await expect(page.locator("[data-macro-feedback]")).toBeHidden();
     await field.dispatchEvent("change");
     await expect.poll(() => updates(page).then(rows => rows.length)).toBe(1);
-    const available = Number((await page.locator("[data-macro-size]").textContent()).match(/(\d+) available/)[1]);
+    const available = (await inspection(page)).availableBytes;
     await field.fill("a".repeat(available + 1));
     await field.dispatchEvent("change");
     await expect(page.locator("[data-macro-feedback]")).toContainText(`${available} are available for this slot`);
@@ -89,9 +95,10 @@ test("mixed steps edit, reorder and remove; raw commands round-trip through Adva
     await page.locator('.picker [data-act="cancel"]').first().click();
     await page.locator('[data-step="2"] [data-move="-1"]').click();
     await expect.poll(() => updates(page).then(rows => rows.at(-1)?.payload)).toBe("hi {{KC_A}}{KC_LEFT_GUI,KC_A}{777}");
+    await page.locator('[data-step-tile="2"]').click();
     await page.locator('[data-step="2"] [data-remove]').click();
     await expect.poll(() => updates(page).then(rows => rows.at(-1)?.payload)).toBe("hi {{KC_A}}{KC_LEFT_GUI,KC_A}");
-    await page.locator("[data-raw] summary").click();
+    await page.locator("[data-raw-toggle]").click();
     await page.locator("[data-raw-payload]").fill("literal {{braces}}{120}{KC_ENT}");
     await page.locator("[data-raw-payload]").dispatchEvent("change");
     await expect(page.locator("[data-step-text]")).toHaveValue("literal {braces}");
@@ -107,8 +114,9 @@ test("mixed steps edit, reorder and remove; raw commands round-trip through Adva
 test("press and release pick one basic key; incomplete steps never stage", async ({page}) => {
     await editor(page);
     await add(page, "press");
-    await expect(page.locator("[data-macro-feedback]")).toContainText("Choose a key");
-    await page.locator('[data-step="1"] [data-pick-step]').click();
+    await expect(page.locator(".picker")).toBeVisible();
+    await expect(page.locator(".macro-token")).toHaveCount(1); // Only the explicitly chosen blank Text remains until a key is picked.
+    expect(await updates(page)).toHaveLength(0);
     await expect(page.locator("[data-mod], [data-sec=layers], [data-sec=macros], [data-sec=modes]")).toHaveCount(0);
     await page.locator('.pkb-key[data-pick="KC_A"]').click();
     await page.locator('.pkb-key[data-pick="KC_LGUI"]').click();
@@ -117,7 +125,7 @@ test("press and release pick one basic key; incomplete steps never stage", async
     await expect(page.locator("[data-macro-feedback]")).toContainText("before the macro ends");
     expect(await updates(page)).toHaveLength(0);
     await add(page, "release");
-    await pick(page, 2, ["KC_LGUI"]);
+    await pick(page, 1, ["KC_LGUI"]);
     await expect.poll(() => updates(page).then(rows => rows.at(-1)?.payload)).toBe("{+KC_LEFT_GUI}{-KC_LEFT_GUI}");
 });
 
@@ -141,13 +149,15 @@ test("recording appends keys to literal text and Clear take restores the exact t
 test("discarded input ignores delayed validation and can be entered again", async ({page}) => {
     await editor(page);
     await page.locator("[data-step-text]").fill("pending");
-    await expect(page.locator("[data-macro-size]")).toContainText("7 bytes of macro memory");
+    await expect.poll(() => inspection(page).then(value => value?.bytes)).toBe(7);
     const request = await page.evaluate(() => window.__posted.find(m => m.type === "validateViaMacro"));
     await page.locator('[data-act="discard"]').click();
     await page.evaluate(message => window.dispatchEvent(new MessageEvent("message", {data: {...message, type: "macroValidation", validation: {error: "OLD ERROR"}}})), request);
     await expect(page.locator("[data-macro-feedback]")).not.toContainText("OLD ERROR");
-    await expect(page.locator("[data-step-text]")).toHaveValue("");
+    await expect(page.locator(".macro-empty")).toBeVisible();
+    await expect(page.locator("[data-step-text]")).toHaveCount(0);
     expect(await updates(page)).toHaveLength(0);
+    await add(page, "text");
     await page.locator("[data-step-text]").fill("pending");
     await page.locator("[data-step-text]").dispatchEvent("change");
     await expect.poll(() => updates(page).then(rows => rows.at(-1)?.payload)).toBe("pending");
@@ -155,7 +165,7 @@ test("discarded input ignores delayed validation and can be entered again", asyn
 
 test("raw edits preserve the next action or step control click", async ({page}) => {
     await editor(page);
-    await page.locator("[data-raw] summary").click();
+    await page.locator("[data-raw-toggle]").click();
     const raw = page.locator("[data-raw-payload]");
     await raw.fill("invalid {");
     await page.locator('[data-act="discard"]').click();
@@ -166,20 +176,22 @@ test("raw edits preserve the next action or step control click", async ({page}) 
     await page.locator('[data-act="clear"]').click();
     await expect(raw).toHaveValue("");
 
-    await page.locator("[data-kind]").selectOption("delay");
     await raw.fill("new raw text");
-    await page.locator('[data-act="insert"]').click();
+    await page.locator('[data-insert-kind="delay"]').click();
     await expect(page.locator("[data-step-text]")).toHaveValue("new raw text");
     await expect(page.locator("[data-step-delay]")).toHaveValue("120");
     await expect.poll(() => updates(page).then(rows => rows.at(-1)?.payload)).toBe("new raw text{120}");
 
     await raw.fill("hi{120}{KC_A}");
+    await page.locator('[data-step-tile="1"]').click();
     await page.locator('[data-step="1"] [data-move="-1"]').click();
     await expect(raw).toHaveValue("{120}hi{KC_A}");
     await raw.fill("hi{120}{KC_A}");
+    await page.locator('[data-step-tile="1"]').click();
     await page.locator('[data-step="1"] [data-remove]').click();
     await expect(raw).toHaveValue("hi{KC_A}");
     await raw.fill("{KC_A}");
+    await page.locator('[data-step-tile="0"]').click();
     await page.locator("[data-pick-step]").click();
     await expect(page.locator(".picker")).toBeVisible();
     await page.locator('.picker [data-act="cancel"]').first().click();
@@ -209,6 +221,11 @@ test("an old inspection cannot stage after host setup changes at the same draft 
         const store = await import("/webview/store.mjs"), model = structuredClone(store.getModel());
         model.macroUnicode = {supported: true, mode: 1, enabled: true};
         store.setModel(model); store.render();
+    });
+    // Let the newly chosen blank Text step finish its setup inspection before
+    // holding the reply for the actual content under test.
+    await expect(page.locator('[data-macro-feedback]')).not.toContainText('Checking this edit');
+    await page.evaluate(() => {
         window.__heldInspections = [];
         window.__dispatchBeforeHold = window.dispatchEvent.bind(window);
         window.dispatchEvent = event => {

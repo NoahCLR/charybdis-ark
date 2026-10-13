@@ -26,6 +26,9 @@ import {screenSettings} from "./ui/settings.mjs";
 import {screenMouse} from "./ui/mouse.mjs";
 import {screenPointing} from "./ui/pointing.mjs";
 import {screenMacros, receiveMacroValidation} from "./ui/macros.mjs";
+import {reconcileRecording} from "./ui/macros/recorder.mjs";
+import {macroClipboardShortcut, macroHistoryShortcut} from './ui/macros/history.mjs';
+import {macroStepShortcut} from "./ui/macros/steps.mjs";
 import {screenCustomKeys} from "./ui/custom-keys.mjs";
 import {screenProfile} from "./ui/profile.mjs";
 import {screenDevice} from "./ui/device.mjs";
@@ -44,6 +47,7 @@ const SCREEN_RENDERERS = {
 
 /** @param {{keepScreen?: boolean}} [options] */
 function render({keepScreen = false} = {}) {
+    reconcileRecording();
     const keptScreen = keepScreen && renderedScreen === state.screen ? root.querySelector(".app > .main") : null;
     const scroll = captureContentScroll(root, renderedScreen, state.screen);
     const benchHeight = captureKeysBenchHeight(root, renderedScreen, state.screen, state.resetBenchHeight);
@@ -104,7 +108,7 @@ function readPlaceholder(read, model) {
             ${loading ? '<p class="note">The menus open when their keyboard data is ready.</p>'
                 : read.state === "blocked" ? (demoHere ? `<div class="read-actions">${exploreButton("primary")}</div>` : "")
                 : `<div class="read-actions">${choose ? '<button class="btn primary" data-act="choose-keyboard">Choose keyboard</button>' : ""}
-                    <button class="btn ${choose ? "ghost" : "primary"}" data-act="retry">Read keyboard</button>
+                    ${model?.device?.connected || !hostOf(model).chooseKeyboard ? '<button class="btn primary" data-act="retry">Read keyboard</button>' : ""}
                     ${demoHere ? exploreButton("ghost") : ""}
                     ${secondary ? `<button class="btn ghost" data-act="secondary">${esc(secondary.label)}</button>` : ""}</div>`}
         </div></div></div></div>`);
@@ -163,7 +167,8 @@ const receivePanelMessage = createPanelMessages({root, refreshCommitBar, render,
 addEventListener("message", (event) => receivePanelMessage(/** @type {import("../contracts/messages.js").PanelResponse} */ (event.data)));
 
 // A field that holds text keeps its own undo: ⌘Z there edits the text, not
-// the draft. Everywhere else it steps the draft, as the ↺ ↻ buttons do.
+// the draft. Macro editor focus uses step history; elsewhere it steps the
+// draft, as the rail ↺ ↻ buttons do.
 const TEXT_INPUTS = new Set(["text", "search", "number", "email", "url", "tel", "password"]);
 /** @param {EventTarget | null} target */
 const editsText = (target) => Boolean(target instanceof Element && target.closest("textarea, [contenteditable]:not([contenteditable=\"false\"])"))
@@ -171,8 +176,10 @@ const editsText = (target) => Boolean(target instanceof Element && target.closes
 
 /** @param {KeyboardEvent} event */
 function historyShortcut(event) {
-    const action = historyAction(event, {editingText: editsText(event.target), busy: Boolean(state.recording || state.retarget)});
+    const inDialog = state.picker || state.overlay || (event.target instanceof Element && event.target.closest('.scrim'));
+    const action = historyAction(event, {editingText: editsText(event.target), busy: Boolean(state.recording || state.retarget || inDialog)});
     if (!action) return false;
+    if (macroHistoryShortcut(event, action)) return true;
     event.preventDefault();
     const draft = getModel()?.draft;
     if (!draft || draft.busy) return true;
@@ -181,12 +188,12 @@ function historyShortcut(event) {
     return true;
 }
 
-// The board's shortcuts take their keys before anything else on the page hears
+// Board and macro-step shortcuts take their keys before anything else on the page hears
 // them. An extension that turns Backspace into Back listens on the window from
 // before Ark loads, so Ark's ordinary listener would come too late, and deleting
 // a key would also leave Ark.
 addEventListener("keydown", (event) => {
-    if (historyShortcut(event) || keysShortcut(event)) event.stopImmediatePropagation();
+    if (historyShortcut(event) || keysShortcut(event) || macroClipboardShortcut(event) || macroStepShortcut(event)) event.stopImmediatePropagation();
 }, true);
 addEventListener("keydown", (event) => {
     if (trapTab(root, event) || activateOnKey(event)) return;

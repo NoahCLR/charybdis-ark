@@ -26,10 +26,10 @@ function number(macro, id, label, hint, extra = {}) {
 }
 /** @param {string} macro @param {number} id @param {string} label @param {string} [hint] @returns {import("../../contracts/model.js").StoredSettingField} */
 const toggle = (macro, id, label, hint) => ({macro, id, label, hint, kind: "toggle"});
-/** @overload @param {string} macro @param {number} id @param {string} label @returns {import("../../contracts/model.js").StoredSettingField} */
-/** @overload @param {string} macro @param {undefined} id @param {string} label @returns {Omit<import("../../contracts/model.js").LayerSettingField, 'record' | 'layer'>} */
-/** @param {string} macro @param {number | undefined} id @param {string} label @returns {import("../../contracts/model.js").SettingFieldBase & {id: number | undefined, kind: 'layer', validate: string}} */
-function layer(macro, id, label) {return {macro, id, label, kind: "layer", validate: "layer"};}
+/** @overload @param {string} macro @param {number} id @param {string} label @param {string} [hint] @returns {import("../../contracts/model.js").StoredSettingField} */
+/** @overload @param {string} macro @param {undefined} id @param {string} label @param {string} [hint] @returns {Omit<import("../../contracts/model.js").LayerSettingField, 'record' | 'layer'>} */
+/** @param {string} macro @param {number | undefined} id @param {string} label @param {string} [hint] @returns {import("../../contracts/model.js").SettingFieldBase & {id: number | undefined, kind: 'layer', validate: string}} */
+function layer(macro, id, label, hint) {return {macro, id, label, hint, kind: "layer", validate: "layer"};}
 /** @param {string} macro @param {number} id @param {number} shift @param {string} label @param {string} [hint] */
 const byte = (macro, id, shift, label, hint) => number(macro, id, label, hint || "0–255", {shift, max: 255, unit: undefined, validate: "uint8"});
 // A duration the keyboard stores in milliseconds but that only means anything
@@ -76,18 +76,18 @@ const sections = [
         // held in the upstream Charybdis config, which the keyboard only
         // accepts in its own steps, so they offer the part of the list the
         // keyboard accepts. A pointing mode's own speed is set on its slot.
-        number("normalDpi", SETTING.DEFAULT_DPI, "Normal pointer DPI", undefined, {unit: undefined, choices: dpiChoices({accepts: v => validSetting(SETTING.DEFAULT_DPI, v)})}),
-        number("snipingDpi", SETTING.SNIPING_DPI, "Sniping DPI", undefined, {unit: undefined, choices: dpiChoices({accepts: v => validSetting(SETTING.SNIPING_DPI, v)})}),
+        number("normalDpi", SETTING.DEFAULT_DPI, "Normal pointer DPI", undefined, {tooltip: "Trackball sensitivity for ordinary pointer movement. Higher DPI moves the cursor farther for the same ball movement.", unit: undefined, choices: dpiChoices({accepts: v => validSetting(SETTING.DEFAULT_DPI, v)})}),
+        number("snipingDpi", SETTING.SNIPING_DPI, "Sniping DPI", undefined, {tooltip: "Trackball sensitivity while sniping is active, including auto-sniping. Lower DPI gives finer cursor control.", unit: undefined, choices: dpiChoices({accepts: v => validSetting(SETTING.SNIPING_DPI, v)})}),
     ]},
     {id: "sniping", label: "Auto-sniping", area: "Mouse", fields: [
         toggle("autoSniping", SETTING.AUTO_SNIPING_ENABLED, "Auto-sniping", "Use sniping speed while the selected layer is active."),
-        layer("snipingLayer", SETTING.AUTO_SNIPING_LAYER, "Auto-sniping layer"),
+        layer("snipingLayer", SETTING.AUTO_SNIPING_LAYER, "Auto-sniping layer", "Use sniping DPI while this layer is active and Auto-sniping is on."),
     ]},
     {id: "autoMouse", label: "Auto-mouse", area: "Mouse", fields: [
         toggle("autoMouse", SETTING.AUTO_MOUSE_ENABLED, "Auto-mouse", "Trackball movement automatically activates the selected layer."),
-        layer("mouseLayer", SETTING.AUTO_MOUSE_LAYER, "Auto-mouse layer"),
+        layer("mouseLayer", SETTING.AUTO_MOUSE_LAYER, "Auto-mouse layer", "The layer activated by trackball movement when Auto-mouse is on."),
         number("mouseTimeout", SETTING.AUTO_MOUSE_TIMEOUT, "Timeout (ms)", "How long the layer stays active after movement. The lighting fade keeps its share of it (Lighting → Auto-mouse fade).", {min: 1}),
-        number("mouseDebounce", SETTING.AUTO_MOUSE_DEBOUNCE, "Movement debounce (ms)", undefined),
+        number("mouseDebounce", SETTING.AUTO_MOUSE_DEBOUNCE, "Movement debounce (ms)", undefined, {tooltip: "Minimum time between trackball events that update auto-mouse. Higher values ignore closely spaced movement events."}),
         number("mouseDelay", SETTING.AUTO_MOUSE_DELAY, "Delay after typing (ms)", "Wait this long after a key event before movement can activate auto-mouse."),
         number("mouseThreshold", SETTING.AUTO_MOUSE_THRESHOLD, "Movement threshold", "Movement needed to activate auto-mouse. Higher values require more movement.", {unit: undefined}),
     ]},
@@ -100,10 +100,10 @@ const sections = [
     ]},
     {id: "rgbAppearance", label: "Base Lighting", fields: [
         {...toggle("lightingEnabled", SETTING.RGB_MODE, "Lighting", "Enable the saved base lighting effect."), shift: 0},
-        byte("hue", SETTING.RGB_COLOR, 0, "Hue"),
+        {...byte("hue", SETTING.RGB_COLOR, 0, "Hue"), tooltip: "The colour of the saved base lighting effect, around the colour wheel."},
         byte("saturation", SETTING.RGB_COLOR, 8, "Saturation", "0 is white; 255 is fully saturated."),
-        byte("brightness", SETTING.RGB_COLOR, 16, "Brightness", "Saved brightness, 0–255. The keyboard applies its hardware brightness limit."),
-        byte("effectSpeed", SETTING.RGB_MODE, 16, "Animation speed"),
+        {...byte("brightness", SETTING.RGB_COLOR, 16, "Brightness", "Saved brightness, 0–255. The keyboard applies its hardware brightness limit."), tooltip: "Brightness of the saved base lighting effect. Layer colours and feedback have their own brightness."},
+        {...byte("effectSpeed", SETTING.RGB_MODE, 16, "Animation speed"), tooltip: "Speed of the saved base lighting animation. Effects without animation ignore this setting."},
         number("lightingTimeout", SETTING.RGB_TIMEOUT, "Idle timeout", "Time without activity before lighting turns off. 0 keeps lighting on. Maximum 24 hours.", {presentation: "duration"}),
     ]},
     {id: "lightingFeedback", label: "Lighting Feedback", fields: [
@@ -111,21 +111,21 @@ const sections = [
     ]},
 ];
 
-/** @type {[string, string][]} */
+/** @type {[string, string, string][]} */
 const optionLabels = [
-    ["swapControlCaps", "Swap Left Control and Caps Lock"],
-    ["capsToControl", "Use Caps Lock as Left Control"],
-    ["swapLeftAltGui", "Swap left Alt and GUI"],
-    ["swapRightAltGui", "Swap right Alt and GUI"],
-    ["disableGui", "Disable GUI keys"],
-    ["swapGraveEscape", "Swap backtick and Escape"],
-    ["swapBackslashBackspace", "Swap backslash and Backspace"],
-    ["nkro", "Allow more than six simultaneous keys"],
-    ["swapLeftControlGui", "Swap left Control and GUI"],
-    ["swapRightControlGui", "Swap right Control and GUI"],
-    ["oneshot", "One-shot modifiers and layers"],
-    ["swapEscapeCaps", "Swap Escape and Caps Lock"],
-    ["autocorrect", "Autocorrect"],
+    ["swapControlCaps", "Swap Left Control and Caps Lock", "Exchange the actions of Left Control and Caps Lock across all layers."],
+    ["capsToControl", "Use Caps Lock as Left Control", "Make Caps Lock send Left Control instead; Left Control keeps its own action."],
+    ["swapLeftAltGui", "Swap left Alt and GUI", "Exchange the left Alt and GUI modifier actions across all layers."],
+    ["swapRightAltGui", "Swap right Alt and GUI", "Exchange the right Alt and GUI modifier actions across all layers."],
+    ["disableGui", "Disable GUI keys", "Prevent either GUI modifier from being sent. Other modifiers still work."],
+    ["swapGraveEscape", "Swap backtick and Escape", "Exchange the backtick and Escape key actions across all layers."],
+    ["swapBackslashBackspace", "Swap backslash and Backspace", "Exchange the backslash and Backspace key actions across all layers."],
+    ["nkro", "Allow more than six simultaneous keys", "Use N-key rollover so the keyboard can report more than six ordinary keys held at once."],
+    ["swapLeftControlGui", "Swap left Control and GUI", "Exchange the left Control and GUI modifier actions across all layers."],
+    ["swapRightControlGui", "Swap right Control and GUI", "Exchange the right Control and GUI modifier actions across all layers."],
+    ["oneshot", "One-shot modifiers and layers", "Allow one-shot modifier and layer keys to affect the next key after they are released."],
+    ["swapEscapeCaps", "Swap Escape and Caps Lock", "Exchange the Escape and Caps Lock key actions across all layers."],
+    ["autocorrect", "Autocorrect", "Enable the running firmware's autocorrection of recognized typing mistakes."],
 ];
 // Which bits of its settings word a field owns: one flag, a shifted byte or
 // nibble, or the whole word. Reading, writing and putting a field back to the
@@ -196,7 +196,7 @@ function settingsSections(snapshot, settings, capabilities) {
     /** @template T @param {(i: number) => T} make */
     const everyLayer = make => Array.from({length: SETTINGS.LAYERS}, (_, i) => make(i));
     result.push({id: "startupLayers", area: "Settings", label: "Startup Layers", expanded: false, description: "Choose the layers active when the keyboard starts. Keep at least one selected; higher layers take priority.", fields:
-        everyLayer(i => ({...toggle(`startupLayer${i}`, SETTING.DEFAULT_LAYERS, name(i), `Layer ${i}`), bitMask: 2 ** i, governs: {kind: /** @type {const} */ ("layer"), layer: i}}))});
+        everyLayer(i => ({...toggle(`startupLayer${i}`, SETTING.DEFAULT_LAYERS, name(i), `Layer ${i}`), tooltip: "Make this layer active when the keyboard starts. Keep at least one startup layer on; higher layers take priority.", bitMask: 2 ** i, governs: {kind: /** @type {const} */ ("layer"), layer: i}}))});
     // Behaviours and combos each have a master switch and one per layer
     // (participation-policy.md): a key takes part only where every switch that
     // applies is on, judged by the layer its key came from. Each behaviour and
@@ -217,9 +217,9 @@ function settingsSections(snapshot, settings, capabilities) {
             ...everyLayer(i => ({...toggle(`combosOnLayer${i}`, SETTING.LAYER_COMBOS, `On ${name(i)}`, "Keys that come from this layer can join combos."), bitMask: 2 ** i, governs: {kind: /** @type {const} */ ("layer"), layer: i}}))]});
     // A layer's combo reference is in its layer record, not a setting value.
     result.push({id: "comboReferences", area: "Settings", label: "Combo Layer Matching", expanded: false, description: "Choose which layer supplies the key assignments used to match combos on each layer. Select the same layer to keep its combos independent.", fields:
-        everyLayer(i => ({...layer(`comboReference${i}`, undefined, `Combos on ${name(i)}`), record: /** @type {const} */ ("reference"), layer: i, governs: {kind: /** @type {const} */ ("layer"), layer: i}}))});
+        everyLayer(i => ({...layer(`comboReference${i}`, undefined, `Combos on ${name(i)}`, "The layer whose key assignments are used to match combos on this layer. Choose the same layer to keep its combos independent."), record: /** @type {const} */ ("reference"), layer: i, governs: {kind: /** @type {const} */ ("layer"), layer: i}}))});
     result.push({id: "keyboardOptions", area: "Settings", label: "Key Options", expanded: false, description: options ? "Keyboard-wide remapping and typing options. These apply across all layers." : "Update both halves to report their supported key options.", fields:
-        options ? optionLabels.map(([macro, label], i) => ({...toggle(macro, SETTING.KEYMAP_OPTIONS, hostKeyLabel(label, host.effective)), bitMask: options.keymapMasks[i], readOnly: !(options.supportedKeymapOptions & (1 << i)), hint: options.supportedKeymapOptions & (1 << i) ? "" : "This option is not enabled in the running firmware."})) : []});
+        options ? optionLabels.map(([macro, label, hint], i) => ({...toggle(macro, SETTING.KEYMAP_OPTIONS, hostKeyLabel(label, host.effective)), tooltip: hostKeyLabel(hint, host.effective), bitMask: options.keymapMasks[i], readOnly: !(options.supportedKeymapOptions & (1 << i)), hint: options.supportedKeymapOptions & (1 << i) ? "" : "This option is not enabled in the running firmware."})) : []});
     /** @param {number} id */
     const label = id => VOCABULARY.hostOs.find(([value]) => value === id)?.[1] || "Unknown";
     const available = Boolean(snapshot.hostOs) || supportsUnicodeMacros(capabilities);

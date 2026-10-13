@@ -70,7 +70,7 @@ export function rail() {
             ${host.chooseKeyboard ? `<div class="rail-choose">
                 <button class="btn tiny" data-act="choose-keyboard" ${health.busy ? "disabled" : ""}
                     data-tip="Pick a Charybdis in the browser's list. Once chosen, it reconnects by itself next time.">Choose keyboard</button>
-                ${device.connected && !demo.active ? `<button class="btn tiny" data-act="forget-keyboard" ${health.busy ? "disabled" : ""}
+                ${device.connected && !demo.active ? `<button class="btn tiny ghost" data-act="forget-keyboard" ${health.busy ? "disabled" : ""}
                     data-tip="Let go of this keyboard. The page will not open it again until you choose it.">Disconnect</button>` : ""}</div>` : ""}
             <div class="rail-status">
                 ${!draft?.dirty ? "" : draft.matching && !draft.stale
