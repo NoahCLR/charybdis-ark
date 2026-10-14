@@ -23,6 +23,7 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
     test(`painter brush, selection, fill, mirror and copy each post (${theme})`, async ({page}) => {
         await openControls(page, "lighting", {}, theme);
         await page.getByRole("button", {name: "Paint keys…"}).click();
+        await expect(page.locator('.painter [data-off]')).toHaveAttribute("data-tip", /real black, covering any lower rule/);
         await clearPosts(page);await page.locator('.painter [data-key="25"]').click();
         await expectPost(page, {type: "paintLightingMap", index: 0, leds: [5]});
         await page.getByRole("combobox", {name: "Select keys that…"}).selectOption("letters");

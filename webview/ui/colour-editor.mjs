@@ -35,7 +35,7 @@ export function colourEditor({identity, colour, title, canEdit = true, onChange,
         <div><div class="colour-title">${esc(title)}</div>
             <div class="note mono">${esc(hsvLabel(colour))} · rgb(${rgb(colour).join(", ")})</div></div>
         ${canEdit ? `<button class="btn tiny ghost" data-off
-            data-tip="${esc(offTip || "Store HSV(0, 0, 0) so this stage stops painting and lets what is underneath show.")}">${zeroMeansClear ? "Turn off" : "Paint black"}</button>` : ""}</div>`);
+            data-tip="${esc(offTip || (zeroMeansClear ? "Store HSV(0, 0, 0) so this stage stops painting and lets what is underneath show." : "Paint real black, covering any lower rule at these LEDs."))}">${zeroMeansClear ? "Turn off" : "Paint black"}</button>` : ""}</div>`);
     node.append(head);
     if (v === 0) node.append(el(`<p class="note">Brightness is zero. Hue and saturation are retained; raise brightness to use this colour again.</p>`));
     /** @type {HTMLElement | null} */ (head.querySelector("[data-off]"))?.addEventListener("click", () => commit([0, 0, 0]));
