@@ -27,6 +27,12 @@ export function canPaintSubject(model, subject) {
     const lighting = model?.rgb?.lighting, fact = subject.kind === 1 ? 1 : subject.kind === 2 ? 3 : subject.kind === 3 ? 7 : 8;
     return Boolean(lighting?.supportedThings.includes(subject.kind) && lighting.supportedFacts.includes(fact) && lighting.supportedPaints.includes(4) && lighting.supportedTargets.includes(0));
 }
+/** @param {import('../../contracts/panel.js').PublishedModel | null | undefined} model @param {Subject} subject */
+export function canCustomiseIdentity(model, subject) {
+    const lighting = model?.rgb?.lighting;
+    return Boolean(lighting?.supportedThings.includes(subject.kind) && (subject.kind < 3 ||
+        lighting.supportedFacts.includes(subject.kind === 3 ? 7 : 8) && lighting.supportedPaints.includes(3) && lighting.supportedTargets.includes(7)));
+}
 /** @param {import('../../contracts/panel.js').Layer | undefined} layer @param {string} query @param {import("../../contracts/panel.js").PublishedModel | null} [model] */
 export function selectPaintKeys(layer, query, model) {
     return (layer?.positions ?? []).filter(p => {

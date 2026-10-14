@@ -2,7 +2,7 @@
 import {el, esc} from "../lib/dom.mjs";
 import {getModel, post, render, state, canEdit} from "../store.mjs";
 import {identityValue} from "../view/lighting.mjs";
-import {subjectRules, canPaintSubject} from "../view/painting.mjs";
+import {subjectRules, canPaintSubject, canCustomiseIdentity} from "../view/painting.mjs";
 import {lightingIdentity} from "../view/edits.mjs";
 import {vocabulary} from "../view/vocabulary.mjs";
 import {colourEditor} from "./colour-editor.mjs";
@@ -20,13 +20,13 @@ export function withLightingTab(editor, subject, title) {
 }
 /** @param {Subject} subject @param {string} title */
 export function thingLighting(subject, title) {
-    const model = getModel(), lighting = model?.rgb?.lighting, editable = canEdit("lighting") && (subject.kind < 3 || canPaintSubject(model, subject)), supported = lighting?.supportedThings.includes(subject.kind);
-    const node = el(`<section class="card thing-lighting" aria-label="${esc(title)} lighting"><div class="card-h"><h3>${esc(title)} · Lighting</h3><button class="btn right" data-customise ${editable && canPaintSubject(model, subject) ? "" : "disabled"}>Customise</button></div><div class="card-b stack gap-12"></div></section>`);
+    const model = getModel(), lighting = model?.rgb?.lighting, editable = canEdit("lighting") && canCustomiseIdentity(model, subject), supported = lighting?.supportedThings.includes(subject.kind);
+    const node = el(`<section class="card thing-lighting" aria-label="${esc(title)} lighting"><div class="card-h"><h3>${esc(title)} · Lighting</h3><button class="btn right" data-customise ${canEdit("lighting") && canPaintSubject(model, subject) ? "" : "disabled"}>Customise</button></div><div class="card-b stack gap-12"></div></section>`);
     const body = /** @type {HTMLElement} */ (node.querySelector(".card-b"));
     if (!lighting || !supported || subject.id < 0) {body.append(el(`<p class="note">${subject.id < 0 ? "Keep this thing in the draft to give it its own lighting." : "This keyboard does not yet offer an identity or lighting condition for this kind of thing."}</p>`));return node;}
     const identity = identityValue(model, subject), rules = subjectRules(model, subject);
     const words = vocabulary(model).lighting;
-    if (subject.kind >= 3 && !canPaintSubject(model, subject)) body.append(el(`<p class="callout">This keyboard reports shared feedback colours, but cannot yet show an individual identity for this thing. Update its firmware to customise this feedback.</p>`));
+    if (subject.kind >= 3 && !canCustomiseIdentity(model, subject)) body.append(el(`<p class="callout">This keyboard reports shared feedback colours, but cannot yet show an individual identity for this thing. Update its firmware to customise this feedback.</p>`));
     body.append(el(`<p class="note">Its colour is shared by rules that show its identity. ${identity.inherited ? "Following the board defaults." : "Customised for this thing."}</p>`));
     const columns = el(`<div class="thing-lighting-layout"><div class="identity-colours stack gap-12"></div><div class="identity-rules stack gap-12"></div></div>`);
     const colours = /** @type {HTMLElement} */ (columns.querySelector(".identity-colours")), explanation = /** @type {HTMLElement} */ (columns.querySelector(".identity-rules"));body.append(columns);
@@ -46,7 +46,7 @@ export function thingLighting(subject, title) {
         card.querySelector("[data-clear]")?.addEventListener("click", () => post(lightingIdentity({...subject, slot, field: "colour", colour: "clear"})));
         colours.append(card);
     });
-    if (subject.kind === 4 && lighting.supportedPaints.includes(8) && canPaintSubject(model, subject)) {
+    if (subject.kind === 4 && lighting.supportedPaints.includes(8) && canCustomiseIdentity(model, subject)) {
         const outcome = lighting.program.rules.some(r => r.parts.some(p => p.slot === 0 && p.kind === 8 && p.params[0] === subject.id && p.params[1] === 12) && r.parts.some(p => p.slot === 3 && p.kind === 8));
         const toggle = el(`<div><label class="sw"><input type="checkbox" data-f="identity:${subject.kind}:${subject.id}:outcome" ${outcome ? "checked" : ""} ${editable ? "" : "disabled"}><span class="track"></span><span class="txt">Colour by outcome</span></label><p class="note">Hold and long hold use the colour of the layer or pointing mode they enter. Other actions keep this behaviour's identity.</p></div>`);
         toggle.querySelector("input")?.addEventListener("change", e => post(lightingIdentity({...subject, field: "outcome", outcome: /** @type {HTMLInputElement} */ (e.target).checked})));colours.append(toggle);

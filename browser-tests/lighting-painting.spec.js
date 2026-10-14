@@ -117,3 +117,22 @@ test("one brush drag posts every crossed key once on release", async ({page}) =>
     expect(await page.evaluate(() => window.__posted)).toEqual([]);
     await page.mouse.up();await expectPost(page, {type: "paintLightingMap", leds: [6, 9, 14]});
 });
+
+test("behaviour identity editing and Customise follow independent capability gates", async ({page}) => {
+    await openControls(page, "keys", {layer: 3});
+    await page.evaluate(async () => {
+        const store = await import("/webview/store.mjs");
+        store.state.tab = "behaviours";store.state.behaviourRow = store.getModel().keyBehaviors[0].keycode;store.render();
+    });
+    await page.locator('.beh-main .thing-tabs [data-lighting]').click();
+    await publishAccepted(page, ["rgb", "lighting", "supportedFacts"], [8]);
+    await publishAccepted(page, ["rgb", "lighting", "supportedPaints"], [3]);
+    await publishAccepted(page, ["rgb", "lighting", "supportedTargets"], [7]);
+    const tab = page.locator('.beh-main .thing-lighting');
+    await expect(tab.locator('[data-channel="0"]')).toBeEnabled();
+    await expect(tab.locator('[data-customise]')).toBeDisabled();
+    await publishAccepted(page, ["rgb", "lighting", "supportedPaints"], [4]);
+    await publishAccepted(page, ["rgb", "lighting", "supportedTargets"], [0]);
+    await expect(tab.locator('[data-channel="0"]')).toBeDisabled();
+    await expect(tab.locator('[data-customise]')).toBeEnabled();
+});
