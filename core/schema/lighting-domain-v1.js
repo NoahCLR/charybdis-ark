@@ -37,7 +37,8 @@ function decodeLightingDomain(value, options = {}) {
     const mapValue = (value, offset) => {
         if (value < 128) {if (value >= P) fail("INVALID_REFERENCE", offset); return;}
         const kind = value - 128;
-        if (!supported("paints", kind) || kind === 4 || KINDS.paints[kind]?.parameters.length !== 0) fail("INVALID_REFERENCE", offset);
+        const descriptor = KINDS.paints[kind];
+        if (!supported("paints", kind) || kind === 4 || (descriptor ? descriptor.parameters.length !== 0 : !limits.allowUnknown)) fail("INVALID_REFERENCE", offset);
     };
     /** @param {string} type @param {number} offset */
     const parameter = (type, offset) => {
@@ -126,6 +127,7 @@ function decodeLightingDomain(value, options = {}) {
                 let p = at + 2;
                 for (const type of descriptor.parameters) {parameter(type, p); p += type === "milliseconds" ? 2 : 1;}
             } else rule.known = false;
+            if ((slot === 3 || slot === 4) && kind === 4 && result.maps[data[at + 2]].some(value => value >= 128 && !KINDS.paints[value - 128])) rule.known = false;
             rule.parts.push({slot, kind, params: [...data.subarray(at + 2, at + 2 + length)]}); at += 2 + length;
         }
         if (!singles.has(2) || !singles.has(3)) fail("INVALID_STRUCTURE", start);

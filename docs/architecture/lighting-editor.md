@@ -10,7 +10,9 @@ The capability read behind feature bit 31 supplies bounds and seven registries.
 Colour editing requires the keyboard's plain palette paint capability. Existing
 length-tagged parts whose kinds Ark cannot interpret are retained as opaque
 parameters. Such rules are read-only; unrelated edits, Apply and backup retain
-their bytes. Unsupported kinds absent from the keyboard's registry are refused.
+their bytes. The same applies to a rule whose map contains a paint Ark does
+not know: its map stays unchanged and its palette entries are not replaced.
+Unsupported kinds absent from the keyboard's registry are refused.
 
 Rules remain in their stored priority order. Presentation inserts a heading
 when the first positive condition's band changes. It never sorts by band.

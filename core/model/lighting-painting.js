@@ -2,7 +2,7 @@
 "use strict";
 const {decodeLightingDomain, encodeLightingDomain} = require("../schema/lighting-domain-v1");
 const {LIGHTING_KINDS} = require("../schema/lighting-kinds-v1");
-const {knownRule, ruleIdentity, ruleBand} = require("./lighting-editor");
+const {knownRule, knownMap, ruleIdentity, ruleBand} = require("./lighting-editor");
 /** @typedef {import('../schema/lighting-types.js').LightingProfile} Program */
 /** @typedef {import('../schema/lighting-types.js').LightingOptions} Options */
 /** @param {string} message @returns {never} */
@@ -13,7 +13,7 @@ function supported(options, registry, kind) {
 }
 /** @param {Program} program */
 function opaque(program) {
-    return program.rules.some(r => !knownRule(r)) || program.extensions.some(e => !LIGHTING_KINDS.domainExtensions[e.kind]);
+    return program.rules.some(r => !knownRule(r)) || !program.maps.every(knownMap) || program.extensions.some(e => !LIGHTING_KINDS.domainExtensions[e.kind]);
 }
 // Never renumber the palette: opaque parts might hold references Ark cannot see.
 // Unreferenced slots can be reused only when every reference is understood.

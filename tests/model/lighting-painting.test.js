@@ -63,7 +63,8 @@ test("named combo and behaviour identity edits create visible subject rules with
     assert.deepEqual(hold.rules.slice(2), decodeLightingDomain(bytes(), options).rules);
 });
 test("identity colour by outcome refuses missing capabilities and preserves unknown rule bytes", () => {
-    assert.throws(() => editLightingIdentity(bytes(), {kind: 4, id: 3, field: "outcome", outcome: true}, options), /does not offer/);
+    const missing = structuredClone(options.capabilities);missing.registries.paints = missing.registries.paints.filter(kind => kind !== 8);
+    assert.throws(() => editLightingIdentity(bytes(), {kind: 4, id: 3, field: "outcome", outcome: true}, {...options, capabilities: missing}), /does not offer/);
     const caps = structuredClone(options.capabilities);caps.registries.facts.push(7, 8);caps.registries.paints.push(8, 200);
     const opts = {...options, capabilities: caps};
     const profile = decodeLightingDomain(bytes(), opts);profile.rules[0].parts.find(p => p.slot === 3).kind = 200;
@@ -88,4 +89,22 @@ test("editing an identity keeps its painted map above the fallback and feedback 
     current = editLightingIdentity(current, {kind: 4, id: 3, field: "outcome", outcome: true}, opts);
     current = editLightingIdentity(current, {kind: 4, id: 3, field: "outcome", outcome: false}, opts);
     p = decodeLightingDomain(current, opts);assert.ok(p.rules.some(r => r.parts[0]?.kind === 8 && r.parts[0].params[1] === 15 && r.parts.find(p => p.slot === 3).kind === 3));
+});
+
+test("a future paint inside a map stays read-only and byte-exact through other edits", () => {
+    const caps = structuredClone(options.capabilities);caps.registries.paints.push(9);
+    const opts = {...options, capabilities: caps};
+    const profile = decodeLightingDomain(bytes(), opts);
+    profile.maps = [Array(58).fill(128)];profile.maps[0][2] = 128 + 9;
+    const p = profile.rules[0].parts.find(p => p.slot === 3);p.kind = 4;p.params = [0];
+    const original = encodeLightingDomain(profile, opts), decoded = decodeLightingDomain(original, opts);
+    assert.equal(decoded.rules[0].known, false);
+    assert.deepEqual(encodeLightingDomain(decoded, opts), original);
+    assert.throws(() => paintLightingMap(original, {index: 0, expectedRule: ruleIdentity(decoded.rules[0]), leds: [2], paint: 129}, opts), /read-only/);
+    assert.throws(() => decodeLightingDomain(original, {...opts, allowUnknown: false}), e => e.code === "INVALID_REFERENCE");
+    assert.throws(() => decodeLightingDomain(original, options), e => e.code === "INVALID_REFERENCE");
+    const edited = editLightingIdentity(original, {kind: 1, id: 3, field: "colour", slot: 1, colour: {h: 177, s: 188, v: 199}}, opts);
+    const after = decodeLightingDomain(edited, opts);
+    assert.deepEqual(after.maps, decoded.maps);assert.deepEqual(after.rules[0], decoded.rules[0]);
+    assert.deepEqual(after.palette.slice(0, profile.palette.length), profile.palette);
 });
