@@ -13,24 +13,22 @@ export function identityValue(model, subject, slot = 1) {
 export function subjectRules(model, subject) {
     return (model?.rgb?.lighting?.rules ?? []).flatMap(rule => {
         const parts = model?.rgb?.lighting?.program.rules[rule.index]?.parts ?? [];
-        const first = parts.find(p => p.slot === 0);
-        if (!first) return [];
         const fact = subject.kind === 1 ? [1, 2] : subject.kind === 2 ? [3] : subject.kind === 3 ? [4, 7] : [5, 8];
-        if (!fact.includes(first.kind)) return [];
-        const aggregate = first.kind === 4 || first.kind === 5;
-        if (!aggregate && first.params[0] !== 255 && first.params[0] !== subject.id) return [];
-        return [{...rule, inherited: aggregate || first.params[0] === 255}];
+        const matches = parts.filter(p => p.slot <= 1 && fact.includes(p.kind) &&
+            (p.kind === 4 || p.kind === 5 || p.params[0] === 255 || p.params[0] === subject.id));
+        if (!matches.length) return [];
+        return [{...rule, inherited: !matches.some(p => p.kind !== 4 && p.kind !== 5 && p.params[0] === subject.id)}];
     });
 }
 /** @param {import('../../contracts/panel.js').PublishedModel | null | undefined} model @param {Subject} subject */
 export function canPaintSubject(model, subject) {
     const lighting = model?.rgb?.lighting, fact = subject.kind === 1 ? 1 : subject.kind === 2 ? 3 : subject.kind === 3 ? 7 : 8;
-    return Boolean(lighting?.supportedThings.includes(subject.kind) && lighting.supportedFacts.includes(fact) && lighting.supportedPaints.includes(4) && lighting.supportedTargets.includes(0));
+    return Boolean([1, 2, 3, 4].includes(subject.kind) && lighting?.supportedThings.includes(subject.kind) && lighting.supportedFacts.includes(fact) && lighting.supportedPaints.includes(4) && lighting.supportedTargets.includes(0));
 }
 /** @param {import('../../contracts/panel.js').PublishedModel | null | undefined} model @param {Subject} subject */
 export function canCustomiseIdentity(model, subject) {
     const lighting = model?.rgb?.lighting;
-    return Boolean(lighting?.supportedThings.includes(subject.kind) && (subject.kind < 3 ||
+    return Boolean([1, 2, 3, 4].includes(subject.kind) && lighting?.supportedThings.includes(subject.kind) && (subject.kind < 3 ||
         lighting.supportedFacts.includes(subject.kind === 3 ? 7 : 8) && lighting.supportedPaints.includes(3) && lighting.supportedTargets.includes(7)));
 }
 /** @param {import('../../contracts/panel.js').Layer | undefined} layer @param {string} query @param {import("../../contracts/panel.js").PublishedModel | null} [model] */

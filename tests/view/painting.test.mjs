@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {LED_INDEX} from "../../webview/view/geometry.mjs";
-import {mirrorMap, MIRROR_LEDS, selectPaintKeys, identityValue, copyLayerCells, canPaintSubject, canCustomiseIdentity} from "../../webview/view/painting.mjs";
+import {mirrorMap, MIRROR_LEDS, selectPaintKeys, identityValue, copyLayerCells, canPaintSubject, canCustomiseIdentity, subjectRules} from "../../webview/view/painting.mjs";
 test("mirror follows physical keys and retains unmatched LEDs", () => {
     const cells = Array.from({length: 58}, (_, i) => i), mirrored = mirrorMap(cells, "left");
     assert.equal(mirrored[LED_INDEX[11]], cells[LED_INDEX[0]]);
@@ -27,6 +27,16 @@ test("identity and map controls require their own advertised modules", () => {
     assert.equal(canCustomiseIdentity(m, subject), false);assert.equal(canPaintSubject(m, subject), true);
     m.rgb.lighting.supportedFacts = [5];
     assert.equal(canCustomiseIdentity(m, subject), false);assert.equal(canPaintSubject(m, subject), false);
+    m.rgb.lighting.supportedThings = [5];m.rgb.lighting.supportedFacts = [8];m.rgb.lighting.supportedPaints = [3, 4];m.rgb.lighting.supportedTargets = [0, 7];
+    assert.equal(canCustomiseIdentity(m, {kind: 5, id: 0}), false);assert.equal(canPaintSubject(m, {kind: 5, id: 0}), false);
+});
+test("a Lighting tab includes later and negated conditions that mention its thing", () => {
+    const m = {rgb: {lighting: {rules: [{index: 0}], program: {rules: [{parts: [{slot: 0, kind: 1, params: [3]}, {slot: 1, kind: 3, params: [2]}]}]}}}};
+    assert.equal(subjectRules(m, {kind: 1, id: 3})[0].inherited, false);
+    assert.equal(subjectRules(m, {kind: 2, id: 2})[0].inherited, false);
+    assert.deepEqual(subjectRules(m, {kind: 2, id: 1}), []);
+    m.rgb.lighting.program.rules[0].parts[1].params[0] = 255;
+    assert.equal(subjectRules(m, {kind: 2, id: 1})[0].inherited, true);
 });
 
 test("copying a layer resolves its identity cells and replaces the whole map", () => {
