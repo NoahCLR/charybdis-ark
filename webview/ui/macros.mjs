@@ -14,6 +14,7 @@
 // The preview parses the payload for reading; the host parses it again for
 // real when the slot is staged, and says so if it disagrees.
 
+import {withLightingTab} from "./thing-lighting.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {macroMatches, macroPeekSteps} from "../view/macro.mjs";
 import {readMacro} from "../view/macro-cache.mjs";
@@ -74,7 +75,7 @@ export function screenMacros() {
         cells.append(cell);
     });
     pad.appendChild(grid);
-    pad.appendChild(slot ? editor(/** @type {import("../../contracts/panel.js").PublishedModel} */ (model), slot, canEdit) : el(`<div class="empty-card"><p class="note">Pick a slot.</p></div>`));
+    pad.appendChild(slot ? withLightingTab(editor(/** @type {import("../../contracts/panel.js").PublishedModel} */ (model), slot, canEdit), {kind: 5, id: (model?.viaMacros ?? []).indexOf(slot)}, slot.name || "Macro") : el(`<div class="empty-card"><p class="note">Pick a slot.</p></div>`));
     main.appendChild(content);
     return main;
 }

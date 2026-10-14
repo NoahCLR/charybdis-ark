@@ -44,6 +44,7 @@ function decodeLightingDomain(value, options = {}) {
         const v = data[offset];
         if (type === "layer" && v !== 255 && v >= limits.logicalLayers) fail("INVALID_PARAMETER", offset);
         if (type === "mode" && v !== 255 && (v >= 32 || !((limits.supportedModeMask >>> v) & 1))) fail("INVALID_PARAMETER", offset);
+        if (type === "thing" && v !== 255 && v >= 128) fail("INVALID_PARAMETER", offset);
         if (type === "role" && ![0, 1, 255].includes(v)) fail("INVALID_PARAMETER", offset);
         if (type === "states" && (!v || v & 240)) fail("INVALID_PARAMETER", offset);
         if (type === "scope" && v > 3) fail("INVALID_PARAMETER", offset);

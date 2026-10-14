@@ -41,7 +41,55 @@ candidate staging. Unsupported versions fail. Offline documents with a tap
 depth other than five carry `tapDepth`; connected validation uses the keyboard's
 reported depth.
 
-Saved identities are projected read-only onto existing Keys and pointing
-surfaces for phase 1. That board is an identity preview, not an arbitrary rule
-renderer or LED telemetry. Identity editing, painter, new facts, inspector,
-timeline, presets and live mode belong to later phases.
+Identity colours and places are edited through the same draft. Layers and
+pointing modes use one colour; behaviours use hold, long hold, tap and one
+colour per extra tap branch. A field can inherit the table's board default,
+paint real black, or say clear. Individual combo/behaviour edits create a
+named-subject identity rule above their inherited feedback, because the parity
+facts still use aggregate defaults. Colour by outcome adds a hold/long-hold
+rule above that identity fallback: layer and mode outcomes use their identity;
+unsupported outcomes clear and leave the identity fallback visible. These
+selectors and the outcome paint require their advertised capability bits.
+
+Keys has a Lighting tab for the current layer; each behaviour, combo,
+pointing-mode, macro and custom-key editor also offers it. The tab names its
+identity, place and deciding rules, marking shared rules as inherited. Macros
+currently have no lighting fact or identity table, so their tab explains that
+capability limit. A custom key uses its stored behaviour's identity. Customise
+opens a painted look for the selected thing; it reopens an existing map when
+one exists. The Keys board remains an identity preview, not an arbitrary rule
+renderer or LED telemetry.
+
+The painter draws the posted map and a brush colour; it is not the combined
+rule result. Brush drags collect LED positions and post one draft edit on
+release; selection is local navigation, and fill posts one edit for the
+selection or whole board. Keyboard Enter/Space paints or selects a focused
+key. Clear, off, identity, outcome and palette paints are offered only when
+advertised. Static “keys that…” selections use semantic key meanings in the
+current layer, then store those selected LEDs; they do not create live query
+rules. Copy takes the source layer's first painted rule, or its mapped keys
+in its identity when it has no painted map. Identity cells resolve to the
+source colour, so copying retains the source look rather than substituting
+the destination identity. Mirror pairs physical positions
+rather than wiring offsets; two unmatched left thumbs, the trackball and the
+unassigned LED keep their values.
+
+Maps are stored canonically: at most 28 non-clear cells use sparse bytes,
+more use dense bytes. An identical map is reused; a shared map detaches before
+editing. Palette allocation reuses identical colours and abandoned known
+references without renumbering anything. Opaque rules/extensions prohibit
+reuse of potentially referenced slots. Repeated brush and identity changes
+therefore retain a small palette. Unknown rules stay read-only and unchanged.
+Combo deletion and behaviour insertion, deletion or retargeting carry their
+identity records and named selectors with the owning rows; removed subjects
+remove their known rules. Unknown parts remain byte-exact.
+
+Review shows per-identity colour and place changes together with maps, rule
+order and the encoded memory total. It warns about similar active/custom
+identities using wrapped hue and saturation/value distance; this is advice,
+not LED calibration. Shadowing is reported only when a higher known untimed
+opaque rule provably covers the lower condition and target. Existing proven
+layer/combo reachability findings inform impossible lighting conditions.
+Unknown kinds and memory at 90% warn; destination brightness violations block.
+Inspector, gesture timeline, presets, new state families and live mode remain
+later phases.

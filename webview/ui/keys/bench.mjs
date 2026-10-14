@@ -15,15 +15,17 @@ import {tabCombos} from "./combos-tab.mjs";
 import {tabKey} from "./key-tab.mjs";
 import {tabMacros} from "./macros-tab.mjs";
 import {tabPointing} from "./pointing-tab.mjs";
+import {thingLighting} from "../thing-lighting.mjs";
 import {storedCount} from "./reach.mjs";
 
-/** @type {{id: "key" | "behaviours" | "combos" | "macros" | "pointing", label: string}[]} */
+/** @type {{id: "key" | "behaviours" | "combos" | "macros" | "pointing" | "lighting", label: string}[]} */
 const TABS = [
     {id: "key", label: "Key"},
     {id: "behaviours", label: "Behaviours"},
     {id: "combos", label: "Combos"},
     {id: "macros", label: "Macros"},
     {id: "pointing", label: "Pointing modes"},
+    {id: "lighting", label: "Lighting"},
 ];
 
 export function bench() {
@@ -31,6 +33,7 @@ export function bench() {
     const layer = currentLayer();
     /** @type {Record<string, string>} */
     const counts = {
+        lighting: "",
         key: String(mappedKeyCount(layer)),
         behaviours: String((({here, combos}) => new Set([...here, ...combos.map((entry) => entry.row)]).size)(behaviourGroups(model, layers(), state.layer))),
         combos: String(comboGroups(model, layers(), state.layer).onKeys.length),
@@ -58,7 +61,7 @@ export function bench() {
     }));
     keepInView(/** @type {HTMLElement} */ (node.querySelector(".bench-tablist")));
     const body = /** @type {HTMLElement} */ (node.querySelector("#benchBody")), right = /** @type {HTMLElement} */ (node.querySelector("#benchRight"));
-    const tabs = /** @type {Record<string, (body: HTMLElement, right: HTMLElement) => void>} */ ({key: tabKey, behaviours: tabBehaviours, combos: tabCombos, macros: tabMacros, pointing: tabPointing});
+    const tabs = /** @type {Record<string, (body: HTMLElement, right: HTMLElement) => void>} */ ({lighting: (body, right) => {right.replaceChildren();body.replaceChildren(thingLighting({kind: 1, id: layer?.index ?? 0}, layer?.displayName || layer?.name || "Layer"));}, key: tabKey, behaviours: tabBehaviours, combos: tabCombos, macros: tabMacros, pointing: tabPointing});
     (tabs[state.tab] || tabKey)(body, right);
     return node;
 }

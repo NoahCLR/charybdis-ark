@@ -17,6 +17,22 @@ for (const vector of [...vectors.codec.valid, ...vectors.render]) {
     assert.deepEqual(encodeLightingDomain(decoded, vectors.limits), bytes);
     lines.push(`CODEC OK 0 ${vector.name} ${vector.hex}`);
 }
+// Exercise the editor's bytes, not only documents copied from the fixtures.
+const painting = require("../../core/model/lighting-painting"), {ruleIdentity} = require("../../core/model/lighting-editor");
+const paintingOptions = {...vectors.limits, capabilities: decodeLightingCapabilities(vectors.capability.map(h => Buffer.from(h, "hex")))};
+const standard = Buffer.from(vectors.codec.valid.find(v => v.name === "standard")?.hex ?? "", "hex");
+/** @type {[string, Buffer][]} */
+const cases = [];
+for (const count of [1, 6, 28, 29, 58]) {
+    const rule = decodeLightingDomain(standard, paintingOptions).rules[0];
+    cases.push([`ark-painted-${count}`, painting.paintLightingMap(standard, {type: "paintLightingMap", index: 0, expectedRule: ruleIdentity(rule), cells: Array(58).fill(128), leds: Array.from({length: count}, (_, i) => i), paint: {h: 177, s: 188, v: 199}}, paintingOptions)]);
+}
+cases.push(["ark-layer-identity", painting.editLightingIdentity(standard, {type: "editLightingIdentity", kind: 1, id: 3, field: "colour", slot: 1, colour: {h: 177, s: 188, v: 199}}, paintingOptions)]);
+if (paintingOptions.capabilities.registries.facts.includes(8)) {
+    cases.push(["ark-behaviour-outcome", painting.editLightingIdentity(standard, {type: "editLightingIdentity", kind: 4, id: 3, field: "outcome", outcome: true}, paintingOptions)]);
+    cases.push(["ark-combo-identity", painting.editLightingIdentity(standard, {type: "editLightingIdentity", kind: 3, id: 3, field: "colour", slot: 1, colour: {h: 177, s: 188, v: 199}}, paintingOptions)]);
+}
+for (const [name, bytes] of cases) lines.push(`CODEC OK 0 ${name} ${bytes.toString("hex")}`);
 for (const vector of vectors.codec.invalid) {
     try {decodeLightingDomain(Buffer.from(vector.hex, "hex"), vectors.limits); throw Error(`Ark accepted ${vector.name}`);} catch (error) {
         const failure = /** @type {Error & {code: string, offset: number}} */ (error);

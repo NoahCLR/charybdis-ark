@@ -68,9 +68,14 @@ export const layerColourRow = (model, layerId) =>
 export const pdColourRow = (model, slotId) =>
     (model?.rgb?.pdModeColors || []).find((row) => row.pointingMode === PD_MODE_IDS[slotId]);
 
-/** @param {Model} model */
-export function feedbackColours(model) {
+/** @param {Model} model @param {string} [keycode] */
+export function feedbackColours(model, keycode) {
     const feedback = model?.rgb?.keyBehaviorFeedback;
+    const id = keycode ? model?.keyBehaviors?.findIndex(r => r.keycode === keycode) ?? -1 : -1;
+    if (id >= 0 && model?.rgb?.lighting) {
+        const c = (/** @type {number} */ slot) => identityValue(/** @type {import('../../contracts/panel.js').PublishedModel} */ (model), {kind: 4, id}, slot).colour || OFF;
+        return {tap: c(3), hold: c(1), long: c(2), branches: Array.from({length: model.behaviorEditing?.maxTapStepsPerBehavior ? model.behaviorEditing.maxTapStepsPerBehavior - 1 : 4}, (_, i) => c(i + 4))};
+    }
     return {
         tap: feedback?.tapCommittedColor || OFF,
         hold: feedback?.holdActiveColor || OFF,
@@ -79,8 +84,8 @@ export function feedbackColours(model) {
     };
 }
 
-/** @param {Model} model @param {import("../../contracts/edits.js").Tier} kind */
-export const tierColour = (model, kind) => feedbackColours(model)[kind] || OFF;
+/** @param {Model} model @param {import("../../contracts/edits.js").Tier} kind @param {string} [keycode] */
+export const tierColour = (model, kind, keycode) => feedbackColours(model, keycode)[kind] || OFF;
 
 // A key counts as mapped on a layer when it stores something of its own;
 // transparent and disabled positions keep the layer underneath.
@@ -152,7 +157,7 @@ function ledLight(model, layer, led, position, options = {}) {
         const active = [...new Set([0, layer?.index ?? 0, ...(options.held || [])])].sort((a, b) => a - b);
         for (const l of active) {
             const row = layerColourRow(model, l);
-            if (!row || !layerPaints(row.color)) continue;
+            if (!row || !layerIdentityPaints(model, l)) continue;
             if (row.mode === "ALL_KEYS" || mappedOn(model, layer, l, position)) paint(row.color, "layer", l);
         }
         for (const group of model?.rgb?.layerLedGroups || []) {
@@ -208,3 +213,24 @@ export function lightingMemory(model) {
 }
 /** @param {Model} model @param {number} index */
 export const rulePaintColour = (model, index) => model?.rgb?.lighting?.rules[index]?.colour ?? null;
+
+import {identityValue} from "./painting.mjs";
+export {identityValue, paintedCells} from "./painting.mjs";
+/** @param {Model} model @param {number} value @param {Colour | null | undefined} identity */
+export function mapPaintColour(model, value, identity) {
+    if (value < 128) return model?.rgb?.lighting?.program.palette[value] ?? null;
+    if (value === 129) return OFF;
+    if (value === 131) return identity ?? null;
+    return null;
+}
+
+/** @param {Model} model @param {number} id */
+export function comboIdentityColour(model, id) {
+    return model?.rgb?.lighting ? identityValue(/** @type {import('../../contracts/panel.js').PublishedModel} */ (model), {kind: 3, id}).colour : model?.rgb?.comboFeedback?.color;
+}
+
+/** @param {Model} model @param {number} id */
+export function layerIdentityPaints(model, id) {
+    if (model?.rgb?.lighting) return identityValue(/** @type {import('../../contracts/panel.js').PublishedModel} */ (model), {kind: 1, id}).colour !== null;
+    return layerPaints(layerColourRow(model, id)?.color);
+}

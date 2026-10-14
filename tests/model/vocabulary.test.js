@@ -93,3 +93,9 @@ test("every state of the two halves has a label and words saying what to do", ()
     }
     assert.match(VOCABULARY.halves.alone.detail, /cable between the halves/);
 });
+
+test("every advertised lighting paint and target has product words", () => {
+    const {LIGHTING_KINDS} = require("../../core/schema/lighting-kinds-v1");
+    for (const id of Object.keys(LIGHTING_KINDS.paints)) assert.ok(VOCABULARY.lighting.paints[Number(id)]);
+    for (const id of Object.keys(LIGHTING_KINDS.targets)) assert.ok(VOCABULARY.lighting.targets[Number(id)]);
+});

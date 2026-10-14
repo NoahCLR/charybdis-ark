@@ -12,7 +12,7 @@ test("whole-profile checks report inert actions and destination blockers", () =>
     const checks = profileFindings(decoded, {brightnessMax: 100, effects: [{id: 2}]});
     assert.equal(checks.find(row => row.kind === "inertPointing")?.count, 2);
     assert.equal(checks.find(row => row.kind === "unplayableMacro")?.place.index, 0);
-    assert.deepEqual(checks.filter(row => row.level === "blocker").map(row => row.kind), ["brightnessBlocker", "effectBlocker"]);
+    assert.deepEqual(checks.filter(row => row.level === "blocker").map(row => row.kind), ["brightnessBlocker", "effectBlocker", "lightingBrightness"]);
 });
 
 test("whole-profile findings retain new and fixed status beside the keyboard", () => {

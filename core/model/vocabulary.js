@@ -74,7 +74,7 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     lighting: {
         bands: {base: "Base", layers: "Layers", preview: "Layer previews", modes: "Pointing modes", combos: "Combos", feedback: "Gesture feedback", other: "Other rules"},
         targets: ["Whole board", "Left half", "Right half", "Saved key set", "Its keys", "Its halves", "Its mapped keys", "Its usual lighting area"],
-        paints: ["Let the rules below show", "Off", "Colour", "Its own colour", "Painted map", "Dim the light below", "Tint the light below"],
+        paints: ["Let the rules below show", "Off", "Colour", "Its own colour", "Painted map", "Dim the light below", "Tint the light below", "Reserved paint", "Colour by outcome"],
         states: ["Branch selected", "Tap", "Hold", "Long hold"],
         scopes: ["Each key", "Newest gesture on each half", "Newest gesture", "Newest gesture in each state"],
     },

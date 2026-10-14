@@ -88,6 +88,7 @@ function profileFindings(decoded, destination = {}) {
             detail: "The connected firmware does not advertise this effect. Apply will refuse the profile.",
             fix: "Choose a base lighting effect this keyboard reports.", place: {kind: "settings", area: "Settings", section: "rgbAppearance"}});
     }
+    findings.push(...require("./lighting-checks").lightingFindings(decoded, destination, findings));
     return findings;
 }
 

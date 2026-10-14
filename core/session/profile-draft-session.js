@@ -280,7 +280,17 @@ class ProfileDraftSession {
                 combos: this.combos(), maximumBrightness: current.limits?.brightnessMax,
             }).toString("base64")};
         } else throw fail("Unsupported draft edit.");
-        const keys = [...this.history[this.cursor].lightingKeys];
+        let keys = [...this.history[this.cursor].lightingKeys];
+        if (message.type === "paintLightingMap" || message.type === "editLightingIdentity") {
+            const old = current.decoded.rgb.rules, next = this.decode(document).decoded.rgb.rules;
+            const used = new Set();
+            keys = next.map(rule => {
+                let index = old.findIndex((r, i) => !used.has(i) && require("../model/lighting-editor").ruleIdentity(r) === require("../model/lighting-editor").ruleIdentity(rule));
+                if (index < 0 && message.type === "paintLightingMap" && message.index !== undefined && !used.has(message.index)) index = message.index;
+                if (index < 0) return `rule-${this.nextLightingKey++}`;
+                used.add(index);return this.history[this.cursor].lightingKeys[index];
+            });
+        }
         if (message.type === "editLightingRule") {
             if (message.action === "delete") keys.splice(message.index, 1);
             if (message.action === "move" && message.to !== undefined) keys.splice(message.to, 0, ...keys.splice(message.index, 1));

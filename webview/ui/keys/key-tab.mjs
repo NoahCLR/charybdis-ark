@@ -3,6 +3,7 @@
 // the stack, what the key reaches, and its participation.
 
 import {css, isOff} from "../../lib/colour.mjs";
+import {withLightingTab} from "../thing-lighting.mjs";
 import {el, esc} from "../../lib/dom.mjs";
 import {LED_INDEX} from "../../view/geometry.mjs";
 import {actionLabel, behaviourFor, canonicalKeycode, keyFace, keyMeaning, keyName, visibleKeycode} from "../../view/keyface.mjs";
@@ -114,7 +115,7 @@ export function tabKey(body) {
             /** @type {HTMLInputElement} */ (controls.querySelector("[data-use-behavior]")).checked, /** @type {HTMLInputElement} */ (controls.querySelector("[data-join-combos]")).checked))));
         /** @type {HTMLElement} */ (node.querySelector("section")).appendChild(controls);
     }
-    body.replaceChildren(node);
+    body.replaceChildren(withLightingTab(node, {kind: 4, id: model?.keyBehaviors.findIndex(r => r.keycode === keyMeaning(position)) ?? -1}, keyMeaning(position)));
 }
 
 // In a layer preview, the selected key may be answered by a layer below: say

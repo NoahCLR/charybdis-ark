@@ -1539,3 +1539,29 @@ details > summary { list-style: none; }
     .lighting-workbench { grid-template-columns: minmax(0, 1fr); }
     .lighting-rule-editor { position: static; }
 }
+
+/* The painter keeps the familiar board beside a compact reusable palette. */
+.painter-workspace { display: grid; grid-template-columns: minmax(0, 1fr) 270px; gap: 24px; align-items: start; }
+.painter-canvas { min-width: 0; }
+.painter-canvas .board { padding: 12px 0; }
+.painter-palette { border-left: 1px solid var(--line); padding-left: 24px; }
+.painter-toolbar { flex-wrap: wrap; }
+.painter-options { align-items: end; flex-wrap: wrap; }
+.painter-options .field { margin: 0; min-width: 180px; }
+.palette-grid { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+.palette-colour { width: 28px; height: 28px; border: 1px solid var(--line); border-radius: 5px; cursor: pointer; }
+.palette-colour:hover, .palette-colour:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+.thing-lighting .colour-head { margin-top: 12px; }
+.thing-lighting-rules { display: grid; gap: 8px; }
+.thing-lighting-rule { padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; }
+.thing-tabs { display: flex; gap: 6px; margin-bottom: 16px; }
+@media (max-width: 1000px) { .painter-workspace { grid-template-columns: 1fr; } .painter-palette { border-left: 0; border-top: 1px solid var(--line); padding: 20px 0 0; } }
+
+.painter .kc-none .kc-rect, .painter .kc-trns .kc-rect, .painter .kc-under .kc-rect { fill-opacity: 1; filter: none; }
+.painter .kc.pickable .kc-rect { stroke-dasharray: inherit; }
+.thing-lighting-rule .tag { margin-left: 8px; }
+
+.thing-lighting-layout { display: grid; grid-template-columns: minmax(240px, 360px) minmax(240px, 1fr); gap: 28px; align-items: start; }
+.identity-colours { min-width: 0; }
+.identity-rules { min-width: 0; }
+@media (max-width: 1150px) { .thing-lighting-layout { grid-template-columns: 1fr; } }

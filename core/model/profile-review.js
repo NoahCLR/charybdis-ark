@@ -256,7 +256,20 @@ function lightingRecords(rgb, names) {
         fields.set(`Rule ${index + 1}`, {text: `${rule.flags & 1 ? "Off · " : ""}${words.when} → ${words.where} · ${words.how}`, key: JSON.stringify([rule.flags, rule.brightness, rule.parts, colour]), ...(colour ? {colour} : {})});
     });
     fields.set("Palette", {text: `${rgb.palette.length} colours`, key: JSON.stringify(rgb.palette)});
-    fields.set("Identity colours", {text: "Stored with lighting", key: JSON.stringify(rgb.things)});
+    fields.set("Identity colours", {text: "Board defaults and individual colours", key: JSON.stringify(rgb.things)});
+    const {VOCABULARY, layerName} = require("./vocabulary");
+    for (const table of rgb.things) for (const [id, record] of [[-1, table.default], ...table.records.map((r, i) => [i, r])]) {
+        const owner = Number(id) < 0 ? `Every ${table.kind === 1 ? "layer" : table.kind === 2 ? "pointing mode" : table.kind === 3 ? "combo" : "behaviour"}`
+            : table.kind === 1 ? layerName(names, Number(id)) : `${table.kind === 2 ? "Pointing mode" : table.kind === 3 ? "Combo" : "Behaviour"} ${Number(id) + 1}`;
+        const row = /** @type {number[]} */ (record);
+        row.slice(1).forEach((reference, slot) => {
+            if (Number(id) >= 0 && row.every(n => n === 254)) return;
+            const colour = rgb.palette[reference === 254 ? table.default[slot + 1] : reference];
+            const label = table.kind === 4 ? ["Hold", "Long hold", "Tap", ...Array.from({length: row.length - 4}, (_, i) => `${i + 2} taps`)][slot] : "Identity colour";
+            fields.set(`${owner} · ${label}`, {text: reference === 254 ? "Board default" : colour ? `HSV(${colour.h}, ${colour.s}, ${colour.v})` : "Let light through", key: JSON.stringify([reference === 254 ? "inherit" : "custom", colour]), ...(colour ? {colour} : {})});
+        });
+        fields.set(`${owner} · Lighting area`, {text: row[0] === 254 ? "Board default" : VOCABULARY.lighting.targets[row[0]], key: String(row[0])});
+    }
     fields.set("Saved key sets and maps", {text: `${rgb.keySets.length} sets · ${rgb.maps.length} maps`, key: JSON.stringify([rgb.keySets, rgb.maps])});
     fields.set("Fade and flashes", {text: "Stored with lighting", key: JSON.stringify(rgb.extensions)});
     return new Map([["rgb:rules", {title: "Lighting rules", stage: null, where: {}, fields}]]);
@@ -475,7 +488,10 @@ function profileReview(before, after, capabilities) {
         item("Pointing modes", `pd:${id}`, `Slot ${id}${(next?.name || old?.name) ? ` · ${next?.kind ? next.name : old?.name}` : ""}`,
             pointingFields(old, namesA), pointingFields(next, namesB), {kind: "pointing", slot: id}, [Boolean(old?.kind || old?.name), Boolean(next?.kind || next?.name)], {kind: "pointing", slot: id});
     }
-    const lightA = lightingRecords(a.rgb, a.settings.names), lightB = lightingRecords(b.rgb, b.settings.names);
+    // A rename alone does not change lighting bytes. Human identity labels
+    // follow their names without creating a phantom lighting edit.
+    const lightingChanged = JSON.stringify(a.rgb) !== JSON.stringify(b.rgb);
+    const lightA = lightingChanged ? lightingRecords(a.rgb, a.settings.names) : new Map(), lightB = lightingChanged ? lightingRecords(b.rgb, b.settings.names) : new Map();
     for (const [unit, record] of lightB) {
         const old = lightA.get(unit);
         item("Lighting", unit, record.title, old?.fields || new Map(), record.fields, {kind: "lighting", stage: record.stage, ...record.where}, [Boolean(old), true], record.titleMark);

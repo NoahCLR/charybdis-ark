@@ -14,6 +14,7 @@ import {draftDot, draftMarks} from "../../view/review.mjs";
 import {attachGroupToggles, groupHeader, groupOpen} from "../groups.mjs";
 import {inGroupOrder, setReachGroupOpen} from "../../view/reach-groups.mjs";
 import {tierDot} from "../marks.mjs";
+import {withLightingTab} from "../thing-lighting.mjs";
 import {behaviourEditor} from "./behaviour-editor.mjs";
 import {behaviourKey, behaviourRoute, selectBehaviourKey} from "./behaviour-selection.mjs";
 import {sourceLabel} from "./reach.mjs";
@@ -66,7 +67,7 @@ export function tabBehaviours(body, right) {
     const item = (group, row, note) => `<button class="rowitem ${row.keycode === state.behaviourRow && (!route || route === group) ? "on" : ""} ${note ? "quiet" : ""}" data-row="${esc(row.keycode)}" data-route="${group}">
         <span class="t">${esc(actionLabel(model, row.keycode))}${actionLabel(model, row.keycode) === row.keycode ? ""
             : ` <code class="dim">${esc(row.keycode)}</code>`}${changed.has(row.keycode) ? draftDot() : ""}</span>
-        <span class="m">${behaviourTiers(row).map((tier) => tierDot(model, tier.kind)).join("")} ${row.steps.length} branch${row.steps.length === 1 ? "" : "es"}${note ? ` · ${esc(note)}` : ""}</span></button>`;
+        <span class="m">${behaviourTiers(row).map((tier) => tierDot(model, tier.kind, row.keycode)).join("")} ${row.steps.length} branch${row.steps.length === 1 ? "" : "es"}${note ? ` · ${esc(note)}` : ""}</span></button>`;
 
     // A selection made anywhere else — the board, the Key tab, a fresh
     // behaviour — can land in a closed group, so the group holding it opens
@@ -119,7 +120,7 @@ export function tabBehaviours(body, right) {
     if (behaviour) {
         const followed = followedBelow(behaviour);
         if (followed) main.appendChild(el(followed));
-        main.appendChild(behaviourEditor(behaviour));
+        main.appendChild(withLightingTab(behaviourEditor(behaviour), {kind: 4, id: model?.keyBehaviors.findIndex(row => row.keycode === behaviour.keycode) ?? -1}, actionLabel(model, behaviour.keycode)));
     }
     else main.appendChild(el(`<p class="note beh-empty">Transparent keys and KC_NO cannot have a behaviour. Pick a mapped key on the board.</p>`));
     body.replaceChildren(node);

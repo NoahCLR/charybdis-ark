@@ -9,6 +9,7 @@ import {bindingName, words} from "./common.mjs";
 import {formControls} from "./form-controls.mjs";
 import {movement} from "./movement.mjs";
 import {slotReach} from "./reach.mjs";
+import {withLightingTab} from "../thing-lighting.mjs";
 import {advancedControls} from "./advanced.mjs";
 
 /** @param {import("../../../contracts/panel.js").PublishedModel} model @param {import("../surface-types.js").PresentedSlot} slot @param {boolean} canEdit @param {import("../surface-types.js").PresentedSlot[]} slots */
@@ -83,5 +84,5 @@ export function editor(model, slot, canEdit, slots) {
         state.pdSlot = target.id;
         post(edits.duplicatePdMode(target.id, slot.id, model.profileIdentity));
     });
-    return wrap;
+    return withLightingTab(wrap, {kind: 2, id: slot.id}, slot.displayName || slot.name || "Pointing mode");
 }

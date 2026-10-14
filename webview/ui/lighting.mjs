@@ -12,7 +12,10 @@ let selected = null;
 /** @type {{index: number, identity: string} | null} */
 let dragged = null;
 
+import {painterOpen, lightingPainter, openPainter, followPaintedRule} from "./lighting-painter.mjs";
 export function screenLighting() {
+    followPaintedRule();
+    if (painterOpen()) return elPainter();
     const model = getModel(), lighting = model?.rgb?.lighting;
     const main = el(`<div class="main">${topbar("Lighting", "Rules paint from top to bottom. The first rule that paints a key wins.")}</div>`);
     if (!model || !lighting) {
@@ -61,7 +64,16 @@ export function screenLighting() {
         } else body.append(el(`<p class="note">This keyboard does not offer a plain colour paint.</p>`));
         if (fade?.params[0]) body.append(el(`<p class="note">Auto-mouse fade uses the bottom ${fade.params[3]} rule${fade.params[3] === 1 ? "" : "s"}. Moving a rule across that boundary changes what fades.</p>`));
         editor.querySelector("[data-delete]")?.addEventListener("click", () => post(lightingRule(rule.index, rule.identity, "delete")));
+        if (!rule.readOnly && lighting.supportedPaints.includes(4)) {
+            const paint = el(`<button class="btn" ${editableLighting ? "" : "disabled"}>Paint keys…</button>`);
+            paint.addEventListener("click", () => openPainter({index: rule.index, title: rule.when}));body.append(paint);
+        }
         editor.append(body);
     } else editor.append(el(`<div class="card-b"><p class="note">Select a rule to change its paint colour.</p></div>`));
     pad.append(split);content.append(pad);main.append(content);return main;
+}
+
+function elPainter() {
+    const main = el(`<div class="main"><div class="content"><div class="pad lighting-pad"></div></div></div>`);
+    main.querySelector(".pad")?.append(lightingPainter());return main;
 }

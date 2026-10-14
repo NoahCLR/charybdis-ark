@@ -120,13 +120,13 @@ export function behaviourEditor(behaviour) {
         ${behaviourTimingChecks(model, behaviour.keycode).map(check => `<p class="note beh-note" role="status"><strong>${check.level === "notice" ? "Timing advice." : "Timing warning."}</strong> ${esc(check.detail)} ${esc(check.fix)}</p>`).join("")}
         <div class="bgrid">
             <span></span>
-            ${/** @type {import("../../../contracts/edits.js").Tier[]} */ (["tap", "hold", "long"]).map((kind) => `<div class="btier">${tierDot(model, kind)}${tierName(model, kind)}</div>`).join("")}
+            ${/** @type {import("../../../contracts/edits.js").Tier[]} */ (["tap", "hold", "long"]).map((kind) => `<div class="btier">${tierDot(model, kind, behaviour.keycode)}${tierName(model, kind)}</div>`).join("")}
             ${timingControl("multiTapTerm", "Multi tap window")}
             <p class="bterm">On release, before the Tap / hold threshold</p>
             ${timingControl("tapHoldTerm", "Tap / hold threshold")}
             ${timingControl("longerHoldTerm", `${tierName(model, "long")} threshold`)}
             ${steps.map((step) => `
-                <div class="bhead">${branchBadge(model, step.tapCount + 1)}
+                <div class="bhead">${branchBadge(model, step.tapCount + 1, "", behaviour.keycode)}
                     <span>${esc(branchName(model, step.tapCount + 1))}</span></div>
                 ${/** @type {import("../../../contracts/edits.js").Tier[]} */ (["tap", "hold", "long"]).map((kind) => cellFor(step, kind)).join("")}`).join("")}
         </div>

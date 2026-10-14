@@ -113,6 +113,7 @@ export type FindingPlace =
     | {kind: 'combo'; index: number}
     | {kind: 'pointing'; slot: number}
     | {kind: 'macro'; index: number}
+    | {kind: 'lighting'; stage?: string | null; layer?: number; slot?: number}
     | {kind: 'settings'; area?: string; section?: string; stage?: string};
 export interface Finding {
     kind: string;

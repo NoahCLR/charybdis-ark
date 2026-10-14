@@ -8,7 +8,7 @@
  * @typedef {{kind: number, operand: number}} WalkAction
  */
 const {keycodeAction, knownActionAbi, pdSlotOfCode} = require("../schema/actions");
-const {decodeProfileBlob, encodeProfileBlob, crc32, fnv1a32, PROFILE_BLOB_V1, PROFILE_DOMAIN_VERSIONS, ProfileBlobProtocolError} = require("../schema/profile-blob-v1");
+const {decodeProfileBlob, encodeProfileBlob, encodeSemanticAction, crc32, fnv1a32, PROFILE_BLOB_V1, PROFILE_DOMAIN_VERSIONS, ProfileBlobProtocolError} = require("../schema/profile-blob-v1");
 const {supportsComboOutputBehaviors, ALL_LAYERS, COMBO_DOMAIN_VERSION, encodeComboDomain} = require("../schema/combo-domain-v1");
 const {SETTING, SETTING_FIELDS, decodeSettings, encodeSettings} = require("../schema/settings-domain-v1");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX, LAYERS, MATRIX_KEYS, matrixPosition} = require("../data/charybdis-layout");
@@ -21,7 +21,7 @@ const {profileDepthOptions} = require("../schema/profile-depth");
 
 // A portable profile is the keyboard's whole configuration in the one format
 // it stores: sixteen layers, the 128 VIA macros, and a schema 3.0 profile with
-// every domain (RGB 4, key behaviours 2, combos 3, settings 6, PD 3) in the
+// every domain (RGB 5, key behaviours 2, combos 3, settings 7, PD 3) in the
 // action vocabulary Ark knows (firmware D-F14). The keyboard migrates nothing:
 // a backup in an older format is refused here, and translated by
 // backup-translation.js before anything else reads it.
@@ -313,6 +313,7 @@ function reorderLayers(document, order, names, {keysFollow = true} = {}) {
         layerTable.records = order.map(id => records[id]);
     }
     for (const rule of rgb.rules) for (const part of rule.parts) {
+        if (!require("./lighting-editor").knownRule(rule)) continue;
         if (part.slot <= 1 && (part.kind === 1 || part.kind === 2) && part.params[0] !== 255) part.params[0] = remap[part.params[0]];
     }
     // A name the editor only showed as a default ("Layer 9" for an unnamed
@@ -338,6 +339,8 @@ function reorderLayers(document, order, names, {keysFollow = true} = {}) {
     // The layers a behaviour or combo may act on are layers by what they hold.
     behaviors.rows.forEach(row => {row.allowedLayers = follow(row.allowedLayers);});
     combos.rows.forEach(row => {row.allowedLayers = follow(row.allowedLayers);});
+    const sorted = behaviors.rows.map((row, old) => ({old, bytes: encodeSemanticAction(row.target)})).sort((a, b) => Buffer.compare(a.bytes, b.bytes));
+    require("./lighting-references").remapLightingThings(rgb, 4, sorted.map(entry => entry.old));
     result.profile = encodeProfileBlob({domains: encodeProfileDomains({rgb, behaviors, combos, settings, pdModes}, validated.codecOptions)}).toString("base64");
     validateSnapshot(result); return result;
 }

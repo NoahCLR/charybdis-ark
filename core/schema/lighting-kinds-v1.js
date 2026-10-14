@@ -6,9 +6,9 @@
 /** @typedef {{parameters: string[], place?: boolean}} Kind */
 /** @type {Readonly<Record<import('./lighting-types.js').LightingRegistry, Readonly<Record<number, Kind>>>>} */
 const LIGHTING_KINDS = Object.freeze({
-    facts: {1: {parameters: ["layer"]}, 2: {parameters: ["layer"]}, 3: {parameters: ["mode"]}, 4: {parameters: ["role"]}, 5: {parameters: ["states", "scope"]}},
+    facts: {1: {parameters: ["layer"]}, 2: {parameters: ["layer"]}, 3: {parameters: ["mode"]}, 4: {parameters: ["role"]}, 5: {parameters: ["states", "scope"]}, 7: {parameters: ["thing", "role"]}, 8: {parameters: ["thing", "states"]}},
     targets: {0: {parameters: [], place: true}, 1: {parameters: [], place: true}, 2: {parameters: [], place: true}, 3: {parameters: ["set"]}, 4: {parameters: [], place: true}, 5: {parameters: [], place: true}, 6: {parameters: [], place: true}, 7: {parameters: []}},
-    paints: {0: {parameters: []}, 1: {parameters: []}, 2: {parameters: ["colour"]}, 3: {parameters: []}, 4: {parameters: ["map"]}, 5: {parameters: ["level"]}, 6: {parameters: ["colour", "level"]}},
+    paints: {0: {parameters: []}, 1: {parameters: []}, 2: {parameters: ["colour"]}, 3: {parameters: []}, 4: {parameters: ["map"]}, 5: {parameters: ["level"]}, 6: {parameters: ["colour", "level"]}, 8: {parameters: []}},
     timings: {1: {parameters: ["milliseconds"]}},
     ruleExtensions: {},
     domainExtensions: {1: {parameters: ["flags", "fadeMode", "colour", "base"]}, 2: {parameters: ["flashMode"]}},

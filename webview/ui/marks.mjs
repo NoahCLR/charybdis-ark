@@ -12,28 +12,29 @@ import {css, isOff} from "../lib/colour.mjs";
 import {esc} from "../lib/dom.mjs";
 import {layerOfKeycode} from "../view/keyface.mjs";
 import {namedAction} from "../view/reach.mjs";
-import {feedbackColours, pdColourRow, stageEnabled} from "../view/lighting.mjs";
+import {comboIdentityColour, feedbackColours, pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {layerSwatch} from "./layerbar.mjs";
 
 // A branch's badge as the grid heads its column: from 2× on, tinted with the
 // tap-branch colour the keyboard shows while that branch is pending.
-/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {number} count @param {string} [className] */
-export function branchBadge(model, count, className = "") {
-    const colour = feedbackColours(model).branches[count - 2];
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {number} count @param {string} [className] @param {string} [keycode] */
+export function branchBadge(model, count, className = "", keycode) {
+    const colour = feedbackColours(model, keycode).branches[count - 2];
     const lit = count > 1 && stageEnabled(model, "key") && colour && !isOff(colour);
     return `<span class="bn${className ? ` ${esc(className)}` : ""}" style="${lit ? `border-color:${css(colour)};color:${css(colour)}` : ""}">${count}×</span>`;
 }
 
-/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} kind */
-export function tierDot(model, kind) {
-    const colour = feedbackColours(model)[/** @type {import("../../contracts/edits.js").Tier} */ (kind)];
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} kind @param {string} [keycode] */
+export function tierDot(model, kind, keycode) {
+    const colour = feedbackColours(model, keycode)[/** @type {import("../../contracts/edits.js").Tier} */ (kind)];
     const lit = stageEnabled(model, "key") && !isOff(colour);
     return `<i class="fbdot${lit ? "" : " off"}"${lit ? ` style="background:${css(colour)}"` : ""}></i>`;
 }
 
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} [badge] */
 export function comboBadge(model, badge = "C") {
-    const colour = model?.rgb?.comboFeedback?.color;
+    const combo = model?.combos.find(c => c.badge === badge);
+    const colour = combo ? comboIdentityColour(model, combo.id) : model?.rgb?.comboFeedback?.color;
     const lit = stageEnabled(model, "combo") && colour && !isOff(colour);
     return `<i class="mk-badge" style="${lit ? `border-color:${css(colour)}` : ""}">${esc(badge)}</i>`;
 }

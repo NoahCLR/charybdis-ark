@@ -1173,3 +1173,78 @@ test("older firmware shows the switches read-only and rejects bypass edits witho
     stage(draft, edits.settingsSection(section, field => field.macro === "combosEnabled" ? false : undefined));
     assert.equal(decoded(draft).settings.values[20], 0, "existing combo switches remain editable");
 });
+
+test("painting and identity builders stage against the real draft with Undo, Redo and whole-program discard", () => {
+    const {decodeLightingCapabilities} = require("../../core/protocol/lighting-capabilities-v1");
+    const vectors = require("../../upstream/firmware/tests/fixtures/lighting_vectors_v1.json");
+    const doc = pdDocument(), caps = {...capabilities, lighting: decodeLightingCapabilities(vectors.capability.map(h => Buffer.from(h, "hex")))};
+    const draft = new ProfileDraftSession({document: doc, fingerprint: portable.fingerprint(doc), summary: portable.summary(doc), limits: {brightnessMax: 200}}, "test-device", caps);
+    stage(draft, edits.lightingIdentity({kind: 1, id: 3, field: "colour", slot: 1, colour: {h: 177, s: 211, v: 199}}));
+    assert.deepEqual(decoded(draft).rgb.palette[decoded(draft).rgb.things[0].records[3][1]], {h: 177, s: 211, v: 199});
+    const r = decoded(draft).rgb.rules[0];
+    stage(draft, edits.paintLighting({index: 0, expectedRule: JSON.stringify([r.flags, r.brightness, r.parts]), leds: [1, 2, 56], paint: {h: 93, s: 222, v: 188}}));
+    const painted = draft.document.profileBlob;assert.equal(decoded(draft).rgb.maps.length, 1);
+    draft.undo(draft.revision);assert.equal(decoded(draft).rgb.maps.length, 0);
+    draft.redo(draft.revision);assert.equal(draft.document.profileBlob, painted);
+    const changes = draft.changes();assert.equal(changes.filter(c => c.area === "Lighting").length, 1);
+    draft.discard(draft.revision, changes.find(c => c.area === "Lighting").group);
+    assert.deepEqual(decoded(draft).rgb, portable.validateSnapshot(doc).rgb);
+});
+
+test("behaviour identity follows sorted insertion, retarget and deletion through the real draft", () => {
+    const {decodeLightingCapabilities} = require("../../core/protocol/lighting-capabilities-v1");
+    const vectors = require("../../upstream/firmware/tests/fixtures/lighting_vectors_v1.json");
+    const doc = pdDocument(), lighting = decodeLightingCapabilities(vectors.capability.map(h => Buffer.from(h, "hex")));
+    lighting.registries.facts = [...new Set([...lighting.registries.facts, 7, 8])];lighting.registries.paints = [...new Set([...lighting.registries.paints, 8])];
+    const caps = {...capabilities, lighting};
+    const draft = new ProfileDraftSession({document: doc, fingerprint: portable.fingerprint(doc), summary: portable.summary(doc), limits: {brightnessMax: 200}}, "test-device", caps);
+    let key = "KC_X"; const colour = {h: 177, s: 199, v: 188};
+    stage(draft, edits.addBehaviour(key));
+    const id = () => decoded(draft).behaviors.rows.findIndex(r => require("../../core/schema/actions").actionName(r.target) === key);
+    const initial = id();assert.ok(initial >= 0);
+    stage(draft, edits.lightingIdentity({kind: 4, id: initial, field: "colour", slot: 1, colour}));
+    stage(draft, edits.addBehaviour("KC_A"));
+    const rgb = decoded(draft).rgb, current = id();
+    assert.deepEqual(rgb.palette[rgb.things.find(t => t.kind === 4).records[current][1]], colour);
+    assert.ok(rgb.rules.some(r => r.parts.some(p => p.slot === 0 && p.kind === 8 && p.params[0] === current)));
+    stage(draft, edits.retargetBehaviour(key, "KC_Z"));key = "KC_Z";
+    const retargeted = decoded(draft).rgb;assert.deepEqual(retargeted.palette[retargeted.things.find(t => t.kind === 4).records[id()][1]], colour);
+    stage(draft, edits.deleteBehaviour("KC_A"));
+    const after = decoded(draft).rgb;assert.deepEqual(after.palette[after.things.find(t => t.kind === 4).records[id()][1]], colour);
+});
+
+test("combo deletion carries later identity records and removes only the deleted combo's lighting", () => {
+    const {decodeLightingCapabilities} = require("../../core/protocol/lighting-capabilities-v1");
+    const vectors = require("../../upstream/firmware/tests/fixtures/lighting_vectors_v1.json");
+    const doc = pdDocument(), lighting = decodeLightingCapabilities(vectors.capability.map(h => Buffer.from(h, "hex")));
+    lighting.registries.facts = [...new Set([...lighting.registries.facts, 7, 8])];
+    const caps = {...capabilities, lighting};
+    const draft = new ProfileDraftSession({document: doc, fingerprint: portable.fingerprint(doc), summary: portable.summary(doc), limits: {brightnessMax: 200}}, "test-device", caps);
+    stage(draft, edits.comboMessage(null, {output: "KC_A", inputs: ["KC_B", "KC_C"], termMs: 50}));
+    stage(draft, edits.comboMessage(null, {output: "KC_D", inputs: ["KC_E", "KC_F"], termMs: 50}));
+    const count = decoded(draft).combos.rows.length;
+    assert.ok(count > 1);
+    const colour = {h: 177, s: 199, v: 188};
+    stage(draft, edits.lightingIdentity({kind: 3, id: count - 1, field: "colour", slot: 1, colour}));
+    stage(draft, edits.deleteCombo(0));
+    const after = decoded(draft).rgb, record = after.things.find(t => t.kind === 3).records[count - 2];
+    assert.deepEqual(after.palette[record[1]], colour);
+    assert.ok(after.rules.some(r => r.parts.some(p => p.slot === 0 && p.kind === 7 && p.params[0] === count - 2)));
+});
+
+test("layer reorder carries named behaviour identities when layer-key targets are re-sorted", () => {
+    const {decodeLightingDomain, encodeLightingDomain} = require("../../core/schema/lighting-domain-v1");
+    const {decodeProfileBlob, encodeProfileBlob} = require("../../core/schema/profile-blob-v1");
+    const {decodeKeyBehaviorDomain, encodeKeyBehaviorDomain} = require("../../core/schema/key-behavior-domain-v1");
+    const {keycodeAction} = require("../../core/schema/actions");
+    const doc = pdDocument(), blob = decodeProfileBlob(Buffer.from(doc.profile, "base64"));
+    const bh = blob.domains.find(d => d.id === 0x20), light = blob.domains.find(d => d.id === 0x10);
+    bh.payload = encodeKeyBehaviorDomain({rows: [{target: keycodeAction(0x5221), steps: []}, {target: keycodeAction(0x5222), steps: []}]});
+    const p = decodeLightingDomain(light.payload);const ref = p.palette.length;p.palette.push({h: 177, s: 199, v: 188});
+    p.things.find(t => t.kind === 4).records = [[254, ref, 254, 254, 254, 254, 254, 254], [254, 254, 254, 254, 254, 254, 254, 254]];
+    light.payload = encodeLightingDomain(p);doc.profile = encodeProfileBlob(blob).toString("base64");
+    const order = Array.from({length: 16}, (_, i) => i);[order[1], order[2]] = [2, 1];
+    const reordered = portable.validateSnapshot(portable.reorderLayers(doc, order));
+    assert.equal(require("../../core/schema/actions").actionName(reordered.behaviors.rows[1].target), "MO(2)");
+    const record = reordered.rgb.things.find(t => t.kind === 4).records[1];assert.deepEqual(reordered.rgb.palette[record[1]], {h: 177, s: 199, v: 188});
+});

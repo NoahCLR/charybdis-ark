@@ -23,10 +23,10 @@ function colourReferences(value, index) {
 const ruleBand = rule => {
     const condition = rule.parts.find(p => p.slot === 0);
     if (!condition) return "base";
-    return ({1: "layers", 2: "preview", 3: "modes", 4: "combos", 5: "feedback"})[condition.kind] ?? "other";
+    return ({1: "layers", 2: "preview", 3: "modes", 4: "combos", 5: "feedback", 7: "combos", 8: "feedback"})[condition.kind] ?? "other";
 };
-/** @param {import('../schema/lighting-types.js').LightingRule} rule @param {string[]} [names] */
-function ruleWords(rule, names = []) {
+/** @param {import('../schema/lighting-types.js').LightingRule} rule @param {string[]} [names] @param {{modes?: string[]; combos?: string[]; behaviours?: string[]}} [subjects] */
+function ruleWords(rule, names = [], subjects = {}) {
     /** @param {number} layer */
     const layer = layer => layer === 255 ? "Any layer" : names[layer] || `Layer ${layer}`;
     const when = rule.parts.filter(p => p.slot <= 1).map(p => {
@@ -34,8 +34,10 @@ function ruleWords(rule, names = []) {
         let text;
         if (p.kind === 1) text = `${layer(value)} is active`;
         else if (p.kind === 2) text = `${layer(value)} is previewing`;
-        else if (p.kind === 3) text = value === 255 ? "Any pointing mode is active" : `Pointing mode ${value + 1} is active`;
+        else if (p.kind === 3) text = value === 255 ? "Any pointing mode is active" : `${subjects.modes?.[value] || `Pointing mode ${value + 1}`} is active`;
         else if (p.kind === 4) text = value === 0 ? "Combos leading into a preview or mode are held" : value === 1 ? "Other combos are held" : "Any combo is held";
+        else if (p.kind === 7) text = value === 255 ? "Each held combo" : `${subjects.combos?.[value] || `Combo ${value + 1}`} is held`;
+        else if (p.kind === 8) text = `${value === 255 ? "Each behaviour" : subjects.behaviours?.[value] || `Behaviour ${value + 1}`} shows ${VOCABULARY.lighting.states.filter((_, bit) => scope & 1 << bit).join(" or ").toLowerCase()}`;
         else if (p.kind === 5) text = `${value === 15 ? "Any key feedback" : VOCABULARY.lighting.states.filter((_, bit) => value & 1 << bit).join(" or ")} · ${VOCABULARY.lighting.scopes[scope]}`;
         else text = "A condition from newer firmware";
         return p.slot === 1 ? `Not: ${text}` : text;

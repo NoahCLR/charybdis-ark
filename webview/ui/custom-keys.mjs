@@ -7,6 +7,7 @@
 // says. A key here is its name; what it does is its behaviour, edited on the
 // Keys screen like any other. Place one on a layer or send it from a combo.
 
+import {withLightingTab} from "./thing-lighting.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {customKeyPlacements} from "../view/reach.mjs";
 import {NAME_MAX_BYTES, NAME_TIP, nameCount} from "../view/names.mjs";
@@ -62,7 +63,7 @@ export function screenCustomKeys() {
         cells.append(cell);
     }
     pad.appendChild(grid);
-    pad.appendChild(key ? editor(model, key, canEdit) : el(`<div class="empty-card"><p class="note">Pick a key.</p></div>`));
+    pad.appendChild(key ? withLightingTab(editor(model, key, canEdit), {kind: 4, id: model?.keyBehaviors.findIndex(r => r.keycode === key.keycode) ?? -1}, key.name || `Custom key ${key.slot}`) : el(`<div class="empty-card"><p class="note">Pick a key.</p></div>`));
     main.appendChild(content);
     return main;
 }

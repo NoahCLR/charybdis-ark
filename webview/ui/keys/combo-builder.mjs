@@ -16,6 +16,7 @@ import * as edits from "../../view/edits.mjs";
 import {timingInput} from "../../view/timing-input.mjs";
 import {openPicker} from "../picker.mjs";
 import {keyNameMarked} from "../marks.mjs";
+import {withLightingTab} from "../thing-lighting.mjs";
 import {vocabulary} from "../../view/vocabulary.mjs";
 
 /** @param {string} text */
@@ -156,5 +157,5 @@ export function comboBuilder(canEdit, holdTerm) {
         }));
         render();
     });
-    return node;
+    return editing ? withLightingTab(node, {kind: 3, id: original?.id ?? -1}, original?.badge || "Combo") : node;
 }

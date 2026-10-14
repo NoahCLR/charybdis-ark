@@ -242,3 +242,12 @@ test("zero brightness keeps explicit black distinct from layer pass-through and 
     m.rgb.layerColors[1].color = black;
     assert.deepEqual(keyLight(m, {index: 3}, position(13, "KC_A")), {colour: black, source: "layer", layer: 3});
 });
+
+test("v5 identity black paints black while a missing identity leaves the base effect visible", () => {
+    const m = model(), layer = {index: 1, positions: [position(0, "KC_A")]};m.layers = [layer];
+    m.rgb.layerColors = [{layerId: 1, layer: "Layer 1", color: colour(0, 0, 0), mode: "ALL_KEYS"}];
+    m.rgb.lighting = {program: {palette: [{h: 0, s: 0, v: 0}], things: [{kind: 1, default: [0, 255], records: [[254, 254], [0, 0]]}]}};
+    const black = keyLight(m, layer, layer.positions[0]);assert.equal(black.source, "layer");assert.equal(Number(black.colour.v), 0);
+    m.rgb.lighting.program.things[0].records[1][1] = 255;
+    assert.equal(keyLight(m, layer, layer.positions[0]).source, "base");
+});

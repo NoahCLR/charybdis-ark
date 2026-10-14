@@ -19,7 +19,7 @@ import {GEO, LED_INDEX, TRACKBALL_LED, fitText, keyFaceRows, keyVisual} from "..
 import {behaviourFor, behaviourTiers, keyFace, keyMeaning} from "../view/keyface.mjs";
 import {combosShownAt} from "../view/combo-reach.mjs";
 import {resolvedPositions} from "../view/layer-resolution.mjs";
-import {keyLight, ownLight, stageEnabled, tierColour, trackballLight} from "../view/lighting.mjs";
+import {comboIdentityColour, keyLight, ownLight, stageEnabled, tierColour, trackballLight} from "../view/lighting.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {hideHover} from "./hover.mjs";
 
@@ -76,7 +76,7 @@ export function board(model, layer, options = {}) {
         const step = 9.6, startX = cx - ((tiers.length - 1) * step) / 2;
         marks += tiers.map((tier, order) => {
             const x = startX + order * step;
-            const colour = tierColour(model, tier.kind);
+            const colour = tierColour(model, tier.kind, keyMeaning(shown));
             if (!feedbackOn || isOff(colour)) {
                 return `<circle cx="${x}" cy="${rows.tierY}" r="3.9" fill="none" stroke="${text || "var(--light-detail)"}" stroke-width="1.1" stroke-dasharray="2 1.6"></circle>`;
             }
@@ -98,6 +98,7 @@ export function board(model, layer, options = {}) {
             let x = cx - (widths.reduce((sum, width) => sum + width, 0) + between) / 2;
             marks += combos.map((combo, order) => {
                 const width = widths[order];
+                const comboColour = comboIdentityColour(model, combo.id), comboLit = stageEnabled(model, "combo") && comboColour && !isOff(comboColour);
                 const badge = `<rect x="${x}" y="${rows.comboY}" width="${width}" height="${rows.comboHeight}" rx="${rows.comboHeight * 0.22}" fill="var(--badge-ink)" stroke="${comboLit ? css(comboColour) : "var(--badge-outline)"}" stroke-width="${rows.comboHeight * 0.08}"></rect>`
                     + `<text x="${x + width / 2}" y="${/** @type {number} */ (rows.comboY) + rows.comboHeight / 2 + 0.1}" class="kc-badgetext" font-size="${fontSize}">${esc(combo.badge || "C")}</text>`;
                 x += width + gap;

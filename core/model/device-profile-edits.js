@@ -12,6 +12,8 @@ const {actionName, keycodeAction, knownActionAbi, layerRef} = require("../schema
 const {comboPlacementProblem} = require("./profile-placement");
 const {pointingTaps} = require("./pointing-taps");
 const {comboTableOf} = require("./portable-profile");
+const {decodeKeyBehaviorDomain} = require("../schema/key-behavior-domain-v1");
+const {rewriteLightingThings} = require("./lighting-references");
 const {editKeyBehaviors} = require("./key-behavior-edits");
 const {inDomain} = require("./draft-edits");
 const {decodeSettings, encodeSettings} = require("../schema/settings-domain-v1");
@@ -164,13 +166,30 @@ function editDeviceProfile(bytes, message, context = {}) {
     if (inDomain(message, "behaviours")) {
         const profile = decodeProfileBlob(bytes);
         const domain = existing(profile.domains, row => row.id === PROFILE_DOMAIN_IDS.KEY_BEHAVIORS, "Key behaviours");
+        const options = profileDepthOptions(context.capabilities), before = decodeKeyBehaviorDomain(domain.payload, options.behaviors).rows;
         domain.payload = editKeyBehaviors(domain.payload, message, context.capabilities);
+        const after = decodeKeyBehaviorDomain(domain.payload, options.behaviors).rows;
+        const canonical = (/** @type {string} */ name) => {const code = keycodes.encode(name);return code === undefined ? name : actionName(keycodeAction(code));};
+        const keys = before.map(row => actionName(row.target));
+        const owners = [...keys];
+        if (message.type === "retargetBehavior") {
+            const from = keys.indexOf(canonical(message.keycode)), to = keys.indexOf(canonical(message.target));
+            if (from >= 0) owners[from] = canonical(message.target);
+            if (to >= 0) owners[to] = message.conflict === "swap" ? canonical(message.keycode) : "";
+        }
+        rewriteLightingThings(profile, 4, after.map(row => {const old = owners.indexOf(actionName(row.target));return old < 0 ? null : old;}), {...options.rgb, maximumBrightness: context.maximumBrightness ?? 255});
         return encodeProfileBlob(profile);
     }
     if (!inDomain(message, "lighting")) throw invalid("Unsupported profile edit.");
     const profile = decodeProfileBlob(bytes);
     const domain = existing(profile.domains, row => row.id === PROFILE_DOMAIN_IDS.RGB, "RGB");
     const maximumBrightness = context.maximumBrightness ?? 255;
+    if (message.type === "editLightingIdentity" || message.type === "paintLightingMap") {
+        const painting = require("./lighting-painting");
+        const options = {...profileDepthOptions(context.capabilities).rgb, maximumBrightness};
+        domain.payload = message.type === "editLightingIdentity" ? painting.editLightingIdentity(domain.payload, message, options) : painting.paintLightingMap(domain.payload, message, options);
+        return encodeProfileBlob(profile);
+    }
     if (message.type === "editLightingRule") {
         domain.payload = require("./lighting-editor").editLightingRule(domain.payload, message, {...profileDepthOptions(context.capabilities).rgb, maximumBrightness});
         return encodeProfileBlob(profile);
@@ -288,6 +307,10 @@ function editCombos(bytes, message, context) {
     // row is checked, not only the one being edited.
     const problem = comboPlacementProblem(table.rows, {layerCount: context.capabilities?.compiledLayerCount ?? 16});
     if (problem) throw invalid(problem);
+    if (message.type === "deleteCombo") {
+        const count = table.rows.length + 1;
+        rewriteLightingThings(profile, 3, Array.from({length: count}, (_, id) => id).filter(id => id !== message.id), {...profileDepthOptions(context.capabilities).rgb, maximumBrightness: context.maximumBrightness ?? 255});
+    }
     const payload = encodeComboDomain(table);
     if (domain) Object.assign(domain, {version: table.version, payload});
     else profile.domains.push({id: PROFILE_DOMAIN_IDS.COMBOS, version: table.version, payload});

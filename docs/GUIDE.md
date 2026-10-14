@@ -127,7 +127,7 @@ Every screen is drawn and wired to the host:
 | Surface | What it edits |
 | --- | --- |
 | Keys | Layout keys, key behaviours, combos, layer names and priority; reachable behaviours, macros and pointing modes are shown in place, whether a key, a behaviour branch or a combo reaches them |
-| Lighting | Lighting rules grouped by their purpose, with reorder, on/off switches, delete and paint colours; lighting memory beside the list and in Review |
+| Lighting | Lighting rules grouped by their purpose, with reorder, on/off switches, delete, identity colours and painted key maps; lighting memory beside the list and in Review |
 | Macros | Named slots: literal Text, a compact sequence of key/delay/press/release tiles, drag reordering and a selected-step editor, raw payload, live size feedback, configurable recorder and placement; search by name, and the layers that set each macro off — by key, behaviour or combo — in their layer colour, each opening that layer in Keys with the macro picked |
 | Mouse | Pointer speed, sniping and auto-mouse — the Settings sections the keyboard's model files under Mouse, drawn with the same cards and posted whole |
 | Pointing modes | All 32 slots: movement, speed, direction shortcuts and how often they send (every step, or once per movement until the ball pauses or moves back the other way), scroll tuning and which way a scrolling mode scrolls (both axes, horizontal only or vertical only), what each direction's shortcut does with held modifiers, thresholds shown as ball movement at the mode's DPI, buttons, bindings, placement, clear and duplicate |
@@ -639,6 +639,33 @@ row. An empty slot takes no room in the profile, so 32 slots cost only what you
 configure.
 
 ### Lighting rules
+
+In Keys, **Lighting** shows the current layer's colour and where it lights up.
+Behaviour, combo and pointing-mode editors have a Lighting tab too. Its colours
+follow the board defaults until you choose your own; **Use board default**
+restores inheritance. **Let light through** clears an identity, while **Paint
+black** stores real black. A behaviour has separate tap, hold, long hold and
+extra-tap colours. **Colour by outcome** uses the layer or pointing mode a hold
+enters, with the behaviour's identity as the fallback for other actions.
+Custom keys use their behaviour's lighting. The macro tab explains that this
+keyboard does not yet provide a macro lighting condition.
+
+**Customise** opens the painter for that thing. Click or drag with **Brush**;
+use **Select**, or **Select keys that…**, then **Fill selection**. With nothing
+selected, Fill paints the whole board. Saved palette colours are reused. Clear
+lets lower rules show, Off paints black, and Identity follows the thing's own
+colour. The painter shows this look, not the combined result of all rules.
+Selections store physical keys; remapping a key later does not move its paint.
+Copy takes a layer's painted look, or its identity on mapped keys. Mirror copies
+matching physical keys to the other half; the two unmatched thumbs and the
+trackball keep their colours. Every stroke uses the normal draft, Undo, Redo
+and Review; nothing is saved to the keyboard until Apply.
+
+Review shows the shared 8 KiB lighting budget, colour/place changes, and advice
+about similar identities, covered rules and conditions that cannot occur.
+Similar-colour warnings are advice: screen colours cannot predict the LEDs
+exactly. Newer kinds remain read-only and survive backups and Apply unchanged.
+
 
 Lighting lists the keyboard's rules in their stored order, under headings such
 as Layers, Pointing modes, Combos and Gesture feedback. The first matching

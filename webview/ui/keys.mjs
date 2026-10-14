@@ -9,7 +9,7 @@
 import {isOff, label as hsvLabel} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {comboAnswers, comboInputKeys, toggleComboInput} from "../view/combo-reach.mjs";
-import {layerColourRow, stageEnabled} from "../view/lighting.mjs";
+import {layerIdentityPaints, layerColourRow, stageEnabled} from "../view/lighting.mjs";
 import {currentLayer, getModel, heldLayers, layers, post, previewing, render, state, writable} from "../store.mjs";
 import * as edits from "../view/edits.mjs";
 import {draftMarks} from "../view/review.mjs";
@@ -53,7 +53,7 @@ export function screenKeys() {
     const stage = el(`<div class="stack keys-stage"></div>`);
     const card = el(`<div class="board-card"></div>`);
     const row = layerColourRow(model, layer.index);
-    const lit = stageEnabled(model, "layers") && row && !isOff(row.color);
+    const lit = stageEnabled(model, "layers") && row && layerIdentityPaints(model, layer.index);
     if (state.placement) card.appendChild(placementBar());
     else if (state.combo.picking) card.appendChild(pickBar());
     // One indication at a time: while a combo is being built its inputs are
