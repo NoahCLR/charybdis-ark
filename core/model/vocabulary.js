@@ -71,6 +71,13 @@ const OS_WORDS = {macos: "macOS", windows: "Windows", linux: "Linux"};
 
 /** @type {Readonly<import("../../contracts/model.js").Vocabulary>} */
 const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.js").Vocabulary} */ ({
+    lighting: {
+        bands: {base: "Base", layers: "Layers", preview: "Layer previews", modes: "Pointing modes", combos: "Combos", feedback: "Gesture feedback", other: "Other rules"},
+        targets: ["Whole board", "Left half", "Right half", "Saved key set", "Its keys", "Its halves", "Its mapped keys", "Its usual lighting area"],
+        paints: ["Let the rules below show", "Off", "Colour", "Its own colour", "Painted map", "Dim the light below", "Tint the light below"],
+        states: ["Branch selected", "Tap", "Hold", "Long hold"],
+        scopes: ["Each key", "Newest gesture on each half", "Newest gesture", "Newest gesture in each state"],
+    },
     phases: PHASE_WORDS,
     halves: HALVES_WORDS,
     hostOs: [[0, "Auto"], [1, "macOS"], [2, "Windows"], [3, "Linux"]],

@@ -176,25 +176,25 @@ test("renaming a layer does not read as a change to the settings that name it", 
 });
 const {decodeRgbDomainV1, encodeRgbDomainV1} = require("../../core/schema/rgb-domain-v1");
 const lighting = (value, change) => withDomain(value,16,payload=>decodeRgbDomainV1(payload),rgb=>encodeRgbDomainV1(rgb),change);
-test("a colour travels as a colour, and an off one says what off means there", () => {
-    const base=pdDocument(), before=snapshot(base);
-    const after=snapshot(lighting(base,rgb=>({...rgb,
-        layerColors:rgb.layerColors.map(row=>row.layerId===2?{...row,color:{h:20,s:200,v:100}}:row),
-        groups:[...rgb.groups,{id:rgb.groups.length,leds:[1,2,3]}],
-        layerGroupRows:[...rgb.layerGroupRows,{selector:3,color:{h:0,s:0,v:0},groupId:rgb.groups.length}]})));
-    const items=profileReview(before,after), names=validateSnapshot(base).settings.names;
-    const layer=items.find(entry=>entry.unit==="rgb:layer:2");
-    assert.equal(layer.title,`${names[2]} colour`,"a layer's colour is named by the layer");
-    assert.deepEqual(layer.fields[0].afterColour,{h:20,s:200,v:100});
-    assert.ok(layer.fields[0].beforeColour,"both sides carry their colour");
-    const override=items.find(entry=>entry.unit==="rgb:groups").fields.find(field=>field.label===`Override · ${names[3]}`);
-    assert.match(override.after,/Group \d+ · 3 LEDs · inherits the stage colour/);
-    assert.deepEqual(override.afterColour,{h:0,s:0,v:0},"drawn as off, as Lighting draws it");
+test("a rule colour travels as a colour in Review, including explicit black", () => {
+    const source = document();
+    const before = snapshot(source);
+    const rgb = validateSnapshot(source).rgb;
+    const {editDeviceProfile} = require("../../core/model/device-profile-edits");
+    const {ruleIdentity} = require("../../core/model/lighting-editor");
+    for (const colour of [{h: 99, s: 255, v: 120}, {h: 0, s: 0, v: 0}]) {
+        const profile = editDeviceProfile(Buffer.from(source.profile,"base64"), {type:"editLightingRule",index:0,expectedRule:ruleIdentity(rgb.rules[0]),action:"colour",colour});
+        const after = snapshot({...source,profile:profile.toString("base64")});
+        const item = profileReview(before,after).find(item=>item.unit==="rgb:rules");
+        assert.deepEqual(item.fields.find(f=>f.label==="Rule 1").afterColour,colour);
+    }
 });
-test("switching one lighting stage off names that stage, in the Lighting screen's words", () => {
-    const base=pdDocument(), before=snapshot(base);
-    const [item]=profileReview(before,snapshot(lighting(base,rgb=>({...rgb,stageEnableMask:rgb.stageEnableMask & ~4}))));
-    assert.deepEqual(item.fields,[{label:"Pointing modes",status:"changed",before:"on",after:"off",beforeMark:{kind:"stage",on:true},afterMark:{kind:"stage",on:false}}]);
+test("switching a lighting rule off names its condition in Review", () => {
+    const source=document(),rgb=validateSnapshot(source).rgb;
+    const {editDeviceProfile}=require("../../core/model/device-profile-edits"),{ruleIdentity}=require("../../core/model/lighting-editor");
+    const profile=editDeviceProfile(Buffer.from(source.profile,"base64"),{type:"editLightingRule",index:0,expectedRule:ruleIdentity(rgb.rules[0]),action:"toggle"});
+    const item=profileReview(snapshot(source),snapshot({...source,profile:profile.toString("base64")})).find(item=>item.unit==="rgb:rules");
+    assert.match(item.fields.find(f=>f.label==="Rule 1").after,/Off.*feedback/i);
 });
 test("a behaviour tier says which branch and tier it is, so it is coloured as the grid colours it", () => {
     const base=pdDocument(), before=snapshot(base);

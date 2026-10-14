@@ -31,7 +31,7 @@ const {PROFILE_WIRE_FEATURES} = require("../protocol/profile-wire-v1");
  * @typedef {import("../model/types.js").ModelReviewChange} ModelReview
  * @typedef {import("./types.js").DraftEdit} Edit
  * @typedef {readonly number[]} Order
- * @typedef {{readonly document: Document, readonly origin: string | null, readonly label: string | null, readonly at: number, readonly order: Order}} HistoryEntry
+ * @typedef {{readonly document: Document, readonly origin: string | null, readonly label: string | null, readonly at: number, readonly order: Order, readonly lightingKeys: readonly string[]}} HistoryEntry
  * @typedef {{decoded: Decoded, fingerprint: string, summary: import("../model/types.js").ProfileSummary}} DecodeEntry
  * @typedef {{snapshot: Complete, order: Order | null}} Reference
  */
@@ -112,12 +112,17 @@ class ProfileDraftSession {
     checksCache;
     /** @type {boolean | undefined} */
     needsRead;
+    nextLightingKey = 0;
     now() {return Date.now();}
     // A step keeps its document, edit grouping, words, time and layer order
     // together. All of them stay fixed as undo, branching and trimming move it.
-    /** @param {Document} document @param {string | null} [origin] @param {string | null} [label] @param {Order} [order] @returns {HistoryEntry} */
-    historyEntry(document, origin = null, label = null, order = IDENTITY) {
-        return freeze({document: copy(document), origin, label, at: this.now(), order: [...order]});
+    /** @param {Document} document @param {string | null} [origin] @param {string | null} [label] @param {Order} [order] @param {readonly string[]} [lightingKeys] @returns {HistoryEntry} */
+    historyEntry(document, origin = null, label = null, order = IDENTITY, lightingKeys) {
+        const stored = copy(document);
+        const count = this.decode(stored).decoded.rgb.rules.length;
+        const previous = lightingKeys ?? this.history?.[this.cursor]?.lightingKeys;
+        const keys = previous?.length === count ? [...previous] : Array.from({length: count}, () => `rule-${this.nextLightingKey++}`);
+        return freeze({document: stored, origin, label, at: this.now(), order: [...order], lightingKeys: keys});
     }
     get document() {return copy(this.history[this.cursor].document);}
     get order() {return this.history[this.cursor].order;}
@@ -143,7 +148,7 @@ class ProfileDraftSession {
     /** @returns {Complete & {decoded: Decoded}} */
     get current() {
         const {decoded, fingerprint: print, summary: brief} = this.decode(this.history[this.cursor].document);
-        return {...this.snapshotFacts, incomplete: false, document: this.history[this.cursor].document, fingerprint: print, summary: brief, decoded};
+        return {...this.snapshotFacts, incomplete: false, document: this.history[this.cursor].document, fingerprint: print, summary: brief, decoded, lightingKeys: this.history[this.cursor].lightingKeys};
     }
     // The keyboard's side as a snapshot, decoded once too.
     get baseSnapshot() {
@@ -240,13 +245,13 @@ class ProfileDraftSession {
         this.checksCache = new WeakMap();
     }
     // A new entry keeps the entry's layer order unless it says otherwise.
-    /** @param {Document} document @param {number} revision @param {string} [origin] @param {string | null} [label] @param {Order} [order] */
-    replace(document, revision, origin = "edit", label = null, order = this.order) {
+    /** @param {Document} document @param {number} revision @param {string} [origin] @param {string | null} [label] @param {Order} [order] @param {readonly string[]} [lightingKeys] */
+    replace(document, revision, origin = "edit", label = null, order = this.order, lightingKeys) {
         this.assertRevision(revision);
         const valid = validateSnapshot(document, this.capabilities).document;
         if (fingerprint(valid) === this.decode(this.history[this.cursor].document).fingerprint) return;
         this.history = this.history.slice(0, this.cursor + 1);
-        this.history.push(this.historyEntry(valid, origin, label, order));
+        this.history.push(this.historyEntry(valid, origin, label, order, lightingKeys));
         if (this.history.length > 101) this.history.shift();
         this.cursor = this.history.length - 1;
         this.revision++; this.reviewedRevision = null;
@@ -275,7 +280,12 @@ class ProfileDraftSession {
                 combos: this.combos(), maximumBrightness: current.limits?.brightnessMax,
             }).toString("base64")};
         } else throw fail("Unsupported draft edit.");
-        this.replace(document, message.draftRevision, "edit", draftEditLabel(message, current.document));
+        const keys = [...this.history[this.cursor].lightingKeys];
+        if (message.type === "editLightingRule") {
+            if (message.action === "delete") keys.splice(message.index, 1);
+            if (message.action === "move" && message.to !== undefined) keys.splice(message.to, 0, ...keys.splice(message.index, 1));
+        }
+        this.replace(document, message.draftRevision, "edit", draftEditLabel(message, current.document), this.order, keys);
         return {message: copy(message), previousFingerprint: before, fingerprint: this.decode(this.history[this.cursor].document).fingerprint};
     }
     // A Rename & Reorder save: its document, and the order it saved, which

@@ -232,7 +232,7 @@ const PORTABLE_ACTIONS = Object.freeze({
         const text = typeof chosen === "string" ? chosen : chosen.text;
         if (typeof text !== "string") throw new Error("This profile file could not be read.");
         if (Buffer.byteLength(text, "utf8") > FILE_MAX_BYTES) throw new Error("This profile file is too large.");
-        const value = validateSnapshot(translateBackup(text), panelCapabilities(session) || undefined);
+        const value = validateSnapshot(translateBackup(text, panelCapabilities(session) || undefined), panelCapabilities(session) || undefined);
         session.portableReview = {document: value.document, fileName: typeof chosen === "string" ? null : chosen.name || null,
             before: session.draft?.current || await service.readPortableProfile({forRestore: true}), revision: session.draft?.revision,
             deviceId: panelState(session).selectedDeviceId, draftId: session.draft?.id};

@@ -48,6 +48,7 @@ export interface DraftView {
 export interface LedGroup {name: string; id: number; ledIndices: number[]; expression: string; usageCount: number; usages: {target: string; owner: string}[]}
 export interface LedRow {index: number; owner: string; color: Colour; ledGroup: string; ledGroupKind: string; ledIndices: number[]}
 export interface RgbView {
+    lighting?: import('./lighting.js').LightingView;
     stageEnableMask: number;
     stages: {id: string; label: string; bit?: number; enabled: boolean}[];
     ledGroups: LedGroup[];

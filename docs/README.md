@@ -20,6 +20,7 @@ source and worktrees; `upstream/` is the pinned baseline, not that checkout.
 | [COMPATIBILITY.md](COMPATIBILITY.md) | Explicit cross-repository integration workflow | Changing wire formats, schemas or shared codec assumptions |
 | [architecture/profile-capture-and-progress.md](architecture/profile-capture-and-progress.md) | Coherent captures, operation-correlated progress and Apply readback | Changing reads, progress or capture reuse |
 | [architecture/interface-contracts.md](architecture/interface-contracts.md) | Fixed rendering positions, composed reach and shared rule ownership | Changing presentation or moving shared rules |
+| [architecture/lighting-editor.md](architecture/lighting-editor.md) | Lighting rules, capability gating, opaque preservation and reviewed edits | Changing lighting editing or migration |
 | [architecture/timing-and-reachability.md](architecture/timing-and-reachability.md) | Conservative timing/layer analysis, built-in branches and inherited defaults | Changing behaviour presentation or review findings |
 | [core/README.md](../core/README.md) | Runtime data flow and adapter contract | Working in core or the extension shell |
 | [upstream/README.md](../upstream/README.md) | Imported inputs, provenance and update procedure | Reading or updating firmware/QMK contracts |

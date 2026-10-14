@@ -127,7 +127,7 @@ Every screen is drawn and wired to the host:
 | Surface | What it edits |
 | --- | --- |
 | Keys | Layout keys, key behaviours, combos, layer names and priority; reachable behaviours, macros and pointing modes are shown in place, whether a key, a behaviour branch or a combo reaches them |
-| Lighting | Six stages, the stage mask, layer and pointing-mode colours with their localities, combo and key feedback, auto-mouse fade with its hold as a share of the timeout, LED group rows and reusable groups |
+| Lighting | Lighting rules grouped by their purpose, with reorder, on/off switches, delete and paint colours; lighting memory beside the list and in Review |
 | Macros | Named slots: literal Text, a compact sequence of key/delay/press/release tiles, drag reordering and a selected-step editor, raw payload, live size feedback, configurable recorder and placement; search by name, and the layers that set each macro off — by key, behaviour or combo — in their layer colour, each opening that layer in Keys with the macro picked |
 | Mouse | Pointer speed, sniping and auto-mouse — the Settings sections the keyboard's model files under Mouse, drawn with the same cards and posted whole |
 | Pointing modes | All 32 slots: movement, speed, direction shortcuts and how often they send (every step, or once per movement until the ball pauses or moves back the other way), scroll tuning and which way a scrolling mode scrolls (both axes, horizontal only or vertical only), what each direction's shortcut does with held modifiers, thresholds shown as ball movement at the mode's DPI, buttons, bindings, placement, clear and duplicate |
@@ -156,7 +156,8 @@ Colour on any screen comes from the model, never from a constant, and a stage
 that is switched off is drawn as off — hollow dots, plain badges, unlit keys.
 Lowering a colour's brightness to zero keeps its hue and saturation visible
 and editable. A layer colour with nonzero saturation paints black at zero
-brightness; only zero saturation and brightness let underlying lighting show
+brightness; a fixed lighting rule at zero brightness paints black. Saved
+identity pass-through lets underlying lighting show
 through. An LED override row inherits its stage colour only at HSV(0, 0, 0).
 
 Every edit is kept in a local draft and reaches the keyboard only through
@@ -408,15 +409,15 @@ firmware's rule: the highest layer on wins, a transparent key is answered by the
 highest layer below it that is also on, and Base is always on. Keys answered from
 below are seen through the top layer's glass: frosted like a transparent key,
 their legend sharp, in the light of the layer that answers, with that key's
-behaviour dots and the badges of the combos it fires with these layers on, and
-on Lighting the board paints every layer on, lowest first, as the keyboard does.
+behaviour dots and the badges of the combos it fires with these layers on, and their saved identity colours. The Keys board is an identity preview; it does
+not simulate arbitrary lighting rules or transient feedback.
 The highest layer keeps the tab joined to the board and every edit is stored on
 it; a key answered from below says so on the Key tab, and setting it overrides
 that answer. ⌘-click Base on its own to see the picked layer over just Base;
 from Base, ⌘-click a layer to see it over Base.
 ⌘-click a layer again to take it out, or click any tab to go back to
 one layer. Layers on under the top one are tinted and outlined in their own
-light, so the set reads from the tabs. The set holds across Keys and Lighting and is dropped
+light, so the set reads from the tabs. The set holds on Keys and is dropped
 when the keyboard or its layer order changes. It is a what-if: a set no key can
 actually hold together still previews.
 
@@ -616,8 +617,7 @@ files are refused without replacing your draft.
 lighting, pointing modes, settings, every layer, macro and custom-key name and
 the keyboard's own name share one block on the keyboard: 65,504 bytes on
 current firmware, the size the keyboard reports. The card lists what uses it, area by area, and the counted
-limits beside it: behaviours, behaviour steps, combos, lighting groups and
-lighting group rows. Each area can stay under its own limit and the profile
+limits beside it: behaviours, behaviour steps, combos, lighting bytes against its separate 8 KiB budget. Each area can stay under its own limit and the profile
 still fill up, so a full profile can refuse an edit in any of them. The bar
 turns amber from 90%. The figures are your draft's while it has changes, and
 the keyboard's otherwise; they follow every edit, undo and discard. Macro steps
@@ -633,10 +633,35 @@ or reflash for ordinary profile editing.
 **Pointing slots.** Current firmware has 32. Pointing modes lists the configured
 slots as cards and the empty ones as a grid of numbered chips beneath them (a
 chip in amber still has keys reaching it); the key picker lists the slots in
-two columns; Lighting's slot list scrolls beside the colour editor. Each slot
+two columns. Each slot
 keeps its own Hold and Toggle key (`PD_SLOT_n`, `PD_SLOT_n_LOCK`) and lighting
 row. An empty slot takes no room in the profile, so 32 slots cost only what you
 configure.
+
+### Lighting rules
+
+Lighting lists the keyboard's rules in their stored order, under headings such
+as Layers, Pointing modes, Combos and Gesture feedback. The first matching
+rule that paints a key wins. Headings repeat if rules of the same purpose
+appear farther down; grouping never changes their priority.
+
+Select a rule to change its paint colour or delete it. Use the arrows or drag
+a rule to reorder it, and its switch to turn it on or off. Choosing a fixed
+colour replaces that rule's paint, keeping its condition and lighting area.
+Black paints black; it does not let a lower rule through. Ark offers this
+colour control only when the keyboard reports that paint as supported.
+Rules from newer firmware are read-only and stay unchanged in Apply and backups.
+
+Every edit uses the same draft, Undo, Redo and Review as Keys and Settings.
+Review keeps the lighting program together when you Discard it, so shared
+colours and references remain consistent. The memory meter shows the draft's
+lighting bytes against 8 KiB and warns from 90%. Auto-mouse fade belongs to the
+bottom group of rules: moving across the boundary changes what fades, and
+deleting one of those rules reduces that group.
+
+Older backups with version-4 lighting are converted before import review or
+restore. Editing saved layer, mode, combo and behaviour identities belongs to
+the next phase; this screen edits rules.
 
 ### Pointing-mode clicks
 

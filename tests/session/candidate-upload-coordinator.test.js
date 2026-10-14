@@ -30,7 +30,7 @@ function representativeBlob(payloadSize = 41) {
         schema: {major: 3, minor: 0},
         domains: [{
             id: PROFILE_DOMAIN_IDS.RGB,
-            version: 4,
+            version: 5,
             payload: Buffer.from(Array.from({length: payloadSize}, (_, index) => index)),
         }],
     });

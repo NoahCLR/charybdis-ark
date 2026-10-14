@@ -52,7 +52,7 @@ test("direct restore refuses pointing clicks on legacy firmware before recovery 
     const keyboard = {...source, answer: report => {
         const responses = source.answer(report);
         if (report[0] === PROFILE_WIRE_V1.COMMAND_GET && report[2] === PROFILE_WIRE_V1.VALUE_CAPABILITIES && report[4] === 0) {
-            for (const response of responses) response.writeUInt32LE(response.readUInt32LE(16) & ~(1 << 28), 16);
+            for (const response of responses) response.writeUInt32LE((response.readUInt32LE(16) & ~(1 << 28)) >>> 0, 16);
         }
         return responses;
     }};

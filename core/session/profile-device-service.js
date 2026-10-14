@@ -15,6 +15,7 @@ const {requireReady, PROFILE_DOMAIN_FLAGS, SUPPORTED_PROFILE_PROTOCOL, SUPPORTED
     REQUIRED_PROFILE_DOMAIN_MASK, REQUIRED_LIVE_MUTATION_FEATURES,
     evaluateProfileCompatibility, evaluateLiveMutationCompatibility} = require("./firmware-support");
 const {baseLighting} = require("../model/settings-editor");
+const {translateBackup} = require("../model/backup-translation");
 const {profilePlacementProblem} = require("../model/profile-placement");
 const {knownActionAbi} = require("../schema/actions");
 const {customKeyOfCode, layerLockOfCode} = require("../data/user-keycodes");
@@ -27,6 +28,7 @@ const {readHostOs} = require("../protocol/host-os-v1");
 const {supportsUnicodeMacros} = require("../schema/macro-payload");
 const {readKeyboardOptions} = require("../protocol/keyboard-options-v1");
 const {profileDomain} = require("../schema/profile-domains");
+const {readLightingCapabilities} = require("../protocol/lighting-capabilities-v1");
 const {profileDepthOptions} = require("../schema/profile-depth");
 const {captureProfile, restoreProfile, validateSnapshot} = require("./portable-profile-session");
 const {NodeHidDeviceAdapter} = require("../transport/node-hid-adapter");
@@ -212,7 +214,11 @@ class ProfileDeviceService {
         return this.runOperation(PHASE.REFRESH, async () => {
             const connection = this.connectedConnection();
             const viaIdentity = await readViaIdentity(connection);
-            const capabilities = await readProfileCapabilities(connection, {nextRequestId: () => this.nextRequestId()});
+            const capabilities = /** @type {Caps} */ (await readProfileCapabilities(connection, {nextRequestId: () => this.nextRequestId()}));
+            if (capabilities.featureFlags & PROFILE_WIRE_FEATURES.LIGHTING_RULES) {
+                capabilities.lighting = await readLightingCapabilities(connection, {nextRequestId: () => this.nextRequestId()});
+                if (capabilities.lighting.tapDepth !== capabilities.maxTapStepsPerBehavior) throw new Error("Lighting and behaviour capabilities disagree on tap depth.");
+            }
             const status = await readProfileStatus(connection, {nextRequestId: () => this.nextRequestId()});
             const candidateStatus = (capabilities.featureFlags & PROFILE_WIRE_FEATURES.CANDIDATE_WRITE) !== 0
                 ? await this.readCandidateStatus(connection, {nextRequestId: () => this.nextRequestId()})
@@ -527,12 +533,14 @@ class ProfileDeviceService {
                 const {limits, options: keyboardOptions} = facts;
                 // What is checked is what would be written: an older backup as
                 // this keyboard numbers its keys.
-                const target = validateSnapshot(document, this.capabilities);
+                const target = validateSnapshot(translateBackup(document, this.capabilities), this.capabilities);
                 const lighting = baseLighting(target.settings.values);
                 const brightness = lighting.brightness;
                 if (limits && limits.brightnessMax !== undefined && brightness > limits.brightnessMax) throw Object.assign(new Error(`This profile's brightness exceeds the keyboard's reported limit of ${limits.brightnessMax}. Lower the brightness before restoring it.`), {code: "SETTINGS_LIMIT_EXCEEDED"});
                 const effect = lighting.effect;
                 if (keyboardOptions && !keyboardOptions.effects.some(item => item.id === effect)) throw Object.assign(new Error("This profile uses a lighting effect unavailable on this keyboard."), {code: "SETTINGS_LIMIT_EXCEEDED"});
+                // Fixed paints also obey the reported ceiling, before staging.
+                if (limits?.brightnessMax !== undefined) validateSnapshot(target.document, {...this.capabilities, brightnessMax: limits.brightnessMax});
                 // The keyboard refuses a profile whose actions sit where it cannot
                 // run them; say which one before anything is sent.
                 const misplaced = profilePlacementProblem(Buffer.from(target.document.profile, "base64"), {layerCount: this.capabilities?.compiledLayerCount ?? 8,
@@ -540,7 +548,7 @@ class ProfileDeviceService {
                     behaviorQmkFunctions: Boolean((this.capabilities?.featureFlags || 0) & PROFILE_WIRE_FEATURES.BEHAVIOR_QMK_FUNCTIONS)});
                 if (misplaced) throw Object.assign(new Error(`${misplaced} Fix it before saving this profile.`), {code: "PLACEMENT_REFUSED"});
                 started = true;
-                result = await restoreProfile(connection, this.requestSequence(), capabilities, document, {...options,
+                result = await restoreProfile(connection, this.requestSequence(), capabilities, target.document, {...options,
                     baseSnapshot: cachedBase,
                     sleep: this.sleep,
                     onProgress: message => {this.portableProgress = message;},

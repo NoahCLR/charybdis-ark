@@ -242,59 +242,24 @@ const V = VOCABULARY;
 /** @param {import("../schema/types.js").Hsv} value @param {string} [off] */
 const colour = (value, off = "off") => ({text: value.v ? hsv(value) : off, key: hsv(value), colour: {h: value.h, s: value.s, v: value.v}});
 
-/** @param {Decoded} value @returns {Map<string, LightingRecord>} */
-function lightingRecords(value) {
-    const r = value.rgb;
-    /** @type {Map<string, LightingRecord>} */
-    const records = new Map();
-    /** @param {number} id */
-    const layerName = id => layerCalled(value.settings.names, id);
-    /** @param {number} id */
-    const slotCalled = id => slotName(value.pdModes?.[id], id);
-    /** @param {string} unit @param {string} title @param {string | null} stage @param {[string, Field][]} fields @param {{layer?: number, slot?: number}} [where] @param {Mark} [titleMark] */
-    const record = (unit, title, stage, fields, where = {}, titleMark) => records.set(unit, {title, stage, where, titleMark, fields: new Map(fields)});
-    // Each stage's switch sits on its own tab, so the stages record belongs
-    // to no single one.
-    record("rgb:stages", "Feedback stages", null, V.stages.filter(stage => stage.bit).map(stage => {
-        const on = Boolean(r.stageEnableMask & (stage.bit || 0));
-        return [stage.label, {text: on ? "on" : "off", key: on, mark: {kind: "stage", on}}];
-    }));
-    for (const row of r.layerColors) record(`rgb:layer:${row.layerId}`, `${layerName(row.layerId)} colour`, "layers",
-        [["Colour", colour(row.color, row.layerId === 0 ? "off · the base effect shows" : "off")], ["Paints", nameIn(V.paintModes, rgbEnums.RGB_LAYER_MODES, row.mode)]], {layer: row.layerId}, {kind: "layer", layer: row.layerId});
-    for (const row of r.pdModeColors) record(`rgb:pd:${row.pdModeId}`, `Pointing mode colour · ${slotCalled(row.pdModeId)}`, "pd",
-        [["Colour", colour(row.color)], ["Where", nameIn(V.localities, rgbEnums.RGB_LOCALITIES, row.locality)]], {slot: row.pdModeId}, {kind: "pointing", slot: row.pdModeId});
-    record("rgb:automouse", "Auto-mouse fade", "auto", [["Fade", nameIn(V.fadeModes, rgbEnums.RGB_AUTOMOUSE_MODES, r.automouseFade.mode)], ["End colour", colour(r.automouseFade.endColor)]]);
-    record("rgb:combo", "Combo feedback", "combo", [["Colour", colour(r.comboFeedback.color)], ["Where", nameIn(V.localities, rgbEnums.RGB_LOCALITIES, r.comboFeedback.locality)]]);
-    const k = r.keyFeedback;
-    record("rgb:key", "Key feedback", "key", [...k.tapBranchColors.map(/** @returns {[string, Field]} */ (value, i) => [`${i + 2}× branch`, colour(value)]),
-        ["Tap committed", colour(k.tapCommittedColor)], ["Hold active", colour(k.holdActiveColor)], ["Long hold active", colour(k.longHoldActiveColor)],
-        ["Tap commit", nameIn(V.tapCommit, rgbEnums.RGB_TAP_COMMIT_MODES, k.tapCommitMode)], ["Where", nameIn(V.localities, rgbEnums.RGB_LOCALITIES, k.locality)]]);
-    // LED groups are one record with every row that paints them: rows name
-    // groups by id, so a row put back without its group could point at a
-    // group that no longer exists. Groups read as the Lighting screen shows
-    // them, "Group 1 · 3 LEDs", and each row as who it paints for.
-    const groups = new Map(r.groups.map(group => [group.id, group]));
-    /** @type {[string, Field][]} */
-    const fields = r.groups.map(group => [`group:${group.id}`, {label: `Group ${group.id}`, text: `LEDs ${group.leds.join(", ")}`, key: group.leds.join(",")}]);
-    /** @type {Record<string, string>} */
-    const TIER_SEMANTICS = {KEY_FEEDBACK_GROUP_TAP_COMMITTED: "tap", KEY_FEEDBACK_GROUP_HOLD_ACTIVE: "hold", KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE: "long"};
-    /** @template {{color: import("../schema/types.js").Hsv, groupId: number}} T @param {string} table @param {T[]} rows @param {(row: T) => string} owner @param {(row: T) => Mark | undefined} ownerMark */
-    const overrides = (table, rows, owner, ownerMark) => rows.forEach((row, i) => {
-        const group = groups.get(row.groupId), leds = group ? `Group ${group.id} · ${group.leds.length} LED${group.leds.length === 1 ? "" : "s"}` : `Group ${row.groupId}`;
-        const paint = colour(row.color, "inherits the stage colour");
-        fields.push([`${table}:${i}`, {label: `Override · ${owner(row)}`, labelMark: ownerMark(row) || undefined, text: `${leds} · ${paint.text}`,
-            key: `${group?.leds.join(",")}|${paint.key}|${owner(row)}`, colour: paint.colour}]);
+/** @param {import("../schema/lighting-types.js").LightingProfile} rgb @param {string[]} names @returns {Map<string, LightingRecord>} */
+function lightingRecords(rgb, names) {
+    const {ruleWords} = require("./lighting-editor");
+    /** @type {Fields} */
+    const fields = new Map();
+    fields.set("Rules", `${rgb.rules.length} rules`);
+    fields.set("Lighting memory", `${rgb.byteLength ?? 0} / 8192 bytes`);
+    rgb.rules.forEach((rule, index) => {
+        const words = ruleWords(rule, names);
+        const paint = rule.parts.find(p => p.slot === 3);
+        const colour = paint && [2, 6].includes(paint.kind) ? rgb.palette[paint.params[0]] : undefined;
+        fields.set(`Rule ${index + 1}`, {text: `${rule.flags & 1 ? "Off · " : ""}${words.when} → ${words.where} · ${words.how}`, key: JSON.stringify([rule.flags, rule.brightness, rule.parts, colour]), ...(colour ? {colour} : {})});
     });
-    overrides("layerGroupRows", r.layerGroupRows, row => row.selector === 255 ? "all layers" : layerName(row.selector), row => row.selector === 255 ? undefined : {kind: "layer", layer: row.selector});
-    overrides("pdModeGroupRows", r.pdModeGroupRows, row => row.selector === 255 ? "all pointing modes" : slotCalled(row.selector), row => row.selector === 255 ? undefined : {kind: "pointing", slot: row.selector});
-    overrides("comboGroupRows", r.comboGroupRows, () => "combos", () => ({kind: "combo"}));
-    overrides("keyGroupRows", r.keyGroupRows, row => nameIn(V.feedbackOwners, rgbEnums.RGB_KEY_SEMANTICS, row.semantic), row => {
-        const name = Object.entries(rgbEnums.RGB_KEY_SEMANTICS).find(([, id]) => id === row.semantic)?.[0];
-        const tier = name === undefined ? undefined : TIER_SEMANTICS[name];
-        return tier ? {kind: "tier", tier} : undefined;
-    });
-    record("rgb:groups", "LED overrides", "groups", fields);
-    return records;
+    fields.set("Palette", {text: `${rgb.palette.length} colours`, key: JSON.stringify(rgb.palette)});
+    fields.set("Identity colours", {text: "Stored with lighting", key: JSON.stringify(rgb.things)});
+    fields.set("Saved key sets and maps", {text: `${rgb.keySets.length} sets · ${rgb.maps.length} maps`, key: JSON.stringify([rgb.keySets, rgb.maps])});
+    fields.set("Fade and flashes", {text: "Stored with lighting", key: JSON.stringify(rgb.extensions)});
+    return new Map([["rgb:rules", {title: "Lighting rules", stage: null, where: {}, fields}]]);
 }
 
 // Compare complete validated snapshots. The review describes final differences,
@@ -510,7 +475,7 @@ function profileReview(before, after, capabilities) {
         item("Pointing modes", `pd:${id}`, `Slot ${id}${(next?.name || old?.name) ? ` · ${next?.kind ? next.name : old?.name}` : ""}`,
             pointingFields(old, namesA), pointingFields(next, namesB), {kind: "pointing", slot: id}, [Boolean(old?.kind || old?.name), Boolean(next?.kind || next?.name)], {kind: "pointing", slot: id});
     }
-    const lightA = lightingRecords(a), lightB = lightingRecords(b);
+    const lightA = lightingRecords(a.rgb, a.settings.names), lightB = lightingRecords(b.rgb, b.settings.names);
     for (const [unit, record] of lightB) {
         const old = lightA.get(unit);
         item("Lighting", unit, record.title, old?.fields || new Map(), record.fields, {kind: "lighting", stage: record.stage, ...record.where}, [Boolean(old), true], record.titleMark);

@@ -31,7 +31,7 @@ const PROFILE_WIRE_STATUS = Object.freeze({
 });
 
 const PROFILE_WIRE_KNOWN_MASKS = Object.freeze({
-    FEATURE_FLAGS: 0x7fffffff,
+    FEATURE_FLAGS: 0xffffffff,
     // Bits current firmware never advertises. An older image that does still
     // decodes; nothing reads them.
     RETIRED_FEATURES: 1 << 13,
@@ -85,6 +85,7 @@ const PROFILE_WIRE_FEATURES = Object.freeze({
     POINTING_CLICKS: PD_CLICK_FEATURE,
     POINTING_MACROS: PD_MACRO_FEATURE,
     COMBO_OUTPUT_BEHAVIORS: COMBO_OUTPUT_BEHAVIORS_FEATURE,
+    LIGHTING_RULES: 0x80000000,
 });
 
 const PROFILE_ACTIVE_KIND = Object.freeze({

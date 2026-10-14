@@ -153,7 +153,7 @@ test("one draft composes every editor without changing its device snapshot", () 
     stage(draft,settings(draft,"keyTiming",{tapHoldTerm:"175"}));
     const row = behaviorRowsForView(validateSnapshot(draft.document).behaviors)[0];
     stage(draft,{type:"saveBehavior",behavior:{...row,tapHoldTerm:"210"},expectedBase:draft.identity()});
-    stage(draft,{type:"updateLayerColor",layer:"Layer 0",h:"23",s:"255",v:"100",mode:"KEYS_MAPPED_ON_THIS_LAYER_ONLY"});
+    stage(draft,{type:"editLightingRule", index:0, expectedRule: require("../../core/model/lighting-editor").ruleIdentity(draft.current.decoded.rgb.rules[0]), action:"colour", colour:{h:64,s:255,v:100}});
     stage(draft,{type:"saveCombo",id:0,inputs:["KC_A","KC_B"],output:"G(KC_N)",termMs:"60",holdTermMs:"200"});
     const view = draft.view({connected:true,selectedDeviceId:"board"});
     assert.deepEqual(new Set(view.changes.map(c=>c.area)),new Set(["Layout","Macros","Settings","Behaviours","Lighting","Combos"]));

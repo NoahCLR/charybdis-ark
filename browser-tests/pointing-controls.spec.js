@@ -211,6 +211,7 @@ test("pointing navigation reaches placement and lighting without an edit", async
     expect(await posted(page)).toEqual([]);
     await page.locator('[data-screen="pointing"]').click();
     await editor(page).locator('[data-act="lighting"]').click();
-    await expect(page.locator('[data-ltab="pd"]')).toHaveAttribute("aria-selected", "true");
+    await expect(page.locator('.main h1')).toHaveText("Lighting");
+    await expect(page.locator('.lighting-band').filter({hasText: "Pointing modes"})).toBeVisible();
     expect(await posted(page)).toEqual([]);
 });

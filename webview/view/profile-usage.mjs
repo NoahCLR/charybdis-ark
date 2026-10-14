@@ -14,6 +14,7 @@ const AREA_WORDS = {
 };
 /** @type {Readonly<Record<string, string>>} */
 const COUNT_WORDS = {
+    lightingMemory: "Lighting memory (bytes)",
     behaviours: "Behaviours",
     behaviourSteps: "Behaviour steps",
     combos: "Combos",

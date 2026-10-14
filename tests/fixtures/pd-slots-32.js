@@ -5,7 +5,7 @@
 const {validateSnapshot} = require("../../core/model/portable-profile");
 const {decodeProfileBlob, encodeProfileBlob} = require("../../core/schema/profile-blob-v1");
 const {decodePdDomain, encodePdDomain} = require("../../core/schema/pd-mode-domain-v1");
-const {decodeRgbDomainV1, encodeRgbDomainV1} = require("../../core/schema/rgb-domain-v1");
+const {decodeLightingDomain, encodeLightingDomain} = require("../../core/schema/lighting-domain-v1");
 const {compiled, document: backup, CURRENT_CAPABILITIES} = require("./portable-profile");
 
 const CAPABILITIES_32 = CURRENT_CAPABILITIES;
@@ -23,11 +23,12 @@ function document32({highSlot = true} = {}) {
     const slots = decodePdDomain(pd.payload);
     slots[12] = {...structuredClone(slots[1]), id: 12, name: "Tabs"};
     pd.payload = encodePdDomain(slots);
-    const rgb = decodeRgbDomainV1(rgbDomain.payload);
-    const color = rgb.pdModeColors.find(row => row.pdModeId === 12);
+    const rgb = decodeLightingDomain(rgbDomain.payload);
+    const color = rgb.things.find(t => t.kind === 2)?.records[12];
     if (!color) throw new Error("The compiled RGB fixture must contain pointing slot 12.");
-    color.color = {h: 200, s: 255, v: 200};
-    rgbDomain.payload = encodeRgbDomainV1(rgb);
+    color[1] = rgb.palette.length;
+    rgb.palette.push({h: 200, s: 255, v: 200});
+    rgbDomain.payload = encodeLightingDomain(rgb);
     doc.profile = encodeProfileBlob(blob).toString("base64");
     validateSnapshot(doc, CAPABILITIES_32);
     return doc;

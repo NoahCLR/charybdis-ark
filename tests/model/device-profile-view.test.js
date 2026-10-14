@@ -1,6 +1,8 @@
 "use strict";
 const assert = require("node:assert/strict");
 const test = require("node:test");
+const {lightingIdentities} = require("../../core/model/lighting-view");
+const {lightingForView} = require("../../core/model/lighting-view");
 const {behaviorRowsForView, rgbForView} = require("../../core/model/device-profile-view");
 const {actionName} = require("../../core/schema/actions");
 const {encodeKeyBehaviorDomain, decodeKeyBehaviorDomain} = require("../../core/schema/key-behavior-domain-v1");
@@ -74,36 +76,24 @@ test("decoded behaviors preserve sparse branches, all hold modes, anchors and ti
     assert.equal(view[0].steps[0].longHold.action, "CUSTOM_KEY_15");
 });
 
-test("real device RGB retains every value and reference through the presentation conversion", () => {
-    const rgb = decodedDeviceProfile().domains.rgb;
-    const original = JSON.stringify(rgb);
-    const view = rgbForView(rgb);
-    assert.deepEqual(view.layerColors[0], {layer: "Layer 0", layerId: 0, color: {h: "0", s: "0", v: "0"}, mode: "ALL_KEYS"});
-    assert.equal(view.layerColors[1].mode, "KEYS_MAPPED_ON_THIS_LAYER_ONLY");
-    assert.equal(view.pdModeColors[0].pointingMode, "PD_MODE_DRAGSCROLL");
-    assert.equal(view.pdModeColors[0].locality, "RGB_RIGHT_HALF");
-    assert.equal(view.automouseFade.mode, "FOLLOW_REAL_DESTINATION");
-    assert.deepEqual(view.automouseFade.end_color, {h: "167", s: "255", v: "199"});
-    assert.equal(view.keyBehaviorFeedback.tapCommitMode, "KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS");
-    assert.equal(view.keyBehaviorFeedback.tapBranchColors.length, 4);
-    assert.deepEqual(view.ledGroups[1].ledIndices, [24, 25, 26, 27, 28, 53, 54, 55]);
-    assert.equal(view.ledGroups[1].usageCount, 3);
-    assert.equal(view.pdModeLedGroups[0].owner, "RGB_PD_MODE_GROUP_ALL");
-    assert.equal(view.keyBehaviorFeedbackLedGroups[0].owner, "KEY_FEEDBACK_GROUP_ALL");
-    assert.equal(JSON.stringify(rgb), original, "converting a snapshot cannot mutate it");
+test("device lighting projection retains identity colours without changing the program", () => {
+    const rgb = decodedDeviceProfile().domains.rgb, original = JSON.stringify(rgb);
+    const view = rgbForView(rgb), stored = lightingIdentities(rgb);
+    assert.deepEqual(view.layerColors[0].color, {h: "0", s: "0", v: "0"});
+    for (const row of view.layerColors) assert.deepEqual(row.color, Object.fromEntries(Object.entries(stored.layerColors[row.layerId].color).map(([k,v]) => [k,String(v)])));
+    assert.deepEqual(view.ledGroups.map(g => g.ledIndices), rgb.keySets);
+    assert.equal(JSON.stringify(rgb), original);
 });
 
-test("RGB selectors and disabled stages are displayed without inventing enabled state", () => {
+test("disabled lighting rules and unknown parts are published verbatim", () => {
     const rgb = decodedDeviceProfile().domains.rgb;
-    rgb.stageEnableMask = 0;
-    rgb.layerGroupRows = [{selector: 0, groupId: 0, color: {h: 0, s: 0, v: 0}}, {selector: 255, groupId: 0, color: {h: 1, s: 2, v: 3}}];
-    rgb.pdModeGroupRows[0].selector = 0;
-    rgb.keyGroupRows[0].semantic = 0;
-    const view = rgbForView(rgb);
-    assert.ok(view.stages.every(stage => !stage.enabled));
-    assert.deepEqual(view.layerLedGroups.map(r => r.owner), ["Layer 0", "RGB_LAYER_GROUP_ALL"]);
-    assert.equal(view.pdModeLedGroups[0].owner, "PD_MODE_DRAGSCROLL");
-    assert.equal(view.keyBehaviorFeedbackLedGroups[0].owner, "KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING");
+    rgb.rules[0].flags = 1;
+    rgb.rules[1].parts.find(p => p.slot === 3).kind = 200;
+    const view = lightingForView(rgb);
+    assert.equal(view.rules[0].enabled, false);
+    assert.equal(view.rules[1].readOnly, true);
+    assert.equal(view.unknownRules, 1);
+    assert.deepEqual(view.program, rgb);
 });
 
 test("authored and built-in behaviour labels use the profile's host naming rule", () => {

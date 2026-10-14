@@ -1,7 +1,7 @@
 # Portable keyboard profile v1
 
-> Current firmware accepts only the formats it writes (D-F10, D-F14): profile
-> schema 3.0; RGB v4, key behaviors v2, combos v3, settings v7 and sparse PD v3;
+> Current firmware accepts only the formats it writes (D-F10, D-F14, D-F26): profile
+> schema 3.0; RGB v5, key behaviors v2, combos v3, settings v7 and sparse PD v3;
 > a 53,216-byte custom payload; and logical store format 5 (`NT`). Every save
 > binds a nonzero VIA generation and digest. HID and split framing remain v1.
 > Older profile/store formats and the legacy GET 9 source page are rejected.
@@ -85,7 +85,7 @@ instructions. Held keys must balance. The bank is reconstructed with zero
 padding and a final zero validity byte. Both macro banks are independent:
 64 VIA slots and 16 user macro slots retain their existing key identities.
 
-See [Unicode macro playback](https://github.com/NoahCLR/charybdis-4x6/blob/86ef55539422b4c301fd26212581686cfc959a50/docs/architecture/runtime-flow.md) for encoding, compiled size, host setup and cancellation.
+See [Unicode macro playback](https://github.com/NoahCLR/charybdis-4x6/blob/b46f3edb494efbe381afda313ed178199c58054d/docs/architecture/runtime-flow.md) for encoding, compiled size, host setup and cancellation.
 
 The reconstructed bank is the document's, not necessarily the keyboard's. A
 valid bank may hold nonzero bytes after its 64th terminator, for instance after
@@ -128,7 +128,7 @@ scalars 10–14 must be zero; mode tuning is in domain `0x50`.
 The keyboard name is the keyboard's own name (D-F25). The firmware serves it
 as the USB product string, so hosts, browser device choosers and clients list
 the keyboard under it. Empty, the compiled default, means QMK's built-in
-`keyboard_name`. [Runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/86ef55539422b4c301fd26212581686cfc959a50/docs/architecture/runtime-flow.md#usb-product-name) defines when
+`keyboard_name`. [Runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/b46f3edb494efbe381afda313ed178199c58054d/docs/architecture/runtime-flow.md#usb-product-name) defines when
 a new name reaches the host.
 
 Settings header byte 5 bit 0 bypasses shared behaviours for every combo output
@@ -172,7 +172,7 @@ a set exclusion bit keeps it out of combos. The
 | 23 | Persistent default-layer bitmask |
 | 24 | QMK keymap options |
 | 25–26 | Auto-mouse activation delay (ms) and movement threshold |
-| 27 | Host settings: bits 0..1 select Auto (0), macOS (1), Windows (2), Linux (3); bit 8 enables Unicode playback; bits 16..23 name the [host layout](https://github.com/NoahCLR/charybdis-4x6/blob/86ef55539422b4c301fd26212581686cfc959a50/docs/architecture/host-layouts-v1.md) (0 US) and bit 24 marks a macOS ISO keyboard; other bits zero. Nonzero requires feature bit 21, and bits 16..24 feature bit 22. Previously reserved zero after version 5 combo references moved to layer records |
+| 27 | Host settings: bits 0..1 select Auto (0), macOS (1), Windows (2), Linux (3); bit 8 enables Unicode playback; bits 16..23 name the [host layout](https://github.com/NoahCLR/charybdis-4x6/blob/b46f3edb494efbe381afda313ed178199c58054d/docs/architecture/host-layouts-v1.md) (0 US) and bit 24 marks a macOS ISO keyboard; other bits zero. Nonzero requires feature bit 21, and bits 16..24 feature bit 22. Previously reserved zero after version 5 combo references moved to layer records |
 | 28 | Behaviour master enable |
 | 29 | Layer behaviours mask, one bit per layer |
 | 30 | Layer combos mask, one bit per layer |

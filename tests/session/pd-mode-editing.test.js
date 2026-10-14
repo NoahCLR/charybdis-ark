@@ -17,7 +17,7 @@ test("the six factory modes stay data, with 32 RGB rows and the remaining slots 
     const value = validateSnapshot(document());
     assert.equal(value.document.version, 3);
     assert.deepEqual(value.pdModes.map(mode => mode.name), ["Dragscroll", "Volume", "Brightness", "Zoom", "Arrow", "Pinch", ...Array(26).fill("")]);
-    assert.equal(value.rgb.formatVersion, 4); assert.equal(value.rgb.pdModeColors.length, 32);
+    assert.equal(value.rgb.formatVersion, 5); assert.equal(value.rgb.things.find(t => t.kind === 2).records.length, 32);
     assert.equal(value.pdModes[4].buttons[0].modifiers, 32);
     assert.equal(value.pdModes[5].heldModifiers, 8);
     assert.deepEqual(value.settings.values.slice(10, 15), [0, 0, 0, 0, 0]);
@@ -31,7 +31,7 @@ test("create, bind, edit RGB and macros, reorder, review and undo share a PD dra
     assert.equal(validateSnapshot(draft.document).pdModes[7].directions.left.keycode, 0x450);
     stage({type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "PD_SLOT_7"}]});
 
-    stage({type: "updatePdModeColor", pointingMode: "PD_MODE_SLOT_7", h: "64", s: "255", v: "100", locality: "RGB_RIGHT_HALF"});
+    stage({type:"editLightingRule", index:0, expectedRule: require("../../core/model/lighting-editor").ruleIdentity(draft.current.decoded.rgb.rules[0]), action:"colour", colour:{h:64,s:255,v:100}});
     stage({type: "updateViaMacro", keycode: "VIA_MACRO_0", payload: "hello", name: "Greeting"});
     const reordered = reorderLayers(draft.document, [0, 2, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
     assert.deepEqual(validateSnapshot(reordered).pdModes, validateSnapshot(draft.document).pdModes);

@@ -6,11 +6,11 @@
 // Reading this registry's metadata never loads a codec.
 /** @typedef {import("./profile-domains-types.js").DomainOptions} DomainOptions */
 const PROFILE_DOMAINS = Object.freeze([
-    Object.freeze({name: "RGB", id: 0x10, key: "rgb", readKey: "rgb", version: 4, wireBit: 1 << 0, area: "lighting",
-        /** @param {import("./types.js").RgbInput} value @param {DomainOptions} [options] @returns {Buffer} */
-        encode: (value, options = {}) => require("./rgb-domain-v1").encodeRgbDomainV1(value, options.rgb),
+    Object.freeze({name: "RGB", id: 0x10, key: "rgb", readKey: "rgb", version: 5, wireBit: 1 << 0, area: "lighting",
+        /** @param {import("./lighting-types.js").LightingProfile} value @param {DomainOptions} [options] @returns {Buffer} */
+        encode: (value, options = {}) => require("./lighting-domain-v1").encodeLightingDomain(value, options.rgb),
         /** @param {Uint8Array} bytes @param {DomainOptions} [options] @returns {import("./profile-domains-types.js").DomainModels["rgb"]} */
-        decode: (bytes, options = {}) => require("./rgb-domain-v1").decodeRgbDomainV1(bytes, options.rgb)}),
+        decode: (bytes, options = {}) => require("./lighting-domain-v1").decodeLightingDomain(bytes, options.rgb)}),
     Object.freeze({name: "KEY_BEHAVIORS", id: 0x20, key: "behaviors", readKey: "keyBehaviors", version: 2, wireBit: 1 << 1, area: "behaviours",
         /** @param {{rows: import("./types.js").BehaviorRowInput[]}} value @param {DomainOptions} [options] @returns {Buffer} */
         encode: (value, options = {}) => require("./key-behavior-domain-v1").encodeKeyBehaviorDomain(value, options.behaviors),
@@ -56,7 +56,10 @@ const domainCodec = key => codecs[key];
 function encodeProfileDomains(models, options = {}) {
     /** @template {import("./profile-domains-types.js").DomainKey} K @param {K} key */
     const encode = key => domainCodec(key).encode(models[key], options);
-    return PROFILE_DOMAINS.map(domain => ({id: domain.id, version: domain.version, payload: encode(domain.key)}));
+    return PROFILE_DOMAINS.map(domain => {
+        const payload = encode(domain.key);
+        return {id: domain.id, version: domain.key === "settings" ? payload[0] : domain.version, payload};
+    });
 }
 
 // Rewrite an envelope payload while retaining its identity and the other

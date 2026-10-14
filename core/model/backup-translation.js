@@ -187,7 +187,7 @@ function pdV3(payload) {
 /** @typedef {Readonly<Record<number, (payload: Buffer) => Buffer>>} DomainTranslations */
 /** @type {Readonly<Record<number, DomainTranslations>>} */
 const DOMAIN_TRANSLATIONS = Object.freeze({
-    [PROFILE_DOMAIN_IDS.RGB]: Object.freeze({4: rgbV4}),
+    [PROFILE_DOMAIN_IDS.RGB]: Object.freeze({4: rgbV4, 5: require("../schema/lighting-conversion-v1").convertLightingV4}),
     [PROFILE_DOMAIN_IDS.KEY_BEHAVIORS]: Object.freeze({2: behaviorsV2}),
     [PROFILE_DOMAIN_IDS.COMBOS]: Object.freeze({3: combosV3}),
     [PROFILE_DOMAIN_IDS.SETTINGS]: Object.freeze({6: settingsV6, 7: settingsV7}),
@@ -196,14 +196,16 @@ const DOMAIN_TRANSLATIONS = Object.freeze({
 
 // Schema admission belongs to the backup revision. Once admitted, a domain
 // follows its own version chain to the registry's current target.
-/** @param {import("../schema/types.js").ProfileDomain} domain @param {number} [targetVersion] @param {DomainTranslations} [translations] @returns {import("../schema/types.js").ProfileDomain} */
-function translateDomain(domain, targetVersion = PROFILE_DOMAIN_VERSIONS[domain.id], translations = DOMAIN_TRANSLATIONS[domain.id]) {
+/** @param {import("../schema/types.js").ProfileDomain} domain @param {number} [targetVersion] @param {DomainTranslations} [translations] @param {import("./types.js").ProfileDestination} [capabilities] @returns {import("../schema/types.js").ProfileDomain} */
+function translateDomain(domain, targetVersion = PROFILE_DOMAIN_VERSIONS[domain.id], translations = DOMAIN_TRANSLATIONS[domain.id], capabilities) {
     let {version, payload} = domain;
     if (!Number.isInteger(version) || !Number.isInteger(targetVersion) || version < 1 || version > targetVersion) throw fail("The backup's profile holds a domain this app cannot translate.");
     while (version < targetVersion) {
         const next = version + 1, step = translations?.[next];
         if (!step) throw fail("The backup's profile holds a domain this app cannot translate.");
-        payload = step(payload);
+        payload = next === 5 && domain.id === PROFILE_DOMAIN_IDS.RGB && step === DOMAIN_TRANSLATIONS[PROFILE_DOMAIN_IDS.RGB][5]
+            ? require("../schema/lighting-conversion-v1").convertLightingV4(payload, require("../schema/profile-depth").profileDepthOptions(capabilities, payload).rgb)
+            : step(payload);
         version = next;
     }
     return {id: domain.id, version, payload};
@@ -224,8 +226,8 @@ function moveActions(value) {
 }
 
 // The profile blob in the current schema.
-/** @param {Buffer} bytes */
-function translateProfileUnchecked(bytes) {
+/** @param {Buffer} bytes @param {import("./types.js").ProfileDestination} [capabilities] */
+function translateProfileUnchecked(bytes, capabilities) {
     if (bytes.length < 8 || bytes.length > 5088 || bytes.toString("ascii", 0, 4) !== "NLP1" || bytes[4] !== PREVIOUS.SCHEMA || bytes[5] !== 0 || bytes[6] !== PREVIOUS.domains.length || bytes[7] !== 1) throw fail("The backup's profile is not one this app can translate.");
     /** @type {import("../schema/types.js").ProfileDomain[]} */
     const domains = [];
@@ -236,7 +238,7 @@ function translateProfileUnchecked(bytes) {
         if (id !== PREVIOUS.domains[index].id) throw fail("The backup's domains are not complete and canonical.");
         const payload = bytes.subarray(offset + 4, offset + 4 + length);
         if (version !== PREVIOUS.domains[index].version || payload.length !== length) throw fail("The backup's profile holds a domain this app cannot translate.");
-        domains.push(translateDomain({id, version, payload}));
+        domains.push(translateDomain({id, version, payload}, undefined, undefined, capabilities));
         offset += 4 + length;
     }
     if (offset !== bytes.length) throw fail("The backup's profile has trailing data.");
@@ -248,9 +250,9 @@ function translateProfileUnchecked(bytes) {
     })});
 }
 
-/** @param {Buffer} bytes */
-function translateProfile(bytes) {
-    try {return translateProfileUnchecked(bytes);} catch (error) {
+/** @param {Buffer} bytes @param {import("./types.js").ProfileDestination} [capabilities] */
+function translateProfile(bytes, capabilities) {
+    try {return translateProfileUnchecked(bytes, capabilities);} catch (error) {
         const failure = /** @type {Error & {code?: string}} */ (error);
         if (failure.code === "INVALID_PORTABLE_PROFILE") throw error;
         throw fail(`The preceding backup is invalid: ${failure.message}`);
@@ -268,8 +270,8 @@ const CURRENT_SCHEMA_VERSIONS = new Map(Object.entries(CURRENT_SCHEMA_FIRST).map
 // version, or the document unchanged when it is not one this can bring
 // forward (validation then says what is wrong with it). Only the profile
 // blob's domains change; keys and macros are the same in every version.
-/** @param {unknown} value @returns {unknown} */
-function translateCurrentBackup(value) {
+/** @param {unknown} value @param {import("./types.js").ProfileDestination} [capabilities] @returns {unknown} */
+function translateCurrentBackup(value, capabilities) {
     const candidate = /** @type {{format?: unknown, version?: unknown, profile?: unknown} | null | undefined} */ (value);
     if (candidate?.format !== "charybdis-profile" || candidate.version !== PROFILE_BLOB_V1.SCHEMA_MAJOR || typeof candidate.profile !== "string") return value;
     const bytes = Buffer.from(candidate.profile, "base64");
@@ -279,8 +281,10 @@ function translateCurrentBackup(value) {
     try {blob = decodeProfileBlob(bytes, {domainVersions: CURRENT_SCHEMA_VERSIONS});} catch {return value;}
     if (blob.domains.every(domain => domain.version === PROFILE_DOMAIN_VERSIONS[domain.id])) return value;
     try {
-        const domains = blob.domains.map(domain => translateDomain(domain));
-        return {...candidate, profile: encodeProfileBlob({domains}).toString("base64")};
+        const oldRgb = blob.domains.find(domain => domain.id === PROFILE_DOMAIN_IDS.RGB && domain.version === 4);
+        const depth = oldRgb ? require("../schema/profile-depth").profileDepthOptions(capabilities, oldRgb.payload).rgb.tapDepth : 5;
+        const domains = blob.domains.map(domain => translateDomain(domain, undefined, undefined, capabilities));
+        return {...candidate, ...(depth !== 5 ? {tapDepth: depth} : {}), profile: encodeProfileBlob({domains}).toString("base64")};
     } catch (error) {
         const failure = /** @type {Error & {code?: string}} */ (error);
         if (failure.code === "INVALID_PORTABLE_PROFILE") throw error;
@@ -301,13 +305,13 @@ function isPreviousBackup(value) {
 
 // A backup from before sixteen layers, or a current-format one with older
 // domain versions, as one in the current format; any other document unchanged.
-/** @param {unknown} value @returns {unknown} */
-function translateBackup(value) {
+/** @param {unknown} value @param {import("./types.js").ProfileDestination} [capabilities] @returns {unknown} */
+function translateBackup(value, capabilities) {
     if (typeof value === "string") {
         if (Buffer.byteLength(value) > FILE_MAX_BYTES) throw fail("This profile file is too large.");
         try {value = JSON.parse(value);} catch {return value;}
     }
-    if (!isPreviousBackup(value)) return translateCurrentBackup(value);
+    if (!isPreviousBackup(value)) return translateCurrentBackup(value, capabilities);
     if (value.keyboard !== "charybdis-4x6" || Object.keys(value).some(key => !["format", "version", "keyboard", "actionAbiDigest", "layers", "profile", "macros"].includes(key))) throw fail("The backup contains unsupported fields.");
     if (!Array.isArray(value.layers) || value.layers.length !== PREVIOUS.LAYERS || value.layers.some(keys => !Array.isArray(keys) || keys.length !== MATRIX_KEYS || keys.some(code => !Number.isInteger(code) || code < 0 || code > 65535))) throw fail("The backup is missing layers.");
     // The complete matrix above has been checked before it is retargeted.
@@ -328,7 +332,7 @@ function translateBackup(value) {
     const translated = {
         format: value.format, version: 3, keyboard: value.keyboard, actionAbiDigest: ACTION_ABI,
         layers: [...layers.map(keys => keys.map(movedKeycode)), ...Array.from({length: LAYERS - PREVIOUS.LAYERS}, () => EMPTY_LAYER.slice())],
-        profile: translateProfile(oldProfile).toString("base64"),
+        profile: translateProfile(oldProfile, capabilities).toString("base64"),
         macros: [...value.macros, ...Array(MACROS - PREVIOUS.MACROS).fill("")],
     };
     validateSnapshot(translated);

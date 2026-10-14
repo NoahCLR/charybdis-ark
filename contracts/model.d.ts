@@ -57,6 +57,7 @@ export interface ApplyView {
 export type WordList<T = Scalar> = readonly (readonly [T, string])[];
 export type HalvesId = 'agree' | 'alone' | 'apart' | 'unread';
 export interface Vocabulary {
+    lighting: {bands: Record<string, string>; targets: string[]; paints: string[]; states: string[]; scopes: string[]};
     phases: Readonly<Record<PhaseId, Readonly<PhaseWords>>>;
     halves: Readonly<Record<HalvesId, Readonly<{label: string; detail: string}>>>;
     pickerModifiers?: {bit: number; value: string; label: string}[];

@@ -40,8 +40,9 @@ async function inputs() {
         supportedPdModeIds: Array.from({length: 32}, (_, id) => id).filter((id) => Number(rgb.get("codec.supported_pd_mode_mask")) & (1 << id)),
     };
     const behaviors = values(path.join(FIRMWARE_FIXTURES, "key_behavior_domain_v1.fixture"));
-    const rgbV4 = json("rgb_domain_v4.json"), pdV3 = json("pd_mode_domain_v3.json");
+    const rgbV4 = json("rgb_domain_v4.json"), pdV3 = json("pd_mode_domain_v3.json"), lighting = json("lighting_vectors_v1.json");
     const domains = [
+        ...[...lighting.codec.valid, ...lighting.codec.invalid].map(vector => ({name: `lighting ${vector.name}`, kind: "lighting", hex: vector.hex, options: lighting.limits})),
         {name: "rgb_domain_v1 payload", kind: "rgb", hex: rgb.get("payload.hex"), options: rgbOptions},
         ...[...rgbV4.valid, ...rgbV4.invalid].map((vector) => ({name: `rgb_domain_v4 ${vector.name}`, kind: "rgb", hex: vector.hex, options: {...rgbV4.limits, formatVersion: 4}})),
         ...[...behaviors].filter(([key]) => key.startsWith("payload.")).map(([key, hex]) => ({name: `key_behavior_domain_v1 ${key}`, kind: "behaviors", hex})),

@@ -19,7 +19,9 @@ function completeFixture() {
     let value = document();
     const decoded = validateSnapshot(value);
     const rgb = structuredClone(decoded.rgb);
-    rgb.layerGroupRows = [{selector: 1, groupId: 0, color: {h: 20, s: 100, v: 100}}];
+    rgb.maps = [Array(58).fill(128)]; rgb.maps[0][0] = 0;
+    rgb.rules[0].parts.find(p => p.slot === 3).kind = 4;
+    rgb.rules[0].parts.find(p => p.slot === 3).params = [0];
     value = rewrite(value, PROFILE_DOMAINS.find(row => row.key === "rgb"), rgb, decoded.codecOptions);
     const settings = structuredClone(decoded.settings);
     settings.layers[0].bypass = [matrixPosition(0)];
@@ -45,7 +47,7 @@ function completeFixture() {
 // cannot be edited independently of their record or schema. Every exemption
 // is an exact path, so a new decoded field must acquire a mutation below.
 const DERIVED = new Map([
-    ["rgb.formatVersion", "codec version"], ["rgb.groups[].id", "canonical group index"],
+    ["rgb.formatVersion", "codec version"], ["rgb.things[].kind", "canonical table identity; changes require moving/removing complete tables"], ["rgb.byteLength", "encoded byte length"], ["rgb.rules[].known", "descriptor knowledge"], ["rgb.groups[].id", "canonical group index"],
     ["rgb.layerColors[].layerId", "canonical layer index"], ["rgb.pdModeColors[].pdModeId", "canonical pointing index"],
     ["behaviors.version", "codec version"], ["behaviors.rowCount", "decoded row count"],
     ["behaviors.populatedStepCount", "decoded step count"], ["behaviors.byteLength", "encoded byte length"],
@@ -81,7 +83,7 @@ test("every editable decoded field has a specific review item", () => {
             if (DERIVED.has(id)) continue;
             // Reserved action flags and retired settings have exactly one
             // accepted value. Changing them is a rejected encoding, no edit.
-            if (id.endsWith(".flags")) {
+            if (id.endsWith(".flags") && id !== "rgb.rules[].flags") {
                 assert.ok(examples.every(row => row.value === 0), `${id}: reserved flags changed`);
                 continue;
             }
@@ -90,6 +92,9 @@ test("every editable decoded field has a specific review item", () => {
             let exercised = false;
             outer: for (const {path, value} of examples) for (const next of candidates(value)) {
                 const changed = structuredClone(model); set(changed, path, next);
+                if (id === "rgb.extensions[].kind") {
+                    changed[path[0]][path[1]].params = next === 1 ? [1, 0, 0, 0] : [1];
+                }
                 // A discriminant change clears the old engine's union, as
                 // the editor does. Canonical inactive bytes must be zero.
                 if (id === "pdModes[].kind" && next === 0) changed[path[0]] = {id: path[0], kind: 0, name: changed[path[0]].name};

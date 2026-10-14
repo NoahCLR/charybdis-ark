@@ -16,8 +16,7 @@ const surfaces = [
     ["keys", {tab: "combos"}], ["keys", {layersOpen: true}],
     ["settings", {settingsOpen: ["keyBehavior", "comboSettings", "autoMouse", "mouse"]}],
     ["mouse", {}], ["customKeys", {}], ["macros", {macroSlot: "VIA_MACRO_17"}],
-    ...["base", "layers", "auto", "pd", "combo", "key", "groups"].map(stage =>
-        ["lighting", {stage, layer: 1, pdSlot: 0, feedbackRow: "holdActiveColor"}]),
+    ["lighting", {}],
     ...[0, 4, 8].map(pdSlot => ["pointing", {pdSlot, pdAdvanced: true}]),
 ];
 
@@ -42,13 +41,6 @@ for (const [screen, state] of surfaces) {
                 store.setModel(model); store.render();
             });
         }
-        if (screen === "lighting" && state.stage === "auto") {
-            await page.evaluate(async () => {
-                const store = await import("/webview/store.mjs");
-                const model = structuredClone(store.getModel()); model.rgb.automouseFade.mode = "END_COLOR_ON_ALL_KEYS";
-                store.setModel(model); store.render();
-            });
-        }
         await page.locator("details:not([open])").evaluateAll(nodes => nodes.forEach(node => {
             node.open = true; node.dispatchEvent(new Event("toggle"));
         }));
@@ -56,10 +48,7 @@ for (const [screen, state] of surfaces) {
         expect(await identityProblems(page)).toEqual([]);
         const ids = await page.locator("input:visible:enabled, select:visible:enabled, textarea:visible:enabled")
             .evaluateAll(nodes => nodes.map(node => node.getAttribute("data-f")));
-        if (screen === "lighting" && state.stage === "base") {
-            // Firmware owns the base effect; this page presents its facts.
-            expect(ids).toEqual([]);
-        } else expect(ids.length, "the editor exposes a form control").toBeGreaterThan(0);
+        expect(ids.length, "the editor exposes a form control").toBeGreaterThan(0);
         // Each assertion crosses the actual receiver's full-DOM accepted-edit
         // path; retaining the same node cannot satisfy it.
         for (const id of ids) {

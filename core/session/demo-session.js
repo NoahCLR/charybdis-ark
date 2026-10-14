@@ -44,13 +44,15 @@ const DEMO_DEVICE_ID = "demo";
 // every feature this app knows but the retired ones. tests/session/demo-session.test.js holds this to
 // what the simulated current keyboard (tests/fixtures/fake-keyboard.js) reports.
 const DEMO_CAPABILITIES = Object.freeze({
+    lighting: {layoutVersion: 1, domainVersion: 5, payloadBudget: 8192, paletteMaximum: 128, conditionsPerRule: 4, partParameterMaximum: 16, tapDepth: 5, ledCount: 58,
+        registries: /** @type {import("../schema/lighting-types.js").LightingCapabilities["registries"]} */ (Object.fromEntries(require("../schema/lighting-kinds-v1").LIGHTING_REGISTRIES.map(name => [name, Object.keys(require("../schema/lighting-kinds-v1").LIGHTING_KINDS[name]).map(Number)])))},
     responseVersion: 2,
     protocol: Object.freeze({major: 1, minor: 0}),
     schema: Object.freeze({major: 3, minor: 0}),
     reportSize: 32,
     candidateChunkMax: 20,
     statusPageCount: 2,
-    featureFlags: PROFILE_WIRE_KNOWN_MASKS.FEATURE_FLAGS & ~PROFILE_WIRE_KNOWN_MASKS.RETIRED_FEATURES,
+    featureFlags: (PROFILE_WIRE_KNOWN_MASKS.FEATURE_FLAGS & ~PROFILE_WIRE_KNOWN_MASKS.RETIRED_FEATURES) >>> 0,
     actionAbiDigest: ACTION_ABI,
     compiledLayerCount: 16,
     maxLogicalLayers: LAYERS,
@@ -113,7 +115,7 @@ const fail = (text, code = "DEMO_REFUSED") => Object.assign(new Error(text), {co
 // limits and options a keyboard would have reported beside it.
 /** @param {unknown} value @returns {import("../model/types.js").CompleteSnapshot} */
 function demoSnapshot(value) {
-    const {document} = validateSnapshot(translateBackup(value), DEMO_CAPABILITIES);
+    const {document} = validateSnapshot(translateBackup(value, DEMO_CAPABILITIES), DEMO_CAPABILITIES);
     return {document, fingerprint: fingerprint(document), summary: summary(document), limits: {...DEMO_LIMITS}, options: DEMO_OPTIONS, hostOs: {detected: 0}};
 }
 

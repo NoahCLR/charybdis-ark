@@ -484,3 +484,31 @@ test("every keyboard Chrome allows is the connected one or in the selector, as t
     await page.evaluate((index) => window.__fakeHidPlug(index, true), left);
     await expect(name.locator(".dot.ok")).toHaveCount(1);
 });
+
+test("lighting edits use the real demo draft, history, review memory and exact backup", async ({page, context, baseURL}) => {
+    test.setTimeout(90000);
+    await withKeyboard(context, baseURL);await open(page);
+    await page.locator('[data-act="explore-demo"]').click();await ready(page);
+    await page.locator('[data-screen="lighting"]').click();
+    const rules=page.locator('.lighting-rule'), initial=await rules.count();
+    await page.locator('.lighting-rule-editor').getByRole('button',{name:'Give it a colour',exact:true}).click();
+    const hue=page.locator('.lighting-rule-editor [data-channel="0"]');await expect(hue).toHaveValue('140');
+    await hue.fill('177');await hue.press('Tab');await expect(hue).toHaveValue('177');
+    await page.locator('[data-rule-index="0"] .sw').click();await expect(page.locator('[data-rule-index="0"] input')).not.toBeChecked();
+    await page.getByRole('button',{name:'Move rule 1 down',exact:true}).click();
+    await expect(page.locator('.lighting-rule-editor h3')).toHaveText('Rule 2');await expect(hue).toHaveValue('177');
+    await page.locator('.lighting-rule-editor [data-delete]').click();await expect(rules).toHaveCount(initial-1);
+    await page.locator('[data-act="undo"]').click();await expect(rules).toHaveCount(initial);
+    await page.locator('[data-act="redo"]').click();await expect(rules).toHaveCount(initial-1);
+    await page.locator('[data-act="undo"]').click();await expect(rules).toHaveCount(initial);
+    await page.locator('.commit [data-act="review"]').click();
+    const sheet=page.locator('.sheet');await expect(sheet.getByRole('region',{name:'Lighting memory'})).toContainText('8,192 bytes');
+    await expect(sheet).toContainText('Lighting rules');await expect(sheet.locator('[data-act="apply"]')).toHaveCount(0);
+    const [download]=await Promise.all([page.waitForEvent('download'),sheet.locator('[data-act="export"]').click()]);
+    const file=JSON.parse(await (await download.createReadStream()).toArray().then(chunks=>Buffer.concat(chunks).toString('utf8')));
+    const {validateSnapshot}=require('../core/model/portable-profile');const rgb=validateSnapshot(file).rgb;
+    {
+        const rule=rgb.rules[1], paint=rule.parts.find(part=>part.slot===3);
+        expect(rule.flags&1).toBe(1);expect(paint.kind).toBe(2);expect(rgb.palette[paint.params[0]]).toEqual({h:177,s:255,v:200});
+    }
+});

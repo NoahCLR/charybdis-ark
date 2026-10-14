@@ -68,8 +68,8 @@ function profileUsage(snapshot, capabilities) {
         ["behaviours", decoded.behaviors.rows.length, capabilities.maxBehaviorRows],
         ["behaviourSteps", decoded.behaviors.populatedStepCount, capabilities.maxPopulatedBehaviorSteps],
         ["combos", decoded.combos.rows.length, capabilities.maxCombos],
-        ["lightingGroups", lighting[4], capabilities.maxReusableRgbGroups],
-        ["lightingGroupRows", lighting[6] + lighting[8] + lighting[9] + lighting[11], capabilities.maxRgbStageGroupRows],
+        ["lightingMemory", lighting.length, capabilities.lighting?.payloadBudget],
+
     ]).filter(([, , limit]) => positive(limit)).map(([id, used, limit]) => ({id, used, limit: /** @type {number} */ (limit)}));
 
     const usage = {

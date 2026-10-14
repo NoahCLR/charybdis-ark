@@ -1,8 +1,8 @@
 import type {RgbProfile, RgbOptions, BehaviorOptions, BehaviorRow, SettingsDomain, PdSlot, SemanticAction} from './types.js';
 
-export interface DomainOptions {rgb?: RgbOptions; behaviors?: BehaviorOptions}
+export interface DomainOptions {rgb?: import('./lighting-types.js').LightingOptions; behaviors?: BehaviorOptions}
 export interface DomainModels {
-    rgb: RgbProfile;
+    rgb: import('./lighting-types.js').LightingProfile;
     behaviors: {rows: (BehaviorRow & {target: SemanticAction & {flags: 0}})[]; rowCount: number; populatedStepCount: number; byteLength: number};
     combos: {version: typeof import('./profile-domains.js').PROFILE_DOMAIN_VERSIONS[typeof import('./profile-domains.js').PROFILE_DOMAIN_IDS.COMBOS]; defaultTermMs: number; holdTermMs: number; rows: {id: number; inputs: (SemanticAction & {flags: 0})[]; output: SemanticAction & {flags: 0}; termMs: number | null; mustHold: boolean; mustTap: boolean; ordered: boolean; enabled: boolean; useOutputBehavior: boolean; allowedLayers: number}[]};
     settings: SettingsDomain & {comboOutputBehaviors: boolean; formatVersion: typeof import('./profile-domains.js').PROFILE_DOMAIN_VERSIONS[typeof import('./profile-domains.js').PROFILE_DOMAIN_IDS.SETTINGS]};

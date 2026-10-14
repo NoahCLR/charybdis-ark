@@ -1,144 +1,67 @@
 // @ts-check
-// Lighting: the same shape as Keys. The board is the constant, with the layer
-// tabs on it, and each stage owns a full-width surface in the workbench, whose
-// tabs are the stages in the order the firmware paints them.
-
-// Selector assertions refer to elements created by this module's authored markup.
-import {css, isOff} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
-import {TRACKBALL_LED} from "../view/geometry.mjs";
-import {baseColour, feedbackColours, layerColourRow, pdColourRow, stageEnabled, stageIdle, stageInEffect} from "../view/lighting.mjs";
-import {slotCalled, stageOrder} from "../view/vocabulary.mjs";
-import {currentLayer, getModel, layerName, layers, post, render, state, writable, heldLayers} from "../store.mjs";
-import * as edits from "../view/edits.mjs";
-import {board} from "./board.mjs";
-import {keepInView, layerBar} from "./layerbar.mjs";
+import {css} from "../lib/colour.mjs";
+import {getModel, post, render, canEdit} from "../store.mjs";
+import {lightingRule} from "../view/edits.mjs";
+import {rulePaintColour} from "../view/lighting.mjs";
 import {topbar, unavailable} from "./shell.mjs";
-import {draftDot, draftMarks} from "../view/review.mjs";
-import {localityLabel} from "./lighting/common.mjs";
-import {stageBody} from "./lighting/stage-body.mjs";
-
-/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} id */
-const stageBit = (model, id) => (model?.rgb?.stages || []).find((stage) => stage.id === id)?.bit;
+import {colourEditor} from "./colour-editor.mjs";
+import {lightingMemoryCard} from "./lighting-memory.mjs";
+/** @type {string | null} */
+let selected = null;
+/** @type {{index: number, identity: string} | null} */
+let dragged = null;
 
 export function screenLighting() {
-    const model = getModel();
-    if (!model?.rgb?.stages) {
-        return el(`<div class="main">${topbar("Lighting", "Nothing read yet.")}
-            <div class="content"><div class="pad"><div class="screen-stub"><h3>No lighting read</h3>
-            <p class="note">${esc(unavailable(model) || "Choose Read keyboard to load this keyboard's lighting.")}</p></div></div></div></div>`);
+    const model = getModel(), lighting = model?.rgb?.lighting;
+    const main = el(`<div class="main">${topbar("Lighting", "Rules paint from top to bottom. The first rule that paints a key wins.")}</div>`);
+    if (!model || !lighting) {
+        main.append(el(`<div class="content"><div class="pad"><div class="screen-stub"><h3>No lighting read</h3><p class="note">${esc(unavailable(model) || "Read the keyboard to load its lighting rules.")}</p></div></div></div>`)); return main;
     }
-    const onGroups = state.stage === "groups";
-    const layer = currentLayer();
-    const main = el(`<div class="main">${topbar(
-        "Lighting",
-        "The only colour in this app is colour the keyboard emits. Stages paint in order, and the board below is the result — your draft's result, before anything is applied."
-    )}</div>`);
-
-    const content = el(`<div class="content"><div class="pad keys-pad"></div></div>`);
-    const pad = /** @type {HTMLElement} */ (content.firstElementChild);
-    // The board, what it is showing and the layer tabs under them are one
-    // card, as on Keys; on LED groups the board is the LED selector instead.
-    const card = el(`<div class="board-card"></div>`);
-    const preview = state.stage === "pd" && state.pdPreview && stageEnabled(model, "pd")
-        ? pdColourRow(model, state.pdSlot) : null;
-    card.appendChild(board(model, layer, {
-        mode: onGroups ? "leds" : "light",
-        faces: !onGroups,
-        held: onGroups ? [] : heldLayers(),
-        picks: state.ledPicks,
-        trackball: state.trackball,
-        pdActive: preview ? {mode: preview.pointingMode, color: preview.color, locality: preview.locality, triggerIndex: undefined} : null,
-        onKey: onGroups ? (index) => {
-            state.ledPicks = state.ledPicks.includes(index)
-                ? state.ledPicks.filter((value) => value !== index) : [...state.ledPicks, index];
-            render();
-        } : undefined,
-        onTrackball: onGroups ? () => { state.trackball = !state.trackball; render(); } : undefined,
-    }));
-    card.appendChild(el(`<div class="board-foot">
-        <b>${onGroups ? "LED selector" : "Preview"}</b>
-        <span class="board-foot-text">${onGroups
-            ? `click physical LEDs to build a group · ${state.ledPicks.length} selected${state.trackball ? " + trackball" : ""}`
-            : `${esc(layerName(layer))}${heldLayers().some((at) => at > 0) && !onGroups
-                ? ` with ${esc(heldLayers().filter((at) => at > 0).reverse().map((at) => layerName(layers()[at])).join(", "))} on`
-                : ""} over the base effect${preview
-                ? ` · ${esc(slotName(model, state.pdSlot))} held, painting ${esc(localityLabel(preview.locality).toLowerCase())}`
-                : ""}`}</span>
-        ${onGroups ? `<span class="right">
-            <button class="btn tiny ghost" data-act="clearleds">Clear selection</button>
-            <button class="btn tiny ${state.trackball ? "primary" : "ghost"}" data-act="trackball"
-                data-tip="Add or remove the trackball LED, index ${TRACKBALL_LED}, from this selection.">Trackball LED</button></span>`
-            : ""}
-    </div>`));
-    /** @type {HTMLButtonElement | null} */ (card.querySelector('[data-act="clearleds"]'))?.addEventListener("click", () => { state.ledPicks = []; render(); });
-    /** @type {HTMLButtonElement | null} */ (card.querySelector('[data-act="trackball"]'))?.addEventListener("click", () => { state.trackball = !state.trackball; render(); });
-    card.append(layerBar());
-    pad.appendChild(card);
-
-    const marks = draftMarks(model?.draft?.changes);
-    // The stage tabs are the paint order: numbered as the firmware paints
-    // them, each in the colour it paints now, a stage that is off drawn off.
-    // LED groups is no stage; every stage can draw on them.
-    const stages = stageOrder(model);
-    /** @param {{id: string, label: string}} stage @param {number} index */
-    const stageTab = (stage, index) => {
-        const on = stageInEffect(model, stage.id), colour = stageColour(model, stage.id), lit = on && colour && !isOff(colour);
-        const idle = stageIdle(model, stage.id);
-        return `<button role="tab" class="${on ? "" : "off"}" data-ltab="${stage.id}" aria-selected="${state.stage === stage.id}"
-            data-tip="Painted ${index + 1} of ${stages.length}${on ? "" : ` · ${esc(idle || "this stage is off")}`}">
-            <span class="n">${index + 1}</span><i class="swatch ${lit ? "" : "swatch-off"}" style="${lit ? `background:${css(colour)}` : ""}"></i>
-            <span class="tab-label">${esc(stage.label)}</span>${marks.lighting.has(stage.id) ? draftDot() : ""}</button>`;
-    };
-    const bench = el(`<div class="card bench">
-        <div class="bench-tabs"><div class="bench-tablist" role="tablist" aria-label="Lighting stages, in paint order">
-            ${stages.map(stageTab).join(`<span class="tab-step" aria-hidden="true">›</span>`)}
-            <span class="tab-sep" aria-hidden="true"></span>
-            <button role="tab" data-ltab="groups" aria-selected="${onGroups}"><span class="tab-label">LED groups</span>${marks.lighting.has("groups") ? draftDot() : ""}</button></div>
-            <span class="bench-right" id="benchRight"></span>
-        </div>
-        <div class="bench-body" id="benchBody"></div>
-    </div>`);
-    /** @type {NodeListOf<HTMLElement>} */ (bench.querySelectorAll("[data-ltab]")).forEach((button) => button.addEventListener("click", () => {
-        state.stage = /** @type {string} */ (button.dataset.ltab);
-        render();
-    }));
-    const right = /** @type {HTMLElement} */ (bench.querySelector("#benchRight"));
-    const bit = stageBit(model, state.stage);
-    if (bit !== undefined) right.appendChild(stageSwitch(model, state.stage, bit));
-    stageBody(/** @type {HTMLElement} */ (bench.querySelector("#benchBody")));
-    keepInView(/** @type {HTMLElement} */ (bench.querySelector(".bench-tablist")));
-    pad.appendChild(bench);
-
-    main.appendChild(content);
-    return main;
-}
-
-const slotName = slotCalled;
-
-/** @param {import("../../contracts/panel.js").PublishedModel} model @param {string} id @param {number} bit */
-function stageSwitch(model, id, bit) {
-    const on = stageEnabled(model, id);
-    const node = el(`<label class="sw" data-tip="Turn this whole stage off without losing the colours it stores.">
-        <input data-f="lighting:${esc(id)}:enabled" type="checkbox" ${on ? "checked" : ""} ${writable() ? "" : "disabled"}><span class="track"></span>
-        <span class="txt">${on ? "Stage on" : "Stage off"}</span></label>`);
-    /** @type {HTMLInputElement} */ (node.querySelector("input")).addEventListener("change", (event) => {
-        const mask = model.rgb.stageEnableMask ?? 0;
-        post(edits.rgbStages(mask, bit, /** @type {HTMLInputElement} */ (event.target).checked));
-    });
-    return node;
-}
-
-// The colour a stage paints now, for its tab: the layer shown, the pointing
-// mode picked, the hold colour for key feedback.
-/** @param {import("../../contracts/panel.js").PublishedModel} model @param {string} id */
-function stageColour(model, id) {
-    return /** @type {Record<string, () => import("../../contracts/edits.js").Colour | null | undefined>} */ ({
-        base: () => baseColour(model),
-        layers: () => layerColourRow(model, currentLayer()?.index)?.color,
-        auto: () => model.rgb.automouseFade?.end_color,
-        pd: () => pdColourRow(model, state.pdSlot)?.color,
-        combo: () => model.rgb.comboFeedback?.color,
-        key: () => feedbackColours(model).hold,
-    })[id]?.();
+    const pad = el(`<div class="pad lighting-pad"></div>`), content = el(`<div class="content"></div>`);
+    const memory = lightingMemoryCard(model); if (memory) pad.append(memory);
+    const editableLighting = canEdit("lighting"), rules = lighting.rules;
+    if (!rules.some(r => r.key === selected)) selected = rules[0]?.key ?? null;
+    const fade = lighting.program.extensions.find(e => e.kind === 1);
+    const split = el(`<div class="lighting-workbench"><div class="card lighting-rule-list"><div class="card-h"><h3>Lighting rules</h3><span class="right note">${rules.length} rule${rules.length === 1 ? "" : "s"}</span></div><div class="rule-list-body"></div></div><div class="card lighting-rule-editor"></div></div>`);
+    const list = /** @type {HTMLElement} */ (split.querySelector(".rule-list-body"));
+    if (!rules.length) list.append(el(`<div class="card-b"><p class="note">No rules paint over the keyboard's base effect.</p></div>`));
+    let band = "";
+    for (const rule of rules) {
+        if (rule.band !== band) {band = rule.band;list.append(el(`<div class="lighting-band">${esc(lighting.bands[band] || "Other rules")}</div>`));}
+        const colour = rulePaintColour(model, rule.index), editable = editableLighting && !rule.readOnly;
+        const row = el(`<article class="lighting-rule ${selected === rule.key ? "selected" : ""} ${rule.enabled ? "" : "rule-disabled"}" data-rule-key="${esc(rule.key)}" data-rule-index="${rule.index}" ${editable ? 'draggable="true"' : ""}>
+            <div class="rule-position"><span class="note">${rule.index + 1}</span><button class="btn tiny ghost" data-up aria-label="Move rule ${rule.index + 1} up" ${editable && rule.index > 0 ? "" : "disabled"}>↑</button><button class="btn tiny ghost" data-down aria-label="Move rule ${rule.index + 1} down" ${editable && rule.index < rules.length - 1 ? "" : "disabled"}>↓</button></div>
+            <button class="rule-description" data-select aria-label="Edit rule ${rule.index + 1}"><strong>${esc(rule.when)}</strong><span class="note">${esc(rule.where)} · ${esc(rule.how)}</span>${rule.readOnly ? '<span class="note">Needs a newer Ark · read-only</span>' : ""}</button>
+            ${colour ? `<span class="rule-colour" style="background:${css(colour)}" data-tip="This rule's paint colour"></span>` : '<span class="rule-colour empty"></span>'}
+            <label class="sw"><input data-f="lighting:${esc(rule.key)}:enabled" type="checkbox" ${rule.enabled ? "checked" : ""} ${editable ? "" : "disabled"} aria-label="Enable rule ${rule.index + 1}"><span class="track"></span><span class="txt">${rule.enabled ? "On" : "Off"}</span></label>
+        </article>`);
+        const send = (/** @type {import('../../contracts/edits.js').EditPayloads['editLightingRule']['action']} */ action, /** @type {Pick<import('../../contracts/edits.js').EditPayloads['editLightingRule'], 'to' | 'colour'>} */ fields = {}) => post(lightingRule(rule.index, rule.identity, action, fields));
+        row.querySelector("[data-select]")?.addEventListener("click", () => {selected = rule.key;render();});
+        row.querySelector("input")?.addEventListener("change", () => send("toggle"));
+        row.querySelector("[data-up]")?.addEventListener("click", () => send("move", {to: rule.index - 1}));
+        row.querySelector("[data-down]")?.addEventListener("click", () => send("move", {to: rule.index + 1}));
+        row.addEventListener("dragstart", event => {dragged = {index: rule.index, identity: rule.identity};event.dataTransfer?.setData("text/plain", rule.key);});
+        row.addEventListener("dragover", event => {if (dragged) {event.preventDefault();row.classList.add("drop-target");}});
+        row.addEventListener("dragleave", () => row.classList.remove("drop-target"));
+        row.addEventListener("drop", event => {event.preventDefault();if (dragged && dragged.index !== rule.index) post(lightingRule(dragged.index, dragged.identity, "move", {to: rule.index}));dragged = null;row.classList.remove("drop-target");});
+        row.addEventListener("dragend", () => {dragged = null;});
+        list.append(row);
+    }
+    const editor = /** @type {HTMLElement} */ (split.querySelector(".lighting-rule-editor")), rule = rules.find(r => r.key === selected);
+    if (rule) {
+        editor.append(el(`<div class="card-h"><h3>Rule ${rule.index + 1}</h3>${!rule.readOnly ? `<button class="btn tiny ghost right" data-delete ${editableLighting ? "" : "disabled"}>Delete</button>` : ""}</div>`));
+        const body = el(`<div class="card-b stack gap-12"><div><strong>${esc(rule.when)}</strong><p class="note">${esc(rule.where)} · ${esc(rule.how)}</p></div></div>`);
+        if (rule.readOnly) body.append(el(`<div class="callout">This rule uses lighting this Ark cannot edit. It stays unchanged when you Apply or export a backup.</div>`));
+        else if (rule.canColour) {
+            body.append(colourEditor({identity: `lighting:${rule.key}:paint`, colour: rulePaintColour(model, rule.index), title: "Paint colour", canEdit: editableLighting, zeroMeansClear: false, offNote: `Current paint: ${rule.how.toLowerCase()}. Choose a colour to replace it.`,
+                maximumBrightness: model.rgb.maximumBrightness, offTip: "Paint black. Lower rules stay covered where this rule paints.",
+                onChange: colour => post(lightingRule(rule.index, rule.identity, "colour", {colour: {h: Number(colour.h), s: Number(colour.s), v: Number(colour.v)}}))}));
+            if (!rule.colour) body.append(el(`<p class="note">Choosing a colour replaces this rule's current paint. Its condition and lighting area stay the same.</p>`));
+        } else body.append(el(`<p class="note">This keyboard does not offer a plain colour paint.</p>`));
+        if (fade?.params[0]) body.append(el(`<p class="note">Auto-mouse fade uses the bottom ${fade.params[3]} rule${fade.params[3] === 1 ? "" : "s"}. Moving a rule across that boundary changes what fades.</p>`));
+        editor.querySelector("[data-delete]")?.addEventListener("click", () => post(lightingRule(rule.index, rule.identity, "delete")));
+        editor.append(body);
+    } else editor.append(el(`<div class="card-b"><p class="note">Select a rule to change its paint colour.</p></div>`));
+    pad.append(split);content.append(pad);main.append(content);return main;
 }

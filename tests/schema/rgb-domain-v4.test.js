@@ -36,7 +36,7 @@ test("the firmware's format-4 rejections are refused with its codes", () => {
 
 const reject = (fn, code) => assert.throws(fn, error => error.code === code, `expected ${code}`);
 // The compiled profile's lighting: a row for every slot.
-const v4 = () => validateSnapshot(document()).rgb;
+const v4 = () => decodeRgbDomainV1(Buffer.from(golden.valid.find(c => c.name === "compiled").hex,"hex"));
 
 test("format 4 colours 16 layers and 32 pointing slots and round-trips", () => {
     assert.equal(RGB_DOMAIN_V1.PD_SLOTS, 32);
@@ -50,8 +50,8 @@ test("format 4 colours 16 layers and 32 pointing slots and round-trips", () => {
     assert.deepEqual(decoded.layerColors.map(row => row.layerId), Array.from({length: 16}, (_, id) => id));
     assert.deepEqual(decoded.pdModeColors.map(row => row.pdModeId), Array.from({length: 32}, (_, id) => id));
     assert.deepEqual(encodeRgbDomainV1(decoded), encoded);
-    const blob = encodeProfileBlob({schema: {major: 3, minor: 0}, domains: [{id: 0x10, version: 4, payload: encoded}]});
-    assert.equal(decodeProfileBlob(blob).domains[0].version, 4);
+    const blob = encodeProfileBlob({schema: {major: 3, minor: 0}, domains: [{id: 0x10, version: 4, payload: encoded}]}, {domainVersions: {16: 4}});
+    assert.equal(decodeProfileBlob(blob, {domainVersions: {16: 4}}).domains[0].version, 4);
 });
 
 test("format 4 needs every layer's and slot's row once, and selectors in range", () => {

@@ -20,10 +20,10 @@ export interface DraftApplyService {
 }
 export type DraftEdit = Extract<import('../../contracts/edits.js').PanelEdit, {type: import('../../contracts/edits.js').DraftEditType}> & {draftRevision: number; expectedBase?: Partial<import('../../contracts/edits.js').BaseIdentity>};
 
-export type DeviceCapabilities = ReturnType<typeof import('../protocol/profile-wire-v1.js').decodeCapabilityPages>;
+export type DeviceCapabilities = ReturnType<typeof import('../protocol/profile-wire-v1.js').decodeCapabilityPages> & {lighting?: import('../schema/lighting-types.js').LightingCapabilities};
 export type ProfileStatus = ReturnType<typeof import('../protocol/profile-wire-v1.js').decodeStatusPages>;
 export interface ReadDomains {
-    rgb?: import('../schema/types.js').RgbProfile;
+    rgb?: import('../schema/lighting-types.js').LightingProfile;
     keyBehaviors?: {rows: import('../schema/types.js').BehaviorRow[]};
     settings?: import('../schema/types.js').SettingsDomain;
     pdModes?: import('../schema/types.js').PdSlot[];

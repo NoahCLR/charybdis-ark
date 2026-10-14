@@ -68,6 +68,7 @@ export interface PdConfig {
 export interface SettingEdit {macro: string; enabled?: boolean; value?: Scalar | boolean}
 
 export interface EditPayloads {
+    editLightingRule: {index: number; expectedRule: string; action: 'toggle' | 'delete' | 'move' | 'colour'; to?: number; colour?: {h: number; s: number; v: number}};
     reviewPortableProfile: {text: string; name: string};
     updateLayoutKeys: {layer: LayerReference; changes: {layoutIndex: number; keycode: string}[]};
     updatePlacementPolicy: {layer: number; layoutIndex: number; useBehavior: boolean; joinCombos: boolean};

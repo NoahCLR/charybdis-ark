@@ -198,3 +198,13 @@ export function trackballLight(model, layer, options = {}) {
 /** @param {import("./types.js").LedLight | null | undefined} light @param {number} [layerId] */
 export const ownLight = (light, layerId = 0) =>
     layerId === 0 || light?.source === "pointing" || (light?.source === "layer" && light.layer === layerId);
+
+/** @param {Model} model */
+export function lightingMemory(model) {
+    const lighting = model?.rgb?.lighting;
+    if (!lighting) return null;
+    return {used: lighting.used, capacity: lighting.capacity, free: lighting.capacity - lighting.used,
+        percent: Math.min(100, lighting.used / lighting.capacity * 100), near: lighting.used >= lighting.capacity * 0.9, unknown: lighting.unknownRules};
+}
+/** @param {Model} model @param {number} index */
+export const rulePaintColour = (model, index) => model?.rgb?.lighting?.rules[index]?.colour ?? null;

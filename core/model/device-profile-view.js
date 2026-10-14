@@ -89,8 +89,9 @@ function behaviorRowsForView(domain, features = {}, names) {
 const colorForView = (color) => ({h: String(color.h), s: String(color.s), v: String(color.v)});
 const layerName = layerRef;
 
-/** @param {import("../schema/types.js").RgbProfile} domain */
+/** @param {import("../schema/types.js").RgbProfile | import("../schema/lighting-types.js").LightingProfile} domain */
 function rgbForView(domain) {
+    if ("rules" in domain) domain = require("./lighting-view").lightingIdentities(domain);
     const ledGroups = domain.groups.map((group) => ({
         name: `Group ${group.id}`,
         id: group.id,

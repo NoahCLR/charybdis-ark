@@ -26,9 +26,10 @@ function edited() {
     stage({type: "retargetBehavior", keycode: "KC_ESCAPE", target: "KC_Q", expectedBase: draft.identity()});
     stage({type: "addCombo", inputs: ["KC_A", "KC_B"], output: "KC_C", termMs: "50", holdTermMs: "200"});
     stage({type: "updateComboDefaultTerm", defaultTermMs: "70"});
-    stage({type: "updateLayerColor", layer: "Layer 2", mode: "ALL_KEYS", h: "20", s: "200", v: "100"});
-    stage({type: "updateRgbStages", stageEnableMask: validateSnapshot(draft.document).rgb.stageEnableMask ^ 1});
-    stage({type: "addRgbLedGroup", group: {target: "layer", owner: "Layer 3", ledIndices: [1, 2, 3], h: "0", s: "0", v: "0"}});
+    const rgb = validateSnapshot(draft.document).rgb;
+    stage({type: "editLightingRule", index: 0, expectedRule: require("../../core/model/lighting-editor").ruleIdentity(rgb.rules[0]), action: "colour", colour: {h: 20, s: 200, v: 100}});
+    const updated = validateSnapshot(draft.document).rgb;
+    stage({type: "editLightingRule", index: 1, expectedRule: require("../../core/model/lighting-editor").ruleIdentity(updated.rules[1]), action: "toggle"});
     const slot = validateSnapshot(draft.document).pdModes[1];
     stage({type: "savePdMode", slot: 1, expectedBase: draft.identity(), config: {...slot, name: "Loudness", thresholdY: 90,
         directions: Object.fromEntries(Object.entries(slot.directions).map(([name, tap]) => [name, {...tap, keycode: String(tap.keycode)}])),

@@ -42,7 +42,7 @@ const MUTATING_COMMANDS = new Set([0x03, 0x05, 0x06, 0x07, 0x09, 0x0a, 0x0b, 0x0
 const FEATURES = PROFILE_WIRE_KNOWN_MASKS.FEATURE_FLAGS & ~PROFILE_WIRE_KNOWN_MASKS.RETIRED_FEATURES;
 
 // The domain versions current firmware stores, and refuses any other.
-const CURRENT_DOMAINS = "16:4,32:2,48:3,64:7,80:3";
+const CURRENT_DOMAINS = "16:5,32:2,48:3,64:7,80:3";
 
 // `compiled` is the profile it was built with, which GET 0x05 serves: the
 // document's own unless given (current firmware's carries every domain, with
@@ -50,13 +50,13 @@ const CURRENT_DOMAINS = "16:4,32:2,48:3,64:7,80:3";
 // defaults, with nothing committed; the live combo and settings readbacks
 // still answer from the document.
 /** @param {import("./types.js").FakeKeyboardOptions} options @returns {import("./types.js").FakeKeyboard} */
-function fakeKeyboard({document, compiled, streaming = false, macroReadMap = false, compiledOnly = false, peerKnown = true, generation = 42, firmwareVersion = 0x00010000, brightnessMax = 255, options = keyboardOptions.wire()}) {
+function fakeKeyboard({document, compiled, streaming = false, macroReadMap = false, compiledOnly = false, peerKnown = true, generation = 42, firmwareVersion = 0x00010000, brightnessMax = 255, lightingPages, options = keyboardOptions.wire()}) {
     const held = validateSnapshot(document);
     held.macros = require("../../core/model/portable-profile").macroBank(document.macros.map(value => Buffer.from(value, "base64")), streaming ? 34903 : 10327);
     if (document.version !== 3 || document.layers.length !== 16) throw new Error("The fake keyboard runs current firmware: a schema-3, sixteen-layer document.");
     /** @param {Buffer} blob */
     const versions = blob => decodeProfileBlob(blob).domains.map(domain => `${domain.id}:${domain.version}`).join();
-    if (versions(held.profile) !== CURRENT_DOMAINS || (compiled && versions(compiled) !== CURRENT_DOMAINS)) throw new Error("The fake keyboard runs current firmware: RGB 4, key behaviours 2, combos 3, settings 7 and PD 3.");
+    if (versions(held.profile) !== CURRENT_DOMAINS || (compiled && versions(compiled) !== CURRENT_DOMAINS)) throw new Error("The fake keyboard runs current firmware: RGB 5, key behaviours 2, combos 3, settings 7 and PD 3.");
     const profile = held.profile, digest = fnv1a32(profile), defaults = compiled || profile;
     const settingsDomain = decodeProfileBlob(profile).domains.find(domain => domain.id === PROFILE_DOMAIN_IDS.SETTINGS);
     if (!settingsDomain) throw new Error("The fake keyboard fixture must contain settings.");
@@ -65,7 +65,7 @@ function fakeKeyboard({document, compiled, streaming = false, macroReadMap = fal
 
     const capabilities = [page(25, (p) => {
         p.set([2, 3, 1, 0, 3, 0, RAW_HID_REPORT_SIZE, PROFILE_CANDIDATE_V1.CHUNK_MAX, PROFILE_WIRE_V1.STATUS_PAGE_COUNT]);
-        p.writeUInt32LE(streaming ? FEATURES : FEATURES & ~(1 << 27), 9); p.writeUInt32LE(document.actionAbiDigest, 13);
+        p.writeUInt32LE((streaming ? FEATURES : FEATURES & ~(1 << 27)) >>> 0, 9); p.writeUInt32LE(document.actionAbiDigest, 13);
         p.writeUInt32LE(firmwareVersion, 17); p.writeUInt32LE(fnv1a32(defaults), 21);
     }), page(25, (p) => {
         // Layers, behaviour rows, tap depth, (steps on page 2), combos, keys
@@ -102,6 +102,7 @@ function fakeKeyboard({document, compiled, streaming = false, macroReadMap = fal
     /** @type {Partial<Record<number, Buffer[]>>} */
     const values = {
         [VALUE.CAPABILITIES]: capabilities,
+        13: lightingPages ?? require("../../upstream/firmware/tests/fixtures/lighting_vectors_v1.json").capability.map(hex => Buffer.from(hex,"hex")),
         [VALUE.STATUS]: status,
         ...(compiledOnly ? {} : {[VALUE.COMMITTED]: payloadPages(profile, generation)}),
         [VALUE.COMPILED]: payloadPages(defaults, 0),

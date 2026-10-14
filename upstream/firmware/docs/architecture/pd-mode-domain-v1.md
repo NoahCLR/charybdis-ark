@@ -24,7 +24,7 @@ and restore preserve them without the repository.
   stays a layer/CPI policy and uses no slot.
 - There are two engine families, **directional** (four or eight directions,
   single axis or dominant axis; see D-L24 and D-L28 in the
-  [direction](https://github.com/NoahCLR/charybdis-4x6/blob/86ef55539422b4c301fd26212581686cfc959a50/docs/LIVE_EDIT_APP_DIRECTION.md)) and **scrolling**. Optional
+  [direction](https://github.com/NoahCLR/charybdis-4x6/blob/b46f3edb494efbe381afda313ed178199c58054d/docs/LIVE_EDIT_APP_DIRECTION.md)) and **scrolling**. Optional
   modifier and mouse-button policies cover Arrow and Pinch. No behavior depends
   on a slot's name.
 
@@ -52,7 +52,7 @@ keycode allocation.
 | 7–31 | Empty | Disabled | Inert actions; not stored; retained, editable RGB row |
 
 Dragscroll and Pinch run this repository's
-[`pd_mode_dragscroll.c`](https://github.com/NoahCLR/charybdis-4x6/blob/86ef55539422b4c301fd26212581686cfc959a50/users/noah/lib/pointing/modes/pd_mode_dragscroll.c),
+[`pd_mode_dragscroll.c`](https://github.com/NoahCLR/charybdis-4x6/blob/b46f3edb494efbe381afda313ed178199c58054d/users/noah/lib/pointing/modes/pd_mode_dragscroll.c),
 not the fork's native `DRAGSCROLL_MODE`; never activate both engines.
 
 ### Slot operations and RGB identity
@@ -116,8 +116,9 @@ meaning, so the pointing engine reads the same 96 bytes it always has.
 Translation from version 2 moves the 24-byte name field's text (up to its
 terminator) to bytes 96..127, writes its length to byte 8 and zeroes bytes
 9..31. The surrounding profile domain envelope adds four
-bytes. RGB remains in its own domain; RGB v4 holds 32 ID/HSV/locality rows,
-one per slot whether or not the slot is stored here.
+bytes. RGB remains in its own domain; RGB v5's pointing-mode thing table holds up
+to 32 place-and-colour records, one per slot whether or not the slot is
+stored here ([lighting rules](lighting-rules-v1.md)).
 
 Retired version 1 was fixed: 776 bytes, the header `01 08 60 00 00 00 00 00`
 then eight records in ID order `0..7`, disabled slots included. No schema-2
@@ -308,7 +309,7 @@ A button press a mode consumes never reaches the button's own behavior, and
 its release goes to the mode that took the press, even after another mode
 replaced it; the release of a press the mode did not take stays with the
 behavior. The key runtime owns that routing; see
-[Runtime Flow](https://github.com/NoahCLR/charybdis-4x6/blob/86ef55539422b4c301fd26212581686cfc959a50/docs/architecture/runtime-flow.md#key-press-flow).
+[Runtime Flow](https://github.com/NoahCLR/charybdis-4x6/blob/b46f3edb494efbe381afda313ed178199c58054d/docs/architecture/runtime-flow.md#key-press-flow).
 
 ## Validation and evidence
 
@@ -375,7 +376,7 @@ bit 7. It binds schema 3.0 and nonzero VIA identity. `NP`, `NQ`, `NR` and `NS`
 headers are rejected. Header CRC, marker-last publication and bounded I/O remain unchanged.
 
 Synchronous validation, bounded boot scanning and commit shape validation
-share the current version rules in `profile_versions.h`: RGB v4, key behaviors
+share the current version rules in `profile_versions.h`: RGB v5, key behaviors
 v2, combos v3, settings v7 and sparse PD v3. Blob magic remains `NLP1`; schema
 bytes must be 3.0. Domain bodies also require semantic validation. Store tests
 cover all mask/origin/flag combinations, both boot paths, old-header rejection,

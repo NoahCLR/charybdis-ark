@@ -11,7 +11,7 @@ const fixture = require("../fixtures/portable-profile");
 
 test("one canonical registry pins every current domain's identity, version, wire bit and model names", () => {
     assert.deepEqual(PROFILE_DOMAINS.map(({name, id, key, readKey, version, wireBit, area}) => ({name, id, key, readKey, version, wireBit, area})), [
-        {name: "RGB", id: 16, key: "rgb", readKey: "rgb", version: 4, wireBit: 1, area: "lighting"},
+        {name: "RGB", id: 16, key: "rgb", readKey: "rgb", version: 5, wireBit: 1, area: "lighting"},
         {name: "KEY_BEHAVIORS", id: 32, key: "behaviors", readKey: "keyBehaviors", version: 2, wireBit: 2, area: "behaviours"},
         {name: "COMBOS", id: 48, key: "combos", readKey: "combos", version: 3, wireBit: 4, area: "combos"},
         {name: "SETTINGS", id: 64, key: "settings", readKey: "settings", version: 7, wireBit: 8, area: "settings"},
@@ -35,7 +35,7 @@ test("one canonical registry pins every current domain's identity, version, wire
 test("registered codecs round-trip every fixture domain without changing canonical bytes", () => {
     const snapshot = validateSnapshot(fixture.document());
     const blob = decodeProfileBlob(snapshot.profile);
-    const versions = [require("../../core/schema/rgb-domain-v1").RGB_DOMAIN_V1.DOMAIN_VERSION,
+    const versions = [require("../../core/schema/lighting-domain-v1").LIGHTING.VERSION,
         require("../../core/schema/key-behavior-domain-v1").KEY_BEHAVIOR_DOMAIN_V1.VERSION,
         require("../../core/schema/combo-domain-v1").COMBO_DOMAIN_VERSION,
         require("../../core/schema/settings-domain-v1").SETTINGS.VERSION,
@@ -51,16 +51,15 @@ test("registered codecs round-trip every fixture domain without changing canonic
 
 // Each domain's error identity as it stands: the codecs share the canonical
 // check, not an error class, so these are pinned rather than unified.
-const ERROR_NAMES = {rgb: ["RgbDomainProtocolError"], behaviors: ["ProfileBlobProtocolError"], combos: ["Error", "ProfileBlobProtocolError"], settings: ["Error"], pdModes: ["Error"]};
+const ERROR_NAMES = {rgb: ["LightingProtocolError"], behaviors: ["ProfileBlobProtocolError"], combos: ["Error", "ProfileBlobProtocolError"], settings: ["Error"], pdModes: ["Error"]};
 // One encoding of each domain that its encoder would never write, made from
 // the fixture's own payload, and the refusal it meets.
 const NONCANONICAL = {
     // The two LED groups swapped: ids still count from zero, but the
     // dictionary is not in bitmap order.
     rgb: payload => {
-        const bytes = Buffer.from(payload);
-        payload.copy(bytes, 17, 26, 34); payload.copy(bytes, 26, 17, 25);
-        return {bytes, refusal: {name: "RgbDomainProtocolError", code: "NONCANONICAL"}};
+        const bytes = Buffer.from(payload); bytes[1] = 1;
+        return {bytes, refusal: {name: "LightingProtocolError", code: "RESERVED_BITS"}};
     },
     // The first two rows swapped out of target order.
     behaviors: payload => {
@@ -144,7 +143,7 @@ test("metadata can be imported before any codec, avoiding partially initialized 
         const fixture = require('./tests/fixtures/portable-profile').document();
         const portable = require('./core/model/portable-profile');
         const value = portable.validateSnapshot(fixture);
-        assert.equal(registry.domainCodec('rgb').decode(registry.encodeProfileDomains(value)[0].payload).layerColors.length, 16);`;
+        assert.equal(registry.domainCodec('rgb').decode(registry.encodeProfileDomains(value)[0].payload).things.find(t => t.kind === 1).records.length, 16);`;
     execFileSync(process.execPath, ["-e", source], {cwd: require("node:path").resolve(__dirname, "../..")});
 });
 

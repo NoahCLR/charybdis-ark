@@ -114,7 +114,7 @@ async function captureProfile(connection, ids, capabilities, onProgress = () => 
             fingerprint: `incomplete:${capabilities.actionAbiDigest}:${crc32(bytes)}:${fnv1a32(bytes)}`, summary: null, incomplete: true, status: after,
             identity: snapshotIdentity(after, storageAfter, settings)};
     }
-    const document = createSnapshot({profile, via, actionAbiDigest: capabilities.actionAbiDigest});
+    const document = createSnapshot({profile, via, actionAbiDigest: capabilities.actionAbiDigest, tapDepth: capabilities.maxTapStepsPerBehavior});
     validateSnapshot(document, capabilities);
     return {document, readback: {active, source: before.activeKind === PROFILE_ACTIVE_KIND.COMMITTED ? "committed" : "compiled", combos}, fingerprint: fingerprint(document), summary: summary(document), status: after, identity: snapshotIdentity(after, storageAfter, settings), storage: heldStorage(via.layout, via.macros, active.bytes)};
 }
@@ -270,7 +270,7 @@ async function restoreProfile(connection, ids, capabilities, input, {expectedFin
         const startedAt = Date.now();
         requireReady(capabilities);
         requireReady(capabilities, true);
-        const target = validateSnapshot(translateBackup(input), capabilities);
+        const target = validateSnapshot(translateBackup(input, capabilities), capabilities);
         const document = target.document;
         const saveCopy = saveRecovery;
         if (typeof saveCopy !== "function") throw fail("RECOVERY_REQUIRED", "Save a recovery copy before restoring this keyboard.");

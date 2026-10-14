@@ -42,7 +42,7 @@ function fixtures() {
             fnv1a32: `0x${values.get("blob.ordered.fnv1a32")}`,
             crc32: `0x${values.get("blob.ordered.crc32")}`,
             domains: [
-                {id: PROFILE_DOMAIN_IDS.RGB, version: 4, payload: "deadbeef"},
+                {id: PROFILE_DOMAIN_IDS.RGB, version: 5, payload: "deadbeef"},
                 {id: PROFILE_DOMAIN_IDS.KEY_BEHAVIORS, version: 2, payload: "000102"},
             ],
         },
@@ -76,7 +76,7 @@ test("empty and ordered-domain blobs match deterministic golden vectors", () => 
 
     const encoded = encodeProfileBlob({schema: {major: 3, minor: 0}, domains: [
         {id: PROFILE_DOMAIN_IDS.KEY_BEHAVIORS, version: 2, payload: hex("000102")},
-        {id: PROFILE_DOMAIN_IDS.RGB, version: 4, payload: hex("deadbeef")},
+        {id: PROFILE_DOMAIN_IDS.RGB, version: 5, payload: hex("deadbeef")},
     ]});
     assert.equal(encoded.toString("hex"), golden.orderedDomains.hex, "encoder must sort domains by id");
     const decoded = decodeProfileBlob(encoded);
@@ -90,11 +90,11 @@ test("empty and ordered-domain blobs match deterministic golden vectors", () => 
 });
 
 test("domain envelope readers support later domain codecs without accepting padding", () => {
-    const first = Buffer.from("10040200aabb", "hex");
+    const first = Buffer.from("10050200aabb", "hex");
     const second = Buffer.from("20020100cc", "hex");
     assert.deepEqual(decodeDomainEnvelope(first), {
         id: PROFILE_DOMAIN_IDS.RGB,
-        version: 4,
+        version: 5,
         payload: hex("aabb"),
     });
     assert.throws(() => decodeDomainEnvelope(Buffer.concat([first, Buffer.from([0])])), (error) => error.code === "TRAILING_BYTES");
@@ -115,11 +115,11 @@ test("strict blob decode rejects unknown, duplicate, out-of-order, truncated, an
     }
 
     const duplicateHeader = Buffer.from("4e4c503103000201", "hex");
-    const rgb = Buffer.from("10040000", "hex");
+    const rgb = Buffer.from("10050000", "hex");
     assert.throws(() => decodeProfileBlob(Buffer.concat([duplicateHeader, rgb, rgb])), (error) => error.code === "DUPLICATE_DOMAIN");
     const behaviors = Buffer.from("20020000", "hex");
     assert.throws(() => decodeProfileBlob(Buffer.concat([duplicateHeader, behaviors, rgb])), (error) => error.code === "DOMAIN_ORDER");
-    assert.throws(() => decodeProfileBlob(Buffer.concat([header, Buffer.from("10040400aabb", "hex")])), (error) => error.code === "TRUNCATED");
+    assert.throws(() => decodeProfileBlob(Buffer.concat([header, Buffer.from("10050400aabb", "hex")])), (error) => error.code === "TRUNCATED");
     assert.throws(() => decodeProfileBlob(Buffer.concat([Buffer.from("4e4c503103000001", "hex"), Buffer.from([0])])), (error) => error.code === "TRAILING_BYTES");
     assert.throws(() => decodeProfileBlob(Buffer.from("4e4c5031030001", "hex")), (error) => error.code === "TRUNCATED");
 });
@@ -144,15 +144,15 @@ test("strict blob header validation rejects magic, schema, and reserved flag var
 
 test("blob encoder rejects duplicate, unknown, oversized, and invalid inputs", () => {
     assert.throws(() => encodeProfileBlob({domains: [
-        {id: PROFILE_DOMAIN_IDS.RGB, version: 4, payload: Buffer.alloc(0)},
-        {id: PROFILE_DOMAIN_IDS.RGB, version: 4, payload: Buffer.alloc(0)},
+        {id: PROFILE_DOMAIN_IDS.RGB, version: 5, payload: Buffer.alloc(0)},
+        {id: PROFILE_DOMAIN_IDS.RGB, version: 5, payload: Buffer.alloc(0)},
     ]}), (error) => error.code === "DUPLICATE_DOMAIN");
     assert.throws(() => encodeProfileBlob({domains: [{id: 0x60, version: 1, payload: Buffer.alloc(0)}]}), (error) => error.code === "UNKNOWN_DOMAIN");
     assert.throws(() => encodeProfileBlob({domains: [{id: PROFILE_DOMAIN_IDS.SETTINGS, version: 5, payload: Buffer.alloc(0)}]}), (error) => error.code === "UNKNOWN_DOMAIN_VERSION");
     assert.throws(() => encodeProfileBlob({schema: {major: 1, minor: 0}, domains: []}), (error) => error.code === "INCOMPATIBLE_SCHEMA");
     assert.throws(() => encodeProfileBlob({domains: [{
         id: PROFILE_DOMAIN_IDS.RGB,
-        version: 4,
+        version: 5,
         payload: Buffer.alloc(PROFILE_BLOB_V1.MAX_SIZE),
     }]}), (error) => error.code === "CAPACITY_EXCEEDED");
     assert.throws(() => encodeProfileBlob({domains: [{id: 0x100, version: 1, payload: Buffer.alloc(0)}]}), /8-bit/);

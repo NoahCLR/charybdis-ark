@@ -226,7 +226,7 @@ const binding = {viaGeneration: 9, viaDigest: 0x89abcdef};
 test("metadata is derived from the canonical blob and its exact domain mask", () => {
     const blob = encodeProfileBlob({
         schema: SCHEMA_3,
-        domains: [{id: PROFILE_DOMAIN_IDS.RGB, version: 4, payload: Buffer.alloc(3)}],
+        domains: [{id: PROFILE_DOMAIN_IDS.RGB, version: 5, payload: Buffer.alloc(3)}],
     });
     const metadata = candidateMetadataForBlob(blob, {actionAbiDigest: 0x12345678, ...binding});
     assert.equal(metadata.schemaMajor, 3);

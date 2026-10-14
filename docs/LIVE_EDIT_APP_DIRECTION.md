@@ -41,10 +41,11 @@ matrix.
 | Product surface | Current state |
 | --- | --- |
 | Layout and 16 layers | Read/write keys, layer names and order; a reorder renumbers layer keys by default, any layer can be the base, and key labels follow the host layout (D-L15, D-L29, D-L37, D-L56) |
-| Key behaviours, combos and RGB | Read/write editors over the shared draft, with participation controls at every scope and capability-gated global/per-combo output behaviour permissions (D-L12, D-L32, D-L49, D-L55) |
+| Key behaviours and combos | Read/write editors over the shared draft, with participation controls at every scope and capability-gated global/per-combo output behaviour permissions (D-L12, D-L32, D-L49, D-L55) |
 | Macros | 128 VIA macros renamed directly through their titles; empty canvas with direct step actions, fixed-size sequence tiles, drag reordering across the whole sequence, Delete/Backspace step removal, per-slot step undo/redo and a shared step clipboard, a selected-step editor, a raw-payload toolbar toggle and live validation, including visible invalid hold order; recorder scoped to its visible slot with taps/chords by default and optional hold timing alongside its other settings; capability-gated Unicode text, typed and checked through the host's OS and keyboard layout; per-macro input protection; one shared memory, shown and enforced (D-L25, D-L26, D-L56, D-L57) |
 | Custom keys | 128 named keys that do what their behaviour says: rename, add or open the behaviour, place, see where each is used (D-L42) |
-| Mouse | Pointer and sniping DPI, auto-sniping and auto-mouse, settings the core files under Mouse, so the rail, the review and import counts all place them there; the auto-mouse fade is a share of the timeout, edited on its lighting stage (D-L17) |
+| Lighting | RGB v5 rules over the shared draft, capability-gated paint colour, reorder, switches and delete; unknown rules preserved read-only; 8 KiB meter in Lighting and Review ([editor contract](architecture/lighting-editor.md)) |
+| Mouse | Pointer and sniping DPI, auto-sniping and auto-mouse, settings the core files under Mouse, so the rail, the review and import counts all place them there; the auto-mouse fade is a share of the timeout, retained in the lighting program; identity and fade policy editing follow in phase 2 (D-L17) |
 | Pointing modes | 32 device-owned slots in the sparse PD domain (D-L41, D-L54); capability-gated mouse-button 1–8 clicks and VIA macro outputs from directions, diagonals and tap overrides, with destination blockers in Review; see [the editor contract](architecture/interface-contracts.md#pointing-tap-outputs) and [PD-mode domain v1](../upstream/firmware/docs/architecture/pd-mode-domain-v1.md) |
 | Global policy | Every other portable setting, including startup layers, combo matching, Host and device-reported lighting and key options; the lighting idle timeout is edited in seconds or minutes; unsupported firmware features stay read-only (D-L18, D-L56) |
 | Keyboard name | The keyboard's own name, its USB product string, edited on Settings and stored in settings v7; an Apply that renames it is followed through the keyboard's USB restart (D-L62) |
@@ -77,6 +78,11 @@ Remaining before calling the product complete:
 - the open issues below.
 
 ## Open Issues
+
+- **Lighting rules need keyboard acceptance.** Codec, conversion and fake-device
+  readback do not prove physical lighting, split synchronisation or Apply on a
+  keyboard. Saved identity editing is phase 2; the Keys board still previews
+  saved identities rather than arbitrary rules. Phase 1 is not released alone.
 
 - **Combo output permissions need keyboard acceptance (D-L55).** Confirm global
   and per-combo bypass, including two combos sharing an output, custom outputs
@@ -283,18 +289,15 @@ hue/saturation), outside custom-profile generation identity, requiring
 consecutive matching samples since VIA has no atomic snapshot. An unstable read
 clears the base colour and leaves custom-profile readback intact.
 
-The board is a **selected-layer preview**: base plus the selected layer, their
-colours in layer order, then their LED groups in reported order, following the
-firmware's membership, pass-through and inheritance rules. It is not LED
-telemetry: brightness is scaled to a ceiling, and effects, animation phase,
-active layers and transient feedback are not reported. Exact live appearance
-would need a future device-frame readout, not host reconstruction.
+The Keys board is a **selected-layer identity preview**. It shows the saved
+layer and pointing identities and base colour; arbitrary rule edits do not
+make it an execution simulator. Effects, animation phase, live active layers
+and transient feedback are not reported. Exact live appearance would need a
+future device-frame readout. Lighting presents the program as a rule list.
+Its editing contract is [Lighting editor](architecture/lighting-editor.md).
 
-Colour editors retain every stored channel at zero brightness. A saturated
-layer colour at zero brightness paints black; a layer colour with zero
-saturation and brightness paints nothing. LED-row inheritance requires all
-three channels to be zero. The editor never substitutes the inheritance
-sentinel for an explicit black colour.
+A fixed rule paint at zero brightness paints black. Identity inheritance and
+pass-through remain distinct stored operations; Ark preserves their bytes.
 
 ### D-L15 — A portable profile is the complete effective configuration
 
@@ -456,8 +459,8 @@ an acceptance requirement, separate from codec and UI verification.
 
 The review lists one item per thing that differs from the keyboard: a key on a
 layer, a layer's name, a behaviour, a combo, a macro with its name, a settings
-section, a pointing slot, or one lighting record (LED groups and the rows that
-paint them are one record, since rows name groups by id). An item says whether
+section, a pointing slot, or the lighting program (its shared palette and
+references are restored together). An item says whether
 it was added, changed or removed and lists only the fields that differ, in the
 editors' words. Fields compare what is stored, not what is shown, so a changed
 default or a renamed layer is one item where it was made. Colour reads as in
@@ -528,7 +531,7 @@ Each thing with a colour of its own has exactly one mark, drawn by
 | A layer | its layer colour |
 | A pointing mode | the light its slot paints |
 | A combo | its badge, in the combo feedback colour |
-| A lighting stage | its on/off dot |
+| A lighting rule | its on/off switch |
 
 A thing is marked where it is the subject and where it is only referred to: a
 setting names what it governs (`governs` in `core/model/settings-editor.js`),
@@ -850,19 +853,24 @@ keyboard only where the host says so (`model.host.blocked.demo`).
 
 ### D-L54 — Current live formats, with a preceding-backup bridge
 
-Ark's live codecs follow firmware D-F14: schema 3.0, RGB 4, key behaviours 2,
-combos 3, settings 6 and sparse PD 3; 16 layers, 128 VIA macros and 128 custom
+Ark's live codecs follow firmware D-F14: schema 3.0, RGB 5, key behaviours 2,
+combos 3, settings 7 and sparse PD 3; 16 layers, 128 VIA macros and 128 custom
 keys; action vocabulary `0x837cf479`. Three capability pages report the wider
 counts, 64 KiB storage slots and 65,504-byte payload capacity. Candidate uploads
 use store format 4 and a nonzero VIA binding. Earlier live firmware remains
 read-only; Ark does not edit its domains or upload old bytes.
 
 The connected firmware's advertised tap depth governs both behaviour steps
-and the RGB tap-branch palette throughout read, edit, history, reorder and
-partial Discard. Offline snapshots carry that depth in the counted RGB palette;
+and lighting behaviour identity records throughout read, edit, history, reorder and
+partial Discard. Offline snapshots with a nondefault depth carry it as `tapDepth` metadata;
 import and Apply validate it against the destination's advertised limits.
 
-Import has one explicit bridge for the immediately preceding schema 2.0 backup
+Lighting GET `0x0D` reports bounds and registry bitmaps behind feature bit 31.
+Ark converts RGB v4 to v5 using the firmware vectors before import or restore;
+current firmware refuses v4 writes. Unknown length-tagged rule parts survive
+byte for byte, with editing disabled for those rules.
+
+Import also has an explicit bridge for the immediately preceding schema 2.0 backup
 with action ABI `0xf79c6151` (eight layers, 64 macros/custom keys, 32 pointing
 slots; RGB 3, behaviours 1, combos 2, settings 5 and PD 2). Translation preserves
 all fields, remaps native custom-key references by slot, adds transparent layers

@@ -19,21 +19,21 @@ test("slot 20 is created, bound, lit, reviewed and discarded like any other", ()
     const config = {kind: 1, name: "Desktops", axis: 1, thresholdX: 30, directions: {left: {keycode: "LCTL(KC_LEFT)"}, right: {keycode: "LCTL(KC_RIGHT)"}}};
     stage({type: "savePdMode", slot: 20, config});
     stage({type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "PD_SLOT_20_LOCK"}]});
-    stage({type: "updatePdModeColor", pointingMode: "PD_MODE_SLOT_20", h: "64", s: "255", v: "100", locality: "RGB_RIGHT_HALF"});
+    stage({type:"editLightingRule", index:0, expectedRule: require("../../core/model/lighting-editor").ruleIdentity(draft.current.decoded.rgb.rules[0]), action:"colour", colour:{h:64,s:255,v:100}});
     stage({type: "addBehavior", behavior: {keycode: "KC_F13", tap: {helper: "TAP_SENDS", action: "PD_SLOT_31"}}});
 
     const value = validateSnapshot(draft.document, CAPABILITIES_32);
     assert.equal(value.pdModes[20].name, "Desktops");
     assert.equal(value.pdModes[20].directions.left.keycode, 0x150);
     assert.ok(value.document.layers[0].includes(0x7eb4), "PD_SLOT_20_LOCK on the board");
-    assert.deepEqual(value.rgb.pdModeColors[20], {pdModeId: 20, color: {h: 64, s: 255, v: 100}, locality: 2});
+    assert.deepEqual(value.rgb.palette[value.rgb.rules[0].parts.find(p => p.slot === 3).params[0]], {h: 64, s: 255, v: 100});
     assert.deepEqual(value.behaviors.rows.find(row => row.target.operand === 0x68).steps[0].tap, {kind: 4, flags: 0, operand: 31});
     assert.equal(decodeProfileBlob(value.profile).domains.find(domain => domain.id === 0x50).version, 3);
 
     const view = draft.view({connected: true, selectedDeviceId: "board"});
     const slot = view.changes.find(change => change.unit === "pd:20");
     assert.equal(slot.title, "Slot 20 · Desktops");
-    assert.ok(view.changes.some(change => change.unit === "rgb:pd:20"), "the colour is its own review row");
+    assert.ok(view.changes.some(change => change.unit === "rgb:rules"), "the colour is its own review row");
 
     const model = buildSnapshotModel(draft.current, CAPABILITIES_32, {editable: true, reason: ""});
     assert.equal(model.pdModes.length, 32);

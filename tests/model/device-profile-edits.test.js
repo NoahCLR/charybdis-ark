@@ -3,31 +3,33 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 const {editDeviceProfile} = require("../../core/model/device-profile-edits");
 const {decodeProfileBlob} = require("../../core/schema/profile-blob-v1");
-const {decodeRgbDomainV1} = require("../../core/schema/rgb-domain-v1");
+const {decodeLightingDomain} = require("../../core/schema/lighting-domain-v1");
+const {ruleIdentity} = require("../../core/model/lighting-editor");
 const {bytes} = require("../fixtures/device-profile");
-const rgb = blob => decodeRgbDomainV1(decodeProfileBlob(blob).domains[0].payload);
+const rgb = blob => decodeLightingDomain(decodeProfileBlob(blob).domains[0].payload);
 
-test("RGB edits replace the selected fields and retain all behaviour bytes", () => {
-    const edited = editDeviceProfile(bytes, {type: "updateLayerColor", layer: "Layer 0", hue: "0", sat: "255", val: "120", mode: "KEYS_MAPPED_ON_THIS_LAYER_ONLY"});
+test("lighting rule colour edits retain behaviour bytes and every unrelated rule", () => {
+    const original = rgb(bytes);
+    const edited = editDeviceProfile(bytes, {type: "editLightingRule", index: 0, expectedRule: ruleIdentity(original.rules[0]), action: "colour", colour: {h: 0, s: 255, v: 120}});
     assert.deepEqual(decodeProfileBlob(edited).domains[1].payload, decodeProfileBlob(bytes).domains[1].payload);
-    const expected = rgb(bytes);
-    expected.layerColors[0].color = {h: 0, s: 255, v: 120}; expected.layerColors[0].mode = 1;
-    assert.deepEqual(rgb(edited), expected);
+    assert.deepEqual(rgb(edited).rules.slice(1), original.rules.slice(1));
+    assert.deepEqual(rgb(edited).things, original.things);
+    assert.deepEqual(rgb(edited).palette[rgb(edited).rules[0].parts.find(p => p.slot === 3).params[0]], {h: 0, s: 255, v: 120});
 });
 
-test("RGB policies preserve zero and reject missing or malformed values", () => {
-    const edited = editDeviceProfile(bytes, {type: "updateRgbStages", stageEnableMask: 0});
-    assert.equal(rgb(edited).stageEnableMask, 0);
-    const fade = editDeviceProfile(bytes, {type: "updateAutomouseFade", mode: "END_COLOR_ON_ALL_KEYS", hue: 1, sat: 0, val: 0});
-    assert.deepEqual(rgb(fade).automouseFade, {mode: 2, endColor: {h: 1, s: 0, v: 0}});
-    for (const hue of ["", "bad", null, -1, 256]) assert.throws(() => editDeviceProfile(bytes, {type: "updateLayerColor", layer: "Layer 0", hue, sat: 0, val: 0, mode: "ALL_KEYS"}));
+test("lighting rule edits preserve explicit black and reject malformed colours", () => {
+    const message = {type: "editLightingRule", index: 0, expectedRule: ruleIdentity(rgb(bytes).rules[0]), action: "colour", colour: {h: 0, s: 0, v: 0}};
+    const edited = editDeviceProfile(bytes, message);
+    assert.deepEqual(rgb(edited).palette[rgb(edited).rules[0].parts.find(p => p.slot === 3).params[0]], {h: 0, s: 0, v: 0});
+    for (const h of ["", "bad", null, -1, 256]) assert.throws(() => editDeviceProfile(bytes, {...message, colour: {h, s: 0, v: 0}}));
 });
 
-test("LED membership edits preserve references and refuse deleting an assigned group", () => {
-    const next = editDeviceProfile(bytes, {type: "saveRgbReusableLedGroup", group: {originalName: "Group 1", ledIndices: [0, 1, 57]}});
-    assert.deepEqual(rgb(next).groups.find(group => group.leds.includes(57)).leds, [0, 1, 57]);
-    assert.throws(() => editDeviceProfile(bytes, {type: "deleteRgbReusableLedGroup", name: "Group 1"}), /assignments/);
-    assert.throws(() => editDeviceProfile(bytes, {type: "saveRgbReusableLedGroup", group: {originalName: "Group 1", ledIndices: [58]}}));
+test("deleting a lighting rule retains key sets, maps and their references", () => {
+    const original = rgb(bytes), index = 0;
+    const next = editDeviceProfile(bytes, {type: "editLightingRule", index, expectedRule: ruleIdentity(original.rules[index]), action: "delete"});
+    assert.deepEqual(rgb(next).keySets, original.keySets); assert.deepEqual(rgb(next).maps, original.maps);
+    assert.deepEqual(rgb(next).rules, original.rules.slice(1));
+    assert.throws(() => editDeviceProfile(bytes, {type: "editLightingRule", index: 99, action: "delete", expectedRule: ""}), /no longer exists/);
 });
 
 const {decodeComboDomain} = require("../../core/schema/combo-domain-v1");
@@ -60,7 +62,7 @@ test("adding, editing and deleting combos preserves every untouched profile doma
     const removed = editDeviceProfile(timed, {type: "deleteCombo", id: 1}, context);
     assert.equal(comboRows(removed).length, 2);
     assert.equal(comboRows(removed)[1].output.kind, 2);
-    const rgbChanged = editDeviceProfile(removed, {type: "updateRgbStages", stageEnableMask: 0});
+    const rgbChanged = editDeviceProfile(removed, {type: "editLightingRule", index: 0, expectedRule: ruleIdentity(rgb(removed).rules[0]), action: "toggle"});
     assert.deepEqual(comboRows(rgbChanged), comboRows(removed));
 });
 test("a combo follows the default window until it has its own, and the default is one edit", () => {
@@ -120,14 +122,11 @@ test("save verification requires the running combo table to match the saved doma
     assert.doesNotThrow(() => assertEffectiveCombos(retimed, {...context.combos, defaultTermMs: 70, rows: context.combos.rows.map(row => ({...row, termMs: 70}))}));
 });
 
-test("auto-mouse save encodes all three policies exactly and keeps the chosen end colour", () => {
-    const names = ["FOLLOW_REAL_DESTINATION", "END_COLOR_WHERE_BASE_EFFECT_WOULD_SHOW", "END_COLOR_ON_ALL_KEYS"];
-    for (const [mode, name] of names.entries()) {
-        const edited = editDeviceProfile(bytes, {type: "updateAutomouseFade", mode: name, hue: 179, sat: 255, val: 199});
-        assert.deepEqual(rgb(edited).automouseFade, {mode, endColor: {h: 179, s: 255, v: 199}});
-        assert.deepEqual(rgb(edited).layerColors, rgb(bytes).layerColors);
-        assert.deepEqual(rgb(edited).pdModeColors, rgb(bytes).pdModeColors);
-    }
+test("lighting colour edits preserve the auto-mouse fade and tap flash settings", () => {
+    const original = rgb(bytes);
+    const next = editDeviceProfile(bytes, {type: "editLightingRule", index: 0, expectedRule: ruleIdentity(original.rules[0]), action: "colour", colour: {h: 179, s: 255, v: 199}});
+    assert.deepEqual(rgb(next).extensions, original.extensions);
+    assert.deepEqual(rgb(next).things, original.things);
 });
 
 test("effective combo verification includes definition enable and allowed source layers", () => {

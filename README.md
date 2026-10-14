@@ -31,10 +31,9 @@ Key and modifier names follow that OS throughout the editors and Review.
   record taps and chords with optional hold timing, build, reorder, copy and paste compact macro steps with their own undo/redo, and name your own custom keys. Macros share the keyboard's
   macro memory, and on current firmware one macro can use all of it. There are 128 slots in each bank;
   a combo can have up to 16 inputs, with its own enable and layer controls. On supporting firmware, choose whether all combo outputs use shared behaviours, or bypass the behaviour for one combo while keeping its chord active.
-- **Lighting.** Set layer and mode colours, combo and key feedback, and the
-  idle timeout in seconds or minutes. Tune the
-  auto-mouse fade. The board on screen is painted the way the keyboard will
-  light up, with black overlays kept distinct from inherited colours.
+- **Lighting.** Reorder rules, switch them on or off, and change their paint
+  colours in the same reviewed draft. See lighting memory against its 8 KiB
+  budget, and set the idle timeout in seconds or minutes.
 - **Its name.** Call the keyboard what you like, and that is the name your
   computer, Chrome and Ark show once it is applied.
 - **Trackball.** Set pointer speed, sniping and auto-mouse, and 32 pointing

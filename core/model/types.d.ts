@@ -9,11 +9,13 @@ export interface PortableDocument {
     layers: number[][];
     profile: string;
     macros: string[];
+    tapDepth?: number;
 }
 
 /** Destination facts used by portable documents and editors, not a wire response. */
 export interface ProfileDestination extends Partial<ActionLimits> {
     featureFlags?: number;
+    lighting?: import('../schema/lighting-types.js').LightingCapabilities;
     actionAbiDigest?: number;
     compiledLayerCount?: number;
     supportedDomainMask?: number;
@@ -43,7 +45,7 @@ export interface DecodedProfile {
     layout: Buffer;
     macros: Buffer;
     settings: ReturnType<typeof import('../schema/settings-domain-v1.js').decodeSettings>;
-    rgb: ReturnType<typeof import('../schema/rgb-domain-v1.js').decodeRgbDomainV1>;
+    rgb: import('../schema/lighting-types.js').LightingProfile;
     behaviors: ReturnType<typeof import('../schema/key-behavior-domain-v1.js').decodeKeyBehaviorDomain>;
     combos: ReturnType<typeof import('../schema/combo-domain-v1.js').decodeComboDomain>;
     pdModes: ReturnType<typeof import('../schema/pd-mode-domain-v1.js').decodePdDomain>;
@@ -52,6 +54,7 @@ export interface DecodedProfile {
 }
 export interface ProfileSummary {layers: number; behaviors: number; combos: number; macros: number; names: string[]}
 export interface SnapshotFacts {
+    lightingKeys?: readonly string[];
     hostOs?: {detected: number} | null;
     limits?: {brightnessMax?: number} | null;
     options?: {effects: {id: number; name: string}[]; supportedKeymapOptions: number; keymapMasks: readonly number[]; ledFlags: number} | null;

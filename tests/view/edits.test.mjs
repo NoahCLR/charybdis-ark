@@ -59,6 +59,10 @@ function session() {
 }
 // The host adds the draft id and revision to every message the webview posts.
 const stage = (draft, message) => draft.stage({draftId: draft.id, draftRevision: draft.revision, ...message});
+const ruleMessage = (draft, index, action, extra = {}) => {
+    const rule = portable.validateSnapshot(draft.document).rgb.rules[index];
+    return edits.lightingRule(index, JSON.stringify([rule.flags, rule.brightness, rule.parts]), action, extra);
+};
 const decoded = (draft) => portable.validateSnapshot(draft.document);
 const slotOf = (layoutIndex) => CHARYBDIS_4X6_LAYOUT_MATRIX[layoutIndex][0] * 6 + CHARYBDIS_4X6_LAYOUT_MATRIX[layoutIndex][1];
 const reviewAreas = (draft) => draft.view({selectedDeviceId: "test-device", connected: true}).changes.map((change) => change.area);
@@ -333,84 +337,55 @@ test("a combo is edited and deleted by the id the interface holds", () => {
 
 // ── lighting ────────────────────────────────────────────────────────────
 
-test("a colour changed in Lighting is staged as the keyboard stores it", () => {
+test("a rule paint colour builder stages exact firmware HSV and validates brightness", () => {
     const draft = session();
-    stage(draft, edits.layerColour("Layer 3", "KEYS_MAPPED_ON_THIS_LAYER_ONLY", {h: 60, s: 255, v: 200}));
-    const row = decoded(draft).rgb.layerColors.find((entry) => entry.layerId === 3);
-    assert.deepEqual(row.color, {h: 60, s: 255, v: 200});
+    stage(draft, ruleMessage(draft, 0, "colour", {colour: {h: 60, s: 255, v: 200}}));
+    const rgb = decoded(draft).rgb, paint = rgb.rules[0].parts.find(p => p.slot === 3);
+    assert.deepEqual(rgb.palette[paint.params[0]], {h: 60, s: 255, v: 200});
     assert.ok(reviewAreas(draft).includes("Lighting"));
-    const tooBright = session();
-    assert.throws(() => stage(tooBright, edits.layerColour("Layer 3", "KEYS_MAPPED_ON_THIS_LAYER_ONLY", {h: 60, s: 255, v: 201})),
-        /Brightness must be between 0 and 200/);
+    assert.throws(() => stage(draft, ruleMessage(draft, 0, "colour", {colour: {h: 60, s: 255, v: 201}})), /brightness limit/);
 });
 
-test("switching a stage off is a mask edit that lands as that mask", () => {
-    const draft = session();
-    const mask = decoded(draft).rgb.stageEnableMask;
-    const bit = 1;
-    stage(draft, edits.rgbStages(mask, bit, false));
-    assert.equal(decoded(draft).rgb.stageEnableMask, mask & ~bit);
-    stage(draft, edits.rgbStages(mask & ~bit, bit, true));
-    assert.equal(decoded(draft).rgb.stageEnableMask, mask | bit);
+test("a rule switch goes through the shared draft and undo restores it", () => {
+    const draft = session(), before = draft.current.fingerprint;
+    stage(draft, ruleMessage(draft, 0, "toggle"));
+    assert.equal(decoded(draft).rgb.rules[0].flags, 1);
+    draft.undo(draft.revision); assert.equal(draft.current.fingerprint, before);
+    draft.redo(draft.revision); assert.equal(decoded(draft).rgb.rules[0].flags, 1);
 });
 
-test("a pointing-mode colour keeps the locality posted beside it", () => {
-    const draft = session();
-    stage(draft, edits.pdModeColour("PD_MODE_DRAGSCROLL", "RGB_BOTH_HALVES", {h: 21, s: 255, v: 180}));
-    const row = decoded(draft).rgb.pdModeColors.find((entry) => entry.pdModeId === 0);
-    assert.equal(row.locality, RGB_LOCALITIES.RGB_BOTH_HALVES);
-    assert.deepEqual(row.color, {h: 21, s: 255, v: 180});
+test("recolouring a mode rule preserves its condition and target", () => {
+    const draft = session(), rgb = decoded(draft).rgb;
+    const index = rgb.rules.findIndex(r => r.parts.some(p => p.slot === 0 && p.kind === 3));
+    const original = rgb.rules[index].parts.filter(p => p.slot <= 2);
+    stage(draft, ruleMessage(draft, index, "colour", {colour: {h: 21, s: 255, v: 180}}));
+    assert.deepEqual(decoded(draft).rgb.rules[index].parts.filter(p => p.slot <= 2), original);
 });
 
-test("key feedback posts the whole record with one colour or policy replaced", () => {
-    const draft = session();
-    // the screen redraws from the new model after each edit, so each message
-    // is built from the record as it stands then
-    const feedback = () => buildSnapshotModel(draft.current, draft.capabilities, {editable: true, reason: ""}).rgb.keyBehaviorFeedback;
-    stage(draft, edits.keyFeedback(feedback(), "holdActiveColor", {h: 99, s: 255, v: 150}));
-    stage(draft, edits.keyFeedback(feedback(), "branch:0", {h: 12, s: 200, v: 100}));
-    const stored = decoded(draft).rgb.keyFeedback;
-    assert.deepEqual(stored.holdActiveColor, {h: 99, s: 255, v: 150});
-    assert.deepEqual(stored.tapBranchColors[0], {h: 12, s: 200, v: 100});
-    stage(draft, edits.keyFeedback(feedback(), null, null, {locality: "RGB_BOTH_HALVES"}));
-    assert.deepEqual(decoded(draft).rgb.keyFeedback.holdActiveColor, {h: 99, s: 255, v: 150}, "and earlier edits survive the next one");
-    assert.equal(decoded(draft).rgb.keyFeedback.locality, RGB_LOCALITIES.RGB_BOTH_HALVES);
+test("rule reorder preserves stored owner focus identities through undo and redo", () => {
+    const draft = session(), keys = [...draft.current.lightingKeys], original = decoded(draft).rgb.rules;
+    stage(draft, ruleMessage(draft, 0, "move", {to: 4}));
+    assert.deepEqual(decoded(draft).rgb.rules, [...original.slice(1,5), original[0], ...original.slice(5)]);
+    assert.equal(draft.current.lightingKeys[4], keys[0]);
+    draft.undo(draft.revision); assert.deepEqual(draft.current.lightingKeys, keys);
+    draft.redo(draft.revision); assert.equal(draft.current.lightingKeys[4], keys[0]);
 });
 
-test("auto-mouse fade and combo feedback post their colour beside their mode", () => {
-    const draft = session();
-    stage(draft, edits.automouseFade("END_COLOR_WHERE_BASE_EFFECT_WOULD_SHOW", {h: 128, s: 255, v: 180}));
-    stage(draft, edits.comboFeedback("RGB_KEYS_ONLY", {h: 32, s: 255, v: 200}));
-    const rgb = decoded(draft).rgb, original = decoded(session()).rgb;
-    assert.equal(rgb.automouseFade.endColor.h, 128);
-    assert.notEqual(rgb.automouseFade.mode, original.automouseFade.mode, "the mode posted beside the colour is the one that lands");
-    assert.equal(rgb.comboFeedback.color.h, 32);
-    assert.equal(rgb.comboFeedback.locality, RGB_LOCALITIES.RGB_KEYS_ONLY);
+test("rule recolour keeps identity palettes, fade and flash extensions untouched", () => {
+    const draft = session(), original = decoded(draft).rgb;
+    stage(draft, ruleMessage(draft, 0, "colour", {colour: {h: 128, s: 255, v: 180}}));
+    assert.deepEqual(decoded(draft).rgb.things, original.things);
+    assert.deepEqual(decoded(draft).rgb.extensions, original.extensions);
 });
 
-test("LED group rows land in every table, and groups renumber when one is deleted", () => {
-    const draft = session();
-    const rgb = () => decoded(draft).rgb;
-    const ledsOf = (id) => rgb().groups.find((group) => group.id === id).leds;
-    const startCount = rgb().groups.length;
-    const colour = {h: 10, s: 255, v: 100};
-    for (const [target, owner] of [["layer", "Layer 2"], ["pdMode", "PD_MODE_VOLUME"], ["combo", "ignored"], ["keyBehavior", "KEY_FEEDBACK_GROUP_HOLD_ACTIVE"]]) {
-        stage(draft, edits.ledRow({target, owner, source: ""}, [1, 2], colour));
-    }
-    assert.equal(rgb().groups.length, startCount + 1, "rows with the same LEDs share one group");
-    assert.equal(edits.ledRow({target: "combo", owner: "x", source: ""}, [1], colour).group.owner, undefined, "a combo row has no owner");
-
-    for (const leds of [[40], [41], [42]]) stage(draft, edits.saveLedGroup(leds));
-    const byLeds = (leds) => rgb().groups.find((group) => group.leds.join() === leds.join()).id;
-    stage(draft, edits.ledRow({target: "layer", owner: "Layer 3", source: `Group ${byLeds([42])}`}, [], {h: 1, s: 1, v: 1}));
-    stage(draft, edits.deleteLedGroup(`Group ${byLeds([40])}`));
-    const ids = rgb().groups.map((group) => group.id);
-    assert.deepEqual(ids, ids.map((_, index) => index), "ids stay consecutive from zero");
-    const layerRow = rgb().layerGroupRows.find((row) => row.selector === 3);
-    assert.deepEqual(ledsOf(layerRow.groupId), [42], "a row still paints the LEDs it pointed at");
-    const before = rgb().layerGroupRows.length;
-    stage(draft, edits.deleteLedRow("layer", before - 1));
-    assert.equal(rgb().layerGroupRows.length, before - 1);
+test("deleting a rule retains key sets and maps, and discard restores its exact bytes", () => {
+    const draft = session(), before = draft.current.fingerprint, original = decoded(draft).rgb;
+    stage(draft, ruleMessage(draft, 0, "delete"));
+    assert.deepEqual(decoded(draft).rgb.rules, original.rules.slice(1));
+    assert.deepEqual(decoded(draft).rgb.keySets, original.keySets);
+    assert.deepEqual(decoded(draft).rgb.maps, original.maps);
+    const change = draft.changes().find(r => r.unit === "rgb:rules");
+    draft.discard(draft.revision, change.group); assert.equal(draft.current.fingerprint, before);
 });
 
 // ── macros ──────────────────────────────────────────────────────────────
@@ -933,8 +908,9 @@ test("on the 32-slot firmware, the same builders reach slots past seven", () => 
     assert.equal(wide().pdModes[27].kind, KIND.SCROLLING);
     stage(draft, edits.duplicatePdMode(30, 12, draft.identity()));
     assert.equal(wide().pdModes[30].name, "Tabs");
-    stage(draft, edits.pdModeColour("PD_MODE_SLOT_25", "RGB_LEFT_HALF", {h: 1, s: 2, v: 3}));
-    assert.deepEqual(wide().rgb.pdModeColors[25], {pdModeId: 25, color: {h: 1, s: 2, v: 3}, locality: RGB_LOCALITIES.RGB_LEFT_HALF});
+    stage(draft, ruleMessage(draft, 4, "colour", {colour: {h: 1, s: 2, v: 3}}));
+    const paint = wide().rgb.rules[4].parts.find(p => p.slot === 3);
+    assert.deepEqual(wide().rgb.palette[paint.params[0]], {h: 1, s: 2, v: 3});
     stage(draft, edits.setKey("Layer 1", 27, "PD_SLOT_31_LOCK"));
     assert.equal(draft.document.layers[1][slotOf(27)], 0x7ebf);
     stage(draft, edits.clearPdMode(12, draft.identity()));

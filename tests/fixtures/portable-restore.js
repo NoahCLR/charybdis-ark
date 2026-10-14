@@ -11,7 +11,7 @@ const capabilityKeyboard = fakeKeyboard({document: document()});
 const capabilities = {...decodeCapabilityPages([0, 1, 2].map(page => {
     const request = buildProfileGetRequest(1, page, page + 1);
     return decodeProfileResponse(capabilityKeyboard.answer(request)[0], request);
-})), featureFlags: 1 << 12};
+})), featureFlags: ((1 << 12) | (1 << 31)) >>> 0};
 
 /** @param {{source?: import('../../core/model/types.js').PortableDocument, generation?: number, compiledOnly?: boolean}} [input] */
 function fixture({source = document(), generation = 4, compiledOnly = false} = {}) {

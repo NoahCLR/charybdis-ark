@@ -5,6 +5,7 @@ import {getModel, post, render as rerender, state, writable} from "../store.mjs"
 import {DEMO_WORDS, demoOf} from "../view/demo.mjs";
 import {discardLabel, groupNote, placeState, reviewBlocks, statusSummary, stillShown} from "../view/review.mjs";
 import {reviewColumns, reviewItem} from "./review-items.mjs";
+import {lightingMemoryCard} from "./lighting-memory.mjs";
 import {checksSection} from "./checks.mjs";
 import {checkSourceGroup, checksToConfirm, confirmText} from "../view/checks.mjs";
 
@@ -98,6 +99,8 @@ export function reviewOverlay() {
                 <button class="btn primary" data-act="apply" ${canApply ? "" : "disabled"}
                     ${blockers.length ? `data-tip="${esc("Resolve the blockers in Checks before applying.")}"` : confirmChecks.length ? `data-tip="${esc("Warnings and traps will be asked about before anything is written.")}"` : ""}>Apply to keyboard</button></span></div>`}
     </div></div>`);
+    const lightingMemory = lightingMemoryCard(model);
+    if (lightingMemory) node.querySelector(".sheet-b")?.prepend(lightingMemory);
     // Pointing at a group's Discard lights what it takes back, in every area
     // the group reaches.
     /** @type {NodeListOf<HTMLButtonElement>} */ (node.querySelectorAll(".rv-block.grouped [data-discard]")).forEach((button) => {

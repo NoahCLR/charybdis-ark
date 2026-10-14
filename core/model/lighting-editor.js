@@ -1,0 +1,85 @@
+// @ts-check
+"use strict";
+const {decodeLightingDomain, encodeLightingDomain} = require("../schema/lighting-domain-v1");
+const {LIGHTING_KINDS, LIGHTING_SLOTS} = require("../schema/lighting-kinds-v1");
+const {VOCABULARY} = require("./vocabulary");
+/** @param {import('../schema/lighting-types.js').LightingRule} rule */
+const ruleIdentity = rule => JSON.stringify([rule.flags, rule.brightness, rule.parts]);
+/** @param {import('../schema/lighting-types.js').LightingRule} rule */
+const knownRule = rule => rule.parts.every(p => Boolean(LIGHTING_KINDS[LIGHTING_SLOTS[p.slot]]?.[p.kind]));
+// An unshared fixed paint can reuse its colour slot. Opaque parts may refer
+// to any palette entry, so their presence forbids replacing existing entries.
+/** @param {import('../schema/lighting-types.js').LightingProfile} value @param {number} index */
+function colourReferences(value, index) {
+    if (!value.rules.every(knownRule) || value.extensions.some(e => !LIGHTING_KINDS.domainExtensions[e.kind])) return Infinity;
+    let count = 0;
+    for (const table of value.things) for (const record of [table.default, ...table.records]) count += record.slice(1).filter(value => value === index).length;
+    for (const map of value.maps) count += map.filter(value => value === index).length;
+    for (const rule of value.rules) for (const part of rule.parts) if ((part.slot === 3 || part.slot === 4) && (part.kind === 2 || part.kind === 6) && part.params[0] === index) count++;
+    for (const extension of value.extensions) if (extension.kind === 1 && extension.params[2] === index) count++;
+    return count;
+}
+/** @param {import('../schema/lighting-types.js').LightingRule} rule */
+const ruleBand = rule => {
+    const condition = rule.parts.find(p => p.slot === 0);
+    if (!condition) return "base";
+    return ({1: "layers", 2: "preview", 3: "modes", 4: "combos", 5: "feedback"})[condition.kind] ?? "other";
+};
+/** @param {import('../schema/lighting-types.js').LightingRule} rule @param {string[]} [names] */
+function ruleWords(rule, names = []) {
+    /** @param {number} layer */
+    const layer = layer => layer === 255 ? "Any layer" : names[layer] || `Layer ${layer}`;
+    const when = rule.parts.filter(p => p.slot <= 1).map(p => {
+        const [value, scope] = p.params;
+        let text;
+        if (p.kind === 1) text = `${layer(value)} is active`;
+        else if (p.kind === 2) text = `${layer(value)} is previewing`;
+        else if (p.kind === 3) text = value === 255 ? "Any pointing mode is active" : `Pointing mode ${value + 1} is active`;
+        else if (p.kind === 4) text = value === 0 ? "Combos leading into a preview or mode are held" : value === 1 ? "Other combos are held" : "Any combo is held";
+        else if (p.kind === 5) text = `${value === 15 ? "Any key feedback" : VOCABULARY.lighting.states.filter((_, bit) => value & 1 << bit).join(" or ")} · ${VOCABULARY.lighting.scopes[scope]}`;
+        else text = "A condition from newer firmware";
+        return p.slot === 1 ? `Not: ${text}` : text;
+    }).join(" and ") || "Always";
+    const target = rule.parts.find(p => p.slot === 2), paint = rule.parts.find(p => p.slot === 3);
+    const where = target?.kind === 3 ? `Saved key set ${target.params[0] + 1}` : VOCABULARY.lighting.targets[target?.kind ?? -1] ?? "A target from newer firmware";
+    const how = VOCABULARY.lighting.paints[paint?.kind ?? -1] ?? "A paint from newer firmware";
+    return {when, where, how};
+}
+/** @param {Uint8Array} bytes @param {import('../../contracts/edits.js').EditOf<'editLightingRule'>} edit @param {import('../schema/lighting-types.js').LightingOptions} [options] */
+function editLightingRule(bytes, edit, options = {}) {
+    const value = decodeLightingDomain(bytes, options);
+    /** @param {string} message @returns {never} */
+    const fail = message => {throw Object.assign(new Error(message), {code: "INVALID_EDIT"});};
+    if (!Number.isInteger(edit.index) || edit.index < 0 || edit.index >= value.rules.length) fail("This lighting rule no longer exists.");
+    const rule = value.rules[edit.index];
+    if (edit.expectedRule !== ruleIdentity(rule)) fail("This lighting rule changed. Read its current value before editing.");
+    if (!knownRule(rule)) fail("This rule needs a newer Ark and is read-only.");
+    const fade = value.extensions.find(e => e.kind === 1), base = fade?.params[3] ?? 0, sceneStart = value.rules.length - base;
+    if (edit.action === "toggle") rule.flags ^= 1;
+    else if (edit.action === "delete") {
+        value.rules.splice(edit.index, 1);
+        if (fade && edit.index >= sceneStart) fade.params[3]--;
+    } else if (edit.action === "move") {
+        if (!Number.isInteger(edit.to) || edit.to === undefined || edit.to < 0 || edit.to >= value.rules.length) fail("Choose a valid place for this lighting rule.");
+        const to = /** @type {number} */ (edit.to);
+        value.rules.splice(edit.index, 1); value.rules.splice(to, 0, rule);
+        // The fade's scene is a bottom suffix in firmware, not a list of ids.
+        // Keep its boundary fixed when ordering changes; describe this in Review.
+    } else if (edit.action === "colour") {
+        const paint = rule.parts.find(p => p.slot === 3);
+        if (!paint || !(options.capabilities?.registries.paints ?? Object.keys(LIGHTING_KINDS.paints).map(Number)).includes(2)) fail("This rule's paint cannot be changed to a colour on this keyboard.");
+        if (!paint) return fail("This rule has no paint.");
+        const colour = edit.colour;
+        if (!colour) return fail("Choose a colour.");
+        if (!colour || [colour.h, colour.s, colour.v].some(v => !Number.isInteger(v) || v < 0 || v > 255) || colour.v > (options.maximumBrightness ?? 255)) fail("Choose a colour within this keyboard's brightness limit.");
+        let index = value.palette.findIndex(c => c.h === colour.h && c.s === colour.s && c.v === colour.v);
+        if (index < 0) {
+            if (paint.kind === 2 && colourReferences(value, paint.params[0]) === 1) {
+                index = paint.params[0];value.palette[index] = {...colour};
+            } else {index = value.palette.length;value.palette.push({...colour});}
+        }
+        paint.kind = 2; paint.params = [index];
+    } else fail("Unknown lighting edit.");
+    return encodeLightingDomain(value, options);
+}
+module.exports = {ruleIdentity, knownRule, ruleBand, ruleWords, editLightingRule};

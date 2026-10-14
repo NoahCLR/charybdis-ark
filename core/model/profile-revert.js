@@ -44,7 +44,7 @@ function revertUnits(before, after, units, capabilities) {
     const document = copy(b.document);
     const blob = decodeProfileBlob(Buffer.from(document.profile, "base64"));
     const baseBlob = decodeProfileBlob(Buffer.from(a.document.profile, "base64"));
-    const rgbOptions = {maximumBrightness: after.limits?.brightnessMax ?? 255, ...b.codecOptions.rgb};
+    const rgbOptions = {...b.codecOptions.rgb, maximumBrightness: after.limits?.brightnessMax ?? 255};
     // Each domain is decoded once, edited for every unit, and encoded once.
     const options = {...b.codecOptions, rgb: rgbOptions};
     /** @type {Map<DomainKey, DomainPair<DomainKey>>} */
@@ -134,16 +134,8 @@ function revertUnits(before, after, units, capabilities) {
             slots.mine[Number(rest)] = slots.theirs[Number(rest)];
         } else if (kind === "rgb") {
             const rgb = domain("rgb"), mine = rgb.mine, theirs = rgb.theirs;
-            if (rest === "stages") mine.stageEnableMask = theirs.stageEnableMask;
-            else if (rest === "automouse") mine.automouseFade = theirs.automouseFade;
-            else if (rest === "combo") mine.comboFeedback = theirs.comboFeedback;
-            else if (rest === "key") mine.keyFeedback = theirs.keyFeedback;
-            else if (rest === "groups") for (const table of GROUP_TABLES) restoreRgbTable(mine, theirs, table);
-            else if (parts[0] === "layer" || parts[0] === "pd") {
-                const id = Number(parts[1]);
-                if (parts[0] === "layer") restoreColor(mine.layerColors, theirs.layerColors, "layerId", id);
-                else restoreColor(mine.pdModeColors, theirs.pdModeColors, "pdModeId", id);
-            } else throw fail("This lighting change cannot be discarded on its own.");
+            if (rest === "rules") rgb.mine = copy(theirs);
+            else throw fail("This lighting change cannot be discarded on its own.");
         } else throw fail("This change cannot be discarded on its own.");
     }
 

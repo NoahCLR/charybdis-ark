@@ -14,7 +14,7 @@ test("the navigation rail stays label-only", () => {
 });
 
 test("layer tabs sit on the board they choose, on every layer-aware screen", () => {
-    for (const name of ["keys.mjs", "lighting.mjs"]) {
+    for (const name of ["keys.mjs"]) {
         const screen = read(name);
         assert.match(screen, /const card = el\(`<div class="board-card"><\/div>`\);/, `${name} draws the board as a card`);
         assert.match(screen, /card\.appendChild\(board\([\s\S]*card\.append\((bar|layerBar\(\))\);/, `${name} puts the layer tabs on it, under the board`);
@@ -22,10 +22,12 @@ test("layer tabs sit on the board they choose, on every layer-aware screen", () 
     }
 });
 
-test("Lighting's stage tabs are the paint order, with no second row of stages", () => {
+test("Lighting renders the ordered rule list with bands and shared draft controls", () => {
     const lighting = read("lighting.mjs");
-    assert.doesNotMatch(lighting, /paintorder|pochip|the board above shows this layer/);
-    assert.match(lighting, /stages\.map\(stageTab\)/);
+    assert.match(lighting, /for \(const rule of rules\)/);
+    assert.match(lighting, /lighting-band/); assert.match(lighting, /class="sw"/);
+    assert.match(lighting, /lightingRule\(/); assert.match(lighting, /lightingMemoryCard/);
+    assert.doesNotMatch(lighting, /stageBody|stages\.map/);
 });
 
 test("profile management leads with working import and export cards", () => {

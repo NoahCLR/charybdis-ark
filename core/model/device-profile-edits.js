@@ -171,7 +171,11 @@ function editDeviceProfile(bytes, message, context = {}) {
     const profile = decodeProfileBlob(bytes);
     const domain = existing(profile.domains, row => row.id === PROFILE_DOMAIN_IDS.RGB, "RGB");
     const maximumBrightness = context.maximumBrightness ?? 255;
-    const rgbOptions = {maximumBrightness, ...profileDepthOptions(context.capabilities, domain.payload).rgb};
+    if (message.type === "editLightingRule") {
+        domain.payload = require("./lighting-editor").editLightingRule(domain.payload, message, {...profileDepthOptions(context.capabilities).rgb, maximumBrightness});
+        return encodeProfileBlob(profile);
+    }
+    const rgbOptions = {...profileDepthOptions(context.capabilities, domain.payload).rgb, maximumBrightness, tapBranchColorCount: (context.capabilities?.maxTapStepsPerBehavior ?? 5) - 1};
     const rgb = decodeRgbDomainV1(domain.payload, rgbOptions);
     /** @param {ColourInput} value */
     const editColor = (value) => color(value, maximumBrightness);

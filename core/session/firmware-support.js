@@ -36,7 +36,8 @@ const canEdit = capabilities => hasCurrentLayers(capabilities)
 // This is the complete Apply's firmware gate, not the live status diagnostic.
 /** @param {Partial<Caps> | null | undefined} capabilities */
 const canApply = capabilities => canEdit(capabilities)
-    && Boolean((capabilities.featureFlags || 0) & PROFILE_WIRE_FEATURES.ATOMIC_LOGICAL_APPLY);
+    && Boolean((capabilities.featureFlags || 0) & PROFILE_WIRE_FEATURES.ATOMIC_LOGICAL_APPLY)
+    && Boolean((capabilities.featureFlags || 0) & PROFILE_WIRE_FEATURES.LIGHTING_RULES);
 
 /** @param {Partial<Caps> | null | undefined} capabilities @param {Partial<ViaIdentity> | null} [viaIdentity] */
 const canRead = (capabilities, viaIdentity) => evaluateProfileCompatibility(capabilities, viaIdentity).compatible;

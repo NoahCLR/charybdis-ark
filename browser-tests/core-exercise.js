@@ -33,12 +33,12 @@ function exerciseCore(core, inputs) {
         }
     };
 
-    const {portable, profileBlob, rgbDomain, keyBehaviorDomain, comboDomain, settingsDomain, pdModeDomain} = core;
+    const {portable, profileBlob, rgbDomain, lightingDomain, keyBehaviorDomain, comboDomain, settingsDomain, pdModeDomain} = core;
     // A profile's domains, each decoded and encoded again the way a snapshot
     // decodes them (portable-profile.js validateSnapshot).
     const domainCodec = (domain) => {
         switch (domain.id) {
-            case 0x10: return [(bytes) => rgbDomain.decodeRgbDomainV1(bytes), (value) => rgbDomain.encodeRgbDomainV1(value)];
+            case 0x10: return [(bytes) => lightingDomain.decodeLightingDomain(bytes), (value) => lightingDomain.encodeLightingDomain(value)];
             case 0x20: return [(bytes) => keyBehaviorDomain.decodeKeyBehaviorDomain(bytes), (value) => keyBehaviorDomain.encodeKeyBehaviorDomain(value)];
             case 0x30: return [(bytes) => comboDomain.decodeComboDomain(bytes), (value) => comboDomain.encodeComboDomain(value)];
             case 0x40: return [(bytes) => settingsDomain.decodeSettings(bytes), (value) => settingsDomain.encodeSettings(value)];
@@ -61,6 +61,7 @@ function exerciseCore(core, inputs) {
     // The firmware's domain vectors, valid and invalid: a rejection has to
     // carry the same code in both.
     const vector = {
+        lighting: [(bytes, options) => lightingDomain.decodeLightingDomain(bytes, options), (value, options) => lightingDomain.encodeLightingDomain(value, options)],
         rgb: [(bytes, options) => rgbDomain.decodeRgbDomainV1(bytes, options), (value, options) => rgbDomain.encodeRgbDomainV1(value, options)],
         behaviors: [(bytes, options) => keyBehaviorDomain.decodeKeyBehaviorDomain(bytes, options), (value, options) => keyBehaviorDomain.encodeKeyBehaviorDomain(value, options)],
         behaviorEnvelope: [(bytes, options) => keyBehaviorDomain.decodeKeyBehaviorDomainEnvelope(bytes, options), (value, options) => keyBehaviorDomain.encodeKeyBehaviorDomainEnvelope(value, options)],

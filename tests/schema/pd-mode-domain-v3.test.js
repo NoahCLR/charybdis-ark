@@ -149,16 +149,16 @@ test("a schema-3 blob carries the sparse domain as version 3", () => {
     assert.deepEqual(decodeProfileBlob(blob).domains[0].payload, payload);
 });
 
-test("the firmware's compiled profile carries the presets vector and the compiled RGB v4 domain", () => {
+test("the firmware's compiled profile carries the presets vector and the compiled lighting v5 domain", () => {
     const fs = require("node:fs"), path = require("node:path");
     const text = fs.readFileSync(path.resolve(__dirname, "../../upstream/firmware/tests/fixtures/compiled_profile_pd_v2.fixture"), "utf8");
     const blob = decodeProfileBlob(Buffer.from(text.match(/^profile.full.hex=(.+)$/m)[1], "hex"));
     const pd = blob.domains.find(domain => domain.id === 0x50), rgb = blob.domains.find(domain => domain.id === 0x10);
     assert.equal(pd.version, 3);
     assert.equal(pd.payload.toString("hex"), golden.valid.find(vector => vector.name === "presets").hex);
-    assert.equal(rgb.version, 4);
-    const rgbVectors = require("../../upstream/firmware/tests/fixtures/rgb_domain_v4.json");
-    assert.equal(rgb.payload.toString("hex"), rgbVectors.valid.find(vector => vector.name === "compiled").hex);
+    assert.equal(rgb.version, 5);
+    const rgbVectors = require("../../upstream/firmware/tests/fixtures/lighting_vectors_v1.json");
+    assert.equal(rgb.payload.toString("hex"), rgbVectors.codec.valid.find(vector => vector.name === "standard").hex);
     const {ACTION_ABI} = require("../../core/schema/actions");
     assert.equal(parseInt(text.match(/^profile.action_abi=(.+)$/m)[1], 16), ACTION_ABI, "the vocabulary Ark knows");
 });

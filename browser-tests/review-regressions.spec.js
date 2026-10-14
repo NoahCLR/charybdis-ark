@@ -40,24 +40,17 @@ test("mixed-side picker modifiers explain the conflict and cannot be used", asyn
     await expectPost(page, {type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "RCTL(RSFT(KC_A))"}]});
 });
 
-test("zero brightness retains editable HSV channels and LED black does not inherit", async ({page}) => {
-    await openControls(page, "lighting", {stage: "layers", layer: 1});
-    const body = page.locator("#benchBody"), value = body.locator('[data-channel="2"]');
-    await change(value, 0);
-    await expectPost(page, {type: "updateLayerColor", layer: "Layer 1", mode: "KEYS_MAPPED_ON_THIS_LAYER_ONLY", h: 85, s: 255, v: 0});
-    await publishAccepted(page, ["rgb", "layerColors", 1, "color"], {h: "85", s: "255", v: "0"});
+test("zero brightness retains rule HSV channels and explicit black", async ({page}) => {
+    await openControls(page, "lighting");
+    await publishAccepted(page, ["rgb", "lighting", "rules", 0, "colour"], {h: 85, s: 255, v: 200});
+    const body = page.locator(".lighting-rule-editor"), value = body.locator('[data-channel="2"]');
+    await clearPosts(page);await change(value, 0);
+    await expectPost(page, {type: "editLightingRule", index: 0, action: "colour", colour: {h: 85, s: 255, v: 0}});
+    await publishAccepted(page, ["rgb", "lighting", "rules", 0, "colour"], {h: 85, s: 255, v: 0});
     await expect(body).toContainText("HSV(85, 255, 0)");
     await expect(body.locator('[data-channel="0"]')).toHaveValue("85");
     await expect(body.locator('[data-channel="1"]')).toHaveValue("255");
     await expect(value).toHaveValue("0");
-    await expect(body).not.toContainText("No colour is stored for this layer");
-    await clearPosts(page);
-    await change(value, 100);
-    await expectPost(page, {type: "updateLayerColor", layer: "Layer 1", mode: "KEYS_MAPPED_ON_THIS_LAYER_ONLY", h: 85, s: 255, v: 100});
-    const text = await page.evaluate(async () => {
-        const {groupRowsTable} = await import("/webview/ui/lighting/led-rows.mjs");
-        return groupRowsTable([{owner: "Layer 1", ledGroup: "Inline", ledIndices: [0], color: {h: "85", s: "255", v: "0"}}], "layer").textContent;
-    });
-    expect(text).toContain("HSV(85, 255, 0)");
-    expect(text).not.toContain("inherits the stage colour");
+    await clearPosts(page);await change(value, 100);
+    await expectPost(page, {type: "editLightingRule", index: 0, action: "colour", colour: {h: 85, s: 255, v: 100}});
 });

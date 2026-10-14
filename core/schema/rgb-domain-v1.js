@@ -17,8 +17,8 @@ const RGB_DOMAIN_V1 = Object.freeze({
     DOMAIN_ID: PROFILE_DOMAIN_IDS.RGB,
     // Format 4, the only one the keyboard stores: a colour row per pointing
     // slot, 32 of them, and per layer of the sixteen-layer bank (D-F14).
-    DOMAIN_VERSION: PROFILE_DOMAIN_VERSIONS[PROFILE_DOMAIN_IDS.RGB],
-    FORMAT_VERSION: PROFILE_DOMAIN_VERSIONS[PROFILE_DOMAIN_IDS.RGB],
+    DOMAIN_VERSION: 4,
+    FORMAT_VERSION: 4,
     PD_SLOTS: 32,
     HEADER_SIZE: 16,
     PHYSICAL_LED_COUNT: 58,

@@ -82,7 +82,7 @@ test("candidate transfer extensions require candidate-write capability", () => {
     }
 });
 
-test("pointing and combo-output support decode through bit 30 without accepting unknown future features", () => {
+test("pointing, combo-output and lighting support decode through bit 31", () => {
     const pages = compiledOnlyPages();
     assert.equal(decodeCapabilityPages(pages).featureFlags & PROFILE_WIRE_FEATURES.POINTING_CLICKS, 0);
     pages[0].writeUInt32LE(pages[0].readUInt32LE(9) | (1 << 28), 9);
@@ -92,7 +92,7 @@ test("pointing and combo-output support decode through bit 30 without accepting 
     pages[0].writeUInt32LE(pages[0].readUInt32LE(9) | (1 << 30), 9);
     assert.equal(decodeCapabilityPages(pages).featureFlags & PROFILE_WIRE_FEATURES.COMBO_OUTPUT_BEHAVIORS, 1 << 30);
     pages[0].writeUInt32LE((pages[0].readUInt32LE(9) | 0x80000000) >>> 0, 9);
-    assert.throws(() => decodeCapabilityPages(pages), error => error.code === "INCOMPATIBLE_RESPONSE");
+    assert.equal(decodeCapabilityPages(pages).featureFlags >>> 31, 1);
 });
 
 test("Profile Wire get requests are canonical 32-byte frames", () => {
@@ -347,7 +347,7 @@ test("status reports a cancelled save the peer never confirmed", () => {
 test("decoders reject unknown masks, active kinds, and invalid ranges", () => {
     const capabilities = compiledOnlyPages();
     const unknownFeature = capabilities.map((page) => Buffer.from(page));
-    unknownFeature[0].writeUInt32LE(PROFILE_WIRE_KNOWN_MASKS.FEATURE_FLAGS + 1, 9);
+    unknownFeature[0][0] = 3; // incompatible capability layout; every u32 feature bit is now assigned
     assert.throws(() => decodeCapabilityPages(unknownFeature), (error) => error.code === "INCOMPATIBLE_RESPONSE");
     // Bit 18 identifies runtime-owned tapping without changing profile bytes.
     const functions = capabilities.map((page) => Buffer.from(page));

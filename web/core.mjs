@@ -55,6 +55,8 @@ import * as profileBlob from "../core/schema/profile-blob-v1.js";
 export {profileBlob};
 import * as rgbDomain from "../core/schema/rgb-domain-v1.js";
 export {rgbDomain};
+import * as lightingDomain from "../core/schema/lighting-domain-v1.js";
+export {lightingDomain};
 import * as keyBehaviorDomain from "../core/schema/key-behavior-domain-v1.js";
 export {keyBehaviorDomain};
 import * as comboDomain from "../core/schema/combo-domain-v1.js";

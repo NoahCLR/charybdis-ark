@@ -4,7 +4,7 @@ const previous = require("../fixtures/previous-profile.charybdis.json");
 const {translateBackup, translateProfile, translateDomain, DOMAIN_TRANSLATIONS, PREVIOUS_ACTION_ABI} = require("../../core/model/backup-translation");
 const {PROFILE_DOMAIN_IDS, PROFILE_DOMAIN_VERSIONS} = require("../../core/schema/profile-domains");
 const {validateSnapshot} = require("../../core/model/portable-profile");
-const {decodeProfileBlob} = require("../../core/schema/profile-blob-v1");
+const {decodeProfileBlob, encodeProfileBlob} = require("../../core/schema/profile-blob-v1");
 const {document} = require("../fixtures/portable-profile");
 
 function changedDomain(id, change) {
@@ -21,7 +21,7 @@ function changedDomain(id, change) {
 
 test("every preceding domain has a step keyed by its produced version", () => {
     assert.deepEqual(Object.entries(DOMAIN_TRANSLATIONS).map(([id, steps]) => [Number(id), Object.keys(steps).map(Number)]), [
-        [16, [4]], [32, [2]], [48, [3]], [64, [6, 7]], [80, [3]],
+        [16, [4, 5]], [32, [2]], [48, [3]], [64, [6, 7]], [80, [3]],
     ]);
     const bytes = Buffer.from(previous.profile, "base64");
     let at = 8;
@@ -138,8 +138,12 @@ test("the chain preserves the exact preceding fixture document and rejects other
     const translated = translateBackup(previous), blob = decodeProfileBlob(Buffer.from(translated.profile, "base64"));
     const settings = blob.domains.find(domain => domain.id === PROFILE_DOMAIN_IDS.SETTINGS);
     assert.equal(settings.payload.at(-1), 0, "an empty keyboard name ends the settings");
+    const rawPrevious = Buffer.from(previous.profile, "base64");
+    const oldRgb = rawPrevious.subarray(12, 12 + rawPrevious.readUInt16LE(10));
+    const retainedV4 = translateDomain({id: 16, version: 3, payload: oldRgb}, 4);
     const six = {...translated, profile: encodeProfileBlob({domains: blob.domains.map(domain => domain === settings
-        ? {...domain, version: 6, payload: Buffer.concat([Buffer.from([6]), domain.payload.subarray(1, -1)])} : domain)}, {domainVersions: {...PROFILE_DOMAIN_VERSIONS, 64: 6}}).toString("base64")};
+        ? {...domain, version: 6, payload: Buffer.concat([Buffer.from([6]), domain.payload.subarray(1, -1)])}
+        : domain.id === 16 ? retainedV4 : domain)}, {domainVersions: {...PROFILE_DOMAIN_VERSIONS, 16: 4, 64: 6}}).toString("base64")};
     assert.equal(createHash("sha256").update(JSON.stringify(six)).digest("hex"),
         "3ca7e5d7b6b5ccdcdccafa9c8c15d87a09fcaf99a0f9fdb57bd0d562ee4405c2", "the pre-refactor translated document is byte-for-byte unchanged");
     const bytes = Buffer.from(previous.profile, "base64");
@@ -198,8 +202,9 @@ test("the previous complete backup preserves its keys, names, macros and definit
     assert.ok(value.behaviors.rows.every(row => row.enabled && row.allowedLayers === 65535));
     assert.ok(value.combos.rows.every(row => row.enabled && row.allowedLayers === 65535 && row.useOutputBehavior));
     assert.equal(value.settings.comboOutputBehaviors, true, "translated backups keep output behaviours enabled");
-    assert.equal(value.rgb.layerColors.length, 16);
-    assert.ok(value.rgb.layerColors.slice(8).every(row => row.color.v === 0));
+    const colours = require("../../core/model/lighting-view").lightingIdentities(value.rgb).layerColors;
+    assert.equal(colours.length, 16);
+    assert.ok(colours.slice(8).every(row => row.color.v === 0));
     assert.equal(value.pdModes.length, 32);
     const old = Buffer.from(previous.profile, "base64");
     let at = 8;
@@ -241,7 +246,7 @@ test("only the known preceding contract translates, and corrupt input is rejecte
     assert.throws(() => translateProfile(bytes.subarray(0, -1)));
     assert.throws(() => translateProfile(Buffer.concat([bytes, Buffer.from([0])])));
     assert.throws(() => translateProfile(Buffer.alloc(8)));
-    assert.deepEqual(decodeProfileBlob(translateProfile(bytes)).domains.map(row => row.version), [4, 2, 3, 7, 3]);
+    assert.deepEqual(decodeProfileBlob(translateProfile(bytes)).domains.map(row => row.version), [5, 2, 3, 7, 3]);
 });
 
 test("translation rejects nonnumeric keycodes and unsupported bytes instead of normalizing them away", () => {
@@ -256,4 +261,19 @@ test("translation rejects nonnumeric keycodes and unsupported bytes instead of n
         bytes[at + 4 + (id === 48 ? 12 : 4)] = 1; // Reserved row/header byte.
         assert.throws(() => translateBackup({...previous, profile: bytes.toString("base64")}), {code: "INVALID_PORTABLE_PROFILE"});
     }
+});
+
+test("offline v4 conversion retains a nondefault tap depth after the counted palette disappears", () => {
+    const {document} = require("../fixtures/portable-profile");
+    const {decodeRgbDomainV1, encodeRgbDomainV1} = require("../../core/schema/rgb-domain-v1");
+    const vectors = require("../../upstream/firmware/tests/fixtures/lighting_vectors_v1.json");
+    const source = document(), blob = decodeProfileBlob(Buffer.from(source.profile, "base64"));
+    const rgb = decodeRgbDomainV1(Buffer.from(vectors.conversion[0].v4, "hex"));
+    rgb.keyFeedback.tapBranchColors.push(...Array.from({length: 3}, () => ({h: 0, s: 0, v: 0})));
+    blob.domains[0] = {id: 16, version: 4, payload: encodeRgbDomainV1(rgb, {tapBranchColorCount: 7})};
+    source.profile = encodeProfileBlob(blob, {domainVersions: {16: 4, 32: 2, 48: 3, 64: 7, 80: 3}}).toString("base64");
+    const converted = translateBackup(source);
+    assert.equal(converted.tapDepth, 8);
+    assert.equal(validateSnapshot(converted).rgb.things.find(table => table.kind === 4).default.length, 11);
+    assert.equal(translateBackup(converted), converted);
 });

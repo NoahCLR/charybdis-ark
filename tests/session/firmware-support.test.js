@@ -45,7 +45,7 @@ test("complete editing pins every registered domain, current layers and the know
 
 test("complete Apply adds exactly the atomic firmware requirement and keeps its refusal stable", () => {
     assert.equal(support.canApply({...complete, featureFlags: 0}), false);
-    assert.equal(support.canApply({...complete, featureFlags: FEATURES.ATOMIC_LOGICAL_APPLY}), true);
+    assert.equal(support.canApply({...complete, featureFlags: FEATURES.ATOMIC_LOGICAL_APPLY | FEATURES.LIGHTING_RULES}), true);
     assert.doesNotThrow(() => support.requireReady({...complete, featureFlags: 0}));
     assert.throws(() => support.requireReady({...complete, featureFlags: 0}, true), {
         code: "FIRMWARE_UPDATE_REQUIRED",

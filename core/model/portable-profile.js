@@ -108,7 +108,7 @@ function materializeProfile(active, defaults, combos, settings) {
     });
     const table = comboTableOf(combos);
     decodeSettings(settings);
-    domains.push(domain(PROFILE_DOMAIN_IDS.COMBOS, encodeComboDomain(table)), domain(PROFILE_DOMAIN_IDS.SETTINGS, settings));
+    domains.push(domain(PROFILE_DOMAIN_IDS.COMBOS, encodeComboDomain(table)), {id: PROFILE_DOMAIN_IDS.SETTINGS, version: settings[0], payload: settings});
     return encodeProfileBlob({domains});
 }
 // The combo table the keyboard runs, as it stores it: which combos follow the
@@ -120,12 +120,12 @@ function comboTableOf(combos) {
             termMs: row.followsDefault ? null : row.termMs, mustHold: row.mustHold, mustTap: row.mustTap, ordered: row.ordered,
             enabled: row.enabled ?? true, useOutputBehavior: row.useOutputBehavior ?? true, allowedLayers: row.allowedLayers ?? ALL_LAYERS}))};
 }
-/** @param {{profile: Buffer, via: {layers: number, layout: Buffer, macros: Buffer, macroSlots: number}, actionAbiDigest: number}} snapshot */
-function createSnapshot({profile, via, actionAbiDigest}) {
+/** @param {{profile: Buffer, via: {layers: number, layout: Buffer, macros: Buffer, macroSlots: number}, actionAbiDigest: number, tapDepth?: number}} snapshot */
+function createSnapshot({profile, via, actionAbiDigest, tapDepth = 5}) {
     /** @type {PortableDocument} */
     const document = {format: "charybdis-profile", version: decodeProfileBlob(profile).schema.major, keyboard: "charybdis-4x6", actionAbiDigest,
         layers: Array.from({length: via.layers}, (_, layer) => Array.from({length: MATRIX_KEYS}, (_, pos) => via.layout.readUInt16BE((layer * MATRIX_KEYS + pos) * 2))),
-        profile: profile.toString("base64"), macros: macroSlots(via.macros, via.macroSlots).map(bytes => bytes.toString("base64"))};
+        ...(tapDepth !== 5 ? {tapDepth} : {}), profile: profile.toString("base64"), macros: macroSlots(via.macros, via.macroSlots).map(bytes => bytes.toString("base64"))};
     validateSnapshot(document); return document;
 }
 /** @param {unknown} value @param {ProfileDestination} [capabilities] @returns {DecodedProfile} */
@@ -138,7 +138,7 @@ function validateSnapshot(value, capabilities) {
     const candidate = /** @type {Partial<Record<keyof PortableDocument, unknown>> | null | undefined} */ (value);
     if (!candidate || candidate.format !== "charybdis-profile" || candidate.keyboard !== "charybdis-4x6" || typeof candidate.actionAbiDigest !== "number" || !Number.isInteger(candidate.actionAbiDigest) || candidate.actionAbiDigest < 1 || candidate.actionAbiDigest > 0xffffffff) throw fail("Choose a supported Charybdis profile file.");
     if (candidate.version !== PROFILE_BLOB_V1.SCHEMA_MAJOR || !knownActionAbi(candidate.actionAbiDigest)) throw fail("This profile is from older firmware, in a format the keyboard no longer stores. Export a new backup from current firmware.");
-    if (Object.keys(candidate).some(key => !["format", "version", "keyboard", "actionAbiDigest", "layers", "profile", "macros"].includes(key))) throw fail("This profile contains unsupported fields.");
+    if (Object.keys(candidate).some(key => !["format", "version", "keyboard", "actionAbiDigest", "layers", "profile", "macros", "tapDepth"].includes(key))) throw fail("This profile contains unsupported fields.");
     if (!Array.isArray(candidate.layers) || candidate.layers.length !== LAYERS || candidate.layers.some(keys => !Array.isArray(keys) || keys.length !== MATRIX_KEYS || !keys.every(u16))) throw fail(`A complete profile must contain all ${LAYERS} layers.`);
     if (!Array.isArray(candidate.macros) || candidate.macros.length !== MACRO_SLOTS) throw fail(`A complete profile must contain all ${MACRO_SLOTS} macro slots.`);
     // The exact layer-bank shape and uint16 values were checked above.
@@ -155,7 +155,8 @@ function validateSnapshot(value, capabilities) {
     /** @param {import("../schema/profile-domains-types.js").DomainKey} key */
     const payload = key => /** @type {import("../schema/types.js").ProfileDomain} */ (domains.find(domain => domain.id === domainCodec(key).id)).payload;
     const pdModes = domainCodec("pdModes").decode(payload("pdModes"));
-    const codecOptions = profileDepthOptions(capabilities, payload("rgb"));
+    if (candidate.tapDepth !== undefined && (typeof candidate.tapDepth !== "number" || !Number.isInteger(candidate.tapDepth) || candidate.tapDepth < 2 || candidate.tapDepth > 255)) throw fail("Invalid backup tap depth.");
+    const codecOptions = profileDepthOptions({...capabilities, maxTapStepsPerBehavior: capabilities?.maxTapStepsPerBehavior ?? candidate.tapDepth}, payload("rgb"));
     const rgb = domainCodec("rgb").decode(payload("rgb"), codecOptions), behaviors = domainCodec("behaviors").decode(payload("behaviors"), codecOptions),
         combos = domainCodec("combos").decode(payload("combos")), settings = domainCodec("settings").decode(payload("settings"));
     if (capabilities && !supportsComboOutputBehaviors(capabilities) && (settings.comboOutputBehaviors === false || combos.rows.some(row => !row.useOutputBehavior))) throw fail("This firmware cannot bypass combo output behaviours. Update both halves before restoring this profile.");
@@ -165,7 +166,7 @@ function validateSnapshot(value, capabilities) {
     // With Unicode playback on, a held ordinary key cannot span text the
     // layout leaves to Unicode entry.
     if (hostWord & 0x100) for (const macro of macros) validateViaMacro(macro, {unicode: true, textEntry: true, layout: hostSettings(settings.values).layout, protectionSupported: capabilities ? supportsMacroProtection(capabilities) : true});
-    if (rgb.layerColors.length !== LAYERS || rgb.layerColors.some(row => row.layerId >= LAYERS)) throw fail(`RGB does not cover all ${LAYERS} layers.`);
+
     // A binding for an empty slot is allowed, because the keyboard allows it:
     // the mode keycodes are a fixed registry, and the runtime refuses to
     // activate a slot whose record is empty rather than misbehaving
@@ -295,17 +296,25 @@ function reorderLayers(document, order, names, {keysFollow = true} = {}) {
     /** @param {WalkAction} a */
     const action = a => {if (!renumbers) return; if ([2, 3].includes(a.kind)) a.operand = reach(a.operand); else if (a.kind === 1) a.operand = native(a.operand);};
     walkActions(behaviors, action); walkActions(combos, action);
-    rgb.layerColors.forEach(row => {row.layerId = remap[row.layerId];}); rgb.layerColors.sort((a, b) => a.layerId - b.layerId);
-    if (order[0] !== 0) {
-        // Validation requires a row for every layer, and order is a permutation.
-        const oldBase = /** @type {typeof rgb.layerColors[number]} */ (rgb.layerColors.find(row => row.layerId === remap[0]));
-        if (oldBase.color.s === 0 && oldBase.color.v === 0) {
-            const hsv = settings.values[SETTING.RGB_COLOR];
-            oldBase.color = {h: hsv & 0xff, s: (hsv >>> 8) & 0xff, v: (hsv >>> 16) & 0xff};
-            oldBase.mode = 0; // ALL_KEYS: the base effect covered the whole layer.
+    const layerTable = rgb.things.find(t => t.kind === 1);
+    if (layerTable) {
+        if (order[0] !== 0) {
+            const old = layerTable.records[0] ?? layerTable.default;
+            const index = old[1] === 254 ? layerTable.default[1] : old[1];
+            if (index === 255) {
+                const saved = settings.values[SETTING.RGB_COLOR];
+                const colour = {h: saved & 255, s: saved >>> 8 & 255, v: saved >>> 16 & 255};
+                let palette = rgb.palette.findIndex(c => c.h === colour.h && c.s === colour.s && c.v === colour.v);
+                if (palette < 0) {palette = rgb.palette.length; rgb.palette.push(colour);}
+                layerTable.records[0] = [0, palette];
+            }
         }
+        const records = Array.from({length: LAYERS}, (_, id) => layerTable.records[id] ?? [254, 254]);
+        layerTable.records = order.map(id => records[id]);
     }
-    rgb.layerGroupRows.forEach(row => {if (row.selector !== 255) row.selector = remap[row.selector];});
+    for (const rule of rgb.rules) for (const part of rule.parts) {
+        if (part.slot <= 1 && (part.kind === 1 || part.kind === 2) && part.params[0] !== 255) part.params[0] = remap[part.params[0]];
+    }
     // A name the editor only showed as a default ("Layer 9" for an unnamed
     // layer) stays unnamed, wherever the layer goes.
     /** @param {string} name @param {number} old */

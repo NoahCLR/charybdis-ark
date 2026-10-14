@@ -23,6 +23,7 @@ export interface PayloadState {
 export interface FakeKeyboardOptions {
     document: PortableDocument;
     compiled?: Buffer;
+    lightingPages?: Buffer[];
     streaming?: boolean;
     macroReadMap?: boolean;
     compiledOnly?: boolean;

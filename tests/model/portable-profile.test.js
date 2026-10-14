@@ -8,6 +8,7 @@ const {encodeSettings, decodeSettings} = require("../../core/schema/settings-dom
 const {decodeProfileBlob, encodeProfileBlob} = require("../../core/schema/profile-blob-v1");
 const {decodeKeyBehaviorDomain, encodeKeyBehaviorDomain} = require("../../core/schema/key-behavior-domain-v1");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../../core/data/charybdis-layout");
+const {lightingIdentities} = require("../../core/model/lighting-view");
 const {settings, document} = require("../fixtures/portable-profile");
 test("complete snapshots flatten effective domains and round-trip without destination defaults", () => {
     const source = document(), actual = validateSnapshot(JSON.stringify(source));
@@ -28,7 +29,7 @@ test("reorder moves matrix data, RGB, pointer policy and every layer action refe
     const actual = validateSnapshot(reordered);
     assert.deepEqual(reordered.layers[0].slice(0, 5), [0x5224, 0x4431, 0x7ec1, 0x5082, 0x52c4]);
     assert.equal(actual.settings.names[1], "Pointer"); assert.equal(actual.settings.values[5], 1);
-    assert.equal(actual.rgb.layerColors.find(row => row.layerId === 1).color.v, 150);
+    assert.equal(lightingIdentities(actual.rgb).layerColors.find(row => row.layerId === 1).color.v, 150);
     assert.equal(fingerprint(reorderLayers(reordered, [0, 4, 2, 3, 1, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])), fingerprint(source));
 });
 test("a backup from older firmware is refused, never upgraded: the keyboard stores only the current format", () => {
@@ -107,7 +108,7 @@ test("with keys not following, layers move but every layer key keeps its number"
     // Names, colours and the pointer setting still follow their layer.
     assert.equal(actual.settings.names[1], before.settings.names[4]);
     assert.equal(actual.settings.values[5], order.indexOf(before.settings.values[5]));
-    assert.deepEqual(actual.rgb.layerColors.find(row => row.layerId === 1).color, before.rgb.layerColors.find(row => row.layerId === 4).color);
+    assert.deepEqual(lightingIdentities(actual.rgb).layerColors.find(row => row.layerId === 1).color, lightingIdentities(before.rgb).layerColors.find(row => row.layerId === 4).color);
     // The default still renumbers.
     assert.equal(validateSnapshot(reorderLayers(source, order)).combos.rows[0].output.operand, 0x5281);
 });
@@ -143,7 +144,7 @@ test("a new base trades roles with the old one: keys to either keep their number
     assert.deepEqual(validateSnapshot(kept).behaviors.rows[0].steps[0].hold.action.operand, 7);
     assert.equal(actual.settings.names[0], before.settings.names[3]);
     assert.equal(actual.settings.names[3], before.settings.names[0]);
-    assert.deepEqual(actual.rgb.layerColors.find(row => row.layerId === 0).color, before.rgb.layerColors.find(row => row.layerId === 3).color, "the new base keeps its colour");
+    assert.deepEqual(lightingIdentities(actual.rgb).layerColors.find(row => row.layerId === 0).color, lightingIdentities(before.rgb).layerColors.find(row => row.layerId === 3).color, "the new base keeps its colour");
     assert.equal(actual.settings.values[23], 1, "the bottom slot is still the one that starts on");
     assert.equal(actual.settings.values[5], order.indexOf(before.settings.values[5]), "the pointer layer follows what it holds");
     assert.deepEqual(actual.settings.layers.map(record => record.reference), Array.from({length: 16}, (_, layer) => layer), "each layer's combos still read from the layer itself");
@@ -163,8 +164,8 @@ test("Make base gives the old uncoloured base its saved HSV and normalizes empty
     const rgb = validateSnapshot(moved).rgb;
     assert.deepEqual(moved.layers[0].slice(0, 4), [0, 0, 5, 0], "transparent positions entering base become KC_NO");
     assert.deepEqual(moved.layers[3].slice(0, 4), [1, 1, 4, 1], "KC_NO positions leaving base become transparent");
-    assert.deepEqual(rgb.layerColors[3], {layerId: 3, color: {h: 27, s: 180, v: 100}, mode: 0});
-    assert.deepEqual(rgb.layerColors[0].color, {h: 180, s: 255, v: 200}, "new base keeps its own lighting");
+    assert.deepEqual(lightingIdentities(rgb).layerColors[3], {layerId: 3, color: {h: 27, s: 180, v: 100}, mode: 0});
+    assert.deepEqual(lightingIdentities(rgb).layerColors[0].color, {h: 180, s: 255, v: 200}, "new base keeps its own lighting");
 });
 
 test("Make base leaves unused matrix slots alone through a base swap and back", () => {
@@ -190,13 +191,14 @@ test("Make base leaves unused matrix slots alone through a base swap and back", 
 test("Make base keeps an existing old-base colour, while overlay reorders keep empty keys", () => {
     const source = document(), blob = decodeProfileBlob(Buffer.from(source.profile, "base64"));
     const rgb = validateSnapshot(source).rgb;
-    rgb.layerColors[0].color = {h: 0, s: 0, v: 120}; // White is a real colour.
-    blob.domains[0].payload = require("../../core/schema/rgb-domain-v1").encodeRgbDomainV1(rgb);
+    rgb.things.find(t => t.kind === 1).records[0] = [0, rgb.palette.length];
+    rgb.palette.push({h: 0, s: 0, v: 120}); // White is a real colour.
+    blob.domains[0].payload = require("../../core/schema/lighting-domain-v1").encodeLightingDomain(rgb);
     source.profile = encodeProfileBlob(blob).toString("base64");
     source.layers[0][0] = 0;
     source.layers[3][0] = 1;
     const moved = reorderLayers(source, [3, 1, 2, 0, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
-    assert.deepEqual(validateSnapshot(moved).rgb.layerColors[3], {layerId: 3, color: {h: 0, s: 0, v: 120}, mode: 0});
+    assert.deepEqual(lightingIdentities(validateSnapshot(moved).rgb).layerColors[3], {layerId: 3, color: {h: 0, s: 0, v: 120}, mode: 0});
     const overlay = reorderLayers(source, [0, 3, 2, 1, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
     assert.equal(overlay.layers[0][0], 0);
     assert.equal(overlay.layers[1][0], 1);

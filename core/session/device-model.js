@@ -108,6 +108,7 @@ function buildSnapshotModel(snapshot, capabilities, binding, deviceState = {}) {
         keyboardNameView: keyboardNameView(current, deviceState.storedKeyboardName === "" ? deviceState.device?.product || "" : ""),
         identity: null,
     }, capabilities, {busy: !editable, behaviors: editable, pointing: editable, combos: editable, macros: editable, settings: editable, customKeys: editable});
+    if (model.rgb.lighting) model.rgb.lighting = require("../model/lighting-view").lightingForView(value.rgb, settings.names, capabilities?.lighting, snapshot.lightingKeys);
     model.layers.forEach((layer, index) => {layer.displayName = snapshot.summary.names[index];});
     return {...model, ...deviceSummary(deviceState)};
 }
@@ -186,7 +187,8 @@ function configurationModel(content, capabilities, editing) {
         profileIdentity: content.identity,
         rgb: {...(content.domains.rgb ? rgbForView(content.domains.rgb) : {}),
             ...(Number.isInteger(content.settingsView?.brightnessMax) ? {maximumBrightness: content.settingsView?.brightnessMax} : {}),
-            baseEffect: content.baseEffect},
+            baseEffect: content.baseEffect,
+            ...(content.domains.rgb ? {lighting: require("../model/lighting-view").lightingForView(content.domains.rgb, content.domains.settings?.names ?? [], capabilities?.lighting)} : {})},
 
         // Native combo values, resolved from either capture or snapshot.
         combos: comboRowsForView(content.comboRows, catalog.labels),

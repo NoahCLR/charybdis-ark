@@ -62,6 +62,7 @@ const capabilities = {
     // gesture timing and runtime-owned tapping, which change what an empty
     // behaviour cell means.
     featureFlags: PROFILE_WIRE_KNOWN_MASKS.FEATURE_FLAGS & ~PROFILE_WIRE_KNOWN_MASKS.RETIRED_FEATURES,
+    lighting: require("../core/protocol/lighting-capabilities-v1").decodeLightingCapabilities(require("../upstream/firmware/tests/fixtures/lighting_vectors_v1.json").capability.map(hex => Buffer.from(hex, "hex"))),
     responseVersion: 2,
     reportSize: 32,
     brightnessMax: 255,

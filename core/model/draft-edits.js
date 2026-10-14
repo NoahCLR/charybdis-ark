@@ -47,6 +47,7 @@ function layoutLabel({layer, changes}, document) {
 }
 
 const DRAFT_EDIT_TYPES = Object.freeze(/** @satisfies {{[K in DraftEditType]: Entry<K>}} */ ({
+    editLightingRule: {editor: "profile", domain: "lighting", label: "Edited a lighting rule"},
     updateLayoutKeys: {editor: "layout", label: layoutLabel},
     updateConfigDefaults: {editor: "settings", label: "Saved a settings section"},
     updateViaMacro: {editor: "macro", label: "Edited a macro"},
