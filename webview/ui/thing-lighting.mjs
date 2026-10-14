@@ -26,6 +26,7 @@ export function thingLighting(subject, title) {
     if (!lighting || !supported || subject.id < 0) {body.append(el(`<p class="note">${subject.id < 0 ? "Keep this thing in the draft to give it its own lighting." : "This keyboard does not yet offer an identity or lighting condition for this kind of thing."}</p>`));return node;}
     const identity = identityValue(model, subject), rules = subjectRules(model, subject);
     const words = vocabulary(model).lighting;
+    if (subject.kind >= 3 && !canPaintSubject(model, subject)) body.append(el(`<p class="callout">This keyboard reports shared feedback colours, but cannot yet show an individual identity for this thing. Update its firmware to customise this feedback.</p>`));
     body.append(el(`<p class="note">Its colour is shared by rules that show its identity. ${identity.inherited ? "Following the board defaults." : "Customised for this thing."}</p>`));
     const columns = el(`<div class="thing-lighting-layout"><div class="identity-colours stack gap-12"></div><div class="identity-rules stack gap-12"></div></div>`);
     const colours = /** @type {HTMLElement} */ (columns.querySelector(".identity-colours")), explanation = /** @type {HTMLElement} */ (columns.querySelector(".identity-rules"));body.append(columns);

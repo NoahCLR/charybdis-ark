@@ -80,12 +80,12 @@ function editLightingIdentity(bytes, edit, options) {
     // needs a named subject rule to be visible on the keyboard.
     if (edit.kind === 3 || edit.kind === 4) {
         const condition = subjectCondition(program, edit.kind, edit.id, options);
-        if (!program.rules.some(r => knownRule(r) && r.parts.some(p => p.slot === 0 && p.kind === condition.kind && p.params[0] === edit.id) && r.parts.some(p => p.slot === 3 && p.kind === 3))) {
+        if (!program.rules.some(r => knownRule(r) && r.parts.some(p => JSON.stringify(p) === JSON.stringify(condition)) && r.parts.some(p => p.slot === 3 && p.kind === 3))) {
             supported(options, "targets", 7);supported(options, "paints", 3);
             const rule = {flags: 0, brightness: 255, parts: [condition, {slot: 2, kind: 7, params: []}, {slot: 3, kind: 3, params: []}]};
             let at = program.rules.findIndex(r => ruleBand(r) === (edit.kind === 3 ? "combos" : "feedback"));
-            const outcome = program.rules.findIndex(r => r.parts.some(p => p.slot === 0 && p.kind === condition.kind && p.params[0] === edit.id) && r.parts.some(p => p.slot === 3 && p.kind === 8));
-            if (outcome >= 0) at = outcome + 1;
+            const own = program.rules.map((r, index) => r.parts.some(p => p.slot === 0 && p.kind === condition.kind && p.params[0] === edit.id) ? index : -1).filter(index => index >= 0);
+            if (own.length) at = Math.max(...own) + 1;
             program.rules.splice(at < 0 ? 0 : at, 0, rule);
         }
     }

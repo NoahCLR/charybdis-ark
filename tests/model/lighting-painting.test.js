@@ -77,3 +77,15 @@ test("a paint exceeding shared lighting memory is refused without changing the o
     assert.throws(() => paintLightingMap(original, {index: 0, expectedRule: ruleIdentity(rule), leds: Array.from({length: 58}, (_, i) => i), paint: {h: 177, s: 188, v: 199}}, opts), e => e.code === "CAPACITY_EXCEEDED");
     assert.deepEqual(original, saved);
 });
+
+test("editing an identity keeps its painted map above the fallback and feedback covers all states", () => {
+    const caps = structuredClone(options.capabilities);caps.registries.facts = [...new Set([...caps.registries.facts, 7, 8])];caps.registries.paints = [...new Set([...caps.registries.paints, 8])];
+    const opts = {...options, capabilities: caps};
+    let current = paintLightingMap(bytes(), {subject: {kind: 4, id: 3}, leds: [1], paint: 129}, opts);
+    current = editLightingIdentity(current, {kind: 4, id: 3, field: "colour", slot: 3, colour: {h: 177, s: 188, v: 199}}, opts);
+    let p = decodeLightingDomain(current, opts);assert.equal(p.rules[0].parts.find(p => p.slot === 3).kind, 4);
+    assert.equal(p.rules[1].parts.find(p => p.slot === 3).kind, 3);assert.deepEqual(p.rules[1].parts[0].params, [3, 15]);
+    current = editLightingIdentity(current, {kind: 4, id: 3, field: "outcome", outcome: true}, opts);
+    current = editLightingIdentity(current, {kind: 4, id: 3, field: "outcome", outcome: false}, opts);
+    p = decodeLightingDomain(current, opts);assert.ok(p.rules.some(r => r.parts[0]?.kind === 8 && r.parts[0].params[1] === 15 && r.parts.find(p => p.slot === 3).kind === 3));
+});
