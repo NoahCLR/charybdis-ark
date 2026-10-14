@@ -1187,6 +1187,9 @@ test("painting and identity builders stage against the real draft with Undo, Red
     draft.undo(draft.revision);assert.equal(decoded(draft).rgb.maps.length, 0);
     draft.redo(draft.revision);assert.equal(draft.document.profileBlob, painted);
     const changes = draft.changes();assert.equal(changes.filter(c => c.area === "Lighting").length, 1);
+    const review = changes.find(c => c.area === "Lighting");
+    assert.match(review.fields[0].label, / · Identity colour$/);
+    assert.deepEqual(review.fields[0].afterColour, {h: 177, s: 211, v: 199}, "identity colour stays visible ahead of map and rule counts in Review");
     draft.discard(draft.revision, changes.find(c => c.area === "Lighting").group);
     assert.deepEqual(decoded(draft).rgb, portable.validateSnapshot(doc).rgb);
 });

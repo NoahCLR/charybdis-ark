@@ -258,6 +258,7 @@ function lightingRecords(rgb, names) {
     fields.set("Palette", {text: `${rgb.palette.length} colours`, key: JSON.stringify(rgb.palette)});
     fields.set("Identity colours", {text: "Board defaults and individual colours", key: JSON.stringify(rgb.things)});
     const {VOCABULARY, layerName} = require("./vocabulary");
+    /** @type {Fields} */ const identities = new Map();
     for (const table of rgb.things) for (const [id, record] of [[-1, table.default], ...table.records.map((r, i) => [i, r])]) {
         const owner = Number(id) < 0 ? `Every ${table.kind === 1 ? "layer" : table.kind === 2 ? "pointing mode" : table.kind === 3 ? "combo" : "behaviour"}`
             : table.kind === 1 ? layerName(names, Number(id)) : `${table.kind === 2 ? "Pointing mode" : table.kind === 3 ? "Combo" : "Behaviour"} ${Number(id) + 1}`;
@@ -266,13 +267,15 @@ function lightingRecords(rgb, names) {
             if (Number(id) >= 0 && row.every(n => n === 254)) return;
             const colour = rgb.palette[reference === 254 ? table.default[slot + 1] : reference];
             const label = table.kind === 4 ? ["Hold", "Long hold", "Tap", ...Array.from({length: row.length - 4}, (_, i) => `${i + 2} taps`)][slot] : "Identity colour";
-            fields.set(`${owner} · ${label}`, {text: reference === 254 ? "Board default" : colour ? `HSV(${colour.h}, ${colour.s}, ${colour.v})` : "Let light through", key: JSON.stringify([reference === 254 ? "inherit" : "custom", colour]), ...(colour ? {colour} : {})});
+            identities.set(`${owner} · ${label}`, {text: reference === 254 ? "Board default" : colour ? `HSV(${colour.h}, ${colour.s}, ${colour.v})` : "Let light through", key: JSON.stringify([reference === 254 ? "inherit" : "custom", colour]), ...(colour ? {colour} : {})});
         });
-        fields.set(`${owner} · Lighting area`, {text: row[0] === 254 ? "Board default" : VOCABULARY.lighting.targets[row[0]], key: String(row[0])});
+        identities.set(`${owner} · Lighting area`, {text: row[0] === 254 ? "Board default" : VOCABULARY.lighting.targets[row[0]], key: String(row[0])});
     }
     fields.set("Saved key sets and maps", {text: `${rgb.keySets.length} sets · ${rgb.maps.length} maps`, key: JSON.stringify([rgb.keySets, rgb.maps])});
     fields.set("Fade and flashes", {text: "Stored with lighting", key: JSON.stringify(rgb.extensions)});
-    return new Map([["rgb:rules", {title: "Lighting rules", stage: null, where: {}, fields}]]);
+    // Review shows a few fields before expansion. Keep the thing's colour
+    // and place visible ahead of aggregate rule/palette counts.
+    return new Map([["rgb:rules", {title: "Lighting rules", stage: null, where: {}, fields: new Map([...identities, ...fields])}]]);
 }
 
 // Compare complete validated snapshots. The review describes final differences,
