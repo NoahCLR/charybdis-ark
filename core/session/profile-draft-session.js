@@ -292,6 +292,7 @@ class ProfileDraftSession {
             });
         }
         if (message.type === "editLightingRule") {
+            if (message.action === "add") keys.unshift(`rule-${this.nextLightingKey++}`);
             if (message.action === "delete") keys.splice(message.index, 1);
             if (message.action === "move" && message.to !== undefined) keys.splice(message.to, 0, ...keys.splice(message.index, 1));
         }
@@ -539,7 +540,7 @@ class ProfileDraftSession {
         this.checksCache ??= new WeakMap();
         const known = this.checksCache.get(draft);
         if (known && known.keyboard === keyboard && known.order === order) return known.checks;
-        const checks = draftProfileChecks(keyboard ?? null, draft, order, {brightnessMax: this.current.limits?.brightnessMax,
+        const checks = draftProfileChecks(keyboard ?? null, draft, order, {lighting: this.capabilities?.lighting, brightnessMax: this.current.limits?.brightnessMax,
             detectedHostOs: this.current.hostOs?.detected,
             featureFlags: this.capabilities?.featureFlags,
             effects: this.current.options?.effects,

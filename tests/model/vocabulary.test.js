@@ -99,3 +99,11 @@ test("every advertised lighting paint and target has product words", () => {
     for (const id of Object.keys(LIGHTING_KINDS.paints)) assert.ok(VOCABULARY.lighting.paints[Number(id)]);
     for (const id of Object.keys(LIGHTING_KINDS.targets)) assert.ok(VOCABULARY.lighting.targets[Number(id)]);
 });
+
+test("every lighting module, construction and parameter enum has product words",()=>{
+ const {LIGHTING_KINDS}=require('../../core/schema/lighting-kinds-v1');const w=VOCABULARY.lighting;
+ for(const [registry,labels] of [['facts',w.facts],['targets',w.targets],['paints',w.paints],['timings',w.timings],['things',w.things]])for(const [id,d] of Object.entries(LIGHTING_KINDS[registry])){
+  assert.ok(labels[id],`${registry}:${id}`);for(const p of d.parameters)if(p!=='milliseconds')assert.ok(w.parameters[p]||registry==='things',p);
+ }
+ for(const [name,n] of Object.entries({layerStatus:4,modeStatus:2,behaviourPhase:5,modifier:4,side:3,modifierState:2,hostLock:3,pointerState:4,keyQuery:16}))assert.equal(w.choices[name].length,n,name);
+});

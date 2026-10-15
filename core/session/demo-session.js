@@ -45,6 +45,8 @@ const DEMO_DEVICE_ID = "demo";
 // what the simulated current keyboard (tests/fixtures/fake-keyboard.js) reports.
 const DEMO_CAPABILITIES = Object.freeze({
     lighting: {layoutVersion: 1, domainVersion: 5, payloadBudget: 8192, paletteMaximum: 128, conditionsPerRule: 4, partParameterMaximum: 16, tapDepth: 5, ledCount: 58,
+        working: {model: 1, capacity: 8220, ownerBytes: 8, descriptorBytes: 12, slotHeaderBytes: 12, memberBase: 5, alignment: 4,
+            modules: Object.fromEntries([[1,16,0,1],[2,16,0,1],[3,32,0,1],[4,1,255,1],[5,1,255,60],[7,128,0,4],[8,128,0,60],[9,16,0,1],[10,32,0,1],[11,128,0,4],[12,128,0,60],[13,128,0,1],[14,60,0,1],[15,8,255,2],[16,1,255,1],[17,1,255,1],[18,1,255,1],[19,16,0,1],[20,16,0,1],[21,16,0,1],[22,32,0,1],[23,32,0,1],[24,128,0,1],[25,128,0,1],[26,128,0,1],[27,128,0,1],[28,128,0,1]].map(([id,domain,selectorParameter,maximumMembers]) => [id,{domain,selectorParameter,maximumMembers}]))},
         registries: /** @type {import("../schema/lighting-types.js").LightingCapabilities["registries"]} */ (Object.fromEntries(require("../schema/lighting-kinds-v1").LIGHTING_REGISTRIES.map(name => [name, Object.keys(require("../schema/lighting-kinds-v1").LIGHTING_KINDS[name]).map(Number)])))},
     responseVersion: 2,
     protocol: Object.freeze({major: 1, minor: 0}),

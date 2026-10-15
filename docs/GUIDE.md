@@ -647,8 +647,7 @@ restores inheritance. **Let light through** clears an identity, while **Paint
 black** stores real black. A behaviour has separate tap, hold, long hold and
 extra-tap colours. **Colour by outcome** uses the layer or pointing mode a hold
 enters, with the behaviour's identity as the fallback for other actions.
-Custom keys use their behaviour's lighting. The macro tab explains that this
-keyboard does not yet provide a macro lighting condition.
+Custom keys use their behaviour's lighting. On supporting firmware, macros have an identity colour and can light while playing or flash after a named playback completes.
 
 **Customise** opens the painter for that thing. Click or drag with **Brush**;
 use **Select**, or **Select keys that…**, then **Fill selection**. With nothing
@@ -686,9 +685,56 @@ lighting bytes against 8 KiB and warns from 90%. Auto-mouse fade belongs to the
 bottom group of rules: moving across the boundary changes what fades, and
 deleting one of those rules reduces that group.
 
+**Add rule** starts an always-on rule that lets light through. Add up to four
+conditions, select a named thing or **Any**, and choose **Not true** for a state
+filter. All conditions must hold. An event belongs first and requires **Flash**;
+it cannot be negated or added as a filter. Only options the keyboard reports
+are offered. Host locks mean Caps, Num and Scroll Lock; Host OS and the reason
+auto-mouse raised a layer are not lighting conditions.
+
+**Save rule** stages the full condition, area, paint, background, brightness and
+timing. Background paints LEDs the main paint does not cover. **Keys that…**
+selects keys from the current keymap each time the rule runs: mapped, transparent,
+unused, native key categories, layer/mode/macro actions, custom keys, behaviour
+rows or enabled combo inputs. A layer rule queries that layer; other rules query
+the top active layer. These live selections follow remaps. The painter's
+**Select keys that…** instead stores fixed LEDs. **What it does** paints a direct
+layer, pointing-mode or macro action in its target's identity colour; it does
+not predict arbitrary behaviour branches or host-layout characters.
+
+**Show after** waits for a continuous state match. **Linger** retains its last
+matching keys after it ends, only if the rule was already showing. Events use
+**Flash**, with filters checked at occurrence. A matching repeat replaces the
+captured keys and restarts the window; a repeat that fails the filters preserves
+the previous flash. Show after runs inside that original window: an event at
+100 ms with Flash 500 and Show after 200 shows at 300–599 ms, then stops at 600.
+A delay longer than the flash never shows.
+
+Flashes and linger also use **Working memory**, separately from the 8 KiB saved
+lighting budget. Ark shows the needed and available bytes and each rule's
+contribution. **Any** reserves every possible matching thing and its complete
+keys. Shorter durations and unlikely filters do not save working memory. An
+over-budget imported draft is kept so you can turn off rules or choose named
+things; Review blocks Apply until it fits. Missing or unfamiliar working-memory
+capabilities do not imply an available budget. Firmware remains authoritative.
+
+**Try a situation** builds an on-screen local timeline. Add state chips, choose
+their subjects and simulated owner keys, press **Show situation**, then advance
+time or fire a named event. The result uses the draft and its live-keymap queries.
+It does not post edits or send temporary frames to the keyboard. Restart time
+clears its histories. Each half renders locally in firmware; uncertain remote
+freshness can shorten or hide a transient and never starts a fresh window.
+This simulation does not establish physical clock drift or LED appearance.
+The firmware's global idle sleep can still force black over a matching idle rule.
+
+The simulator labels fixed LEDs, including LED 55. In the pinned firmware it is
+associated with matrix key 56; matrix key 59 (the last right-thumb layout key)
+has no LED association. Fixed LED 55 remains paintable in the schematic painter;
+that schematic selection is not proof that a key-relative rule reaches the same
+LED. Reconciling this metadata with hardware is separate work.
+
 Older backups with version-4 lighting are converted before import review or
-restore. Editing saved layer, mode, combo and behaviour identities belongs to
-the next phase; this screen edits rules.
+restore.
 
 ### Pointing-mode clicks
 

@@ -102,7 +102,7 @@ function fakeKeyboard({document, compiled, streaming = false, macroReadMap = fal
     /** @type {Partial<Record<number, Buffer[]>>} */
     const values = {
         [VALUE.CAPABILITIES]: capabilities,
-        13: lightingPages ?? require("../../upstream/firmware/tests/fixtures/lighting_vectors_v1.json").capability.map(hex => Buffer.from(hex,"hex")),
+        13: lightingPages ?? require("./lighting-capabilities").lightingPages(),
         [VALUE.STATUS]: status,
         ...(compiledOnly ? {} : {[VALUE.COMMITTED]: payloadPages(profile, generation)}),
         [VALUE.COMPILED]: payloadPages(defaults, 0),
@@ -160,7 +160,7 @@ function fakeKeyboard({document, compiled, streaming = false, macroReadMap = fal
             case PROFILE_WIRE_V1.COMMAND_GET:
                 if (request[1] === 3) return rgbValue(request, reply);
                 if (request[1] !== PROFILE_WIRE_V1.CHANNEL) return undefined;
-                return profileValue(values[request[2]]?.[request[4] | (request[5] << 8)], reply);
+                return profileValue(values[request[2]]?.[request[4] | (request[5] << 8)] ?? (request[2] === 13 ? Buffer.alloc(0) : undefined), reply);
             case VIA_STORAGE.LAYER_COUNT: return scalar(reply, [16]);
             case VIA_STORAGE.MACRO_COUNT: return scalar(reply, [128]);
             case VIA_STORAGE.MACRO_SIZE: return scalar(reply, [held.macros.length >> 8, held.macros.length & 255]);
@@ -186,7 +186,7 @@ function fakeKeyboard({document, compiled, streaming = false, macroReadMap = fal
 /** @param {Buffer | undefined} payload @param {Buffer} reply */
 function profileValue(payload, reply) {
     if (!payload) return undefined;
-    reply.fill(0, 5); reply[6] = payload.length; payload.copy(reply, PROFILE_WIRE_V1.PAYLOAD_OFFSET);
+    reply.fill(0, 5); if (!payload.length) reply[5] = 2; reply[6] = payload.length; payload.copy(reply, PROFILE_WIRE_V1.PAYLOAD_OFFSET);
     return reply;
 }
 /** @param {Buffer} reply @param {number[]} bytes */

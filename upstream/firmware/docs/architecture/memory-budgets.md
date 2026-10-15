@@ -622,3 +622,103 @@ largest split-slave path is 328/768; the owner manifest reaches 1,912/1,920 and
 policies cover reviewed linked paths only; global/interrupt maxima, allocator
 and stack high-water, split cadence and outcome rendering remain acceptance
 on both physical halves.
+
+### Cached key queries and direct action paint
+
+The per-layer native/behaviour basis for keys-that and what-it-does has an
+additional **3,072-byte static regression-policy increment**, approved by the
+orchestrator under Noah's delegated engineering decision authority. The relevant
+D-F26 portable RGB profile artifact threshold is **229,376 bytes**, previously
+226,304. The artifact selector reads recorded compiler flags: PD profile,
+portable profile and RGB Matrix enabled, with at least one of the keys-that or
+what-it-does modules enabled, and the cache-refresh implementation actually
+linked in the ELF. Both consumers disabled retains226,304; unrelated
+artifact policies retain their previous thresholds. This budgets this query
+basis only, without promising space for event, linger or flash histories.
+
+The representation is bounded by compiled geometry, independent of accepted
+rule/query count: nativeu16 plus authored behaviour-rowu8 per key/layer, one
+any-combo bitmap per layer, and one matrix-key index per LED. At16layers,
+60matrix positions and58LEDs these linked arrays are1920+960+128+58 bytes,
+plus generation4 and readiness1. They replace the old mapped128/generation4/
+valid-layers4 cache. Existing resident combo rows are reused; there is no heap,
+per-query mask bank, eviction, admission limit or format/budget redefinition.
+
+Historical **right-only** GCC15.2.0 link at firmwaree352687b, BKd280a447, before
+the amendment: data5280+bss223784=229064 B, a2928 B net linked increase over the
+repaired pre-query checkpoint, including alignment/optimization effects. It
+failed the old policy by2760 B; at the approved threshold it would have312 B
+policy margin. SRAM0–3 fixed prefix229072 B, boot linker/core-memory span33072 B,
+fixed occupancy across unique banks236528 B. The left was not built because
+the tool stopped at the right gate. These are allocation evidence for the
+amendment, **not a two-half verification pass or a pair to try**.
+
+Physical270336 B per half, boot core-memory floor4096 B and reviewed-path stack
+limits1920/768 B stay unchanged. Boot span is not runtime-free or high-water
+memory. The cache refresh and query/paint paths must appear in both tracked
+stack manifests and pass fresh linked checks on each half. Declared query
+operation bounds and host tests do not prove physical cadence, global or
+interrupt-stack maximum, allocator high-water or hardware acceptance. Those
+remain explicit physical acceptance obligations before release.
+
+## Linked RTOS context-save accounting
+
+The reviewed timer-restoration paths include ChibiOS's ARMv6-M `__port_switch`.
+At the pinned linked instruction sequence, it pushes r4–r7/lr (20 bytes), moves
+r8–r11 into r4–r7 and pushes those (16 bytes), then stores that outgoing stack
+pointer before loading another thread's saved stack. The outgoing reviewed
+caller is therefore charged36 bytes. The other thread's restored continuation
+belongs to that thread's stack; this is no global/thread/interrupt maximum proof.
+
+The analyzer recognizes only the exact named16-instruction linked save/store/
+load/restore sequence, including the context offsets and transfer registers.
+A different sequence or arbitrary stack-pointer replacement remains unbounded
+and fails the gate. This adds actual context-save coverage without a manifest
+frame override, an excluded call edge or a changed stack policy.
+
+## Admitted retained lighting candidate
+
+The unreleased phase3 candidate reserves8220 bytes per half for new flash/linger
+history. This is one fixed pool, not a raised static policy or a heap-backed
+reservation. Registry bounds charge two complete profile-sized banks and one
+replacement slot, Q=2*S+W. Current plus immutable outgoing/slave staging coexist;
+replacement workspace is separately charged. No third frozen history bank is
+used: render consumes the current scene synchronously and publishes owned LED
+pixels. Source capture facts and replacement workspace coexist. The replacement
+split protocol additionally owns one complete role-disjoint fact snapshot outside
+the pool; its bytes must appear in linked accounting.
+
+A separate decoded candidate program keeps reads/admission before active program
+replacement. Provider publication preflights it at the existing safe boundary;
+commit copies owned RAM without later source I/O. The working-memory capability
+reports the reproducible conservative model and an over-budget candidate rejects
+before activation. This deliberately amends payload-only acceptance for new
+timing; unchanged Standard and state/show-after profiles retain their acceptance.
+The lighting spec governs the exact descriptor/member layout and module bounds.
+
+The scoped retained-lighting artifact has a247808-byte static tripwire,
+18432 above its preceding229376 query-only policy. Selection requires the
+recorded GCC15.2.0 configuration,60 matrix keys, four combo records, portable
+RGB/PD ownership, the linked query cache and enabled retained consumer. The
+memory gate proves compiler/geometry from its recorded flags and forced
+headers; capture flags or the target filename alone do not select this policy.
+All other artifact and geometry policies retain their previous thresholds.
+
+The initial enabled links on BOTH halves measured data5292+bss242176=247468,
+fixed SRAM0–3 prefix247480 and boot core-memory span14664. The18396-byte net
+increase consists of8220 pool plus10176 fixed/control bytes,472 more than the
+previous9704 fixed projection. Named fixed additions are candidate program9264,
+coherent fact snapshot621, snapshot/session168, working control24, identities48,
+flags4, revisions8, scene pointer4 and RPC resend entry1;34 bytes are alignment/
+unnamed residual. The1024-byte capture/render union replaces the same-size
+placement array, without a saving credit or another frame bank.
+
+At that measured size the new policy margin is340 bytes and boot span exceeds
+the4096 floor by10568. Neither is runtime-free memory or a high-water result.
+This funds the implemented8220-pool/staged-program/coherent-fact representation
+only; source corrections must be freshly linked against this fixed ceiling,
+which does not float. Those initial links failed reviewed main-stack policy
+and are not accepted pairs. Physical SRAM remains270336 bytes per half; core
+floor4096 and reviewed main/slave1920/768 remain unchanged. Hardware cadence,
+oscillator drift and allocator/global/interrupt-stack high-water acceptance
+remain unproved. Host logical-clock and linked-path checks do not prove them.

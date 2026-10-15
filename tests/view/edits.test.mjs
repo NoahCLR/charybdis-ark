@@ -1251,3 +1251,29 @@ test("layer reorder carries named behaviour identities when layer-key targets ar
     assert.equal(require("../../core/schema/actions").actionName(reordered.behaviors.rows[1].target), "MO(2)");
     const record = reordered.rgb.things.find(t => t.kind === 4).records[1];assert.deepEqual(reordered.rgb.palette[record[1]], {h: 177, s: 199, v: 188});
 });
+
+test("new facts, event construction and timed working budget use the real guarded draft", () => {
+    const caps = {...capabilities, lighting: require('../fixtures/lighting-capabilities').lightingCapabilities()};
+    const doc = pdDocument(), draft = new ProfileDraftSession({document:doc, fingerprint:portable.fingerprint(doc), summary:portable.summary(doc)}, 'test-device', caps);
+    const make = (kind, params, timing, duration) => ({flags:0,brightness:177,parts:[{slot:0,kind,params},{slot:2,kind:8,params:[12,127]},{slot:3,kind:9,params:[]},{slot:5,kind:timing,params:[duration&255,duration>>8]}]});
+    stage(draft, edits.lightingRule(-1,'','add',{rule:make(28,[127],3,777)}));
+    assert.equal(decoded(draft).rgb.rules[0].parts.at(-1).params[0],9); // 777 little endian
+    const key=draft.lightingKeys?.[0]??draft.view({selectedDeviceId:'test-device',connected:true}).id;
+    stage(draft, ruleMessage(draft,0,'configure',{rule:make(13,[127],2,999)}));
+    assert.equal(decoded(draft).rgb.rules[0].parts[0].kind,13);
+    draft.undo(draft.revision);assert.equal(decoded(draft).rgb.rules[0].parts[0].kind,28);
+    draft.redo(draft.revision);assert.equal(decoded(draft).rgb.rules[0].parts[0].kind,13);
+    const before=draft.document;
+    const invalid=make(28,[127],3,777);invalid.parts[0].slot=1;
+    assert.throws(()=>stage(draft,edits.lightingRule(-1,'','add',{rule:invalid})),/INVALID_STRUCTURE/);assert.deepEqual(draft.document,before);
+    stage(draft,edits.lightingIdentity({kind:5,id:127,field:'colour',slot:1,colour:{h:177,s:199,v:188}}));
+    assert.deepEqual(decoded(draft).rgb.palette[decoded(draft).rgb.things.find(t=>t.kind===5).records[127][1]],{h:177,s:199,v:188});
+    // A broad behaviour tail is structurally valid but cannot activate. Keep
+    // its exact bytes in the draft, exported backup, Undo and Review.
+    stage(draft,edits.lightingRule(-1,'','add',{rule:make(8,[255,4],2,777)}));
+    assert.equal(draft.hasBlockers(),true);
+    assert.equal(draft.checks().some(c=>c.kind==='lightingWorkingMemory'&&c.level==='blocker'),true);
+    assert.deepEqual(portable.validateSnapshot(JSON.parse(JSON.stringify(draft.document))).rgb,decoded(draft).rgb);
+    stage(draft,ruleMessage(draft,0,'toggle'));assert.equal(draft.checks().some(c=>c.kind==='lightingWorkingMemory'&&c.status!=='fixed'),false);
+    assert.ok(key);
+});

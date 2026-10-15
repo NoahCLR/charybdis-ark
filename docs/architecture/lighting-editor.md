@@ -55,9 +55,7 @@ selectors and the outcome paint require their advertised capability bits.
 
 Keys has a Lighting tab for the current layer; each behaviour, combo,
 pointing-mode, macro and custom-key editor also offers it. The tab names its
-identity, place and deciding rules, marking shared rules as inherited. Macros
-currently have no lighting fact or identity table, so their tab explains that
-capability limit. A custom key uses its stored behaviour's identity. Customise
+identity, place and deciding rules, marking shared rules as inherited. Macro identity and Customise require both advertised macro identity and playing-state support; absent capabilities retain the explanatory read-only tab. A custom key uses its stored behaviour's identity. Customise
 opens a painted look for the selected thing; it reopens an existing map when
 one exists. The Keys board remains an identity preview, not an arbitrary rule
 renderer or LED telemetry.
@@ -93,5 +91,72 @@ not LED calibration. Shadowing is reported only when a higher known untimed
 opaque rule provably covers the lower condition and target. Existing proven
 layer/combo reachability findings inform impossible lighting conditions.
 Unknown kinds and memory at 90% warn; destination brightness violations block.
-Inspector, gesture timeline, presets, new state families and live mode remain
-later phases.
+Inspector, gesture timeline, presets and live mode remain later phases.
+
+
+## Facts, construction and local simulation
+
+The pinned firmware contract owns each descriptor's parameter widths, subject
+kind, construction role and retained ordering. The application implements the
+open registries in `schema/lighting-kinds-v1.js`; model vocabulary supplies all
+stored-value words. The connected bitmaps select offered kinds. The rule editor
+saves whole known rules through the guarded `editLightingRule` builder and core
+validation; adding a rule creates a stable draft rule key. It never assembles a
+second stored program in browser state. Unsaved form changes are local until
+Save rule. State conditions are independently negatable; events are positive
+first triggers with explicit flash. Linger is state/board only. The constructor
+removes incompatible timing when changing between state and event roles.
+
+The pure simulator registry walkers consume an explicit situation and a native
+keymap basis posted with each draft. The basis contains native key values,
+authored behaviour row ids and enabled/layer-qualified combo inputs. Query
+selection and what-it-does paint share the direct native-action interpretation;
+neither infers arbitrary branches, automatic activation provenance or Host OS.
+Every advertised fact, target, paint and timing is covered by shared vectors.
+
+Local timing stores whole last-matching ordered batches per (rule, thing).
+Partial owner refresh replaces that batch without renewing its entry token.
+Full departure retains only an eligible batch; full re-entry renews the token.
+Filters qualify at event occurrence; a nonqualifying repeat preserves the old
+flash and a qualifying repeat replaces it. Natural module priority precedes
+newer full-match entry order, then kind/id/authored order. Monotonic observation
+tokens are independent of saturated lifetime ages and wrapping timer samples.
+The existing Standard auto-mouse scene fade and pulses retain their parity.
+
+Event show-after runs inside the original flash interval. State departure
+cannot mature a previously unmet show-after. The simulator is an authored local
+timeline, not live telemetry or a split transport emulator. Each half renders
+locally; the firmware's conservative freshness is conditional on nominal
+equal-rate logical millisecond timers, not measured crystal drift. Unknown age
+suppresses transient paint; late arrival never deliberately restarts a window.
+
+The pinned RGB geometry associates LED55 with matrix56, while the last physical
+layout key is matrix59 with no LED association. The simulator's relative targets,
+queries and what-it-does paint use that RGB matrix map. Fixed LED55 bytes, the
+existing painter schematic and identity-board layout indices remain unchanged.
+The situation explains this distinction. Hardware and metadata reconciliation
+is a separate follow-up; no physical wiring conclusion follows from these files.
+
+## Working-memory admission
+
+GET0x0D page15 carries a model id, capacity, owner-bitmap bytes and layout sizes;
+page128+fact-id carries compiled subject-domain, selector-parameter and maximum
+whole-batch-member bounds. Optional unknown pages remain unavailable; malformed
+pages fail. Unknown model ids are retained without interpreting their layout.
+No capacity is inferred from absent metadata or ordinary registry support.
+
+For supported model1, enabled new flash/linger rules reserve
+`B=ownerBytes`, `C=align4(12+M*(5+B))`, `S=sum(12+N*C)`, `W=max(C)` and
+`Q=2*S+W`, with zero when no new timing is enabled. A named selector uses N=1;
+Any uses the module's complete subject domain. Checked u32 arithmetic and
+validated bounds reject overflow. Filters, occupancy, duration and sharing give
+no discount. The current pinned build reports 8220 bytes; this is device data,
+not a runtime default. Existing state/show-after and Standard acceptance is
+unchanged. Saved v5 remains bounded by 8192 bytes and its existing byte counts.
+
+Structural decoding deliberately retains an over-budget imported program. The
+model publishes needed/available bytes and per-rule contributions separately
+from saved bytes. Review blocks activation, and the shared restore path checks
+admission before any recovery write or candidate mutation. Firmware validates
+again before publication. Disabled timed rules reserve no working space; unknown
+rule bytes remain read-only and are never rewritten to repair a budget.

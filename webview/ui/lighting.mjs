@@ -11,7 +11,11 @@ import {lightingMemoryCard} from "./lighting-memory.mjs";
 let selected = null;
 /** @type {{index: number, identity: string} | null} */
 let dragged = null;
+/** @type {{index: number; identity: string; key: string} | null} */
+let pressedRule = null;
 
+import {lightingRuleConfiguration} from "./lighting-rule-editor.mjs";
+import {lightingSituationCard} from "./lighting-situation.mjs";
 import {painterOpen, lightingPainter, openPainter, followPaintedRule} from "./lighting-painter.mjs";
 export function screenLighting() {
     followPaintedRule();
@@ -24,9 +28,13 @@ export function screenLighting() {
     const pad = el(`<div class="pad lighting-pad"></div>`), content = el(`<div class="content"></div>`);
     const memory = lightingMemoryCard(model); if (memory) pad.append(memory);
     const editableLighting = canEdit("lighting"), rules = lighting.rules;
+    pad.append(lightingSituationCard());
     if (!rules.some(r => r.key === selected)) selected = rules[0]?.key ?? null;
     const fade = lighting.program.extensions.find(e => e.kind === 1);
-    const split = el(`<div class="lighting-workbench"><div class="card lighting-rule-list"><div class="card-h"><h3>Lighting rules</h3><span class="right note">${rules.length} rule${rules.length === 1 ? "" : "s"}</span></div><div class="rule-list-body"></div></div><div class="card lighting-rule-editor"></div></div>`);
+    const split = el(`<div class="lighting-workbench"><div class="card lighting-rule-list"><div class="card-h"><h3>Lighting rules</h3><button class="btn tiny" data-new-rule>Add rule</button><span class="right note">${rules.length} rule${rules.length === 1 ? "" : "s"}</span></div><div class="rule-list-body"></div></div><div class="card lighting-rule-editor"></div></div>`);
+    const add = /** @type {HTMLButtonElement} */ (split.querySelector("[data-new-rule]"));
+    add.disabled = !editableLighting || !lighting.supportedTargets.includes(0) || !lighting.supportedPaints.some(id => id === 0 || id === 1);
+    add.addEventListener("click", () => {selected = null;post(lightingRule(-1, "", "add", {rule: {flags: 0, brightness: 255, parts: [{slot: 2, kind: 0, params: []}, {slot: 3, kind: lighting.supportedPaints.includes(0) ? 0 : 1, params: []}]}}));});
     const list = /** @type {HTMLElement} */ (split.querySelector(".rule-list-body"));
     if (!rules.length) list.append(el(`<div class="card-b"><p class="note">No rules paint over the keyboard's base effect.</p></div>`));
     let band = "";
@@ -44,11 +52,18 @@ export function screenLighting() {
         row.querySelector("input")?.addEventListener("change", () => send("toggle"));
         row.querySelector("[data-up]")?.addEventListener("click", () => send("move", {to: rule.index - 1}));
         row.querySelector("[data-down]")?.addEventListener("click", () => send("move", {to: rule.index + 1}));
-        row.addEventListener("dragstart", event => {dragged = {index: rule.index, identity: rule.identity};event.dataTransfer?.setData("text/plain", rule.key);});
+        // Browser auto-scroll can move a neighbour under the original pointer
+        // before dragstart. Keep the rule actually pressed as the source.
+        row.addEventListener("pointerdown", event => {if (editable && event.button === 0) pressedRule = {index: rule.index, identity: rule.identity, key: rule.key};});
+        row.addEventListener("pointerup", () => {pressedRule = null;});
+        row.addEventListener("dragstart", event => {
+            const source = pressedRule ?? {index: rule.index, identity: rule.identity, key: rule.key};
+            dragged = {index: source.index, identity: source.identity};event.dataTransfer?.setData("text/plain", source.key);
+        });
         row.addEventListener("dragover", event => {if (dragged) {event.preventDefault();row.classList.add("drop-target");}});
         row.addEventListener("dragleave", () => row.classList.remove("drop-target"));
         row.addEventListener("drop", event => {event.preventDefault();if (dragged && dragged.index !== rule.index) post(lightingRule(dragged.index, dragged.identity, "move", {to: rule.index}));dragged = null;row.classList.remove("drop-target");});
-        row.addEventListener("dragend", () => {dragged = null;});
+        row.addEventListener("dragend", () => {dragged = null;pressedRule = null;});
         list.append(row);
     }
     const editor = /** @type {HTMLElement} */ (split.querySelector(".lighting-rule-editor")), rule = rules.find(r => r.key === selected);
@@ -68,6 +83,7 @@ export function screenLighting() {
             const paint = el(`<button class="btn" ${editableLighting ? "" : "disabled"}>Paint keys…</button>`);
             paint.addEventListener("click", () => openPainter({index: rule.index, title: rule.when}));body.append(paint);
         }
+        if (!rule.readOnly) body.append(lightingRuleConfiguration(rule));
         editor.append(body);
     } else editor.append(el(`<div class="card-b"><p class="note">Select a rule to change its paint colour.</p></div>`));
     pad.append(split);content.append(pad);main.append(content);return main;

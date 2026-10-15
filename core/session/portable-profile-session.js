@@ -271,6 +271,8 @@ async function restoreProfile(connection, ids, capabilities, input, {expectedFin
         requireReady(capabilities);
         requireReady(capabilities, true);
         const target = validateSnapshot(translateBackup(input, capabilities), capabilities);
+        const cost = require("../schema/lighting-working-v1").lightingWorkingCost(target.rgb, capabilities.lighting?.working);
+        if (!cost.admitted) throw fail("LIGHTING_WORKING_CAPACITY", cost.reason ?? `Lighting needs ${cost.required} bytes of working memory; the keyboard provides ${cost.capacity}.`);
         const document = target.document;
         const saveCopy = saveRecovery;
         if (typeof saveCopy !== "function") throw fail("RECOVERY_REQUIRED", "Save a recovery copy before restoring this keyboard.");

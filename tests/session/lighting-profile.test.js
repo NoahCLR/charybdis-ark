@@ -52,3 +52,13 @@ test("restore converts a current-schema v4 backup before staging or recovery wri
     assert.equal(validateSnapshot(saved.document).rgb.formatVersion,5);
     assert.notEqual(saved.fingerprint,read.fingerprint);
 });
+
+test("working-memory rejection precedes recovery/candidate writes while keeping imported bytes", async t=>{
+ const source=document(),{service}=await connectedService(t,{keyboard:writableKeyboard({document:source})},{sleep:async()=>{}});
+ const read=await service.readPortableProfile(),target=structuredClone(read.document),blob=decodeProfileBlob(Buffer.from(target.profile,'base64'));
+ const fixture=vectors.workingMemory.find(v=>v.name==='one-more-named-overbudget');blob.domains.find(d=>d.id===16).payload=Buffer.from(fixture.hex,'hex');target.profile=encodeProfileBlob(blob).toString('base64');
+ const draft=new ProfileDraftSession(read,'test',service.capabilities);draft.replace(target,draft.revision,"import");
+ assert.equal(draft.hasBlockers(),true);assert.deepEqual(rgbBytes(draft.document),Buffer.from(fixture.hex,'hex'));
+ let recovery=false;await assert.rejects(()=>service.restorePortableProfile(target,{saveRecovery:async()=>{recovery=true;return '/fake';}}),e=>e.code==='LIGHTING_WORKING_CAPACITY');assert.equal(recovery,false);
+ assert.deepEqual(rgbBytes((await service.readPortableProfile()).document),rgbBytes(source));
+});

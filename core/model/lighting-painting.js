@@ -34,7 +34,7 @@ function paletteColour(program, colour, options) {
 /** @param {Program} program @param {number} kind @param {number} id @param {Options} options */
 function thingRecord(program, kind, id, options) {
     supported(options, "things", kind);
-    const count = kind === 1 ? options.logicalLayers ?? 16 : kind === 2 ? 32 : 128;
+    const count = kind === 1 ? options.logicalLayers ?? 16 : kind === 2 ? 32 : kind === 6 ? 8 : kind === 7 ? 60 : 128;
     if (!Number.isInteger(id) || id < 0 || id >= count) fail("Choose a stored lighting identity.");
     let table = program.things.find(t => t.kind === kind);
     if (!table) {
@@ -78,12 +78,12 @@ function editLightingIdentity(bytes, edit, options) {
     }
     // The original parity facts use aggregate defaults. A named identity
     // needs a named subject rule to be visible on the keyboard.
-    if (edit.kind === 3 || edit.kind === 4) {
+    if (edit.kind === 3 || edit.kind === 4 || edit.kind === 5) {
         const condition = subjectCondition(program, edit.kind, edit.id, options);
         if (!program.rules.some(r => knownRule(r) && r.parts.some(p => JSON.stringify(p) === JSON.stringify(condition)) && r.parts.some(p => p.slot === 3 && p.kind === 3))) {
             supported(options, "targets", 7);supported(options, "paints", 3);
             const rule = {flags: 0, brightness: 255, parts: [condition, {slot: 2, kind: 7, params: []}, {slot: 3, kind: 3, params: []}]};
-            let at = program.rules.findIndex(r => ruleBand(r) === (edit.kind === 3 ? "combos" : "feedback"));
+            let at = program.rules.findIndex(r => ruleBand(r) === (edit.kind === 3 ? "combos" : edit.kind === 5 ? "macros" : "feedback"));
             const own = program.rules.map((r, index) => r.parts.some(p => p.slot === 0 && p.kind === condition.kind && p.params[0] === edit.id) ? index : -1).filter(index => index >= 0);
             if (own.length) at = Math.max(...own) + 1;
             program.rules.splice(at < 0 ? 0 : at, 0, rule);
@@ -95,7 +95,7 @@ function editLightingIdentity(bytes, edit, options) {
 function subjectCondition(program, kind, id, options) {
     thingRecord(program, kind, id, options);
     // Named selectors for combo/behaviour are adopted with the phase 2 firmware.
-    const fact = kind === 1 ? 1 : kind === 2 ? 3 : kind === 3 ? 7 : 8;
+    const fact = kind === 1 ? 1 : kind === 2 ? 3 : kind === 3 ? 7 : kind === 5 ? 13 : kind === 7 ? 14 : 8;
     supported(options, "facts", fact);
     return {slot: 0, kind: fact, params: kind === 4 ? [id, 15] : kind === 3 ? [id, 255] : [id]};
 }
@@ -125,7 +125,7 @@ function paintLightingMap(bytes, edit, options) {
     }
     const paint = rule.parts.find(p => p.slot === 3);
     if (!paint) fail("This rule has no paint.");
-    let cells = paint.kind === 4 ? [...program.maps[paint.params[0]]] : Array(58).fill(paint.kind === 2 ? paint.params[0] : [0, 1, 3, 8].includes(paint.kind) ? 128 + paint.kind : 128);
+    let cells = paint.kind === 4 ? [...program.maps[paint.params[0]]] : Array(58).fill(paint.kind === 2 ? paint.params[0] : [0, 1, 3, 8, 9].includes(paint.kind) ? 128 + paint.kind : 128);
     if (edit.cells) {
         if (edit.cells.length !== 58) fail("A painted map must describe the whole board.");
         cells = [...edit.cells];

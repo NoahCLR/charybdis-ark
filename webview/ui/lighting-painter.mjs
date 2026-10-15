@@ -64,7 +64,7 @@ export function lightingPainter() {
     node.querySelector("[data-copy]")?.addEventListener("click", () => send({cells: copyLayerCells(model, copyLayer)}));
     for (const button of node.querySelectorAll("[data-mirror]")) button.addEventListener("click", () => send({cells: mirrorMap(cells, /** @type {'left' | 'right'} */ (/** @type {HTMLElement} */ (button).dataset.mirror))}));
     const paints = node.querySelector("[data-paints]");
-    for (const [kind, name] of [[0, "Clear"], [1, "Off"], [3, "Identity"], [8, "Outcome"]]) if (lighting.supportedPaints.includes(Number(kind)) && (kind !== 8 || ctx.subject?.kind === 4 || rule && lighting.program.rules[rule.index]?.parts.some(p => p.slot === 0 && p.kind === 8))) {
+    for (const [kind, name] of [[0, "Clear"], [1, "Off"], [3, "Identity"], [8, "Outcome"], [9, "What it does"]]) if (lighting.supportedPaints.includes(Number(kind)) && (kind !== 8 || ctx.subject?.kind === 4 || rule && lighting.program.rules[rule.index]?.parts.some(p => p.slot === 0 && p.kind === 8))) {
         const b = el(`<button class="btn tiny ${brush === 128 + Number(kind) ? "primary" : ""}">${esc(name)}</button>`);b.addEventListener("click", () => {brush = 128 + Number(kind);render();});paints?.append(b);
     }
     if (lighting.supportedPaints.includes(2)) node.querySelector("[data-colour]")?.append(colourEditor({identity: "painter:brush", title: "Colour", offNote: typeof brush === "number" ? "Choose a saved colour, or give the brush a colour." : undefined, colour: typeof brush === "number" ? null : brush, zeroMeansClear: false, maximumBrightness: model.rgb.maximumBrightness, canEdit: editable,
@@ -82,12 +82,12 @@ export function lightingPainter() {
     for (const glow of picture.querySelectorAll(".kc-glow")) glow.remove();
     const ball = picture.querySelector("[data-trackball]");ball?.classList.remove("glass", "sel");
     const condition = ctx.index === undefined ? undefined : lighting.program.rules[ctx.index]?.parts.find(p => p.slot === 0);
-    const subject = ctx.subject ?? (condition ? {kind: condition.kind <= 2 ? 1 : condition.kind === 3 ? 2 : condition.kind === 4 || condition.kind === 7 ? 3 : 4, id: condition.kind === 4 || condition.kind === 5 ? 255 : condition.params[0] === 255 ? layer?.index ?? 0 : condition.params[0]} : null);
+    const subject = ctx.subject ?? (condition ? {kind: lighting.descriptors.facts[condition.kind]?.thing ?? 0, id: condition.kind === 4 || condition.kind === 5 ? 255 : condition.params[0] === 255 ? layer?.index ?? 0 : condition.params[0]} : null);
     const identity = subject ? identityValue(model, subject).colour : null;
     const situation = el(`<p class="note painter-situation">${esc(rule?.when || (ctx.subject?.kind === 1 ? `${ctx.title} is active` : ctx.subject?.kind === 2 ? `${ctx.title} is active` : ctx.subject?.kind === 3 ? `${ctx.title} is held` : `${ctx.title} shows feedback`))} · showing keys from ${esc(layer?.displayName || layer?.name || "the current layer")}</p>`);
     node.querySelector(".painter-toolbar")?.after(situation);
     for (const group of picture.querySelectorAll("[data-key]")) {
-        const led = LED_INDEX[Number(/** @type {HTMLElement} */ (group).dataset.key)], colour = mapPaintColour(model, cells[led], identity);
+        const led = LED_INDEX[Number(/** @type {HTMLElement} */ (group).dataset.key)], colour = mapPaintColour(model, cells[led], identity, led, layer?.index);
         group.querySelector(".kc-rect")?.setAttribute("style", colour ? `fill:${css(colour)};stroke:var(--light-outline)` : "fill:var(--surface-2);stroke:var(--line);stroke-dasharray:4 3");
         if (colour) for (const text of group.querySelectorAll("text")) text.setAttribute("style", `fill:${idealText(colour)}`);
     }
@@ -114,7 +114,7 @@ export function lightingPainter() {
     const cancel = () => {drawing = false;window.removeEventListener("pointerup", finish);window.removeEventListener("pointercancel", cancel);render();};
     picture.addEventListener("pointerdown", () => {if (drawing) {window.addEventListener("pointerup", finish);window.addEventListener("pointercancel", cancel);}});
     for (const b of node.querySelectorAll("[data-extra]")) b.addEventListener("click", () => activate(Number(/** @type {HTMLElement} */ (b).dataset.extra)));
-    const ballColour = mapPaintColour(model, cells[56], identity);
+    const ballColour = mapPaintColour(model, cells[56], identity, 56, layer?.index);
     ball?.querySelector("circle")?.setAttribute("style", ballColour ? `fill:${css(ballColour)}` : "fill:var(--surface-2);stroke:var(--line-2);stroke-dasharray:4 3");
 
     for (const text of picture.querySelectorAll(".kc-label, .kc-sub")) if (!text.closest("[data-key]")?.querySelector(".kc-rect")?.getAttribute("style")?.includes("rgb")) text.setAttribute("style", "fill:var(--text)");

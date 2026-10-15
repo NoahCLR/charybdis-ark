@@ -108,7 +108,8 @@ function buildSnapshotModel(snapshot, capabilities, binding, deviceState = {}) {
         keyboardNameView: keyboardNameView(current, deviceState.storedKeyboardName === "" ? deviceState.device?.product || "" : ""),
         identity: null,
     }, capabilities, {busy: !editable, behaviors: editable, pointing: editable, combos: editable, macros: editable, settings: editable, customKeys: editable});
-    if (model.rgb.lighting) model.rgb.lighting = require("../model/lighting-view").lightingForView(value.rgb, settings.names, capabilities?.lighting, snapshot.lightingKeys, {modes: model.pdModes.map(s => s.displayName || s.name), combos: model.combos.map(c => c.badge), behaviours: model.keyBehaviors.map(b => model.qmkKeyLabels[b.keycode] || b.keycode)});
+    if (model.rgb.lighting) model.rgb.lighting = require("../model/lighting-view").lightingForView(value.rgb, settings.names, capabilities?.lighting, snapshot.lightingKeys, {modes: model.pdModes.map(s => s.displayName || s.name), combos: model.combos.map(c => c.badge), behaviours: model.keyBehaviors.map(b => model.qmkKeyLabels[b.keycode] || b.keycode), macros: model.viaMacros.map(m => m.name)});
+    if (model.rgb.lighting) Object.assign(model.rgb.lighting, require("../model/lighting-view").lightingKeymap(value));
     model.layers.forEach((layer, index) => {layer.displayName = snapshot.summary.names[index];});
     return {...model, ...deviceSummary(deviceState)};
 }

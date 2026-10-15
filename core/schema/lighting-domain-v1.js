@@ -48,6 +48,7 @@ function decodeLightingDomain(value, options = {}) {
         if (type === "thing" && v !== 255 && v >= 128) fail("INVALID_PARAMETER", offset);
         if (type === "role" && ![0, 1, 255].includes(v)) fail("INVALID_PARAMETER", offset);
         if (type === "states" && (!v || v & 240)) fail("INVALID_PARAMETER", offset);
+        if ((type === "layerStatus" && v > 3) || (type === "modeStatus" && v > 1) || (type === "behaviourPhase" && v > 4) || (type === "keyQuery" && v > 15) || (type === "modifier" && v > 3) || (type === "side" && v > 2) || (type === "modifierState" && v > 1) || (type === "hostLock" && v > 2) || (type === "pointerState" && v > 3) || (type === "keySelector" && v !== 255 && v >= 60) || (type === "tapSelector" && v !== 255 && (v < 1 || v > limits.tapDepth))) fail("INVALID_PARAMETER", offset);
         if (type === "scope" && v > 3) fail("INVALID_PARAMETER", offset);
         if ((type === "set" && v >= K) || (type === "colour" && v >= P) || (type === "map" && v >= M) || (type === "base" && v > R)) fail("INVALID_REFERENCE", offset);
         if (type === "milliseconds" && !(v | data[offset + 1] << 8)) fail("INVALID_PARAMETER", offset);
@@ -63,7 +64,7 @@ function decodeLightingDomain(value, options = {}) {
         need(at, 2); const kind = data[at], count = data[at + 1];
         if (!supported("things", kind) || !KINDS.things[kind]) fail("UNSUPPORTED_KIND", at);
         if (kind <= previous) fail("NONCANONICAL_ORDER", at); previous = kind;
-        if (count > (kind === 1 ? limits.logicalLayers : kind === 2 ? 32 : 128)) fail("CAPACITY_EXCEEDED", at + 1);
+        if (count > (kind === 1 ? limits.logicalLayers : kind === 2 ? 32 : kind === 6 ? 8 : kind === 7 ? 60 : 128)) fail("CAPACITY_EXCEEDED", at + 1);
         const size = kind === 4 ? 1 + 3 + limits.tapDepth - 1 : 2;
         at += 2; const records = [];
         for (let record = 0; record <= count; record++) {
@@ -108,7 +109,7 @@ function decodeLightingDomain(value, options = {}) {
         if (size < 6) fail("INVALID_LENGTH", at); need(at, 1 + size);
         if (data[at + 1] & 254) fail("RESERVED_BITS", at + 1);
         const end = at + 1 + size, rule = {flags: data[at + 1], brightness: data[at + 2], parts: /** @type {import('./lighting-types.js').LightingPart[]} */ ([]), known: true};
-        at += 3; let rank = 0, conditions = 0, timings = 0; const singles = new Set(), last = [-1, -1, -1, -1, -1, -1, -1];
+        at += 3; let event = false, window = false, unknownTrigger = false, unknownTiming = false; let rank = 0, conditions = 0, timings = 0; const singles = new Set(), last = [-1, -1, -1, -1, -1, -1, -1];
         while (at < end) {
             if (at + 2 > end) fail("INVALID_LENGTH", at);
             const slot = data[at] >> 5, length = data[at] & 31, kind = data[at + 1];
@@ -123,6 +124,16 @@ function decodeLightingDomain(value, options = {}) {
             const registry = LIGHTING_SLOTS[slot], descriptor = KINDS[registry][kind];
             if (!supported(registry, kind) || (!descriptor && !limits.allowUnknown)) fail("UNSUPPORTED_KIND", at + 1);
             if (length > 16 || (descriptor && length !== parameterLength(descriptor)) || at + 2 + length > end) fail("INVALID_LENGTH", at);
+            if (slot === 0 && conditions === 1 && !descriptor) unknownTrigger = true;
+            if (slot === 5 && !descriptor) unknownTiming = true;
+            if (slot < 2 && descriptor?.construction === "event") {
+                if (slot !== 0 || conditions !== 1) fail("INVALID_STRUCTURE", at);
+                event = true;
+            }
+            if (slot === 5) {
+                if (descriptor?.construction === "stateTail" && event || descriptor?.construction === "eventWindow" && !event && !unknownTrigger) fail("INVALID_STRUCTURE", at);
+                window ||= descriptor?.construction === "eventWindow";
+            }
             if (descriptor) {
                 let p = at + 2;
                 for (const type of descriptor.parameters) {parameter(type, p); p += type === "milliseconds" ? 2 : 1;}
@@ -130,6 +141,7 @@ function decodeLightingDomain(value, options = {}) {
             if ((slot === 3 || slot === 4) && kind === 4 && result.maps[data[at + 2]].some(value => value >= 128 && !KINDS.paints[value - 128])) rule.known = false;
             rule.parts.push({slot, kind, params: [...data.subarray(at + 2, at + 2 + length)]}); at += 2 + length;
         }
+        if (event && !window && !unknownTiming) fail("INVALID_STRUCTURE", start);
         if (!singles.has(2) || !singles.has(3)) fail("INVALID_STRUCTURE", start);
         result.rules.push(rule);
     }

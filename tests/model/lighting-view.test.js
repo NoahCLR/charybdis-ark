@@ -11,3 +11,12 @@ test("lighting view reports ordered bands, retained zeros and device colour supp
  caps.registries.paints.push(2);assert.ok(lightingForView(d,[],caps).rules.every(r=>r.canColour));
  assert.equal(v.rules[0].band,"feedback");assert.equal(v.rules.at(-1).band,"layers");assert.deepEqual(lightingIdentities(d).layerColors[0].color,{h:0,s:0,v:0});
 });
+
+test("native keymap query basis follows remaps and exact authored rows and combo layers",()=>{
+ const {validateSnapshot}=require('../../core/model/portable-profile'),{lightingKeymap}=require('../../core/model/lighting-view');
+ const doc=require('../fixtures/pd-profile').document(),d=validateSnapshot(doc);d.document.layers[3][59]=0x777f;d.document.layers[3][56]=0x5222;
+ const native=require('../../core/schema/actions').nativeCode(d.behaviors.rows[0].target);d.document.layers[3][0]=native;
+ let b=lightingKeymap(d);assert.equal(b.keymap[3][0].behaviour,0);assert.equal(b.keymap[3][59].code,0x777f);assert.equal(b.keymap[3][56].code,0x5222);
+ d.document.layers[3][59]=0x7e9f;b=lightingKeymap(d);assert.equal(b.keymap[3][59].code,0x7e9f);
+ for(const [id,c] of Object.entries(b.queryCombos)){assert.equal(c.enabled,d.combos.rows[id].enabled);assert.ok(c.inputs.every(Number.isInteger));}
+});

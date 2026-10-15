@@ -13,7 +13,7 @@ export function identityValue(model, subject, slot = 1) {
 export function subjectRules(model, subject) {
     return (model?.rgb?.lighting?.rules ?? []).flatMap(rule => {
         const parts = model?.rgb?.lighting?.program.rules[rule.index]?.parts ?? [];
-        const fact = subject.kind === 1 ? [1, 2] : subject.kind === 2 ? [3] : subject.kind === 3 ? [4, 7] : [5, 8];
+        const fact = subject.kind === 1 ? [1, 2, 9, 19, 20, 21] : subject.kind === 2 ? [3, 10, 22, 23] : subject.kind === 3 ? [4, 7, 11, 24] : subject.kind === 5 ? [13, 28] : [5, 8, 12, 25, 26, 27];
         const matches = parts.filter(p => p.slot <= 1 && fact.includes(p.kind) &&
             (p.kind === 4 || p.kind === 5 || p.params[0] === 255 || p.params[0] === subject.id));
         if (!matches.length) return [];
@@ -22,14 +22,14 @@ export function subjectRules(model, subject) {
 }
 /** @param {import('../../contracts/panel.js').PublishedModel | null | undefined} model @param {Subject} subject */
 export function canPaintSubject(model, subject) {
-    const lighting = model?.rgb?.lighting, fact = subject.kind === 1 ? 1 : subject.kind === 2 ? 3 : subject.kind === 3 ? 7 : 8;
-    return Boolean([1, 2, 3, 4].includes(subject.kind) && lighting?.supportedThings.includes(subject.kind) && lighting.supportedFacts.includes(fact) && lighting.supportedPaints.includes(4) && lighting.supportedTargets.includes(0));
+    const lighting = model?.rgb?.lighting, fact = subject.kind === 1 ? 1 : subject.kind === 2 ? 3 : subject.kind === 3 ? 7 : subject.kind === 5 ? 13 : 8;
+    return Boolean([1, 2, 3, 4, 5].includes(subject.kind) && lighting?.supportedThings.includes(subject.kind) && lighting.supportedFacts.includes(fact) && lighting.supportedPaints.includes(4) && lighting.supportedTargets.includes(0));
 }
 /** @param {import('../../contracts/panel.js').PublishedModel | null | undefined} model @param {Subject} subject */
 export function canCustomiseIdentity(model, subject) {
     const lighting = model?.rgb?.lighting;
-    return Boolean([1, 2, 3, 4].includes(subject.kind) && lighting?.supportedThings.includes(subject.kind) && (subject.kind < 3 ||
-        lighting.supportedFacts.includes(subject.kind === 3 ? 7 : 8) && lighting.supportedPaints.includes(3) && lighting.supportedTargets.includes(7)));
+    return Boolean([1, 2, 3, 4, 5].includes(subject.kind) && lighting?.supportedThings.includes(subject.kind) && (subject.kind < 3 ||
+        lighting.supportedFacts.includes(subject.kind === 3 ? 7 : subject.kind === 5 ? 13 : 8) && lighting.supportedPaints.includes(3) && lighting.supportedTargets.includes(7)));
 }
 /** @param {import('../../contracts/panel.js').Layer | undefined} layer @param {string} query @param {import("../../contracts/panel.js").PublishedModel | null} [model] */
 export function selectPaintKeys(layer, query, model) {
@@ -74,7 +74,7 @@ export function paintedCells(model, index) {
     const program = model?.rgb?.lighting?.program, rule = index === undefined ? undefined : program?.rules[index];
     const paint = rule?.parts.find(p => p.slot === 3);
     if (paint?.kind === 4) return program?.maps[paint.params[0]] ?? Array(58).fill(128);
-    const cell = paint?.kind === 2 ? paint.params[0] : paint && [0, 1, 3, 8].includes(paint.kind) ? 128 + paint.kind : 128;
+    const cell = paint?.kind === 2 ? paint.params[0] : paint && [0, 1, 3, 8, 9].includes(paint.kind) ? 128 + paint.kind : 128;
     return Array(58).fill(cell);
 }
 

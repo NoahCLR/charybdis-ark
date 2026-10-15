@@ -19,13 +19,18 @@ function remapLightingThings(program, kind, previousIds) {
         table.records = previousIds.map(id => id === null ? table.default.map(() => 254) : [...(old[id] ?? table.default.map(() => 254))]);
         while (table.records.length && table.records.at(-1)?.every(n => n === 254)) table.records.pop();
     }
-    const selector = kind === 3 ? 7 : 8, removed = new Set();
+    const selectors = kind === 3 ? [7, 11, 24] : [8, 12, 25, 26, 27], removed = new Set();
     program.rules = program.rules.filter((rule, at) => {
         if (!knownRule(rule)) return true;
-        for (const p of rule.parts) if (p.slot <= 1 && p.kind === selector && p.params[0] !== 255) {
+        for (const p of rule.parts) if (p.slot <= 1 && selectors.includes(p.kind) && p.params[0] !== 255) {
             const id = previousIds.indexOf(p.params[0]);
             if (id < 0) {removed.add(at);return false;}
             p.params[0] = id;
+        }
+        for (const p of rule.parts) if (p.slot === 2 && p.kind === 8 && p.params[0] === (kind === 3 ? 15 : 14) && p.params[1] !== 255) {
+            const id = previousIds.indexOf(p.params[1]);
+            if (id < 0) {removed.add(at);return false;}
+            p.params[1] = id;
         }
         return true;
     });

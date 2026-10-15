@@ -1565,3 +1565,13 @@ details > summary { list-style: none; }
 .identity-colours { min-width: 0; }
 .identity-rules { min-width: 0; }
 @media (max-width: 1150px) { .thing-lighting-layout { grid-template-columns: 1fr; } }
+
+.lighting-configuration { border-top: 1px solid var(--line); padding-top: 16px; }
+.lighting-condition { border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
+.lighting-parameters { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 8px; }
+.lighting-chips { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.lighting-simulation-board { width: 100%; max-height: 370px; }
+.lighting-simulation-board text { font-size: 16px; paint-order: stroke; fill: var(--text); stroke: var(--surface); stroke-width: 2px; }
+.lighting-working-memory { margin-top: 12px; }
+
+.situation-controls > div { padding-top: 12px; }

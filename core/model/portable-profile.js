@@ -314,7 +314,9 @@ function reorderLayers(document, order, names, {keysFollow = true} = {}) {
     }
     for (const rule of rgb.rules) for (const part of rule.parts) {
         if (!require("./lighting-editor").knownRule(rule)) continue;
-        if (part.slot <= 1 && (part.kind === 1 || part.kind === 2) && part.params[0] !== 255) part.params[0] = remap[part.params[0]];
+        if (part.slot <= 1 && [1, 2, 9, 19, 20, 21].includes(part.kind) && part.params[0] !== 255) part.params[0] = remap[part.params[0]];
+        if (part.slot <= 1 && part.kind === 11 && part.params[1] !== 255) part.params[1] = remap[part.params[1]];
+        if (part.slot === 2 && part.kind === 8 && part.params[0] === 10 && part.params[1] !== 255 && part.params[1] < LAYERS) part.params[1] = remap[part.params[1]];
     }
     // A name the editor only showed as a default ("Layer 9" for an unnamed
     // layer) stays unnamed, wherever the layer goes.

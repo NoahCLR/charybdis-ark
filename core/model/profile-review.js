@@ -260,8 +260,8 @@ function lightingRecords(rgb, names) {
     const {VOCABULARY, layerName} = require("./vocabulary");
     /** @type {Fields} */ const identities = new Map();
     for (const table of rgb.things) for (const [id, record] of [[-1, table.default], ...table.records.map((r, i) => [i, r])]) {
-        const owner = Number(id) < 0 ? `Every ${table.kind === 1 ? "layer" : table.kind === 2 ? "pointing mode" : table.kind === 3 ? "combo" : "behaviour"}`
-            : table.kind === 1 ? layerName(names, Number(id)) : `${table.kind === 2 ? "Pointing mode" : table.kind === 3 ? "Combo" : "Behaviour"} ${Number(id) + 1}`;
+        const owner = Number(id) < 0 ? `Every ${VOCABULARY.lighting.things[table.kind].toLowerCase()}`
+            : table.kind === 1 ? layerName(names, Number(id)) : `${VOCABULARY.lighting.things[table.kind]} ${Number(id) + 1}`;
         const row = /** @type {number[]} */ (record);
         row.slice(1).forEach((reference, slot) => {
             if (Number(id) >= 0 && row.every(n => n === 254)) return;

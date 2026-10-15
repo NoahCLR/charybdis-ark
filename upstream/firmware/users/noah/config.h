@@ -30,8 +30,9 @@
 
 // Profile Apply copies the profile to the other half in split RPC frames.
 // QMK sends each RPC's own length, so this raises the ceiling for the profile
-// copy's payload chunks only (up to 110 profile bytes a frame instead of 14);
-// every other split RPC keeps its 32-byte frames. The cost is 96 bytes more
+// copy's payload chunks (up to 110 profile bytes a frame instead of 14).
+// Grouped lighting events use at most 64-byte requests; other runtime RPCs
+// keep their 32-byte frames. The ceiling stays 128 bytes. Its cost is 96 bytes more
 // of the shared RPC buffer and the transport CRC's staging buffer on each
 // half. A full request alone takes about 5.6 ms on the 230,400-baud link,
 // before its reply and handshake.
@@ -62,9 +63,15 @@
 // - base runtime-visible state (automouse / pd / preview)
 // - combo feedback locality
 // - truthful key-feedback semantics and tap branch state
+// - qualified occurrence groups when the actual event consumer is enabled
 // - durable committed VIA-storage reconciliation
 // so both halves render layer-owned RGB from the same runtime and keymap data.
-#    define SPLIT_TRANSACTION_IDS_USER PUT_SPLIT_RUNTIME_BASE_SYNC, PUT_SPLIT_LIGHTING_FACTS_SYNC, PUT_VIA_KEYMAP_SYNC, PUT_VIA_KEYMAP_MIRROR, PUT_PROFILE_SPLIT_SYNC
+#    if NOAH_LIGHTING_EVENT_CAPTURE_ENABLE
+#        define NOAH_LIGHTING_EVENT_TRANSACTION_ID , PUT_SPLIT_LIGHTING_EVENTS_SYNC
+#    else
+#        define NOAH_LIGHTING_EVENT_TRANSACTION_ID
+#    endif
+#    define SPLIT_TRANSACTION_IDS_USER PUT_SPLIT_RUNTIME_BASE_SYNC, PUT_SPLIT_LIGHTING_FACTS_SYNC, PUT_VIA_KEYMAP_SYNC, PUT_VIA_KEYMAP_MIRROR, PUT_PROFILE_SPLIT_SYNC NOAH_LIGHTING_EVENT_TRANSACTION_ID
 
 // Dynamic key-local placement for PD-mode RGB overlays.
 // Required only when a pd_mode_colors[] row uses RGB_KEY_HALF or

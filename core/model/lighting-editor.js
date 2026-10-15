@@ -25,9 +25,9 @@ function colourReferences(value, index) {
 const ruleBand = rule => {
     const condition = rule.parts.find(p => p.slot === 0);
     if (!condition) return "base";
-    return ({1: "layers", 2: "preview", 3: "modes", 4: "combos", 5: "feedback", 7: "combos", 8: "feedback"})[condition.kind] ?? "other";
+    return ({1: "layers", 2: "preview", 3: "modes", 4: "combos", 5: "feedback", 7: "combos", 8: "feedback", 9: "layers", 10: "modes", 11: "combos", 12: "feedback", 13: "macros", 14: "keys", 15: "alerts", 16: "alerts", 17: "pointer", 18: "base", 19: "layers", 20: "layers", 21: "layers", 22: "modes", 23: "modes", 24: "combos", 25: "feedback", 26: "feedback", 27: "feedback", 28: "macros"})[condition.kind] ?? "other";
 };
-/** @param {import('../schema/lighting-types.js').LightingRule} rule @param {string[]} [names] @param {{modes?: string[]; combos?: string[]; behaviours?: string[]}} [subjects] */
+/** @param {import('../schema/lighting-types.js').LightingRule} rule @param {string[]} [names] @param {{modes?: string[]; combos?: string[]; behaviours?: string[]; macros?: string[]}} [subjects] */
 function ruleWords(rule, names = [], subjects = {}) {
     /** @param {number} layer */
     const layer = layer => layer === 255 ? "Any layer" : names[layer] || `Layer ${layer}`;
@@ -41,11 +41,24 @@ function ruleWords(rule, names = [], subjects = {}) {
         else if (p.kind === 7) text = value === 255 ? "Each held combo" : `${subjects.combos?.[value] || `Combo ${value + 1}`} is held`;
         else if (p.kind === 8) text = `${value === 255 ? "Each behaviour" : subjects.behaviours?.[value] || `Behaviour ${value + 1}`} shows ${VOCABULARY.lighting.states.filter((_, bit) => scope & 1 << bit).join(" or ").toLowerCase()}`;
         else if (p.kind === 5) text = `${value === 15 ? "Any key feedback" : VOCABULARY.lighting.states.filter((_, bit) => value & 1 << bit).join(" or ")} · ${VOCABULARY.lighting.scopes[scope]}`;
-        else text = "A condition from newer firmware";
+        else if (LIGHTING_KINDS.facts[p.kind]) {
+            const descriptor = LIGHTING_KINDS.facts[p.kind];
+            const details = p.params.map((v, i) => {
+                const type = descriptor.parameters[i];
+                if (VOCABULARY.lighting.choices[type]) return VOCABULARY.lighting.choices[type][v];
+                if (type === "layer") return layer(v);
+                if (type === "mode") return v === 255 ? "Any mode" : subjects.modes?.[v] || `Pointing mode ${v + 1}`;
+                if (type === "thing") return v === 255 ? "Any" : descriptor.thing === 5 ? subjects.macros?.[v] || `Macro ${v + 1}` : descriptor.thing === 3 ? subjects.combos?.[v] || `Combo ${v + 1}` : subjects.behaviours?.[v] || `Behaviour ${v + 1}`;
+                if (type === "tapSelector") return v === 255 ? "Any branch" : `Branch ${v}`;
+                if (type === "keySelector") return v === 255 ? "Any key" : `Key position ${v + 1}`;
+                return String(v);
+            });
+            text = [VOCABULARY.lighting.facts[p.kind], ...details].join(" · ");
+        } else text = "A condition from newer firmware";
         return p.slot === 1 ? `Not: ${text}` : text;
     }).join(" and ") || "Always";
     const target = rule.parts.find(p => p.slot === 2), paint = rule.parts.find(p => p.slot === 3);
-    const where = target?.kind === 3 ? `Saved key set ${target.params[0] + 1}` : VOCABULARY.lighting.targets[target?.kind ?? -1] ?? "A target from newer firmware";
+    const where = target?.kind === 8 ? `Keys that ${VOCABULARY.lighting.choices.keyQuery[target.params[0]].toLowerCase()}${target.params[1] === 255 ? "" : ` · ${target.params[1] + 1}`}` : target?.kind === 3 ? `Saved key set ${target.params[0] + 1}` : VOCABULARY.lighting.targets[target?.kind ?? -1] ?? "A target from newer firmware";
     const how = VOCABULARY.lighting.paints[paint?.kind ?? -1] ?? "A paint from newer firmware";
     return {when, where, how};
 }
@@ -54,12 +67,22 @@ function editLightingRule(bytes, edit, options = {}) {
     const value = decodeLightingDomain(bytes, options);
     /** @param {string} message @returns {never} */
     const fail = message => {throw Object.assign(new Error(message), {code: "INVALID_EDIT"});};
+    if (edit.action === "add") {
+        if (!options.capabilities || !edit.rule) return fail("Choose a lighting rule supported by this keyboard.");
+        if (!knownRule(edit.rule)) return fail("New lighting rules must use kinds this Ark understands.");
+        value.rules.unshift({...edit.rule, parts: edit.rule.parts.map(p => ({...p, params: [...p.params]}))});
+        return encodeLightingDomain(value, options);
+    }
     if (!Number.isInteger(edit.index) || edit.index < 0 || edit.index >= value.rules.length) fail("This lighting rule no longer exists.");
     const rule = value.rules[edit.index];
     if (edit.expectedRule !== ruleIdentity(rule)) fail("This lighting rule changed. Read its current value before editing.");
     if (!knownRule(rule)) fail("This rule needs a newer Ark and is read-only.");
     const fade = value.extensions.find(e => e.kind === 1), base = fade?.params[3] ?? 0, sceneStart = value.rules.length - base;
-    if (edit.action === "toggle") rule.flags ^= 1;
+    if (edit.action === "configure") {
+        if (!edit.rule) return fail("Choose a complete lighting rule.");
+        if (!knownRule(edit.rule)) return fail("Choose lighting kinds this Ark can edit.");
+        value.rules[edit.index] = {...edit.rule, flags: rule.flags, parts: edit.rule.parts.map(p => ({...p, params: [...p.params]}))};
+    } else if (edit.action === "toggle") rule.flags ^= 1;
     else if (edit.action === "delete") {
         value.rules.splice(edit.index, 1);
         if (fade && edit.index >= sceneStart) fade.params[3]--;

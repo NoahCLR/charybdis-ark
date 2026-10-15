@@ -12,6 +12,8 @@ function lightingFindings(decoded, destination, reach = []) {
     if ((program.byteLength ?? 0) >= budget * .9) warn("lightingMemory", String(program.byteLength), "Lighting memory is nearly full", `${program.byteLength} of ${budget} bytes are used. Maps, colours and rules share this space.`, "Reuse a look or remove lighting you no longer need.");
     const unknown = program.rules.filter(r => !knownRule(r)).length;
     if (unknown) warn("unknownLighting", String(unknown), "Some lighting needs a newer Ark", `${unknown} rule${unknown === 1 ? " is" : "s are"} read-only and will stay unchanged in Apply and backups.`, "Use a newer Ark to edit those rules.");
+    const working = require("../schema/lighting-working-v1").lightingWorkingCost(program, destination.lighting?.working);
+    if (!working.admitted) findings.push({kind: "lightingWorkingMemory", level: "blocker", layers: [], identity: String(working.required), title: "Lighting cannot run on this keyboard yet", detail: working.reason ?? `Flashes and linger need ${working.required} bytes of working memory; this keyboard provides ${working.capacity}. Saved lighting bytes are a separate budget.`, fix: "Turn off a flash or linger rule, or choose a named thing instead of Any.", place: {kind: "lighting"}});
     const max = destination.brightnessMax;
     if (max !== undefined && program.palette.some(c => c.v > max)) findings.push({kind: "lightingBrightness", level: "blocker", layers: [], identity: String(max), title: "A lighting colour exceeds the keyboard's brightness limit", detail: `The keyboard accepts a value of ${max} or less.`, fix: "Lower the colour's brightness.", place: {kind: "lighting"}});
     // Screen HSV distance is advice, never an assertion about measured LEDs.
@@ -21,7 +23,7 @@ function lightingFindings(decoded, destination, reach = []) {
     for (const t of program.things) t.records.forEach((r, id) => {
         if ((t.kind === 3 || t.kind === 4) && r.slice(1).every(n => n === 254)) return;
         if (t.kind === 2 && !decoded.pdModes.some(m => m.id === id && m.kind)) return;
-        const name = t.kind === 1 ? layerName(decoded.settings.names, id) : t.kind === 2 ? decoded.pdModes.find(m => m.id === id)?.name || `Pointing mode ${id + 1}` : t.kind === 3 ? `Combo ${id + 1}` : `Behaviour ${id + 1}`;
+        const name = t.kind === 1 ? layerName(decoded.settings.names, id) : t.kind === 2 ? decoded.pdModes.find(m => m.id === id)?.name || `Pointing mode ${id + 1}` : t.kind === 3 ? `Combo ${id + 1}` : `${require("./vocabulary").VOCABULARY.lighting.things[t.kind]} ${id + 1}`;
         for (let slot = 1; slot < r.length; slot++) {
             if (t.kind >= 3 && r[slot] === 254) continue;
             const ref = r[slot] === 254 ? t.default[slot] : r[slot];

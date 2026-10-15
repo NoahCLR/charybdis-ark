@@ -302,7 +302,7 @@ export function keyAction({key, metaKey, ctrlKey, altKey, shiftKey}) {
     return null;
 }
 
-/** @param {number} index @param {string} expectedRule @param {import('../../contracts/edits.js').EditPayloads['editLightingRule']['action']} action @param {Pick<import('../../contracts/edits.js').EditPayloads['editLightingRule'], 'to' | 'colour'>} [fields] @returns {import('../../contracts/edits.js').EditOf<'editLightingRule'>} */
+/** @param {number} index @param {string} expectedRule @param {import('../../contracts/edits.js').EditPayloads['editLightingRule']['action']} action @param {Pick<import('../../contracts/edits.js').EditPayloads['editLightingRule'], 'to' | 'colour' | 'rule'>} [fields] @returns {import('../../contracts/edits.js').EditOf<'editLightingRule'>} */
 export const lightingRule = (index, expectedRule, action, fields = {}) => ({type: "editLightingRule", index, expectedRule, action, ...fields});
 
 /** @param {import('../../contracts/edits.js').EditPayloads['editLightingIdentity']} fields @returns {import('../../contracts/edits.js').EditOf<'editLightingIdentity'>} */

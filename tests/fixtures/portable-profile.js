@@ -13,7 +13,7 @@ const {ACTION_ABI} = require("../../core/schema/actions");
 const {LAYER_LOCK_BASE} = require("../../core/data/user-keycodes");
 
 const FIXTURE = path.resolve(__dirname, "../../upstream/firmware/tests/fixtures/compiled_profile_pd_v2.fixture");
-const CURRENT_CAPABILITIES = Object.freeze({compiledLayerCount: 16, supportedDomainMask: 31, schema: {major: 3}, lighting: require("../../core/protocol/lighting-capabilities-v1").decodeLightingCapabilities(require("../../upstream/firmware/tests/fixtures/lighting_vectors_v1.json").capability.map(hex => Buffer.from(hex, "hex"))), actionAbiDigest: ACTION_ABI});
+const CURRENT_CAPABILITIES = Object.freeze({compiledLayerCount: 16, supportedDomainMask: 31, schema: {major: 3}, lighting: require("./lighting-capabilities").lightingCapabilities(), actionAbiDigest: ACTION_ABI});
 
 // Settings v7: values 10..14 are the retired pointing DPI and 27 the retired
 // combo references, all zero; behaviours and combos are on everywhere; every

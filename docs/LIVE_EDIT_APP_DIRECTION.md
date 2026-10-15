@@ -44,7 +44,7 @@ matrix.
 | Key behaviours and combos | Read/write editors over the shared draft, with participation controls at every scope and capability-gated global/per-combo output behaviour permissions (D-L12, D-L32, D-L49, D-L55) |
 | Macros | 128 VIA macros renamed directly through their titles; empty canvas with direct step actions, fixed-size sequence tiles, drag reordering across the whole sequence, Delete/Backspace step removal, per-slot step undo/redo and a shared step clipboard, a selected-step editor, a raw-payload toolbar toggle and live validation, including visible invalid hold order; recorder scoped to its visible slot with taps/chords by default and optional hold timing alongside its other settings; capability-gated Unicode text, typed and checked through the host's OS and keyboard layout; per-macro input protection; one shared memory, shown and enforced (D-L25, D-L26, D-L56, D-L57) |
 | Custom keys | 128 named keys that do what their behaviour says: rename, add or open the behaviour, place, see where each is used (D-L42) |
-| Lighting | RGB v5 rules, inherited identity colours and places, painted maps with brush/fill/selection/mirror/copy, Keys Lighting tabs and conservative Review warnings over the shared draft; capability-gated kinds; unknown rules preserved read-only; 8 KiB meter in Lighting and Review ([editor contract](architecture/lighting-editor.md)) |
+| Lighting | RGB v5 rules, inherited identity colours and places, painted maps with brush/fill/selection/mirror/copy, Keys Lighting tabs, condition/event rule construction, local situation simulation and live-keymap queries over the shared draft; capability-gated kinds; unknown rules preserved read-only; separate saved/working-memory admission in Lighting and Review ([editor contract](architecture/lighting-editor.md)) |
 | Mouse | Pointer and sniping DPI, auto-sniping and auto-mouse, settings the core files under Mouse, so the rail, the review and import counts all place them there; the auto-mouse fade is a share of the timeout, retained in the lighting program; identity editing is available; fade policy editing remains a gap (D-L17) |
 | Pointing modes | 32 device-owned slots in the sparse PD domain (D-L41, D-L54); capability-gated mouse-button 1–8 clicks and VIA macro outputs from directions, diagonals and tap overrides, with destination blockers in Review; see [the editor contract](architecture/interface-contracts.md#pointing-tap-outputs) and [PD-mode domain v1](../upstream/firmware/docs/architecture/pd-mode-domain-v1.md) |
 | Global policy | Every other portable setting, including startup layers, combo matching, Host and device-reported lighting and key options; the lighting idle timeout is edited in seconds or minutes; unsupported firmware features stay read-only (D-L18, D-L56) |
@@ -81,9 +81,14 @@ Remaining before calling the product complete:
 
 - **Lighting rules need keyboard acceptance.** Codec, conversion and fake-device
   readback do not prove physical lighting, split synchronisation or Apply on a
-  keyboard. Painting and identity edits are software-verified; the Keys board still
-  previews saved identities rather than arbitrary rules. Macros have no
-  lighting fact yet. The first release combines phases 1 and 2.
+  keyboard. Painting, identities and the local facts/timing simulator have software checks; the Keys board still previews saved identities rather than arbitrary rules. Live telemetry, temporary frames, presets and understanding surfaces remain later work. The first release combines phases 1 and 2.
+
+- **Lighting geometry needs reconciliation.** Pinned RGB metadata associates
+  LED 55 with matrix key 56, while the last right-thumb layout key is matrix 59
+  with no LED association. Execution simulation follows that metadata; fixed
+  LED 55 and the painter's schematic selection retain their bytes and positions.
+  This is not evidence of physical wiring or a reason to remap it without a
+  separate hardware/metadata check.
 
 - **Combo output permissions need keyboard acceptance (D-L55).** Confirm global
   and per-combo bypass, including two combos sharing an output, custom outputs

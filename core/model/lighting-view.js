@@ -1,8 +1,9 @@
 // @ts-check
 "use strict";
+const {LIGHTING_KINDS} = require("../schema/lighting-kinds-v1");
 const {VOCABULARY} = require("./vocabulary");
 const {knownRule, ruleIdentity, ruleBand, ruleWords} = require("./lighting-editor");
-/** @param {import('../schema/lighting-types.js').LightingProfile} domain @param {string[]} [names] @param {import('../schema/lighting-types.js').LightingCapabilities} [capabilities] @param {readonly string[]} [keys] @param {{modes?: string[]; combos?: string[]; behaviours?: string[]}} [subjects] */
+/** @param {import('../schema/lighting-types.js').LightingProfile} domain @param {string[]} [names] @param {import('../schema/lighting-types.js').LightingCapabilities} [capabilities] @param {readonly string[]} [keys] @param {{modes?: string[]; combos?: string[]; behaviours?: string[]; macros?: string[]}} [subjects] */
 function lightingForView(domain, names = [], capabilities, keys = [], subjects = {}) {
     const rules = domain.rules.map((rule, index) => {
         const words = ruleWords(rule, names, subjects), paint = rule.parts.find(p => p.slot === 3);
@@ -10,7 +11,7 @@ function lightingForView(domain, names = [], capabilities, keys = [], subjects =
         return {index, key: keys[index] ?? `rule-${index}`, identity: ruleIdentity(rule), band: ruleBand(rule), enabled: !(rule.flags & 1), readOnly: !knownRule(rule), ...words,
             colour, canColour: knownRule(rule) && Boolean(paint) && (capabilities?.registries.paints.includes(2) ?? false)};
     });
-    return {program: domain, rules, bands: VOCABULARY.lighting.bands, used: domain.byteLength ?? 0, capacity: capabilities?.payloadBudget ?? 8192, paletteCapacity: capabilities?.paletteMaximum ?? 128,
+    return {program: domain, rules, working: require("../schema/lighting-working-v1").lightingWorkingCost(domain, capabilities?.working), descriptors: LIGHTING_KINDS, supportedTimings: capabilities?.registries.timings ?? [], bands: VOCABULARY.lighting.bands, used: domain.byteLength ?? 0, capacity: capabilities?.payloadBudget ?? 8192, paletteCapacity: capabilities?.paletteMaximum ?? 128,
         supportedPaints: capabilities?.registries.paints ?? [], supportedTargets: capabilities?.registries.targets ?? [], supportedFacts: capabilities?.registries.facts ?? [], supportedThings: capabilities?.registries.things ?? [], unknownRules: rules.filter(r => r.readOnly).length};
 }
 // Project identities onto the existing Keys presentation; the complete
@@ -42,4 +43,17 @@ function lightingIdentities(domain) {
             tapBranchColors: (domain.things.find(t => t.kind === 4)?.default.slice(4) ?? []).map((_, index) => colour(4, 255, index + 4)), locality: locality(place(4, 255)), tapCommitMode: domain.extensions.some(e => e.kind === 2) ? 1 : 0}, keyGroupRows: [],
         automouseFade: {mode: fade?.params[1] ?? 0, endColor: domain.palette[fade?.params[2] ?? -1] ?? off}};
 }
-module.exports = {lightingForView, lightingIdentities};
+
+
+// Publish a sufficient native keymap basis with the draft. Queries must follow
+// remaps and exact authored rows, independent of host-layout key labels.
+/** @param {import('./types.js').DecodedProfile} decoded */
+function lightingKeymap(decoded) {
+    const {nativeCode} = require("../schema/actions");
+    const rows = decoded.behaviors.rows.map(row => nativeCode(row.target));
+    return {keymap: Object.fromEntries(decoded.document.layers.map((layer, id) => [id, Object.fromEntries(layer.map((code, key) => {
+        const behaviour = rows.indexOf(code);
+        return [key, {code, ...(behaviour < 0 ? {} : {behaviour})}];
+    }))])), queryCombos: Object.fromEntries(decoded.combos.rows.map((c, id) => [id, {enabled: c.enabled, inputs: c.inputs.map(nativeCode).filter(n => n !== undefined), layers: Array.from({length: 16}, (_, l) => l).filter(l => c.allowedLayers & 1 << l)}]))};
+}
+module.exports = {lightingForView, lightingIdentities, lightingKeymap};

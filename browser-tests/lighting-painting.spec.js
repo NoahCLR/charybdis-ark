@@ -75,7 +75,7 @@ for (const theme of ["vscode-dark", "vscode-light"]) test(`real demo painting su
     expect(lighting.maps).toHaveLength(1);expect(lighting.rules.filter(r => r.parts.some(p => p.slot === 3 && p.kind === 4))).toHaveLength(1);
 });
 
-test("each thing editor exposes its own Lighting tab, with unavailable macro facts explained", async ({page}) => {
+test("each thing editor exposes its own Lighting tab, including advertised macro lighting", async ({page}) => {
     await page.goto("/dist/web/index.html");await page.locator('[data-act="explore-demo"]').click();
     await expect(page.locator(".bench-tablist")).toBeVisible();
     await page.locator('.bench-tablist [data-tab="behaviours"]').click();
@@ -93,7 +93,8 @@ test("each thing editor exposes its own Lighting tab, with unavailable macro fac
     await page.locator('[data-screen="pointing"]').click();await page.locator('.pd-page .thing-tabs [data-lighting]').click();
     await expect(page.locator('.pd-page .thing-lighting')).toContainText("Where it lights up");
     await page.locator('[data-screen="macros"]').click();await page.locator('.thing-tabs [data-lighting]').click();
-    await expect(page.locator('.thing-lighting')).toContainText("does not yet offer an identity or lighting condition");
+    await expect(page.locator('.thing-lighting')).toContainText("Identity colour");
+    await expect(page.locator('.thing-lighting [data-customise]')).toBeEnabled();
 });
 
 test("painter respects capability gates and keyboard activation posts one stroke", async ({page}) => {

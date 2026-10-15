@@ -216,11 +216,15 @@ export const rulePaintColour = (model, index) => model?.rgb?.lighting?.rules[ind
 
 import {identityValue} from "./painting.mjs";
 export {identityValue, paintedCells} from "./painting.mjs";
-/** @param {Model} model @param {number} value @param {Colour | null | undefined} identity */
-export function mapPaintColour(model, value, identity) {
+/** @param {Model} model @param {number} value @param {Colour | null | undefined} identity @param {number} [led] @param {number} [layer] */
+export function mapPaintColour(model, value, identity, led, layer = 0) {
     if (value < 128) return model?.rgb?.lighting?.program.palette[value] ?? null;
     if (value === 129) return OFF;
     if (value === 131) return identity ?? null;
+    if (value === 137 && model && led !== undefined) {
+        const key = KEY_LEDS.indexOf(led), code = model.rgb?.lighting?.keymap?.[layer]?.[key]?.code, target = code === undefined ? null : nativeIdentity(code);
+        return target ? identityValue(/** @type {import('../../contracts/panel.js').PublishedModel} */ (model), {kind: target[0], id: target[1]}).colour : null;
+    }
     return null;
 }
 
@@ -234,3 +238,6 @@ export function layerIdentityPaints(model, id) {
     if (model?.rgb?.lighting) return identityValue(/** @type {import('../../contracts/panel.js').PublishedModel} */ (model), {kind: 1, id}).colour !== null;
     return layerPaints(layerColourRow(model, id)?.color);
 }
+
+import {KEY_LEDS} from "./lighting-simulator.mjs";
+import {nativeIdentity} from "./lighting-facts.mjs";

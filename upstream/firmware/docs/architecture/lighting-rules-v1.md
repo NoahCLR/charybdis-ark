@@ -53,6 +53,28 @@ yields at least one subject, a negated one when it yields none. A rule whose
 first condition is negated, or that has none, has one subject: the **board**,
 which names no thing.
 
+Retained and live batches preserve that existing natural priority as the primary
+ordering. Only members at exactly equal natural priority use newer full-match
+entry observation first. A state thing's entry is a monotonic observation-order
+token: refreshing its whole matching batch does not renew it; full-match
+re-entry does. This is separate from local lifetime age and synchronized paint
+time. A saturated age or wrapping/resynchronized timestamp cannot serve as the
+token. Event subjects keep their captured natural occurrence order unchanged.
+For genuinely equal entry order, ascending thing kind then ascending thing id
+break the tie; authored within-batch order is the final stable tie.
+
+For example, row A at matrix key0 ends at100 with linger1000. Row B at that
+same key enters at600. B paints above A at600; A remains underneath until1100.
+Unequal matrix positions and higher/lower layer priorities still win before
+entry recency. This is not a preference for live batches: if A continuously
+matches at another key while its key0 member leaves and returns, a newer B
+key0 tail can remain above A's older, still-live full match. Partial member
+changes do not create new full-match entries or independent linger clocks.
+The shared `retainedOrdering` traces pin pixel, complete member order and entry
+tokens through these cases, show-after maturation and timer boundaries. They
+exercise the owned-record/ordered-batch/merge seam; they do not substitute for
+the production admission model and linked resource checks below.
+
 A subject carries what targets and paints may ask about it: its thing kind
 and id (for its identity colour and place), the keys it concerns, and the
 halves it concerns. Each fact kind below defines what its subjects carry.
@@ -121,6 +143,9 @@ A record is one **place** byte followed by the kind's colour slots:
 | pointing mode | 2 | 32 | colour |
 | combo | 3 | 128 | colour |
 | behaviour | 4 | 128 | hold, long hold, tap, then one per tap branch `2..depth` |
+| macro | 5 | 128 | colour |
+| modifier | 6 | 8 | colour |
+| key | 7 | 60 matrix positions | colour |
 
 The behaviour record therefore has `1 + 3 + (depth − 1)` bytes, `8` at the
 supported tap depth of five (D-F14). Kind `0` is the board: it has no table.
@@ -260,6 +285,17 @@ subjects from the slice, highest-priority first, and says whether any exist.
 | 5 | behaviour state | behaviour | states, scope | synced, 61 B | see below |
 | 7 | combo held | combo | combo (`0..127`, `0xff` any), role (`0`, `1`, `0xff`) | synced, 40 B | each identified held combo, newest completion first; its own input keys and halves |
 | 8 | behaviour | behaviour | behaviour (`0..127`, `0xff` any), states | synced, 180 B | each key showing that authored row, in matrix order; its selected colour slot |
+| 9 | layer status | layer | layer, status (`0` top, `1` held, `2` locked, `3` one-shot armed) | synced, 64 B | matching layers, highest first; actual momentary owner keys and their halves |
+| 10 | mode status | pointing mode | mode, status (`0` held, `1` locked) | synced, 11 B | the actual held or locked mode with its real owner keys/halves |
+| 11 | combo layer | combo | combo, layer | synced, 40 B | held outputs whose representative key actually holds the selected layer, newest first; combo inputs/halves |
+| 12 | behaviour phase | behaviour | behaviour, phase (`0` selected branch, `1` tap pending, `2` hold pending, `3` active hold tier, `4` active long-hold tier), branch (`1..depth`, `255` any) | synced, 180 B | authored key instances in matrix order, independent of flash visibility; captured row, branch and selected colour slot |
+| 13 | macro playing | macro | slot (`0..127`, `255` any) | synced, 1 B | actual named VIA playback slot through cleanup; anonymous direct payloads yield none |
+| 14 | key pressed | key | matrix index (`0..59`, `255` any) | synced, 8 B | physical matrix keys down, in matrix order; each owns that key and half |
+| 15 | modifier | modifier | modifier (`0` Ctrl, `1` Shift, `2` Alt, `3` GUI), side (`0` left, `1` right, `2` either), state (`0` active, `1` one-shot armed) | synced, 2 B | actual modifier mask; either yields left then right |
+| 16 | host lock | board | LED (`0` Caps, `1` Num, `2` Scroll) | synced, 1 B | board subject when the USB host's corresponding lock LED is set |
+| 17 | pointer | board | state (`0` auto-mouse target on, `1` fading, `2` sniping, `3` raw sensor x/y nonzero) | synced, 1 B | board subject for the actual selected state |
+| 18 | idle | board | — | synced, 1 B | board subject for the existing RGB sleep predicate |
+
 
 "Combos held" leaves out a combo whose output holds a momentary layer: the
 layer's own lighting says what the hold does. Its subject stands for every
@@ -272,7 +308,7 @@ a selected branch, whether a flashing state is lit, and the newest gesture
 that owns each surface: the board, each half, and each state. A flashing state
 (a registered hold, a repeat) counts only while lit. The slice carries those
 maps exactly as the key runtime produces them (the
-[feedback model](https://github.com/NoahCLR/charybdis-4x6/blob/b216e686a8575ca038c35010fd173c62dd3a06b8/docs/rgbflow.md)). The parameters are a states mask (bit 0
+[feedback model](https://github.com/NoahCLR/charybdis-4x6/blob/1177252704f99a72c245d8f7d618c6370dffbcd0/docs/rgbflow.md)). The parameters are a states mask (bit 0
 branch selected, bit 1 tap, bit 2 hold, bit 3 long hold; bits 4–7 zero, at
 least one set) and a scope:
 
@@ -323,6 +359,48 @@ the board-wide behaviour default. The row's place follows the same field-wise
 inheritance. An outcome paint is chosen on a rule or map cell; selecting it on
 a behaviour's hold/long-hold rule is the colour-by-outcome option.
 
+**Actual state and observation boundaries.** Fact 9 reads momentary bindings,
+locked mask and one-shot ownership directly; the keys of a layer subject are
+its actual momentary owners. A combo output contributes its representative
+owner key, never inferred owners at every input. Top means the highest active
+layer, including the permanent base. Automatic activation provenance is not
+advertised: QMK's public auto-mouse-active predicate also includes mouse keys,
+manual layer anchors, toggle and one-shot retention, so it cannot establish
+that sensor motion raised a layer. Facts 17's target-on and fading states
+remain available without making that provenance claim.
+
+Fact 12 distinguishes gesture phases from fact 8's displayed feedback. Its
+phase bits can overlap: a selected branch can have a tap or hold pending.
+An entered hold/long-hold tier remains a phase even when a feedback flash is
+dark. Intrinsic/bypassed gestures with no authored row yield none.
+
+Fact 15's active mask is QMK real plus weak plus locked-one-shot modifiers;
+its armed mask is the unconsumed one-shot mask. It describes current modifier
+state rather than claiming every modifier originates at a physical key.
+Modifier ids are their report-bit positions (`0..3` left, `4..7` right).
+
+Fact 17's target-on means auto-mouse is enabled and its configured target layer
+is active. Fading uses the existing nonzero fade progress while that target
+is on. Sniping includes automatic layer sniping and manually enabled sniping.
+Sensor observation is literally the latest x/y passed to
+`noah_pointing_device_task_user`, before idle-noise suppression and pointing-mode
+transforms. It excludes wheel output and buttons, can include tiny sensor
+noise, and makes no claim to distinguish physical ball movement from noise.
+Every poll replaces the observation; there is no continuation window. Lighting
+collection samples it, and the peer sees the latest committed split frame;
+a nonzero sample replaced by a later zero before collection/publication need
+not appear on either render. This is distinct from auto-mouse on/fading and
+preserves their timing and Standard pixels.
+
+Fact 18 is parameterless: effective RGB timeout is nonzero and
+`last_input_activity_elapsed() > timeout`, exactly the existing sleep test.
+The collector exports the boolean, so a threshold crossing changes fact bytes
+without a new wake API. Timeout zero disables the predicate. There is no
+independent idle interval or held-key/macro veto. The existing global sleep
+override still forces every LED black; a matching idle rule, or its negation,
+cannot override sleep. These new modules default on with the portable runtime
+and their required subsystem; each has its own compile flag and capability.
+
 ### Targets
 
 | Id | Target | Parameters | Place-capable | LEDs |
@@ -335,6 +413,53 @@ a behaviour's hold/long-hold rule is the colour-by-outcome option.
 | 5 | the subject's halves | — | yes | the halves it concerns; the whole board when none |
 | 6 | the subject layer's mapped keys | — | yes | LEDs of keys that are neither `KC_NO` nor `KC_TRNS` on the subject's layer, read live from the keymap; none for a subject that is not a layer |
 | 7 | the subject's place | — | no | the target named by the subject's place; none for a kind without a table |
+| 8 | keys that | query `0..15`, selector `0..127` or `255` | no | keys matching the query on the shown layer |
+
+**Key queries.** Target8 takes two bytes. Queries0/1/2 select mapped (neither
+`KC_NO` nor `KC_TRNS`), transparent and `KC_NO`. Queries3..9 select modifier,
+letter, number, symbol, navigation, media/system and mouse usages. Queries10/11/12
+select direct layer/mode/macro actions;13 custom keys;14 authored behaviour
+rows;15 combo inputs. Selector255 means any; a specific selector is an identity
+for10/11/12/14/15 and is ignored otherwise. Out-of-domain or absent identities
+match nothing. Behaviour means a row exists, independent of its participation
+policy. Combo membership requires an enabled row whose allowed layers include
+the shown layer, and exact native-input equality (at most16 inputs per row).
+The shown layer is a layer subject's own layer, otherwise the highest active
+layer, including the synthetic fade destination.
+
+These are native usages/actions, never host-layout characters. Modifier-wrapped
+literals use their base HID usage for categories and also match modifiers.
+Modifier-tap, one-shot-modifier and layer-mod actions match modifiers; their
+other possible emissions are not inferred. HID ranges are letters04..1d,
+numbers1e..27/59..62, symbols2d..38/54..57/64/67/85,
+navigation49..52/28/29/2a/2b/58, media/systema5..be and mousecd..df.
+Direct layer actions include MO/TO/TG/OSL/TT/LM/LT and userspace layer locks;
+mode holds/locks and named macros use their stable native action blocks.
+Raw DF/PDF, authored branches and other unsupported actions have no inferred
+identity.
+
+The per-layer cache retains native u16 plus authored behaviour row+1 u8 per
+matrix position, a canonical any-combo input bitmap per layer, and one geometry
+key index per LED. This sufficient basis
+composes exact queries without a bitmap per rule. RAM is
+`3 * LAYER_COUNT * MATRIX_ROWS * MATRIX_COLS + LAYER_COUNT * KEY_ORIGIN_BITMAP_SIZE + LED_COUNT`, plus generation/readiness
+metadata; no query/rule/identity cap is added. On the main context before a
+frame's render walk, a changed VIA/keymap or effective-profile generation
+rebuilds the basis. Behaviour rows are captured there because their lookup
+is reader-backed. Before/after generation disagreement rejects the in-place
+rebuild; reader-busy/read-error results also reject it rather than inventing
+an absent behaviour. Existing pixels remain and no chunk may render the incomplete basis.
+A later settled frame retries. Publication callbacks never walk storage to
+rebuild it. Existing VIA local/split/default-restore invalidations and effective
+profile generation changes cover the source generations. Rendering uses no
+keymap/behaviour profile-reader I/O. Specific combo queries cost at most16 input
+comparisons per key; any-combo reads its canonical bitmap. Rebuilding that bitmap costs at most
+`LAYER_COUNT * matrix_keys * 128 * 16` input comparisons. These are operation bounds, not
+physical timing or cadence measurements. The current query basis has a scoped
+3072-byte static-policy increment documented in
+[memory budgets](memory-budgets.md#cached-key-queries-and-direct-action-paint);
+it does not alter the shared8192-byte lighting budget,255 accepted rules or
+any physical/core-memory/stack limit, and does not budget future retained histories.
 
 ### Paints
 
@@ -353,6 +478,15 @@ it **changes with time**.
 | 5 | dim | level | yes | `below × level / 255` |
 | 6 | tint | palette index, amount | yes | `below` mixed toward the colour by `amount / 255` |
 | 8 | outcome | — | no | a fact-8 hold/long-hold's resolved layer or pointing-mode identity, else clear |
+| 9 | what it does | — | no | the key's direct layer/mode/macro target identity on the shown layer; unsupported/absent is clear |
+
+**What it does.** Paint9 uses the same shown layer and cached native actions as
+target8. It takes the target thing's colour slot zero, with ordinary default,
+inherit and `none` handling. A missing table or unsupported action is clear;
+black remains opaque. It is parameterless, including map value0x89. Non-key
+LEDs are clear; when geometry maps several matrix positions to one LED, the
+first matrix position supplies its action. The geometry lookup is cached so
+this paint does not scan the matrix or read storage per LED.
 
 **Outcome support.** Paint 8 follows the materialized hold or long-hold action
 of the selected branch, including a resolved transparent tier, rather than the
@@ -387,8 +521,424 @@ disappears.
 | ---: | --- | --- | --- |
 | 1 | show after | milliseconds `1..65535` | `0` until the subject has existed that long, then `255` |
 
+The C implementation retains every accepted timed rule and every subject
+thing. Equivalent first conditions share presence clocks, normalizing a
+specific thing selector to any; rule filters retain separate clocks. The
+continuous matching age is the smaller of subject presence and filter age.
+An absent subject or failed filter resets its matching lifetime, independently
+of other rules. Millisecond ages saturate at 65535, after every possible
+show-after delay has elapsed.
+
+Presence storage uses a bitmap of possible signature/subject pairs and a dense
+array of ages for the pairs currently present, in bitmap order. Forward removal
+then backward insertion preserves every continuing age without a temporary
+union of departed and arriving ids or a second age array. A rank query finds
+an age; no age is evicted to make room. Only signatures selected by enabled
+timed rules are indexed. Duplicate rules share presence but keep independent
+filter lifetimes. All 255 state/show-after rules remain accepted within the
+shared 8192-byte payload; the new flash/linger admission model below is a
+deliberate additional constraint for those new constructions only.
+
+The registry's joint live bound applies across **all** non-selector signatures
+of a fact, not separately to each signature. This bounds the dense age array
+for every accepted profile, including one containing every distinct signature:
+
+| Fact | Joint live clocks, default four combo records | Reason |
+| --- | ---: | --- |
+| layer active / preview / mode active | 16 / 1 / 1 | layer bitmap; single preview and shown mode |
+| aggregate combos / aggregate behaviour | 3 / 60 | three role signatures; 15 state masks times four scopes, thing 255 |
+| combo held | 8 | each of four records matches its role and any |
+| behaviour | 480 | at most 60 key records, each in one state; eight of 15 masks contain that state |
+| layer status | 34 | 16 held plus 16 locked, one top and one one-shot |
+| mode status | 2 | at most one held and one locked subject |
+| combo layer | 8 | four records, each matches one layer and any |
+| behaviour phase | 600 | at most five phase bits per key, each matching its branch and any; 60 keys |
+| macro playing / key pressed | 1 / 60 | one current slot; one record per physical key |
+| modifier | 32 | eight bits in each of two classes, each matching its side and either |
+| host locks / pointer / idle | 3 / 4 / 1 | one boolean for each parameter signature |
+| **Total** | **1314** | sum of the independent conservative upper bounds |
+
+Repeated authored ids only reduce these counts: a pair is stored once even
+when several keys yield it. High ids through 127 do not consume extra ages.
+Increasing combo buffer length changes its two registry bounds mechanically;
+tap depth changes possible signatures but a live phase record still matches
+at most its branch and any. Module-off builds sum only their compiled rows.
+The possible-pair bitmap covers the full subject domains (8963 pairs with the
+default registry/tap depth); the dense ages need 2628 bytes instead of 17926.
+The selected-signature index, filter ages and bitmap remain separate, linked
+fixed storage, with no allocator escape from RAM accounting.
+
+This live bound is specific to show-after. It cannot be reused as a bound for
+linger or event retention: absent things can retain timing state and their
+last owner footprint until expiry, and a repeated event must refresh its own
+lifetime. New flash/linger rules therefore use the separate deterministic
+reservation and admission bound below, including independently filtered rules;
+a normal profile or the current live-state maximum does not establish it.
+
+The event catalog provides the following additive, optional entries. Each has
+its own source module and generated registry dispatch. Production RGB builds
+enable the strong capture/consumer seam; a build without that consumer must
+omit event capabilities and reject an explicit event-module configuration.
+
+| Id | Event trigger | Parameters | Captured subject |
+| --- | --- | --- | --- |
+| 19 / 20 / 21 | layer locked / unlocked / one-shot used | layer or any | actual layer and momentary owner keys at occurrence |
+| 22 / 23 | pointing mode started / ended | mode or any | actual mode and its captured owner keys |
+| 24 | combo fired | combo row or any | actual row and input footprint, once per fired completion |
+| 25 | tap fired | behaviour row or any, branch or any | actual row, physical key, captured branch colour slot and outcome |
+| 26 / 27 | hold / long-hold fired | behaviour row or any | actual row, physical key, captured hold tier and outcome |
+| 28 | named macro played | slot or any | successful completed slot; no invented key owner |
+
+The corresponding optional timing rows are `2 linger` (state-tail role) and
+`3 flash` (event-window role), each with a nonzero little-endian u16 duration.
+Show-after row1 has the unrestricted role. Construction roles live on registry
+rows and in the client contract; validators use those roles rather than event
+or timing id switches. An event is an occurrence matcher, never a fact walker
+with an implicit held/recent truth. The qualifier walks the published program
+against its caller-supplied coherent occurrence frame, copies borrowed owners
+synchronously and returns the qualified255-rule mask plus captured subject.
+A false qualification does not authorize erasing a previous qualified marker.
+It performs no profile-reader I/O and does not mutate the input fact frame.
+The capture pipeline sequences caller-owned collection, qualification and
+synchronous retention, and neither keeps producer pointers nor provides a
+queue. Its collector/retainer must stay in main, without input reentry or
+profile publication during the call. Actual runtime hooks/workspace ownership
+and retained histories remain separate integration requirements. In the immediate combo-output path, origin/cache
+publication and record normalization precede observation; the output action
+itself executes afterwards. A scan-first fired completion can be observed
+before delayed output has published an active output owner, so filters see
+that actual existing state, not a manufactured layer or cache entry.
+
+New event kinds are positive first-condition triggers and require explicit
+flash timing. Mode and combo event capabilities also require their actual
+pointing/combo producers; forcing a module without its producer is a compile
+error outside the all-kinds schema build. They do not define a recent-event boolean or a negated truth
+window. State kinds remain independently negatable filters. The filters
+qualify against the coherent occurrence context: a layer appearing later
+cannot resurrect an occurrence that failed its layer filter. No occurrence
+at boot means no flash. A qualifying repeat of the same event thing replaces
+its last ordered matching batch and restarts expiry; a nonqualifying repeat
+preserves its older qualifying flash. Different thing ids coexist, retaining
+their captured natural order.
+
+Linger is per (rule, subject thing). While the full condition matches, its
+last whole ordered matching batch is refreshed. When the full match ends,
+that batch freezes until expiry. Departure of some keys while the same thing
+still matches updates the live batch rather than creating independent tails.
+These construction and retention rules constrain the forthcoming modules;
+this checkpoint does not advertise flash or linger support.
+
+Producer occurrences use an explicit `NOAH_LIGHTING_EVENT_CAPTURE_ENABLE`
+integration gate. Disabled builds have inline no-ops and no observer symbol,
+queue or event capability. Enabled builds must link the actual synchronous
+observer. Its owner bitmap is borrowed only for the call: the observer must
+copy needed data before returning and must not reenter an input producer.
+Standalone producer tests link recording observers; these do not provide
+the production consumer. An event module cannot be advertised until its
+consumer is enabled and linked on the production and host build surfaces.
+
+Authored behaviour occurrences follow actual branch emission, independently
+of Standard's visual feedback eligibility. A committed buffered base tap or
+inherited tap still has its captured row and branch even when no visual pulse
+is requested. A pending release hold is not a fired hold. Repeated action
+emission from one committed tap branch is one branch occurrence, after its
+final emission. Deferred output carries the captured row and branch through
+the existing dispatch queue; queue-full immediate fallback observes the
+actual immediate emission. It does not look up a later key binding. Behaviour
+subjects own the same physical matrix key as the per-key phase facts, with
+the captured colour slot and supported layer/mode outcome.
+
+Fallback settlement uses a synchronous one-effect stream with caller-owned
+context, rather than an unused buffered core plan. Its explicit planning
+boundary ends before later transition execution. A sink may drain/project
+while planning remains active: that route retains the stream's effect and
+caller plan on stack and requires separate reviewed-path coverage. Queue
+admission scratch ends before queue-full immediate dispatch. Neither lifetime
+boundary changes queue capacity, output order or captured owner/commit data.
+
+The compact action effects and persistent dispatch slots remain12 bytes in
+the current compiler configuration. Deferred branch metadata uses the six
+unused dispatch-flag bits and snapshot bitfields. Compiled tap depths above63
+use an explicit byte per dispatch slot instead (two slots per matrix key),
+and larger snapshots remain bounded by the existing64-byte drain workspace.
+The default and8/64/255-depth host configurations test those representations;
+these sizeof/serialization checks are not linked resource or stack proof.
+
+Flash is valid only for an event trigger; linger only for state/board rules.
+Combining event flash and linger is invalid. Show-after and event flash use
+parallel clocks from the qualifying occurrence: observation100, flash500 and
+show-after200 paints300..599 and expires600; show-after700 never paints.
+Qualifying repeats restart both clocks; nonqualifying repeats change neither.
+Subsequent filter changes cannot alter an already qualified event's flash.
+For state show-after100/linger200, a match100..149 never paints or leaves a
+tail; a match100..249 paints200..449 and expires450. Departure cannot mature
+unmet show-after. Without show-after, an eligible state can linger immediately.
+
+`lighting_lifetime` provides the allocation-free matching/tail/event calendar.
+Its packed3-byte cell contains a saturated millisecond age, phase and the
+eligibility observed during the last matching observation. A match refreshes
+the last whole batch only after show-after is met; departure cannot mature an
+unmet gate. Reappearance starts a new matching lifetime. Qualified repeats
+replace/restart an event; nonqualifying observations only advance ordinary
+elapsed time. It reports batch replace/keep/release-render and the next local
+wake boundary. Releasing an expired rendering reference never authorizes
+freeing an unacknowledged delivery marker. The history owner must retain those
+references independently until ACK or the defined fresh-session reset.
+
+`lighting_batch` serializes each thing's whole natural-order subject batch
+without caching LEDs or final pixels. The cell owns the common thing kind/id;
+each member stores its slot/outcome, actual sides/has-keys flag and exact owner
+keys. Consecutive equal slot/outcome fields are omitted. Owner encoding is
+empty, one key index, or the compiled owner bitmap (eight bytes for60keys).
+The bounded scan follows that compiled size; smaller matrices zero-extend
+occurrence owners into the fixed8-byte split group. Order and multiplicity
+remain explicit; equal-looking subjects are never merged, because dimming and
+background composition can observe repeated paints. A same-paint64-key batch
+uses129 bytes; the exact maximum per batch is705 bytes (64 members, each with
+one flag, two paint fields and eight owner bytes, plus count). Sixty-four is
+the existing registry/matrix subject bound, not an added profile restriction.
+Writes refuse insufficient caller workspace atomically rather than keeping a
+partial batch. The history owner must supply the proved complete workspace;
+this codec supplies no bank, eviction or overflow acceptance policy. Frozen
+bytes own no producer pointers, preserve departed slots/outcomes and remain
+usable by current keymap-derived targets after remapping. The shared render
+harness also round-trips actual fact-walker batches across its accepted cases.
+This per-batch bound does not bound the number of independently filtered live,
+lingering or unacknowledged event batches.
+
+`lighting_batch_arena` owns densely packed immutable batches in caller-supplied
+storage. Each entry has an explicit12-byte little-endian header:32-bit stable
+reference,32-bit owner count,16-bit payload length and common thing kind/id.
+Interning compares the full kind/id and ordered bytes, never a hash, LED mask
+or final colour. Release compacts bytes immediately; references identify
+entries rather than addresses. Readers copy bounded ranges, so no movable
+pointer escapes. The ordered iterator reads at most one encoded member at a
+time (12 bytes including prefix for the default geometry), preserving slot
+inheritance and multiplicity without another705-byte staging frame. A pinned
+reference stays valid if an unrelated release compacts its bytes mid-iteration. Replacement reserves the new entry before releasing the old;
+allocation failure leaves existing entries and references unchanged. The
+production history owner must prove that failure unreachable for accepted
+profiles; the primitive grants no eviction, rejection or overflow policy.
+
+`lighting_retained` keeps each rule/thing's qualification lifetime and delivery
+version independent of payload sharing. Its explicit18-byte record has rule/id,
+flags, the3-byte lifetime, u64 captured order and u32 batch reference. Expired
+unacknowledged markers retain their bytes; an ACK clears only the matching
+captured order. A newer qualifying occurrence replaces/restarts that record;
+nonqualifying observations preserve it. A frozen frame copies metadata and
+retains its own reference, keeping old owners/slots/outcomes and age independent
+of later capture, ACK, remap or compaction. A duplicate partial group commit
+cannot restart an already committed cell. Coordinated session/profile reset
+must discard all current and frame references before reinitializing storage.
+The shared lifetime traces also exercise this owned-record path.
+Grouped application preflights all qualified record slots and parameters,
+encodes the single captured subject, then reserves one shared immutable batch
+with all required reference counts. Only then does the non-failing commit loop
+replace each cell. Retry preserves an already committed matching order. A
+fresh same-profile transport session, after calendars advance, seeds still-live
+markers including those waiting for show-after and discards expired dirty
+markers. Per-cell ACK/version cleanup never touches a newer occurrence.
+The actual QMK adapter fixture uses one such owner per emulated half and
+asserts RPC callbacks cannot modify its arena/cells before main consumes.
+
+
+`lighting_history_index` describes the accepted publication's retained rules
+using registry-declared subject domains/selectors and each optional timing
+module's lifetime-parameter binding. Event domains are16 layers,32 modes or128
+identified things; their zero continuous-presence signatures still allocate no
+old show-after clocks. Specific selectors require one logical cell, any selectors
+the full declared domain, and board/aggregate subjects one. Disabled and
+show-after-only rules require no retained cell. A512-byte caller-owned u16 prefix
+index addresses all255 rules, including high ids:255×128=32640 is a logical
+address bound, **not** a required reservation, reachable simultaneous occupancy,
+storage lower bound or proof of fit. No target instance is allocated here.
+Rebuild the index and reset owning histories together at profile publication.
+The `historyIndex` shared fixtures enumerate every supported fact domain, all
+event selectors, mixed filter/board/disabled rules and the accepted255-rule
+maximum; lookup checks all256 supplied ids. Timing interpretation stays in the
+optional modules, not a fact/timing-kind switch in the renderer.
+
+`lighting_history_owner` connects that index to independent occupied records,
+full-equality payload ownership, per-half calendars and fair grouped delivery.
+Sorted occupied metadata uses binary lookup; group preflight reserves missing
+keys in one backward ordered merge, without a whole-bank scratch copy or a
+whole-bank shift per qualified rule. The cursor continues from the same old
+record across insertion/compaction. Parameters are decoded from the current
+RAM program, with one descriptor per occupied rule during calendar/wake scans.
+Source capture and receiver main consumption use the same atomic group path;
+state observation preserves full-match entry and D1's last whole matching batch.
+No callback, renderer or producer may reenter these main-owned mutations.
+
+An occupied matching record remains needed even before show-after has a payload.
+An expired event with pending delivery also remains needed. Once matching,
+rendering and delivery ownership all end, metadata can be reclaimed; independent
+frozen copies still own their batch references. Committed-sequence deduplication
+happens **before** receiver main consumption. Within one session, a source cohort
+is offered with all its current dirty rules; later occurrences can only replace
+members, and its committed ACK clears only unchanged versions. Acknowledged
+members cannot become dirty again under the same order except through a fresh
+session, which resets the receiver. Thus a committed expired event need not keep
+a permanent per-rule replay cell. Source observation tokens denote actual new
+occurrences. The QMK adapter trace retries a committed request after receiver
+metadata reclamation and proves that it never calls the consumer again.
+The immutable outgoing packet contains the complete single-event subject and
+mask; it borrows no arena pointer/reference. Metadata/body reserve failures at
+this component seam preserve prior records/payloads and expose failure; a
+production owner must prove those failures unreachable, not use them as an
+admission cap, history eviction or busy-drop path.
+
+For the32-bit target this owner control is24 bytes, the separate prefix index
+512, and each occupied/frozen metadata record18. Group preflight also uses a
+32-byte missing-rule mask; the bounded rule descriptor is12 bytes. These are
+in addition to arena control/payloads and still-live capture/transport workspace.
+No target metadata/payload capacity is selected or allocated by these components.
+The full logical-domain host fixture deliberately reserves32640 records to test
+independence; that is not the chosen target layout, simultaneous physical
+reachability, or a storage minimum/fit proof. Optional host counters count
+comparisons, metadata byte moves, calendars, descriptor decodes and dirty visits;
+they allocate no counters in production and make no target-time/cadence claim.
+
+For a32-bit target the arena control block is16 bytes. Payload storage is
+exactly the sum of12 plus encoded size per distinct referenced batch; record
+storage is18 per allocated current or frozen record. Reference increments need
+no second payload. Distinct old/new maximum batches overlap at1434 bytes
+before record/control/encoding workspace. No fixed target arena or rule/id
+index is allocated by these components. Linear full-equality search has an
+explicit entry/byte-count seam; operation counts are not millisecond or split
+cadence measurements. Its performance and a full accepted-profile capacity
+bound remain obligations of the production owner, rather than an inference
+from typical deduplication or the705-byte single-batch bound.
+
+`lighting_history_store` places current metadata, immutable frozen metadata and
+full-equality batches in the same owned arena. The header's internal size word
+uses two type bits and fourteen length bits; this changes neither profile nor
+split bytes. Every accepted batch and metadata object fits that per-object
+length. Current metadata is uniquely owned and mutable; frozen metadata and
+payloads are immutable. No movable address escapes. Structural mutation
+invalidates only an internal byte-scan cursor, never a stable reference.
+
+Metadata sharing requires equality of the complete retained template, with
+only its rule byte normalized. Each cohort carries an explicit sparse rule
+list or255-bit membership bitmap. A member's qualification, age, captured order,
+flags and full batch reference remain independent: changing one member splits
+it before changing its history. Equal pixels or filters are not an equivalence
+criterion. Group application reserves its complete destination before removing
+old memberships. Per-cell replacement reserves before release. A calendar or
+ACK walk commits cells separately; reserve failure is exposed and is not a
+retry/drop policy. Production enablement requires proving the complete reserve
+bound, including these intermediate splits.
+
+The exact cohort body is one membership tag,18 template bytes and either one
+byte per member (fewer than32) or32 bitmap bytes. Including its12-byte arena
+header, singleton metadata costs32 bytes and a255-member cohort63. One encoded
+single-owner occurrence costs17 bytes including its header, so the corresponding
+one-rule and255-rule current samples cost49 and80 bytes. Freezing the latter
+adds63 metadata bytes (143 total), with no payload copy. These are measured
+serialization sizes for those samples, **not** a bound for independently
+filtered accepted histories. The store control is4 bytes on Cortex-M0+; its
+logical cursor is4. `lighting_history_bank` adds a program reference and fair
+dirty cursor, for12 bytes including the store control, without an instance of
+the512-byte prefix index or a rule×thing array. Rule parameters still come from
+registry/module descriptors over the published RAM program.
+
+Freezing preflights all current metadata plus entry headers, then pins every
+referenced batch. Current capture, replacement, ACK and reclamation may continue
+without changing the frozen frame's ages, owners, slots or outcomes. The
+immutable outgoing packet owns its complete bytes separately and borrows no
+arena handle. Reset must release current and frame memberships before arena
+initialization. A failed freeze leaves current histories unchanged and removes
+its partial frozen references.
+
+`lighting_retained_render` streams frozen subjects in the settled natural /
+entry / thing / authored priority order without a fixed placement array or
+per-rule subject cap. A fact-module callback supplies natural priority; the
+engine supplies painting. Each selection scans that rule's full visible batches
+and emits its next lowest-priority member, so worst-case candidate visits are
+quadratic in visible members. The128-member sample visits16512 candidates and
+retains all128 subjects; it makes no target-time/cadence claim. Actual module
+priority bindings, a full accepted-profile storage bound and linked enabled
+consumer acceptance remain required. The old flat owner remains an independent
+comparison surface in producer and QMK-adapter fixtures, both of which also run
+against this arena-backed bank.
+
+`lighting_history_observe` consumes a coherent state frame after local calendar
+advancement. It evaluates the rule's independent filters, walks the actual
+first fact and groups **all** matching subjects for each thing into one ordered
+batch. Partial same-thing departure refreshes that live batch; a full match end
+freezes its last batch. Negative-first and unconditional rules use the board
+subject. A frame's monotonic observation token is common to its new entries;
+refresh preserves the earlier entry token, while full re-entry replaces it.
+The walk neither recollects facts nor reads profile storage. Its caller-owned
+batch scratch must coexist with the immutable facts. Failures are exposed;
+accepted-domain reserve remains the production owner's obligation.
+
+`noah_lighting_apply_retained_rule` streams one authored rule's frozen histories
+through the same target, paint, brightness and background composition as the
+ordinary engine. It passes the full retained subject, including departed owners,
+slot and outcome, to relative targeting and painting. It does not requalify
+filters: event filters were captured at occurrence, and a state tail retains
+its last whole matching batch. The caller supplies that fact's natural priority
+and a same-publication frame store. Shared `historyObservations` and
+`historyEvents` cases compare the resulting pixels against the reference walk,
+in addition to independent metadata/owner assertions. They cover delayed
+visibility, full/partial departures, nonqualifying and qualifying repeats,
+per-thing coexistence and expiry, high rule/id values and no resurrection after
+later filter gain. These are component APIs; the normal scene loop, synthetic
+fade destination, production natural-priority bindings, bank allocation and
+main/capture/RPC activation still require complete integration and linked
+acceptance. Their presence alone advertises no event/retention capability.
+
+Renderer placement and synchronous occurrence capture share one explicitly
+owned workspace. The recorded60-key/four-combo/full-module configuration uses
+1024 bytes for64 placed subjects; capture holds621 fact bytes,56-byte native
+group and12-byte **single-event** batch simultaneously (696 bytes including
+alignment). A general state batch can need705 bytes and is a separate phase;
+it is not overlaid with facts still being walked. Larger compiler geometries
+use the larger union arm and require their own linked acceptance. Cortex-M0+
+layout assertions cover the recorded configuration. Resolved RGB facts/frame,
+fade frames, cached keymap basis and immutable in-flight request are separate
+owners and are never borrowed by this workspace. Render placement is dead on
+synchronous resolve return; collection, qualification and retention cannot
+call an input producer or renderer. Split callbacks only stage their separate
+mailbox. Existing shared render/occurrence traces alternate these phases and
+poison scratch while preserving caller facts and frames. Complete enabled
+producer/callback/role integration and its linked stacks remain required.
+
+The earlier ownership/transition and experimental arena components are not the
+production allocation. Host tests of255×128 independent cells establish
+transition independence, not that a raw matrix fits the target. Production
+uses the admitted direct current/snapshot reservations below; experimental
+component allocations are not linked runtime banks.
+
 Each half times from the frame in which it first sees the subject, so the
-halves may differ by the link's latency.
+halves may differ by the link's latency. Gate observation and wake deadlines
+use local `timer_read32()`, independently of `sync_timer_read32()` passed to
+paint context for animations. Split offset adjustments cannot mature, delay or
+rewind a gate. The engine defensively ignores a backward observation sample
+and retains its last forward sample; a forward 32-bit wrap advances normally.
+As with QMK deadline ordering, wrap/backward discrimination assumes successive
+observations within the timer's half-range (about24 days); active RGB frames
+observe at the configured frame interval. Millisecond ages remain saturated
+at65535 and existing forward/large-jump pixels are preserved.
+
+Resolved facts are owned by the main render context through every effect
+chunk. Collection stages one module slice, compares actual bytes and updates
+that resolved frame; a failed coherent peer read preserves its previous synced
+slices. During fade destination rendering, the engine temporarily removes the
+auto-mouse layer from active layers, retains base0 and recomputes synthetic
+top from that active set. It saves/restores only active/top bytes synchronously;
+held, locked and one-shot ownership remain actual. Split callbacks publish to
+separate remote storage and cannot mutate the pinned render frame.
+
+Transport storage has disjoint role lifetimes: master built/sent frames share
+a union with slave staging/committed frames. Main-context init closes callback
+readiness, initializes the selected role arm, registers RPC handlers and only
+then publishes readiness. A wrong-role or unready callback rejects before
+accessing packet or role storage. Reinitialization is quiescent: the high
+priority split worker can preempt main, while main cannot preempt a running
+callback. Failed sends preserve the last committed sent frame and force a
+whole latest-frame retry. Module-specific idle builders initialize/compare
+sentinels using at most one slice of scratch, not a persistent idle frame.
 
 ### Thing kinds
 
@@ -444,7 +994,12 @@ program, the keymap (for mapped-key targets), a timing's next change, or every
 frame while something time-based shows (an animating timing, a paint that
 changes with time, the auto-mouse fade). Between resolutions each chunk copies
 the resolved colours; LEDs whose result composes over the effect are finished
-per chunk from the effect the chunk just drew.
+per chunk from the effect the chunk just drew. A publication replaces the one
+RAM program; a keymap publication invalidates its query basis. If either
+changes between chunks, remaining chunks use the last coherent resolved pixels
+instead of combining the new program/basis with old facts, gates or retained
+references. The next frame boundary captures the new generation. Checking the
+program's publication stamp is RAM-only and never lazily loads defaults.
 
 ### Outside the registries
 
@@ -471,13 +1026,13 @@ carries). Synced slices are collected on the USB half and sent to the other
 half as one **lighting facts frame**, which replaces the per-stage combo and
 key-feedback packets and the preview byte of the base packet.
 
-The synced frame is the synced slices in registry order (298 bytes in this
-build: the original 78-byte prefix plus 40 combo bytes and 180 behaviour bytes). It travels in chunks on one transaction, `PUT_SPLIT_LIGHTING_FACTS_SYNC`:
+The synced frame is the synced slices in registry order (607 bytes with these modules enabled:
+the original 298-byte Painting prefix plus 309 state bytes). It travels in chunks on one transaction, `PUT_SPLIT_LIGHTING_FACTS_SYNC`:
 
 | Offset | Size | Field |
 | ---: | ---: | --- |
 | 0 | 1 | frame sequence |
-| 1 | 1 | chunk index (bits 0–3); bit 7 commit |
+| 1 | 1 | chunk index (bits 0–6); bit 7 commit |
 | 2 | 30 | frame bytes `index × 30 ..`, the last chunk zero-padded |
 
 Each pass the USB half rebuilds the frame and sends the chunks that changed
@@ -490,6 +1045,224 @@ generation, so a render never mixes two frames. A pass that fails part-way
 publishes nothing and the next pass resends every chunk. Heartbeats and
 transport back-off are the ones the runtime sync already uses.
 
+### Admitted local histories and conservative split freshness
+
+New flash/linger rules require structural validation **and** shared working-memory
+admission before activation. Existing Standard, state and show-after-only rules
+retain their acceptance. This deliberately replaces the earlier promise that
+8192 payload bytes alone suffice for every new timing construction. It is a
+conservative admission tradeoff, not an impossibility claim about other layouts.
+Over-budget activation/import is rejected atomically; the active program,
+histories and pixels remain intact. There is no eviction or runtime drop escape.
+
+Retained natural priority is registry-owned: layer surfaces use descending
+layer identity; matrix/key surfaces retain their stable walker cursor; event
+and single-current surfaces use captured entry order after natural ties. Named
+combo tails preserve the complete actual newest-first batch. With the current
+8220 pool, a broad128-identity combo tail with M>=2 already exceeds Q (10304
+bytes at M=2), independent of occupancy. With M=1, the actual origin cache holds
+at most one live completion, so older departed completions precede newer entries
+only by their captured recency; there is no concurrently older live completion
+behind a newer departed one. Named selectors have one whole live-or-tail batch.
+This derives from existing producer capacity and admission arithmetic, not a new
+selector cap or a sharing assumption. Increasing the pool/admitting broader
+multi-live combo tails would also require durable module occurrence-order
+bindings before advertising that changed working model.
+
+Working model1 reserves two complete banks and one replacement slot in an
+8220-byte pool per half. For each enabled new-timing rule, registry metadata
+supplies N selected identities (1 for a named selector) and M maximum complete
+ordered members per identity. With B=ceil(matrix_keys/8), C=align4(12+M*(5+B)),
+S=sum(12+N*C), W=max(C), and Q=2*S+W; Q=0 without new timing. Checked arithmetic
+rejects overflow. Owners, slot, outcome, sides, natural priority and independent
+entry order/lifetimes are retained. No sharing, sparse occupancy, short duration,
+filter impossibility or input-rate discount affects admission. The second bank
+is master immutable outgoing snapshot **or** slave validated staging; local
+render consumes current synchronously, never a third pinned bank. The 8220-byte
+pool is fixed independently of the scoped linked RAM policy in memory-budgets.md;
+reviewed stack policy is unchanged.
+
+Startup loads the compiled program and initializes its histories before input
+producers run. Successful publication initializes the admitted owned program,
+profile identity and split lifecycle before exposing the new lighting generation;
+all fallible source reads/admission precede active replacement. The observer
+uses only that prepared generation and synchronously collects, qualifies and
+retains an occurrence; it never lazily loads/decodes a program or defers filters.
+The pinned split role is fixed at split_pre_init. An explicit role reinitialization
+runs at a shallow main boundary before producers, closes callback readiness and
+rebuilds the selected role before publication. Render chunks keep their owned
+previous pixels across generation/reset changes. Command-mutation and collection
+scratch return before later capture/qualification phases where their lifetimes
+are disjoint; outer planning storage remains live during synchronous drains.
+
+Each half renders locally. Source-expired flashes are not deliberately replayed
+or granted a fresh window by reconnect. A remote flash paints only when its
+**entire** proved age interval satisfies lower>=show-after and upper<flash.
+A departed linger preserves its whole eligible batch and departure age, with
+no extended expiry. Unknown freshness suppresses transient paint; uncertainty
+can shorten or hide a transient. State facts still resynchronize coherently.
+The former late-arrival full-window journal below is superseded for the new
+production snapshot discriminator; its historical codec/component tests are
+not evidence for the revised production protocol.
+
+V1 explicitly assumes nominal **equal-rate logical millisecond timers** between
+valid causal evidence and use; independent offsets are arbitrary. This is a
+product/software model, not a measured crystal tolerance, ppm bound or exact
+physical-deadline guarantee. No-resurrection is conditional on that model.
+Slow physical drift need not be detected. Hardware drift, cadence and high-water
+acceptance remain unproved.
+
+For snapshot capture C, source request samples M0 before and M1 after a successful
+synchronous RPC, and receiver callback sample S inside that causal interval.
+At receiver time R the elapsed-source-age interval since C is conservatively
+[max(0,M0-C+(R-S)-2), M1-C+(R-S)+2]. Each subtraction of two floor-to-ms timer
+readings differs from elapsed logical time by less than one millisecond; the two
+subtractions justify outward two-millisecond rounding. No symmetric-delay or
+zero-delay assumption is used. C precedes M0, so capture/assembly time is charged;
+R-S charges transfer, main-consume delay and subsequent elapsed time. Snapshot
+slot ages at C are added with saturation at65535, which is expired for every
+u16 duration, never wrapped or restarted.
+
+Every modular span, and its composed evidence-to-use span, must be below2^31ms.
+Detected backward/discontinuous local time, ambiguous wrap, session/profile/role
+reset or malformed causal evidence invalidates calibration; fresh causal evidence
+is required. Full-wrap silence cannot be inferred from a wrapping counter alone:
+normal observation/use requires the half-range continuity precondition. This
+model is deliberately separate from stepped synchronized paint-animation time.
+
+### Coherent history snapshot v2 (internal split protocol)
+
+The replacement uses HELLO/CONFIRM/DATA/REPLY tags0x81/0x82/0x83/0x84;
+legacy tags1..4 are rejected by this endpoint. HELLO retains the exact22-byte
+profile identity and u32 sequence, CONFIRM epoch+sequence. DATA is64 bytes:
+tag, epoch u32, sequence u32, payload55. REPLY is14 bytes: tag,status,epoch,
+sequence and receiver callback timer u32. Requests/replies stay within the
+existing128/32 QMK allocation. All integers are explicit little endian; no
+native descriptor padding is transmitted.
+
+Payload byte0 selects PING3, BEGIN0, CHUNK1 or COMMIT2. PING establishes one
+successful causal exchange. BEGIN bytes1/5/9/13 carry capture/source-before/
+source-after/receiver-callback u32 samples; bytes17..18 carry total snapshot
+length. CHUNK bytes1..2 are exact sequential offset, byte3 length1..51, bytes4..
+are data. COMMIT follows exactly the complete length. Reserved payload bytes
+are zero. The stream is the admitted bank's explicit descriptors/slots followed
+by the complete registry-defined byte-only fact frame. Source pins that whole
+cut through retries; the slave owns one fact staging buffer alongside its
+reserved second history bank. Callback stages one immutable request only;
+main validates complete snapshot metadata and adjusts transient ages before
+swapping the bank and copying its facts, then acknowledges. Partial transfer,
+wrong offset/profile/size or malformed descriptors never publish a mixed scene.
+The additional fact staging buffer is fixed storage outside the8220 pool and
+must be included in linked accounting; it is not a third history bank.
+
+There is one synchronous RPC and one immutable pending request. Exact committed
+sequence duplicates acknowledge without repeating a calendar commit. A newer
+source occurrence changes current only; a pinned outgoing snapshot remains
+unchanged and the next cut carries the newer still-live state. No journal pins
+source-expired markers. Normal failed transfers preserve current pixels; late
+snapshots age against their original capture and can suppress expired tails or
+flashes. A valid session/profile/role reset closes callback readiness before
+storage initialization and clears receiver transient history. A boot epoch is
+not a unique nonce: stale rejection uses the same bounded synchronous QMK RPC
+lifetime and exact next-sequence/HELLO/CONFIRM discipline as below. Mixed protocol
+peers never consume each other's masks or snapshot payloads.
+
+Matching state show-after remains local observed-frame time; a continuously
+observed matching thing retains its local gate through resynchronization.
+Source-aged flashes and already eligible departed tails retain their captured
+qualification, whole batch and deadline interval. Local render never requalifies
+an event with later filters. Published pixels survive input/publication between
+QMK chunks; history-dependent rerender uses a matching revision only. The
+snapshot staging buffer and render placement/capture scratch have separate
+lifetimes and are charged separately.
+
+### Qualified event groups (internal split protocol) — legacy component
+
+`qmk_lighting_event_transport` binds the portable sender/receiver to actual
+`transaction_register_rpc` / `transaction_rpc_exec` with at most one bounded
+RPC per master step. The callback validates/stages only; slave main invokes
+the consumer. Its role-selected link is initialized and registration kept
+closed before readiness publication; wrong-role and registration-time calls
+cannot overwrite a packet arm. The master offer workspace ends before the
+synchronous RPC call. Enabled builds add their transaction id through the
+shared config; disabled capture adds no id, instance or callback. A two-instance
+host seam exercises these actual calls with normal and sanitized builds.
+The history owner must still supply the fair next/consume/reset/ACK operations,
+exact effective-profile identity and main/init hooks before production capture
+is enabled. This adapter alone does not advertise or implement that owner.
+
+
+Event transport is separate from the coherent state-fact frame. The portable
+codec/session component below is implemented; the occurrence qualifier,
+retained-history consumer and QMK RPC adapter were required before event
+modules can be advertised. It does not add a profile/domain version or enlarge
+QMK's 128-byte request/32-byte reply allocation. All integers are little endian;
+there is no native struct serialization.
+
+| Message | Bytes | Layout |
+| --- | ---: | --- |
+| HELLO1 |27 | opcode1, agreed profile identity (22 bytes), exact first sequence u32 |
+| CONFIRM2 |9 | opcode2, receiver epoch u32, exact first sequence u32 |
+| DATA3 |63 | opcode3, epoch u32, sequence u32, qualified group (54 bytes) |
+| REPLY4 |10 | opcode4, status u8, epoch u32, echoed sequence u32 |
+
+Profile identity (22 bytes) is generation, payload CRC32, payload digest, compiled-default
+digest and action ABI digest (five u32), followed by origin and kind (two u8),
+using the effective provider's identity fields. HELLO must agree before any
+rule mask is consumed; publication/reboot/role change invalidates the session.
+The group is order u64, subject thing-kind/thing/slot/outcome/sides/has-keys
+(six u8), owner bitmap8 and qualified-rule mask32. Bits 0..254 name accepted
+rule ordinals; bit 255 is zero and the mask is nonempty. Sides 0..3 and
+has-keys 0..1 retain their subject meanings. Capture has already qualified all
+independent filters at the coherent occurrence; the receiver never substitutes
+its current filters. The order distinguishes a newer qualifying repeat from
+the immutable outgoing version. Source qualification and storage bounds are
+not established by these packet sizes.
+
+Statuses are 1 pending,2 committed ACK,3 need HELLO,4 reject,5 profile mismatch
+and6 HELLO ready. Callback validates and stages only. Main owns the immutable
+mailbox through synchronous consumption and publishes ACK only after the whole
+group commits. A consumer that cannot commit changes nothing and leaves the
+packet pending. Retries before main return pending; the last committed sequence
+returns ACK without consuming/restarting its clock. Any other DATA sequence
+rejects. The exact next-u32 sequence increments modulo2^32. The sender advances
+the first sequence when an old pending request discovers a fresh receiver, so
+that request is excluded even if the receiver's boot epoch repeats. HELLO and
+CONFIRM are retried byte-identically until their respective replies; a lost
+CONFIRM ACK retries CONFIRM, never starts another HELLO/reset.
+
+Epoch is a receiver session counter, not a unique boot nonce. Pinned QMK runs
+one synchronous CRC-protected info/request/execute/reply sequence at a time:
+no older asynchronous RPC survives a later completed request. The sender owns
+one outgoing packet until ACK; a boot loses it, and a role/profile reinit closes
+callback readiness before touching union/control storage. Epoch/sequence wrap
+therefore does not rely on comparing arbitrary packets retained across 2^32
+completed sessions. Out-of-order/stale DATA within the bounded RPC lifetime
+rejects; an already committed last request is the sole idempotent duplicate.
+Synthetic packets retained outside that lifetime are not an extra transport
+queue or a security/replay guarantee.
+
+In the superseded legacy component, an ordinary failed request or lost ACK never
+resets the session or discards an expired unsent marker. Marker 100/flash500 first committed remotely at 1000 starts
+that half's local window 1000..1499 and expires 1500; a duplicate cannot restart
+it. An explicit fresh session clears receiver histories and seeds the sender
+only from currently live qualified markers, excluding expired past events.
+Main gives a staged reset priority over an old pending/consuming group; an old
+ACK cannot publish across it. A qualifying newer repeat remains dirty when ACK
+cleanup compares the captured order/mask with current records; a nonqualifying
+repeat leaves the older qualified record untouched. Round-robin dirty history
+selection remains a consumer integration obligation, not a short dropping
+transport queue.
+
+One caller-owned link object bounds control plus the role-disjoint outgoing/
+mailbox storage at 112 bytes (native layout is not the wire layout). No retained
+history or event queue is allocated inside it. Initialization/readiness and
+synchronous borrowed group lifetimes must hold on each half; no packet pointer
+survives its ACK callback. Component host vectors cover codec boundaries,
+pending/ACK loss, immutable retries, newer occurrences, sequence wrap, reset
+while consuming and role readiness. They do not prove the unfinished retained
+history bound, enabled ARM integration, physical cadence or hardware behavior.
+
 ## Capabilities
 
 Feature bit 31 advertises version-5 lighting and the lighting capability
@@ -500,14 +1273,18 @@ and padding rules.
 | ---: | --- |
 | 0 | layout version `1`, domain version `5`, payload budget (u16, `8192`), palette maximum (`128`), conditions per rule (`4`), part parameter maximum (`16`), tap depth, LED count (`58`), registry count (`7`) |
 | `1 + 2r + h` | registry `r`, ids `128h..128h+127`: registry id, first id, then a 16-byte bitmap (bit `i` of byte `i / 8` is id `first + i`) |
+| 15 | working model1, pool capacity u16, owner bitmap bytes, descriptor12, slot header12, member base5, alignment4 |
+| `128 + fact-id` | compiled module id, subject domain, selector parameter (255 if none), maximum whole-batch members; unsupported pages return no payload |
 
 Registries `r` are `0` facts, `1` targets, `2` paints, `3` timings, `4` rule
 extensions, `5` domain extensions, `6` thing kinds. A client offers only what
 the keyboard reports and keeps a rule it cannot edit byte for byte.
 
 With all modules enabled, the low-id fact page is registry 0, first id 0,
-bitmap prefix `be 01` (ids 1–5, 7, 8); the paint page is registry 2,
-bitmap prefix `7f 01` (ids 0–6, 8). Target bits remain `ff` (ids 0–7).
+bitmap prefix `be ff ff 1f` (ids 1–5, 7–28); builds without the
+retention consumer omit ids19–28 (`be ff 07`); the paint page is registry 2,
+bitmap prefix `7f 01` (ids 0–6, 8). Target prefix becomes `ff 01` (ids0–8); paint prefix `7f 03` adds paint9.
+Thing kinds now include 5–7, giving the low-id thing bitmap `fe`.
 The rest of each 16-byte bitmap is zero. Disabling
 `NOAH_LIGHTING_FACT_COMBO_HELD`, `NOAH_LIGHTING_FACT_BEHAVIOUR` or
 `NOAH_LIGHTING_PAINT_OUTCOME` removes only its kind/bit and rejects that kind

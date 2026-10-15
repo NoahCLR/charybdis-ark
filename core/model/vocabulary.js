@@ -72,9 +72,20 @@ const OS_WORDS = {macos: "macOS", windows: "Windows", linux: "Linux"};
 /** @type {Readonly<import("../../contracts/model.js").Vocabulary>} */
 const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.js").Vocabulary} */ ({
     lighting: {
-        bands: {base: "Base", layers: "Layers", preview: "Layer previews", modes: "Pointing modes", combos: "Combos", feedback: "Gesture feedback", other: "Other rules"},
-        targets: ["Whole board", "Left half", "Right half", "Saved key set", "Its keys", "Its halves", "Its mapped keys", "Its usual lighting area"],
-        paints: ["Let the rules below show", "Off", "Colour", "Its own colour", "Painted map", "Dim the light below", "Tint the light below", "Reserved paint", "Colour by outcome"],
+        bands: {base: "Base", layers: "Layers", preview: "Layer previews", modes: "Pointing modes", combos: "Combos", feedback: "Gesture feedback", macros: "Macros", keys: "Keys", alerts: "Modifiers and host locks", pointer: "Pointer", other: "Other rules"},
+        targets: ["Whole board", "Left half", "Right half", "Saved key set", "Its keys", "Its halves", "Its mapped keys", "Its usual lighting area", "Keys that…"],
+        paints: ["Let the rules below show", "Off", "Colour", "Its own colour", "Painted map", "Dim the light below", "Tint the light below", "Reserved paint", "Colour by outcome", "What it does"],
+        things: ["Board", "Layer", "Pointing mode", "Combo", "Behaviour", "Macro", "Modifier", "Key"],
+        facts: {1: "Layer active", 2: "Layer previewing", 3: "Pointing mode active", 4: "Shared combo feedback", 5: "Shared gesture feedback", 7: "Combo held", 8: "Behaviour showing feedback", 9: "Layer state", 10: "Pointing mode state", 11: "Combo holding a layer", 12: "Behaviour phase", 13: "Macro playing", 14: "Key pressed", 15: "Modifier", 16: "Host lock", 17: "Pointer", 18: "Board idle", 19: "Layer locked", 20: "Layer unlocked", 21: "One-shot layer used", 22: "Pointing mode started", 23: "Pointing mode ended", 24: "Combo fired", 25: "Tap fired", 26: "Hold fired", 27: "Long hold fired", 28: "Macro played"},
+        timings: {1: "Show after", 2: "Linger", 3: "Flash"},
+        parameters: {layer: "Layer", mode: "Pointing mode", thing: "Thing", role: "Combo role", states: "Feedback states", scope: "Which gesture", layerStatus: "Layer state", modeStatus: "Pointing mode state", behaviourPhase: "Phase", tapSelector: "Tap branch", keySelector: "Key position", modifier: "Modifier", side: "Side", modifierState: "Modifier state", hostLock: "Host lock", pointerState: "Pointer state", keyQuery: "Keys that", set: "Saved key set", colour: "Palette colour", map: "Painted map", level: "Amount"},
+        choices: {
+            layerStatus: ["Top layer", "Held", "Locked", "One-shot armed"], modeStatus: ["Held", "Locked"],
+            behaviourPhase: ["Branch selected", "Tap pending", "Hold pending", "Hold active", "Long hold active"],
+            modifier: ["Ctrl", "Shift", "Alt", "GUI"], side: ["Left", "Right", "Either"], modifierState: ["Held", "One-shot armed"],
+            hostLock: ["Caps Lock on", "Num Lock on", "Scroll Lock on"], pointerState: ["Auto-mouse on", "Auto-mouse fading", "Sniping", "Ball moving"],
+            keyQuery: ["Are mapped", "Are transparent", "Do nothing", "Send a modifier", "Send a letter", "Send a number", "Send a symbol", "Send navigation", "Send media or system keys", "Send mouse keys", "Switch to a layer", "Start a pointing mode", "Play a macro", "Are custom keys", "Have a behaviour", "Are combo inputs"],
+        },
         states: ["Branch selected", "Tap", "Hold", "Long hold"],
         scopes: ["Each key", "Newest gesture on each half", "Newest gesture", "Newest gesture in each state"],
     },

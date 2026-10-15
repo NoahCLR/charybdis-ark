@@ -92,10 +92,10 @@ test("editing an identity keeps its painted map above the fallback and feedback 
 });
 
 test("a future paint inside a map stays read-only and byte-exact through other edits", () => {
-    const caps = structuredClone(options.capabilities);caps.registries.paints.push(9);
+    const caps = structuredClone(options.capabilities);caps.registries.paints.push(10);
     const opts = {...options, capabilities: caps};
     const profile = decodeLightingDomain(bytes(), opts);
-    profile.maps = [Array(58).fill(128)];profile.maps[0][2] = 128 + 9;
+    profile.maps = [Array(58).fill(128)];profile.maps[0][2] = 128 + 10;
     const p = profile.rules[0].parts.find(p => p.slot === 3);p.kind = 4;p.params = [0];
     const original = encodeLightingDomain(profile, opts), decoded = decodeLightingDomain(original, opts);
     assert.equal(decoded.rules[0].known, false);
