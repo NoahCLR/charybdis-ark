@@ -1,6 +1,22 @@
 // @ts-check
 import {vocabulary} from "./vocabulary.mjs";
+import {KEY_LEDS} from "./lighting-simulator.mjs";
 /** @typedef {import('../../contracts/panel.js').PublishedModel} Model */
+/** @param {number} query @returns {number | undefined} */
+export const lightingQueryThing = query => ({10: 1, 11: 2, 12: 5, 14: 4, 15: 3})[query];
+/** Only explicit user changes canonicalise an unused query selector. Reading,
+ * saving another field, and opaque-rule rewrites leave the stored bytes alone.
+ * @param {import('../../contracts/lighting.js').LightingPart} part @param {number} index @param {number} value */
+export function lightingParameterChange(part, index, value) {
+    const params = [...part.params];params[index] = value;
+    if (part.slot === 2 && part.kind === 8 && index === 0 && !lightingQueryThing(value)) params[1] = 255;
+    return params;
+}
+/** @param {number} matrix */
+export function lightingOwnerLabel(matrix) {
+    const led = KEY_LEDS[matrix];
+    return `Matrix ${matrix} · ${led === undefined ? "no LED association in pinned firmware" : `LED ${led}`}`;
+}
 /** @param {Model} model @param {string} type @param {number} [thing] @returns {[number, string][]} */
 export function lightingParameterChoices(model, type, thing = 0) {
     const lighting = model.rgb.lighting, words = vocabulary(model).lighting;
@@ -11,7 +27,7 @@ export function lightingParameterChoices(model, type, thing = 0) {
     if (type === "layer") result = model.layers.map(l => [l.index, l.displayName || l.name]);
     else if (type === "mode") result = model.pdModes.map(m => [m.id, m.displayName || m.name || `Pointing mode ${m.id + 1}`]);
     else if (type === "thing") result = thing === 3 ? model.combos.map((c, i) => [i, c.badge || `Combo ${i + 1}`]) : thing === 4 ? model.keyBehaviors.map((b, i) => [i, model.qmkKeyLabels[b.keycode] || b.keycode]) : thing === 5 ? model.viaMacros.map((m, i) => [i, m.name || `Macro ${i + 1}`]) : numbered(128, "Thing").map(([n, label]) => [Number(n), String(label)]);
-    else if (type === "keySelector") result = Array.from({length: 60}, (_, k) => [k, `Key position ${k + 1} · ${k < 30 ? "left" : "right"} ${Math.floor(k / 6) % 5 + 1}:${k % 6 + 1}`]);
+    else if (type === "keySelector") result = Array.from({length: 60}, (_, k) => [k, lightingOwnerLabel(k)]);
     else if (type === "tapSelector") return [[255, "Any branch"], ...Array.from({length: model.behaviorEditing.maxTapStepsPerBehavior}, (_, i) => [i + 1, `Branch ${i + 1}`])].map(([n, label]) => [Number(n), String(label)]);
     else if (type === "role") return [[255, "Any held combo"], [0, "Leading into a preview or mode"], [1, "Other held combos"]];
     else if (type === "scope") return words.scopes.map((label, i) => [i, label]);

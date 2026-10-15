@@ -84,3 +84,55 @@ for(const theme of ['vscode-dark','vscode-light'])test(`actual demo draft accept
  const [download]=await Promise.all([page.waitForEvent('download'),page.locator('.sheet [data-act="export"]').click()]);const chunks=await (await download.createReadStream()).toArray(),file=JSON.parse(Buffer.concat(chunks).toString('utf8'));const p=require('../core/model/portable-profile').validateSnapshot(file).rgb;
  expect(p.rules[0].parts).toEqual(expect.arrayContaining([{slot:0,kind:28,params:[127]},{slot:3,kind:9,params:[]},{slot:5,kind:3,params:[9,3]}]));
 });
+
+for(const theme of ['vscode-dark','vscode-light']) {
+ test(`query selectors follow semantics and post only applicable parameters (${theme})`,async({page})=>{
+  await openControls(page,'lighting',{},theme);await field(page,':slot:2:kind').selectOption('8');
+  for(const [query,word] of [[10,'Layer'],[11,'Pointing mode'],[12,'Macro'],[14,'Behaviour'],[15,'Combo']]){
+   await field(page,':slot:2:parameter:0').selectOption(String(query));
+   const selector=field(page,':slot:2:parameter:1');await expect(selector).toBeVisible();
+   expect(await selector.locator('option').allTextContents()).not.toEqual(expect.arrayContaining(['Thing 1','Thing 128']));
+   await expect(selector.locator('..')).toContainText(word);
+  }
+  await field(page,':slot:2:parameter:0').selectOption('12');await field(page,':slot:2:parameter:1').selectOption('127');
+  for(const query of [...Array.from({length:10},(_,i)=>i),13]){
+   await field(page,':slot:2:parameter:0').selectOption(String(query));await expect(field(page,':slot:2:parameter:1')).toHaveCount(0);
+   await clearPosts(page);await save(page);expect((await posted(page))[0].rule.parts).toContainEqual({slot:2,kind:8,params:[query,255]});
+   await field(page,':slot:2:parameter:0').selectOption('12');await expect(field(page,':slot:2:parameter:1')).toHaveValue('255');
+   await field(page,':slot:2:parameter:1').selectOption('127');
+  }
+  await clearPosts(page);await save(page);expect((await posted(page))[0].rule.parts).toContainEqual({slot:2,kind:8,params:[12,127]});
+  await field(page,':slot:2:kind').selectOption('0');
+  await publishAccepted(page,['rgb','lighting','supportedTargets'],[0,1,2,3,4,5,6,7]);
+  await expect(field(page,':slot:2:kind').locator('option[value="8"]')).toHaveCount(0);await expect(field(page,':slot:2:parameter:0')).toHaveCount(0);
+ });
+ test(`matrix owner choices reach the associated LED and all legends contrast (${theme})`,async({page})=>{
+  await openControls(page,'lighting',{},theme);await page.locator('.situation-controls summary').click();
+  const rule={flags:0,brightness:255,parts:[{slot:0,kind:28,params:[127]},{slot:2,kind:4,params:[]},{slot:3,kind:2,params:[0]},{slot:5,kind:3,params:[244,1]}]};
+  const program={formatVersion:5,palette:[{h:0,s:0,v:200}],things:[],keySets:[],maps:[],extensions:[],rules:[rule]};
+  await publishAccepted(page,['rgb','lighting','program'],program);await page.locator('[data-f="situation:event:kind"]').selectOption('28');await page.locator('[data-f="situation:event:parameter:0"]').selectOption('127');await clearPosts(page);
+  const choose=page.locator('[data-f="situation:event:owners:choose"]');
+  await expect(choose.locator('option[value="56"]')).toHaveText('Matrix 56 · LED 55');
+  for(const matrix of [56,59,24,54]){
+   await choose.selectOption(String(matrix));await expect(page.locator('[data-f="situation:event:owners"]')).toHaveValue(String(matrix));
+   await expect(page.locator('[data-owner-associations]').last()).toContainText(matrix===56?'Matrix 56 · LED 55':`Matrix ${matrix} · no LED association in pinned firmware`);
+   await page.locator('[data-reset]').click();await page.locator('[data-fire-event]').click();
+   await expect(page.locator('[data-sim-led="55"]')).toHaveAttribute('data-colour',matrix===56?'c8c8c8':'-');
+   expect(await page.locator('[data-sim-led]').evaluateAll(nodes=>nodes.filter(n=>n.getAttribute('data-colour')!=='-').map(n=>n.getAttribute('data-sim-led')))).toEqual(matrix===56?['55']:[]);
+  }
+  // State owner selection shares the same matrix-number contract.
+  await page.locator('[data-f="situation:add-kind"]').selectOption('8');await page.locator('[data-add-state]').click();
+  await page.locator('.lighting-chips [data-f$=":parameter:1"]').selectOption('4');
+  await page.locator('.lighting-chips [data-f$=":owners:choose"]').selectOption('56');await expect(page.locator('.lighting-chips [data-f$=":owners"]')).toHaveValue('56');
+  const stateProgram={...program,rules:[{...rule,parts:[{slot:0,kind:8,params:[0,4]},...rule.parts.slice(1,3)]}]};
+  await publishAccepted(page,['rgb','lighting','program'],stateProgram);await page.locator('[data-show-situation]').click();await expect(page.locator('[data-sim-led="55"]')).toHaveAttribute('data-colour','c8c8c8');
+  // Full-board fills cover normal keys, trackball and extra LED legends.
+  for(const [v,colour,legend] of [[200,'c8c8c8','rgb(0, 0, 0)'],[0,'000000','rgb(255, 255, 255)']]){
+   await publishAccepted(page,['rgb','lighting','program'],{...program,palette:[{h:0,s:0,v}],rules:[{flags:0,brightness:255,parts:[{slot:2,kind:0,params:[]},{slot:3,kind:2,params:[0]}]}]});
+   expect(await page.locator('[data-sim-led]').evaluateAll(nodes=>[...new Set(nodes.map(n=>n.getAttribute('data-colour')))])).toEqual([colour]);
+   await expect(page.locator('[data-sim-label]')).toHaveCount(58);
+   expect(await page.locator('[data-sim-label]').evaluateAll(nodes=>[...new Set(nodes.map(n=>getComputedStyle(n).fill))])).toEqual([legend]);
+  }
+  expect(await posted(page)).toEqual([]);
+ });
+}

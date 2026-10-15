@@ -106,6 +106,12 @@ second stored program in browser state. Unsaved form changes are local until
 Save rule. State conditions are independently negatable; events are positive
 first triggers with explicit flash. Linger is state/board only. The constructor
 removes incompatible timing when changing between state and event roles.
+Keys-that queries 0–9 and 13 ignore their selector and show no identity field.
+Queries 10/11/12/14/15 select layer/mode/macro/behaviour/combo identities from
+the corresponding model collections. An explicit query change to an unused
+selector stores 255; rendering, other edits and opaque-rule rewrites never
+canonicalise ignored stored bytes. The pure parameter-change helper feeds the
+existing posted rule builder and core acceptance path.
 
 The pure simulator registry walkers consume an explicit situation and a native
 keymap basis posted with each draft. The basis contains native key values,
@@ -134,7 +140,11 @@ The pinned RGB geometry associates LED55 with matrix56, while the last physical
 layout key is matrix59 with no LED association. The simulator's relative targets,
 queries and what-it-does paint use that RGB matrix map. Fixed LED55 bytes, the
 existing painter schematic and identity-board layout indices remain unchanged.
-The situation explains this distinction. Hardware and metadata reconciliation
+The situation owner fields and choices explicitly name matrix0–59 and show the
+pinned LED cross-reference; the board labels fixed LED0–57. Matrix24/54/58/59
+have no association in that map. Label contrast uses the shared luminance
+helper on the rendered RGB, including the trackball and extra LED.
+Hardware and metadata reconciliation
 is a separate follow-up; no physical wiring conclusion follows from these files.
 
 ## Working-memory admission
@@ -160,3 +170,8 @@ from saved bytes. Review blocks activation, and the shared restore path checks
 admission before any recovery write or candidate mutation. Firmware validates
 again before publication. Disabled timed rules reserve no working space; unknown
 rule bytes remain read-only and are never rewritten to repair a budget.
+Before the zero-cost shortcut, every enabled timing must have a known cost
+classification. Unknown enabled timing makes the whole estimate unknown even
+in a mixed known/unknown program or with future capability metadata. This blocks
+Review/restore activation before recovery or candidate writes; imported bytes,
+backups and history remain available. Disabled unknown timing contributes zero.

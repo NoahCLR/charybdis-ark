@@ -87,6 +87,8 @@ Remaining before calling the product complete:
   LED 55 with matrix key 56, while the last right-thumb layout key is matrix 59
   with no LED association. Execution simulation follows that metadata; fixed
   LED 55 and the painter's schematic selection retain their bytes and positions.
+  Simulator owner choices use explicit matrix numbers with their LED association;
+  matrix 24, 54, 58 and 59 have no association in the pinned firmware.
   This is not evidence of physical wiring or a reason to remap it without a
   separate hardware/metadata check.
 

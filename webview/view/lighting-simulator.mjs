@@ -6,8 +6,8 @@ import {emptyLifetime, observeLifetime, lifetimeStatus, subjectPriority} from ".
 /** @typedef {import('./lighting-simulator-types.js').Timing} Timing */
 /** @typedef {import('./lighting-simulator-types.js').Entry} Entry */
 /** @typedef {number[]} RGB */
-// The pinned RGB matrix wiring differs from the physical key layout at the
-// final right thumb: matrix56 owns LED55, matrix59 has no LED. Do not invent
+// The pinned RGB matrix association differs from the key layout at the
+// final right thumb: matrix56 owns LED55, matrix59 has no LED association. Do not invent
 // a key-to-LED connection from the pictorial layout.
 /** @type {(number | undefined)[]} */
 export const KEY_LEDS = [0,7,8,15,16,20,1,6,9,14,17,21,2,5,10,13,18,22,3,4,11,12,19,23,undefined,28,24,26,27,25,29,36,37,44,45,49,30,35,38,43,46,50,31,34,39,42,47,51,32,33,40,41,48,52,undefined,53,55,54,undefined,undefined];

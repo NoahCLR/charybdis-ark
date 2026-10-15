@@ -5,7 +5,7 @@
 // dots, the swatches and the review all answer the same way — and they answer
 // from the draft, because the draft is what the model carries.
 
-import {isOff} from "../lib/colour.mjs";
+import {isOff, idealTextRgb} from "../lib/colour.mjs";
 import {LED_INDEX, TRACKBALL_LED, inLocality, trackballInLocality} from "./geometry.mjs";
 
 /**
@@ -16,6 +16,9 @@ import {LED_INDEX, TRACKBALL_LED, inLocality, trackballInLocality} from "./geome
  * @typedef {import("./types.js").LightOptions} LightOptions
  */
 const OFF = {h: "0", s: "0", v: "0"};
+
+/** @param {number[] | null} channels */
+export const simulationLegend = channels => channels ? idealTextRgb(channels, true) : "var(--muted)";
 
 
 // A pointing slot's lighting row by the name the RGB enum gives its id; the

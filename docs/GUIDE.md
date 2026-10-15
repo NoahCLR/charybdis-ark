@@ -697,7 +697,10 @@ timing. Background paints LEDs the main paint does not cover. **Keys that…**
 selects keys from the current keymap each time the rule runs: mapped, transparent,
 unused, native key categories, layer/mode/macro actions, custom keys, behaviour
 rows or enabled combo inputs. A layer rule queries that layer; other rules query
-the top active layer. These live selections follow remaps. The painter's
+the top active layer. Only queries for a layer, pointing mode, macro, behaviour
+or combo show a named/Any selector. Changing to a key category clears that
+unused selector; simply reading a saved rule preserves its bytes. These live
+selections follow remaps. The painter's
 **Select keys that…** instead stores fixed LEDs. **What it does** paints a direct
 layer, pointing-mode or macro action in its target's identity colour; it does
 not predict arbitrary behaviour branches or host-layout characters.
@@ -716,7 +719,11 @@ contribution. **Any** reserves every possible matching thing and its complete
 keys. Shorter durations and unlikely filters do not save working memory. An
 over-budget imported draft is kept so you can turn off rules or choose named
 things; Review blocks Apply until it fits. Missing or unfamiliar working-memory
-capabilities do not imply an available budget. Firmware remains authoritative.
+capabilities do not imply an available budget. An enabled timing that needs a
+newer Ark has an unknown cost and blocks activation, too. Keep its backup and
+use a compatible Ark before activating it; its read-only bytes stay intact.
+Disabled unknown timing does not reserve working memory. Firmware remains
+authoritative.
 
 **Try a situation** builds an on-screen local timeline. Add state chips, choose
 their subjects and simulated owner keys, press **Show situation**, then advance
@@ -727,9 +734,11 @@ freshness can shorten or hide a transient and never starts a fresh window.
 This simulation does not establish physical clock drift or LED appearance.
 The firmware's global idle sleep can still force black over a matching idle rule.
 
-The simulator labels fixed LEDs, including LED 55. In the pinned firmware it is
-associated with matrix key 56; matrix key 59 (the last right-thumb layout key)
-has no LED association. Fixed LED 55 remains paintable in the schematic painter;
+Owner fields and their selection lists use **matrix** numbers 0–59, with the
+pinned LED association beside each choice. The simulator board labels **LEDs**
+0–57. LED 55 is associated with matrix key 56; matrix keys 24, 54, 58 and 59
+(59 is the last right-thumb layout key) have no LED association in the pinned
+firmware. Fixed LED 55 remains paintable in the schematic painter;
 that schematic selection is not proof that a key-relative rule reaches the same
 LED. Reconciling this metadata with hardware is separate work.
 

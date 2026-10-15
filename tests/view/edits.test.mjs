@@ -1277,3 +1277,30 @@ test("new facts, event construction and timed working budget use the real guarde
     stage(draft,ruleMessage(draft,0,'toggle'));assert.equal(draft.checks().some(c=>c.kind==='lightingWorkingMemory'&&c.status!=='fixed'),false);
     assert.ok(key);
 });
+
+test("query changes post canonical unused selectors through the real draft without normalising stored reads", async () => {
+    const {lightingParameterChange, lightingQueryThing} = await import('../../webview/view/lighting-rules.mjs');
+    const caps = {...capabilities, lighting: require('../fixtures/lighting-capabilities').lightingCapabilities()};
+    const doc = pdDocument(), draft = new ProfileDraftSession({document:doc, fingerprint:portable.fingerprint(doc), summary:portable.summary(doc)}, 'test-device', caps);
+    const target = {slot:2,kind:8,params:[12,127]}, rule = {flags:0,brightness:177,parts:[target,{slot:3,kind:0,params:[]}]};
+    stage(draft, edits.lightingRule(-1,'','add',{rule}));
+    for(const query of [...Array.from({length:10},(_,i)=>i),13]) {
+        assert.equal(lightingQueryThing(query),undefined);
+        const unused=lightingParameterChange(target,0,query);assert.deepEqual(unused,[query,255]);
+        stage(draft,ruleMessage(draft,0,'configure',{rule:{...rule,parts:[{...target,params:unused},rule.parts[1]]}}));
+        assert.deepEqual(decoded(draft).rgb.rules[0].parts[0].params,unused);
+        const applicable=lightingParameterChange({...target,params:unused},0,12);assert.deepEqual(applicable,[12,255]);
+        stage(draft,ruleMessage(draft,0,'configure',{rule:{...rule,parts:[{...target,params:lightingParameterChange({...target,params:applicable},1,127)},rule.parts[1]]}}));
+        assert.deepEqual(decoded(draft).rgb.rules[0].parts[0].params,[12,127]);
+    }
+    assert.deepEqual(target.params,[12,127]);
+    // Ignored selectors are accepted bytes. Merely saving brightness keeps them.
+    const stored={...target,params:[0,127]};assert.deepEqual(lightingParameterChange(stored,1,127),[0,127]);
+    stage(draft,ruleMessage(draft,0,'configure',{rule:{...rule,parts:[stored,rule.parts[1]]}}));
+    stage(draft,ruleMessage(draft,0,'configure',{rule:{...decoded(draft).rgb.rules[0],brightness:178}}));
+    assert.deepEqual(decoded(draft).rgb.rules[0].parts[0].params,[0,127]);
+    assert.deepEqual([10,11,12,14,15].map(lightingQueryThing),[1,2,5,4,3]);
+    const unsupported=structuredClone(caps);unsupported.lighting.registries.targets=unsupported.lighting.registries.targets.filter(n=>n!==8);
+    const other=new ProfileDraftSession({document:doc,fingerprint:portable.fingerprint(doc),summary:portable.summary(doc)},'test-device',unsupported);
+    assert.throws(()=>stage(other,edits.lightingRule(-1,'','add',{rule})),/UNSUPPORTED_KIND/);
+});

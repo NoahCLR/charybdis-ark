@@ -32,7 +32,7 @@ Key and modifier names follow that OS throughout the editors and Review.
   macro memory, and on current firmware one macro can use all of it. There are 128 slots in each bank;
   a combo can have up to 16 inputs, with its own enable and layer controls. On supporting firmware, choose whether all combo outputs use shared behaviours, or bypass the behaviour for one combo while keeping its chord active.
 - **Lighting.** Paint individual keys, mirror or copy a layer’s look, and give layers,
-  modes, combos, behaviours and macros their own colours. Build rules for states or event flashes, choose keys by what they do, and try situations on screen. Review shows saved lighting and flash/linger working memory separately; set the idle timeout in seconds or minutes.
+  modes, combos, behaviours and macros their own colours. Build rules for states or event flashes, choose keys by what they do, and try situations on screen. Review shows saved lighting and flash/linger working memory separately, and waits when timing costs are unknown; set the idle timeout in seconds or minutes.
 - **Its name.** Call the keyboard what you like, and that is the name your
   computer, Chrome and Ark show once it is applied.
 - **Trackball.** Set pointer speed, sniping and auto-mouse, and 32 pointing

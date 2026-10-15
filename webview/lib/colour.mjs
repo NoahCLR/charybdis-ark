@@ -58,9 +58,13 @@ export function valuePercent(value, maximumBrightness) {
 // colour, the label still has to be readable on it.
 /** @param {Colour} colour */
 export function idealText(colour) {
-    const [r, g, b] = rgb(colour).map((channel) => {
+    return idealTextRgb(rgb(colour));
+}
+/** @param {readonly number[]} channels @param {boolean} [opaque] */
+export function idealTextRgb(channels, opaque = false) {
+    const [r, g, b] = channels.map((channel) => {
         const c = channel / 255;
         return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
     });
-    return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.32 ? "rgba(0,0,0,.82)" : "rgba(255,255,255,.94)";
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.32 ? opaque ? "#000000" : "rgba(0,0,0,.82)" : opaque ? "#ffffff" : "rgba(255,255,255,.94)";
 }

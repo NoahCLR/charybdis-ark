@@ -5,9 +5,12 @@ const {LIGHTING_KINDS} = require("./lighting-kinds-v1");
 // a complete, byte-preserved draft that can be repaired before activation.
 /** @param {import('./lighting-types.js').LightingProfile} program @param {import('./lighting-types.js').LightingWorkingCapabilities} [working] @returns {import('../../contracts/lighting.js').LightingWorkingCost} */
 function lightingWorkingCost(program, working) {
+    const unknown = (/** @type {string} */ reason) => ({required: null, bank: null, maximum: null, admitted: false, contributors: [], capacity: working?.capacity, reason});
+    // An open timing registry may contain a future allocator. Classify every
+    // enabled timing before the zero-cost shortcut, without decoding its bytes.
+    if (program.rules.some(r => !(r.flags & 1) && r.parts.some(p => p.slot === 5 && !["any", "stateTail", "eventWindow"].includes(LIGHTING_KINDS.timings[p.kind]?.construction ?? "")))) return unknown("An enabled rule has timing that needs a newer Ark. Its working-memory cost is unknown; keep the backup and use a newer Ark before activating it.");
     const rows = program.rules.flatMap((r, index) => !(r.flags & 1) && r.parts.some(p => p.slot === 5 && ["stateTail", "eventWindow"].includes(LIGHTING_KINDS.timings[p.kind]?.construction ?? "")) ? [{rule: r, index}] : []);
     if (!rows.length) return {required: 0, bank: 0, maximum: 0, admitted: true, contributors: [], capacity: working?.capacity};
-    const unknown = (/** @type {string} */ reason) => ({required: null, bank: null, maximum: null, admitted: false, contributors: [], capacity: working?.capacity, reason});
     if (!working || working.model !== 1) return unknown("The keyboard has not reported a supported working-memory model for flashes and linger.");
     if (working.descriptorBytes !== 12 || working.slotHeaderBytes !== 12 || working.memberBase !== 5 || working.alignment !== 4 || !Number.isInteger(working.ownerBytes) || working.ownerBytes < 1 || working.ownerBytes > 32 || !Number.isInteger(working.capacity) || working.capacity < 0 || working.capacity > 65535) return unknown("The keyboard's working-memory layout is not supported.");
     let bank = 0, maximum = 0;

@@ -62,3 +62,25 @@ test("working-memory rejection precedes recovery/candidate writes while keeping 
  let recovery=false;await assert.rejects(()=>service.restorePortableProfile(target,{saveRecovery:async()=>{recovery=true;return '/fake';}}),e=>e.code==='LIGHTING_WORKING_CAPACITY');assert.equal(recovery,false);
  assert.deepEqual(rgbBytes((await service.readPortableProfile()).document),rgbBytes(source));
 });
+
+test("unknown enabled timing survives import, backup, owner/layer rewrites and Undo but cannot write", async t=>{
+ const {lightingPages}=require('../fixtures/lighting-capabilities'),pages=lightingPages();pages[7][5]|=128; // timing31
+ const keyboard=writableKeyboard({document:document(),lightingPages:pages}),{service}=await connectedService(t,{keyboard},{sleep:async()=>{}});
+ const read=await service.readPortableProfile(),target=structuredClone(read.document),blob=decodeProfileBlob(Buffer.from(target.profile,'base64'));
+ const domain=blob.domains.find(d=>d.id===16),p=decodeLightingDomain(domain.payload);
+ p.rules=[{flags:0,brightness:177,parts:[{slot:0,kind:1,params:[2]},{slot:2,kind:0,params:[]},{slot:3,kind:0,params:[]},{slot:5,kind:31,params:[7,0,255]}]}];p.extensions=[];
+ p.things=[];domain.payload=encodeLightingDomain(p,{capabilities:service.capabilities.lighting});target.profile=encodeProfileBlob(blob).toString('base64');
+ const raw=rgbBytes(target),draft=new ProfileDraftSession(read,'test',service.capabilities);draft.replace(target,draft.revision,'import');
+ assert.equal(draft.hasBlockers(),true);assert.match(draft.checks().find(f=>f.kind==='lightingWorkingMemory').detail,/unknown/);
+ assert.equal(buildSnapshotModel(draft.current,service.capabilities,{editable:true,reason:''}).rgb.lighting.rules[0].readOnly,true);
+ assert.deepEqual(rgbBytes(validateSnapshot(JSON.parse(JSON.stringify(draft.document))).document),raw);
+ const order=target.layers.map((_,i)=>i);[order[1],order[2]]=[2,1];
+ const reordered=require('../../core/model/portable-profile').reorderLayers(draft.document,order);
+ assert.deepEqual(rgbBytes(reordered),raw,'opaque whole rule is not reinterpreted when layers move');
+ require('../../core/model/lighting-references').rewriteLightingThings(blob,4,[1,0],{capabilities:service.capabilities.lighting});
+ assert.deepEqual(blob.domains.find(d=>d.id===16).payload,raw,'owner rewrite preserves opaque whole rule');
+ draft.undo(draft.revision);assert.deepEqual(rgbBytes(draft.document),rgbBytes(read.document));draft.redo(draft.revision);assert.deepEqual(rgbBytes(draft.document),raw);
+ const before=keyboard.mutations.length;let recovery=false;
+ await assert.rejects(()=>service.restorePortableProfile(draft.document,{saveRecovery:async()=>{recovery=true;return '/fake';}}),e=>e.code==='LIGHTING_WORKING_CAPACITY'&&/unknown/.test(e.message));
+ assert.equal(recovery,false);assert.equal(keyboard.mutations.length,before,'no candidate or storage write');
+});
