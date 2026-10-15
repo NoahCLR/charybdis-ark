@@ -5,7 +5,10 @@ APP="${CHARYBDIS_ARK_ROOT:?Set CHARYBDIS_ARK_ROOT}"
 BUILD_DIR="$(mktemp -d)"
 trap 'rm -rf "$BUILD_DIR"' EXIT INT TERM
 node "$APP/tests/integration/lighting-corpus.js" "$BUILD_DIR/vectors.txt"
-FLAGS="-DRGB_MATRIX_ENABLE -DRGB_KEY_BEHAVIOR_FEEDBACK_ENABLE -DPOINTING_DEVICE_ENABLE -DRGB_PD_MODE_FEEDBACK_ENABLE -DCOMBO_ENABLE -DRGB_COMBO_FEEDBACK_ENABLE -DPOINTING_DEVICE_AUTO_MOUSE_ENABLE -DRGB_AUTOMOUSE_GRADIENT_ENABLE -DNOAH_PD_PROFILE_ENABLE"
+# The shared corpus covers every schema registry row, independent of the
+# separately tested production module/consumer feature gates. Match the
+# firmware-owned schema runner at the pin.
+FLAGS="-DNOAH_LIGHTING_SCHEMA_ALL_KINDS -DNOAH_PORTABLE_PROFILE_ENABLE -DRGB_MATRIX_ENABLE -DRGB_KEY_BEHAVIOR_FEEDBACK_ENABLE -DPOINTING_DEVICE_ENABLE -DRGB_PD_MODE_FEEDBACK_ENABLE -DCOMBO_ENABLE -DRGB_COMBO_FEEDBACK_ENABLE -DPOINTING_DEVICE_AUTO_MOUSE_ENABLE -DRGB_AUTOMOUSE_GRADIENT_ENABLE -DNOAH_PD_PROFILE_ENABLE"
 for variant in normal sanitized; do
     SANITIZE=""
     if [ "$variant" = sanitized ]; then SANITIZE="-fsanitize=address,undefined -fno-omit-frame-pointer"; fi
