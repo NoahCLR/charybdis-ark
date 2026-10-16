@@ -98,4 +98,24 @@ for(const theme of ['vscode-dark','vscode-light']) {
   await field(page,`${p}:layer`).selectOption('0');await field(page,`${p}:owner`).selectOption('1');await expect(field(page,`${p}:owner`)).toHaveValue('1');await field(page,`${p}:layer`).selectOption('1');await expect(field(page,`${p}:owner`)).toHaveValue('2');expect(await posted(page)).toEqual([]);
  });
 
+ test(`mode and combo looks open their own editors without draft posts (${theme})`,async({page})=>{
+  await page.goto('/preview/index.html?host=demo&screen=lighting');await installedHost(page,theme);await page.locator('body').evaluate((b,t)=>b.classList.add('vscode-body',t),theme);await page.locator('[data-tool="overview"]').click();await clearPosts(page);
+  await page.locator('[data-look="2:0"] [data-open-owner]').click();await expect(page.locator('h1')).toHaveText('Pointing modes');await expect(page.locator('[data-slot="0"]')).toHaveAttribute('aria-current','true');
+  await page.locator('[data-screen="lighting"]').click();await page.locator('[data-tool="overview"]').click();await page.locator('[data-look="3:0"] [data-open-owner]').click();
+  const id=await page.evaluate(async()=>{const {getModel,state}=await import('/webview/store.mjs');if(state.combo.editId!==getModel().combos[0].id)throw Error('wrong combo editor');return state.combo.editId;});
+  await expect(field(page,`combo:${id}:output`)).toBeVisible();expect(await posted(page)).toEqual([]);
+ });
+
+ test(`authored DEMO timing drives the behaviour and Lighting timelines (${theme})`,async({page})=>{
+  await page.goto('/dist/web/index.html');await page.evaluate(()=>{window.addEventListener('message',e=>{if(e.data?.type==='model')window.__understandingModel=e.data.model;});const api=window.acquireVsCodeApi(),post=api.postMessage.bind(api);window.__posted=[];api.postMessage=m=>{window.__posted.push(structuredClone(m));return post(m);};});
+  await page.locator('[data-act="explore-demo"]').click();await expect(page.locator('.bench-tablist')).toBeVisible();await installedHost(page,theme);
+  const wanted=theme==='vscode-dark'?'dark':'light';if(await page.locator('[data-act="theme"]').getAttribute('data-theme-now')!==wanted)await page.locator('[data-act="theme"]').click();
+  const info=await page.evaluate(()=>{const m=window.__understandingModel,r=m.keyBehaviors.find(r=>r.steps.some(s=>s.hold&&s.longHold)&&Object.values(m.rgb.lighting.keymap[0]).some(k=>k.code===r.code));return {key:r.keycode,count:r.steps.find(s=>s.hold&&s.longHold).tapCount+1};});
+  await page.locator('[data-tab="behaviours"]').click();await page.locator(`[data-row="${info.key}"]`).first().click();await clearPosts(page);
+  const timing=field(page,`behaviour:${info.key}:timing:tapHoldTerm`);await timing.fill('317');await timing.press('Tab');await expect(timing).toHaveValue('317');await expect(page.locator('.lighting-gesture')).toContainText('Hold 317 ms');
+  expect(await posted(page)).toEqual([expect.objectContaining({type:'saveBehavior',behavior:expect.objectContaining({keycode:info.key,tapHoldTerm:'317'})})]);await clearPosts(page);
+  const prefix=`gesture:${info.key}`;await field(page,`${prefix}:branch`).selectOption(String(info.count));const moments=await field(page,`${prefix}:step`).locator('option').evaluateAll(ns=>ns.map(n=>({value:n.value,text:n.textContent})));await field(page,`${prefix}:step`).selectOption(moments.find(n=>n.text.includes('Hold · 317')).value);
+  await page.locator('.thing-tabs [data-lighting]').click();await expect(page.locator('.lighting-gesture')).toContainText('Hold 317 ms');await page.locator('[data-inspect-gesture]').click();await expect(page.locator('.lighting-situation')).toContainText(`${317+2*(info.count-1)} ms`);expect(await posted(page)).toEqual([]);
+ });
+
 }

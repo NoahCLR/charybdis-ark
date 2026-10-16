@@ -21,7 +21,7 @@ export function lightingOverview() {
         tile.querySelector("[data-open-owner]")?.addEventListener("click", () => {
             state.screen = "keys";
             if (look.kind === 1) {state.layer = look.id;state.tab = "key";}
-            else if (look.kind === 2) {state.layer = layer;state.tab = "pointing";state.pdSlot = look.id;}
+            else if (look.kind === 2) {state.screen = "pointing";state.layer = layer;state.pdSlot = look.id;state.pdKind = null;state.pdButtons = null;state.pdTaps = null;}
             else {state.layer = layer;state.tab = "combos";openComboBuilder(model.combos[look.id], model.comboReadback.defaultTermMs ?? 0);}
             render();
         });
