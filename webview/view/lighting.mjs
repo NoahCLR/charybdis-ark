@@ -18,7 +18,7 @@ import {LED_INDEX, TRACKBALL_LED, inLocality, trackballInLocality} from "./geome
 const OFF = {h: "0", s: "0", v: "0"};
 
 /** @param {number[] | null} channels */
-export const simulationLegend = channels => channels ? idealTextRgb(channels, true) : "var(--muted)";
+export const simulationLegend = channels => channels ? idealTextRgb(channels, true) : "var(--text-2)";
 
 
 // A pointing slot's lighting row by the name the RGB enum gives its id; the

@@ -86,6 +86,28 @@ for(const theme of ['vscode-dark','vscode-light'])test(`actual demo draft accept
 });
 
 for(const theme of ['vscode-dark','vscode-light']) {
+ test(`empty and partially painted simulation legends remain readable (${theme})`,async({page})=>{
+  await openControls(page,'lighting',{},theme);await clearPosts(page);
+  const program={formatVersion:5,palette:[{h:0,s:0,v:200},{h:0,s:0,v:0}],things:[],keySets:[[0,56],[1,57]],maps:[],extensions:[],rules:[]};
+  const paint=(set,colour)=>({flags:0,brightness:255,parts:[{slot:2,kind:3,params:[set]},{slot:3,kind:2,params:[colour]}]});
+  for(const [scene,rules] of [['empty',[]],['partial',[paint(0,0),paint(1,1)]]]){
+   await publishAccepted(page,['rgb','lighting','program'],{...program,rules});
+   expect(await page.locator('[data-sim-led]').evaluateAll(nodes=>nodes.filter(n=>n.getAttribute('data-colour')!=='-').map(n=>Number(n.getAttribute('data-sim-led'))).sort((a,b)=>a-b))).toEqual(scene==='empty'?[]:[0,1,56,57]);
+   const legends=await page.locator('[data-sim-label]').evaluateAll(nodes=>{
+    const rgb=c=>{const channels=c.match(/[\d.]+/g)?.map(Number);if(!channels||channels.length!==3)throw Error(`Expected opaque computed RGB: ${c}`);return channels;};
+    const luminance=c=>{const [r,g,b]=rgb(c).map(v=>{const s=v/255;return s<=.04045?s/12.92:((s+.055)/1.055)**2.4;});return .2126*r+.7152*g+.0722*b;};
+    return nodes.map(n=>{
+     const led=Number(n.getAttribute('data-sim-label')),shape=document.querySelector(`[data-sim-led="${led}"]`),foreground=getComputedStyle(n).fill,background=getComputedStyle(shape).fill;
+     const a=luminance(foreground),b=luminance(background),label=n.getBBox(),box=shape.getBBox();
+     return {led,foreground,background,contrast:(Math.max(a,b)+.05)/(Math.min(a,b)+.05),inside:label.x>=box.x&&label.y>=box.y&&label.x+label.width<=box.x+box.width&&label.y+label.height<=box.y+box.height};
+    });
+   });
+   expect(legends).toHaveLength(58);
+   expect(legends.filter(l=>l.contrast<4.5||!l.inside),`${scene} legends need readable contrast and complete glyphs`).toEqual([]);
+   expect(legends.filter(l=>l.led===56||l.led===57)).toHaveLength(2);
+  }
+  expect(await posted(page)).toEqual([]);
+ });
  test(`query selectors follow semantics and post only applicable parameters (${theme})`,async({page})=>{
   await openControls(page,'lighting',{},theme);await field(page,':slot:2:kind').selectOption('8');
   for(const [query,word] of [[10,'Layer'],[11,'Pointing mode'],[12,'Macro'],[14,'Behaviour'],[15,'Combo']]){
