@@ -22,4 +22,4 @@ export interface Entry {index: number; rule: LightingRule; subject: Subject; tar
 export type Program = LightingProgram;
 
 export interface Contribution {index: number; subject: Subject; source: string; scene?: string; weight?: number; target: boolean; readsBelow: boolean; colour: number[] | null}
-export interface Observation {situation: Situation; event?: Event | null}
+export interface Observation {situation: Situation; event?: Event | null; occurrenceOnly?: boolean}

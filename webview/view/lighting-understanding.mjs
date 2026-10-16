@@ -26,7 +26,10 @@ export function replayLighting(program, history, depth, clearRule = null) {
                 remaining -= wake;
             }
         }
-        simulator.observe(step.situation, step.event ?? null);previous = step.situation;
+        simulator.observe(step.situation, step.event ?? null, undefined, step.occurrenceOnly === true);
+        // Occurrence facts are borrowed only for event filters. They do not
+        // replace the last continuous sample held between runtime observations.
+        if (!step.occurrenceOnly) previous = step.situation;
     }
     if (previous) frame = simulator.frame(previous);
     return {simulator, frame};

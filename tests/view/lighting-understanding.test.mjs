@@ -42,3 +42,9 @@ test('overview builds isolated, named native-layer situations and marks empty/di
  const looks=lightingLooks(m,1),mode=looks.find(l=>l.kind===2&&l.id===0);assert.deepEqual(mode.situation.mode.keys,[0]);assert.deepEqual(mode.situation.layers,[1]);assert.equal(looks.find(l=>l.kind===2&&l.id===1).available,false);assert.equal(looks.find(l=>l.kind===3).available,false);
  mode.situation.layers.push(8);assert.deepEqual(looks[1].situation.layers,[1]);assert.deepEqual(lightingLooks(m,1).find(l=>l.kind===2&&l.id===0).situation.layers,[1]);m.rgb.lighting.supportedFacts=[];assert.ok(lightingLooks(m,1).every(l=>!l.available));
 });
+test('occurrence-only filters cannot end or renew a continuous entry and retain its original show boundary',()=>{
+ const p=program([rule([part(0,16,[0]),part(2,0),part(3,2,[0]),part(5,1,[100,0]),part(5,2,[200,0])])]);
+ const history=[{situation:{time:100,hostLocks:1}},{situation:{time:150,hostLocks:0},event:{kind:0,thing:3},occurrenceOnly:true},{situation:{time:200,hostLocks:1}}];
+ const result=replayLighting(p,history,5);assert.deepEqual(result.frame[0],[100,100,100]);assert.equal([...result.simulator.histories.values()][0].cell.entry,1n,'the initial continuous entry survives the event-only sample');
+ const equality=replayLighting(p,[...history.slice(0,2),{situation:{time:200,hostLocks:0}}],5);assert.equal(equality.frame[0],null,'occurrence does not manufacture show eligibility before equality departure');
+});

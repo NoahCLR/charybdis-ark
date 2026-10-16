@@ -46,8 +46,8 @@ export class LightingSimulator {
         /** @type {import('./lighting-simulator-types.js').Contribution[]} */ this.contributions = [];
         /** @type {number | null} */ this.inspectLed = null;
     }
-    /** @param {Situation} s @param {import('./lighting-simulator-types.js').Event | null} [event] @param {bigint} [order] */
-    observe(s, event = null, order = this.order + 1n) {
+    /** @param {Situation} s @param {import('./lighting-simulator-types.js').Event | null} [event] @param {bigint} [order] @param {boolean} [occurrenceOnly] */
+    observe(s, event = null, order = this.order + 1n, occurrenceOnly = false) {
         this.order = order;
         const now = (s.time ?? 0) >>> 0;
         let elapsed = this.lastTime === undefined ? 0 : (now - this.lastTime) >>> 0;
@@ -58,6 +58,9 @@ export class LightingSimulator {
             const conditions = rule.parts.filter(p => p.slot < 2), first = conditions[0], timing = ruleTiming(rule);
             /** @type {Subject[]} */ let subjects = [];
             const isEvent = first && eventKind(first);
+            // The firmware's synchronous occurrence hook qualifies events only;
+            // its continuous-state observation happens after native dispatch.
+            if (occurrenceOnly && !isEvent) return;
             if (isEvent) {
                 if (event && first.kind === 19 + event.kind && (first.params[0] === 255 || first.params[0] === event.thing) && (first.kind !== 25 || event.branch && (first.params[1] === 255 || first.params[1] === event.branch)) && qualifies(conditions.slice(1), s, this.depth)) {
                     const keys = event.owners ?? (event.key !== undefined && event.key < 60 ? [event.key] : []), kind = ({19: 1, 20: 1, 21: 1, 22: 2, 23: 2, 24: 3, 25: 4, 26: 4, 27: 4, 28: 5})[first.kind];
@@ -77,7 +80,7 @@ export class LightingSimulator {
         });
         for (const [key, h] of this.histories) if (!seen.has(key)) {
             const first = this.program.rules[h.rule].parts[0];
-            h.cell = observeLifetime(h.cell, h.timing, elapsed, eventKind(first) ? "idle" : "absent", null, order);
+            h.cell = observeLifetime(h.cell, h.timing, elapsed, occurrenceOnly || eventKind(first) ? "idle" : "absent", null, order);
             if (h.cell.phase === "empty") this.histories.delete(key);
         }
     }

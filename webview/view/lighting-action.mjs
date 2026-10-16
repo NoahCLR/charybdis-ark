@@ -52,7 +52,7 @@ export function applyGestureAction(s, action, phase, owner, project = () => s) {
     /** @type {Observation[]} */ const observations = [];
     // Synchronous observers borrow live state. Own each complete occurrence,
     // including its event owners, before the next mutation can change either.
-    /** @type {Capture} */ const capture = event => observations.push({situation: structuredClone(project()), ...event ? {event: structuredClone(event)} : {}});
+    /** @type {Capture} */ const capture = event => observations.push({situation: structuredClone(project()), occurrenceOnly: true, ...event ? {event: structuredClone(event)} : {}});
     const id = action.identity?.[1];if (id === undefined) return observations;
     if (action.kind === "layer-toggle" && phase !== "release") setLock(s, id, !(s.lockedLayers ?? []).includes(id), capture);
     if (action.kind === "layer-goto" && phase !== "release") {

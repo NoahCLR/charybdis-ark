@@ -251,7 +251,10 @@ the command's resulting mode, with separate copied old/new owners. Registered
 release/replacement and physical release retain their own observation boundaries;
 feedback commits follow native dispatch. Replay preserves this causal order at
 the same logical time before the final milestone, so filters use occurrence
-facts and flashes retain their original expiry. Continuing persistent state
+facts and flashes retain their original expiry. Synchronous occurrence-only
+captures advance event history without qualifying or ending continuous rules;
+the final runtime sample supplies continuous state. An intermediate target/old
+lock overlap cannot fabricate a state linger. Continuing persistent state
 neither re-fires commits nor keeps a released behaviour's feedback alive.
 
 A complete capture already reads compiled defaults; its exact RGB payload is

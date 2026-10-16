@@ -11,7 +11,7 @@ const {buildSnapshotModel}=require('../../core/session/device-model');
 const {demoProfile,demoSnapshot,DEMO_CAPABILITIES}=require('../../core/session/demo-session');
 const modeHold=buildSnapshotModel(demoSnapshot(demoProfile()),DEMO_CAPABILITIES,{editable:true}).pdModes[0].binding.hold;
 const action=(action,helper='PRESS_AND_HOLD_UNTIL_RELEASE')=>({action,helper});
-function accepted({keycode='CUSTOM_KEY_0',tap='KC_A',hold=action('MO(2)'),long=action('KC_B','TAP_ON_RELEASE_AFTER_HOLD'),initial,layerValue=0,path="hold",eventConditions}={}) {
+function accepted({keycode='CUSTOM_KEY_0',tap='KC_A',hold=action('MO(2)'),long=action('KC_B','TAP_ON_RELEASE_AFTER_HOLD'),initial,layerValue=0,path="hold",eventConditions,probeTiming=3}={}) {
  const draft=new ProfileDraftSession(demoSnapshot(demoProfile()),'demo',DEMO_CAPABILITIES);
  const model=()=>buildSnapshotModel(draft.current,DEMO_CAPABILITIES,{editable:true});
  const stage=edit=>draft.stage({...edit,draftId:draft.id,draftRevision:draft.revision});
@@ -21,7 +21,7 @@ function accepted({keycode='CUSTOM_KEY_0',tap='KC_A',hold=action('MO(2)'),long=a
  // Independent diagnostic rules run through the same guarded editor and codec.
  // Preview is white, held layer is black, behaviour Painting is white above it.
  for(const [kind,params,paint]of (eventConditions?[[null,[],1]]:[[null,[],1],[2,[2],2],[1,[2],1],[8,[savedId,4],2]])){stage(lightingRule(-1,'','add',{rule:{flags:0,brightness:255,parts:[...kind===null?[]:[{slot:0,kind,params}],{slot:2,kind:0,params:[]},{slot:3,kind:paint,params:paint===2?[0]:[]}]}}));if(paint===2||kind===1&&layerValue)stage(lightingRule(0,model().rgb.lighting.rules[0].identity,'colour',{colour:{h:0,s:0,v:kind===1?layerValue:200}}));}
- if(eventConditions){stage(lightingRule(-1,'','add',{rule:{flags:0,brightness:255,parts:[...eventConditions,{slot:2,kind:0,params:[]},{slot:3,kind:2,params:[0]},{slot:5,kind:3,params:[100,0]}]}}));stage(lightingRule(0,model().rgb.lighting.rules[0].identity,'colour',{colour:{h:0,s:0,v:200}}));}
+ if(eventConditions){stage(lightingRule(-1,'','add',{rule:{flags:0,brightness:255,parts:[...eventConditions,{slot:2,kind:0,params:[]},{slot:3,kind:2,params:[0]},{slot:5,kind:probeTiming,params:[100,0]}]}}));stage(lightingRule(0,model().rgb.lighting.rules[0].identity,'colour',{colour:{h:0,s:0,v:200}}));}
  if(keycode!=='CUSTOM_KEY_0')stage(setKey('Layer 0',0,keycode));
  const m=model(),id=m.keyBehaviors.findIndex(r=>r.keycode===row.keycode),owner=Number(Object.entries(m.rgb.lighting.keymap[0]).find(([,k])=>k.code===row.code)[0]);
  assert.equal(m.keyBehaviors[id].tapHoldTerm,'317');
@@ -192,4 +192,11 @@ test('G5 registered mode release precedes replacement and release-fired feedback
  assert.deepEqual(events.map(o=>[o.event.kind,o.event.thing,o.situation.mode?.id]),[[4,0,undefined],[3,other.id,other.id]]);for(const o of events){assert.deepEqual(o.event.owners,[replacement.owner]);assert.deepEqual(o.situation.pressedKeys,[replacement.owner]);assert.deepEqual(o.situation.behaviourPhases[replacement.owner].phases,[4]);}
  const release=replacement.history.find(o=>o.situation.time===914&&o.event?.kind===4);assert.equal(release.situation.mode,undefined);assert.deepEqual(release.situation.pressedKeys,[]);assert.equal(release.situation.behaviour,undefined);assert.equal(release.situation.behaviourPhases,undefined);
  const pulse=g5({hold:action(modeHold),long:action('KC_B','TAP_ON_RELEASE_AFTER_HOLD')}),end=pulse.history.filter(o=>o.situation.time===914);assert.equal(end[0].event.kind,4);assert.equal(end[0].situation.behaviour,undefined);assert.deepEqual(end[0].situation.pressedKeys,[]);assert.equal(end.at(-1).event.kind,8);assert.equal(end.at(-1).situation.behaviour.keys[pulse.owner].state,'long');assert.equal(at(pulse,1114).situation.behaviour,undefined);
+});
+
+test('G5 synchronous event captures do not invent continuous state observations between native effects',()=>{
+ // Firmware occurrence observers qualify events; the runtime samples continuous
+ // state after the synchronous action sequence, when layer2 is already gone.
+ const c=g5({eventConditions:[{slot:0,kind:1,params:[2]},{slot:0,kind:1,params:[3]}],probeTiming:2});
+ for(const time of [913,914,1012]){const r=at(c,time);assert.deepEqual(r.frame[0],[0,0,0],`no fabricated state linger at ${time}`);assert.equal(r.explanation.rules[0].visits.length,0);}
 });
