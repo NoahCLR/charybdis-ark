@@ -11,7 +11,7 @@ const {buildSnapshotModel}=require('../../core/session/device-model');
 const {demoProfile,demoSnapshot,DEMO_CAPABILITIES}=require('../../core/session/demo-session');
 const modeHold=buildSnapshotModel(demoSnapshot(demoProfile()),DEMO_CAPABILITIES,{editable:true}).pdModes[0].binding.hold;
 const action=(action,helper='PRESS_AND_HOLD_UNTIL_RELEASE')=>({action,helper});
-function accepted({keycode='CUSTOM_KEY_0',tap='KC_A',hold=action('MO(2)'),long=action('KC_B','TAP_ON_RELEASE_AFTER_HOLD')}={}) {
+function accepted({keycode='CUSTOM_KEY_0',tap='KC_A',hold=action('MO(2)'),long=action('KC_B','TAP_ON_RELEASE_AFTER_HOLD'),initial,layerValue=0,path="hold"}={}) {
  const draft=new ProfileDraftSession(demoSnapshot(demoProfile()),'demo',DEMO_CAPABILITIES);
  const model=()=>buildSnapshotModel(draft.current,DEMO_CAPABILITIES,{editable:true});
  const stage=edit=>draft.stage({...edit,draftId:draft.id,draftRevision:draft.revision});
@@ -20,11 +20,11 @@ function accepted({keycode='CUSTOM_KEY_0',tap='KC_A',hold=action('MO(2)'),long=a
  const savedId=model().keyBehaviors.findIndex(r=>r.keycode===keycode);
  // Independent diagnostic rules run through the same guarded editor and codec.
  // Preview is white, held layer is black, behaviour Painting is white above it.
- for(const [kind,params,paint]of [[null,[],1],[2,[2],2],[1,[2],1],[8,[savedId,4],2]]){stage(lightingRule(-1,'','add',{rule:{flags:0,brightness:255,parts:[...kind===null?[]:[{slot:0,kind,params}],{slot:2,kind:0,params:[]},{slot:3,kind:paint,params:paint===2?[0]:[]}]}}));if(paint===2)stage(lightingRule(0,model().rgb.lighting.rules[0].identity,'colour',{colour:{h:0,s:0,v:200}}));}
+ for(const [kind,params,paint]of [[null,[],1],[2,[2],2],[1,[2],1],[8,[savedId,4],2]]){stage(lightingRule(-1,'','add',{rule:{flags:0,brightness:255,parts:[...kind===null?[]:[{slot:0,kind,params}],{slot:2,kind:0,params:[]},{slot:3,kind:paint,params:paint===2?[0]:[]}]}}));if(paint===2||kind===1&&layerValue)stage(lightingRule(0,model().rgb.lighting.rules[0].identity,'colour',{colour:{h:0,s:0,v:kind===1?layerValue:200}}));}
  if(keycode!=='CUSTOM_KEY_0')stage(setKey('Layer 0',0,keycode));
  const m=model(),id=m.keyBehaviors.findIndex(r=>r.keycode===row.keycode),owner=Number(Object.entries(m.rgb.lighting.keymap[0]).find(([,k])=>k.code===row.code)[0]);
  assert.equal(m.keyBehaviors[id].tapHoldTerm,'317');
- const gesture=lightingGesture(m,row.keycode,0,owner);
+ const gesture=lightingGesture(m,row.keycode,0,owner,1,path,initial);
  return {m,id,owner,gesture,history:gestureHistory(gesture.steps,gesture.flash)};
 }
 const at=(c,time)=>{
@@ -49,6 +49,8 @@ test('G3 delegated behaviour Painting remains visible across both feedback half-
 test('G1 preview qualification retains compatible layer-lock/goto paths and rejects mismatches and LT taps',()=>{
  for(const options of [
   {tap:'LOCK_LAYER(2)',long:null},
+  {tap:'TG(2)',hold:action('TT(2)'),long:null},
+  {tap:'TG(2)',long:action('TG(2)','TAP_AT_HOLD_THRESHOLD')},
   {tap:'TO(2)',long:action('MO(2)')},
   {tap:'LOCK_LAYER(2)',long:action('TO(2)','TAP_AT_HOLD_THRESHOLD')},
  ]){const c=accepted(options);for(const time of [0,316])assert.equal(at(c,time).situation.preview,2);}
@@ -80,4 +82,66 @@ test('G3 ordinary registered keys and repeats still blink in the real fact query
   const c=accepted({hold});
   for(const [time,visible]of [[317,true],[516,true],[517,false],[716,false],[717,true],[912,true]]){const r=at(c,time);assert.equal(factSubjects(8,[c.id,4],r.situation).length,Number(visible),`named fact at ${time}`);assert.equal(factSubjects(5,[4,0],r.situation).length,Number(visible),`Standard at ${time}`);assert.deepEqual(r.frame[0],visible?[200,200,200]:[0,0,0],`pixel at ${time}`);}
  }
+});
+
+test('G4 accepted press-only goto and both layer toggles never fabricate momentary ownership and persist after release',()=>{
+ for(const expression of ['TO(2)','TG(2)','LOCK_LAYER(2)']){
+  const c=accepted({hold:action(expression),long:null,layerValue:80});
+  assert.equal(factSubjects(1,[2],at(c,316).situation).length,0);
+  for(const time of [317,318,518]){const r=at(c,time);assert.equal(factSubjects(9,[2,1],r.situation).length,0,`${expression} no held fact at ${time}`);assert.equal(factSubjects(9,[2,2],r.situation).length,1,`${expression} locked at ${time}`);assert.deepEqual(r.frame[0],time===317?[200,200,200]:[80,80,80],`${expression} scene at ${time}`);}
+  const release=at(c,318);assert.match(release.explanation.rules[1].status,/Contributes/);assert.equal(factSubjects(8,[c.id,12],release.situation).length,0,'persistent active layer does not retain behaviour feedback');assert.equal(c.history.filter(o=>o.event?.kind===7).length,1,'only one threshold commit fires');
+ }
+});
+test('G4 toggles inspect lock state, not active bits, and repeated press-only toggles have no release effect',()=>{
+ for(const expression of ['TG(2)','LOCK_LAYER(2)'])for(const initiallyLocked of [false,true]){
+  const c=accepted({hold:action(expression),long:action(expression),initial:{layers:initiallyLocked?[2]:[],lockedLayers:initiallyLocked?[2]:[]}});
+  for(const time of [317,912])assert.equal(factSubjects(9,[2,2],at(c,time).situation).length,Number(!initiallyLocked));
+  for(const time of [913,914,1114]){const r=at(c,time);assert.equal(factSubjects(9,[2,2],r.situation).length,Number(initiallyLocked));assert.equal(factSubjects(9,[2,1],r.situation).length,0);}
+ }
+ const heldByOther=accepted({hold:action('TG(2)'),long:null,initial:{layers:[2],layerOwners:{0:2}}});
+ const r=at(heldByOther,318).situation;assert.equal(factSubjects(9,[2,2],r).length,1);assert.deepEqual(factSubjects(9,[2,1],r)[0].keys,[0]);
+});
+test('G4 goto replaces only locks and one-shot state, preserving other true owners and base semantics',()=>{
+ const initial={layers:[1,3,4],lockedLayers:[1],layerOwners:{0:3},oneshotLayer:4};
+ for(const target of [0,2]){
+  const c=accepted({hold:action(`TO(${target})`),long:null,initial}),r=at(c,318).situation;
+  assert.deepEqual(r.lockedLayers,target?[2]:[]);assert.equal(r.oneshotLayer,undefined);assert.equal(factSubjects(1,[1],r).length,0);assert.equal(factSubjects(1,[4],r).length,0);assert.equal(factSubjects(1,[3],r).length,1);assert.deepEqual(factSubjects(9,[3,1],r)[0].keys,[0]);assert.equal(factSubjects(1,[0],r).length,1);
+ }
+});
+test('G4 earlier persistent state survives pending or replacement actions without becoming a fake held fact',()=>{
+ for(const hold of ['TO(2)','TG(2)','LOCK_LAYER(2)']){
+  const pending=accepted({hold:action(hold)});for(const time of [317,913,914,1114]){const r=at(pending,time).situation;assert.equal(factSubjects(9,[2,2],r).length,1);assert.equal(factSubjects(9,[2,1],r).length,0);}
+  const replaced=accepted({hold:action(hold),long:action('MO(3)')});const r=at(replaced,913).situation;assert.equal(factSubjects(9,[2,2],r).length,1);assert.deepEqual(factSubjects(9,[3,1],r)[0].keys,[replaced.owner]);assert.equal(factSubjects(9,[2,2],at(replaced,914).situation).length,1);assert.equal(factSubjects(1,[3],at(replaced,914).situation).length,0);
+ }
+});
+test('G4 mode lock persists with its real display owner, toggles off and never becomes an unlocked held mode',()=>{
+ const basis=buildSnapshotModel(demoSnapshot(demoProfile()),DEMO_CAPABILITIES,{editable:true}),lock=basis.pdModes[0].binding.lock;
+ for(const initiallyLocked of [false,true]){
+  const initial=initiallyLocked?{mode:{id:0,locked:true,keys:[0],halves:['left']},modeStatus:{id:0,locked:true,keys:[0],halves:['left']}}:{};
+  const c=accepted({hold:action(lock),long:null,initial});
+  for(const time of [317,318,518]){const r=at(c,time).situation;assert.equal(factSubjects(10,[0,1],r).length,Number(!initiallyLocked));assert.equal(factSubjects(10,[0,0],r).length,0);if(!initiallyLocked)assert.deepEqual(r.mode.keys,[c.owner]);}
+  assert.equal(c.history.filter(o=>o.event?.kind===3).length,Number(!initiallyLocked));assert.equal(c.history.filter(o=>o.event?.kind===4).length,Number(initiallyLocked));assert.equal(at(c,318).situation.behaviour,undefined);
+ }
+ const twice=accepted({hold:action(lock),long:action(lock)});assert.equal(at(twice,317).situation.modeStatus.locked,true);assert.equal(at(twice,913).situation.mode,undefined);assert.equal(at(twice,914).situation.mode,undefined);
+ const pending=accepted({hold:action(lock)});assert.equal(at(pending,913).situation.modeStatus.locked,true);assert.equal(at(pending,914).situation.modeStatus.locked,true);
+ const replaced=accepted({hold:action(lock),long:action(modeHold)});assert.equal(at(replaced,913).situation.modeStatus.locked,true);assert.deepEqual(at(replaced,914).situation.mode.keys,[replaced.owner],'releasing same-slot hold does not end the lock');
+ const other=basis.pdModes.find(m=>m.kind&&m.id!==0);
+ assert.ok(other,'real second configured mode');const switched=accepted({hold:action(lock),long:action(other.binding.hold)});assert.equal(at(switched,913).situation.mode.id,other.id);assert.equal(at(switched,913).situation.modeStatus.locked,false);assert.equal(at(switched,914).situation.mode,undefined);
+});
+test('G4 layer toggles preserve other locks and true owners; momentary TT releases while lock events fire only on changes',()=>{
+ const c=accepted({hold:action('TG(2)'),long:action('TG(2)'),initial:{layers:[1,2],lockedLayers:[1],layerOwners:{0:2}}});
+ assert.deepEqual(at(c,913).situation.lockedLayers,[1]);assert.deepEqual(at(c,914).situation.layerOwners,{0:2});assert.equal(factSubjects(1,[2],at(c,914).situation).length,1);
+ assert.deepEqual(c.history.filter(o=>o.event?.kind===0||o.event?.kind===1).map(o=>[o.situation.time,o.event.kind,o.event.thing]),[[317,0,2],[913,1,2]]);
+ const noop=accepted({hold:action('TO(2)'),long:null,initial:{layers:[2],lockedLayers:[2]}});assert.equal(noop.history.filter(o=>o.event?.kind===0||o.event?.kind===1).length,0,'retained lock does not refire');
+ const tt=accepted({hold:action('TT(2)'),long:null});assert.equal(factSubjects(9,[2,1],at(tt,317).situation).length,1);assert.equal(factSubjects(9,[2,2],at(tt,317).situation).length,0);assert.equal(factSubjects(1,[2],at(tt,318).situation).length,0);
+ const lockByOther=accepted({hold:action('MO(2)'),long:null,initial:{layers:[2],lockedLayers:[2],layerOwners:{0:2}}});assert.deepEqual(at(lockByOther,318).situation.layerOwners,{0:2});assert.deepEqual(at(lockByOther,318).situation.lockedLayers,[2]);
+});
+test('G4 mode holds preserve another real owner, and tapping the hold binding does not invent mode activation',()=>{
+ const initial={mode:{id:0,keys:[0],halves:['left']},modeStatus:{id:0,locked:false,keys:[0],halves:['left']}};
+ const c=accepted({hold:action(modeHold),long:null,initial});assert.deepEqual(at(c,317).situation.mode.keys,[0,c.owner]);assert.deepEqual(at(c,318).situation.mode.keys,[0]);assert.equal(c.history.filter(o=>o.event?.kind===3||o.event?.kind===4).length,0,'unchanged active mode never restarts');
+ const tap=accepted({hold:action(modeHold,'TAP_AT_HOLD_THRESHOLD'),long:null});for(const time of [317,318,517,518])assert.equal(at(tap,time).situation.mode,undefined);
+});
+test('G4 unavailable one-shot policy and state-changing repeats are explicit conditional paths, not invented state',()=>{
+ const once=accepted({tap:'OSL(2)',hold:null,long:null,path:'tap'});assert.deepEqual(once.history,[]);assert.match(once.gesture.notes.join(' '),/One-shot enabled state and prior arming time/);
+ const repeated=accepted({hold:{...action('TG(2)','REPEAT_WHILE_HELD'),repeatHz:'10'},long:null});assert.deepEqual(repeated.history,[]);assert.match(repeated.gesture.notes.join(' '),/Repeated state-changing/);
 });

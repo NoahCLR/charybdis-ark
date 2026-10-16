@@ -759,6 +759,11 @@ difference between steady layer/mode hints and blinking key/repeat feedback.
 A held layer previews early only when the tap and longer action also lead to
 that layer. A longer action waiting for release can leave the earlier layer or
 mode held, even when that behaviour's feedback is no longer visible.
+The native action determines what release does: momentary layers end with
+their owner, while Go to layer and layer/mode locks persist after release.
+A lock does not count as a held layer, and its persistence does not retain
+the behaviour's feedback. One-shot policy and nested action planning are
+labelled conditional when their required inputs are unavailable.
 **Inspect this moment** retains that exact history.
 Transparent actions, built-in or immediate hold planning and runtime
 arbitration are labelled conditional where not represented. This is a solitary

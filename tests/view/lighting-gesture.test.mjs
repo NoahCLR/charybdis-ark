@@ -41,7 +41,8 @@ test('qualified direct held layers preview then own their target; direct TO disp
  const held=a.steps.find(s=>s.label==='Hold · 317 ms').observation.situation;assert.equal(held.layerOwners[owner],2);assert.deepEqual(held.behaviour.standardKeys,{});assert.equal(held.behaviour.keys[owner].outcome,3);
  assert.equal(a.steps.find(s=>s.label==='Release').observation.situation.layerOwners,undefined);
  r.steps=[{tapCount:0,longHold:{helper:'TAP_AT_HOLD_THRESHOLD',action:'TO(2)',code:0x5202}}];const b=lightingGesture(m,r.keycode,layer,owner);
- assert.deepEqual(b.steps.find(s=>s.label==='Long hold · 913 ms').observation.situation.layers,[2]);assert.deepEqual(b.steps.find(s=>s.label==='Release').observation.situation.layers,[2]);
+ // TO changes known locks, not an unrelated starting active fact of unknown ownership.
+ for(const label of ['Long hold · 913 ms','Release']){const s=b.steps.find(s=>s.label===label).observation.situation;assert.deepEqual(s.layers,[...new Set([2,layer])].filter(l=>l!==0).sort());assert.deepEqual(s.lockedLayers,[2]);assert.equal(s.layerOwners,undefined);}
 });
 test('release-fired hold pulse survives with released physical key until the exact configured boundary',()=>{
  const {m,r}=model(),{layer,owner}=located(m,r);m.participation=null;r.tapHoldTerm='317';r.steps=[{tapCount:0,hold:{helper:'TAP_ON_RELEASE_AFTER_HOLD',action:'KC_A',code:4}}];

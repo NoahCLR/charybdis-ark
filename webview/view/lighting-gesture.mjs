@@ -1,15 +1,16 @@
 // @ts-check
 import {behaviourEditorRow, behaviourTimingField} from "./behavior-editor.mjs";
 import {lightingSituation} from "./lighting-rules.mjs";
+import {classifyGestureAction, applyGestureAction} from "./lighting-action.mjs";
 import {nativeIdentity} from "./lighting-facts.mjs";
 import {helperWord} from "./vocabulary.mjs";
 import {participationAt} from "./participation.mjs";
 /** @typedef {import('./lighting-simulator-types.js').Observation} Observation */
 /** An authored, solitary gesture illustration. It does not run the QMK planner.
- * @param {import('../../contracts/panel.js').PublishedModel} model @param {string} keycode @param {number} layer @param {number} owner @param {number} [pressCount] @param {"hold" | "tap"} [path] */
-export function lightingGesture(model, keycode, layer, owner, pressCount = 1, path = "hold") {
+ * @param {import('../../contracts/panel.js').PublishedModel} model @param {string} keycode @param {number} layer @param {number} owner @param {number} [pressCount] @param {"hold" | "tap"} [path] @param {import("./lighting-simulator-types.js").Situation} [initial] */
+export function lightingGesture(model, keycode, layer, owner, pressCount = 1, path = "hold", initial = {}) {
     const row = behaviourEditorRow(model, keycode), id = model.keyBehaviors.findIndex(r => r.keycode === row?.keycode);
-    /** @type {{label: string; detail: string; observation: Observation; blinkAt: number}[]} */ const steps = [];
+    /** @type {{label: string; detail: string; observation: Observation; blinkAt: number; effects?: import("./lighting-simulator-types.js").Event[]}[]} */ const steps = [];
     const notes = ["Solitary local gesture. No pointer interception, combo arbitration, foreign-key buffering or physical timing is predicted."];
     if (!row) return {steps, notes: ["Choose a configured behaviour."]};
     /** @param {"tapHoldTerm" | "longerHoldTerm" | "multiTapTerm"} name */
@@ -26,15 +27,21 @@ export function lightingGesture(model, keycode, layer, owner, pressCount = 1, pa
     notes.unshift(`${pressDuration} ms presses and 1 ms gaps select the requested branch on a logical clock.`);
     /** @param {number} n */
     const authored = n => row.steps.some(s => s.tapCount === n - 1 && (s.tap || s.hold || s.longHold));
-    const branch = row.steps.find(s => s.tapCount === count - 1), base = lightingSituation(model, [{kind: 1, params: [layer], keys: []}]);
+    const branch = row.steps.find(s => s.tapCount === count - 1), base = {...lightingSituation(model, [{kind: 1, params: [layer], keys: []}]), ...structuredClone(initial)};
     const unresolved = (path === "tap" ? [branch?.tap] : [branch?.hold, branch?.longHold]).find(a => a && (a.code === 1 || /^0x/i.test(a.action)));
     if (unresolved) return {steps, notes: [`${unresolved.action} needs transparent or unknown-action resolution. This conditional path is not simulated; no fired event or output is invented.`]};
+    if (layer !== 0 && initial.layers === undefined) notes.push("The source layer starts active with unspecified ownership. Other owners and locks are not inferred from an active bit.");
+    const pathActions = path === "tap" ? [branch?.tap] : [branch?.hold, branch?.longHold];
+    for (const a of pathActions) if (a?.code !== undefined) {
+        const classified = classifyGestureAction(model, a.code);
+        if (classified.kind === "conditional" || a.helper === "REPEAT_WHILE_HELD" && classified.kind !== "key") return {steps, notes: [...notes, classified.reason ?? "Repeated state-changing native actions need each repeat and policy input; this conditional path is not replayed."]};
+    }
     /** The pinned handled_key_policy preview requires the tap and any longer
      * action to lead to the held layer too. An MO alone is not that promise.
      * @param {import('../../contracts/panel.js').Branch | undefined} action */
-    const heldLayer = action => action?.helper === "PRESS_AND_HOLD_UNTIL_RELEASE" && action.code !== undefined && action.code >= 0x5220 && action.code <= 0x523f ? nativeIdentity(action.code)?.[1] ?? null : null;
+    const heldLayer = action => action?.helper === "PRESS_AND_HOLD_UNTIL_RELEASE" && action.code !== undefined && classifyGestureAction(model, action.code).kind === "layer-hold" ? nativeIdentity(action.code)?.[1] ?? null : null;
     /** @param {import('../../contracts/panel.js').Branch | undefined} action @param {number} layer */
-    const leadsToLayer = (action, layer) => action?.code !== undefined && (action.code >= 0x5200 && action.code <= 0x521f || action.code >= 0x7ec0 && action.code <= 0x7ecf) && nativeIdentity(action.code)?.[1] === layer;
+    const leadsToLayer = (action, layer) => action?.code !== undefined && ["layer-goto", "layer-toggle"].includes(classifyGestureAction(model, action.code).kind) && nativeIdentity(action.code)?.[1] === layer;
     /** @param {number} n */
     const previewFor = n => {
         const step = row.steps.find(s => s.tapCount === n - 1), layer = heldLayer(step?.hold);
@@ -44,18 +51,17 @@ export function lightingGesture(model, keycode, layer, owner, pressCount = 1, pa
     /** Registered output outlives a release-pending longer tier. Its ownership
      * and its visible feedback are separate, as in feedback.c.
      * @type {number | null} */ let registeredCode = null;
-    /** @type {[number, number] | null} */ let heldIdentity = null;
+    /** @type {import("./lighting-simulator-types.js").Event[]} */ let effects = [];
+    const releaseRegistered = () => {
+        if (registeredCode !== null) effects.push(...applyGestureAction(base, classifyGestureAction(model, registeredCode), "release", owner));
+        registeredCode = null;
+    };
     /** @param {import('../../contracts/panel.js').Branch | undefined} action */
     const dispatch = action => {
-        const code = action?.code;if (code === undefined) return;
-        const identity = nativeIdentity(code);if (!identity) return;
-        if (identity[0] === 1) {
-            if (code >= 0x5200 && code <= 0x521f) base.layers = [identity[1]];
-            else if (code >= 0x5260 && code <= 0x527f || code >= 0x7ec0 && code <= 0x7ecf) {
-                const active = new Set([0, ...base.layers ?? []]);if (identity[1] !== 0 && active.has(identity[1])) active.delete(identity[1]);else active.add(identity[1]);base.layers = [...active];base.lockedLayers = [...active].filter(l => l !== 0);
-            } else if (code >= 0x5280 && code <= 0x529f) {base.oneshotLayer = identity[1];base.layers = [...base.layers ?? [], identity[1]];}
-            else notes.push(`${action?.label || action?.action}: transient/default layer dispatch is conditional; no persistent layer change is inferred.`);
-        } else notes.push(`${action?.label || action?.action}: nested mode/macro dispatch is not executed by this illustration.`);
+        if (action?.code === undefined) return;
+        const classified = classifyGestureAction(model, action.code);
+        if (classified.kind === "conditional") notes.push(classified.reason ?? "This native action is conditional.");
+        else effects.push(...applyGestureAction(base, classified, "tap", owner));
     };
     let blinkAt = -1, physicallyPressed = true;
     /** @type {{at: number; state: 'tap' | 'hold' | 'long'; outcome: number; branch: number} | null} */ let pulse = null;
@@ -64,19 +70,17 @@ export function lightingGesture(model, keycode, layer, owner, pressCount = 1, pa
     const add = (time, label, detail, state, phases, event = null, outcome = 0, flashing = false, branchNumber = count) => {
         const situation = structuredClone(base);situation.time = time;
         situation.pressedKeys = physicallyPressed ? [owner] : [];
-        if (!physicallyPressed) {registeredCode = null;heldIdentity = null;previewLayer = null;}
+        if (!physicallyPressed) previewLayer = null;
         if (previewLayer !== null) situation.preview = previewLayer;
-        if (heldIdentity?.[0] === 1) {situation.layers = [layer, heldIdentity[1]];situation.layerOwners = {[owner]: heldIdentity[1]};}
-        if (heldIdentity?.[0] === 2) situation.mode = {id: heldIdentity[1], keys: [owner], halves: [owner < 30 ? "left" : "right"]};
         if (id >= 0 && phases.length) situation.behaviourPhases = {[owner]: {id, phases, branch: branchNumber}};
         if (!state && pulse && time < pulse.at + flash) {state = pulse.state;outcome = pulse.outcome;branchNumber = pulse.branch;flashing = false;}
         if (state && id >= 0) {
             situation.behaviour = {keys: {[owner]: {id, state, branch: branchNumber, outcome, flashing, lit: !flashing || blinkAt < 0 || Math.floor((time - blinkAt) / flash) % 2 === 0}}, owners: {board: owner, [owner < 30 ? "left" : "right"]: owner, [state]: owner}};
-            if (heldIdentity || previewLayer !== null) situation.behaviour.standardKeys = {};
+            if (registeredCode !== null && !classifyGestureAction(model, registeredCode).keepsFeedback || previewLayer !== null) situation.behaviour.standardKeys = {};
             if (state === "tap" && branchNumber === 1) situation.behaviour.standardKeys = {};
 
         }
-        steps.push({label, detail, observation: {situation, event}, blinkAt});
+        steps.push({label, detail, observation: {situation, event}, blinkAt, effects});effects = [];
     };
     for (let n = 1; n < count; n++) {
         physicallyPressed = true;previewLayer = previewFor(n);
@@ -98,15 +102,14 @@ export function lightingGesture(model, keycode, layer, owner, pressCount = 1, pa
         if (t.at > 0) add(start + t.at - 1, `Before ${t.tier === "long" ? "long hold" : t.action.helper === "TAP_SENDS" ? "tap settles" : "hold"}`, `${t.at - 1} ms since this press.`, state, phases, null, outcome, flashing);
         const actionCode = t.action.code ?? model.qmkKeycodes.find(k => k.key === t.action.action || k.value === t.action.action)?.keycode;
         if (actionCode === undefined || actionCode <= 1) {notes.push(`${t.tier}: ${t.action.action} needs transparent or unsupported action resolution; no outcome or fired event is invented.`);continue;}
-        const identity = nativeIdentity(actionCode);outcome = identity?.[0] === 1 ? identity[1] + 1 : identity?.[0] === 2 ? identity[1] + 33 : 0;
+        const classified = classifyGestureAction(model, actionCode);outcome = classified.outcome;
         const helper = t.action.helper;
         state = helper === "TAP_SENDS" ? "tap" : t.tier;phases = [helper === "TAP_SENDS" ? 1 : helper === "TAP_ON_RELEASE_AFTER_HOLD" ? 2 : state === "hold" ? 3 : 4];
         if (helper === "PRESS_AND_HOLD_UNTIL_RELEASE") {
-            registeredCode = actionCode;
-            heldIdentity = identity && (identity[0] === 1 || identity[0] === 2 && model.pdModes.some(m => m.id === identity[1] && m.kind)) ? identity : null;
-        } else if (helper !== "TAP_ON_RELEASE_AFTER_HOLD" && helper !== "TAP_SENDS") {registeredCode = null;heldIdentity = null;}
-        const registeredKind = registeredCode === null ? null : nativeIdentity(registeredCode)?.[0];
-        const delegated = registeredCode !== null && (registeredKind === 1 || registeredKind === 2);
+            releaseRegistered();registeredCode = actionCode;
+            effects.push(...applyGestureAction(base, classified, "press", owner));
+        } else if (helper !== "TAP_ON_RELEASE_AFTER_HOLD" && helper !== "TAP_SENDS") releaseRegistered();
+        const delegated = registeredCode !== null && !classifyGestureAction(model, registeredCode).keepsFeedback;
         flashing = helper === "REPEAT_WHILE_HELD" || registeredCode !== null && !delegated;
         if (delegated && !outcome) state = null;
         // A pending longer release changes the phase/outcome, not the held
@@ -118,7 +121,7 @@ export function lightingGesture(model, keycode, layer, owner, pressCount = 1, pa
         const fires = helper === "TAP_AT_HOLD_THRESHOLD" || helper === "REPEAT_WHILE_HELD" || helper === "PRESS_AND_HOLD_UNTIL_RELEASE";
         const event = fires && id >= 0 ? {kind: t.tier === "long" ? 8 : 7, thing: id, owners: [owner], slot: t.tier === "long" ? 1 : 0, outcome} : null;
         if (helper === "TAP_AT_HOLD_THRESHOLD" || helper === "REPEAT_WHILE_HELD") pulse = {at: start + t.at, state: t.tier, outcome, branch: count};
-        add(start + t.at, `${state === "tap" ? "Tap candidate settled" : t.tier === "long" ? "Long hold" : "Hold"} · ${t.at} ms`, `${t.action.label || t.action.action} · ${helperWord(model, t.tier, helper ?? "")}${helper === "REPEAT_WHILE_HELD" ? ` at ${t.action.repeatHz} Hz; repeats are not enumerated` : ""}${helper === "TAP_ON_RELEASE_AFTER_HOLD" || helper === "TAP_SENDS" ? "; waits for release" : "; active at threshold"}${helper === "TAP_ON_RELEASE_AFTER_HOLD" && registeredCode !== null ? ". The previous held action stays active until release." : ""}`, state, phases, event, outcome, flashing);
+        add(start + t.at, `${state === "tap" ? "Tap candidate settled" : t.tier === "long" ? "Long hold" : "Hold"} · ${t.at} ms`, `${t.action.label || t.action.action} · ${helperWord(model, t.tier, helper ?? "")}${helper === "REPEAT_WHILE_HELD" ? ` at ${t.action.repeatHz} Hz; repeats are not enumerated` : ""}${helper === "TAP_ON_RELEASE_AFTER_HOLD" || helper === "TAP_SENDS" ? "; waits for release" : "; active at threshold"}${helper === "TAP_ON_RELEASE_AFTER_HOLD" && registeredCode !== null ? ["layer-goto", "layer-toggle", "mode-lock"].includes(classifyGestureAction(model, registeredCode).kind) ? ". The previous press-only state persists, including after release." : ". The previous held action stays active until release." : ""}`, state, phases, event, outcome, flashing);
         const next = thresholds[thresholds.indexOf(t) + 1]?.at;
         if (next !== undefined && Number.isInteger(flash) && flash > 0 && t.at + flash < next) {
             add(start + t.at + flash - 1, "Before feedback half-period", "The same held output and feedback projection, just before its configured half-period.", state, phases, null, outcome, flashing);
@@ -139,9 +142,11 @@ export function lightingGesture(model, keycode, layer, owner, pressCount = 1, pa
     } else {
         const end = start + Math.max(...thresholds.map(t => t.at), 0) + 1;
         const tier = branch.longHold ?? branch.hold, firesOnRelease = tier?.helper === "TAP_ON_RELEASE_AFTER_HOLD";
+        const persistent = registeredCode !== null && ["layer-goto", "layer-toggle", "mode-lock"].includes(classifyGestureAction(model, registeredCode).kind);
+        releaseRegistered();
         if (firesOnRelease) {dispatch(tier);pulse = {at: end, state: branch.longHold ? "long" : "hold", outcome, branch: count};}
         physicallyPressed = false;
-        add(end, "Release", firesOnRelease ? `Sends ${tier.action} on release.` : "Ends the held action; no additional threshold event.", null, [], firesOnRelease && id >= 0 ? {kind: branch.longHold ? 8 : 7, thing: id, owners: [owner], slot: branch.longHold ? 1 : 0, outcome} : null);
+        add(end, "Release", firesOnRelease ? `Sends ${tier.action} on release.` : persistent ? "Releases the physical key; the native layer/mode lock persists. No additional threshold event." : "Ends the held action; no additional threshold event.", null, [], firesOnRelease && id >= 0 ? {kind: branch.longHold ? 8 : 7, thing: id, owners: [owner], slot: branch.longHold ? 1 : 0, outcome} : null);
     }
     if (Number.isInteger(flash) && flash > 0) {
         const last = steps.at(-1)?.observation.situation.time ?? start;
@@ -154,7 +159,7 @@ export function lightingGesture(model, keycode, layer, owner, pressCount = 1, pa
 
 /** Include actual feedback half-cycle transitions between displayed milestones.
  * The UI lists meaningful gesture moments; the renderer still sees every edge.
- * @param {{observation: Observation; blinkAt: number}[]} steps @param {number | undefined} flash @returns {Observation[]} */
+ * @param {{observation: Observation; blinkAt: number; effects?: import("./lighting-simulator-types.js").Event[]}[]} steps @param {number | undefined} flash @returns {Observation[]} */
 export function gestureHistory(steps, flash) {
     /** @type {Observation[]} */ const history = [];
     for (let i = 0; i < steps.length; i++) {
@@ -171,6 +176,7 @@ export function gestureHistory(steps, flash) {
                 }
             }
         }
+        for (const event of step.effects ?? []) history.push({situation: step.observation.situation, event});
         history.push(step.observation);
     }
     return history;

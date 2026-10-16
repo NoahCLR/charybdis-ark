@@ -16,22 +16,22 @@ async function installedHost(page,theme) {
 }
 // Send the public edit builders through the real DEMO host, then wait for its
 // accepted model. No injected decoded behaviour or local simulator state.
-async function acceptedGestureDemo(page,theme,mode) {
+async function acceptedGestureDemo(page,theme,mode,persistent=null) {
  await page.goto('/dist/web/index.html');await page.evaluate(()=>{window.addEventListener('message',e=>{if(e.data?.type==='model')window.__gestureModel=e.data.model;});const api=window.acquireVsCodeApi(),post=api.postMessage.bind(api);window.__posted=[];api.postMessage=m=>{window.__posted.push(structuredClone(m));return post(m);};});
  await page.locator('[data-act="explore-demo"]').click();await expect(page.locator('.bench-tablist')).toBeVisible();await installedHost(page,theme);
  const wanted=theme==='vscode-dark'?'dark':'light';if(await page.locator('[data-act="theme"]').getAttribute('data-theme-now')!==wanted)await page.locator('[data-act="theme"]').click();await page.locator('body').evaluate((b,t)=>b.classList.add('vscode-body',t),theme);
- return page.evaluate(async mode=>{
+ return page.evaluate(async ({mode,persistent})=>{
   const {saveBehaviour,lightingRule}=await import('/webview/view/edits.mjs'),api=window.acquireVsCodeApi();
   const send=edit=>new Promise(resolve=>{const m=window.__gestureModel,listener=e=>{if(e.data?.type==='model'&&e.data.model.draft?.revision>m.draft.revision){window.removeEventListener('message',listener);resolve();}};window.addEventListener('message',listener);api.postMessage({...edit,draftId:m.draft.id,draftRevision:m.draft.revision});});
-  const row=window.__gestureModel.keyBehaviors.find(r=>r.keycode==='CUSTOM_KEY_0'),hold=mode?window.__gestureModel.pdModes[0].binding.hold:'MO(2)';window.__posted=[];
-  await send(saveBehaviour({...row,tapHoldTerm:'317',longerHoldTerm:'913',multiTapTerm:'89',steps:[{tapCount:0,tap:{helper:'TAP_SENDS',action:'KC_A'},hold:{helper:'PRESS_AND_HOLD_UNTIL_RELEASE',action:hold},longHold:{helper:'TAP_ON_RELEASE_AFTER_HOLD',action:'KC_B'}}]}, {}, window.__gestureModel.profileIdentity));
+  const row=window.__gestureModel.keyBehaviors.find(r=>r.keycode==='CUSTOM_KEY_0'),hold=persistent??(mode?window.__gestureModel.pdModes[0].binding.hold:'MO(2)');window.__posted=[];
+  await send(saveBehaviour({...row,tapHoldTerm:'317',longerHoldTerm:'913',multiTapTerm:'89',steps:[{tapCount:0,tap:{helper:'TAP_SENDS',action:'KC_A'},hold:{helper:'PRESS_AND_HOLD_UNTIL_RELEASE',action:hold},...persistent?{}:{longHold:{helper:'TAP_ON_RELEASE_AFTER_HOLD',action:'KC_B'}}}]}, {}, window.__gestureModel.profileIdentity));
   const id=window.__gestureModel.keyBehaviors.findIndex(r=>r.keycode===row.keycode);
   for(const [kind,params,value]of [[null,[],0],[2,[2],200],[mode?3:1,[mode?0:2],80],[8,[id,12],200]]){
    await send(lightingRule(-1,'','add',{rule:{flags:0,brightness:255,parts:[...kind===null?[]:[{slot:0,kind,params}],{slot:2,kind:0,params:[]},{slot:3,kind:value?2:1,params:value?[0]:[]}]}}));
    if(value)await send(lightingRule(0,window.__gestureModel.rgb.lighting.rules[0].identity,'colour',{colour:{h:0,s:0,v:value}}));
   }
   return {key:row.keycode,id,seedPosts:window.__posted.map(m=>m.type)};
- },mode);
+ },{mode,persistent});
 }
 for(const theme of ['vscode-dark','vscode-light']) {
  test(`Inspector selection, whole-rule counterfactual and matrix associations are local (${theme})`,async({page})=>{
@@ -149,6 +149,17 @@ for(const theme of ['vscode-dark','vscode-light']) {
   await moment('Long hold · 913');await pixels('505050');await expect(page.locator('[data-gesture-moment]')).toContainText('previous held action stays active');await page.locator('[data-inspect-gesture]').click();
   await expect(page.locator('[data-inspector-rule="1"]')).toContainText('Contributes opaque light');await field(page,'inspector:clear-rule').selectOption('1');await expect(page.locator('[data-counterfactual]')).toContainText('#000000');await field(page,'inspector:clear-rule').selectOption('-1');
   await moment('Release');await pixels('c8c8c8');await moment('Before feedback ends');await pixels('c8c8c8');await moment('Feedback interval');await pixels('000000');await page.locator('[data-inspect-gesture]').click();await expect(page.locator('.lighting-situation')).toContainText('1114 ms');expect(await posted(page)).toEqual([]);
+ });
+
+ for(const action of ['TO(2)','TG(2)','LOCK_LAYER(2)'])test(`G4 guarded ${action} persists after release without held ownership or retained feedback (${theme})`,async({page})=>{
+  const info=await acceptedGestureDemo(page,theme,false,action);expect(info.seedPosts).toHaveLength(8);expect(info.seedPosts[0]).toBe('saveBehavior');
+  await page.locator('[data-tab="behaviours"]').click();await page.locator(`[data-row="${info.key}"]`).first().click();await clearPosts(page);
+  const prefix=`gesture:${info.key}`,moment=async text=>{const opts=await field(page,`${prefix}:step`).locator('option').evaluateAll(ns=>ns.map(n=>({value:n.value,text:n.textContent})));await field(page,`${prefix}:step`).selectOption(opts.find(o=>o.text.includes(text)).value);};
+  const pixels=async expected=>expect(await page.locator('[data-gesture-led]').evaluateAll(ns=>[...new Set(ns.map(n=>n.getAttribute('data-colour')))] )).toEqual([expected]);
+  await moment('Before hold');await pixels('000000');await moment('Hold · 317');await pixels('c8c8c8');await moment('Release');await pixels('505050');
+  await page.locator('.thing-tabs [data-lighting]').click();await pixels('505050');await page.locator('[data-inspect-gesture]').click();await expect(page.locator('.lighting-situation')).toContainText('318 ms');await expect(page.locator('[data-inspector-rule="1"]')).toContainText('Contributes opaque light');await expect(page.locator('[data-inspector-rule="0"]')).toContainText('Condition');
+  await field(page,'inspector:clear-rule').selectOption('1');await expect(page.locator('[data-counterfactual]')).toContainText('#000000');await field(page,'inspector:clear-rule').selectOption('-1');
+  await page.locator('[data-tool="gesture"]').click();await field(page,'gesture:behaviour').selectOption(String(info.id));await moment('Release');await pixels('505050');await moment('Feedback interval');await pixels('505050');await page.locator('[data-inspect-gesture]').click();await expect(page.locator('.lighting-situation')).toContainText('518 ms');expect(await posted(page)).toEqual([]);
  });
 
 }

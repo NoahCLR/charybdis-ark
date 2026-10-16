@@ -209,7 +209,13 @@ feedback half-period. Only authored tiers create thresholds. Layer preview is
 qualified by the pinned handled-key contract: a delayed momentary-layer hold
 previews only when the tap locks or goes to that same layer and any longer
 hold also leads there. A plain tap, LT tap or mismatched longer action makes no
-such promise. Registered layer/mode ownership survives a release-pending longer
+such promise. Native lifecycle is classified independently from paint identity
+and the authored helper name. TO and TG/userspace layer-lock dispatch persist
+after release and never create momentary owners. Toggles inspect lock state,
+not active bits; TO replaces other locks and consumes one-shot state while
+retaining actual momentary owners. Unrelated starting active bits have no
+invented lock provenance. Registered layer/mode ownership survives a
+release-pending longer
 tier until replacement or release. That output is independent of current
 feedback phase/outcome: a prior delegated output can remain held with no visible
 behaviour slot while a different longer action waits for release. Layer/mode
@@ -222,6 +228,24 @@ own explicit situation and fresh history; other subjects use the selected shown
 layer, while layer subjects use their own native layer. Empty/disabled and
 unsupported subjects have no fabricated look. Editor/Inspector navigation posts
 no draft edit.
+
+The bounded gesture action families follow the pinned action-kind registry and
+its dispatch/ownership handlers (`action_kind_registry_list.h`,
+`action_kind_dispatch.c`, `layer_ownership.c`, `pd_mode_state.c`), with feedback
+kept separate through the `key_feedback_*` projections in `feedback.c`:
+
+| Native family | Local lifecycle and limits |
+| --- | --- |
+| TO | Press/tap locks only the target (TO(0) clears locks), clears other locks and one-shot state; release is a no-op. |
+| TG / userspace layer lock | Press/tap toggles only that lock; release is a no-op. Other owners still keep their layers active. |
+| MO / authored TT hold | Press acquires the physical key's layer ownership; replacement/release relinquishes only that ownership. TT's built-in tap-count planning is outside this authored-action path. |
+| Pointing mode hold | Actual model binding; registered press acquires an unlocked mode owner, release removes that owner. A tap of the hold binding does not activate a mode. An existing same-mode lock survives hold release. |
+| Pointing mode lock | Actual model binding; press/tap toggles the lock. Switching modes clears the old lock/owners; the lock's display owner can remain after physical release without representing a held native output. |
+| Registered key / key repeat | Registered output ends on replacement/release; configured feedback blinks. Repeat commits are not enumerated. |
+| OSL / LT / LM / nested macro | One-shot enable/prior arming policy, nested planning/modifier ownership or playback is unavailable here. These paths are explicitly conditional; no layer/mode ownership or commit is fabricated. Repeated state-changing actions likewise require repeat inputs outside this illustration. |
+
+Only dispatch changes emit local lock/mode events. Continuing persistent state
+neither re-fires commits nor keeps a released behaviour's feedback alive.
 
 A complete capture already reads compiled defaults; its exact RGB payload is
 retained as `factoryLighting` snapshot metadata, outside the portable document.
