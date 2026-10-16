@@ -11,7 +11,7 @@ const {buildSnapshotModel}=require('../../core/session/device-model');
 const {demoProfile,demoSnapshot,DEMO_CAPABILITIES}=require('../../core/session/demo-session');
 const modeHold=buildSnapshotModel(demoSnapshot(demoProfile()),DEMO_CAPABILITIES,{editable:true}).pdModes[0].binding.hold;
 const action=(action,helper='PRESS_AND_HOLD_UNTIL_RELEASE')=>({action,helper});
-function accepted({keycode='CUSTOM_KEY_0',tap='KC_A',hold=action('MO(2)'),long=action('KC_B','TAP_ON_RELEASE_AFTER_HOLD'),initial,layerValue=0,path="hold"}={}) {
+function accepted({keycode='CUSTOM_KEY_0',tap='KC_A',hold=action('MO(2)'),long=action('KC_B','TAP_ON_RELEASE_AFTER_HOLD'),initial,layerValue=0,path="hold",eventConditions}={}) {
  const draft=new ProfileDraftSession(demoSnapshot(demoProfile()),'demo',DEMO_CAPABILITIES);
  const model=()=>buildSnapshotModel(draft.current,DEMO_CAPABILITIES,{editable:true});
  const stage=edit=>draft.stage({...edit,draftId:draft.id,draftRevision:draft.revision});
@@ -20,7 +20,8 @@ function accepted({keycode='CUSTOM_KEY_0',tap='KC_A',hold=action('MO(2)'),long=a
  const savedId=model().keyBehaviors.findIndex(r=>r.keycode===keycode);
  // Independent diagnostic rules run through the same guarded editor and codec.
  // Preview is white, held layer is black, behaviour Painting is white above it.
- for(const [kind,params,paint]of [[null,[],1],[2,[2],2],[1,[2],1],[8,[savedId,4],2]]){stage(lightingRule(-1,'','add',{rule:{flags:0,brightness:255,parts:[...kind===null?[]:[{slot:0,kind,params}],{slot:2,kind:0,params:[]},{slot:3,kind:paint,params:paint===2?[0]:[]}]}}));if(paint===2||kind===1&&layerValue)stage(lightingRule(0,model().rgb.lighting.rules[0].identity,'colour',{colour:{h:0,s:0,v:kind===1?layerValue:200}}));}
+ for(const [kind,params,paint]of (eventConditions?[[null,[],1]]:[[null,[],1],[2,[2],2],[1,[2],1],[8,[savedId,4],2]])){stage(lightingRule(-1,'','add',{rule:{flags:0,brightness:255,parts:[...kind===null?[]:[{slot:0,kind,params}],{slot:2,kind:0,params:[]},{slot:3,kind:paint,params:paint===2?[0]:[]}]}}));if(paint===2||kind===1&&layerValue)stage(lightingRule(0,model().rgb.lighting.rules[0].identity,'colour',{colour:{h:0,s:0,v:kind===1?layerValue:200}}));}
+ if(eventConditions){stage(lightingRule(-1,'','add',{rule:{flags:0,brightness:255,parts:[...eventConditions,{slot:2,kind:0,params:[]},{slot:3,kind:2,params:[0]},{slot:5,kind:3,params:[100,0]}]}}));stage(lightingRule(0,model().rgb.lighting.rules[0].identity,'colour',{colour:{h:0,s:0,v:200}}));}
  if(keycode!=='CUSTOM_KEY_0')stage(setKey('Layer 0',0,keycode));
  const m=model(),id=m.keyBehaviors.findIndex(r=>r.keycode===row.keycode),owner=Number(Object.entries(m.rgb.lighting.keymap[0]).find(([,k])=>k.code===row.code)[0]);
  assert.equal(m.keyBehaviors[id].tapHoldTerm,'317');
@@ -39,7 +40,7 @@ test('G1 accepted plain tap and mismatched longer action never announce a layer 
 test('G2 registered layer output survives a release-pending longer action independently of its feedback',()=>{
  const c=accepted();for(const time of [317,912,913]){const r=at(c,time);assert.equal(r.situation.layerOwners?.[c.owner],2);assert.equal(factSubjects(9,[2,1],r.situation).length,1);}
  const pending=at(c,913);assert.equal(factSubjects(8,[c.id,12],pending.situation).length,0,'no old hold or invented long Painting feedback');assert.deepEqual(pending.frame[0],[0,0,0],'held layer still paints');
- const released=at(c,914);assert.equal(released.situation.layerOwners,undefined);assert.equal(released.situation.behaviour.keys[c.owner].state,'long');assert.equal(c.history.find(o=>o.situation.time===914).event.kind,8);
+ const released=at(c,914);assert.equal(released.situation.layerOwners,undefined);assert.equal(released.situation.behaviour.keys[c.owner].state,'long');assert.equal(c.history.find(o=>o.situation.time===914&&o.event).event.kind,8);
  assert.equal(at(c,1113).situation.behaviour.keys[c.owner].state,'long');assert.equal(at(c,1114).situation.behaviour,undefined);
 });
 test('G3 delegated behaviour Painting remains visible across both feedback half-periods',()=>{
@@ -144,4 +145,51 @@ test('G4 mode holds preserve another real owner, and tapping the hold binding do
 test('G4 unavailable one-shot policy and state-changing repeats are explicit conditional paths, not invented state',()=>{
  const once=accepted({tap:'OSL(2)',hold:null,long:null,path:'tap'});assert.deepEqual(once.history,[]);assert.match(once.gesture.notes.join(' '),/One-shot enabled state and prior arming time/);
  const repeated=accepted({hold:{...action('TG(2)','REPEAT_WHILE_HELD'),repeatHz:'10'},long:null});assert.deepEqual(repeated.history,[]);assert.match(repeated.gesture.notes.join(' '),/Repeated state-changing/);
+});
+
+const g5=(options={})=>accepted({hold:action('TG(2)'),long:action('TO(3)'),eventConditions:[{slot:0,kind:19,params:[3]},{slot:0,kind:1,params:[2]}],...options});
+test('G5 target-lock flash qualifies at its synchronous occurrence before goto clears the old lock',()=>{
+ const c=g5();for(const time of [912,913,914,1012,1013,1114]){const r=at(c,time);assert.deepEqual(r.frame[0],time>=913&&time<1013?[200,200,200]:[0,0,0],`occurrence flash at ${time}`);if(time===914){assert.deepEqual(r.situation.layers,[3]);assert.match(r.explanation.rules[0].status,/Contributes/);const cleared=replayLighting(c.m.rgb.lighting.program,c.history.filter(o=>o.situation.time<=time),5,0);assert.deepEqual(cleared.frame[0],[0,0,0]);}}
+ const occurrences=c.history.filter(o=>o.situation.time===913&&o.event);assert.deepEqual(occurrences.map(o=>[o.event.kind,o.event.thing]),[[0,3],[1,2],[8,c.id]]);
+ assert.deepEqual(occurrences[0].situation.layers,[2,3]);assert.deepEqual(occurrences[0].situation.lockedLayers,[2,3]);assert.deepEqual(occurrences[1].situation.layers,[3]);
+});
+test('G5 filters qualify at occurrence, not a later matching final state, and keep original flash expiry',()=>{
+ for(const [options,visible]of [
+  [{eventConditions:[{slot:0,kind:19,params:[3]},{slot:1,kind:1,params:[2]}]},false],
+  [{hold:action('KC_C')},false],
+  [{hold:action('TO(3)')},false], // no second lock occurrence at913
+  [{eventConditions:[{slot:0,kind:19,params:[3]},{slot:0,kind:9,params:[2,2]}]},true],
+ ]){const c=g5(options),r=at(c,914);assert.deepEqual(r.frame[0],visible?[200,200,200]:[0,0,0]);if(!visible)assert.match(r.explanation.rules[0].status,/No qualifying event|Flash expired/);assert.deepEqual(at(c,1013).frame[0],[0,0,0]);}
+});
+test('G5 goto captures target lock, ordered old unlocks and later one-shot consumption with actual owners',()=>{
+ const initial={layers:[1,2,4,5],lockedLayers:[5,2,1],layerOwners:{0:2},oneshotLayer:4};
+ const c=g5({hold:action('TO(3)'),long:null,initial}),native=c.history.filter(o=>o.situation.time===317&&o.event?.kind<6);
+ assert.deepEqual(native.map(o=>[o.event.kind,o.event.thing,o.situation.layers,o.situation.lockedLayers,o.situation.oneshotLayer,o.event.owners]),[
+  [0,3,[1,2,3,4,5],[1,2,3,5],4,[]],
+  [1,1,[2,3,4,5],[2,3,5],4,[]],
+  [1,2,[2,3,4,5],[3,5],4,[0]],
+  [1,5,[2,3,4],[3],4,[]],
+ ]);
+ const consumed=c.gesture.steps.find(s=>s.observation.situation.time===317).effects.at(-1);assert.equal(consumed.event,undefined);assert.deepEqual(consumed.situation.layers,[2,3]);assert.equal(consumed.situation.oneshotLayer,undefined);
+ for(const o of native){assert.deepEqual(o.situation.pressedKeys,[c.owner]);assert.deepEqual(o.situation.layerOwners,{0:2});assert.deepEqual(o.situation.behaviourPhases[c.owner].phases,[3]);assert.equal(factSubjects(9,[3,1],o.situation).length,0);}
+});
+test('G5 occurrence snapshots own their nested state, native/commit metadata and owners across later mutations',()=>{
+ const c=g5(),native=c.history.filter(o=>o.situation.time===913&&o.event),lock=native[0],unlock=native[1],commit=native[2];
+ assert.deepEqual(lock.situation.pressedKeys,[c.owner]);assert.deepEqual(lock.situation.behaviourPhases[c.owner],{id:c.id,phases:[4],branch:1});assert.deepEqual(lock.situation.behaviour.keys[c.owner],{id:c.id,state:'long',branch:1,outcome:4,flashing:false,lit:true});assert.deepEqual(lock.situation.behaviour.standardKeys,{});
+ assert.deepEqual(commit.event,{kind:8,thing:c.id,owners:[c.owner],slot:1,outcome:4});assert.deepEqual(unlock.situation.lockedLayers,[3]);assert.notEqual(lock.situation,unlock.situation);assert.notEqual(lock.situation.behaviour,commit.situation.behaviour);
+ const before=structuredClone(lock),final=c.history.at(-1).situation;final.layers.push(9);final.lockedLayers.push(10);commit.situation.behaviour.keys[c.owner].outcome=99;unlock.situation.keymap[0][c.owner].code=0;assert.deepEqual(lock,before);
+});
+test('G5 mode command observers see post-command mode with borrowed old owners copied before the start event',()=>{
+ const basis=buildSnapshotModel(demoSnapshot(demoProfile()),DEMO_CAPABILITIES,{editable:true}),other=basis.pdModes.find(m=>m.kind&&m.id!==0);
+ const initial={mode:{id:0,locked:true,keys:[0],halves:['left']},modeStatus:{id:0,locked:true,keys:[0],halves:['left']}};
+ const c=g5({hold:action(other.binding.lock),long:null,initial}),native=c.history.filter(o=>o.situation.time===317&&[3,4].includes(o.event?.kind));
+ assert.deepEqual(native.map(o=>[o.event.kind,o.event.thing,o.event.owners,o.situation.mode.id,o.situation.modeStatus.locked]),[[4,0,[0],other.id,true],[3,other.id,[c.owner],other.id,true]]);
+ assert.notEqual(native[0].situation,native[1].situation);native[1].event.owners.push(1);native[1].situation.mode.keys.push(2);assert.deepEqual(native[0].event.owners,[0]);assert.deepEqual(native[0].situation.mode.keys,[c.owner]);assert.deepEqual(at(c,318).situation.mode.keys,[c.owner]);
+});
+test('G5 registered mode release precedes replacement and release-fired feedback, with truthful physical boundaries',()=>{
+ const basis=buildSnapshotModel(demoSnapshot(demoProfile()),DEMO_CAPABILITIES,{editable:true}),other=basis.pdModes.find(m=>m.kind&&m.id!==0);
+ const replacement=g5({hold:action(modeHold),long:action(other.binding.hold)}),events=replacement.history.filter(o=>o.situation.time===913&&[3,4].includes(o.event?.kind));
+ assert.deepEqual(events.map(o=>[o.event.kind,o.event.thing,o.situation.mode?.id]),[[4,0,undefined],[3,other.id,other.id]]);for(const o of events){assert.deepEqual(o.event.owners,[replacement.owner]);assert.deepEqual(o.situation.pressedKeys,[replacement.owner]);assert.deepEqual(o.situation.behaviourPhases[replacement.owner].phases,[4]);}
+ const release=replacement.history.find(o=>o.situation.time===914&&o.event?.kind===4);assert.equal(release.situation.mode,undefined);assert.deepEqual(release.situation.pressedKeys,[]);assert.equal(release.situation.behaviour,undefined);assert.equal(release.situation.behaviourPhases,undefined);
+ const pulse=g5({hold:action(modeHold),long:action('KC_B','TAP_ON_RELEASE_AFTER_HOLD')}),end=pulse.history.filter(o=>o.situation.time===914);assert.equal(end[0].event.kind,4);assert.equal(end[0].situation.behaviour,undefined);assert.deepEqual(end[0].situation.pressedKeys,[]);assert.equal(end.at(-1).event.kind,8);assert.equal(end.at(-1).situation.behaviour.keys[pulse.owner].state,'long');assert.equal(at(pulse,1114).situation.behaviour,undefined);
 });

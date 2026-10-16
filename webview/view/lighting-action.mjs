@@ -4,6 +4,8 @@
 import {nativeIdentity} from "./lighting-facts.mjs";
 /** @typedef {import('./lighting-simulator-types.js').Situation} Situation */
 /** @typedef {import('./lighting-simulator-types.js').Event} Event */
+/** @typedef {import('./lighting-simulator-types.js').Observation} Observation */
+/** @typedef {(event?: Event) => void} Capture */
 /** @typedef {{kind: 'key'|'layer-hold'|'layer-goto'|'layer-toggle'|'mode-hold'|'mode-lock'|'conditional'; code: number; identity: [number, number] | null; outcome: number; keepsFeedback: boolean; reason?: string}} GestureAction */
 /** @param {import('../../contracts/panel.js').PublishedModel} model @param {number} code @returns {GestureAction} */
 export function classifyGestureAction(model, code) {
@@ -32,11 +34,11 @@ function refreshLayer(s, layer) {
     const active = Object.values(s.layerOwners ?? {}).includes(layer) || (s.lockedLayers ?? []).includes(layer) || s.oneshotLayer === layer;
     s.layers = [...new Set([...(s.layers ?? []).filter(l => l !== layer && l !== 0), ...active && layer !== 0 ? [layer] : []])].sort((a, b) => a - b);
 }
-/** @param {Situation} s @param {number} layer @param {boolean} locked @param {Event[]} events */
-function setLock(s, layer, locked, events) {
+/** @param {Situation} s @param {number} layer @param {boolean} locked @param {Capture} capture */
+function setLock(s, layer, locked, capture) {
     if ((s.lockedLayers ?? []).includes(layer) === locked) return;
     s.lockedLayers = [...new Set([...(s.lockedLayers ?? []).filter(l => l !== layer), ...locked ? [layer] : []])].sort((a, b) => a - b);
-    refreshLayer(s, layer);events.push({kind: locked ? 0 : 1, thing: layer, owners: []});
+    refreshLayer(s, layer);capture({kind: locked ? 0 : 1, thing: layer, owners: Object.keys(s.layerOwners ?? {}).map(Number).filter(k => s.layerOwners?.[k] === layer)});
 }
 /** @param {Situation} s @param {number} id @param {boolean} locked @param {number[]} keys */
 function setMode(s, id, locked, keys) {
@@ -45,20 +47,23 @@ function setMode(s, id, locked, keys) {
 }
 /** Same classification is used for registration, dispatch and release. A
  * press-only action never acquires a momentary owner merely due to its helper.
- * @param {Situation} s @param {GestureAction} action @param {'press'|'tap'|'release'} phase @param {number} owner @returns {Event[]} */
-export function applyGestureAction(s, action, phase, owner) {
-    /** @type {Event[]} */ const events = [];
-    const id = action.identity?.[1];if (id === undefined) return events;
-    if (action.kind === "layer-toggle" && phase !== "release") setLock(s, id, !(s.lockedLayers ?? []).includes(id), events);
+ * @param {Situation} s @param {GestureAction} action @param {'press'|'tap'|'release'} phase @param {number} owner @param {() => Situation} [project] @returns {Observation[]} */
+export function applyGestureAction(s, action, phase, owner, project = () => s) {
+    /** @type {Observation[]} */ const observations = [];
+    // Synchronous observers borrow live state. Own each complete occurrence,
+    // including its event owners, before the next mutation can change either.
+    /** @type {Capture} */ const capture = event => observations.push({situation: structuredClone(project()), ...event ? {event: structuredClone(event)} : {}});
+    const id = action.identity?.[1];if (id === undefined) return observations;
+    if (action.kind === "layer-toggle" && phase !== "release") setLock(s, id, !(s.lockedLayers ?? []).includes(id), capture);
     if (action.kind === "layer-goto" && phase !== "release") {
-        if (id !== 0) setLock(s, id, true, events);
-        for (const other of [...s.lockedLayers ?? []]) if (other !== id || id === 0) setLock(s, other, false, events);
-        const once = s.oneshotLayer;delete s.oneshotLayer;if (once !== undefined) refreshLayer(s, once);
+        if (id !== 0) setLock(s, id, true, capture);
+        for (const other of [...s.lockedLayers ?? []].sort((a, b) => a - b)) if (other !== id || id === 0) setLock(s, other, false, capture);
+        const once = s.oneshotLayer;delete s.oneshotLayer;if (once !== undefined) {refreshLayer(s, once);capture();}
     }
     if (action.kind === "layer-hold" && phase !== "tap") {
         if (phase === "press") {const previous = s.layerOwners?.[owner];s.layerOwners ??= {};s.layerOwners[owner] = id;if (previous !== undefined && previous !== id) refreshLayer(s, previous);}
         else if (s.layerOwners?.[owner] === id) {delete s.layerOwners[owner];if (!Object.keys(s.layerOwners).length) delete s.layerOwners;}
-        refreshLayer(s, id);
+        refreshLayer(s, id);capture();
     }
     if (action.kind === "mode-hold" || action.kind === "mode-lock") {
         const before = s.mode ? structuredClone(s.mode) : null;
@@ -72,9 +77,9 @@ export function applyGestureAction(s, action, phase, owner) {
             if (keys.length) setMode(s, id, false, keys);else {delete s.mode;delete s.modeStatus;}
         }
         if (before?.id !== s.mode?.id) {
-            if (before) events.push({kind: 4, thing: before.id, owners: before.keys ?? []});
-            if (s.mode) events.push({kind: 3, thing: s.mode.id, owners: s.mode.keys ?? []});
-        }
+            if (before) capture({kind: 4, thing: before.id, owners: before.keys ?? []});
+            if (s.mode) capture({kind: 3, thing: s.mode.id, owners: s.mode.keys ?? []});
+        } else if (JSON.stringify(before) !== JSON.stringify(s.mode ?? null)) capture();
     }
-    return events;
+    return observations;
 }

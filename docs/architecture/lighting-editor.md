@@ -215,9 +215,8 @@ after release and never create momentary owners. Toggles inspect lock state,
 not active bits; TO replaces other locks and consumes one-shot state while
 retaining actual momentary owners. Unrelated starting active bits have no
 invented lock provenance. Registered layer/mode ownership survives a
-release-pending longer
-tier until replacement or release. That output is independent of current
-feedback phase/outcome: a prior delegated output can remain held with no visible
+release-pending longer tier until replacement or release. That output is
+independent of current feedback phase/outcome: a prior delegated output can remain held with no visible
 behaviour slot while a different longer action waits for release. Layer/mode
 Painting feedback is steady and Standard delegates to its scene; ordinary
 registered-key and repeat feedback retains configured blink edges. Transparent,
@@ -244,7 +243,15 @@ kept separate through the `key_feedback_*` projections in `feedback.c`:
 | Registered key / key repeat | Registered output ends on replacement/release; configured feedback blinks. Repeat commits are not enumerated. |
 | OSL / LT / LM / nested macro | One-shot enable/prior arming policy, nested planning/modifier ownership or playback is unavailable here. These paths are explicitly conditional; no layer/mode ownership or commit is fabricated. Repeated state-changing actions likewise require repeat inputs outside this illustration. |
 
-Only dispatch changes emit local lock/mode events. Continuing persistent state
+Only dispatch changes emit local lock/mode events. Each synchronous occurrence
+owns a detached complete situation and event metadata before the next mutation.
+Goto's target-lock occurrence still sees old locks; old unlocks follow in layer
+order, then one-shot consumption. Mode-command end/start observers instead see
+the command's resulting mode, with separate copied old/new owners. Registered
+release/replacement and physical release retain their own observation boundaries;
+feedback commits follow native dispatch. Replay preserves this causal order at
+the same logical time before the final milestone, so filters use occurrence
+facts and flashes retain their original expiry. Continuing persistent state
 neither re-fires commits nor keeps a released behaviour's feedback alive.
 
 A complete capture already reads compiled defaults; its exact RGB payload is

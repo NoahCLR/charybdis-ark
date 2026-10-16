@@ -764,7 +764,10 @@ their owner, while Go to layer and layer/mode locks persist after release.
 A lock does not count as a held layer, and its persistence does not retain
 the behaviour's feedback. One-shot policy and nested action planning are
 labelled conditional when their required inputs are unavailable.
-**Inspect this moment** retains that exact history.
+**Inspect this moment** retains that exact history, including the state at
+each event occurrence. For example, Go to layer locks its target before
+clearing previous locks; an event filtered by a previous active layer can
+therefore qualify and finish its flash after that layer has gone away.
 Transparent actions, built-in or immediate hold planning and runtime
 arbitration are labelled conditional where not represented. This is a solitary
 gesture illustration, not a QMK input emulator or a hardware timing guarantee.

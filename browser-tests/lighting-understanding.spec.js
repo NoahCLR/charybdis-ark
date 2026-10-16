@@ -16,22 +16,28 @@ async function installedHost(page,theme) {
 }
 // Send the public edit builders through the real DEMO host, then wait for its
 // accepted model. No injected decoded behaviour or local simulator state.
-async function acceptedGestureDemo(page,theme,mode,persistent=null) {
+async function acceptedGestureDemo(page,theme,mode,persistent=null,occurrence=false) {
  await page.goto('/dist/web/index.html');await page.evaluate(()=>{window.addEventListener('message',e=>{if(e.data?.type==='model')window.__gestureModel=e.data.model;});const api=window.acquireVsCodeApi(),post=api.postMessage.bind(api);window.__posted=[];api.postMessage=m=>{window.__posted.push(structuredClone(m));return post(m);};});
  await page.locator('[data-act="explore-demo"]').click();await expect(page.locator('.bench-tablist')).toBeVisible();await installedHost(page,theme);
  const wanted=theme==='vscode-dark'?'dark':'light';if(await page.locator('[data-act="theme"]').getAttribute('data-theme-now')!==wanted)await page.locator('[data-act="theme"]').click();await page.locator('body').evaluate((b,t)=>b.classList.add('vscode-body',t),theme);
- return page.evaluate(async ({mode,persistent})=>{
+ return page.evaluate(async ({mode,persistent,occurrence})=>{
   const {saveBehaviour,lightingRule}=await import('/webview/view/edits.mjs'),api=window.acquireVsCodeApi();
   const send=edit=>new Promise(resolve=>{const m=window.__gestureModel,listener=e=>{if(e.data?.type==='model'&&e.data.model.draft?.revision>m.draft.revision){window.removeEventListener('message',listener);resolve();}};window.addEventListener('message',listener);api.postMessage({...edit,draftId:m.draft.id,draftRevision:m.draft.revision});});
-  const row=window.__gestureModel.keyBehaviors.find(r=>r.keycode==='CUSTOM_KEY_0'),hold=persistent??(mode?window.__gestureModel.pdModes[0].binding.hold:'MO(2)');window.__posted=[];
-  await send(saveBehaviour({...row,tapHoldTerm:'317',longerHoldTerm:'913',multiTapTerm:'89',steps:[{tapCount:0,tap:{helper:'TAP_SENDS',action:'KC_A'},hold:{helper:'PRESS_AND_HOLD_UNTIL_RELEASE',action:hold},...persistent?{}:{longHold:{helper:'TAP_ON_RELEASE_AFTER_HOLD',action:'KC_B'}}}]}, {}, window.__gestureModel.profileIdentity));
+  const row=window.__gestureModel.keyBehaviors.find(r=>r.keycode==='CUSTOM_KEY_0'),hold=occurrence?'TG(2)':persistent??(mode?window.__gestureModel.pdModes[0].binding.hold:'MO(2)');window.__posted=[];
+  await send(saveBehaviour({...row,tapHoldTerm:'317',longerHoldTerm:'913',multiTapTerm:'89',steps:[{tapCount:0,tap:{helper:'TAP_SENDS',action:'KC_A'},hold:{helper:'PRESS_AND_HOLD_UNTIL_RELEASE',action:hold},...occurrence?{longHold:{helper:'PRESS_AND_HOLD_UNTIL_RELEASE',action:'TO(3)'}}:persistent?{}:{longHold:{helper:'TAP_ON_RELEASE_AFTER_HOLD',action:'KC_B'}}}]}, {}, window.__gestureModel.profileIdentity));
   const id=window.__gestureModel.keyBehaviors.findIndex(r=>r.keycode===row.keycode);
+  if(occurrence){
+   await send(lightingRule(-1,'','add',{rule:{flags:0,brightness:255,parts:[{slot:2,kind:0,params:[]},{slot:3,kind:1,params:[]}]}}));
+   await send(lightingRule(-1,'','add',{rule:{flags:0,brightness:255,parts:[{slot:0,kind:19,params:[3]},{slot:0,kind:1,params:[2]},{slot:2,kind:0,params:[]},{slot:3,kind:2,params:[0]},{slot:5,kind:3,params:[100,0]}]}}));
+   await send(lightingRule(0,window.__gestureModel.rgb.lighting.rules[0].identity,'colour',{colour:{h:0,s:0,v:200}}));
+   return {key:row.keycode,id,seedPosts:window.__posted.map(m=>m.type)};
+  }
   for(const [kind,params,value]of [[null,[],0],[2,[2],200],[mode?3:1,[mode?0:2],80],[8,[id,12],200]]){
    await send(lightingRule(-1,'','add',{rule:{flags:0,brightness:255,parts:[...kind===null?[]:[{slot:0,kind,params}],{slot:2,kind:0,params:[]},{slot:3,kind:value?2:1,params:value?[0]:[]}]}}));
    if(value)await send(lightingRule(0,window.__gestureModel.rgb.lighting.rules[0].identity,'colour',{colour:{h:0,s:0,v:value}}));
   }
   return {key:row.keycode,id,seedPosts:window.__posted.map(m=>m.type)};
- },{mode,persistent});
+ },{mode,persistent,occurrence});
 }
 for(const theme of ['vscode-dark','vscode-light']) {
  test(`Inspector selection, whole-rule counterfactual and matrix associations are local (${theme})`,async({page})=>{
@@ -160,6 +166,19 @@ for(const theme of ['vscode-dark','vscode-light']) {
   await page.locator('.thing-tabs [data-lighting]').click();await pixels('505050');await page.locator('[data-inspect-gesture]').click();await expect(page.locator('.lighting-situation')).toContainText('318 ms');await expect(page.locator('[data-inspector-rule="1"]')).toContainText('Contributes opaque light');await expect(page.locator('[data-inspector-rule="0"]')).toContainText('Condition');
   await field(page,'inspector:clear-rule').selectOption('1');await expect(page.locator('[data-counterfactual]')).toContainText('#000000');await field(page,'inspector:clear-rule').selectOption('-1');
   await page.locator('[data-tool="gesture"]').click();await field(page,'gesture:behaviour').selectOption(String(info.id));await moment('Release');await pixels('505050');await moment('Feedback interval');await pixels('505050');await page.locator('[data-inspect-gesture]').click();await expect(page.locator('.lighting-situation')).toContainText('518 ms');expect(await posted(page)).toEqual([]);
+ });
+
+ test(`G5 synchronous goto occurrence qualifies flash through both timelines and exact-history Inspector (${theme})`,async({page})=>{
+  const info=await acceptedGestureDemo(page,theme,false,null,true);expect(info.seedPosts).toEqual(['saveBehavior','editLightingRule','editLightingRule','editLightingRule']);
+  await page.locator('[data-tab="behaviours"]').click();await page.locator(`[data-row="${info.key}"]`).first().click();await clearPosts(page);
+  const prefix=`gesture:${info.key}`,moment=async text=>{const opts=await field(page,`${prefix}:step`).locator('option').evaluateAll(ns=>ns.map(n=>({value:n.value,text:n.textContent})));await field(page,`${prefix}:step`).selectOption(opts.find(o=>o.text.includes(text)).value);};
+  const pixels=async(scope,expected)=>expect(await page.locator(`[data-${scope}-led]`).evaluateAll(ns=>[...new Set(ns.map(n=>n.getAttribute('data-colour')))] )).toEqual([expected]);
+  await moment('Before long hold');await pixels('gesture','000000');await moment('Long hold · 913');await pixels('gesture','c8c8c8');await moment('Release');await pixels('gesture','c8c8c8');
+  await page.locator('.thing-tabs [data-lighting]').click();await pixels('gesture','c8c8c8');await page.locator('[data-inspect-gesture]').click();await expect(page.locator('.lighting-situation')).toContainText('914 ms');await expect(page.locator('[data-inspector-rule="0"]')).toContainText('Contributes opaque light');
+  await field(page,'inspector:clear-rule').selectOption('0');await expect(page.locator('[data-counterfactual]')).toContainText('#000000');await field(page,'inspector:clear-rule').selectOption('-1');
+  await page.locator('.situation-controls summary').click();await field(page,'situation:advance').fill('98');await page.locator('[data-advance]').click();await expect(page.locator('.lighting-situation')).toContainText('1012 ms');await pixels('sim','c8c8c8');
+  await field(page,'situation:advance').fill('1');await page.locator('[data-advance]').click();await expect(page.locator('.lighting-situation')).toContainText('1013 ms');await pixels('sim','000000');await expect(page.locator('[data-inspector-rule="0"]')).toContainText('Flash expired');
+  await page.locator('[data-tool="gesture"]').click();await field(page,'gesture:behaviour').selectOption(String(info.id));await moment('Release');await pixels('gesture','c8c8c8');await page.locator('[data-inspect-gesture]').click();await expect(page.locator('.lighting-situation')).toContainText('914 ms');await pixels('sim','c8c8c8');expect(await posted(page)).toEqual([]);
  });
 
 }
