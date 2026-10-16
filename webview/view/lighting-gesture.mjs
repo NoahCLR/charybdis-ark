@@ -29,9 +29,21 @@ export function lightingGesture(model, keycode, layer, owner, pressCount = 1, pa
     const branch = row.steps.find(s => s.tapCount === count - 1), base = lightingSituation(model, [{kind: 1, params: [layer], keys: []}]);
     const unresolved = (path === "tap" ? [branch?.tap] : [branch?.hold, branch?.longHold]).find(a => a && (a.code === 1 || /^0x/i.test(a.action)));
     if (unresolved) return {steps, notes: [`${unresolved.action} needs transparent or unknown-action resolution. This conditional path is not simulated; no fired event or output is invented.`]};
+    /** The pinned handled_key_policy preview requires the tap and any longer
+     * action to lead to the held layer too. An MO alone is not that promise.
+     * @param {import('../../contracts/panel.js').Branch | undefined} action */
+    const heldLayer = action => action?.helper === "PRESS_AND_HOLD_UNTIL_RELEASE" && action.code !== undefined && action.code >= 0x5220 && action.code <= 0x523f ? nativeIdentity(action.code)?.[1] ?? null : null;
+    /** @param {import('../../contracts/panel.js').Branch | undefined} action @param {number} layer */
+    const leadsToLayer = (action, layer) => action?.code !== undefined && (action.code >= 0x5200 && action.code <= 0x521f || action.code >= 0x7ec0 && action.code <= 0x7ecf) && nativeIdentity(action.code)?.[1] === layer;
     /** @param {number} n */
-    const previewFor = n => {const hold = row.steps.find(s => s.tapCount === n - 1)?.hold, code = hold?.code;if (hold?.helper !== "PRESS_AND_HOLD_UNTIL_RELEASE" || code === undefined || code < 0x5220 || code > 0x523f) return null;return nativeIdentity(code)?.[1] ?? null;};
+    const previewFor = n => {
+        const step = row.steps.find(s => s.tapCount === n - 1), layer = heldLayer(step?.hold);
+        return layer !== null && leadsToLayer(step?.tap, layer) && (!step?.longHold || heldLayer(step.longHold) === layer || leadsToLayer(step.longHold, layer)) ? layer : null;
+    };
     /** @type {number | null} */ let previewLayer = null;
+    /** Registered output outlives a release-pending longer tier. Its ownership
+     * and its visible feedback are separate, as in feedback.c.
+     * @type {number | null} */ let registeredCode = null;
     /** @type {[number, number] | null} */ let heldIdentity = null;
     /** @param {import('../../contracts/panel.js').Branch | undefined} action */
     const dispatch = action => {
@@ -52,7 +64,7 @@ export function lightingGesture(model, keycode, layer, owner, pressCount = 1, pa
     const add = (time, label, detail, state, phases, event = null, outcome = 0, flashing = false, branchNumber = count) => {
         const situation = structuredClone(base);situation.time = time;
         situation.pressedKeys = physicallyPressed ? [owner] : [];
-        if (!physicallyPressed) {heldIdentity = null;previewLayer = null;}
+        if (!physicallyPressed) {registeredCode = null;heldIdentity = null;previewLayer = null;}
         if (previewLayer !== null) situation.preview = previewLayer;
         if (heldIdentity?.[0] === 1) {situation.layers = [layer, heldIdentity[1]];situation.layerOwners = {[owner]: heldIdentity[1]};}
         if (heldIdentity?.[0] === 2) situation.mode = {id: heldIdentity[1], keys: [owner], halves: [owner < 30 ? "left" : "right"]};
@@ -89,15 +101,29 @@ export function lightingGesture(model, keycode, layer, owner, pressCount = 1, pa
         const identity = nativeIdentity(actionCode);outcome = identity?.[0] === 1 ? identity[1] + 1 : identity?.[0] === 2 ? identity[1] + 33 : 0;
         const helper = t.action.helper;
         state = helper === "TAP_SENDS" ? "tap" : t.tier;phases = [helper === "TAP_SENDS" ? 1 : helper === "TAP_ON_RELEASE_AFTER_HOLD" ? 2 : state === "hold" ? 3 : 4];
-        flashing = helper === "PRESS_AND_HOLD_UNTIL_RELEASE" || helper === "REPEAT_WHILE_HELD";
-        blinkAt = start + t.at;
+        if (helper === "PRESS_AND_HOLD_UNTIL_RELEASE") {
+            registeredCode = actionCode;
+            heldIdentity = identity && (identity[0] === 1 || identity[0] === 2 && model.pdModes.some(m => m.id === identity[1] && m.kind)) ? identity : null;
+        } else if (helper !== "TAP_ON_RELEASE_AFTER_HOLD" && helper !== "TAP_SENDS") {registeredCode = null;heldIdentity = null;}
+        const registeredKind = registeredCode === null ? null : nativeIdentity(registeredCode)?.[0];
+        const delegated = registeredCode !== null && (registeredKind === 1 || registeredKind === 2);
+        flashing = helper === "REPEAT_WHILE_HELD" || registeredCode !== null && !delegated;
+        if (delegated && !outcome) state = null;
+        // A pending longer release changes the phase/outcome, not the held
+        // output. A delegated prior output may leave no current feedback slot.
+        if (helper === "TAP_ON_RELEASE_AFTER_HOLD" && registeredCode !== null) phases = [t.tier === "long" ? 4 : 3];
+        if (helper !== "TAP_ON_RELEASE_AFTER_HOLD") blinkAt = start + t.at;
         previewLayer = null;
-        heldIdentity = helper === "PRESS_AND_HOLD_UNTIL_RELEASE" && identity && (identity[0] === 1 || identity[0] === 2 && model.pdModes.some(m => m.id === identity[1] && m.kind)) ? identity : null;
         if (helper === "TAP_AT_HOLD_THRESHOLD" || helper === "REPEAT_WHILE_HELD") dispatch(t.action);
         const fires = helper === "TAP_AT_HOLD_THRESHOLD" || helper === "REPEAT_WHILE_HELD" || helper === "PRESS_AND_HOLD_UNTIL_RELEASE";
         const event = fires && id >= 0 ? {kind: t.tier === "long" ? 8 : 7, thing: id, owners: [owner], slot: t.tier === "long" ? 1 : 0, outcome} : null;
         if (helper === "TAP_AT_HOLD_THRESHOLD" || helper === "REPEAT_WHILE_HELD") pulse = {at: start + t.at, state: t.tier, outcome, branch: count};
-        add(start + t.at, `${state === "tap" ? "Tap candidate settled" : t.tier === "long" ? "Long hold" : "Hold"} · ${t.at} ms`, `${t.action.label || t.action.action} · ${helperWord(model, t.tier, helper ?? "")}${helper === "REPEAT_WHILE_HELD" ? ` at ${t.action.repeatHz} Hz; repeats are not enumerated` : ""}${helper === "TAP_ON_RELEASE_AFTER_HOLD" || helper === "TAP_SENDS" ? "; waits for release" : "; active at threshold"}`, state, phases, event, outcome, flashing);
+        add(start + t.at, `${state === "tap" ? "Tap candidate settled" : t.tier === "long" ? "Long hold" : "Hold"} · ${t.at} ms`, `${t.action.label || t.action.action} · ${helperWord(model, t.tier, helper ?? "")}${helper === "REPEAT_WHILE_HELD" ? ` at ${t.action.repeatHz} Hz; repeats are not enumerated` : ""}${helper === "TAP_ON_RELEASE_AFTER_HOLD" || helper === "TAP_SENDS" ? "; waits for release" : "; active at threshold"}${helper === "TAP_ON_RELEASE_AFTER_HOLD" && registeredCode !== null ? ". The previous held action stays active until release." : ""}`, state, phases, event, outcome, flashing);
+        const next = thresholds[thresholds.indexOf(t) + 1]?.at;
+        if (next !== undefined && Number.isInteger(flash) && flash > 0 && t.at + flash < next) {
+            add(start + t.at + flash - 1, "Before feedback half-period", "The same held output and feedback projection, just before its configured half-period.", state, phases, null, outcome, flashing);
+            add(start + t.at + flash, "Next feedback half-period", "Delegated layer/mode Painting stays steady; ordinary registered key and repeat feedback may blink.", state, phases, null, outcome, flashing);
+        }
     }
     if (path === "tap" || !branch?.hold && !branch?.longHold) {
         // Tap-only path: release, equality boundary, strict series settlement.

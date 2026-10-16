@@ -754,7 +754,12 @@ the requested branch; hold ages restart at the current press. Quick taps settle
 strictly after the configured release gap; equality still admits the next tap.
 Only authored tiers introduce thresholds. It supplies local facts and coherent
 events to the same renderer, including configured feedback blink edges and
-intermediate timing gates. **Inspect this moment** retains that exact history.
+intermediate timing gates. Moments around the feedback half-period show the
+difference between steady layer/mode hints and blinking key/repeat feedback.
+A held layer previews early only when the tap and longer action also lead to
+that layer. A longer action waiting for release can leave the earlier layer or
+mode held, even when that behaviour's feedback is no longer visible.
+**Inspect this moment** retains that exact history.
 Transparent actions, built-in or immediate hold planning and runtime
 arbitration are labelled conditional where not represented. This is a solitary
 gesture illustration, not a QMK input emulator or a hardware timing guarantee.

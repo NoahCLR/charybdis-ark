@@ -204,7 +204,17 @@ Gesture illustrations use each stored row's native target/action codes, real
 native placements, participation and inherited/effective row terms. They project
 solitary short-press branch selection, held thresholds or release settlement
 onto the existing facts/events, with actual feedback-half-period edges between
-displayed milestones. Only authored tiers create thresholds. Transparent,
+displayed milestones, with selectable moments on both sides of a configured
+feedback half-period. Only authored tiers create thresholds. Layer preview is
+qualified by the pinned handled-key contract: a delayed momentary-layer hold
+previews only when the tap locks or goes to that same layer and any longer
+hold also leads there. A plain tap, LT tap or mismatched longer action makes no
+such promise. Registered layer/mode ownership survives a release-pending longer
+tier until replacement or release. That output is independent of current
+feedback phase/outcome: a prior delegated output can remain held with no visible
+behaviour slot while a different longer action waits for release. Layer/mode
+Painting feedback is steady and Standard delegates to its scene; ordinary
+registered-key and repeat feedback retains configured blink edges. Transparent,
 built-in/immediate planning, QMK buffering, pointer interception and combo
 arbitration remain explicit conditional/unsupported paths. This is neither a
 complete key planner nor physical timing evidence. Each overview look has its

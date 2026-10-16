@@ -34,9 +34,9 @@ test('unresolved transparent actions are conditional and never create a fired ev
  const {m,r}=model(),{layer,owner}=located(m,r);m.participation=null;r.steps=[{tapCount:0,tap:{helper:'TAP_SENDS',action:'KC_TRNS',code:1}}];
  const a=lightingGesture(m,r.keycode,layer,owner,1,'tap');assert.deepEqual(a.steps,[]);assert.match(a.notes.join(' '),/conditional/);
 });
-test('direct held layers preview then own their target; direct TO dispatch persists after release',()=>{
+test('qualified direct held layers preview then own their target; direct TO dispatch persists after release',()=>{
  const {m,r}=model(),{layer,owner}=located(m,r);m.participation=null;r.tapHoldTerm='317';r.longerHoldTerm='913';r.multiTapTerm='89';
- r.steps=[{tapCount:0,hold:{helper:'PRESS_AND_HOLD_UNTIL_RELEASE',action:'MO(2)',code:0x5222}}];
+ r.steps=[{tapCount:0,tap:{helper:'TAP_SENDS',action:'LOCK_LAYER(2)',code:0x7ec2},hold:{helper:'PRESS_AND_HOLD_UNTIL_RELEASE',action:'MO(2)',code:0x5222}}];
  const a=lightingGesture(m,r.keycode,layer,owner);assert.equal(a.steps[0].observation.situation.preview,2);
  const held=a.steps.find(s=>s.label==='Hold · 317 ms').observation.situation;assert.equal(held.layerOwners[owner],2);assert.deepEqual(held.behaviour.standardKeys,{});assert.equal(held.behaviour.keys[owner].outcome,3);
  assert.equal(a.steps.find(s=>s.label==='Release').observation.situation.layerOwners,undefined);
