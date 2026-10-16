@@ -55,6 +55,13 @@ export interface ControlPayloads {
         setTheme: {theme: 'light' | 'dark'};
         downloadRecovery: {id: string | number};
     };
+    lighting: {
+        lightingSurface: {visible: boolean};
+        startLightingLive: {};
+        pauseLightingLive: {};
+        tryLightingFrame: {frame: number[]};
+        stopLightingFrame: {};
+    };
     inspect: {
         validateViaMacro: Omit<Extract<PanelEdit, {type: 'validateViaMacro'}>, 'type'>;
     };

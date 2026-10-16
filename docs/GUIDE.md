@@ -812,6 +812,42 @@ firmware. Fixed LED 55 remains paintable in the schematic painter;
 that schematic selection is not proof that a key-relative rule reaches the same
 LED. Reconciling this metadata with hardware is separate work.
 
+**Start Live** explicitly samples current facts while Lighting is visible and this
+window has focus. **Pause Live** keeps the last sample labelled stale. The card
+names its source, keyboard capture time, lighting generation and how long ago
+the read began. Firmware without the exact supported Live format disables the
+controls and explains why; the demo has no keyboard behind it.
+
+Fact chips and **Sampled rule conditions** describe only that capture. They do
+not reconstruct missed events, flashes, linger, or show-after progress. The
+local Inspector walk can evaluate an entirely known, untimed program against
+current samples, but cannot measure an LED. With timed or unknown lighting,
+stale data, or a changed draft, the colour contribution is indeterminate. A
+dirty draft is explicitly labelled: it can evaluate different rules from the
+active keyboard. A temporary frame also overrides ordinary output separately
+from those rule explanations. Local situations, gesture illustrations and
+their histories remain independent of Live samples.
+
+**Try on keyboard** is a separate opt-in. It sends the complete known look in
+**Try a situation**, including its chosen gesture moment, as literal temporary
+RGB colours. Unknown rules, unresolved base-effect colours and incomplete LED
+coverage disable it; Ark does not fill missing LEDs with invented black. Try
+does not enable keyboard lighting or change brightness settings. Diagnostics,
+None/disabled lighting and sleep still take precedence and are reported.
+
+**Stop** releases temporary output, including while upload or publication is
+pending. Leaving Lighting, opening the painter or an overlay, hiding or unfocusing this window, closing it,
+changing keyboard/profile/role, another editor action, or an error stops the
+activity. Returning requires a fresh explicit Start or Try. Changing the shown
+situation does not automatically transmit another frame; Stop, then Try again.
+Nothing is saved, staged in Review, or added to Undo by these controls. The
+keyboard resumes its current ordinary lighting, rather than an old screenshot.
+If Ark disappears, the keyboard's finite lease is the final protection while
+its main loop progresses. This is not a wall-clock extinction promise under a
+stalled firmware loop. Acknowledged logical readiness is not physical LED proof;
+screen colours may differ from LEDs. A failed split transfer can briefly leave
+ordinary lighting beside one preview until cleanup or independent expiry.
+
 Older backups with version-4 lighting are converted before import review or
 restore.
 

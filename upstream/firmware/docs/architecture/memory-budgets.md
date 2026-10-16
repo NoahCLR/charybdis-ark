@@ -752,3 +752,65 @@ The pinned enabled candidate with this repair links5292B `.data` plus242360B
 core-memory span. The net92B static change includes compiler layout, not just
 the89B declared cache/controls. These are linked figures for the recorded
 configuration, not runtime availability or hardware high-water evidence.
+
+## Lighting Live candidate accounting
+
+The live candidate owns an additional frozen main facts sample, two complete RGB
+frames and separate bounded control/HID/split endpoint state. At default geometry
+and enabled17 slices the declared fixed total per half is1272B: sample664
+(facts621 plus profile22, fouru32 and four flags/padding), RGB348 (two174B frames),
+control76, split112 (role-disjoint64B request/mailbox plus24B cached reply and
+control), HID72 (32B request,32B cached reply and completion/guards). All coexist;
+no savings are credited from existing histories, staged program, raw87B cache or
+source621B fact cut. No heap, third history bank, EEPROM/candidate buffer or
+lifetime scratch reuse funds this state. Slice/page encoding writes directly to
+bounded caller output and excludes the facts struct's final sentinel.
+
+The complete linked implementation has a fixed scoped249344-byte static
+regression ceiling, a1536B amendment to247808. This funds the measured1272B
+owned representation plus12B of initialized data: the appended split RPC adds
+one12B `split_transaction_desc_t` (table264B,22 descriptors instead of21).
+No new128/32-byte transport buffer is allocated. The selector requires the
+existing retained/query profile prerequisites, the actual linked owned objects
+at the sizes above and all main/HID/split/capture/RGB-release consumers. It also
+compiles the recorded flags including forced headers to prove GCC15.2.0,
+60 matrix positions, four combos,58 LEDs/29 left, RGB/VIA/split/profile-owner
+and live consumers, and unchanged128/32 RPC buffers. Flags or target filenames
+alone do not grant it. Other geometries, compilers and partial/unrelated artifacts
+retain their preceding policies; the247808 retained selector is unchanged.
+
+Both enabled halves at firmware4e790c09b63dd12fd35d8ae48e3268b2bbaeae66,
+tree0ff40d6a6a6e30b1af4122b5d04faa6046203322, pinned
+BKd280a4471e414533f198f02e3faf33b7368ecea3 and build image digest
+b62c41e6f75f74158bfc35727864847c4f5f80797724832e97017de8dadbf02e link
+5304B `.data` plus243632B `.bss`:248936B static,408B policy margin.
+The complete diagnostic source/provenance, ELF/maps/flags/object symbols and
+four path reports are identified by artifact-manifest SHA256
+7ee8c845f28bb76d7493634ecd40a684a74bdbe81c0d44715689b57d11e8ea5a.
+This is a measured policy basis, not a final accepted build receipt.
+Against the recorded predecessor247652B static, net growth is1284B exactly:
+1272B BSS plus12B data. SRAM0–3 prefix248944B grows1280B because final section
+alignment decreases4B. Boot linker/core-memory span is13200B, previously14480B;
+it is not runtime-free memory or allocator high-water. SRAM4/5 prefixes remain
+3872/3584B; unique-bank fixed occupancy256400B excludes dynamic allocation.
+
+The physical270336B per half,4096B boot core-span floor and1920/768 main/slave
+reviewed-path stack ceilings remain unchanged. All four reports cover548
+ordinary and480 owner scenarios, retaining the original400/334 and every
+indirect assertion. Main/slave maxima remain1896/304 ordinary and1912/624 owner;
+new live paths reach1472 main (current ordinary release) and104 callback.
+Coverage includes capture, bounded callback decoding, paging, main publication,
+leases/expiry/error/reset, split send/main ACK and current ordinary/native
+release including FLUSHING. These reports prove only the named paths, not global
+or interrupt maxima. Exact final-head links and reports remain required.
+
+Additional work is explicit in the charged host model: complete healthy preview
+uses18 RPC/1648 wire bytes/85 logical ms (81680us serial+PIO-wait charge).
+Combined existing retained621-byte facts/8220-byte histories with both live
+endpoints and renewals adds8 live RPC/552 wire bytes over the200/500ms scenarios;
+total blocking charge is416356us. The200ms retained trace is48 RPC/2542 bytes/
+144542us, versus137424us isolated; the500ms trace is48/2542/158778us.
+These executable schedules are not physical cadence, pointing, RTT, drift or
+simultaneous output measurements. No allocator/stack high-water, global IRQ,
+physical appearance/geometry or first-release acceptance is inferred. Hardware
+or loop stalls/sleep do not provide a wall-clock lease extinction guarantee.

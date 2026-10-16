@@ -32,6 +32,7 @@
  * @typedef {import("./types.js").LoopHost} Host
  * @typedef {import("../../contracts/messages.js").PanelRequest} Message
  */
+const {lightingControl} = require("./lighting-controls");
 const {panelControl} = require("./panel-control-registry");
 const {ProfileDeviceService} = require("./profile-device-service");
 const {buildPanelModel, observeService, panelRequest, routeMessage} = require("./panel-session");
@@ -50,16 +51,33 @@ function openPanelLoop(host, options = {}) {
     /** @type {Session} */
     let session;
     const {service, reconnect: timing = {}, ...device} = options;
+    let hostVisible = true, lightingVisible = false;
     const waiting = {timing: {sleep: device.sleep, ...timing}, running: /** @type {Promise<void> | undefined} */ (undefined)};
     const loop = {
         publish: () => publish(session, host),
         serviceChanged: () => serviceChanged(session, host),
         handleMessage: /** @param {unknown} posted */ async (posted) => {
-            await handleMessage(session, panelRequest(posted), host);
+            const message = panelRequest(posted);
+            if (message && panelControl(message.type)?.route === "lighting") {
+                try {
+                    await lightingControl(session, /** @type {import('../../contracts/messages.js').ControlsOn<'lighting'> & Partial<import('../../contracts/edits.js').DraftIdentity>} */ (message), {surface: async visible => {
+                        lightingVisible = visible;
+                        await activeService.lightingLive?.surface(hostVisible && lightingVisible);
+                    }});
+                } catch (error) {session.notice = error instanceof Error ? error.message : String(error);}
+                publish(session, host);return;
+            }
+            // Profile/device operations release temporary output before routing;
+            // a completed edit never silently restarts a preview.
+            if (message && message.type !== "ready" && panelControl(message.type)?.route !== "view" && panelControl(message.type)?.route !== "inspect") await activeService.lightingLive?.stop("The editor changed or another action started.");
+            await handleMessage(session, message, host);
             followReconnect(session, host, waiting);
         },
         // Settles when a wait for a renamed keyboard ends, at once without one.
         reconnected: () => waiting.running || Promise.resolve(),
+        setLightingVisible: (/** @type {boolean} */ visible) => {
+            hostVisible = visible;return activeService.lightingLive?.surface(hostVisible && lightingVisible);
+        },
         close: () => {
             if (session.reconnect) endReconnect(session, session.reconnect);
             return session.service.close();

@@ -5,6 +5,7 @@ const fs = require("node:fs"), path = require("node:path");
 const {CONTROLS, controlsOn, panelControl, writingProfile} = require("../../core/session/panel-control-registry");
 const {DRAFT_CONTROLS, PORTABLE_MESSAGES, DEMO_MESSAGES, routeMessage} = require("../../core/session/panel-session");
 const {DRAFT_ACTIONS, PORTABLE_ACTIONS, draftControl} = require("../../core/session/panel-controls");
+const {LIGHTING_ACTIONS} = require("../../core/session/lighting-controls");
 const {DEMO_ACTIONS, DEMO_WORDS} = require("../../core/session/demo-session");
 const {openPanelLoop} = require("../../core/session/panel-loop");
 const {ProfileDraftSession} = require("../../core/session/profile-draft-session");
@@ -46,11 +47,11 @@ test("every policy is complete and every routed action resolves", () => {
         assert.ok(["allow", "refuse", "ignore", "leave", "export", "open", "replace", "close", "host-leave"].includes(entry.demo), type);
         assert.ok(["panel", "apply", "restore", "read", "view", "host", "inspect"].includes(entry.phase), type);
         assert.equal(typeof entry.identity, "boolean", type);
-        const handlers = {draft: DRAFT_ACTIONS, portable: PORTABLE_ACTIONS, demo: DEMO_ACTIONS}[entry.route];
+        const handlers = {draft: DRAFT_ACTIONS, portable: PORTABLE_ACTIONS, demo: DEMO_ACTIONS, lighting: LIGHTING_ACTIONS}[entry.route];
         if (handlers && entry.action !== "export") assert.equal(typeof handlers[entry.action], "function", type);
         else assert.ok(["export", "read", "select", "openHistory", "closeHistory", "chooseKeyboard", "forgetKeyboard", "setTheme", "downloadRecovery", "validateMacro"].includes(entry.action), type);
     }
-    for (const [route, handlers] of Object.entries({draft: DRAFT_ACTIONS, portable: PORTABLE_ACTIONS, demo: DEMO_ACTIONS})) {
+    for (const [route, handlers] of Object.entries({draft: DRAFT_ACTIONS, portable: PORTABLE_ACTIONS, demo: DEMO_ACTIONS, lighting: LIGHTING_ACTIONS})) {
         const actions = Object.values(CONTROLS).filter(entry => entry.route === route && entry.action !== "export").map(entry => entry.action).sort();
         assert.deepEqual(Object.keys(handlers).sort(), actions, route + " has no orphan actions");
     }

@@ -101,7 +101,11 @@ function openPanel(context) {
         running.add(work);
         void work.finally(() => running.delete(work));
     });
+    panel.onDidChangeViewState(() => {void loop.setLightingVisible(panel.visible && panel.active && vscode.window.state.focused);});
+    const windowState = vscode.window.onDidChangeWindowState(event => {void loop.setLightingVisible(panel.visible && panel.active && event.focused);});
     panel.onDidDispose(() => {
+        windowState.dispose();
+        void loop.setLightingVisible(false);
         disposed = true;
         openedPanel = undefined;
         if (writingProfile(loop.session)) {

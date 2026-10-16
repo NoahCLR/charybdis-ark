@@ -44,7 +44,7 @@ matrix.
 | Key behaviours and combos | Read/write editors over the shared draft, with participation controls at every scope and capability-gated global/per-combo output behaviour permissions (D-L12, D-L32, D-L49, D-L55) |
 | Macros | 128 VIA macros renamed directly through their titles; empty canvas with direct step actions, fixed-size sequence tiles, drag reordering across the whole sequence, Delete/Backspace step removal, per-slot step undo/redo and a shared step clipboard, a selected-step editor, a raw-payload toolbar toggle and live validation, including visible invalid hold order; recorder scoped to its visible slot with taps/chords by default and optional hold timing alongside its other settings; capability-gated Unicode text, typed and checked through the host's OS and keyboard layout; per-macro input protection; one shared memory, shown and enforced (D-L25, D-L26, D-L56, D-L57) |
 | Custom keys | 128 named keys that do what their behaviour says: rename, add or open the behaviour, place, see where each is used (D-L42) |
-| Lighting | RGB v5 rules, inherited identity colours and places, painted maps with brush/fill/selection/mirror/copy, Keys Lighting tabs, condition/event rule construction, local situation simulation, LED Inspector and counterfactual replay, authored gesture illustrations, isolated look comparisons, editable Standard/Minimal/Teaching starting presets and live-keymap queries over the shared draft; capability-gated kinds; unknown rules preserved read-only; separate saved/working-memory admission in Lighting and Review ([editor contract](architecture/lighting-editor.md)) |
+| Lighting | RGB v5 rules, inherited identity colours and places, painted maps with brush/fill/selection/mirror/copy, Keys Lighting tabs, condition/event rule construction, local situation simulation, LED Inspector and counterfactual replay, authored gesture illustrations, isolated look comparisons, editable Standard/Minimal/Teaching starting presets, explicit sampled read-only Live facts, separate unsaved Try on keyboard frames and live-keymap queries over the shared draft; capability-gated kinds; unknown rules preserved read-only; separate saved/working-memory admission in Lighting and Review ([editor contract](architecture/lighting-editor.md)) |
 | Mouse | Pointer and sniping DPI, auto-sniping and auto-mouse, settings the core files under Mouse, so the rail, the review and import counts all place them there; the auto-mouse fade is a share of the timeout, retained in the lighting program; identity editing is available; fade policy editing remains a gap (D-L17) |
 | Pointing modes | 32 device-owned slots in the sparse PD domain (D-L41, D-L54); capability-gated mouse-button 1–8 clicks and VIA macro outputs from directions, diagonals and tap overrides, with destination blockers in Review; see [the editor contract](architecture/interface-contracts.md#pointing-tap-outputs) and [PD-mode domain v1](../upstream/firmware/docs/architecture/pd-mode-domain-v1.md) |
 | Global policy | Every other portable setting, including startup layers, combo matching, Host and device-reported lighting and key options; the lighting idle timeout is edited in seconds or minutes; unsupported firmware features stay read-only (D-L18, D-L56) |
@@ -81,7 +81,7 @@ Remaining before calling the product complete:
 
 - **Lighting rules need keyboard acceptance.** Codec, conversion and fake-device
   readback do not prove physical lighting, split synchronisation or Apply on a
-  keyboard. Painting, identities and the local facts/timing simulator have software checks; the Keys board still previews saved identities rather than arbitrary rules. Inspector, gesture illustrations, look comparisons and editable presets are local software surfaces. Live telemetry and temporary keyboard frames remain later work; local simulation is not physical timing or LED calibration. The first release combines phases 1 and 2.
+  keyboard. Painting, identities and the local facts/timing simulator have software checks; the Keys board still previews saved identities rather than arbitrary rules. Inspector, gesture illustrations, look comparisons and editable presets are local software surfaces. Live facts and temporary frames have fake-device and compatibility checks; sampled conditions are not event/tail traces, and logical readiness is not physical timing, lease expiry under stalls, or LED calibration. The first release combines phases 1 and 2.
 
 - **Lighting geometry needs reconciliation.** Pinned RGB metadata associates
   LED 55 with matrix key 56, while the last right-thumb layout key is matrix 59
@@ -300,8 +300,8 @@ clears the base colour and leaves custom-profile readback intact.
 The Keys board is a **selected-layer identity preview**. It shows the saved
 layer and pointing identities and base colour; arbitrary rule edits do not
 make it an execution simulator. Effects, animation phase, live active layers
-and transient feedback are not reported. Exact live appearance would need a
-future device-frame readout. Lighting presents the program as a rule list.
+and transient feedback are not reported. The separately gated Lighting Live surface samples facts and can send a temporary
+frame; it does not read physical pixels or native effect phase. Lighting presents the program as a rule list.
 Its editing contract is [Lighting editor](architecture/lighting-editor.md).
 
 A fixed rule paint at zero brightness paints black. Identity inheritance and
@@ -1177,6 +1177,27 @@ Ark expects that too. A recovery restore whose previous name is unreadable may
 also restart, so Ark expects it conservatively. Reading or choosing a keyboard
 during the wait ends it; this also ends an expectation if a repaired keyboard
 kept its name and never needed to restart.
+
+### D-L63 — Live facts and temporary lighting have separate explicit intent
+
+Lighting Live uses the exact advertised v1 capability and firmware D-F27,
+without granting meaning to reserved feature7. One session controller owns
+capture paging, the main mailbox, frame identities, renewal and cleanup over
+the existing request coordinator. Reports yield at each boundary; ambiguous
+in-flight outcomes retain the coordinator's disconnect rule. Sample streams
+must match capture/profile/source/role/geometry and the read's unchanged VIA
+storage identity. No runtime firmware checkout or second renderer is involved.
+
+Live is opt-in and read-only, scoped to visible focused Lighting. Current
+condition evaluation consumes a coherent sample through the existing pure
+fact walkers/Inspector. It never feeds local timeline history, invents missed
+occurrences, or reports a local draft or temporary override as saved output.
+Try is separate opt-in, complete literal RGB, never a candidate or storage
+operation. Stopping latches synchronously, drains only an exact outstanding
+command, and ends only its own owner/token/revision. Unknown outcomes cease
+renewal and rely on the finite firmware lease. Window/screen/device/profile/
+role changes and failures require new explicit intent. The [editor contract](architecture/lighting-editor.md#live-facts-and-unsaved-temporary-frames)
+owns coherence, scheduling bounds and evidence limits.
 
 ## Historical decisions
 

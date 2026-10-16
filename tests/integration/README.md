@@ -26,3 +26,9 @@ firmware's separate host suites exercise committed-source reuse through the
 production owner, both-half saving and reboot. Older firmware without this
 optional extension reports this runner as skipped; test the proposed new firmware
 too before handing over transfer changes. No device is opened.
+
+Lighting Live adds an Ark-owned runner that compares exact imported Python and
+Ark-built capability/read/control/status/full-session goldens, then runs those
+reports through the selected production C two-instance module in normal and
+sanitized builds, including four namespace-exhaustion paths. This compiles host
+probes only, never QMK images. It has no keyboard access or firmware writes.

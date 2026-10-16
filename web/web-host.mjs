@@ -228,6 +228,10 @@ export function startWebHost(env) {
         follow("disconnect");
     }
 
+    document.addEventListener("visibilitychange", () => {void loop.setLightingVisible(document.visibilityState === "visible" && document.hasFocus());});
+    window.addEventListener("blur", () => {void loop.setLightingVisible(false);});
+    window.addEventListener("focus", () => {void loop.setLightingVisible(document.visibilityState === "visible");});
+    window.addEventListener("pagehide", () => {void loop.setLightingVisible(false);});
     window.addEventListener("beforeunload", (event) => {
         if (!leaving(loop.session)) return;
         event.preventDefault();

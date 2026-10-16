@@ -22,3 +22,10 @@ test("the layer panel posts every typed name with a toggle, a move and a save", 
     assert.deepEqual(controls.moveLayer(1, {direction: -1}, names), {type: "editPortableLayer", id: 1, direction: -1, names});
     assert.deepEqual(controls.moveLayer(1, {makeBase: true}, names), {type: "editPortableLayer", id: 1, makeBase: true, names});
 });
+
+test("Live and temporary frames have separate pure control builders", () => {
+    assert.deepEqual(controls.lightingSurface(false), {type: "lightingSurface", visible: false});
+    for (const type of ["startLightingLive", "pauseLightingLive", "stopLightingFrame"]) assert.deepEqual(controls.lightingControl(type), {type});
+    const source = [0, 100, 255], request = controls.tryLightingFrame(source);source[0] = 77;
+    assert.deepEqual(request, {type: "tryLightingFrame", frame: [0, 100, 255]});
+});

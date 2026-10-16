@@ -118,6 +118,7 @@ export interface OperationFailure extends Error {code?: string; cause?: Operatio
 
 /** State presented to the panel, including a disconnected or demo source. */
 export interface PanelDeviceState extends DeviceModelInput, Omit<DraftDeviceContext, "committed"> {
+    lightingLive?: import('../../contracts/lighting-live.js').LightingLiveView;
     connected: boolean;
     devices?: (import('../transport/types.js').DeviceDescriptor & {label: string; number?: number})[];
     portableSummary?: Pick<import('../model/types.js').ProfileSummary, 'names'> | null;
@@ -169,7 +170,7 @@ export interface PanelEnvelope {type: string; draftId?: string; draftRevision?: 
 export type PanelMessage = PanelEnvelope | (DraftEdit & {draftId?: string});
 export type PanelDraftView = ReturnType<NonNullable<DemoSession['draft']>['view']> & {busy: boolean; editable: boolean; reason: DraftBlock; steps?: import('../../contracts/model.js').HistoryStep[]};
 /** What the panel adds to the device model; the posted shape is the contract's. */
-export type PanelModelExtras = Pick<import('../../contracts/panel.js').PublishedModel, 'devices' | 'selectedDeviceId' | 'demo' | 'apply' | 'postApplyRead' | 'portable' | 'host' | 'load' | 'reconnecting'> & {draft?: PanelDraftView};
+export type PanelModelExtras = Pick<import('../../contracts/panel.js').PublishedModel, 'devices' | 'selectedDeviceId' | 'demo' | 'apply' | 'postApplyRead' | 'portable' | 'host' | 'load' | 'reconnecting' | 'lightingLive'> & {draft?: PanelDraftView};
 
 export type CompleteCapture = Extract<CapturedProfile, import('../model/types.js').CompleteSnapshot>;
 export type RestoredProfile = Awaited<ReturnType<typeof import('./portable-profile-session.js').restoreProfile>> & import('../model/types.js').SnapshotFacts;
@@ -179,6 +180,7 @@ export type RestoredProfile = Awaited<ReturnType<typeof import('./portable-profi
  * `readBaseRgb` are optional reads that never reject.
  */
 export interface ControlService extends DraftApplyService {
+    lightingLive?: InstanceType<typeof import('./lighting-live-session.js').LightingLiveSession>;
     capabilities?: Partial<DeviceCapabilities> | null;
     phase?: import('../../contracts/model.js').PhaseId;
     portable?: import('../model/types.js').ProfileSnapshot | null;

@@ -1,5 +1,7 @@
 // @ts-check
 "use strict";
+const {LightingLiveSession} = require("./lighting-live-session");
+const {readLiveCapability} = require("../protocol/lighting-live-v1");
 const {PHASE} = require("../model/vocabulary");
 
 /**
@@ -149,6 +151,11 @@ class ProfileDeviceService {
         this.settingsView = undefined;
         /** @type {InstanceType<typeof ProfilePayloadReader> | undefined} */
         this.payloadReader = undefined;
+        /** @type {import("../../contracts/lighting-live.js").LightingLiveProfile | null} */
+        this.lightingProfile = null;
+        /** @type {import("../../contracts/lighting-live.js").LightingLiveSupport} */
+        this.lightingSupport = {available: false, reason: "This firmware does not offer Live lighting."};
+        this.lightingLive = new LightingLiveSession({context: () => this.lightingContext(), changed: () => this.emitChange()});
     }
 
     async enumerate() {
@@ -215,8 +222,11 @@ class ProfileDeviceService {
             const connection = this.connectedConnection();
             const viaIdentity = await readViaIdentity(connection);
             const capabilities = /** @type {Caps} */ (await readProfileCapabilities(connection, {nextRequestId: () => this.nextRequestId()}));
+            this.lightingSupport = {available: false, reason: "This firmware does not offer Live lighting."};
             if (capabilities.featureFlags & PROFILE_WIRE_FEATURES.LIGHTING_RULES) {
+                this.lightingSupport = await readLiveCapability(connection, {nextRequestId: () => this.nextRequestId()});
                 capabilities.lighting = await readLightingCapabilities(connection, {nextRequestId: () => this.nextRequestId()});
+                if (this.lightingSupport.capability && this.lightingSupport.capability.ledCount !== capabilities.physicalLedCount) this.lightingSupport = {available: false, reason: "This keyboard reports inconsistent Live lighting geometry. Update both halves together."};
                 if (capabilities.lighting.tapDepth !== capabilities.maxTapStepsPerBehavior) throw new Error("Lighting and behaviour capabilities disagree on tap depth.");
             }
             const status = await readProfileStatus(connection, {nextRequestId: () => this.nextRequestId()});
@@ -415,6 +425,7 @@ class ProfileDeviceService {
     // Always ends disconnected and resolves; a failure to close the handle
     // cleanly is recorded in `error`.
     async disconnect() {
+        await this.lightingLive.stop("Keyboard disconnected.");
         const connection = this.connection;
         if (!connection) {
             this.phase = this.scanned ? (this.devices.length ? PHASE.AVAILABLE : PHASE.EMPTY) : PHASE.IDLE;
@@ -483,6 +494,8 @@ class ProfileDeviceService {
                     this.#acceptLayout(decodeViaLayout(capture.storage.layout, capture.document.layers.length));
                     this.#acceptCommitted(capture.readback.active, capture.readback.source);
                     this.status = result.status;
+                    const m = capture.readback.active.metadata;
+                    this.lightingProfile = {generation: m.generation, crc32: m.crc32, digest: m.digest, compiledDigest: capabilities.compiledDefaultDigest, actionAbi: capabilities.actionAbiDigest, kind: result.status.activeKind, origin: result.status.activeOriginHalf};
                     this.combos = {state: "read", ...capture.readback.combos, readAt: new Date().toISOString()};
                     this.baseRgb = baseRgb;
                     if (baseRgb.error) this.addDiagnostic(`Base RGB: ${baseRgb.error.message}`);
@@ -579,6 +592,7 @@ class ProfileDeviceService {
     }
 
     async close() {
+        await this.lightingLive.stop("Ark closed.");
         this.disposeConnectionListener?.();
         this.disposeConnectionListener = undefined;
         this.disconnecting = true;
@@ -590,9 +604,19 @@ class ProfileDeviceService {
         }
     }
 
+    /** @returns {import("./lighting-live-types.js").LiveContext | null} */
+    lightingContext() {
+        const profile = this.lightingProfile;
+        if (!this.connection?.connected || !profile || !this.capabilities || !this.status || !this.portable?.identity) return null;
+        return {factKinds: this.capabilities.lighting?.registries.facts.filter(id => id < 19) ?? [], storage: {generation: this.portable.identity.storageGeneration, digest: this.portable.identity.storageDigest}, key: JSON.stringify([this.connectionToken, this.connectionPublicId, profile, this.portable.identity.storageGeneration, this.portable.identity.storageDigest, this.status.activeKind, this.status.activeDigest, this.status.activeGeneration, this.status.activeOriginHalf]), connection: this.connection,
+            support: this.lightingSupport,
+            profile, nextRequestId: () => this.nextRequestId()};
+    }
+
     /** @returns {import("./types.js").ServiceSnapshot} */
     snapshot() {
         return {
+            lightingLive: this.lightingLive.snapshot(),
             phase: this.phase,
             operationId: this.operationId,
             scanned: this.scanned,
@@ -643,6 +667,7 @@ class ProfileDeviceService {
         /** @type {PublishedError | undefined} */
         let failure;
         try {
+            if (this.lightingLive.running || this.lightingLive.live || this.lightingLive.preview || this.lightingLive.frame) await this.lightingLive.stop("Another keyboard operation started.");
             initialize?.();
             this.emitChange();
             await operation();
@@ -727,6 +752,9 @@ class ProfileDeviceService {
     }
 
     clearConnection() {
+        this.lightingProfile = null;
+        this.lightingSupport = {available: false, reason: "Read a connected keyboard before using Live lighting."};
+        void this.lightingLive?.stop("The keyboard disconnected. Start Live again after reconnecting.");
         this.portable = undefined; this.portableProgress = "";
         this.macroView = undefined;
         this.customKeyView = undefined;

@@ -175,7 +175,7 @@ function buildPanelModel(session, state) {
         connectionToken: state.connectionToken,
         progress: reconnecting && !session.readBusy ? RECONNECT_WORDS.waiting : state.portableProgress || state.layout?.progress || state.committed?.progress || null,
     };
-    return {...model, devices, selectedDeviceId, ...(draft ? {draft} : {}), demo, apply, postApplyRead, portable, host, load, reconnecting};
+    return {...model, lightingLive: session.demo ? undefined : state.lightingLive, devices, selectedDeviceId, ...(draft ? {draft} : {}), demo, apply, postApplyRead, portable, host, load, reconnecting};
 }
 
 // How full the profile is: the draft's, when one is open for this keyboard,
@@ -240,6 +240,7 @@ function routeMessage(session, message, state) {
         session.historyOpen = control.action === "openHistory";
         return "none";
     }
+    if (control?.route === "lighting") return session.portableBusy || session.readBusy ? "none" : "lighting";
     // Nothing starts while a read or backup runs, and a request that would is
     // refused out loud (panel-loop.js). A webview that loads again only asks
     // for the model, and host controls start nothing here, so both are answered.

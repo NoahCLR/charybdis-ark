@@ -21,6 +21,8 @@ import {pickerOverlay} from "./ui/picker.mjs";
 import {keysShortcut, screenKeys} from "./ui/keys.mjs";
 import {historyOverlay} from "./ui/history.mjs";
 import {closeLayers} from "./ui/layers.mjs";
+import {shownLightingFrame} from "./ui/lighting-situation.mjs";
+import {reconcileLightingSurface, refreshLightingLiveCard} from "./ui/lighting-live.mjs";
 import {screenLighting} from "./ui/lighting.mjs";
 import {screenSettings} from "./ui/settings.mjs";
 import {screenMouse} from "./ui/mouse.mjs";
@@ -48,6 +50,7 @@ const SCREEN_RENDERERS = {
 /** @param {{keepScreen?: boolean}} [options] */
 function render({keepScreen = false} = {}) {
     reconcileRecording();
+    reconcileLightingSurface();
     const keptScreen = keepScreen && renderedScreen === state.screen ? root.querySelector(".app > .main") : null;
     const scroll = captureContentScroll(root, renderedScreen, state.screen);
     const benchHeight = captureKeysBenchHeight(root, renderedScreen, state.screen, state.resetBenchHeight);
@@ -63,6 +66,7 @@ function render({keepScreen = false} = {}) {
     const read = screenAvailable(model, state.screen) ? null : readScreen(model, state.screen);
     const screen = keptScreen || (read ? readPlaceholder(read, model) : SCREENS[state.screen].render(SCREEN_RENDERERS));
     if (keptScreen) {
+        if (state.screen === "lighting") refreshLightingLiveCard(keptScreen, shownLightingFrame());
         keptScreen.querySelector(":scope > .commit")?.remove();
         const detail = keptScreen.querySelector(".read-placeholder > p");
         if (read && detail) detail.textContent = read.detail;
@@ -72,7 +76,8 @@ function render({keepScreen = false} = {}) {
     if (bar) screen.appendChild(bar);
     root.appendChild(app);
     const theme = hostOf(model).theme;
-    root.querySelector('[data-act="theme"]')?.addEventListener("click", () => post(setTheme(otherTheme(theme))));
+    const themeButton = /** @type {HTMLElement | null} */ (root.querySelector('[data-act="theme"]'));
+    if (themeButton) themeButton.onclick = () => post(setTheme(otherTheme(theme)));
     restoreKeysBenchHeight(root, benchHeight);
     restoreContentScroll(root, scroll);
     revealSelectedContentRow(root);

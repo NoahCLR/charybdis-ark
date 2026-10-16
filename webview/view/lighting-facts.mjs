@@ -17,7 +17,7 @@ const branchSlot = (b, depth) => 3 + (b <= 2 ? 0 : Math.min(b - 2, depth - 2));
 /** @param {Situation} s @param {number | undefined} key */
 function shown(s, key, standard = false) {const e = key === undefined ? undefined : (standard ? s.behaviour?.standardKeys ?? s.behaviour?.keys : s.behaviour?.keys)?.[key];return e?.flashing && !e.lit ? undefined : e;}
 /** @param {number} key @param {import('./lighting-simulator-types.js').Behaviour} e @param {number} depth @param {number} [thing] @param {import('./lighting-simulator-types.js').Half[]} [halves] */
-const behaviourSubject = (key, e, depth, thing = 255, halves = [keyHalf(key)]) => ({...subject(4, thing, e.state === "branch" ? branchSlot(e.branch ?? 0, depth) : stateSlots[e.state], [key], halves), outcome: e.outcome ?? 0});
+const behaviourSubject = (key, e, depth, thing = 255, halves = [keyHalf(key)]) => ({...subject(4, thing, e.slot ?? (e.state === "branch" ? branchSlot(e.branch ?? 0, depth) : stateSlots[e.state]), [key], halves), outcome: e.outcome ?? 0});
 /** @type {Record<number, (s: Situation, p: number[], depth: number) => Subject[]>} */
 const FACTS = {
     1: (s, p) => activeLayers(s).filter(l => matches(p[0], l)).map(l => subject(1, l)),
@@ -43,10 +43,10 @@ const FACTS = {
         return e && e.id !== undefined && matches(p[0], e.id) && p[1] >> stateBits[e.state] & 1 && !(e.state === "branch" && covered.includes(k)) ? [behaviourSubject(k, e, depth, e.id)] : [];
     }),
     9: (s, p) => {
-        const owners = s.layerOwners ?? {}, layers = p[1] === 0 ? [activeLayers(s)[0]] : p[1] === 1 ? [...new Set(Object.values(owners))] : p[1] === 2 ? s.lockedLayers ?? [] : s.oneshotLayer === undefined ? [] : [s.oneshotLayer];
+        const owners = s.layerOwners ?? {}, layers = p[1] === 0 ? [s.topLayer ?? activeLayers(s)[0]] : p[1] === 1 ? [...new Set(Object.values(owners))] : p[1] === 2 ? s.lockedLayers ?? [] : s.oneshotLayer === undefined ? [] : [s.oneshotLayer];
         return layers.sort((a, b) => b - a).filter(l => matches(p[0], l)).map(l => {const keys = Object.keys(owners).map(Number).filter(k => owners[k] === l);return subject(1, l, 0, keys, keys.map(keyHalf));});
     },
-    10: (s, p) => s.modeStatus && Boolean(p[1]) === Boolean(s.modeStatus.locked) && matches(p[0], s.modeStatus.id) ? [subject(2, s.modeStatus.id, 0, s.modeStatus.keys, s.modeStatus.halves)] : [],
+    10: (s, p) => {const m = s.modeStatuses ? p[1] ? s.modeStatuses.locked : s.modeStatuses.held : s.modeStatus;return m && Boolean(p[1]) === Boolean(m.locked) && matches(p[0], m.id) ? [subject(2, m.id, 0, m.keys, m.halves)] : [];},
     11: (s, p) => (s.comboLayers ?? []).filter(i => matches(p[0], i.id) && matches(p[1], i.layer)).map(i => subject(3, i.id, 0, i.keys, i.keys.map(keyHalf))),
     12: (s, p, depth) => Object.keys(s.behaviourPhases ?? {}).map(Number).sort((a, b) => a - b).flatMap(k => {const e = s.behaviourPhases?.[k];return e && matches(p[0], e.id) && e.phases.includes(p[1]) && matches(p[2], e.branch) ? [subject(4, e.id, p[1] === 4 ? 1 : [2, 3].includes(p[1]) ? 0 : p[1] === 1 ? 2 : branchSlot(e.branch, depth), [k], [keyHalf(k)])] : [];}),
     13: (s, p) => s.macroPlaying !== undefined && matches(p[0], s.macroPlaying) ? [subject(5, s.macroPlaying)] : [],

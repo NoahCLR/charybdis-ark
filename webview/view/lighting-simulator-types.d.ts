@@ -1,9 +1,10 @@
 import type {LightingProgram, LightingRule} from '../../contracts/lighting.js';
 export type Half = 'left' | 'right';
 export interface Subject {kind: number; thing: number; slot: number; outcome: number; keys: number[]; halves: Half[]; natural?: number; entry?: bigint; authored?: number}
-export interface Behaviour {id?: number; state: 'branch' | 'tap' | 'hold' | 'long'; branch?: number; flashing?: boolean; lit?: boolean; outcome?: number}
+export interface Behaviour {id?: number; state: 'branch' | 'tap' | 'hold' | 'long'; branch?: number; flashing?: boolean; lit?: boolean; outcome?: number; slot?: number}
 export interface Mode {id: number; locked?: boolean; keys?: number[]; halves?: Half[]}
 export interface Situation {
+ topLayer?: number; modeStatuses?: {held?: Mode; locked?: Mode};
  time?: number; layers?: number[]; mapped?: Record<number, number[]>; preview?: number; mode?: Mode; modeStatus?: Mode;
  combos?: {owning?: number[]; others?: number[]; instances?: {id: number; role: number; keys: number[]}[]};
  behaviour?: {keys: Record<number, Behaviour>; standardKeys?: Record<number, Behaviour>; owners?: Record<string, number>};

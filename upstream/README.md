@@ -14,6 +14,7 @@ to locate task worktrees and distinguish current source from this pinned baselin
 | --- | --- | --- |
 | `firmware/tests/fixtures/` | Golden wire bytes and stored profiles, including historical formats kept for rejection and shared record checks | Firmware project |
 | `firmware/docs/architecture/` | Profile Wire, domain, transaction, ownership and resource specifications used when developing the client | Firmware project |
+| `firmware/tools/lighting_live_reference.py` | Executable Lighting Live wire definitions and golden reproduction, developer/test input only | Firmware project |
 | `qmk/data/constants/keycodes/` | Numeric keycode definitions and US aliases used by the catalog generator | QMK fork |
 | `qmk/keyboards/bastardkb/charybdis/` | Keyboard keycode declarations and the 4×6 matrix layout contract | QMK fork |
 | `qmk/version.txt` | Catalog's original QMK version stamp, synthesized for reproducible generation without a QMK Git checkout | Import metadata |

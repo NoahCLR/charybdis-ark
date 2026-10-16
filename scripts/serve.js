@@ -22,10 +22,11 @@ const TYPES = {
     ".svg": "image/svg+xml",
 };
 
-/** @param {string} root @param {number} port @returns {Promise<import("node:http").Server>} */
-function serve(root, port) {
+/** @param {string} root @param {number} port @param {{handle?: (request: import("node:http").IncomingMessage, response: import("node:http").ServerResponse) => boolean | Promise<boolean>}} [options] @returns {Promise<import("node:http").Server>} */
+function serve(root, port, {handle} = {}) {
     const base = path.resolve(root);
-    const server = http.createServer((request, response) => {
+    const server = http.createServer(async (request, response) => {
+        if (handle && await handle(request, response)) return;
         const url = new URL(request.url ?? "/", "http://127.0.0.1");
         let file;
         try {file = path.join(base, decodeURIComponent(url.pathname));} catch {file = "";}

@@ -6,6 +6,7 @@ import {defaultLightingParams, lightingSituation, lightingOwnerLabel} from "../v
 import {lightingBoard} from "./lighting-board.mjs";
 import {lightingInspector, inspectLightingLed} from "./lighting-inspector.mjs";
 import {replayLighting} from "../view/lighting-understanding.mjs";
+import {completeLocalFrame} from "../view/lighting-live.mjs";
 import {LightingSimulator} from "../view/lighting-simulator.mjs";
 import {lightingSelect, lightingParams} from "./lighting-fields.mjs";
 
@@ -85,3 +86,5 @@ export function lightingSituationCard(edit) {
     body.append(el(`<div><p class="note">Numbers name fixed LEDs; a dash in the result means the base effect shows. The pinned firmware associates LED 55 with matrix key 56, and has no LED association for matrix key 59. Painting fixed LED 55 is still available in the painter.</p><p class="note">This is a local timeline. Each half renders locally; uncertain split freshness may shorten or hide a flash or linger, and never starts a fresh window. The firmware's timer model is not a hardware drift measurement. Idle matches the sleep condition; the keyboard's global sleep can still force black.</p>${error ? `<p class="callout">${esc(error)}</p>` : ""}</div>`));
     return node;
 }
+
+export function shownLightingFrame() {return error ? {reason: `No complete local look: ${error}`, bytes: null} : completeLocalFrame(frame, getModel());}

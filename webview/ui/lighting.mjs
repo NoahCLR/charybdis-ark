@@ -19,7 +19,8 @@ let dragged = null;
 let pressedRule = null;
 
 import {lightingRuleConfiguration} from "./lighting-rule-editor.mjs";
-import {lightingSituationCard} from "./lighting-situation.mjs";
+import {lightingLiveCard} from "./lighting-live.mjs";
+import {lightingSituationCard, shownLightingFrame} from "./lighting-situation.mjs";
 import {painterOpen, lightingPainter, openPainter, followPaintedRule} from "./lighting-painter.mjs";
 export function screenLighting() {
     followPaintedRule();
@@ -35,6 +36,7 @@ export function screenLighting() {
     const tabs = el(`<div class="row lighting-tools" role="tablist" aria-label="Lighting tools">${[["rules", "Rules"], ["gesture", "Gesture timeline"], ["overview", "Compare looks"], ["presets", "Starting presets"]].map(([id, label]) => `<button class="btn ${surface === id ? "primary" : ""}" role="tab" aria-selected="${surface === id}" data-tool="${id}">${label}</button>`).join("")}</div>`);
     tabs.querySelectorAll("button").forEach(button => button.addEventListener("click", () => {surface = button.dataset.tool || "rules";render();}));pad.append(tabs);
     const situation = lightingSituationCard(index => {selected = rules[index]?.key ?? null;surface = "rules";render();requestAnimationFrame(() => document.querySelector(".lighting-rule-editor")?.scrollIntoView({block: "start"}));});
+    pad.append(lightingLiveCard(shownLightingFrame()));
     if (surface !== "rules") {pad.append(surface === "gesture" ? lightingGestureCard() : surface === "overview" ? lightingOverview() : lightingPresetsCard(), situation);content.append(pad);main.append(content);return main;}
     pad.append(situation);
     if (!rules.some(r => r.key === selected)) selected = rules[0]?.key ?? null;

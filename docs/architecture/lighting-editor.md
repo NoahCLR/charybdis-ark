@@ -91,7 +91,7 @@ not LED calibration. Shadowing is reported only when a higher known untimed
 opaque rule provably covers the lower condition and target. Existing proven
 layer/combo reachability findings inform impossible lighting conditions.
 Unknown kinds and memory at 90% warn; destination brightness violations block.
-Local understanding and editable presets are described below. Live fact telemetry and temporary keyboard frames remain later work.
+Local understanding and editable presets are described below. Explicit Live facts and unsaved temporary frames are described below.
 
 
 ## Facts, construction and local simulation
@@ -294,3 +294,108 @@ Physical pointing cadence, drift, global/interrupt/allocator high-water and LED
 geometry/appearance remain unproved. The firmware's useful8220/200ms48RPC/~137ms,
 fact-delta5RPC/~20ms and quiet-reboot1s-heartbeat plus~946ms-cold-resync models
 are software projections, not new UI or hardware acceptance.
+
+
+## Live facts and unsaved temporary frames
+
+Firmware D-F27 and the pinned [exact wire](../../upstream/firmware/docs/architecture/profile-wire-v1.md#lighting-live-v1--volatile-read-and-frame-surface)
+own GET0D/page16, GET0E, GET0F and SET1D. Feature31 plus the exact version1
+descriptor is required, with independent facts/frame flags, formats1, endpoint
+ids, complete geometry, chunk8, metadata48, lease2000, staging2000 and renewal500.
+Feature7 is not permission. Missing, unknown or malformed support disables the
+controls in plain language. No profile/domain/registry acceptance changes.
+The exact Python reference and full-session goldens are committed imports with
+manifest provenance, consumed by ordinary tests without sibling checkouts.
+The compatibility bridge compares Ark-built reports with Python and the actual
+production C mailbox/read/two-half lifecycle implementation.
+
+`LightingLiveSession` is the one owner per service. Only explicit intent on a
+visible focused Lighting surface starts work. The panel loop, both host window
+lifecycles and the renderer surface independently revoke intent on painter/
+overlay entry or exit/hide/
+blur/dispose. New connections, profile operations, editor actions and errors
+stop it. Returning does not resume automatically. The real guarded host path
+checks draft identity and revision before accepting a temporary frame; invalid
+RGB, opaque rules/extensions and unsupported geometry never produce output.
+Local situations and frames are evaluated by the existing simulator path. A
+complete known solid base can fill explicit base-effect cells; otherwise an
+unknown base or incomplete result disables Try instead of inventing black.
+Changing a local situation does not post a draft edit or automatically replace
+temporary output. Stop then Try explicitly selects another complete frame.
+
+Every32B report has channel0/nonzero request id and exact bytes0..4 echo,
+local v1 status vocabulary0..10, bounded payload and canonical zeros. Mailbox
+PENDING is admission only: exact retries drain that one command before another
+may start. A finite retry budget failing with unknown completion never sends a
+new mailbox command. Queued/in-flight transport failures keep the existing
+coordinator's stale-reply isolation. UI Stop latches before any awaited report;
+cooperative cancellation drains at the next report boundary so it need not
+abort an active coordinator request. A late BEGIN token is discovered only
+through this connection's exact owner/revision and receives its own END. A
+newer window's identity is never ended by the previous owner.
+
+Capture reads an immutable nonzero stream identity with exact page lengths,
+metadata/total/TLV order and producer slice lengths. Default capture is719 bytes,
+35 pages of21 stream bytes,620 semantic bytes plus51 TLV-header bytes and48
+metadata bytes: no native621-byte sentinel is sent. Capture/source/master/
+validity/full22-byte active profile/runtime publication/keymap identity and
+geometry must agree. The first page is revalidated after the last, and VIA
+storage generation/digest/readiness is checked before and after against the
+complete editor read; an intervening remap cannot rename old owners against a
+new keymap. An invalid stream never replaces the last labelled stale sample.
+Unknown source/format or producer layouts are unavailable explanations.
+GET0F uses three complete pages at one exact status revision, identity0 only
+on page0; at most three attempts handle revision changes.
+
+Current samples project onto the existing pure fact walkers without observing
+any simulator history. Rule conditions may match now without proving a timed
+rule paints. Event windows, retained tails, entry/show-after ages, missed
+transitions and physical pixel/contribution traces are absent. Current
+untimed/known conditions may use the existing Inspector walk only while the
+draft and active profile match and no temporary frame overrides output. Dirty
+drafts, stale samples, timing, missing facts and overrides explicitly mark
+contribution indeterminate. Standard/local timeline/counterfactual histories,
+G1–G5 native gesture semantics, unknown saved bytes, Review/Undo/export remain
+unchanged. Fixed LED55/matrix56 and unmapped24/54/58/59 keep their prior meaning.
+
+BEGIN uses a fresh nonzero owner64 and increasing client revision32, expected
+active payload digest, complete174-byte default frame length and whole CRC32.
+After the assigned token, UPLOAD must confirm the CLEAR/main-ACK barrier before
+sequential RGB chunks. PUBLISH's own CLEAR and split main publication must reach
+correlated logical LIVE/readiness/peer success; a mailbox OK is not displayed
+output. Strict new renewal sequences extend only that exact live identity.
+Local timeout, peer failure, role/profile/reset/namespace exhaustion or stop
+ceases renewal and sends best-effort END if the result/identity is known.
+Literal global-index RGB never enables RGB, rewrites config, enters candidate/
+Apply/restore/storage or creates history. Suppression flags are shown. Firmware
+continues native effects/rules underneath and restores CURRENT ordinary output.
+Loss can leave ordinary output beside ONE preview until cleanup or lease expiry;
+there is no physical simultaneous-commit or wall-clock-under-stall guarantee.
+
+Live publications are status data: the normal kept-screen path retains local
+editors/timeline inputs and the Live action nodes, refreshing only the card
+through its existing renderer. Sampling cannot detach a pressed control or
+reset an unsaved rule form.
+
+Scheduling uses one worker and no UI poller. A capture yields before every page
+for Stop/renew, then waits1000ms after completion before the next sample. The
+default no-retry capture costs43 HID exchanges: two CAPTURE admission/result,
+three status pages,35 facts pages, one first-page revalidation and two VIA
+storage guards (2752B bidirectional reports). A full no-retry frame start costs
+58 exchanges including its storage guard, two BEGIN reports, two three-page
+status confirmations,22 two-report chunks and two PUBLISH reports plus three
+publication-status pages (3712B). A renewal is six exchanges including storage,
+two mailbox reports and three status pages (384B). Status revision retries add
+bounded work; command retries are at most12 with10–30ms backoff, peer-state
+waits at most16 polls/1100ms elapsed plus the last bounded status read.
+Each report timeout is at most100ms. Renew is due500ms after the conservative
+send time of the last confirmed publish/renew; a new renewal is refused after
+1250ms, and live traffic is bounded by a1500ms host confirmation deadline.
+Pending commands cannot starve renew indefinitely: exceeding a report/retry/
+deadline budget fails visibly, stops intent and renewal, and relies on firmware
+expiry where command outcome is unknown. Bulky captures do not queue ahead of
+renew/end. These host work budgets are not measured USB, physical output or
+firmware wall-clock deadlines. Sample age is elapsed host time since the read
+began, a conservative age bound, not a fabricated lease countdown; after3000ms
+the sample is labelled stale. Hardware N3 cadence, pointing, drift, IRQ/
+allocator/stack high-water, appearance and stall extinction remain unproven.

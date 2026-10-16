@@ -457,6 +457,14 @@ The fixture is current firmware's compiled profile, with slot 12 configured
 too. Use `npm run preview -- --multiple --vscode` to inspect the selector with
 two fixture keyboards in the VS Code themed preview.
 
+The explicit fake Lighting Live bench uses the built real browser host and
+request coordinator, with no native-device route. Run `npm run preview -- --vscode`,
+`npm run build:web`, then `node scripts/serve-lighting-live.js --port 8984` and open
+`http://127.0.0.1:8984/__lighting-live/bench.html?theme=dark` (or `light`). It
+injects only the existing test WebHID adapter, records posts in `window.__posted`,
+and exposes bounded fake reports/status/fault endpoints. The installed host styles
+are required by this bench. It is a developer server, never bundled in the product.
+
 ### Compatibility with firmware
 
 For protocol changes, run the separate [firmware compatibility check](COMPATIBILITY.md)

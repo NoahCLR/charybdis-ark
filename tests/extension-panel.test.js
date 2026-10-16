@@ -12,6 +12,8 @@ const vscode = {
     ViewColumn: {One: 1},
     Uri: {joinPath: (base, ...parts) => ({path: [base.path, ...parts].join("/")})},
     window: {
+        state: {focused: true},
+        onDidChangeWindowState: () => ({dispose() {}}),
         showInformationMessage: async (text) => {calls.info.push(text);},
         showWarningMessage: async (text) => {calls.warnings.push(text);},
         createWebviewPanel: () => {
@@ -21,6 +23,8 @@ const vscode = {
             calls.webviews.push(webview);
             return {
                 reveal: () => {calls.revealed++;},
+                visible: true, active: true,
+                onDidChangeViewState: () => ({dispose() {}}),
                 onDidDispose: (listener) => {disposeListeners.push(listener);},
                 webview,
             };
@@ -32,7 +36,7 @@ Module._load = function (request, ...rest) { return request === "vscode" ? vscod
 const {openPanel} = require("../extension");
 Module._load = load;
 
-const context = {extensionUri: {path: "/ark"}, globalStorageUri: {path: "/storage", fsPath: "/storage"}};
+const context = {subscriptions: [], extensionUri: {path: "/ark"}, globalStorageUri: {path: "/storage", fsPath: "/storage"}};
 
 test("one panel holds the keyboard in a window: opening again reveals it, and a closed one finishes first", async () => {
     openPanel(context);

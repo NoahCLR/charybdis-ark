@@ -5,7 +5,7 @@ const {PHASE, PHASE_WORDS} = require("../model/vocabulary");
 // Panel controls have one policy: where they run, what they bind to, what
 // the demo permits and which operation surrounds them. The actions themselves
 // live in the controller modules; this inert table cannot import them.
-/** @typedef {'draft' | 'portable' | 'demo' | 'read' | 'view' | 'host' | 'inspect'} Route */
+/** @typedef {'draft' | 'portable' | 'demo' | 'read' | 'view' | 'host' | 'inspect' | 'lighting'} Route */
 /** @typedef {{route: Route, action: string, binding: 'none' | 'apply' | 'import' | 'profile' | 'inspect', demo: 'allow' | 'refuse' | 'ignore' | 'leave' | 'export' | 'open' | 'replace' | 'close' | 'host-leave', phase: 'panel' | 'apply' | 'restore' | 'read' | 'view' | 'host' | 'inspect', identity: boolean}} Control */
 /** @type {Readonly<Record<import('../../contracts/messages.js').ControlType, Readonly<Control>>>} */
 const CONTROLS = Object.freeze({
@@ -38,6 +38,11 @@ const CONTROLS = Object.freeze({
     forgetKeyboard: Object.freeze({route: "host", action: "forgetKeyboard", binding: "none", demo: "allow", phase: "host", identity: false}),
     setTheme: Object.freeze({route: "host", action: "setTheme", binding: "none", demo: "allow", phase: "host", identity: false}),
     downloadRecovery: Object.freeze({route: "host", action: "downloadRecovery", binding: "none", demo: "allow", phase: "host", identity: false}),
+    lightingSurface: Object.freeze({route: "lighting", action: "surface", binding: "none", demo: "refuse", phase: "view", identity: false}),
+    startLightingLive: Object.freeze({route: "lighting", action: "start", binding: "none", demo: "refuse", phase: "view", identity: false}),
+    pauseLightingLive: Object.freeze({route: "lighting", action: "pause", binding: "none", demo: "refuse", phase: "view", identity: false}),
+    tryLightingFrame: Object.freeze({route: "lighting", action: "try", binding: "none", demo: "refuse", phase: "view", identity: false}),
+    stopLightingFrame: Object.freeze({route: "lighting", action: "stop", binding: "none", demo: "refuse", phase: "view", identity: false}),
     validateViaMacro: Object.freeze({route: "inspect", action: "validateMacro", binding: "inspect", demo: "allow", phase: "inspect", identity: false}),
 });
 
