@@ -308,7 +308,7 @@ a selected branch, whether a flashing state is lit, and the newest gesture
 that owns each surface: the board, each half, and each state. A flashing state
 (a registered hold, a repeat) counts only while lit. The slice carries those
 maps exactly as the key runtime produces them (the
-[feedback model](https://github.com/NoahCLR/charybdis-4x6/blob/1177252704f99a72c245d8f7d618c6370dffbcd0/docs/rgbflow.md)). The parameters are a states mask (bit 0
+[feedback model](https://github.com/NoahCLR/charybdis-4x6/blob/4292bc31994ddfe9b1584c58ae59c40da1f6c376/docs/rgbflow.md)). The parameters are a states mask (bit 0
 branch selected, bit 1 tap, bit 2 hold, bit 3 long hold; bits 4–7 zero, at
 least one set) and a scope:
 
@@ -625,8 +625,9 @@ Linger is per (rule, subject thing). While the full condition matches, its
 last whole ordered matching batch is refreshed. When the full match ends,
 that batch freezes until expiry. Departure of some keys while the same thing
 still matches updates the live batch rather than creating independent tails.
-These construction and retention rules constrain the forthcoming modules;
-this checkpoint does not advertise flash or linger support.
+The enabled production consumer implements these construction and retention
+rules. Its compiled registry capabilities advertise flash/linger only with the
+actual synchronous observer, admitted working owner and split adapter linked.
 
 Producer occurrences use an explicit `NOAH_LIGHTING_EVENT_CAPTURE_ENABLE`
 integration gate. Disabled builds have inline no-ops and no observer symbol,
@@ -674,241 +675,27 @@ For state show-after100/linger200, a match100..149 never paints or leaves a
 tail; a match100..249 paints200..449 and expires450. Departure cannot mature
 unmet show-after. Without show-after, an eligible state can linger immediately.
 
-`lighting_lifetime` provides the allocation-free matching/tail/event calendar.
-Its packed3-byte cell contains a saturated millisecond age, phase and the
-eligibility observed during the last matching observation. A match refreshes
-the last whole batch only after show-after is met; departure cannot mature an
-unmet gate. Reappearance starts a new matching lifetime. Qualified repeats
-replace/restart an event; nonqualifying observations only advance ordinary
-elapsed time. It reports batch replace/keep/release-render and the next local
-wake boundary. Releasing an expired rendering reference never authorizes
-freeing an unacknowledged delivery marker. The history owner must retain those
-references independently until ACK or the defined fresh-session reset.
+#### Historical storage experiments (reference tests only)
 
-`lighting_batch` serializes each thing's whole natural-order subject batch
-without caching LEDs or final pixels. The cell owns the common thing kind/id;
-each member stores its slot/outcome, actual sides/has-keys flag and exact owner
-keys. Consecutive equal slot/outcome fields are omitted. Owner encoding is
-empty, one key index, or the compiled owner bitmap (eight bytes for60keys).
-The bounded scan follows that compiled size; smaller matrices zero-extend
-occurrence owners into the fixed8-byte split group. Order and multiplicity
-remain explicit; equal-looking subjects are never merged, because dimming and
-background composition can observe repeated paints. A same-paint64-key batch
-uses129 bytes; the exact maximum per batch is705 bytes (64 members, each with
-one flag, two paint fields and eight owner bytes, plus count). Sixty-four is
-the existing registry/matrix subject bound, not an added profile restriction.
-Writes refuse insufficient caller workspace atomically rather than keeping a
-partial batch. The history owner must supply the proved complete workspace;
-this codec supplies no bank, eviction or overflow acceptance policy. Frozen
-bytes own no producer pointers, preserve departed slots/outcomes and remain
-usable by current keymap-derived targets after remapping. The shared render
-harness also round-trips actual fact-walker batches across its accepted cases.
-This per-batch bound does not bound the number of independently filtered live,
-lingering or unacknowledged event batches.
+The following components describe superseded experiments, **not** the current
+allocation, acceptance, wire protocol or capability implementation. They remain
+explicit reference-test dependencies, outside the production source manifest:
+`lighting_lifetime`, `lighting_batch`, `lighting_batch_arena`, `lighting_retained`,
+`lighting_priority`, `lighting_history_owner/store/bank/observe`,
+`lighting_retained_render`, `lighting_owned_batch`, `lighting_retained_group`,
+`lighting_event_capture` and the legacy event transport adapter. Their unlimited
+host fixtures and former source-expired delivery journals do not establish
+admitted runtime capacity or current replay semantics. Original assertions
+remain executable for those historical interfaces.
 
-`lighting_batch_arena` owns densely packed immutable batches in caller-supplied
-storage. Each entry has an explicit12-byte little-endian header:32-bit stable
-reference,32-bit owner count,16-bit payload length and common thing kind/id.
-Interning compares the full kind/id and ordered bytes, never a hash, LED mask
-or final colour. Release compacts bytes immediately; references identify
-entries rather than addresses. Readers copy bounded ranges, so no movable
-pointer escapes. The ordered iterator reads at most one encoded member at a
-time (12 bytes including prefix for the default geometry), preserving slot
-inheritance and multiplicity without another705-byte staging frame. A pinned
-reference stays valid if an unrelated release compacts its bytes mid-iteration. Replacement reserves the new entry before releasing the old;
-allocation failure leaves existing entries and references unchanged. The
-production history owner must prove that failure unreachable for accepted
-profiles; the primitive grants no eviction, rejection or overflow policy.
-
-`lighting_retained` keeps each rule/thing's qualification lifetime and delivery
-version independent of payload sharing. Its explicit18-byte record has rule/id,
-flags, the3-byte lifetime, u64 captured order and u32 batch reference. Expired
-unacknowledged markers retain their bytes; an ACK clears only the matching
-captured order. A newer qualifying occurrence replaces/restarts that record;
-nonqualifying observations preserve it. A frozen frame copies metadata and
-retains its own reference, keeping old owners/slots/outcomes and age independent
-of later capture, ACK, remap or compaction. A duplicate partial group commit
-cannot restart an already committed cell. Coordinated session/profile reset
-must discard all current and frame references before reinitializing storage.
-The shared lifetime traces also exercise this owned-record path.
-Grouped application preflights all qualified record slots and parameters,
-encodes the single captured subject, then reserves one shared immutable batch
-with all required reference counts. Only then does the non-failing commit loop
-replace each cell. Retry preserves an already committed matching order. A
-fresh same-profile transport session, after calendars advance, seeds still-live
-markers including those waiting for show-after and discards expired dirty
-markers. Per-cell ACK/version cleanup never touches a newer occurrence.
-The actual QMK adapter fixture uses one such owner per emulated half and
-asserts RPC callbacks cannot modify its arena/cells before main consumes.
-
-
-`lighting_history_index` describes the accepted publication's retained rules
-using registry-declared subject domains/selectors and each optional timing
-module's lifetime-parameter binding. Event domains are16 layers,32 modes or128
-identified things; their zero continuous-presence signatures still allocate no
-old show-after clocks. Specific selectors require one logical cell, any selectors
-the full declared domain, and board/aggregate subjects one. Disabled and
-show-after-only rules require no retained cell. A512-byte caller-owned u16 prefix
-index addresses all255 rules, including high ids:255×128=32640 is a logical
-address bound, **not** a required reservation, reachable simultaneous occupancy,
-storage lower bound or proof of fit. No target instance is allocated here.
-Rebuild the index and reset owning histories together at profile publication.
-The `historyIndex` shared fixtures enumerate every supported fact domain, all
-event selectors, mixed filter/board/disabled rules and the accepted255-rule
-maximum; lookup checks all256 supplied ids. Timing interpretation stays in the
-optional modules, not a fact/timing-kind switch in the renderer.
-
-`lighting_history_owner` connects that index to independent occupied records,
-full-equality payload ownership, per-half calendars and fair grouped delivery.
-Sorted occupied metadata uses binary lookup; group preflight reserves missing
-keys in one backward ordered merge, without a whole-bank scratch copy or a
-whole-bank shift per qualified rule. The cursor continues from the same old
-record across insertion/compaction. Parameters are decoded from the current
-RAM program, with one descriptor per occupied rule during calendar/wake scans.
-Source capture and receiver main consumption use the same atomic group path;
-state observation preserves full-match entry and D1's last whole matching batch.
-No callback, renderer or producer may reenter these main-owned mutations.
-
-An occupied matching record remains needed even before show-after has a payload.
-An expired event with pending delivery also remains needed. Once matching,
-rendering and delivery ownership all end, metadata can be reclaimed; independent
-frozen copies still own their batch references. Committed-sequence deduplication
-happens **before** receiver main consumption. Within one session, a source cohort
-is offered with all its current dirty rules; later occurrences can only replace
-members, and its committed ACK clears only unchanged versions. Acknowledged
-members cannot become dirty again under the same order except through a fresh
-session, which resets the receiver. Thus a committed expired event need not keep
-a permanent per-rule replay cell. Source observation tokens denote actual new
-occurrences. The QMK adapter trace retries a committed request after receiver
-metadata reclamation and proves that it never calls the consumer again.
-The immutable outgoing packet contains the complete single-event subject and
-mask; it borrows no arena pointer/reference. Metadata/body reserve failures at
-this component seam preserve prior records/payloads and expose failure; a
-production owner must prove those failures unreachable, not use them as an
-admission cap, history eviction or busy-drop path.
-
-For the32-bit target this owner control is24 bytes, the separate prefix index
-512, and each occupied/frozen metadata record18. Group preflight also uses a
-32-byte missing-rule mask; the bounded rule descriptor is12 bytes. These are
-in addition to arena control/payloads and still-live capture/transport workspace.
-No target metadata/payload capacity is selected or allocated by these components.
-The full logical-domain host fixture deliberately reserves32640 records to test
-independence; that is not the chosen target layout, simultaneous physical
-reachability, or a storage minimum/fit proof. Optional host counters count
-comparisons, metadata byte moves, calendars, descriptor decodes and dirty visits;
-they allocate no counters in production and make no target-time/cadence claim.
-
-For a32-bit target the arena control block is16 bytes. Payload storage is
-exactly the sum of12 plus encoded size per distinct referenced batch; record
-storage is18 per allocated current or frozen record. Reference increments need
-no second payload. Distinct old/new maximum batches overlap at1434 bytes
-before record/control/encoding workspace. No fixed target arena or rule/id
-index is allocated by these components. Linear full-equality search has an
-explicit entry/byte-count seam; operation counts are not millisecond or split
-cadence measurements. Its performance and a full accepted-profile capacity
-bound remain obligations of the production owner, rather than an inference
-from typical deduplication or the705-byte single-batch bound.
-
-`lighting_history_store` places current metadata, immutable frozen metadata and
-full-equality batches in the same owned arena. The header's internal size word
-uses two type bits and fourteen length bits; this changes neither profile nor
-split bytes. Every accepted batch and metadata object fits that per-object
-length. Current metadata is uniquely owned and mutable; frozen metadata and
-payloads are immutable. No movable address escapes. Structural mutation
-invalidates only an internal byte-scan cursor, never a stable reference.
-
-Metadata sharing requires equality of the complete retained template, with
-only its rule byte normalized. Each cohort carries an explicit sparse rule
-list or255-bit membership bitmap. A member's qualification, age, captured order,
-flags and full batch reference remain independent: changing one member splits
-it before changing its history. Equal pixels or filters are not an equivalence
-criterion. Group application reserves its complete destination before removing
-old memberships. Per-cell replacement reserves before release. A calendar or
-ACK walk commits cells separately; reserve failure is exposed and is not a
-retry/drop policy. Production enablement requires proving the complete reserve
-bound, including these intermediate splits.
-
-The exact cohort body is one membership tag,18 template bytes and either one
-byte per member (fewer than32) or32 bitmap bytes. Including its12-byte arena
-header, singleton metadata costs32 bytes and a255-member cohort63. One encoded
-single-owner occurrence costs17 bytes including its header, so the corresponding
-one-rule and255-rule current samples cost49 and80 bytes. Freezing the latter
-adds63 metadata bytes (143 total), with no payload copy. These are measured
-serialization sizes for those samples, **not** a bound for independently
-filtered accepted histories. The store control is4 bytes on Cortex-M0+; its
-logical cursor is4. `lighting_history_bank` adds a program reference and fair
-dirty cursor, for12 bytes including the store control, without an instance of
-the512-byte prefix index or a rule×thing array. Rule parameters still come from
-registry/module descriptors over the published RAM program.
-
-Freezing preflights all current metadata plus entry headers, then pins every
-referenced batch. Current capture, replacement, ACK and reclamation may continue
-without changing the frozen frame's ages, owners, slots or outcomes. The
-immutable outgoing packet owns its complete bytes separately and borrows no
-arena handle. Reset must release current and frame memberships before arena
-initialization. A failed freeze leaves current histories unchanged and removes
-its partial frozen references.
-
-`lighting_retained_render` streams frozen subjects in the settled natural /
-entry / thing / authored priority order without a fixed placement array or
-per-rule subject cap. A fact-module callback supplies natural priority; the
-engine supplies painting. Each selection scans that rule's full visible batches
-and emits its next lowest-priority member, so worst-case candidate visits are
-quadratic in visible members. The128-member sample visits16512 candidates and
-retains all128 subjects; it makes no target-time/cadence claim. Actual module
-priority bindings, a full accepted-profile storage bound and linked enabled
-consumer acceptance remain required. The old flat owner remains an independent
-comparison surface in producer and QMK-adapter fixtures, both of which also run
-against this arena-backed bank.
-
-`lighting_history_observe` consumes a coherent state frame after local calendar
-advancement. It evaluates the rule's independent filters, walks the actual
-first fact and groups **all** matching subjects for each thing into one ordered
-batch. Partial same-thing departure refreshes that live batch; a full match end
-freezes its last batch. Negative-first and unconditional rules use the board
-subject. A frame's monotonic observation token is common to its new entries;
-refresh preserves the earlier entry token, while full re-entry replaces it.
-The walk neither recollects facts nor reads profile storage. Its caller-owned
-batch scratch must coexist with the immutable facts. Failures are exposed;
-accepted-domain reserve remains the production owner's obligation.
-
-`noah_lighting_apply_retained_rule` streams one authored rule's frozen histories
-through the same target, paint, brightness and background composition as the
-ordinary engine. It passes the full retained subject, including departed owners,
-slot and outcome, to relative targeting and painting. It does not requalify
-filters: event filters were captured at occurrence, and a state tail retains
-its last whole matching batch. The caller supplies that fact's natural priority
-and a same-publication frame store. Shared `historyObservations` and
-`historyEvents` cases compare the resulting pixels against the reference walk,
-in addition to independent metadata/owner assertions. They cover delayed
-visibility, full/partial departures, nonqualifying and qualifying repeats,
-per-thing coexistence and expiry, high rule/id values and no resurrection after
-later filter gain. These are component APIs; the normal scene loop, synthetic
-fade destination, production natural-priority bindings, bank allocation and
-main/capture/RPC activation still require complete integration and linked
-acceptance. Their presence alone advertises no event/retention capability.
-
-Renderer placement and synchronous occurrence capture share one explicitly
-owned workspace. The recorded60-key/four-combo/full-module configuration uses
-1024 bytes for64 placed subjects; capture holds621 fact bytes,56-byte native
-group and12-byte **single-event** batch simultaneously (696 bytes including
-alignment). A general state batch can need705 bytes and is a separate phase;
-it is not overlaid with facts still being walked. Larger compiler geometries
-use the larger union arm and require their own linked acceptance. Cortex-M0+
-layout assertions cover the recorded configuration. Resolved RGB facts/frame,
-fade frames, cached keymap basis and immutable in-flight request are separate
-owners and are never borrowed by this workspace. Render placement is dead on
-synchronous resolve return; collection, qualification and retention cannot
-call an input producer or renderer. Split callbacks only stage their separate
-mailbox. Existing shared render/occurrence traces alternate these phases and
-poison scratch while preserving caller facts and frames. Complete enabled
-producer/callback/role integration and its linked stacks remain required.
-
-The earlier ownership/transition and experimental arena components are not the
-production allocation. Host tests of255×128 independent cells establish
-transition independence, not that a raw matrix fits the target. Production
-uses the admitted direct current/snapshot reservations below; experimental
-component allocations are not linked runtime banks.
+Current production uses `lighting_working`: deterministic admitted direct
+current/snapshot slots, whole ordered members with owned key bitmaps, and the
+single replacement workspace described below. Shared calendar vectors execute
+through that owner as well as independent calendar references. Admitted shared
+whole-batch/event pixel vectors execute both the current `scene.working`
+resolver and half-chunk resolution; over-admission profiles are explicitly
+reference-only. Actual optional-module natural-priority bindings drive the
+production walk. No captured subject is collapsed to its eventual LEDs/pixels.
 
 Each half times from the frame in which it first sees the subject, so the
 halves may differ by the link's latency. Gate observation and wake deadlines
@@ -921,8 +708,8 @@ observations within the timer's half-range (about24 days); active RGB frames
 observe at the configured frame interval. Millisecond ages remain saturated
 at65535 and existing forward/large-jump pixels are preserved.
 
-Resolved facts are owned by the main render context through every effect
-chunk. Collection stages one module slice, compares actual bytes and updates
+Resolved facts are owned by the main render context through the synchronous
+whole-local-frame composition. Collection stages one module slice, compares actual bytes and updates
 that resolved frame; a failed coherent peer read preserves its previous synced
 slices. During fade destination rendering, the engine temporarily removes the
 auto-mouse layer from active layers, retains base0 and recomputes synthetic
@@ -987,19 +774,20 @@ sees exactly what is below it.
 
 ### When it re-resolves
 
-The firmware resolves a whole frame at the first LED chunk of a frame that
-falls on its own half (or the first chunk drawn at all), and only when
-something changed: the fact frame, the published
-program, the keymap (for mapped-key targets), a timing's next change, or every
-frame while something time-based shows (an animating timing, a paint that
-changes with time, the auto-mouse fade). Between resolutions each chunk copies
-the resolved colours; LEDs whose result composes over the effect are finished
-per chunk from the effect the chunk just drew. A publication replaces the one
-RAM program; a keymap publication invalidates its query basis. If either
-changes between chunks, remaining chunks use the last coherent resolved pixels
-instead of combining the new program/basis with old facts, gates or retained
-references. The next frame boundary captures the new generation. Checking the
-program's publication stamp is RAM-only and never lazily loads defaults.
+The firmware composes once after QMK has drawn its **last local effect chunk**,
+before QMK flushes that frame. Earlier advanced-indicator calls leave the
+matrix-effect buffer untouched. At that boundary it captures one coherent fact,
+program, keymap and retained-history generation, then resolves/writes every
+local LED together. Event, expiry, publication and remap between effect chunks
+are included in that final coherent cut. This requires no third history bank
+and never treats the previous frame's composed pixels as the current effect.
+
+It re-resolves when facts/program/keymap or observable history state changes,
+a timing wakes, or a time-varying result/effect composition needs it. Advancing
+an age without changing visibility or a matching batch does not dirty the
+scene or wire. Dirty latches survive arbitrary intermediate updates; an old
+ACK clears only its immutable cut, never newer current work. Publication-stamp
+checks are RAM-only and never lazily load defaults.
 
 ### Outside the registries
 
@@ -1020,7 +808,7 @@ program's publication stamp is RAM-only and never lazily loads defaults.
 ## Facts on the split link
 
 Each half renders its own LEDs from its own profile and its own fact frame.
-Local slices are collected on each half from state both halves already share
+Without retained rules, local slices are collected on each half from state both halves already share
 (the layer state QMK syncs; the pointing state the runtime base packet
 carries). Synced slices are collected on the USB half and sent to the other
 half as one **lighting facts frame**, which replaces the per-stage combo and
@@ -1044,6 +832,11 @@ each chunk, and publishes staging as its live frame on commit, as one
 generation, so a render never mixes two frames. A pass that fails part-way
 publishes nothing and the next pass resends every chunk. Heartbeats and
 transport back-off are the ones the runtime sync already uses.
+
+When retained rules are active, this separate lighting-facts broadcast is
+suppressed. The history snapshot protocol below carries the complete coherent
+scene instead; a slave never combines independently fresh local facts with an
+unrelated retained cut. Base pointing/layer synchronization remains separate.
 
 ### Admitted local histories and conservative split freshness
 
@@ -1090,8 +883,8 @@ uses only that prepared generation and synchronously collects, qualifies and
 retains an occurrence; it never lazily loads/decodes a program or defers filters.
 The pinned split role is fixed at split_pre_init. An explicit role reinitialization
 runs at a shallow main boundary before producers, closes callback readiness and
-rebuilds the selected role before publication. Render chunks keep their owned
-previous pixels across generation/reset changes. Command-mutation and collection
+rebuilds the selected role before publication. Synchronous basic-indicator composition at actual effect completion reads the latest complete generation;
+partial split transfer keeps the last committed scene. Command-mutation and collection
 scratch return before later capture/qualification phases where their lifetimes
 are disjoint; outer planning storage remains live during synchronous drains.
 
@@ -1130,53 +923,203 @@ is required. Full-wrap silence cannot be inferred from a wrapping counter alone:
 normal observation/use requires the half-range continuity precondition. This
 model is deliberately separate from stepped synchronized paint-animation time.
 
-### Coherent history snapshot v2 (internal split protocol)
+### Coherent history snapshot v4 (internal split protocol)
 
-The replacement uses HELLO/CONFIRM/DATA/REPLY tags0x81/0x82/0x83/0x84;
-legacy tags1..4 are rejected by this endpoint. HELLO retains the exact22-byte
-profile identity and u32 sequence, CONFIRM epoch+sequence. DATA is64 bytes:
-tag, epoch u32, sequence u32, payload55. REPLY is14 bytes: tag,status,epoch,
-sequence and receiver callback timer u32. Requests/replies stay within the
-existing128/32 QMK allocation. All integers are explicit little endian; no
-native descriptor padding is transmitted.
+HELLO/CONFIRM/DATA/REPLY tags are0xa1/0xa2/0xa3/0xa4. Legacy tags1..4 and
+snapshot-v2/v3 tags0x81..0x84/0x91..0x94 are rejected; saved profile v5/ids remain unchanged.
+HELLO is27 bytes (profile identity22 and next u32 sequence); CONFIRM9 bytes.
+DATA contains tag, epoch u32, sequence u32 and a precisely sized payload:
+PING3 (one byte), BEGIN0 (24 bytes), CHUNK1 (4+length bytes, length1..51),
+ORDER4 (4+count bytes, count1..51) and COMMIT2 (3 bytes). REPLY14 contains tag,status,epoch,sequence,callback timer.
+Requests never exceed64 and replies stay within32; QMK allocation remains128/32.
 
-Payload byte0 selects PING3, BEGIN0, CHUNK1 or COMMIT2. PING establishes one
-successful causal exchange. BEGIN bytes1/5/9/13 carry capture/source-before/
-source-after/receiver-callback u32 samples; bytes17..18 carry total snapshot
-length. CHUNK bytes1..2 are exact sequential offset, byte3 length1..51, bytes4..
-are data. COMMIT follows exactly the complete length. Reserved payload bytes
-are zero. The stream is the admitted bank's explicit descriptors/slots followed
-by the complete registry-defined byte-only fact frame. Source pins that whole
-cut through retries; the slave owns one fact staging buffer alongside its
-reserved second history bank. Callback stages one immutable request only;
-main validates complete snapshot metadata and adjusts transient ages before
-swapping the bank and copying its facts, then acknowledges. Partial transfer,
-wrong offset/profile/size or malformed descriptors never publish a mixed scene.
-The additional fact staging buffer is fixed storage outside the8220 pool and
-must be included in linked accounting; it is not a third history bank.
+BEGIN offsets1/5/9/13 carry capture/source-before/source-after/receiver-callback
+u32 samples,17..18 logical length,19 flags,20..23 acknowledged baseline token.
+Flags0 initializes complete history/facts,1 initializes complete history with
+fact deltas,3 preserves acknowledged history with fact deltas,5 applies changed
+history slots/orders and fact deltas on the exact baseline; other flags are
+invalid. The sender uses5 for changed history after baseline acknowledgment.
+A delta requires the exact prior committed baseline token; each successful
+whole cut advances it modulo2^32. One synchronous immutable request/sequence
+is in flight, so a token cannot be ambiguously reused across observed updates;
+session/profile/role reset invalidates the baseline and forces a full cut.
 
-There is one synchronous RPC and one immutable pending request. Exact committed
-sequence duplicates acknowledge without repeating a calendar commit. A newer
-source occurrence changes current only; a pinned outgoing snapshot remains
-unchanged and the next cut carries the newer still-live state. No journal pins
-source-expired markers. Normal failed transfers preserve current pixels; late
-snapshots age against their original capture and can suppress expired tails or
-flashes. A valid session/profile/role reset closes callback readiness before
-storage initialization and clears receiver transient history. A boot epoch is
-not a unique nonce: stale rejection uses the same bounded synchronous QMK RPC
-lifetime and exact next-sequence/HELLO/CONFIRM discipline as below. Mixed protocol
-peers never consume each other's masks or snapshot payloads.
+CHUNK offsets1..2 name a monotonically nonoverlapping logical range,3 its
+length,4.. its bytes. Full history staging zero-initializes all slot bytes and
+copies only local profile-derived descriptors. Source streams occupied headers
+and exact ordered members, coalescing adjacent ranges within51 bytes. It does not stream reserved empty slots or stale member capacity; bounded
+coalescing may include canonical zero gaps within one51-byte range. Native
+descriptors are never sent. Full facts initialize zero; changed facts initialize from the last
+published coherent fact frame. A registry-sized bitset selects whole changed
+slices, including bytes changed to zero. The source owns its existing fact cut
+and freezes collection during transmission, so a slice mask needs no third621
+byte copy. New runtime state is collected/coalesced after ACK; new captured
+events still mutate current history while the outgoing bank stays immutable.
 
-Matching state show-after remains local observed-frame time; a continuously
-observed matching thing retains its local gate through resynchronization.
-Source-aged flashes and already eligible departed tails retain their captured
-qualification, whole batch and deadline interval. Local render never requalifies
-an event with later filters. Published pixels survive input/publication between
-QMK chunks; history-dependent rerender uses a matching revision only. The
-snapshot staging buffer and render placement/capture scratch have separate
-lifetimes and are charged separately.
+For history deltas, staging starts from the current bank. Only changed slots
+send their complete header/ordered batch, including a zero header on expiry.
+ORDER4 offsets1..2 name the first profile-derived slot ordinal,3 count1..51,
+4.. the exact entry-rank bytes of consecutive slots. It never changes independent
+clocks, phase, owners or payload. Order-only updates of already conservatively
+expired receiver cells remain absent. Main copies the locally advanced unchanged
+cells at commit (preserving any local gate maturation/expiry); changed calendars
+alone receive source-age correction. All updates share the same immutable cut,
+calibration and final validation/commit. No partial scene is rendered.
+
+Four fixed dirty bitsets separate current/full-slot, current/order-only and their
+immutable outgoing copies; the receiver reuses the snapshot masks for staged
+changes. Their bound is derived from admission, not occupancy/sharing: every
+retained identity reserves at least align4(12+5+ownerBytes) in both banks, hence
+N<=floor(pool/(2*minimumSlot)). For8220/60keys this gives146 cells,19 bytes per
+bitset,76 bytes total. Descriptor bytes and replacement workspace only tighten
+that bound. Existing state/show-after-only profiles reserve no retained cells.
+No accepted sequence can exceed these masks; no new rule/subject cap is imposed.
+The bank and replacement workspace remain exactly2S+W. Descriptor-index lookup
+is bounded by the admitted rule count; its CPU time is not a measured deadline.
+
+COMMIT offsets1..2 give the exact logical end, allowing omitted trailing
+canonical zeros/unchanged baseline. Main validates the entire new history,
+advances source-aged transients with causal uncertainty, then swaps its bank
+and publishes facts as one cut. Facts-only commit keeps its acknowledged
+history and advances its local calendar; it never resets ages or changes
+occurrence qualification. Its source capture precedes transfer, but no transient
+age calibration is replaced by a facts-only update. Wrong range/profile/size,
+baseline or slot metadata cannot publish mixed state. Failed consume exposes
+REJECT, releases the failed mailbox and requires HELLO/full resync; it never
+ACKs a failed commit or spins permanently PENDING. The last committed scene
+survives validation failure. Defined fresh session clears transient history.
+
+Source dirty latches trigger one immutable coalesced cut. Idle settled scenes
+send **zero** RPCs. An ordinary fact change on an acknowledged unchanged-history
+baseline sends only changed slices; it does not wait for an unnecessary full
+history resend. When history also changes both are captured/committed together; unchanged
+large payloads and calendars are not resent for a small update.
+Retries are byte-identical; committed sequence duplicates never reapply/restart
+clocks. Failure backoff uses the existing split policy50..1000ms (configurable),
+only after failed transport; no scene/flash/input rate or duration restriction.
+Normal source expiry is never restarted at arrival. The fixed8220 pool remains
+2S+W; fact staging, endpoint control/dirty bits and failure backoff are accounted
+separately by linked resource checks. There is no third history/fact bank.
+
+The existing base heartbeat additionally requests **one response byte** only
+when capture is enabled and the source actually uses a retained scene. Its
+version1 exact magic is `d0` NOT_READY or `d1` READY; zero, missing, unknown and
+mixed-peer bytes are never READY. Standard/non-retained/disabled paths retain
+the original zero-response base RPC. No new polling interval or buffer exists.
+READY means main committed a baseline for the current initialized endpoint;
+it is not profile/session authorization. The callback reads only a published
+scalar. Main publishes it in a short ChibiOS scheduling-critical section after
+complete validation/commit; session, role, profile, close, detected clock reset
+and rejection clear it before exposing the unready state. In-progress coherent
+deltas do not erase a previously committed baseline.
+
+A source with an acknowledged baseline invalidates it once on unavailable or
+unknown readiness, supersedes any old immutable outgoing packet with a fresh
+HELLO, and captures a full current/live scene after the session handshake.
+It keeps current histories, never creates a new window for source-expired
+flashes, and cannot repeatedly reset a pending resync: invalidation clears
+its baseline flag immediately. The same heartbeat later observes recovery.
+Missing/unknown replies and mixed snapshot discriminators/profile mismatch
+use the existing failure backoff; an unavailable base reply emits split trace
+SCENE_UNAVAILABLE with raw byte/transport result. No diagnostic claims an
+unsupported peer is compatible. A READY byte never replaces full identity,
+epoch/sequence validation or main commit. Quiet peer-only reboot recovery uses
+this existing heartbeat; settled unchanged lighting RPC count remains zero.
+
+A continuously observed remote MATCH retains this half's own show-after start.
+If the new source episode's age upper bound at consumption is strictly below
+the receiver's uninterrupted observed lower age, a source restart is proved:
+start a new local gate and clear old eligibility. A continuous episode cannot
+meet that inequality under the equal-rate model. Saturation/unknown intervals
+do not prove a restart. Departure/reentry that is entirely unobserved and not
+provable from these intervals remains observationally indistinguishable; no
+claim of perfect restart detection is made.
+
+#### Raw effect storage and physical output ownership
+
+The pinned RP2040/ChibiOS vendor WS2812 target composes the complete local
+scene from QMK's **basic** indicator callback, which runs after actual effect
+completion and before the advanced callback. This covers chunked effects and
+whole-frame Digital Rain; the advanced range is not a completion signal.
+The immediate advanced call is suppressed before range checks, including a
+right-half iter0 range outside that half. The public advanced entry retains
+its independent legacy range behavior, but production uses basic completion.
+There are no project keymap/basic/advanced overrides or configured indicator
+modules that bypass this order or write over the composed output afterward.
+Any new override must preserve the owned completion/restore lifecycle and
+explicitly document its indicator priority.
+
+Before any owned paint, diagnostics or sleep-black override, capture **all**
+local raw driver pixels. Native Raindrops/Jellybean preserve untouched pixels
+between frames, so the composed buffer cannot become their next raw input.
+One owned cache uses max(leftCount,rightCount) native WS2812 pixels (87B for
+29/29 RGB), plus a phase byte and basic/advanced suppression flag. It is not a
+history bank, an RGB-equality inference or a working-admission discount.
+Indexing uses QMK's actual global-to-driver projection; asymmetric halves are
+covered, with compile-time geometry bounds. Published resolved facts and the
+immutable outgoing scene remain separately owned.
+
+The two-state restore phase is derived from this **specific pinned loop**:
+keyboard_task calls rgb_matrix_task once on each role, then main calls
+housekeeping once. Same-loop housekeeping only arms restoration. The following
+RGB step normally FLUSHES: ws2812_flush first copies all driver pixels into its
+separate WS2812_BUFFER, then starts DMA. Housekeeping can restore raw driver
+storage while the physical transfer consumes the separate composed copy.
+Mode/enable/toggle setters can replace FLUSHING by STARTING; STARTING performs
+no effect writes, so restoration then precedes the next render and cannot erase
+new pixels. It is not a generic scan-count or elapsed-time flush heuristic.
+
+USB suspension stalls the ordinary pair. Its userspace power-down hook cancels
+pending restoration before QMK synchronously renders/flushes NONE black, even
+if resume precedes housekeeping. On the slave, transactions_slave applies at
+most one synchronous suspend observation per matrix pass before RGB; observing
+suspended state in housekeeping discards the superseded cache. RPC callbacks
+stage state, not raw RGB. NONE does not call basic indicators; its black flush
+and subsequent init never inherit a stale restore. Profile/remap/publication
+changes leave pending raw ownership intact; fresh keyboard/driver initialization
+is a separate quiescent boundary. The runtime's actual output writers are its
+owned composition/diagnostics/timeout and QMK's documented effect/control paths.
+Production drivers/loops outside the reviewed RP2040/ChibiOS vendor WS2812
+with RGB sleep configuration fail compilation pending a new ownership proof;
+host fixtures are explicitly test backends. Raw storage is not a physical RGB
+or cadence measurement. The source-backed native fixture compiles the pinned
+effect bodies and task/control code and checks raw storage separately from the
+physical-transfer copy under normal and sanitized builds.
+
+#### Wire cost and timing limits
+
+Pinned RP2040 vendor PIO serial defaults to230400 baud,8N1. Each RPC executes
+four QMK transactions: INFO4, REQUESTn, EXECUTE1 and RESPONSE14. Four id/handshake
+pairs and four trailing CRC8 bytes add12; total is n+31 wire bytes (95 for a
+64-byte request). Each send also enters the pinned PIO receive-state wait of
+floor(11 bit times)=47us. A host schedule may charge all twelve sends/waits,
+including conservative overlap of the last character, plus explicit nonzero
+main scheduling/retry delays; this is a software projection, not a hardware
+cadence upper bound. Main-before-ACK stop-and-wait needs a second RPC to observe
+main's commit. Short requests omit unused payload padding. A fact-only update
+skips recalibration; a changed-history cut obtains fresh causal evidence.
+
+The scoped base heartbeat has the same four transactions but RESPONSE1:
+`n+18` wire bytes, versus `n+17` for the original RESPONSE0, an extra byte
+on an existing response transaction. With the configured mode-owner base
+payload13 this is31 bytes. It retains the existing250ms active/1000ms idle
+heartbeat and50..1000ms failure backoff; recovery latency includes those waits
+plus complete resync. No additional idle lighting RPC is issued to poll readiness.
+
+Standard's existing feedback pulse uses the configured200ms default and retains
+its legacy logic. Named500ms and useful-mixture200/500ms transients are exercised
+with real621 facts and every wire/request/reply/main/retry charged. Short windows
+can still be shortened or suppressed under load; an all-occupied admitted cut
+may take longer than a short pulse. Capacity and conservative expiry are not a
+promise that every event is observable remotely. Physical pointing cadence,
+clock drift and allocator/stack high-water remain unproved.
 
 ### Qualified event groups (internal split protocol) — legacy component
+
+The following paragraphs describe the superseded **test-only** group protocol
+and its component guarantees. Its source-expired journal, numeric occurrence
+identities and proposed owner wiring are historical; they are not the enabled
+working-owner/snapshot v4 behavior specified above.
 
 `qmk_lighting_event_transport` binds the portable sender/receiver to actual
 `transaction_register_rpc` / `transaction_rpc_exec` with at most one bounded

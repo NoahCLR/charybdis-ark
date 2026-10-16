@@ -722,3 +722,33 @@ and are not accepted pairs. Physical SRAM remains270336 bytes per half; core
 floor4096 and reviewed main/slave1920/768 remain unchanged. Hardware cadence,
 oscillator drift and allocator/global/interrupt-stack high-water acceptance
 remain unproved. Host logical-clock and linked-path checks do not prove them.
+
+The v4 snapshot correction retains the same8220 pool and staged program.
+Additional control comprises a working-owner change latch/diagnostic revision,
+four admission-derived slot/order dirty bitsets (76B for60keys/8220),
+a registry-sized fact dirty bitset, one acknowledged baseline token and retry
+backoff timestamps and a one-byte published readiness scalar inside the bounded
+role-disjoint endpoint control (the base heartbeat response uses existing QMK
+RPC allocation). It reuses the existing source fact snapshot and receiver
+published/staging frames; no third621-byte fact buffer or history bank exists.
+The compiler-flag policy selector follows final ordered `-D`/`-U` definitions:
+valueless or proven nonzero integer enables a prerequisite; zero, undefined or
+unknown expressions cannot grant a larger artifact allowance. The separate
+compiler/geometry assertion remains required for247808. New exact-head links
+must account for this control and actual stack paths under the fixed policies;
+the historical initial sizes above are not a pass for later corrections.
+
+
+The persistent-native-effect repair owns one local raw WS2812 pixel cache,
+sized to the larger physical half:87B at29/29 RGB, plus one phase byte and one
+basic/advanced suppression flag. It is fixed module state outside the8220
+history pool, with no sharing assumption or heap allocation. Compiler alignment
+and changed caller frames require fresh linked accounting; these source sizes
+are not an approved static-policy increase or a runtime high-water result.
+The scoped247808/core4096/main1920/slave768 policies remain unchanged. Exact
+raw/physical ownership and supported target guards live in the lighting spec.
+The pinned enabled candidate with this repair links5292B `.data` plus242360B
+`.bss` per half (247652B static,156B policy margin), with14480B boot
+core-memory span. The net92B static change includes compiler layout, not just
+the89B declared cache/controls. These are linked figures for the recorded
+configuration, not runtime availability or hardware high-water evidence.
