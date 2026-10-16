@@ -1571,7 +1571,7 @@ details > summary { list-style: none; }
 .lighting-parameters { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); gap: 8px; }
 .lighting-chips { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
 .lighting-simulation-board { width: 100%; max-height: 370px; }
-.lighting-simulation-board text { font-size: 14px; }
+.lighting-simulation-board text { font-family: var(--mono); font-size: 14px; }
 .lighting-working-memory { margin-top: 12px; }
 
 .situation-controls > div { padding-top: 12px; }

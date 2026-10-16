@@ -132,6 +132,10 @@ for(const theme of ['vscode-dark','vscode-light']) {
    expect(await page.locator('[data-sim-led]').evaluateAll(nodes=>[...new Set(nodes.map(n=>n.getAttribute('data-colour')))])).toEqual([colour]);
    await expect(page.locator('[data-sim-label]')).toHaveCount(58);
    expect(await page.locator('[data-sim-label]').evaluateAll(nodes=>[...new Set(nodes.map(n=>getComputedStyle(n).fill))])).toEqual([legend]);
+   expect(await page.locator('[data-sim-label]').evaluateAll(nodes=>nodes.filter(n=>{
+    const label=n.getBBox(),shape=document.querySelector(`[data-sim-led="${n.getAttribute('data-sim-label')}"]`).getBBox();
+    return label.x<shape.x||label.y<shape.y||label.x+label.width>shape.x+shape.width||label.y+label.height>shape.y+shape.height;
+   }).map(n=>n.textContent))).toEqual([]);
   }
   expect(await posted(page)).toEqual([]);
  });
