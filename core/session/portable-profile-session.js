@@ -116,7 +116,7 @@ async function captureProfile(connection, ids, capabilities, onProgress = () => 
     }
     const document = createSnapshot({profile, via, actionAbiDigest: capabilities.actionAbiDigest, tapDepth: capabilities.maxTapStepsPerBehavior});
     validateSnapshot(document, capabilities);
-    return {document, readback: {active, source: before.activeKind === PROFILE_ACTIVE_KIND.COMMITTED ? "committed" : "compiled", combos}, fingerprint: fingerprint(document), summary: summary(document), status: after, identity: snapshotIdentity(after, storageAfter, settings), storage: heldStorage(via.layout, via.macros, active.bytes)};
+    return {document, factoryLighting: require("../schema/profile-blob-v1").decodeProfileBlob(defaults.bytes).domains.find(d => d.id === 0x10)?.payload.toString("base64"), readback: {active, source: before.activeKind === PROFILE_ACTIVE_KIND.COMMITTED ? "committed" : "compiled", combos}, fingerprint: fingerprint(document), summary: summary(document), status: after, identity: snapshotIdentity(after, storageAfter, settings), storage: heldStorage(via.layout, via.macros, active.bytes)};
 }
 /** @param {Connection} connection @param {Ids} ids @param {{allowCandidate?: boolean, sleep?: (ms: number) => Promise<void>, widePages?: boolean}} [options] */
 async function readIdentity(connection, ids, {allowCandidate = true, sleep, widePages} = {}) {

@@ -91,7 +91,7 @@ not LED calibration. Shadowing is reported only when a higher known untimed
 opaque rule provably covers the lower condition and target. Existing proven
 layer/combo reachability findings inform impossible lighting conditions.
 Unknown kinds and memory at 90% warn; destination brightness violations block.
-Inspector, gesture timeline, presets and live mode remain later phases.
+Local understanding and editable presets are described below. Live fact telemetry and temporary keyboard frames remain later work.
 
 
 ## Facts, construction and local simulation
@@ -175,3 +175,78 @@ classification. Unknown enabled timing makes the whole estimate unknown even
 in a mixed known/unknown program or with future capability metadata. This blocks
 Review/restore activation before recovery or candidate writes; imported bytes,
 backups and history remain available. Disabled unknown timing contributes zero.
+
+
+## Local understanding and editable starting presets
+
+The pinned firmware's [phase 4 contract](../../upstream/firmware/docs/architecture/lighting-rules-v1.md#local-understanding-and-editable-presets)
+defines the existing support and proof limits. No host trace or new wire kind
+is implied. `LightingSimulator.frame` and `walk` produce both pixels and optional
+per-LED contribution records. Inspector consumes those records in stored rule
+order, retaining the subject, owners, foreground/background source, below reads
+and fade/composition weight. A zero-weight lower paint is covered at that
+endpoint. A first positive atom supplies subjects; a first negation or no atom
+supplies the board. Later positive atoms only filter; they never rebind identity.
+Unknown active rules/maps/extensions make rendering and explanation incomplete,
+not clear. Fixed LED and matrix-key selection preserve the geometry boundary above.
+
+Whole-rule-clear counterfactuals disable the rule locally, including its
+background, and replay the same observations through a fresh simulator with
+unchanged indices. They make no posted edit. Replay advances the existing
+lifetime wakeups between inputs while the previous situation holds, strictly
+before the next observation, so a departed state cannot newly mature at an
+equal boundary. It never invents event repeats or renews a continuous entry.
+D1/D2, retained batches and legacy Standard/fade composition remain owned by
+the existing simulator and shared vectors. A known solid base colour is supplied
+to below-reading paints; without a base sample that part is explicitly illustrative.
+
+Gesture illustrations use each stored row's native target/action codes, real
+native placements, participation and inherited/effective row terms. They project
+solitary short-press branch selection, held thresholds or release settlement
+onto the existing facts/events, with actual feedback-half-period edges between
+displayed milestones. Only authored tiers create thresholds. Transparent,
+built-in/immediate planning, QMK buffering, pointer interception and combo
+arbitration remain explicit conditional/unsupported paths. This is neither a
+complete key planner nor physical timing evidence. Each overview look has its
+own explicit situation and fresh history; other subjects use the selected shown
+layer, while layer subjects use their own native layer. Empty/disabled and
+unsupported subjects have no fabricated look. Editor/Inspector navigation posts
+no draft edit.
+
+A complete capture already reads compiled defaults; its exact RGB payload is
+retained as `factoryLighting` snapshot metadata, outside the portable document.
+History carries the read's basis; imports cannot replace it with authored source.
+The demo uses its immutable bundled starting lighting, even when another file
+is opened. `model.rgb.lighting.presets` holds core-validated previews. Standard
+uses those exact compiled bytes or the existing exact v4 converter. Missing
+factory data disables construction instead of approximating Standard.
+
+Minimal selects only Standard's layer-active rules and required data, without
+fade/tap-commit extensions or other feedback rules. Teaching starts from that
+layer recipe with current identity tables, then places top-layer fact9/target8
+query10/paint9 direct-layer-key hints above it. Enabled combos, in ascending id
+order above those hints, use fact9/target8 query15/C/paint2. Their resolved slot0
+colours are copied at creation to palette entries independent of all retained
+identity references; copies may share with other copies. Inherit resolves before
+copying, none/missing emits no accent, black is opaque. Live query matching still
+checks enabled, allowed shown layer and exact native inputs. These are configured
+input hints, not a reachability claim. The UI explicitly says later identity
+edits do not update copied colours and recreating the preset refreshes them.
+There is no hidden provenance, automatic recolouring, fake held-combo fact or
+new protocol paint.
+
+`replaceLightingPreset` carries the chosen name, expected lighting bytes,
+explicit unknown-replacement intent and the preview revision. Core reconstructs
+and validates all capabilities, references, palette/saved bounds, brightness
+and working admission before staging a single lighting-domain rewrite. The
+browser never supplies an unchecked replacement program. Opaque lighting needs
+an intentional replacement acknowledgement; the old bytes remain in Undo and
+backups. Other domains remain byte-exact. Normal history, Review, Discard and
+export semantics apply; no device write occurs. A changed draft invalidates the
+preview. Review's never-visible event-delay proof and conservative coverage/
+reachability rules never turn a heuristic or unknown into a blocker.
+
+Physical pointing cadence, drift, global/interrupt/allocator high-water and LED
+geometry/appearance remain unproved. The firmware's useful8220/200ms48RPC/~137ms,
+fact-delta5RPC/~20ms and quiet-reboot1s-heartbeat plus~946ms-cold-resync models
+are software projections, not new UI or hardware acceptance.

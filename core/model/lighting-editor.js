@@ -9,11 +9,13 @@ const ruleIdentity = rule => JSON.stringify([rule.flags, rule.brightness, rule.p
 const knownRule = rule => rule.known !== false && rule.parts.every(p => Boolean(LIGHTING_KINDS[LIGHTING_SLOTS[p.slot]]?.[p.kind]));
 /** @param {number[]} map */
 const knownMap = map => map.every(value => value < 128 || Boolean(LIGHTING_KINDS.paints[value - 128]));
+/** @param {import('../schema/lighting-types.js').LightingProfile} value */
+const opaqueLighting = value => !value.rules.every(knownRule) || !value.maps.every(knownMap) || value.extensions.some(e => !LIGHTING_KINDS.domainExtensions[e.kind]);
 // An unshared fixed paint can reuse its colour slot. Opaque parts may refer
 // to any palette entry, so their presence forbids replacing existing entries.
 /** @param {import('../schema/lighting-types.js').LightingProfile} value @param {number} index */
 function colourReferences(value, index) {
-    if (!value.rules.every(knownRule) || !value.maps.every(knownMap) || value.extensions.some(e => !LIGHTING_KINDS.domainExtensions[e.kind])) return Infinity;
+    if (opaqueLighting(value)) return Infinity;
     let count = 0;
     for (const table of value.things) for (const record of [table.default, ...table.records]) count += record.slice(1).filter(value => value === index).length;
     for (const map of value.maps) count += map.filter(value => value === index).length;
@@ -109,4 +111,4 @@ function editLightingRule(bytes, edit, options = {}) {
     } else fail("Unknown lighting edit.");
     return encodeLightingDomain(value, options);
 }
-module.exports = {ruleIdentity, knownRule, knownMap, ruleBand, ruleWords, editLightingRule};
+module.exports = {ruleIdentity, knownRule, knownMap, opaqueLighting, ruleBand, ruleWords, editLightingRule};

@@ -118,7 +118,7 @@ const fail = (text, code = "DEMO_REFUSED") => Object.assign(new Error(text), {co
 /** @param {unknown} value @returns {import("../model/types.js").CompleteSnapshot} */
 function demoSnapshot(value) {
     const {document} = validateSnapshot(translateBackup(value, DEMO_CAPABILITIES), DEMO_CAPABILITIES);
-    return {document, fingerprint: fingerprint(document), summary: summary(document), limits: {...DEMO_LIMITS}, options: DEMO_OPTIONS, hostOs: {detected: 0}};
+    return {document, factoryLighting: require("../schema/profile-blob-v1").decodeProfileBlob(Buffer.from(DEMO_PROFILE.profile, "base64")).domains.find(d => d.id === 0x10)?.payload.toString("base64"), fingerprint: fingerprint(document), summary: summary(document), limits: {...DEMO_LIMITS}, options: DEMO_OPTIONS, hostOs: {detected: 0}};
 }
 
 // The bundled demo profile, as a fresh copy each time.

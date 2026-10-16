@@ -1575,3 +1575,15 @@ details > summary { list-style: none; }
 .lighting-working-memory { margin-top: 12px; }
 
 .situation-controls > div { padding-top: 12px; }
+
+/* Local lighting explanations use the same cards and monochrome controls. */
+.lighting-inspector .card-b { max-height: 38rem; overflow: auto; }
+.inspector-rule, .preset-choice { border-top: 1px solid var(--line); padding-top: 12px; }
+.lighting-overview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 16px; }
+.lighting-look { min-width: 0; border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
+.lighting-look .lighting-simulation-board { width: 100%; }
+.lighting-look [data-colour] { pointer-events: none; }
+.lighting-tools { flex-wrap: wrap; }
+.lighting-simulation-board text { font-size: 11px; }
+.lighting-simulation-board [role="button"] { cursor: pointer; }
+.lighting-simulation-board [role="button"]:focus { outline: 3px solid var(--text); }

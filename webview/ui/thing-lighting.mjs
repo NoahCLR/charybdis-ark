@@ -6,17 +6,19 @@ import {subjectRules, canPaintSubject, canCustomiseIdentity} from "../view/paint
 import {lightingIdentity} from "../view/edits.mjs";
 import {vocabulary} from "../view/vocabulary.mjs";
 import {colourEditor} from "./colour-editor.mjs";
+import {lightingGestureCard} from "./lighting-gesture.mjs";
 import {openPainter} from "./lighting-painter.mjs";
 /** @typedef {import('../../contracts/lighting.js').LightingSubject} Subject */
 /** @type {Set<string>} */ const open = new Set();
 /** @type {Map<string, number>} */ const colourSlot = new Map();
-/** @param {HTMLElement} editor @param {Subject} subject @param {string} title */
-export function withLightingTab(editor, subject, title) {
+/** @param {HTMLElement} editor @param {Subject} subject @param {string} title @param {boolean} [showGesture] */
+export function withLightingTab(editor, subject, title, showGesture = false) {
     const key = `${subject.kind}:${subject.id}`, selected = open.has(key);
     const node = el(`<div class="thing-editor"><div class="thing-tabs" role="tablist" aria-label="${esc(title)} editor"><button class="btn ${selected ? "" : "primary"}" role="tab" aria-selected="${!selected}" data-settings>Settings</button><button class="btn ${selected ? "primary" : ""}" role="tab" aria-selected="${selected}" data-lighting>Lighting</button></div></div>`);
     node.querySelector("[data-settings]")?.addEventListener("click", () => {open.delete(key);render();});
     node.querySelector("[data-lighting]")?.addEventListener("click", () => {open.add(key);render();});
-    node.append(selected ? thingLighting(subject, title) : editor);return node;
+    node.append(selected ? thingLighting(subject, title) : editor);
+    if (subject.kind === 4 && subject.id >= 0 && (selected || showGesture)) node.append(lightingGestureCard(getModel()?.keyBehaviors[subject.id]?.keycode));return node;
 }
 /** @param {Subject} subject @param {string} title */
 export function thingLighting(subject, title) {

@@ -15,7 +15,7 @@ export const activeLayers = s => [...new Set([0, ...s.layers ?? []])].sort((a, b
 const branchSlot = (b, depth) => 3 + (b <= 2 ? 0 : Math.min(b - 2, depth - 2));
 /** @type {Record<string, number>} */ const stateBits = {branch: 0, tap: 1, hold: 2, long: 3}, stateSlots = {hold: 0, long: 1, tap: 2};
 /** @param {Situation} s @param {number | undefined} key */
-function shown(s, key) {const e = key === undefined ? undefined : s.behaviour?.keys[key];return e?.flashing && !e.lit ? undefined : e;}
+function shown(s, key, standard = false) {const e = key === undefined ? undefined : (standard ? s.behaviour?.standardKeys ?? s.behaviour?.keys : s.behaviour?.keys)?.[key];return e?.flashing && !e.lit ? undefined : e;}
 /** @param {number} key @param {import('./lighting-simulator-types.js').Behaviour} e @param {number} depth @param {number} [thing] @param {import('./lighting-simulator-types.js').Half[]} [halves] */
 const behaviourSubject = (key, e, depth, thing = 255, halves = [keyHalf(key)]) => ({...subject(4, thing, e.state === "branch" ? branchSlot(e.branch ?? 0, depth) : stateSlots[e.state], [key], halves), outcome: e.outcome ?? 0});
 /** @type {Record<number, (s: Situation, p: number[], depth: number) => Subject[]>} */
@@ -30,12 +30,12 @@ const FACTS = {
     5: (s, p, depth) => {
         const owners = s.behaviour?.owners ?? {};
         /** @type {[number, import('./lighting-simulator-types.js').Half[] | undefined][]} */ let keys = [];
-        if (p[1] === 0) keys = Object.keys(s.behaviour?.keys ?? {}).map(Number).sort((a, b) => a - b).map(k => [k, undefined]);
+        if (p[1] === 0) keys = Object.keys(s.behaviour?.standardKeys ?? s.behaviour?.keys ?? {}).map(Number).sort((a, b) => a - b).map(k => [k, undefined]);
         else if (p[1] === 1) keys = ["left", "right"].flatMap(h => owners[h] === undefined ? [] : [[owners[h], [/** @type {import('./lighting-simulator-types.js').Half} */ (h)]]]);
         else if (p[1] === 2) keys = owners.board === undefined ? [] : [[owners.board, undefined]];
-        else keys = ["long", "hold", "tap", "branch"].flatMap(state => {const k = owners[state], e = shown(s, k);return e && e.state === state && p[0] >> stateBits[state] & 1 ? [[k, undefined]] : [];});
+        else keys = ["long", "hold", "tap", "branch"].flatMap(state => {const k = owners[state], e = shown(s, k, true);return e && e.state === state && p[0] >> stateBits[state] & 1 ? [[k, undefined]] : [];});
         const covered = [...s.combos?.owning ?? [], ...s.combos?.others ?? []];
-        return keys.flatMap(([k, halves]) => {const e = shown(s, k);return e && p[0] >> stateBits[e.state] & 1 && !(e.state === "branch" && covered.includes(k)) ? [behaviourSubject(k, e, depth, 255, halves)] : [];});
+        return keys.flatMap(([k, halves]) => {const e = shown(s, k, true);return e && p[0] >> stateBits[e.state] & 1 && !(e.state === "branch" && covered.includes(k)) ? [behaviourSubject(k, e, depth, 255, halves)] : [];});
     },
     7: (s, p) => (s.combos?.instances ?? []).filter(i => matches(p[0], i.id) && matches(p[1], i.role)).map(i => subject(3, i.id, 0, i.keys, i.keys.map(keyHalf))),
     8: (s, p, depth) => Object.keys(s.behaviour?.keys ?? {}).map(Number).sort((a, b) => a - b).flatMap(k => {

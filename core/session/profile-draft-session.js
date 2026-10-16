@@ -277,7 +277,7 @@ class ProfileDraftSession {
                 capabilities: {...this.capabilities,
                     ownedLayerToggles: Boolean((this.capabilities.featureFlags || 0) & PROFILE_WIRE_FEATURES.OWNED_LAYER_TOGGLES),
                     behaviorQmkFunctions: Boolean((this.capabilities.featureFlags || 0) & PROFILE_WIRE_FEATURES.BEHAVIOR_QMK_FUNCTIONS)},
-                combos: this.combos(), maximumBrightness: current.limits?.brightnessMax,
+                factoryLighting: current.factoryLighting, combos: this.combos(), maximumBrightness: current.limits?.brightnessMax,
             }).toString("base64")};
         } else throw fail("Unsupported draft edit.");
         let keys = [...this.history[this.cursor].lightingKeys];
@@ -291,6 +291,7 @@ class ProfileDraftSession {
                 used.add(index);return this.history[this.cursor].lightingKeys[index];
             });
         }
+        if (message.type === "replaceLightingPreset") keys = this.decode(document).decoded.rgb.rules.map(() => `rule-${this.nextLightingKey++}`);
         if (message.type === "editLightingRule") {
             if (message.action === "add") keys.unshift(`rule-${this.nextLightingKey++}`);
             if (message.action === "delete") keys.splice(message.index, 1);

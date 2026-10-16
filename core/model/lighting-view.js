@@ -11,8 +11,10 @@ function lightingForView(domain, names = [], capabilities, keys = [], subjects =
         return {index, key: keys[index] ?? `rule-${index}`, identity: ruleIdentity(rule), band: ruleBand(rule), enabled: !(rule.flags & 1), readOnly: !knownRule(rule), ...words,
             colour, canColour: knownRule(rule) && Boolean(paint) && (capabilities?.registries.paints.includes(2) ?? false)};
     });
-    return {program: domain, rules, working: require("../schema/lighting-working-v1").lightingWorkingCost(domain, capabilities?.working), descriptors: LIGHTING_KINDS, supportedTimings: capabilities?.registries.timings ?? [], bands: VOCABULARY.lighting.bands, used: domain.byteLength ?? 0, capacity: capabilities?.payloadBudget ?? 8192, paletteCapacity: capabilities?.paletteMaximum ?? 128,
+    /** @type {import("../../contracts/lighting.js").LightingView} */
+    const view = {program: domain, rules, working: require("../schema/lighting-working-v1").lightingWorkingCost(domain, capabilities?.working), descriptors: LIGHTING_KINDS, supportedTimings: capabilities?.registries.timings ?? [], bands: VOCABULARY.lighting.bands, used: domain.byteLength ?? 0, capacity: capabilities?.payloadBudget ?? 8192, paletteCapacity: capabilities?.paletteMaximum ?? 128,
         supportedPaints: capabilities?.registries.paints ?? [], supportedTargets: capabilities?.registries.targets ?? [], supportedFacts: capabilities?.registries.facts ?? [], supportedThings: capabilities?.registries.things ?? [], unknownRules: rules.filter(r => r.readOnly).length};
+    return view;
 }
 // Project identities onto the existing Keys presentation; the complete
 // lighting program remains the only stored and edited form.

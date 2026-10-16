@@ -68,6 +68,7 @@ export interface PdConfig {
 export interface SettingEdit {macro: string; enabled?: boolean; value?: Scalar | boolean}
 
 export interface EditPayloads {
+    replaceLightingPreset: {preset: 'standard' | 'minimal' | 'teaching'; expectedLighting: string; replaceUnknown: boolean};
     editLightingIdentity: {kind: number; id: number; field: 'colour' | 'place' | 'outcome'; outcome?: boolean; slot?: number; colour?: import('./lighting.js').PaintColour | 'inherit' | 'clear'; place?: number};
     paintLightingMap: {index?: number; expectedRule?: string; subject?: import('./lighting.js').LightingSubject; target?: number; leds?: number[]; paint?: number | import('./lighting.js').PaintColour; cells?: number[]};
     editLightingRule: {index: number; expectedRule: string; action: 'toggle' | 'delete' | 'move' | 'colour' | 'add' | 'configure'; rule?: import('./lighting.js').LightingRule; to?: number; colour?: {h: number; s: number; v: number}};

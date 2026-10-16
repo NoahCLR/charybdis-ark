@@ -1,6 +1,6 @@
 // @ts-check
 "use strict";
-const {knownRule, ruleIdentity} = require("./lighting-editor");
+const {knownRule, ruleIdentity, opaqueLighting} = require("./lighting-editor");
 const {layerName} = require("./vocabulary");
 /** @param {import('./types.js').DecodedProfile} decoded @param {import('./types.js').ProfileDestination} destination @param {import('../../contracts/model.js').Finding[]} [reach] @returns {import('../../contracts/model.js').Finding[]} */
 function lightingFindings(decoded, destination, reach = []) {
@@ -11,6 +11,7 @@ function lightingFindings(decoded, destination, reach = []) {
     const budget = destination.lighting?.payloadBudget ?? 8192;
     if ((program.byteLength ?? 0) >= budget * .9) warn("lightingMemory", String(program.byteLength), "Lighting memory is nearly full", `${program.byteLength} of ${budget} bytes are used. Maps, colours and rules share this space.`, "Reuse a look or remove lighting you no longer need.");
     const unknown = program.rules.filter(r => !knownRule(r)).length;
+    if (!unknown && opaqueLighting(program)) warn("unknownLighting", "tables", "Some lighting needs a newer Ark", "A painted map or lighting extension cannot be interpreted. Its bytes remain in the draft and backups; local explanation is incomplete.", "Keep a backup and use a newer Ark to interpret it.");
     if (unknown) warn("unknownLighting", String(unknown), "Some lighting needs a newer Ark", `${unknown} rule${unknown === 1 ? " is" : "s are"} read-only and will stay unchanged in the draft and backups.`, "Use a newer Ark to edit those rules.");
     const working = require("../schema/lighting-working-v1").lightingWorkingCost(program, destination.lighting?.working);
     if (!working.admitted) findings.push({kind: "lightingWorkingMemory", level: "blocker", layers: [], identity: String(working.required), title: "Lighting cannot run on this keyboard yet", detail: working.reason ?? `Flashes and linger need ${working.required} bytes of working memory; this keyboard provides ${working.capacity}. Saved lighting bytes are a separate budget.`, fix: working.required === null ? "Keep a backup. Use an Ark and keyboard firmware that can report the cost of these rules before activating them." : "Turn off a flash or linger rule, or choose a named thing instead of Any.", place: {kind: "lighting"}});
@@ -42,15 +43,25 @@ function lightingFindings(decoded, destination, reach = []) {
     program.rules.forEach((rule, index) => {
         if (rule.flags & 1 || !knownRule(rule)) return;
         const condition = rule.parts.filter(p => p.slot < 2), target = rule.parts.find(p => p.slot === 2), paint = rule.parts.find(p => p.slot === 3);
-        if (condition.some(p => (p.kind === 1 || p.kind === 2) && p.params[0] !== 255 && !decoded.document.layers[p.params[0]])) warn("unreachableLighting", ruleIdentity(rule), `Rule ${index + 1} names an unavailable layer`, "This condition cannot occur in the current profile.", "Choose an existing layer or remove the rule.");
+        if (condition.some(p => p.slot === 0 && (p.kind === 1 || p.kind === 2) && p.params[0] !== 255 && !decoded.document.layers[p.params[0]])) warn("unreachableLighting", ruleIdentity(rule), `Rule ${index + 1} names an unavailable layer`, "This condition cannot occur in the current profile.", "Choose an existing layer or remove the rule.");
         const never = condition.find(p => p.slot === 0 && ((p.kind === 1 || p.kind === 2) && unreachableLayers.has(p.params[0]) || p.kind === 7 && unreachableCombos.has(p.params[0])));
         if (never) warn("unreachableLighting", ruleIdentity(rule), `Rule ${index + 1} has a condition that cannot occur`, "The profile's reachability checks cannot reach the layer or fire the combo this rule needs.", "Fix its keys or participation, or remove this lighting rule.");
         // Prove only simple opaque coverage; maps, identities, relative
         // targets, timings and unknown kinds cannot establish total coverage.
-        const hidden = program.rules.slice(0, index).find(above => {
+        const show = rule.parts.find(p => p.slot === 5 && p.kind === 1), flash = rule.parts.find(p => p.slot === 5 && p.kind === 3);
+        /** @param {import("../schema/lighting-types.js").LightingPart | undefined} p */
+        const duration = p => p ? p.params[0] | p.params[1] << 8 : 0;
+        if (show && flash && duration(show) >= duration(flash)) warn("neverVisibleLighting", ruleIdentity(rule), `Rule ${index + 1} cannot show its flash`, "Show after reaches or exceeds the entire event flash window. No visible time remains.", "Shorten Show after or lengthen Flash.");
+        const hidden = program.rules.slice(0, index).find((above, aboveIndex) => {
+            if (program.extensions.some(e => ![1, 2].includes(e.kind) || e.kind === 1 && e.params[0] && aboveIndex >= program.rules.length - e.params[3]) || rule.parts.some(p => p.slot === 5 && (p.kind === 2 || p.kind === 3)) || rule.parts.some(p => p.slot === 4)) return false;
             if (above.flags & 1 || !knownRule(above) || above.parts.some(p => p.slot >= 4)) return false;
             const conditions = above.parts.filter(p => p.slot < 2), area = above.parts.find(p => p.slot === 2), fill = above.parts.find(p => p.slot === 3);
             const covers = area?.kind === 0 || area && [1, 2, 3].includes(area.kind) && JSON.stringify(area) === JSON.stringify(target);
+            const aFirst = conditions[0], bFirst = condition[0];
+            // Conditions after the first only filter; they never supply subjects.
+            // An event filter is not a state implication, nor does a later layer
+            // atom necessarily imply an upper first-subject match.
+            if (aFirst && (aFirst.kind >= 19 || JSON.stringify(aFirst) !== JSON.stringify(bFirst))) return false;
             return covers && (fill?.kind === 1 || fill?.kind === 2) && conditions.every(p => condition.some(c => JSON.stringify(c) === JSON.stringify(p)));
         });
         if (hidden && paint?.kind !== 0) warn("hiddenLighting", ruleIdentity(rule), `Rule ${index + 1} is covered by a higher rule`, "Whenever this rule could paint, a higher rule already covers its lighting area.", "Move this rule higher or narrow the rule that covers it.");

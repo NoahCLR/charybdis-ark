@@ -42,6 +42,9 @@ export class LightingSimulator {
         /** @type {Map<string, {rule: number; thing: number; timing: Timing; cell: import('./lighting-simulator-types.js').Lifetime<Subject[]>}>} */ this.histories = new Map();
         /** @type {number | undefined} */ this.lastTime = undefined;
         this.order = 0n;
+        /** @type {Set<number>} */ this.seenRules = new Set();
+        /** @type {import('./lighting-simulator-types.js').Contribution[]} */ this.contributions = [];
+        /** @type {number | null} */ this.inspectLed = null;
     }
     /** @param {Situation} s @param {import('./lighting-simulator-types.js').Event | null} [event] @param {bigint} [order] */
     observe(s, event = null, order = this.order + 1n) {
@@ -67,6 +70,7 @@ export class LightingSimulator {
                 const batch = batches.get(subj.thing) ?? [];batch.push({...subj, natural, authored});batches.set(subj.thing, batch);
             });
             for (const [thing, batch] of batches) {
+                this.seenRules.add(index);
                 const key = `${index}:${thing}`, old = this.histories.get(key)?.cell ?? emptyLifetime();
                 this.histories.set(key, {rule: index, thing, timing, cell: observeLifetime(old, timing, elapsed, isEvent ? "event" : "match", batch, order)});seen.add(key);
             }
@@ -128,7 +132,7 @@ export class LightingSimulator {
                 subs = c?.slot === 0 ? factSubjects(c.kind, c.params, s, this.depth) : [subject(0, 255)];
                 subs = subs.filter(sub => {const h = this.histories.get(`${index}:${sub.thing}`);return !rule.parts.some(p => p.slot === 5) || h && lifetimeStatus(h.cell, h.timing).visible;});
             } else for (const h of this.histories.values()) if (h.rule === index && lifetimeStatus(h.cell, h.timing).visible) subs.push(...(h.cell.batch ?? []).map(sub => ({...sub, entry: h.cell.entry})));
-            subs.sort(subjectPriority);for (const sub of subs) entries.push({rule, subject: sub, target: this.target(target.kind, target.params, sub, s)});
+            subs.sort(subjectPriority);for (const sub of subs) entries.push({index, rule, subject: sub, target: this.target(target.kind, target.params, sub, s)});
         }
         return entries;
     }
@@ -136,10 +140,16 @@ export class LightingSimulator {
     walk(entries, at, led, s, bottom = null) {
         for (; at < entries.length; at++) {
             const e = entries[at], next = at + 1;
-            const below = () => this.walk(entries, next, led, s, bottom) ?? effectColour(s.effect?.[led]) ?? [0, 0, 0];
+            let readsBelow = false, belowStart = this.contributions.length, belowEnd = belowStart;
+            const below = () => {readsBelow = true;belowStart = this.contributions.length;const result = this.walk(entries, next, led, s, bottom) ?? effectColour(s.effect?.[led]) ?? [0, 0, 0];belowEnd = this.contributions.length;return result;};
             const paint = e.rule.parts.find(p => p.slot === 3), background = e.rule.parts.find(p => p.slot === 4);
             let colour = paint && e.target.includes(led) ? this.paint(paint.kind, paint.params, e.subject, led, s, below) : null;
-            if (!colour && background) colour = this.paint(background.kind, background.params, e.subject, led, s, below);
+            let source = "foreground";
+            if (!colour && background) {source = "background";colour = this.paint(background.kind, background.params, e.subject, led, s, below);}
+            const used = source === "background" ? background : paint;
+            const factor = (used?.kind === 5 ? used.params[0] : used?.kind === 6 ? 255 - used.params[1] : 255) * e.rule.brightness / 255;
+            if (this.inspectLed === led && readsBelow) for (const c of this.contributions.slice(belowStart, belowEnd)) c.weight = Math.round((c.weight ?? 255) * factor / 255);
+            if (this.inspectLed === led) this.contributions.push({index: e.index, subject: e.subject, source, target: e.target.includes(led), readsBelow, colour: colour ? scale(colour, e.rule.brightness) : null});
             if (colour) return scale(colour, e.rule.brightness);
         }
         return bottom?.(led) ?? null;
@@ -147,6 +157,13 @@ export class LightingSimulator {
     /** @param {Situation} s @param {import('./lighting-simulator-types.js').Event | null} [event] @param {bigint} [order] */
     render(s, event = null, order = this.order + 1n) {
         this.observe(s, event, order);
+        return this.frame(s);
+    }
+    /** Render the already observed history. Explanation and pixels use this same walk.
+     * @param {Situation} s @param {number | null} [led] */
+    frame(s, led = null) {
+        this.inspectLed = led;this.contributions = [];
+        if (this.program.extensions.some(e => ![1, 2].includes(e.kind)) || this.program.maps.some(m => m.some(v => v >= 128 && ![0, 1, 3, 8, 9].includes(v - 128)))) throw new Error("Explanation incomplete: this lighting contains a map or extension that needs a newer Ark.");
         const fade = this.program.extensions.find(e => e.kind === 1)?.params;
         const fading = fade && fade[0] & 1 && s.fade && activeLayers(s).includes(s.fade.autoMouseLayer) && s.fade.progress !== 0;
         const scene = fading && fade ? this.program.rules.length - fade[3] : this.program.rules.length;
@@ -156,11 +173,42 @@ export class LightingSimulator {
             const dest = {...s, layers: activeLayers(s).filter(l => l !== s.fade?.autoMouseLayer)}, start = this.plan(s, scene, this.program.rules.length), end = this.plan(dest, scene, this.program.rules.length, true);
             const span = s.fade.timeout - s.fade.deadTime, amount = s.fade.progress >= span ? 255 : Math.floor(s.fade.progress * 255 / span), endColour = this.rgb[fade[2]];
             bottom = led => {
-                const a = this.walk(start, 0, led, s), b = fade[1] === 2 ? endColour : this.walk(end, 0, led, dest) ?? (fade[1] === 1 ? endColour : effectColour(s.effect?.[led]));
+                const before = this.contributions.length, a = this.walk(start, 0, led, s), middle = this.contributions.length, b = fade[1] === 2 ? endColour : this.walk(end, 0, led, dest) ?? (fade[1] === 1 ? endColour : effectColour(s.effect?.[led]));
+                if (this.inspectLed === led) {
+                    for (const c of this.contributions.slice(before, middle)) {c.scene = "fade from";c.weight = Math.round((c.weight ?? 255) * (a && b ? 255 - amount : a && amount !== 255 ? 255 : 0) / 255);}
+                    for (const c of this.contributions.slice(middle)) {c.scene = "fade to";c.weight = Math.round((c.weight ?? 255) * (a && b ? amount : b && amount !== 0 ? 255 : 0) / 255);}
+                }
                 return a && b ? mix(a, b, amount) : a ? amount === 255 ? null : a : b && amount !== 0 ? b : null;
             };
         }
-        return ALL.map(led => this.walk(upper, 0, led, s, bottom));
+        const result = ALL.map(led => this.walk(upper, 0, led, s, bottom));
+        this.inspectLed = null;return result;
+    }
+    /** @param {Situation} s @param {number} led */
+    explain(s, led) {
+        const frame = this.frame(s, led), contributions = this.contributions;
+        const rules = this.program.rules.map((rule, index) => {
+            const visits = contributions.filter(c => c.index === index), hs = [...this.histories.values()].filter(h => h.rule === index);
+            let status = "Covered by a higher contribution";
+            const conditions = rule.parts.filter(p => p.slot < 2), first = conditions[0];
+            if (rule.flags & 1) status = "Turned off";
+            else if (visits.some(v => v.colour && (v.weight ?? 255) > 0)) status = visits.some(v => v.readsBelow) ? "Contributes with light below" : "Contributes opaque light";
+            else if (visits.some(v => v.colour)) status = "Covered at this fade or composition endpoint";
+            else if (visits.length) status = visits.some(v => v.target) ? "Clear here; light below shows" : "Target misses; background is clear";
+            else if (hs.some(h => lifetimeStatus(h.cell, h.timing).visible)) {
+                const target = rule.parts.find(p => p.slot === 2), background = rule.parts.find(p => p.slot === 4);
+                const reaches = target && hs.flatMap(h => h.cell.batch ?? []).some(sub => this.target(target.kind, target.params, sub, s).includes(led));
+                if (!reaches && !background) status = "Target does not reach this LED";
+            } else {
+                if (hs.some(h => h.cell.phase === "match" || h.cell.phase === "flash")) status = "Waiting for show after";
+                else if (first && eventKind(first)) status = this.seenRules.has(index) ? "Flash expired" : "No qualifying event occurrence";
+                else if (!qualifies(first?.slot === 0 ? conditions.slice(1) : conditions, s, this.depth)) status = "Condition filter fails";
+                else if (this.seenRules.has(index)) status = "Condition ended; no eligible linger remains";
+                else status = "Condition does not match";
+            }
+            return {index, status, visits, subject: first?.slot === 0 ? "First condition supplies the subject; later conditions only filter." : "Board subject; negated conditions only filter."};
+        });
+        return {frame, rules, contributions};
     }
 }
 /** @param {string | undefined} hex @returns {RGB | null} */

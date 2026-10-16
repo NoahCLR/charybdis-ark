@@ -22,7 +22,7 @@ const {profileDepthOptions} = require("../schema/profile-depth");
 /**
  * @typedef {Extract<import("../../contracts/edits.js").PanelEdit, {type: import("./draft-edits.js").InDomain<"combos">}>} ComboEdit
  * @typedef {Extract<import("../../contracts/edits.js").PanelEdit, {type: import("./draft-edits.js").EditedBy<"profile">}>} ProfileEdit
- * @typedef {{capabilities?: import("./types.js").ProfileDestination, combos?: import("./types.js").ComboRead, maximumBrightness?: number}} EditContext
+ * @typedef {{capabilities?: import("./types.js").ProfileDestination, combos?: import("./types.js").ComboRead, maximumBrightness?: number, factoryLighting?: string}} EditContext
  * @typedef {Omit<import("../schema/types.js").ComboRowInput, 'inputs' | 'output'> & {inputs: import("../schema/types.js").SemanticAction[], output: import("../schema/types.js").SemanticAction}} SemanticComboRow
  * @typedef {import("../schema/types.js").RgbProfile} Rgb
  * @typedef {Partial<import("../../contracts/edits.js").PdConfig> & {id: number, kind: number, name: string}} EditablePointing
@@ -184,6 +184,17 @@ function editDeviceProfile(bytes, message, context = {}) {
     const profile = decodeProfileBlob(bytes);
     const domain = existing(profile.domains, row => row.id === PROFILE_DOMAIN_IDS.RGB, "RGB");
     const maximumBrightness = context.maximumBrightness ?? 255;
+    if (message.type === "replaceLightingPreset") {
+        if (message.expectedLighting !== domain.payload.toString("base64")) throw invalid("Lighting changed. Preview the preset again before keeping it.");
+        const options = {...profileDepthOptions(context.capabilities).rgb, maximumBrightness};
+        const current = require("../schema/lighting-domain-v1").decodeLightingDomain(domain.payload, options);
+        const comboDomain = profile.domains.find(d => d.id === PROFILE_DOMAIN_IDS.COMBOS);
+        const combos = comboDomain ? decodeComboDomain(comboDomain.payload).rows : context.combos?.state === "read" ? comboTableOf(context.combos).rows : [];
+        const factory = context.factoryLighting ? Buffer.from(context.factoryLighting, "base64") : null;
+        const result = require("./lighting-presets").lightingPreset(current, factory, combos, options, message.preset);
+        if (result.replacesUnknown && message.replaceUnknown !== true) throw invalid("This replaces lighting Ark cannot interpret. Export a backup, then explicitly confirm replacement; Undo also keeps the original bytes.");
+        domain.payload = result.bytes;return encodeProfileBlob(profile);
+    }
     if (message.type === "editLightingIdentity" || message.type === "paintLightingMap") {
         const painting = require("./lighting-painting");
         const options = {...profileDepthOptions(context.capabilities).rgb, maximumBrightness};

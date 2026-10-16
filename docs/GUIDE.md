@@ -734,6 +734,63 @@ freshness can shorten or hide a transient and never starts a fresh window.
 This simulation does not establish physical clock drift or LED appearance.
 The firmware's global idle sleep can still force black over a matching idle rule.
 
+**Inspector** explains the shown local situation in stored rule order. Click an
+LED or choose an associated matrix key. It distinguishes contributors, clear
+paint, target misses, covered rules, failed conditions, waiting and expired
+windows. Off is black; dim, tint and the auto-mouse fade can retain several
+contributors. Choose **What if an entire rule were clear?** to replay the same
+state/event history without that rule, including its background. This posts
+nothing. **Open rule** takes you to the explicit editor. Unfamiliar paints,
+maps or extensions make the result incomplete; Ark never assumes them clear.
+A known solid base colour supplies dim/tint's underlying light. Without a
+sample of the base effect, black beneath those paints is illustrative; clear
+cells are marked as space for the base effect, not a sampled animation.
+
+**Gesture timeline**, also beside a behaviour's editor, uses its current
+native placement, participation, authored branch depth and effective timing
+settings. Choose a source layer, physical origin, branch and quick-tap or held
+path, then a moment before/at a threshold or release. Prior short presses select
+the requested branch; hold ages restart at the current press. Quick taps settle
+strictly after the configured release gap; equality still admits the next tap.
+Only authored tiers introduce thresholds. It supplies local facts and coherent
+events to the same renderer, including configured feedback blink edges and
+intermediate timing gates. **Inspect this moment** retains that exact history.
+Transparent actions, built-in or immediate hold planning and runtime
+arbitration are labelled conditional where not represented. This is a solitary
+gesture illustration, not a QMK input emulator or a hardware timing guarantee.
+
+**Compare looks** shows isolated layer, held-mode and held-combo situations
+side by side at zero milliseconds, before delayed rules mature. Choose the
+shown native layer for mode/combo examples. Each tile names its role and owners;
+empty, disabled and unsupported things have no invented active look. Open its
+owning editor or inspect the local look. These thumbnails are synthetic, not
+live telemetry, and do not share timing histories with each other.
+
+**Starting presets** previews an ordinary editable ruleset before **Keep in
+draft** replaces the lighting in one Undo step. Other profile domains stay as
+they were. Review and Export use that draft; keeping a preset never writes to
+the keyboard. Standard uses the exact compiled lighting read with the complete
+profile (the bundled starting lighting in Demo), not colours reconstructed from
+your edits. Without that factory basis the presets are unavailable. Minimal
+keeps only its layer looks, with no gesture/combo/mode/preview feedback, fade or
+tap-commit extension. Teaching keeps layer looks beneath passive learning hints:
+direct layer-action keys use their target layer's identity, and enabled,
+layer-qualified combo inputs use copied combo colours. Lower combo numbers win
+overlapping hints, above layer-key hints; these inputs are configured matches,
+not a guarantee the combo fires.
+
+Teaching copies current combo colours. Later identity edits do not update these
+copied colours; recreate the preset to refresh. Clear or missing combo identities
+add no invented hint, while black remains black. Preview validates the keyboard's
+capabilities and saved/working limits. A changed draft requires a fresh preview.
+Replacing lighting Ark cannot interpret needs an explicit acknowledgement;
+export a backup first, and Undo also retains the exact previous bytes.
+
+Review additionally warns when a known event's Show after consumes its complete
+Flash window. Coverage and unreachable-fact warnings require proof; a hidden
+thumbnail or an unfamiliar kind does not prove a rule can never show. Saved and
+working memory remain separate, with their rule contributions available in Review.
+
 Owner fields and their selection lists use **matrix** numbers 0–59, with the
 pinned LED association beside each choice. The simulator board labels **LEDs**
 0–57. LED 55 is associated with matrix key 56; matrix keys 24, 54, 58 and 59

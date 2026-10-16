@@ -84,3 +84,13 @@ test("unknown enabled timing survives import, backup, owner/layer rewrites and U
  await assert.rejects(()=>service.restorePortableProfile(draft.document,{saveRecovery:async()=>{recovery=true;return '/fake';}}),e=>e.code==='LIGHTING_WORKING_CAPACITY'&&/unknown/.test(e.message));
  assert.equal(recovery,false);assert.equal(keyboard.mutations.length,before,'no candidate or storage write');
 });
+test("complete read retains exact compiled lighting as snapshot metadata independently of the active draft",async t=>{
+ const source=document(), keyboard=writableKeyboard({document:source}),{service}=await connectedService(t,{keyboard},{sleep:async()=>{}});
+ const read=await service.readPortableProfile();assert.equal(typeof read.factoryLighting,'string');
+ const draft=new ProfileDraftSession(read,'test',service.capabilities),model=buildSnapshotModel(draft.current,service.capabilities,{editable:true,reason:''});
+ assert.equal(model.rgb.lighting.presets.find(p=>p.name==='standard').reason,undefined);
+ assert.equal(require('../../core/schema/lighting-domain-v1').encodeLightingDomain(model.rgb.lighting.presets.find(p=>p.name==='standard').program).toString('base64'),read.factoryLighting);
+ assert.equal('factoryLighting' in JSON.parse(JSON.stringify(draft.document)),false,'read metadata is not portable profile data');
+ const revision=draft.revision;draft.stage({type:'replaceLightingPreset',preset:'minimal',expectedLighting:rgbBytes(draft.document).toString('base64'),replaceUnknown:false,draftRevision:revision});
+ assert.equal(draft.current.factoryLighting,read.factoryLighting);assert.equal(keyboard.mutations.length,0,'preset stage makes no device write');
+});

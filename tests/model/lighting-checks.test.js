@@ -28,3 +28,18 @@ test("impossible lighting conditions reuse proven reachability and do not infer 
     assert.ok(!lightingFindings(d, {}).some(f => f.kind === "unreachableLighting"));
     assert.ok(lightingFindings(d, {}, [{kind: "unreachable", layers: [3]}]).some(f => f.kind === "unreachableLighting"));
 });
+test("show-after that consumes a complete event window is provably never visible",()=>{
+ const d=decoded();d.rgb.rules=[{flags:0,brightness:255,parts:[{slot:0,kind:24,params:[0]},{slot:2,kind:0,params:[]},{slot:3,kind:1,params:[]},{slot:5,kind:1,params:[244,1]},{slot:5,kind:3,params:[244,1]}]}];
+ assert.ok(lightingFindings(d,{}).some(f=>f.kind==='neverVisibleLighting'));
+ d.rgb.rules[0].parts[3].params=[243,1];assert.ok(!lightingFindings(d,{}).some(f=>f.kind==='neverVisibleLighting'));
+});
+test("retained/event coverage and negated unavailable layers are not universal shadow/unreachable proofs",()=>{
+ const d=decoded();const upper={flags:0,brightness:255,parts:[{slot:0,kind:1,params:[3]},{slot:2,kind:0,params:[]},{slot:3,kind:1,params:[]}]};
+ const lower={flags:0,brightness:255,parts:[{slot:0,kind:1,params:[3]},{slot:2,kind:0,params:[]},{slot:3,kind:1,params:[]},{slot:5,kind:2,params:[100,0]}]};
+ d.rgb.rules=[upper,lower];assert.ok(!lightingFindings(d,{}).some(f=>f.kind==='hiddenLighting'));
+ lower.parts=[{slot:1,kind:1,params:[99]},{slot:2,kind:0,params:[]},{slot:3,kind:1,params:[]}];assert.ok(!lightingFindings(d,{}).some(f=>f.kind==='unreachableLighting'));
+});
+test("unknown maps/extensions are incomplete and cannot establish universal coverage",()=>{
+ const d=decoded();d.rgb.rules=[{flags:0,brightness:255,parts:[{slot:2,kind:0,params:[]},{slot:3,kind:1,params:[]}]},{flags:0,brightness:255,parts:[{slot:2,kind:0,params:[]},{slot:3,kind:1,params:[]}]}];d.rgb.extensions=[{kind:200,params:[77]}];
+ const found=lightingFindings(d,{});assert.ok(found.some(f=>f.kind==='unknownLighting'));assert.ok(!found.some(f=>f.kind==='hiddenLighting'));
+});

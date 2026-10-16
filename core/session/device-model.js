@@ -110,6 +110,10 @@ function buildSnapshotModel(snapshot, capabilities, binding, deviceState = {}) {
     }, capabilities, {busy: !editable, behaviors: editable, pointing: editable, combos: editable, macros: editable, settings: editable, customKeys: editable});
     if (model.rgb.lighting) model.rgb.lighting = require("../model/lighting-view").lightingForView(value.rgb, settings.names, capabilities?.lighting, snapshot.lightingKeys, {modes: model.pdModes.map(s => s.displayName || s.name), combos: model.combos.map(c => c.badge), behaviours: model.keyBehaviors.map(b => model.qmkKeyLabels[b.keycode] || b.keycode), macros: model.viaMacros.map(m => m.name)});
     if (model.rgb.lighting) Object.assign(model.rgb.lighting, require("../model/lighting-view").lightingKeymap(value));
+    if (model.rgb.lighting) {
+        model.rgb.lighting.expectedLighting = require("../schema/profile-blob-v1").decodeProfileBlob(value.profile).domains.find(d => d.id === 0x10)?.payload.toString("base64") ?? "";
+        model.rgb.lighting.presets = require("../model/lighting-presets").lightingPresets(value.rgb, snapshot.factoryLighting ? Buffer.from(snapshot.factoryLighting, "base64") : null, value.combos.rows, {...require("../schema/profile-depth").profileDepthOptions(capabilities).rgb, maximumBrightness: max});
+    }
     model.layers.forEach((layer, index) => {layer.displayName = snapshot.summary.names[index];});
     return {...model, ...deviceSummary(deviceState)};
 }

@@ -309,3 +309,6 @@ export const lightingRule = (index, expectedRule, action, fields = {}) => ({type
 export const lightingIdentity = fields => ({type: "editLightingIdentity", ...fields});
 /** @param {import('../../contracts/edits.js').EditPayloads['paintLightingMap']} fields @returns {import('../../contracts/edits.js').EditOf<'paintLightingMap'>} */
 export const paintLighting = fields => ({type: "paintLightingMap", ...fields});
+
+/** @param {import("../../contracts/edits.js").EditPayloads["replaceLightingPreset"]} fields @param {number} [draftRevision] @returns {import("../../contracts/edits.js").EditPayloads["replaceLightingPreset"] & {type: "replaceLightingPreset"; draftRevision?: number}} */
+export const lightingPreset = (fields, draftRevision) => ({type: "replaceLightingPreset", ...fields, ...(draftRevision === undefined ? {} : {draftRevision})});

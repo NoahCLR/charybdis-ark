@@ -24,10 +24,10 @@ test("a row carries its key's built-in first tap and hold, named as a person rea
     const byKey = (rows) => Object.fromEntries(rows.map((entry) => [entry.keycode, entry.builtIn]));
     const rows = byKey(behaviorRowsForView(domain, {physicalGestureTiming: true, ownedTapping: true}));
     assert.deepEqual(rows["MT(MOD_LSFT|MOD_LGUI,KC_S)"], {
-        tap: {helper: "TAP_SENDS", action: "KC_S", label: "S"},
-        hold: {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "LSFT(LGUI(KC_NO))", repeatHz: "0", label: "Shift+GUI"},
+        tap: {helper: "TAP_SENDS", action: "KC_S", label: "S", code: 0x16},
+        hold: {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "LSFT(LGUI(KC_NO))", repeatHz: "0", label: "Shift+GUI", code: 0x0a00},
     }, "a modifiers-only hold reads as its modifiers, not Shift+GUI+N/A");
-    assert.deepEqual(rows["LT(3,KC_SLASH)"].hold, {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "MO(3)", repeatHz: "0"});
+    assert.deepEqual(rows["LT(3,KC_SLASH)"].hold, {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "MO(3)", repeatHz: "0", code: 0x5223});
     assert.deepEqual(rows.KC_LEFT_GUI, {});
     assert.ok(Object.values(byKey(behaviorRowsForView(domain))).every((builtIn) => !Object.keys(builtIn).length),
         "without the advertised features nothing is claimed");

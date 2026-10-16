@@ -47,6 +47,7 @@ function layoutLabel({layer, changes}, document) {
 }
 
 const DRAFT_EDIT_TYPES = Object.freeze(/** @satisfies {{[K in DraftEditType]: Entry<K>}} */ ({
+    replaceLightingPreset: {editor: "profile", domain: "lighting", label: message => `Started ${message.preset} lighting`},
     editLightingIdentity: {editor: "profile", domain: "lighting", label: "Changed an identity colour or place"},
     paintLightingMap: {editor: "profile", domain: "lighting", label: "Painted a lighting look"},
     editLightingRule: {editor: "profile", domain: "lighting", label: "Edited a lighting rule"},

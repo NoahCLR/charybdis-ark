@@ -1304,3 +1304,41 @@ test("query changes post canonical unused selectors through the real draft witho
     const other=new ProfileDraftSession({document:doc,fingerprint:portable.fingerprint(doc),summary:portable.summary(doc)},'test-device',unsupported);
     assert.throws(()=>stage(other,edits.lightingRule(-1,'','add',{rule})),/UNSUPPORTED_KIND/);
 });
+
+test("preset builder stages one guarded lighting replacement, keeping unrelated domains, history, Review and export", () => {
+ const {demoSnapshot,demoProfile,DEMO_CAPABILITIES}=require('../../core/session/demo-session');
+ const {decodeProfileBlob}=require('../../core/schema/profile-blob-v1');
+ const draft=new ProfileDraftSession(demoSnapshot(demoProfile()),'demo',DEMO_CAPABILITIES), before=structuredClone(draft.document);
+ const payload=()=>decodeProfileBlob(Buffer.from(draft.document.profile,'base64')).domains.find(d=>d.id===0x10).payload.toString('base64');
+ const original=payload();stage(draft,edits.lightingPreset({preset:'minimal',expectedLighting:original,replaceUnknown:false}));
+ const minimal=payload();assert.notEqual(minimal,original);assert.equal(draft.history.length,2);
+ assert.deepEqual(draft.document.layers,before.layers);assert.deepEqual(draft.document.macros,before.macros);
+ assert.deepEqual(decodeProfileBlob(Buffer.from(draft.document.profile,'base64')).domains.filter(d=>d.id!==16),decodeProfileBlob(Buffer.from(before.profile,'base64')).domains.filter(d=>d.id!==16));
+ assert.ok(draft.changes().some(c=>c.unit==='rgb:rules'));assert.deepEqual(portable.validateSnapshot(JSON.parse(JSON.stringify(draft.document))).rgb.extensions,[]);
+ draft.undo(draft.revision);assert.equal(payload(),original);draft.redo(draft.revision);assert.equal(payload(),minimal);
+ assert.throws(()=>stage(draft,edits.lightingPreset({preset:'standard',expectedLighting:original,replaceUnknown:false})),/changed/);assert.equal(payload(),minimal);
+ stage(draft,edits.lightingPreset({preset:'standard',expectedLighting:minimal,replaceUnknown:false}));assert.equal(payload(),original);
+});
+
+test("preset replacement of unknown lighting requires explicit intent and Undo retains exact opaque bytes",()=>{
+ const {demoSnapshot,demoProfile,DEMO_CAPABILITIES}=require('../../core/session/demo-session');
+ const {decodeProfileBlob,encodeProfileBlob}=require('../../core/schema/profile-blob-v1');
+ const {decodeLightingDomain,encodeLightingDomain}=require('../../core/schema/lighting-domain-v1');
+ const caps=structuredClone(DEMO_CAPABILITIES);caps.lighting.registries.domainExtensions.push(31);
+ const snapshot=demoSnapshot(demoProfile()),blob=decodeProfileBlob(Buffer.from(snapshot.document.profile,'base64')),domain=blob.domains.find(d=>d.id===16),p=decodeLightingDomain(domain.payload);
+ p.extensions.push({kind:31,params:[77,99]});domain.payload=encodeLightingDomain(p,{allowUnknown:true});snapshot.document.profile=encodeProfileBlob(blob).toString('base64');snapshot.fingerprint=portable.fingerprint(snapshot.document);
+ const draft=new ProfileDraftSession(snapshot,'demo',caps),expected=domain.payload.toString('base64');
+ assert.throws(()=>stage(draft,edits.lightingPreset({preset:'minimal',expectedLighting:expected,replaceUnknown:false})),/explicitly confirm/);
+ assert.equal(draft.history.length,1);stage(draft,edits.lightingPreset({preset:'minimal',expectedLighting:expected,replaceUnknown:true}));draft.undo(draft.revision);
+ assert.equal(decodeProfileBlob(Buffer.from(draft.document.profile,'base64')).domains.find(d=>d.id===16).payload.toString('base64'),expected);
+});
+
+test("Teaching snapshots remain independent after identity edits and stale preset previews are refused",()=>{
+ const {demoSnapshot,demoProfile,DEMO_CAPABILITIES}=require('../../core/session/demo-session');const {decodeProfileBlob}=require('../../core/schema/profile-blob-v1');
+ const draft=new ProfileDraftSession(demoSnapshot(demoProfile()),'demo',DEMO_CAPABILITIES),expected=draft.current.factoryLighting;
+ stage(draft,edits.lightingPreset({preset:'teaching',expectedLighting:expected,replaceUnknown:false},draft.revision));
+ const p=decoded(draft).rgb, hint=p.rules.find(r=>r.parts.some(p=>p.slot===2&&p.kind===8&&p.params[0]===15)),ref=hint.parts.find(p=>p.slot===3).params[0],copy={...p.palette[ref]};
+ const stale=edits.lightingPreset({preset:'standard',expectedLighting:decodeProfileBlob(Buffer.from(draft.document.profile,'base64')).domains.find(d=>d.id===16).payload.toString('base64'),replaceUnknown:false},draft.revision);
+ stage(draft,edits.lightingIdentity({kind:3,id:0,slot:1,field:'colour',colour:{h:177,s:199,v:188}}));assert.deepEqual(decoded(draft).rgb.palette[ref],copy);
+ assert.throws(()=>stage(draft,stale),/changed|revision|older|stale/i);assert.deepEqual(decoded(draft).rgb.palette[ref],copy);
+});

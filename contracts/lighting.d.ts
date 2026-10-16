@@ -9,6 +9,8 @@ export interface LightingProgram {
     extensions: {kind: number; params: number[]}[]; byteLength?: number;
 }
 export interface LightingView {
+    expectedLighting?: string;
+    presets?: {name: 'standard' | 'minimal' | 'teaching'; program?: LightingProgram; working?: LightingWorkingCost; replacesUnknown?: boolean; reason?: string}[];
     program: LightingProgram;
     keymap?: Record<number, Record<number, {code: number; behaviour?: number}>>;
     queryCombos?: Record<number, {enabled: boolean; inputs: number[]; layers: number[]}>;

@@ -3,7 +3,7 @@
 
 // Presentation of validated device domains. Names here describe wire IDs;
 // configuration values and membership always come from the received domain.
-const {actionName, layerRef} = require("../schema/actions");
+const {actionName, layerRef, nativeCode} = require("../schema/actions");
 const {VOCABULARY, branchName} = require("./vocabulary");
 const {keyLabel} = require("./key-names");
 const keycodes = require("../data/keycode-catalog");
@@ -28,10 +28,11 @@ function enumName(values, value) {
 // the profile's own layers, slots and macros.
 /** @param {import("../schema/types.js").SemanticAction} action @param {import("../../contracts/model.js").ProfileKeyNames} [names] */
 function actionDisplay(action, names) {
-    if (action.kind !== ACTION.QMK_KEYCODE) return {};
+    const code = nativeCode(action);
+    if (action.kind !== ACTION.QMK_KEYCODE) return {code};
     const resolved = keycodes.resolve(action.operand);
     const label = keyLabel(names, action.operand);
-    return resolved.known && label !== resolved.name ? {label} : {};
+    return resolved.known && label !== resolved.name ? {label, code} : {code};
 }
 
 // A modifiers-only keycode is how a key holds its modifiers; the catalogue
@@ -39,7 +40,7 @@ function actionDisplay(action, names) {
 /** @param {import("../schema/types.js").SemanticAction} action @param {import("../../contracts/model.js").ProfileKeyNames} [names] */
 function builtInDisplay(action, names) {
     const display = actionDisplay(action, names);
-    return display.label ? {label: display.label.replace(/\+N\/A$/, "")} : display;
+    return display.label ? {...display, label: display.label.replace(/\+N\/A$/, "")} : display;
 }
 
 // The key's own tap and first-press hold, shaped like authored branches, for
@@ -67,7 +68,7 @@ function behaviorRowsForView(domain, features = {}, names) {
         ...actionDisplay(branch.action, names),
     });
     return domain.rows.map((row) => ({
-        keycode: actionName(row.target),
+        keycode: actionName(row.target), code: nativeCode(row.target),
         builtIn: builtInForView(row.target, features, names),
         tapHoldTerm: String(row.tapHoldTerm),
         longerHoldTerm: String(row.longerHoldTerm),

@@ -54,6 +54,7 @@ export interface DecodedProfile {
 }
 export interface ProfileSummary {layers: number; behaviors: number; combos: number; macros: number; names: string[]}
 export interface SnapshotFacts {
+    factoryLighting?: string;
     lightingKeys?: readonly string[];
     hostOs?: {detected: number} | null;
     limits?: {brightnessMax?: number} | null;

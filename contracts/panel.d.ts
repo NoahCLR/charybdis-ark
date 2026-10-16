@@ -16,9 +16,10 @@ export interface Position {
 /** One possible answer, while its layer is active and higher answering layers are absent. */
 export interface LayerAnswer {layer: number; active: number; blocked: number}
 export interface Layer {name: LayerReference; index: number; positions: Position[]; displayName?: string; answers: LayerAnswer[][]}
-export interface Branch extends BehaviorBranch { label?: string; fallback?: boolean}
+export interface Branch extends BehaviorBranch { code?: number; label?: string; fallback?: boolean}
 export interface BuiltIn {tap?: Branch; hold?: Branch; releaseTaps?: boolean}
 export interface BehaviorView extends Omit<Behavior, 'steps'> {
+    code?: number;
     builtIn?: BuiltIn;
     steps: {tapCount: number; tapCountName?: string; tap?: Branch; hold?: Branch; longHold?: Branch}[];
     timingDefaults?: Record<string, Scalar | undefined>;

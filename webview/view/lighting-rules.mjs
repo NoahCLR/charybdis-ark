@@ -1,6 +1,6 @@
 // @ts-check
 import {vocabulary} from "./vocabulary.mjs";
-import {KEY_LEDS} from "./lighting-simulator.mjs";
+import {KEY_LEDS, lightingRgb} from "./lighting-simulator.mjs";
 /** @typedef {import('../../contracts/panel.js').PublishedModel} Model */
 /** @param {number} query @returns {number | undefined} */
 export const lightingQueryThing = query => ({10: 1, 11: 2, 12: 5, 14: 4, 15: 3})[query];
@@ -57,6 +57,11 @@ export function lightingSituation(model, chips) {
     const lighting = model.rgb.lighting;
     /** @type {import('./lighting-simulator-types.js').Situation} */
     const s = {layers: [], mapped: {}, keymap: lighting?.keymap, queryCombos: lighting?.queryCombos};
+    const effect = model.rgb.baseEffect.previewColor;
+    if (effect) {
+        const rgb = lightingRgb({h: Number(effect.h), s: Number(effect.s), v: Number(effect.v)}).map(v => v.toString(16).padStart(2, "0")).join("");
+        s.effect = Object.fromEntries(Array.from({length: 58}, (_, led) => [led, rgb]));
+    }
     for (const [layer, keys] of Object.entries(s.keymap ?? {})) (s.mapped ??= {})[Number(layer)] = Object.entries(keys).filter(([, k]) => k.code !== 0 && k.code !== 1).map(([k]) => Number(k));
     for (const {kind, params: p, keys} of chips) {
         const id = p[0] === 255 ? 0 : p[0];

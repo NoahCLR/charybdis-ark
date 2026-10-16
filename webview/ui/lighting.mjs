@@ -6,6 +6,10 @@ import {lightingRule} from "../view/edits.mjs";
 import {rulePaintColour} from "../view/lighting.mjs";
 import {topbar, unavailable} from "./shell.mjs";
 import {colourEditor} from "./colour-editor.mjs";
+import {lightingGestureCard} from "./lighting-gesture.mjs";
+import {lightingOverview} from "./lighting-overview.mjs";
+import {lightingPresetsCard} from "./lighting-presets.mjs";
+let surface = "rules";
 import {lightingMemoryCard} from "./lighting-memory.mjs";
 /** @type {string | null} */
 let selected = null;
@@ -21,14 +25,18 @@ export function screenLighting() {
     followPaintedRule();
     if (painterOpen()) return elPainter();
     const model = getModel(), lighting = model?.rgb?.lighting;
-    const main = el(`<div class="main">${topbar("Lighting", "Rules paint from top to bottom. The first rule that paints a key wins.")}</div>`);
+    const main = el(`<div class="main">${topbar("Lighting", "Rules paint in stored order. Clear lets light through; dim and tint can combine rules.")}</div>`);
     if (!model || !lighting) {
         main.append(el(`<div class="content"><div class="pad"><div class="screen-stub"><h3>No lighting read</h3><p class="note">${esc(unavailable(model) || "Read the keyboard to load its lighting rules.")}</p></div></div></div>`)); return main;
     }
     const pad = el(`<div class="pad lighting-pad"></div>`), content = el(`<div class="content"></div>`);
     const memory = lightingMemoryCard(model); if (memory) pad.append(memory);
     const editableLighting = canEdit("lighting"), rules = lighting.rules;
-    pad.append(lightingSituationCard());
+    const tabs = el(`<div class="row lighting-tools" role="tablist" aria-label="Lighting tools">${[["rules", "Rules"], ["gesture", "Gesture timeline"], ["overview", "Compare looks"], ["presets", "Starting presets"]].map(([id, label]) => `<button class="btn ${surface === id ? "primary" : ""}" role="tab" aria-selected="${surface === id}" data-tool="${id}">${label}</button>`).join("")}</div>`);
+    tabs.querySelectorAll("button").forEach(button => button.addEventListener("click", () => {surface = button.dataset.tool || "rules";render();}));pad.append(tabs);
+    const situation = lightingSituationCard(index => {selected = rules[index]?.key ?? null;surface = "rules";render();requestAnimationFrame(() => document.querySelector(".lighting-rule-editor")?.scrollIntoView({block: "start"}));});
+    if (surface !== "rules") {pad.append(surface === "gesture" ? lightingGestureCard() : surface === "overview" ? lightingOverview() : lightingPresetsCard(), situation);content.append(pad);main.append(content);return main;}
+    pad.append(situation);
     if (!rules.some(r => r.key === selected)) selected = rules[0]?.key ?? null;
     const fade = lighting.program.extensions.find(e => e.kind === 1);
     const split = el(`<div class="lighting-workbench"><div class="card lighting-rule-list"><div class="card-h"><h3>Lighting rules</h3><button class="btn tiny" data-new-rule>Add rule</button><span class="right note">${rules.length} rule${rules.length === 1 ? "" : "s"}</span></div><div class="rule-list-body"></div></div><div class="card lighting-rule-editor"></div></div>`);

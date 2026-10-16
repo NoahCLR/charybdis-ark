@@ -120,7 +120,7 @@ export function tabBehaviours(body, right) {
     if (behaviour) {
         const followed = followedBelow(behaviour);
         if (followed) main.appendChild(el(followed));
-        main.appendChild(withLightingTab(behaviourEditor(behaviour), {kind: 4, id: model?.keyBehaviors.findIndex(row => row.keycode === behaviour.keycode) ?? -1}, actionLabel(model, behaviour.keycode)));
+        main.appendChild(withLightingTab(behaviourEditor(behaviour), {kind: 4, id: model?.keyBehaviors.findIndex(row => row.keycode === behaviour.keycode) ?? -1}, actionLabel(model, behaviour.keycode), true));
     }
     else main.appendChild(el(`<p class="note beh-empty">Transparent keys and KC_NO cannot have a behaviour. Pick a mapped key on the board.</p>`));
     body.replaceChildren(node);
