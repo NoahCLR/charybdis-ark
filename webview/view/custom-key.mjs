@@ -6,6 +6,7 @@
 import {vocabulary} from "./vocabulary.mjs";
 import {customKeyPlacements} from "./reach.mjs";
 import {NAME_MAX_BYTES, nameBytes} from "./names.mjs";
+import {compactModifierMask} from "./keyvalues.mjs";
 
 /** @typedef {Partial<import("../../contracts/panel.js").PublishedModel> | null | undefined} Model */
 /** @typedef {import("../../contracts/panel.js").CustomKey} CustomKey */
@@ -82,6 +83,25 @@ export function shortcutKeyCode(model, expression) {
     return entry ? entry.keycode : null;
 }
 
+// A catalogue key that is or carries modifiers is a shortcut too, though its
+// keycode is not a key the shortcut holds: a modifier key is its modifier in
+// the mask (Left Shift is Left Shift, with no key), and a key with its own
+// modifiers, as QMK's shifted symbols are (KC_EXLM is S(KC_1)), is those
+// modifiers and its key, when the shortcut may hold that key. So the shortcut
+// picker offers every modifier and symbol the Keys screen's picker does, and
+// `!` is Left Shift + 1. Null for any other key.
+/** @param {Model} model @param {string} name @returns {{key: string, mods: number} | null} */
+export function shortcutModifiers(model, name) {
+    const value = model?.qmkKeycodeAliases?.[name] || name;
+    const code = (model?.qmkKeycodes || []).find((row) => row.value === value || row.aliases.includes(value))?.keycode;
+    if (code === undefined) return null;
+    if (code >= 0xe0 && code <= 0xe7) return {key: "", mods: 1 << (code - 0xe0)};
+    const mods = compactModifierMask(code);
+    if (!mods) return null;
+    const base = (model?.qmkKeycodes || []).find((row) => row.keycode === (code & 0xff));
+    return base && shortcutKeyCode(model, base.value) !== null ? {key: base.value, mods} : null;
+}
+
 // The keycode picker sets a shortcut as it wraps any key: the modifier row
 // above the board, here any of the eight, left and right mixed, since the
 // shortcut stores a mask rather than one wrapped keycode (firmware D-F26).
@@ -94,6 +114,8 @@ export const shortcutPickMods = (model, mask) => (vocabulary(model).pickerModifi
 export function shortcutPick(model, {mods = [], keys = []}) {
     const controls = vocabulary(model).pickerModifiers || [];
     const mask = mods.reduce((bits, wrapper) => bits | (controls.find((entry) => entry.value === wrapper)?.bit ?? 0), 0);
+    const held = keys[0] ? shortcutModifiers(model, keys[0]) : null;
+    if (held) return {mods: mask | held.mods, key: held.key ? shortcutKeyCode(model, held.key) ?? 0 : 0};
     return {mods: mask, key: keys[0] ? shortcutKeyCode(model, keys[0]) ?? 0 : 0};
 }
 
