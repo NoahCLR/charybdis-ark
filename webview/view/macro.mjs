@@ -136,6 +136,17 @@ export function macroPeekSteps(steps, label = (name) => name) {
     return steps[0] ? describeStep(steps[0], label) : "";
 }
 
+// A macro as the hover card reads it: each step in order, held (↓), let go
+// (↑), tapped, typed or waited, up to `limit` steps and how many more follow.
+/** @param {unknown} payload @param {(name: string) => string} [label] @param {number} [limit] */
+export function macroChips(payload, label = (name) => name, limit = 12) {
+    const {steps} = parseMacro(payload, {unicode: true});
+    const chips = steps.slice(0, limit).map((step) => ({kind: step.kind,
+        text: step.kind === "press" ? `↓ ${describeStep(step, label)}` : step.kind === "release" ? `↑ ${describeStep(step, label)}`
+            : step.kind === "text" ? `“${step.text}”` : describeStep(step, label)}));
+    return {chips, more: Math.max(0, steps.length - limit)};
+}
+
 // Held keys that are never released leave the keyboard holding them, so the
 // preview says so rather than letting it through quietly.
 /** @param {readonly MacroStep[]} steps @param {Readonly<Record<string, string>>} [aliases] */

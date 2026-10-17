@@ -1,7 +1,7 @@
 import {withAnswers} from "../fixtures/layer-answers.mjs";
 import assert from "node:assert/strict";
 import test from "node:test";
-import {combosInView, combosForKey, comboReferenceLayer, comboGroups, combosAt, combosInPreview, combosShownAt, comboAnswers, comboInputIsKey, comboInputKeys, comboInputShown, combosOnKey, toggleComboInput} from "../../webview/view/combo-reach.mjs";
+import {comboBehaviours, combosInView, combosForKey, comboReferenceLayer, comboGroups, combosAt, combosInPreview, combosShownAt, comboAnswers, comboInputIsKey, comboInputKeys, comboInputShown, combosOnKey, toggleComboInput} from "../../webview/view/combo-reach.mjs";
 
 test("combos follow the device's own input positions before falling back to keycodes", () => {
     const model = {combos: [
@@ -289,4 +289,25 @@ test("a combo marks the input the key itself presses, by the same rule as its ba
     const named = {badge: "C2", inputs: ["KC_J", "LT(3,KC_K)"], output: "KC_TAB"};
     assert.deepEqual([0, 1].map((at) => comboInputIsKey(named, at, {layoutIndex: 5, keycode: "LT(3,KC_K)"})), [false, true]);
     assert.equal(comboInputIsKey(named, 0, null), false);
+});
+
+test("a combo runs the behaviour of the key it sends only while every switch for it is on", () => {
+    const combos = [
+        {badge: "C2", output: "KC_LEFT_GUI", outputDisplay: "Left Command", useOutputBehavior: true},
+        {badge: "C3", output: "LGUI(KC_N)", outputDisplay: "Command+N", useOutputBehavior: true},
+        {badge: "C5", output: "KC_LEFT_GUI", outputDisplay: "Left Command", useOutputBehavior: true},
+        {badge: "C14", output: "0x7F04", outputDisplay: "VoiceInk", useOutputBehavior: false},
+    ];
+    const model = {keyBehaviors: [{keycode: "KC_LEFT_GUI", steps: []}, {keycode: "CUSTOM_KEY_4", steps: []}],
+        qmkKeycodeAliases: {"0x7F04": "CUSTOM_KEY_4"}, participation: {behaviorsEnabled: true, comboOutputBehaviors: true}};
+    assert.deepEqual(comboBehaviours(model, combos), [{keycode: "KC_LEFT_GUI", output: "KC_LEFT_GUI", shown: "Left Command", badges: ["C2", "C5"]}],
+        "a plain shortcut runs nothing, two combos sending one key share it, and a bypassed output runs none");
+    assert.deepEqual(comboBehaviours(model, [{...combos[3], useOutputBehavior: true}]).map((row) => row.keycode), ["CUSTOM_KEY_4"], "a custom key is found by its name");
+    assert.deepEqual(comboBehaviours({...model, participation: {behaviorsEnabled: true, comboOutputBehaviors: false}}, combos), []);
+    assert.deepEqual(comboBehaviours({...model, participation: {behaviorsEnabled: false, comboOutputBehaviors: true}}, combos), []);
+    // The behaviour's own switches hold for a combo output too.
+    const gui = (/** @type {object} */ row) => ({...model, keyBehaviors: [{keycode: "KC_LEFT_GUI", steps: [], ...row}]});
+    assert.deepEqual(comboBehaviours(gui({enabled: false}), combos), [], "a disabled behaviour runs for no combo");
+    assert.deepEqual(comboBehaviours(gui({allowedLayers: 0b01}), combos, 1), [], "nor on a layer it is not allowed on");
+    assert.equal(comboBehaviours(gui({allowedLayers: 0b10}), combos, 1).length, 1, "but does on one it is");
 });

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {keyFace, layerOfKeycode, keyName, visibleKeycode, cellLabel, behaviourFor, canonicalKeycode, behaviourListeningTo, behaviourTiers, behaviourGridSteps, inheritedBranch, impliedBranch} from "../../webview/view/keyface.mjs";
+import {actionNaming, dualRole, keyFace, layerOfKeycode, keyName, visibleKeycode, cellLabel, behaviourFor, canonicalKeycode, behaviourListeningTo, behaviourTiers, behaviourGridSteps, inheritedBranch, impliedBranch} from "../../webview/view/keyface.mjs";
 import keyNames from "../../core/model/key-names.js";
 
 test("visible macro keycodes use the VIA slot name for both QMK's named and unnamed values", () => {
@@ -9,6 +9,21 @@ test("visible macro keycodes use the VIA slot name for both QMK's named and unna
     assert.equal(visibleKeycode(model, "0x773F"), "VIA_MACRO_63");
     assert.equal(visibleKeycode(model, "QK_USER_16"), "QK_USER_16", "other stored identities keep their existing display");
     assert.equal(visibleKeycode({}, "QK_MACRO_9"), "QK_MACRO_9", "an unadvertised alias is not invented");
+});
+
+test("a bare value the keyboard names reads by that name, and a named keycode keeps its own", () => {
+    const model = {qmkKeycodeAliases: {"0x7F01": "CUSTOM_KEY_1", "0x7E85": "PD_SLOT_5", QK_USER_16: "PD_SLOT_0"}};
+    assert.equal(visibleKeycode(model, "0x7F01"), "CUSTOM_KEY_1");
+    assert.equal(visibleKeycode(model, "0x7E85"), "PD_SLOT_5");
+    assert.equal(visibleKeycode(model, "QK_USER_16"), "QK_USER_16");
+    assert.equal(visibleKeycode(model, "0x7F09"), "0x7F09", "a value nothing names stays a value");
+});
+
+test("an action is named by its words, with the stored keycode only where it adds something", () => {
+    const model = {qmkKeyLabels: {"MO(2)": "Hold Symbol", "0x7F04": "VoiceInk", KC_A: "A"}, qmkKeycodeAliases: {"0x7F04": "CUSTOM_KEY_4"}};
+    assert.deepEqual(actionNaming(model, "MO(2)"), {words: "Hold Symbol", stored: "MO(2)"});
+    assert.deepEqual(actionNaming(model, "0x7F04"), {words: "VoiceInk", stored: "CUSTOM_KEY_4"});
+    assert.deepEqual(actionNaming({}, "LT(3,KC_F)"), {words: "LT(3,KC_F)", stored: ""}, "an unnamed action is not repeated");
 });
 
 test("a key face uses the model's own resolution, and names the layer a dual-role key reaches", () => {
@@ -188,4 +203,11 @@ test("with only a Long hold set, a release before it sends the press's tap on ke
     assert.equal(impliedBranch(layer, {tapCount: 0, tap: set, longHold}, "hold"), null, "a layer key sends no tap once held");
     const lt = {keycode: "LT(3,KC_SLASH)", builtIn: {tap, hold: {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "MO(3)"}}, steps: []};
     assert.equal(impliedBranch(lt, {tapCount: 0, longHold}, "hold"), null, "a dual-role key's own hold fills the cell");
+});
+
+test("a dual-role key names what its tap sends and what its hold does", () => {
+    assert.deepEqual(dualRole({}, {keycode: "LT(3,KC_F)", display: "F", layerLabel: "Navigation"}), {tap: "F", hold: {layer: 3, name: "Navigation"}});
+    assert.deepEqual(dualRole({}, {keycode: "MT(MOD_LSFT,KC_A)", display: "A", modifierLabel: "Shift"}), {tap: "A", hold: {modifier: "Shift"}});
+    assert.equal(dualRole({}, {keycode: "MO(3)", display: "Hold Navigation"}), null, "a layer key has no tap half");
+    assert.equal(dualRole({}, {keycode: "KC_F", display: "F"}), null);
 });

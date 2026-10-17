@@ -4,24 +4,29 @@
 
 // Selector assertions refer to elements created by this module's authored markup.
 import {el, esc} from "../lib/dom.mjs";
-import {actionLabel, behaviourFor, behaviourTiers, canonicalKeycode, keyMeaning, keyName, visibleKeycode} from "../view/keyface.mjs";
-import {customKeyOf, customKeyShortcutLine} from "../view/custom-key.mjs";
-import {comboInputIsKey, combosAt, combosShownAt} from "../view/combo-reach.mjs";
+import {actionNaming, behaviourFor, behaviourTiers, canonicalKeycode, dualRole, keyMeaning, keyName, visibleKeycode} from "../view/keyface.mjs";
+import {comboBehaviours, comboInputIsKey, combosAt, combosShownAt} from "../view/combo-reach.mjs";
+import {customKeyHeadline, customKeyOf, customKeyShortcutOnly} from "../view/custom-key.mjs";
 import {macroKeycodes, pointingSlotFor} from "../view/reach.mjs";
+import {macroChips} from "../view/macro.mjs";
+import {behaviourEditorRow, behaviourIsEmpty, behaviourThresholds, helperDetail} from "../view/behavior-editor.mjs";
+import {keyHandling} from "../view/participation.mjs";
 import {resolvedPositions} from "../view/layer-resolution.mjs";
 import {pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {getModel, heldLayers, layerName, positionAt} from "../store.mjs";
-import {branchBadge, comboBadge, keyNameMarked, mark, marked, sends, sendsKind, tierDot} from "./marks.mjs";
+import {branchBadge, comboBadge, comboTint, keyNameMarked, mark, marked, sends, sendsKind, tierDot} from "./marks.mjs";
 import {helperWord, tierName, vocabulary, word} from "../view/vocabulary.mjs";
 import {KIND} from "../view/pointing-config.mjs";
 
 const tip = el(`<div class="tip" hidden></div>`);
 const card = el(`<div class="hovercard" hidden></div>`);
+// The behaviours the key's combos run, each in its own card beside the key's.
+const side = el(`<div class="hovercard-side" hidden></div>`);
 let timer = 0;
 
 /** @param {HTMLElement} root */
 export function mountHover(root) {
-    document.body.append(tip, card);
+    document.body.append(tip, card, side);
     root.addEventListener("mouseover", (event) => {
         const key = /** @type {SVGElement | null} */ (/** @type {Element} */ (event.target).closest("[data-key]"));
         const hinted = /** @type {HTMLElement | null} */ (/** @type {Element} */ (event.target).closest("[data-tip]"));
@@ -30,11 +35,14 @@ export function mountHover(root) {
         if (/** @type {HTMLElement | null} */ (document.querySelector(".kc.dragging"))) { hideHover(); return; }
         if (key) {
             const rect = key.getBoundingClientRect();
-            timer = setTimeout(() => { card.innerHTML = keyCard(Number(key.dataset.key)); place(card, rect, 14, true); }, 140);
+            timer = setTimeout(() => {
+                card.innerHTML = keyCard(Number(key.dataset.key)); place(card, rect, 14, true);
+                side.innerHTML = behaviourCards(Number(key.dataset.key)); placeSide(rect);
+            }, 140);
             tip.hidden = true;
             return;
         }
-        card.hidden = true;
+        card.hidden = true; side.hidden = true;
         if (hinted) {
             const rect = hinted.getBoundingClientRect();
             timer = setTimeout(() => { tip.textContent = hinted.dataset.tip ?? ""; place(tip, rect, 8); }, 260);
@@ -46,7 +54,21 @@ export function mountHover(root) {
     addEventListener("scroll", hideHover, true);
 }
 
-export function hideHover() { clearTimeout(timer); tip.hidden = true; card.hidden = true; }
+export function hideHover() { clearTimeout(timer); tip.hidden = true; card.hidden = true; side.hidden = true; }
+
+// Beside the key's card, on its far side from the key, or across the key when
+// there is no room there.
+/** @param {DOMRect} keyRect */
+function placeSide(keyRect) {
+    side.hidden = !side.innerHTML;
+    if (side.hidden) return;
+    const main = card.getBoundingClientRect(), box = side.getBoundingClientRect();
+    const right = main.left >= keyRect.right;
+    let left = right ? main.right + 10 : main.left - 10 - box.width;
+    if (left < 10 || left + box.width > innerWidth - 10) left = right ? keyRect.left - 14 - box.width : keyRect.right + 14;
+    side.style.left = `${Math.max(10, Math.min(left, innerWidth - box.width - 10))}px`;
+    side.style.top = `${Math.max(10, Math.min(main.top, innerHeight - box.height - 10))}px`;
+}
 
 /** @param {HTMLElement} node @param {DOMRect} rect @param {number} [gap] @param {boolean} [beside] */
 function place(node, rect, gap = 10, beside = false) {
@@ -75,69 +97,128 @@ function keyCard(index) {
     const position = positionAt(layer, index);
     if (!position) return "";
     const own = reachSections(model, layer, position, index);
-    if (!own.length) own.push(`<div class="hc-sect"><div class="hc-empty">No key behaviour, macro, combo or pointing mode on this key.</div></div>`);
     return `<div class="hc-head"><div class="hc-title"><span class="t">${keyNameMarked(model, keyName(position), keyMeaning(position))}</span>
         <span class="hc-pill">index ${index}</span></div>
-        <code class="hc-code">${esc(visibleKeycode(model, position.keycode))}</code></div>${own.join("")}${seenThrough(model, stack, index)}`;
+        <code class="hc-code">${esc(visibleKeycode(model, position.keycode))}</code>${headline(model, keyMeaning(position))}</div>${own.join("")}${seenThrough(model, stack, index)}`;
 }
 
-// In a layer preview, a key transparent on the viewed layer is answered by the
-// highest layer below that is on. The card still reads the viewed layer's own
-// key first, then what the answering key does, as the keyboard would run it.
+// One card per behaviour the key's combos run, as the key that behaviour
+// belongs to would show it, naming the combos that run it. Three at most.
+/** @param {number} index */
+function behaviourCards(index) {
+    const model = getModel();
+    const stack = model?.layers || [];
+    const layer = stack[state()] || stack[0];
+    if (!positionAt(layer, index)) return "";
+    const runs = comboBehaviours(model, combosAt(model, stack, layer?.index ?? 0, index), layer?.index ?? 0);
+    const tint = comboTint(model);
+    const cards = runs.slice(0, SIDE_CARDS).map((run) => {
+        const target = /** @type {import("../../contracts/panel.js").Position} */ ({keycode: run.output, semantic: run.keycode, layoutIndex: -1});
+        return `<div class="hovercard hc-side"${tint ? ` style="--combo:${tint}"` : ""}><div class="hc-head"><div class="hc-eyebrow">Combo behaviour</div><div class="hc-title"><span class="t">${esc(run.shown)}</span>
+            <span class="hc-badges">${run.badges.map((badge) => comboBadge(model, badge)).join("")}</span></div>
+            <code class="hc-code">${esc(visibleKeycode(model, run.output))}</code>${headline(model, run.keycode)}
+            <div class="hc-sub hc-foot">Runs when ${esc(run.badges.join(" or "))} fires.</div></div>${reachSections(model, layer, target, -1, [], {foot: false}).join("")}</div>`;
+    });
+    if (runs.length > SIDE_CARDS) cards.push(`<div class="hc-more">+${runs.length - SIDE_CARDS} more behaviour${runs.length - SIDE_CARDS === 1 ? "" : "s"} run by this key's combos</div>`);
+    return cards.join("");
+}
+const SIDE_CARDS = 3;
+
+// A key transparent on the viewed layer is answered by the highest layer below
+// that is on: the default layer, or a layer previewed under this one. The card
+// reads the viewed layer's own key first, then what the answering key does, as
+// the keyboard would run it — the same answer the board draws.
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/panel.js").Layer[]} stack @param {number} index */
 function seenThrough(model, stack, index) {
     const held = heldLayers();
-    if (!held.length) return "";
     const answer = resolvedPositions(stack, state(), held).find((entry) => entry.position.layoutIndex === index);
     if (!answer?.fellThrough) return "";
     const from = answer.layer, position = answer.position;
     const sections = reachSections(model, from, position, index, combosShownAt(model, stack, state(), held, index));
     return `<div class="hc-through"><div class="hc-sect">
-            <div class="hc-h">Seen through from ${marked(model, {kind: "layer", layer: from.index}, layerName(from))}</div>
-            <div class="hc-title"><span class="t">${keyNameMarked(model, keyName(position), keyMeaning(position))}</span></div>
-            <code class="hc-code">${esc(visibleKeycode(model, position.keycode))}</code></div>
-        ${sections.length ? sections.join("") : `<div class="hc-sect"><div class="hc-empty">No key behaviour, macro, combo or pointing mode on that key.</div></div>`}</div>`;
+            <div class="hc-h">Falls through to ${marked(model, {kind: "layer", layer: from.index}, layerName(from))}</div>
+            <div class="hc-flow"><span class="hc-name">${keyNameMarked(model, keyName(position), keyMeaning(position))}</span>
+            <code class="hc-stored">${esc(visibleKeycode(model, position.keycode))}</code></div>${headline(model, keyMeaning(position))}
+            ${held.length ? "" : `<div class="hc-sub hc-foot">With no layer previewed. ⌘-click a layer tab to see what answers while it is held.</div>`}</div>
+        ${sections.join("")}</div>`;
 }
 
 // What one stored key reaches: its behaviour, macros, pointing mode and the
 // combos on its layer at this position — or, for a key seen through a preview,
 // the combos the board badges it with there. Empty when it reaches none of them.
-/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/panel.js").Layer} layer @param {import("../../contracts/panel.js").Position} position @param {number} index @param {import("../../contracts/panel.js").ComboView[]} [combos] */
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/panel.js").Layer} layer @param {import("../../contracts/panel.js").Position} position @param {number} index @param {import("../../contracts/panel.js").ComboView[]} [combos] @param {{foot?: boolean}} [options] */
 function reachSections(model, layer, position, index,
-    combos = combosAt(model, model?.layers || [], layer?.index ?? 0, index)) {
+    combos = combosAt(model, model?.layers || [], layer?.index ?? 0, index), {foot = true} = {}) {
     const behaviour = behaviourFor(model, keyMeaning(position));
     const macros = macroKeycodes(keyMeaning(position));
     const slot = pointingSlotFor(model, keyMeaning(position));
     const lit = stageEnabled(model, "key");
     const sections = [];
-    const custom = customKeyOf(model, canonicalKeycode(model, keyMeaning(position)));
-    if (custom) {
-        sections.push(`<div class="hc-sect"><div class="hc-h">Custom key shortcut</div>
-            <div class="hc-sub">${esc(customKeyShortcutLine(custom))}</div></div>`);
+    const custom = customOf(model, keyMeaning(position));
+    const role = dualRole(model, position);
+    const empty = Boolean(behaviour) && behaviourIsEmpty(/** @type {any} */ (behaviour), model?.layers?.length || 16);
+    const branchless = Boolean(behaviour) && !behaviour?.steps?.length;
+    // Any behaviour row the keyboard runs here hands the key to its own key
+    // engine, even one with no branches; without one, QMK handles the key
+    // (firmware D-F02). A dual-role key's tap / hold says which decides it.
+    const handling = "row" in position
+        ? keyHandling(model, layer?.index ?? 0, /** @type {{row: number, column: number}} */ (/** @type {unknown} */ (position)), behaviour)
+        : {by: behaviour ? "keyboard" : "qmk", reasons: []};
+    const byKeyboard = handling.by === "keyboard";
+    const unused = behaviour && !byKeyboard ? `Its behaviour row is not used here (${handling.reasons.join("; ")}), so QMK decides.` : "";
+    if (role) {
+        // QMK ignores a row it does not run, so it waits its own threshold:
+        // the key's default, never the row's override.
+        const fallback = behaviourEditorRow(model, keyMeaning(position))?.timingDefaults?.tapHoldTerm ?? model?.behaviorTimingDefaults?.tapHoldTerm;
+        const term = byKeyboard && behaviour ? behaviourThresholds(model, behaviour).tapHoldTerm : {ms: fallback === undefined ? "" : String(fallback)};
+        const hold = "layer" in role.hold
+            ? marked(model, {kind: "layer", layer: role.hold.layer}, role.hold.name)
+            : esc(role.hold.modifier);
+        const note = unused || (branchless ? "Its behaviour row has no branches; having a row is what hands this key's tap / hold to the keyboard instead of QMK." : "");
+        sections.push(`<div class="hc-sect"><div class="hc-h">Tap / hold</div>
+            <div class="hc-sub">tap / hold ${esc(threshold(term))} · decided by ${byKeyboard ? "the keyboard" : "QMK"}</div>
+            <div class="hc-act"><span class="hc-stage">Tap</span><span><span class="hc-name">${esc(role.tap)}</span></span></div>
+            <div class="hc-act"><span class="hc-stage">Hold</span><span><span class="hc-name">${hold}</span></span></div>
+            ${note ? `<div class="hc-sub hc-foot hc-quiet">${esc(note)}</div>` : ""}</div>`);
+    } else if (empty && !custom) {
+        sections.push(`<div class="hc-sect"><div class="hc-sub hc-quiet">${esc(byKeyboard
+            ? "Handled by the keyboard's key engine: it has a behaviour row with no branches."
+            : `Has a behaviour row with no branches, not used here (${handling.reasons.join("; ")}).`)}</div></div>`);
     }
-    if (behaviour) {
+    if (behaviour && !(role && branchless) && !(empty && !role && !custom)) {
+        const terms = behaviourThresholds(model, behaviour);
         const branches = (behaviour.steps || []).map((step) => {
             /** @type {[import("../../contracts/edits.js").Tier, string, import("../../contracts/panel.js").Branch | undefined][]} */
             const tiers = [["tap", tierName(model, "tap"), step.tap], ["hold", tierName(model, "hold"), step.hold], ["long", tierName(model, "long"), step.longHold]];
             const rows = tiers
                 .map(([kind, name, branch]) => branch ? `<div class="hc-act"><span class="hc-stage">${tierDot(model, kind)}${esc(name)}</span>
-                    <span>${sends(model, branch.action) || `<span class="hc-target">${esc(branch.action)}</span>`}
-                    <span class="hc-life${sendsKind(model, branch.action) ? " hc-under" : ""}">${esc(described(sendsKind(model, branch.action), helperText(kind, branch.helper)))}</span></span></div>` : "").join("");
+                    <span>${sends(model, branch.action) || named(model, branch.action)}
+                    ${under(described(sendsKind(model, branch.action) || customKeyShortcutOnly(customOf(model, branch.action)), kind === "tap" ? "" : helperAt(kind, branch, terms)))}</span></div>` : "").join("");
             return `<div class="hc-branch">${branchBadge(model, step.tapCount + 1, "hc-n")}<div>${rows}</div></div>`;
         }).join("");
+        const count = behaviour.steps.length;
         sections.push(`<div class="hc-sect"><div class="hc-h">Key behaviour</div>
-            <div class="hc-sub">${keyNameMarked(model, actionLabel(model, behaviour.keycode), behaviour.keycode)} · ${behaviour.steps.length} branch${behaviour.steps.length === 1 ? "" : "es"} · tap/hold ${timing(behaviour.tapHoldTerm)}${behaviour.keepsAutoMouseAnchored ? " · keeps auto-mouse anchored" : ""}</div>
+            <div class="hc-sub">${[count ? `${count} branch${count === 1 ? "" : "es"}` : "No branches yet",
+                ...terms.used.map((name) => `${TERM_WORDS[name]} ${threshold(terms[name])}`),
+                ...(behaviour.keepsAutoMouseAnchored ? ["keeps auto-mouse anchored"] : [])].map(esc).join(" · ")}</div>
+            ${!role && !byKeyboard ? `<div class="hc-sub hc-quiet">${esc(`Not used here (${handling.reasons.join("; ")}): ${custom
+                ? customKeyShortcutOnly(custom) : `sends ${keyName(position)} directly`}.`)}</div>` : ""}
             ${branches}
-            <div class="hc-sub hc-foot">${lit
-                ? "The dot beside each tier is the colour the keyboard flashes on this key when that tier resolves."
-                : "Key feedback is switched off, so none of these flash on the keyboard."}</div></div>`);
+            ${count && foot ? `<div class="hc-sub hc-foot">${lit
+                ? "Each dot is the colour this key flashes when that tier resolves."
+                : "Key feedback is off, so no tier flashes on the keyboard."}</div>` : ""}</div>`);
     }
     if (macros.length) {
         const slots = model?.viaMacros || [];
-        sections.push(`<div class="hc-sect"><div class="hc-h">Macro payload</div>${macros.map((keycode) => {
+        const label = (/** @type {string} */ name) => actionNaming(model, name).words;
+        sections.push(`<div class="hc-sect"><div class="hc-h">Macro</div>${macros.map((keycode) => {
             const macro = slots.find((row) => row.keycode === keycode);
-            return `<div class="hc-sub">${esc(keycode)}${macro ? "" : " · not reported"}</div>`
-                + (macro?.payload ? `<div class="hc-step"><span class="k">payload</span><span class="v">${esc(macro.payload.slice(0, 64))}</span></div>` : "");
+            if (!macro) return `<div class="hc-sub">${esc(keycode)} · not reported by the keyboard</div>`;
+            if (!macro.payload) return `<div class="hc-sub">${esc(macro.name || keycode)} · empty</div>`;
+            const {chips, more} = macroChips(macro.payload, label);
+            return `<div class="hc-macro">${chips.map((chip) => chip.kind === "delay"
+                ? `<span class="hc-life">${esc(chip.text)}</span>`
+                : `<span class="hc-key${chip.kind === "tap" ? " here" : chip.kind === "text" ? " hc-typed" : ""}">${esc(chip.text)}</span>`).join("")}${more ? `<span class="hc-life">+${more} more</span>` : ""}</div>`;
         }).join("")}</div>`);
     }
     if (slot) {
@@ -153,25 +234,54 @@ function reachSections(model, layer, position, index,
     if (combos.length) {
         // What a combo sends leads; the keys that press it follow, with this
         // key marked among them.
+        const running = new Set(comboBehaviours(model, combos, layer?.index ?? 0).flatMap((run) => run.badges));
         sections.push(`<div class="hc-sect"><div class="hc-h">Combos · ${combos.length}</div>${combos.map((combo) => {
             const inputs = combo.inputs || [];
             const shown = combo.outputDisplay || combo.output;
             const stored = visibleKeycode(model, combo.output);
             return `<div class="hc-combo">${comboBadge(getModel(), combo.badge || "C")}
-            <span class="hc-sends"><span class="hc-life">→</span><span>${esc(shown)}</span>${stored && stored !== shown ? `<code class="hc-stored">${esc(stored)}</code>` : ""}<span class="hc-life hc-count">${inputs.length} key${inputs.length === 1 ? "" : "s"}</span></span>
+            <span class="hc-sends"><span class="hc-life">→</span><span>${esc(shown)}</span>${stored && stored !== shown ? `<code class="hc-stored">${esc(stored)}</code>` : ""}<span class="hc-life hc-count">${inputs.length} key${inputs.length === 1 ? "" : "s"}</span>${running.has(combo.badge) ? `<span class="hc-life hc-runs">runs its behaviour</span>`
+                : customOf(model, combo.output) ? `<span class="hc-life hc-runs">${esc(customKeyShortcutOnly(customOf(model, combo.output)))}</span>` : ""}</span>
             <span class="hc-keys">${inputs.map((input, at) => `<span class="hc-key${comboInputIsKey(combo, at, position) ? " here" : ""}">${keyNameMarked(model, combo.inputDisplays?.[at] ?? input, input)}</span>`).join('<span class="hc-life">+</span>')}</span></div>`;
         }).join("")}</div>`);
     }
     return sections;
 }
 
+// The custom key a keycode is, under any of its names or the bare hex a
+// combo stores, and what it sends, in the card's header (firmware D-F26).
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} keycode */
+const customOf = (model, keycode) => customKeyOf(model, canonicalKeycode(model, keycode)) ?? customKeyOf(model, visibleKeycode(model, keycode));
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} keycode */
+const headline = (model, keycode) => {
+    const text = customKeyHeadline(customOf(model, keycode));
+    return text ? `<div class="hc-sub hc-foot${text === "No shortcut" ? " hc-quiet" : ""}">${esc(text)}</div>` : "";
+};
+// A branch action as everything else in the card names one: its words, with
+// the layer it reaches marked, then the keycode it stores where that adds.
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} action */
+const named = (model, action) => {
+    const {words, stored} = actionNaming(model, action);
+    return `<span class="hc-name">${keyNameMarked(model, words, action)}</span>${stored ? ` <code class="hc-stored">${esc(stored)}</code>` : ""}`;
+};
+/** @param {string} text */
+const under = (text) => text ? `<span class="hc-life hc-under">${esc(text)}</span>` : "";
 /** @param {import("../../contracts/edits.js").Tier} kind @param {string | undefined} helper */
 const helperText = (kind, helper) => helperWord(getModel(), kind, helper ?? "");
+// How a hold tier runs, with the threshold it waits for or the rate it repeats at.
+/** @param {import("../../contracts/edits.js").Tier} kind @param {import("../../contracts/panel.js").Branch} branch @param {ReturnType<typeof behaviourThresholds>} terms */
+const helperAt = (kind, branch, terms) => {
+    const detail = helperDetail(kind, branch, terms);
+    return detail ? `${helperText(kind, branch.helper)} (${detail})` : helperText(kind, branch.helper);
+};
+// The Behaviours editor's own words for each threshold.
+const TERM_WORDS = {tapHoldTerm: "tap / hold", longerHoldTerm: "long hold", multiTapTerm: "multi tap window"};
+// A threshold as the keyboard runs it: its own time or the keyboard's default.
+/** @param {{ms: string}} term */
+const threshold = (term) => term.ms === "" ? "keyboard default" : `${term.ms} ms`;
 /** @param {string} what @param {string} how */
 const described = (what, how) => [what, how].filter(Boolean).join(" · ");
 
-/** @param {import("../../contracts/edits.js").Scalar | undefined} value */
-const timing = (value) => Number(value) ? `${value} ms` : "keyboard default";
 
 // Where a colour paints, in the vocabulary's words, read inside a sentence.
 /** @param {string | undefined} locality */

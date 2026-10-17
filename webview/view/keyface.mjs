@@ -46,6 +46,16 @@ export function layerOfKeycode(model, keycode) {
     return match ? Number(match[1] ?? match[2]) : null;
 }
 
+// A dual-role key's two halves: what a tap sends, and what a hold does — hold
+// a layer on, or a modifier. Null for any other key.
+/** @param {ViewModel} model @param {Position | null | undefined} position @returns {{tap: string, hold: {layer: number, name: string} | {modifier: string}} | null} */
+export function dualRole(model, position) {
+    if (!position) return null;
+    const layer = /^LT\(/.test(position.keycode) ? layerOfKeycode(model, position.keycode) : null;
+    if (layer !== null) return {tap: position.display || "", hold: {layer, name: position.layerLabel || `Layer ${layer}`}};
+    return position.modifierLabel ? {tap: position.display || "", hold: {modifier: position.modifierLabel}} : null;
+}
+
 // A key by its whole name, for anything that is not a key cap. A cap shows what
 // fits — "F" over "Navigation" — and the name is the host's for the keycode,
 // "F / Navigation" (core/model/key-names.js).
@@ -71,13 +81,24 @@ const shortLayer = (name) => name.replace(/^LAYER_/, "").toLowerCase();
 export const keyMeaning = (/** @type {import("../../contracts/panel.js").Position | null | undefined} */ position) => position?.semantic || position?.keycode || "";
 
 // Macro slots have one profile name across all 64 slots, even though QMK's
-// catalogue names only the first 32 native values. Keep position.keycode for
-// round-trip edits; use this when a screen prints that keycode to a person.
+// catalogue names only the first 32 native values. A bare value the keyboard
+// names — a custom key, a pointing slot — reads by that name too, since the
+// number says nothing to a person. Keep position.keycode for round-trip edits;
+// use this when a screen prints that keycode to a person.
 /** @param {ViewModel} model @param {string} name */
 export const visibleKeycode = (model, name) => {
-    const semantic = model?.qmkKeycodeAliases?.[name] || name || "";
-    return /^VIA_MACRO_(?:[0-9]|[1-5][0-9]|6[0-3])$/.test(semantic) ? semantic : name || "";
+    const semantic = model?.qmkKeycodeAliases?.[name] || "";
+    if (/^VIA_MACRO_(?:[0-9]|[1-5][0-9]|6[0-3])$/.test(semantic)) return semantic;
+    return semantic && /^0x[0-9a-f]+$/i.test(name) ? semantic : name || "";
 };
+
+// An action as the hover card names it: its words, and the keycode it stores
+// where that says something the words do not.
+/** @param {ViewModel} model @param {string} name */
+export function actionNaming(model, name) {
+    const words = actionLabel(model, name), stored = visibleKeycode(model, name);
+    return {words, stored: stored && stored !== words ? stored : ""};
+}
 
 // How a keycode name is spoken in prose: the label the keyboard's own
 // vocabulary gives it, so a behaviour row, a reach line and the key cap all

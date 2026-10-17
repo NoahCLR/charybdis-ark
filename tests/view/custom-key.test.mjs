@@ -1,7 +1,7 @@
 import test from "node:test";
 import {withAnswers} from "../fixtures/layer-answers.mjs";
 import assert from "node:assert/strict";
-import {customKeyBypassText, customKeyDoes, customKeyOf, customKeySendsNote, customKeyShortcutLine, hasShortcut, shortcutKeyCode, shortcutPick, shortcutPickLabel, shortcutPickMods, shortcutOffer, unusedCustomKey, offeredName, customKeyWithShortcut, customKeyChoice} from "../../webview/view/custom-key.mjs";
+import {customKeyBypassText, customKeyDoes, customKeyHeadline, customKeyShortcutOnly, customKeyOf, customKeySendsNote, customKeyShortcutLine, hasShortcut, shortcutKeyCode, shortcutPick, shortcutPickLabel, shortcutPickMods, shortcutOffer, unusedCustomKey, offeredName, customKeyWithShortcut, customKeyChoice} from "../../webview/view/custom-key.mjs";
 
 const key = (slot, shortcut = {mods: 0, key: 0}, shortcutLabel = "", hasBehavior = false) =>
     ({slot, keycode: `CUSTOM_KEY_${slot}`, code: 0x7f00 + slot, name: "", hasBehavior, shortcut, shortcutLabel});
@@ -35,6 +35,19 @@ test("what a custom key does says its shortcut, its behaviour on top, both, or n
     assert.equal(customKeySendsNote(model, "CUSTOM_KEY_1"), "Custom key · sends Left Ctrl + Right Alt + K");
     assert.match(customKeySendsNote(model, "CUSTOM_KEY_0"), /no shortcut/);
     assert.equal(customKeySendsNote(model, "KC_A"), "", "not a custom key");
+});
+
+test("the hover card says what a custom key sends, short where its behaviour says the rest", () => {
+    assert.equal(customKeyHeadline(model.customKeys[1]), "Sends Left Ctrl + Right Alt + K: held while the key is held, tapped when it is tapped.");
+    assert.equal(customKeyHeadline(model.customKeys[2]), "Sends Left Ctrl + Left Shift + Left Alt + Left GUI where its behaviour leaves a tap or hold empty.");
+    assert.equal(customKeyHeadline({...model.customKeys[0], hasBehavior: true}), "No shortcut");
+    assert.match(customKeyHeadline(model.customKeys[0]), /sends nothing/);
+    assert.equal(customKeyHeadline(undefined), "");
+    // A step or a combo output whose behaviour does not run sends the
+    // shortcut only, never the key's own behaviour (firmware D-F26).
+    assert.equal(customKeyShortcutOnly(model.customKeys[2]), "sends its shortcut, Left Ctrl + Left Shift + Left Alt + Left GUI");
+    assert.equal(customKeyShortcutOnly({...model.customKeys[0], hasBehavior: true}), "no shortcut, so it sends nothing");
+    assert.equal(customKeyShortcutOnly(undefined), "");
 });
 
 test("a bypassed custom key sends its shortcut, and says so, or nothing", () => {

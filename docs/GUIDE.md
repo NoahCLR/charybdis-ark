@@ -375,9 +375,35 @@ that layer — the base effect, then
 the layer's colour on the keys it owns — with the legends drawn on top in
 whichever of black or white stays readable, and the behaviour dots and combo
 badges on the key face in the feedback colours the keyboard flashes.
-Resting the pointer on a key opens a card of everything it reaches. Each combo
-there leads with what it sends, the keycode it stores and how many keys it
-takes, with the keys that press it beneath and the hovered key marked among them.
+Resting the pointer on a key opens a card of everything it reaches. Every
+action there reads by its name first, then the keycode it stores; a custom key
+or pointing mode reads as `CUSTOM_KEY_n` or `PD_SLOT_n` rather than its number.
+A custom key says under its name what its shortcut sends, held and tapped as
+the key is or where its behaviour leaves a tap or hold empty, or that it has
+none.
+A layer-tap or mod-tap key always lists what its tap sends, what its hold does,
+the tap / hold threshold it runs on and who decides it: the keyboard, when it
+has a behaviour row that runs there (even one with no branches), or QMK, when
+it has none or its row is switched off or bypassed there. Any other key with a
+branchless behaviour row says in one line that the keyboard's key engine
+handles it. A behaviour switched off or bypassed there says so and why, and
+what the key sends instead: its own keycode, or a custom key's shortcut.
+Behaviour branches list each tier's action and how a hold runs, and the
+behaviour names the thresholds it runs on in milliseconds, its own or the
+keyboard's default; a hold that taps at or after a threshold names
+that threshold's time, and one that repeats its rate in Hz. A macro lists its steps — held (↓), let go (↑),
+tapped, typed and waited. A branch that sends a custom key says it sends that
+key's shortcut, never its behaviour. Each combo leads with what it sends and how many keys
+it takes, with the keys that press it beneath and the hovered key marked among
+them. When a combo sends a key that has a behaviour, and that behaviour runs —
+the combo's own output behaviour, the keyboard's behaviours and Combo outputs
+use behaviours are all on — its row says so, and the behaviour opens in its own
+card beside the key's, tinted in the combo colour the keyboard flashes (grey
+when that is off) and naming the combos that run it; up to three such cards
+show, with a count of any more. A combo sending a custom key whose behaviour
+does not run says what its shortcut sends, or that it sends nothing. A transparent key says which
+layer answers it and what that key does there, following the layers you
+preview.
 During initial read, refresh or device selection, every screen menu is disabled
 and a loading step replaces the screen. Once the read finishes, Device opens
 if the keyboard reported its capabilities. Profile & backups opens when a

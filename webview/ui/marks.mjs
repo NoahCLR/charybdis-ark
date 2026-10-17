@@ -31,6 +31,14 @@ export function tierDot(model, kind) {
     return `<i class="fbdot${lit ? "" : " off"}"${lit ? ` style="background:${css(colour)}"` : ""}></i>`;
 }
 
+// The colour the keyboard flashes when a combo fires, as a CSS colour, or ""
+// when that stage or colour is off — so whatever wears it looks off too.
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model */
+export function comboTint(model) {
+    const colour = model?.rgb?.comboFeedback?.color;
+    return stageEnabled(model, "combo") && colour && !isOff(colour) ? css(colour) : "";
+}
+
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} [badge] */
 export function comboBadge(model, badge = "C") {
     const colour = model?.rgb?.comboFeedback?.color;

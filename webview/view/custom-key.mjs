@@ -38,6 +38,23 @@ export function customKeyShortcutLine(key) {
         : `Sends ${key.shortcutLabel}: held while the key is held, tapped when it is tapped.`;
 }
 
+// A custom key under its name in the hover card: what its shortcut does on
+// the key, or, with none, only that, since its behaviour shows below.
+/** @param {CustomKey | null | undefined} key */
+export function customKeyHeadline(key) {
+    if (!key) return "";
+    if (hasShortcut(key)) return customKeyShortcutLine(key);
+    return key.hasBehavior ? "No shortcut" : "No shortcut and no behaviour yet: it sends nothing.";
+}
+
+// Where only a custom key's shortcut runs (a behaviour step that sends the
+// key, or a combo output whose behaviour does not run), what it sends.
+/** @param {CustomKey | null | undefined} key */
+export function customKeyShortcutOnly(key) {
+    if (!key) return "";
+    return hasShortcut(key) ? `sends its shortcut, ${key.shortcutLabel}` : "no shortcut, so it sends nothing";
+}
+
 // A short note for a place that names the key: what it sends.
 /** @param {Model} model @param {string | null | undefined} keycode */
 export function customKeySendsNote(model, keycode) {
