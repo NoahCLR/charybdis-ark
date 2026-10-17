@@ -2,7 +2,7 @@
 
 This document defines the ownership model for live editing with Charybdis Ark
 (the independent app repository in the
-[local workspace map](https://github.com/NoahCLR/charybdis-4x6/blob/1eab17be63962f51036396288fffef8ace36879f/docs/DEVELOPMENT.md#local-repositories-and-worktrees)). It supersedes the earlier project assumption that the three C
+[local workspace map](https://github.com/NoahCLR/charybdis-4x6/blob/1c75ba538a8b05ae8215933081df4ac3c13fafcc/docs/DEVELOPMENT.md#local-repositories-and-worktrees)). It supersedes the earlier project assumption that the three C
 authoring files must remain the only source of truth during a live editing
 session.
 
@@ -145,7 +145,7 @@ physical capacity.
 
 The delivery slices are in Ark's product goal and the product's status in
 Ark's direction; the firmware's status is in the
-[firmware direction](https://github.com/NoahCLR/charybdis-4x6/blob/1eab17be63962f51036396288fffef8ace36879f/docs/LIVE_EDIT_APP_DIRECTION.md#current-firmware-status).
+[firmware direction](https://github.com/NoahCLR/charybdis-4x6/blob/1c75ba538a8b05ae8215933081df4ac3c13fafcc/docs/LIVE_EDIT_APP_DIRECTION.md#current-firmware-status).
 The logical-generation manifest and cross-store commit and recovery ordering
 are implemented; external VIA edit adoption remains. The active phase is
 acceptance: reboot, reconnect, applicable USB/role configurations,
@@ -161,9 +161,9 @@ and recover the same editable values without consulting the C files.
 
 ## Current-format admission
 
-Firmware accepts only its current schema 3.0 domain versions and `NS` format-4
+Firmware accepts only its current schema 3.0 domain versions and `NT` format-5
 storage (D-F10, D-F14). Every save binds VIA generation/digest, including custom-only
-edits. Legacy storage is refused at boot; older backup translation belongs to
-the client. See [Profile Wire](profile-wire-v1.md) and
+edits. Legacy storage is refused at boot, and a backup in an earlier format is
+refused, not translated. See [Profile Wire](profile-wire-v1.md) and
 [logical transactions](logical-profile-transaction-v1.md) for admission and
 recovery rules.

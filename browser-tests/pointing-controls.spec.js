@@ -187,7 +187,7 @@ test("shortcut picker, duplicate, clear and empty-slot creation post their comma
     await configPost(page, 4, {directions: expect.objectContaining({up: expect.objectContaining({keycode: expect.stringContaining("KC_A")})})});
     await clearPosts(page);
     await editor(page).locator('[data-act="duplicate"]').click();
-    await expectPost(page, {type: "duplicatePdMode", slot: 7, source: 4});
+    await expectPost(page, {type: "duplicatePdMode", slot: 6, source: 4});
     await page.locator('[data-slot="4"]').click();
     await clearPosts(page);
     await editor(page).locator('[data-act="clear"]').click();

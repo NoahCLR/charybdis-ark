@@ -2,7 +2,7 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const {decodeComboPages, readDeviceCombos} = require("../../core/protocol/combo-readback-v1");
-const {fixturePages, rehash, responseFor} = require("../fixtures/device-combos");
+const {fixturePages, retiredPages, rehash, responseFor} = require("../fixtures/device-combos");
 const decode = pages => decodeComboPages(pages[0], pages.slice(1));
 
 test("the firmware fixture decodes native inputs, output and timing without a repository lookup", async () => {
@@ -32,7 +32,7 @@ test("the firmware fixture decodes native inputs, output and timing without a re
 
 test("retired combo readback is rejected before rows are requested", async () => {
     for (const version of [1, 2]) {
-        const pages = fixturePages(version);
+        const pages = retiredPages(version);
         assert.throws(() => decode(pages), {code: "COMBO_INCOMPATIBLE"});
         const seen = [];
         await assert.rejects(readDeviceCombos({request: async request => {

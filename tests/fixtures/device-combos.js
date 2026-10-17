@@ -4,10 +4,17 @@ const fs = require("node:fs");
 const path = require("node:path");
 const {fnv1a32} = require("../../core/schema/profile-blob-v1");
 
-// The firmware's own byte fixtures: version 3, the only one the app reads.
-function fixturePages(version = 3) {
-    return fs.readFileSync(path.resolve(__dirname, `../../upstream/firmware/tests/fixtures/combo_readback_v${version}.fixture`), "utf8")
+// The firmware's own byte fixture: version 3, the only one the app reads.
+function fixturePages() {
+    return fs.readFileSync(path.resolve(__dirname, "../../upstream/firmware/tests/fixtures/combo_readback_v3.fixture"), "utf8")
         .trim().split("\n").map(line => Buffer.from(line.split(" ")[1], "hex"));
+}
+// The same pages labelled as an earlier readback version, which the app refuses.
+/** @param {number} version */
+function retiredPages(version) {
+    const pages = fixturePages();
+    pages[0][0] = version;
+    return pages;
 }
 // Version 3's digest covers every metadata byte but the digest itself (bytes
 // 6..9), then every later page.
@@ -24,4 +31,4 @@ function responseFor(request, pages) {
     pages[request[4] | (request[5] << 8)].copy(response, 7);
     return response;
 }
-module.exports = {fixturePages, rehash, responseFor};
+module.exports = {fixturePages, retiredPages, rehash, responseFor};

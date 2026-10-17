@@ -1,10 +1,11 @@
 // @ts-check
 "use strict";
-// Current firmware's profile as Ark's tests build it: the pinned compiled
-// profile (compiled_profile_pd_v2.fixture: schema 3.0, RGB 4, key behaviours 2,
-// combos 3, settings 8, sparse PD 3, slots 0-6 configured), materialized the
-// way a keyboard read does, with these settings and a combo table standing in
-// for the live readbacks.
+// Current firmware's profile as Ark's tests build it: the firmware's frozen
+// populated profile (populated_profile_v3.fixture: schema 3.0, RGB 4, key
+// behaviours 2, combos 3, settings 8, sparse PD 3, slots 0-5 configured),
+// materialized the way a keyboard read does, with these settings and a combo
+// table standing in for the live readbacks. It is a format sample, never the
+// firmware's authored defaults, so editing the keymap changes nothing here.
 const fs = require("node:fs");
 const path = require("node:path");
 const {createSnapshot, materializeProfile} = require("../../core/model/portable-profile");
@@ -13,7 +14,7 @@ const {ACTION_ABI} = require("../../core/schema/actions");
 const {LAYER_LOCK_BASE} = require("../../core/data/user-keycodes");
 const {PROFILE_WIRE_KNOWN_MASKS} = require("../../core/protocol/profile-wire-v1");
 
-const FIXTURE = path.resolve(__dirname, "../../upstream/firmware/tests/fixtures/compiled_profile_pd_v2.fixture");
+const FIXTURE = path.resolve(__dirname, "../../upstream/firmware/tests/fixtures/populated_profile_v3.fixture");
 const CURRENT_CAPABILITIES = Object.freeze({compiledLayerCount: 16, supportedDomainMask: 31, schema: {major: 3}, actionAbiDigest: ACTION_ABI,
     featureFlags: PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES});
 
@@ -29,16 +30,16 @@ function settings() {
     return {values, names: ["Base", "Numbers", "Symbols", "Navigation", "Pointer", "Extra 1", "Extra 2", "Extra 3", ...Array(8).fill("")], layers,
         macroNames: Array(128).fill(""), customKeyNames: Array(128).fill(""), customKeyShortcuts: Array.from({length: 128}, () => ({mods: 0, key: 0})), keyboardName: "", formatVersion: 8};
 }
-const compiledBytes = () => {
-    const match = fs.readFileSync(FIXTURE, "utf8").match(/^profile.full.hex=(.+)$/m);
-    if (!match) throw new Error("The compiled profile fixture has no profile.full.hex.");
+const profileBytes = () => {
+    const match = fs.readFileSync(FIXTURE, "utf8").match(/^profile\.hex=(.+)$/m);
+    if (!match) throw new Error("The populated profile fixture has no profile.hex.");
     return Buffer.from(match[1], "hex");
 };
 
-// The compiled profile with an empty layout and no combos, unless given.
+// The profile with an empty layout and no combos, unless given.
 /** @param {import("./types.js").CompiledOptions} [options] */
 function compiled({combos = [], layout = Buffer.alloc(1920), policy = settings()} = {}) {
-    const bytes = compiledBytes();
+    const bytes = profileBytes();
     const table = {version: 3, defaultTermMs: 50, holdTermMs: 200, rows: combos};
     const profile = materializeProfile(bytes, bytes, table, encodeSettings(policy));
     return createSnapshot({profile, actionAbiDigest: ACTION_ABI, via: {layers: 16, layout, macros: Buffer.alloc(10327), macroSlots: 128}});

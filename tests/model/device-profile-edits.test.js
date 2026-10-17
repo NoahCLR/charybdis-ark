@@ -32,7 +32,7 @@ test("LED membership edits preserve references and refuse deleting an assigned g
 
 const {decodeComboDomain} = require("../../core/schema/combo-domain-v1");
 const {decodeComboPages} = require("../../core/protocol/combo-readback-v1");
-const {fixturePages} = require("../fixtures/device-combos");
+const {fixturePages, retiredPages} = require("../fixtures/device-combos");
 const {assertEffectiveCombos} = require("../../core/model/device-profile-edits");
 const readOf = pages => ({state: "read", ...decodeComboPages(pages[0], pages.slice(1))});
 const pages = fixturePages();
@@ -82,7 +82,7 @@ test("a combo follows the default window until it has its own, and the default i
     assert.equal(comboTable(editDeviceProfile(empty, {type: "updateComboHoldTerm", holdTermMs: 250}, context)).holdTermMs, 250);
 });
 test("retired combo readback never becomes an editable table", () => {
-    assert.throws(() => readOf(fixturePages(1)), {code: "COMBO_INCOMPATIBLE"});
+    assert.throws(() => readOf(retiredPages(1)), {code: "COMBO_INCOMPATIBLE"});
 });
 test("Cmd+N from the combo picker saves and verifies as a standard modified key", () => {
     const message = {type: "saveCombo", id: 0, inputs: ["G(KC_C)", "G(KC_V)"], output: "G(KC_N)", termMs: "50"};

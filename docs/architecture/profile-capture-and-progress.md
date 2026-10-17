@@ -105,5 +105,5 @@ malformed maps, later unavailability, changed identities and corruption fail
 the read. Freshness and exact stored bytes are preserved for initial capture,
 Refresh, Export, recovery and differential Apply. Storage and backup formats
 stay unchanged. The firmware owns the
-[wire contract](../../upstream/firmware/docs/architecture/profile-wire-v1.md#sparse-via-macro-read-map--optional-get-value-0x0c),
+[wire contract](../../upstream/firmware/docs/architecture/profile-wire-v1.md#sparse-via-macro-read-map--get-value-0x0c),
 imported from its published implementation.

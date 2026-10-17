@@ -1,9 +1,9 @@
 // @ts-check
 "use strict";
-// Current firmware's compiled profile with every pointing slot from 6 on empty,
-// so creation and duplication have destinations, whatever the compiled
-// profile configures there; the authored Undo / Redo branch that reached slot
-// 6 goes too, so a deliberately empty destination raises no unrelated warning.
+// The test profile (./portable-profile) with every pointing slot from 6 on
+// empty, so creation and duplication have destinations whatever the profile
+// configures there; any behaviour step reaching those slots goes too, so a
+// deliberately empty destination raises no unrelated warning.
 const {createSnapshot} = require("../../core/model/portable-profile");
 const {decodeProfileBlob, encodeProfileBlob} = require("../../core/schema/profile-blob-v1");
 const {decodePdDomain, encodePdDomain} = require("../../core/schema/pd-mode-domain-v1");

@@ -1,52 +1,12 @@
 "use strict";
 
 const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const path = require("node:path");
 const test = require("node:test");
 
-const {decodeProfileBlob, encodeProfileBlob} = require("../../core/schema/profile-blob-v1");
-const {decodeKeyBehaviorDomain, encodeKeyBehaviorDomain} = require("../../core/schema/key-behavior-domain-v1");
-const {decodeRgbDomainV1, encodeRgbDomainV1} = require("../../core/schema/rgb-domain-v1");
-const {decodeComboDomain, encodeComboDomain} = require("../../core/schema/combo-domain-v1");
-const {decodeSettings, encodeSettings} = require("../../core/schema/settings-domain-v1");
-const {decodePdDomain, encodePdDomain} = require("../../core/schema/pd-mode-domain-v1");
 const {
     buildCanonicalStudioProfileV1,
     semanticActionForExpression,
 } = require("../../core/schema/compiled-profile-v1");
-
-const fixturePath = path.resolve(__dirname, "../../upstream/firmware/tests/fixtures/compiled_profile_pd_v2.fixture");
-const fixture = new Map(fs.readFileSync(fixturePath, "utf8")
-    .split(/\r?\n/)
-    .filter((line) => line && !line.startsWith("#"))
-    .map((line) => {
-        const separator = line.indexOf("=");
-        return [line.slice(0, separator), line.slice(separator + 1)];
-    }));
-
-// The firmware's compiled profile, all five domains in registry order, each
-// re-encoded by Ark to exactly its bytes.
-test("real compiled defaults remain a canonical cross-language profile fixture", () => {
-    const bytes = Buffer.from(fixture.get("profile.full.hex"), "hex");
-    const decoded = decodeProfileBlob(bytes);
-    assert.equal(bytes.length, Number(fixture.get("profile.byte_length")));
-    assert.equal(decoded.crc32, Number.parseInt(fixture.get("profile.crc32"), 16));
-    assert.equal(decoded.digest, Number.parseInt(fixture.get("profile.fnv1a32"), 16));
-    assert.deepEqual(decoded.domains.map((domain) => [domain.id, domain.version]), [[0x10, 4], [0x20, 2], [0x30, 3], [0x40, 8], [0x50, 3]]);
-    assert.equal(decodeSettings(decoded.domains[3].payload).keyboardName, "", "the compiled default is the built-in name");
-    assert.ok(decodeSettings(decoded.domains[3].payload).customKeyShortcuts.every(({mods, key}) => !mods && !key), "no compiled custom key has a shortcut");
-    const rgb = decodeRgbDomainV1(decoded.domains[0].payload);
-    const behaviors = decodeKeyBehaviorDomain(decoded.domains[1].payload);
-    assert.equal(rgb.layerColors.length, 16);
-    assert.equal(rgb.pdModeColors.length, 32);
-    assert.deepEqual(encodeRgbDomainV1(rgb), decoded.domains[0].payload);
-    assert.deepEqual(encodeKeyBehaviorDomain({rows: behaviors.rows}), decoded.domains[1].payload);
-    assert.deepEqual(encodeComboDomain(decodeComboDomain(decoded.domains[2].payload)), decoded.domains[2].payload);
-    assert.deepEqual(encodeSettings(decodeSettings(decoded.domains[3].payload)), decoded.domains[3].payload);
-    assert.deepEqual(encodePdDomain(decodePdDomain(decoded.domains[4].payload)), decoded.domains[4].payload);
-    assert.deepEqual(encodeProfileBlob({domains: decoded.domains}), bytes);
-});
 
 function minimalStudioModel() {
     return {

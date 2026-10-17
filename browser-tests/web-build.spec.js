@@ -26,8 +26,9 @@ async function inputs() {
     const blobs = [];
     for (const dir of [FIRMWARE_FIXTURES, APP_FIXTURES]) {
         for (const file of fs.readdirSync(dir).filter((name) => name.endsWith(".fixture")).sort()) {
+            // rgb_domain_v1's bare blob.hex needs its codec limits; its payload runs below.
             for (const [key, hex] of values(path.join(dir, file))) {
-                if (/^(profile\.full|blob\.[a-z]+)\.hex$/.test(key)) blobs.push({name: `${dir === APP_FIXTURES ? "app" : "firmware"}/${file} ${key}`, hex, rejects: ["compiled_profile_v1.fixture", "compiled_profile_eight_v1.fixture"].includes(file) ? "INCOMPATIBLE_SCHEMA" : undefined});
+                if (/^(profile|profile\.full|blob\.[a-z]+)\.hex$/.test(key)) blobs.push({name: `${dir === APP_FIXTURES ? "app" : "firmware"}/${file} ${key}`, hex});
             }
         }
     }
@@ -61,6 +62,9 @@ async function inputs() {
         {name: "retired portable version", document: {...portableFixture.document(), version: 1}, rejects: "INVALID_PORTABLE_PROFILE"},
     ];
     for (const {name, document} of documents.filter(entry => !entry.rejects)) blobs.push({name: `document ${name}`, hex: Buffer.from(document.profile, "base64").toString("hex")});
+    // A current profile labelled with an earlier schema, refused alike.
+    const older = Buffer.from(portableFixture.document().profile, "base64"); older[4] = 1;
+    blobs.push({name: "schema 1 profile", hex: older.toString("hex"), rejects: "INCOMPATIBLE_SCHEMA"});
 
     const edits = await import("../webview/view/edits.mjs");
     const {ACTION_ABI} = require("../core/schema/actions");

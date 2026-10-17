@@ -12,7 +12,7 @@ to locate task worktrees and distinguish current source from this pinned baselin
 
 | Directory | Purpose | Owner |
 | --- | --- | --- |
-| `firmware/tests/fixtures/` | Golden wire bytes and stored profiles, including historical formats kept for rejection and shared record checks | Firmware project |
+| `firmware/tests/fixtures/` | Golden wire bytes and current-format profiles that the firmware's own tests check | Firmware project |
 | `firmware/docs/architecture/` | Profile Wire, domain, transaction, ownership and resource specifications used when developing the client | Firmware project |
 | `qmk/data/constants/keycodes/` | Numeric keycode definitions and US aliases used by the catalog generator | QMK fork |
 | `qmk/keyboards/bastardkb/charybdis/` | Keyboard keycode declarations and the 4×6 matrix layout contract | QMK fork |
@@ -43,7 +43,7 @@ Node dependencies have been installed.
 ## Updating a contract
 
 1. Select a committed firmware or QMK revision. Inspect the relevant protocol,
-   schema, capability and migration changes before copying files. Use committed
+   schema and capability changes before copying files. Use committed
    blobs, not an unreviewed working-tree snapshot. Locally, any committed
    revision will do, landed or not. A pin change lands only once its revision
    is on the source's published trunk (firmware `dev`; QMK
@@ -66,7 +66,12 @@ Node dependencies have been installed.
    stay as written; every other relative link is pinned to the source commit.
    Never edit fixture bytes simply to match the app.
 3. To add a file, list it in the manifest (`path`, `source`, `sourcePath`), then
-   refresh. Historical fixtures still needed for compatibility stay listed.
+   refresh. Import format samples only: never a fixture the firmware
+   regenerates from its keymap or authored defaults. Agreement requires every
+   imported fixture to equal the firmware's, so such a file would block a
+   firmware release on an ordinary keymap edit, which agreement deliberately
+   never compares ([COMPATIBILITY.md](../docs/COMPATIBILITY.md)). Ark builds
+   older-format inputs for its refusal tests itself.
 4. Review the diff, then run `npm run check`, `npm run keycodes -- --check` and
    `npm run upstream -- --check --firmware PATH --qmk PATH`, which rebuilds every
    file from the commit its entry pins and fails on any difference; CI's

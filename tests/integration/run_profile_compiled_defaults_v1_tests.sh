@@ -23,10 +23,9 @@ noah_host_export_qmk_cpath "$ROOT"
     printf '#include "%s/config.h"\n' "$KEYMAP_PATH"
 } >"$CONFIG"
 
-# Earlier eight-slot profiles remain rejected by current firmware.
-for suffix in .pd .pd3 .pd4 .pd5; do
-    cp "$ROOT/tests/fixtures/client-regression/portable.bin$suffix" "$BUILD_DIR/portable.bin$suffix"
-done
+# A profile from before the current format (eight pointing slots, schema 2)
+# is refused by current firmware.
+cp "$ROOT/tests/fixtures/client-regression/portable.bin.pd5" "$BUILD_DIR/old.bin"
 
 node - "$BUILD_DIR/current.bin" "$BUILD_DIR/maximum.bin" "$BUILD_DIR/combo-permissions" <<'JS'
 const fs = require("node:fs");
@@ -119,9 +118,7 @@ build_and_run() {
         -o "$bin"
     if [ "$name" = configured ] || [ "$name" = configured_sanitized ]; then
         "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture"
-        for suffix in .pd .pd3 .pd4 .pd5; do
-            "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --reject-profile "$BUILD_DIR/portable.bin$suffix"
-        done
+        "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --reject-profile "$BUILD_DIR/old.bin"
         "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --import-profile "$BUILD_DIR/current.bin"
         "$bin" "$ROOT/tests/fixtures/compiled_profile_pd_v2.fixture" --import-profile "$BUILD_DIR/maximum.bin"
         for permission in global row both; do

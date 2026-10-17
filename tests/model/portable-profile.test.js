@@ -1,8 +1,6 @@
 "use strict";
 const {test} = require("node:test");
 const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const path = require("node:path");
 const {validateSnapshot, reorderLayers, fingerprint, materializeProfile} = require("../../core/model/portable-profile");
 const {encodeSettings, decodeSettings} = require("../../core/schema/settings-domain-v1");
 const {decodeProfileBlob, encodeProfileBlob} = require("../../core/schema/profile-blob-v1");
@@ -49,9 +47,11 @@ test("a backup from older firmware is refused, never upgraded: the keyboard stor
         assert.throws(() => validateSnapshot({...source, profile: relabelled.toString("base64")}), older, `domain 0x${domain.id.toString(16)}`);
         offset += 4 + domain.payload.length;
     }
-    // The firmware's frozen schema-1 compiled profile.
-    const frozen = fs.readFileSync(path.resolve(__dirname, "../../upstream/firmware/tests/fixtures/compiled_profile_eight_v1.fixture"), "utf8");
-    assert.throws(() => validateSnapshot({...source, profile: Buffer.from(frozen.match(/^profile.full.hex=(.+)$/m)[1], "hex").toString("base64")}), older);
+    // A current profile relabelled with an earlier blob schema.
+    for (const major of [1, 2]) {
+        const relabelled = Buffer.from(raw); relabelled[4] = major;
+        assert.throws(() => validateSnapshot({...source, profile: relabelled.toString("base64")}), older, `schema ${major}`);
+    }
 });
 test("behaviour targets and tap/hold branches follow their layers", () => {
     const source = document(), blob = decodeProfileBlob(Buffer.from(source.profile, "base64"));
