@@ -1048,9 +1048,25 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .hc-key { border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; font-family: var(--mono); font-size: 10.5px; line-height: 16px; color: var(--text-2); }
 .hc-key .mk { gap: 4px; }
 .hc-key.here { color: var(--text); border-color: var(--line-2); background: var(--surface-3); font-weight: 600; }
-.hc-macro { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
-.hc-macro + .hc-macro { margin-top: 6px; }
-.hc-key.hc-typed { font-family: var(--sans); }
+/* A macro's steps as chips: each a small macro editor tile, mark then label,
+   never wider than its row; a long label ends in an ellipsis. */
+.step-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 0; }
+.step-chips + .step-chips { margin-top: 6px; }
+.step-chip { display: inline-flex; align-items: center; gap: 5px; max-width: 100%; min-width: 0; border: 1px solid var(--line); border-radius: 4px;
+  padding: 0 6px 0 3px; font: 10.5px/18px var(--mono); color: var(--text); white-space: nowrap; }
+.step-chip > * { flex: none; }
+.step-chip > .step-chip-label { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.step-chip-mark { display: grid; place-items: center; width: 14px; height: 14px; font: 600 11px/1 var(--sans); color: var(--text); }
+.step-chip.press .step-chip-mark, .step-chip.release .step-chip-mark { background: var(--surface-3); border-radius: 3px; }
+.step-chip-mark .macro-tap-dot { width: 4px; height: 4px; }
+.step-chip-mark svg { width: 12px; height: 12px; stroke: var(--text-2); fill: none; stroke-width: 1.5; }
+.step-chip.text { gap: 0; padding-left: 6px; font-family: var(--sans); }
+.step-chip.delay { border-style: dashed; }
+.step-chip-then { color: var(--line-3); font-size: 11px; margin: 0 -1px; }
+.step-chip-unit { margin-left: -2px; font-size: 9px; color: var(--text-2); }
+.step-chips-more { color: var(--text-3); font-size: 10.5px; }
+/* Read out, not shown: the step's kind, which its mark shows on screen. */
+.step-chip-said { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 /* What answers a transparent key, set apart as its own group under the viewed
    layer's key. */
 .hc-through { background: var(--surface-2); }

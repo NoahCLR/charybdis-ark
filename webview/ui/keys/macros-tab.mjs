@@ -1,6 +1,7 @@
 // @ts-check
 // The Macros tab: every macro this layer reaches, grouped by how, each linking
-// to its slot in the Macros view.
+// to its slot in the Macros view. Each row shows its steps as the hover card
+// does.
 
 import {el, esc} from "../../lib/dom.mjs";
 import {macroReach} from "../../view/reach.mjs";
@@ -9,7 +10,7 @@ import {draftDot, draftMarks} from "../../view/review.mjs";
 import {attachReachRows, reachAttrs, reachTable} from "../groups.mjs";
 import {reachEntries} from "../../view/reach-groups.mjs";
 import {macroView, reachLabel} from "./reach.mjs";
-import {actionMarked} from "../marks.mjs";
+import {actionMarked, macroSteps} from "../marks.mjs";
 
 /** @param {HTMLElement} body @param {HTMLElement} right */
 export function tabMacros(body, right) {
@@ -27,7 +28,7 @@ export function tabMacros(body, right) {
         const slot = slots.find((entry) => entry.keycode === keycode);
         return `<tr${reachAttrs("macros", group, keycode)}>
             <td>${actionMarked(model, keycode)} <code class="dim">${esc(keycode)}</code>${changedMacros.has(keycode) ? draftDot() : ""}</td>
-            <td class="mono">${esc(slot?.payload || "—")}</td>
+            <td>${slot?.payload ? macroSteps(model, slot.payload) : `<span class="muted">${slot ? "empty" : "—"}</span>`}</td>
             <td class="muted">${reachedBy}</td>
             <td class="reach-edit">${slot ? `<button class="btn tiny ghost" data-editmacro="${esc(keycode)}">Edit</button>` : ""}</td></tr>`;
     };
@@ -54,7 +55,7 @@ export function tabMacros(body, right) {
     // A folded group holding a changed macro says so on its header.
     for (const group of groups) group.drafted = (group.id === "elsewhere" ? reach.elsewhere : reachEntries(reach, group.id).map((entry) => entry.name))
         .some((keycode) => changedMacros.has(keycode));
-    const node = reachTable("macros", groups, [["Slot", "24%"], ["Payload", "44%"], ["Reached by", "24%"], ["", "8%"]]);
+    const node = reachTable("macros", groups, [["Slot", "24%"], ["Steps", "44%"], ["Reached by", "24%"], ["", "8%"]]);
     attachReachRows(node, "macros");
     /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-editmacro]")).forEach((button) => button.addEventListener("click", () => {
         const keycode = button.dataset.editmacro;
