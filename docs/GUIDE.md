@@ -195,7 +195,9 @@ The floating bar is the only way changes leave the window.
 
 Hover over a setting's label or control on Mouse or Settings to see what it
 does. Read-only settings also explain why they cannot be edited. Visible
-hints and numeric limits stay beside the setting.
+hints and numeric limits stay beside the setting. A number field takes only
+digits (a time in seconds or minutes also takes one decimal point): letters
+and other characters typed or pasted into it do not appear.
 
 When an accepted edit redraws the screen, the same field keeps keyboard focus
 and its text selection while it remains available. Search fields also keep

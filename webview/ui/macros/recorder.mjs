@@ -41,8 +41,8 @@ export function recorder(model, slot, canEdit) {
             <div class="row record-opts">
                 <label class="sw"><input type="checkbox" data-f="macro:${esc(slot.keycode)}:record-delays" data-delays ${delays ? "checked" : ""} ${state.recordPreserveHoldTiming ? "disabled" : ""}>
                     <span class="track"></span><span class="txt">Record delays</span></label>
-                <label class="field ms-field"><span>After (ms)</span><input class="input mono" data-f="macro:${esc(slot.keycode)}:record-threshold" data-threshold value="${esc(state.recordDelayThreshold)}" ${delays ? "" : "disabled"}></label>
-                <label class="field ms-field"><span>Round to (ms)</span><input class="input mono" data-f="macro:${esc(slot.keycode)}:record-round" data-round value="${esc(state.recordDelayRound)}" ${delays ? "" : "disabled"}></label>
+                <label class="field ms-field"><span>After (ms)</span><input class="input mono" data-f="macro:${esc(slot.keycode)}:record-threshold" data-threshold inputmode="numeric" value="${esc(state.recordDelayThreshold)}" ${delays ? "" : "disabled"}></label>
+                <label class="field ms-field"><span>Round to (ms)</span><input class="input mono" data-f="macro:${esc(slot.keycode)}:record-round" data-round inputmode="numeric" value="${esc(state.recordDelayRound)}" ${delays ? "" : "disabled"}></label>
                 <label class="sw" data-tip="Keeps individual presses and releases with their timing. Record delays stays on; After and Round to set its precision."><input type="checkbox" data-f="macro:${esc(slot.keycode)}:record-preserve-hold-timing" data-preserve-hold-timing ${state.recordPreserveHoldTiming ? "checked" : ""} ${recording ? "disabled" : ""}>
                     <span class="track"></span><span class="txt">Preserve hold timing</span></label>
             </div>
