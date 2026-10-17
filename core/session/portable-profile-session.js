@@ -9,6 +9,7 @@ const {candidateMetadataForBlob, readCandidatePeerStatus, readCandidateStatus, C
 const {ApplyProgress, failureReason} = require("./apply-progress");
 const {CandidateUploadCoordinator} = require("./candidate-upload-coordinator");
 const {LogicalViaStageCoordinator} = require("./logical-via-stage-coordinator");
+const {readLogicalViaStatus, LOGICAL_VIA_STATE} = require("../protocol/logical-via-stage-v1");
 const {createSnapshot, validateSnapshot, materializeProfile, fingerprint, summary, reorderLayers} = require("../model/portable-profile");
 const {requireReady: checkFirmwareReady, supportsCompleteProfile, canCapture, canReadIdentity, identityStateFlags} = require("./firmware-support");
 const {encodeSettings} = require("../schema/settings-domain-v1");
@@ -187,6 +188,47 @@ async function peerRestartGuidance(connection, options) {
     } catch {}
     return "";
 }
+// A save the keyboard failed after its decision because split authority was
+// lost or another commit ran at the same time (candidate state
+// AUTHORITY_FAILED) never finishes by itself: the keyboard holds that state
+// until it restarts. If the master half had already requested the slave
+// half's VIA ACCEPT, it also types nothing until then, because only complete
+// activation lifts the fence ACCEPT starts. The failure is read first: the
+// keyboard requests no ACCEPT after it, so a staged, idle VIA status read
+// afterwards proves the fence never started. `fenced` is undefined when the
+// VIA status says neither. Best effort, like peerRestartGuidance.
+/** @param {Connection} connection @param {import("../protocol/types.js").ReadOptions} options @param {Failure} error @param {{transactionId: number, generation: number, digest: number, acceptObserved: boolean}} expected @returns {Promise<{fenced: boolean | undefined, deviceError: import("./types.js").CandidateStatus["error"]} | null>} */
+async function authorityFailure(connection, options, error, {transactionId, generation, digest, acceptObserved}) {
+    /** @type {import("./types.js").CandidateStatus["error"] | undefined} */
+    let deviceError;
+    for (let cause = /** @type {Failure | undefined} */ (error); cause && !deviceError; cause = cause.cause) {
+        if (cause.code === "AUTHORITY_FAILED" && cause.deviceError) deviceError = cause.deviceError;
+    }
+    if (!deviceError) {
+        try {
+            const status = await readCandidateStatus(connection, options);
+            if (status.transactionId === transactionId && status.state === CANDIDATE_STATE.AUTHORITY_FAILED) deviceError = status.error;
+        } catch {}
+    }
+    if (!deviceError) return null;
+    if (acceptObserved) return {fenced: true, deviceError};
+    try {
+        const via = await readLogicalViaStatus(connection, options);
+        if (via.transactionId === transactionId && via.generation === generation && via.digest === digest) {
+            if (via.state === LOGICAL_VIA_STATE.STAGED && !via.pending) return {fenced: false, deviceError};
+            // Queued, acknowledged, failed or already rolled forward: after the
+            // decision the only VIA request left is ACCEPT.
+            if (via.pending || /** @type {number[]} */ ([LOGICAL_VIA_STATE.ACCEPTED, LOGICAL_VIA_STATE.ERROR, LOGICAL_VIA_STATE.IDLE]).includes(via.state)) return {fenced: true, deviceError};
+        }
+    } catch {}
+    return {fenced: undefined, deviceError};
+}
+/** @type {Readonly<Record<string, string>>} */
+const UNTIL_RESTART = Object.freeze({
+    true: "The master half types nothing until it restarts.",
+    false: "The master half keeps typing the old profile until it restarts.",
+    undefined: "The master half may type nothing until it restarts.",
+});
 // What the keyboard is doing for the "Copy the profile to the slave half" step,
 // from candidate status page 1.
 /** @type {Readonly<Record<string, string>>} */
@@ -244,7 +286,9 @@ function progressText(view) {
 // and what can honestly be said about what was saved.
 /** @param {Failure} error @param {InstanceType<typeof ApplyProgress>} applyProgress @param {string} saved */
 function withFailure(error, applyProgress, saved) {
-    const cause = error.cause || error;
+    // A device reason found after the step failed (AUTHORITY_FAILED read
+    // back) outranks the step's own error.
+    const cause = error.deviceError ? error : error.cause || error;
     const failure = applyProgress.fail({reason: failureReason(cause, cause.progress?.peer), saved});
     return Object.assign(error, {step: failure.step, stepLabel: failure.label, reason: failure.reason, saved: failure.saved});
 }
@@ -307,7 +351,7 @@ async function restoreProfile(connection, ids, capabilities, input, {expectedFin
         const layoutRanges = changedRanges(base.layout, target.layout);
         /** @type {import("./types.js").PreparedCandidate | undefined} */
         let prepared;
-        let decisionObserved = false, commitRequested = false;
+        let decisionObserved = false, commitRequested = false, acceptObserved = false;
         try {
             applyProgress.report("upload");
             prepared = await coordinator.upload(target.profile, {baseSource: candidateBaseSource(before),
@@ -325,6 +369,7 @@ async function restoreProfile(connection, ids, capabilities, input, {expectedFin
                 decisionObserved = true;
                 applyProgress.report("converge", {detail: "Waiting for the slave half's copy of keys and macros"});
                 await viaCoordinator.waitUntilAccepted({transactionId: candidate.transactionId, generation: targetStorageGeneration, digest: expectedStorageDigest});
+                acceptObserved = true;
                 applyProgress.report("local");
                 await rollForwardLocalStorage(connection, target, base, layoutRanges, macroRanges, counted => applyProgress.report("local", counted));
             }});
@@ -364,10 +409,17 @@ async function restoreProfile(connection, ids, capabilities, input, {expectedFin
             if (!decisionObserved && (!commitRequested || cancelled)) {
                 throw Object.assign(fail("RESTORE_NOT_SAVED", `Nothing was saved: the keyboard kept the profile it had. ${/** @type {Error} */ (error).message}${restart}`), {cause: error});
             }
+            const recoveryAdvice = before.incomplete ? `Import your original complete backup again. Interrupted data was saved for diagnosis at ${recovery}.` : `Import the recovery file ${recovery}.`;
+            const authority = prepared ? await authorityFailure(connection, options, /** @type {Failure} */ (error), {transactionId: prepared.transactionId, generation: targetStorageGeneration, digest: expectedStorageDigest, acceptObserved}) : null;
+            if (authority) {
+                // Only a restart ends it, so the advice is to restart even when
+                // the master half may still be typing.
+                throw Object.assign(fail("RESTORE_INCOMPLETE", `Restore was interrupted. Keep both halves connected. The keyboard had already decided to save it, but the halves then stopped agreeing on the saved profile, so it cannot finish by itself. ${UNTIL_RESTART[String(authority.fenced)]} Unplug the USB cable (not the cable between the halves), wait a few seconds and plug it back in, then read the keyboard again. Only if it still shows the old profile: ${recoveryAdvice} ${/** @type {Error} */ (error).message}`), {cause: error, deviceError: authority.deviceError});
+            }
             // After the decision the keyboard owns the outcome: once this app
             // stops writing, it copies the slave half's complete target itself.
             const finishing = decisionObserved ? "The keyboard had already decided to save it and finishes from the slave half's copy by itself, about 15 seconds after both halves are connected; read the keyboard again then. Only if it still shows the old profile: " : "";
-            throw Object.assign(fail("RESTORE_INCOMPLETE", `Restore was interrupted. Keep both halves connected. ${finishing}${before.incomplete ? `Import your original complete backup again. Interrupted data was saved for diagnosis at ${recovery}.` : `Import the recovery file ${recovery}.`} ${/** @type {Error} */ (error).message}${restart}`), {cause: error});
+            throw Object.assign(fail("RESTORE_INCOMPLETE", `Restore was interrupted. Keep both halves connected. ${finishing}${recoveryAdvice} ${/** @type {Error} */ (error).message}${restart}`), {cause: error});
         }
     }
 }

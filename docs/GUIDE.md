@@ -960,7 +960,19 @@ What to expect while it applies:
 - It then holds key input for the few moments while the master half's keys and
   macros are rewritten and the new profile activates. If the app is closed in
   that window, the keyboard finishes the save on its own from the slave half's
-  copy within about 15 seconds.
+  copy within about 15 seconds. Most failures after the decision end the same
+  way: Ark says the keyboard finishes by itself, and you read it again once
+  both halves have been connected for about 15 seconds.
+- Rarely, the halves stop agreeing on the saved profile after the decision:
+  the slave half reports a newer one, or another save ran at the same time.
+  The keyboard cannot finish that save by itself, and waiting does nothing.
+  If it had already started holding key input, the master half types nothing
+  until it restarts. Ark says so and asks you to unplug the USB cable (not the
+  cable between the halves), wait a few seconds, plug it back in and read the
+  keyboard again; the recovery file stays the fallback. When Ark can tell that
+  key input was never held, it says the master half keeps typing the old
+  profile until then; when it cannot tell, it says the master half may type
+  nothing.
 - If the cable between the halves comes out after the decision, the master half
   keeps typing the old profile until the rewrite starts, and the save resumes
   when the cable goes back in. If it comes out during the rewrite, the master

@@ -97,6 +97,18 @@ Remaining before calling the product complete:
   recovery restore, and another keyboard already using the target name.
   Automated tests use fake adapters only.
 
+- **Replugging after an Apply the halves disagreed on needs keyboard acceptance
+  (D-L23).** An Apply that fails after the decision with post-commit authority
+  lost or a concurrent commit (`AUTHORITY_FAILED`) stays failed until the
+  keyboard restarts, and from the VIA ACCEPT request the master half types
+  nothing until then. Ark tells the user to unplug and replug, and says the
+  master half types nothing when it saw or reads back that ACCEPT, keeps
+  typing when the VIA status proves ACCEPT was never requested, and may type
+  nothing when it cannot tell. A real keyboard cannot be made to hit this on
+  demand: when it happens, confirm the message matches whether the master half
+  typed, and that a replug leaves one complete profile on both halves.
+  Automated tests use the fake keyboard only.
+
 - **Refusing older firmware needs keyboard acceptance (D-L64).** Read a
   keyboard on an older firmware release and confirm Ark names the update and
   reads nothing it could edit, in VS Code and in Chrome.
@@ -383,6 +395,12 @@ step, the keyboard's reason and whether anything was saved. Progress updates
 must preserve the visible editor and remain bound to the operation that made
 them. A complete coherent capture opens the draft; fresh integrity checks and
 exact stored bytes remain required wherever the contract calls for a new read.
+
+After the decision, a failure also says what ends it: the keyboard finishing
+from the slave half's copy by itself, or, when the keyboard reports lost split
+authority or a concurrent commit, a restart by unplugging and replugging it.
+Where Ark cannot tell whether the master half's output is fenced, it gives the
+restart advice and says the master half may type nothing.
 
 This makes a slow or failed operation explainable without allowing progress
 traffic or cached authored bytes to change the draft's meaning. The detailed

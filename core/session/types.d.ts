@@ -114,7 +114,7 @@ export interface RestoreOptions {
     onApplyProgress?: (view: import('../../contracts/model.js').ApplyView) => void;
     sleep?: (ms: number) => Promise<void>;
 }
-export interface OperationFailure extends Error {code?: string; cause?: OperationFailure; progress?: CandidateProgress}
+export interface OperationFailure extends Error {code?: string; cause?: OperationFailure; progress?: CandidateProgress; deviceError?: CandidateStatus["error"]}
 
 /** State presented to the panel, including a disconnected or demo source. */
 export interface PanelDeviceState extends DeviceModelInput, Omit<DraftDeviceContext, "committed"> {

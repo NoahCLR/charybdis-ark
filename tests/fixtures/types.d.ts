@@ -50,6 +50,8 @@ export interface WritableKeyboardFaults {
     cleanupPending?: boolean;
     peerUnseen?: boolean;
     disconnectAfterDecision?: boolean;
+    /** After the decision the keyboard loses split authority (or sees a concurrent commit) and ends in AUTHORITY_FAILED with `error`, on the candidate read after the one that showed the decision. `accept` is how far the slave half's VIA ACCEPT got first: acknowledged (the master half's rewrite runs), queued and never answered, or never requested. */
+    authorityFailed?: {error: number; accept: "acknowledged" | "queued" | "never"};
     disconnected?: boolean;
     beforeRequest?: (request: Buffer, keyboard: ReturnType<typeof import('./writable-keyboard.js').writableKeyboard>) => void;
     afterRequest?: (request: Buffer, response: Buffer, keyboard: ReturnType<typeof import('./writable-keyboard.js').writableKeyboard>) => void;

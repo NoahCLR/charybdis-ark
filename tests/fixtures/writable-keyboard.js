@@ -33,10 +33,10 @@ function writableKeyboard(options) {
     let operation = O.NONE;
     /** @type {number} */
     let error = E.NONE;
-    let viaSequence = 0, viaGeneration = 0, viaDigest = 0, viaTransaction = 0;
+    let viaSequence = 0, viaGeneration = 0, viaDigest = 0, viaTransaction = 0, viaPending = false;
     /** @type {number} */
     let viaState = VS.IDLE;
-    let commitPolls = 0, durable = false, activated = false;
+    let commitPolls = 0, durable = false, activated = false, authorityPending = false;
     /** @type {Buffer[]} */
     const requests = [];
     /** @type {Buffer[]} */
@@ -58,6 +58,7 @@ function writableKeyboard(options) {
             faults.disconnected = false; activate();
         }};
     function activate() {
+        if (faults.authorityFailed) return;
         if (!durable || viaStorageDigest(local) !== viaDigest) return;
         active = Buffer.from(candidate); storageGeneration = viaGeneration; activeGeneration = viaGeneration; activeKind = 1; peerGeneration = viaGeneration;
         candidateState = S.IDLE; viaState = VS.IDLE; activated = true;
@@ -76,8 +77,17 @@ function writableKeyboard(options) {
         const reply = Buffer.from(request); reply.fill(0, 5); reply[5] = admission; reply[6] = reason; reply[7] = 255; return reply;
     }
     function candidateStatus() {
+        if (authorityPending) {
+            // Terminal until the keyboard restarts; the master half requests
+            // no ACCEPT after it.
+            authorityPending = false; candidateState = S.AUTHORITY_FAILED; error = /** @type {number} */ (faults.authorityFailed?.error); sequence++; events.push("authority failed");
+        }
         if (candidateState === S.PREPARING_PEER && !faults.stallCommit && commitPolls++ > 0) {
-            durable = true; peerGeneration = viaGeneration; candidateState = S.CONVERGING_PEER; viaState = VS.ACCEPTED; events.push("decision");
+            const accept = faults.authorityFailed?.accept ?? "acknowledged";
+            durable = true; peerGeneration = viaGeneration; candidateState = S.CONVERGING_PEER; events.push("decision");
+            if (accept === "acknowledged") viaState = VS.ACCEPTED;
+            viaPending = accept === "queued";
+            authorityPending = Boolean(faults.authorityFailed);
             if (faults.disconnectAfterDecision) {faults.disconnected = true; throw Object.assign(Error("disconnected after durable decision"), {code: "DISCONNECTED"});}
         }
         const p = Buffer.alloc(25); p.set([1, candidateState, operation, 0]);
@@ -85,7 +95,7 @@ function writableKeyboard(options) {
         p.writeUInt32LE(digest, 10); p[14] = error; p.fill(255, 15, 23); p.writeUInt16LE(sequence, 23); return p;
     }
     function viaStatus() {
-        const p = Buffer.alloc(18); p.set([1, viaState, viaState === VS.ERROR ? 9 : 0, 0]);
+        const p = Buffer.alloc(18); p.set([1, viaState, viaState === VS.ERROR ? 9 : 0, viaPending ? 1 : 0]);
         p.writeUInt16LE(viaTransaction, 4); p.writeUInt16LE(viaSequence, 6);
         p.writeUInt32LE(viaGeneration, 8); p.writeUInt32LE(viaDigest, 12); return p;
     }
