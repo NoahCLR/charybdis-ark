@@ -11,7 +11,6 @@
 
 const keycodes = require("../data/keycode-catalog");
 const {PD_SLOT_BINDINGS, PD_SLOT_CAPACITY, pdBindingOfCode} = require("../data/pd-bindings");
-const {customKeyOfCode} = require("../data/user-keycodes");
 const {PROFILE_ACTION_KINDS: ACTION} = require("./profile-blob-v1");
 const {resolveNativeQmkExpression} = require("./compiled-profile-v1");
 
@@ -84,8 +83,9 @@ const isOwnedLayerCode = (code, layerCount) =>
 // key, a press-and-hold branch or a combo (a combo holds its output); OSL() is
 // a key, a tap or a combo; LM() is a key or a combo; LT() is only a key; TG(),
 // TO() and LOCK_LAYER() go anywhere; DF() and PDF(), which the keyboard does not
-// own, go nowhere. A custom key does what its own behaviour says, so it is a
-// key or a combo output, never a step. Returns what is wrong, or undefined.
+// own, go nowhere. A custom key goes anywhere: as a step it sends its shortcut
+// only, never its own behaviour (firmware D-F26). Returns what is wrong, or
+// undefined.
 /** @typedef {'key' | 'tap' | 'holdPress' | 'holdOther' | 'comboOutput'} Placement */
 const PLACEMENT = Object.freeze({KEY: "key", TAP: "tap", HOLD_PRESS: "holdPress", HOLD_OTHER: "holdOther", COMBO_OUTPUT: "comboOutput"});
 
@@ -106,10 +106,6 @@ function layerRuleOf(code, layerCount) {
 
 /** @param {import("./types.js").SemanticAction} action @param {Placement} placement @param {{layerCount?: number}} [options] */
 function placementProblem(action, placement, {layerCount = 16} = {}) {
-    if (action.kind === ACTION.CUSTOM_KEY || (action.kind === ACTION.QMK_KEYCODE && customKeyOfCode(action.operand) !== undefined)) {
-        return /** @type {Placement[]} */ ([PLACEMENT.KEY, PLACEMENT.COMBO_OUTPUT]).includes(placement) ? undefined
-            : `${actionName(action)} is a custom key: it does what its own behaviour says, so it works as a key or a combo output, not inside a behaviour.`;
-    }
     const code = action.kind === ACTION.LAYER_MOMENTARY ? 0x5220 | action.operand : nativeCode(action);
     const rule = code === undefined ? undefined : layerRuleOf(code, layerCount);
     if (!rule || rule.places.includes(placement)) return undefined;

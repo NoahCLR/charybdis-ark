@@ -13,11 +13,39 @@ const {inspectMacroPlayback} = require("./macro-input");
 const {pointingClicks, pointingMacros} = require("./pointing-taps");
 const {supportsComboOutputBehaviors} = require("../schema/combo-domain-v1");
 const {supportsPdClicks, supportsPdMacros} = require("../schema/pd-mode-domain-v1");
+const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
+const {actionName} = require("../schema/actions");
+const {VOCABULARY} = require("./vocabulary");
+
+// A behaviour step that sends a custom key sends only its shortcut (firmware
+// D-F26). The keyboard accepts a step naming a custom key without one, which
+// then does nothing; the profile carries it and the check says so.
+/** @param {import("./types.js").DecodedProfile} decoded @returns {import("../../contracts/model.js").Finding[]} */
+function shortcutlessCustomKeySteps(decoded) {
+    const shortcuts = decoded.settings.customKeyShortcuts || [], names = decoded.settings.customKeyNames || [];
+    /** @type {import("../../contracts/model.js").Finding[]} */
+    const findings = [];
+    for (const row of decoded.behaviors?.rows || []) {
+        const keycode = actionName(row.target);
+        for (const step of row.steps) for (const [tier, action] of /** @type {const} */ ([["tap", step.tap], ["hold", step.hold?.action], ["long", step.longHold?.action]])) {
+            if (action?.kind !== ACTION.CUSTOM_KEY) continue;
+            const shortcut = shortcuts[action.operand];
+            if (shortcut && (shortcut.mods || shortcut.key)) continue;
+            // The custom key as the Custom keys screen calls it.
+            const name = names[action.operand] ? `custom key “${names[action.operand]}”` : `custom key ${action.operand}`;
+            findings.push({kind: "shortcutlessCustomKeyStep", level: "warning", layers: [], identity: `${keycode}:${step.tapIndex}:${tier}:${action.operand}`,
+                title: `${keycode}: press ${step.tapIndex + 1} ${VOCABULARY.tiers[tier].toLowerCase()} sends ${name}, which has no shortcut`,
+                detail: "A behaviour step sends a custom key's shortcut only, never its own behaviour. This custom key has no shortcut, so the step does nothing.",
+                fix: "Give the custom key a shortcut on the Custom keys screen, or choose another action.", place: {kind: "behaviour", keycode}});
+        }
+    }
+    return findings;
+}
 
 /** @param {import("./types.js").DecodedProfile} decoded @param {import("./types.js").ProfileDestination} [destination] @returns {import("../../contracts/model.js").Finding[]} */
 function profileFindings(decoded, destination = {}) {
     /** @type {import("../../contracts/model.js").Finding[]} */
-    const findings = [...layerReach(decoded, {legacyGestureTiming: destination.physicalGestureTiming === false, legacyOwnedTapping: destination.ownedTapping === false}), ...gestureTimingFindings(decoded)];
+    const findings = [...layerReach(decoded, {legacyGestureTiming: destination.physicalGestureTiming === false, legacyOwnedTapping: destination.ownedTapping === false}), ...gestureTimingFindings(decoded), ...shortcutlessCustomKeySteps(decoded)];
     for (const [slot, count] of Object.entries(decoded.danglingPdBindings || {})) {
         if (!count) continue;
         findings.push({kind: "inertPointing", level: "warning", layers: [], identity: `${slot}:${count}`, count,

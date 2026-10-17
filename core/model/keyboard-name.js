@@ -1,7 +1,7 @@
 // @ts-check
 "use strict";
 
-// The keyboard's own name (settings v7, firmware D-F14): the USB product
+// The keyboard's own name (settings v7 onwards, firmware D-F14): the USB product
 // string the computer, Chrome's keyboard chooser and Ark's keyboard menu show.
 // It is one more counted name in the settings domain, so it is edited in the
 // draft, reviewed, applied and backed up like any other. Empty means the

@@ -7,6 +7,23 @@ const {validateSnapshot} = require("../../core/model/portable-profile");
 const {decodeProfileBlob} = require("../../core/schema/profile-blob-v1");
 const {document} = require("../fixtures/portable-profile");
 
+// A settings v8 payload as version 7 stored it: without the 128 two-byte
+// custom-key shortcuts at offset 404, header byte 6 zero.
+const SHORTCUTS_AT = 404, SHORTCUTS_END = 660;
+/** @param {Buffer} eight */
+function settingsSeven(eight) {
+    const seven = Buffer.concat([eight.subarray(0, SHORTCUTS_AT), eight.subarray(SHORTCUTS_END)]);
+    seven[0] = 7; seven[6] = 0;
+    return seven;
+}
+// And as version 6 stored it: without the keyboard's (empty) name either.
+/** @param {Buffer} eight */
+function settingsSix(eight) {
+    const six = settingsSeven(eight).subarray(0, -1);
+    six[0] = 6;
+    return six;
+}
+
 function changedDomain(id, change) {
     const bytes = Buffer.from(previous.profile, "base64"), parts = [bytes.subarray(0, 8)];
     let at = 8;
@@ -21,7 +38,7 @@ function changedDomain(id, change) {
 
 test("every preceding domain has a step keyed by its produced version", () => {
     assert.deepEqual(Object.entries(DOMAIN_TRANSLATIONS).map(([id, steps]) => [Number(id), Object.keys(steps).map(Number)]), [
-        [16, [4]], [32, [2]], [48, [3]], [64, [6, 7]], [80, [3]],
+        [16, [4]], [32, [2]], [48, [3]], [64, [6, 7, 8]], [80, [3]],
     ]);
     const bytes = Buffer.from(previous.profile, "base64");
     let at = 8;
@@ -55,7 +72,7 @@ test("the settings v7 step receives the historical step's version 6 bytes and ad
     assert.equal(calls, 1);
     assert.equal(result.version, 7);
     assert.deepEqual(result.payload, Buffer.concat([Buffer.from([7]), six.payload.subarray(1), Buffer.from([0])]), "version 7, then the same bytes and one empty name");
-    const value = decodeSettings(result.payload);
+    const value = decodeSettings(DOMAIN_TRANSLATIONS[domain.id][8](result.payload));
     assert.equal(value.keyboardName, "", "the firmware's built-in name");
     assert.deepEqual(value.names.slice(0, 8), ["Base", "Number", "Symbol", "Navigation", "Pointing", "Function", "Game", "Extra"]);
     assert.equal(value.macroNames.length, 128);
@@ -65,7 +82,7 @@ test("the settings v7 step refuses a version 6 body that is not well-formed", ()
     const step = DOMAIN_TRANSLATIONS[PROFILE_DOMAIN_IDS.SETTINGS][7];
     const {encodeSettings} = require("../../core/schema/settings-domain-v1");
     const {settings} = require("../fixtures/portable-profile");
-    const seven = encodeSettings({...settings(), customKeyNames: Array(128).fill("k")});
+    const seven = settingsSeven(encodeSettings({...settings(), customKeyNames: Array(128).fill("k")}));
     const six = Buffer.from(seven.subarray(0, -1)); six[0] = 6;
     assert.deepEqual(step(six), seven, "a well-formed v6 body becomes the v7 one");
     const corrupt = (patch) => {const bytes = Buffer.from(six); patch(bytes); return bytes;};
@@ -76,14 +93,35 @@ test("the settings v7 step refuses a version 6 body that is not well-formed", ()
     }
 });
 
-test("a current-format backup with version 6 settings is brought forward, and a current one is left alone", () => {
+test("the settings v8 step inserts 128 empty shortcuts after the layer records and counts them", () => {
+    const step = DOMAIN_TRANSLATIONS[PROFILE_DOMAIN_IDS.SETTINGS][8];
+    const {encodeSettings, decodeSettings} = require("../../core/schema/settings-domain-v1");
+    const {settings} = require("../fixtures/portable-profile");
+    const eight = encodeSettings({...settings(), customKeyNames: Array.from({length: 128}, (_, i) => `Key ${i}`), keyboardName: "Charybdis", comboOutputBehaviors: false});
+    const seven = settingsSeven(eight), original = Buffer.from(seven);
+    assert.deepEqual([...seven.subarray(0, 8)], [7, 16, 31, 128, 128, 1, 0, 0]);
+    assert.deepEqual(step(seven), eight, "the v7 bytes, 256 zero bytes at 404, byte 6 counting 128 and version 8");
+    assert.deepEqual(seven, original, "the step leaves its source bytes unchanged");
+    assert.ok(decodeSettings(step(seven)).customKeyShortcuts.every(({mods, key}) => !mods && !key), "no custom key has a shortcut");
+    const corrupt = (patch) => {const bytes = Buffer.from(seven); patch(bytes); return bytes;};
+    for (const [label, bytes] of [["v8 header", eight], ["v6 header", corrupt(b => {b[0] = 6;})], ["unknown flag", corrupt(b => {b[5] = 2;})], ["eight layers", corrupt(b => {b[1] = 8;})],
+        ["reserved byte 6", corrupt(b => {b[6] = 128;})], ["reserved byte 7", corrupt(b => {b[7] = 1;})], ["short", seven.subarray(0, 600)]]) {
+        assert.throws(() => step(bytes), {code: "INVALID_PORTABLE_PROFILE"}, label);
+    }
+});
+
+test("a current-format backup with version 6 or 7 settings is brought forward, and a current one is left alone", () => {
     const {translateCurrentBackup} = require("../../core/model/backup-translation");
     const {encodeProfileBlob} = require("../../core/schema/profile-blob-v1");
     const current = document(), blob = decodeProfileBlob(Buffer.from(current.profile, "base64"));
     const named = validateSnapshot(current).settings;
     assert.equal(named.keyboardName, "");
     const older = {...current, profile: encodeProfileBlob({domains: blob.domains.map(domain => domain.id !== PROFILE_DOMAIN_IDS.SETTINGS ? domain
-        : {...domain, version: 6, payload: Buffer.concat([Buffer.from([6]), domain.payload.subarray(1, -1)])})}, {domainVersions: {...PROFILE_DOMAIN_VERSIONS, 64: 6}}).toString("base64")};
+        : {...domain, version: 6, payload: settingsSix(domain.payload)})}, {domainVersions: {...PROFILE_DOMAIN_VERSIONS, 64: 6}}).toString("base64")};
+    const seven = {...current, profile: encodeProfileBlob({domains: blob.domains.map(domain => domain.id !== PROFILE_DOMAIN_IDS.SETTINGS ? domain
+        : {...domain, version: 7, payload: settingsSeven(domain.payload)})}, {domainVersions: {...PROFILE_DOMAIN_VERSIONS, 64: 7}}).toString("base64")};
+    assert.throws(() => validateSnapshot(seven), "the keyboard does not take version 7 settings");
+    assert.equal(translateBackup(JSON.stringify(seven)).profile, current.profile, "version 7 settings gain empty shortcuts and nothing else");
     assert.throws(() => validateSnapshot(older), "the keyboard does not take version 6 settings");
     const original = structuredClone(older);
     const translated = translateBackup(JSON.stringify(older));
@@ -134,12 +172,14 @@ test("the chain preserves the exact preceding fixture document and rejects other
     const {createHash} = require("node:crypto");
     const {encodeProfileBlob} = require("../../core/schema/profile-blob-v1");
     // Up to settings v6 the translation is the pre-refactor one, byte for
-    // byte; the v7 step then adds only the keyboard's empty name.
+    // byte; the v7 step then adds only the keyboard's empty name, and the v8
+    // step only empty shortcuts.
     const translated = translateBackup(previous), blob = decodeProfileBlob(Buffer.from(translated.profile, "base64"));
     const settings = blob.domains.find(domain => domain.id === PROFILE_DOMAIN_IDS.SETTINGS);
     assert.equal(settings.payload.at(-1), 0, "an empty keyboard name ends the settings");
+    assert.ok(settings.payload.subarray(SHORTCUTS_AT, SHORTCUTS_END).every(byte => byte === 0), "no custom key has a shortcut");
     const six = {...translated, profile: encodeProfileBlob({domains: blob.domains.map(domain => domain === settings
-        ? {...domain, version: 6, payload: Buffer.concat([Buffer.from([6]), domain.payload.subarray(1, -1)])} : domain)}, {domainVersions: {...PROFILE_DOMAIN_VERSIONS, 64: 6}}).toString("base64")};
+        ? {...domain, version: 6, payload: settingsSix(domain.payload)} : domain)}, {domainVersions: {...PROFILE_DOMAIN_VERSIONS, 64: 6}}).toString("base64")};
     assert.equal(createHash("sha256").update(JSON.stringify(six)).digest("hex"),
         "3ca7e5d7b6b5ccdcdccafa9c8c15d87a09fcaf99a0f9fdb57bd0d562ee4405c2", "the pre-refactor translated document is byte-for-byte unchanged");
     const bytes = Buffer.from(previous.profile, "base64");
@@ -241,7 +281,7 @@ test("only the known preceding contract translates, and corrupt input is rejecte
     assert.throws(() => translateProfile(bytes.subarray(0, -1)));
     assert.throws(() => translateProfile(Buffer.concat([bytes, Buffer.from([0])])));
     assert.throws(() => translateProfile(Buffer.alloc(8)));
-    assert.deepEqual(decodeProfileBlob(translateProfile(bytes)).domains.map(row => row.version), [4, 2, 3, 7, 3]);
+    assert.deepEqual(decodeProfileBlob(translateProfile(bytes)).domains.map(row => row.version), [4, 2, 3, 8, 3]);
 });
 
 test("translation rejects nonnumeric keycodes and unsupported bytes instead of normalizing them away", () => {

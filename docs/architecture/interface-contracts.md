@@ -385,8 +385,9 @@ macro checks exercise repeated and reordered steps.
 Settings → Combos exposes **Combo outputs use behaviours**; each combo builder
 exposes **Use output behaviour**. Both default on. Switching either off changes
 output processing while preserving the chord, timing and participation policy.
-Explain the native fallback and custom-key no-action consequence beside the
-controls. Firmware feature bit 30 enables editing; without it the controls are
+Explain the native fallback beside the controls, and that a custom key sends
+its shortcut, or nothing without one; the combo builder names the output's
+shortcut. Firmware feature bit 30 enables editing; without it the controls are
 read-only and unsupported bypass bytes are refused on import and staging.
 
 The global value is a tagged header field in the existing Settings section,

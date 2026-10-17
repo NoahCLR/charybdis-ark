@@ -15,6 +15,21 @@ test("reads coherent settings using correlated bounded pages", async () => {
     connection.request = async (...args) => {const reply = await original(...args); if (!args[0][4] && ++headers === 2) reply[11]++; return reply;};
     await assert.rejects(readSettings(connection, ids()), /changed/);
 });
+test("settings a keyboard stores in an older version are returned as stored, a newer one refused", async () => {
+    /** @param {Buffer} bytes */
+    const keyboard = bytes => {
+        const metadata = Buffer.alloc(12); metadata.set([1,25]); metadata.writeUInt16LE(bytes.length, 2); metadata.writeUInt32LE(crc32(bytes),4); metadata.writeUInt32LE(fnv1a32(bytes),8);
+        return {request: async request => {const page = request[4]; return response(request, page ? bytes.subarray((page-1)*25, page*25) : metadata);}};
+    };
+    // Settings v7: the current form without its 256-byte shortcut table; the
+    // session translates it (core/model/portable-profile.js).
+    const current = settings(), older = Buffer.concat([current.subarray(0, 404), current.subarray(660)]);
+    older[0] = 7; older[6] = 0;
+    assert.ok(older.length < 933, "below the current minimum");
+    assert.deepEqual(await readSettings(keyboard(older), ids()), older);
+    const newer = Buffer.from(current); newer[0] = 9;
+    await assert.rejects(readSettings(keyboard(newer), ids()));
+});
 test("old firmware cannot silently produce a partial backup", async () => {
     await assert.rejects(readSettings({request: async () => Buffer.alloc(32,255)},ids()), /Update both halves/);
 });

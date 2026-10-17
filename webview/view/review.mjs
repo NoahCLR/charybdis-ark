@@ -79,7 +79,7 @@ function categoryOf(item, names, stages) {
         case "behaviour": return ["Keys", "Behaviours", 30];
         case "combo": return ["Keys", "Combos", 40];
         case "macro": return ["Macros", "Macros", 0];
-        case "customKey": return ["Keys", "Custom key names", 35];
+        case "customKey": return ["Keys", "Custom keys", 35];
         case "pointing": return ["Pointing modes", "Pointing modes", 0];
         case "lighting": {
             if (!place.stage) return ["Lighting", "Stages on or off", 0];

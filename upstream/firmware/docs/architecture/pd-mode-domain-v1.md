@@ -24,7 +24,7 @@ and restore preserve them without the repository.
   stays a layer/CPI policy and uses no slot.
 - There are two engine families, **directional** (four or eight directions,
   single axis or dominant axis; see D-L24 and D-L28 in the
-  [direction](https://github.com/NoahCLR/charybdis-4x6/blob/86ef55539422b4c301fd26212581686cfc959a50/docs/LIVE_EDIT_APP_DIRECTION.md)) and **scrolling**. Optional
+  [direction](https://github.com/NoahCLR/charybdis-4x6/blob/6db1ea16a2b5b7971f932537182641f63d545915/docs/LIVE_EDIT_APP_DIRECTION.md)) and **scrolling**. Optional
   modifier and mouse-button policies cover Arrow and Pinch. No behavior depends
   on a slot's name.
 
@@ -52,7 +52,7 @@ keycode allocation.
 | 7–31 | Empty | Disabled | Inert actions; not stored; retained, editable RGB row |
 
 Dragscroll and Pinch run this repository's
-[`pd_mode_dragscroll.c`](https://github.com/NoahCLR/charybdis-4x6/blob/86ef55539422b4c301fd26212581686cfc959a50/users/noah/lib/pointing/modes/pd_mode_dragscroll.c),
+[`pd_mode_dragscroll.c`](https://github.com/NoahCLR/charybdis-4x6/blob/6db1ea16a2b5b7971f932537182641f63d545915/users/noah/lib/pointing/modes/pd_mode_dragscroll.c),
 not the fork's native `DRAGSCROLL_MODE`; never activate both engines.
 
 ### Slot operations and RGB identity
@@ -308,7 +308,7 @@ A button press a mode consumes never reaches the button's own behavior, and
 its release goes to the mode that took the press, even after another mode
 replaced it; the release of a press the mode did not take stays with the
 behavior. The key runtime owns that routing; see
-[Runtime Flow](https://github.com/NoahCLR/charybdis-4x6/blob/86ef55539422b4c301fd26212581686cfc959a50/docs/architecture/runtime-flow.md#key-press-flow).
+[Runtime Flow](https://github.com/NoahCLR/charybdis-4x6/blob/6db1ea16a2b5b7971f932537182641f63d545915/docs/architecture/runtime-flow.md#key-press-flow).
 
 ## Validation and evidence
 
@@ -376,7 +376,7 @@ headers are rejected. Header CRC, marker-last publication and bounded I/O remain
 
 Synchronous validation, bounded boot scanning and commit shape validation
 share the current version rules in `profile_versions.h`: RGB v4, key behaviors
-v2, combos v3, settings v7 and sparse PD v3. Blob magic remains `NLP1`; schema
+v2, combos v3, settings v8 and sparse PD v3. Blob magic remains `NLP1`; schema
 bytes must be 3.0. Domain bodies also require semantic validation. Store tests
 cover all mask/origin/flag combinations, both boot paths, old-header rejection,
 reserved bits with repaired CRCs, incompatible versions, one-byte commit steps,

@@ -100,6 +100,12 @@ export interface LayerRecord {reference: number; bypass: number[]; exclude: numb
 // also carries its bounds.
 export interface SettingRule {valid(v: number, layers: number): boolean; min?: number; max?: number; step?: number; layerReference?: 'layer' | 'mask'; layerReorder?: 'storage' | 'reach'}
 export interface SettingField<Name extends string = string> extends SettingRule {id: number; name: Name}
+/** A custom key's own action (firmware D-F26): a HID report modifier mask (bit 0 Left Ctrl … bit 7 Right GUI) and one key, 0 for none. */
+export interface CustomKeyShortcut {
+    mods: number;
+    key: number;
+}
+
 export interface SettingsDomain {
     comboOutputBehaviors?: boolean;
     formatVersion?: number;
@@ -108,6 +114,8 @@ export interface SettingsDomain {
     layers: LayerRecord[];
     macroNames: string[];
     customKeyNames: string[];
+    /** Each custom key's shortcut, custom key 0 first; `{mods: 0, key: 0}` is none. */
+    customKeyShortcuts: CustomKeyShortcut[];
     /** The keyboard's own name, its USB product string; empty for the firmware's built-in name. */
     keyboardName: string;
 }

@@ -26,7 +26,7 @@
  * @typedef {import("./types.js").DemoSession} DemoSession
  * @typedef {import("./types.js").DraftBlock} DraftBlock
  * @typedef {NonNullable<DemoSession["draft"]>} Draft
- * @typedef {Pick<import("./types.js").PanelDeviceState, "connected" | "selectedDeviceId" | "connectionToken" | "busy" | "capabilities">} BindingState
+ * @typedef {Pick<import("./types.js").PanelDeviceState, "connected" | "selectedDeviceId" | "connectionToken" | "busy" | "capabilities" | "olderDomains">} BindingState
  * @typedef {string | ((reason: DraftBlock) => string)} Refusal
  */
 const {canEdit} = require("./firmware-support");
@@ -34,8 +34,8 @@ const {canEdit} = require("./firmware-support");
 /**
  * Whether the open draft may be edited against what the panel answers to now
  * (the keyboard's state, or the demo's): it is this keyboard's, over the
- * connection it was read through, on firmware that holds a complete profile,
- * current with the keyboard, and nothing is running. The demo's draft is the
+ * connection it was read through, on firmware that holds a complete profile
+ * in the formats Ark writes, current with the keyboard, and nothing is running. The demo's draft is the
  * demo device's, so it holds there with no keyboard (demo-session.js).
  *
  * The reasons come in this order, so "busy" says that only an operation in
@@ -49,6 +49,7 @@ function draftBinding(session, state) {
     /** @type {DraftBlock} */
     const reason = !draft ? "no-draft"
         : draft.bindingTo(state) || (!canEdit(state.capabilities) ? "unsupported"
+            : state.olderDomains?.length ? "older-firmware"
             : draft.stale ? "stale"
             : state.busy || session.portableBusy || session.readBusy ? "busy" : "");
     return {editable: !reason, reason};

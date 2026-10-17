@@ -52,9 +52,8 @@ test("placement follows the keyboard's rule: only layer keycodes are restricted"
     assert.equal(places(code(0x4104)), "ok - - - -", "LT is a key of its own");
     assert.equal(places(code(0x5062)), "ok - - - ok", "LM(3, Shift) is a key or a combo");
     for (const unowned of [0x5241, 0x52e1, 0x5102, 0x5268]) assert.equal(places(code(unowned)), "- - - - -", `0x${unowned.toString(16)} goes nowhere`);
-    assert.equal(places({kind: ACTION.CUSTOM_KEY, operand: 2}), "ok - - - ok", "a custom key is a key or a combo output, never a step");
-    assert.equal(places(code(0x7f02)), "ok - - - ok", "however it is stored");
-    assert.equal(places(code(0x7f7f)), "ok - - - ok", "custom key 127 too");
+    assert.equal(places({kind: ACTION.CUSTOM_KEY, operand: 2}), "ok ok ok ok ok", "a custom key goes anywhere: a step sends its shortcut (firmware D-F26)");
+    assert.equal(places({kind: ACTION.CUSTOM_KEY, operand: 127}), "ok ok ok ok ok", "custom key 127 too");
 });
 
 test("placement covers all sixteen layers and refuses a layer past the bank", () => {

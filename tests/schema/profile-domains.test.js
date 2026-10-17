@@ -3,7 +3,7 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const {execFileSync} = require("node:child_process");
-const {PROFILE_DOMAINS, PROFILE_DOMAIN_IDS, PROFILE_DOMAIN_VERSIONS, PROFILE_WIRE_DOMAINS, PROFILE_DOMAIN_MASK,
+const {PROFILE_DOMAINS, PROFILE_DOMAIN_IDS, PROFILE_DOMAIN_VERSIONS, READABLE_DOMAIN_VERSIONS, PROFILE_WIRE_DOMAINS, PROFILE_DOMAIN_MASK,
     profileDomain, domainCodec, encodeProfileDomains, replaceDomain} = require("../../core/schema/profile-domains");
 const {decodeProfileBlob, encodeProfileBlob} = require("../../core/schema/profile-blob-v1");
 const {validateSnapshot} = require("../../core/model/portable-profile");
@@ -14,7 +14,7 @@ test("one canonical registry pins every current domain's identity, version, wire
         {name: "RGB", id: 16, key: "rgb", readKey: "rgb", version: 4, wireBit: 1, area: "lighting"},
         {name: "KEY_BEHAVIORS", id: 32, key: "behaviors", readKey: "keyBehaviors", version: 2, wireBit: 2, area: "behaviours"},
         {name: "COMBOS", id: 48, key: "combos", readKey: "combos", version: 3, wireBit: 4, area: "combos"},
-        {name: "SETTINGS", id: 64, key: "settings", readKey: "settings", version: 7, wireBit: 8, area: "settings"},
+        {name: "SETTINGS", id: 64, key: "settings", readKey: "settings", version: 8, wireBit: 8, area: "settings"},
         {name: "PD_MODES", id: 80, key: "pdModes", readKey: "pdModes", version: 3, wireBit: 16, area: "pointing"},
     ]);
     assert.equal(PROFILE_DOMAIN_MASK, 31);
@@ -164,4 +164,12 @@ test("replacing a domain preserves every other envelope and lets the caller reta
     assert.deepEqual(replaceDomain(snapshot.profile, 0xff, () => {throw new Error("must not run");}), snapshot.profile);
     const capacityError = Object.assign(new Error("The name does not fit."), {code: "PROFILE_FULL"});
     assert.throws(() => replaceDomain(snapshot.profile, PROFILE_DOMAIN_IDS.SETTINGS, payload => payload, () => {throw capacityError;}), error => error === capacityError);
+});
+
+test("a live keyboard's older domain versions are readable, and never a newer one", () => {
+    for (const domain of PROFILE_DOMAINS) {
+        assert.deepEqual(READABLE_DOMAIN_VERSIONS[domain.id], Array.from({length: domain.version}, (_, index) => index + 1), domain.name);
+    }
+    assert.ok(READABLE_DOMAIN_VERSIONS[PROFILE_DOMAIN_IDS.SETTINGS].includes(7), "settings v7, before custom-key shortcuts (D-L63)");
+    assert.ok(!READABLE_DOMAIN_VERSIONS[PROFILE_DOMAIN_IDS.SETTINGS].includes(PROFILE_DOMAIN_VERSIONS[PROFILE_DOMAIN_IDS.SETTINGS] + 1));
 });

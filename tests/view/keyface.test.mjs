@@ -120,6 +120,7 @@ test("a behaviour cell reads by the host's name for its key, and by its keycode 
     const model = {qmkKeyLabels: {KC_HASH: "#", KC_F: "F", ...names.labels, "LT(1,KC_F)": keyNames.keyLabel(names, 0x4109)}};
     assert.equal(cellLabel(model, {action: "KC_HASH"}), "#");
     assert.equal(cellLabel(model, {action: "LSFT(KC_ENTER)", label: "Shift+Enter"}), "Shift+Enter", "an expression takes the host's name");
+    assert.equal(cellLabel(model, {action: "CUSTOM_KEY_2", label: "Left Ctrl + K"}), "Left Ctrl + K", "a custom key's own action reads as its shortcut");
     assert.equal(cellLabel(model, {action: "MO(1)"}), "Hold Numbers", "a layer action names the layer, in the picker's words");
     assert.equal(cellLabel(model, {action: "LOCK_LAYER(1)"}), "Lock Numbers");
     assert.equal(cellLabel(model, {action: "LT(1,KC_F)"}), "F / Numbers");

@@ -23,7 +23,8 @@ const {COMBO_READBACK_V1} = require("../../core/protocol/combo-readback-v1");
 const {PROFILE_CANDIDATE_V1, CANDIDATE_STATE} = require("../../core/protocol/profile-candidate-v1");
 const {VIA_LAYOUT_COMMANDS} = require("../../core/protocol/via-layout-v1");
 const {VIA_STORAGE, viaStorageDigest} = require("../../core/protocol/via-storage-v1");
-const {PROFILE_DOMAIN_IDS, crc32, decodeProfileBlob, fnv1a32} = require("../../core/schema/profile-blob-v1");
+const {PROFILE_DOMAIN_IDS, crc32, decodeProfileBlob, encodeProfileBlob, fnv1a32} = require("../../core/schema/profile-blob-v1");
+const {READABLE_DOMAIN_VERSIONS} = require("../../core/schema/profile-domains");
 const {nativeCode} = require("../../core/schema/actions");
 const {validateSnapshot} = require("../../core/model/portable-profile");
 const {baseLighting} = require("../../core/model/settings-editor");
@@ -42,23 +43,40 @@ const MUTATING_COMMANDS = new Set([0x03, 0x05, 0x06, 0x07, 0x09, 0x0a, 0x0b, 0x0
 const FEATURES = PROFILE_WIRE_KNOWN_MASKS.FEATURE_FLAGS & ~PROFILE_WIRE_KNOWN_MASKS.RETIRED_FEATURES;
 
 // The domain versions current firmware stores, and refuses any other.
-const CURRENT_DOMAINS = "16:4,32:2,48:3,64:7,80:3";
+const CURRENT_DOMAINS = "16:4,32:2,48:3,64:8,80:3";
 
 // `compiled` is the profile it was built with, which GET 0x05 serves: the
 // document's own unless given (current firmware's carries every domain, with
 // its authored combos and factory settings). `compiledOnly` runs those
 // defaults, with nothing committed; the live combo and settings readbacks
-// still answer from the document.
+// still answer from the document. `settingsVersion: 7` is the firmware before
+// custom-key shortcuts (firmware D-F26): it stores and serves the same
+// settings without the shortcut table, as version 7.
+// A current profile as firmware before custom-key shortcuts stores it: the
+// settings domain at version 7, without the 128 shortcut records after the
+// layer records (offsets 404-659) and with header byte 6 zero.
+/** @param {Buffer} blob */
+function settingsV7Profile(blob) {
+    const decoded = decodeProfileBlob(blob);
+    return encodeProfileBlob({schema: decoded.schema, domains: decoded.domains.map(domain => {
+        if (domain.id !== PROFILE_DOMAIN_IDS.SETTINGS) return domain;
+        const payload = Buffer.concat([domain.payload.subarray(0, 404), domain.payload.subarray(660)]);
+        payload[0] = 7; payload[6] = 0;
+        return {...domain, version: 7, payload};
+    })}, {domainVersions: READABLE_DOMAIN_VERSIONS});
+}
+
 /** @param {import("./types.js").FakeKeyboardOptions} options @returns {import("./types.js").FakeKeyboard} */
-function fakeKeyboard({document, compiled, streaming = false, macroReadMap = false, compiledOnly = false, peerKnown = true, generation = 42, firmwareVersion = 0x00010000, brightnessMax = 255, options = keyboardOptions.wire()}) {
+function fakeKeyboard({document, compiled, streaming = false, macroReadMap = false, compiledOnly = false, peerKnown = true, generation = 42, firmwareVersion = 0x00010000, brightnessMax = 255, options = keyboardOptions.wire(), settingsVersion = 8}) {
     const held = validateSnapshot(document);
     held.macros = require("../../core/model/portable-profile").macroBank(document.macros.map(value => Buffer.from(value, "base64")), streaming ? 34903 : 10327);
     if (document.version !== 3 || document.layers.length !== 16) throw new Error("The fake keyboard runs current firmware: a schema-3, sixteen-layer document.");
     /** @param {Buffer} blob */
     const versions = blob => decodeProfileBlob(blob).domains.map(domain => `${domain.id}:${domain.version}`).join();
-    if (versions(held.profile) !== CURRENT_DOMAINS || (compiled && versions(compiled) !== CURRENT_DOMAINS)) throw new Error("The fake keyboard runs current firmware: RGB 4, key behaviours 2, combos 3, settings 7 and PD 3.");
-    const profile = held.profile, digest = fnv1a32(profile), defaults = compiled || profile;
-    const settingsDomain = decodeProfileBlob(profile).domains.find(domain => domain.id === PROFILE_DOMAIN_IDS.SETTINGS);
+    if (versions(held.profile) !== CURRENT_DOMAINS || (compiled && versions(compiled) !== CURRENT_DOMAINS)) throw new Error("The fake keyboard runs current firmware: RGB 4, key behaviours 2, combos 3, settings 8 and PD 3.");
+    const stored = settingsVersion === 7 ? settingsV7Profile : (/** @type {Buffer} */ blob) => blob;
+    const profile = stored(held.profile), digest = fnv1a32(profile), defaults = compiled ? stored(compiled) : profile;
+    const settingsDomain = decodeProfileBlob(profile, {domainVersions: READABLE_DOMAIN_VERSIONS}).domains.find(domain => domain.id === PROFILE_DOMAIN_IDS.SETTINGS);
     if (!settingsDomain) throw new Error("The fake keyboard fixture must contain settings.");
     const settings = settingsDomain.payload;
     const storageDigest = viaStorageDigest({layout: held.layout, macros: held.macros});

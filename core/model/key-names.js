@@ -251,6 +251,16 @@ function keyLabel(names, value) {
     }
     return carriesModifiers(resolved) ? hostKeyLabel(resolved.label, names?.hostOs) : resolved.label;
 }
+// A custom key's shortcut (firmware D-F26) as it reads: its modifiers in the
+// host's words, left before right, then its key, joined by " + ". Empty for
+// no shortcut.
+/** @param {Partial<import("../../contracts/model.js").ProfileKeyNames> | null | undefined} names @param {{mods: number, key: number} | null | undefined} shortcut */
+function shortcutLabel(names, shortcut) {
+    if (!shortcut) return "";
+    const parts = hostKeyVocabulary(names?.hostOs).modifiers.filter(([bit]) => shortcut.mods & bit).map(([, label]) => label);
+    if (shortcut.key) parts.push(keyLabel(names, shortcut.key));
+    return parts.join(" + ");
+}
 /** @param {Partial<import("../../contracts/model.js").ProfileKeyNames> | null | undefined} names @param {number} value */
 function keyLabelWithName(names, value) {
     const {name} = keycodes.resolve(value);
@@ -258,4 +268,4 @@ function keyLabelWithName(names, value) {
     return label === name ? label : `${label} (${name})`;
 }
 
-module.exports = {compactKeyLabel, compactKeyLabels, hostKeyVocabulary, hostKeyLabel, keyLabel, keyLabelWithName, layerKeyLabel, profileKeyNames, semanticLabel};
+module.exports = {compactKeyLabel, compactKeyLabels, hostKeyVocabulary, hostKeyLabel, keyLabel, keyLabelWithName, layerKeyLabel, profileKeyNames, semanticLabel, shortcutLabel};

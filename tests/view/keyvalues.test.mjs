@@ -3,7 +3,7 @@ import test from "node:test";
 import {createRequire} from "node:module";
 const require = createRequire(import.meta.url);
 const {buildDeviceModel} = require("../../core/session/device-model");
-import {modifierBits, keyName, modifierNames, pickerModifierProblem, macroIndex, pointingMacro} from "../../webview/view/keyvalues.mjs";
+import {modifierBits, keyName, modifierNames, modifierPick, pickerModifierProblem, macroIndex, pointingMacro} from "../../webview/view/keyvalues.mjs";
 
 const model = {qmkKeycodes: [
     {keycode: 0x0004, value: "KC_A"},
@@ -76,4 +76,31 @@ test("pointing macro identities use the stored slot and current profile name", (
     assert.deepEqual(pointingMacro(model, 0x7700), {index: 0, name: "Greeting <&>", empty: true});
     assert.deepEqual(pointingMacro(model, "VIA_MACRO_127"), {index: 127, name: "Macro 127", empty: false});
     assert.equal(keyName(model, 0x777f), "VIA_MACRO_127");
+});
+
+test("modifiers alone, or with a modifier key, fold into one set stored as the simplest keycode", () => {
+    const names = ["LEFT_CTRL", "LEFT_SHIFT", "LEFT_ALT", "LEFT_GUI", "RIGHT_CTRL", "RIGHT_SHIFT", "RIGHT_ALT", "RIGHT_GUI"];
+    const wrappers = ["C", "S", "A", "G", "RCTL", "RSFT", "RALT", "RGUI"];
+    const picking = {
+        qmkKeycodes: [{keycode: 0x06, value: "KC_C", aliases: []}, ...names.map((name, i) => ({keycode: 0xe0 + i, value: `KC_${name}`, aliases: [`KC_${["LCTL", "LSFT", "LALT", "LGUI", "RCTL", "RSFT", "RALT", "RGUI"][i]}`]}))],
+        qmkKeycodeAliases: {KC_LGUI: "KC_LEFT_GUI", KC_RGUI: "KC_RIGHT_GUI"},
+        vocabulary: {pickerModifiers: wrappers.map((value, i) => ({bit: 1 << i, value, label: value}))},
+    };
+    // Command and the Left Command key: the same modifier twice is that key.
+    assert.deepEqual(modifierPick(picking, {mods: ["G"], keys: ["KC_LGUI"]}), {keys: ["KC_LEFT_GUI"], mods: []});
+    // Right Command around the Left Command key holds both Commands.
+    assert.deepEqual(modifierPick(picking, {mods: ["RGUI"], keys: ["KC_LGUI"]}), {keys: ["KC_LEFT_GUI"], mods: ["RGUI"]});
+    // ...and adding Command, which that key already is, changes nothing.
+    assert.deepEqual(modifierPick(picking, {mods: ["G", "RGUI"], keys: ["KC_LGUI"]}), {keys: ["KC_LEFT_GUI"], mods: ["RGUI"]});
+    // Both Commands with no key: the right one becomes the key.
+    assert.deepEqual(modifierPick(picking, {mods: ["G", "RGUI"], keys: []}), {keys: ["KC_RIGHT_GUI"], mods: ["G"]});
+    // A lone modifier is its own key; several from one side wrap one of them.
+    assert.deepEqual(modifierPick(picking, {mods: ["C"], keys: []}), {keys: ["KC_LEFT_CTRL"], mods: []});
+    assert.deepEqual(modifierPick(picking, {mods: ["C", "S", "RALT"], keys: []}), {keys: ["KC_RIGHT_ALT"], mods: ["C", "S"]});
+    // Two or more on each side: no keycode holds it, so a custom key would.
+    assert.deepEqual(modifierPick(picking, {mods: ["C", "S", "RCTL", "RSFT"], keys: []}), {shortcut: {mods: 0x33, key: 0}});
+    assert.deepEqual(modifierPick(picking, {mods: ["S", "RCTL", "RSFT"], keys: ["KC_LCTL"]}), {shortcut: {mods: 0x33, key: 0}});
+    // A key that is not a modifier, or nothing at all, is left as picked.
+    assert.equal(modifierPick(picking, {mods: ["G"], keys: ["KC_C"]}), null);
+    assert.equal(modifierPick(picking, {mods: [], keys: []}), null);
 });

@@ -3,7 +3,7 @@
 
 const {CHARYBDIS_4X6_LAYOUT_MATRIX, matrixPosition} = require("../data/charybdis-layout");
 const {layerOfRef, nativeCode} = require("../schema/actions");
-const {hostKeyLabel, keyLabel, keyLabelWithName, profileKeyNames} = require("./key-names");
+const {hostKeyLabel, keyLabel, keyLabelWithName, profileKeyNames, shortcutLabel} = require("./key-names");
 const {hostSettings, HOST_SETTING} = require("../schema/host-settings");
 const {SETTING} = require("../schema/settings-domain-v1");
 const {decodedOf} = require("./portable-profile");
@@ -436,13 +436,20 @@ function profileReview(before, after, capabilities) {
             /** @type {Change} */ (items.at(-1)).note = "Playback changes because of Settings → Host. Discard together with the Host change.";
         });
     }
-    // A custom key is its name here; what it does is its behaviour's item.
+    // A custom key is its name and shortcut here; what its behaviour adds is
+    // the behaviour's item.
     const keyNamesA = a.settings.customKeyNames, keyNamesB = b.settings.customKeyNames;
     keyNamesA.forEach((old, i) => {
         const next = keyNamesB[i];
-        /** @param {string} name @returns {Fields} */
-        const fields = name => new Map([["Name", name || "no name"]]);
-        item("Custom keys", `customKey:${i}`, `Custom key ${i}${(next || old) ? ` · ${next || old}` : ""}`, fields(old), fields(next), {kind: "customKey", index: i}, [Boolean(old), Boolean(next)]);
+        const shortcutA = a.settings.customKeyShortcuts[i], shortcutB = b.settings.customKeyShortcuts[i];
+        /** @param {{mods: number, key: number}} shortcut @param {Names} names @returns {Field} */
+        const shortcutField = (shortcut, names) => ({text: shortcutLabel(names.keys, shortcut) || "none", key: `${shortcut.mods}:${shortcut.key}`});
+        /** @param {string} name @param {{mods: number, key: number}} shortcut @param {Names} names @returns {Fields} */
+        const fields = (name, shortcut, names) => new Map([["Name", name || "no name"], ["Shortcut", shortcutField(shortcut, names)]]);
+        /** @param {string} name @param {{mods: number, key: number}} shortcut */
+        const exists = (name, shortcut) => Boolean(name || shortcut.mods || shortcut.key);
+        item("Custom keys", `customKey:${i}`, `Custom key ${i}${(next || old) ? ` · ${next || old}` : ""}`, fields(old, shortcutA, namesA), fields(next, shortcutB, namesB), {kind: "customKey", index: i},
+            [exists(old, shortcutA), exists(next, shortcutB)]);
     });
     // The keyboard's own name, edited on Settings' Keyboard card. Empty is the
     // firmware's built-in name, which the keyboard then reports over USB.

@@ -7,7 +7,9 @@
 // The key's own tap fills an empty tap at every tap count the row reaches, sent
 // once per press: a double tap that authors no tap sends it twice. A plain key
 // (a basic keycode, alone or with modifiers) taps itself; LT() taps its key,
-// MT() taps its key and OSM() arms its one-shot.
+// MT() taps its key and OSM() arms its one-shot. A custom key with a shortcut
+// (firmware D-F26) is a plain key whose own action is that shortcut: it taps
+// it, and holds it as a fallback.
 //
 // The built-in hold belongs to the first press. LT() holds its layer and MT()
 // and OSM() their modifiers, whatever else the row authors. A plain key's hold
@@ -35,12 +37,20 @@ const within = (code, start, end) => code >= start && code <= end;
 /** @param {number} code */
 const plainKey = (code) => (within(code, 0x0004, 0x00ff) && !within(code, 0x00e0, 0x00e7)) || within(code, 0x0100, 0x1fff);
 
-/** @param {import("../schema/types.js").SemanticAction | null | undefined} target @param {{physicalGestureTiming?: boolean, ownedTapping?: boolean}} [options] @returns {{tap?: import("../schema/types.js").SemanticAction, hold?: import("../schema/types.js").SemanticAction, fallback?: boolean, releaseTaps?: boolean}} */
-function builtInActions(target, {physicalGestureTiming = false, ownedTapping = false} = {}) {
-    if (target?.kind === ACTION.CUSTOM_KEY || target?.kind === ACTION.VIA_MACRO) return {releaseTaps: true};
+/** @typedef {{physicalGestureTiming?: boolean, ownedTapping?: boolean, customKeyShortcuts?: readonly {mods: number, key: number}[]}} BuiltInFeatures */
+/** @param {import("../schema/types.js").SemanticAction | null | undefined} target @param {BuiltInFeatures} [options] @returns {{tap?: import("../schema/types.js").SemanticAction, hold?: import("../schema/types.js").SemanticAction, fallback?: boolean, releaseTaps?: boolean}} */
+function builtInActions(target, {physicalGestureTiming = false, ownedTapping = false, customKeyShortcuts = []} = {}) {
+    const slot = target?.kind === ACTION.CUSTOM_KEY ? target.operand : target?.kind === ACTION.QMK_KEYCODE ? customKeyOfCode(target.operand) : undefined;
+    if (slot !== undefined) {
+        const shortcut = customKeyShortcuts[slot];
+        if (!shortcut || !(shortcut.mods || shortcut.key)) return {releaseTaps: true};
+        const own = {kind: ACTION.CUSTOM_KEY, operand: slot};
+        return {tap: own, hold: own, fallback: true, releaseTaps: true};
+    }
+    if (target?.kind === ACTION.VIA_MACRO) return {releaseTaps: true};
     if (target?.kind !== ACTION.QMK_KEYCODE || !Number.isInteger(target.operand)) return {};
     const code = target.operand;
-    if (customKeyOfCode(code) !== undefined || within(code, 0x7700, 0x777f)) return {releaseTaps: true};
+    if (within(code, 0x7700, 0x777f)) return {releaseTaps: true};
     if (plainKey(code)) {
         return {tap: keycodeAction(code), hold: keycodeAction(code), fallback: true, releaseTaps: true};
     }

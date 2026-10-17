@@ -4,7 +4,8 @@
 
 // Selector assertions refer to elements created by this module's authored markup.
 import {el, esc} from "../lib/dom.mjs";
-import {actionLabel, behaviourFor, behaviourTiers, keyMeaning, keyName, visibleKeycode} from "../view/keyface.mjs";
+import {actionLabel, behaviourFor, behaviourTiers, canonicalKeycode, keyMeaning, keyName, visibleKeycode} from "../view/keyface.mjs";
+import {customKeyOf, customKeyShortcutLine} from "../view/custom-key.mjs";
 import {combosAt, combosShownAt} from "../view/combo-reach.mjs";
 import {macroKeycodes, pointingSlotFor} from "../view/reach.mjs";
 import {resolvedPositions} from "../view/layer-resolution.mjs";
@@ -109,6 +110,11 @@ function reachSections(model, layer, position, index,
     const slot = pointingSlotFor(model, keyMeaning(position));
     const lit = stageEnabled(model, "key");
     const sections = [];
+    const custom = customKeyOf(model, canonicalKeycode(model, keyMeaning(position)));
+    if (custom) {
+        sections.push(`<div class="hc-sect"><div class="hc-h">Custom key shortcut</div>
+            <div class="hc-sub">${esc(customKeyShortcutLine(custom))}</div></div>`);
+    }
     if (behaviour) {
         const branches = (behaviour.steps || []).map((step) => {
             /** @type {[import("../../contracts/edits.js").Tier, string, import("../../contracts/panel.js").Branch | undefined][]} */

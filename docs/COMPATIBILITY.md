@@ -43,7 +43,7 @@ The bridge then sequentially runs these Ark-owned integration runners under `tes
 - `run_macro_program_size_tests.sh`: app size predictions against C decoding.
 - `run_profile_compiled_defaults_v1_tests.sh`: app profiles → C validation. A
   profile Ark writes for current firmware (schema 3.0, RGB 4, key behaviours 2,
-  combos 3, settings 6, PD 3) is accepted directly. The eight-slot profiles are
+  combos 3, settings 8, PD 3) is accepted directly. The eight-slot profiles are
   frozen firmware-owned rejection evidence: refused as they are. The bridge
   also checks Ark's translation of the immediately preceding backup, maximum
   names and the simultaneous maximum profile in normal and sanitizer builds.

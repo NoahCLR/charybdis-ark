@@ -50,8 +50,11 @@ export interface DecodedProfile {
     codecOptions: ReturnType<typeof import('../schema/profile-depth.js').profileDepthOptions>;
     danglingPdBindings: Record<string, number>;
 }
+export interface OlderDomain {id: number; version: number}
 export interface ProfileSummary {layers: number; behaviors: number; combos: number; macros: number; names: string[]}
 export interface SnapshotFacts {
+    /** Domains the keyboard stores in an older version, translated to be shown read-only (D-L63). */
+    older?: OlderDomain[];
     hostOs?: {detected: number} | null;
     limits?: {brightnessMax?: number} | null;
     options?: {effects: {id: number; name: string}[]; supportedKeymapOptions: number; keymapMasks: readonly number[]; ledFlags: number} | null;

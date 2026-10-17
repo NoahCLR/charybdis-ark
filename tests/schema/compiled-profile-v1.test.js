@@ -33,8 +33,9 @@ test("real compiled defaults remain a canonical cross-language profile fixture",
     assert.equal(bytes.length, Number(fixture.get("profile.byte_length")));
     assert.equal(decoded.crc32, Number.parseInt(fixture.get("profile.crc32"), 16));
     assert.equal(decoded.digest, Number.parseInt(fixture.get("profile.fnv1a32"), 16));
-    assert.deepEqual(decoded.domains.map((domain) => [domain.id, domain.version]), [[0x10, 4], [0x20, 2], [0x30, 3], [0x40, 7], [0x50, 3]]);
+    assert.deepEqual(decoded.domains.map((domain) => [domain.id, domain.version]), [[0x10, 4], [0x20, 2], [0x30, 3], [0x40, 8], [0x50, 3]]);
     assert.equal(decodeSettings(decoded.domains[3].payload).keyboardName, "", "the compiled default is the built-in name");
+    assert.ok(decodeSettings(decoded.domains[3].payload).customKeyShortcuts.every(({mods, key}) => !mods && !key), "no compiled custom key has a shortcut");
     const rgb = decodeRgbDomainV1(decoded.domains[0].payload);
     const behaviors = decodeKeyBehaviorDomain(decoded.domains[1].payload);
     assert.equal(rgb.layerColors.length, 16);

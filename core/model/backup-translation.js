@@ -17,7 +17,9 @@
 // v2 → v3 moves each name to the counted rule. Layers 8..15 start transparent
 // and unnamed, macros 64..127 empty, and every participation control on, so
 // the restored keyboard behaves as the backup did. Settings v6 → v7 adds the
-// keyboard's own name, empty: the firmware's built-in name.
+// keyboard's own name, empty: the firmware's built-in name. Settings v7 → v8
+// adds 128 custom-key shortcuts, all none, so each custom key still does only
+// what its behaviour says.
 //
 // Custom keys moved from 0x7e40 + n to 0x7f00 + n. They are named by their
 // stable slot, so the backup's keys, behaviour targets and combo inputs and
@@ -163,6 +165,21 @@ function settingsV7(payload) {
     return translated;
 }
 
+// Settings v7 → v8 (firmware D-F26): 256 zero bytes, no shortcut for any
+// custom key, go after the layer records, and header byte 6 counts them. The
+// v7 body is checked for its header only; the names are moved unread and the
+// complete document is validated once it is current.
+/** @param {Buffer} payload */
+function settingsV8(payload) {
+    const scalars = 31, fixed = 8 + scalars * 4 + 16 * 17, names = 16 + 128 + 128 + 1, shortcuts = 128;
+    if (payload.length < fixed + names || payload.length > fixed + names * (1 + NAME_MAX_BYTES)
+        || !payload.subarray(0, 5).equals(Buffer.from([7, 16, scalars, 128, 128])) || payload[5] & ~1 || payload[6] || payload[7]) throw fail("The backup's settings are in an unknown format.");
+    const translated = Buffer.concat([payload.subarray(0, fixed), Buffer.alloc(shortcuts * 2), payload.subarray(fixed)]);
+    translated[0] = 8;
+    translated[6] = shortcuts;
+    return translated;
+}
+
 /** @param {Buffer} payload */
 function pdV3(payload) {
     const count = payload[3];
@@ -190,7 +207,7 @@ const DOMAIN_TRANSLATIONS = Object.freeze({
     [PROFILE_DOMAIN_IDS.RGB]: Object.freeze({4: rgbV4}),
     [PROFILE_DOMAIN_IDS.KEY_BEHAVIORS]: Object.freeze({2: behaviorsV2}),
     [PROFILE_DOMAIN_IDS.COMBOS]: Object.freeze({3: combosV3}),
-    [PROFILE_DOMAIN_IDS.SETTINGS]: Object.freeze({6: settingsV6, 7: settingsV7}),
+    [PROFILE_DOMAIN_IDS.SETTINGS]: Object.freeze({6: settingsV6, 7: settingsV7, 8: settingsV8}),
     [PROFILE_DOMAIN_IDS.PD_MODES]: Object.freeze({3: pdV3}),
 });
 

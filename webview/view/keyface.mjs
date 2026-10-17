@@ -92,10 +92,12 @@ export const actionLabel = (model, name) => model?.qmkKeyLabels?.[name]
 // by, so it says "#", "Shift+Enter" and "Hold Numbers" where the keyboard
 // stores KC_HASH, LSFT(KC_ENTER) and MO(1). Every name comes from the host
 // (core/model/key-names.js); with none, the keycode is the label. The cell
-// editor keeps the keycode.
+// editor keeps the keycode. A custom key's own tap and hold read as the
+// shortcut they send (firmware D-F26), which the host labels them with.
 /** @param {ViewModel} model @param {import("../../contracts/panel.js").Branch | null | undefined} branch */
 export function cellLabel(model, branch) {
     const action = String(branch?.action ?? "");
+    if (/^CUSTOM_KEY_\d+$/.test(action) && branch?.label) return branch.label;
     const named = actionLabel(model, action);
     return named !== action ? named : branch?.label || action;
 }

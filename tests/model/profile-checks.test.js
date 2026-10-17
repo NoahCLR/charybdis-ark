@@ -58,3 +58,25 @@ test("destination checks block each unsupported combo-output permission without 
     assert.deepEqual(blockers(0).map(row => [row.level, row.identity, row.place.kind]), [["blocker", "global", "settings"], ["blocker", "combo:0", "combo"]]);
     assert.deepEqual(blockers(1 << 30), []);
 });
+
+test("a behaviour step that sends a custom key without a shortcut is flagged, and one with a shortcut is not", () => {
+    const decoded = validateSnapshot(document());
+    const customKey = operand => ({kind: 7, flags: 0, operand});
+    decoded.behaviors.rows = [{target: {kind: 1, flags: 0, operand: 4}, steps: [
+        {tapIndex: 0, tap: customKey(3), hold: {mode: 0, repeatHz: 0, action: customKey(5)}},
+        {tapIndex: 1, longHold: {mode: 0, repeatHz: 0, action: customKey(3)}},
+    ]}];
+    decoded.settings.customKeyShortcuts[5] = {mods: 0, key: 0xd1};
+    decoded.settings.customKeyNames[3] = "";
+    const flagged = profileFindings(decoded, {}).filter(row => row.kind === "shortcutlessCustomKeyStep");
+    assert.deepEqual(flagged.map(row => [row.level, row.title]), [
+        ["warning", "KC_A: press 1 tap sends custom key 3, which has no shortcut"],
+        ["warning", "KC_A: press 2 long hold sends custom key 3, which has no shortcut"],
+    ]);
+    decoded.settings.customKeyNames[3] = "Hyper";
+    assert.equal(profileFindings(decoded, {}).find(row => row.kind === "shortcutlessCustomKeyStep")?.title,
+        "KC_A: press 1 tap sends custom key “Hyper”, which has no shortcut", "the custom key by its name");
+    assert.deepEqual(flagged[0].place, {kind: "behaviour", keycode: "KC_A"});
+    decoded.settings.customKeyShortcuts[3] = {mods: 0x0f, key: 0};
+    assert.ok(!profileFindings(decoded, {}).some(row => row.kind === "shortcutlessCustomKeyStep"), "modifiers alone are a shortcut");
+});

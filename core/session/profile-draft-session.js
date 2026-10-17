@@ -262,21 +262,40 @@ class ProfileDraftSession {
         let document;
         if (editedBy(message, "settings")) document = editSettings(current, {...message, expectedFingerprint: message.expectedFingerprint || before}, this.capabilities);
         else if (editedBy(message, "macro")) document = editMacro(current, {...message, expectedFingerprint: message.expectedFingerprint || before}, this.capabilities);
-        else if (editedBy(message, "customKey")) document = editCustomKey(current, {...message, expectedFingerprint: message.expectedFingerprint || before}, this.capabilities);
+        else if (editedBy(message, "customKey")) {
+            document = editCustomKey(current, {...message, expectedFingerprint: message.expectedFingerprint || before}, this.capabilities);
+            // A custom key made for a shortcut is put to use in the same step
+            // (a layout key, a behaviour cell), so one undo takes both back
+            // (D-L63).
+            const then = "then" in message ? message.then : undefined;
+            if (then) document = this.editFollowing(then, document);
+        }
         else if (editedBy(message, "keyboardName")) document = editKeyboardName(current, {...message, expectedFingerprint: message.expectedFingerprint || before}, this.capabilities);
         else if (editedBy(message, "layout")) document = this.editLayout(message);
-        else if (editedBy(message, "profile")) {
-            const expected = message.expectedBase;
-            if (expected && (/** @type {const} */ (["source", "generation", "digest", "originHalf"])).some(key => expected[key] !== this.identity()[key])) throw fail("This form belongs to an older draft. Reload it before keeping changes.");
-            document = {...current.document, profile: editDeviceProfile(Buffer.from(current.document.profile, "base64"), message, {
-                capabilities: {...this.capabilities,
-                    ownedLayerToggles: Boolean((this.capabilities.featureFlags || 0) & PROFILE_WIRE_FEATURES.OWNED_LAYER_TOGGLES),
-                    behaviorQmkFunctions: Boolean((this.capabilities.featureFlags || 0) & PROFILE_WIRE_FEATURES.BEHAVIOR_QMK_FUNCTIONS)},
-                combos: this.combos(), maximumBrightness: current.limits?.brightnessMax,
-            }).toString("base64")};
-        } else throw fail("Unsupported draft edit.");
+        else if (editedBy(message, "profile")) document = this.editProfile(message, current.document);
+        else throw fail("Unsupported draft edit.");
         this.replace(document, message.draftRevision, "edit", draftEditLabel(message, current.document));
         return {message: copy(message), previousFingerprint: before, fingerprint: this.decode(this.history[this.cursor].document).fingerprint};
+    }
+    // One profile-domain edit, checked against the draft's base, on `base`.
+    /** @param {import("../model/device-profile-edits.js").ProfileEdit} message @param {Document} base @returns {Document} */
+    editProfile(message, base) {
+        const expected = "expectedBase" in message ? message.expectedBase : undefined;
+        if (expected && (/** @type {const} */ (["source", "generation", "digest", "originHalf"])).some(key => expected[key] !== this.identity()[key])) throw fail("This form belongs to an older draft. Reload it before keeping changes.");
+        return {...base, profile: editDeviceProfile(Buffer.from(base.profile, "base64"), message, {
+            capabilities: {...this.capabilities,
+                ownedLayerToggles: Boolean((this.capabilities.featureFlags || 0) & PROFILE_WIRE_FEATURES.OWNED_LAYER_TOGGLES),
+                behaviorQmkFunctions: Boolean((this.capabilities.featureFlags || 0) & PROFILE_WIRE_FEATURES.BEHAVIOR_QMK_FUNCTIONS)},
+            combos: this.combos(), maximumBrightness: this.current.limits?.brightnessMax,
+        }).toString("base64")};
+    }
+    // The edit a custom key made for a shortcut carries: a layout key or a
+    // behaviour, staged on the document that already holds the key (D-L63).
+    /** @param {{type: string}} message @param {Document} base @returns {Document} */
+    editFollowing(message, base) {
+        if (message.type === "updateLayoutKeys") return this.editLayout(/** @type {import("../../contracts/edits.js").EditOf<"updateLayoutKeys">} */ (message), base);
+        if (message.type === "saveBehavior") return this.editProfile(/** @type {import("../../contracts/edits.js").EditOf<"saveBehavior">} */ (message), base);
+        throw fail("A custom key made for a shortcut goes on a key or in a behaviour.");
     }
     // A Rename & Reorder save: its document, and the order it saved, which
     // rearranges this revision. An order and each name are separate
@@ -288,11 +307,11 @@ class ProfileDraftSession {
     }
     // A layout message is untrusted like any other: its layer and every key
     // are checked before anything is written.
-    /** @param {import("../../contracts/edits.js").EditOf<"updateLayoutKeys">} message */
-    editLayout({layer: reference, changes}) {
+    /** @param {Pick<import("../../contracts/edits.js").EditOf<"updateLayoutKeys">, "layer" | "changes">} message @param {Document} [base] */
+    editLayout({layer: reference, changes}, base = this.document) {
         const layer = layerOfRef(reference);
         if (layer === undefined || !(layer < LAYERS) || !Array.isArray(changes)) throw fail("Choose a layer reported by this keyboard.");
-        const document = this.document;
+        const document = copy(base);
         for (const change of changes) {
             const position = Number.isInteger(change.layoutIndex) && CHARYBDIS_4X6_LAYOUT_MATRIX[change.layoutIndex];
             const code = keycodes.encode(change.keycode) ?? (knownActionAbi(this.capabilities.actionAbiDigest ?? 0) ? resolveNativeQmkExpression(change.keycode, {}) : undefined);

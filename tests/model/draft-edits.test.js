@@ -86,6 +86,8 @@ test("each edit is recorded in its own words", () => {
     assert.equal(draftEditLabel({type: "retargetBehavior", keycode: "KC_A", target: "KC_B"}, document), "Moved a behaviour");
     assert.equal(draftEditLabel({type: "updateRgbStages", stageEnableMask: 0}, document), "Edited lighting");
     assert.equal(draftEditLabel({type: "updateCustomKey", keycode: "CUSTOM_KEY_0", name: "Thumb"}, document), "Renamed a custom key");
+    assert.equal(draftEditLabel({type: "updateCustomKeyShortcut", keycode: "CUSTOM_KEY_0", shortcut: {mods: 1, key: 0}}, document), "Changed a custom key's shortcut");
+    assert.equal(draftEditLabel({type: "updateCustomKeyShortcut", keycode: "CUSTOM_KEY_0", shortcut: {mods: 0, key: 0}}, document), "Cleared a custom key's shortcut");
     assert.equal(draftEditLabel({type: "renameKeyboard", name: "Board"}, document), "Renamed the keyboard");
 
     session.stage({type: "updateLayoutKeys", draftRevision: session.revision, layer: "Layer 1", changes: [{layoutIndex: 0, keycode: "KC_A"}]});

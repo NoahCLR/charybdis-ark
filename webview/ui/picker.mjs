@@ -14,18 +14,29 @@ import {getModel, layerName, layers, render, state} from "../store.mjs";
 import {actionLabel} from "../view/keyface.mjs";
 import {PICKER_BOARD, pickerBoardKey} from "../view/picker-board.mjs";
 import {pickerExpression} from "../view/edits.mjs";
-import {pickerModifierProblem} from "../view/keyvalues.mjs";
+import {modifierPick, pickerModifierProblem} from "../view/keyvalues.mjs";
 import {entriesForPickerSection, pickable, pickerSections} from "../view/picker-sections.mjs";
 import {macroMatches} from "../view/macro.mjs";
+import {customKeyChoice, offeredName, shortcutOffer, shortcutPick, shortcutPickLabel, shortcutPickMods} from "../view/custom-key.mjs";
 import {vocabulary, word} from "../view/vocabulary.mjs";
 
 /** @param {Model} model */
 const modifierControls = model => vocabulary(model).pickerModifiers || [];
 
 /** @param {import("./editor-types.js").PickerOptions} options */
-export function openPicker({title, context, contextKeycode, seed = [], mode = "single", allowedKeys = null, modifiable = null, maxKeys = Infinity, onPick}) {
+// `shortcut` picks a custom key's shortcut (firmware D-F26): the same board and
+// modifier row, but any of the eight modifiers mix, sides included, a key is
+// optional, and the choice goes to `onShortcut` as a mask and a key.
+// `onCustomKey` lets a keycode field take modifiers no keycode can hold — both
+// sides at once, or no key — through a custom key with that shortcut (D-L63):
+// one that already has it is picked as any key is, otherwise an unused one is
+// made it. The picker names the key either way. `customKeyRuns` says what the
+// field does with a custom key: runs its behaviour too (a layout key, a combo
+// output), or sends only its shortcut (a behaviour step).
+export function openPicker({title, context, contextKeycode, seed = [], mode = "single", allowedKeys = null, modifiable = null, shortcut = null, maxKeys = Infinity, onPick, onShortcut, onCustomKey, customKeyRuns = "behaviour"}) {
     const keys = allowedKeys ? seed.map(key => getModel()?.qmkKeycodeAliases?.[key] || key) : seed.slice();
-    state.picker = {title, context, contextKeycode, mode, allowedKeys, modifiable, maxKeys, section: "board", search: "", mods: [], keys, layerTap: null, onPick};
+    const mods = shortcut ? shortcutPickMods(getModel(), shortcut.mods) : [];
+    state.picker = {title, context, contextKeycode, mode, allowedKeys, modifiable, shortcut: Boolean(shortcut), maxKeys, section: "board", search: "", mods, keys, layerTap: null, onPick, onShortcut, onCustomKey, customKeyRuns};
     render();
 }
 
@@ -45,15 +56,28 @@ const sections = (model) => pickerSections().filter(section => !state.picker?.al
     || (section.kind === "macros" && (model?.viaMacros || []).some(slot => allowed(slot.keycode)))
     || entriesForPickerSection(model?.qmkKeycodes || [], section).some(entry => allowed(entry.value)));
 
-const expression = () => state.picker ? pickerExpression(state.picker) : "";
+// Modifiers alone, or with a modifier key, are one set of modifiers, stored as
+// the simplest keycode that holds them (modifierPick): Command, Right Command
+// and the Left Command key are RGUI(KC_LEFT_GUI). Any other selection is
+// stored as picked.
+/** @param {Model} model @param {import("../state.js").PickerState} picker */
+const folded = (model, picker) => !picker.shortcut && picker.mode === "single" && !picker.layerTap ? modifierPick(model, picker) : null;
+/** @param {Model} model @param {import("../state.js").PickerState} picker */
+const stored = (model, picker) => {
+    const fold = folded(model, picker);
+    return fold && "keys" in fold ? {...picker, ...fold} : picker;
+};
+
+const expression = () => !state.picker ? ""
+    : state.picker.shortcut ? shortcutPickLabel(getModel(), shortcutPick(getModel(), state.picker)) : pickerExpression(stored(getModel(), state.picker));
 
 /** @template T @param {T[]} values @param {number} size */
 const chunk = (values, size) => values.reduce((rows, value, index) =>
     (index % size ? rows[rows.length - 1].push(value) : rows.push([value]), rows), /** @type {T[][]} */ ([]));
 
-/** @param {Pick<import("../../contracts/panel.js").CatalogEntry, "value" | "label">} entry @param {boolean} picked */
+/** @param {Pick<import("../../contracts/panel.js").CatalogEntry, "value" | "label" | "tip">} entry @param {boolean} picked */
 function keyButton(entry, picked) {
-    return `<button class="pk ${picked ? "on" : ""}" data-pick="${esc(entry.value)}">
+    return `<button class="pk ${picked ? "on" : ""}" data-pick="${esc(entry.value)}"${entry.tip ? ` data-tip="${esc(entry.tip)}"` : ""}>
         <span class="l">${esc(entry.label || entry.value)}</span><span class="c">${esc(entry.value)}</span></button>`;
 }
 
@@ -110,7 +134,7 @@ function sectionBody(model) {
         }).join("");
         return `<div class="pk-body"><div class="pkb"><svg viewBox="0 0 ${PICKER_BOARD.width} ${PICKER_BOARD.height}" xmlns="http://www.w3.org/2000/svg">${keys}</svg></div>
             ${model?.hostLayoutLegends ? `<p class="note pk-note">Shift above; ${modifierControls(model).find(({value}) => value === "A")?.label === "Option" ? "Option" : "AltGr"} on the right. ◌ marks a dead key: press it, then a letter.</p>` : ""}
-            <p class="note pk-note">${picker.mode === "list" ? picker.maxKeys === 1 ? "Choose the key to press or release." : "Choose the keys to send together." : `Click a key. Modifiers above wrap it, so <code>${esc(modifierControls(model).find(({value}) => value === "G")?.label || "G")}</code> + <code>C</code> stores <code>G(KC_C)</code> — identical to <code>LGUI(KC_C)</code>.`}</p></div>`;
+            <p class="note pk-note">${picker.shortcut ? "Click a key and the modifiers held with it, left and right mixed. Modifiers alone, or a key alone, are a shortcut too." : picker.mode === "list" ? picker.maxKeys === 1 ? "Choose the key to press or release." : "Choose the keys to send together." : `Click a key. Modifiers above wrap it, so <code>${esc(modifierControls(model).find(({value}) => value === "G")?.label || "G")}</code> + <code>C</code> stores <code>G(KC_C)</code> — identical to <code>LGUI(KC_C)</code>.`}</p></div>`;
     }
     if (section.kind === "layers") {
         // TG(n) is the same lock as LOCK_LAYER(n), so a key storing it lights
@@ -172,7 +196,15 @@ export function pickerOverlay() {
     if (!picker) return null;
     const model = getModel();
     const value = expression();
-    const problem = pickerModifierProblem(model, picker);
+    const problem = pickerModifierProblem(model, stored(model, picker));
+    // Modifiers no keycode can hold, offered as a custom key's shortcut.
+    const fold = folded(model, picker);
+    const offer = !picker.onCustomKey || picker.mode !== "single" || picker.shortcut || picker.layerTap ? null
+        : fold ? ("shortcut" in fold && (model?.customKeyShortcutKeys || []).length ? fold.shortcut : null) : shortcutOffer(model, picker);
+    const {existing, withBehaviour, spare} = offer ? customKeyChoice(model, offer, layers(), {runsBehaviour: picker.customKeyRuns !== "shortcut"})
+        : {existing: undefined, withBehaviour: false, spare: undefined};
+    /** @param {import("../../contracts/panel.js").CustomKey} key */
+    const keyWords = (key) => `Custom key ${key.slot}${key.name ? ` · ${key.name}` : ""}`;
     const node = el(`<div class="scrim"><div class="sheet picker" role="dialog" aria-modal="true" aria-label="Pick a keycode">
         <div class="sheet-h">
             <div><h2>Pick a keycode</h2>
@@ -182,7 +214,7 @@ export function pickerOverlay() {
         </div>
         ${picker.mode === "list" ? "" : `<div class="pk-mods"><span class="label">Modifiers</span>
             ${modifierControls(model).map(({value: wrap, label}) => `<button class="pk-mod ${picker.mods.includes(wrap) ? "on" : ""}" data-mod="${wrap}"
-                data-tip="Wraps the picked key as ${wrap}(key).">${esc(label)}</button>`).join("")}
+                data-tip="${picker.shortcut ? "Held with the key." : `Wraps the picked key as ${wrap}(key).`}">${esc(label)}</button>`).join("")}
             <span class="note">held together with the key</span></div>`}
         <div class="sheet-b">
             <div class="picker-side">${sections(model).map((section) =>
@@ -197,9 +229,21 @@ export function pickerOverlay() {
             <code class="mono pk-value">${esc(value || "—")}</code>
             <span class="right"><button class="btn ghost" data-act="clear">Clear</button>
                 <button class="btn ghost" data-act="cancel">Cancel</button>
-                <button class="btn primary" data-act="use" ${value && !problem ? "" : "disabled"}>Use keycode</button></span>
+                <button class="btn primary" data-act="use" ${value && !problem ? "" : "disabled"}>${picker.shortcut ? "Use shortcut" : "Use keycode"}</button></span>
         </div>
-        ${problem ? `<div class="note pk-problem" role="status">${esc(problem)}</div>` : ""}
+        ${problem && !offer ? `<div class="note pk-problem" role="status">${esc(problem)}</div>` : ""}
+        ${offer ? `<div class="note pk-problem pk-offer" role="status">${existing && !withBehaviour
+            ? `No keycode can hold ${esc(shortcutPickLabel(model, offer))}, but ${esc(keyWords(existing))} already sends it.
+                <button class="btn" data-act="use-existing-key" data-tip="Uses ${esc(existing.keycode)}, which already has this shortcut.">Use ${esc(keyWords(existing))}</button>`
+            : existing
+            ? `No keycode can hold ${esc(shortcutPickLabel(model, offer))}. ${esc(keyWords(existing))} already sends it, with its behaviour on top, which runs here too.
+                <button class="btn" data-act="use-existing-key" data-tip="Uses ${esc(existing.keycode)}: its shortcut and its behaviour.">Use ${esc(keyWords(existing))}</button>
+                ${spare ? `<button class="btn" data-act="use-custom-key" data-tip="Gives ${esc(spare.keycode)} this shortcut alone and a name, and uses it here.">Make Custom key ${esc(spare.slot)}</button>`
+                    : `<span>Every other custom key is in use.</span>`}`
+            : spare
+            ? `No keycode can hold ${esc(shortcutPickLabel(model, offer))}, but a custom key's shortcut can.
+                <button class="btn" data-act="use-custom-key" data-tip="Gives ${esc(spare.keycode)} this shortcut and a name, and uses it here.">Use Custom key ${esc(spare.slot)}</button>`
+            : `No keycode can hold ${esc(shortcutPickLabel(model, offer))}, and every custom key is in use. Free one on the Custom keys screen to hold it.`}</div>` : ""}
     </div></div>`);
 
     node.addEventListener("click", (event) => {
@@ -220,11 +264,22 @@ export function pickerOverlay() {
         if (remove) { picker.keys.splice(Number(remove.dataset.remove), 1); return render(); }
         // The picker closes itself before handing the choice on, so every
         // caller only says what the choice does.
+        if (existing && /** @type {HTMLElement | null} */ (/** @type {Element} */ (event.target).closest('[data-act="use-existing-key"]'))) {
+            state.picker = null;
+            picker.onPick?.(existing.keycode);
+            return render();
+        }
+        if (offer && spare && /** @type {HTMLElement | null} */ (/** @type {Element} */ (event.target).closest('[data-act="use-custom-key"]'))) {
+            state.picker = null;
+            picker.onCustomKey?.(spare.keycode, offer, offeredName(model, offer));
+            return render();
+        }
         if (/** @type {HTMLElement | null} */ (/** @type {Element} */ (event.target).closest('[data-act="use"]'))) {
             const chosen = expression();
-            if (!chosen || pickerModifierProblem(getModel(), picker)) return;
+            if (!chosen || pickerModifierProblem(getModel(), stored(getModel(), picker))) return;
             state.picker = null;
-            picker.onPick?.(chosen);
+            if (picker.shortcut) picker.onShortcut?.(shortcutPick(getModel(), picker));
+            else picker.onPick?.(chosen);
             return render();
         }
         const pick = /** @type {HTMLElement | SVGElement | null} */ (/** @type {Element} */ (event.target).closest("[data-pick]"));

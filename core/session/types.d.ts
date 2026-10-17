@@ -122,6 +122,8 @@ export interface PanelDeviceState extends DeviceModelInput, Omit<DraftDeviceCont
     devices?: (import('../transport/types.js').DeviceDescriptor & {label: string; number?: number})[];
     portableSummary?: Pick<import('../model/types.js').ProfileSummary, 'names'> | null;
     portableProgress?: string;
+    /** Domains the keyboard stores in an older version: shown read-only, never written (D-L63). */
+    olderDomains?: import('../model/types.js').OlderDomain[];
     operationId?: number;
     diagnostics?: string[];
 }
@@ -169,7 +171,7 @@ export interface PanelEnvelope {type: string; draftId?: string; draftRevision?: 
 export type PanelMessage = PanelEnvelope | (DraftEdit & {draftId?: string});
 export type PanelDraftView = ReturnType<NonNullable<DemoSession['draft']>['view']> & {busy: boolean; editable: boolean; reason: DraftBlock; steps?: import('../../contracts/model.js').HistoryStep[]};
 /** What the panel adds to the device model; the posted shape is the contract's. */
-export type PanelModelExtras = Pick<import('../../contracts/panel.js').PublishedModel, 'devices' | 'selectedDeviceId' | 'demo' | 'apply' | 'postApplyRead' | 'portable' | 'host' | 'load' | 'reconnecting'> & {draft?: PanelDraftView};
+export type PanelModelExtras = Pick<import('../../contracts/panel.js').PublishedModel, 'devices' | 'selectedDeviceId' | 'demo' | 'apply' | 'postApplyRead' | 'portable' | 'host' | 'load' | 'reconnecting' | 'olderFirmware'> & {draft?: PanelDraftView};
 
 export type CompleteCapture = Extract<CapturedProfile, import('../model/types.js').CompleteSnapshot>;
 export type RestoredProfile = Awaited<ReturnType<typeof import('./portable-profile-session.js').restoreProfile>> & import('../model/types.js').SnapshotFacts;

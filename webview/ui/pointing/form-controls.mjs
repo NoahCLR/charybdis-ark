@@ -1,7 +1,7 @@
 // @ts-check
 import {el, esc} from "../../lib/dom.mjs";
-import {keyName, modifierBits, pointingMacro} from "../../view/keyvalues.mjs";
-import {vocabulary} from "../../view/vocabulary.mjs";
+import {keyName, pointingMacro} from "../../view/keyvalues.mjs";
+import {modifierGrid} from "../modifier-grid.mjs";
 import {render} from "../../store.mjs";
 import {openPicker} from "../picker.mjs";
 
@@ -59,28 +59,13 @@ export function formControls(model, slot, canEdit, stageCurrent) {
         });
         return node;
     };
-    // Eight modifiers as a Left / Right by Ctrl / Shift / Alt / GUI grid, so
-    // each switch sits under its name instead of wrapping wherever it lands.
+    // The shared Left / Right by Ctrl / Shift / Alt / GUI grid.
     /** @param {string} label @param {number} mask @param {string} key */
     const modifiers = (label, mask, key) => {
-        const bits = modifierBits(model);
-        const columns = (vocabulary(model).pickerModifiers || []).filter(({bit}) => bit < 16).map(({label}) => label);
-        /** @param {readonly [number, string]} entry */
-        const cell = ([bit, name]) => `<label class="sw" data-tip="${esc(name)}"><input data-f="pointing:${slot.id}:${esc(key)}:modifier:${bit}" type="checkbox" data-bit="${bit}" aria-label="${esc(name)}"
-            ${mask & bit ? "checked" : ""} ${disabled}><span class="track"></span></label>`;
-        /** @param {boolean} right */
-        const side = (right) => bits.filter(([bit]) => (bit >= 16) === right);
-        const node = el(`<div class="field"><span>${esc(label)}</span>
-            <div class="pd-mods" style="grid-template-columns:44px repeat(${columns.length}, 58px)">
-                <span></span>${columns.map((name) => `<span class="h">${esc(name)}</span>`).join("")}
-                <span class="s">Left</span>${side(false).map(cell).join("")}
-                <span class="s">Right</span>${side(true).map(cell).join("")}
-            </div></div>`);
-        form[key] = () => [.../** @type {NodeListOf<HTMLInputElement>} */ (node.querySelectorAll("[data-bit]"))].reduce((total, input) =>
-            total | (input.checked ? Number(input.dataset.bit) : 0), 0);
-        return node;
+        const grid = modifierGrid(model, {label, mask, id: `pointing:${slot.id}:${key}`, disabled: !canEdit});
+        form[key] = grid.read;
+        return grid.node;
     };
-
 
     return {form, disabled, field, select, shortcut, modifiers};
 }

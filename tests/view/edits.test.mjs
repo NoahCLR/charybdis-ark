@@ -470,6 +470,66 @@ test("a custom key's name is posted trimmed against the draft it was read from, 
     assert.equal(decoded(draft).settings.customKeyNames[2], "");
 });
 
+test("a custom key's shortcut is posted as a mask and a key, reviewed, undone and redone", () => {
+    const draft = session(), read = draft.current.fingerprint, layers = draft.document.layers;
+    const message = edits.customKeyShortcutMessage("CUSTOM_KEY_2", 0x41, 0x0e, read);
+    assert.deepEqual(message, {type: "updateCustomKeyShortcut", keycode: "CUSTOM_KEY_2", shortcut: {mods: 0x41, key: 0x0e}, expectedFingerprint: read});
+    stage(draft, message);
+    assert.deepEqual(decoded(draft).settings.customKeyShortcuts[2], {mods: 0x41, key: 0x0e});
+    assert.deepEqual(draft.document.layers, layers, "a shortcut moves no key");
+    const view = draft.view({selectedDeviceId: "test-device", connected: true});
+    assert.ok(view.changes.some((change) => change.unit === "customKey:2" && change.fields.some((field) => field.label === "Shortcut" && field.after === "Left Ctrl + Right Alt + K")));
+    assert.equal(view.undoLabel, "Changed a custom key's shortcut");
+    stage(draft, edits.customKeyShortcutMessage("CUSTOM_KEY_2", 0x0f, 0));
+    assert.deepEqual(decoded(draft).settings.customKeyShortcuts[2], {mods: 0x0f, key: 0}, "modifiers alone");
+    stage(draft, edits.customKeyShortcutMessage("CUSTOM_KEY_2", 0, 0));
+    assert.deepEqual(decoded(draft).settings.customKeyShortcuts[2], {mods: 0, key: 0}, "cleared");
+    assert.throws(() => stage(draft, edits.customKeyShortcutMessage("CUSTOM_KEY_2", 0, 0xe0)), /plain key or mouse button/, "a modifier key belongs in the mask");
+    draft.undo(draft.revision);
+    assert.deepEqual(decoded(draft).settings.customKeyShortcuts[2], {mods: 0x0f, key: 0});
+    draft.redo(draft.revision);
+    assert.deepEqual(decoded(draft).settings.customKeyShortcuts[2], {mods: 0, key: 0});
+});
+
+test("a custom key made for a shortcut no keycode holds is named and placed in one draft step", () => {
+    const draft = session();
+    const before = draft.document;
+    const message = edits.customKeyForShortcut("CUSTOM_KEY_9", {mods: 0x88, key: 0}, " Left GUI + Right GUI ", edits.setKey("Layer 0", 27, "CUSTOM_KEY_9"), draft.current.fingerprint);
+    assert.deepEqual(message, {type: "updateCustomKeyShortcut", keycode: "CUSTOM_KEY_9", shortcut: {mods: 0x88, key: 0}, expectedFingerprint: draft.current.fingerprint,
+        name: "Left GUI + Right GUI", then: {type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 27, keycode: "CUSTOM_KEY_9"}]}});
+    stage(draft, message);
+    const after = decoded(draft);
+    assert.deepEqual(after.settings.customKeyShortcuts[9], {mods: 0x88, key: 0}, "both GUIs, no key");
+    assert.equal(after.settings.customKeyNames[9], "Left GUI + Right GUI");
+    assert.equal(draft.document.layers[0][slotOf(27)], customKeyCode(9), "placed on the key the picker was for");
+    assert.equal(draft.view({selectedDeviceId: "test-device", connected: true}).undoLabel, "Made a custom key for a shortcut");
+    draft.undo(draft.revision);
+    assert.deepEqual(draft.document, before, "one undo takes back the key, its name and its shortcut");
+    assert.throws(() => stage(draft, edits.customKeyForShortcut("CUSTOM_KEY_9", {mods: 0x88, key: 0}, "", edits.setKey("Layer 99", 27, "CUSTOM_KEY_9"))), /layer/, "a bad placement refuses the whole step");
+    assert.deepEqual(draft.document, before);
+});
+
+test("a custom key made for a behaviour cell's shortcut is sent by that cell in the same step", () => {
+    const draft = session();
+    const before = draft.document;
+    const behaviour = {keycode: "KC_Q", steps: []};
+    const then = edits.saveBehaviour(behaviour, {change: {tapCount: 0, kind: "hold", branch: edits.cellBranch("hold", {action: "CUSTOM_KEY_9", helper: "PRESS_AND_HOLD_UNTIL_RELEASE"})}}, draft.identity());
+    stage(draft, edits.customKeyForShortcut("CUSTOM_KEY_9", {mods: 0x11, key: 0}, "Left Ctrl + Right Ctrl", /** @type {any} */ (then)));
+    const after = decoded(draft);
+    assert.deepEqual(after.settings.customKeyShortcuts[9], {mods: 0x11, key: 0});
+    const row = after.behaviors.rows.find((entry) => entry.target.operand === 0x14);
+    assert.deepEqual([row.steps[0].hold.action.kind, row.steps[0].hold.action.operand], [7, 9], "the hold sends the custom key");
+    draft.undo(draft.revision);
+    assert.deepEqual(draft.document, before, "one undo takes back both");
+    // Without a following edit (a combo output, saved with its combo later),
+    // the key is only named and given the shortcut.
+    stage(draft, edits.customKeyForShortcut("CUSTOM_KEY_9", {mods: 0x11, key: 0}, "Left Ctrl + Right Ctrl"));
+    assert.deepEqual(decoded(draft).settings.customKeyShortcuts[9], {mods: 0x11, key: 0});
+    assert.deepEqual(draft.document.layers, before.layers);
+    assert.throws(() => stage(draft, {...edits.customKeyForShortcut("CUSTOM_KEY_8", {mods: 0x11, key: 0}, ""), then: /** @type {any} */ ({type: "renameKeyboard", name: "x"})}),
+        /goes on a key or in a behaviour/, "only a layout key or a behaviour follows");
+});
+
 test("the keyboard's name is posted trimmed against the draft it was read from, and review shows the rename", () => {
     const draft = session(), read = draft.current.fingerprint, layers = draft.document.layers;
     const message = edits.keyboardNameMessage("  Noah’s Charybdis ", read);

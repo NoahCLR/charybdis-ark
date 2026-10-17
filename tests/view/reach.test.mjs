@@ -493,6 +493,19 @@ test("a custom key's layers are the ones where a key carries it or a combo sends
 });
 
 
+test("a custom key is placed wherever it is sent, unnamed and with nothing but a shortcut, or by a behaviour step", () => {
+    const at = (layoutIndex, keycode, semantic) => ({layoutIndex, keycode, semantic, display: keycode});
+    const model = {
+        customKeys: [0, 1].map((slot) => ({slot, keycode: `CUSTOM_KEY_${slot}`, name: "", hasBehavior: false, shortcut: {mods: slot ? 0 : 0x41, key: slot ? 0 : 0x0e}})),
+        qmkKeycodeAliases: {},
+        keyBehaviors: [{keycode: "KC_A", enabled: true, allowedLayers: 0xffff, steps: [{tapCount: 1, tap: {helper: "TAP_SENDS", action: "CUSTOM_KEY_1"}}]}],
+        combos: [],
+    };
+    const stack = withAnswers([{index: 0, name: "Base", positions: [at(0, "QK_USER_0", "CUSTOM_KEY_0"), at(1, "KC_A")]}]);
+    const groups = (keycode) => customKeyPlacements(model, stack, keycode).map((entry) => entry.routes.map((route) => route.group));
+    assert.deepEqual(groups("CUSTOM_KEY_0"), [["here"]], "an unnamed key with only a shortcut is placed");
+    assert.deepEqual(groups("CUSTOM_KEY_1"), [["branches"]], "a behaviour step sending it places it");
+});
 test("generated behaviour lists use the declared owner's physical source rather than reference or other member", () => {
     const at = (layoutIndex, keycode) => ({layoutIndex, keycode, display: keycode});
     const row = {keycode: "CUSTOM_KEY_0", enabled: true, allowedLayers: 1,

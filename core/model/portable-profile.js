@@ -21,15 +21,16 @@ const {profileDepthOptions} = require("../schema/profile-depth");
 
 // A portable profile is the keyboard's whole configuration in the one format
 // it stores: sixteen layers, the 128 VIA macros, and a schema 3.0 profile with
-// every domain (RGB 4, key behaviours 2, combos 3, settings 6, PD 3) in the
-// action vocabulary Ark knows (firmware D-F14). The keyboard migrates nothing:
-// a backup in an older format is refused here, and translated by
-// backup-translation.js before anything else reads it.
+// every domain (RGB 4, key behaviours 2, combos 3, settings 8, PD 3) in the
+// action vocabulary Ark knows (firmware D-F14, D-F26). The keyboard migrates
+// nothing: a backup in an older format is refused here, and translated by
+// backup-translation.js before anything else reads it; a keyboard still
+// storing an older domain is read through the same translation, read-only.
 const MACRO_SLOTS = 128;
 // A file holds at most a full 65,504-byte profile in base64, sixteen layers of
 // keys and a full macro bank; this ceiling leaves room for all three.
 const FILE_MAX_BYTES = 262144;
-const {PROFILE_DOMAINS, PROFILE_DOMAIN_IDS, PROFILE_DOMAIN_MASK, domainCodec, encodeProfileDomains} = require("../schema/profile-domains");
+const {PROFILE_DOMAINS, PROFILE_DOMAIN_IDS, PROFILE_DOMAIN_MASK, READABLE_DOMAIN_VERSIONS, domainCodec, encodeProfileDomains} = require("../schema/profile-domains");
 const DOMAIN_IDS = PROFILE_DOMAINS.map(domain => domain.id);
 /** @param {number} id @param {Buffer} payload */
 const domain = (id, payload) => ({id, version: PROFILE_DOMAIN_VERSIONS[id], payload});
@@ -96,19 +97,38 @@ function macroBank(slots, capacity) {
     for (const slot of slots) {slot.copy(result, offset); offset += slot.length + 1;}
     return result;
 }
-/** @param {Uint8Array} active @param {Uint8Array} defaults @param {import("./types.js").NativeComboTable} combos @param {Buffer} settings */
-function materializeProfile(active, defaults, combos, settings) {
-    if (!combos || combos.noTimer || combos.customTrigger || combos.customRelease || combos.customRepress || combos.strictTimer || combos.fixedReference) throw fail("This keyboard uses combo hooks or timing that cannot be represented by a portable profile.");
-    const live = decodeProfileBlob(active), fallback = decodeProfileBlob(defaults);
+// A domain a keyboard still stores in an older version, translated to the
+// current one by the same steps a backup takes (D-L63). The keyboard keeps
+// its own bytes: the translation only lets it be shown, never written.
+/** @param {import("../schema/types.js").ProfileDomain} stored @returns {import("../schema/types.js").ProfileDomain} */
+function currentDomain(stored) {
+    return stored.version < PROFILE_DOMAIN_VERSIONS[stored.id] ? require("./backup-translation").translateDomain(stored) : stored;
+}
+/** @param {Uint8Array} active @param {Uint8Array} defaults @param {Buffer} settings */
+function liveDomains(active, defaults, settings) {
+    const live = decodeProfileBlob(active, {domainVersions: READABLE_DOMAIN_VERSIONS}), fallback = decodeProfileBlob(defaults, {domainVersions: READABLE_DOMAIN_VERSIONS});
     /** @type {import("../schema/types.js").ProfileDomain[]} */
-    const domains = [PROFILE_DOMAIN_IDS.RGB, PROFILE_DOMAIN_IDS.KEY_BEHAVIORS, PROFILE_DOMAIN_IDS.PD_MODES].map(id => {
+    const stored = [PROFILE_DOMAIN_IDS.RGB, PROFILE_DOMAIN_IDS.KEY_BEHAVIORS, PROFILE_DOMAIN_IDS.PD_MODES].map(id => {
         const found = live.domains.find(d => d.id === id) || fallback.domains.find(d => d.id === id);
         if (!found) throw fail("The keyboard did not report every profile domain.");
         return found;
     });
+    return [...stored, {id: PROFILE_DOMAIN_IDS.SETTINGS, version: settings[0], payload: settings}];
+}
+// The domains a keyboard stores in an older version than this app writes: it
+// is shown read-only until both halves are updated (D-L63).
+/** @param {Uint8Array} active @param {Uint8Array} defaults @param {Buffer} settings @returns {import("./types.js").OlderDomain[]} */
+function olderDomains(active, defaults, settings) {
+    return liveDomains(active, defaults, settings).filter(stored => stored.version < PROFILE_DOMAIN_VERSIONS[stored.id]).map(({id, version}) => ({id, version}));
+}
+/** @param {Uint8Array} active @param {Uint8Array} defaults @param {import("./types.js").NativeComboTable} combos @param {Buffer} settings */
+function materializeProfile(active, defaults, combos, settings) {
+    if (!combos || combos.noTimer || combos.customTrigger || combos.customRelease || combos.customRepress || combos.strictTimer || combos.fixedReference) throw fail("This keyboard uses combo hooks or timing that cannot be represented by a portable profile.");
+    const domains = liveDomains(active, defaults, settings).map(currentDomain);
+    const current = /** @type {import("../schema/types.js").ProfileDomain} */ (domains.pop());
     const table = comboTableOf(combos);
-    decodeSettings(settings);
-    domains.push(domain(PROFILE_DOMAIN_IDS.COMBOS, encodeComboDomain(table)), domain(PROFILE_DOMAIN_IDS.SETTINGS, settings));
+    decodeSettings(current.payload);
+    domains.push(domain(PROFILE_DOMAIN_IDS.COMBOS, encodeComboDomain(table)), domain(PROFILE_DOMAIN_IDS.SETTINGS, current.payload));
     return encodeProfileBlob({domains});
 }
 // The combo table the keyboard runs, as it stores it: which combos follow the
@@ -340,4 +360,4 @@ function summaryOf(value) {
         macros: value.document.macros.filter(Boolean).length,
         names: value.settings.names.map((name, index) => layerName(value.settings.names, index))};
 }
-module.exports = {LAYERS, MACRO_SLOTS, MACRO_BANK_BYTES, MACRO_BANK_MAX_BYTES, FILE_MAX_BYTES, encodeNamedProfile, comboTableOf, createSnapshot, validateSnapshot, materializeProfile, macroSlots, macroBank, validateViaMacro, fingerprint, fingerprintOf, decodedOf, reorderLayers, summary, summaryOf};
+module.exports = {LAYERS, MACRO_SLOTS, MACRO_BANK_BYTES, MACRO_BANK_MAX_BYTES, FILE_MAX_BYTES, encodeNamedProfile, comboTableOf, createSnapshot, validateSnapshot, materializeProfile, olderDomains, currentDomain, macroSlots, macroBank, validateViaMacro, fingerprint, fingerprintOf, decodedOf, reorderLayers, summary, summaryOf};
