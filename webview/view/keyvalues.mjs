@@ -35,6 +35,16 @@ export function keyName(/** @type {Model} */ model, /** @type {number} */ code) 
     return `0x${code.toString(16).toUpperCase()}`;
 }
 
+// The modifiers a compact keycode carries (0x0100–0x1fff, as KC_EXLM is
+// S(KC_1)), as the eight-bit mask the picker's controls use: bits 8–11 are
+// the modifiers and bit 12 puts them on the right. 0 for any other keycode.
+/** @param {number} code */
+export const compactModifierMask = (code) => {
+    if (code < 0x0100 || code > 0x1fff) return 0;
+    const compact = (code >> 8) & 0x1f;
+    return compact & 0x10 ? (compact & 0x0f) << 4 : compact & 0x0f;
+};
+
 // Labels arrive with the current model; never retain a translated name.
 export const modifierBits = (/** @type {Model} */ model) => vocabulary(model).modifiers;
 export const modifierNames = (/** @type {Model} */ model, /** @type {number} */ mask) => modifierBits(model).filter(([bit]) => mask & bit).map(([, name]) => name);
@@ -87,10 +97,7 @@ export function pickerModifierProblem(model, picker) {
     let mask = picker.mods.reduce((bits, wrapper) => bits | ((vocabulary(model).pickerModifiers || []).find(entry => entry.value === wrapper)?.bit ?? 0), 0);
     const selected = model?.qmkKeycodeAliases?.[picker.keys[0]] || picker.keys[0];
     const code = model?.qmkKeycodes?.find(entry => entry.value === selected)?.keycode;
-    if (code !== undefined && code <= 0x1fff) {
-        const compact = (code >> 8) & 0x1f;
-        mask |= compact & 0x10 ? (compact & 0x0f) << 4 : compact & 0x0f;
-    }
+    if (code !== undefined) mask |= compactModifierMask(code);
     return (mask & 0x0f) && (mask & 0xf0)
         ? "A keycode can hold left modifiers or right modifiers together. Choose modifiers from one side." : "";
 }

@@ -1,17 +1,22 @@
 import test from "node:test";
 import {withAnswers} from "../fixtures/layer-answers.mjs";
 import assert from "node:assert/strict";
-import {customKeyBypassText, customKeyDoes, customKeyHeadline, customKeyShortcutOnly, customKeyOf, customKeySendsNote, customKeyShortcutLine, hasShortcut, shortcutKeyCode, shortcutPick, shortcutPickLabel, shortcutPickMods, shortcutOffer, unusedCustomKey, offeredName, customKeyWithShortcut, customKeyChoice} from "../../webview/view/custom-key.mjs";
+import {customKeyBypassText, customKeyDoes, customKeyHeadline, customKeyShortcutOnly, customKeyOf, customKeySendsNote, customKeyShortcutLine, hasShortcut, shortcutKeyCode, shortcutPick, shortcutPickLabel, shortcutPickMods, shortcutOffer, shortcutModifiers, unusedCustomKey, offeredName, customKeyWithShortcut, customKeyChoice} from "../../webview/view/custom-key.mjs";
 
 const key = (slot, shortcut = {mods: 0, key: 0}, shortcutLabel = "", hasBehavior = false) =>
     ({slot, keycode: `CUSTOM_KEY_${slot}`, code: 0x7f00 + slot, name: "", hasBehavior, shortcut, shortcutLabel});
 const model = {
     customKeys: [key(0), key(1, {mods: 0x41, key: 0x0e}, "Left Ctrl + Right Alt + K"), key(2, {mods: 0x0f, key: 0}, "Left Ctrl + Left Shift + Left Alt + Left GUI", true)],
-    customKeyShortcutKeys: ["KC_K", "QK_MOUSE_BUTTON_1", "MS_BTN1"],
+    customKeyShortcutKeys: ["KC_K", "KC_1", "QK_MOUSE_BUTTON_1", "MS_BTN1"],
     qmkKeycodes: [
         {value: "KC_K", key: "KC_K", label: "K", group: "basic", aliases: [], keycode: 0x0e, searchTerms: [], search: "", searchCompact: ""},
         {value: "QK_MOUSE_BUTTON_1", key: "QK_MOUSE_BUTTON_1", label: "Mouse Button 1", group: "mouse", aliases: ["MS_BTN1"], keycode: 0xd1, searchTerms: [], search: "", searchCompact: ""},
         {value: "KC_LEFT_CTRL", key: "KC_LEFT_CTRL", label: "Left Ctrl", group: "modifiers", aliases: ["KC_LCTL"], keycode: 0xe0, searchTerms: [], search: "", searchCompact: ""},
+        {value: "KC_RIGHT_GUI", key: "KC_RIGHT_GUI", label: "Right GUI", group: "modifiers", aliases: ["KC_RGUI"], keycode: 0xe7, searchTerms: [], search: "", searchCompact: ""},
+        {value: "KC_1", key: "KC_1", label: "1", group: "basic", aliases: [], keycode: 0x1e, searchTerms: [], search: "", searchCompact: ""},
+        {value: "KC_EXLM", key: "KC_EXLM", label: "!", group: "shifted", aliases: ["KC_EXCLAIM"], keycode: 0x21e, searchTerms: [], search: "", searchCompact: ""},
+        {value: "RCS(KC_K)", key: "RCS(KC_K)", label: "", group: "shifted", aliases: [], keycode: 0x130e, searchTerms: [], search: "", searchCompact: ""},
+        {value: "S(KC_LEFT_CTRL)", key: "S(KC_LEFT_CTRL)", label: "", group: "shifted", aliases: [], keycode: 0x2e0, searchTerms: [], search: "", searchCompact: ""},
     ],
 };
 
@@ -70,10 +75,29 @@ test("the picker's modifier row sets the shortcut's mask, either side, and start
         pickerModifiers: names.map((label, i) => ({bit: 1 << i, value: wrappers[i], label}))}};
     assert.deepEqual(shortcutPick(picking, {mods: ["C", "RALT"], keys: ["KC_K"]}), {mods: 0x41, key: 0x0e}, "sides mix");
     assert.deepEqual(shortcutPick(picking, {mods: ["C", "S", "A", "G"], keys: []}), {mods: 0x0f, key: 0}, "modifiers alone");
-    assert.deepEqual(shortcutPick(picking, {mods: [], keys: ["KC_LEFT_CTRL"]}), {mods: 0, key: 0}, "a key a shortcut cannot hold is none");
+    assert.deepEqual(shortcutPick(picking, {mods: [], keys: ["CUSTOM_KEY_0"]}), {mods: 0, key: 0}, "a key a shortcut cannot hold is none");
     assert.deepEqual(shortcutPickMods(picking, 0x41), ["C", "RALT"]);
     assert.equal(shortcutPickLabel(picking, {mods: 0x41, key: 0x0e}), "Left Ctrl + Right Alt + K");
     assert.equal(shortcutPickLabel(picking, {mods: 0, key: 0}), "", "nothing picked");
+});
+
+test("a modifier key or a shifted symbol is a shortcut too: its modifiers and its key", () => {
+    const names = ["Left Ctrl", "Left Shift", "Left Alt", "Left GUI", "Right Ctrl", "Right Shift", "Right Alt", "Right GUI"];
+    const wrappers = ["C", "S", "A", "G", "RCTL", "RSFT", "RALT", "RGUI"];
+    const picking = {...model, vocabulary: {modifiers: names.map((label, i) => [1 << i, label]),
+        pickerModifiers: names.map((label, i) => ({bit: 1 << i, value: wrappers[i], label}))}};
+    assert.deepEqual(shortcutModifiers(picking, "KC_EXLM"), {key: "KC_1", mods: 0x02}, "! is Left Shift + 1");
+    assert.deepEqual(shortcutModifiers(picking, "KC_EXCLAIM"), {key: "KC_1", mods: 0x02}, "an alias names the same key");
+    assert.deepEqual(shortcutModifiers(picking, "RCS(KC_K)"), {key: "KC_K", mods: 0x30}, "right-hand modifiers keep their side");
+    assert.deepEqual(shortcutModifiers(picking, "KC_LCTL"), {key: "", mods: 0x01}, "a modifier key is its modifier, with no key");
+    assert.deepEqual(shortcutModifiers(picking, "KC_RIGHT_GUI"), {key: "", mods: 0x80});
+    for (const refused of ["S(KC_LEFT_CTRL)", "KC_1", "KC_K", "", "CUSTOM_KEY_0"]) assert.equal(shortcutModifiers(picking, refused), null, refused);
+    assert.deepEqual(shortcutPick(picking, {mods: [], keys: ["KC_EXLM"]}), {mods: 0x02, key: 0x1e});
+    assert.deepEqual(shortcutPick(picking, {mods: ["C"], keys: ["KC_EXLM"]}), {mods: 0x03, key: 0x1e}, "with the row's modifiers");
+    assert.deepEqual(shortcutPick(picking, {mods: ["RALT"], keys: ["KC_LEFT_CTRL"]}), {mods: 0x41, key: 0});
+    assert.equal(shortcutPickLabel(picking, shortcutPick(picking, {mods: ["RALT"], keys: ["KC_EXLM"]})), "Left Shift + Right Alt + 1");
+    // The Keys screen offers a custom key for a symbol with the other side's modifiers.
+    assert.deepEqual(shortcutOffer(picking, {mods: ["RALT"], keys: ["KC_EXLM"]}), {mods: 0x42, key: 0x1e});
 });
 
 test("modifiers no keycode can hold are offered as an unused custom key's shortcut", () => {

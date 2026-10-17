@@ -246,7 +246,11 @@ keycode is: one key and any of the eight modifiers, held while the custom key
 is held and tapped when it is tapped. **Pick…** opens the keycode picker as
 on the Keys screen: click the key, from those a shortcut can hold (letters,
 digits, symbols, navigation, function keys and mouse buttons 1–8), and the
-modifiers in the row above the board. Here left and right mix freely (Left
+modifiers in the row above the board. A modifier key on the board is its
+button in that row, and a shifted symbol is Shift and its key, so picking
+**!** lights Left Shift and picks 1; the keys offered are the Keys screen's,
+less those a shortcut cannot send (media, layers and the like). Here left
+and right mix freely (Left
 Ctrl + Right Alt + K), which a single keycode cannot store, and **Use
 shortcut** saves it. Modifiers alone (a held Hyper) and a key alone are both
 shortcuts; **Clear** removes it. **What it does** says whether the

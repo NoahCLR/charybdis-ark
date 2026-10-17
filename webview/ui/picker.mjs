@@ -17,7 +17,7 @@ import {pickerExpression} from "../view/edits.mjs";
 import {modifierPick, pickerModifierProblem} from "../view/keyvalues.mjs";
 import {entriesForPickerSection, pickable, pickerSections} from "../view/picker-sections.mjs";
 import {macroMatches} from "../view/macro.mjs";
-import {customKeyChoice, offeredName, shortcutOffer, shortcutPick, shortcutPickLabel, shortcutPickMods} from "../view/custom-key.mjs";
+import {customKeyChoice, offeredName, shortcutOffer, shortcutPick, shortcutPickLabel, shortcutPickMods, shortcutModifiers} from "../view/custom-key.mjs";
 import {vocabulary, word} from "../view/vocabulary.mjs";
 
 /** @param {Model} model */
@@ -49,8 +49,13 @@ export const closePicker = () => { state.picker = null; render(); };
 
 /** @param {string} value */
 const pickValue = (value) => state.picker?.allowedKeys ? getModel()?.qmkKeycodeAliases?.[value] || value : value;
+// A shortcut also takes a key that is or carries modifiers: a modifier key
+// is its button in the row, and a shifted symbol is its key with those
+// modifiers lit.
 /** @param {string} value */
-const allowed = (value) => !state.picker?.allowedKeys || state.picker?.allowedKeys?.includes(value);
+const heldModifiers = (value) => state.picker?.shortcut ? shortcutModifiers(getModel(), value) : null;
+/** @param {string} value */
+const allowed = (value) => !state.picker?.allowedKeys || state.picker?.allowedKeys?.includes(value) || Boolean(heldModifiers(value));
 /** @param {Model} model */
 const sections = (model) => pickerSections().filter(section => !state.picker?.allowedKeys || section.kind === "board"
     || (section.kind === "macros" && (model?.viaMacros || []).some(slot => allowed(slot.keycode)))
@@ -96,7 +101,11 @@ function sectionBody(model) {
     if (!picker) return "";
     const catalogue = model?.qmkKeycodes || [];
     /** @param {string} value */
-    const picked = (value) => picker.keys.includes(pickValue(value));
+    const picked = (value) => {
+        const held = heldModifiers(value);
+        return held ? (!held.key || picker.keys[0] === held.key) && shortcutPickMods(model, held.mods).every((mod) => picker.mods.includes(mod))
+            : picker.keys.includes(pickValue(value));
+    };
 
     if (picker.search) {
         const query = picker.search.toLowerCase();
@@ -286,6 +295,15 @@ export function pickerOverlay() {
         if (pick) {
             const chosen = pickValue(pick.dataset.pick || "");
             if (!allowed(chosen)) return;
+            const held = heldModifiers(chosen);
+            if (held) {
+                const mods = shortcutPickMods(getModel(), held.mods);
+                // A modifier key toggles its button; a symbol takes its key.
+                if (!held.key && mods.every((mod) => picker.mods.includes(mod))) picker.mods = picker.mods.filter((mod) => !mods.includes(mod));
+                else picker.mods = [...new Set([...picker.mods, ...mods])];
+                if (held.key) picker.keys = [held.key];
+                return render();
+            }
             if (picker.mode === "list" && !picker.keys.includes(chosen) && picker.keys.length >= picker.maxKeys && picker.maxKeys !== 1) return;
             picker.keys = picker.mode === "list"
                 ? (picker.keys.includes(chosen) ? picker.keys.filter((key) => key !== chosen) : picker.maxKeys === 1 ? [chosen] : [...picker.keys, chosen])

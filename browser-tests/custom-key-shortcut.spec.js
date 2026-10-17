@@ -56,8 +56,8 @@ for (const theme of ["plain", "vscode-dark"]) {
 test("the picker refuses a key a shortcut cannot hold, and firmware without shortcuts says so", async ({page}) => {
     await openControls(page, "customKeys", {customKey: "CUSTOM_KEY_1"});
     await page.locator('[data-act="pick-shortcut"]').click();
-    await page.locator("#pickerSearch").fill("KC_LEFT_CTRL");
-    await expect(page.locator('.picker [data-pick="KC_LEFT_CTRL"]')).toHaveCount(0);
+    await page.locator("#pickerSearch").fill("KC_AUDIO_MUTE");
+    await expect(page.locator('.picker [data-pick="KC_AUDIO_MUTE"]')).toHaveCount(0);
     await page.locator('.picker [data-act="cancel"]').first().click();
     await page.evaluate(async () => {
         const store = await import("/webview/store.mjs");
@@ -67,6 +67,64 @@ test("the picker refuses a key a shortcut cannot hold, and firmware without shor
     });
     await expect(page.locator(".content")).toContainText("cannot give a custom key a shortcut");
     await expect(page.locator('[data-act="pick-shortcut"]')).toHaveCount(0);
+});
+
+// A modifier key is its modifier and a shifted symbol is Shift and its key,
+// both of which a shortcut holds, so the shortcut picker's board, Symbols and
+// More keys are the Keys screen's. Picked, `!` is the 1 key with Left Shift
+// lit, and reopens that way; the board's Shift key is the Shift button.
+test("the shortcut picker offers the modifier keys and shifted symbols, as modifiers and their key", async ({page}) => {
+    const keysOf = (selector) => page.locator(selector).evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-pick")));
+    const open = {};
+    await openControls(page, "keys");
+    await page.evaluate(async () => (await import("/webview/ui/keys/key-edits.mjs")).pickKeycodeFor(27));
+    open.board = await keysOf(".picker .pkb [data-pick]");
+    expect(open.board).toContain("KC_LSFT");
+    for (const section of ["symbols", "more"]) {
+        await page.locator(`.picker [data-sec="${section}"]`).click();
+        open[section] = await keysOf(".picker .pk-rows [data-pick]");
+    }
+    expect(open.symbols).toContain("KC_EXLM");
+    expect(open.more).toContain("KC_LEFT_CTRL");
+    await page.locator('.picker [data-act="cancel"]').first().click();
+
+    await page.locator('[data-screen="customKeys"]').click();
+    await page.evaluate(async () => {
+        const store = await import("/webview/store.mjs");
+        store.state.customKey = "CUSTOM_KEY_1"; store.render();
+    });
+    await page.locator('[data-act="pick-shortcut"]').click();
+    expect(await keysOf(".picker .pkb [data-pick]")).toEqual(open.board);
+    await page.locator('.picker .pkb [data-pick="KC_LSFT"]').click();
+    await expect(page.locator('.picker [data-mod="S"]')).toHaveClass(/\bon\b/);
+    await expect(page.locator('.picker .pkb [data-pick="KC_LSFT"]')).toHaveClass(/\bon\b/);
+    await page.locator('.picker .pkb [data-pick="KC_LSFT"]').click();
+    await expect(page.locator('.picker [data-mod="S"]')).not.toHaveClass(/\bon\b/);
+    await page.locator('.picker [data-sec="more"]').click();
+    expect(await keysOf(".picker .pk-rows [data-pick]")).toEqual(open.more);
+    await page.locator('.picker [data-sec="symbols"]').click();
+    expect(await keysOf(".picker .pk-rows [data-pick]")).toEqual(open.symbols);
+    await page.locator('.picker [data-pick="KC_EXLM"]').click();
+    await expect(page.locator('.picker [data-mod="S"]')).toHaveClass(/\bon\b/);
+    await expect(page.locator('.picker [data-pick="KC_EXLM"]')).toHaveClass(/\bon\b/);
+    await expect(page.locator(".picker .pk-value")).toHaveText("Left Shift + 1");
+    await clearPosts(page);
+    await page.locator('.picker [data-act="use"]').click();
+    await expect.poll(() => posted(page)).toEqual([shortcut(0x02, 0x1e)]);
+
+    await page.evaluate(async () => {
+        const store = await import("/webview/store.mjs");
+        const model = structuredClone(store.getModel());
+        Object.assign(model.customKeys[1], {shortcut: {mods: 0x02, key: 0x1e}, shortcutLabel: "Left Shift + 1"});
+        store.setModel(model); store.render();
+    });
+    await page.locator('[data-act="pick-shortcut"]').click();
+    await page.locator('.picker [data-sec="symbols"]').click();
+    await expect(page.locator('.picker [data-pick="KC_EXLM"]')).toHaveClass(/\bon\b/);
+    // Shift off again is the 1 key alone.
+    await page.locator('.picker [data-mod="S"]').click();
+    await expect(page.locator('.picker [data-pick="KC_EXLM"]')).not.toHaveClass(/\bon\b/);
+    await expect(page.locator(".picker .pk-value")).toHaveText("1");
 });
 
 // A keyboard whose firmware still stores settings v7 opens no draft: every
