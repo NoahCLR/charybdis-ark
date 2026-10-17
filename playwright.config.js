@@ -2,8 +2,8 @@
 "use strict";
 const {defineConfig} = require("@playwright/test");
 // The tests build the web page first, unless ARK_WEB_BUILT says dist/web/ is
-// already the build to test: the publish workflow tests the very files it
-// then publishes.
+// already the build to test: a manual Pages upload tests the very files it
+// then uploads (docs/REPOSITORY.md).
 const buildWeb = process.env.ARK_WEB_BUILT ? "" : " && npm run build:web";
 module.exports = defineConfig({
     testDir: "./browser-tests",

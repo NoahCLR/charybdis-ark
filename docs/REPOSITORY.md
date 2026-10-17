@@ -69,13 +69,39 @@ source revision.
 
 ## Development and installation
 
-Use Node from `.nvmrc`, run `npm ci`, then `npm run check` and
-`npm run keycodes -- --check`. `npm run preview` builds the offline fixture UI.
-Open this repository directly in VS Code and use its F5 launch configuration.
+New contributors and agents start with [AGENTS.md](../AGENTS.md) and the
+[documentation map](README.md), which defines reading order, document
+ownership and where new plans or specifications belong.
+
+### Working on Ark
+
+Open this folder directly in VS Code. Use Node 26.10.0 (`nvm use` with the
+checked-in `.nvmrc`), run `npm ci`, then `npm run check` and
+`npm run keycodes -- --check`. Press F5 with **Run Charybdis Ark**
+(`.vscode/launch.json`) to launch an Extension Development Host with a
+debugger attached. No firmware repository, QMK checkout, or multi-root
+workspace is required.
+
 The extension identity is `noah.charybdis-ark`; the checkout's path does not
 identify device profiles or recovery files. Recovery files saved under the
 former identities `noah.charybdis-live` and `noah.charybdis-live-v2` are copied
-into Ark's storage on start (D-L47).
+into Ark's storage on start (D-L47). For a local installation, check the
+extension symlink points at the intended Ark checkout; F5 tests a worktree
+without retargeting that installed copy. Recovery files live under VS Code's
+extension-global storage, outside every source checkout. Preserve those files
+and profile backups during a switch.
+
+The root `.editorconfig` defines indentation and whitespace conventions.
+Folder settings select VS Code's built-in JavaScript, JSON, HTML and CSS
+formatters and the YAML extension for YAML; Markdown is not reformatted on
+save. **Check Charybdis Ark** is available as the default test task. The
+extension supplies its own **Charybdis Ark** status-bar button; the shared
+parent workspace does not add a duplicate or a test button.
+
+[`upstream/README.md`](../upstream/README.md) explains the imported test vectors,
+protocol references and QMK catalog inputs.
+
+### Test fakes
 
 Normal tests use injected HID adapters. A test that needs a connected
 `ProfileDeviceService` starts from `tests/fixtures/connected-service.js`, which
@@ -96,43 +122,6 @@ does not expose its internal coordinators or readers as replaceable options.
 The read-only fake remains the preview adapter. These fakes model protocol state
 and transfer correctness, not flash durability, split scheduling or physical
 interruption acceptance.
-The check workflow runs app checks, catalog verification, preview generation
-and native module loading; it contains no publishing job. Publishing the web
-page is its own workflow ([below](#publishing-the-web-page)).
-
-For a local installation, check the extension symlink points at the intended
-Ark checkout. F5 can test a worktree without retargeting that installed copy.
-Recovery files live under VS Code's extension-global storage, outside
-both source checkouts. Preserve those files and profile backups during a switch.
-The independent repo does not require changes to a shared workspace or to the
-firmware project's active working tree.
-
-### Working on Ark
-
-Open this folder directly in VS Code. Use Node 26.10.0 (`nvm use` with the
-checked-in `.nvmrc`), run `npm ci`, then `npm run check`. Press F5 with
-**Run Charybdis Ark** to launch an Extension Development Host. No firmware
-repository, QMK checkout, or multi-root workspace is required.
-
-The root `.editorconfig` defines indentation and whitespace conventions.
-Folder settings select VS Code's built-in JavaScript, JSON, HTML and CSS
-formatters and the YAML extension for YAML; Markdown is not reformatted on
-save. **Check Charybdis Ark** is available as the default test task. The
-extension supplies its own **Charybdis Ark** status-bar button; the shared
-parent workspace does not add a duplicate or a test button.
-
-[`upstream/README.md`](../upstream/README.md) explains the imported test vectors,
-protocol references and QMK catalog inputs. The [documentation map](README.md)
-defines reading order and document ownership.
-
-For local firmware development, the active checkout is `charybdis-4x6` in the
-workspace; see the
-[workspace map](REPOSITORY.md#local-development-workspace). Agents can
-inspect it while the app and its ordinary tests remain self-contained.
-
-New contributors and agents should start with [AGENTS.md](../AGENTS.md) and the
-[documentation map](README.md), which defines reading order, document
-ownership and where new plans or specifications belong.
 
 ### The code's layout
 
@@ -148,6 +137,9 @@ ownership and where new plans or specifications belong.
   system.
 - `tests/` — mirrors `core/`, plus the view modules and the payloads the
   interface posts.
+- `browser-tests/` — Playwright specs run by `npm run test:browser`: the
+  interface in the fixture preview, and the built web page against a fake
+  keyboard.
 - `contracts/` — declarations for data posted between the host and panel,
   shared by their type checks; no executable code or core imports.
 - `web/` — the [web page](#the-web-build): its HTML, the browser host that
@@ -443,9 +435,6 @@ pin checkouts) are not listed.
 
 ### Running it without a keyboard
 
-F5 provides a separate development host without changing the installed link. The repo's `.vscode/launch.json` has *Run Charybdis Ark*, which
-launches an Extension Development Host with a debugger attached.
-
 To work on the interface without a keyboard, run `npm run preview`, serve this
 folder (`node scripts/serve.js . --port 8972`) and open `preview/index.html`.
 `preview/index.html?host=web` answers as the web page's host instead, with
@@ -473,8 +462,10 @@ checkout or app dependencies.
 Development is verified locally, so the GitHub Actions checks do not run on
 `dev` or on pull requests into it (D-L51). Cloudflare separately
 [builds and publishes the web page](#publishing-the-web-page) on Git pushes,
-including task-branch previews; that build result gates only publication. A release's `dev` → `main` pull request runs the independent app
-suite on Linux and macOS, loads the native HID module, runs the browser smoke,
+including task-branch previews; that build result gates only publication. A
+release's `dev` → `main` pull request runs the independent app suite on Linux
+and macOS (`npm run check`, catalog verification and the fixture preview),
+loads the native HID module, runs the browser tests,
 checks every imported source pin against its published trunk, runs the
 [compatibility bridge](COMPATIBILITY.md) at the pins and judges the firmware
 contract Ark will sit next to (`agreement`): firmware `main`, or firmware `dev`
@@ -484,12 +475,15 @@ never blocking, CI checks
 `dev`) and whether the published mains still agree. Reports are retained in
 Actions.
 
-`npm run test:browser` starts a fixture-only preview and drives a pointer-speed
-edit, checking the complete posted settings section and the host stylesheet
-cascade, then checks [the web build](#the-web-build) in Chrome against Node
-and the built page against a fake keyboard. Install its browser once with `npx playwright install chromium`.
-The small host-style fixture covers known padding/cascade regressions; it is not
-a VS Code extension-host or physical-device acceptance test.
+`npm run test:browser` builds the fixture preview and the web page, serves
+them, and runs every spec in `browser-tests/` in Chromium: the screens'
+controls against the fixture preview and the edits they post, the host
+stylesheet cascade, [the web build](#the-web-build) against Node, and the
+built page against a fake keyboard. Install its browser once with
+`npx playwright install chromium` (CI uses `scripts/install-chrome.sh`, which
+retries a stalled download). The small host-style fixture covers known
+padding/cascade regressions; none of this is a VS Code extension-host or
+physical-device acceptance test.
 
 Development and publication procedures are governed by [AGENTS.md](../AGENTS.md),
 which points to the work-queue tools. This section records the CI jobs and

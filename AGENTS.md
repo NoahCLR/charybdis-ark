@@ -97,6 +97,7 @@ web/                web build entries: what a browser host takes from core/
 scripts/            developer entry points and build steps
 tools/              developer tools outside the app, e.g. the branch-window extension
 tests/              mirrors core/; view/ tests the interface, scripts/ the developer tools
+browser-tests/      Playwright specs: the interface in the preview, the built web page
 preview/            ignored generated previews, never authoritative source
 dist/               ignored web build output (`npm run build:web`)
 ```

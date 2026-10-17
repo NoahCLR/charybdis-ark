@@ -5,9 +5,7 @@
 Ark is the editor for [my Charybdis 4x6 firmware](https://github.com/NoahCLR/charybdis-4x6).
 Plug the keyboard in and you see exactly what is on it. Change it, and save it
 back. You don't write C, you don't reflash, and you don't need a firmware
-checkout. Everything Ark shows comes from the keyboard itself. Small edits
-reuse unchanged profile data while the complete result is still checked and
-saved to both halves, including your first save from firmware defaults.
+checkout. Everything Ark shows comes from the keyboard itself.
 
 Paste text straight into a macro, including code and literal braces, and add
 shortcuts or delays as separate steps. Pick your computer's keyboard layout in
@@ -27,10 +25,15 @@ Key and modifier names follow that OS throughout the editors and Review.
   count, in one grid with its timing. Keep up to 128 definitions with five tap
   counts each, and choose which layers and placements use them.
 - **Combos, macros and custom keys.** Build combos, write named macros or
-  record taps and chords with optional hold timing, build, reorder, copy and paste compact macro steps with their own undo/redo, and name your own custom keys, each with a shortcut of its own (any modifiers,
-  left and right mixed, and one key) held as long as you hold the key, and give each its behaviour, even before it sits on a layer. Macros share the keyboard's
-  macro memory, and one macro can use all of it. There are 128 slots in each bank;
-  a combo can have up to 16 inputs, with its own enable and layer controls. Choose whether all combo outputs use shared behaviours, or bypass the behaviour for one combo while keeping its chord active.
+  record taps and chords with optional hold timing, and build, reorder, copy
+  and paste macro steps with their own undo and redo. Macros share the
+  keyboard's macro memory, and one macro can use all of it. Name your own
+  custom keys and give each a shortcut (any modifiers, left and right mixed,
+  and one key, held as long as you hold the key) and a behaviour, even before
+  it sits on a layer. There are 128 slots in each bank; a combo can have up to
+  16 inputs, with its own enable and layer controls. Choose whether combo
+  outputs use shared behaviours, for every combo or one at a time; the chord
+  stays active either way.
 - **Lighting.** Set layer and mode colours, combo and key feedback, and the
   idle timeout in seconds or minutes. Tune the
   auto-mouse fade. The board on screen is painted the way the keyboard will
@@ -49,10 +52,8 @@ Every edit goes into a draft with undo, redo and a full history. **Review**
 lists what changed and checks what the layers let you reach. It warns you
 about a layer you could lock yourself into, combos that can't fire and macros
 your Host setup can't play. **Apply** saves a recovery copy, writes both halves
-and reads the result back to prove it. You can stay in the editor while it copies
-and reads the keyboard back. One verified read supplies the editor and backup, with keys fetched in chunks
-and firmware defaults reused while connected. Reads also skip confirmed empty
-macro storage while checking the complete result.
+and reads the result back to prove it, and you can stay in the editor while it
+does.
 
 **Export profile** saves your whole setup as one file. **Import profile**
 takes a backup by choosing a file or dropping it onto the Import card, then

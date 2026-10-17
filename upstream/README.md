@@ -20,10 +20,11 @@ to locate task worktrees and distinguish current source from this pinned baselin
 
 [`manifest.json`](manifest.json) records the repository URL, full commit ID,
 original path, original SHA-256 and local SHA-256 for each imported file.
-The firmware source is the committed source of this extraction; QMK's source
-is the commit identified by the existing catalog. These pins describe source
-provenance, not proof that every firmware/QMK combination passed hardware
-acceptance.
+The firmware pin is a commit on firmware's trunk, and the QMK pin is normally
+the BK commit that firmware's own `qmk-pin.json` names at that commit, so the
+inputs are the ones the firmware is built with ([below](#updating-a-contract)). These
+pins describe source provenance, not proof that every firmware/QMK combination
+passed hardware acceptance.
 
 Fixtures and QMK inputs are byte-for-byte copies. Documentation links are
 adjusted to local copies when available and revision-pinned upstream URLs
@@ -77,8 +78,8 @@ Node dependencies have been installed.
    behavior against these vectors; they do not compile or run current firmware.
 
 Ark owns cross-language runners under `tests/integration/`. They compile
-probes from the selected firmware and compare readers, writers and macro sizing
-with Ark's current implementation. Use the separate
+probes from the selected firmware and compare readers, writers, candidate
+transfers and sparse macro reads with Ark's current implementation. Use the separate
 [compatibility bridge](../docs/COMPATIBILITY.md); it also fails when a pinned
 fixture differs from the selected firmware and lists specs that lag it. Firmware itself does not require
 Ark; it keeps independent regression fixtures and C tests. The imported
