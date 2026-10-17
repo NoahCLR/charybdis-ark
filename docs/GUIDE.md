@@ -375,6 +375,9 @@ that layer — the base effect, then
 the layer's colour on the keys it owns — with the legends drawn on top in
 whichever of black or white stays readable, and the behaviour dots and combo
 badges on the key face in the feedback colours the keyboard flashes.
+Resting the pointer on a key opens a card of everything it reaches. Each combo
+there leads with what it sends, the keycode it stores and how many keys it
+takes, with the keys that press it beneath and the hovered key marked among them.
 During initial read, refresh or device selection, every screen menu is disabled
 and a loading step replaces the screen. Once the read finishes, Device opens
 if the keyboard reported its capabilities. Profile & backups opens when a
