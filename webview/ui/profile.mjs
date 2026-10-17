@@ -196,6 +196,9 @@ function reviewCard(model, portable, busy) {
     const draft = model?.draft;
     const pending = draft?.dirty ? draft.changes.length : 0;
     const same = differences && !differences.length;
+    // A file that matches the keyboard still replaces a draft's edits.
+    const changesNothing = same && !pending;
+    const holds = demoOf(model).active ? "the demo setup holds" : "the keyboard runs";
     const summary = differences ? categorySummary(differences, {names: incoming.names, stages: stageOrder(model)}) : [];
     const counted = differences?.length
         ? `${differences.length} difference${differences.length === 1 ? "" : "s"} from ${demoOf(model).active ? "the demo setup" : "the keyboard"} · ${statusSummary(differences)}` : "";
@@ -209,13 +212,14 @@ function reviewCard(model, portable, busy) {
             ${fileName ? `<span class="right note mono">${esc(fileName)}</span>` : ""}</div>
         <div class="card-b stack gap-12">
             ${counted ? `<p class="note">${esc(counted)}</p>` : ""}
-            ${same ? `<div class="callout">This file holds exactly what ${demoOf(model).active ? "the demo setup holds" : "the keyboard runs"}. Using it changes nothing.</div>` : ""}
+            ${same ? `<div class="callout">This file holds exactly what ${holds}. ${changesNothing ? "Using it changes nothing."
+                : `Using it puts your draft back to that, as Discard all does; Undo brings your ${pending} change${pending === 1 ? "" : "s"} back.`}</div>` : ""}
             ${summary.length ? `<table class="t import-diff"><thead><tr><th>What this file changes</th><th>Differences</th><th></th></tr></thead>
                 <tbody>${summary.map((group) => `<tr class="cat"><td>${esc(group.category)}</td><td class="mono">${group.count}</td><td class="note">${esc(group.status)}</td></tr>
                     ${group.rows.map((row) => `<tr class="sub"><td>${esc(row.label)}</td><td class="mono">${row.count}</td><td></td></tr>`).join("")}`).join("")}</tbody></table>` : ""}
             ${same ? "" : `<div class="callout warn">${esc(callout)}</div>`}
             <div class="row gap-8">
-                <button class="btn primary" data-act="restore" ${busy || same ? "disabled" : ""}>${draft ? "Use as draft" : "Restore profile"}</button>
+                <button class="btn primary" data-act="restore" ${busy || changesNothing ? "disabled" : ""}>${draft ? "Use as draft" : "Restore profile"}</button>
                 <button class="btn ghost" data-act="cancel" ${busy ? "disabled" : ""}>Cancel</button></div>
         </div></div>`);
     /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="restore"]')).addEventListener("click", () => post(controls.control("restorePortableProfile")));

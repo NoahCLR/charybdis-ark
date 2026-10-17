@@ -8,7 +8,7 @@ const {decodeRgbDomainV1, encodeRgbDomainV1, RGB_LAYER_MODES, RGB_LOCALITIES, RG
 const keycodes = require("../data/keycode-catalog");
 const {semanticActionForExpression, resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
 const {decodeComboDomain, encodeComboDomain, runningComboRows} = require("../schema/combo-domain-v1");
-const {actionName, keycodeAction, knownActionAbi, layerRef} = require("../schema/actions");
+const {keycodeAction, knownActionAbi, layerRef} = require("../schema/actions");
 const {comboPlacementProblem} = require("./profile-placement");
 const {pointingTaps} = require("./pointing-taps");
 const {comboTableOf} = require("./portable-profile");

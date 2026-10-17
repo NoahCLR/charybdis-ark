@@ -54,14 +54,6 @@ function decodeViaGetKeycodeResponse(response, request) {
     return (report[4] << 8) | report[5];
 }
 
-/** @param {import("../transport/types.js").RequestConnection} connection @param {import("./types.js").ViaPosition} entry @param {import("./types.js").ReadOptions} [options] */
-async function readViaKeycode(connection, entry, options = {}) {
-    assertConnection(connection);
-    const request = buildViaGetKeycodeRequest(entry);
-    const response = await connection.request(request, requestOptions(options));
-    return decodeViaGetKeycodeResponse(response, request);
-}
-
 // VIA's buffer read covers all 10 x 6 matrix coordinates, including the four
 // unused positions per layer. Decode just the visible layout in its authored
 // order. Sixteen layers need 69 reports rather than 896 single-key reads.
@@ -129,15 +121,6 @@ function handledResponse(response, request, command) {
     return report;
 }
 
-/** @param {import("./types.js").ReadOptions} options */
-function requestOptions(options) {
-    return {
-        matchResponse: viaKeycodeResponseMatcher,
-        signal: options.signal,
-        timeoutMs: options.timeoutMs,
-    };
-}
-
 /** @param {import("../transport/types.js").RequestConnection} connection */
 function assertConnection(connection) {
     if (!connection || typeof connection.request !== "function") {
@@ -158,7 +141,6 @@ module.exports = {
     ViaLayoutError,
     buildViaGetKeycodeRequest,
     decodeViaGetKeycodeResponse,
-    readViaKeycode,
     readViaLayout,
     decodeViaLayout,
     viaKeycodeResponseMatcher,

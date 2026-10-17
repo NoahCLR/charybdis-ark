@@ -31,10 +31,6 @@ const {VOCABULARY, word, layerName: layerCalled, slotName, modifierNames} = requ
  * @typedef {Combos['rows'][number]} Combo
  * @typedef {{title: string, stage: string | null, where: {layer?: number, slot?: number}, titleMark?: Mark, fields: Fields}} LightingRecord
  */
-/** @param {unknown} text */
-const words = text => String(text).replace(/^(RGB_|KEY_FEEDBACK_|PD_MODE_)/, "").replace(/_/g, " ").toLowerCase();
-/** @param {Record<string, number>} values @param {number} value */
-const named = (values, value) => words(Object.entries(values).find(([, id]) => id === value)?.[0] ?? value);
 // An action named as the editors name what it reaches: a layer, a pointing
 // mode or a macro by its own name in that snapshot, when it has one.
 // A key, a layer key, a pointing mode and a macro read by the one name the
@@ -380,7 +376,8 @@ function profileReview(before, after, capabilities) {
             const position = matrixPosition(layoutIndex);
             /** @param {import("../schema/types.js").LayerRecord} entry @returns {Fields} */
             const fields = entry => new Map([["Use shared behaviour", entry.bypass.includes(position) ? "off" : "on"], ["Join combos", entry.exclude.includes(position) ? "off" : "on"]]);
-            item("Layout", `placement:${layer}:${position}`, `Participation · ${layerCalled(b.settings.names, layer)} · key ${LAYOUT_INDEX.get(position)}`, fields(record), fields(b.settings.layers[layer]),
+            // Named where the key sits, as its layout change is.
+            item("Layout", `placement:${layer}:${position}`, `Participation · ${layerName(b, layer)} · ${positionName(position)}`, fields(record), fields(b.settings.layers[layer]),
                 {kind: "key", layer, layoutIndex: LAYOUT_INDEX.get(position)}, [true, true]);
         }
     });

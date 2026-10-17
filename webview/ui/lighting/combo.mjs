@@ -1,5 +1,5 @@
 // @ts-check
-import {el, esc} from "../../lib/dom.mjs";
+import {el} from "../../lib/dom.mjs";
 import {post, writable} from "../../store.mjs";
 import {vocabulary} from "../../view/vocabulary.mjs";
 import * as edits from "../../view/edits.mjs";

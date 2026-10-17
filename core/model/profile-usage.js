@@ -12,7 +12,6 @@
 
 const {decodedOf} = require("./portable-profile");
 const {PROFILE_BLOB_V1, PROFILE_DOMAIN_IDS} = require("../schema/profile-blob-v1");
-const {SETTINGS} = require("../schema/settings-domain-v1");
 
 const {profileDomain} = require("../schema/profile-domains");
 // The order the areas are listed in: what an edit most often grows first.

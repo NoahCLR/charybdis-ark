@@ -10,7 +10,7 @@
 const {keycodeAction, knownActionAbi, pdSlotOfCode} = require("../schema/actions");
 const {decodeProfileBlob, encodeProfileBlob, crc32, fnv1a32, PROFILE_BLOB_V1, PROFILE_DOMAIN_VERSIONS, ProfileBlobProtocolError} = require("../schema/profile-blob-v1");
 const {supportsComboOutputBehaviors, ALL_LAYERS, COMBO_DOMAIN_VERSION, encodeComboDomain} = require("../schema/combo-domain-v1");
-const {SETTING, SETTING_FIELDS, decodeSettings, encodeSettings} = require("../schema/settings-domain-v1");
+const {SETTING, SETTING_FIELDS, decodeSettings} = require("../schema/settings-domain-v1");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX, LAYERS, MATRIX_KEYS, matrixPosition} = require("../data/charybdis-layout");
 const {LAYER_LOCK_BASE, LAYER_LOCK_SLOTS} = require("../data/user-keycodes");
 const {layerName} = require("./vocabulary");

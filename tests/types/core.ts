@@ -32,7 +32,6 @@ import {buildPanelModel, startLayerEdit} from '../../core/session/panel-session.
 import {demoExport, demoState} from '../../core/session/demo-session.js';
 import {captureProfile, restoreProfile} from '../../core/session/portable-profile-session.js';
 import type {CapturedProfile, DeviceCapabilities, PanelSession, PanelDeviceState, CaptureIdentity} from '../../core/session/types.js';
-import type {StatusModel} from '../../contracts/model.js';
 import type {SemanticAction} from '../../core/schema/types.js';
 
 async function contracts() {
