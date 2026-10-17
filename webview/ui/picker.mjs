@@ -148,23 +148,22 @@ function sectionBody(model) {
     if (section.kind === "layers") {
         // TG(n) is the same lock as LOCK_LAYER(n), so a key storing it lights
         // Lock rather than getting a button of its own.
-        const owned = Boolean(model?.ownsLayerKeys);
         /** @param {string} value @param {string} label @param {string} tip */
         const button = (value, label, tip, on = picked(value)) =>
             `<button class="pk wide ${on ? "on" : ""}" data-pick="${value}" data-tip="${esc(tip)}"><span class="l">${label}</span><span class="c">${value}</span></button>`;
-        return `<div class="pk-body"><div class="pk-layers ${owned ? "owned" : ""}">${layers().map((layer) => `
+        return `<div class="pk-body"><div class="pk-layers">${layers().map((layer) => `
             <div class="pk-layer">
                 <span class="ix">${layer.index}</span><span class="nm">${esc(layerName(layer))}</span>
                 ${button(`MO(${layer.index})`, "Hold", "On while the key is down.")}
                 ${button(`LOCK_LAYER(${layer.index})`, "Lock", "Turns the layer on until pressed again. QMK's TG() is the same lock.", picked(`LOCK_LAYER(${layer.index})`) || picked(`TG(${layer.index})`))}
                 <button class="pk wide ${picker.layerTap === String(layer.index) ? "on" : ""}" data-lt="${layer.index}" data-tip="A tap sends a key, a hold holds the layer. Pick the tap key next."><span class="l">Tap-hold</span><span class="c">LT(${layer.index}, …)</span></button>
-                ${owned ? `${button(`TT(${layer.index})`, "Tap-toggle", "Holds the layer like Hold; repeated taps lock it.")}
+                ${button(`TT(${layer.index})`, "Tap-toggle", "Holds the layer like Hold; repeated taps lock it.")}
                 ${button(`OSL(${layer.index})`, "One-shot", "Holds the layer like Hold; a tap turns it on for the next key only.")}
-                ${button(`TO(${layer.index})`, "Move", "Locks this layer alone and releases every other lock. TO(0) returns to the base layer.")}` : ""}
+                ${button(`TO(${layer.index})`, "Move", "Locks this layer alone and releases every other lock. TO(0) returns to the base layer.")}
             </div>`).join("")}</div>
             <p class="note pk-note">${picker.layerTap
                 ? `Tap-hold on <b>${esc(layerTapName(picker.layerTap))}</b> is armed — now pick the tap key from any section.`
-                : `Hold reaches the layer while the key is down. Lock toggles it. Tap-hold asks for a tap key next.${owned ? " Tap-toggle and One-shot hold like Hold; Move switches to the layer alone." : ""}`}</p></div>`;
+                : `Hold reaches the layer while the key is down. Lock toggles it. Tap-hold asks for a tap key next. Tap-toggle and One-shot hold like Hold; Move switches to the layer alone.`}</p></div>`;
     }
     if (section.kind === "modes") {
         // One row per slot, laid out like the layers: the slot, what it does,

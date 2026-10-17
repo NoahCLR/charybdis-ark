@@ -3,10 +3,10 @@ const {test} = require("node:test");
 const assert = require("node:assert/strict");
 const {VIA_STORAGE, VIA_REGION_BYTES, LAYOUT_BYTES, MACRO_BANK_BYTES, viaStorageDigest, readViaStorage, readRegion, writeRegion, changedRanges, writeChangedRegion, writeViaMacros} = require("../../core/protocol/via-storage-v1");
 // The sixteen-layer keyboard (firmware D-F14): a 1,920-byte keymap (16 layers
-// of 10 x 6 keys) and a 10,327-byte macro bank for 128 macro slots, inside a
-// 12 KiB VIA region.
+// of 10 x 6 keys) and a 34,903-byte macro bank for 128 macro slots, inside a
+// 36 KiB VIA region.
 function keyboard() {
-    const layout = Buffer.alloc(1920, 1), macros = Buffer.alloc(10327);
+    const layout = Buffer.alloc(1920, 1), macros = Buffer.alloc(34903);
     return {layout, macros, async request(request) {
         const response = Buffer.from(request), command = request[0];
         if (command === 0x11) response[1] = 16;
@@ -22,10 +22,10 @@ function keyboard() {
     }};
 }
 test("reads every matrix position and the entire macro bank, including unused storage", async () => {
-    assert.equal(VIA_REGION_BYTES, 12288); assert.equal(LAYOUT_BYTES, 1920); assert.equal(MACRO_BANK_BYTES, 10327);
-    const device = keyboard(); device.macros[10000] = 23; device.layout[1919] = 9;
+    assert.equal(VIA_REGION_BYTES, 36864); assert.equal(LAYOUT_BYTES, 1920); assert.equal(MACRO_BANK_BYTES, 34903);
+    const device = keyboard(); device.macros[30000] = 23; device.layout[1919] = 9;
     const read = await readViaStorage(device);
-    assert.equal(read.layers, 16); assert.equal(read.macroSlots, 128); assert.equal(read.macroCapacity, 10327);
+    assert.equal(read.layers, 16); assert.equal(read.macroSlots, 128); assert.equal(read.macroCapacity, 34903);
     assert.deepEqual(read.layout, device.layout); assert.deepEqual(read.macros, device.macros);
 });
 test("computes the firmware's canonical digest for the complete VIA store", () => {
@@ -35,8 +35,8 @@ test("computes the firmware's canonical digest for the complete VIA store", () =
     const fnv = bytes => bytes.reduce((hash, byte) => Math.imul((hash ^ byte) >>> 0, 16777619) >>> 0, 2166136261);
     const frame = (id, bytes) => [id, bytes.length & 255, bytes.length >>> 8, ...bytes];
     const reference = fnv([...frame(1, [1, 0]), ...frame(2, device.layout), ...frame(3, []), ...frame(4, device.macros)]);
-    assert.equal(viaStorageDigest(device), 1534821754);
-    assert.equal(reference, 1534821754);
+    assert.equal(viaStorageDigest(device), 1187449050);
+    assert.equal(reference, 1187449050);
     assert.throws(() => viaStorageDigest({layout: Buffer.alloc(1), macros: device.macros}), /geometry/);
     // The eight-layer geometry (960-byte keymap, 7,191-byte macro bank) is refused.
     assert.throws(() => viaStorageDigest({layout: Buffer.alloc(960, 1), macros: device.macros}), /geometry/);
@@ -59,7 +59,7 @@ test("writes only changed byte ranges and reads them back at their absolute offs
     assert.deepEqual(await readRegion(device, VIA_STORAGE.LAYOUT_READ, 2, {startOffset: 1918}), target.subarray(1918, 1920));
 });
 test("rejects an incomplete macro write and corrupted response headers", async () => {
-    const device = keyboard(); device.macros[10326] = 1;
+    const device = keyboard(); device.macros[34902] = 1;
     await assert.rejects(readViaStorage(device), /incomplete/);
     assert.deepEqual((await readViaStorage(device, {allowIncomplete: true})).macros, device.macros);
     await assert.rejects(readRegion({request: async request => {const r = Buffer.from(request); r[2]++; return r;}}, 0x12, 30), /chunk/);
@@ -67,7 +67,7 @@ test("rejects an incomplete macro write and corrupted response headers", async (
 test("macro execution stays invalidated until the last acknowledged byte", async () => {
     const device = keyboard(), request = device.request.bind(device), sentinels = [];
     device.request = async bytes => {const response = await request(bytes); sentinels.push(device.macros.at(-1)); return response;};
-    const target = Buffer.alloc(10327); target.write("hello");
+    const target = Buffer.alloc(34903); target.write("hello");
     await writeViaMacros(device, target);
     assert.ok(sentinels.slice(0, -1).every(value => value === 1));
     assert.equal(sentinels.at(-1), 0); assert.deepEqual(device.macros, target);
@@ -78,13 +78,13 @@ test("a small macro edit does not transfer the unused macro capacity", async () 
     const request = device.request.bind(device);
     device.request = async bytes => {requests.push(Buffer.from(bytes)); const response = await request(bytes); return response;};
     await writeViaMacros(device, target, {current});
-    assert.deepEqual(requests.map(bytes => [bytes.readUInt16BE(1), bytes[3]]), [[10326, 1], [0, 28], [10326, 1]]);
+    assert.deepEqual(requests.map(bytes => [bytes.readUInt16BE(1), bytes[3]]), [[34902, 1], [0, 28], [34902, 1]]);
     assert.deepEqual(device.macros, target);
 });
 test("an interrupted macro transfer stays invalid and can be replaced on retry", async () => {
     const device = keyboard(), request = device.request.bind(device); let writes = 0;
     device.request = async bytes => {if (++writes === 4) throw Error("disconnected"); return request(bytes);};
-    const target = Buffer.alloc(10327); target.write("replacement");
+    const target = Buffer.alloc(34903); target.write("replacement");
     await assert.rejects(writeViaMacros(device, target), /disconnected/);
     assert.equal(device.macros.at(-1), 1);
     device.request = request; await writeViaMacros(device, target);
@@ -99,9 +99,9 @@ test("rejects unhandled commands, bad capacities and malformed write echoes", as
         [0x0d, r => {r.writeUInt16BE(VIA_REGION_BYTES + 1, 1);}], [0x0d, r => {r.writeUInt16BE(128, 1);}],
     ]) {
         device.request = async data => {const r = await request(data); if (r[0] === command) mutate(r); return r;};
-        await assert.rejects(readViaStorage(device, {capabilities: {compiledLayerCount: 16, viaMacroSlots: 128, viaMacroBytes: 10327}}), /geometry/);
+        await assert.rejects(readViaStorage(device, {capabilities: {compiledLayerCount: 16, viaMacroSlots: 128, viaMacroBytes: 34903}}), /geometry/);
     }
-    // Every read and write stays inside the 12 KiB region; its last chunk is reachable.
+    // Every read and write stays inside the 36 KiB region; its last chunk is reachable.
     const edge = {request: async data => Buffer.from(data)};
     assert.equal((await readRegion(edge, VIA_STORAGE.MACRO_READ, 28, {startOffset: VIA_REGION_BYTES - 28})).length, 28);
     await assert.rejects(readRegion(edge, VIA_STORAGE.MACRO_READ, VIA_REGION_BYTES + 1), /size/);
@@ -111,12 +111,13 @@ test("rejects unhandled commands, bad capacities and malformed write echoes", as
 });
 
 test("the expanded bank is read, hashed and written through its last offset with bounded ranges", async () => {
-    // Use an independent device adapter with the larger backing allocation.
+    // Use an independent device adapter with the larger backing allocation,
+    // whose macro read map is unavailable (status 3), so the whole bank is read.
     const layout = Buffer.alloc(1920), macros = Buffer.alloc(34903), requests = [];
     const connection = {async request(request) {
         requests.push(Buffer.from(request));
         const reply = Buffer.from(request);
-        if (request[0] === 8) {reply[0] = 255; return reply;}
+        if (request[0] === 8) {reply.fill(0, 5); reply[5] = 3; return reply;}
         if (request[0] === VIA_STORAGE.LAYER_COUNT) reply[1] = 16;
         else if (request[0] === VIA_STORAGE.MACRO_COUNT) reply[1] = 128;
         else if (request[0] === VIA_STORAGE.MACRO_SIZE) reply.writeUInt16BE(macros.length, 1);
@@ -194,14 +195,15 @@ test("sparse reads keep stale tail bytes and the incomplete-write marker", async
     await assert.rejects(readViaStorage(device, {capabilities: {}}), /incomplete/);
     assert.deepEqual((await readViaStorage(device, {capabilities: {}, allowIncomplete: true})).macros, device.macros);
 });
-test("legacy and unavailable maps use the full-bank read", async () => {
-    for (const status of [null, 2, 3]) {
-        const device = sparseKeyboard(); device.macros[30000] = 99;
-        if (status === null) device.map = false;
-        else device.mutateReply = r => {if (r[0] === 8) {r.fill(0, 5); r[5] = status;} return r;};
-        assert.deepEqual((await readViaStorage(device, {capabilities: {}})).macros, device.macros);
-        assert.equal(device.requests.filter(r => r[0] === VIA_STORAGE.MACRO_READ).length, 1247);
-    }
+test("an unavailable map uses the full-bank read, and a missing or refused one fails", async () => {
+    const device = sparseKeyboard(); device.macros[30000] = 99;
+    device.mutateReply = r => {if (r[0] === 8) {r.fill(0, 5); r[5] = 3;} return r;};
+    assert.deepEqual((await readViaStorage(device, {capabilities: {}})).macros, device.macros);
+    assert.equal(device.requests.filter(r => r[0] === VIA_STORAGE.MACRO_READ).length, 1247);
+    const missing = sparseKeyboard(); missing.map = false;
+    await assert.rejects(readViaStorage(missing, {capabilities: {}}), /macro read map/);
+    const refused = sparseKeyboard(); refused.mutateReply = r => {if (r[0] === 8) {r.fill(0, 5); r[5] = 2;} return r;};
+    await assert.rejects(readViaStorage(refused, {capabilities: {}}), /status 2/);
 });
 test("malformed maps and false zero claims fail rather than silently falling back", async () => {
     for (const corrupt of [

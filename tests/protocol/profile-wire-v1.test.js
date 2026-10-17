@@ -106,10 +106,7 @@ test("Profile Wire get requests are canonical 32-byte frames", () => {
     assert.deepEqual(Array.from(wide.subarray(4, 6)), [2621 & 0xff, 2621 >> 8]);
     assert.equal(wide.subarray(6).every((byte) => byte === 0), true);
     assert.throws(() => buildProfileGetRequest(4, 0x10000, 1), RangeError);
-    // Without wide pages a page past 255 is refused, never sent as another page.
-    assert.equal(buildProfileGetRequest(4, 255, 1, {widePages: false})[4], 255);
-    assert.throws(() => buildProfileGetRequest(4, 256, 1, {widePages: false}), (error) => error.code === "WIDE_PAGES_UNSUPPORTED");
-    assert.equal(buildProfileGetRequest(4, 256, 1, {widePages: true})[5], 1);
+    assert.equal(buildProfileGetRequest(4, 256, 1)[5], 1);
 });
 
 test("JavaScript consumes the same golden reports as the C firmware codec", () => {
@@ -449,12 +446,17 @@ test("capability reads serialize through the transport connection", async () => 
     assert.equal(decoded.maxProfilePayload, 65504);
 });
 
-test("feature bit 13 is retired: no feature names it, and an older image that sets it still decodes", () => {
-    assert.equal(PROFILE_WIRE_KNOWN_MASKS.RETIRED_FEATURES, 1 << 13);
-    assert.equal(Object.values(PROFILE_WIRE_FEATURES).some((bit) => bit & PROFILE_WIRE_KNOWN_MASKS.RETIRED_FEATURES), false);
-    const older = compiledOnlyPages().map((page) => Buffer.from(page));
-    older[0].writeUInt32LE(older[0].readUInt32LE(9) | (1 << 13), 9);
-    assert.ok(decodeCapabilityPages(older).featureFlags & (1 << 13));
+test("what current firmware reports is one set of masks, and never the bits it does not advertise", () => {
+    const {CURRENT_FEATURES, CURRENT_MUTATION_FEATURES, CURRENT_PAIR_FEATURES} = PROFILE_WIRE_KNOWN_MASKS;
+    assert.equal(CURRENT_FEATURES & CURRENT_MUTATION_FEATURES, 0);
+    assert.equal(CURRENT_PAIR_FEATURES, (CURRENT_FEATURES | CURRENT_MUTATION_FEATURES | PROFILE_WIRE_FEATURES.SPLIT_KEYBOARD) >>> 0);
+    // Bit 13 is retired; RGB preview and participation are never advertised.
+    assert.equal(CURRENT_PAIR_FEATURES & ((1 << 13) | PROFILE_WIRE_FEATURES.RGB_PREVIEW | PROFILE_WIRE_FEATURES.PARTICIPATION_CONTROLS), 0);
+    assert.equal(Object.values(PROFILE_WIRE_FEATURES).some((bit) => bit === 1 << 13), false);
+    const pages = compiledOnlyPages().map((page) => Buffer.from(page));
+    pages[0].writeUInt32LE(CURRENT_PAIR_FEATURES, 9);
+    pages[0][7] = 20; pages[1][21] = 31;
+    assert.equal(decodeCapabilityPages(pages).featureFlags, CURRENT_PAIR_FEATURES);
 });
 
 test("macro output isolation requires protection and stays separate from transfer extensions", () => {

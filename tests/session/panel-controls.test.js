@@ -7,7 +7,7 @@ const {ProfileDraftSession} = require("../../core/session/profile-draft-session"
 const {fingerprint, summary} = require("../../core/model/portable-profile");
 const {document} = require("../fixtures/pd-profile");
 
-const capabilities = {compiledLayerCount: 16, supportedDomainMask: 31, actionAbiDigest: 0x837cf479, featureFlags: 0};
+const capabilities = {compiledLayerCount: 16, supportedDomainMask: 31, actionAbiDigest: 0x837cf479, featureFlags: require("../../core/protocol/profile-wire-v1").PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES};
 const snapshot = () => {
     const doc = document();
     return {document: doc, fingerprint: fingerprint(doc), summary: summary(doc), limits: {brightnessMax: 200}};
@@ -66,15 +66,33 @@ test("reading the keyboard connects, reads in dependency order and says what it 
 });
 
 test("a failed committed-profile read keeps the layout and the optional reads, and says what failed", async () => {
-    const state = {connected: true, selectedDeviceId: "kb", devices: [device], capabilities: {...capabilities, supportedDomainMask: 3},
+    const state = {connected: true, selectedDeviceId: "kb", devices: [device], capabilities,
         layout: {state: "read", layers: []}, committed: {state: "reading"}, error: null};
     const service = fakeService({snapshot: () => state, capabilities: state.capabilities,
+        readKeyboardProfile: async () => {throw new Error("interrupted");},
         readCommittedProfile: async () => {state.error = {code: "TIMEOUT", message: "no answer"}; throw new Error("no answer");}});
     service.calls.length = 0;
     const session = {service};
     assert.equal(await readKeyboard(session, undefined, host()), false);
     assert.deepEqual(service.calls, ["enumerate", "refresh", "readLayout", "readBaseRgb", "readCombos"]);
-    assert.equal(session.notice, "The keyboard profile could not be read: no answer.");
+    assert.equal(session.notice, "The keyboard profile could not be read: no answer. Macros and global settings could not be read: interrupted");
+});
+
+test("a keyboard not on current firmware is read no further, and told to update", async () => {
+    for (const older of [{...capabilities, supportedDomainMask: 3}, {...capabilities, featureFlags: capabilities.featureFlags & ~(1 << 30)}]) {
+        const service = fakeService({capabilities: older});
+        const session = {service};
+        assert.equal(await readKeyboard(session, undefined, host()), false);
+        assert.deepEqual(service.calls, ["enumerate", "refresh"]);
+        assert.match(session.notice, /the only one Ark supports\. Update both halves/);
+    }
+    // Firmware with every feature that stores an older domain version is told
+    // so by the complete capture, and its profile is not read independently.
+    const stored = fakeService({readKeyboardProfile: async () => {throw Object.assign(new Error("stores its profile in a format Ark does not read"), {code: "FIRMWARE_UPDATE_REQUIRED"});}});
+    const session = {service: stored};
+    assert.equal(await readKeyboard(session, undefined, host()), false);
+    assert.deepEqual(stored.calls, ["enumerate", "refresh"]);
+    assert.equal(session.notice, "stores its profile in a format Ark does not read");
 });
 
 test("a failed device read fails the whole read with its own error", async () => {

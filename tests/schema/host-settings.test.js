@@ -1,6 +1,6 @@
 "use strict";
 const test = require("node:test"), assert = require("node:assert/strict");
-const {HOST_SETTING, hostSettings, supportsHostLayouts, layoutFits, layoutForOs, MACOS_ISO, HOST_LAYOUT_FEATURE} = require("../../core/schema/host-settings");
+const {HOST_SETTING, hostSettings, layoutFits, layoutForOs, MACOS_ISO} = require("../../core/schema/host-settings");
 const {hostLayouts} = require("../../core/data/host-layouts");
 const {SETTING, validSetting} = require("../../core/schema/settings-domain-v1");
 // The settings domain requires host-settings, so it keeps its own copy of the ID.
@@ -20,8 +20,6 @@ test("host override and Unicode enablement are independent and unknown never gue
 test("the host layout and ISO bits are validated against the catalogue", () => {
     for (let layout = 0; layout < 15; layout++) assert(validSetting(27, 1 | 0x100 | MACOS_ISO | (layout << 16)));
     for (const invalid of [15 << 16, 0xff0000, 0x2000000, 0x8000]) assert.equal(validSetting(27, invalid), false);
-    assert.equal(supportsHostLayouts({featureFlags: HOST_LAYOUT_FEATURE}), true);
-    assert.equal(supportsHostLayouts({featureFlags: 1 << 21}), false);
 });
 
 test("Unicode entry follows the layout: on macOS only Unicode Hex Input, or US with the switch", () => {

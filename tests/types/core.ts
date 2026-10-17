@@ -13,7 +13,6 @@ import {editMacro} from '../../core/model/macro-editor.js';
 import {analyzeLayerStates} from '../../core/model/layer-state-graph.js';
 import {profileReview} from '../../core/model/profile-review.js';
 import {revertUnits} from '../../core/model/profile-revert.js';
-import {translateBackup} from '../../core/model/backup-translation.js';
 import {ProfileDraftSession} from '../../core/session/profile-draft-session.js';
 import {editDeviceProfile} from '../../core/model/device-profile-edits.js';
 import {ApplyProgress} from '../../core/session/apply-progress.js';
@@ -127,10 +126,7 @@ function analysisContracts(snapshot: CompleteSnapshot) {
         void target; void keycode;
     }
     const restored: PortableDocument = revertUnits(snapshot, snapshot, new Set(['macro:0']));
-    const imported: unknown = translateBackup('untrusted file');
-    // @ts-expect-error A translated import still needs portable-profile validation.
-    const portable: PortableDocument = imported;
-    void restored; void portable;
+    void restored;
 }
 
 void analysisContracts;

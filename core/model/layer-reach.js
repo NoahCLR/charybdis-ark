@@ -33,7 +33,6 @@
 // absence claims about the part they could not establish.
 
 const {effectiveTimings, releaseHoldUnreachable} = require("./gesture-timing");
-const {effectiveComboTerm} = require("../schema/combo-domain-v1");
 const keycodes = require("../data/keycode-catalog");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX, LAYERS, matrixPosition} = require("../data/charybdis-layout");
 const {layerLockOfCode} = require("../data/user-keycodes");
@@ -274,8 +273,8 @@ function offers(facts, active, cache) {
 // on active layers. A transparent overlay contributes no condition at all;
 // independently available layer controls therefore share one decision rather
 // than expanding every hold/lock combination.
-/** @param {Facts} facts @param {boolean} legacyTiming @returns {SymbolicWalk | Extract<import("./types.js").LayerAnalysisResult<Transition>, {reachedLayers?: undefined}>} */
-function compactWalk(facts, legacyTiming) {
+/** @param {Facts} facts @returns {SymbolicWalk | Extract<import("./types.js").LayerAnalysisResult<Transition>, {reachedLayers?: undefined}>} */
+function compactWalk(facts) {
     /** @type {Transition[]} */
     const transitions = [];
     /** @type {Condition[]} */
@@ -316,12 +315,6 @@ function compactWalk(facts, legacyTiming) {
             if (reference >= LAYERS) continue;
             const code = reference === top.layer ? source.code : facts.layers[reference][source.position];
             include(code, source, {all: [source.when, top.when]});
-        }
-        // Timing buffering depends on the resolved row and raw combo
-        // reference, even when the other chord members are absent.
-        if (legacyTiming && facts.rows.has(source.code)) {
-            if (selfReferences) queries.push(source.when);
-            else for (const top of tops) if (top.layer >= source.layer) queries.push({all: [source.when, top.when]});
         }
     }
     /** @param {number | undefined} code @param {number} allowed @returns {Condition} */
@@ -616,46 +609,6 @@ function findings(facts, walked) {
     return results;
 }
 
-// QMK buffers a matching member even when the remaining chord members are
-// absent. Match each reachable physical position through its reference layer;
-// the behavior still belongs to the key resolved on the active layer stack.
-/** @param {import("./types.js").DecodedProfile} decoded @param {Facts} facts @param {Walk} walked @param {boolean} legacyGestureTiming @param {boolean} legacyOwnedTapping @returns {Finding[]} */
-function gestureTimingFindings(decoded, facts, walked, legacyGestureTiming, legacyOwnedTapping) {
-    /** @type {Map<number, {row: BehaviorRow, nativeLayerTap: boolean, nativeWait: boolean, combos: Set<number>}>} */
-    const affected = new Map();
-    for (const active of walked.cache.keys()) {
-        const reference = facts.comboLayer(highest(active));
-        facts.layers[0].forEach((_, position) => {
-            const key = resolve(facts, active, position);
-            const row = key ? facts.rows.get(key.code) : undefined;
-            if (!row || !key) return;
-            const nativeLayerTap = key.code >= 0x4000 && key.code <= 0x4fff;
-            const otherTapping = (key.code >= 0x2000 && key.code <= 0x3fff) || (key.code >= 0x5280 && key.code <= 0x52df);
-            const nativeWait = (nativeLayerTap && legacyGestureTiming) || (otherTapping && legacyOwnedTapping);
-            const repeated = row.steps.some(step => step.tapIndex > 0);
-            const held = row.steps.some(step => step.hold || step.longHold);
-            if (!nativeWait && !repeated && !held) return;
-            const comboCode = reference === highest(active) ? key.code : facts.layers[reference]?.[position];
-            const members = legacyGestureTiming ? facts.combos.filter(combo => combo.inputs.includes(comboCode)) : [];
-            if (!nativeWait && !members.length) return;
-            const entry = affected.get(key.code) || {row, nativeLayerTap, nativeWait, combos: new Set()};
-            members.forEach(combo => entry.combos.add(combo.index));
-            affected.set(key.code, entry);
-        });
-    }
-    return [...affected].map(([code, {row, nativeLayerTap, nativeWait, combos}]) => {
-        const repeat = row.multiTapTerm || decoded.settings.values[SETTING.MULTI_TAP_TERM];
-        const hold = row.tapHoldTerm || decoded.settings.values[nativeLayerTap ? 0 : 1];
-        const competing = [...combos].sort((a,b) => a-b).map(index => `combo ${index} (${effectiveComboTerm(decoded.combos, decoded.combos.rows[index])} ms)`);
-        const reason = competing.length ? `This key also waits for ${competing.join(", ")}. ` : "";
-        return {kind: "gestureTiming", level: LEVELS.WARNING, layers: [], identity: String(code),
-            title: `${codeName(code)} has timing affected by input buffering`,
-            detail: `${reason}This firmware does not report all timing fixes needed for this key. Buffering can delay holds${legacyGestureTiming && row.steps.some(step => step.tapIndex > 0) ? " or make an on-time second press miss its repeat window" : ""}.${nativeWait ? " QMK also decides tap or hold before this authored behaviour runs." : ""} Effective tap / hold threshold: ${hold} ms; repeated taps: ${repeat} ms.`,
-            fix: "Use firmware with physical gesture timing and runtime-owned tapping. Longer timings can help repeated taps on older firmware, but also delay actions. Double hold means press, release, then press and keep holding.",
-            place: {kind: "behaviour", keycode: codeName(code)}};
-    });
-}
-
 // A finding's identity across two profiles: what kind it is and which layers it
 // is about, named by the keyboard layer each slot holds (`order[slot]`, as
 // model/layer-order.js keeps it).
@@ -664,13 +617,13 @@ const IDENTITY = Object.freeze(Array.from({length: LAYERS}, (_, layer) => layer)
 const findingKey = (finding, order = IDENTITY) => `${finding.kind}:${finding.layers.map((slot) => order[slot]).sort((a, b) => a - b).join(",")}${finding.identity === undefined ? "" : `:${finding.identity}`}`;
 
 // The findings for a validated profile.
-/** @param {import("./types.js").DecodedProfile} decoded @param {{legacyGestureTiming?: boolean, legacyOwnedTapping?: boolean}} [options] @returns {Finding[]} */
-function layerReach(decoded, {legacyGestureTiming = false, legacyOwnedTapping = legacyGestureTiming} = {}) {
+/** @param {import("./types.js").DecodedProfile} decoded @returns {Finding[]} */
+function layerReach(decoded) {
     if (decoded?.document?.layers?.length !== LAYERS) return [];
     const facts = profileFacts(decoded);
-    const compact = compactWalk(facts, legacyGestureTiming || legacyOwnedTapping);
+    const compact = compactWalk(facts);
     const walked = compact.complete || compact.reachabilityComplete ? compact : {...boundedWalk(facts), uncertainty: compact};
-    return [...findings(facts, walked), ...((legacyGestureTiming || legacyOwnedTapping) ? gestureTimingFindings(decoded, facts, walked, legacyGestureTiming, legacyOwnedTapping) : [])];
+    return findings(facts, walked);
 }
 
 // The findings for a draft beside its keyboard's: each finding in the draft is

@@ -2,17 +2,17 @@
 "use strict";
 const {test, expect} = require("@playwright/test");
 
-// The preview runs current firmware, which streams macro playback; `legacy`
-// stands in for firmware that plays one 512-byte program.
-async function editor(page, {legacy = false} = {}) {
+// The preview runs current firmware, which streams macro playback, so only
+// the free macro memory bounds a macro; `free` sets how much there is.
+async function editor(page, {free} = {}) {
     await page.goto("/preview/index.html");
-    await page.evaluate(async legacy => {
+    await page.evaluate(async free => {
         const store = await import("/webview/store.mjs");
         const model = store.getModel();
-        if (legacy) store.setModel({...model, macroBank: {...model.macroBank, programMax: 512}});
+        if (free !== undefined) store.setModel({...model, macroBank: {...model.macroBank, free}});
         store.state.screen = "macros"; store.state.macroSlot = "VIA_MACRO_17"; store.render();
         window.__posted.length = 0;
-    }, legacy);
+    }, free);
     await page.locator('[data-insert-kind="text"]').click();
 }
 const inspection = page => page.evaluate(async () => (await import('/webview/store.mjs')).macroForm('VIA_MACRO_17').validation?.validation);
@@ -44,7 +44,7 @@ test("Text accepts code literally and inspection measures pending input without 
     await expect(page.locator("[data-local-state]")).toHaveText("edited here");
 });
 
-test("a macro past 512 playback bytes stages on streaming firmware, up to the free memory", async ({page}) => {
+test("a long macro stages up to the free memory", async ({page}) => {
     await editor(page);
     const field = page.locator("[data-step-text]");
     await field.fill("a".repeat(2000));
@@ -60,17 +60,16 @@ test("a macro past 512 playback bytes stages on streaming firmware, up to the fr
     expect(await updates(page)).toHaveLength(1);
 });
 
-test("oversized text remains editable, reports its size and recovers as soon as it fits", async ({page}) => {
-    await editor(page, {legacy: true});
+test("oversized text remains editable and recovers as soon as it fits", async ({page}) => {
+    await editor(page, {free: 500});
     const field = page.locator("[data-step-text]");
-    await field.fill("a".repeat(509));
+    await field.fill("a".repeat(501));
     await field.dispatchEvent("change");
-    await expect(page.locator("[data-macro-size]")).toContainText("513 of 512 playback bytes");
+    await expect(page.locator("[data-macro-feedback]")).toContainText("500 are available for this slot");
     await expect(page.locator("[data-macro-feedback]")).toContainText("This edit is not staged");
     expect(await updates(page)).toHaveLength(0);
-    await expect(field).toHaveValue("a".repeat(509));
-    await field.fill("a".repeat(508));
-    await expect(page.locator("[data-macro-size]")).toContainText("512 of 512 playback bytes");
+    await expect(field).toHaveValue("a".repeat(501));
+    await field.fill("a".repeat(500));
     await expect(page.locator("[data-macro-feedback] .unavailable")).toHaveCount(0);
     await field.dispatchEvent("change");
     await expect.poll(() => updates(page).then(rows => rows.length)).toBe(1);
@@ -219,7 +218,7 @@ test("an old inspection cannot stage after host setup changes at the same draft 
     await editor(page);
     await page.evaluate(async () => {
         const store = await import("/webview/store.mjs"), model = structuredClone(store.getModel());
-        model.macroUnicode = {supported: true, mode: 1, enabled: true};
+        model.macroUnicode = {mode: 1, enabled: true};
         store.setModel(model); store.render();
     });
     // Let the newly chosen blank Text step finish its setup inspection before

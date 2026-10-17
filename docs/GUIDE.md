@@ -8,9 +8,15 @@ applied, and how backups work. Developing Ark is described in
 ## Reading the keyboard
 
 Connecting, refreshing and exporting still read and verify the whole saved
-configuration. With supporting firmware, Ark skips macro storage the keyboard
-confirms is empty; progress counts the bytes transferred. Older firmware uses
-the full read. A change during a read fails the capture so you can read again.
+configuration. Ark skips macro storage the keyboard confirms is empty, and
+reads the whole bank while the keyboard cannot yet say; progress counts the
+bytes transferred. A change during a read fails the capture so you can read
+again.
+
+Ark works with the current firmware only: the left/right pair from the latest
+firmware release. A keyboard running anything older, or anything else, is read
+no further than its identity: Ark says to update both halves and shows nothing
+it could edit. See [Firmware versions](#firmware-versions).
 
 ## Installing and upgrading
 
@@ -110,9 +116,8 @@ on your keyboard, **Import profile** reviews it against what the keyboard holds
 before anything is applied.
 
 **Open a profile file…**, on the strip, replaces the demo's setup with one of
-your exported `.charybdis.json` files, checked as Import checks it (an older
-backup is brought up to current firmware the same way). A file Import would
-refuse is refused, and the demo stays as it was.
+your exported `.charybdis.json` files, checked as Import checks it. A file
+Import would refuse is refused, and the demo stays as it was.
 
 **Leaving.** **Leave demo** on the strip, or **Choose keyboard** or **Read**,
 leaves the demo for a keyboard. With edits not exported since, Ark asks first
@@ -132,7 +137,7 @@ Every screen is drawn and wired to the host:
 | Macros | Named slots: literal Text, a compact sequence of key/delay/press/release tiles, drag reordering and a selected-step editor, raw payload, live size feedback, configurable recorder and placement; search by name, and the layers that set each macro off — by key, behaviour or combo — in their layer colour, each opening that layer in Keys with the macro picked |
 | Mouse | Pointer speed, sniping and auto-mouse — the Settings sections the keyboard's model files under Mouse, drawn with the same cards and posted whole |
 | Pointing modes | All 32 slots: movement, speed, direction shortcuts and how often they send (every step, or once per movement until the ball pauses or moves back the other way), scroll tuning and which way a scrolling mode scrolls (both axes, horizontal only or vertical only), what each direction's shortcut does with held modifiers, thresholds shown as ball movement at the mode's DPI, buttons, bindings, placement, clear and duplicate |
-| Settings | The keyboard's own name, then every other section the keyboard reports, posted whole, read-only where the firmware cannot report; the Combos section also carries the default combo window and the combo hold threshold, which the keyboard stores with its combos |
+| Settings | The keyboard's own name, then every other section the keyboard reports, posted whole, read-only where the firmware build leaves an option out; the Combos section also carries the default combo window and the combo hold threshold, which the keyboard stores with its combos |
 | Profile & backups | Import (the file against the keyboard, counted by what it configures — keys, lighting, macros, mouse, pointing — before it becomes the draft), export, profile memory, recovery state |
 | Device | Read-only: connection, committed generation, what was read |
 
@@ -192,9 +197,9 @@ aligned positions. Things made by the same edit (a key swap, a
 moved behaviour) go back together, as one undoable step. Layers are compared
 by which layer they are, not where they sit, so a reorder is one **Layer
 priority** item and a key edited or a layer renamed after it is its own item;
-each can be discarded without the other. A keyboard the app cannot open a draft for — its profile
-could not be read, or its firmware predates profile editing — is read-only:
-the host refuses any edit rather than writing it directly.
+each can be discarded without the other. A keyboard the app cannot open a draft for — its
+complete profile could not be read — is read-only: the host refuses any edit
+rather than writing it directly.
 
 Review checks whether you can reach your layers and combos and get back to
 Base after locking layers. It checks independent controls together and reports
@@ -261,13 +266,7 @@ ordinary key's empty cells send its keycode. A behaviour step on another key
 may send a custom key; it sends that key's shortcut only, never its
 behaviour, and Review warns about a step naming a custom key that has no
 shortcut. Shortcut changes are draft edits, reviewed beside the name with
-Discard, Undo and Redo, and saved by Apply. They need firmware that stores
-settings version 8. A keyboard whose firmware still stores version 7 opens
-no draft: every screen shows what it holds, read-only, the Shortcut field says
-the firmware cannot hold one, and Apply and restore refuse it until both
-halves are updated. You can still export it: the backup is in the current
-format, with no shortcuts, so it restores onto the updated keyboard. A backup
-from older firmware gains empty shortcuts when imported.
+Discard, Undo and Redo, and saved by Apply.
 
 Under the key, **What it does** also holds its behaviour editor, the same one
 as Keys → Behaviours: timings, the tap × tier grid and participation, and once
@@ -296,12 +295,10 @@ letters take two.
 
 The name is stored in the keyboard's profile, so it is a draft edit like any
 other: Review lists it as **Keyboard name**, Undo and Discard take it back,
-and backups carry it. Older backups have none, so they keep the built-in
-name. Ark calls the keyboard by its new name as soon as the Apply is read
-back; the computer and Chrome see it once the keyboard has reconnected
-([below](#applying-changes)). The serial number does not change, so Chrome
-keeps its permission to open the keyboard. Naming needs current firmware on
-both halves.
+and backups carry it. Ark calls the keyboard by its new name as soon as the
+Apply is read back; the computer and Chrome see it once the keyboard has
+reconnected ([below](#applying-changes)). The serial number does not change,
+so Chrome keeps its permission to open the keyboard.
 
 ## Choosing where behaviours and combos run
 
@@ -335,13 +332,10 @@ in that combo's editor, and the behaviour definition's enabled and allowed-layer
 controls and source-layer behaviour switches do not apply to that generated
 output. Another input's allowance cannot enable it.
 
-The two output switches default on and require supporting firmware on both
-halves. Turning either off keeps the combo active and sends its normal action;
-a custom key sends its shortcut, or nothing if it has none; the combo editor
-says which for its output. These
-switches keep inputs, outputs, timing and layer permissions intact. Older
-firmware shows them read-only, and Ark refuses a backup containing a bypass
-until both halves support it. Earlier backups keep output behaviours on.
+The two output switches default on. Turning either off keeps the combo active
+and sends its normal action; a custom key sends its shortcut, or nothing if it
+has none; the combo editor says which for its output. These switches keep
+inputs, outputs, timing and layer permissions intact.
 
 The profile holds up to 128 shared behaviour definitions and 128 combos with
 up to 16 inputs each. Firmware normally provides five tap steps per behaviour
@@ -463,8 +457,8 @@ a release before the Long hold threshold sends, for plain keys, custom keys and 
 layer and pointing keys send no tap once held. **Change key…** moves a behaviour to another
 key through the keycode picker; when that key already has one, you choose to
 overwrite it, swap the two, or cancel, and either is one undoable draft step.
-On a keyboard that owns its layer keys (Profile Wire feature bit 14), a
-behaviour takes QMK's layer keys where the keyboard can run them: `TG()`,
+The keyboard owns its layer keys, so a behaviour takes QMK's layer keys where
+the keyboard can run them: `TG()`,
 `TO()` and `LOCK_LAYER()` anywhere, `OSL()` as a tap, `TT()` and `MO()` as a
 "Press and hold until release" branch; `LT()` and `LM()` stay keys and combos,
 and `DF()`/`PDF()` are refused.
@@ -593,10 +587,8 @@ grid and the review.
 
 ## Timing checks
 
-Review and the behaviour editor explain combo/tap timing risks on older
-firmware, using the connected profile. Firmware with physical gesture timing
-is recognized without changing the layout or tuning values.
-
+The keyboard times gestures from the physical presses, and owns the tapping of
+authored LT(), MT() and OSM() rows, so combo buffering does not delay them.
 Timing checks resolve inherited defaults, warn about overlapping or impossible
 release tiers, and exclude proven-impossible layer routes. Narrow gesture/chord
 windows receive advice; this is conservative analysis, not a guarantee that
@@ -617,10 +609,9 @@ warnings in orange, traps and save blockers in red. It checks layer reachability
 combos, inert pointing bindings, and macros the keyboard cannot play. Apply asks
 for confirmation when a warning or trap is present and stays disabled until
 destination save blockers are resolved.
-On firmware that supports it, Apply sends changed profile data and lets the
-keyboard copy unchanged data into the new profile. It still checks the complete
-result and saves both halves together, including the first save from firmware
-defaults. Older compatible firmware uses a full profile upload.
+Apply sends changed profile data and lets the keyboard copy unchanged data into
+the new profile. It still checks the complete result and saves both halves
+together, including the first save from firmware defaults.
 
 Removing one combo appears as one deletion in Review and Draft history; later
 combo numbers shift because the device stores them in a packed table.
@@ -724,7 +715,7 @@ files are refused without replacing your draft.
 
 **Profile memory** shows how full the profile is. Behaviours, combos,
 lighting, pointing modes, settings, every layer, macro and custom-key name and
-the keyboard's own name share one block on the keyboard: 65,504 bytes on
+the keyboard's own name share one block on the keyboard: 53,216 bytes on
 current firmware, the size the keyboard reports. The card lists what uses it, area by area, and the counted
 limits beside it: behaviours, behaviour steps, combos, lighting groups and
 lighting group rows. Each area can stay under its own limit and the profile
@@ -750,8 +741,8 @@ configure.
 
 ### Pointing-mode clicks
 
-On supporting firmware, a straight direction, diagonal or physical-button tap
-override can send a plain **Mouse Button 1–8**, including buttons 3 and 4.
+A straight direction, diagonal or physical-button tap override can send a
+plain **Mouse Button 1–8**, including buttons 3 and 4.
 Use **Pick…** or enter its QMK name, such as `MS_BTN3`. The pointing picker
 offers only outputs that field accepts: keyboard keys and shortcuts, media
 and system keys, and supported mouse buttons. Pointer movement, wheel,
@@ -770,15 +761,9 @@ holds that button, the click adds no new press edge and leaves it held. The
 computer decides what a button number means; buttons 3 and 4 do not necessarily
 mean Back and Forward.
 
-Ark checks the keyboard's reported support. Older firmware keeps its existing
-pointing editors but offers no mouse-click outputs and explains why. A backup
-containing clicks keeps them exactly through import review, draft history and
-undo/redo; Review blocks Apply on a keyboard without support. Update its
-firmware or replace those outputs before saving.
-
 ### Pointing-mode macros
 
-On firmware that reports support, **Pick… → Macros** offers all 128 VIA slots
+**Pick… → Macros** offers all 128 VIA slots
 by their names for a direction, diagonal or button tap override. The output
 shows the name beside its stored keycode. An empty macro is allowed and marked
 **does nothing yet**; add its steps on Macros. It sends nothing and leaves a
@@ -793,31 +778,15 @@ The keyboard runs one macro at a time. Triggers while it is busy are dropped,
 never queued. **Every step** is allowed; its macro output carries a tip pointing
 to **Once per movement**, usually a better fit for a longer sequence.
 
-Older firmware offers no new macro outputs. Backups and imports keep them
-exactly, with Review blockers until the destination supports them or you
-replace them. You can fix one output while retaining the others. Apply and
-direct restore refuse unsupported records before writing.
+### Firmware versions
 
-### Upgrading from eight-layer firmware
-
-Export your saved setup with the previous Ark before flashing. Keep that file
-and the old left/right pair. Flash both halves with the matching new pair,
-then open the new Ark and read the keyboard. The larger storage layout starts
-with flashed defaults; it does not migrate the old on-device profile.
-
-Choose your exported backup in **Profile & backups**. Ark translates the
-immediately preceding eight-layer, 32-pointing-slot format into the new format
-before Import review. **Use as draft**, check Review, then **Apply** restores
-both halves through the usual recovery transaction. No write happens during
-translation or Import review.
-
-The translation keeps all keys, behaviours, combos, pointing modes, macros and
-names. The eight added layers are transparent and unnamed, macro/custom-key
-slots 64–127 are empty, and every participation control starts on. Custom-key
-placements and native references move to their new keycodes while keeping
-the same slot. Five-layer and eight-pointing-slot backups, unknown action
-vocabularies and malformed files are refused; Ark does not drop data to make
-a backup fit.
+Ark works with the current firmware only, the pair from the latest firmware
+release; each Ark release names the firmware release it was built with. It
+reads, edits and restores only what that firmware stores, and converts
+nothing. A keyboard on older firmware is told to update both halves and read
+no further, and a backup in an older format is refused at Import. When a
+firmware update changes the stored format, the keyboard starts from its
+flashed defaults, and backups from before the update no longer import.
 
 Executable custom combo hooks and unsupported macro content
 cannot be represented as profile data; export reports these explicitly instead
@@ -858,8 +827,7 @@ Neither OS detection nor selection checks the computer’s input configuration.
 when the OS is unknown): ABC, Dutch, Unicode Hex Input, British, German and
 French on macOS; US International, United Kingdom, German and French on Windows
 and on Linux. Macro text is typed through it, so pick the layout that is active
-on the computer; the keyboard cannot check. US is the default and what older
-firmware assumes. Choosing a **Host OS** brings the layout along: it stays if
+on the computer; the keyboard cannot check. US is the default. Choosing a **Host OS** brings the layout along: it stays if
 it belongs to that OS (US belongs to all of them), and otherwise becomes that
 OS's layout of the same language (German, French, British or United Kingdom),
 or US. It is one change, so one undo restores both. Auto cannot do this for
@@ -897,9 +865,7 @@ Alt/Super on Linux. Shortcuts, mod-taps, layer-mod keys, Magic actions and
 macro command previews follow the same rule. Display
 names refresh in open editors when the Host setting changes; stored keycodes
 and key assignments do not. Auto with an unknown OS uses Alt/GUI names. Both Host settings
-travel through Review, undo/redo, readback and backups. Older firmware leaves
-them read-only and keeps ASCII editing; firmware without host layouts leaves
-the layout read-only at US.
+travel through Review, undo/redo, readback and backups.
 
 When the effective OS is Windows and **Unicode playback** is on, the Host
 section shows **WinCompose on GitHub** with the GitHub icon. The link opens the
@@ -1008,7 +974,7 @@ duration up to the moment the take ends. Otherwise, it finishes
 the pending tap or chord. Incomplete or invalid
 takes remain local for correction and are not kept in the draft.
 
-**Uninterruptible playback** is saved per macro on supporting firmware.
+**Uninterruptible playback** is saved per macro.
 **Automatic** turns it on when the selected layout needs Unicode entry for any
 text in the macro. For example, Dutch types `é` natively, so it stays off;
 Unicode Hex Input needs Unicode entry for `é`, so it turns on. **On** protects
@@ -1018,25 +984,20 @@ Changing the layout rechecks Automatic and lists its effect in Review.
 Protection ignores new keypresses from this keyboard until playback and cleanup
 finish; it does not queue or replay them. Their releases are ignored too, even
 after playback ends, while releases of keys held before playback still work.
-On firmware with keyboard-output isolation, playback starts immediately and
-suspends ordinary keys already held. Only the macro's keyboard output reaches
+Playback starts immediately and suspends ordinary keys already held. Only the macro's keyboard output reaches
 the computer during playback, including its own modifiers. Physical releases
 keep updating internal state; modifiers still held resume after cleanup.
 Ordinary keys remaining held do not resume automatically: release and press them
 again. This avoids an unwanted fresh character when playback ends. Another macro
-can still type the same key. Earlier firmware protects only against new presses;
-Ark explains that limitation and asks you to update both halves.
-Pointing, consumer/media actions and input from another keyboard remain outside
+can still type the same key. Pointing, consumer/media actions and input from another keyboard remain outside
 this keyboard-output protection. Reset and error cleanup still release the macro's keys. The option
 does not change macOS Unicode Hex Input's effect on Option shortcuts.
 
 Text edits and renames preserve the choice. Review, undo/redo, discard, exports
-and imports carry it with the macro. Older firmware shows the control read-only;
-a backup containing an explicit override needs firmware supporting the setting.
+and imports carry it with the macro.
 
 Shared macro memory stays in the slot bank; the editor shows checking status and
-validation errors without routine memory or staging notes. Earlier firmware also
-shows its fixed playback-size limit. Valid edits enter the draft when you finish editing a field or change a key step. Incomplete,
+validation errors without routine memory or staging notes. Valid edits enter the draft when you finish editing a field or change a key step. Incomplete,
 invalid or oversized edits stay visible locally with their reason and never
 replace the last valid draft. **Discard local edits** returns to the draft's
 current macro; use step Undo while editing the macro, or draft Undo from the rail
@@ -1048,7 +1009,7 @@ key, `{+KC_A}` presses it, `{-KC_A}` releases it, and `{120}` waits 120 ms.
 Literal braces there must be doubled as `{{` and `}}`; Text escapes them for you.
 Valid raw edits read back as editable steps. A raw edit that cannot be completely
 parsed disables step editing until corrected or discarded, preserving its whole
-input. Both views describe the same macro and use the same playback-size limit.
+input. Both views describe the same macro and are checked against the same free memory.
 
 Text is typed through the **Keyboard layout** in **Settings → Host**, with the
 keys that layout uses: on German, `z` is the key QMK calls `KC_Y`; on macOS
@@ -1071,11 +1032,8 @@ before Apply. Release that key before the text, or choose a layout that can type
 the character. Characters with no native route or Unicode setup show **setup**.
 Ark cannot repair those sequences without changing what you authored.
 
-Bank usage counts UTF-8 bytes; compiled usage counts each non-ASCII scalar as
-four bytes and each ASCII run with its instruction headers. Current firmware
-plays a stored macro in windows, so one macro can use all the free memory;
-firmware from before the larger macro memory keeps the 512-byte program limit.
-Valid supplementary characters and joined emoji count
+Bank usage counts UTF-8 bytes. The keyboard plays a stored macro in windows,
+so one macro can use all the free memory. Valid supplementary characters and joined emoji count
 by their scalar sequence, not their apparent glyph count. Unpaired UTF-16
 surrogates, malformed UTF-8 and unsupported control characters are rejected.
 Avoid concurrent typing and release ordinary keys before playback. Cancellation

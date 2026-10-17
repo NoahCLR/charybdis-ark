@@ -58,10 +58,8 @@ const capabilities = {
     compiledLayerCount: 16,
     supportedDomainMask: 31,
     actionAbiDigest: ACTION_ABI,
-    // Current firmware: every feature this app knows, including physical
-    // gesture timing and runtime-owned tapping, which change what an empty
-    // behaviour cell means.
-    featureFlags: PROFILE_WIRE_KNOWN_MASKS.FEATURE_FLAGS & ~PROFILE_WIRE_KNOWN_MASKS.RETIRED_FEATURES,
+    // Current firmware: everything the flashable pair reports.
+    featureFlags: PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES,
     responseVersion: 2,
     reportSize: 32,
     brightnessMax: 255,

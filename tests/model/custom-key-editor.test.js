@@ -125,14 +125,6 @@ test("a shortcut is staged, reviewed beside the name, discarded alone and named 
     assert.ok(model.customKeyShortcutKeys.includes("KC_K"));
 });
 
-test("a keyboard still storing settings v7 offers no shortcut keys (D-L63)", () => {
-    const current = snapshot(pdDocument());
-    assert.ok(customKeyEditorView(current, capabilities).shortcutKeys.includes("KC_K"));
-    const older = {...current, older: [{id: 0x40, version: 7}]};
-    assert.deepEqual(customKeyEditorView(older, capabilities).shortcutKeys, []);
-    assert.equal(customKeyEditorView(older, capabilities).keys.length, 128, "its keys and names are still shown");
-});
-
 test("one message can name a custom key and set its shortcut together", () => {
     const before = snapshot(pdDocument());
     const after = validateSnapshot(editCustomKey(before, {keycode: "CUSTOM_KEY_9", name: "Both GUI", shortcut: {mods: 0x88, key: 0}, expectedFingerprint: before.fingerprint}, capabilities));

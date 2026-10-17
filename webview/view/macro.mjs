@@ -13,11 +13,11 @@
 /** @typedef {import("./types.js").MacroStep} MacroStep */
 
 const MAX_DELAY = 65535, MAX_KEYS = 16;
-/** @param {string} character @param {boolean | undefined} unicode */
-const printable = (character, unicode) => {
+/** @param {string} character */
+const printable = (character) => {
     const code = character.codePointAt(0);
     if (code === undefined) return false;
-    return code === 9 || code === 10 || (code >= 32 && code <= 126) || (unicode && code >= 0xA0 && code <= 0x10FFFF && !(code >= 0xD800 && code <= 0xDFFF));
+    return code === 9 || code === 10 || (code >= 32 && code <= 126) || (code >= 0xA0 && code <= 0x10FFFF && !(code >= 0xD800 && code <= 0xDFFF));
 };
 
 /** @param {unknown} payload @param {import("./types.js").MacroOptions} [options] */
@@ -45,7 +45,7 @@ export function parseMacro(payload, options = {}) {
         if ((character === "{" || character === "}") && source[index] === character) { text += character; index++; continue; }
         if (character === "}") return fail(steps, "Unexpected } — use }} for a literal closing brace.");
         if (character !== "{") {
-            if (!printable(character, options.unicode)) return fail(steps, options.unicode ? "Use valid Unicode text, tabs or newlines; control characters and unpaired surrogates are unsupported." : "This firmware supports ASCII macro text only. Update both halves for Unicode.");
+            if (!printable(character)) return fail(steps, "Use valid Unicode text, tabs or newlines; control characters and unpaired surrogates are unsupported.");
             text += character; continue;
         }
         flush();
@@ -121,7 +121,7 @@ export function macroStepsInput(steps) {
 // identical; what tells them apart is the key they actually send.
 /** @param {unknown} payload @param {(name: string) => string} [label] */
 export function macroPeek(payload, label = (name) => name) {
-    const {steps} = parseMacro(payload, {unicode: true});
+    const {steps} = parseMacro(payload);
     return macroPeekSteps(steps, label);
 }
 
@@ -145,7 +145,7 @@ export const TEXT_CHIP = 24, TEXT_TIP = 200;
 const clip = (text, max) => [...text].length > max ? `${[...text].slice(0, max - 1).join("").trimEnd()}…` : text;
 /** @param {unknown} payload @param {(step: MacroStep) => {label: string, full: string}} [face] @param {number} [limit] */
 export function macroChips(payload, face = (step) => ({label: describeStep(step), full: describeStep(step)}), limit = 12) {
-    const {steps} = parseMacro(payload, {unicode: true});
+    const {steps} = parseMacro(payload);
     const chips = steps.slice(0, limit).map((step) => {
         const {label, full} = face(step);
         if (step.kind === "text") return {kind: step.kind, label: clip(label, TEXT_CHIP), full: clip(full, TEXT_TIP)};

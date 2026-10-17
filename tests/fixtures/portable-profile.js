@@ -11,9 +11,11 @@ const {createSnapshot, materializeProfile} = require("../../core/model/portable-
 const {encodeSettings, defaultLayerRecord} = require("../../core/schema/settings-domain-v1");
 const {ACTION_ABI} = require("../../core/schema/actions");
 const {LAYER_LOCK_BASE} = require("../../core/data/user-keycodes");
+const {PROFILE_WIRE_KNOWN_MASKS} = require("../../core/protocol/profile-wire-v1");
 
 const FIXTURE = path.resolve(__dirname, "../../upstream/firmware/tests/fixtures/compiled_profile_pd_v2.fixture");
-const CURRENT_CAPABILITIES = Object.freeze({compiledLayerCount: 16, supportedDomainMask: 31, schema: {major: 3}, actionAbiDigest: ACTION_ABI});
+const CURRENT_CAPABILITIES = Object.freeze({compiledLayerCount: 16, supportedDomainMask: 31, schema: {major: 3}, actionAbiDigest: ACTION_ABI,
+    featureFlags: PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES});
 
 // Settings v8: values 10..14 are the retired pointing DPI and 27 the retired
 // combo references, all zero; behaviours and combos are on everywhere; every

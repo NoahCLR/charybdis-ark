@@ -1,7 +1,7 @@
 "use strict";
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const {document} = require("../fixtures/portable-profile");
+const {document, CURRENT_CAPABILITIES} = require("../fixtures/portable-profile");
 const {document: pdDocument} = require("../fixtures/pd-profile");
 const {fingerprint, validateSnapshot} = require("../../core/model/portable-profile");
 const {macroEditorView, editMacro, macroInputStatus, macroBudget, SLOT_RESERVE_TAPS} = require("../../core/model/macro-editor");
@@ -15,7 +15,6 @@ test("per-macro protection follows Unicode entry automatically, and explicit pol
     const {hostMacros} = require("../fixtures/host-macros");
     for (const layout of [2, 3]) {
         const fixture = hostMacros(1 | (layout << 16), ["é"]);
-        fixture.capabilities.featureFlags |= 1 << 23;
         let current = fixture.snapshot;
         const view = () => macroEditorView(current, fixture.capabilities).viaMacros[0];
         const edit = message => {current = snapshot(editMacro(current, {keycode: "VIA_MACRO_0", expectedFingerprint: current.fingerprint, ...message}, fixture.capabilities));};
@@ -27,18 +26,16 @@ test("per-macro protection follows Unicode entry automatically, and explicit pol
         edit({protection: "on"}); assert.equal(view().uninterruptible, true);
         edit({protection: "auto"}); assert.equal(view().uninterruptible, layout === 3);
         assert.equal(Buffer.from(current.document.macros[0], "base64").toString("utf8"), "éé");
-        assert.throws(() => editMacro(current, {keycode: "VIA_MACRO_0", protection: "on", expectedFingerprint: current.fingerprint}, {...fixture.capabilities, featureFlags: (1 << 21) | (1 << 22)}), /Update both halves/);
     }
 });
 
 test("an empty macro may store protection and keeps its empty-slot reserve", () => {
     const {hostMacros} = require("../fixtures/host-macros");
-    const {snapshot: current, capabilities} = hostMacros(1, []); capabilities.featureFlags |= 1 << 23;
+    const {snapshot: current, capabilities} = hostMacros(1, []);
     const protectedEmpty = snapshot(editMacro(current, {keycode: "VIA_MACRO_0", protection: "on", expectedFingerprint: current.fingerprint}, capabilities));
     const view = macroEditorView(protectedEmpty, capabilities);
     assert.equal(view.viaMacros[0].empty, true); assert.equal(view.viaMacros[0].protection, "on");
     assert.equal(view.macroBank.stored, macroEditorView(current, capabilities).macroBank.stored + 3);
-    assert.equal(view.viaMacros[0].program, 0);
 });
 
 test("stored macro status agrees with editing after a host layout change", () => {
@@ -50,7 +47,6 @@ test("stored macro status agrees with editing after a host layout change", () =>
         assert.equal(slot.playable, !status.error);
         assert.equal(slot.playbackError, status.error);
         assert.equal(slot.playbackCode, status.code);
-        assert.equal(slot.program, 8, "the stored program size does not change with its typing method");
     }
 });
 
@@ -132,7 +128,7 @@ test("stale drafts and wrong slots are rejected before a write", () => {
     for (const keycode of ["VIA_MACRO_128", "VIA_MACRO_01", "KC_A", "MACRO_2", "CUSTOM_KEY_2"]) assert.throws(() => editMacro(current, {...message, keycode}), /slot/);
     assert.equal(Buffer.from(editMacro(current, {...message, keycode: "VIA_MACRO_127"}).macros[127], "base64").toString(), "hello", "the last slot is a slot");
     assert.throws(() => editMacro(current, {keycode: "VIA_MACRO_0", expectedFingerprint: current.fingerprint}), /steps, its name/);
-    assert.throws(() => editMacro(current, {...message, payload: "x".repeat(10327)}), /bytes/);
+    assert.throws(() => editMacro(current, {...message, payload: "x".repeat(34903)}), /bytes/);
 });
 
 test("every empty slot keeps room for ten key taps; the highest ones run out of room first", () => {
@@ -157,37 +153,36 @@ test("every empty slot keeps room for ten key taps; the highest ones run out of 
     assert.equal(macroBudget(slots, 10327).available, 5);
 });
 
-test("the model reports each macro's program size and the bank; an unplayable macro is refused", () => {
+test("the model reports the bank and each macro's room; a macro past the free memory is refused", () => {
     let current = snapshot(pdDocument());
     current = snapshot(editMacro(current, {keycode: "VIA_MACRO_2", payload: "{KC_A}{KC_B}", expectedFingerprint: current.fingerprint}));
-    const view = macroEditorView(current, {viaMacroBytes: 10327});
+    const view = macroEditorView(current, {viaMacroBytes: 34903});
     const slot = view.viaMacros[2];
-    assert.equal(slot.program, 6);
     assert.equal(slot.playable, true);
     assert.equal(slot.available, true);
-    assert.equal(slot.roomTaps, Math.floor((512 - 6) / 3));
-    assert.equal(view.macroBank.capacity, 10327);
+    assert.equal(slot.roomTaps, Math.floor(view.macroBank.free / 3));
+    assert.equal(view.macroBank.capacity, 34903);
     assert.equal(view.macroBank.slots, 128);
-    assert.equal(view.macroBank.programMax, 512);
     assert.equal(view.macroBank.reserveTaps, 10);
     assert.equal(view.macroBank.available, 128);
     const model = buildDeviceModel({macroView: view, capabilities: {compiledLayerCount: 16, actionAbiDigest: 0x837cf479}});
     assert.deepEqual(model.macroBank, view.macroBank);
-    // 170 taps play; 171 would be kept but never play, so the edit is refused.
-    assert.doesNotThrow(() => editMacro(current, {keycode: "VIA_MACRO_2", payload: "{KC_A}".repeat(170), expectedFingerprint: current.fingerprint}));
-    assert.throws(() => editMacro(current, {keycode: "VIA_MACRO_2", payload: "{KC_A}".repeat(171), expectedFingerprint: current.fingerprint}),
-        error => error.code === "MACRO_TOO_LONG" && /513 bytes/.test(error.message));
+    // The keyboard streams a macro in windows, so only the free memory bounds it.
+    assert.doesNotThrow(() => editMacro(current, {keycode: "VIA_MACRO_2", payload: "{KC_A}".repeat(171), expectedFingerprint: current.fingerprint}));
+    assert.throws(() => editMacro(current, {keycode: "VIA_MACRO_2", payload: "a".repeat(view.macroBank.free + 7), expectedFingerprint: current.fingerprint}),
+        error => error.code === "MACRO_BANK_FULL");
 });
 
-test("Unicode host setup persists with the profile and gates Unicode edits on legacy firmware", () => {
-    const capabilities = {featureFlags: 1 << 21, compiledLayerCount: 16, supportedDomainMask: 31, actionAbiDigest: 0x837cf479};
+test("Unicode host setup persists with the profile", () => {
+    const capabilities = CURRENT_CAPABILITIES;
     let current = snapshot(document());
     const change = value => editMacro(current, {keycode: "VIA_MACRO_0", expectedFingerprint: current.fingerprint, ...value}, capabilities);
     assert.throws(() => change({payload: "café 🙂"}), error => error.code === "UNICODE_SETUP_REQUIRED");
+    // Unicode playback on or off; the Mac's ISO switch stays off.
     const setHost = (mode, enabled) => {
         const section = settingsEditorView({...current, hostOs: {detected: 0}}).sections.find(s => s.id === "host");
         return editSettings(current, {sectionId: "host", expectedFingerprint: current.fingerprint,
-            fields: section.fields.map(f => f.kind === "toggle" ? {macro: f.macro, enabled} : {macro: f.macro, value: f.macro === "hostOs" ? String(mode) : f.value})}, capabilities);
+            fields: section.fields.map(f => f.kind === "toggle" ? {macro: f.macro, enabled: f.macro === "macosIso" ? false : enabled} : {macro: f.macro, value: f.macro === "hostOs" ? String(mode) : f.value})}, capabilities);
     };
     for (const mode of [1, 2, 3]) {
         current = snapshot(setHost(mode, true));
@@ -195,12 +190,10 @@ test("Unicode host setup persists with the profile and gates Unicode edits on le
         current = snapshot(change({payload: "café 🙂 e\u0301 👩‍💻"}));
         const view = macroEditorView(current, capabilities);
         const {layoutChars, ...unicodeView} = view.unicode;
-        // Firmware without host layouts types through US, ASCII only.
-        assert.deepEqual(unicodeView, {supported: true, mode, enabled: true, os: mode, layouts: false, layout: 0, layoutFits: true, layoutName: "US"});
+        assert.deepEqual(unicodeView, {mode, enabled: true, os: mode, layout: 0, layoutFits: true, layoutName: "US"});
         assert.equal(layoutChars.length, 97);
         assert.equal(view.viaMacros[0].payload, "café 🙂 e\u0301 👩‍💻");
         assert.equal(Buffer.from(current.document.macros[0], "base64").toString("utf8"), "café 🙂 e\u0301 👩‍💻");
-        assert.throws(() => validateSnapshot(current.document, {...capabilities, featureFlags: 0}), /ASCII/);
     }
     const off = snapshot(setHost(0, false));
     const offView = macroEditorView(off, capabilities);
@@ -209,11 +202,8 @@ test("Unicode host setup persists with the profile and gates Unicode edits on le
     assert.throws(() => change({payload: "{+KC_A}é{-KC_A}"}), /Release ordinary keys/);
     assert.doesNotThrow(() => change({payload: "{+KC_LALT}é{-KC_LALT}"}));
     assert.throws(() => setHost(4, true), /supported range/);
-    assert.throws(() => change({payload: "é".repeat(129)}), error => error.code === "MACRO_TOO_LONG");
-    const legacy = snapshot(document());
-    assert.throws(() => editMacro(legacy, {keycode: "VIA_MACRO_0", expectedFingerprint: legacy.fingerprint, unicodeHostMode: 1}, {...capabilities, featureFlags: 0}), /steps/);
-    assert.throws(() => editMacro(legacy, {keycode: "VIA_MACRO_0", expectedFingerprint: legacy.fingerprint, payload: "café"}, {...capabilities, featureFlags: 0}), /ASCII/);
-    assert.doesNotThrow(() => editMacro(legacy, {keycode: "VIA_MACRO_0", expectedFingerprint: legacy.fingerprint, payload: "ASCII"}, {...capabilities, featureFlags: 0}));
+    const unchanged = snapshot(document());
+    assert.throws(() => editMacro(unchanged, {keycode: "VIA_MACRO_0", expectedFingerprint: unchanged.fingerprint, unicodeHostMode: 1}, capabilities), /steps/);
 });
 
 
@@ -229,11 +219,11 @@ test("live macro inspection and staging agree without inspection changing the sn
 });
 
 test("macro text is judged against the host layout the keyboard types through", () => {
-    const capabilities = {featureFlags: (1 << 21) | (1 << 22), compiledLayerCount: 16, supportedDomainMask: 31, actionAbiDigest: 0x837cf479};
+    const capabilities = CURRENT_CAPABILITIES;
     let current = snapshot(document());
     const change = payload => editMacro(current, {keycode: "VIA_MACRO_0", expectedFingerprint: current.fingerprint, payload}, capabilities);
     const setHost = (os, layout, unicode = false, iso = false) => {
-        const section = settingsEditorView({...current, hostOs: {detected: 0}}, capabilities).sections.find(s => s.id === "host");
+        const section = settingsEditorView({...current, hostOs: {detected: 0}}).sections.find(s => s.id === "host");
         const shown = {hostOs: String(os), hostLayout: String(layout), unicodeEnabled: unicode, macosIso: iso};
         current = snapshot(editSettings(current, {sectionId: "host", expectedFingerprint: current.fingerprint,
             fields: section.fields.map(f => f.kind === "toggle" ? {macro: f.macro, enabled: shown[f.macro]} : {macro: f.macro, value: shown[f.macro]})}, capabilities));
@@ -258,26 +248,13 @@ test("macro text is judged against the host layout the keyboard types through", 
     assert.doesNotThrow(() => change("🙂"));
 });
 
-test("macro output isolation is reported only when both protection capabilities are present", () => {
-    const {hostMacros} = require("../fixtures/host-macros");
-    const {snapshot, capabilities} = hostMacros(1 | (3 << 16), ["é"]);
-    for (const flags of [0, 1 << 23, 1 << 26, (1 << 23) | (1 << 26)]) {
-        const view = macroEditorView(snapshot, {...capabilities, featureFlags: flags});
-        const expected = flags === ((1 << 23) | (1 << 26));
-        assert.equal(view.outputIsolationSupported, expected);
-        assert.equal(buildDeviceModel({macroView: view}).macroOutputIsolationSupported, expected);
-    }
-});
-
-test("streaming macros use the free bank and filled high slots survive lower empty slots running out of room", () => {
-    const capabilities = {compiledLayerCount: 16, supportedDomainMask: 31, actionAbiDigest: document().actionAbiDigest,
-        featureFlags: 1 << 27, viaMacroBytes: 34903, maxProfilePayload: 53216};
+test("macros use the free bank and filled high slots survive lower empty slots running out of room", () => {
+    const capabilities = {...CURRENT_CAPABILITIES, viaMacroBytes: 34903, maxProfilePayload: 53216};
     let current = snapshot(document());
     const update = payload => {current = snapshot(editMacro(current, {keycode: "VIA_MACRO_127", payload, expectedFingerprint: current.fingerprint}, capabilities));};
     const free = macroEditorView(current, capabilities).macroBank.free;
     update("a".repeat(free));
     let view = macroEditorView(current, capabilities);
-    assert.equal(view.macroBank.programMax, null);
     assert.equal(view.macroBank.free, 0);
     assert.equal(view.macroBank.available, 1);
     assert.equal(view.viaMacros[127].available, true);
@@ -296,12 +273,7 @@ test("streaming macros use the free bank and filled high slots survive lower emp
     assert.equal(macroEditorView(current, capabilities).macroBank.available, 128);
 });
 
-test("the streaming flag removes the program limit while legacy firmware retains it", () => {
+test("a long macro plays whatever its length while it fits the bank", () => {
     const current = snapshot(document()), payload = "a".repeat(600);
-    const old = macroInputStatus(current, {keycode: "VIA_MACRO_0", payload}, {viaMacroBytes: 10327});
-    const next = macroInputStatus(current, {keycode: "VIA_MACRO_0", payload}, {featureFlags: 1 << 27, viaMacroBytes: 34903});
-    assert.equal(old.code, "MACRO_TOO_LONG");
-    assert.equal(old.programMax, 512);
-    assert.equal(next.error, "");
-    assert.equal(next.programMax, null);
+    assert.equal(macroInputStatus(current, {keycode: "VIA_MACRO_0", payload}, {viaMacroBytes: 34903}).error, "");
 });

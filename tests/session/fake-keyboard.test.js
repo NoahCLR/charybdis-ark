@@ -53,7 +53,8 @@ for (const [name, document] of [["the compiled pointing profile", document32()],
             const profileChunks = keyboard.requests.filter(request => request[0] === 0x08 && request[2] === 4 && (request[4] || request[5]));
             assert.equal(profileChunks.length, Math.ceil(Buffer.from(document.profile, "base64").length / 25),
                 "the shared capture downloads committed bytes once");
-            assert.ok(keyboard.requests.length > 500, "the whole keyboard was read over the wire");
+            assert.ok(keyboard.requests.length > 100, "the whole keyboard was read over the wire");
+            assert.ok(keyboard.requests.some(request => request[0] === 8 && request[2] === 0x0c), "macros are read through the keyboard's macro read map");
             assert.equal(keyboard.requests.filter(request => request[0] === 8 && request[1] === 0 && request[2] === 6).length,
                 3 + 2 * loop.session.service.combos.rows.length, "one verified combo capture feeds both views");
             assert.deepEqual(loop.session.service.layout.layers.flatMap(({layer, keys}) => keys.map(key => key.keycode)),
@@ -113,7 +114,7 @@ test("the fake keyboard runs current firmware, and refuses to serve an older pro
     const {fakeKeyboard} = require("../fixtures/fake-keyboard");
     const source = pdProfile.document(), profile = Buffer.from(source.profile, "base64");
     profile[9] = 2; // Retired RGB envelope version.
-    assert.throws(() => fakeKeyboard({document: {...source, profile: profile.toString("base64")}}), /older firmware/);
+    assert.throws(() => fakeKeyboard({document: {...source, profile: profile.toString("base64")}}), /format current firmware does not store/);
 });
 
 for (const compiledOnly of [false, true]) {

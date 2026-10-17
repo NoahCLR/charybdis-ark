@@ -29,21 +29,3 @@ for (const theme of ["plain", "vscode-light", "vscode-dark"]) {
             mustHold: false, mustTap: true, ordered: true, enabled: true, allowedLayers: 3});
     });
 }
-
-test("older firmware exposes a disabled per-combo switch and no editable global switch", async ({page}) => {
-    await openControls(page, "settings", {settingsOpen: ["comboSettings"]});
-    await page.evaluate(async () => {
-        const store = await import("/webview/store.mjs");
-        const model = structuredClone(store.getModel());
-        model.participation.comboOutputBehaviorsSupported = false;
-        model.configDefaults.find(section => section.id === "comboSettings").fields
-            .find(field => field.macro === "comboOutputBehaviors").readOnly = true;
-        store.setModel(model); store.render();
-    });
-    await expect(page.locator('[data-f="setting:comboOutputBehaviors"]')).toHaveCount(0);
-    await page.locator('[data-screen="keys"]').click();
-    await page.locator('[data-tab="combos"]').click();
-    await page.getByRole("button", {name: "New combo", exact: true}).click();
-    await expect(page.locator('[data-output-behavior]')).toBeDisabled();
-    expect(await posted(page)).toEqual([]);
-});

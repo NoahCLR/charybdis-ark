@@ -16,7 +16,6 @@ export interface CoordinatorOptions extends CandidateDriverOptions {
 export interface UploadOptions extends Partial<CandidateBlobOptions> {
     metadata?: CandidateMetadataInput;
     baseSource?: CandidateBaseSource;
-    streamChunks?: boolean;
     transactionId?: number;
     verifyBase?: () => Promise<void>;
     onProgress?: (progress: CandidateProgress) => void;
@@ -45,7 +44,6 @@ export interface UploadContext {
     transactionId?: number;
     expectedDigest?: number;
     peer?: CandidatePeer;
-    peerUnsupported?: boolean;
 }
 export type OperationContext = UploadContext & {transactionId: number; status: CandidateStatus};
 export type CommitContext = OperationContext & {expectedDigest: number};

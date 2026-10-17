@@ -22,12 +22,15 @@
 const {panelControl} = require("./panel-control-registry");
 const {canEdit, hasCurrentLayers} = require("./firmware-support");
 const {validateSnapshot, FILE_MAX_BYTES} = require("../model/portable-profile");
-const {translateBackup} = require("../model/backup-translation");
 const {DEMO_WORDS, panelCapabilities, panelState} = require("./demo-session");
 const {applyLayerEdit, discardDraftForDevice, layerEditDocument, observePortable, startLayerEdit} = require("./panel-session");
 const {closeEditors, whileApplying} = require("./panel-session-state");
 const {IDENTITY} = require("../model/layer-order");
 const {RECONNECT_WORDS, expectReconnect, renamedTo} = require("./keyboard-reconnect");
+
+// Ark reads only current firmware; the compatibility diagnostics say what
+// this keyboard's firmware lacks.
+const FIRMWARE_UPDATE = "This keyboard's firmware is not the current firmware, which is the only one Ark supports. Update both halves, then read the keyboard again. The keyboard has not been changed.";
 
 /** @template T @param {Host} host @param {string} title @param {() => Promise<T>} work */
 const run = (host, title, work) => host.progress ? host.progress(title, work) : work();
@@ -75,9 +78,9 @@ async function rereadKeyboard(service, onStep = () => {}) {
 // Connect if needed, then read what the keyboard runs. Each device read
 // rejects with what failed (and leaves it in the keyboard's state), which
 // fails the read and becomes the panel's notice. The notice says what was
-// read and what could not be: a failed complete capture falls back to the
-// independent reads, and a failed committed-profile read keeps the layout and
-// the optional reads.
+// read and what could not be: a keyboard not on current firmware is read no
+// further, a failed complete capture falls back to the independent reads, and
+// a failed committed-profile read keeps the layout and the optional reads.
 /** @param {Session} session @param {string | undefined} selectedDeviceId @param {Host} [host] */
 async function readKeyboard(session, selectedDeviceId, host = {}) {
     const service = session.service;
@@ -99,14 +102,22 @@ async function readKeyboard(session, selectedDeviceId, host = {}) {
         await service.connect(deviceId);
     }
     await service.refresh();
+    if (!canEdit(service.capabilities)) {
+        session.notice = FIRMWARE_UPDATE;
+        return false;
+    }
     let macroFailure = "", portable;
-    if (canEdit(service.capabilities)) {
-        try {portable = await run(host, "Reading the complete keyboard configuration", () => service.readKeyboardProfile());}
-        catch (error) {macroFailure = " Macros and global settings could not be read: " + /** @type {Error} */ (error).message;}
+    try {portable = await run(host, "Reading the complete keyboard configuration", () => service.readKeyboardProfile());}
+    catch (error) {
+        if (/** @type {Error & {code?: string}} */ (error).code === "FIRMWARE_UPDATE_REQUIRED") {
+            session.notice = /** @type {Error} */ (error).message;
+            return false;
+        }
+        macroFailure = " Macros and global settings could not be read: " + /** @type {Error} */ (error).message;
     }
     if (!portable) {
-        // Older or partially readable firmware still gets its independent
-        // diagnostics. A failed complete capture never opens an editable draft.
+        // A partly readable keyboard still gets its independent diagnostics.
+        // A failed complete capture never opens an editable draft.
         await run(host, "Reading layout from the keyboard", () => service.readLayout());
         // A failure stays in the keyboard's state, said below.
         await run(host, "Reading keyboard profile", () => service.readCommittedProfile()).catch(() => {});
@@ -232,7 +243,7 @@ const PORTABLE_ACTIONS = Object.freeze({
         const text = typeof chosen === "string" ? chosen : chosen.text;
         if (typeof text !== "string") throw new Error("This profile file could not be read.");
         if (Buffer.byteLength(text, "utf8") > FILE_MAX_BYTES) throw new Error("This profile file is too large.");
-        const value = validateSnapshot(translateBackup(text), panelCapabilities(session) || undefined);
+        const value = validateSnapshot(text, panelCapabilities(session) || undefined);
         session.portableReview = {document: value.document, fileName: typeof chosen === "string" ? null : chosen.name || null,
             before: session.draft?.current || await service.readPortableProfile({forRestore: true}), revision: session.draft?.revision,
             deviceId: panelState(session).selectedDeviceId, draftId: session.draft?.id};

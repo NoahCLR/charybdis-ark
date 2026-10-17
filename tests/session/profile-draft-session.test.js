@@ -249,18 +249,11 @@ test("bounded history and a new branch retain each step's time, label, document 
     assert.equal(macroEditorView(draft.current, draft.capabilities).viaMacros[0].payload, "branch");
 });
 
-test("draft staging translates the connected firmware's behaviour capabilities into model facts", () => {
+test("draft staging takes owned layer keys and QMK functions in a behaviour", () => {
     const {snapshot, caps} = fixture();
-    const {PROFILE_WIRE_FEATURES} = require("../../core/protocol/profile-wire-v1");
-    for (const [flag, name, code, refusal] of [
-        [PROFILE_WIRE_FEATURES.OWNED_LAYER_TOGGLES, "TG(2)", 0x5262, /MO\(layer\)/],
-        [PROFILE_WIRE_FEATURES.BEHAVIOR_QMK_FUNCTIONS, "DPI_MOD", 0x7e00, /only works as a key or a combo/],
-    ]) {
+    for (const [name, code] of [["TG(2)", 0x5262], ["DPI_MOD", 0x7e00]]) {
         const edit = {type: "saveBehavior", behavior: {keycode: "KC_F24", steps: [{tapCount: 0, tap: {helper: "TAP_SENDS", action: name}}]}};
-        const blocked = new ProfileDraftSession(snapshot, "board", {...caps, featureFlags: 0});
-        assert.throws(() => stage(blocked, edit), refusal);
-        assert.equal(blocked.current.fingerprint, snapshot.fingerprint);
-        const allowed = new ProfileDraftSession(snapshot, "board", {...caps, featureFlags: flag});
+        const allowed = new ProfileDraftSession(snapshot, "board", caps);
         stage(allowed, edit);
         const row = allowed.current.decoded.behaviors.rows.find(row => row.target.operand === 0x73);
         assert.ok(row, "the authored KC_F24 row is stored");
@@ -553,24 +546,14 @@ test("edits link by the layer they touched, so a reorder between them ties nothi
     assert.notEqual(groupOf(draft,"layout:3:0"),groupOf(draft,"layout:2:0"),"Navigation's keys are another edit");
 });
 
-test("draft checks use the connected firmware's physical gesture capability", () => {
-    const {snapshot, caps} = fixture();
-    const row = behaviorRowsForView(validateSnapshot(snapshot.document).behaviors).find(row => row.keycode.startsWith("LT("));
-    assert.ok(row, "fixture includes an authored layer-tap");
-    for (const fixed of [false, true]) {
-        const draft = new ProfileDraftSession(snapshot, "board", {...caps, featureFlags: fixed ? 1 << 17 : 0});
-        stage(draft, {type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: row.keycode}]});
-        assert.equal(draft.checks().some(check => check.kind === "gestureTiming" && check.place.keycode === row.keycode), !fixed);
-    }
-});
-
 function unicodeDraft(detected = 1) {
     const {snapshot, caps} = fixture();
-    snapshot.hostOs = {detected}; caps.featureFlags = 1 << 21;
+    snapshot.hostOs = {detected};
     return {snapshot, caps, draft:new ProfileDraftSession(snapshot, 'board', caps)};
 }
 test("Unicode survives real draft Review, history, undo/redo and an unrelated edit", () => {
-    const {draft,caps} = unicodeDraft();
+    // Windows, where Unicode playback is a switch: WinCompose enters what US cannot type.
+    const {draft,caps} = unicodeDraft(2);
     stage(draft,settings(draft,'host',{hostOs:'0',unicodeEnabled:true}));
     const text = ' café “hello” 🙂 e\u0301 👩‍💻 ';
     stage(draft,{type:'updateViaMacro',keycode:'VIA_MACRO_0',payload:text});
@@ -588,7 +571,6 @@ test("Unicode survives real draft Review, history, undo/redo and an unrelated ed
     const {profileReview} = require('../../core/model/profile-review');
     assert.doesNotThrow(()=>profileReview(next.baseSnapshot,next.current));
     assert.equal(validateSnapshot(next.document).document.macros[0],encoded);
-    assert.throws(()=>validateSnapshot(next.document,{...caps,featureFlags:0}),/ASCII/);
 });
 test("new detection refreshes dirty draft labels and Unicode gates without altering history or edits", () => {
     const {draft,snapshot,caps} = unicodeDraft(0);

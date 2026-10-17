@@ -43,14 +43,18 @@ behind it, which the loop answers to in place of the device service's state
 while it is open.
 
 `session/firmware-support.js` owns the firmware gates and their diagnostics.
-They answer different questions and retain different requirements:
+Ark supports only current firmware (D-L64): every feature it reports, named in
+`protocol/profile-wire-v1.js` as `CURRENT_FEATURES` and
+`CURRENT_MUTATION_FEATURES`, is required here, and no code past these gates
+asks whether a feature is there. They answer different questions and retain
+different requirements:
 
 | Predicate | Requirements |
 | --- | --- |
-| `canRead` / `evaluateProfileCompatibility` | Supported protocol/schema and VIA identity, report framing, status pages, read features, RGB and behaviour domains; advertised capacities and the action ABI are not compared |
-| `canEdit` (also exported as `supportsCompleteProfile`) | Current layer count, every registered profile domain and a known action ABI |
-| `canApply` | The complete-document gate plus atomic logical Apply support |
-| `evaluateLiveMutationCompatibility` | Connection and established read compatibility, persistent split mutation features, candidate chunk size, known and converged peer; it publishes the existing ordered reasons and recovery facts |
+| `canRead` / `evaluateProfileCompatibility` | Supported protocol/schema and VIA protocol 13, report framing, status pages, current firmware's features, RGB and behaviour domains; advertised capacities and the action ABI are not compared |
+| `canEdit` (also exported as `supportsCompleteProfile`) | Current layer count, every registered profile domain, a known action ABI and current firmware's features |
+| `canApply` | The complete-document gate plus every mutation feature current firmware reports, candidate reuse and streaming included |
+| `evaluateLiveMutationCompatibility` | Connection and established read compatibility, the mutation features, candidate chunk size, known and converged peer; it publishes the existing ordered reasons and recovery facts |
 | `editableDomains` | Independent view gates: complete idle read for behaviours/pointing, committed idle read for combos, current layers and the corresponding idle view for macros/settings, and an idle custom-key view |
 
 `canCapture` and `canReadIdentity` distinguish a stable backup from a base read
@@ -122,8 +126,11 @@ reuse behind a small interface. Its stateless protocol codec checks complete
 metadata identities, retries coherent reads and verifies CRC/FNV. `ProfileDeviceService` owns one reader per connection;
 `readKeyboardProfile` makes one coherent complete capture and uses its verified
 raw layout, active payload and live combos for the editor as well as the draft.
-It publishes completed data together; a failed capture falls back to independent
-read-only diagnostics and keeps the edit gate closed. Normal committed reads
+It publishes completed data together; a failed capture on current firmware
+falls back to independent read-only diagnostics and keeps the edit gate
+closed. A keyboard that is not on current firmware, by its features or by a
+stored schema or domain version (`FIRMWARE_UPDATE_REQUIRED`), is read no
+further. Normal committed reads
 always fetch bytes, including initial reads, post-Apply readback and standalone exports. Compiled defaults
 are immutable during a connection and use verified reuse; reconnect drops the
 reader. No Apply target or portable document seeds it.
@@ -134,8 +141,8 @@ profile, or from the compiled defaults (GET `0x05`) when nothing is committed,
 and combos and settings from their own live readbacks. The compiled read
 carries all five domains, but its combos are the authored ones and its settings
 the immutable factory ones, so neither ever stands in for what the keyboard
-runs, and no domain is taken twice. The retired legacy pointing-mode page
-(GET `0x09`, feature bit 13) is never read.
+runs, and no domain is taken twice. The retired pointing-mode page (GET
+`0x09`, feature bit 13) is never read.
 
 Custom Profile Wire pages use one monotonically increasing nonzero request-id
 sequence per connected session (wrapping `255` to `1`), so a delayed response
@@ -185,7 +192,7 @@ written before the first device write, the profile is staged on both halves
 through the candidate mailbox (`protocol/profile-candidate-v1.js`,
 `session/candidate-upload-coordinator.js`) and the peer VIA stage
 (`session/logical-via-stage-coordinator.js`), and one generation is published.
-Every candidate is schema 3.0 in logical store format 3 (`NR`), bound to the
+Every candidate is schema 3.0 in logical store format 5 (`NT`), bound to the
 VIA store generation and digest it publishes with: `candidateMetadataForBlob`
 refuses a missing binding or a zero generation or digest before anything is
 sent, and there is no custom-only format 0.
@@ -198,7 +205,8 @@ host refuses edits rather than writing them directly.
 ## Byte formats
 
 `schema/profile-domains.js` owns each domain's ID, model key, version, wire
-capability bit, review area and codecs. Envelope validation, candidate masks,
+capability bit, review area and codecs: the one place a domain is added or its
+version bumped. Each domain is read and written in that one version. Envelope validation, candidate masks,
 portable encoding, device decoding, usage and partial reverts read that registry.
 Codec loading is deferred so this metadata stays available to the envelope and
 the codecs themselves. `replaceDomain` rewrites one payload while preserving
@@ -233,15 +241,10 @@ these identities for every registered domain.
 `schema/profile-blob-v1.js` encodes and strictly decodes the `NLP1` header and
 its ordered domain envelopes, the four-byte semantic action values, and the
 FNV-1a 32-bit and CRC32 helpers. It accepts schema 3.0 only; unknown domains
-and retired domain versions are rejected. Complete snapshots use sixteen layers
-and the current 32-slot action vocabulary. The preceding eight-layer format is
-translated before import review by `model/backup-translation.js` (D-L54). Its
-backup-revision metadata admits the historical schema and domain versions;
-each admitted domain then follows consecutive translation steps keyed by the
-version each step produces, ending at the domain registry's current version.
-A later domain bump adds a step to that chain. Historical steps retain their
-own output layouts. Missing intermediate steps and future versions are refused;
-current documents still bypass translation. The domain codecs —
+and every other domain version are rejected, and `decodeStoredProfileBlob`
+says so to a keyboard storing one. Complete snapshots use sixteen layers and
+the current 32-slot action vocabulary; an older backup is refused, never
+translated (D-L54, D-L64). The domain codecs —
 `rgb-domain-v1.js`, `key-behavior-domain-v1.js`,
 `combo-domain-v1.js`, `pd-mode-domain-v1.js`, `settings-domain-v1.js` — are
 exact inverses of their decoders, under the canonical check above, and enforce

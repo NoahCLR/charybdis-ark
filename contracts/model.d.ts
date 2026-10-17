@@ -97,8 +97,6 @@ export type MacroTypingRoute =
     | {character: string; method: 'unicode' | 'unavailable'; mode: number};
 export interface MacroInspection {
     bytes: number | null;
-    program: number | null;
-    programMax: number | null;
     availableBytes: number;
     error: string;
     code: string;
@@ -197,7 +195,6 @@ export interface HistoryStep {
 }
 export interface Participation {
     comboOutputBehaviors?: boolean;
-    comboOutputBehaviorsSupported?: boolean;
     behaviorsEnabled: boolean;
     combosEnabled: boolean;
     behaviorLayers: number;

@@ -18,7 +18,6 @@ const {requestHandled} = require("./via-unhandled-v1");
 const {
     PROFILE_WIRE_V1,
     ProfileWireProtocolError,
-    assertPagesReachable,
     buildProfileGetRequest,
     decodeProfileResponse,
     profileResponseMatcher,
@@ -35,8 +34,8 @@ const PROFILE_PAYLOAD_V1 = Object.freeze({
     METADATA_PAGE: 0,
     METADATA_SIZE: 21,
     DEFAULT_GENERATION_RETRIES: 3,
-    // A page index is 16 bits (feature bit 19): a full 65,504-byte payload is
-    // 2,621 chunks.
+    // A page index is 16 bits (feature bit 19): a full 53,216-byte payload is
+    // 2,129 chunks.
     MAX_CHUNKS: 0xffff,
 });
 
@@ -103,7 +102,6 @@ async function readProfilePayload(connection, value, options = {}, previous) {
 
     for (let attempt = 0; attempt <= retries; attempt += 1) {
         const metadata = decodePayloadMetadata(await requestPage(connection, value, PROFILE_PAYLOAD_V1.METADATA_PAGE, requestIds, options));
-        assertPagesReachable(1 + chunkCount(metadata), options.widePages);
         const reused = previous && sameMetadata(previous.metadata, metadata);
         const total = reused ? 0 : chunkCount(metadata);
         const bytes = reused ? Buffer.from(previous.bytes) : Buffer.alloc(metadata.payloadLength);
@@ -171,7 +169,7 @@ function verify(bytes, metadata) {
 
 /** @param {import("../transport/types.js").RequestConnection} connection @param {number} value @param {number} page @param {import("./types.js").RequestIds} requestIds @param {import("./types.js").PayloadReadOptions} options */
 async function requestPage(connection, value, page, requestIds, options) {
-    const request = buildProfileGetRequest(value, page, requestIds.next(), {widePages: options.widePages});
+    const request = buildProfileGetRequest(value, page, requestIds.next());
     const response = await requestHandled(connection, request, {
         matchResponse: profileResponseMatcher,
         signal: options.signal,

@@ -23,16 +23,14 @@ export interface PayloadState {
 export interface FakeKeyboardOptions {
     document: PortableDocument;
     compiled?: Buffer;
-    streaming?: boolean;
-    macroReadMap?: boolean;
     compiledOnly?: boolean;
     peerKnown?: boolean;
     generation?: number;
     firmwareVersion?: number;
     brightnessMax?: number;
     options?: ReturnType<typeof import('./keyboard-options.js').wire>;
-    /** 7: firmware before custom-key shortcuts, storing settings v7. */
-    settingsVersion?: 7 | 8;
+    /** The version its settings readback reports; any but 8 is firmware Ark does not read. */
+    settingsVersion?: number;
 }
 export interface FakeKeyboard {
     requests: Buffer[];

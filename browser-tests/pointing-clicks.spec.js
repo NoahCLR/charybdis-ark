@@ -6,11 +6,12 @@ const {fingerprint, summary, validateSnapshot} = require("../core/model/portable
 const {ProfileDraftSession} = require("../core/session/profile-draft-session");
 const {buildSnapshotModel} = require("../core/session/device-model");
 const {draftBinding} = require("../core/session/panel-session-state");
+const {PROFILE_WIRE_KNOWN_MASKS} = require("../core/protocol/profile-wire-v1");
 
 for (const theme of ["vscode-dark", "vscode-light"]) {
-    test(`pointing picks post and stage mouse buttons 3/4 with the firmware gate (${theme})`, async ({page}) => {
+    test(`pointing picks post and stage mouse buttons 3/4 (${theme})`, async ({page}) => {
         const value = document();
-        const capabilities = {compiledLayerCount: 16, supportedDomainMask: 31, actionAbiDigest: value.actionAbiDigest, featureFlags: 1 << 28};
+        const capabilities = {compiledLayerCount: 16, supportedDomainMask: 31, actionAbiDigest: value.actionAbiDigest, featureFlags: PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES};
         const draft = new ProfileDraftSession({document: value, fingerprint: fingerprint(value), summary: summary(value)}, "board", capabilities);
         const connection = {connected: true, selectedDeviceId: "board", capabilities};
         const publish = async () => {
@@ -46,17 +47,5 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
         }
         expect(draft.changes().find(row => row.unit === "pd:4").fields.filter(field => ["Left", "Right"].includes(field.label)).map(field => field.after))
             .toEqual(["Mouse Button 3 · Inherit modifiers", "Mouse Button 4 · Inherit modifiers"]);
-
-        // The same editor on legacy firmware retains the draft data but offers
-        // no new clicks; Review blocks Apply rather than substituting keys.
-        capabilities.featureFlags = 0;
-        draft.acceptCapabilities(capabilities);
-        await publish();
-        expect(draft.hasBlockers()).toBe(true);
-        await expect(page.locator(".pd-editor")).toContainText("firmware cannot click mouse buttons");
-        await page.locator('label:has(input[data-f="pointing:4:dir:left"]) button').click();
-        const picker = page.getByRole("dialog", {name: "Pick a keycode"});
-        await picker.locator('[data-f="picker:search"]').fill("mouse button");
-        await expect(picker.locator("[data-pick]")).toHaveCount(0);
     });
 }

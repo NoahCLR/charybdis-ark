@@ -40,8 +40,6 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
     /** @type {{rows: Row[]}} */
     const {rows} = decodeKeyBehaviorDomain(payload, profileDepthOptions(capabilities).behaviors);
     const knownAbi = knownActionAbi(capabilities.actionAbiDigest ?? 0);
-    const ownsLayerKeys = Boolean(capabilities.ownedLayerToggles);
-    const behaviorQmkFunctions = Boolean(capabilities.behaviorQmkFunctions);
     /** @param {Action} action */
     const native = action => action.kind === ACTION.QMK_KEYCODE ? action.operand
         : knownAbi ? nativeCode(action) : undefined;
@@ -53,7 +51,7 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
     const layerCount = capabilities.compiledLayerCount ?? 16;
     /** @param {Row[]} rows */
     const checkPlacements = (rows) => {
-        const problem = behaviorPlacementProblem(rows, {layerCount, behaviorQmkFunctions});
+        const problem = behaviorPlacementProblem(rows, {layerCount});
         if (problem) throw invalid(problem);
     };
     /** @param {Row[]} rows */
@@ -73,10 +71,8 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
             // Where an owned layer keycode may go is checked with the rest of the
             // row (behaviorPlacementProblem); only keycodes the keyboard does not
             // run through its layer ownership are refused here.
-            if (keycodes.resolve(encoded).kind === "layer" && !(ownsLayerKeys && isOwnedLayerCode(encoded, capabilities.compiledLayerCount ?? 0))) {
-                throw invalid(ownsLayerKeys
-                    ? "DF and PDF are not supported: layer 0 stays the base. Use MO, TG, TO, TT, OSL or LOCK_LAYER."
-                    : "Use MO(layer) or LOCK_LAYER(layer) so the keyboard can track layer ownership.");
+            if (keycodes.resolve(encoded).kind === "layer" && !isOwnedLayerCode(encoded, capabilities.compiledLayerCount ?? 0)) {
+                throw invalid("DF and PDF are not supported: layer 0 stays the base. Use MO, TG, TO, TT, OSL or LOCK_LAYER.");
             }
             result = {kind: ACTION.QMK_KEYCODE, operand: encoded};
         } else {

@@ -7,7 +7,7 @@ const {DEMO_CAPABILITIES, DEMO_DEVICE_ID, demoProfile, demoSnapshot, demoState} 
 const {fingerprint, summary} = require("../../core/model/portable-profile");
 const {document} = require("../fixtures/pd-profile");
 
-const capabilities = {compiledLayerCount: 16, supportedDomainMask: 31, actionAbiDigest: 0x837cf479, featureFlags: 0};
+const capabilities = {compiledLayerCount: 16, supportedDomainMask: 31, actionAbiDigest: 0x837cf479, featureFlags: require("../../core/protocol/profile-wire-v1").PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES};
 const snapshot = () => {
     const doc = document();
     return {document: doc, fingerprint: fingerprint(doc), summary: summary(doc), limits: {brightnessMax: 200}};
@@ -27,8 +27,7 @@ test("each thing that stands between the draft and an edit is named", () => {
     assert.equal(reason(withDraft(), connected({connectionToken: 2})), "connection-changed");
     assert.equal(reason(withDraft(), connected({connectionToken: undefined})), "connection-changed", "no token is not the draft's token");
     assert.equal(reason(withDraft(), connected({capabilities: {...capabilities, compiledLayerCount: 5}})), "unsupported");
-    assert.equal(reason(withDraft(), connected({olderDomains: [{id: 0x40, version: 7}]})), "older-firmware", "a keyboard storing settings v7 takes no edit (D-L63)");
-    assert.equal(reason(withDraft(), connected({olderDomains: []})), "");
+    assert.equal(reason(withDraft(), connected({capabilities: {...capabilities, featureFlags: capabilities.featureFlags & ~(1 << 30)}})), "unsupported", "firmware without a current feature takes no edit");
     const stale = withDraft();
     stale.draft.noteConnection(9);
     assert.equal(reason(stale, connected()), "stale");

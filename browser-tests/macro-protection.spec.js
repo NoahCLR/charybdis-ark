@@ -11,7 +11,6 @@ const fs = require("node:fs");
 for (const theme of ["vscode-dark", "vscode-light"]) {
     test(`macro protection defaults to Unicode entry and its override posts and reviews (${theme})`, async ({page}) => {
         const {snapshot, capabilities} = hostMacros(1 | (2 << 16), ["é"]);
-        capabilities.featureFlags |= (1 << 23) | (1 << 26);
         const draft = new ProfileDraftSession(snapshot, "board", capabilities);
         const connection = {connected: true, selectedDeviceId: "board", capabilities};
         const publish = async () => {
@@ -57,18 +56,5 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
         await expect(policy.locator("option:checked")).toHaveText("Automatic · on");
         await policy.scrollIntoViewIfNeeded();
         await page.screenshot({path: `/tmp/ark-macro-protection-${theme}.png`, fullPage: true});
-        const previous = {...connection, capabilities: {...capabilities, featureFlags: capabilities.featureFlags & ~(1 << 26)}};
-        const previousDraft = new ProfileDraftSession(snapshot, "board", previous.capabilities);
-        await page.evaluate(async patch => {const store = await import("/webview/store.mjs"); store.setModel({...store.getModel(), ...patch}); store.render();},
-            {...buildSnapshotModel(previousDraft.current, previousDraft.capabilities, draftBinding({draft: previousDraft}, previous), previous), draft: {...previousDraft.view(previous), ...draftBinding({draft: previousDraft}, previous)}});
-        await expect(policy).toBeEnabled();
-        await expect(page.locator('[data-macro-editor]')).toContainText("Update both halves to suspend keys already held");
-        await expect(page.locator('[data-macro-editor]')).toContainText("Release ordinary keys before starting");
-        const legacy = {...connection, capabilities: {...capabilities, featureFlags: (1 << 21) | (1 << 22)}};
-        const legacyDraft = new ProfileDraftSession(snapshot, "board", legacy.capabilities);
-        await page.evaluate(async patch => {const store = await import("/webview/store.mjs"); store.setModel({...store.getModel(), ...patch}); store.render();},
-            {...buildSnapshotModel(legacyDraft.current, legacyDraft.capabilities, draftBinding({draft: legacyDraft}, legacy), legacy), draft: {...legacyDraft.view(legacy), ...draftBinding({draft: legacyDraft}, legacy)}});
-        await expect(policy).toBeDisabled();
-        await expect(page.locator('[data-macro-editor]')).toContainText("Update both halves to protect macro playback");
     });
 }

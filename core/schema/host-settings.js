@@ -4,16 +4,12 @@ const {hostLayout, hostLayouts, US_HOST_LAYOUT, HOST_LAYOUT_COUNT} = require("..
 
 // Settings scalar 27: bits 0..1 the host OS (Auto, macOS, Windows, Linux),
 // bit 8 Unicode playback, bits 16..23 the host layout and bit 24 a Mac that
-// classified the keyboard as ISO. Feature bit 21 gates the word, bit 22 the
-// layout and ISO bits.
+// classified the keyboard as ISO.
 const HOST_SETTING = 27, UNICODE_ENABLED = 0x100;
 const LAYOUT_SHIFT = 16, LAYOUT_MASK = 0xff0000, MACOS_ISO = 0x1000000;
 const HOST_SETTING_BITS = 0x103 | LAYOUT_MASK | MACOS_ISO;
-const HOST_LAYOUT_FEATURE = 1 << 22;
 const MACOS = 1;
 const OS_OF = [null, "macos", "windows", "linux"];
-/** @param {{featureFlags?: number} | null | undefined} capabilities */
-const supportsHostLayouts = capabilities => Boolean((capabilities?.featureFlags ?? 0) & HOST_LAYOUT_FEATURE);
 /** @param {number} v */
 const validHostSetting = v => (v & ~HOST_SETTING_BITS) === 0 && ((v & LAYOUT_MASK) >>> LAYOUT_SHIFT) < HOST_LAYOUT_COUNT;
 
@@ -68,5 +64,4 @@ function followHostOs(values, before, detected) {
     values[HOST_SETTING] = ((values[HOST_SETTING] & ~LAYOUT_MASK) | (layoutForOs(next.layout, next.effective) << LAYOUT_SHIFT)) >>> 0;
     return values;
 }
-module.exports = {HOST_SETTING, UNICODE_ENABLED, LAYOUT_SHIFT, LAYOUT_MASK, MACOS_ISO, HOST_SETTING_BITS, HOST_LAYOUT_FEATURE,
-    supportsHostLayouts, validHostSetting, hostSettings, layoutFits, layoutForOs, followHostOs};
+module.exports = {HOST_SETTING, UNICODE_ENABLED, LAYOUT_SHIFT, LAYOUT_MASK, MACOS_ISO, HOST_SETTING_BITS, validHostSetting, hostSettings, layoutFits, layoutForOs, followHostOs};

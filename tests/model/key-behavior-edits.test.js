@@ -81,8 +81,8 @@ test("stable semantic actions and standard shortcuts do not require a known cust
     const unknown = {...capabilities, actionAbiDigest: 0};
     for (const row of views) assert.deepEqual(edit({type: "saveBehavior", behavior: row}, unknown), payload);
     assert.equal(rowFor(edit({type: "saveBehavior", behavior: form()}, unknown), "KC_A").steps[0].tap.operand, 0x0811);
-    // DPI_MOD is a native keycode, not a custom action, but a behaviour cannot send it.
-    assert.throws(() => edit({type: "saveBehavior", behavior: {...form(), steps: [{tapCount: 0, tap: {helper: "TAP_SENDS", action: "DPI_MOD"}}]}}, unknown), /only works as a key or a combo/);
+    // DPI_MOD is a native keycode, not a custom action.
+    assert.equal(rowFor(edit({type: "saveBehavior", behavior: {...form(), steps: [{tapCount: 0, tap: {helper: "TAP_SENDS", action: "DPI_MOD"}}]}}, unknown), "KC_A").steps[0].tap.operand, 0x7e00);
 });
 
 test("invalid edits and references are rejected before upload", () => {
@@ -91,7 +91,7 @@ test("invalid edits and references are rejected before upload", () => {
     for (const steps of [undefined, [{tapCount: 5}], [{tapCount: 0}, {tapCount: 0}], [{tapCount: 0, tap: {helper: "" , action: "KC_A"}}], [{tapCount: 0, tap: {helper: "BOGUS", action: "KC_A"}}]]) {
         assert.throws(() => save({...form(), steps}));
     }
-    for (const action of ["", "UNKNOWN", "MO(8)", "LOCK_LAYER(16)", "VIA_MACRO_128", "MACRO_16", "TG(2)", "G(MO(2))"]) {
+    for (const action of ["", "UNKNOWN", "MO(16)", "LOCK_LAYER(16)", "VIA_MACRO_128", "MACRO_16", "DF(2)", "G(MO(2))"]) {
         assert.throws(() => save({...form(), steps: [{tapCount: 0, tap: {helper: "TAP_SENDS", action}}]}), undefined, action);
     }
     for (const repeatHz of ["", "0", "101", "-1", "2.5"]) assert.throws(() => save({...form(), steps: [{tapCount: 0, hold: {helper: "REPEAT_WHILE_HELD", action: "KC_A", repeatHz}}]}));
@@ -140,33 +140,30 @@ test("retargeting onto a key with its own row needs a choice: overwrite or swap"
     assert.deepEqual(edit({...message, conflict: "swap"}, capabilities, swapped), payload);
 });
 
-test("retargeting refuses a missing row, its own key and raw layer keycodes", () => {
+test("retargeting refuses a missing row, its own key and layer keycodes the keyboard does not own", () => {
     const [first] = views;
     assert.throws(() => edit({type: "retargetBehavior", keycode: "KC_F24", target: "KC_A"}), /no longer present/);
     assert.throws(() => edit({type: "retargetBehavior", keycode: first.keycode, target: first.keycode}), /already listens/);
-    assert.throws(() => edit({type: "retargetBehavior", keycode: first.keycode, target: "TG(2)"}), /MO\(layer\)/);
+    assert.throws(() => edit({type: "retargetBehavior", keycode: first.keycode, target: "DF(2)"}), /DF and PDF are not supported/);
 });
 
-test("a keyboard reporting behaviour QMK functions accepts DPI and other QMK functions in every behaviour position", () => {
-    const sending = {...capabilities, behaviorQmkFunctions: true};
-    const save = (step, caps) => edit({type: "saveBehavior", behavior: {...form(), steps: [{tapCount: 0, ...step}]}}, caps);
+test("behaviours send DPI and other QMK functions in every position", () => {
+    const save = (step) => edit({type: "saveBehavior", behavior: {...form(), steps: [{tapCount: 0, ...step}]}});
     const stepOf = (output) => rowFor(output, "KC_A").steps[0];
     for (const [name, code] of [["DPI_MOD", 0x7e00], ["S_D_RMOD", 0x7e03], ["QK_RGB_MATRIX_TOGGLE", 0x7842], ["QK_BOOT", 0x7c00]]) {
-        assert.throws(() => save({tap: {helper: "TAP_SENDS", action: name}}, capabilities), /only works as a key or a combo/, `${name} without the capability`);
-        assert.equal(stepOf(save({tap: {helper: "TAP_SENDS", action: name}}, sending)).tap.operand, code, name);
+        assert.equal(stepOf(save({tap: {helper: "TAP_SENDS", action: name}})).tap.operand, code, name);
     }
     // SNIPING holds sniping while held, as it does on a key.
-    assert.equal(stepOf(save({hold: {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "SNIPING", repeatHz: ""}}, sending)).hold.action.operand, 0x7e04);
+    assert.equal(stepOf(save({hold: {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "SNIPING", repeatHz: ""}})).hold.action.operand, 0x7e04);
 });
 
-test("a keyboard that owns its layer keys accepts TG, TO, TT and OSL in behaviours where they can run", () => {
-    const owning = {...capabilities, ownedLayerToggles: true};
+test("behaviours take TG, TO, TT and OSL where they can run, through the keyboard's layer ownership", () => {
+    const owning = capabilities;
     const save = (step, caps) => edit({type: "saveBehavior", behavior: {...form(), steps: [{tapCount: 0, ...step}]}}, caps);
     const tap = action => ({tap: {helper: "TAP_SENDS", action}});
     const hold = (helper, action) => ({hold: {helper, action, repeatHz: ""}});
     const stepOf = (output) => rowFor(output, "KC_A").steps[0];
     for (const [name, code] of [["TG(2)", 0x5262], ["TO(0)", 0x5200], ["OSL(2)", 0x5282]]) {
-        assert.throws(() => save(tap(name), capabilities), /MO\(layer\)/, `${name} without the capability`);
         const action = stepOf(save(tap(name), owning)).tap;
         assert.deepEqual({kind: action.kind, operand: action.operand}, {kind: 1, operand: code}, name);
     }

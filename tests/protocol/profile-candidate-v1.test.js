@@ -194,8 +194,8 @@ test("candidate status uses normal request correlation and decodes structured lo
 test("candidate codecs reject noncanonical padding, invalid bounds, and unknown status values", () => {
     const fixtures = goldenFixtures();
     assert.throws(() => buildCandidateChunkRequest(1, 0, Buffer.alloc(0)), /1 through 20/);
-    assert.throws(() => buildCandidateChunkRequest(1, 65500, Buffer.alloc(20)), /end at or before/);
-    assert.equal(buildCandidateChunkRequest(1, 65484, Buffer.alloc(20)).readUInt16LE(5), 65484, "the last chunk of a full slot");
+    assert.throws(() => buildCandidateChunkRequest(1, 53200, Buffer.alloc(20)), /end at or before/);
+    assert.equal(buildCandidateChunkRequest(1, 53196, Buffer.alloc(20)).readUInt16LE(5), 53196, "the last chunk of a full slot");
     assert.throws(() => buildCandidateAbortRequest(0), /nonzero/);
 
     const badAck = Buffer.from(fixtures["begin-queued-ack"]);
@@ -234,7 +234,7 @@ test("metadata is derived from the canonical blob and its exact domain mask", ()
     assert.equal(metadata.requestedDomains, 1);
     assert.equal(metadata.payloadLength, blob.length);
     assert.equal(metadata.actionAbiDigest, 0x12345678);
-    assert.equal(metadata.storeFormatVersion, 4);
+    assert.equal(metadata.storeFormatVersion, 5);
     assert.notEqual(metadata.crc32, metadata.digest);
     assert.throws(
         () => candidateMetadataForBlob(blob, {actionAbiDigest: 1, requestedDomains: 2, ...binding}),
@@ -242,12 +242,12 @@ test("metadata is derived from the canonical blob and its exact domain mask", ()
     );
 });
 
-test("every candidate begin binds the target VIA identity in store format 4", () => {
+test("every candidate begin binds the target VIA identity in store format 5", () => {
     const blob = encodeProfileBlob({schema: SCHEMA_3, domains: []});
     const metadata = candidateMetadataForBlob(blob, {actionAbiDigest: 0x12345678, ...binding});
     const report = buildCandidateBeginRequest(0x4321, metadata);
     assert.equal(report[5], 3);
-    assert.equal(report[23], 4);
+    assert.equal(report[23], 5);
     assert.equal(report.readUInt32LE(24), 9);
     assert.equal(report.readUInt32LE(28), 0x89abcdef);
 });
@@ -271,25 +271,25 @@ test("a candidate without a nonzero VIA binding fails before anything is sent", 
     assert.throws(() => buildCandidateBeginRequest(1, {...metadata, viaDigest: 0}), unbound);
 });
 
-test("the custom-only store format 0, and formats other than 4 and 5 are refused", () => {
+test("every store format but current firmware's 5 is refused, the custom-only format 0 included", () => {
     const blob = encodeProfileBlob({schema: SCHEMA_3, domains: []});
     const metadata = candidateMetadataForBlob(blob, {actionAbiDigest: 1, ...binding});
-    for (const storeFormatVersion of [0, 1, 2, 3, 6, undefined]) {
+    for (const storeFormatVersion of [0, 1, 2, 3, 4, 6, undefined]) {
         assert.throws(() => buildCandidateBeginRequest(1, {...metadata, storeFormatVersion}), /store format/);
     }
     // Format 0 carried no binding; dropping it as well changes nothing.
     assert.throws(() => buildCandidateBeginRequest(1, {...metadata, storeFormatVersion: 0, viaGeneration: 0, viaDigest: 0}), /store format/);
 });
 
-test("only schema 3.0 candidates are built, up to the 65,504-byte payload", () => {
+test("only schema 3.0 candidates are built, up to the 53,216-byte payload", () => {
     const schema1 = Buffer.from("4e4c503101000001", "hex");
     assert.throws(() => candidateMetadataForBlob(schema1, {actionAbiDigest: 1, ...binding}), (error) => error.code === "INCOMPATIBLE_SCHEMA");
     const metadata = candidateMetadataForBlob(encodeProfileBlob({schema: SCHEMA_3, domains: []}), {actionAbiDigest: 1, ...binding});
     assert.throws(() => buildCandidateBeginRequest(1, {...metadata, schemaMajor: 1}), (error) => error.code === "INCOMPATIBLE_SCHEMA");
     assert.throws(() => buildCandidateBeginRequest(1, {...metadata, schemaMinor: 1}), (error) => error.code === "INCOMPATIBLE_SCHEMA");
     assert.throws(() => candidateMetadataForBlob(Buffer.from("4e4c503102000001", "hex"), {actionAbiDigest: 1, ...binding}), (error) => error.code === "INCOMPATIBLE_SCHEMA");
-    assert.equal(buildCandidateBeginRequest(1, {...metadata, payloadLength: 65504}).readUInt16LE(9), 65504);
-    assert.throws(() => buildCandidateBeginRequest(1, {...metadata, payloadLength: 65505}), /payload length/);
+    assert.equal(buildCandidateBeginRequest(1, {...metadata, payloadLength: 53216}).readUInt16LE(9), 53216);
+    assert.throws(() => buildCandidateBeginRequest(1, {...metadata, payloadLength: 53217}), /payload length/);
 });
 
 test("request and transaction id allocators wrap without emitting zero", () => {
@@ -325,7 +325,7 @@ function peerPayload() {
     payload.writeUInt32LE(2, 12);
     return payload;
 }
-test("candidate status page 1 reports the copy to the other half, and older firmware reports nothing", async () => {
+test("candidate status page 1 reports the copy to the other half", async () => {
     let ids = 0x50;
     const reply = (options) => ({async request(actual) { return peerResponse(actual, options); }});
     const peer = await readCandidatePeerStatus(reply({payload: peerPayload()}), {nextRequestId: () => ids++});
@@ -341,7 +341,7 @@ test("candidate status page 1 reports the copy to the other half, and older firm
     const waiting = peerPayload(); waiting[3] = 0x06;
     assert.equal((await readCandidatePeerStatus(reply({payload: waiting}), {nextRequestId: () => ids++})).waitingSafeBoundary, true);
 
-    assert.equal(await readCandidatePeerStatus(reply({status: 2}), {nextRequestId: () => ids++}), null, "UNKNOWN_PAGE is 'not reported'");
+    await assert.rejects(readCandidatePeerStatus(reply({status: 2}), {nextRequestId: () => ids++}), {code: "DEVICE_REJECTED"}, "a refused page is an error");
 
     for (const [offset, value, pattern] of [[1, 10, /phase/], [2, 11, /peer status/], [3, 0x08, /flag/], [18, 8, /busy detail/], [19, 10, /busy detail/], [20, 3, /busy detail/], [21, 3, /busy detail/], [22, 1, /reserved/]]) {
         const payload = peerPayload();
@@ -350,13 +350,8 @@ test("candidate status page 1 reports the copy to the other half, and older firm
     }
 });
 
-test("streaming firmware selects format 5 and its smaller payload while legacy candidates keep format 4", () => {
+test("a candidate fits the capacity the keyboard reports", () => {
     const blob = encodeProfileBlob({schema: SCHEMA_3, domains: []});
-    const newer = candidateMetadataForBlob(blob, {actionAbiDigest: 1, ...binding, capabilities: {featureFlags: 1 << 27, maxProfilePayload: 53216}});
-    assert.equal(newer.storeFormatVersion, 5);
-    assert.equal(buildCandidateBeginRequest(1, newer)[23], 5);
-    assert.equal(buildCandidateBeginRequest(1, {...newer, payloadLength: 53216}).readUInt16LE(9), 53216);
-    assert.throws(() => buildCandidateBeginRequest(1, {...newer, payloadLength: 53217}), /format-5 capacity/);
-    const old = candidateMetadataForBlob(blob, {actionAbiDigest: 1, ...binding, capabilities: {featureFlags: 0, maxProfilePayload: 65504}});
-    assert.equal(buildCandidateBeginRequest(1, {...old, payloadLength: 65504})[23], 4);
+    assert.equal(candidateMetadataForBlob(blob, {actionAbiDigest: 1, ...binding, capabilities: {maxProfilePayload: blob.length}}).payloadLength, blob.length);
+    assert.throws(() => candidateMetadataForBlob(blob, {actionAbiDigest: 1, ...binding, capabilities: {maxProfilePayload: blob.length - 1}}), /capacity/);
 });

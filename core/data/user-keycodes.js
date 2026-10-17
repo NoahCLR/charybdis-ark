@@ -13,7 +13,8 @@
 
 const CUSTOM_KEY_BASE = 0x7f00, PD_HOLD_BASE = 0x7e80, PD_LOCK_BASE = 0x7ea0, LAYER_LOCK_BASE = 0x7ec0;
 const CUSTOM_KEY_SLOTS = 128, LAYER_LOCK_SLOTS = 16;
-// Where custom keys were before D-F14: a backup from then names them here.
+// The block custom keys used before D-F14, now inert: nothing there is a
+// custom key.
 const RETIRED_CUSTOM_KEY_BASE = 0x7e40, RETIRED_CUSTOM_KEY_SLOTS = 64;
 
 /** @param {number} slot */

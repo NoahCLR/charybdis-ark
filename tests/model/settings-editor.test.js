@@ -8,25 +8,22 @@ const {buildDeviceModel} = require("../../core/session/device-model");
 const {POINTER_DPI} = require("../../core/model/pointer-dpi");
 const snapshot = () => {const value = document(); return {document: value, fingerprint: fingerprint(value), limits: {brightnessMax: 200}};};
 
-test("macOS Unicode warnings follow the effective setup, including legacy US Unicode", () => {
+test("macOS Unicode warnings follow the effective setup, including US with the Unicode switch", () => {
     const {hostMacros} = require("../fixtures/host-macros");
-    const flags = (1 << 21) | (1 << 22);
-    for (const [word, detected, featureFlags, visible] of [
-        [1 | (3 << 16), 2, flags, true], // Explicit macOS UHI.
-        [3 << 16, 1, flags, true], // Auto detects macOS.
-        [0x101, 2, 1 << 21, true], // Legacy US with Unicode on.
-        [1 | (2 << 16), 1, flags, false], // Dutch uses native entry.
-        [0x101 | (2 << 16), 1, flags, false], // Switch does not enable entry on Dutch.
-        [1, 1, flags, false], // US without entry.
-        [2 | (3 << 16), 1, flags, false], // Effective Windows: the layout mismatch warns instead.
-        [3 << 16, 0, flags, false], // Unknown Auto.
-        [1 | (3 << 16), 1, 0, false], // Unsupported firmware.
+    for (const [word, detected, visible] of [
+        [1 | (3 << 16), 2, true], // Explicit macOS UHI.
+        [3 << 16, 1, true], // Auto detects macOS.
+        [0x101, 2, true], // US with Unicode on.
+        [1 | (2 << 16), 1, false], // Dutch uses native entry.
+        [0x101 | (2 << 16), 1, false], // Switch does not enable entry on Dutch.
+        [1, 1, false], // US without entry.
+        [2 | (3 << 16), 1, false], // Effective Windows: the layout mismatch warns instead.
+        [3 << 16, 0, false], // Unknown Auto.
     ]) {
-        const {snapshot, capabilities} = hostMacros(word, []);
+        const {snapshot} = hostMacros(word, []);
         snapshot.hostOs.detected = detected;
-        capabilities.featureFlags = featureFlags;
-        const host = settingsEditorView(snapshot, capabilities).sections.find(section => section.id === "host");
-        assert.equal(/Option\+Left/.test(host.warning || ""), visible, `Host word ${word}, detected ${detected}, capabilities ${featureFlags}`);
+        const host = settingsEditorView(snapshot).sections.find(section => section.id === "host");
+        assert.equal(/Option\+Left/.test(host.warning || ""), visible, `Host word ${word}, detected ${detected}`);
         if (visible) {
             assert.match(host.warning, /Option\+Left\/Right for word navigation/);
             assert.match(host.warning, /Ark does not switch your Mac's input source/);
@@ -36,21 +33,19 @@ test("macOS Unicode warnings follow the effective setup, including legacy US Uni
 
 test("WinCompose setup links follow the effective Windows host and enabled Unicode playback", () => {
     const {hostMacros} = require("../fixtures/host-macros");
-    for (const [word, detected, featureFlags, visible] of [
-        [0x102, 1, 1 << 21, true], // Manual Windows overrides macOS detection.
-        [0x100, 2, 1 << 21, true], // Auto uses Windows detection.
-        [2, 2, 1 << 21, false], // Unicode off.
-        [0x101, 2, 1 << 21, false], // Manual macOS overrides Windows detection.
-        [0x103, 2, 1 << 21, false], // Linux.
-        [0x100, 0, 1 << 21, false], // Unknown Auto.
-        [0x102, 2, 0, false], // Firmware without Unicode support.
+    for (const [word, detected, visible] of [
+        [0x102, 1, true], // Manual Windows overrides macOS detection.
+        [0x100, 2, true], // Auto uses Windows detection.
+        [2, 2, false], // Unicode off.
+        [0x101, 2, false], // Manual macOS overrides Windows detection.
+        [0x103, 2, false], // Linux.
+        [0x100, 0, false], // Unknown Auto.
     ]) {
-        const {snapshot, capabilities} = hostMacros(word, []);
+        const {snapshot} = hostMacros(word, []);
         snapshot.hostOs.detected = detected;
-        capabilities.featureFlags = featureFlags;
-        const host = settingsEditorView(snapshot, capabilities).sections.find(section => section.id === "host");
+        const host = settingsEditorView(snapshot).sections.find(section => section.id === "host");
         assert.deepEqual(host.githubLink, visible ? {label: "WinCompose on GitHub", url: "https://github.com/samhocevar/wincompose"} : undefined,
-            `Host word ${word}, detected ${detected}, capabilities ${featureFlags}`);
+            `Host word ${word}, detected ${detected}`);
     }
 });
 function message(current, sectionId, updates = {}) {
@@ -258,7 +253,6 @@ test("key options use masks supplied by the keyboard rather than assuming bitfie
 test("Key Options follows the effective host vocabulary, including unknown Auto and manual overrides", () => {
     for (const [detected, selected, alt, gui] of [[0,0,"Alt","GUI"], [1,0,"Option","Command"], [2,0,"Alt","Windows"], [3,0,"Alt","Super"], [1,3,"Alt","Super"]]) {
         const current = withSettings(settings => {settings.values[27] = selected;});
-        current.capabilities = {featureFlags: 1 << 21};
         current.hostOs = {detected};
         const fields = settingsEditorView(current).sections.find(({id}) => id === "keyboardOptions").fields;
         const label = macro => fields.find(field => field.macro === macro).label;
@@ -269,34 +263,30 @@ test("Key Options follows the effective host vocabulary, including unknown Auto 
     }
 });
 
-test("the Host section offers the effective OS's layouts and gates them on firmware support", () => {
+test("the Host section offers the effective OS's layouts", () => {
     const {document} = require("../fixtures/portable-profile");
     const {fingerprint} = require("../../core/model/portable-profile");
     const {settingsEditorView} = require("../../core/model/settings-editor");
     const current = {document: document(), fingerprint: fingerprint(document())};
-    const host = (detected, featureFlags) => settingsEditorView({...current, hostOs: {detected}}, {featureFlags}).sections.find(s => s.id === "host");
+    const host = detected => settingsEditorView({...current, hostOs: {detected}}).sections.find(s => s.id === "host");
     const fields = section => section.fields.map(field => field.macro);
-    const layouts = (1 << 21) | (1 << 22);
-    const mac = host(1, layouts);
+    const mac = host(1);
     assert.deepEqual(fields(mac), ["hostOs", "hostLayout", "macosIso"], "on macOS, Unicode entry is the Unicode Hex Input layout");
     assert.deepEqual(mac.fields[1].choices.map(choice => choice.label), ["US", "ABC (macOS)", "Dutch (macOS)", "Unicode Hex Input (macOS)", "British (macOS)", "German (macOS)", "French (macOS)"]);
-    const windows = host(2, layouts);
+    const windows = host(2);
     assert.deepEqual(fields(windows), ["hostOs", "hostLayout", "unicodeEnabled"]);
     assert.deepEqual(windows.fields[1].choices.map(choice => choice.value), [0, 7, 8, 9, 10]);
-    assert.equal(host(0, layouts).fields[1].choices.length, 15, "with no known OS, every layout");
-    const legacy = host(1, 1 << 21);
-    assert.equal(legacy.fields.find(field => field.macro === "hostLayout").readOnly, true);
-    assert.ok(fields(legacy).includes("unicodeEnabled"), "older firmware keeps the switch on macOS");
+    assert.equal(host(0).fields[1].choices.length, 15, "with no known OS, every layout");
+    assert.ok(windows.fields.every(field => !field.readOnly), "every Host field is editable");
 });
 
 test("choosing a Host OS carries the layout to that OS, and a mismatch left by Auto warns", () => {
     const {hostMacros} = require("../fixtures/host-macros");
-    const flags = (1 << 21) | (1 << 22);
-    const host = (current, capabilities) => settingsEditorView(current, capabilities).sections.find(section => section.id === "host");
+    const host = current => settingsEditorView(current).sections.find(section => section.id === "host");
     const choose = (word, detected, shown) => {
         const {snapshot: current, capabilities} = hostMacros(word, []);
         current.hostOs.detected = detected;
-        const section = host(current, capabilities);
+        const section = host(current);
         const next = editSettings(current, {sectionId: "host", expectedFingerprint: current.fingerprint,
             fields: section.fields.map(f => f.kind === "toggle" ? {macro: f.macro, enabled: f.enabled} : {macro: f.macro, value: shown[f.macro] ?? f.value})}, capabilities);
         return validateSnapshot(next).settings.values[27];
@@ -316,15 +306,12 @@ test("choosing a Host OS carries the layout to that OS, and a mismatch left by A
     // macro editor say so instead.
     const {snapshot: current, capabilities} = hostMacros(5 << 16, []);
     current.hostOs.detected = 2;
-    assert.match(host(current, capabilities).warning, /^German \(macOS\) is not a Windows layout, so macros may type the wrong characters on Windows/);
+    assert.match(host(current).warning, /^German \(macOS\) is not a Windows layout, so macros may type the wrong characters on Windows/);
     const {macroEditorView} = require("../../core/model/macro-editor");
     assert.equal(macroEditorView(current, capabilities).unicode.layoutFits, false);
     current.hostOs.detected = 1;
     assert.equal(macroEditorView(current, capabilities).unicode.layoutFits, true);
-    assert.equal(host(current, capabilities).warning, undefined);
-    capabilities.featureFlags = 1 << 21;
-    current.hostOs.detected = 2;
-    assert.equal(host(current, capabilities).warning, undefined, "firmware without layouts types US");
+    assert.equal(host(current).warning, undefined);
 });
 
 

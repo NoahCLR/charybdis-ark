@@ -32,9 +32,10 @@ test("local step focus metadata stays outside cached host parsing", () => {
 
 test("a new published model cannot reuse parsing under old host settings", () => {
     const read = createMacroReader();
-    const ascii = {macroUnicode: {supported: false}};
-    assert.match(read(ascii, "VIA_MACRO_0", "é", "grid").error, /ASCII/);
-    assert.equal(read({...ascii, macroUnicode: {supported: true}}, "VIA_MACRO_0", "é", "grid").error, "");
+    // A held key across text the layout cannot type is fine until Unicode entry is on.
+    const native = {macroUnicode: {mode: 0}};
+    assert.equal(read(native, "VIA_MACRO_0", "{+KC_A}é{-KC_A}", "grid").error, "");
+    assert.match(read({...native, macroUnicode: {mode: 1}}, "VIA_MACRO_0", "{+KC_A}é{-KC_A}", "grid").error, /Release ordinary keys/);
     const model = {macroPayloadKeycodes: ["KC_A"], qmkKeycodeAliases: {KC_ENT: "KC_ENTER"}};
     assert.match(read(model, "VIA_MACRO_0", "{KC_B}", "editor").error, /not a key/);
     assert.equal(read(model, "VIA_MACRO_0", "{KC_B}", "peek").error, "", "peek preserves its independent permissive parser");

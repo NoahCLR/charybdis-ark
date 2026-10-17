@@ -6,11 +6,12 @@ const {fingerprint, summary, validateSnapshot} = require("../core/model/portable
 const {ProfileDraftSession} = require("../core/session/profile-draft-session");
 const {buildSnapshotModel} = require("../core/session/device-model");
 const {draftBinding} = require("../core/session/panel-session-state");
+const {PROFILE_WIRE_KNOWN_MASKS} = require("../core/protocol/profile-wire-v1");
 
 for (const theme of ["vscode-dark", "vscode-light"]) {
     test(`pointing macro picks stage directions, diagonals and buttons (${theme})`, async ({page}) => {
         const value = document();
-        const capabilities = {compiledLayerCount: 16, supportedDomainMask: 31, actionAbiDigest: value.actionAbiDigest, featureFlags: 1 << 29};
+        const capabilities = {compiledLayerCount: 16, supportedDomainMask: 31, actionAbiDigest: value.actionAbiDigest, featureFlags: PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES};
         const draft = new ProfileDraftSession({document: value, fingerprint: fingerprint(value), summary: summary(value)}, "board", capabilities);
         const connection = {connected: true, selectedDeviceId: "board", capabilities};
         draft.stage({type: "updateViaMacro", keycode: "VIA_MACRO_0", payload: "777", name: "Greeting <&>", draftId: draft.id, draftRevision: draft.revision});
@@ -75,17 +76,5 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
         expect(message.config.buttons[1].tap).toEqual({keycode: "VIA_MACRO_0", modifierPolicy: 0, mask: 0});
         expect(validateSnapshot(draft.document).pdModes[4].buttons[1].tap.keycode).toBe(0x7700);
         await expect(page.locator(".pd-buttons")).toContainText("Inherit modifiers · the macro continues after its trigger");
-
-        // Both capability gates remain independent, and old firmware retains
-        // the imported outputs for review while offering no new macros.
-        capabilities.featureFlags = 1 << 28;
-        draft.acceptCapabilities(capabilities);
-        await publish();
-        expect(draft.hasBlockers()).toBe(true);
-        await page.locator('label:has(input[data-f="pointing:4:dir:left"]) button').click();
-        const legacyPicker = page.getByRole("dialog", {name: "Pick a keycode"});
-        await expect(legacyPicker.locator('[data-sec="macros"]')).toHaveCount(0);
-        await legacyPicker.locator('[data-f="picker:search"]').fill("Greeting");
-        await expect(legacyPicker.locator("[data-pick]")).toHaveCount(0);
     });
 }

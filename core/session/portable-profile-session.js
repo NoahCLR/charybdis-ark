@@ -2,15 +2,14 @@
 "use strict";
 const {readViaStorage, readRegion, writeRegion, writeViaMacros, changedRanges, viaStorageDigest, VIA_STORAGE, LAYOUT_BYTES} = require("../protocol/via-storage-v1");
 const {readSettings, readStorageStatus, waitForStorage} = require("../protocol/portable-profile-v1");
-const {readProfileStatus, supportsWidePages, PROFILE_ACTIVE_KIND, PROFILE_STATE_FLAGS, PROFILE_WIRE_FEATURES} = require("../protocol/profile-wire-v1");
+const {readProfileStatus, PROFILE_ACTIVE_KIND, PROFILE_STATE_FLAGS} = require("../protocol/profile-wire-v1");
 const {ProfilePayloadReader} = require("./profile-payload-reader");
 const {readDeviceCombos} = require("../protocol/combo-readback-v1");
 const {candidateMetadataForBlob, readCandidatePeerStatus, readCandidateStatus, CANDIDATE_STATE} = require("../protocol/profile-candidate-v1");
 const {ApplyProgress, failureReason} = require("./apply-progress");
 const {CandidateUploadCoordinator} = require("./candidate-upload-coordinator");
 const {LogicalViaStageCoordinator} = require("./logical-via-stage-coordinator");
-const {createSnapshot, validateSnapshot, materializeProfile, olderDomains, fingerprint, summary, reorderLayers} = require("../model/portable-profile");
-const {translateBackup} = require("../model/backup-translation");
+const {createSnapshot, validateSnapshot, materializeProfile, fingerprint, summary, reorderLayers} = require("../model/portable-profile");
 const {requireReady: checkFirmwareReady, supportsCompleteProfile, canCapture, canReadIdentity, identityStateFlags} = require("./firmware-support");
 const {encodeSettings} = require("../schema/settings-domain-v1");
 const {crc32, fnv1a32} = require("../schema/profile-blob-v1");
@@ -27,8 +26,6 @@ const {crc32, fnv1a32} = require("../schema/profile-blob-v1");
 const requireReady = checkFirmwareReady;
 /** @param {string} code @param {string} message */
 const fail = (code, message) => Object.assign(new Error(message), {code});
-// A keyboard that stores an older domain version is never written (D-L63).
-const OLDER_FIRMWARE = "This keyboard's firmware stores its profile in an older format than Ark writes, so Ark shows it read-only. Update both halves, then apply or restore. The keyboard has not been changed.";
 /** @param {import("./types.js").ProfileStatus} s */
 const statusKey = s => JSON.stringify([s.activeKind, s.activeDigest, s.activeGeneration, s.activeOriginHalf, s.committedDigest, s.committedGeneration, s.stateFlags]);
 /** @param {import("./types.js").ProfileStatus} s */
@@ -47,10 +44,10 @@ const snapshotIdentity = (profile, storage, settings) => ({profile: identityStat
 /** @param {Buffer} layout @param {Buffer} macros @param {Buffer} [profile] */
 const heldStorage = (layout, macros, profile) => ({layout: Buffer.from(layout), macros: Buffer.from(macros),
     ...(profile ? {profile: Buffer.from(profile)} : {})});
-/** @param {Capture} before @param {Caps} capabilities @returns {import("./types.js").CandidateBaseSource | undefined} */
-function candidateBaseSource(before, capabilities) {
+/** @param {Capture} before @returns {import("./types.js").CandidateBaseSource | undefined} */
+function candidateBaseSource(before) {
     const bytes = before.storage?.profile, status = before.status;
-    if (!(capabilities.featureFlags & PROFILE_WIRE_FEATURES.CANDIDATE_REUSE) || !bytes || !status
+    if (!bytes || !status
         || !(/** @type {number[]} */ ([PROFILE_ACTIVE_KIND.COMPILED_ONLY, PROFILE_ACTIVE_KIND.COMMITTED])).includes(status.activeKind)
         || fnv1a32(bytes) !== status.activeDigest) return undefined;
     // Compiled GET status has no committed half and leaves origin zero; REUSE
@@ -89,7 +86,7 @@ async function captureProfile(connection, ids, capabilities, onProgress = () => 
     {sleep, payloadReader = new ProfilePayloadReader(connection), reuseReadback = false} = {}) {
     requireReady(capabilities);
     if (payloadReader.connection !== connection) throw fail("PROFILE_CHANGED", "The profile reader belongs to another connection. Read the keyboard again.");
-    const options = {nextRequestId: () => ids.next(), widePages: supportsWidePages(capabilities)};
+    const options = {nextRequestId: () => ids.next()};
     onProgress("Reading the complete keyboard configuration");
     await requirePeer(connection, options);
     const storageBefore = await waitForStorage(connection, ids, {sleep}), before = await readProfileStatus(connection, options);
@@ -99,15 +96,12 @@ async function captureProfile(connection, ids, capabilities, onProgress = () => 
     const defaults = await payloadReader.readCompiled({...options, onProgress: counted("Reading compiled defaults")});
     const active = before.activeKind === PROFILE_ACTIVE_KIND.COMMITTED ? await payloadReader.readCommitted({...options, reuse: reuseReadback, onProgress: counted("Reading saved behaviours and lighting")}) : defaults;
     onProgress("Reading combos and global settings");
-    const combos = await readDeviceCombos(connection, options), settings = await readSettings(connection, ids, options);
+    const combos = await readDeviceCombos(connection, options), settings = await readSettings(connection, ids);
     const via = await readViaStorage(connection, {capabilities, allowIncomplete, nextRequestId: options.nextRequestId, storageIdentity: storageBefore, onProgress: progress =>
         counted(progress.region === "layout" ? "Reading keys and layers" : "Reading macros")(progress)});
     onProgress("Checking the complete read");
-    if (!settings.equals(await readSettings(connection, ids, options))) throw fail("PROFILE_CHANGED", "Keyboard settings changed during the backup. Read it again before continuing.");
+    if (!settings.equals(await readSettings(connection, ids))) throw fail("PROFILE_CHANGED", "Keyboard settings changed during the backup. Read it again before continuing.");
     const profile = materializeProfile(active.bytes, defaults.bytes, combos, settings);
-    // A keyboard storing an older domain is read through its translation, to
-    // be shown and backed up in the current format, never written (D-L63).
-    const older = olderDomains(active.bytes, defaults.bytes, settings);
     const after = await readProfileStatus(connection, options), storageAfter = await readStorageStatus(connection, ids);
     if (statusKey(before) !== statusKey(after) || !storageAfter.ready || storageBefore.generation !== storageAfter.generation || storageBefore.digest !== storageAfter.digest) throw fail("PROFILE_CHANGED", "The keyboard changed during the backup. Read it again before continuing.");
     if (allowIncomplete && via.macros.at(-1) !== 0) {
@@ -117,19 +111,19 @@ async function captureProfile(connection, ids, capabilities, onProgress = () => 
         return {document: {format: "charybdis-recovery-capture", version: 1, keyboard: "charybdis-4x6", actionAbiDigest: capabilities.actionAbiDigest,
             profile: profile.toString("base64"), layout: via.layout.toString("base64"), macros: via.macros.toString("base64")},
             fingerprint: `incomplete:${capabilities.actionAbiDigest}:${crc32(bytes)}:${fnv1a32(bytes)}`, summary: null, incomplete: true, status: after,
-            identity: snapshotIdentity(after, storageAfter, settings), ...(older.length ? {older} : {})};
+            identity: snapshotIdentity(after, storageAfter, settings)};
     }
     const document = createSnapshot({profile, via, actionAbiDigest: capabilities.actionAbiDigest});
     validateSnapshot(document, capabilities);
-    return {document, readback: {active, source: before.activeKind === PROFILE_ACTIVE_KIND.COMMITTED ? "committed" : "compiled", combos}, fingerprint: fingerprint(document), summary: summary(document), status: after, identity: snapshotIdentity(after, storageAfter, settings), storage: heldStorage(via.layout, via.macros, active.bytes), ...(older.length ? {older} : {})};
+    return {document, readback: {active, source: before.activeKind === PROFILE_ACTIVE_KIND.COMMITTED ? "committed" : "compiled", combos}, fingerprint: fingerprint(document), summary: summary(document), status: after, identity: snapshotIdentity(after, storageAfter, settings), storage: heldStorage(via.layout, via.macros, active.bytes)};
 }
-/** @param {Connection} connection @param {Ids} ids @param {{allowCandidate?: boolean, sleep?: (ms: number) => Promise<void>, widePages?: boolean}} [options] */
-async function readIdentity(connection, ids, {allowCandidate = true, sleep, widePages} = {}) {
+/** @param {Connection} connection @param {Ids} ids @param {{allowCandidate?: boolean, sleep?: (ms: number) => Promise<void>}} [options] */
+async function readIdentity(connection, ids, {allowCandidate = true, sleep} = {}) {
     const options = {nextRequestId: () => ids.next()};
     await requirePeer(connection, options);
     const storageBefore = await waitForStorage(connection, ids, {sleep}), before = await readProfileStatus(connection, options);
     if (!canReadIdentity(before, allowCandidate)) throw fail("KEYBOARD_NOT_READY", "The keyboard changed before the save could start.");
-    const settings = await readSettings(connection, ids, {widePages});
+    const settings = await readSettings(connection, ids);
     const after = await readProfileStatus(connection, options), storageAfter = await readStorageStatus(connection, ids);
     if (statusKey(before) !== statusKey(after) || !storageAfter.ready || storageBefore.generation !== storageAfter.generation || storageBefore.digest !== storageAfter.digest) throw fail("PROFILE_CHANGED", "The keyboard changed before the save could start.");
     return snapshotIdentity(after, storageAfter, settings);
@@ -275,7 +269,7 @@ async function restoreProfile(connection, ids, capabilities, input, {expectedFin
         const startedAt = Date.now();
         requireReady(capabilities);
         requireReady(capabilities, true);
-        const target = validateSnapshot(translateBackup(input), capabilities);
+        const target = validateSnapshot(input, capabilities);
         const document = target.document;
         const saveCopy = saveRecovery;
         if (typeof saveCopy !== "function") throw fail("RECOVERY_REQUIRED", "Save a recovery copy before restoring this keyboard.");
@@ -286,14 +280,13 @@ async function restoreProfile(connection, ids, capabilities, input, {expectedFin
         if (baseSnapshot?.document && baseSnapshot.identity && (baseSnapshot.incomplete || hasStorage(baseSnapshot, capabilities)) && (!expectedFingerprint || baseSnapshot.fingerprint === expectedFingerprint)) {
             if (!baseSnapshot.incomplete) validateSnapshot(baseSnapshot.document, capabilities);
             applyProgress.report("check", {detail: "Comparing with the reviewed profile"});
-            const liveIdentity = await readIdentity(connection, ids, {allowCandidate: false, sleep, widePages: supportsWidePages(capabilities)});
+            const liveIdentity = await readIdentity(connection, ids, {allowCandidate: false, sleep});
             if (identityKey(liveIdentity) !== identityKey(baseSnapshot.identity)) throw fail("PROFILE_CHANGED", "The keyboard changed since the restore was reviewed. Review it again.");
             before = baseSnapshot;
         } else {
             before = await captureProfile(connection, ids, capabilities, message => applyProgress.report("check", {detail: message}), false, true, {sleep});
         }
         if (expectedFingerprint && before.fingerprint !== expectedFingerprint) throw fail("PROFILE_CHANGED", "The keyboard changed since the restore was reviewed. Review it again.");
-        if (before.older?.length) throw fail("FIRMWARE_UPDATE_REQUIRED", OLDER_FIRMWARE);
         applyProgress.report("backup");
         const recovery = await saveCopy(before.document);
         if (!recovery) throw fail("RECOVERY_REQUIRED", "A recovery copy could not be saved. The keyboard has not been changed.");
@@ -317,10 +310,9 @@ async function restoreProfile(connection, ids, capabilities, input, {expectedFin
         let decisionObserved = false, commitRequested = false;
         try {
             applyProgress.report("upload");
-            prepared = await coordinator.upload(target.profile, {baseSource: candidateBaseSource(before, capabilities),
-                streamChunks: Boolean(capabilities.featureFlags & PROFILE_WIRE_FEATURES.CANDIDATE_STREAM),
+            prepared = await coordinator.upload(target.profile, {baseSource: candidateBaseSource(before),
                 metadata: candidateMetadataForBlob(target.profile, {capabilities, actionAbiDigest: capabilities.actionAbiDigest, viaGeneration: targetStorageGeneration, viaDigest: expectedStorageDigest}), verifyBase: async () => {
-                const identity = await readIdentity(connection, ids, {allowCandidate: true, sleep, widePages: supportsWidePages(capabilities)});
+                const identity = await readIdentity(connection, ids, {allowCandidate: true, sleep});
                 if (identityKey(identity) !== identityKey(beforeIdentity)) throw fail("PROFILE_CHANGED", "The keyboard changed before restore could start.");
             }});
             const candidate = prepared;

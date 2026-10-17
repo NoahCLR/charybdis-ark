@@ -41,15 +41,16 @@ matrix.
 | Product surface | Current state |
 | --- | --- |
 | Layout and 16 layers | Read/write keys, layer names and order; a reorder renumbers layer keys by default, any layer can be the base, and key labels follow the host layout (D-L15, D-L29, D-L37, D-L56) |
-| Key behaviours, combos and RGB | Read/write editors over the shared draft, with participation controls at every scope and capability-gated global/per-combo output behaviour permissions (D-L12, D-L32, D-L49, D-L55) |
-| Macros | 128 VIA macros renamed directly through their titles; empty canvas with direct step actions, fixed-size sequence tiles, drag reordering across the whole sequence, Delete/Backspace step removal, per-slot step undo/redo and a shared step clipboard, a selected-step editor, a raw-payload toolbar toggle and live validation, including visible invalid hold order; recorder scoped to its visible slot with taps/chords by default and optional hold timing alongside its other settings; capability-gated Unicode text, typed and checked through the host's OS and keyboard layout; per-macro input protection; one shared memory, shown and enforced (D-L25, D-L26, D-L56, D-L57) |
+| Key behaviours, combos and RGB | Read/write editors over the shared draft, with participation controls at every scope and global/per-combo output behaviour permissions (D-L12, D-L32, D-L49, D-L55) |
+| Macros | 128 VIA macros renamed directly through their titles; empty canvas with direct step actions, fixed-size sequence tiles, drag reordering across the whole sequence, Delete/Backspace step removal, per-slot step undo/redo and a shared step clipboard, a selected-step editor, a raw-payload toolbar toggle and live validation, including visible invalid hold order; recorder scoped to its visible slot with taps/chords by default and optional hold timing alongside its other settings; Unicode text, typed and checked through the host's OS and keyboard layout; per-macro input protection; one shared memory, shown and enforced (D-L25, D-L26, D-L56, D-L57) |
 | Custom keys | 128 named keys, each with an optional shortcut (one key and any modifiers, sides mixed) as its own action and a behaviour on top: rename, set or clear the shortcut, edit the behaviour on the same screen whether or not the key is placed, place, see where each is used; behaviour steps may send one's shortcut (D-L42, D-L63) |
 | Mouse | Pointer and sniping DPI, auto-sniping and auto-mouse, settings the core files under Mouse, so the rail, the review and import counts all place them there; the auto-mouse fade is a share of the timeout, edited on its lighting stage (D-L17) |
-| Pointing modes | 32 device-owned slots in the sparse PD domain (D-L41, D-L54); capability-gated mouse-button 1–8 clicks and VIA macro outputs from directions, diagonals and tap overrides, with destination blockers in Review; see [the editor contract](architecture/interface-contracts.md#pointing-tap-outputs) and [PD-mode domain v1](../upstream/firmware/docs/architecture/pd-mode-domain-v1.md) |
-| Global policy | Every other portable setting, including startup layers, combo matching, Host and device-reported lighting and key options; the lighting idle timeout is edited in seconds or minutes; unsupported firmware features stay read-only (D-L18, D-L56) |
+| Pointing modes | 32 device-owned slots in the sparse PD domain (D-L41, D-L54); mouse-button 1–8 clicks and VIA macro outputs from directions, diagonals and tap overrides; see [the editor contract](architecture/interface-contracts.md#pointing-tap-outputs) and [PD-mode domain v1](../upstream/firmware/docs/architecture/pd-mode-domain-v1.md) |
+| Global policy | Every other portable setting, including startup layers, combo matching, Host and device-reported lighting and key options; the lighting idle timeout is edited in seconds or minutes; key options the firmware build leaves out stay read-only (D-L18, D-L56) |
 | Keyboard name | The keyboard's own name, its USB product string, edited on Settings and stored in the settings domain; an Apply that renames it is followed through the keyboard's USB restart (D-L62) |
-| Backup and restore | Complete current-format snapshots, import review against the keyboard, recovery file and verified restore; the preceding eight-layer backup is translated before review (D-L15, D-L23, D-L54) |
+| Backup and restore | Complete current-format snapshots, import review against the keyboard, recovery file and verified restore; older formats are refused, never converted (D-L15, D-L23, D-L54, D-L64) |
 | Drafts and Apply | One draft with item-by-item review, discard by edit group, Show, undo/redo and history; the review checks reachable actions, confirms warnings and traps and blocks what the destination cannot save; Apply names its steps and halves and says where a failure happened (D-L19, D-L23, D-L29, D-L30, D-L36, D-L60, D-L61) |
+| Firmware supported | Current firmware only: every feature it reports is required, and a keyboard on anything older is read no further than its identity and told to update (D-L64) |
 | Recovery | Atomic logical Apply, differential custom and VIA transfer, reboot recovery fencing, firmware roll-forward after the decision, resume after a lost or power-cycled peer link, bounded cancel owned by the keyboard (D-L20–D-L22, D-L27, D-L39, D-L58) |
 | Where it runs | The VS Code extension, and a web page in Chrome or Edge over WebHID; Cloudflare Git integration publishes `dev` to `ark-dev.ncleroy.dev`, `main` to `ark.ncleroy.dev`, and task branches to PR previews; a phone gets only a notice (D-L02, D-L52) |
 | Demo without a keyboard | The bundled demo profile in a real draft, in both hosts: every screen editable and reviewed, Apply refused, Export saves the draft (D-L53) |
@@ -81,10 +82,8 @@ Remaining before calling the product complete:
 - **Custom key shortcuts need keyboard acceptance (D-L63).** Set a mixed-side
   shortcut, a modifier-only one and a key-only one, apply, read back and hold
   each on both halves; put a behaviour on the key and send it from another
-  key's behaviour step and as a bypassed combo output. Before flashing, read a
-  keyboard still on settings v7: it is shown read-only and exports a backup
-  that restores after the update. Automated tests use the firmware's fixtures
-  and fake adapters only.
+  key's behaviour step and as a bypassed combo output. Automated tests use the
+  firmware's fixtures and fake adapters only.
 
 - **Combo output permissions need keyboard acceptance (D-L55).** Confirm global
   and per-combo bypass, including two combos sharing an output, custom outputs
@@ -98,6 +97,9 @@ Remaining before calling the product complete:
   recovery restore, and another keyboard already using the target name.
   Automated tests use fake adapters only.
 
+- **Refusing older firmware needs keyboard acceptance (D-L64).** Read a
+  keyboard on an older firmware release and confirm Ark names the update and
+  reads nothing it could edit, in VS Code and in Chrome.
 - **Sparse macro read timing needs hardware acceptance (D-L23).** Compare
   first read, Refresh and Export with mostly empty and full macro banks, and
   after shortening a macro. Automated counts prove reduced transfer volume;
@@ -208,10 +210,7 @@ layer keycodes and below the user range: the DPI and sniping keys, RGB Matrix,
 Magic, `QK_BOOT`) as a synthetic QMK record, so they run as on a key, and says
 so with Profile Wire feature bit 15. A key whose own keycode is one keeps a
 plain key's fallback hold: with only a double-tap branch on `SNIPING`, holding
-it still holds sniping, as with no behaviour at all. Older firmware sent them through
-`tap_code16()`, which keeps only the low byte (`DPI_MOD` sent nothing), so
-against a keyboard without bit 15 the app refuses them in a behaviour's target,
-tap or hold (`behaviorEmitProblem` in `core/schema/actions.js`).
+it still holds sniping, as with no behaviour at all.
 
 The picker offers only what does something on this keyboard. It leaves out
 retired user macros and inert `QK_USER_0`–`QK_USER_31` entries, the Charybdis
@@ -318,8 +317,8 @@ The standard image reserves 16 layers; base stays at index zero and the app
 moves overlays and rewrites references together. The action ABI describes the
 engine vocabulary independently of authored rows, so empty and populated
 builds advertise the same ABI. The old five-layer snapshot bridge is retired
-(D-L40). Ark edits current portable snapshots and translates the immediately preceding
-eight-layer backup before Import review (D-L54). No firmware is flashed by the app.
+(D-L40). Ark edits current portable snapshots and refuses older ones (D-L54,
+D-L64). No firmware is flashed by the app.
 
 Choose profile and dropping one file onto the Import profile card open the
 same validated review in both hosts and in the demo. Dropping is available only
@@ -353,9 +352,8 @@ not unapplied changes. Closing the editor loses the draft.
 
 ### D-L20 — Differential Apply
 
-The VIA macro bank is 34,903 bytes (10,327 on earlier firmware) and a 32-byte
-Raw HID report carries 28 data bytes, so one complete macro read is 1,247
-exchanges (369 before); the old path read the
+The VIA macro bank is 34,903 bytes and a 32-byte Raw HID report carries 28
+data bytes, so one complete macro read is 1,247 exchanges; the old path read the
 profile four times and rewrote the whole bank. Apply now verifies and reuses
 the snapshot already loaded as its recovery base, uses custom, VIA and settings
 identities for the compare-and-swap checks, writes only changed 28-byte blocks
@@ -392,18 +390,13 @@ the user flow is in the [guide](GUIDE.md#applying-changes).
 ### D-L26 — Macro slots share one visible memory, and every slot says what fits
 
 All 128 slots share the keyboard's macro memory, whose size the keyboard
-reports (34,903 bytes on current firmware, 10,327 before the macro expansion;
-a key tap takes 3 bytes, ASCII text 1 byte per character, Unicode text its
-UTF-8 bytes). Firmware advertising streaming macro playback (feature bit 27,
-firmware D-F14) plays a stored macro in 512-byte windows, so the only limit on
-one macro is the free memory. Older firmware plays a macro only if it compiles
-into at most 512 bytes (`MACRO_PAYLOAD_IR_MAX_BYTES`), about 170 key taps; for
-it the app computes that size exactly (`macroProgramBytes`, checked against the
-firmware decoder by `run_macro_program_size_tests.sh`), refuses an edit past
-it, and marks a slot VIA wrote past it as too long.
-Reviewing a retained draft against a reconnected keyboard adopts the current
-firmware's capabilities and invalidates the draft's cached decoding and checks,
-so an upgrade or downgrade changes these limits before editing resumes.
+reports (34,903 bytes on current firmware; a key tap takes 3 bytes, ASCII text
+1 byte per character, Unicode text its UTF-8 bytes). The keyboard plays a
+stored macro in 512-byte windows (streaming macro playback, feature bit 27,
+firmware D-F14), so the only limit on one macro is the free memory.
+Reviewing a retained draft against a reconnected keyboard adopts its reported
+capabilities and invalidates the draft's cached decoding and checks before
+editing resumes.
 
 A portable profile stores macro streams, not a bank size. Restore pads them to
 the destination's bank or refuses them, naming how many bytes are over; a
@@ -438,25 +431,20 @@ app shows what a VIA edit left. The current settings version gives every macro
 name up to 32 UTF-8 bytes, following the shared counted-name contract; see the
 [portable profile](../upstream/firmware/docs/architecture/portable-profile-v1.md).
 
-Unicode-capable firmware (feature bit 21) accepts canonical UTF-8 text and
-settings scalar 27’s Host settings, without changing the settings shape:
-bits 0..1 select Auto/macOS/Windows/Linux; bit 8 independently enables Unicode.
-Ark requires the capability for Unicode edits and nonzero Host settings, preserving
-legacy ASCII editing. Non-ASCII scalars cost four compiled bytes each; text
-and backups preserve exact scalar sequences. Settings → Host owns both
+The keyboard accepts canonical UTF-8 text (feature bit 21) and settings
+scalar 27’s Host settings: bits 0..1 select Auto/macOS/Windows/Linux; bit 8
+independently enables Unicode. Text and backups preserve exact scalar
+sequences. Settings → Host owns both
 controls and shows detected/effective OS from the
 keyboard’s GET 0x0B readback. Auto follows that USB guess, with manual override
 and unknown fallback; it cannot confirm input setup. The macro screen links to
 Host settings. Both choices participate in draft review and history.
-Stored macro decoding and presentation preserve valid Unicode without a
-destination capability context, so capture, backup comparison, Review and
-history can read it. Write validation still enforces the destination capability.
 Detected OS metadata is volatile: a complete Read keyboard refreshes the
 current draft and its presentation caches without changing stored edits,
 history, revision or conflict fingerprints. Saved OS overrides remain part
 of the document and take precedence over that metadata.
-Host-layout firmware (feature bit 22) adds the keyboard layout to scalar 27
-(bits 16–23, with bit 24 for a macOS ISO keyboard); see D-L56.
+Scalar 27 also holds the keyboard layout (feature bit 22: bits 16–23, with
+bit 24 for a macOS ISO keyboard); see D-L56.
 See the [guide](GUIDE.md#text-macros). Physical host insertion remains
 an acceptance requirement, separate from codec and UI verification.
 
@@ -709,20 +697,13 @@ extension: it names the keyboard, not the app.
 
 ### D-L48 — Gesture timing advice follows firmware capability
 
-Profile Wire feature bit 17 identifies physical gesture timing. Without it,
-review and the behaviour editor warn when a reachable authored hold/repeat key
-is buffered by an enabled combo, or an authored layer-tap also waits for native
-QMK tapping. Advice names effective inherited timings and competing combo
-windows, using the connected profile and native combo reference-layer rules.
-It does not infer a safe timing from subtracting those windows.
-
-Warnings participate in the existing new/existing/fixed review and remain
-confirmable; they neither reject a legal profile nor rewrite its timings.
-Unknown offline timing semantics do not produce a firmware-defect claim. On a
-keyboard advertising bit 17, this legacy warning disappears. General guidance
-still explains double hold as press–release–press-and-hold, the released repeat
-gap, and tap/hold classification. Firmware buffering can postpone output even
-when it preserves physical gesture eligibility.
+Current firmware times gestures from physical presses (Profile Wire feature
+bit 17) and owns the tapping of authored LT(), MT() and OSM() rows (bit 18),
+and Ark requires both (D-L64). So Ark gives no advice about combo buffering
+or native QMK tap classification, which only firmware without them needed.
+General guidance still explains double hold as press–release–press-and-hold,
+the released repeat gap, and tap/hold classification. Firmware buffering can
+postpone output even when it preserves physical gesture eligibility.
 
 The firmware owns timing semantics (D-F01 in its direction); Ark consumes the
 capability, not source code. Hardware acceptance of a particular firmware build
@@ -856,36 +837,25 @@ the demo; with edits not exported since, the message must say the panel asked
 connected and no unapplied keyboard draft, and on a page that cannot reach a
 keyboard only where the host says so (`model.host.blocked.demo`).
 
-### D-L54 — Current live formats, with a preceding-backup bridge
+### D-L54 — Current live formats, and nothing older
 
 Ark's live codecs follow firmware D-F14: schema 3.0, RGB 4, key behaviours 2,
 combos 3, settings 8 (D-L62, D-L63) and sparse PD 3; 16 layers, 128 VIA macros and 128 custom
 keys; action vocabulary `0x837cf479`. Three capability pages report the wider
-counts, 64 KiB storage slots and 65,504-byte payload capacity. Candidate uploads
-use store format 4 and a nonzero VIA binding. Earlier live firmware remains
-read-only; Ark does not edit its domains or upload old bytes.
+counts, 52 KiB storage slots, a 53,216-byte payload capacity and a
+34,903-byte macro bank. Candidate uploads use store format 5 and a nonzero VIA
+binding. Each domain is read and written in that one version (D-L64).
 
 The connected firmware's advertised tap depth governs both behaviour steps
 and the RGB tap-branch palette throughout read, edit, history, reorder and
 partial Discard. Offline snapshots carry that depth in the counted RGB palette;
 import and Apply validate it against the destination's advertised limits.
 
-Import has one explicit bridge for the immediately preceding schema 2.0 backup
-with action ABI `0xf79c6151` (eight layers, 64 macros/custom keys, 32 pointing
-slots; RGB 3, behaviours 1, combos 2, settings 5 and PD 2). Translation preserves
-all fields, remaps native custom-key references by slot, adds transparent layers
-and empty name/macro slots, and enables every new participation policy. It
-first validates source records, action references, counts, names and macro
-capacity against that preceding format's limits, then validates the translated
-document under the current complete-profile contract
-before Import review. The connected keyboard and draft remain unchanged until
-Use as draft and then the existing recovery-first Apply flow. Demo file opening
-and restore use the same translator. Unknown versions and malformed input fail;
-there is no general historical upgrade chain or data-dropping fallback.
-
-Upgrading firmware changes storage geometry and starts from flashed defaults.
-Export with the preceding Ark first, flash the matched pair to both halves,
-then import and review that backup with this Ark. The guide carries these steps.
+Import, demo file opening and restore take only backups in these formats; an
+older schema, action vocabulary or domain version is refused, never
+translated, and malformed input fails without a data-dropping fallback.
+Upgrading to firmware that changes the stored format starts from flashed
+defaults; backups from before it no longer import. The guide says so.
 
 ### D-L55 — Participation controls edit policy, preserving definitions
 
@@ -900,13 +870,12 @@ with their layers. Disabling retains definitions and timing. A bypassed native
 key falls through normally; a bypassed custom key sends its shortcut, or
 nothing without one (D-L63).
 
-Supporting firmware also exposes a default-on global **Combo outputs use
-behaviours** switch in Settings → Combos and **Use output behaviour** per combo.
-These veto shared behaviour use by generated outputs independently of chord
-participation. Native outputs fall through; a custom output sends its shortcut, or nothing without one (D-L63).
-Zero-default and preceding backups retain the former opt-in behaviour. Feature
-bit 30 gates editing and restoration of bypasses; no domain version, scalar
-count or action ABI changes. Review, history, section Discard, backups, layer
+The firmware also exposes (feature bit 30) a default-on global **Combo outputs
+use behaviours** switch in Settings → Combos and **Use output behaviour** per
+combo. These veto shared behaviour use by generated outputs independently of
+chord participation. Native outputs fall through; a custom output sends its
+shortcut, or nothing without one (D-L63). Zero-default backups retain the
+former opt-in behaviour. Review, history, section Discard, backups, layer
 rewrites and reach checks preserve both permissions. See
 [interface-contracts.md](architecture/interface-contracts.md#combo-output-behaviour-permissions).
 
@@ -923,8 +892,8 @@ fixture through `upstream/` and generates `core/data/host-layouts.json` from it
 the fixture's character table and never re-derives it, so what the editor
 accepts and what the keyboard types cannot disagree.
 
-Settings → Host offers the layouts of the effective OS, plus US, behind feature
-bit 22; older firmware shows the layout read-only at US. The keyboard types
+Settings → Host offers the layouts of the effective OS, plus US (feature
+bit 22). The keyboard types
 through the layout whatever the OS, so a Host edit that changes the effective
 OS carries the layout along (`followHostOs` in `core/schema/host-settings.js`):
 kept if it is US or that OS's, else that OS's layout of the same language, else
@@ -934,7 +903,7 @@ entry needs the Unicode Hex Input source, so it is a layout choice there, not a
 switch; the switch stays for Windows and Linux. The macro editor refuses a
 character the layout cannot type unless Unicode entry is available, naming it,
 and refuses an ordinary key held across text that needs Unicode entry, as the
-keyboard's preflight does. On Unicode-capable firmware, Settings → Host links
+keyboard's preflight does. Settings → Host links
 to WinCompose's GitHub project with the shared GitHub mark when the effective
 OS is Windows and Unicode playback is enabled (Auto follows detection).
 When macOS Unicode entry is selected, the Host section warns that an active
@@ -970,27 +939,25 @@ and Review groups that derived effect with Host; explicit overrides are macro
 changes and discard with their slot. Ignored presses are never replayed, and
 the explanation distinguishes keyboard-output isolation from a host input lock.
 Feature bit 26 extends bit 23 with immediate isolation of already-held ordinary
-keys and unrelated keyboard output. On supporting firmware the explanation says
-that held modifiers resume and suspended ordinary keys require release and a
-fresh press. Older bit-23 firmware retains the earlier warning to release keys
-before starting; neither explanation promises protection from another keyboard,
-pointing or consumer/media actions.
+keys and unrelated keyboard output, so the explanation says that held
+modifiers resume and suspended ordinary keys require release and a fresh
+press; it does not promise protection from another keyboard, pointing or
+consumer/media actions.
 
 The optional canonical prefix belongs to the macro bytes. Text/name edits
 preserve it, metadata-only empty slots keep their reserve, and bank accounting
-includes its three bytes while playback accounting excludes it. Portable decode
-preserves overrides without a destination; staging and Apply require the
-capability. The app does not pretend older firmware enforces protection.
+includes its three bytes while playback accounting excludes it.
 
 ### D-L58 — Transfer less, validate the complete saved result
 
-On firmware advertising D-F18's candidate-reuse and streaming capabilities,
-Apply plans changes against the exact raw active profile retained by the coherent
-capture, rather than the portable document's materialized live settings. Domains
+Current firmware reuses and streams candidate data (D-F18; feature bits 24 and
+25, which Ark requires to Apply). Apply plans changes against the exact raw
+active profile retained by the coherent capture, rather than the portable
+document's materialized live settings. Domains
 are aligned by identity so resizing one preserves reuse of unchanged later
 ones. Firmware copies unchanged ranges into its inactive candidate; the host
-sends short or changed ranges. A missing or mismatched source uses a full upload.
-Older firmware uses the original chunk path. Compiled defaults are an
+sends short or changed ranges. A missing or mismatched source streams the whole
+profile. Compiled defaults are an
 origin-independent reuse source: translate the status page's unused origin to
 REUSE's sentinel `255`, keeping generation zero. Committed sources keep their
 reported generation and physical origin. The captured status and stale-base
@@ -1113,28 +1080,24 @@ capture is observed once. A standalone export captures the current keyboard
 without replacing the editor snapshot or its views; this keeps an export from
 moving the draft's comparison behind the user's edits.
 
-The same module adapts independent device reads for an earlier firmware or
-partial capture (`buildDeviceModel`). Both inputs share configuration
+The same module adapts independent device reads for a partial capture
+(`buildDeviceModel`). Both inputs share configuration
 presentation, but a draft never fabricates a `LayoutRead`, `CommittedRead` or
 base RGB read to pass through the device adapter. The keyboard header and
 diagnostics use the actual device state throughout; local changes only add
 the existing draft subtitle. The demo supplies its own explicit header and
-diagnostics (D-L53). Earlier firmware keeps its independent read-only view
+diagnostics (D-L53). A partial capture keeps its independent read-only view
 and domain failures even when a dirty draft is retained.
 
 ### D-L62 — The keyboard is named in its profile, and its restart is expected
 
-The keyboard's own name is the 273rd counted name in settings domain 0x40,
-version 7 (firmware D-F14's name rule: up to 32 bytes of UTF-8, no control
+The keyboard's own name is the 273rd counted name in settings domain 0x40
+(since version 7; firmware D-F14's name rule: up to 32 bytes of UTF-8, no control
 characters), after the layer, macro and custom-key names. Empty means the
 firmware's built-in name (QMK `keyboard_name`); the firmware serves the
 effective name as its USB product string. Because it is profile data, it is
 edited in the draft (`renameKeyboard`, `core/model/keyboard-name.js`), reviewed
-as Keyboard name, discarded on its own and kept in backups. A settings v6
-document, from the eight-layer translation or a current-format backup, gains an
-empty name in one translation step (`core/model/backup-translation.js`); a
-keyboard still storing v6 is older firmware, read-only as any older domain
-version is (D-L63).
+as Keyboard name, discarded on its own and kept in backups.
 
 Labels follow one rule (`deviceLabels` in `core/session/device-model.js`): a
 listed keyboard is called by the product name it reports, and the connected
@@ -1178,17 +1141,9 @@ domain 0x40, version 8: 128 two-byte records after the layer records, custom
 key 0 first, each an 8-bit HID report modifier mask (bit 0 Left Ctrl … bit 7
 Right GUI, any combination) and one key, none, a basic key `0x04..0xa4` or a
 mouse button `0xd1..0xd8`. Both zero is no shortcut; modifiers alone and a key
-alone are shortcuts. Ark writes version 8 only
-(`core/schema/settings-domain-v1.js`), and a version 7 backup gains 128 empty
-shortcuts in one translation step (`core/model/backup-translation.js`), so it
-restores as it behaved. A keyboard still storing an older domain version, as
-firmware before D-F26 stores settings 7, is read through the same translation
-(`READABLE_DOMAIN_VERSIONS`, `materializeProfile` and `olderDomains` in
-`core/model/portable-profile.js`) and is older firmware, read-only (D-L54): no
-draft opens on it (`older-firmware` in `draftBinding`), its screens show the
-keyboard's own model with the reason, the Shortcut field offers nothing, and
-Apply and restore refuse it before the recovery copy. An export from it is a
-current-format backup with no shortcuts.
+alone are shortcuts. Ark reads and writes version 8 only
+(`core/schema/settings-domain-v1.js`): a keyboard or backup storing settings 7,
+from before D-F26, is not current firmware and is refused (D-L64).
 
 The shortcut is edited on the Custom keys screen beside the name, through the
 custom key editor (`updateCustomKeyShortcut`, `core/model/custom-key-editor.js`):
@@ -1228,6 +1183,50 @@ behaviour, so behaviours never chain. The firmware does not check that such a
 step's key has a shortcut; Ark warns in Review
 (`shortcutlessCustomKeyStep`, `core/model/profile-checks.js`) rather than
 refusing what the keyboard accepts.
+
+### D-L64 — Ark supports only current firmware
+
+Ark reads, edits, applies and restores only what the current firmware release
+stores and reports, and converts nothing. Firmware and Ark are one stack
+(D-L50): each Ark release is built against a firmware release, and an older
+keyboard is updated rather than accommodated.
+
+What current firmware is lives in one place per kind.
+`core/schema/profile-domains.js` registers each profile domain with the one
+version it is read and written in. `core/protocol/profile-wire-v1.js` names
+every Profile Wire feature and groups what current firmware reports:
+`CURRENT_FEATURES` (what it reads and plays), `CURRENT_MUTATION_FEATURES`
+(what a build that saves profiles adds) and `CURRENT_PAIR_FEATURES` (all the
+flashable pair reports, which the demo and test keyboards report too). Store
+format 5 and the 53,216-byte payload are in `profile-candidate-v1.js`, VIA
+protocol 13 in `VIA_READS`. `core/session/firmware-support.js` requires them:
+`canEdit` needs current layers, every domain, the known action ABI and every
+current feature; `canApply` adds the mutation features; the compatibility
+diagnostic lists what a keyboard lacks. Past those gates no code asks whether
+a feature is there.
+
+A keyboard that fails them, or stores a schema or domain in another version
+(`decodeStoredProfileBlob` and `readSettings` raise `FIRMWARE_UPDATE_REQUIRED`),
+is read no further than its identity: no independent reads, no draft, and a
+notice to update both halves. A backup in another format is refused at
+Import, in the demo and at restore. Independent per-area reads remain only for
+current firmware whose complete capture failed.
+
+The next firmware that adds a feature or bumps a domain version reaches Ark as
+one change to these tables, its codec and tests, pinned and released with it
+(D-L44, D-L50); the agreement check fails a firmware that does not report
+every feature Ark requires. A firmware update that changes the stored format
+starts the keyboard from flashed defaults, and backups from before it no
+longer import.
+
+This replaces the read-only display of older keyboards (formerly in D-L63),
+the preceding-backup translation (formerly in D-L54) and every per-feature
+fallback: ASCII-only macros, US-only host layouts, the 512-byte macro program
+limit, store format 4 with its 64 KiB slots and 10,327-byte macro bank, narrow
+pages, one-at-a-time candidate chunks, uploads without reuse, missing
+settings-limit, option and macro-map pages, the combo-output, click and macro
+blockers, and the gesture-timing advice for firmware without physical timing
+(D-L48).
 
 ## Historical decisions
 

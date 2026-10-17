@@ -20,15 +20,13 @@ test("a row carries its key's built-in first tap and hold, named as a person rea
         keepsAutoMouseAnchored: false, steps: [{tapIndex: 1, tap: {kind: 1, operand: 4}}]});
     const domain = decodeKeyBehaviorDomain(encodeKeyBehaviorDomain({rows: [row(0x2a16), row(0x4338), row(0xe3)]}));
     const byKey = (rows) => Object.fromEntries(rows.map((entry) => [entry.keycode, entry.builtIn]));
-    const rows = byKey(behaviorRowsForView(domain, {physicalGestureTiming: true, ownedTapping: true}));
+    const rows = byKey(behaviorRowsForView(domain));
     assert.deepEqual(rows["MT(MOD_LSFT|MOD_LGUI,KC_S)"], {
         tap: {helper: "TAP_SENDS", action: "KC_S", label: "S"},
         hold: {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "LSFT(LGUI(KC_NO))", repeatHz: "0", label: "Shift+GUI"},
     }, "a modifiers-only hold reads as its modifiers, not Shift+GUI+N/A");
     assert.deepEqual(rows["LT(3,KC_SLASH)"].hold, {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "MO(3)", repeatHz: "0"});
     assert.deepEqual(rows.KC_LEFT_GUI, {});
-    assert.ok(Object.values(byKey(behaviorRowsForView(domain))).every((builtIn) => !Object.keys(builtIn).length),
-        "without the advertised features nothing is claimed");
 });
 
 test("a behaviour branch carries the readable name of the keycode it stores, when one exists", () => {

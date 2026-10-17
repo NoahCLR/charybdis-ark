@@ -7,10 +7,8 @@ const {effectiveTimings} = require("./gesture-timing");
 const {encodeKeyBehaviorDomain} = require("../schema/key-behavior-domain-v1");
 const {validateSnapshot, decodedOf} = require("./portable-profile");
 const {SETTING, SETTING_FIELD, SETTING_FIELDS, SETTINGS, encodeSettings, validSetting} = require("../schema/settings-domain-v1");
-const {hostSettings, followHostOs, supportsHostLayouts, UNICODE_ENABLED, LAYOUT_SHIFT, MACOS_ISO} = require("../schema/host-settings");
+const {hostSettings, followHostOs, UNICODE_ENABLED, LAYOUT_SHIFT, MACOS_ISO} = require("../schema/host-settings");
 const {hostLayouts} = require("../data/host-layouts");
-const {supportsUnicodeMacros} = require("../schema/macro-payload");
-const {supportsComboOutputBehaviors} = require("../schema/combo-domain-v1");
 const {dpiChoices} = require("./pointer-dpi");
 const {hostKeyLabel} = require("./key-names");
 const {layerName, VOCABULARY} = require("./vocabulary");
@@ -173,8 +171,8 @@ function withSetting(field, word, number) {
     const bits = field.bitMask ? (field.kind === "toggle" ? (number ? field.bitMask : 0) : number & field.bitMask) : field.shift === undefined ? number : number << field.shift;
     return ((word & ~fieldMask(field)) | (bits & fieldMask(field))) >>> 0;
 }
-/** @param {import("./types.js").SnapshotFacts} snapshot @param {import("../schema/types.js").SettingsDomain} settings @param {import("./types.js").ProfileDestination} [capabilities] */
-function settingsSections(snapshot, settings, capabilities) {
+/** @param {import("./types.js").SnapshotFacts} snapshot @param {import("../schema/types.js").SettingsDomain} settings */
+function settingsSections(snapshot, settings) {
     const options = snapshot.options;
     const host = hostSettings(settings.values, snapshot.hostOs?.detected);
     /** @type {import("../../contracts/model.js").SettingsSection[]} */
@@ -189,8 +187,8 @@ function settingsSections(snapshot, settings, capabilities) {
     if (options) for (let mask = 1; mask < 16; mask++) if (!(mask & ~options.ledFlags)) flags.push({value: mask, label: ledNames.filter(([bit]) => mask & bit).map(([, name]) => name).join(" + ")});
     if (!flags.some(choice => choice.value === currentFlags)) flags.push({value: currentFlags, label: "Current custom LED selection"});
     rgb.fields.splice(1, 0,
-        {...byte("effectMode", SETTING.RGB_MODE, 8, "Lighting effect"), choices: effects, readOnly: !options, hint: options ? "Effects available on this keyboard. Layer colours can override the base effect." : "Update both halves to report the available lighting effects."},
-        {...byte("effectLeds", SETTING.RGB_MODE, 24, "Apply base effect to"), choices: flags, readOnly: !options, hint: options ? "Choose which LED classes receive the base effect. Layer colours and feedback have their own policies." : "Update both halves to report the LED classes."});
+        {...byte("effectMode", SETTING.RGB_MODE, 8, "Lighting effect"), choices: effects, readOnly: !options, hint: options ? "Effects available on this keyboard. Layer colours can override the base effect." : "Read the keyboard to see the lighting effects it has."},
+        {...byte("effectLeds", SETTING.RGB_MODE, 24, "Apply base effect to"), choices: flags, readOnly: !options, hint: options ? "Choose which LED classes receive the base effect. Layer colours and feedback have their own policies." : "Read the keyboard to see its LED classes."});
     /** @param {number} i */
     const name = i => layerName(settings.names, i);
     /** @template T @param {(i: number) => T} make */
@@ -211,22 +209,18 @@ function settingsSections(snapshot, settings, capabilities) {
     result.push({id: "comboSettings", comboTiming: COMBO_TIMING, area: "Settings", label: "Combos", fields:
         [toggle("combosEnabled", SETTING.COMBOS_ENABLED, "Enabled", "Turn every combo on or off. Each combo's own window and conditions are set in Keys · Combos."),
             {macro: "comboOutputBehaviors", header: "comboOutputBehaviors", kind: "toggle", label: "Combo outputs use behaviours",
-                readOnly: !supportsComboOutputBehaviors(capabilities), hint: supportsComboOutputBehaviors(capabilities)
-                    ? "Off, combos still fire but use their normal output action. Physical-key behaviours stay eligible. A bypassed custom key sends its shortcut, or nothing if it has none."
-                    : "Update both halves to control combo output behaviours. This firmware has no separate combo-output switch."},
+                hint: "Off, combos still fire but use their normal output action. Physical-key behaviours stay eligible. A bypassed custom key sends its shortcut, or nothing if it has none."},
             ...everyLayer(i => ({...toggle(`combosOnLayer${i}`, SETTING.LAYER_COMBOS, `On ${name(i)}`, "Keys that come from this layer can join combos."), bitMask: 2 ** i, governs: {kind: /** @type {const} */ ("layer"), layer: i}}))]});
     // A layer's combo reference is in its layer record, not a setting value.
     result.push({id: "comboReferences", area: "Settings", label: "Combo Layer Matching", expanded: false, description: "Choose which layer supplies the key assignments used to match combos on each layer. Select the same layer to keep its combos independent.", fields:
         everyLayer(i => ({...layer(`comboReference${i}`, undefined, `Combos on ${name(i)}`, "The layer whose key assignments are used to match combos on this layer. Choose the same layer to keep its combos independent."), record: /** @type {const} */ ("reference"), layer: i, governs: {kind: /** @type {const} */ ("layer"), layer: i}}))});
-    result.push({id: "keyboardOptions", area: "Settings", label: "Key Options", expanded: false, description: options ? "Keyboard-wide remapping and typing options. These apply across all layers." : "Update both halves to report their supported key options.", fields:
+    result.push({id: "keyboardOptions", area: "Settings", label: "Key Options", expanded: false, description: options ? "Keyboard-wide remapping and typing options. These apply across all layers." : "Read the keyboard to see the key options it supports.", fields:
         options ? optionLabels.map(([macro, label, hint], i) => ({...toggle(macro, SETTING.KEYMAP_OPTIONS, hostKeyLabel(label, host.effective)), tooltip: hostKeyLabel(hint, host.effective), bitMask: options.keymapMasks[i], readOnly: !(options.supportedKeymapOptions & (1 << i)), hint: options.supportedKeymapOptions & (1 << i) ? "" : "This option is not enabled in the running firmware."})) : []});
     /** @param {number} id */
     const label = id => VOCABULARY.hostOs.find(([value]) => value === id)?.[1] || "Unknown";
-    const available = Boolean(snapshot.hostOs) || supportsUnicodeMacros(capabilities);
-    const layouts = supportsHostLayouts(capabilities);
     const macos = host.effective === 1;
     const setup = ["Select a host OS manually if detection is unknown.",
-        layouts ? "For emoji and other characters your layout cannot type, choose the Unicode Hex Input layout and make it your active input source." : "Enable Unicode Hex Input in macOS and keep it active during playback.",
+        "For emoji and other characters your layout cannot type, choose the Unicode Hex Input layout and make it your active input source.",
         "Install and run WinCompose with Right Alt as Compose.", "Use an input method/application accepting Ctrl+Shift+U, hex digits and Space. Some Linux applications do not support it."][host.effective];
     // The effective OS's layouts first, then US; with no known OS, all of them.
     const osName = [null, "macos", "windows", "linux"][host.effective];
@@ -234,50 +228,48 @@ function settingsSections(snapshot, settings, capabilities) {
     /** @param {number} id */
     const layoutWord = id => VOCABULARY.hostLayouts.find(([value]) => value === id)?.[1];
     result.push({id: "host", area: "Settings", label: "Host",
-        ...(supportsUnicodeMacros(capabilities) && host.effective === 2 && host.unicodeEnabled
+        ...(host.effective === 2 && host.unicodeEnabled
             ? {githubLink: {label: "WinCompose on GitHub", url: "https://github.com/samhocevar/wincompose"}} : {}),
         // Auto can follow detection onto another OS than the layout's; a
         // Host OS chosen here carries the layout along (followHostOs).
-        ...(layouts && !host.layoutFits
+        ...(!host.layoutFits
             ? {warning: `${layoutWord(host.layout)} is not a ${label(host.effective)} layout, so macros may type the wrong characters on ${label(host.effective)}. Choose a ${label(host.effective)} layout, or set Host OS to the computer you use.`}
-            : supportsUnicodeMacros(capabilities) && macos && host.unicodeMode
+            : macos && host.unicodeMode
             ? {warning: "While Unicode Hex Input is active on your Mac, Option-based symbols and shortcuts may stop working, including Option+Left/Right for word navigation. This affects ordinary typing and key-step shortcuts too. Ark does not switch your Mac's input source; switch back to your usual source when you need those keys, and match the layout here before playing macros."} : {}),
-        description: available
-        ? `Detected: ${host.detected ? label(host.detected) : "Unknown"}. Effective: ${host.effective ? label(host.effective) : "Unknown"}. Detection is a best guess; override it if incorrect. ${setup} The keyboard cannot confirm your input setup.`
-        : "Update both halves to report their host OS and support these settings.", fields: [
-        {...number("hostOs", SETTING.UNICODE_HOST_MODE, "Host OS", "Auto uses the keyboard’s USB detection. This controls display names, the layouts offered and Unicode entry; it does not swap keys.", {max: 3, unit: undefined}), bitMask: 3, kind: "number", readOnly: !available,
+        description: `Detected: ${host.detected ? label(host.detected) : "Unknown"}. Effective: ${host.effective ? label(host.effective) : "Unknown"}. Detection is a best guess; override it if incorrect. ${setup} The keyboard cannot confirm your input setup.`, fields: [
+        {...number("hostOs", SETTING.UNICODE_HOST_MODE, "Host OS", "Auto uses the keyboard’s USB detection. This controls display names, the layouts offered and Unicode entry; it does not swap keys.", {max: 3, unit: undefined}), bitMask: 3, kind: "number",
             choices: VOCABULARY.hostOs.map(([value, label]) => ({value, label}))},
-        {...byte("hostLayout", SETTING.UNICODE_HOST_MODE, LAYOUT_SHIFT, "Keyboard layout"), kind: "number", readOnly: !layouts,
-            hint: layouts ? "The layout your computer types with. Macros type through it, accents included; pick the one that is active on the computer." : "Update both halves to type macros through your keyboard layout. Until then they assume US.",
+        {...byte("hostLayout", SETTING.UNICODE_HOST_MODE, LAYOUT_SHIFT, "Keyboard layout"), kind: "number",
+            hint: "The layout your computer types with. Macros type through it, accents included; pick the one that is active on the computer.",
             choices: offered.map(layout => ({value: layout.id, label: layoutWord(layout.id)}))},
-        ...((macos && layouts) || host.macosIso ? [{...toggle("macosIso", SETTING.UNICODE_HOST_MODE, "ISO keyboard on macOS", "Turn on if macOS set this keyboard up as ISO (Keyboard Setup Assistant). macOS then swaps the keys left of 1 and left of Z, so macros must too."), bitMask: MACOS_ISO, readOnly: !layouts}] : []),
+        ...(macos || host.macosIso ? [{...toggle("macosIso", SETTING.UNICODE_HOST_MODE, "ISO keyboard on macOS", "Turn on if macOS set this keyboard up as ISO (Keyboard Setup Assistant). macOS then swaps the keys left of 1 and left of Z, so macros must too."), bitMask: MACOS_ISO}] : []),
         // On macOS, Unicode entry is the Unicode Hex Input layout, not a switch.
-        ...(layouts && macos && !host.unicodeEnabled ? [] : [{...toggle("unicodeEnabled", SETTING.UNICODE_HOST_MODE, "Unicode playback", layouts && macos
+        ...(macos && !host.unicodeEnabled ? [] : [{...toggle("unicodeEnabled", SETTING.UNICODE_HOST_MODE, "Unicode playback", macos
             ? "On macOS, choose the Unicode Hex Input layout instead; this switch only applies with US."
-            : `${setup} Enable only after configuring the host. Avoid typing during playback.`), bitMask: UNICODE_ENABLED, readOnly: !available}]),
+            : `${setup} Enable only after configuring the host. Avoid typing during playback.`), bitMask: UNICODE_ENABLED}]),
     ]});
     return result;
 }
 
 // Capabilities decide which Host fields can be edited; Review and revert read
 // values without them.
-/** @param {import("./types.js").ProfileSnapshot | null | undefined} snapshot @param {import("./types.js").ProfileDestination} [capabilities] */
-function settingsEditorView(snapshot, capabilities) {
+/** @param {import("./types.js").ProfileSnapshot | null | undefined} snapshot */
+function settingsEditorView(snapshot) {
     if (!snapshot?.document || snapshot.incomplete) return null;
     const {settings} = decodedOf(snapshot);
     return {identity: snapshot.fingerprint,
         brightnessMax: snapshot.limits?.brightnessMax,
-        sections: settingsSections(snapshot, settings, capabilities).map(section => ({...section, fields: section.fields.map(field => {
+        sections: settingsSections(snapshot, settings).map(section => ({...section, fields: section.fields.map(field => {
             const value = field.header ? Number(settings[field.header] !== false) : field.record ? settings.layers[field.layer][field.record] : settingValue(field, settings.values);
             if (field.kind === "share") return {...field, value: String(shareOf(value, settings.values[field.of])),
                 ms: String(value), whole: String(settings.values[field.of])};
             const brightness = field.macro === "brightness";
             const max = brightness ? snapshot.limits?.brightnessMax : field.max;
             return {...field, max, readOnly: field.readOnly || (brightness && max === undefined),
-                hint: brightness ? (max === undefined ? "Update both halves to report their brightness limit before editing brightness." : `0–${max}, the brightness limit reported by this keyboard.`) : field.hint,
+                hint: brightness ? (max === undefined ? "Read the keyboard to learn its brightness limit before editing brightness." : `0–${max}, the brightness limit reported by this keyboard.`) : field.hint,
                 value: field.kind === "layer" ? `Layer ${value}` : String(value), enabled: Boolean(value)};
         })})),
-        host: {...hostSettings(settings.values, snapshot.hostOs?.detected), supported: Boolean(snapshot.hostOs)},
+        host: hostSettings(settings.values, snapshot.hostOs?.detected),
         timing: Object.fromEntries(keyTiming.fields.map(field => [field.macro, String(settings.values[field.id])]))};
 }
 
@@ -285,7 +277,7 @@ function settingsEditorView(snapshot, capabilities) {
 function editSettings(snapshot, message, capabilities) {
     if (!snapshot?.document || !message.expectedFingerprint || message.expectedFingerprint !== snapshot.fingerprint) throw fail("The keyboard changed since these settings were opened. Read the keyboard and review your changes before saving again.");
     const value = validateSnapshot(snapshot.document, capabilities);
-    const section = settingsSections(snapshot, value.settings, capabilities).find(section => section.id === message.sectionId);
+    const section = settingsSections(snapshot, value.settings).find(section => section.id === message.sectionId);
     if (!section || !Array.isArray(message.fields) || message.fields.length !== section.fields.length) throw fail("Choose a complete settings section reported by the keyboard.");
     const seen = new Set(), before = value.settings.values.slice();
     for (const input of message.fields) {
@@ -302,7 +294,7 @@ function editSettings(snapshot, message, capabilities) {
             if (typeof text !== "string" || !/^\d+$/.test(text)) throw fail(`${field.label} needs a whole number${field.kind === "layer" ? " identifying a layer" : ""}.`);
             number = Number(text);
             if (field.macro === "brightness" && number !== baseLighting(value.settings.values).brightness) {
-                if (snapshot.limits?.brightnessMax === undefined) throw fail("Read the keyboard's brightness limit before changing brightness. Update both halves if this field is unavailable.");
+                if (snapshot.limits?.brightnessMax === undefined) throw fail("Read the keyboard's brightness limit before changing brightness.");
                 if (number > snapshot.limits.brightnessMax) throw fail(`Brightness must be between 0 and ${snapshot.limits.brightnessMax}, the keyboard's reported limit.`);
             }
             if ((field.min !== undefined && number < field.min) || (field.max !== undefined && number > field.max) || (field.choices && !field.choices.some(choice => (typeof choice === "object" ? choice.value : choice) === number))) throw fail(`${field.label} is outside the keyboard's supported range${field.hint ? ": " + field.hint : "."}`);

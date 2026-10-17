@@ -19,9 +19,6 @@ const COMBO_DOMAIN_VERSION = PROFILE_DOMAIN_VERSIONS[PROFILE_DOMAIN_IDS.COMBOS];
 const HEADER_SIZE = 8;
 const ROW_FIXED_SIZE = 12;
 const COMBO_LIMITS = Object.freeze({maxRows: 128, maxInputs: 16, maxLayers: LAYERS});
-const COMBO_OUTPUT_BEHAVIORS_FEATURE = 1 << 30;
-/** @param {{featureFlags?: number} | null | undefined} capabilities */
-const supportsComboOutputBehaviors = capabilities => Boolean((capabilities?.featureFlags || 0) & COMBO_OUTPUT_BEHAVIORS_FEATURE);
 const FLAG = Object.freeze({HOLD: 1, TAP: 2, ORDERED: 4, DISABLED: 8, OUTPUT_BYPASS: 16});
 const ALL_LAYERS = 2 ** COMBO_LIMITS.maxLayers - 1;
 /** @param {number | null} value @param {number} min @returns {value is number} */
@@ -101,4 +98,4 @@ const effectiveComboTerm = (table, row) => row.termMs ?? table.defaultTermMs;
 const runningComboRows = table => table.rows.map(row => ({...row, termMs: effectiveComboTerm(table, row), followsDefault: row.termMs === null,
     inputs: row.inputs.map(action => /** @type {number} */ (nativeCode(action))), output: /** @type {number} */ (nativeCode(row.output))}));
 
-module.exports = {COMBO_OUTPUT_BEHAVIORS_FEATURE, supportsComboOutputBehaviors, COMBO_DOMAIN_VERSION, COMBO_LIMITS, ALL_LAYERS, encodeComboDomain, decodeComboDomain, effectiveComboTerm, runningComboRows};
+module.exports = {COMBO_DOMAIN_VERSION, COMBO_LIMITS, ALL_LAYERS, encodeComboDomain, decodeComboDomain, effectiveComboTerm, runningComboRows};

@@ -401,12 +401,11 @@ function profileReview(before, after, capabilities) {
         }
     }
     item("Settings", "comboTiming", "Combo timing", comboTimingFields(a.combos), comboTimingFields(b.combos), {kind: "settings", section: "comboSettings", area: "Settings"}, [true, true]);
-    macrosA.viaMacros.forEach((slot, i) => {
-        const protectionShown = macrosB.protectionSupported || slot.protection !== "auto" || macrosB.viaMacros[i].protection !== "auto";
+    macrosA.viaMacros.forEach((_, i) => {
         /** @param {Macros["viaMacros"][number]} macro @returns {Fields} */
         const fields = (macro) => new Map(/** @type {[string, Field][]} */ ([["Steps", macro.payload || "empty"], ["Name", macro.name || "no name"],
-            ...(protectionShown ? [["Uninterruptible playback", {key: macro.protection,
-                text: macro.protection === "auto" && macrosB.protectionSupported ? `${word(VOCABULARY.macroProtection, macro.protection)} · ${macro.uninterruptible ? "on" : "off"}` : word(VOCABULARY.macroProtection, macro.protection)}]] : [])]));
+            ["Uninterruptible playback", {key: macro.protection,
+                text: macro.protection === "auto" ? `${word(VOCABULARY.macroProtection, macro.protection)} · ${macro.uninterruptible ? "on" : "off"}` : word(VOCABULARY.macroProtection, macro.protection)}]]));
         const old = macrosA.viaMacros[i], next = macrosB.viaMacros[i], has = /** @param {Macros["viaMacros"][number]} macro */ (macro) => Boolean(macro.payload || macro.name || macro.protection !== "auto");
         item("Macros", `macro:${i}`, `Macro ${i}${(next.name || old.name) ? ` · ${next.name || old.name}` : ""}`, fields(old), fields(next), {kind: "macro", index: i}, [has(old), has(next)]);
     });
@@ -416,7 +415,7 @@ function profileReview(before, after, capabilities) {
             if (!macro.payload) return;
             // Compare the current authored text under each host setup. An
             // independent text edit belongs to its own macro change above.
-            const old = inspectMacroPlayback(macro.payload, oldHost, true, macrosB.macroBank.programMax), next = inspectMacroPlayback(macro.payload, nextHost, true, macrosB.macroBank.programMax);
+            const old = inspectMacroPlayback(macro.payload, oldHost), next = inspectMacroPlayback(macro.payload, nextHost);
             const affected = new Set(next.typing.filter((route, i) => JSON.stringify(route) !== JSON.stringify(old.typing[i])).map(route => route.character));
             if (!affected.size && old.error === next.error) return;
             /** @param {ReturnType<typeof inspectMacroPlayback>} playback @param {ReturnType<typeof hostSettings>} host @returns {Fields} */
@@ -436,7 +435,7 @@ function profileReview(before, after, capabilities) {
                         key: JSON.stringify(playback.typing.filter(route => affected.has(route.character))),
                         detail: `${layout.name} · ${typing}${host.macosIso ? " · ISO" : " · ANSI"}`}]] : []),
                     ["Playback", playback.error || "Ready to play"],
-                    ...(macrosB.protectionSupported && macro.protection === "auto"
+                    ...(macro.protection === "auto"
                         ? [["Uninterruptible playback", playback.typing.some(route => route.method !== "layout") ? "Automatic · on" : "Automatic · off"]] : []),
                 ]));
             };

@@ -38,19 +38,12 @@ function fail(code, offset, message) {
 }
 /** @param {Uint8Array} bytes */
 function zero(bytes) { return bytes.every(byte => byte === 0); }
-// A tap may click a plain mouse button 1–8 (firmware D-F22). The record and
-// the domain version are unchanged: older firmware refuses these keycodes, and
-// capability feature bit 28 is how Ark learns a keyboard takes them.
-const PD_CLICK_FEATURE = 1 << 28;
-const PD_MACRO_FEATURE = 1 << 29;
+// A tap may click a plain mouse button 1–8 (firmware D-F22) or run a VIA
+// macro.
 const PD_MACROS = Object.freeze({FIRST: 0x7700, LAST: 0x777f});
-/** @param {{featureFlags?: number} | null | undefined} capabilities */
-const supportsPdMacros = capabilities => Boolean((capabilities?.featureFlags ?? 0) & PD_MACRO_FEATURE);
 /** @param {number} keycode */
 const isPdMacro = keycode => Number.isInteger(keycode) && keycode >= PD_MACROS.FIRST && keycode <= PD_MACROS.LAST;
 const PD_CLICKS = Object.freeze({FIRST: 0xd1, LAST: 0xd8});
-/** @param {{featureFlags?: number} | null | undefined} capabilities */
-const supportsPdClicks = capabilities => Boolean((capabilities?.featureFlags ?? 0) & PD_CLICK_FEATURE);
 /** @param {number} keycode */
 const isPdClick = keycode => Number.isInteger(keycode) && keycode >= PD_CLICKS.FIRST && keycode <= PD_CLICKS.LAST;
 /** @param {number} keycode */
@@ -60,12 +53,10 @@ function isPdTapKey(keycode) {
     const mods = keycode >>> 8, key = keycode & 255;
     return mods <= 0x1f && (mods & 15) !== 0 && key >= 4 && key <= 0xa4;
 }
-// Why a keycode cannot be a pointing-mode tap for a keyboard that does or does
-// not click, or "" when it can. The words name what a person would have picked.
-/** @param {number} keycode @param {{clicks: boolean, macros?: boolean}} options */
-function pdTapProblem(keycode, {clicks, macros = false}) {
-    if (isPdMacro(keycode)) return macros ? "" : "This keyboard's firmware cannot run a macro from a pointing mode. Update the firmware to use one.";
-    if (isPdClick(keycode)) return clicks ? "" : "This keyboard's firmware cannot click a mouse button from a pointing mode. Update the firmware to use one.";
+// Why a keycode cannot be a pointing-mode tap, or "" when it can. The words
+// name what a person would have picked.
+/** @param {number} keycode */
+function pdTapProblem(keycode) {
     if (isPdTapKey(keycode)) return "";
     const key = keycode & 255, modified = keycode > 0xff;
     if (keycode <= 0x1fff && key >= 0xcd && key <= 0xdf) {
@@ -290,4 +281,4 @@ function validatePdRecord(bytes, id, offset = 0) {
     validateRecord(bytes, id, offset);
 }
 
-module.exports = {PD_DOMAIN, PD_KIND, PD_AXIS, PD_SCROLL_AXES, PD_EMPTY_DIRECTION, PD_DIRECTION_OUTPUT, PD_MODIFIERS, PD_BUTTON, DIAGONALS, PD_CLICK_FEATURE, PD_CLICKS, supportsPdClicks, isPdClick, PD_MACRO_FEATURE, PD_MACROS, supportsPdMacros, isPdMacro, isPdTapKey, pdTapProblem, encodePdDomain, decodePdDomain, encodePdRecord, validatePdRecord};
+module.exports = {PD_DOMAIN, PD_KIND, PD_AXIS, PD_SCROLL_AXES, PD_EMPTY_DIRECTION, PD_DIRECTION_OUTPUT, PD_MODIFIERS, PD_BUTTON, DIAGONALS, PD_CLICKS, isPdClick, PD_MACROS, isPdMacro, isPdTapKey, pdTapProblem, encodePdDomain, decodePdDomain, encodePdRecord, validatePdRecord};

@@ -15,20 +15,18 @@ test("reads coherent settings using correlated bounded pages", async () => {
     connection.request = async (...args) => {const reply = await original(...args); if (!args[0][4] && ++headers === 2) reply[11]++; return reply;};
     await assert.rejects(readSettings(connection, ids()), /changed/);
 });
-test("settings a keyboard stores in an older version are returned as stored, a newer one refused", async () => {
+test("settings in another version than current firmware's are refused, older or newer", async () => {
     /** @param {Buffer} bytes */
     const keyboard = bytes => {
         const metadata = Buffer.alloc(12); metadata.set([1,25]); metadata.writeUInt16LE(bytes.length, 2); metadata.writeUInt32LE(crc32(bytes),4); metadata.writeUInt32LE(fnv1a32(bytes),8);
         return {request: async request => {const page = request[4]; return response(request, page ? bytes.subarray((page-1)*25, page*25) : metadata);}};
     };
-    // Settings v7: the current form without its 256-byte shortcut table; the
-    // session translates it (core/model/portable-profile.js).
+    // Settings v7: the current form without its 256-byte shortcut table.
     const current = settings(), older = Buffer.concat([current.subarray(0, 404), current.subarray(660)]);
     older[0] = 7; older[6] = 0;
-    assert.ok(older.length < 933, "below the current minimum");
-    assert.deepEqual(await readSettings(keyboard(older), ids()), older);
+    await assert.rejects(readSettings(keyboard(older), ids()), {code: "FIRMWARE_UPDATE_REQUIRED", message: /Ark supports only current firmware/});
     const newer = Buffer.from(current); newer[0] = 9;
-    await assert.rejects(readSettings(keyboard(newer), ids()));
+    await assert.rejects(readSettings(keyboard(newer), ids()), {code: "FIRMWARE_UPDATE_REQUIRED"});
 });
 test("old firmware cannot silently produce a partial backup", async () => {
     await assert.rejects(readSettings({request: async () => Buffer.alloc(32,255)},ids()), /Update both halves/);
@@ -52,7 +50,7 @@ test("waiting for storage sleeps with the host's sleep", async () => {
 });
 
 
-test("optional brightness limits distinguish old firmware from malformed readback", async () => {
+test("brightness limits are read from the keyboard, and a refused or malformed readback fails", async () => {
     const connection = {request: async (request, options) => {
         assert.equal(request[2], 8); assert.equal(request[4], 1);
         const reply = response(request, Buffer.from([1, 200])); assert(options.matchResponse(reply)); return reply;
@@ -60,7 +58,7 @@ test("optional brightness limits distinguish old firmware from malformed readbac
     assert.deepEqual(await readSettingsLimits(connection, ids()), {brightnessMax: 200});
     assert.deepEqual(await readSettingsLimits({request: async request => response(request, Buffer.from([1,0]))}, ids()), {brightnessMax: 0});
     await assert.rejects(readSettingsLimits({request: async request => response(request, Buffer.from([1]), 2)}, ids()), /status 2/);
-    assert.equal(await readSettingsLimits({request: async request => response(request, Buffer.alloc(0), 2)}, ids()), null);
+    await assert.rejects(readSettingsLimits({request: async request => response(request, Buffer.alloc(0), 2)}, ids()), /status 2/);
     await assert.rejects(readSettingsLimits({request: async request => response(request, Buffer.from([1,200,0]))}, ids()), /limits/);
     await assert.rejects(readSettingsLimits({request: async request => {const reply = response(request, Buffer.alloc(0), 2); reply[3]++; return reply;}}, ids()), /correlation/);
     await assert.rejects(readSettingsLimits({request: async request => {const reply = response(request, Buffer.alloc(0), 2); reply[31] = 1; return reply;}}, ids()), /trailing/);

@@ -1,7 +1,7 @@
 // @ts-check
 "use strict";
 const {PROFILE_WIRE_DOMAINS} = require("../schema/profile-domains");
-const {encodePdDomain, decodePdDomain, pdTapProblem, supportsPdClicks, supportsPdMacros, isPdMacro} = require("../schema/pd-mode-domain-v1");
+const {encodePdDomain, decodePdDomain, pdTapProblem, isPdMacro} = require("../schema/pd-mode-domain-v1");
 const {decodeProfileBlob, encodeProfileBlob, PROFILE_DOMAIN_IDS} = require("../schema/profile-blob-v1");
 const {decodeRgbDomainV1, encodeRgbDomainV1, RGB_LAYER_MODES, RGB_LOCALITIES, RGB_AUTOMOUSE_MODES, RGB_TAP_COMMIT_MODES, RGB_PD_MODE_IDS, RGB_KEY_SEMANTICS} = require("../schema/rgb-domain-v1");
 
@@ -126,7 +126,6 @@ function editDeviceProfile(bytes, message, context = {}) {
         /** @type {EditablePointing[]} */
         const slots = decodePdDomain(domain.payload);
         const id = integer(message.slot, slots.length - 1, "Slot");
-        const before = /** @type {import("../schema/types.js").PdSlot} */ (slots[id]);
         if (message.type === "clearPdMode") slots[id] = {id, kind: 0, name: ""};
         else if (message.type === "duplicatePdMode") {
             const source = integer(message.source, slots.length - 1, "Source slot");
@@ -145,14 +144,11 @@ function editDeviceProfile(bytes, message, context = {}) {
         Object.values(slots[id].diagonals || {}).forEach(convertTap);
         slots[id].buttons?.forEach(button => convertTap(button.tap));
         // Each shortcut is one the keyboard can send, said in words before the
-        // encoder's bare refusal. A click needs firmware that clicks, unless
-        // the slot already stored that click there: an imported click is not
-        // rewritten, and removing another one must stay possible.
-        const clicks = supportsPdClicks(context.capabilities), macros = supportsPdMacros(context.capabilities);
-        for (const {label, tap, stored} of pointingTaps(slots[id], before)) {
+        // encoder's bare refusal.
+        for (const {label, tap} of pointingTaps(slots[id])) {
             const code = tap?.keycode;
             if (typeof code !== "number" || !Number.isInteger(code) || code === 0) continue;
-            const problem = pdTapProblem(code, {clicks: clicks || code === stored?.keycode, macros: macros || code === stored?.keycode});
+            const problem = pdTapProblem(code);
             if (problem) throw invalid(`${label}: ${problem}`);
             if (isPdMacro(code) && (Number(tap?.modifierPolicy || 0) !== 0 || Number(tap?.mask || 0) !== 0)) throw invalid(`${label}: A macro must inherit held modifiers, with no mask, because playback continues across scans.`);
         }

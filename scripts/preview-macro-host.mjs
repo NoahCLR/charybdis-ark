@@ -15,9 +15,9 @@ export function inspect(message, model) {
     // The macro editor is available only after this fixture bank was read.
     const bank = /** @type {NonNullable<typeof model.macroBank>} */ (model.macroBank);
     return {...message, type: "macroValidation", validation: inspectMacroInput(message.payload, {
-        unicode: model.macroUnicode.supported, mode: model.macroUnicode.mode, enabled: model.macroUnicode.enabled ?? Boolean(model.macroUnicode.mode),
-        currentBytes: slot.bytes, bankFree: bank.free, programMax: bank.programMax,
+        mode: model.macroUnicode.mode, enabled: model.macroUnicode.enabled ?? Boolean(model.macroUnicode.mode),
+        currentBytes: slot.bytes, bankFree: bank.free,
         layout: model.macroUnicode.layout, os: model.macroUnicode.os,
-        protection: slot.protection, protectionSupported: model.macroProtectionSupported,
+        protection: slot.protection,
     })};
 }

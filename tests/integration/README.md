@@ -23,6 +23,4 @@ selected firmware's production candidate transaction, store backend and whole
 validator. It compares full and differential uploads of ordinary and maximum
 profiles and rejects corrupted reused bytes. The probe ends at validation;
 firmware's separate host suites exercise committed-source reuse through the
-production owner, both-half saving and reboot. Older firmware without this
-optional extension reports this runner as skipped; test the proposed new firmware
-too before handing over transfer changes. No device is opened.
+production owner, both-half saving and reboot. No device is opened.

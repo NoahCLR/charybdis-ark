@@ -9,7 +9,9 @@
 // Wire capability pages the keyboard answers, its BK pin, its fixture hashes);
 // this judges it with Ark's own runtime code. Contract checks fail the run:
 // the pages decode with Ark's Profile Wire decoder, Ark knows the action-ABI
-// digest, protocol and schema versions are ones Ark speaks, Ark's BK keycode
+// digest, protocol and schema versions are ones Ark speaks, the firmware
+// reports every feature Ark requires (Ark supports only current firmware, so
+// its gates would refuse a keyboard lacking one), Ark's BK keycode
 // and layout inputs equal those at firmware's BK pin (--qmk must contain that
 // commit), and Ark's pinned fixtures equal firmware's. Everything else
 // (firmware version, compiled-default digest, capacities) is reported only:
@@ -20,7 +22,7 @@ const os = require("node:os");
 const path = require("node:path");
 const {createHash} = require("node:crypto");
 const {execFileSync} = require("node:child_process");
-const {decodeCapabilityPages} = require("../core/protocol/profile-wire-v1");
+const {decodeCapabilityPages, PROFILE_WIRE_KNOWN_MASKS} = require("../core/protocol/profile-wire-v1");
 const {knownActionAbi, KNOWN_ACTION_ABIS} = require("../core/schema/actions");
 const {PROFILE_BLOB_V1} = require("../core/schema/profile-blob-v1");
 
@@ -89,6 +91,10 @@ function judge(contract, manifest, qmkRoot) {
             `firmware ${decoded.schema.major}.${decoded.schema.minor}; Ark ${SCHEMA_MAJORS.join(", ")}`);
         add("action-ABI digest is known to Ark", knownActionAbi(decoded.actionAbiDigest),
             `firmware ${hex(decoded.actionAbiDigest)}; Ark knows ${KNOWN_ACTION_ABIS.map(hex).join(", ")}`);
+        const required = (PROFILE_WIRE_KNOWN_MASKS.CURRENT_FEATURES | PROFILE_WIRE_KNOWN_MASKS.CURRENT_MUTATION_FEATURES) >>> 0;
+        const missing = (required & ~decoded.featureFlags) >>> 0;
+        add("firmware reports every feature Ark requires", missing === 0,
+            `firmware ${hex(decoded.featureFlags)}; Ark requires ${hex(required)}${missing ? `, missing ${hex(missing)}` : ""}`);
     }
 
     // BK inputs: Ark's keycode and layout snapshots against firmware's BK pin.

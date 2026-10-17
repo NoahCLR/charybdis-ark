@@ -3,16 +3,7 @@
 
 const catalog = require("../data/keycode-catalog");
 const {layoutTypes, US_HOST_LAYOUT} = require("../data/host-layouts");
-const UNICODE_MACRO_FEATURE = 1 << 21;
-const MACRO_PROTECTION_FEATURE = 1 << 23;
-const MACRO_OUTPUT_ISOLATION_FEATURE = 1 << 26;
 const MACRO_PROTECTION = Object.freeze({AUTO: "auto", ON: "on", OFF: "off"});
-/** @param {{featureFlags?: number} | null | undefined} capabilities */
-const supportsUnicodeMacros = capabilities => Boolean((capabilities?.featureFlags ?? 0) & UNICODE_MACRO_FEATURE);
-/** @param {{featureFlags?: number} | null | undefined} capabilities */
-const supportsMacroProtection = capabilities => Boolean((capabilities?.featureFlags ?? 0) & MACRO_PROTECTION_FEATURE);
-/** @param {{featureFlags?: number} | null | undefined} capabilities */
-const supportsMacroOutputIsolation = capabilities => supportsMacroProtection(capabilities) && Boolean((capabilities?.featureFlags ?? 0) & MACRO_OUTPUT_ISOLATION_FEATURE);
 /** @param {string} message */
 const fail = message => Object.assign(new Error(message), {code: "INVALID_MACRO"});
 /** @param {unknown} key @returns {key is number} */
@@ -35,7 +26,7 @@ function macroModifierKeycodes() {
 // The keyboard types text through the host layout and the rest by host
 // Unicode entry, which an ordinary key held across it would corrupt.
 /** @param {unknown} payload @param {import("./types.js").MacroOptions} [options] @returns {import("./types.js").MacroStep[]} */
-function parsePayload(payload, {unicode = false, textEntry = false, layout = US_HOST_LAYOUT} = {}) {
+function parsePayload(payload, {textEntry = false, layout = US_HOST_LAYOUT} = {}) {
     if (typeof payload !== "string") throw fail("Enter a macro as text.");
     /** @type {import("./types.js").MacroStep[]} */
     const steps = [];
@@ -53,7 +44,7 @@ function parsePayload(payload, {unicode = false, textEntry = false, layout = US_
         if (char !== "{") {
             // The loop has just read this character, so its index is in range.
             const code = /** @type {number} */ (payload.codePointAt(index - 1));
-            if (!(code === 9 || code === 10 || (code >= 32 && code <= 126) || (unicode && code >= 0xA0 && code <= 0x10FFFF && !(code >= 0xD800 && code <= 0xDFFF)))) throw fail(unicode ? "Macro text must contain valid Unicode characters, tabs or newlines; control characters and unpaired surrogates are unsupported." : "This firmware supports ASCII macro text only. Update both halves for Unicode text.");
+            if (!(code === 9 || code === 10 || (code >= 32 && code <= 126) || (code >= 0xA0 && code <= 0x10FFFF && !(code >= 0xD800 && code <= 0xDFFF)))) throw fail("Macro text must contain valid Unicode characters, tabs or newlines; control characters and unpaired surrogates are unsupported.");
             if (code > 0xFFFF) {text += payload.slice(index - 1, index + 1); index++;} else text += char;
             continue;
         }
@@ -91,10 +82,7 @@ function encodeMacroPayload(payload, options) {
     const chunks = [];
     const protection = options?.protection ?? "auto";
     if (!Object.values(MACRO_PROTECTION).includes(protection)) throw fail("Choose Automatic, On or Off for uninterruptible playback.");
-    if (protection !== "auto") {
-        if (!options?.protectionSupported) throw fail("Update both halves to set macro playback protection.");
-        chunks.push(Buffer.from([1, 5, protection === "on" ? 1 : 2]));
-    }
+    if (protection !== "auto") chunks.push(Buffer.from([1, 5, protection === "on" ? 1 : 2]));
     for (const step of parsePayload(payload, options)) {
         if (step.kind === "text") {
             chunks.push(Buffer.from(step.text, "utf8"));
@@ -125,7 +113,7 @@ function decodeMacroPayload(bytes, options) {
         }
         op = bytes[offset++];
         if (op === 5) {
-            macroProtectionOf(bytes, options);
+            macroProtectionOf(bytes);
             if (offset !== 2) throw fail("Macro protection must be a single prefix before the steps.");
             offset++;
         } else if (op === 4) {
@@ -141,79 +129,11 @@ function decodeMacroPayload(bytes, options) {
     return output;
 }
 
-// Legacy firmware compiles a stored macro into one bounded program. Streaming
-// firmware preflights and refills windows, so only the shared bank bounds it.
-const MACRO_PROGRAM_MAX = 512;
-const STREAMING_MACRO_FEATURE = 1 << 27;
-/** @param {{featureFlags?: number} | null | undefined} capabilities */
-const supportsStreamingMacros = capabilities => Boolean((capabilities?.featureFlags ?? 0) & STREAMING_MACRO_FEATURE);
-// null means the shared bank is the only size limit.
-/** @param {{featureFlags?: number} | null | undefined} capabilities */
-const macroProgramLimit = capabilities => supportsStreamingMacros(capabilities) ? null : MACRO_PROGRAM_MAX;
-
-/** @param {Uint8Array} bytes @param {import("./types.js").MacroOptions} [options] @returns {"auto" | "on" | "off"} */
-function macroProtectionOf(bytes, {protectionSupported = false} = {}) {
+/** @param {Uint8Array} bytes @returns {"auto" | "on" | "off"} */
+function macroProtectionOf(bytes) {
     if (bytes[0] !== 1 || bytes[1] !== 5) return "auto";
-    if (!protectionSupported) throw fail("Update both halves to read macro playback protection.");
     if (bytes[2] !== 1 && bytes[2] !== 2) throw fail("Invalid macro playback protection prefix.");
     return bytes[2] === 1 ? "on" : "off";
 }
 
-// The program size the firmware's decoder (macro_payload_decode_qmk_stream)
-// produces for well-formed VIA macro bytes. It mirrors that decoder step for
-// step: text runs cost 2 bytes per 255 characters plus one per character; a
-// tap 3; a held key's press and release 2 each; a chord of held keys closed
-// around one tap becomes one tap list; a delay 3.
-/** @param {Buffer} bytes */
-function macroProgramBytes(bytes) {
-    if (!Buffer.isBuffer(bytes)) throw fail("Invalid macro bytes.");
-    let length = 0, chunk = 0, matched = 0;
-    /** @type {number[]} */
-    let downs = [];
-    /** @type {number | null} */
-    let tap = null;
-    const flush = () => {
-        length += 2 * downs.length + (tap === null ? 0 : 3) + 2 * matched;
-        downs = []; tap = null; matched = 0;
-    };
-    for (let index = 0; index < bytes.length;) {
-        const byte = bytes[index++];
-        if (byte !== 1) {
-            flush();
-            if (byte >= 0x80) {
-                const width = byte < 0xE0 ? 2 : byte < 0xF0 ? 3 : 4;
-                index += width - 1; length += 4; chunk = 0;
-                continue;
-            }
-            if (!chunk || chunk === 255) { length += 2; chunk = 0; }
-            length++; chunk++;
-            continue;
-        }
-        chunk = 0;
-        const op = bytes[index++];
-        if (op === 5) { index++; continue; }
-        if (op === 4) {
-            flush();
-            while (index < bytes.length && bytes[index] !== 124) index++;
-            index++; length += 3;
-            continue;
-        }
-        const key = bytes[index++];
-        if (op === 1) {
-            if (tap !== null) flush();
-            if (!downs.length) length += 3;
-            else { tap = key; matched = 0; }
-        } else if (op === 2) {
-            if (tap !== null) flush();
-            downs.push(key);
-        } else if (tap !== null && matched < downs.length && key === downs[downs.length - 1 - matched]) {
-            if (++matched === downs.length) { length += 3 + downs.length; downs = []; tap = null; matched = 0; }
-        } else {
-            flush(); length += 2;
-        }
-    }
-    flush();
-    return length;
-}
-
-module.exports = {STREAMING_MACRO_FEATURE, supportsStreamingMacros, macroProgramLimit, macroModifierKeycodes, UNICODE_MACRO_FEATURE, supportsUnicodeMacros, MACRO_PROTECTION_FEATURE, MACRO_OUTPUT_ISOLATION_FEATURE, supportsMacroOutputIsolation, MACRO_PROTECTION, supportsMacroProtection, macroProtectionOf, macroKeycodes, parsePayload, encodeMacroPayload, decodeMacroPayload, macroProgramBytes, MACRO_PROGRAM_MAX};
+module.exports = {macroModifierKeycodes, MACRO_PROTECTION, macroProtectionOf, macroKeycodes, parsePayload, encodeMacroPayload, decodeMacroPayload};

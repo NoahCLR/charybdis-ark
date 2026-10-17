@@ -5,27 +5,16 @@ const {buildProfileGetRequest, decodeProfileResponse, profileResponseMatcher} = 
 /** @param {string} message */
 const fail = message => Object.assign(new Error(message), {code: "INVALID_KEYBOARD_OPTIONS"});
 
-/** @overload @param {import("../transport/types.js").RequestConnection} connection @param {import("./types.js").RequestIds} ids @param {number} page @param {false} [optional] @returns {Promise<Buffer>} */
-/** @overload @param {import("../transport/types.js").RequestConnection} connection @param {import("./types.js").RequestIds} ids @param {number} page @param {boolean} optional @returns {Promise<Buffer | null>} */
-/** @param {import("../transport/types.js").RequestConnection} connection @param {import("./types.js").RequestIds} ids @param {number} page @param {boolean} [optional] */
-async function readPage(connection, ids, page, optional = false) {
+/** @param {import("../transport/types.js").RequestConnection} connection @param {import("./types.js").RequestIds} ids @param {number} page */
+async function readPage(connection, ids, page) {
     const request = buildProfileGetRequest(8, page, ids.next());
     const response = await connection.request(request, {matchResponse: orUnhandled(profileResponseMatcher, request)});
-    // An optional page on firmware without it is simply absent.
-    if (isUnhandledEcho(response, request)) {
-        if (optional) return null;
-        throw unhandledError(`keyboard options page ${page}`);
-    }
-    try {return Buffer.from(decodeProfileResponse(response, request, {allowShortPayload: true}));}
-    catch (error) {
-        if (optional && error instanceof Error && "code" in error && error.code === "DEVICE_REJECTED" && "status" in error && error.status === 2 && response[6] === 0) return null;
-        throw error;
-    }
+    if (isUnhandledEcho(response, request)) throw unhandledError(`keyboard options page ${page}`);
+    return Buffer.from(decodeProfileResponse(response, request, {allowShortPayload: true}));
 }
 /** @param {import("../transport/types.js").RequestConnection} connection @param {import("./types.js").RequestIds} ids */
 async function readKeyboardOptions(connection, ids) {
-    const metadata = await readPage(connection, ids, 2, true);
-    if (!metadata) return null;
+    const metadata = await readPage(connection, ids, 2);
     if (metadata.length !== 9 || metadata[0] !== 1 || metadata[1] !== 25 || metadata[5] !== 13 || !metadata[4] || metadata.readUInt16LE(6) & ~0x1fff || metadata[8] & ~15) throw fail("Unsupported keyboard options metadata.");
     const length = metadata.readUInt16LE(2), count = metadata[4];
     if (length !== 26 + 64 * count || length > 253 * 25) throw fail("Invalid keyboard options capacity.");

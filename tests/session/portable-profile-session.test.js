@@ -9,7 +9,6 @@ const {decodeProfileBlob, encodeProfileBlob, fnv1a32} = require("../../core/sche
 const {encodeSettings} = require("../../core/schema/settings-domain-v1");
 const {PROFILE_CANDIDATE_V1: C} = require("../../core/protocol/profile-candidate-v1");
 const {LOGICAL_VIA_STAGE_V1: V} = require("../../core/protocol/logical-via-stage-v1");
-const {PROFILE_WIRE_FEATURES: FEATURES} = require("../../core/protocol/profile-wire-v1");
 const {fakeKeyboard} = require("../fixtures/fake-keyboard");
 const {capabilities, fixture} = require("../fixtures/portable-restore");
 
@@ -187,13 +186,18 @@ test("an unobserved durable decision refuses abort and the keyboard finishes fro
     assert.deepEqual(f.keyboard.active, Buffer.from(f.source.profile, "base64"));
     f.keyboard.recover(); assertTarget(f);
 });
+// A reviewed snapshot without its raw custom bytes gives Apply no source to
+// reuse, so it streams the whole profile.
+async function fullUpload(f) {
+    const captured = await f.capture(); delete captured.storage.profile; f.options.baseSnapshot = captured;
+}
 test("lost replies retain an ambiguous upload lease and a sent commit is safe only after confirmed cancel", async () => {
-    for (const value of [C.VALUE_CHUNK, C.VALUE_COMMIT]) {
-        const f = fixture(); f.keyboard.faults.loseReply = value;
+    for (const value of [C.VALUE_STREAM_CHUNK, C.VALUE_COMMIT]) {
+        const f = fixture(); await fullUpload(f); f.keyboard.faults.loseReply = value;
         if (value === C.VALUE_COMMIT) f.keyboard.faults.stallCommit = true;
-        await assert.rejects(f.restore(), error => value === C.VALUE_CHUNK ? error.code === "TRANSPORT_OUTCOME_AMBIGUOUS"
+        await assert.rejects(f.restore(), error => value === C.VALUE_STREAM_CHUNK ? error.code === "TRANSPORT_OUTCOME_AMBIGUOUS"
             : error.code === "RESTORE_NOT_SAVED");
-        if (value === C.VALUE_CHUNK) {
+        if (value === C.VALUE_STREAM_CHUNK) {
             assert.equal(f.keyboard.events.at(-1), "begin", "a lost acknowledgement is not proof the upload was cancelled");
             const {CandidateUploadCoordinator} = require("../../core/session/candidate-upload-coordinator");
             await new CandidateUploadCoordinator(f.connection, {requestIds: f.ids}).abort(1);
@@ -203,9 +207,9 @@ test("lost replies retain an ambiguous upload lease and a sent commit is safe on
     }
 });
 test("BUSY candidate admission is retried through real status without duplicating accepted bytes", async () => {
-    const f = fixture(); f.keyboard.faults.busy = C.VALUE_CHUNK;
+    const f = fixture(); await fullUpload(f); f.keyboard.faults.busy = C.VALUE_STREAM_CHUNK;
     await f.restore(); assertTarget(f);
-    const chunks = candidateMutations(f).filter(r => r[2] === C.VALUE_CHUNK);
+    const chunks = candidateMutations(f).filter(r => r[2] === C.VALUE_STREAM_CHUNK);
     assert.equal(chunks[0].readUInt16LE(5), chunks[1].readUInt16LE(5));
     assert.equal(chunks.length, Math.ceil(f.target.profile.length / 20) + 1);
 });
@@ -295,7 +299,7 @@ test("a cached read without its stored bank is captured again", async () => {
 });
 test("a malformed stored bank read refuses before any write", async () => {
     const f = fixture();
-    f.keyboard.faults.afterRequest = (r, reply) => {if (r[0] === VIA_STORAGE.MACRO_READ) reply[3] ^= 1;};
+    f.keyboard.faults.afterRequest = (r, reply) => {if (r[0] === VIA_STORAGE.LAYOUT_READ) reply[3] ^= 1;};
     await assert.rejects(f.restore(), error => error.code === "VIA_STORAGE_INVALID" && error.saved === "none");
     assert.deepEqual(f.keyboard.mutations, []);
 });
@@ -308,7 +312,7 @@ const {backup32, CAPABILITIES_32} = require("../fixtures/pd-slots-32");
 const {settings: currentSettings} = require("../fixtures/portable-profile");
 const {encodeComboDomain} = require("../../core/schema/combo-domain-v1");
 const {decodeSettings} = require("../../core/schema/settings-domain-v1");
-const captureCapabilities = {...CAPABILITIES_32, featureFlags: 1 << 12, candidateChunkMax: 20, viaMacroBytes: 10327};
+const captureCapabilities = {...CAPABILITIES_32, candidateChunkMax: 20, viaMacroBytes: 34903};
 function wired(keyboard) {
     let id = 0;
     return {connection: {request: async (report) => keyboard.answer(report)[0]}, ids: {next: () => (id = id % 255 + 1)}};
@@ -340,19 +344,19 @@ for (const compiledOnly of [false, true]) {
     });
 }
 
-test("a capture never reads the retired PD page, even from firmware that still advertises bit 13", async () => {
+test("a capture never reads the retired PD page, and asks for nothing the keyboard does not serve", async () => {
     const source = backup32(), keyboard = fakeKeyboard({document: source});
     const {connection, ids} = wired(keyboard);
-    const captured = await captureProfile(connection, ids, {...captureCapabilities, featureFlags: (1 << 12) | (1 << 13)});
+    const captured = await captureProfile(connection, ids, captureCapabilities);
     assert.equal(keyboard.requests.some(r => r[0] === 0x08 && r[1] === 0 && r[2] === 0x09), false, "no GET 0x09");
     assert.equal(Object.hasOwn(captured.document, "pdModeSource"), false, "no pointing-mode source is written");
-    assert.deepEqual(keyboard.unhandled.map(r => [r[0], r[1], r[2], r[4]]), [[8, 0, 0x0c, 0]], "only the optional macro read map is unsupported");
+    assert.deepEqual(keyboard.unhandled, []);
 });
 
 test("a complete fresh capture uses sparse macros without changing the backup or held bank", async () => {
-    const source = backup32(), keyboard = fakeKeyboard({document: source, streaming: true, macroReadMap: true});
+    const source = backup32(), keyboard = fakeKeyboard({document: source});
     const {connection, ids} = wired(keyboard);
-    const captured = await captureProfile(connection, ids, {...captureCapabilities, viaMacroBytes: 34903, featureFlags: captureCapabilities.featureFlags | (1 << 27)});
+    const captured = await captureProfile(connection, ids, captureCapabilities);
     assert.equal(captured.fingerprint, fingerprint(source));
     assert.deepEqual(captured.document.macros, source.macros);
     assert.equal(captured.storage.macros.length, 34903);
@@ -382,20 +386,19 @@ test("clean nonzero VIA layout options retain complete capture through full-read
     assert.equal(captured.fingerprint, fingerprint(source));
     assert.equal(captured.identity.storageDigest, digest);
     assert.deepEqual(captured.storage.macros, held.macros);
-    assert.equal(keyboard.requests.filter(r => r[0] === 0x0e).length, 369);
+    assert.equal(keyboard.requests.filter(r => r[0] === 0x0e).length, 1247);
 });
 
-test("complete capture preserves Unicode bank bytes and still rejects legacy destinations", async () => {
+test("complete capture preserves Unicode bank bytes", async () => {
     const source = backup32();
     const text = ' café “hello” 🙂 e\u0301 👩‍💻 ';
     source.macros[0] = Buffer.from(text).toString('base64');
     const keyboard = fakeKeyboard({document:source});
     const {connection, ids} = wired(keyboard);
-    const captured = await captureProfile(connection, ids, {...captureCapabilities, featureFlags:captureCapabilities.featureFlags | (1 << 21)});
+    const captured = await captureProfile(connection, ids, captureCapabilities);
     assert.deepEqual(captured.document.macros, source.macros);
     assert.equal(captured.fingerprint, fingerprint(source));
     assert.equal(Buffer.from(captured.document.macros[0], 'base64').toString('utf8'), text);
-    assert.throws(() => validateSnapshot(captured.document, captureCapabilities), /ASCII/);
     assert.deepEqual(keyboard.mutations, []);
     const malformed = structuredClone(source);
     malformed.macros[0] = Buffer.from([0xc0,0xaf]).toString('base64');
@@ -403,30 +406,27 @@ test("complete capture preserves Unicode bank bytes and still rejects legacy des
 });
 
 
-test("Apply negotiates real transfer extensions from committed and compiled base sources", async () => {
-    for (const compiledOnly of [false, true]) for (const extensions of [0, FEATURES.CANDIDATE_REUSE | FEATURES.CANDIDATE_STREAM]) {
+test("Apply reuses the committed or compiled base source and streams changed bytes", async () => {
+    for (const compiledOnly of [false, true]) {
         const f = fixture({compiledOnly}); f.options.baseSnapshot = await f.capture();
-        const caps = {...capabilities, featureFlags: capabilities.featureFlags | extensions};
-        await restoreProfile(f.connection, f.ids, caps, f.targetDocument, f.options);
+        await restoreProfile(f.connection, f.ids, capabilities, f.targetDocument, f.options);
         const values = candidateMutations(f).map(r => r[2]);
-        assert.equal(values.includes(C.VALUE_REUSE), Boolean(extensions));
-        assert.equal(values.includes(C.VALUE_CHUNK), !extensions);
-        // A layout/macro edit leaves every custom byte reusable, so force a
-        // custom edit separately to exercise streaming chunks as well.
+        assert.ok(values.includes(C.VALUE_REUSE));
+        assert.equal(values.includes(C.VALUE_CHUNK), false, "every chunk streams");
         assertTarget(f);
-        if (extensions) {
-            const reuse = candidateMutations(f).find(r => r[2] === C.VALUE_REUSE);
-            assert.equal(reuse[23], compiledOnly ? 0 : 1);
-            assert.equal(reuse[24], compiledOnly ? 255 : 0);
-        }
+        const reuse = candidateMutations(f).find(r => r[2] === C.VALUE_REUSE);
+        assert.equal(reuse[23], compiledOnly ? 0 : 1);
+        assert.equal(reuse[24], compiledOnly ? 255 : 0);
     }
+    // A layout/macro edit leaves every custom byte reusable, so a custom edit
+    // exercises streaming chunks as well.
     const f = fixture(), target = withSetting(f.source); f.options.baseSnapshot = await f.capture();
-    await restoreProfile(f.connection, f.ids, {...capabilities, featureFlags: capabilities.featureFlags | FEATURES.CANDIDATE_REUSE | FEATURES.CANDIDATE_STREAM}, target, f.options);
+    await restoreProfile(f.connection, f.ids, capabilities, target, f.options);
     assert.ok(candidateMutations(f).some(r => r[2] === C.VALUE_STREAM_CHUNK));
 });
 test("raw custom bytes that differ from the reviewed active identity fall back to full transfer", async () => {
     const f = fixture(), snapshot = await f.capture(); snapshot.storage.profile[10] ^= 1; f.options.baseSnapshot = snapshot;
-    await restoreProfile(f.connection, f.ids, {...capabilities, featureFlags: capabilities.featureFlags | FEATURES.CANDIDATE_REUSE}, f.targetDocument, f.options);
+    await restoreProfile(f.connection, f.ids, capabilities, f.targetDocument, f.options);
     assert.equal(candidateMutations(f).some(r => r[2] === C.VALUE_REUSE), false); assertTarget(f);
 });
 
@@ -440,19 +440,17 @@ test("a keyboard without its slave half refuses a capture at once, without waiti
     assert.equal(waits, 0, "no poll for the halves to agree");
 });
 
-// Firmware before custom-key shortcuts (settings v7) is read through the
-// translation and named as older; nothing is ever written to it (D-L63).
-test("a keyboard storing settings v7 is captured as older, and a restore to it is refused before any write", async () => {
+// Ark reads and writes only current firmware: a keyboard storing settings in
+// another version is neither captured nor written.
+test("a keyboard storing settings in another version is not captured, and a restore to it is refused before any write", async () => {
     const keyboard = fakeKeyboard({document: document(), settingsVersion: 7});
     let id = 0;
     const ids = {next: () => (id = id % 255 + 1)};
     const connection = {request: async report => keyboard.answer(report)[0]};
-    const capture = await captureProfile(connection, ids, capabilities);
-    assert.deepEqual(capture.older, [{id: 0x40, version: 7}]);
-    assert.ok(validateSnapshot(capture.document).settings.customKeyShortcuts.every(shortcut => !shortcut.mods && !shortcut.key));
+    await assert.rejects(captureProfile(connection, ids, capabilities), {code: "FIRMWARE_UPDATE_REQUIRED", message: /Ark supports only current firmware/});
     let recovered = false;
     await assert.rejects(restoreProfile(connection, ids, capabilities, document(), {sleep: async () => {}, saveRecovery: async () => {recovered = true; return "/r.json";}}),
-        {code: "FIRMWARE_UPDATE_REQUIRED", message: /older format than Ark writes/});
+        {code: "FIRMWARE_UPDATE_REQUIRED", message: /Ark supports only current firmware/});
     assert.equal(recovered, false, "refused before the recovery copy");
     assert.deepEqual(keyboard.mutations, []);
 });

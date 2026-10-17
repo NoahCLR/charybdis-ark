@@ -34,7 +34,6 @@ export function comboBuilder(canEdit, holdTerm) {
     const editing = state.combo.editId !== null;
     const original = (model?.combos || []).find((combo) => combo.id === state.combo.editId);
     const form = state.combo.form;
-    const outputSupported = model?.participation?.comboOutputBehaviorsSupported === true;
     // The keyboard's default window; empty on a keyboard that has none, where
     // every combo keeps its own.
     const fallback = edits.comboDefaultTermValue(model);
@@ -65,9 +64,9 @@ export function comboBuilder(canEdit, holdTerm) {
                 ${fallback ? `<button class="btn tiny ghost" data-act="usedefault" ${canEdit ? "" : "disabled"} ${form.followsDefault ? "hidden" : ""}
                     data-tip="Follow the default combo window (Settings · Combos) again, so this combo changes with it.">Use default · ${esc(fallback)} ms</button>` : ""}</div></label>
             <div class="field">
-                <label class="sw"><input type="checkbox" data-output-behavior data-f="combo:${esc(state.combo.editId ?? 'new')}:use-output-behavior" ${form.useOutputBehavior !== false ? "checked" : ""} ${canEdit && outputSupported ? "" : "disabled"}>
+                <label class="sw"><input type="checkbox" data-output-behavior data-f="combo:${esc(state.combo.editId ?? 'new')}:use-output-behavior" ${form.useOutputBehavior !== false ? "checked" : ""} ${canEdit ? "" : "disabled"}>
                     <span class="track"></span><span class="txt">${esc(sentence(vocabulary(model).comboOptions.useOutputBehavior))}</span></label>
-                <p class="note">${outputSupported ? `Off, this combo still fires and sends its normal output action. ${esc(bypassedOutput(model, form.output))} The behaviour master and Settings · Combos · Combo outputs use behaviours must also be on.` : "Update both halves to control whether this combo uses its output behaviour."}</p>
+                <p class="note">Off, this combo still fires and sends its normal output action. ${esc(bypassedOutput(model, form.output))} The behaviour master and Settings · Combos · Combo outputs use behaviours must also be on.</p>
             </div>
             <div class="row combo-flags">
                 ${[["mustHold", "Fires only once its keys are held past the combo hold threshold (Settings · Combos). Released sooner, the keys type themselves."],

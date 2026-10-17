@@ -25,7 +25,7 @@ export interface BehaviorView extends Omit<Behavior, 'steps'> {
 }
 export interface ComboView extends Combo {inputPositions?: number[]; id: number; badge: string; inputDisplays: string[]; outputDisplay: string}
 export interface CatalogEntry {value: string; key: string; label: string; group: string; aliases: string[]; keycode: number; searchTerms: string[]; search: string; searchCompact: string; name?: string; tip?: string}
-export interface MacroSlot {kind: string; keycode: string; name: string; payload: string; protection: 'auto' | 'on' | 'off'; uninterruptible: boolean; needsUnicodeEntry: boolean; needsUnicodeSetup: boolean; playbackError: string; playbackCode: string; empty: boolean; bytes: number; program: number; playable: boolean; available: boolean; roomTaps: number}
+export interface MacroSlot {kind: string; keycode: string; name: string; payload: string; protection: 'auto' | 'on' | 'off'; uninterruptible: boolean; needsUnicodeEntry: boolean; needsUnicodeSetup: boolean; playbackError: string; playbackCode: string; empty: boolean; bytes: number; playable: boolean; available: boolean; roomTaps: number}
 /** A custom key's shortcut: a HID report modifier mask (bit 0 Left Ctrl … bit 7 Right GUI) and one key, 0 for none. */
 export interface CustomKeyShortcut {mods: number; key: number}
 /** `shortcutLabel` names the shortcut in the host's words ("Left Ctrl + Right Alt + K"), empty for none. */
@@ -38,7 +38,7 @@ export interface ProfileSummary {layers: number; behaviors: number; combos: numb
  * keyboard is selected; its keyboard is disconnected; it is connected over a new connection; the firmware
  * cannot hold a complete profile; the draft is stale; an operation is running.
  */
-export type DraftBlock = '' | 'no-draft' | 'other-keyboard' | 'disconnected' | 'connection-changed' | 'unsupported' | 'older-firmware' | 'stale' | 'busy';
+export type DraftBlock = '' | 'no-draft' | 'other-keyboard' | 'disconnected' | 'connection-changed' | 'unsupported' | 'stale' | 'busy';
 export interface DraftView {
     id: string; revision: number; dirty: boolean; stale: boolean; connectionChanged: boolean; connected: boolean; matching: boolean; busy: boolean;
     /** Whether core takes an edit to this draft now (core/session/panel-session-state.js draftBinding); the interface's canEdit reads it. */
@@ -70,7 +70,7 @@ export interface PublishedModel {
     layers: Layer[];
     hostLayoutLegends: Record<string, string[]> | null;
     pdModes: (PdSlot & {displayName: string; binding: {slot: number; hold: string; lock: string; holdCode: number; lockCode: number}})[];
-    pdModeEditing: {writable: boolean; dpiChoices: {value: number; label: string}[]; clicks: boolean; macros: boolean; tapKeys: {plain: string[]; modified: string[]}};
+    pdModeEditing: {writable: boolean; dpiChoices: {value: number; label: string}[]; tapKeys: {plain: string[]; modified: string[]}};
     keyBehaviors: BehaviorView[];
     behaviorEditing: {busy: boolean; writable: boolean; maxTapStepsPerBehavior: number; keyDefaults: Record<string, {builtIn: BuiltIn; timing: Record<string, Scalar | undefined>}>};
     profileIdentity: Partial<BaseIdentity> | null;
@@ -79,11 +79,9 @@ export interface PublishedModel {
     comboReadback: {layerReferences?: number[]; version?: number; state?: string; writable?: boolean; defaultTermMs?: number; holdTermMs?: number; enabled?: boolean; error?: {message?: string}};
     viaMacros: MacroSlot[];
     macroNameSpace: {perName: number} | null;
-    macroBank: {capacity: number; stored: number; free: number; available: number; slots: number; reserveTaps: number; programMax: number | null} | null;
-    hostSettings: {selected: number; detected: number; effective: number; unicodeEnabled: boolean; unicodeMode: number; layout: number; layoutFits: boolean; macosIso: boolean; supported: boolean} | null;
-    macroUnicode: {supported: boolean; mode: number; enabled?: boolean; os?: number; layouts?: boolean; layout?: number; layoutFits?: boolean; layoutName?: string; layoutChars?: string};
-    macroProtectionSupported: boolean;
-    macroOutputIsolationSupported: boolean;
+    macroBank: {capacity: number; stored: number; free: number; available: number; slots: number; reserveTaps: number} | null;
+    hostSettings: {selected: number; detected: number; effective: number; unicodeEnabled: boolean; unicodeMode: number; layout: number; layoutFits: boolean; macosIso: boolean} | null;
+    macroUnicode: {mode: number; enabled?: boolean; os?: number; layout?: number; layoutFits?: boolean; layoutName?: string; layoutChars?: string};
     macroProtectionChoices: {value: 'auto' | 'on' | 'off'; label: string}[];
     macroEditing: {identity: string; writable: boolean};
     behaviorTimingDefaults: Record<string, string>;
@@ -99,7 +97,6 @@ export interface PublishedModel {
     customKeyEditing: {identity: string; writable: boolean};
     /** The keyboard's own name: '' for the firmware's built-in one, which `builtIn` gives when the host knows it. */
     keyboardName: {name: string; builtIn: string; identity: string; perName: number} | null;
-    ownsLayerKeys: boolean;
     qmkKeycodes: CatalogEntry[];
     qmkKeyLabels: Record<string, string>;
     /** Keycode name → the layer it acts on, beside its label in qmkKeyLabels (model/key-names.js keyLayer). */
@@ -121,6 +118,4 @@ export interface PublishedModel {
     load: LoadView;
     /** A renamed keyboard that disconnected to take its new name, which the panel waits to see again. */
     reconnecting: {name: string} | null;
-    /** The keyboard stores a domain in an older version than Ark writes: it is shown read-only and opens no draft (D-L63). */
-    olderFirmware?: boolean;
 }

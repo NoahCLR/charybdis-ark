@@ -40,13 +40,12 @@ The bridge then sequentially runs these Ark-owned integration runners under `tes
 
 - `run_qmk_portable_editor_tests.sh`: firmware option pages → app reader.
 - `run_qmk_portable_profile_tests.sh`: firmware settings pages → app reader.
-- `run_macro_program_size_tests.sh`: app size predictions against C decoding.
 - `run_profile_compiled_defaults_v1_tests.sh`: app profiles → C validation. A
   profile Ark writes for current firmware (schema 3.0, RGB 4, key behaviours 2,
   combos 3, settings 8, PD 3) is accepted directly. The eight-slot profiles are
   frozen firmware-owned rejection evidence: refused as they are. The bridge
-  also checks Ark's translation of the immediately preceding backup, maximum
-  names and the simultaneous maximum profile in normal and sanitizer builds.
+  also checks maximum names and the simultaneous maximum profile in normal and
+  sanitizer builds.
 - `run_profile_pd_v1_tests.sh`: app PD record corpus → C validation. The
   test-only version-1 envelope converts frozen 96-byte records into the current
   128-byte records checked with Ark's codec, preserving the frozen harness's
@@ -71,11 +70,9 @@ run: this tests working copies, not immutable snapshots or a dirty-tree archive.
 
 The candidate-transfer runner adds Ark upload → production C candidate/store/
 validator checks, including exact reconstructed bytes and corruption rejection,
-in normal and sanitizer builds. When the selected older firmware lacks the
-optional transfer extension, it reports that coverage as skipped; the existing
-full-upload and validator checks still run. New-firmware work must also run this
-runner against the proposed firmware, where it must execute rather than skip.
-Its scan opportunities are simulated and establish no hardware timing.
+in normal and sanitizer builds. Ark supports only current firmware (D-L64), so
+firmware without the transfer extension fails this runner rather than skipping
+it. Its scan opportunities are simulated and establish no hardware timing.
 
 The macro-read-map runner exercises firmware's production checksum worker
 against Ark's sparse reader, in normal and sanitizer builds, with empty,
@@ -83,9 +80,7 @@ sparse (including stale tail bytes) and dense banks at both 34,903 and 65,535
 bytes. It requires exact reconstructed bytes and matching whole-store digests,
 and full-read fallback when firmware's hashed VIA config has nonzero layout
 options. The complete-capture regression also retains that actual storage identity.
-It skips only when the selected firmware predates the optional read-map
-extension; work adding that extension must also run against the proposed
-firmware, where this coverage must execute. Transfer counts are not hardware
+Firmware without the read map fails it. Transfer counts are not hardware
 read timings.
 
 ## Agreement with a firmware contract
@@ -102,6 +97,8 @@ containing firmware's pin:
   consistency rules);
 - the protocol and profile schema are ones Ark speaks, and Ark knows the
   action-ABI digest (`KNOWN_ACTION_ABIS`);
+- the firmware reports every feature Ark requires (`CURRENT_FEATURES` and
+  `CURRENT_MUTATION_FEATURES` in `core/protocol/profile-wire-v1.js`, D-L64);
 - Ark's BK keycode and layout inputs equal those at firmware's BK pin (file
   equality, not commit equality);
 - Ark's pinned fixtures equal the firmware's.
@@ -110,11 +107,11 @@ What can break Ark, and what checks it:
 
 | Surface | Defined in | Ark learns it from | Checked by |
 | --- | --- | --- | --- |
-| Profile Wire channel | firmware `compat/qmk_via_profile_channel.c` | protocol and schema versions, feature flags | agreement (pages decode, versions); golden fixtures |
+| Profile Wire channel | firmware `compat/qmk_via_profile_channel.c` | protocol and schema versions, feature flags | agreement (pages decode, versions, required features); golden fixtures |
 | Stored profile format (blob, domains, settings, compiled defaults) | firmware `lib/profile/schema/` | schema version | the bridge's runners; agreement (fixtures equal) |
 | Action vocabulary and action-ABI digest | firmware, and BK keycode values | digest against `KNOWN_ACTION_ABIS` | agreement (digest known) |
 | Keycode catalog and layout | BK | Ark's pinned BK snapshot | agreement (files equal at firmware's BK pin); `npm run keycodes -- --check` |
-| VIA surface (layers, macro buffer, macro format) | BK's VIA and firmware config | capacities on the capability pages | agreement (decoder consistency rules); macro-size runner |
+| VIA surface (layers, macro buffer, macro format) | BK's VIA and firmware config | capacities on the capability pages | agreement (decoder consistency rules); macro-read-map runner |
 | Keyboard options (RGB effects and order, LED flags) | BK's RGB matrix and firmware config | reported at runtime | portable-editor runner |
 | Behaviour on the keyboard | firmware | nothing | keyboard checks only; not automatable |
 

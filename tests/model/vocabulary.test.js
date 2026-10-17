@@ -50,7 +50,7 @@ test("one rule names an unnamed layer, slot, branch and modifier set", () => {
 
 
 test("macro playback statuses have one set of presentation words", () => {
-    assert.deepEqual(VOCABULARY.macroPlayback, {setup: "setup", tooLong: "too long", blocked: "blocked", noRoom: "no room"});
+    assert.deepEqual(VOCABULARY.macroPlayback, {setup: "setup", blocked: "blocked", noRoom: "no room"});
 });
 
 

@@ -3,7 +3,7 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const {execFileSync} = require("node:child_process");
-const {PROFILE_DOMAINS, PROFILE_DOMAIN_IDS, PROFILE_DOMAIN_VERSIONS, READABLE_DOMAIN_VERSIONS, PROFILE_WIRE_DOMAINS, PROFILE_DOMAIN_MASK,
+const {PROFILE_DOMAINS, PROFILE_DOMAIN_IDS, PROFILE_DOMAIN_VERSIONS, PROFILE_WIRE_DOMAINS, PROFILE_DOMAIN_MASK,
     profileDomain, domainCodec, encodeProfileDomains, replaceDomain} = require("../../core/schema/profile-domains");
 const {decodeProfileBlob, encodeProfileBlob} = require("../../core/schema/profile-blob-v1");
 const {validateSnapshot} = require("../../core/model/portable-profile");
@@ -166,10 +166,11 @@ test("replacing a domain preserves every other envelope and lets the caller reta
     assert.throws(() => replaceDomain(snapshot.profile, PROFILE_DOMAIN_IDS.SETTINGS, payload => payload, () => {throw capacityError;}), error => error === capacityError);
 });
 
-test("a live keyboard's older domain versions are readable, and never a newer one", () => {
+test("each domain is read only in the version current firmware stores, older or newer refused", () => {
     for (const domain of PROFILE_DOMAINS) {
-        assert.deepEqual(READABLE_DOMAIN_VERSIONS[domain.id], Array.from({length: domain.version}, (_, index) => index + 1), domain.name);
+        for (const version of [domain.version - 1, domain.version + 1]) {
+            assert.throws(() => decodeProfileBlob(encodeProfileBlob({domains: [{id: domain.id, version, payload: Buffer.alloc(0)}]}, {domainVersions: {[domain.id]: version}})),
+                error => error.code === "UNKNOWN_DOMAIN_VERSION", `${domain.name} v${version}`);
+        }
     }
-    assert.ok(READABLE_DOMAIN_VERSIONS[PROFILE_DOMAIN_IDS.SETTINGS].includes(7), "settings v7, before custom-key shortcuts (D-L63)");
-    assert.ok(!READABLE_DOMAIN_VERSIONS[PROFILE_DOMAIN_IDS.SETTINGS].includes(PROFILE_DOMAIN_VERSIONS[PROFILE_DOMAIN_IDS.SETTINGS] + 1));
 });

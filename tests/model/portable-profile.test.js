@@ -3,7 +3,7 @@ const {test} = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const {validateSnapshot, reorderLayers, fingerprint, materializeProfile, olderDomains, currentDomain} = require("../../core/model/portable-profile");
+const {validateSnapshot, reorderLayers, fingerprint, materializeProfile} = require("../../core/model/portable-profile");
 const {encodeSettings, decodeSettings} = require("../../core/schema/settings-domain-v1");
 const {decodeProfileBlob, encodeProfileBlob} = require("../../core/schema/profile-blob-v1");
 const {decodeKeyBehaviorDomain, encodeKeyBehaviorDomain} = require("../../core/schema/key-behavior-domain-v1");
@@ -32,7 +32,7 @@ test("reorder moves matrix data, RGB, pointer policy and every layer action refe
     assert.equal(fingerprint(reorderLayers(reordered, [0, 4, 2, 3, 1, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])), fingerprint(source));
 });
 test("a backup from older firmware is refused, never upgraded: the keyboard stores only the current format", () => {
-    const older = /older firmware/;
+    const older = /format current firmware does not store/;
     const source = document();
     // Another schema, action vocabulary or layer count, and the retired
     // pointing-mode evidence older backups carried.
@@ -242,21 +242,16 @@ test("current backups preserve retired user assignments without reinterpreting t
     assert.equal(keyLabel(names, 0x7f00), "Right Thumb");
 });
 
-test("a keyboard's settings v7 are read through the backup translation, with no shortcuts, and named as older", () => {
+test("a keyboard storing a domain in another version than current firmware's is not read", () => {
     const source = validateSnapshot(document());
     const current = encodeSettings(settings());
     const v7 = Buffer.concat([current.subarray(0, 404), current.subarray(660)]);
     v7[0] = 7; v7[6] = 0;
     const blob = decodeProfileBlob(source.profile);
     const live = encodeProfileBlob({schema: blob.schema, domains: blob.domains.map(domain => domain.id === 0x40 ? {...domain, version: 7, payload: v7} : domain)},
-        {domainVersions: {0x10: [4], 0x20: [2], 0x30: [3], 0x40: [7], 0x50: [3]}});
+        {domainVersions: {0x10: 4, 0x20: 2, 0x30: 3, 0x40: 7, 0x50: 3}});
     const combos = {defaultTermMs: 50, holdTermMs: 200, rows: []};
-    const profile = materializeProfile(live, live, combos, v7);
-    const read = decodeSettings(decodeProfileBlob(profile).domains.find(domain => domain.id === 0x40).payload);
-    assert.deepEqual(read.customKeyShortcuts.filter(shortcut => shortcut.mods || shortcut.key), [], "no custom key has a shortcut");
-    assert.deepEqual(read.names, decodeSettings(current).names, "every name survives the translation");
-    assert.deepEqual(olderDomains(live, live, v7), [{id: 0x40, version: 7}]);
-    assert.deepEqual(olderDomains(source.profile, source.profile, current), [], "a current keyboard stores nothing older");
-    assert.equal(currentDomain({id: 0x40, version: 8, payload: current}).payload, current, "a current domain is its own");
-    assert.throws(() => materializeProfile(live, live, combos, Buffer.from([9, ...current.subarray(1)])), "a newer version is refused");
+    assert.throws(() => materializeProfile(live, live, combos, current), {code: "FIRMWARE_UPDATE_REQUIRED", message: /Ark supports only current firmware/});
+    assert.throws(() => materializeProfile(source.profile, source.profile, combos, Buffer.from([9, ...current.subarray(1)])), /settings/i, "settings in another version are refused");
+    assert.doesNotThrow(() => materializeProfile(source.profile, source.profile, combos, current));
 });

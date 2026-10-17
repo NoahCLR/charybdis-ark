@@ -71,25 +71,21 @@ test("bridge selects explicit checkouts, records dirty state, and stops on failu
 });
 
 
+// Ark supports only current firmware: firmware without what a runner checks
+// fails the bridge, never skips it.
 for (const [runner, header] of [
     ["run_candidate_transfer_tests.sh", "users/noah/lib/profile/protocol/profile_candidate_v1.h"],
     ["run_macro_read_map_tests.sh", "users/noah/lib/compat/qmk_via_storage_regions.h"],
-]) test(`${runner} skips absent features but fails unreadable contracts and missing search tools`, () => {
+]) test(`${runner} fails, never skips, on firmware without what it checks`, () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "ark-contract-guard-"));
     try {
         const env = {...process.env, FIRMWARE_ROOT: root, CHARYBDIS_ARK_ROOT: path.resolve(__dirname, "../..")};
         const script = path.resolve(__dirname, "../integration", runner);
-        const unreadable = spawnSync("/bin/sh", [script], {env, encoding: "utf8"});
-        assert.notEqual(unreadable.status, 0, "a missing contract cannot prove an absent feature");
-        assert.doesNotMatch(unreadable.stdout, /skipped/);
         const file = path.join(root, header);
         fs.mkdirSync(path.dirname(file), {recursive: true});
-        fs.writeFileSync(file, "/* older firmware without the optional feature */\n");
+        fs.writeFileSync(file, "/* older firmware without the feature */\n");
         const older = spawnSync("/bin/sh", [script], {env, encoding: "utf8"});
-        assert.equal(older.status, 0);
-        assert.match(older.stdout, /predates/);
-        const noTools = spawnSync("/bin/sh", [script], {env: {...env, PATH: root}, encoding: "utf8"});
-        assert.notEqual(noTools.status, 0);
-        assert.doesNotMatch(noTools.stdout, /skipped/);
+        assert.notEqual(older.status, 0);
+        assert.doesNotMatch(older.stdout, /skipped|predates/);
     } finally { fs.rmSync(root, {recursive: true, force: true}); }
 });

@@ -105,9 +105,7 @@ export function advancedControls(model, slot, scrolling, {form, disabled, field,
     }
 
     const buttons = section("Mouse button overrides");
-    buttons.append(el(model.pdModeEditing?.clicks
-        ? `<p class="note">A tap override can click mouse buttons 1–8, including its own number, without running the clicked button's behaviour or overrides. A button already held stays held, with no extra click.</p>`
-        : `<p class="note">This keyboard's firmware cannot click mouse buttons from a pointing mode. Tap overrides can still send keyboard shortcuts.</p>`));
+    buttons.append(el(`<p class="note">A tap override can click mouse buttons 1–8, including its own number, without running the clicked button's behaviour or overrides. A button already held stays held, with no extra click.</p>`));
     if ((slot.buttons || []).length) {
         // An override still being set up is drawn as chosen, not as stored.
         const unfinished = state.pdButtons?.slot === slot.id ? state.pdButtons.rows : {};

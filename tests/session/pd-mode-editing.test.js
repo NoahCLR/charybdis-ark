@@ -71,12 +71,12 @@ test("keycode-picker modifier expressions are accepted as directional actions", 
     assert.equal(mode.directions.up.keycode, 0x081d);
     assert.equal(mode.directions.down.keycode, 0x081c);
 });
-test("logical Apply declares schema three, all five domains and storage format four", () => {
+test("logical Apply declares schema three, all five domains and storage format five", () => {
     const value = validateSnapshot(document());
     const metadata = candidateMetadataForBlob(value.profile, {actionAbiDigest: value.document.actionAbiDigest, viaGeneration: 3, viaDigest: 42});
-    assert.equal(metadata.schemaMajor, 3); assert.equal(metadata.requestedDomains, 31); assert.equal(metadata.storeFormatVersion, 4);
+    assert.equal(metadata.schemaMajor, 3); assert.equal(metadata.requestedDomains, 31); assert.equal(metadata.storeFormatVersion, 5);
     const frame = buildCandidateBeginRequest(1, metadata);
-    assert.equal(frame[23], 4); assert.equal(frame.readUInt32LE(24), 3); assert.equal(frame.readUInt32LE(28), 42);
+    assert.equal(frame[23], 5); assert.equal(frame.readUInt32LE(24), 3); assert.equal(frame.readUInt32LE(28), 42);
 });
 
 test("a cleared slot keeps its bindings, because the keyboard keeps its keycodes", () => {

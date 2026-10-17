@@ -41,7 +41,7 @@ export function screenMacros() {
     if (!bank.length) {
         pad.classList.remove("library");
         pad.appendChild(el(`<div class="screen-stub"><h3>No macro banks read</h3>
-            <p class="note">${esc(unavailable(model) || "This firmware has not reported its macro banks.")}</p></div>`));
+            <p class="note">${esc(unavailable(model) || "Choose Read keyboard to load this keyboard's macros.")}</p></div>`));
         main.appendChild(content);
         return main;
     }
@@ -65,11 +65,11 @@ export function screenMacros() {
         const peek = macroPeekSteps(readMacro(model, row.keycode, row.payload, "peek").steps, (name) => model?.qmkKeyLabels?.[name] || name);
         const out = row.available === false;
         const tip = out ? `Slot ${index} · no room: the free macro memory is kept for the lower empty slots. Shorten or clear a macro to open it.`
-            : row.empty ? `Slot ${index} · empty` : `Slot ${index} · ${steps.length} step${steps.length === 1 ? "" : "s"}${memory?.programMax === null ? "" : ` · ${row.program} of ${memory?.programMax ?? 512} bytes to play`} · ${row.payload}`;
+            : row.empty ? `Slot ${index} · empty` : `Slot ${index} · ${steps.length} step${steps.length === 1 ? "" : "s"} · ${row.payload}`;
         const cell = el(`<button class="mslot ${row.empty ? "" : "filled"} ${out ? "out" : ""} ${row.playable === false ? "warn" : ""}" data-slot="${esc(row.keycode)}"
             aria-current="${row.keycode === slot?.keycode}" ${out ? "disabled" : ""} data-tip="${esc(tip)}">
             <span class="n">M${index}</span>${changedMacros.has(row.keycode) ? draftDot("Changed in your draft", "corner") : ""}
-            <span class="v">${row.needsUnicodeSetup ? vocabulary(model).macroPlayback?.setup : row.playable === false ? (row.playbackCode === "MACRO_TOO_LONG" ? vocabulary(model).macroPlayback?.tooLong : vocabulary(model).macroPlayback?.blocked) : row.name ? esc(row.name.length > 13 ? `${row.name.slice(0, 12)}…` : row.name) : row.empty ? (out ? vocabulary(model).macroPlayback?.noRoom : "—") : esc(peek.length > 13 ? `${peek.slice(0, 12)}…` : peek)}</span></button>`);
+            <span class="v">${row.needsUnicodeSetup ? vocabulary(model).macroPlayback?.setup : row.playable === false ? vocabulary(model).macroPlayback?.blocked : row.name ? esc(row.name.length > 13 ? `${row.name.slice(0, 12)}…` : row.name) : row.empty ? (out ? vocabulary(model).macroPlayback?.noRoom : "—") : esc(peek.length > 13 ? `${peek.slice(0, 12)}…` : peek)}</span></button>`);
         cell.addEventListener("click", () => { state.macroSlot = row.keycode; render(); });
         cells.append(cell);
     });

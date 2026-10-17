@@ -2,7 +2,7 @@
 "use strict";
 const {LAYERS} = require("../data/charybdis-layout");
 const {isUnhandledEcho, orUnhandled} = require("./via-unhandled-v1");
-const {assertPagesReachable, buildProfileGetRequest, decodeProfileResponse, profileResponseMatcher} = require("./profile-wire-v1");
+const {buildProfileGetRequest, decodeProfileResponse, profileResponseMatcher} = require("./profile-wire-v1");
 const {fnv1a32} = require("../schema/profile-blob-v1");
 
 const COMBO_READBACK_V1 = Object.freeze({VALUE: 0x06, VERSION: 3, MAX_ROWS: 128, MAX_INPUTS: 16, MAX_LAYERS: LAYERS, PAGES_PER_ROW: 2});
@@ -61,17 +61,16 @@ async function readDeviceCombos(connection, options = {}) {
     /** @param {number} page */
     const read = async page => {
         const id = options.nextRequestId ? options.nextRequestId() : (nextId = nextId % 255 + 1);
-        const request = buildProfileGetRequest(COMBO_READBACK_V1.VALUE, page, id, {widePages: options.widePages});
+        const request = buildProfileGetRequest(COMBO_READBACK_V1.VALUE, page, id);
         const response = await connection.request(request, {
             matchResponse: orUnhandled(profileResponseMatcher, request),
         });
-        if (isUnhandledEcho(response, request)) throw fail("COMBO_UNSUPPORTED", "This firmware does not expose combos. Flash the updated firmware pair to read them.");
+        if (isUnhandledEcho(response, request)) throw fail("COMBO_UNSUPPORTED", "The keyboard does not report its combos: Ark supports only current firmware. Update both halves to read them.");
         return Buffer.from(decodeProfileResponse(response, request));
     };
     for (let attempt = 0; attempt < 2; attempt++) {
         const before = await read(0);
-        if (before[0] !== COMBO_READBACK_V1.VERSION || before[1] > COMBO_READBACK_V1.MAX_ROWS) throw fail("COMBO_INCOMPATIBLE", "Unsupported combo readback version or capacity: update both halves to firmware with 16 layers.");
-        assertPagesReachable(2 + COMBO_READBACK_V1.PAGES_PER_ROW * before[1], options.widePages);
+        if (before[0] !== COMBO_READBACK_V1.VERSION || before[1] > COMBO_READBACK_V1.MAX_ROWS) throw fail("COMBO_INCOMPATIBLE", "Unsupported combo readback version or capacity: Ark supports only current firmware. Update both halves.");
         const pages = [];
         for (let index = 1; index <= COMBO_READBACK_V1.PAGES_PER_ROW * before[1] + 1; index++) pages.push(await read(index));
         if (!before.equals(await read(0))) continue;

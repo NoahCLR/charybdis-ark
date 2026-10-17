@@ -30,7 +30,7 @@ export function screenMouse() {
             <p class="note">${esc(unavailable(model) || "Choose Read keyboard to load this keyboard's pointer settings.")}</p></div>`));
     } else if (!canEdit) {
         pad.appendChild(el(`<div class="unavailable">${esc(unavailable(model)
-            || "This firmware reports its pointer settings but cannot save them. Flash the complete-profile pair to edit them here.")}</div>`));
+            || "These settings cannot be edited right now.")}</div>`));
     }
     for (const section of sections) if (section.fields.length) pad.appendChild(sectionCard(model, section, section.fields, canEdit));
     main.appendChild(content);

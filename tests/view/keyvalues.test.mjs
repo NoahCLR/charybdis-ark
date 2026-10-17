@@ -59,7 +59,7 @@ test("picker modifier checks include both selected sides and a shifted key's sto
 });
 
 test("pointing picks allow modified keyboard keys while mouse clicks and media stay plain", () => {
-    const model = buildDeviceModel({capabilities: {featureFlags: 1 << 28}});
+    const model = buildDeviceModel({});
     const problem = (key, mods) => pickerModifierProblem(model, {keys: [key], mods, mode: "single", modifiable: model.pdModeEditing.tapKeys.modified});
     assert.equal(problem("KC_A", ["C"]), "");
     for (const key of ["QK_MOUSE_BUTTON_3", "QK_MOUSE_BUTTON_4", "KC_AUDIO_VOL_UP"]) {
