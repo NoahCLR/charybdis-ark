@@ -18,7 +18,14 @@ connected over USB; the slave half is its partner over the split cable. These
 roles do not imply left or right, and the Device screen explains them.
 `restoreProfile()` reports at each real boundary with byte counts. A failure keeps its step, a reason from the
 keyboard's own error (or the slave half's last answer), and whether anything
-was saved. The commit bar keeps a failed Apply on screen until dismissed.
+was saved. After the decision it says how the save ends. Ordinarily the
+keyboard finishes it from the slave half's copy. When the candidate is (or
+reads back as) `AUTHORITY_FAILED`, only a restart ends it: the message asks
+for an unplug and replug, and says whether the master half types nothing
+(VIA ACCEPT seen, or read back as queued, acknowledged, failed or rolled
+forward), keeps typing (staged with nothing queued) or may type nothing (VIA
+status unreadable), with that keyboard reason in place of the failed step's own.
+The commit bar keeps a failed Apply on screen until dismissed.
 Transfer progress uses a separate `applyProgress` panel message, correlated to
 the current draft ID and revision. The service retains the latest view for
 full snapshots; progress alone updates the commit bar without rebuilding the

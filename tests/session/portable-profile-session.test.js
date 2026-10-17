@@ -7,7 +7,7 @@ const {document32: document} = require("../fixtures/pd-slots-32");
 const {changedRanges, viaStorageDigest, VIA_STORAGE} = require("../../core/protocol/via-storage-v1");
 const {decodeProfileBlob, encodeProfileBlob, fnv1a32} = require("../../core/schema/profile-blob-v1");
 const {encodeSettings} = require("../../core/schema/settings-domain-v1");
-const {PROFILE_CANDIDATE_V1: C} = require("../../core/protocol/profile-candidate-v1");
+const {PROFILE_CANDIDATE_V1: C, CANDIDATE_ERROR: E} = require("../../core/protocol/profile-candidate-v1");
 const {LOGICAL_VIA_STAGE_V1: V} = require("../../core/protocol/logical-via-stage-v1");
 const {fakeKeyboard} = require("../fixtures/fake-keyboard");
 const {capabilities, fixture} = require("../fixtures/portable-restore");
@@ -185,6 +185,57 @@ test("an unobserved durable decision refuses abort and the keyboard finishes fro
     assert.equal(f.keyboard.events.at(-1), "abort refused");
     assert.deepEqual(f.keyboard.active, Buffer.from(f.source.profile, "base64"));
     f.keyboard.recover(); assertTarget(f);
+});
+// After the decision, lost split authority or a concurrent commit leaves the
+// keyboard in AUTHORITY_FAILED until it restarts, and from the VIA ACCEPT
+// request the master half types nothing until then. Waiting does nothing.
+const REPLUG = /Unplug the USB cable \(not the cable between the halves\), wait a few seconds and plug it back in, then read the keyboard again\. Only if it still shows the old profile: Import the recovery file \/recovery\.json\./;
+const AUTHORITY_REASONS = [[E.POSTCOMMIT_AUTHORITY_LOST, "The slave half reported a newer profile after the master half saved."], [E.PEER_COMMIT_CONFLICT, "The two halves disagree about which profile is current."]];
+// The wait for ACCEPT then times out, through the production coordinator.
+/** @param {ReturnType<typeof fixture>} f @param {import("node:test").TestContext} t */
+function timeOutAccept(f, t) {
+    if (!timedOut.has(t)) {t.mock.timers.enable({apis: ["Date"], now: 0}); timedOut.add(t);}
+    f.options.sleep = async () => t.mock.timers.tick(120000);
+}
+const timedOut = new WeakSet();
+test("an authority failure after the slave half acknowledged ACCEPT says the master half types nothing until it is plugged in again", async () => {
+    for (const [error, reason] of AUTHORITY_REASONS) {
+        const f = fixture(); f.keyboard.faults.authorityFailed = {error, accept: "acknowledged"};
+        await assert.rejects(f.restore(), failure => failure.code === "RESTORE_INCOMPLETE" && failure.saved === "unknown" && failure.reason === reason
+            && /The master half types nothing until it restarts\./.test(failure.message) && REPLUG.test(failure.message)
+            && !/finishes from the slave half's copy/.test(failure.message) && failure.cause.code === "AUTHORITY_FAILED");
+        assert.ok(f.keyboard.events.includes("local write"), "the master half's rewrite ran under the fence");
+        assert.equal(f.keyboard.events.includes("activated"), false);
+    }
+});
+test("an authority failure with ACCEPT queued but unanswered is fenced too, found by reading the keyboard after the wait failed", async t => {
+    for (const [error, reason] of AUTHORITY_REASONS) {
+        const f = fixture(); timeOutAccept(f, t); f.keyboard.faults.authorityFailed = {error, accept: "queued"};
+        await assert.rejects(f.restore(), failure => failure.code === "RESTORE_INCOMPLETE" && failure.reason === reason
+            && /The master half types nothing until it restarts\./.test(failure.message) && REPLUG.test(failure.message)
+            && !/finishes from the slave half's copy/.test(failure.message) && /staged VIA profile to become the recovery authority/.test(failure.message));
+        assert.equal(f.keyboard.events.includes("local write"), false);
+        assert.equal(f.keyboard.events.at(-1), "authority failed");
+    }
+});
+test("an authority failure before ACCEPT was requested still needs a restart, but the master half keeps typing", async t => {
+    const f = fixture(); timeOutAccept(f, t); f.keyboard.faults.authorityFailed = {error: E.PEER_COMMIT_CONFLICT, accept: "never"};
+    await assert.rejects(f.restore(), failure => failure.code === "RESTORE_INCOMPLETE"
+        && /The master half keeps typing the old profile until it restarts\./.test(failure.message) && REPLUG.test(failure.message)
+        && !/types nothing/.test(failure.message) && !/finishes from the slave half's copy/.test(failure.message));
+});
+test("an authority failure whose VIA status cannot be read afterwards assumes the master half may be fenced", async t => {
+    const f = fixture(); timeOutAccept(f, t); f.keyboard.faults.authorityFailed = {error: E.POSTCOMMIT_AUTHORITY_LOST, accept: "never"};
+    f.keyboard.faults.beforeRequest = (r, keyboard) => {if (keyboard.events.includes("authority failed") && r[0] === 8 && r[2] === V.VALUE_STATUS) throw Error("unreadable");};
+    await assert.rejects(f.restore(), failure => failure.code === "RESTORE_INCOMPLETE"
+        && /The master half may type nothing until it restarts\./.test(failure.message) && REPLUG.test(failure.message));
+});
+test("other failures after an observed ACCEPT keep the message that the keyboard finishes by itself", async () => {
+    const f = fixture();
+    f.keyboard.faults.beforeRequest = r => {if (r[0] === VIA_STORAGE.LAYOUT_WRITE) throw Object.assign(Error("write refused"), {code: "REQUEST_TIMEOUT"});};
+    await assert.rejects(f.restore(), failure => failure.code === "RESTORE_INCOMPLETE" && /finishes from the slave half's copy/.test(failure.message)
+        && !/Unplug|restarts/.test(failure.message));
+    assert.equal(f.keyboard.events.includes("authority failed"), false);
 });
 // A reviewed snapshot without its raw custom bytes gives Apply no source to
 // reuse, so it streams the whole profile.
