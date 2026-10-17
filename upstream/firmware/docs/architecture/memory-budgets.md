@@ -19,6 +19,9 @@ The target definition is
 linker map is
 `../bastardkb-qmk/platforms/chibios/boards/common/ld/RP2040_FLASH_TIMECRIT.ld`.
 
+The dated sections below record each change's linked measurements in order;
+the newest is last.
+
 ## Historical Ordinary Checkpoint — 2026-09-03
 
 Freshly remeasured on 2026-09-03 at the first testable engineering live-edit
@@ -75,7 +78,7 @@ GNU `size` reports the linker-reserved `.heap` section and stack reservations
 inside its aggregate BSS number. Do not add that aggregate BSS value to the
 separate `.data`, `.bss`, core-memory-span, or stack figures.
 
-## Current Portable-Profile Checkpoint — 2026-09-08
+## Portable-Profile Checkpoint — 2026-09-08
 
 The eight-layer left artifact was built by `sh tools/build-firmware-pair.sh`
 with `NOAH_PHYSICAL_HALF=left` and `FORCE_SLAVE=yes`. The owner and portable
@@ -113,7 +116,7 @@ Repartitioning the existing 16 KiB logical EEPROM does not enlarge its linked
 wear-level cache. Increasing logical EEPROM does increase that cache roughly
 byte-for-byte and therefore requires a fresh linked measurement.
 
-## Current Atomic-Apply Checkpoint — 2026-09-15
+## Atomic-Apply Checkpoint — 2026-09-15
 
 The normal eight-layer, owner-enabled left image from
 `sh tools/build-firmware-pair.sh` links the `runtime_owner` at exactly 4,096
@@ -167,16 +170,19 @@ Every memory report must name:
   runtime high-water;
 - the exact fresh build and command that produced it.
 
-Use:
+Measure the instrumented pair, built as the firmware anyone flashes (from a
+task worktree, with `QMK_ROOT` and `BUILD_ROOT` set):
 
 ```sh
-qmk compile -kb bastardkb/charybdis/4x6 -km noah
-sh tests/host/run_firmware_memory_budget_checks.sh
-sh tests/host/run_firmware_stack_budget_checks.sh
+NOAH_RESOURCE_CHECKS=yes sh tools/build-firmware-pair.sh
 ```
 
-The stack runner performs its own clean instrumented build. Its PASS result is
-explicitly limited to the paths in `tools/firmware_stack_budget.json`.
+It runs `tests/host/run_firmware_memory_budget_checks.sh` and both
+reviewed-path manifests on each half and keeps the ELF, map, flags and reports
+beside the pair. A PASS covers only the paths in `tools/firmware_stack_budget.json`
+and `tools/firmware_stack_budget_live_profile_owner.json`. The standalone
+`tests/host/run_firmware_stack_budget_checks.sh` compiles a plain `qmk compile`
+image without the live-profile owner (D-L08), not the flashed pair.
 
 ## Portable-Profile Stack Acceptance — 2026-09-08
 
@@ -559,9 +565,43 @@ call shape the paths measure. Three paths cover the shortcut itself, on both
 halves: a held shortcut's press (1,288 bytes), a behaviour step tapping one
 (1,408) and its release (1,360), all within the 1,920-byte main-process budget.
 
-Both builds, `dev`'s included, fail the reviewed-path gate in the same way:
-the same six `main_process` paths over 1,920 bytes (worst 2,104, handled press
-projection with fallback settlement), the missing
-`noah_dispatch_synthetic_qmk_tap` and the unlinked `io_read` adjacency of
-boot discovery. That predates this change; it is an open issue in
-[the direction](https://github.com/NoahCLR/charybdis-4x6/blob/6db1ea16a2b5b7971f932537182641f63d545915/docs/LIVE_EDIT_APP_DIRECTION.md#open-issues).
+Both builds, `dev`'s included, failed the reviewed-path gate in the same way;
+the next section gives the cause and the fix.
+
+## Keyboard-name entry points out of line — 2026-10-17
+
+The keyboard name (D-F25) added two entry points that only `main` reaches:
+`noah_qmk_usb_product_name_pre_init`, from `keyboard_pre_init_user`, and
+`noah_qmk_usb_product_name_task`, from housekeeping. LTO inlined both, with
+the boot name read's store walk and the restart checks' owner and VIA
+snapshots, so `main`'s own frame grew from 160 to 352 bytes. `main` is the
+base of every main-process path, so six ordinary paths through fallback
+settlement and seven owner peer-copy paths crossed the 1,920-byte policy
+(worst 2,104 bytes, 456 from the physical 2,560-byte boundary).
+
+Both entry points are now `noinline`
+(`users/noah/lib/compat/qmk_usb_product_name.c`): their frames exist only
+while they run, never beneath a key path. The owner manifest names three
+paths from `main` through them (boot storage read 400 bytes, restart
+readiness 680, USB restart 416), so inlining either again fails the gate as a
+false adjacency. Anything `main` reaches only at boot or from housekeeping
+with more than a few words of locals keeps a frame of its own.
+
+The same builds refresh three adjacencies the linker now shapes differently.
+Boot discovery reaches `io_read` through `noah_profile_store_boot_select_step`,
+a function of its own since the boot name read shares it; the coherent VIA
+status read reaches the authority status through `noah_profile_owner_status`;
+and pointing-mode taps no longer replay a synthetic QMK record, so the stale
+QMK-function tap path gives way to the pointing-mode macro start (D-F23):
+812 bytes decoding a held sequence, 792 reading macro storage.
+
+Fresh resource builds of the pinned image (`NOAH_RESOURCE_CHECKS=yes`
+`tools/build-firmware-pair.sh`, GCC 15.2.0, BK `d280a4471e`) pass both
+manifests on both halves. The worst main-process path is 1,912 bytes in each
+manifest (ordinary: handled press projection with fallback settlement; owner:
+peer large chunk candidate write), 8 bytes inside the policy and 648 bytes
+from the physical boundary; the worst split-slave paths are 328 and 624 bytes
+of 768. SRAM0–3 `.data + .bss` is 208,352 bytes per half, 1,568 below the
+209,920-byte tripwire: 16 bytes of LTO partition padding, no new state. These
+are link-time values for the named paths only, not runtime high-water or a
+global or interrupt-stack maximum.

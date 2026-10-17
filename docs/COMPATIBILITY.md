@@ -36,7 +36,9 @@ warning during local work. With `--publish`, it fails before any runner starts;
 run that form before landing an Ark change that moves a pin (`land` also refuses
 pins that are not on the published trunks).
 
-The bridge then sequentially runs these Ark-owned integration runners under `tests/integration/`:
+The bridge then runs the seven Ark-owned integration runners under
+`tests/integration/` in turn, the five below and then the candidate-transfer and
+macro-read-map runners described after them:
 
 - `run_qmk_portable_editor_tests.sh`: firmware option pages → app reader.
 - `run_qmk_portable_profile_tests.sh`: firmware settings pages → app reader.
@@ -53,7 +55,7 @@ The bridge then sequentially runs these Ark-owned integration runners under `tes
   version-3 vectors and their mutations also require C to report Ark's error
   code and byte offset.
 - `run_profile_rgb_v1_tests.sh`: app RGB encodings and malformed-byte corpus →
-  C validation for format 4 at five- and eight-tap depth, with
+  C validation for RGB domain version 4 at five- and eight-tap depth, with
   address/undefined-behavior sanitizers. Both implementations reject a byte
   that names an older format.
 

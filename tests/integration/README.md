@@ -24,3 +24,7 @@ validator. It compares full and differential uploads of ordinary and maximum
 profiles and rejects corrupted reused bytes. The probe ends at validation;
 firmware's separate host suites exercise committed-source reuse through the
 production owner, both-half saving and reboot. No device is opened.
+
+The macro-read-map runner links the selected firmware's production checksum
+worker against Ark's sparse macro reader and requires exact reconstructed
+banks and matching store digests.

@@ -9,8 +9,9 @@ the result without editing C or reflashing firmware.
 
 This is more than a live-edit transport. The finished product must make the
 keyboard understandable, customizable, recoverable, and trustworthy during
-normal use. The VS Code extension is the development shell for that product;
-its core does not depend on the repository or on VS Code.
+normal use. It runs as a VS Code extension and as a web page in Chrome or
+Edge (D-L02, D-L52); its core depends on neither the firmware repository nor
+VS Code.
 
 It is user-space HID control software; it does not require a custom
 kernel driver. Normal configuration uses the keyboard's VIA and Profile Wire

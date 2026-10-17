@@ -109,8 +109,8 @@ Remaining before calling the product complete:
   does not include, matched against its rules files and QMK's defaults. It
   drifts when a feature is enabled or disabled. The keyboard should report its
   built features so the picker reads them from the device.
-- **Firmware open issues** are tracked in the firmware direction: the one-half
-  power-cycle recovery transition, why a peer stops acknowledging a push or
+- **Firmware open issues** are tracked in the firmware direction, including the
+  one-half power-cycle recovery transition, why a peer stops acknowledging a push or
   fails a flash write mid-copy (D-L22, D-L27), physical acceptance of buffered gesture timing
   (firmware D-F01) and the keycode-block migration not yet run on hardware (D-L42).
 
@@ -151,7 +151,7 @@ text in the firmware repository.
 | <a id="d-l34--layer-keycodes-are-owned-in-the-firmware-and-the-app-follows"></a>D-L34 | Layer keycodes are owned in the firmware, and the app follows | [Firmware direction](https://github.com/NoahCLR/charybdis-4x6/blob/dev/docs/LIVE_EDIT_APP_DIRECTION.md#d-l34--layer-keycodes-are-owned-in-the-firmware-and-the-app-follows) |
 | <a id="d-l38--the-dual-role-setting-is-qmks-tapping-term"></a>D-L38 | The dual-role setting is QMK's tapping term | [Firmware direction](https://github.com/NoahCLR/charybdis-4x6/blob/dev/docs/LIVE_EDIT_APP_DIRECTION.md#d-l38--the-dual-role-setting-is-qmks-tapping-term) |
 | <a id="d-l39--only-the-keyboard-ends-a-staging-together-with-its-candidate"></a>D-L39 | Only the keyboard ends a staging, together with its candidate | [Firmware direction](https://github.com/NoahCLR/charybdis-4x6/blob/dev/docs/LIVE_EDIT_APP_DIRECTION.md#d-l39--only-the-keyboard-ends-a-staging-together-with-its-candidate) |
-| <a id="d-l40--firmware-builds-use-only-the-eight-slot-pointing-engine"></a>D-L40 | Firmware builds use only the eight-slot pointing engine | [Firmware direction](https://github.com/NoahCLR/charybdis-4x6/blob/dev/docs/LIVE_EDIT_APP_DIRECTION.md#d-l40--firmware-builds-use-only-the-eight-slot-pointing-engine) |
+| <a id="d-l40--firmware-builds-use-only-the-eight-slot-pointing-engine"></a>D-L40 | Firmware builds use only the slot-based pointing engine | [Firmware direction](https://github.com/NoahCLR/charybdis-4x6/blob/dev/docs/LIVE_EDIT_APP_DIRECTION.md#d-l40--firmware-builds-use-only-the-slot-based-pointing-engine) |
 | <a id="d-l41--pointing-keycodes-name-slots-not-factory-presets"></a>D-L41 | Pointing keycodes name slots, not factory presets | [Firmware direction](https://github.com/NoahCLR/charybdis-4x6/blob/dev/docs/LIVE_EDIT_APP_DIRECTION.md#d-l41--pointing-keycodes-name-slots-not-factory-presets) |
 | <a id="d-l42--userspace-keycodes-sit-in-fixed-blocks-and-custom-keys-are-named"></a>D-L42 | Userspace keycodes sit in fixed blocks, and custom keys are named | [Firmware direction](https://github.com/NoahCLR/charybdis-4x6/blob/dev/docs/LIVE_EDIT_APP_DIRECTION.md#d-l42--userspace-keycodes-sit-in-fixed-blocks-and-custom-keys-are-named) |
 | <a id="d-l43--split-activity-optimization-at-qmks-default-baud"></a>D-L43 | Split activity optimization, at QMK's default baud | [Firmware direction](https://github.com/NoahCLR/charybdis-4x6/blob/dev/docs/LIVE_EDIT_APP_DIRECTION.md#d-l43--split-activity-optimization-at-qmks-default-baud) |
@@ -329,8 +329,10 @@ Before a file becomes the draft or is restored, its card compares it with what
 the keyboard holds, since that is what applying it would write, counting the
 differences by what they configure: Keys, Lighting, Macros, Mouse and Pointing
 modes (anything else under Other), each with added, changed and removed
-totals. It names no single difference; that is the draft's review. A file identical to the keyboard says so and cannot
-be used. A file carries no layer order, so it is compared slot by slot. See
+totals. It names no single difference; that is the draft's review. A file
+identical to the keyboard says so, and can be used only while the draft has
+edits: using it then puts the draft back to the keyboard's profile, as
+**Discard all** does. A file carries no layer order, so it is compared slot by slot. See
 `importDifferences` in `core/session/panel-session.js` and `categorySummary`
 in `webview/view/review.mjs`.
 
@@ -345,7 +347,7 @@ Apply requires the exact reviewed draft revision and the matching connected
 device; draft revisions are never device generations. Unfinished forms survive
 keeping another section and re-reading the device; undo, redo and review
 require them to be kept or discarded first. An external change preserves the
-draft and blocks a stale Apply; **Review against keyboard** compares it
+draft and blocks a stale Apply; **Review against the keyboard** compares it
 against a fresh read and never silently merges. An incomplete read is labelled
 as recovery, never as a complete backup. Export captures the saved keyboard,
 not unapplied changes. Closing the editor loses the draft.
@@ -670,8 +672,8 @@ firmware repository and its consumers are maintained separately. See
 
 ### D-L45 — Compatibility tests select both implementations explicitly
 
-The developer-only compatibility bridge runs the five Ark-owned
-cross-language runners against explicit firmware, Ark and QMK Git roots.
+The developer-only compatibility bridge runs every Ark-owned cross-language
+runner in `tests/integration/` against explicit firmware, Ark and QMK Git roots.
 It records revisions, dirty state and results without changing runtime or
 requiring firmware for ordinary app checks. Protocol changes run the bridge
 before merging; UI-only changes use the independent suite. Development pins

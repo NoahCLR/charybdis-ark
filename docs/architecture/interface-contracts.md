@@ -162,9 +162,13 @@ import silently substitutes a keyboard shortcut.
   vocabulary. Key Options uses the same host naming rule. Auto with an unknown
   host uses neutral Alt/GUI wording. The webview has no modifier-name table;
   an unnamed value falls back to its stored code. Compact keycodes have one
-  modifier-side flag: the picker checks its model-supplied modifier bits and
-  the selected key's existing mask, and refuses mixed left/right selections.
-  Both native expression encoders refuse those combinations too; numeric
+  modifier-side flag. The picker folds modifiers alone, or with a modifier
+  key, into the simplest keycode that holds them (`modifierPick` in
+  `webview/view/keyvalues.mjs`); otherwise it checks its model-supplied
+  modifier bits and the selected key's existing mask (`pickerModifierProblem`)
+  and refuses mixed left/right selections, where a layout key, behaviour cell
+  or combo output offers a custom key's shortcut instead (D-L63). Both native
+  expression encoders refuse those combinations too; numeric
   stored values keep their exact interpretation. Host-switch browser checks
   exercise open behaviour pickers, combo builders, macro previews and pointing
   editors through the production model-message handler. The stored name
