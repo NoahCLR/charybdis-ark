@@ -43,11 +43,11 @@ matrix.
 | Layout and 16 layers | Read/write keys, layer names and order; a reorder renumbers layer keys by default, any layer can be the base, and key labels follow the host layout (D-L15, D-L29, D-L37, D-L56) |
 | Key behaviours, combos and RGB | Read/write editors over the shared draft, with participation controls at every scope and capability-gated global/per-combo output behaviour permissions (D-L12, D-L32, D-L49, D-L55) |
 | Macros | 128 VIA macros renamed directly through their titles; empty canvas with direct step actions, fixed-size sequence tiles, drag reordering across the whole sequence, Delete/Backspace step removal, per-slot step undo/redo and a shared step clipboard, a selected-step editor, a raw-payload toolbar toggle and live validation, including visible invalid hold order; recorder scoped to its visible slot with taps/chords by default and optional hold timing alongside its other settings; capability-gated Unicode text, typed and checked through the host's OS and keyboard layout; per-macro input protection; one shared memory, shown and enforced (D-L25, D-L26, D-L56, D-L57) |
-| Custom keys | 128 named keys that do what their behaviour says: rename, edit the behaviour on the same screen whether or not the key is placed, place, see where each is used (D-L42) |
+| Custom keys | 128 named keys, each with an optional shortcut (one key and any modifiers, sides mixed) as its own action and a behaviour on top: rename, set or clear the shortcut, edit the behaviour on the same screen whether or not the key is placed, place, see where each is used; behaviour steps may send one's shortcut (D-L42, D-L63) |
 | Mouse | Pointer and sniping DPI, auto-sniping and auto-mouse, settings the core files under Mouse, so the rail, the review and import counts all place them there; the auto-mouse fade is a share of the timeout, edited on its lighting stage (D-L17) |
 | Pointing modes | 32 device-owned slots in the sparse PD domain (D-L41, D-L54); capability-gated mouse-button 1–8 clicks and VIA macro outputs from directions, diagonals and tap overrides, with destination blockers in Review; see [the editor contract](architecture/interface-contracts.md#pointing-tap-outputs) and [PD-mode domain v1](../upstream/firmware/docs/architecture/pd-mode-domain-v1.md) |
 | Global policy | Every other portable setting, including startup layers, combo matching, Host and device-reported lighting and key options; the lighting idle timeout is edited in seconds or minutes; unsupported firmware features stay read-only (D-L18, D-L56) |
-| Keyboard name | The keyboard's own name, its USB product string, edited on Settings and stored in settings v7; an Apply that renames it is followed through the keyboard's USB restart (D-L62) |
+| Keyboard name | The keyboard's own name, its USB product string, edited on Settings and stored in the settings domain; an Apply that renames it is followed through the keyboard's USB restart (D-L62) |
 | Backup and restore | Complete current-format snapshots, import review against the keyboard, recovery file and verified restore; the preceding eight-layer backup is translated before review (D-L15, D-L23, D-L54) |
 | Drafts and Apply | One draft with item-by-item review, discard by edit group, Show, undo/redo and history; the review checks reachable actions, confirms warnings and traps and blocks what the destination cannot save; Apply names its steps and halves and says where a failure happened (D-L19, D-L23, D-L29, D-L30, D-L36, D-L60, D-L61) |
 | Recovery | Atomic logical Apply, differential custom and VIA transfer, reboot recovery fencing, firmware roll-forward after the decision, resume after a lost or power-cycled peer link, bounded cancel owned by the keyboard (D-L20–D-L22, D-L27, D-L39, D-L58) |
@@ -77,6 +77,14 @@ Remaining before calling the product complete:
 - the open issues below.
 
 ## Open Issues
+
+- **Custom key shortcuts need keyboard acceptance (D-L63).** Set a mixed-side
+  shortcut, a modifier-only one and a key-only one, apply, read back and hold
+  each on both halves; put a behaviour on the key and send it from another
+  key's behaviour step and as a bypassed combo output. Before flashing, read a
+  keyboard still on settings v7: it is shown read-only and exports a backup
+  that restores after the update. Automated tests use the firmware's fixtures
+  and fake adapters only.
 
 - **Combo output permissions need keyboard acceptance (D-L55).** Confirm global
   and per-combo bypass, including two combos sharing an output, custom outputs
@@ -426,7 +434,7 @@ replacing the field, preserving native editing and composition.
 Every empty slot keeps room for ten key taps (30 bytes); when free memory
 cannot keep that for every empty slot, the highest-numbered empty slots show no
 room and cannot be edited until space is freed. The firmware does not enforce the reserve, so the
-app shows what a VIA edit left. Current settings version 7 gives every macro
+app shows what a VIA edit left. The current settings version gives every macro
 name up to 32 UTF-8 bytes, following the shared counted-name contract; see the
 [portable profile](../upstream/firmware/docs/architecture/portable-profile-v1.md).
 
@@ -851,7 +859,7 @@ keyboard only where the host says so (`model.host.blocked.demo`).
 ### D-L54 — Current live formats, with a preceding-backup bridge
 
 Ark's live codecs follow firmware D-F14: schema 3.0, RGB 4, key behaviours 2,
-combos 3, settings 6 and sparse PD 3; 16 layers, 128 VIA macros and 128 custom
+combos 3, settings 8 (D-L62, D-L63) and sparse PD 3; 16 layers, 128 VIA macros and 128 custom
 keys; action vocabulary `0x837cf479`. Three capability pages report the wider
 counts, 64 KiB storage slots and 65,504-byte payload capacity. Candidate uploads
 use store format 4 and a nonzero VIA binding. Earlier live firmware remains
@@ -889,12 +897,13 @@ transparent inherited key to the placement that supplies its keycode. Controls
 stage ordinary profile edits; Review and partial Discard preserve other fields,
 Undo/Redo restore policy, and layer reordering moves masks and placement bits
 with their layers. Disabling retains definitions and timing. A bypassed native
-key falls through normally; a bypassed custom key produces no output.
+key falls through normally; a bypassed custom key sends its shortcut, or
+nothing without one (D-L63).
 
 Supporting firmware also exposes a default-on global **Combo outputs use
 behaviours** switch in Settings → Combos and **Use output behaviour** per combo.
 These veto shared behaviour use by generated outputs independently of chord
-participation. Native outputs fall through; custom outputs have no native action.
+participation. Native outputs fall through; a custom output sends its shortcut, or nothing without one (D-L63).
 Zero-default and preceding backups retain the former opt-in behaviour. Feature
 bit 30 gates editing and restoration of bypasses; no domain version, scalar
 count or action ABI changes. Review, history, section Discard, backups, layer
@@ -1124,8 +1133,8 @@ edited in the draft (`renameKeyboard`, `core/model/keyboard-name.js`), reviewed
 as Keyboard name, discarded on its own and kept in backups. A settings v6
 document, from the eight-layer translation or a current-format backup, gains an
 empty name in one translation step (`core/model/backup-translation.js`); a
-keyboard still storing v6 is older firmware, refused as any older domain
-version is.
+keyboard still storing v6 is older firmware, read-only as any older domain
+version is (D-L63).
 
 Labels follow one rule (`deviceLabels` in `core/session/device-model.js`): a
 listed keyboard is called by the product name it reports, and the connected
@@ -1161,6 +1170,64 @@ Ark expects that too. A recovery restore whose previous name is unreadable may
 also restart, so Ark expects it conservatively. Reading or choosing a keyboard
 during the wait ends it; this also ends an expectation if a repaired keyboard
 kept its name and never needed to restart.
+
+### D-L63 — A custom key's shortcut is its own action
+
+Firmware D-F26 gives each custom key an optional shortcut, stored in settings
+domain 0x40, version 8: 128 two-byte records after the layer records, custom
+key 0 first, each an 8-bit HID report modifier mask (bit 0 Left Ctrl … bit 7
+Right GUI, any combination) and one key, none, a basic key `0x04..0xa4` or a
+mouse button `0xd1..0xd8`. Both zero is no shortcut; modifiers alone and a key
+alone are shortcuts. Ark writes version 8 only
+(`core/schema/settings-domain-v1.js`), and a version 7 backup gains 128 empty
+shortcuts in one translation step (`core/model/backup-translation.js`), so it
+restores as it behaved. A keyboard still storing an older domain version, as
+firmware before D-F26 stores settings 7, is read through the same translation
+(`READABLE_DOMAIN_VERSIONS`, `materializeProfile` and `olderDomains` in
+`core/model/portable-profile.js`) and is older firmware, read-only (D-L54): no
+draft opens on it (`older-firmware` in `draftBinding`), its screens show the
+keyboard's own model with the reason, the Shortcut field offers nothing, and
+Apply and restore refuse it before the recovery copy. An export from it is a
+current-format backup with no shortcuts.
+
+The shortcut is edited on the Custom keys screen beside the name, through the
+custom key editor (`updateCustomKeyShortcut`, `core/model/custom-key-editor.js`):
+key and modifiers both in the keycode picker, as any key is set on the Keys
+screen: the key limited to what the firmware accepts, the modifiers in its row.
+In this `shortcut` mode the row's eight modifiers mix sides, which a single
+keycode cannot, and the choice is a mask and a key (`shortcutPick` in
+`webview/view/custom-key.mjs`). The keycode picker folds modifier buttons and
+a clicked modifier key into one set (`modifierPick` in
+`webview/view/keyvalues.mjs`) and stores the simplest keycode that holds it:
+one modifier as the key, wrapped in the others while those are on one side.
+Only a set with two or more modifiers on each side, or a key with modifiers
+from both sides, needs more: a keycode field's picker (a layout key, a
+behaviour cell, a combo output) then offers a custom key for it
+(`shortcutOffer`, `customKeyChoice`). One that already has exactly that
+shortcut and no behaviour is used. Where the field runs the custom key's
+behaviour too, a layout key or a combo output, a match with a behaviour is
+offered beside a new key and the person chooses; a behaviour step sends only
+the shortcut and never chains a behaviour, so there any match is used.
+Otherwise the first unused custom key (`unusedCustomKey`) is named and given
+the shortcut by one `updateCustomKeyShortcut`, whose `then` carries the layout
+or behaviour edit that uses it, staged in the same draft step. A combo output
+is made at once and saved with its combo.
+Review shows it as the custom key's Shortcut field, discarded with its name.
+It is named in the host's words (`shortcutLabel`, `core/model/key-names.js`)
+wherever the key is described: the screen, the picker's tip, the board's hover
+card, the combo editor and the key inspector.
+
+Because the shortcut is the key's own action, its behaviour row works on top:
+the built-in tap and fallback hold of a custom key with a shortcut are the key
+itself, shown as its shortcut, exactly as a plain key's are its keycode
+(`builtInActions`). A bypassed custom key, on a placement or as a combo
+output, sends its shortcut, or nothing without one, and Ark words it so. A
+behaviour step may now send a custom key as a tap, press-and-hold or other
+hold (`placementProblem`); it sends only that key's shortcut, never its
+behaviour, so behaviours never chain. The firmware does not check that such a
+step's key has a shortcut; Ark warns in Review
+(`shortcutlessCustomKeyStep`, `core/model/profile-checks.js`) rather than
+refusing what the keyboard accepts.
 
 ## Historical decisions
 

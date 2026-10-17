@@ -216,13 +216,12 @@ export const macroPlacements = (model, stack, keycode) => placementsVia(macroRea
 export const customKeyKeycodes = (keycode) =>
     [...String(keycode || "").matchAll(/\b(CUSTOM_KEY_\d+)\b/g)].map((match) => match[1]);
 
-// A custom key is reached by a key carrying it or a combo sending it; no
-// behaviour branch can send one.
-/** @param {ViewModel} model @param {Layer[]} stack @param {number} at */
-export const customKeyReach = (model, stack, at) => reachGroups(model, stack, at, customKeyKeycodes,
-    (model?.customKeys || []).filter((key) => key.name || key.hasBehavior).map((key) => key.keycode));
+// Where a custom key is placed, whatever it does: a key carrying it, a
+// behaviour branch sending it (which sends its shortcut, D-L63) or a combo
+// sending it.
 /** @param {ViewModel} model @param {Layer[]} stack @param {string} keycode */
-export const customKeyPlacements = (model, stack, keycode) => placementsVia(customKeyReach, model, stack, keycode);
+export const customKeyPlacements = (model, stack, keycode) => placementsVia(
+    (m, s, at) => reachGroups(m, s, at, customKeyKeycodes, [keycode]), model, stack, keycode);
 
 /** @param {import("./keyface-types.js").ReachOf} reachOf @param {ViewModel} model @param {Layer[]} stack @param {string} keycode */
 function placementsVia(reachOf, model, stack, keycode) {

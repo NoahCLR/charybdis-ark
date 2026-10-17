@@ -3,7 +3,7 @@
 // swapping two keys by dragging one onto the other.
 
 import {keyMeaning} from "../../view/keyface.mjs";
-import {currentLayer, layerName, positionAt, post, state, writable} from "../../store.mjs";
+import {currentLayer, getModel, layerName, positionAt, post, state, writable} from "../../store.mjs";
 import * as edits from "../../view/edits.mjs";
 import {openPicker} from "../picker.mjs";
 
@@ -20,6 +20,11 @@ export function pickKeycodeFor(layoutIndex) {
         seed: position ? [keyMeaning(position)] : [],
         onPick: (expression) => {
             post(edits.setKey(layer.name, layoutIndex, expression));
+        },
+        // Modifiers from both sides, or modifiers alone: an unused custom key
+        // gets them as its shortcut and goes here, in one draft step (D-L63).
+        onCustomKey: (keycode, shortcut, name) => {
+            post(edits.customKeyForShortcut(keycode, shortcut, name, edits.setKey(layer.name, layoutIndex, keycode), getModel()?.customKeyEditing?.identity));
         },
     });
 }

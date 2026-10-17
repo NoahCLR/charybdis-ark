@@ -39,6 +39,17 @@ test("custom keys and macros keep their tap when released before a long hold, an
     assert.equal(builtInActions(key(0x4338), both).releaseTaps, undefined, "a dual-role key always has its own hold");
 });
 
+test("a custom key with a shortcut taps it and holds it as a fallback, like a plain key", () => {
+    const customKeyShortcuts = Array.from({length: 128}, () => ({mods: 0, key: 0}));
+    customKeyShortcuts[2] = {mods: 0x41, key: 0x0e};
+    customKeyShortcuts[127] = {mods: 0x0f, key: 0};
+    const own = operand => ({kind: ACTION.CUSTOM_KEY, operand});
+    for (const [target, slot] of [[own(2), 2], [key(0x7f02), 2], [own(127), 127], [key(0x7f7f), 127]]) {
+        assert.deepEqual(builtInActions(target, {customKeyShortcuts}), {tap: own(slot), hold: own(slot), fallback: true, releaseTaps: true});
+    }
+    assert.deepEqual(builtInActions(own(3), {customKeyShortcuts}), {releaseTaps: true}, "one without a shortcut claims nothing");
+});
+
 test("bare modifiers, other key families and non-keycode targets inherit nothing", () => {
     const others = [key(0x00), key(0x01), key(0x03), key(0xe0), key(0xe3), key(0xe7), key(0x5223), key(0x5310), key(0x7e00), key(0x7e80), key(0x7ec0),
         {kind: ACTION.LAYER_MOMENTARY, operand: 3}, {kind: ACTION.PD_MODE_MOMENTARY, operand: 0}, undefined];

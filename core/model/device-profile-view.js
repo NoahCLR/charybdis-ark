@@ -5,7 +5,7 @@
 // configuration values and membership always come from the received domain.
 const {actionName, layerRef} = require("../schema/actions");
 const {VOCABULARY, branchName} = require("./vocabulary");
-const {keyLabel} = require("./key-names");
+const {keyLabel, shortcutLabel} = require("./key-names");
 const keycodes = require("../data/keycode-catalog");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {KEY_BEHAVIOR_HOLD_MODES} = require("../schema/key-behavior-domain-v1");
@@ -36,8 +36,13 @@ function actionDisplay(action, names) {
 
 // A modifiers-only keycode is how a key holds its modifiers; the catalogue
 // names it "Shift+N/A", which reads as a broken key rather than "Shift".
-/** @param {import("../schema/types.js").SemanticAction} action @param {import("../../contracts/model.js").ProfileKeyNames} [names] */
-function builtInDisplay(action, names) {
+// A custom key's own action is its shortcut, so the cell reads as that.
+/** @param {import("../schema/types.js").SemanticAction} action @param {import("../../contracts/model.js").ProfileKeyNames} [names] @param {import("./built-in-behavior.js").BuiltInFeatures} [features] */
+function builtInDisplay(action, names, features) {
+    if (action.kind === ACTION.CUSTOM_KEY) {
+        const label = shortcutLabel(names, features?.customKeyShortcuts?.[action.operand]);
+        return label ? {label} : {};
+    }
     const display = actionDisplay(action, names);
     return display.label ? {label: display.label.replace(/\+N\/A$/, "")} : display;
 }
@@ -51,8 +56,8 @@ function builtInForView(target, features, names) {
     const {tap, hold, fallback, releaseTaps} = builtInActions(target, features);
     return {
         ...(releaseTaps ? {releaseTaps: true} : {}),
-        ...(tap ? {tap: {helper: "TAP_SENDS", action: actionName(tap), ...builtInDisplay(tap, names)}} : {}),
-        ...(hold ? {hold: {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: actionName(hold), repeatHz: "0", ...builtInDisplay(hold, names),
+        ...(tap ? {tap: {helper: "TAP_SENDS", action: actionName(tap), ...builtInDisplay(tap, names, features)}} : {}),
+        ...(hold ? {hold: {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: actionName(hold), repeatHz: "0", ...builtInDisplay(hold, names, features),
             ...(fallback ? {fallback: true} : {})}} : {}),
     };
 }

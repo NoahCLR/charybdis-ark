@@ -273,10 +273,15 @@ export function commitBar() {
 }
 
 // Read-only reasons, said plainly where the control is.
+// A keyboard whose firmware stores an older profile format is shown as it is,
+// read-only, and can still be backed up (D-L63).
+export const OLDER_FIRMWARE = "This keyboard's firmware is older than this Ark: it cannot store custom-key shortcuts. Its profile is shown read-only; update both halves to edit it. You can export a backup now.";
+
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model */
 export function unavailable(model) {
     if (!model?.device?.connected && !demoOf(model).active) return hostOf(model).blocked?.title || hostOf(model).words.noKeyboard || "";
     if (!model?.layers?.length) return "Nothing has been read from the keyboard yet. Choose Read keyboard.";
+    if (!model?.draft && model?.olderFirmware) return OLDER_FIRMWARE;
     if (!model?.draft) return "This keyboard's firmware cannot hold a complete 16-layer profile, so edits cannot be drafted here. Update both halves.";
     if (!model.draft.matching) return "The local draft belongs to another keyboard. Select it again or discard the draft here.";
     if (model.draft.stale) return "Review the draft against the current keyboard before editing further.";

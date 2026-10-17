@@ -233,6 +233,15 @@ export const macroNameMessage = (keycode, name, identity) => ({type: "updateViaM
 export const macroProtectionMessage = (keycode, protection, identity) => ({type: "updateViaMacro", keycode, protection, expectedFingerprint: identity});
 /** @param {string} keycode @param {string} name @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'updateCustomKey'>} */
 export const customKeyNameMessage = (keycode, name, identity) => ({type: "updateCustomKey", keycode, name: String(name ?? "").trim(), expectedFingerprint: identity});
+// A custom key's shortcut: the eight-bit modifier mask the grid reads and one
+// key, 0 for none. Both zero clears it.
+/** @param {string} keycode @param {number} mods @param {number} key @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'updateCustomKeyShortcut'>} */
+export const customKeyShortcutMessage = (keycode, mods, key, identity) => ({type: "updateCustomKeyShortcut", keycode, shortcut: {mods: Number(mods) || 0, key: Number(key) || 0}, expectedFingerprint: identity});
+// A custom key made for a shortcut no keycode can hold: named, and put to use
+// by `then` (a layout key or a behaviour cell) in the same draft step (D-L63).
+/** @param {string} keycode @param {{mods: number, key: number}} shortcut @param {string} name @param {import("../../contracts/edits.js").EditPayloads['updateCustomKeyShortcut']['then']} [then] @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'updateCustomKeyShortcut'>} */
+export const customKeyForShortcut = (keycode, shortcut, name, then, identity) => ({...customKeyShortcutMessage(keycode, shortcut.mods, shortcut.key, identity),
+    name: String(name ?? "").trim(), ...(then ? {then} : {})});
 // The keyboard's own name; empty gives it back its built-in name.
 /** @param {string} name @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'renameKeyboard'>} */
 export const keyboardNameMessage = (name, identity) => ({type: "renameKeyboard", name: String(name ?? "").trim(), expectedFingerprint: identity});

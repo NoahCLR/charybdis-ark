@@ -8,7 +8,8 @@
 
 import {el, esc} from "../../lib/dom.mjs";
 import {scrollContentTo} from "../../lib/scroll.mjs";
-import {actionLabel, visibleKeycode} from "../../view/keyface.mjs";
+import {actionLabel, canonicalKeycode, visibleKeycode} from "../../view/keyface.mjs";
+import {customKeyOf, customKeySendsNote, hasShortcut} from "../../view/custom-key.mjs";
 import {comboInputShown} from "../../view/combo-reach.mjs";
 import {closeComboBuilder, getModel, heldLayers, layerName, layers, post, render, state} from "../../store.mjs";
 import {definitionControls} from "../participation.mjs";
@@ -44,7 +45,8 @@ export function comboBuilder(canEdit, holdTerm) {
         <div class="card-b">
             <div class="field"><span>Sends</span>
                 <div class="input-row"><input class="input mono" data-f="combo:${esc(state.combo.editId ?? 'new')}:output" data-output value="${esc(visibleKeycode(model, form.output))}" ${canEdit ? "" : "disabled"}>
-                <button class="btn" data-act="pickout" ${canEdit ? "" : "disabled"}>Pick…</button></div></div>
+                <button class="btn" data-act="pickout" ${canEdit ? "" : "disabled"}>Pick…</button></div>
+                ${customKeySendsNote(model, canonicalKeycode(model, form.output)) ? `<span class="note">${esc(customKeySendsNote(model, canonicalKeycode(model, form.output)))}</span>` : ""}</div>
             <div class="field"><span>Inputs</span>
                 <div class="row combo-inputs">
                     ${state.combo.inputs.length ? state.combo.inputs.map((input) => `<span class="chip"${shown(input) ? ""
@@ -65,7 +67,7 @@ export function comboBuilder(canEdit, holdTerm) {
             <div class="field">
                 <label class="sw"><input type="checkbox" data-output-behavior data-f="combo:${esc(state.combo.editId ?? 'new')}:use-output-behavior" ${form.useOutputBehavior !== false ? "checked" : ""} ${canEdit && outputSupported ? "" : "disabled"}>
                     <span class="track"></span><span class="txt">${esc(sentence(vocabulary(model).comboOptions.useOutputBehavior))}</span></label>
-                <p class="note">${outputSupported ? "Off, this combo still fires and sends its normal output action. A custom key has no native action and sends nothing when bypassed. The behaviour master and Settings · Combos · Combo outputs use behaviours must also be on." : "Update both halves to control whether this combo uses its output behaviour."}</p>
+                <p class="note">${outputSupported ? `Off, this combo still fires and sends its normal output action. ${esc(bypassedOutput(model, form.output))} The behaviour master and Settings · Combos · Combo outputs use behaviours must also be on.` : "Update both halves to control whether this combo uses its output behaviour."}</p>
             </div>
             <div class="row combo-flags">
                 ${[["mustHold", "Fires only once its keys are held past the combo hold threshold (Settings · Combos). Released sooner, the keys type themselves."],
@@ -96,6 +98,12 @@ export function comboBuilder(canEdit, holdTerm) {
         title: "Combo output", context: editing ? original?.badge : "new combo",
         seed: form.output ? [form.output] : [],
         onPick: (expression) => { form.output = expression; },
+        // Modifiers no keycode can hold: an unused custom key is made that
+        // shortcut now and becomes the output, saved with the combo (D-L63).
+        onCustomKey: (keycode, shortcut, name) => {
+            post(edits.customKeyForShortcut(keycode, shortcut, name, undefined, getModel()?.customKeyEditing?.identity));
+            form.output = keycode;
+        },
     }));
     // Typing and ticking land in state as they happen, so a board click that
     // redraws the screen keeps them.
@@ -157,4 +165,13 @@ export function comboBuilder(canEdit, holdTerm) {
         render();
     });
     return node;
+}
+
+// What a bypassed output sends, when it is a custom key: its shortcut, or
+// nothing without one (firmware D-F26).
+/** @param {Model} model @param {string} output */
+function bypassedOutput(model, output) {
+    const key = customKeyOf(model, canonicalKeycode(model, output));
+    if (!key) return "A custom key sends its shortcut, or nothing if it has none.";
+    return hasShortcut(key) ? `This custom key sends its shortcut, ${key.shortcutLabel}.` : "This custom key has no shortcut, so it sends nothing.";
 }

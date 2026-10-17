@@ -26,7 +26,8 @@ const {storedKeyboardName} = require("../model/keyboard-name");
 const {readHostOs} = require("../protocol/host-os-v1");
 const {supportsUnicodeMacros} = require("../schema/macro-payload");
 const {readKeyboardOptions} = require("../protocol/keyboard-options-v1");
-const {profileDomain} = require("../schema/profile-domains");
+const {profileDomain, READABLE_DOMAIN_VERSIONS} = require("../schema/profile-domains");
+const {currentDomain} = require("../model/portable-profile");
 const {profileDepthOptions} = require("../schema/profile-depth");
 const {captureProfile, restoreProfile, validateSnapshot} = require("./portable-profile-session");
 const {NodeHidDeviceAdapter} = require("../transport/node-hid-adapter");
@@ -324,15 +325,18 @@ class ProfileDeviceService {
 
     /** @param {import("../protocol/types.js").PayloadRead} read @param {string} source */
     #acceptCommitted({metadata, bytes}, source) {
-        const blob = decodeProfileBlob(bytes);
-        const depth = profileDepthOptions(this.capabilities, blob.domains.find(domain => domain.id === PROFILE_DOMAIN_IDS.RGB)?.payload);
+        // A domain the keyboard stores in an older version is shown through
+        // its translation (D-L63); the capture marks the keyboard read-only.
+        const blob = decodeProfileBlob(bytes, {domainVersions: READABLE_DOMAIN_VERSIONS});
+        const rgb = blob.domains.find(domain => domain.id === PROFILE_DOMAIN_IDS.RGB);
+        const depth = profileDepthOptions(this.capabilities, rgb && currentDomain(rgb).payload);
         /** @type {import("./types.js").ReadDomains} */
         const domains = {};
         const failures = [];
         for (const domain of blob.domains) {
             try {
                 const registered = profileDomain(domain.id);
-                if (registered) Object.assign(domains, {[registered.readKey]: registered.decode(domain.payload, depth)});
+                if (registered) Object.assign(domains, {[registered.readKey]: registered.decode(currentDomain(domain).payload, depth)});
             } catch (error) {
                 failures.push({domainId: domain.id, message: error instanceof Error ? error.message : String(error)});
             }
@@ -606,6 +610,7 @@ class ProfileDeviceService {
                 Boolean(this.connection?.connected),
                 this.status
             ),
+            olderDomains: this.portable?.older ? this.portable.older.map(entry => ({...entry})) : [],
             storedKeyboardName: storedKeyboardName(this.portable) ?? this.committed?.domains?.settings?.keyboardName,
             portableSummary: this.committed?.domains?.settings ? {names: this.committed.domains.settings.names.map((name, index, names) => layerName(names, index))} : this.portable?.summary || null,
             portableProgress: this.portableProgress || "",

@@ -21,7 +21,7 @@ const PROFILE_DOMAINS = Object.freeze([
         encode: value => require("./combo-domain-v1").encodeComboDomain(value),
         /** @param {Uint8Array} bytes @param {DomainOptions} [_options] @returns {import("./profile-domains-types.js").DomainModels["combos"]} */
         decode: (bytes, _options = {}) => require("./combo-domain-v1").decodeComboDomain(bytes)}),
-    Object.freeze({name: "SETTINGS", id: 0x40, key: "settings", readKey: "settings", version: 7, wireBit: 1 << 3, area: "settings",
+    Object.freeze({name: "SETTINGS", id: 0x40, key: "settings", readKey: "settings", version: 8, wireBit: 1 << 3, area: "settings",
         /** @param {import("./types.js").SettingsDomain} value @returns {Buffer} */
         encode: value => require("./settings-domain-v1").encodeSettings(value),
         /** @param {Buffer} bytes @param {DomainOptions} [_options] @returns {import("./profile-domains-types.js").DomainModels["settings"]} */
@@ -38,6 +38,12 @@ const PROFILE_DOMAINS = Object.freeze([
 const PROFILE_DOMAIN_IDS = Object.freeze(/** @type {{[K in DomainName]: Extract<ProfileDomain, {name: K}>['id']}} */ (Object.fromEntries(PROFILE_DOMAINS.map(domain => [domain.name, domain.id]))));
 /** @type {Readonly<{[K in ProfileDomain['id']]: Extract<ProfileDomain, {id: K}>['version']} & Record<number, number>>} */
 const PROFILE_DOMAIN_VERSIONS = Object.freeze(/** @type {{[K in ProfileDomain['id']]: Extract<ProfileDomain, {id: K}>['version']}} */ (Object.fromEntries(PROFILE_DOMAINS.map(domain => [domain.id, domain.version]))));
+// Every version of each domain up to the current one. A live keyboard that
+// stores an older version is read through these, translated to the current
+// version to be shown, and never written (D-L63); backups admit older domains
+// through their own translation (core/model/backup-translation.js).
+/** @type {Readonly<Record<number, number[]>>} */
+const READABLE_DOMAIN_VERSIONS = Object.freeze(Object.fromEntries(PROFILE_DOMAINS.map(domain => [domain.id, Array.from({length: domain.version}, (_, index) => index + 1)])));
 /** @type {Readonly<{[K in DomainName]: number}>} */
 const PROFILE_WIRE_DOMAINS = Object.freeze(/** @type {{[K in DomainName]: number}} */ (Object.fromEntries(PROFILE_DOMAINS.map(domain => [domain.name, domain.wireBit]))));
 /** @type {number} */
@@ -68,4 +74,4 @@ function replaceDomain(bytes, id, change, encode = require("./profile-blob-v1").
     return encode({...blob, domains: blob.domains.map(domain => domain.id === id ? {...domain, payload: change(domain.payload)} : domain)});
 }
 
-module.exports = {PROFILE_DOMAINS, PROFILE_DOMAIN_IDS, PROFILE_DOMAIN_VERSIONS, PROFILE_WIRE_DOMAINS, PROFILE_DOMAIN_MASK, profileDomain, domainCodec, encodeProfileDomains, replaceDomain};
+module.exports = {PROFILE_DOMAINS, PROFILE_DOMAIN_IDS, PROFILE_DOMAIN_VERSIONS, READABLE_DOMAIN_VERSIONS, PROFILE_WIRE_DOMAINS, PROFILE_DOMAIN_MASK, profileDomain, domainCodec, encodeProfileDomains, replaceDomain};

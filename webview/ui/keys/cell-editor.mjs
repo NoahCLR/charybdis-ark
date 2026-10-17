@@ -6,11 +6,11 @@
 // how it runs, and its repeat rate.
 
 import {el, esc} from "../../lib/dom.mjs";
-import {getModel, render, state, canEdit as canEditArea} from "../../store.mjs";
+import {getModel, post, render, state, canEdit as canEditArea} from "../../store.mjs";
 import * as edits from "../../view/edits.mjs";
 import {openPicker} from "../picker.mjs";
 import {branchName, holdHelpers, tierName} from "../../view/vocabulary.mjs";
-import {saveBehaviour} from "./save-behaviour.mjs";
+import {behaviourMessage, saveBehaviour} from "./save-behaviour.mjs";
 
 const {TIER_FIELDS, DEFAULT_REPEAT_HZ} = edits;
 
@@ -57,6 +57,18 @@ export function cellEditor(behaviour, step, kind) {
         seed: branch?.action ? [branch.action] : [],
         onPick: (expression) => {
             stage(expression);
+            render();
+        },
+        // A step sends a custom key's shortcut only, so a key whose shortcut
+        // is these modifiers will do, behaviour or not; failing one, an unused
+        // key is made it and this cell sends it, in one draft step (D-L63).
+        customKeyRuns: "shortcut",
+        onCustomKey: (keycode, shortcut, name) => {
+            const edit = edits.cellEdit(kind, {stored: Boolean(branch), action: keycode,
+                helper: /** @type {import("../../../contracts/edits.js").BranchHelper | undefined} */ (/** @type {HTMLSelectElement | null} */ (node.querySelector("[data-helper]"))?.value), repeatHz: /** @type {HTMLInputElement | null} */ (node.querySelector("[data-repeat]"))?.value});
+            const then = edit.branch ? behaviourMessage(document, behaviour, {tapCount: step.tapCount, kind, branch: edit.branch}) : null;
+            state.cellHow = null;
+            if (then) post(edits.customKeyForShortcut(keycode, shortcut, name, then, getModel()?.customKeyEditing?.identity));
             render();
         },
     }));

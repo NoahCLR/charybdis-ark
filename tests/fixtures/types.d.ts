@@ -31,6 +31,8 @@ export interface FakeKeyboardOptions {
     firmwareVersion?: number;
     brightnessMax?: number;
     options?: ReturnType<typeof import('./keyboard-options.js').wire>;
+    /** 7: firmware before custom-key shortcuts, storing settings v7. */
+    settingsVersion?: 7 | 8;
 }
 export interface FakeKeyboard {
     requests: Buffer[];

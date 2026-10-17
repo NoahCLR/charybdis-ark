@@ -145,6 +145,26 @@ macros included, found by the name they were given. Layers offers each layer
 as Hold (`MO`), Lock (`LOCK_LAYER`, the same lock as QMK's `TG`) and Tap-hold
 (`LT`); a keyboard that owns its layer keys adds Tap-toggle (`TT`), One-shot
 (`OSL`) and Move (`TO`).
+A modifier key counts as a modifier: choose modifiers alone, or with a
+modifier key, and the picker stores the simplest keycode that holds them, which
+the footer shows. Command with the Left Command key is just `KC_LEFT_GUI`, and
+Left with Right Command, picked any way, is one keycode (`RGUI(KC_LEFT_GUI)`):
+one modifier becomes the key and the others wrap it, which works while all
+but one sit on one side. A keycode cannot hold two or more modifiers from each
+side, or a key such as K with modifiers from both sides. For those, on a key
+on the board, a behaviour cell or a combo output, the picker offers a custom
+key instead. A custom key that already sends exactly that, and nothing more,
+is offered by number and name. On a key or as a combo output, a custom key's
+own behaviour runs too, so a match that has a behaviour is offered beside
+**Make Custom key N**, and you choose: that key, behaviour and all, or a new
+one with the shortcut alone. A behaviour cell sends only a custom key's
+shortcut and never chains its behaviour, so there any match is used as it
+is. Otherwise **Use Custom key N**
+takes the first custom key that does nothing yet (no name, behaviour or
+shortcut, on no layer), gives it that shortcut and a name in words, and uses
+it. On a key or in a behaviour cell that is one draft change, which Review
+shows and one Undo takes back. A combo output is made at once and saved with
+the combo.
 The retired **User 0–31** keys are hidden from every picker section and search
 because they do nothing on current firmware. Choose the named **Custom keys**,
 including Right Thumb, Left Thumb and Click Spam, instead. Existing retired
@@ -215,23 +235,51 @@ macro memory and playback limits. The demo remains editable without a keyboard.
 
 Macro keycodes are shown as `VIA_MACRO_0` through `VIA_MACRO_127` in the live
 editor, including slots whose QMK values have no named constant.
-**Custom keys** lists the 128 custom keys: rename one, place it on a key, and
-see where it is used; the key picker offers them in its own Custom keys section.
-Their names are stored on the keyboard; a keyboard with none stored reports the
-names authored in `keymap.c`. Under the key, **What it does** is its behaviour
-editor, the same one as Keys → Behaviours: timings, the tap × tier grid and
-participation, and once the key has a behaviour, **Change key…** and **Remove
-behaviour**. It works for a key on no layer yet, so a custom key can get its
-taps and holds where it is defined. A key with no behaviour shows the key's
-defaults, and the first change adds the behaviour to the draft. Edits here are
-the same draft changes as on the Keys screen, with the same review, undo and
-redo, and with a cell open, Delete, ⌘C and ⌘V act on it as they do there.
-**Change key…** to another custom key moves the screen to that key; to any
-other key, it opens the behaviour on the Keys screen, where that key's
-behaviours are. A key that is placed also offers **Show on the Keys screen**,
-which opens its behaviour there with the board showing the keys that reach it,
-on a layer that reaches the key. Picking another key closes the cell open in
-this key's behaviour; a cell open on the Keys screen stays open there.
+**Custom keys** lists the 128 custom keys: rename one, give it a shortcut,
+add or edit its behaviour, place it on a key, and see where it is used; the
+key picker offers them in its own Custom keys section, each tip naming the
+shortcut it sends. Their names are stored on the keyboard; a keyboard with
+none stored reports the names authored in `keymap.c`.
+
+A custom key's **Shortcut** is its own action, the way an ordinary key's
+keycode is: one key and any of the eight modifiers, held while the custom key
+is held and tapped when it is tapped. **Pick…** opens the keycode picker as
+on the Keys screen: click the key, from those a shortcut can hold (letters,
+digits, symbols, navigation, function keys and mouse buttons 1–8), and the
+modifiers in the row above the board. Here left and right mix freely (Left
+Ctrl + Right Alt + K), which a single keycode cannot store, and **Use
+shortcut** saves it. Modifiers alone (a held Hyper) and a key alone are both
+shortcuts; **Clear** removes it. **What it does** says whether the
+key sends its shortcut, its behaviour, both, or nothing yet, above the key's
+behaviour editor (below). A behaviour on
+the key works on top: an empty tap or hold sends the shortcut, as an
+ordinary key's empty cells send its keycode. A behaviour step on another key
+may send a custom key; it sends that key's shortcut only, never its
+behaviour, and Review warns about a step naming a custom key that has no
+shortcut. Shortcut changes are draft edits, reviewed beside the name with
+Discard, Undo and Redo, and saved by Apply. They need firmware that stores
+settings version 8. A keyboard whose firmware still stores version 7 opens
+no draft: every screen shows what it holds, read-only, the Shortcut field says
+the firmware cannot hold one, and Apply and restore refuse it until both
+halves are updated. You can still export it: the backup is in the current
+format, with no shortcuts, so it restores onto the updated keyboard. A backup
+from older firmware gains empty shortcuts when imported.
+
+Under the key, **What it does** also holds its behaviour editor, the same one
+as Keys → Behaviours: timings, the tap × tier grid and participation, and once
+the key has a behaviour, **Change key…** and **Remove behaviour**. It works for
+a key on no layer yet, so a custom key can get its taps and holds where it is
+defined. A key with no behaviour shows the key's defaults, with its shortcut
+in the cells the behaviour leaves empty, and the first change adds the
+behaviour to the draft. Edits here are the same draft changes as on the Keys
+screen, with the same review, undo and redo, and with a cell open, Delete, ⌘C
+and ⌘V act on it as they do there. **Change key…** to another custom key moves
+the screen to that key; to any other key, it opens the behaviour on the Keys
+screen, where that key's behaviours are. A key that is placed also offers
+**Show on the Keys screen**, which opens its behaviour there with the board
+showing the keys that reach it, on a layer that reaches the key. Picking
+another key closes the cell open in this key's behaviour; a cell open on the
+Keys screen stays open there.
 
 ## Naming the keyboard
 
@@ -271,8 +319,8 @@ behaviour or combo participation off.
 
 For a plain gaming key, disable **Use behaviour** on that placement to emit
 its underlying keycode directly; disabling **Join combos** independently stops
-that placement entering a combo. A custom key bypassed this way emits nothing,
-since its behaviour supplies its action. A combo still needs every physical
+that placement entering a combo. A custom key bypassed this way sends its
+shortcut, or nothing if it has none; the key inspector says which. A combo still needs every physical
 input to be eligible. A gesture already in progress completes under the
 policy captured when it started.
 
@@ -285,7 +333,8 @@ output. Another input's allowance cannot enable it.
 
 The two output switches default on and require supporting firmware on both
 halves. Turning either off keeps the combo active and sends its normal action;
-a custom key has no native action, so it sends nothing when bypassed. These
+a custom key sends its shortcut, or nothing if it has none; the combo editor
+says which for its output. These
 switches keep inputs, outputs, timing and layer permissions intact. Older
 firmware shows them read-only, and Ark refuses a backup containing a bypass
 until both halves support it. Earlier backups keep output behaviours on.
@@ -369,7 +418,9 @@ tap count up to the deepest one the behaviour sets; past that, the presses are
 separate shorter gestures and the cell stays empty. On the first press, an
 `LT()` holds its layer and an `MT()` or `OSM()` its modifiers. A plain key,
 such as `-` or `Ctrl+C`, stays held down until release, unless that first
-press sets a Hold or Long hold. Shift, Ctrl, Alt and Cmd on their own show
+press sets a Hold or Long hold. A custom key with a shortcut does the same
+with its shortcut, and its dashed cells read as that shortcut. Shift, Ctrl,
+Alt and Cmd on their own show
 nothing built in. An empty Long hold beside a Hold, set or built in, shows
 that the Hold carries on, since nothing takes over at the Long hold threshold: one held
 until release stays held, one that repeats keeps repeating, one that sends

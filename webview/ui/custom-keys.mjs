@@ -3,14 +3,16 @@
  * @typedef {import("../../contracts/panel.js").PublishedModel | null} Model
  */
 // Selector assertions describe the controls authored in these templates.
-// Custom keys: the keyboard's 128 named keys that do only what their behaviour
-// says. The selected key shows two cards: the key itself (its name and where it
-// is placed; each field is one entry in `keyFields`) and what it does, which is
-// the Keys screen's behaviour editor for that key, placed or not. A key with no
-// stored behaviour shows the unstored grid with its built-in defaults; the first
-// edit adds the row. This is the only behaviour editor on screen, so the open
-// cell and the timing fields it saves are this key's. Place one on a layer or
-// send it from a combo.
+// Custom keys: the keyboard's 128 named keys. A key here is its name, its
+// shortcut, which is the key's own action (firmware D-F26), and its behaviour,
+// which works on top. The selected key shows two cards: the key itself (its
+// name, shortcut and where it is placed; each field is one entry in
+// `keyFields`) and what it does, which is the Keys screen's behaviour editor for
+// that key, placed or not. A key with no stored behaviour shows the unstored
+// grid with its built-in defaults; the first edit adds the row. This is the
+// only behaviour editor on screen, so the open cell and the timing fields it
+// saves are this key's. Place one on a layer, send it from a combo, or send its
+// shortcut from another key's behaviour.
 
 import {el, esc} from "../lib/dom.mjs";
 import {customKeyPlacements} from "../view/reach.mjs";
@@ -21,6 +23,9 @@ import * as edits from "../view/edits.mjs";
 import {layerSwatch} from "./layerbar.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {topbar, unavailable} from "./shell.mjs";
+import {keyName} from "../view/keyvalues.mjs";
+import {customKeyDoes, hasShortcut, customKeyShortcutLine} from "../view/custom-key.mjs";
+import {openPicker} from "./picker.mjs";
 import {behaviourEditorRow} from "../view/behavior-editor.mjs";
 import {behaviourEditor} from "./keys/behaviour-editor.mjs";
 
@@ -33,7 +38,7 @@ export function screenCustomKeys() {
 
     const main = el(`<div class="main">${topbar(
         "Custom keys",
-        "Named keys that do only what their behaviour says. Place one on a key or send it from a combo; a behaviour cannot send one.",
+        "Named keys with a shortcut of their own and a behaviour on top. Place one on a key or send it from a combo; a behaviour step sends its shortcut.",
     )}</div>`);
 
     const content = el(`<div class="content"><div class="pad library"></div></div>`);
@@ -60,8 +65,9 @@ export function screenCustomKeys() {
     const changed = draftMarks(model?.draft?.changes).customKeys;
     for (const row of keys) {
         if (!matches(row)) continue;
-        const tip = `Custom key ${row.slot}${row.name ? ` · ${row.name}` : ""} · ${row.hasBehavior ? "has a behaviour" : "no behaviour: does nothing yet"}`;
-        const cell = el(`<button class="mslot ${row.name || row.hasBehavior ? "filled" : ""}" data-key="${esc(row.keycode)}"
+        const does = [hasShortcut(row) ? `sends ${row.shortcutLabel}` : "", row.hasBehavior ? "has a behaviour" : ""].filter(Boolean).join(" · ");
+        const tip = `Custom key ${row.slot}${row.name ? ` · ${row.name}` : ""} · ${does || "no shortcut or behaviour: does nothing yet"}`;
+        const cell = el(`<button class="mslot ${row.name || row.hasBehavior || hasShortcut(row) ? "filled" : ""}" data-key="${esc(row.keycode)}"
             aria-current="${row.keycode === key?.keycode}" data-tip="${esc(tip)}">
             <span class="n">K${row.slot}</span>${changed.has(row.keycode) ? draftDot("Changed in your draft", "corner") : ""}
             <span class="v">${row.name ? esc(row.name.length > 13 ? `${row.name.slice(0, 12)}…` : row.name) : "—"}</span></button>`);
@@ -94,6 +100,7 @@ function editor(model, key, canEdit) {
                 <button class="btn tiny ghost" data-act="place" ${writable() ? "" : "disabled"}>Place on a key…</button></span></div>
         <div class="card-b stack">${keyFields(model, key, canEdit).join("")}</div></div>`);
     attachNameField(card, model, key);
+    /** @type {HTMLElement} */ (card.querySelector("[data-shortcut]")).replaceWith(shortcutField(model, key, canEdit));
     /** @type {HTMLElement} */ (card.querySelector('[data-act="place"]')).addEventListener("click", () => {
         state.placement = {keycode: key.keycode};
         state.screen = "keys"; state.tab = "key"; render();
@@ -103,9 +110,10 @@ function editor(model, key, canEdit) {
     return card;
 }
 
-// The key's own fields, in the order the card shows them.
+// The key's own fields, in the order the card shows them. The shortcut is a
+// placeholder filled in once the card exists (shortcutField).
 /** @param {Model} model @param {import("../../contracts/panel.js").CustomKey} key @param {boolean} canEdit */
-const keyFields = (model, key, canEdit) => [nameField(model, key, canEdit), placedOn(model, key)];
+const keyFields = (model, key, canEdit) => [nameField(model, key, canEdit), `<div data-shortcut></div>`, placedOn(model, key)];
 
 /** @param {Model} model @param {import("../../contracts/panel.js").CustomKey} key @param {boolean} canEdit */
 function nameField(model, key, canEdit) {
@@ -128,7 +136,8 @@ function attachNameField(card, model, key) {
     nameInput.addEventListener("change", () => post(edits.customKeyNameMessage(key.keycode, nameInput.value, model?.customKeyEditing?.identity)));
 }
 
-// What the key does: its behaviour editor, the same one the Keys screen's
+// What the key does: in words (its shortcut, its behaviour on top, both, or
+// nothing yet), then its behaviour editor, the same one the Keys screen's
 // Behaviours tab shows. A placed key links there too, where the board shows
 // the keys that reach it: on the layer shown if it reaches the key there,
 // otherwise on the first layer that does.
@@ -142,7 +151,7 @@ function behaviourCard(model, key) {
             <span class="tag">${key.hasBehavior ? "Behaviour" : "No behaviour yet"}</span>
             ${placed ? `<span class="right row actions"><button class="btn tiny ghost" data-act="show-behaviour"
                 data-tip="Open this behaviour in Keys · Behaviours, with the board showing the keys that reach it.">Show on the Keys screen</button></span>` : ""}</div>
-        <div class="card-b"></div></div>`);
+        <div class="card-b stack"><p class="note" data-does>${esc(customKeyDoes(key))}</p></div></div>`);
     const body = /** @type {HTMLElement} */ (card.querySelector(".card-b"));
     if (behaviour) body.appendChild(behaviourEditor(behaviour));
     /** @type {HTMLElement | null} */ (card.querySelector('[data-act="show-behaviour"]'))?.addEventListener("click", () => {
@@ -153,6 +162,37 @@ function behaviourCard(model, key) {
         render();
     });
     return card;
+}
+
+// The key's shortcut, set in the keycode picker as any key is on the Keys
+// screen: a key from those the keyboard accepts, and the modifiers in the
+// picker's row, here left and right mixed. Each change posts the whole
+// shortcut; Clear posts none.
+/** @param {Model} model @param {import("../../contracts/panel.js").CustomKey} key @param {boolean} canEdit */
+function shortcutField(model, key, canEdit) {
+    const allowed = model?.customKeyShortcutKeys || [];
+    if (!allowed.length) return el(`<div class="field"><span>Shortcut</span>
+        <span class="note">This firmware cannot give a custom key a shortcut. Update both halves to set one.</span></div>`);
+    const identity = model?.customKeyEditing?.identity;
+    const name = keyName(model, key.shortcut.key);
+    const node = el(`<div class="field"><span>Shortcut</span>
+            <div class="input-row"><input data-f="custom-key:${key.slot}:shortcut" class="input" data-shortcut value="${esc(hasShortcut(key) ? key.shortcutLabel : "")}" placeholder="None" readonly ${canEdit ? "" : "disabled"}
+                data-tip="One key and any modifiers, left and right mixed. Pick… opens the keycode picker with its modifier row.">
+            <button class="btn" data-act="pick-shortcut" ${canEdit ? "" : "disabled"}>Pick…</button>
+            <button class="btn ghost" data-act="clear-shortcut" ${canEdit && hasShortcut(key) ? "" : "disabled"}
+                data-tip="No shortcut: the key does only what its behaviour says.">Clear</button></div>
+            <span class="note">${esc(customKeyShortcutLine(key))}</span></div>`);
+    /** @param {{mods: number, key: number}} shortcut */
+    const save = (shortcut) => post(edits.customKeyShortcutMessage(key.keycode, shortcut.mods, shortcut.key, identity));
+    /** @type {HTMLElement} */ (node.querySelector('[data-act="clear-shortcut"]')).addEventListener("click", () => save({mods: 0, key: 0}));
+    /** @type {HTMLElement} */ (node.querySelector('[data-act="pick-shortcut"]')).addEventListener("click", () => openPicker({
+        title: "Shortcut", context: key.name || `Custom key ${key.slot}`,
+        seed: name ? [name] : [], allowedKeys: allowed, shortcut: {mods: key.shortcut.mods},
+        onShortcut: (shortcut) => {
+            if (shortcut.mods !== key.shortcut.mods || shortcut.key !== key.shortcut.key) save(shortcut);
+        },
+    }));
+    return node;
 }
 
 // The layers where a key carries this custom key or a combo sends it, each in
@@ -168,7 +208,7 @@ function placedOn(model, key) {
     }).join("");
     return `<div class="field"><span>On layers</span>
         ${chips ? `<div class="row layer-chips">${chips}</div>`
-            : `<span class="note">No key or combo sends this custom key. Place it on a key to use it.</span>`}</div>`;
+            : `<span class="note">No key, behaviour or combo sends this custom key. Place it on a key to use it.</span>`}</div>`;
 }
 
 /** @param {string} keycode @param {number} at */

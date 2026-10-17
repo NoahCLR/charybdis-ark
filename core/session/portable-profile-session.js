@@ -9,7 +9,7 @@ const {candidateMetadataForBlob, readCandidatePeerStatus, readCandidateStatus, C
 const {ApplyProgress, failureReason} = require("./apply-progress");
 const {CandidateUploadCoordinator} = require("./candidate-upload-coordinator");
 const {LogicalViaStageCoordinator} = require("./logical-via-stage-coordinator");
-const {createSnapshot, validateSnapshot, materializeProfile, fingerprint, summary, reorderLayers} = require("../model/portable-profile");
+const {createSnapshot, validateSnapshot, materializeProfile, olderDomains, fingerprint, summary, reorderLayers} = require("../model/portable-profile");
 const {translateBackup} = require("../model/backup-translation");
 const {requireReady: checkFirmwareReady, supportsCompleteProfile, canCapture, canReadIdentity, identityStateFlags} = require("./firmware-support");
 const {encodeSettings} = require("../schema/settings-domain-v1");
@@ -27,6 +27,8 @@ const {crc32, fnv1a32} = require("../schema/profile-blob-v1");
 const requireReady = checkFirmwareReady;
 /** @param {string} code @param {string} message */
 const fail = (code, message) => Object.assign(new Error(message), {code});
+// A keyboard that stores an older domain version is never written (D-L63).
+const OLDER_FIRMWARE = "This keyboard's firmware stores its profile in an older format than Ark writes, so Ark shows it read-only. Update both halves, then apply or restore. The keyboard has not been changed.";
 /** @param {import("./types.js").ProfileStatus} s */
 const statusKey = s => JSON.stringify([s.activeKind, s.activeDigest, s.activeGeneration, s.activeOriginHalf, s.committedDigest, s.committedGeneration, s.stateFlags]);
 /** @param {import("./types.js").ProfileStatus} s */
@@ -103,6 +105,9 @@ async function captureProfile(connection, ids, capabilities, onProgress = () => 
     onProgress("Checking the complete read");
     if (!settings.equals(await readSettings(connection, ids, options))) throw fail("PROFILE_CHANGED", "Keyboard settings changed during the backup. Read it again before continuing.");
     const profile = materializeProfile(active.bytes, defaults.bytes, combos, settings);
+    // A keyboard storing an older domain is read through its translation, to
+    // be shown and backed up in the current format, never written (D-L63).
+    const older = olderDomains(active.bytes, defaults.bytes, settings);
     const after = await readProfileStatus(connection, options), storageAfter = await readStorageStatus(connection, ids);
     if (statusKey(before) !== statusKey(after) || !storageAfter.ready || storageBefore.generation !== storageAfter.generation || storageBefore.digest !== storageAfter.digest) throw fail("PROFILE_CHANGED", "The keyboard changed during the backup. Read it again before continuing.");
     if (allowIncomplete && via.macros.at(-1) !== 0) {
@@ -112,11 +117,11 @@ async function captureProfile(connection, ids, capabilities, onProgress = () => 
         return {document: {format: "charybdis-recovery-capture", version: 1, keyboard: "charybdis-4x6", actionAbiDigest: capabilities.actionAbiDigest,
             profile: profile.toString("base64"), layout: via.layout.toString("base64"), macros: via.macros.toString("base64")},
             fingerprint: `incomplete:${capabilities.actionAbiDigest}:${crc32(bytes)}:${fnv1a32(bytes)}`, summary: null, incomplete: true, status: after,
-            identity: snapshotIdentity(after, storageAfter, settings)};
+            identity: snapshotIdentity(after, storageAfter, settings), ...(older.length ? {older} : {})};
     }
     const document = createSnapshot({profile, via, actionAbiDigest: capabilities.actionAbiDigest});
     validateSnapshot(document, capabilities);
-    return {document, readback: {active, source: before.activeKind === PROFILE_ACTIVE_KIND.COMMITTED ? "committed" : "compiled", combos}, fingerprint: fingerprint(document), summary: summary(document), status: after, identity: snapshotIdentity(after, storageAfter, settings), storage: heldStorage(via.layout, via.macros, active.bytes)};
+    return {document, readback: {active, source: before.activeKind === PROFILE_ACTIVE_KIND.COMMITTED ? "committed" : "compiled", combos}, fingerprint: fingerprint(document), summary: summary(document), status: after, identity: snapshotIdentity(after, storageAfter, settings), storage: heldStorage(via.layout, via.macros, active.bytes), ...(older.length ? {older} : {})};
 }
 /** @param {Connection} connection @param {Ids} ids @param {{allowCandidate?: boolean, sleep?: (ms: number) => Promise<void>, widePages?: boolean}} [options] */
 async function readIdentity(connection, ids, {allowCandidate = true, sleep, widePages} = {}) {
@@ -288,6 +293,7 @@ async function restoreProfile(connection, ids, capabilities, input, {expectedFin
             before = await captureProfile(connection, ids, capabilities, message => applyProgress.report("check", {detail: message}), false, true, {sleep});
         }
         if (expectedFingerprint && before.fingerprint !== expectedFingerprint) throw fail("PROFILE_CHANGED", "The keyboard changed since the restore was reviewed. Review it again.");
+        if (before.older?.length) throw fail("FIRMWARE_UPDATE_REQUIRED", OLDER_FIRMWARE);
         applyProgress.report("backup");
         const recovery = await saveCopy(before.document);
         if (!recovery) throw fail("RECOVERY_REQUIRED", "A recovery copy could not be saved. The keyboard has not been changed.");

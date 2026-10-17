@@ -12,6 +12,14 @@ import * as edits from "../../view/edits.mjs";
 // reads another behaviour's form.
 /** @param {ParentNode} root @param {EditorBehavior} behaviour @param {NonNullable<Parameters<typeof edits.saveBehaviour>[1]>["change"]} [change] */
 export function saveBehaviour(root, behaviour, change) {
+    const message = behaviourMessage(root, behaviour, change);
+    if (message) post(message);
+}
+
+// The message saveBehaviour posts, for an edit that carries it (a custom key
+// made for a cell's shortcut, D-L63).
+/** @param {ParentNode} root @param {EditorBehavior} behaviour @param {NonNullable<Parameters<typeof edits.saveBehaviour>[1]>["change"]} [change] */
+export function behaviourMessage(root, behaviour, change) {
     /** @param {string} identity */
     const field = (identity) => /** @type {HTMLInputElement | undefined} */ ([...root.querySelectorAll("[data-f]")]
         .find((node) => /** @type {HTMLElement} */ (node).dataset.f === `behaviour:${behaviour.keycode}:${identity}`));
@@ -20,6 +28,5 @@ export function saveBehaviour(root, behaviour, change) {
         return input ? [[name, input.dataset.stored]] : [];
     }));
     const anchorField = field("anchor");
-    const message = edits.saveBehaviour(behaviour, {terms, anchored: anchorField ? anchorField.checked : undefined, change}, getModel()?.profileIdentity);
-    if (message) post(message);
+    return edits.saveBehaviour(behaviour, {terms, anchored: anchorField ? anchorField.checked : undefined, change}, getModel()?.profileIdentity);
 }

@@ -69,14 +69,20 @@ function hostModel(host) {
     };
 }
 
+// Firmware that stores a domain in an older version than Ark writes opens no
+// draft (D-L63).
+/** @param {Pick<State, "olderDomains">} state */
+const storesOlder = state => Boolean(state.olderDomains?.length);
+
 // A complete read of a supported keyboard opens the draft, or refreshes the
-// one already open against what the keyboard now holds.
+// one already open against what the keyboard now holds. A keyboard storing an
+// older domain version opens none: it is shown read-only (D-L63).
 /** @param {ModelSession} session @param {State} state @param {import("../model/types.js").ProfileSnapshot | null | undefined} [portable] */
 function observePortable(session, state, portable = session.service.portable) {
-    if (session.draft && !session.draft.dirty && state.connected && (state.selectedDeviceId !== session.draft.deviceId || !canEdit(state.capabilities))) {
+    if (session.draft && !session.draft.dirty && state.connected && (state.selectedDeviceId !== session.draft.deviceId || !canEdit(state.capabilities) || storesOlder(state))) {
         setDraft(session, undefined);
     }
-    if (!portable || portable === session.observedPortable || !state.connected || !canEdit(state.capabilities)) return;
+    if (!portable || portable === session.observedPortable || !state.connected || !canEdit(state.capabilities) || storesOlder(state)) return;
     if (portable.incomplete && !session.draft) return;
     if (!session.draft) setDraft(session, new ProfileDraftSession(portable, state.selectedDeviceId, state.capabilities, state.connectionToken));
     else session.draft.observe(portable, state.selectedDeviceId, state.connectionToken, state.capabilities);
@@ -93,7 +99,7 @@ function observeService(session, state) {
 
 /** @param {Session} session @param {State} state @param {Snapshot | undefined} snapshot */
 function discardDraftForDevice(session, state, snapshot) {
-    replaceDraft(session, canEdit(state.capabilities)
+    replaceDraft(session, canEdit(state.capabilities) && !storesOlder(state)
         ? new ProfileDraftSession(/** @type {Snapshot} */ (snapshot), state.selectedDeviceId, state.capabilities, state.connectionToken)
         : undefined);
 }
@@ -161,7 +167,11 @@ function buildPanelModel(session, state) {
     // A read is ready while its draft could be edited once whatever runs now
     // finishes, so an Apply's readback keeps the editor shown.
     const editableDraft = binding.editable || binding.reason === "busy";
-    const readReady = (session.readReady ?? editableDraft) && editableDraft;
+    // A keyboard storing an older domain version opens no draft, and its
+    // complete read is shown read-only from the keyboard's own model (D-L63).
+    const olderFirmware = Boolean(state.connected) && storesOlder(state);
+    const viewable = editableDraft || (olderFirmware && !session.draft && Boolean(session.service?.portable));
+    const readReady = (session.readReady ?? viewable) && viewable;
     const host = hostModel(session.host);
     // A renamed keyboard that has gone to take its new name is coming back:
     // the panel waits for it as for a read, rather than asking to connect one.
@@ -175,7 +185,7 @@ function buildPanelModel(session, state) {
         connectionToken: state.connectionToken,
         progress: reconnecting && !session.readBusy ? RECONNECT_WORDS.waiting : state.portableProgress || state.layout?.progress || state.committed?.progress || null,
     };
-    return {...model, devices, selectedDeviceId, ...(draft ? {draft} : {}), demo, apply, postApplyRead, portable, host, load, reconnecting};
+    return {...model, devices, selectedDeviceId, ...(draft ? {draft} : {}), demo, apply, postApplyRead, portable, host, load, reconnecting, olderFirmware};
 }
 
 // How full the profile is: the draft's, when one is open for this keyboard,

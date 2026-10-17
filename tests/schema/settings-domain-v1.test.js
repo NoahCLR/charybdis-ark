@@ -1,25 +1,28 @@
 "use strict";
 const {test} = require("node:test");
 const assert = require("node:assert/strict");
-const {SETTINGS, SETTING, SETTING_FIELD, SETTING_FIELDS, MATRIX_POSITIONS, validSetting, defaultLayerRecord, encodeSettings, decodeSettings} = require("../../core/schema/settings-domain-v1");
+const {SETTINGS, SHORTCUT_KEYS, SETTING, SETTING_FIELD, SETTING_FIELDS, MATRIX_POSITIONS, validSetting, validShortcutKey, defaultLayerRecord, encodeSettings, decodeSettings} = require("../../core/schema/settings-domain-v1");
 
 // Compiled defaults as the firmware sets them (portable-profile-v1.md):
 // scalar 27 retired at zero, behaviours on, every layer in both masks, every
 // layer referring combos to itself with nothing bypassed or excluded.
 const defaults = () => ({comboOutputBehaviors: true, values: [200,150,400,150,1,4,1200,25,1,3,0,0,0,0,0,200,400,900000,1200,200,1,257,0xc8ff00,1,0,200,10,0,1,0xffff,0xffff],
     names: Array.from({length: 16}, (_, id) => id < 8 ? `Layer ${id}` : ""), layers: Array.from({length: 16}, (_, layer) => defaultLayerRecord(layer)),
-    macroNames: Array(128).fill(""), customKeyNames: Array(128).fill(""), keyboardName: "", formatVersion: 7});
+    macroNames: Array(128).fill(""), customKeyNames: Array(128).fill(""), customKeyShortcuts: Array.from({length: 128}, () => ({mods: 0, key: 0})), keyboardName: "", formatVersion: 8});
 const thirtyTwo = (seed, fill) => `${seed}`.padEnd(32, fill);
 const full = () => ({...defaults(), names: Array.from({length: 16}, (_, i) => thirtyTwo(`L${i}`, "-")),
     macroNames: Array.from({length: 128}, (_, i) => thirtyTwo(i, "~")), customKeyNames: Array.from({length: 128}, (_, i) => thirtyTwo(`Key ${i}`, "!")),
+    customKeyShortcuts: Array.from({length: 128}, (_, i) => ({mods: 255 - i, key: [0, 0x04, 0xa4, 0xd1, 0xd8][i % 5]})),
     keyboardName: thirtyTwo("Charybdis", "*")});
+const withShortcut = (slot, shortcut) => { const value = defaults(); value.customKeyShortcuts[slot] = shortcut; return value; };
 const withValue = (id, v) => { const value = defaults(); value.values[id] = v; return value; };
 const withLayer = (layer, record) => { const value = defaults(); value.layers[layer] = {...value.layers[layer], ...record}; return value; };
 
-test("the layout constants are the firmware's version 7 domain", () => {
-    assert.deepEqual([SETTINGS.VERSION, SETTINGS.COUNT, SETTINGS.LAYERS, SETTINGS.MACRO_NAMES, SETTINGS.CUSTOM_KEY_NAMES], [7, 31, 16, 128, 128]);
-    // 273 counted names: 16 layers, 128 macros, 128 custom keys and the keyboard.
-    assert.deepEqual([SETTINGS.SCALARS_OFFSET, SETTINGS.LAYER_RECORDS_OFFSET, SETTINGS.FIXED_SIZE, SETTINGS.MIN_SIZE, SETTINGS.MAX_SIZE], [8, 132, 404, 677, 9413]);
+test("the layout constants are the firmware's version 8 domain", () => {
+    assert.deepEqual([SETTINGS.VERSION, SETTINGS.COUNT, SETTINGS.LAYERS, SETTINGS.MACRO_NAMES, SETTINGS.CUSTOM_KEY_NAMES, SETTINGS.CUSTOM_KEY_SHORTCUTS], [8, 31, 16, 128, 128, 128]);
+    // 128 two-byte shortcuts at 404, then 273 counted names: 16 layers, 128
+    // macros, 128 custom keys and the keyboard (portable-profile-v1.md).
+    assert.deepEqual([SETTINGS.SCALARS_OFFSET, SETTINGS.LAYER_RECORDS_OFFSET, SETTINGS.SHORTCUTS_OFFSET, SETTINGS.FIXED_SIZE, SETTINGS.MIN_SIZE, SETTINGS.MAX_SIZE], [8, 132, 404, 660, 933, 9669]);
     assert.deepEqual([SETTING.UNICODE_HOST_MODE, SETTING.BEHAVIORS_ENABLED, SETTING.LAYER_BEHAVIORS, SETTING.LAYER_COMBOS], [27, 28, 29, 30]);
     assert.equal(MATRIX_POSITIONS, 60);
     assert.deepEqual(defaultLayerRecord(9), {reference: 9, bypass: [], exclude: []});
@@ -28,7 +31,8 @@ test("the layout constants are the firmware's version 7 domain", () => {
 test("the stored field table determines scalar geometry and layer-reference rewrites", () => {
     assert.equal(SETTINGS.COUNT, SETTING_FIELDS.length);
     assert.equal(SETTINGS.LAYER_RECORDS_OFFSET, SETTINGS.SCALARS_OFFSET + SETTING_FIELDS.length * 4);
-    assert.equal(SETTINGS.FIXED_SIZE, SETTINGS.LAYER_RECORDS_OFFSET + SETTINGS.LAYERS * SETTINGS.LAYER_RECORD_SIZE);
+    assert.equal(SETTINGS.SHORTCUTS_OFFSET, SETTINGS.LAYER_RECORDS_OFFSET + SETTINGS.LAYERS * SETTINGS.LAYER_RECORD_SIZE);
+    assert.equal(SETTINGS.FIXED_SIZE, SETTINGS.SHORTCUTS_OFFSET + SETTINGS.CUSTOM_KEY_SHORTCUTS * SETTINGS.SHORTCUT_SIZE);
     assert.deepEqual(SETTING_FIELDS.filter(field => field.layerReference).map(field => [field.name, field.layerReference, field.layerReorder]), [
         ["AUTO_MOUSE_LAYER", "layer", "storage"], ["AUTO_SNIPING_LAYER", "layer", "storage"],
         ["DEFAULT_LAYERS", "mask", "reach"], ["LAYER_BEHAVIORS", "mask", "storage"], ["LAYER_COMBOS", "mask", "storage"],
@@ -73,13 +77,13 @@ test("every stored value is named once, in ID order, and accepts only what the f
     assert.deepEqual([SETTING_FIELD.DEFAULT_DPI.min, SETTING_FIELD.DEFAULT_DPI.max, SETTING_FIELD.DEFAULT_DPI.step], [400, 3400, 200]);
 });
 
-test("settings v7 round-trip Unicode names, layer records, zero settings and every name", () => {
+test("settings v8 round-trip Unicode names, layer records, zero settings and every name", () => {
     const value = defaults(); value.names[1] = "Édition ⌘"; value.names[15] = "Top"; value.macroNames[3] = "Sign-off"; value.macroNames[127] = "Last macro";
     value.customKeyNames[127] = "Last key"; value.keyboardName = "Noah’s Charybdis";
     value.layers[2] = {reference: 0, bypass: [0, 7, 8, 59], exclude: [12, 33]};
     value.layers[15] = {reference: 14, bypass: [], exclude: [59]};
     const bytes = encodeSettings(value);
-    assert.deepEqual([...bytes.subarray(0, 8)], [7, 16, 31, 128, 128, 0, 0, 0]);
+    assert.deepEqual([...bytes.subarray(0, 8)], [8, 16, 31, 128, 128, 0, 128, 0]);
     const nameBytes = [...value.names, ...value.macroNames, ...value.customKeyNames, value.keyboardName].reduce((sum, name) => sum + Buffer.byteLength(name), 0);
     assert.equal(bytes.length, SETTINGS.MIN_SIZE + nameBytes);
     const layer2 = SETTINGS.LAYER_RECORDS_OFFSET + 2 * SETTINGS.LAYER_RECORD_SIZE;
@@ -197,17 +201,17 @@ test("decoded names must be well-formed, counted and within 32 bytes", () => {
     }
     const overlong = Buffer.concat([named.subarray(0, last), Buffer.from([33]), Buffer.alloc(33, 0x61)]);
     assert.throws(() => decodeSettings(overlong), /Invalid name length/);
-    // A version 6 body (272 names) relabelled 7 lacks the keyboard name.
+    // A body one name short lacks the keyboard name.
     const six = encodeSettings({...defaults(), names: Array(16).fill("")}).subarray(0, SETTINGS.MIN_SIZE - 1);
     assert.throws(() => decodeSettings(six), /Unsupported settings format/);
 });
 
-test("only version 7 is read or written: the retired versions and reserved bytes are refused", () => {
-    for (const formatVersion of [6, 5, 4, 8]) assert.throws(() => encodeSettings({...defaults(), formatVersion}), /Unsupported settings format/);
+test("only version 8 is read or written: the retired versions and reserved bytes are refused", () => {
+    for (const formatVersion of [7, 6, 5, 4, 9]) assert.throws(() => encodeSettings({...defaults(), formatVersion}), /Unsupported settings format/);
     const bytes = encodeSettings(defaults());
-    for (const header of [[5, 8, 28, 64, 64], [4, 8, 28, 64, 0], [3, 8, 28, 64, 0], [2, 8, 28, 16, 0], [1, 8, 28, 16, 0], [6, 16, 31, 128, 128], [8, 16, 31, 128, 128],
-        [7, 8, 31, 128, 128], [7, 16, 28, 128, 128], [7, 16, 31, 64, 128], [7, 16, 31, 128, 64],
-        [7, 16, 31, 128, 128, 2], [7, 16, 31, 128, 128, 0, 0, 1]]) {
+    for (const header of [[5, 8, 28, 64, 64], [4, 8, 28, 64, 0], [3, 8, 28, 64, 0], [2, 8, 28, 16, 0], [1, 8, 28, 16, 0], [6, 16, 31, 128, 128], [7, 16, 31, 128, 128], [9, 16, 31, 128, 128],
+        [8, 8, 31, 128, 128], [8, 16, 28, 128, 128], [8, 16, 31, 64, 128], [8, 16, 31, 128, 64],
+        [8, 16, 31, 128, 128, 2], [8, 16, 31, 128, 128, 0, 0], [8, 16, 31, 128, 128, 0, 64], [8, 16, 31, 128, 128, 0, 128, 1]]) {
         const relabelled = Buffer.from(bytes); relabelled.set(header);
         assert.throws(() => decodeSettings(relabelled), /Unsupported settings format/, header.join());
     }
@@ -231,4 +235,32 @@ test("the global combo-output permission changes only header byte 5 and defaults
         const bytes = Buffer.from(enabled); bytes[5] = flag;
         assert.throws(() => decodeSettings(bytes), /Unsupported settings format/);
     }
+});
+
+test("a custom-key shortcut is a modifier mask and one key the firmware accepts", () => {
+    // Firmware D-F26: none, KC_A..KC_EXSEL, or mouse buttons 1-8.
+    assert.deepEqual(SHORTCUT_KEYS, {BASIC_MIN: 0x04, BASIC_MAX: 0xa4, MOUSE_MIN: 0xd1, MOUSE_MAX: 0xd8});
+    const accepted = [0, 0x04, 0x0e, 0xa4, 0xd1, 0xd8];
+    const refused = [0x01, 0x03, 0xa5, 0xcd, 0xd0, 0xd9, 0xe0, 0xe7, 0xff, 0x104, -1, 1.5];
+    for (const key of accepted) assert.ok(validShortcutKey(key), `accepts 0x${key.toString(16)}`);
+    for (const key of refused) assert.equal(validShortcutKey(key), false, `refuses ${key}`);
+    // Mixed sides, modifiers alone and a key alone are all shortcuts.
+    for (const shortcut of [{mods: 0x41, key: 0x0e}, {mods: 0x0f, key: 0}, {mods: 0, key: 0xd1}, {mods: 0xff, key: 0xa4}]) {
+        const bytes = encodeSettings(withShortcut(5, shortcut));
+        const at = SETTINGS.SHORTCUTS_OFFSET + 5 * 2;
+        assert.deepEqual([...bytes.subarray(at, at + 2)], [shortcut.mods, shortcut.key]);
+        assert.deepEqual(decodeSettings(bytes).customKeyShortcuts[5], shortcut);
+    }
+    for (const shortcut of [{mods: 256, key: 0}, {mods: -1, key: 0}, {mods: 0, key: 0xe0}, {mods: 1, key: 0xa5}, {mods: 1}, null, 4]) {
+        assert.throws(() => encodeSettings(withShortcut(5, shortcut)), /shortcut/, JSON.stringify(shortcut));
+    }
+    assert.throws(() => encodeSettings({...defaults(), customKeyShortcuts: defaults().customKeyShortcuts.slice(1)}), /custom key shortcuts/);
+    assert.throws(() => encodeSettings({...defaults(), customKeyShortcuts: undefined}), /custom key shortcuts/);
+    const bytes = encodeSettings(defaults());
+    for (const key of [0x01, 0xa5, 0xe0, 0xd9]) {
+        const stored = Buffer.from(bytes); stored[SETTINGS.SHORTCUTS_OFFSET + 127 * 2 + 1] = key;
+        assert.throws(() => decodeSettings(stored), /cannot hold/, `0x${key.toString(16)}`);
+    }
+    const any = Buffer.from(bytes); any[SETTINGS.SHORTCUTS_OFFSET + 127 * 2] = 0xff;
+    assert.deepEqual(decodeSettings(any).customKeyShortcuts[127], {mods: 0xff, key: 0}, "any modifier mask");
 });

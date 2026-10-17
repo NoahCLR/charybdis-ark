@@ -4,7 +4,8 @@ const assert = require("node:assert/strict");
 const {exportedProfile, openPanelLoop} = require("../../core/session/panel-loop");
 const {FakeDeviceAdapter} = require("../../core/transport/fake-device-adapter");
 const {LIVE_LINK_ERROR_CODES, liveLinkError} = require("../../core/transport/device-adapter");
-const {fingerprint, summary} = require("../../core/model/portable-profile");
+const {fingerprint, summary, validateSnapshot} = require("../../core/model/portable-profile");
+const {decodeProfileBlob} = require("../../core/schema/profile-blob-v1");
 const {document} = require("../fixtures/pd-profile");
 const {document: currentDocument} = require("../fixtures/portable-profile");
 const {fakeKeyboardAdapter, fakeKeyboard} = require("../fixtures/fake-keyboard");
@@ -49,6 +50,32 @@ test("read progress posts only a small operation-correlated view", async t => {
     }
     const final = reads.at(-1).read.progress;
     assert.equal(final.done, final.total);
+});
+
+// Firmware before custom-key shortcuts stores settings v7 (D-L63): the read
+// shows its profile from the keyboard's own model, read-only with no draft;
+// an edit is refused, and an export is a current backup with no shortcuts.
+test("a keyboard storing settings v7 is shown read-only, refuses edits and exports a current backup", async t => {
+    const host = fakeHost();
+    const loop = openPanelLoop(host, {adapter: fakeKeyboardAdapter({document: currentDocument(), settingsVersion: 7}), defaultTimeoutMs: 200});
+    t.after(() => loop.close());
+    await loop.handleMessage({type: "refresh"});
+    const {model} = last(host);
+    assert.equal(loop.session.draft, undefined, "no draft opens");
+    assert.equal(model.olderFirmware, true);
+    assert.equal(model.load.state, "ready", "its screens show the keyboard");
+    assert.deepEqual(model.customKeyShortcutKeys, [], "the Shortcut field is unavailable");
+    assert.equal(model.customKeys.length, 128);
+    assert.deepEqual(loop.session.service.snapshot().olderDomains, [{id: 0x40, version: 7}]);
+
+    await loop.handleMessage({type: "updateCustomKey", keycode: "CUSTOM_KEY_1", name: "Late"});
+    assert.match(last(host).notice, /no editable draft/);
+
+    await loop.handleMessage({type: "exportPortableProfile"});
+    assert.equal(host.exports.length, 1);
+    const exported = validateSnapshot(JSON.parse(host.exports[0].text));
+    assert.ok(exported.settings.customKeyShortcuts.every(shortcut => !shortcut.mods && !shortcut.key));
+    assert.equal(decodeProfileBlob(exported.profile).domains.find(domain => domain.id === 0x40).version, 8, "a current-format backup");
 });
 
 // A host that records everything the loop hands it.

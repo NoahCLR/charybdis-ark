@@ -4,8 +4,9 @@ const {PROFILE_DOMAIN_VERSIONS, PROFILE_DOMAIN_IDS} = require("./profile-domains
 const {LAYERS, MATRIX_KEYS} = require("../data/charybdis-layout");
 const {validHostSetting} = require("./host-settings");
 const {canonical} = require("./bytes");
-// Settings domain 0x40, version 7, the only one the keyboard stores (firmware
-// D-F14): 31 values, sixteen layer records, then 273 counted names — sixteen
+// Settings domain 0x40, version 8, the only one the keyboard stores (firmware
+// D-F14, D-F26): 31 values, sixteen layer records, 128 custom-key shortcuts,
+// then 273 counted names — sixteen
 // layer names, 128 VIA macro names, 128 custom-key names and the keyboard's
 // own name, each a length byte and up to 32 bytes of UTF-8 (profile-name.js).
 // An empty keyboard name means the firmware's built-in name; a stored one is
@@ -16,6 +17,11 @@ const {canonical} = require("./bytes");
 // positions whose behaviour is bypassed, and positions kept out of combos
 // (participation-policy.md). Decoded, each bitmap is the sorted list of its
 // set positions (row × columns + column).
+//
+// A custom-key shortcut is two bytes, custom key 0 first: the modifier mask in
+// HID report order (bit 0 Left Ctrl … bit 7 Right GUI, any combination), then
+// the key: none, a basic key or a mouse button (SHORTCUT_KEYS). Both zero is no
+// shortcut; modifiers alone and a key alone are both shortcuts.
 const {NAME_MAX_BYTES, validName, nameOfBytes, encodeName} = require("./profile-name");
 
 /** @param {string} message */
@@ -65,14 +71,28 @@ const STORED = /** @type {const} */ ([
 // names without updating parallel byte offsets.
 const SCALARS_OFFSET = 8, PLACEMENT_BYTES = 8, LAYER_RECORD_SIZE = 1 + 2 * PLACEMENT_BYTES;
 const LAYER_RECORDS_OFFSET = SCALARS_OFFSET + STORED.length * 4;
-const FIXED_SIZE = LAYER_RECORDS_OFFSET + LAYERS * LAYER_RECORD_SIZE;
 const MACRO_NAMES = 128, CUSTOM_KEY_NAMES = 128, KEYBOARD_NAMES = 1, NAME_COUNT = LAYERS + MACRO_NAMES + CUSTOM_KEY_NAMES + KEYBOARD_NAMES;
-const SETTINGS = Object.freeze({VERSION: PROFILE_DOMAIN_VERSIONS[PROFILE_DOMAIN_IDS.SETTINGS], COUNT: STORED.length, LAYERS, MACRO_NAMES, CUSTOM_KEY_NAMES,
-    LAYER_RECORD_SIZE, PLACEMENT_BYTES, PLACEMENT_MAX_POSITIONS: PLACEMENT_BYTES * 8, NAME_MAX_BYTES,
-    SCALARS_OFFSET, LAYER_RECORDS_OFFSET, FIXED_SIZE, MIN_SIZE: FIXED_SIZE + NAME_COUNT, MAX_SIZE: FIXED_SIZE + NAME_COUNT * (NAME_MAX_BYTES + 1)});
+const CUSTOM_KEY_SHORTCUTS = 128, SHORTCUT_SIZE = 2;
+const SHORTCUTS_OFFSET = LAYER_RECORDS_OFFSET + LAYERS * LAYER_RECORD_SIZE;
+const FIXED_SIZE = SHORTCUTS_OFFSET + CUSTOM_KEY_SHORTCUTS * SHORTCUT_SIZE;
+const SETTINGS = Object.freeze({VERSION: PROFILE_DOMAIN_VERSIONS[PROFILE_DOMAIN_IDS.SETTINGS], COUNT: STORED.length, LAYERS, MACRO_NAMES, CUSTOM_KEY_NAMES, CUSTOM_KEY_SHORTCUTS,
+    LAYER_RECORD_SIZE, PLACEMENT_BYTES, PLACEMENT_MAX_POSITIONS: PLACEMENT_BYTES * 8, NAME_MAX_BYTES, SHORTCUT_SIZE,
+    SCALARS_OFFSET, LAYER_RECORDS_OFFSET, SHORTCUTS_OFFSET, FIXED_SIZE, MIN_SIZE: FIXED_SIZE + NAME_COUNT, MAX_SIZE: FIXED_SIZE + NAME_COUNT * (NAME_MAX_BYTES + 1)});
+// The keys a shortcut may hold (firmware D-F26): none, the basic keyboard
+// usages KC_A..KC_EXSEL, or mouse buttons 1-8. Modifiers belong in the mask.
+const SHORTCUT_KEYS = Object.freeze({BASIC_MIN: 0x04, BASIC_MAX: 0xa4, MOUSE_MIN: 0xd1, MOUSE_MAX: 0xd8});
+/** @param {unknown} key */
+const validShortcutKey = key => Number.isInteger(key) && (key === 0 || (/** @type {number} */ (key) >= SHORTCUT_KEYS.BASIC_MIN && /** @type {number} */ (key) <= SHORTCUT_KEYS.BASIC_MAX)
+    || (/** @type {number} */ (key) >= SHORTCUT_KEYS.MOUSE_MIN && /** @type {number} */ (key) <= SHORTCUT_KEYS.MOUSE_MAX));
+/** @param {unknown} shortcut @returns {shortcut is import("./types.js").CustomKeyShortcut} */
+const validShortcut = shortcut => typeof shortcut === "object" && shortcut !== null
+    && Number.isInteger(/** @type {any} */ (shortcut).mods) && /** @type {any} */ (shortcut).mods >= 0 && /** @type {any} */ (shortcut).mods <= 0xff
+    && validShortcutKey(/** @type {any} */ (shortcut).key);
+/** @returns {import("./types.js").CustomKeyShortcut} */
+const noShortcut = () => ({mods: 0, key: 0});
 const MATRIX_POSITIONS = MATRIX_KEYS;
 const SETTINGS_HEADER_FLAGS = Object.freeze({OFFSET: 5, COMBO_OUTPUT_BYPASS: 1, KNOWN: 1});
-const HEADER = Buffer.from([SETTINGS.VERSION, SETTINGS.LAYERS, SETTINGS.COUNT, SETTINGS.MACRO_NAMES, SETTINGS.CUSTOM_KEY_NAMES, 0, 0, 0]);
+const HEADER = Buffer.from([SETTINGS.VERSION, SETTINGS.LAYERS, SETTINGS.COUNT, SETTINGS.MACRO_NAMES, SETTINGS.CUSTOM_KEY_NAMES, 0, SETTINGS.CUSTOM_KEY_SHORTCUTS, 0]);
 
 /** @typedef {typeof STORED[number][0]} SettingName */
 // The stored values in ID order, each by its name, and each ID by its name.
@@ -124,6 +144,8 @@ function encodeSettings(value, layers = SETTINGS.LAYERS, positions = MATRIX_POSI
     if (!Array.isArray(value.macroNames) || value.macroNames.length !== SETTINGS.MACRO_NAMES) throw fail("Missing macro names.");
     if (!Array.isArray(value.customKeyNames) || value.customKeyNames.length !== SETTINGS.CUSTOM_KEY_NAMES) throw fail("Missing custom key names.");
     if (typeof value.keyboardName !== "string") throw fail("Missing keyboard name.");
+    if (!Array.isArray(value.customKeyShortcuts) || value.customKeyShortcuts.length !== SETTINGS.CUSTOM_KEY_SHORTCUTS) throw fail("Missing custom key shortcuts.");
+    if (!value.customKeyShortcuts.every(validShortcut)) throw fail("A custom key shortcut holds modifiers and one plain key or mouse button.");
     const fixed = Buffer.alloc(SETTINGS.FIXED_SIZE);
     HEADER.copy(fixed);
     if (value.comboOutputBehaviors !== undefined && typeof value.comboOutputBehaviors !== "boolean") throw fail("Combo output behaviour permission must be on or off.");
@@ -135,6 +157,10 @@ function encodeSettings(value, layers = SETTINGS.LAYERS, positions = MATRIX_POSI
         fixed[at] = record.reference;
         bitmapOfPositions(record.bypass, positions).copy(fixed, at + 1);
         bitmapOfPositions(record.exclude, positions).copy(fixed, at + 1 + SETTINGS.PLACEMENT_BYTES);
+    });
+    value.customKeyShortcuts.forEach(({mods, key}, slot) => {
+        fixed[SETTINGS.SHORTCUTS_OFFSET + slot * SETTINGS.SHORTCUT_SIZE] = mods;
+        fixed[SETTINGS.SHORTCUTS_OFFSET + slot * SETTINGS.SHORTCUT_SIZE + 1] = key;
     });
     /** @param {string} name @param {string} what */
     const record = (name, what) => {
@@ -152,6 +178,11 @@ function decodeSettings(bytes, layers = SETTINGS.LAYERS, positions = MATRIX_POSI
         const at = SETTINGS.LAYER_RECORDS_OFFSET + layer * SETTINGS.LAYER_RECORD_SIZE;
         return {reference: bytes[at], bypass: positionsOfBitmap(bytes.subarray(at + 1, at + 9), positions), exclude: positionsOfBitmap(bytes.subarray(at + 9, at + 17), positions)};
     });
+    const customKeyShortcuts = Array.from({length: SETTINGS.CUSTOM_KEY_SHORTCUTS}, (_, slot) => {
+        const at = SETTINGS.SHORTCUTS_OFFSET + slot * SETTINGS.SHORTCUT_SIZE;
+        if (!validShortcutKey(bytes[at + 1])) throw fail("A custom key shortcut names a key it cannot hold.");
+        return {mods: bytes[at], key: bytes[at + 1]};
+    });
     let offset = SETTINGS.FIXED_SIZE;
     const nameRecord = () => {
         if (offset >= bytes.length) throw fail("Missing name.");
@@ -167,7 +198,7 @@ function decodeSettings(bytes, layers = SETTINGS.LAYERS, positions = MATRIX_POSI
     const customKeyNames = Array.from({length: SETTINGS.CUSTOM_KEY_NAMES}, nameRecord);
     const keyboardName = nameRecord();
     if (offset !== bytes.length) throw fail("Unexpected settings data.");
-    const result = {comboOutputBehaviors: !(bytes[SETTINGS_HEADER_FLAGS.OFFSET] & SETTINGS_HEADER_FLAGS.COMBO_OUTPUT_BYPASS), values, names, layers: layerRecords, macroNames, customKeyNames, keyboardName, formatVersion: SETTINGS.VERSION};
+    const result = {comboOutputBehaviors: !(bytes[SETTINGS_HEADER_FLAGS.OFFSET] & SETTINGS_HEADER_FLAGS.COMBO_OUTPUT_BYPASS), values, names, layers: layerRecords, macroNames, customKeyNames, customKeyShortcuts, keyboardName, formatVersion: SETTINGS.VERSION};
     return canonical(bytes, result, value => encodeSettings(value, layers, positions), () => fail("Noncanonical settings data."));
 }
-module.exports = {SETTINGS_HEADER_FLAGS, SETTINGS, SETTING, SETTING_FIELD, SETTING_FIELDS: FIELDS, MATRIX_POSITIONS, validName, validSetting, defaultLayerRecord, encodeSettings, decodeSettings};
+module.exports = {SETTINGS_HEADER_FLAGS, SETTINGS, SHORTCUT_KEYS, SETTING, SETTING_FIELD, SETTING_FIELDS: FIELDS, MATRIX_POSITIONS, validName, validSetting, validShortcutKey, validShortcut, noShortcut, defaultLayerRecord, encodeSettings, decodeSettings};

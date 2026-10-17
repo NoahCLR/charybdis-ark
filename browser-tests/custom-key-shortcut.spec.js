@@ -1,0 +1,264 @@
+// @ts-check
+"use strict";
+const {test, expect} = require("@playwright/test");
+const {openControls, posted, clearPosts} = require("./control-preview");
+
+const shortcut = (mods, key) => expect.objectContaining({type: "updateCustomKeyShortcut", keycode: "CUSTOM_KEY_1", shortcut: {mods, key}});
+
+// The Shortcut field is set in the keycode picker, with the modifier row the
+// Keys screen uses: here left and right mix, and modifiers alone or a key
+// alone are a shortcut. Use posts the whole shortcut; Clear posts none.
+for (const theme of ["plain", "vscode-dark"]) {
+    test(`a custom key's shortcut is picked with mixed-side modifiers, and cleared (${theme})`, async ({page}) => {
+        await openControls(page, "customKeys", {customKey: "CUSTOM_KEY_1"}, theme);
+        await expect(page.locator('[data-f^="custom-key:1:shortcut:modifier"]'), "no separate modifier grid").toHaveCount(0);
+        await page.locator('[data-act="pick-shortcut"]').click();
+        await expect(page.locator(".picker")).toBeVisible();
+        await expect(page.locator(".picker .pk-mods")).toHaveCount(1);
+        // Left Ctrl and Right Alt together: a single keycode cannot, a shortcut can.
+        await page.locator('.picker [data-mod="C"]').click();
+        await page.locator('.picker [data-mod="RALT"]').click();
+        await page.locator("#pickerSearch").fill("KC_K");
+        await page.locator('.picker [data-pick="KC_K"]').first().click();
+        await expect(page.locator(".picker .pk-problem")).toHaveCount(0);
+        await expect(page.locator(".picker .pk-value")).toHaveText(/^Left Ctrl \+ Right (Alt|Option) \+ K$/);
+        await page.locator('.picker [data-act="use"]').click();
+        await expect.poll(() => posted(page)).toEqual([shortcut(0x41, 0x0e)]);
+
+        // Modifiers alone are a shortcut too.
+        await clearPosts(page);
+        await page.locator('[data-act="pick-shortcut"]').click();
+        for (const mod of ["C", "S", "A", "G"]) await page.locator(`.picker [data-mod="${mod}"]`).click();
+        await page.locator('.picker [data-act="use"]').click();
+        await expect.poll(() => posted(page)).toEqual([shortcut(0x0f, 0)]);
+
+        // Publish a model in which the key has the mixed-side shortcut, as the
+        // host would after staging: the field shows it, the picker opens with
+        // its modifiers on, and Clear posts none.
+        await page.evaluate(async () => {
+            const store = await import("/webview/store.mjs");
+            const model = structuredClone(store.getModel());
+            Object.assign(model.customKeys[1], {shortcut: {mods: 0x41, key: 0x0e}, shortcutLabel: "Left Ctrl + Right Alt + K"});
+            store.setModel(model); store.render();
+            window.__posted.length = 0;
+        });
+        await expect(page.locator('[data-f="custom-key:1:shortcut"]')).toHaveValue("Left Ctrl + Right Alt + K");
+        await page.locator('[data-act="pick-shortcut"]').click();
+        await expect(page.locator('.picker [data-mod="C"]')).toHaveClass(/\bon\b/);
+        await expect(page.locator('.picker [data-mod="RALT"]')).toHaveClass(/\bon\b/);
+        await page.locator('.picker [data-act="cancel"]').first().click();
+        expect(await posted(page)).toEqual([]);
+        await page.locator('[data-act="clear-shortcut"]').click();
+        await expect.poll(() => posted(page)).toEqual([shortcut(0, 0)]);
+    });
+}
+
+test("the picker refuses a key a shortcut cannot hold, and firmware without shortcuts says so", async ({page}) => {
+    await openControls(page, "customKeys", {customKey: "CUSTOM_KEY_1"});
+    await page.locator('[data-act="pick-shortcut"]').click();
+    await page.locator("#pickerSearch").fill("KC_LEFT_CTRL");
+    await expect(page.locator('.picker [data-pick="KC_LEFT_CTRL"]')).toHaveCount(0);
+    await page.locator('.picker [data-act="cancel"]').first().click();
+    await page.evaluate(async () => {
+        const store = await import("/webview/store.mjs");
+        const model = structuredClone(store.getModel());
+        model.customKeyShortcutKeys = [];
+        store.setModel(model); store.render();
+    });
+    await expect(page.locator(".content")).toContainText("cannot give a custom key a shortcut");
+    await expect(page.locator('[data-act="pick-shortcut"]')).toHaveCount(0);
+});
+
+// A keyboard whose firmware still stores settings v7 opens no draft: every
+// screen shows it from the keyboard's own model, read-only, with the reason.
+test("a keyboard on firmware older than shortcuts is shown read-only on every screen", async ({page}) => {
+    const errors = [];
+    page.on("pageerror", error => errors.push(error.message));
+    await openControls(page, "customKeys", {customKey: "CUSTOM_KEY_1"});
+    await page.evaluate(async () => {
+        const store = await import("/webview/store.mjs");
+        const model = structuredClone(store.getModel());
+        delete model.draft;
+        Object.assign(model, {olderFirmware: true, customKeyShortcutKeys: [], load: {...model.load, state: "ready"}});
+        store.setModel(model); store.render();
+    });
+    await expect(page.locator(".content")).toContainText("cannot give a custom key a shortcut");
+    await expect(page.locator('[data-f="custom-key:1:name"]')).toBeDisabled();
+    for (const screen of ["keys", "lighting", "macros", "customKeys", "mouse", "pointing", "settings"]) {
+        await page.locator(`[data-screen="${screen}"]`).click();
+        await expect(page.locator(`[data-screen="${screen}"]`)).toHaveAttribute("aria-current", "true");
+        await expect(page.getByText("Keyboard not ready for edits"), `${screen} shows the keyboard, not a placeholder`).toHaveCount(0);
+    }
+    await expect(page.locator(".content")).toContainText("older than this Ark");
+    await clearPosts(page);
+    expect(await posted(page)).toEqual([]);
+    expect(errors).toEqual([]);
+});
+
+// A layout key's picker offers an unused custom key for modifiers no keycode
+// can hold — two or more from each side — and makes it in one draft step:
+// named, given the shortcut and placed on that key (D-L63).
+test("the Keys screen's picker offers a custom key for Ctrl and Shift on both sides, and places it", async ({page}) => {
+    await openControls(page, "keys");
+    await page.evaluate(async () => (await import("/webview/ui/keys/key-edits.mjs")).pickKeycodeFor(27));
+    await expect(page.locator(".picker")).toBeVisible();
+    // The picker starts on the key already there; take it off for modifiers alone.
+    await page.locator('.picker [data-remove="0"]').click();
+    for (const mod of ["C", "S", "RCTL", "RSFT"]) await page.locator(`.picker [data-mod="${mod}"]`).click();
+    const offer = page.locator('.picker [data-act="use-custom-key"]');
+    await expect(offer).toHaveText(/^Use Custom key \d+$/);
+    await expect(page.locator(".picker .pk-offer")).toContainText("No keycode can hold");
+    const slot = Number((await offer.textContent()).match(/\d+/)[0]);
+    const layer = await page.evaluate(async () => (await import("/webview/store.mjs")).currentLayer()?.name);
+    await clearPosts(page);
+    await offer.click();
+    await expect(page.locator(".picker")).toHaveCount(0);
+    await expect.poll(() => posted(page)).toEqual([expect.objectContaining({type: "updateCustomKeyShortcut", keycode: `CUSTOM_KEY_${slot}`,
+        shortcut: {mods: 0x33, key: 0}, name: "LCtrl+LShift+RCtrl+RShift",
+        then: {type: "updateLayoutKeys", layer, changes: [{layoutIndex: 27, keycode: `CUSTOM_KEY_${slot}`}]}})]);
+
+    // One side and a key is an ordinary keycode: no offer.
+    await page.evaluate(async () => (await import("/webview/ui/keys/key-edits.mjs")).pickKeycodeFor(27));
+    await page.locator('.picker [data-mod="G"]').click();
+    await page.locator('.picker [data-pick="KC_C"]').first().click();
+    await expect(page.locator('.picker [data-act="use-custom-key"]')).toHaveCount(0);
+    await expect(page.locator('.picker [data-act="use"]')).toBeEnabled();
+});
+
+// A custom key that already sends the modifiers is used, not another made:
+// on a layout key only one without a behaviour, since the key runs it there.
+test("the picker uses a custom key that already holds the shortcut", async ({page}) => {
+    await openControls(page, "keys");
+    await page.evaluate(async () => {
+        const store = await import("/webview/store.mjs");
+        const model = structuredClone(store.getModel());
+        Object.assign(model.customKeys[3], {name: "Ctrl Shift both", hasBehavior: false, shortcut: {mods: 0x33, key: 0}, shortcutLabel: "Left Ctrl + Left Shift + Right Ctrl + Right Shift"});
+        store.setModel(model); store.render();
+    });
+    await page.evaluate(async () => (await import("/webview/ui/keys/key-edits.mjs")).pickKeycodeFor(27));
+    await page.locator('.picker [data-remove="0"]').click();
+    for (const mod of ["C", "S", "RCTL", "RSFT"]) await page.locator(`.picker [data-mod="${mod}"]`).click();
+    await expect(page.locator('.picker [data-act="use-custom-key"]')).toHaveCount(0);
+    const reuse = page.locator('.picker [data-act="use-existing-key"]');
+    await expect(reuse).toHaveText("Use Custom key 3 · Ctrl Shift both");
+    const layer = await page.evaluate(async () => (await import("/webview/store.mjs")).currentLayer()?.name);
+    await clearPosts(page);
+    await reuse.click();
+    await expect.poll(() => posted(page)).toEqual([expect.objectContaining({type: "updateLayoutKeys", layer, changes: [{layoutIndex: 27, keycode: "CUSTOM_KEY_3"}]})]);
+});
+
+// A behaviour cell takes the same offer: the custom key is made and the cell
+// sends it, in one message.
+test("a behaviour cell's picker makes a custom key for mixed-side modifiers, and sends it", async ({page}) => {
+    await openControls(page, "customKeys", {customKey: "CUSTOM_KEY_5"});
+    await page.locator('.custom-key-behaviour [data-cell="0-hold"]').click();
+    await page.locator('.cell-editor [data-act="pick"]').click();
+    for (const mod of ["C", "S", "RCTL", "RSFT"]) await page.locator(`.picker [data-mod="${mod}"]`).click();
+    const offer = page.locator('.picker [data-act="use-custom-key"]');
+    await expect(offer).toHaveText(/^Use Custom key \d+$/);
+    const slot = Number((await offer.textContent()).match(/\d+/)[0]);
+    await clearPosts(page);
+    await offer.click();
+    await expect.poll(() => posted(page)).toEqual([expect.objectContaining({type: "updateCustomKeyShortcut", keycode: `CUSTOM_KEY_${slot}`, shortcut: {mods: 0x33, key: 0},
+        then: expect.objectContaining({type: "saveBehavior", behavior: expect.objectContaining({keycode: "CUSTOM_KEY_5",
+            steps: [expect.objectContaining({tapCount: 0, hold: expect.objectContaining({action: `CUSTOM_KEY_${slot}`})})]})})})]);
+});
+
+// A combo output is saved with its combo: the key is made now and becomes the
+// output in the builder.
+test("a combo output's picker makes a custom key and fills the output", async ({page}) => {
+    await openControls(page, "keys", {tab: "combos"});
+    await page.getByRole("button", {name: "New combo", exact: true}).click();
+    await page.locator('[data-act="pickout"]').click();
+    for (const mod of ["S", "A", "RSFT", "RALT"]) await page.locator(`.picker [data-mod="${mod}"]`).click();
+    const offer = page.locator('.picker [data-act="use-custom-key"]');
+    const slot = Number((await offer.textContent()).match(/\d+/)[0]);
+    await clearPosts(page);
+    await offer.click();
+    await expect.poll(() => posted(page)).toEqual([expect.objectContaining({type: "updateCustomKeyShortcut", keycode: `CUSTOM_KEY_${slot}`, shortcut: {mods: 0x66, key: 0}})]);
+    expect((await posted(page))[0].then).toBeUndefined();
+    await expect(page.locator("[data-output]")).toHaveValue(`CUSTOM_KEY_${slot}`);
+});
+
+// On a layout key a matching custom key that has a behaviour would run it
+// too: the picker offers it beside a new key, and either choice works.
+test("a matching custom key with a behaviour is offered beside a new one on a layout key", async ({page}) => {
+    await openControls(page, "keys");
+    await page.evaluate(async () => {
+        const store = await import("/webview/store.mjs");
+        const model = structuredClone(store.getModel());
+        Object.assign(model.customKeys[3], {name: "Ctrl Shift both", hasBehavior: true, shortcut: {mods: 0x33, key: 0}, shortcutLabel: "Left Ctrl + Left Shift + Right Ctrl + Right Shift"});
+        store.setModel(model); store.render();
+    });
+    const open = async () => {
+        await page.evaluate(async () => (await import("/webview/ui/keys/key-edits.mjs")).pickKeycodeFor(27));
+        await page.locator('.picker [data-remove="0"]').click();
+        for (const mod of ["C", "S", "RCTL", "RSFT"]) await page.locator(`.picker [data-mod="${mod}"]`).click();
+    };
+    await open();
+    await expect(page.locator(".picker .pk-offer")).toContainText("with its behaviour on top");
+    await expect(page.locator('.picker [data-act="use-existing-key"]')).toHaveText("Use Custom key 3 · Ctrl Shift both");
+    const make = page.locator('.picker [data-act="use-custom-key"]');
+    await expect(make).toHaveText(/^Make Custom key \d+$/);
+    const layer = await page.evaluate(async () => (await import("/webview/store.mjs")).currentLayer()?.name);
+    await clearPosts(page);
+    await page.locator('.picker [data-act="use-existing-key"]').click();
+    await expect.poll(() => posted(page)).toEqual([expect.objectContaining({type: "updateLayoutKeys", layer, changes: [{layoutIndex: 27, keycode: "CUSTOM_KEY_3"}]})]);
+    await open();
+    const slot = Number((await make.textContent()).match(/\d+/)[0]);
+    expect(slot).not.toBe(3);
+    await clearPosts(page);
+    await make.click();
+    await expect.poll(() => posted(page)).toEqual([expect.objectContaining({type: "updateCustomKeyShortcut", keycode: `CUSTOM_KEY_${slot}`, shortcut: {mods: 0x33, key: 0}})]);
+});
+
+// In a behaviour cell the step sends only the shortcut, never the matching
+// key's behaviour, so the match is used as it is with nothing new offered.
+test("a behaviour cell uses a matching custom key even when it has a behaviour", async ({page}) => {
+    await openControls(page, "customKeys", {customKey: "CUSTOM_KEY_5"});
+    await page.evaluate(async () => {
+        const store = await import("/webview/store.mjs");
+        const model = structuredClone(store.getModel());
+        Object.assign(model.customKeys[3], {name: "Ctrl Shift both", hasBehavior: true, shortcut: {mods: 0x33, key: 0}, shortcutLabel: "Left Ctrl + Left Shift + Right Ctrl + Right Shift"});
+        store.setModel(model); store.render();
+    });
+    await page.locator('.custom-key-behaviour [data-cell="0-hold"]').click();
+    await page.locator('.cell-editor [data-act="pick"]').click();
+    for (const mod of ["C", "S", "RCTL", "RSFT"]) await page.locator(`.picker [data-mod="${mod}"]`).click();
+    await expect(page.locator('.picker [data-act="use-custom-key"]')).toHaveCount(0);
+    await expect(page.locator(".picker .pk-offer")).not.toContainText("behaviour on top");
+    await clearPosts(page);
+    await page.locator('.picker [data-act="use-existing-key"]').click();
+    await expect.poll(() => posted(page)).toEqual([expect.objectContaining({type: "saveBehavior", behavior: expect.objectContaining({keycode: "CUSTOM_KEY_5",
+        steps: [expect.objectContaining({hold: expect.objectContaining({action: "CUSTOM_KEY_3"})})]})})]);
+});
+
+// A modifier key is a modifier: with the buttons it folds into one set,
+// stored as the simplest keycode that holds it (modifierPick).
+test("modifier buttons and a modifier key fold into the simplest keycode", async ({page}) => {
+    await openControls(page, "keys");
+    const pick = async (mods, key) => {
+        await page.evaluate(async () => (await import("/webview/ui/keys/key-edits.mjs")).pickKeycodeFor(27));
+        await page.locator('.picker [data-remove="0"]').click();
+        for (const mod of mods) await page.locator(`.picker [data-mod="${mod}"]`).click();
+        if (key) await page.locator(`.picker [data-pick="${key}"]`).first().click();
+    };
+    const value = page.locator(".picker .pk-value");
+    // Command and the Left Command key: just Left Command.
+    await pick(["G"], "KC_LGUI");
+    await expect(value).toHaveText("KC_LEFT_GUI");
+    await page.locator('.picker [data-act="cancel"]').first().click();
+    // Command, Right Command and the Left Command key: both Commands, a keycode.
+    await pick(["G", "RGUI"], "KC_LGUI");
+    await expect(value).toHaveText("RGUI(KC_LEFT_GUI)");
+    await expect(page.locator(".picker .pk-problem")).toHaveCount(0);
+    await expect(page.locator('.picker [data-act="use-custom-key"]')).toHaveCount(0);
+    const layer = await page.evaluate(async () => (await import("/webview/store.mjs")).currentLayer()?.name);
+    await clearPosts(page);
+    await page.locator('.picker [data-act="use"]').click();
+    await expect.poll(() => posted(page)).toEqual([expect.objectContaining({type: "updateLayoutKeys", layer, changes: [{layoutIndex: 27, keycode: "RGUI(KC_LEFT_GUI)"}]})]);
+    // Both Commands from the buttons alone: the same keycode, the other way round.
+    await pick(["G", "RGUI"]);
+    await expect(value).toHaveText("G(KC_RIGHT_GUI)");
+    await expect(page.locator('.picker [data-act="use"]')).toBeEnabled();
+});

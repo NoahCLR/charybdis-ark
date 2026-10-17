@@ -116,6 +116,11 @@ that supplies it and that the row is shared by that keycode. A position answered
 by `KC_NO`, by nothing, or shown alone outside a preview keeps no editor.
 Changing the previewed layers re-resolves a row opened from the selected key; a
 row picked from the list stays (`toggleLayerOn` in webview/store.mjs).
+Opening a custom key's behaviour follows the same rule. A custom key with a
+shortcut (firmware D-F26) is built in like a plain key: its shortcut is its
+own tap and its fallback hold, and the dashed cells read as the shortcut
+(`builtInActions` with the profile's `customKeyShortcuts`). Without a
+shortcut it claims only `releaseTaps`.
 A custom key's behaviour follows the same rule on the Custom keys screen, which
 shows the selected key's editor in place, whether or not any layer holds the key.
 The host publishes built-in defaults for every custom key as well as for every

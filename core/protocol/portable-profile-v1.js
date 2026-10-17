@@ -18,7 +18,9 @@ async function readSettings(connection, ids, options = {}) {
     const before = await page(connection, 7, 0, ids);
     if (before.length !== 12 || before[0] !== 1 || before[1] !== 25) throw fail("Invalid settings metadata.");
     const length = before.readUInt16LE(2);
-    if (length < SETTINGS.MIN_SIZE || length > SETTINGS.MAX_SIZE) throw fail("Invalid settings capacity.");
+    // An older version may lack the shortcut table and the keyboard's name, but
+    // every version Ark reads holds the fields before them.
+    if (length <= SETTINGS.SHORTCUTS_OFFSET || length > SETTINGS.MAX_SIZE) throw fail("Invalid settings capacity.");
     assertPagesReachable(1 + Math.ceil(length / 25), options.widePages);
     const chunks = [];
     for (let offset = 0; offset < length; offset += 25) {
@@ -28,7 +30,10 @@ async function readSettings(connection, ids, options = {}) {
     }
     const bytes = Buffer.concat(chunks), after = await page(connection, 7, 0, ids);
     if (!before.equals(after) || crc32(bytes) !== before.readUInt32LE(4) || fnv1a32(bytes) !== before.readUInt32LE(8)) throw fail("Keyboard settings changed during the read. Try again.");
-    decodeSettings(bytes); return bytes;
+    // An older version (a keyboard not yet updated) is returned as stored; the
+    // session translates it and checks the result (materializeProfile).
+    if (bytes[0] >= SETTINGS.VERSION) decodeSettings(bytes);
+    return bytes;
 }
 /** @param {import("../transport/types.js").RequestConnection} connection @param {import("./types.js").RequestIds} ids */
 async function readStorageStatus(connection, ids) {

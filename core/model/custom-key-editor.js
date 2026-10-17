@@ -2,15 +2,18 @@
 "use strict";
 const {PROFILE_DOMAIN_IDS, replaceDomain} = require("../schema/profile-domains");
 
-// The 128 custom keys: named keys that do only what their behaviour says. A key
-// has an identity (CUSTOM_KEY_n, keycode 0x7f00 + n) and a name; what it does
-// is its behaviour row, edited like any other. Without a row it does nothing,
-// and a behaviour step cannot send one: it is placed on a layer or emitted by
-// a combo.
+// The 128 custom keys. A key has an identity (CUSTOM_KEY_n, keycode
+// 0x7f00 + n), a name and a shortcut: modifiers from either side and one key
+// (firmware D-F26). The shortcut is the key's own action, the way an ordinary
+// key's keycode is: held while the key is held, tapped when it is tapped, and
+// what its behaviour row falls back to. A behaviour row, edited like any other,
+// works on top of it. Without either, the key does nothing. A behaviour step on
+// another key that sends a custom key sends only its shortcut.
 
 const {decodedOf, encodeNamedProfile, validateSnapshot} = require("./portable-profile");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
-const {SETTINGS, validName, encodeSettings} = require("../schema/settings-domain-v1");
+const {SETTINGS, validName, validShortcut, validShortcutKey, encodeSettings} = require("../schema/settings-domain-v1");
+const keycodes = require("../data/keycode-catalog");
 const {knownActionAbi} = require("../schema/actions");
 const {CUSTOM_KEY_SLOTS, customKeyCode} = require("../data/user-keycodes");
 /** @param {string} message @param {string} [code] */
@@ -28,28 +31,52 @@ function customKeyEditorView(snapshot, capabilities) {
     const names = settings.customKeyNames;
     const behaved = new Set(behaviors.rows.filter(row => row.target.kind === ACTION.CUSTOM_KEY).map(row => row.target.operand));
     return {identity: snapshot.fingerprint,
-        keys: names.map((name, slot) => ({slot, keycode: `CUSTOM_KEY_${slot}`, code: customKeyCode(slot), name, hasBehavior: behaved.has(slot)})),
+        keys: names.map((name, slot) => ({slot, keycode: `CUSTOM_KEY_${slot}`, code: customKeyCode(slot), name, hasBehavior: behaved.has(slot),
+            shortcut: {...settings.customKeyShortcuts[slot]}})),
         // Each name may be 32 bytes of text; the profile as a whole has a ceiling.
-        names: {perName: SETTINGS.NAME_MAX_BYTES}};
+        names: {perName: SETTINGS.NAME_MAX_BYTES},
+        // The keys a shortcut may hold, by catalogue name, for the picker; none
+        // on a keyboard still storing settings older than shortcuts (D-L63).
+        shortcutKeys: snapshot.older?.some(entry => entry.id === PROFILE_DOMAIN_IDS.SETTINGS) ? [] : SHORTCUT_KEY_NAMES};
 }
 
-// A custom key's name. Names live in the profile's settings domain.
-/** @param {import("./types.js").CompleteSnapshot} snapshot @param {import("../../contracts/edits.js").EditPayloads['updateCustomKey'] & {expectedFingerprint: string}} message @param {import("./types.js").ProfileDestination} [capabilities] */
+// Every key a shortcut may hold, by its catalogue name: the basic keys and
+// mouse buttons 1-8 the firmware accepts (validShortcutKey), not none.
+const SHORTCUT_KEY_NAMES = Object.freeze(keycodes.entries()
+    .filter(entry => entry.value !== 0 && validShortcutKey(entry.value))
+    .flatMap(entry => [entry.name, ...entry.aliases]));
+
+// A custom key's name, or its shortcut. Both live in the profile's settings
+// domain; a message carries one or the other.
+/** @param {import("./types.js").CompleteSnapshot} snapshot @param {(import("../../contracts/edits.js").EditPayloads['updateCustomKey'] | import("../../contracts/edits.js").EditPayloads['updateCustomKeyShortcut']) & {expectedFingerprint: string}} message @param {import("./types.js").ProfileDestination} [capabilities] */
 function editCustomKey(snapshot, message, capabilities) {
     if (!snapshot?.document || !message.expectedFingerprint || message.expectedFingerprint !== snapshot.fingerprint) throw fail("The keyboard changed since this draft was opened. Read the keyboard and review the draft before saving again.");
     const match = /^CUSTOM_KEY_(\d+)$/.exec(message.keycode || "");
     const slot = match ? Number(match[1]) : -1;
     if (!match || slot >= CUSTOM_KEY_SLOTS || String(slot) !== match[1]) throw fail("Choose a custom key the keyboard has.");
-    if (typeof message.name !== "string") throw fail("A custom key name must be text.");
+    // A message renames the key, sets its shortcut, or both at once (a key
+    // made for a shortcut the picker could not store as a keycode).
+    const renaming = "name" in message && message.name !== undefined;
+    if (renaming && typeof message.name !== "string") throw fail("A custom key name must be text.");
+    const shortcut = "shortcut" in message ? message.shortcut : undefined;
+    if ((!renaming || shortcut !== undefined) && !validShortcut(shortcut)) throw fail("A custom key shortcut holds modifiers and one plain key or mouse button.", "CUSTOM_KEY_SHORTCUT_INVALID");
     if (!customKeysSupported(snapshot.document, capabilities)) throw fail("Custom keys need firmware with the userspace keycode blocks.", "CUSTOM_KEYS_UNSUPPORTED");
     const value = validateSnapshot(snapshot.document, capabilities);
-    const name = message.name.trim();
-    if (!validName(name)) throw fail(`A custom key name is up to ${SETTINGS.NAME_MAX_BYTES} bytes of text, with no control characters. Accented letters and symbols take two to four bytes each.`, "CUSTOM_KEY_NAME_INVALID");
-    if (name === value.settings.customKeyNames[slot]) return value.document;
+    const settings = structuredClone(value.settings);
+    if (renaming) {
+        const name = /** @type {string} */ (message.name).trim();
+        if (!validName(name)) throw fail(`A custom key name is up to ${SETTINGS.NAME_MAX_BYTES} bytes of text, with no control characters. Accented letters and symbols take two to four bytes each.`, "CUSTOM_KEY_NAME_INVALID");
+        settings.customKeyNames[slot] = name;
+    }
+    if (shortcut !== undefined) {
+        const {mods, key} = /** @type {import("../schema/types.js").CustomKeyShortcut} */ (shortcut);
+        settings.customKeyShortcuts[slot] = {mods, key};
+    }
+    if (settings.customKeyNames[slot] === value.settings.customKeyNames[slot]
+        && settings.customKeyShortcuts[slot].mods === value.settings.customKeyShortcuts[slot].mods
+        && settings.customKeyShortcuts[slot].key === value.settings.customKeyShortcuts[slot].key) return value.document;
     /** @type {import("./types.js").PortableDocument} */
     const document = JSON.parse(JSON.stringify(value.document));
-    const settings = structuredClone(value.settings);
-    settings.customKeyNames[slot] = name;
     document.profile = replaceDomain(value.profile, PROFILE_DOMAIN_IDS.SETTINGS, () => encodeSettings(settings), encodeNamedProfile).toString("base64");
     validateSnapshot(document, capabilities);
     return document;

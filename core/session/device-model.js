@@ -15,7 +15,7 @@ const {PHASE, VOCABULARY, HALVES_WORDS, slotName} = require("../model/vocabulary
 const keycodeCatalog = require("../data/keycode-catalog");
 const {baseEffectForView, baseRgbForView, behaviorRowsForView, builtInForView, comboRowsForView, rgbForView} = require("../model/device-profile-view");
 const {effectiveTimings} = require("../model/gesture-timing");
-const {compactKeyLabels, hostKeyVocabulary, keyLabel, profileKeyNames} = require("../model/key-names");
+const {compactKeyLabels, hostKeyVocabulary, keyLabel, profileKeyNames, shortcutLabel} = require("../model/key-names");
 const {layerName} = require("../model/vocabulary");
 const {keycodeAction, knownActionAbi, layerRef, nativeCode} = require("../schema/actions");
 const {dpiChoices} = require("../model/pointer-dpi");
@@ -142,10 +142,14 @@ function configurationModel(content, capabilities, editing) {
         const presentation = {value: name, key: name, label, group: "Pointing modes", aliases: [native], keycode: code, searchTerms: [name, label], search: `${name} ${label}`.toLowerCase(), searchCompact: `${name}${label}`.toLowerCase()};
         if (entry) Object.assign(entry, presentation); else catalog.entries.push(presentation);
     }
-    // So is each custom key, under its name.
+    // So is each custom key, under its name, its tip naming the shortcut it
+    // sends.
+    const customKeys = (content.customKeyView?.keys || []).map(key => ({...key, shortcutLabel: shortcutLabel(names, key.shortcut)}));
     for (const {name, native, code, label} of names.custom) {
         const entry = catalog.entries.find(entry => entry.keycode === code);
-        const presentation = {value: name, key: name, label, group: "Custom keys", aliases: [native], keycode: code, searchTerms: [name, label], search: `${name} ${label}`.toLowerCase(), searchCompact: `${name}${label}`.toLowerCase()};
+        const sends = customKeys.find(key => key.code === code)?.shortcutLabel;
+        const presentation = {value: name, key: name, label, group: "Custom keys", aliases: [native], keycode: code, searchTerms: [name, label], search: `${name} ${label}`.toLowerCase(), searchCompact: `${name}${label}`.toLowerCase(),
+            tip: sends ? `${label} · sends ${sends}` : `${label} · no shortcut`};
         if (entry) Object.assign(entry, presentation); else catalog.entries.push(presentation);
     }
     // Every keycode the profile holds is in the table by its name here, so the
@@ -176,7 +180,7 @@ function configurationModel(content, capabilities, editing) {
             // The keys a direction or button override may send, so the
             // picker offers only those (model/pointing-taps.js).
             tapKeys: pointingTapKeys(Boolean((capabilities?.featureFlags || 0) & PROFILE_WIRE_FEATURES.POINTING_CLICKS), Boolean((capabilities?.featureFlags || 0) & PROFILE_WIRE_FEATURES.POINTING_MACROS))},
-        keyBehaviors: content.domains.keyBehaviors ? behaviorRowsForView(content.domains.keyBehaviors, behaviorFeatures(capabilities), names) : [],
+        keyBehaviors: content.domains.keyBehaviors ? behaviorRowsForView(content.domains.keyBehaviors, behaviorFeatures(capabilities, content), names) : [],
         behaviorEditing: {
             busy: editing.busy,
             writable: editing.behaviors,
@@ -215,8 +219,9 @@ function configurationModel(content, capabilities, editing) {
         macroPayloadKeycodes: content.macroView?.macroPayloadKeycodes || [],
         macroPayloadModifierKeycodes: content.macroView?.macroPayloadModifierKeycodes || [],
         // The 128 named custom keys, on a keyboard with the keycode blocks.
-        customKeys: content.customKeyView?.keys || [],
+        customKeys,
         customKeyNameSpace: content.customKeyView?.names || null,
+        customKeyShortcutKeys: content.customKeyView?.shortcutKeys ? [...content.customKeyView.shortcutKeys] : [],
         customKeyEditing: {identity: content.customKeyView?.identity || "", writable: editing.customKeys},
         // The keyboard's own name, edited on Settings with the other settings.
         keyboardName: content.keyboardNameView || null,
@@ -324,12 +329,15 @@ function profileKeycodes(content, capabilities) {
     return values.filter(/** @returns {value is number} */ (value) => typeof value === "number" && Number.isInteger(value));
 }
 
-/** @param {Partial<import("./types.js").DeviceCapabilities> | null | undefined} capabilities */
-function behaviorFeatures(capabilities) {
+// What fills a behaviour's empty tiers depends on the firmware and, for a
+// custom key, on whether the profile gives it a shortcut.
+/** @param {Partial<import("./types.js").DeviceCapabilities> | null | undefined} capabilities @param {Configuration} content */
+function behaviorFeatures(capabilities, content) {
     const flags = capabilities?.featureFlags || 0;
     return {
         physicalGestureTiming: Boolean(flags & PROFILE_WIRE_FEATURES.PHYSICAL_GESTURE_TIMING),
         ownedTapping: Boolean(flags & PROFILE_WIRE_FEATURES.OWNED_TAPPING),
+        customKeyShortcuts: content.domains.settings?.customKeyShortcuts || [],
     };
 }
 
@@ -341,7 +349,7 @@ function behaviorFeatures(capabilities) {
 function behaviorDefaults(content, capabilities, aliases, names) {
     const defaults = content.settingsView?.timing || {};
     const values = [defaults.tappingTerm, defaults.tapHoldTerm, defaults.longerHoldTerm, defaults.multiTapTerm];
-    const features = behaviorFeatures(capabilities);
+    const features = behaviorFeatures(capabilities, content);
     const customKeys = (content.customKeyView?.keys || []).map(key => key.code);
     return Object.fromEntries([...new Set([...profileKeycodes(content, capabilities), ...customKeys])].filter(code => code > 1).map(code => {
         const target = keycodeAction(code);

@@ -439,3 +439,20 @@ test("a keyboard without its slave half refuses a capture at once, without waiti
         {code: "KEYBOARD_NOT_READY", message: /slave half is not connected/});
     assert.equal(waits, 0, "no poll for the halves to agree");
 });
+
+// Firmware before custom-key shortcuts (settings v7) is read through the
+// translation and named as older; nothing is ever written to it (D-L63).
+test("a keyboard storing settings v7 is captured as older, and a restore to it is refused before any write", async () => {
+    const keyboard = fakeKeyboard({document: document(), settingsVersion: 7});
+    let id = 0;
+    const ids = {next: () => (id = id % 255 + 1)};
+    const connection = {request: async report => keyboard.answer(report)[0]};
+    const capture = await captureProfile(connection, ids, capabilities);
+    assert.deepEqual(capture.older, [{id: 0x40, version: 7}]);
+    assert.ok(validateSnapshot(capture.document).settings.customKeyShortcuts.every(shortcut => !shortcut.mods && !shortcut.key));
+    let recovered = false;
+    await assert.rejects(restoreProfile(connection, ids, capabilities, document(), {sleep: async () => {}, saveRecovery: async () => {recovered = true; return "/r.json";}}),
+        {code: "FIRMWARE_UPDATE_REQUIRED", message: /older format than Ark writes/});
+    assert.equal(recovered, false, "refused before the recovery copy");
+    assert.deepEqual(keyboard.mutations, []);
+});

@@ -15,6 +15,7 @@ import {participationAt} from "../../view/participation.mjs";
 import * as edits from "../../view/edits.mjs";
 import {canHaveBehaviour} from "../../view/behavior-editor.mjs";
 import {comboBadge} from "../marks.mjs";
+import {customKeyBypassText, customKeyOf} from "../../view/custom-key.mjs";
 import {unavailable} from "../shell.mjs";
 import {behaviourKey, selectBehaviourKey} from "./behaviour-selection.mjs";
 import {pickKeycodeFor} from "./key-edits.mjs";
@@ -107,7 +108,7 @@ export function tabKey(body) {
             <label class="sw"><input type="checkbox" data-f="key:${source.index}:${key.layoutIndex}:behaviour" data-use-behavior ${bp.placementOn ? "checked" : ""} ${writable() ? "" : "disabled"}><span class="track"></span><span class="txt">Use behaviour</span></label>
             <label class="sw"><input type="checkbox" data-f="key:${source.index}:${key.layoutIndex}:combos" data-join-combos ${cp.placementOn ? "checked" : ""} ${writable() ? "" : "disabled"}><span class="track"></span><span class="txt">Join combos</span></label>`}
             <p class="note">Behaviour: ${esc(bp.reasons.length ? bp.reasons.join("; ") : behavior ? "all permissions allow it" : "no shared definition")}. Combos: ${esc(cp.reasons.length ? cp.reasons.join("; ") : "placement is eligible; each combo also has its own permissions")}.</p>
-            ${/^CUSTOM_KEY_\d+$/.test(canonicalKeycode(model, keyMeaning(key))) ? `<p class="note">A custom key has no normal output when its behaviour is bypassed or disabled. Map a plain keycode on a gaming layer that needs direct output.</p>` : ""}
+            ${customKeyBypassText(customKeyOf(model, canonicalKeycode(model, keyMeaning(key)))) ? `<p class="note">${esc(customKeyBypassText(customKeyOf(model, canonicalKeycode(model, keyMeaning(key)))))}</p>` : ""}
         </div>`);
         /** @type {HTMLElement | null} */ (controls.querySelector("[data-source-layer]"))?.addEventListener("click", () => {showLayer(layers().indexOf(source)); render();});
         /** @type {NodeListOf<HTMLInputElement>} */ (controls.querySelectorAll("input")).forEach(input => input.addEventListener("change", () => post(edits.placementPolicy(source.index, key.layoutIndex,

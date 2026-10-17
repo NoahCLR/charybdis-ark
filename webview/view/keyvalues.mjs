@@ -39,14 +39,48 @@ export function keyName(/** @type {Model} */ model, /** @type {number} */ code) 
 export const modifierBits = (/** @type {Model} */ model) => vocabulary(model).modifiers;
 export const modifierNames = (/** @type {Model} */ model, /** @type {number} */ mask) => modifierBits(model).filter(([bit]) => mask & bit).map(([, name]) => name);
 
+// A picker selection that is modifiers only: the modifier buttons and, if
+// one was clicked, a modifier key. A modifier key is a modifier like the
+// buttons, so Command + Right Command + the Left Command key is just Left and
+// Right Command. Folded into one set, it is stored as the simplest keycode
+// that holds it: one modifier as the key, wrapped in the others when those are
+// all on one side (Left + Right Command is RGUI(KC_LEFT_GUI)), a lone modifier
+// as its own key. A set no keycode can hold (two or more modifiers on each
+// side) comes back as the shortcut a custom key would take instead (D-L63).
+// Null when the selection has a key that is not a modifier, or nothing.
+/** @param {Model} model @param {{keys?: string[], mods?: string[]}} picker @returns {{keys: string[], mods: string[]} | {shortcut: {mods: number, key: number}} | null} */
+export function modifierPick(model, {keys = [], mods = []}) {
+    const controls = vocabulary(model).pickerModifiers || [];
+    const wrapped = mods.reduce((bits, wrapper) => bits | (controls.find((entry) => entry.value === wrapper)?.bit ?? 0), 0);
+    /** @param {string} name */
+    const entryOf = (name) => (model?.qmkKeycodes || []).find((entry) => entry.value === (model?.qmkKeycodeAliases?.[name] || name) || entry.aliases?.includes(name));
+    const code = keys[0] ? entryOf(keys[0])?.keycode : undefined;
+    const keyBit = code !== undefined && code >= 0xe0 && code <= 0xe7 ? 1 << (code - 0xe0) : 0;
+    if (keys.length && !keyBit) return null;
+    const mask = wrapped | keyBit;
+    if (!mask) return null;
+    const oneSide = (/** @type {number} */ bits) => !(bits & 0x0f) || !(bits & 0xf0);
+    const single = (/** @type {number} */ bits) => bits !== 0 && (bits & (bits - 1)) === 0;
+    // The clicked modifier stays the key when it can; otherwise a side with
+    // one modifier gives it, the right side first.
+    const inner = keyBit && oneSide(mask & ~keyBit) ? keyBit
+        : single(mask & 0xf0) && oneSide(mask & ~(mask & 0xf0)) ? mask & 0xf0
+        : single(mask & 0x0f) && oneSide(mask & ~(mask & 0x0f)) ? mask & 0x0f : 0;
+    if (!inner) return {shortcut: {mods: mask, key: 0}};
+    const name = (model?.qmkKeycodes || []).find((entry) => entry.keycode === 0xe0 + Math.log2(inner))?.value;
+    if (!name) return null;
+    return {keys: [name], mods: controls.filter((entry) => mask & ~inner & entry.bit).map((entry) => entry.value)};
+}
+
 // Picker controls carry the full eight-bit modifier mask from the model.
 // Compact keycodes can store modifiers from only one side. Include a shifted
 // catalogue key's own modifiers (e.g. KC_EXLM), not just the selected controls.
 // A field that lets only some keys take modifiers (a pointing mode's shortcut)
 // names them, and the others are refused with the controls on.
-/** @param {Model} model @param {{keys: string[], mods: string[], mode: 'single' | 'list', modifiable?: string[] | null}} picker */
+/** @param {Model} model @param {{keys: string[], mods: string[], mode: 'single' | 'list', modifiable?: string[] | null, shortcut?: boolean}} picker */
 export function pickerModifierProblem(model, picker) {
-    if (picker.mode === "list") return "";
+    // A shortcut holds a mask, so its modifiers mix sides (firmware D-F26).
+    if (picker.mode === "list" || picker.shortcut) return "";
     if (picker.modifiable && picker.mods.length && picker.keys.length && !picker.modifiable.includes(picker.keys[0])) {
         return "Only keyboard keys take modifiers here. Send this key on its own, or clear the modifiers.";
     }
