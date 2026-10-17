@@ -47,6 +47,17 @@ const comboTouches = (combo, position) => Array.isArray(combo?.inputPositions) &
 const inputOn = (name, position) => name === position.keycode || name === keyMeaning(position);
 export const comboInputOn = inputOn;
 
+// Whether a combo's input number `at` is the key at this position, by the same
+// rule as comboTouches: the device's input positions when it reports them,
+// otherwise the keycode.
+/** @param {ComboView} combo @param {number} at @param {Position | null | undefined} position */
+export function comboInputIsKey(combo, at, position) {
+    if (!position) return false;
+    return Array.isArray(combo?.inputPositions) && combo.inputPositions.length
+        ? combo.inputPositions[at] === position.layoutIndex
+        : inputOn(combo?.inputs?.[at] ?? "", position);
+}
+
 // The matching rule alone, for one key, with no layer in view. Screens ask
 // combosAt(), which applies it the way the keyboard does on the layer shown.
 /** @param {ViewModel} model @param {Position | null | undefined} position */

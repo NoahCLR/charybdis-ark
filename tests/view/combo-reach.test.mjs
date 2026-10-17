@@ -1,7 +1,7 @@
 import {withAnswers} from "../fixtures/layer-answers.mjs";
 import assert from "node:assert/strict";
 import test from "node:test";
-import {combosInView, combosForKey, comboReferenceLayer, comboGroups, combosAt, combosInPreview, combosShownAt, comboAnswers, comboInputKeys, comboInputShown, combosOnKey, toggleComboInput} from "../../webview/view/combo-reach.mjs";
+import {combosInView, combosForKey, comboReferenceLayer, comboGroups, combosAt, combosInPreview, combosShownAt, comboAnswers, comboInputIsKey, comboInputKeys, comboInputShown, combosOnKey, toggleComboInput} from "../../webview/view/combo-reach.mjs";
 
 test("combos follow the device's own input positions before falling back to keycodes", () => {
     const model = {combos: [
@@ -280,4 +280,13 @@ test("combo grouping skips irrelevant holds but keeps layers that block transpar
     assert.deepEqual(groups.throughKeys[0].keys.map(key => key.layer.index), [7, 15]);
     assert.ok(reads < 1000, `combo grouping read layers ${reads} times`);
     assert.equal(combosInView({combos: [combo]}, stack, 15, [7, 13]).length, 0, "a disabled key blocks the lower input");
+});
+
+test("a combo marks the input the key itself presses, by the same rule as its badge", () => {
+    const placed = {badge: "C1", inputs: ["KC_D", "KC_F"], inputPositions: [27, 28], output: "KC_ESC"};
+    assert.deepEqual([0, 1].map((at) => comboInputIsKey(placed, at, {layoutIndex: 28, keycode: "KC_Z"})), [false, true],
+        "reported positions win over the keycode");
+    const named = {badge: "C2", inputs: ["KC_J", "LT(3,KC_K)"], output: "KC_TAB"};
+    assert.deepEqual([0, 1].map((at) => comboInputIsKey(named, at, {layoutIndex: 5, keycode: "LT(3,KC_K)"})), [false, true]);
+    assert.equal(comboInputIsKey(named, 0, null), false);
 });

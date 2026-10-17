@@ -6,7 +6,7 @@
 import {el, esc} from "../lib/dom.mjs";
 import {actionLabel, behaviourFor, behaviourTiers, canonicalKeycode, keyMeaning, keyName, visibleKeycode} from "../view/keyface.mjs";
 import {customKeyOf, customKeyShortcutLine} from "../view/custom-key.mjs";
-import {combosAt, combosShownAt} from "../view/combo-reach.mjs";
+import {comboInputIsKey, combosAt, combosShownAt} from "../view/combo-reach.mjs";
 import {macroKeycodes, pointingSlotFor} from "../view/reach.mjs";
 import {resolvedPositions} from "../view/layer-resolution.mjs";
 import {pdColourRow, stageEnabled} from "../view/lighting.mjs";
@@ -151,10 +151,16 @@ function reachSections(model, layer, position, index,
                 : "This slot is empty, so the key does nothing until it is configured. The keyboard keeps the keycode either way."}</div></div>`);
     }
     if (combos.length) {
-        sections.push(`<div class="hc-sect"><div class="hc-h">Combos</div>${combos.map((combo) => `
-            <div class="hc-flow">${comboBadge(getModel(), combo.badge || "C")}
-            ${(combo.inputs || []).map((input, at) => `<span class="hc-chip">${keyNameMarked(model, combo.inputDisplays?.[at] ?? input, input)}</span>`).join('<span class="hc-life">+</span>')}
-            <span class="hc-life">→</span><span class="hc-chip out">${esc(combo.outputDisplay || combo.output)}</span></div>`).join("")}</div>`);
+        // What a combo sends leads; the keys that press it follow, with this
+        // key marked among them.
+        sections.push(`<div class="hc-sect"><div class="hc-h">Combos · ${combos.length}</div>${combos.map((combo) => {
+            const inputs = combo.inputs || [];
+            const shown = combo.outputDisplay || combo.output;
+            const stored = visibleKeycode(model, combo.output);
+            return `<div class="hc-combo">${comboBadge(getModel(), combo.badge || "C")}
+            <span class="hc-sends"><span class="hc-life">→</span><span>${esc(shown)}</span>${stored && stored !== shown ? `<code class="hc-stored">${esc(stored)}</code>` : ""}<span class="hc-life hc-count">${inputs.length} key${inputs.length === 1 ? "" : "s"}</span></span>
+            <span class="hc-keys">${inputs.map((input, at) => `<span class="hc-key${comboInputIsKey(combo, at, position) ? " here" : ""}">${keyNameMarked(model, combo.inputDisplays?.[at] ?? input, input)}</span>`).join('<span class="hc-life">+</span>')}</span></div>`;
+        }).join("")}</div>`);
     }
     return sections;
 }
