@@ -93,7 +93,10 @@ export function cellEdit(kind, {stored, action, helper, repeatHz}) {
 // One behaviour row, posted whole: the form is the row. `terms` are the
 // timing fields as typed (empty means the keyboard default, stored as 0),
 // `change` replaces one cell, and every other cell is carried as read.
-/** @param {Behavior} behaviour @param {{terms?: Partial<Record<'tapHoldTerm' | 'longerHoldTerm' | 'multiTapTerm', Scalar>>, anchored?: boolean, enabled?: boolean, allowedLayers?: number, change?: {tapCount: number, kind: Tier, branch: BehaviorBranch | null}}} [fields] @param {Partial<BaseIdentity> | null} [identity] @returns {import("../../contracts/edits.js").EditOf<'saveBehavior'> | null} */
+// A row left with nothing of its own — no branches, default timing, every
+// layer, no anchor — changes nothing on the keyboard, so it is not kept: a key
+// without a row gets none, and a stored row is removed rather than saved empty.
+/** @param {Behavior} behaviour @param {{terms?: Partial<Record<'tapHoldTerm' | 'longerHoldTerm' | 'multiTapTerm', Scalar>>, anchored?: boolean, enabled?: boolean, allowedLayers?: number, change?: {tapCount: number, kind: Tier, branch: BehaviorBranch | null}}} [fields] @param {Partial<BaseIdentity> | null} [identity] @returns {import("../../contracts/edits.js").EditOf<'saveBehavior'> | import("../../contracts/edits.js").EditOf<'deleteBehavior'> | null} */
 export function saveBehaviour(behaviour, {terms = {}, anchored, enabled, allowedLayers, change} = {}, identity) {
     /** @param {'tapHoldTerm' | 'longerHoldTerm' | 'multiTapTerm'} name */
     const term = (name) => terms[name] === undefined ? String(behaviour[name] ?? "0") : String(terms[name]).trim() || "0";
@@ -121,8 +124,10 @@ export function saveBehaviour(behaviour, {terms = {}, anchored, enabled, allowed
         allowedLayers: allowedLayers ?? behaviour.allowedLayers ?? 0xffff,
         steps,
     };
-    if (behaviour.stored === false && behavior.enabled && behavior.allowedLayers === 0xffff && !steps.length && !behavior.keepsAutoMouseAnchored
-        && [behavior.tapHoldTerm, behavior.longerHoldTerm, behavior.multiTapTerm].every(value => /^0+$/.test(value))) return null;
+    if (behavior.enabled && behavior.allowedLayers === 0xffff && !steps.length && !behavior.keepsAutoMouseAnchored
+        && [behavior.tapHoldTerm, behavior.longerHoldTerm, behavior.multiTapTerm].every(value => /^0+$/.test(value))) {
+        return behaviour.stored === false ? null : deleteBehaviour(behaviour.keycode, identity);
+    }
     return {
         type: "saveBehavior",
         expectedBase: identity ?? undefined,

@@ -215,6 +215,27 @@ test("how an empty cell runs is held until it sends something, then posted with 
     assert.deepEqual(edits.cellEdit("tap", {stored: false, action: ""}), {pending: null}, "a tap tier has no helper to hold");
 });
 
+test("removing the last thing a stored row holds removes the row rather than keeping it empty", () => {
+    const draft = session();
+    stage(draft, edits.addBehaviour("KC_Q", draft.identity()));
+    const rows = () => decoded(draft).behaviors.rows.filter(entry => entry.target.operand === 0x14);
+    const branch = {helper: "TAP_SENDS", action: "KC_A"};
+    stage(draft, edits.saveBehaviour({keycode: "KC_Q", stored: true, steps: []}, {change: {tapCount: 0, kind: "tap", branch}}, draft.identity()));
+    const stored = {keycode: "KC_Q", stored: true, steps: [{tapCount: 0, tap: branch}]};
+    const cleared = edits.saveBehaviour(stored, {change: {tapCount: 0, kind: "tap", branch: null}}, draft.identity());
+    assert.equal(cleared?.type, "deleteBehavior", "its last branch gone, nothing is left");
+    stage(draft, cleared);
+    assert.equal(rows().length, 0);
+    draft.undo(draft.revision);
+    assert.equal(rows().length, 1, "undo brings the row back");
+    // Anything still its own keeps the row: a timing, a layer limit, the anchor.
+    for (const fields of [{terms: {tapHoldTerm: "120"}}, {allowedLayers: 1}, {anchored: true}, {enabled: false}]) {
+        assert.equal(edits.saveBehaviour({keycode: "KC_Q", stored: true, steps: []}, fields, draft.identity())?.type, "saveBehavior");
+    }
+    const timed = {keycode: "KC_Q", stored: true, tapHoldTerm: "120", steps: []};
+    assert.equal(edits.saveBehaviour(timed, {terms: {tapHoldTerm: ""}}, draft.identity())?.type, "deleteBehavior", "clearing its only timing empties it too");
+});
+
 test("a behaviour row is added for a key without one, and deleted again", () => {
     const draft = session();
     const rows = () => decoded(draft).behaviors.rows.length;

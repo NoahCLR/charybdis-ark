@@ -342,7 +342,10 @@ matching overrides converted to defaults under their behaviours. Those stored
 changes discard together with the default edit.
 Selecting a key opens its grid in Behaviours even before it has a stored row.
 Only a grid action, timing override or anchor change adds the row to the draft;
-browsing leaves the board and behaviour counts unchanged. Transparent keys and
+browsing leaves the board and behaviour counts unchanged. The reverse holds
+too: an edit that leaves a stored row with nothing of its own — no branches,
+default timing, every layer, no anchor — removes the row, and Undo and Review
+show it as removed. Transparent keys and
 `KC_NO` cannot have behaviours. In a layer preview, a transparent key opens the
 key the board shows through it: the editor names the layer that supplies that
 key and says the behaviour belongs to its keycode, so changing it changes that
