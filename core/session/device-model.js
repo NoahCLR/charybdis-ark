@@ -335,12 +335,15 @@ function behaviorFeatures(capabilities) {
 
 // Unstored editor rows need the same built-in actions and timing defaults as
 // saved rows. Publish presentation only; these are not profile behaviours.
+// Every keycode the profile holds has them, and so does every custom key,
+// placed or not: Custom keys edits the behaviour of a key on no layer yet.
 /** @param {Configuration} content @param {import("./types.js").DeviceModelInput["capabilities"]} capabilities @param {Record<string, string>} aliases @param {import("../../contracts/model.js").ProfileKeyNames} names @returns {Record<string, {builtIn: ReturnType<typeof builtInForView>, timing: {tapHoldTerm: number | string | undefined, longerHoldTerm: number | string | undefined, multiTapTerm: number | string | undefined}}>} */
 function behaviorDefaults(content, capabilities, aliases, names) {
     const defaults = content.settingsView?.timing || {};
     const values = [defaults.tappingTerm, defaults.tapHoldTerm, defaults.longerHoldTerm, defaults.multiTapTerm];
     const features = behaviorFeatures(capabilities);
-    return Object.fromEntries([...new Set(profileKeycodes(content, capabilities))].filter(code => code > 1).map(code => {
+    const customKeys = (content.customKeyView?.keys || []).map(key => key.code);
+    return Object.fromEntries([...new Set([...profileKeycodes(content, capabilities), ...customKeys])].filter(code => code > 1).map(code => {
         const target = keycodeAction(code);
         const name = keycodeCatalog.resolve(code).name;
         const timing = effectiveTimings({target}, values);

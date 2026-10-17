@@ -127,6 +127,7 @@ Every screen is drawn and wired to the host:
 | Surface | What it edits |
 | --- | --- |
 | Keys | Layout keys, key behaviours, combos, layer names and priority; reachable behaviours, macros and pointing modes are shown in place, whether a key, a behaviour branch or a combo reaches them |
+| Custom keys | The 128 custom keys' names and, for each, its behaviour: timings, the tap × tier grid and participation, for a key on a layer or on none; where each is placed |
 | Lighting | Six stages, the stage mask, layer and pointing-mode colours with their localities, combo and key feedback, auto-mouse fade with its hold as a share of the timeout, LED group rows and reusable groups |
 | Macros | Named slots: literal Text, a compact sequence of key/delay/press/release tiles, drag reordering and a selected-step editor, raw payload, live size feedback, configurable recorder and placement; search by name, and the layers that set each macro off — by key, behaviour or combo — in their layer colour, each opening that layer in Keys with the macro picked |
 | Mouse | Pointer speed, sniping and auto-mouse — the Settings sections the keyboard's model files under Mouse, drawn with the same cards and posted whole |
@@ -214,10 +215,23 @@ macro memory and playback limits. The demo remains editable without a keyboard.
 
 Macro keycodes are shown as `VIA_MACRO_0` through `VIA_MACRO_127` in the live
 editor, including slots whose QMK values have no named constant.
-**Custom keys** lists the 128 custom keys: rename one, add or edit its
-behaviour, place it on a key, and see where it is used; the key picker offers
-them in its own Custom keys section. Their names are stored on the keyboard; a
-keyboard with none stored reports the names authored in `keymap.c`.
+**Custom keys** lists the 128 custom keys: rename one, place it on a key, and
+see where it is used; the key picker offers them in its own Custom keys section.
+Their names are stored on the keyboard; a keyboard with none stored reports the
+names authored in `keymap.c`. Under the key, **What it does** is its behaviour
+editor, the same one as Keys → Behaviours: timings, the tap × tier grid and
+participation, and once the key has a behaviour, **Change key…** and **Remove
+behaviour**. It works for a key on no layer yet, so a custom key can get its
+taps and holds where it is defined. A key with no behaviour shows the key's
+defaults, and the first change adds the behaviour to the draft. Edits here are
+the same draft changes as on the Keys screen, with the same review, undo and
+redo, and with a cell open, Delete, ⌘C and ⌘V act on it as they do there.
+**Change key…** to another custom key moves the screen to that key; to any
+other key, it opens the behaviour on the Keys screen, where that key's
+behaviours are. A key that is placed also offers **Show on the Keys screen**,
+which opens its behaviour there with the board showing the keys that reach it,
+on a layer that reaches the key. Picking another key closes the cell open in
+this key's behaviour; a cell open on the Keys screen stays open there.
 
 ## Naming the keyboard
 
@@ -246,7 +260,7 @@ its actions, inputs, outputs, timing and names, ready to enable again.
 | --- | --- | --- |
 | Whole keyboard | Settings → Key behaviours or Combos | Master switch for that engine |
 | Source layer | The same Settings section | Whether that layer uses behaviours or joins combos |
-| Definition | Keys → Behaviours or the combo editor | Enabled switch and allowed layers for that shared definition |
+| Definition | Keys → Behaviours, a custom key's **What it does** on Custom keys, or the combo editor | Enabled switch and allowed layers for that shared definition |
 | Physical placement | Pick a key in Keys | **Use behaviour** and **Join combos** for that source layer and position |
 
 All applicable switches must allow an event. The layer that supplies the

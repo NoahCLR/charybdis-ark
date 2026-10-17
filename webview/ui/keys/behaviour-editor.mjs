@@ -37,6 +37,11 @@ function timingDefaultsNote(behaviour) {
         : "Clear a timing override to follow the keyboard default from Settings · Tap & Hold Timing.";
 }
 
+// The cell open in this behaviour's grid: one opened in another behaviour's
+// editor, on this screen or another, stays closed here.
+/** @param {EditorBehavior} behaviour */
+export const openCell = (behaviour) => state.cellRow === behaviour.keycode ? state.cell : null;
+
 /** @param {EditorBehavior} behaviour */
 export function behaviourEditor(behaviour) {
     const model = getModel();
@@ -54,7 +59,7 @@ export function behaviourEditor(behaviour) {
     const cellFor = (step, kind) => {
         const branch = step[TIER_FIELDS[kind]];
         const id = `${step.tapCount}-${kind}`;
-        const open = state.cell === id;
+        const open = openCell(behaviour) === id;
         const inherited = inheritedBranch(behaviour, step, kind);
         if (!branch && inherited) {
             const label = cellLabel(model, inherited);
@@ -135,12 +140,14 @@ export function behaviourEditor(behaviour) {
     </div>`);
 
     /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-cell]")).forEach((button) => button.addEventListener("click", () => {
-        state.cell = state.cell === button.dataset.cell ? null : button.dataset.cell || null;
+        state.cell = openCell(behaviour) === button.dataset.cell ? null : button.dataset.cell || null;
+        state.cellRow = behaviour.keycode;
         state.cellHow = null;
         render();
     }));
-    if (state.cell) {
-        const [tapCount, tier] = state.cell.split("-");
+    const cell = openCell(behaviour);
+    if (cell) {
+        const [tapCount, tier] = cell.split("-");
         const kind = /** @type {import("../../../contracts/edits.js").Tier} */ (tier);
         const step = steps.find((row) => String(row.tapCount) === tapCount);
         if (step) /** @type {HTMLElement} */ (node.querySelector("#cellEditor")).appendChild(cellEditor(behaviour, step, kind));

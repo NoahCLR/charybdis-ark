@@ -67,6 +67,23 @@ test("unstored behaviour defaults share the firmware timing and built-in rules",
     assert.deepEqual(buildDeviceModel({...state, capabilities: {}}).behaviorEditing.keyDefaults["LT(3,KC_F)"].builtIn, {});
 });
 
+test("every custom key has built-in behaviour defaults, placed or not", () => {
+    // Custom keys edits the behaviour of a key on no layer yet, so its unstored
+    // grid needs the same defaults as a placed one's.
+    const keys = [0, 5].map(slot => ({slot, keycode: `CUSTOM_KEY_${slot}`, code: 0x7f00 + slot, name: "", hasBehavior: false}));
+    const model = buildDeviceModel({
+        layout: layoutWith([0x7f00, 0x04].map((keycode, layoutIndex) => ({keycode, layoutIndex, resolved: resolve(keycode)}))),
+        committed: decodedDeviceProfile(), capabilities: {actionAbiDigest: 0x837cf479},
+        settingsView: {timing: {tappingTerm: "210", tapHoldTerm: "150", longerHoldTerm: "400", multiTapTerm: "170"}},
+        customKeyView: {keys},
+    });
+    const defaults = model.behaviorEditing.keyDefaults;
+    assert.deepEqual(defaults.CUSTOM_KEY_0.builtIn, {releaseTaps: true}, "a placed custom key");
+    assert.deepEqual(defaults.CUSTOM_KEY_5, defaults.CUSTOM_KEY_0, "an unplaced one has the same defaults");
+    assert.deepEqual(defaults.CUSTOM_KEY_5.timing, {tapHoldTerm: "150", longerHoldTerm: "400", multiTapTerm: "170"});
+    assert.ok(!model.keyBehaviors.some(row => row.keycode === "CUSTOM_KEY_5"), "publishing defaults authors no behaviour");
+});
+
 test("device shortcut labels stay complete and semantic names require the advertised ABI", () => {
     const values = [0x0806, 0x0a1d, 0x7e80, 0x7ec5, 0x7ec6, 0x7f02];
     const state = {
