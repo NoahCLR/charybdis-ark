@@ -34,6 +34,7 @@ const {NodeHidDeviceAdapter} = require("../transport/node-hid-adapter");
 const {DeviceRequestCoordinator} = require("../transport/request-coordinator");
 const {readViaLayout, decodeViaLayout} = require("../protocol/via-layout-v1");
 const keycodeCatalog = require("../data/keycode-catalog");
+const {LAYERS} = require("../data/charybdis-layout");
 const {readViaRgbMatrix} = require("../protocol/via-rgb-matrix-v1");
 const {readDeviceCombos} = require("../protocol/combo-readback-v1");
 const {ProfilePayloadReader} = require("./profile-payload-reader");
@@ -539,7 +540,7 @@ class ProfileDeviceService {
                 if (keyboardOptions && !keyboardOptions.effects.some(item => item.id === effect)) throw Object.assign(new Error("This profile uses a lighting effect unavailable on this keyboard."), {code: "SETTINGS_LIMIT_EXCEEDED"});
                 // The keyboard refuses a profile whose actions sit where it cannot
                 // run them; say which one before anything is sent.
-                const misplaced = profilePlacementProblem(Buffer.from(target.document.profile, "base64"), {layerCount: this.capabilities?.compiledLayerCount ?? 8,
+                const misplaced = profilePlacementProblem(Buffer.from(target.document.profile, "base64"), {layerCount: this.capabilities?.compiledLayerCount ?? LAYERS,
                     capabilities: this.capabilities,
                     behaviorQmkFunctions: Boolean((this.capabilities?.featureFlags || 0) & PROFILE_WIRE_FEATURES.BEHAVIOR_QMK_FUNCTIONS)});
                 if (misplaced) throw Object.assign(new Error(`${misplaced} Fix it before saving this profile.`), {code: "PLACEMENT_REFUSED"});

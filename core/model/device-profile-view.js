@@ -12,7 +12,7 @@ const {KEY_BEHAVIOR_HOLD_MODES} = require("../schema/key-behavior-domain-v1");
 const {builtInActions} = require("./built-in-behavior");
 const {
     RGB_AUTOMOUSE_MODES, RGB_DOMAIN_V1, RGB_KEY_SEMANTICS, RGB_LAYER_MODES,
-    RGB_LOCALITIES, RGB_PD_MODE_IDS, RGB_STAGE_BITS, RGB_TAP_COMMIT_MODES,
+    RGB_LOCALITIES, RGB_PD_MODE_IDS, RGB_TAP_COMMIT_MODES,
 } = require("../schema/rgb-domain-v1");
 
 /** @template {Record<string, number>} T @param {T} values @param {number} value @returns {keyof T & string} */
@@ -173,12 +173,6 @@ function baseEffectForView(lighting, maximumBrightness) {
     };
 }
 
-/** @param {import("./types.js").ComboRead | null | undefined} read @param {Record<string, string>} labels */
-function combosForView(read, labels) {
-    if (read?.state !== "read") return [];
-    return comboRowsForView(read.rows, labels);
-}
-
 /** @param {Extract<import("./types.js").ComboRead, {state: "read"}>["rows"]} rows @param {Record<string, string>} labels */
 function comboRowsForView(rows, labels) {
     /** @param {number} value */
@@ -197,4 +191,4 @@ function comboRowsForView(rows, labels) {
     }));
 }
 
-module.exports = {baseEffectForView, baseRgbForView, comboRowsForView, behaviorRowsForView, builtInForView, combosForView, rgbForView};
+module.exports = {baseEffectForView, baseRgbForView, comboRowsForView, behaviorRowsForView, builtInForView, rgbForView};

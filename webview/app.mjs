@@ -10,7 +10,7 @@ import * as controls from "./view/controls.mjs";
 import {el, esc} from "./lib/dom.mjs";
 import {captureContentScroll, captureKeysBenchHeight, revealSelectedContentRow, restoreContentScroll, restoreKeysBenchHeight} from "./lib/scroll.mjs";
 import {activateOnKey, captureFocus, focusDialog, restoreFocus, trapTab} from "./lib/focus.mjs";
-import {closeComboBuilder, getModel, post, postLeavingDemo, setRenderer, state} from "./store.mjs";
+import {getModel, post, postLeavingDemo, setRenderer, state} from "./store.mjs";
 import {historyAction} from "./view/edits.mjs";
 import {chooseKeyboard, hostOf, otherTheme, setTheme} from "./view/host.mjs";
 import {DEMO_WORDS, demoOf, leaveDemo, openDemo, openDemoProfile} from "./view/demo.mjs";

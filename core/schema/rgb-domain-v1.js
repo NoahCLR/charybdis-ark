@@ -81,8 +81,6 @@ const RGB_PD_MODE_IDS = Object.freeze({
     ...Object.fromEntries(Array.from({length: 24}, (_, index) => [`PD_MODE_SLOT_${index + 8}`, index + 8])),
 });
 
-const BLACK = Object.freeze({h: 0, s: 0, v: 0});
-
 const RgbDomainProtocolError = protocolError("RgbDomainProtocolError");
 
 /** @param {import("./types.js").RgbInput} profile @param {import("./types.js").RgbOptions} [options] */

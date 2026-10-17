@@ -4,7 +4,7 @@
 
 // Selector assertions refer to elements created by this module's authored markup.
 import {el, esc} from "../lib/dom.mjs";
-import {actionNaming, behaviourFor, behaviourTiers, canonicalKeycode, dualRole, keyMeaning, keyName, visibleKeycode} from "../view/keyface.mjs";
+import {actionNaming, behaviourFor, canonicalKeycode, dualRole, keyMeaning, keyName, visibleKeycode} from "../view/keyface.mjs";
 import {comboBehaviours, comboInputIsKey, combosAt, combosShownAt} from "../view/combo-reach.mjs";
 import {customKeyHeadline, customKeyOf, customKeyShortcutOnly} from "../view/custom-key.mjs";
 import {macroKeycodes, pointingSlotFor} from "../view/reach.mjs";

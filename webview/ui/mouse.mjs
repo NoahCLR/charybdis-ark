@@ -10,7 +10,7 @@
 
 // Selector assertions refer to elements created by this module's authored markup.
 import {el, esc} from "../lib/dom.mjs";
-import {getModel, render, state, canEdit as canEditArea} from "../store.mjs";
+import {getModel, canEdit as canEditArea} from "../store.mjs";
 import {topbar, unavailable} from "./shell.mjs";
 import {sectionCard, sectionsIn} from "./settings.mjs";
 

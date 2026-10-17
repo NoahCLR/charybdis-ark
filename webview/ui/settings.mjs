@@ -11,7 +11,7 @@
 // Selector assertions refer to elements created by this module's authored markup.
 import * as edits from "../view/edits.mjs";
 import {el, esc} from "../lib/dom.mjs";
-import {getModel, layers, post, render, state, writable, canEdit as canEditArea} from "../store.mjs";
+import {getModel, layers, post, render, state, canEdit as canEditArea} from "../store.mjs";
 import {topbar, unavailable} from "./shell.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {marked} from "./marks.mjs";

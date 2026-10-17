@@ -90,6 +90,38 @@ for (const previous of [false, true]) for (const demo of [false, true]) test(`dr
     ownFilesOnly();
 });
 
+test("a file that matches the keyboard changes nothing, but still puts a draft with edits back to it", async ({page, context, baseURL}) => {
+    const {keyboard} = await withKeyboard(context, baseURL);
+    const errors = await open(page);
+    await page.locator('.read-placeholder [data-act="choose-keyboard"]').click();
+    await ready(page);
+    await page.locator('[data-screen="profile"]').click();
+    const card = page.locator(".card").filter({has: page.locator('[data-act="restore"]')});
+    const same = {name: "same.charybdis.json", text: JSON.stringify(pdDocument()), type: ""};
+    await dropFiles(page, [same]);
+    await expect(card).toContainText("This file holds exactly what the keyboard runs. Using it changes nothing.");
+    await expect(page.locator('[data-act="restore"]')).toBeDisabled();
+    await page.locator('[data-act="cancel"]').click();
+    await expect(page.locator('[data-act="restore"]')).toHaveCount(0);
+    // One edit in the draft, from another file.
+    const edited = pdDocument();
+    edited.layers[0][0] = edited.layers[0][0] === 5 ? 6 : 5;
+    await dropFiles(page, [{name: "edited.charybdis.json", text: JSON.stringify(edited), type: ""}]);
+    await expect(page.locator('[data-act="restore"]')).toBeEnabled();
+    await page.locator('[data-act="restore"]').click();
+    await expect(page.locator(".rail-status")).toContainText("1 change in draft");
+    await expect(page.locator('[data-act="restore"]')).toHaveCount(0);
+    await dropFiles(page, [same]);
+    await expect(card).toContainText("Using it puts your draft back to that, as Discard all does; Undo brings your 1 change back.");
+    await expect(page.locator('[data-act="restore"]')).toBeEnabled();
+    await page.locator('[data-act="restore"]').click();
+    await expect(page.locator(".rail-status")).not.toContainText(/in draft/);
+    await page.keyboard.press("Meta+z");
+    await expect(page.locator(".rail-status")).toContainText("1 change in draft");
+    expect(keyboard.mutations).toEqual([]);
+    expect(errors).toEqual([]);
+});
+
 test("choose a keyboard, read it, stage an edit, keep a recovery copy, and reconnect on reload", async ({page, context, baseURL}) => {
     test.setTimeout(90000);
     const {keyboard, ownFilesOnly} = await withKeyboard(context, baseURL);

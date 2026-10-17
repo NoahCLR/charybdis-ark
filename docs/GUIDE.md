@@ -80,7 +80,7 @@ be saved. Profile & backups lists every copy, newest first, with a
 low, but clearing the site's data (or the browser's) deletes the copies, so
 download any you want to keep. **Export profile** downloads the profile file;
 **Import profile** opens the browser's file chooser and takes files up to
-100 kB. Errors
+256 KiB, enough for any complete profile. Errors
 show in the rail's message rather than as a notification, and the page's
 version and commit are at the foot of the rail, with GitHub's logo: choose them
 to open that commit on GitHub in a new tab.
@@ -715,7 +715,10 @@ each with a download (see [Using Ark in Chrome](#using-ark-in-chrome)).
 On **Profile & backups**, use **Choose profile…** or drop one backup file
 onto the **Import profile** card. Both open the same review, including in the
 demo. **Use as draft** replaces the draft; Undo brings it back, and the keyboard
-changes only after Review and Apply. Import is disabled while the keyboard or
+changes only after Review and Apply. A file that holds exactly what the
+keyboard runs changes nothing and cannot be used, unless the draft has edits:
+then using it puts the draft back to the keyboard's profile, as **Discard all**
+does. Import is disabled while the keyboard or
 draft is unavailable, stale or busy. Multiple, unreadable, invalid and oversized
 files are refused without replacing your draft.
 

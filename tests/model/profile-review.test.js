@@ -87,6 +87,18 @@ test("a key changed to a layer key carries that layer's mark, and one changed to
     assert.deepEqual(marks,[{kind:"layer",layer:5},{kind:"layer",layer:3},{kind:"pointing",slot:0},undefined]);
 });
 
+test("a key's participation is named where the key sits, as its layout change is", () => {
+    const {editDeviceProfile}=require("../../core/model/device-profile-edits");
+    const {matrixPosition}=require("../../core/data/charybdis-layout");
+    const before=snapshot(document()), after=structuredClone(before.document);
+    after.layers[0][matrixPosition(7)]=0x05; // KC_B
+    after.profile=editDeviceProfile(Buffer.from(after.profile,"base64"),{type:"updatePlacementPolicy",layer:0,layoutIndex:7,useBehavior:false,joinCombos:true}).toString("base64");
+    const rows=profileReview(before,snapshot(after));
+    const key=rows.find(row=>row.unit.startsWith("layout:")), placement=rows.find(row=>row.unit.startsWith("placement:"));
+    assert.equal(key.title,"Base · Right · row 1, column 5");
+    assert.equal(placement.title,"Participation · Base · Right · row 1, column 5");
+});
+
 // ── items ───────────────────────────────────────────────────────────────
 
 const {document:pdDocument} = require("../fixtures/pd-profile");
