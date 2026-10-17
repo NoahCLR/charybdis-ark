@@ -67,7 +67,7 @@ export function screenCustomKeys() {
         if (!matches(row)) continue;
         const does = [hasShortcut(row) ? `sends ${row.shortcutLabel}` : "", row.hasBehavior ? "has a behaviour" : ""].filter(Boolean).join(" · ");
         const tip = `Custom key ${row.slot}${row.name ? ` · ${row.name}` : ""} · ${does || "no shortcut or behaviour: does nothing yet"}`;
-        const cell = el(`<button class="mslot ${row.name || row.hasBehavior || hasShortcut(row) ? "filled" : ""}" data-key="${esc(row.keycode)}"
+        const cell = el(`<button class="mslot ${row.name || row.hasBehavior || hasShortcut(row) ? "filled" : ""}" data-custom-key="${esc(row.keycode)}"
             aria-current="${row.keycode === key?.keycode}" data-tip="${esc(tip)}">
             <span class="n">K${row.slot}</span>${changed.has(row.keycode) ? draftDot("Changed in your draft", "corner") : ""}
             <span class="v">${row.name ? esc(row.name.length > 13 ? `${row.name.slice(0, 12)}…` : row.name) : "—"}</span></button>`);
