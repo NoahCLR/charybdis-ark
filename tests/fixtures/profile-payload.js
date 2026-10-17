@@ -45,7 +45,8 @@ function payloadDevice(states, value = PROFILE_PAYLOAD_V1.VALUE) {
             const request = Buffer.from(report);
             assert.equal(request[2], value);
             assert.notEqual(request[3], 0);
-            const page = request[4];
+            // A 16-bit page: byte 4 its low byte, byte 5 its high byte.
+            const page = request[4] | (request[5] << 8);
             requests.push(page);
             const state = snapshots[Math.min(served, snapshots.length - 1)];
             if (page === 0) {

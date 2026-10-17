@@ -16,21 +16,11 @@ test("behaviour editing requires supported firmware and a complete idle read", (
     }
 });
 
-test("the picker offers TT, OSL and TO only when the keyboard owns its layer keys", () => {
-    assert.equal(buildDeviceModel({}).ownsLayerKeys, false);
-    assert.equal(buildDeviceModel({capabilities: {featureFlags: ~(1 << 14) & 0xffff}}).ownsLayerKeys, false);
-    assert.equal(buildDeviceModel({capabilities: {featureFlags: 1 << 14}}).ownsLayerKeys, true);
-});
-
-test("behaviour rows claim built-in first actions from the keyboard's advertised features", () => {
-    const committed = decodedDeviceProfile();
-    const rows = (featureFlags) => buildDeviceModel({capabilities: {featureFlags}, committed}).keyBehaviors;
-    const claims = (list) => list.filter((row) => Object.keys(row.builtIn).length).map((row) => row.keycode);
-    const dualRole = (list) => claims(list).filter((keycode) => /^(LT|MT|OSM)\(/.test(keycode));
-    assert.ok(dualRole(rows(1 << 17)).some((keycode) => keycode.startsWith("LT(")), "the fixture's LT row inherits its tap and layer hold on bit 17 firmware");
-    assert.deepEqual(dualRole(rows(0)), [], "older firmware claims no dual-role action");
-    assert.ok(["KC_1", "LGUI(KC_C)", "QK_MOUSE_BUTTON_3"].every((keycode) => claims(rows(0)).includes(keycode)),
-        "plain keys tap and hold themselves on every firmware");
+test("behaviour rows claim their keys' built-in first actions", () => {
+    const rows = buildDeviceModel({committed: decodedDeviceProfile()}).keyBehaviors;
+    const claims = rows.filter((row) => Object.keys(row.builtIn).length).map((row) => row.keycode);
+    assert.ok(claims.some((keycode) => keycode.startsWith("LT(")), "the fixture's LT row inherits its tap and layer hold");
+    assert.ok(["KC_1", "LGUI(KC_C)", "QK_MOUSE_BUTTON_3"].every((keycode) => claims.includes(keycode)), "plain keys tap and hold themselves");
 });
 
 // The ported Studio UI renders whatever shape it is given, so these assertions
@@ -41,7 +31,7 @@ test("behaviour rows claim built-in first actions from the keyboard's advertised
 const MODEL_FIELDS = [
     "layers", "keyBehaviors", "combos", "viaMacros", "macroNameSpace", "behaviorTimingDefaults",
     "configDefaults", "rgb", "qmkKeycodes", "qmkKeyLabels", "qmkKeyLayers", "qmkKeyShortLabels", "qmkKeycodeAliases",
-    "qmkKeycodeSource", "macroPayloadKeycodes", "diagnostics", "ownsLayerKeys",
+    "qmkKeycodeSource", "macroPayloadKeycodes", "diagnostics",
 ];
 
 function layoutWith(keys) {
@@ -51,7 +41,6 @@ function layoutWith(keys) {
 test("unstored behaviour defaults share the firmware timing and built-in rules", () => {
     const values = [0x4309, 0x2109, 0x04, 0, 1];
     const state = {layout: layoutWith(values.map((keycode, layoutIndex) => ({keycode, layoutIndex, resolved: resolve(keycode)}))),
-        capabilities: {featureFlags: (1 << 17) | (1 << 18)},
         settingsView: {timing: {tappingTerm: "210", tapHoldTerm: "150", longerHoldTerm: "400", multiTapTerm: "170"}}};
     const model = buildDeviceModel(state);
     const defaults = model.behaviorEditing.keyDefaults;
@@ -64,7 +53,6 @@ test("unstored behaviour defaults share the firmware timing and built-in rules",
     assert.equal(defaults.KC_NO, undefined);
     assert.equal(defaults.KC_TRANSPARENT, undefined);
     assert.deepEqual(model.keyBehaviors, [], "no behaviour is authored by publishing defaults");
-    assert.deepEqual(buildDeviceModel({...state, capabilities: {}}).behaviorEditing.keyDefaults["LT(3,KC_F)"].builtIn, {});
 });
 
 test("every custom key has built-in behaviour defaults, placed or not", () => {
@@ -381,7 +369,6 @@ test("decoded domains reach the UI only after a verified read", () => {
     assert.ok(done.keyBehaviors.every(row => row.keycode && row.steps.every(step => Number.isInteger(step.tapCount))));
 });
 
-
 test("a keyboard with no committed profile says so instead of looking broken", () => {
     const model = buildDeviceModel({capabilities: {}, committed: {state: "none", reason: "no committed profile"}});
     assert.deepEqual(model.rgb, {baseEffect: {state: "unread", message: "Base RGB has not been read from the keyboard."}});
@@ -480,7 +467,6 @@ test("effective host names reach keycaps, picker search and modifier controls wi
     assert.match(model.qmkKeycodes.find(e => e.keycode === 0xe3).search, /command/);
 });
 
-
 test("pointing-only shortcuts enter the shared OS label table", () => {
     const model = buildDeviceModel({settingsView:{host:{effective:3}}, committed:{state:"read", domains:{pdModes:[
         {id:0, kind:1, directions:{up:{keycode:0x0804}}, diagonals:{}, buttons:[{tap:{keycode:0x0805}}]}
@@ -488,7 +474,6 @@ test("pointing-only shortcuts enter the shared OS label table", () => {
     assert.equal(model.qmkKeyLabels[resolve(0x0804).name], "Super+A");
     assert.equal(model.qmkKeyLabels[resolve(0x0805).name], "Super+B");
 });
-
 
 test("every name the model gives a layer key carries the layer the model says it acts on", () => {
     // The interface marks the layer a name ends in from qmkKeyLayers, never

@@ -30,7 +30,6 @@ const {panelControl} = require("./panel-control-registry");
 const {ProfileDraftSession} = require("./profile-draft-session");
 const {replaceDraft} = require("./panel-session-state");
 const {validateSnapshot, fingerprint, summary} = require("./portable-profile-session");
-const {translateBackup} = require("../model/backup-translation");
 const {ACTION_ABI} = require("../schema/actions");
 const {PROFILE_WIRE_KNOWN_MASKS} = require("../protocol/profile-wire-v1");
 const DEMO_PROFILE = require("../data/demo-profile.charybdis.json");
@@ -40,9 +39,9 @@ const DEMO_DEVICE_ID = "demo";
 
 // What current firmware (the 32-slot pair) reports about itself, as the device
 // service decodes it, without what only a real keyboard has: its firmware
-// version and the digest of the profile it was compiled with. It advertises
-// every feature this app knows but the retired ones. tests/session/demo-session.test.js holds this to
-// what the simulated current keyboard (tests/fixtures/fake-keyboard.js) reports.
+// version and the digest of the profile it was compiled with.
+// tests/session/demo-session.test.js holds this to what the simulated current
+// keyboard (tests/fixtures/fake-keyboard.js) reports.
 const DEMO_CAPABILITIES = Object.freeze({
     responseVersion: 2,
     protocol: Object.freeze({major: 1, minor: 0}),
@@ -50,7 +49,7 @@ const DEMO_CAPABILITIES = Object.freeze({
     reportSize: 32,
     candidateChunkMax: 20,
     statusPageCount: 2,
-    featureFlags: PROFILE_WIRE_KNOWN_MASKS.FEATURE_FLAGS & ~PROFILE_WIRE_KNOWN_MASKS.RETIRED_FEATURES,
+    featureFlags: PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES,
     actionAbiDigest: ACTION_ABI,
     compiledLayerCount: 16,
     maxLogicalLayers: LAYERS,
@@ -113,7 +112,7 @@ const fail = (text, code = "DEMO_REFUSED") => Object.assign(new Error(text), {co
 // limits and options a keyboard would have reported beside it.
 /** @param {unknown} value @returns {import("../model/types.js").CompleteSnapshot} */
 function demoSnapshot(value) {
-    const {document} = validateSnapshot(translateBackup(value), DEMO_CAPABILITIES);
+    const {document} = validateSnapshot(value, DEMO_CAPABILITIES);
     return {document, fingerprint: fingerprint(document), summary: summary(document), limits: {...DEMO_LIMITS}, options: DEMO_OPTIONS, hostOs: {detected: 0}};
 }
 

@@ -3,8 +3,8 @@
 const {LAYERS} = require("../data/charybdis-layout");
 const {u8: assertU8, u16: assertU16, asBytes, copyBytes, protocolError} = require("./bytes");
 
-// The one profile format the keyboard stores: schema 3.0, up to 65,504 bytes
-// (one 64 KiB slot less its header, firmware D-F14).
+// The one profile format the keyboard stores: schema 3.0, up to 53,216 bytes
+// (one 52 KiB slot less its header, firmware D-F14).
 // Earlier schemas and domain versions are refused, as the firmware refuses
 // them (firmware D-F10).
 const PROFILE_BLOB_V1 = Object.freeze({
@@ -16,7 +16,7 @@ const PROFILE_BLOB_V1 = Object.freeze({
     SCHEMA_MINOR: 0,
     CANONICAL_FLAG: 1,
     KNOWN_FLAGS: 1,
-    MAX_SIZE: 65504,
+    MAX_SIZE: 53216,
 });
 
 const {PROFILE_DOMAIN_IDS, PROFILE_DOMAIN_VERSIONS} = require("./profile-domains");
@@ -228,7 +228,7 @@ function readSemanticAction(value, offset = 0, options = {}) {
     return {action, nextOffset: offset + PROFILE_BLOB_V1.ACTION_SIZE};
 }
 
-/** @param {import("./types.js").DomainInput} domain @param {Map<number, Set<number>>} domainVersions */
+/** @param {import("./types.js").DomainInput} domain @param {Map<number, number>} domainVersions */
 function normalizeDomain(domain, domainVersions) {
     const id = assertU8(domain?.id, "Domain id");
     const version = assertU8(domain?.version, "Domain version");
@@ -292,33 +292,27 @@ function normalizeActionLimits(options = {}) {
     return limits;
 }
 
+// Each registered domain has exactly one version: the one current firmware
+// stores. A caller may register a domain the registry does not have yet.
 /** @param {import("./types.js").DomainVersions} [value] */
 function normalizeDomainVersions(value) {
     const source = value === undefined ? PROFILE_DOMAIN_VERSIONS : value;
     const entries = source instanceof Map ? Array.from(source.entries()) : Object.entries(source || {});
-    /** @type {Map<number, Set<number>>} */
+    /** @type {Map<number, number>} */
     const versions = new Map();
     for (const [rawId, rawVersion] of entries) {
-        const id = assertU8(Number(rawId), "Registered domain id");
-        const accepted = rawVersion instanceof Set || Array.isArray(rawVersion)
-            ? Array.from(rawVersion)
-            : [rawVersion];
-        const versionSet = new Set(accepted.map((version) => assertU8(Number(version), "Registered domain version")));
-        if (!versionSet.size) {
-            throw new TypeError(`Registered domain 0x${hexByte(id)} must accept at least one version.`);
-        }
-        versions.set(id, versionSet);
+        versions.set(assertU8(Number(rawId), "Registered domain id"), assertU8(Number(rawVersion), "Registered domain version"));
     }
     return versions;
 }
 
-/** @param {number} id @param {number} version @param {Map<number, Set<number>>} domainVersions */
+/** @param {number} id @param {number} version @param {Map<number, number>} domainVersions */
 function assertKnownDomain(id, version, domainVersions) {
-    const acceptedVersions = domainVersions.get(id);
-    if (!acceptedVersions) {
+    const acceptedVersion = domainVersions.get(id);
+    if (acceptedVersion === undefined) {
         throw profileBlobError("UNKNOWN_DOMAIN", `Unknown Profile Wire v1.0 domain 0x${hexByte(id)}.`, {domainId: id});
     }
-    if (!acceptedVersions.has(version)) {
+    if (acceptedVersion !== version) {
         throw profileBlobError("UNKNOWN_DOMAIN_VERSION", `Domain 0x${hexByte(id)} version ${version} is not supported.`, {domainId: id, domainVersion: version});
     }
 }
@@ -373,6 +367,23 @@ function hexByte(value) {
     return Number(value).toString(16).padStart(2, "0");
 }
 
+// What a keyboard storing another format than current firmware's is told.
+// Ark supports only current firmware and migrates nothing, so it reads such a
+// keyboard no further.
+function firmwareUpdateRequired() {
+    return Object.assign(new Error("This keyboard's firmware stores its profile in a format Ark does not read: Ark supports only current firmware. Update both halves, then read the keyboard again. The keyboard has not been changed."), {code: "FIRMWARE_UPDATE_REQUIRED"});
+}
+
+// A profile blob as a keyboard stores it, refused with firmwareUpdateRequired
+// when its schema or a domain version is not current firmware's.
+/** @param {Uint8Array} value */
+function decodeStoredProfileBlob(value) {
+    try {return decodeProfileBlob(value);} catch (error) {
+        if (error instanceof ProfileBlobProtocolError && ["INCOMPATIBLE_SCHEMA", "UNKNOWN_DOMAIN_VERSION"].includes(String(error.code))) throw firmwareUpdateRequired();
+        throw error;
+    }
+}
+
 module.exports = {
     PROFILE_ACTION_KINDS,
     PROFILE_ACTION_LIMITS,
@@ -384,9 +395,11 @@ module.exports = {
     decodeDomainEnvelope,
     decodeProfileBlob,
     decodeSemanticAction,
+    decodeStoredProfileBlob,
     encodeDomainEnvelope,
     encodeProfileBlob,
     encodeSemanticAction,
+    firmwareUpdateRequired,
     fnv1a32,
     readDomainEnvelope,
     readSemanticAction,

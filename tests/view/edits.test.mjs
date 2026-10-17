@@ -30,13 +30,13 @@ const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require(path.join(here, "..", "..", "core"
 const {RGB_LOCALITIES} = require(path.join(here, "..", "..", "core", "schema", "rgb-domain-v1"));
 const {document: pdDocument} = require(path.join(here, "..", "fixtures", "pd-profile"));
 
-const capabilities = {compiledLayerCount: 16, supportedDomainMask: 31, actionAbiDigest: 0x837cf479};
+const capabilities = {compiledLayerCount: 16, supportedDomainMask: 31, actionAbiDigest: 0x837cf479,
+    featureFlags: require(path.join(here, "..", "..", "core", "protocol", "profile-wire-v1")).PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES};
 
 test("the playback protection control stages a portable policy and Review/discard/undo preserve text", () => {
     const {hostMacros} = require("../fixtures/host-macros");
     const {macroEditorView} = require("../../core/model/macro-editor");
     const fixture = hostMacros(1 | (3 << 16), ["café🙂"]);
-    fixture.capabilities.featureFlags |= 1 << 23;
     const draft = new ProfileDraftSession(fixture.snapshot, "test-device", fixture.capabilities);
     const message = edits.macroProtectionMessage("VIA_MACRO_0", "off", draft.current.fingerprint);
     assert.deepEqual(message, {type: "updateViaMacro", keycode: "VIA_MACRO_0", protection: "off", expectedFingerprint: draft.current.fingerprint});
@@ -46,7 +46,6 @@ test("the playback protection control stages a portable policy and Review/discar
     assert.deepEqual(change.fields.map(field => [field.label, field.before, field.after]), [["Uninterruptible playback", "Automatic · on", "Off"]]);
     const exported = JSON.parse(JSON.stringify(draft.document));
     assert.deepEqual(portable.validateSnapshot(exported).document.macros, draft.document.macros);
-    assert.throws(() => portable.validateSnapshot(exported, {...fixture.capabilities, featureFlags: (1 << 21) | (1 << 22)}), /Update both halves/);
     draft.discard(draft.revision, change.group);
     assert.deepEqual(draft.document.macros, fixture.snapshot.document.macros);
     draft.undo(draft.revision);
@@ -764,7 +763,7 @@ test("each direction posts what held modifiers do to it, and an empty direction 
 
 test("mouse buttons 3/4 stage with modifier policies, review, undo and complete backup import intact", async () => {
     const value = pdDocument();
-    const caps = {...capabilities, featureFlags: 1 << 28};
+    const caps = capabilities;
     const snapshot = {document: value, fingerprint: portable.fingerprint(value), summary: portable.summary(value)};
     const draft = new ProfileDraftSession(snapshot, "test-device", caps);
     const before = decoded(draft).pdModes[4];
@@ -793,46 +792,20 @@ test("mouse buttons 3/4 stage with modifier policies, review, undo and complete 
     restored.replace(portable.validateSnapshot(backup, caps).document, restored.revision, "edit", "Imported a profile");
     assert.equal(restored.document.profile, savedProfile, "complete backup keeps the exact bytes");
     assert.deepEqual(decoded(restored).pdModes[4], after);
-
-    // A legacy destination preserves the file and explains every click; Apply
-    // is blocked until the unsupported outputs are removed.
-    const legacy = new ProfileDraftSession(snapshot, "test-device", {...caps, featureFlags: 0});
-    legacy.replace(portable.validateSnapshot(backup).document, legacy.revision, "edit", "Imported a profile");
-    assert.equal(legacy.document.profile, savedProfile);
-    assert.equal(legacy.hasBlockers(), true);
-    assert.equal(legacy.checks().filter(check => check.kind === "pointingClickBlocker").length, 4);
-    legacy.review(legacy.revision);
-    await assert.rejects(legacy.apply({restorePortableProfile: () => {throw Error("must not write");}}, legacy.revision, () => {}), /Resolve the review's blockers/);
-    assert.throws(() => stage(legacy, edits.duplicatePdMode(7, 4, legacy.identity())), /firmware cannot click/);
-    const retained = decoded(legacy).pdModes[4];
-    stage(legacy, edits.pdMode(4, readConfig(retained, formOf({kind: retained.kind, name: retained.name, dpi: retained.dpi, "dir:left": "KC_LEFT"})), legacy.identity()));
-    assert.deepEqual(decoded(legacy).pdModes[4].directions.right, after.directions.right, "fixing one click retains the others verbatim");
-    assert.equal(legacy.checks().filter(check => check.kind === "pointingClickBlocker" && check.status !== "fixed").length, 3);
-    stage(legacy, edits.clearPdMode(4, legacy.identity()));
-    assert.equal(legacy.hasBlockers(), false);
 });
 
 test("pointing text entry refuses unsupported mouse/control outputs without changing the draft", () => {
-    for (const featureFlags of [0, 1 << 28]) {
-        const value = pdDocument();
-        const caps = {...capabilities, featureFlags};
-        const draft = new ProfileDraftSession({document: value, fingerprint: portable.fingerprint(value), summary: portable.summary(value)}, "test-device", caps);
-        const slot = decoded(draft).pdModes[4];
-        const before = draft.current.fingerprint;
-        const set = key => edits.pdMode(4, readConfig(slot, formOf({kind: slot.kind, name: slot.name, dpi: slot.dpi, "dir:left": key})), draft.identity());
-        for (const key of ["MS_UP", "MS_WHLD", "MS_ACL0", "C(MS_BTN3)", "PD_SLOT_0", "VIA_MACRO_0", "MO(1)", "QK_BOOTLOADER"]) {
-            assert.throws(() => stage(draft, set(key)), /Left:.*(pointing mode|keyboard keys|mouse-button click)/, key);
-            assert.equal(draft.current.fingerprint, before);
-        }
-        if (!featureFlags) {
-            for (const key of ["MS_BTN3", "QK_MOUSE_BUTTON_4", "0x00d8"]) assert.throws(() => stage(draft, set(key)), /firmware cannot click/);
-            stage(draft, set("G(KC_C)"));
-            assert.equal(decoded(draft).pdModes[4].directions.left.keycode, 0x0806, "existing shortcuts remain editable");
-        }
-        const model = buildSnapshotModel(draft.current, caps, {editable: true, reason: ""});
-        assert.equal(model.pdModeEditing.clicks, Boolean(featureFlags));
-        assert.equal(model.pdModeEditing.tapKeys.plain.includes("QK_MOUSE_BUTTON_3"), Boolean(featureFlags));
+    const value = pdDocument();
+    const draft = new ProfileDraftSession({document: value, fingerprint: portable.fingerprint(value), summary: portable.summary(value)}, "test-device", capabilities);
+    const slot = decoded(draft).pdModes[4];
+    const before = draft.current.fingerprint;
+    const set = key => edits.pdMode(4, readConfig(slot, formOf({kind: slot.kind, name: slot.name, dpi: slot.dpi, "dir:left": key})), draft.identity());
+    for (const key of ["MS_UP", "MS_WHLD", "MS_ACL0", "C(MS_BTN3)", "PD_SLOT_0", "MO(1)", "QK_BOOTLOADER"]) {
+        assert.throws(() => stage(draft, set(key)), /Left:.*(pointing mode|keyboard keys|mouse-button click)/, key);
+        assert.equal(draft.current.fingerprint, before);
     }
+    const model = buildSnapshotModel(draft.current, capabilities, {editable: true, reason: ""});
+    assert.ok(model.pdModeEditing.tapKeys.plain.includes("QK_MOUSE_BUTTON_3"));
 });
 
 test("a threshold reads as ball movement at the mode's pointer speed", () => {
@@ -1074,40 +1047,38 @@ test("a late layer carries its participation masks and placement flags through r
     assert(draft.changes().some(row => row.unit === "layerOrder"));
 });
 
-test("an old backup opens as a translated import review before replacing the draft", async () => {
+test("a backup from older firmware is refused at import, and the draft is left as it was", async () => {
     const {portableControl} = require("../../core/session/panel-controls");
-    const previous = require("../fixtures/previous-profile.charybdis.json");
     const draft = session(), before = draft.document;
+    const older = {...structuredClone(before), version: 2, actionAbiDigest: 0xf79c6151};
     const panel = {draft, service: {snapshot: () => ({selectedDeviceId: "test-device", connected: true, capabilities})}};
-    await portableControl(panel, edits.reviewPortableProfile(JSON.stringify(previous), "previous.json"));
+    await assert.rejects(portableControl(panel, edits.reviewPortableProfile(JSON.stringify(older), "previous.json")), /format current firmware does not store/);
+    assert.equal(panel.portableReview, undefined);
     assert.deepEqual(draft.document, before);
-    assert.equal(panel.portableReview.document.version, 3);
-    await portableControl(panel, {type: "restorePortableProfile"});
-    assert.equal(draft.document.layers.length, 16); assert.equal(draft.document.macros.length, 128);
-    draft.undo(draft.revision); assert.deepEqual(draft.document, before);
 });
 
 test("the Host section posts staged settings with Review, undo, redo and backup intact", () => {
-    const caps = {...capabilities, featureFlags: 1 << 21};
+    const caps = capabilities;
     const doc = pdDocument();
     const draft = new ProfileDraftSession({document: doc, fingerprint: portable.fingerprint(doc), summary: portable.summary(doc), limits: {brightnessMax: 200}, hostOs: {detected: 1}}, "test-device", caps);
-    const host = settingsEditorView(draft.current).sections.find(s => s.id === "host");
-    stage(draft, edits.settingsSection(host, field => field.macro === "hostOs" ? "2" : field.kind === "toggle" ? true : undefined, portable.fingerprint(draft.document)));
+    const host = () => settingsEditorView(draft.current).sections.find(s => s.id === "host");
+    // Windows first, where Unicode playback is a switch; then the switch.
+    stage(draft, edits.settingsSection(host(), field => field.macro === "hostOs" ? "2" : field.kind === "toggle" ? false : undefined, portable.fingerprint(draft.document)));
+    stage(draft, edits.settingsSection(host(), field => field.macro === "unicodeEnabled" ? true : undefined, portable.fingerprint(draft.document)));
     assert.equal(decoded(draft).settings.values[27], 0x102);
     assert.ok(reviewAreas(draft).includes("Settings"));
     stage(draft, edits.macroMessage("VIA_MACRO_0", "café 🙂 e\u0301", portable.fingerprint(draft.document)));
     assert.equal(Buffer.from(draft.document.macros[0], "base64").toString("utf8"), "café 🙂 e\u0301");
     const backup = JSON.parse(JSON.stringify(draft.document));
     assert.equal(portable.validateSnapshot(backup, caps).settings.values[27], 0x102);
-    assert.throws(() => portable.validateSnapshot(backup, capabilities), /ASCII/);
     draft.undo(draft.revision); assert.equal(draft.document.macros[0], doc.macros[0]);
+    draft.undo(draft.revision); assert.equal(decoded(draft).settings.values[27], 2);
     draft.undo(draft.revision); assert.equal(decoded(draft).settings.values[27], 0);
-    draft.redo(draft.revision); draft.redo(draft.revision); assert.deepEqual(draft.document, backup);
+    draft.redo(draft.revision); draft.redo(draft.revision); draft.redo(draft.revision); assert.deepEqual(draft.document, backup);
 });
 
-
-test("the Host section stages a keyboard layout and the macOS ISO bit on host-layout firmware", () => {
-    const caps = {...capabilities, featureFlags: (1 << 21) | (1 << 22)};
+test("the Host section stages a keyboard layout and the macOS ISO bit", () => {
+    const caps = capabilities;
     const doc = pdDocument();
     const draft = new ProfileDraftSession({document: doc, fingerprint: portable.fingerprint(doc), summary: portable.summary(doc), limits: {brightnessMax: 200}, hostOs: {detected: 1}}, "test-device", caps);
     const host = draft.current && settingsEditorView(draft.current, caps).sections.find(s => s.id === "host");
@@ -1118,7 +1089,6 @@ test("the Host section stages a keyboard layout and the macOS ISO bit on host-la
     assert.equal(decoded(draft).settings.values[27], (2 << 16) | 0x1000000);
     stage(draft, edits.macroMessage("VIA_MACRO_0", "café “hello” €", portable.fingerprint(draft.document)));
     assert.equal(Buffer.from(draft.document.macros[0], "base64").toString("utf8"), "café “hello” €");
-    assert.throws(() => portable.validateSnapshot(JSON.parse(JSON.stringify(draft.document)), {...caps, featureFlags: 1 << 21}), /host keyboard layout/);
 });
 
 test("literal step messages inspect and stage the exact text with undo intact", async () => {
@@ -1171,7 +1141,7 @@ test("the layer panel's toggle, moves and save reach the draft through the real 
 
 test("pointing macros stage inherit-only outputs and survive review, history and backup import", async () => {
     const value = pdDocument();
-    const caps = {...capabilities, featureFlags: 1 << 29};
+    const caps = capabilities;
     const snapshot = {document: value, fingerprint: portable.fingerprint(value), summary: portable.summary(value)};
     const draft = new ProfileDraftSession(snapshot, "test-device", caps);
     const before = decoded(draft).pdModes[4];
@@ -1194,19 +1164,10 @@ test("pointing macros stage inherit-only outputs and survive review, history and
     const backup = JSON.stringify(draft.document);
     draft.undo(draft.revision); assert.deepEqual(decoded(draft).pdModes[4], before);
     draft.redo(draft.revision); assert.deepEqual(decoded(draft).pdModes[4], after);
-    const legacy = new ProfileDraftSession(snapshot, "test-device", {...caps, featureFlags: 0});
-    legacy.replace(portable.validateSnapshot(backup).document, legacy.revision, "edit", "Imported profile");
-    assert.deepEqual(decoded(legacy).pdModes[4], after);
-    assert.equal(legacy.checks().filter(check => check.kind === "pointingMacroBlocker").length, 4);
-    legacy.review(legacy.revision);
-    await assert.rejects(legacy.apply({restorePortableProfile: () => {throw Error("must not write");}}, legacy.revision, () => {}), /Resolve the review's blockers/);
-    assert.throws(() => stage(legacy, edits.duplicatePdMode(7, 4, legacy.identity())), /firmware cannot run a macro/);
-    stage(legacy, edits.pdMode(4, readConfig(after, formOf({kind: 1, name: after.name, dpi: after.dpi, "dir:left": "KC_LEFT"})), legacy.identity()));
-    assert.equal(decoded(legacy).pdModes[4].directions.right.keycode, 0x777f);
-    assert.equal(legacy.checks().filter(check => check.kind === "pointingMacroBlocker" && check.status !== "fixed").length, 3);
-    stage(legacy, edits.clearPdMode(4, legacy.identity())); assert.equal(legacy.hasBlockers(), false);
+    const imported = new ProfileDraftSession(snapshot, "test-device", caps);
+    imported.replace(portable.validateSnapshot(backup).document, imported.revision, "edit", "Imported profile");
+    assert.deepEqual(decoded(imported).pdModes[4], after, "a backup keeps the macro outputs");
     const model = buildSnapshotModel(draft.current, caps, {editable: true, reason: ""});
-    assert.equal(model.pdModeEditing.macros, true);
     assert.ok(model.pdModeEditing.tapKeys.plain.includes("VIA_MACRO_127"));
     for (const [modifierPolicy, mask] of [[1, 2], [2, 0], [0, 2]]) {
         const bad = structuredClone(config); bad.directions.left = {keycode: "VIA_MACRO_0", modifierPolicy, mask};
@@ -1214,9 +1175,8 @@ test("pointing macros stage inherit-only outputs and survive review, history and
     }
 });
 
-
 test("combo-output permissions post, review, discard and survive backups and layer reorder", () => {
-    const caps = {...capabilities, featureFlags: 1 << 30};
+    const caps = capabilities;
     const doc = require("../fixtures/portable-profile").document();
     const base = {document: doc, fingerprint: portable.fingerprint(doc), summary: portable.summary(doc)};
     const draft = new ProfileDraftSession(base, "test-device", caps);
@@ -1247,7 +1207,6 @@ test("combo-output permissions post, review, discard and survive backups and lay
     const exported = JSON.parse(JSON.stringify(draft.document));
     assert.equal(portable.validateSnapshot(exported, caps).settings.comboOutputBehaviors, false);
     assert.equal(portable.validateSnapshot(exported, caps).combos.rows[0].useOutputBehavior, false);
-    assert.throws(() => portable.validateSnapshot(exported, capabilities), /Update both halves/);
     const order = Array.from({length: 16}, (_, i) => 15 - i);
     const reordered = portable.validateSnapshot(portable.reorderLayers(exported, order), caps);
     assert.equal(reordered.settings.comboOutputBehaviors, false);
@@ -1257,18 +1216,4 @@ test("combo-output permissions post, review, discard and survive backups and lay
     draft.discard(draft.revision, change.group);
     assert.equal(decoded(draft).settings.comboOutputBehaviors, true);
     assert.equal(decoded(draft).combos.rows[0].useOutputBehavior, false);
-});
-
-test("older firmware shows the switches read-only and rejects bypass edits without changing the draft", () => {
-    const doc = require("../fixtures/portable-profile").document();
-    const base = {document: doc, fingerprint: portable.fingerprint(doc), summary: portable.summary(doc)};
-    const draft = new ProfileDraftSession(base, "test-device", capabilities), before = draft.document;
-    const section = settingsEditorView(draft.current, capabilities).sections.find(row => row.id === "comboSettings");
-    assert.equal(section.fields.find(field => field.macro === "comboOutputBehaviors").readOnly, true);
-    assert.throws(() => stage(draft, edits.settingsSection(section, field => field.macro === "comboOutputBehaviors" ? false : undefined)), /cannot be changed/);
-    const combo = buildSnapshotModel(draft.current, capabilities, {editable: true, reason: ""}).combos[0];
-    assert.throws(() => stage(draft, edits.comboMessage(0, {...combo, useOutputBehavior: false})), /Update both halves/);
-    assert.deepEqual(draft.document, before);
-    stage(draft, edits.settingsSection(section, field => field.macro === "combosEnabled" ? false : undefined));
-    assert.equal(decoded(draft).settings.values[20], 0, "existing combo switches remain editable");
 });

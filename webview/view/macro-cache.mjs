@@ -27,9 +27,9 @@ export function createMacroReader(parse = parseMacro) {
 
 /** @param {Model} model @param {Purpose} purpose @returns {import("./types.js").MacroOptions} */
 function readingOptions(model, purpose) {
-    if (purpose === "peek") return {unicode: true};
-    if (purpose === "editor") return {unicode: true, keys: model?.macroPayloadKeycodes, aliases: model?.qmkKeycodeAliases};
-    return {unicode: model?.macroUnicode?.supported, textEntry: Boolean(model?.macroUnicode?.mode),
+    if (purpose === "peek") return {};
+    if (purpose === "editor") return {keys: model?.macroPayloadKeycodes, aliases: model?.qmkKeycodeAliases};
+    return {textEntry: Boolean(model?.macroUnicode?.mode),
         layoutChars: model?.macroUnicode?.layoutChars, modifierKeys: model?.macroPayloadModifierKeycodes,
         ...(purpose === "feedback" ? {keys: model?.macroPayloadKeycodes, aliases: model?.qmkKeycodeAliases} : {})};
 }

@@ -88,16 +88,11 @@ export function paintFeedback(card, model, slot) {
     /** @type {import("../../../contracts/messages.js").MacroValidation | null | undefined} */
     const inspection = matchingValidation(form, model, slot) ? form.validation?.validation : null;
     const error = form.stepError || parsed.error || (held.length ? `Release ${held.map(key => actionLabel(model, key)).join(", ")} before the macro ends.` : "") || inspection?.error || (!local && slot.playbackError);
-    const measured = inspection && "bytes" in inspection ? /** @type {import("../../../contracts/model.js").MacroInspection} */ (inspection) : null;
-    const program = local ? measured?.program : slot.program;
-    const max = model?.macroBank?.programMax === null ? null : model?.macroBank?.programMax ?? 512;
     const note = error ? (local ? "Fix this edit before it can be kept in your draft." : "Change Host settings or fix the macro before playing it.") : local && !inspection ? "Checking this edit…" : "";
     const feedback = /** @type {HTMLElement} */ (card.querySelector("[data-macro-feedback]"));
-    feedback.hidden = !error && !note && max === null;
+    feedback.hidden = !error && !note;
     feedback.replaceChildren(el(`<div class="stack">
         ${error ? `<div class="unavailable">${esc(error)} ${local ? "This edit is not staged." : "This stored macro cannot play with the current Host settings."}</div>` : ""}
-        ${max === null ? "" : `<div class="meter ${program != null && program > max ? "over" : ""}"><i style="width:${Math.min(100, (program ?? 0) / max * 100)}%"></i></div>`}
-        ${max === null ? "" : `<p class="note" data-macro-size>${program == null ? "Playback size unavailable" : `${esc(program)} of ${esc(max)} playback bytes`}</p>`}
         ${note ? `<p class="note">${esc(note)}</p>` : ""}
     </div>`));
     const dirty = local && payload !== slot.payload;

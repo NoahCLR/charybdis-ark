@@ -2,8 +2,7 @@
 const {test} = require("node:test");
 const assert = require("node:assert/strict");
 const fixture = require("../../upstream/firmware/tests/fixtures/pd_mode_domain_v1.json");
-const {PD_DOMAIN, PD_CLICK_FEATURE, encodePdDomain, decodePdDomain, isPdTapKey, isPdMacro, PD_MACRO_FEATURE, pdTapProblem, supportsPdClicks} = require("../../core/schema/pd-mode-domain-v1");
-const {PROFILE_WIRE_FEATURES} = require("../../core/protocol/profile-wire-v1");
+const {PD_DOMAIN, encodePdDomain, decodePdDomain, isPdTapKey, isPdMacro, pdTapProblem} = require("../../core/schema/pd-mode-domain-v1");
 const {decodeProfileBlob, encodeProfileBlob} = require("../../core/schema/profile-blob-v1");
 // The firmware's eight-slot record fixture as the 32 slots the keyboard has:
 // slot 6 disabled but named, so it keeps a record, and the rest empty. The
@@ -89,14 +88,9 @@ test("directional output vocabulary accepts macros and excludes controls, mouse 
     reject(() => encodePdDomain(value), "INVALID_PARAMETER");
 });
 
-// Firmware D-F22: a tap may click a plain mouse button 1–8, the keyboard says
-// so with feature bit 28, and the record is unchanged.
+// Firmware D-F22: a tap may click a plain mouse button 1–8, and the record is
+// unchanged.
 test("mouse buttons 1–8 click from a direction, a diagonal and a button override under every modifier policy", () => {
-    assert.equal(PD_CLICK_FEATURE, 1 << 28);
-    assert.equal(PROFILE_WIRE_FEATURES.POINTING_CLICKS, PD_CLICK_FEATURE);
-    assert.equal(supportsPdClicks({featureFlags: 1 << 28}), true);
-    assert.equal(supportsPdClicks({featureFlags: 0x0fffffff}), false);
-    assert.equal(supportsPdClicks(undefined), false);
     const value = slots();
     Object.assign(value[4], {axis: 3, thresholdX: 40, thresholdY: 40,
         directions: {up: {keycode: 0xd3}, down: {keycode: 0xd4, modifierPolicy: 1, mask: 2}, left: {keycode: 0xd1, modifierPolicy: 2}, right: {keycode: 0xd8}},
@@ -116,20 +110,14 @@ test("mouse buttons 1–8 click from a direction, a diagonal and a button overri
     }
 });
 
-test("a refused tap is explained by what it is, and a click by whether the keyboard clicks", () => {
-    for (const code of [4, 0xa5, 0x0204, 0xd3]) assert.equal(pdTapProblem(code, {clicks: true}), "", code.toString(16));
-    assert.match(pdTapProblem(0xd3, {clicks: false}), /firmware cannot click/);
-    assert.equal(pdTapProblem(4, {clicks: false}), "");
-    for (const code of [0xcd, 0xd0, 0xd9, 0xdf]) assert.match(pdTapProblem(code, {clicks: true}), /not move the pointer, scroll or change mouse acceleration/);
-    assert.match(pdTapProblem(0x01d3, {clicks: true}), /cannot carry modifiers/);
-    assert.match(pdTapProblem(0x02ae, {clicks: true}), /Only keyboard keys take modifiers/);
-    assert.match(pdTapProblem(0x7700, {clicks: true}), /cannot run a macro/);
-    for (const code of [1, 0x7e80, 0x41d1, 0xe0]) assert.match(pdTapProblem(code, {clicks: true}), /not layer, pointing-mode or keyboard controls/);
+test("a refused tap is explained by what it is", () => {
+    for (const code of [4, 0xa5, 0x0204, 0xd3, 0x7700]) assert.equal(pdTapProblem(code), "", code.toString(16));
+    for (const code of [0xcd, 0xd0, 0xd9, 0xdf]) assert.match(pdTapProblem(code), /not move the pointer, scroll or change mouse acceleration/);
+    assert.match(pdTapProblem(0x01d3), /cannot carry modifiers/);
+    assert.match(pdTapProblem(0x02ae), /Only keyboard keys take modifiers/);
+    for (const code of [1, 0x7e80, 0x41d1, 0xe0]) assert.match(pdTapProblem(code), /not layer, pointing-mode or keyboard controls/);
     // Every keycode the problem accepts is one the record takes, and only those.
-    for (let code = 1; code <= 0xffff; code++) {
-        assert.equal(pdTapProblem(code, {clicks: true, macros: true}) === "", isPdTapKey(code), code.toString(16));
-        assert.equal(pdTapProblem(code, {clicks: false, macros: true}) === "", isPdTapKey(code) && !(code >= 0xd1 && code <= 0xd8), code.toString(16));
-    }
+    for (let code = 1; code <= 0xffff; code++) assert.equal(pdTapProblem(code) === "", isPdTapKey(code), code.toString(16));
 });
 
 test("scroll validation rejects bad timing and ratios before they reach arithmetic", () => {
@@ -204,7 +192,6 @@ test("a profile carries the PD domain only as version 3, and the retired payload
 });
 
 test("macro records round trip every tap place, inherit only", () => {
-    assert.equal(PROFILE_WIRE_FEATURES.POINTING_MACROS, PD_MACRO_FEATURE);
     for (const keycode of [0x7700, 0x777f]) {
         assert.ok(isPdMacro(keycode));
         const modes = slots();

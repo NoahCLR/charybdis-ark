@@ -4,6 +4,7 @@ const {test, expect} = require("@playwright/test");
 const fs = require("node:fs");
 const path = require("node:path");
 const {document} = require("../tests/fixtures/pd-profile");
+const {PROFILE_WIRE_KNOWN_MASKS} = require("../core/protocol/profile-wire-v1");
 
 for (const {screen, source, initial} of [
     {screen: "macros", source: "layout"}, {screen: "keys", source: "layout"},
@@ -13,7 +14,7 @@ for (const {screen, source, initial} of [
     test(`${initial ? "initial read" : "readback"} of ${source} preserves the ${screen} screen between replies`, async ({page}) => {
         await page.goto("/preview/index.html");
         const coreFile = fs.readdirSync(path.join(__dirname, "../dist/web")).find(name => /^core-.*\.js$/.test(name));
-        const result = await page.evaluate(async ({screen, source, initial, coreFile, doc}) => {
+        const result = await page.evaluate(async ({screen, source, initial, coreFile, doc, featureFlags}) => {
             const store = await import("/webview/store.mjs"), core = await import(`/dist/web/${coreFile}`);
             let models = 0, readContent, preserved = true, replies = 0, lastBar = "", lastProgress, staleIgnored = true;
             const beforePosts = window.__posted.length;
@@ -24,7 +25,7 @@ for (const {screen, source, initial} of [
             }}, {adapter: {listDevices: async () => [], connect: async () => {throw Error("fixture must not connect");}}});
             const service = loop.session.service;
             service.connectionPublicId = "fixture"; service.connectionToken = 1;
-            service.capabilities = {compiledLayerCount: 16, supportedDomainMask: 31, actionAbiDigest: 0x837cf479, featureFlags: 0};
+            service.capabilities = {compiledLayerCount: 16, supportedDomainMask: 31, actionAbiDigest: 0x837cf479, featureFlags};
             if (!initial) service.portable = {document: doc};
             const bytes = core.Buffer.from(doc.profile, "base64"), metadata = core.Buffer.alloc(25);
             metadata[0] = 1; metadata[1] = 25; metadata.writeUInt16LE(bytes.length, 2);
@@ -91,7 +92,7 @@ for (const {screen, source, initial} of [
                 profileBytes: bytes.length, staleIgnored, error: service.error?.message,
                 localTextPreserved: store.macroForm("VIA_MACRO_17").draft === localText,
                 posts: window.__posted.length - beforePosts};
-        }, {screen, source, initial, coreFile, doc: document()});
+        }, {screen, source, initial, coreFile, doc: document(), featureFlags: PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES});
         expect(result.error).toBeUndefined();
         if (source === "layout") {
             expect(result.replies).toBe(69);

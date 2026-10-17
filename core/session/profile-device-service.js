@@ -24,10 +24,8 @@ const {readSettingsLimits} = require("../protocol/portable-profile-v1");
 const {deviceLabels, editorViews} = require("./device-model");
 const {storedKeyboardName} = require("../model/keyboard-name");
 const {readHostOs} = require("../protocol/host-os-v1");
-const {supportsUnicodeMacros} = require("../schema/macro-payload");
 const {readKeyboardOptions} = require("../protocol/keyboard-options-v1");
-const {profileDomain, READABLE_DOMAIN_VERSIONS} = require("../schema/profile-domains");
-const {currentDomain} = require("../model/portable-profile");
+const {profileDomain} = require("../schema/profile-domains");
 const {profileDepthOptions} = require("../schema/profile-depth");
 const {captureProfile, restoreProfile, validateSnapshot} = require("./portable-profile-session");
 const {NodeHidDeviceAdapter} = require("../transport/node-hid-adapter");
@@ -38,9 +36,9 @@ const {LAYERS} = require("../data/charybdis-layout");
 const {readViaRgbMatrix} = require("../protocol/via-rgb-matrix-v1");
 const {readDeviceCombos} = require("../protocol/combo-readback-v1");
 const {ProfilePayloadReader} = require("./profile-payload-reader");
-const {PROFILE_DOMAIN_IDS, decodeProfileBlob} = require("../schema/profile-blob-v1");
+const {PROFILE_DOMAIN_IDS, decodeStoredProfileBlob} = require("../schema/profile-blob-v1");
 const {CANDIDATE_STATE_NAMES, readCandidateStatus} = require("../protocol/profile-candidate-v1");
-const {PROFILE_ACTIVE_KIND, PROFILE_STATE_FLAGS, PROFILE_WIRE_FEATURES, readProfileCapabilities, readProfileStatus, readViaIdentity, supportsWidePages} = require("../protocol/profile-wire-v1");
+const {PROFILE_ACTIVE_KIND, PROFILE_STATE_FLAGS, PROFILE_WIRE_FEATURES, readProfileCapabilities, readProfileStatus, readViaIdentity} = require("../protocol/profile-wire-v1");
 
 /** @type {(capabilities: Partial<Caps> | null | undefined, writing?: boolean) => asserts capabilities is Partial<Caps>} */
 const checkReady = requireReady;
@@ -313,7 +311,6 @@ class ProfileDeviceService {
             /** @type {import("../protocol/types.js").ReadOptions & {onProgress: (progress: import("../../contracts/model.js").CountedProgress) => void}} */
             const readOptions = {
                 nextRequestId: () => this.nextRequestId(),
-                widePages: this.widePages(),
                 onProgress: progress => this.reportReadProgress("profile", progress),
             };
             const read = source === "compiled" ? await reader.readCompiled(readOptions) : await reader.readCommitted(readOptions);
@@ -326,18 +323,16 @@ class ProfileDeviceService {
 
     /** @param {import("../protocol/types.js").PayloadRead} read @param {string} source */
     #acceptCommitted({metadata, bytes}, source) {
-        // A domain the keyboard stores in an older version is shown through
-        // its translation (D-L63); the capture marks the keyboard read-only.
-        const blob = decodeProfileBlob(bytes, {domainVersions: READABLE_DOMAIN_VERSIONS});
+        const blob = decodeStoredProfileBlob(bytes);
         const rgb = blob.domains.find(domain => domain.id === PROFILE_DOMAIN_IDS.RGB);
-        const depth = profileDepthOptions(this.capabilities, rgb && currentDomain(rgb).payload);
+        const depth = profileDepthOptions(this.capabilities, rgb?.payload);
         /** @type {import("./types.js").ReadDomains} */
         const domains = {};
         const failures = [];
         for (const domain of blob.domains) {
             try {
                 const registered = profileDomain(domain.id);
-                if (registered) Object.assign(domains, {[registered.readKey]: registered.decode(currentDomain(domain).payload, depth)});
+                if (registered) Object.assign(domains, {[registered.readKey]: registered.decode(domain.payload, depth)});
             } catch (error) {
                 failures.push({domainId: domain.id, message: error instanceof Error ? error.message : String(error)});
             }
@@ -374,7 +369,7 @@ class ProfileDeviceService {
             const connection = this.connection;
             try {
                 if (!connection?.connected) throw new Error("Connect to a keyboard before reading combos.");
-                const read = await readDeviceCombos(connection, {nextRequestId: () => this.nextRequestId(), widePages: this.widePages()});
+                const read = await readDeviceCombos(connection, {nextRequestId: () => this.nextRequestId()});
                 if (this.connection !== connection || !connection.connected) return this.snapshot();
                 this.combos = {state: "read", ...read, readAt: new Date().toISOString()};
             } catch (error) {
@@ -497,14 +492,14 @@ class ProfileDeviceService {
     }
 
     // What the keyboard accepts beside its profile: its settings limits, its
-    // lighting effects and, where it plays Unicode macros, the host OS it
-    // detected. A profile already read from this connection supplies the first
-    // two; the host OS is always read fresh. Read before anything is written.
+    // lighting effects and the host OS it detected. A profile already read
+    // from this connection supplies the first two; the host OS is always read
+    // fresh. Read before anything is written.
     /** @param {Connection} connection @param {Pick<Capture, "limits" | "options">} [known] */
     async #readDeviceFacts(connection, known) {
         const limits = known?.limits || await readSettingsLimits(connection, this.requestSequence());
         const options = known?.options || await readKeyboardOptions(connection, this.requestSequence());
-        return {limits, options, ...(supportsUnicodeMacros(this.capabilities) ? {hostOs: await readHostOs(connection, this.requestSequence())} : {})};
+        return {limits, options, hostOs: await readHostOs(connection, this.requestSequence())};
     }
 
     // The profile the editors follow, with their views (device-model.js).
@@ -530,8 +525,7 @@ class ProfileDeviceService {
                     : undefined;
                 const facts = await this.#readDeviceFacts(connection, cachedBase);
                 const {limits, options: keyboardOptions} = facts;
-                // What is checked is what would be written: an older backup as
-                // this keyboard numbers its keys.
+                // What is checked is what would be written.
                 const target = validateSnapshot(document, this.capabilities);
                 const lighting = baseLighting(target.settings.values);
                 const brightness = lighting.brightness;
@@ -541,8 +535,7 @@ class ProfileDeviceService {
                 // The keyboard refuses a profile whose actions sit where it cannot
                 // run them; say which one before anything is sent.
                 const misplaced = profilePlacementProblem(Buffer.from(target.document.profile, "base64"), {layerCount: this.capabilities?.compiledLayerCount ?? LAYERS,
-                    capabilities: this.capabilities,
-                    behaviorQmkFunctions: Boolean((this.capabilities?.featureFlags || 0) & PROFILE_WIRE_FEATURES.BEHAVIOR_QMK_FUNCTIONS)});
+                    capabilities: this.capabilities});
                 if (misplaced) throw Object.assign(new Error(`${misplaced} Fix it before saving this profile.`), {code: "PLACEMENT_REFUSED"});
                 started = true;
                 result = await restoreProfile(connection, this.requestSequence(), capabilities, document, {...options,
@@ -611,7 +604,6 @@ class ProfileDeviceService {
                 Boolean(this.connection?.connected),
                 this.status
             ),
-            olderDomains: this.portable?.older ? this.portable.older.map(entry => ({...entry})) : [],
             storedKeyboardName: storedKeyboardName(this.portable) ?? this.committed?.domains?.settings?.keyboardName,
             portableSummary: this.committed?.domains?.settings ? {names: this.committed.domains.settings.names.map((name, index, names) => layerName(names, index))} : this.portable?.summary || null,
             portableProgress: this.portableProgress || "",
@@ -809,8 +801,6 @@ class ProfileDeviceService {
         return this.requestIds;
     }
     nextRequestId() {return this.requestSequence().next();}
-    // Whether reads may go past page 255; unknown until capabilities are read.
-    widePages() {return this.capabilities ? supportsWidePages(this.capabilities) : undefined;}
     profileCapabilities() {
         const capabilities = this.capabilities;
         checkReady(capabilities);

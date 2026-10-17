@@ -68,8 +68,7 @@ const layerOfRef = text => {
 };
 
 // TG(n), TO(n), TT(n) and OSL(n) on a layer the keyboard has: the QMK layer
-// keycodes a keyboard reporting Profile Wire feature bit 14 runs through its
-// own layer ownership (TG as LOCK_LAYER, TO as "lock only n", TT as a hold
+// keycodes the keyboard runs through its own layer ownership (TG as LOCK_LAYER, TO as "lock only n", TT as a hold
 // whose fifth tap locks, OSL as a one-shot). Where each may go is
 // placementProblem's to say.
 const OWNED_LAYER_BASES = Object.freeze([0x5200, 0x5260, 0x5280, 0x52c0]); // TO, TG, OSL, TT
@@ -120,20 +119,4 @@ function placementProblem(action, placement, {layerCount = 16} = {}) {
     }
 }
 
-// Whether a behaviour can send an action. QMK and keyboard functions past the
-// layer keycodes and below the user range (the Charybdis DPI and sniping keys,
-// RGB Matrix, Magic, QK_BOOT…) run only through QMK's key processing. A
-// keyboard reporting Profile Wire feature bit 15 sends them from a behaviour as
-// a synthetic QMK record, so they work there as on a key. An older one sends
-// them through tap_code16(), which keeps only the low byte (DRGSCRL, 0x7E06,
-// types C), so there they belong on a key or a combo only.
-/** @param {number} code */
-const isQmkFunction = code => code > 0x52ff && code < 0x7e40 && !(code >= 0x7700 && code < 0x7780);
-/** @param {import("./types.js").SemanticAction} action @param {{behaviorQmkFunctions?: boolean}} [options] */
-function behaviorEmitProblem(action, {behaviorQmkFunctions = false} = {}) {
-    const code = nativeCode(action);
-    if (behaviorQmkFunctions || code === undefined || !isQmkFunction(code)) return undefined;
-    return `${actionName(action)} runs in QMK's own key handling, which this keyboard's behaviours do not reach yet, so it only works as a key or a combo here. A firmware update lets behaviours send it.`;
-}
-
-module.exports = {PLACEMENT, placementProblem, behaviorEmitProblem, isOwnedLayerCode, KNOWN_ACTION_ABIS, ACTION_ABI, knownActionAbi, PD_SLOT_COUNT, actionName, nativeCode, keycodeAction, pdSlotOfCode, layerRef, layerOfRef};
+module.exports = {PLACEMENT, placementProblem, isOwnedLayerCode, KNOWN_ACTION_ABIS, ACTION_ABI, knownActionAbi, PD_SLOT_COUNT, actionName, nativeCode, keycodeAction, pdSlotOfCode, layerRef, layerOfRef};

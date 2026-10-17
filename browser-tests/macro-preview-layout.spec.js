@@ -8,10 +8,10 @@ for (const theme of ["plain", "vscode-dark", "vscode-light"]) {
         await openPreview(page, theme);
         await page.evaluate(async () => {
             const store = await import("/webview/store.mjs");
-            // Firmware that plays one 512-byte program, so the long texts
-            // show their error feedback beside the field.
+            // Macro memory with 400 bytes free, so the long texts show their
+            // error feedback beside the field.
             const model = store.getModel();
-            store.setModel({...model, macroBank: {...model.macroBank, programMax: 512}});
+            store.setModel({...model, macroBank: {...model.macroBank, free: 400}});
             store.state.screen = "macros"; store.state.macroSlot = "VIA_MACRO_17"; store.render();
             window.__posted.length = 0;
         });
@@ -25,16 +25,16 @@ for (const theme of ["plain", "vscode-dark", "vscode-light"]) {
             const bounds = await field.evaluate(node => {
                 const box = node.getBoundingClientRect(), row = node.closest(".macro-step").getBoundingClientRect();
                 const controls = node.closest(".macro-step").querySelector(".macro-step-head").getBoundingClientRect();
-                const feedback = document.querySelector("[data-macro-feedback]").getBoundingClientRect();
+                const feedbackNode = /** @type {HTMLElement} */ (document.querySelector("[data-macro-feedback]")), feedback = feedbackNode.getBoundingClientRect();
                 return {fieldContained: box.top >= row.top && box.bottom <= row.bottom && box.left >= row.left && box.right <= row.right,
                     controlsContained: controls.left >= row.left && controls.right <= row.right,
-                    controlsSeparate: controls.bottom <= box.top, feedbackSeparate: row.bottom <= feedback.top,
+                    controlsSeparate: controls.bottom <= box.top, feedbackSeparate: feedbackNode.hidden || row.bottom <= feedback.top,
                     preservesWhitespace: getComputedStyle(node).whiteSpace === "pre-wrap", scrollsInside: getComputedStyle(node).overflowY !== "visible"};
             });
             expect(bounds).toEqual({fieldContained: true, controlsContained: true, controlsSeparate: true,
                 feedbackSeparate: true, preservesWhitespace: true, scrollsInside: true});
         }
-        await expect(page.locator("[data-macro-feedback]")).toContainText("Shorten the text");
+        await expect(page.locator("[data-macro-feedback]")).toContainText("Shorten it or clear another macro");
         await expect(page.locator("[data-macro-feedback]")).not.toContainText("not a key");
         const updates = await page.evaluate(() => window.__posted.filter(message => message.type === "updateViaMacro"));
         expect(updates).toHaveLength(1); // Only the 400-byte prose fits.

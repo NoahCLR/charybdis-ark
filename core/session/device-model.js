@@ -28,9 +28,7 @@ const {keyboardNameView} = require("../model/keyboard-name");
 const {runningComboRows} = require("../schema/combo-domain-v1");
 const {SETTING} = require("../schema/settings-domain-v1");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX, matrixPosition} = require("../data/charybdis-layout");
-const {PROFILE_WIRE_FEATURES} = require("../protocol/profile-wire-v1");
 const {compileLayerAnswers} = require("../model/layer-resolution");
-const {PROFILE_WIRE_DOMAINS} = require("../schema/profile-domains");
 
 const {editableDomains} = require("./firmware-support");
 
@@ -52,7 +50,7 @@ const CATALOG_SOURCE = "vendored QMK keycode catalog";
  * @typedef {{busy: boolean, behaviors: boolean, pointing: boolean, combos: boolean, macros: boolean, settings: boolean, customKeys: boolean}} Editing
  */
 
-// Independent readback remains useful on older firmware and partial captures.
+// Independent readback remains useful when a complete capture fails.
 /** @param {import("./types.js").DeviceModelInput} [state] */
 function buildDeviceModel(state = {}) {
     const committed = state.committed?.state === "read";
@@ -71,7 +69,7 @@ function buildDeviceModel(state = {}) {
 // service keeps them for the profile it read, and a draft builds its own.
 /** @param {import("../model/types.js").ProfileSnapshot} snapshot @param {import("../model/types.js").ProfileDestination} [capabilities] */
 function editorViews(snapshot, capabilities) {
-    return {settingsView: settingsEditorView(snapshot, capabilities), macroView: macroEditorView(snapshot, capabilities),
+    return {settingsView: settingsEditorView(snapshot), macroView: macroEditorView(snapshot, capabilities),
         customKeyView: customKeyEditorView(snapshot, capabilities)};
 }
 
@@ -180,14 +178,10 @@ function configurationModel(content, capabilities, editing) {
         pdModes: (content.domains?.pdModes || []).map((slot) => ({...slot, displayName: slotName(slot), binding: PD_SLOT_BINDINGS[slot.id]})),
         pdModeEditing: {writable: editing.pointing,
             dpiChoices: dpiChoices({normalSpeed: true}),
-            // Whether a direction or button override may click a mouse
-            // button 1–8 (Profile Wire feature bit 28).
-            clicks: Boolean((capabilities?.featureFlags || 0) & PROFILE_WIRE_FEATURES.POINTING_CLICKS),
-            macros: Boolean((capabilities?.featureFlags || 0) & PROFILE_WIRE_FEATURES.POINTING_MACROS),
             // The keys a direction or button override may send, so the
             // picker offers only those (model/pointing-taps.js).
-            tapKeys: pointingTapKeys(Boolean((capabilities?.featureFlags || 0) & PROFILE_WIRE_FEATURES.POINTING_CLICKS), Boolean((capabilities?.featureFlags || 0) & PROFILE_WIRE_FEATURES.POINTING_MACROS))},
-        keyBehaviors: content.domains.keyBehaviors ? behaviorRowsForView(content.domains.keyBehaviors, behaviorFeatures(capabilities, content), names) : [],
+            tapKeys: pointingTapKeys()},
+        keyBehaviors: content.domains.keyBehaviors ? behaviorRowsForView(content.domains.keyBehaviors, behaviorFeatures(content), names) : [],
         behaviorEditing: {
             busy: editing.busy,
             writable: editing.behaviors,
@@ -206,16 +200,13 @@ function configurationModel(content, capabilities, editing) {
         macroNameSpace: content.macroView?.names || null,
         macroBank: content.macroView?.macroBank || null,
         hostSettings: content.settingsView?.host || null,
-        macroUnicode: content.macroView?.unicode || {supported: false, mode: 0},
-        macroProtectionSupported: Boolean(content.macroView?.protectionSupported),
-        macroOutputIsolationSupported: Boolean(content.macroView?.outputIsolationSupported),
+        macroUnicode: content.macroView?.unicode || {mode: 0},
         macroProtectionChoices: content.macroView?.protectionChoices || [],
         macroEditing: {identity: content.macroView?.identity || "", writable: editing.macros},
         behaviorTimingDefaults: content.settingsView?.timing || {},
         configDefaults: content.settingsView?.sections || [],
         participation: content.domains.settings?.values && content.domains.settings.layers ? {
             comboOutputBehaviors: content.domains.settings.comboOutputBehaviors !== false,
-            comboOutputBehaviorsSupported: Boolean((capabilities?.featureFlags || 0) & PROFILE_WIRE_FEATURES.COMBO_OUTPUT_BEHAVIORS),
             behaviorsEnabled: Boolean(content.domains.settings.values[SETTING.BEHAVIORS_ENABLED]),
             combosEnabled: Boolean(content.domains.settings.values[SETTING.COMBOS_ENABLED]),
             behaviorLayers: content.domains.settings.values[SETTING.LAYER_BEHAVIORS],
@@ -233,9 +224,6 @@ function configurationModel(content, capabilities, editing) {
         // The keyboard's own name, edited on Settings with the other settings.
         keyboardName: content.keyboardNameView || null,
 
-        // TT(), OSL() and TO() are offered only by a keyboard that runs them
-        // through its own layer ownership (Profile Wire feature bit 14).
-        ownsLayerKeys: Boolean((capabilities?.featureFlags || 0) & PROFILE_WIRE_FEATURES.OWNED_LAYER_TOGGLES),
         qmkKeycodes: catalog.entries,
         qmkKeyLabels: catalog.labels,
         qmkKeyLayers: keyLayers,
@@ -337,16 +325,11 @@ function profileKeycodes(content, capabilities) {
     return values.filter(/** @returns {value is number} */ (value) => typeof value === "number" && Number.isInteger(value));
 }
 
-// What fills a behaviour's empty tiers depends on the firmware and, for a
-// custom key, on whether the profile gives it a shortcut.
-/** @param {Partial<import("./types.js").DeviceCapabilities> | null | undefined} capabilities @param {Configuration} content */
-function behaviorFeatures(capabilities, content) {
-    const flags = capabilities?.featureFlags || 0;
-    return {
-        physicalGestureTiming: Boolean(flags & PROFILE_WIRE_FEATURES.PHYSICAL_GESTURE_TIMING),
-        ownedTapping: Boolean(flags & PROFILE_WIRE_FEATURES.OWNED_TAPPING),
-        customKeyShortcuts: content.domains.settings?.customKeyShortcuts || [],
-    };
+// What fills a custom key's empty tiers depends on whether the profile gives
+// it a shortcut.
+/** @param {Configuration} content */
+function behaviorFeatures(content) {
+    return {customKeyShortcuts: content.domains.settings?.customKeyShortcuts || []};
 }
 
 // Unstored editor rows need the same built-in actions and timing defaults as
@@ -357,7 +340,7 @@ function behaviorFeatures(capabilities, content) {
 function behaviorDefaults(content, capabilities, aliases, names) {
     const defaults = content.settingsView?.timing || {};
     const values = [defaults.tappingTerm, defaults.tapHoldTerm, defaults.longerHoldTerm, defaults.multiTapTerm];
-    const features = behaviorFeatures(capabilities, content);
+    const features = behaviorFeatures(content);
     const customKeys = (content.customKeyView?.keys || []).map(key => key.code);
     return Object.fromEntries([...new Set([...profileKeycodes(content, capabilities), ...customKeys])].filter(code => code > 1).map(code => {
         const target = keycodeAction(code);
@@ -483,7 +466,6 @@ function diagnosticsFor(state) {
     }
     if (state.combos?.state === "read") notes.push(`${state.combos.rows.length} combos read from the keyboard. Combos are ${state.combos.enabled ? "enabled" : "disabled"}.`);
     else notes.push(state.combos?.error?.message || "Combos have not been read from the keyboard yet.");
-    notes.push((state.capabilities?.supportedDomainMask || 0) & PROFILE_WIRE_DOMAINS.SETTINGS ? "Complete profile backups include both macro banks and global keyboard settings." : "Macro payloads and policy defaults need the complete-profile firmware update.");
     return notes;
 }
 

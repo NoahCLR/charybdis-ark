@@ -49,7 +49,7 @@ function fadeTiming(model, idle) {
     const box = el(`<div class="stack gap-12"></div>`);
     box.append(control, note);
     if (!idle) box.append(open);
-    if (!editable && !idle) box.append(el(`<div class="unavailable">${esc(unavailable(model) || "This firmware reports the fade timing but cannot save it.")}</div>`));
+    if (!editable && !idle) box.append(el(`<div class="unavailable">${esc(unavailable(model) || "The fade timing cannot be edited right now.")}</div>`));
     node.append(box);
     return node;
 }

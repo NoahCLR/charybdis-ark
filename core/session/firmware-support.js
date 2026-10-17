@@ -1,16 +1,19 @@
 // @ts-check
 "use strict";
-// Firmware facts have several intentionally different gates. Independent
-// reads need a supported read surface; complete documents also need every
-// domain, current layers and a known action ABI. Complete Apply adds the
-// atomic feature. The live mutation diagnostic additionally checks the link,
-// candidate transfer and established read compatibility.
+// Ark supports only current firmware: every feature it reports is required
+// here (PROFILE_WIRE_KNOWN_MASKS), and nothing past these gates asks whether
+// the keyboard has one. The gates answer different questions. A read needs the
+// read surface; a complete document also needs every domain, current layers,
+// a known action ABI and current firmware's features. Complete Apply adds what
+// a build that saves profiles reports. The live mutation diagnostic
+// additionally checks the link, candidate transfer and established read
+// compatibility.
 const {LAYERS} = require("../data/charybdis-layout");
 const {knownActionAbi} = require("../schema/actions");
 const {PROFILE_BLOB_V1} = require("../schema/profile-blob-v1");
 const {PROFILE_WIRE_DOMAINS, PROFILE_DOMAIN_MASK} = require("../schema/profile-domains");
 const {RAW_HID_REPORT_SIZE} = require("../transport/device-adapter");
-const {PROFILE_ACTIVE_KIND, PROFILE_STATE_FLAGS, PROFILE_WIRE_FEATURES,
+const {PROFILE_ACTIVE_KIND, PROFILE_STATE_FLAGS,
     PROFILE_WIRE_KNOWN_MASKS, PROFILE_WIRE_V1, VIA_READS} = require("../protocol/profile-wire-v1");
 /** @typedef {import("./types.js").DeviceCapabilities} Caps */
 /** @typedef {import("./types.js").ProfileStatus} Status */
@@ -20,23 +23,22 @@ const SUPPORTED_PROFILE_PROTOCOL = Object.freeze({major: 1, minor: 0});
 const SUPPORTED_PROFILE_SCHEMA = Object.freeze({major: PROFILE_BLOB_V1.SCHEMA_MAJOR, minor: PROFILE_BLOB_V1.SCHEMA_MINOR});
 const PROFILE_DOMAIN_FLAGS = Object.freeze({RGB: PROFILE_WIRE_DOMAINS.RGB, KEY_BEHAVIORS: PROFILE_WIRE_DOMAINS.KEY_BEHAVIORS});
 const REQUIRED_PROFILE_DOMAIN_MASK = PROFILE_DOMAIN_FLAGS.RGB | PROFILE_DOMAIN_FLAGS.KEY_BEHAVIORS;
-const REQUIRED_LIVE_MUTATION_FEATURES = PROFILE_WIRE_FEATURES.CANDIDATE_WRITE
-    | PROFILE_WIRE_FEATURES.PERSISTENT_COMMIT
-    | PROFILE_WIRE_FEATURES.RUNTIME_ACTIVATION
-    | PROFILE_WIRE_FEATURES.PEER_RECONCILIATION
-    | PROFILE_WIRE_FEATURES.ATOMIC_LOGICAL_APPLY;
+const CURRENT_FEATURES = PROFILE_WIRE_KNOWN_MASKS.CURRENT_FEATURES;
+const REQUIRED_LIVE_MUTATION_FEATURES = PROFILE_WIRE_KNOWN_MASKS.CURRENT_MUTATION_FEATURES;
 /** @param {Partial<Caps> | null | undefined} capabilities */
 const hasCurrentLayers = capabilities => capabilities?.compiledLayerCount === LAYERS;
+/** @param {number | undefined} flags @param {number} mask */
+const hasAll = (flags, mask) => ((Number(flags) || 0) & mask) === mask;
 
 /** @param {Partial<Caps> | null | undefined} capabilities @returns {capabilities is Partial<Caps>} */
 const canEdit = capabilities => hasCurrentLayers(capabilities)
+    && hasAll(capabilities?.featureFlags, CURRENT_FEATURES)
     && ((capabilities?.supportedDomainMask || 0) & PROFILE_DOMAIN_MASK) === PROFILE_DOMAIN_MASK
     && knownActionAbi(capabilities?.actionAbiDigest ?? 0);
 
 // This is the complete Apply's firmware gate, not the live status diagnostic.
 /** @param {Partial<Caps> | null | undefined} capabilities */
-const canApply = capabilities => canEdit(capabilities)
-    && Boolean((capabilities.featureFlags || 0) & PROFILE_WIRE_FEATURES.ATOMIC_LOGICAL_APPLY);
+const canApply = capabilities => canEdit(capabilities) && hasAll(capabilities.featureFlags, REQUIRED_LIVE_MUTATION_FEATURES);
 
 /** @param {Partial<Caps> | null | undefined} capabilities @param {Partial<ViaIdentity> | null} [viaIdentity] */
 const canRead = (capabilities, viaIdentity) => evaluateProfileCompatibility(capabilities, viaIdentity).compatible;
@@ -69,9 +71,10 @@ function canCapture(status, allowCandidate = false) {
 /** @param {Pick<Status, "stateFlags">} status */
 const identityStateFlags = status => status.stateFlags & ~PROFILE_STATE_FLAGS.CANDIDATE_PENDING;
 
-// Independent device views keep their historical per-area gates. A failed
-// domain prevents behaviours/pointing editing but does not close combos; a
-// custom-key view does not acquire an extra layer-count requirement.
+// Independent device views, read when a complete capture fails, keep per-area
+// gates. A failed domain prevents behaviours/pointing editing but does not
+// close combos; a custom-key view does not acquire an extra layer-count
+// requirement.
 /** @param {import("./types.js").DeviceModelInput} state */
 function editableDomains(state) {
     const committed = state.committed?.state === "read";
@@ -94,11 +97,11 @@ function evaluateProfileCompatibility(capabilities, viaIdentity = {}) {
     const checks = [
         equalityCheck("Protocol major", capabilities?.protocol?.major, SUPPORTED_PROFILE_PROTOCOL.major),
         equalityCheck("Schema major", capabilities?.schema?.major, SUPPORTED_PROFILE_SCHEMA.major),
-        oneOfCheck("VIA protocol version", viaIdentity?.protocolVersion, VIA_READS.SUPPORTED_PROTOCOL_VERSIONS),
+        equalityCheck("VIA protocol version", viaIdentity?.protocolVersion, VIA_READS.PROTOCOL_VERSION),
         equalityCheck("VIA firmware version", viaIdentity?.firmwareVersion, capabilities?.firmwareVersion),
         equalityCheck("Raw HID report size", capabilities?.reportSize, RAW_HID_REPORT_SIZE),
         minimumCheck("Status pages", capabilities?.statusPageCount, PROFILE_WIRE_V1.STATUS_PAGE_COUNT),
-        maskCheck("Required Profile Wire features", capabilities?.featureFlags, PROFILE_WIRE_KNOWN_MASKS.REQUIRED_READ_FEATURES),
+        maskCheck("Current firmware features", capabilities?.featureFlags, CURRENT_FEATURES),
         maskCheck("Required profile domains", capabilities?.supportedDomainMask, REQUIRED_PROFILE_DOMAIN_MASK),
     ];
     const reasons = checks.filter((check) => !check.ok).map((check) => check.message);
@@ -114,12 +117,6 @@ function evaluateProfileCompatibility(capabilities, viaIdentity = {}) {
 function equalityCheck(label, actual, expected) {
     const ok = Number(actual) === Number(expected);
     return {label, ok, actual, limit: expected, message: ok ? "" : `${label} is ${actual}; Charybdis Ark requires ${expected}.`};
-}
-
-/** @param {string} label @param {number | undefined} actual @param {readonly number[]} accepted */
-function oneOfCheck(label, actual, accepted) {
-    const ok = accepted.includes(Number(actual));
-    return {label, ok, actual, limit: accepted, message: ok ? "" : `${label} is ${actual}; Charybdis Ark supports ${accepted.join(" or ")}.`};
 }
 
 /** @param {string} label @param {number | undefined} actual @param {number} expected */
@@ -141,7 +138,7 @@ function evaluateLiveMutationCompatibility(capabilities, compatibility, connecte
     if (!connected) reasons.push("Connect to the keyboard before applying a live profile.");
     if (!compatibility?.compatible) reasons.push(...(compatibility?.reasons || ["Read compatibility has not been established."]));
     const flags = Number(capabilities?.featureFlags) || 0;
-    if ((flags & REQUIRED_LIVE_MUTATION_FEATURES) !== REQUIRED_LIVE_MUTATION_FEATURES) {
+    if (!hasAll(flags, REQUIRED_LIVE_MUTATION_FEATURES)) {
         reasons.push(`Firmware mutation flags 0x${flags.toString(16)} do not include required persistent split apply mask 0x${REQUIRED_LIVE_MUTATION_FEATURES.toString(16)}.`);
     }
     if (!Number.isInteger(capabilities?.candidateChunkMax) || (capabilities?.candidateChunkMax ?? 0) < 1) {

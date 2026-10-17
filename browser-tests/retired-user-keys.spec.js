@@ -6,6 +6,7 @@ const {fingerprint, summary, validateSnapshot} = require("../core/model/portable
 const {ProfileDraftSession} = require("../core/session/profile-draft-session");
 const {buildSnapshotModel} = require("../core/session/device-model");
 const {draftBinding} = require("../core/session/panel-session-state");
+const {PROFILE_WIRE_KNOWN_MASKS} = require("../core/protocol/profile-wire-v1");
 
 for (const theme of ["vscode-dark", "vscode-light"]) {
     test(`retired user keys stay readable but cannot be picked (${theme})`, async ({page}) => {
@@ -13,7 +14,7 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
         // Publish a real draft with named custom keys and a retained retired code.
         const value = pdDocument();
         value.layers[0][0] = 0x7e54;
-        const capabilities = {compiledLayerCount: 16, supportedDomainMask: 31, actionAbiDigest: value.actionAbiDigest, featureFlags: 1 << 16};
+        const capabilities = {compiledLayerCount: 16, supportedDomainMask: 31, actionAbiDigest: value.actionAbiDigest, featureFlags: PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES};
         const draft = new ProfileDraftSession({document: value, fingerprint: fingerprint(value), summary: summary(value)}, "board", capabilities);
         for (const [slot, name] of ["Right Thumb", "Left Thumb", "Click Spam"].entries())
             draft.stage({type: "updateCustomKey", keycode: `CUSTOM_KEY_${slot}`, name, draftId: draft.id, draftRevision: draft.revision});

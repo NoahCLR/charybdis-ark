@@ -22,11 +22,8 @@
 // keys and macros. Layer keys send no tap once held past Tap / hold, pointing
 // keys hold their mode, and dual-role keys always have their own hold.
 //
-// Plain keys have done this on every firmware with a Profile Wire. Dual-role
-// keys are claimed only by firmware that advertises it: authored LT() rows since
-// physical gesture timing (Profile Wire bit 17), MT() and OSM() rows since
-// runtime-owned tapping (bit 18). Older firmware classified those keys in QMK
-// first, and the app does not guess what that produced. A bare modifier key is
+// The keyboard owns the gesture timing of authored LT(), MT() and OSM() rows
+// (physical gesture timing and runtime-owned tapping). A bare modifier key is
 // buffered rather than tapped, so it claims nothing.
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {keycodeAction} = require("../schema/actions");
@@ -37,9 +34,9 @@ const within = (code, start, end) => code >= start && code <= end;
 /** @param {number} code */
 const plainKey = (code) => (within(code, 0x0004, 0x00ff) && !within(code, 0x00e0, 0x00e7)) || within(code, 0x0100, 0x1fff);
 
-/** @typedef {{physicalGestureTiming?: boolean, ownedTapping?: boolean, customKeyShortcuts?: readonly {mods: number, key: number}[]}} BuiltInFeatures */
+/** @typedef {{customKeyShortcuts?: readonly {mods: number, key: number}[]}} BuiltInFeatures */
 /** @param {import("../schema/types.js").SemanticAction | null | undefined} target @param {BuiltInFeatures} [options] @returns {{tap?: import("../schema/types.js").SemanticAction, hold?: import("../schema/types.js").SemanticAction, fallback?: boolean, releaseTaps?: boolean}} */
-function builtInActions(target, {physicalGestureTiming = false, ownedTapping = false, customKeyShortcuts = []} = {}) {
+function builtInActions(target, {customKeyShortcuts = []} = {}) {
     const slot = target?.kind === ACTION.CUSTOM_KEY ? target.operand : target?.kind === ACTION.QMK_KEYCODE ? customKeyOfCode(target.operand) : undefined;
     if (slot !== undefined) {
         const shortcut = customKeyShortcuts[slot];
@@ -54,13 +51,13 @@ function builtInActions(target, {physicalGestureTiming = false, ownedTapping = f
     if (plainKey(code)) {
         return {tap: keycodeAction(code), hold: keycodeAction(code), fallback: true, releaseTaps: true};
     }
-    if (within(code, 0x4000, 0x4fff) && physicalGestureTiming) {
+    if (within(code, 0x4000, 0x4fff)) {
         return {tap: keycodeAction(code & 0xff), hold: {kind: ACTION.LAYER_MOMENTARY, operand: (code >> 8) & 0x0f}};
     }
-    if (within(code, 0x2000, 0x3fff) && ownedTapping) {
+    if (within(code, 0x2000, 0x3fff)) {
         return {tap: keycodeAction(code & 0xff), hold: keycodeAction(((code >> 8) & 0x1f) << 8)};
     }
-    if (within(code, 0x52a0, 0x52bf) && ownedTapping) {
+    if (within(code, 0x52a0, 0x52bf)) {
         return {tap: keycodeAction(code), hold: keycodeAction((code & 0x1f) << 8)};
     }
     return {};

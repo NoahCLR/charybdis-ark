@@ -7,12 +7,10 @@
 const {gestureTimingFindings} = require("./gesture-timing");
 const {layerReach, compareFindings} = require("./layer-reach");
 const {baseLighting} = require("./settings-editor");
-const {decodeMacroPayload, macroProgramLimit} = require("../schema/macro-payload");
+const {decodeMacroPayload} = require("../schema/macro-payload");
 const {hostSettings} = require("../schema/host-settings");
 const {inspectMacroPlayback} = require("./macro-input");
-const {pointingClicks, pointingMacros} = require("./pointing-taps");
-const {supportsComboOutputBehaviors} = require("../schema/combo-domain-v1");
-const {supportsPdClicks, supportsPdMacros} = require("../schema/pd-mode-domain-v1");
+const {pointingMacros} = require("./pointing-taps");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {actionName} = require("../schema/actions");
 const {VOCABULARY} = require("./vocabulary");
@@ -45,7 +43,7 @@ function shortcutlessCustomKeySteps(decoded) {
 /** @param {import("./types.js").DecodedProfile} decoded @param {import("./types.js").ProfileDestination} [destination] @returns {import("../../contracts/model.js").Finding[]} */
 function profileFindings(decoded, destination = {}) {
     /** @type {import("../../contracts/model.js").Finding[]} */
-    const findings = [...layerReach(decoded, {legacyGestureTiming: destination.physicalGestureTiming === false, legacyOwnedTapping: destination.ownedTapping === false}), ...gestureTimingFindings(decoded), ...shortcutlessCustomKeySteps(decoded)];
+    const findings = [...layerReach(decoded), ...gestureTimingFindings(decoded), ...shortcutlessCustomKeySteps(decoded)];
     for (const [slot, count] of Object.entries(decoded.danglingPdBindings || {})) {
         if (!count) continue;
         findings.push({kind: "inertPointing", level: "warning", layers: [], identity: `${slot}:${count}`, count,
@@ -53,48 +51,22 @@ function profileFindings(decoded, destination = {}) {
             detail: "Keys, behaviours or combo outputs still name this empty slot. The keyboard accepts them but does nothing when they run.",
             fix: "Configure the slot or replace the actions that reach it.", place: {kind: "pointing", slot: Number(slot)}});
     }
-    if (typeof destination.featureFlags === "number" && !supportsComboOutputBehaviors(destination)) {
-        const detail = "This firmware cannot bypass shared behaviours for combo outputs. Apply will refuse the profile.";
-        const fix = "Update both halves, or turn output behaviour permissions back on.";
-        if (decoded.settings.comboOutputBehaviors === false) findings.push({kind: "comboOutputBehaviorBlocker", level: "blocker", layers: [], identity: "global",
-            title: "Combo outputs bypass behaviours globally", detail, fix, place: {kind: "settings", area: "Settings", section: "comboSettings"}});
-        decoded.combos.rows.forEach((row, index) => {
-            if (!row.useOutputBehavior) findings.push({kind: "comboOutputBehaviorBlocker", level: "blocker", layers: [], identity: `combo:${index}`,
-                title: `Combo ${index} bypasses its output behaviour`, detail, fix, place: {kind: "combo", index}});
-        });
-    }
     const host = hostSettings(decoded.settings.values, destination.detectedHostOs);
     const emptyMacros = new Set();
     (decoded.document?.macros || []).forEach((encoded, index) => {
         const bytes = Buffer.from(encoded, "base64");
         if (!bytes.length) { emptyMacros.add(index); return; }
-        const payload = decodeMacroPayload(bytes, {unicode: true, protectionSupported: true});
+        const payload = decodeMacroPayload(bytes);
         if (!payload) emptyMacros.add(index);
-        const playback = inspectMacroPlayback(payload, host, true, macroProgramLimit(destination));
+        const playback = inspectMacroPlayback(payload, host);
         if (!playback.error) return;
         findings.push({kind: "unplayableMacro", level: "warning", layers: [], identity: `${index}:${playback.code}:${playback.error}`,
-            title: playback.code === "MACRO_TOO_LONG" ? `Macro ${index} is too long to play` : `Macro ${index} cannot play with this Host setup`,
+            title: `Macro ${index} cannot play with this Host setup`,
             detail: `${playback.error} The keyboard stores this macro, but pressing it does nothing.`,
             fix: "Fix the macro or change Settings → Host before playing it.", place: {kind: "macro", index}});
     });
-    // A keyboard that does not click refuses a pointing mode that does; a
-    // profile read elsewhere or restored from a file can still hold one.
-    if (typeof destination.featureFlags === "number" && !supportsPdClicks(destination)) {
-        for (const click of pointingClicks(decoded.pdModes || [])) {
-            findings.push({kind: "pointingClickBlocker", level: "blocker", layers: [], identity: `${click.slot}:${click.label}:${click.button}`,
-                title: `${click.name} clicks mouse button ${click.button} on ${click.label}`,
-                detail: "This keyboard's firmware cannot click a mouse button from a pointing mode. Apply will refuse the profile.",
-                fix: "Update the firmware, or give that direction or button another shortcut.", place: {kind: "pointing", slot: click.slot}});
-        }
-    }
     for (const output of pointingMacros(decoded.pdModes || [])) {
         const where = {kind: /** @type {const} */ ("pointing"), slot: output.slot};
-        if (typeof destination.featureFlags === "number" && !supportsPdMacros(destination)) {
-            findings.push({kind: "pointingMacroBlocker", level: "blocker", layers: [], identity: `${output.slot}:${output.label}:${output.macro}`,
-                title: `${output.name} runs macro ${output.macro} on ${output.label}`,
-                detail: "This keyboard's firmware cannot run a macro from a pointing mode. Apply will refuse the profile.",
-                fix: "Update the firmware, or give that direction or button another shortcut.", place: where});
-        }
         if (emptyMacros.has(output.macro)) {
             findings.push({kind: "inertPointingMacro", level: "warning", layers: [], identity: `${output.slot}:${output.label}:${output.macro}`,
                 title: `${output.name}: ${output.label} runs empty macro ${output.macro}`,

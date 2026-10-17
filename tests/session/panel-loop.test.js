@@ -4,14 +4,13 @@ const assert = require("node:assert/strict");
 const {exportedProfile, openPanelLoop} = require("../../core/session/panel-loop");
 const {FakeDeviceAdapter} = require("../../core/transport/fake-device-adapter");
 const {LIVE_LINK_ERROR_CODES, liveLinkError} = require("../../core/transport/device-adapter");
-const {fingerprint, summary, validateSnapshot} = require("../../core/model/portable-profile");
-const {decodeProfileBlob} = require("../../core/schema/profile-blob-v1");
+const {fingerprint, summary} = require("../../core/model/portable-profile");
 const {document} = require("../fixtures/pd-profile");
 const {document: currentDocument} = require("../fixtures/portable-profile");
 const {fakeKeyboardAdapter, fakeKeyboard} = require("../fixtures/fake-keyboard");
 const {PHASE} = require("../../core/model/vocabulary");
 
-const capabilities = {compiledLayerCount: 16, supportedDomainMask: 31, actionAbiDigest: 0x837cf479, featureFlags: 0};
+const capabilities = {compiledLayerCount: 16, supportedDomainMask: 31, actionAbiDigest: 0x837cf479, featureFlags: require("../../core/protocol/profile-wire-v1").PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES};
 const snapshot = () => {
     const doc = document();
     return {document: doc, fingerprint: fingerprint(doc), summary: summary(doc), limits: {brightnessMax: 200}};
@@ -52,30 +51,22 @@ test("read progress posts only a small operation-correlated view", async t => {
     assert.equal(final.done, final.total);
 });
 
-// Firmware before custom-key shortcuts stores settings v7 (D-L63): the read
-// shows its profile from the keyboard's own model, read-only with no draft;
-// an edit is refused, and an export is a current backup with no shortcuts.
-test("a keyboard storing settings v7 is shown read-only, refuses edits and exports a current backup", async t => {
+// Ark reads only current firmware: a keyboard whose settings are another
+// version opens nothing, is told to update, and refuses edits.
+test("a keyboard storing settings in another version is not read, and is told to update", async t => {
     const host = fakeHost();
-    const loop = openPanelLoop(host, {adapter: fakeKeyboardAdapter({document: currentDocument(), settingsVersion: 7}), defaultTimeoutMs: 200});
+    const adapter = fakeKeyboardAdapter({document: currentDocument(), settingsVersion: 7});
+    const loop = openPanelLoop(host, {adapter, defaultTimeoutMs: 200});
     t.after(() => loop.close());
     await loop.handleMessage({type: "refresh"});
-    const {model} = last(host);
+    const {model, notice} = last(host);
     assert.equal(loop.session.draft, undefined, "no draft opens");
-    assert.equal(model.olderFirmware, true);
-    assert.equal(model.load.state, "ready", "its screens show the keyboard");
-    assert.deepEqual(model.customKeyShortcutKeys, [], "the Shortcut field is unavailable");
-    assert.equal(model.customKeys.length, 128);
-    assert.deepEqual(loop.session.service.snapshot().olderDomains, [{id: 0x40, version: 7}]);
-
+    assert.equal(model.load.state, "unavailable");
+    assert.match(notice, /Ark supports only current firmware\. Update both halves/);
+    assert.equal(loop.session.service.layout, undefined, "nothing more is read");
     await loop.handleMessage({type: "updateCustomKey", keycode: "CUSTOM_KEY_1", name: "Late"});
     assert.match(last(host).notice, /no editable draft/);
-
-    await loop.handleMessage({type: "exportPortableProfile"});
-    assert.equal(host.exports.length, 1);
-    const exported = validateSnapshot(JSON.parse(host.exports[0].text));
-    assert.ok(exported.settings.customKeyShortcuts.every(shortcut => !shortcut.mods && !shortcut.key));
-    assert.equal(decodeProfileBlob(exported.profile).domains.find(domain => domain.id === 0x40).version, 8, "a current-format backup");
+    assert.deepEqual(adapter.keyboard.mutations, []);
 });
 
 // A host that records everything the loop hands it.
@@ -382,8 +373,8 @@ test("live macro validation replies inline without staging, history, toasts or d
     await loop.handleMessage(message);
     assert.deepEqual(last(host), {...message, type: "macroValidation", validation: require("../../core/model/macro-editor").macroInputStatus(draft.current, message, draft.capabilities)});
     assert.equal(last(host).validation.error, "");
-    await loop.handleMessage({...message, payload: "a".repeat(509)});
-    assert.equal(last(host).validation.code, "MACRO_TOO_LONG");
+    await loop.handleMessage({...message, payload: "a".repeat(35000)});
+    assert.equal(last(host).validation.code, "MACRO_BANK_FULL");
     await loop.handleMessage({...message, payload: "{+KC_A}"});
     assert.match(last(host).validation.error, /Release/);
     for (const stale of [{draftId: "old"}, {draftRevision: revision - 1}]) {
@@ -487,35 +478,26 @@ test("demo macros use the same live validation without a keyboard", async () => 
 });
 
 
-test("a retained dirty draft adopts the reconnected firmware's macro limits at rebase", async t => {
+test("a retained dirty draft adopts the reconnected keyboard's capabilities at rebase", async t => {
     const host = fakeHost();
-    const adapter = fakeKeyboardAdapter({document: currentDocument(), streaming: false});
+    const adapter = fakeKeyboardAdapter({document: currentDocument()});
     const loop = openPanelLoop(host, {adapter, defaultTimeoutMs: 200});
     t.after(() => loop.close());
     await loop.handleMessage({type: "refresh"});
     const draft = loop.session.draft;
     await loop.handleMessage({type: "updateLayoutKeys", draftId: draft.id, draftRevision: draft.revision,
         layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_A"}]});
-    assert.equal(last(host).model.macroBank.programMax, 512);
-    for (const streaming of [true, false]) {
-        await loop.session.service.disconnect();
-        adapter.keyboard = fakeKeyboard({document: currentDocument(), streaming});
-        await loop.handleMessage({type: "refresh"});
-        assert.equal(loop.session.draft, draft, "reconnect preserves the authored draft");
-        await loop.handleMessage({type: "rebaseProfileDraft", draftId: draft.id, draftRevision: draft.revision});
-        const model = last(host).model;
-        assert.equal(model.draft.editable, true);
-        assert.equal(model.macroBank.capacity, streaming ? 34903 : 10327);
-        assert.equal(model.macroBank.programMax, streaming ? null : 512);
-        await loop.handleMessage({type: "updateViaMacro", draftId: draft.id, draftRevision: draft.revision,
-            keycode: "VIA_MACRO_0", payload: "a".repeat(600)});
-        if (streaming) assert.equal(last(host).model.viaMacros[0].payload.length, 600);
-        else {
-            assert.match(last(host).notice, /512/);
-            assert.equal(last(host).model.viaMacros[0].payload.length, 600, "the refused edit keeps the earlier macro");
-            assert.equal(last(host).model.viaMacros[0].playable, false, "recomputed playback uses the smaller firmware limit");
-        }
-    }
+    await loop.session.service.disconnect();
+    adapter.keyboard = fakeKeyboard({document: currentDocument(), firmwareVersion: 0x00020000});
+    await loop.handleMessage({type: "refresh"});
+    assert.equal(loop.session.draft, draft, "reconnect preserves the authored draft");
+    assert.equal(draft.capabilities.firmwareVersion, 0x00010000, "a retained draft keeps its interpretation until rebase");
+    await loop.handleMessage({type: "rebaseProfileDraft", draftId: draft.id, draftRevision: draft.revision});
+    assert.equal(last(host).model.draft.editable, true);
+    assert.equal(draft.capabilities.firmwareVersion, 0x00020000);
+    await loop.handleMessage({type: "updateViaMacro", draftId: draft.id, draftRevision: draft.revision,
+        keycode: "VIA_MACRO_0", payload: "a".repeat(600)});
+    assert.equal(last(host).model.viaMacros[0].payload.length, 600);
 });
 
 test("a read lets go of a keyboard that left the list and connects the one listed", async () => {

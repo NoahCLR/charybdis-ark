@@ -21,7 +21,7 @@ export interface ActionLimits {
 }
 
 export type ActionOptions = Partial<ActionLimits> & {actionLimits?: Partial<ActionLimits>};
-export type DomainVersions = Map<number | string, number | Set<number> | number[]> | Record<string, number | Set<number> | number[]>;
+export type DomainVersions = Map<number | string, number> | Record<string, number>;
 export interface BlobOptions {domainVersions?: DomainVersions}
 export interface DomainInput {id: number; version: number; payload?: Uint8Array}
 export interface ProfileDomain {id: number; version: number; payload: Buffer}
@@ -125,11 +125,9 @@ export type MacroStep =
     | {kind: 'delay'; delay: number}
     | {kind: 'tap' | 'down' | 'up'; keys: number[]};
 export interface MacroOptions {
-    unicode?: boolean;
     textEntry?: boolean;
     layout?: number;
     protection?: 'auto' | 'on' | 'off';
-    protectionSupported?: boolean;
 }
 
 export interface PdTap {keycode: number; modifierPolicy: number; mask: number}

@@ -4,9 +4,8 @@ const {PROFILE_DOMAIN_IDS, replaceDomain} = require("../schema/profile-domains")
 
 const {MACRO_BANK_BYTES, MACRO_SLOTS, decodedOf, encodeNamedProfile, validateSnapshot} = require("./portable-profile");
 const {SETTINGS, validName, encodeSettings} = require("../schema/settings-domain-v1");
-const {macroKeycodes, macroModifierKeycodes, encodeMacroPayload, decodeMacroPayload, macroProgramBytes, macroProgramLimit} = require("../schema/macro-payload");
-const {supportsUnicodeMacros, supportsMacroProtection, supportsMacroOutputIsolation, macroProtectionOf} = require("../schema/macro-payload");
-const {hostSettings, supportsHostLayouts} = require("../schema/host-settings");
+const {macroKeycodes, macroModifierKeycodes, encodeMacroPayload, decodeMacroPayload, macroProtectionOf} = require("../schema/macro-payload");
+const {hostSettings} = require("../schema/host-settings");
 const {hostLayout} = require("../data/host-layouts");
 const {inspectMacroInput, inspectMacroPlayback} = require("./macro-input");
 const {VOCABULARY} = require("./vocabulary");
@@ -32,9 +31,6 @@ function macroBudget(slots, capacity) {
 function macroEditorView(snapshot, capabilities) {
     if (!snapshot?.document || snapshot.incomplete) return null;
     const {document, settings} = decodedOf(snapshot);
-    const unicode = supportsUnicodeMacros(capabilities);
-    const programMax = macroProgramLimit(capabilities);
-    const protectionSupported = supportsMacroProtection(capabilities);
     const host = hostSettings(settings.values, snapshot.hostOs?.detected);
     const names = settings.macroNames;
     // hostSettings selects an existing layout, with US as its fallback.
@@ -43,32 +39,28 @@ function macroEditorView(snapshot, capabilities) {
     const budget = macroBudget(slots, capabilities?.viaMacroBytes ?? MACRO_BANK_BYTES);
     /** @param {Buffer} bytes @param {number} index */
     const slot = (bytes, index) => {
-        const program = macroProgramBytes(bytes);
-        // Presentation preserves valid stored text, including Review without a
-        // destination. Editing and Apply gate writes against capabilities.
-        const payload = decodeMacroPayload(bytes, {unicode: true, protectionSupported: true});
-        const playback = inspectMacroPlayback(payload, host, unicode, programMax);
-        const protection = macroProtectionOf(bytes, {protectionSupported: true});
+        const payload = decodeMacroPayload(bytes);
+        const playback = inspectMacroPlayback(payload, host);
+        const protection = macroProtectionOf(bytes);
         const needsUnicodeEntry = playback.typing.some(route => route.method !== "layout");
         const needsUnicodeSetup = playback.code === "UNICODE_SETUP_REQUIRED";
         return {kind: "via", keycode: `VIA_MACRO_${index}`, name: names[index],
-            payload, protection, uninterruptible: protectionSupported && (protection === "on" || (protection === "auto" && needsUnicodeEntry)),
+            payload, protection, uninterruptible: protection === "on" || (protection === "auto" && needsUnicodeEntry),
             needsUnicodeEntry, needsUnicodeSetup, playbackError: playback.error, playbackCode: playback.code, empty: !payload, bytes: bytes.length,
-            program, playable: !playback.error, available: !budget.outOfRoom.has(index),
-            // How many more key taps this macro can take: the smaller of what
-            // it may still play and what the bank has free.
-            roomTaps: Math.floor(Math.max(0, Math.min(programMax === null ? Infinity : programMax - program, budget.free)) / KEY_TAP_BYTES)};
+            playable: !playback.error, available: !budget.outOfRoom.has(index),
+            // How many more key taps this macro can take: what the bank has free.
+            roomTaps: Math.floor(budget.free / KEY_TAP_BYTES)};
     };
     return {identity: snapshot.fingerprint,
         // Text types through the host layout; what it cannot type needs Unicode
         // entry (mode). The interface judges held keys against layoutChars.
-        unicode: {supported: unicode, mode: host.unicodeMode, enabled: host.unicodeEnabled, os: host.effective,
-            layouts: supportsHostLayouts(capabilities), layout: host.layout, layoutFits: host.layoutFits, layoutName: layout.name, layoutChars: layout.chars},
+        unicode: {mode: host.unicodeMode, enabled: host.unicodeEnabled, os: host.effective,
+            layout: host.layout, layoutFits: host.layoutFits, layoutName: layout.name, layoutChars: layout.chars},
         viaMacros: slots.map(slot),
         macroBank: {capacity: budget.capacity, stored: budget.stored, free: budget.free, available: budget.available,
-            slots: slots.length, reserveTaps: SLOT_RESERVE_TAPS, programMax},
+            slots: slots.length, reserveTaps: SLOT_RESERVE_TAPS},
         // Every slot can hold a full-length name, whatever the others hold.
-        names: {perName: SETTINGS.NAME_MAX_BYTES}, protectionSupported, outputIsolationSupported: supportsMacroOutputIsolation(capabilities),
+        names: {perName: SETTINGS.NAME_MAX_BYTES},
         protectionChoices: VOCABULARY.macroProtection.map(([value, label]) => ({value, label})),
         macroPayloadKeycodes: macroKeycodes(), macroPayloadModifierKeycodes: macroModifierKeycodes()};
 }
@@ -82,8 +74,7 @@ function macroInputStatus(snapshot, message, capabilities) {
     const slots = document.macros.map(value => Buffer.from(value, "base64"));
     const budget = macroBudget(slots, capabilities?.viaMacroBytes ?? MACRO_BANK_BYTES);
     const host = hostSettings(settings.values, snapshot.hostOs?.detected);
-    return inspectMacroInput(message.payload, {programMax: macroProgramLimit(capabilities), unicode: supportsUnicodeMacros(capabilities), mode: host.unicodeMode,
-        protectionSupported: supportsMacroProtection(capabilities), protection: message.protection ?? macroProtectionOf(slots[index], {protectionSupported: true}),
+    return inspectMacroInput(message.payload, {mode: host.unicodeMode, protection: message.protection ?? macroProtectionOf(slots[index]),
         enabled: Boolean(host.unicodeMode), layout: host.layout, os: host.effective, macosIso: host.macosIso, currentBytes: slots[index].length, bankFree: budget.free});
 }
 
@@ -104,19 +95,17 @@ function editMacro(snapshot, message, capabilities) {
     /** @type {import("./types.js").PortableDocument} */
     const document = JSON.parse(JSON.stringify(value.document));
     if (message.payload !== undefined) {
-        const unicode = supportsUnicodeMacros(capabilities);
         const host = hostSettings(value.settings.values, snapshot.hostOs?.detected);
         const status = macroInputStatus(snapshot, message, capabilities);
         if (status.error) throw fail(status.error, status.code);
-        const protection = message.protection ?? macroProtectionOf(Buffer.from(document.macros[index], "base64"), {protectionSupported: true});
-        const bytes = encodeMacroPayload(message.payload, {unicode, textEntry: Boolean(host.unicodeMode), layout: host.layout, protection, protectionSupported: supportsMacroProtection(capabilities)});
+        const protection = message.protection ?? macroProtectionOf(Buffer.from(document.macros[index], "base64"));
+        const bytes = encodeMacroPayload(message.payload, {textEntry: Boolean(host.unicodeMode), layout: host.layout, protection});
         document.macros[index] = bytes.toString("base64");
     }
     if (message.protection !== undefined && message.payload === undefined) {
-        if (!supportsMacroProtection(capabilities)) throw fail("Update both halves to set macro playback protection.");
         const bytes = Buffer.from(document.macros[index], "base64");
-        const previous = macroProtectionOf(bytes, {protectionSupported: true});
-        const prefix = encodeMacroPayload("", {protection: message.protection, protectionSupported: true});
+        const previous = macroProtectionOf(bytes);
+        const prefix = encodeMacroPayload("", {protection: message.protection});
         document.macros[index] = Buffer.concat([prefix, bytes.subarray(previous === "auto" ? 0 : 3)]).toString("base64");
     }
     if (message.name !== undefined && message.name !== value.settings.macroNames[index]) {

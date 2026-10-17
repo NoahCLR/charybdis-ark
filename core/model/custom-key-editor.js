@@ -35,9 +35,8 @@ function customKeyEditorView(snapshot, capabilities) {
             shortcut: {...settings.customKeyShortcuts[slot]}})),
         // Each name may be 32 bytes of text; the profile as a whole has a ceiling.
         names: {perName: SETTINGS.NAME_MAX_BYTES},
-        // The keys a shortcut may hold, by catalogue name, for the picker; none
-        // on a keyboard still storing settings older than shortcuts (D-L63).
-        shortcutKeys: snapshot.older?.some(entry => entry.id === PROFILE_DOMAIN_IDS.SETTINGS) ? [] : SHORTCUT_KEY_NAMES};
+        // The keys a shortcut may hold, by catalogue name, for the picker.
+        shortcutKeys: SHORTCUT_KEY_NAMES};
 }
 
 // Every key a shortcut may hold, by its catalogue name: the basic keys and

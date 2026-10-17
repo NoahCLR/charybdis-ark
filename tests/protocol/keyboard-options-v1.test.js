@@ -17,10 +17,10 @@ test("reads the keyboard's actual effect inventory, feature flags and option mas
     const c = connection(); assert.deepEqual(await readKeyboardOptions(c, ids()), options());
     assert.equal(c.requests.length, 11); assert.equal(c.requests.at(-1)[4], 2);
 });
-test("old firmware is distinguished from corrupt optional metadata", async () => {
-    const unsupported = connection(wire(), response => {response.fill(0, 5); response[5] = 2;});
-    assert.equal(await readKeyboardOptions(unsupported, ids()), null);
-    assert.equal(unsupported.requests.length, 1);
+test("a refused or corrupt metadata page fails the read", async () => {
+    const refused = connection(wire(), response => {response.fill(0, 5); response[5] = 2;});
+    await assert.rejects(readKeyboardOptions(refused, ids()), {code: "DEVICE_REJECTED"});
+    assert.equal(refused.requests.length, 1);
     for (const update of [r => {r[7] = 2;}, r => {r[6] = 8; r[15] = 0;}, r => {r[15] = 128;}, r => {r[10] = 255;}]) await assert.rejects(readKeyboardOptions(connection(wire(), update), ids()));
     await assert.rejects(readKeyboardOptions(connection(wire(), (r, q, count) => {if (q[4] === 2 && count > 1) r[15] = 4;}), ids()), /changed/);
 });

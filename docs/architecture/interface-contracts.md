@@ -75,24 +75,22 @@ only vertical scroller.
 ## Pointing tap outputs
 
 Straight directions, diagonals and physical-button tap overrides use one tap
-vocabulary, owned by `core/schema/pd-mode-domain-v1.js`. Plain mouse buttons
-1–8 (`0x00d1..0x00d8`) require the keyboard's Profile Wire feature bit 28.
-VIA macro outputs (`0x7700..0x777f`) require feature bit 29, inherit policy
-and mask zero (firmware D-F23). The domain version and record layout stay
-unchanged. Mouse movement, wheel,
+vocabulary, owned by `core/schema/pd-mode-domain-v1.js`. It includes plain
+mouse buttons 1–8 (`0x00d1..0x00d8`, Profile Wire feature bit 28) and VIA
+macro outputs (`0x7700..0x777f`, feature bit 29), which take inherit policy
+and mask zero (firmware D-F23); Ark requires both features (D-L64). Mouse movement, wheel,
 acceleration and modifier-wrapped mouse codes remain invalid. The firmware
 owns the click runtime contract (D-F22); the [guide](../GUIDE.md#pointing-mode-clicks)
 describes its effect for users.
 
 `core/model/pointing-taps.js` supplies the allowed picker names and aliases,
-separates keys that may carry modifier wrappers, and finds stored clicks and
-macro outputs for destination checks. The panel receives this through `pdModeEditing`; it does
+separates keys that may carry modifier wrappers, and finds stored macro
+outputs for the empty-macro check. The panel receives this through `pdModeEditing`; it does
 not duplicate the schema's allowlist. All three tap field families use these
 restrictions. Typed names, aliases and numeric codes are resolved and checked
 before staging, with a reason for unsupported outputs.
 
-The picker offers all 128 VIA macros by their current profile names when
-supported, even though QMK's catalogue names only slots 0–31. The pure
+The picker offers all 128 VIA macros by their current profile names, even though QMK's catalogue names only slots 0–31. The pure
 `webview/view/keyvalues.mjs` helper resolves macro identities and presentation;
 its numbers are checked against the schema. Every tap form uses
 `tapRecord` to reset a newly chosen macro to inherit and zero mask. The host
@@ -100,12 +98,8 @@ refuses noncanonical policy bytes. Held-modifier rows show fixed Inherit with
 the reason; Every step outputs show the drop-while-busy tip, and empty slots
 show that they do nothing yet.
 
-Backups retain click and macro records independently of destination support.
-Import may
-stage them for review on older firmware, with blockers naming the slot and
-output place; Apply and direct restore refuse them before writing. Existing
-outputs may be retained while fixing a slot, but new outputs need support.
-No field, history step or import silently substitutes a keyboard shortcut.
+Backups retain click and macro records exactly. No field, history step or
+import silently substitutes a keyboard shortcut.
 
 ## Shared rule ownership
 
@@ -183,15 +177,14 @@ No field, history step or import silently substitutes a keyboard shortcut.
   every catalogue section and search. Inert `QK_USER_0`–`QK_USER_31` entries
   stay in the catalogue for exact readback and backups, but are never offered.
   Current named `CUSTOM_KEY_n`, N/A and Transparent remain selectable where
-  the field supports them. Selection policy never rewrites stored identities
-  or changes preceding-backup translation.
+  the field supports them. Selection policy never rewrites stored identities.
 - Actions, native keycodes, decode limits, layer references:
   `core/schema/actions.js`; the pointing registry and key layout are data.
 - Decoding: once per draft revision, carried as `decoded` and taken through
   `decodedOf`; history entries are frozen.
 - Pure domain edits and presentation: `core/model/device-profile-edits.js`,
   `core/model/key-behavior-edits.js` and `core/model/device-profile-view.js`.
-  The session translates wire capability bits into the model's destination
+  The session passes the keyboard's capacities to the model as destination
   facts before staging; the model imports no session or protocol modules.
 - Layer answers: `core/model/layer-resolution.js` compiles possible answers
   and their active-layer conditions from decoded layout values. Layer reach
@@ -320,8 +313,7 @@ still judges the complete payload and prevents invalid, unsupported or oversized
 edits from replacing the last valid draft. Local step diagnostics do not replace
 the firmware decoder or the host's validation authority. Routine per-macro memory
 and successful-staging notes are omitted; the feedback area collapses when there
-is no error or pending inspection on streaming firmware. Shared bank memory
-remains visible, and earlier firmware retains its fixed playback-size meter.
+is no error or pending inspection. Shared bank memory remains visible.
 
 `recorder.mjs` owns capture listeners and finishes a take when its slot is no
 longer the editable, visible Macros slot, a dialog opens, or the user clicks
@@ -398,13 +390,12 @@ exposes **Use output behaviour**. Both default on. Switching either off changes
 output processing while preserving the chord, timing and participation policy.
 Explain the native fallback beside the controls, and that a custom key sends
 its shortcut, or nothing without one; the combo builder names the output's
-shortcut. Firmware feature bit 30 enables editing; without it the controls are
-read-only and unsupported bypass bytes are refused on import and staging.
+shortcut. They are firmware feature bit 30, which Ark requires (D-L64).
 
 The global value is a tagged header field in the existing Settings section,
 not another scalar ID. Review and section Discard include it. Per-combo edits,
 Review, Undo/Redo, backup/export/import and layer rewriting preserve the row
-permission. Current zero-default and translated preceding backups opt in.
+permission. Zero-default backups opt in.
 Native readback compares the permission as well as inputs, output and timing.
 Combo-derived behaviour and macro/pointing reach lists honour the two output
 permissions while retaining normal native outputs.

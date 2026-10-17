@@ -54,9 +54,10 @@ and retains the capture's status, storage and settings coherence checks.
 Reconnect discards the reader. Authored Apply target bytes never seed its cache:
 the stored metadata alone is not a fresh integrity read of flash. The complete
 macro bank, including unused trailing bytes, remains freshly verified because
-Apply compares the actual stored bank. Optional macro read maps reconstruct
-firmware-confirmed zero blocks and download every marked block; older firmware
-keeps the full read. Portable progress names each read
+Apply compares the actual stored bank. The macro read map reconstructs
+firmware-confirmed zero blocks and downloads every marked block; while the
+keyboard reports the map unavailable (its storage not yet settled), the whole
+bank is read. Portable progress names each read
 and reports transferred bytes. Configure editors retain their DOM when a full
 model changes only transient read status; data, vocabulary, permission or
 connection changes and form-reset/edit replies redraw. New model fields are

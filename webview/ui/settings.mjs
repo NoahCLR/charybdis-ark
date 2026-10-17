@@ -40,7 +40,7 @@ export function screenSettings() {
     }
     if (!canEdit && sections.length) {
         pad.appendChild(el(`<div class="unavailable">${esc(unavailable(model)
-            || "This firmware reports its settings but cannot save them. Flash the complete-profile pair to edit them here.")}</div>`));
+            || "These settings cannot be edited right now.")}</div>`));
     }
 
     if (sections.length) {

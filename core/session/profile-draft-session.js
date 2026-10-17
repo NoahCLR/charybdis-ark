@@ -21,7 +21,6 @@ const {SETTING} = require("../schema/settings-domain-v1");
 const {resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX, matrixPosition} = require("../data/charybdis-layout");
 const keycodes = require("../data/keycode-catalog");
-const {PROFILE_WIRE_FEATURES} = require("../protocol/profile-wire-v1");
 /**
  * @typedef {import("../model/types.js").PortableDocument} Document
  * @typedef {import("../model/types.js").ProfileSnapshot} Snapshot
@@ -228,7 +227,7 @@ class ProfileDraftSession {
     }
     // A retained dirty draft keeps its original interpretation until rebase.
     // Once the current keyboard is accepted, no cached decode or review may
-    // retain the old firmware's capacities or optional features.
+    // retain the old keyboard's capacities.
     /** @param {import("../model/types.js").ProfileDestination} capabilities */
     acceptCapabilities(capabilities) {
         if (JSON.stringify(capabilities) === JSON.stringify(this.capabilities)) return;
@@ -283,9 +282,7 @@ class ProfileDraftSession {
         const expected = "expectedBase" in message ? message.expectedBase : undefined;
         if (expected && (/** @type {const} */ (["source", "generation", "digest", "originHalf"])).some(key => expected[key] !== this.identity()[key])) throw fail("This form belongs to an older draft. Reload it before keeping changes.");
         return {...base, profile: editDeviceProfile(Buffer.from(base.profile, "base64"), message, {
-            capabilities: {...this.capabilities,
-                ownedLayerToggles: Boolean((this.capabilities.featureFlags || 0) & PROFILE_WIRE_FEATURES.OWNED_LAYER_TOGGLES),
-                behaviorQmkFunctions: Boolean((this.capabilities.featureFlags || 0) & PROFILE_WIRE_FEATURES.BEHAVIOR_QMK_FUNCTIONS)},
+            capabilities: this.capabilities,
             combos: this.combos(), maximumBrightness: this.current.limits?.brightnessMax,
         }).toString("base64")};
     }
@@ -540,10 +537,7 @@ class ProfileDraftSession {
         if (known && known.keyboard === keyboard && known.order === order) return known.checks;
         const checks = draftProfileChecks(keyboard ?? null, draft, order, {brightnessMax: this.current.limits?.brightnessMax,
             detectedHostOs: this.current.hostOs?.detected,
-            featureFlags: this.capabilities?.featureFlags,
-            effects: this.current.options?.effects,
-            ownedTapping: Boolean((this.capabilities?.featureFlags || 0) & PROFILE_WIRE_FEATURES.OWNED_TAPPING),
-            physicalGestureTiming: Boolean((this.capabilities?.featureFlags || 0) & PROFILE_WIRE_FEATURES.PHYSICAL_GESTURE_TIMING)});
+            effects: this.current.options?.effects});
         this.checksCache.set(draft, {keyboard, order, checks});
         return checks;
     }

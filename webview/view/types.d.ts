@@ -8,7 +8,6 @@ export type MacroStep = ({focusId?: string} & (
     | {kind: 'press'; keys: string[]}
     | {kind: 'release'; keys: string[]}));
 export interface MacroOptions {
-    unicode?: boolean;
     textEntry?: boolean;
     aliases?: Readonly<Record<string, string>>;
     keys?: readonly string[];

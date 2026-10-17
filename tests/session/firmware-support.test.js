@@ -4,30 +4,32 @@ const {test} = require("node:test");
 const assert = require("node:assert/strict");
 const support = require("../../core/session/firmware-support");
 const {PROFILE_DOMAINS, PROFILE_DOMAIN_MASK, PROFILE_WIRE_DOMAINS: DOMAINS} = require("../../core/schema/profile-domains");
-const {PROFILE_WIRE_FEATURES: FEATURES, PROFILE_STATE_FLAGS: FLAGS, PROFILE_ACTIVE_KIND: KIND} = require("../../core/protocol/profile-wire-v1");
+const {PROFILE_WIRE_FEATURES: FEATURES, PROFILE_WIRE_KNOWN_MASKS: MASKS, PROFILE_STATE_FLAGS: FLAGS, PROFILE_ACTIVE_KIND: KIND} = require("../../core/protocol/profile-wire-v1");
 const {capabilities} = require("../fixtures/portable-restore");
 
-const READ_FEATURES = FEATURES.READ_SURFACE | FEATURES.STORAGE_LAYOUT | FEATURES.RGB_SCHEMA | FEATURES.KEY_BEHAVIOR_SCHEMA;
-const via = {protocolVersion: 12, firmwareVersion: capabilities.firmwareVersion};
-const complete = {...capabilities, supportedDomainMask: PROFILE_DOMAIN_MASK};
-const read = {...complete, featureFlags: READ_FEATURES, supportedDomainMask: DOMAINS.RGB | DOMAINS.KEY_BEHAVIORS};
+// Every feature current firmware reports, one bit at a time.
+const bits = mask => Array.from({length: 31}, (_, bit) => 1 << bit).filter(bit => mask & bit);
+const CURRENT = MASKS.CURRENT_FEATURES, MUTATION = MASKS.CURRENT_MUTATION_FEATURES;
+const via = {protocolVersion: 13, firmwareVersion: capabilities.firmwareVersion};
+const complete = {...capabilities, supportedDomainMask: PROFILE_DOMAIN_MASK, featureFlags: MASKS.CURRENT_PAIR_FEATURES};
+const read = {...complete, featureFlags: CURRENT, supportedDomainMask: DOMAINS.RGB | DOMAINS.KEY_BEHAVIORS};
 
-test("independent reads accept the reported capacities without acquiring the complete-document gate", () => {
+test("reads accept the reported capacities, and need VIA 13 and every feature current firmware reports", () => {
     const partial = {...read, compiledLayerCount: 8, actionAbiDigest: 0, candidateChunkMax: 0,
         schema: {major: read.schema.major, minor: 99}, protocol: {major: read.protocol.major, minor: 99}};
-    for (const protocolVersion of [12, 13]) assert.equal(support.canRead(partial, {...via, protocolVersion}), true);
+    assert.equal(support.canRead(partial, via), true);
+    assert.equal(support.canRead(partial, {...via, protocolVersion: 12}), false, "VIA 12 is older firmware");
     assert.equal(support.canEdit(partial), false);
     assert.equal(support.canApply(partial), false);
-    for (const feature of [FEATURES.READ_SURFACE, FEATURES.STORAGE_LAYOUT, FEATURES.RGB_SCHEMA, FEATURES.KEY_BEHAVIOR_SCHEMA]) {
-        assert.equal(support.canRead({...partial, featureFlags: READ_FEATURES & ~feature}, via), false);
-    }
+    for (const feature of bits(CURRENT)) assert.equal(support.canRead({...partial, featureFlags: CURRENT & ~feature}, via), false, feature.toString(16));
     for (const domain of [DOMAINS.RGB, DOMAINS.KEY_BEHAVIORS]) {
         assert.equal(support.canRead({...partial, supportedDomainMask: partial.supportedDomainMask & ~domain}, via), false);
     }
 });
 
-test("complete editing pins every registered domain, current layers and the known ABI", () => {
-    assert.equal(support.canEdit({...complete, featureFlags: 0}), true, "read or mutation features are not added to this gate");
+test("complete editing pins every registered domain, current layers, the known ABI and current firmware's features", () => {
+    assert.equal(support.canEdit({...complete, featureFlags: CURRENT}), true, "mutation features are not added to this gate");
+    for (const feature of bits(CURRENT)) assert.equal(support.canEdit({...complete, featureFlags: CURRENT & ~feature}), false, feature.toString(16));
     for (const domain of PROFILE_DOMAINS) {
         assert.equal(support.canEdit({...complete, supportedDomainMask: PROFILE_DOMAIN_MASK & ~domain.wireBit}), false, domain.key);
     }
@@ -43,11 +45,12 @@ test("complete editing pins every registered domain, current layers and the know
     }
 });
 
-test("complete Apply adds exactly the atomic firmware requirement and keeps its refusal stable", () => {
-    assert.equal(support.canApply({...complete, featureFlags: 0}), false);
-    assert.equal(support.canApply({...complete, featureFlags: FEATURES.ATOMIC_LOGICAL_APPLY}), true);
-    assert.doesNotThrow(() => support.requireReady({...complete, featureFlags: 0}));
-    assert.throws(() => support.requireReady({...complete, featureFlags: 0}, true), {
+test("complete Apply adds what a build that saves profiles reports and keeps its refusal stable", () => {
+    assert.equal(support.canApply({...complete, featureFlags: CURRENT}), false);
+    assert.equal(support.canApply({...complete, featureFlags: CURRENT | MUTATION}), true);
+    for (const feature of bits(MUTATION)) assert.equal(support.canApply({...complete, featureFlags: (CURRENT | MUTATION) & ~feature}), false, feature.toString(16));
+    assert.doesNotThrow(() => support.requireReady({...complete, featureFlags: CURRENT}));
+    assert.throws(() => support.requireReady({...complete, featureFlags: CURRENT}, true), {
         code: "FIRMWARE_UPDATE_REQUIRED",
         message: "Complete profile backup and Apply need current firmware on both halves. Your current keyboard configuration has not been changed.",
     });
@@ -102,11 +105,11 @@ test("read diagnostic reasons and their order stay stable", () => {
     assert.deepEqual(result.reasons, [
         "Protocol major is undefined; Charybdis Ark requires 1.",
         "Schema major is undefined; Charybdis Ark requires 3.",
-        "VIA protocol version is undefined; Charybdis Ark supports 12 or 13.",
+        "VIA protocol version is undefined; Charybdis Ark requires 13.",
         "VIA firmware version is undefined; Charybdis Ark requires undefined.",
         "Raw HID report size is undefined; Charybdis Ark requires 32.",
         "Status pages is undefined; at least 2 is required.",
-        "Required Profile Wire features mask 0x0 does not include required mask 0xf.",
+        `Current firmware features mask 0x0 does not include required mask 0x${CURRENT.toString(16)}.`,
         "Required profile domains mask 0x0 does not include required mask 0x3.",
     ]);
 });
@@ -119,12 +122,12 @@ test("live mutation readiness keeps its additional transfer and peer diagnostic 
         available: true, reasons: [], requiredFeatureMask: support.REQUIRED_LIVE_MUTATION_FEATURES, peerReady: true, recoveryPending: true,
     });
     for (const feature of [FEATURES.CANDIDATE_WRITE, FEATURES.PERSISTENT_COMMIT, FEATURES.RUNTIME_ACTIVATION,
-        FEATURES.PEER_RECONCILIATION, FEATURES.ATOMIC_LOGICAL_APPLY]) {
+        FEATURES.PEER_RECONCILIATION, FEATURES.ATOMIC_LOGICAL_APPLY, FEATURES.CANDIDATE_REUSE, FEATURES.CANDIDATE_STREAM]) {
         assert.equal(support.evaluateLiveMutationCompatibility({...caps, featureFlags: caps.featureFlags & ~feature}, compatible, true, status).available, false);
     }
     assert.deepEqual(support.evaluateLiveMutationCompatibility({featureFlags: 0, candidateChunkMax: 0}, {compatible: false, reasons: ["earlier read failure"]}, false).reasons, [
         "Connect to the keyboard before applying a live profile.", "earlier read failure",
-        "Firmware mutation flags 0x0 do not include required persistent split apply mask 0x1360.",
+        `Firmware mutation flags 0x0 do not include required persistent split apply mask 0x${MUTATION.toString(16)}.`,
         "Firmware does not advertise a candidate upload chunk size.",
     ]);
     assert.equal(support.evaluateLiveMutationCompatibility(caps, compatible, true).reasons.at(-1), "Live profile status has not been read yet.");

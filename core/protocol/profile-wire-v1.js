@@ -1,17 +1,13 @@
 // @ts-check
 "use strict";
 const {PROFILE_WIRE_DOMAINS, PROFILE_DOMAIN_MASK} = require("../schema/profile-domains");
-const {UNICODE_MACRO_FEATURE, MACRO_PROTECTION_FEATURE, MACRO_OUTPUT_ISOLATION_FEATURE, STREAMING_MACRO_FEATURE} = require("../schema/macro-payload");
-const {HOST_LAYOUT_FEATURE} = require("../schema/host-settings");
-const {COMBO_OUTPUT_BEHAVIORS_FEATURE} = require("../schema/combo-domain-v1");
-const {PD_CLICK_FEATURE, PD_MACRO_FEATURE} = require("../schema/pd-mode-domain-v1");
 
 const {isUnhandledEcho, requestHandled} = require("./via-unhandled-v1");
 const {RAW_HID_REPORT_SIZE, normalizeRawHidReport} = require("../transport/device-adapter");
 
 const PROFILE_WIRE_V1 = Object.freeze({
     // Response layout 2 (firmware D-F14): three pages, the third carrying the
-    // fields wider than a byte. Older firmware's two-page layout is refused.
+    // fields wider than a byte. Any other layout is refused.
     CAPABILITY_LAYOUT: 2,
     CAPABILITY_PAGE_COUNT: 3,
     CHANNEL: 0x00,
@@ -30,16 +26,6 @@ const PROFILE_WIRE_STATUS = Object.freeze({
     UNAVAILABLE: 3,
 });
 
-const PROFILE_WIRE_KNOWN_MASKS = Object.freeze({
-    FEATURE_FLAGS: 0x7fffffff,
-    // Bits current firmware never advertises. An older image that does still
-    // decodes; nothing reads them.
-    RETIRED_FEATURES: 1 << 13,
-    REQUIRED_READ_FEATURES: 0x0000000f,
-    STATE_FLAGS: 0x01ff,
-    SUPPORTED_DOMAINS: PROFILE_DOMAIN_MASK,
-});
-
 const PROFILE_WIRE_FEATURES = Object.freeze({
     READ_SURFACE: 1 << 0,
     STORAGE_LAYOUT: 1 << 1,
@@ -54,8 +40,7 @@ const PROFILE_WIRE_FEATURES = Object.freeze({
     ACTION_ABI_DIGEST: 1 << 10,
     COMPILED_PROFILE_HASH: 1 << 11,
     ATOMIC_LOGICAL_APPLY: 1 << 12,
-    // Bit 13 is retired and never advertised; the legacy PD readback page
-    // (GET 0x09) it announced is unsupported.
+    // Bit 13 is retired and never advertised.
     // TG(), TO(), TT() and OSL() act through the keyboard's layer ownership.
     OWNED_LAYER_TOGGLES: 1 << 14,
     // Behaviours send QMK and keyboard functions (DPI_MOD, RGB Matrix…)
@@ -68,23 +53,45 @@ const PROFILE_WIRE_FEATURES = Object.freeze({
     PHYSICAL_GESTURE_TIMING: 1 << 17,
     OWNED_TAPPING: 1 << 18,
     // GET 0x04..0x07 take a 16-bit page: request byte 4 its low byte, byte 5
-    // its high byte (a 65,504-byte payload is 2,621 pages).
+    // its high byte (a 53,216-byte payload is 2,129 pages).
     WIDE_PAGES: 1 << 19,
     // Behaviour and combo participation at the master, layer, definition and
-    // placement scopes (participation-policy.md).
+    // placement scopes (participation-policy.md). Never advertised.
     PARTICIPATION_CONTROLS: 1 << 20,
-    UNICODE_MACROS: UNICODE_MACRO_FEATURE,
+    UNICODE_MACROS: 1 << 21,
     // Settings scalar 27 names a host layout macro text is typed through.
-    HOST_LAYOUTS: HOST_LAYOUT_FEATURE,
-    MACRO_PROTECTION: MACRO_PROTECTION_FEATURE,
+    HOST_LAYOUTS: 1 << 22,
+    MACRO_PROTECTION: 1 << 23,
     CANDIDATE_REUSE: 1 << 24,
     CANDIDATE_STREAM: 1 << 25,
-    MACRO_OUTPUT_ISOLATION: MACRO_OUTPUT_ISOLATION_FEATURE,
-    STREAMING_MACROS: STREAMING_MACRO_FEATURE,
-    // A pointing-mode tap may click a plain mouse button 1–8.
-    POINTING_CLICKS: PD_CLICK_FEATURE,
-    POINTING_MACROS: PD_MACRO_FEATURE,
-    COMBO_OUTPUT_BEHAVIORS: COMBO_OUTPUT_BEHAVIORS_FEATURE,
+    MACRO_OUTPUT_ISOLATION: 1 << 26,
+    STREAMING_MACROS: 1 << 27,
+    // A pointing-mode tap may click a plain mouse button 1–8, or run a macro.
+    POINTING_CLICKS: 1 << 28,
+    POINTING_MACROS: 1 << 29,
+    COMBO_OUTPUT_BEHAVIORS: 1 << 30,
+});
+
+// Ark supports only current firmware, so what it advertises is required, not
+// asked about where it is used. CURRENT_FEATURES is what it reads and plays;
+// CURRENT_MUTATION_FEATURES is what a build that saves profiles adds, and
+// CURRENT_PAIR_FEATURES everything the flashable pair reports. A feature the
+// next firmware adds joins one of these, which session/firmware-support.js
+// requires.
+const F = PROFILE_WIRE_FEATURES;
+const CURRENT_FEATURES = (F.READ_SURFACE | F.STORAGE_LAYOUT | F.RGB_SCHEMA | F.KEY_BEHAVIOR_SCHEMA | F.ACTION_ABI_DIGEST
+    | F.COMPILED_PROFILE_HASH | F.OWNED_LAYER_TOGGLES | F.BEHAVIOR_QMK_FUNCTIONS | F.CUSTOM_KEYS | F.PHYSICAL_GESTURE_TIMING
+    | F.OWNED_TAPPING | F.WIDE_PAGES | F.UNICODE_MACROS | F.HOST_LAYOUTS | F.MACRO_PROTECTION | F.MACRO_OUTPUT_ISOLATION
+    | F.STREAMING_MACROS | F.POINTING_CLICKS | F.POINTING_MACROS | F.COMBO_OUTPUT_BEHAVIORS) >>> 0;
+const CURRENT_MUTATION_FEATURES = (F.CANDIDATE_WRITE | F.PERSISTENT_COMMIT | F.RUNTIME_ACTIVATION | F.PEER_RECONCILIATION
+    | F.ATOMIC_LOGICAL_APPLY | F.CANDIDATE_REUSE | F.CANDIDATE_STREAM) >>> 0;
+const PROFILE_WIRE_KNOWN_MASKS = Object.freeze({
+    FEATURE_FLAGS: 0x7fffffff,
+    CURRENT_FEATURES,
+    CURRENT_MUTATION_FEATURES,
+    CURRENT_PAIR_FEATURES: (CURRENT_FEATURES | CURRENT_MUTATION_FEATURES | F.SPLIT_KEYBOARD) >>> 0,
+    STATE_FLAGS: 0x01ff,
+    SUPPORTED_DOMAINS: PROFILE_DOMAIN_MASK,
 });
 
 const PROFILE_ACTIVE_KIND = Object.freeze({
@@ -113,11 +120,7 @@ const VIA_READS = Object.freeze({
     COMMAND_GET_KEYBOARD_VALUE: 0x02,
     VALUE_FIRMWARE_VERSION: 0x04,
     UNHANDLED: 0xff,
-    // QMK 0.34.6 moved VIA from 12 to 13 by adding one keyboard value
-    // (keycodes version, 0x06); the commands Ark sends are unchanged. Firmware
-    // released before it reports 12, so Ark accepts both.
     PROTOCOL_VERSION: 0x000d,
-    SUPPORTED_PROTOCOL_VERSIONS: Object.freeze([0x000c, 0x000d]),
 });
 
 class ProfileWireProtocolError extends Error {
@@ -138,30 +141,17 @@ function assertByte(value, label, {nonzero = false} = {}) {
     return value;
 }
 
-// A page above 255 is a wide page: its high byte goes in request byte 5, which
-// only the wide readbacks (feature bit 19) read; every other value's byte 5
-// stays zero.
-/** @param {{featureFlags?: number} | null | undefined} capabilities */
-const supportsWidePages = capabilities => Boolean((capabilities?.featureFlags ?? 0) & PROFILE_WIRE_FEATURES.WIDE_PAGES);
-const PAGE_MAX = 0xff;
-// A read past page 255 on firmware without wide pages would ask for a page it
-// cannot address. `widePages` false refuses it in words; undefined is a caller
-// that has no capabilities to say, as in the protocol's own tests.
-/** @param {number} pages @param {boolean | undefined} widePages */
-function assertPagesReachable(pages, widePages) {
-    if (widePages === false && pages - 1 > PAGE_MAX) {
-        throw new ProfileWireProtocolError("WIDE_PAGES_UNSUPPORTED", `This read needs ${pages} pages and the keyboard's firmware addresses at most ${PAGE_MAX + 1}. Update both halves to current firmware.`, {pages});
-    }
-}
-/** @param {number} valueId @param {number} page @param {number} requestId @param {{widePages?: boolean}} [options] */
-function buildProfileGetRequest(valueId, page, requestId, {widePages} = {}) {
+// A page is 16 bits: its low byte goes in request byte 4 and its high byte in
+// byte 5, which only the wide readbacks (feature bit 19) read; every other
+// value's byte 5 stays zero.
+/** @param {number} valueId @param {number} page @param {number} requestId */
+function buildProfileGetRequest(valueId, page, requestId) {
     const report = Buffer.alloc(RAW_HID_REPORT_SIZE);
     report[0] = PROFILE_WIRE_V1.COMMAND_GET;
     report[1] = PROFILE_WIRE_V1.CHANNEL;
     report[2] = assertByte(valueId, "valueId");
     report[3] = assertByte(requestId, "requestId", {nonzero: true});
     if (!Number.isInteger(page) || page < 0 || page > 0xffff) throw new RangeError("page must be a 16-bit integer.");
-    assertPagesReachable(page + 1, widePages);
     report[4] = page & 0xff;
     report[5] = page >> 8;
     return report;
@@ -235,7 +225,7 @@ function decodeCapabilityPages(pages) {
     const capacity = pages[1];
     const wide = pages[2];
     if (identity[0] !== PROFILE_WIRE_V1.CAPABILITY_LAYOUT || identity[1] !== PROFILE_WIRE_V1.CAPABILITY_PAGE_COUNT) {
-        throw new ProfileWireProtocolError("INCOMPATIBLE_RESPONSE", "Unsupported Profile Wire capability layout: this keyboard runs firmware from before 16 layers. Update both halves.");
+        throw new ProfileWireProtocolError("INCOMPATIBLE_RESPONSE", "Unsupported Profile Wire capability layout: Ark supports only current firmware. Update both halves.");
     }
     assertZeroRange(capacity, 22, 25, "capability page 1");
     assertZeroRange(capacity, 4, 5, "capability page 1");
@@ -532,7 +522,6 @@ module.exports = {
     PROFILE_WIRE_V1,
     ProfileWireProtocolError,
     VIA_READS,
-    assertPagesReachable,
     buildProfileGetRequest,
     buildViaFirmwareVersionRequest,
     buildViaProtocolVersionRequest,
@@ -546,6 +535,5 @@ module.exports = {
     readProfilePages,
     readProfileStatus,
     readViaIdentity,
-    supportsWidePages,
     viaReadResponseMatcher,
 };

@@ -46,7 +46,7 @@ export function screenCustomKeys() {
     if (!keys.length) {
         pad.classList.remove("library");
         pad.appendChild(el(`<div class="screen-stub"><h3>No custom keys read</h3>
-            <p class="note">${esc(unavailable(model) || "This firmware has no custom keys, or its profile has not been read.")}</p></div>`));
+            <p class="note">${esc(unavailable(model) || "Choose Read keyboard to load this keyboard's custom keys.")}</p></div>`));
         main.appendChild(content);
         return main;
     }
@@ -170,9 +170,6 @@ function behaviourCard(model, key) {
 // shortcut; Clear posts none.
 /** @param {Model} model @param {import("../../contracts/panel.js").CustomKey} key @param {boolean} canEdit */
 function shortcutField(model, key, canEdit) {
-    const allowed = model?.customKeyShortcutKeys || [];
-    if (!allowed.length) return el(`<div class="field"><span>Shortcut</span>
-        <span class="note">This firmware cannot give a custom key a shortcut. Update both halves to set one.</span></div>`);
     const identity = model?.customKeyEditing?.identity;
     const name = keyName(model, key.shortcut.key);
     const node = el(`<div class="field"><span>Shortcut</span>
@@ -187,7 +184,7 @@ function shortcutField(model, key, canEdit) {
     /** @type {HTMLElement} */ (node.querySelector('[data-act="clear-shortcut"]')).addEventListener("click", () => save({mods: 0, key: 0}));
     /** @type {HTMLElement} */ (node.querySelector('[data-act="pick-shortcut"]')).addEventListener("click", () => openPicker({
         title: "Shortcut", context: key.name || `Custom key ${key.slot}`,
-        seed: name ? [name] : [], allowedKeys: allowed, shortcut: {mods: key.shortcut.mods},
+        seed: name ? [name] : [], allowedKeys: model?.customKeyShortcutKeys || [], shortcut: {mods: key.shortcut.mods},
         onShortcut: (shortcut) => {
             if (shortcut.mods !== key.shortcut.mods || shortcut.key !== key.shortcut.key) save(shortcut);
         },

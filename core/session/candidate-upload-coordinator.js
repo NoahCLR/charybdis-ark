@@ -130,8 +130,7 @@ class CandidateUploadCoordinator {
         this.requestTimeoutMs = options.requestTimeoutMs;
         this.onProgress = typeof options.onProgress === "function" ? options.onProgress : undefined;
         // Reads candidate status page 1 while the keyboard prepares the other
-        // half. Optional: without it (or on firmware that answers null) the
-        // peer phase is waited out blind, as before page 1 existed.
+        // half. Optional: without it the peer phase is waited out blind.
         this.readPeerStatus = typeof options.readPeerStatus === "function" ? options.readPeerStatus : undefined;
         this.sleep = typeof options.sleep === "function" ? options.sleep : defaultSleep;
         this.now = typeof options.now === "function" ? options.now : Date.now;
@@ -224,20 +223,8 @@ class CandidateUploadCoordinator {
                     context.bytesSent = part.offset + part.length;
                     context.bytesReused += part.length;
                     this.emitProgress(context);
-                } else if (options.streamChunks) {
-                    await this.writeChunkRange(context, part);
                 } else {
-                    for (let offset = part.offset; offset < part.offset + part.length;) {
-                        const bytes = context.blob.subarray(offset, Math.min(offset + this.chunkSize, part.offset + part.length));
-                        context.operation = CANDIDATE_OPERATION.CHUNK;
-                        context.chunkIndex = context.chunksAdmitted;
-                        context.status = await this.performMutation(buildCandidateChunkRequest(context.transactionId, offset, bytes), context, {offset, length: bytes.length});
-                        context.chunksAdmitted++;
-                        context.bytesUploaded += bytes.length;
-                        offset += bytes.length;
-                        context.bytesSent = offset;
-                        this.emitProgress(context);
-                    }
+                    await this.writeChunkRange(context, part);
                 }
             }
 
@@ -709,11 +696,9 @@ class CandidateUploadCoordinator {
 
     /** @param {Context} context */
     async refreshPeerStatus(context) {
-        if (!this.readPeerStatus || context.peerUnsupported) return;
+        if (!this.readPeerStatus) return;
         try {
-            const peer = await this.readPeerStatus(this.connection, {nextRequestId: () => this.requestIds.next(), timeoutMs: this.requestTimeoutMs});
-            if (peer === null) context.peerUnsupported = true;
-            else context.peer = peer;
+            context.peer = await this.readPeerStatus(this.connection, {nextRequestId: () => this.requestIds.next(), timeoutMs: this.requestTimeoutMs});
         } catch {
             // Page 1 is advisory; the page-0 poll decides the commit's outcome.
         }

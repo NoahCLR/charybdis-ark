@@ -38,7 +38,7 @@ export function emptySlot(model, slot, canEdit, slots) {
                 ${sources.map((row) => `<option value="${row.id}">Slot ${row.id} · ${esc(row.name)}</option>`).join("")}</select></label>
             <button class="btn" data-act="duplicate" ${canEdit ? "" : "disabled"}>Duplicate into this slot</button></div>`
             : ""}
-        ${canEdit ? "" : `<div class="unavailable">${esc(unavailable(model) || "This firmware cannot store configurable pointing modes.")}</div>`}
+        ${canEdit ? "" : `<div class="unavailable">${esc(unavailable(model) || "This slot cannot be edited right now.")}</div>`}
     </div></div></div>`);
     /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-new]")).forEach((button) => button.addEventListener("click", () =>
         post(edits.pdMode(slot.id, newMode(slot, Number(button.dataset.new)), model.profileIdentity))));

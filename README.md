@@ -5,10 +5,9 @@
 Ark is the editor for [my Charybdis 4x6 firmware](https://github.com/NoahCLR/charybdis-4x6).
 Plug the keyboard in and you see exactly what is on it. Change it, and save it
 back. You don't write C, you don't reflash, and you don't need a firmware
-checkout. Everything Ark shows comes from the keyboard itself. With compatible
-firmware, small edits reuse unchanged profile data while the complete result
-is still checked and saved to both halves, including your first save from
-firmware defaults.
+checkout. Everything Ark shows comes from the keyboard itself. Small edits
+reuse unchanged profile data while the complete result is still checked and
+saved to both halves, including your first save from firmware defaults.
 
 Paste text straight into a macro, including code and literal braces, and add
 shortcuts or delays as separate steps. Pick your computer's keyboard layout in
@@ -30,8 +29,8 @@ Key and modifier names follow that OS throughout the editors and Review.
 - **Combos, macros and custom keys.** Build combos, write named macros or
   record taps and chords with optional hold timing, build, reorder, copy and paste compact macro steps with their own undo/redo, and name your own custom keys, each with a shortcut of its own (any modifiers,
   left and right mixed, and one key) held as long as you hold the key, and give each its behaviour, even before it sits on a layer. Macros share the keyboard's
-  macro memory, and on current firmware one macro can use all of it. There are 128 slots in each bank;
-  a combo can have up to 16 inputs, with its own enable and layer controls. On supporting firmware, choose whether all combo outputs use shared behaviours, or bypass the behaviour for one combo while keeping its chord active.
+  macro memory, and one macro can use all of it. There are 128 slots in each bank;
+  a combo can have up to 16 inputs, with its own enable and layer controls. Choose whether all combo outputs use shared behaviours, or bypass the behaviour for one combo while keeping its chord active.
 - **Lighting.** Set layer and mode colours, combo and key feedback, and the
   idle timeout in seconds or minutes. Tune the
   auto-mouse fade. The board on screen is painted the way the keyboard will
@@ -40,26 +39,24 @@ Key and modifier names follow that OS throughout the editors and Review.
   computer, Chrome and Ark show once it is applied.
 - **Trackball.** Set pointer speed, sniping and auto-mouse, and 32 pointing
   slots (scroll, volume, zoom, arrows, your own
-  shortcuts…), with their keys. On supporting firmware, directions and button
-  overrides can click mouse buttons 1–8 or run a macro too. Mouse and Settings
-  explain each control on hover.
+  shortcuts…), with their keys. Directions and button overrides can click
+  mouse buttons 1–8 or run a macro too. Mouse and Settings explain each
+  control on hover.
 
 ## Nothing is saved until you say so
 
 Every edit goes into a draft with undo, redo and a full history. **Review**
 lists what changed and checks what the layers let you reach. It warns you
 about a layer you could lock yourself into, combos that can't fire and macros
-that are too long to play. **Apply** saves a recovery copy, writes both halves
+your Host setup can't play. **Apply** saves a recovery copy, writes both halves
 and reads the result back to prove it. You can stay in the editor while it copies
 and reads the keyboard back. One verified read supplies the editor and backup, with keys fetched in chunks
-and firmware defaults reused while connected. With supporting firmware, reads
-also skip confirmed empty macro storage while checking the complete result.
+and firmware defaults reused while connected. Reads also skip confirmed empty
+macro storage while checking the complete result.
 
 **Export profile** saves your whole setup as one file. **Import profile**
-takes a current-format backup by choosing a file or dropping it onto the Import
-card, then restores it after the same review. Backups from the previous
-eight-layer, 32-pointing-slot firmware are translated for review too; see the
-[upgrade steps](docs/GUIDE.md#upgrading-from-eight-layer-firmware).
+takes a backup by choosing a file or dropping it onto the Import card, then
+restores it after the same review.
 
 No keyboard to hand? **Explore a demo** opens Ark on a complete setup with nothing
 connected. Every screen works and every edit shows up in the review; only Apply
@@ -85,9 +82,11 @@ ln -s "$PWD" ~/.vscode/extensions/noah.charybdis-ark-0.1.0   # then reload VS Co
 Click **Charybdis Ark** in the status bar, or run **Charybdis: Open Charybdis
 Ark** from the command palette.
 
-The keyboard needs the left/right pair from a
-[firmware release](https://github.com/NoahCLR/charybdis-4x6/releases/latest).
-A plain `qmk compile` image can't be read or saved by Ark.
+The keyboard needs the left/right pair from the
+[latest firmware release](https://github.com/NoahCLR/charybdis-4x6/releases/latest):
+Ark works with current firmware only, and reads or restores nothing older,
+backups from older firmware included. A plain `qmk compile` image can't be
+read or saved by Ark.
 
 ## Learn more
 

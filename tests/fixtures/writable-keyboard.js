@@ -18,7 +18,7 @@ const {LOGICAL_VIA_STAGE_V1: V, LOGICAL_VIA_STATE: VS, buildLogicalViaBeginReque
 /** @param {import('./types.js').FakeKeyboardOptions} options */
 function writableKeyboard(options) {
     const source = validateSnapshot(options.document);
-    source.macros = macroBank(options.document.macros.map(value => Buffer.from(value, "base64")), options.streaming ? 34903 : 10327);
+    source.macros = macroBank(options.document.macros.map(value => Buffer.from(value, "base64")), 34903);
     const local = {layout: Buffer.from(source.layout), macros: Buffer.from(source.macros)};
     const peer = {layout: Buffer.from(local.layout), macros: Buffer.from(local.macros)};
     let active = Buffer.from(source.profile), activeGeneration = options.generation ?? 42;
@@ -114,6 +114,17 @@ function writableKeyboard(options) {
                 return response(r, p);
             }
             if (value === V.VALUE_STATUS) return response(r, viaStatus());
+            // The macro read map, of the bank as it is now.
+            if (value === 0x0c) {
+                const page = r.readUInt16LE(4), macros = local.macros;
+                if (page === 0) {
+                    const p = Buffer.alloc(13); p[0] = 1; p.writeUInt16LE(256, 1); p.writeUInt16LE(macros.length, 3);
+                    p.writeUInt32LE(storageGeneration, 5); p.writeUInt32LE(viaStorageDigest(local), 9); return response(r, p);
+                }
+                const bitmap = Buffer.alloc(Math.ceil(Math.ceil(macros.length / 256) / 8));
+                for (let i = 0; i < macros.length; i++) if (macros[i]) bitmap[Math.floor(i / 2048)] |= 1 << (Math.floor(i / 256) % 8);
+                return response(r, bitmap.subarray((page - 1) * 25, page * 25));
+            }
             if (value === 8 && r.readUInt16LE(4) === 0) {
                 const p = Buffer.alloc(25); p.set([1, 4]);
                 p.writeUInt32LE(storageGeneration, 2); p.writeUInt32LE(viaStorageDigest(local), 6);

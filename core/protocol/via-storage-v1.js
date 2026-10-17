@@ -9,10 +9,10 @@ const {ProfileWireProtocolError, buildProfileGetRequest, decodeProfileResponse, 
 const VIA_STORAGE = Object.freeze({MACRO_COUNT: 0x0c, MACRO_SIZE: 0x0d, MACRO_READ: 0x0e, MACRO_WRITE: 0x0f, LAYER_COUNT: 0x11, LAYOUT_READ: 0x12, LAYOUT_WRITE: 0x13, CHUNK: 28});
 /** @param {string} message */
 const fail = message => Object.assign(new Error(message), {code: "VIA_STORAGE_INVALID"});
-// Legacy defaults for callers without a device. Live transfers use the bank
-// capacity reported by VIA and checked against Profile Wire; offsets are
-// relative to that bank and fit the protocol's 16-bit field.
-const VIA_REGION_BYTES = 12288, LAYOUT_BYTES = 1920, MACRO_BANK_BYTES = 10327;
+// Current firmware's geometry (D-F14), for callers without a device. Live
+// transfers use the bank capacity reported by VIA and checked against Profile
+// Wire; offsets are relative to that bank and fit the protocol's 16-bit field.
+const VIA_REGION_BYTES = 36864, LAYOUT_BYTES = 1920, MACRO_BANK_BYTES = 34903;
 /** @param {{layout: Buffer, macros: Buffer}} storage */
 function viaStorageDigest({layout, macros}) {
     if (!Buffer.isBuffer(layout) || layout.length !== LAYOUT_BYTES || !Buffer.isBuffer(macros) || (macros.length < 129 || macros.length > 65535)) throw fail("Unsupported keyboard storage geometry.");
@@ -99,20 +99,20 @@ async function writeRegion(connection, command, bytes, {onProgress = () => {}, s
     }
 }
 
-// Optional GET 0x0c describes exact nonzero storage, including stale tail
-// bytes. A bitmap omission is a firmware assertion of zero, never a guess
-// based on macro slot contents. Verify the reconstructed whole-store digest.
+// GET 0x0c describes exact nonzero storage, including stale tail bytes. A
+// bitmap omission is a firmware assertion of zero, never a guess based on
+// macro slot contents. Verify the reconstructed whole-store digest. The
+// keyboard keeps the map only while its storage is settled; while it is not
+// (UNAVAILABLE, status 3) the first page is optional, and the whole bank is
+// read instead.
 /** @param {import("../transport/types.js").RequestConnection} connection @param {number} page @param {() => number} nextRequestId @param {boolean} [optional] */
 async function macroMapPage(connection, page, nextRequestId, optional = false) {
     const request = buildProfileGetRequest(0x0c, page, nextRequestId());
     const response = normalizeRawHidReport(await connection.request(request, {matchResponse: orUnhandled(profileResponseMatcher, request)}));
-    if (isUnhandledEcho(response, request)) {
-        if (optional) return null;
-        throw fail("The macro read map became unavailable. Read the keyboard again.");
-    }
+    if (isUnhandledEcho(response, request)) throw fail("The keyboard did not answer its macro read map. Read the keyboard again.");
     try { return Buffer.from(decodeProfileResponse(response, request, {allowShortPayload: true})); }
     catch (error) {
-        if (optional && error instanceof ProfileWireProtocolError && error.code === "DEVICE_REJECTED" && "status" in error && typeof error.status === "number" && [2, 3].includes(error.status) && response[6] === 0) return null;
+        if (optional && error instanceof ProfileWireProtocolError && error.code === "DEVICE_REJECTED" && "status" in error && error.status === 3 && response[6] === 0) return null;
         throw error;
     }
 }

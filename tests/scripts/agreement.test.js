@@ -8,8 +8,8 @@ const {judge, markdown} = require("../../scripts/check-agreement");
 const FIRMWARE = "https://github.com/NoahCLR/charybdis-4x6";
 const QMK = "https://github.com/NoahCLR/bastardkb-qmk";
 // Capability pages as firmware's contract probe states them (action-ABI digest
-// 0x837cf479, schema 3, sixteen layers).
-const PAGES = ["0203010003002014027fdf0f0079f47c8300000100dff0d215", "1010800500801010203a088080e0ffe0ff000057281f000000", "80020500000100202040000000000000000000000000000000"];
+// 0x837cf479, schema 3, sixteen layers, every feature of the current pair).
+const PAGES = ["0203010003002014027fdfef7f79f47c8300000100dff0d215", "1010800500801010203a088080e0ffe0ff000057281f000000", "80020500000100202040000000000000000000000000000000"];
 const sha = text => createHash("sha256").update(text).digest("hex");
 
 function setup() {
@@ -49,6 +49,9 @@ test("each contract check can fail on its own", () => {
         // Pages Ark's decoder rejects: more layers than the logical capacity.
         const inconsistent = Buffer.from(PAGES[1], "hex"); inconsistent[0] = 17;
         assert.deepEqual(failing({capabilityPages: [PAGES[0], inconsistent.toString("hex"), PAGES[2]]}), ["Profile Wire capability pages decode with Ark's decoder"]);
+        // A firmware without a feature Ark requires: no pointing clicks (bit 28).
+        const older = Buffer.from(PAGES[0], "hex"); older.writeUInt32LE(older.readUInt32LE(9) & ~(1 << 28), 9);
+        assert.deepEqual(failing({capabilityPages: [older.toString("hex"), PAGES[1], PAGES[2]]}), ["firmware reports every feature Ark requires"]);
         // A schema Ark cannot read (byte 4 of page 0).
         const schema = Buffer.from(PAGES[0], "hex"); schema[4] = 9;
         assert.deepEqual(failing({capabilityPages: [schema.toString("hex"), PAGES[1], PAGES[2]]}), ["profile schema is one Ark reads"]);

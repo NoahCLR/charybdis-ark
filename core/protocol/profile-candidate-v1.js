@@ -3,13 +3,10 @@
 const {u8: assertU8, u16: assertU16, asBytes: copyBytes, protocolError, zeroRange} = require("../schema/bytes");
 
 const {profileDomain, PROFILE_DOMAIN_MASK} = require("../schema/profile-domains");
-const {supportsStreamingMacros} = require("../schema/macro-payload");
 const {requestHandled} = require("./via-unhandled-v1");
 const {RAW_HID_REPORT_SIZE, normalizeRawHidReport} = require("../transport/device-adapter");
 const {crc32, decodeProfileBlob, fnv1a32} = require("../schema/profile-blob-v1");
 const {
-    ProfileWireProtocolError,
-    PROFILE_WIRE_STATUS,
     PROFILE_WIRE_V1,
     buildProfileGetRequest,
     decodeProfileResponse,
@@ -31,14 +28,13 @@ const PROFILE_CANDIDATE_V1 = Object.freeze({
     VALUE_REUSE: 0x1b,
     VALUE_STREAM_CHUNK: 0x1c,
     MIN_BLOB_SIZE: 8,
-    MAX_BLOB_SIZE: 65504,
+    // A 52 KiB slot less its 32-byte header (firmware D-F14).
+    MAX_BLOB_SIZE: 53216,
     STATUS_LAYOUT_VERSION: 1,
     STATUS_PAYLOAD_SIZE: 25,
-    // Format 4 (`NS`) uses 64 KiB slots. Streaming firmware advertises bit 27
-    // and uses format 5 (`NT`) with 52 KiB slots. Both bind VIA identity.
-    LOGICAL_STORE_FORMAT: 4,
-    STREAMING_STORE_FORMAT: 5,
-    STREAMING_BLOB_SIZE: 53216,
+    // Store format 5 (`NT`), the one current firmware writes; it binds VIA
+    // identity.
+    STORE_FORMAT: 5,
     SCHEMA_MAJOR: 3,
     SCHEMA_MINOR: 0,
     KNOWN_DOMAIN_MASK: PROFILE_DOMAIN_MASK,
@@ -442,19 +438,12 @@ function decodeCandidatePeerStatusResponse(response, request) {
     };
 }
 
-// Firmware before page 1 answers UNKNOWN_PAGE; that is "not reported", not a
-// failure, and resolves to null.
 /** @param {import("../transport/types.js").RequestConnection} connection @param {import("./types.js").ReadOptions} [options] */
 async function readCandidatePeerStatus(connection, options = {}) {
     if (typeof options.nextRequestId !== "function") throw new TypeError("nextRequestId must be a function.");
     const request = buildCandidatePeerStatusRequest(assertNextRequestId(options.nextRequestId));
     const response = await requestHandled(connection, request, {matchResponse: profileResponseMatcher, signal: options.signal, timeoutMs: options.timeoutMs}, "the candidate peer status read");
-    try {
-        return decodeCandidatePeerStatusResponse(response, request);
-    } catch (error) {
-        if (error instanceof ProfileWireProtocolError && error.code === "DEVICE_REJECTED" && "status" in error && error.status === PROFILE_WIRE_STATUS.UNKNOWN_PAGE) return null;
-        throw error;
-    }
+    return decodeCandidatePeerStatusResponse(response, request);
 }
 
 // A candidate is always bound to the VIA store generation it will publish
@@ -463,8 +452,8 @@ async function readCandidatePeerStatus(connection, options = {}) {
 /** @param {Uint8Array} value @param {Partial<import("./types.js").CandidateBlobOptions>} [options] @returns {import("./types.js").CandidateMetadata} */
 function candidateMetadataForBlob(value, options = {}) {
     const blob = copyBytes(value, "Candidate profile blob");
-    const storeFormatVersion = options.storeFormatVersion ?? (supportsStreamingMacros(options.capabilities) ? PROFILE_CANDIDATE_V1.STREAMING_STORE_FORMAT : PROFILE_CANDIDATE_V1.LOGICAL_STORE_FORMAT);
-    const maximum = options.capabilities?.maxProfilePayload ?? (storeFormatVersion === PROFILE_CANDIDATE_V1.STREAMING_STORE_FORMAT ? PROFILE_CANDIDATE_V1.STREAMING_BLOB_SIZE : PROFILE_CANDIDATE_V1.MAX_BLOB_SIZE);
+    const storeFormatVersion = options.storeFormatVersion ?? PROFILE_CANDIDATE_V1.STORE_FORMAT;
+    const maximum = options.capabilities?.maxProfilePayload ?? PROFILE_CANDIDATE_V1.MAX_BLOB_SIZE;
     if (blob.length > maximum) throw new RangeError(`Candidate profile blob exceeds the keyboard's ${maximum}-byte capacity.`);
     if (blob.length < PROFILE_CANDIDATE_V1.MIN_BLOB_SIZE || blob.length > PROFILE_CANDIDATE_V1.MAX_BLOB_SIZE) {
         throw new RangeError(`Candidate profile blob must contain ${PROFILE_CANDIDATE_V1.MIN_BLOB_SIZE} through ${PROFILE_CANDIDATE_V1.MAX_BLOB_SIZE} bytes.`);
@@ -518,10 +507,9 @@ function normalizeCandidateMetadata(metadata) {
     const schemaMinor = assertU8(metadata.schemaMinor, "Candidate schema minor");
     assertCurrentSchema(schemaMajor, schemaMinor);
     const storeFormatVersion = assertU8(metadata.storeFormatVersion, "Candidate store format");
-    if (!/** @type {number[]} */ ([PROFILE_CANDIDATE_V1.LOGICAL_STORE_FORMAT, PROFILE_CANDIDATE_V1.STREAMING_STORE_FORMAT]).includes(storeFormatVersion)) {
-        throw new RangeError(`Candidate store format must be 4 or 5.`);
+    if (storeFormatVersion !== PROFILE_CANDIDATE_V1.STORE_FORMAT) {
+        throw new RangeError(`Candidate store format must be ${PROFILE_CANDIDATE_V1.STORE_FORMAT}.`);
     }
-    if (storeFormatVersion === PROFILE_CANDIDATE_V1.STREAMING_STORE_FORMAT && payloadLength > PROFILE_CANDIDATE_V1.STREAMING_BLOB_SIZE) throw new RangeError(`Candidate payload length exceeds the ${PROFILE_CANDIDATE_V1.STREAMING_BLOB_SIZE}-byte format-5 capacity.`);
     const {viaGeneration, viaDigest} = assertViaBinding(metadata.viaGeneration, metadata.viaDigest);
     return {
         schemaMajor,

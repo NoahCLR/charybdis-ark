@@ -10,8 +10,8 @@ const {canonical} = require("./bytes");
 // layer names, 128 VIA macro names, 128 custom-key names and the keyboard's
 // own name, each a length byte and up to 32 bytes of UTF-8 (profile-name.js).
 // An empty keyboard name means the firmware's built-in name; a stored one is
-// the USB product string the computer sees. Earlier versions are refused, as
-// the firmware refuses them; a backup's are translated (backup-translation.js).
+// the USB product string the computer sees. Every other version is refused,
+// as the firmware refuses it.
 //
 // A layer record is its combo reference layer and two placement bitmaps:
 // positions whose behaviour is bypassed, and positions kept out of combos
@@ -128,7 +128,7 @@ function bitmapOfPositions(list, positions) {
 }
 
 // A fresh layer record: combos refer to the layer itself, nothing bypassed or
-// excluded, as compiled defaults and translated backups have it.
+// excluded, as compiled defaults have it.
 /** @param {number} layer @returns {import("./types.js").LayerRecord} */
 const defaultLayerRecord = layer => ({reference: layer, bypass: [], exclude: []});
 

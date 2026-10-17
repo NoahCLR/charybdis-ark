@@ -1,10 +1,10 @@
 // @ts-check
 "use strict";
 
-// The keyboard's own name (settings v7 onwards, firmware D-F14): the USB product
-// string the computer, Chrome's keyboard chooser and Ark's keyboard menu show.
-// It is one more counted name in the settings domain, so it is edited in the
-// draft, reviewed, applied and backed up like any other. Empty means the
+// The keyboard's own name (firmware D-F14): the USB product string the
+// computer, Chrome's keyboard chooser and Ark's keyboard menu show. It is one
+// more counted name in the settings domain, so it is edited in the draft,
+// reviewed, applied and backed up like any other. Empty means the
 // firmware's built-in name; the keyboard then reports that as its product.
 
 const {decodedOf, encodeNamedProfile, validateSnapshot} = require("./portable-profile");

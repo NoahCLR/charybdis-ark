@@ -8,34 +8,34 @@
  * @typedef {{kind: number, operand: number}} WalkAction
  */
 const {keycodeAction, knownActionAbi, pdSlotOfCode} = require("../schema/actions");
-const {decodeProfileBlob, encodeProfileBlob, crc32, fnv1a32, PROFILE_BLOB_V1, PROFILE_DOMAIN_VERSIONS, ProfileBlobProtocolError} = require("../schema/profile-blob-v1");
-const {supportsComboOutputBehaviors, ALL_LAYERS, COMBO_DOMAIN_VERSION, encodeComboDomain} = require("../schema/combo-domain-v1");
+const {decodeProfileBlob, decodeStoredProfileBlob, encodeProfileBlob, crc32, fnv1a32, PROFILE_BLOB_V1, PROFILE_DOMAIN_VERSIONS, ProfileBlobProtocolError} = require("../schema/profile-blob-v1");
+const {ALL_LAYERS, COMBO_DOMAIN_VERSION, encodeComboDomain} = require("../schema/combo-domain-v1");
 const {SETTING, SETTING_FIELDS, decodeSettings} = require("../schema/settings-domain-v1");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX, LAYERS, MATRIX_KEYS, matrixPosition} = require("../data/charybdis-layout");
 const {LAYER_LOCK_BASE, LAYER_LOCK_SLOTS} = require("../data/user-keycodes");
 const {layerName} = require("./vocabulary");
 const {decodeMacroPayload} = require("../schema/macro-payload");
-const {supportsUnicodeMacros, supportsMacroProtection} = require("../schema/macro-payload");
-const {hostSettings, supportsHostLayouts, LAYOUT_MASK, MACOS_ISO} = require("../schema/host-settings");
+const {hostSettings} = require("../schema/host-settings");
 const {profileDepthOptions} = require("../schema/profile-depth");
 
 // A portable profile is the keyboard's whole configuration in the one format
 // it stores: sixteen layers, the 128 VIA macros, and a schema 3.0 profile with
 // every domain (RGB 4, key behaviours 2, combos 3, settings 8, PD 3) in the
-// action vocabulary Ark knows (firmware D-F14, D-F26). The keyboard migrates
-// nothing: a backup in an older format is refused here, and translated by
-// backup-translation.js before anything else reads it; a keyboard still
-// storing an older domain is read through the same translation, read-only.
+// action vocabulary Ark knows (firmware D-F14, D-F26). Nothing is migrated:
+// Ark reads and writes only what current firmware stores, so a backup or a
+// keyboard in an older format is refused.
 const MACRO_SLOTS = 128;
-// A file holds at most a full 65,504-byte profile in base64, sixteen layers of
+// A file holds at most a full 53,216-byte profile in base64, sixteen layers of
 // keys and a full macro bank; this ceiling leaves room for all three.
 const FILE_MAX_BYTES = 262144;
-const {PROFILE_DOMAINS, PROFILE_DOMAIN_IDS, PROFILE_DOMAIN_MASK, READABLE_DOMAIN_VERSIONS, domainCodec, encodeProfileDomains} = require("../schema/profile-domains");
+const {PROFILE_DOMAINS, PROFILE_DOMAIN_IDS, PROFILE_DOMAIN_MASK, domainCodec, encodeProfileDomains} = require("../schema/profile-domains");
 const DOMAIN_IDS = PROFILE_DOMAINS.map(domain => domain.id);
 /** @param {number} id @param {Buffer} payload */
 const domain = (id, payload) => ({id, version: PROFILE_DOMAIN_VERSIONS[id], payload});
 /** @param {string} message */
 const fail = message => Object.assign(new Error(message), {code: "INVALID_PORTABLE_PROFILE"});
+// What a backup in another format than current firmware's is told.
+const OLDER_FORMAT = "This profile is in a format current firmware does not store, so Ark cannot read it. Export a new backup from a keyboard on current firmware.";
 /** @param {unknown} value @returns {value is number} */
 const u16 = value => typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 65535;
 const PHYSICAL_MATRIX_SLOTS = new Set(CHARYBDIS_4X6_LAYOUT_MATRIX.map((position, layoutIndex) => matrixPosition(layoutIndex)));
@@ -47,7 +47,6 @@ function base64(value, max, label) {
     return bytes;
 }
 // Capture parses the stored format; validateSnapshot gates the destination.
-// Unicode bytes must survive capture even before capability checks run.
 /** @param {Buffer} bytes @param {number} count */
 function macroSlots(bytes, count) {
     if (!Buffer.isBuffer(bytes) || bytes.at(-1) !== 0) throw fail("The macro bank has an unfinished write.");
@@ -55,13 +54,13 @@ function macroSlots(bytes, count) {
     while (slots.length < count) {
         const end = bytes.indexOf(0, offset);
         if (end < offset || end >= bytes.length - 1) throw fail("The macro bank is missing a slot terminator.");
-        const slot = Buffer.from(bytes.subarray(offset, end)); validateViaMacro(slot, {unicode: true, protectionSupported: true}); slots.push(slot); offset = end + 1;
+        const slot = Buffer.from(bytes.subarray(offset, end)); validateViaMacro(slot); slots.push(slot); offset = end + 1;
     }
     return slots;
 }
 /** @param {Buffer} bytes @param {import("../schema/types.js").MacroOptions} [options] */
-function validateViaMacro(bytes, {unicode = false, textEntry = false, layout, protectionSupported = false} = {}) {
-    decodeMacroPayload(bytes, {unicode, textEntry, layout, protectionSupported});
+function validateViaMacro(bytes, {textEntry = false, layout} = {}) {
+    decodeMacroPayload(bytes, {textEntry, layout});
     const held = new Set(); let index = 0;
     /** @param {number} v */
     const key = v => (v >= 4 && v <= 0xa4) || (v >= 0xe0 && v <= 0xe7);
@@ -84,9 +83,9 @@ function validateViaMacro(bytes, {unicode = false, textEntry = false, layout, pr
     }
     if (held.size) throw fail("A macro leaves keys pressed.");
 }
-// The macro bank the sixteen-layer storage geometry has, when no keyboard says:
-// a 12 KiB VIA region less config and the 1,920-byte keymap (D-F14).
-const MACRO_BANK_BYTES = 10327;
+// The macro bank current firmware's storage geometry has, when no keyboard
+// says: a 36 KiB VIA region less config and the 1,920-byte keymap (D-F14).
+const MACRO_BANK_BYTES = 34903;
 const MACRO_BANK_MAX_BYTES = 65535;
 /** @param {Buffer[]} slots @param {number} capacity */
 function macroBank(slots, capacity) {
@@ -97,38 +96,18 @@ function macroBank(slots, capacity) {
     for (const slot of slots) {slot.copy(result, offset); offset += slot.length + 1;}
     return result;
 }
-// A domain a keyboard still stores in an older version, translated to the
-// current one by the same steps a backup takes (D-L63). The keyboard keeps
-// its own bytes: the translation only lets it be shown, never written.
-/** @param {import("../schema/types.js").ProfileDomain} stored @returns {import("../schema/types.js").ProfileDomain} */
-function currentDomain(stored) {
-    return stored.version < PROFILE_DOMAIN_VERSIONS[stored.id] ? require("./backup-translation").translateDomain(stored) : stored;
-}
-/** @param {Uint8Array} active @param {Uint8Array} defaults @param {Buffer} settings */
-function liveDomains(active, defaults, settings) {
-    const live = decodeProfileBlob(active, {domainVersions: READABLE_DOMAIN_VERSIONS}), fallback = decodeProfileBlob(defaults, {domainVersions: READABLE_DOMAIN_VERSIONS});
+/** @param {Uint8Array} active @param {Uint8Array} defaults @param {import("./types.js").NativeComboTable} combos @param {Buffer} settings */
+function materializeProfile(active, defaults, combos, settings) {
+    if (!combos || combos.noTimer || combos.customTrigger || combos.customRelease || combos.customRepress || combos.strictTimer || combos.fixedReference) throw fail("This keyboard uses combo hooks or timing that cannot be represented by a portable profile.");
+    const live = decodeStoredProfileBlob(active), fallback = decodeStoredProfileBlob(defaults);
     /** @type {import("../schema/types.js").ProfileDomain[]} */
-    const stored = [PROFILE_DOMAIN_IDS.RGB, PROFILE_DOMAIN_IDS.KEY_BEHAVIORS, PROFILE_DOMAIN_IDS.PD_MODES].map(id => {
+    const domains = [PROFILE_DOMAIN_IDS.RGB, PROFILE_DOMAIN_IDS.KEY_BEHAVIORS, PROFILE_DOMAIN_IDS.PD_MODES].map(id => {
         const found = live.domains.find(d => d.id === id) || fallback.domains.find(d => d.id === id);
         if (!found) throw fail("The keyboard did not report every profile domain.");
         return found;
     });
-    return [...stored, {id: PROFILE_DOMAIN_IDS.SETTINGS, version: settings[0], payload: settings}];
-}
-// The domains a keyboard stores in an older version than this app writes: it
-// is shown read-only until both halves are updated (D-L63).
-/** @param {Uint8Array} active @param {Uint8Array} defaults @param {Buffer} settings @returns {import("./types.js").OlderDomain[]} */
-function olderDomains(active, defaults, settings) {
-    return liveDomains(active, defaults, settings).filter(stored => stored.version < PROFILE_DOMAIN_VERSIONS[stored.id]).map(({id, version}) => ({id, version}));
-}
-/** @param {Uint8Array} active @param {Uint8Array} defaults @param {import("./types.js").NativeComboTable} combos @param {Buffer} settings */
-function materializeProfile(active, defaults, combos, settings) {
-    if (!combos || combos.noTimer || combos.customTrigger || combos.customRelease || combos.customRepress || combos.strictTimer || combos.fixedReference) throw fail("This keyboard uses combo hooks or timing that cannot be represented by a portable profile.");
-    const domains = liveDomains(active, defaults, settings).map(currentDomain);
-    const current = /** @type {import("../schema/types.js").ProfileDomain} */ (domains.pop());
-    const table = comboTableOf(combos);
-    decodeSettings(current.payload);
-    domains.push(domain(PROFILE_DOMAIN_IDS.COMBOS, encodeComboDomain(table)), domain(PROFILE_DOMAIN_IDS.SETTINGS, current.payload));
+    decodeSettings(settings);
+    domains.push(domain(PROFILE_DOMAIN_IDS.COMBOS, encodeComboDomain(comboTableOf(combos))), domain(PROFILE_DOMAIN_IDS.SETTINGS, settings));
     return encodeProfileBlob({domains});
 }
 // The combo table the keyboard runs, as it stores it: which combos follow the
@@ -157,18 +136,18 @@ function validateSnapshot(value, capabilities) {
     // Inspect the unvalidated object; its complete shape is established below.
     const candidate = /** @type {Partial<Record<keyof PortableDocument, unknown>> | null | undefined} */ (value);
     if (!candidate || candidate.format !== "charybdis-profile" || candidate.keyboard !== "charybdis-4x6" || typeof candidate.actionAbiDigest !== "number" || !Number.isInteger(candidate.actionAbiDigest) || candidate.actionAbiDigest < 1 || candidate.actionAbiDigest > 0xffffffff) throw fail("Choose a supported Charybdis profile file.");
-    if (candidate.version !== PROFILE_BLOB_V1.SCHEMA_MAJOR || !knownActionAbi(candidate.actionAbiDigest)) throw fail("This profile is from older firmware, in a format the keyboard no longer stores. Export a new backup from current firmware.");
+    if (candidate.version !== PROFILE_BLOB_V1.SCHEMA_MAJOR || !knownActionAbi(candidate.actionAbiDigest)) throw fail(OLDER_FORMAT);
     if (Object.keys(candidate).some(key => !["format", "version", "keyboard", "actionAbiDigest", "layers", "profile", "macros"].includes(key))) throw fail("This profile contains unsupported fields.");
     if (!Array.isArray(candidate.layers) || candidate.layers.length !== LAYERS || candidate.layers.some(keys => !Array.isArray(keys) || keys.length !== MATRIX_KEYS || !keys.every(u16))) throw fail(`A complete profile must contain all ${LAYERS} layers.`);
     if (!Array.isArray(candidate.macros) || candidate.macros.length !== MACRO_SLOTS) throw fail(`A complete profile must contain all ${MACRO_SLOTS} macro slots.`);
     // The exact layer-bank shape and uint16 values were checked above.
     const layers = /** @type {number[][]} */ (candidate.layers);
-    const macros = candidate.macros.map(slot => {const bytes = base64(slot, MACRO_BANK_MAX_BYTES, "macro"); validateViaMacro(bytes, {unicode: capabilities ? supportsUnicodeMacros(capabilities) : true, protectionSupported: capabilities ? supportsMacroProtection(capabilities) : true}); return bytes;});
+    const macros = candidate.macros.map(slot => {const bytes = base64(slot, MACRO_BANK_MAX_BYTES, "macro"); validateViaMacro(bytes); return bytes;});
     const profile = base64(candidate.profile, PROFILE_BLOB_V1.MAX_SIZE, "profile data");
     if (capabilities?.maxProfilePayload !== undefined && profile.length > capabilities.maxProfilePayload) throw fail(`The profile needs ${profile.length} bytes; this keyboard holds ${capabilities.maxProfilePayload}.`);
     let domains;
     try {domains = decodeProfileBlob(profile).domains;} catch (error) {
-        if (error instanceof ProfileBlobProtocolError && ["INCOMPATIBLE_SCHEMA", "UNKNOWN_DOMAIN_VERSION"].includes(error.code)) throw fail("This profile is from older firmware, in a format the keyboard no longer stores. Export a new backup from current firmware.");
+        if (error instanceof ProfileBlobProtocolError && ["INCOMPATIBLE_SCHEMA", "UNKNOWN_DOMAIN_VERSION"].includes(error.code)) throw fail(OLDER_FORMAT);
         throw error;
     }
     if (domains.map(d => d.id).join() !== DOMAIN_IDS.join()) throw fail("The profile is missing configuration. Partial profiles cannot be restored as a complete backup.");
@@ -178,13 +157,9 @@ function validateSnapshot(value, capabilities) {
     const codecOptions = profileDepthOptions(capabilities, payload("rgb"));
     const rgb = domainCodec("rgb").decode(payload("rgb"), codecOptions), behaviors = domainCodec("behaviors").decode(payload("behaviors"), codecOptions),
         combos = domainCodec("combos").decode(payload("combos")), settings = domainCodec("settings").decode(payload("settings"));
-    if (capabilities && !supportsComboOutputBehaviors(capabilities) && (settings.comboOutputBehaviors === false || combos.rows.some(row => !row.useOutputBehavior))) throw fail("This firmware cannot bypass combo output behaviours. Update both halves before restoring this profile.");
-    const hostWord = settings.values[SETTING.UNICODE_HOST_MODE];
-    if (hostWord && capabilities && !supportsUnicodeMacros(capabilities)) throw fail("This firmware cannot use Host settings. Update both halves before restoring this profile.");
-    if (hostWord & (LAYOUT_MASK | MACOS_ISO) && capabilities && !supportsHostLayouts(capabilities)) throw fail("This firmware cannot type through a host keyboard layout. Update both halves before restoring this profile.");
     // With Unicode playback on, a held ordinary key cannot span text the
     // layout leaves to Unicode entry.
-    if (hostWord & 0x100) for (const macro of macros) validateViaMacro(macro, {unicode: true, textEntry: true, layout: hostSettings(settings.values).layout, protectionSupported: capabilities ? supportsMacroProtection(capabilities) : true});
+    if (settings.values[SETTING.UNICODE_HOST_MODE] & 0x100) for (const macro of macros) validateViaMacro(macro, {textEntry: true, layout: hostSettings(settings.values).layout});
     if (rgb.layerColors.length !== LAYERS || rgb.layerColors.some(row => row.layerId >= LAYERS)) throw fail(`RGB does not cover all ${LAYERS} layers.`);
     // A binding for an empty slot is allowed, because the keyboard allows it:
     // the mode keycodes are a fixed registry, and the runtime refuses to
@@ -242,10 +217,9 @@ function walkActions(value, action) {
 // caller already has it, so a document decoded once is not decoded again.
 /** @param {Pick<DecodedProfile, 'document' | 'profile' | 'layout' | 'macros'>} snapshot */
 function fingerprintOf({document, profile, layout, macros}) {
-    // Bank padding is destination geometry, not part of a portable edit.
-    // Retain legacy fingerprints for small profiles and normalize larger ones
-    // to their streams plus terminators and validity byte.
-    const length = Math.max(MACRO_BANK_BYTES, document.macros.reduce((sum, encoded) => sum + Buffer.byteLength(encoded, "base64") + 1, 1));
+    // Bank padding is destination geometry, not part of a portable edit: the
+    // macros count as their streams plus terminators and validity byte.
+    const length = document.macros.reduce((sum, encoded) => sum + Buffer.byteLength(encoded, "base64") + 1, 1);
     const canonical = macros.length === length ? macros : Buffer.alloc(length);
     if (canonical !== macros) macros.copy(canonical, 0, 0, Math.min(length, macros.length));
     const bytes = Buffer.concat([profile, layout, canonical]);
@@ -360,4 +334,4 @@ function summaryOf(value) {
         macros: value.document.macros.filter(Boolean).length,
         names: value.settings.names.map((name, index) => layerName(value.settings.names, index))};
 }
-module.exports = {LAYERS, MACRO_SLOTS, MACRO_BANK_BYTES, MACRO_BANK_MAX_BYTES, FILE_MAX_BYTES, encodeNamedProfile, comboTableOf, createSnapshot, validateSnapshot, materializeProfile, olderDomains, currentDomain, macroSlots, macroBank, validateViaMacro, fingerprint, fingerprintOf, decodedOf, reorderLayers, summary, summaryOf};
+module.exports = {LAYERS, MACRO_SLOTS, MACRO_BANK_BYTES, MACRO_BANK_MAX_BYTES, FILE_MAX_BYTES, encodeNamedProfile, comboTableOf, createSnapshot, validateSnapshot, materializeProfile, macroSlots, macroBank, validateViaMacro, fingerprint, fingerprintOf, decodedOf, reorderLayers, summary, summaryOf};

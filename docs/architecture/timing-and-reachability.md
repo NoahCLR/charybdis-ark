@@ -73,11 +73,12 @@ physical-only. A bypassed native output keeps its native effects; a bypassed
 custom output supplies no escape. Both exhaustive and symbolic reach analysis
 follow this policy, as the firmware's participation contract defines.
 
-Feature bit 18 identifies runtime-owned tapping, extending bit 17's authored LT
-bypass to every handled key (including authored MT/OSM and owned TT/OSL). Ark
-keeps native-buffering warnings for those families on bit-17-only firmware.
-Neither capability changes stored profile bytes. Firmware owns that policy and
-its native-key controls; Ark owns these findings and their presentation.
+Current firmware times gestures physically (feature bit 17) and owns tapping
+(bit 18), which extends the authored LT bypass to every handled key (including
+authored MT/OSM and owned TT/OSL); Ark requires both (D-L64), so it gives no
+native-buffering warnings. Neither capability changes stored profile bytes.
+Firmware owns that policy and its native-key controls; Ark owns these findings
+and their presentation.
 
 ## Built-in branches and behaviour previews
 
@@ -88,11 +89,9 @@ press, so it is claimed at every tap count up to the row's deepest stored step
 and marked `×N` past a single tap; deeper counts are separate gestures and stay
 empty. The hold belongs to the first press. A plain key (a basic keycode, alone
 or with modifiers) taps itself and holds itself down as a fallback that any
-first-press hold or long hold replaces; every firmware with a Profile Wire does
-this. Bare modifiers are buffered, not tapped, and claim nothing. Dual-role
-keys are claimed only where firmware advertises them: an LT() row's tap and
-layer hold on bit 17, an MT() or OSM() row's tap and modifier hold on bit 18.
-Older firmware classified those keys in QMK first, so Ark claims nothing there.
+first-press hold or long hold replaces. Bare modifiers are buffered, not
+tapped, and claim nothing. Dual-role keys claim their own meaning too: an LT()
+row's tap and layer hold, an MT() or OSM() row's tap and modifier hold.
 The other hold tier also fills a cell. With no Long hold, nothing happens at
 its threshold and a release never selects it, so the press's Hold, set or
 built in, carries on as its helper runs (held, repeating, sending on release,

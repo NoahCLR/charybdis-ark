@@ -23,8 +23,7 @@ const {COMBO_READBACK_V1} = require("../../core/protocol/combo-readback-v1");
 const {PROFILE_CANDIDATE_V1, CANDIDATE_STATE} = require("../../core/protocol/profile-candidate-v1");
 const {VIA_LAYOUT_COMMANDS} = require("../../core/protocol/via-layout-v1");
 const {VIA_STORAGE, viaStorageDigest} = require("../../core/protocol/via-storage-v1");
-const {PROFILE_DOMAIN_IDS, crc32, decodeProfileBlob, encodeProfileBlob, fnv1a32} = require("../../core/schema/profile-blob-v1");
-const {READABLE_DOMAIN_VERSIONS} = require("../../core/schema/profile-domains");
+const {PROFILE_DOMAIN_IDS, crc32, decodeProfileBlob, fnv1a32} = require("../../core/schema/profile-blob-v1");
 const {nativeCode} = require("../../core/schema/actions");
 const {validateSnapshot} = require("../../core/model/portable-profile");
 const {baseLighting} = require("../../core/model/settings-editor");
@@ -39,8 +38,8 @@ const VALUE = {CAPABILITIES: 1, STATUS: 2, COMMITTED: PROFILE_PAYLOAD_V1.VALUE, 
 // keymap reset, custom set (Profile Wire SET, RGB Matrix set), custom save,
 // EEPROM reset, bootloader jump, macro write and reset, layout write, encoder set.
 const MUTATING_COMMANDS = new Set([0x03, 0x05, 0x06, 0x07, 0x09, 0x0a, 0x0b, 0x0f, 0x10, 0x13, 0x15]);
-// Every feature current firmware advertises; it never advertises the retired ones.
-const FEATURES = PROFILE_WIRE_KNOWN_MASKS.FEATURE_FLAGS & ~PROFILE_WIRE_KNOWN_MASKS.RETIRED_FEATURES;
+// Every feature the current flashable pair advertises.
+const FEATURES = PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES;
 
 // The domain versions current firmware stores, and refuses any other.
 const CURRENT_DOMAINS = "16:4,32:2,48:3,64:8,80:3";
@@ -49,51 +48,35 @@ const CURRENT_DOMAINS = "16:4,32:2,48:3,64:8,80:3";
 // document's own unless given (current firmware's carries every domain, with
 // its authored combos and factory settings). `compiledOnly` runs those
 // defaults, with nothing committed; the live combo and settings readbacks
-// still answer from the document. `settingsVersion: 7` is the firmware before
-// custom-key shortcuts (firmware D-F26): it stores and serves the same
-// settings without the shortcut table, as version 7.
-// A current profile as firmware before custom-key shortcuts stores it: the
-// settings domain at version 7, without the 128 shortcut records after the
-// layer records (offsets 404-659) and with header byte 6 zero.
-/** @param {Buffer} blob */
-function settingsV7Profile(blob) {
-    const decoded = decodeProfileBlob(blob);
-    return encodeProfileBlob({schema: decoded.schema, domains: decoded.domains.map(domain => {
-        if (domain.id !== PROFILE_DOMAIN_IDS.SETTINGS) return domain;
-        const payload = Buffer.concat([domain.payload.subarray(0, 404), domain.payload.subarray(660)]);
-        payload[0] = 7; payload[6] = 0;
-        return {...domain, version: 7, payload};
-    })}, {domainVersions: READABLE_DOMAIN_VERSIONS});
-}
-
+// still answer from the document. `settingsVersion` is the version its
+// settings readback reports: any but 8 is firmware Ark does not read.
 /** @param {import("./types.js").FakeKeyboardOptions} options @returns {import("./types.js").FakeKeyboard} */
-function fakeKeyboard({document, compiled, streaming = false, macroReadMap = false, compiledOnly = false, peerKnown = true, generation = 42, firmwareVersion = 0x00010000, brightnessMax = 255, options = keyboardOptions.wire(), settingsVersion = 8}) {
+function fakeKeyboard({document, compiled, settingsVersion = 8, compiledOnly = false, peerKnown = true, generation = 42, firmwareVersion = 0x00010000, brightnessMax = 255, options = keyboardOptions.wire()}) {
     const held = validateSnapshot(document);
-    held.macros = require("../../core/model/portable-profile").macroBank(document.macros.map(value => Buffer.from(value, "base64")), streaming ? 34903 : 10327);
+    held.macros = require("../../core/model/portable-profile").macroBank(document.macros.map(value => Buffer.from(value, "base64")), 34903);
     if (document.version !== 3 || document.layers.length !== 16) throw new Error("The fake keyboard runs current firmware: a schema-3, sixteen-layer document.");
     /** @param {Buffer} blob */
     const versions = blob => decodeProfileBlob(blob).domains.map(domain => `${domain.id}:${domain.version}`).join();
     if (versions(held.profile) !== CURRENT_DOMAINS || (compiled && versions(compiled) !== CURRENT_DOMAINS)) throw new Error("The fake keyboard runs current firmware: RGB 4, key behaviours 2, combos 3, settings 8 and PD 3.");
-    const stored = settingsVersion === 7 ? settingsV7Profile : (/** @type {Buffer} */ blob) => blob;
-    const profile = stored(held.profile), digest = fnv1a32(profile), defaults = compiled ? stored(compiled) : profile;
-    const settingsDomain = decodeProfileBlob(profile, {domainVersions: READABLE_DOMAIN_VERSIONS}).domains.find(domain => domain.id === PROFILE_DOMAIN_IDS.SETTINGS);
+    const profile = held.profile, digest = fnv1a32(profile), defaults = compiled || profile;
+    const settingsDomain = decodeProfileBlob(profile).domains.find(domain => domain.id === PROFILE_DOMAIN_IDS.SETTINGS);
     if (!settingsDomain) throw new Error("The fake keyboard fixture must contain settings.");
     const settings = settingsDomain.payload;
     const storageDigest = viaStorageDigest({layout: held.layout, macros: held.macros});
 
     const capabilities = [page(25, (p) => {
         p.set([2, 3, 1, 0, 3, 0, RAW_HID_REPORT_SIZE, PROFILE_CANDIDATE_V1.CHUNK_MAX, PROFILE_WIRE_V1.STATUS_PAGE_COUNT]);
-        p.writeUInt32LE(streaming ? FEATURES : FEATURES & ~(1 << 27), 9); p.writeUInt32LE(document.actionAbiDigest, 13);
+        p.writeUInt32LE(FEATURES, 9); p.writeUInt32LE(document.actionAbiDigest, 13);
         p.writeUInt32LE(firmwareVersion, 17); p.writeUInt32LE(fnv1a32(defaults), 21);
     }), page(25, (p) => {
         // Layers, behaviour rows, tap depth, (steps on page 2), combos, keys
         // per combo, RGB groups, stage rows, LEDs, LED bitmap, custom keys, macros.
         p.set([16, 16, 128, 5, 0, 128, 16, 16, 32, 58, 8, 128, 128]);
-        p.writeUInt16LE(streaming ? 53216 : 65504, 13); p.writeUInt16LE(streaming ? 53216 : 65504, 15);
+        p.writeUInt16LE(53216, 13); p.writeUInt16LE(53216, 15);
         p.writeUInt16LE(held.macros.length, 19); p[21] = 31;
     }), page(25, (p) => {
         // Populated steps, tap depth, slot size, name bytes, mask bits, positions.
-        p.writeUInt16LE(640, 0); p[2] = 5; p.writeUInt32LE(streaming ? 53248 : 65536, 3); p.set([32, 32, 60], 7);
+        p.writeUInt16LE(640, 0); p[2] = 5; p.writeUInt32LE(53248, 3); p.set([32, 32, 60], 7);
     })];
     // Committed (or running its defaults), converged with the slave half,
     // nothing pending.
@@ -124,21 +107,20 @@ function fakeKeyboard({document, compiled, streaming = false, macroReadMap = fal
         ...(compiledOnly ? {} : {[VALUE.COMMITTED]: payloadPages(profile, generation)}),
         [VALUE.COMPILED]: payloadPages(defaults, 0),
         [VALUE.COMBOS]: comboPages(held.combos, held.settings.layers.map(record => record.reference)),
-        [VALUE.SETTINGS]: storedPages(settings),
+        [VALUE.SETTINGS]: storedPages(settingsVersion === settings[0] ? settings : Buffer.from([settingsVersion, ...settings.subarray(1)])),
         [VALUE.STORAGE]: storage,
         [0x0b]: [Buffer.from([1, 0])],
         [VALUE.CANDIDATE_STATUS]: candidateStatus,
     };
-    if (macroReadMap) {
-        const metadata = page(13, p => {
-            p[0] = 1; p.writeUInt16LE(256, 1); p.writeUInt16LE(held.macros.length, 3);
-            p.writeUInt32LE(generation, 5); p.writeUInt32LE(storageDigest, 9);
-        });
-        const bitmap = Buffer.alloc(Math.ceil(Math.ceil(held.macros.length / 256) / 8));
-        for (let i = 0; i < held.macros.length; i++) if (held.macros[i]) bitmap[Math.floor(i / 2048)] |= 1 << (Math.floor(i / 256) % 8);
-        values[0x0c] = [metadata];
-        for (let offset = 0; offset < bitmap.length; offset += 25) values[0x0c].push(bitmap.subarray(offset, offset + 25));
-    }
+    // The macro read map: which 256-byte blocks of the bank hold anything.
+    const metadata = page(13, p => {
+        p[0] = 1; p.writeUInt16LE(256, 1); p.writeUInt16LE(held.macros.length, 3);
+        p.writeUInt32LE(generation, 5); p.writeUInt32LE(storageDigest, 9);
+    });
+    const bitmap = Buffer.alloc(Math.ceil(Math.ceil(held.macros.length / 256) / 8));
+    for (let i = 0; i < held.macros.length; i++) if (held.macros[i]) bitmap[Math.floor(i / 2048)] |= 1 << (Math.floor(i / 256) % 8);
+    values[0x0c] = [metadata];
+    for (let offset = 0; offset < bitmap.length; offset += 25) values[0x0c].push(bitmap.subarray(offset, offset + 25));
     const lighting = baseLighting(held.settings.values);
     /** @type {Partial<Record<number, number[]>>} */
     const rgb = {1: [lighting.brightness], 2: [lighting.effect], 3: [lighting.speed], 4: [lighting.hue, lighting.saturation]};

@@ -34,7 +34,7 @@ export function editor(model, slot, canEdit) {
                 <button class="btn tiny ghost" data-act="place" ${writable() ? "" : "disabled"}>Place on a key…</button></span></div>
         <div class="card-b stack">
             <div class="macro-context">${placedOn(model, slot)}
-            <label class="macro-protection"><span>Uninterruptible playback</span><select class="input" data-f="macro:${esc(slot.keycode)}:protection" data-protection ${canEdit && model.macroProtectionSupported ? "" : "disabled"}>
+            <label class="macro-protection"><span>Uninterruptible playback</span><select class="input" data-f="macro:${esc(slot.keycode)}:protection" data-protection ${canEdit ? "" : "disabled"}>
                 ${(model.macroProtectionChoices || []).map(({value, label}) => `<option value="${esc(value)}" ${slot.protection === value ? "selected" : ""}>${esc(label)}${value === "auto" ? ` · ${slot.uninterruptible ? "on" : "off"}` : ""}</option>`).join("")}</select></label></div>
             <div class="macro-sequence-heading"><h4>Sequence</h4></div>
             <div class="macro-insert-tools" aria-label="Add a macro step">
@@ -58,7 +58,7 @@ export function editor(model, slot, canEdit) {
             </div>
             <details class="macro-guidance" id="macro-help-${esc(slot.keycode)}" data-guidance ${form.guidanceOpen ? "open" : ""}>
                 <summary>Typing & playback help</summary>${unicodeSetup(model, slot)}
-                <p class="note">${model.macroProtectionSupported ? (model.macroOutputIsolationSupported ? "Automatic turns protection on when this layout needs Unicode entry. Protected playback starts immediately and suspends ordinary keys already held. Only the macro types; new presses are ignored and releases still work. Held modifiers resume afterward. Suspended ordinary keys need to be released and pressed again; ignored presses are never replayed. Pointing and other keyboards can still interfere." : "Typing during Unicode entry can corrupt the text. Automatic turns protection on when this layout needs Unicode entry. On ignores new keypresses from this keyboard until playback finishes; releases still work. Ignored presses are not replayed. Release ordinary keys before starting; other keyboards can still interfere. Update both halves to suspend keys already held.") : "Update both halves to protect macro playback. This firmware does not support the per-macro setting."}</p>
+                <p class="note">Automatic turns protection on when this layout needs Unicode entry. Protected playback starts immediately and suspends ordinary keys already held. Only the macro types; new presses are ignored and releases still work. Held modifiers resume afterward. Suspended ordinary keys need to be released and pressed again; ignored presses are never replayed. Pointing and other keyboards can still interfere.</p>
             </details>
             </div>
         </div></div>`);
@@ -187,19 +187,16 @@ function showOnLayer(keycode, at) {
 
 /** @param {Model} model @param {MacroSlot} slot */
 function unicodeSetup(model, slot) {
-    if (!model?.macroUnicode?.supported) return `<p class="note">Unicode macro text needs newer firmware on both halves.</p>`;
-    const {mode, os, layouts, layout, layoutFits, layoutName} = model.macroUnicode;
-    const typed = layouts && layoutFits === false
+    const {mode, os, layout, layoutFits, layoutName} = model?.macroUnicode || {mode: 0};
+    const typed = layoutFits === false
         ? `Text types through ${word(vocabulary(model).hostLayouts, layout)}, chosen in Settings → Host, which is not a ${word(vocabulary(model).hostOs, os)} layout: macros may type the wrong characters until the layout matches the computer.`
-        : layouts
-        ? `Text types through the ${layoutName} layout chosen in Settings → Host, accented letters included; keep that layout active on the computer.`
-        : "Plain ASCII text types with ordinary keys on any input source.";
+        : `Text types through the ${layoutName} layout chosen in Settings → Host, accented letters included; keep that layout active on the computer.`;
     const entry = mode
         ? ["", "Other characters use Unicode entry: keep Unicode Hex Input active in macOS input sources while macros play. Option shortcuts can behave differently in this input source.",
             "Other characters use Unicode entry: install and run WinCompose on Windows with Right Alt as its Compose key.",
             "Other characters use Unicode entry: use an input method or application that accepts Ctrl+Shift+U, hexadecimal digits and Space, such as IBus. This sequence does not work in every Linux application."][mode]
-        : layouts && os === 1 ? "Characters it cannot type, such as emoji, need the Unicode Hex Input layout."
+        : os === 1 ? "Characters it cannot type, such as emoji, need the Unicode Hex Input layout."
             : "Characters it cannot type, such as emoji, need Unicode playback on and a known host OS.";
-    const typing = model.macroOutputIsolationSupported && slot?.uninterruptible ? "" : " Avoid typing while a text macro plays.";
+    const typing = slot?.uninterruptible ? "" : " Avoid typing while a text macro plays.";
     return `<p class="note">${esc(typed)} ${esc(entry)} The keyboard cannot check your input setup.${esc(typing)}</p>`;
 }

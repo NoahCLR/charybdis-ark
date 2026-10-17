@@ -39,7 +39,7 @@ export function screenPointing() {
     if (!model || !slots.length) {
         pad.classList.remove("pd-page");
         pad.appendChild(el(`<div class="screen-stub"><h3>No pointing modes read</h3>
-            <p class="note">${esc(unavailable(model) || "This firmware has fixed pointing modes. The configurable-slot firmware and a migrated profile are needed to edit them.")}</p></div>`));
+            <p class="note">${esc(unavailable(model) || "Choose Read keyboard to load this keyboard's pointing modes.")}</p></div>`));
         main.appendChild(content);
         return main;
     }

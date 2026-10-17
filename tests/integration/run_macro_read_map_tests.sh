@@ -2,15 +2,6 @@
 set -eu
 ROOT="${FIRMWARE_ROOT:?Set FIRMWARE_ROOT}"
 : "${CHARYBDIS_ARK_ROOT:?Set CHARYBDIS_ARK_ROOT}"
-if grep -q NOAH_QMK_VIA_MACRO_READ_BLOCK_SIZE "$ROOT/users/noah/lib/compat/qmk_via_storage_regions.h"; then
-    :
-elif [ "$?" -eq 1 ]; then
-    echo "Macro read map bridge skipped: selected firmware predates sparse macro reads."
-    exit 0
-else
-    echo "Cannot inspect the selected firmware contract." >&2
-    exit 1
-fi
 . "$ROOT/tests/host/noah_host_qmk_env.sh"
 noah_host_export_qmk_cpath "$ROOT"
 BUILD_DIR="$(mktemp -d)"

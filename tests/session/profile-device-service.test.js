@@ -12,7 +12,7 @@ const {
     evaluateProfileCompatibility,
     evaluateLiveMutationCompatibility,
 } = require("../../core/session/profile-device-service");
-const {PROFILE_ACTIVE_KIND, PROFILE_WIRE_FEATURES, PROFILE_WIRE_STATUS, PROFILE_WIRE_V1, VIA_READS} = require("../../core/protocol/profile-wire-v1");
+const {PROFILE_ACTIVE_KIND, PROFILE_WIRE_FEATURES, PROFILE_WIRE_KNOWN_MASKS, PROFILE_WIRE_STATUS, PROFILE_WIRE_V1, VIA_READS} = require("../../core/protocol/profile-wire-v1");
 const {document} = require("../fixtures/pd-profile");
 const {fakeKeyboard} = require("../fixtures/fake-keyboard");
 const {connectedService} = require("../fixtures/connected-service");
@@ -46,8 +46,7 @@ test("a restore reads what the keyboard accepts, including its host OS, before w
     assert.deepEqual(keyboard.mutations, [], "a failed facts read refuses before the first write");
 });
 
-test("direct restore refuses pointing clicks on legacy firmware before recovery or any write", async t => {
-    const {editDeviceProfile} = require("../../core/model/device-profile-edits");
+test("a restore to firmware without a current feature is refused before recovery or any write", async t => {
     const source = fakeKeyboard({document: document()});
     const keyboard = {...source, answer: report => {
         const responses = source.answer(report);
@@ -58,12 +57,8 @@ test("direct restore refuses pointing clicks on legacy firmware before recovery 
     }};
     const {service} = await connectedService(t, {keyboard});
     assert.equal(service.capabilities.featureFlags & (1 << 28), 0);
-    const target = document();
-    target.profile = editDeviceProfile(Buffer.from(target.profile, "base64"), {type: "savePdMode", slot: 7,
-        config: {kind: 1, name: "Clicks", axis: 1, thresholdX: 40, directions: {left: {keycode: "MS_BTN3"}}}},
-    {capabilities: {...service.capabilities, featureFlags: service.capabilities.featureFlags | (1 << 28)}}).toString("base64");
     let recovery = 0;
-    await assert.rejects(service.restorePortableProfile(target, {saveRecovery: () => {recovery++;}}), error => error.code === "PLACEMENT_REFUSED" && /firmware cannot click/.test(error.message));
+    await assert.rejects(service.restorePortableProfile(document(), {saveRecovery: () => {recovery++;}}), {code: "FIRMWARE_UPDATE_REQUIRED"});
     assert.equal(recovery, 0);
     assert.deepEqual(source.mutations, []);
 });
@@ -121,20 +116,8 @@ function response(request, payload) {
 
 function readPages(options = {}) {
     const capabilityIdentity = Buffer.alloc(25);
-    const featureFlags = PROFILE_WIRE_FEATURES.READ_SURFACE
-        | PROFILE_WIRE_FEATURES.STORAGE_LAYOUT
-        | PROFILE_WIRE_FEATURES.RGB_SCHEMA
-        | PROFILE_WIRE_FEATURES.KEY_BEHAVIOR_SCHEMA
-        | PROFILE_WIRE_FEATURES.SPLIT_KEYBOARD
-        | PROFILE_WIRE_FEATURES.ACTION_ABI_DIGEST
-        | PROFILE_WIRE_FEATURES.COMPILED_PROFILE_HASH
-        | (options.mutation
-            ? PROFILE_WIRE_FEATURES.CANDIDATE_WRITE
-                | PROFILE_WIRE_FEATURES.PERSISTENT_COMMIT
-                | PROFILE_WIRE_FEATURES.RUNTIME_ACTIVATION
-                | PROFILE_WIRE_FEATURES.PEER_RECONCILIATION
-                | PROFILE_WIRE_FEATURES.ATOMIC_LOGICAL_APPLY
-            : 0);
+    const featureFlags = PROFILE_WIRE_KNOWN_MASKS.CURRENT_FEATURES | PROFILE_WIRE_FEATURES.SPLIT_KEYBOARD
+        | (options.mutation ? PROFILE_WIRE_KNOWN_MASKS.CURRENT_MUTATION_FEATURES : 0);
     capabilityIdentity.set([2, 3, 1, 0, options.schemaMajor || 3, 0, 32, options.mutation ? 20 : 0, 2], 0);
     capabilityIdentity.writeUInt32LE(featureFlags, 9);
     capabilityIdentity.writeUInt32LE(options.actionAbiDigest ?? 0x12345678, 13);
@@ -378,29 +361,23 @@ test("compatibility compares only what the keyboard reports with what this app r
     assert.match(compatibility.reasons.join("\n"), /Required profile domains/);
     assert.deepEqual(compatibility.checks.map((check) => check.label), [
         "Protocol major", "Schema major", "VIA protocol version", "VIA firmware version",
-        "Raw HID report size", "Status pages", "Required Profile Wire features", "Required profile domains",
+        "Raw HID report size", "Status pages", "Current firmware features", "Required profile domains",
     ], "no capacity is compared: the keyboard advertises its own and nothing here has another to compare");
 });
 
-test("compatibility accepts VIA 12 and 13 and nothing else", () => {
+test("compatibility accepts VIA 13, which current firmware reports, and nothing else", () => {
     const via = (protocolVersion) => evaluateProfileCompatibility({}, {protocolVersion, firmwareVersion: 0})
         .checks.find((check) => check.label === "VIA protocol version");
-    // Released firmware reports 12; QMK 0.34.6 and later report 13.
-    assert.equal(via(12).ok, true);
     assert.equal(via(13).ok, true);
-    for (const version of [11, 14, undefined]) {
+    for (const version of [11, 12, 14, undefined]) {
         assert.equal(via(version).ok, false);
-        assert.match(via(version).message, /supports 12 or 13/);
+        assert.match(via(version).message, /requires 13/);
     }
 });
 
 test("persistent live apply requires every mutation capability", () => {
     const compatible = {compatible: true, reasons: []};
-    const completeFlags = PROFILE_WIRE_FEATURES.CANDIDATE_WRITE
-        | PROFILE_WIRE_FEATURES.PERSISTENT_COMMIT
-        | PROFILE_WIRE_FEATURES.RUNTIME_ACTIVATION
-        | PROFILE_WIRE_FEATURES.PEER_RECONCILIATION
-        | PROFILE_WIRE_FEATURES.ATOMIC_LOGICAL_APPLY;
+    const completeFlags = PROFILE_WIRE_KNOWN_MASKS.CURRENT_MUTATION_FEATURES;
     const readyStatus = {peerKnown: true, peerConverged: true, candidatePending: false};
     assert.equal(evaluateLiveMutationCompatibility({featureFlags: completeFlags, candidateChunkMax: 20}, compatible, true, readyStatus).available, true);
 

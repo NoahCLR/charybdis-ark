@@ -53,20 +53,13 @@ for (const theme of ["plain", "vscode-dark"]) {
     });
 }
 
-test("the picker refuses a key a shortcut cannot hold, and firmware without shortcuts says so", async ({page}) => {
+test("the picker refuses a key a shortcut cannot hold", async ({page}) => {
     await openControls(page, "customKeys", {customKey: "CUSTOM_KEY_1"});
     await page.locator('[data-act="pick-shortcut"]').click();
     await page.locator("#pickerSearch").fill("KC_AUDIO_MUTE");
     await expect(page.locator('.picker [data-pick="KC_AUDIO_MUTE"]')).toHaveCount(0);
     await page.locator('.picker [data-act="cancel"]').first().click();
-    await page.evaluate(async () => {
-        const store = await import("/webview/store.mjs");
-        const model = structuredClone(store.getModel());
-        model.customKeyShortcutKeys = [];
-        store.setModel(model); store.render();
-    });
-    await expect(page.locator(".content")).toContainText("cannot give a custom key a shortcut");
-    await expect(page.locator('[data-act="pick-shortcut"]')).toHaveCount(0);
+    expect(await posted(page)).toEqual([]);
 });
 
 // A modifier key is its modifier and a shifted symbol is Shift and its key,
@@ -125,32 +118,6 @@ test("the shortcut picker offers the modifier keys and shifted symbols, as modif
     await page.locator('.picker [data-mod="S"]').click();
     await expect(page.locator('.picker [data-pick="KC_EXLM"]')).not.toHaveClass(/\bon\b/);
     await expect(page.locator(".picker .pk-value")).toHaveText("1");
-});
-
-// A keyboard whose firmware still stores settings v7 opens no draft: every
-// screen shows it from the keyboard's own model, read-only, with the reason.
-test("a keyboard on firmware older than shortcuts is shown read-only on every screen", async ({page}) => {
-    const errors = [];
-    page.on("pageerror", error => errors.push(error.message));
-    await openControls(page, "customKeys", {customKey: "CUSTOM_KEY_1"});
-    await page.evaluate(async () => {
-        const store = await import("/webview/store.mjs");
-        const model = structuredClone(store.getModel());
-        delete model.draft;
-        Object.assign(model, {olderFirmware: true, customKeyShortcutKeys: [], load: {...model.load, state: "ready"}});
-        store.setModel(model); store.render();
-    });
-    await expect(page.locator(".content")).toContainText("cannot give a custom key a shortcut");
-    await expect(page.locator('[data-f="custom-key:1:name"]')).toBeDisabled();
-    for (const screen of ["keys", "lighting", "macros", "customKeys", "mouse", "pointing", "settings"]) {
-        await page.locator(`[data-screen="${screen}"]`).click();
-        await expect(page.locator(`[data-screen="${screen}"]`)).toHaveAttribute("aria-current", "true");
-        await expect(page.getByText("Keyboard not ready for edits"), `${screen} shows the keyboard, not a placeholder`).toHaveCount(0);
-    }
-    await expect(page.locator(".content")).toContainText("older than this Ark");
-    await clearPosts(page);
-    expect(await posted(page)).toEqual([]);
-    expect(errors).toEqual([]);
 });
 
 // A layout key's picker offers an unused custom key for modifiers no keycode

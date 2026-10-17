@@ -158,20 +158,18 @@ test("metadata that does not describe a readable payload is refused", () => {
     }
 });
 
-test("wide pages address a whole 64 KiB slot", () => {
-    // Pages are 16 bits (feature bit 19): past 255 pages, up to 65,504 bytes.
-    for (const payloadLength of [25 * 256, 65504]) {
+test("wide pages address a whole 52 KiB slot", () => {
+    // Pages are 16 bits (feature bit 19): past 255 pages, up to 53,216 bytes.
+    for (const payloadLength of [25 * 256, 53216]) {
         assert.equal(decodePayloadMetadata(metadataPage({bytes: payloadOf(10), generation: 1, payloadLength})).payloadLength, payloadLength);
     }
 });
 
-test("a payload past page 255 is refused in words on firmware without wide pages, before any chunk", async () => {
-    // 255 chunks plus metadata fit narrow pages; one byte more needs page 256.
-    const fits = payloadOf(25 * 255), over = payloadOf(25 * 255 + 1);
-    assert.deepEqual((await readCommittedPayload(payloadDevice({bytes: fits, generation: 1}), {widePages: false})).bytes, fits);
-    const device = payloadDevice({bytes: over, generation: 1});
-    await assert.rejects(readCommittedPayload(device, {widePages: false}), (error) => error.code === "WIDE_PAGES_UNSUPPORTED" && /Update both halves/.test(error.message));
-    assert.deepEqual(device.requests, [0], "only the metadata was read");
+test("a payload past page 255 is read through wide pages", async () => {
+    // 255 chunks plus metadata fit one byte of page index; one byte more needs page 256.
+    const over = payloadOf(25 * 255 + 1), device = payloadDevice({bytes: over, generation: 1});
+    assert.deepEqual((await readCommittedPayload(device)).bytes, over);
+    assert.ok(device.requests.includes(256), "the last chunk is page 256");
 });
 
 test("metadata with nonzero reserved bytes is refused", () => {

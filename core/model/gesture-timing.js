@@ -70,7 +70,7 @@ function gestureTimingFindings(decoded) {
         results.push({kind: "comboTiming", level: "notice", layers: [], identity: String(index),
             title: `Combo ${index} has a short chord window`,
             detail: `Its ${combo.inputs.length} keys must complete a chord within the effective ${term} ms window. This may be difficult to perform; it is not proof that the chord is impossible.`,
-            fix: "Increase the combo window if needed. Longer windows can postpone individual-key output; they do not consume the repeat gap on firmware with physical gesture timing.",
+            fix: "Increase the combo window if needed. Longer windows can postpone individual-key output; they do not consume the repeat gap, which the keyboard times from the physical presses.",
             place: {kind: "combo", index}});
     });
     return results;

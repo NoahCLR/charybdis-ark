@@ -73,7 +73,7 @@ async function run(label, source, target, optimized, corruptSource = false) {
         // Simulated scan opportunities, not a prediction of device timings.
         const coordinator = new CandidateUploadCoordinator(connection, {sleep: async () => {assert.equal(await exchange("tick 20"), "ok");}});
         const uploading = coordinator.upload(target, {actionAbiDigest: CAPABILITIES_32.actionAbiDigest, capabilities, viaGeneration: 2, viaDigest: 123,
-            streamChunks: optimized, ...(optimized ? {baseSource: {bytes: source, kind: 0, origin: 255, generation: 0, crc32: crc32(source), digest: fnv1a32(source)}} : {})});
+            ...(optimized ? {baseSource: {bytes: source, kind: 0, origin: 255, generation: 0, crc32: crc32(source), digest: fnv1a32(source)}} : {})});
         if (corruptSource) {
             await assert.rejects(uploading, error => error instanceof CandidateUploadError && error.code === "DEVICE_REJECTED" && error.deviceError?.name === "CHECKSUM_MISMATCH");
             return;
