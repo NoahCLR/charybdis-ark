@@ -35,7 +35,10 @@ export function mountHover(root) {
         if (key) {
             const rect = key.getBoundingClientRect();
             timer = setTimeout(() => {
-                card.innerHTML = keyCard(Number(key.dataset.key)); place(card, rect, 14, true);
+                // A key the layer has no position for has nothing to show.
+                card.innerHTML = keyCard(Number(key.dataset.key));
+                if (!card.innerHTML) { hideHover(); return; }
+                place(card, rect, 14, true);
                 side.innerHTML = behaviourCards(Number(key.dataset.key)); placeSide(rect);
             }, 140);
             tip.hidden = true;

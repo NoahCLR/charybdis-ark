@@ -11,7 +11,7 @@
 /** @typedef {HTMLElement & {selectionStart?: number | null, selectionEnd?: number | null, setSelectionRange?: (start: number, end: number | null) => void}} FocusControl */
 
 const ACTION_NAMES = [
-    "id", "data-key", "data-trackball", "data-cell", "data-term", "data-macro", "data-channel", "data-row",
+    "id", "data-key", "data-custom-key", "data-trackball", "data-cell", "data-term", "data-macro", "data-channel", "data-row",
     "data-edit", "data-editmacro", "data-editpd", "data-pick", "data-lt", "data-mod", "data-screen", "data-tab",
     "data-ltab", "data-slot", "data-b", "data-helper", "data-repeat", "data-output", "data-target", "data-owner",
     "data-source", "data-mode", "data-anchor", "data-act", "data-step-text", "data-step-delay", "data-raw-payload",

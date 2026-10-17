@@ -7,7 +7,16 @@ const {openControls, clearPosts, posted, change} = require("./control-preview");
 // for a key on a layer or on none, posting the same draft edits.
 
 const editor = (page) => page.locator(".custom-key-behaviour");
-const pick = (page, slot) => page.locator(`.macro-grid [data-key="CUSTOM_KEY_${slot}"]`).click();
+const pick = (page, slot) => page.locator(`.macro-grid [data-custom-key="CUSTOM_KEY_${slot}"]`).click();
+
+test("a custom key tile hovers its tip, not the board's key card", async ({page}) => {
+    await openControls(page, "customKeys");
+    const tile = page.locator('.macro-grid [data-custom-key="CUSTOM_KEY_5"]');
+    await tile.hover();
+    await expect(page.locator(".tip")).toBeVisible();
+    await expect(page.locator(".tip")).toHaveText(await tile.getAttribute("data-tip"));
+    await expect(page.locator(".hovercard")).toBeHidden();
+});
 
 test("an unplaced custom key gets its behaviour on the Custom keys screen, with its built-in defaults", async ({page}) => {
     const errors = [];
