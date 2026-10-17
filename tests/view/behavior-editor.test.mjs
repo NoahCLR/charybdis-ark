@@ -1,8 +1,8 @@
 import {withAnswers} from "../fixtures/layer-answers.mjs";
 import assert from "node:assert/strict";
 import test from "node:test";
+import {behaviourEditorRow, behaviourIsEmpty, behaviourThresholds, helperDetail, behaviourKeyAt, behaviourRowAfterPreview, behaviourTimingEdit, behaviourTimingField, canHaveBehaviour} from "../../webview/view/behavior-editor.mjs";
 import {impliedBranch} from "../../webview/view/keyface.mjs";
-import {behaviourEditorRow, behaviourKeyAt, behaviourRowAfterPreview, behaviourTimingEdit, behaviourTimingField, canHaveBehaviour} from "../../webview/view/behavior-editor.mjs";
 
 test("opening an unstored behaviour leaves the model unchanged and takes built-ins from the host", () => {
     const builtIn = {tap: {helper: "TAP_SENDS", action: "KC_F"}};
@@ -101,4 +101,37 @@ test("a row opened from the selected key follows it when the preview changes; a 
     assert.equal(behaviourRowAfterPreview("KC_DELETE", "KC_DELETE", "KC_TRANSPARENT"), "KC_TRANSPARENT", "turned off again, back to the key itself");
     assert.equal(behaviourRowAfterPreview("KC_ENTER", "KC_TRANSPARENT", "KC_DELETE"), "KC_ENTER", "a row picked from the list is kept");
     assert.equal(behaviourRowAfterPreview(null, "KC_TRANSPARENT", "KC_DELETE"), null, "nothing opened yet");
+});
+
+test("a behaviour names the thresholds it runs on, its own or the keyboard's", () => {
+    const model = {behaviorTimingDefaults: {tapHoldTerm: "150", longerHoldTerm: "400", multiTapTerm: "150"}, keyBehaviors: []};
+    const behaviour = {keycode: "KC_LEFT", tapHoldTerm: "100", longerHoldTerm: "0", multiTapTerm: "0", steps: [
+        {tapCount: 0, hold: {action: "LALT(KC_LEFT)", helper: "TAP_ON_RELEASE_AFTER_HOLD"}, longHold: {action: "LGUI(KC_LEFT)", helper: "TAP_AT_HOLD_THRESHOLD"}}]};
+    model.keyBehaviors.push(behaviour);
+    const terms = behaviourThresholds(model, behaviour);
+    assert.deepEqual(terms.used, ["tapHoldTerm", "longerHoldTerm"], "no branch starts on a later tap");
+    assert.deepEqual(terms.tapHoldTerm, {name: "tapHoldTerm", ms: "100"}, "its own time");
+    assert.deepEqual(terms.longerHoldTerm, {name: "longerHoldTerm", ms: "400"}, "the keyboard default it follows");
+    assert.deepEqual(behaviourThresholds(model, {...behaviour, steps: []}).used, ["tapHoldTerm"], "a behaviour with no branches keeps its tap / hold term");
+    assert.deepEqual(behaviourThresholds(model, {...behaviour, steps: [{tapCount: 1, tap: {action: "KC_A"}}]}).used, ["multiTapTerm"]);
+});
+
+test("a hold tier states its own threshold when it waits for one, and its rate when it repeats", () => {
+    const terms = {tapHoldTerm: {name: "tapHoldTerm", ms: "150"}, longerHoldTerm: {name: "longerHoldTerm", ms: "400"}, multiTapTerm: {name: "multiTapTerm", ms: "100"}, used: []};
+    assert.equal(helperDetail("hold", {helper: "TAP_AT_HOLD_THRESHOLD"}, terms), "150 ms");
+    assert.equal(helperDetail("long", {helper: "TAP_ON_RELEASE_AFTER_HOLD"}, terms), "400 ms");
+    assert.equal(helperDetail("hold", {helper: "REPEAT_WHILE_HELD", repeatHz: "100"}, terms), "100 Hz", "a repeat runs at its rate, not a gap between taps");
+    assert.equal(helperDetail("hold", {helper: "REPEAT_WHILE_HELD", repeatHz: "0"}, terms), "0 Hz", "the stored rate is reported as it is");
+    assert.equal(helperDetail("hold", {helper: "PRESS_AND_HOLD_UNTIL_RELEASE"}, terms), "");
+    assert.equal(helperDetail("tap", {helper: "TAP_AT_HOLD_THRESHOLD"}, terms), "");
+});
+
+test("a behaviour row with nothing of its own is empty, and any one setting makes it not", () => {
+    const empty = {keycode: "KC_DELETE", tapHoldTerm: "0", longerHoldTerm: "0", multiTapTerm: "0", keepsAutoMouseAnchored: false, enabled: true, allowedLayers: 65535, steps: []};
+    assert.equal(behaviourIsEmpty(empty, 16), true);
+    assert.equal(behaviourIsEmpty({...empty, tapHoldTerm: "150"}, 16), false, "its own timing");
+    assert.equal(behaviourIsEmpty({...empty, steps: [{tapCount: 0, tap: {action: "KC_A"}}]}, 16), false);
+    assert.equal(behaviourIsEmpty({...empty, allowedLayers: 1}, 16), false, "limited to some layers");
+    assert.equal(behaviourIsEmpty({...empty, enabled: false}, 16), false, "switched off");
+    assert.equal(behaviourIsEmpty({...empty, keepsAutoMouseAnchored: true}, 16), false);
 });

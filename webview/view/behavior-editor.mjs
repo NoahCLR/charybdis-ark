@@ -48,6 +48,49 @@ export function behaviourTimingField(/** @type {import("../../contracts/panel.js
         ...timingInput(stored, fallback, followsDefault)};
 }
 
+// A stored behaviour row that changes nothing: no branches, no timing of its
+// own, on on every layer and not anchoring auto-mouse. The keyboard runs the
+// key as if the row were not there.
+export function behaviourIsEmpty(/** @type {import("../../contracts/panel.js").BehaviorView} */ behaviour, /** @type {number} */ layerCount) {
+    const every = 2 ** layerCount - 1;
+    return !(behaviour.steps || []).length && behaviour.enabled !== false && !behaviour.keepsAutoMouseAnchored
+        && ((behaviour.allowedLayers ?? every) & every) === every
+        && ["tapHoldTerm", "longerHoldTerm", "multiTapTerm"].every((name) => Number(behaviour[/** @type {"tapHoldTerm"} */ (name)] ?? 0) === 0);
+}
+
+// The thresholds a behaviour actually runs on, in ms — its own, or the
+// keyboard's default where it follows that: tap / hold whenever a tier waits to be held, long
+// hold when a branch has one, repeated taps when a branch starts on a later
+// tap. A behaviour with no branches yet still carries its tap / hold term.
+export function behaviourThresholds(/** @type {Model} */ model, /** @type {import("../../contracts/panel.js").BehaviorView} */ behaviour) {
+    const row = behaviourEditorRow(model, behaviour.keycode) || {...behaviour, timingDefaults: model?.behaviorTimingDefaults || {}};
+    const steps = behaviour.steps || [];
+    /** @param {"tapHoldTerm" | "longerHoldTerm" | "multiTapTerm"} name */
+    const term = (name) => {
+        const field = behaviourTimingField(/** @type {any} */ (row), name);
+        return {name, ms: field.followsDefault ? field.fallback : field.stored};
+    };
+    const used = {
+        tapHoldTerm: !steps.length || steps.some((step) => step.hold || step.longHold),
+        longerHoldTerm: steps.some((step) => step.longHold),
+        multiTapTerm: steps.some((step) => step.tapCount > 0),
+    };
+    return {tapHoldTerm: term("tapHoldTerm"), longerHoldTerm: term("longerHoldTerm"), multiTapTerm: term("multiTapTerm"),
+        used: /** @type {const} */ (["tapHoldTerm", "longerHoldTerm", "multiTapTerm"]).filter((name) => used[name])};
+}
+
+// The number a hold tier's helper turns on, as the card states it beside the
+// helper: a Hold that taps at or after its threshold waits for tap / hold and a
+// Long hold for long hold, while one that repeats runs at its own rate, given
+// as stored. Empty when the helper turns on neither.
+export function helperDetail(/** @type {import("../../contracts/edits.js").Tier} */ kind, /** @type {{helper?: string, repeatHz?: import("../../contracts/edits.js").Scalar}} */ branch, /** @type {ReturnType<typeof behaviourThresholds>} */ terms) {
+    if (kind === "tap") return "";
+    if (branch.helper === "REPEAT_WHILE_HELD") return `${String(branch.repeatHz ?? "0")} Hz`;
+    if (branch.helper !== "TAP_AT_HOLD_THRESHOLD" && branch.helper !== "TAP_ON_RELEASE_AFTER_HOLD") return "";
+    const term = terms[kind === "hold" ? "tapHoldTerm" : "longerHoldTerm"];
+    return term.ms === "" ? "" : `${term.ms} ms`;
+}
+
 // Leaving a displayed default untouched must keep the stored inheritance zero.
 export function behaviourTimingEdit(/** @type {string} */ value, /** @type {ReturnType<typeof behaviourTimingField>} */ field) {
     const written = String(value).trim();

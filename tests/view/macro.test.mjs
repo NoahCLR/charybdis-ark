@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {describeStep, macroMatches, macroPeek, parseMacro, serializeMacro, macroStepsInput, unreleased} from "../../webview/view/macro.mjs";
+import {describeStep, macroChips, macroMatches, macroPeek, parseMacro, serializeMacro, macroStepsInput, unreleased} from "../../webview/view/macro.mjs";
 
 test("a payload reads back as the steps the keyboard will play", () => {
     const {steps, error} = parseMacro("noah@xomnia.com{120}{KC_ENT}");
@@ -154,4 +154,14 @@ test("a held key may span text the host layout types, in preview and host alike"
             assert.equal(previewAccepts(payload), accepted, `preview ${layout}: ${payload}`);
         }
     }
+});
+
+test("the hover card reads a macro step by step, held, let go, tapped, typed and waited", () => {
+    const label = (name) => ({KC_LEFT_GUI: "Left Command", KC_TAB: "Tab"})[name] ?? name;
+    assert.deepEqual(macroChips("{+KC_LEFT_GUI}{KC_TAB}{120}t3 code{-KC_LEFT_GUI}", label), {more: 0, chips: [
+        {kind: "press", text: "↓ Left Command"}, {kind: "tap", text: "Tab"}, {kind: "delay", text: "120 ms"},
+        {kind: "text", text: "“t3 code”"}, {kind: "release", text: "↑ Left Command"}]});
+    const long = macroChips("{KC_A}".repeat(15));
+    assert.equal(long.chips.length, 12);
+    assert.equal(long.more, 3);
 });

@@ -1,5 +1,5 @@
 // @ts-check
-import {keyFace, keyMeaning} from "./keyface.mjs";
+import {behaviourFor, keyFace, keyMeaning} from "./keyface.mjs";
 import {comboActivations, downTheStack, resolvedPositions} from "./layer-resolution.mjs";
 /** @typedef {import("../../contracts/panel.js").ComboView} ComboView */
 /** @typedef {import("../../contracts/panel.js").Layer} Layer */
@@ -56,6 +56,31 @@ export function comboInputIsKey(combo, at, position) {
     return Array.isArray(combo?.inputPositions) && combo.inputPositions.length
         ? combo.inputPositions[at] === position.layoutIndex
         : inputOn(combo?.inputs?.[at] ?? "", position);
+}
+
+// The behaviours these combos run when they fire: one per key they send, in
+// combo order, with the badges of the combos that send it. A combo runs the
+// behaviour of the key it sends only while its own output behaviour, the
+// keyboard's behaviours and "combo outputs use behaviours" are all on, and the
+// behaviour itself is enabled and allowed on the combo's source layer, when
+// that is given.
+/** @param {ViewModel} model @param {ComboView[]} combos @param {number} [layer] */
+export function comboBehaviours(model, combos, layer) {
+    const participation = model?.participation;
+    if (participation?.behaviorsEnabled === false || participation?.comboOutputBehaviors === false) return [];
+    /** @type {Map<string, {keycode: string, output: string, shown: string, badges: string[]}>} */
+    const found = new Map();
+    for (const combo of combos) {
+        if (combo.useOutputBehavior === false) continue;
+        const keycode = model?.qmkKeycodeAliases?.[combo.output] || combo.output;
+        const behaviour = behaviourFor(model, keycode);
+        if (!behaviour || behaviour.enabled === false) continue;
+        if (layer !== undefined && behaviour.allowedLayers !== undefined && !(Number(behaviour.allowedLayers) & (1 << layer))) continue;
+        const entry = found.get(keycode) ?? {keycode, output: combo.output, shown: combo.outputDisplay || combo.output, badges: []};
+        entry.badges.push(combo.badge);
+        found.set(keycode, entry);
+    }
+    return [...found.values()];
 }
 
 // The matching rule alone, for one key, with no layer in view. Screens ask
