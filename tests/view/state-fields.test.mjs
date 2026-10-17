@@ -45,7 +45,7 @@ const RESETS = ["retarget", "pdKind", "pdButtons", "pdTaps", "lastTake"];
 const CUSTOM = ["combo", "macroForms"];
 const KEPT = [
     "screen", "layer", "layersOn", "layerGripFocus", "selected", "tab", "behaviourRow", "behaviourRowShown", "behaviourRoute",
-    "reachGroups", "resetBenchHeight", "reachRow", "cell", "reveal", "pickCombo", "settingsOpen", "cellHow", "placement",
+    "reachGroups", "resetBenchHeight", "reachRow", "cell", "cellRow", "reveal", "pickCombo", "settingsOpen", "cellHow", "placement",
     "macroClipboard", "keyClipboard", "stage", "layersOpen", "layersAsked", "pdSlot", "pdAdvanced", "applyDismissed", "pdPreview", "feedbackRow",
     "macroSlot", "macroSearch", "customKey", "customKeySearch", "recording", "recordDelays", "recordPreserveHoldTiming", "recordDelayThreshold",
     "recordDelayRound", "ledPicks", "trackball", "rowColour", "ledRow", "settingsSearch", "overlay", "leaveDemo", "confirmChecks",
@@ -65,7 +65,7 @@ const layer = (index) => ({index, name: `Layer ${index}`, positions: []});
 test("a draft change resets the existing forms and preserves historically kept pending choices", () => {
     setModel({layers: [layer(0), layer(1), layer(2)]});
     const standing = {
-        screen: "macros", layer: 2, layersOn: [1], selected: 7, tab: "behaviours", cell: "0-hold",
+        screen: "macros", layer: 2, layersOn: [1], selected: 7, tab: "behaviours", cell: "0-hold", cellRow: "QK_USER_16",
         cellHow: {cell: "0-hold", keycode: "QK_USER_16", helper: "REPEAT_WHILE_HELD", repeatHz: "20"},
         placement: {keycode: "VIA_MACRO_1"}, keyClipboard: {keycode: "KC_A", label: "A"}, pdSlot: 2, macroSlot: "VIA_MACRO_0",
         macroSearch: "hello", ledPicks: [1, 4], trackball: true, rowColour: {h: "10", s: "20", v: "30"},

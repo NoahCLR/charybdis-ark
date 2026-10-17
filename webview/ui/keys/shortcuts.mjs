@@ -1,6 +1,7 @@
 // @ts-check
 // The Keys screen's keyboard shortcuts: copy, paste and delete on the selected
-// key, or on the open behaviour cell.
+// key, or on the open behaviour cell. On Custom keys they act on the open cell
+// of the selected key's behaviour, and only there.
 
 import {behaviourGridSteps, keyFace, keyName, visibleKeycode} from "../../view/keyface.mjs";
 import {currentLayer, getModel, positionAt, post, render, state, writable, canEdit as canEditArea} from "../../store.mjs";
@@ -16,12 +17,13 @@ const {TIER_FIELDS} = edits;
 // their own copy, paste and delete.
 /** @param {KeyboardEvent} event */
 export function keysShortcut(event) {
-    if (state.screen !== "keys" || state.overlay || state.picker || state.retarget || state.recording || state.combo.picking) return false;
+    if ((state.screen !== "keys" && state.screen !== "customKeys") || state.overlay || state.picker || state.retarget || state.recording || state.combo.picking) return false;
     const action = edits.keyAction(event);
     if (!action) return false;
     if (/** @type {HTMLElement} */ (event.target).closest?.("input, textarea, select, [contenteditable]")) return false;
     if (action === "copy" && String(getSelection?.() || "")) return false;
     if (cellShortcut(action)) { event.preventDefault(); return true; }
+    if (state.screen !== "keys") return false;
     const layer = currentLayer();
     if (!layer) return false;
     const position = positionAt(layer, state.selected);
@@ -49,13 +51,18 @@ export function keysShortcut(event) {
 // ⌘V makes it send the copied key, running as it already does or as chosen.
 /** @param {"copy" | "paste" | "clear"} action */
 function cellShortcut(action) {
-    if (state.tab !== "behaviours" || !state.cell) return false;
-    const behaviour = behaviourEditorRow(getModel(), state.behaviourRow || "");
+    if (!state.cell) return false;
+    const model = getModel();
+    // The behaviour whose editor is on screen: the Behaviours tab's row, or the
+    // custom key Custom keys shows (the first until one is picked).
+    const row = state.screen === "customKeys" ? state.customKey || model?.customKeys?.[0]?.keycode
+        : state.tab === "behaviours" ? state.behaviourRow : null;
+    const behaviour = behaviourEditorRow(model, row || "");
     const [tapCount, tier] = state.cell.split("-");
     const kind = /** @type {import("../../../contracts/edits.js").Tier} */ (tier);
-    const step = behaviour && behaviourGridSteps(behaviour, getModel()?.behaviorEditing?.maxTapStepsPerBehavior)
+    const step = behaviour && behaviourGridSteps(behaviour, model?.behaviorEditing?.maxTapStepsPerBehavior)
         .find((row) => String(row.tapCount) === tapCount);
-    if (!step || !behaviour) return false;
+    if (!step || !behaviour || state.cellRow !== behaviour.keycode) return false;
     const branch = step[TIER_FIELDS[kind]];
     /** @param {import("../../../contracts/edits.js").BehaviorBranch | null} next */
     const change = (next) => saveBehaviour(document, behaviour, {tapCount: step.tapCount, kind, branch: next});

@@ -4,8 +4,13 @@
  */
 // Selector assertions describe the controls authored in these templates.
 // Custom keys: the keyboard's 128 named keys that do only what their behaviour
-// says. A key here is its name; what it does is its behaviour, edited on the
-// Keys screen like any other. Place one on a layer or send it from a combo.
+// says. The selected key shows two cards: the key itself (its name and where it
+// is placed; each field is one entry in `keyFields`) and what it does, which is
+// the Keys screen's behaviour editor for that key, placed or not. A key with no
+// stored behaviour shows the unstored grid with its built-in defaults; the first
+// edit adds the row. This is the only behaviour editor on screen, so the open
+// cell and the timing fields it saves are this key's. Place one on a layer or
+// send it from a combo.
 
 import {el, esc} from "../lib/dom.mjs";
 import {customKeyPlacements} from "../view/reach.mjs";
@@ -16,6 +21,8 @@ import * as edits from "../view/edits.mjs";
 import {layerSwatch} from "./layerbar.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {topbar, unavailable} from "./shell.mjs";
+import {behaviourEditorRow} from "../view/behavior-editor.mjs";
+import {behaviourEditor} from "./keys/behaviour-editor.mjs";
 
 
 export function screenCustomKeys() {
@@ -58,34 +65,60 @@ export function screenCustomKeys() {
             aria-current="${row.keycode === key?.keycode}" data-tip="${esc(tip)}">
             <span class="n">K${row.slot}</span>${changed.has(row.keycode) ? draftDot("Changed in your draft", "corner") : ""}
             <span class="v">${row.name ? esc(row.name.length > 13 ? `${row.name.slice(0, 12)}…` : row.name) : "—"}</span></button>`);
-        cell.addEventListener("click", () => { state.customKey = row.keycode; render(); });
+        cell.addEventListener("click", () => {
+            // Another key's behaviour opens with no cell open, as picking
+            // another row does on the Keys screen. Only this key's own cell
+            // closes: one open in the Keys screen's row stays open there.
+            if (row.keycode !== key?.keycode && state.cellRow === key?.keycode) Object.assign(state, {cell: null, cellRow: null, cellHow: null});
+            state.customKey = row.keycode;
+            render();
+        });
         cells.append(cell);
     }
     pad.appendChild(grid);
-    pad.appendChild(key ? editor(model, key, canEdit) : el(`<div class="empty-card"><p class="note">Pick a key.</p></div>`));
+    if (key) {
+        const side = el(`<div class="stack"></div>`);
+        side.append(editor(model, key, canEdit), behaviourCard(model, key));
+        pad.appendChild(side);
+    } else pad.appendChild(el(`<div class="empty-card"><p class="note">Pick a key.</p></div>`));
     main.appendChild(content);
     return main;
 }
 
 /** @param {Model} model @param {import("../../contracts/panel.js").CustomKey} key @param {boolean} canEdit */
 function editor(model, key, canEdit) {
-    const space = model?.customKeyNameSpace || {perName: NAME_MAX_BYTES};
-    const count = nameCount(key.name, space.perName);
     const card = el(`<div class="card">
         <div class="card-h"><h3>${esc(key.name || `Custom key ${key.slot}`)}</h3>
             <span class="tag" data-tip="${esc(key.keycode)}">Key ${esc(key.slot)}</span>
             <span class="right row actions">
-                <button class="btn tiny ghost" data-act="behaviour" ${canEditArea("behaviours") ? "" : "disabled"}>Open behaviour…</button>
                 <button class="btn tiny ghost" data-act="place" ${writable() ? "" : "disabled"}>Place on a key…</button></span></div>
-        <div class="card-b stack">
-            <label class="field"><span>Name</span>
-                <input data-f="custom-key:${key.slot}:name" class="input" data-name value="${esc(key.name)}" placeholder="Custom key ${esc(key.slot)}" ${canEdit ? "" : "disabled"}
-                    data-tip="${esc(NAME_TIP)}">
-                <span class="note${count.over ? " warn" : ""}" data-name-count>${esc(count.label)}</span></label>
-            <div class="field"><span>What it does</span>
-                <span class="note">${key.hasBehavior ? "Its behaviour: open it to see and change what each tap and hold sends." : "Nothing yet. Add a behaviour to give it taps and holds."}</span></div>
-            ${placedOn(model, key)}
-        </div></div>`);
+        <div class="card-b stack">${keyFields(model, key, canEdit).join("")}</div></div>`);
+    attachNameField(card, model, key);
+    /** @type {HTMLElement} */ (card.querySelector('[data-act="place"]')).addEventListener("click", () => {
+        state.placement = {keycode: key.keycode};
+        state.screen = "keys"; state.tab = "key"; render();
+    });
+    /** @type {NodeListOf<HTMLElement>} */ (card.querySelectorAll("[data-goto-layer]")).forEach((button) => button.addEventListener("click", () =>
+        showOnLayer(key.keycode, Number(button.dataset.gotoLayer))));
+    return card;
+}
+
+// The key's own fields, in the order the card shows them.
+/** @param {Model} model @param {import("../../contracts/panel.js").CustomKey} key @param {boolean} canEdit */
+const keyFields = (model, key, canEdit) => [nameField(model, key, canEdit), placedOn(model, key)];
+
+/** @param {Model} model @param {import("../../contracts/panel.js").CustomKey} key @param {boolean} canEdit */
+function nameField(model, key, canEdit) {
+    const count = nameCount(key.name, (model?.customKeyNameSpace || {perName: NAME_MAX_BYTES}).perName);
+    return `<label class="field"><span>Name</span>
+        <input data-f="custom-key:${key.slot}:name" class="input" data-name value="${esc(key.name)}" placeholder="Custom key ${esc(key.slot)}" ${canEdit ? "" : "disabled"}
+            data-tip="${esc(NAME_TIP)}">
+        <span class="note${count.over ? " warn" : ""}" data-name-count>${esc(count.label)}</span></label>`;
+}
+
+/** @param {HTMLElement} card @param {Model} model @param {import("../../contracts/panel.js").CustomKey} key */
+function attachNameField(card, model, key) {
+    const space = model?.customKeyNameSpace || {perName: NAME_MAX_BYTES};
     const nameInput = /** @type {HTMLInputElement} */ (card.querySelector("[data-name]"));
     nameInput.addEventListener("input", () => {
         const now = nameCount(nameInput.value, space.perName), node = /** @type {HTMLElement} */ (card.querySelector("[data-name-count]"));
@@ -93,18 +126,32 @@ function editor(model, key, canEdit) {
         node.classList.toggle("warn", now.over);
     });
     nameInput.addEventListener("change", () => post(edits.customKeyNameMessage(key.keycode, nameInput.value, model?.customKeyEditing?.identity)));
-    /** @type {HTMLElement} */ (card.querySelector('[data-act="place"]')).addEventListener("click", () => {
-        state.placement = {keycode: key.keycode};
-        state.screen = "keys"; state.tab = "key"; render();
-    });
-    /** @type {HTMLElement} */ (card.querySelector('[data-act="behaviour"]')).addEventListener("click", () => {
-        Object.assign(state, {screen: "keys", tab: "behaviours", behaviourRow: key.keycode});
-        state.cell = null;
-        state.cellHow = null;
+}
+
+// What the key does: its behaviour editor, the same one the Keys screen's
+// Behaviours tab shows. A placed key links there too, where the board shows
+// the keys that reach it: on the layer shown if it reaches the key there,
+// otherwise on the first layer that does.
+/** @param {Model} model @param {import("../../contracts/panel.js").CustomKey} key */
+function behaviourCard(model, key) {
+    const behaviour = behaviourEditorRow(model, key.keycode);
+    const placements = customKeyPlacements(model, layers(), key.keycode);
+    const placed = placements.length > 0;
+    const card = el(`<div class="card custom-key-behaviour">
+        <div class="card-h"><h3>What it does</h3>
+            <span class="tag">${key.hasBehavior ? "Behaviour" : "No behaviour yet"}</span>
+            ${placed ? `<span class="right row actions"><button class="btn tiny ghost" data-act="show-behaviour"
+                data-tip="Open this behaviour in Keys · Behaviours, with the board showing the keys that reach it.">Show on the Keys screen</button></span>` : ""}</div>
+        <div class="card-b"></div></div>`);
+    const body = /** @type {HTMLElement} */ (card.querySelector(".card-b"));
+    if (behaviour) body.appendChild(behaviourEditor(behaviour));
+    /** @type {HTMLElement | null} */ (card.querySelector('[data-act="show-behaviour"]'))?.addEventListener("click", () => {
+        // The open cell belongs to this behaviour, so it stays open there.
+        const shown = placements.find((entry) => entry.at === state.layer) || placements[0];
+        Object.assign(state, {screen: "keys", tab: "behaviours", behaviourRow: behaviour?.keycode || key.keycode,
+            behaviourRoute: null, behaviourRowShown: null, layer: shown ? shown.at : state.layer});
         render();
     });
-    /** @type {NodeListOf<HTMLElement>} */ (card.querySelectorAll("[data-goto-layer]")).forEach((button) => button.addEventListener("click", () =>
-        showOnLayer(key.keycode, Number(button.dataset.gotoLayer))));
     return card;
 }
 

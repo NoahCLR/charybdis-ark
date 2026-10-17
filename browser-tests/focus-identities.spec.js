@@ -12,7 +12,7 @@ async function identityProblems(page) {
 }
 
 const surfaces = [
-    ["keys", {tab: "key"}], ["keys", {tab: "behaviours", behaviourRow: "KC_LEFT_GUI", cell: "1-hold"}],
+    ["keys", {tab: "key"}], ["keys", {tab: "behaviours", behaviourRow: "KC_LEFT_GUI", cell: "1-hold", cellRow: "KC_LEFT_GUI"}],
     ["keys", {tab: "combos"}], ["keys", {layersOpen: true}],
     ["settings", {settingsOpen: ["keyBehavior", "comboSettings", "autoMouse", "mouse"]}],
     ["mouse", {}], ["customKeys", {}], ["macros", {macroSlot: "VIA_MACRO_17"}],

@@ -661,8 +661,10 @@ button.tier:hover { background: var(--surface-3); }
 .reach-table { padding: 2px 0; }
 
 .beh-head { display: flex; align-items: flex-start; gap: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
-.beh-intro { display: flex; align-items: flex-start; gap: 18px; padding: 13px 0 16px; }
-.beh-intro .note { flex: 1; min-width: 0; }
+/* The note keeps a readable width: beside a narrow editor (Custom keys) the
+   switch and participation controls wrap below it rather than squeeze it. */
+.beh-intro { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 18px; padding: 13px 0 16px; }
+.beh-intro .note { flex: 1 1 280px; min-width: 0; }
 .beh-intro .sw { flex: none; }
 /* One row per tap count the keyboard allows, all shown; a column per tier.
    Each timing heads what it governs: Multi tap window the tap counts, Tap /

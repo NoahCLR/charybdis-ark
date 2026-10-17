@@ -20,6 +20,7 @@ import {AXIS, BUTTON, DIRECTIONAL_STARTER_THRESHOLD, KIND, MODIFIER_POLICY, SCRO
 
 const require = createRequire(import.meta.url);
 const {SETTING} = require("../../core/schema/settings-domain-v1");
+const {customKeyCode} = require("../../core/data/user-keycodes");
 const here = path.dirname(fileURLToPath(import.meta.url));
 const {ProfileDraftSession} = require(path.join(here, "..", "..", "core", "session", "profile-draft-session"));
 const portable = require(path.join(here, "..", "..", "core", "model", "portable-profile"));
@@ -239,6 +240,20 @@ test("new behaviour rows preserve built-in actions, including LT targets", () =>
             tapCount: 0, kind: "tap", branch: {helper: "TAP_SENDS", action: "LT(3,KC_F)"},
         }}, draft.identity())), /makes its own tap\/hold decision/, "LT is still refused as an authored action");
     }
+});
+
+test("a custom key on no layer gets its behaviour row from the Custom keys screen's first edit", () => {
+    const draft = session();
+    const slot = 5;
+    const isRow = (entry) => entry.target.kind === 7 && entry.target.operand === slot;
+    assert.ok(!draft.document.layers.some((layer) => layer.includes(customKeyCode(slot))), "CUSTOM_KEY_5 is on no layer");
+    assert.ok(!decoded(draft).behaviors.rows.some(isRow));
+    const row = behaviourEditorRow({behaviorTimingDefaults: {tapHoldTerm: "150", longerHoldTerm: "400", multiTapTerm: "150"}}, "CUSTOM_KEY_5");
+    stage(draft, edits.saveBehaviour(row, {change: {tapCount: 0, kind: "long", branch: edits.cellBranch("long", {action: "KC_B", helper: "TAP_AT_HOLD_THRESHOLD"})}}, draft.identity()));
+    const saved = decoded(draft).behaviors.rows.find(isRow);
+    assert.ok(saved, "the row is stored for the unplaced custom key");
+    assert.equal(saved.steps[0].longHold.action.operand, 0x05);
+    assert.ok(reviewAreas(draft).includes("Behaviours"));
 });
 
 test("an unstored editor only creates a row after an action, timing override or anchor change", () => {

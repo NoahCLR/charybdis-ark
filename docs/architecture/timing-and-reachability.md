@@ -116,7 +116,23 @@ that supplies it and that the row is shared by that keycode. A position answered
 by `KC_NO`, by nothing, or shown alone outside a preview keeps no editor.
 Changing the previewed layers re-resolves a row opened from the selected key; a
 row picked from the list stays (`toggleLayerOn` in webview/store.mjs).
-Opening a custom key's behaviour follows the same rule.
+A custom key's behaviour follows the same rule on the Custom keys screen, which
+shows the selected key's editor in place, whether or not any layer holds the key.
+The host publishes built-in defaults for every custom key as well as for every
+keycode the profile holds (`behaviorDefaults` in core/session/device-model.js),
+so an unplaced key's unstored grid matches a placed one's (`releaseTaps`). Each
+screen shows at most one behaviour editor. The open cell belongs to the
+behaviour it was opened in (`cellRow` in webview/store.mjs), so it never opens
+in another behaviour's grid or takes the other screen's shortcuts, and a save
+reads the timing fields by their identity, which names the behaviour. The cell
+shortcuts (`keysShortcut` in webview/ui/keys/shortcuts.mjs) act on the cell
+open in the behaviour on screen: the Behaviours tab's row, or the custom key
+the Custom keys screen shows. Picking another custom key closes only a cell
+that key owned. **Change key…** on Custom keys follows the behaviour: to the
+custom key that now holds it, or to the Keys screen's Behaviours tab when it
+moved to any other key (`retargetBehaviour` in webview/ui/keys/retarget.mjs).
+**Show on the Keys screen** keeps the previewed layer if the key is reached
+there, and otherwise shows the first layer that reaches it.
 
 ## Inherited timing and review
 

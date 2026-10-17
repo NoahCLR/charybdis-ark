@@ -1,6 +1,7 @@
 import {withAnswers} from "../fixtures/layer-answers.mjs";
 import assert from "node:assert/strict";
 import test from "node:test";
+import {impliedBranch} from "../../webview/view/keyface.mjs";
 import {behaviourEditorRow, behaviourKeyAt, behaviourRowAfterPreview, behaviourTimingEdit, behaviourTimingField, canHaveBehaviour} from "../../webview/view/behavior-editor.mjs";
 
 test("opening an unstored behaviour leaves the model unchanged and takes built-ins from the host", () => {
@@ -15,6 +16,16 @@ test("opening an unstored behaviour leaves the model unchanged and takes built-i
     assert.deepEqual(row.builtIn, builtIn);
     assert.deepEqual(row.timingDefaults, timing);
     assert.deepEqual(model, before);
+});
+
+test("an unstored custom key's grid shows the tap a release before Long hold sends", () => {
+    // Custom keys shows this editor for a key on no layer, with the host's
+    // defaults for every custom key (tests/session/device-model.test.js).
+    const model = {keyBehaviors: [], behaviorEditing: {keyDefaults: {CUSTOM_KEY_9: {builtIn: {releaseTaps: true}, timing: {}}}}};
+    const unplaced = behaviourEditorRow(model, "CUSTOM_KEY_9");
+    assert.equal(unplaced.stored, false);
+    const step = {tapCount: 0, tap: {helper: "TAP_SENDS", action: "KC_A"}, longHold: {helper: "HOLD_WHILE_HELD", action: "KC_B"}};
+    assert.equal(impliedBranch({...unplaced, steps: [step]}, step, "hold")?.meaning, "tapsBeforeLong");
 });
 
 test("an existing row is selected through its semantic alias without changing it", () => {

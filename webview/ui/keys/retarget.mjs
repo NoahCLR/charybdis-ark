@@ -33,9 +33,19 @@ export function pickBehaviourKey(behaviour) {
 function retargetBehaviour(from, to, conflict) {
     const model = getModel();
     state.retarget = null;
-    state.behaviourRow = conflict === "swap" || conflict === "overwrite"
+    const row = conflict === "swap" || conflict === "overwrite"
         ? behaviourListeningTo(model, to)?.keycode || canonicalKeycode(model, to) : canonicalKeycode(model, to);
-    state.behaviourRowShown = null;
+    // The editor that moved it follows it to its new key: the Keys screen's
+    // open row, or on Custom keys the key now holding it if that is one. Moved
+    // from Custom keys to any other key, it opens on the Keys screen, where
+    // that key's behaviours are, rather than leaving an empty editor here.
+    const toCustomKey = (model?.customKeys || []).some((key) => key.keycode === row);
+    if (state.screen === "customKeys" && !toCustomKey) Object.assign(state, {screen: "keys", tab: "behaviours", behaviourRoute: null});
+    if (state.screen === "keys" || state.behaviourRow === from) {
+        state.behaviourRow = row;
+        state.behaviourRowShown = null;
+    }
+    if (state.screen === "customKeys") state.customKey = row;
     state.cell = null;
     post(edits.retargetBehaviour(from, to, model?.profileIdentity, conflict));
     render();

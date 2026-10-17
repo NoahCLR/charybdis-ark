@@ -39,6 +39,10 @@ export const STATE_FIELDS = {
     // a row in a table can answer "where do I press for this".
     reachRow: kept({macros: null, combos: null, pointing: null}),
     cell: kept(null),
+    // The behaviour whose grid `cell` is open in. The Keys screen and the
+    // Custom keys screen each show one behaviour editor, and a cell opened in
+    // one behaviour never opens in another's grid or takes its shortcuts.
+    cellRow: kept(null),
     reveal: kept(null),        // a selector the next render scrolls into view and marks, then forgets
     pickCombo: kept(null),     // a combo id to pick in the Combos tab, wherever this layer lists it
     settingsOpen: kept([]),    // settings sections opened by hand or by a Show, so a render keeps them open
