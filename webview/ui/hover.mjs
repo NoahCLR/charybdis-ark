@@ -14,7 +14,7 @@ import {keyHandling} from "../view/participation.mjs";
 import {resolvedPositions} from "../view/layer-resolution.mjs";
 import {pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {getModel, heldLayers, layerName, positionAt} from "../store.mjs";
-import {branchBadge, comboBadge, comboTint, keyNameMarked, mark, marked, sends, sendsKind, tierDot} from "./marks.mjs";
+import {branchBadge, comboBadge, comboOutputMarked, comboTint, keyNameMarked, mark, marked, sends, sendsKind, tierDot} from "./marks.mjs";
 import {helperWord, tierName, vocabulary, word} from "../view/vocabulary.mjs";
 import {KIND} from "../view/pointing-config.mjs";
 
@@ -114,7 +114,7 @@ function behaviourCards(index) {
     const tint = comboTint(model);
     const cards = runs.slice(0, SIDE_CARDS).map((run) => {
         const target = /** @type {import("../../contracts/panel.js").Position} */ ({keycode: run.output, semantic: run.keycode, layoutIndex: -1});
-        return `<div class="hovercard hc-side"${tint ? ` style="--combo:${tint}"` : ""}><div class="hc-head"><div class="hc-eyebrow">Combo behaviour</div><div class="hc-title"><span class="t">${esc(run.shown)}</span>
+        return `<div class="hovercard hc-side"${tint ? ` style="--combo:${tint}"` : ""}><div class="hc-head"><div class="hc-eyebrow">Combo behaviour</div><div class="hc-title"><span class="t">${keyNameMarked(model, run.shown, run.keycode)}</span>
             <span class="hc-badges">${run.badges.map((badge) => comboBadge(model, badge)).join("")}</span></div>
             <code class="hc-code">${esc(visibleKeycode(model, run.output))}</code>${headline(model, run.keycode)}
             <div class="hc-sub hc-foot">Runs when ${esc(run.badges.join(" or "))} fires.</div></div>${reachSections(model, layer, target, -1, [], {foot: false}).join("")}</div>`;
@@ -201,8 +201,8 @@ function reachSections(model, layer, position, index,
             <div class="hc-sub">${[count ? `${count} branch${count === 1 ? "" : "es"}` : "No branches yet",
                 ...terms.used.map((name) => `${TERM_WORDS[name]} ${threshold(terms[name])}`),
                 ...(behaviour.keepsAutoMouseAnchored ? ["keeps auto-mouse anchored"] : [])].map(esc).join(" · ")}</div>
-            ${!role && !byKeyboard ? `<div class="hc-sub hc-quiet">${esc(`Not used here (${handling.reasons.join("; ")}): ${custom
-                ? customKeyShortcutOnly(custom) : `sends ${keyName(position)} directly`}.`)}</div>` : ""}
+            ${!role && !byKeyboard ? `<div class="hc-sub hc-quiet">${esc(`Not used here (${handling.reasons.join("; ")}): `)}${custom
+                ? esc(customKeyShortcutOnly(custom)) : `sends ${keyNameMarked(model, keyName(position), keyMeaning(position))} directly`}.</div>` : ""}
             ${branches}
             ${count && foot ? `<div class="hc-sub hc-foot">${lit
                 ? "Each dot is the colour this key flashes when that tier resolves."
@@ -239,8 +239,10 @@ function reachSections(model, layer, position, index,
             const inputs = combo.inputs || [];
             const shown = combo.outputDisplay || combo.output;
             const stored = visibleKeycode(model, combo.output);
+            // Named as a branch action is, with the layer it reaches marked.
+            const sent = sends(model, combo.output) || `<span class="hc-name">${comboOutputMarked(model, combo)}</span>${stored && stored !== shown ? `<code class="hc-stored">${esc(stored)}</code>` : ""}`;
             return `<div class="hc-combo">${comboBadge(getModel(), combo.badge || "C")}
-            <span class="hc-sends"><span class="hc-life">→</span><span>${esc(shown)}</span>${stored && stored !== shown ? `<code class="hc-stored">${esc(stored)}</code>` : ""}<span class="hc-life hc-count">${inputs.length} key${inputs.length === 1 ? "" : "s"}</span>${running.has(combo.badge) ? `<span class="hc-life hc-runs">runs its behaviour</span>`
+            <span class="hc-sends"><span class="hc-life">→</span>${sent}<span class="hc-life hc-count">${inputs.length} key${inputs.length === 1 ? "" : "s"}</span>${running.has(combo.badge) ? `<span class="hc-life hc-runs">runs its behaviour</span>`
                 : customOf(model, combo.output) ? `<span class="hc-life hc-runs">${esc(customKeyShortcutOnly(customOf(model, combo.output)))}</span>` : ""}</span>
             <span class="hc-keys">${inputs.map((input, at) => `<span class="hc-key${comboInputIsKey(combo, at, position) ? " here" : ""}">${keyNameMarked(model, combo.inputDisplays?.[at] ?? input, input)}</span>`).join('<span class="hc-life">+</span>')}</span></div>`;
         }).join("")}</div>`);

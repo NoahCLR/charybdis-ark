@@ -35,15 +35,20 @@ export function keyFace(/** @type {import("../../contracts/panel.js").Position |
     };
 }
 
-// The layer a keycode acts on, as its place in the stack: MO(3), LOCK_LAYER(3)
-// and LT(3,KC_F) all name layer 3. A stored name the host knows by a semantic
-// one (QK_USER_31 → LOCK_LAYER(3)) is read by that. Null for any other key.
-const LAYER_KEYCODE = /^(?:MO|TG|TT|OSL|TO|DF|PDF|LOCK_LAYER)\(\s*(\d+)\s*\)$|^LT\(\s*(\d+)\s*,/;
-/** @param {ViewModel} model @param {string} keycode */
+// The layer a keycode acts on, as the host names it beside its label
+// (qmkKeyLayers, from core/model/key-names.js keyLayer): MO(3), LOCK_LAYER(3)
+// and LT(3,KC_F) all name layer 3. Read under the stored name, the name the
+// host knows it by (QK_USER_31 → LOCK_LAYER(3)), or however the expression is
+// spelled. Null for any other key: the interface never works a layer out of a
+// keycode itself.
+/** @param {ViewModel} model @param {string} keycode @returns {number | null} */
 export function layerOfKeycode(model, keycode) {
-    const name = model?.qmkKeycodeAliases?.[keycode ?? ""] ?? keycode;
-    const match = LAYER_KEYCODE.exec(String(name ?? ""));
-    return match ? Number(match[1] ?? match[2]) : null;
+    const layers = model?.qmkKeyLayers || {};
+    const name = String(keycode ?? "");
+    for (const key of [name, model?.qmkKeycodeAliases?.[name], canonicalKeycode(model, name)]) {
+        if (key && Number.isInteger(layers[key])) return layers[key];
+    }
+    return null;
 }
 
 // A dual-role key's two halves: what a tap sends, and what a hold does — hold

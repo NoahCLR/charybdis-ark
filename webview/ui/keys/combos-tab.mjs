@@ -9,7 +9,7 @@ import * as edits from "../../view/edits.mjs";
 import {draftMarks, draftDot} from "../../view/review.mjs";
 import {reachAttrs, reachTable} from "../groups.mjs";
 import {setReachGroupOpen} from "../../view/reach-groups.mjs";
-import {comboBadge, keyNameMarked} from "../marks.mjs";
+import {comboBadge, comboOutputMarked, keyNameMarked} from "../marks.mjs";
 import {vocabulary} from "../../view/vocabulary.mjs";
 import {comboBuilder} from "./combo-builder.mjs";
 import {keysReach} from "./reach.mjs";
@@ -55,7 +55,7 @@ export function tabCombos(body, right) {
         const requires = /** @type {("mustHold" | "mustTap" | "ordered")[]} */ (["mustHold", "mustTap", "ordered"]).filter((flag) => combo[flag]).map((flag) => vocabulary(model).comboOptions[flag]).join(" · ") || "—";
         return `<tr${reachAttrs("combos", group, combo.id)} data-combo="${esc(String(combo.id))}"><td>${comboBadge(model, combo.badge)}${changedCombos.has(combo.id) ? draftDot() : ""}</td>
             <td>${(combo.inputs || []).map((input, at) => `<span class="tok">${keyNameMarked(model, combo.inputDisplays?.[at] ?? input, input)}</span>`).join(" + ")}</td>
-            <td class="mono">${esc(combo.outputDisplay || combo.output)}</td>
+            <td class="mono">${comboOutputMarked(model, combo)}</td>
             <td class="mono">${esc(combo.termMs ?? "")} ms${combo.followsDefault ? ` <span class="tag" data-tip="Follows the default combo window (Settings · Combos), so it changes with it.">default</span>` : ""}</td>
             <td class="muted">${esc(requires)}</td>
             <td class="muted">${reachedBy}</td></tr>`;

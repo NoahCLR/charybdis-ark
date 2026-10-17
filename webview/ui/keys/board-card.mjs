@@ -8,11 +8,10 @@
 
 import {css, isOff} from "../../lib/colour.mjs";
 import {el, esc} from "../../lib/dom.mjs";
-import {actionLabel} from "../../view/keyface.mjs";
 import {feedbackColours, stageEnabled} from "../../view/lighting.mjs";
 import {getModel, heldLayers, layerName, layers, render, state, writable} from "../../store.mjs";
 import {draftDot} from "../../view/review.mjs";
-import {comboBadge} from "../marks.mjs";
+import {actionMarked, comboBadge, keyNameMarked} from "../marks.mjs";
 import {comboInputLabel} from "./combo-builder.mjs";
 
 // The caption while layers are previewed on together: which ones, in the
@@ -30,7 +29,7 @@ export function previewFoot(layer, lead = "") {
 export function placementBar() {
     const placement = state.placement;
     const node = el(`<div class="pickbar">
-        <span><b>Placing ${esc(actionLabel(getModel(), placement?.keycode || "") || "keycode")}</b> — choose a layer, then click its destination key</span>
+        <span><b>Placing ${placement?.keycode ? actionMarked(getModel(), placement.keycode) : "keycode"}</b> — choose a layer, then click its destination key</span>
         <code class="n">${esc(placement?.keycode || "")}</code>
         <span class="right"><button class="btn tiny ghost" data-act="cancel">Cancel</button></span></div>`);
     /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="cancel"]')).addEventListener("click", () => { state.placement = null; render(); });
@@ -59,10 +58,10 @@ export function legend(model) {
 }
 
 export function pickBar() {
-    const names = state.combo.inputs.map((name) => comboInputLabel(getModel(), name));
+    const names = state.combo.inputs.map((name) => keyNameMarked(getModel(), comboInputLabel(getModel(), name), name));
     const node = el(`<div class="pickbar">
         <span><b>Picking combo inputs</b> — click keys on the board</span>
-        <span class="n">${esc(names.join(" + ") || "none yet")}</span>
+        <span class="n">${names.join(" + ") || "none yet"}</span>
         <span class="right pickbar-actions">
             <button class="btn tiny ghost" data-act="clear">Clear</button>
             <button class="btn tiny" data-act="done">Done</button></span></div>`);

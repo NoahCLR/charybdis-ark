@@ -3,13 +3,13 @@
 // to its slot in the Macros view.
 
 import {el, esc} from "../../lib/dom.mjs";
-import {actionLabel} from "../../view/keyface.mjs";
 import {macroReach} from "../../view/reach.mjs";
 import {getModel, layers, render, state} from "../../store.mjs";
 import {draftDot, draftMarks} from "../../view/review.mjs";
 import {attachReachRows, reachAttrs, reachTable} from "../groups.mjs";
 import {reachEntries} from "../../view/reach-groups.mjs";
 import {macroView, reachLabel} from "./reach.mjs";
+import {actionMarked} from "../marks.mjs";
 
 /** @param {HTMLElement} body @param {HTMLElement} right */
 export function tabMacros(body, right) {
@@ -26,7 +26,7 @@ export function tabMacros(body, right) {
     const row = (group, keycode, reachedBy) => {
         const slot = slots.find((entry) => entry.keycode === keycode);
         return `<tr${reachAttrs("macros", group, keycode)}>
-            <td>${esc(actionLabel(model, keycode))} <code class="dim">${esc(keycode)}</code>${changedMacros.has(keycode) ? draftDot() : ""}</td>
+            <td>${actionMarked(model, keycode)} <code class="dim">${esc(keycode)}</code>${changedMacros.has(keycode) ? draftDot() : ""}</td>
             <td class="mono">${esc(slot?.payload || "—")}</td>
             <td class="muted">${reachedBy}</td>
             <td class="reach-edit">${slot ? `<button class="btn tiny ghost" data-editmacro="${esc(keycode)}">Edit</button>` : ""}</td></tr>`;

@@ -102,6 +102,8 @@ export interface PublishedModel {
     ownsLayerKeys: boolean;
     qmkKeycodes: CatalogEntry[];
     qmkKeyLabels: Record<string, string>;
+    /** Keycode name → the layer it acts on, beside its label in qmkKeyLabels (model/key-names.js keyLayer). */
+    qmkKeyLayers: Record<string, number>;
     qmkKeyShortLabels: Record<string, string>;
     qmkKeycodeAliases: Record<string, string>;
     qmkKeycodeSource: string;

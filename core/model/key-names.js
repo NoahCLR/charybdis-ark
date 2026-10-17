@@ -15,7 +15,7 @@
 
 const {VOCABULARY} = require("./vocabulary");
 const {PD_SLOT_BINDINGS} = require("../data/pd-bindings");
-const {CUSTOM_KEY_SLOTS, customKeyCode} = require("../data/user-keycodes");
+const {CUSTOM_KEY_SLOTS, customKeyCode, layerLockOfCode} = require("../data/user-keycodes");
 const keycodes = require("../data/keycode-catalog");
 const {actionName} = require("../schema/actions");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
@@ -44,6 +44,9 @@ function semanticLabel(semantic) {
  *   aliases   stored name → the profile's name for it (QK_USER_16 → PD_SLOT_0)
  *   pointing  every pointing-mode keycode, {name, native, code, label}
  *   custom    every custom key, {name, native, code, label}
+ *   keyLayers keycode name → the layer it acts on, for every layer key named
+ *             here (keyLayer), so a screen marks the layer a name ends in
+ *             without working it out again
  *
  * `layers` holds the layer names, which every layer key reads by. Only a
  * keyboard whose action ABI is known gets the rest from its profile: the
@@ -99,6 +102,8 @@ function hostLayoutNames(layoutId, macosIso) {
 function profileKeyNames({hostOs = 0, hostLayout: layoutId = US_HOST_LAYOUT, macosIso = false, layers, macros = [], customKeys = [], behaviors = [], pdModes = [], actionsKnown = false} = {}) {
     const typed = hostLayoutNames(layoutId, macosIso);
     const labels = {...typed.labels};
+    /** @type {Record<string, number>} */
+    const keyLayers = {};
     /** @type {Record<string, string>} */
     const aliases = {};
     /** @type {import("../../contracts/model.js").NamedKey[]} */
@@ -116,16 +121,19 @@ function profileKeyNames({hostOs = 0, hostLayout: layoutId = US_HOST_LAYOUT, mac
     const count = Math.max(8, layers?.length || 0);
     for (let layer = 0; layer < count; layer++) for (const form of Object.keys(LAYER_VERBS)) {
         const name = `${form}(${layer})`;
-        if (form !== "LOCK_LAYER") labels[name] = /** @type {string} */ (layerKeyLabel(name, layers));
-        else if (actionsKnown) {
+        if (form !== "LOCK_LAYER") {
+            labels[name] = /** @type {string} */ (layerKeyLabel(name, layers));
+            keyLayers[name] = layer;
+        } else if (actionsKnown) {
             const value = resolveNativeQmkExpression(name, {});
             if (value === undefined) continue;
             const native = keycodes.resolve(value).name;
             aliases[native] = name;
             labels[native] = labels[name] = /** @type {string} */ (layerKeyLabel(name, layers));
+            keyLayers[native] = keyLayers[name] = layer;
         }
     }
-    const layered = {labels, aliases, pointing, custom, hostOs, legends: typed.legends, layers: layers || []};
+    const layered = {labels, aliases, pointing, custom, hostOs, legends: typed.legends, layers: layers || [], keyLayers};
     if (!actionsKnown) return layered;
     for (const slot of macros) {
         const native = keycodes.resolve(/** @type {number} */ (resolveNativeQmkExpression(slot.keycode, {}))).name;
@@ -175,6 +183,15 @@ function profileKeyNames({hostOs = 0, hostLayout: layoutId = US_HOST_LAYOUT, mac
         pointing.push({name, native, code, label});
     }
     return layered;
+}
+
+// The layer a stored keycode acts on: a layer key's, a layer-tap's hold, a
+// layer-mod's, a layer lock's. Undefined for any other key. The screens
+// (through keyLayers and the model's qmkKeyLayers) and the review's marks
+// both take it from here.
+/** @param {number} value @returns {number | undefined} */
+function keyLayer(value) {
+    return layerLockOfCode(value) ?? keycodes.resolve(value).layer;
 }
 
 // A layer key by what it does and the name of its layer.
@@ -268,4 +285,4 @@ function keyLabelWithName(names, value) {
     return label === name ? label : `${label} (${name})`;
 }
 
-module.exports = {compactKeyLabel, compactKeyLabels, hostKeyVocabulary, hostKeyLabel, keyLabel, keyLabelWithName, layerKeyLabel, profileKeyNames, semanticLabel, shortcutLabel};
+module.exports = {compactKeyLabel, compactKeyLabels, hostKeyVocabulary, hostKeyLabel, keyLabel, keyLabelWithName, keyLayer, layerKeyLabel, profileKeyNames, semanticLabel, shortcutLabel};

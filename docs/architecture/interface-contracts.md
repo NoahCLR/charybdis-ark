@@ -60,6 +60,17 @@ only vertical scroller.
   an enum.
 - Where marked and unmarked labels share a column, every label gets the same
   mark slot (`marked(…, {slot: true})` in `webview/ui/marks.mjs`).
+- A key or action that acts on a layer is named with that layer's mark before
+  the layer's name, "Hold ■ Numbers", wherever markup names it: a branch, a
+  combo's output or inputs, a behaviour's title, a reach, a review value.
+  Name it through `actionMarked` or `keyNameMarked` in `webview/ui/marks.mjs`,
+  never `esc(actionLabel(…))`. Only attributes and plain-text messages carry
+  the words alone. Which layer a keycode acts on is the host's answer, never
+  the interface's: `keyLayer` in `core/model/key-names.js` decides it, the
+  model publishes it beside each label as `qmkKeyLayers`, and the review's
+  marks use the same function. A device-model test holds every published
+  name to carrying its layer's name, and `tests/view/key-names-marked.test.mjs`
+  refuses a screen that escapes a key's name.
 
 ## Pointing tap outputs
 
