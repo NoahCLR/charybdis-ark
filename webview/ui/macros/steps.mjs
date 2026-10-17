@@ -9,6 +9,7 @@ import {actionLabel} from "../../view/keyface.mjs";
 import {appendSequenceStep, moveSequenceStep, sequenceFace, sequenceInsertionAt, sequenceIssues} from "../../view/macro-sequence.mjs";
 import {getModel, macroForm, render, setMacroForm, state} from "../../store.mjs";
 import {openPicker} from "../picker.mjs";
+import {stepMark, stepWord} from "../marks.mjs";
 import {inspectEdit} from "./validation.mjs";
 import {finishMacroHistoryGroup, rememberMacroEdit, selectedStepIds} from "./history.mjs";
 /** @type {[MacroStep["kind"], string][]} */
@@ -142,13 +143,12 @@ function paintTiles(node, model, slot, steps) {
         const content = "keys" in step && step.keys.length
             ? step.keys.map((key, at) => `<span class="macro-chord-part">${at ? "+ " : ""}${esc(sequenceFace(model, {kind: "tap", keys: [key]}).label)}</span>`).join(" ")
             : esc(face.label || (step.kind === "text" ? "Text…" : "Choose…"));
-        const mark = step.kind === "press" ? "↓" : step.kind === "release" ? "↑" : step.kind === "tap" ? '<i class="macro-tap-dot"></i>' : step.kind === "text" ? "“" : '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M8 4v4l3 2"/></svg>';
         const wrap = el(`<div class="macro-token-wrap"><button type="button" class="macro-token ${esc(step.kind)} ${face.wide ? "wide" : ""} ${issues[index] ? "invalid" : ""}"
             data-step-tile="${index}" data-step-id="${esc(step.focusId)}" data-act="macro-step:${esc(slot.keycode)}:${esc(step.focusId)}"
             draggable="${editable}" aria-pressed="${selected}" aria-label="${esc(title)}" ${issues[index] ? 'aria-invalid="true"' : ""} data-tip="${esc(title)}">
-            <span class="macro-token-index" aria-hidden="true">${index + 1}</span><span class="macro-token-mark" aria-hidden="true">${mark}</span>
+            <span class="macro-token-index" aria-hidden="true">${index + 1}</span><span class="macro-token-mark" aria-hidden="true">${stepMark(step.kind)}</span>
             <span class="macro-token-label">${content}${step.kind === "delay" ? '<span class="macro-token-unit"> ms</span>' : ""}</span>
-            <span class="macro-token-kind">${face.kind === "text" ? "text" : face.kind === "delay" ? "wait" : face.kind}</span>
+            <span class="macro-token-kind">${stepWord(step.kind, face.kind === "chord")}</span>
             ${issues[index] ? '<span class="macro-token-error" aria-hidden="true">!</span>' : ""}</button>
             ${index < steps.length - 1 ? '<span class="macro-connector" aria-hidden="true">→</span>' : ""}</div>`);
         const tile = /** @type {HTMLButtonElement} */ (wrap.querySelector("button"));

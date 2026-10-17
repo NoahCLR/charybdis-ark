@@ -11,6 +11,8 @@
 import {css, isOff} from "../lib/colour.mjs";
 import {esc} from "../lib/dom.mjs";
 import {actionLabel, layerOfKeycode, visibleKeycode} from "../view/keyface.mjs";
+import {macroChips} from "../view/macro.mjs";
+import {sequenceFace} from "../view/macro-sequence.mjs";
 import {namedAction} from "../view/reach.mjs";
 import {feedbackColours, pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {layerSwatch} from "./layerbar.mjs";
@@ -133,3 +135,32 @@ export const marked = (model, value, text, {slot = false} = {}) => {
     if (slot) return `<span class="mk"><span class="mk-slot">${shown}</span><span>${esc(text)}</span></span>`;
     return shown ? `<span class="mk">${shown}<span>${esc(text)}</span></span>` : esc(text);
 };
+
+// A macro step's mark: ↓ held, ↑ let go, a dot tapped, a quote typed and a
+// clock waited. The macro editor's tiles and every chip of steps share it.
+/** @param {string} kind */
+export const stepMark = (kind) => kind === "press" ? "↓" : kind === "release" ? "↑" : kind === "tap" ? '<i class="macro-tap-dot"></i>'
+    : kind === "text" ? "“" : '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M8 4v4l3 2"/></svg>';
+
+// The word under an editor tile, and what a screen reader says before a chip,
+// since the mark that tells press from release is not read out.
+/** @param {string} kind @param {boolean} [chord] */
+export const stepWord = (kind, chord = false) => kind === "delay" ? "wait" : kind === "tap" && chord ? "chord" : kind;
+
+const THEN = '<span class="step-chip-then" aria-hidden="true">→</span>';
+
+// A macro's steps as chips, each a small editor tile: its mark, then the
+// short name the tile shows (typed text in quotes), joined by the editor's
+// arrows. The full name is the chip's tip in Keys → Macros; the hover card
+// cannot be hovered, so it reads the short names alone.
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} payload */
+export function macroSteps(model, payload) {
+    const {chips, more} = macroChips(payload, (step) => sequenceFace(model, step));
+    const said = (/** @type {typeof chips[number]} */ chip) => `<span class="step-chip-said">${esc(stepWord(chip.kind, chip.chord))} </span>`;
+    // Typed text reads as a string: its quotes stand in for the mark, and stay
+    // in view when the chip is too narrow for the text.
+    return `<div class="step-chips">${chips.map((chip) => `<span class="step-chip ${esc(chip.kind)}" data-tip="${esc(chip.full)}">${said(chip)}${chip.kind === "text"
+        ? `<span aria-hidden="true">“</span><span class="step-chip-label">${esc(chip.label)}</span><span aria-hidden="true">”</span>`
+        : `<span class="step-chip-mark" aria-hidden="true">${stepMark(chip.kind)}</span><span class="step-chip-label">${esc(chip.label)}</span>`}${chip.kind === "delay"
+        ? '<span class="step-chip-unit">ms</span>' : ""}</span>`).join(THEN)}${more ? `${THEN}<span class="step-chips-more">+${more} more</span>` : ""}</div>`;
+}

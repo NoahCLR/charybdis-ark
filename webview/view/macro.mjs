@@ -136,14 +136,21 @@ export function macroPeekSteps(steps, label = (name) => name) {
     return steps[0] ? describeStep(steps[0], label) : "";
 }
 
-// A macro as the hover card reads it: each step in order, held (↓), let go
-// (↑), tapped, typed or waited, up to `limit` steps and how many more follow.
-/** @param {unknown} payload @param {(name: string) => string} [label] @param {number} [limit] */
-export function macroChips(payload, label = (name) => name, limit = 12) {
+// A macro as its chips read it: each step in order with its kind (a tap of
+// several keys marked as a chord), its short label and its full words, up to `limit` steps and how many more follow.
+// Typed text is cut to `TEXT_CHIP` characters on the chip and `TEXT_TIP` in its
+// tooltip, so a long string cannot swamp the row or the hover card.
+export const TEXT_CHIP = 24, TEXT_TIP = 200;
+/** @param {string} text @param {number} max */
+const clip = (text, max) => [...text].length > max ? `${[...text].slice(0, max - 1).join("").trimEnd()}…` : text;
+/** @param {unknown} payload @param {(step: MacroStep) => {label: string, full: string}} [face] @param {number} [limit] */
+export function macroChips(payload, face = (step) => ({label: describeStep(step), full: describeStep(step)}), limit = 12) {
     const {steps} = parseMacro(payload, {unicode: true});
-    const chips = steps.slice(0, limit).map((step) => ({kind: step.kind,
-        text: step.kind === "press" ? `↓ ${describeStep(step, label)}` : step.kind === "release" ? `↑ ${describeStep(step, label)}`
-            : step.kind === "text" ? `“${step.text}”` : describeStep(step, label)}));
+    const chips = steps.slice(0, limit).map((step) => {
+        const {label, full} = face(step);
+        if (step.kind === "text") return {kind: step.kind, label: clip(label, TEXT_CHIP), full: clip(full, TEXT_TIP)};
+        return step.kind === "tap" && step.keys.length > 1 ? {kind: step.kind, label, full, chord: true} : {kind: step.kind, label, full};
+    });
     return {chips, more: Math.max(0, steps.length - limit)};
 }
 

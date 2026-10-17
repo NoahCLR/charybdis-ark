@@ -569,6 +569,12 @@ Every Keys workbench tab is at least as tall as Behaviours, so switching tabs
 keeps the page at the same scroll position. If an editor grows taller, that
 height stays while switching tabs.
 
+The Macros tab and the board's hover card show a macro's steps as small
+versions of the Macros editor's tiles, with the same marks and short key names:
+↓ press, ↑ release, a dot for a tap and a clock for a wait, with arrows from one
+step to the next. Typed text is in quotes and cut short when long. In the
+Macros tab, hover a step for its full key name or more of its text.
+
 Repeated badges, tier dots and draft marks have fixed positions, including an
 empty mark slot when neighboring labels have marks. Review and Draft history
 keep title marks separate from their names. Review fields line up as the

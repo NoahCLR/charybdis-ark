@@ -8,13 +8,12 @@ import {actionNaming, behaviourFor, behaviourTiers, canonicalKeycode, dualRole, 
 import {comboBehaviours, comboInputIsKey, combosAt, combosShownAt} from "../view/combo-reach.mjs";
 import {customKeyHeadline, customKeyOf, customKeyShortcutOnly} from "../view/custom-key.mjs";
 import {macroKeycodes, pointingSlotFor} from "../view/reach.mjs";
-import {macroChips} from "../view/macro.mjs";
 import {behaviourEditorRow, behaviourIsEmpty, behaviourThresholds, helperDetail} from "../view/behavior-editor.mjs";
 import {keyHandling} from "../view/participation.mjs";
 import {resolvedPositions} from "../view/layer-resolution.mjs";
 import {pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {getModel, heldLayers, layerName, positionAt} from "../store.mjs";
-import {branchBadge, comboBadge, comboOutputMarked, comboTint, keyNameMarked, mark, marked, sends, sendsKind, tierDot} from "./marks.mjs";
+import {branchBadge, comboBadge, comboOutputMarked, comboTint, keyNameMarked, macroSteps, mark, marked, sends, sendsKind, tierDot} from "./marks.mjs";
 import {helperWord, tierName, vocabulary, word} from "../view/vocabulary.mjs";
 import {KIND} from "../view/pointing-config.mjs";
 
@@ -210,15 +209,11 @@ function reachSections(model, layer, position, index,
     }
     if (macros.length) {
         const slots = model?.viaMacros || [];
-        const label = (/** @type {string} */ name) => actionNaming(model, name).words;
         sections.push(`<div class="hc-sect"><div class="hc-h">Macro</div>${macros.map((keycode) => {
             const macro = slots.find((row) => row.keycode === keycode);
             if (!macro) return `<div class="hc-sub">${esc(keycode)} · not reported by the keyboard</div>`;
             if (!macro.payload) return `<div class="hc-sub">${esc(macro.name || keycode)} · empty</div>`;
-            const {chips, more} = macroChips(macro.payload, label);
-            return `<div class="hc-macro">${chips.map((chip) => chip.kind === "delay"
-                ? `<span class="hc-life">${esc(chip.text)}</span>`
-                : `<span class="hc-key${chip.kind === "tap" ? " here" : chip.kind === "text" ? " hc-typed" : ""}">${esc(chip.text)}</span>`).join("")}${more ? `<span class="hc-life">+${more} more</span>` : ""}</div>`;
+            return macroSteps(model, macro.payload);
         }).join("")}</div>`);
     }
     if (slot) {

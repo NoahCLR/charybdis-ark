@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {describeStep, macroChips, macroMatches, macroPeek, parseMacro, serializeMacro, macroStepsInput, unreleased} from "../../webview/view/macro.mjs";
+import {sequenceFace} from "../../webview/view/macro-sequence.mjs";
+import {TEXT_CHIP, TEXT_TIP, describeStep, macroChips, macroMatches, macroPeek, parseMacro, serializeMacro, macroStepsInput, unreleased} from "../../webview/view/macro.mjs";
 
 test("a payload reads back as the steps the keyboard will play", () => {
     const {steps, error} = parseMacro("noah@xomnia.com{120}{KC_ENT}");
@@ -156,11 +157,25 @@ test("a held key may span text the host layout types, in preview and host alike"
     }
 });
 
-test("the hover card reads a macro step by step, held, let go, tapped, typed and waited", () => {
-    const label = (name) => ({KC_LEFT_GUI: "Left Command", KC_TAB: "Tab"})[name] ?? name;
-    assert.deepEqual(macroChips("{+KC_LEFT_GUI}{KC_TAB}{120}t3 code{-KC_LEFT_GUI}", label), {more: 0, chips: [
-        {kind: "press", text: "↓ Left Command"}, {kind: "tap", text: "Tab"}, {kind: "delay", text: "120 ms"},
-        {kind: "text", text: "“t3 code”"}, {kind: "release", text: "↑ Left Command"}]});
+test("a macro's chips read it step by step, held, let go, tapped, typed and waited", () => {
+    const face = (step) => ({label: describeStep(step, (name) => ({KC_LEFT_GUI: "L Cmd"})[name] ?? name),
+        full: describeStep(step, (name) => ({KC_LEFT_GUI: "Left Command", KC_TAB: "Tab"})[name] ?? name)});
+    assert.deepEqual(macroChips("{+KC_LEFT_GUI}{KC_TAB}{120}t3 code{-KC_LEFT_GUI}", face), {more: 0, chips: [
+        {kind: "press", label: "L Cmd", full: "Left Command"}, {kind: "tap", label: "KC_TAB", full: "Tab"},
+        {kind: "delay", label: "120 ms", full: "120 ms"}, {kind: "text", label: "t3 code", full: "t3 code"},
+        {kind: "release", label: "L Cmd", full: "Left Command"}]});
+    // The face the screens use: short names on the chip, a wait's bare number
+    // (the chip adds its unit), a chord as one chip and line breaks shown.
+    const model = {qmkKeyLabels: {KC_LGUI: "Left Command", KC_TAB: "Tab"}, qmkKeyShortLabels: {KC_LGUI: "L Cmd", KC_TAB: "Tab"}};
+    assert.deepEqual(macroChips("{KC_LGUI,KC_TAB}{+KC_LGUI}{120}a\nb{-KC_LGUI}", (step) => sequenceFace(model, step)).chips, [
+        {kind: "tap", label: "L Cmd + Tab", full: "Left Command + Tab", chord: true}, {kind: "press", label: "L Cmd", full: "Left Command"},
+        {kind: "delay", label: "120", full: "120 ms"}, {kind: "text", label: "a ↵ b", full: "a\nb"},
+        {kind: "release", label: "L Cmd", full: "Left Command"}]);
+    const [typed] = macroChips("x".repeat(500)).chips;
+    assert.equal([...typed.label].length, TEXT_CHIP, "a long string is cut on the chip");
+    assert.ok(typed.label.endsWith("…"));
+    assert.equal([...typed.full].length, TEXT_TIP, "and in its tooltip");
+    assert.equal(macroChips("😀".repeat(30)).chips[0].label, `${"😀".repeat(TEXT_CHIP - 1)}…`, "cut between characters, not inside one");
     const long = macroChips("{KC_A}".repeat(15));
     assert.equal(long.chips.length, 12);
     assert.equal(long.more, 3);
