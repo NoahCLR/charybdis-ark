@@ -80,6 +80,13 @@ test("a key changed for another with the same label is still a visible change", 
     assert.match(field.before,/KC_1\b/); assert.match(field.after,/KC_KP_1/);
 });
 
+test("a key changed to a layer key carries that layer's mark, and one changed to a pointing mode its slot", () => {
+    const before=snapshot(document()), after=structuredClone(before.document);
+    after.layers[0][7]=0x5225; after.layers[0][8]=0x4338; after.layers[0][9]=0x7e80; after.layers[0][10]=0x04; // MO(5), LT(3,KC_SLASH), PD slot 0, KC_A
+    const marks=profileReview(before,snapshot(after)).filter(row=>row.area==="Layout").map(row=>row.fields[0].afterMark);
+    assert.deepEqual(marks,[{kind:"layer",layer:5},{kind:"layer",layer:3},{kind:"pointing",slot:0},undefined]);
+});
+
 // ── items ───────────────────────────────────────────────────────────────
 
 const {document:pdDocument} = require("../fixtures/pd-profile");

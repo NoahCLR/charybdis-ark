@@ -13,24 +13,24 @@ import {behaviourEditorRow} from "../../view/behavior-editor.mjs";
 import {draftDot, draftMarks} from "../../view/review.mjs";
 import {attachGroupToggles, groupHeader, groupOpen} from "../groups.mjs";
 import {inGroupOrder, setReachGroupOpen} from "../../view/reach-groups.mjs";
-import {tierDot} from "../marks.mjs";
+import {actionMarked, comboInputsMarked, tierDot} from "../marks.mjs";
 import {behaviourEditor} from "./behaviour-editor.mjs";
 import {behaviourKey, behaviourRoute, selectBehaviourKey} from "./behaviour-selection.mjs";
 import {sourceLabel} from "./reach.mjs";
 
 // The combos that send a behaviour, by badge and chord; one that needs a
-// transparent key names the layer answering for it. Plain text: the row
-// escapes its note.
+// transparent key names the layer answering for it. Markup, as every row's
+// note is, so the chord's keys carry their layer marks.
 /** @param {Pick<ReturnType<typeof behavioursInView>[number], "combos">} entry */
 const comboNote = (entry) => entry.combos.map(({combo, keys}) => {
     const sources = [...new Set(keys.filter((key) => key.fellThrough)
-        .map((key) => layerName(key.layer) + (key.whileHeld ? " when held" : "")))];
-    return `combo ${combo.badge} · ${(combo.inputDisplays || combo.inputs || []).join(" + ")}${sources.length ? ` · on ${sources.join(", ")}` : ""}`;
+        .map((key) => esc(layerName(key.layer)) + (key.whileHeld ? " when held" : "")))];
+    return `combo ${esc(combo.badge)} · ${comboInputsMarked(getModel(), combo)}${sources.length ? ` · on ${sources.join(", ")}` : ""}`;
 }).join(", ");
 /** @param {ReturnType<typeof behavioursInView>[number]} entry */
 const viewBehaviourNote = (entry) => {
     const indexes = [...new Set(entry.keys.map((key) => key.position.layoutIndex))];
-    const sources = [...new Set(entry.keys.filter((key) => key.fellThrough).map((key) => layerName(key.layer)))];
+    const sources = [...new Set(entry.keys.filter((key) => key.fellThrough).map((key) => esc(layerName(key.layer))))];
     return [indexes.length ? `index ${indexes.join(", ")}${sources.length ? ` · on ${sources.join(", ")}` : ""}` : "",
         entry.combos.length ? comboNote(entry) : ""].filter(Boolean).join(" · ");
 };
@@ -44,10 +44,10 @@ function followedBelow(behaviour) {
     const followed = behaviourKey(position?.layoutIndex);
     if (!followed.from || followed.keycode !== state.behaviourRow) return "";
     const model = getModel();
-    const name = actionLabel(model, behaviour.keycode);
+    const name = actionMarked(model, behaviour.keycode);
     return `<p class="note beh-note">The selected key on <b>${esc(layerName(currentLayer()))}</b> is transparent,
-        so in this preview <b>${esc(layerName(followed.from))}</b> answers with ${esc(name)}. A behaviour belongs to its keycode:
-        this is ${esc(name)}’s, and a change here applies wherever ${esc(name)} is pressed, not only at this position.</p>`;
+        so in this preview <b>${esc(layerName(followed.from))}</b> answers with ${name}. A behaviour belongs to its keycode:
+        this is ${name}’s, and a change here applies wherever ${name} is pressed, not only at this position.</p>`;
 }
 
 /** @param {HTMLElement} body @param {HTMLElement} right */
@@ -64,9 +64,9 @@ export function tabBehaviours(body, right) {
     const changed = draftMarks(model?.draft?.changes).behaviours;
     /** @param {string} group @param {import("../../../contracts/panel.js").BehaviorView} row @param {string} note */
     const item = (group, row, note) => `<button class="rowitem ${row.keycode === state.behaviourRow && (!route || route === group) ? "on" : ""} ${note ? "quiet" : ""}" data-row="${esc(row.keycode)}" data-route="${group}">
-        <span class="t">${esc(actionLabel(model, row.keycode))}${actionLabel(model, row.keycode) === row.keycode ? ""
+        <span class="t">${actionMarked(model, row.keycode)}${actionLabel(model, row.keycode) === row.keycode ? ""
             : ` <code class="dim">${esc(row.keycode)}</code>`}${changed.has(row.keycode) ? draftDot() : ""}</span>
-        <span class="m">${behaviourTiers(row).map((tier) => tierDot(model, tier.kind)).join("")} ${row.steps.length} branch${row.steps.length === 1 ? "" : "es"}${note ? ` · ${esc(note)}` : ""}</span></button>`;
+        <span class="m">${behaviourTiers(row).map((tier) => tierDot(model, tier.kind)).join("")} ${row.steps.length} branch${row.steps.length === 1 ? "" : "es"}${note ? ` · ${note}` : ""}</span></button>`;
 
     // A selection made anywhere else — the board, the Key tab, a fresh
     // behaviour — can land in a closed group, so the group holding it opens

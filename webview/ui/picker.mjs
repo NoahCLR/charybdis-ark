@@ -11,7 +11,7 @@
 
 import {el, esc} from "../lib/dom.mjs";
 import {getModel, layerName, layers, render, state} from "../store.mjs";
-import {actionLabel} from "../view/keyface.mjs";
+import {actionMarked} from "./marks.mjs";
 import {PICKER_BOARD, pickerBoardKey} from "../view/picker-board.mjs";
 import {pickerExpression} from "../view/edits.mjs";
 import {modifierPick, pickerModifierProblem} from "../view/keyvalues.mjs";
@@ -208,7 +208,7 @@ export function pickerOverlay() {
     const node = el(`<div class="scrim"><div class="sheet picker" role="dialog" aria-modal="true" aria-label="Pick a keycode">
         <div class="sheet-h">
             <div><h2>Pick a keycode</h2>
-                <p class="note">${picker.mode === "list" ? picker.maxKeys === 1 ? "Choose one key." : Number.isFinite(picker.maxKeys) ? `Choose up to ${picker.maxKeys} keys to send together.` : "Choose one or more keys." : `For <b>${esc(picker.title)}</b> · ${esc([picker.contextKeycode ? actionLabel(model, picker.contextKeycode) : "", picker.context].filter(Boolean).join(" · "))}`}</p></div>
+                <p class="note">${picker.mode === "list" ? picker.maxKeys === 1 ? "Choose one key." : Number.isFinite(picker.maxKeys) ? `Choose up to ${picker.maxKeys} keys to send together.` : "Choose one or more keys." : `For <b>${esc(picker.title)}</b> · ${[picker.contextKeycode ? actionMarked(model, picker.contextKeycode) : "", esc(picker.context || "")].filter(Boolean).join(" · ")}`}</p></div>
             <input class="input pk-search" id="pickerSearch" data-f="picker:search" placeholder="Search every section" value="${esc(picker.search)}">
             <span class="right"><button class="btn ghost" data-act="cancel">Cancel</button></span>
         </div>

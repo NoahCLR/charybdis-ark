@@ -2,8 +2,8 @@
 "use strict";
 
 const {CHARYBDIS_4X6_LAYOUT_MATRIX, matrixPosition} = require("../data/charybdis-layout");
-const {layerOfRef, nativeCode} = require("../schema/actions");
-const {hostKeyLabel, keyLabel, keyLabelWithName, profileKeyNames, shortcutLabel} = require("./key-names");
+const {layerOfRef, nativeCode, pdSlotOfCode} = require("../schema/actions");
+const {hostKeyLabel, keyLabel, keyLabelWithName, keyLayer, profileKeyNames, shortcutLabel} = require("./key-names");
 const {hostSettings, HOST_SETTING} = require("../schema/host-settings");
 const {SETTING} = require("../schema/settings-domain-v1");
 const {decodedOf} = require("./portable-profile");
@@ -59,12 +59,25 @@ const namesIn = (value, macros, detected) => {
         keys: profileKeyNames({hostOs: host.effective, hostLayout: host.layout, macosIso: host.macosIso, actionsKnown: true, layers: value.settings.names, macros: macros?.viaMacros, behaviors: value.behaviors.rows, pdModes: value.pdModes,
             customKeys: value.settings.customKeyNames.map((name, slot) => ({slot, name}))})};
 };
+// The mark a stored keycode carries: the layer it acts on (model/key-names.js
+// keyLayer, as the screens mark it), or the pointing mode it runs.
+/** @param {number} code @returns {Mark | undefined} */
+const keyMark = code => {
+    const slot = pdSlotOfCode(code);
+    if (slot !== undefined) return {kind: "pointing", slot};
+    const layer = keyLayer(code);
+    return layer === undefined ? undefined : {kind: "layer", layer};
+};
 // The mark an action carries: what it reaches, when that has a colour of its
 // own — a pointing mode's light, a layer's colour.
 /** @param {Action | undefined} value @returns {Mark | undefined} */
-const actionMark = value => !value ? undefined
-    : value.kind === 4 || value.kind === 5 ? {kind: "pointing", slot: value.operand}
-    : value.kind === 2 || value.kind === 3 ? {kind: "layer", layer: value.operand} : undefined;
+const actionMark = value => {
+    if (!value) return undefined;
+    if (value.kind === 4 || value.kind === 5) return {kind: "pointing", slot: value.operand};
+    if (value.kind === 2 || value.kind === 3) return {kind: "layer", layer: value.operand};
+    const code = nativeCode(value);
+    return code === undefined ? undefined : keyMark(code);
+};
 // A pointing slot as fields, in the Pointing modes editor's words.
 /** @param {import("../schema/types.js").PdSlot | undefined} slot @param {Names} names @returns {Fields} */
 function pointingFields(slot, names) {
@@ -350,7 +363,7 @@ function profileReview(before, after, capabilities) {
         // Each side reads by its own snapshot's names: a renamed macro is
         // its old name on the keyboard and its new one in the draft.
         /** @param {number} code @param {Names} names */
-        const values = (code, names) => ({text: keyLabel(names.keys, code), detail: keyLabelWithName(names.keys, code), key: code});
+        const values = (code, names) => ({text: keyLabel(names.keys, code), detail: keyLabelWithName(names.keys, code), key: code, mark: keyMark(code)});
         item("Layout", `layout:${l}:${p}`, `${layerName(b, l)} · ${positionName(p)}`, new Map([["", values(code, namesA)]]), new Map([["", values(b.document.layers[l][p], namesB)]]),
             {kind: "key", layer: l, layoutIndex: LAYOUT_INDEX.get(p)}, undefined, {kind: "layer", layer: l});
     }));

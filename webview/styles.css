@@ -913,6 +913,8 @@ table.t tr[data-reach]:hover > td { background: var(--surface-2); }
 table.t tr[data-picked] > td { background: var(--surface-3); }
 table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text); }
 .del { color: var(--text-3); text-decoration: line-through; }
+/* A struck-out value keeps its strike through the layer mark inside it. */
+.del .mk { text-decoration: inherit; }
 .ins { color: var(--text); }
 
 /* ── commit bar ──────────────────────────────────────────────────────── */
@@ -1039,8 +1041,7 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 /* A combo in the hover card: badge, what it sends, then the keys that press it (ui/hover.mjs). */
 .hc-combo { display: grid; grid-template-columns: 30px minmax(0,1fr); column-gap: 9px; row-gap: 5px; align-items: center; }
 .hc-combo + .hc-combo { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--line); }
-.hc-sends { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 6px; row-gap: 2px; min-width: 0; font-size: 12px; font-weight: 560; overflow-wrap: anywhere; }
-.hc-sends .hc-life { font-weight: 400; }
+.hc-sends { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 6px; row-gap: 2px; min-width: 0; font-size: 11px; line-height: 18px; overflow-wrap: anywhere; }
 .hc-stored { font-family: var(--mono); font-size: 10.5px; font-weight: 400; color: var(--text-3); }
 .hc-count { margin-left: auto; }
 .hc-keys { grid-column: 2; display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }

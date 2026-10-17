@@ -89,14 +89,16 @@ test("a key's name outside a cap is the host's whole name, not the cap's short l
     assert.equal(keyName({keycode: "KC_NO", display: "", editLabel: "N/A"}), "Unmapped");
 });
 
-test("a layer key knows the layer it acts on, however the keyboard stores it", () => {
-    const model = {qmkKeycodeAliases: {QK_USER_31: "LOCK_LAYER(3)", KC_ENT: "KC_ENTER"}};
+test("a layer key knows the layer the host says it acts on, however the keyboard stores it", () => {
+    const model = {qmkKeycodeAliases: {QK_USER_31: "LOCK_LAYER(3)", KC_ENT: "KC_ENTER"},
+        qmkKeyLayers: {"MO(3)": 3, "LT(2,KC_J)": 2, "LOCK_LAYER(3)": 3, "LGUI(KC_3)": undefined}};
     assert.equal(layerOfKeycode(model, "MO(3)"), 3);
     assert.equal(layerOfKeycode(model, "LT(2,KC_J)"), 2);
     assert.equal(layerOfKeycode(model, "LT(2, KC_J)"), 2, "however the expression is spaced");
     assert.equal(layerOfKeycode(model, "QK_USER_31"), 3, "a layer lock stored as a user slot");
     assert.equal(layerOfKeycode(model, "KC_ENT"), null);
     assert.equal(layerOfKeycode(model, "LGUI(KC_3)"), null, "a number inside a keycode is not a layer");
+    assert.equal(layerOfKeycode(model, "MO(4)"), null, "a layer the host has not named is not worked out here");
 });
 
 test("a layer-tap cap names its layer on the second line, as the host names it", () => {
@@ -206,7 +208,8 @@ test("with only a Long hold set, a release before it sends the press's tap on ke
 });
 
 test("a dual-role key names what its tap sends and what its hold does", () => {
-    assert.deepEqual(dualRole({}, {keycode: "LT(3,KC_F)", display: "F", layerLabel: "Navigation"}), {tap: "F", hold: {layer: 3, name: "Navigation"}});
+    assert.deepEqual(dualRole({qmkKeyLayers: {"LT(3,KC_F)": 3}}, {keycode: "LT(3,KC_F)", display: "F", layerLabel: "Navigation"}), {tap: "F", hold: {layer: 3, name: "Navigation"}},
+        "the layer its hold reaches is the one the host names");
     assert.deepEqual(dualRole({}, {keycode: "MT(MOD_LSFT,KC_A)", display: "A", modifierLabel: "Shift"}), {tap: "A", hold: {modifier: "Shift"}});
     assert.equal(dualRole({}, {keycode: "MO(3)", display: "Hold Navigation"}), null, "a layer key has no tap half");
     assert.equal(dualRole({}, {keycode: "KC_F", display: "F"}), null);

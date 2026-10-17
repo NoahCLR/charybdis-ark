@@ -144,6 +144,8 @@ export interface ProfileKeyNames {
     hostOs: number;
     legends: Record<string, string[]> | null;
     layers: string[];
+    /** Keycode name → the layer it acts on, for every layer key named here. */
+    keyLayers: Record<string, number>;
 }
 export interface NamedKey {name: string; native: string; code: number; label: string}
 

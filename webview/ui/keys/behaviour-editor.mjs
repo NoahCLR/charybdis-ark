@@ -12,7 +12,7 @@ import {definitionControls} from "../participation.mjs";
 import * as edits from "../../view/edits.mjs";
 import {behaviourTimingChecks} from "../../view/checks.mjs";
 import {behaviourTimingEdit, behaviourTimingField} from "../../view/behavior-editor.mjs";
-import {branchBadge, sends, sendsKind, tierDot} from "../marks.mjs";
+import {actionMarked, branchBadge, keyNameMarked, sends, sendsKind, tierDot} from "../marks.mjs";
 import {branchName, helperWord, tierName, vocabulary, word} from "../../view/vocabulary.mjs";
 import {cellEditor} from "./cell-editor.mjs";
 import {pickBehaviourKey, retargetPrompt} from "./retarget.mjs";
@@ -68,7 +68,7 @@ export function behaviourEditor(behaviour) {
                 ? `What this key does on its own: its tap, once for each of the ${inherited.times} presses. Set an action here to replace it.`
                 : "What this key does on its own. Set an action here to replace it.";
             return `<button class="bcell inherited ${open ? "on" : ""}" data-cell="${id}" data-tip="${esc(tip)}">
-                <span class="bk named">${esc(label)}</span>
+                <span class="bk named">${keyNameMarked(model, label, inherited.action)}</span>
                 <span class="bl">${esc(["built in", `${helperLabel(kind, inherited.helper)}${times}`].join(" · "))}</span></button>`;
         }
         const implied = branch ? null : impliedBranch(behaviour, step, kind);
@@ -79,7 +79,7 @@ export function behaviourEditor(behaviour) {
             const label = hold.helper === "TAP_AT_HOLD_THRESHOLD" ? "Nothing more" : cellLabel(model, hold);
             return `<button class="bcell inherited ${open ? "on" : ""}" data-cell="${id}"
                 data-tip="No Long hold is set, so nothing takes over at the Long hold threshold: the Hold carries on. Set an action here to add a Long hold.">
-                <span class="bk named">${esc(label)}</span>
+                <span class="bk named">${hold.helper === "TAP_AT_HOLD_THRESHOLD" ? esc(label) : keyNameMarked(model, label, hold.action)}</span>
                 <span class="bl">${esc([tierName(model, "hold"), word(vocabulary(model).holdWithoutLongHold, hold.helper)].join(" · "))}</span></button>`;
         }
         if (implied?.meaning === "tapsBeforeLong") {
@@ -87,7 +87,7 @@ export function behaviourEditor(behaviour) {
             const times = tap.times ? ` ×${tap.times}` : "";
             return `<button class="bcell inherited ${open ? "on" : ""}" data-cell="${id}"
                 data-tip="No Hold is set: let go after the Tap / hold threshold but before the Long hold threshold and the key sends its tap. Set an action here to add a Hold.">
-                <span class="bk named">${esc(cellLabel(model, tap))}</span>
+                <span class="bk named">${keyNameMarked(model, cellLabel(model, tap), tap.action)}</span>
                 <span class="bl">${esc(["released before Long hold threshold", `${helperLabel("tap", tap.helper)}${times}`].join(" · "))}</span></button>`;
         }
         if (!branch) return `<button class="bcell empty ${open ? "on" : ""}" data-cell="${id}"><span class="plus">+</span></button>`;
@@ -95,7 +95,7 @@ export function behaviourEditor(behaviour) {
         const label = cellLabel(model, branch);
         const named = Boolean(sends(model, branch.action)) || label !== branch.action;
         return `<button class="bcell ${open ? "on" : ""}" data-cell="${id}"${named ? ` data-tip="${esc(branch.action)}"` : ""}>
-            <span class="bk ${named ? "named" : ""}">${sends(model, branch.action) || esc(label)}</span>
+            <span class="bk ${named ? "named" : ""}">${sends(model, branch.action) || keyNameMarked(model, label, branch.action)}</span>
             <span class="bl">${esc([sendsKind(model, branch.action), helperLabel(kind, branch.helper)].filter(Boolean).join(" · "))}</span></button>`;
     };
 
@@ -104,7 +104,7 @@ export function behaviourEditor(behaviour) {
     const node = el(`<div>
         <div class="beh-head">
             <div>
-                <div class="row beh-title"><h3>${esc(actionLabel(model, behaviour.keycode))}</h3>
+                <div class="row beh-title"><h3>${actionMarked(model, behaviour.keycode)}</h3>
                     ${actionLabel(model, behaviour.keycode) === behaviour.keycode ? "" : `<code class="dim">${esc(behaviour.keycode)}</code>`}</div>
                 <p class="note">${esc(timingDefaultsNote(behaviour))}</p>
                 ${behaviour.stored ? "" : `<p class="note">Using the key’s defaults. A behaviour is added to the draft when you change a timing, switch or grid action.</p>`}

@@ -576,7 +576,10 @@ change sign, label, value on the keyboard and value in the draft; an absent
 value shows a dash. Show and Discard stay at the edge, and a destructive action
 is last in its row. A removed item keeps its mark and Show only when its editor
 still shows that slot, such as a cleared pointing or macro slot. Owner selectors
-use their displayed names and marks.
+use their displayed names and marks. A key or action that holds, locks or taps
+to a layer always shows that layer's colour before the layer's name, so
+"Hold ■ Numbers" reads the same in the hover card, the Keys tabs, the behaviour
+grid and the review.
 
 ## Timing checks
 

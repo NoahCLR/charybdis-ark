@@ -15,7 +15,7 @@ const {PHASE, VOCABULARY, HALVES_WORDS, slotName} = require("../model/vocabulary
 const keycodeCatalog = require("../data/keycode-catalog");
 const {baseEffectForView, baseRgbForView, behaviorRowsForView, builtInForView, comboRowsForView, rgbForView} = require("../model/device-profile-view");
 const {effectiveTimings} = require("../model/gesture-timing");
-const {compactKeyLabels, hostKeyVocabulary, keyLabel, profileKeyNames, shortcutLabel} = require("../model/key-names");
+const {compactKeyLabels, hostKeyVocabulary, keyLabel, keyLayer, profileKeyNames, shortcutLabel} = require("../model/key-names");
 const {layerName} = require("../model/vocabulary");
 const {keycodeAction, knownActionAbi, layerRef, nativeCode} = require("../schema/actions");
 const {dpiChoices} = require("../model/pointer-dpi");
@@ -155,7 +155,14 @@ function configurationModel(content, capabilities, editing) {
     // Every keycode the profile holds is in the table by its name here, so the
     // interface names any of them by keycode and never composes a name itself:
     // a layer-tap cannot be listed ahead of time, one per layer and tap key.
-    for (const value of profileKeycodes(content, capabilities)) catalog.labels[keycodeCatalog.resolve(value).name] = keyLabel(names, value);
+    // The layer each one acts on is beside it, so the interface marks the
+    // layer a name ends in without working it out again.
+    const keyLayers = {...names.keyLayers};
+    for (const value of profileKeycodes(content, capabilities)) {
+        const name = keycodeCatalog.resolve(value).name, layer = keyLayer(value);
+        catalog.labels[name] = keyLabel(names, value);
+        if (layer !== undefined) keyLayers[name] = layer;
+    }
     const hostVocabulary = hostKeyVocabulary(names.hostOs);
     return {
         // The words for every value the keyboard stores, so the interface
@@ -231,6 +238,7 @@ function configurationModel(content, capabilities, editing) {
         ownsLayerKeys: Boolean((capabilities?.featureFlags || 0) & PROFILE_WIRE_FEATURES.OWNED_LAYER_TOGGLES),
         qmkKeycodes: catalog.entries,
         qmkKeyLabels: catalog.labels,
+        qmkKeyLayers: keyLayers,
         qmkKeyShortLabels: compactKeyLabels(catalog.labels),
         qmkKeycodeAliases: catalog.aliases,
         qmkKeycodeSource: CATALOG_SOURCE,

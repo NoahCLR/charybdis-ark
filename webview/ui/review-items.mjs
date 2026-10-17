@@ -6,7 +6,7 @@
 import {esc} from "../lib/dom.mjs";
 import {css, isOff} from "../lib/colour.mjs";
 import {FIELDS_SHOWN} from "../view/review.mjs";
-import {mark, marked} from "./marks.mjs";
+import {layerNameMarked, mark, marked} from "./marks.mjs";
 import {tierName} from "../view/vocabulary.mjs";
 
 // A colour is shown as the keyboard would light it, beside its value; an
@@ -17,9 +17,16 @@ const swatch = (colour) => colour
 // Everything with a colour of its own carries its mark, drawn as every
 // editor draws it (ui/marks.mjs): a tier's dot, a branch badge, a layer's
 // or pointing mode's light, a combo badge, a stage's on/off dot.
+// A value naming a layer ("Hold Numbers") carries the layer's mark before the
+// layer's name, as an action reads on every other surface.
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/edits.js").Scalar | null} text @param {string} klass @param {import("../../contracts/edits.js").Colour | null | undefined} colour @param {import("../../contracts/model.js").ReviewMark | null | undefined} marker */
-const value = (model, text, klass, colour, marker) => text === null ? ""
-    : `<span class="rv-val">${swatch(colour)}${mark(model, marker)}<span class="${klass}">${esc(text)}</span></span>`;
+const value = (model, text, klass, colour, marker) => {
+    if (text === null) return "";
+    const inline = marker?.kind === "layer" ? layerNameMarked(model, marker.layer, String(text)) : "";
+    return inline && inline !== esc(String(text))
+        ? `<span class="rv-val">${swatch(colour)}<span class="${klass}">${inline}</span></span>`
+        : `<span class="rv-val">${swatch(colour)}${mark(model, marker)}<span class="${klass}">${esc(text)}</span></span>`;
+};
 // A behaviour tier is labelled as the grid heads it: the branch badge,
 // the tier's dot, then the tier's name.
 // Within an item, marked and unmarked labels share one mark slot, so the

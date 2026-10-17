@@ -5,7 +5,7 @@
 import {css, isOff} from "../../lib/colour.mjs";
 import {el, esc} from "../../lib/dom.mjs";
 import {LED_INDEX} from "../../view/geometry.mjs";
-import {actionLabel, behaviourFor, canonicalKeycode, keyFace, keyMeaning, keyName, visibleKeycode} from "../../view/keyface.mjs";
+import {behaviourFor, canonicalKeycode, keyFace, keyMeaning, keyName, visibleKeycode} from "../../view/keyface.mjs";
 import {combosAt} from "../../view/combo-reach.mjs";
 import {pointingSlotFor} from "../../view/reach.mjs";
 import {resolvedPositions} from "../../view/layer-resolution.mjs";
@@ -14,7 +14,7 @@ import {currentLayer, getModel, heldLayers, layerName, layers, openComboBuilder,
 import {participationAt} from "../../view/participation.mjs";
 import * as edits from "../../view/edits.mjs";
 import {canHaveBehaviour} from "../../view/behavior-editor.mjs";
-import {comboBadge} from "../marks.mjs";
+import {actionMarked, comboBadge, comboOutputMarked, keyNameMarked} from "../marks.mjs";
 import {customKeyBypassText, customKeyOf} from "../../view/custom-key.mjs";
 import {unavailable} from "../shell.mjs";
 import {behaviourKey, selectBehaviourKey} from "./behaviour-selection.mjs";
@@ -38,7 +38,7 @@ export function tabKey(body) {
                 <div class="input-row"><input class="input mono" id="keycodeField" data-f="key:${layer.index}:${position?.layoutIndex}:keycode" value="${esc(keyMeaning(position))}" ${writable() ? "" : "disabled"}>
                 <button class="btn" data-act="pick" ${writable() ? "" : "disabled"}>Pick…</button></div></div>
             <dl class="kv key-details">
-                <dt>Resolves to</dt><dd>${esc(position ? keyName(position) : "—")}</dd>
+                <dt>Resolves to</dt><dd>${position ? keyNameMarked(model, keyName(position), keyMeaning(position)) : "—"}</dd>
                 <dt>Stored</dt><dd>${esc(position ? visibleKeycode(model, position.keycode) : "—")}</dd>
                 <dt>Matrix</dt><dd>row ${position?.row ?? "—"} · col ${position?.column ?? "—"}</dd>
                 <dt>Layout index</dt><dd>${position?.layoutIndex ?? "—"}</dd>
@@ -68,11 +68,11 @@ export function tabKey(body) {
             <div class="stack key-reaches">
                 <button class="reach ${behaviour ? "" : "empty"}" data-goto="behaviours" ${behaviourOpen ? "" : "disabled"}>
                     <span class="rl">Behaviour</span>
-                    <span class="rv">${behaviour ? `${esc(actionLabel(model, behaviour.keycode))} · ${behaviour.steps.length} branch${behaviour.steps.length === 1 ? "" : "es"}` : behaviourOpen ? "Using the key’s defaults" : "Unavailable for transparent keys and KC_NO"}${behaviourOpen && followed.from ? ` · from ${esc(layerName(followed.from))}` : ""}</span>
+                    <span class="rv">${behaviour ? `${actionMarked(model, behaviour.keycode)} · ${behaviour.steps.length} branch${behaviour.steps.length === 1 ? "" : "es"}` : behaviourOpen ? "Using the key’s defaults" : "Unavailable for transparent keys and KC_NO"}${behaviourOpen && followed.from ? ` · from ${esc(layerName(followed.from))}` : ""}</span>
                     <span class="ra">${behaviour ? "Edit" : "Open"}</span></button>
                 <button class="reach ${combos.length ? "" : "empty"}" data-goto="combos">
                     <span class="rl">Combos</span>
-                    <span class="rv">${combos.length ? combos.map((combo) => `${comboBadge(model, combo.badge)} → ${esc(combo.outputDisplay || combo.output)}`).join(" · ") : "not part of a combo"}</span>
+                    <span class="rv">${combos.length ? combos.map((combo) => `${comboBadge(model, combo.badge)} → ${comboOutputMarked(model, combo)}`).join(" · ") : "not part of a combo"}</span>
                     <span class="ra">${combos.length ? "Edit" : "New"}</span></button>
                 ${slot ? `<button class="reach" data-goto="pointing"><span class="rl">Pointing</span>
                     <span class="rv">${esc(slot.displayName || `Slot ${slot.id}`)}</span><span class="ra">Edit</span></button>` : ""}
@@ -127,6 +127,6 @@ function answeredBelow(layer, position) {
         .find((entry) => entry.position.layoutIndex === position.layoutIndex);
     if (!answer?.fellThrough) return "";
     return `<p class="note answered-below">In this preview <b>${esc(layerName(answer.layer))}</b> answers here
-        with ${esc(keyName(answer.position))}, through a transparent key. A keycode set here
+        with ${keyNameMarked(getModel(), keyName(answer.position), keyMeaning(answer.position))}, through a transparent key. A keycode set here
         is stored on ${esc(layerName(layer))} and wins over it.</p>`;
 }

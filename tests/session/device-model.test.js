@@ -40,7 +40,7 @@ test("behaviour rows claim built-in first actions from the keyboard's advertised
 
 const MODEL_FIELDS = [
     "layers", "keyBehaviors", "combos", "viaMacros", "macroNameSpace", "behaviorTimingDefaults",
-    "configDefaults", "rgb", "qmkKeycodes", "qmkKeyLabels", "qmkKeyShortLabels", "qmkKeycodeAliases",
+    "configDefaults", "rgb", "qmkKeycodes", "qmkKeyLabels", "qmkKeyLayers", "qmkKeyShortLabels", "qmkKeycodeAliases",
     "qmkKeycodeSource", "macroPayloadKeycodes", "diagnostics", "ownsLayerKeys",
 ];
 
@@ -489,6 +489,41 @@ test("pointing-only shortcuts enter the shared OS label table", () => {
     assert.equal(model.qmkKeyLabels[resolve(0x0805).name], "Super+B");
 });
 
+
+test("every name the model gives a layer key carries the layer the model says it acts on", () => {
+    // The interface marks the layer a name ends in from qmkKeyLayers, never
+    // from the keycode, so the two must agree or a name reads unmarked.
+    const {ProfileDraftSession} = require("../../core/session/profile-draft-session");
+    const {document, CURRENT_CAPABILITIES} = require("../fixtures/portable-profile");
+    const {fingerprint, summary} = require("../../core/model/portable-profile");
+    const value = document();
+    const draft = new ProfileDraftSession({document: value, fingerprint: fingerprint(value), summary: summary(value), limits: {brightnessMax: 200}}, "board", CURRENT_CAPABILITIES);
+    draft.stage({type: "updateLayoutKeys", draftRevision: draft.revision, layer: "Layer 0", changes: [
+        {layoutIndex: 0, keycode: "MO(2)"}, {layoutIndex: 1, keycode: "LT(1,KC_B)"}, {layoutIndex: 2, keycode: "LOCK_LAYER(3)"},
+        {layoutIndex: 3, keycode: "LM(1,MOD_LSFT)"}, {layoutIndex: 4, keycode: "TG(2)"},
+    ]});
+    draft.stage({type: "addCombo", draftRevision: draft.revision, inputs: ["LT(1,KC_B)", "KC_C"], output: "MO(2)", termMs: ""});
+    const state = {capabilities: CURRENT_CAPABILITIES, phase: "idle", committed: {state: "unavailable"}, combos: {state: "unavailable"}};
+    const model = buildSnapshotModel(draft.current, CURRENT_CAPABILITIES, {editable: true, reason: ""}, state);
+    const layerNames = model.layers.map(layer => layer.displayName);
+    /** @param {string} label @param {number} layer */
+    const carries = (label, layer) => label.endsWith(layerNames[layer]) || label.startsWith(layerNames[layer]);
+    for (const [name, layer] of Object.entries(model.qmkKeyLayers)) {
+        if (layer >= layerNames.length || model.qmkKeyLabels[name] === undefined) continue;
+        assert.ok(carries(model.qmkKeyLabels[name], layer), `${name} reads "${model.qmkKeyLabels[name]}", without ${layerNames[layer]}`);
+    }
+    for (const position of model.layers[0].positions.slice(0, 5)) {
+        assert.ok(Number.isInteger(model.qmkKeyLayers[position.keycode]), `${position.keycode} is in the layer table`);
+        assert.ok(carries(position.editLabel, model.qmkKeyLayers[position.keycode]), `${position.keycode} reads "${position.editLabel}"`);
+    }
+    const combo = model.combos.find(row => row.output === "MO(2)");
+    assert.equal(model.qmkKeyLayers[combo.output], 2);
+    assert.ok(carries(combo.outputDisplay, 2), `the combo's output reads "${combo.outputDisplay}"`);
+    combo.inputs.forEach((input, at) => {
+        if (model.qmkKeyLayers[input] !== undefined) assert.ok(carries(combo.inputDisplays[at], model.qmkKeyLayers[input]), `${input} reads "${combo.inputDisplays[at]}"`);
+    });
+    assert.equal(model.qmkKeyLayers.KC_C, undefined, "a key on no layer is not in the table");
+});
 
 test("snapshot presentation uses its decoded configuration and real device diagnostics", () => {
     const {ProfileDraftSession} = require("../../core/session/profile-draft-session");

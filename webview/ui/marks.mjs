@@ -10,7 +10,7 @@
 
 import {css, isOff} from "../lib/colour.mjs";
 import {esc} from "../lib/dom.mjs";
-import {layerOfKeycode} from "../view/keyface.mjs";
+import {actionLabel, layerOfKeycode, visibleKeycode} from "../view/keyface.mjs";
 import {namedAction} from "../view/reach.mjs";
 import {feedbackColours, pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {layerSwatch} from "./layerbar.mjs";
@@ -88,16 +88,40 @@ export function mark(model, value) {
 }
 
 // A key's name with the layer it acts on marked where the name says it:
-// "F / ■ Navigation", "Hold ■ Navigation". Every key name ends in its layer's
-// name (core/model/key-names.js); one that does not is left as it is.
+// "F / ■ Navigation", "Hold ■ Navigation", "■ Numbers + Shift". The host names
+// the layer (qmkKeyLayers) and puts its name at one end of the key's name
+// (core/model/key-names.js); one that does not is left as it is.
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} text @param {string} keycode */
 export function keyNameMarked(model, text, keycode) {
-    const at = layerOfKeycode(model, keycode);
-    const layer = at === null ? null : model?.layers?.[at];
+    return layerNameMarked(model, layerOfKeycode(model, keycode), text);
+}
+
+// An action by its words with its layer marked, as every surface names one:
+// "Hold ■ Numbers", "Lock ■ Symbol". The plain words when it acts on no layer.
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} keycode @param {string} [text] */
+export const actionMarked = (model, keycode, text = actionLabel(model, keycode)) => keyNameMarked(model, text, keycode);
+
+// What a combo sends and the keys that press it, named the same way.
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/panel.js").ComboView} combo */
+export const comboOutputMarked = (model, combo) =>
+    keyNameMarked(model, combo.outputDisplay || combo.output, visibleKeycode(model, combo.output) || combo.output);
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/panel.js").ComboView} combo */
+export const comboInputsMarked = (model, combo) =>
+    (combo.inputs || []).map((input, at) => keyNameMarked(model, combo.inputDisplays?.[at] ?? input, input)).join(" + ");
+
+// A label starting or ending in a layer's name, with that layer's mark before
+// the name. Empty-handed (no layer, or a label that does not carry its name)
+// it is the label as it is.
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {number | null | undefined} at @param {string} text */
+export function layerNameMarked(model, at, text) {
+    const layer = at === null || at === undefined ? null : model?.layers?.[at];
     const name = layer ? layer.displayName || layer.name : "";
     const label = String(text ?? "");
-    if (!layer || !name || !label.endsWith(name)) return esc(label);
-    return `${esc(label.slice(0, -name.length))}${marked(model, {kind: "layer", layer: layer.index}, name)}`;
+    if (!layer || !name) return esc(label);
+    const shown = marked(model, {kind: "layer", layer: layer.index}, name);
+    if (label.endsWith(name)) return `${esc(label.slice(0, -name.length))}${shown}`;
+    if (label.startsWith(name)) return `${shown}${esc(label.slice(name.length))}`;
+    return esc(label);
 }
 
 // A label with its mark in front, as a label reads everywhere. Where marked

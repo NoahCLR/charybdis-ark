@@ -12,7 +12,7 @@ import {comboGroups, combosInView} from "../../view/combo-reach.mjs";
 import {resolvedPositions} from "../../view/layer-resolution.mjs";
 import {heldLayers, layerName, layers, state} from "../../store.mjs";
 import {reachEntries} from "../../view/reach-groups.mjs";
-import {comboBadge} from "../marks.mjs";
+import {actionMarked, comboBadge, comboInputsMarked} from "../marks.mjs";
 import {behaviourRoute} from "./behaviour-selection.mjs";
 
 // The keys the board rings: the ones that reach whatever row is picked in the
@@ -84,7 +84,7 @@ export const keysReach = (keys) => {
 /** @param {Model} model @param {string} keycode */
 const namedKey = (model, keycode) => {
     const label = actionLabel(model, keycode);
-    return label === String(keycode) ? esc(label) : `${esc(label)} <code class="dim">${esc(keycode)}</code>`;
+    return label === String(keycode) ? esc(label) : `${actionMarked(model, keycode, label)} <code class="dim">${esc(keycode)}</code>`;
 };
 /** @param {Model} model @param {ReturnType<typeof reachInView>[number]} entry */
 export const branchReach = (model, entry, showSends = true) => entry.behaviours.map((row) => {
@@ -99,9 +99,8 @@ export const branchReach = (model, entry, showSends = true) => entry.behaviours.
 // that needs a transparent key names the layer answering for it.
 /** @param {Model} model @param {ReturnType<typeof reachInView>[number]} entry */
 export const comboReach = (model, entry, showSends = true) => entry.combos.map(({combo, via, action, keys}) => {
-    const inputs = (combo.inputDisplays || combo.inputs || []).join(" + ");
     const sources = [...new Set(keys.filter((key) => key.fellThrough).map(sourceLabel))];
-    return `${comboBadge(model, combo.badge)} ${esc(inputs)}`
+    return `${comboBadge(model, combo.badge)} ${comboInputsMarked(model, combo)}`
         + (via ? ` · through ${namedKey(model, via)}` : "")
         + (showSends && action && String(entry.name) !== String(action) ? ` · sends ${namedKey(model, action)}` : "")
         + (sources.length ? ` · on ${sources.join(", ")}` : "");
