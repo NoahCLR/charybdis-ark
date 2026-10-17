@@ -142,7 +142,12 @@ for (const theme of ["plain", "vscode-dark", "vscode-light"]) {
             expect(posted).toHaveLength(8);
             expect(posted.find(field => field.macro === "brightness").value).toBe("200");
         }
-        for (const invalid of ["", "no time", "-1", "1441"]) {
+        // Letters and signs never reach the field, so they cannot be posted.
+        for (const [typed, kept] of [["no time", ""], ["-1", "1"], ["1.5.0", "1.50"]]) {
+            await input.fill(typed);
+            await expect(input).toHaveValue(kept);
+        }
+        for (const invalid of ["", "1441"]) {
             await page.evaluate(() => {window.__posted.length = 0;});
             await input.fill(invalid);
             await input.blur();

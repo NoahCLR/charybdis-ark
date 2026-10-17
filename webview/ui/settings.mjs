@@ -104,7 +104,7 @@ function comboTimingRow(model, entry) {
     const row = el(`<div class="setrow" data-tip="${esc(hint)}">
         <div><div class="nm">${esc(entry.label)}</div>
             <div class="hint">${esc(hint)}</div></div>
-        <div class="control"><div class="input-row"><input class="input mono" id="${hold ? "comboHoldTerm" : "comboDefaultTerm"}" data-f="settings:combo:${hold ? "hold" : "default"}" value="${esc(stored)}" ${editable ? "" : "disabled"}></div></div>
+        <div class="control"><div class="input-row"><input class="input mono" id="${hold ? "comboHoldTerm" : "comboDefaultTerm"}" data-f="settings:combo:${hold ? "hold" : "default"}" inputmode="numeric" value="${esc(stored)}" ${editable ? "" : "disabled"}></div></div>
     </div>`);
     // Posted on its own rather than riding along with whichever combo is saved
     // next. The keyboard always stores a number, so an emptied field is put
@@ -234,7 +234,7 @@ function fieldRow(field, canEdit, submit, hidden, slot, durations) {
         control.appendChild(node);
         return row;
     }
-    const node = el(`<div class="input-row"><input class="input mono" data-macro="${esc(field.macro)}" data-f="setting:${esc(field.macro)}" value="${esc(field.value)}" ${editable ? "" : "disabled"}>
+    const node = el(`<div class="input-row"><input class="input mono" data-macro="${esc(field.macro)}" data-f="setting:${esc(field.macro)}" inputmode="numeric" value="${esc(field.value)}" ${editable ? "" : "disabled"}>
         ${field.unit ? `<span class="chip">${esc(field.unit)}</span>` : ""}</div>`);
     /** @type {HTMLInputElement} */ (node.querySelector("input")).addEventListener("change", submit);
     control.appendChild(node);

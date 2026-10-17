@@ -109,6 +109,15 @@ import silently substitutes a keyboard shortcut.
   renderer combines them for `data-tip`, including read-only reasons. Keyboard
   name and combo timing rows use the same hover path. `ui/hover.mjs` displays
   all of them; screens do not maintain separate tooltip catalogues.
+- Number entry: a text field for a stored whole number authors
+  `inputmode="numeric"`, and a duration in seconds or minutes
+  `inputmode="decimal"`. `webview/lib/number-entry.mjs`, mounted once on the
+  root, keeps only their digits (and the duration's first point) as text is
+  typed, pasted or dropped, with the caret where it was. A `type="number"`
+  field cannot be read back while its text is not a number, so the same path
+  refuses a non-digit before it is inserted. A field never shows text its
+  edit would refuse as not a number; range limits are still checked by the
+  edit.
 - Screens: `webview/view/screens.mjs` owns their IDs, labels, icons, rail
   groups, availability, placeholder titles, renderer dispatch and redraw
   policy. The app supplies render functions to keep this registry pure.
