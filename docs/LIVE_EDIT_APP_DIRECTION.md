@@ -1257,8 +1257,7 @@ decisions above, the [guide](GUIDE.md) and [`AGENTS.md`](../AGENTS.md). D-L01
 and are complete. D-L16 wired Studio's macro UI into v1 and went with it
 (D-L35). The first live app (v1, which lived at the same path) ported Studio's
 interface (D-L06). It was frozen by D-L35 and then removed; the profiles it
-wrote remain a compatibility check in the firmware's
-`tests/fixtures/stored_profile_live_v1.fixture`.
+wrote are an older format, refused like any other (D-L64).
 
 ### D-L06 — v1 ported Studio's whole UI and rebuilt only the model source
 

@@ -118,7 +118,9 @@ What can break Ark, and what checks it:
 | Behaviour on the keyboard | firmware | nothing | keyboard checks only; not automatable |
 
 Firmware version, compiled-default digest and capacities are reported, never
-compared: they change with ordinary keymap edits. CI's `agreement` job runs it
+compared: they change with ordinary keymap edits. For the same reason Ark
+imports no fixture the firmware regenerates from its keymap
+([`upstream/README.md`](../upstream/README.md#updating-a-contract)). CI's `agreement` job runs it
 on a release's promotion pull request against firmware `main`, or firmware
 `dev` when the release marker says the release is joint (D-L51), and nightly
 against firmware `dev`; it is required on `main`, and its table is in the job

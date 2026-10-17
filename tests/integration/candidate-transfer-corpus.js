@@ -6,6 +6,7 @@ const assert = require("node:assert/strict");
 const {spawn} = require("node:child_process");
 const {createInterface} = require("node:readline");
 const {CandidateUploadCoordinator, CandidateUploadError} = require("../../core/session/candidate-upload-coordinator");
+const {candidateTransferPlan} = require("../../core/protocol/candidate-transfer-plan");
 const {decodeProfileBlob, encodeProfileBlob, crc32, fnv1a32} = require("../../core/schema/profile-blob-v1");
 const {decodeSettings, encodeSettings} = require("../../core/schema/settings-domain-v1");
 const {document32, CAPABILITIES_32} = require("../fixtures/pd-slots-32");
@@ -98,7 +99,13 @@ async function run(label, source, target, optimized, corruptSource = false) {
         if (label !== "unchanged-custom") assert.ok(!source.equals(target), "name edit must change the stored profile");
         const before = await run(label + "-full", source, target, false), after = await run(label + "-delta", source, target, true);
         assert(before && after, "Successful corpus uploads must return transfer counters.");
-        assert.ok(after.uploaded < before.uploaded / 5);
+        // A full upload sends every byte; a delta sends exactly what its plan
+        // writes and reuses the rest. How small the plan is, is the plan's own test.
+        const planned = candidateTransferPlan(target, source).filter(part => part.kind === "write").reduce((sum, part) => sum + part.length, 0);
+        assert.equal(before.uploaded, target.length, `${label}: the full upload sends the whole profile`);
+        assert.equal(after.uploaded, planned, `${label}: the delta sends what its plan writes`);
+        assert.equal(after.uploaded + after.reused, target.length, `${label}: the delta reuses everything else`);
+        assert.ok(after.uploaded < before.uploaded, `${label}: the delta sends less than a full upload`);
         assert.ok(after.requests < before.requests / 2);
         console.log(`${label}: custom bytes ${before.uploaded} -> ${after.uploaded}; HID exchanges ${before.requests} -> ${after.requests}; reused ${after.reused}; exact C readback and full validation passed`);
     }
