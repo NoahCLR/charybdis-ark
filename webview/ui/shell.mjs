@@ -88,9 +88,9 @@ export function rail() {
         ${draft ? `<div class="rail-foot">
             <button class="btn tiny ghost rail-history" data-act="history"
                 data-tip="Every step of the draft, newest first, with what each one changed. Go back or forward to any of them.">Draft history${draft && draft.historyLength > 1 ? ` <span class="c">${draft.historyLength - 1}</span>` : ""}</button>
-            <button class="btn tiny ghost icon" data-act="undo" ${draft?.canUndo ? "" : "disabled"}
+            <button class="btn tiny ghost icon" data-act="undo" aria-label="Undo" aria-keyshortcuts="Meta+Z" ${draft?.canUndo ? "" : "disabled"}
                 data-tip="${esc(draft?.undoLabel ? `Undo: ${draft.undoLabel} (⌘Z)` : "Undo the last edit in the draft (⌘Z). The keyboard is not touched until you apply.")}">↺</button>
-            <button class="btn tiny ghost icon" data-act="redo" ${draft?.canRedo ? "" : "disabled"}
+            <button class="btn tiny ghost icon" data-act="redo" aria-label="Redo" aria-keyshortcuts="Meta+Shift+Z" ${draft?.canRedo ? "" : "disabled"}
                 data-tip="${esc(draft?.redoLabel ? `Redo: ${draft.redoLabel} (⇧⌘Z)` : "Redo the edit you just undid (⇧⌘Z).")}">↻</button>
         </div>` : ""}
         ${railBuild(host.build)}

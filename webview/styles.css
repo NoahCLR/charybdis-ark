@@ -30,7 +30,11 @@
   --line-3: rgba(255,255,255,.26);
   --text: #f5f5f6;
   --text-2: #9a9aa4;
-  --text-3: #626270;
+  /* Muted text meets 4.5:1 on the surfaces; what cannot be used is
+     --text-disabled, and keyboard focus is one ring in --focus. */
+  --text-3: #85858f;
+  --text-disabled: #626270;
+  --focus: var(--text);
   --inv-bg: #ffffff;
   --inv-text: #0a0a0c;
   /* Rings ride on top of the light a key emits, so they are the one colour
@@ -71,7 +75,8 @@
   --line-3: rgba(0,0,0,.34);
   --text: #0c0c0e;
   --text-2: #5b5b64;
-  --text-3: #8b8b95;
+  --text-3: #6a6a74;
+  --text-disabled: #8b8b95;
   --inv-bg: #0c0c0e;
   --inv-text: #ffffff;
   --draft: #9a6b00;
@@ -152,8 +157,8 @@ select.rail-picker {
   background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);
   background-position: right 10px top 50%, right 6px top 50%; background-size: 4px 4px; background-repeat: no-repeat;
 }
-select.rail-picker:hover, select.rail-picker:focus-visible { background-color: var(--surface-2); border-color: var(--line); outline: none; }
-select.rail-picker:disabled { cursor: default; opacity: .6; }
+select.rail-picker:hover, select.rail-picker:focus-visible { background-color: var(--surface-2); border-color: var(--line); }
+select.rail-picker:disabled { cursor: default; color: var(--text-2); }
 .rail-status:not(:has(*)) { display: none; }
 .rail-status { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
 .rail-message { margin: 0 12px 12px; flex: none; display: flex; align-items: flex-start; gap: 6px; padding: 7px 6px 7px 9px;
@@ -179,7 +184,12 @@ select.rail-picker:disabled { cursor: default; opacity: .6; }
 }
 .nav-item:hover { background: var(--surface-2); color: var(--text); }
 .nav-item[aria-current="true"] { background: var(--surface-3); color: var(--text); font-weight: 520; }
-.nav-item:disabled, .nav-item:disabled:hover { color: var(--text-3); background: transparent; cursor: default; }
+.nav-item:disabled, .nav-item:disabled:hover { color: var(--text-disabled); background: transparent; cursor: default; }
+/* One focus ring for everything that takes the keyboard: 2 px of --focus,
+   2 px out. A switch draws it on its track, the input being hidden. */
+:where(button, a, summary, [tabindex], .input, select, textarea, input):focus-visible,
+.input:focus-visible, select.input:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.sw input:focus-visible + .track { outline: 2px solid var(--focus); outline-offset: 2px; }
 .nav-item[aria-current="true"]:disabled { background: var(--surface-2); }
 .nav-item svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.4; opacity: .85; }
 .rail-foot { padding: 12px; border-top: 1px solid var(--line); display: flex; gap: 8px; align-items: center; }
@@ -440,7 +450,7 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 }
 .lp-grip svg { width: 10px; height: 16px; fill: currentColor; }
 .lp-grip:hover, .lp-grip:focus-visible { color: var(--text); background: var(--surface-3); }
-.lp-grip:disabled { cursor: default; opacity: .4; }
+.lp-grip:disabled { cursor: default; color: var(--text-disabled); background: none; }
 .list.sorting, .list.sorting .lp-grip { cursor: grabbing; user-select: none; }
 .lp-row.dragging { position: relative; z-index: 1; background: var(--surface-3); box-shadow: 0 6px 18px rgba(0,0,0,.35); border-radius: 7px; }
 /* When the panel is capped, only the list scrolls: the heading and the toggle
@@ -525,7 +535,7 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
    still shows where focus is, as a thin outline inset past the selection ring:
    outside the key it would run under the neighbouring keys, which paint later. */
 .board [tabindex]:focus { outline: none; }
-.board [tabindex]:not(.sel):focus-visible { outline: 1.5px solid var(--text-2); outline-offset: -6px; }
+.board [tabindex]:not(.sel):focus-visible { outline: 2px solid var(--focus); outline-offset: -6px; }
 .sv-field, .hue-ramp { touch-action: none; cursor: crosshair; }
 /* Selected and indicated must never read alike: the selection is a solid ring
    inside the key; the keys for the picked row, or the inputs of the combo
@@ -667,7 +677,7 @@ button.tier:hover { background: var(--surface-3); }
 .tab-grid .span { grid-column: 1 / -1; }
 /* A stage switched on that paints nothing (auto-mouse off): its controls stay
    visible and kept, but read as not in play. */
-.tab-grid.idle > section { opacity: .5; }
+.tab-grid.idle > section { color: var(--text-2); }
 .tab-grid section { min-width: 0; }
 .tab-split { display: grid; grid-template-columns: 236px minmax(0, 1fr); gap: 20px; align-items: start; }
 .tab-split.builder { grid-template-columns: 330px minmax(0, 1fr); }
@@ -684,7 +694,7 @@ button.tier:hover { background: var(--surface-3); }
 .rowitem.on { background: var(--surface-3); box-shadow: inset 2px 0 0 var(--text); }
 .rowitem .t { font-size: 12.5px; }
 .rowitem .m { font-size: 10.5px; color: var(--text-3); }
-.rowitem.quiet { opacity: .62; }
+.rowitem.quiet .t { color: var(--text-2); }
 
 /* ── reach groups ────────────────────────────────────────────────────────
    Every tab that answers "what does this layer reach" heads its groups the
@@ -934,7 +944,8 @@ table.t .num { text-align: right; font-variant-numeric: tabular-nums; }
 .ck-item.warning:not(.fixed) { border-color: color-mix(in srgb, var(--warning) 55%, var(--line)); background: color-mix(in srgb, var(--warning) 14%, var(--surface)); }
 .ck-item.trap:not(.fixed) { border-color: color-mix(in srgb, var(--danger) 60%, var(--line)); background: color-mix(in srgb, var(--danger) 14%, var(--surface)); }
 .ck-item.blocker:not(.fixed) { border-color: var(--danger); background: color-mix(in srgb, var(--danger) 20%, var(--surface)); }
-.ck-item.fixed { opacity: .7; }
+.ck-item.fixed { color: var(--text-2); }
+.ck-item.fixed .ck-t { color: var(--text-2); }
 .ck-h { display: grid; grid-template-columns: 150px minmax(0, 1fr) auto; column-gap: 12px; align-items: baseline; }
 .ck-level { display: grid; gap: 2px; font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--text-3); }
 .ck-level > span { display: flex; align-items: center; gap: 6px; }
@@ -1045,7 +1056,8 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .hs-go { margin-left: auto; flex: none; align-self: center; }
 .hs-here { display: inline-flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--text); }
 .hs-step.current .rv-block { box-shadow: inset 3px 0 0 var(--draft); }
-.hs-step.undone .hs-label, .hs-step.undone .rv-block { opacity: .55; }
+.hs-step.undone .hs-label, .hs-step.undone .rv-block { color: var(--text-3); }
+.hs-step.undone .rv-block { border-style: dashed; }
 .hs-empty { margin: 0 0 10px; }
 .hs .hs-empty:only-child { padding: 18px; }
 
@@ -1182,7 +1194,8 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .pk:hover { border-color: var(--line-3); background: var(--surface-3); }
 .pk.on { background: var(--inv-bg); border-color: transparent; }
 .pk.on .l, .pk.on .c { color: var(--inv-text); }
-.pk[disabled] { opacity: .35; pointer-events: none; }
+.pk[disabled] { pointer-events: none; background: none; border-style: dashed; }
+.pk[disabled] .l, .pk[disabled] .c { color: var(--text-disabled); }
 .pk .l { font-size: 12.5px; }
 .pk .c { font-family: var(--mono); font-size: 9.5px; color: var(--text-3); }
 .pk.wide { min-width: 120px; }
@@ -1359,7 +1372,8 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .mslot.filled { background: var(--surface-3); border-color: var(--line-2); }
 .mslot[aria-current="true"] { border-color: var(--line-3); background: var(--key-hi); }
 /* A slot macro memory has no room left for reads as unavailable, not as empty. */
-.mslot.out { opacity: .38; border-style: dashed; cursor: not-allowed; }
+.mslot.out { border-style: dashed; background: none; cursor: not-allowed; }
+.mslot.out .n, .mslot.out .v { color: var(--text-disabled); }
 .mslot.warn { border-color: var(--danger); }
 .mslot.warn .v { color: var(--danger); }
 .meter.over i { background: var(--danger); }
@@ -1534,7 +1548,7 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .import-fits.warn { color: var(--warning); }
 .setrow { display: grid; grid-template-columns: minmax(0,1fr) 190px; gap: 16px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line); }
 .setrow:last-child { border-bottom: 0; }
-.setrow.ro { opacity: .72; }
+.setrow.ro .nm { color: var(--text-2); }
 .setrow .nm { font-size: 12.5px; }
 .setrow .hint { font-size: 11.5px; color: var(--text-3); margin-top: 2px; }
 /* A section's one-per-layer switches: one row, the layers in a grid under
@@ -1557,7 +1571,8 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .colour-head .swatch-lg { width: 34px; height: 34px; }
 .colour-head .colour-title { font-size: 12.5px; }
 .colour-head > .btn { margin-left: auto; }
-.colour-head.unused { opacity: .5; }
+.colour-head.unused .colour-title { color: var(--text-2); }
+.colour-head.unused .swatch-lg { border-style: dashed; }
 .colour-head.unused + .note { margin-top: 10px; }
 /* Lighting's stage surfaces. */
 .tab-grid.stage-detail { gap: 22px; }
