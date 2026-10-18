@@ -14,7 +14,7 @@ const {PD_SLOT_BINDINGS} = require("../data/pd-bindings");
 const {PHASE, VOCABULARY, HALVES_WORDS, slotName} = require("../model/vocabulary");
 const keycodeCatalog = require("../data/keycode-catalog");
 const {baseEffectForView, baseRgbForView, behaviorRowsForView, builtInForView, comboRowsForView, rgbForView} = require("../model/device-profile-view");
-const {effectiveTimings} = require("../model/gesture-timing");
+const {effectiveTimings, holdTermSetting} = require("../model/gesture-timing");
 const {compactKeyLabels, hostKeyVocabulary, keyLabel, keyLayer, profileKeyNames, shortcutLabel} = require("../model/key-names");
 const {layerName} = require("../model/vocabulary");
 const {keycodeAction, knownActionAbi, layerRef, nativeCode} = require("../schema/actions");
@@ -336,7 +336,7 @@ function behaviorFeatures(content) {
 // saved rows. Publish presentation only; these are not profile behaviours.
 // Every keycode the profile holds has them, and so does every custom key,
 // placed or not: Custom keys edits the behaviour of a key on no layer yet.
-/** @param {Configuration} content @param {import("./types.js").DeviceModelInput["capabilities"]} capabilities @param {Record<string, string>} aliases @param {import("../../contracts/model.js").ProfileKeyNames} names @returns {Record<string, {builtIn: ReturnType<typeof builtInForView>, timing: {tapHoldTerm: number | string | undefined, longerHoldTerm: number | string | undefined, multiTapTerm: number | string | undefined}}>} */
+/** @param {Configuration} content @param {import("./types.js").DeviceModelInput["capabilities"]} capabilities @param {Record<string, string>} aliases @param {import("../../contracts/model.js").ProfileKeyNames} names @returns {import("../../contracts/panel.js").PublishedModel["behaviorEditing"]["keyDefaults"]} */
 function behaviorDefaults(content, capabilities, aliases, names) {
     const defaults = content.settingsView?.timing || {};
     const values = [defaults.tappingTerm, defaults.tapHoldTerm, defaults.longerHoldTerm, defaults.multiTapTerm];
@@ -346,8 +346,15 @@ function behaviorDefaults(content, capabilities, aliases, names) {
         const target = keycodeAction(code);
         const name = keycodeCatalog.resolve(code).name;
         const timing = effectiveTimings({target}, values);
+        // Where each default comes from, named for the editor's placeholders;
+        // a key with no row may follow another (B5: QMK's MT and OSM keys).
+        const source = (/** @type {boolean} */ stored) => holdTermSetting(target, stored) === SETTING.TAPPING_TERM ? "tappingTerm" : "tapHoldTerm";
+        const unstored = effectiveTimings({target}, values, {stored: false});
         return [aliases[name] || name, {builtIn: builtInForView(target, features, names),
-            timing: {tapHoldTerm: timing.hold, longerHoldTerm: timing.long, multiTapTerm: timing.repeat}}];
+            timing: {tapHoldTerm: timing.hold, longerHoldTerm: timing.long, multiTapTerm: timing.repeat},
+            timingSources: {tapHoldTerm: source(true), longerHoldTerm: "longHoldTerm", multiTapTerm: "multiTapTerm"},
+            ...(unstored.hold !== timing.hold || source(false) !== source(true)
+                ? {withoutRow: {tapHoldTerm: unstored.hold, tapHoldSource: source(false)}} : {})}];
     }));
 }
 

@@ -105,6 +105,11 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         ["REPEAT_WHILE_HELD", "keeps repeating until release"],
     ],
     tapSends: "tap sends",
+    // A built-in hold that starts as the key goes down (MO, LM, pointing modes).
+    holdFromPress: "held from the press",
+    // The setting a timing default comes from, as a behaviour's timing
+    // placeholders name it ("200 · dual-role").
+    timingSources: {tappingTerm: "dual-role", tapHoldTerm: "behaviour default", longHoldTerm: "default", multiTapTerm: "default"},
     tiers: {tap: "Tap", hold: "Hold", long: "Long hold"},
     // A behaviour's branch by how many taps start it.
     branches: ["Single tap", "Double tap", "Triple tap", "Quadruple tap", "Quintuple tap"],
