@@ -91,6 +91,7 @@ for(const theme of ['vscode-dark','vscode-light']) {
             window.__posted.length=0;
         });
         await sendHost(page,1);
+        await page.locator('[data-menu="more"]').click();
         await page.locator('[data-act="rekey"]').click();
         // The actual screen opens this picker; never restore or replace its state.
         for(const host of [1,2,3,0]) {

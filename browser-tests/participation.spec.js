@@ -19,12 +19,14 @@ test("participation controls post placements, shared definitions and master/sour
 
     await page.locator('[data-tab="behaviours"]').click();
     await clear();
-    await page.getByText('Use this behaviour', {exact: true}).click();
+    await page.locator('.beh-head label').filter({has: page.locator('[data-definition-enabled]')}).click();
     await expect.poll(posted).toEqual([expect.objectContaining({type: "saveBehavior", behavior: expect.objectContaining({enabled: false, allowedLayers: 65535})})]);
-    await page.getByText("Layers it runs on", {exact: true}).click();
+    await page.locator('.beh-head [data-menu="layers"]').click();
     await clear();
     await page.locator('label').filter({has: page.locator('[data-allowed-layer="15"]')}).click();
-    await expect.poll(posted).toEqual([expect.objectContaining({type: "saveBehavior", behavior: expect.objectContaining({enabled: false, allowedLayers: 32767})})]);
+    // The preview applies nothing, so opening the popover redraws the switch
+    // from the model: on.
+    await expect.poll(posted).toEqual([expect.objectContaining({type: "saveBehavior", behavior: expect.objectContaining({enabled: true, allowedLayers: 32767})})]);
 
     await page.locator('[data-tab="combos"]').click();
     await page.getByRole("button", {name: "New combo", exact: true}).click();

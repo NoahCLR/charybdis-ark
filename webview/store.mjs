@@ -44,6 +44,7 @@ export const STATE_FIELDS = {
     // Custom keys screen each show one behaviour editor, and a cell opened in
     // one behaviour never opens in another's grid or takes its shortcuts.
     cellRow: kept(null),
+    behaviourMenu: kept(null), // the open behaviour editor's head popover: "layers" or "more"
     reveal: kept(null),        // a selector the next render scrolls into view and marks, then forgets
     pickCombo: kept(null),     // a combo id to pick in the Combos tab, wherever this layer lists it
     settingsOpen: kept([]),    // settings sections opened by hand or by a Show, so a render keeps them open

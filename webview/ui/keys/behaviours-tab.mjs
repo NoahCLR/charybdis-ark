@@ -12,7 +12,7 @@ import {currentLayer, getModel, heldLayers, layerName, layers, render, selectedP
 import {behaviourEditorRow} from "../../view/behavior-editor.mjs";
 import {draftDot, draftMarks} from "../../view/review.mjs";
 import {attachGroupToggles, groupHeader, groupOpen} from "../groups.mjs";
-import {inGroupOrder, setReachGroupOpen} from "../../view/reach-groups.mjs";
+import {GROUP_TITLES, inGroupOrder, setReachGroupOpen} from "../../view/reach-groups.mjs";
 import {actionMarked, comboInputsMarked, keycodeMark, tierDot} from "../marks.mjs";
 import {behaviourEditor} from "./behaviour-editor.mjs";
 import {behaviourKey, behaviourRoute, selectBehaviourKey} from "./behaviour-selection.mjs";
@@ -65,9 +65,10 @@ export function tabBehaviours(body, right) {
     const route = behaviourRoute();
     const changed = draftMarks(model?.draft?.changes).behaviours;
     /** @param {string} group @param {import("../../../contracts/panel.js").BehaviorView} row @param {string} note */
-    const item = (group, row, note) => `<button class="rowitem ${row.keycode === state.behaviourRow && (!route || route === group) ? "on" : ""} ${note ? "quiet" : ""}" data-row="${esc(row.keycode)}" data-route="${group}">
+    // Only a row this layer never reaches reads quieter, by colour.
+    const item = (group, row, note) => `<button class="rowitem ${row.keycode === state.behaviourRow && (!route || route === group) ? "on" : ""} ${group === "elsewhere" ? "unreached" : ""}" data-row="${esc(row.keycode)}" data-route="${group}"${note ? ` data-tip="${esc(note.replace(/<[^>]*>/g, ""))}"` : ""}>
         <span class="t">${actionMarked(model, row.keycode)}${(code => code ? ` ${code}` : "")(keycodeMark("behaviourRow", row.keycode, actionLabel(model, row.keycode)))}${changed.has(row.keycode) ? draftDot() : ""}</span>
-        <span class="m">${behaviourTiers(row).map((tier) => tierDot(model, tier.kind)).join("")} ${actionsWords(row)}${note ? ` · ${note}` : ""}</span></button>`;
+        <span class="m">${behaviourTiers(row).map((tier) => tierDot(model, tier.kind)).join("")} ${actionsWords(row)}</span></button>`;
 
     // A selection made anywhere else — the board, the Key tab, a fresh
     // behaviour — can land in a closed group, so the group holding it opens
@@ -83,13 +84,17 @@ export function tabBehaviours(body, right) {
             empty: "No transparent key falls through to a behaviour."},
         {id: "belowCombos", rows: combosBelow.map((entry) => ({row: entry.row, note: comboNote(entry)})),
             empty: "No combo that needs a transparent key sends a behaviour."},
-        {id: "elsewhere", rows: elsewhere.map((row) => ({row, note: "not on this layer"})),
+        {id: "elsewhere", rows: elsewhere.map((row) => ({row, note: ""})),
             empty: "Every behaviour on the board is reached from this layer."},
     ];
+    // "On this view" says something of its own only while a layer is
+    // previewed; outside one, this layer leads.
+    const previewing = heldLayers().length > 0;
+    const listed = groups.filter((group) => group.id !== "view" || previewing);
     const selectionMoved = state.behaviourRow !== state.behaviourRowShown;
     if (selectionMoved) {
-        const holding = groups.find((group) => group.id === route)
-            || groups.find((group) => group.rows.some((entry) => entry.row.keycode === state.behaviourRow));
+        const holding = listed.find((group) => group.id === route)
+            || listed.find((group) => group.rows.some((entry) => entry.row.keycode === state.behaviourRow));
         if (holding) state.reachGroups = setReachGroupOpen(state.reachGroups, holding.id, true);
         state.behaviourRowShown = state.behaviourRow;
     }
@@ -102,9 +107,12 @@ export function tabBehaviours(body, right) {
                 : `<p class="note rowgroup-empty">${esc(group.empty)}</p>`)
             : ""}</div>`;
 
-    const node = el(`<div class="tab-split">
+    // Groups with nothing in them fold into one line at the foot.
+    const empty = inGroupOrder(listed).filter((group) => !group.rows.length);
+    const none = empty.length ? `<p class="note rowgroup-none">No behaviours ${esc(empty.map((group) => GROUP_TITLES[/** @type {keyof typeof GROUP_TITLES} */ (group.id)].toLowerCase()).join(", or "))}.</p>` : "";
+    const node = el(`<div class="tab-split behaviours">
         <aside class="rowlist behaviour-rail">
-            ${inGroupOrder(groups).map(section).join("")}
+            ${inGroupOrder(listed).filter((group) => group.rows.length).map(section).join("")}${none}
         </aside>
         <div class="beh-main"></div>
     </div>`);
@@ -122,6 +130,6 @@ export function tabBehaviours(body, right) {
         if (followed) main.appendChild(el(followed));
         main.appendChild(behaviourEditor(behaviour));
     }
-    else main.appendChild(el(`<p class="note beh-empty">Behaviours are what a key does when tapped, held or tapped several times. Transparent and Nothing keys cannot have one: choose another key on the board.</p>`));
+    else main.appendChild(el(`<p class="note beh-empty">What this key does when tapped, held or tapped several times. Transparent and Nothing keys cannot have one: choose another key on the board.</p>`));
     body.replaceChildren(node);
 }

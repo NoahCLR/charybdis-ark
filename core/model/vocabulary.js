@@ -79,21 +79,21 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     // A host layout names its OS, since German on macOS and on Windows differ.
     hostLayouts: hostLayouts().map(/** @returns {[number, string]} */ layout => [layout.id, layout.os === "any" ? layout.name : `${layout.name} (${OS_WORDS[layout.os]})`]),
     // How a hold action runs once its threshold passes ("How it runs"), in
-    // that hold's words: one that names a threshold names its own, the Tap / hold
-    // threshold for Hold and the Long hold threshold for Long hold. A tap tier
-    // only sends.
+    // short words: the threshold is the column's own (Hold after, Long hold
+    // after), so the words need not name it. A tap tier only sends; a
+    // repeating hold says its rate where it is drawn ("Repeats 20/s").
     holdHelpers: {
         hold: [
             ["PRESS_AND_HOLD_UNTIL_RELEASE", "held until release"],
-            ["TAP_AT_HOLD_THRESHOLD", "tap at Tap / hold threshold"],
-            ["TAP_ON_RELEASE_AFTER_HOLD", "tap on release after Tap / hold threshold"],
-            ["REPEAT_WHILE_HELD", "repeat while held"],
+            ["TAP_AT_HOLD_THRESHOLD", "sent at threshold"],
+            ["TAP_ON_RELEASE_AFTER_HOLD", "sent on release"],
+            ["REPEAT_WHILE_HELD", "repeats while held"],
         ],
         long: [
             ["PRESS_AND_HOLD_UNTIL_RELEASE", "held until release"],
-            ["TAP_AT_HOLD_THRESHOLD", "tap at Long hold threshold"],
-            ["TAP_ON_RELEASE_AFTER_HOLD", "tap on release after Long hold threshold"],
-            ["REPEAT_WHILE_HELD", "repeat while held"],
+            ["TAP_AT_HOLD_THRESHOLD", "sent at threshold"],
+            ["TAP_ON_RELEASE_AFTER_HOLD", "sent on release"],
+            ["REPEAT_WHILE_HELD", "repeats while held"],
         ],
     },
     // What a Hold does past the Long hold threshold when no Long hold is set:

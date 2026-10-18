@@ -33,8 +33,10 @@ export const inGroupOrder = (groups) => GROUP_ORDER.map((id) => groups.find((gro
 // The same section means the same thing in each Keys tab. Keep one open state
 // by section id, including ids that only some tabs show. No section closes
 // another when it opens.
+// The view and this layer start open: outside a layer preview the Behaviours
+// and Combos tabs list this layer first, as the view is the same.
 export const initialReachGroups = () => Object.fromEntries(
-    GROUP_ORDER.map((id) => [id, id === "key" || id === "view"]));
+    GROUP_ORDER.map((id) => [id, id === "key" || id === "view" || id === "here"]));
 /** @param {Record<string, boolean>} groups @param {string} id @param {boolean} open */
 export const setReachGroupOpen = (groups, id, open) => ({...groups, [id]: open});
 

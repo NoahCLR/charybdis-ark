@@ -24,13 +24,14 @@ test("reach sections share one state across Keys tabs and open independently", (
     const initial = initialReachGroups();
     assert.deepEqual(Object.keys(initial), GROUP_ORDER);
     assert.equal(initial.view, true);
-    assert.equal(initial.here, false);
-    const withLayer = setReachGroupOpen(initial, "here", true);
+    assert.equal(initial.here, true, "this layer starts open too: it leads outside a preview");
+    assert.equal(initial.through, false);
+    const withLayer = setReachGroupOpen(setReachGroupOpen(initial, "here", false), "here", true);
     const withCombos = setReachGroupOpen(withLayer, "combos", true);
     assert.equal(withCombos.view, true, "opening another route leaves the view open");
     assert.equal(withCombos.here, true, "opening a third route leaves this layer open");
     assert.equal(withCombos.combos, true);
     assert.equal(setReachGroupOpen(withCombos, "here", false).here, false,
         "collapsing a shared route is visible to every tab that has it");
-    assert.equal(initial.here, false, "the initial state is not changed");
+    assert.equal(initial.combos, false, "the initial state is not changed");
 });

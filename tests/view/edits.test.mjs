@@ -215,6 +215,26 @@ test("how an empty cell runs is held until it sends something, then posted with 
     assert.deepEqual(edits.cellEdit("tap", {stored: false, action: ""}), {pending: null}, "a tap tier has no helper to hold");
 });
 
+test("Nothing in a built-in cell posts KC_NO, which the draft stores in place of the key's own action", () => {
+    // The cell popover's Nothing on an empty built-in cell (ui/keys/cell-editor.mjs).
+    const edit = edits.cellEdit("tap", {stored: false, action: "KC_NO"});
+    assert.deepEqual(edit, {branch: {helper: "TAP_SENDS", action: "KC_NO"}});
+    const draft = session();
+    stage(draft, edits.saveBehaviour({keycode: "KC_Q", steps: []}, {change: {tapCount: 0, kind: "tap", branch: edit.branch}}, draft.identity()));
+    const row = decoded(draft).behaviors.rows.find((entry) => entry.target.operand === 0x14);
+    assert.deepEqual(row.steps[0].tap, {kind: 1, flags: 0, operand: 0}, "KC_NO, stored as a tap of its own");
+});
+
+test("the behaviour head's On switch and Layers popover post one row with both permissions", () => {
+    const draft = session();
+    const behaviour = {keycode: "KC_ESCAPE", tapHoldTerm: 0, longerHoldTerm: 0, multiTapTerm: 0, keepsAutoMouseAnchored: false,
+        steps: [{tapCount: 0, tap: {helper: "TAP_SENDS", action: "KC_ESCAPE"}}]};
+    stage(draft, edits.saveBehaviour(behaviour, {enabled: false, allowedLayers: 0x7fff}, draft.identity()));
+    const row = decoded(draft).behaviors.rows.find((entry) => entry.target.kind === 1 && entry.target.operand === 0x29);
+    assert.equal(row.enabled, false);
+    assert.equal(row.allowedLayers, 0x7fff);
+});
+
 test("a behaviour row is added for a key without one, and deleted again", () => {
     const draft = session();
     const rows = () => decoded(draft).behaviors.rows.length;

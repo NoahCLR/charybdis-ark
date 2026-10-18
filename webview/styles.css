@@ -763,6 +763,18 @@ button.tier:hover { background: var(--surface-3); }
 .rowitem .t { font-size: var(--fs-body); }
 .rowitem .m { font-size: var(--fs-micro); color: var(--text-3); }
 .rowitem.quiet .t { color: var(--text-2); }
+.rowitem.unreached .t { color: var(--text-3); }
+/* The Behaviours list: 40 px rows, one line each, scrolling on its own and
+   held under the workbench tabs while the editor beside it scrolls. */
+.tab-split.behaviours { grid-template-columns: var(--bench-list) minmax(0, 1fr); }
+.tab-split.behaviours > .behaviour-rail {
+  position: sticky; top: calc(var(--board-top, 0px) + var(--h-tab) + 24px);
+  max-height: calc(100vh - var(--topbar) - var(--board-top, 0px) - var(--h-tab) - 120px); min-height: 160px; overflow-y: auto; overscroll-behavior: contain;
+}
+.behaviour-rail .rowitem { grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; min-height: 40px; padding: 4px 12px; }
+.behaviour-rail .rowitem .t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.behaviour-rail .rowitem .m { white-space: nowrap; }
+.rowgroup-none { padding: 10px 12px; border-top: 1px solid var(--line); }
 
 /* ── reach groups ────────────────────────────────────────────────────────
    Every tab that answers "what does this layer reach" heads its groups the
@@ -786,30 +798,46 @@ button.tier:hover { background: var(--surface-3); }
 .rowlist .rowgroup + .rowgroup .group-h { border-top: 1px solid var(--line); }
 .reach-table { padding: 2px 0; }
 
-.beh-head { display: flex; align-items: flex-start; gap: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
-/* Whether the behaviour runs and where lead, keeping a readable width; the
-   mouse-layer switch sits at the row's end, and wraps below beside a narrow
-   editor (Custom keys) rather than squeezing them. */
-.beh-intro { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 16px; padding: 12px 0 16px; }
-.beh-intro > .stack { flex: 1 1 280px; min-width: 0; }
-.beh-intro .sw { flex: none; }
-.beh-intro > .sw { margin-left: auto; }
-/* One row per tap count the keyboard allows, all shown; a column per tier.
-   Each timing heads what it governs: Multi tap window the tap counts, Tap /
-   hold and Long hold their tiers. */
-.bgrid { display: grid; grid-template-columns: 150px repeat(3, minmax(110px, 1fr)); gap: 6px; align-items: stretch; overflow-x: auto; padding-bottom: 2px; }
-.bgrid .bterm-field { gap: 4px; align-self: end; min-width: 0; margin-bottom: 6px; }
-.bterm { display: flex; align-items: center; align-self: end; height: var(--h-control); margin-bottom: 6px; padding: 0 2px; font-size: var(--fs-small); color: var(--text-3); }
-.bhead { display: flex; align-items: center; gap: 6px; padding: 0 2px; font-size: var(--fs-small); color: var(--text-2); }
+/* The behaviour editor (ui/keys/behaviour-editor.mjs): a head with its name
+   and On · Layers ▾ · More ▾, one 40 px timing strip, then the grid. Its open
+   cell's editor is a popover placed against the editor. */
+.beh-editor { position: relative; }
+.beh-head { display: flex; align-items: center; gap: 12px; min-height: var(--h-tab); }
+.beh-head .beh-actions { gap: 8px; margin-left: auto; flex-wrap: wrap; justify-content: flex-end; }
+.beh-pop-wrap { position: relative; }
+.beh-pop {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 6; width: 360px; display: grid; gap: 8px;
+  padding: 12px; border: 1px solid var(--line-2); border-radius: var(--r-card); background: var(--surface); box-shadow: var(--shadow-1);
+}
+.beh-pop { scroll-margin-bottom: 64px; }
+.beh-pop .layer-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.beh-pop.menu { width: 260px; gap: 2px; padding: 6px; }
+.beh-pop.menu .sw { padding: 0 6px; }
+.beh-pop.menu .btn.text { justify-content: flex-start; width: 100%; }
+.beh-timing { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; min-height: 40px; padding: 4px 0; margin: 8px 0 12px;
+  border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); font-size: var(--fs-small); color: var(--text-2); }
+.beh-timing .bterm-field { display: inline-flex; align-items: center; gap: 6px; }
+.beh-timing .input { width: auto; height: var(--h-compact); padding: 0 6px; }
+.beh-timing .input.warn, .bgrid .input.warn { border-color: var(--warning); }
+.beh-timing .sep, .beh-timing .unit { color: var(--text-3); }
+/* A row per tap count in use and the next (or all, Show all tap counts); a
+   column per tier. */
+.bgrid { display: grid; grid-template-columns: 88px repeat(3, minmax(140px, 240px)); gap: 6px; align-items: stretch; overflow-x: auto; padding-bottom: 2px; }
+.bgrid .bcost { grid-column: span 1; align-self: start; font-size: var(--fs-small); color: var(--text-3); padding: 0 2px 4px; }
+.bgrid .bcost.span2 { grid-column: span 2; }
+.bhead { display: flex; align-items: center; gap: 6px; padding: 0 2px; font-size: var(--fs-small); color: var(--text-2); white-space: nowrap; overflow: hidden; }
 .bhead .bn { font-family: var(--mono); font-size: var(--fs-micro); color: var(--text-3); border: 1px solid var(--line); border-radius: var(--r-chip); padding: 1px 4px; }
-.bhead .bx { margin-left: auto; color: var(--text-3); font-size: var(--fs-small); }
-.bhead .bx:hover { color: var(--text); }
-.bhead.add { justify-content: flex-start; }
-.btier { display: flex; align-items: center; gap: 6px; padding: 0 2px; font-size: var(--fs-small); color: var(--text-3); }
+.bhead.add, .bhead.past { color: var(--text-3); }
+.btier { display: flex; align-items: center; gap: 6px; padding: 0 2px; font-size: var(--fs-small); color: var(--text-3); min-height: var(--h-chip); }
+.bfoot { gap: 12px; margin-top: 8px; max-width: calc(88px + 3 * 240px + 18px); }
+.bfoot .toggle { margin-left: auto; }
+.bcycle { font-size: var(--fs-small); color: var(--text-3); }
+.bwarnings { margin: 8px 0 0; padding: 0 0 0 16px; font-size: var(--fs-small); color: var(--warning); }
+.bwarnings .notice { color: var(--text-2); }
 .fbdot { width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--line-3); flex: none; display: inline-block; }
 .rowitem .fbdot, .reach .fbdot { margin-right: 3px; }
 .bcell {
-  display: grid; align-content: center; justify-items: center; gap: 2px; min-height: 52px; padding: 8px 10px;
+  display: grid; align-content: center; justify-items: center; gap: 2px; min-height: 56px; padding: 6px 10px;
   border: 1px solid var(--line); border-radius: var(--r-control); background: var(--surface-2); text-align: center; width: 100%;
 }
 .bcell:hover { border-color: var(--line-3); background: var(--surface-3); }
@@ -823,10 +851,20 @@ button.tier:hover { background: var(--surface-3); }
    but not stored in the row, so it keeps the empty cell's dashed edge. */
 .bcell.inherited { border-style: dashed; background: none; }
 .bcell.inherited .bk { color: var(--text-2); }
-.cell-editor { margin-top: 14px; border: 1px solid var(--line-2); border-radius: var(--r-card); background: var(--surface-2); overflow: hidden; }
-.ce-head { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
-.ce-head h4 { font-size: var(--fs-body); }
-.ce-body { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, .8fr) auto; gap: 12px; padding: 12px; align-items: end; }
+/* A timing check condemns this cell (ui/keys/behaviour-editor.mjs). */
+.bcell.warn { border-color: var(--warning); box-shadow: inset 0 0 0 1px var(--warning); }
+.cell-editor {
+  position: absolute; z-index: 7; width: 360px; max-width: 100%; border: 1px solid var(--line-2); border-radius: var(--r-card);
+  background: var(--surface); box-shadow: var(--shadow-1);
+}
+.cell-pop { scroll-margin-bottom: 64px; }
+.ce-head { display: flex; align-items: center; gap: 10px; padding: 10px 12px 0; }
+.ce-body { display: grid; gap: 12px; padding: 10px 12px 12px; }
+.ce-body .value-btn { justify-content: flex-start; width: 100%; }
+.ce-builtin { font-size: var(--fs-body); color: var(--text-2); }
+.ce-builtin b { color: var(--text); font-weight: var(--fw-medium); }
+.ce-choices { gap: 8px; }
+.ce-actions { justify-content: flex-end; }
 
 .stacklist { display: grid; gap: 2px; }
 .stackrow { display: grid; grid-template-columns: 14px 92px minmax(0, 1fr) auto; gap: 8px; align-items: center;
@@ -872,11 +910,7 @@ button.tier:hover { background: var(--surface-3); }
 .beh-empty { padding: 16px; }
 .beh-title { gap: 8px; }
 .beh-title h3 { font-size: var(--fs-heading); }
-.beh-head .note { margin-top: 3px; }
-.beh-actions { gap: 8px; margin-left: auto; }
 .beh-note { margin-bottom: 12px; }
-.beh-foot { margin-top: 12px; }
-.ce-actions { gap: 8px; align-items: end; }
 /* Moving a behaviour onto a key that has one asks first (ui/keys/retarget.mjs). */
 .sheet.retarget { width: min(520px, 100%); }
 .sheet.retarget .sheet-b { padding: 16px 16px; }
@@ -898,7 +932,8 @@ button.tier:hover { background: var(--surface-3); }
    232 px of it (window widths in brackets). */
 @container content (max-width: 948px) { /* window 1180 */
   .tab-grid.three { grid-template-columns: minmax(0, 1fr); }
-  .tab-split, .tab-split.wide, .tab-split.builder { grid-template-columns: minmax(0, 1fr); }
+  .tab-split, .tab-split.wide, .tab-split.builder, .tab-split.behaviours { grid-template-columns: minmax(0, 1fr); }
+  .tab-split.behaviours > .behaviour-rail { position: static; max-height: 320px; }
 }
 
 /* ── lists / tables ──────────────────────────────────────────────────── */
