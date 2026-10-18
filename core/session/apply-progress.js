@@ -59,11 +59,12 @@ class ApplyProgress {
         /** @type {import("../../contracts/model.js").ApplyFailure | null} */
         this.failure = null;
         this.finished = false;
+        this.waiting = false;
     }
 
     // Moves to `step` (never backwards) and records what it is doing now.
-    /** @param {ApplyStep} step @param {{detail?: string, completed?: number, total?: number}} [progress] */
-    report(step, {detail = "", completed, total} = {}) {
+    /** @param {ApplyStep} step @param {{detail?: string, completed?: number, total?: number, waiting?: boolean}} [progress] */
+    report(step, {detail = "", completed, total, waiting = false} = {}) {
         const index = STEP_INDEX[step];
         if (index === undefined) throw new RangeError(`Unknown Apply step ${step}.`);
         if (this.finished || this.failure || index < this.index) return;
@@ -72,6 +73,7 @@ class ApplyProgress {
             this.bytes = null;
         }
         this.detail = detail;
+        this.waiting = waiting;
         const counted = bytes(completed, total);
         if (counted) this.bytes = counted;
         this.onChange(this.view());
@@ -100,6 +102,7 @@ class ApplyProgress {
         this.index = APPLY_STEPS.length - 1;
         this.detail = "";
         this.bytes = null;
+        this.waiting = false;
         this.onChange(this.view());
     }
 
@@ -120,6 +123,7 @@ class ApplyProgress {
             detail: this.detail,
             bytes: this.bytes ? {...this.bytes} : null,
             failure: this.failure ? {...this.failure} : null,
+            waiting: this.waiting && !this.failure && !this.finished,
         };
     }
 }

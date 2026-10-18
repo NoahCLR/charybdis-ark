@@ -19,10 +19,10 @@ test("what is already on the keyboard stays folded unless it holds a trap", () =
     assert.equal(checkGroups([check("blocker", "existing")])[0].open, true);
 });
 
-test("active traps and warnings ask for confirmation, including ones already on the keyboard", () => {
+test("only the traps and warnings this draft brings ask for confirmation; ones already on the keyboard do not", () => {
     const checks = [check("trap", "new", "A"), check("trap", "existing", "B"), check("trap", "fixed", "C"),
         check("warning", "new", "D"), check("warning", "existing", "E"), check("warning", "fixed", "F"), check("notice", "new", "G")];
-    assert.deepEqual(checksToConfirm(checks).map((item) => item.title), ["A", "B", "D", "E"]);
+    assert.deepEqual(checksToConfirm(checks).map((item) => item.title), ["A", "D"]);
     assert.deepEqual(checksToConfirm(), []);
     assert.deepEqual(checksToConfirm([check("blocker", "new")]), [], "a blocker cannot be confirmed away");
 });

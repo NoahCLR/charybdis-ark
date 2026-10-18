@@ -25,7 +25,7 @@ export interface PanelState {
     placement: {keycode: string} | null; retarget: {from: string; to: string; existing: string} | null; keyClipboard: {keycode: string; label: string} | null;
     stage: string; layersOpen: boolean; layersAsked: boolean; layerGripFocus?: number; pdSlot: number; pdKind: {slot: number; kind: number} | null;
     pdButtons: {slot: number; rows: Record<number, PdButton>} | null; pdTaps: {slot: number; rows: Record<string, PdTap>} | null;
-    pdAdvanced: boolean; tbEntry: 'pointer' | 'sniping' | 'mouseLayer'; tbEmptiesOpen: boolean; tbFineTuning: boolean; pdStartEmpty: boolean; applyDismissed: number; pdPreview: boolean; feedbackRow: string | undefined;
+    pdAdvanced: boolean; tbEntry: 'pointer' | 'sniping' | 'mouseLayer'; tbEmptiesOpen: boolean; tbFineTuning: boolean; pdStartEmpty: boolean; applyDismissed: number; applied: number; appliedDismissed: number; applyWait: {id: number; since: number} | null; applyReread: number; pdPreview: boolean; feedbackRow: string | undefined;
     macroSlot: string | null; macroSearch: string; macroEmptyOpen: boolean; customKey: string | null; customKeySearch: string; customKeyEmptyOpen: boolean; customKeyAddBehaviour: string | null; macroForms: Record<string, MacroForm>;
     macroClipboard: MacroStep[] | null;
     recording: {slot: string; before: string} | null; lastTake: {slot: string; before: string} | null;

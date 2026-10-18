@@ -93,6 +93,8 @@ class ProfileDraftSession {
         /** @type {Snapshot} */
         this.latest = copy(snapshot);
         this.hostOs = copy(snapshot.hostOs ?? null);
+        /** @type {{key: string, words: string[]} | null} */
+        this.keyboardChangedCache = null;
         this.history = [this.historyEntry(snapshot.document)];
         this.cursor = 0;
         this.revision = 1;
@@ -543,7 +545,7 @@ class ProfileDraftSession {
     }
     // Whether Apply has to be confirmed: active traps and warnings matter
     // whether the draft introduced them or the keyboard already has them.
-    hasChecksToConfirm() {return this.checks().some(check => check.status !== "fixed" && (/** @type {string[]} */ ([CHECK_LEVELS.TRAP, CHECK_LEVELS.WARNING])).includes(check.level));}
+    hasChecksToConfirm() {return this.checks().some(check => check.status === "new" && (/** @type {string[]} */ ([CHECK_LEVELS.TRAP, CHECK_LEVELS.WARNING])).includes(check.level));}
     hasBlockers() {return this.checks().some(check => check.status !== "fixed" && check.level === "blocker");}
     identity() {return {source: "draft", generation: this.revision, digest: this.decode(this.history[this.cursor].document).fingerprint, originHalf: this.deviceId};}
     // The draft's combos as the keyboard would report them: every window as
@@ -558,6 +560,26 @@ class ProfileDraftSession {
             version: combos.version, defaultTermMs: combos.defaultTermMs, holdTermMs: combos.holdTermMs,
             rows: combos.rows.map(row => ({...row, termMs: effectiveComboTerm(combos, row), followsDefault: row.termMs === null, inputs: row.inputs.map(native), output: native(row.output)}))};
     }
+    // The differences between the keyboard the draft began from and the one
+    // read since, one line each: a single field as "label before → after",
+    // more as the thing's title. Computed once per pair of reads.
+    /** @returns {string[]} */
+    keyboardChanged() {
+        if (this.latest.incomplete || this.base.incomplete || this.latest.fingerprint === this.base.fingerprint) return [];
+        const key = `${this.base.fingerprint}>${this.latest.fingerprint}`;
+        if (this.keyboardChangedCache?.key !== key) {
+            let words = /** @type {string[]} */ ([]);
+            try {
+                words = profileReview(this.base, this.latest, this.latestCapabilities).map(item => {
+                    const [field] = item.fields;
+                    return item.fields.length === 1 && field.before !== null && field.after !== null
+                        ? `${item.title === field.label ? "" : `${item.title}: `}${field.label} ${field.before} → ${field.after}` : `${item.title} ${item.status}`;
+                });
+            } catch { words = []; }
+            this.keyboardChangedCache = {key, words};
+        }
+        return this.keyboardChangedCache.words;
+    }
     /** @param {import("./types.js").DraftDeviceContext} state */
     view(state) {
         const matching = state.selectedDeviceId === this.deviceId, connected = matching && state.connected;
@@ -571,6 +593,9 @@ class ProfileDraftSession {
             // only while the history sheet is open (steps()).
             historyLength: this.history.length,
             reviewed: this.reviewedRevision === this.revision,
+            // What changed on the keyboard since the draft began, in words,
+            // for the stale bar: "Normal 400 → 600".
+            keyboardChanged: this.keyboardChanged(),
             changes: this.changes(),
             checks: this.checks()};
     }

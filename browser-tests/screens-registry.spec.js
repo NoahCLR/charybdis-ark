@@ -17,7 +17,9 @@ test("every registered screen opens from the rail with its own title and keeps t
         await expect(button).toHaveText(label);
         await button.click();
         await expect(button).toHaveAttribute("aria-current", "true");
-        await expect(page.locator(".main > .topbar h1")).toHaveText(label);
+        // Keyboard's title is the keyboard's own name, renamed in place.
+        if (id === "device") await expect(page.locator('.main > .topbar [data-f="keyboard:name"]')).toHaveCount(1);
+        else await expect(page.locator(".main > .topbar h1")).toHaveText(label);
         await expect(page.locator(".read-placeholder")).toHaveCount(0);
     }
 });

@@ -43,7 +43,15 @@ export interface StatusModel {
 }
 
 export type ApplyStep = 'check' | 'backup' | 'upload' | 'validate' | 'stage' | 'peer' | 'commit' | 'converge' | 'local' | 'verify';
+/** `saved`: "none" nothing was saved; "decided" the keyboard decided to save and finishes by itself; "unknown". */
 export interface ApplyFailure {step: ApplyStep; label: string; reason: string; saved: string}
+/** What the connected firmware reports about itself (core/session/firmware-support.js firmwareView). */
+export interface FirmwareView {
+    version: string | null; versionWord: string | null; defaultsDigest: string | null;
+    worksWithArk: boolean; readable: boolean;
+    layers: number | null; tapCounts: number | null; behaviours: number | null; combos: number | null; keysPerCombo: number | null;
+    macros: number | null; macroBytes: number | null; customKeys: number | null; leds: number | null; profileBytes: number | null; repeatHz: number;
+}
 export interface ApplyView {
     id: number;
     state: 'failed' | 'done' | 'applying';
@@ -52,6 +60,8 @@ export interface ApplyView {
     detail: string;
     bytes: {completed: number; total: number} | null;
     failure: ApplyFailure | null;
+    /** The keyboard waits for every key to be let go (and locked layers or modes off) before it saves. */
+    waiting: boolean;
 }
 
 export type WordList<T = Scalar> = readonly (readonly [T, string])[];
@@ -217,6 +227,10 @@ export interface SettingFieldBase extends SettingBits {
     max?: number;
     choices?: (number | {value: number; label?: string})[];
     readOnly?: boolean;
+    /** The firmware was built without it: it does nothing, whatever it reads. */
+    notBuilt?: boolean;
+    /** QMK owns the live value, so keys on the keyboard (or VIA) change it too. */
+    keyboardKeys?: boolean;
     governs?: {kind: 'tier'; tier: string} | {kind: 'branch'; count: number} | {kind: 'layer'; layer: number};
 }
 export interface StoredSettingField extends SettingFieldBase {

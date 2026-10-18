@@ -6,6 +6,7 @@ import * as controls from "../../webview/view/controls.mjs";
 
 test("draft and read controls post their type and the one value they carry", () => {
     assert.deepEqual(controls.control("reviewProfileDraft"), {type: "reviewProfileDraft"});
+    assert.deepEqual(controls.control("putBackProfile"), {type: "putBackProfile"});
     assert.deepEqual(controls.applyDraft(), {type: "applyProfileDraft"}, "no confirmation is claimed unless given");
     assert.deepEqual(controls.applyDraft(true), {type: "applyProfileDraft", confirmChecks: true});
     assert.deepEqual(controls.applyDraft(false), {type: "applyProfileDraft", confirmChecks: false});

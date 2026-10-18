@@ -72,6 +72,13 @@ test("a copy the slave half keeps refusing says what it is waiting on", () => {
     assert.equal(peerReport({phaseName: "BEGINNING", transferOffset: 0, transferLength: 2520, busyStreak: 12, busyReason: "OTHER_COPY"}).detail, "Starting the copy · the slave half still holds an earlier copy");
     assert.equal(peerReport({phaseName: "SENDING", transferOffset: 28, transferLength: 2520, busyStreak: 1, busyReason: "ADMITTED"}).detail, "Sending");
     assert.match(peerReport({phaseName: "PREPARED", waitingSafeBoundary: true}).detail, /Release held keys/);
+    assert.equal(peerReport({phaseName: "PREPARED", waitingSafeBoundary: true}).waiting, true);
+    const {ApplyProgress} = require("../../core/session/apply-progress");
+    const progress = new ApplyProgress();
+    progress.report("peer", peerReport({phaseName: "PREPARED", waitingSafeBoundary: true}));
+    assert.equal(progress.view().waiting, true, "the wait for a quiet keyboard is a fact of the view, not a sentence to match");
+    progress.report("peer", peerReport({phaseName: "SENDING"}));
+    assert.equal(progress.view().waiting, false);
     assert.match(failureReason({deviceError: {name: "TIMEOUT"}}, {waitingSafeBoundary: true}), /stayed locked.*Nothing changed/);
     assert.equal(failureReason({deviceError: {name: "TIMEOUT"}}, {waitingSafeBoundary: false}), "The keyboard gave up waiting for this save.");
 });

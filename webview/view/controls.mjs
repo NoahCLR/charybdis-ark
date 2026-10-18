@@ -2,7 +2,7 @@
 // Commands without an edit payload still cross the same panel boundary.
 // Keep their authored shapes here, beside the edit builders.
 
-/** @typedef {'ready' | 'refresh' | 'reviewProfileDraft' | 'closeProfileDraftReview' | 'undoProfileDraft' | 'redoProfileDraft' | 'discardProfileDraft' | 'rebaseProfileDraft' | 'openProfileDraftHistory' | 'closeProfileDraftHistory' | 'exportPortableProfile' | 'choosePortableProfile' | 'restorePortableProfile' | 'managePortableLayers' | 'cancelPortableReview'} SimpleControl */
+/** @typedef {'ready' | 'refresh' | 'reviewProfileDraft' | 'closeProfileDraftReview' | 'undoProfileDraft' | 'redoProfileDraft' | 'discardProfileDraft' | 'rebaseProfileDraft' | 'putBackProfile' | 'openProfileDraftHistory' | 'closeProfileDraftHistory' | 'exportPortableProfile' | 'choosePortableProfile' | 'restorePortableProfile' | 'managePortableLayers' | 'cancelPortableReview'} SimpleControl */
 
 /** @template {SimpleControl} T @param {T} type @returns {{type: T}} */
 export const control = (type) => ({type});

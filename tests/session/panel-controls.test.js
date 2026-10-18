@@ -132,6 +132,25 @@ test("apply writes a recovery copy through the host, then reads the keyboard aga
     assert.equal(session.resetDraftForms, true);
 });
 
+test("after Apply, Put back makes what the keyboard held before it the draft, one undoable step", async () => {
+    const session = sessionWithDraft(), draft = session.draft, h = host();
+    stage(session, {type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_A"}]});
+    draft.review(draft.revision);
+    await assert.rejects(draftControl(session, {type: "putBackProfile", draftRevision: draft.revision}, h), /no copy from before an Apply/);
+    await draftControl(session, {type: "applyProfileDraft", draftRevision: draft.revision}, h);
+    assert.ok(session.beforeApply, "the copy saved before Apply is kept for Put back");
+    assert.deepEqual(session.beforeApply.document, h.saved[0]);
+    assert.equal(buildPanelModel(session, session.service.snapshot()).portable.putBack, session.beforeApply.savedAt);
+    // The fake keyboard saves the target itself; stand in what a real one held.
+    const before = snapshot().document;
+    session.beforeApply.document = before;
+    await draftControl(session, {type: "putBackProfile", draftRevision: session.draft.revision}, h);
+    assert.equal(fingerprint(session.draft.document), fingerprint(before));
+    const view = session.draft.view(session.service.snapshot());
+    assert.equal(view.dirty, true);
+    assert.equal(view.undoLabel, "Put back what the keyboard had before Apply");
+});
+
 test("an Apply that renames the keyboard expects it to reconnect, and a readback its restart cuts short is no failure", async () => {
     const {RECONNECT_WORDS} = require("../../core/session/keyboard-reconnect");
     for (const name of ["Desk", device.product]) for (const interrupted of [false, true]) {

@@ -51,9 +51,9 @@ Key and modifier names follow that OS throughout the editors and Review.
 Every edit goes into a draft with undo, redo and a full history. **Review**
 lists what changed and checks what the layers let you reach. It warns you
 about a layer you could lock yourself into, combos that can't fire and macros
-your computer's setup can't play. **Apply** saves the previous profile, writes both halves
+your computer's setup can't play. **Apply** saves a copy of what the keyboard had, writes both halves
 and reads the result back to prove it, and you can stay in the editor while it
-does.
+does. When it's done you can put back what it had in one click.
 
 **Save a backup file…** saves your whole setup as one file. **Choose a backup
 file…** (or dropping one onto the Restore card) restores it after the same

@@ -32,7 +32,9 @@ export function checkGroups(checks = []) {
 
 // Checks that Apply asks about. Fixed findings and notices need no decision.
 /** @param {readonly import("../../contracts/model.js").Check[]} [checks] */
-export const checksToConfirm = (checks = []) => checks.filter((check) => check.status !== "fixed" && ["trap", "warning"].includes(check.level));
+// Only what this draft brings is asked about: a warning or trap already on
+// the keyboard is shown in the review, but not asked about again on every Apply.
+export const checksToConfirm = (checks = []) => checks.filter((check) => check.status === "new" && ["trap", "warning"].includes(check.level));
 
 // Point a new actionable finding at a draft group only when the source is
 // unambiguous. One group explains a new finding relative to the keyboard;

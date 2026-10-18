@@ -646,21 +646,60 @@ Native readback compares the permission as well as inputs, output and timing.
 Combo-derived behaviour and macro/pointing reach lists honour the two output
 permissions while retaining normal native outputs.
 
+## Settings, Keyboard and Backups
+
+`view/settings-layout.mjs` owns the Settings screen's order (`SETTINGS_CARDS`),
+the words a folded section counts (`foldedCount`, shown only while folded),
+what search matches (label, hint, hover help, a section's `search`), the
+empty-search words, the pointers to other screens and the read-only
+**Built into this firmware** facts (`firmwareFacts`, from `model.firmware`,
+which core's `firmwareView` builds from the keyboard's capability pages). A
+Settings section QMK keeps live marks its fields `keyboardKeys`; a section
+whose every field is so marked says it once by its title. A key option the
+firmware was built without is `notBuilt` and reads "Not in this firmware".
+Where behaviours and combos run groups two sections under one title; each
+still saves whole. Combo layer matching is one select per layer in the
+layer grid, `data-f="setting:comboReference<n>"`, posted as its section.
+
+The Keyboard screen's halves, firmware line and the halves banner are
+`view/keyboard-view.mjs`; the banner (`.halves-banner`) sits under every
+screen's top bar while the left half is missing or the halves disagree.
+Backups lists the copies saved before each Apply (`host.recoveries`) named by
+`copyTitle`, each posting `useRecovery`, `downloadRecovery` or
+`deleteRecovery`; a chosen file's comparison is a 720 px sheet
+(`.import-sheet`) with `portable.review.fits`.
+
+## The Apply moment
+
+`view/apply.mjs` owns the draft bar's Apply words: the three user steps
+(`USER_STEPS`, which place each of core's ten exactly once), the wait headline
+while `apply.waiting` (counting down `WAIT_SECONDS`), the three verdicts on
+`apply.failure.saved` (`none`, `decided`, `unknown`; "decided" re-reads the
+keyboard after `REREAD_SECONDS`), the stale words from `draft.keyboardChanged`,
+the Review's Apply note and its footer. Success persists (`state.applied`)
+until dismissed or the next edit, and **Put back what it had** posts
+`putBackProfile` when `portable.putBack` names a copy from before the last
+Apply on this keyboard. Only checks with status `new` ask for confirmation
+before Apply (view `checksToConfirm` and core `hasChecksToConfirm`).
+
 ## Keyboard name
 
-Settings opens with a **Keyboard** card (`.settings-group[data-section="keyboard"]`)
-holding one text field, `data-f="settings:keyboard-name"`, in the ordinary
-(not monospace) face, with a live byte count against the 32-byte name rule.
-Its placeholder is `model.keyboardName.builtIn`, the firmware's built-in name
-while the connected keyboard stores none and reports it over USB, else
-"Built-in name". It follows `canEdit("settings")` and the Settings search.
+The Keyboard screen's title is the name: the shared title-name component
+(`ui/title-name.mjs`, as macro and custom-key titles), `data-f="keyboard:name"`
+inside `.keyboard-title`, with a byte count against the 32-byte name rule and
+the reconnect note shown only while it has focus. Its placeholder is
+`model.keyboardName.builtIn`, the firmware's built-in name while the
+connected keyboard stores none and reports it over USB, else the device's
+label. It follows `canEdit("settings")`; a Settings search that matches the
+name points to Keyboard (`view/settings-layout.mjs matchesElsewhere`).
 
 On `change` it posts `renameKeyboard` built by `keyboardNameMessage` in
 `webview/view/edits.mjs`: `{name, expectedFingerprint}`, the name trimmed. Core
 (`core/model/keyboard-name.js`) refuses names past 32 bytes or with control
 characters; an empty name gives the keyboard back its built-in one. The review
 item is `keyboardName` in Settings, with place `{kind: "settings", section:
-"keyboard"}`, so Show opens the card and the draft mark is the section's.
+"keyboard"}`; Show opens the Keyboard screen (`placeState`) and the draft
+mark sits by the title.
 
 While a renamed keyboard is restarting (D-L62) the model carries
 `reconnecting: {name}` and a loading `load` whose progress names the wait; the

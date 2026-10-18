@@ -275,6 +275,8 @@ test("external reads retain the draft and require an explicit new comparison", (
     stage(external,settings(external,"keyTiming",{tapHoldTerm:"190"}));
     draft.observe(external.current,"different-board"); assert.equal(draft.stale,false);
     draft.observe(external.current,"board"); assert.equal(draft.stale,true);
+    assert.ok(draft.view({}).keyboardChanged.includes("Tap & hold timing changed"), "the stale bar can name what changed on the keyboard");
+    assert.ok(draft.view({}).keyboardChanged.some(line => /Tap \/ hold threshold 150 ms → default · 190 ms$/.test(line)));
     assert.throws(()=>draft.review(draft.revision),/keyboard changed/);
     assert.equal(draft.current.fingerprint,target);
     draft.rebase(draft.revision);

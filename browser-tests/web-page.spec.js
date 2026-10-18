@@ -70,7 +70,7 @@ for (const demo of [false, true]) test(`drop a profile into the real ${demo ? "d
     file.layers[0][0] = 5;
     const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.locator('[data-act="import"]').click()]);
     await chooser.setFiles({name: "chosen.charybdis.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(file))});
-    await expect(page.locator(".card").filter({has: page.locator('[data-act="restore"]')})).toContainText("chosen.charybdis.json");
+    await expect(page.locator(".import-sheet")).toContainText("chosen.charybdis.json");
     await page.locator('[data-act="cancel"]').click();
     await expect(page.locator('[data-act="restore"]')).toHaveCount(0);
     await dropFiles(page, [{name: "broken.json", text: "not json"}]);
@@ -78,7 +78,7 @@ for (const demo of [false, true]) test(`drop a profile into the real ${demo ? "d
     await expect(page.locator('[data-act="restore"]')).toHaveCount(0);
     await dropFiles(page, [{name: "dropped.charybdis.json", text: JSON.stringify(file), type: ""}]);
     await expect(page.locator('[data-act="restore"]')).toBeEnabled();
-    await expect(page.locator(".card").filter({has: page.locator('[data-act="restore"]')})).toContainText("dropped.charybdis.json");
+    await expect(page.locator(".import-sheet")).toContainText("dropped.charybdis.json");
     expect(keyboard.mutations).toEqual([]);
     await page.locator('[data-act="restore"]').click();
     await expect(page.locator(".commit")).toContainText(/\d+ changes?\s+in your draft/);
@@ -96,7 +96,7 @@ test("a file that matches the keyboard changes nothing, but still puts a draft w
     await page.locator('.read-placeholder [data-act="choose-keyboard"]').click();
     await ready(page);
     await page.locator('[data-screen="profile"]').click();
-    const card = page.locator(".card").filter({has: page.locator('[data-act="restore"]')});
+    const card = page.locator(".import-sheet");
     const same = {name: "same.charybdis.json", text: JSON.stringify(pdDocument()), type: ""};
     await dropFiles(page, [same]);
     await expect(card).toContainText("This file holds exactly what the keyboard runs. Using it changes nothing.");
@@ -130,7 +130,7 @@ test("choose a keyboard, read it, stage an edit, keep a recovery copy, and recon
 
     // Nothing is allowed yet: the page offers Chrome's picker, in its own words.
     const placeholder = page.locator(".read-placeholder");
-    await expect(placeholder.locator("h2")).toHaveText("Connect your keyboard");
+    await expect(placeholder.locator("h2")).toHaveText("Connect your Charybdis");
     await expect(placeholder).toContainText("pick it in Chrome's list with Choose keyboard");
     await page.locator('.rail [data-act="more"]').click();
     await expect(page.locator(".rail-build")).toHaveText(/^Ark \d{4}\.\d+\.\d+\S* · \S+$/);
@@ -176,7 +176,8 @@ test("choose a keyboard, read it, stage an edit, keep a recovery copy, and recon
     await page.locator('[data-screen="profile"]').click();
     const copies = page.locator(".card.recoveries .recovery-row");
     await expect(copies).toHaveCount(1);
-    await expect(copies.first().locator(".mono")).toHaveText(/^recovery-.+\.charybdis\.json$/);
+    await expect(copies.first().locator(".recovery-name")).toHaveText(/^Before Apply · .+ · \d{1,2} \w{3} \d{4}, \d\d:\d\d$/);
+    await expect(copies.first().locator(".recovery-name")).toHaveAttribute("title", /^recovery-.+\.charybdis\.json$/);
     const [recovery] = await Promise.all([page.waitForEvent("download"), copies.first().locator("[data-recovery]").click()]);
     expect(recovery.suggestedFilename()).toMatch(/^recovery-.+\.charybdis\.json$/);
 
@@ -249,7 +250,7 @@ test("explore the demo: edit on several screens, review with no Apply, export, o
     const {keyboard, ownFilesOnly} = await withKeyboard(context, baseURL);
     const errors = await open(page);
     const placeholder = page.locator(".read-placeholder");
-    await expect(placeholder.locator("h2")).toHaveText("Connect your keyboard");
+    await expect(placeholder.locator("h2")).toHaveText("Connect your Charybdis");
     await expect(placeholder.locator('[data-act="choose-keyboard"]')).toBeVisible();
     await placeholder.locator('[data-act="explore-demo"]').click();
     await ready(page);
@@ -319,7 +320,7 @@ test("explore the demo: edit on several screens, review with no Apply, export, o
     await expect(ask.locator('[data-act="export"]')).toBeVisible();
     await ask.locator('[data-act="confirm-leave"]').click();
     await expect(banner).toHaveCount(0);
-    await expect(placeholder.locator("h2")).toHaveText("Connect your keyboard");
+    await expect(placeholder.locator("h2")).toHaveText("Connect your Charybdis");
 
     expect(keyboard.requests).toEqual([], "nothing was sent to a keyboard");
     expect(await page.evaluate(() => window.__fakeHid)).toEqual({requested: 0, refusedWithoutClick: 0, opened: 0});
@@ -405,7 +406,7 @@ test("a narrow window on a computer still gets Ark", async ({browser, baseURL}) 
         await withKeyboard(context, baseURL);
         const page = await context.newPage();
         const errors = await open(page);
-        await expect(page.locator(".read-placeholder h2")).toHaveText("Connect your keyboard");
+        await expect(page.locator(".read-placeholder h2")).toHaveText("Connect your Charybdis");
         await expect(page.locator(".phone-notice")).toHaveCount(0);
         expect(errors).toEqual([]);
     } finally {
@@ -472,7 +473,7 @@ test("Disconnect lets go of the keyboard, and the page does not reopen it", asyn
     expect(await page.evaluate(() => window.__fakeHid.forgotten)).toBe(1);
 
     await page.reload();
-    await expect(page.locator(".read-placeholder h2")).toHaveText("Connect your keyboard");
+    await expect(page.locator(".read-placeholder h2")).toHaveText("Connect your Charybdis");
     expect(await page.evaluate(() => window.__fakeHid.opened)).toBe(0);
 });
 

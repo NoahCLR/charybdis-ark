@@ -168,8 +168,8 @@ test("an observed decision followed by a local-write disconnect preserves the pe
     f.keyboard.faults.beforeRequest = (r, keyboard) => {
         if (r[0] === VIA_STORAGE.LAYOUT_WRITE) {keyboard.faults.disconnected = true; throw Object.assign(Error("disconnected"), {code: "DISCONNECTED"});}
     };
-    await assert.rejects(f.restore(), error => error.code === "RESTORE_INCOMPLETE" && error.saved === "unknown"
-        && error.message.includes("/recovery.json") && /finishes from the slave half's copy/.test(error.message));
+    await assert.rejects(f.restore(), error => error.code === "RESTORE_INCOMPLETE" && error.saved === "decided"
+        && /^Apply was interrupted/.test(error.message) && error.message.includes("/recovery.json") && /finishes from the slave half's copy/.test(error.message));
     assert.equal(f.keyboard.events.includes("aborted"), false);
     assert.deepEqual(f.keyboard.peer.macros, f.target.macros);
     delete f.keyboard.faults.beforeRequest; f.keyboard.recover(); assertTarget(f);
@@ -189,7 +189,7 @@ test("an unobserved durable decision refuses abort and the keyboard finishes fro
 // After the decision, lost split authority or a concurrent commit leaves the
 // keyboard in AUTHORITY_FAILED until it restarts, and from the VIA ACCEPT
 // request the master half types nothing until then. Waiting does nothing.
-const REPLUG = /Unplug the USB cable \(not the cable between the halves\), wait a few seconds and plug it back in, then read the keyboard again\. Only if it still shows the old profile: Import the recovery file \/recovery\.json\./;
+const REPLUG = /Unplug the USB cable \(not the cable between the halves\), wait a few seconds and plug it back in, then read the keyboard again\. Only if it still shows the old profile: use the copy saved before Apply \(\/recovery\.json\) on Backups\./;
 const AUTHORITY_REASONS = [[E.POSTCOMMIT_AUTHORITY_LOST, "The slave half reported a newer profile after the master half saved."], [E.PEER_COMMIT_CONFLICT, "The two halves disagree about which profile is current."]];
 // The wait for ACCEPT then times out, through the production coordinator.
 /** @param {ReturnType<typeof fixture>} f @param {import("node:test").TestContext} t */
@@ -203,7 +203,7 @@ test("an authority failure after the slave half acknowledged ACCEPT says the mas
         const f = fixture(); f.keyboard.faults.authorityFailed = {error, accept: "acknowledged"};
         await assert.rejects(f.restore(), failure => failure.code === "RESTORE_INCOMPLETE" && failure.saved === "unknown" && failure.reason === reason
             && /The master half types nothing until it restarts\./.test(failure.message) && REPLUG.test(failure.message)
-            && !/finishes from the slave half's copy/.test(failure.message) && failure.cause.code === "AUTHORITY_FAILED");
+            && !/finishes from the slave half's copy/.test(failure.message) && failure.cause.code === "AUTHORITY_FAILED" && failure.saved === "unknown");
         assert.ok(f.keyboard.events.includes("local write"), "the master half's rewrite ran under the fence");
         assert.equal(f.keyboard.events.includes("activated"), false);
     }
