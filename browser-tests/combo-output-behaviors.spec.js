@@ -21,9 +21,8 @@ for (const theme of ["plain", "vscode-light", "vscode-dark"]) {
             const model = structuredClone(store.getModel()); model.combos = [combo];
             store.setModel(model); store.openComboBuilder(combo); store.render();
         });
+        // An existing combo edits live: the switch posts the combo whole.
         await page.locator('label:has([data-output-behavior])').click();
-        expect(await posted(page)).toEqual([], "the builder waits for Keep");
-        await page.locator('.combo-builder [data-act="keep"]').click();
         await expectPost(page, {type: "saveCombo", id: 0, useOutputBehavior: false,
             inputs: ["KC_D", "KC_F"], output: "KC_ESCAPE", termMs: "45", followsDefault: false,
             mustHold: false, mustTap: true, ordered: true, enabled: true, allowedLayers: 3});

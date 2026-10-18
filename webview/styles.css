@@ -925,7 +925,11 @@ button.tier:hover { background: var(--surface-3); }
 .combo-inputs button { color: var(--text-3); }
 .combo-pick { gap: 6px; margin-top: 4px; }
 .combo-flags { gap: 12px; flex-wrap: wrap; }
-.combo-actions { gap: 8px; }
+.combo-actions { gap: 8px; flex-wrap: wrap; }
+.combo-inputs .chip[draggable="true"] { cursor: grab; }
+.combo-builder .value-btn { justify-content: flex-start; width: 100%; }
+/* A combo's row: its keys → what they send, and its quiet C-number. */
+.combo-id .combo-index { margin-left: 6px; font-family: var(--mono); font-size: var(--fs-micro); }
 /* A reach table's last column holds the row's Edit, at its end. */
 .reach-edit { text-align: right; }
 /* Layout switches follow the content box, not the window: the rail takes

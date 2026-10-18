@@ -9,7 +9,7 @@ import * as edits from "../../view/edits.mjs";
 import {draftMarks, draftDot} from "../../view/review.mjs";
 import {reachAttrs, reachTable} from "../groups.mjs";
 import {setReachGroupOpen} from "../../view/reach-groups.mjs";
-import {comboBadge, comboOutputMarked, keycodeMark, keyNameMarked} from "../marks.mjs";
+import {comboOutputMarked, keycodeMark, keyNameMarked} from "../marks.mjs";
 import {visibleKeycode} from "../../view/keyface.mjs";
 import {vocabulary} from "../../view/vocabulary.mjs";
 import {comboBuilder} from "./combo-builder.mjs";
@@ -23,9 +23,9 @@ export function tabCombos(body, right) {
     const canEdit = canEditArea("combos");
 
     right.replaceChildren();
-    const toggle = el(`<button class="btn tiny" ${canEdit ? "" : "disabled"}>${state.combo.open ? "Close builder" : "New combo"}</button>`);
+    const toggle = el(`<button class="btn compact" ${canEdit ? "" : "disabled"}>${state.combo.open && state.combo.editId === null ? "Close" : "New combo…"}</button>`);
     toggle.addEventListener("click", () => {
-        if (state.combo.open) closeComboBuilder(); else openComboBuilder(null, edits.comboDefaultTermValue(model));
+        if (state.combo.open && state.combo.editId === null) closeComboBuilder(); else openComboBuilder(null, edits.comboDefaultTermValue(model));
         render();
     });
     right.appendChild(toggle);
@@ -50,15 +50,21 @@ export function tabCombos(body, right) {
         state.reachRow.combos = route ? `${route}:${id}` : null;
         if (route) state.reachGroups = setReachGroupOpen(state.reachGroups, route, true);
     }
+    // A combo reads as its keys and what they send; its C-number is a quiet
+    // index (it renumbers when an earlier combo is deleted). The window shows
+    // only where a combo has its own, and conditions only when one has any.
+    const FLAGS = /** @type {("mustHold" | "mustTap" | "ordered")[]} */ (["mustHold", "mustTap", "ordered"]);
+    const conditions = combos.some((combo) => FLAGS.some((flag) => combo[flag]));
     /** @param {string} group @param {Pick<ReturnType<typeof comboGroups>["onKeys"][number], "combo">} entry @param {string} reachedBy */
     const row = (group, entry, reachedBy) => {
         const combo = entry.combo;
-        const requires = /** @type {("mustHold" | "mustTap" | "ordered")[]} */ (["mustHold", "mustTap", "ordered"]).filter((flag) => combo[flag]).map((flag) => vocabulary(model).comboOptions[flag]).join(" · ") || "—";
-        return `<tr${reachAttrs("combos", group, combo.id)} data-combo="${esc(String(combo.id))}"><td>${comboBadge(model, combo.badge)}${changedCombos.has(combo.id) ? draftDot() : ""}</td>
-            <td>${(combo.inputs || []).map((input, at) => `<span class="tok">${keyNameMarked(model, combo.inputDisplays?.[at] ?? input, input)}</span>`).join(" + ")}</td>
-            <td class="mono">${comboOutputMarked(model, combo)}${(code => code ? ` ${code}` : "")(keycodeMark("comboSends", visibleKeycode(model, combo.output), combo.outputDisplay))}</td>
-            <td class="mono">${esc(combo.termMs ?? "")} ms${combo.followsDefault ? ` <span class="tag" data-tip="Follows the default combo window (Settings · Combos), so it changes with it.">default</span>` : ""}</td>
-            <td class="muted">${esc(requires)}</td>
+        const requires = FLAGS.filter((flag) => combo[flag]).map((flag) => vocabulary(model).comboOptions[flag]).join(" · ");
+        return `<tr${reachAttrs("combos", group, combo.id)} data-combo="${esc(String(combo.id))}">
+            <td class="combo-id"><span class="combo-keys">${(combo.inputs || []).map((input, at) => `<span class="tok">${keyNameMarked(model, combo.inputDisplays?.[at] ?? input, input)}</span>`).join(" + ")}</span>
+                <span class="dim">→</span> <span class="combo-sends">${comboOutputMarked(model, combo)}${(code => code ? ` ${code}` : "")(keycodeMark("comboSends", visibleKeycode(model, combo.output), combo.outputDisplay))}</span>
+                <span class="combo-index dim">${esc(combo.badge)}</span>${changedCombos.has(combo.id) ? draftDot() : ""}</td>
+            <td class="mono">${combo.followsDefault ? "" : `${esc(combo.termMs ?? "")} ms`}</td>
+            ${conditions ? `<td class="muted">${esc(requires)}</td>` : ""}
             <td class="muted">${reachedBy}</td></tr>`;
     };
     /** @param {string} group @param {ReturnType<typeof comboGroups>["onKeys"][number] & {inputs?: number, covered?: number}} entry */
@@ -89,9 +95,12 @@ export function tabCombos(body, right) {
         {id: "elsewhere", drafted: groupsOf.elsewhere.some((entry) => changedCombos.has(entry.combo.id)), rows: groupsOf.elsewhere.map((entry) => row("elsewhere", entry, reachedBy("elsewhere", entry))),
             empty: "Every combo on the board fires from this layer."},
     ];
-    const comboTable = reachTable("combos", comboGroupRows, [
-        ["", "7%"], ["Inputs", "31%"], ["Sends", "15%"], ["Window", "10%"],
-        ["Conditions", "13%"], ["Reached by", "24%"]]);
+    const fallback = edits.comboDefaultTermValue(model);
+    // "On this view" only while a layer is previewed; outside one it is this layer.
+    const shownGroups = comboGroupRows.filter((group) => group.id !== "view" || heldLayers().length > 0);
+    const comboTable = reachTable("combos", shownGroups, [
+        ["Combo", conditions ? "40%" : "52%"], [fallback ? `Window · ${fallback} ms default` : "Window", "20%"],
+        ...(conditions ? [["Conditions", "14%"]] : []), ["Reached by", conditions ? "26%" : "28%"]]);
     /** @type {HTMLElement} */ (node.querySelector("#comboTable")).replaceWith(comboTable);
 
     // A combo row is picked like any reach row — its keys ring on the board —
@@ -111,6 +120,6 @@ export function tabCombos(body, right) {
     }));
     const side = /** @type {HTMLElement} */ (node.querySelector("#comboSide"));
     side.appendChild(state.combo.open ? comboBuilder(canEdit, () => edits.comboHoldTermValue(model, undefined)) : el(`<div class="empty-card">
-        <p class="note">Use <b>New combo</b> to build one: choose what it sends, then click its input keys straight on the board.</p></div>`));
+        <p class="note">Pick a combo to change it here, or use <b>New combo…</b> to build one: choose what it sends, then click its keys on the board.</p></div>`));
     body.replaceChildren(node);
 }

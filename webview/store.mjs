@@ -67,10 +67,14 @@ export const STATE_FIELDS = {
     //   form        the builder's fields, kept across renders; followsDefault
     //               says the window is the keyboard's default, not the combo's own
     //   awaiting    a Keep or Delete posted; the builder closes when the host accepts it
-    // A draft change closes it, as Close does.
-    combo: resetsTo({open: false, picking: false, inputs: [],
-        form: {output: "", termMs: "", followsDefault: false, mustHold: false, mustTap: false, ordered: false}, awaiting: false, editId: null},
-    () => closedComboBuilder()),
+    // A draft change closes a new combo's builder, as Close does. An existing
+    // combo edits live, so its builder stays open on it, and its fields are
+    // read from the model again (ui/keys/combo-builder.mjs); one being
+    // deleted closes.
+    combo: resetsTo(/** @type {PanelState["combo"]} */ ({open: false, picking: false, inputs: [],
+        form: {output: "", termMs: "", followsDefault: false, mustHold: false, mustTap: false, ordered: false}, awaiting: false, editId: null}),
+    (combo) => combo.open && combo.editId !== null && !combo.awaiting
+        ? {...closedComboBuilder(), open: true, editId: combo.editId, picking: combo.picking} : closedComboBuilder()),
     placement: kept(null),     // {keycode}: next board click places it on the current layer
     retarget: resets(null),    // {from, to, existing}: a behaviour move waiting on overwrite / swap / cancel
     macroClipboard: kept(null), // copied macro steps, shared between slots in this Ark window
@@ -151,6 +155,9 @@ function comboBuilder(combo = null, defaultTermMs = "") {
     };
 }
 const closedComboBuilder = () => ({...comboBuilder(), open: false});
+// A combo's fields as the builder shows them, from what the model holds.
+/** @param {import("../contracts/panel.js").ComboView} combo */
+export const comboFormOf = (combo) => comboBuilder(combo);
 /** @param {import("../contracts/panel.js").ComboView | null} [combo] @param {import("../contracts/edits.js").Scalar} [defaultTermMs] */
 export function openComboBuilder(combo = null, defaultTermMs = "") {
     state.combo = comboBuilder(combo, defaultTermMs);
