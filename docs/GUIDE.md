@@ -110,7 +110,7 @@ setup with your edits as a backup file (`charybdis-demo-<date>.charybdis.json`);
 on your keyboard, **Choose a backup file…** under Restore reviews it against what the keyboard holds
 before anything is applied.
 
-**Open a profile file…**, on the strip, replaces the demo's setup with one of
+**Open a backup file…**, on the strip, replaces the demo's setup with one of
 your saved `.charybdis.json` backup files, checked as Restore checks it. A file
 Restore would refuse is refused, and the demo stays as it was.
 

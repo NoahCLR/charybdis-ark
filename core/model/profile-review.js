@@ -300,7 +300,7 @@ function lightingRecords(value) {
             key: `${group?.leds.join(",")}|${paint.key}|${owner(row)}`, colour: paint.colour}]);
     });
     overrides("layerGroupRows", r.layerGroupRows, row => row.selector === 255 ? "all layers" : layerName(row.selector), row => row.selector === 255 ? undefined : {kind: "layer", layer: row.selector});
-    overrides("pdModeGroupRows", r.pdModeGroupRows, row => row.selector === 255 ? "all pointing modes" : slotCalled(row.selector), row => row.selector === 255 ? undefined : {kind: "pointing", slot: row.selector});
+    overrides("pdModeGroupRows", r.pdModeGroupRows, row => row.selector === 255 ? "all trackball modes" : slotCalled(row.selector), row => row.selector === 255 ? undefined : {kind: "pointing", slot: row.selector});
     overrides("comboGroupRows", r.comboGroupRows, () => "combos", () => ({kind: "combo"}));
     overrides("keyGroupRows", r.keyGroupRows, row => nameIn(V.feedbackOwners, rgbEnums.RGB_KEY_SEMANTICS, row.semantic), row => {
         const name = Object.entries(rgbEnums.RGB_KEY_SEMANTICS).find(([, id]) => id === row.semantic)?.[0];

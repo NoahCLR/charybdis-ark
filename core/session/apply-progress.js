@@ -125,7 +125,7 @@ class ApplyProgress {
 }
 
 /** @type {Readonly<Record<number, string>>} */
-const DOMAIN_NAMES = Object.freeze({0x10: "lighting", 0x20: "key behaviours", 0x30: "combos", 0x40: "settings", 0x50: "pointing modes"});
+const DOMAIN_NAMES = Object.freeze({0x10: "lighting", 0x20: "key behaviours", 0x30: "combos", 0x40: "settings", 0x50: "trackball modes"});
 
 // What the keyboard's candidate error means, in the words of the person who
 // pressed Apply. Unlisted errors fall back to their wire name.

@@ -132,7 +132,7 @@ function demoBanner(demo) {
         <i class="dot demo" aria-hidden="true"></i><strong>${esc(DEMO_WORDS.status)}</strong>
         <span class="copy">${esc(DEMO_WORDS.banner)}${demo.fileName ? ` <span class="mono">${esc(demo.fileName)}</span>` : ""}</span>
         <span class="acts"><button class="btn tiny" data-act="open-demo-profile"
-                data-tip="Open one of your exported .charybdis.json profiles in the demo, in place of this setup.">Open a profile file…</button>
+                data-tip="Open one of your saved .charybdis.json backup files in the demo, in place of this setup.">Open a backup file…</button>
             <button class="btn tiny ghost" data-act="leave-demo" data-tip="Close the demo and go back to connecting a keyboard.">Leave demo</button></span>
     </div>`);
     /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="open-demo-profile"]')).addEventListener("click", () => postLeavingDemo(openDemoProfile()));
