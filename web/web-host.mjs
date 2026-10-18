@@ -87,7 +87,7 @@ export function startWebHost(env) {
         saveRecovery: async (copy) => {
             const name = await recoveries.save(copy);
             recoveryList = await recoveries.list();
-            return `${name}, kept in this browser (Profile & backups)`;
+            return `${name}, kept in this browser (Backups)`;
         },
         chooseProfile: () => {
             const chosen = choosing || Promise.resolve(undefined);
@@ -151,6 +151,22 @@ export function startWebHost(env) {
                 const copy = await recoveries.get(message.id).catch(() => undefined);
                 if (copy) download(document, window, copy.name, copy.text);
                 else loop.session.notice = "Failed: That recovery copy is no longer in this browser.";
+                return loop.publish();
+            }
+            // A copy saved before an Apply opens as a backup file does: its
+            // comparison with the keyboard first, then Use as draft.
+            case "useRecovery": {
+                const copy = await recoveries.get(message.id).catch(() => undefined);
+                if (!copy) {
+                    loop.session.notice = "Failed: That copy is no longer in this browser.";
+                    return loop.publish();
+                }
+                const draft = loop.session.draft;
+                return loop.handleMessage({type: "reviewPortableProfile", text: copy.text, name: copy.name, ...(draft ? {draftId: draft.id, draftRevision: draft.revision} : {})});
+            }
+            case "deleteRecovery": {
+                await recoveries.delete(message.id).catch(() => {loop.session.notice = "Failed: That copy could not be deleted.";});
+                recoveryList = await recoveries.list().catch(() => recoveryList);
                 return loop.publish();
             }
             case "chooseKeyboard": {

@@ -185,6 +185,14 @@ const DRAFT_ACTIONS = Object.freeze({
         session.notice = "Review now compares your draft with the latest keyboard state. Apply will replace the differences shown.";
         return;
     },
+    // The success state's way back: the copy saved before the last Apply
+    // becomes the draft, one undoable step, reviewed and applied as any edit.
+    putBack: ({draft, revision, session}) => {
+        const before = session.beforeApply;
+        if (!before || before.deviceId !== draft.deviceId) throw new Error("There is no copy from before an Apply on this keyboard to put back.");
+        draft.replace(before.document, revision, "edit", "Put back what the keyboard had before Apply", IDENTITY);
+        session.resetDraftForms = true;
+    },
     apply: async ({draft, revision, message, session, service, host}) => {
         // The interface asks about active traps and warnings; the host
         // enforces that decision before writing a recovery copy or HID.
@@ -195,10 +203,14 @@ const DRAFT_ACTIONS = Object.freeze({
         await whileApplying(session, async (readStep) => {
             /** @type {string | undefined} */
             let recovery = "";
+            /** @type {import("../model/types.js").PortableDocument | undefined} */
+            let saved;
             const before = draft.base;
             const result = await run(host, "Applying the complete profile to both halves",
-                () => draft.apply(service, revision, async (document) => (recovery = await saveRecovery(host, document))));
+                () => draft.apply(service, revision, async (document) => {if (document.format === "charybdis-profile") saved = /** @type {import("../model/types.js").PortableDocument} */ (document); return (recovery = await saveRecovery(host, document));}));
             session.resetDraftForms = true;
+            // What the keyboard held before, for "Put back what it had".
+            session.beforeApply = saved ? {document: saved, deviceId: draft.deviceId, savedAt: new Date().toISOString()} : undefined;
             const expected = reconnectAfter(session, before, result);
             let reread = "";
             await rereadKeyboard(service, (step) => {

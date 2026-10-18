@@ -24,6 +24,8 @@ export interface ControlPayloads {
         applyProfileDraft: {confirmChecks?: boolean};
         jumpProfileDraft: {step: number};
         discardProfileDraftChanges: {group: number};
+        /** Replace the draft with what the keyboard held before the last Apply. */
+        putBackProfile: Record<never, never>;
     };
     portable: {
         exportPortableProfile: {};
@@ -54,6 +56,8 @@ export interface ControlPayloads {
         forgetKeyboard: Record<never, never>;
         setTheme: {theme: 'light' | 'dark'};
         downloadRecovery: {id: string | number};
+        useRecovery: {id: string | number};
+        deleteRecovery: {id: string | number};
     };
     inspect: {
         validateViaMacro: Omit<Extract<PanelEdit, {type: 'validateViaMacro'}>, 'type'>;
