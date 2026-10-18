@@ -174,8 +174,8 @@ select.rail-picker {
   background-image: linear-gradient(45deg, transparent 50%, currentColor 50%), linear-gradient(135deg, currentColor 50%, transparent 50%);
   background-position: right 10px top 50%, right 6px top 50%; background-size: 4px 4px; background-repeat: no-repeat;
 }
-select.rail-picker:hover, select.rail-picker:focus-visible { background-color: var(--surface-2); border-color: var(--line); outline: none; }
-select.rail-picker:disabled { cursor: default; opacity: .6; }
+select.rail-picker:hover, select.rail-picker:focus-visible { background-color: var(--surface-2); border-color: var(--line); }
+select.rail-picker:disabled { cursor: default; color: var(--text-2); }
 .rail-status:not(:has(*)) { display: none; }
 .rail-status { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
 .rail-message { margin: 0 12px 12px; flex: none; display: flex; align-items: flex-start; gap: 6px; padding: 6px 6px 6px 8px;
@@ -201,7 +201,7 @@ select.rail-picker:disabled { cursor: default; opacity: .6; }
 }
 .nav-item:hover { background: var(--surface-2); color: var(--text); }
 .nav-item[aria-current="true"] { background: var(--surface-3); color: var(--text); font-weight: var(--fw-medium); }
-.nav-item:disabled, .nav-item:disabled:hover { color: var(--text-3); background: transparent; cursor: default; }
+.nav-item:disabled, .nav-item:disabled:hover { color: var(--text-disabled); background: transparent; cursor: default; }
 .nav-item[aria-current="true"]:disabled { background: var(--surface-2); }
 .nav-item svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.4; opacity: .85; }
 .rail-foot { padding: 12px; border-top: 1px solid var(--line); display: flex; gap: 8px; align-items: center; }
@@ -302,6 +302,11 @@ a.rail-build:hover { color: var(--text-2); }
   font-size: var(--fs-eyebrow); line-height: var(--lh-eyebrow); letter-spacing: var(--ls-eyebrow);
   text-transform: uppercase; font-weight: var(--fw-strong); color: var(--text-3);
 }
+/* One focus ring for everything that takes the keyboard: 2 px of --focus,
+   2 px out. A switch draws it on its track, the input being hidden. */
+:where(button, a, summary, [tabindex], .input, select, textarea, input):focus-visible,
+.input:focus-visible, select.input:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.sw input:focus-visible + .track { outline: 2px solid var(--focus); outline-offset: 2px; }
 /* The hidden attribute wins over any component display rule. */
 [hidden] { display: none !important; }
 .field { display: grid; gap: 6px; }
@@ -314,6 +319,8 @@ a.rail-build:hover { color: var(--text-2); }
   appearance: none;
 }
 .input:focus { border-color: var(--line-3); background: var(--surface-3); }
+/* Read-only: the value stays readable; a dashed edge says it cannot change. */
+.input:disabled { color: var(--text-2); border-style: dashed; background: var(--surface); }
 .input.mono { font-family: var(--mono); font-size: var(--fs-small); }
 select.input { background-image: linear-gradient(45deg, transparent 50%, var(--text-3) 50%), linear-gradient(135deg, var(--text-3) 50%, transparent 50%); background-position: calc(100% - 15px) 14px, calc(100% - 10px) 14px; background-size: 5px 5px; background-repeat: no-repeat; padding-right: 28px; }
 .input-row { display: flex; align-items: center; gap: 6px; }
@@ -474,7 +481,7 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 }
 .lp-grip svg { width: 10px; height: 16px; fill: currentColor; }
 .lp-grip:hover, .lp-grip:focus-visible { color: var(--text); background: var(--surface-3); }
-.lp-grip:disabled { cursor: default; opacity: .4; }
+.lp-grip:disabled { cursor: default; color: var(--text-disabled); background: none; }
 .list.sorting, .list.sorting .lp-grip { cursor: grabbing; user-select: none; }
 .lp-row.dragging { position: relative; z-index: 1; background: var(--surface-3); box-shadow: 0 6px 18px rgba(0,0,0,.35); border-radius: var(--r-control); }
 /* When the panel is capped, only the list scrolls: the heading and the toggle
@@ -557,7 +564,7 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
    still shows where focus is, as a thin outline inset past the selection ring:
    outside the key it would run under the neighbouring keys, which paint later. */
 .board [tabindex]:focus { outline: none; }
-.board [tabindex]:not(.sel):focus-visible { outline: 1.5px solid var(--text-2); outline-offset: -6px; }
+.board [tabindex]:not(.sel):focus-visible { outline: 2px solid var(--focus); outline-offset: -6px; }
 .sv-field, .hue-ramp { touch-action: none; cursor: crosshair; }
 /* Selected and indicated must never read alike: the selection is a solid ring
    inside the key; the keys for the picked row, or the inputs of the combo
@@ -688,7 +695,7 @@ button.tier:hover { background: var(--surface-3); }
 .tab-grid .span { grid-column: 1 / -1; }
 /* A stage switched on that paints nothing (auto-mouse off): its controls stay
    visible and kept, but read as not in play. */
-.tab-grid.idle > section { opacity: .5; }
+.tab-grid.idle > section { color: var(--text-2); }
 .tab-grid section { min-width: 0; }
 .tab-split { display: grid; grid-template-columns: 236px minmax(0, 1fr); gap: 20px; align-items: start; }
 .tab-split.builder { grid-template-columns: 330px minmax(0, 1fr); }
@@ -705,7 +712,7 @@ button.tier:hover { background: var(--surface-3); }
 .rowitem.on { background: var(--surface-3); box-shadow: inset 2px 0 0 var(--text); }
 .rowitem .t { font-size: var(--fs-body); }
 .rowitem .m { font-size: var(--fs-micro); color: var(--text-3); }
-.rowitem.quiet { opacity: .62; }
+.rowitem.quiet .t { color: var(--text-2); }
 
 /* ── reach groups ────────────────────────────────────────────────────────
    Every tab that answers "what does this layer reach" heads its groups the
@@ -879,7 +886,7 @@ table.t .num { text-align: right; font-variant-numeric: tabular-nums; }
 .mslot, .slotcard { position: relative; }
 
 /* A place a jump landed on is marked for a moment, then fades. */
-.revealed, tr.revealed > td { background: color-mix(in srgb, var(--draft) 16%, transparent) !important; }
+.revealed, tr.revealed > td { background: color-mix(in srgb, var(--text) 10%, transparent) !important; }
 .settings-group, .rowitem, [data-reach] > td { transition: background .6s ease; }
 
 /* The review: one item per thing that differs, with only the fields that do.
@@ -952,7 +959,8 @@ table.t .num { text-align: right; font-variant-numeric: tabular-nums; }
 .ck-item.warning:not(.fixed) { border-color: color-mix(in srgb, var(--warning) 55%, var(--line)); background: color-mix(in srgb, var(--warning) 14%, var(--surface)); }
 .ck-item.trap:not(.fixed) { border-color: color-mix(in srgb, var(--danger) 60%, var(--line)); background: color-mix(in srgb, var(--danger) 14%, var(--surface)); }
 .ck-item.blocker:not(.fixed) { border-color: var(--danger); background: color-mix(in srgb, var(--danger) 20%, var(--surface)); }
-.ck-item.fixed { opacity: .7; }
+.ck-item.fixed { color: var(--text-2); }
+.ck-item.fixed .ck-t { color: var(--text-2); }
 .ck-h { display: grid; grid-template-columns: 150px minmax(0, 1fr) auto; column-gap: 12px; align-items: baseline; }
 .ck-level { display: grid; gap: 2px; font-size: var(--fs-eyebrow); letter-spacing: .04em; text-transform: uppercase; color: var(--text-3); }
 .ck-level > span { display: flex; align-items: center; gap: 6px; }
@@ -1063,7 +1071,8 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .hs-go { margin-left: auto; flex: none; align-self: center; }
 .hs-here { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-small); color: var(--text); }
 .hs-step.current .rv-block { box-shadow: inset 3px 0 0 var(--draft); }
-.hs-step.undone .hs-label, .hs-step.undone .rv-block { opacity: .55; }
+.hs-step.undone .hs-label, .hs-step.undone .rv-block { color: var(--text-3); }
+.hs-step.undone .rv-block { border-style: dashed; }
 .hs-empty { margin: 0 0 10px; }
 .hs .hs-empty:only-child { padding: 16px; }
 
@@ -1200,7 +1209,8 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .pk:hover { border-color: var(--line-3); background: var(--surface-3); }
 .pk.on { background: var(--inv-bg); border-color: transparent; }
 .pk.on .l, .pk.on .c { color: var(--inv-text); }
-.pk[disabled] { opacity: .35; pointer-events: none; }
+.pk[disabled] { pointer-events: none; background: none; border-style: dashed; }
+.pk[disabled] .l, .pk[disabled] .c { color: var(--text-disabled); }
 .pk .l { font-size: var(--fs-body); }
 .pk .c { font-family: var(--mono); font-size: var(--fs-micro); color: var(--text-3); }
 .pk.wide { min-width: 120px; }
@@ -1244,7 +1254,7 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 }
 .slotchip:hover { border-color: var(--line-3); color: var(--text-2); }
 .slotchip[aria-current="true"] { border-style: solid; border-color: var(--line-3); background: var(--surface-2); color: var(--text); box-shadow: inset 0 -2px 0 var(--text); }
-.slotchip.warn { color: var(--draft); border-color: color-mix(in srgb, var(--draft) 45%, var(--line)); }
+.slotchip.warn { color: var(--warning); border-color: color-mix(in srgb, var(--warning) 45%, var(--line)); }
 .slotchip > .draft-dot.corner { top: 3px; right: 3px; }
 .pd-swatch { width: 12px; height: 12px; border-radius: var(--r-chip); border: 1px solid var(--line-2); flex: none; display: inline-block; }
 .pd-swatch.lg { width: 16px; height: 16px; border-radius: var(--r-chip); }
@@ -1260,7 +1270,7 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .slotcard .no { font-family: var(--mono); font-size: var(--fs-micro); color: var(--text-3); }
 .slotcard .meta { grid-column: 2 / -1; font-size: var(--fs-small); color: var(--text-3); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .slotcard .meta.mono { font-size: var(--fs-micro); }
-.slotcard .meta.warn { color: var(--draft); }
+.slotcard .meta.warn { color: var(--warning); }
 .slotcard.empty .nm { color: var(--text-2); font-weight: var(--fw-regular); }
 /* The editor sizes its own grids from its own width, not the window's: the
    panel can be much narrower than the screen it sits on. */
@@ -1376,7 +1386,8 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .mslot.filled { background: var(--surface-3); border-color: var(--line-2); }
 .mslot[aria-current="true"] { border-color: var(--line-3); background: var(--key-hi); }
 /* A slot macro memory has no room left for reads as unavailable, not as empty. */
-.mslot.out { opacity: .38; border-style: dashed; cursor: not-allowed; }
+.mslot.out { border-style: dashed; background: none; cursor: not-allowed; }
+.mslot.out .n, .mslot.out .v { color: var(--text-disabled); }
 .mslot.warn { border-color: var(--danger); }
 .mslot.warn .v { color: var(--danger); }
 .meter.over i { background: var(--danger); }
@@ -1519,7 +1530,7 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .pad.profile-pad { max-width: var(--page); }
 .setrow { display: grid; grid-template-columns: minmax(0,1fr) 190px; gap: 16px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line); }
 .setrow:last-child { border-bottom: 0; }
-.setrow.ro { opacity: .72; }
+.setrow.ro .nm { color: var(--text-2); }
 .setrow .nm { font-size: var(--fs-body); }
 .setrow .hint { font-size: var(--fs-small); color: var(--text-3); margin-top: 2px; }
 /* A section's one-per-layer switches: one row, the layers in a grid under
@@ -1542,7 +1553,8 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .colour-head .swatch-lg { width: 34px; height: 34px; }
 .colour-head .colour-title { font-size: var(--fs-body); }
 .colour-head > .btn { margin-left: auto; }
-.colour-head.unused { opacity: .5; }
+.colour-head.unused .colour-title { color: var(--text-2); }
+.colour-head.unused .swatch-lg { border-style: dashed; }
 .colour-head.unused + .note { margin-top: 10px; }
 /* Lighting's stage surfaces. */
 .tab-grid.stage-detail { gap: 20px; }
@@ -1554,7 +1566,7 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .note { font-size: var(--fs-small); color: var(--text-3); line-height: 1.5; }
 .note.warn { color: var(--warning); }
 .callout { border: 1px solid var(--line); border-left: 2px solid var(--line-3); border-radius: 0 var(--r-control) var(--r-control) 0; padding: 10px 12px; background: var(--surface-2); font-size: var(--fs-small); color: var(--text-2); }
-.callout.warn { border-left-color: var(--draft); }
+.callout.warn { border-left-color: var(--warning); }
 /* A share of a duration as a slider whose track is the duration: solid up to
    the share, fading after it. --share is set by the control as it moves. */
 .share-field > span { display: flex; justify-content: space-between; }
@@ -1615,7 +1627,7 @@ details[open] > summary .chev { transform: rotate(90deg); }
 .busy-veil { position: absolute; inset: 0; background: color-mix(in srgb, var(--bg) 55%, transparent);
   display: grid; place-items: center; z-index: 30; }
 .unavailable { display: grid; gap: 8px; padding: 12px 16px; border: 1px solid var(--line);
-  border-left: 2px solid var(--draft); border-radius: 0 var(--r-card) var(--r-card) 0; background: var(--surface-2);
+  border-left: 2px solid var(--warning); border-radius: 0 var(--r-card) var(--r-card) 0; background: var(--surface-2);
   font-size: var(--fs-body); color: var(--text-2); max-width: 78ch; }
 
 /* ── the web page on a phone: a notice instead of Ark (web/phone.mjs) ───── */
