@@ -3,7 +3,7 @@
 /** @typedef {import("../../../contracts/panel.js").MacroSlot} MacroSlot */
 /** @typedef {import("../../view/types.js").MacroStep} MacroStep */
 import {el, esc} from "../../lib/dom.mjs";
-import {unreleased} from "../../view/macro.mjs";
+import {samePayload, unreleased} from "../../view/macro.mjs";
 import {readMacro} from "../../view/macro-cache.mjs";
 import {actionLabel} from "../../view/keyface.mjs";
 import {canEdit as canEditArea, getModel, macroForm, post, render, setMacroForm, state} from "../../store.mjs";
@@ -85,7 +85,7 @@ function refreshFeedback(keycode) {
 // with the way to Settings → Your computer, where most such problems are fixed.
 /** @param {HTMLElement} card @param {Model} model @param {MacroSlot} slot */
 export function paintFeedback(card, model, slot) {
-    const form = macroForm(slot.keycode), local = form.draft !== undefined && form.draft !== slot.payload;
+    const form = macroForm(slot.keycode), local = form.draft !== undefined && !samePayload(form.draft, slot.payload, model?.qmkKeycodeAliases);
     const payload = form.draft ?? slot.payload;
     const parsed = readMacro(model, slot.keycode, payload, "feedback");
     const held = unreleased(parsed.steps, model?.qmkKeycodeAliases);

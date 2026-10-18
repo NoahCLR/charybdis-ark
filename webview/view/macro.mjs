@@ -182,3 +182,18 @@ export function macroMatches(slot, query) {
     return [slot?.name, `M${number}`, `Macro ${number}`, slot?.keycode]
         .some((text) => String(text ?? "").toLowerCase().includes(needle));
 }
+
+// Whether two payloads are the same macro: the same steps once every key name
+// is read through the catalogue's aliases (KC_LGUI is KC_LEFT_GUI). The draft
+// holds the keyboard's canonical names, so an edit typed with an alias is not
+// "local" once the draft has it. Unparseable text compares as written.
+/** @param {unknown} a @param {unknown} b @param {Readonly<Record<string, string>>} [aliases] */
+export function samePayload(a, b, aliases = {}) {
+    const left = String(a ?? ""), right = String(b ?? "");
+    if (left === right) return true;
+    const one = parseMacro(left), two = parseMacro(right);
+    if (one.error || two.error) return false;
+    /** @param {MacroStep} step @returns {MacroStep} */
+    const canonical = step => step.kind === "text" || step.kind === "delay" ? step : {...step, keys: step.keys.map(key => aliases[key] || key)};
+    return serializeMacro(one.steps.map(canonical)) === serializeMacro(two.steps.map(canonical));
+}

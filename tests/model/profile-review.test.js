@@ -38,6 +38,16 @@ test("Host changes review affected text macros while leaving key steps and ident
     assert.equal(profileReview(after, before).filter(row => row.area === "Macros").at(-1).fields.find(field => field.label === "Playback").after, "Ready to play");
 });
 
+test("a macro's Steps carry a macro mark, so Review draws tiles, and no mark on a side without steps", () => {
+    const {hostMacros} = require("../fixtures/host-macros");
+    const before = hostMacros(1 | (2 << 16), ["", "{KC_A}"]).snapshot, after = hostMacros(1 | (2 << 16), ["{KC_LGUI,KC_N}", "{KC_A}"]).snapshot;
+    const row = profileReview(before, after).find(entry => entry.area === "Macros" && entry.place.index === 0);
+    const steps = row.fields.find(field => field.label === "Steps");
+    assert.equal(steps.after, "{KC_LEFT_GUI,KC_N}");
+    assert.deepEqual(steps.afterMark, {kind: "macro"});
+    assert.equal(steps.beforeMark, undefined);
+});
+
 test("Review detects native key changes, ISO swaps and loss of Unicode setup", () => {
     const {hostMacros} = require("../fixtures/host-macros");
     const review = (oldHost, nextHost, payload) => profileReview(hostMacros(oldHost, [payload]).snapshot, hostMacros(nextHost, [payload]).snapshot).find(row => row.area === "Macros");

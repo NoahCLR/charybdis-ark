@@ -4,6 +4,7 @@
 /** @typedef {import("../../view/types.js").MacroStep} MacroStep */
 import {el, esc} from "../../lib/dom.mjs";
 import {readMacro} from "../../view/macro-cache.mjs";
+import {samePayload} from "../../view/macro.mjs";
 import {macroPlacements} from "../../view/reach.mjs";
 import {titleName, attachTitleName} from "../title-name.mjs";
 import {ROUTE_WORDS, setReachGroupOpen} from "../../view/reach-groups.mjs";
@@ -32,7 +33,7 @@ export function editor(model, slot, canEdit) {
     const editable = canEdit && !state.recording && (!parsed.error || Boolean(form.steps));
     // An edit still local to this screen (typed but not yet in the draft) can
     // be dropped; once staged, the draft's own undo and Review own it.
-    const local = form.draft !== undefined && form.draft !== slot.payload;
+    const local = form.draft !== undefined && !samePayload(form.draft, slot.payload, model.qmkKeycodeAliases);
     const changed = draftMarks(model.draft?.changes).macros.has(slot.keycode);
     const rawOpen = Boolean(form.rawOpen || (parsed.error && !form.steps));
     const shortcut = parsed.error ? null : singleShortcut(steps, model.qmkKeycodeAliases);

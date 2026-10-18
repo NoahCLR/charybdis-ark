@@ -408,7 +408,9 @@ function profileReview(before, after, capabilities) {
     item("Settings", "comboTiming", "Combo timing", comboTimingFields(a.combos), comboTimingFields(b.combos), {kind: "settings", section: "comboSettings", area: "Settings"}, [true, true]);
     macrosA.viaMacros.forEach((_, i) => {
         /** @param {Macros["viaMacros"][number]} macro @returns {Fields} */
-        const fields = (macro) => new Map(/** @type {[string, Field][]} */ ([["Steps", macro.payload || "empty"], ["Name", macro.name || "no name"],
+        // Steps carry a macro mark, so Review draws them as the editor's
+        // tiles; the payload stays the value and its tooltip.
+        const fields = (macro) => new Map(/** @type {[string, Field][]} */ ([["Steps", macro.payload ? {text: macro.payload, key: macro.payload, mark: {kind: "macro"}} : "empty"], ["Name", macro.name || "no name"],
             ["Uninterruptible playback", {key: macro.protection,
                 text: macro.protection === "auto" ? `${word(VOCABULARY.macroProtection, macro.protection)} · ${macro.uninterruptible ? "on" : "off"}` : word(VOCABULARY.macroProtection, macro.protection)}]]));
         const old = macrosA.viaMacros[i], next = macrosB.viaMacros[i], has = /** @param {Macros["viaMacros"][number]} macro */ (macro) => Boolean(macro.payload || macro.name || macro.protection !== "auto");
