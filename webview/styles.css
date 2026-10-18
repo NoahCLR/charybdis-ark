@@ -144,24 +144,31 @@ code { color: inherit; background: none; padding: 0; border-radius: 0; }
   min-height: 0;
 }
 .rail-device {
-  padding: 16px 16px 16px;
+  padding: 0 16px 16px;
   border-bottom: 1px solid var(--line);
 }
-/* Ark's mark: the board and its name, one block above the keyboard it edits. */
+/* Ark's mark: the board and its name, one 56 px block above the keyboard it
+   edits. */
+.rail-brand { height: 56px; display: flex; align-items: center; gap: 10px; }
 .rail-board {
-  width: 100%; height: auto; display: block;
-  padding: 4px 6px 0; box-sizing: border-box;
+  width: 52px; height: auto; display: block; flex: none;
   fill: var(--text); stroke: none;
 }
 .rail-mark {
-  margin-top: 12px; text-align: center;
   font-size: var(--fs-eyebrow); font-weight: var(--fw-strong); letter-spacing: .2em; text-transform: uppercase; color: var(--text-3);
+  white-space: nowrap;
 }
-/* The keyboard, whether it is connected, and reading it again sit on one line,
-   so a stale panel is corrected where it is noticed. */
-.rail-keyboard { margin-top: 18px; display: flex; align-items: flex-start; gap: 8px; }
-.rail-keyboard .dot { width: 6px; height: 6px; margin-top: 6px; }
-.rail-product { flex: 1; min-width: 0; font-size: var(--fs-body); font-weight: var(--fw-strong); line-height: 1.4; overflow-wrap: anywhere; }
+/* The keyboard's name, then a chip saying in words whether it is connected
+   and whether its halves agree. */
+.rail-keyboard { margin-top: 4px; display: grid; justify-items: start; gap: 8px; }
+.rail-product { min-width: 0; max-width: 100%; font-size: var(--fs-body); font-weight: var(--fw-strong); line-height: var(--lh-body); overflow-wrap: anywhere; }
+.rail-chip {
+  display: inline-flex; align-items: center; gap: 6px; height: var(--h-chip); padding: 0 8px; max-width: 100%;
+  border: 1px solid var(--line); border-radius: var(--r-chip); background: var(--surface);
+  font-size: var(--fs-small); color: var(--text-2); white-space: nowrap;
+}
+.rail-chip > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.rail-chip .dot { width: 6px; height: 6px; }
 /* Reading pulses the dot instead of adding a line. */
 .rail-keyboard .dot.busy { animation: dot-busy 1.4s ease-in-out infinite; }
 @keyframes dot-busy { 50% { opacity: .25; } }
@@ -204,9 +211,19 @@ select.rail-picker:disabled { cursor: default; color: var(--text-2); }
 .nav-item:disabled, .nav-item:disabled:hover { color: var(--text-disabled); background: transparent; cursor: default; }
 .nav-item[aria-current="true"]:disabled { background: var(--surface-2); }
 .nav-item svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.4; opacity: .85; }
-.rail-foot { padding: 12px; border-top: 1px solid var(--line); display: flex; gap: 8px; align-items: center; }
-.rail-foot .rail-history { margin-right: auto; margin-left: -9px; color: var(--text-3); }
-.rail-foot .rail-history:hover { color: var(--text); }
+/* Draft history · ↺ ↻ · ⋯ */
+.rail-foot { padding: 8px 12px; border-top: 1px solid var(--line); display: flex; gap: 2px; align-items: center; }
+.rail-foot .rail-history { margin-right: auto; margin-left: -6px; }
+.rail-more { position: relative; margin-left: auto; }
+.rail-history ~ .rail-more { margin-left: 0; }
+.rail-menu {
+  position: absolute; z-index: 50; right: -4px; bottom: calc(100% + 8px); width: calc(var(--rail) - 24px);
+  display: grid; gap: 4px; padding: 8px; border: 1px solid var(--line-2); border-radius: var(--r-card);
+  background: var(--surface); box-shadow: var(--shadow-1);
+}
+.rail-menu .btn.text { justify-content: flex-start; width: 100%; }
+.rail-menu .sw { padding: 0 10px; }
+.rail-menu .rail-build { padding: 4px 10px 2px; }
 .rail-history .c { font-family: var(--mono); font-size: var(--fs-micro); color: var(--text-3); margin-left: 5px; }
 /* What a web page's host adds to the rail: its picker, what it is doing, and
    the build it is. The extension has none of them. */
@@ -220,17 +237,17 @@ a.rail-build:hover { color: var(--text-2); }
 
 /* ── main ────────────────────────────────────────────────────────────── */
 .main { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--bg); }
+/* One 64 px height on every screen, so the board below never moves between
+   them: the title and one line of explanation, ending in an ellipsis when
+   the window is too narrow (the whole line is its tooltip). */
 .topbar {
-  display: flex; align-items: flex-start; gap: 20px;
-  padding: 20px 24px 16px;
+  display: flex; align-items: center; gap: 20px; flex: none;
+  height: var(--topbar); padding: 0 24px;
   border-bottom: 1px solid var(--line);
 }
-/* One height on every screen, so the board below never moves between them:
-   the title is one line and the explanation always takes two. Explanations
-   are written to fit two; a window too narrow for that clips the rest. */
-.topbar h1 { font-size: var(--fs-title); line-height: 24px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.topbar .sub { margin-top: 3px; font-size: var(--fs-small); line-height: 17px; height: 34px; color: var(--text-2); max-width: 62ch;
-  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.topbar h1 { font-size: var(--fs-title); line-height: var(--lh-title); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.topbar .sub { font-size: var(--fs-small); line-height: var(--lh-small); color: var(--text-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .topbar > div:first-child { min-width: 0; }
 .topbar-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; flex: none; }
 /* A search sits in the panel it filters. */
@@ -239,7 +256,7 @@ a.rail-build:hover { color: var(--text-2); }
 .pad .settings-search { width: 280px; max-width: 100%; margin-bottom: 4px; }
 .theme-toggle svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.4; }
 .content { flex: 1; overflow: auto; min-height: 0; container: content / inline-size; }
-.pad { padding: 20px 24px 120px; }
+.pad { padding: 20px 24px 32px; }
 .device-pad { max-width: var(--page); }
 
 /* ── controls ────────────────────────────────────────────────────────── */
@@ -1010,25 +1027,24 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .ins { color: var(--text); }
 
 /* ── commit bar ──────────────────────────────────────────────────────── */
+/* Docked under the content, across its width: it never covers what it is
+   about. 48 px for the draft; an Apply's steps grow it upward. */
 .commit {
-  position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%);
-  display: flex; align-items: center; gap: 12px;
-  padding: 8px 8px 8px 16px; border-radius: var(--r-card);
-  background: color-mix(in srgb, var(--surface-3) 88%, transparent);
-  border: 1px solid var(--line-2);
-  box-shadow: var(--shadow-1);
-  backdrop-filter: blur(14px) saturate(140%);
-  z-index: 40; max-width: calc(100% - 48px);
+  flex: none; display: flex; align-items: center; gap: 12px;
+  min-height: var(--bar); padding: 8px 24px;
+  background: var(--surface-2); border-top: 1px solid var(--line-2);
+  box-shadow: var(--shadow-1); z-index: 40;
 }
+.commit > .sep { display: none; }
+.commit > .btn:first-of-type { margin-left: auto; }
 .commit .n { display: flex; align-items: center; gap: 8px; font-size: var(--fs-body); white-space: nowrap; }
 .commit .peek { display: flex; gap: 6px; overflow: hidden; max-width: 320px; }
 .commit .sep { width: 1px; height: 20px; background: var(--line); }
 .commit .peek .note { white-space: nowrap; }
 /* A draft that cannot go on as it is: another keyboard's, or a stale one. */
-.commit.draft { border-color: var(--draft); }
-.commit.applying { border-color: var(--line-3); }
-.commit.readback { display: grid; grid-template-columns: 14px minmax(0, 1fr); column-gap: 10px; row-gap: 4px;
-  width: min(510px, calc(100% - 48px)); padding: 12px 16px; }
+.commit.draft { border-top-color: var(--draft); }
+.commit.applying { border-top-color: var(--line-3); }
+.commit.readback { display: grid; grid-template-columns: 14px minmax(0, 1fr); column-gap: 10px; row-gap: 4px; padding: 12px 24px; }
 .commit.readback .spin { grid-row: 1 / 4; align-self: center; }
 .commit.readback strong { font-size: var(--fs-body); }
 .readback-detail { font-size: var(--fs-small); color: var(--text-2); }
@@ -1037,8 +1053,9 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .commit .progress i { display: block; height: 100%; background: var(--text); }
 /* An Apply's steps. The bar grows upward into a column while it runs, and
    keeps a failed Apply on screen until it is dismissed. */
-.commit.ap { flex-direction: column; align-items: stretch; gap: 10px; width: min(460px, calc(100% - 48px)); padding: 12px 16px; }
-.commit.ap.failed { border-color: var(--danger); }
+.commit.ap { flex-direction: column; align-items: stretch; gap: 10px; padding: 12px 24px; }
+.commit.ap > * { max-width: 640px; }
+.commit.ap.failed { border-top-color: var(--danger); }
 .ap-head { display: flex; align-items: center; gap: 8px; font-size: var(--fs-body); }
 .ap-head .muted { margin-left: auto; font-size: var(--fs-small); }
 .ap-reason { font-size: var(--fs-body); color: var(--text); }

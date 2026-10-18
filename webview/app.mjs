@@ -202,6 +202,7 @@ addEventListener("keydown", (event) => {
     if (trapTab(root, event) || activateOnKey(event)) return;
     if (event.key !== "Escape") return;
     hideHover();
+    if (state.railMenu) { state.railMenu = false; render(); return; }
     if (state.picker) { state.picker = null; render(); return; }
     if (state.retarget) { state.retarget = null; render(); return; }
     if (state.layersOpen) { closeLayers(); render(); return; }
@@ -214,6 +215,12 @@ addEventListener("keydown", (event) => {
         render();
     }
 });
+// The rail's "⋯" menu closes on a press anywhere outside it.
+addEventListener("pointerdown", (event) => {
+    if (!state.railMenu || (event.target instanceof Element && event.target.closest(".rail-more"))) return;
+    state.railMenu = false;
+    render();
+}, true);
 addEventListener("resize", () => {
     /** @type {HTMLElement | null} */ (root.querySelector(".keys-pad .bench"))?.style.removeProperty("min-height");
 });

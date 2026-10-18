@@ -19,7 +19,7 @@ export interface PanelState {
     screen: ScreenId; layer: number; layersOn: number[]; selected: number; tab: string;
     behaviourRow: string | null; behaviourRowShown: string | null; behaviourRoute: {row: string; group: string} | null;
     reachGroups: Record<string, boolean>; resetBenchHeight: boolean; reachRow: {macros: string | null; combos: string | null; pointing: string | null};
-    cell: string | null; cellRow: string | null; reveal: string | null; pickCombo: number | null; settingsOpen: string[]; keyDetailsOpen: boolean; stackOpen: boolean; showKeycodes: boolean;
+    cell: string | null; cellRow: string | null; reveal: string | null; pickCombo: number | null; settingsOpen: string[]; keyDetailsOpen: boolean; stackOpen: boolean; showKeycodes: boolean; hideBoard: boolean; railMenu: boolean;
     cellHow: {cell: string; keycode: string; helper?: BranchHelper; repeatHz?: Scalar} | null;
     combo: {open: boolean; picking: boolean; inputs: string[]; form: Omit<Combo, 'inputs'> & {output: string; termMs: string}; awaiting: boolean; editId: number | null};
     placement: {keycode: string} | null; retarget: {from: string; to: string; existing: string} | null; keyClipboard: {keycode: string; label: string} | null;

@@ -4,7 +4,7 @@
 
 import assert from "node:assert/strict";
 import test from "node:test";
-import {connectPanel} from "../web/panel-channel.mjs";
+import {PANEL_STATE_KEY, connectPanel} from "../web/panel-channel.mjs";
 import {workerSleep} from "../web/sleep.mjs";
 import {BLOCKED, PROFILE_FILE_LIMIT, WEB_WORDS, initialTheme, leaving, readProfileFile} from "../web/web-host.mjs";
 import {recoveryName} from "../web/recoveries.mjs";
@@ -46,6 +46,32 @@ test("the stand-in delivers both ways later and as copies, and shows the click i
         assert.deepEqual(panel.api.getState(), {screen: "keys"});
     } finally {
         panel.close();
+    }
+});
+
+test("the panel's own state outlives the page, in the page's storage", () => {
+    const items = new Map();
+    const storage = {getItem: (key) => items.get(key) ?? null, setItem: (key, value) => items.set(key, value)};
+    const first = connectPanel({receive: () => {}, target: new EventTarget(), storage});
+    try {
+        assert.equal(first.api.getState(), undefined, "nothing stored yet");
+        first.api.setState({preferences: {showKeycodes: true, hideBoard: false}});
+        assert.equal(JSON.parse(items.get(PANEL_STATE_KEY)).preferences.showKeycodes, true);
+    } finally {
+        first.close();
+    }
+    const again = connectPanel({receive: () => {}, target: new EventTarget(), storage});
+    try {
+        assert.deepEqual(again.api.getState(), {preferences: {showKeycodes: true, hideBoard: false}}, "a reload reads it back");
+    } finally {
+        again.close();
+    }
+    items.set(PANEL_STATE_KEY, "{not json");
+    const damaged = connectPanel({receive: () => {}, target: new EventTarget(), storage});
+    try {
+        assert.equal(damaged.api.getState(), undefined, "a damaged store starts afresh");
+    } finally {
+        damaged.close();
     }
 });
 

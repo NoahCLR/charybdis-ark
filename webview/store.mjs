@@ -9,6 +9,7 @@ import {layersOn, toggleLayer} from "./view/layer-set.mjs";
 import {initialReachGroups} from "./view/reach-groups.mjs";
 import {leaving} from "./view/demo.mjs";
 import {afterDraftChange, initialState, kept, resets, resetsTo} from "./view/state-fields.mjs";
+import {readPreferences, withPreference} from "./view/preferences.mjs";
 
 const vscode = acquireVsCodeApi();
 
@@ -47,7 +48,9 @@ export const STATE_FIELDS = {
     pickCombo: kept(null),     // a combo id to pick in the Combos tab, wherever this layer lists it
     settingsOpen: kept([]),    // settings sections opened by hand or by a Show, so a render keeps them open
     keyDetailsOpen: kept(false), // the Key tab's folded position details, open on every key once opened
-    showKeycodes: kept(false),   // the Show keycodes preference: QMK keycodes beside names everywhere (decisions R2, §3)
+    showKeycodes: kept(false),   // the Show keycodes preference: QMK keycodes beside names everywhere (decisions R2, §3); remembered per host (setPreference)
+    hideBoard: kept(false),      // Hide board on Keys and Lighting: the board folds to its layer tabs; remembered per host (setPreference)
+    railMenu: kept(false),       // the rail's "⋯" menu is open
     stackOpen: kept(false),    // the Key tab's runs of transparent layers, shown in full once asked
     settingsDurationUnits: kept({}), // display preferences; stored settings remain milliseconds
     // {cell, keycode, helper, repeatHz}: how the open empty cell runs, chosen
@@ -118,6 +121,16 @@ export const STATE_FIELDS = {
 
 /** @type {PanelState} */
 export const state = initialState(STATE_FIELDS);
+// The preferences this host remembers start the panel where it was left.
+Object.assign(state, readPreferences(vscode.getState()));
+
+// Change a remembered preference: now, and in the host's panel state for the
+// next session (view/preferences.mjs).
+/** @param {"showKeycodes" | "hideBoard"} name @param {boolean} value */
+export function setPreference(name, value) {
+    state[name] = value;
+    vscode.setState(withPreference(vscode.getState(), name, value));
+}
 
 // The combo builder, opened for a combo (or none, for a new one) and closed
 // again. Its fields live here rather than in the DOM, because a board click

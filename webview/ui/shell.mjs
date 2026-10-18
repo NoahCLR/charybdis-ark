@@ -5,7 +5,7 @@
 // Selector assertions refer to elements created by this module's authored markup.
 import * as controls from "../view/controls.mjs";
 import {el, esc} from "../lib/dom.mjs";
-import {getModel, post, postLeavingDemo, render, state} from "../store.mjs";
+import {getModel, post, postLeavingDemo, render, setPreference, state} from "../store.mjs";
 import {halvesWords, phaseWords} from "../view/vocabulary.mjs";
 import {statusBesideCount} from "../view/review.mjs";
 import {busyText, postApplyReadText, screenAvailable} from "../view/readiness.mjs";
@@ -48,11 +48,13 @@ export function rail() {
     // screen and the Device tab say the rest, with Read where it helps.
     const busyWords = health.busy ? `${phaseWords(model, health.phase)?.label || "Working"}. ` : "";
     const halves = halvesWords(model, health.halves);
+    // The status chip says it in words: the halves' state, or that nothing
+    // (or the demo) is connected; its tip says the rest.
     const keyboardDot = demo.active
-        ? {tone: "demo", tip: "Nothing is connected. The demo runs Ark's own draft over a demo setup; only Apply needs a keyboard."}
-        : reconnecting ? {tone: "", tip: "Reconnecting so the keyboard takes its new name. It comes back by itself in a moment."}
-        : !device.connected ? {tone: "err", tip: "No keyboard is connected."}
-        : {tone: health.halves === "agree" ? "ok" : health.halves === "unread" ? "" : "warn", tip: `${busyWords}${halves.label}. ${halves.detail}`};
+        ? {tone: "demo", words: "Demo", tip: "Nothing is connected. The demo runs Ark's own draft over a demo setup; only Apply needs a keyboard."}
+        : reconnecting ? {tone: "", words: "Reconnecting", tip: "Reconnecting so the keyboard takes its new name. It comes back by itself in a moment."}
+        : !device.connected ? {tone: "", words: "Not connected", tip: "No keyboard is connected."}
+        : {tone: health.halves === "agree" ? "ok" : health.halves === "unread" ? "" : "warn", words: halves.label, tip: `${busyWords}${halves.label}. ${halves.detail}`};
 
     const nav = screenGroups().map((group) => `<div class="rail-group">${esc(group.group)}</div>` + group.items.map(({id, definition}) => `
         <button class="nav-item" data-screen="${id}" aria-current="${state.screen === id}"
@@ -62,38 +64,36 @@ export function rail() {
 
     const node = el(`<aside class="rail">
         <div class="rail-device">
-            ${boardOutlineMarkup("rail-board")}
-            <div class="rail-mark">Charybdis Ark</div>
+            <div class="rail-brand">${boardOutlineMarkup("rail-board")}<span class="rail-mark">Charybdis Ark</span></div>
             <div class="rail-keyboard">
-                <i class="dot ${keyboardDot.tone}${(health.busy || reconnecting) && !demo.active ? " busy" : ""}" data-tip="${esc(keyboardDot.tip)}"></i>
-                ${name}</div>
+                ${name}
+                <span class="rail-chip" data-tip="${esc(keyboardDot.tip)}">
+                    <i class="dot ${keyboardDot.tone}${(health.busy || reconnecting) && !demo.active ? " busy" : ""}" data-tip="${esc(keyboardDot.tip)}"></i>
+                    <span>${esc(keyboardDot.words)}</span></span></div>
             ${host.chooseKeyboard ? `<div class="rail-choose">
                 <button class="btn tiny" data-act="choose-keyboard" ${health.busy ? "disabled" : ""}
                     data-tip="Pick a Charybdis in the browser's list. Once chosen, it reconnects by itself next time.">Choose keyboard</button>
                 ${device.connected && !demo.active ? `<button class="btn tiny ghost" data-act="forget-keyboard" ${health.busy ? "disabled" : ""}
                     data-tip="Let go of this keyboard. The page will not open it again until you choose it.">Disconnect</button>` : ""}</div>` : ""}
             <div class="rail-status">
-                ${!draft?.dirty ? "" : draft.matching && !draft.stale
-                    ? `<button class="stat link" data-act="open-review" data-tip="Edits waiting in this window. The keyboard still runs its saved profile. Open the review to see them."><i class="dot draft"></i> ${draft.changes.length} change${draft.changes.length === 1 ? "" : "s"} in draft</button>`
-                    : line("draft", `${draft.changes.length} change${draft.changes.length === 1 ? "" : "s"} in draft`, "Edits waiting in this window. The keyboard still runs its saved profile.")}
                 ${demo.active ? "" : health.restartNeeded
                     ? line("err", "Restart the keyboard",
                         "The slave half did not confirm a cancelled save, so the keyboard refuses new saves. Unplug the USB cable (not the cable between the halves), wait a few seconds and plug it back in. Nothing was lost.")
-                    : health.recoveryPending ? line("draft", "Recovery pending", "A recovery copy is written before every apply.") : ""}
+                    : health.recoveryPending ? line("warn", "Recovery pending", "A recovery copy is written before every apply.") : ""}
             </div>
         </div>
         <nav class="rail-nav">${nav}</nav>
         ${host.progress ? `<div class="rail-progress" role="status">${spinner()}<span>${esc(host.progress)}</span></div>` : ""}
         ${railMessage()}
-        ${draft ? `<div class="rail-foot">
-            <button class="btn tiny ghost rail-history" data-act="history"
-                data-tip="Every step of the draft, newest first, with what each one changed. Go back or forward to any of them.">Draft history${draft && draft.historyLength > 1 ? ` <span class="c">${draft.historyLength - 1}</span>` : ""}</button>
-            <button class="btn tiny ghost icon" data-act="undo" ${draft?.canUndo ? "" : "disabled"}
-                data-tip="${esc(draft?.undoLabel ? `Undo: ${draft.undoLabel} (⌘Z)` : "Undo the last edit in the draft (⌘Z). The keyboard is not touched until you apply.")}">↺</button>
-            <button class="btn tiny ghost icon" data-act="redo" ${draft?.canRedo ? "" : "disabled"}
-                data-tip="${esc(draft?.redoLabel ? `Redo: ${draft.redoLabel} (⇧⌘Z)` : "Redo the edit you just undid (⇧⌘Z).")}">↻</button>
-        </div>` : ""}
-        ${railBuild(host.build)}
+        <div class="rail-foot">
+            ${draft ? `<button class="btn text rail-history" data-act="history"
+                data-tip="Every step of the draft, newest first, with what each one changed. Go back or forward to any of them.">Draft history${draft.historyLength > 1 ? ` <span class="c">${draft.historyLength - 1}</span>` : ""}</button>
+            <button class="btn text icon" data-act="undo" ${draft.canUndo ? "" : "disabled"} aria-label="Undo" aria-keyshortcuts="Meta+Z"
+                data-tip="${esc(draft.undoLabel ? `Undo: ${draft.undoLabel} (⌘Z)` : "Undo the last edit in the draft (⌘Z). The keyboard is not touched until you apply.")}">↺</button>
+            <button class="btn text icon" data-act="redo" ${draft.canRedo ? "" : "disabled"} aria-label="Redo" aria-keyshortcuts="Shift+Meta+Z"
+                data-tip="${esc(draft.redoLabel ? `Redo: ${draft.redoLabel} (⇧⌘Z)` : "Redo the edit you just undid (⇧⌘Z).")}">↻</button>` : ""}
+            ${railMenu(host)}
+        </div>
     </aside>`);
 
     /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-screen]")).forEach((button) => button.addEventListener("click", () => {
@@ -107,7 +107,11 @@ export function rail() {
     /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="choose-keyboard"]'))?.addEventListener("click", () => postLeavingDemo(chooseKeyboard()));
     /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="forget-keyboard"]'))?.addEventListener("click", () => post(forgetKeyboard()));
     /** @type {HTMLSelectElement | null} */ (node.querySelector('[data-act="select-device"]'))?.addEventListener("change", (event) => post(controls.selectDevice(/** @type {HTMLSelectElement} */ (event.target).value)));
-    /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="open-review"]'))?.addEventListener("click", openReview);
+    /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="more"]'))?.addEventListener("click", () => { state.railMenu = !state.railMenu; render(); });
+    /** @type {HTMLInputElement | null} */ (node.querySelector('[data-act="show-keycodes"]'))?.addEventListener("change", (event) => {
+        setPreference("showKeycodes", /** @type {HTMLInputElement} */ (event.target).checked);
+        render();
+    });
     // Draft history, undo and redo show once there is a draft to step through.
     /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="history"]'))?.addEventListener("click", openHistory);
     /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="undo"]'))?.addEventListener("click", () => post(controls.control("undoProfileDraft")));
@@ -115,23 +119,42 @@ export function rail() {
     return node;
 }
 
-// A host that leaves the theme to the panel (a web page) gets its toggle at
-// the top right of every screen; in VS Code the panel follows VS Code's theme.
+// The subtitle is one line; a window too narrow for it ends it in an
+// ellipsis and keeps the whole of it as the line's tooltip.
 /** @param {string} title @param {string} subtitle @param {string} [actions] */
 export const topbar = (title, subtitle, actions = "") => `<header class="topbar">
-    <div><h1>${esc(title)}</h1><p class="sub">${esc(subtitle)}</p></div>
-    <div class="topbar-actions">${actions}${themeToggle()}</div>
+    <div><h1>${esc(title)}</h1><p class="sub" title="${esc(subtitle)}">${esc(subtitle)}</p></div>
+    ${actions ? `<div class="topbar-actions">${actions}</div>` : ""}
 </header>`;
 
 const THEME_ICONS = {
     dark: '<svg viewBox="0 0 16 16"><path d="M13.2 10.1A5.6 5.6 0 0 1 5.9 2.8a5.6 5.6 0 1 0 7.3 7.3z"/></svg>',
     light: '<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.8"/><path d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1"/></svg>',
 };
-function themeToggle() {
-    const theme = hostOf(getModel()).theme;
+/** @param {import("../../contracts/model.js").HostPanel} host */
+function themeToggle(host) {
+    const theme = host.theme;
     if (!theme) return "";
-    return `<button class="btn tiny ghost icon theme-toggle" data-act="theme" data-theme-now="${esc(theme)}"
-        aria-label="${esc(themeLabel(theme))}" data-tip="${esc(themeLabel(theme))}">${THEME_ICONS[theme]}</button>`;
+    return `<button class="btn text theme-toggle" data-act="theme" data-theme-now="${esc(theme)}">${THEME_ICONS[theme]}<span>${esc(themeLabel(theme))}</span></button>`;
+}
+
+// The rail's "⋯" menu: how the panel is shown, and which build it is. The
+// theme is there where the host leaves it to the panel (a web page); VS Code
+// sets its own. Show keycodes is remembered per host (view/preferences.mjs).
+/** @param {import("../../contracts/model.js").HostPanel} host */
+function railMenu(host) {
+    const open = state.railMenu;
+    return `<div class="rail-more">
+        <button class="btn text icon" data-act="more" aria-label="More options" aria-haspopup="true" aria-expanded="${open}"
+            data-tip="Theme, Show keycodes and this build">⋯</button>
+        ${open ? `<div class="rail-menu" role="group" aria-label="More options">
+            ${themeToggle(host)}
+            <label class="sw" data-tip="Show the QMK keycode beside each key's name, everywhere in Ark. The key you are editing always shows its own.">
+                <input type="checkbox" data-f="rail:show-keycodes" data-act="show-keycodes" ${state.showKeycodes ? "checked" : ""}><span class="track"></span>
+                <span class="txt">Show keycodes</span></label>
+            ${railBuild(host.build)}
+        </div>` : ""}
+    </div>`;
 }
 
 // What the keyboard or the host last said — a read, a save, a refusal — sits
