@@ -47,6 +47,22 @@ const UNBUILT = new RegExp("^(?:" + [
 ].join("|") + ")");
 /** @param {Entry} entry */
 const unbuilt = (entry) => UNBUILT_GROUPS.has(entry.group) || UNBUILT.test(valueOf(entry));
+// Whether a stored keycode belongs to a feature this firmware does not build,
+// so it does nothing wherever it sits (the Keys board says so on its cap).
+/** @type {WeakMap<object, Map<string, Entry>>} */
+const BY_NAME = new WeakMap();
+/** @param {{qmkKeycodes?: Entry[]} | null | undefined} model @param {string} keycode */
+export function unbuiltKeycode(model, keycode) {
+    const entries = model?.qmkKeycodes || [];
+    let byName = BY_NAME.get(entries);
+    if (!byName) {
+        byName = new Map();
+        for (const entry of entries) for (const name of [valueOf(entry), entry.key, entry.name]) if (name && !byName.has(name)) byName.set(name, entry);
+        BY_NAME.set(entries, byName);
+    }
+    const entry = byName.get(keycode);
+    return entry ? unbuilt(entry) : UNBUILT.test(keycode);
+}
 // Whether the picker offers an entry at all, in any section or search.
 /** @param {Entry} entry */
 export const pickable = (entry) => !NATIVE_MACRO.test(valueOf(entry)) && !RETIRED_USER.test(valueOf(entry)) && !UNSUPPORTED.has(valueOf(entry)) && !unbuilt(entry);

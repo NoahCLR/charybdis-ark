@@ -44,3 +44,36 @@ test("the plate shows a layer over Base, This layer only shows it alone, and a l
     await expect(page.locator(".layer-tabs .layer-tab.on")).not.toHaveCount(0);
     expect(await page.evaluate(() => window.__posted.length)).toBe(0);
 });
+
+test("the Key tab's keycode field stages a key it can store and keeps one it cannot, with the reason", async ({page}) => {
+    await openControls(page, "keys", {tab: "key", selected: 0});
+    const field = page.locator("#keycodeField");
+    await clearPosts(page);
+    await change(field, "NOT_A_KEY");
+    await expect(page.locator(".key-field-error")).toContainText("not a key this keyboard can store");
+    await expect(field).toHaveValue("NOT_A_KEY");
+    expect(await page.evaluate(() => window.__posted.length)).toBe(0);
+    await change(field, "KC_B");
+    await expectPost(page, {type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_B"}]});
+});
+
+test("Add a hold… opens the picker with its Hold slot open; Change key… opens it plain", async ({page}) => {
+    await openControls(page, "keys", {tab: "key", selected: 0});
+    await page.locator('.key-tab [data-act="hold"]').click();
+    await expect(page.getByRole("dialog", {name: "Choose a key"})).toBeVisible();
+    expect(await page.evaluate(async () => (await import("/webview/store.mjs")).state.picker?.holdMenu)).toBe("root");
+    await openControls(page, "keys", {tab: "key", selected: 0});
+    await page.locator('.key-tab [data-act="pick"]').click();
+    await expect(page.getByRole("dialog", {name: "Choose a key"})).toBeVisible();
+    expect(await page.evaluate(async () => (await import("/webview/store.mjs")).state.picker?.holdMenu)).toBe(null);
+});
+
+test("the Key tab's rows go to the behaviour and combos they name", async ({page}) => {
+    await openControls(page, "keys", {tab: "key", selected: 0});
+    await page.locator('.key-tab [data-goto="behaviours"]').click();
+    await expect(page.locator('[data-tab="behaviours"]')).toHaveAttribute("aria-selected", "true");
+    await page.locator('[data-tab="key"]').click();
+    await page.locator('.key-tab [data-goto="combos"]').click();
+    await expect(page.locator('[data-tab="combos"]')).toHaveAttribute("aria-selected", "true");
+    await expect(page.locator('[data-tab="key"] .c')).toHaveCount(0);
+});

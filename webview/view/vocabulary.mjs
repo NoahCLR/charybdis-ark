@@ -9,7 +9,7 @@
 /** @typedef {{vocabulary?: import("../../contracts/model.js").Vocabulary, pdModes?: {id: number, displayName: string}[]}} VocabularyModel */
 
 /** @type {import("../../contracts/model.js").Vocabulary} */
-const NONE = {phases: /** @type {import("../../contracts/model.js").Vocabulary["phases"]} */ ({}), halves: /** @type {import("../../contracts/model.js").Vocabulary["halves"]} */ ({}), hostOs: [], macroProtection: [], hostLayouts: [], tapSends: "", holdFromPress: "", timingSources: {}, holdHelpers: {hold: [], long: []}, holdWithoutLongHold: [], tiers: {}, layerWayVerbs: /** @type {import("../../contracts/model.js").Vocabulary["layerWayVerbs"]} */ ({}), branches: [], localities: [], paintModes: [], fadeModes: [], tapCommit: [],
+const NONE = {phases: /** @type {import("../../contracts/model.js").Vocabulary["phases"]} */ ({}), halves: /** @type {import("../../contracts/model.js").Vocabulary["halves"]} */ ({}), hostOs: [], macroProtection: [], hostLayouts: [], tapSends: "", holdFromPress: "", timingSources: {}, holdHelpers: {hold: [], long: []}, holdWithoutLongHold: [], tiers: {}, layerWayVerbs: /** @type {import("../../contracts/model.js").Vocabulary["layerWayVerbs"]} */ ({}), layerKeyEffects: {}, branches: [], localities: [], paintModes: [], fadeModes: [], tapCommit: [],
     feedbackOwners: [], stages: [], pointing: {kinds: [], axes: [], invert: [], pointerLayer: [], buttons: [],
         emptyDirection: [], directionOutput: [], scrollAxes: [], modifierPolicy: [], scrollFields: [], heldModifiers: ""}, modifiers: [], comboOptions: {}};
 

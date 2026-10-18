@@ -965,6 +965,30 @@ button.tier:hover { background: var(--surface-3); }
 .stackrow.folded .nm { color: var(--text-2); }
 .stackrow .swatch-lg { width: 12px; height: 12px; border-radius: var(--r-chip); }
 .key-reaches { gap: 8px; }
+/* The inspector: title, Does, the Key row, what it reaches. */
+.key-tab.tab-grid.two { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); }
+.key-main { display: flex; flex-direction: column; gap: var(--s-3); }
+.key-title { display: flex; align-items: center; gap: var(--s-2); min-width: 0; }
+.key-title h3 { font-size: var(--fs-heading); line-height: var(--lh-heading); font-weight: var(--fw-strong); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.key-title .key-title-swatch { width: 12px; height: 12px; border-radius: var(--r-chip); border: 1px solid var(--line-2); flex: none; }
+.key-title .key-where { margin-left: auto; font-size: var(--fs-small); }
+.key-warn { color: var(--warning); }
+.key-does { margin: 0; }
+.key-does dd { min-width: 0; font-family: var(--sans); font-size: var(--fs-body); }
+.key-does dd .btn.text { margin-left: var(--s-1); vertical-align: middle; }
+.key-inert { color: var(--warning); }
+.key-row .input-row { flex-wrap: wrap; }
+.key-row .input-row .input { flex: 1 1 160px; min-width: 0; }
+.key-field-error { color: var(--warning); margin-top: var(--s-1); }
+.key-reach-rows { display: grid; gap: var(--s-1); border-top: 1px solid var(--line); padding-top: var(--s-2); }
+.key-line { display: grid; grid-template-columns: 112px minmax(0, 1fr) auto; gap: var(--s-2); align-items: center; min-height: var(--h-control); font-size: var(--fs-body); }
+.key-line .mk-swatch { vertical-align: middle; }
+.key-combo-list { display: grid; gap: 2px; min-width: 0; }
+.key-row-link { display: flex; gap: var(--s-2); justify-content: space-between; text-align: left; min-width: 0; padding: 2px 0; }
+.key-row-link > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.key-row-link:hover > span:first-child { text-decoration: underline; }
+.stack-show { color: var(--text-3); font-size: var(--fs-small); visibility: hidden; }
+.stackrow:hover .stack-show, .stackrow:focus-visible .stack-show { visibility: visible; color: var(--text-2); }
 .key-participation { gap: 8px; margin-top: 16px; }
 .key-participation > .sect-h { margin: 6px 0 2px; }
 .def-layers > summary { cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }

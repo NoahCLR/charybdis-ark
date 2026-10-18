@@ -6,6 +6,7 @@
 import {el, esc} from "../../lib/dom.mjs";
 import {layerReachLines} from "../../view/layer-plate.mjs";
 import {layerIsEmpty} from "../../view/layer-tabs.mjs";
+import {isPlainKey} from "../../view/keycode-expression.mjs";
 import {addedLayers, defaultLayersUnder, getModel, heldLayers, layerName, layers, render, showLayer, state, toggleLayerOn, writable} from "../../store.mjs";
 import {layerSwatch} from "../layerbar.mjs";
 import {pickKeycodeFor} from "./key-edits.mjs";
@@ -112,6 +113,6 @@ export function layerPlate(layer) {
 export function placedKeycode(placement, position) {
     if (placement.layerTap === undefined) return placement.keycode;
     const tap = position?.keycode || "";
-    return /^KC_[A-Z0-9_]+$/.test(tap) && !["KC_NO", "KC_TRANSPARENT", "KC_TRNS"].includes(tap) ? `LT(${placement.layerTap},${tap})` : null;
+    return isPlainKey(getModel(), tap) && !["KC_NO", "KC_TRANSPARENT", "KC_TRNS"].includes(tap) ? `LT(${placement.layerTap},${tap})` : null;
 }
 export {pickKeycodeFor};

@@ -81,6 +81,7 @@ export interface Vocabulary {
     timingSources: Record<string, string>;
     tiers: Readonly<Record<string, string>>;
     layerWayVerbs: Readonly<Record<LayerWay['verb'], string>>;
+    layerKeyEffects: Readonly<Record<string, string>>;
     branches: readonly string[];
     localities: WordList<string>;
     paintModes: WordList<string>;

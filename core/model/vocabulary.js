@@ -114,6 +114,12 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     // What a way into a layer does to it (layer-reach.js layerWays), as the
     // Keys layer plate says it after the gesture: "Double-tap Left Thumb (lock)".
     layerWayVerbs: {hold: "hold", lock: "lock", move: "move to", oneShot: "one-shot"},
+    // What a layer key does to its layer on this firmware, after its name
+    // ("Hold Number: on while held"). TG is a lock here (D-L34); TT locks on
+    // QMK's TAPPING_TOGGLE, the 5th tap.
+    layerKeyEffects: {MO: "on while held", TG: "on until pressed again", LOCK_LAYER: "on until pressed again",
+        TT: "on while held; the 5th tap locks it", OSL: "on while held; a tap turns it on for the next key only",
+        TO: "turns off every other layer and locks this one", DF: "makes it the default layer (QMK)", PDF: "makes it the default layer (QMK)"},
     // A behaviour's tap count, the row its actions sit on, by how many taps
     // start it.
     branches: ["Single tap", "Double tap", "Triple tap", "Quadruple tap", "Quintuple tap"],
