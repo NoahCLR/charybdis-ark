@@ -1646,6 +1646,7 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .led-rows { margin-top: 8px; }
 .led-swatch { width: 13px; height: 13px; border-radius: var(--r-chip); border: 1px solid var(--line-2); flex: none; display: inline-block; vertical-align: -2px; }
 .led-swatch + code { margin-left: 6px; }
+table.t td.led-count { white-space: nowrap; }
 .note { font-size: var(--fs-small); color: var(--text-3); line-height: 1.5; }
 .note.warn { color: var(--warning); }
 .callout { border: 1px solid var(--line); border-left: 2px solid var(--line-3); border-radius: 0 var(--r-control) var(--r-control) 0; padding: 10px 12px; background: var(--surface-2); font-size: var(--fs-small); color: var(--text-2); }

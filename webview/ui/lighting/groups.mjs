@@ -81,7 +81,7 @@ function groupTables(model, canEdit) {
     node.append(el(`<div><div class="sect-h"><h4>Saved groups</h4><span class="right note">one set of keys, used by many rows</span></div>
         ${groups.length ? `<table class="t"><thead><tr><th>Group</th><th>LEDs</th><th>Used by</th><th></th></tr></thead><tbody>
             ${groups.map((group) => `<tr data-group-row="${esc(group.name)}"><td>${esc(groupName(group.ledIndices))}</td>
-                <td class="mono" data-tip="LEDs ${esc(group.ledIndices.join(", "))}">${ledCount(group.ledIndices.length)}</td>
+                <td class="mono led-count" data-tip="LEDs ${esc(group.ledIndices.join(", "))}">${ledCount(group.ledIndices.length)}</td>
                 <td class="muted">${group.usageCount ? esc(group.usages.map((usage) => usedBy(model, usage)).join(", ")) : "not used yet"}</td>
                 <td class="t-act"><button class="btn tiny ghost" data-delete="${esc(group.name)}"
                     ${canEdit && !group.usageCount ? "" : "disabled"}

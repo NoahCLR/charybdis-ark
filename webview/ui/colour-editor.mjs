@@ -56,7 +56,7 @@ export function colourEditor({identity, colour, title, canEdit = true, onChange,
     // Hue and saturation 0–255, brightness up to the keyboard's limit: the
     // numbers the keyboard stores.
     const fields = el(`<div class="colour-numbers">
-        ${[["Hue", h, 255, "0–255"], ["Saturation", s, 255, "0–255"], ["Brightness", v, maximum, `of ${maximum}`]].map(([name, value, max, range], index) =>
+        ${[["Hue", h, 255, "0–255"], ["Saturation", s, 255, "0–255"], ["Brightness", v, maximum, Number.isInteger(maximumBrightness) ? `of ${maximum}` : "limit not read"]].map(([name, value, max, range], index) =>
             `<label class="field"><span>${name} <i class="dim">${range}</i></span><input type="number" min="0" max="${max}" step="1" class="input mono" value="${value}" data-f="${esc(identity)}:colour:${index}" data-channel="${index}" ${canEdit ? "" : "disabled"}></label>`).join("")}</div>`);
     /** @type {NodeListOf<HTMLInputElement>} */ (fields.querySelectorAll("[data-channel]")).forEach((input) => input.addEventListener("change", () => {
         const next = [h, s, v];
