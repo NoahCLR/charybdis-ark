@@ -48,13 +48,12 @@ export function behaviourTimingField(/** @type {import("../../contracts/panel.js
         ...timingInput(stored, fallback, followsDefault)};
 }
 
-// A stored behaviour row that changes nothing: no branches, no timing of its
-// own, on on every layer and not anchoring auto-mouse. The keyboard runs the
-// key as if the row were not there.
-export function behaviourIsEmpty(/** @type {import("../../contracts/panel.js").BehaviorView} */ behaviour, /** @type {number} */ layerCount) {
-    const every = 2 ** layerCount - 1;
-    return !(behaviour.steps || []).length && behaviour.enabled !== false && !behaviour.keepsAutoMouseAnchored
-        && ((behaviour.allowedLayers ?? every) & every) === every
+// A stored behaviour row with nothing in it: no branches, no timing of its own
+// and not anchoring auto-mouse. A row without branches is no row (firmware
+// D-F27 "Rows without steps"), and its switch and layers gate only what it
+// holds, so the keyboard runs the key as if the row were not there.
+export function behaviourIsEmpty(/** @type {import("../../contracts/panel.js").BehaviorView} */ behaviour) {
+    return !(behaviour.steps || []).length && !behaviour.keepsAutoMouseAnchored
         && ["tapHoldTerm", "longerHoldTerm", "multiTapTerm"].every((name) => Number(behaviour[/** @type {"tapHoldTerm"} */ (name)] ?? 0) === 0);
 }
 

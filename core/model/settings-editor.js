@@ -62,9 +62,9 @@ const COMBO_TIMING = Object.freeze([
 /** @type {Omit<import("../../contracts/model.js").SettingsSection, "fields"> & {fields: import("../../contracts/model.js").StoredSettingField[]}} */
 const keyTiming = {id: "keyTiming", label: "Tap & hold timing", fields: [
     // Said in words first; the QMK names are in its hover help.
-    number("tappingTerm", SETTING.TAPPING_TERM, "Dual-role tap / hold threshold", "How long a key that types on tap and holds a layer or modifier waits before a press counts as a hold. Behaviours use the threshold below instead.",
-        {tooltip: "QMK's tapping term, used by LT(), MT(), TT(), OSL() and OSM() keys. An LT() key's behaviour with an empty Tap / hold threshold uses it too."}),
-    number("tapHoldTerm", SETTING.TAP_HOLD_TERM, "Behaviour tap / hold threshold", "Used when a behaviour leaves its Tap / hold threshold empty.", {governs: {kind: "tier", tier: "hold"}}),
+    number("tappingTerm", SETTING.TAPPING_TERM, "Dual-role tap / hold threshold", "How long a key that types on tap and holds a layer or modifier waits before a press counts as a hold, with or without a behaviour, unless its behaviour sets its own.",
+        {tooltip: "QMK's tapping term, used by LT(), MT(), OSM(), TT() and OSL() keys, and by their behaviours with an empty Tap / hold threshold."}),
+    number("tapHoldTerm", SETTING.TAP_HOLD_TERM, "Behaviour tap / hold threshold", "Used when a behaviour on any other key leaves its Tap / hold threshold empty.", {governs: {kind: "tier", tier: "hold"}}),
     number("longerHoldTerm", SETTING.LONG_HOLD_TERM, "Long hold threshold", "Used when a behaviour leaves its Long hold threshold empty.", {governs: {kind: "tier", tier: "long"}}),
     number("multiTapTerm", SETTING.MULTI_TAP_TERM, "Multi tap window", "How long after releasing a key the next press still counts as another tap. Used when a behaviour leaves its Multi tap window empty.", {governs: {kind: "branch", count: 2}}),
 ]};

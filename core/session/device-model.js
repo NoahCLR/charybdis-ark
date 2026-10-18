@@ -350,15 +350,12 @@ function behaviorDefaults(content, capabilities, aliases, names) {
         const target = keycodeAction(code);
         const name = keycodeCatalog.resolve(code).name;
         const timing = effectiveTimings({target}, values);
-        // Where each default comes from, named for the editor's placeholders;
-        // a key with no row may follow another (B5: QMK's MT and OSM keys).
-        const source = (/** @type {boolean} */ stored) => holdTermSetting(target, stored) === SETTING.TAPPING_TERM ? "tappingTerm" : "tapHoldTerm";
-        const unstored = effectiveTimings({target}, values, {stored: false});
+        // Where each default comes from, named for the editor's placeholders.
+        // A key follows the same one with or without a row (firmware D-F27).
+        const source = holdTermSetting(target) === SETTING.TAPPING_TERM ? "tappingTerm" : "tapHoldTerm";
         return [aliases[name] || name, {builtIn: builtInForView(target, features, names),
             timing: {tapHoldTerm: timing.hold, longerHoldTerm: timing.long, multiTapTerm: timing.repeat},
-            timingSources: {tapHoldTerm: source(true), longerHoldTerm: "longHoldTerm", multiTapTerm: "multiTapTerm"},
-            ...(unstored.hold !== timing.hold || source(false) !== source(true)
-                ? {withoutRow: {tapHoldTerm: unstored.hold, tapHoldSource: source(false)}} : {})}];
+            timingSources: {tapHoldTerm: source, longerHoldTerm: "longHoldTerm", multiTapTerm: "multiTapTerm"}}];
     }));
 }
 

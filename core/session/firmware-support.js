@@ -28,8 +28,9 @@ const CURRENT_FEATURES = PROFILE_WIRE_KNOWN_MASKS.CURRENT_FEATURES;
 const REQUIRED_LIVE_MUTATION_FEATURES = PROFILE_WIRE_KNOWN_MASKS.CURRENT_MUTATION_FEATURES;
 /** @param {Partial<Caps> | null | undefined} capabilities */
 const hasCurrentLayers = capabilities => capabilities?.compiledLayerCount === LAYERS;
+// Compared unsigned: a mask with bit 31 is positive, `&` gives it back negative.
 /** @param {number | undefined} flags @param {number} mask */
-const hasAll = (flags, mask) => ((Number(flags) || 0) & mask) === mask;
+const hasAll = (flags, mask) => (((Number(flags) || 0) & mask) >>> 0) === mask >>> 0;
 
 /** @param {Partial<Caps> | null | undefined} capabilities @returns {capabilities is Partial<Caps>} */
 const canEdit = capabilities => hasCurrentLayers(capabilities)
@@ -128,8 +129,8 @@ function minimumCheck(label, actual, expected) {
 
 /** @param {string} label @param {number | undefined} actual @param {number} expected */
 function maskCheck(label, actual, expected) {
-    const numeric = Number(actual) || 0;
-    const ok = (numeric & expected) === expected;
+    const numeric = (Number(actual) || 0) >>> 0;
+    const ok = hasAll(numeric, expected);
     return {label, ok, actual: numeric, limit: expected, message: ok ? "" : `${label} mask 0x${numeric.toString(16)} does not include required mask 0x${expected.toString(16)}.`};
 }
 

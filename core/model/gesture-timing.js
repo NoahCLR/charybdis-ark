@@ -19,21 +19,20 @@ const SHORT_WINDOW_MS = 50; // advisory comfort heuristic, never a validity limi
 const transparent = action => nativeCode(action) === 1;
 /** @param {number | undefined} code @param {number} start @param {number} end */
 const within = (code, start, end) => code !== undefined && code >= start && code <= end;
-// The setting a key's Tap / hold threshold follows when it sets none. With a
-// row, an LT() row follows the dual-role term and every other row the
-// behaviour term (key_behavior_lookup.c, key_behavior_view_build). Without
-// one, LT(), MT() and OSM() keys are QMK's own dual-role keys, so they follow
-// the dual-role term too.
-/** @param {import("../schema/types.js").SemanticAction} target @param {boolean} [stored] */
-function holdTermSetting(target, stored = true) {
+// QMK's dual-role keys: MT(), LT(), OSL(), OSM() and TT().
+const DUAL_ROLE = /** @type {const} */ ([[0x2000, 0x3fff], [0x4000, 0x4fff], [0x5280, 0x52df]]);
+// The setting a key's Tap / hold threshold follows when its row sets none, or
+// when it has no row. A dual-role key follows the dual-role term either way,
+// every other row the behaviour term (firmware D-F27 "Every dual-role key",
+// Profile Wire feature bit 31, which Ark requires).
+/** @param {import("../schema/types.js").SemanticAction} target */
+function holdTermSetting(target) {
     const code = nativeCode(target);
-    if (within(code, 0x4000, 0x4fff)) return SETTING.TAPPING_TERM;
-    if (!stored && (within(code, 0x2000, 0x3fff) || within(code, 0x52a0, 0x52bf))) return SETTING.TAPPING_TERM;
-    return SETTING.TAP_HOLD_TERM;
+    return DUAL_ROLE.some(([start, end]) => within(code, start, end)) ? SETTING.TAPPING_TERM : SETTING.TAP_HOLD_TERM;
 }
-/** @template {number | string | undefined} T @param {Pick<import("../schema/types.js").BehaviorRow, 'target'> & Partial<Pick<import("../schema/types.js").BehaviorRow, 'tapHoldTerm' | 'longerHoldTerm' | 'multiTapTerm'>>} row @param {readonly T[]} values @param {{stored?: boolean}} [options] @returns {{hold: number | T, long: number | T, repeat: number | T}} */
-function effectiveTimings(row, values, {stored = true} = {}) {
-    return {hold: row.tapHoldTerm || values[holdTermSetting(row.target, stored)],
+/** @template {number | string | undefined} T @param {Pick<import("../schema/types.js").BehaviorRow, 'target'> & Partial<Pick<import("../schema/types.js").BehaviorRow, 'tapHoldTerm' | 'longerHoldTerm' | 'multiTapTerm'>>} row @param {readonly T[]} values @returns {{hold: number | T, long: number | T, repeat: number | T}} */
+function effectiveTimings(row, values) {
+    return {hold: row.tapHoldTerm || values[holdTermSetting(row.target)],
         long: row.longerHoldTerm || values[SETTING.LONG_HOLD_TERM], repeat: row.multiTapTerm || values[SETTING.MULTI_TAP_TERM]};
 }
 /** @param {BehaviorStep} step @param {Timings} terms @returns {step is BehaviorStep & {hold: import("../schema/types.js").HoldBranch, longHold: import("../schema/types.js").HoldBranch}} */

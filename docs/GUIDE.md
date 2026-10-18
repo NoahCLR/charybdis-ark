@@ -216,8 +216,8 @@ without says **Not in this firmware** and does nothing; Your computer; then,
 folded, Default layers and **Built into this firmware**. That last section is
 read-only: the layers, tap counts, macro, custom key, pointing mode and combo
 slots, LEDs, brightness and repeat ceilings and DPI steps the keyboard
-reports, and QMK's tap-hold options, which the keyboard does not report; each
-needs a firmware build to change. A folded section says what it holds in
+reports, and that QMK's tap-hold options are not used, since the keyboard
+decides every key's tap or hold itself; each needs a firmware build to change. A folded section says what it holds in
 words ("16 layers", "13 options"). Settings that QMK keeps live (combos on or
 off, default layers, key options) say **↺ keyboard keys change this too**: a
 key on the keyboard, or VIA, can change them, and the draft then asks to be
@@ -268,13 +268,16 @@ or pointing mode reads as `CUSTOM_KEY_n` or `PD_SLOT_n` rather than its number.
 A custom key says under its name what its shortcut sends, held and tapped as
 the key is or where its behaviour leaves a tap or hold empty, or that it has
 none.
-A layer-tap or mod-tap key always lists what its tap sends, what its hold does,
-the tap / hold threshold it runs on and who decides it: the keyboard, when it
-has a behaviour row that runs there (even one with no branches), or QMK, when
-it has none or its row is switched off or bypassed there. Any other key with a
-branchless behaviour row says in one line that the keyboard's key engine
-handles it. A behaviour switched off or bypassed there says so and why, and
-what the key sends instead: its own keycode, or a custom key's shortcut.
+A layer-tap or mod-tap key always lists what its tap sends, what its hold does
+and the tap / hold threshold it runs on: its behaviour's own, or Settings'
+dual-role threshold. The keyboard decides every key's tap or hold itself, with
+or without a behaviour, so the card does not name who decides. When the key's
+behaviour is switched off or bypassed there, the card says so and why, and the
+key keeps its own tap and hold at the dual-role threshold. Any other key whose
+behaviour has no branches, timing or mouse-layer anchor says in one line that
+it runs as it does without one. A behaviour switched off or bypassed on any
+other key says so and why, and what the key sends instead: its own keycode, or
+a custom key's shortcut.
 Behaviour branches list each tier's action and how a hold runs, and the
 behaviour names the thresholds it runs on in milliseconds, its own or the
 keyboard's default; a hold that taps at or after a threshold names
@@ -374,7 +377,9 @@ column's: "tap at Tap / hold threshold" under Hold, "tap at Long hold
 threshold" under Long hold. Behaviour and combo
 timings matching the default show a muted placeholder such as `150 · default`;
 other values look entered, with `ms` inside the field. Clearing an override restores the
-default. LT keys show their own dual-role default.
+default. A dual-role key (`LT()`, `MT()`, `OSM()`, `TT()` or `OSL()`) shows the
+dual-role default, as it runs with or without a behaviour; every other key the
+behaviour default.
 Changing a behaviour timing default moves every row following it, including
 explicit values matching the old default; distinct custom timings stay fixed.
 Review lists inherited effective-time changes under Tap & hold timing and any
@@ -1014,8 +1019,9 @@ several edits could be responsible, the review leaves the source unlabeled.
 
 ### Timing checks
 
-The keyboard times gestures from the physical presses, and owns the tapping of
-authored LT(), MT() and OSM() rows, so combo buffering does not delay them.
+The keyboard times gestures from the physical presses and decides every key's
+tap or hold itself, with or without a behaviour, so combo buffering does not
+delay them.
 Timing checks resolve inherited defaults, warn about overlapping or impossible
 release tiers, and exclude proven-impossible layer routes. Narrow gesture/chord
 windows receive advice; this is conservative analysis, not a guarantee that

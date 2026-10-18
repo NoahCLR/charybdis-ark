@@ -8,7 +8,8 @@ const {PROFILE_WIRE_FEATURES: FEATURES, PROFILE_WIRE_KNOWN_MASKS: MASKS, PROFILE
 const {capabilities} = require("../fixtures/portable-restore");
 
 // Every feature current firmware reports, one bit at a time.
-const bits = mask => Array.from({length: 31}, (_, bit) => 1 << bit).filter(bit => mask & bit);
+// Bit 31 included: written 2 ** bit, since 1 << 31 is negative.
+const bits = mask => Array.from({length: 32}, (_, bit) => 2 ** bit).filter(bit => mask & bit);
 const CURRENT = MASKS.CURRENT_FEATURES, MUTATION = MASKS.CURRENT_MUTATION_FEATURES;
 const via = {protocolVersion: 13, firmwareVersion: capabilities.firmwareVersion};
 const complete = {...capabilities, supportedDomainMask: PROFILE_DOMAIN_MASK, featureFlags: MASKS.CURRENT_PAIR_FEATURES};
@@ -29,6 +30,7 @@ test("reads accept the reported capacities, and need VIA 13 and every feature cu
 
 test("complete editing pins every registered domain, current layers, the known ABI and current firmware's features", () => {
     assert.equal(support.canEdit({...complete, featureFlags: CURRENT}), true, "mutation features are not added to this gate");
+    assert.ok(bits(CURRENT).includes(FEATURES.UNIFIED_TAPPING), "bit 31, every dual-role key the keyboard's, is required");
     for (const feature of bits(CURRENT)) assert.equal(support.canEdit({...complete, featureFlags: CURRENT & ~feature}), false, feature.toString(16));
     for (const domain of PROFILE_DOMAINS) {
         assert.equal(support.canEdit({...complete, supportedDomainMask: PROFILE_DOMAIN_MASK & ~domain.wireBit}), false, domain.key);

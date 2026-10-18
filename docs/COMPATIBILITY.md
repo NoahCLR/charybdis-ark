@@ -100,7 +100,10 @@ containing firmware's pin:
 - the protocol and profile schema are ones Ark speaks, and Ark knows the
   action-ABI digest (`KNOWN_ACTION_ABIS`);
 - the firmware reports every feature Ark requires (`CURRENT_FEATURES` and
-  `CURRENT_MUTATION_FEATURES` in `core/protocol/profile-wire-v1.js`, D-L64);
+  `CURRENT_MUTATION_FEATURES` in `core/protocol/profile-wire-v1.js`, D-L64),
+  through bit 31, the last bit of the feature word (every dual-role key is
+  the keyboard's, firmware D-F27); a capability after it needs a new field
+  that Ark's decoder learns first;
 - Ark's BK keycode and layout inputs equal those at firmware's BK pin (file
   equality, not commit equality);
 - Ark's pinned fixtures equal the firmware's.

@@ -201,11 +201,14 @@ test("TO(n) locks n alone, so TO() onto a layer with no exit is a trap and TO(0)
     assert.deepEqual(traps(profile({keys: {"0:0": TG(1), "0:1": TG(2), "1:0": KC_B, "2:1": KC_B, "1:9": TO(0), "2:9": TO(0)}})), []);
 });
 
-test("TT locks on its fifth tap, unless a behaviour row on it replaces that", () => {
+test("TT locks on its fifth tap, unless a behaviour row with steps on it replaces that", () => {
     const [trap] = traps(profile({keys: {"0:0": TT(1), "1:0": KC_B}}));
     assert.deepEqual(trap.path, ["Tap TT(1) 5 times on Base"]);
     const row = {target: code(TT(1)), steps: [{tapIndex: 0, tap: code(KC_B)}]};
     assert.deepEqual(traps(profile({keys: {"0:0": TT(1), "1:0": KC_B}, rows: [row]})), []);
+    // A row without steps is no row: TT() keeps its own taps (firmware D-F27).
+    const [kept] = traps(profile({keys: {"0:0": TT(1), "1:0": KC_B}, rows: [{target: code(TT(1)), tapHoldTerm: 180, steps: []}]}));
+    assert.deepEqual(kept?.path, ["Tap TT(1) 5 times on Base"]);
 });
 
 test("behaviour branches lock and release like keys, told by the taps that reach them", () => {
