@@ -51,7 +51,9 @@ test("dropping in the space before the first tile inserts the dragged step first
 });
 
 test("the first step can move to trailing whitespace after wrapped rows", async ({page}) => {
-    await page.setViewportSize({width: 800, height: 900});
+    // Narrow enough that five tiles wrap in the full-width editor the
+    // library stacks into below 820 px of content.
+    await page.setViewportSize({width: 640, height: 900});
     await openControls(page, "macros", {macroSlot: "VIA_MACRO_17"});
     await page.locator('[data-raw-toggle]').click();
     await page.locator('[data-raw-payload]').fill('{KC_A}{KC_B}{KC_C}{KC_D}{KC_ENT}');

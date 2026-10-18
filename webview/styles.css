@@ -1502,10 +1502,10 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .macro-token-mark svg { width: 17px; height: 17px; stroke: var(--text-2); fill: none; stroke-width: 1.5; }
 .macro-token.text .macro-token-mark { color: var(--text-2); }
 .macro-token-label { display: block; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-family: var(--mono); font-size: var(--fs-small); line-height: 22px; }
-.macro-token.wide .macro-token-label { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; font-size: var(--fs-small); line-height: 16px; white-space: normal; overflow-wrap: anywhere; }
+.macro-token.wide .macro-token-label { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; font-size: var(--fs-micro); line-height: 16px; white-space: normal; overflow-wrap: anywhere; }
 .macro-token.text .macro-token-label { font-family: var(--sans); text-align: left; padding: 0 4px; }
 .macro-token-unit { font-size: var(--fs-micro); color: var(--text-2); }
-.macro-token.delay .macro-token-label { font-size: var(--fs-small); }
+.macro-token.delay .macro-token-label { font-size: var(--fs-micro); }
 .macro-chord-part { display: inline-block; white-space: nowrap; max-width: 100%; }
 .macro-token:not(.wide) .macro-chord-part { display: block; overflow: hidden; text-overflow: ellipsis; }
 .macro-token-kind { font-size: var(--fs-micro); line-height: 12px; color: var(--text-3); }

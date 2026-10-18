@@ -81,10 +81,10 @@ for (const demo of [false, true]) test(`drop a profile into the real ${demo ? "d
     await expect(page.locator(".card").filter({has: page.locator('[data-act="restore"]')})).toContainText("dropped.charybdis.json");
     expect(keyboard.mutations).toEqual([]);
     await page.locator('[data-act="restore"]').click();
-    await expect(page.locator(".rail-status")).toContainText(/\d+ changes? in draft/);
+    await expect(page.locator(".commit")).toContainText(/\d+ changes?\s+in your draft/);
     await expect(page.locator('[data-act="restore"]')).toHaveCount(0);
     await page.keyboard.press("Meta+z");
-    await expect(page.locator(".rail-status")).not.toContainText(/\d+ changes? in draft/);
+    await expect(page.locator(".main")).not.toContainText(/\d+ changes?\s+in your draft/);
     expect(keyboard.mutations).toEqual([]);
     expect(errors).toEqual([]);
     ownFilesOnly();
@@ -109,15 +109,15 @@ test("a file that matches the keyboard changes nothing, but still puts a draft w
     await dropFiles(page, [{name: "edited.charybdis.json", text: JSON.stringify(edited), type: ""}]);
     await expect(page.locator('[data-act="restore"]')).toBeEnabled();
     await page.locator('[data-act="restore"]').click();
-    await expect(page.locator(".rail-status")).toContainText("1 change in draft");
+    await expect(page.locator(".commit")).toContainText(/1 change\s+in your draft/);
     await expect(page.locator('[data-act="restore"]')).toHaveCount(0);
     await dropFiles(page, [same]);
     await expect(card).toContainText("Using it puts your draft back to that, as Discard all does; Undo brings your 1 change back.");
     await expect(page.locator('[data-act="restore"]')).toBeEnabled();
     await page.locator('[data-act="restore"]').click();
-    await expect(page.locator(".rail-status")).not.toContainText(/in draft/);
+    await expect(page.locator(".main")).not.toContainText(/\d+ changes?\s+in your draft/);
     await page.keyboard.press("Meta+z");
-    await expect(page.locator(".rail-status")).toContainText("1 change in draft");
+    await expect(page.locator(".commit")).toContainText(/1 change\s+in your draft/);
     expect(keyboard.mutations).toEqual([]);
     expect(errors).toEqual([]);
 });
@@ -132,6 +132,7 @@ test("choose a keyboard, read it, stage an edit, keep a recovery copy, and recon
     const placeholder = page.locator(".read-placeholder");
     await expect(placeholder.locator("h2")).toHaveText("Connect your keyboard");
     await expect(placeholder).toContainText("pick it in Chrome's list with Choose keyboard");
+    await page.locator('.rail [data-act="more"]').click();
     await expect(page.locator(".rail-build")).toHaveText(/^Ark \d{4}\.\d+\.\d+\S* · \S+$/);
     await expectBuildLink(page.locator(".rail-build"), "rail-build-mark");
     expect(await page.locator(".rail-build").getAttribute("target")).toBe(await page.locator("a.rail-build").count() ? "_blank" : null);
@@ -148,7 +149,7 @@ test("choose a keyboard, read it, stage an edit, keep a recovery copy, and recon
     await expect(field).toBeEnabled();
     const other = await field.evaluate((select) => [...select.options].find((option) => !option.selected).value);
     await field.selectOption(other);
-    await expect(page.locator(".rail-status")).toContainText("1 change in draft");
+    await expect(page.locator(".commit")).toContainText(/1 change\s+in your draft/);
     expect(keyboard.mutations).toEqual([]);
 
     // Export downloads the file the loop names.
@@ -179,8 +180,9 @@ test("choose a keyboard, read it, stage an edit, keep a recovery copy, and recon
     const [recovery] = await Promise.all([page.waitForEvent("download"), copies.first().locator("[data-recovery]").click()]);
     expect(recovery.suggestedFilename()).toMatch(/^recovery-.+\.charybdis\.json$/);
 
-    // The theme toggle sits at the top right, and the choice outlives a reload.
-    await page.locator('.topbar [data-act="theme"]').click();
+    // The theme toggle sits in the rail's "⋯" menu, and the choice outlives a reload.
+    if (!await page.locator('.rail [data-act="theme"]').count()) await page.locator('.rail [data-act="more"]').click();
+    await page.locator('.rail [data-act="theme"]').click();
     await expect.poll(() => page.evaluate(() => document.documentElement.dataset.theme)).toBe("dark");
 
     // Leaving with unapplied edits asks first.
@@ -265,21 +267,21 @@ test("explore the demo: edit on several screens, review with no Apply, export, o
     const dpi = page.locator('select[data-macro="normalDpi"]');
     await expect(dpi).toBeEnabled();
     await dpi.selectOption(await dpi.evaluate((select) => [...select.options].find((option) => !option.selected).value));
-    await expect(page.locator(".rail-status")).toContainText("1 change in draft");
+    await expect(page.locator(".commit")).toContainText(/1 change\s+in your draft/);
     // Custom keys: a name.
     await page.locator('[data-screen="customKeys"]').click();
     const keyName = page.locator(".main [data-name]").first();
     await expect(keyName).toBeEnabled();
     await keyName.fill("Demo key");
     await keyName.dispatchEvent("change");
-    await expect(page.locator(".rail-status")).toContainText("2 changes in draft");
+    await expect(page.locator(".commit")).toContainText(/2 changes\s+in your draft/);
     // Macros: a name.
     await page.locator('[data-screen="macros"]').click();
     const macroName = page.locator(".main [data-name]").first();
     await expect(macroName).toBeEnabled();
     await macroName.fill("Demo macro");
     await macroName.dispatchEvent("change");
-    await expect(page.locator(".rail-status")).toContainText("3 changes in draft");
+    await expect(page.locator(".commit")).toContainText(/3 changes\s+in your draft/);
 
     // The review shows them, says Apply needs a keyboard and offers Export.
     await page.locator('.commit [data-act="review"]').click();
@@ -300,7 +302,7 @@ test("explore the demo: edit on several screens, review with no Apply, export, o
     await chooser.setFiles({name: "mine.charybdis.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(replacement))});
     await expect(page.locator(".rail-message")).toContainText("Opened mine.charybdis.json in the demo.");
     await expect(banner).toContainText("mine.charybdis.json");
-    await expect(page.locator(".rail-status")).not.toContainText(/in draft/);
+    await expect(page.locator(".main")).not.toContainText(/\d+ changes?\s+in your draft/);
 
     // The exported file is one Import takes, as on a keyboard.
     await page.locator('[data-screen="profile"]').click();
@@ -308,7 +310,7 @@ test("explore the demo: edit on several screens, review with no Apply, export, o
     await importChooser.setFiles({name: "demo.charybdis.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(file))});
     await expect(page.locator('[data-act="restore"]')).toBeEnabled();
     await page.locator('[data-act="restore"]').click();
-    await expect(page.locator(".rail-status")).toContainText(/\d+ changes? in draft/);
+    await expect(page.locator(".commit")).toContainText(/\d+ changes?\s+in your draft/);
 
     // Leaving with edits not exported asks first, and offers Export.
     await banner.locator('[data-act="leave-demo"]').click();
@@ -423,9 +425,9 @@ test("literal macro steps stage through the real web host, export exactly, undo 
     const text = ' {"key": "{KC_A}"}\nhello ';
     await page.locator("[data-step-text]").fill(text);
     await expect(page.locator("[data-macro-feedback]")).toBeHidden();
-    await expect(page.locator(".rail-status")).not.toContainText(/in draft/);
+    await expect(page.locator(".main")).not.toContainText(/\d+ changes?\s+in your draft/);
     await page.locator("[data-step-text]").dispatchEvent("change");
-    await expect(page.locator(".rail-status")).toContainText("1 change in draft");
+    await expect(page.locator(".commit")).toContainText(/1 change\s+in your draft/);
     await page.locator('.commit [data-act="review"]').click();
     const [exported] = await Promise.all([page.waitForEvent("download"), page.locator('.sheet [data-act="export"]').click()]);
     const file = JSON.parse(await (await exported.createReadStream()).toArray().then(chunks => Buffer.concat(chunks).toString("utf8")));
