@@ -76,12 +76,13 @@ export function screenProfile() {
     const usage = portable.available ? profileUsageView(portable.usage, model?.macroBank) : null;
     if (usage) pad.appendChild(usageCard(usage));
 
-    if (!demo) pad.appendChild(el(`<div class="profile-recovery">
-        <i class="dot ${health.recoveryPending ? "draft" : "on"}"></i>
-        <div class="copy"><b>Automatic recovery</b><p class="note">${health.recoveryPending
+    // Its state reads as Device's do: a chip with a dot at the right of the title.
+    if (!demo) pad.appendChild(el(`<div class="card profile-recovery">
+        <div class="card-h"><h3>Automatic recovery</h3>
+            <span class="right"><span class="chip"><i class="dot ${health.recoveryPending ? "draft" : "on"}"></i>${health.recoveryPending ? "pending" : "clear"}</span></span></div>
+        <div class="card-b"><p class="note">${health.recoveryPending
             ? "An apply was interrupted. The keyboard is still running its last complete profile; the recovery copy restores it, and Apply retries from there."
             : "A recovery copy is written before every apply and released once both halves confirm. Nothing is outstanding."}</p></div>
-        <span class="chip state">${health.recoveryPending ? "pending" : "clear"}</span>
     </div>`));
 
     const recoveries = hostOf(model).recoveries;
@@ -175,10 +176,10 @@ function usageCard(usage) {
                 <div class="meter ${usage.nearlyFull ? "near" : ""}" data-tip="${Math.round(usage.share * 100)}% used"><i style="width:${usage.share * 100}%"></i></div></div>
             <p class="note">Behaviours, combos, lighting, pointing modes, settings and names all share this one block, so a full profile can refuse an edit in any of them${usage.nearlyFull ? ". It is nearly full: the next edit may not fit" : ""}.</p>
             <div class="usage-tables">
-                <table class="t"><thead><tr><th>Uses the block</th><th>Bytes</th><th></th></tr></thead>
-                    <tbody>${usage.areas.map((area) => `<tr><td>${esc(area.label)}</td><td class="mono">${bytes(area.bytes)}</td><td class="note mono">${area.percent}%</td></tr>`).join("")}</tbody></table>
-                ${usage.counts.length ? `<table class="t"><thead><tr><th>Counted limits</th><th>Used</th><th></th></tr></thead>
-                    <tbody>${usage.counts.map((count) => `<tr><td>${esc(count.label)}</td><td class="mono">${count.used} of ${count.limit}</td><td class="note">${count.full ? "full" : ""}</td></tr>`).join("")}</tbody></table>` : ""}
+                <table class="t"><thead><tr><th>Uses the block</th><th class="num">Bytes</th><th></th></tr></thead>
+                    <tbody>${usage.areas.map((area) => `<tr><td>${esc(area.label)}</td><td class="mono num">${bytes(area.bytes)}</td><td class="note mono num">${area.percent}%</td></tr>`).join("")}</tbody></table>
+                ${usage.counts.length ? `<table class="t"><thead><tr><th>Counted limits</th><th class="num">Used</th><th></th></tr></thead>
+                    <tbody>${usage.counts.map((count) => `<tr><td>${esc(count.label)}</td><td class="mono num">${count.used} of ${count.limit}</td><td class="note">${count.full ? "full" : ""}</td></tr>`).join("")}</tbody></table>` : ""}
             </div>
             ${usage.macros ? `<div><div class="sect-h"><h4>Macro memory (separate)</h4>
                 <span class="right note">${bytes(usage.macros.used)} of ${bytes(usage.macros.capacity)} bytes used</span></div>

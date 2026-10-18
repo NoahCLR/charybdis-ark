@@ -5,7 +5,7 @@
 import {el, esc} from "../../lib/dom.mjs";
 import {readMacro} from "../../view/macro-cache.mjs";
 import {macroPlacements} from "../../view/reach.mjs";
-import {NAME_TIP, nameCount} from "../../view/names.mjs";
+import {titleName, attachTitleName} from "../title-name.mjs";
 import {ROUTE_WORDS, setReachGroupOpen} from "../../view/reach-groups.mjs";
 import {getModel, layerName, layers, macroForm, post, render, setMacroForm, state, writable} from "../../store.mjs";
 import * as edits from "../../view/edits.mjs";
@@ -28,10 +28,12 @@ export function editor(model, slot, canEdit) {
     const rawOpen = Boolean(form.rawOpen || (parsed.error && !form.steps));
     const wrap = el(`<div class="stack"></div>`);
     const card = el(`<div class="card macro-editor-card" data-macro-editor="${esc(slot.keycode)}">
-        <div class="card-h macro-titlebar">${nameField(model, slot, canEdit)}
+        <div class="card-h name-titlebar macro-titlebar">${nameField(model, slot, canEdit)}
             <span class="tag">M${esc(slot.keycode.split("_").at(-1))}</span>
-            <span class="right row"><span class="chip" data-local-state><i class="dot ${dirty ? "draft" : "on"}"></i>${dirty ? "edited here" : "as read"}</span>
-                <button class="btn tiny ghost" data-act="place" ${writable() ? "" : "disabled"}>Place on a key…</button></span></div>
+            <span class="right row actions"><span class="chip" data-local-state><i class="dot ${dirty ? "draft" : "on"}"></i>${dirty ? "edited here" : "as read"}</span>
+                <button class="btn tiny ghost" data-act="place" ${writable() ? "" : "disabled"}>Place on a key…</button>
+                <button class="btn tiny ghost" data-act="discard" ${dirty ? "" : "disabled"}>Discard local edits</button>
+                <button class="btn tiny ghost" data-act="clear" ${canEdit && !state.recording ? "" : "disabled"}>Clear macro</button></span></div>
         <div class="card-b stack">
             <div class="macro-context">${placedOn(model, slot)}
             <label class="macro-protection"><span>Uninterruptible playback</span><select class="input" data-f="macro:${esc(slot.keycode)}:protection" data-protection ${canEdit ? "" : "disabled"}>
@@ -48,10 +50,6 @@ export function editor(model, slot, canEdit) {
             </details>
             <div data-macro-steps class="stack"></div>
             <div data-macro-feedback role="status" aria-live="polite"></div>
-            <div class="row macro-actions">
-                <button class="btn" data-act="discard" ${dirty ? "" : "disabled"}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 10-4-4 4-4M5 6h9a7 7 0 0 1 0 14h-3"/></svg>Discard local edits</button>
-                <button class="btn" data-act="clear" ${canEdit && !state.recording ? "" : "disabled"}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7"/></svg>Clear macro</button>
-            </div>
             <div class="stack macro-footer">
             <div class="macro-utilities"><button class="btn tiny ghost" data-host-settings>${esc(model.macroUnicode?.layoutName || "Host")} · Host settings ↗</button>
                 <button class="btn tiny ghost macro-help-link" data-show-help aria-controls="macro-help-${esc(slot.keycode)}" aria-expanded="${Boolean(form.guidanceOpen)}">Typing & playback help</button>
@@ -69,17 +67,8 @@ export function editor(model, slot, canEdit) {
     });
     /** @type {HTMLElement | null} */ (card.querySelector("[data-host-settings]"))?.addEventListener("click", () => { state.screen = "settings"; render(); });
     /** @type {HTMLSelectElement} */ (card.querySelector("[data-protection]")).addEventListener("change", event => post(edits.macroProtectionMessage(slot.keycode, /** @type {"auto" | "on" | "off"} */ (/** @type {HTMLSelectElement} */ (event.target).value), model.macroEditing.identity)));
-    const nameInput = /** @type {HTMLInputElement | null} */ (card.querySelector("[data-name]"));
-    nameInput?.addEventListener("input", () => showCount(/** @type {HTMLElement} */ (card.querySelector("[data-name-count]")), nameInput.value, /** @type {{perName: number}} */ (model.macroNameSpace).perName));
-    nameInput?.addEventListener("change", () => {if (nameInput.value !== (slot.name || "")) post(edits.macroNameMessage(slot.keycode, nameInput.value, getModel()?.macroEditing?.identity));});
-    nameInput?.addEventListener("keydown", event => {
-        if (event.key === "Enter") {event.preventDefault(); nameInput.blur();}
-        if (event.key === "Escape") {
-            event.preventDefault(); nameInput.value = slot.name || "";
-            showCount(/** @type {HTMLElement} */ (card.querySelector("[data-name-count]")), nameInput.value, /** @type {{perName: number}} */ (model.macroNameSpace).perName);
-            nameInput.blur();
-        }
-    });
+    if (model.macroNameSpace) attachTitleName(card, {stored: slot.name || "", perName: model.macroNameSpace.perName,
+        rename: name => post(edits.macroNameMessage(slot.keycode, name, getModel()?.macroEditing?.identity))});
     /** @type {NodeListOf<HTMLElement>} */ (card.querySelectorAll("[data-goto-layer]")).forEach(button => button.addEventListener("click", () => showOnLayer(slot.keycode, Number(button.dataset.gotoLayer))));
     /** @type {HTMLButtonElement} */ (card.querySelector('[data-act="place"]')).addEventListener("click", () => {
         state.placement = {keycode: slot.keycode}; state.screen = "keys"; state.tab = "key"; render();
@@ -139,16 +128,10 @@ export function editor(model, slot, canEdit) {
 /** @param {Model} model @param {MacroSlot} slot @param {boolean} canEdit */
 function nameField(model, slot, canEdit) {
     const space = model?.macroNameSpace;
-    if (!space) return `<h3>${esc(slot.name || `Macro ${slot.keycode.split("_").at(-1)}`)}</h3>`;
-    const count = nameCount(slot.name || "", space.perName);
-    return `<div class="macro-title-control"><input class="macro-title-input" data-f="macro:${esc(slot.keycode)}:name" data-name value="${esc(slot.name || "")}" placeholder="Macro ${esc(slot.keycode.split("_").at(-1))}" aria-label="Macro name" ${canEdit ? "" : "disabled"}
-            data-tip="Click the title to rename. ${esc(NAME_TIP)}"><span class="macro-name-count note${count.over ? " warn" : ""}" data-name-count>${esc(count.label)}</span></div>`;
-}
-/** @param {HTMLElement} node @param {string} text @param {number} max */
-function showCount(node, text, max) {
-    const count = nameCount(text, max);
-    node.textContent = count.label;
-    node.classList.toggle("warn", count.over);
+    const number = slot.keycode.split("_").at(-1);
+    if (!space) return `<h3>${esc(slot.name || `Macro ${number}`)}</h3>`;
+    return titleName({f: `macro:${slot.keycode}:name`, value: slot.name || "", placeholder: `Macro ${number}`,
+        label: "Macro name", perName: space.perName, canEdit});
 }
 
 // The layers that set this macro off themselves — a key carrying it, a

@@ -24,10 +24,10 @@ export function slotReach(model, slot, canEdit) {
                 <span class="act"><span class="k">${esc(bindingName(slot))}</span><span class="how">hold</span></span>
                 <span class="act"><span class="k">${esc(slot.binding?.lock || "")}</span><span class="how">toggle</span></span>
                 <span class="note">${esc(placedOn(model, slot))}</span></div>
-            <button class="btn tiny" data-act="place" ${disabled}>Place on a layer…</button>
+            <button class="btn tiny ghost" data-act="place" ${disabled}>Place on a layer…</button>
             <span class="lbl">Light</span>
             <div class="val">${light.swatch()}<span class="note mono">${lightText}</span></div>
-            <button class="btn tiny" data-act="lighting">Edit in Lighting</button>
+            <button class="btn tiny ghost" data-act="lighting">Edit in Lighting</button>
             <p class="note foot">Clearing the slot leaves its keys where they are. The keyboard keeps its mode keycodes whatever a slot holds, and refuses to activate an empty one — so they do nothing until this slot is configured again.</p>
         </div></div>`);
     /** @type {HTMLButtonElement} */ (reach.querySelector('[data-act="lighting"]')).addEventListener("click", () => {

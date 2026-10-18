@@ -1,10 +1,11 @@
 // @ts-check
 // The grouped lists the Keys tabs share: a counted header per group, shared
-// independent open state, and rows that pick themselves.
+// independent open state, and rows that pick themselves. A group folds with the
+// same chevron as everything else that folds, turned down while open.
 // Titles and order come from view/reach-groups.mjs.
 
 // Selector assertions refer to elements created by this module's authored markup.
-import {el, esc} from "../lib/dom.mjs";
+import {DISCLOSURE, el, esc} from "../lib/dom.mjs";
 import {render, state} from "../store.mjs";
 import {draftDot} from "../view/review.mjs";
 import {GROUP_TITLES, inGroupOrder, setReachGroupOpen} from "../view/reach-groups.mjs";
@@ -16,7 +17,7 @@ import {GROUP_TITLES, inGroupOrder, setReachGroupOpen} from "../view/reach-group
 export function groupHeader(tab, id, count, drafted = false, detail = "") {
     const open = state.reachGroups[id];
     return `<button class="group-h" data-group-tab="${tab}" data-group="${id}" aria-expanded="${open}">
-        <span class="chev" aria-hidden="true">${open ? "−" : "+"}</span><span class="ttl">${esc(GROUP_TITLES[/** @type {keyof typeof GROUP_TITLES} */ (id)])}${detail ? ` <span class="mono dim">· ${esc(detail)}</span>` : ""}${drafted && !open ? draftDot("Holds a change in your draft") : ""}</span>
+        ${DISCLOSURE}<span class="ttl">${esc(GROUP_TITLES[/** @type {keyof typeof GROUP_TITLES} */ (id)])}${detail ? ` <span class="mono dim">· ${esc(detail)}</span>` : ""}${drafted && !open ? draftDot("Holds a change in your draft") : ""}</span>
         <span class="n">${count}</span></button>`;
 }
 

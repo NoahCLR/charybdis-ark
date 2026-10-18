@@ -12,6 +12,15 @@ export function pickerBoardKey(/** @type {{x: number, y: number, w: number, h: n
   return modifier ? {...source, labels: [(spoken || source.value).replace(/^(Left|Right) /, "")]} : legend ? {...source, labels: legend} : source;
 }
 
+// A key's one legend is drawn at full size when it fits the key, and smaller
+// when it does not: Shift and Space stay full size on their wide keys, while
+// Insert and Command shrink on narrow ones. The estimate is the legend's
+// characters at .55 of the full size (.pkb-main's 21 units), inside 6 units of
+// padding a side.
+const LEGEND_SIZE = 21, LEGEND_ADVANCE = 0.55, LEGEND_PAD = 6;
+/** @param {string} label @param {number} width the key's width in board units */
+export const legendFits = (label, width) => [...label].length * LEGEND_SIZE * LEGEND_ADVANCE <= width - 2 * LEGEND_PAD;
+
 export const PICKER_BOARD = {
   width: 1563.3125,
   height: 466.2,

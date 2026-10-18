@@ -203,11 +203,16 @@ value; the review still names the unit.
 
 Anything that folds has a chevron before its name, turned down while it is
 open: a Settings section, a behaviour's allowed source layers, a group of
-review checks, a pointing mode's Advanced. Review, the keycode picker and
+review checks, a pointing mode's Advanced, a group in a Keys tab. Review, the keycode picker and
 Draft history each close with **Close** at their top right, or Escape; their
 footers hold only what acts, such as Apply, Export…, Clear and Use keycode.
-An editor's own actions, such as Change key…, Duplicate and Clear slot, are
-small text buttons at the right of its title bar.
+An editor's own actions, such as Change key…, Duplicate, Clear slot and Clear
+macro, are small text buttons at the right of its title bar, the destructive
+one last; so are the buttons that take you to another screen, such as Place on
+a layer… and Edit in Lighting. A macro and a custom key are named by their
+editor's title: click it to rename. A tap-count badge from 2× on is tinted
+with the colour its branch flashes, its count in the normal text colour so a
+dark colour still reads. Numbers in a table line up on their last digit.
 
 When an accepted edit redraws the screen, the same field keeps keyboard focus
 and its text selection while it remains available. Search fields also keep
@@ -448,7 +453,8 @@ editor, including slots whose QMK values have no named constant.
 
 ### Custom keys
 
-**Custom keys** lists the 128 custom keys: rename one, give it a shortcut,
+**Custom keys** lists the 128 custom keys: rename one by clicking its
+editor's title, as on Macros, give it a shortcut,
 add or edit its behaviour, place it on a key, and see where it is used; the
 key picker offers them in its own Custom keys section, each tip naming the
 shortcut it sends. Their names are stored on the keyboard; a keyboard with
@@ -757,8 +763,9 @@ Uninterruptible playback and placement stay beside the title and context.
 The sequence and add actions come first, with validation errors shown underneath;
 **Typing & playback help** opens the longer explanation.
 Host settings and that help sit at the bottom, below the recorder. Add-step actions
-and Discard / Clear macro use larger, bordered buttons; Record / Stop is the
-prominent recording action. The **Raw payload** toggle sits at the right of
+use larger, bordered buttons; **Discard local edits** and **Clear macro** are
+text buttons at the right of the title, after Place on a key…; Record / Stop is the
+prominent recording action, under a Record heading styled like Sequence's. The **Raw payload** toggle sits at the right of
 the add-step row and reveals its editor above the sequence. All recorder options remain
 visible below. The slots sit three across in a bank that scrolls independently
 of the editor and keeps its position when selecting a slot, editing or recording.

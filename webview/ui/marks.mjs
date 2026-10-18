@@ -18,12 +18,14 @@ import {feedbackColours, pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {layerSwatch} from "./layerbar.mjs";
 
 // A branch's badge as the grid heads its column: from 2× on, tinted with the
-// tap-branch colour the keyboard shows while that branch is pending.
+// tap-branch colour the keyboard shows while that branch is pending. The
+// colour is the badge's border and fill; its count stays in the text colour,
+// so a dark colour such as a deep blue still reads.
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {number} count @param {string} [className] */
 export function branchBadge(model, count, className = "") {
     const colour = feedbackColours(model).branches[count - 2];
     const lit = count > 1 && stageEnabled(model, "key") && colour && !isOff(colour);
-    return `<span class="bn${className ? ` ${esc(className)}` : ""}" style="${lit ? `border-color:${css(colour)};color:${css(colour)}` : ""}">${count}×</span>`;
+    return `<span class="bn${lit ? " lit" : ""}${className ? ` ${esc(className)}` : ""}"${lit ? ` style="--tint:${css(colour)}"` : ""}>${count}×</span>`;
 }
 
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} kind */
