@@ -122,14 +122,14 @@ export const STATE_FIELDS = {
 /** @type {PanelState} */
 export const state = initialState(STATE_FIELDS);
 // The preferences this host remembers start the panel where it was left.
-Object.assign(state, readPreferences(vscode.getState()));
+Object.assign(state, readPreferences(vscode.getState?.()));
 
 // Change a remembered preference: now, and in the host's panel state for the
 // next session (view/preferences.mjs).
 /** @param {"showKeycodes" | "hideBoard"} name @param {boolean} value */
 export function setPreference(name, value) {
     state[name] = value;
-    vscode.setState(withPreference(vscode.getState(), name, value));
+    vscode.setState?.(withPreference(vscode.getState?.(), name, value));
 }
 
 // The combo builder, opened for a combo (or none, for a new one) and closed
