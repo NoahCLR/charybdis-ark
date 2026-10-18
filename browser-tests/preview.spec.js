@@ -9,7 +9,7 @@ for (const host of ["", "?host=web", "?host=demo"]) {
         await page.goto(`/preview/index.html${host}`);
         await page.locator('[data-screen="profile"]').click();
         const card = page.locator("[data-profile-drop]");
-        await expect(card).toContainText("drop a complete backup here");
+        await expect(card).toContainText("drop a backup file here");
         await page.evaluate(() => {window.__posted.length = 0;});
         const file = {name: "777.charybdis.json", text: '{"sentinel":777}'};
         await card.evaluate((node) => {
@@ -19,10 +19,10 @@ for (const host of ["", "?host=web", "?host=demo"]) {
         });
         await expect(card).toHaveClass(/drag-over/);
         expect(await dropFiles(page, [file, file])).toBe(true);
-        await expect(card.locator('[role="status"]')).toHaveText("Drop one profile file at a time.");
+        await expect(card.locator('[role="status"]')).toHaveText("Drop one backup file at a time.");
         await expect(card).not.toHaveClass(/drag-over/);
         await dropFiles(page, [{...file, text: "x".repeat(262145)}]);
-        await expect(card.locator('[role="status"]')).toHaveText("This profile file is too large.");
+        await expect(card.locator('[role="status"]')).toHaveText("This backup file is too large.");
         await page.evaluate(() => {
             const text = File.prototype.text;
             File.prototype.text = () => Promise.reject(new Error("unreadable"));
@@ -84,7 +84,7 @@ test("dropping respects every Import gate and cancels a read when the surface ch
     });
     await dropFiles(page, [file]);
     await expect(page.locator('[data-act="import"]')).toBeDisabled();
-    await expect(page.locator('.profile-drop-status')).toHaveText("Reading profile…");
+    await expect(page.locator('.profile-drop-status')).toHaveText("Reading the backup file…");
     await page.evaluate(() => {
         window.__setDropModel({draft: {revision: window.__dropModel.draft.revision + 1}});
         window.__finishDropRead("{}");

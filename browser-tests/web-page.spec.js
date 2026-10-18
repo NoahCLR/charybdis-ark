@@ -313,7 +313,7 @@ test("explore the demo: edit on several screens, review with no Apply, export, o
     // Leaving with edits not exported asks first, and offers Export.
     await banner.locator('[data-act="leave-demo"]').click();
     const ask = page.locator(".sheet.leave-demo");
-    await expect(ask).toContainText("have not been exported");
+    await expect(ask).toContainText("have not been saved to a backup file");
     await expect(ask.locator('[data-act="export"]')).toBeVisible();
     await ask.locator('[data-act="confirm-leave"]').click();
     await expect(banner).toHaveCount(0);

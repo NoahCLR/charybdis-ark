@@ -131,7 +131,7 @@ test("the Keys screen's picker offers a custom key for Ctrl and Shift on both si
     await page.locator('.picker [data-remove="0"]').click();
     for (const mod of ["C", "S", "RCTL", "RSFT"]) await page.locator(`.picker [data-mod="${mod}"]`).click();
     const offer = page.locator('.picker [data-act="use-custom-key"]');
-    await expect(offer).toHaveText(/^Use Custom key \d+$/);
+    await expect(offer).toHaveText(/^Use custom key K\d+$/);
     await expect(page.locator(".picker .pk-offer")).toContainText("No keycode can hold");
     const slot = Number((await offer.textContent()).match(/\d+/)[0]);
     const layer = await page.evaluate(async () => (await import("/webview/store.mjs")).currentLayer()?.name);
@@ -165,7 +165,7 @@ test("the picker uses a custom key that already holds the shortcut", async ({pag
     for (const mod of ["C", "S", "RCTL", "RSFT"]) await page.locator(`.picker [data-mod="${mod}"]`).click();
     await expect(page.locator('.picker [data-act="use-custom-key"]')).toHaveCount(0);
     const reuse = page.locator('.picker [data-act="use-existing-key"]');
-    await expect(reuse).toHaveText("Use Custom key 3 · Ctrl Shift both");
+    await expect(reuse).toHaveText("Use K3 · Ctrl Shift both");
     const layer = await page.evaluate(async () => (await import("/webview/store.mjs")).currentLayer()?.name);
     await clearPosts(page);
     await reuse.click();
@@ -180,7 +180,7 @@ test("a behaviour cell's picker makes a custom key for mixed-side modifiers, and
     await page.locator('.cell-editor [data-act="pick"]').click();
     for (const mod of ["C", "S", "RCTL", "RSFT"]) await page.locator(`.picker [data-mod="${mod}"]`).click();
     const offer = page.locator('.picker [data-act="use-custom-key"]');
-    await expect(offer).toHaveText(/^Use Custom key \d+$/);
+    await expect(offer).toHaveText(/^Use custom key K\d+$/);
     const slot = Number((await offer.textContent()).match(/\d+/)[0]);
     await clearPosts(page);
     await offer.click();
@@ -222,9 +222,9 @@ test("a matching custom key with a behaviour is offered beside a new one on a la
     };
     await open();
     await expect(page.locator(".picker .pk-offer")).toContainText("with its behaviour on top");
-    await expect(page.locator('.picker [data-act="use-existing-key"]')).toHaveText("Use Custom key 3 · Ctrl Shift both");
+    await expect(page.locator('.picker [data-act="use-existing-key"]')).toHaveText("Use K3 · Ctrl Shift both");
     const make = page.locator('.picker [data-act="use-custom-key"]');
-    await expect(make).toHaveText(/^Make Custom key \d+$/);
+    await expect(make).toHaveText(/^Make custom key K\d+$/);
     const layer = await page.evaluate(async () => (await import("/webview/store.mjs")).currentLayer()?.name);
     await clearPosts(page);
     await page.locator('.picker [data-act="use-existing-key"]').click();

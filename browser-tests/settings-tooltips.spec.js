@@ -26,6 +26,6 @@ test("read-only settings retain explanations on hover", async ({page}) => {
     });
     const chip = page.locator('[data-section="normalPointerSpeed"] .chip').first();
     await chip.hover();
-    await expect(page.locator(".tip")).toContainText("Trackball sensitivity");
+    await expect(page.locator(".tip")).toContainText("Ball speed for ordinary pointer movement");
     await expect(page.locator(".tip")).toContainText("cannot be edited");
 });
