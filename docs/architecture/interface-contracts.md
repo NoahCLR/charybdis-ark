@@ -26,7 +26,9 @@ the Behaviours tab; a taller editor carries its height across tab changes, so
 changing tabs does not move the page's scroll position.
 The Behaviours, Combos, Macros and Trackball modes reach lists lead with **On
 this view**, calculated for the selected layer plus exactly the lower layers
-currently previewed on. **On this layer** means a key stored on the selected
+currently previewed on; Behaviours and Combos list it only while a preview is
+on, since without one it repeats **On this layer**, and **On this layer**
+starts open. **On this layer** means a key stored on the selected
 layer, and the other route groups describe ways it can reach an item under
 different activations. The view can therefore overlap those groups; it is the
 current activation, not another storage location. A combo in the view requires
@@ -48,8 +50,49 @@ enumerating every combination of all 16 layers just to list its placements.
 The reach sections have one open state by section identity across those four
 tabs. Opening one does not close another. A section unique to one tab keeps its
 own state; sections absent from another tab retain their state until shown
-again. The Behaviours rail grows with its rows, so the Keys content pane is its
-only vertical scroller.
+again. The Behaviours list (`--bench-list`, 40 px rows) is sticky under the
+workbench tabs with its own scroll; its empty groups fold into one line at its
+foot, and only a row the layer never reaches is quieter, by colour.
+
+The behaviour editor (`ui/keys/behaviour-editor.mjs`) is a head, a timing
+line and a grid:
+- Head: the key's name (keycode per Show keycodes), **On**, **Layers: … ▾**
+  (a popover holding the `.layer-grid` switches Settings uses) and **More ▾**
+  (Keeps the mouse layer on, Move to another key…, Remove behaviour last).
+  The popovers are always in the DOM, hidden when closed, so every field a
+  save reads (`ui/keys/save-behaviour.mjs`) is there; `state.behaviourMenu`
+  keeps one open across renders, and Esc or a press outside closes it.
+- Timing line: Taps within · Hold after · Long hold after, one 40 px row.
+  Placeholders name the default's source from `model.vocabulary.timingSources`
+  through `timingPlaceholder` (`view/behavior-editor.mjs`); the source is the
+  host's (`keyDefaults[key].timingSources`, and `withoutRow` for an MT or OSM
+  key QMK times on the dual-role term until it has a row).
+- Grid: `behaviourGridLayout` (`view/keyface.mjs`) draws the tap counts in use
+  and the next (or all, the remembered `allTapCounts` preference), and the
+  keyboard's cycling: depth + 1 taps answer as 1× (`(count % depth) + 1`).
+  `behaviourCosts` words the single-tap delay and what another key does during
+  the hold; `timingMarks` puts each timing check on the cell or field it
+  questions. Built-in holds carry `fromPress` for MO, LM and pointing-mode keys
+  (`core/model/built-in-behavior.js`); a pointing-mode key whose later tap
+  count holds another mode waits for Hold after instead.
+- The open cell's editor is a 360 px popover anchored to its cell
+  (`placeCellEditor`), below it unless only the space above holds it; it never
+  scrolls its cell under the workbench tabs. Esc or a press elsewhere in the
+  editor closes it.
+- In Behaviours, Delete and ⌘V act on the open cell only; with none open they
+  do nothing, never reaching the board's selected key (`ui/keys/shortcuts.mjs`).
+
+The combo builder (`ui/keys/combo-builder.mjs`) edits an existing combo live:
+each control posts `saveCombo` whole from the model's own fields
+(`comboFormOf`), so `state.combo` keeps only which combo is open and whether
+keys are being picked, and that survives a draft change. A new combo's form
+lives in `state.combo` until **Add combo**, which `comboMissing`
+(`view/combo-form.mjs`) disables until it has an output and two inputs, saying
+which is missing; a draft change closes it. Picking keys happens on the sticky
+board from the bench; the pick bar offers Done (Esc) and Add combo. Input
+chips reorder by drag or Alt+arrows (`moved`). Must be held and Tap only
+tips state `comboDecidedAfter`: the longer of the window and the hold
+threshold.
 
 - The review is one grid: a status gutter, the title with its area underneath
   when outside its section, the fields as sign · label · on the keyboard · in

@@ -35,9 +35,87 @@ export function behaviourEditorRow(/** @type {Model} */ model, /** @type {string
     const existing = behaviourListeningTo(model, keycode);
     const key = existing?.keycode || canonicalKeycode(model, keycode);
     const defaults = model?.behaviorEditing?.keyDefaults?.[key];
+    // A key with no row runs on the Tap / hold default it follows today, which
+    // for QMK's own MT and OSM keys is the dual-role one (B5).
+    const unstored = !existing && defaults?.withoutRow;
+    const timing = defaults?.timing || model?.behaviorTimingDefaults || {};
     return {...(existing || {keycode: key, steps: [], tapHoldTerm: "0", longerHoldTerm: "0", multiTapTerm: "0",
         keepsAutoMouseAnchored: false, builtIn: defaults?.builtIn || {}}),
-        stored: Boolean(existing), timingDefaults: defaults?.timing || model?.behaviorTimingDefaults || {}};
+        stored: Boolean(existing),
+        timingDefaults: unstored ? {...timing, tapHoldTerm: unstored.tapHoldTerm} : timing,
+        timingSources: /** @type {Record<string, import("../../contracts/panel.js").TimingSource>} */ ({...(defaults?.timingSources || {}),
+            ...(unstored ? {tapHoldTerm: unstored.tapHoldSource} : {})})};
+}
+
+// A timing field's placeholder: the default it follows and where that comes
+// from, "200 · dual-role" (vocabulary timingSources).
+/** @param {Model} model @param {ReturnType<typeof behaviourEditorRow>} behaviour @param {"tapHoldTerm" | "longerHoldTerm" | "multiTapTerm"} name */
+export function timingPlaceholder(model, behaviour, name) {
+    const fallback = behaviour?.timingDefaults?.[name];
+    if (fallback === undefined || String(fallback) === "") return "default unavailable";
+    const source = behaviour?.timingSources?.[name];
+    const words = (source && model?.vocabulary?.timingSources?.[source]) || "default";
+    return `${fallback} · ${words}`;
+}
+
+// The Layers button's words for an allowed-layers mask: All, None, one or two
+// names, or a count.
+/** @param {{index: number, label: string}[]} layers @param {number | undefined} mask */
+export function layersSummary(layers, mask) {
+    const allowed = mask ?? 0xffff;
+    const on = layers.filter((layer) => allowed & 2 ** layer.index);
+    if (on.length === layers.length) return "All";
+    if (!on.length) return "None";
+    if (on.length <= 2) return on.map((layer) => layer.label).join(", ");
+    return `${on.length} of ${layers.length}`;
+}
+
+// The timing checks drawn on the grid: each on the cell it condemns, or the
+// timing field it questions, with one line in the grid's own words. The
+// check's identity names the problem and its tap count (core/model/
+// gesture-timing.js).
+/** @param {Model} model @param {readonly import("../../contracts/model.js").Check[]} checks @param {{hold: string, long: string, repeat: string}} terms @returns {{level: "notice" | "warning", cell: string | null, term: "tapHoldTerm" | "longerHoldTerm" | "multiTapTerm" | null, line: string}[]} */
+export function timingMarks(model, checks, terms) {
+    /** @param {number} at */
+    const row = (at) => model?.vocabulary?.branches?.[at] || `${at + 1} taps`;
+    /** @typedef {{level: "notice" | "warning", cell: string | null, term: "tapHoldTerm" | "longerHoldTerm" | "multiTapTerm" | null, line: string}} Mark */
+    return checks.flatMap((check) => /** @type {Mark[]} */ (markOf(check)));
+    /** @param {import("../../contracts/model.js").Check} check @returns {Mark[]} */
+    function markOf(check) {
+        const id = String(check.identity ?? "").split(":").slice(1).join(":");
+        const [problem, which] = id.split(":");
+        const level = /** @type {"notice" | "warning"} */ (check.level === "notice" ? "notice" : "warning");
+        const at = Number(which);
+        if (problem === "release") return [{level, cell: `${at}-hold`, term: null,
+            line: `${row(at)} Hold never sends: Long hold takes over at ${terms.long} ms, at or before Hold's ${terms.hold} ms.`}];
+        if (problem === "order") return [{level, cell: `${at}-long`, term: "longerHoldTerm",
+            line: `${row(at)} Long hold starts at ${terms.long} ms, not after Hold at ${terms.hold} ms.`}];
+        if (problem === "narrow") return [{level, cell: `${at}-hold`, term: null,
+            line: `${row(at)} Hold has ${Number(terms.long) - Number(terms.hold)} ms before Long hold takes over.`}];
+        if (problem === "short") return [{level, cell: null, term: which === "first-press tap" ? "tapHoldTerm" : "multiTapTerm",
+            line: which === "first-press tap" ? `Hold after ${terms.hold} ms is quick to tap under.` : `Taps within ${terms.repeat} ms is quick to tap again in.`}];
+        return [];
+    }
+}
+
+// What a behaviour costs, said when true: single taps wait while a deeper tap
+// count could follow, and what pressing another key does while the first
+// press's hold is undecided (firmware INTERACTION_MODEL.md, "Keys pressed
+// while a tap/hold key is undecided"). Today an LT, MT or OSM key, or one
+// whose hold is a layer held until release, makes later keys wait; one that
+// holds from the press uses its hold at once; any other hold lets later keys
+// through at once.
+/** @param {ReturnType<typeof behaviourEditorRow>} behaviour @param {number} depth @param {{hold: string, repeat: string}} terms @param {import("../../contracts/panel.js").Branch | null | undefined} hold */
+export function behaviourCosts(behaviour, depth, terms, hold) {
+    const single = depth > 1 ? `Single taps wait ${terms.repeat} ms to see if another tap follows.` : "";
+    if (!hold) return {single, hold: ""};
+    const dual = /^(LT|MT|OSM)\(/.test(String(behaviour?.keycode ?? ""));
+    const layerHold = hold.helper === "PRESS_AND_HOLD_UNTIL_RELEASE" && /^MO\(/.test(String(hold.action));
+    let line;
+    if (hold.fromPress) line = "Its hold starts as the key goes down, so keys pressed meanwhile use it at once.";
+    else if (dual || layerHold) line = `Keys pressed before ${terms.hold} ms wait until this key is a tap or a hold.`;
+    else line = `Keys pressed before ${terms.hold} ms are sent at once, so a quick roll types them before this key's tap.`;
+    return {single, hold: line};
 }
 
 export function behaviourTimingField(/** @type {import("../../contracts/panel.js").BehaviorView} */ behaviour, /** @type {"tapHoldTerm" | "longerHoldTerm" | "multiTapTerm"} */ name) {

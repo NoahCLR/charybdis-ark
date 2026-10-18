@@ -53,12 +53,12 @@ function builtInDisplay(action, names, features) {
 // a press with only a long hold still taps when released before it.
 /** @param {import("../schema/types.js").SemanticAction} target @param {Parameters<typeof builtInActions>[1]} features @param {import("../../contracts/model.js").ProfileKeyNames} [names] @returns {import("../../contracts/panel.js").BuiltIn} */
 function builtInForView(target, features, names) {
-    const {tap, hold, fallback, releaseTaps} = builtInActions(target, features);
+    const {tap, hold, fallback, releaseTaps, fromPress} = builtInActions(target, features);
     return {
         ...(releaseTaps ? {releaseTaps: true} : {}),
         ...(tap ? {tap: {helper: "TAP_SENDS", action: actionName(tap), ...builtInDisplay(tap, names, features)}} : {}),
         ...(hold ? {hold: {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: actionName(hold), repeatHz: "0", ...builtInDisplay(hold, names, features),
-            ...(fallback ? {fallback: true} : {})}} : {}),
+            ...(fallback ? {fallback: true} : {}), ...(fromPress ? {fromPress: true} : {})}} : {}),
     };
 }
 

@@ -13,7 +13,8 @@ import {saveBehaviour} from "./save-behaviour.mjs";
 const {TIER_FIELDS} = edits;
 
 // ⌘C copies the selected key's keycode and ⌘V stores it on the selected key,
-// on any layer; Delete or Backspace makes it transparent. Text fields keep
+// on any layer; Delete or Backspace makes it transparent. In the Behaviours
+// tab only ⌘C reaches the selected key. Text fields keep
 // their own copy, paste and delete.
 /** @param {KeyboardEvent} event */
 export function keysShortcut(event) {
@@ -24,6 +25,9 @@ export function keysShortcut(event) {
     if (action === "copy" && String(getSelection?.() || "")) return false;
     if (cellShortcut(action)) { event.preventDefault(); return true; }
     if (state.screen !== "keys") return false;
+    // In Behaviours, Delete and ⌘V belong to the open cell alone: the board's
+    // selected key may not be the behaviour on screen, so they never reach it.
+    if (state.tab === "behaviours" && action !== "copy") return false;
     const layer = currentLayer();
     if (!layer) return false;
     const position = positionAt(layer, state.selected);

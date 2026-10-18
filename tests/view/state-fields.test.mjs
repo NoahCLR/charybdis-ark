@@ -45,7 +45,7 @@ const RESETS = ["retarget", "pdKind", "pdButtons", "pdTaps", "lastTake"];
 const CUSTOM = ["combo", "macroForms"];
 const KEPT = [
     "screen", "layer", "layersOn", "layerGripFocus", "selected", "tab", "behaviourRow", "behaviourRowShown", "behaviourRoute",
-    "reachGroups", "resetBenchHeight", "reachRow", "cell", "cellRow", "reveal", "pickCombo", "settingsOpen", "keyDetailsOpen", "stackOpen", "showKeycodes", "hideBoard", "railMenu", "cellHow", "placement",
+    "reachGroups", "resetBenchHeight", "reachRow", "cell", "cellRow", "behaviourMenu", "reveal", "pickCombo", "settingsOpen", "keyDetailsOpen", "stackOpen", "showKeycodes", "hideBoard", "allTapCounts", "railMenu", "cellHow", "placement",
     "macroClipboard", "keyClipboard", "stage", "layersOpen", "layersAsked", "pdSlot", "pdAdvanced", "tbEntry", "tbEmptiesOpen", "tbFineTuning", "pdStartEmpty", "applyDismissed", "applied", "appliedDismissed", "applyWait", "applyReread", "pdPreview", "feedbackRow",
     "macroSlot", "macroSearch", "macroEmptyOpen", "customKey", "customKeySearch", "customKeyEmptyOpen", "customKeyAddBehaviour", "recording", "recordDelays", "recordPreserveHoldTiming", "recordDelayThreshold",
     "recordDelayRound", "ledPicks", "trackball", "rowColour", "ledRow", "colourPicks", "colourRow", "settingsSearch", "overlay", "leaveDemo", "confirmChecks",
@@ -87,9 +87,14 @@ test("a draft change resets the existing forms and preserves historically kept p
     for (const name of Object.keys(standing)) assert.equal(state[name], references[name], `${name} is kept as it was`);
     for (const name of RESETS) assert.equal(state[name], null, `${name} starts again`);
     assert.deepEqual(state.macroForms, {});
-    assert.equal(state.combo.open, false, "the combo builder closes");
-    assert.equal(state.combo.picking, false);
-    assert.equal(state.combo.form.allowedLayers, 0b111, "and starts again on every layer of the keyboard");
+    assert.equal(state.combo.open, true, "an existing combo edits live, so its builder stays open on it");
+    assert.equal(state.combo.editId, 4);
+    assert.equal(state.combo.picking, true);
+    assert.equal(state.combo.form.allowedLayers, 0b111, "its fields are read from the model again, not kept");
+    openComboBuilder(null);
+    state.combo.inputs = ["KC_A"];
+    resetDraftForms();
+    assert.equal(state.combo.open, false, "a new combo's builder closes");
 });
 
 test("a draft change closes the combo builder exactly as Close does", () => {

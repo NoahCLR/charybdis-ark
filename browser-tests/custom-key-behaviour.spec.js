@@ -75,7 +75,9 @@ test("an unplaced custom key gets its behaviour on the Custom keys screen, with 
         return behaviourEditorRow(getModel(), "CUSTOM_KEY_5")?.builtIn;
     }), "the same defaults as a placed custom key").toEqual({releaseTaps: true});
 
-    // The first edit adds the row: a Long hold on the first press.
+    // The first edit adds the row: a Long hold on the first press, typed
+    // exactly, which the cell's editor offers with Show keycodes on.
+    await page.evaluate(async () => { const store = await import("/webview/store.mjs"); store.state.showKeycodes = true; store.render(); });
     await editor(page).locator('[data-cell="0-long"]').click();
     await expect(page.locator(".cell-editor")).toHaveCount(1);
     await clearPosts(page);
@@ -122,8 +124,9 @@ test("once stored, the behaviour shows its dashed cells and can be removed from 
     await expect(editor(page).locator('[data-act="add-behaviour"]'), "a stored behaviour is never folded").toHaveCount(0);
     const dashed = editor(page).locator('[data-cell="0-hold"]');
     await expect(dashed).toHaveClass(/inherited/);
-    await expect(dashed).toContainText("released before Long hold threshold");
+    await expect(dashed).toContainText("tap if released before Long hold");
     await clearPosts(page);
+    await editor(page).locator('[data-menu="more"]').click();
     await editor(page).locator('[data-act="remove"]').click();
     await expect.poll(() => posted(page)).toEqual([expect.objectContaining({type: "deleteBehavior", keycode: "CUSTOM_KEY_5"})]);
 });
@@ -201,6 +204,7 @@ test("the behaviour editor on Custom keys follows the behaviours edit gate", asy
 test("Change key… on Custom keys moves the behaviour and the screen follows it to another custom key", async ({page}) => {
     await openControls(page, "customKeys", {customKeyEmptyOpen: true});
     await pick(page, 0);
+    await editor(page).locator('[data-menu="more"]').click();
     await editor(page).locator('[data-act="rekey"]').click();
     await expect(page.locator(".picker")).toHaveCount(1);
     const keysRow = await page.evaluate(async () => (await import("/webview/store.mjs")).state.behaviourRow);
@@ -257,6 +261,7 @@ test("Show on the Keys screen shows a layer that reaches the key", async ({page}
 test("Change key… on Custom keys to an ordinary key opens the behaviour on the Keys screen", async ({page}) => {
     await openControls(page, "customKeys", {customKeyEmptyOpen: true});
     await pick(page, 0);
+    await editor(page).locator('[data-menu="more"]').click();
     await editor(page).locator('[data-act="rekey"]').click();
     await clearPosts(page);
     await page.evaluate(async () => {

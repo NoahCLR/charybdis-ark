@@ -210,13 +210,56 @@ export function behaviourGridSteps(behaviour, advertisedMaximum = 5) {
     return Array.from({length: maximum}, (_, tapCount) => populated.get(tapCount) || {tapCount});
 }
 
+// How deep a behaviour's tap counts go: its deepest tap count with an action
+// set, or 0 with none. Past it the keyboard cycles (runtime.c,
+// key_runtime_core_tap_series_next_tap_count): depth + 1 taps and the press
+// counts as a single tap again, so deeper rows are never reached.
+/** @param {BehaviorView | null | undefined} behaviour */
+export const behaviourDepth = (behaviour) => Math.max(0, ...(behaviour?.steps || [])
+    .filter((step) => step.tap || step.hold || step.longHold).map((step) => step.tapCount + 1));
+
+// The grid's rows. Compact, it shows the tap counts in use and the next one,
+// to add (`add`); all, every tap count the keyboard allows. A row past the
+// next one is never reached while the keyboard cycles, so it says which tap
+// count answers instead (`like`, 0-based). `cycle` is the line under the
+// grid: how many taps start again at a single tap, when the row is deeper
+// than one.
+/** @param {BehaviorView | null | undefined} behaviour @param {number} [advertisedMaximum] @param {boolean} [all] */
+export function behaviourGridLayout(behaviour, advertisedMaximum = 5, all = false) {
+    const steps = behaviourGridSteps(behaviour, advertisedMaximum);
+    const depth = behaviourDepth(behaviour);
+    const shown = all ? steps.length : Math.min(steps.length, Math.max(depth, 1) + 1);
+    const rows = steps.slice(0, shown).map((step) => ({step,
+        add: step.tapCount >= Math.max(depth, 1),
+        like: depth > 1 && step.tapCount > depth ? step.tapCount % depth : null}));
+    return {rows, depth, cycle: depth > 1 ? {taps: depth + 1} : null};
+}
+
+/** @param {string | undefined} action */
+const pointingSlotOf = (action) => {
+    const match = /^PD_SLOT_(\d+)(?:_LOCK)?$/.exec(String(action ?? ""));
+    return match ? Number(match[1]) : null;
+};
+// A pointing-mode key holds its mode from the press unless a later tap count
+// holds another mode: then it waits for Tap / hold, so the two modes never
+// overlap (key_behavior_lookup.c, key_behavior_step_references_foreign_pd_mode).
+/** @param {BehaviorView | null | undefined} behaviour @param {import("./keyface-types.js").InheritedBranch} hold */
+function builtInHoldNow(behaviour, hold) {
+    const own = pointingSlotOf(hold.action);
+    if (!hold.fromPress || own === null) return hold;
+    const foreign = (behaviour?.steps || []).some((step) => step.tapCount > 0 && [step.hold, step.longHold]
+        .some((branch) => { const slot = pointingSlotOf(branch?.action); return slot !== null && slot !== own; }));
+    return foreign ? {...hold, fromPress: false} : hold;
+}
+
 // What the keyboard does for a tier the row leaves empty (core/model/
 // built-in-behavior.js). The key's own tap fills an empty tap at every tap count
 // the row reaches, its deepest authored count, and is sent once per press, so
-// it carries `times` past a single tap. Past that depth the presses are
-// separate, shorter gestures, so those cells stay empty. The built-in hold
-// belongs to the first press, and a fallback hold also gives way to an authored
-// long hold there. An authored cell and a key with nothing built in inherit nothing.
+// it carries `times` past a single tap. Past that depth the keyboard cycles
+// back to a single tap (behaviourGridLayout), so those cells stay empty. The
+// built-in hold belongs to the first press (`fromPress` when it starts as the
+// key goes down), and a fallback hold also gives way to an authored long hold
+// there. An authored cell and a key with nothing built in inherit nothing.
 /** @param {BehaviorView | null | undefined} behaviour @param {import("./keyface-types.js").BehaviorStep | null | undefined} step @param {import("./keyface-types.js").Tier} kind @returns {import("./keyface-types.js").InheritedBranch | null} */
 export function inheritedBranch(behaviour, step, kind) {
     const builtIn = behaviour?.builtIn || {};
@@ -230,7 +273,7 @@ export function inheritedBranch(behaviour, step, kind) {
     }
     if (kind === "hold") {
         if (!builtIn.hold || step.tapCount !== 0 || step.hold || (builtIn.hold.fallback && step.longHold)) return null;
-        return builtIn.hold;
+        return builtInHoldNow(behaviour, builtIn.hold);
     }
     return null;
 }

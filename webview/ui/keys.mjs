@@ -8,7 +8,8 @@
 
 import {isOff, label as hsvLabel} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
-import {comboAnswers, comboInputKeys, toggleComboInput} from "../view/combo-reach.mjs";
+import {comboAnswers, comboInputKeys} from "../view/combo-reach.mjs";
+import {builderInputs, pickComboInput} from "./keys/combo-builder.mjs";
 import {layerColourRow, stageEnabled} from "../view/lighting.mjs";
 import {currentLayer, getModel, heldLayers, layers, post, previewing, render, state, writable} from "../store.mjs";
 import * as edits from "../view/edits.mjs";
@@ -63,7 +64,7 @@ export function screenKeys() {
     card.appendChild(board(model, layer, {
         selected: state.selected,
         drafted: draftMarks(model?.draft?.changes).keys.get(layer.index),
-        reach: building ? comboInputKeys(model, layers(), state.layer, heldLayers(), state.combo.inputs) : reachHighlight(model),
+        reach: building ? comboInputKeys(model, layers(), state.layer, heldLayers(), builderInputs()) : reachHighlight(model),
         picking: state.combo.picking || Boolean(state.placement),
         held: heldLayers(),
         onKey: (/** @type {number} */ index) => {
@@ -76,8 +77,7 @@ export function screenKeys() {
                 // The key the keyboard would answer with here, taken now: a
                 // transparent key picks what shows through it, and switching
                 // layers afterwards leaves this input as it is.
-                const answer = comboAnswers(model, layers(), state.layer, heldLayers()).get(index);
-                state.combo.inputs = toggleComboInput(state.combo.inputs, answer);
+                pickComboInput(comboAnswers(model, layers(), state.layer, heldLayers()).get(index));
             } else {
                 state.selected = index;
                 // Follow the key the board shows, including one with no

@@ -10,11 +10,10 @@ conservative analysis, its limits, and presentation of inherited behaviour.
 
 Ark resolves each row's timing overrides against the connected settings, including
 the dual-role default for authored LT rows. A Hold and Long hold that both
-tap on release ("tap on release after Tap / hold threshold", "… after Long
-hold threshold") have
+tap on release ("sent on release") have
 an impossible Hold branch when Long hold is
 at or before Tap / hold: no release interval selects Hold. Review and the
-behaviour editor warn, and the layer graph removes that proven-impossible edge,
+behaviour editor warn (the editor outlines the condemned cell), and the layer graph removes that proven-impossible edge,
 including behaviours reached through combo outputs. Global-default edits are
 analyzed in the same draft, with new/existing/fixed findings.
 

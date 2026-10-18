@@ -77,6 +77,8 @@ export interface Vocabulary {
     holdHelpers: {hold: WordList<string>; long: WordList<string>};
     holdWithoutLongHold: WordList<string>;
     tapSends: string;
+    holdFromPress: string;
+    timingSources: Record<string, string>;
     tiers: Readonly<Record<string, string>>;
     branches: readonly string[];
     localities: WordList<string>;

@@ -233,8 +233,8 @@ value; the review still names the unit.
 A Settings section's one-per-layer switches (Default layers, and where
 Behaviours and Combos run) are one row: its label and what it means, then a
 switch for each layer in a grid, named and marked in the layer's colour. A
-search for one layer's name still finds its switch. Settings and the
-behaviour editor call the time between taps the **Multi tap window**.
+search for one layer's name still finds its switch. Settings calls the time between taps the **Multi tap window**, and the
+behaviour editor's timing line **Taps within**.
 
 **Settings** reads top to bottom: Tap & hold timing; Where behaviours and
 combos run (Behaviours and Combos, each with its master switch and layers);
@@ -255,7 +255,7 @@ are) and a section's other names; it says when nothing matches, and points to
 matches on another screen ("3 matches on Trackball →").
 
 Anything that folds has a chevron before its name, turned down while it is
-open: a Settings section, a behaviour's **Layers it runs on**, a group of
+open: a Settings section, a combo's **Layers it runs on**, a group of
 review checks, a trackball mode's Advanced, a group in a Keys tab. Review, the keycode picker and
 Draft history each close with **Close** at their top right, or Escape; their
 footers hold only what acts, such as Apply, Save a backup file…, Clear and Use key.
@@ -434,24 +434,64 @@ actually hold together still previews.
 ### The workbench
 
 Under the board, one workbench whose tabs are the key, its behaviour, its combos,
-and the macros and trackball modes the layer reaches. A behaviour is tap count ×
-tap, hold and long hold, so it is drawn as a grid of actions: a row for every tap count the keyboard allows,
-always all of them, and a column each for Tap, Hold and Long hold. Each timing
-heads what it governs: **Multi tap window** (release to next press) the tap
-counts, the Tap / hold threshold the Hold column and the Long hold threshold
-its own; Tap fires on release.
-The timing fields over Hold and Long hold read **Tap / hold threshold** and
-**Long hold threshold**, and a hold cell's **How it runs** names its own
-column's: "tap at Tap / hold threshold" under Hold, "tap at Long hold
-threshold" under Long hold. Behaviour and combo
-timings matching the default show a muted placeholder such as `150 · default`;
-other values look entered, with `ms` inside the field. Clearing an override restores the
-default. LT keys show their own dual-role default.
+and the macros and trackball modes the layer reaches.
+
+**Behaviours.** The list on the left (240 px, rows of 40 px) scrolls on its
+own and stays in place under the workbench tabs while the editor beside it
+scrolls. Each row is the key's name and how many actions it sets, with a dot
+per tier; what reaches it is on hover. Only a row this layer never reaches
+reads quieter. **On this view** appears only while a layer preview is on;
+outside one it would only repeat **On this layer**. Groups with nothing in them
+fold into one line at the foot ("No behaviours through a transparent key, or
+…").
+
+The editor's head is the key's name (its keycode beside it with Show
+keycodes), then **On**, whether it runs at all; **Layers: All ▾**, a popover
+with a switch per layer (the same layer grid Settings uses) for the layers a
+key can come from for it to run; and **More ▾**: **Keeps the mouse layer on**,
+**Move to another key…** and **Remove behaviour**, last. Under it, one line of
+timing: **Taps within** (release to the next press), **Hold after** and **Long
+hold after**, in ms. An empty field follows a default, and its placeholder
+says which: `150 · default`, `150 · behaviour default`, or `200 · dual-role`
+for keys on the dual-role threshold. An `LT()` key follows dual-role with or
+without a behaviour. An `MT()` or `OSM()` key with no behaviour is QMK's own
+dual-role key, so it shows the dual-role default; give it a behaviour and the
+keyboard times it with the behaviour default instead, and the placeholder
+says so. Clearing an override restores the default.
 Changing a behaviour timing default moves every row following it, including
 explicit values matching the old default; distinct custom timings stay fixed.
 Review lists inherited effective-time changes under Tap & hold timing and any
 matching overrides converted to defaults under their behaviours. Those stored
 changes discard together with the default edit.
+
+A behaviour is tap count × tap, hold and long hold, so it is drawn as a grid
+of actions: a column each for Tap, Hold and Long hold, and a row for each tap
+count the behaviour uses, then the next one to add (**+ Double tap**). Tap
+fires on release. Past the deepest tap count set, the keyboard counts round:
+with Single and Double tap set, a third tap counts as a single tap again, and
+the grid says so under its rows ("↻ 3 taps → like 1× again"). **Show all tap
+counts**, remembered, draws every tap count the keyboard allows; the rows it
+cannot reach today say which tap count answers them ("↻ like 2×"). The grid
+says what a behaviour costs when it does: once it has a Double tap, "Single
+taps wait 150 ms to see if another tap follows"; and under Hold, what pressing
+another key does while this one is down. An `LT()`, `MT()` or `OSM()` key, or
+one whose hold is a layer held until release, makes later keys wait until it
+is a tap or a hold; a key that holds from the press uses its hold at once; any
+other hold lets later keys through at once, so a quick roll types them first.
+A timing check outlines the cell it condemns and says why in one line under
+the grid, in the grid's words ("Double tap Hold never sends: Long hold takes
+over at 200 ms…").
+
+Click a cell to edit it in a popover beside it. **Sends** shows what the
+action sends and opens the key picker (with Show keycodes, the keycode can be
+typed too); a hold says **How it runs**: held until release, sent at
+threshold, sent on release, or repeats while held, at a rate you set; **Clear**
+empties the cell. Every change is a draft change at once. Esc, or a click
+elsewhere in the editor, closes it.
+With a cell open, Delete, ⌘C and ⌘V act on that cell; with none open, Delete
+and ⌘V do nothing in Behaviours, so they never change the key selected on the
+board behind it.
+
 Selecting a key opens its grid in Behaviours even before it has a stored row.
 Only a grid action, timing override or anchor change adds the row to the draft;
 browsing leaves the board and behaviour counts unchanged. Transparent and
@@ -461,32 +501,49 @@ key and says the behaviour belongs to its keycode, so changing it changes that
 key wherever it is pressed. Turning layers on or off in the preview updates the
 open key, whichever you did first. Empty cells preserve the key's built-in
 actions until you override them. An empty cell shows, dashed and marked
-"built in", what the key does there on its own. An empty tap sends the key's
-own tap once per press, so an empty Double tap sends it twice (`×2`), at every
-tap count up to the deepest one the behaviour sets; past that, the presses are
-separate shorter gestures and the cell stays empty. On the first press, an
-`LT()` holds its layer and an `MT()` or `OSM()` its modifiers. A plain key,
-such as `-` or `Ctrl+C`, stays held down until release, unless that first
-press sets a Hold or Long hold. A custom key with a shortcut does the same
-with its shortcut, and its dashed cells read as that shortcut. Shift, Ctrl,
-Alt and Cmd on their own show
-nothing built in. An empty Long hold beside a Hold, set or built in, shows
-that the Hold carries on, since nothing takes over at the Long hold threshold: one held
-until release stays held, one that repeats keeps repeating, one that sends
-on release still sends whenever you let go, and one that fired at its
-threshold does nothing more. An empty Hold beside a Long hold shows the tap
-a release before the Long hold threshold sends, for plain keys, custom keys and macros;
-layer and trackball mode keys send no tap once held. **Move to another key…** moves a behaviour to another
-key through the key picker; when that key already has one, you choose to
-overwrite it, swap the two, or cancel, and either is one undoable draft step.
+"built in", what the key does there on its own; its popover says "Built in:
+…" and offers **Set something else…** or **Nothing**. An empty tap sends the
+key's own tap once per press, so an empty Double tap sends it twice (`×2`), at
+every tap count up to the deepest one the behaviour sets. On the first press,
+an `LT()` holds its layer and an `MT()` or `OSM()` its modifiers. An `MO()`
+holds its layer and an `LM()` its layer and modifiers from the press, and a
+trackball mode key runs its mode from the press ("held from the press"),
+unless a later tap count holds another mode: then it waits for Hold after, so
+the two modes never overlap. A plain key, such as `-` or `Ctrl+C`, stays held
+down until release, unless that first press sets a Hold or Long hold. A custom
+key with a shortcut does the same with its shortcut, and its dashed cells read
+as that shortcut. Shift, Ctrl, Alt and Cmd on their own show nothing built in.
+An empty Long hold beside a Hold, set or built in, shows that the Hold carries
+on, since nothing takes over at the Long hold threshold: one held until
+release stays held, one that repeats keeps repeating, one that sends on
+release still sends whenever you let go, and one that fired at its threshold
+does nothing more. An empty Hold beside a Long hold shows the tap a release
+before Long hold sends, for plain keys, custom keys and macros; layer and
+trackball mode keys send no tap once held. **Move to another key…** moves a
+behaviour to another key through the key picker; when that key already has
+one, you choose to overwrite it, swap the two, or cancel, and either is one
+undoable draft step.
 The keyboard owns its layer keys, so a behaviour takes QMK's layer keys where
 the keyboard can run them: `TG()`,
 `TO()` and `LOCK_LAYER()` anywhere, `OSL()` as a tap, `TT()` and `MO()` as a
 "held until release" hold action; `LT()` and `LM()` stay keys and combos,
 and `DF()`/`PDF()` are refused.
 
-In **Keys → Combos**, **Pick on board** brings the board into view so its keys
-can be selected as combo inputs.
+**Combos.** The table names each combo by its keys and what it sends ("D + F
+→ Tab"), with its C-number as a quiet index. The window column is headed with
+the default ("Window · 50 ms default") and shows a value only for a combo with
+its own; **Conditions** appears only when some combo has one. Pick a row to
+edit that combo beside the table: it edits live, like a behaviour, so every
+switch, its window, what it sends and its keys are a draft change at once,
+and **Delete** removes it. A combo keeps at least two keys. **New combo…**
+builds one: **Add combo** stays off until it has what it sends and two keys,
+and says which is missing. **Pick on board** picks keys on the board above
+without leaving the workbench; the bar over the board lists them, with
+**Done** (or Esc) and, for a new combo, **Add combo**. Drag a key chip, or
+press Alt+← or → on it, to change the order **Keys in order** checks. **Must
+be held** and **Tap only** say the wait they mean: the longer of the combo's
+window and the combo hold threshold. **Use output behaviour** explains itself
+on hover.
 The **Key** tab count is the number of mapped keys on the selected layer.
 The Key tab says what the selected key does; **Where it is stored** unfolds
 its stored keycode, matrix row and column, layout index and LED index, and
@@ -498,11 +555,10 @@ labels them, rather than their layout indexes; a combo's row already names
 its inputs, so it says only which layer answers a transparent one.
 In **Keys → Behaviours**, reach sections open independently. Matching sections
 share their expanded or collapsed state across the Behaviours, Combos, Macros
-and Trackball modes tabs. The full list scrolls with the Keys page rather than
-inside the rail.
-The Behaviours, Combos, Macros and Trackball modes tabs start with **On this
-view**: what the board reaches with the selected layer and any layers previewed
-under it. **On this layer** stays tied to keys stored on the selected layer;
+and Trackball modes tabs, and **On this view** and **On this layer** start open.
+**On this view** is what the board reaches with the selected layer and any
+layers previewed under it; Behaviours and Combos show it only while a preview
+is on. **On this layer** stays tied to keys stored on the selected layer;
 the tab counts use that layer too. Use ⌘-click on layer tabs to change the
 composed view. Combo rows use the keyboard's Combo layer matching reference
 when one is configured.
@@ -642,8 +698,9 @@ Discard, Undo and Redo, and saved by Apply.
 a behaviour; that button opens the key's behaviour editor, posting nothing
 until you set something. With a behaviour, the editor is always open: the
 same one as Keys → Behaviours, without a title of its own (the card's title
-names the key): timings, the grid of actions and participation, and once
-the key has a behaviour, **Move to another key…** and **Remove behaviour**. It works for
+names the key): On, Layers and More, timings and the grid of actions, and
+once the key has a behaviour, **Move to another key…** and **Remove
+behaviour** under More. It works for
 a key on no layer yet, so a custom key can get its taps and holds where it is
 defined. A key with no behaviour shows the key's defaults, with its shortcut
 in the cells the behaviour leaves empty, and the first change adds the

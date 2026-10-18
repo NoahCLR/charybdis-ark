@@ -44,11 +44,13 @@ export const STATE_FIELDS = {
     // Custom keys screen each show one behaviour editor, and a cell opened in
     // one behaviour never opens in another's grid or takes its shortcuts.
     cellRow: kept(null),
+    behaviourMenu: kept(null), // the open behaviour editor's head popover: "layers" or "more"
     reveal: kept(null),        // a selector the next render scrolls into view and marks, then forgets
     pickCombo: kept(null),     // a combo id to pick in the Combos tab, wherever this layer lists it
     settingsOpen: kept([]),    // settings sections opened by hand or by a Show, so a render keeps them open
     keyDetailsOpen: kept(false), // the Key tab's folded position details, open on every key once opened
     showKeycodes: kept(false),   // the Show keycodes preference: QMK keycodes beside names everywhere (decisions R2, §3); remembered per host (setPreference)
+    allTapCounts: kept(false),   // Show all tap counts in a behaviour's grid, not only those in use and the next; remembered per host (setPreference)
     hideBoard: kept(false),      // Hide board on Keys and Lighting: the board folds to its layer tabs; remembered per host (setPreference)
     railMenu: kept(false),       // the rail's "⋯" menu is open
     stackOpen: kept(false),    // the Key tab's runs of transparent layers, shown in full once asked
@@ -65,10 +67,14 @@ export const STATE_FIELDS = {
     //   form        the builder's fields, kept across renders; followsDefault
     //               says the window is the keyboard's default, not the combo's own
     //   awaiting    a Keep or Delete posted; the builder closes when the host accepts it
-    // A draft change closes it, as Close does.
-    combo: resetsTo({open: false, picking: false, inputs: [],
-        form: {output: "", termMs: "", followsDefault: false, mustHold: false, mustTap: false, ordered: false}, awaiting: false, editId: null},
-    () => closedComboBuilder()),
+    // A draft change closes a new combo's builder, as Close does. An existing
+    // combo edits live, so its builder stays open on it, and its fields are
+    // read from the model again (ui/keys/combo-builder.mjs); one being
+    // deleted closes.
+    combo: resetsTo(/** @type {PanelState["combo"]} */ ({open: false, picking: false, inputs: [],
+        form: {output: "", termMs: "", followsDefault: false, mustHold: false, mustTap: false, ordered: false}, awaiting: false, editId: null}),
+    (combo) => combo.open && combo.editId !== null && !combo.awaiting
+        ? {...closedComboBuilder(), open: true, editId: combo.editId, picking: combo.picking} : closedComboBuilder()),
     placement: kept(null),     // {keycode}: next board click places it on the current layer
     retarget: resets(null),    // {from, to, existing}: a behaviour move waiting on overwrite / swap / cancel
     macroClipboard: kept(null), // copied macro steps, shared between slots in this Ark window
@@ -141,7 +147,7 @@ Object.assign(state, readPreferences(vscode.getState?.()));
 
 // Change a remembered preference: now, and in the host's panel state for the
 // next session (view/preferences.mjs).
-/** @param {"showKeycodes" | "hideBoard"} name @param {boolean} value */
+/** @param {"showKeycodes" | "hideBoard" | "allTapCounts"} name @param {boolean} value */
 export function setPreference(name, value) {
     state[name] = value;
     vscode.setState?.(withPreference(vscode.getState?.(), name, value));
@@ -164,6 +170,9 @@ function comboBuilder(combo = null, defaultTermMs = "") {
     };
 }
 const closedComboBuilder = () => ({...comboBuilder(), open: false});
+// A combo's fields as the builder shows them, from what the model holds.
+/** @param {import("../contracts/panel.js").ComboView} combo */
+export const comboFormOf = (combo) => comboBuilder(combo);
 /** @param {import("../contracts/panel.js").ComboView | null} [combo] @param {import("../contracts/edits.js").Scalar} [defaultTermMs] */
 export function openComboBuilder(combo = null, defaultTermMs = "") {
     state.combo = comboBuilder(combo, defaultTermMs);

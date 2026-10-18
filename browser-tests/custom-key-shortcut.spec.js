@@ -198,8 +198,8 @@ test("a behaviour cell's picker makes a custom key for mixed-side modifiers, and
 // A combo output is saved with its combo: the key is made now and becomes the
 // output in the builder.
 test("a combo output's picker makes a custom key and fills the output", async ({page}) => {
-    await openControls(page, "keys", {tab: "combos"});
-    await page.getByRole("button", {name: "New combo", exact: true}).click();
+    await openControls(page, "keys", {tab: "combos", showKeycodes: true});
+    await page.getByRole("button", {name: "New combo…", exact: true}).click();
     await page.locator('[data-act="pickout"]').click();
     for (const mod of ["S", "A", "RSFT", "RALT"]) await page.locator(`.picker [data-mod="${mod}"]`).click();
     const offer = page.locator('.picker [data-act="use-custom-key"]');

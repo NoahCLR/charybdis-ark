@@ -17,10 +17,23 @@ const {nativeCode, actionName} = require("../schema/actions");
 const SHORT_WINDOW_MS = 50; // advisory comfort heuristic, never a validity limit
 /** @param {import("../schema/types.js").SemanticAction} action */
 const transparent = action => nativeCode(action) === 1;
-/** @template {number | string | undefined} T @param {Pick<import("../schema/types.js").BehaviorRow, 'target'> & Partial<Pick<import("../schema/types.js").BehaviorRow, 'tapHoldTerm' | 'longerHoldTerm' | 'multiTapTerm'>>} row @param {readonly T[]} values @returns {{hold: number | T, long: number | T, repeat: number | T}} */
-function effectiveTimings(row, values) {
-    const code = nativeCode(row.target);
-    return {hold: row.tapHoldTerm || values[code !== undefined && code >= 0x4000 && code <= 0x4fff ? SETTING.TAPPING_TERM : SETTING.TAP_HOLD_TERM],
+/** @param {number | undefined} code @param {number} start @param {number} end */
+const within = (code, start, end) => code !== undefined && code >= start && code <= end;
+// The setting a key's Tap / hold threshold follows when it sets none. With a
+// row, an LT() row follows the dual-role term and every other row the
+// behaviour term (key_behavior_lookup.c, key_behavior_view_build). Without
+// one, LT(), MT() and OSM() keys are QMK's own dual-role keys, so they follow
+// the dual-role term too.
+/** @param {import("../schema/types.js").SemanticAction} target @param {boolean} [stored] */
+function holdTermSetting(target, stored = true) {
+    const code = nativeCode(target);
+    if (within(code, 0x4000, 0x4fff)) return SETTING.TAPPING_TERM;
+    if (!stored && (within(code, 0x2000, 0x3fff) || within(code, 0x52a0, 0x52bf))) return SETTING.TAPPING_TERM;
+    return SETTING.TAP_HOLD_TERM;
+}
+/** @template {number | string | undefined} T @param {Pick<import("../schema/types.js").BehaviorRow, 'target'> & Partial<Pick<import("../schema/types.js").BehaviorRow, 'tapHoldTerm' | 'longerHoldTerm' | 'multiTapTerm'>>} row @param {readonly T[]} values @param {{stored?: boolean}} [options] @returns {{hold: number | T, long: number | T, repeat: number | T}} */
+function effectiveTimings(row, values, {stored = true} = {}) {
+    return {hold: row.tapHoldTerm || values[holdTermSetting(row.target, stored)],
         long: row.longerHoldTerm || values[SETTING.LONG_HOLD_TERM], repeat: row.multiTapTerm || values[SETTING.MULTI_TAP_TERM]};
 }
 /** @param {BehaviorStep} step @param {Timings} terms @returns {step is BehaviorStep & {hold: import("../schema/types.js").HoldBranch, longHold: import("../schema/types.js").HoldBranch}} */
@@ -75,4 +88,4 @@ function gestureTimingFindings(decoded) {
     });
     return results;
 }
-module.exports = {effectiveTimings, releaseHoldUnreachable, gestureTimingFindings};
+module.exports = {holdTermSetting, effectiveTimings, releaseHoldUnreachable, gestureTimingFindings};

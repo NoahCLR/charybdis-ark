@@ -12,7 +12,8 @@ import {feedbackColours, stageEnabled} from "../../view/lighting.mjs";
 import {getModel, heldLayers, layerName, layers, render, state, writable} from "../../store.mjs";
 import {draftDot} from "../../view/review.mjs";
 import {actionMarked, comboBadge, keyNameMarked, keycodeMark} from "../marks.mjs";
-import {comboInputLabel} from "./combo-builder.mjs";
+import {addCombo, comboInputLabel} from "./combo-builder.mjs";
+import {comboMissing} from "../../view/combo-form.mjs";
 
 // The caption while layers are previewed on together: which ones, in the
 // order they win. Clicking any tab goes back to one layer.
@@ -74,15 +75,23 @@ export function boardHelp(model) {
     </details>`);
 }
 
+// While combo keys are picked: the keys so far, and Done (or Esc). A new
+// combo can be added from here too, once it has what it needs.
 export function pickBar() {
-    const names = state.combo.inputs.map((name) => keyNameMarked(getModel(), comboInputLabel(getModel(), name), name));
+    const model = getModel();
+    const adding = state.combo.editId === null;
+    const inputs = adding ? state.combo.inputs : (model?.combos || []).find((combo) => combo.id === state.combo.editId)?.inputs || [];
+    const names = inputs.map((name) => keyNameMarked(model, comboInputLabel(model, name), name));
+    const missing = adding ? comboMissing(state.combo.form, inputs) : "";
     const node = el(`<div class="pickbar">
-        <span><b>Picking combo inputs</b> — click keys on the board</span>
+        <span><b>Picking keys for the combo</b> — click keys on the board</span>
         <span class="n">${names.join(" + ") || "none yet"}</span>
         <span class="right pickbar-actions">
-            <button class="btn tiny ghost" data-act="clear">Clear</button>
-            <button class="btn tiny" data-act="done">Done</button></span></div>`);
-    /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="clear"]')).addEventListener("click", () => { state.combo.inputs = []; render(); });
+            ${adding ? `<button class="btn text" data-act="clear">Clear</button>` : ""}
+            <button class="btn compact" data-act="done" aria-keyshortcuts="Escape">Done</button>
+            ${adding ? `<button class="btn compact primary" data-act="add" ${missing || !writable() ? "disabled" : ""} data-tip="${esc(missing || "Add this combo to the draft.")}">Add combo</button>` : ""}</span></div>`);
+    /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="clear"]'))?.addEventListener("click", () => { state.combo.inputs = []; render(); });
     /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="done"]')).addEventListener("click", () => { state.combo.picking = false; render(); });
+    /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="add"]'))?.addEventListener("click", addCombo);
     return node;
 }

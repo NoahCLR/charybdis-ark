@@ -1,7 +1,7 @@
 import {withAnswers} from "../fixtures/layer-answers.mjs";
 import assert from "node:assert/strict";
 import test from "node:test";
-import {behaviourEditorRow, behaviourIsEmpty, behaviourThresholds, helperDetail, behaviourKeyAt, behaviourRowAfterPreview, behaviourTimingEdit, behaviourTimingField, canHaveBehaviour} from "../../webview/view/behavior-editor.mjs";
+import {behaviourCosts, layersSummary, timingMarks, timingPlaceholder, behaviourEditorRow, behaviourIsEmpty, behaviourThresholds, helperDetail, behaviourKeyAt, behaviourRowAfterPreview, behaviourTimingEdit, behaviourTimingField, canHaveBehaviour} from "../../webview/view/behavior-editor.mjs";
 import {impliedBranch} from "../../webview/view/keyface.mjs";
 
 test("opening an unstored behaviour leaves the model unchanged and takes built-ins from the host", () => {
@@ -134,4 +134,48 @@ test("a behaviour row with nothing of its own is empty, and any one setting make
     assert.equal(behaviourIsEmpty({...empty, allowedLayers: 1}, 16), false, "limited to some layers");
     assert.equal(behaviourIsEmpty({...empty, enabled: false}, 16), false, "switched off");
     assert.equal(behaviourIsEmpty({...empty, keepsAutoMouseAnchored: true}, 16), false);
+});
+
+const VOCABULARY = {timingSources: {tappingTerm: "dual-role", tapHoldTerm: "behaviour default", longHoldTerm: "default", multiTapTerm: "default"},
+    branches: ["Single tap", "Double tap", "Triple tap"]};
+
+test("an MT key with no row shows the dual-role default it runs on, and the behaviour default once it has a row (B5)", () => {
+    const keyDefaults = {"MT(MOD_LSFT,KC_A)": {builtIn: {}, timing: {tapHoldTerm: 150, longerHoldTerm: 400, multiTapTerm: 150},
+        timingSources: {tapHoldTerm: "tapHoldTerm", longerHoldTerm: "longHoldTerm", multiTapTerm: "multiTapTerm"},
+        withoutRow: {tapHoldTerm: 200, tapHoldSource: "tappingTerm"}}};
+    const model = {vocabulary: VOCABULARY, keyBehaviors: [], behaviorEditing: {keyDefaults}};
+    const bare = behaviourEditorRow(model, "MT(MOD_LSFT,KC_A)");
+    assert.equal(timingPlaceholder(model, bare, "tapHoldTerm"), "200 · dual-role");
+    assert.equal(timingPlaceholder(model, bare, "longerHoldTerm"), "400 · default");
+    const stored = {...model, keyBehaviors: [{keycode: "MT(MOD_LSFT,KC_A)", steps: [], tapHoldTerm: "0", longerHoldTerm: "0", multiTapTerm: "0"}]};
+    assert.equal(timingPlaceholder(stored, behaviourEditorRow(stored, "MT(MOD_LSFT,KC_A)"), "tapHoldTerm"), "150 · behaviour default");
+    assert.equal(timingPlaceholder(model, {timingDefaults: {}}, "tapHoldTerm"), "default unavailable");
+});
+
+test("the Layers button names all, none, one or two layers, or counts them", () => {
+    const layers = [{index: 0, label: "Base"}, {index: 1, label: "Number"}, {index: 2, label: "Symbol"}];
+    assert.equal(layersSummary(layers, undefined), "All");
+    assert.equal(layersSummary(layers, 0b111), "All");
+    assert.equal(layersSummary(layers, 0), "None");
+    assert.equal(layersSummary(layers, 0b101), "Base, Symbol");
+    assert.equal(layersSummary([...layers, {index: 3, label: "Nav"}], 0b1011), "3 of 4");
+});
+
+test("timing checks land on the cell or field they question, in the grid's words", () => {
+    const checks = [{identity: "41:release:1", level: "warning"}, {identity: "41:order:0", level: "warning"},
+        {identity: "41:narrow:2", level: "notice"}, {identity: "41:short:released repeat gap", level: "notice"}, {identity: "41:other", level: "warning"}];
+    const marks = timingMarks({vocabulary: VOCABULARY}, checks, {hold: "200", long: "200", repeat: "40"});
+    assert.deepEqual(marks.map((mark) => [mark.cell, mark.term, mark.level]), [["1-hold", null, "warning"], ["0-long", "longerHoldTerm", "warning"],
+        ["2-hold", null, "notice"], [null, "multiTapTerm", "notice"]]);
+    assert.match(marks[0].line, /^Double tap Hold never sends/);
+});
+
+test("a behaviour's costs are said only when true", () => {
+    const terms = {hold: "200", repeat: "150"};
+    assert.deepEqual(behaviourCosts({keycode: "KC_ESCAPE"}, 1, terms, null), {single: "", hold: ""});
+    assert.equal(behaviourCosts({keycode: "KC_ESCAPE"}, 2, terms, null).single, "Single taps wait 150 ms to see if another tap follows.");
+    assert.match(behaviourCosts({keycode: "LT(3,KC_F)"}, 1, terms, {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "MO(3)"}).hold, /wait until this key is a tap or a hold/);
+    assert.match(behaviourCosts({keycode: "KC_1"}, 1, terms, {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "MO(3)"}).hold, /wait until/);
+    assert.match(behaviourCosts({keycode: "KC_1"}, 1, terms, {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "KC_EXLM"}).hold, /sent at once/);
+    assert.match(behaviourCosts({keycode: "MO(2)"}, 1, terms, {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "MO(2)", fromPress: true}).hold, /as the key goes down/);
 });
