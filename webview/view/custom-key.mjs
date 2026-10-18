@@ -24,9 +24,9 @@ export const customKeyOf = (model, keycode) => /^CUSTOM_KEY_\d+$/.test(String(ke
 export function customKeyDoes(key) {
     const sends = hasShortcut(key) ? key.shortcutLabel : "";
     if (sends && key.hasBehavior) return `Its behaviour, on top of ${sends}: a tap or hold the behaviour leaves empty sends ${sends}.`;
-    if (sends) return `Sends ${sends}: held while the key is held, tapped when it is tapped. Add a behaviour to give it more taps and holds.`;
+    if (sends) return `Sends ${sends}: held while the key is held, tapped when it is tapped. Set taps and holds in its grid to give it more.`;
     if (key.hasBehavior) return "Only what its behaviour says. Give it a shortcut to send one where the behaviour leaves a tap or hold empty.";
-    return "Nothing yet. Give it a shortcut, or add a behaviour to give it taps and holds.";
+    return "Nothing yet. Give it a shortcut, or set taps and holds in its grid.";
 }
 
 // What the shortcut does on this key, in one line: held and tapped as the key

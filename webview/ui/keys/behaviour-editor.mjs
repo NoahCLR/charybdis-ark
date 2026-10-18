@@ -11,7 +11,7 @@ import {getModel, layerName, layers, post, render, state, canEdit as canEditArea
 import {definitionControls} from "../participation.mjs";
 import * as edits from "../../view/edits.mjs";
 import {behaviourTimingChecks} from "../../view/checks.mjs";
-import {behaviourTimingEdit, behaviourTimingField} from "../../view/behavior-editor.mjs";
+import {behaviourChangesNothing, behaviourHasTiming, behaviourTimingEdit, behaviourTimingField} from "../../view/behavior-editor.mjs";
 import {actionMarked, branchBadge, keyNameMarked, sends, sendsKind, tierDot} from "../marks.mjs";
 import {branchName, helperWord, tierName, vocabulary, word} from "../../view/vocabulary.mjs";
 import {cellEditor} from "./cell-editor.mjs";
@@ -42,11 +42,29 @@ function timingDefaultsNote(behaviour) {
 /** @param {EditorBehavior} behaviour */
 export const openCell = (behaviour) => state.cellRow === behaviour.keycode ? state.cell : null;
 
+// What the head says about a behaviour that is not stored yet, or that changes
+// nothing (firmware D-F27 "Rows without steps"). On a plain key a timing does
+// nothing until the behaviour has a branch, so its fields wait for one.
+/** @param {EditorBehavior} behaviour */
+function storageNotes(behaviour) {
+    const timingIdle = !behaviour.steps.length && behaviour.timingAlone === false;
+    if (!behaviour.stored) return [timingIdle
+        ? "Using the key’s defaults. A behaviour is added to the draft when you set a grid action or Keeps the mouse layer on. On this key a timing does nothing until it has a branch."
+        : "Using the key’s defaults. A behaviour is added to the draft when you set a grid action, a timing or Keeps the mouse layer on."];
+    if (behaviourChangesNothing(behaviour)) return [`This behaviour changes nothing: ${behaviourHasTiming(behaviour)
+        ? "on this key a timing does nothing without a branch" : "it has no branches or timing of its own"}, so the key runs as if it had none. Set a grid action, or remove it.`];
+    return timingIdle ? ["On this key a timing does nothing until the behaviour has a branch."] : [];
+}
+
 /** @param {EditorBehavior} behaviour */
 export function behaviourEditor(behaviour) {
     const model = getModel();
     const steps = behaviourGridSteps(behaviour, model?.behaviorEditing?.maxTapStepsPerBehavior);
     const canEdit = canEditArea("behaviours");
+    // Timing waits for a branch on a plain key; the switches wait for anything
+    // they could turn on or off.
+    const timingIdle = !behaviour.steps.length && behaviour.timingAlone === false;
+    const switchesIdle = behaviourChangesNothing(behaviour);
     // What each timing means is said where it is set, on hover.
     const TIMING_TIPS = {
         multiTapTerm: "The time allowed from releasing the key to pressing it again for another tap. A Double tap Hold is press, release, then press and keep holding.",
@@ -58,7 +76,7 @@ export function behaviourEditor(behaviour) {
         const field = behaviourTimingField(behaviour, name);
         return `<label class="field bterm-field" data-tip="${esc(TIMING_TIPS[name])}"><span>${esc(label)}</span>
             <span class="affix unit"><input class="input mono" data-f="behaviour:${esc(behaviour.keycode)}:timing:${name}" data-term="${name}" data-stored="${esc(field.stored)}" inputmode="numeric" value="${esc(field.value)}"
-                placeholder="${esc(field.fallback === "" ? "default unavailable" : field.placeholder)}" ${canEdit ? "" : "disabled"}><i>ms</i></span></label>`;
+                placeholder="${esc(field.fallback === "" ? "default unavailable" : field.placeholder)}" ${canEdit && !timingIdle ? "" : "disabled"}><i>ms</i></span></label>`;
     };
 
     /** @param {import("../../../contracts/panel.js").BehaviorView["steps"][number]} step @param {import("../../../contracts/edits.js").Tier} kind */
@@ -113,7 +131,7 @@ export function behaviourEditor(behaviour) {
                 <div class="row beh-title"><h3>${actionMarked(model, behaviour.keycode)}</h3>
                     ${actionLabel(model, behaviour.keycode) === behaviour.keycode ? "" : `<code class="dim">${esc(behaviour.keycode)}</code>`}</div>
                 <p class="note">${esc(timingDefaultsNote(behaviour))}</p>
-                ${behaviour.stored ? "" : `<p class="note">Using the key’s defaults. A behaviour is added to the draft when you change a timing, switch or grid action.</p>`}
+                ${storageNotes(behaviour).map((note) => `<p class="note">${esc(note)}</p>`).join("")}
             </div>
             ${behaviour.stored ? `<div class="right row beh-actions">
                 <button class="btn tiny ghost" data-act="rekey" ${canEdit ? "" : "disabled"}
@@ -171,7 +189,7 @@ export function behaviourEditor(behaviour) {
     /** @type {HTMLInputElement | null} */ (node.querySelector("[data-anchor]"))?.addEventListener("change", commit);
     // Whether the behaviour runs, and where, leads; the mouse-layer switch
     // sits at the end of the row.
-    /** @type {HTMLElement} */ (node.querySelector(".beh-intro")).prepend(definitionControls(layers().map(layer => ({...layer, label: layerName(layer)})), behaviour, canEdit, (/** @type {{enabled: boolean, allowedLayers: number}} */ permissions) => {
+    /** @type {HTMLElement} */ (node.querySelector(".beh-intro")).prepend(definitionControls(layers().map(layer => ({...layer, label: layerName(layer)})), behaviour, canEdit && !switchesIdle, (/** @type {{enabled: boolean, allowedLayers: number}} */ permissions) => {
         const message = edits.saveBehaviour(behaviour, permissions, model?.profileIdentity);
         if (message) post(message);
     }, `behaviour:${behaviour.keycode}:definition`, "behaviour"));

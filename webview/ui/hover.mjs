@@ -8,7 +8,7 @@ import {actionNaming, behaviourFor, canonicalKeycode, dualRole, keyMeaning, keyN
 import {comboBehaviours, comboInputIsKey, combosAt, combosShownAt} from "../view/combo-reach.mjs";
 import {customKeyHeadline, customKeyOf, customKeyShortcutOnly} from "../view/custom-key.mjs";
 import {macroKeycodes, pointingSlotFor} from "../view/reach.mjs";
-import {behaviourEditorRow, behaviourIsEmpty, behaviourThresholds, helperDetail} from "../view/behavior-editor.mjs";
+import {behaviourEditorRow, behaviourHasTiming, behaviourThresholds, helperDetail} from "../view/behavior-editor.mjs";
 import {behaviourRuns} from "../view/participation.mjs";
 import {resolvedPositions} from "../view/layer-resolution.mjs";
 import {pdColourRow, stageEnabled} from "../view/lighting.mjs";
@@ -158,7 +158,11 @@ function reachSections(model, layer, position, index,
     const sections = [];
     const custom = customOf(model, keyMeaning(position));
     const role = dualRole(model, position);
-    const empty = Boolean(behaviour) && behaviourIsEmpty(/** @type {any} */ (behaviour));
+    // A row that changes nothing says so, and why, in place of its details
+    // (firmware D-F27 "Rows without steps"; the host judges it).
+    const inert = Boolean(behaviour?.changesNothing);
+    const inertNote = behaviour && inert ? `Its behaviour changes nothing: ${behaviourHasTiming(behaviour)
+        ? "on this key a timing does nothing without a branch" : "it has no branches or timing of its own"}, so the key runs as if it had none.` : "";
     const branchless = Boolean(behaviour) && !behaviour?.steps?.length;
     // The keyboard decides every key's tap or hold, with or without a row
     // (firmware D-F27), so the card says only whether this key's row runs
@@ -175,16 +179,16 @@ function reachSections(model, layer, position, index,
         const hold = "layer" in role.hold
             ? marked(model, {kind: "layer", layer: role.hold.layer}, role.hold.name)
             : esc(role.hold.modifier);
-        const note = behaviour && !runs && !empty ? `Its behaviour row is not used here (${use.reasons.join("; ")}), so the key keeps this tap and hold.` : "";
+        const note = inertNote || (behaviour && !runs ? `Its behaviour row is not used here (${use.reasons.join("; ")}), so the key keeps this tap and hold.` : "");
         sections.push(`<div class="hc-sect"><div class="hc-h">Tap / hold</div>
             <div class="hc-sub">tap / hold ${esc(threshold(term))}</div>
             <div class="hc-act"><span class="hc-stage">Tap</span><span><span class="hc-name">${esc(role.tap)}</span></span></div>
             <div class="hc-act"><span class="hc-stage">Hold</span><span><span class="hc-name">${hold}</span></span></div>
             ${note ? `<div class="hc-sub hc-foot hc-quiet">${esc(note)}</div>` : ""}</div>`);
-    } else if (empty && !custom) {
-        sections.push(`<div class="hc-sect"><div class="hc-sub hc-quiet">${esc("Its behaviour row has no branches or timing of its own: the key runs as it does without one.")}</div></div>`);
+    } else if (inert) {
+        sections.push(`<div class="hc-sect"><div class="hc-sub hc-quiet">${esc(inertNote)}</div></div>`);
     }
-    if (behaviour && !(role && branchless) && !(empty && !role && !custom)) {
+    if (behaviour && !(role && branchless) && !(inert && !role)) {
         const terms = behaviourThresholds(model, behaviour);
         const branches = (behaviour.steps || []).map((step) => {
             /** @type {[import("../../contracts/edits.js").Tier, string, import("../../contracts/panel.js").Branch | undefined][]} */

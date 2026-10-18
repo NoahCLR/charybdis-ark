@@ -13,7 +13,7 @@ function contracts(slot: PdSlot, identity: BaseIdentity) {
     const messages: PanelEdit[] = [
         edits.setKey('Layer 0', 1, 'KC_A'),
         edits.placementPolicy(0, 1, true, false),
-        edits.addBehaviour('KC_A', identity),
+        edits.deleteBehaviour('KC_A', identity),
         edits.comboMessage(null, {inputs: ['KC_A', 'KC_B'], output: 'KC_C', termMs: '50'}),
         edits.macroMessage('VIA_MACRO_0', 'hello', 'fingerprint'),
         edits.macroProtectionMessage('VIA_MACRO_0', 'auto', 'fingerprint'),

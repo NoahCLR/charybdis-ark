@@ -15,8 +15,8 @@ const {profileDepthOptions} = require("../schema/profile-depth");
  * @typedef {import("../schema/types.js").SemanticAction} Action
  * @typedef {import("../schema/types.js").BehaviorRow} Row
  * @typedef {import("../../contracts/edits.js").BehaviorBranch} Branch
- * @typedef {Omit<import("../../contracts/edits.js").Behavior, 'steps'> & {steps?: import("../../contracts/edits.js").BehaviorStep[], tap?: Branch, hold?: Branch, longHold?: Branch}} BehaviorInput
- * @typedef {Extract<import("../../contracts/edits.js").PanelEdit, {type: 'deleteBehavior' | 'retargetBehavior'}> | {type: 'saveBehavior' | 'addBehavior', behavior: BehaviorInput}} BehaviorEdit
+ * @typedef {Omit<import("../../contracts/edits.js").Behavior, 'steps'> & {steps?: import("../../contracts/edits.js").BehaviorStep[]}} BehaviorInput
+ * @typedef {Extract<import("../../contracts/edits.js").PanelEdit, {type: 'deleteBehavior' | 'retargetBehavior'}> | {type: 'saveBehavior', behavior: BehaviorInput}} BehaviorEdit
  */
 const RETARGET_CONFLICTS = new Set(["overwrite", "swap"]);
 /** @param {string} message */
@@ -134,9 +134,7 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
         rows.splice(index, 1);
     } else {
         checkTarget(target);
-        if (message.type === "addBehavior" && previous) throw invalid("This key already has a behaviour row. Edit the existing row instead.");
-        const suppliedSteps = message.type === "addBehavior" && form.steps === undefined
-            ? [{tapCount: 0, tap: form.tap, hold: form.hold, longHold: form.longHold}] : form.steps;
+        const suppliedSteps = form.steps;
         if (!Array.isArray(suppliedSteps)) throw invalid("A behaviour must include its tap branches.");
         /** @type {import("../schema/types.js").BehaviorStep[]} */
         const steps = [];

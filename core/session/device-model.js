@@ -16,6 +16,7 @@ const keycodeCatalog = require("../data/keycode-catalog");
 const keycodeLegacy = require("../data/keycode-legacy");
 const {baseEffectForView, baseRgbForView, behaviorRowsForView, builtInForView, comboRowsForView, rgbForView} = require("../model/device-profile-view");
 const {effectiveTimings, holdTermSetting} = require("../model/gesture-timing");
+const {timingAlone} = require("../model/inert-behaviors");
 const {compactKeyLabels, hostKeyVocabulary, keyLabel, keyLayer, profileKeyNames, shortcutLabel} = require("../model/key-names");
 const {layerName} = require("../model/vocabulary");
 const {keycodeAction, knownActionAbi, layerRef, nativeCode} = require("../schema/actions");
@@ -355,7 +356,8 @@ function behaviorDefaults(content, capabilities, aliases, names) {
         const source = holdTermSetting(target) === SETTING.TAPPING_TERM ? "tappingTerm" : "tapHoldTerm";
         return [aliases[name] || name, {builtIn: builtInForView(target, features, names),
             timing: {tapHoldTerm: timing.hold, longerHoldTerm: timing.long, multiTapTerm: timing.repeat},
-            timingSources: {tapHoldTerm: source, longerHoldTerm: "longHoldTerm", multiTapTerm: "multiTapTerm"}}];
+            timingSources: {tapHoldTerm: source, longerHoldTerm: "longHoldTerm", multiTapTerm: "multiTapTerm"},
+            timingAlone: timingAlone(target, features.customKeyShortcuts)}];
     }));
 }
 

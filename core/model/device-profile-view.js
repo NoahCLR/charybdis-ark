@@ -10,6 +10,7 @@ const keycodes = require("../data/keycode-catalog");
 const {PROFILE_ACTION_KINDS: ACTION} = require("../schema/profile-blob-v1");
 const {KEY_BEHAVIOR_HOLD_MODES} = require("../schema/key-behavior-domain-v1");
 const {builtInActions} = require("./built-in-behavior");
+const {changesNothing} = require("./inert-behaviors");
 const {
     RGB_AUTOMOUSE_MODES, RGB_DOMAIN_V1, RGB_KEY_SEMANTICS, RGB_LAYER_MODES,
     RGB_LOCALITIES, RGB_PD_MODE_IDS, RGB_TAP_COMMIT_MODES,
@@ -80,6 +81,7 @@ function behaviorRowsForView(domain, features = {}, names) {
         keepsAutoMouseAnchored: row.keepsAutoMouseAnchored,
         enabled: row.enabled,
         allowedLayers: row.allowedLayers,
+        changesNothing: changesNothing(row, features.customKeyShortcuts),
         steps: row.steps.map((step) => ({
             tapCount: step.tapIndex,
             tapCountName: branchName(step.tapIndex + 1),

@@ -20,7 +20,7 @@ test("slot 20 is created, bound, lit, reviewed and discarded like any other", ()
     stage({type: "savePdMode", slot: 20, config});
     stage({type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "PD_SLOT_20_LOCK"}]});
     stage({type: "updatePdModeColor", pointingMode: "PD_MODE_SLOT_20", h: "64", s: "255", v: "100", locality: "RGB_RIGHT_HALF"});
-    stage({type: "addBehavior", behavior: {keycode: "KC_F13", tap: {helper: "TAP_SENDS", action: "PD_SLOT_31"}}});
+    stage({type: "saveBehavior", behavior: {keycode: "KC_F13", steps: [{tapCount: 0, tap: {helper: "TAP_SENDS", action: "PD_SLOT_31"}}]}});
 
     const value = validateSnapshot(draft.document, CAPABILITIES_32);
     assert.equal(value.pdModes[20].name, "Desktops");
@@ -55,7 +55,7 @@ test("behaviour edits accept every current slot and refuse slots past the bank",
     const wide = document32();
     const blob = decodeProfileBlob(Buffer.from(wide.profile, "base64"));
     const payload = blob.domains.find(domain => domain.id === 0x20).payload;
-    const message = {type: "addBehavior", behavior: {keycode: "KC_F14", tap: {helper: "TAP_SENDS", action: "PD_SLOT_31"}}};
-    assert.ok(editKeyBehaviors(payload, message, CAPABILITIES_32).length > payload.length);
-    assert.throws(() => editKeyBehaviors(payload, {...message, behavior: {...message.behavior, tap: {helper: "TAP_SENDS", action: "PD_SLOT_32"}}}, CAPABILITIES_32));
+    const message = action => ({type: "saveBehavior", behavior: {keycode: "KC_F14", steps: [{tapCount: 0, tap: {helper: "TAP_SENDS", action}}]}});
+    assert.ok(editKeyBehaviors(payload, message("PD_SLOT_31"), CAPABILITIES_32).length > payload.length);
+    assert.throws(() => editKeyBehaviors(payload, message("PD_SLOT_32"), CAPABILITIES_32));
 });

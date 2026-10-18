@@ -273,11 +273,11 @@ and the tap / hold threshold it runs on: its behaviour's own, or Settings'
 dual-role threshold. The keyboard decides every key's tap or hold itself, with
 or without a behaviour, so the card does not name who decides. When the key's
 behaviour is switched off or bypassed there, the card says so and why, and the
-key keeps its own tap and hold at the dual-role threshold. Any other key whose
-behaviour has no branches, timing or mouse-layer anchor says in one line that
-it runs as it does without one. A behaviour switched off or bypassed on any
-other key says so and why, and what the key sends instead: its own keycode, or
-a custom key's shortcut.
+key keeps its own tap and hold at the dual-role threshold. A key whose
+behaviour changes nothing (below) says so and why in one line, in place of the
+behaviour's details. A behaviour switched off or bypassed on any other key says
+so and why, and what the key sends instead: its own keycode, or a custom key's
+shortcut.
 Behaviour branches list each tier's action and how a hold runs, and the
 behaviour names the thresholds it runs on in milliseconds, its own or the
 keyboard's default; a hold that taps at or after a threshold names
@@ -385,9 +385,21 @@ explicit values matching the old default; distinct custom timings stay fixed.
 Review lists inherited effective-time changes under Tap & hold timing and any
 matching overrides converted to defaults under their behaviours. Those stored
 changes discard together with the default edit.
-Selecting a key opens its grid in Behaviours even before it has a stored row.
-Only a grid action, timing override or anchor change adds the row to the draft;
-browsing leaves the board and behaviour counts unchanged. Transparent keys and
+Selecting a key opens its grid in Behaviours even before it has a stored row;
+there is no separate Add behaviour. A behaviour is added to the draft only when
+it would change something: a grid action, **Keeps the mouse layer on** (on any
+key), or a timing on a key the keyboard handles anyway — a layer-tap, mod-tap,
+one-shot or tap-toggle key, a key that holds a layer (`MO()`, `LM()`) or a
+pointing mode while it is down, or a custom key with a shortcut. On any other
+key, such as Delete, `TG()` or a pointing-mode toggle, a timing does nothing
+until the behaviour has a branch, so the timing fields wait for one, and **Use
+this behaviour** and its layers wait for something to switch. A behaviour that
+changes nothing (no branches, not keeping the mouse layer on, and no timing
+that applies to its key) is not kept: an edit that leaves one so, such as
+clearing its last grid action, removes it, draft history says "Removed a
+behaviour", Review lists the removal and Undo brings it back. One already on
+the keyboard says in the editor why it changes nothing. Browsing leaves the
+board and behaviour counts unchanged. Transparent keys and
 `KC_NO` cannot have behaviours. In a layer preview, a transparent key opens the
 key the board shows through it: the editor names the layer that supplies that
 key and says the behaviour belongs to its keycode, so changing it changes that
@@ -1008,8 +1020,9 @@ still appear.
 Other checks cover a layer with keys nothing reaches, a layer key onto an empty
 layer, transparent and `KC_NO` keys on Base, a pointer layer that cannot work,
 and layer keys the keyboard leaves to QMK. They also name combos that cannot
-fire, actions aimed at empty pointing slots, and macros your Host setup
-cannot play.
+fire, actions aimed at empty pointing slots, macros your Host setup cannot
+play, and behaviours that change nothing, as a notice that opens the behaviour
+so you can remove it or give it a branch.
 Brightness or lighting effects unsupported by the destination are blockers:
 Apply stays disabled until they are fixed. Notices and checks fixed by the draft need no
 confirmation. Each check says whether the draft made it, the keyboard already

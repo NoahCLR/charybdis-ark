@@ -7,6 +7,7 @@
 // of shape fails there rather than on a keyboard.
 
 import {hsv} from "../lib/colour.mjs";
+import {behaviourChangesNothing} from "./behavior-editor.mjs";
 
 /**
  * @typedef {import("../../contracts/edits.js").BaseIdentity} BaseIdentity
@@ -54,13 +55,6 @@ export const swapKeys = (layer, from, to) => layoutKeys(layer, [
 export const TIER_FIELDS = {tap: "tap", hold: "hold", long: "longHold"};
 export const DEFAULT_REPEAT_HZ = "20";
 
-// Empty branches preserve the key's firmware defaults. Copying the target into
-// a tap branch would override those defaults and is invalid for keys like LT.
-/** @param {string} keycode @param {Partial<BaseIdentity> | null} [identity] @returns {import("../../contracts/edits.js").EditOf<'addBehavior'>} */
-export const addBehaviour = (keycode, identity) => ({
-    type: "addBehavior", expectedBase: identity ?? undefined,
-    behavior: {keycode, steps: []},
-});
 /** @param {string} keycode @param {Partial<BaseIdentity> | null} [identity] @returns {import("../../contracts/edits.js").EditOf<'deleteBehavior'>} */
 export const deleteBehaviour = (keycode, identity) => ({type: "deleteBehavior", keycode, expectedBase: identity ?? undefined});
 /** @param {string} keycode @param {string} target @param {Partial<BaseIdentity> | null} [identity] @param {'swap' | 'overwrite'} [conflict] @returns {import("../../contracts/edits.js").EditOf<'retargetBehavior'>} */
@@ -92,8 +86,10 @@ export function cellEdit(kind, {stored, action, helper, repeatHz}) {
 
 // One behaviour row, posted whole: the form is the row. `terms` are the
 // timing fields as typed (empty means the keyboard default, stored as 0),
-// `change` replaces one cell, and every other cell is carried as read.
-/** @param {Behavior} behaviour @param {{terms?: Partial<Record<'tapHoldTerm' | 'longerHoldTerm' | 'multiTapTerm', Scalar>>, anchored?: boolean, enabled?: boolean, allowedLayers?: number, change?: {tapCount: number, kind: Tier, branch: BehaviorBranch | null}}} [fields] @param {Partial<BaseIdentity> | null} [identity] @returns {import("../../contracts/edits.js").EditOf<'saveBehavior'> | null} */
+// `change` replaces one cell, and every other cell is carried as read. A row
+// that would change nothing is not kept: a key without a row gets none, and a
+// stored row is removed rather than saved, so Undo and Review show the removal.
+/** @param {Behavior} behaviour @param {{terms?: Partial<Record<'tapHoldTerm' | 'longerHoldTerm' | 'multiTapTerm', Scalar>>, anchored?: boolean, enabled?: boolean, allowedLayers?: number, change?: {tapCount: number, kind: Tier, branch: BehaviorBranch | null}}} [fields] @param {Partial<BaseIdentity> | null} [identity] @returns {import("../../contracts/edits.js").EditOf<'saveBehavior'> | import("../../contracts/edits.js").EditOf<'deleteBehavior'> | null} */
 export function saveBehaviour(behaviour, {terms = {}, anchored, enabled, allowedLayers, change} = {}, identity) {
     /** @param {'tapHoldTerm' | 'longerHoldTerm' | 'multiTapTerm'} name */
     const term = (name) => terms[name] === undefined ? String(behaviour[name] ?? "0") : String(terms[name]).trim() || "0";
@@ -121,8 +117,7 @@ export function saveBehaviour(behaviour, {terms = {}, anchored, enabled, allowed
         allowedLayers: allowedLayers ?? behaviour.allowedLayers ?? 0xffff,
         steps,
     };
-    if (behaviour.stored === false && behavior.enabled && behavior.allowedLayers === 0xffff && !steps.length && !behavior.keepsAutoMouseAnchored
-        && [behavior.tapHoldTerm, behavior.longerHoldTerm, behavior.multiTapTerm].every(value => /^0+$/.test(value))) return null;
+    if (behaviourChangesNothing({...behavior, timingAlone: behaviour.timingAlone})) return behaviour.stored ? deleteBehaviour(behaviour.keycode, identity) : null;
     return {
         type: "saveBehavior",
         expectedBase: identity ?? undefined,

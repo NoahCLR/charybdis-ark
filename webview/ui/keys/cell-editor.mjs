@@ -66,7 +66,9 @@ export function cellEditor(behaviour, step, kind) {
         onCustomKey: (keycode, shortcut, name) => {
             const edit = edits.cellEdit(kind, {stored: Boolean(branch), action: keycode,
                 helper: /** @type {import("../../../contracts/edits.js").BranchHelper | undefined} */ (/** @type {HTMLSelectElement | null} */ (node.querySelector("[data-helper]"))?.value), repeatHz: /** @type {HTMLInputElement | null} */ (node.querySelector("[data-repeat]"))?.value});
-            const then = edit.branch ? behaviourMessage(document, behaviour, {tapCount: step.tapCount, kind, branch: edit.branch}) : null;
+            // A cell that sends something keeps its row, so this is always a save.
+            const message = edit.branch ? behaviourMessage(document, behaviour, {tapCount: step.tapCount, kind, branch: edit.branch}) : null;
+            const then = message?.type === "saveBehavior" ? message : null;
             state.cellHow = null;
             if (then) post(edits.customKeyForShortcut(keycode, shortcut, name, then, getModel()?.customKeyEditing?.identity));
             render();

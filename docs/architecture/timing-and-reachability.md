@@ -110,9 +110,10 @@ pointing keys (their own hold) or bare modifiers.
 A dashed cell is display only; setting an action in it authors the tier
 (core/model/built-in-behavior.js, `impliedBranch` in webview/view/keyface.mjs).
 New behaviour editors start with no authored branches, preserving these defaults.
-Selecting a key opens its row or an unstored grid; only an action, timing override
-or anchor change creates a draft row. Previews never enter the host model's stored
-behaviour list, counts or board marks. Transparent keys and `KC_NO` have no
+Selecting a key opens its row or an unstored grid; there is no separate Add
+behaviour edit. Only an edit that leaves the row changing something creates a
+draft row ([Rows that change nothing](#rows-that-change-nothing)). Previews never
+enter the host model's stored behaviour list, counts or board marks. Transparent keys and `KC_NO` have no
 behaviour editor, and the host rejects them as new or retargeted row targets.
 Behaviour rows are keyed by keycode, so in a layer preview selecting a
 transparent position opens the keycode the board shows there, answered from
@@ -143,6 +144,45 @@ custom key that now holds it, or to the Keys screen's Behaviours tab when it
 moved to any other key (`retargetBehaviour` in webview/ui/keys/retarget.mjs).
 **Show on the Keys screen** keeps the previewed layer if the key is reached
 there, and otherwise shows the first layer that reaches it.
+
+## Rows that change nothing
+
+A row without steps is no row (firmware D-F27 "Rows without steps", Profile
+Wire feature bit 31): it decides neither a key's taps nor whether the keyboard
+handles the key, its timing applies only to a key the keyboard handles anyway,
+and its enable and allowed layers gate only what it holds. Its auto-mouse
+anchor applies on any key. So a row **changes nothing** when it has no steps,
+does not keep the mouse layer on and has no timing that applies to its key.
+Keys handled anyway, as the firmware's key runtime classifies them
+(`key_behavior_lookup.c` and the action registry's runtime-handled kinds):
+dual-role keys (`MT()`, `LT()`, `OSM()`), the keys that hold a layer while
+down (`MO()`, `TT()`, `OSL()`, `LM()`) on a layer the keyboard has,
+pointing-mode holds and custom keys with a shortcut. `TO()`, `TG()`,
+`LOCK_LAYER()`, pointing-mode toggles, `DF()` and `PDF()` are not, so a row
+with only a timing on one of them changes nothing. The contract's own words
+("dual-role, layer and pd-mode keys") are broader; Ark follows the
+classification itself (Noah, 2026-10-19), and a firmware change to it is an
+Ark follow-up.
+
+The rule is `changesNothing` in core/model/inert-behaviors.js. The host
+publishes it twice: each stored row's `changesNothing`, and each key's
+`timingAlone` in its behaviour defaults (whether a timing alone does
+something there; a key with none published counts as yes). The editor composes
+the same rule for the row it is about to post (`behaviourChangesNothing` in
+webview/view/behavior-editor.mjs); a test stages each case against a real
+draft and checks the two agree.
+
+The editor keeps no such row. An edit that would create one posts nothing; an
+edit that leaves a stored row changing nothing posts its removal, so history
+says "Removed a behaviour", Review lists it as removed and Undo restores it.
+On a key where a timing alone does nothing, the timing fields wait for a
+branch, and the row's switch and layers wait for anything to gate; **Keeps the
+mouse layer on** stays available on every key and alone makes a row. Rows that
+already change nothing, read from the keyboard, imported or left by a retarget
+or a cleared shortcut, are kept until edited or removed: Review notes each as
+an `inertBehavior` notice opening its behaviour, the editor says why it
+changes nothing, and the hover card says so in place of its details. Ark
+removes nothing on read and refuses nothing the keyboard accepts.
 
 ## Inherited timing and review
 
