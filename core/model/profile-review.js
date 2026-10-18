@@ -216,6 +216,11 @@ function comboFields(row, table, names) {
         ["Enabled", row.enabled ? "on" : "off"], ["Use output behaviour", row.useOutputBehavior ? "on" : "off"],
         ["Allowed layers", {text: names.layers.filter((_, i) => row.allowedLayers & 2 ** i).join(", ") || "none", key: row.allowedLayers}]]));
 }
+// A combo by what it is: "Space + Delete → Hold Number". Its number is only
+// its place in the table, which deleting a combo renumbers, so it rides along
+// as the title's quiet mark rather than as its name.
+/** @param {Combo | undefined} row @param {Names} names */
+const comboTitle = (row, names) => row ? `${row.inputs.map(input => action(input, names)).join(" + ") || "No inputs"} → ${action(row.output, names)}` : "";
 // The two values every combo shares. A version 1 table has no default window,
 // and without combos no hold threshold either.
 /** @param {Combos} table @returns {Fields} */
@@ -391,12 +396,12 @@ function profileReview(before, after, capabilities) {
     const removedCombo = singleComboRemovalIndex(combosA, combosB);
     if (removedCombo !== null) {
         const i = removedCombo;
-        item("Combos", `combo:${i}`, `Combo ${i}`, comboFields(combosA[i], a.combos, namesA), new Map(), {kind: "combo", index: i}, undefined,
+        item("Combos", `combo:${i}`, comboTitle(combosA[i], namesA), comboFields(combosA[i], a.combos, namesA), new Map(), {kind: "combo", index: i}, undefined,
             {kind: "combo", badge: `C${i}`});
         if (i < combosB.length) /** @type {Change} */ (items.at(-1)).note = "Later combos move up one number.";
     } else {
         for (let i = 0; i < Math.max(combosA.length, combosB.length); i++) {
-            item("Combos", `combo:${i}`, `Combo ${i}`, comboFields(combosA[i], a.combos, namesA), comboFields(combosB[i], b.combos, namesB), {kind: "combo", index: i}, undefined,
+            item("Combos", `combo:${i}`, comboTitle(combosB[i], namesB) || comboTitle(combosA[i], namesA), comboFields(combosA[i], a.combos, namesA), comboFields(combosB[i], b.combos, namesB), {kind: "combo", index: i}, undefined,
                 {kind: "combo", badge: `C${i}`});
         }
     }

@@ -16,7 +16,7 @@ import {definitionControls} from "../participation.mjs";
 import * as edits from "../../view/edits.mjs";
 import {timingInput} from "../../view/timing-input.mjs";
 import {openPicker} from "../picker.mjs";
-import {keyNameMarked} from "../marks.mjs";
+import {keyNameMarked, comboIdentityMarked} from "../marks.mjs";
 import {vocabulary} from "../../view/vocabulary.mjs";
 
 /** @param {string} text */
@@ -39,7 +39,7 @@ export function comboBuilder(canEdit, holdTerm) {
     const fallback = edits.comboDefaultTermValue(model);
     const windowField = timingInput(form.termMs, fallback, form.followsDefault && fallback !== "");
     const node = el(`<div class="card combo-builder">
-        <div class="card-h"><h3>${editing ? `Edit ${esc(original?.badge || "combo")}` : "New combo"}</h3>
+        <div class="card-h"><h3>${editing && original ? `${comboIdentityMarked(model, original)} <span class="tag">${esc(original.badge || "")}</span>` : "New combo"}</h3>
             <span class="right">${editing ? `<button class="btn tiny ghost" data-act="delete" ${canEdit ? "" : "disabled"}>Delete</button>` : ""}</span></div>
         <div class="card-b">
             <div class="field"><span>Sends</span>
@@ -75,10 +75,10 @@ export function comboBuilder(canEdit, holdTerm) {
                     `<label class="sw" data-tip="${esc(tip)}"><input type="checkbox" data-f="combo:${esc(state.combo.editId ?? 'new')}:${esc(flag)}" data-${flag.toLowerCase()} ${form[/** @type {"mustHold" | "mustTap" | "ordered"} */ (flag)] ? "checked" : ""} ${canEdit ? "" : "disabled"}><span class="track"></span><span class="txt">${esc(sentence(vocabulary(model).comboOptions[flag]))}</span></label>`).join("")}
             </div>
             <div class="row combo-actions">
-                <button class="btn primary" data-act="keep" ${canEdit && !state.combo.awaiting ? "" : "disabled"}>Add combo</button>
+                <button class="btn primary" data-act="keep" ${canEdit && !state.combo.awaiting ? "" : "disabled"}>${editing ? "Update combo" : "Add combo"}</button>
                 <button class="btn ghost" data-act="cancel">Cancel</button>
             </div>
-            <p class="note">A combo needs its output and at least two inputs, so this form keeps its own state until you keep it.</p>
+            <p class="note">A combo needs its output and at least two inputs, so this form keeps its own state until you add it.</p>
         </div></div>`);
 
     /** @type {HTMLElement} */ (node.querySelector(".card-b")).insertBefore(definitionControls(layers().map(layer => ({...layer, label: layerName(layer)})), form, canEdit,

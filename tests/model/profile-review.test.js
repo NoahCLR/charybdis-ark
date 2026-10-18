@@ -67,6 +67,9 @@ test("a combo's keys read as the screens read them, with no stored name where no
     const after=snapshot(combos(base,rows=>rows.map((row,id)=>id===0?{...row,inputs:[{kind:1,flags:0,operand:0x4338},{kind:1,flags:0,operand:0x7e80}]}:row)));
     const keys=profileReview(before,after).find(row=>row.unit==="combo:0").fields.find(field=>field.label==="Keys");
     assert.equal(keys.after,`/ / ${settings.names[3]} + ${slots[0].name} · hold`,"a layer by its name");
+    const item=profileReview(before,after).find(row=>row.unit==="combo:0");
+    assert.match(item.title,new RegExp(`^/ / ${settings.names[3]} \\+ ${slots[0].name} · hold → `),"a combo is titled by its inputs and what it sends");
+    assert.deepEqual(item.titleMark,{kind:"combo",badge:"C0"},"its number is a quiet mark beside it");
 });
 test("a key changed for another with the same label is still a visible change", () => {
     const before=snapshot(document()), changed=structuredClone(before.document);

@@ -122,6 +122,10 @@ export const comboOutputMarked = (model, combo) =>
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/panel.js").ComboView} combo */
 export const comboInputsMarked = (model, combo) =>
     (combo.inputs || []).map((input, at) => keyNameMarked(model, combo.inputDisplays?.[at] ?? input, input)).join(" + ");
+// A combo by what it is, "Space + Delete → Hold ■ Number": its C-number is
+// only a quiet index, since deleting a combo renumbers the ones after it.
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/panel.js").ComboView} combo */
+export const comboIdentityMarked = (model, combo) => `${comboInputsMarked(model, combo) || "No inputs"} → ${comboOutputMarked(model, combo)}`;
 
 // A label starting or ending in a layer's name, with that layer's mark before
 // the name. Empty-handed (no layer, or a label that does not carry its name)
