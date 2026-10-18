@@ -35,7 +35,7 @@ const domain = (id, payload) => ({id, version: PROFILE_DOMAIN_VERSIONS[id], payl
 /** @param {string} message */
 const fail = message => Object.assign(new Error(message), {code: "INVALID_PORTABLE_PROFILE"});
 // What a backup in another format than current firmware's is told.
-const OLDER_FORMAT = "This profile is in a format current firmware does not store, so Ark cannot read it. Export a new backup from a keyboard on current firmware.";
+const OLDER_FORMAT = "This profile is in a format current firmware does not store, so Ark cannot read it. Save a new backup file from a keyboard on current firmware.";
 /** @param {unknown} value @returns {value is number} */
 const u16 = value => typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 65535;
 const PHYSICAL_MATRIX_SLOTS = new Set(CHARYBDIS_4X6_LAYOUT_MATRIX.map((position, layoutIndex) => matrixPosition(layoutIndex)));

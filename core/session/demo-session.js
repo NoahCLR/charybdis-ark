@@ -101,7 +101,7 @@ const DEMO_OPTIONS = Object.freeze({
 const DEMO_WORDS = Object.freeze({
     label: "Demo",
     bundled: "the demo setup",
-    applyNeedsKeyboard: "Apply needs a keyboard. Export this setup, then import it on your keyboard to review and apply it there.",
+    applyNeedsKeyboard: "Apply needs a keyboard. Save a backup file, then restore it on your keyboard to review and apply it there.",
 });
 
 /** @param {string} text @param {string} [code] */
@@ -285,7 +285,7 @@ function demoHeader(session, busy) {
 function demoDiagnostics(session) {
     return [
         `No keyboard is connected. The demo opened ${session.demo.name} as current firmware would hold it: sixteen layers, 32 pointing slots, 128 macros and 128 custom keys.`,
-        "Edits, checks and the review work as they would on a keyboard. Apply needs one: export the setup, then import it on your keyboard.",
+        "Edits, checks and the review work as they would on a keyboard. Apply needs one: save a backup file, then restore it on your keyboard.",
     ];
 }
 
