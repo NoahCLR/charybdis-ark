@@ -338,10 +338,10 @@ test("the model shows the draft's surfaces but the keyboard's own header", () =>
     assert.match(model.device.subtitle, /local draft/, "the rail says the keyboard still runs what it ran");
     assert.equal(model.layers[1].displayName, draft.current.summary.names[1]);
     assert.equal(model.portable.available, true);
-    assert.equal(model.portable.layers, null, "the layer editor is closed until Rename & Reorder opens it");
+    assert.equal(model.portable.layers, null, "the layer editor is closed until Layers… opens it");
 });
 
-test("Rename & Reorder renames and reorders, keeps Base at the bottom, and carries names with a move", () => {
+test("Layers… renames and reorders, keeps Base at the bottom, and carries names with a move", () => {
     const before = snapshot();
     const edit = startLayerEdit(before, 3);
     assert.deepEqual(edit.order, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
@@ -363,7 +363,7 @@ test("Rename & Reorder renames and reorders, keeps Base at the bottom, and carri
     assert.equal(saved.settings.names[3], "Symbols+");
 });
 
-test("Rename & Reorder checks every posted name by rewriting the document, and each message keeps or refuses them its own way", () => {
+test("Layers… checks every posted name by rewriting the document, and each message keeps or refuses them its own way", () => {
     const tooLong = "x".repeat(40);
     const rename = (edit, id, name) => edit.names.map((old, slot) => (slot === id ? name : old));
 

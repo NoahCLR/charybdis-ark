@@ -32,7 +32,7 @@ export function formControls(model, slot, canEdit, stageCurrent) {
         const name = options.name ?? keyName(model, Number(code ?? 0));
         const node = el(`<label class="field ${options.klass || ""}"><span>${options.labelHtml || esc(label)}</span>
             <div class="input-row"><input data-f="pointing:${slot.id}:${esc(key)}" class="input mono" value="${esc(name)}" placeholder="nothing" ${disabled}>
-            <button class="btn" data-pick ${disabled}>Pick…</button></div></label>`);
+            <button class="btn" data-pick ${disabled}>Choose…</button></div></label>`);
         const macro = pointingMacro(model, code);
         if (macro) {
             node.append(el(`<span class="note">${esc(macro.name)}${macro.empty ? " · empty: does nothing yet" : ""}</span>`));

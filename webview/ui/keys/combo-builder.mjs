@@ -44,7 +44,7 @@ export function comboBuilder(canEdit, holdTerm) {
         <div class="card-b">
             <div class="field"><span>Sends</span>
                 <div class="input-row"><input class="input mono" data-f="combo:${esc(state.combo.editId ?? 'new')}:output" data-output value="${esc(visibleKeycode(model, form.output))}" ${canEdit ? "" : "disabled"}>
-                <button class="btn" data-act="pickout" ${canEdit ? "" : "disabled"}>Pick…</button></div>
+                <button class="btn" data-act="pickout" ${canEdit ? "" : "disabled"}>Choose…</button></div>
                 ${customKeySendsNote(model, canonicalKeycode(model, form.output)) ? `<span class="note">${esc(customKeySendsNote(model, canonicalKeycode(model, form.output)))}</span>` : ""}</div>
             <div class="field"><span>Inputs</span>
                 <div class="row combo-inputs">
@@ -75,7 +75,7 @@ export function comboBuilder(canEdit, holdTerm) {
                     `<label class="sw" data-tip="${esc(tip)}"><input type="checkbox" data-f="combo:${esc(state.combo.editId ?? 'new')}:${esc(flag)}" data-${flag.toLowerCase()} ${form[/** @type {"mustHold" | "mustTap" | "ordered"} */ (flag)] ? "checked" : ""} ${canEdit ? "" : "disabled"}><span class="track"></span><span class="txt">${esc(sentence(vocabulary(model).comboOptions[flag]))}</span></label>`).join("")}
             </div>
             <div class="row combo-actions">
-                <button class="btn primary" data-act="keep" ${canEdit && !state.combo.awaiting ? "" : "disabled"}>Keep combo in draft</button>
+                <button class="btn primary" data-act="keep" ${canEdit && !state.combo.awaiting ? "" : "disabled"}>Add combo</button>
                 <button class="btn ghost" data-act="cancel">Cancel</button>
             </div>
             <p class="note">A combo needs its output and at least two inputs, so this form keeps its own state until you keep it.</p>

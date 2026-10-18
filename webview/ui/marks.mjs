@@ -16,6 +16,16 @@ import {sequenceFace} from "../view/macro-sequence.mjs";
 import {namedAction} from "../view/reach.mjs";
 import {feedbackColours, pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {layerSwatch} from "./layerbar.mjs";
+import {keycodeAside} from "../view/show-keycodes.mjs";
+import {state} from "../store.mjs";
+
+// A key's QMK keycode as the muted suffix beside its words, where Show
+// keycodes allows it at this place (view/show-keycodes.mjs); empty otherwise.
+/** @param {import("../view/show-keycodes.mjs").KeycodePlace} place @param {string | null | undefined} keycode @param {string} [words] @param {string} [className] */
+export function keycodeMark(place, keycode, words, className = "dim") {
+    const code = keycodeAside(state, place, keycode, words);
+    return code ? `<code class="${esc(className)} kc-aside">${esc(code)}</code>` : "";
+}
 
 // A branch's badge as the grid heads its column: from 2× on, tinted with the
 // tap-branch colour the keyboard shows while that branch is pending. The

@@ -236,7 +236,7 @@ export function pickerOverlay() {
                 : `<span class="note">nothing picked yet</span>`}
             <code class="mono pk-value">${esc(value || "—")}</code>
             <span class="right"><button class="btn ghost" data-act="clear">Clear</button>
-                <button class="btn primary" data-act="use" ${value && !problem ? "" : "disabled"}>${picker.shortcut ? "Use shortcut" : "Use keycode"}</button></span>
+                <button class="btn primary" data-act="use" ${value && !problem ? "" : "disabled"}>${picker.shortcut ? "Use shortcut" : "Use key"}</button></span>
         </div>
         ${problem && !offer ? `<div class="note pk-problem" role="status">${esc(problem)}</div>` : ""}
         ${offer ? `<div class="note pk-problem pk-offer" role="status">${existing && !withBehaviour

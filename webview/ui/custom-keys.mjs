@@ -157,8 +157,8 @@ function shortcutField(model, key, canEdit) {
     const name = keyName(model, key.shortcut.key);
     const node = el(`<div class="field"><span>Shortcut</span>
             <div class="input-row"><input data-f="custom-key:${key.slot}:shortcut" class="input" data-shortcut value="${esc(hasShortcut(key) ? key.shortcutLabel : "")}" placeholder="None" readonly ${canEdit ? "" : "disabled"}
-                data-tip="One key and any modifiers, left and right mixed. Pick… opens the keycode picker with its modifier row.">
-            <button class="btn" data-act="pick-shortcut" ${canEdit ? "" : "disabled"}>Pick…</button>
+                data-tip="One key and any modifiers, left and right mixed. Choose… opens the key picker with its modifier row.">
+            <button class="btn" data-act="pick-shortcut" ${canEdit ? "" : "disabled"}>Choose…</button>
             <button class="btn ghost" data-act="clear-shortcut" ${canEdit && hasShortcut(key) ? "" : "disabled"}
                 data-tip="No shortcut: the key does only what its behaviour says.">Clear</button></div>
             <span class="note">${esc(customKeyShortcutLine(key))}</span></div>`);

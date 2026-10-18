@@ -12,7 +12,7 @@ import {definitionControls} from "../participation.mjs";
 import * as edits from "../../view/edits.mjs";
 import {behaviourTimingChecks} from "../../view/checks.mjs";
 import {behaviourTimingEdit, behaviourTimingField} from "../../view/behavior-editor.mjs";
-import {actionMarked, branchBadge, keyNameMarked, sends, sendsKind, tierDot} from "../marks.mjs";
+import {actionMarked, branchBadge, keyNameMarked, sends, sendsKind, tierDot, keycodeMark} from "../marks.mjs";
 import {branchName, helperWord, tierName, vocabulary, word} from "../../view/vocabulary.mjs";
 import {cellEditor} from "./cell-editor.mjs";
 import {pickBehaviourKey, retargetPrompt} from "./retarget.mjs";
@@ -100,9 +100,10 @@ export function behaviourEditor(behaviour) {
         // The grid reads by name; the keycode is on hover and in the editor.
         const label = cellLabel(model, branch);
         const named = Boolean(sends(model, branch.action)) || label !== branch.action;
-        return `<button class="bcell ${open ? "on" : ""}" data-cell="${id}"${named ? ` data-tip="${esc(branch.action)}"` : ""}>
+        const code = named ? keycodeMark("behaviourCell", branch.action, label) : "";
+        return `<button class="bcell ${open ? "on" : ""}" data-cell="${id}"${code ? ` data-tip="${esc(branch.action)}"` : ""}>
             <span class="bk ${named ? "named" : ""}">${sends(model, branch.action) || keyNameMarked(model, label, branch.action)}</span>
-            <span class="bl">${esc([sendsKind(model, branch.action), helperLabel(kind, branch.helper)].filter(Boolean).join(" · "))}</span></button>`;
+            <span class="bl">${esc([sendsKind(model, branch.action), helperLabel(kind, branch.helper)].filter(Boolean).join(" · "))}${code ? ` ${code}` : ""}</span></button>`;
     };
 
     const dashed = steps.some((step) => /** @type {import("../../../contracts/edits.js").Tier[]} */ (["tap", "hold", "long"]).some((kind) => !step[TIER_FIELDS[kind]]
@@ -111,19 +112,19 @@ export function behaviourEditor(behaviour) {
         <div class="beh-head">
             <div>
                 <div class="row beh-title"><h3>${actionMarked(model, behaviour.keycode)}</h3>
-                    ${actionLabel(model, behaviour.keycode) === behaviour.keycode ? "" : `<code class="dim">${esc(behaviour.keycode)}</code>`}</div>
+                    ${keycodeMark("behaviourTitle", behaviour.keycode, actionLabel(model, behaviour.keycode))}</div>
                 <p class="note">${esc(timingDefaultsNote(behaviour))}</p>
                 ${behaviour.stored ? "" : `<p class="note">Using the key’s defaults. A behaviour is added to the draft when you change a timing, switch or grid action.</p>`}
             </div>
             ${behaviour.stored ? `<div class="right row beh-actions">
                 <button class="btn tiny ghost" data-act="rekey" ${canEdit ? "" : "disabled"}
-                    data-tip="Pick the key this behaviour listens to. Everything it does moves with it.">Change key…</button>
+                    data-tip="Choose the key this behaviour listens to. Everything it does moves with it.">Move to another key…</button>
                 <button class="btn tiny ghost" data-act="remove" ${canEdit ? "" : "disabled"}
                     data-tip="Remove this behaviour from the draft. Its keys then send their plain keycode.">Remove behaviour</button>
             </div>` : ""}
         </div>
         <div class="beh-intro">
-            <label class="sw" data-tip="Treat this key as part of using the mouse, so pressing it keeps the auto-mouse layer on instead of turning it off.">
+            <label class="sw" data-tip="Treat this key as part of using the mouse, so pressing it keeps the mouse layer on instead of turning it off.">
                 <input type="checkbox" data-f="behaviour:${esc(behaviour.keycode)}:anchor" data-anchor ${behaviour.keepsAutoMouseAnchored ? "checked" : ""} ${canEdit ? "" : "disabled"}>
                 <span class="track"></span><span class="txt">Keeps the mouse layer on</span></label>
         </div>
@@ -141,7 +142,7 @@ export function behaviourEditor(behaviour) {
                 ${/** @type {import("../../../contracts/edits.js").Tier[]} */ (["tap", "hold", "long"]).map((kind) => cellFor(step, kind)).join("")}`).join("")}
         </div>
         <div id="cellEditor"></div>
-        <p class="note beh-foot">Every cell is one action: what it sends, and how it runs once its threshold passes. Empty cells are dropped when the profile is applied.${dashed ? " A dashed cell is what the keyboard does there with nothing set: the key's own action, or the other hold tier carrying on. It is not stored, and setting an action there replaces it." : ""}</p>
+        <p class="note beh-foot">Every cell is one action: what it sends, and how it runs once its threshold passes. Empty cells are dropped when the profile is applied.${dashed ? " A dashed cell is what the keyboard does there with nothing set: the key's own action, or the other hold carrying on. It is not stored, and setting an action there replaces it." : ""}</p>
     </div>`);
 
     /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-cell]")).forEach((button) => button.addEventListener("click", () => {

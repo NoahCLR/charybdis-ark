@@ -45,7 +45,7 @@ function groupBuilder(model, canEdit) {
     }));
     const actions = el(`<div class="row gap-8">
         <button class="btn primary" data-act="keep" ${canEdit && (draft.source || state.ledPicks.length) ? "" : "disabled"}
-            data-tip="Pick LEDs on the board, or choose a saved group, to give the row something to paint.">Keep row in draft</button>
+            data-tip="Pick LEDs on the board, or choose a saved group, to give the row something to paint.">Add</button>
         <button class="btn ghost" data-act="save" ${canEdit ? "" : "disabled"}
             data-tip="Store this selection as a named group other rows can point at.">Save selection as a group</button></div>`);
     /** @type {HTMLButtonElement} */ (actions.querySelector('[data-act="keep"]')).addEventListener("click", () => {

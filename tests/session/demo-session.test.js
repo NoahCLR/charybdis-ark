@@ -229,7 +229,7 @@ test("Open a profile file replaces the demo profile with the file, checked as Im
     }
 });
 
-test("Import and Rename & Reorder work on the demo's draft as on a keyboard's", async () => {
+test("Import and Layers… work on the demo's draft as on a keyboard's", async () => {
     const {loop, host} = await unplugged();
     try {
         await loop.handleMessage({type: "openDemo"});

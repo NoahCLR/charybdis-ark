@@ -257,6 +257,11 @@ function layersForView(layout, labels, aliases = {}, layerNames = []) {
             if (resolved.tap && labels[resolved.tap]) resolved.tapLabel = labels[resolved.tap];
             // A layer key names its layer on the cap by the layer's name.
             if (resolved.layer !== undefined) resolved.layerLabel = layerName(layerNames, resolved.layer);
+            // So does a layer lock, which the keyboard stores as a user
+            // keycode the profile names LOCK_LAYER(n): its cap reads like
+            // TG(n)'s, the layer over "Lock".
+            const lock = /^LOCK_LAYER\(/.test(aliases[key.resolved.name] || "") ? keyLayer(key.keycode) : undefined;
+            if (lock !== undefined) resolved.layerLabel = layerName(layerNames, lock);
             return {
                 layoutIndex: key.layoutIndex,
                 keycode: key.resolved.name,
@@ -266,7 +271,7 @@ function layersForView(layout, labels, aliases = {}, layerNames = []) {
                 // bare hex, so every lookup that crosses that gap matches on
                 // this and nothing has to re-derive the mapping.
                 semantic: aliases[key.resolved.name] || key.resolved.name,
-                display: displayFor(resolved),
+                display: lock !== undefined ? /** @type {string} */ (resolved.layerLabel) : displayFor(resolved),
                 editLabel: resolved.label,
                 ...(resolved.kind === "mod-tap" ? {modifierLabel: resolved.label.split(" / ").at(-1)} : {}),
                 ...(resolved.layerLabel ? {layerLabel: resolved.layerLabel} : {}),
@@ -287,7 +292,7 @@ function displayFor(resolved) {
         return "▽";
     }
     if (resolved.name === "KC_NO") {
-        return "";
+        return "—";
     }
     if (resolved.kind === "layer") {
         return resolved.layerLabel;
