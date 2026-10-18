@@ -256,7 +256,7 @@ const PEER_BUSY_DETAIL = Object.freeze({
 /** @param {import("./types.js").CandidatePeer | null | undefined} peer @returns {{detail: string, completed?: number, total?: number}} */
 function peerReport(peer) {
     if (!peer) return {detail: "Waiting for the slave half"};
-    if (peer.waitingSafeBoundary) return {detail: "Release held keys and turn off locked layers or pointer modes to finish saving"};
+    if (peer.waitingSafeBoundary) return {detail: "Release held keys and turn off locked layers or trackball modes to finish saving"};
     const busy = peer.busyStreak >= 3 ? ` · ${PEER_BUSY_DETAIL[peer.busyReason] || "the slave half is busy"}` : "";
     const report = {detail: `${PEER_DETAIL[peer.phaseName] || "Waiting for the slave half"}${busy}`};
     if (peer.phaseName === "SENDING" || peer.phaseName === "BEGINNING") Object.assign(report, {completed: peer.transferOffset, total: peer.transferLength});

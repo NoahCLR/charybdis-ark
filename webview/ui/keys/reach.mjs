@@ -12,7 +12,7 @@ import {comboGroups, combosInView} from "../../view/combo-reach.mjs";
 import {resolvedPositions} from "../../view/layer-resolution.mjs";
 import {getModel, heldLayers, layerName, layers, state} from "../../store.mjs";
 import {reachEntries} from "../../view/reach-groups.mjs";
-import {actionMarked, comboBadge, comboInputsMarked, keyNameMarked} from "../marks.mjs";
+import {actionMarked, comboBadge, comboInputsMarked, keyNameMarked, keycodeMark} from "../marks.mjs";
 import {behaviourRoute} from "./behaviour-selection.mjs";
 
 // The keys the board rings: the ones that reach whatever row is picked in the
@@ -89,7 +89,7 @@ export const keysReach = (keys, {names = true} = {}) => {
 /** @param {Model} model @param {string} keycode */
 const namedKey = (model, keycode) => {
     const label = actionLabel(model, keycode);
-    return label === String(keycode) ? esc(label) : `${actionMarked(model, keycode, label)} <code class="dim">${esc(keycode)}</code>`;
+    return label === String(keycode) ? esc(label) : `${actionMarked(model, keycode, label)}${(code => code ? ` ${code}` : "")(keycodeMark("reachRow", keycode, label))}`;
 };
 /** @param {Model} model @param {ReturnType<typeof reachInView>[number]} entry */
 export const branchReach = (model, entry, showSends = true) => entry.behaviours.map((row) => {

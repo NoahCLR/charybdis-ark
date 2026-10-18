@@ -62,7 +62,7 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
     /** @param {unknown} value @param {Action} [previous] @returns {Action} */
     const action = (value, previous) => {
         const name = String(value ?? "").trim();
-        if (!name) throw invalid("Choose an action for each enabled behaviour branch.");
+        if (!name) throw invalid("Choose what each action you set sends.");
         if (previous && normalized(name) === normalized(actionName(previous))) return previous;
         /** @type {Action} */
         let result;
@@ -142,7 +142,7 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
         const steps = [];
         const seen = new Set();
         for (const step of suppliedSteps) {
-            const tapIndex = integer(step?.tapCount, (capabilities.maxTapStepsPerBehavior ?? 5) - 1, "Tap branch index");
+            const tapIndex = integer(step?.tapCount, (capabilities.maxTapStepsPerBehavior ?? 5) - 1, "Tap count");
             if (seen.has(tapIndex)) throw invalid("A behaviour cannot repeat a tap branch index.");
             seen.add(tapIndex);
             const oldStep = previous?.steps.find(row => row.tapIndex === tapIndex);
@@ -153,11 +153,11 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
                 if (!branch) continue;
                 const helper = String(branch.helper ?? "").trim();
                 if (!helper) {
-                    if (String(branch.action ?? "").trim() || String(branch.repeatHz ?? "").trim()) throw invalid("Choose a helper for each enabled behaviour branch.");
+                    if (String(branch.action ?? "").trim() || String(branch.repeatHz ?? "").trim()) throw invalid("Choose How it runs for each hold action you set.");
                     continue;
                 }
                 if (field === "tap") {
-                    if (helper !== "TAP_SENDS") throw invalid("Tap branches require the Tap sends helper.");
+                    if (helper !== "TAP_SENDS") throw invalid("A tap action only sends: it has no How it runs.");
                     next.tap = action(branch.action, oldStep?.tap);
                 } else {
                     if (!Object.hasOwn(KEY_BEHAVIOR_HOLD_MODES, helper)) throw invalid(`Unknown hold helper: ${helper}.`);

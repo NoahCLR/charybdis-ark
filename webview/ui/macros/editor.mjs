@@ -183,7 +183,7 @@ function unicodeSetup(model, slot) {
             "Other characters use Unicode entry: install and run WinCompose on Windows with Right Alt as its Compose key.",
             "Other characters use Unicode entry: use an input method or application that accepts Ctrl+Shift+U, hexadecimal digits and Space, such as IBus. This sequence does not work in every Linux application."][mode]
         : os === 1 ? "Characters it cannot type, such as emoji, need the Unicode Hex Input layout."
-            : "Characters it cannot type, such as emoji, need Unicode playback on and a known host OS.";
+            : "Characters it cannot type, such as emoji, need Unicode playback on and a known operating system.";
     const typing = slot?.uninterruptible ? "" : " Avoid typing while a text macro plays.";
     return `<p class="note">${esc(typed)} ${esc(entry)} The keyboard cannot check your input setup.${esc(typing)}</p>`;
 }

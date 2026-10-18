@@ -54,7 +54,7 @@ function groupBuilder(model, canEdit) {
     /** @type {HTMLButtonElement} */ (actions.querySelector('[data-act="save"]')).addEventListener("click", () =>
         post(edits.saveLedGroup(ledIndices())));
     node.append(actions);
-    node.append(el(`<p class="note">Rows are applied in device order, so a later row wins on the LEDs it shares.</p>`));
+    node.append(el(`<p class="note">Rows are applied in the order the keyboard stores them, so a later row wins on the LEDs it shares.</p>`));
     return node;
 }
 

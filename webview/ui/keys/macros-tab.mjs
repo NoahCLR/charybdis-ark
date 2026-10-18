@@ -10,7 +10,7 @@ import {draftDot, draftMarks} from "../../view/review.mjs";
 import {attachReachRows, reachAttrs, reachTable} from "../groups.mjs";
 import {reachEntries} from "../../view/reach-groups.mjs";
 import {macroView, reachLabel} from "./reach.mjs";
-import {actionMarked, macroSteps} from "../marks.mjs";
+import {actionMarked, macroSteps, keycodeMark} from "../marks.mjs";
 
 /** @param {HTMLElement} body @param {HTMLElement} right */
 export function tabMacros(body, right) {
@@ -27,7 +27,7 @@ export function tabMacros(body, right) {
     const row = (group, keycode, reachedBy) => {
         const slot = slots.find((entry) => entry.keycode === keycode);
         return `<tr${reachAttrs("macros", group, keycode)}>
-            <td>${actionMarked(model, keycode)} <code class="dim">${esc(keycode)}</code>${changedMacros.has(keycode) ? draftDot() : ""}</td>
+            <td>${actionMarked(model, keycode)}${(code => code ? ` ${code}` : "")(keycodeMark("reachRow", keycode))}${changedMacros.has(keycode) ? draftDot() : ""}</td>
             <td>${slot?.payload ? macroSteps(model, slot.payload) : `<span class="muted">${slot ? "empty" : "—"}</span>`}</td>
             <td class="muted">${reachedBy}</td>
             <td class="reach-edit">${slot ? `<button class="btn tiny ghost" data-editmacro="${esc(keycode)}">Edit</button>` : ""}</td></tr>`;

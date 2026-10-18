@@ -8,7 +8,7 @@ import {behaviourListeningTo, canonicalKeycode} from "../../view/keyface.mjs";
 import {getModel, post, render, state} from "../../store.mjs";
 import * as edits from "../../view/edits.mjs";
 import {openPicker} from "../picker.mjs";
-import {actionMarked} from "../marks.mjs";
+import {actionMarked, keycodeMark} from "../marks.mjs";
 
 // A behaviour belongs to the key it listens to, so changing that key moves the
 // whole row. A key that already has a row is never replaced silently: the
@@ -57,7 +57,7 @@ export function retargetPrompt(behaviour) {
     const model = getModel();
     const {to, existing} = /** @type {NonNullable<typeof state.retarget>} */ (state.retarget);
     /** @param {string} keycode */
-    const name = (keycode) => `<b>${actionMarked(model, keycode)}</b> <code class="dim">${esc(keycode)}</code>`;
+    const name = (keycode) => `<b>${actionMarked(model, keycode)}</b>${(code => code ? ` ${code}` : "")(keycodeMark("reachRow", keycode))}`;
     const node = el(`<div class="scrim"><div class="sheet retarget" role="alertdialog" aria-modal="true" aria-label="Key already has a behaviour">
         <div class="sheet-h"><h2>${actionMarked(model, existing)} already has a behaviour</h2></div>
         <div class="sheet-b"><p>
