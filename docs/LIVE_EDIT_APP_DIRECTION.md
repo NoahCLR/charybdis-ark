@@ -44,11 +44,11 @@ matrix.
 | Key behaviours, combos and RGB | Read/write editors over the shared draft, with participation controls at every scope and global/per-combo output behaviour permissions (D-L12, D-L32, D-L49, D-L55) |
 | Macros | 128 VIA macros renamed directly through their titles; empty canvas with direct step actions, fixed-size sequence tiles, drag reordering across the whole sequence, Delete/Backspace step removal, per-slot step undo/redo and a shared step clipboard, a selected-step editor, a raw-payload toolbar toggle and live validation, including visible invalid hold order; recorder scoped to its visible slot with taps/chords by default and optional hold timing alongside its other settings; Unicode text, typed and checked through the host's OS and keyboard layout; per-macro input protection; one shared memory, shown and enforced (D-L25, D-L26, D-L56, D-L57) |
 | Custom keys | 128 named keys, each with an optional shortcut (one key and any modifiers, sides mixed) as its own action and a behaviour on top: rename, set or clear the shortcut, edit the behaviour on the same screen whether or not the key is placed, place, see where each is used; behaviour steps may send one's shortcut (D-L42, D-L63) |
-| Mouse | Pointer and sniping DPI, auto-sniping and auto-mouse, settings the core files under Mouse, so the rail, the review and import counts all place them there; the auto-mouse fade is a share of the timeout, edited on its lighting stage (D-L17) |
+| Mouse | Pointer and sniping DPI, auto-sniping (with where the sniping keys are placed) and auto-mouse, settings the core files under Mouse, so the rail, the review and import counts all place them there; the auto-mouse fade is a share of the timeout, edited on its lighting stage (D-L17) |
 | Pointing modes | 32 device-owned slots in the sparse PD domain (D-L41, D-L54); mouse-button 1–8 clicks and VIA macro outputs from directions, diagonals and tap overrides; see [the editor contract](architecture/interface-contracts.md#pointing-tap-outputs) and [PD-mode domain v1](../upstream/firmware/docs/architecture/pd-mode-domain-v1.md) |
-| Global policy | Every other portable setting, including startup layers, combo matching, Host and device-reported lighting and key options; the lighting idle timeout is edited in seconds or minutes; key options the firmware build leaves out stay read-only (D-L18, D-L56) |
-| Keyboard name | The keyboard's own name, its USB product string, edited on Settings and stored in the settings domain; an Apply that renames it is followed through the keyboard's USB restart (D-L62) |
-| Backup and restore | Complete current-format snapshots, import review against the keyboard, recovery file and verified restore; older formats are refused, never converted (D-L15, D-L23, D-L54, D-L64) |
+| Settings | Every other portable setting, including default layers, combo matching, Host and device-reported lighting and key options; the lighting idle timeout is edited in seconds or minutes; key options the firmware build leaves out stay read-only and a read-only list of what is built into this firmware (D-L18, D-L56) |
+| Keyboard name | The keyboard's own name, its USB product string, edited as the Keyboard screen's title and stored in the settings domain; an Apply that renames it is followed through the keyboard's USB restart (D-L62) |
+| Backup and restore | Complete current-format backup files, restore review against the keyboard, the copies saved before each Apply (each usable as a draft) and verified restore; older formats are refused, never converted (D-L15, D-L23, D-L54, D-L64) |
 | Drafts and Apply | One draft with item-by-item review, discard by edit group, Show, undo/redo and history; the review checks reachable actions, confirms warnings and traps and blocks what the destination cannot save; Apply names its steps and halves and says where a failure happened (D-L19, D-L23, D-L29, D-L30, D-L36, D-L60, D-L61) |
 | Firmware supported | Current firmware only: every feature it reports is required, and a keyboard on anything older is read no further than its identity and told to update (D-L64) |
 | Recovery | Atomic logical Apply, differential custom and VIA transfer, reboot recovery fencing, firmware roll-forward after the decision, resume after a lost or power-cycled peer link, bounded cancel owned by the keyboard (D-L20–D-L22, D-L27, D-L39, D-L58) |
@@ -121,6 +121,14 @@ Remaining before calling the product complete:
   does not include, matched against its rules files and QMK's defaults. It
   drifts when a feature is enabled or disabled. The keyboard should report its
   built features so the picker reads them from the device.
+- **Chords written in the firmware's form need keyboard acceptance.** Ark
+  writes a chord as the firmware does (presses, a tap of the last key, releases
+  in reverse) and reads that and its older all-down-all-up form back as one
+  chord. Record and apply a chord macro, read it back, and play it on both
+  halves; the step round-trip is unit-tested only.
+- **Apply's three failure verdicts need keyboard acceptance (D-L23).** Confirm
+  nothing saved, the keyboard finishing a decided save by itself, and unknown,
+  against what the keyboard runs after a replug.
 - **Firmware open issues** are tracked in the firmware direction, including the
   one-half power-cycle recovery transition, why a peer stops acknowledging a push or
   fails a flash write mid-copy (D-L22, D-L27), physical acceptance of buffered gesture timing
@@ -291,7 +299,7 @@ read has opened an editable draft. Layout, committed domains, VIA base RGB and
 the complete profile arrive in separate reads and are published separately for
 diagnostics, but their partial previews must stay behind one loading state.
 Every screen menu is disabled during that read. Afterwards, Configure requires
-an editable draft; Profile & backups requires complete-profile support; Device requires a connected
+an editable draft; Backups requires complete-profile support; Keyboard requires a connected
 keyboard that reported its capabilities.
 
 ### D-L12 — RGB rule identity and preview appearance are separate
@@ -796,7 +804,7 @@ the keyboard (a Web Lock), as one panel does in a VS Code window; leaving with
 unapplied edits or during Apply asks first (a VS Code panel cannot ask, so one
 closed during Apply finishes the save before it releases the keyboard); Apply's waits run on a worker's clock, so a background tab does not slow
 it. Recovery copies are kept in the browser's storage (IndexedDB), listed on
-Profile & backups with a download each; clearing the site's data deletes them.
+Backups with Use as draft, Download and Delete each; clearing the site's data deletes them.
 
 A phone gets none of this: the page shows a notice that Ark runs on a computer,
 with links to Ark's and the firmware's repositories and to BastardKB, the

@@ -70,17 +70,17 @@ pulsing while a read runs. Hovering it says which, in plain words and with what
 to do: check the cable between the halves, or wait and read again. With more
 than one keyboard its name is the selector. The web page adds **Choose
 keyboard** and **Disconnect** beneath. Below that the rail lists only changes
-in the draft, a pending recovery or a restart. The screen and the Device tab
+in the draft, a pending recovery or a restart. The screen and the Keyboard screen
 say what is wrong and offer **Read** to read the keyboard again. A screen's top
 bar holds only the theme button; a search sits in the panel it filters.
 
 **Recovery copies and files.** Apply and Import save a recovery copy in the
 browser's storage before they write anything, and refuse to write if it cannot
-be saved. Profile & backups lists every copy, newest first, with a
-**Download** button each. Ark asks Chrome to keep this storage when space runs
+be saved. Backups lists every copy, newest first, with **Use as draft**,
+**Download** and **Delete**. Ark asks Chrome to keep this storage when space runs
 low, but clearing the site's data (or the browser's) deletes the copies, so
-download any you want to keep. **Export profile** downloads the profile file;
-**Import profile** opens the browser's file chooser and takes files up to
+download any you want to keep. **Save a backup file…** downloads the backup file;
+**Choose a backup file…** opens the browser's file chooser and takes files up to
 256 KiB, enough for any complete profile. Errors
 show in the rail's message rather than as a notification, and the page's
 version and commit are at the foot of the rail, with GitHub's logo: choose them
@@ -99,15 +99,15 @@ Reorder and Import all work on it.
 
 It never claims to be a keyboard. A strip across the top of the window says
 **Demo · no keyboard** on every screen; the rail names it Demo, with a hollow
-dot and no connection, halves or recovery to report, and the Device screen says what it
+dot and no connection, halves or recovery to report, and the Keyboard screen says what it
 stands in for. Nothing in it reaches a keyboard, and nothing is kept: the demo
 lives in this window until it is left or closed.
 
 **Apply needs a keyboard.** The commit bar's button reads **Review changes**,
 and where the review would offer Apply it says Apply needs a keyboard and
-offers **Export…**. Export, there or on Profile & backups, saves the demo's
+offers **Export…**. Export there, or **Save a backup file…** on Backups, saves the demo's
 setup with your edits as a profile file (`charybdis-demo-<date>.charybdis.json`);
-on your keyboard, **Import profile** reviews it against what the keyboard holds
+on your keyboard, **Choose a backup file…** on Backups reviews it against what the keyboard holds
 before anything is applied.
 
 **Open a profile file…**, on the strip, replaces the demo's setup with one of
@@ -160,8 +160,8 @@ review adopts that keyboard's reported capacities, including its macro memory.
 The demo remains editable without a keyboard.
 
 During initial read, refresh or device selection, every screen menu is disabled
-and a loading step replaces the screen. Once the read finishes, Device opens
-if the keyboard reported its capabilities. Profile & backups opens when a
+and a loading step replaces the screen. Once the read finishes, Keyboard opens
+if the keyboard reported its capabilities. Backups opens when a
 connected keyboard runs current firmware with complete-profile
 backup. The Configure
 menus open only with an editable draft.
@@ -178,11 +178,11 @@ What each screen edits:
 | Custom keys | The 128 custom keys' names, shortcuts and, for each, its behaviour: timings, the tap × tier grid and participation, for a key on a layer or on none; where each is placed |
 | Lighting | Six stages, the stage mask, layer and pointing-mode colours with their localities, combo and key feedback, auto-mouse fade with its hold as a share of the timeout, LED group rows and reusable groups |
 | Macros | Named slots: literal Text, a compact sequence of key/delay/press/release tiles, drag reordering and a selected-step editor, raw payload, live size feedback, configurable recorder and placement; search by name, and the layers that set each macro off — by key, behaviour or combo — in their layer colour, each opening that layer in Keys with the macro picked |
-| Mouse | Pointer speed, sniping and auto-mouse — the Settings sections the keyboard's model files under Mouse, drawn with the same cards and posted whole |
+| Mouse | Pointer speed, sniping (with where the sniping keys are placed, and Place on a key…) and auto-mouse — the Settings sections the keyboard's model files under Mouse, drawn with the same cards and posted whole |
 | Pointing modes | All 32 slots: movement, speed, direction shortcuts and how often they send (every step, or once per movement until the ball pauses or moves back the other way), scroll tuning and which way a scrolling mode scrolls (both axes, horizontal only or vertical only), what each direction's shortcut does with held modifiers, thresholds shown as ball movement at the mode's DPI, buttons, bindings, placement, clear and duplicate |
-| Settings | The keyboard's own name, then every other section the keyboard reports, posted whole, read-only where the firmware build leaves an option out; the Combos section also carries the default combo window and the combo hold threshold, which the keyboard stores with its combos |
-| Profile & backups | Import (the file against the keyboard, counted by what it configures — keys, lighting, macros, mouse, pointing — before it becomes the draft), export, profile memory, recovery state |
-| Device | Read-only: connection, the saved profile's generation, what was read |
+| Settings | Tap & hold timing · where behaviours and combos run · combo timing (the default combo window and the combo hold threshold, which the keyboard stores with its combos) · combo layer matching · key options · your computer · base lighting · default layers · what is built into this firmware (read-only); each section posted whole, read-only where the firmware build leaves an option out |
+| Backups | Back up (Save a backup file…) and Restore (Choose a backup file…: the file against the keyboard, counted by what it configures, and whether it fits, before it becomes the draft); the copies saved before each Apply, each usable as a draft |
+| Keyboard | The keyboard's name (the screen's title, click to rename); its firmware and whether it works with this Ark; both halves; memory; diagnostics |
 
 ## The interface
 
@@ -201,11 +201,29 @@ and other characters typed or pasted into it do not appear. A time's unit sits
 inside its field at the right, on every screen, so the label names only the
 value; the review still names the unit.
 
-A Settings section's one-per-layer switches (Startup layers, and where
+A Settings section's one-per-layer switches (Default layers, and where
 Behaviours and Combos run) are one row: its label and what it means, then a
 switch for each layer in a grid, named and marked in the layer's colour. A
 search for one layer's name still finds its switch. Settings and the
 behaviour editor call the time between taps the **Multi tap window**.
+
+**Settings** reads top to bottom: Tap & hold timing; Where behaviours and
+combos run (Behaviours and Combos, each with its master switch and layers);
+Combo timing (the default combo window and the combo hold threshold, editable
+on current firmware with or without combos); Combo layer matching, a select
+per layer four across; Key options, where an option the firmware was built
+without says **Not in this firmware** and does nothing; Your computer; then,
+folded, Default layers and **Built into this firmware**. That last section is
+read-only: the layers, tap counts, macro, custom key, pointing mode and combo
+slots, LEDs, brightness and repeat ceilings and DPI steps the keyboard
+reports, and QMK's tap-hold options, which the keyboard does not report; each
+needs a firmware build to change. A folded section says what it holds in
+words ("16 layers", "13 options"). Settings that QMK keeps live (combos on or
+off, default layers, key options) say **↺ keyboard keys change this too**: a
+key on the keyboard, or VIA, can change them, and the draft then asks to be
+updated. Search reads each setting's words, its hover help (where QMK's names
+are) and a section's other names; it says when nothing matches, and points to
+matches on another screen ("3 matches on Mouse →").
 
 Anything that folds has a chevron before its name, turned down while it is
 open: a Settings section, a behaviour's **Layers it runs on**, a group of
@@ -396,7 +414,9 @@ the keyboard can run them: `TG()`,
 and `DF()`/`PDF()` are refused.
 
 In **Keys → Combos**, **Pick on board** brings the board into view so its keys
-can be selected as combo inputs.
+can be selected as combo inputs. **Keep combo in draft** stays off until the
+combo has what it sends and at least two keys, and the note beside it says
+which is missing.
 The **Key** tab count is the number of mapped keys on the selected layer.
 The Key tab says what the selected key does; **Where it is stored** unfolds
 its stored keycode, matrix row and column, layout index and LED index, and
@@ -437,6 +457,12 @@ macros included, found by the name they were given. Layers offers each layer
 as Hold (`MO`), Lock (`LOCK_LAYER`, the same lock as QMK's `TG`) and Tap-hold
 (`LT`); a keyboard that owns its layer keys adds Tap-toggle (`TT`), One-shot
 (`OSL`) and Move (`TO`).
+On a key on the board, **Use keycode** stays off for a keycode the draft would
+refuse, such as `S(MO(2))` or a layer the keyboard does not have, so the
+picker never closes into an error. The Key tab's **Keycode** field takes the
+same keycodes and QMK's other spellings (`LCTL_T(KC_A)`, `SGUI(KC_S)`,
+`KC_BTN1`, `RESET`); one it would refuse stays in the field with the reason
+under it, and nothing is posted.
 A modifier key counts as a modifier: choose modifiers alone, or with a
 modifier key, and the picker stores the simplest keycode that holds them, which
 the footer shows. Command with the Left Command key is just `KC_LEFT_GUI`, and
@@ -546,12 +572,15 @@ through. An LED override row inherits its stage colour only at HSV(0, 0, 0).
 
 ## Naming the keyboard
 
-**Settings → Keyboard → Name** gives the keyboard a name of your own. It is
+The **Keyboard** screen's title is the keyboard's name: click it to give the
+keyboard a name of your own, Enter to finish, Escape to put it back. It is
 what Chrome's keyboard chooser, your computer's list of devices and Ark's
-keyboard menu call it. Leave it empty for the firmware's built-in name
-(Charybdis (4x6) Splinky), which the field shows greyed when the keyboard
-reports it. A name is up to 32 bytes of UTF-8, counted as you type; accented
-letters take two.
+keyboard menu call it, and while you edit it the screen says the keyboard
+reconnects for a moment after Apply to take it. Leave it empty for the
+firmware's built-in name (Charybdis (4x6) Splinky), which the title shows
+greyed when the keyboard reports it. A name is up to 32 bytes of UTF-8,
+counted as you type; accented letters take two. A Settings search for "name"
+points to Keyboard.
 
 The name is stored in the keyboard's profile, so it is a draft edit like any
 other: Review lists it as **Keyboard name**, Undo and Discard take it back,
@@ -559,6 +588,17 @@ and backups carry it. Ark calls the keyboard by its new name as soon as the
 Apply is read back; the computer and Chrome see it once the keyboard has
 reconnected ([below](#applying-changes)). The serial number does not change,
 so Chrome keeps its permission to open the keyboard.
+
+Under the title, **This keyboard** names the product, the firmware's version
+with "works with this Ark ✓" (or that both halves need updating, with a link
+to the firmware release), Ark's own version, and the two halves: the right
+half, with the USB cable and the trackball, is the master; the left half is
+the slave. When the keyboard needs a restart it says so here with the steps.
+**Memory** shows how full the profile is ([below](#profiles-and-backups)), and
+**Diagnostics**, folded, holds the saved profile's generation and digest, the
+read phase, what was read and **Read from keyboard**. While a half is missing
+or the halves disagree, every screen shows a strip under its title saying so,
+with **Keyboard →**.
 
 ## Choosing where behaviours and combos run
 
@@ -820,6 +860,11 @@ release separately, preserving how long keys are held. A shortcut then appears
 as press/release steps rather than one chord step. This option is off by default
 and cannot change during a take.
 
+The recorder takes every key a macro can send: letters, digits, Delete,
+Insert, Home, End, Page Up and Down, Caps Lock, the numpad, Print Screen,
+Menu, F1–F24 and volume. A key a macro cannot send is caught, so the page does
+not scroll or act on it, and named under the recorder as not recorded.
+
 **Record delays** keeps pauses above **After**, rounded to **Round to**, both
 in milliseconds. Normal recording keeps pauses between completed taps/chords.
 **Preserve hold timing** keeps Record delays on and records gaps between
@@ -980,7 +1025,7 @@ every gesture is physically practical.
 
 Ark calls the half connected over USB the **master half**, and its partner the
 **slave half**. These names describe their connection roles, whichever side
-holds each role. Device explains the names; Apply progress, failures and
+holds each role. Keyboard explains the names; Apply progress, failures and
 recovery notices use them consistently.
 
 **Review and apply** saves a recovery copy, then commits the complete profile
@@ -1006,8 +1051,11 @@ Apply reports the transaction's steps in order: check the keyboard, save a
 recovery copy, send the profile, let the keyboard check it, stage keys and
 macros on the slave half, copy the profile to that half, save on the master
 half, finish the slave half, write the master's keys and macros, then check
-both halves. A failure keeps its step, the keyboard's reason and whether
-anything was saved on screen until you dismiss it. The later editor readback
+both halves. A failure keeps its step, the keyboard's reason and one of three
+verdicts on screen until you dismiss it: nothing was saved; the keyboard had
+already decided to save and finishes by itself about 15 seconds after both
+halves are connected; or Ark cannot tell which profile was saved. A save is
+all or nothing, so none of them is "part of it". The later editor readback
 is separate from those transaction steps.
 
 What to expect while it applies:
@@ -1071,31 +1119,38 @@ progress, so keep the recovery file that Apply creates.
 
 ## Profiles and backups
 
-Charybdis Ark's **Export profile** saves the configuration read from the
+Charybdis Ark's **Save a backup file…** saves the configuration read from the
 keyboard: every layer and key position, behaviours, combos, named VIA macros,
 lighting and global settings. Flashed defaults and live edits become one
 portable file.
-Export leaves the editor and any local draft unchanged, even if the keyboard
+Saving a backup file leaves the editor and any local draft unchanged, even if the keyboard
 has changed since its last editor read.
 
-**Import profile** shows a review, saves a recovery copy, restores
-both halves and verifies the complete readback. A failed or interrupted restore
-reports the saved recovery file instead of claiming success. Recovery files are
-kept in the extension's local storage; the app shows their full path. In
-Chrome they are kept in the browser's storage and listed on Profile & backups,
-each with a download (see [Using Ark in Chrome](#using-ark-in-chrome)).
+A backup restores onto the same firmware release; check the release notes
+before updating firmware ([below](#firmware-versions)).
 
-On **Profile & backups**, use **Choose profile…** or drop one backup file
-onto the **Import profile** card. Both open the same review, including in the
-demo. **Use as draft** replaces the draft; Undo brings it back, and the keyboard
+**Saved before each Apply** lists the copy every Apply saves first, named
+"Before Apply · Charybdis - Home · 18 Oct 2026, 07:12". In Chrome they are
+kept in the browser's storage, each with **Use as draft** (it opens the same
+comparison as a backup file), **Download** and **Delete** (see [Using Ark in
+Chrome](#using-ark-in-chrome)). VS Code keeps them as files in the
+extension's local storage and the notice after Apply shows the full path;
+restore one with **Choose a backup file…**. **Start from the firmware's
+defaults** is not available yet: the keymap and macros need firmware support
+first.
+
+On **Backups**, use **Choose a backup file…** or drop one backup file
+onto the **Restore** card. Both open the same comparison, as a sheet over the
+screen, including in the demo: what the file changes, counted by what it
+configures, and whether it fits ("This file fits: 4,101 of 53,216 bytes"). **Use as draft** replaces the draft; Undo brings it back, and the keyboard
 changes only after Review and Apply. A file that holds exactly what the
 keyboard runs changes nothing and cannot be used, unless the draft has edits:
 then using it puts the draft back to the keyboard's profile, as **Discard all**
-does. Import is disabled while the keyboard or
+does. Restore is disabled while the keyboard or
 draft is unavailable, stale or busy. Multiple, unreadable, invalid and oversized
 files are refused without replacing your draft.
 
-**Profile memory** shows how full the profile is. Its bar is the space the
+**Memory**, on the Keyboard screen, shows how full the profile is. Its bar is the space the
 keyboard stores behaviours, combos, lighting, pointing modes, custom keys,
 settings and every name in: 53,216 bytes on current firmware, the size the
 keyboard reports. Under it, **In use** counts what you have set up against what
