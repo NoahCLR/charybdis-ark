@@ -13,6 +13,7 @@ import {currentLayer, getModel, layerName, layers, post, render, state, writable
 import * as edits from "../view/edits.mjs";
 import {board} from "./board.mjs";
 import {keepInView, layerBar} from "./layerbar.mjs";
+import {attachLayersControl} from "./layers.mjs";
 import {topbar, unavailable} from "./shell.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {localityLabel} from "./lighting/common.mjs";
@@ -73,7 +74,11 @@ export function screenLighting() {
     </div>`));
     /** @type {HTMLButtonElement | null} */ (card.querySelector('[data-act="clearleds"]'))?.addEventListener("click", () => { state.ledPicks = []; render(); });
     /** @type {HTMLButtonElement | null} */ (card.querySelector('[data-act="trackball"]'))?.addEventListener("click", () => { state.trackball = !state.trackball; render(); });
-    card.append(layerBar());
+    // The same strip as Keys, Rename & Reorder included: a layer is renamed
+    // and reordered wherever its tabs are.
+    const bar = layerBar();
+    attachLayersControl(bar);
+    card.append(bar);
     pad.appendChild(card);
 
     const marks = draftMarks(model?.draft?.changes);

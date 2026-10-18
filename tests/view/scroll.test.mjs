@@ -15,6 +15,18 @@ test("rerendering a screen preserves its content scroll position", () => {
     assert.deepEqual(after, {scrollTop: 840, scrollLeft: 36});
 });
 
+test("a slot bank keeps its own scroll position beside the page's", () => {
+    // Macros and Custom keys draw their bank the same way; each keeps its place.
+    const rootOf = (content, bank) => ({querySelector: (selector) =>
+        selector === ".content" ? content : selector === ".pad.library .macro-grid" ? bank : null});
+    const scroll = captureContentScroll(rootOf({scrollTop: 0, scrollLeft: 0}, {scrollTop: 2310, scrollLeft: 0}), "customKeys", "customKeys");
+    assert.deepEqual(scroll, {top: 0, left: 0, bank: {top: 2310, left: 0}});
+
+    const bank = {scrollTop: 0, scrollLeft: 0};
+    restoreContentScroll(rootOf({scrollTop: 0, scrollLeft: 0}, bank), scroll);
+    assert.deepEqual(bank, {scrollTop: 2310, scrollLeft: 0});
+});
+
 test("a taller Keys tab keeps enough page height when another tab is shown", () => {
     const previous = {querySelector: (selector) => selector === ".keys-pad .bench"
         ? {getBoundingClientRect: () => ({height: 820})} : null};

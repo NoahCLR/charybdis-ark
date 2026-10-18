@@ -218,7 +218,7 @@ export function pickerOverlay() {
             <div><h2>Pick a keycode</h2>
                 <p class="note">${picker.mode === "list" ? picker.maxKeys === 1 ? "Choose one key." : Number.isFinite(picker.maxKeys) ? `Choose up to ${picker.maxKeys} keys to send together.` : "Choose one or more keys." : `For <b>${esc(picker.title)}</b> · ${[picker.contextKeycode ? actionMarked(model, picker.contextKeycode) : "", esc(picker.context || "")].filter(Boolean).join(" · ")}`}</p></div>
             <input class="input pk-search" id="pickerSearch" data-f="picker:search" placeholder="Search every section" value="${esc(picker.search)}">
-            <span class="right"><button class="btn ghost" data-act="cancel">Cancel</button></span>
+            <span class="right"><button class="btn ghost" data-act="cancel">Close</button></span>
         </div>
         ${picker.mode === "list" ? "" : `<div class="pk-mods"><span class="label">Modifiers</span>
             ${modifierControls(model).map(({value: wrap, label}) => `<button class="pk-mod ${picker.mods.includes(wrap) ? "on" : ""}" data-mod="${wrap}"
@@ -236,7 +236,6 @@ export function pickerOverlay() {
                 : `<span class="note">nothing picked yet</span>`}
             <code class="mono pk-value">${esc(value || "—")}</code>
             <span class="right"><button class="btn ghost" data-act="clear">Clear</button>
-                <button class="btn ghost" data-act="cancel">Cancel</button>
                 <button class="btn primary" data-act="use" ${value && !problem ? "" : "disabled"}>${picker.shortcut ? "Use shortcut" : "Use keycode"}</button></span>
         </div>
         ${problem && !offer ? `<div class="note pk-problem" role="status">${esc(problem)}</div>` : ""}

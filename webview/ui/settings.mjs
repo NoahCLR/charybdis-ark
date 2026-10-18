@@ -10,7 +10,7 @@
 
 // Selector assertions refer to elements created by this module's authored markup.
 import * as edits from "../view/edits.mjs";
-import {el, esc} from "../lib/dom.mjs";
+import {DISCLOSURE, el, esc} from "../lib/dom.mjs";
 import {getModel, layers, post, render, state, canEdit as canEditArea} from "../store.mjs";
 import {topbar, unavailable} from "./shell.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
@@ -130,7 +130,8 @@ const KEYBOARD_NAME = {label: "Keyboard name",
 function keyboardCard(model, keyboard, canEdit) {
     const count = nameCount(keyboard.name, keyboard.perName || NAME_MAX_BYTES);
     const node = el(`<section class="card settings-group" data-section="keyboard">
-        <div class="card-h"><h3>Keyboard${draftMarks(model?.draft?.changes).settings.has("keyboard") ? draftDot() : ""}</h3></div>
+        <div class="card-h"><h3>Keyboard${draftMarks(model?.draft?.changes).settings.has("keyboard") ? draftDot() : ""}</h3>
+            <span class="right tag">1 setting</span></div>
         <div class="rows"><div class="setrow" data-tip="${esc(KEYBOARD_NAME.hint)}">
             <div><div class="nm">Name</div><div class="hint">${esc(KEYBOARD_NAME.hint)}</div></div>
             <div class="control field"><input class="input" data-f="settings:keyboard-name" data-keyboard-name value="${esc(keyboard.name)}"
@@ -155,7 +156,7 @@ export function sectionCard(model, section, fields, canEdit, searching = false) 
     const opened = (state.settingsOpen || []).includes(section.id);
     const open = searching || section.expanded !== false || opened;
     const node = /** @type {HTMLDetailsElement} */ (el(`<details class="card settings-group" data-section="${esc(section.id)}" ${open ? "open" : ""}>
-        <summary class="card-h"><h3>${esc(section.label)}${draftMarks(model?.draft?.changes).settings.has(section.id) ? draftDot() : ""}</h3>
+        <summary class="card-h">${DISCLOSURE}<h3>${esc(section.label)}${draftMarks(model?.draft?.changes).settings.has(section.id) ? draftDot() : ""}</h3>
             <span class="right tag">${section.fields.length} setting${section.fields.length === 1 ? "" : "s"}</span></summary>
         ${section.description ? `<div class="card-b settings-intro"><p class="note">${esc(section.description)}</p></div>` : ""}
         <div class="rows"></div>
@@ -193,8 +194,13 @@ export function sectionCard(model, section, fields, canEdit, searching = false) 
 /** @param {import("../../contracts/panel.js").PresentedField} field @param {boolean} canEdit @param {() => void} submit @param {boolean} hidden @param {boolean} slot @param {Map<string, ReturnType<typeof durationControl>>} durations */
 function fieldRow(field, canEdit, submit, hidden, slot, durations) {
     const editable = canEdit && !field.readOnly;
+    // A number field shows its unit inside the input, as every screen does,
+    // so the label drops the "(ms)" it carries in the review.
+    const affixed = Boolean(field.unit) && !field.readOnly && field.presentation !== "duration"
+        && field.kind !== "toggle" && field.kind !== "layer" && !field.choices?.length;
+    const label = affixed ? field.label.replace(new RegExp(`\\s*\\(${field.unit}\\)$`), "") : field.label;
     const row = el(`<div class="setrow ${field.readOnly ? "ro" : ""}" data-tip="${esc([field.tooltip, field.hint].filter(Boolean).join(" "))}" ${hidden ? "hidden" : ""}>
-        <div><div class="nm">${marked(getModel(), field.governs, field.label, {slot})}</div>${field.hint ? `<div class="hint">${esc(field.hint)}</div>` : ""}</div>
+        <div><div class="nm">${marked(getModel(), field.governs, label, {slot})}</div>${field.hint ? `<div class="hint">${esc(field.hint)}</div>` : ""}</div>
         <div class="control"></div>
     </div>`);
     const control = /** @type {HTMLElement} */ (row.querySelector(".control"));
@@ -234,8 +240,7 @@ function fieldRow(field, canEdit, submit, hidden, slot, durations) {
         control.appendChild(node);
         return row;
     }
-    const node = el(`<div class="input-row"><input class="input mono" data-macro="${esc(field.macro)}" data-f="setting:${esc(field.macro)}" inputmode="numeric" value="${esc(field.value)}" ${editable ? "" : "disabled"}>
-        ${field.unit ? `<span class="chip">${esc(field.unit)}</span>` : ""}</div>`);
+    const node = el(`<span class="affix${affixed ? " unit" : ""}"><input class="input mono" data-macro="${esc(field.macro)}" data-f="setting:${esc(field.macro)}" inputmode="numeric" value="${esc(field.value)}" ${editable ? "" : "disabled"}>${affixed ? `<i>${esc(field.unit)}</i>` : ""}</span>`);
     /** @type {HTMLInputElement} */ (node.querySelector("input")).addEventListener("change", submit);
     control.appendChild(node);
     return row;

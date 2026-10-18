@@ -8,6 +8,10 @@ const ENTITIES = Object.freeze({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&q
 /** @param {unknown} value */
 export const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => ENTITIES[character]);
 
+// The one mark for something that folds: a chevron at the start of its
+// summary, turned down while it is open (styles.css, "details > summary .chev").
+export const DISCLOSURE = `<svg class="chev" viewBox="0 0 10 10" aria-hidden="true"><path d="M3.5 2l3 3-3 3"/></svg>`;
+
 /** @param {string} markup @returns {HTMLElement} */
 export function el(markup) {
     const template = document.createElement("template");

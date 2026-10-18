@@ -51,7 +51,7 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
         const discard = await page.evaluate(() => window.__posted.at(-1));
         expect(discard).toMatchObject({type: "discardProfileDraftChanges", group: changed.group});
         draft.discard(draft.revision, discard.group); await publish();
-        await review.getByRole("button", {name: "Keep editing"}).click();
+        await review.getByRole("button", {name: "Close"}).click();
         await expect(policy).toHaveValue("auto");
         await expect(policy.locator("option:checked")).toHaveText("Automatic · on");
         await policy.scrollIntoViewIfNeeded();

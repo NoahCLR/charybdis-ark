@@ -1,13 +1,42 @@
 // @ts-check
 "use strict";
 const {test, expect} = require("@playwright/test");
-const {openControls, clearPosts, posted, change} = require("./control-preview");
+const {openControls, clearPosts, posted, change, publishAccepted} = require("./control-preview");
 
 // Custom keys shows the selected key's behaviour editor: the Keys screen's,
 // for a key on a layer or on none, posting the same draft edits.
 
 const editor = (page) => page.locator(".custom-key-behaviour");
 const pick = (page, slot) => page.locator(`.macro-grid [data-custom-key="CUSTOM_KEY_${slot}"]`).click();
+
+test("the custom key bank scrolls on its own and keeps its place, so the editor stays beside it", async ({page}) => {
+    await openControls(page, "customKeys");
+    const bank = page.locator(".pad.library .macro-grid");
+    const content = page.locator(".content");
+    const tile = page.locator('.macro-grid [data-custom-key="CUSTOM_KEY_100"]');
+    await tile.scrollIntoViewIfNeeded();
+    const position = await bank.evaluate(node => node.scrollTop);
+    expect(position, "the bank scrolls inside its card").toBeGreaterThan(0);
+    expect(await content.evaluate(node => node.scrollTop), "the page does not scroll").toBe(0);
+    const expectPosition = () => expect.poll(() => bank.evaluate(node => node.scrollTop)).toBe(position);
+
+    await tile.click();
+    await expect(tile).toHaveAttribute("aria-current", "true");
+    await expectPosition();
+    const name = page.locator('[data-f="custom-key:100:name"]');
+    await expect(name).toBeInViewport();
+    await clearPosts(page);
+    await change(name, "Far key");
+    await expect.poll(() => posted(page).then(rows => JSON.stringify(rows))).toContain("Far key");
+    const index = await page.evaluate(async () => (await import("/webview/store.mjs")).getModel().customKeys.findIndex(row => row.slot === 100));
+    await publishAccepted(page, ["customKeys", index, "name"], "Far key");
+    await expectPosition();
+    await expect(name).toBeInViewport();
+
+    await page.locator('[data-screen="settings"]').click();
+    await page.locator('[data-screen="customKeys"]').click();
+    await expect.poll(() => bank.evaluate(node => node.scrollTop)).toBe(0);
+});
 
 test("a custom key tile hovers its tip, not the board's key card", async ({page}) => {
     await openControls(page, "customKeys");

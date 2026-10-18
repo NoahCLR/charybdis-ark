@@ -205,7 +205,7 @@ addEventListener("keydown", (event) => {
     if (state.retarget) { state.retarget = null; render(); return; }
     if (state.layersOpen) { closeLayers(); render(); return; }
     if (state.overlay) {
-        // Leaving the review by Esc is leaving it by Keep editing.
+        // Leaving the review by Esc is leaving it by Close.
         if (state.overlay === "review") post(controls.control("closeProfileDraftReview"));
         if (state.overlay === "history") post(controls.control("closeProfileDraftHistory"));
         state.overlay = null;

@@ -197,7 +197,17 @@ Hover over a setting's label or control on Mouse or Settings to see what it
 does. Read-only settings also explain why they cannot be edited. Visible
 hints and numeric limits stay beside the setting. A number field takes only
 digits (a time in seconds or minutes also takes one decimal point): letters
-and other characters typed or pasted into it do not appear.
+and other characters typed or pasted into it do not appear. A time's unit sits
+inside its field at the right, on every screen, so the label names only the
+value; the review still names the unit.
+
+Anything that folds has a chevron before its name, turned down while it is
+open: a Settings section, a behaviour's allowed source layers, a group of
+review checks, a pointing mode's Advanced. Review, the keycode picker and
+Draft history each close with **Close** at their top right, or Escape; their
+footers hold only what acts, such as Apply, Export…, Clear and Use keycode.
+An editor's own actions, such as Change key…, Duplicate and Clear slot, are
+small text buttons at the right of its title bar.
 
 When an accepted edit redraws the screen, the same field keeps keyboard focus
 and its text selection while it remains available. Search fields also keep
@@ -273,7 +283,7 @@ The layers are tabs along the foot of the board card, next to the workbench
 rather than in it, since a layer is not a property of the selected key; the
 picked one opens into the board
 it shows, on Keys and on Lighting alike; **Rename & Reorder** stays at the end
-of those tabs, outside what scrolls, and opens upward over the board, so a layer
+of those tabs on both screens, outside what scrolls, and opens upward over the board, so a layer
 is renamed and reordered where its keys are on screen. Drag a row by the grip
 on its left to move it within the full sixteen-layer stack, or focus the grip
 and press ↑ ↓. The bottom row is the
@@ -330,11 +340,11 @@ The timing fields over Hold and Long hold read **Tap / hold threshold** and
 column's: "tap at Tap / hold threshold" under Hold, "tap at Long hold
 threshold" under Long hold. Behaviour and combo
 timings matching the default show a muted placeholder such as `150 · default`;
-other values look entered. Labels end at `ms`. Clearing an override restores the
+other values look entered, with `ms` inside the field. Clearing an override restores the
 default. LT keys show their own dual-role default.
 Changing a behaviour timing default moves every row following it, including
 explicit values matching the old default; distinct custom timings stay fixed.
-Review lists inherited effective-time changes under Tap & Hold Timing and any
+Review lists inherited effective-time changes under Tap & hold timing and any
 matching overrides converted to defaults under their behaviours. Those stored
 changes discard together with the default edit.
 Selecting a key opens its grid in Behaviours even before it has a stored row.
@@ -382,7 +392,7 @@ The Behaviours, Combos, Macros and Pointing modes tabs start with **On this
 view**: what the board reaches with the selected layer and any layers previewed
 under it. **On this layer** stays tied to keys stored on the selected layer;
 the tab counts use that layer too. Use ⌘-click on layer tabs to change the
-composed view. Combo rows use the keyboard's Combo Layer Matching reference
+composed view. Combo rows use the keyboard's Combo layer matching reference
 when one is configured.
 Every Keys workbench tab is at least as tall as Behaviours, so switching tabs
 keeps the page at the same scroll position. If an editor grows taller, that
@@ -442,7 +452,10 @@ editor, including slots whose QMK values have no named constant.
 add or edit its behaviour, place it on a key, and see where it is used; the
 key picker offers them in its own Custom keys section, each tip naming the
 shortcut it sends. Their names are stored on the keyboard; a keyboard with
-none stored reports the names authored in `keymap.c`.
+none stored reports the names authored in `keymap.c`. The keys sit three
+across in a list that scrolls on its own beside the editor, as the Macros
+slots do, so picking one far down keeps the editor in view, and the list keeps
+its place while you edit.
 
 A custom key's **Shortcut** is its own action, the way an ordinary key's
 keycode is: one key and any of the eight modifiers, held while the custom key
@@ -747,8 +760,8 @@ Host settings and that help sit at the bottom, below the recorder. Add-step acti
 and Discard / Clear macro use larger, bordered buttons; Record / Stop is the
 prominent recording action. The **Raw payload** toggle sits at the right of
 the add-step row and reveals its editor above the sequence. All recorder options remain
-visible below. The slot bank scrolls independently of the editor and keeps its
-position when selecting a slot, editing or recording.
+visible below. The slots sit three across in a bank that scrolls independently
+of the editor and keeps its position when selecting a slot, editing or recording.
 Key pickers offer only the basic keys macros can send;
 a chord takes up to 16 distinct keys, and a press or release takes one.
 Record appends key steps; **Clear take** restores what was there before recording.
@@ -768,8 +781,8 @@ release separately, preserving how long keys are held. A shortcut then appears
 as press/release steps rather than one chord step. This option is off by default
 and cannot change during a take.
 
-**Record delays** keeps pauses above **After (ms)**, rounded to **Round to
-(ms)**. Normal recording keeps pauses between completed taps/chords.
+**Record delays** keeps pauses above **After**, rounded to **Round to**, both
+in milliseconds. Normal recording keeps pauses between completed taps/chords.
 **Preserve hold timing** keeps Record delays on and records gaps between
 individual events, including holds, with that same threshold and rounding.
 Turning it off restores your previous delay choice. Neither records the wait

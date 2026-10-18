@@ -1,6 +1,6 @@
 // @ts-check
 // Selector assertions refer to elements created by this module's authored markup.
-import {el, esc} from "../lib/dom.mjs";
+import {DISCLOSURE, el, esc} from "../lib/dom.mjs";
 
 // Definition switches preserve all actions and timing while disabled.
 /** @param {{index: number, label?: string, name: string}[]} layers @param {{enabled?: boolean, allowedLayers?: number}} definition @param {boolean} editable @param {(patch: {enabled: boolean, allowedLayers: number}) => void} changed @param {string} identity */
@@ -8,7 +8,7 @@ export function definitionControls(layers, definition, editable, changed, identi
     const node = el(`<div class="stack gap-10">
         <label class="sw"><input type="checkbox" data-f="${esc(identity)}:enabled" data-definition-enabled ${definition.enabled !== false ? "checked" : ""} ${editable ? "" : "disabled"}>
             <span class="track"></span><span class="txt">Definition enabled</span></label>
-        <details><summary class="note">Allowed source layers</summary><div class="row sw-group">
+        <details class="def-layers"><summary class="note">${DISCLOSURE}Allowed source layers</summary><div class="row sw-group">
             ${layers.map(layer => `<label class="sw"><input type="checkbox" data-f="${esc(identity)}:allowed-layer:${layer.index}" data-allowed-layer="${layer.index}" ${(definition.allowedLayers ?? 0xffff) & 2 ** layer.index ? "checked" : ""} ${editable ? "" : "disabled"}>
                 <span class="track"></span><span class="txt">${esc(layer.label || layer.name)}</span></label>`).join("")}
         </div></details>

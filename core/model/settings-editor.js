@@ -60,7 +60,7 @@ const COMBO_TIMING = Object.freeze([
 // The defaults behaviours inherit, which the editor view also publishes as
 // `timing`.
 /** @type {Omit<import("../../contracts/model.js").SettingsSection, "fields"> & {fields: import("../../contracts/model.js").StoredSettingField[]}} */
-const keyTiming = {id: "keyTiming", label: "Tap & Hold Timing", fields: [
+const keyTiming = {id: "keyTiming", label: "Tap & hold timing", fields: [
     number("tappingTerm", SETTING.TAPPING_TERM, "Dual-role tap / hold threshold", "How long LT(), MT(), TT(), OSL() and OSM() keys wait before a press counts as a hold (QMK's tapping term). LT() behaviours with an empty Tap / hold threshold use it too; other behaviours use the Behaviour tap / hold threshold."),
     number("tapHoldTerm", SETTING.TAP_HOLD_TERM, "Behaviour tap / hold threshold", "Used when a behaviour leaves its Tap / hold threshold empty.", {governs: {kind: "tier", tier: "hold"}}),
     number("longerHoldTerm", SETTING.LONG_HOLD_TERM, "Long hold threshold", "Used when a behaviour leaves its Long hold threshold empty.", {governs: {kind: "tier", tier: "long"}}),
@@ -69,7 +69,7 @@ const keyTiming = {id: "keyTiming", label: "Tap & Hold Timing", fields: [
 /** @type {import("../../contracts/model.js").SettingsSection[]} */
 const sections = [
     keyTiming,
-    {id: "normalPointerSpeed", label: "Pointer Speed", area: "Mouse", fields: [
+    {id: "normalPointerSpeed", label: "Pointer speed", area: "Mouse", fields: [
         // Every DPI field offers the one list in pointer-dpi.js. These two are
         // held in the upstream Charybdis config, which the keyboard only
         // accepts in its own steps, so they offer the part of the list the
@@ -96,7 +96,7 @@ const sections = [
     {id: "automouseFade", label: "Auto-mouse fade", area: "Lighting", stage: "auto", fields: [
         share("mouseFadeHold", SETTING.AUTO_MOUSE_DEAD_TIME, SETTING.AUTO_MOUSE_TIMEOUT, "Hold before fading", "The share of the auto-mouse timeout the colour holds before it starts to fade, 0–99%."),
     ]},
-    {id: "rgbAppearance", label: "Base Lighting", fields: [
+    {id: "rgbAppearance", label: "Base lighting", fields: [
         {...toggle("lightingEnabled", SETTING.RGB_MODE, "Lighting", "Enable the saved base lighting effect."), shift: 0},
         {...byte("hue", SETTING.RGB_COLOR, 0, "Hue"), tooltip: "The colour of the saved base lighting effect, around the colour wheel."},
         byte("saturation", SETTING.RGB_COLOR, 8, "Saturation", "0 is white; 255 is fully saturated."),
@@ -104,7 +104,7 @@ const sections = [
         {...byte("effectSpeed", SETTING.RGB_MODE, 16, "Animation speed"), tooltip: "Speed of the saved base lighting animation. Effects without animation ignore this setting."},
         number("lightingTimeout", SETTING.RGB_TIMEOUT, "Idle timeout", "Time without activity before lighting turns off. 0 keeps lighting on. Maximum 24 hours.", {presentation: "duration"}),
     ]},
-    {id: "lightingFeedback", label: "Lighting Feedback", fields: [
+    {id: "lightingFeedback", label: "Lighting feedback", fields: [
         number("feedbackFlash", SETTING.FEEDBACK_PERIOD, "Key feedback flash interval (ms)", "Time for each on or off phase; a full blink takes twice this value.", {min: SETTING_FIELD.FEEDBACK_PERIOD.min, validate: "positive-int"}),
     ]},
 ];
@@ -159,7 +159,7 @@ function settingValue(field, values) {
     return field.shift === undefined ? bits : bits >>> field.shift;
 }
 // The saved base lighting, read out of the two words that pack it by the same
-// field layout the Base Lighting section edits.
+// field layout the Base lighting section edits.
 const {RGB_MODE, RGB_COLOR} = SETTING;
 const LIGHTING_FIELDS = {enabled: {id: RGB_MODE, shift: 0}, effect: {id: RGB_MODE, shift: 8}, speed: {id: RGB_MODE, shift: 16}, leds: {id: RGB_MODE, shift: 24},
     hue: {id: RGB_COLOR, shift: 0}, saturation: {id: RGB_COLOR, shift: 8}, brightness: {id: RGB_COLOR, shift: 16}};
@@ -193,7 +193,7 @@ function settingsSections(snapshot, settings) {
     const name = i => layerName(settings.names, i);
     /** @template T @param {(i: number) => T} make */
     const everyLayer = make => Array.from({length: SETTINGS.LAYERS}, (_, i) => make(i));
-    result.push({id: "startupLayers", area: "Settings", label: "Startup Layers", expanded: false, description: "Choose the layers active when the keyboard starts. Keep at least one selected; higher layers take priority.", fields:
+    result.push({id: "startupLayers", area: "Settings", label: "Startup layers", expanded: false, description: "Choose the layers active when the keyboard starts. Keep at least one selected; higher layers take priority.", fields:
         everyLayer(i => ({...toggle(`startupLayer${i}`, SETTING.DEFAULT_LAYERS, name(i), `Layer ${i}`), tooltip: "Make this layer active when the keyboard starts. Keep at least one startup layer on; higher layers take priority.", bitMask: 2 ** i, governs: {kind: /** @type {const} */ ("layer"), layer: i}}))});
     // Behaviours and combos each have a master switch and one per layer
     // (participation-policy.md): a key takes part only where every switch that
@@ -212,9 +212,9 @@ function settingsSections(snapshot, settings) {
                 hint: "Off, combos still fire but use their normal output action. Physical-key behaviours stay eligible. A bypassed custom key sends its shortcut, or nothing if it has none."},
             ...everyLayer(i => ({...toggle(`combosOnLayer${i}`, SETTING.LAYER_COMBOS, `On ${name(i)}`, "Keys that come from this layer can join combos."), bitMask: 2 ** i, governs: {kind: /** @type {const} */ ("layer"), layer: i}}))]});
     // A layer's combo reference is in its layer record, not a setting value.
-    result.push({id: "comboReferences", area: "Settings", label: "Combo Layer Matching", expanded: false, description: "Choose which layer supplies the key assignments used to match combos on each layer. Select the same layer to keep its combos independent.", fields:
+    result.push({id: "comboReferences", area: "Settings", label: "Combo layer matching", expanded: false, description: "Choose which layer supplies the key assignments used to match combos on each layer. Select the same layer to keep its combos independent.", fields:
         everyLayer(i => ({...layer(`comboReference${i}`, undefined, `Combos on ${name(i)}`, "The layer whose key assignments are used to match combos on this layer. Choose the same layer to keep its combos independent."), record: /** @type {const} */ ("reference"), layer: i, governs: {kind: /** @type {const} */ ("layer"), layer: i}}))});
-    result.push({id: "keyboardOptions", area: "Settings", label: "Key Options", expanded: false, description: options ? "Keyboard-wide remapping and typing options. These apply across all layers." : "Read the keyboard to see the key options it supports.", fields:
+    result.push({id: "keyboardOptions", area: "Settings", label: "Key options", expanded: false, description: options ? "Keyboard-wide remapping and typing options. These apply across all layers." : "Read the keyboard to see the key options it supports.", fields:
         options ? optionLabels.map(([macro, label, hint], i) => ({...toggle(macro, SETTING.KEYMAP_OPTIONS, hostKeyLabel(label, host.effective)), tooltip: hostKeyLabel(hint, host.effective), bitMask: options.keymapMasks[i], readOnly: !(options.supportedKeymapOptions & (1 << i)), hint: options.supportedKeymapOptions & (1 << i) ? "" : "This option is not enabled in the running firmware."})) : []});
     /** @param {number} id */
     const label = id => VOCABULARY.hostOs.find(([value]) => value === id)?.[1] || "Unknown";

@@ -150,7 +150,7 @@ specific old default become inheritance zeros in the same draft step. Existing
 zeros follow naturally; distinct custom values stay fixed. LT's Tap / hold follows
 the dual-role default, other rows the normal threshold. Unchanged defaults and
 unrelated settings edits do not normalize rows.
-Review lists each inherited effective-time change under Tap & Hold Timing, with
+Review lists each inherited effective-time change under Tap & hold timing, with
 the affected behaviour and old/new milliseconds. Explicit matches adopting
 inheritance appear as stored behaviour changes grouped with the settings edit.
 Inherited effects are not independent discard units, so discarding the default

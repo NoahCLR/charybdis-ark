@@ -59,8 +59,8 @@ export function comboBuilder(canEdit, holdTerm) {
                         data-tip="Switch the board into input-picking mode; click keys to add or remove them.">${state.combo.picking ? "Picking on board…" : "Pick on board"}</button>
                 </div>
             </div>
-            <label class="field" data-tip="How close together its keys must be pressed, from the first to the last."><span>Combo window · ms</span>
-                <div class="input-row"><input class="input mono" data-f="combo:${esc(state.combo.editId ?? 'new')}:term" data-term inputmode="numeric" value="${esc(windowField.value)}" placeholder="${esc(windowField.placeholder)}" ${canEdit ? "" : "disabled"}>
+            <label class="field" data-tip="How close together its keys must be pressed, from the first to the last."><span>Combo window</span>
+                <div class="input-row"><span class="affix unit"><input class="input mono" data-f="combo:${esc(state.combo.editId ?? 'new')}:term" data-term inputmode="numeric" value="${esc(windowField.value)}" placeholder="${esc(windowField.placeholder)}" ${canEdit ? "" : "disabled"}><i>ms</i></span>
                 ${fallback ? `<button class="btn tiny ghost" data-act="usedefault" ${canEdit ? "" : "disabled"} ${form.followsDefault ? "hidden" : ""}
                     data-tip="Follow the default combo window (Settings · Combos) again, so this combo changes with it.">Use default · ${esc(fallback)} ms</button>` : ""}</div></label>
             <div class="field">
