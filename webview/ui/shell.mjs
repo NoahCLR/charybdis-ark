@@ -182,9 +182,12 @@ function spinner() {
 }
 
 /** @type {Readonly<Record<string, string>>} */
+// What can honestly be said about what was saved when Apply stops: a save is
+// all or nothing, so never "part of it" (core's failure.saved).
 const SAVED_VERDICT = {
     none: "Nothing was saved. The keyboard kept the profile it had.",
-    unknown: "The keyboard may have saved part of it. Read the keyboard to see what it runs now.",
+    decided: "The keyboard had already decided to save the new profile, and finishes it by itself about 15 seconds after both halves are connected. Read the keyboard then.",
+    unknown: "Ark can't tell which profile was saved. Read the keyboard to see what it runs now.",
 };
 
 export function commitBar() {
