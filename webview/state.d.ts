@@ -14,7 +14,13 @@ export interface MacroForm {
     moveNotice?: string;
     selectionAnchor?: string | null; selectedSteps?: string[]; stepHistory?: MacroHistory;
 }
-export interface PickerState {title: string; context?: string; contextKeycode?: string; mode: 'single' | 'list'; allowedKeys: string[] | null; modifiable?: string[] | null; shortcut?: boolean; maxKeys: number; section: string; search: string; mods: string[]; keys: string[]; layerTap: string | null; onPick?: (expression: string) => void; onShortcut?: (shortcut: {mods: number; key: number}) => void; onCustomKey?: (keycode: string, shortcut: {mods: number; key: number}, name: string) => void; customKeyRuns?: 'behaviour' | 'shortcut'}
+export interface PickerState {title: string; heading?: string; context?: string; contextKeycode?: string; mode: 'single' | 'list'; allowedKeys: string[] | null; modifiable?: string[] | null; shortcut?: boolean; maxKeys: number; section: string; search: string; mods: string[]; keys: string[];
+    /** The Hold slot on a layout key (decisions R7): a modifier, a layer or a trackball mode held. */
+    hold: import('./view/picker-choice.mjs').Hold | null; holdMenu: 'root' | 'right' | 'layer' | 'mode' | null; focusHold: boolean;
+    /** Who gets a trackball-mode hold: this key only (a custom key) or every key sending the tap; null follows the default. */
+    holdScope: 'this' | 'every' | null; showEmpty: string[]; cursor: number;
+    target: import('./ui/editor-types.js').PickerTarget | null;
+    onPick?: (expression: string) => void; onEdit?: (message: import('../contracts/edits.js').PanelEdit) => void; onShortcut?: (shortcut: {mods: number; key: number}) => void; onCustomKey?: (keycode: string, shortcut: {mods: number; key: number}, name: string) => void; customKeyRuns?: 'behaviour' | 'shortcut'}
 export interface PanelState {
     screen: ScreenId; layer: number; layersOn: number[]; selected: number; tab: string;
     behaviourRow: string | null; behaviourRowShown: string | null; behaviourRoute: {row: string; group: string} | null;

@@ -26,13 +26,16 @@ const catalogue = [
 test("the picker uses task-shaped sections instead of raw QMK group names", () => {
     assert.deepEqual(pickerSections().map(({label}) => label), [
         "Keyboard", "Symbols", "Navigation", "Numpad", "Layers", "Trackball modes", "Macros",
-        "Mouse", "Media", "Lighting", "Key options", "Custom keys", "More keys", "Other QMK", "All keycodes",
+        "Mouse", "Media", "Lighting", "Key options", "Custom keys", "Everything else",
     ]);
 });
 
+// Every entry some section offers, once.
+const offered = (entries) => [...new Set(pickerSections().flatMap((section) => entriesForPickerSection(entries, section)))];
+
 test("curated picker sections route representative keycodes", () => {
     const section = (id) => pickerSections().find((candidate) => candidate.id === id);
-    for (const id of ["custom", "all"]) assert.ok(entriesForPickerSection(catalogue, section(id)).some((entry) => entry.value === "CUSTOM_KEY_0"), id);
+    assert.ok(entriesForPickerSection(catalogue, section("custom")).some((entry) => entry.value === "CUSTOM_KEY_0"));
     assert.deepEqual(entriesForPickerSection(catalogue, section("symbols")).map((entry) => entry.value), ["KC_SLASH", "KC_EXLM"]);
     assert.deepEqual(entriesForPickerSection(catalogue, section("navigation")).map((entry) => entry.value), ["KC_HOME"]);
     assert.deepEqual(entriesForPickerSection(catalogue, section("numpad")).map((entry) => entry.value), ["KC_KP_1"]);
@@ -40,8 +43,9 @@ test("curated picker sections route representative keycodes", () => {
     // The keyboard's own pointer keys sit with the mouse; its unnamed slots do nothing.
     assert.deepEqual(entriesForPickerSection(catalogue, section("mouse")).map((entry) => entry.value), ["QK_MOUSE_BUTTON_1", "DPI_MOD"]);
     assert.deepEqual(entriesForPickerSection(catalogue, section("custom")).map((entry) => entry.value), ["CUSTOM_KEY_0"]);
-    assert.deepEqual(entriesForPickerSection(catalogue, section("other")).map((entry) => entry.value), ["QK_BOOT"]);
-    assert.equal(entriesForPickerSection(catalogue, section("all")).length, catalogue.length - 5, "native macros, retired user keys and unsupported keyboard slots are excluded");
+    // Function keys, modifiers and QMK's own keys share one last section.
+    assert.deepEqual(entriesForPickerSection(catalogue, section("else")).map((entry) => entry.value), ["KC_F12", "QK_BOOT"]);
+    assert.equal(offered(catalogue).length, catalogue.length - 7, "native macros, retired user keys and unsupported keyboard slots are excluded; letters are on the board and pointing slots in Trackball modes");
     assert.equal(pickable({value: "QK_MACRO_9", group: "macro"}), false);
 });
 
@@ -72,8 +76,7 @@ test("keycodes for QMK features this firmware does not build are offered nowhere
     ];
     for (const entry of built) assert.ok(pickable(entry), entry.value);
     for (const entry of unbuilt) assert.ok(!pickable(entry), entry.value);
-    const all = pickerSections().find((section) => section.id === "all");
-    assert.equal(entriesForPickerSection([...built, ...unbuilt], all).length, built.length);
+    assert.equal(offered([...built, ...unbuilt]).length, built.length);
 });
 
 test("all 32 retired user entries stay in the catalogue but are absent from sections and search", async () => {
@@ -92,9 +95,11 @@ test("all 32 retired user entries stay in the catalogue but are absent from sect
     }
     for (const section of pickerSections()) assert.deepEqual(entriesForPickerSection(retired, section), [], section.id);
     assert.deepEqual(retired.filter(pickable).filter(entry => entry.search.includes("user")), []);
-    for (const value of ["CUSTOM_KEY_0", "CUSTOM_KEY_127", "KC_NO", "KC_TRANSPARENT"]) {
-        const entry = {value, group: value.startsWith("CUSTOM") ? "Custom keys" : "internal"};
+    for (const value of ["CUSTOM_KEY_0", "CUSTOM_KEY_127"]) {
+        const entry = {value, group: "Custom keys"};
         assert.ok(pickable(entry), value);
         assert.deepEqual(entriesForPickerSection([entry], pickerSections().find(section => section.id === "custom")), [entry]);
     }
+    // Nothing and Transparent lead the picker's Basics strip and its search.
+    for (const value of ["KC_NO", "KC_TRANSPARENT"]) assert.ok(pickable({value, group: "internal"}), value);
 });

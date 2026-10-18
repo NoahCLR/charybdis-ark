@@ -31,7 +31,7 @@ test("behaviour rows claim their keys' built-in first actions", () => {
 const MODEL_FIELDS = [
     "layers", "keyBehaviors", "combos", "viaMacros", "macroNameSpace", "behaviorTimingDefaults",
     "configDefaults", "rgb", "qmkKeycodes", "qmkKeyLabels", "qmkKeyLayers", "qmkKeyShortLabels", "qmkKeycodeAliases",
-    "qmkKeycodeSource", "macroPayloadKeycodes", "diagnostics",
+    "qmkKeycodeSource", "qmkSpellings", "macroPayloadKeycodes", "diagnostics",
 ];
 
 function layoutWith(keys) {

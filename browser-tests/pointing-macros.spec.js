@@ -41,12 +41,15 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
             await page.locator(`.field:has(input[data-f="pointing:4:${field}"]) [data-pick]`).click();
             const picker = page.getByRole("dialog", {name: "Choose a key"});
             await picker.locator('[data-sec="macros"]').click();
+            // Empty slots wait behind one button.
+            await picker.locator('[data-empty="macros"]').click();
             await expect(picker.locator("[data-pick]")).toHaveCount(128);
             if (macro === 0) await expect(picker).toContainText("Greeting <&>");
             await picker.locator(`[data-pick="VIA_MACRO_${macro}"]`).click();
-            await picker.locator('[data-mod="C"]').click();
-            await expect(picker.locator('[data-act="use"]')).toBeDisabled();
-            await picker.locator('[data-mod="C"]').click();
+            // A macro cannot hold modifiers: the chips say so rather than let Use fail.
+            await expect(picker.locator('[data-mod="C"]')).toHaveAttribute("aria-disabled", "true");
+            await picker.locator('[data-mod="C"]').click({force: true});
+            await expect(picker.locator('[data-mod="C"]')).not.toHaveClass(/\bon\b/);
             await picker.locator('[data-act="use"]').click();
             const message = await stagePosts();
             const [group, name] = field.split(":");

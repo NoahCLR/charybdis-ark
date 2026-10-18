@@ -67,6 +67,8 @@ export interface PdConfig {
 }
 export interface SettingEdit {macro: string; enabled?: boolean; value?: Scalar | boolean}
 
+/** What a custom key made from the keycode picker is put to use by, in the same draft step. */
+export type CustomKeyFollowing = Extract<PanelEdit, {type: 'updateLayoutKeys' | 'saveBehavior'}>;
 export interface EditPayloads {
     reviewPortableProfile: {text: string; name: string};
     updateLayoutKeys: {layer: LayerReference; changes: {layoutIndex: number; keycode: string}[]};
@@ -74,7 +76,8 @@ export interface EditPayloads {
     addBehavior: {expectedBase?: Partial<BaseIdentity>; behavior: Behavior};
     deleteBehavior: {expectedBase?: Partial<BaseIdentity>; keycode: string};
     retargetBehavior: {expectedBase?: Partial<BaseIdentity>; keycode: string; target: string; conflict?: 'swap' | 'overwrite'};
-    saveBehavior: {expectedBase?: Partial<BaseIdentity>; behavior: Behavior};
+    /** `then` puts a key on the layout in the same draft step: the tap of a hold the keycode picker gives a key. */
+    saveBehavior: {expectedBase?: Partial<BaseIdentity>; behavior: Behavior; then?: EditOf<'updateLayoutKeys'>};
     addCombo: Combo;
     saveCombo: Combo & {id: number};
     deleteCombo: {id: number};
@@ -104,9 +107,10 @@ export interface EditPayloads {
     /**
      * A custom key's shortcut (firmware D-F26): a HID report modifier mask and one key, `{mods: 0, key: 0}` to clear it.
      * `name` names the key in the same step. `then` is a layout or profile edit staged on top in the same draft step
-     * (a layout key, a behaviour cell): what the keycode picker offers for modifiers no keycode can hold (D-L63).
+     * (a layout key, a behaviour cell, or both in order): what the keycode picker offers for modifiers no keycode can
+     * hold (D-L63), and for a hold that only one key should get.
      */
-    updateCustomKeyShortcut: {keycode: string; shortcut: {mods: number; key: number}; name?: string; then?: Extract<PanelEdit, {type: 'updateLayoutKeys' | 'saveBehavior'}>; expectedFingerprint?: string};
+    updateCustomKeyShortcut: {keycode: string; shortcut: {mods: number; key: number}; name?: string; then?: CustomKeyFollowing | CustomKeyFollowing[]; expectedFingerprint?: string};
     renameKeyboard: {name: string; expectedFingerprint?: string};
     savePdMode: {slot: number; config: PdConfig; expectedBase?: Partial<BaseIdentity>};
     clearPdMode: {slot: number; expectedBase?: Partial<BaseIdentity>};

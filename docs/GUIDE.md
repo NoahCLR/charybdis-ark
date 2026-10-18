@@ -518,16 +518,52 @@ Macros tab, hover a step for its full key name or more of its text.
 
 ### The keycode picker
 
-The key picker, **Choose a key**, leads with a board labelled for your computer's keyboard layout
-(ANSI for US; see [Your computer](#your-computer)), then task-shaped Symbols,
+The key picker opens on the section of the key it changes, titled for it:
+**Change F on Base**. It leads with **Basics**: **Nothing** (the key does
+nothing and blocks the layers below), on a board key **Transparent (falls
+through)** to the layer below, and the layer keys you used lately. Then comes a
+board labelled for your computer's keyboard layout
+(ANSI for US; see [Your computer](#your-computer)), and task-shaped Symbols,
 Navigation, Numpad, Layers, Trackball modes, Macros, Mouse, Media, Lighting,
-Key options (QMK's Magic keys) and Custom keys sections. Keys supported by this firmware are available under
-More keys, Other QMK and All keycodes, and search spans those entries — named
-macros included, found by the name they were given. Layers offers each layer
-as Hold (`MO`), Lock (`LOCK_LAYER`, the same lock as QMK's `TG`) and Tap-hold
-(`LT`); a keyboard that owns its layer keys adds Tap-toggle (`TT`), One-shot
-(`OSL`) and Move to (`TO`). Trackball modes offers each mode as Hold and
-Lock. Under each button its keycode shows with **Show keycodes** on.
+Key options (QMK's Magic keys), Custom keys and **Everything else** (function
+keys, modifiers and QMK's own keys). Empty macro, custom key and trackball mode
+slots wait behind **Show N empty**. Bootloader, Reboot and Clear EEPROM carry
+⚠ and say what pressing them does.
+
+Search covers every section: keys by their words and QMK names (including the
+names QMK used to give them, such as `KC_BTN1` or `RESET`), named macros, words
+such as *nothing*, *transparent* and *reset*, and layer keys by the layer's
+name and verb (*numbers* finds Hold, Lock, Tap-hold, Tap-toggle, One-shot and
+Move to Numbers). A QMK expression typed in, such as `LT(3, KC_F)` or
+`LCTL_T(KC_A)`, is the first result, in words (**Use LT(3, KC_F)** · F, hold
+Navigation); one the keyboard cannot store says why. ↑ and ↓ walk the results
+and Enter uses the one chosen. Double-click a key, or press Enter on it, to use
+it at once.
+
+Layers offers each layer as Hold (`MO`), Lock (`LOCK_LAYER`, the same lock as
+QMK's `TG`), Tap-toggle (`TT`), One-shot (`OSL`) and Move to (`TO`), and on a
+board key Tap-hold (`LT`), which sets the Hold slot below. Base is always on,
+so its row offers only Tap-hold and Move to. Trackball modes offers each mode
+as Hold and Lock. Under each button its keycode shows with **Show keycodes** on.
+
+On a board key the footer has two slots, **Tap** and **Hold**, then what the
+keyboard stores, **Clear** and **Use key**. The Hold menu offers Nothing, Ctrl,
+Shift, Option, Command, Right ▸ (the right-hand ones), Layer ▸ and Trackball
+mode ▸; **Add a hold…** on the Key tab opens the picker with this menu open. A
+modifier held is stored as a mod-tap (`MT(MOD_LCTL, KC_ESC)`) and a layer held
+as a layer-tap (`LT(3, KC_F)`). Both tap only a plain key, a letter, digit,
+F-key, Space or Enter for instance, and take no modifiers of their own, so the
+modifier row switches off with the reason. Over any other tap the picker offers
+**Make custom key KN** instead: a custom key that sends the tap, with the hold
+as its behaviour, put on this key. A trackball mode held is a behaviour row on
+the tap's keycode, and every key sending that keycode gets it, which the
+picker says ("Every Space key gets this hold: Base, Game"). When the tap is on
+more than one key, the default is **Only this key: make Custom key N (sends
+Space)**. Each choice is one draft change that one Undo takes back.
+
+**Use key** is enabled only for what the keyboard can store: a layer, macro,
+trackball mode or custom key cannot be wrapped in modifiers, so the modifier
+row switches off with the reason, and the picker never closes into an error.
 A modifier key counts as a modifier: choose modifiers alone, or with a
 modifier key, and the picker stores the simplest keycode that holds them, which
 the footer shows. Command with the Left Command key is just `KC_LEFT_GUI`, and

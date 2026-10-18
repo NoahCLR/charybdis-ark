@@ -1328,6 +1328,47 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .pkb-main.sm { font-size: 15px; }
 .pkb-alt { fill: var(--text-3); font-family: var(--sans); font-size: 15px; text-anchor: middle; }
 .sheet-f .chip { cursor: pointer; }
+/* Basics: Nothing, Transparent and recent layer keys, above the sections. */
+.pk-basics { display: flex; align-items: center; gap: var(--s-2); padding: var(--s-2) var(--s-4); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.pk-basics .eyebrow { margin-right: var(--s-1); }
+.pk-basics-sep { width: 1px; align-self: stretch; background: var(--line); margin: 0 var(--s-1); }
+.pk.compact { height: var(--h-compact); min-width: 0; padding: 0 var(--s-3); display: inline-flex; gap: var(--s-2); }
+.pk.compact .l { font-size: var(--fs-small); }
+.pk-warn { color: var(--warning); }
+.pk-mod[aria-disabled="true"] { color: var(--text-disabled); border-style: dashed; cursor: default; }
+.pk-mod[aria-disabled="true"]:hover { border-color: var(--line); color: var(--text-disabled); }
+/* Search: a typed expression first, then layer keys, macros and keys. */
+.pk-typed { display: flex; align-items: baseline; gap: var(--s-3); width: 100%; min-height: var(--h-control); padding: var(--s-2) var(--s-3); margin-bottom: var(--s-3);
+  border: 1px solid var(--line-2); border-radius: var(--r-control); background: var(--surface-2); text-align: left; }
+.pk-typed .l { font-size: var(--fs-body); color: var(--text); }
+.pk-typed .d { font-size: var(--fs-small); color: var(--text-2); }
+.pk-typed[aria-disabled="true"] { border-style: dashed; cursor: default; }
+.pk-typed[aria-disabled="true"] .l { color: var(--text-2); }
+.pk-typed:not([aria-disabled="true"]):hover { border-color: var(--line-3); background: var(--surface-3); }
+.pk-results { margin-bottom: var(--s-3); }
+.pk.cursor, .pk-typed.cursor { outline: 2px solid var(--focus); outline-offset: 1px; }
+.pk-fold { margin-top: var(--s-2); }
+.pk-gap { display: block; }
+.pk-layers.no-lt .pk-layer { grid-template-columns: 16px 130px repeat(5, minmax(0, 150px)); }
+.pk-layer .nm .mk { display: inline-flex; }
+/* The footer: the Tap and Hold slots, what is stored, and Use key. */
+.pk-foot { flex-wrap: wrap; }
+.pk-slot { display: inline-flex; align-items: center; gap: var(--s-2); }
+.pk-slot .value-btn { max-width: 260px; }
+.pk-hold { position: relative; }
+.pk-menu { position: absolute; bottom: calc(100% + var(--s-1)); left: 0; z-index: 3; min-width: 220px; max-height: 360px; overflow: auto; padding: var(--s-1);
+  background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--r-card); box-shadow: var(--shadow-1); display: grid; }
+.pk-menu-item { display: flex; align-items: center; gap: var(--s-2); height: var(--h-compact); padding: 0 var(--s-2); border-radius: var(--r-chip);
+  font-size: var(--fs-body); color: var(--text); text-align: left; }
+.pk-menu-item span[aria-hidden] { margin-left: auto; color: var(--text-3); }
+.pk-menu-back span[aria-hidden] { margin-left: 0; }
+.pk-menu-item:hover, .pk-menu-item:focus-visible { background: var(--surface-3); }
+.pk-menu-item[aria-checked="true"] { font-weight: var(--fw-medium); }
+.pk-menu-item[aria-checked="true"]::after { content: "✓"; margin-left: auto; color: var(--text-2); }
+.pk-menu-note { padding: var(--s-2); }
+/* Who gets a trackball-mode hold: this key, or every key sending its tap. */
+.pk-scope { display: grid; gap: var(--s-1); padding: 0 var(--s-4) var(--s-3); background: var(--surface-2); font-size: var(--fs-small); color: var(--text-2); }
+.pk-choice { display: flex; align-items: baseline; gap: var(--s-2); }
 
 /* ── misc screens ────────────────────────────────────────────────────── */
 /* ── trackball (ui/trackball.mjs, ui/trackball/, ui/pointing/) ───────── */

@@ -273,7 +273,13 @@ class ProfileDraftSession {
         }
         else if (editedBy(message, "keyboardName")) document = editKeyboardName(current, {...message, expectedFingerprint: message.expectedFingerprint || before}, this.capabilities);
         else if (editedBy(message, "layout")) document = this.editLayout(message);
-        else if (editedBy(message, "profile")) document = this.editProfile(message, current.document);
+        else if (editedBy(message, "profile")) {
+            document = this.editProfile(message, current.document);
+            // A hold given to a key from the picker puts its tap on the key
+            // in the same step, so one undo takes both back.
+            const then = message.type === "saveBehavior" && "then" in message ? message.then : undefined;
+            if (then) document = this.editFollowing(then, document);
+        }
         else throw fail("Unsupported draft edit.");
         this.replace(document, message.draftRevision, "edit", draftEditLabel(message, current.document));
         return {message: copy(message), previousFingerprint: before, fingerprint: this.decode(this.history[this.cursor].document).fingerprint};
@@ -289,9 +295,12 @@ class ProfileDraftSession {
         }).toString("base64")};
     }
     // The edit a custom key made for a shortcut carries: a layout key or a
-    // behaviour, staged on the document that already holds the key (D-L63).
-    /** @param {{type: string}} message @param {Document} base @returns {Document} */
+    // behaviour, or both in order, staged on the document that already holds
+    // the key (D-L63); and the layout key a behaviour row given from the
+    // picker carries.
+    /** @param {{type: string} | {type: string}[]} message @param {Document} base @returns {Document} */
     editFollowing(message, base) {
+        if (Array.isArray(message)) return message.reduce((document, next) => this.editFollowing(next, document), base);
         if (message.type === "updateLayoutKeys") return this.editLayout(/** @type {import("../../contracts/edits.js").EditOf<"updateLayoutKeys">} */ (message), base);
         if (message.type === "saveBehavior") return this.editProfile(/** @type {import("../../contracts/edits.js").EditOf<"saveBehavior">} */ (message), base);
         throw fail("A custom key made for a shortcut goes on a key or in a behaviour.");
