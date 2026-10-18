@@ -47,6 +47,6 @@ test("the firmware facts state what the firmware reports, each needing a build",
     assert.equal(by["Repeat ceiling"], "100 Hz");
     assert.equal(by["Brightness ceiling"], String(model.rgb.maximumBrightness));
     assert.ok(facts.every((fact) => /Needs a firmware build/.test(fact.hint)));
-    assert.ok(facts.some((fact) => fact.label === "QMK tap-hold options" && /cannot show them/.test(fact.hint)), "what Ark cannot read is said, not guessed");
+    assert.equal(by["QMK tap-hold options"], "Not used", "the keyboard decides every key's tap or hold itself (firmware D-F27)");
     assert.ok(!firmwareFacts({...model, firmware: null}).some((fact) => fact.label === "LEDs"), "an unreported ceiling is left out");
 });

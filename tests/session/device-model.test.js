@@ -39,7 +39,7 @@ function layoutWith(keys) {
 }
 
 test("unstored behaviour defaults share the firmware timing and built-in rules", () => {
-    const values = [0x4309, 0x2109, 0x04, 0, 1];
+    const values = [0x4309, 0x2109, 0x52a1, 0x52c2, 0x5281, 0x5201, 0x04, 0, 1];
     const state = {layout: layoutWith(values.map((keycode, layoutIndex) => ({keycode, layoutIndex, resolved: resolve(keycode)}))),
         settingsView: {timing: {tappingTerm: "210", tapHoldTerm: "150", longerHoldTerm: "400", multiTapTerm: "170"}}};
     const model = buildDeviceModel(state);
@@ -47,7 +47,13 @@ test("unstored behaviour defaults share the firmware timing and built-in rules",
     assert.equal(defaults["LT(3,KC_F)"].timing.tapHoldTerm, "210", "LT inherits the dual-role threshold");
     assert.equal(defaults["LT(3,KC_F)"].builtIn.tap.action, "KC_F");
     assert.equal(defaults["LT(3,KC_F)"].builtIn.hold.action, "MO(3)");
-    assert.equal(defaults["MT(MOD_LCTL,KC_F)"].timing.tapHoldTerm, "150");
+    // Every dual-role key holds at the dual-role threshold, row or not
+    // (firmware D-F27, bit 31); any other key's row at the behaviour one.
+    for (const name of ["MT(MOD_LCTL,KC_F)", "OSM(MOD_LCTL)", "TT(2)", "OSL(1)"]) {
+        assert.equal(defaults[name].timing.tapHoldTerm, "210", name);
+        assert.equal(defaults[name].timingSources?.tapHoldTerm, "tappingTerm", name);
+    }
+    assert.equal(defaults["TO(1)"].timing.tapHoldTerm, "150", "TO() is no dual-role key");
     assert.equal(defaults["MT(MOD_LCTL,KC_F)"].builtIn.tap.action, "KC_F");
     assert.deepEqual(defaults.KC_A.timing, {tapHoldTerm: "150", longerHoldTerm: "400", multiTapTerm: "170"});
     assert.equal(defaults.KC_NO, undefined);
@@ -535,13 +541,13 @@ test("snapshot presentation uses its decoded configuration and real device diagn
     assert.equal(model.behaviorEditing.keyDefaults["LT(3,KC_F)"].builtIn.hold.action, "MO(3)");
     assert.deepEqual(model.behaviorEditing.keyDefaults["LT(3,KC_F)"].timingSources,
         {tapHoldTerm: "tappingTerm", longerHoldTerm: "longHoldTerm", multiTapTerm: "multiTapTerm"});
-    assert.equal(model.behaviorEditing.keyDefaults["LT(3,KC_F)"].withoutRow, undefined, "LT follows the dual-role term with or without a row");
-    // B5: an MT key with no row is QMK's own, on the dual-role term; a row puts it on the behaviour term.
+    // Every dual-role key follows the dual-role term, row or not (firmware
+    // D-F27, bit 31); any other key's row the behaviour term.
     const mt = Object.entries(model.behaviorEditing.keyDefaults).find(([name]) => /^(LSFT_T|MT)\(/.test(name))?.[1];
     assert.ok(mt, "the MT key has defaults");
-    assert.equal(mt.timingSources.tapHoldTerm, "tapHoldTerm");
-    assert.equal(mt.withoutRow.tapHoldSource, "tappingTerm");
-    assert.equal(mt.withoutRow.tapHoldTerm, model.behaviorEditing.keyDefaults["LT(3,KC_F)"].timing.tapHoldTerm);
+    assert.equal(mt.timingSources?.tapHoldTerm, "tappingTerm");
+    assert.equal(mt.timing.tapHoldTerm, model.behaviorEditing.keyDefaults["LT(3,KC_F)"].timing.tapHoldTerm);
+    assert.equal(model.behaviorEditing.keyDefaults["KC_A"]?.timingSources?.tapHoldTerm, "tapHoldTerm");
     // B6: MO holds its layer from the press.
     assert.equal(model.behaviorEditing.keyDefaults["MO(2)"].builtIn.hold.fromPress, true);
     assert.equal(model.viaMacros[0].payload, "hello");

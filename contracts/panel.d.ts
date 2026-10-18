@@ -17,14 +17,13 @@ export interface Position {
 export interface LayerAnswer {layer: number; active: number; blocked: number}
 export interface Layer {name: LayerReference; index: number; positions: Position[]; displayName?: string; answers: LayerAnswer[][]}
 // What a key with no behaviour of its own runs on: its built-in actions, the
-// timing defaults a row on it would follow, which setting each comes from, and
-// (B5) the Tap / hold default it follows today when that differs with no row.
+// timing defaults it follows, with or without a row, and which setting each
+// comes from.
 export type TimingSource = "tappingTerm" | "tapHoldTerm" | "longHoldTerm" | "multiTapTerm";
 export interface KeyBehaviorDefaults {
     builtIn: BuiltIn;
     timing: Record<string, Scalar | undefined>;
     timingSources?: Record<string, TimingSource>;
-    withoutRow?: {tapHoldTerm: Scalar | undefined; tapHoldSource: TimingSource};
 }
 export interface Branch extends BehaviorBranch { label?: string; fallback?: boolean; fromPress?: boolean}
 export interface BuiltIn {tap?: Branch; hold?: Branch; releaseTaps?: boolean}

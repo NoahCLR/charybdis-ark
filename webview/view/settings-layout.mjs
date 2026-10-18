@@ -82,8 +82,8 @@ export const noMatchWords = (query) => `No setting matches “${query.trim()}”
 const BUILD = "Needs a firmware build to change.";
 
 // What this firmware was built with, read-only: each fact the keyboard
-// reports (model.firmware) or that the screens already show, and the QMK
-// options Ark cannot read at all, said as such.
+// reports (model.firmware) or that the screens already show, and that QMK's
+// tap-hold options apply to no key.
 /** @param {Model | null | undefined} model @returns {{label: string, value: string, hint: string}[]} */
 export function firmwareFacts(model) {
     const firmware = model?.firmware;
@@ -107,7 +107,9 @@ export function firmwareFacts(model) {
         if (steps.length) facts.push({label: `${field.label.replace(/ \(.*\)$/, "")} speed steps`, value: `${steps[0]}–${steps[steps.length - 1]} DPI, ${steps.length} steps`,
             hint: `The DPI steps the Charybdis accepts for this speed; a trackball mode's own speed is not limited to them. ${BUILD}`});
     }
-    facts.push({label: "QMK tap-hold options", value: "As built",
-        hint: `Permissive hold, hold on other key press and quick tap are set in the firmware's source, which the keyboard does not report, so Ark cannot show them. ${BUILD}`});
+    // Current firmware decides every key's tap or hold itself (firmware D-F27,
+    // Profile Wire feature bit 31, which Ark requires).
+    facts.push({label: "QMK tap-hold options", value: "Not used",
+        hint: `The keyboard decides every key's tap or hold itself, so QMK's permissive hold, hold on other key press and quick tap apply to no key. ${BUILD}`});
     return facts;
 }

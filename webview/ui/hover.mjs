@@ -9,7 +9,7 @@ import {comboBehaviours, comboInputIsKey, combosAt, combosShownAt} from "../view
 import {customKeyHeadline, customKeyOf, customKeyShortcutOnly} from "../view/custom-key.mjs";
 import {macroKeycodes, pointingSlotFor} from "../view/reach.mjs";
 import {behaviourEditorRow, behaviourIsEmpty, behaviourThresholds, helperDetail} from "../view/behavior-editor.mjs";
-import {keyHandling} from "../view/participation.mjs";
+import {behaviourRuns} from "../view/participation.mjs";
 import {resolvedPositions} from "../view/layer-resolution.mjs";
 import {pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {getModel, heldLayers, layerName, positionAt} from "../store.mjs";
@@ -158,34 +158,31 @@ function reachSections(model, layer, position, index,
     const sections = [];
     const custom = customOf(model, keyMeaning(position));
     const role = dualRole(model, position);
-    const empty = Boolean(behaviour) && behaviourIsEmpty(/** @type {any} */ (behaviour), model?.layers?.length || 16);
+    const empty = Boolean(behaviour) && behaviourIsEmpty(/** @type {any} */ (behaviour));
     const branchless = Boolean(behaviour) && !behaviour?.steps?.length;
-    // Any behaviour row the keyboard runs here hands the key to its own key
-    // engine, even one with no branches; without one, QMK handles the key
-    // (firmware D-F02). A dual-role key's tap / hold says which decides it.
-    const handling = "row" in position
-        ? keyHandling(model, layer?.index ?? 0, /** @type {{row: number, column: number}} */ (/** @type {unknown} */ (position)), behaviour)
-        : {by: behaviour ? "keyboard" : "qmk", reasons: []};
-    const byKeyboard = handling.by === "keyboard";
-    const unused = behaviour && !byKeyboard ? `Its behaviour row is not used here (${handling.reasons.join("; ")}), so QMK decides.` : "";
+    // The keyboard decides every key's tap or hold, with or without a row
+    // (firmware D-F27), so the card says only whether this key's row runs
+    // here, and why not.
+    const use = "row" in position
+        ? behaviourRuns(model, layer?.index ?? 0, /** @type {{row: number, column: number}} */ (/** @type {unknown} */ (position)), behaviour)
+        : {runs: Boolean(behaviour), reasons: []};
+    const runs = use.runs;
     if (role) {
-        // QMK ignores a row it does not run, so it waits its own threshold:
-        // the key's default, never the row's override.
-        const fallback = behaviourEditorRow(model, keyMeaning(position))?.timingDefaults?.tapHoldTerm ?? model?.behaviorTimingDefaults?.tapHoldTerm;
-        const term = byKeyboard && behaviour ? behaviourThresholds(model, behaviour).tapHoldTerm : {ms: fallback === undefined ? "" : String(fallback)};
+        // A row that does not run is ignored, its own threshold with it: the
+        // key waits its default, the dual-role threshold.
+        const fallback = behaviourEditorRow(model, keyMeaning(position))?.timingDefaults?.tapHoldTerm ?? model?.behaviorTimingDefaults?.tappingTerm;
+        const term = runs && behaviour ? behaviourThresholds(model, behaviour).tapHoldTerm : {ms: fallback === undefined ? "" : String(fallback)};
         const hold = "layer" in role.hold
             ? marked(model, {kind: "layer", layer: role.hold.layer}, role.hold.name)
             : esc(role.hold.modifier);
-        const note = unused || (branchless ? "Its behaviour row has no branches; having a row is what hands this key's tap / hold to the keyboard instead of QMK." : "");
+        const note = behaviour && !runs && !empty ? `Its behaviour row is not used here (${use.reasons.join("; ")}), so the key keeps this tap and hold.` : "";
         sections.push(`<div class="hc-sect"><div class="hc-h">Tap / hold</div>
-            <div class="hc-sub">tap / hold ${esc(threshold(term))} · decided by ${byKeyboard ? "the keyboard" : "QMK"}</div>
+            <div class="hc-sub">tap / hold ${esc(threshold(term))}</div>
             <div class="hc-act"><span class="hc-stage">Tap</span><span><span class="hc-name">${esc(role.tap)}</span></span></div>
             <div class="hc-act"><span class="hc-stage">Hold</span><span><span class="hc-name">${hold}</span></span></div>
             ${note ? `<div class="hc-sub hc-foot hc-quiet">${esc(note)}</div>` : ""}</div>`);
     } else if (empty && !custom) {
-        sections.push(`<div class="hc-sect"><div class="hc-sub hc-quiet">${esc(byKeyboard
-            ? "Handled by the keyboard's key engine: it has a behaviour row with no branches."
-            : `Has a behaviour row with no branches, not used here (${handling.reasons.join("; ")}).`)}</div></div>`);
+        sections.push(`<div class="hc-sect"><div class="hc-sub hc-quiet">${esc("Its behaviour row has no branches or timing of its own: the key runs as it does without one.")}</div></div>`);
     }
     if (behaviour && !(role && branchless) && !(empty && !role && !custom)) {
         const terms = behaviourThresholds(model, behaviour);
@@ -203,7 +200,7 @@ function reachSections(model, layer, position, index,
             <div class="hc-sub">${[count ? `${count} branch${count === 1 ? "" : "es"}` : "No branches yet",
                 ...terms.used.map((name) => `${TERM_WORDS[name]} ${threshold(terms[name])}`),
                 ...(behaviour.keepsAutoMouseAnchored ? ["keeps auto-mouse anchored"] : [])].map(esc).join(" · ")}</div>
-            ${!role && !byKeyboard ? `<div class="hc-sub hc-quiet">${esc(`Not used here (${handling.reasons.join("; ")}): `)}${custom
+            ${!role && !runs ? `<div class="hc-sub hc-quiet">${esc(`Not used here (${use.reasons.join("; ")}): `)}${custom
                 ? esc(customKeyShortcutOnly(custom)) : `sends ${keyNameMarked(model, keyName(position), keyMeaning(position))} directly`}.</div>` : ""}
             ${branches}
             ${count && foot ? `<div class="hc-sub hc-foot">${lit

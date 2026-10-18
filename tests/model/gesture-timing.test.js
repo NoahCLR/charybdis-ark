@@ -41,12 +41,12 @@ test("an empty long action cannot shadow a release hold", () => {
     const r = row(); r.steps[0].longHold.action = code(0);
     assert.equal(releaseHoldUnreachable(r.steps[0], effectiveTimings(r, [])), false);
 });
-test("with no row, QMK's MT and OSM keys follow the dual-role term; a row puts them on the behaviour term", () => {
+test("every dual-role key follows the dual-role term, row or not; any other row the behaviour term", () => {
     const values = [200, 150, 400, 150];
-    for (const operand of [0x2204, 0x52a2]) {
-        assert.equal(effectiveTimings({target: code(operand)}, values, {stored: false}).hold, 200);
-        assert.equal(effectiveTimings({target: code(operand)}, values).hold, 150);
+    // MT(), LT(), OSL(), OSM() and TT() (firmware D-F27, bit 31).
+    for (const operand of [0x2204, 0x3fff, 0x432f, 0x5281, 0x52a2, 0x52c2, 0x52df]) {
+        assert.equal(effectiveTimings({target: code(operand)}, values).hold, 200, operand.toString(16));
+        assert.equal(effectiveTimings({target: code(operand), tapHoldTerm: 180}, values).hold, 180, "a row's own time wins");
     }
-    assert.equal(effectiveTimings({target: code(0x432f)}, values, {stored: false}).hold, 200);
-    assert.equal(effectiveTimings({target: code(4)}, values, {stored: false}).hold, 150);
+    for (const operand of [4, 0x5201, 0x5221, 0x5261, 0x52e0]) assert.equal(effectiveTimings({target: code(operand)}, values).hold, 150, operand.toString(16));
 });

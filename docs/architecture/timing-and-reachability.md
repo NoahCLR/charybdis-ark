@@ -9,7 +9,8 @@ conservative analysis, its limits, and presentation of inherited behaviour.
 ## Timing findings and analysis limits
 
 Ark resolves each row's timing overrides against the connected settings, including
-the dual-role default for authored LT rows. A Hold and Long hold that both
+the dual-role default of every dual-role key (`LT()`, `MT()`, `OSM()`, `TT()`,
+`OSL()`). A Hold and Long hold that both
 tap on release ("tap on release after Tap / hold threshold", "… after Long
 hold threshold") have
 an impossible Hold branch when Long hold is
@@ -73,10 +74,15 @@ physical-only. A bypassed native output keeps its native effects; a bypassed
 custom output supplies no escape. Both exhaustive and symbolic reach analysis
 follow this policy, as the firmware's participation contract defines.
 
-Current firmware times gestures physically (feature bit 17) and owns tapping
-(bit 18), which extends the authored LT bypass to every handled key (including
-authored MT/OSM and owned TT/OSL); Ark requires both (D-L64), so it gives no
-native-buffering warnings. Neither capability changes stored profile bytes.
+Current firmware times gestures physically (feature bit 17), owns tapping
+(bit 18) and decides every `LT()`, `MT()` and `OSM()` key with or without a row
+(bit 31, firmware D-F27): QMK's tapping engine classifies no key, a row switched
+off or bypassed is ignored while the key keeps its own tap and hold, every
+dual-role key holds at the dual-role threshold unless its row sets its own, and
+a row without steps is no row, so `TT()` keeps its own taps under one. Ark
+requires all three (D-L64), so it gives no native-buffering warnings, and layer
+reach drops `TT()`'s locking tap only under a row with steps. None of these
+capabilities changes stored profile bytes.
 Firmware owns that policy and its native-key controls; Ark owns these findings
 and their presentation.
 
@@ -147,8 +153,8 @@ with no default/custom marker after `ms` in the label. Other values remain enter
 Presentation alone never rewrites an explicit override that matches the default.
 When a behaviour timing default changes, explicit row values equal to that
 specific old default become inheritance zeros in the same draft step. Existing
-zeros follow naturally; distinct custom values stay fixed. LT's Tap / hold follows
-the dual-role default, other rows the normal threshold. Unchanged defaults and
+zeros follow naturally; distinct custom values stay fixed. A dual-role key's
+Tap / hold follows the dual-role default, other rows the normal threshold. Unchanged defaults and
 unrelated settings edits do not normalize rows.
 Review lists each inherited effective-time change under Tap & hold timing, with
 the affected behaviour and old/new milliseconds. Explicit matches adopting
@@ -157,7 +163,8 @@ Inherited effects are not independent discard units, so discarding the default
 does not discard unrelated edits on rows that already inherited it. Undo restores
 the entire step, including any former explicit values.
 The host supplies per-key defaults using the same timing
-resolution as review, including LT's dual-role threshold. Displaying a default
+resolution as review, including the dual-role threshold, which a dual-role key
+follows with or without a row. Displaying a default
 keeps the stored inheritance zero; changing another field never freezes it as an
 override. Clearing an override restores the default. An unchanged empty preview
 posts nothing.

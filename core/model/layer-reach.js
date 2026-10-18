@@ -120,15 +120,16 @@ const holdPhrase = (index, name, longer) => `${index === 0 ? `Hold ${name}` : `T
 
 // Every layer effect one key offers once it resolves to `code`: its own
 // action, less the parts its behaviour row replaces, and each branch of that
-// row. A hold branch that presses and holds until release holds the layer; any
-// other hold, like a tap, sends the action once.
+// row. A row with steps replaces TT()'s own taps; one without is no row
+// (firmware D-F27). A hold branch that presses and holds until release holds
+// the layer; any other hold, like a tap, sends the action once.
 /** @param {number} code @param {BehaviorRow | undefined} row @param {readonly number[]} [values] @returns {(LayerEffect & {how: string, note?: string})[]} */
 function keyEffects(code, row, values) {
     /** @type {(LayerEffect & {how: string, note?: string})[]} */
     const effects = [];
     const first = row?.steps.find((step) => step.tapIndex === 0);
     for (const effect of layerEffects(code)) {
-        if (effect.taps && row) continue;
+        if (effect.taps && row?.steps.length) continue;
         if (effect.kind === "hold" && !effect.oneShot ? first?.hold : first?.tap) continue;
         effects.push({...effect, how: effect.taps ? `Tap ${codeName(code)} ${effect.taps} times` : effect.kind === "hold" && !effect.oneShot ? `Hold ${codeName(code)}` : `Tap ${codeName(code)}`});
     }

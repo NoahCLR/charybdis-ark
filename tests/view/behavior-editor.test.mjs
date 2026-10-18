@@ -126,12 +126,13 @@ test("a hold tier states its own threshold when it waits for one, and its rate w
     assert.equal(helperDetail("tap", {helper: "TAP_AT_HOLD_THRESHOLD"}, terms), "");
 });
 
-test("a behaviour row with nothing of its own is empty, and any one setting makes it not", () => {
+test("a behaviour row with nothing in it is empty, and a branch, a timing or the anchor makes it not", () => {
     const empty = {keycode: "KC_DELETE", tapHoldTerm: "0", longerHoldTerm: "0", multiTapTerm: "0", keepsAutoMouseAnchored: false, enabled: true, allowedLayers: 65535, steps: []};
-    assert.equal(behaviourIsEmpty(empty, 16), true);
-    assert.equal(behaviourIsEmpty({...empty, tapHoldTerm: "150"}, 16), false, "its own timing");
-    assert.equal(behaviourIsEmpty({...empty, steps: [{tapCount: 0, tap: {action: "KC_A"}}]}, 16), false);
-    assert.equal(behaviourIsEmpty({...empty, allowedLayers: 1}, 16), false, "limited to some layers");
-    assert.equal(behaviourIsEmpty({...empty, enabled: false}, 16), false, "switched off");
-    assert.equal(behaviourIsEmpty({...empty, keepsAutoMouseAnchored: true}, 16), false);
+    assert.equal(behaviourIsEmpty(empty), true);
+    assert.equal(behaviourIsEmpty({...empty, tapHoldTerm: "150"}), false, "its own timing");
+    assert.equal(behaviourIsEmpty({...empty, steps: [{tapCount: 0, tap: {action: "KC_A"}}]}), false);
+    assert.equal(behaviourIsEmpty({...empty, keepsAutoMouseAnchored: true}), false);
+    // Its switch and layers gate only what it holds (firmware D-F27 "Rows without steps").
+    assert.equal(behaviourIsEmpty({...empty, allowedLayers: 1}), true, "limited to some layers, it still holds nothing");
+    assert.equal(behaviourIsEmpty({...empty, enabled: false}), true, "switched off, it still holds nothing");
 });

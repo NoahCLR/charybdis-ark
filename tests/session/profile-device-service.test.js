@@ -51,7 +51,7 @@ test("a restore to firmware without a current feature is refused before recovery
     const keyboard = {...source, answer: report => {
         const responses = source.answer(report);
         if (report[0] === PROFILE_WIRE_V1.COMMAND_GET && report[2] === PROFILE_WIRE_V1.VALUE_CAPABILITIES && report[4] === 0) {
-            for (const response of responses) response.writeUInt32LE(response.readUInt32LE(16) & ~(1 << 28), 16);
+            for (const response of responses) response.writeUInt32LE((response.readUInt32LE(16) & ~(1 << 28)) >>> 0, 16);
         }
         return responses;
     }};
@@ -116,8 +116,8 @@ function response(request, payload) {
 
 function readPages(options = {}) {
     const capabilityIdentity = Buffer.alloc(25);
-    const featureFlags = PROFILE_WIRE_KNOWN_MASKS.CURRENT_FEATURES | PROFILE_WIRE_FEATURES.SPLIT_KEYBOARD
-        | (options.mutation ? PROFILE_WIRE_KNOWN_MASKS.CURRENT_MUTATION_FEATURES : 0);
+    const featureFlags = (PROFILE_WIRE_KNOWN_MASKS.CURRENT_FEATURES | PROFILE_WIRE_FEATURES.SPLIT_KEYBOARD
+        | (options.mutation ? PROFILE_WIRE_KNOWN_MASKS.CURRENT_MUTATION_FEATURES : 0)) >>> 0;
     capabilityIdentity.set([2, 3, 1, 0, options.schemaMajor || 3, 0, 32, options.mutation ? 20 : 0, 2], 0);
     capabilityIdentity.writeUInt32LE(featureFlags, 9);
     capabilityIdentity.writeUInt32LE(options.actionAbiDigest ?? 0x12345678, 13);

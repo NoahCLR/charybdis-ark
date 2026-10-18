@@ -82,7 +82,7 @@ test("candidate transfer extensions require candidate-write capability", () => {
     }
 });
 
-test("pointing and combo-output support decode through bit 30 without accepting unknown future features", () => {
+test("pointing, combo-output and unified tapping support decode through bit 31, the last of the word", () => {
     const pages = compiledOnlyPages();
     assert.equal(decodeCapabilityPages(pages).featureFlags & PROFILE_WIRE_FEATURES.POINTING_CLICKS, 0);
     pages[0].writeUInt32LE(pages[0].readUInt32LE(9) | (1 << 28), 9);
@@ -92,7 +92,10 @@ test("pointing and combo-output support decode through bit 30 without accepting 
     pages[0].writeUInt32LE(pages[0].readUInt32LE(9) | (1 << 30), 9);
     assert.equal(decodeCapabilityPages(pages).featureFlags & PROFILE_WIRE_FEATURES.COMBO_OUTPUT_BEHAVIORS, 1 << 30);
     pages[0].writeUInt32LE((pages[0].readUInt32LE(9) | 0x80000000) >>> 0, 9);
-    assert.throws(() => decodeCapabilityPages(pages), error => error.code === "INCOMPATIBLE_RESPONSE");
+    const decoded = decodeCapabilityPages(pages);
+    assert.equal(PROFILE_WIRE_FEATURES.UNIFIED_TAPPING, 0x80000000);
+    assert.ok(decoded.featureFlags > 0, "read unsigned");
+    assert.equal((decoded.featureFlags & PROFILE_WIRE_FEATURES.UNIFIED_TAPPING) >>> 0, PROFILE_WIRE_FEATURES.UNIFIED_TAPPING);
 });
 
 test("Profile Wire get requests are canonical 32-byte frames", () => {
@@ -343,9 +346,8 @@ test("status reports a cancelled save the peer never confirmed", () => {
 
 test("decoders reject unknown masks, active kinds, and invalid ranges", () => {
     const capabilities = compiledOnlyPages();
-    const unknownFeature = capabilities.map((page) => Buffer.from(page));
-    unknownFeature[0].writeUInt32LE(PROFILE_WIRE_KNOWN_MASKS.FEATURE_FLAGS + 1, 9);
-    assert.throws(() => decodeCapabilityPages(unknownFeature), (error) => error.code === "INCOMPATIBLE_RESPONSE");
+    // Bit 31 filled the feature word, so no feature bit is unknown any more.
+    assert.equal(PROFILE_WIRE_KNOWN_MASKS.FEATURE_FLAGS, 0xffffffff);
     // Bit 18 identifies runtime-owned tapping without changing profile bytes.
     const functions = capabilities.map((page) => Buffer.from(page));
     functions[0].writeUInt32LE(functions[0].readUInt32LE(9) | (1 << 18), 9);

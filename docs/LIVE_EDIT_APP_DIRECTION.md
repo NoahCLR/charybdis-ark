@@ -50,7 +50,7 @@ matrix.
 | Keyboard name | The keyboard's own name, its USB product string, edited as the Keyboard screen's title and stored in the settings domain; an Apply that renames it is followed through the keyboard's USB restart (D-L62) |
 | Backup and restore | Complete current-format backup files, restore review against the keyboard, the copies saved before each Apply (each usable as a draft) and verified restore; older formats are refused, never converted (D-L15, D-L23, D-L54, D-L64) |
 | Drafts and Apply | One draft with item-by-item review, discard by edit group, Show, undo/redo and history; the review checks reachable actions, confirms warnings and traps and blocks what the destination cannot save; Apply names its steps and halves and says where a failure happened (D-L19, D-L23, D-L29, D-L30, D-L36, D-L60, D-L61) |
-| Firmware supported | Current firmware only: every feature it reports is required, and a keyboard on anything older is read no further than its identity and told to update (D-L64) |
+| Firmware supported | Current firmware only: every feature it reports is required, through bit 31 (every dual-role key decided by the keyboard, with or without a behaviour row), and a keyboard on anything older is read no further than its identity and told to update (D-L48, D-L64) |
 | Recovery | Atomic logical Apply, differential custom and VIA transfer, reboot recovery fencing, firmware roll-forward after the decision, resume after a lost or power-cycled peer link, bounded cancel owned by the keyboard (D-L20–D-L22, D-L27, D-L39, D-L58) |
 | Where it runs | The VS Code extension, and a web page in Chrome or Edge over WebHID; Cloudflare Git integration publishes `dev` to `ark-dev.ncleroy.dev`, `main` to `ark.ncleroy.dev`, and task branches to PR previews; a phone gets only a notice (D-L02, D-L52) |
 | Demo without a keyboard | The bundled demo profile in a real draft, in both hosts: every screen editable and reviewed, Apply refused, Export saves the draft (D-L53) |
@@ -726,9 +726,13 @@ extension: it names the keyboard, not the app.
 ### D-L48 — Gesture timing advice follows firmware capability
 
 Current firmware times gestures from physical presses (Profile Wire feature
-bit 17) and owns the tapping of authored LT(), MT() and OSM() rows (bit 18),
-and Ark requires both (D-L64). So Ark gives no advice about combo buffering
-or native QMK tap classification, which only firmware without them needed.
+bit 17), owns the tapping of authored LT(), MT() and OSM() rows (bit 18) and,
+since bit 31 (firmware D-F27), decides every LT(), MT() and OSM() key with or
+without a row, holding every dual-role key at the dual-role threshold unless
+its row sets its own. Ark requires all three (D-L64). So Ark gives no advice
+about combo buffering or native QMK tap classification, which only firmware
+without them needed, and never says who decides a key's tap or hold: the
+keyboard always does.
 General guidance still explains double hold as press–release–press-and-hold,
 the released repeat gap, and tap/hold classification. Firmware buffering can
 postpone output even when it preserves physical gesture eligibility.
@@ -1243,7 +1247,10 @@ current firmware whose complete capture failed.
 The next firmware that adds a feature or bumps a domain version reaches Ark as
 one change to these tables, its codec and tests, pinned and released with it
 (D-L44, D-L50); the agreement check fails a firmware that does not report
-every feature Ark requires. A firmware update that changes the stored format
+every feature Ark requires. Bit 31 (firmware D-F27) filled the 32-bit feature
+word, so every bit is now known and the decoder has none left to refuse; a
+later capability reaches Ark as a new field or a protocol change, which its
+decoder must learn first. A firmware update that changes the stored format
 starts the keyboard from flashed defaults, and backups from before it no
 longer import.
 
