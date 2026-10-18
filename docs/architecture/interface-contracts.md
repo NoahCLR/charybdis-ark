@@ -355,7 +355,26 @@ Settings always matches QMK names.
   every catalogue section and search. Inert `QK_USER_0`–`QK_USER_31` entries
   stay in the catalogue for exact readback and backups, but are never offered.
   Current named `CUSTOM_KEY_n`, Nothing (`KC_NO`) and Transparent remain selectable where
-  the field supports them. Selection policy never rewrites stored identities.
+  the field supports them: Nothing and Transparent in the picker's Basics strip
+  and search, not a section. Selection policy never rewrites stored identities.
+- Picker validity (B10): `webview/view/keycode-expression.mjs` mirrors the
+  draft's layout-key encoder (`core/data/keycode-catalog.js` `encode`, the
+  keyboard's own blocks, and `placementProblem`'s layer rule) over the published
+  catalogue, aliases and `qmkSpellings` (QMK's mod-tap shorthands, deprecated
+  wrappers and older names, from `core/data/keycode-legacy.js`). The picker
+  enables **Use key** only when it says the draft takes the choice;
+  `tests/view/keycode-expression.test.mjs` stages each expression against a
+  real draft and holds both to the same keycode. Typed expressions, layer-key
+  search, seeds opening in their slots and the Hold slot's rules are pure, in
+  `webview/view/picker-choice.mjs`.
+- Picker holds (decisions R7): on a layout key (`openPicker({target})`) the
+  footer's Hold slot stores `MT(mod, tap)` or `LT(n, tap)` over a plain tap,
+  or a Single-tap Hold behaviour row for a trackball mode. Each posts one draft
+  edit (`holdEdit`): a layout edit; a `saveBehavior` whose `then` puts the tap
+  on the key; or an `updateCustomKeyShortcut` whose `then` is the custom key's
+  row and the key, for a hold only this key gets or over a tap no mod-tap can
+  send. `pickKeycodeFor(index, {hold: true})` in `webview/ui/keys/key-edits.mjs`
+  opens it with the Hold menu focused.
 - Actions, native keycodes, decode limits, layer references:
   `core/schema/actions.js`; the pointing registry and key layout are data.
 - Decoding: once per draft revision, carried as `decoded` and taken through
