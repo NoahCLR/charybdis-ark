@@ -5,14 +5,17 @@ const {openPreview} = require("./host-page");
 
 async function openControls(page, screen, state = {}, theme = "plain") {
     await openPreview(page, theme);
-    await expect(page.locator(`[data-screen="${screen}"]`)).toBeEnabled();
-    await page.locator(`[data-screen="${screen}"]`).click();
+    // Trackball modes are the Trackball screen opened on a mode: its rail
+    // item is Trackball's.
+    const rail = screen === "pointing" ? "mouse" : screen;
+    await expect(page.locator(`[data-screen="${rail}"]`)).toBeEnabled();
+    await page.locator(`[data-screen="${rail}"]`).click();
     await page.evaluate(async state => {
         const store = await import("/webview/store.mjs");
         Object.assign(store.state, state);
         store.render();
         window.__posted.length = 0;
-    }, state);
+    }, {screen, ...state});
 }
 
 const clearPosts = page => page.evaluate(() => {window.__posted.length = 0;});

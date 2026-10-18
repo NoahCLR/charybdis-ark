@@ -18,33 +18,36 @@ async function advanced(page) {
 test("every scrolling tuning field posts the visible value once, retaining the rest of the record", async ({page}) => {
     await openControls(page, "pointing", {pdSlot: 0});
     await advanced(page);
+    // Each value keeps every rule the keyboard checks (expiry at least the
+    // lock timeout, ratios at least 1:1, retention at most selection), so
+    // every change is posted.
     const fields = [
-        ["Movement per wheel step ↔", "divisorH"], ["Movement per wheel step ↕", "divisorV"],
-        ["Minimum interval ms", "intervalMs"], ["Axis lock timeout ms", "lockMs"],
-        ["Horizontal activation threshold", "thresholdH"], ["Vertical activation threshold", "thresholdV"],
-        ["Gesture expiry ms", "expireMs"], ["Cross-axis decay divisor", "decayDivisor"],
-        ["Axis selection ratio numerator", "startNumerator"], ["Axis selection ratio denominator", "startDenominator"],
-        ["Axis retention ratio numerator", "sustainNumerator"], ["Axis retention ratio denominator", "sustainDenominator"],
+        ["Sideways · per wheel step in sensor counts", "divisorH", 71], ["Up and down · per wheel step in sensor counts", "divisorV", 72],
+        ["Minimum interval", "intervalMs", 73], ["Axis lock timeout", "lockMs", 74],
+        ["Sideways activation threshold", "thresholdH", 75], ["Up and down activation threshold", "thresholdV", 76],
+        ["Gesture expiry", "expireMs", 177], ["Cross-axis decay divisor", "decayDivisor", 78],
+        ["Axis selection ratio numerator", "startNumerator", 79], ["Axis retention ratio numerator", "sustainNumerator", 71],
+        ["Axis retention ratio denominator", "sustainDenominator", 70], ["Axis selection ratio denominator", "startDenominator", 70],
     ];
     const changed = {invert: 2};
-    for (const [index, [label, key]] of fields.entries()) {
+    for (const [label, key, value] of fields) {
         await clearPosts(page);
-        await change(field(page, label), 71 + index);
-        changed[key] = 71 + index;
+        await change(field(page, label), value);
+        changed[key] = value;
         await configPost(page, 0, {kind: 2, name: "Dragscroll", dpi: 100, scroll: expect.objectContaining({...changed})});
     }
 });
 
 for (const [label, value, expected] of [
     ["Name", "Scroll sentinel", {name: "Scroll sentinel"}],
-    ["Ball speed", "1400", {dpi: 1400}],
+    ["Sensitivity", "1400", {dpi: 1400}],
+    ["Sensitivity", "12000", {dpi: 12000}],
     ["Scrolls", "1", {axis: 1}],
     ["Reverse scrolling", "3", {scroll: expect.objectContaining({invert: 3})}],
     ["While this mode runs", "1", {pointerLayer: 1}],
 ]) {
-    test(`scrolling ${label} posts its record`, async ({page}) => {
+    test(`scrolling ${label} ${value} posts its record`, async ({page}) => {
         await openControls(page, "pointing", {pdSlot: 0});
-        if (label === "While this mode runs") await advanced(page);
         if (label === "Name") await change(field(page, label), value);
         else await field(page, label).selectOption(value);
         await configPost(page, 0, {kind: 2, ...expected});
@@ -67,7 +70,8 @@ test("each modifier checkbox in scrolling contributes its own bit", async ({page
 });
 
 test("directional shortcuts, axes, empty directions, output and thresholds all post", async ({page}) => {
-    await openControls(page, "pointing", {pdSlot: 4});
+    // Typed keycodes are the Show keycodes form of a direction.
+    await openControls(page, "pointing", {pdSlot: 4, showKeycodes: true});
     const directions = {};
     for (const direction of ["up", "left", "right", "down"]) {
         await clearPosts(page);
@@ -75,18 +79,18 @@ test("directional shortcuts, axes, empty directions, output and thresholds all p
         directions[direction] = expect.objectContaining({keycode: "KC_A"});
         await configPost(page, 4, {directions: expect.objectContaining({...directions})});
     }
+    // With every direction set, what an empty one does is not asked.
+    await expect(editor(page).locator('[data-f="pointing:4:emptyDirection"]')).toHaveCount(0);
     for (const [label, value, expected] of [
-        ["When a direction is empty", "2", {emptyDirection: 2}],
         ["How often it sends", "1", {directionOutput: 1}],
     ]) {
         await clearPosts(page);
         await field(page, label).selectOption(value);
         await configPost(page, 4, expected);
     }
-    await advanced(page);
-    for (const [axis, key] of [["Horizontal", "thresholdX"], ["Vertical", "thresholdY"]]) {
+    for (const [axis, key] of [["Sideways step", "thresholdX"], ["Up and down step", "thresholdY"]]) {
         await clearPosts(page);
-        await change(editor(page).locator("label.field").filter({hasText: new RegExp(`^${axis} movement`)}).locator("input"), 777);
+        await change(editor(page).getByLabel(`${axis} in sensor counts`, {exact: true}), 777);
         await configPost(page, 4, {[key]: 777});
     }
     await clearPosts(page);
@@ -99,7 +103,7 @@ test("directional shortcuts, axes, empty directions, output and thresholds all p
 });
 
 test("eight directions draw and post every diagonal shortcut and modifier policy", async ({page}) => {
-    await openControls(page, "pointing", {pdSlot: 4});
+    await openControls(page, "pointing", {pdSlot: 4, showKeycodes: true});
     await field(page, "Reads").selectOption("3");
     await configPost(page, 4, {axis: 3});
     // The host accepts the axis change before the four new fields are drawn.
@@ -156,7 +160,8 @@ test("button overrides wait for a complete shortcut or modifiers, then stage", a
     await field(page, "Button 1").selectOption("2");
     await configPost(page, 0, {buttons: expect.arrayContaining([expect.objectContaining({kind: 0})])});
     await clearPosts(page);
-    await change(field(page, "Button 1 shortcut"), "KC_A");
+    await page.evaluate(async () => { const store = await import("/webview/store.mjs"); store.state.showKeycodes = true; store.render(); });
+    await change(editor(page).getByLabel("Button 1 shortcut keycode", {exact: true}), "KC_A");
     await configPost(page, 0, {buttons: expect.arrayContaining([expect.objectContaining({kind: 2, tap: expect.objectContaining({keycode: "KC_A"})})])});
     await clearPosts(page);
     await field(page, "Button 2").selectOption("3");
@@ -192,7 +197,9 @@ test("shortcut picker, duplicate, clear and empty-slot creation post their comma
     await clearPosts(page);
     await editor(page).locator('[data-act="clear"]').click();
     await expectPost(page, {type: "clearPdMode", slot: 4});
+    await page.locator(".tb-list .pd-empties summary").click();
     await page.locator('[data-slot="8"]').click();
+    await editor(page).locator(".pd-start-empty summary").click();
     for (const [label, kind] of [["New directional mode", 1], ["New scrolling mode", 2]]) {
         await clearPosts(page);
         await editor(page).getByRole("button", {name: label, exact: true}).click();
@@ -209,7 +216,8 @@ test("pointing navigation reaches placement and lighting without an edit", async
     await editor(page).locator('[data-act="place"]').click();
     await expect(page.locator('.main h1')).toHaveText("Keys");
     expect(await posted(page)).toEqual([]);
-    await page.locator('[data-screen="pointing"]').click();
+    await page.locator('[data-screen="mouse"]').click();
+    await page.locator('[data-slot="4"]').click();
     await editor(page).locator('[data-act="lighting"]').click();
     await expect(page.locator('[data-ltab="pd"]')).toHaveAttribute("aria-selected", "true");
     expect(await posted(page)).toEqual([]);

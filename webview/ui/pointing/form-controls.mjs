@@ -20,7 +20,7 @@ export function formControls(model, slot, canEdit, stageCurrent) {
     /** @param {string} label @param {import("../../../contracts/edits.js").Scalar | null | undefined} value @param {string} key @param {import("../surface-types.js").FieldOptions} [options] */
     const field = (label, value, key, options = {}) => {
         const node = el(`<label class="field" data-problem-for="${esc(key)}"><span>${esc(label)}</span>
-            <span class="affix ${options.unit ? "unit" : ""} ${options.wide ? "wide" : ""}"><input data-f="pointing:${slot.id}:${esc(key)}" class="input mono" value="${esc(value ?? "")}" inputmode="numeric" ${disabled}
+            <span class="affix ${options.unit ? "unit" : ""} ${options.wide ? "wide" : ""}"><input data-f="pointing:${slot.id}:${esc(key)}" class="input mono" value="${esc(value ?? "")}" inputmode="numeric" aria-label="${esc(label)}" ${disabled}
             ${options.tip ? `data-tip="${esc(options.tip)}"` : ""}>${options.unit ? `<i>${esc(options.unit)}</i>` : ""}</span>
             ${options.hint ? `<span class="note">${esc(options.hint)}</span>` : ""}${PROBLEM}</label>`);
         form[key] = () => /** @type {HTMLInputElement} */ (node.querySelector("input")).value;
