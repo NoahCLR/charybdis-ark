@@ -24,8 +24,35 @@ test("VIA macros round-trip text, literal braces, Cmd+N, holds and delays", () =
     assert.ok(decodeMacroPayload(bytes).includes('{{"key": 1}}'));
 });
 
-test("VIA chords hold keys together and release in reverse order", () => {
-    assert.deepEqual([...encodeMacroPayload("{KC_LGUI,KC_N}")], [1, 2, 227, 1, 2, 17, 1, 3, 17, 1, 3, 227]);
+test("chords use the firmware's form: presses, a tap of the last key, releases in reverse", () => {
+    assert.deepEqual([...encodeMacroPayload("{KC_LGUI,KC_N}")], [1, 2, 227, 1, 1, 17, 1, 3, 227]);
+    assert.deepEqual([...encodeMacroPayload("{KC_LCTL,KC_LALT,KC_LGUI,KC_X}")], [1, 2, 224, 1, 2, 226, 1, 2, 227, 1, 1, 27, 1, 3, 227, 1, 3, 226, 1, 3, 224]);
+});
+
+test("a firmware-authored chord and Ark's older all-down-all-up chord both read as one chord step", () => {
+    const firmware = Buffer.from([1, 2, 224, 1, 2, 226, 1, 2, 227, 1, 1, 27, 1, 3, 227, 1, 3, 226, 1, 3, 224]);
+    assert.equal(decodeMacroPayload(firmware), "{KC_LEFT_CTRL,KC_LEFT_ALT,KC_LEFT_GUI,KC_X}");
+    const older = Buffer.from([1, 2, 227, 1, 2, 17, 1, 3, 17, 1, 3, 227]);
+    assert.equal(decodeMacroPayload(older), "{KC_LEFT_GUI,KC_N}");
+    // Releases that do not mirror the presses are not a chord.
+    assert.equal(decodeMacroPayload(Buffer.from([1, 2, 227, 1, 1, 17, 1, 1, 4, 1, 3, 227])), "{+KC_LEFT_GUI}{KC_N}{KC_A}{-KC_LEFT_GUI}");
+    assert.equal(decodeMacroPayload(Buffer.from([1, 2, 225, 1, 2, 4, 1, 3, 225, 1, 3, 4])), "{+KC_LEFT_SHIFT}{+KC_A}{-KC_LEFT_SHIFT}{-KC_A}");
+});
+
+test("steps round-trip: decode(encode(steps)) gives the same steps", () => {
+    const {parsePayload} = require("../../core/schema/macro-payload");
+    for (const payload of [
+        "{KC_LEFT_GUI,KC_N}",
+        "{KC_LEFT_CTRL,KC_LEFT_ALT,KC_LEFT_GUI,KC_X}",
+        "hi {KC_LEFT_GUI,KC_LEFT_SHIFT,KC_4}{250}{KC_A}",
+        "{+KC_LEFT_SHIFT}{KC_A}{KC_B}{-KC_LEFT_SHIFT}",
+        "{+KC_X}{KC_LEFT_GUI,KC_N}{KC_A}{-KC_X}",
+        "{+KC_LEFT_SHIFT}{100}{-KC_LEFT_SHIFT}{KC_LEFT_GUI,KC_SPACE}{KC_ENTER}",
+    ]) {
+        const steps = parsePayload(payload);
+        assert.deepEqual(parsePayload(decodeMacroPayload(encodeMacroPayload(payload))), steps, payload);
+        assert.equal(decodeMacroPayload(encodeMacroPayload(payload)), payload);
+    }
 });
 
 test("macro validation refuses stuck keys, ambiguous commands and oversized content", () => {
