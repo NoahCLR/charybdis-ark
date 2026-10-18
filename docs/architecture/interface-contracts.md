@@ -129,6 +129,75 @@ The same kind of control looks and sits the same on every screen.
 - Keys and Lighting draw the same layer strip, Rename & Reorder included
   (`layerBar` and `attachLayersControl`).
 
+## Design tokens
+
+`webview/styles.css` is one design system, and its sizes are tokens declared
+once in its `:root` block (light values follow it). A rule names a token,
+never a literal; `tests/view/design-tokens.test.mjs` fails on a literal font
+size, weight, radius or control height, on opacity used to dim text, on more
+than 24 distinct padding literals, and on a token used but not declared. The
+board's SVG units, the phone page and glyph marks sized to their box are the
+listed exceptions.
+
+| Family | Tokens |
+| --- | --- |
+| Type (size / line) | `--fs-title` 20/26, `--fs-heading` 15/20, `--fs-subhead` 13/18, `--fs-body` 13/19, `--fs-small` 12/17 (hints), `--fs-eyebrow` 11/14 caps `.08em`, `--fs-micro` 10.5/14 (tabular tags) |
+| Weight | `--fw-regular` 400, `--fw-medium` 500, `--fw-strong` 600 |
+| Text tiers | `--text`, `--text-2`, `--text-3` (at least 4.5:1 on every surface, both themes), `--text-disabled` (disabled controls and decorative glyphs only) |
+| Status | `--draft` amber, for unsaved draft work and nothing else; `--warning`, `--danger`, `--ok` |
+| Space | `--s-1`…`--s-7`: 4, 8, 12, 16, 24, 32, 48 |
+| Radius | `--r-chip` 4, `--r-control` 6, `--r-card` 10, `--r-sheet` 14 |
+| Control height | `--h-chip` 24, `--h-compact` 28 (compact buttons, inline selects), `--h-control` 32 (buttons, fields), `--h-tab` 36 (tabs, navigation) |
+| Elevation | `--shadow-1` popovers and the draft bar, `--shadow-2` sheets |
+| Frame | `--rail` 232, `--topbar` 64, `--bar` 48, `--board-h` `clamp(380px, 52vh, 560px)` (`max(300px, 45vh)` under 800 px tall), `--key-max` 64, `--page`, `--measure` |
+
+- Every uppercase group label (rail groups, section and list heads, table
+  column heads, the hover card's sections) is one `.eyebrow` style.
+- Text is never dimmed with `opacity`. Quiet, read-only and idle things use a
+  text tier, a dashed edge or a word; disabled controls use `--text-disabled`.
+- One focus ring: `outline: 2px solid var(--focus)`, offset 2 px, on every
+  `:focus-visible`, a switch's on its track and a board key's inset inside
+  the key so neighbours do not cover it.
+- Layout switches are container queries on the content box (`.content`,
+  named `content`) or the sheet, never window media queries: the content is
+  the window less the rail.
+- The board card on Keys and Lighting is `position: sticky` at the top of
+  `.content`, `--board-h` tall, its SVG fitted by width and height with keys
+  at most `--key-max`; the workbench's tab strip sticks under it. Hide board
+  (`state.hideBoard`) folds the card to its layer tabs. Legends are sized in
+  `view/geometry.mjs` (`legendFit`) from the key's drawn width `k`, which
+  `ui/board.mjs` measures and redraws for: main `clamp(9, .22k, 14)` px,
+  second line `clamp(8.5, .16k, 10.5)` px; a long legend shrinks to that
+  floor, then wraps, then squeezes no further than 0.85.
+- Remembered view preferences (`showKeycodes`, `hideBoard`) are read and
+  written by `view/preferences.mjs` through the host's panel state
+  (`getState` / `setState`); the web page keeps that state in its storage
+  (`web/panel-channel.mjs`). They are never posted.
+
+## Action grammar
+
+Every button is one of these, so what a button does can be read from how it
+looks. `browser-tests/design-tokens.spec.js` fails when a surface (the
+content, the draft bar, the rail, a sheet) shows more than one filled button
+or an icon button has no `aria-label`.
+
+| Kind | Class | Form |
+| --- | --- | --- |
+| Commit | `.btn.primary` | filled; one per surface |
+| Create or open | `.btn` | outlined, 32 px; "…" when more input follows |
+| Object action | `.btn.text` (`.btn.ghost.tiny`) | text, 28 px, at the end of its row or title |
+| Destructive | `.btn.text.destructive` | text, last in its row, `--danger` on hover |
+| Go elsewhere | `.btn.text` | text naming the destination, ending "→" in its words |
+| Dismiss | `.btn.ghost` | borderless |
+| Icon | `.btn.icon` | 28 × 28, with an `aria-label` |
+| View state | `.btn.toggle[aria-pressed]` | stays pressed while on |
+| Stored on/off | `.sw` | a switch, its label part of a target at least 28 px tall |
+| Shows its value | `.value-btn` | looks like its value (a keycap, a name), 32 px, opens a picker |
+
+The draft bar is docked under the content across its width, at least
+`--bar` tall; the hover card opens after `HOVER_DELAY_MS` (300 ms) on a cold
+board, at once while warm, and for keyboard focus (`view/hover-timing.mjs`).
+
 ## Pointing tap outputs
 
 Straight directions, diagonals and physical-button tap overrides use one tap

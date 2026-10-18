@@ -57,22 +57,22 @@ reloading the tab while the draft has unapplied edits, or while Apply is
 running, asks first: the draft lives in the tab and does not survive a reload.
 Apply keeps its pace in a background tab, but keep the tab open until it ends.
 
-**Light and dark.** The button at the top right of every screen switches
-between a light and a dark theme. Ark starts from your system's setting and
-remembers your choice in this browser. In VS Code there is no toggle; the panel
-follows VS Code's theme.
+**Light and dark.** The rail's **⋯** menu switches between a light and a dark
+theme. Ark starts from your system's setting and remembers your choice in this
+browser. In VS Code there is no toggle; the panel follows VS Code's theme.
 
-**The rail and the top bar stay quiet.** The rail opens with the board and
-Ark's name. Under them is the keyboard, and only its dot changes: green when it
-is connected with both halves together, orange when the slave half is not found
-or the halves are out of sync, red with no keyboard, hollow in the demo, and
-pulsing while a read runs. Hovering it says which, in plain words and with what
-to do: check the cable between the halves, or wait and read again. With more
-than one keyboard its name is the selector. The web page adds **Choose
-keyboard** and **Disconnect** beneath. Below that the rail lists only changes
-in the draft, a pending recovery or a restart. The screen and the Device tab
-say what is wrong and offer **Read** to read the keyboard again. A screen's top
-bar holds only the theme button; a search sits in the panel it filters.
+**The rail and the top bar stay quiet.** The rail opens with Ark's mark: the
+board and its name on one line. Under it is the keyboard's name and a chip that
+says in words how it is: **Both halves connected**, **Slave half not found**,
+**Halves out of sync**, **Not connected**, or **Demo**, its dot green, orange
+or hollow, and pulsing while a read runs. Hovering it says what to do: check
+the cable between the halves, or wait and read again. With more than one
+keyboard its name is the selector. The web page adds **Choose keyboard** and
+**Disconnect** beneath. Below that the rail shows only a pending recovery or a
+restart; the draft's changes are counted in the draft bar. The screen and the
+Device tab say what is wrong and offer **Read** to read the keyboard again. A
+screen's top bar holds its title and one line saying what the screen is for;
+a search sits in the panel it filters.
 
 **Recovery copies and files.** Apply and Import save a recovery copy in the
 browser's storage before they write anything, and refuse to write if it cannot
@@ -83,7 +83,7 @@ download any you want to keep. **Export profile** downloads the profile file;
 **Import profile** opens the browser's file chooser and takes files up to
 256 KiB, enough for any complete profile. Errors
 show in the rail's message rather than as a notification, and the page's
-version and commit are at the foot of the rail, with GitHub's logo: choose them
+version and commit are in the rail's **⋯** menu, with GitHub's logo: choose them
 to open that commit on GitHub in a new tab.
 
 ## Exploring without a keyboard
@@ -188,10 +188,38 @@ What each screen edits:
 
 Every colour on screen is a colour the keyboard emits; one amber signal marks
 work that has not reached the keyboard yet. The one exception is the
-connection's status dot: green, orange or red for a keyboard that is ready,
-needs its halves seen to, or is not there. Colour on any screen comes from the model, never from a constant, and a stage
+connection's status chip: green or orange for a keyboard that is ready or
+needs its halves seen to. Orange also marks a warning, such as a key that
+reaches an empty pointing slot; amber is never used for anything but the
+draft. Colour on any screen comes from the model, never from a constant, and a stage
 that is switched off is drawn as off — hollow dots, plain badges, unlit keys.
-The floating bar is the only way changes leave the window.
+The draft bar is the only way changes leave the window.
+
+**The frame.** The rail is on the left and the screen's top bar, 64 px tall,
+above it. The draft bar is docked along the bottom of the screen, across its
+width, and never covers what it is about. The rail's foot holds **Draft
+history**, undo (↺) and redo (↻), and a **⋯** menu with the theme (on the web
+page), **Show keycodes** and the build. **Show keycodes** puts each key's QMK
+keycode beside its name across Ark; the key you are editing always shows its
+own. It is off at first and remembered by VS Code or the browser, as is
+**Hide board**. On Keys and Lighting the board card stays at the top of the
+screen while the workbench under it scrolls, so a key's editor is in view as
+soon as the key is clicked; **Hide board**, at the right of the workbench's
+tabs, folds the board to its layer tabs for a long edit and brings it back
+when pressed again. What the board's marks mean, and its shortcuts, are behind
+the **?** at the board's top right.
+
+**Controls.** Every control that takes the keyboard shows the same ring when
+it is reached with Tab, a switch on its track. A disabled control reads in a
+fainter colour, never faded; a read-only field keeps its value readable with a
+dashed edge. Buttons follow one grammar: the one action that commits a
+surface is filled; one that creates something or opens a dialog is outlined,
+ending in "…" when it asks for more; an object's own actions are small text
+buttons at the end of its row or title, the destructive one last and red
+under the pointer; a button that takes you to another screen is a text button
+naming where; a view choice, such as Hide board or Pick on board, is a button
+that stays pressed; a stored on/off is a switch; and an icon-only button is
+named for screen readers.
 
 Hover over a setting's label or control on Mouse or Settings to see what it
 does. Read-only settings also explain why they cannot be edited. Visible
@@ -238,13 +266,20 @@ grid and the review.
 
 ### The board
 
-After the complete keyboard read opens an editable draft, the board stays on
-screen, full width, painted with the light the keyboard would actually show for
+After the complete keyboard read opens an editable draft, the board stays at
+the top of the screen at a capped height (about half the window, its keys no
+wider than 64 px), painted with the light the keyboard would actually show for
 that layer — the base effect, then
 the layer's colour on the keys it owns — with the legends drawn on top in
 whichever of black or white stays readable, and the behaviour dots and combo
-badges on the key face in the feedback colours the keyboard flashes.
-Resting the pointer on a key opens a card of everything it reaches. Every
+badges on the key face in the feedback colours the keyboard flashes. A key's
+legend is sized from the key as drawn, never smaller than 9 px (8.5 px for its
+second line) unless the key has no room; a long name wraps onto two lines
+before its letters are narrowed.
+Resting the pointer on a key opens a card of everything it reaches: the first
+after a moment, then at once as you move from key to key, and for a moment
+after leaving the board. Tabbing to a key opens its card too, and Escape
+closes it. Every
 action there reads by its name first, then the keycode it stores; a custom key
 or pointing mode reads as `CUSTOM_KEY_n` or `PD_SLOT_n` rather than its number.
 A custom key says under its name what its shortcut sends, held and tapped as
@@ -929,7 +964,7 @@ rather than writing it directly.
 Removing one combo appears as one deletion in Review and Draft history; later
 combo numbers shift because the device stores them in a packed table.
 
-The floating bar and the review's title count the draft's changes. They add
+The draft bar and the review's title count the draft's changes. They add
 how many were added, changed and removed only when that says more than the
 count: "3 changes" alone when all three changed something, "3 changes · 2
 added · 1 changed" when they differ.
