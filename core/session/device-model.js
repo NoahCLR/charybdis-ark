@@ -137,7 +137,9 @@ function configurationModel(content, capabilities, editing) {
     // A pointing-mode keycode is offered in the picker under its slot.
     for (const {name, native, code, label} of names.pointing) {
         const entry = catalog.entries.find(entry => entry.keycode === code);
-        const presentation = {value: name, key: name, label, group: "Pointing modes", aliases: [native], keycode: code, searchTerms: [name, label], search: `${name} ${label}`.toLowerCase(), searchCompact: `${name}${label}`.toLowerCase()};
+        // Found by "trackball mode" and by QMK's and the firmware's word,
+        // "pointing", as well as by its name and keycode.
+        const presentation = {value: name, key: name, label, group: "Pointing modes", aliases: [native], keycode: code, searchTerms: [name, label], search: `${name} ${label} trackball mode pointing`.toLowerCase(), searchCompact: `${name}${label}`.toLowerCase()};
         if (entry) Object.assign(entry, presentation); else catalog.entries.push(presentation);
     }
     // So is each custom key, under its name, its tip naming the shortcut it
@@ -482,7 +484,9 @@ function catalogViews() {
     /** @type {Record<string, string>} */
     const labels = {};
     for (const entry of keycodeCatalog.entries()) {
-        const searchTerms = [entry.name, entry.label, ...entry.aliases].filter(Boolean);
+        // QMK's Magic keycodes are Key options here, as in Settings; both
+        // names find them.
+        const searchTerms = [entry.name, entry.label, ...entry.aliases, ...(entry.group === "magic" ? ["magic", "key options"] : [])].filter(Boolean);
         entries.push({
             value: entry.name,
             key: entry.name,

@@ -19,6 +19,7 @@ import {entriesForPickerSection, pickable, pickerSections} from "../view/picker-
 import {macroMatches} from "../view/macro.mjs";
 import {customKeyChoice, offeredName, shortcutOffer, shortcutPick, shortcutPickLabel, shortcutPickMods, shortcutModifiers} from "../view/custom-key.mjs";
 import {vocabulary, word} from "../view/vocabulary.mjs";
+import {keycodeAside} from "../view/show-keycodes.mjs";
 
 /** @param {Model} model */
 const modifierControls = model => vocabulary(model).pickerModifiers || [];
@@ -83,16 +84,17 @@ const chunk = (values, size) => values.reduce((rows, value, index) =>
 /** @param {Pick<import("../../contracts/panel.js").CatalogEntry, "value" | "label" | "tip">} entry @param {boolean} picked */
 function keyButton(entry, picked) {
     return `<button class="pk ${picked ? "on" : ""}" data-pick="${esc(entry.value)}"${entry.tip ? ` data-tip="${esc(entry.tip)}"` : ""}>
-        <span class="l">${esc(entry.label || entry.value)}</span><span class="c">${esc(entry.value)}</span></button>`;
+        <span class="l">${esc(entry.label || entry.value)}</span><span class="c">${esc(keycodeAside(state, "pickerButton", entry.value, entry.label))}</span></button>`;
 }
 
 // A macro slot shows by its name when it has one, with its slot and size
 // underneath, so a named macro is recognisable wherever it is offered.
 /** @param {MacroSlot} slot @param {boolean} picked */
 function macroButton(slot, picked) {
-    return `<button class="pk ${slot.name ? "wide" : ""} ${picked ? "on" : ""}" data-pick="${esc(slot.keycode)}" data-tip="${esc(slot.keycode)}">
-        <span class="l">${esc(slot.name || slot.keycode.replace(/^VIA_MACRO_/, "M"))}</span>
-        <span class="c">${slot.name ? `M${esc(slot.keycode.split("_").at(-1))} · ` : ""}${slot.empty ? "empty" : `${slot.bytes} B`}</span></button>`;
+    const number = slot.keycode.split("_").at(-1), code = keycodeAside(state, "pickerButton", slot.keycode);
+    return `<button class="pk ${slot.name ? "wide" : ""} ${picked ? "on" : ""}" data-pick="${esc(slot.keycode)}"${code ? ` data-tip="${esc(code)}"` : ""}>
+        <span class="l">${esc(slot.name || `Macro ${number}`)}</span>
+        <span class="c">M${esc(number)} · ${slot.empty ? "empty" : `${slot.bytes} B`}</span></button>`;
 }
 
 /** @param {Model} model */
@@ -150,20 +152,20 @@ function sectionBody(model) {
         // Lock rather than getting a button of its own.
         /** @param {string} value @param {string} label @param {string} tip */
         const button = (value, label, tip, on = picked(value)) =>
-            `<button class="pk wide ${on ? "on" : ""}" data-pick="${value}" data-tip="${esc(tip)}"><span class="l">${label}</span><span class="c">${value}</span></button>`;
+            `<button class="pk wide ${on ? "on" : ""}" data-pick="${value}" data-tip="${esc(tip)}"><span class="l">${label}</span><span class="c">${esc(keycodeAside(state, "pickerButton", value))}</span></button>`;
         return `<div class="pk-body"><div class="pk-layers">${layers().map((layer) => `
             <div class="pk-layer">
                 <span class="ix">${layer.index}</span><span class="nm">${esc(layerName(layer))}</span>
                 ${button(`MO(${layer.index})`, "Hold", "On while the key is down.")}
                 ${button(`LOCK_LAYER(${layer.index})`, "Lock", "Turns the layer on until pressed again. QMK's TG() is the same lock.", picked(`LOCK_LAYER(${layer.index})`) || picked(`TG(${layer.index})`))}
-                <button class="pk wide ${picker.layerTap === String(layer.index) ? "on" : ""}" data-lt="${layer.index}" data-tip="A tap sends a key, a hold holds the layer. Pick the tap key next."><span class="l">Tap-hold</span><span class="c">LT(${layer.index}, …)</span></button>
+                <button class="pk wide ${picker.layerTap === String(layer.index) ? "on" : ""}" data-lt="${layer.index}" data-tip="A tap sends a key, a hold holds the layer. Choose the tap key next."><span class="l">Tap-hold</span><span class="c">${esc(keycodeAside(state, "pickerButton", `LT(${layer.index}, …)`))}</span></button>
                 ${button(`TT(${layer.index})`, "Tap-toggle", "Holds the layer like Hold; repeated taps lock it.")}
                 ${button(`OSL(${layer.index})`, "One-shot", "Holds the layer like Hold; a tap turns it on for the next key only.")}
-                ${button(`TO(${layer.index})`, "Move", "Locks this layer alone and releases every other lock. TO(0) returns to the base layer.")}
+                ${button(`TO(${layer.index})`, "Move to", "Locks this layer alone and releases every other lock. TO(0) returns to the base layer.")}
             </div>`).join("")}</div>
             <p class="note pk-note">${picker.layerTap
-                ? `Tap-hold on <b>${esc(layerTapName(picker.layerTap))}</b> is armed — now pick the tap key from any section.`
-                : `Hold reaches the layer while the key is down. Lock toggles it. Tap-hold asks for a tap key next. Tap-toggle and One-shot hold like Hold; Move switches to the layer alone.`}</p></div>`;
+                ? `Tap-hold on <b>${esc(layerTapName(picker.layerTap))}</b> is armed — now choose the tap key from any section.`
+                : `Hold reaches the layer while the key is down. Lock keeps it on until pressed again. Tap-hold asks for a tap key next. Tap-toggle and One-shot hold like Hold; Move to switches to the layer alone.`}</p></div>`;
     }
     if (section.kind === "modes") {
         // One row per slot, laid out like the layers: the slot, what it does,
@@ -173,19 +175,19 @@ function sectionBody(model) {
         const slots = model?.pdModes || [];
         const many = slots.length > 8;
         const rows = many ? ` style="grid-template-rows:repeat(${Math.ceil(slots.length / 2)}, auto)"` : "";
-        if (!slots.length) return `<p class="note pk-empty">This keyboard has not reported its pointing modes.</p>`;
+        if (!slots.length) return `<p class="note pk-empty">This keyboard has not reported its trackball modes.</p>`;
         const kinds = vocabulary(model).pointing.kinds;
         /** @param {string} value @param {string} label @param {string} tip */
         const button = (value, label, tip) =>
-            `<button class="pk wide ${picked(value) ? "on" : ""}" data-pick="${esc(value)}" data-tip="${esc(tip)}"><span class="l">${label}</span><span class="c">${esc(value)}</span></button>`;
+            `<button class="pk wide ${picked(value) ? "on" : ""}" data-pick="${esc(value)}" data-tip="${esc(tip)}"><span class="l">${label}</span><span class="c">${esc(keycodeAside(state, "pickerButton", value))}</span></button>`;
         return `<div class="pk-body"><div class="pk-layers modes ${many ? "many" : ""}"${rows}>${slots.map((slot) => `
             <div class="pk-layer ${slot.kind ? "" : "empty"}">
-                <span class="ix">${slot.id}</span>
+                <span class="ix">P${slot.id}</span>
                 <span class="nm"><span>${esc(slot.displayName)}</span><span class="sub">${esc(slot.kind ? word(kinds, slot.kind) : "Empty — does nothing yet")}</span></span>
                 ${button(slot.binding.hold, "Hold", "On while the key is down.")}
-                ${button(slot.binding.lock, "Toggle", "Turns the mode on until pressed again.")}
+                ${button(slot.binding.lock, "Lock", "Keeps the mode on until pressed again.")}
             </div>`).join("")}</div>
-            <p class="note pk-note">Hold re-reads the trackball while the key is down. Toggle keeps the mode on until the key is pressed again. A key for an empty slot does nothing until the slot is configured.</p></div>`;
+            <p class="note pk-note">Hold re-reads the trackball while the key is down. Lock keeps the mode on until the key is pressed again. A key for an empty slot does nothing until the slot is configured.</p></div>`;
     }
     if (section.kind === "macros") {
         const slots = (model?.viaMacros || []).filter(slot => allowed(slot.keycode));
@@ -212,10 +214,10 @@ export function pickerOverlay() {
     const {existing, withBehaviour, spare} = offer ? customKeyChoice(model, offer, layers(), {runsBehaviour: picker.customKeyRuns !== "shortcut"})
         : {existing: undefined, withBehaviour: false, spare: undefined};
     /** @param {import("../../contracts/panel.js").CustomKey} key */
-    const keyWords = (key) => `Custom key ${key.slot}${key.name ? ` · ${key.name}` : ""}`;
-    const node = el(`<div class="scrim"><div class="sheet picker" role="dialog" aria-modal="true" aria-label="Pick a keycode">
+    const keyWords = (key) => key.name ? `K${key.slot} · ${key.name}` : `Custom key ${key.slot}`;
+    const node = el(`<div class="scrim"><div class="sheet picker" role="dialog" aria-modal="true" aria-label="Choose a key">
         <div class="sheet-h">
-            <div><h2>Pick a keycode</h2>
+            <div><h2>Choose a key</h2>
                 <p class="note">${picker.mode === "list" ? picker.maxKeys === 1 ? "Choose one key." : Number.isFinite(picker.maxKeys) ? `Choose up to ${picker.maxKeys} keys to send together.` : "Choose one or more keys." : `For <b>${esc(picker.title)}</b> · ${[picker.contextKeycode ? actionMarked(model, picker.contextKeycode) : "", esc(picker.context || "")].filter(Boolean).join(" · ")}`}</p></div>
             <input class="input pk-search" id="pickerSearch" data-f="picker:search" placeholder="Search every section" value="${esc(picker.search)}">
             <span class="right"><button class="btn ghost" data-act="cancel">Close</button></span>
@@ -241,15 +243,15 @@ export function pickerOverlay() {
         ${problem && !offer ? `<div class="note pk-problem" role="status">${esc(problem)}</div>` : ""}
         ${offer ? `<div class="note pk-problem pk-offer" role="status">${existing && !withBehaviour
             ? `No keycode can hold ${esc(shortcutPickLabel(model, offer))}, but ${esc(keyWords(existing))} already sends it.
-                <button class="btn" data-act="use-existing-key" data-tip="Uses ${esc(existing.keycode)}, which already has this shortcut.">Use ${esc(keyWords(existing))}</button>`
+                <button class="btn" data-act="use-existing-key" data-tip="Uses ${esc(keyWords(existing))}, which already has this shortcut.">Use ${esc(keyWords(existing))}</button>`
             : existing
             ? `No keycode can hold ${esc(shortcutPickLabel(model, offer))}. ${esc(keyWords(existing))} already sends it, with its behaviour on top, which runs here too.
-                <button class="btn" data-act="use-existing-key" data-tip="Uses ${esc(existing.keycode)}: its shortcut and its behaviour.">Use ${esc(keyWords(existing))}</button>
-                ${spare ? `<button class="btn" data-act="use-custom-key" data-tip="Gives ${esc(spare.keycode)} this shortcut alone and a name, and uses it here.">Make Custom key ${esc(spare.slot)}</button>`
+                <button class="btn" data-act="use-existing-key" data-tip="Uses ${esc(keyWords(existing))}: its shortcut and its behaviour.">Use ${esc(keyWords(existing))}</button>
+                ${spare ? `<button class="btn" data-act="use-custom-key" data-tip="Gives Custom key ${esc(spare.slot)} this shortcut alone and a name, and uses it here.">Make custom key K${esc(spare.slot)}</button>`
                     : `<span>Every other custom key is in use.</span>`}`
             : spare
             ? `No keycode can hold ${esc(shortcutPickLabel(model, offer))}, but a custom key's shortcut can.
-                <button class="btn" data-act="use-custom-key" data-tip="Gives ${esc(spare.keycode)} this shortcut and a name, and uses it here.">Use Custom key ${esc(spare.slot)}</button>`
+                <button class="btn" data-act="use-custom-key" data-tip="Gives Custom key ${esc(spare.slot)} this shortcut and a name, and uses it here.">Use custom key K${esc(spare.slot)}</button>`
             : `No keycode can hold ${esc(shortcutPickLabel(model, offer))}, and every custom key is in use. Free one on the Custom keys screen to hold it.`}</div>` : ""}
     </div></div>`);
 

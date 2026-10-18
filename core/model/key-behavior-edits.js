@@ -94,7 +94,7 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
     };
     /** @param {Action} target */
     const checkTarget = target => {
-        if (native(target) === 0 || native(target) === 1) throw invalid("Transparent keys and KC_NO cannot have a behaviour.");
+        if (native(target) === 0 || native(target) === 1) throw invalid("Transparent and Nothing keys cannot have a behaviour.");
     };
 
     // Move a row to the key it listens to. When that key already has a row the

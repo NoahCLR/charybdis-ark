@@ -518,7 +518,7 @@ function findings(facts, walked) {
     for (const [layer, effect] of empty) {
         results.push({kind: "emptyTarget", level: LEVELS.NOTICE, layers: [layer],
             title: `A layer key reaches ${layerName(facts.names, layer)}, which has no keys of its own`,
-            detail: `${effect.how}: ${layerName(facts.names, layer)} holds only transparent keys and KC_NO, so it adds nothing to the board.`,
+            detail: `${effect.how}: ${layerName(facts.names, layer)} holds only Transparent and Nothing keys, so it adds nothing to the board.`,
             fix: `Give ${layerName(facts.names, layer)} keys, or take the layer key away.`,
             place: placeOf(effect.from)});
     }
@@ -573,14 +573,14 @@ function findings(facts, walked) {
         results.push({kind: "deadBase", level: LEVELS.NOTICE, layers: [0], count: transparent.length, identity: transparent.join(","),
             title: `${transparent.length} transparent key${transparent.length === 1 ? "" : "s"} on the base layer (${layerName(facts.names, 0)}) ${transparent.length === 1 ? "does" : "do"} nothing`,
             detail: `A transparent key on the base layer (${layerName(facts.names, 0)}) has no layer under it to answer, so it sends nothing unless a layer above covers it.`,
-            fix: `Give ${transparent.length === 1 ? "it" : "them"} a keycode, or KC_NO to mark ${transparent.length === 1 ? "it" : "them"} intentionally empty.`,
+            fix: `Give ${transparent.length === 1 ? "it" : "them"} a key, or Nothing to mark ${transparent.length === 1 ? "it" : "them"} intentionally empty.`,
             place: keyPlace(0, transparent[0])});
     }
     const no = emptyBase(NOTHING);
     if (no.length) {
         results.push({kind: "noBase", level: LEVELS.NOTICE, layers: [0], count: no.length, identity: no.join(","),
-            title: `${no.length} KC_NO key${no.length === 1 ? "" : "s"} on the base layer (${layerName(facts.names, 0)}) ${no.length === 1 ? "does" : "do"} nothing`,
-            detail: `KC_NO on the base layer (${layerName(facts.names, 0)}) explicitly sends nothing unless a layer above covers it.`,
+            title: `${no.length} Nothing key${no.length === 1 ? "" : "s"} on the base layer (${layerName(facts.names, 0)}) ${no.length === 1 ? "does" : "do"} nothing`,
+            detail: `A Nothing key on the base layer (${layerName(facts.names, 0)}) explicitly sends nothing unless a layer above covers it.`,
             fix: `Give ${no.length === 1 ? "it" : "them"} a keycode if ${no.length === 1 ? "it should" : "they should"} do something.`,
             place: keyPlace(0, no[0])});
     }

@@ -179,3 +179,10 @@ test("macOS ISO labels swap the same positions as playback, including modified k
     assert.equal(keyLabel(german, 0x211c), "Z / Ctrl");
     assert.equal(keyLabel(german, 0x4133), "Ö / Layer 1");
 });
+
+test("KC_NO is called Nothing, alone; modifiers over it are the modifiers alone", () => {
+    const names = profileKeyNames({});
+    assert.equal(keyLabel(names, 0), "Nothing");
+    assert.equal(names.labels.XXXXXXX, "Nothing");
+    assert.doesNotMatch(keyLabel(names, 0x1800), /Nothing/);
+});
