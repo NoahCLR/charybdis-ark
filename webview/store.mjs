@@ -47,6 +47,7 @@ export const STATE_FIELDS = {
     pickCombo: kept(null),     // a combo id to pick in the Combos tab, wherever this layer lists it
     settingsOpen: kept([]),    // settings sections opened by hand or by a Show, so a render keeps them open
     keyDetailsOpen: kept(false), // the Key tab's folded position details, open on every key once opened
+    showKeycodes: kept(false),   // the Show keycodes preference: QMK keycodes beside names everywhere (decisions R2, §3)
     stackOpen: kept(false),    // the Key tab's runs of transparent layers, shown in full once asked
     settingsDurationUnits: kept({}), // display preferences; stored settings remain milliseconds
     // {cell, keycode, helper, repeatHz}: how the open empty cell runs, chosen
