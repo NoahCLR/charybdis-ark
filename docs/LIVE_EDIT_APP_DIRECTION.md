@@ -41,19 +41,18 @@ matrix.
 | Product surface | Current state |
 | --- | --- |
 | Layout and 16 layers | Read/write keys, layer names and order; a reorder renumbers layer keys by default, any layer can be the base, and key labels follow the host layout (D-L15, D-L29, D-L37, D-L56) |
-| Key behaviours, combos and RGB | Read/write editors over the shared draft, with participation controls at every scope and global/per-combo output behaviour permissions (D-L12, D-L32, D-L49, D-L55) |
+| Key behaviours, combos and RGB | Read/write editors over the shared draft, with participation controls at every scope and global/per-combo output behaviour permissions; Lighting owns All lighting and the base effect, and black is drawn and named as black (D-L12, D-L32, D-L49, D-L55, D-L65) |
 | Macros | 128 VIA macros renamed directly through their titles; empty canvas with direct step actions, fixed-size sequence tiles, drag reordering across the whole sequence, Delete/Backspace step removal, per-slot step undo/redo and a shared step clipboard, a selected-step editor, a raw-payload toolbar toggle and live validation, including visible invalid hold order; recorder scoped to its visible slot with taps/chords by default and optional hold timing alongside its other settings; Unicode text, typed and checked through the host's OS and keyboard layout; per-macro input protection; one shared memory, shown and enforced (D-L25, D-L26, D-L56, D-L57) |
 | Custom keys | 128 named keys, each with an optional shortcut (one key and any modifiers, sides mixed) as its own action and a behaviour on top: rename, set or clear the shortcut, edit the behaviour on the same screen whether or not the key is placed, place, see where each is used; behaviour steps may send one's shortcut (D-L42, D-L63) |
-| Mouse | Pointer and sniping DPI, auto-sniping and auto-mouse, settings the core files under Mouse, so the rail, the review and import counts all place them there; the auto-mouse fade is a share of the timeout, edited on its lighting stage (D-L17) |
-| Pointing modes | 32 device-owned slots in the sparse PD domain (D-L41, D-L54); mouse-button 1–8 clicks and VIA macro outputs from directions, diagonals and tap overrides; see [the editor contract](architecture/interface-contracts.md#pointing-tap-outputs) and [PD-mode domain v1](../upstream/firmware/docs/architecture/pd-mode-domain-v1.md) |
-| Global policy | Every other portable setting, including startup layers, combo matching, Host and device-reported lighting and key options; the lighting idle timeout is edited in seconds or minutes; key options the firmware build leaves out stay read-only (D-L18, D-L56) |
-| Keyboard name | The keyboard's own name, its USB product string, edited on Settings and stored in the settings domain; an Apply that renames it is followed through the keyboard's USB restart (D-L62) |
-| Backup and restore | Complete current-format snapshots, import review against the keyboard, recovery file and verified restore; older formats are refused, never converted (D-L15, D-L23, D-L54, D-L64) |
+| Trackball | One screen: Pointer and Sniping DPI, auto-sniping and the Mouse layer (settings the core files under Trackball, so the rail, the review and import counts all place them there; the fade is a share of the timeout, edited on its lighting stage), then the 32 device-owned trackball mode slots in the sparse PD domain, with step distance in millimetres and templates for an empty slot (D-L17, D-L41, D-L54, D-L65); mouse-button 1–8 clicks and VIA macro outputs from directions, diagonals and tap overrides; see [the editor contract](architecture/interface-contracts.md#pointing-tap-outputs) and [PD-mode domain v1](../upstream/firmware/docs/architecture/pd-mode-domain-v1.md) |
+| Settings | Every other portable setting, including default layers, combo timing and matching, your computer and key options, and a read-only list of what is built into this firmware; key options the firmware build leaves out say so (D-L18, D-L56, D-L65) |
+| Keyboard name | The keyboard's own name, its USB product string, edited as the Keyboard screen's title and stored in the settings domain; an Apply that renames it is followed through the keyboard's USB restart (D-L62) |
+| Backup and restore | Complete current-format backup files, restore review against the keyboard, the copies saved before each Apply (each usable as a draft) and verified restore; older formats are refused, never converted (D-L15, D-L23, D-L54, D-L64) |
 | Drafts and Apply | One draft with item-by-item review, discard by edit group, Show, undo/redo and history; the review checks reachable actions, confirms warnings and traps and blocks what the destination cannot save; Apply names its steps and halves and says where a failure happened (D-L19, D-L23, D-L29, D-L30, D-L36, D-L60, D-L61) |
 | Firmware supported | Current firmware only: every feature it reports is required, and a keyboard on anything older is read no further than its identity and told to update (D-L64) |
 | Recovery | Atomic logical Apply, differential custom and VIA transfer, reboot recovery fencing, firmware roll-forward after the decision, resume after a lost or power-cycled peer link, bounded cancel owned by the keyboard (D-L20–D-L22, D-L27, D-L39, D-L58) |
 | Where it runs | The VS Code extension, and a web page in Chrome or Edge over WebHID; Cloudflare Git integration publishes `dev` to `ark-dev.ncleroy.dev`, `main` to `ark.ncleroy.dev`, and task branches to PR previews; a phone gets only a notice (D-L02, D-L52) |
-| Demo without a keyboard | The bundled demo profile in a real draft, in both hosts: every screen editable and reviewed, Apply refused, Export saves the draft (D-L53) |
+| Demo without a keyboard | The bundled demo profile in a real draft, in both hosts: every screen editable and reviewed, Apply refused, Save a backup file saves the draft (D-L53) |
 
 The rail's keyboard dot shows connection and both-half convergence, in plain
 words on hover; the rail lists draft state
@@ -121,6 +120,15 @@ Remaining before calling the product complete:
   does not include, matched against its rules files and QMK's defaults. It
   drifts when a feature is enabled or disabled. The keyboard should report its
   built features so the picker reads them from the device.
+- **Chords written in the firmware's form need keyboard acceptance (D-L65).**
+  Ark now writes a chord as the firmware does (presses, a tap of the last key,
+  releases in reverse) and reads both that and its older all-down-all-up form
+  back as one chord. Record and apply a chord macro, read it back, and play it
+  on both halves; the step round-trip is unit-tested only.
+- **The Apply moment's verdicts need keyboard acceptance (D-L23, D-L65).**
+  Confirm the three failure verdicts (nothing saved, the keyboard finishes by
+  itself, unknown), the automatic re-read after 15 s, and **Put back what it
+  had** after a real Apply.
 - **Firmware open issues** are tracked in the firmware direction, including the
   one-half power-cycle recovery transition, why a peer stops acknowledging a push or
   fails a flash write mid-copy (D-L22, D-L27), physical acceptance of buffered gesture timing
@@ -1247,6 +1255,31 @@ pages, one-at-a-time candidate chunks, uploads without reuse, missing
 settings-limit, option and macro-map pages, the combo-output, click and macro
 blockers, and the gesture-timing advice for firmware without physical timing
 (D-L48).
+
+### D-L65 — One vocabulary, one design system, one frame
+
+Ark speaks one set of words and draws one set of controls, chosen in a
+screen-by-screen review against the firmware. The words for stored values are
+in `core/model/vocabulary.js`: an *action* in a *tap count*, *How it runs*,
+one layer-verb set (Hold, Lock, Tap-hold, Tap-toggle, One-shot, Move to; a
+toggle and a layer lock are both Lock), *Nothing* and *Transparent*, *Default
+layers*, *Your computer*, *Trackball* and *trackball modes*, *All lighting* and
+*Black*. Slots are tagged M5, K5 and P5, counted from 0; combos are named
+inputs → output. QMK keycodes appear only with the **Show keycodes**
+preference (`webview/view/show-keycodes.mjs`), except where the keycode is the
+thing being edited: the Key tab's Keycode field, the picker's footer, Where it
+is stored, Raw payload and Review's value tooltips.
+
+Sizes, weights, radii and colours are tokens at the top of `styles.css`,
+guarded by `tests/view/design-tokens.test.mjs`; controls follow one action
+grammar (filled for the one primary action, outlined, compact, text, pressed
+toggles, value buttons), and amber marks only the draft. Keys and Lighting
+hold a capped board at the top with the bench beneath it, and the draft bar is
+docked. The Mouse and Trackball modes screens are one Trackball screen; the
+base effect and the flash speed live on Lighting; Profile & backups and Device
+are Backups and Keyboard. The full reasoning lives in the review that chose
+them, and the [guide](GUIDE.md) and
+[interface specification](architecture/interface-contracts.md) state the rules.
 
 ## Historical decisions
 
