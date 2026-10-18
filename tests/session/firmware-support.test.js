@@ -147,3 +147,19 @@ test("legacy portable and service entry points reexport the single support imple
         assert.equal(service[name], support[name], name);
     }
 });
+
+test("firmwareView says what the firmware reports about itself and its ceilings, nothing it does not", () => {
+    assert.equal(support.firmwareView(null), null);
+    const view = support.firmwareView({...complete, firmwareVersion: 0x00010203, compiledDefaultDigest: 0xabc});
+    assert.equal(view?.version, "1.2.3");
+    assert.equal(view?.versionWord, "0x00010203");
+    assert.equal(view?.defaultsDigest, "0x00000ABC");
+    assert.equal(view?.worksWithArk, true);
+    assert.equal(view?.layers, complete.compiledLayerCount);
+    assert.equal(view?.tapCounts, complete.maxTapStepsPerBehavior);
+    assert.equal(view?.repeatHz, 100);
+    const old = support.firmwareView({...complete, featureFlags: 0, firmwareVersion: 0, physicalLedCount: undefined});
+    assert.equal(old?.worksWithArk, false);
+    assert.equal(old?.version, null, "no version is said rather than 0.0.0");
+    assert.equal(old?.leds, null);
+});

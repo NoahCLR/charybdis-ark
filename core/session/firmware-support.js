@@ -11,6 +11,7 @@
 const {LAYERS} = require("../data/charybdis-layout");
 const {knownActionAbi} = require("../schema/actions");
 const {PROFILE_BLOB_V1} = require("../schema/profile-blob-v1");
+const {KEY_BEHAVIOR_LIMITS} = require("../schema/key-behavior-domain-v1");
 const {PROFILE_WIRE_DOMAINS, PROFILE_DOMAIN_MASK} = require("../schema/profile-domains");
 const {RAW_HID_REPORT_SIZE} = require("../transport/device-adapter");
 const {PROFILE_ACTIVE_KIND, PROFILE_STATE_FLAGS,
@@ -160,8 +161,39 @@ function evaluateLiveMutationCompatibility(capabilities, compatibility, connecte
     };
 }
 
+// What the connected firmware says about itself, for the Keyboard screen and
+// Settings' "Built into this firmware": its version (VIA's u32, major.minor.patch
+// in its top three bytes), whether this Ark works with it, and the ceilings it
+// was compiled with. Only what the keyboard reports, or Ark's own schema
+// limits; never a guess. Nothing without capabilities.
+/** @param {Partial<Caps> | null | undefined} capabilities */
+function firmwareView(capabilities) {
+    if (!capabilities) return null;
+    const version = capabilities.firmwareVersion;
+    const known = Number.isInteger(version) && /** @type {number} */ (version) > 0;
+    /** @param {unknown} value */
+    const count = value => Number.isInteger(value) ? /** @type {number} */ (value) : null;
+    return {
+        version: known ? `${(/** @type {number} */ (version) >>> 16) & 0xffff}.${(/** @type {number} */ (version) >>> 8) & 0xff}.${/** @type {number} */ (version) & 0xff}` : null,
+        versionWord: known ? `0x${/** @type {number} */ (version).toString(16).toUpperCase().padStart(8, "0")}` : null,
+        defaultsDigest: Number.isInteger(capabilities.compiledDefaultDigest) ? `0x${/** @type {number} */ (capabilities.compiledDefaultDigest).toString(16).toUpperCase().padStart(8, "0")}` : null,
+        worksWithArk: canApply(capabilities),
+        readable: canEdit(capabilities),
+        layers: count(capabilities.compiledLayerCount),
+        tapCounts: count(capabilities.maxTapStepsPerBehavior),
+        behaviours: count(capabilities.maxBehaviorRows),
+        combos: count(capabilities.maxCombos),
+        keysPerCombo: count(capabilities.maxKeysPerCombo),
+        macros: count(capabilities.viaMacroSlots),
+        macroBytes: count(capabilities.viaMacroBytes),
+        customKeys: count(capabilities.customKeySlots),
+        leds: count(capabilities.physicalLedCount),
+        profileBytes: count(capabilities.maxProfilePayload),
+        repeatHz: KEY_BEHAVIOR_LIMITS.maxRepeatHz,
+    };
+}
 
-module.exports = {canRead, canEdit, canApply, hasCurrentLayers, editableDomains, canCapture,
+module.exports = {firmwareView, canRead, canEdit, canApply, hasCurrentLayers, editableDomains, canCapture,
     canReadIdentity, identityStateFlags, supportsCompleteProfile, requireReady,
     evaluateProfileCompatibility, evaluateLiveMutationCompatibility, PROFILE_DOMAIN_FLAGS,
     SUPPORTED_PROFILE_PROTOCOL, SUPPORTED_PROFILE_SCHEMA, REQUIRED_PROFILE_DOMAIN_MASK,

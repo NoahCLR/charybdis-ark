@@ -43,7 +43,15 @@ export interface StatusModel {
 }
 
 export type ApplyStep = 'check' | 'backup' | 'upload' | 'validate' | 'stage' | 'peer' | 'commit' | 'converge' | 'local' | 'verify';
+/** `saved`: "none" nothing was saved; "decided" the keyboard decided to save and finishes by itself; "unknown". */
 export interface ApplyFailure {step: ApplyStep; label: string; reason: string; saved: string}
+/** What the connected firmware reports about itself (core/session/firmware-support.js firmwareView). */
+export interface FirmwareView {
+    version: string | null; versionWord: string | null; defaultsDigest: string | null;
+    worksWithArk: boolean; readable: boolean;
+    layers: number | null; tapCounts: number | null; behaviours: number | null; combos: number | null; keysPerCombo: number | null;
+    macros: number | null; macroBytes: number | null; customKeys: number | null; leds: number | null; profileBytes: number | null; repeatHz: number;
+}
 export interface ApplyView {
     id: number;
     state: 'failed' | 'done' | 'applying';

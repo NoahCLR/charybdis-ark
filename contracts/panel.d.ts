@@ -123,9 +123,11 @@ export interface PublishedModel {
     apply: ApplyView | null;
     /** Core always sets `progress`, possibly undefined, which a JSON transport drops. */
     postApplyRead: {step: import('./messages.js').ReadStep; progress?: import('./model.js').CountedProgress | null} | null;
-    portable: {available: boolean; busy: boolean; progress?: string; review: {incoming: ProfileSummary; current?: ProfileSummary | null; fileName: string | null; differences: import('./model.js').ReviewSummary[] | null} | null; layers: {key: string; order: number[]; names: string[]; keysFollow: boolean} | null; usage: ProfileUsage | null};
+    portable: {available: boolean; busy: boolean; progress?: string; review: {incoming: ProfileSummary; current?: ProfileSummary | null; fileName: string | null; differences: import('./model.js').ReviewSummary[] | null} | null; layers: {key: string; order: number[]; names: string[]; keysFollow: boolean} | null; usage: ProfileUsage | null; /** When the copy from before the last Apply on this keyboard was saved; Put back what it had uses it. */ putBack: string | null};
     host: HostPanel;
     load: LoadView;
     /** A renamed keyboard that disconnected to take its new name, which the panel waits to see again. */
     reconnecting: {name: string} | null;
+    /** What the connected firmware reports about itself; null with no keyboard read. */
+    firmware: import('./model.js').FirmwareView | null;
 }

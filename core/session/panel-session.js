@@ -23,7 +23,7 @@ const {PHASE} = require("../model/vocabulary");
 const {fingerprint, summary, reorderLayers} = require("../model/portable-profile");
 const {profileReview} = require("../model/profile-review");
 const {profileUsage} = require("../model/profile-usage");
-const {canEdit} = require("./firmware-support");
+const {canEdit, firmwareView} = require("./firmware-support");
 const {ProfileDraftSession, DRAFT_EDITS} = require("./profile-draft-session");
 const {buildDeviceModel, buildSnapshotModel, deviceLabels} = require("./device-model");
 const {demoDiagnostics, demoHeader, demoModel} = require("./demo-session");
@@ -156,6 +156,7 @@ function buildPanelModel(session, state) {
             fileName: session.portableReview.fileName || null, differences: importDifferences({...session, portableReview: session.portableReview})} : null,
         layers: session.portableLayers ? {key: session.portableLayers.before.fingerprint, order: session.portableLayers.order, names: session.portableLayers.names, keysFollow: session.portableLayers.keysFollow !== false} : null,
         usage: usageOf(session, state, draft),
+        putBack: session.beforeApply && session.beforeApply.deviceId === state.selectedDeviceId ? session.beforeApply.savedAt : null,
     };
     if (!draft?.matching) model.layers?.forEach((layer, index) => {layer.displayName = state.portableSummary?.names[index] || layer.name;});
     // A read is ready while its draft could be edited once whatever runs now
@@ -175,7 +176,9 @@ function buildPanelModel(session, state) {
         connectionToken: state.connectionToken,
         progress: reconnecting && !session.readBusy ? RECONNECT_WORDS.waiting : state.portableProgress || state.layout?.progress || state.committed?.progress || null,
     };
-    return {...model, devices, selectedDeviceId, ...(draft ? {draft} : {}), demo, apply, postApplyRead, portable, host, load, reconnecting};
+    // What the firmware says about itself and its ceilings (Keyboard, Settings).
+    const firmware = firmwareView(state.capabilities);
+    return {...model, devices, selectedDeviceId, ...(draft ? {draft} : {}), demo, apply, postApplyRead, portable, host, load, reconnecting, firmware};
 }
 
 // How full the profile is: the draft's, when one is open for this keyboard,
