@@ -62,7 +62,12 @@ test("duplicate and clear are atomic, and unsupported outputs cannot enter a dra
     assert.throws(() => stage({type: "duplicatePdMode", slot: 6, source: 5}), /empty destination/);
     assert.throws(() => stage({type: "savePdMode", slot: 7, config: {kind: 1, name: "Recursive", thresholdY: 40, directions: {up: {keycode: "PD_SLOT_6"}}}}));
     assert.equal(draft.current.fingerprint, before);
-    stage({type: "clearPdMode", slot: 6}); assert.equal(draft.dirty, false);
+    // Clearing empties the record again; the colour the copy took stays,
+    // as a cleared slot keeps its colour row.
+    const colour = (id) => validateSnapshot(draft.document).rgb.pdModeColors.find(row => row.pdModeId === id);
+    assert.deepEqual(colour(6).color, colour(4).color, "the copy took its source's colour");
+    stage({type: "clearPdMode", slot: 6});
+    assert.deepEqual(validateSnapshot(draft.document).pdModes[6], validateSnapshot(document()).pdModes[6]);
 });
 test("keycode-picker modifier expressions are accepted as directional actions", () => {
     const {draft, stage} = fixture();
