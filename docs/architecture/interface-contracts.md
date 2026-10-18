@@ -189,8 +189,10 @@ The same kind of control looks and sits the same on every screen.
   (280 px) wide and sticky, scrolling on its own; the editor at most
   `--editor-max`; below 788 px of content the list stacks above it. Side-by-side tables start at the top rather than stretching to
   each other's height.
-- Keys and Lighting draw the same layer strip, Rename & Reorder included
-  (`layerBar` and `attachLayersControl`).
+- Keys and Lighting draw the same layer strip, Layers… included
+  (`layerBar` and `attachLayersControl`). `view/layer-tabs.mjs` decides which
+  layers fold into the "+N empty" tab (no name, keys or colour; never Base or
+  the picked layer), and the tab's index sits in a fixed tabular slot.
 
 ## Design tokens
 
@@ -379,6 +381,25 @@ Settings always matches QMK names.
   hides those channels. `view/lighting.mjs` owns layer pass-through (zero
   saturation and brightness) and LED-row inheritance (all three channels
   zero); an explicit black row remains distinct from an inherited colour.
+- Keys: the board takes a `centre` element, laid over the empty centre
+  between the halves (`ui/board.mjs` places it as the board scales); Keys puts
+  the layer plate there (`ui/keys/layer-plate.mjs`, its frame `plateFrame`
+  shared for any board that names its layer in the centre). How a layer is
+  reached is core's (`core/model/layer-reach.js` `layerWays`, published as
+  `draft.layerWays` with the default layers); `view/layer-plate.mjs` only
+  words it. On Keys `heldLayers()` (`store.mjs`) is the default layers under a
+  non-base layer unless "This layer only" is pressed or layers were added to
+  the view; `addedLayers()` is what the view adds beyond them. What a key does
+  is `view/key-summary.mjs` (`keySummary`): a layer key's effect sentence
+  (`vocabulary.layerKeyEffects`), its actions by press with transparent ones
+  resolved below (`answerBelow`), the timings with their sources and the cost
+  lines; the Key tab's Does line and the hover card both draw it through
+  `ui/keys/summary.mjs`. The arrow keys, `[` `]` and digits on the board are
+  `view/board-nav.mjs`; the board has one Tab stop (roving tabindex on the
+  picked key). Layers… posts each rename, move and Make base as an
+  `editPortableLayer`, which core commits to the draft at once
+  (`core/session/panel-controls.js` `editLayer`); `savePortableLayers` remains
+  for a keyboard restored without a draft.
 - Trackball: `webview/ui/trackball.mjs` owns the list and what it opens. The
   registry gives it two ids: `mouse`, opened on the fixed entry in
   `state.tbEntry`, and `pointing`, opened on the mode in `state.pdSlot`; the

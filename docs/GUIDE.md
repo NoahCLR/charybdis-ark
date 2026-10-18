@@ -331,38 +331,38 @@ badges on the key face in the feedback colours the keyboard flashes. A key's
 legend is sized from the key as drawn, never smaller than 9 px (8.5 px for its
 second line) unless the key has no room; a long name wraps onto two lines
 before its letters are narrowed.
-Resting the pointer on a key opens a card of everything it reaches: the first
-after a moment, then at once as you move from key to key, and for a moment
-after leaving the board. Tabbing to a key opens its card too, and Escape
-closes it. Every
-action there reads by its name first, then the keycode it stores; a custom key
-or pointing mode reads as `CUSTOM_KEY_n` or `PD_SLOT_n` rather than its number.
-A custom key says under its name what its shortcut sends, held and tapped as
-the key is or where its behaviour leaves a tap or hold empty, or that it has
-none.
-A layer-tap or mod-tap key always lists what its tap sends, what its hold does,
-the tap / hold threshold it runs on and who decides it: the keyboard, when it
-has a behaviour row that runs there (even one with no actions), or QMK, when
-it has none or its row is switched off or bypassed there. Any other key with a
-behaviour row with no actions says in one line that the keyboard's key engine
-handles it. A behaviour switched off or bypassed there says so and why, and
-what the key sends instead: its own keycode, or a custom key's shortcut.
-A behaviour lists each tap count's actions and how a hold runs, and the
-behaviour names the thresholds it runs on in milliseconds, its own or the
-keyboard's default; a hold that taps at or after a threshold names
-that threshold's time, and one that repeats its rate in Hz. A macro lists its steps — held (↓), let go (↑),
-tapped, typed and waited. An action that sends a custom key says it sends that
-key's shortcut, never its behaviour. Each combo leads with what it sends and how many keys
-it takes, with the keys that press it beneath and the hovered key marked among
-them. When a combo sends a key that has a behaviour, and that behaviour runs —
-the combo's own output behaviour, the keyboard's behaviours and Combo outputs
-use behaviours are all on — its row says so, and the behaviour opens in its own
-card beside the key's, tinted in the combo colour the keyboard flashes (grey
-when that is off) and naming the combos that run it; up to three such cards
-show, with a count of any more. A combo sending a custom key whose behaviour
-does not run says what its shortcut sends, or that it sends nothing. A transparent key reads "Transparent →" what answers it and from which
-layer, following the layers you
-preview.
+A key that does nothing is drawn as "—" (Nothing: it blocks the layers below);
+a key of a feature this firmware does not build reads "not in this firmware"
+on its second line; Bootloader, Reboot and Clear EEPROM carry ⚠. A key that
+starts combos wears one combo mark, with how many when more than one (the
+numbers combos carry renumber when one is deleted, so the card and the Combos
+tab name them); a behaviour's tiers are dots without counts.
+
+Resting the pointer on a key opens its card: the first after a moment, then
+at once as you move from key to key, and for a moment after leaving the
+board. Tabbing to a key opens its card too, and Escape closes it. The card is
+the key's name (⚠ when it stops or erases the keyboard, or does nothing in
+this firmware), then what it does: a layer key in one sentence ("Hold ■
+Number: on while held.", "Lock ■ Symbol: on until pressed again.", a
+Tap-toggle's "the 5th tap locks it"), a custom key what its shortcut sends.
+Then its actions by press — Tap, Hold, Long hold, 2×, 2× hold… — from its
+behaviour and from what the key does on its own where the behaviour leaves a
+cell empty. A transparent action reads as what answers from below ("Tap . from
+■ Base"), the way the keyboard runs it. One line under them gives the times
+it waits and where each comes from ("hold after 200 ms (dual-role) · taps
+within 150 ms (default)") and, until the firmware's single tap-hold engine
+lands, who decides it: the keyboard, when a behaviour row runs there (even
+one with no actions), or QMK. What it costs follows only when true: "Single
+taps wait 150 ms for a second tap." once a behaviour has a multi-tap, "Tap
+sends on release." once it has a hold. A behaviour switched off or bypassed
+there says so and why, and what the key sends instead. A macro lists its
+steps; a trackball mode says it paints its locality, not the key. Up to three
+combos follow, each by what it sends with its keys beneath and this key marked
+among them, then how many more. The behaviours a key's combos run open in
+their own cards beside the picked key's card (click the key first), tinted in
+the combo colour. A transparent key reads "Transparent →" what answers it and
+from which layer, following the layers on in the view. Keycodes appear in the
+card only with Show keycodes.
 
 On the board, drag one key onto another to swap them, ⌘C and ⌘V copy a key
 onto the selected key, and Delete or Backspace makes it transparent. ⌘Z undoes
@@ -373,8 +373,11 @@ beside it, sits at the foot of the rail once a keyboard or the demo has been
 read into a draft; it opens every step of the
 draft, newest first, each with when it was made and what it changed from the
 step before it (not from the keyboard, as the review compares); go straight
-back or forward to any of them. Board keys work from the keyboard too: Space or Enter
-selects one, and Enter on the selected key opens its picker.
+back or forward to any of them. The board is one Tab stop, on the picked key:
+the arrow keys move to the next key that way as the keys sit (across the gap
+between the halves, down to the thumbs), `[` and `]` go to the layer before or
+after, a digit jumps to that layer, and Enter opens the picker for the picked
+key. The board's "?" lists every shortcut.
 
 ### Layers
 
@@ -382,8 +385,24 @@ The standard firmware reserves 16 layers, so ordinary editing never changes
 the layer count or needs a reflash. **Layers…** lists them with the
 highest-priority layer first and Base at the bottom.
 
-A layer tab shows its layer's number after its name, except for a layer named
-only by its number ("Layer 8"), so the number is never said twice.
+A layer tab shows its name, then its number quietly in a fixed slot. Layers
+with no name, no keys and no colour fold into one **+N empty** tab after the
+others, whose menu shows any of them; the layer you pick keeps its own tab.
+
+The board's empty centre holds the layer plate: the layer's swatch and name,
+what it is shown over, and how it is reached. On Keys a layer other than Base
+is shown the way the keyboard runs it, **Over** the default layers that are
+always on under it, so its transparent keys show, frosted, what answers them;
+**This layer only** (a pressed toggle) shows what the layer stores alone.
+**Reached by** lists up to three ways in, each a key, a behaviour's gesture,
+a combo or the trackball, with how many more ("Hold J", "Double-tap Left Thumb
+(lock)", "Space + Delete together (hold)"); click one that is a key to show it.
+A layer nothing reaches says **Not reached by any key**, with **Add a key that
+reaches it…**: choose Hold, Lock or Tap-hold and click a key on Base to put it
+there (Tap-hold keeps that key's tap; a key that cannot be a tap opens the
+picker's Hold slot instead). A default layer says it is always on. **+ Add
+layer to view** turns other layers on in the view, as ⌘-click on their tabs
+does.
 The layers are tabs along the foot of the board card, next to the workbench
 rather than in it, since a layer is not a property of the selected key; the
 picked one opens into the board
@@ -391,7 +410,10 @@ it shows, on Keys and on Lighting alike; **Layers…** stays at the end
 of those tabs on both screens, outside what scrolls, and opens upward over the board, so a layer
 is renamed and reordered where its keys are on screen. Drag a row by the grip
 on its left to move it within the full sixteen-layer stack, or focus the grip
-and press ↑ ↓. The bottom row is the
+and press ↑ ↓. Each row carries its layer's swatch, and a default layer is
+marked "default"; empty layers fold behind one line, in their places. Each
+rename, move and **Make base** is its own draft change at once, undone like
+any other; there is no separate save. The bottom row is the
 base: always on, and what every transparent key falls through to. It is not
 dragged; **Make base** on another row swaps that layer into it, and the old
 base takes its place. **Keys follow their layers** (on by
@@ -544,13 +566,24 @@ press Alt+← or → on it, to change the order **Keys in order** checks. **Must
 be held** and **Tap only** say the wait they mean: the longer of the combo's
 window and the combo hold threshold. **Use output behaviour** explains itself
 on hover.
-The **Key** tab count is the number of mapped keys on the selected layer.
-The Key tab says what the selected key does; **Where it is stored** unfolds
-its stored keycode, matrix row and column, layout index and LED index, and
-stays open for every key once opened. **This key on every layer** lists the
-position from the highest layer down; three or more transparent layers in a
-row fold into one line that says they fall through, and clicking it shows
-each of them. Reach tables name the keys that reach a row, as the board
+**Key.** The tab is the picked key, so it carries no count. Its title is the
+key's name; **Does** says what it does in one line, from the same summary as
+the hover card, with the times it waits and their sources beneath; a
+transparent key reads "Transparent → Esc from Base" with **Show on Base**.
+The **Key** row is its keycode, always shown here, with **Change key…** and
+**Add a hold…** (the picker with its Hold slot open). Type a keycode and press
+Enter: one the keyboard cannot store stays in the field with the reason and
+changes nothing. **Behaviour** says how many actions it sets (**Edit →**),
+**Combos** names up to three by their keys and what they send (**Combos →**),
+and a trackball mode key names its mode. **Runs its behaviour here** and
+**Can start combos here** show only when they would change something — the
+key has a behaviour, or starts a combo — and otherwise one quiet line says no
+behaviour or combo uses it. **Where it is stored** unfolds its stored keycode,
+matrix row and column, layout index and LED index, and stays open for every
+key once opened. **This key on every layer** lists the position from the
+highest layer down, each with its verb ("Hold ■ Number") and **Show →** on
+hover; three or more transparent layers in a row fold into one line that says
+they fall through, and clicking it shows each of them. Reach tables name the keys that reach a row, as the board
 labels them, rather than their layout indexes; a combo's row already names
 its inputs, so it says only which layer answers a transparent one.
 In **Keys → Behaviours**, reach sections open independently. Matching sections
@@ -565,6 +598,10 @@ when one is configured.
 Every Keys workbench tab is at least as tall as Behaviours, so switching tabs
 keeps the page at the same scroll position. If an editor grows taller, that
 height stays while switching tabs.
+
+**Macros** and **Trackball modes** list what the layer reaches in 40 px rows,
+each with **Open →** to its editor; groups with nothing in them fold into one
+line, and **On this view** shows only while other layers are added to the view.
 
 The Macros tab and the board's hover card show a macro's steps as small
 versions of the Macros editor's tiles, with the same marks and short key names:
