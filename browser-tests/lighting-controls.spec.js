@@ -204,3 +204,32 @@ test("Lighting preview switches and screen links navigate without posting edits"
     await page.locator('.main [data-act="read"]').click();
     await expectPost(page, {type: "refresh"});
 });
+
+test("the layer and pointing-mode lists scroll on their own and keep their place", async ({page}) => {
+    await openStage(page, "layers");
+    const list = page.locator('[data-scroll-list="layers"]');
+    const content = page.locator(".content");
+    await expect(list).toHaveClass(/\bmany\b/);
+    const layer = list.locator('[data-layer="12"]');
+    await layer.scrollIntoViewIfNeeded();
+    const position = await list.evaluate(node => node.scrollTop);
+    expect(position, "the list scrolls inside its card").toBeGreaterThan(0);
+    const page_ = await content.evaluate(node => node.scrollTop);
+    await layer.click();
+    await expect(layer).toHaveClass(/\bon\b/);
+    await expect.poll(() => list.evaluate(node => node.scrollTop), {message: "a click redraws without losing the list's place"}).toBe(position);
+    expect(await content.evaluate(node => node.scrollTop)).toBe(page_);
+
+    // Each list keeps its own place: the pointing list starts at its top, and
+    // coming back shows the picked layer again.
+    await page.locator('[data-ltab="pd"]').click();
+    const pointing = page.locator('[data-scroll-list="pd"]');
+    await expect.poll(() => pointing.evaluate(node => node.scrollTop)).toBe(0);
+    await page.locator('[data-ltab="layers"]').click();
+    const shown = () => page.locator('[data-scroll-list="layers"]').evaluate(node => {
+        const bounds = node.getBoundingClientRect(), row = /** @type {Element} */ (node.querySelector(".rowitem.on")).getBoundingClientRect();
+        return row.top >= bounds.top && row.bottom <= bounds.bottom;
+    });
+    await expect.poll(shown, {message: "the picked layer is shown inside the list"}).toBe(true);
+    expect(await posted(page)).toEqual([]);
+});

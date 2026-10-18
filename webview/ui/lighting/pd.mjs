@@ -17,7 +17,7 @@ export function stagePointing(model) {
 
     node.className = "tab-split";
     // Past eight slots the list scrolls on its own beside the editor.
-    const list = el(`<aside class="rowlist ${(model.pdModes || []).length > 8 ? "many" : ""}"><div class="rowlist-h">Pointing modes</div></aside>`);
+    const list = el(`<aside class="rowlist ${(model.pdModes || []).length > 8 ? "many" : ""}" data-scroll-list="pd"><div class="rowlist-h">Pointing modes</div></aside>`);
     (model.pdModes || []).forEach((slot) => {
         const row = pdColourRow(model, slot.id);
         const lit = row && !isOff(row.color);
