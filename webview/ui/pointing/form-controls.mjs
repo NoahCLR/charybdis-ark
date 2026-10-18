@@ -53,7 +53,7 @@ export function formControls(model, slot, canEdit, stageCurrent) {
                 ${typed ? `<input data-f="pointing:${slot.id}:${esc(key)}" class="input mono" value="${esc(name)}" placeholder="nothing" aria-label="${esc(`${label} keycode`)}" ${disabled}>` : ""}
             </div>${PROBLEM}</div>`);
         if (macro) {
-            if (macro.empty) node.append(el(`<span class="note">Empty macro: does nothing yet</span>`));
+            if (macro.empty) node.append(el(`<span class="note">This macro is empty: does nothing yet</span>`));
             if (!key.startsWith("button:") && slot.directionOutput === 0) node.append(el(`<span class="note" data-tip="Triggers while a macro is playing are dropped. Choose Once per movement under How often it sends for a longer macro.">Busy triggers are dropped · try Once per movement</span>`));
         }
         const input = /** @type {HTMLInputElement | null} */ (node.querySelector("input"));

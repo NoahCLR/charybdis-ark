@@ -22,11 +22,11 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
                 store.setModel({...store.getModel(), ...patch}); store.render();
             }, patch);
         };
-        await openControls(page, "pointing", {pdSlot: 4}, theme);
+        await openControls(page, "pointing", {pdSlot: 4, showKeycodes: true}, theme);
         await publish();
         for (const [direction, button] of [["left", 3], ["right", 4]]) {
             await clearPosts(page);
-            await page.locator(`label:has(input[data-f="pointing:4:dir:${direction}"]) button`).click();
+            await page.locator(`.field:has(input[data-f="pointing:4:dir:${direction}"]) [data-pick]`).click();
             const picker = page.getByRole("dialog", {name: "Choose a key"});
             await picker.locator('[data-sec="mouse"]').click();
             await expect(picker.locator("[data-pick]")).toHaveCount(8);

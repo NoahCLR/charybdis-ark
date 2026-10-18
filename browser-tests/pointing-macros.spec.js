@@ -30,7 +30,7 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
             await publish();
             return messages[0];
         };
-        await openControls(page, "pointing", {pdSlot: 4, pdAdvanced: true}, theme);
+        await openControls(page, "pointing", {pdSlot: 4, pdAdvanced: true, showKeycodes: true}, theme);
         await publish();
         await clearPosts(page);
         await page.locator('[data-f="pointing:4:axis"]').selectOption("3");
@@ -38,7 +38,7 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
 
         for (const [field, macro] of [["dir:left", 0], ["diag:upLeft", 127]]) {
             await clearPosts(page);
-            await page.locator(`label:has(input[data-f="pointing:4:${field}"]) button`).click();
+            await page.locator(`.field:has(input[data-f="pointing:4:${field}"]) [data-pick]`).click();
             const picker = page.getByRole("dialog", {name: "Choose a key"});
             await picker.locator('[data-sec="macros"]').click();
             await expect(picker.locator("[data-pick]")).toHaveCount(128);
@@ -67,7 +67,7 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
         await expect(page.locator(".pd-cross")).not.toContainText("Busy triggers are dropped");
         // Button 2 already taps a shortcut in the fixture. Choose a macro there.
         await clearPosts(page);
-        await page.locator('label:has(input[data-f="pointing:4:button:1:tap"]) button').click();
+        await page.locator('.field:has(input[data-f="pointing:4:button:1:tap"]) [data-pick]').click();
         const picker = page.getByRole("dialog", {name: "Choose a key"});
         await picker.locator('[data-sec="macros"]').click();
         await picker.locator('[data-pick="VIA_MACRO_0"]').click();
