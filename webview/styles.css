@@ -1357,6 +1357,11 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .pd-problem[hidden] { display: none; }
 .input[aria-invalid="true"] { border-color: var(--danger); }
 .pd-while > .field { max-width: 340px; }
+.pd-templates { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+.pd-start-empty > summary { display: inline-flex; align-items: center; gap: 6px; height: var(--h-control); cursor: pointer; list-style: none; color: var(--text-2); font-size: var(--fs-small); }
+.pd-start-empty > summary:hover { color: var(--text); }
+.pd-start-empty[open] > summary .chev { transform: rotate(90deg); }
+.pd-start-empty-b { padding-top: var(--s-2); }
 .pd-split.pd-split-top { padding-top: 0; border-top: 0; }
 .pd-grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-items: end; }
 .pd-grid4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; align-items: end; }

@@ -92,7 +92,7 @@ const sections = [
     {id: "autoMouse", label: "Mouse layer", area: "Trackball", search: "auto-mouse auto mouse pointer layer pointing", fields: [
         toggle("autoMouse", SETTING.AUTO_MOUSE_ENABLED, "Mouse layer", "Moving the trackball turns the chosen layer on."),
         layer("mouseLayer", SETTING.AUTO_MOUSE_LAYER, "Layer", "The layer moving the trackball turns on while Mouse layer is on."),
-        number("mouseTimeout", SETTING.AUTO_MOUSE_TIMEOUT, "Timeout (ms)", "How long the layer stays on after the ball stops. It turns off as soon as you type a key that is not a mouse key.", {min: 1, tooltip: "QMK's auto-mouse timeout. The lighting fade keeps its share of it (Lighting → Mouse layer fade)."}),
+        number("mouseTimeout", SETTING.AUTO_MOUSE_TIMEOUT, "Timeout (ms)", "How long the layer stays on after the ball stops.", {min: 1, tooltip: "QMK's auto-mouse timeout. The lighting fade keeps its share of it (Lighting → Mouse layer fade)."}),
         number("mouseDebounce", SETTING.AUTO_MOUSE_DEBOUNCE, "Movement debounce (ms)", undefined, {tooltip: "Minimum time between trackball events that update the mouse layer. Higher values ignore closely spaced movement events. QMK calls this auto-mouse."}),
         number("mouseDelay", SETTING.AUTO_MOUSE_DELAY, "Delay after typing (ms)", "Movement this soon after you press a key does not turn the mouse layer on."),
         number("mouseThreshold", SETTING.AUTO_MOUSE_THRESHOLD, "Movement threshold", "Sensor counts on either axis, at the current ball speed, before movement turns the mouse layer on. A mouse button press turns it on at once.", {unit: "counts"}),

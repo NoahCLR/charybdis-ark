@@ -99,7 +99,7 @@ function mouseLayer(model, rows) {
     const on = settingValue(model, "autoMouse") !== false;
     const main = rows("autoMouse", ["autoMouse", "mouseLayer", "mouseTimeout"]);
     node.append(main, el(`<div class="card-b tb-facts">
-        <p class="note">Turns off as soon as you type a key that is not a mouse key.</p>
+        <p class="note">It turns off as soon as you type: any key that is not a mouse key ends it at once.</p>
         <p class="note">The auto-sniping layer keeps it off while that layer is on.</p></div>`));
     const fine = /** @type {HTMLDetailsElement} */ (el(`<details class="tb-fold" ${state.tbFineTuning ? "open" : ""}>
         <summary class="card-h">${DISCLOSURE}<h3>Fine-tuning</h3><span class="right note">debounce, delay after typing, threshold</span></summary></details>`));

@@ -84,6 +84,7 @@ export const STATE_FIELDS = {
     tbEntry: kept("pointer"),  // the Trackball screen's fixed entry shown on "mouse": pointer, sniping or mouseLayer
     tbEmptiesOpen: kept(false), // the Trackball list's empty slots unfolded
     tbFineTuning: kept(false), // the mouse layer's fine-tuning fold open
+    pdStartEmpty: kept(false), // an empty slot's "Start empty…" fold open
     applyDismissed: kept(0),  // the failed Apply (by id) the person closed, so it stays closed
     pdPreview: kept(false),
     feedbackRow: kept("hold"),
