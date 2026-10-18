@@ -1,6 +1,6 @@
 "use strict";
 const test = require("node:test"), assert = require("node:assert/strict");
-const {VOCABULARY, word, layerName, slotName, branchName, modifierNames} = require("../../core/model/vocabulary");
+const {VOCABULARY, word, layerName, slotName, slotTag, branchName, modifierNames} = require("../../core/model/vocabulary");
 const rgb = require("../../core/schema/rgb-domain-v1");
 const pd = require("../../core/schema/pd-mode-domain-v1");
 const {KEY_BEHAVIOR_HOLD_MODES} = require("../../core/schema/key-behavior-domain-v1");
@@ -42,9 +42,10 @@ test("one rule names an unnamed layer, slot, branch and modifier set", () => {
     assert.equal(layerName(["", "Numbers"], 0), "Base", "layer 0 is the base layer");
     assert.equal(layerName(["", ""], 3), "Layer 3");
     assert.equal(layerName(["", "Numbers"], 1), "Numbers");
-    assert.equal(slotName({id: 4, kind: 0, name: "Arrow"}), "Slot 4", "an empty slot is not called by the name it kept");
+    assert.equal(slotName({id: 4, kind: 0, name: "Arrow"}), "Mode 4", "an empty slot is not called by the name it kept");
     assert.equal(slotName({id: 4, kind: 1, name: "Arrow"}), "Arrow");
     assert.equal(branchName(2), "Double tap");
+    assert.deepEqual([slotTag("macro", 5), slotTag("customKey", 5), slotTag("pointing", 5)], ["M5", "K5", "P5"], "tags are 0-based, as the keycodes are");
     assert.deepEqual(modifierNames(2 | 128), ["Left Shift", "Right GUI"]);
 });
 
@@ -92,4 +93,13 @@ test("every state of the two halves has a label and words saying what to do", ()
         assert.doesNotMatch(`${label} ${detail}`, /converge|generation|peer|digest/i, `${id} is said without the protocol's words`);
     }
     assert.match(VOCABULARY.halves.alone.detail, /cable between the halves/);
+});
+
+test("one set of words for what the keyboard stores, as decided", () => {
+    assert.equal(word(VOCABULARY.pointing.buttons, 1), "Block the click");
+    assert.deepEqual(VOCABULARY.pointing.pointerLayer.map(([, words]) => words), ["Keep the mouse layer on", "Go back to the typing layer"]);
+    assert.deepEqual(VOCABULARY.stages.map(stage => stage.label), ["Base effect", "Layer colours", "Mouse layer fade", "Trackball modes", "Combo feedback", "Key feedback"]);
+    assert.deepEqual(VOCABULARY.feedbackOwners.slice(1).map(([, words]) => words), ["Waiting on 2×…5×", "Multi-tap sent", "Holding", "Long holding"]);
+    const everyWord = JSON.stringify(VOCABULARY);
+    assert.doesNotMatch(everyWord, /Consume|Tap committed|Hold active|pointer layer|Auto-mouse|Pointing modes/, "no retired word is left");
 });

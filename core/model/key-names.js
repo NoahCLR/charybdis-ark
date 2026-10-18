@@ -175,7 +175,7 @@ function profileKeyNames({hostOs = 0, hostLayout: layoutId = US_HOST_LAYOUT, mac
     for (const slot of pdModes) for (const locked of [false, true]) {
         const binding = PD_SLOT_BINDINGS[slot.id];
         const name = locked ? binding.lock : binding.hold, code = locked ? binding.lockCode : binding.holdCode;
-        const label = `${slotName(slot)} · ${locked ? "toggle" : "hold"}${slot.kind ? "" : " (empty)"}`;
+        const label = `${slotName(slot)} · ${locked ? "lock" : "hold"}${slot.kind ? "" : " (empty)"}`;
         const native = keycodes.resolve(code).name;
         aliases[native] = name;
         labels[native] = label;

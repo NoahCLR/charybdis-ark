@@ -927,7 +927,7 @@ test("the auto-mouse fade is posted as a share, and a new timeout rescales it in
     assert.equal(fade().whole, timeout);
     const last = draft.steps().at(-1).changes;
     assert.deepEqual(last.map((change) => [change.unit, change.area]).sort(),
-        [["settings:autoMouse", "Mouse"], ["settings:automouseFade", "Lighting"]], "the step says it moved the fade too");
+        [["settings:autoMouse", "Trackball"], ["settings:automouseFade", "Lighting"]], "the step says it moved the fade too");
     const place = last.find((change) => change.unit === "settings:automouseFade").place;
     assert.deepEqual(place, {kind: "settings", section: "automouseFade", area: "Lighting", stage: "auto"});
     const groups = draft.view({}).changes.filter((change) => ["settings:autoMouse", "settings:automouseFade"].includes(change.unit)).map((change) => change.group);
@@ -987,7 +987,7 @@ test("on the 32-slot firmware, the same builders reach slots past seven", () => 
     assert.equal(draft.document.layers[1][slotOf(27)], 0x7ebf);
     stage(draft, edits.clearPdMode(12, draft.identity()));
     assert.equal(wide().pdModes[12].kind, 0);
-    assert.ok(reviewAreas(draft).includes("Pointing modes"));
+    assert.ok(reviewAreas(draft).includes("Trackball modes"));
 });
 
 test("participation controls preserve definitions, review their scopes, and undo or discard as one edit", () => {

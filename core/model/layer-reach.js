@@ -590,7 +590,7 @@ function findings(facts, walked) {
             results.push({kind: "pointerLayer", level: LEVELS.WARNING, layers: [facts.pointer],
                 title: `The trackball turns on ${layerName(facts.names, facts.pointer)}, which is always on`,
                 detail: "Moving the trackball changes nothing on the board, so the pointer layer's keys are never there when you mouse.",
-                fix: "Choose the pointer layer under Mouse → Auto-mouse.", place: {kind: "settings", area: "Mouse"}});
+                fix: "Choose the layer under Trackball → Mouse layer.", place: {kind: "settings", area: "Trackball"}});
         } else if (!hasKeys(facts.pointer)) {
             results.push({kind: "pointerLayer", level: LEVELS.NOTICE, layers: [facts.pointer],
                 title: `The trackball turns on ${layerName(facts.names, facts.pointer)}, which has no keys of its own`,

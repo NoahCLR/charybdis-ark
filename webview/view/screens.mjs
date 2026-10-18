@@ -40,12 +40,12 @@ export const SCREENS = Object.freeze({
         available: configureReady, render: renderers => renderers.screenCustomKeys(),
     }),
     mouse: screen({
-        label: "Mouse", group: "Configure", title: "Keyboard", keepOnPublish: true,
+        label: "Trackball", group: "Configure", title: "Keyboard", keepOnPublish: true,
         icon: '<svg viewBox="0 0 16 16"><rect x="4" y="1.5" width="8" height="13" rx="4"/><path d="M8 1.5v4.5"/></svg>',
         available: configureReady, render: renderers => renderers.screenMouse(),
     }),
     pointing: screen({
-        label: "Pointing modes", group: "Configure", title: "Keyboard", keepOnPublish: true,
+        label: "Trackball modes", group: "Configure", title: "Keyboard", keepOnPublish: true,
         icon: '<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5"/><path d="M8 2.5v11M2.5 8h11"/></svg>',
         available: configureReady, render: renderers => renderers.screenPointing(),
     }),
@@ -55,18 +55,18 @@ export const SCREENS = Object.freeze({
         available: configureReady, render: renderers => renderers.screenSettings(),
     }),
     profile: screen({
-        label: "Profile & backups", group: "Keyboard", title: "Profile & backups", keepOnPublish: false,
-        secondaryLabel: "Profile & backups",
+        label: "Backups", group: "Manage", title: "Backups", keepOnPublish: false,
+        secondaryLabel: "Backups",
         icon: '<svg viewBox="0 0 16 16"><path d="M8 1.8v8.4M5 7.4 8 10.4l3-3M2.8 12.2v1.4h10.4v-1.4"/></svg>',
         available: model => Boolean(model.portable?.available), render: renderers => renderers.screenProfile(),
         unavailable: {title: "Backups unavailable", detail: "Connect a keyboard with complete-profile firmware, then read it to manage backups."},
     }),
     device: screen({
-        label: "Device", group: "Keyboard", title: "Device", keepOnPublish: false,
-        secondaryLabel: "Device details",
+        label: "Keyboard", group: "Manage", title: "Keyboard", keepOnPublish: false,
+        secondaryLabel: "Keyboard details",
         icon: '<svg viewBox="0 0 16 16"><rect x="2.5" y="2.5" width="11" height="11" rx="2.5"/><path d="M6 6.5h4v3H6z"/></svg>',
         available: model => Boolean(model.device?.connected || model.demo?.active), render: renderers => renderers.screenDevice(),
-        unavailable: {title: "Device status unavailable", detail: "Read the keyboard to see its connection and diagnostics."},
+        unavailable: {title: "Keyboard status unavailable", detail: "Read the keyboard to see its connection and diagnostics."},
     }),
 });
 

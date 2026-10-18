@@ -9,7 +9,7 @@
 // item knows how to go to its editor.
 
 // The order areas are read in, as the rail lists the screens they live on.
-export const AREAS = ["Layout", "Layers", "Behaviours", "Combos", "Custom keys", "Macros", "Mouse", "Pointing modes", "Lighting", "Settings", "Profile", "Recovery"];
+export const AREAS = ["Layout", "Layers", "Behaviours", "Combos", "Custom keys", "Macros", "Trackball", "Trackball modes", "Lighting", "Settings", "Profile", "Recovery"];
 /** @param {string} area */
 const rank = (area) => (AREAS.indexOf(area) + 1 || AREAS.length + 1);
 
@@ -65,13 +65,13 @@ export const statusBesideCount = (changes) => changes.every((change) => change.s
 // Timing with keys, Lighting Feedback with lighting). A section edited on a
 // lighting stage counts with that stage. `names` are the file's layer names;
 // `stages` the lighting stages in paint order, as the vocabulary words them.
-export const CATEGORIES = ["Keys", "Lighting", "Macros", "Mouse", "Pointing modes", "Other"];
+export const CATEGORIES = ["Keys", "Lighting", "Macros", "Trackball", "Trackball modes", "Other"];
 // A custom key's name is counted with the keys, where its behaviour is too.
 /** @type {Readonly<Record<string, [string, string, number]>>} */
 const SECTIONS = {
-    keyTiming: ["Keys", "Tap & hold timing", 31], startupLayers: ["Keys", "Startup layers", 22], behaviorSettings: ["Keys", "Behaviour settings", 32], comboSettings: ["Keys", "Combo settings", 40], comboReferences: ["Keys", "Combo layer matching", 41],
+    keyTiming: ["Keys", "Tap & hold timing", 31], startupLayers: ["Keys", "Default layers", 22], behaviorSettings: ["Keys", "Behaviour settings", 32], comboSettings: ["Keys", "Combo settings", 40], comboReferences: ["Keys", "Combo layer matching", 41],
     keyboardOptions: ["Keys", "Key options", 50], rgbAppearance: ["Lighting", "Base effect", 1], lightingFeedback: ["Lighting", "Key feedback", 15],
-    normalPointerSpeed: ["Mouse", "Pointer speed", 1], sniping: ["Mouse", "Auto-sniping", 2], autoMouse: ["Mouse", "Auto-mouse", 3],
+    normalPointerSpeed: ["Trackball", "Ball speed", 1], sniping: ["Trackball", "Auto-sniping", 2], autoMouse: ["Trackball", "Mouse layer", 3],
 };
 // Where one difference is counted: its category, its row's words, and the
 // row's place within the category.
@@ -85,7 +85,7 @@ function categoryOf(item, names, stages) {
         case "combo": return ["Keys", "Combos", 40];
         case "macro": return ["Macros", "Macros", 0];
         case "customKey": return ["Keys", "Custom keys", 35];
-        case "pointing": return ["Pointing modes", "Pointing modes", 0];
+        case "pointing": return ["Trackball modes", "Trackball modes", 0];
         case "lighting": {
             if (!place.stage) return ["Lighting", "Stages on or off", 0];
             if (place.stage === "groups") return ["Lighting", "LED groups", 20];
@@ -160,7 +160,7 @@ export function placeState(place, layers = []) {
         // for a Lighting one, Mouse, or Settings.
         case "settings": {
             if (place.stage) return {screen: "lighting", stage: place.stage};
-            const screen = place.area === "Mouse" ? "mouse" : "settings";
+            const screen = place.area === "Trackball" ? "mouse" : "settings";
             return place.section
                 ? {screen, settingsSearch: "", settingsOpen: [place.section], reveal: `.settings-group[data-section="${place.section}"]`}
                 : {screen, settingsSearch: ""};

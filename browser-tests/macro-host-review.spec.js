@@ -49,7 +49,7 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
             store.state.overlay = "review"; store.render();
         });
         const review = page.getByRole("dialog", {name: "Review changes"});
-        await expect(review).toContainText("Playback changes because of Settings → Host");
+        await expect(review).toContainText("Playback changes because of Settings → Your computer");
         await expect(review).toContainText('layout keys: "é"');
         await expect(review).toContainText('Unicode entry (macOS): "é"');
         await expect(review).toContainText("Macro 1 cannot play with this Host setup");

@@ -16,17 +16,17 @@ import {sectionCard, sectionsIn} from "./settings.mjs";
 
 export function screenMouse() {
     const model = getModel();
-    const sections = sectionsIn(model, "Mouse");
+    const sections = sectionsIn(model, "Trackball");
     const canEdit = canEditArea("settings");
     const main = el(`<div class="main">${topbar(
-        "Mouse",
+        "Trackball",
         "How the trackball moves the pointer: its speed, sniping (a slower speed for precise work), and the mouse layer that moving the ball turns on."
     )}</div>`);
 
     const content = el(`<div class="content"><div class="pad settings-pad"></div></div>`);
     const pad = /** @type {HTMLElement} */ (content.firstElementChild);
     if (!sections.length) {
-        pad.appendChild(el(`<div class="screen-stub"><h3>No mouse settings read</h3>
+        pad.appendChild(el(`<div class="screen-stub"><h3>No trackball settings read</h3>
             <p class="note">${esc(unavailable(model) || "Choose Read keyboard to load this keyboard's pointer settings.")}</p></div>`));
     } else if (!canEdit) {
         pad.appendChild(el(`<div class="unavailable">${esc(unavailable(model)

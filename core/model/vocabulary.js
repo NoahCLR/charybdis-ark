@@ -78,8 +78,8 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     macroProtection: [["auto", "Automatic"], ["on", "On"], ["off", "Off"]],
     // A host layout names its OS, since German on macOS and on Windows differ.
     hostLayouts: hostLayouts().map(/** @returns {[number, string]} */ layout => [layout.id, layout.os === "any" ? layout.name : `${layout.name} (${OS_WORDS[layout.os]})`]),
-    // How a hold tier runs once its threshold passes, in that tier's words: a
-    // helper that names a threshold names the tier's own, the Tap / hold
+    // How a hold action runs once its threshold passes ("How it runs"), in
+    // that hold's words: one that names a threshold names its own, the Tap / hold
     // threshold for Hold and the Long hold threshold for Long hold. A tap tier
     // only sends.
     holdHelpers: {
@@ -106,7 +106,8 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     ],
     tapSends: "tap sends",
     tiers: {tap: "Tap", hold: "Hold", long: "Long hold"},
-    // A behaviour's branch by how many taps start it.
+    // A behaviour's tap count, the row its actions sit on, by how many taps
+    // start it.
     branches: ["Single tap", "Double tap", "Triple tap", "Quadruple tap", "Quintuple tap"],
 
     localities: [
@@ -119,21 +120,24 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         ["END_COLOR_WHERE_BASE_EFFECT_WOULD_SHOW", "End colour where the base effect would show"],
         ["END_COLOR_ON_ALL_KEYS", "End colour on all keys"],
     ],
-    tapCommit: [["KEY_FEEDBACK_TAP_COMMIT_OFF", "Off"], ["KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS", "Non-base taps"]],
+        // Whether a double tap or more flashes once its tap is sent; a single tap
+    // never does (firmware RGB_CONFIG "tap commit").
+    tapCommit: [["KEY_FEEDBACK_TAP_COMMIT_OFF", "Off"], ["KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS", "On"]],
     feedbackOwners: [
         ["KEY_FEEDBACK_GROUP_ALL", "Every feedback state"],
-        ["KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING", "Tap branch pending"],
-        ["KEY_FEEDBACK_GROUP_TAP_COMMITTED", "Tap committed"],
-        ["KEY_FEEDBACK_GROUP_HOLD_ACTIVE", "Hold active"],
-        ["KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE", "Long hold active"],
+        ["KEY_FEEDBACK_GROUP_TAP_BRANCH_PENDING", "Waiting on 2×…5×"],
+        ["KEY_FEEDBACK_GROUP_TAP_COMMITTED", "Multi-tap sent"],
+        // A hold shows its colour while it is still pending too.
+        ["KEY_FEEDBACK_GROUP_HOLD_ACTIVE", "Holding"],
+        ["KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE", "Long holding"],
     ],
     // The lighting stages in the order the firmware paints them. A stage is
     // found by its id or bit, never by its words.
     stages: [
         {id: "base", label: "Base effect"},
         {id: "layers", label: "Layer colours", bit: RGB_STAGE_BITS.LAYER},
-        {id: "auto", label: "Auto-mouse fade", bit: RGB_STAGE_BITS.AUTOMOUSE},
-        {id: "pd", label: "Pointing modes", bit: RGB_STAGE_BITS.PD_MODE},
+        {id: "auto", label: "Mouse layer fade", bit: RGB_STAGE_BITS.AUTOMOUSE},
+        {id: "pd", label: "Trackball modes", bit: RGB_STAGE_BITS.PD_MODE},
         {id: "combo", label: "Combo feedback", bit: RGB_STAGE_BITS.COMBO},
         {id: "key", label: "Key feedback", bit: RGB_STAGE_BITS.KEY_BEHAVIOR},
     ],
@@ -144,8 +148,10 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         invert: [[0, "Neither axis"], [1, "Horizontal"], [2, "Vertical"], [3, "Both axes"]],
         // Which axes a scrolling mode scrolls.
         scrollAxes: [[0, "Both axes"], [1, "Horizontal only"], [2, "Vertical only"]],
-        pointerLayer: [[0, "Keep the pointer layer active"], [1, "Return to the typing layer"]],
-        buttons: [[0, "Pass through"], [1, "Consume"], [2, "Tap a shortcut"], [3, "Hold modifiers"]],
+                // While the mode runs, held or locked: the mouse layer stays on, or
+        // is switched off so keys type from the layer under it.
+        pointerLayer: [[0, "Keep the mouse layer on"], [1, "Go back to the typing layer"]],
+        buttons: [[0, "Pass through"], [1, "Block the click"], [2, "Tap a shortcut"], [3, "Hold modifiers"]],
         // What moving toward a direction with no shortcut does. "Both" sends
         // the two compass neighbours, 45 degrees either side, the one the
         // movement leans toward first: a diagonal's straight directions, a
@@ -180,11 +186,17 @@ const word = (list, key) => (list.find(([id]) => id === key)?.[1] ?? String(key 
 // their own. Layer 0 is the base layer.
 /** @param {readonly string[] | null | undefined} names @param {number} index */
 const layerName = (names, index) => names?.[index] || (index ? `Layer ${index}` : "Base");
+// A slot's tag is its kind's letter and its 0-based number, as the keycode
+// numbers it: M5 is VIA_MACRO_5, K5 CUSTOM_KEY_5, P5 PD_SLOT_5. A slot with
+// no name of its own reads by its placeholder: "Macro 5", "Custom key 5",
+// "Mode 5".
 /** @param {{id: number, kind: number, name: string} | null | undefined} slot @param {number} [id] */
-const slotName = (slot, id = slot?.id) => (slot?.kind && slot.name) || `Slot ${id}`;
+const slotName = (slot, id = slot?.id) => (slot?.kind && slot.name) || `Mode ${id}`;
+/** @param {"macro" | "customKey" | "pointing"} kind @param {number} index */
+const slotTag = (kind, index) => `${{macro: "M", customKey: "K", pointing: "P"}[kind]}${index}`;
 /** @param {number} count */
 const branchName = (count) => VOCABULARY.branches[count - 1] || `${count} taps`;
 /** @param {number} mask */
 const modifierNames = (mask) => VOCABULARY.modifiers.filter(([bit]) => mask & bit).map(([, name]) => name);
 
-module.exports = {PHASE, PHASE_WORDS, HALVES_WORDS, VOCABULARY, word, layerName, slotName, branchName, modifierNames};
+module.exports = {PHASE, PHASE_WORDS, HALVES_WORDS, VOCABULARY, word, layerName, slotName, slotTag, branchName, modifierNames};

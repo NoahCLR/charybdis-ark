@@ -27,7 +27,7 @@ test("Host changes review affected text macros while leaving key steps and ident
     assert.deepEqual(effects.map(row => row.place.index), [0, 3]);
     for (const row of effects) {
         assert.equal(row.unit, "settings:host", "the effect discards the host setting, not the macro");
-        assert.match(row.note, /because of Settings → Host/);
+        assert.match(row.note, /because of Settings → Your computer/);
         const typing = row.fields.find(field => field.label === "Text entry");
         assert.match(typing.before, /layout keys: "é"/);
         assert.match(typing.after, /Unicode entry \(macOS\): "é"/);
@@ -171,7 +171,7 @@ test("a new pointing mode is one added item, however many fields it sets", () =>
     const items=profileReview(before,after);
     assert.equal(items.length,1);
     assert.equal(items[0].status,"added");
-    assert.equal(items[0].title,"Slot 6 · Mode 6");
+    assert.equal(items[0].title,"P6 · Mode 6");
     assert.ok(items[0].fields.length>5,"it lists what it sets");
     assert.deepEqual(items[0].place,{kind:"pointing",slot:6});
 });
@@ -213,7 +213,7 @@ test("a colour travels as a colour, and an off one says what off means there", (
 test("switching one lighting stage off names that stage, in the Lighting screen's words", () => {
     const base=pdDocument(), before=snapshot(base);
     const [item]=profileReview(before,snapshot(lighting(base,rgb=>({...rgb,stageEnableMask:rgb.stageEnableMask & ~4}))));
-    assert.deepEqual(item.fields,[{label:"Pointing modes",status:"changed",before:"on",after:"off",beforeMark:{kind:"stage",on:true},afterMark:{kind:"stage",on:false}}]);
+    assert.deepEqual(item.fields,[{label:"Trackball modes",status:"changed",before:"on",after:"off",beforeMark:{kind:"stage",on:true},afterMark:{kind:"stage",on:false}}]);
 });
 test("a behaviour tier says which branch and tier it is, so it is coloured as the grid colours it", () => {
     const base=pdDocument(), before=snapshot(base);
@@ -239,7 +239,7 @@ test("a setting is marked with what it governs, as the Settings screen marks it"
     const items=profileReview(before,after);
     const timing=items.find(entry=>entry.unit==="settings:keyTiming").fields;
     assert.deepEqual(timing.filter(field=>field.labelMark).map(field=>field.labelMark),[{kind:"tier",tier:"hold"},{kind:"tier",tier:"long"}]);
-    const layer=items.find(entry=>entry.unit==="settings:autoMouse").fields.find(field=>field.label==="Auto-mouse layer");
+    const layer=items.find(entry=>entry.unit==="settings:autoMouse").fields.find(field=>field.label==="Layer");
     assert.deepEqual(layer.afterMark,{kind:"layer",layer:3},"a layer value carries the layer's colour");
 });
 test("a settings section is listed under the screen it is edited on", () => {
@@ -251,8 +251,8 @@ test("a settings section is listed under the screen it is edited on", () => {
     const timing=items.find(entry=>entry.unit==="settings:keyTiming"), mouse=items.find(entry=>entry.unit==="settings:autoMouse");
     assert.equal(timing.area,"Settings");
     assert.deepEqual(timing.place,{kind:"settings",section:"keyTiming",area:"Settings"});
-    assert.equal(mouse.area,"Mouse","auto-mouse is edited on the Mouse screen");
-    assert.deepEqual(mouse.place,{kind:"settings",section:"autoMouse",area:"Mouse"});
+    assert.equal(mouse.area,"Trackball","the mouse layer is edited on the Trackball screen");
+    assert.deepEqual(mouse.place,{kind:"settings",section:"autoMouse",area:"Trackball"});
 });
 test("clearing a pointing mode is a change to the slot, not to every behaviour that reaches it", () => {
     const base=pdDocument(), slots=validateSnapshot(base).pdModes;

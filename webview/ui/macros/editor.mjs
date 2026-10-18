@@ -51,7 +51,7 @@ export function editor(model, slot, canEdit) {
             <div data-macro-steps class="stack"></div>
             <div data-macro-feedback role="status" aria-live="polite"></div>
             <div class="stack macro-footer">
-            <div class="macro-utilities"><button class="btn tiny ghost" data-host-settings>${esc(model.macroUnicode?.layoutName || "Host")} · Host settings ↗</button>
+            <div class="macro-utilities"><button class="btn tiny ghost" data-host-settings>${esc(model.macroUnicode?.layoutName || "Your computer")} · Your computer settings →</button>
                 <button class="btn tiny ghost macro-help-link" data-show-help aria-controls="macro-help-${esc(slot.keycode)}" aria-expanded="${Boolean(form.guidanceOpen)}">Typing & playback help</button>
             </div>
             <details class="macro-guidance" id="macro-help-${esc(slot.keycode)}" data-guidance ${form.guidanceOpen ? "open" : ""}>
@@ -172,8 +172,8 @@ function showOnLayer(keycode, at) {
 function unicodeSetup(model, slot) {
     const {mode, os, layout, layoutFits, layoutName} = model?.macroUnicode || {mode: 0};
     const typed = layoutFits === false
-        ? `Text types through ${word(vocabulary(model).hostLayouts, layout)}, chosen in Settings → Host, which is not a ${word(vocabulary(model).hostOs, os)} layout: macros may type the wrong characters until the layout matches the computer.`
-        : `Text types through the ${layoutName} layout chosen in Settings → Host, accented letters included; keep that layout active on the computer.`;
+        ? `Text types through ${word(vocabulary(model).hostLayouts, layout)}, chosen in Settings → Your computer, which is not a ${word(vocabulary(model).hostOs, os)} layout: macros may type the wrong characters until the layout matches the computer.`
+        : `Text types through the ${layoutName} layout chosen in Settings → Your computer, accented letters included; keep that layout active on the computer.`;
     const entry = mode
         ? ["", "Other characters use Unicode entry: keep Unicode Hex Input active in macOS input sources while macros play. Option shortcuts can behave differently in this input source.",
             "Other characters use Unicode entry: install and run WinCompose on Windows with Right Alt as its Compose key.",

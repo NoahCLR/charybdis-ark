@@ -70,11 +70,11 @@ test("Defaults and inherited behaviour timing come entirely from the complete ke
     assert.deepEqual(buildDeviceModel().configDefaults, []);
 });
 
-test("every section names the screen it is edited on, and the pointer's own settings are Mouse", () => {
+test("every section names the screen it is edited on, and the pointer's own settings are Trackball", () => {
     const areas = Object.fromEntries(settingsEditorView(snapshot()).sections.map(section => [section.id, section.area]));
-    assert.deepEqual(Object.keys(areas).filter(id => areas[id] === "Mouse"), ["normalPointerSpeed", "sniping", "autoMouse"]);
+    assert.deepEqual(Object.keys(areas).filter(id => areas[id] === "Trackball"), ["normalPointerSpeed", "sniping", "autoMouse"]);
     assert.deepEqual(Object.keys(areas).filter(id => areas[id] === "Lighting"), ["automouseFade"], "the fade is timed where it is coloured");
-    assert.ok(Object.values(areas).every(area => ["Mouse", "Lighting", "Settings"].includes(area)), "a section with no area of its own is a Settings one");
+    assert.ok(Object.values(areas).every(area => ["Trackball", "Lighting", "Settings"].includes(area)), "a section with no area of its own is a Settings one");
 });
 
 test("every field edits a stored value the schema names, within what the keyboard accepts", () => {
