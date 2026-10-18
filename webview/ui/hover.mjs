@@ -16,12 +16,41 @@ import {getModel, heldLayers, layerName, positionAt} from "../store.mjs";
 import {branchBadge, comboBadge, comboOutputMarked, comboTint, keyNameMarked, macroSteps, mark, marked, sends, sendsKind, tierDot} from "./marks.mjs";
 import {helperWord, tierName, vocabulary, word} from "../view/vocabulary.mjs";
 import {KIND} from "../view/pointing-config.mjs";
+import {coldHover, hoverClosed, hoverShown, hoverWait} from "../view/hover-timing.mjs";
 
 const tip = el(`<div class="tip" hidden></div>`);
 const card = el(`<div class="hovercard" hidden></div>`);
 // The behaviours the key's combos run, each in its own card beside the key's.
 const side = el(`<div class="hovercard-side" hidden></div>`);
 let timer = 0;
+// The first card waits; then cards swap at once while the board is warm
+// (view/hover-timing.mjs).
+let clock = coldHover();
+
+// A key's card, for the pointer over it or the keyboard focus on it.
+/** @param {Element} key */
+function showKey(key) {
+    clearTimeout(timer);
+    tip.hidden = true;
+    const open = () => {
+        if (!key.isConnected) return;
+        const rect = key.getBoundingClientRect();
+        // A key the layer has no position for has nothing to show.
+        card.innerHTML = keyCard(Number(/** @type {HTMLElement} */ (key).dataset.key));
+        if (!card.innerHTML) { hideHover(); return; }
+        place(card, rect, 14, true);
+        side.innerHTML = behaviourCards(Number(/** @type {HTMLElement} */ (key).dataset.key)); placeSide(rect);
+        clock = hoverShown(clock);
+    };
+    const wait = hoverWait(clock, performance.now());
+    if (wait) timer = setTimeout(open, wait);
+    else open();
+}
+
+function closeCard() {
+    if (!card.hidden) clock = hoverClosed(clock, performance.now());
+    card.hidden = true; side.hidden = true;
+}
 
 /** @param {HTMLElement} root */
 export function mountHover(root) {
@@ -33,18 +62,10 @@ export function mountHover(root) {
         // A key being dragged to a swap is not a key being read.
         if (/** @type {HTMLElement | null} */ (document.querySelector(".kc.dragging"))) { hideHover(); return; }
         if (key) {
-            const rect = key.getBoundingClientRect();
-            timer = setTimeout(() => {
-                // A key the layer has no position for has nothing to show.
-                card.innerHTML = keyCard(Number(key.dataset.key));
-                if (!card.innerHTML) { hideHover(); return; }
-                place(card, rect, 14, true);
-                side.innerHTML = behaviourCards(Number(key.dataset.key)); placeSide(rect);
-            }, 140);
-            tip.hidden = true;
+            showKey(key);
             return;
         }
-        card.hidden = true; side.hidden = true;
+        closeCard();
         if (hinted) {
             const rect = hinted.getBoundingClientRect();
             timer = setTimeout(() => { tip.textContent = hinted.dataset.tip ?? ""; place(tip, rect, 8); }, 260);
@@ -52,11 +73,20 @@ export function mountHover(root) {
         }
         tip.hidden = true;
     }, true);
+    // The keyboard reads a key the same way: its card opens on focus.
+    root.addEventListener("focusin", (event) => {
+        const key = event.target instanceof Element && event.target.matches(":focus-visible") ? event.target.closest("[data-key]") : null;
+        if (key) showKey(key);
+    });
+    root.addEventListener("focusout", (event) => {
+        if (event.target instanceof Element && event.target.closest("[data-key]")) hideHover();
+    });
     root.addEventListener("mouseleave", hideHover, true);
     addEventListener("scroll", hideHover, true);
 }
 
-export function hideHover() { clearTimeout(timer); tip.hidden = true; card.hidden = true; side.hidden = true; }
+// Escape, a redraw, a scroll or leaving the board closes the card.
+export function hideHover() { clearTimeout(timer); tip.hidden = true; closeCard(); }
 
 // Beside the key's card, on its far side from the key, or across the key when
 // there is no room there.
