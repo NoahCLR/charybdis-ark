@@ -13,6 +13,7 @@
 const {PD_SLOT_BINDINGS} = require("../data/pd-bindings");
 const {PHASE, VOCABULARY, HALVES_WORDS, slotName} = require("../model/vocabulary");
 const keycodeCatalog = require("../data/keycode-catalog");
+const keycodeLegacy = require("../data/keycode-legacy");
 const {baseEffectForView, baseRgbForView, behaviorRowsForView, builtInForView, comboRowsForView, rgbForView} = require("../model/device-profile-view");
 const {effectiveTimings, holdTermSetting} = require("../model/gesture-timing");
 const {compactKeyLabels, hostKeyVocabulary, keyLabel, keyLayer, profileKeyNames, shortcutLabel} = require("../model/key-names");
@@ -230,6 +231,9 @@ function configurationModel(content, capabilities, editing) {
         qmkKeyShortLabels: compactKeyLabels(catalog.labels),
         qmkKeycodeAliases: catalog.aliases,
         qmkKeycodeSource: CATALOG_SOURCE,
+        // QMK's other spellings the encoder accepts (data/keycode-legacy.js),
+        // so the picker reads a typed LCTL_T(KC_A) as the draft will.
+        qmkSpellings: {modTaps: keycodeLegacy.MOD_TAP_SHORTHANDS, wrappers: keycodeLegacy.WRAPPER_ALIASES, names: keycodeLegacy.NAMES},
 
     };
 }
