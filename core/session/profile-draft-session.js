@@ -9,6 +9,7 @@ const {revertUnits} = require("../model/profile-revert");
 const {keyPlacementProblem} = require("../model/profile-placement");
 const {LEVELS: CHECK_LEVELS} = require("../model/layer-reach");
 const {draftProfileChecks} = require("../model/profile-checks");
+const {layerWays} = require("../model/layer-reach");
 const {editSettings} = require("../model/settings-editor");
 const {editMacro} = require("../model/macro-editor");
 const {editCustomKey} = require("../model/custom-key-editor");
@@ -111,6 +112,8 @@ class ProfileDraftSession {
     stepCache;
     /** @type {WeakMap<Decoded, {keyboard: Decoded | null | undefined, order: Order, checks: import("../../contracts/model.js").Check[]}> | undefined} */
     checksCache;
+    /** @type {WeakMap<Decoded, import("../../contracts/model.js").LayerWays | null> | undefined} */
+    waysCache;
     /** @type {boolean | undefined} */
     needsRead;
     now() {return Date.now();}
@@ -552,6 +555,14 @@ class ProfileDraftSession {
         this.checksCache.set(draft, {keyboard, order, checks});
         return checks;
     }
+    // How each layer of this revision is turned on, for the Keys screen's
+    // layer plate (model/layer-reach.js layerWays), worked out once per entry.
+    layerWays() {
+        const draft = this.current.decoded;
+        this.waysCache ??= new WeakMap();
+        if (!this.waysCache.has(draft)) this.waysCache.set(draft, layerWays(draft));
+        return this.waysCache.get(draft) ?? null;
+    }
     // Whether Apply has to be confirmed: active traps and warnings matter
     // whether the draft introduced them or the keyboard already has them.
     hasChecksToConfirm() {return this.checks().some(check => check.status === "new" && (/** @type {string[]} */ ([CHECK_LEVELS.TRAP, CHECK_LEVELS.WARNING])).includes(check.level));}
@@ -606,7 +617,8 @@ class ProfileDraftSession {
             // for the stale bar: "Normal 400 → 600".
             keyboardChanged: this.keyboardChanged(),
             changes: this.changes(),
-            checks: this.checks()};
+            checks: this.checks(),
+            layerWays: this.layerWays()};
     }
 }
 // The router (panel-session.js) and the web build take the registry's list from here.

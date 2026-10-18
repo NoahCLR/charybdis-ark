@@ -137,6 +137,20 @@ export interface Finding {
     scope?: 'escapes' | 'reachability';
 }
 export interface Check extends Finding {key: string; status: 'new' | 'existing' | 'fixed'}
+/** One way a layer is turned on: what it does to the layer, the press that does it, and where it is. */
+export interface LayerWay {
+    verb: 'hold' | 'lock' | 'move' | 'oneShot';
+    /** The press: a tap, a hold, or a longer hold; `tapIndex` 0 is the first press, 1 a double tap. */
+    press: 'tap' | 'hold' | 'longHold';
+    tapIndex: number;
+    from: {layer: number; layoutIndex: number} | {combo: number} | {trackball: true};
+}
+/** How each layer is reached, by keyboard layer; `reached` null when the walk could not tell. */
+export interface LayerWays {
+    complete: boolean;
+    defaults: number[];
+    layers: {layer: number; reached: boolean | null; ways: LayerWay[]}[];
+}
 export interface ProfileUsage {
     used: number;
     capacity: number;

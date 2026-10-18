@@ -1,7 +1,7 @@
 "use strict";
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const {layerReach, draftChecks, compareFindings, LEVELS} = require("../../core/model/layer-reach");
+const {layerReach, layerWays, draftChecks, compareFindings, LEVELS} = require("../../core/model/layer-reach");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../../core/data/charybdis-layout");
 const {spawnSync} = require("node:child_process");
 const {compiled, settings} = require("../fixtures/portable-profile");
@@ -539,4 +539,33 @@ test("bypassed normal combo outputs retain their native layer escape", () => {
     assert.deepEqual(traps(p), []);
     combo.useOutputBehavior = true; p.settings.comboOutputBehaviors = false;
     assert.deepEqual(traps(p), []);
+});
+
+test("layerWays names each way a layer is turned on, only where it can answer", () => {
+    const lock = {target: code(KC_ESC), steps: [{tapIndex: 1, tap: {kind: 3, flags: 0, operand: 2}}]};
+    const combo = {inputs: [code(KC_A), code(KC_B)], output: code(MO(3))};
+    const p = profile({keys: {"0:0": MO(1), "0:1": KC_ESC, "0:2": KC_B, "1:5": TT(2), "1:6": MO(1), "6:0": MO(5), "5:3": KC_B}, rows: [lock], combos: [combo]});
+    const ways = layerWays(p);
+    assert.equal(ways.complete, true);
+    assert.deepEqual(ways.defaults, [0]);
+    assert.deepEqual(ways.layers[1].ways, [{verb: "hold", press: "hold", tapIndex: 0, from: {layer: 0, layoutIndex: 0}}],
+        "the MO(1) on layer 1 itself is its way out, not in");
+    assert.deepEqual(ways.layers[2].ways, [
+        {verb: "lock", press: "tap", tapIndex: 1, from: {layer: 0, layoutIndex: 1}},
+        {verb: "hold", press: "hold", tapIndex: 0, from: {layer: 1, layoutIndex: 5}},
+        {verb: "lock", press: "tap", tapIndex: 4, from: {layer: 1, layoutIndex: 5}},
+    ]);
+    assert.deepEqual(ways.layers[3].ways, [{verb: "hold", press: "hold", tapIndex: 0, from: {combo: 0}}]);
+    // Layer 6 is never reached, so its MO(5) is no way into layer 5.
+    assert.deepEqual([ways.layers[5].reached, ways.layers[5].ways], [false, []]);
+    assert.equal(ways.layers[6].reached, false);
+    assert.equal(ways.layers[0].reached, true);
+});
+
+test("layerWays counts a key covered by a default layer above it as no way in", () => {
+    const p = profile({keys: {"0:0": MO(1), "2:0": KC_B, "2:1": KC_A}, settings: {[require("../../core/schema/settings-domain-v1").SETTING.DEFAULT_LAYERS]: 0b101}});
+    const ways = layerWays(p);
+    assert.deepEqual(ways.defaults, [0, 2]);
+    assert.deepEqual(ways.layers[1].ways, []);
+    assert.equal(layerWays({document: {layers: []}}), null);
 });
