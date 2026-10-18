@@ -118,13 +118,14 @@ for (const theme of ["plain", "vscode-dark", "vscode-light"]) {
             const model = structuredClone(store.getModel());
             model.configDefaults.find(section => section.id === "rgbAppearance").fields.find(field => field.macro === "lightingTimeout").value = "60000";
             store.setModel(model);
-            store.state.screen = "settings";
-            store.state.settingsOpen = ["rgbAppearance"];
+            // The idle timeout is edited on Lighting's Base effect stage.
+            store.state.screen = "lighting";
+            store.state.stage = "base";
             store.render();
             window.__posted.length = 0;
         });
-        const input = page.getByRole("textbox", {name: "Idle timeout", exact: true});
-        const unit = page.getByRole("combobox", {name: "Idle timeout unit"});
+        const input = page.getByRole("textbox", {name: "Lights off after", exact: true});
+        const unit = page.getByRole("combobox", {name: "Lights off after unit"});
         await expect(input).toHaveValue("1");
         await expect(unit).toHaveValue("minutes");
         await unit.selectOption("seconds");

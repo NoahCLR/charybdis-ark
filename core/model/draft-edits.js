@@ -77,6 +77,8 @@ const DRAFT_EDIT_TYPES = Object.freeze(/** @satisfies {{[K in DraftEditType]: En
     deleteRgbReusableLedGroup: {editor: "profile", domain: "lighting", label: "Edited lighting"},
     addRgbLedGroup: {editor: "profile", domain: "lighting", label: "Edited lighting"},
     deleteRgbLedGroup: {editor: "profile", domain: "lighting", label: "Edited lighting"},
+    updateRgbLedGroup: {editor: "profile", domain: "lighting", label: "Edited lighting"},
+    moveRgbLedGroup: {editor: "profile", domain: "lighting", label: "Reordered lighting rows"},
 }));
 /** @typedef {typeof DRAFT_EDIT_TYPES} Registry */
 /** @template {Editor} E @typedef {{[K in DraftEditType]: Registry[K]["editor"] extends E ? K : never}[DraftEditType]} EditedBy */

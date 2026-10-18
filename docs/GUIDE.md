@@ -176,7 +176,7 @@ What each screen edits:
 | --- | --- |
 | Keys | Layout keys, key behaviours, combos, layer names and priority; reachable behaviours, macros and trackball modes are shown in place, whether a key, a behaviour's action or a combo reaches them |
 | Custom keys | The 128 custom keys' names, shortcuts and, for each, its behaviour: timings, the tap count × tap/hold/long hold grid and participation, for a key on a layer or on none; where each is placed |
-| Lighting | Six stages, the stage mask, layer and trackball mode colours with where they light, combo and key feedback, mouse layer fade with its hold as a share of the timeout, LED group rows and reusable groups |
+| Lighting | All lighting, the base effect (effect, colour, brightness, speed, which LEDs, lights off after), six stages and the stage mask, layer and trackball mode colours with where they light, keys with their own colour, combo and key feedback with the flash speed, mouse fade with its hold as a share of the timeout, LED group rows and saved groups |
 | Macros | Named slots: literal Text, a compact sequence of key/delay/press/release tiles, drag reordering and a selected-step editor, raw payload, live size feedback, configurable recorder and placement; search by name, and the layers that set each macro off — by key, behaviour or combo — in their layer colour, each opening that layer in Keys with the macro picked |
 | Trackball | Pointer (ball speed), Sniping (its speed, auto-sniping and where its keys are placed) and the Mouse layer — the Settings sections the keyboard's model files under Trackball, each posted whole — then all 32 trackball mode slots: movement, step distance in millimetres with the stored counts, sensitivity, direction shortcuts and how often they send, which layer it keeps while it runs, scroll tuning with each field's rule, what each shortcut does with held modifiers, button overrides, placement, templates, clear and duplicate |
 | Settings | The keyboard's own name, then every other section the keyboard reports, posted whole, read-only where the firmware build leaves an option out; the Combos section also carries the default combo window and the combo hold threshold, which the keyboard stores with its combos |
@@ -603,40 +603,91 @@ Keys screen stays open there.
 
 ### Lighting
 
-On **Layer colours** and **Trackball modes**, the list beside the editor scrolls
-on its own, keeps its place when you pick a row, and shows the picked row when
-you switch back to it. Each row's swatch is its colour; under its name it says
-where the colour paints (the keys it lights, or the half), or **no colour**.
-The numbers of a colour are in its editor, where they are changed. Key
-feedback lists its **Feedback colours**, with **When and where** beside them.
+Lighting owns every light on the keyboard. **All lighting**, at the right of
+the topbar, is QMK's RGB Matrix switch: off, every LED stays dark, including
+layer colours and all feedback. While it is off, every stage says so with a
+**Turn on** button and the board is dark.
 
-**Base effect** shows the colour the keyboard reports as a swatch, with its
-effect, colour and speed. The keyboard keeps the base effect with its other
-settings, so it is changed in Settings → Base lighting, which **Open Settings →
-Base lighting** opens. The six stages, LED groups and the stage switch fit
-across a laptop-wide window.
+The stage tabs are the order the keyboard paints in: **Base effect · Layers ·
+Mouse fade · Trackball modes · Combos · Key feedback**, then **LED groups**,
+which is not a stage. Each tab's swatch is the colour the stage paints now; a
+stage that paints nothing is drawn hollow. The strip fits a 1100 px window.
+Each stage opens with its name, what it paints and its own switch, **Show this
+stage**: off, the stage paints nothing and keeps its colours.
 
-The lighting **Idle timeout** uses seconds or minutes: `60000` milliseconds
-reads as `1` minute. Choose the unit beside the value; changing units alone
-does not edit the draft. Fractions are accepted and rounded to the nearest
-millisecond. `0` keeps lighting on, and the maximum is 24 hours (1440 minutes).
-Review names the time in seconds or minutes, or **Always on** for zero.
+**Base effect** edits the effect under every other stage. The keyboard keeps
+it with its global settings, so each change saves that settings section:
+**Effect** (named from the keyboard's own list), the colour, brightness on the
+keyboard's own scale ("150 of 200", never the 0–255 scale the keyboard reports
+over VIA), **Speed** for an animated effect, **Lights** (All LEDs, Thumb keys
+and trackball, Main keys, or both) and **Lights off after**. An animated effect
+has no single colour, so the board draws it as a soft glow of its hue and says
+"animated" under the board; it never looks off. Settings no longer lists the
+base effect or the flash speed; searching Settings for them points to
+Lighting.
 
-Lowering a colour's brightness to zero keeps its hue and saturation visible
-and editable. A layer colour with nonzero saturation paints black at zero
-brightness; only zero saturation and brightness let underlying lighting show
-through. An LED override row inherits its stage colour only at HSV(0, 0, 0).
+**Lights off after** uses seconds or minutes: `60000` milliseconds reads as `1`
+minute. Choose the unit beside the value; changing units alone does not edit
+the draft. Fractions are accepted and rounded to the nearest millisecond. `0`
+keeps lighting on, and the maximum is 24 hours (1440 minutes). Review names the
+time in seconds or minutes, or **Always on** for zero.
 
-On a layer colour, **Turn off** stores HSV(0, 0, 0), which lets the base
-effect show. On the other stages (a trackball mode's colour, combo and key
-feedback, the mouse layer fade's end colour) the same value paints the LEDs
-black while the stage shows, so the button there is **Black** and the editor
-says what goes dark: "While Dragscroll runs, the right half goes dark." Every
-stage names where its colour paints **Where it lights**. Key feedback's colours
-are **Waiting on 2×**…**5×** (while a multi-tap is pending), **Multi-tap sent**,
-**Holding** (pending or active) and **Long holding**; the switch **Flash after
-a double tap or more** decides whether a sent multi-tap flashes, since a single
-tap never does.
+The board on Lighting shows legends and light only: behaviour dots appear on
+Key feedback and combo badges on Combos, where they are the subject. Hovering a
+key says what paints its LED now (the base effect, a layer's colour, a key with
+its own colour, a previewed trackball mode) and when that light is seen through
+from a lower layer.
+
+On **Layers** and **Trackball modes**, the 240 px list beside the editor
+scrolls on its own, keeps its place when you pick a row, and shows the picked
+row when you switch back to it. Each row is one line: the swatch, the name, and
+where the colour paints when that is not the usual case (**every key**, **no
+colour**, **black**). A layer's **Lights** is **Keys that do something**
+(transparent and Nothing keys leave the layers below showing) or **Every key**.
+Holding a layer key previews its colours first; this follows Show this stage on
+Layers.
+
+**Keys with their own colour** lists this layer's rows and the rows for **All
+layers** (marked). Click keys on the board to pick them ("3 keys · Colour them
+on Symbol…"), then **+ Colour picked keys** makes a row for them on the layer
+shown and opens it. **Edit** opens a row's colour and **Use the picked keys**
+replaces its keys; drag a row by its grip (or press ↑ ↓ on the grip) to
+reorder, since a later row wins on the keys it shares.
+
+The colour editor has a 240 × 150 saturation and brightness field, a hue strip,
+the numbers the keyboard stores (Hue 0–255, Saturation 0–255, Brightness of
+200) and presets **In use on this keyboard**, each naming who uses it.
+Lowering brightness to zero keeps the hue and saturation and paints black.
+
+Black is black. On a layer, the button is **No colour (lower layers show)** and
+stores HSV(0, 0, 0), which the keyboard skips. On the other stages (a trackball
+mode, Combos, Key feedback and the mouse fade's end colour) the same value
+paints the LEDs dark while the stage shows, so the button is **Black**, the
+editor says what goes dark ("While Dragscroll runs, the right half goes dark"),
+the list says **black** and the board paints black. To show nothing, turn the
+stage off. A row in Keys with their own colour or LED groups stored as HSV(0,
+0, 0) takes its stage's colour instead.
+
+**Show it running on the board** on Trackball modes previews the mode as the
+keyboard paints it. **The half holding the trigger key** and **Only the
+trigger key** start from the mode's first placed key (on the layer shown, else
+the lowest layer that places it); with no key placed, the keyboard paints
+everywhere, and the board says so. The mouse fade starts from the mouse
+layer's colour and replaces the layer colours while it runs; the board shows
+the layers, not the fade.
+
+**Key feedback** lists its colours in the order a gesture shows them:
+**Waiting on 2×**…**5×** (while more taps may follow), **Holding** (pending or
+active), **Long hold** and **Multi-tap sent**. The switch **Flash after a double
+tap or more** decides whether a sent multi-tap flashes, since a single tap never
+does; **Flash speed** is how long each on or off phase lasts. **Combos** paint
+while a combo's keys are held, but not while the combo holds a layer: that
+layer's colour shows instead.
+
+**LED groups** are saved sets of LEDs, named by what they hold ("Thumbs, both
+halves + trackball"), with **Used by** in words. Hovering a group or a row
+outlines its keys on the board. Pick LEDs on the board, choose the stage and
+whom the row is for, then **Add**.
 
 ## Naming the keyboard
 

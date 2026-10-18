@@ -5,8 +5,9 @@
 // dots, the swatches and the review all answer the same way — and they answer
 // from the draft, because the draft is what the model carries.
 
-import {isOff} from "../lib/colour.mjs";
-import {LED_INDEX, TRACKBALL_LED, inLocality, trackballInLocality} from "./geometry.mjs";
+import {GEO, LED_INDEX, TRACKBALL_LED, inLocality, isRightHalf, trackballInLocality} from "./geometry.mjs";
+import {pointingSlotFor} from "./reach.mjs";
+import {keyMeaning} from "./keyface.mjs";
 
 /**
  * @typedef {Partial<import("../../contracts/panel.js").PublishedModel> | null | undefined} Model
@@ -58,6 +59,90 @@ export function baseColour(model) {
     const base = model?.rgb?.baseEffect;
     if (!base || base.state !== "read" || !base.enabled || !base.previewColor) return null;
     return base.previewColor;
+}
+
+// The settings sections Lighting draws: the base effect with the master switch
+// (stage "base") and the flash speed (stage "key"). They are settings the
+// keyboard stores with its global policy, so they save as settings sections.
+/** @param {Model} model @param {string} id */
+export const lightingSection = (model, id) => (model?.configDefaults || []).find((section) => section.id === id && section.area === "Lighting");
+/** @param {Model} model */
+export const baseSection = (model) => lightingSection(model, "rgbAppearance");
+/** @param {Model} model @param {string} macro */
+export const baseField = (model, macro) => baseSection(model)?.fields.find((field) => field.macro === macro);
+
+// "All lighting": QMK's RGB Matrix enable. Off, the keyboard reports effect 0
+// and never runs the indicator stages, so every LED is dark (rgb_matrix.c).
+// Read from the draft's settings where it has them, else from the keyboard.
+/** @param {Model} model @returns {boolean | null} */
+export function allLightingOn(model) {
+    const field = baseField(model, "lightingEnabled");
+    if (field) return Boolean(field.enabled);
+    const base = model?.rgb?.baseEffect;
+    return base?.state === "read" ? Boolean(base.enabled) : null;
+}
+
+// An effect other than Solid colour animates: it has no single colour, but it
+// is lit, so it must never be drawn as off.
+/** @param {Model} model */
+export function baseAnimated(model) {
+    const base = model?.rgb?.baseEffect;
+    return Boolean(base && base.state === "read" && base.enabled && base.effectId !== 1);
+}
+
+// The effect by the name the keyboard's own list gives it, never "Effect 13".
+/** @param {Model} model */
+export function baseEffectName(model) {
+    const field = baseField(model, "effectMode");
+    const choice = (field?.choices || []).find((entry) => typeof entry === "object" && String(entry.value) === String(field?.value));
+    if (choice && typeof choice === "object") return choice.label;
+    const base = model?.rgb?.baseEffect;
+    return base?.effectId === 1 ? "Solid colour" : base?.enabled === false ? "Off" : "";
+}
+
+// The colour the base effect shows as: its solid colour, or for an animated
+// effect the glow the board draws it with.
+/** @param {Model} model */
+export const baseShownColour = (model) => baseColour(model) || (baseAnimated(model) ? animatedGlow(model) : null);
+
+// An animated effect drawn as a soft glow of its own hue: lit, but not a
+// colour the keyboard holds still.
+/** @param {Model} model @returns {Colour | null} */
+function animatedGlow(model) {
+    const base = model?.rgb?.baseEffect;
+    if (!base || base.state !== "read") return null;
+    const brightness = Number(base.previewColor?.v ?? baseField(model, "brightness")?.value ?? base.brightness ?? 0);
+    return {h: String(base.hue ?? 0), s: String(Math.round(Number(base.saturation ?? 0) / 4)), v: String(Math.round(brightness * 0.6))};
+}
+
+// Which LEDs the base effect paints: QMK skips an LED whose class the stored
+// flags leave out. On this board the "modifier" class is the eight thumb keys
+// and the trackball LED, the "key" class every other key.
+/** @param {Model} model @param {number | undefined} layoutIndex undefined for the trackball LED */
+export function baseReaches(model, layoutIndex) {
+    const field = baseField(model, "effectLeds");
+    if (!field) return true;
+    const flags = Number(field.value);
+    if (flags === 255) return true;
+    const thumb = layoutIndex === undefined || Object.hasOwn(GEO.thumbs, layoutIndex);
+    return Boolean(flags & (thumb ? 1 : 4));
+}
+
+// The key a trackball mode's preview starts from: the first key that holds or
+// locks it, on the viewed layer first, then from layer 0 up. The firmware
+// paints "the half holding the trigger key" and "only the trigger key" from
+// the key that started the mode; with none, both halves or every LED.
+/** @param {Model} model @param {Layer} layer @param {number} slotId @returns {{layoutIndex: number, layer: number} | null} */
+export function pdTrigger(model, layer, slotId) {
+    const stack = model?.layers || [];
+    const order = [layer, ...stack.filter((row) => row !== layer)].filter(Boolean);
+    for (const row of order) {
+        const found = (row?.positions || []).find((position) => {
+            return pointingSlotFor(/** @type {any} */ (model), keyMeaning(position))?.id === slotId;
+        });
+        if (found) return {layoutIndex: found.layoutIndex, layer: /** @type {number} */ (row?.index)};
+    }
+    return null;
 }
 
 /** @param {Model} model @param {number} layerId */
@@ -139,14 +224,18 @@ function mappedOn(model, layer, l, position) {
 /** @param {Model} model @param {Layer} layer @param {number | undefined} led @param {Position} position @param {LightOptions} [options] @returns {import("./types.js").LedLight} */
 function ledLight(model, layer, led, position, options = {}) {
     if (matrixOff(model)) return {colour: OFF, source: "off"};
-    const base = stageEnabled(model, "base") ? baseColour(model) : null;
+    const baseHere = baseReaches(model, position ? position.layoutIndex : undefined);
+    const animated = baseHere && stageEnabled(model, "base") && baseAnimated(model);
+    const base = !baseHere || !stageEnabled(model, "base") ? null : animated ? animatedGlow(model) : baseColour(model);
     /** @type {Colour} */
     let colour = base || OFF;
-    let source = base ? "base" : "off";
+    let source = base ? (animated ? "animated" : "base") : "off";
     /** @type {number | null} */
     let painter = null;
-    /** @param {Colour} next @param {string} from @param {number | null} [by] */
-    const paint = (next, from, by = null) => { colour = next; source = from; painter = by; };
+    /** @type {number | null} */
+    let row = null;
+    /** @param {Colour} next @param {string} from @param {number | null} [by] @param {number | null} [at] the LED group row, by its place in its table */
+    const paint = (next, from, by = null, at = null) => { colour = next; source = from; painter = by; row = at; };
 
     if (stageEnabled(model, "layers")) {
         const active = [...new Set([0, layer?.index ?? 0, ...(options.held || [])])].sort((a, b) => a - b);
@@ -155,29 +244,31 @@ function ledLight(model, layer, led, position, options = {}) {
             if (!row || !layerPaints(row.color)) continue;
             if (row.mode === "ALL_KEYS" || mappedOn(model, layer, l, position)) paint(row.color, "layer", l);
         }
-        for (const group of model?.rgb?.layerLedGroups || []) {
-            if (!(group.ledIndices || []).includes(led ?? -1)) continue;
+        (model?.rgb?.layerLedGroups || []).forEach((group, at) => {
+            if (!(group.ledIndices || []).includes(led ?? -1)) return;
             const owners = group.owner === "RGB_LAYER_GROUP_ALL" ? active : active.filter((l) => group.owner === `Layer ${l}`);
             for (const l of owners) {
-                const row = layerColourRow(model, l);
-                if (!inheritsStageColour(group.color)) paint(group.color, "layer", l);
-                else if (row && layerPaints(row.color)) paint(row.color, "layer", l);
+                const own = layerColourRow(model, l);
+                if (!inheritsStageColour(group.color)) paint(group.color, "layer", l, at);
+                else if (own && layerPaints(own.color)) paint(own.color, "layer", l, at);
             }
-        }
+        });
     }
 
     const preview = options.pdActive;
     if (preview && stageEnabled(model, "pd")) {
         const reaches = position ? inLocality(position.layoutIndex, preview.locality, preview.triggerIndex)
             : trackballInLocality(preview.locality, preview.triggerIndex);
-        if (!isOff(preview.color) && reaches) paint(preview.color, "pointing");
-        for (const group of model?.rgb?.pdModeLedGroups || []) {
-            if (!(group.ledIndices || []).includes(led ?? -1)) continue;
-            if (group.owner !== "RGB_PD_MODE_GROUP_ALL" && group.owner !== preview.mode) continue;
-            paint(inheritsStageColour(group.color) ? preview.color : group.color, "pointing");
-        }
+        // Black is black: outside layer colours HSV(0, 0, 0) paints the LEDs
+        // dark while the mode runs (B17).
+        if (reaches) paint(preview.color, "pointing");
+        (model?.rgb?.pdModeLedGroups || []).forEach((group, at) => {
+            if (!(group.ledIndices || []).includes(led ?? -1)) return;
+            if (group.owner !== "RGB_PD_MODE_GROUP_ALL" && group.owner !== preview.mode) return;
+            paint(inheritsStageColour(group.color) ? preview.color : group.color, "pointing", null, at);
+        });
     }
-    return {colour, source, layer: painter};
+    return {colour, source, layer: painter, ...(row === null ? {} : {row})};
 }
 
 /** @param {Model} model @param {Layer} layer @param {Position} position @param {LightOptions} [options] */
@@ -209,4 +300,75 @@ export function blackConsequence(when, where) {
     const subject = !place ? "its LEDs" : /^(the|only|both) /.test(place) ? place : `the ${place}`;
     const plural = /^both |^its /.test(subject);
     return `${when}, ${subject} ${plural ? "go" : "goes"} dark.`;
+}
+
+// The colours this keyboard already uses, for the colour editor's presets:
+// each once (by its stored HSV), with who uses it, the layers first. Black and
+// "no colour" are not presets; the editor has its own button for those.
+/** @param {Model} model @param {number} [limit] @returns {{colour: Colour, uses: string[]}[]} */
+export function colourPresets(model, limit = 12) {
+    /** @type {Map<string, {colour: Colour, uses: string[]}>} */
+    const found = new Map();
+    /** @param {Colour | null | undefined} colour @param {string} use */
+    const add = (colour, use) => {
+        if (!colour || inheritsStageColour(colour) || Number(colour.v) === 0) return;
+        const key = `${Number(colour.h)},${Number(colour.s)},${Number(colour.v)}`;
+        const entry = found.get(key) || {colour: {h: String(Number(colour.h)), s: String(Number(colour.s)), v: String(Number(colour.v))}, uses: []};
+        entry.uses.push(use);
+        found.set(key, entry);
+    };
+    const layers = model?.layers || [];
+    for (const row of model?.rgb?.layerColors || []) {
+        const layer = layers.find((entry) => entry.index === row.layerId);
+        if (layerPaints(row.color)) add(row.color, `${layer?.displayName || layer?.name || `Layer ${row.layerId}`} layer`);
+    }
+    for (const row of model?.rgb?.pdModeColors || []) {
+        const slot = (model?.pdModes || []).find((entry) => PD_MODE_IDS[entry.id] === row.pointingMode);
+        if (slot?.kind) add(row.color, slot.displayName || `Mode ${slot.id}`);
+    }
+    const feedback = model?.rgb?.keyBehaviorFeedback;
+    add(feedback?.holdActiveColor, "Holding");
+    add(feedback?.longHoldActiveColor, "Long hold");
+    add(feedback?.tapCommittedColor, "Multi-tap sent");
+    (feedback?.tapBranchColors || []).forEach((colour, index) => add(colour, `Waiting on ${index + 2}×`));
+    add(model?.rgb?.comboFeedback?.color, "Combos");
+    return [...found.values()].slice(0, limit);
+}
+
+// An LED group by what it holds, since the keyboard stores no names: "Thumbs,
+// both halves", "Left thumbs + trackball", "W, A, S, D". `keyAt` names the key
+// over a layout position (on Base); a lone LED with no key reads "LED n".
+/** @param {readonly number[]} leds @param {(layoutIndex: number) => string} keyAt */
+export function groupContentName(leds, keyAt) {
+    const byLed = new Map(Object.entries(LED_INDEX).map(([index, led]) => [led, Number(index)]));
+    const thumbs = Object.keys(GEO.thumbs).map(Number);
+    const half = (/** @type {boolean} */ right) => thumbs.filter((index) => isRightHalf(index) === right).map((index) => LED_INDEX[index]);
+    const set = new Set(leds);
+    const whole = (/** @type {number[]} */ group) => group.length > 0 && group.every((led) => set.has(led));
+    const left = whole(half(false)), right = whole(half(true));
+    /** @type {string[]} */
+    const parts = [];
+    if (left && right) parts.push("Thumbs, both halves");
+    else if (left) parts.push("Left thumbs");
+    else if (right) parts.push("Right thumbs");
+    const covered = new Set([...(left ? half(false) : []), ...(right ? half(true) : [])]);
+    const keys = [];
+    for (const led of [...set].sort((a, b) => a - b)) {
+        if (covered.has(led)) continue;
+        if (led === TRACKBALL_LED) continue;
+        const index = byLed.get(led);
+        keys.push(index === undefined ? `LED ${led}` : keyAt(index) || `LED ${led}`);
+    }
+    if (keys.length) parts.push(keys.length > 4 ? `${keys.slice(0, 4).join(", ")} +${keys.length - 4}` : keys.join(", "));
+    if (set.has(TRACKBALL_LED)) parts.push("trackball");
+    const name = parts.join(" + ") || "No LEDs";
+    return name.charAt(0).toUpperCase() + name.slice(1);
+}
+
+// The layout positions an LED group lights, for outlining it on the board;
+// the trackball LED has none and is answered apart.
+/** @param {readonly number[]} leds */
+export function groupPositions(leds) {
+    const set = new Set(leds);
+    return {keys: Object.entries(LED_INDEX).filter(([, led]) => set.has(led)).map(([index]) => Number(index)), trackball: set.has(TRACKBALL_LED)};
 }

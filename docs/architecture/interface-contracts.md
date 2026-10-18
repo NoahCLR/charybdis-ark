@@ -99,7 +99,7 @@ The same kind of control looks and sits the same on every screen.
   mode, a macro (Discard this edit while an edit is local, Clear macro), a
   custom key. Place on a key… is an outlined compact button in the macro's and
   custom key's **Placed on** row. A button that takes you to another screen (Place on a layer…, Edit in
-  Lighting, Show on the Keys screen, Edit groups) is the same small text button.
+  Lighting, Show on the Keys screen, Edit groups, Open Trackball →) is the same small text button.
 - A macro and a custom key are named by their editor's title, the shared
   `titleName` in `ui/title-name.mjs`: the title is the only name field, Enter
   commits, Escape restores the stored name, and the byte counter shows on focus
@@ -272,7 +272,8 @@ a key's name is `core/model/key-names.js`'s. The rules:
   C-number a quiet mark, since a deletion renumbers the rest.
 - On a non-layer lighting stage HSV(0, 0, 0) is Black, not off: the colour
   editor's `black` option labels the button and states what goes dark
-  (`blackConsequence` in `view/lighting.mjs`).
+  (`blackConsequence` in `view/lighting.mjs`), and the board paints it black.
+  On a layer the button is `offLabel`, "No colour (lower layers show)".
 
 **Show keycodes** (`state.showKeycodes`, off by default) is decided in one
 place, `webview/view/show-keycodes.mjs`. `ALWAYS` lists where a keycode is
@@ -311,10 +312,24 @@ Settings always matches QMK names.
   unavailable surface with a menu recovery path rather than another screen.
 - Words: `core/model/vocabulary.js`, sent as `model.vocabulary`; stages are
   found by id, never by label.
-- Lighting: `webview/ui/lighting.mjs` owns the board, stage tabs and switches.
-  Its `ui/lighting/` modules each own one stage's surface and listeners: base,
-  layers, auto-mouse fade, pointing overlays, combo feedback, key feedback and
-  LED groups. Shared colour controls retain the stored owner's focus identity;
+- Lighting: `webview/ui/lighting.mjs` owns the board, the All lighting switch
+  and the stage tabs. `ui/lighting/stage-body.mjs` draws the All-lighting-off
+  callout and each stage's header with its "Show this stage" switch; the other
+  `ui/lighting/` modules each own one stage's surface and listeners: base,
+  layers, mouse fade, trackball modes, combos, key feedback and LED groups;
+  `light-card.mjs` is the board's hover card on Lighting (bound through
+  `bindLightCard` in `ui/hover.mjs`, chosen by `data-hover="light"` on the
+  board). The base effect and the flash speed are settings sections with
+  `area: "Lighting"` and a `stage` (`core/model/settings-editor.js`); Lighting
+  posts them with `settingsSection`, and Settings search points to Lighting
+  for them. `view/lighting.mjs` reads them (`allLightingOn`, `baseEffectName`,
+  `baseReaches`, `baseAnimated`), paints an animated effect as a glow (source
+  `animated`), finds a trackball mode's trigger key (`pdTrigger`), names LED
+  groups by content (`groupContentName`) and gathers the colour editor's
+  presets (`colourPresets`). The board takes `dots` and `badges` apart from
+  `faces`, so Lighting shows dots only on Key feedback and badges only on
+  Combos. Layer LED rows are edited in place with `updateRgbLedGroup` and
+  reordered with `moveRgbLedGroup`. Shared colour controls retain the stored owner's focus identity;
   LED override tables share their owner presentation. Stage modules read the
   published model and post the same pure edit builders as other screens.
   Zero brightness never replaces the stored hue or saturation with zeros or
@@ -413,7 +428,7 @@ Settings always matches QMK names.
   composes behaviour, macro and pointing routes from those answers.
 - Settings bits and base lighting: `fieldMask` and `baseLighting` in
   `core/model/settings-editor.js`.
-  The idle lighting timeout is published and staged in milliseconds, with
+  The idle lighting timeout ("Lights off after") is published and staged in milliseconds, with
   duration presentation metadata. `view/duration.mjs` converts the editor's
   seconds or minutes to the nearest millisecond; whole-minute values initially
   use minutes, other values use seconds. The unit preference survives renders

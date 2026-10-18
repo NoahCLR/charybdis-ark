@@ -13,7 +13,7 @@ test("idle timeout review uses human units while comparing stored milliseconds",
         const after = snapshot(editSettings(before, {sectionId: section.id, expectedFingerprint: before.fingerprint,
             fields: section.fields.map(field => field.kind === "toggle" ? {macro: field.macro, enabled: field.enabled} : {macro: field.macro, value: field.macro === "lightingTimeout" ? value : field.value})}));
         const change = profileReview(before, after).find(row => row.unit === "settings:rgbAppearance");
-        assert.equal(change.fields.find(field => field.label === "Idle timeout").after, expected);
+        assert.equal(change.fields.find(field => field.label === "Lights off after").after, expected);
         before = after;
     }
 });

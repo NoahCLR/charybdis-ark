@@ -48,7 +48,7 @@ const KEPT = [
     "reachGroups", "resetBenchHeight", "reachRow", "cell", "cellRow", "reveal", "pickCombo", "settingsOpen", "keyDetailsOpen", "stackOpen", "showKeycodes", "hideBoard", "railMenu", "cellHow", "placement",
     "macroClipboard", "keyClipboard", "stage", "layersOpen", "layersAsked", "pdSlot", "pdAdvanced", "tbEntry", "tbEmptiesOpen", "tbFineTuning", "pdStartEmpty", "applyDismissed", "pdPreview", "feedbackRow",
     "macroSlot", "macroSearch", "macroEmptyOpen", "customKey", "customKeySearch", "customKeyEmptyOpen", "customKeyAddBehaviour", "recording", "recordDelays", "recordPreserveHoldTiming", "recordDelayThreshold",
-    "recordDelayRound", "ledPicks", "trackball", "rowColour", "ledRow", "settingsSearch", "overlay", "leaveDemo", "confirmChecks",
+    "recordDelayRound", "ledPicks", "trackball", "rowColour", "ledRow", "colourPicks", "colourRow", "settingsSearch", "overlay", "leaveDemo", "confirmChecks",
     "picker", "notice", "error", "settingsDurationUnits",
 ];
 

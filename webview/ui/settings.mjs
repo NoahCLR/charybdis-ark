@@ -29,7 +29,7 @@ export function screenSettings() {
     const canEdit = canEditArea("settings");
     const main = el(`<div class="main">${topbar(
         "Settings",
-        "What applies to the whole keyboard: its name, tap and hold timing, base lighting, where behaviours and combos run, and the computer it types on."
+        "What applies to the whole keyboard: its name, tap and hold timing, where behaviours and combos run, and the computer it types on."
     )}</div>`);
 
     const content = el(`<div class="content"><div class="pad settings-pad"></div></div>`);
@@ -68,13 +68,20 @@ export function screenSettings() {
         }
         pad.appendChild(card);
     }
-    // A search for something that moved to Trackball says where it went.
-    const elsewhere = query ? sectionsIn(model, "Trackball").reduce((total, section) => total + matching(section).length, 0) : 0;
-    if (elsewhere) {
-        const note = el(`<div class="callout row gap-10">
-            <span>${elsewhere} matching setting${elsewhere === 1 ? " is" : "s are"} on the Trackball screen.</span>
-            <button class="btn tiny" data-act="mouse">Open Trackball</button></div>`);
-        /** @type {HTMLButtonElement} */ (note.querySelector('[data-act="mouse"]')).addEventListener("click", () => { state.screen = "mouse"; render(); });
+    // A search for something that moved to Trackball or Lighting says where
+    // it went, and goes there: a Lighting section opens its stage.
+    for (const [area, screen, name] of /** @type {const} */ ([["Trackball", "mouse", "Trackball"], ["Lighting", "lighting", "Lighting"]])) {
+        const found = query ? sectionsIn(model, area).filter((section) => matching(section).length) : [];
+        const elsewhere = found.reduce((total, section) => total + matching(section).length, 0);
+        if (!elsewhere) continue;
+        const note = el(`<div class="callout row gap-10" data-elsewhere="${area}">
+            <span>${elsewhere} matching setting${elsewhere === 1 ? " is" : "s are"} on the ${name} screen${area === "Lighting" ? ` (${esc(found.map((section) => section.label).join(", "))})` : ""}.</span>
+            <button class="btn text" data-act="${screen}">Open ${name} →</button></div>`);
+        /** @type {HTMLButtonElement} */ (note.querySelector("button")).addEventListener("click", () => {
+            state.screen = screen;
+            if (found[0]?.stage) state.stage = found[0].stage;
+            render();
+        });
         pad.appendChild(note);
     }
 

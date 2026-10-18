@@ -117,6 +117,10 @@ export const STATE_FIELDS = {
     trackball: kept(false),
     rowColour: kept({h: "0", s: "0", v: "0"}),
     ledRow: kept({target: "layer", owner: "", source: ""}),
+    // Lighting's Layers stage: the keys picked on the board to colour on the
+    // layer shown (layout indices), and the colour row open for editing.
+    colourPicks: kept([]),
+    colourRow: kept(null),
     settingsSearch: kept(""),
     overlay: kept(null),
     leaveDemo: kept(null),     // {ask, message}: leaving the demo (or replacing its file) waiting on its question

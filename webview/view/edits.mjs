@@ -215,6 +215,15 @@ export const ledRow = ({target, owner, source}, ledIndices, colour) => ({
 });
 /** @param {string} target @param {number} index @returns {import("../../contracts/edits.js").EditOf<'deleteRgbLedGroup'>} */
 export const deleteLedRow = (target, index) => ({type: "deleteRgbLedGroup", target, index});
+// One row's new colour, and its new keys when given; it keeps its owner and
+// its place in its table.
+/** @param {string} target @param {number} index @param {Colour} colour @param {number[]} [ledIndices] @returns {import("../../contracts/edits.js").EditOf<'updateRgbLedGroup'>} */
+export const updateLedRow = (target, index, colour, ledIndices) => ({
+    type: "updateRgbLedGroup", target, index, ...hsvPayload(colour), ...(ledIndices ? {ledIndices} : {}),
+});
+// A row dragged to another place in its table: later rows win.
+/** @param {string} target @param {number} from @param {number} to @returns {import("../../contracts/edits.js").EditOf<'moveRgbLedGroup'>} */
+export const moveLedRow = (target, from, to) => ({type: "moveRgbLedGroup", target, from, to});
 /** @param {number[]} ledIndices @returns {import("../../contracts/edits.js").EditOf<'saveRgbReusableLedGroup'>} */
 export const saveLedGroup = (ledIndices) => ({type: "saveRgbReusableLedGroup", group: {ledIndices}});
 /** @param {string} name @returns {import("../../contracts/edits.js").EditOf<'deleteRgbReusableLedGroup'>} */

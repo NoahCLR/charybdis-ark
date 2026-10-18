@@ -92,7 +92,7 @@ const sections = [
     {id: "autoMouse", label: "Mouse layer", area: "Trackball", search: "auto-mouse auto mouse pointer layer pointing", fields: [
         toggle("autoMouse", SETTING.AUTO_MOUSE_ENABLED, "Mouse layer", "Moving the trackball turns the chosen layer on."),
         layer("mouseLayer", SETTING.AUTO_MOUSE_LAYER, "Layer", "The layer moving the trackball turns on while Mouse layer is on."),
-        number("mouseTimeout", SETTING.AUTO_MOUSE_TIMEOUT, "Timeout (ms)", "How long the layer stays on after the ball stops.", {min: 1, tooltip: "QMK's auto-mouse timeout. The lighting fade keeps its share of it (Lighting → Mouse layer fade)."}),
+        number("mouseTimeout", SETTING.AUTO_MOUSE_TIMEOUT, "Timeout (ms)", "How long the layer stays on after the ball stops.", {min: 1, tooltip: "QMK's auto-mouse timeout. The lighting fade keeps its share of it (Lighting → Mouse fade)."}),
         number("mouseDebounce", SETTING.AUTO_MOUSE_DEBOUNCE, "Movement debounce (ms)", undefined, {tooltip: "Minimum time between trackball events that update the mouse layer. Higher values ignore closely spaced movement events. QMK calls this auto-mouse."}),
         number("mouseDelay", SETTING.AUTO_MOUSE_DELAY, "Delay after typing (ms)", "Movement this soon after you press a key does not turn the mouse layer on."),
         number("mouseThreshold", SETTING.AUTO_MOUSE_THRESHOLD, "Movement threshold", "Sensor counts on either axis, at the current ball speed, before movement turns the mouse layer on. A mouse button press turns it on at once.", {unit: "counts"}),
@@ -101,19 +101,22 @@ const sections = [
     // before it fades, and refuses a profile where that is not shorter than
     // the timeout. Edited as a share of the timeout, it cannot be: a share is
     // at most 99%, and a new timeout carries the share with it.
-    {id: "automouseFade", label: "Mouse layer fade", area: "Lighting", stage: "auto", search: "auto-mouse", fields: [
+    {id: "automouseFade", label: "Mouse fade", area: "Lighting", stage: "auto", search: "auto-mouse", fields: [
         share("mouseFadeHold", SETTING.AUTO_MOUSE_DEAD_TIME, SETTING.AUTO_MOUSE_TIMEOUT, "Hold before fading", "The share of the mouse layer timeout the colour holds before it starts to fade, 0–99%."),
     ]},
-    {id: "rgbAppearance", label: "Base lighting", fields: [
+    // Lighting owns all light: the base effect and its master switch are drawn
+    // in its Base effect stage (the switch in its topbar), the flash interval
+    // in Key feedback. Settings search still finds them and points there.
+    {id: "rgbAppearance", label: "Base effect", area: "Lighting", stage: "base", search: "base lighting rgb matrix effect brightness idle timeout all lighting", fields: [
         {...toggle("lightingEnabled", SETTING.RGB_MODE, "All lighting", "Off, every LED stays dark: the base effect, layer colours and feedback."), tooltip: "QMK's RGB Matrix enable switch, saved with the base lighting.", shift: 0},
         {...byte("hue", SETTING.RGB_COLOR, 0, "Hue"), tooltip: "The colour of the saved base lighting effect, around the colour wheel."},
         byte("saturation", SETTING.RGB_COLOR, 8, "Saturation", "0 is white; 255 is fully saturated."),
-        {...byte("brightness", SETTING.RGB_COLOR, 16, "Brightness", "Saved brightness, 0–255. The keyboard applies its hardware brightness limit."), tooltip: "Brightness of the saved base lighting effect. Layer colours and feedback have their own brightness."},
-        {...byte("effectSpeed", SETTING.RGB_MODE, 16, "Animation speed"), tooltip: "Speed of the saved base lighting animation. Effects without animation ignore this setting."},
-        number("lightingTimeout", SETTING.RGB_TIMEOUT, "Idle timeout", "Time without activity before lighting turns off. 0 keeps lighting on. Maximum 24 hours.", {presentation: "duration"}),
+        {...byte("brightness", SETTING.RGB_COLOR, 16, "Brightness", "Saved brightness, up to the keyboard's limit."), tooltip: "Brightness of the saved base lighting effect. Layer colours and feedback have their own brightness."},
+        {...byte("effectSpeed", SETTING.RGB_MODE, 16, "Speed"), tooltip: "Speed of the saved base lighting animation. Effects without animation ignore this setting."},
+        number("lightingTimeout", SETTING.RGB_TIMEOUT, "Lights off after", "Time without typing or moving the ball before every LED goes dark. 0 keeps lighting on. Maximum 24 hours.", {presentation: "duration", tooltip: "The idle timeout (RGB_TIMEOUT)."}),
     ]},
-    {id: "lightingFeedback", label: "Lighting feedback", fields: [
-        number("feedbackFlash", SETTING.FEEDBACK_PERIOD, "Key feedback flash interval (ms)", "Time for each on or off phase; a full blink takes twice this value.", {min: SETTING_FIELD.FEEDBACK_PERIOD.min, validate: "positive-int"}),
+    {id: "lightingFeedback", label: "Key feedback", area: "Lighting", stage: "key", search: "lighting feedback flash interval FEEDBACK_PERIOD", fields: [
+        number("feedbackFlash", SETTING.FEEDBACK_PERIOD, "Flash speed", "Time for each on or off phase of a key feedback flash; a full blink takes twice this value.", {min: SETTING_FIELD.FEEDBACK_PERIOD.min, validate: "positive-int", tooltip: "The key feedback flash interval (FEEDBACK_PERIOD)."}),
     ]},
 ];
 
@@ -191,13 +194,15 @@ function settingsSections(snapshot, settings) {
     const effects = options?.effects.map(effect => ({value: effect.id, label: effect.name.toLowerCase().replace(/_/g, " ").replace(/\bcolor\b/g, "colour").replace(/^./, c => c.toUpperCase())})) || [];
     if (!effects.some(effect => effect.value === currentEffect)) effects.push({value: currentEffect, label: `Current effect (${currentEffect})`});
     /** @type {[number, string][]} */
-    const ledNames = [[1, "Modifiers"], [2, "Underlighting"], [4, "Keys"], [8, "Indicators"]];
+    // QMK's LED classes, named by what they are on this board: its
+    // "modifier" LEDs are the eight thumb keys and the trackball LED.
+    const ledNames = [[1, "Thumb keys and trackball"], [2, "Underlighting"], [4, "Main keys"], [8, "Indicators"]];
     const flags = [{value: 255, label: "All LEDs"}, {value: 0, label: "No LEDs"}];
     if (options) for (let mask = 1; mask < 16; mask++) if (!(mask & ~options.ledFlags)) flags.push({value: mask, label: ledNames.filter(([bit]) => mask & bit).map(([, name]) => name).join(" + ")});
     if (!flags.some(choice => choice.value === currentFlags)) flags.push({value: currentFlags, label: "Current custom LED selection"});
     rgb.fields.splice(1, 0,
-        {...byte("effectMode", SETTING.RGB_MODE, 8, "Lighting effect"), choices: effects, readOnly: !options, hint: options ? "Effects available on this keyboard. Layer colours can override the base effect." : "Read the keyboard to see the lighting effects it has."},
-        {...byte("effectLeds", SETTING.RGB_MODE, 24, "Apply base effect to"), choices: flags, readOnly: !options, hint: options ? "Choose which LED classes receive the base effect. Layer colours and feedback have their own policies." : "Read the keyboard to see its LED classes."});
+        {...byte("effectMode", SETTING.RGB_MODE, 8, "Effect"), tooltip: "The QMK RGB Matrix effect under every other stage.", choices: effects, readOnly: !options, hint: options ? "Effects available on this keyboard. Layer colours can override the base effect." : "Read the keyboard to see the lighting effects it has."},
+        {...byte("effectLeds", SETTING.RGB_MODE, 24, "Lights"), tooltip: "Which LED classes the base effect paints (QMK's LED flags).", choices: flags, readOnly: !options, hint: options ? "Which LEDs the base effect paints. Layer colours and feedback have their own places." : "Read the keyboard to see its LED classes."});
     /** @param {number} i */
     const name = i => layerName(settings.names, i);
     /** @template T @param {(i: number) => T} make */

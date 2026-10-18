@@ -31,6 +31,7 @@ export interface PanelState {
     recording: {slot: string; before: string} | null; lastTake: {slot: string; before: string} | null;
     recordDelays: boolean; recordPreserveHoldTiming: boolean; recordDelayThreshold: number; recordDelayRound: number;
     ledPicks: number[]; trackball: boolean; rowColour: {h: string; s: string; v: string}; ledRow: {target: string; owner: string; source: string};
+    colourPicks: number[]; colourRow: number | null;
     settingsSearch: string; overlay: string | null;
     settingsDurationUnits: Record<string, 'seconds' | 'minutes'>;
     leaveDemo: {ask: {title: string; detail: string; confirm: string}; message: PanelCommand} | null;

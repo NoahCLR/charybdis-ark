@@ -60,7 +60,8 @@ for (const stage of stages) {
 
     test(`${stage.id}: the stage switch posts its own bit without changing other stages`, async ({page}) => {
         await openStage(page, stage.id);
-        await page.locator("#benchRight label.sw").click();
+        // "Show this stage" sits in the stage body's header.
+        await page.locator("#benchBody .stage-head label.sw").click();
         await expectPost(page, {type: "updateRgbStages", stageEnableMask: 31 & ~stage.bit});
     });
 }
@@ -79,11 +80,10 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
 
 test("all Lighting policy selects post the chosen policy and retained colour", async ({page}) => {
     for (const [stage, label, value, message] of [
-        ["layers", "Which keys light up", "ALL_KEYS", {type: "updateLayerColor", layer: "Layer 1", mode: "ALL_KEYS", h: 85, s: 255, v: 200}],
+        ["layers", "Lights", "ALL_KEYS", {type: "updateLayerColor", layer: "Layer 1", mode: "ALL_KEYS", h: 85, s: 255, v: 200}],
         ["auto", "Fade mode", "END_COLOR_WHERE_BASE_EFFECT_WOULD_SHOW", {type: "updateAutomouseFade", mode: "END_COLOR_WHERE_BASE_EFFECT_WOULD_SHOW", h: 167, s: 255, v: 199}],
         ["pd", "Where it lights", "RGB_LEFT_HALF", {type: "updatePdModeColor", pointingMode: "PD_MODE_DRAGSCROLL", locality: "RGB_LEFT_HALF", h: 21, s: 255, v: 200}],
         ["combo", "Where it lights", "RGB_BOTH_HALVES", {type: "updateComboFeedback", locality: "RGB_BOTH_HALVES", h: 191, s: 255, v: 200}],
-        ["key", "Flash after a double tap or more", "KEY_FEEDBACK_TAP_COMMIT_OFF", {type: "updateKeyBehaviorFeedback", config: expect.objectContaining({tapCommitMode: "KEY_FEEDBACK_TAP_COMMIT_OFF", holdActiveColor: {h: 18, s: 255, v: 200}})}],
         ["key", "Where it lights", "RGB_LEFT_HALF", {type: "updateKeyBehaviorFeedback", config: expect.objectContaining({locality: "RGB_LEFT_HALF", holdActiveColor: {h: 18, s: 255, v: 200}})}],
     ]) {
         await openStage(page, stage);
@@ -133,7 +133,8 @@ test("hue and saturation/brightness dragging preview locally and commit once on 
     ]) {
         await clearPosts(page);
         const surface = body(page).locator(selector);
-        await surface.scrollIntoViewIfNeeded();
+        // At the bottom of the window, clear of the sticky board and tab strip.
+        await surface.evaluate(node => node.scrollIntoView({block: "end"}));
         const box = await surface.boundingBox();
         await page.mouse.move(box.x + box.width * fraction.x, box.y + box.height * fraction.y);
         await page.mouse.down();
@@ -186,17 +187,10 @@ test("LED groups stage every table/owner/source/colour control and remove rows/g
     }
 });
 
-test("Lighting preview switches and screen links navigate without posting edits", async ({page}) => {
+test("Lighting preview toggles and screen links navigate without posting edits", async ({page}) => {
     await openStage(page, "pd");
-    await body(page).getByText("Preview it active on the board", {exact: true}).click();
+    await body(page).getByRole("button", {name: "Show it running on the board", exact: true}).click();
     await expect(page.locator(".board-foot-text")).toContainText("held, painting");
-    expect(await posted(page)).toEqual([]);
-    await page.locator('[data-ltab="base"]').click();
-    // Edited in Settings, the base effect is a swatch here: no picker that cannot move.
-    await expect(body(page).locator(".colour-head .swatch-lg")).toHaveCount(1);
-    await expect(body(page).locator("[data-channel], .sv-field, .hue-ramp")).toHaveCount(0);
-    await body(page).getByRole("button", {name: "Open Settings → Base lighting", exact: true}).click();
-    await expect(page.locator(".main h1")).toHaveText("Settings");
     expect(await posted(page)).toEqual([]);
     await page.locator('[data-screen="lighting"]').click();
     await expect(page.locator('.topbar [data-act="read"]')).toHaveCount(0);
@@ -206,12 +200,139 @@ test("Lighting preview switches and screen links navigate without posting edits"
     await expectPost(page, {type: "refresh"});
 });
 
+// The base effect and the flash speed are settings the keyboard stores with
+// its global policy, edited on Lighting: each posts its whole section.
+const sectionOf = (page, id) => page.evaluate(async id => (await import("/webview/store.mjs")).getModel().configDefaults.find(section => section.id === id), id);
+const sectionPost = (section, changes) => ({type: "updateConfigDefaults", sectionId: section.id, fields: section.fields.map(field =>
+    field.kind === "toggle" ? {macro: field.macro, enabled: changes[field.macro] ?? field.enabled} : {macro: field.macro, value: changes[field.macro] ?? field.value})});
+
+test("All lighting posts the master switch, and off it says so on every stage with Turn on", async ({page}) => {
+    await openStage(page, "layers");
+    const section = await sectionOf(page, "rgbAppearance");
+    await page.locator(".topbar label.sw").click();
+    await expectPost(page, sectionPost(section, {lightingEnabled: false}));
+    const index = await page.evaluate(async () => (await import("/webview/store.mjs")).getModel().configDefaults.findIndex(row => row.id === "rgbAppearance"));
+    await publishAccepted(page, ["configDefaults", index, "fields", 0, "enabled"], false);
+    for (const stage of ["layers", "pd", "key"]) {
+        await page.locator(`[data-ltab="${stage}"]`).click();
+        await expect(body(page).locator("[data-all-off]")).toContainText("All lighting is off. Layer colours and feedback are dark too.");
+    }
+    await clearPosts(page);
+    await body(page).getByRole("button", {name: "Turn on", exact: true}).click();
+    await expectPost(page, sectionPost(section, {lightingEnabled: true}));
+});
+
+test("the Base effect stage edits the settings values, brightness of 200, never Effect N", async ({page}) => {
+    await openStage(page, "base");
+    // A keyboard that reports its brightness limit, as a current one does.
+    await page.evaluate(async () => {
+        const store = await import("/webview/store.mjs");
+        const model = structuredClone(store.getModel());
+        const fields = model.configDefaults.find(row => row.id === "rgbAppearance").fields;
+        Object.assign(fields.find(field => field.macro === "brightness"), {max: 200, readOnly: false});
+        // and its effects and LED classes.
+        Object.assign(fields.find(field => field.macro === "effectMode"), {readOnly: false, choices: [{value: 1, label: "Solid colour"}, {value: 13, label: "Cycle left right"}]});
+        Object.assign(fields.find(field => field.macro === "effectLeds"), {readOnly: false, choices: [{value: 255, label: "All LEDs"}, {value: 4, label: "Main keys"}]});
+        store.setModel(model); store.render();
+    });
+    const section = await sectionOf(page, "rgbAppearance");
+    const value = macro => section.fields.find(field => field.macro === macro).value;
+    await expect(body(page)).not.toContainText(/Effect \d/);
+    await expect(body(page).locator("[data-base-brightness]")).toContainText(`Brightness ${value("brightness")}`);
+    await expect(body(page).locator("[data-base-brightness]")).not.toContainText("255");
+    await change(channel(page, 0), 77);
+    await expectPost(page, sectionPost(section, {hue: "77"}));
+    await clearPosts(page);
+    await change(channel(page, 2), 150);
+    await expectPost(page, sectionPost(section, {brightness: "150"}));
+    await clearPosts(page);
+    await body(page).locator('[data-f="lighting:base:leds"]').selectOption("4");
+    await expectPost(page, sectionPost(section, {effectLeds: "4"}));
+    await clearPosts(page);
+    await body(page).locator('[data-f="setting:lightingTimeout"]').fill("5");
+    await body(page).locator('[data-f="setting:lightingTimeout"]').press("Tab");
+    expect(Number(value("lightingTimeout")) % 60000, "the fixture reads in minutes").toBe(0);
+    await expectPost(page, sectionPost(section, {lightingTimeout: "300000"}));
+    const animated = (await page.locator('[data-f="lighting:base:effect"] option').evaluateAll(options => options.map(option => option.value))).find(id => id !== "1");
+    await clearPosts(page);
+    await body(page).locator('[data-f="lighting:base:effect"]').selectOption(animated);
+    await expectPost(page, sectionPost(section, {effectMode: animated}));
+    await expect(body(page).locator('[data-f="lighting:base:speed"]')).toHaveCount(0);
+});
+
+test("Key feedback's switch and Flash speed post what they say", async ({page}) => {
+    await openStage(page, "key");
+    await expect(body(page).locator("[data-row]")).toHaveText(["Waiting on 2×", "Waiting on 3×", "Waiting on 4×", "Waiting on 5×", "Holding", "Long hold", "Multi-tap sent"]);
+    await body(page).locator("label.sw").filter({hasText: "Flash after a double tap or more"}).click();
+    await expectPost(page, {type: "updateKeyBehaviorFeedback", config: expect.objectContaining({tapCommitMode: "KEY_FEEDBACK_TAP_COMMIT_OFF"})});
+    const section = await sectionOf(page, "lightingFeedback");
+    await clearPosts(page);
+    await change(body(page).locator('[data-f="lighting:key:flash"]'), 321);
+    await expectPost(page, sectionPost(section, {feedbackFlash: "321"}));
+});
+
+test("keys picked on Layers become a row of their own colour, edited and dragged in place", async ({page}) => {
+    await openStage(page, "layers");
+    await page.locator('.board [data-key="0"]').click();
+    await page.locator('.board [data-key="1"]').click();
+    await expect(page.locator(".picks-foot")).toContainText("2 keys");
+    await page.locator('[data-act="colour-picks"]').click();
+    const leds = await page.evaluate(async () => {const {LED_INDEX} = await import("/webview/view/geometry.mjs"); return [LED_INDEX[0], LED_INDEX[1]];});
+    await expectPost(page, {type: "addRgbLedGroup", group: expect.objectContaining({target: "layer", owner: "Layer 1", ledIndices: leds})});
+    // The host accepts it: the row is on this layer, after any already there.
+    await page.evaluate(async () => {
+        const {getModel} = await import("/webview/store.mjs");
+        const model = structuredClone(getModel());
+        const rows = model.rgb.layerLedGroups = model.rgb.layerLedGroups || [];
+        rows.push({owner: "Layer 1", ledGroup: "Group 9", ledIndices: [0, 1], color: {h: "170", s: "255", v: "200"}});
+        rows.push({owner: "Layer 1", ledGroup: "Group 10", ledIndices: [2], color: {h: "10", s: "255", v: "200"}});
+        model.draft.revision++;
+        window.dispatchEvent(new MessageEvent("message", {data: {type: "model", model}}));
+    });
+    const own = body(page).locator(".own-row");
+    await expect(own).toHaveCount(await page.evaluate(async () => (await import("/webview/store.mjs")).getModel().rgb.layerLedGroups
+        .filter(row => row.owner === "Layer 1" || row.owner === "RGB_LAYER_GROUP_ALL").length));
+    const index = Number(await own.nth(-2).getAttribute("data-own-row"));
+    await clearPosts(page);
+    if (!(await own.nth(-2).locator('[data-act="edit"]').getAttribute("aria-expanded") === "true")) await own.nth(-2).locator('[data-act="edit"]').click();
+    await change(body(page).locator(`[data-f="lighting:layers:row:${index}:colour:0"]`), 33);
+    await expectPost(page, {type: "updateRgbLedGroup", target: "layer", index, h: 33, s: 255, v: 200});
+    await clearPosts(page);
+    await own.nth(-2).locator(".grip").focus();
+    await page.keyboard.press("ArrowDown");
+    await expectPost(page, {type: "moveRgbLedGroup", target: "layer", from: index, to: index + 1});
+    await clearPosts(page);
+    // Dragged by the row: the drop lands it in the target's place.
+    await page.evaluate(([from, to]) => {
+        const transfer = new DataTransfer();
+        const row = (index) => document.querySelector(`[data-own-row="${index}"]`);
+        row(from)?.dispatchEvent(new DragEvent("dragstart", {bubbles: true, dataTransfer: transfer}));
+        row(to)?.dispatchEvent(new DragEvent("dragover", {bubbles: true, cancelable: true, dataTransfer: transfer}));
+        row(to)?.dispatchEvent(new DragEvent("drop", {bubbles: true, cancelable: true, dataTransfer: transfer}));
+    }, [index + 1, index]);
+    await expectPost(page, {type: "moveRgbLedGroup", target: "layer", from: index + 1, to: index});
+    await clearPosts(page);
+    await own.nth(-1).locator('[data-act="remove"]').click();
+    await expectPost(page, {type: "deleteRgbLedGroup", target: "layer", index: index + 1});
+});
+
+test("the stage strip fits a 1100 px window, and hovering a key says what lights it", async ({page}) => {
+    await page.setViewportSize({width: 1100, height: 700});
+    await openStage(page, "layers");
+    const tabs = page.locator(".bench-tablist");
+    expect(await tabs.evaluate(node => node.scrollWidth <= node.clientWidth)).toBe(true);
+    await expect(page.locator("[data-ltab] .n")).toHaveCount(0);
+    await page.locator('.board [data-key="0"]').hover();
+    await expect(page.locator(".hovercard")).toContainText("LED");
+    await expect(page.locator(".hovercard")).not.toContainText("Key behaviour");
+});
+
 test("the layer and pointing-mode lists scroll on their own and keep their place", async ({page}) => {
     await openStage(page, "layers");
     const list = page.locator('[data-scroll-list="layers"]');
     const content = page.locator(".content");
     await expect(list).toHaveClass(/\bmany\b/);
-    const layer = list.locator('[data-layer="12"]');
+    const layer = list.locator('[data-layer="15"]');
     await layer.scrollIntoViewIfNeeded();
     const position = await list.evaluate(node => node.scrollTop);
     expect(position, "the list scrolls inside its card").toBeGreaterThan(0);
@@ -219,7 +340,9 @@ test("the layer and pointing-mode lists scroll on their own and keep their place
     await layer.click();
     await expect(layer).toHaveClass(/\bon\b/);
     await expect.poll(() => list.evaluate(node => node.scrollTop), {message: "a click redraws without losing the list's place"}).toBe(position);
-    expect(await content.evaluate(node => node.scrollTop)).toBe(page_);
+    // The page keeps its place too, unless the picked layer's editor is
+    // shorter and the page can no longer scroll that far.
+    expect(await content.evaluate(node => node.scrollTop)).toBe(await content.evaluate((node, before) => Math.min(before, node.scrollHeight - node.clientHeight), page_));
 
     // Each list keeps its own place: the pointing list starts at its top, and
     // coming back shows the picked layer again.

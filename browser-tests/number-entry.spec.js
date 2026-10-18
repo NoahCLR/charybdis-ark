@@ -23,7 +23,8 @@ test("a whole-number setting shows and posts only the digits typed into it", asy
 });
 
 test("a duration keeps one decimal point and no letters", async ({page}) => {
-    await openControls(page, "settings");
+    // The one duration, Lights off after, is on Lighting's Base effect stage.
+    await openControls(page, "lighting", {stage: "base"});
     const field = page.locator('input[inputmode="decimal"]:not([disabled])').first();
     await field.fill("");
     await field.pressSequentially("1.5.s");

@@ -51,7 +51,8 @@ export function inLocality(layoutIndex, locality, triggerIndex) {
         case "RGB_RIGHT_HALF": return isRightHalf(layoutIndex);
         case "RGB_KEY_HALF":
             return triggerIndex === undefined ? true : isRightHalf(layoutIndex) === isRightHalf(triggerIndex);
-        case "RGB_KEYS_ONLY": return triggerIndex === undefined ? false : layoutIndex === triggerIndex;
+        // With no trigger key the firmware paints every LED (rgb_pd_mode_stage.c).
+        case "RGB_KEYS_ONLY": return triggerIndex === undefined ? true : layoutIndex === triggerIndex;
         default: return true;
     }
 }
@@ -88,7 +89,7 @@ export function trackballInLocality(locality, triggerIndex) {
         case "RGB_LEFT_HALF": return false;
         case "RGB_RIGHT_HALF": return true;
         case "RGB_KEY_HALF": return triggerIndex === undefined ? true : isRightHalf(triggerIndex);
-        case "RGB_KEYS_ONLY": return false;
+        case "RGB_KEYS_ONLY": return triggerIndex === undefined;
         default: return true;
     }
 }

@@ -428,6 +428,42 @@ test("LED group rows land in every table, and groups renumber when one is delete
     assert.equal(rgb().layerGroupRows.length, before - 1);
 });
 
+// Lighting's Layers stage edits its rows in place: a colour, the picked keys,
+// and a drag to another place (later rows win).
+test("a colour row is recoloured, given the picked keys and dragged, as the draft takes them", () => {
+    const draft = session();
+    const rows = () => decoded(draft).rgb.layerGroupRows;
+    for (const [index, leds] of [[0, [1]], [1, [2]], [2, [3]]]) stage(draft, edits.ledRow({target: "layer", owner: "Layer 1", source: ""}, leds, {h: index * 10, s: 255, v: 100}));
+    const start = rows().length - 3;
+    const recolour = edits.updateLedRow("layer", start, {h: "7", s: "8", v: "9"});
+    assert.deepEqual(recolour, {type: "updateRgbLedGroup", target: "layer", index: start, h: 7, s: 8, v: 9});
+    stage(draft, recolour);
+    assert.deepEqual(rows()[start].color, {h: 7, s: 8, v: 9});
+    stage(draft, edits.updateLedRow("layer", start, {h: 7, s: 8, v: 9}, [4, 5]));
+    const rgb = decoded(draft).rgb;
+    assert.deepEqual(rgb.groups.find((group) => group.id === rows()[start].groupId).leds, [4, 5]);
+    const move = edits.moveLedRow("layer", start, start + 2);
+    assert.deepEqual(move, {type: "moveRgbLedGroup", target: "layer", from: start, to: start + 2});
+    stage(draft, move);
+    assert.deepEqual(rows().slice(start).map((row) => row.color.h), [10, 20, 7]);
+});
+
+// The base effect and the flash speed are settings sections drawn on Lighting.
+test("Lighting's settings controls post their whole section with one field changed", () => {
+    const draft = session();
+    const section = (id) => settingsEditorView(draft.current).sections.find((row) => row.id === id);
+    const base = section("rgbAppearance");
+    assert.equal(base.area, "Lighting");
+    const off = edits.settingsSection(base, (field) => field.macro === "lightingEnabled" ? false : undefined, draft.current.fingerprint);
+    stage(draft, off);
+    assert.equal(section("rgbAppearance").fields.find((field) => field.macro === "lightingEnabled").enabled, false, "All lighting off");
+    stage(draft, edits.settingsSection(section("rgbAppearance"), (field) => ({hue: "12", saturation: "34", brightness: "150"})[field.macro], draft.current.fingerprint));
+    assert.deepEqual(["hue", "saturation", "brightness"].map((macro) => section("rgbAppearance").fields.find((field) => field.macro === macro).value), ["12", "34", "150"]);
+    const flash = section("lightingFeedback");
+    stage(draft, edits.settingsSection(flash, (field) => field.macro === "feedbackFlash" ? "321" : undefined, draft.current.fingerprint));
+    assert.equal(section("lightingFeedback").fields[0].value, "321");
+});
+
 // ── macros ──────────────────────────────────────────────────────────────
 
 test("a macro payload is posted as the text the keyboard stores", () => {

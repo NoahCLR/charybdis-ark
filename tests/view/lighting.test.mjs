@@ -251,3 +251,83 @@ test("black on a feedback stage is said as what goes dark, where it lights", asy
     assert.equal(blackConsequence("While this shows", "The half holding the trigger key"), "While this shows, the half holding the trigger key goes dark.");
     assert.equal(blackConsequence("While this shows", ""), "While this shows, its LEDs go dark.");
 });
+
+// The base effect and its master switch are settings the draft carries; Lighting
+// reads them from there (B19), and names the effect from the keyboard's list.
+const baseSettings = (fields) => ({id: "rgbAppearance", area: "Lighting", stage: "base", label: "Base effect", fields: [
+    {macro: "lightingEnabled", kind: "toggle", enabled: true, value: "1"},
+    {macro: "effectMode", value: "1", choices: [{value: 1, label: "Solid colour"}, {value: 13, label: "Cycle left right"}]},
+    {macro: "effectLeds", value: "255"},
+    ...fields,
+].map((field) => ({label: field.macro, ...field}))});
+test("the base effect and All lighting come from the draft's settings, the effect by its name", async () => {
+    const {allLightingOn, baseAnimated, baseEffectName, baseReaches} = await import("../../webview/view/lighting.mjs");
+    const withSettings = (overrides = []) => ({...model(), configDefaults: [baseSettings(overrides)]});
+    assert.equal(allLightingOn(withSettings()), true);
+    const off = withSettings();
+    off.configDefaults[0].fields[0] = {...off.configDefaults[0].fields[0], enabled: false};
+    assert.equal(allLightingOn(off), false);
+    assert.equal(allLightingOn(model()), true, "without settings, the keyboard's read answers");
+    assert.equal(allLightingOn({rgb: {baseEffect: {state: "unread"}}}), null);
+    const cycle = withSettings();
+    cycle.configDefaults[0].fields[1] = {...cycle.configDefaults[0].fields[1], value: "13"};
+    assert.equal(baseEffectName(cycle), "Cycle left right", "never Effect 13");
+    // Thumbs and trackball are QMK's modifier class (1), the rest its key class (4).
+    const keysOnly = withSettings();
+    keysOnly.configDefaults[0].fields[2] = {macro: "effectLeds", label: "Lights", value: "4"};
+    assert.equal(baseReaches(keysOnly, 0), true);
+    assert.equal(baseReaches(keysOnly, 50), false, "a thumb key is not a main key");
+    assert.equal(baseReaches(keysOnly, undefined), false, "nor is the trackball LED");
+    assert.equal(baseAnimated(model()), false);
+    assert.equal(baseAnimated(model({rgb: {baseEffect: {state: "read", enabled: true, effectId: 13, hue: 10, saturation: 255, brightness: 255}}})), true);
+});
+
+test("an animated effect is drawn lit, never as off; a class the effect skips stays unlit", () => {
+    const animated = model({rgb: {...model().rgb, layerColors: [], baseEffect: {state: "read", enabled: true, effectId: 13, hue: 10, saturation: 200, brightness: 255, previewColor: undefined}}});
+    const light = keyLight(animated, {index: 0, positions: [position(0, "KC_A")]}, position(0, "KC_A"));
+    assert.equal(light.source, "animated");
+    assert.ok(!isOff(light.colour), "lit");
+    const keysOnly = {...model({rgb: {...model().rgb, layerColors: []}}), configDefaults: [baseSettings([])]};
+    keysOnly.configDefaults[0].fields[2] = {macro: "effectLeds", label: "Lights", value: "4"};
+    assert.equal(keyLight(keysOnly, {index: 0, positions: []}, position(50, "KC_SPC")).source, "off");
+    assert.equal(keyLight(keysOnly, {index: 0, positions: []}, position(0, "KC_A")).source, "base");
+});
+
+test("a trackball mode previews from its first placed key, and black paints dark", async () => {
+    const {pdTrigger} = await import("../../webview/view/lighting.mjs");
+    const pd = {pdModes: [{id: 0, kind: 2, binding: {slot: 0, hold: "PD_SLOT_0", lock: "PD_LOCK_0"}}]};
+    const base = {index: 0, positions: [position(0, "KC_A"), {layoutIndex: 40, keycode: "QK_USER_16", semantic: "PD_SLOT_0"}]};
+    const other = {index: 3, positions: [{layoutIndex: 5, keycode: "QK_USER_17", semantic: "PD_LOCK_0"}]};
+    const m = {...model(), ...pd, layers: [base, other]};
+    assert.deepEqual(pdTrigger(m, base, 0), {layoutIndex: 40, layer: 0});
+    assert.deepEqual(pdTrigger(m, other, 0), {layoutIndex: 5, layer: 3}, "the viewed layer's key first");
+    assert.equal(pdTrigger(m, base, 1), null);
+    const black = {mode: "PD_MODE_DRAGSCROLL", color: colour(0, 0, 0), locality: "RGB_RIGHT_HALF"};
+    const light = keyLight(model(), {index: 0, positions: []}, position(11, "KC_A"), {pdActive: black});
+    assert.equal(light.source, "pointing");
+    assert.ok(isOff(light.colour), "the right half goes dark");
+});
+
+test("presets are the colours this keyboard uses, each once, naming who uses it", async () => {
+    const {colourPresets} = await import("../../webview/view/lighting.mjs");
+    const m = {...model(), layers: [{index: 3, name: "Symbol", positions: []}], pdModes: [{id: 0, kind: 2, displayName: "Dragscroll"}]};
+    m.rgb.comboFeedback = {color: colour(180, 255, 200), locality: "RGB_KEYS_ONLY"};
+    const presets = colourPresets(m);
+    assert.deepEqual(presets[0], {colour: colour(180, 255, 200), uses: ["Symbol layer", "Combos"]}, "one swatch, both users");
+    assert.ok(!presets.some((entry) => Number(entry.colour.v) === 0), "black and no colour are not presets");
+    assert.ok(presets.some((entry) => entry.uses.includes("Dragscroll")));
+    assert.equal(colourPresets(m, 2).length, 2);
+});
+
+test("an LED group is named by what it holds, and outlines the keys it lights", async () => {
+    const {groupContentName, groupPositions} = await import("../../webview/view/lighting.mjs");
+    const {LED_INDEX, TRACKBALL_LED} = await import("../../webview/view/geometry.mjs");
+    const keyAt = (index) => ({0: "Esc", 1: "1"})[index] || "";
+    const thumbs = [48, 49, 50, 51, 52, 53, 54, 55].map((index) => LED_INDEX[index]);
+    assert.equal(groupContentName(thumbs, keyAt), "Thumbs, both halves");
+    assert.equal(groupContentName([...thumbs, TRACKBALL_LED], keyAt), "Thumbs, both halves + trackball");
+    assert.equal(groupContentName([LED_INDEX[0], LED_INDEX[1]], keyAt), "Esc, 1");
+    assert.equal(groupContentName([TRACKBALL_LED], keyAt), "Trackball");
+    assert.equal(groupContentName([57], keyAt), "LED 57");
+    assert.deepEqual(groupPositions([LED_INDEX[0], TRACKBALL_LED]), {keys: [0], trackball: true});
+});

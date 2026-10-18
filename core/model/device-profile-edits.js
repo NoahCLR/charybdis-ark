@@ -255,6 +255,24 @@ function editDeviceProfile(bytes, message, context = {}) {
             const index = integer(message.index, rows.length - 1, "Assignment index");
             rows.splice(index, 1); break;
         }
+        case "updateRgbLedGroup": {
+            const rows = groupRows(rgb, message.target);
+            const row = rows[integer(message.index, rows.length - 1, "Assignment index")];
+            row.color = editColor(message);
+            if (message.ledIndices !== undefined) {
+                if (!Array.isArray(message.ledIndices) || !message.ledIndices.length) throw invalid("Choose at least one LED for this row.");
+                // The group it used before stays a saved group: the keyboard
+                // cannot tell one made for this row from one saved on purpose.
+                row.groupId = groupFor(rgb, message.ledIndices.map(value => integer(value, 57, "LED index")));
+            }
+            break;
+        }
+        case "moveRgbLedGroup": {
+            const rows = groupRows(rgb, message.target);
+            const from = integer(message.from, rows.length - 1, "Assignment index");
+            const to = integer(message.to, rows.length - 1, "Destination index");
+            rows.splice(to, 0, ...rows.splice(from, 1)); break;
+        }
         default: throw invalid("Unsupported profile edit.");
     }
     domain.payload = encodeRgbDomainV1(rgb, rgbOptions);

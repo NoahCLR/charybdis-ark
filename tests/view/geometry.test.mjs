@@ -22,7 +22,7 @@ test("locality answers for the regions the firmware defines", () => {
     assert.equal(inLocality(0, "RGB_KEY_HALF", 7), false);
     assert.equal(inLocality(7, "RGB_KEYS_ONLY", 7), true);
     assert.equal(inLocality(6, "RGB_KEYS_ONLY", 7), false);
-    assert.equal(inLocality(6, "RGB_KEYS_ONLY", undefined), false, "with no trigger, nothing is the trigger key");
+    assert.equal(inLocality(6, "RGB_KEYS_ONLY", undefined), true, "with no trigger key the firmware paints every LED (rgb_pd_mode_stage.c)");
 });
 
 test("the trackball is drawn at its own size, clear of the keys around it", () => {

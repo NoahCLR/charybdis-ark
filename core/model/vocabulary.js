@@ -114,7 +114,8 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         ["RGB_BOTH_HALVES", "Both halves"], ["RGB_LEFT_HALF", "Left half"], ["RGB_RIGHT_HALF", "Right half"],
         ["RGB_KEY_HALF", "The half holding the trigger key"], ["RGB_KEYS_ONLY", "Only the trigger key"],
     ],
-    paintModes: [["KEYS_MAPPED_ON_THIS_LAYER_ONLY", "Keys mapped on this layer only"], ["ALL_KEYS", "All keys"]],
+    // Mapped-only skips transparent and Nothing keys (rgb_layer_stage.c).
+    paintModes: [["KEYS_MAPPED_ON_THIS_LAYER_ONLY", "Keys that do something"], ["ALL_KEYS", "Every key"]],
     fadeModes: [
         ["FOLLOW_REAL_DESTINATION", "Follow the real destination"],
         ["END_COLOR_WHERE_BASE_EFFECT_WOULD_SHOW", "End colour where the base effect would show"],
@@ -129,16 +130,16 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         ["KEY_FEEDBACK_GROUP_TAP_COMMITTED", "Multi-tap sent"],
         // A hold shows its colour while it is still pending too.
         ["KEY_FEEDBACK_GROUP_HOLD_ACTIVE", "Holding"],
-        ["KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE", "Long holding"],
+        ["KEY_FEEDBACK_GROUP_LONG_HOLD_ACTIVE", "Long hold"],
     ],
     // The lighting stages in the order the firmware paints them. A stage is
     // found by its id or bit, never by its words.
     stages: [
         {id: "base", label: "Base effect"},
-        {id: "layers", label: "Layer colours", bit: RGB_STAGE_BITS.LAYER},
-        {id: "auto", label: "Mouse layer fade", bit: RGB_STAGE_BITS.AUTOMOUSE},
+        {id: "layers", label: "Layers", bit: RGB_STAGE_BITS.LAYER},
+        {id: "auto", label: "Mouse fade", bit: RGB_STAGE_BITS.AUTOMOUSE},
         {id: "pd", label: "Trackball modes", bit: RGB_STAGE_BITS.PD_MODE},
-        {id: "combo", label: "Combo feedback", bit: RGB_STAGE_BITS.COMBO},
+        {id: "combo", label: "Combos", bit: RGB_STAGE_BITS.COMBO},
         {id: "key", label: "Key feedback", bit: RGB_STAGE_BITS.KEY_BEHAVIOR},
     ],
 
