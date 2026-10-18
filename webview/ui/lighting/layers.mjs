@@ -1,8 +1,8 @@
 // @ts-check
 import {el, esc} from "../../lib/dom.mjs";
-import {css, isOff, label as hsvLabel} from "../../lib/colour.mjs";
+import {css, isOff} from "../../lib/colour.mjs";
 import {currentLayer, layerName, layers, post, render, showLayer, state, writable} from "../../store.mjs";
-import {layerColourRow} from "../../view/lighting.mjs";
+import {layerColourRow, layerPaints} from "../../view/lighting.mjs";
 import {vocabulary, word} from "../../view/vocabulary.mjs";
 import {draftDot, draftMarks} from "../../view/review.mjs";
 import * as edits from "../../view/edits.mjs";
@@ -24,7 +24,7 @@ export function stageLayers(model) {
         const lit = row && !isOff(row.color);
         const item = el(`<button class="rowitem ${index === state.layer ? "on" : ""}" data-layer="${index}">
             <span class="t"><span class="mk-swatch lead ${lit ? "" : "swatch-off"}" style="${lit ? `background:${css(row.color)}` : ""}"></span>${esc(layerName(layer))}${marks.lightingLayers.has(layer.index) ? draftDot() : ""}</span>
-            <span class="m mono">${esc(row ? hsvLabel(row.color) : "not reported")} · ${esc(word(vocabulary(model).paintModes, row?.mode).toLowerCase())}</span></button>`);
+            <span class="m">${esc(!row ? "not reported" : !layerPaints(row.color) ? "no colour" : `${lit ? "" : "black · "}${word(vocabulary(model).paintModes, row.mode).toLowerCase()}`)}</span></button>`);
         item.addEventListener("click", () => { showLayer(index); render(); });
         list.append(item);
     });

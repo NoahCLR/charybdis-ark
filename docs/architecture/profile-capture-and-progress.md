@@ -15,7 +15,7 @@ keyboard checks it, stage keys and macros on the slave half, copy the profile
 to the slave half, save it on the master half, finish the slave half, write keys
 and macros on the master half, check both halves. The master half is the one
 connected over USB; the slave half is its partner over the split cable. These
-roles do not imply left or right, and the Device screen explains them.
+roles do not imply left or right, and the Keyboard screen explains them.
 `restoreProfile()` reports at each real boundary with byte counts. A failure keeps its step, a reason from the
 keyboard's own error (or the slave half's last answer), and whether anything
 was saved. After the decision it says how the save ends. Ordinarily the

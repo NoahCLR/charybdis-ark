@@ -4,6 +4,7 @@
 /** @typedef {import("../../view/types.js").MacroStep} MacroStep */
 import {el, esc} from "../../lib/dom.mjs";
 import {readMacro} from "../../view/macro-cache.mjs";
+import {samePayload} from "../../view/macro.mjs";
 import {macroPlacements} from "../../view/reach.mjs";
 import {titleName, attachTitleName} from "../title-name.mjs";
 import {ROUTE_WORDS, setReachGroupOpen} from "../../view/reach-groups.mjs";
@@ -24,7 +25,7 @@ export function editor(model, slot, canEdit) {
     let steps = focusSteps(slot, form.steps ?? parsed.steps);
     ensureMacroHistory(slot, parsed.error && !form.steps ? undefined : steps);
     const editable = canEdit && !state.recording && (!parsed.error || Boolean(form.steps));
-    const dirty = form.draft !== undefined && payload !== slot.payload;
+    const dirty = form.draft !== undefined && !samePayload(payload, slot.payload, model.qmkKeycodeAliases);
     const rawOpen = Boolean(form.rawOpen || (parsed.error && !form.steps));
     const wrap = el(`<div class="stack"></div>`);
     const card = el(`<div class="card macro-editor-card" data-macro-editor="${esc(slot.keycode)}">

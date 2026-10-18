@@ -1,6 +1,6 @@
 // @ts-check
 import {el, esc} from "../../lib/dom.mjs";
-import {css, isOff, label as hsvLabel} from "../../lib/colour.mjs";
+import {css, isOff} from "../../lib/colour.mjs";
 import {post, render, state, writable} from "../../store.mjs";
 import {feedbackColours, stageEnabled} from "../../view/lighting.mjs";
 import {branchName, vocabulary, word} from "../../view/vocabulary.mjs";
@@ -31,12 +31,12 @@ export function stageKey(model) {
     if (!rows.some((row) => row.id === state.feedbackRow)) state.feedbackRow = rows[0]?.id;
     const current = rows.find((row) => row.id === state.feedbackRow) || rows[0];
     node.className = "tab-split";
-    const list = el(`<aside class="rowlist"><div class="rowlist-h">Semantics</div></aside>`);
+    const list = el(`<aside class="rowlist"><div class="rowlist-h">Feedback colours</div></aside>`);
     rows.forEach((row) => {
         const lit = !isOff(row.colour);
         const item = el(`<button class="rowitem ${row.id === current?.id ? "on" : ""}" data-row="${esc(row.id)}">
             <span class="t"><span class="mk-swatch lead ${lit ? "" : "swatch-off"}" style="${lit ? `background:${css(row.colour)}` : ""}"></span>${esc(row.label)}</span>
-            <span class="m mono">${esc(hsvLabel(row.colour))}</span></button>`);
+            ${lit ? "" : `<span class="m">off</span>`}</button>`);
         item.addEventListener("click", () => { state.feedbackRow = row.id; render(); });
         list.append(item);
     });
@@ -44,10 +44,10 @@ export function stageKey(model) {
     const colour = section(current?.label || "Feedback");
     colour.append(colourControl(model, {
         colour: current?.colour, canEdit, title: current?.label || "",
-        offNote: "No colour is stored for this semantic, so the keyboard flashes nothing for it.",
+        offNote: "No colour is stored for this state, so the keyboard flashes nothing for it.",
         onChange: (next) => { if (current) post(edits.keyFeedback(model.rgb.keyBehaviorFeedback, current.id, next)); },
     }));
-    const policy = section("Policy");
+    const policy = section("When and where");
     const commit = el(`<label class="field"><span>Tap commit</span><select data-f="lighting:key:tap-commit" class="input" ${canEdit ? "" : "disabled"}>
         ${vocabulary(model).tapCommit.map(([id, text]) => `<option value="${id}" ${feedback.tapCommitMode === id ? "selected" : ""}>${text}</option>`).join("")}</select></label>`);
     /** @type {HTMLSelectElement} */ (commit.querySelector("select")).addEventListener("change", (event) =>

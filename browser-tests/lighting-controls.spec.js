@@ -192,8 +192,9 @@ test("Lighting preview switches and screen links navigate without posting edits"
     await expect(page.locator(".board-foot-text")).toContainText("held, painting");
     expect(await posted(page)).toEqual([]);
     await page.locator('[data-ltab="base"]').click();
-    await expect(body(page).locator("[data-channel]")).toHaveCount(3);
-    await expect(body(page).locator("[data-channel]").first()).toBeDisabled();
+    // Edited in Settings, the base effect is a swatch here: no picker that cannot move.
+    await expect(body(page).locator(".colour-head .swatch-lg")).toHaveCount(1);
+    await expect(body(page).locator("[data-channel], .sv-field, .hue-ramp")).toHaveCount(0);
     await body(page).getByRole("button", {name: "Open Settings → Base lighting", exact: true}).click();
     await expect(page.locator(".main h1")).toHaveText("Settings");
     expect(await posted(page)).toEqual([]);

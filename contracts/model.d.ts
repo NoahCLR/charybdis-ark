@@ -43,7 +43,15 @@ export interface StatusModel {
 }
 
 export type ApplyStep = 'check' | 'backup' | 'upload' | 'validate' | 'stage' | 'peer' | 'commit' | 'converge' | 'local' | 'verify';
+/** `saved`: "none" nothing was saved; "decided" the keyboard decided to save and finishes by itself; "unknown". */
 export interface ApplyFailure {step: ApplyStep; label: string; reason: string; saved: string}
+/** What the connected firmware reports about itself (core/session/firmware-support.js firmwareView). */
+export interface FirmwareView {
+    version: string | null; versionWord: string | null; defaultsDigest: string | null;
+    worksWithArk: boolean; readable: boolean;
+    layers: number | null; tapCounts: number | null; behaviours: number | null; combos: number | null; keysPerCombo: number | null;
+    macros: number | null; macroBytes: number | null; customKeys: number | null; leds: number | null; profileBytes: number | null; repeatHz: number;
+}
 export interface ApplyView {
     id: number;
     state: 'failed' | 'done' | 'applying';
@@ -67,6 +75,8 @@ export interface Vocabulary {
     holdHelpers: {hold: WordList<string>; long: WordList<string>};
     holdWithoutLongHold: WordList<string>;
     tapSends: string;
+    holdFromPress: string;
+    timingSources: Record<string, string>;
     tiers: Readonly<Record<string, string>>;
     branches: readonly string[];
     localities: WordList<string>;
@@ -215,6 +225,10 @@ export interface SettingFieldBase extends SettingBits {
     max?: number;
     choices?: (number | {value: number; label?: string})[];
     readOnly?: boolean;
+    /** The firmware was built without it: it does nothing, whatever it reads. */
+    notBuilt?: boolean;
+    /** QMK owns the live value, so keys on the keyboard (or VIA) change it too. */
+    keyboardKeys?: boolean;
     governs?: {kind: 'tier'; tier: string} | {kind: 'branch'; count: number} | {kind: 'layer'; layer: number};
 }
 export interface StoredSettingField extends SettingFieldBase {
@@ -258,8 +272,12 @@ export interface SettingsSection {
     stage?: string;
     expanded?: boolean;
     description?: string;
+    /** Other words the section is found by in Settings search: QMK's names and earlier ones. */
+    search?: string;
     warning?: string;
     githubLink?: {label: string; url: string};
+    /** The words for the section's one-per-layer switches, shown together as one row of layers. */
+    layerGroup?: {label: string; hint: string};
     fields: SettingField[];
     comboTiming?: readonly ComboTimingField[];
 }

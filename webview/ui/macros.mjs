@@ -33,7 +33,7 @@ export function screenMacros() {
 
     const main = el(`<div class="main">${topbar(
         "Macros",
-        "Macro slots on the keyboard. A named macro shows by its name on keys, in the picker and in the key card.",
+        "Text and key sequences one key can type. A macro you name shows by that name on the board and in the picker.",
     )}</div>`);
 
     const content = el(`<div class="content"><div class="pad library macros-library"></div></div>`);
@@ -46,11 +46,13 @@ export function screenMacros() {
         return main;
     }
 
+    // Counted as Custom keys counts its keys: how many are in use. A slot
+    // without room in macro memory is counted only when there is one.
     const filled = bank.filter((row) => !row.empty).length;
     const available = memory?.available ?? bank.length;
     const grid = el(`<div class="card"><div class="card-h"><h3>Slots</h3>
         <input class="input search card-search" id="macroSearch" data-f="macros:search" type="search" placeholder="Search by name" value="${esc(state.macroSearch || "")}">
-        <span class="tag" data-tip="${filled} filled">${available} of ${bank.length} available</span></div>
+        <span class="tag" data-tip="${available} of ${bank.length} slots have room in macro memory">${filled} of ${bank.length} used${available < bank.length ? ` · ${bank.length - available} without room` : ""}</span></div>
         <div class="card-b"><div class="macro-grid"></div>${memoryMeter(memory)}</div></div>`);
     /** @type {HTMLInputElement} */ (grid.querySelector("#macroSearch")).addEventListener("input", (event) => { state.macroSearch = /** @type {HTMLInputElement} */ (event.target).value; render(); });
     const cells = /** @type {HTMLElement} */ (grid.querySelector(".macro-grid"));

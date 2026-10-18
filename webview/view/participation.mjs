@@ -8,12 +8,13 @@ export function participationAt(model, layer, position, definition, kind = "beha
     const record = policy.layers[layer];
     if (!record) return null;
     const placementOn = !(behavior ? record.bypass : record.exclude).includes(position.row * 6 + position.column);
+    // Each reason names the switch that says no, in the words its control uses.
     const reasons = [];
-    if (!(behavior ? policy.behaviorsEnabled : policy.combosEnabled)) reasons.push("master switch is off");
-    if (!((behavior ? policy.behaviorLayers : policy.comboLayers) & bit)) reasons.push("source layer switch is off");
-    if (definition?.enabled === false) reasons.push("definition is disabled");
-    if (definition && !((definition.allowedLayers ?? 0xffff) & bit)) reasons.push("definition does not allow the source layer");
-    if (!placementOn) reasons.push(behavior ? "this placement bypasses its behaviour" : "this placement is excluded from combos");
+    if (!(behavior ? policy.behaviorsEnabled : policy.combosEnabled)) reasons.push(behavior ? "behaviours are off in Settings" : "combos are off in Settings");
+    if (!((behavior ? policy.behaviorLayers : policy.comboLayers) & bit)) reasons.push(behavior ? "Settings has behaviours off on this layer" : "Settings has combos off on this layer");
+    if (definition?.enabled === false) reasons.push(behavior ? "Use this behaviour is off" : "Use this combo is off");
+    if (definition && !((definition.allowedLayers ?? 0xffff) & bit)) reasons.push("this layer is not one it runs on");
+    if (!placementOn) reasons.push(behavior ? "this key's Use behaviour is off" : "this key's Join combos is off");
     return {placementOn, enabled: reasons.length === 0, reasons};
 }
 
@@ -25,6 +26,6 @@ export function participationAt(model, layer, position, definition, kind = "beha
 export function keyHandling(model, layer, position, behaviour) {
     if (!behaviour) return {by: "qmk", reasons: []};
     const decision = participationAt(model, layer, position, behaviour);
-    if (!decision) return {by: behaviour.enabled === false ? "qmk" : "keyboard", reasons: behaviour.enabled === false ? ["definition is disabled"] : []};
+    if (!decision) return {by: behaviour.enabled === false ? "qmk" : "keyboard", reasons: behaviour.enabled === false ? ["Use this behaviour is off"] : []};
     return {by: decision.enabled ? "keyboard" : "qmk", reasons: decision.reasons};
 }

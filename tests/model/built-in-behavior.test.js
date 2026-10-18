@@ -42,7 +42,18 @@ test("a custom key with a shortcut taps it and holds it as a fallback, like a pl
 });
 
 test("bare modifiers, other key families and non-keycode targets inherit nothing", () => {
-    const others = [key(0x00), key(0x01), key(0x03), key(0xe0), key(0xe3), key(0xe7), key(0x5223), key(0x5310), key(0x7e00), key(0x7e80), key(0x7ec0),
-        {kind: ACTION.LAYER_MOMENTARY, operand: 3}, {kind: ACTION.PD_MODE_MOMENTARY, operand: 0}, undefined];
+    const others = [key(0x00), key(0x01), key(0x03), key(0xe0), key(0xe3), key(0xe7), key(0x5310), key(0x7e00), key(0x7ea0), key(0x7ec0), undefined];
     for (const target of others) assert.deepEqual(builtInActions(target), {});
+});
+
+test("layer holds and pointing-mode keys hold from the press, with no tap of their own", () => {
+    // MO(3): the layer is on as soon as the key goes down.
+    assert.deepEqual(builtInActions(key(0x5223)), {hold: {kind: ACTION.LAYER_MOMENTARY, operand: 3}, fromPress: true});
+    assert.deepEqual(builtInActions({kind: ACTION.LAYER_MOMENTARY, operand: 3}), {hold: {kind: ACTION.LAYER_MOMENTARY, operand: 3}, fromPress: true});
+    // LM(2, MOD_LSFT): its layer and its modifiers, from the press.
+    assert.deepEqual(builtInActions(key(0x5042)), {hold: key(0x5042), fromPress: true});
+    // PD_SLOT_0 and PD_SLOT_31 run their mode while held.
+    assert.deepEqual(builtInActions(key(0x7e80)), {hold: key(0x7e80), fromPress: true});
+    assert.deepEqual(builtInActions(key(0x7e9f)), {hold: key(0x7e9f), fromPress: true});
+    assert.deepEqual(builtInActions({kind: ACTION.PD_MODE_MOMENTARY, operand: 0}), {hold: {kind: ACTION.PD_MODE_MOMENTARY, operand: 0}, fromPress: true});
 });

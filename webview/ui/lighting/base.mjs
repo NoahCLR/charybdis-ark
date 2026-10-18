@@ -1,7 +1,8 @@
 // @ts-check
 import {el, esc} from "../../lib/dom.mjs";
 import {render, state} from "../../store.mjs";
-import {colourControl, section} from "./common.mjs";
+import {css} from "../../lib/colour.mjs";
+import {section} from "./common.mjs";
 
 /** @param {import("../../../contracts/panel.js").PublishedModel} model */
 export function stageBase(model) {
@@ -11,9 +12,12 @@ export function stageBase(model) {
     // rest of its global policy — so it is edited there, not in the profile.
     const base = model.rgb.baseEffect || {};
     node.className = "tab-grid three";
+    // Edited in Settings, so it shows as a swatch here rather than as a
+    // picker that cannot be moved.
     const colour = section("Colour");
     colour.append(base.previewColor
-        ? colourControl(model, {colour: base.previewColor, title: "Base effect", canEdit: false})
+        ? el(`<div class="row colour-head"><span class="swatch-lg" style="background:${css(base.previewColor)}"></span>
+            <div><div class="colour-title">Base effect</div><div class="note">${esc(base.effectName || "")}</div></div></div>`)
         : el(`<div class="callout">${esc(base.enabled === false ? "The base effect is switched off." : "This effect animates, so it has no single colour to show.")}</div>`));
     const facts = section("What the keyboard reports");
     facts.append(el(`<dl class="kv wide">
@@ -25,7 +29,7 @@ export function stageBase(model) {
     const where = section("Where it is edited");
     const jump = el(`<button class="btn self-start">Open Settings → Base lighting</button>`);
     jump.addEventListener("click", () => { state.screen = "settings"; render(); });
-    where.append(el(`<p class="note">The base effect is not part of the profile: the keyboard keeps it with its global policy, and both halves report it. Editing it there keeps one value in one place; this board paints whatever it says.</p>`), jump);
+    where.append(el(`<p class="note">The keyboard keeps its base effect with its other settings, so its effect, colour and speed are changed in Settings. This board paints whatever they are set to.</p>`), jump);
     node.append(colour, facts, where);
     return node;
 }

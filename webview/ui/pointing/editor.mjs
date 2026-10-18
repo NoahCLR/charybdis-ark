@@ -1,7 +1,7 @@
 // @ts-check
 import {el, esc} from "../../lib/dom.mjs";
 import {NAME_MAX_BYTES, NAME_TIP} from "../../view/names.mjs";
-import {KIND, dpiOptions, readConfig, settleButtons, settleTaps, startingRecord} from "../../view/pointing-config.mjs";
+import {KIND, dpiOptions, readConfig, scrollStarter, settleButtons, settleTaps, startingRecord} from "../../view/pointing-config.mjs";
 import {post, render, state} from "../../store.mjs";
 import * as edits from "../../view/edits.mjs";
 import {slotLight} from "../marks.mjs";
@@ -19,7 +19,7 @@ export function editor(model, slot, canEdit, slots) {
     // be read out of a scrolling form.
     const kind = state.pdKind?.slot === slot.id ? state.pdKind.kind : slot.kind;
     // startingRecord spreads the supplied slot, retaining its presentation fields.
-    if (kind !== slot.kind) slot = /** @type {import("../surface-types.js").PresentedSlot} */ (startingRecord(slot, kind));
+    if (kind !== slot.kind) slot = /** @type {import("../surface-types.js").PresentedSlot} */ (startingRecord(slot, kind, scrollStarter(slots)));
     const scrolling = kind === KIND.SCROLLING;
     const light = slotLight(model, slot);
     const wrap = el(`<div class="pd-editor stack"></div>`);

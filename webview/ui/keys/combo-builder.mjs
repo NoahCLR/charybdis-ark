@@ -18,6 +18,7 @@ import {timingInput} from "../../view/timing-input.mjs";
 import {openPicker} from "../picker.mjs";
 import {keyNameMarked} from "../marks.mjs";
 import {vocabulary} from "../../view/vocabulary.mjs";
+import {comboMissing} from "../../view/combo-form.mjs";
 
 /** @param {string} text */
 const sentence = (text) => text.charAt(0).toUpperCase() + text.slice(1);
@@ -38,6 +39,9 @@ export function comboBuilder(canEdit, holdTerm) {
     // every combo keeps its own.
     const fallback = edits.comboDefaultTermValue(model);
     const windowField = timingInput(form.termMs, fallback, form.followsDefault && fallback !== "");
+    // Keep stays off until the combo has what it sends and two keys, and says
+    // which is missing: the keyboard refuses less (B8).
+    const missing = comboMissing(form, state.combo.inputs);
     const node = el(`<div class="card combo-builder">
         <div class="card-h"><h3>${editing ? `Edit ${esc(original?.badge || "combo")}` : "New combo"}</h3>
             <span class="right">${editing ? `<button class="btn tiny ghost" data-act="delete" ${canEdit ? "" : "disabled"}>Delete</button>` : ""}</span></div>
@@ -75,14 +79,15 @@ export function comboBuilder(canEdit, holdTerm) {
                     `<label class="sw" data-tip="${esc(tip)}"><input type="checkbox" data-f="combo:${esc(state.combo.editId ?? 'new')}:${esc(flag)}" data-${flag.toLowerCase()} ${form[/** @type {"mustHold" | "mustTap" | "ordered"} */ (flag)] ? "checked" : ""} ${canEdit ? "" : "disabled"}><span class="track"></span><span class="txt">${esc(sentence(vocabulary(model).comboOptions[flag]))}</span></label>`).join("")}
             </div>
             <div class="row combo-actions">
-                <button class="btn primary" data-act="keep" ${canEdit && !state.combo.awaiting ? "" : "disabled"}>Keep combo in draft</button>
+                <button class="btn primary" data-act="keep" ${canEdit && !state.combo.awaiting && !missing ? "" : "disabled"}>Keep combo in draft</button>
                 <button class="btn ghost" data-act="cancel">Cancel</button>
+                <span class="note" data-combo-missing ${missing ? "" : "hidden"}>${esc(missing)}</span>
             </div>
             <p class="note">A combo needs its output and at least two inputs, so this form keeps its own state until you keep it.</p>
         </div></div>`);
 
     /** @type {HTMLElement} */ (node.querySelector(".card-b")).insertBefore(definitionControls(layers().map(layer => ({...layer, label: layerName(layer)})), form, canEdit,
-        (/** @type {{enabled: boolean, allowedLayers: number}} */ permissions) => Object.assign(form, permissions), `combo:${state.combo.editId ?? "new"}:definition`), /** @type {HTMLElement} */ (node.querySelector(".card-b")).firstChild);
+        (/** @type {{enabled: boolean, allowedLayers: number}} */ permissions) => Object.assign(form, permissions), `combo:${state.combo.editId ?? "new"}:definition`, "combo"), /** @type {HTMLElement} */ (node.querySelector(".card-b")).firstChild);
     /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-remove]")).forEach((button) => button.addEventListener("click", () => {
         state.combo.inputs = state.combo.inputs.filter((input) => input !== button.dataset.remove);
         render();
@@ -106,7 +111,15 @@ export function comboBuilder(canEdit, holdTerm) {
     }));
     // Typing and ticking land in state as they happen, so a board click that
     // redraws the screen keeps them.
-    /** @type {HTMLInputElement} */ (node.querySelector("[data-output]")).addEventListener("input", (event) => { form.output = /** @type {HTMLInputElement} */ (event.target).value; });
+    /** @type {HTMLInputElement} */ (node.querySelector("[data-output]")).addEventListener("input", (event) => {
+        form.output = /** @type {HTMLInputElement} */ (event.target).value;
+        // Typing what it sends can complete the combo before the next render.
+        const now = comboMissing(form, state.combo.inputs);
+        const keep = /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="keep"]'));
+        if (keep) keep.disabled = !canEdit || state.combo.awaiting || Boolean(now);
+        const note = /** @type {HTMLElement | null} */ (node.querySelector("[data-combo-missing]"));
+        if (note) { note.textContent = now; note.hidden = !now; }
+    });
     // Typing a window gives the combo its own; emptying the field, or Use
     // default, has it follow the keyboard's default again. The button changes
     // in place, and matching defaults become placeholders after editing.

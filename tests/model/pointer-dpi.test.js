@@ -3,7 +3,8 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const {DPI_STEP, DPI_MAX_CHOICE, POINTER_DPI, dpiChoices} = require("../../core/model/pointer-dpi");
 
-test("the app's one DPI list moves in the sensor's steps up to the top of the normal range", () => {
+test("the app's one DPI list moves in the sensor's steps up to the sensor's 12000", () => {
+    assert.equal(DPI_MAX_CHOICE, 12000);
     assert.equal(POINTER_DPI[0], DPI_STEP);
     assert.equal(POINTER_DPI.at(-1), DPI_MAX_CHOICE);
     assert.ok(POINTER_DPI.every((dpi, index) => dpi === DPI_STEP * (index + 1)));

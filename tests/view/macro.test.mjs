@@ -180,3 +180,13 @@ test("a macro's chips read it step by step, held, let go, tapped, typed and wait
     assert.equal(long.chips.length, 12);
     assert.equal(long.more, 3);
 });
+
+test("two payloads are the same macro when their keys differ only by alias", async () => {
+    const {samePayload} = await import("../../webview/view/macro.mjs");
+    const aliases = {KC_LGUI: "KC_LEFT_GUI", KC_SPC: "KC_SPACE"};
+    assert.equal(samePayload("{KC_LGUI,KC_SPC}{KC_A}", "{KC_LEFT_GUI,KC_SPACE}{KC_A}", aliases), true);
+    assert.equal(samePayload("{KC_LGUI,KC_SPC}", "{KC_LEFT_GUI,KC_A}", aliases), false);
+    assert.equal(samePayload("{KC_LGUI", "{KC_LGUI", aliases), true);
+    assert.equal(samePayload("{KC_LGUI", "{KC_LEFT_GUI}", aliases), false);
+    assert.equal(samePayload("", undefined), true);
+});

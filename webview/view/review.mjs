@@ -54,6 +54,11 @@ export function statusSummary(changes) {
     return Object.entries(counts).filter(([, count]) => count).map(([status, count]) => `${count} ${status}`).join(" · ");
 }
 
+// The same, beside a count that already says how many: only when it tells
+// more than that count, so "1 change" is never followed by "1 changed".
+/** @param {readonly Pick<import("../../contracts/model.js").ReviewChange, "status">[]} changes */
+export const statusBesideCount = (changes) => changes.every((change) => change.status === "changed") ? "" : statusSummary(changes);
+
 // A profile file's differences as counts, by what they configure rather than
 // by which screen stores them: the categories of the rail, each split the way
 // its screen is, and the Settings sections filed with what they tune (Key

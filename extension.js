@@ -15,6 +15,7 @@
 // files, progress, toasts and the panel itself.
 
 const fs = require("node:fs");
+const EXTENSION_VERSION = require("./package.json").version;
 const path = require("node:path");
 const vscode = require("vscode");
 
@@ -136,6 +137,9 @@ function vscodeHost(panel, recoveryRoot, disposed = () => false) {
             await vscode.workspace.fs.writeFile(uri, Buffer.from(file.text));
             return uri.fsPath;
         },
+        // Ark's own version, for the Keyboard screen; the extension has no
+        // commit to name.
+        panel: () => ({build: {version: EXTENSION_VERSION, commit: ""}}),
     };
 }
 

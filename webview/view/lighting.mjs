@@ -5,8 +5,9 @@
 // dots, the swatches and the review all answer the same way — and they answer
 // from the draft, because the draft is what the model carries.
 
-import {isOff} from "../lib/colour.mjs";
-import {LED_INDEX, TRACKBALL_LED, inLocality, trackballInLocality} from "./geometry.mjs";
+import {GEO, LED_INDEX, TRACKBALL_LED, inLocality, trackballInLocality} from "./geometry.mjs";
+import {pointingSlotFor} from "./reach.mjs";
+import {keyMeaning} from "./keyface.mjs";
 
 /**
  * @typedef {Partial<import("../../contracts/panel.js").PublishedModel> | null | undefined} Model
@@ -58,6 +59,56 @@ export function baseColour(model) {
     const base = model?.rgb?.baseEffect;
     if (!base || base.state !== "read" || !base.enabled || !base.previewColor) return null;
     return base.previewColor;
+}
+
+// A base-lighting setting the draft holds (Settings · Base lighting).
+/** @param {Model} model @param {string} macro */
+const baseField = (model, macro) => (model?.configDefaults || []).find((section) => section.id === "rgbAppearance")?.fields.find((field) => field.macro === macro);
+
+// An effect other than Solid colour animates: it has no single colour, but it
+// is lit, so it must never be drawn as off.
+/** @param {Model} model */
+export function baseAnimated(model) {
+    const base = model?.rgb?.baseEffect;
+    return Boolean(base && base.state === "read" && base.enabled && base.effectId !== 1);
+}
+
+// An animated effect drawn as a soft glow of its own hue: lit, but not a
+// colour the keyboard holds still.
+/** @param {Model} model @returns {Colour | null} */
+function animatedGlow(model) {
+    const base = model?.rgb?.baseEffect;
+    if (!base || base.state !== "read") return null;
+    const brightness = Number(base.previewColor?.v ?? baseField(model, "brightness")?.value ?? base.brightness ?? 0);
+    return {h: String(base.hue ?? 0), s: String(Math.round(Number(base.saturation ?? 0) / 4)), v: String(Math.round(brightness * 0.6))};
+}
+
+// Which LEDs the base effect paints: QMK skips an LED whose class the stored
+// flags leave out. On this board the "modifier" class is the eight thumb keys
+// and the trackball LED, the "key" class every other key.
+/** @param {Model} model @param {number | undefined} layoutIndex undefined for the trackball LED */
+export function baseReaches(model, layoutIndex) {
+    const field = baseField(model, "effectLeds");
+    if (!field) return true;
+    const flags = Number(field.value);
+    if (flags === 255) return true;
+    const thumb = layoutIndex === undefined || Object.hasOwn(GEO.thumbs, layoutIndex);
+    return Boolean(flags & (thumb ? 1 : 4));
+}
+
+// The key a trackball mode's preview starts from: the first key that holds or
+// locks it, on the viewed layer first, then from layer 0 up. The firmware
+// paints "the half holding the trigger key" and "only the trigger key" from
+// the key that started the mode; with none, both halves or every LED.
+/** @param {Model} model @param {Layer} layer @param {number} slotId @returns {{layoutIndex: number, layer: number} | null} */
+export function pdTrigger(model, layer, slotId) {
+    const stack = model?.layers || [];
+    const order = [layer, ...stack.filter((row) => row !== layer)].filter(Boolean);
+    for (const row of order) {
+        const found = (row?.positions || []).find((position) => pointingSlotFor(/** @type {any} */ (model), keyMeaning(position))?.id === slotId);
+        if (found) return {layoutIndex: found.layoutIndex, layer: /** @type {number} */ (row?.index)};
+    }
+    return null;
 }
 
 /** @param {Model} model @param {number} layerId */
@@ -139,10 +190,12 @@ function mappedOn(model, layer, l, position) {
 /** @param {Model} model @param {Layer} layer @param {number | undefined} led @param {Position} position @param {LightOptions} [options] @returns {import("./types.js").LedLight} */
 function ledLight(model, layer, led, position, options = {}) {
     if (matrixOff(model)) return {colour: OFF, source: "off"};
-    const base = stageEnabled(model, "base") ? baseColour(model) : null;
+    const baseHere = baseReaches(model, position ? position.layoutIndex : undefined);
+    const animated = baseHere && stageEnabled(model, "base") && baseAnimated(model);
+    const base = !baseHere || !stageEnabled(model, "base") ? null : animated ? animatedGlow(model) : baseColour(model);
     /** @type {Colour} */
     let colour = base || OFF;
-    let source = base ? "base" : "off";
+    let source = base ? (animated ? "animated" : "base") : "off";
     /** @type {number | null} */
     let painter = null;
     /** @param {Colour} next @param {string} from @param {number | null} [by] */
@@ -170,7 +223,9 @@ function ledLight(model, layer, led, position, options = {}) {
     if (preview && stageEnabled(model, "pd")) {
         const reaches = position ? inLocality(position.layoutIndex, preview.locality, preview.triggerIndex)
             : trackballInLocality(preview.locality, preview.triggerIndex);
-        if (!isOff(preview.color) && reaches) paint(preview.color, "pointing");
+        // Black is black: outside layer colours HSV(0, 0, 0) paints the LEDs
+        // dark while the mode runs (B17).
+        if (reaches) paint(preview.color, "pointing");
         for (const group of model?.rgb?.pdModeLedGroups || []) {
             if (!(group.ledIndices || []).includes(led ?? -1)) continue;
             if (group.owner !== "RGB_PD_MODE_GROUP_ALL" && group.owner !== preview.mode) continue;

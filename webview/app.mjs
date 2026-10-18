@@ -103,7 +103,7 @@ function readPlaceholder(read, model) {
     const demoHere = demoOf(model).offered && (read.state !== "blocked" || Boolean(hostOf(model).blocked?.demo));
     const screenTitle = screenDefinition(state.screen)?.title || "Keyboard";
     const secondary = secondaryScreen(model, state.screen);
-    const screen = el(`<div class="main">${topbar(screenTitle, "The keyboard's current data appears here when this screen is available.")}
+    const screen = el(`<div class="main">${topbar(screenTitle, "Ark changes what your Charybdis does — keys, layers, lighting, macros and the trackball — and saves nothing until you review it.")}
         <div class="content"><div class="pad"><div class="read-placeholder" role="status" aria-live="polite">
             ${loading ? '<span class="spin" aria-hidden="true"></span>' : '<i class="dot err" aria-hidden="true"></i>'}
             <h2>${esc(read.title)}</h2><p>${esc(read.detail)}</p>

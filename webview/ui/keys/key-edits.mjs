@@ -18,6 +18,7 @@ export function pickKeycodeFor(layoutIndex) {
         title: `Keycode on ${layerName(layer)}`,
         context: `index ${layoutIndex}`,
         seed: position ? [keyMeaning(position)] : [],
+        layoutKey: true,
         onPick: (expression) => {
             post(edits.setKey(layer.name, layoutIndex, expression));
         },

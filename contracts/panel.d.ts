@@ -16,7 +16,17 @@ export interface Position {
 /** One possible answer, while its layer is active and higher answering layers are absent. */
 export interface LayerAnswer {layer: number; active: number; blocked: number}
 export interface Layer {name: LayerReference; index: number; positions: Position[]; displayName?: string; answers: LayerAnswer[][]}
-export interface Branch extends BehaviorBranch { label?: string; fallback?: boolean}
+// What a key with no behaviour of its own runs on: its built-in actions, the
+// timing defaults a row on it would follow, which setting each comes from, and
+// (B5) the Tap / hold default it follows today when that differs with no row.
+export type TimingSource = "tappingTerm" | "tapHoldTerm" | "longHoldTerm" | "multiTapTerm";
+export interface KeyBehaviorDefaults {
+    builtIn: BuiltIn;
+    timing: Record<string, Scalar | undefined>;
+    timingSources?: Record<string, TimingSource>;
+    withoutRow?: {tapHoldTerm: Scalar | undefined; tapHoldSource: TimingSource};
+}
+export interface Branch extends BehaviorBranch { label?: string; fallback?: boolean; fromPress?: boolean}
 export interface BuiltIn {tap?: Branch; hold?: Branch; releaseTaps?: boolean}
 export interface BehaviorView extends Omit<Behavior, 'steps'> {
     builtIn?: BuiltIn;
@@ -72,7 +82,7 @@ export interface PublishedModel {
     pdModes: (PdSlot & {displayName: string; binding: {slot: number; hold: string; lock: string; holdCode: number; lockCode: number}})[];
     pdModeEditing: {writable: boolean; dpiChoices: {value: number; label: string}[]; tapKeys: {plain: string[]; modified: string[]}};
     keyBehaviors: BehaviorView[];
-    behaviorEditing: {busy: boolean; writable: boolean; maxTapStepsPerBehavior: number; keyDefaults: Record<string, {builtIn: BuiltIn; timing: Record<string, Scalar | undefined>}>};
+    behaviorEditing: {busy: boolean; writable: boolean; maxTapStepsPerBehavior: number; keyDefaults: Record<string, KeyBehaviorDefaults>};
     profileIdentity: Partial<BaseIdentity> | null;
     rgb: Partial<RgbView> & {maximumBrightness?: number; baseEffect: BaseRgbView};
     combos: ComboView[];
@@ -104,6 +114,8 @@ export interface PublishedModel {
     qmkKeyShortLabels: Record<string, string>;
     qmkKeycodeAliases: Record<string, string>;
     qmkKeycodeSource: string;
+    /** QMK spellings the encoder accepts beyond the catalogue: mod-tap shorthands (name → MT modifiers), deprecated wrappers (name → wrapper) and names (name → expression). */
+    qmkSpellings: {modTaps: Record<string, string>; wrappers: Record<string, string>; names: Record<string, string>};
     diagnostics: string[];
     device: {connected: boolean; label: string; summary: string; subtitle: string; health: {profile: string; converged: boolean; halves: import('./model.js').HalvesId; recoveryPending: boolean; restartNeeded: boolean; busy: boolean; phase: PhaseId; error: string}};
     devices: {id: string; label: string}[];
@@ -113,9 +125,11 @@ export interface PublishedModel {
     apply: ApplyView | null;
     /** Core always sets `progress`, possibly undefined, which a JSON transport drops. */
     postApplyRead: {step: import('./messages.js').ReadStep; progress?: import('./model.js').CountedProgress | null} | null;
-    portable: {available: boolean; busy: boolean; progress?: string; review: {incoming: ProfileSummary; current?: ProfileSummary | null; fileName: string | null; differences: import('./model.js').ReviewSummary[] | null} | null; layers: {key: string; order: number[]; names: string[]; keysFollow: boolean} | null; usage: ProfileUsage | null};
+    portable: {available: boolean; busy: boolean; progress?: string; review: {incoming: ProfileSummary; current?: ProfileSummary | null; fileName: string | null; differences: import('./model.js').ReviewSummary[] | null; /** The file's profile bytes against this keyboard's memory. */ fits?: {used: number; capacity: number} | null} | null; layers: {key: string; order: number[]; names: string[]; keysFollow: boolean} | null; usage: ProfileUsage | null; /** When the copy from before the last Apply on this keyboard was saved; Put back what it had uses it. */ putBack: string | null};
     host: HostPanel;
     load: LoadView;
     /** A renamed keyboard that disconnected to take its new name, which the panel waits to see again. */
     reconnecting: {name: string} | null;
+    /** What the connected firmware reports about itself; null with no keyboard read. */
+    firmware: import('./model.js').FirmwareView | null;
 }

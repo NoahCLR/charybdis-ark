@@ -1,7 +1,7 @@
 // @ts-check
 "use strict";
 const {PROFILE_WIRE_DOMAINS} = require("../schema/profile-domains");
-const {encodePdDomain, decodePdDomain, pdTapProblem, isPdMacro} = require("../schema/pd-mode-domain-v1");
+const {encodePdDomain, decodePdDomain, pdTapProblem, isPdMacro, PD_DOMAIN} = require("../schema/pd-mode-domain-v1");
 const {decodeProfileBlob, encodeProfileBlob, PROFILE_DOMAIN_IDS} = require("../schema/profile-blob-v1");
 const {decodeRgbDomainV1, encodeRgbDomainV1, RGB_LAYER_MODES, RGB_LOCALITIES, RGB_AUTOMOUSE_MODES, RGB_TAP_COMMIT_MODES, RGB_PD_MODE_IDS, RGB_KEY_SEMANTICS} = require("../schema/rgb-domain-v1");
 
@@ -26,6 +26,7 @@ const {profileDepthOptions} = require("../schema/profile-depth");
  * @typedef {Partial<import("../../contracts/edits.js").PdConfig> & {id: number, kind: number, name: string}} EditablePointing
  * @typedef {import("../../contracts/edits.js").Colour & {hue?: import("../../contracts/edits.js").Scalar, sat?: import("../../contracts/edits.js").Scalar, val?: import("../../contracts/edits.js").Scalar}} ColourInput
  */
+const PD_NAME_MAX_BYTES = PD_DOMAIN.NAME_MAX_BYTES;
 /** @param {string} message */
 const invalid = message => Object.assign(new Error(message), {code: "INVALID_PROFILE_EDIT"});
 // QMK fires a combo only when its keys land within the window, so a 0 ms
@@ -100,6 +101,29 @@ const keycodeValues = () => {
     return keycodeValueCache;
 };
 
+// "<name> copy", cut back a whole character at a time to the name's byte limit.
+/** @param {string} name */
+function copyName(name) {
+    let base = String(name || "");
+    while (base && Buffer.byteLength(`${base} copy`, "utf8") > PD_NAME_MAX_BYTES) base = [...base].slice(0, -1).join("");
+    return `${base.trimEnd()} copy`;
+}
+// The RGB row of a duplicated pointing slot follows its record: colour and
+// locality. A profile without the RGB domain, or without a row for either
+// slot, has nothing to copy.
+/** @param {ReturnType<typeof decodeProfileBlob>} profile @param {number} source @param {number} id @param {EditContext} context */
+function copyPdColour(profile, source, id, context) {
+    const domain = profile.domains.find(row => row.id === PROFILE_DOMAIN_IDS.RGB);
+    if (!domain) return;
+    const options = {maximumBrightness: context.maximumBrightness ?? 255, ...profileDepthOptions(context.capabilities, domain.payload).rgb};
+    const rgb = decodeRgbDomainV1(domain.payload, options);
+    const from = rgb.pdModeColors.find(row => row.pdModeId === source), to = rgb.pdModeColors.find(row => row.pdModeId === id);
+    if (!from || !to) return;
+    to.color = {...from.color};
+    to.locality = from.locality;
+    domain.payload = encodeRgbDomainV1(rgb);
+}
+
 // One profile edit, sent to its domain as model/draft-edits.js files it.
 /** @param {Buffer} bytes @param {ProfileEdit} message @param {EditContext} [context] */
 function editDeviceProfile(bytes, message, context = {}) {
@@ -130,7 +154,10 @@ function editDeviceProfile(bytes, message, context = {}) {
         else if (message.type === "duplicatePdMode") {
             const source = integer(message.source, slots.length - 1, "Source slot");
             if (slots[id].kind || !slots[source].kind || id === source) throw invalid("Choose a configured source and an empty destination slot.");
-            slots[id] = {...slots[source], id};
+            // A copy is named as one, and takes the source's colour row with
+            // it, as the PD domain spec says a duplicate does.
+            slots[id] = {...structuredClone(slots[source]), id, name: copyName(slots[source].name)};
+            copyPdColour(profile, source, id, context);
         } else slots[id] = {...structuredClone(message.config), id};
         const keyValues = keycodeValues();
         /** @param {import("../../contracts/edits.js").PdTap | undefined} tap */
