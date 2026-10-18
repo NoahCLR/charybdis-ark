@@ -30,7 +30,7 @@ export function screenMouse() {
     if (!sections.length) {
         pad.appendChild(el(`<div class="screen-stub"><h3>No mouse settings read</h3>
             <p class="note">${esc(unavailable(model) || "Choose Read keyboard to load this keyboard's pointer settings.")}</p></div>`));
-    } else if (!canEdit) {
+    } else if (!canEdit && !model?.draft?.busy) {
         pad.appendChild(el(`<div class="unavailable">${esc(unavailable(model)
             || "These settings cannot be edited right now.")}</div>`));
     }
