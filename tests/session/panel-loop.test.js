@@ -286,7 +286,7 @@ test("export hands the host what to save, and says where it went", async () => {
     const [file] = host.exports;
     assert.equal(file.text, JSON.stringify(loop.session.service.portable.document, null, 2) + "\n");
     assert.match(file.fileName, /^charybdis-\d{4}-\d{2}-\d{2}\.charybdis\.json$/);
-    assert.equal(last(host).notice, "Complete keyboard profile exported to /exports/" + file.fileName);
+    assert.equal(last(host).notice, "Backup file saved to /exports/" + file.fileName);
     assert.equal(host.posted.length, 1);
 
     // A cancelled save says nothing, but is still answered.

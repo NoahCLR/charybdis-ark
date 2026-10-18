@@ -280,7 +280,7 @@ test("the demo's controls post their messages", async ({page}) => {
     await expect.poll(posted).toEqual([expect.objectContaining({type: "leaveDemo"})]);
     expect(JSON.stringify(await posted())).not.toContain("discardDemo");
     await page.locator('[data-screen="device"]').click();
-    await expect(page.locator(".main h1")).toHaveText("Device");
+    await expect(page.locator(".main h1")).toHaveText("Keyboard");
     await expect(page.locator(".main")).toContainText("no keyboard");
 
     // With an edit not exported: the review has Export in Apply's place, and

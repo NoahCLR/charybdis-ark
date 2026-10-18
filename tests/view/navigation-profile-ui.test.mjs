@@ -34,8 +34,8 @@ test("profile management leads with working import and export cards", () => {
     const recovery = profile.indexOf("profile-recovery");
     assert(actions >= 0 && recovery > actions, "backup actions must precede secondary recovery status");
     assert.match(profile, /class="card profile-action"/);
-    assert.match(profile, /Export profile…/);
-    assert.match(profile, /Choose profile…/);
+    assert.match(profile, /Save a backup file…/);
+    assert.match(profile, /Choose a backup file…/);
     assert.match(profile, /exportPortableProfile/);
     assert.match(profile, /choosePortableProfile/);
     assert.doesNotMatch(profile, /Layer priority/);

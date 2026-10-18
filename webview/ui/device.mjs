@@ -51,13 +51,13 @@ export function screenDevice() {
         setupChip: chip(device?.health?.halves === "agree" ? "ok" : "warn", halvesWords(model, device?.health?.halves).label.toLowerCase()),
         setupBody: `${kv([
             ["Generation and digest", device?.summary],
-            ["Recovery", device?.health?.recoveryPending ? "pending" : "clear"],
+            ["Save in progress", device?.health?.recoveryPending ? "yes: the previous profile is kept until both halves confirm" : "no"],
             ["Draft", changes],
         ])}${["alone", "apart"].includes(device?.health?.halves || "") ? `<p class="note">${esc(halvesWords(model, device?.health?.halves).detail)}</p>` : ""}`,
         read: () => post(controls.control("refresh")),
     };
     const main = el(`<div class="main">${topbar(
-        "Device",
+        "Keyboard",
         page.sub
     )}
         <div class="content"><div class="pad stack device-pad">

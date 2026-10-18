@@ -37,14 +37,14 @@ test("every scrolling tuning field posts the visible value once, retaining the r
 
 for (const [label, value, expected] of [
     ["Name", "Scroll sentinel", {name: "Scroll sentinel"}],
-    ["Pointer speed while active", "1400", {dpi: 1400}],
+    ["Ball speed", "1400", {dpi: 1400}],
     ["Scrolls", "1", {axis: 1}],
     ["Reverse scrolling", "3", {scroll: expect.objectContaining({invert: 3})}],
-    ["After this mode ends", "1", {pointerLayer: 1}],
+    ["While this mode runs", "1", {pointerLayer: 1}],
 ]) {
     test(`scrolling ${label} posts its record`, async ({page}) => {
         await openControls(page, "pointing", {pdSlot: 0});
-        if (label === "After this mode ends") await advanced(page);
+        if (label === "While this mode runs") await advanced(page);
         if (label === "Name") await change(field(page, label), value);
         else await field(page, label).selectOption(value);
         await configPost(page, 0, {kind: 2, ...expected});
@@ -90,7 +90,7 @@ test("directional shortcuts, axes, empty directions, output and thresholds all p
         await configPost(page, 4, {[key]: 777});
     }
     await clearPosts(page);
-    await field(page, "After this mode ends").selectOption("0");
+    await field(page, "While this mode runs").selectOption("0");
     await configPost(page, 4, {pointerLayer: 0});
     await clearPosts(page);
     await field(page, "Reads").selectOption("0");

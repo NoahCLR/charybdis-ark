@@ -39,7 +39,7 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
         for (const [field, macro] of [["dir:left", 0], ["diag:upLeft", 127]]) {
             await clearPosts(page);
             await page.locator(`label:has(input[data-f="pointing:4:${field}"]) button`).click();
-            const picker = page.getByRole("dialog", {name: "Pick a keycode"});
+            const picker = page.getByRole("dialog", {name: "Choose a key"});
             await picker.locator('[data-sec="macros"]').click();
             await expect(picker.locator("[data-pick]")).toHaveCount(128);
             if (macro === 0) await expect(picker).toContainText("Greeting <&>");
@@ -68,7 +68,7 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
         // Button 2 already taps a shortcut in the fixture. Choose a macro there.
         await clearPosts(page);
         await page.locator('label:has(input[data-f="pointing:4:button:1:tap"]) button').click();
-        const picker = page.getByRole("dialog", {name: "Pick a keycode"});
+        const picker = page.getByRole("dialog", {name: "Choose a key"});
         await picker.locator('[data-sec="macros"]').click();
         await picker.locator('[data-pick="VIA_MACRO_0"]').click();
         await picker.locator('[data-act="use"]').click();

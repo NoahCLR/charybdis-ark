@@ -21,10 +21,10 @@ export const leaveDemo = () => ({type: "leaveDemo"});
 // What the panel says in the demo.
 export const DEMO_WORDS = Object.freeze({
     status: "Demo · no keyboard",
-    banner: "No keyboard is connected. Change anything: edits stay in this window, and Export saves them as a profile file for your keyboard.",
+    banner: "No keyboard is connected. Change anything: edits stay in this window, and Save a backup file… keeps them for your keyboard.",
     explore: "Explore a demo",
     exploreTip: "Open Ark on a demo setup, with no keyboard. Every screen works and every edit shows in the review; only Apply needs a keyboard.",
-    exportNote: "Save the demo setup, with your edits, as a complete profile file. On your keyboard, Import it to review and apply it.",
+    exportNote: "Save the demo setup, with your edits, as a complete backup file. On your keyboard, restore it to review and apply it.",
 });
 
 // Leaving the demo, or opening another file in it, loses edits not exported
@@ -40,9 +40,9 @@ export function leaving(model, message) {
     const them = changes === 1 ? "it" : "them";
     return {
         ask: {
-            title: replacing ? "Open another profile file?" : "Leave the demo?",
-            detail: `Your ${count} in the demo ${changes === 1 ? "has" : "have"} not been exported. ${replacing ? "Opening another file replaces" : "Leaving loses"} ${them}; Export saves ${them} as a profile file first.`,
-            confirm: replacing ? "Open without exporting" : "Leave without exporting",
+            title: replacing ? "Open another backup file?" : "Leave the demo?",
+            detail: `Your ${count} in the demo ${changes === 1 ? "has" : "have"} not been saved to a backup file. ${replacing ? "Opening another file replaces" : "Leaving loses"} ${them}; Save a backup file… keeps ${them} first.`,
+            confirm: replacing ? "Open without saving" : "Leave without saving",
         },
         message: {...message, discardDemo: true},
     };

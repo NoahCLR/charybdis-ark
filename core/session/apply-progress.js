@@ -20,7 +20,7 @@
 /** @type {readonly {id: ApplyStep, label: string}[]} */
 const APPLY_STEPS = Object.freeze(/** @type {const} */ ([
     {id: "check", label: "Check the keyboard"},
-    {id: "backup", label: "Save a recovery copy"},
+    {id: "backup", label: "Save the previous profile"},
     {id: "upload", label: "Send the profile"},
     {id: "validate", label: "Keyboard checks the profile"},
     {id: "stage", label: "Stage keys and macros on the slave half"},

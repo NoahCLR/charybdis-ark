@@ -166,7 +166,7 @@ test("Export saves the demo's draft, edits and all; leaving afterwards asks noth
         const [file] = host.exports;
         assert.match(file.fileName, /^charybdis-demo-\d{4}-\d\d-\d\d\.charybdis\.json$/);
         assert.equal(fingerprint(JSON.parse(file.text)), current.fingerprint, "the file holds the draft, not the demo profile");
-        assert.match(last(host).notice, /Demo setup exported to \/exports\/.+Import it on your keyboard/);
+        assert.match(last(host).notice, /Demo setup saved as a backup file at \/exports\/.+Restore it on your keyboard/);
         assert.equal(last(host).model.demo.unsaved, false);
 
         await loop.handleMessage({type: "leaveDemo"});

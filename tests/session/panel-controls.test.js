@@ -127,7 +127,7 @@ test("apply writes a recovery copy through the host, then reads the keyboard aga
     assert.deepEqual(readSteps, [["layout", true], ["profile", true], ["combos", true], ["baseRgb", true]]);
     assert.equal(session.postApplyReadStep, undefined, "the readback state clears when Apply finishes");
     assert.equal(session.applyRunning, false, "a later operation is not drawn as this Apply's readback");
-    assert.match(session.notice, /Recovery copy: \/recovery\/1\.json/);
+    assert.match(session.notice, /Previous profile saved at \/recovery\/1\.json/);
     assert.match(session.notice, /both halves and verified/);
     assert.equal(session.resetDraftForms, true);
 });
@@ -142,9 +142,9 @@ test("an Apply that renames the keyboard expects it to reconnect, and a readback
         session.draft.review(session.draft.revision);
         await draftControl(session, {type: "applyProfileDraft", draftRevision: session.draft.revision}, host());
         assert.deepEqual(session.reconnect, {deviceId: "kb", serialNumber: "", name, otherDevices: [], startedAt: session.reconnect.startedAt, dropped: false,
-            saved: "Complete profile applied to both halves and verified. Recovery copy: /recovery/1.json"});
+            saved: "Complete profile applied to both halves and verified. Previous profile saved at /recovery/1.json"});
         assert.deepEqual(expecting, [true]);
-        assert.equal(session.notice, `Complete profile applied to both halves and verified. Recovery copy: /recovery/1.json ${RECONNECT_WORDS.waiting}`,
+        assert.equal(session.notice, `Complete profile applied to both halves and verified. Previous profile saved at /recovery/1.json ${RECONNECT_WORDS.waiting}`,
             interrupted ? "the keyboard is read again once it is back, so the cut-short read is not reported" : "");
     }
     // A save that leaves the name alone expects nothing.
@@ -181,7 +181,7 @@ test("a failed post-Apply read clears its progress stage and is said after the s
     await draftControl(session, {type: "applyProfileDraft", draftRevision: session.draft.revision}, host());
     assert.equal(session.postApplyReadStep, undefined);
     assert.equal(session.applyRunning, false);
-    assert.match(session.notice, /^Complete profile applied to both halves and verified\. Reading the keyboard again failed: readback interrupted\. Recovery copy: \/recovery\/1\.json$/);
+    assert.match(session.notice, /^Complete profile applied to both halves and verified\. Reading the keyboard again failed: readback interrupted\. Previous profile saved at \/recovery\/1\.json$/);
 });
 
 test("a destination blocker refuses Apply before recovery or HID", async () => {
@@ -284,7 +284,7 @@ test("layer edits and imports are kept in the draft; without one they restore to
     bare.portableReview = {document: document(), before: bare.service.portable};
     await portableControl(bare, {type: "restorePortableProfile"}, h);
     assert.deepEqual(bare.service.calls, ["restorePortableProfile", "readLayout", "readCommittedProfile", "readCombos", "readBaseRgb"]);
-    assert.match(bare.notice, /Recovery copy: \/recovery\/1\.json/);
+    assert.match(bare.notice, /Previous profile saved at \/recovery\/1\.json/);
 });
 
 test("a layer editor opened on one keyboard cannot replace another keyboard's draft", async () => {
