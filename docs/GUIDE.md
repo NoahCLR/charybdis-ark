@@ -175,7 +175,7 @@ What each screen edits:
 | Surface | What it edits |
 | --- | --- |
 | Keys | Layout keys, key behaviours, combos, layer names and priority; reachable behaviours, macros and pointing modes are shown in place, whether a key, a behaviour branch or a combo reaches them |
-| Custom keys | The 128 custom keys' names and, for each, its behaviour: timings, the tap × tier grid and participation, for a key on a layer or on none; where each is placed |
+| Custom keys | The 128 custom keys' names, shortcuts and, for each, its behaviour: timings, the tap × tier grid and participation, for a key on a layer or on none; where each is placed |
 | Lighting | Six stages, the stage mask, layer and pointing-mode colours with their localities, combo and key feedback, auto-mouse fade with its hold as a share of the timeout, LED group rows and reusable groups |
 | Macros | Named slots: literal Text, a compact sequence of key/delay/press/release tiles, drag reordering and a selected-step editor, raw payload, live size feedback, configurable recorder and placement; search by name, and the layers that set each macro off — by key, behaviour or combo — in their layer colour, each opening that layer in Keys with the macro picked |
 | Mouse | Pointer speed, sniping and auto-mouse — the Settings sections the keyboard's model files under Mouse, drawn with the same cards and posted whole |
@@ -826,7 +826,9 @@ does not change macOS Unicode Hex Input's effect on Option shortcuts.
 Text edits and renames preserve the choice. Review, undo/redo, discard, exports
 and imports carry it with the macro.
 
-Shared macro memory stays in the slot bank; the editor shows checking status and
+Shared macro memory stays in the slot bank. Every empty slot keeps room there
+for ten key taps; when it cannot, the highest empty slots read **unavailable**
+and cannot be picked until a macro is shortened or cleared. The editor shows checking status and
 validation errors without routine memory or staging notes. Valid edits enter the draft when you finish editing a field or change a key step. Incomplete,
 invalid or oversized edits stay visible locally with their reason and never
 replace the last valid draft. **Discard local edits** returns to the draft's
@@ -1054,14 +1056,22 @@ does. Import is disabled while the keyboard or
 draft is unavailable, stale or busy. Multiple, unreadable, invalid and oversized
 files are refused without replacing your draft.
 
-**Profile memory** shows how full the profile is. Behaviours, combos,
-lighting, pointing modes, settings, every layer, macro and custom-key name and
-the keyboard's own name share one block on the keyboard: 53,216 bytes on
-current firmware, the size the keyboard reports. The card lists what uses it, area by area, and the counted
-limits beside it: behaviours, behaviour steps, combos, lighting groups and
-lighting group rows. Each area can stay under its own limit and the profile
-still fill up, so a full profile can refuse an edit in any of them. The bar
-turns amber from 90%. The figures are your draft's while it has changes, and
+**Profile memory** shows how full the profile is. Its bar is the space the
+keyboard stores behaviours, combos, lighting, pointing modes, custom keys,
+settings and every name in: 53,216 bytes on current firmware, the size the
+keyboard reports. Under it, **In use** counts what you have set up against what
+the keyboard holds, each with a short bar, in the words of the screen that
+edits it. Behaviours, behaviour tap counts, combos, LED groups and LED
+overrides count toward limits: at one, the row says full and the keyboard
+refuses one more. Macro slots with steps, custom keys with a name, a shortcut
+or a behaviour, and pointing-mode slots that hold a mode count out of the 128,
+128 and 32 the keyboard has, each bar showing the slots in use against the free
+ones. Every empty macro slot keeps room in macro memory for ten key taps; when
+the memory cannot, the highest empty slots are unavailable until a macro is
+shortened or cleared, and the Macros bar fills its free end in red for them,
+its row saying how many are unavailable. Hover a row for what it counts. The
+profile bar turns orange from 90%, when the next edit may not fit. The figures
+are your draft's while it has changes, and
 the keyboard's otherwise; they follow every edit, undo and discard. Macro steps
 are stored apart from the profile, so the card shows them as a second bar,
 counted slot by slot on Macros.

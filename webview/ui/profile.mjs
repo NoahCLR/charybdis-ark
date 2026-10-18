@@ -4,8 +4,8 @@
 // Layer names and priority are edited beside the board, in Keys → Layers, where
 // what a layer holds is visible while it is named.
 //
-// A complete profile is layers, behaviours, combos, macros, pointing modes,
-// lighting and settings. Restoring one replaces all of that, so the card counts, area
+// A complete profile is layers, behaviours, combos, custom keys, macros,
+// pointing modes, lighting and settings. Restoring one replaces all of that, so the card counts, area
 // by area, what the file changes on the keyboard before anything is written.
 
 // Selector assertions refer to elements created by this module's authored markup.
@@ -35,7 +35,7 @@ export function screenProfile() {
 
     const main = el(`<div class="main">${topbar(
         "Profile & backups",
-        "A complete backup is everything the keyboard stores: layers, behaviours, combos, macros, pointing modes, lighting and settings.",
+        "A complete backup is everything the keyboard stores: layers, behaviours, combos, custom keys, macros, pointing modes, lighting and settings.",
     )}</div>`);
 
     const content = el(`<div class="content"><div class="pad stack profile-pad"></div></div>`);
@@ -162,8 +162,8 @@ function recoveriesCard(recoveries) {
     return node;
 }
 
-// How full the profile is, area by area, with the counted limits beside it.
-// Every area shares the one block, so the bar is what an edit can run into.
+// How full the profile is, and how many of each thing are set up against what
+// the keyboard holds: the counts are what an edit runs into first.
 /** @param {NonNullable<ReturnType<typeof profileUsageView>>} usage */
 function usageCard(usage) {
     /** @param {number} value */
@@ -174,13 +174,13 @@ function usageCard(usage) {
             <div><div class="sect-h"><h4>Profile</h4>
                 <span class="right note">${bytes(usage.used)} of ${bytes(usage.capacity)} bytes used · ${bytes(usage.free)} free</span></div>
                 <div class="meter ${usage.nearlyFull ? "near" : ""}" data-tip="${Math.round(usage.share * 100)}% used"><i style="width:${usage.share * 100}%"></i></div></div>
-            <p class="note">Behaviours, combos, lighting, pointing modes, settings and names all share this one block, so a full profile can refuse an edit in any of them${usage.nearlyFull ? ". It is nearly full: the next edit may not fit" : ""}.</p>
-            <div class="usage-tables">
-                <table class="t"><thead><tr><th>Uses the block</th><th class="num">Bytes</th><th></th></tr></thead>
-                    <tbody>${usage.areas.map((area) => `<tr><td>${esc(area.label)}</td><td class="mono num">${bytes(area.bytes)}</td><td class="note mono num">${area.percent}%</td></tr>`).join("")}</tbody></table>
-                ${usage.counts.length ? `<table class="t"><thead><tr><th>Counted limits</th><th class="num">Used</th><th></th></tr></thead>
-                    <tbody>${usage.counts.map((count) => `<tr><td>${esc(count.label)}</td><td class="mono num">${count.used} of ${count.limit}</td><td class="note">${count.full ? "full" : ""}</td></tr>`).join("")}</tbody></table>` : ""}
-            </div>
+            <p class="note">Behaviours, combos, lighting, pointing modes, custom keys, settings and names are stored together here${usage.nearlyFull ? ". It is nearly full: the next edit may not fit" : ""}.</p>
+            ${usage.counts.length ? `<table class="t usage-counts"><thead><tr><th>In use</th><th class="count num"></th><th></th><th></th></tr></thead>
+                <tbody>${usage.counts.map((count) => `<tr data-tip="${esc(count.tip)}"><td>${esc(count.label)}</td>
+                    <td class="mono count num">${count.used} of ${count.limit}</td>
+                    <td class="bar"><div class="meter"><i style="width:${count.share * 100}%"></i>${count.unavailable
+                        ? `<span class="out" style="width:${count.unavailableShare * 100}%"></span>` : ""}</div></td>
+                    <td class="note">${esc(count.note)}</td></tr>`).join("")}</tbody></table>` : ""}
             ${usage.macros ? `<div><div class="sect-h"><h4>Macro memory (separate)</h4>
                 <span class="right note">${bytes(usage.macros.used)} of ${bytes(usage.macros.capacity)} bytes used</span></div>
                 <div class="meter"><i style="width:${usage.macros.share * 100}%"></i></div>
@@ -207,7 +207,7 @@ function reviewCard(model, portable, busy) {
         ? "An interrupted restore left an incomplete configuration, so this file cannot be compared with it. This profile replaces it; the interrupted data is kept as a diagnostic copy, so keep your original backup as well."
         : draft
             ? `${pending ? `This replaces your draft and its ${pending} change${pending === 1 ? "" : "s"}; Undo brings ${pending === 1 ? "it" : "them"} back. ` : ""}Nothing is written to the keyboard until you review and apply; the review shows every change field by field.`
-            : "This replaces the keyboard's layout, behaviours, combos, macros, pointing modes, lighting and settings. A recovery copy is saved automatically before restoring, and both halves are verified afterwards.";
+            : "This replaces the keyboard's layout, behaviours, combos, custom keys, macros, pointing modes, lighting and settings. A recovery copy is saved automatically before restoring, and both halves are verified afterwards.";
     const node = el(`<div class="card">
         <div class="card-h"><h3>${draft ? "Use this profile as your draft?" : "Restore this profile?"}</h3>
             ${fileName ? `<span class="right note mono">${esc(fileName)}</span>` : ""}</div>

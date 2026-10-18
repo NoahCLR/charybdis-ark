@@ -128,8 +128,8 @@ export interface Check extends Finding {key: string; status: 'new' | 'existing' 
 export interface ProfileUsage {
     used: number;
     capacity: number;
-    areas: {id: string; bytes: number}[];
-    counts: {id: string; used: number; limit: number}[];
+    /** `unavailable`: free slots the keyboard cannot use right now (macro slots macro memory has no room for). */
+    counts: {id: string; used: number; limit: number; unavailable?: number}[];
     source?: 'draft' | 'keyboard' | 'demo';
 }
 
