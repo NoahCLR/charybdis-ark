@@ -79,8 +79,8 @@ browser's storage before they write anything, and refuse to write if it cannot
 be saved. Backups lists every copy, newest first, with **Use as draft**,
 **Download** and **Delete**. Ark asks Chrome to keep this storage when space runs
 low, but clearing the site's data (or the browser's) deletes the copies, so
-download any you want to keep. **Save a backup file…** downloads the backup file;
-**Choose a backup file…** opens the browser's file chooser and takes files up to
+download any you want to keep. **Export profile…** downloads the profile file;
+**Choose profile…** opens the browser's file chooser and takes files up to
 256 KiB, enough for any complete profile. Errors
 show in the rail's message rather than as a notification, and the page's
 version and commit are at the foot of the rail, with GitHub's logo: choose them
@@ -105,9 +105,9 @@ lives in this window until it is left or closed.
 
 **Apply needs a keyboard.** The commit bar's button reads **Review changes**,
 and where the review would offer Apply it says Apply needs a keyboard and
-offers **Export…**. Export there, or **Save a backup file…** on Backups, saves the demo's
+offers **Export…**. Export there, or **Export profile…** on Backups, saves the demo's
 setup with your edits as a profile file (`charybdis-demo-<date>.charybdis.json`);
-on your keyboard, **Choose a backup file…** on Backups reviews it against what the keyboard holds
+on your keyboard, **Choose profile…** on Backups reviews it against what the keyboard holds
 before anything is applied.
 
 **Open a profile file…**, on the strip, replaces the demo's setup with one of
@@ -181,7 +181,7 @@ What each screen edits:
 | Mouse | Pointer speed, sniping (with where the sniping keys are placed, and Place on a key…) and auto-mouse — the Settings sections the keyboard's model files under Mouse, drawn with the same cards and posted whole |
 | Pointing modes | All 32 slots: movement, speed, direction shortcuts and how often they send (every step, or once per movement until the ball pauses or moves back the other way), scroll tuning and which way a scrolling mode scrolls (both axes, horizontal only or vertical only), what each direction's shortcut does with held modifiers, thresholds shown as ball movement at the mode's DPI, buttons, bindings, placement, clear and duplicate |
 | Settings | Tap & hold timing · where behaviours and combos run · combo timing (the default combo window and the combo hold threshold, which the keyboard stores with its combos) · combo layer matching · key options · your computer · base lighting · default layers · what is built into this firmware (read-only); each section posted whole, read-only where the firmware build leaves an option out |
-| Backups | Back up (Save a backup file…) and Restore (Choose a backup file…: the file against the keyboard, counted by what it configures, and whether it fits, before it becomes the draft); the copies saved before each Apply, each usable as a draft |
+| Backups | Export profile, and Import profile (Choose profile…, or drop a file: the file against the keyboard, counted by what it configures, and whether it fits, before it becomes the draft); the copies saved before each Apply, each usable as a draft |
 | Keyboard | The keyboard's name (the screen's title, click to rename); its firmware and whether it works with this Ark; both halves; memory; diagnostics |
 
 ## The interface
@@ -1119,11 +1119,11 @@ progress, so keep the recovery file that Apply creates.
 
 ## Profiles and backups
 
-Charybdis Ark's **Save a backup file…** saves the configuration read from the
+Charybdis Ark's **Export profile…** saves the configuration read from the
 keyboard: every layer and key position, behaviours, combos, named VIA macros,
 lighting and global settings. Flashed defaults and live edits become one
 portable file.
-Saving a backup file leaves the editor and any local draft unchanged, even if the keyboard
+Exporting leaves the editor and any local draft unchanged, even if the keyboard
 has changed since its last editor read.
 
 A backup restores onto the same firmware release; check the release notes
@@ -1135,18 +1135,18 @@ kept in the browser's storage, each with **Use as draft** (it opens the same
 comparison as a backup file), **Download** and **Delete** (see [Using Ark in
 Chrome](#using-ark-in-chrome)). VS Code keeps them as files in the
 extension's local storage and the notice after Apply shows the full path;
-restore one with **Choose a backup file…**. **Start from the firmware's
+import one with **Choose profile…**. **Start from the firmware's
 defaults** is not available yet: the keymap and macros need firmware support
 first.
 
-On **Backups**, use **Choose a backup file…** or drop one backup file
-onto the **Restore** card. Both open the same comparison, as a sheet over the
+On **Backups**, use **Choose profile…** or drop one backup file
+onto the **Import profile** card. Both open the same comparison, as a sheet over the
 screen, including in the demo: what the file changes, counted by what it
 configures, and whether it fits ("This file fits: 4,101 of 53,216 bytes"). **Use as draft** replaces the draft; Undo brings it back, and the keyboard
 changes only after Review and Apply. A file that holds exactly what the
 keyboard runs changes nothing and cannot be used, unless the draft has edits:
 then using it puts the draft back to the keyboard's profile, as **Discard all**
-does. Restore is disabled while the keyboard or
+does. Import is disabled while the keyboard or
 draft is unavailable, stale or busy. Multiple, unreadable, invalid and oversized
 files are refused without replacing your draft.
 

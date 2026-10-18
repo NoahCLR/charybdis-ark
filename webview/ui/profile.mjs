@@ -26,8 +26,8 @@ export function screenProfile() {
     const busy = Boolean(portable.busy);
     const canExport = canEditArea("export");
     const canImport = canEditArea("import");
-    // In the demo there is no keyboard: Back up saves the demo's draft,
-    // Restore reviews a file against the demo setup, and nothing is recovered.
+    // In the demo there is no keyboard: Export saves the demo's draft,
+    // Import reviews a file against the demo setup, and nothing is recovered.
     const demo = demoOf(model).active;
 
     const main = el(`<div class="main">${topbar(
@@ -43,25 +43,25 @@ export function screenProfile() {
         pad.appendChild(el(`<div class="unavailable">${esc("Connect a keyboard with complete-profile firmware to manage its backups.")}</div>`));
     }
 
+    // Import first, as a drop zone; the arrow points in. Export's points out.
     const actions = el(`<div class="profile-actions">
-        <div class="card profile-action">
-            <div class="card-b">
-                <span class="profile-action-mark"><svg viewBox="0 0 24 24"><path d="M12 3v12M7.5 10.5 12 15l4.5-4.5M4 19h16"/></svg></span>
-                <h3>Back up</h3>
-                <p class="note">${demo ? esc(DEMO_WORDS.exportNote)
-                    : "Save everything the keyboard runs now as one file, to keep or to restore later."}</p>
-                <p class="note">${esc(FIRMWARE_LINE)}</p>
-                <button class="btn" data-act="export" ${canExport ? "" : "disabled"}>Save a backup file…</button>
-            </div>
-        </div>
         <div class="card profile-action" data-profile-drop aria-disabled="${!canImport}">
             <div class="card-b">
-                <span class="profile-action-mark"><svg viewBox="0 0 24 24"><path d="M12 21V9M7.5 13.5 12 9l4.5 4.5M4 5h16"/></svg></span>
-                <h3>Restore</h3>
-                <p class="note">${demo ? "Choose or drop a backup file here to compare it with the demo setup first. Using it replaces the demo's draft; Undo brings it back."
-                    : "Choose or drop a backup file here to compare it with the keyboard first. Using it replaces your draft; nothing is written until you review and apply."}</p>
+                <span class="profile-action-mark"><svg viewBox="0 0 24 24"><path d="M12 3v12M7.5 10.5 12 15l4.5-4.5M4 19h16"/></svg></span>
+                <h3>Import profile</h3>
+                <p class="note">${demo ? "Choose or drop a complete backup here and review its differences from the demo setup first. Import replaces the demo's draft; Undo brings it back."
+                    : "Choose or drop a complete backup here and review its differences first. Import replaces the local draft; nothing is written to the keyboard until you review and apply it."}</p>
                 <p class="note profile-drop-status" role="status" hidden></p>
-                <button class="btn" data-act="import" ${canImport ? "" : "disabled"}>Choose a backup file…</button>
+                <button class="btn" data-act="import" ${canImport ? "" : "disabled"}>Choose profile…</button>
+            </div>
+        </div>
+        <div class="card profile-action">
+            <div class="card-b">
+                <span class="profile-action-mark"><svg viewBox="0 0 24 24"><path d="M12 21V9M7.5 13.5 12 9l4.5 4.5M4 5h16"/></svg></span>
+                <h3>Export profile</h3>
+                <p class="note">${demo ? esc(DEMO_WORDS.exportNote)
+                    : `Save a complete backup of the profile currently running on the keyboard. Keep it somewhere safe before experimenting. ${esc(FIRMWARE_LINE)}`}</p>
+                <button class="btn primary" data-act="export" ${canExport ? "" : "disabled"}>Export profile…</button>
             </div>
         </div>
     </div>`);
@@ -138,7 +138,7 @@ function wireProfileDrop(card) {
             tell("");
             post(reviewPortableProfile(text, file.name));
         } catch {
-            tell("This backup file could not be read. Try Choose a backup file… instead.");
+            tell("This backup file could not be read. Try Choose profile… instead.");
         } finally {
             reading = false;
             choose.disabled = !canEditArea("import");
@@ -164,7 +164,7 @@ function recoveriesCard(model, recoveries) {
                 <button class="btn text destructive" data-delete="${esc(copy.id)}">Delete</button></span></div>`).join("")}</div>` : ""}
         <div class="card-b"><p class="note">${recoveries
             ? `${recoveries.length ? "" : "None yet. "}Every Apply first saves what the keyboard had, here. They stay in this browser until you delete them or clear the site's data, so download any you want to keep.`
-            : "Every Apply first saves what the keyboard had as a file in VS Code's storage for Ark; the message after Apply says where. Restore one with Choose a backup file…"}</p></div>
+            : "Every Apply first saves what the keyboard had as a file in VS Code's storage for Ark; the message after Apply says where. Import one with Choose profile…"}</p></div>
     </div>`);
     /** @param {string} attribute @param {(id: string | number) => Parameters<typeof post>[0]} message */
     const wire = (attribute, message) => /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll(`[${attribute}]`)).forEach((button) => button.addEventListener("click", () => {
