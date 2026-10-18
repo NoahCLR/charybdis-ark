@@ -83,7 +83,10 @@ export function stageBase(model) {
         controls.push(box);
     }
     effect.append(stack(...controls));
-    if (brightness) effect.append(el(`<p class="note" data-base-brightness>Brightness ${esc(brightness.value)} of ${esc(brightness.max ?? model.rgb.maximumBrightness ?? "")}, the keyboard's limit. Layer colours and feedback have their own brightness.</p>`));
+    const limit = brightness?.max ?? model.rgb.maximumBrightness;
+    if (brightness) effect.append(el(`<p class="note" data-base-brightness>${limit === undefined
+        ? `Brightness ${esc(brightness.value)}. ${esc(brightness.hint || "")}`
+        : `Brightness ${esc(brightness.value)} of ${esc(limit)}, the keyboard's limit.`} Layer colours and feedback have their own brightness.</p>`));
     if (!canEdit) effect.append(el(`<div class="unavailable">${esc(unavailable(model) || "The base effect cannot be edited right now.")}</div>`));
     node.append(colour, effect);
     return node;
