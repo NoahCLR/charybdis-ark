@@ -73,12 +73,12 @@ test("the shortcut picker offers the modifier keys and shifted symbols, as modif
     await page.evaluate(async () => (await import("/webview/ui/keys/key-edits.mjs")).pickKeycodeFor(27));
     open.board = await keysOf(".picker .pkb [data-pick]");
     expect(open.board).toContain("KC_LSFT");
-    for (const section of ["symbols", "more"]) {
+    for (const section of ["symbols", "else"]) {
         await page.locator(`.picker [data-sec="${section}"]`).click();
         open[section] = await keysOf(".picker .pk-rows [data-pick]");
     }
     expect(open.symbols).toContain("KC_EXLM");
-    expect(open.more).toContain("KC_LEFT_CTRL");
+    expect(open.else).toContain("KC_LEFT_CTRL");
     await page.locator('.picker [data-act="cancel"]').first().click();
 
     await page.locator('[data-screen="customKeys"]').click();
@@ -93,8 +93,12 @@ test("the shortcut picker offers the modifier keys and shifted symbols, as modif
     await expect(page.locator('.picker .pkb [data-pick="KC_LSFT"]')).toHaveClass(/\bon\b/);
     await page.locator('.picker .pkb [data-pick="KC_LSFT"]').click();
     await expect(page.locator('.picker [data-mod="S"]')).not.toHaveClass(/\bon\b/);
-    await page.locator('.picker [data-sec="more"]').click();
-    expect(await keysOf(".picker .pk-rows [data-pick]")).toEqual(open.more);
+    await page.locator('.picker [data-sec="else"]').click();
+    // Everything else also holds QMK's own keys, which no shortcut sends; the
+    // keys a shortcut can hold are the Keys screen's, in its order.
+    const shortcutElse = await keysOf(".picker .pk-rows [data-pick]");
+    expect(shortcutElse).toEqual(open.else.filter((key) => shortcutElse.includes(key)));
+    expect(shortcutElse).toEqual(expect.arrayContaining(["KC_LEFT_CTRL", "KC_F1"]));
     await page.locator('.picker [data-sec="symbols"]').click();
     expect(await keysOf(".picker .pk-rows [data-pick]")).toEqual(open.symbols);
     await page.locator('.picker [data-pick="KC_EXLM"]').click();

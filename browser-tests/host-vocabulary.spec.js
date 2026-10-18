@@ -43,7 +43,7 @@ for(const theme of ["vscode-dark","vscode-light"]) {
             for(const {value,label} of model.vocabulary.pickerModifiers) await expect(page.locator(`[data-mod="${value}"]`)).toHaveText(label);
             await expect(page.locator('.picker .sheet-h')).toContainText(hostKeyLabel('Left GUI',host));
             await expect(page.locator('[data-mod="RGUI"]')).toHaveClass(/on/);
-            await expect(page.locator('.picker [data-remove="0"]')).toContainText('KC_A');
+            await expect(page.locator('.picker .pk-value')).toContainText('KC_A');
             await expect(page.locator('.pkb-key[data-pick="KC_LGUI"]')).toHaveAttribute('aria-label',hostKeyLabel('Left GUI',host));
             await expect(page.locator('.pkb-key[data-pick="KC_RALT"]')).toContainText(hostKeyLabel('Alt',host));
             await page.locator('#pickerSearch').fill('SC_LAPO');
@@ -96,7 +96,7 @@ for(const theme of ['vscode-dark','vscode-light']) {
         for(const host of [1,2,3,0]) {
             await sendHost(page,host);
             await expect(page.locator('.picker .sheet-h')).toContainText(hostKeyLabel('Left GUI',host));
-            await expect(page.locator('.picker [data-remove="0"]')).toContainText('KC_LEFT_GUI');
+            await expect(page.locator('.picker .pk-value')).toContainText('KC_LEFT_GUI');
         }
         await page.locator('.picker [data-act="clear"]').click();
         await page.locator('.pkb-key[data-pick="KC_A"]').click();

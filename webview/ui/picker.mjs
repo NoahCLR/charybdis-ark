@@ -434,7 +434,8 @@ export function pickerOverlay() {
         </div>
         ${single ? `<div class="sheet-f pk-foot">
             <span class="pk-slot"><span class="eyebrow">Tap</span>
-                <button class="value-btn" data-act="tapslot" data-tip="Choose the key a tap sends from any section, or search.">${picker.keys.length ? actionMarked(model, tapExpression || picker.keys[0]) : "—"}</button></span>
+                <button class="value-btn" data-act="tapslot" data-tip="Choose the key a tap sends from any section, or search.">${picker.keys.length ? actionMarked(model, tapExpression || picker.keys[0]) : "—"}</button>
+                ${picker.keys.length ? `<button class="btn text icon" data-remove="0" aria-label="Remove the tap" data-tip="Remove the tap">✕</button>` : ""}</span>
             ${picker.target ? `<span class="pk-slot pk-hold"><span class="eyebrow">Hold</span>
                 <button class="value-btn" data-act="holdmenu" aria-haspopup="menu" aria-expanded="${Boolean(picker.holdMenu)}">${holdWords(model, picker.hold)} <span aria-hidden="true">▾</span></button>
                 ${holdMenu(model, picker)}</span>` : ""}
