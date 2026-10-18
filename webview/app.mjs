@@ -174,7 +174,7 @@ function reveal() {
 }
 
 setRenderer(render);
-bindLayerIndex(() => state.layer);
+bindLayerIndex(() => state.layer, () => state.selected);
 mountHover(root);
 mountNumberEntry(root);
 

@@ -11,13 +11,14 @@ import {actionMarked, keyNameMarked, marked, sends} from "../marks.mjs";
 
 // One action by the press that runs it: "Tap F", "Hold ■ Navigation" (a hold
 // of a layer hold says Hold once), "Tap . from ■ Base" for a transparent one.
-/** @param {Model} model @param {Summary["parts"][number]} part */
-export function partHtml(model, part) {
+// Without its lead, for a card that sets the press in its own column.
+/** @param {Model} model @param {Summary["parts"][number]} part @param {{lead?: boolean}} [options] */
+export function partHtml(model, part, {lead: withLead = true} = {}) {
     const words = actionLabel(model, part.action);
     // A hold of a layer hold says hold once: "Hold ■ Number", "2× hold ■ Number".
     const holdsLayer = /hold$/i.test(part.lead) && /^Hold /.test(words);
-    const what = sends(model, part.action) || actionMarked(model, part.action, holdsLayer && part.lead !== "Hold" ? words.slice(5) : words);
-    const lead = holdsLayer && part.lead === "Hold" ? "" : `${esc(part.lead)} `;
+    const what = sends(model, part.action) || actionMarked(model, part.action, holdsLayer && (part.lead !== "Hold" || !withLead) ? words.slice(5) : words);
+    const lead = !withLead || (holdsLayer && part.lead === "Hold") ? "" : `${esc(part.lead)} `;
     const from = part.from ? ` <span class="dim">from</span> ${marked(model, {kind: "layer", layer: part.from.index}, part.from.displayName || part.from.name)}` : "";
     return `${lead}${what}${from}`;
 }

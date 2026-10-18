@@ -1302,6 +1302,7 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .hc-head { padding: 10px 12px 10px; border-bottom: 1px solid var(--line); }
 .hc-title { display: flex; align-items: center; gap: 8px; }
 .hc-title .t { font-size: var(--fs-heading); font-weight: var(--fw-strong); letter-spacing: -.02em; }
+.hc-warn { color: var(--warning); }
 .hc-pill { margin-left: auto; font-family: var(--mono); font-size: var(--fs-micro); color: var(--text-3);
   border: 1px solid var(--line); border-radius: var(--r-chip); padding: 1px 6px; }
 .hc-code { display: block; margin-top: 4px; font-family: var(--mono); font-size: var(--fs-micro); color: var(--text-3); }

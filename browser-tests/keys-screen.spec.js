@@ -98,3 +98,15 @@ test("the board is one Tab stop; arrows move the picked key, [ ] and digits swit
     await page.keyboard.press("Enter");
     await expect(page.getByRole("dialog", {name: "Choose a key"})).toBeVisible();
 });
+
+test("the hover card names the key's actions by press, with no index pill or footer", async ({page}) => {
+    await openControls(page, "keys", {tab: "key", selected: 5, layer: 0});
+    await page.locator('.keys-pad .board [data-key="0"]').hover();
+    const card = page.locator(".hovercard:not(.hc-side)").first();
+    await expect(card).toBeVisible();
+    await expect(card.locator(".hc-pill")).toHaveCount(0);
+    await expect(card.locator(".hc-act .hc-stage").first()).toHaveText("Tap");
+    await expect(card).not.toContainText("Each dot is the colour");
+    await page.keyboard.press("Escape");
+    await expect(card).toBeHidden();
+});
