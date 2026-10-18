@@ -36,14 +36,14 @@ Key and modifier names follow that OS throughout the editors and Review.
   stays active either way.
 - **Lighting.** Set layer and mode colours, combo and key feedback, and the
   idle timeout in seconds or minutes. Tune the
-  auto-mouse fade. The board on screen is painted the way the keyboard will
+  mouse layer fade. The board on screen is painted the way the keyboard will
   light up, with black overlays kept distinct from inherited colours.
 - **Its name.** Call the keyboard what you like, and that is the name your
   computer, Chrome and Ark show once it is applied.
-- **Trackball.** Set pointer speed, sniping and auto-mouse, and 32 pointing
-  slots (scroll, volume, zoom, arrows, your own
+- **Trackball.** Set ball speed, sniping and the mouse layer, and 32 trackball
+  modes (scroll, volume, zoom, arrows, your own
   shortcuts…), with their keys. Directions and button overrides can click
-  mouse buttons 1–8 or run a macro too. Mouse and Settings explain each
+  mouse buttons 1–8 or run a macro too. Trackball and Settings explain each
   control on hover.
 
 ## Nothing is saved until you say so
@@ -51,17 +51,17 @@ Key and modifier names follow that OS throughout the editors and Review.
 Every edit goes into a draft with undo, redo and a full history. **Review**
 lists what changed and checks what the layers let you reach. It warns you
 about a layer you could lock yourself into, combos that can't fire and macros
-your Host setup can't play. **Apply** saves a recovery copy, writes both halves
+your computer's setup can't play. **Apply** saves the previous profile, writes both halves
 and reads the result back to prove it, and you can stay in the editor while it
 does.
 
-**Export profile** saves your whole setup as one file. **Import profile**
-takes a backup by choosing a file or dropping it onto the Import card, then
-restores it after the same review.
+**Save a backup file…** saves your whole setup as one file. **Choose a backup
+file…** (or dropping one onto the Restore card) restores it after the same
+review.
 
 No keyboard to hand? **Explore a demo** opens Ark on a complete setup with nothing
 connected. Every screen works and every edit shows up in the review; only Apply
-needs the keyboard, and Export takes what you made there to yours.
+needs the keyboard, and Save a backup file… takes what you made there to yours.
 
 ## Install
 

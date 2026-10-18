@@ -54,7 +54,9 @@ export function screenSettings() {
     const query = (state.settingsSearch || "").trim().toLowerCase();
     if (model?.keyboardName && (!query || matches(KEYBOARD_NAME, query))) pad.appendChild(keyboardCard(model, model.keyboardName, canEdit));
     /** @param {import("../../contracts/panel.js").PresentedSection} section */
-    const matching = (section) => query ? section.fields.filter((field) => matches(field, query)) : section.fields;
+    // A section found by one of its other names (section.search: QMK's,
+    // or the one Ark used before) shows whole.
+    const matching = (section) => !query || matches({label: section.label, hint: section.search}, query) ? section.fields : section.fields.filter((field) => matches(field, query));
     for (const section of sections) {
         const fields = matching(section);
         const timing = section.id === "comboSettings" ? (section.comboTiming || []).filter((entry) => !query || matches(entry, query)) : [];
@@ -66,12 +68,12 @@ export function screenSettings() {
         }
         pad.appendChild(card);
     }
-    // A search for something that moved to Mouse says where it went.
-    const elsewhere = query ? sectionsIn(model, "Mouse").reduce((total, section) => total + matching(section).length, 0) : 0;
+    // A search for something that moved to Trackball says where it went.
+    const elsewhere = query ? sectionsIn(model, "Trackball").reduce((total, section) => total + matching(section).length, 0) : 0;
     if (elsewhere) {
         const note = el(`<div class="callout row gap-10">
-            <span>${elsewhere} matching setting${elsewhere === 1 ? " is" : "s are"} on the Mouse screen.</span>
-            <button class="btn tiny" data-act="mouse">Open Mouse</button></div>`);
+            <span>${elsewhere} matching setting${elsewhere === 1 ? " is" : "s are"} on the Trackball screen.</span>
+            <button class="btn tiny" data-act="mouse">Open Trackball</button></div>`);
         /** @type {HTMLButtonElement} */ (note.querySelector('[data-act="mouse"]')).addEventListener("click", () => { state.screen = "mouse"; render(); });
         pad.appendChild(note);
     }
@@ -118,8 +120,10 @@ function comboTimingRow(model, entry) {
     return row;
 }
 
-/** @param {{label: string, hint?: string}} field @param {string} query */
-const matches = (field, query) => `${field.label} ${field.hint || ""}`.toLowerCase().includes(query);
+// Search reads a field's label, hint and hover help, so a QMK name said only
+// in the hover help still finds it.
+/** @param {{label: string, hint?: string, tooltip?: string, macro?: string}} field @param {string} query */
+const matches = (field, query) => `${field.label} ${field.hint || ""} ${field.tooltip || ""}`.toLowerCase().includes(query);
 
 // The keyboard's own name, which it stores with its settings and reports over
 // USB. Empty is the firmware's built-in name, shown as the placeholder when

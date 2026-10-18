@@ -5,7 +5,7 @@ import {SCREENS, configureReady, isScreenId, screenAvailable, screenDefinition, 
 test("the registry owns every rail screen and renderer in the existing order", () => {
     assert.deepEqual(screenGroups().map(({group, items}) => [group, items.map(({id}) => id)]), [
         ["Configure", ["keys", "lighting", "macros", "customKeys", "mouse", "pointing", "settings"]],
-        ["Keyboard", ["profile", "device"]],
+        ["Manage", ["profile", "device"]],
     ]);
     const renderers = Object.fromEntries(["Keys", "Lighting", "Macros", "CustomKeys", "Mouse", "Pointing", "Settings", "Profile", "Device"]
         .map(name => [`screen${name}`, () => name[0].toLowerCase() + name.slice(1)]));
@@ -30,11 +30,11 @@ test("every screen follows its readiness rule, including demo and read failures"
         assert.equal(screenAvailable(noKeyboard, id), false, id);
         assert.equal(screenAvailable({...ready, load: {state: "loading"}}, id), false, id);
         assert.equal(screenAvailable(connected, id), id === "device", id);
-        assert.equal(screenAvailable(backup, id), definition.group === "Keyboard", id);
+        assert.equal(screenAvailable(backup, id), definition.group === "Manage", id);
         assert.equal(screenAvailable(ready, id), true, id);
         assert.equal(screenAvailable(demo, id), true, id);
         assert.equal(definition.keepOnPublish, definition.group === "Configure", id);
-        assert.equal(Boolean(definition.unavailable), definition.group === "Keyboard", id);
+        assert.equal(Boolean(definition.unavailable), definition.group === "Manage", id);
     }
 });
 
@@ -48,9 +48,9 @@ test("an unknown screen cannot silently render Keys or pass readiness", () => {
 
 test("unavailable screens offer backups before device diagnostics and never link to themselves", () => {
     const connected = {load: {state: "unavailable"}, device: {connected: true}, portable: {available: true}};
-    assert.deepEqual(secondaryScreen(connected, "keys"), {screen: "profile", label: "Profile & backups"});
-    assert.deepEqual(secondaryScreen(connected, "profile"), {screen: "device", label: "Device details"});
-    assert.deepEqual(secondaryScreen({...connected, portable: {available: false}}, "keys"), {screen: "device", label: "Device details"});
+    assert.deepEqual(secondaryScreen(connected, "keys"), {screen: "profile", label: "Backups"});
+    assert.deepEqual(secondaryScreen(connected, "profile"), {screen: "device", label: "Keyboard details"});
+    assert.deepEqual(secondaryScreen({...connected, portable: {available: false}}, "keys"), {screen: "device", label: "Keyboard details"});
     assert.equal(secondaryScreen({...connected, portable: {available: false}}, "device"), null);
     assert.equal(secondaryScreen({...connected, load: {state: "loading"}}, "keys"), null);
     assert.equal(secondaryScreen(null, "keys"), null);

@@ -25,8 +25,8 @@ const catalogue = [
 
 test("the picker uses task-shaped sections instead of raw QMK group names", () => {
     assert.deepEqual(pickerSections().map(({label}) => label), [
-        "Keyboard", "Symbols", "Navigation", "Numpad", "Layers", "Pointing modes", "Macros",
-        "Mouse", "Media", "Lighting", "Magic", "Custom keys", "More keys", "Other QMK", "All keycodes",
+        "Keyboard", "Symbols", "Navigation", "Numpad", "Layers", "Trackball modes", "Macros",
+        "Mouse", "Media", "Lighting", "Key options", "Custom keys", "More keys", "Other QMK", "All keycodes",
     ]);
 });
 

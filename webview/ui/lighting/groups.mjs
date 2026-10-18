@@ -26,7 +26,7 @@ function groupBuilder(model, canEdit) {
     const node = el(`<aside class="stack gap-12">
         <div class="sect-h"><h4>New row from the selection</h4><span class="right tag">${state.ledPicks.length} LEDs</span></div>
         <label class="field"><span>Table</span><select class="input" data-f="lighting:groups:target" data-target ${canEdit ? "" : "disabled"}>
-            ${[["layer", "Layer LED groups"], ["pdMode", "Pointing-mode LED groups"], ["combo", "Combo feedback LED groups"], ["keyBehavior", "Key feedback LED groups"]]
+            ${[["layer", "Layer LED groups"], ["pdMode", "Trackball mode LED groups"], ["combo", "Combo feedback LED groups"], ["keyBehavior", "Key feedback LED groups"]]
                 .map(([value, text]) => option(value, text, draft.target)).join("")}</select></label>
         ${owners.length ? `<label class="field"><span>Owner</span><select class="input" data-f="lighting:groups:owner" data-owner ${canEdit ? "" : "disabled"}>
             ${owners.map(([value, text]) => option(value, text, draft.owner)).join("")}</select></label>` : ""}
@@ -45,7 +45,7 @@ function groupBuilder(model, canEdit) {
     }));
     const actions = el(`<div class="row gap-8">
         <button class="btn primary" data-act="keep" ${canEdit && (draft.source || state.ledPicks.length) ? "" : "disabled"}
-            data-tip="Pick LEDs on the board, or choose a saved group, to give the row something to paint.">Keep row in draft</button>
+            data-tip="Pick LEDs on the board, or choose a saved group, to give the row something to paint.">Add</button>
         <button class="btn ghost" data-act="save" ${canEdit ? "" : "disabled"}
             data-tip="Store this selection as a named group other rows can point at.">Save selection as a group</button></div>`);
     /** @type {HTMLButtonElement} */ (actions.querySelector('[data-act="keep"]')).addEventListener("click", () => {
@@ -54,7 +54,7 @@ function groupBuilder(model, canEdit) {
     /** @type {HTMLButtonElement} */ (actions.querySelector('[data-act="save"]')).addEventListener("click", () =>
         post(edits.saveLedGroup(ledIndices())));
     node.append(actions);
-    node.append(el(`<p class="note">Rows are applied in device order, so a later row wins on the LEDs it shares.</p>`));
+    node.append(el(`<p class="note">Rows are applied in the order the keyboard stores them, so a later row wins on the LEDs it shares.</p>`));
     return node;
 }
 

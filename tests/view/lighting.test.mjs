@@ -58,13 +58,13 @@ test("stages report what the device said, and the base effect is its own read", 
 // in the draft the stage paints nothing, whatever its stored switch says.
 test("the auto-mouse fade is in effect only while auto-mouse is on", () => {
     const withAutoMouse = (enabled) => ({...model(), configDefaults: [
-        {id: "autoMouse", area: "Mouse", fields: [{macro: "autoMouse", kind: "toggle", value: enabled ? "1" : "0", enabled}]}]});
+        {id: "autoMouse", area: "Trackball", fields: [{macro: "autoMouse", kind: "toggle", value: enabled ? "1" : "0", enabled}]}]});
     assert.equal(stageInEffect(withAutoMouse(true), "auto"), true);
     assert.equal(stageIdle(withAutoMouse(true), "auto"), null);
     const off = withAutoMouse(false);
     assert.equal(stageEnabled(off, "auto"), true, "the stored switch is left as it is");
     assert.equal(stageInEffect(off, "auto"), false);
-    assert.match(stageIdle(off, "auto"), /auto-mouse is off/i);
+    assert.match(stageIdle(off, "auto"), /mouse layer is off/i);
     assert.equal(stageInEffect(off, "layers"), true, "other stages do not depend on auto-mouse");
     const stored = model();
     stored.rgb.stages = stored.rgb.stages.map((row) => row.id === "auto" ? {...row, enabled: false} : row);
@@ -241,4 +241,13 @@ test("zero brightness keeps explicit black distinct from layer pass-through and 
     const m = model();
     m.rgb.layerColors[1].color = black;
     assert.deepEqual(keyLight(m, {index: 3}, position(13, "KC_A")), {colour: black, source: "layer", layer: 3});
+});
+
+test("black on a feedback stage is said as what goes dark, where it lights", async () => {
+    const {blackConsequence} = await import("../../webview/view/lighting.mjs");
+    assert.equal(blackConsequence("While Dragscroll runs", "Right half"), "While Dragscroll runs, the right half goes dark.");
+    assert.equal(blackConsequence("While a combo's keys are held", "Both halves"), "While a combo's keys are held, both halves go dark.");
+    assert.equal(blackConsequence("While this shows", "Only the trigger key"), "While this shows, only the trigger key goes dark.");
+    assert.equal(blackConsequence("While this shows", "The half holding the trigger key"), "While this shows, the half holding the trigger key goes dark.");
+    assert.equal(blackConsequence("While this shows", ""), "While this shows, its LEDs go dark.");
 });

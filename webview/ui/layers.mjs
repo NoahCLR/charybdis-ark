@@ -40,7 +40,7 @@ export function attachLayersControl(bar) {
     const trigger = el(`<button class="layer-edit" aria-haspopup="dialog" aria-expanded="${Boolean(state.layersOpen)}"
         data-tip="Rename layers and change their order: a higher layer wins over the ones under it.">
         <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 13V3M2.5 5.5 5 3l2.5 2.5M11 3v10M8.5 10.5 11 13l2.5-2.5"/></svg>
-        <span>Rename &amp; Reorder</span></button>`);
+        <span>Layers…</span></button>`);
     trigger.addEventListener("click", () => {
         state.layersOpen = !state.layersOpen;
         if (!state.layersOpen) state.layersAsked = false;
@@ -113,7 +113,7 @@ function editor(model, portable, busy) {
                     : "Layer keys keep their numbers: a key set to MO(1) reaches whatever layer is now 1. Names, colours and the pointer and sniping settings still move with their layer, and Make base still swaps the keys that reach the two layers."}</span>
             </div>
             <div class="row">
-                <button class="btn primary" data-act="save" ${busy ? "disabled" : ""}>Keep layers in draft</button>
+                <button class="btn primary" data-act="save" ${busy ? "disabled" : ""}>Add to draft</button>
                 <button class="btn ghost" data-act="cancel" ${busy ? "disabled" : ""}>Discard</button>
             </div>
         </div></div>`);
@@ -135,7 +135,7 @@ function editor(model, portable, busy) {
             <span class="note ${mapped ? "" : "dim"}">${mapped ? `${mapped} key${mapped === 1 ? "" : "s"}` : "nothing mapped"}</span>
             ${base ? `<span class="tag lp-base" data-tip="Always on, and what every transparent key falls through to.">base</span>`
                 : `<button class="btn tiny ghost" data-base="${layerId}" ${busy ? "disabled" : ""}
-                    data-tip="Put this layer at the bottom. Its transparent keys become KC_NO; KC_NO on the former base becomes transparent. An uncoloured former base gets the saved base colour.">Make base</button>`}</div>`);
+                    data-tip="Put this layer at the bottom. Its Transparent keys become Nothing; Nothing on the former base becomes Transparent. An uncoloured former base gets the saved base colour.">Make base</button>`}</div>`);
         list.append(row);
     });
 

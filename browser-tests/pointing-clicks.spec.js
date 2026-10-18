@@ -27,7 +27,7 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
         for (const [direction, button] of [["left", 3], ["right", 4]]) {
             await clearPosts(page);
             await page.locator(`label:has(input[data-f="pointing:4:dir:${direction}"]) button`).click();
-            const picker = page.getByRole("dialog", {name: "Pick a keycode"});
+            const picker = page.getByRole("dialog", {name: "Choose a key"});
             await picker.locator('[data-sec="mouse"]').click();
             await expect(picker.locator("[data-pick]")).toHaveCount(8);
             await picker.locator(`[data-pick="QK_MOUSE_BUTTON_${button}"]`).click();

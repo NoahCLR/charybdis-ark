@@ -280,7 +280,7 @@ test("a layer key onto a layer with no keys of its own is a notice", () => {
     const [finding] = layerReach(profile({keys: {"0:0": MO(2)}}));
     assert.equal(finding.kind, "emptyTarget");
     assert.equal(finding.level, "notice");
-    assert.match(finding.detail, /^Hold MO\(2\) on Base: Symbols holds only transparent keys and KC_NO/);
+    assert.match(finding.detail, /^Hold MO\(2\) on Base: Symbols holds only Transparent and Nothing keys/);
 });
 
 test("transparent and KC_NO base keys have separate notices and counts", () => {
@@ -292,8 +292,8 @@ test("transparent and KC_NO base keys have separate notices and counts", () => {
     assert.match(transparent.detail, /^A transparent key on the base layer \(Base\)/);
     assert.deepEqual(transparent.place, {kind: "key", layer: 0, layoutIndex: 3});
     assert.equal(no.count, 1);
-    assert.equal(no.title, "1 KC_NO key on the base layer (Base) does nothing");
-    assert.match(no.detail, /^KC_NO on the base layer \(Base\) explicitly sends nothing/);
+    assert.equal(no.title, "1 Nothing key on the base layer (Base) does nothing");
+    assert.match(no.detail, /^A Nothing key on the base layer \(Base\) explicitly sends nothing/);
     assert.deepEqual(no.place, {kind: "key", layer: 0, layoutIndex: 5});
     const named = profile({keys: {"0:3": TRNS}});
     named.settings.names[0] = "Symbol";

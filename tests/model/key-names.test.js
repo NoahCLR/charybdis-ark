@@ -40,8 +40,8 @@ test("a key reads by the profile's name for it, under every name it is known by"
     });
     assert.equal(keyLabel(names, PD_SLOT_0), "Dragscroll · hold", "not the catalogue's bare user slot");
     assert.equal(names.labels.PD_SLOT_0, "Dragscroll · hold");
-    assert.equal(keyLabel(names, PD_BINDINGS[1].holdCode), "Slot 1 · hold (empty)", "an empty slot says so");
-    assert.equal(keyLabel(names, PD_BINDINGS[0].lockCode), "Dragscroll · toggle");
+    assert.equal(keyLabel(names, PD_BINDINGS[1].holdCode), "Mode 1 · hold (empty)", "an empty slot says so");
+    assert.equal(keyLabel(names, PD_BINDINGS[0].lockCode), "Dragscroll · lock");
     assert.equal(names.labels.VIA_MACRO_0, "Copy line");
     assert.equal(names.labels.VIA_MACRO_1, "Macro 1", "an unnamed macro reads by its number");
     assert.equal(keyLabel(names, 0x04), "A", "the rest reads as the catalogue names it");
@@ -178,4 +178,11 @@ test("macOS ISO labels swap the same positions as playback, including modified k
     assert.equal(keyLabel(german, 0x233), "Ö");
     assert.equal(keyLabel(german, 0x211c), "Z / Ctrl");
     assert.equal(keyLabel(german, 0x4133), "Ö / Layer 1");
+});
+
+test("KC_NO is called Nothing, alone; modifiers over it are the modifiers alone", () => {
+    const names = profileKeyNames({});
+    assert.equal(keyLabel(names, 0), "Nothing");
+    assert.equal(names.labels.XXXXXXX, "Nothing");
+    assert.doesNotMatch(keyLabel(names, 0x1800), /Nothing/);
 });

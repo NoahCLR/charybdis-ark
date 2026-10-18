@@ -100,15 +100,15 @@ test("invalid edits and references are rejected before upload", () => {
     assert.throws(() => edit({type: "saveBehavior", behavior: form()}, {...capabilities, supportedDomainMask: 1}), /firmware/);
     assert.throws(() => edit({type: "saveBehavior", behavior: form()}, {...capabilities, maxBehaviorRows: original.rowCount}), /row count/);
     assert.throws(() => edit({type: "saveBehavior", behavior: form()}, {...capabilities, maxPopulatedBehaviorSteps: original.populatedStepCount}), /step count/);
-    assert.throws(() => edit({type: "saveBehavior", behavior: form()}, {...capabilities, maxTapStepsPerBehavior: 4}), /Tap branch index/);
+    assert.throws(() => edit({type: "saveBehavior", behavior: form()}, {...capabilities, maxTapStepsPerBehavior: 4}), /Tap count/);
 });
 
 test("transparent and disabled keys cannot receive or be retargeted to a behaviour", () => {
     for (const keycode of ["KC_NO", "XXXXXXX", "KC_TRANSPARENT", "KC_TRNS", "_______", "0x0000", "0x0001"]) {
         for (const type of ["saveBehavior", "addBehavior"]) {
-            assert.throws(() => edit({type, behavior: {...form(), keycode}}), /Transparent keys and KC_NO cannot have a behaviour/, keycode);
+            assert.throws(() => edit({type, behavior: {...form(), keycode}}), /Transparent and Nothing keys cannot have a behaviour/, keycode);
         }
-        assert.throws(() => edit({type: "retargetBehavior", keycode: views[0].keycode, target: keycode}), /Transparent keys and KC_NO cannot have a behaviour/, keycode);
+        assert.throws(() => edit({type: "retargetBehavior", keycode: views[0].keycode, target: keycode}), /Transparent and Nothing keys cannot have a behaviour/, keycode);
     }
 });
 

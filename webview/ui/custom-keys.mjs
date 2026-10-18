@@ -25,6 +25,7 @@ import {layerSwatch} from "./layerbar.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {topbar, unavailable} from "./shell.mjs";
 import {keyName} from "../view/keyvalues.mjs";
+import {keycodeAside} from "../view/show-keycodes.mjs";
 import {customKeyDoes, hasShortcut, customKeyShortcutLine} from "../view/custom-key.mjs";
 import {openPicker} from "./picker.mjs";
 import {behaviourEditorRow} from "../view/behavior-editor.mjs";
@@ -97,7 +98,7 @@ function editor(model, key, canEdit) {
     const card = el(`<div class="card">
         <div class="card-h name-titlebar">${titleName({f: `custom-key:${key.slot}:name`, value: key.name, placeholder: `Custom key ${key.slot}`,
             label: "Custom key name", perName: (model?.customKeyNameSpace || {perName: NAME_MAX_BYTES}).perName, canEdit})}
-            <span class="tag" data-tip="${esc(key.keycode)}">Key ${esc(key.slot)}</span>
+            <span class="tag"${keycodeAside(state, "behaviourTitle", key.keycode) ? ` data-tip="${esc(key.keycode)}"` : ""}>K${esc(key.slot)}</span>
             <span class="right row actions">
                 <button class="btn tiny ghost" data-act="place" ${writable() ? "" : "disabled"}>Place on a key…</button></span></div>
         <div class="card-b stack">${keyFields(model, key).join("")}</div></div>`);
@@ -157,8 +158,8 @@ function shortcutField(model, key, canEdit) {
     const name = keyName(model, key.shortcut.key);
     const node = el(`<div class="field"><span>Shortcut</span>
             <div class="input-row"><input data-f="custom-key:${key.slot}:shortcut" class="input" data-shortcut value="${esc(hasShortcut(key) ? key.shortcutLabel : "")}" placeholder="None" readonly ${canEdit ? "" : "disabled"}
-                data-tip="One key and any modifiers, left and right mixed. Pick… opens the keycode picker with its modifier row.">
-            <button class="btn" data-act="pick-shortcut" ${canEdit ? "" : "disabled"}>Pick…</button>
+                data-tip="One key and any modifiers, left and right mixed. Choose… opens the key picker with its modifier row.">
+            <button class="btn" data-act="pick-shortcut" ${canEdit ? "" : "disabled"}>Choose…</button>
             <button class="btn ghost" data-act="clear-shortcut" ${canEdit && hasShortcut(key) ? "" : "disabled"}
                 data-tip="No shortcut: the key does only what its behaviour says.">Clear</button></div>
             <span class="note">${esc(customKeyShortcutLine(key))}</span></div>`);

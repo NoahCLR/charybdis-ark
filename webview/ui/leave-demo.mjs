@@ -4,7 +4,7 @@ import {el, esc} from "../lib/dom.mjs";
 import {post, render as rerender, state} from "../store.mjs";
 
 // Leaving the demo, or replacing its file, with edits not exported: asked
-// once, with Export offered first.
+// once, with Save a backup file… offered first.
 export function leaveDemoOverlay() {
     const leave = state.leaveDemo;
     if (state.overlay !== "leaveDemo" || !leave) return null;
@@ -13,7 +13,7 @@ export function leaveDemoOverlay() {
         <div class="sheet-b"><p>${esc(leave.ask.detail)}</p></div>
         <div class="sheet-f"><button class="btn ghost" data-act="stay">Stay in the demo</button>
             <span class="right"><button class="btn" data-act="confirm-leave">${esc(leave.ask.confirm)}</button>
-                <button class="btn primary" data-act="export">Export…</button></span></div>
+                <button class="btn primary" data-act="export">Save a backup file…</button></span></div>
     </div></div>`);
     const close = () => {state.overlay = null; state.leaveDemo = null; rerender();};
     node.addEventListener("click", (event) => {

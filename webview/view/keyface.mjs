@@ -15,9 +15,15 @@ export function keyFace(/** @type {import("../../contracts/panel.js").Position |
     if (!position) return {main: "", sub: "", kind: "none"};
     const keycode = position.keycode || "";
     if (TRANSPARENT.has(keycode)) return {main: "▽", sub: "", kind: "transparent"};
-    if (DISABLED.has(keycode)) return {main: "", sub: "", kind: "disabled"};
+    // Nothing (KC_NO) does nothing and blocks the layers below; its cap says
+    // so with a dash rather than looking like a blank, unlabelled key.
+    if (DISABLED.has(keycode)) return {main: "—", sub: "", kind: "disabled"};
     const layerTap = /^LT\(\s*([A-Z0-9_]+)\s*,/.exec(keycode);
-    const layerKey = /^(MO|TO|TG|OSL|DF|PDF|TT)\(\s*([A-Z0-9_]+)\s*\)$/.exec(keycode);
+    // A layer lock is stored as a user keycode (QK_USER_31, or bare hex such
+    // as 0x7EC4), so it is recognised by what it means: on this firmware TG
+    // is a lock too, and both read "Lock" (D-L34).
+    const layerKey = /^(MO|TO|TG|OSL|DF|PDF|TT|LOCK_LAYER)\(\s*([A-Z0-9_]+)\s*\)$/.exec(keycode)
+        || /^(LOCK_LAYER)\(\s*([A-Z0-9_]+)\s*\)$/.exec(position.semantic || "");
     const modTap = /^MT\(([^,]+),/.exec(keycode);
     // A pointing key for a slot that holds nothing keeps its own name on the
     // cap; that it is inert belongs on the second line, where a key cap says
@@ -68,12 +74,14 @@ export function dualRole(model, position) {
 export function keyName(position) {
     const face = keyFace(position);
     if (face.kind === "transparent") return "Transparent";
-    if (face.kind === "disabled" || face.kind === "none") return "Unmapped";
+    if (face.kind === "disabled" || face.kind === "none") return "Nothing";
     return position?.editLabel || face.main || position?.keycode || "";
 }
 
+// What a layer key does to its layer, in the one set of verbs every surface
+// uses (core/model/key-names.js): TG and LOCK_LAYER are both a lock here.
 /** @type {Record<string, string>} */
-const LAYER_VERBS = {MO: "momentary", TO: "move", TG: "toggle", OSL: "one-shot", DF: "default", PDF: "default", TT: "tap-toggle"};
+const LAYER_VERBS = {MO: "Hold", TO: "Move to", TG: "Lock", LOCK_LAYER: "Lock", OSL: "One-shot", DF: "Default", PDF: "Default", TT: "Tap-toggle"};
 // Only for a position the host has not named: the layer the keycode holds.
 /** @param {string} name */
 const shortLayer = (name) => name.replace(/^LAYER_/, "").toLowerCase();
@@ -179,6 +187,17 @@ export function behaviourTiers(behaviour) {
     ];
     return tiers.filter((tier) => tier.count > 0);
 }
+
+// How many actions a behaviour sets: every tap, hold and long hold cell that
+// holds one. A row reads "3 actions"; an action is the grid's cell.
+/** @param {BehaviorView | null | undefined} behaviour */
+export const behaviourActionCount = (behaviour) => (behaviour?.steps || [])
+    .reduce((total, step) => total + [step.tap, step.hold, step.longHold].filter(Boolean).length, 0);
+/** @param {BehaviorView | null | undefined} behaviour */
+export const actionsWords = (behaviour) => {
+    const count = behaviourActionCount(behaviour);
+    return count ? `${count} action${count === 1 ? "" : "s"}` : "No actions yet";
+};
 
 // The device stores only populated tap steps, but the editor is a matrix of
 // every step the firmware supports. Keep empty columns visible so a one-step

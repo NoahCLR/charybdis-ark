@@ -51,7 +51,13 @@ const COMBO_TIMING = Object.freeze([
 //
 // `area` is the rail screen a section is edited on, and the review area it is
 // listed under; a section without one is a Settings section. Everything the
-// trackball does to the pointer — its speed, sniping, auto-mouse — is Mouse.
+// trackball does to the pointer — its speed, sniping, the mouse layer — is
+// Trackball.
+//
+// `search` holds the other words a section is found by in Settings search:
+// QMK's names and the words Ark used before (host, startup, magic,
+// auto-mouse), so renaming a section never hides it from someone who knows
+// it by its old name.
 //
 // `governs` names what a setting is about when that thing has a colour of its
 // own elsewhere — a behaviour tier, a tap-count branch, a pointing slot, a
@@ -71,35 +77,35 @@ const keyTiming = {id: "keyTiming", label: "Tap & hold timing", fields: [
 /** @type {import("../../contracts/model.js").SettingsSection[]} */
 const sections = [
     keyTiming,
-    {id: "normalPointerSpeed", label: "Pointer speed", area: "Mouse", fields: [
+    {id: "normalPointerSpeed", label: "Ball speed", area: "Trackball", search: "pointer speed pointing DPI sensitivity", fields: [
         // Every DPI field offers the one list in pointer-dpi.js. These two are
         // held in the upstream Charybdis config, which the keyboard only
         // accepts in its own steps, so they offer the part of the list the
         // keyboard accepts. A pointing mode's own speed is set on its slot.
-        number("normalDpi", SETTING.DEFAULT_DPI, "Normal pointer DPI", undefined, {tooltip: "Trackball sensitivity for ordinary pointer movement. Higher DPI moves the cursor farther for the same ball movement.", unit: undefined, choices: dpiChoices({accepts: v => validSetting(SETTING.DEFAULT_DPI, v)})}),
-        number("snipingDpi", SETTING.SNIPING_DPI, "Sniping DPI", undefined, {tooltip: "Trackball sensitivity while sniping is active, including auto-sniping. Lower DPI gives finer cursor control.", unit: undefined, choices: dpiChoices({accepts: v => validSetting(SETTING.SNIPING_DPI, v)})}),
+        number("normalDpi", SETTING.DEFAULT_DPI, "Normal", undefined, {tooltip: "Ball speed for ordinary pointer movement, in DPI. Higher DPI moves the cursor farther for the same ball movement.", unit: undefined, choices: dpiChoices({accepts: v => validSetting(SETTING.DEFAULT_DPI, v)})}),
+        number("snipingDpi", SETTING.SNIPING_DPI, "Sniping (precision speed)", undefined, {tooltip: "Ball speed while sniping is on, including auto-sniping, in DPI. Lower DPI gives finer cursor control.", unit: undefined, choices: dpiChoices({accepts: v => validSetting(SETTING.SNIPING_DPI, v)})}),
     ]},
-    {id: "sniping", label: "Auto-sniping", area: "Mouse", fields: [
+    {id: "sniping", label: "Auto-sniping", area: "Trackball", search: "pointing precision", fields: [
         toggle("autoSniping", SETTING.AUTO_SNIPING_ENABLED, "Auto-sniping", "Use sniping speed while the selected layer is active."),
         layer("snipingLayer", SETTING.AUTO_SNIPING_LAYER, "Auto-sniping layer", "Use sniping DPI while this layer is active and Auto-sniping is on."),
     ]},
-    {id: "autoMouse", label: "Auto-mouse", area: "Mouse", fields: [
-        toggle("autoMouse", SETTING.AUTO_MOUSE_ENABLED, "Auto-mouse", "Trackball movement automatically activates the selected layer."),
-        layer("mouseLayer", SETTING.AUTO_MOUSE_LAYER, "Auto-mouse layer", "The layer activated by trackball movement when Auto-mouse is on."),
-        number("mouseTimeout", SETTING.AUTO_MOUSE_TIMEOUT, "Timeout (ms)", "How long the layer stays active after movement. The lighting fade keeps its share of it (Lighting → Auto-mouse fade).", {min: 1}),
-        number("mouseDebounce", SETTING.AUTO_MOUSE_DEBOUNCE, "Movement debounce (ms)", undefined, {tooltip: "Minimum time between trackball events that update auto-mouse. Higher values ignore closely spaced movement events."}),
-        number("mouseDelay", SETTING.AUTO_MOUSE_DELAY, "Delay after typing (ms)", "Wait this long after a key event before movement can activate auto-mouse."),
-        number("mouseThreshold", SETTING.AUTO_MOUSE_THRESHOLD, "Movement threshold", "Movement needed to activate auto-mouse. Higher values require more movement.", {unit: undefined}),
+    {id: "autoMouse", label: "Mouse layer", area: "Trackball", search: "auto-mouse auto mouse pointer layer pointing", fields: [
+        toggle("autoMouse", SETTING.AUTO_MOUSE_ENABLED, "Mouse layer", "Moving the trackball turns the chosen layer on."),
+        layer("mouseLayer", SETTING.AUTO_MOUSE_LAYER, "Layer", "The layer moving the trackball turns on while Mouse layer is on."),
+        number("mouseTimeout", SETTING.AUTO_MOUSE_TIMEOUT, "Timeout (ms)", "How long the layer stays on after movement. The lighting fade keeps its share of it (Lighting → Mouse layer fade).", {min: 1}),
+        number("mouseDebounce", SETTING.AUTO_MOUSE_DEBOUNCE, "Movement debounce (ms)", undefined, {tooltip: "Minimum time between trackball events that update the mouse layer. Higher values ignore closely spaced movement events. QMK calls this auto-mouse."}),
+        number("mouseDelay", SETTING.AUTO_MOUSE_DELAY, "Delay after typing (ms)", "Wait this long after a key event before movement can turn the mouse layer on."),
+        number("mouseThreshold", SETTING.AUTO_MOUSE_THRESHOLD, "Movement threshold", "Movement needed to turn the mouse layer on. Higher values require more movement.", {unit: undefined}),
     ]},
     // The keyboard stores this as the milliseconds the auto-mouse colour holds
     // before it fades, and refuses a profile where that is not shorter than
     // the timeout. Edited as a share of the timeout, it cannot be: a share is
     // at most 99%, and a new timeout carries the share with it.
-    {id: "automouseFade", label: "Auto-mouse fade", area: "Lighting", stage: "auto", fields: [
-        share("mouseFadeHold", SETTING.AUTO_MOUSE_DEAD_TIME, SETTING.AUTO_MOUSE_TIMEOUT, "Hold before fading", "The share of the auto-mouse timeout the colour holds before it starts to fade, 0–99%."),
+    {id: "automouseFade", label: "Mouse layer fade", area: "Lighting", stage: "auto", search: "auto-mouse", fields: [
+        share("mouseFadeHold", SETTING.AUTO_MOUSE_DEAD_TIME, SETTING.AUTO_MOUSE_TIMEOUT, "Hold before fading", "The share of the mouse layer timeout the colour holds before it starts to fade, 0–99%."),
     ]},
     {id: "rgbAppearance", label: "Base lighting", fields: [
-        {...toggle("lightingEnabled", SETTING.RGB_MODE, "Lighting", "Enable the saved base lighting effect."), shift: 0},
+        {...toggle("lightingEnabled", SETTING.RGB_MODE, "All lighting", "Off, every LED stays dark: the base effect, layer colours and feedback."), tooltip: "QMK's RGB Matrix enable switch, saved with the base lighting.", shift: 0},
         {...byte("hue", SETTING.RGB_COLOR, 0, "Hue"), tooltip: "The colour of the saved base lighting effect, around the colour wheel."},
         byte("saturation", SETTING.RGB_COLOR, 8, "Saturation", "0 is white; 255 is fully saturated."),
         {...byte("brightness", SETTING.RGB_COLOR, 16, "Brightness", "Saved brightness, 0–255. The keyboard applies its hardware brightness limit."), tooltip: "Brightness of the saved base lighting effect. Layer colours and feedback have their own brightness."},
@@ -198,9 +204,9 @@ function settingsSections(snapshot, settings) {
     const everyLayer = make => Array.from({length: SETTINGS.LAYERS}, (_, i) => make(i));
     // Each section's one-per-layer switches are one setting to a person: the
     // interface draws them as one row of layers, worded by `layerGroup`.
-    result.push({id: "startupLayers", area: "Settings", label: "Startup layers", expanded: false,
-        layerGroup: {label: "On at startup", hint: "The layers active when the keyboard starts. Keep at least one on; higher layers take priority."}, fields:
-        everyLayer(i => ({...toggle(`startupLayer${i}`, SETTING.DEFAULT_LAYERS, name(i), `Layer ${i}`), tooltip: "Make this layer active when the keyboard starts. Keep at least one startup layer on; higher layers take priority.", bitMask: 2 ** i, governs: {kind: /** @type {const} */ ("layer"), layer: i}}))});
+    result.push({id: "startupLayers", area: "Settings", label: "Default layers", expanded: false, search: "startup layers always on default_layer_state",
+        layerGroup: {label: "Default layers", hint: "Always on underneath every other layer. Normally only Base. QMK calls these default layers."}, fields:
+        everyLayer(i => ({...toggle(`startupLayer${i}`, SETTING.DEFAULT_LAYERS, name(i), `Layer ${i}`), tooltip: "Make this layer a default layer: always on underneath every other layer. Keep at least one on; a higher default layer covers a lower one.", bitMask: 2 ** i, governs: {kind: /** @type {const} */ ("layer"), layer: i}}))});
     // Behaviours and combos each have a master switch and one per layer
     // (participation-policy.md): a key takes part only where every switch that
     // applies is on, judged by the layer its key came from. Each behaviour and
@@ -222,12 +228,12 @@ function settingsSections(snapshot, settings) {
     // A layer's combo reference is in its layer record, not a setting value.
     result.push({id: "comboReferences", area: "Settings", label: "Combo layer matching", expanded: false, description: "Choose which layer supplies the key assignments used to match combos on each layer. Select the same layer to keep its combos independent.", fields:
         everyLayer(i => ({...layer(`comboReference${i}`, undefined, `Combos on ${name(i)}`, "The layer whose key assignments are used to match combos on this layer. Choose the same layer to keep its combos independent."), record: /** @type {const} */ ("reference"), layer: i, governs: {kind: /** @type {const} */ ("layer"), layer: i}}))});
-    result.push({id: "keyboardOptions", area: "Settings", label: "Key options", expanded: false, description: options ? "Keyboard-wide remapping and typing options. These apply across all layers." : "Read the keyboard to see the key options it supports.", fields:
+    result.push({id: "keyboardOptions", area: "Settings", label: "Key options", expanded: false, search: "magic keymap options keyboard options", description: options ? "Keyboard-wide remapping and typing options. These apply across all layers." : "Read the keyboard to see the key options it supports.", fields:
         options ? optionLabels.map(([macro, label, hint], i) => ({...toggle(macro, SETTING.KEYMAP_OPTIONS, hostKeyLabel(label, host.effective)), tooltip: hostKeyLabel(hint, host.effective), bitMask: options.keymapMasks[i], readOnly: !(options.supportedKeymapOptions & (1 << i)), hint: options.supportedKeymapOptions & (1 << i) ? "" : "This option is not enabled in the running firmware."})) : []});
     /** @param {number} id */
     const label = id => VOCABULARY.hostOs.find(([value]) => value === id)?.[1] || "Unknown";
     const macos = host.effective === 1;
-    const setup = ["Select a host OS manually if detection is unknown.",
+    const setup = ["Choose the operating system yourself if detection is unknown.",
         "For emoji and other characters your layout cannot type, choose the Unicode Hex Input layout and make it your active input source.",
         "Install and run WinCompose with Right Alt as Compose.", "Use an input method/application accepting Ctrl+Shift+U, hex digits and Space. Some Linux applications do not support it."][host.effective];
     // The effective OS's layouts first, then US; with no known OS, all of them.
@@ -235,17 +241,17 @@ function settingsSections(snapshot, settings) {
     const offered = hostLayouts().filter(layout => !osName || layout.os === "any" || layout.os === osName || layout.id === host.layout);
     /** @param {number} id */
     const layoutWord = id => VOCABULARY.hostLayouts.find(([value]) => value === id)?.[1];
-    result.push({id: "host", area: "Settings", label: "Host",
+    result.push({id: "host", area: "Settings", label: "Your computer", search: "host os unicode UNICODE_HOST_MODE",
         ...(host.effective === 2 && host.unicodeEnabled
             ? {githubLink: {label: "WinCompose on GitHub", url: "https://github.com/samhocevar/wincompose"}} : {}),
         // Auto can follow detection onto another OS than the layout's; a
-        // Host OS chosen here carries the layout along (followHostOs).
+        // operating system chosen here carries the layout along (followHostOs).
         ...(!host.layoutFits
-            ? {warning: `${layoutWord(host.layout)} is not a ${label(host.effective)} layout, so macros may type the wrong characters on ${label(host.effective)}. Choose a ${label(host.effective)} layout, or set Host OS to the computer you use.`}
+            ? {warning: `${layoutWord(host.layout)} is not a ${label(host.effective)} layout, so macros may type the wrong characters on ${label(host.effective)}. Choose a ${label(host.effective)} layout, or set Operating system to the one your computer runs.`}
             : macos && host.unicodeMode
             ? {warning: "While Unicode Hex Input is active on your Mac, Option-based symbols and shortcuts may stop working, including Option+Left/Right for word navigation. This affects ordinary typing and key-step shortcuts too. Ark does not switch your Mac's input source; switch back to your usual source when you need those keys, and match the layout here before playing macros."} : {}),
         description: `Detected: ${host.detected ? label(host.detected) : "Unknown"}. Effective: ${host.effective ? label(host.effective) : "Unknown"}. Detection is a best guess; override it if incorrect. ${setup} The keyboard cannot confirm your input setup.`, fields: [
-        {...number("hostOs", SETTING.UNICODE_HOST_MODE, "Host OS", "Auto uses the keyboard’s USB detection. This controls display names, the layouts offered and Unicode entry; it does not swap keys.", {max: 3, unit: undefined}), bitMask: 3, kind: "number",
+        {...number("hostOs", SETTING.UNICODE_HOST_MODE, "Operating system", "Auto uses the keyboard’s USB detection. This controls display names, the layouts offered and Unicode entry; it does not swap keys.", {max: 3, unit: undefined}), bitMask: 3, kind: "number",
             choices: VOCABULARY.hostOs.map(([value, label]) => ({value, label}))},
         {...byte("hostLayout", SETTING.UNICODE_HOST_MODE, LAYOUT_SHIFT, "Keyboard layout"), kind: "number",
             hint: "The layout your computer types with. Macros type through it, accents included; pick the one that is active on the computer.",
@@ -254,7 +260,7 @@ function settingsSections(snapshot, settings) {
         // On macOS, Unicode entry is the Unicode Hex Input layout, not a switch.
         ...(macos && !host.unicodeEnabled ? [] : [{...toggle("unicodeEnabled", SETTING.UNICODE_HOST_MODE, "Unicode playback", macos
             ? "On macOS, choose the Unicode Hex Input layout instead; this switch only applies with US."
-            : `${setup} Enable only after configuring the host. Avoid typing during playback.`), bitMask: UNICODE_ENABLED}]),
+            : `${setup} Turn on only after setting up your computer. Avoid typing during playback.`), bitMask: UNICODE_ENABLED}]),
     ]});
     return result;
 }
@@ -331,7 +337,7 @@ function editSettings(snapshot, message, capabilities) {
     }
     rescaleShares(value.settings.values, before);
     if (section.id === "host") followHostOs(value.settings.values, before, snapshot.hostOs?.detected);
-    if (!value.settings.values[SETTING.DEFAULT_LAYERS]) throw fail("Keep at least one startup layer selected.");
+    if (!value.settings.values[SETTING.DEFAULT_LAYERS]) throw fail("Keep at least one default layer on.");
     if (!value.settings.values.every((number, id) => validSetting(id, number))) throw fail("A setting is outside the keyboard's supported range.");
     // A timing displayed as default follows that default, including an older
     // profile's explicit value equal to it. Adopt inheritance only for changed

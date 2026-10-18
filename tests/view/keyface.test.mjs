@@ -28,10 +28,10 @@ test("an action is named by its words, with the stored keycode only where it add
 
 test("a key face uses the model's own resolution, and names the layer a dual-role key reaches", () => {
     assert.deepEqual(keyFace({keycode: "KC_TRANSPARENT", display: "▽"}), {main: "▽", sub: "", kind: "transparent"});
-    assert.deepEqual(keyFace({keycode: "KC_NO", display: ""}), {main: "", sub: "", kind: "disabled"});
+    assert.deepEqual(keyFace({keycode: "KC_NO", display: ""}), {main: "—", sub: "", kind: "disabled"}, "Nothing reads as a dash, not a blank key");
     assert.deepEqual(keyFace({keycode: "KC_A", display: "A"}), {main: "A", sub: "", kind: "key"});
     assert.deepEqual(keyFace({keycode: "LT(LAYER_NAV,KC_F)", display: "F"}), {main: "F", sub: "nav", kind: "layer"});
-    assert.deepEqual(keyFace({keycode: "MO(LAYER_SYM)", display: "L2"}), {main: "L2", sub: "momentary", kind: "layer"});
+    assert.deepEqual(keyFace({keycode: "MO(LAYER_SYM)", display: "L2"}), {main: "L2", sub: "Hold", kind: "layer"});
     assert.equal(keyFace(undefined).kind, "none");
 });
 
@@ -86,7 +86,7 @@ test("a key's name outside a cap is the host's whole name, not the cap's short l
         "a layer-tap is a layer key too, which its cap's top line alone does not say");
     assert.equal(keyName({keycode: "KC_A", display: "A", editLabel: "A"}), "A");
     assert.equal(keyName({keycode: "KC_TRANSPARENT", display: "▽", editLabel: "Transparent"}), "Transparent");
-    assert.equal(keyName({keycode: "KC_NO", display: "", editLabel: "N/A"}), "Unmapped");
+    assert.equal(keyName({keycode: "KC_NO", display: "", editLabel: "N/A"}), "Nothing");
 });
 
 test("a layer key knows the layer the host says it acts on, however the keyboard stores it", () => {
@@ -103,7 +103,7 @@ test("a layer key knows the layer the host says it acts on, however the keyboard
 
 test("a layer-tap cap names its layer on the second line, as the host names it", () => {
     assert.deepEqual(keyFace({keycode: "LT(3,KC_SLASH)", display: "/", layerLabel: "Navigation"}), {main: "/", sub: "Navigation", kind: "layer"});
-    assert.deepEqual(keyFace({keycode: "MO(3)", display: "Navigation", layerLabel: "Navigation"}), {main: "Navigation", sub: "momentary", kind: "layer"});
+    assert.deepEqual(keyFace({keycode: "MO(3)", display: "Navigation", layerLabel: "Navigation"}), {main: "Navigation", sub: "Hold", kind: "layer"});
 });
 
 test("a picked key matches its behaviour row however its modifiers are spelled", () => {
@@ -118,12 +118,16 @@ test("a picked key matches its behaviour row however its modifiers are spelled",
 
 test("a key cap tells layer keys and mod-taps apart from plain keys", () => {
     const face = (keycode, display) => keyFace({keycode, display});
-    assert.deepEqual(face("MO(1)", "L1"), {main: "L1", sub: "momentary", kind: "layer"});
-    assert.equal(face("TG(1)", "L1").sub, "toggle");
-    assert.equal(face("TO(2)", "L2").sub, "move");
-    assert.equal(face("OSL(3)", "L3").sub, "one-shot");
-    assert.equal(face("TT(1)", "L1").sub, "tap-toggle");
-    assert.equal(face("DF(0)", "L0").sub, "default");
+    // One verb set everywhere (B11): TG and a layer lock are both "Lock".
+    assert.deepEqual(face("MO(1)", "L1"), {main: "L1", sub: "Hold", kind: "layer"});
+    assert.equal(face("TG(1)", "L1").sub, "Lock");
+    assert.deepEqual(keyFace({keycode: "0x7EC4", semantic: "LOCK_LAYER(4)", display: "Pointing", layerLabel: "Pointing"}), {main: "Pointing", sub: "Lock", kind: "layer"},
+        "a layer lock stored as bare hex reads as TG does");
+    assert.equal(keyFace({keycode: "QK_USER_31", semantic: "LOCK_LAYER(3)", display: "L3"}).sub, "Lock");
+    assert.equal(face("TO(2)", "L2").sub, "Move to");
+    assert.equal(face("OSL(3)", "L3").sub, "One-shot");
+    assert.equal(face("TT(1)", "L1").sub, "Tap-toggle");
+    assert.equal(face("DF(0)", "L0").sub, "Default");
     assert.deepEqual(face("MT(MOD_LSFT,KC_A)", "A"), {main: "A", sub: "MOD_LSFT", kind: "key"});
     assert.equal(face("MT(MOD_LCTL|MOD_LSFT|MOD_LGUI,KC_A)", "A").sub, "MOD_LCTL|MOD_LSFT|MOD_LGUI");
     assert.equal(face("MT(MOD_RALT,KC_B)", "B").sub, "MOD_RALT");
@@ -213,4 +217,13 @@ test("a dual-role key names what its tap sends and what its hold does", () => {
     assert.deepEqual(dualRole({}, {keycode: "MT(MOD_LSFT,KC_A)", display: "A", modifierLabel: "Shift"}), {tap: "A", hold: {modifier: "Shift"}});
     assert.equal(dualRole({}, {keycode: "MO(3)", display: "Hold Navigation"}), null, "a layer key has no tap half");
     assert.equal(dualRole({}, {keycode: "KC_F", display: "F"}), null);
+});
+
+test("a behaviour row counts its actions, one per cell set, not its tap counts", async () => {
+    const {actionsWords, behaviourActionCount} = await import("../../webview/view/keyface.mjs");
+    const row = {steps: [{tapCount: 0, tap: {action: "KC_A"}, hold: {action: "MO(1)"}}, {tapCount: 1, longHold: {action: "KC_B"}}]};
+    assert.equal(behaviourActionCount(row), 3);
+    assert.equal(actionsWords(row), "3 actions");
+    assert.equal(actionsWords({steps: [{tapCount: 0, tap: {action: "KC_A"}}]}), "1 action");
+    assert.equal(actionsWords({steps: []}), "No actions yet");
 });

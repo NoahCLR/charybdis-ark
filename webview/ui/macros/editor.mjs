@@ -15,6 +15,9 @@ import {STEP_KINDS, insertStep, sequenceEditor, saveSteps, focusSteps} from "./s
 import {inspectEdit, paintFeedback, matchingValidation, requestInspection} from "./validation.mjs";
 import {ensureMacroHistory, finishMacroHistoryGroup, rememberMacroEdit} from "./history.mjs";
 import {cancelRecording, recorder} from "./recorder.mjs";
+// What Uninterruptible playback does, said where it is set (Noah keeps the
+// label; the hint says the consequence).
+const PROTECTION_HINT = "Other key presses are ignored while it plays (not the trackball or other keyboards).";
 /** @param {import("../../../contracts/panel.js").PublishedModel} model @param {MacroSlot} slot @param {boolean} canEdit */
 export function editor(model, slot, canEdit) {
     const form = macroForm(slot.keycode);
@@ -36,8 +39,9 @@ export function editor(model, slot, canEdit) {
                 <button class="btn tiny ghost" data-act="clear" ${canEdit && !state.recording ? "" : "disabled"}>Clear macro</button></span></div>
         <div class="card-b stack">
             <div class="macro-context">${placedOn(model, slot)}
-            <label class="macro-protection"><span>Uninterruptible playback</span><select class="input" data-f="macro:${esc(slot.keycode)}:protection" data-protection ${canEdit ? "" : "disabled"}>
-                ${(model.macroProtectionChoices || []).map(({value, label}) => `<option value="${esc(value)}" ${slot.protection === value ? "selected" : ""}>${esc(label)}${value === "auto" ? ` · ${slot.uninterruptible ? "on" : "off"}` : ""}</option>`).join("")}</select></label></div>
+            <label class="macro-protection" data-tip="${esc(PROTECTION_HINT)}"><span>Uninterruptible playback</span><select class="input" data-f="macro:${esc(slot.keycode)}:protection" data-protection ${canEdit ? "" : "disabled"}>
+                ${(model.macroProtectionChoices || []).map(({value, label}) => `<option value="${esc(value)}" ${slot.protection === value ? "selected" : ""}>${esc(label)}${value === "auto" ? ` · ${slot.uninterruptible ? "on" : "off"}` : ""}</option>`).join("")}</select>
+                <span class="note">${esc(PROTECTION_HINT)}</span></label></div>
             <div class="macro-sequence-heading"><h4>Sequence</h4></div>
             <div class="macro-insert-tools" aria-label="Add a macro step">
                 ${STEP_KINDS.map(([value, label]) => `<button class="btn" data-insert-kind="${value}" data-act="macro-insert:${esc(slot.keycode)}:${value}" ${editable ? "" : "disabled"}>+ ${value === "tap" ? "Key / chord" : value === "press" ? "Press" : label}</button>`).join("")}
@@ -51,7 +55,7 @@ export function editor(model, slot, canEdit) {
             <div data-macro-steps class="stack"></div>
             <div data-macro-feedback role="status" aria-live="polite"></div>
             <div class="stack macro-footer">
-            <div class="macro-utilities"><button class="btn tiny ghost" data-host-settings>${esc(model.macroUnicode?.layoutName || "Host")} · Host settings ↗</button>
+            <div class="macro-utilities"><button class="btn tiny ghost" data-host-settings>${esc(model.macroUnicode?.layoutName || "Your computer")} · Your computer settings →</button>
                 <button class="btn tiny ghost macro-help-link" data-show-help aria-controls="macro-help-${esc(slot.keycode)}" aria-expanded="${Boolean(form.guidanceOpen)}">Typing & playback help</button>
             </div>
             <details class="macro-guidance" id="macro-help-${esc(slot.keycode)}" data-guidance ${form.guidanceOpen ? "open" : ""}>
@@ -172,14 +176,14 @@ function showOnLayer(keycode, at) {
 function unicodeSetup(model, slot) {
     const {mode, os, layout, layoutFits, layoutName} = model?.macroUnicode || {mode: 0};
     const typed = layoutFits === false
-        ? `Text types through ${word(vocabulary(model).hostLayouts, layout)}, chosen in Settings → Host, which is not a ${word(vocabulary(model).hostOs, os)} layout: macros may type the wrong characters until the layout matches the computer.`
-        : `Text types through the ${layoutName} layout chosen in Settings → Host, accented letters included; keep that layout active on the computer.`;
+        ? `Text types through ${word(vocabulary(model).hostLayouts, layout)}, chosen in Settings → Your computer, which is not a ${word(vocabulary(model).hostOs, os)} layout: macros may type the wrong characters until the layout matches the computer.`
+        : `Text types through the ${layoutName} layout chosen in Settings → Your computer, accented letters included; keep that layout active on the computer.`;
     const entry = mode
         ? ["", "Other characters use Unicode entry: keep Unicode Hex Input active in macOS input sources while macros play. Option shortcuts can behave differently in this input source.",
             "Other characters use Unicode entry: install and run WinCompose on Windows with Right Alt as its Compose key.",
             "Other characters use Unicode entry: use an input method or application that accepts Ctrl+Shift+U, hexadecimal digits and Space, such as IBus. This sequence does not work in every Linux application."][mode]
         : os === 1 ? "Characters it cannot type, such as emoji, need the Unicode Hex Input layout."
-            : "Characters it cannot type, such as emoji, need Unicode playback on and a known host OS.";
+            : "Characters it cannot type, such as emoji, need Unicode playback on and a known operating system.";
     const typing = slot?.uninterruptible ? "" : " Avoid typing while a text macro plays.";
     return `<p class="note">${esc(typed)} ${esc(entry)} The keyboard cannot check your input setup.${esc(typing)}</p>`;
 }

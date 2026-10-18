@@ -79,8 +79,9 @@ test("device shortcut labels stay complete and semantic names require the advert
         committed: decodedDeviceProfile(), capabilities: {actionAbiDigest: 0x837cf479},
     };
     const model = buildDeviceModel(state);
-    assert.deepEqual(model.layers[0].positions.map(key => key.display), ["GUI+C", "Shift+GUI+Z", "Pd slot 0", "Lock Layer 5", "Lock Layer 6", "Custom key 2"],
+    assert.deepEqual(model.layers[0].positions.map(key => key.display), ["GUI+C", "Shift+GUI+Z", "Pd slot 0", "Layer 5", "Layer 6", "Custom key 2"],
         "a layer lock and a custom key are user slots under the native ABI, named by what they are");
+    assert.deepEqual([model.layers[0].positions[3].editLabel, model.layers[0].positions[3].layerLabel], ["Lock Layer 5", "Layer 5"], "a lock's cap names its layer and its whole name says Lock");
     assert.equal(model.layers[0].positions[5].keycode, "0x7F02", "the editable identity still encodes to the original numeric value");
     assert.doesNotMatch(buildDeviceModel({...state, capabilities: {}}).layers[0].positions[5].display, /Custom key/, "an unknown ABI names no custom key");
 });

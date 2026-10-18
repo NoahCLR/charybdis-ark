@@ -191,12 +191,12 @@ async function portableMessage(session, message, host) {
                 const where = await host.saveExport(exportedProfile(snapshot, new Date(), "charybdis-demo"));
                 if (where) {
                     saved();
-                    session.notice = `Demo setup exported to ${where}. Import it on your keyboard to review and apply it.`;
+                    session.notice = `Demo setup saved as a backup file at ${where}. Restore it on your keyboard to review and apply it.`;
                 }
             } else if (panelControl(message.type)?.action === "export") {
                 const file = exportedProfile(await session.service.readPortableProfile());
                 const where = await host.saveExport(file);
-                if (where) session.notice = "Complete keyboard profile exported to " + where;
+                if (where) session.notice = "Backup file saved to " + where;
             } else {
                 await portableControl(session, message, host);
             }

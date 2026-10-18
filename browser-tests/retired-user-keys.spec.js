@@ -28,7 +28,7 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
         await expect(page.locator("#keycodeField")).toHaveValue("QK_USER_20");
         await expect(page.locator(".key-details")).toContainText("QK_USER_20");
         await page.locator('[data-act="pick"]').click();
-        const picker = page.getByRole("dialog", {name: "Pick a keycode"});
+        const picker = page.getByRole("dialog", {name: "Choose a key"});
         for (const section of ["custom", "all"]) {
             await picker.locator(`[data-sec="${section}"]`).click();
             await expect(picker.locator('[data-pick^="QK_USER_"]')).toHaveCount(0);

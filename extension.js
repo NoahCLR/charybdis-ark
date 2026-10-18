@@ -131,7 +131,7 @@ function vscodeHost(panel, recoveryRoot, disposed = () => false) {
             return {text: Buffer.from(await vscode.workspace.fs.readFile(files[0])).toString("utf8"), name};
         },
         saveExport: async (file) => {
-            const uri = await vscode.window.showSaveDialog({title: "Export complete keyboard profile", saveLabel: "Export profile", filters: {"Charybdis profile": ["charybdis.json", "json"]}});
+            const uri = await vscode.window.showSaveDialog({title: "Save a backup file", saveLabel: "Save backup", filters: {"Charybdis profile": ["charybdis.json", "json"]}});
             if (!uri) return undefined;
             await vscode.workspace.fs.writeFile(uri, Buffer.from(file.text));
             return uri.fsPath;

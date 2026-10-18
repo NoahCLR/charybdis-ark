@@ -22,7 +22,7 @@ export function advancedControls(model, slot, scrolling, {form, disabled, field,
     };
 
     const behaviour = el(`<div class="pd-grid3"></div>`);
-    behaviour.append(select("After this mode ends", words(model).pointerLayer, slot.pointerLayer, "pointerLayer"));
+    behaviour.append(select("While this mode runs", words(model).pointerLayer, slot.pointerLayer, "pointerLayer"));
     if (!scrolling) {
         // An axis the mode does not read has no threshold to set. Sending
         // once per movement, the threshold is how far a movement has to go.

@@ -23,7 +23,7 @@ const TABS = [
     {id: "behaviours", label: "Behaviours"},
     {id: "combos", label: "Combos"},
     {id: "macros", label: "Macros"},
-    {id: "pointing", label: "Pointing modes"},
+    {id: "pointing", label: "Trackball modes"},
 ];
 
 export function bench() {

@@ -28,11 +28,11 @@ test("leaving the demo asks first only when edits would be lost, and then says s
     const leave = leaving(unsaved, {type: "chooseKeyboard"});
     assert.deepEqual(leave.message, {type: "chooseKeyboard", discardDemo: true});
     assert.equal(leave.ask.title, "Leave the demo?");
-    assert.match(leave.ask.detail, /Your 2 changes in the demo have not been exported/);
-    assert.match(leave.ask.detail, /Export saves them/);
+    assert.match(leave.ask.detail, /Your 2 changes in the demo have not been saved to a backup file/);
+    assert.match(leave.ask.detail, /Save a backup file… keeps them/);
     const replace = leaving(unsaved, openDemoProfile());
-    assert.equal(replace.ask.title, "Open another profile file?");
-    assert.equal(replace.ask.confirm, "Open without exporting");
+    assert.equal(replace.ask.title, "Open another backup file?");
+    assert.equal(replace.ask.confirm, "Open without saving");
     assert.deepEqual(replace.message, {type: "openDemoProfile", discardDemo: true});
 });
 

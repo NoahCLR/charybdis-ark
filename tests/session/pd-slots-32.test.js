@@ -32,7 +32,7 @@ test("slot 20 is created, bound, lit, reviewed and discarded like any other", ()
 
     const view = draft.view({connected: true, selectedDeviceId: "board"});
     const slot = view.changes.find(change => change.unit === "pd:20");
-    assert.equal(slot.title, "Slot 20 · Desktops");
+    assert.equal(slot.title, "P20 · Desktops");
     assert.ok(view.changes.some(change => change.unit === "rgb:pd:20"), "the colour is its own review row");
 
     const model = buildSnapshotModel(draft.current, CAPABILITIES_32, {editable: true, reason: ""});

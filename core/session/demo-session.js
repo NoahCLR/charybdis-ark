@@ -141,7 +141,7 @@ const demoUnsaved = (session) => Boolean(session.demo && session.draft?.dirty &&
 /** @param {Session} session @param {CloseOptions | null | undefined} message */
 function assertDemoMayClose(session, message) {
     if (demoUnsaved(session) && message?.discardDemo !== true) {
-        throw fail("The demo has edits that were not exported. Export them first, or confirm leaving them behind.", "DEMO_UNSAVED");
+        throw fail("The demo has edits that were not saved to a backup file. Save a backup file first, or confirm leaving them behind.", "DEMO_UNSAVED");
     }
 }
 

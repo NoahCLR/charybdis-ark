@@ -27,7 +27,7 @@ test("Host changes review affected text macros while leaving key steps and ident
     assert.deepEqual(effects.map(row => row.place.index), [0, 3]);
     for (const row of effects) {
         assert.equal(row.unit, "settings:host", "the effect discards the host setting, not the macro");
-        assert.match(row.note, /because of Settings → Host/);
+        assert.match(row.note, /because of Settings → Your computer/);
         const typing = row.fields.find(field => field.label === "Text entry");
         assert.match(typing.before, /layout keys: "é"/);
         assert.match(typing.after, /Unicode entry \(macOS\): "é"/);
@@ -67,6 +67,9 @@ test("a combo's keys read as the screens read them, with no stored name where no
     const after=snapshot(combos(base,rows=>rows.map((row,id)=>id===0?{...row,inputs:[{kind:1,flags:0,operand:0x4338},{kind:1,flags:0,operand:0x7e80}]}:row)));
     const keys=profileReview(before,after).find(row=>row.unit==="combo:0").fields.find(field=>field.label==="Keys");
     assert.equal(keys.after,`/ / ${settings.names[3]} + ${slots[0].name} · hold`,"a layer by its name");
+    const item=profileReview(before,after).find(row=>row.unit==="combo:0");
+    assert.match(item.title,new RegExp(`^/ / ${settings.names[3]} \\+ ${slots[0].name} · hold → `),"a combo is titled by its inputs and what it sends");
+    assert.deepEqual(item.titleMark,{kind:"combo",badge:"C0"},"its number is a quiet mark beside it");
 });
 test("a key changed for another with the same label is still a visible change", () => {
     const before=snapshot(document()), changed=structuredClone(before.document);
@@ -171,7 +174,7 @@ test("a new pointing mode is one added item, however many fields it sets", () =>
     const items=profileReview(before,after);
     assert.equal(items.length,1);
     assert.equal(items[0].status,"added");
-    assert.equal(items[0].title,"Slot 6 · Mode 6");
+    assert.equal(items[0].title,"P6 · Mode 6");
     assert.ok(items[0].fields.length>5,"it lists what it sets");
     assert.deepEqual(items[0].place,{kind:"pointing",slot:6});
 });
@@ -213,7 +216,7 @@ test("a colour travels as a colour, and an off one says what off means there", (
 test("switching one lighting stage off names that stage, in the Lighting screen's words", () => {
     const base=pdDocument(), before=snapshot(base);
     const [item]=profileReview(before,snapshot(lighting(base,rgb=>({...rgb,stageEnableMask:rgb.stageEnableMask & ~4}))));
-    assert.deepEqual(item.fields,[{label:"Pointing modes",status:"changed",before:"on",after:"off",beforeMark:{kind:"stage",on:true},afterMark:{kind:"stage",on:false}}]);
+    assert.deepEqual(item.fields,[{label:"Trackball modes",status:"changed",before:"on",after:"off",beforeMark:{kind:"stage",on:true},afterMark:{kind:"stage",on:false}}]);
 });
 test("a behaviour tier says which branch and tier it is, so it is coloured as the grid colours it", () => {
     const base=pdDocument(), before=snapshot(base);
@@ -239,7 +242,7 @@ test("a setting is marked with what it governs, as the Settings screen marks it"
     const items=profileReview(before,after);
     const timing=items.find(entry=>entry.unit==="settings:keyTiming").fields;
     assert.deepEqual(timing.filter(field=>field.labelMark).map(field=>field.labelMark),[{kind:"tier",tier:"hold"},{kind:"tier",tier:"long"}]);
-    const layer=items.find(entry=>entry.unit==="settings:autoMouse").fields.find(field=>field.label==="Auto-mouse layer");
+    const layer=items.find(entry=>entry.unit==="settings:autoMouse").fields.find(field=>field.label==="Layer");
     assert.deepEqual(layer.afterMark,{kind:"layer",layer:3},"a layer value carries the layer's colour");
 });
 test("a settings section is listed under the screen it is edited on", () => {
@@ -251,8 +254,8 @@ test("a settings section is listed under the screen it is edited on", () => {
     const timing=items.find(entry=>entry.unit==="settings:keyTiming"), mouse=items.find(entry=>entry.unit==="settings:autoMouse");
     assert.equal(timing.area,"Settings");
     assert.deepEqual(timing.place,{kind:"settings",section:"keyTiming",area:"Settings"});
-    assert.equal(mouse.area,"Mouse","auto-mouse is edited on the Mouse screen");
-    assert.deepEqual(mouse.place,{kind:"settings",section:"autoMouse",area:"Mouse"});
+    assert.equal(mouse.area,"Trackball","the mouse layer is edited on the Trackball screen");
+    assert.deepEqual(mouse.place,{kind:"settings",section:"autoMouse",area:"Trackball"});
 });
 test("clearing a pointing mode is a change to the slot, not to every behaviour that reaches it", () => {
     const base=pdDocument(), slots=validateSnapshot(base).pdModes;

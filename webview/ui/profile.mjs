@@ -34,8 +34,8 @@ export function screenProfile() {
     const demo = demoOf(model).active;
 
     const main = el(`<div class="main">${topbar(
-        "Profile & backups",
-        "A complete backup is everything the keyboard stores: layers, behaviours, combos, custom keys, macros, pointing modes, lighting and settings.",
+        "Backups",
+        "A complete backup is everything the keyboard stores: layers, behaviours, combos, custom keys, macros, trackball modes, lighting and settings.",
     )}</div>`);
 
     const content = el(`<div class="content"><div class="pad stack profile-pad"></div></div>`);
@@ -51,20 +51,20 @@ export function screenProfile() {
         <div class="card profile-action" data-profile-drop aria-disabled="${!canImport}">
             <div class="card-b">
                 <span class="profile-action-mark"><svg viewBox="0 0 24 24"><path d="M12 21V9M7.5 13.5 12 9l4.5 4.5M4 5h16"/></svg></span>
-                <h3>Import profile</h3>
-                <p class="note">${demo ? "Choose or drop a complete backup here and review its differences from the demo setup first. Import replaces the demo's draft; Undo brings it back."
-                    : "Choose or drop a complete backup here and review its differences first. Import replaces the local draft; nothing is written to the keyboard until you review and apply it."}</p>
+                <h3>Restore</h3>
+                <p class="note">${demo ? "Choose or drop a backup file here and review its differences from the demo setup first. Restoring replaces the demo's draft; Undo brings it back."
+                    : "Choose or drop a backup file here and review its differences first. Restoring replaces your draft; nothing is written to the keyboard until you review and apply it."}</p>
                 <p class="note profile-drop-status" role="status" hidden></p>
-                <button class="btn" data-act="import" ${canImport ? "" : "disabled"}>Choose profile…</button>
+                <button class="btn" data-act="import" ${canImport ? "" : "disabled"}>Choose a backup file…</button>
             </div>
         </div>
         <div class="card profile-action">
             <div class="card-b">
                 <span class="profile-action-mark"><svg viewBox="0 0 24 24"><path d="M12 3v12M7.5 10.5 12 15l4.5-4.5M4 19h16"/></svg></span>
-                <h3>Export profile</h3>
+                <h3>Back up</h3>
                 <p class="note">${demo ? esc(DEMO_WORDS.exportNote)
                     : "Save a complete, portable backup of the profile currently running on the keyboard. Keep it somewhere safe before experimenting or updating firmware."}</p>
-                <button class="btn primary" data-act="export" ${canExport ? "" : "disabled"}>Export profile…</button>
+                <button class="btn" data-act="export" ${canExport ? "" : "disabled"}>Save a backup file…</button>
             </div>
         </div>
     </div>`);
@@ -78,11 +78,11 @@ export function screenProfile() {
 
     // Its state reads as Device's do: a chip with a dot at the right of the title.
     if (!demo) pad.appendChild(el(`<div class="card profile-recovery">
-        <div class="card-h"><h3>Automatic recovery</h3>
+        <div class="card-h"><h3>Saves in progress</h3>
             <span class="right"><span class="chip"><i class="dot ${health.recoveryPending ? "draft" : "on"}"></i>${health.recoveryPending ? "pending" : "clear"}</span></span></div>
         <div class="card-b"><p class="note">${health.recoveryPending
-            ? "An apply was interrupted. The keyboard is still running its last complete profile; the recovery copy restores it, and Apply retries from there."
-            : "A recovery copy is written before every apply and released once both halves confirm. Nothing is outstanding."}</p></div>
+            ? "An apply was interrupted. The keyboard is still running its last complete profile; the previous profile saved before Apply restores it, and Apply retries from there."
+            : "The keyboard keeps a copy of its profile before every Apply and lets it go once both halves confirm. Nothing is outstanding."}</p></div>
     </div>`));
 
     const recoveries = hostOf(model).recoveries;
@@ -117,15 +117,15 @@ function wireProfileDrop(card) {
         card.classList.remove("drag-over");
         if (!available()) return;
         const dropped = Array.from(/** @type {DataTransfer} */ (event.dataTransfer).files);
-        if (dropped.length !== 1) {tell("Drop one profile file at a time."); return;}
+        if (dropped.length !== 1) {tell("Drop one backup file at a time."); return;}
         const file = dropped[0];
-        if (file.size > 262144) {tell("This profile file is too large."); return;}
+        if (file.size > 262144) {tell("This backup file is too large."); return;}
         const draft = getModel()?.draft;
         if (!draft) return;
         const {id, revision} = draft;
         reading = true;
         choose.disabled = true;
-        tell("Reading profile…");
+        tell("Reading the backup file…");
         try {
             const text = await file.text();
             if (!card.isConnected) return;
@@ -136,7 +136,7 @@ function wireProfileDrop(card) {
             tell("");
             post(reviewPortableProfile(text, file.name));
         } catch {
-            tell("This profile file could not be read. Try Choose profile instead.");
+            tell("This backup file could not be read. Try Choose a backup file… instead.");
         } finally {
             reading = false;
             choose.disabled = !canEditArea("import");
@@ -149,11 +149,11 @@ function wireProfileDrop(card) {
 /** @param {import("../../contracts/model.js").RecoveryCopy[]} recoveries */
 function recoveriesCard(recoveries) {
     const node = el(`<div class="card recoveries">
-        <div class="card-h"><h3>Recovery copies</h3><span class="right note">${recoveries.length} in this browser</span></div>
+        <div class="card-h"><h3>Previous profiles</h3><span class="right note">${recoveries.length} in this browser</span></div>
         ${recoveries.length ? `<div class="list">${recoveries.map((copy) => `<div class="list-row recovery-row">
             <span class="mono">${esc(copy.name)}</span><span class="note">${esc(savedWhen(copy.savedAt))}</span>
             <button class="btn tiny" data-recovery="${esc(copy.id)}">Download</button></div>`).join("")}</div>` : ""}
-        <div class="card-b"><p class="note">${recoveries.length ? "" : "None yet. "}Apply and Import save a copy of what the keyboard held here before they write anything. They stay in this browser until you clear the site's data, which deletes them too, so download any you want to keep.</p></div>
+        <div class="card-b"><p class="note">${recoveries.length ? "" : "None yet. "}Apply and Restore save a copy of what the keyboard held here before they write anything. They stay in this browser until you clear the site's data, which deletes them too, so download any you want to keep.</p></div>
     </div>`);
     /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-recovery]")).forEach((button) => button.addEventListener("click", () => {
         const copy = recoveries.find((copy) => String(copy.id) === button.dataset.recovery);
@@ -174,7 +174,7 @@ function usageCard(usage) {
             <div><div class="sect-h"><h4>Profile</h4>
                 <span class="right note">${bytes(usage.used)} of ${bytes(usage.capacity)} bytes used · ${bytes(usage.free)} free</span></div>
                 <div class="meter ${usage.nearlyFull ? "near" : ""}" data-tip="${Math.round(usage.share * 100)}% used"><i style="width:${usage.share * 100}%"></i></div></div>
-            <p class="note">Behaviours, combos, lighting, pointing modes, custom keys, settings and names are stored together here${usage.nearlyFull ? ". It is nearly full: the next edit may not fit" : ""}.</p>
+            <p class="note">Behaviours, combos, lighting, trackball modes, custom keys, settings and names are stored together here${usage.nearlyFull ? ". It is nearly full: the next edit may not fit" : ""}.</p>
             ${usage.counts.length ? `<table class="t usage-counts"><thead><tr><th>In use</th><th class="count num"></th><th></th><th></th></tr></thead>
                 <tbody>${usage.counts.map((count) => `<tr data-tip="${esc(count.tip)}"><td>${esc(count.label)}</td>
                     <td class="mono count num">${count.used} of ${count.limit}</td>
@@ -207,7 +207,7 @@ function reviewCard(model, portable, busy) {
         ? "An interrupted restore left an incomplete configuration, so this file cannot be compared with it. This profile replaces it; the interrupted data is kept as a diagnostic copy, so keep your original backup as well."
         : draft
             ? `${pending ? `This replaces your draft and its ${pending} change${pending === 1 ? "" : "s"}; Undo brings ${pending === 1 ? "it" : "them"} back. ` : ""}Nothing is written to the keyboard until you review and apply; the review shows every change field by field.`
-            : "This replaces the keyboard's layout, behaviours, combos, custom keys, macros, pointing modes, lighting and settings. A recovery copy is saved automatically before restoring, and both halves are verified afterwards.";
+            : "This replaces the keyboard's layout, behaviours, combos, custom keys, macros, trackball modes, lighting and settings. The previous profile is saved automatically before restoring, and both halves are verified afterwards.";
     const node = el(`<div class="card">
         <div class="card-h"><h3>${draft ? "Use this profile as your draft?" : "Restore this profile?"}</h3>
             ${fileName ? `<span class="right note mono">${esc(fileName)}</span>` : ""}</div>

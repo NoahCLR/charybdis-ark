@@ -45,7 +45,7 @@ export function stageIdle(model, id) {
     if (id !== "auto" || !stageEnabled(model, id)) return null;
     const field = (model?.configDefaults || []).find((section) => section.id === "autoMouse")
         ?.fields.find((entry) => entry.macro === "autoMouse");
-    return field && !field.enabled ? "Auto-mouse is off, so this stage paints nothing." : null;
+    return field && !field.enabled ? "Mouse layer is off, so this stage paints nothing." : null;
 }
 
 /** @param {Model} model @param {string} id */
@@ -198,3 +198,15 @@ export function trackballLight(model, layer, options = {}) {
 /** @param {import("./types.js").LedLight | null | undefined} light @param {number} [layerId] */
 export const ownLight = (light, layerId = 0) =>
     layerId === 0 || light?.source === "pointing" || (light?.source === "layer" && light.layer === layerId);
+
+// What black does on a stage that is not a layer colour: HSV(0, 0, 0) paints
+// those LEDs dark while the stage shows, it does not hand them back to what is
+// underneath (B17). Said as the consequence, where it lights:
+// "While Dragscroll runs, the right half goes dark."
+/** @param {string} when @param {string} where the vocabulary's words for where it lights */
+export function blackConsequence(when, where) {
+    const place = String(where || "").toLowerCase();
+    const subject = !place ? "its LEDs" : /^(the|only|both) /.test(place) ? place : `the ${place}`;
+    const plural = /^both |^its /.test(subject);
+    return `${when}, ${subject} ${plural ? "go" : "goes"} dark.`;
+}

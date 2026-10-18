@@ -20,7 +20,7 @@
 /** @type {readonly {id: ApplyStep, label: string}[]} */
 const APPLY_STEPS = Object.freeze(/** @type {const} */ ([
     {id: "check", label: "Check the keyboard"},
-    {id: "backup", label: "Save a recovery copy"},
+    {id: "backup", label: "Save the previous profile"},
     {id: "upload", label: "Send the profile"},
     {id: "validate", label: "Keyboard checks the profile"},
     {id: "stage", label: "Stage keys and macros on the slave half"},
@@ -125,7 +125,7 @@ class ApplyProgress {
 }
 
 /** @type {Readonly<Record<number, string>>} */
-const DOMAIN_NAMES = Object.freeze({0x10: "lighting", 0x20: "key behaviours", 0x30: "combos", 0x40: "settings", 0x50: "pointing modes"});
+const DOMAIN_NAMES = Object.freeze({0x10: "lighting", 0x20: "key behaviours", 0x30: "combos", 0x40: "settings", 0x50: "trackball modes"});
 
 // What the keyboard's candidate error means, in the words of the person who
 // pressed Apply. Unlisted errors fall back to their wire name.

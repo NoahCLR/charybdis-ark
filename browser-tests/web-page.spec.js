@@ -287,13 +287,13 @@ test("explore the demo: edit on several screens, review with no Apply, export, o
     await page.locator('.commit [data-act="review"]').click();
     const sheet = page.locator(".sheet");
     await expect(sheet.locator("h2")).toHaveText("Review 3 changes");
-    for (const area of ["Mouse", "Custom keys", "Macros"]) await expect(sheet.locator(".rv-sect h4", {hasText: area})).toHaveCount(1);
+    for (const area of ["Trackball", "Custom keys", "Macros"]) await expect(sheet.locator(".rv-sect h4", {hasText: area})).toHaveCount(1);
     await expect(sheet).toContainText("Apply needs a keyboard");
     await expect(sheet.locator('[data-act="apply"], [data-act="apply-anyway"]')).toHaveCount(0);
     const [exported] = await Promise.all([page.waitForEvent("download"), sheet.locator('[data-act="export"]').click()]);
     expect(exported.suggestedFilename()).toMatch(/^charybdis-demo-\d{4}-\d\d-\d\d\.charybdis\.json$/);
     const file = JSON.parse(await (await exported.createReadStream()).toArray().then((chunks) => Buffer.concat(chunks).toString("utf8")));
-    await expect(page.locator(".rail-message")).toContainText("Import it on your keyboard");
+    await expect(page.locator(".rail-message")).toContainText("Restore it on your keyboard");
     await page.locator('.sheet [data-act="close"]').first().click();
 
     // Open a profile file: exported just now, so nothing is asked first.
@@ -315,7 +315,7 @@ test("explore the demo: edit on several screens, review with no Apply, export, o
     // Leaving with edits not exported asks first, and offers Export.
     await banner.locator('[data-act="leave-demo"]').click();
     const ask = page.locator(".sheet.leave-demo");
-    await expect(ask).toContainText("have not been exported");
+    await expect(ask).toContainText("have not been saved to a backup file");
     await expect(ask.locator('[data-act="export"]')).toBeVisible();
     await ask.locator('[data-act="confirm-leave"]').click();
     await expect(banner).toHaveCount(0);

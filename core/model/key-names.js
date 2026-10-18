@@ -118,6 +118,9 @@ function profileKeyNames({hostOs = 0, hostLayout: layoutId = US_HOST_LAYOUT, mac
         labels[entry.name] = label;
         for (const alias of ("aliases" in entry ? entry.aliases : [])) labels[alias] = label;
     }
+    // KC_NO does nothing and blocks the layers below. QMK's catalogue calls
+    // it "N/A"; Ark calls it Nothing everywhere it names a key on its own.
+    labels.KC_NO = labels.XXXXXXX = "Nothing";
     const count = Math.max(8, layers?.length || 0);
     for (let layer = 0; layer < count; layer++) for (const form of Object.keys(LAYER_VERBS)) {
         const name = `${form}(${layer})`;
@@ -175,7 +178,7 @@ function profileKeyNames({hostOs = 0, hostLayout: layoutId = US_HOST_LAYOUT, mac
     for (const slot of pdModes) for (const locked of [false, true]) {
         const binding = PD_SLOT_BINDINGS[slot.id];
         const name = locked ? binding.lock : binding.hold, code = locked ? binding.lockCode : binding.holdCode;
-        const label = `${slotName(slot)} · ${locked ? "toggle" : "hold"}${slot.kind ? "" : " (empty)"}`;
+        const label = `${slotName(slot)} · ${locked ? "lock" : "hold"}${slot.kind ? "" : " (empty)"}`;
         const native = keycodes.resolve(code).name;
         aliases[native] = name;
         labels[native] = label;
@@ -264,7 +267,8 @@ function keyLabel(names, value) {
     }
     if (resolved.kind === "modified") {
         const base = keycodes.resolve(value & 0xff);
-        return hostKeyLabel(resolved.label, names?.hostOs).replace(/\+[^+]+$/, () => `+${keyLabel(names, base.value)}`);
+        // Modifiers over KC_NO are the modifiers alone.
+        return hostKeyLabel(resolved.label, names?.hostOs).replace(/\+[^+]+$/, () => base.value ? `+${keyLabel(names, base.value)}` : "+N/A");
     }
     return carriesModifiers(resolved) ? hostKeyLabel(resolved.label, names?.hostOs) : resolved.label;
 }

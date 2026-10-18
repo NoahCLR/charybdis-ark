@@ -580,7 +580,7 @@ test("new detection refreshes dirty draft labels and Unicode gates without alter
     const {macroEditorView} = require('../../core/model/macro-editor');
     const guiWord = () => draft.steps().at(-1).changes[0].fields[0].after;
     assert.match(guiWord(),/GUI/); // Populate presentation cache before fresh reads.
-    assert.throws(()=>stage(draft,{type:'updateViaMacro',keycode:'VIA_MACRO_0',payload:'café'}),/setup|Select|host/i);
+    assert.throws(()=>stage(draft,{type:'updateViaMacro',keycode:'VIA_MACRO_0',payload:'café'}),/setup|Select|host|operating system/i);
     for(const [detected,label] of [[1,'Command'],[2,'Windows'],[3,'Super'],[0,'GUI']]) {
         draft.observe({...snapshot,hostOs:{detected}},'board');
         assert.equal(draft.current.hostOs.detected,detected);

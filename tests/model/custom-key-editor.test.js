@@ -28,7 +28,7 @@ test("all 128 custom keys are listed, and a name changes nothing else", () => {
     assert.deepEqual(after.settings.macroNames, validateSnapshot(before.document).settings.macroNames, "the macros keep their names");
     assert.deepEqual(named.layers, before.document.layers);
     const [item] = profileReview(before, snapshot(named)).filter(row => row.unit === "customKey:2");
-    assert.equal(item.title, "Custom key 2 · Click Spam");
+    assert.equal(item.title, "K2 · Click Spam");
     assert.equal(item.fields.find(field => field.label === "Name").after, "Click Spam");
     assert.deepEqual(revertUnits(before, snapshot(named), new Set(["customKey:2"]), capabilities).layers, before.document.layers);
     assert.equal(validateSnapshot(revertUnits(before, snapshot(named), new Set(["customKey:2"]), capabilities)).settings.customKeyNames[2], "", "discarded alone");

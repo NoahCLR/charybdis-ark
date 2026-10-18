@@ -22,7 +22,7 @@ details, folded under **Where it is stored**. Reach rows and tables name keys
 as the board does, never by layout index. Every Keys tab is at least as tall as
 the Behaviours tab; a taller editor carries its height across tab changes, so
 changing tabs does not move the page's scroll position.
-The Behaviours, Combos, Macros and Pointing modes reach lists lead with **On
+The Behaviours, Combos, Macros and Trackball modes reach lists lead with **On
 this view**, calculated for the selected layer plus exactly the lower layers
 currently previewed on. **On this layer** means a key stored on the selected
 layer, and the other route groups describe ways it can reach an item under
@@ -106,7 +106,7 @@ The same kind of control looks and sits the same on every screen.
 - A table's number column (`th.num`, `td.num`) is right-aligned with tabular
   digits.
 - A status card names its state in a chip with a dot at the right of its title,
-  as Device and Automatic recovery do.
+  as Keyboard and Saves in progress do.
 - The keycode picker draws a key's single legend smaller only when it does not
   fit the key (`legendFits` in `view/picker-board.mjs`).
 - Card and section names are sentence case, as the rail and the review name
@@ -117,13 +117,13 @@ The same kind of control looks and sits the same on every screen.
   `lib/scroll.mjs` keeps the bank's position across same-screen renders. A
   narrower window shows two across, and below 720 px the bank stacks above
   the editor.
-- A list beside its editor (Lighting's layers and pointing modes) scrolls on
+- A list beside its editor (Lighting's layers and trackball modes) scrolls on
   its own past eight rows, `.rowlist.many`, with its heading kept in view. Its
   `data-scroll-list` key lets `lib/scroll.mjs` keep each list's position across
   same-screen renders without carrying it into another list, and bring the
   picked row into view.
 - A heading inside a workbench column uses the column's `sect-h` style.
-- Pages of cards (Mouse, Settings, Profile & backups, Device) share one width,
+- Pages of cards (Trackball, Settings, Backups, Keyboard) share one width,
   `--page`. Side-by-side tables start at the top rather than stretching to
   each other's height.
 - Keys and Lighting draw the same layer strip, Rename & Reorder included
@@ -206,7 +206,7 @@ mouse buttons 1–8 (`0x00d1..0x00d8`, Profile Wire feature bit 28) and VIA
 macro outputs (`0x7700..0x777f`, feature bit 29), which take inherit policy
 and mask zero (firmware D-F23); Ark requires both features (D-L64). Mouse movement, wheel,
 acceleration and modifier-wrapped mouse codes remain invalid. The firmware
-owns the click runtime contract (D-F22); the [guide](../GUIDE.md#pointing-mode-clicks)
+owns the click runtime contract (D-F22); the [guide](../GUIDE.md#trackball-mode-clicks)
 describes its effect for users.
 
 `core/model/pointing-taps.js` supplies the allowed picker names and aliases,
@@ -227,10 +227,49 @@ show that they do nothing yet.
 Backups retain click and macro records exactly. No field, history step or
 import silently substitutes a keyboard shortcut.
 
+## Words and keycodes
+
+One thing has one name on every surface (decisions §3). The words for a value
+the keyboard stores live in `core/model/vocabulary.js` and reach the webview
+as `model.vocabulary`; a setting's label, hint, hover help and its section's
+`search` words (the older and QMK names Settings search still matches: host,
+startup, magic, auto-mouse, pointing) live in `core/model/settings-editor.js`;
+a key's name is `core/model/key-names.js`'s. The rules:
+
+- Layer verbs are one set: Hold (`MO`), Lock (`TG` and `LOCK_LAYER`, the same
+  lock on this firmware), Tap-hold (`LT`), Tap-toggle (`TT`), One-shot (`OSL`)
+  and Move to (`TO`). Key names, the cap's second line (`view/keyface.mjs`,
+  which recognises a lock stored as a user keycode by its `semantic`), the
+  picker and the review all use them. A trackball mode's two keys are its hold
+  and its lock.
+- `KC_NO` is Nothing (its cap a dash); `KC_TRANSPARENT` is Transparent.
+- A behaviour's cells are actions; its rows are tap counts; a hold action has
+  How it runs. Rows count actions (`actionsWords` in `view/keyface.mjs`).
+- Slots are 0-based and tagged M5, K5 and P5 (`slotTag` in
+  `core/model/vocabulary.js`); an unnamed one reads "Macro 5", "Custom key 5"
+  or "Mode 5". A combo is named by its inputs and output
+  (`comboIdentityMarked` in `ui/marks.mjs`, and the review's titles), its
+  C-number a quiet mark, since a deletion renumbers the rest.
+- On a non-layer lighting stage HSV(0, 0, 0) is Black, not off: the colour
+  editor's `black` option labels the button and states what goes dark
+  (`blackConsequence` in `view/lighting.mjs`).
+
+**Show keycodes** (`state.showKeycodes`, off by default) is decided in one
+place, `webview/view/show-keycodes.mjs`. `ALWAYS` lists where a keycode is
+always shown because you act on it there: the Key tab's Keycode field, the
+picker footer, Where it is stored, a macro's raw payload and a review value's
+tooltip. `OPTIONAL` lists every other place a screen may print one (hover card,
+behaviour rows, titles and cells, combo Sends, stack rows, picker buttons,
+reach rows, the placing bar); there `keycodeAside` returns the keycode only
+with the preference on, and never when it repeats the words. Screens draw it
+with `keycodeMark` (`ui/marks.mjs`) as a muted mono suffix; a new place is
+added to `OPTIONAL` first, or `keycodeShown` throws. Search in the picker and
+Settings always matches QMK names.
+
 ## Shared rule ownership
 
 - Settings help: `core/model/settings-editor.js` owns the descriptions for its
-  Mouse and Settings fields. `hint` remains visible; optional `tooltip` adds
+  Trackball and Settings fields. `hint` remains visible; optional `tooltip` adds
   an explanation where the hint is a numeric range. The shared setting-row
   renderer combines them for `data-tip`, including read-only reasons. Keyboard
   name and combo timing rows use the same hover path. `ui/hover.mjs` displays
@@ -315,7 +354,7 @@ import silently substitutes a keyboard shortcut.
 - Picker selection: `webview/view/picker-sections.mjs` owns `pickable` for
   every catalogue section and search. Inert `QK_USER_0`–`QK_USER_31` entries
   stay in the catalogue for exact readback and backups, but are never offered.
-  Current named `CUSTOM_KEY_n`, N/A and Transparent remain selectable where
+  Current named `CUSTOM_KEY_n`, Nothing (`KC_NO`) and Transparent remain selectable where
   the field supports them. Selection policy never rewrites stored identities.
 - Actions, native keycodes, decode limits, layer references:
   `core/schema/actions.js`; the pointing registry and key layout are data.

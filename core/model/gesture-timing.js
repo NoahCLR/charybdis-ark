@@ -52,7 +52,7 @@ function gestureTimingFindings(decoded) {
                     `The Long hold threshold is ${terms.long} ms and the Tap / hold threshold is ${terms.hold} ms. Which actions run also depends on their hold modes, input delivery and scan order; the normal Hold-then-Long-hold progression is not available.`,
                     "Put the Long hold threshold after the Tap / hold threshold for distinct tiers. This warning does not claim both actions are impossible.");
                 else if (step.hold && gap < SHORT_WINDOW_MS) add(`narrow:${step.tapIndex}`, `${branch} has a narrow hold interval`,
-                    `Only ${gap} ms separates Hold (${terms.hold} ms) from Long hold (${terms.long} ms). Selecting or using just the first tier may be difficult.`,
+                    `Only ${gap} ms separates Hold (${terms.hold} ms) from Long hold (${terms.long} ms). Selecting or using just the first hold may be difficult.`,
                     "Increase the gap if you need to select Hold separately. The 50 ms advisory threshold is a comfort heuristic, not a firmware limit.", "notice");
             }
         }

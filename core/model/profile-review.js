@@ -74,7 +74,7 @@ const actionMark = value => {
     const code = nativeCode(value);
     return code === undefined ? undefined : keyMark(code);
 };
-// A pointing slot as fields, in the Pointing modes editor's words.
+// A pointing slot as fields, in the Trackball modes editor's words.
 /** @param {import("../schema/types.js").PdSlot | undefined} slot @param {Names} names @returns {Fields} */
 function pointingFields(slot, names) {
     const P = VOCABULARY.pointing;
@@ -86,8 +86,8 @@ function pointingFields(slot, names) {
     /** @param {import("../schema/types.js").PdTap | undefined} output */
     const tap = output => !output?.keycode ? "None"
         : `${keyLabel(names.keys, output.keycode)} · ${output.modifierPolicy === 1 ? `${word(P.modifierPolicy, 1)} ${mods(output.mask)}` : word(P.modifierPolicy, output.modifierPolicy)}`;
-    result.set("DPI", slot.dpi || "Normal pointer speed");
-    result.set("Pointer layer", word(P.pointerLayer, slot.pointerLayer));
+    result.set("Ball speed", slot.dpi ? `${slot.dpi} DPI` : "Normal");
+    result.set("While this mode runs", word(P.pointerLayer, slot.pointerLayer));
     if (slot.kind === 1) {
         result.set("Axes", word(P.axes, slot.axis));
         result.set("Horizontal movement per tap", slot.thresholdX);
@@ -160,7 +160,7 @@ function behaviourFields(row, defaults, names) {
         ["Multi tap window", timing(row.multiTapTerm, defaults[3], {kind: "branch", count: 2})],
         ["Tap / hold threshold", timing(row.tapHoldTerm, inherited.hold, {kind: "tier", tier: "hold"})],
         ["Long hold threshold", timing(row.longerHoldTerm, defaults[2], {kind: "tier", tier: "long"})],
-        ["Keeps auto-mouse anchored", row.keepsAutoMouseAnchored ? "yes" : "no"],
+        ["Keeps the mouse layer on", row.keepsAutoMouseAnchored ? "yes" : "no"],
         ["Enabled", row.enabled ? "on" : "off"],
         ["Allowed layers", {text: names.layers.filter((_, i) => row.allowedLayers & 2 ** i).join(", ") || "none", key: row.allowedLayers}],
     ]);
@@ -216,6 +216,11 @@ function comboFields(row, table, names) {
         ["Enabled", row.enabled ? "on" : "off"], ["Use output behaviour", row.useOutputBehavior ? "on" : "off"],
         ["Allowed layers", {text: names.layers.filter((_, i) => row.allowedLayers & 2 ** i).join(", ") || "none", key: row.allowedLayers}]]));
 }
+// A combo by what it is: "Space + Delete → Hold Number". Its number is only
+// its place in the table, which deleting a combo renumbers, so it rides along
+// as the title's quiet mark rather than as its name.
+/** @param {Combo | undefined} row @param {Names} names */
+const comboTitle = (row, names) => row ? `${row.inputs.map(input => action(input, names)).join(" + ") || "No inputs"} → ${action(row.output, names)}` : "";
 // The two values every combo shares. A version 1 table has no default window,
 // and without combos no hold threshold either.
 /** @param {Combos} table @returns {Fields} */
@@ -270,14 +275,14 @@ function lightingRecords(value) {
     }));
     for (const row of r.layerColors) record(`rgb:layer:${row.layerId}`, `${layerName(row.layerId)} colour`, "layers",
         [["Colour", colour(row.color, row.layerId === 0 ? "off · the base effect shows" : "off")], ["Paints", nameIn(V.paintModes, rgbEnums.RGB_LAYER_MODES, row.mode)]], {layer: row.layerId}, {kind: "layer", layer: row.layerId});
-    for (const row of r.pdModeColors) record(`rgb:pd:${row.pdModeId}`, `Pointing mode colour · ${slotCalled(row.pdModeId)}`, "pd",
-        [["Colour", colour(row.color)], ["Where", nameIn(V.localities, rgbEnums.RGB_LOCALITIES, row.locality)]], {slot: row.pdModeId}, {kind: "pointing", slot: row.pdModeId});
-    record("rgb:automouse", "Auto-mouse fade", "auto", [["Fade", nameIn(V.fadeModes, rgbEnums.RGB_AUTOMOUSE_MODES, r.automouseFade.mode)], ["End colour", colour(r.automouseFade.endColor)]]);
-    record("rgb:combo", "Combo feedback", "combo", [["Colour", colour(r.comboFeedback.color)], ["Where", nameIn(V.localities, rgbEnums.RGB_LOCALITIES, r.comboFeedback.locality)]]);
+    for (const row of r.pdModeColors) record(`rgb:pd:${row.pdModeId}`, `Trackball mode colour · ${slotCalled(row.pdModeId)}`, "pd",
+        [["Colour", colour(row.color)], ["Where it lights", nameIn(V.localities, rgbEnums.RGB_LOCALITIES, row.locality)]], {slot: row.pdModeId}, {kind: "pointing", slot: row.pdModeId});
+    record("rgb:automouse", "Mouse layer fade", "auto", [["Fade", nameIn(V.fadeModes, rgbEnums.RGB_AUTOMOUSE_MODES, r.automouseFade.mode)], ["End colour", colour(r.automouseFade.endColor)]]);
+    record("rgb:combo", "Combo feedback", "combo", [["Colour", colour(r.comboFeedback.color)], ["Where it lights", nameIn(V.localities, rgbEnums.RGB_LOCALITIES, r.comboFeedback.locality)]]);
     const k = r.keyFeedback;
-    record("rgb:key", "Key feedback", "key", [...k.tapBranchColors.map(/** @returns {[string, Field]} */ (value, i) => [`${i + 2}× branch`, colour(value)]),
-        ["Tap committed", colour(k.tapCommittedColor)], ["Hold active", colour(k.holdActiveColor)], ["Long hold active", colour(k.longHoldActiveColor)],
-        ["Tap commit", nameIn(V.tapCommit, rgbEnums.RGB_TAP_COMMIT_MODES, k.tapCommitMode)], ["Where", nameIn(V.localities, rgbEnums.RGB_LOCALITIES, k.locality)]]);
+    record("rgb:key", "Key feedback", "key", [...k.tapBranchColors.map(/** @returns {[string, Field]} */ (value, i) => [`Waiting on ${i + 2}×`, colour(value)]),
+        ["Multi-tap sent", colour(k.tapCommittedColor)], ["Holding", colour(k.holdActiveColor)], ["Long holding", colour(k.longHoldActiveColor)],
+        ["Flash after a double tap or more", nameIn(V.tapCommit, rgbEnums.RGB_TAP_COMMIT_MODES, k.tapCommitMode)], ["Where it lights", nameIn(V.localities, rgbEnums.RGB_LOCALITIES, k.locality)]]);
     // LED groups are one record with every row that paints them: rows name
     // groups by id, so a row put back without its group could point at a
     // group that no longer exists. Groups read as the Lighting screen shows
@@ -295,7 +300,7 @@ function lightingRecords(value) {
             key: `${group?.leds.join(",")}|${paint.key}|${owner(row)}`, colour: paint.colour}]);
     });
     overrides("layerGroupRows", r.layerGroupRows, row => row.selector === 255 ? "all layers" : layerName(row.selector), row => row.selector === 255 ? undefined : {kind: "layer", layer: row.selector});
-    overrides("pdModeGroupRows", r.pdModeGroupRows, row => row.selector === 255 ? "all pointing modes" : slotCalled(row.selector), row => row.selector === 255 ? undefined : {kind: "pointing", slot: row.selector});
+    overrides("pdModeGroupRows", r.pdModeGroupRows, row => row.selector === 255 ? "all trackball modes" : slotCalled(row.selector), row => row.selector === 255 ? undefined : {kind: "pointing", slot: row.selector});
     overrides("comboGroupRows", r.comboGroupRows, () => "combos", () => ({kind: "combo"}));
     overrides("keyGroupRows", r.keyGroupRows, row => nameIn(V.feedbackOwners, rgbEnums.RGB_KEY_SEMANTICS, row.semantic), row => {
         const name = Object.entries(rgbEnums.RGB_KEY_SEMANTICS).find(([, id]) => id === row.semantic)?.[0];
@@ -391,12 +396,12 @@ function profileReview(before, after, capabilities) {
     const removedCombo = singleComboRemovalIndex(combosA, combosB);
     if (removedCombo !== null) {
         const i = removedCombo;
-        item("Combos", `combo:${i}`, `Combo ${i}`, comboFields(combosA[i], a.combos, namesA), new Map(), {kind: "combo", index: i}, undefined,
+        item("Combos", `combo:${i}`, comboTitle(combosA[i], namesA), comboFields(combosA[i], a.combos, namesA), new Map(), {kind: "combo", index: i}, undefined,
             {kind: "combo", badge: `C${i}`});
         if (i < combosB.length) /** @type {Change} */ (items.at(-1)).note = "Later combos move up one number.";
     } else {
         for (let i = 0; i < Math.max(combosA.length, combosB.length); i++) {
-            item("Combos", `combo:${i}`, `Combo ${i}`, comboFields(combosA[i], a.combos, namesA), comboFields(combosB[i], b.combos, namesB), {kind: "combo", index: i}, undefined,
+            item("Combos", `combo:${i}`, comboTitle(combosB[i], namesB) || comboTitle(combosA[i], namesA), comboFields(combosA[i], a.combos, namesA), comboFields(combosB[i], b.combos, namesB), {kind: "combo", index: i}, undefined,
                 {kind: "combo", badge: `C${i}`});
         }
     }
@@ -407,7 +412,7 @@ function profileReview(before, after, capabilities) {
             ["Uninterruptible playback", {key: macro.protection,
                 text: macro.protection === "auto" ? `${word(VOCABULARY.macroProtection, macro.protection)} · ${macro.uninterruptible ? "on" : "off"}` : word(VOCABULARY.macroProtection, macro.protection)}]]));
         const old = macrosA.viaMacros[i], next = macrosB.viaMacros[i], has = /** @param {Macros["viaMacros"][number]} macro */ (macro) => Boolean(macro.payload || macro.name || macro.protection !== "auto");
-        item("Macros", `macro:${i}`, `Macro ${i}${(next.name || old.name) ? ` · ${next.name || old.name}` : ""}`, fields(old), fields(next), {kind: "macro", index: i}, [has(old), has(next)]);
+        item("Macros", `macro:${i}`, (next.name || old.name) ? `M${i} · ${next.name || old.name}` : `Macro ${i}`, fields(old), fields(next), {kind: "macro", index: i}, [has(old), has(next)]);
     });
     if (a.settings.values[HOST_SETTING] !== b.settings.values[HOST_SETTING]) {
         const oldHost = hostSettings(a.settings.values, before.hostOs?.detected), nextHost = hostSettings(b.settings.values, after.hostOs?.detected);
@@ -441,8 +446,8 @@ function profileReview(before, after, capabilities) {
             };
             // The effect belongs to Host, so discarding it restores Host and
             // preserves independently edited macro text and names.
-            item("Macros", "settings:host", `Macro ${index}${macro.name ? ` · ${macro.name}` : ""} · host setup`, fields(old, oldHost), fields(next, nextHost), {kind: "macro", index}, [true, true]);
-            /** @type {Change} */ (items.at(-1)).note = "Playback changes because of Settings → Host. Discard together with the Host change.";
+            item("Macros", "settings:host", `${macro.name ? `M${index} · ${macro.name}` : `Macro ${index}`} · computer setup`, fields(old, oldHost), fields(next, nextHost), {kind: "macro", index}, [true, true]);
+            /** @type {Change} */ (items.at(-1)).note = "Playback changes because of Settings → Your computer. Discard together with that change.";
         });
     }
     // A custom key is its name and shortcut here; what its behaviour adds is
@@ -457,7 +462,7 @@ function profileReview(before, after, capabilities) {
         const fields = (name, shortcut, names) => new Map([["Name", name || "no name"], ["Shortcut", shortcutField(shortcut, names)]]);
         /** @param {string} name @param {{mods: number, key: number}} shortcut */
         const exists = (name, shortcut) => Boolean(name || shortcut.mods || shortcut.key);
-        item("Custom keys", `customKey:${i}`, `Custom key ${i}${(next || old) ? ` · ${next || old}` : ""}`, fields(old, shortcutA, namesA), fields(next, shortcutB, namesB), {kind: "customKey", index: i},
+        item("Custom keys", `customKey:${i}`, (next || old) ? `K${i} · ${next || old}` : `Custom key ${i}`, fields(old, shortcutA, namesA), fields(next, shortcutB, namesB), {kind: "customKey", index: i},
             [exists(old, shortcutA), exists(next, shortcutB)]);
     });
     // The keyboard's own name, edited on Settings' Keyboard card. Empty is the
@@ -523,7 +528,7 @@ function profileReview(before, after, capabilities) {
         new Map([["Stored bits", `0x${(b.settings.values[SETTING.KEYMAP_OPTIONS] & ~masks).toString(16)}`]]), {kind: "settings"}, [true, true]);
     for (let id = 0; id < Math.max(a.pdModes?.length || 0, b.pdModes?.length || 0); id++) {
         const old = a.pdModes?.[id], next = b.pdModes?.[id];
-        item("Pointing modes", `pd:${id}`, `Slot ${id}${(next?.name || old?.name) ? ` · ${next?.kind ? next.name : old?.name}` : ""}`,
+        item("Trackball modes", `pd:${id}`, (next?.name || old?.name) ? `P${id} · ${next?.kind ? next.name : old?.name}` : `Mode ${id}`,
             pointingFields(old, namesA), pointingFields(next, namesB), {kind: "pointing", slot: id}, [Boolean(old?.kind || old?.name), Boolean(next?.kind || next?.name)], {kind: "pointing", slot: id});
     }
     const lightA = lightingRecords(a), lightB = lightingRecords(b);

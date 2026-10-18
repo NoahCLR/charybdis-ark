@@ -16,6 +16,16 @@ import {sequenceFace} from "../view/macro-sequence.mjs";
 import {namedAction} from "../view/reach.mjs";
 import {feedbackColours, pdColourRow, stageEnabled} from "../view/lighting.mjs";
 import {layerSwatch} from "./layerbar.mjs";
+import {keycodeAside} from "../view/show-keycodes.mjs";
+import {state} from "../store.mjs";
+
+// A key's QMK keycode as the muted suffix beside its words, where Show
+// keycodes allows it at this place (view/show-keycodes.mjs); empty otherwise.
+/** @param {import("../view/show-keycodes.mjs").KeycodePlace} place @param {string | null | undefined} keycode @param {string} [words] @param {string} [className] */
+export function keycodeMark(place, keycode, words, className = "dim") {
+    const code = keycodeAside(state, place, keycode, words);
+    return code ? `<code class="${esc(className)} kc-aside">${esc(code)}</code>` : "";
+}
 
 // A branch's badge as the grid heads its column: from 2× on, tinted with the
 // tap-branch colour the keyboard shows while that branch is pending. The
@@ -112,6 +122,10 @@ export const comboOutputMarked = (model, combo) =>
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/panel.js").ComboView} combo */
 export const comboInputsMarked = (model, combo) =>
     (combo.inputs || []).map((input, at) => keyNameMarked(model, combo.inputDisplays?.[at] ?? input, input)).join(" + ");
+// A combo by what it is, "Space + Delete → Hold ■ Number": its C-number is
+// only a quiet index, since deleting a combo renumbers the ones after it.
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/panel.js").ComboView} combo */
+export const comboIdentityMarked = (model, combo) => `${comboInputsMarked(model, combo) || "No inputs"} → ${comboOutputMarked(model, combo)}`;
 
 // A label starting or ending in a layer's name, with that layer's mark before
 // the name. Empty-handed (no layer, or a label that does not carry its name)

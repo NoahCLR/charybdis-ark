@@ -205,7 +205,7 @@ const DRAFT_ACTIONS = Object.freeze({
                 readStep(step);
                 service.emitChange?.();
             }).catch((error) => {reread = rereadOutcome(session, expected, error);});
-            session.notice = reconnectNotice(expected, `${savedNotice(result, "applied to")} ${reread}Recovery copy: ${recovery}`);
+            session.notice = reconnectNotice(expected, `${savedNotice(result, "applied to")} ${reread}Previous profile saved at ${recovery}`);
         });
         return;
     },
@@ -294,7 +294,7 @@ const PORTABLE_ACTIONS = Object.freeze({
         const expected = reconnectAfter(session, before, result);
         let reread = "";
         await rereadKeyboard(service).catch((error) => {reread = rereadOutcome(session, expected, error);});
-        session.notice = reconnectNotice(expected, savedNotice(result, "saved to") + " " + reread + (before.incomplete ? "Interrupted data retained for diagnosis: " : "Recovery copy: ") + recovery);
+        session.notice = reconnectNotice(expected, savedNotice(result, "saved to") + " " + reread + (before.incomplete ? "Interrupted data retained for diagnosis: " : "Previous profile saved at ") + recovery);
         return;
     },
 });

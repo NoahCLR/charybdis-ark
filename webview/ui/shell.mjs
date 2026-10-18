@@ -79,7 +79,7 @@ export function rail() {
                 ${demo.active ? "" : health.restartNeeded
                     ? line("err", "Restart the keyboard",
                         "The slave half did not confirm a cancelled save, so the keyboard refuses new saves. Unplug the USB cable (not the cable between the halves), wait a few seconds and plug it back in. Nothing was lost.")
-                    : health.recoveryPending ? line("warn", "Recovery pending", "A recovery copy is written before every apply.") : ""}
+                    : health.recoveryPending ? line("warn", "Save in progress", "The keyboard keeps a copy of its previous profile until both halves confirm a save.") : ""}
             </div>
         </div>
         <nav class="rail-nav">${nav}</nav>
@@ -290,7 +290,7 @@ export function commitBar() {
         <button class="btn ghost tiny" data-act="discard"
             data-tip="${demo ? "Put every change back to the demo setup." : "Put every change back to what the keyboard holds."} Undo (⌘Z) brings them back.">Discard all</button>
         <button class="btn primary" data-act="review"
-            data-tip="${demo ? "See every change and what the checks find. Apply needs a keyboard; Export saves the setup." : "See every change, then write the draft to both halves as one generation."}">${demo ? "Review changes" : "Review and apply"}</button></div>`);
+            data-tip="${demo ? "See every change and what the checks find. Apply needs a keyboard; Save a backup file… keeps the setup." : "See every change, then write the draft to both halves as one generation."}">${demo ? "Review changes" : "Review and apply"}</button></div>`);
     /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="review"]')).addEventListener("click", openReview);
     /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="discard"]')).addEventListener("click", () => post(controls.control("discardProfileDraft")));
     return node;

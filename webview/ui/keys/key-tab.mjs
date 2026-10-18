@@ -5,7 +5,7 @@
 import {css, isOff} from "../../lib/colour.mjs";
 import {DISCLOSURE, el, esc} from "../../lib/dom.mjs";
 import {LED_INDEX} from "../../view/geometry.mjs";
-import {behaviourFor, canonicalKeycode, keyFace, keyMeaning, keyName, visibleKeycode} from "../../view/keyface.mjs";
+import {actionsWords, behaviourFor, canonicalKeycode, keyFace, keyMeaning, keyName, visibleKeycode} from "../../view/keyface.mjs";
 import {combosAt} from "../../view/combo-reach.mjs";
 import {pointingSlotFor} from "../../view/reach.mjs";
 import {resolvedPositions} from "../../view/layer-resolution.mjs";
@@ -14,7 +14,7 @@ import {currentLayer, getModel, heldLayers, layerName, layers, openComboBuilder,
 import {participationAt} from "../../view/participation.mjs";
 import * as edits from "../../view/edits.mjs";
 import {canHaveBehaviour} from "../../view/behavior-editor.mjs";
-import {actionMarked, comboBadge, comboOutputMarked, keyNameMarked} from "../marks.mjs";
+import {actionMarked, comboBadge, comboOutputMarked, keycodeMark, keyNameMarked} from "../marks.mjs";
 import {customKeyBypassText, customKeyOf} from "../../view/custom-key.mjs";
 import {unavailable} from "../shell.mjs";
 import {behaviourKey, selectBehaviourKey} from "./behaviour-selection.mjs";
@@ -36,7 +36,7 @@ export function tabKey(body) {
             <div class="sect-h"><h4>This position on ${esc(layerName(layer))}</h4></div>
             <div class="field"><span>Keycode</span>
                 <div class="input-row"><input class="input mono" id="keycodeField" data-f="key:${layer.index}:${position?.layoutIndex}:keycode" value="${esc(keyMeaning(position))}" ${writable() ? "" : "disabled"}>
-                <button class="btn" data-act="pick" ${writable() ? "" : "disabled"}>Pick…</button></div></div>
+                <button class="btn" data-act="pick" ${writable() ? "" : "disabled"}>Change key…</button></div></div>
             <div class="key-details">
                 <dl class="kv"><dt>Does</dt><dd>${position ? keyNameMarked(model, keyName(position), keyMeaning(position)) : "—"}</dd></dl>
                 <details class="key-more" ${state.keyDetailsOpen ? "open" : ""}><summary class="note">${DISCLOSURE}Where it is stored</summary>
@@ -60,14 +60,14 @@ export function tabKey(body) {
             <div class="stack key-reaches">
                 <button class="reach ${behaviour ? "" : "empty"}" data-goto="behaviours" ${behaviourOpen ? "" : "disabled"}>
                     <span class="rl">Behaviour</span>
-                    <span class="rv">${behaviour ? `${actionMarked(model, behaviour.keycode)} · ${behaviour.steps.length} branch${behaviour.steps.length === 1 ? "" : "es"}` : behaviourOpen ? "Using the key’s defaults" : "Unavailable for transparent keys and KC_NO"}${behaviourOpen && followed.from ? ` · from ${esc(layerName(followed.from))}` : ""}</span>
+                    <span class="rv">${behaviour ? `${actionMarked(model, behaviour.keycode)} · ${actionsWords(behaviour)}` : behaviourOpen ? "Using the key’s defaults" : "Unavailable for Transparent and Nothing keys"}${behaviourOpen && followed.from ? ` · from ${esc(layerName(followed.from))}` : ""}</span>
                     <span class="ra">${behaviour ? "Edit" : "Open"}</span></button>
                 <button class="reach ${combos.length ? "" : "empty"}" data-goto="combos">
                     <span class="rl">Combos</span>
                     <span class="rv">${combos.length ? combos.map((combo) => `${comboBadge(model, combo.badge)} → ${comboOutputMarked(model, combo)}`).join(" · ") : "not part of a combo"}</span>
                     <span class="ra">${combos.length ? "Edit" : "New"}</span></button>
-                ${slot ? `<button class="reach" data-goto="pointing"><span class="rl">Pointing</span>
-                    <span class="rv">${esc(slot.displayName || `Slot ${slot.id}`)}</span><span class="ra">Edit</span></button>` : ""}
+                ${slot ? `<button class="reach" data-goto="pointing"><span class="rl">Trackball mode</span>
+                    <span class="rv">${esc(slot.displayName || `Mode ${slot.id}`)}</span><span class="ra">Edit</span></button>` : ""}
             </div>
         </section>
     </div>`);
@@ -131,14 +131,14 @@ function stackRows(model, layer, position) {
         return `<button class="stackrow ${other.index === layer.index ? "on" : ""}${through ? " through" : ""}" data-golayer="${layers().indexOf(other)}">
             <span class="swatch-lg ${lit ? "" : "swatch-off"}"${lit ? ` style="background:${css(colour.color)}"` : ""}></span>
             <span class="nm">${esc(layerName(other))}</span>
-            <span class="val ${face.kind === "transparent" ? "dim" : ""}">${face.kind === "transparent" ? "falls through" : esc(face.main || "nothing")}</span>
-            <code class="dim">${face.kind === "transparent" ? "" : esc(visibleKeycode(model, there?.keycode || ""))}</code></button>`;
+            <span class="val ${face.kind === "transparent" ? "dim" : ""}">${face.kind === "transparent" ? "Transparent" : keyNameMarked(model, keyName(there), keyMeaning(there))}</span>
+            ${keycodeMark("stackRow", face.kind === "transparent" ? "" : visibleKeycode(model, there?.keycode || ""), keyName(there)) || `<code class="dim"></code>`}</button>`;
     };
     let html = "", run = /** @type {typeof rows} */ ([]);
     const flush = () => {
         if (run.length >= 3 && !state.stackOpen) html += `<button class="stackrow folded" data-stack-open data-tip="Show each of these layers">
             <span class="swatch-lg swatch-off"></span><span class="nm">${run.length} layers</span>
-            <span class="val dim">fall through · ${esc(layerName(run[0].other))} to ${esc(layerName(run[run.length - 1].other))}</span><code class="dim"></code></button>`;
+            <span class="val dim">Transparent · ${esc(layerName(run[0].other))} to ${esc(layerName(run[run.length - 1].other))}</span><code class="dim"></code></button>`;
         else html += run.map(row).join("");
         run = [];
     };

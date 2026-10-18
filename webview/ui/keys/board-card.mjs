@@ -11,7 +11,7 @@ import {el, esc} from "../../lib/dom.mjs";
 import {feedbackColours, stageEnabled} from "../../view/lighting.mjs";
 import {getModel, heldLayers, layerName, layers, render, state, writable} from "../../store.mjs";
 import {draftDot} from "../../view/review.mjs";
-import {actionMarked, comboBadge, keyNameMarked} from "../marks.mjs";
+import {actionMarked, comboBadge, keyNameMarked, keycodeMark} from "../marks.mjs";
 import {comboInputLabel} from "./combo-builder.mjs";
 
 // The caption while layers are previewed on together: which ones, in the
@@ -30,7 +30,7 @@ export function placementBar() {
     const placement = state.placement;
     const node = el(`<div class="pickbar">
         <span><b>Placing ${placement?.keycode ? actionMarked(getModel(), placement.keycode) : "keycode"}</b> — choose a layer, then click its destination key</span>
-        <code class="n">${esc(placement?.keycode || "")}</code>
+        ${keycodeMark("placeBar", placement?.keycode, "", "n")}
         <span class="right"><button class="btn tiny ghost" data-act="cancel">Cancel</button></span></div>`);
     /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="cancel"]')).addEventListener("click", () => { state.placement = null; render(); });
     return node;
@@ -59,16 +59,17 @@ export function boardHelp(model) {
                 <span class="legend-item">the light this layer paints</span>
                 <span class="legend-item"><i class="lkey sel"></i> selected key</span>
                 <span class="legend-item"><i class="lkey indicated"></i> keys for the picked row or the combo being built</span>
-                <span class="legend-item">${dot(colours.tap)} tap branch</span>
-                <span class="legend-item">${dot(colours.hold)} hold branch</span>
-                <span class="legend-item">${dot(colours.long)} long hold branch</span>
+                <span class="legend-item">${dot(colours.tap)} tap</span>
+                <span class="legend-item">${dot(colours.hold)} hold</span>
+                <span class="legend-item">${dot(colours.long)} long hold</span>
                 <span class="legend-item">${comboBadge(model, "C0")} combo input</span>
-                <span class="legend-item"><i class="lkey transparent"></i> transparent · falls through</span>
+                <span class="legend-item"><i class="lkey transparent"></i> Transparent (falls through)</span>
+                <span class="legend-item">— Nothing (blocks lower layers)</span>
                 ${model?.draft?.dirty ? `<span class="legend-item">${draftDot()} changed in your draft</span>` : ""}
             </div>
             <div class="eyebrow">Shortcuts</div>
             <dl class="board-shortcuts">${shortcuts.map(([keys, does]) => `<dt>${esc(keys)}</dt><dd>${esc(does)}</dd>`).join("")}</dl>
-            ${state.keyClipboard ? `<p class="note">Copied <code class="n">${esc(state.keyClipboard.keycode)}</code></p>` : ""}
+            ${state.keyClipboard ? `<p class="note">Copied <b>${esc(state.keyClipboard.label || state.keyClipboard.keycode)}</b>${keycodeMark("placeBar", state.keyClipboard.keycode, state.keyClipboard.label, "n")}</p>` : ""}
         </div>
     </details>`);
 }

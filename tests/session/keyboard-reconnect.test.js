@@ -76,7 +76,7 @@ test("a stored rename expects a reconnect even when the USB product already has 
 test("the renamed keyboard drops off, comes back under its new name and is read again", async () => {
     const session = stubSession(), timing = clock(), reads = [], published = [];
     const expected = expectReconnect(session, "Desk", timing.now);
-    expected.saved = "Complete profile applied. Recovery copy: /r.json";
+    expected.saved = "Complete profile applied. Previous profile saved at /r.json";
     let ticks = 0;
     const sleep = async (ms) => {
         await timing.sleep(ms);
@@ -88,7 +88,7 @@ test("the renamed keyboard drops off, comes back under its new name and is read 
         read: async (id) => {reads.push(id); Object.assign(session.service.state, {connected: true, selectedDeviceId: id});}});
     assert.deepEqual(reads, ["kb-2"]);
     assert.equal(session.reconnect, undefined);
-    assert.equal(session.notice, `Complete profile applied. Recovery copy: /r.json ${RECONNECT_WORDS.back("Desk")}`);
+    assert.equal(session.notice, `Complete profile applied. Previous profile saved at /r.json ${RECONNECT_WORDS.back("Desk")}`);
     assert.equal(published[0], true, "the panel is told as soon as the keyboard drops");
     assert.deepEqual(session.service.calls, ["expect:true", "enumerate", "enumerate", "enumerate", "expect:false"], "the list is polled until it is back");
 });
@@ -157,7 +157,7 @@ test("the return wait ignores the other keyboard left connected until the rename
 test("failed enumeration never reconnects from a stale list, and the timeout preserves the recovery notice", async () => {
     const session = stubSession(), timing = clock(), reads = [];
     const expected = expectReconnect(session, "Desk", timing.now);
-    expected.saved = "Saved. Recovery copy: /r.json";
+    expected.saved = "Saved. Previous profile saved at /r.json";
     session.service.state.connected = false;
     session.service.state.devices = [{id: "stale", product: "Desk"}];
     session.service.enumerate = async () => {throw new Error("listing unavailable");};
