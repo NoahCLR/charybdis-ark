@@ -26,7 +26,7 @@ export interface PanelState {
     stage: string; layersOpen: boolean; layersAsked: boolean; layerGripFocus?: number; pdSlot: number; pdKind: {slot: number; kind: number} | null;
     pdButtons: {slot: number; rows: Record<number, PdButton>} | null; pdTaps: {slot: number; rows: Record<string, PdTap>} | null;
     pdAdvanced: boolean; applyDismissed: number; pdPreview: boolean; feedbackRow: string | undefined;
-    macroSlot: string | null; macroSearch: string; customKey: string | null; customKeySearch: string; macroForms: Record<string, MacroForm>;
+    macroSlot: string | null; macroSearch: string; macroEmptyOpen: boolean; customKey: string | null; customKeySearch: string; customKeyEmptyOpen: boolean; customKeyAddBehaviour: string | null; macroForms: Record<string, MacroForm>;
     macroClipboard: MacroStep[] | null;
     recording: {slot: string; before: string} | null; lastTake: {slot: string; before: string} | null;
     recordDelays: boolean; recordPreserveHoldTiming: boolean; recordDelayThreshold: number; recordDelayRound: number;

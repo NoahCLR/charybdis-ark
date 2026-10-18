@@ -11,7 +11,7 @@ const pick = (page, slot) => page.locator(`.macro-grid [data-custom-key="CUSTOM_
 
 test("the custom key bank scrolls on its own and keeps its place, so the editor stays beside it", async ({page}) => {
     await openControls(page, "customKeys");
-    const bank = page.locator(".pad.library .macro-grid");
+    const bank = page.locator(".pad.library .bank-scroll");
     const content = page.locator(".content");
     const tile = page.locator('.macro-grid [data-custom-key="CUSTOM_KEY_100"]');
     await tile.scrollIntoViewIfNeeded();

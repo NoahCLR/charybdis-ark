@@ -132,6 +132,12 @@ function paintTiles(node, model, slot, steps) {
         finishDrag();
         moveStep(slot, macroForm(slot.keycode).steps ?? steps, id, before);
     };
+    // While recording, a listening tile ends the sequence: the next key lands there.
+    const listening = state.recording?.slot === slot.keycode
+        ? el(`<div class="macro-token-wrap listening-wrap">${steps.length ? '<span class="macro-connector" aria-hidden="true">→</span>' : ""}<span class="macro-token listening" data-listening role="status">
+            <span class="macro-token-mark" aria-hidden="true"><i class="record-dot"></i></span><span class="macro-token-label">…</span><span class="macro-token-kind">listening</span></span></div>`) : null;
+    node.classList.toggle("empty", !steps.length && !listening);
+    if (!steps.length && listening) { node.replaceChildren(listening); return; }
     if (!steps.length) {
         node.replaceChildren(el(`<div class="macro-empty"><span class="macro-empty-mark" aria-hidden="true">+</span>
             <strong>Your macro starts here</strong><p class="note">${editable ? "Add text, a shortcut or a delay above, or record your keys below." : "This macro has no steps."}</p></div>`));
@@ -177,6 +183,7 @@ function paintTiles(node, model, slot, steps) {
         tile.addEventListener("dragend", finishDrag);
         return wrap;
     }));
+    if (listening) node.append(listening);
 }
 
 /** @param {MacroSlot} slot @param {MacroStep[]} steps @param {string} id @param {number} before */

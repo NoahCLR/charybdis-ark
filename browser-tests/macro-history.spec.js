@@ -16,7 +16,7 @@ async function command(page, action) {
 
 
 async function openMacro(page, payload = '{KC_A}{KC_C}') {
-    await openControls(page, 'macros', {macroSlot: 'VIA_MACRO_17'});
+    await openControls(page, 'macros', {macroSlot: 'VIA_MACRO_17', macroEmptyOpen: true});
     await page.evaluate(async payload => {
         const store = await import('/webview/store.mjs'), model = structuredClone(store.getModel());
         Object.assign(model.viaMacros[17], {payload, bytes: 6, empty: false});
@@ -91,7 +91,7 @@ test('field edits coalesce, invalid delay redo stays local, and a valid correcti
     await expect(page.locator('[data-macro-feedback]')).toBeHidden();
     await command(page, 'redo');
     await expect(delay).toHaveValue('65536');
-    await expect(page.locator('[data-macro-feedback]')).toContainText('not staged');
+    await expect(page.locator('[data-macro-feedback]')).toContainText('not in your draft');
     expect(await updates(page)).toEqual([]);
     await delay.fill('250'); await delay.press('Tab');
     await expect.poll(() => updates(page).then(rows => rows.at(-1)?.payload)).toBe('{250}{KC_C}');
@@ -100,7 +100,7 @@ test('field edits coalesce, invalid delay redo stays local, and a valid correcti
 test('raw edits retain stable identities and invalid raw input is undoable without enabling paste', async ({page}) => {
     await openMacro(page);
     await page.locator('[data-step-tile="0"]').click(); await page.keyboard.press('Control+c');
-    await page.locator('[data-raw-toggle]').check();
+    await page.locator('[data-raw-toggle]').click();
     const raw = page.locator('[data-raw-payload]');
     await raw.fill('{KC_A}{KC_C}{KC_ENT}'); await raw.press('Tab');
     const added = await page.locator('[data-step-tile="2"]').getAttribute('data-step-id');
@@ -254,7 +254,7 @@ test('pasting an unsupported key stays local, and a finished take followed by Cl
         store.render(); window.__posted.length = 0;
     });
     await command(page, 'paste');
-    await expect(page.locator('[data-macro-feedback]')).toContainText('not staged');
+    await expect(page.locator('[data-macro-feedback]')).toContainText('not in your draft');
     expect(await updates(page)).toEqual([]);
     await page.keyboard.press('Control+z');
     await page.locator('[data-act="record"]').click(); await page.keyboard.press('b'); await page.locator('[data-act="record"]').click();

@@ -4,25 +4,14 @@
 /** @typedef {import("../../view/types.js").MacroStep} MacroStep */
 import {el, esc} from "../../lib/dom.mjs";
 import {canEdit, getModel, macroForm, render, setMacroForm, state} from "../../store.mjs";
-import {recordedTakePayload} from "../../view/macro-recording.mjs";
+import {recordedKeycode, recordedTakePayload} from "../../view/macro-recording.mjs";
 import {rememberMacroEdit} from "./history.mjs";
 import {stageMacro} from "./validation.mjs";
 /* ── the recorder ──────────────────────────────────────────────────────── */
-/** @type {Record<string, string>} */
-const EVENT_CODES = {
-    Space: "KC_SPC", Enter: "KC_ENT", Tab: "KC_TAB", Backspace: "KC_BSPC", Escape: "KC_ESC",
-    Minus: "KC_MINS", Equal: "KC_EQL", BracketLeft: "KC_LBRC", BracketRight: "KC_RBRC",
-    Backslash: "KC_BSLS", Semicolon: "KC_SCLN", Quote: "KC_QUOT", Comma: "KC_COMM",
-    Period: "KC_DOT", Slash: "KC_SLSH", Backquote: "KC_GRV",
-    ShiftLeft: "KC_LSFT", ShiftRight: "KC_RSFT", ControlLeft: "KC_LCTL", ControlRight: "KC_RCTL",
-    AltLeft: "KC_LALT", AltRight: "KC_RALT", MetaLeft: "KC_LGUI", MetaRight: "KC_RGUI",
-    ArrowUp: "KC_UP", ArrowDown: "KC_DOWN", ArrowLeft: "KC_LEFT", ArrowRight: "KC_RGHT",
-};
-/** @param {string} code */
-const codeToKeycode = (code) => EVENT_CODES[code]
-    || (/^Key([A-Z])$/.test(code) ? `KC_${code.slice(3)}` : "")
-    || (/^Digit(\d)$/.test(code) ? `KC_${code.slice(5)}` : "")
-    || (/^F(\d{1,2})$/.test(code) ? `KC_${code}` : "");
+// Keys pressed during a take that a macro cannot send: named in the recorder,
+// never silently turned into a pause.
+/** @type {string[]} */
+let skippedKeys = [];
 /** @type {import('../../view/macro-recording.mjs').RecordedKey[]} */
 let recordedEvents = [];
 
@@ -34,10 +23,14 @@ const recordingOptions = () => ({explicit: state.recordPreserveHoldTiming,
 export function recorder(model, slot, canEdit) {
     const recording = state.recording?.slot === slot.keycode;
     const delays = state.recordPreserveHoldTiming || state.recordDelays !== false;
-    const node = el(`<div class="card" data-recorder="${esc(slot.keycode)}">
-        <div class="card-h"><h3>Record</h3><span class="tag">${recording ? "recording" : "idle"}</span>
-            <button class="btn ${recording ? "" : "primary"} right" data-act="record" ${canEdit ? "" : "disabled"}>${recording ? "Stop" : "● Record"}</button></div>
+    const lastTake = state.lastTake?.slot === slot.keycode;
+    const node = el(`<div class="card${recording ? " recording" : ""}" data-recorder="${esc(slot.keycode)}">
+        <div class="card-h"><h3>Record</h3>
+            <button class="btn record-btn right" data-act="record" ${recording ? 'aria-pressed="true"' : ""} ${canEdit ? "" : "disabled"}><i class="record-dot" aria-hidden="true"></i>${recording ? "Recording · Stop (Esc)" : "Record"}</button></div>
         <div class="card-b stack">
+            <p class="note">${recording ? "Press your keys: each is added to the end of the sequence. Esc, Stop or a click outside the recorder ends the recording."
+                : "Records the keys you press and adds them to the end of the sequence."} Shortcuts your computer keeps (⌘Tab, ⌘Space, screenshots) can't be recorded; add them with + Key / chord.</p>
+            ${skippedKeys.length && (recording || lastTake) ? `<p class="note warn" data-skipped-keys>Not recorded: ${esc(skippedKeys.join(", "))}. A macro cannot send ${skippedKeys.length === 1 ? "this key" : "these keys"}.</p>` : ""}
             <div class="row record-opts">
                 <label class="sw"><input type="checkbox" data-f="macro:${esc(slot.keycode)}:record-delays" data-delays ${delays ? "checked" : ""} ${state.recordPreserveHoldTiming ? "disabled" : ""}>
                     <span class="track"></span><span class="txt">Record delays</span></label>
@@ -45,12 +38,10 @@ export function recorder(model, slot, canEdit) {
                 <label class="field ms-field"><span>Round to</span><span class="affix unit"><input class="input mono" data-f="macro:${esc(slot.keycode)}:record-round" data-round inputmode="numeric" value="${esc(state.recordDelayRound)}" ${delays ? "" : "disabled"}><i>ms</i></span></label>
                 <label class="sw" data-tip="Keeps individual presses and releases with their timing. Record delays stays on; After and Round to set its precision."><input type="checkbox" data-f="macro:${esc(slot.keycode)}:record-preserve-hold-timing" data-preserve-hold-timing ${state.recordPreserveHoldTiming ? "checked" : ""} ${recording ? "disabled" : ""}>
                     <span class="track"></span><span class="txt">Preserve hold timing</span></label>
+                <button class="btn text right" data-act="clear-take" ${recording || lastTake ? "" : "disabled"}
+                    data-tip="Put the macro back as it was before this recording.">Undo recording</button>
             </div>
             <p class="note">${state.recordPreserveHoldTiming ? "Preserving hold timing: keeps every press and release, with recorded delays." : "Overlapping keys become one chord; held modifiers join each shortcut. Complex rolling overlaps keep press and release steps."}</p>
-            <div class="row gap-8">
-                <span class="note">${recording ? "Typing is captured for this slot. Escape, Stop or clicking outside this recorder finishes the take." : "Appends key steps. Leaving this recorder finishes the take."}</span>
-                <button class="btn ghost right" data-act="clear-take" ${recording || state.lastTake?.slot === slot.keycode ? "" : "disabled"}>Clear take</button>
-            </div>
         </div></div>`);
 
     /** @type {HTMLInputElement} */ (node.querySelector("[data-preserve-hold-timing]")).addEventListener("change", event => {
@@ -92,6 +83,7 @@ export function recorder(model, slot, canEdit) {
 /** @param {MacroSlot} slot @param {string} before */
 function startRecording(slot, before) {
     recordedEvents = [];
+    skippedKeys = [];
     state.lastTake = null;
     setMacroForm(slot.keycode, {draft: before, steps: undefined, stepError: ""});
     state.recording = {slot: slot.keycode, before};
@@ -163,8 +155,16 @@ function onRecordKey(event) {
     const recording = state.recording;
     if (!recording?.slot) return;
     if (event.key === "Escape" && event.type === "keydown") { event.preventDefault(); stopRecording(); return; }
-    const keycode = codeToKeycode(event.code);
-    if (!keycode) return;
+    const keycode = recordedKeycode(event.code);
+    if (!keycode) {
+        // Captured, so the page does not scroll or act on it, and named in
+        // the recorder rather than passing as a pause.
+        if (event.type !== "keydown" || !event.code) return;
+        event.preventDefault();
+        const name = event.key && event.key !== "Unidentified" && event.key.length > 1 ? event.key : event.code;
+        if (!skippedKeys.includes(name)) { skippedKeys = [...skippedKeys, name]; render(); }
+        return;
+    }
     if (event.repeat) { event.preventDefault(); return; }
     if (event.type !== "keydown" && event.type !== "keyup") return;
     event.preventDefault();

@@ -420,7 +420,9 @@ test("literal macro steps stage through the real web host, export exactly, undo 
     await page.locator('.read-placeholder [data-act="explore-demo"]').click();
     await ready(page);
     await page.locator('[data-screen="macros"]').click();
-    await page.locator('[data-slot="VIA_MACRO_17"]').click();
+    // + New macro opens the first free slot, M17 in the demo.
+    await page.locator('[data-act="new-macro"]').click();
+    await expect(page.locator('[data-slot="VIA_MACRO_17"]')).toHaveAttribute("aria-current", "true");
     await page.locator('[data-insert-kind="text"]').click();
     const text = ' {"key": "{KC_A}"}\nhello ';
     await page.locator("[data-step-text]").fill(text);
@@ -440,14 +442,19 @@ test("literal macro steps stage through the real web host, export exactly, undo 
     await expect(page.locator("[data-step-text]")).toHaveValue(text);
     // Step history must also work after the real host accepts a deletion.
     await page.locator('[data-step-tile="0"]').click(); await page.keyboard.press('Delete');
+    // Every step is in the draft, so nothing is local to discard; the draft
+    // mark by the title says whether the macro differs from the keyboard.
     await expect(page.locator('.macro-empty')).toBeVisible();
-    await expect(page.locator('.macro-titlebar [data-local-state]')).toHaveText('as read');
+    await expect(page.locator('.macro-titlebar [data-act="discard"]')).toBeHidden();
+    await expect(page.locator('.macro-titlebar .draft-dot')).toHaveCount(0);
     await page.keyboard.press('Control+z');
     await expect(page.locator('[data-step-text]')).toHaveValue(text);
-    await expect(page.locator('.macro-titlebar [data-local-state]')).toHaveText('as read');
+    await expect(page.locator('.macro-titlebar [data-act="discard"]')).toBeHidden();
+    await expect(page.locator('.macro-titlebar .draft-dot')).toHaveCount(1);
     await page.keyboard.press('Control+Shift+z');
     await expect(page.locator('.macro-empty')).toBeVisible();
-    await expect(page.locator('.macro-titlebar [data-local-state]')).toHaveText('as read');
+    await expect(page.locator('.macro-titlebar [data-act="discard"]')).toBeHidden();
+    await expect(page.locator('.macro-titlebar .draft-dot')).toHaveCount(0);
     expect(keyboard.requests).toEqual([]);
     expect(errors).toEqual([]);
     ownFilesOnly();

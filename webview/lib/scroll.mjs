@@ -16,7 +16,7 @@ export function captureContentScroll(root, previousScreen, nextScreen) {
     if (previousScreen !== nextScreen) return null;
     const content = root.querySelector(".content");
     if (!content) return null;
-    const bank = root.querySelector(".pad.library .macro-grid");
+    const bank = root.querySelector(".pad.library .bank-scroll");
     const list = /** @type {HTMLElement | null} */ (root.querySelector("[data-scroll-list]"));
     return {top: content.scrollTop, left: content.scrollLeft,
         ...(bank ? {bank: {top: bank.scrollTop, left: bank.scrollLeft}} : {}),
@@ -30,7 +30,7 @@ export function restoreContentScroll(root, scroll) {
     if (!content) return;
     content.scrollTop = scroll.top;
     content.scrollLeft = scroll.left;
-    const bank = root.querySelector(".pad.library .macro-grid");
+    const bank = root.querySelector(".pad.library .bank-scroll");
     if (bank && scroll.bank) {
         bank.scrollTop = scroll.bank.top;
         bank.scrollLeft = scroll.bank.left;
