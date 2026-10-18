@@ -98,8 +98,8 @@ test("every state of the two halves has a label and words saying what to do", ()
 test("one set of words for what the keyboard stores, as decided", () => {
     assert.equal(word(VOCABULARY.pointing.buttons, 1), "Block the click");
     assert.deepEqual(VOCABULARY.pointing.pointerLayer.map(([, words]) => words), ["Keep the mouse layer on", "Go back to the typing layer"]);
-    assert.deepEqual(VOCABULARY.stages.map(stage => stage.label), ["Base effect", "Layer colours", "Mouse layer fade", "Trackball modes", "Combo feedback", "Key feedback"]);
-    assert.deepEqual(VOCABULARY.feedbackOwners.slice(1).map(([, words]) => words), ["Waiting on 2×…5×", "Multi-tap sent", "Holding", "Long holding"]);
+    assert.deepEqual(VOCABULARY.stages.map(stage => stage.label), ["Base effect", "Layers", "Mouse fade", "Trackball modes", "Combos", "Key feedback"]);
+    assert.deepEqual(VOCABULARY.feedbackOwners.slice(1).map(([, words]) => words), ["Waiting on 2×…5×", "Multi-tap sent", "Holding", "Long hold"]);
     const everyWord = JSON.stringify(VOCABULARY);
     assert.doesNotMatch(everyWord, /Consume|Tap committed|Hold active|pointer layer|Auto-mouse|Pointing modes/, "no retired word is left");
 });

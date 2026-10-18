@@ -73,7 +73,9 @@ test("Defaults and inherited behaviour timing come entirely from the complete ke
 test("every section names the screen it is edited on, and the pointer's own settings are Trackball", () => {
     const areas = Object.fromEntries(settingsEditorView(snapshot()).sections.map(section => [section.id, section.area]));
     assert.deepEqual(Object.keys(areas).filter(id => areas[id] === "Trackball"), ["normalPointerSpeed", "sniping", "autoMouse"]);
-    assert.deepEqual(Object.keys(areas).filter(id => areas[id] === "Lighting"), ["automouseFade"], "the fade is timed where it is coloured");
+    assert.deepEqual(Object.keys(areas).filter(id => areas[id] === "Lighting"), ["automouseFade", "rgbAppearance", "lightingFeedback"], "Lighting owns all light: the fade's timing, the base effect and the flash speed");
+    const stages = Object.fromEntries(settingsEditorView(snapshot()).sections.filter(section => section.area === "Lighting").map(section => [section.id, section.stage]));
+    assert.deepEqual(stages, {automouseFade: "auto", rgbAppearance: "base", lightingFeedback: "key"}, "each is drawn in its stage");
     assert.ok(Object.values(areas).every(area => ["Trackball", "Lighting", "Settings"].includes(area)), "a section with no area of its own is a Settings one");
 });
 
@@ -102,7 +104,7 @@ test("range hints and numeric bounds follow the stored field rules", () => {
     const {SETTING_FIELD} = require("../../core/schema/settings-domain-v1");
     const fields = settingsEditorView(snapshot()).sections.flatMap(section => section.fields);
     const timeout = fields.find(field => field.macro === "lightingTimeout");
-    assert.deepEqual([timeout.label, timeout.presentation, timeout.unit, timeout.min, timeout.max], ["Idle timeout", "duration", "ms", 0, 86400000]);
+    assert.deepEqual([timeout.label, timeout.presentation, timeout.unit, timeout.min, timeout.max], ["Lights off after", "duration", "ms", 0, 86400000]);
     for (const [macro, rule, unit] of [["normalDpi", SETTING_FIELD.DEFAULT_DPI, ""], ["snipingDpi", SETTING_FIELD.SNIPING_DPI, ""], ["mouseDebounce", SETTING_FIELD.AUTO_MOUSE_DEBOUNCE, " ms"]]) {
         const field = fields.find(field => field.macro === macro);
         assert.deepEqual([field.min, field.max], [rule.min, rule.max], macro);

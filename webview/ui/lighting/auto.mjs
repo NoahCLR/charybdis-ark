@@ -79,7 +79,7 @@ export function stageAuto(model) {
         ${vocabulary(model).fadeModes.map(([id, text]) => `<option value="${id}" ${fade.mode === id ? "selected" : ""}>${text}</option>`).join("")}</select></label>`);
     /** @type {HTMLSelectElement} */ (select.querySelector("select")).addEventListener("change", (event) =>
         { if (fade.end_color) post(edits.automouseFade(/** @type {HTMLSelectElement} */ (event.target).value, fade.end_color)); });
-    policy.append(stack(select, el(`<p class="note">Where the fade lands once the mouse layer drops out. The board shows the destination, not the animation.</p>`)));
+    policy.append(stack(select, el(`<p class="note">Where the fade lands once the mouse layer drops out. It starts from the mouse layer's own colour and replaces the layer colours while it runs; the board shows the layers, not the fade.</p>`)));
     const endColour = section("End colour");
     const unused = fade.mode === "FOLLOW_REAL_DESTINATION";
     endColour.append(unused

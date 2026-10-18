@@ -47,6 +47,6 @@ export interface DraftMarks {
 }
 
 export interface LightOptions {held?: number[]; pdActive?: null | {locality: string; triggerIndex?: number; color: import('../../contracts/edits.js').Colour; mode: string}}
-export interface LedLight {colour: import('../../contracts/edits.js').Colour; source: string; layer?: number | null}
+export interface LedLight {colour: import('../../contracts/edits.js').Colour; source: string; layer?: number | null; row?: number | null}
 
 export type PickerSection = {id: string; label: string} & ({kind: 'catalogue'; filter: (entry: Pick<import('../../contracts/panel.js').CatalogEntry, 'group'> & {value?: string; key?: string; name?: string}) => boolean} | {kind: 'board' | 'layers' | 'modes' | 'macros'});

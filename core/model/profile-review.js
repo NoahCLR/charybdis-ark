@@ -281,7 +281,7 @@ function lightingRecords(value) {
     record("rgb:combo", "Combo feedback", "combo", [["Colour", colour(r.comboFeedback.color)], ["Where it lights", nameIn(V.localities, rgbEnums.RGB_LOCALITIES, r.comboFeedback.locality)]]);
     const k = r.keyFeedback;
     record("rgb:key", "Key feedback", "key", [...k.tapBranchColors.map(/** @returns {[string, Field]} */ (value, i) => [`Waiting on ${i + 2}×`, colour(value)]),
-        ["Multi-tap sent", colour(k.tapCommittedColor)], ["Holding", colour(k.holdActiveColor)], ["Long holding", colour(k.longHoldActiveColor)],
+        ["Multi-tap sent", colour(k.tapCommittedColor)], ["Holding", colour(k.holdActiveColor)], ["Long hold", colour(k.longHoldActiveColor)],
         ["Flash after a double tap or more", nameIn(V.tapCommit, rgbEnums.RGB_TAP_COMMIT_MODES, k.tapCommitMode)], ["Where it lights", nameIn(V.localities, rgbEnums.RGB_LOCALITIES, k.locality)]]);
     // LED groups are one record with every row that paints them: rows name
     // groups by id, so a row put back without its group could point at a

@@ -50,6 +50,9 @@ function measureKeys(svg) {
 export function board(model, layer, options = {}) {
     const {selected, mode = "light", picks = [], reach = [], pdActive = null, drafted = null,
         faces = true, trackball = false, held = [], onKey, onOpen, onSwap, onTrackball} = options;
+    // Lighting shows behaviour dots only on Key feedback and combo badges only
+    // on Combos; elsewhere both follow `faces`.
+    const {dots = faces, badges = faces} = options;
     const positions = layer?.positions || [];
     const stack = model?.layers || [];
     const heldIds = held.map((at) => stack[at]?.index).filter((id) => id !== undefined);
@@ -88,9 +91,8 @@ export function board(model, layer, options = {}) {
             glow += `<rect class="kc-glow${glass ? " kc-glow-trns" : ""}" x="${visual.x}" y="${visual.y}" width="${GEO.keyW}" height="${GEO.keyH}" rx="${GEO.radius}" fill="${paint}"${transform}></rect>`;
         }
 
-        const showMarks = faces && mode !== "leds";
-        const tiers = showMarks ? behaviourTiers(behaviourFor(model, keyMeaning(shown))) : [];
-        const combos = showMarks ? combosShownAt(model, stack, layer?.index ?? 0, held, index) : [];
+        const tiers = dots && mode !== "leds" ? behaviourTiers(behaviourFor(model, keyMeaning(shown))) : [];
+        const combos = badges && mode !== "leds" ? combosShownAt(model, stack, layer?.index ?? 0, held, index) : [];
         const sub = mode === "leds" ? "" : face.sub;
         const rows = keyFaceRows(visual.y,
             {tiers: tiers.length > 0, combos: combos.length > 0, sub: Boolean(sub)});
@@ -158,7 +160,7 @@ export function board(model, layer, options = {}) {
         keys += `<g class="${classes}${selected === index ? " sel" : ""}" data-key="${index}" tabindex="0" role="button"
             aria-label="${esc(keyMeaning(shown))} at index ${index}${from ? `, from ${esc(from.displayName || from.name || `layer ${from.index}`)}` : ""}"${transform}>
             <rect class="kc-rect${picked}" x="${visual.x}" y="${visual.y}" width="${GEO.keyW}" height="${GEO.keyH}" rx="${GEO.radius}"${fill}></rect>
-            ${selected === index ? ring("kc-ring") : ""}
+            ${selected === index || (mode !== "leds" && picks.includes(index)) ? ring("kc-ring") : ""}
             ${reach.includes(index) ? `<rect class="kc-reach" x="${visual.x - 3}" y="${visual.y - 3}" width="${GEO.keyW + 6}" height="${GEO.keyH + 6}" rx="${GEO.radius + 2}"></rect>` : ""}
             ${marks}
             ${drafted?.has(index) ? `<circle class="kc-draft" cx="${visual.x + GEO.keyW - 5.5}" cy="${visual.y + 5.5}" r="2.6"></circle>` : ""}

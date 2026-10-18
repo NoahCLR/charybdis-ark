@@ -30,6 +30,23 @@ test("LED membership edits preserve references and refuse deleting an assigned g
     assert.throws(() => editDeviceProfile(bytes, {type: "saveRgbReusableLedGroup", group: {originalName: "Group 1", ledIndices: [58]}}));
 });
 
+test("a colour row is edited in place, its keys replaced, and moved so a later row wins", () => {
+    const withRows = [["Layer 1", [1, 2]], ["Layer 1", [3]], ["RGB_LAYER_GROUP_ALL", [54, 56]]].reduce((blob, [owner, ledIndices], index) =>
+        editDeviceProfile(blob, {type: "addRgbLedGroup", group: {target: "layer", owner, ledIndices, h: String(index * 10), s: "255", v: "100"}}), bytes);
+    const recoloured = editDeviceProfile(withRows, {type: "updateRgbLedGroup", target: "layer", index: 1, h: "7", s: "8", v: "9"});
+    assert.deepEqual(rgb(recoloured).layerGroupRows[1], {...rgb(withRows).layerGroupRows[1], color: {h: 7, s: 8, v: 9}}, "owner and keys kept");
+    const rekeyed = editDeviceProfile(recoloured, {type: "updateRgbLedGroup", target: "layer", index: 1, h: "7", s: "8", v: "9", ledIndices: [4, 5]});
+    const after = rgb(rekeyed);
+    assert.deepEqual(after.groups.find(group => group.id === after.layerGroupRows[1].groupId).leds, [4, 5]);
+    assert.ok(after.groups.some(group => group.leds.join() === "3"), "the group it used before stays a saved group");
+    const moved = rgb(editDeviceProfile(withRows, {type: "moveRgbLedGroup", target: "layer", from: 0, to: 2}));
+    assert.deepEqual(moved.layerGroupRows.map(row => row.color.h), [10, 20, 0]);
+    assert.deepEqual(rgb(editDeviceProfile(withRows, {type: "moveRgbLedGroup", target: "layer", from: 2, to: 0})).layerGroupRows.map(row => row.color.h), [20, 0, 10]);
+    assert.throws(() => editDeviceProfile(withRows, {type: "moveRgbLedGroup", target: "layer", from: 0, to: 3}), /between 0 and 2/);
+    assert.throws(() => editDeviceProfile(withRows, {type: "updateRgbLedGroup", target: "layer", index: 0, h: "1", s: "1", v: "1", ledIndices: []}), /at least one LED/);
+    assert.throws(() => editDeviceProfile(withRows, {type: "updateRgbLedGroup", target: "nope", index: 0, h: "1", s: "1", v: "1"}), /target/);
+});
+
 const {decodeComboDomain} = require("../../core/schema/combo-domain-v1");
 const {decodeComboPages} = require("../../core/protocol/combo-readback-v1");
 const {fixturePages, retiredPages} = require("../fixtures/device-combos");

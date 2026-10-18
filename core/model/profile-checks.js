@@ -80,13 +80,13 @@ function profileFindings(decoded, destination = {}) {
         findings.push({kind: "brightnessBlocker", level: "blocker", layers: [], identity: String(lighting.brightness),
             title: `Base brightness exceeds this keyboard's limit of ${max}`,
             detail: `This profile stores brightness ${lighting.brightness}; the keyboard accepts at most ${max}. Apply will refuse the profile.`,
-            fix: `Set Base lighting brightness to ${max} or lower.`, place: {kind: "settings", area: "Settings", section: "rgbAppearance"}});
+            fix: `Set the base effect brightness to ${max} or lower (Lighting, Base effect).`, place: {kind: "settings", area: "Lighting", section: "rgbAppearance", stage: "base"}});
     }
     if (Array.isArray(destination.effects) && !destination.effects.some(effect => effect.id === lighting.effect)) {
         findings.push({kind: "effectBlocker", level: "blocker", layers: [], identity: String(lighting.effect),
-            title: `Base lighting effect ${lighting.effect} is unavailable on this keyboard`,
+            title: `Base effect ${lighting.effect} is unavailable on this keyboard`,
             detail: "The connected firmware does not advertise this effect. Apply will refuse the profile.",
-            fix: "Choose a base lighting effect this keyboard reports.", place: {kind: "settings", area: "Settings", section: "rgbAppearance"}});
+            fix: "Choose a base effect this keyboard reports (Lighting, Base effect).", place: {kind: "settings", area: "Lighting", section: "rgbAppearance", stage: "base"}});
     }
     return findings;
 }

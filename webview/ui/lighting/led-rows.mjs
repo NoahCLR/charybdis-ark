@@ -1,11 +1,12 @@
 // @ts-check
 import {el, esc} from "../../lib/dom.mjs";
 import {css, label as hsvLabel} from "../../lib/colour.mjs";
-import {getModel, layerName, layers, post, writable} from "../../store.mjs";
+import {getModel, layerName, layers, positionAt, post, writable} from "../../store.mjs";
 import {slotCalled, vocabulary} from "../../view/vocabulary.mjs";
 import * as edits from "../../view/edits.mjs";
-import {inheritsStageColour} from "../../view/lighting.mjs";
+import {groupContentName, groupPositions, inheritsStageColour} from "../../view/lighting.mjs";
 import {marked} from "../marks.mjs";
+import {keyName} from "../../view/keyface.mjs";
 
 // A row's owner by the name its dropdown offers, with the owner's mark —
 // the layer's colour, the pointing mode's light, the feedback tier's dot —
@@ -24,16 +25,18 @@ function ownerCell(model, target, owner) {
 /** @param {import("../../../contracts/panel.js").LedRow[] | undefined} rows @param {string} target */
 export function groupRowsTable(rows, target) {
     const model = getModel();
-    if (!rows?.length) return el(`<p class="note led-rows">No LED override rows in this table. Rows override the stage colour on the LEDs they name.</p>`);
-    const node = el(`<table class="t led-rows"><thead><tr><th>Owner</th><th>LEDs</th><th>Colour</th><th></th></tr></thead>
-        <tbody>${rows.map((row, index) => `<tr>
+    if (!rows?.length) return el(`<p class="note led-rows">No rows here. A row gives the LEDs it names their own colour while its stage shows.</p>`);
+    const node = el(`<table class="t led-rows"><thead><tr><th>For</th><th>LEDs</th><th>Colour</th><th></th></tr></thead>
+        <tbody>${rows.map((row, index) => `<tr data-led-row="${index}">
             <td>${target === "combo" ? "All combos" : ownerCell(model, target, row.owner)}</td>
-            <td class="mono">${esc(row.ledGroup)} · ${row.ledIndices.length} LED${row.ledIndices.length === 1 ? "" : "s"}</td>
+            <td data-tip="LEDs ${esc(row.ledIndices.join(", "))}">${esc(groupName(row.ledIndices))} · ${row.ledIndices.length} LED${row.ledIndices.length === 1 ? "" : "s"}</td>
             <td><span class="led-swatch ${inheritsStageColour(row.color) ? "swatch-off" : ""}" style="${inheritsStageColour(row.color) ? "" : `background:${css(row.color)}`}"></span>
                 <code class="dim">${esc(hsvLabel(row.color))}</code>${inheritsStageColour(row.color) ? ` <span class="note">inherits the stage colour</span>` : ""}</td>
             <td class="t-act"><button class="btn tiny ghost" data-remove="${index}" ${writable() ? "" : "disabled"}>Remove</button></td></tr>`).join("")}</tbody></table>`);
     /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-remove]")).forEach((button) => button.addEventListener("click", () =>
         post(edits.deleteLedRow(target, Number(button.dataset.remove)))));
+    /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-led-row]")).forEach((tr) =>
+        outlinesOnBoard(tr, rows[Number(tr.dataset.ledRow)]?.ledIndices || []));
     return node;
 }
 
@@ -47,4 +50,25 @@ export function rowOwners(model, target) {
         /** @type {[string, string]} */ ([row.pointingMode, slotCalled(model, index)])), ["RGB_PD_MODE_GROUP_ALL", "All trackball modes"]];
     if (target === "keyBehavior") return vocabulary(model).feedbackOwners;
     return [];
+}
+
+// A group by what it holds, the keys named as they are on Base.
+/** @param {readonly number[]} leds */
+export const groupName = (leds) => groupContentName(leds, (index) => {
+    const position = positionAt(layers()[0], index);
+    return position ? keyName(position) : "";
+});
+
+// Hovering a group or a row outlines the keys it lights on the board.
+/** @param {HTMLElement} row @param {readonly number[]} leds */
+export function outlinesOnBoard(row, leds) {
+    const {keys, trackball} = groupPositions(leds);
+    /** @param {boolean} on */
+    const mark = (on) => {
+        const board = row.ownerDocument.querySelector(".board-card .board");
+        for (const index of keys) board?.querySelector(`[data-key="${index}"]`)?.classList.toggle("kc-outline", on);
+        if (trackball) board?.querySelector(".kc-ball")?.classList.toggle("kc-outline", on);
+    };
+    row.addEventListener("mouseenter", () => mark(true));
+    row.addEventListener("mouseleave", () => mark(false));
 }

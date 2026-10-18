@@ -35,11 +35,13 @@ function showKey(key) {
     const open = () => {
         if (!key.isConnected) return;
         const rect = key.getBoundingClientRect();
-        // A key the layer has no position for has nothing to show.
-        card.innerHTML = keyCard(Number(/** @type {HTMLElement} */ (key).dataset.key));
+        // A key the layer has no position for has nothing to show. On a board
+        // that shows light (Lighting), the card says what paints the LED.
+        const light = Boolean(key.closest('[data-hover="light"]'));
+        card.innerHTML = light ? lightCard(Number(/** @type {HTMLElement} */ (key).dataset.key)) : keyCard(Number(/** @type {HTMLElement} */ (key).dataset.key));
         if (!card.innerHTML) { hideHover(); return; }
         place(card, rect, 14, true);
-        side.innerHTML = behaviourCards(Number(/** @type {HTMLElement} */ (key).dataset.key)); placeSide(rect);
+        side.innerHTML = light ? "" : behaviourCards(Number(/** @type {HTMLElement} */ (key).dataset.key)); placeSide(rect);
         clock = hoverShown(clock);
     };
     const wait = hoverWait(clock, performance.now());
@@ -317,6 +319,12 @@ const described = (what, how) => [what, how].filter(Boolean).join(" · ");
 // Where a colour paints, in the vocabulary's words, read inside a sentence.
 /** @param {string | undefined} locality */
 const localityText = (locality) => locality ? word(vocabulary(getModel()).localities, locality).toLowerCase() : "where it lights";
+
+// Lighting's card, about the light rather than the key (ui/lighting/light-card.mjs).
+/** @type {(index: number) => string} */
+let lightCard = () => "";
+/** @param {(index: number) => string} fn */
+export const bindLightCard = (fn) => { lightCard = fn; };
 
 // The card is drawn for whichever layer the screen is showing.
 let layerIndex = () => 0;

@@ -10,6 +10,8 @@ export interface BoardOptions {
     pdActive?: LightOptions['pdActive'] | null;
     drafted?: ReadonlySet<number | undefined> | null;
     faces?: boolean;
+    dots?: boolean;
+    badges?: boolean;
     trackball?: boolean;
     held?: number[];
     picking?: boolean;

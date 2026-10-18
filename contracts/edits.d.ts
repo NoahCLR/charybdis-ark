@@ -88,6 +88,10 @@ export interface EditPayloads {
     updateKeyBehaviorFeedback: {config: KeyFeedback};
     addRgbLedGroup: {group: Hsv & {target: string; owner?: string; ledGroupName?: string; ledIndices?: number[]}};
     deleteRgbLedGroup: {target: string; index: number};
+    /** One row's colour, and its LEDs when given; it keeps its owner and its place. */
+    updateRgbLedGroup: Hsv & {target: string; index: number; ledIndices?: number[]};
+    /** One row moved to another place in its table; a later row wins on the LEDs it shares. */
+    moveRgbLedGroup: {target: string; from: number; to: number};
     saveRgbReusableLedGroup: {group: {ledIndices: number[]; originalName?: string}};
     deleteRgbReusableLedGroup: {name: string};
     updateViaMacro: {keycode: string; expectedFingerprint?: string} & (

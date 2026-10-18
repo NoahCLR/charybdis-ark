@@ -717,22 +717,21 @@ button.tier:hover { background: var(--surface-3); }
 .bench-tabs [data-tab="pointing"] { width: 152px; }
 .bench-tabs [data-tab] .c { text-align: left; }
 .bench-tabs button[role="tab"] > .draft-dot { position: absolute; top: 4px; right: 4px; margin: 0; }
-/* Lighting's stage tabs carry the paint order: a number, the colour the
+/* Lighting's stage tabs are the paint order, unnumbered: the colour the
    stage paints now, and a stage that is off drawn dim. */
-.bench-tabs .n { font-family: var(--mono); font-size: var(--fs-micro); color: var(--text-3); }
 .bench-tabs .swatch { width: 9px; height: 9px; border-radius: var(--r-chip); border: 1px solid var(--line-2); flex: none; }
 .bench-tabs button[role="tab"].off { color: var(--text-3); }
-.bench-tabs .tab-step { color: var(--text-3); font-size: var(--fs-small); padding: 0; }
 .bench-tabs .tab-sep { width: 1px; height: 18px; background: var(--line-2); margin: 0 6px; }
-/* Each stage tab is as wide as its label in the picked weight, so the six
-   stages, LED groups and the stage switch fit a laptop-wide window. */
-.bench-tabs [data-ltab="base"] { width: 124px; }
-.bench-tabs [data-ltab="layers"] { width: 136px; }
-.bench-tabs [data-ltab="auto"] { width: 160px; }
-.bench-tabs [data-ltab="pd"] { width: 149px; }
-.bench-tabs [data-ltab="combo"] { width: 158px; }
-.bench-tabs [data-ltab="key"] { width: 137px; }
-.bench-tabs [data-ltab="groups"] { width: 96px; }
+/* Each stage tab is as wide as its label in the picked weight (a hidden
+   copy of the label in that weight holds the width), so picking one never
+   moves its neighbours; the six stages and LED groups fit a 1100 px window. */
+.bench-tabs button[data-ltab] { padding: 0 8px; }
+.bench-tabs [data-ltab] .tab-label { display: inline-flex; flex-direction: column; overflow: visible; }
+.bench-tabs [data-ltab] .tab-label::after { content: attr(data-text); height: 0; overflow: hidden; visibility: hidden; font-weight: var(--fw-medium); }
+@container content (max-width: 900px) {
+  .bench-tabs button[data-ltab] { padding: 0 5px; gap: 4px; }
+  .bench-tabs .tab-sep { margin: 0 2px; }
+}
 .bench-tabs .c { font-family: var(--mono); font-size: var(--fs-micro); color: var(--text-3); }
 .bench-tabs button[role="tab"][aria-selected="true"] .c { color: var(--text-2); }
 .bench-right { flex: none; margin: 0 0 5px 12px; display: flex; align-items: center; gap: 8px; padding-right: 4px; white-space: nowrap; }
@@ -1592,10 +1591,20 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .layer-grid .sw[hidden] { display: none; }
 .layer-grid .sw .txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .btn .settings-help-mark { width: 14px; height: 14px; flex: none; fill: currentColor; stroke: none; }
+/* The colour editor: a 240 × 150 saturation/brightness field with the hue
+   strip under it, the stored numbers beside them, presets underneath. */
+.colour-pick { display: flex; flex-wrap: wrap; gap: var(--s-4); align-items: flex-start; }
+.colour-pad { display: grid; gap: var(--s-2); width: 240px; flex: none; }
+.colour-numbers { display: grid; gap: var(--s-2); width: 136px; }
+.colour-numbers .field > span i { font-style: normal; }
+.colour-presets { display: grid; gap: var(--s-2); }
+.colour-presets .row { flex-wrap: wrap; }
+.colour-presets .preset { width: var(--h-chip); height: var(--h-chip); border-radius: var(--r-chip); border: 1px solid var(--line-2); }
+.colour-presets .preset:hover { border-color: var(--text); }
 .swatch-pick { display: flex; gap: 10px; align-items: center; }
-.hue-ramp { flex: 1; height: 26px; border-radius: var(--r-control); border: 1px solid var(--line); background: linear-gradient(90deg,#f33,#ff0,#3f3,#0ff,#33f,#f0f,#f33); position: relative; }
+.hue-ramp { display: block; height: 12px; border-radius: var(--r-control); border: 1px solid var(--line); background: linear-gradient(90deg,#f33,#ff0,#3f3,#0ff,#33f,#f0f,#f33); position: relative; }
 .hue-ramp .thumb { position: absolute; top: -3px; bottom: -3px; width: 4px; border-radius: var(--r-chip); background: var(--text); box-shadow: 0 0 0 2px var(--surface); }
-.sv-field { height: 92px; border-radius: var(--r-control); border: 1px solid var(--line); position: relative; }
+.sv-field { width: 240px; height: 150px; border-radius: var(--r-control); border: 1px solid var(--line); position: relative; }
 .sv-field .thumb { position: absolute; width: 11px; height: 11px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.5); transform: translate(-50%,-50%); }
 .swatch-pick .label { width: 34px; }
 /* The colour an editor edits, large, beside its name and value. */
@@ -1607,6 +1616,30 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .colour-head.unused .swatch-lg { border-style: dashed; }
 .colour-head.unused + .note { margin-top: 10px; }
 /* Lighting's stage surfaces. */
+/* Each stage body opens with its name, what it paints and "Show this stage". */
+.stage-head { display: flex; align-items: flex-start; gap: var(--s-4); margin-bottom: var(--s-4); }
+.stage-head h3 { font-size: var(--fs-heading); line-height: var(--lh-heading); }
+.stage-head > .sw { margin-left: auto; flex: none; }
+.lighting-off { align-items: center; margin-bottom: var(--s-4); }
+.lighting-off > .btn { margin-left: auto; }
+/* Lists inside the bench: 240 px, one-line 40 px rows. */
+.tab-split.bench-split, .tab-split:has(> .rowlist.compact) { grid-template-columns: var(--bench-list) minmax(0, 1fr); }
+.rowlist.compact .rowitem { display: flex; align-items: center; justify-content: space-between; gap: var(--s-2); height: 40px; padding: 0 var(--s-3); }
+.rowlist.compact .rowitem .t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rowlist.compact .rowitem .m { flex: none; max-width: 50%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Keys with their own colour: rows that drag to reorder (later wins). */
+.own-rows { display: grid; border: 1px solid var(--line); border-radius: var(--r-card); overflow: hidden; }
+.own-row { display: flex; align-items: center; gap: var(--s-2); min-height: 40px; padding: 0 var(--s-2); border-bottom: 1px solid var(--line); background: var(--surface); }
+.own-row:last-child { border-bottom: 0; }
+.own-row.open { background: var(--surface-2); }
+.own-row.drop-target { box-shadow: inset 0 2px 0 var(--text); }
+.own-row.dragging { opacity: .5; }
+.own-row .grip { width: var(--h-chip); text-align: center; color: var(--text-3); cursor: grab; border-radius: var(--r-chip); }
+.own-row .own-keys { flex: 1; min-width: 0; font-size: var(--fs-small); }
+.own-editor { padding: var(--s-3); border-bottom: 1px solid var(--line); background: var(--surface-2); display: grid; gap: var(--s-3); }
+.own-colours .sect-h .right { margin-left: auto; }
+/* An LED group hovered in a table outlines its keys on the board. */
+.kc.kc-outline .kc-rect, .kc-ball.kc-outline circle { stroke: var(--ring); stroke-width: 2.4; stroke-dasharray: 3 2; }
 .tab-grid.stage-detail { gap: 20px; }
 .stage-about { max-width: 96ch; }
 .stage-chips { flex-wrap: wrap; margin-bottom: 10px; }

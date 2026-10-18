@@ -10,11 +10,12 @@ import {brightnessLimit, clampHsv, css, hsv, label as hsvLabel, rgb, valuePercen
 import {inheritsStageColour} from "../view/lighting.mjs";
 import {el, esc} from "../lib/dom.mjs";
 
-// A layer colour of HSV(0, 0, 0) is off: the base effect shows through. On
-// every other stage the same value paints black (B17), so there the button is
-// Black and `black` says what goes dark.
-/** @param {{identity: string, colour: import("../../contracts/edits.js").Colour | null | undefined, title: string, canEdit?: boolean, onChange?: (colour: import("../../contracts/edits.js").Colour) => void, offNote?: string, black?: string, maximumBrightness?: number}} options */
-export function colourEditor({identity, colour, title, canEdit = true, onChange, offNote, black, maximumBrightness}) {
+// A layer colour of HSV(0, 0, 0) is off: the lower layers show through, and
+// the button says so ("No colour (lower layers show)"). On every other stage
+// the same value paints black (B17), so there the button is Black and `black`
+// says what goes dark. `presets` are the colours the keyboard already uses.
+/** @param {{identity: string, colour: import("../../contracts/edits.js").Colour | null | undefined, title: string, canEdit?: boolean, onChange?: (colour: import("../../contracts/edits.js").Colour) => void, offNote?: string, offLabel?: string, black?: string, maximumBrightness?: number, presets?: {colour: import("../../contracts/edits.js").Colour, uses: string[]}[]}} options */
+export function colourEditor({identity, colour, title, canEdit = true, onChange, offNote, offLabel, black, maximumBrightness, presets = []}) {
     const [h, s, v] = hsv(colour);
     const maximum = brightnessLimit(maximumBrightness);
     const node = el(`<div class="stack gap-12"></div>`);
@@ -37,10 +38,10 @@ export function colourEditor({identity, colour, title, canEdit = true, onChange,
         <span class="swatch-lg" style="background:${css(colour)}"></span>
         <div><div class="colour-title">${esc(title)}</div>
             <div class="note mono">${esc(hsvLabel(colour))} · rgb(${rgb(colour).join(", ")})</div></div>
-        ${canEdit ? `<button class="btn tiny ghost" data-off
-            data-tip="${esc(black ? `Store black, HSV(0, 0, 0). ${black}` : "Store HSV(0, 0, 0) so this layer stops painting and lets what is underneath show.")}">${black ? "Black" : "Turn off"}</button>` : ""}</div>`);
+        ${canEdit ? `<button class="btn text" data-off
+            data-tip="${esc(black ? `Store black, HSV(0, 0, 0). ${black}` : "Store HSV(0, 0, 0) so this layer stops painting and the layers below show.")}">${esc(black ? "Black" : offLabel || "No colour")}</button>` : ""}</div>`);
     node.append(head);
-    if (v === 0) node.append(el(`<p class="note">Brightness is zero. Hue and saturation are retained; raise brightness to use this colour again.</p>`));
+    if (v === 0) node.append(el(`<p class="note">${esc(black ? `Brightness is zero, so this paints black. ${black}` : "Brightness is zero, so this paints black. Hue and saturation are kept; raise brightness to use this colour again.")}</p>`));
     /** @type {HTMLElement | null} */ (head.querySelector("[data-off]"))?.addEventListener("click", () => commit([0, 0, 0]));
 
     const topWhite = css({h: "0", s: "0", v: String(maximum)});
@@ -48,27 +49,38 @@ export function colourEditor({identity, colour, title, canEdit = true, onChange,
     const field = el(`<div class="sv-field" data-tip="Brightness is limited to ${maximum}, as reported by this keyboard."
         style="background:linear-gradient(to top, ${css({h: "0", s: "0", v: "0"})}, transparent), linear-gradient(to right, ${topWhite}, ${topHue})">
         <span class="thumb" style="left:${(s / 255) * 100}%;top:${100 - valuePercent(v, maximum)}%"></span></div>`);
-    node.append(field);
+    const ramp = el(`<span class="hue-ramp" aria-label="Hue"><span class="thumb" style="left:${(h / 255) * 100}%"></span></span>`);
+    const picker = el(`<div class="colour-pick"><div class="colour-pad"></div></div>`);
+    /** @type {HTMLElement} */ (picker.firstElementChild).append(field, ramp);
 
-    const ramp = el(`<div class="swatch-pick"><span class="label">Hue</span>
-        <span class="hue-ramp"><span class="thumb" style="left:${(h / 255) * 100}%"></span></span></div>`);
-    node.append(ramp);
-
-    const fields = el(`<div class="grid3">
-        ${[["H", h, 255], ["S", s, 255], [`V · max ${maximum}`, v, maximum]].map(([name, value, max], index) =>
-            `<label class="field"><span>${name}</span><input type="number" min="0" max="${max}" step="1" class="input mono" value="${value}" data-f="${esc(identity)}:colour:${index}" data-channel="${index}" ${canEdit ? "" : "disabled"}></label>`).join("")}</div>`);
+    // Hue and saturation 0–255, brightness up to the keyboard's limit: the
+    // numbers the keyboard stores.
+    const fields = el(`<div class="colour-numbers">
+        ${[["Hue", h, 255, "0–255"], ["Saturation", s, 255, "0–255"], ["Brightness", v, maximum, `of ${maximum}`]].map(([name, value, max, range], index) =>
+            `<label class="field"><span>${name} <i class="dim">${range}</i></span><input type="number" min="0" max="${max}" step="1" class="input mono" value="${value}" data-f="${esc(identity)}:colour:${index}" data-channel="${index}" ${canEdit ? "" : "disabled"}></label>`).join("")}</div>`);
     /** @type {NodeListOf<HTMLInputElement>} */ (fields.querySelectorAll("[data-channel]")).forEach((input) => input.addEventListener("change", () => {
         const next = [h, s, v];
         next[Number(input.dataset.channel)] = Number(input.value) || 0;
         commit(next);
     }));
-    node.append(fields);
+    picker.append(fields);
+    node.append(picker);
+    if (presets.length && canEdit) {
+        const row = el(`<div class="colour-presets"><span class="eyebrow">In use on this keyboard</span><div class="row gap-4">
+            ${presets.map((preset, index) => `<button class="preset" data-preset="${index}" aria-label="${esc(preset.uses.join(", "))}"
+                data-tip="${esc(`${preset.uses.join(", ")} · ${hsvLabel(preset.colour)}`)}" style="background:${css(preset.colour)}"></button>`).join("")}</div></div>`);
+        /** @type {NodeListOf<HTMLElement>} */ (row.querySelectorAll("[data-preset]")).forEach((button) => button.addEventListener("click", () => {
+            const preset = presets[Number(button.dataset.preset)].colour;
+            commit([Number(preset.h), Number(preset.s), Number(preset.v)]);
+        }));
+        node.append(row);
+    }
 
     // Dragging previews locally and commits once on release: every commit
     // round-trips through the model and redraws this control, which would
     // drop the pointer mid-drag.
     if (canEdit) {
-        const hueRamp = /** @type {HTMLElement} */ (ramp.querySelector(".hue-ramp"));
+        const hueRamp = ramp;
         let draft = [h, s, v];
         /** @param {number[]} next */
         const preview = (next) => {
