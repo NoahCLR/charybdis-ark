@@ -70,17 +70,17 @@ pulsing while a read runs. Hovering it says which, in plain words and with what
 to do: check the cable between the halves, or wait and read again. With more
 than one keyboard its name is the selector. The web page adds **Choose
 keyboard** and **Disconnect** beneath. Below that the rail lists only changes
-in the draft, a pending recovery or a restart. The screen and the Device tab
+in the draft, a pending recovery or a restart. The screen and the Keyboard screen
 say what is wrong and offer **Read** to read the keyboard again. A screen's top
 bar holds only the theme button; a search sits in the panel it filters.
 
-**Recovery copies and files.** Apply and Import save a recovery copy in the
+**Previous profiles and files.** Apply and Restore save a copy of the previous profile in the
 browser's storage before they write anything, and refuse to write if it cannot
-be saved. Profile & backups lists every copy, newest first, with a
+be saved. Backups lists every copy, newest first, with a
 **Download** button each. Ark asks Chrome to keep this storage when space runs
 low, but clearing the site's data (or the browser's) deletes the copies, so
-download any you want to keep. **Export profile** downloads the profile file;
-**Import profile** opens the browser's file chooser and takes files up to
+download any you want to keep. **Save a backup file…** downloads the backup file;
+**Choose a backup file…** opens the browser's file chooser and takes files up to
 256 KiB, enough for any complete profile. Errors
 show in the rail's message rather than as a notification, and the page's
 version and commit are at the foot of the rail, with GitHub's logo: choose them
@@ -91,32 +91,32 @@ to open that commit on GitHub in a new tab.
 With no keyboard connected, the connect area offers **Explore a demo** beside
 **Read keyboard** (VS Code) or **Choose keyboard** (the web page). It is offered
 on a browser without WebHID too, since it needs no keyboard. The demo opens a
-complete setup, as current firmware holds one (16 layers, 32 pointing slots,
+complete setup, as current firmware holds one (16 layers, 32 trackball mode slots,
 128 macros and 128 custom keys), in the same draft a keyboard's opens in. Every
 screen works, and every edit stages, is checked and shows in the review exactly
-as it would on a keyboard; undo, redo, Discard, the draft history, Rename &
-Reorder and Import all work on it.
+as it would on a keyboard; undo, redo, Discard, the draft history, **Layers…**
+and Restore all work on it.
 
 It never claims to be a keyboard. A strip across the top of the window says
 **Demo · no keyboard** on every screen; the rail names it Demo, with a hollow
-dot and no connection, halves or recovery to report, and the Device screen says what it
+dot and no connection, halves or recovery to report, and the Keyboard screen says what it
 stands in for. Nothing in it reaches a keyboard, and nothing is kept: the demo
 lives in this window until it is left or closed.
 
 **Apply needs a keyboard.** The commit bar's button reads **Review changes**,
 and where the review would offer Apply it says Apply needs a keyboard and
-offers **Export…**. Export, there or on Profile & backups, saves the demo's
-setup with your edits as a profile file (`charybdis-demo-<date>.charybdis.json`);
-on your keyboard, **Import profile** reviews it against what the keyboard holds
+offers **Save a backup file…**. That button, there or on Backups, saves the demo's
+setup with your edits as a backup file (`charybdis-demo-<date>.charybdis.json`);
+on your keyboard, **Choose a backup file…** under Restore reviews it against what the keyboard holds
 before anything is applied.
 
 **Open a profile file…**, on the strip, replaces the demo's setup with one of
-your exported `.charybdis.json` files, checked as Import checks it. A file
-Import would refuse is refused, and the demo stays as it was.
+your saved `.charybdis.json` backup files, checked as Restore checks it. A file
+Restore would refuse is refused, and the demo stays as it was.
 
 **Leaving.** **Leave demo** on the strip, or **Choose keyboard** or **Read**,
-leaves the demo for a keyboard. With edits not exported since, Ark asks first
-and offers Export; opening another profile file asks the same way. Closing or
+leaves the demo for a keyboard. With edits not saved to a backup file since, Ark asks first
+and offers Save a backup file…; opening another backup file asks the same way. Closing or
 reloading a web page with such edits asks too. While a keyboard is connected,
 or a draft holds unapplied edits for one, the demo is not offered.
 
@@ -160,8 +160,8 @@ review adopts that keyboard's reported capacities, including its macro memory.
 The demo remains editable without a keyboard.
 
 During initial read, refresh or device selection, every screen menu is disabled
-and a loading step replaces the screen. Once the read finishes, Device opens
-if the keyboard reported its capabilities. Profile & backups opens when a
+and a loading step replaces the screen. Once the read finishes, Keyboard opens
+if the keyboard reported its capabilities. Backups opens when a
 connected keyboard runs current firmware with complete-profile
 backup. The Configure
 menus open only with an editable draft.
@@ -174,15 +174,15 @@ What each screen edits:
 
 | Surface | What it edits |
 | --- | --- |
-| Keys | Layout keys, key behaviours, combos, layer names and priority; reachable behaviours, macros and pointing modes are shown in place, whether a key, a behaviour branch or a combo reaches them |
-| Custom keys | The 128 custom keys' names, shortcuts and, for each, its behaviour: timings, the tap × tier grid and participation, for a key on a layer or on none; where each is placed |
-| Lighting | Six stages, the stage mask, layer and pointing-mode colours with their localities, combo and key feedback, auto-mouse fade with its hold as a share of the timeout, LED group rows and reusable groups |
+| Keys | Layout keys, key behaviours, combos, layer names and priority; reachable behaviours, macros and trackball modes are shown in place, whether a key, a behaviour's action or a combo reaches them |
+| Custom keys | The 128 custom keys' names, shortcuts and, for each, its behaviour: timings, the tap count × tap/hold/long hold grid and participation, for a key on a layer or on none; where each is placed |
+| Lighting | Six stages, the stage mask, layer and trackball mode colours with where they light, combo and key feedback, mouse layer fade with its hold as a share of the timeout, LED group rows and reusable groups |
 | Macros | Named slots: literal Text, a compact sequence of key/delay/press/release tiles, drag reordering and a selected-step editor, raw payload, live size feedback, configurable recorder and placement; search by name, and the layers that set each macro off — by key, behaviour or combo — in their layer colour, each opening that layer in Keys with the macro picked |
-| Mouse | Pointer speed, sniping and auto-mouse — the Settings sections the keyboard's model files under Mouse, drawn with the same cards and posted whole |
-| Pointing modes | All 32 slots: movement, speed, direction shortcuts and how often they send (every step, or once per movement until the ball pauses or moves back the other way), scroll tuning and which way a scrolling mode scrolls (both axes, horizontal only or vertical only), what each direction's shortcut does with held modifiers, thresholds shown as ball movement at the mode's DPI, buttons, bindings, placement, clear and duplicate |
+| Trackball | Ball speed, sniping and the mouse layer — the Settings sections the keyboard's model files under Trackball, drawn with the same cards and posted whole |
+| Trackball modes | All 32 slots: movement, speed, direction shortcuts and how often they send (every step, or once per movement until the ball pauses or moves back the other way), scroll tuning and which way a scrolling mode scrolls (both axes, horizontal only or vertical only), what each direction's shortcut does with held modifiers, thresholds shown as ball movement at the mode's DPI, buttons, bindings, placement, clear and duplicate |
 | Settings | The keyboard's own name, then every other section the keyboard reports, posted whole, read-only where the firmware build leaves an option out; the Combos section also carries the default combo window and the combo hold threshold, which the keyboard stores with its combos |
-| Profile & backups | Import (the file against the keyboard, counted by what it configures — keys, lighting, macros, mouse, pointing — before it becomes the draft), export, profile memory, recovery state |
-| Device | Read-only: connection, the saved profile's generation, what was read |
+| Backups | Back up (Save a backup file…) and Restore (Choose a backup file…: the file against the keyboard, counted by what it configures — keys, lighting, macros, trackball, trackball modes — before it becomes the draft), profile memory, previous profiles, saves in progress |
+| Keyboard | Read-only: connection, the saved profile's generation, what was read |
 
 ## The interface
 
@@ -193,7 +193,7 @@ needs its halves seen to, or is not there. Colour on any screen comes from the m
 that is switched off is drawn as off — hollow dots, plain badges, unlit keys.
 The floating bar is the only way changes leave the window.
 
-Hover over a setting's label or control on Mouse or Settings to see what it
+Hover over a setting's label or control on Trackball or Settings to see what it
 does. Read-only settings also explain why they cannot be edited. Visible
 hints and numeric limits stay beside the setting. A number field takes only
 digits (a time in seconds or minutes also takes one decimal point): letters
@@ -201,7 +201,7 @@ and other characters typed or pasted into it do not appear. A time's unit sits
 inside its field at the right, on every screen, so the label names only the
 value; the review still names the unit.
 
-A Settings section's one-per-layer switches (Startup layers, and where
+A Settings section's one-per-layer switches (Default layers, and where
 Behaviours and Combos run) are one row: its label and what it means, then a
 switch for each layer in a grid, named and marked in the layer's colour. A
 search for one layer's name still finds its switch. Settings and the
@@ -209,22 +209,22 @@ behaviour editor call the time between taps the **Multi tap window**.
 
 Anything that folds has a chevron before its name, turned down while it is
 open: a Settings section, a behaviour's **Layers it runs on**, a group of
-review checks, a pointing mode's Advanced, a group in a Keys tab. Review, the keycode picker and
+review checks, a trackball mode's Advanced, a group in a Keys tab. Review, the keycode picker and
 Draft history each close with **Close** at their top right, or Escape; their
-footers hold only what acts, such as Apply, Export…, Clear and Use keycode.
-An editor's own actions, such as Change key…, Duplicate, Clear slot and Clear
+footers hold only what acts, such as Apply, Save a backup file…, Clear and Use key.
+An editor's own actions, such as Move to another key…, Duplicate, Clear slot and Clear
 macro, are small text buttons at the right of its title bar, the destructive
 one last; so are the buttons that take you to another screen, such as Place on
 a layer… and Edit in Lighting. A macro and a custom key are named by their
 editor's title: click it to rename. A tap-count badge from 2× on is tinted
-with the colour its branch flashes, its count in the normal text colour so a
+with the colour that tap count flashes while it waits, its count in the normal text colour so a
 dark colour still reads. Numbers in a table line up on their last digit.
 
 When an accepted edit redraws the screen, the same field keeps keyboard focus
 and its text selection while it remains available. Search fields also keep
 the caret where you are editing, including when filtering Settings.
 
-Repeated badges, tier dots and draft marks have fixed positions, including an
+Repeated badges, tap and hold dots and draft marks have fixed positions, including an
 empty mark slot when neighboring labels have marks. Review and Draft history
 keep title marks separate from their names. Review fields line up as the
 change sign, label, value on the keyboard and value in the draft; an absent
@@ -236,6 +236,41 @@ to a layer always shows that layer's colour before the layer's name, so
 "Hold ■ Numbers" reads the same in the hover card, the Keys tabs, the behaviour
 grid and the review.
 
+### Words and keycodes
+
+Ark names one thing one way on every screen, in the words of what the
+keyboard does. A behaviour is a grid of **actions**: a row per **tap count**
+(Single tap, Double tap…) and a column each for tap, hold and long hold; a
+hold action says **How it runs**, a behaviour row says how many actions it
+sets ("3 actions"), and **Clear** empties one cell. A layer key's verb is one
+of **Hold**, **Lock**, **Tap-hold**, **Tap-toggle**, **One-shot** and **Move
+to**, on the key cap, in the hover card, in the picker and in the review; QMK's
+`TG()` is a lock on this keyboard, so it reads Lock like a layer lock does.
+`KC_NO` is **Nothing**: it does nothing and blocks the layers below, and its
+cap shows a dash. A **Transparent** key falls through to the layer below, and
+where Ark knows what answers it says so ("Transparent → Esc from Base").
+Settings calls QMK's default layers **Default layers**: always on underneath
+every other layer, normally only Base. The section about the computer is **Your
+computer**, with its **Operating system**. The rail groups the screens as
+CONFIGURE and MANAGE; the trackball's screens are **Trackball** and
+**Trackball modes**, and the mouse layer QMK calls auto-mouse is the **Mouse
+layer**. Slots are numbered from 0 as their keycodes are and tagged **M5**,
+**K5** and **P5** for macro, custom key and trackball mode 5; one with no name
+reads "Macro 5", "Custom key 5" or "Mode 5". A combo is named by its keys and
+what it sends, "Space + Delete → Hold Number", with its C-number as a quiet
+index, since deleting a combo renumbers the ones after it. Settings and the
+picker search still find the older and QMK words (host, startup, magic,
+pointing, auto-mouse, `KC_ESCAPE`).
+
+**Show keycodes** is one switch, off by default and remembered. Keycodes are
+always shown where you act on one: the Key tab's Keycode field, the picker's
+footer, **Where it is stored**, a macro's raw payload and a review value's
+tooltip. Everywhere else the switch decides: with it on, the hover card,
+behaviour rows, titles and cells, combo Sends, the Key tab's "This key on every
+layer" rows, reach rows and picker buttons add the keycode as a muted suffix;
+with it off they show only words. A trackball mode's direction field holds its
+keycode, where you act on it, with the key's words under it.
+
 ### The board
 
 After the complete keyboard read opens an editable draft, the board stays on
@@ -245,23 +280,24 @@ the layer's colour on the keys it owns — with the legends drawn on top in
 whichever of black or white stays readable, and the behaviour dots and combo
 badges on the key face in the feedback colours the keyboard flashes.
 Resting the pointer on a key opens a card of everything it reaches. Every
-action there reads by its name first, then the keycode it stores; a custom key
-or pointing mode reads as `CUSTOM_KEY_n` or `PD_SLOT_n` rather than its number.
+action there reads by its name; with **Show keycodes** on, the keycode it
+stores follows, and a custom key or trackball mode reads as `CUSTOM_KEY_n` or
+`PD_SLOT_n` rather than its number.
 A custom key says under its name what its shortcut sends, held and tapped as
 the key is or where its behaviour leaves a tap or hold empty, or that it has
 none.
 A layer-tap or mod-tap key always lists what its tap sends, what its hold does,
 the tap / hold threshold it runs on and who decides it: the keyboard, when it
-has a behaviour row that runs there (even one with no branches), or QMK, when
+has a behaviour row that runs there (even one with no actions), or QMK, when
 it has none or its row is switched off or bypassed there. Any other key with a
-branchless behaviour row says in one line that the keyboard's key engine
+behaviour row with no actions says in one line that the keyboard's key engine
 handles it. A behaviour switched off or bypassed there says so and why, and
 what the key sends instead: its own keycode, or a custom key's shortcut.
-Behaviour branches list each tier's action and how a hold runs, and the
+A behaviour lists each tap count's actions and how a hold runs, and the
 behaviour names the thresholds it runs on in milliseconds, its own or the
 keyboard's default; a hold that taps at or after a threshold names
 that threshold's time, and one that repeats its rate in Hz. A macro lists its steps — held (↓), let go (↑),
-tapped, typed and waited. A branch that sends a custom key says it sends that
+tapped, typed and waited. An action that sends a custom key says it sends that
 key's shortcut, never its behaviour. Each combo leads with what it sends and how many keys
 it takes, with the keys that press it beneath and the hovered key marked among
 them. When a combo sends a key that has a behaviour, and that behaviour runs —
@@ -270,8 +306,8 @@ use behaviours are all on — its row says so, and the behaviour opens in its ow
 card beside the key's, tinted in the combo colour the keyboard flashes (grey
 when that is off) and naming the combos that run it; up to three such cards
 show, with a count of any more. A combo sending a custom key whose behaviour
-does not run says what its shortcut sends, or that it sends nothing. A transparent key says which
-layer answers it and what that key does there, following the layers you
+does not run says what its shortcut sends, or that it sends nothing. A transparent key reads "Transparent →" what answers it and from which
+layer, following the layers you
 preview.
 
 On the board, drag one key onto another to swap them, ⌘C and ⌘V copy a key
@@ -289,7 +325,7 @@ selects one, and Enter on the selected key opens its picker.
 ### Layers
 
 The standard firmware reserves 16 layers, so ordinary editing never changes
-the layer count or needs a reflash. **Rename & Reorder** lists them with the
+the layer count or needs a reflash. **Layers…** lists them with the
 highest-priority layer first and Base at the bottom.
 
 A layer tab shows its layer's number after its name, except for a layer named
@@ -297,7 +333,7 @@ only by its number ("Layer 8"), so the number is never said twice.
 The layers are tabs along the foot of the board card, next to the workbench
 rather than in it, since a layer is not a property of the selected key; the
 picked one opens into the board
-it shows, on Keys and on Lighting alike; **Rename & Reorder** stays at the end
+it shows, on Keys and on Lighting alike; **Layers…** stays at the end
 of those tabs on both screens, outside what scrolls, and opens upward over the board, so a layer
 is renamed and reordered where its keys are on screen. Drag a row by the grip
 on its left to move it within the full sixteen-layer stack, or focus the grip
@@ -317,11 +353,11 @@ the old base if nothing reaches it, and any layer key that holds or toggles the
 base, which does nothing since the base is always on.
 
 When **Make base** swaps a layer with the current base, empty
-physical keys entering the base become `KC_NO`; `KC_NO` physical keys leaving it
+physical keys entering the base become Nothing (`KC_NO`); Nothing keys leaving it
 become transparent. Unused matrix positions keep their values. If the former
 base had no layer colour, it receives the saved base HSV as its own all-key
 colour, even when an animated base effect is
-selected. The review gives transparent and `KC_NO` base keys separate notices.
+selected. The review gives Transparent and Nothing base keys separate notices.
 
 **⌘-click** (Ctrl-click off a Mac) more layer tabs to preview them on
 together. The board then shows what the keyboard would answer with, by the
@@ -344,8 +380,8 @@ actually hold together still previews.
 ### The workbench
 
 Under the board, one workbench whose tabs are the key, its behaviour, its combos,
-and the macros and pointing modes the layer reaches. A behaviour is tap count ×
-tier, so it is drawn as a grid: a row for every tap count the keyboard allows,
+and the macros and trackball modes the layer reaches. A behaviour is tap count ×
+tap, hold and long hold, so it is drawn as a grid of actions: a row for every tap count the keyboard allows,
 always all of them, and a column each for Tap, Hold and Long hold. Each timing
 heads what it governs: **Multi tap window** (release to next press) the tap
 counts, the Tap / hold threshold the Hold column and the Long hold threshold
@@ -364,12 +400,12 @@ matching overrides converted to defaults under their behaviours. Those stored
 changes discard together with the default edit.
 Selecting a key opens its grid in Behaviours even before it has a stored row.
 Only a grid action, timing override or anchor change adds the row to the draft;
-browsing leaves the board and behaviour counts unchanged. Transparent keys and
-`KC_NO` cannot have behaviours. In a layer preview, a transparent key opens the
+browsing leaves the board and behaviour counts unchanged. Transparent and
+Nothing keys cannot have behaviours. In a layer preview, a transparent key opens the
 key the board shows through it: the editor names the layer that supplies that
 key and says the behaviour belongs to its keycode, so changing it changes that
 key wherever it is pressed. Turning layers on or off in the preview updates the
-open key, whichever you did first. Empty branches preserve the key's built-in
+open key, whichever you did first. Empty cells preserve the key's built-in
 actions until you override them. An empty cell shows, dashed and marked
 "built in", what the key does there on its own. An empty tap sends the key's
 own tap once per press, so an empty Double tap sends it twice (`×2`), at every
@@ -386,13 +422,13 @@ until release stays held, one that repeats keeps repeating, one that sends
 on release still sends whenever you let go, and one that fired at its
 threshold does nothing more. An empty Hold beside a Long hold shows the tap
 a release before the Long hold threshold sends, for plain keys, custom keys and macros;
-layer and pointing keys send no tap once held. **Change key…** moves a behaviour to another
-key through the keycode picker; when that key already has one, you choose to
+layer and trackball mode keys send no tap once held. **Move to another key…** moves a behaviour to another
+key through the key picker; when that key already has one, you choose to
 overwrite it, swap the two, or cancel, and either is one undoable draft step.
 The keyboard owns its layer keys, so a behaviour takes QMK's layer keys where
 the keyboard can run them: `TG()`,
 `TO()` and `LOCK_LAYER()` anywhere, `OSL()` as a tap, `TT()` and `MO()` as a
-"Press and hold until release" branch; `LT()` and `LM()` stay keys and combos,
+"held until release" hold action; `LT()` and `LM()` stay keys and combos,
 and `DF()`/`PDF()` are refused.
 
 In **Keys → Combos**, **Pick on board** brings the board into view so its keys
@@ -408,9 +444,9 @@ labels them, rather than their layout indexes; a combo's row already names
 its inputs, so it says only which layer answers a transparent one.
 In **Keys → Behaviours**, reach sections open independently. Matching sections
 share their expanded or collapsed state across the Behaviours, Combos, Macros
-and Pointing modes tabs. The full list scrolls with the Keys page rather than
+and Trackball modes tabs. The full list scrolls with the Keys page rather than
 inside the rail.
-The Behaviours, Combos, Macros and Pointing modes tabs start with **On this
+The Behaviours, Combos, Macros and Trackball modes tabs start with **On this
 view**: what the board reaches with the selected layer and any layers previewed
 under it. **On this layer** stays tied to keys stored on the selected layer;
 the tab counts use that layer too. Use ⌘-click on layer tabs to change the
@@ -428,15 +464,16 @@ Macros tab, hover a step for its full key name or more of its text.
 
 ### The keycode picker
 
-The keycode picker leads with a board labelled for your host keyboard layout
-(ANSI for US; see [Host settings](#host-settings)), then task-shaped Symbols,
-Navigation, Numpad, Layers, Pointing modes, Macros, Mouse, Media, Lighting,
-Magic and Custom keys sections. Keys supported by this firmware are available under
+The key picker, **Choose a key**, leads with a board labelled for your computer's keyboard layout
+(ANSI for US; see [Your computer](#your-computer)), then task-shaped Symbols,
+Navigation, Numpad, Layers, Trackball modes, Macros, Mouse, Media, Lighting,
+Key options (QMK's Magic keys) and Custom keys sections. Keys supported by this firmware are available under
 More keys, Other QMK and All keycodes, and search spans those entries — named
 macros included, found by the name they were given. Layers offers each layer
 as Hold (`MO`), Lock (`LOCK_LAYER`, the same lock as QMK's `TG`) and Tap-hold
 (`LT`); a keyboard that owns its layer keys adds Tap-toggle (`TT`), One-shot
-(`OSL`) and Move (`TO`).
+(`OSL`) and Move to (`TO`). Trackball modes offers each mode as Hold and
+Lock. Under each button its keycode shows with **Show keycodes** on.
 A modifier key counts as a modifier: choose modifiers alone, or with a
 modifier key, and the picker stores the simplest keycode that holds them, which
 the footer shows. Command with the Left Command key is just `KC_LEFT_GUI`, and
@@ -462,8 +499,8 @@ because they do nothing on current firmware. Choose the named **Custom keys**,
 including Right Thumb, Left Thumb and Click Spam, instead. Existing retired
 assignments keep their stored names and bytes when read or backed up.
 Where no keycode can hold the modifiers picked and no custom key is offered,
-such as a pointing mode's direction shortcut, the picker explains it and
-disables **Use keycode**. A symbol's built-in Shift counts as a modifier too.
+such as a trackball mode's direction shortcut, the picker explains it and
+disables **Use key**. A symbol's built-in Shift counts as a modifier too.
 
 Macro keycodes are shown as `VIA_MACRO_0` through `VIA_MACRO_127` in the live
 editor, including slots whose QMK values have no named constant.
@@ -482,7 +519,7 @@ its place while you edit.
 
 A custom key's **Shortcut** is its own action, the way an ordinary key's
 keycode is: one key and any of the eight modifiers, held while the custom key
-is held and tapped when it is tapped. **Pick…** opens the keycode picker as
+is held and tapped when it is tapped. **Choose…** opens the keycode picker as
 on the Keys screen: click the key, from those a shortcut can hold (letters,
 digits, symbols, navigation, function keys and mouse buttons 1–8), and the
 modifiers in the row above the board. A modifier key on the board is its
@@ -503,14 +540,14 @@ shortcut. Shortcut changes are draft edits, reviewed beside the name with
 Discard, Undo and Redo, and saved by Apply.
 
 Under the key, **What it does** also holds its behaviour editor, the same one
-as Keys → Behaviours: timings, the tap × tier grid and participation, and once
-the key has a behaviour, **Change key…** and **Remove behaviour**. It works for
+as Keys → Behaviours: timings, the grid of actions and participation, and once
+the key has a behaviour, **Move to another key…** and **Remove behaviour**. It works for
 a key on no layer yet, so a custom key can get its taps and holds where it is
 defined. A key with no behaviour shows the key's defaults, with its shortcut
 in the cells the behaviour leaves empty, and the first change adds the
 behaviour to the draft. Edits here are the same draft changes as on the Keys
 screen, with the same review, undo and redo, and with a cell open, Delete, ⌘C
-and ⌘V act on it as they do there. **Change key…** to another custom key moves
+and ⌘V act on it as they do there. **Move to another key…** to another custom key moves
 the screen to that key; to any other key, it opens the behaviour on the Keys
 screen, where that key's behaviours are. A key that is placed also offers
 **Show on the Keys screen**, which opens its behaviour there with the board
@@ -520,7 +557,7 @@ Keys screen stays open there.
 
 ### Lighting
 
-On **Layer colours** and **Pointing modes**, the list beside the editor scrolls
+On **Layer colours** and **Trackball modes**, the list beside the editor scrolls
 on its own, keeps its place when you pick a row, and shows the picked row when
 you switch back to it. Each row's swatch is its colour; under its name it says
 where the colour paints (the keys it lights, or the half), or **no colour**.
@@ -543,6 +580,17 @@ Lowering a colour's brightness to zero keeps its hue and saturation visible
 and editable. A layer colour with nonzero saturation paints black at zero
 brightness; only zero saturation and brightness let underlying lighting show
 through. An LED override row inherits its stage colour only at HSV(0, 0, 0).
+
+On a layer colour, **Turn off** stores HSV(0, 0, 0), which lets the base
+effect show. On the other stages (a trackball mode's colour, combo and key
+feedback, the mouse layer fade's end colour) the same value paints the LEDs
+black while the stage shows, so the button there is **Black** and the editor
+says what goes dark: "While Dragscroll runs, the right half goes dark." Every
+stage names where its colour paints **Where it lights**. Key feedback's colours
+are **Waiting on 2×**…**5×** (while a multi-tap is pending), **Multi-tap sent**,
+**Holding** (pending or active) and **Long holding**; the switch **Flash after
+a double tap or more** decides whether a sent multi-tap flashes, since a single
+tap never does.
 
 ## Naming the keyboard
 
@@ -602,46 +650,46 @@ The profile holds up to 128 shared behaviour definitions and 128 combos with
 up to 16 inputs each. Firmware normally provides five tap steps per behaviour
 (640 steps total); Ark uses the connected keyboard's advertised tap depth and
 matching tap-feedback colours when firmware is configured for more. Layer, macro,
-custom-key, pointing-mode and keyboard names allow up to 32 UTF-8 bytes; accented letters
+custom-key, trackball mode and keyboard names allow up to 32 UTF-8 bytes; accented letters
 can use more than one byte. All edits go through the draft, Review, Undo and
 Apply, including switches and layer allowances.
 
-## Pointing modes
+## Trackball modes
 
-Current firmware has 32 pointing slots. Pointing modes lists the configured
+Current firmware has 32 trackball mode slots. Trackball modes lists the configured
 slots as cards, each with its name, colour and movement (its keycodes are in
-the editor's title), and the empty ones as a grid of numbered chips beneath them (a
+the editor's title), and the empty ones as a grid of chips tagged P0…P31 beneath them (a
 chip in amber still has keys reaching it); the key picker lists the slots in
 two columns; Lighting's slot list scrolls beside the colour editor. Each slot
-keeps its own Hold and Toggle key (`PD_SLOT_n`, `PD_SLOT_n_LOCK`) and lighting
+keeps its own Hold and Lock key (`PD_SLOT_n`, `PD_SLOT_n_LOCK`) and lighting
 row. An empty slot takes no room in the profile, so 32 slots cost only what you
 configure.
 
-### Cleared pointing slots
+### Cleared trackball modes
 
-A key bound to a **cleared pointing slot** is allowed. The keyboard keeps its
+A key bound to a **cleared trackball mode slot** is allowed. The keyboard keeps its
 mode keycodes in a fixed registry and its runtime refuses to activate a slot
 with an empty record, so such a key is inert, not invalid — it does nothing
 until the slot is configured again. The clear goes through even while something
 still reaches the slot, the validated profile counts what
-still points at the empty slot, and the Pointing modes screen and the hover card
+still points at the empty slot, and the Trackball modes screen and the hover card
 say the key does nothing for now.
 
 The same reasoning runs the other way, so the keycode picker offers **every**
-slot, configured or not: its Pointing modes section lists every slot as a
-row, each with a Hold and a Toggle key, and marks an empty slot's row as doing
-nothing yet. Search finds the same keys as `Slot 6 · hold (empty)`. A board can be laid out before its modes are, and the key says `empty`
+slot, configured or not: its Trackball modes section lists every slot as a
+row, tagged P0…P31, each with a Hold and a Lock key, and marks an empty slot's row as doing
+nothing yet. Search finds the same keys as `Mode 6 · hold (empty)`. A board can be laid out before its modes are, and the key says `empty`
 on its second line until the slot is filled in.
 
-### Pointing-mode clicks
+### Trackball mode clicks
 
 A straight direction, diagonal or physical-button tap override can send a
 plain **Mouse Button 1–8**, including buttons 3 and 4.
-Use **Pick…** or enter its QMK name, such as `MS_BTN3`. The pointing picker
+Use **Choose…** or enter its QMK name, such as `MS_BTN3`. The pointing picker
 offers only outputs that field accepts: keyboard keys and shortcuts, media
 and system keys, and supported mouse buttons. Pointer movement, wheel,
 acceleration, layer controls and mode controls are refused. Supported macros
-are offered too ([below](#pointing-mode-macros)). Mouse
+are offered too ([below](#trackball-mode-macros)). Mouse
 buttons and media/system keys must be plain keycodes; modifier wrappers such
 as `C(MS_BTN3)` are refused.
 
@@ -655,7 +703,7 @@ holds that button, the click adds no new press edge and leaves it held. The
 computer decides what a button number means; buttons 3 and 4 do not necessarily
 mean Back and Forward.
 
-### Pointing-mode macros
+### Trackball mode macros
 
 **Pick… → Macros** offers all 128 VIA slots
 by their names for a direction, diagonal or button tap override. The output
@@ -672,9 +720,9 @@ The keyboard runs one macro at a time. Triggers while it is busy are dropped,
 never queued. **Every step** is allowed; its macro output carries a tip pointing
 to **Once per movement**, usually a better fit for a longer sequence.
 
-## Host settings
+## Your computer
 
-**Settings → Host** stores **Host OS** (Auto, macOS, Windows or Linux), the
+**Settings → Your computer** stores **Operating system** (Auto, macOS, Windows or Linux), the
 **Keyboard layout** your computer types with, and on Windows and Linux a
 **Unicode playback** switch. Auto uses the keyboard’s USB OS guess,
 not the OS running Ark. The section shows the detected and effective OS from
@@ -689,12 +737,12 @@ Neither OS detection nor selection checks the computer’s input configuration.
 when the OS is unknown): ABC, Dutch, Unicode Hex Input, British, German and
 French on macOS; US International, United Kingdom, German and French on Windows
 and on Linux. Macro text is typed through it, so pick the layout that is active
-on the computer; the keyboard cannot check. US is the default. Choosing a **Host OS** brings the layout along: it stays if
+on the computer; the keyboard cannot check. US is the default. Choosing a **Operating system** brings the layout along: it stays if
 it belongs to that OS (US belongs to all of them), and otherwise becomes that
 OS's layout of the same language (German, French, British or United Kingdom),
 or US. It is one change, so one undo restores both. Auto cannot do this for
 you: when the keyboard is detected on another OS than its layout's, for example
-plugged into another computer, the layout stays, and Host and the macro editor
+plugged into another computer, the layout stays, and Your computer and the macro editor
 warn that macros may type the wrong characters until it matches. On macOS, **ISO keyboard on macOS** matters if macOS set this
 keyboard up as ISO (its Keyboard Setup Assistant asks): macOS then swaps the key
 left of 1 with the one left of Z, and macros must swap them too. On macOS there
@@ -703,7 +751,7 @@ other characters your layout cannot type.
 
 While Unicode Hex Input is active on your Mac, Option symbols and shortcuts
 may stop working, including Option+Left/Right for word navigation. This affects
-ordinary typing, behaviours and macro key steps as well. Host shows a warning
+ordinary typing, behaviours and macro key steps as well. Your computer shows a warning
 when its macOS setup uses Unicode entry. Ark does not switch the Mac's input
 source: switch back to your usual source for those keys, and match Ark's layout
 before playing macros. Merely selecting a layout in Ark does not change how
@@ -723,22 +771,22 @@ layout never moves a key. US shows the familiar ANSI labels.
 
 The effective OS names modifier keys consistently in the layout, picker, macros,
 pointing controls and Review: Option/Command on macOS, Alt/Windows on Windows,
-Alt/Super on Linux. Shortcuts, mod-taps, layer-mod keys, Magic actions and
+Alt/Super on Linux. Shortcuts, mod-taps, layer-mod keys, Key options actions and
 macro command previews follow the same rule. Display
-names refresh in open editors when the Host setting changes; stored keycodes
-and key assignments do not. Auto with an unknown OS uses Alt/GUI names. Both Host settings
+names refresh in open editors when Your computer changes; stored keycodes
+and key assignments do not. Auto with an unknown OS uses Alt/GUI names. Both of these settings
 travel through Review, undo/redo, readback and backups.
 
-When the effective OS is Windows and **Unicode playback** is on, the Host
+When the effective OS is Windows and **Unicode playback** is on, the Your computer section
 section shows **WinCompose on GitHub** with the GitHub icon. The link opens the
 helper's project in your browser; install and run it with Right Alt as Compose.
 Auto uses the detected OS for this link too. It disappears when Unicode playback
 is off or the effective OS changes.
 
-Changing Host rechecks every stored macro against the new typing setup. Review
+Changing Your computer rechecks every stored macro against the new typing setup. Review
 lists affected text macros with their old and new entry method and playback
 status, including a macro that becomes ready or needs a fix. These effects
-discard together with the Host change; separately edited macro text and names
+discard together with that change; separately edited macro text and names
 stay in the draft. Text and key steps are preserved: text uses the new layout's
 keys automatically, while explicit key steps still send the keys you chose.
 
@@ -762,7 +810,7 @@ row. Individual keys and delays use one fixed tile size; chords and text use
 a wider size with the same height. A down arrow means press, an up arrow means
 release, and a dot means tap. Delays show their milliseconds inline. Long labels
 and text stay within the tile; hover shows the full value. Short modifier names
-keep their side and follow Host settings, such as L Cmd on macOS and L Win on Windows.
+keep their side and follow Your computer, such as L Cmd on macOS and L Win on Windows.
 Click a tile to open its editor underneath, including the full Text box or key
 picker. Drag any tile anywhere in the sequence to reorder: the beginning,
 row gaps and the space after the last tile accept drops too, with an insertion
@@ -794,7 +842,7 @@ affected tiles and stays local for correction; it never replaces the valid draft
 Uninterruptible playback and placement stay beside the title and context.
 The sequence and add actions come first, with validation errors shown underneath;
 **Typing & playback help** opens the longer explanation.
-Host settings and that help sit at the bottom, below the recorder. Add-step actions
+Your computer settings and that help sit at the bottom, below the recorder. Add-step actions
 use larger, bordered buttons; **Discard local edits** and **Clear macro** are
 text buttons at the right of the title, after Place on a key…; Record / Stop is the
 prominent recording action, under a Record heading styled like Sequence's. The **Raw payload** toggle sits at the right of
@@ -877,7 +925,7 @@ Valid raw edits read back as editable steps. A raw edit that cannot be completel
 parsed disables step editing until corrected or discarded, preserving its whole
 input. Both views describe the same macro and are checked against the same free memory.
 
-Text is typed through the **Keyboard layout** in **Settings → Host**, with the
+Text is typed through the **Keyboard layout** in **Settings → Your computer**, with the
 keys that layout uses: on German, `z` is the key QMK calls `KC_Y`; on macOS
 Dutch, `é` is Option+E then E and `€` is Option+2. Every layout types all of
 ASCII. A character the layout cannot type, such as an emoji, needs Unicode
@@ -915,9 +963,9 @@ valid. Review lists each changed thing once, under the area it is
 edited in, with the fields that changed, can open it where it is edited, and
 can discard part of the draft. Stored names are compared even when clearing
 one leaves the same default label; Review explains the stored name and its
-fallback separately. A disabled pointing slot's retained name is reviewed too.
+fallback separately. A disabled trackball mode slot's retained name is reviewed too.
 In Review and Draft history, combo badges have
-space before their names, and tap-count badges and tier dots occupy separate
+space before their names, and tap-count badges and tap and hold dots occupy separate
 aligned positions. Things made by the same edit (a key swap, a
 moved behaviour) go back together, as one undoable step. Layers are compared
 by which layer they are, not where they sit, so a reorder is one **Layer
@@ -927,7 +975,9 @@ complete profile could not be read — is read-only: the host refuses any edit
 rather than writing it directly.
 
 Removing one combo appears as one deletion in Review and Draft history; later
-combo numbers shift because the device stores them in a packed table.
+combo numbers shift because the keyboard stores them in a packed table. That is
+why Review names a combo by its keys and what it sends ("Space + Delete → Hold
+Number"), with its C-number as a quiet mark beside the name.
 
 The floating bar and the review's title count the draft's changes. They add
 how many were added, changed and removed only when that says more than the
@@ -956,9 +1006,9 @@ could not establish every escape, the warning says so; the completed checks
 still appear.
 
 Other checks cover a layer with keys nothing reaches, a layer key onto an empty
-layer, transparent and `KC_NO` keys on Base, a pointer layer that cannot work,
+layer, Transparent and Nothing keys on Base, a pointer layer that cannot work,
 and layer keys the keyboard leaves to QMK. They also name combos that cannot
-fire, actions aimed at empty pointing slots, and macros your Host setup
+fire, actions aimed at empty trackball mode slots, and macros your computer setup
 cannot play.
 Brightness or lighting effects unsupported by the destination are blockers:
 Apply stays disabled until they are fixed. Notices and checks fixed by the draft need no
@@ -972,7 +1022,7 @@ several edits could be responsible, the review leaves the source unlabeled.
 The keyboard times gestures from the physical presses, and owns the tapping of
 authored LT(), MT() and OSM() rows, so combo buffering does not delay them.
 Timing checks resolve inherited defaults, warn about overlapping or impossible
-release tiers, and exclude proven-impossible layer routes. Narrow gesture/chord
+release holds, and exclude proven-impossible layer routes. Narrow gesture/chord
 windows receive advice; this is conservative analysis, not a guarantee that
 every gesture is physically practical.
 
@@ -980,10 +1030,10 @@ every gesture is physically practical.
 
 Ark calls the half connected over USB the **master half**, and its partner the
 **slave half**. These names describe their connection roles, whichever side
-holds each role. Device explains the names; Apply progress, failures and
+holds each role. Keyboard explains the names; Apply progress, failures and
 recovery notices use them consistently.
 
-**Review and apply** saves a recovery copy, then commits the complete profile
+**Review and apply** saves the previous profile, then commits the complete profile
 to both halves as one recovery-first logical transaction and verifies the
 readback. It asks for confirmation when the review has a warning or trap, and
 stays disabled until save blockers are resolved
@@ -1003,7 +1053,7 @@ discard names what it reads and says nothing about saving, because it writes
 nothing to the keyboard.
 
 Apply reports the transaction's steps in order: check the keyboard, save a
-recovery copy, send the profile, let the keyboard check it, stage keys and
+previous profile, send the profile, let the keyboard check it, stage keys and
 macros on the slave half, copy the profile to that half, save on the master
 half, finish the slave half, write the master's keys and macros, then check
 both halves. A failure keeps its step, the keyboard's reason and whether
@@ -1071,39 +1121,39 @@ progress, so keep the recovery file that Apply creates.
 
 ## Profiles and backups
 
-Charybdis Ark's **Export profile** saves the configuration read from the
+Charybdis Ark's **Save a backup file…** saves the configuration read from the
 keyboard: every layer and key position, behaviours, combos, named VIA macros,
 lighting and global settings. Flashed defaults and live edits become one
 portable file.
-Export leaves the editor and any local draft unchanged, even if the keyboard
+Saving a backup file leaves the editor and any local draft unchanged, even if the keyboard
 has changed since its last editor read.
 
-**Import profile** shows a review, saves a recovery copy, restores
+**Restore** (**Choose a backup file…**) shows a review, saves the previous profile, restores
 both halves and verifies the complete readback. A failed or interrupted restore
 reports the saved recovery file instead of claiming success. Recovery files are
 kept in the extension's local storage; the app shows their full path. In
-Chrome they are kept in the browser's storage and listed on Profile & backups,
+Chrome they are kept in the browser's storage and listed on Backups,
 each with a download (see [Using Ark in Chrome](#using-ark-in-chrome)).
 
-On **Profile & backups**, use **Choose profile…** or drop one backup file
-onto the **Import profile** card. Both open the same review, including in the
+On **Backups**, use **Choose a backup file…** or drop one backup file
+onto the **Restore** card. Both open the same review, including in the
 demo. **Use as draft** replaces the draft; Undo brings it back, and the keyboard
 changes only after Review and Apply. A file that holds exactly what the
 keyboard runs changes nothing and cannot be used, unless the draft has edits:
 then using it puts the draft back to the keyboard's profile, as **Discard all**
-does. Import is disabled while the keyboard or
+does. Restore is disabled while the keyboard or
 draft is unavailable, stale or busy. Multiple, unreadable, invalid and oversized
 files are refused without replacing your draft.
 
 **Profile memory** shows how full the profile is. Its bar is the space the
-keyboard stores behaviours, combos, lighting, pointing modes, custom keys,
+keyboard stores behaviours, combos, lighting, trackball modes, custom keys,
 settings and every name in: 53,216 bytes on current firmware, the size the
 keyboard reports. Under it, **In use** counts what you have set up against what
 the keyboard holds, each with a short bar, in the words of the screen that
 edits it. Behaviours, behaviour tap counts, combos, LED groups and LED
 overrides count toward limits: at one, the row says full and the keyboard
 refuses one more. Macro slots with steps, custom keys with a name, a shortcut
-or a behaviour, and pointing-mode slots that hold a mode count out of the 128,
+or a behaviour, and trackball mode slots that hold a mode count out of the 128,
 128 and 32 the keyboard has, each bar showing the slots in use against the free
 ones. Every empty macro slot keeps room in macro memory for ten key taps; when
 the memory cannot, the highest empty slots are unavailable until a macro is
@@ -1121,12 +1171,12 @@ Ark works with the current firmware only, the pair from the latest firmware
 release; each Ark release names the firmware release it was built with. It
 reads, edits and restores only what that firmware stores, and converts
 nothing. A keyboard on older firmware is told to update both halves and read
-no further, and a backup in an older format is refused at Import. When a
+no further, and a backup in an older format is refused at Restore. When a
 firmware update changes the stored format, the keyboard starts from its
-flashed defaults, and backups from before the update no longer import.
+flashed defaults, and backups from before the update no longer restore.
 
 Executable custom combo hooks and unsupported macro content
-cannot be represented as profile data; export reports these explicitly instead
+cannot be represented as profile data; saving a backup file reports these explicitly instead
 of producing an incomplete file.
 The [portable profile contract](../upstream/firmware/docs/architecture/portable-profile-v1.md) records
 format limits, compatibility, restore ordering and remaining hardware checks.
