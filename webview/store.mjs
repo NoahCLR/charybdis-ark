@@ -81,6 +81,9 @@ export const STATE_FIELDS = {
     pdButtons: resets(null),   // {slot, rows: {index: override}}: button overrides whose kind is chosen but not yet its shortcut or modifiers
     pdTaps: resets(null),      // {slot, rows: {"dir:up": tap}}: direction shortcuts set to ignore modifiers before any is chosen
     pdAdvanced: kept(false),  // Advanced open on the pointing editor, whichever slot is shown
+    tbEntry: kept("pointer"),  // the Trackball screen's fixed entry shown on "mouse": pointer, sniping or mouseLayer
+    tbEmptiesOpen: kept(false), // the Trackball list's empty slots unfolded
+    tbFineTuning: kept(false), // the mouse layer's fine-tuning fold open
     applyDismissed: kept(0),  // the failed Apply (by id) the person closed, so it stays closed
     pdPreview: kept(false),
     feedbackRow: kept("hold"),

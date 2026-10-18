@@ -5,12 +5,12 @@
 
 /** @typedef {import("../../contracts/model.js").StatusModel} StatusModel */
 /** @typedef {{screenKeys: () => HTMLElement, screenLighting: () => HTMLElement, screenMacros: () => HTMLElement,
- * screenCustomKeys: () => HTMLElement, screenMouse: () => HTMLElement, screenPointing: () => HTMLElement,
+ * screenCustomKeys: () => HTMLElement, screenTrackball: () => HTMLElement,
  * screenSettings: () => HTMLElement, screenProfile: () => HTMLElement, screenDevice: () => HTMLElement}} ScreenRenderers */
 /** @typedef {keyof typeof SCREENS} ScreenId */
 /** @typedef {{label: string, group: string, icon: string, title: string, keepOnPublish: boolean,
  * available: (model: StatusModel) => boolean, render: (renderers: ScreenRenderers) => HTMLElement,
- * secondaryLabel?: string, unavailable?: {title: string, detail: string}}} ScreenDefinition */
+ * secondaryLabel?: string, unavailable?: {title: string, detail: string}, aliasOf?: string}} ScreenDefinition */
 
 /** @param {StatusModel | null | undefined} model */
 export const configureReady = (model) => model?.load?.state === "ready";
@@ -39,15 +39,19 @@ export const SCREENS = Object.freeze({
         icon: '<svg viewBox="0 0 16 16"><rect x="2.5" y="2.5" width="11" height="11" rx="2.5"/><path d="M5.5 8h5M8 5.5v5"/></svg>',
         available: configureReady, render: renderers => renderers.screenCustomKeys(),
     }),
+    // Trackball: the pointer, sniping and the mouse layer, then the trackball
+    // modes, on one screen. "pointing" is the same screen opened on a mode,
+    // kept as its own id so links to a mode (Review, Keys, Lighting) still
+    // land there; it has no rail item of its own.
     mouse: screen({
         label: "Trackball", group: "Configure", title: "Keyboard", keepOnPublish: true,
-        icon: '<svg viewBox="0 0 16 16"><rect x="4" y="1.5" width="8" height="13" rx="4"/><path d="M8 1.5v4.5"/></svg>',
-        available: configureReady, render: renderers => renderers.screenMouse(),
+        icon: '<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5"/><circle cx="8" cy="8" r="2"/></svg>',
+        available: configureReady, render: renderers => renderers.screenTrackball(),
     }),
     pointing: screen({
-        label: "Trackball modes", group: "Configure", title: "Keyboard", keepOnPublish: true,
-        icon: '<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5"/><path d="M8 2.5v11M2.5 8h11"/></svg>',
-        available: configureReady, render: renderers => renderers.screenPointing(),
+        label: "Trackball modes", group: "Configure", title: "Keyboard", keepOnPublish: true, aliasOf: "mouse",
+        icon: '<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5"/><circle cx="8" cy="8" r="2"/></svg>',
+        available: configureReady, render: renderers => renderers.screenTrackball(),
     }),
     settings: screen({
         label: "Settings", group: "Configure", title: "Keyboard", keepOnPublish: true,
@@ -70,6 +74,13 @@ export const SCREENS = Object.freeze({
     }),
 });
 
+// The rail item a screen lights: its own, or the one it is an alias of.
+/** @param {unknown} id @returns {ScreenId | null} */
+export const railScreen = (id) => {
+    const definition = screenDefinition(id);
+    return definition ? /** @type {ScreenId} */ (definition.aliasOf || id) : null;
+};
+
 /** @param {unknown} id @returns {id is ScreenId} */
 export const isScreenId = (id) => typeof id === "string" && Object.hasOwn(SCREENS, id);
 
@@ -87,7 +98,8 @@ export function screenGroups() {
     /** @type {Map<string, {id: ScreenId, definition: ScreenDefinition}[]>} */
     const groups = new Map();
     for (const id of /** @type {ScreenId[]} */ (Object.keys(SCREENS))) {
-        const definition = SCREENS[id];
+        const definition = /** @type {ScreenDefinition} */ (SCREENS[id]);
+        if (definition.aliasOf) continue;
         const items = groups.get(definition.group) || [];
         items.push({id, definition});
         groups.set(definition.group, items);

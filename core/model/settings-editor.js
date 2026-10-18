@@ -82,20 +82,20 @@ const sections = [
         // held in the upstream Charybdis config, which the keyboard only
         // accepts in its own steps, so they offer the part of the list the
         // keyboard accepts. A pointing mode's own speed is set on its slot.
-        number("normalDpi", SETTING.DEFAULT_DPI, "Normal", undefined, {tooltip: "Ball speed for ordinary pointer movement, in DPI. Higher DPI moves the cursor farther for the same ball movement.", unit: undefined, choices: dpiChoices({accepts: v => validSetting(SETTING.DEFAULT_DPI, v)})}),
-        number("snipingDpi", SETTING.SNIPING_DPI, "Sniping (precision speed)", undefined, {tooltip: "Ball speed while sniping is on, including auto-sniping, in DPI. Lower DPI gives finer cursor control.", unit: undefined, choices: dpiChoices({accepts: v => validSetting(SETTING.SNIPING_DPI, v)})}),
+        number("normalDpi", SETTING.DEFAULT_DPI, "Ball speed", undefined, {tooltip: "Ball speed for ordinary pointer movement, in DPI. Higher DPI moves the cursor farther for the same ball movement. Modes kept at Normal speed follow it. QMK calls this the default DPI.", unit: undefined, choices: dpiChoices({accepts: v => validSetting(SETTING.DEFAULT_DPI, v)})}),
+        number("snipingDpi", SETTING.SNIPING_DPI, "Sniping speed", undefined, {tooltip: "Ball speed while sniping is on, including auto-sniping, in DPI. Lower DPI gives finer cursor control. Directional trackball modes slow down with it; scrolling modes ignore it.", unit: undefined, choices: dpiChoices({accepts: v => validSetting(SETTING.SNIPING_DPI, v)})}),
     ]},
     {id: "sniping", label: "Auto-sniping", area: "Trackball", search: "pointing precision", fields: [
-        toggle("autoSniping", SETTING.AUTO_SNIPING_ENABLED, "Auto-sniping", "Use sniping speed while the selected layer is active."),
-        layer("snipingLayer", SETTING.AUTO_SNIPING_LAYER, "Auto-sniping layer", "Use sniping DPI while this layer is active and Auto-sniping is on."),
+        toggle("autoSniping", SETTING.AUTO_SNIPING_ENABLED, "Auto-sniping", "Sniping speed while the chosen layer is on. That layer also keeps the mouse layer off."),
+        layer("snipingLayer", SETTING.AUTO_SNIPING_LAYER, "Auto-sniping layer", "Sniping speed while this layer is on and Auto-sniping is on."),
     ]},
     {id: "autoMouse", label: "Mouse layer", area: "Trackball", search: "auto-mouse auto mouse pointer layer pointing", fields: [
         toggle("autoMouse", SETTING.AUTO_MOUSE_ENABLED, "Mouse layer", "Moving the trackball turns the chosen layer on."),
         layer("mouseLayer", SETTING.AUTO_MOUSE_LAYER, "Layer", "The layer moving the trackball turns on while Mouse layer is on."),
-        number("mouseTimeout", SETTING.AUTO_MOUSE_TIMEOUT, "Timeout (ms)", "How long the layer stays on after movement. The lighting fade keeps its share of it (Lighting → Mouse layer fade).", {min: 1}),
+        number("mouseTimeout", SETTING.AUTO_MOUSE_TIMEOUT, "Timeout (ms)", "How long the layer stays on after the ball stops. It turns off as soon as you type a key that is not a mouse key.", {min: 1, tooltip: "QMK's auto-mouse timeout. The lighting fade keeps its share of it (Lighting → Mouse layer fade)."}),
         number("mouseDebounce", SETTING.AUTO_MOUSE_DEBOUNCE, "Movement debounce (ms)", undefined, {tooltip: "Minimum time between trackball events that update the mouse layer. Higher values ignore closely spaced movement events. QMK calls this auto-mouse."}),
-        number("mouseDelay", SETTING.AUTO_MOUSE_DELAY, "Delay after typing (ms)", "Wait this long after a key event before movement can turn the mouse layer on."),
-        number("mouseThreshold", SETTING.AUTO_MOUSE_THRESHOLD, "Movement threshold", "Movement needed to turn the mouse layer on. Higher values require more movement.", {unit: undefined}),
+        number("mouseDelay", SETTING.AUTO_MOUSE_DELAY, "Delay after typing (ms)", "Movement this soon after you press a key does not turn the mouse layer on."),
+        number("mouseThreshold", SETTING.AUTO_MOUSE_THRESHOLD, "Movement threshold", "Sensor counts on either axis, at the current ball speed, before movement turns the mouse layer on. A mouse button press turns it on at once.", {unit: "counts"}),
     ]},
     // The keyboard stores this as the milliseconds the auto-mouse colour holds
     // before it fades, and refuses a profile where that is not shorter than

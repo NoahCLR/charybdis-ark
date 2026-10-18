@@ -173,20 +173,9 @@ export function sectionCard(model, section, fields, canEdit, searching = false) 
         state.settingsOpen = node.open ? [...others, section.id] : others;
     });
 
-    // A section is saved whole: the core validates the complete set, so every
-    // field travels together and one changed value cannot half-write a section.
     /** @type {Map<string, ReturnType<typeof durationControl>>} */
     const durations = new Map();
-    const submit = () => {
-        for (const duration of durations.values()) if (duration.read() === null) { duration.reportValidity(); return; }
-        post(edits.settingsSection(section, (field) => {
-            const duration = durations.get(field.macro);
-            if (duration) return duration.read() ?? undefined;
-            const input = /** @type {HTMLInputElement | HTMLSelectElement | null} */ (node.querySelector(`[data-macro="${cssEscape(field.macro)}"]`));
-            if (!input) return undefined;
-            return field.kind === "toggle" ? /** @type {HTMLInputElement} */ (input).checked : input.value;
-        }, model?.settingsEditing?.identity));
-    };
+    const submit = sectionSubmit(model, section, node, durations);
 
     // A section's one-per-layer switches read as one setting, so they are one
     // row of layers rather than a row each.
@@ -201,6 +190,39 @@ export function sectionCard(model, section, fields, canEdit, searching = false) 
         rows.appendChild(fieldRow(field, canEdit, submit, hidden, slot, durations));
     }
     return node;
+}
+
+// A section is saved whole: the core validates the complete set, so every
+// field travels together and one changed value cannot half-write a section.
+// A field not drawn inside `node` keeps the value the keyboard reported.
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/panel.js").PresentedSection} section @param {Element} node @param {Map<string, ReturnType<typeof durationControl>>} durations */
+function sectionSubmit(model, section, node, durations) {
+    return () => {
+        for (const duration of durations.values()) if (duration.read() === null) { duration.reportValidity(); return; }
+        post(edits.settingsSection(section, (field) => {
+            const duration = durations.get(field.macro);
+            if (duration) return duration.read() ?? undefined;
+            const input = /** @type {HTMLInputElement | HTMLSelectElement | null} */ (node.querySelector(`[data-macro="${cssEscape(field.macro)}"]`));
+            if (!input) return undefined;
+            return field.kind === "toggle" ? /** @type {HTMLInputElement} */ (input).checked : input.value;
+        }, model?.settingsEditing?.identity));
+    };
+}
+
+// Some of a section's fields as setting rows, without the section's card:
+// a screen that groups settings its own way (Trackball) draws the rows it
+// needs where it needs them, and each still saves its whole section.
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/panel.js").PresentedSection} section @param {readonly string[]} macros @param {boolean} canEdit */
+export function settingRows(model, section, macros, canEdit) {
+    const rows = el(`<div class="rows" data-section="${esc(section.id)}"></div>`);
+    /** @type {Map<string, ReturnType<typeof durationControl>>} */
+    const durations = new Map();
+    const submit = sectionSubmit(model, section, rows, durations);
+    for (const macro of macros) {
+        const field = section.fields.find((entry) => entry.macro === macro);
+        if (field) rows.appendChild(fieldRow(field, canEdit, submit, false, false, durations));
+    }
+    return rows;
 }
 
 /** @param {import("../../contracts/panel.js").PresentedField} field */

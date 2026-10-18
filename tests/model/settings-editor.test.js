@@ -326,7 +326,8 @@ test("settings presentation owns combo timing words and explicit duration units"
     for (const macro of ["tappingTerm", "tapHoldTerm", "longerHoldTerm", "multiTapTerm", "mouseTimeout", "mouseDebounce", "mouseDelay", "lightingTimeout", "feedbackFlash"]) {
         assert.equal(fields.find(field => field.macro === macro).unit, "ms", macro);
     }
-    for (const macro of ["normalDpi", "snipingDpi", "mouseThreshold", "hue", "brightness", "hostOs"]) {
+    for (const macro of ["normalDpi", "snipingDpi", "hue", "brightness", "hostOs"]) {
         assert.equal(fields.find(field => field.macro === macro).unit, undefined, macro);
     }
+    assert.equal(fields.find(field => field.macro === "mouseThreshold").unit, "counts", "the mouse layer threshold is sensor counts");
 });

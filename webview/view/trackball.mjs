@@ -150,6 +150,27 @@ export const reachCount = ({keys, behaviours, combos}) => keys.length + behaviou
 
 // ── what a mode sends ────────────────────────────────────────────────────
 
+const MOD_KEYS = [[1, "KC_LCTL", "KC_RCTL"], [2, "KC_LSFT", "KC_RSFT"], [4, "KC_LALT", "KC_RALT"], [8, "KC_LGUI", "KC_RGUI"]];
+// A shortcut a mode sends, in words as the computer's keys read: "Command + =",
+// "Shift + Command + Z", "Volume Up". A left-hand modifier drops its side,
+// as people say it; a right-hand one keeps it.
+/** @param {Model} model @param {Scalar | null | undefined} code */
+export function tapWords(model, code) {
+    if (typeof code === "string") return code === "0" ? "" : actionLabel(model, code);
+    const value = Number(code || 0);
+    if (!value) return "";
+    if (value >= 0x0100 && value <= 0x1fff) {
+        const bits = (value >> 8) & 0x1f, right = Boolean(bits & 0x10);
+        const base = keyName(model, value & 0xff);
+        const mods = MOD_KEYS.filter(([bit]) => bits & /** @type {number} */ (bit)).map(([, left, rightKey]) => {
+            const label = actionLabel(model, String(right ? rightKey : left));
+            return right ? label : label.replace(/^Left\s+/, "");
+        });
+        if (base && !base.startsWith("0x")) return [...mods, actionLabel(model, base)].join(" + ");
+    }
+    return actionLabel(model, keyName(model, value));
+}
+
 const ARROW = /** @type {Record<string, string>} */ ({up: "↑", left: "←", right: "→", down: "↓"});
 // A mode as one line in the list: a directional mode's directions in words,
 // a scrolling mode's axes.
@@ -162,9 +183,8 @@ export function sendsLine(model, slot) {
     if (slot.kind !== KIND.DIRECTIONAL) return "Empty";
     const parts = [];
     for (const direction of axisReads(slot.axis)) {
-        const code = slot.directions?.[direction]?.keycode;
-        const name = typeof code === "string" ? code : keyName(model, Number(code || 0));
-        if (name && name !== "0") parts.push(`${ARROW[direction]} ${actionLabel(model, name)}`);
+        const words = tapWords(model, slot.directions?.[direction]?.keycode);
+        if (words) parts.push(`${ARROW[direction]} ${words}`);
     }
     if (slot.axis === AXIS.EIGHT) parts.push("+ diagonals");
     return parts.length ? parts.join("  ") : "No shortcuts yet";
@@ -237,7 +257,7 @@ const NONE = tap("0");
 const directions = (set) => ({up: NONE, down: NONE, left: NONE, right: NONE, ...set});
 const PASS = {kind: BUTTON.PASS_THROUGH, modifiers: 0, tap: NONE};
 // The modes the firmware ships (keymaps/noah/pd_config.c), with their
-// thresholds (pd_mode_defaults.h) and speeds (config.h), plus two Ark offers
+// thresholds (pd_mode_defaults.h) and speeds (the keymap's settings), plus two Ark offers
 // that it does not ship: Back / Forward (as Ark's demo has it) and Tabs.
 /** @type {readonly Template[]} */
 export const TEMPLATES = Object.freeze([

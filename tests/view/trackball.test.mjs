@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {SCROLL_STARTER, KIND, AXIS} from "../../webview/view/pointing-config.mjs";
-import {countsToMm, fixedSummaries, followsNormal, keycodePlacements, mmToCounts, modeProblems, reachLine, runningDpi, sendsLine, stepAside, SCROLL_HELP, TEMPLATES} from "../../webview/view/trackball.mjs";
+import {countsToMm, fixedSummaries, followsNormal, keycodePlacements, mmToCounts, modeProblems, reachLine, runningDpi, sendsLine, stepAside, tapWords, SCROLL_HELP, TEMPLATES} from "../../webview/view/trackball.mjs";
 
 test("a step converts between sensor counts and millimetres at the DPI it runs at", () => {
     assert.equal(countsToMm(60, 400), 3.8);
@@ -79,4 +79,14 @@ test("each scroll rule the firmware checks is named on the field that breaks it"
 test("the templates are the eight the decision names, the shipped ones first", () => {
     assert.deepEqual(TEMPLATES.map((entry) => entry.label), ["Volume", "Brightness", "Zoom", "Scroll", "Arrows", "Undo / Redo", "Back / Forward", "Tabs"]);
     assert.deepEqual(TEMPLATES.filter((entry) => !entry.shipped).map((entry) => entry.id), ["backForward", "tabs"]);
+});
+
+test("a shortcut a mode sends reads as the computer's keys", () => {
+    const labels = {qmkKeycodes: [{value: "KC_EQUAL", keycode: 0x2e}, {value: "KC_Z", keycode: 0x1d}],
+        qmkKeyLabels: {KC_EQUAL: "=", KC_Z: "Z", KC_LGUI: "Left Command", KC_LSFT: "Left Shift", KC_RGUI: "Right Command"}};
+    assert.equal(tapWords(labels, 0x082e), "Command + =");
+    assert.equal(tapWords(labels, 0x0a1d), "Shift + Command + Z");
+    assert.equal(tapWords(labels, 0x181d), "Right Command + Z");
+    assert.equal(tapWords(labels, 0), "");
+    assert.equal(tapWords(labels, "KC_Z"), "Z");
 });
