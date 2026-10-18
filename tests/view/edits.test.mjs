@@ -197,7 +197,6 @@ test("choosing repeat while held posts a rate the keyboard accepts", () => {
     assert.equal(edits.cellBranch("hold", {action: "KC_RIGHT", helper: "TAP_AT_HOLD_THRESHOLD", repeatHz: "30"}).repeatHz, "0");
     assert.equal(edits.cellBranch("tap", {action: " "}), null, "an empty cell removes the tier");
     const draft = session();
-    stage(draft, edits.addBehaviour("KC_Q", draft.identity()));
     const behaviour = {keycode: "KC_Q", steps: [{tapCount: 0, tap: {helper: "TAP_SENDS", action: "KC_Q"}}]};
     stage(draft, edits.saveBehaviour(behaviour, {change: {tapCount: 0, kind: "hold",
         branch: edits.cellBranch("hold", {action: "KC_RIGHT", helper: "REPEAT_WHILE_HELD", repeatHz: ""})}}, draft.identity()));
@@ -215,23 +214,71 @@ test("how an empty cell runs is held until it sends something, then posted with 
     assert.deepEqual(edits.cellEdit("tap", {stored: false, action: ""}), {pending: null}, "a tap tier has no helper to hold");
 });
 
-test("a behaviour row is added for a key without one, and deleted again", () => {
+test("a behaviour row is added by a key's first action, and deleted again", () => {
     const draft = session();
     const rows = () => decoded(draft).behaviors.rows.length;
     const before = rows();
-    stage(draft, edits.addBehaviour("KC_Q", draft.identity()));
+    stage(draft, edits.saveBehaviour({keycode: "KC_Q", stored: false, steps: []}, {change: {tapCount: 0, kind: "tap", branch: {helper: "TAP_SENDS", action: "KC_A"}}}, draft.identity()));
     assert.equal(rows(), before + 1);
     stage(draft, edits.deleteBehaviour("KC_Q", draft.identity()));
     assert.equal(rows(), before);
 });
 
+test("an edit that leaves a stored row changing nothing removes it, and Undo brings it back", () => {
+    const draft = session();
+    const rows = () => decoded(draft).behaviors.rows.filter(entry => entry.target.kind === 1 && entry.target.operand === 0x14);
+    const branch = {helper: "TAP_SENDS", action: "KC_A"};
+    stage(draft, edits.saveBehaviour({keycode: "KC_Q", stored: false, steps: []}, {change: {tapCount: 0, kind: "tap", branch}}, draft.identity()));
+    const stored = {keycode: "KC_Q", stored: true, timingAlone: false, steps: [{tapCount: 0, tap: branch}]};
+    const cleared = edits.saveBehaviour(stored, {change: {tapCount: 0, kind: "tap", branch: null}}, draft.identity());
+    assert.equal(cleared?.type, "deleteBehavior", "its last branch gone, nothing is left");
+    stage(draft, cleared);
+    assert.equal(rows().length, 0);
+    assert.equal(draft.history[draft.cursor].label, "Removed a behaviour");
+    draft.undo(draft.revision);
+    assert.equal(rows().length, 1, "undo brings the row back");
+    // On a plain key a timing alone does nothing, so a row left with only one goes too.
+    const timed = {...stored, tapHoldTerm: "120"};
+    assert.equal(edits.saveBehaviour(timed, {change: {tapCount: 0, kind: "tap", branch: null}}, draft.identity())?.type, "deleteBehavior");
+    // Its switch and layers gate only what it holds.
+    assert.equal(edits.saveBehaviour({...stored, steps: []}, {enabled: false, allowedLayers: 1}, draft.identity())?.type, "deleteBehavior");
+    // What keeps a row: a branch, the anchor on any key, a timing on a key the keyboard handles anyway.
+    assert.equal(edits.saveBehaviour({...stored, steps: []}, {anchored: true}, draft.identity())?.type, "saveBehavior");
+    assert.equal(edits.saveBehaviour({...stored, steps: [], timingAlone: true}, {terms: {tapHoldTerm: "120"}}, draft.identity())?.type, "saveBehavior");
+    // A key without a row gets none.
+    assert.equal(edits.saveBehaviour({...stored, stored: false, steps: []}, {terms: {tapHoldTerm: "120"}}, draft.identity()), null);
+});
+
+test("the editor removes exactly the rows the host's review notes as changing nothing", () => {
+    const {changesNothing} = require("../../core/model/inert-behaviors");
+    const {nativeCode} = require("../../core/schema/actions");
+    const {resolveNativeQmkExpression} = require("../../core/schema/compiled-profile-v1");
+    const model = buildSnapshotModel(session().current, capabilities, {editable: true, reason: ""});
+    // Keys this profile holds, which the host publishes defaults for.
+    for (const keycode of ["KC_ENTER", "LGUI(KC_C)", "VIA_MACRO_10", "LT(3,KC_SLASH)", "OSM(MOD_LSFT)", "MO(3)", "LOCK_LAYER(3)", "PD_SLOT_0", "PD_SLOT_0_LOCK", "CUSTOM_KEY_0"]) {
+        const row = behaviourEditorRow(model, keycode);
+        assert.ok(row, keycode);
+        for (const fields of [{}, {terms: {tapHoldTerm: "120"}}, {terms: {multiTapTerm: "90"}}, {anchored: true}, {enabled: false}]) {
+            const terms = {tapHoldTerm: "0", longerHoldTerm: "0", multiTapTerm: "0", ...fields.terms};
+            const posted = edits.saveBehaviour({...row, ...terms, stored: true, steps: []}, fields, null);
+            // The same row stored as it is, for the host's rule to judge.
+            const draft = session();
+            stage(draft, {type: "saveBehavior", behavior: {keycode: row.keycode, steps: [], ...terms,
+                keepsAutoMouseAnchored: Boolean(fields.anchored), enabled: fields.enabled ?? true, allowedLayers: 0xffff}});
+            const value = decoded(draft);
+            const code = require("../../core/data/keycode-catalog").encode(row.keycode) ?? resolveNativeQmkExpression(row.keycode, {});
+            const saved = value.behaviors.rows.find(entry => nativeCode(entry.target) === code);
+            assert.ok(saved, `${keycode} is stored`);
+            assert.equal(posted?.type === "deleteBehavior", changesNothing(saved, value.settings.customKeyShortcuts), `${keycode} ${JSON.stringify(fields)}`);
+        }
+    }
+});
+
 test("new behaviour rows preserve built-in actions, including LT targets", () => {
-    for (const [keycode, operand] of [["LT(3,KC_F)", 0x4309], ["MT(MOD_LCTL,KC_F)", 0x2109], ["MO(3)", 0x5223], ["KC_Q", 0x14]]) {
+    for (const [keycode, operand] of [["LT(3,KC_F)", 0x4309], ["MT(MOD_LCTL,KC_F)", 0x2109], ["MO(3)", 0x5223]]) {
         const draft = session();
-        stage(draft, edits.addBehaviour(keycode, draft.identity()));
         const row = () => decoded(draft).behaviors.rows.find(entry => entry.target.kind === 1 && entry.target.operand === operand
             || keycode === "MO(3)" && entry.target.kind === 2 && entry.target.operand === 3);
-        assert.deepEqual(row().steps, [], keycode);
         stage(draft, edits.saveBehaviour({keycode, steps: []}, {terms: {tapHoldTerm: "177"}}, draft.identity()));
         assert.equal(row().tapHoldTerm, 177, "timing-only edits keep the target valid");
         assert.deepEqual(row().steps, []);
@@ -255,25 +302,32 @@ test("a custom key on no layer gets its behaviour row from the Custom keys scree
     assert.ok(reviewAreas(draft).includes("Behaviours"));
 });
 
-test("an unstored editor only creates a row after an action, timing override or anchor change", () => {
-    for (const change of [
-        {terms: {multiTapTerm: "777"}},
-        {terms: {tapHoldTerm: "177"}},
-        {terms: {longerHoldTerm: "477"}},
-        {anchored: true},
-        {change: {tapCount: 0, kind: "tap", branch: {helper: "TAP_SENDS", action: "KC_A"}}},
+test("an unstored editor only creates a row after an action, a timing where one alone does something, or the anchor", () => {
+    const timing = {tapHoldTerm: "150", longerHoldTerm: "400", multiTapTerm: "150"};
+    const model = {behaviorTimingDefaults: timing, behaviorEditing: {keyDefaults: {
+        KC_Q: {builtIn: {}, timing, timingAlone: false}, "LT(3,KC_F)": {builtIn: {}, timing, timingAlone: true}}}};
+    // On a plain key a timing alone does nothing (firmware D-F27), so it makes no row.
+    for (const terms of [{multiTapTerm: "777"}, {tapHoldTerm: "177"}, {longerHoldTerm: "477"}]) {
+        assert.equal(edits.saveBehaviour(behaviourEditorRow(model, "KC_Q"), {terms}, null), null, JSON.stringify(terms));
+    }
+    for (const [keycode, operand, change] of [
+        ["LT(3,KC_F)", 0x4309, {terms: {multiTapTerm: "777"}}],
+        ["LT(3,KC_F)", 0x4309, {terms: {tapHoldTerm: "177"}}],
+        ["LT(3,KC_F)", 0x4309, {terms: {longerHoldTerm: "477"}}],
+        ["KC_Q", 0x14, {anchored: true}],
+        ["KC_Q", 0x14, {change: {tapCount: 0, kind: "tap", branch: {helper: "TAP_SENDS", action: "KC_A"}}}],
     ]) {
         const draft = session();
         const before = decoded(draft).behaviors.rows.length;
-        const row = behaviourEditorRow({behaviorTimingDefaults: {tapHoldTerm: "150", longerHoldTerm: "400", multiTapTerm: "150"}}, "KC_Q");
+        const row = behaviourEditorRow(model, keycode);
         assert.equal(edits.saveBehaviour(row, {}, draft.identity()), null);
         const field = behaviourTimingField(row, "multiTapTerm");
         assert.equal(edits.saveBehaviour(row, {terms: {multiTapTerm: behaviourTimingEdit("150", field)}}, draft.identity()), null);
         assert.equal(edits.saveBehaviour(row, {change: {tapCount: 0, kind: "tap", branch: null}}, draft.identity()), null);
-        assert.throws(() => stage(draft, edits.saveBehaviour(row, {terms: {multiTapTerm: "0.0"}}, draft.identity())), /whole number/);
+        if (row?.timingAlone) assert.throws(() => stage(draft, edits.saveBehaviour(row, {terms: {multiTapTerm: "0.0"}}, draft.identity())), /whole number/);
         assert.equal(draft.dirty, false);
         stage(draft, edits.saveBehaviour(row, change, draft.identity()));
-        const saved = decoded(draft).behaviors.rows.find(entry => entry.target.operand === 0x14);
+        const saved = decoded(draft).behaviors.rows.find(entry => entry.target.kind === 1 && entry.target.operand === operand);
         assert.equal(decoded(draft).behaviors.rows.length, before + 1);
         assert.equal(saved.tapHoldTerm, Number(change.terms?.tapHoldTerm || 0));
         assert.equal(saved.longerHoldTerm, Number(change.terms?.longerHoldTerm || 0));
@@ -288,8 +342,7 @@ test("an unstored editor only creates a row after an action, timing override or 
 test("a behaviour moves to another key, and overwrites or swaps with one already there", () => {
     const draft = session();
     const rows = () => decoded(draft).behaviors.rows.length;
-    stage(draft, edits.addBehaviour("KC_Q", draft.identity()));
-    stage(draft, edits.addBehaviour("KC_W", draft.identity()));
+    for (const keycode of ["KC_Q", "KC_W"]) stage(draft, edits.saveBehaviour({keycode, stored: false, steps: []}, {anchored: true}, draft.identity()));
     const before = rows();
     stage(draft, edits.retargetBehaviour("KC_Q", "KC_E", draft.identity()));
     assert.equal(rows(), before, "moving to a free key keeps the row count");

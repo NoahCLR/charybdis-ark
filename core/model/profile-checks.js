@@ -5,6 +5,7 @@
 // own walk; these checks cover actions that the firmware accepts but cannot
 // perform, and destination limits that would refuse the save.
 const {gestureTimingFindings} = require("./gesture-timing");
+const {inertBehaviorFindings} = require("./inert-behaviors");
 const {layerReach, compareFindings} = require("./layer-reach");
 const {baseLighting} = require("./settings-editor");
 const {decodeMacroPayload} = require("../schema/macro-payload");
@@ -43,7 +44,7 @@ function shortcutlessCustomKeySteps(decoded) {
 /** @param {import("./types.js").DecodedProfile} decoded @param {import("./types.js").ProfileDestination} [destination] @returns {import("../../contracts/model.js").Finding[]} */
 function profileFindings(decoded, destination = {}) {
     /** @type {import("../../contracts/model.js").Finding[]} */
-    const findings = [...layerReach(decoded), ...gestureTimingFindings(decoded), ...shortcutlessCustomKeySteps(decoded)];
+    const findings = [...layerReach(decoded), ...gestureTimingFindings(decoded), ...shortcutlessCustomKeySteps(decoded), ...inertBehaviorFindings(decoded)];
     for (const [slot, count] of Object.entries(decoded.danglingPdBindings || {})) {
         if (!count) continue;
         findings.push({kind: "inertPointing", level: "warning", layers: [], identity: `${slot}:${count}`, count,

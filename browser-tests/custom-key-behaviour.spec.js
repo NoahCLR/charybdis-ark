@@ -72,7 +72,17 @@ test("an unplaced custom key gets its behaviour on the Custom keys screen, with 
         steps: [{tapCount: 0, longHold: expect.objectContaining({action: "KC_B"})}]})})]);
     const fromHere = (await posted(page))[0];
 
-    // A timing posts the row too, with the timing as typed.
+    // A timing alone does nothing on a custom key without a shortcut (firmware
+    // D-F27 "Rows without steps"), so its fields wait for a branch.
+    await expect(page.locator('[data-f="behaviour:CUSTOM_KEY_5:timing:multiTapTerm"]')).toBeDisabled();
+    // Where the host says a timing alone counts, as for a custom key with a
+    // shortcut, a timing posts the row too, with the timing as typed.
+    await page.evaluate(async () => {
+        const store = await import("/webview/store.mjs");
+        const model = structuredClone(store.getModel());
+        model.behaviorEditing.keyDefaults.CUSTOM_KEY_5.timingAlone = true;
+        store.setModel(model); store.render();
+    });
     await clearPosts(page);
     await change(page.locator('[data-f="behaviour:CUSTOM_KEY_5:timing:multiTapTerm"]'), "210");
     await expect.poll(() => posted(page)).toEqual([expect.objectContaining({type: "saveBehavior",

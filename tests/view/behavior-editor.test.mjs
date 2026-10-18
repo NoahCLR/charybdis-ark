@@ -1,7 +1,7 @@
 import {withAnswers} from "../fixtures/layer-answers.mjs";
 import assert from "node:assert/strict";
 import test from "node:test";
-import {behaviourEditorRow, behaviourIsEmpty, behaviourThresholds, helperDetail, behaviourKeyAt, behaviourRowAfterPreview, behaviourTimingEdit, behaviourTimingField, canHaveBehaviour} from "../../webview/view/behavior-editor.mjs";
+import {behaviourEditorRow, behaviourChangesNothing, behaviourHasTiming, behaviourThresholds, helperDetail, behaviourKeyAt, behaviourRowAfterPreview, behaviourTimingEdit, behaviourTimingField, canHaveBehaviour} from "../../webview/view/behavior-editor.mjs";
 import {impliedBranch} from "../../webview/view/keyface.mjs";
 
 test("opening an unstored behaviour leaves the model unchanged and takes built-ins from the host", () => {
@@ -126,13 +126,23 @@ test("a hold tier states its own threshold when it waits for one, and its rate w
     assert.equal(helperDetail("tap", {helper: "TAP_AT_HOLD_THRESHOLD"}, terms), "");
 });
 
-test("a behaviour row with nothing in it is empty, and a branch, a timing or the anchor makes it not", () => {
-    const empty = {keycode: "KC_DELETE", tapHoldTerm: "0", longerHoldTerm: "0", multiTapTerm: "0", keepsAutoMouseAnchored: false, enabled: true, allowedLayers: 65535, steps: []};
-    assert.equal(behaviourIsEmpty(empty), true);
-    assert.equal(behaviourIsEmpty({...empty, tapHoldTerm: "150"}), false, "its own timing");
-    assert.equal(behaviourIsEmpty({...empty, steps: [{tapCount: 0, tap: {action: "KC_A"}}]}), false);
-    assert.equal(behaviourIsEmpty({...empty, keepsAutoMouseAnchored: true}), false);
+test("a behaviour changes nothing without a branch, the anchor or a timing that applies to its key", () => {
+    const empty = {keycode: "KC_DELETE", tapHoldTerm: "0", longerHoldTerm: "0", multiTapTerm: "0", keepsAutoMouseAnchored: false, enabled: true, allowedLayers: 65535, steps: [], timingAlone: false};
+    assert.equal(behaviourChangesNothing(empty), true);
+    assert.equal(behaviourChangesNothing({...empty, tapHoldTerm: "150"}), true, "a timing alone does nothing on a plain key");
+    assert.equal(behaviourChangesNothing({...empty, timingAlone: true, tapHoldTerm: "150"}), false, "it does on a key the keyboard handles anyway");
+    assert.equal(behaviourChangesNothing({...empty, timingAlone: undefined, tapHoldTerm: "150"}), false, "unknown counts as doing something");
+    assert.equal(behaviourChangesNothing({...empty, steps: [{tapCount: 0, tap: {helper: "TAP_SENDS", action: "KC_A"}}]}), false);
+    assert.equal(behaviourChangesNothing({...empty, keepsAutoMouseAnchored: true}), false, "the anchor applies on any key");
     // Its switch and layers gate only what it holds (firmware D-F27 "Rows without steps").
-    assert.equal(behaviourIsEmpty({...empty, allowedLayers: 1}), true, "limited to some layers, it still holds nothing");
-    assert.equal(behaviourIsEmpty({...empty, enabled: false}), true, "switched off, it still holds nothing");
+    assert.equal(behaviourChangesNothing({...empty, allowedLayers: 1, enabled: false}), true);
+    assert.equal(behaviourHasTiming({tapHoldTerm: "", longerHoldTerm: "00", multiTapTerm: undefined}), false, "empty and zero follow the default");
+    assert.equal(behaviourHasTiming({tapHoldTerm: "0.0"}), true, "anything else is written, for the keyboard to judge");
+});
+
+test("the editor row carries whether a timing alone does something on its key", () => {
+    const model = {behaviorEditing: {keyDefaults: {KC_DELETE: {builtIn: {}, timing: {}, timingAlone: false}, "LT(3,KC_F)": {builtIn: {}, timing: {}, timingAlone: true}}}};
+    assert.equal(behaviourEditorRow(model, "KC_DELETE")?.timingAlone, false);
+    assert.equal(behaviourEditorRow(model, "LT(3,KC_F)")?.timingAlone, true);
+    assert.equal(behaviourEditorRow(model, "KC_Q")?.timingAlone, true, "a key the host published nothing for keeps its timing");
 });

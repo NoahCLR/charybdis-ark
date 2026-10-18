@@ -19,7 +19,10 @@ export interface Behavior {
     keepsAutoMouseAnchored?: boolean;
     enabled?: boolean;
     allowedLayers?: number;
+    // Editor-only, never posted: whether the row is stored, and whether a
+    // timing alone does something on its key (firmware D-F27).
     stored?: boolean;
+    timingAlone?: boolean;
 }
 export interface Combo {
     useOutputBehavior?: boolean;
@@ -71,7 +74,6 @@ export interface EditPayloads {
     reviewPortableProfile: {text: string; name: string};
     updateLayoutKeys: {layer: LayerReference; changes: {layoutIndex: number; keycode: string}[]};
     updatePlacementPolicy: {layer: number; layoutIndex: number; useBehavior: boolean; joinCombos: boolean};
-    addBehavior: {expectedBase?: Partial<BaseIdentity>; behavior: Behavior};
     deleteBehavior: {expectedBase?: Partial<BaseIdentity>; keycode: string};
     retargetBehavior: {expectedBase?: Partial<BaseIdentity>; keycode: string; target: string; conflict?: 'swap' | 'overwrite'};
     saveBehavior: {expectedBase?: Partial<BaseIdentity>; behavior: Behavior};

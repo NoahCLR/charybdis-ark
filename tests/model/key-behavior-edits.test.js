@@ -45,7 +45,7 @@ test("behaviour creation, edit and deletion preserve unrelated rows and profile 
 });
 
 test("simple additions and all hold modes produce canonical rows", () => {
-    const next = edit({type: "addBehavior", behavior: {keycode: "KC_A", tapHoldTerm: "90", tap: {helper: "TAP_SENDS", action: "KC_TRNS"}}});
+    const next = edit({type: "saveBehavior", behavior: {keycode: "KC_A", tapHoldTerm: "90", steps: [{tapCount: 0, tap: {helper: "TAP_SENDS", action: "KC_TRNS"}}]}});
     assert.equal(rowFor(next, "KC_A").steps[0].tap.operand, 1);
     // A layer hold only works as "Press and hold until release"; the other hold
     // modes carry a lock, as the keyboard requires.
@@ -71,7 +71,6 @@ test("native aliases update existing semantic targets without duplicating or ren
     assert.equal(decodeKeyBehaviorDomain(result).rowCount, original.rowCount);
     assert.equal(rowFor(result, "PD_SLOT_0").target.kind, 4);
     assert.equal(rowFor(result, "PD_SLOT_0").tapHoldTerm, 125);
-    assert.throws(() => edit({type: "addBehavior", behavior: {...form(), keycode: "0x7E80"}}, current), /already/);
     const anchored = views.find(row => row.keepsAutoMouseAnchored);
     const {keepsAutoMouseAnchored, ...withoutFlag} = anchored;
     assert.deepEqual(edit({type: "saveBehavior", behavior: withoutFlag}), payload);
@@ -105,9 +104,7 @@ test("invalid edits and references are rejected before upload", () => {
 
 test("transparent and disabled keys cannot receive or be retargeted to a behaviour", () => {
     for (const keycode of ["KC_NO", "XXXXXXX", "KC_TRANSPARENT", "KC_TRNS", "_______", "0x0000", "0x0001"]) {
-        for (const type of ["saveBehavior", "addBehavior"]) {
-            assert.throws(() => edit({type, behavior: {...form(), keycode}}), /Transparent keys and KC_NO cannot have a behaviour/, keycode);
-        }
+        assert.throws(() => edit({type: "saveBehavior", behavior: {...form(), keycode}}), /Transparent keys and KC_NO cannot have a behaviour/, keycode);
         assert.throws(() => edit({type: "retargetBehavior", keycode: views[0].keycode, target: keycode}), /Transparent keys and KC_NO cannot have a behaviour/, keycode);
     }
 });

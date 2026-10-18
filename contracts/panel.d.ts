@@ -17,20 +17,24 @@ export interface Position {
 export interface LayerAnswer {layer: number; active: number; blocked: number}
 export interface Layer {name: LayerReference; index: number; positions: Position[]; displayName?: string; answers: LayerAnswer[][]}
 // What a key with no behaviour of its own runs on: its built-in actions, the
-// timing defaults it follows, with or without a row, and which setting each
-// comes from.
+// timing defaults it follows, with or without a row, which setting each comes
+// from, and whether a behaviour's timing alone does something on it (firmware
+// D-F27 "Rows without steps").
 export type TimingSource = "tappingTerm" | "tapHoldTerm" | "longHoldTerm" | "multiTapTerm";
 export interface KeyBehaviorDefaults {
     builtIn: BuiltIn;
     timing: Record<string, Scalar | undefined>;
     timingSources?: Record<string, TimingSource>;
+    timingAlone?: boolean;
 }
 export interface Branch extends BehaviorBranch { label?: string; fallback?: boolean; fromPress?: boolean}
 export interface BuiltIn {tap?: Branch; hold?: Branch; releaseTaps?: boolean}
+// A stored behaviour says whether it changes nothing (core/model/inert-behaviors.js).
 export interface BehaviorView extends Omit<Behavior, 'steps'> {
     builtIn?: BuiltIn;
     steps: {tapCount: number; tapCountName?: string; tap?: Branch; hold?: Branch; longHold?: Branch}[];
     timingDefaults?: Record<string, Scalar | undefined>;
+    changesNothing?: boolean;
 }
 export interface ComboView extends Combo {inputPositions?: number[]; id: number; badge: string; inputDisplays: string[]; outputDisplay: string}
 export interface CatalogEntry {value: string; key: string; label: string; group: string; aliases: string[]; keycode: number; searchTerms: string[]; search: string; searchCompact: string; name?: string; tip?: string}

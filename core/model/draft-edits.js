@@ -64,7 +64,6 @@ const DRAFT_EDIT_TYPES = Object.freeze(/** @satisfies {{[K in DraftEditType]: En
     updateComboHoldTerm: {editor: "profile", domain: "combos", label: "Changed the combo hold threshold"},
     updateComboDefaultTerm: {editor: "profile", domain: "combos", label: "Changed the default combo window"},
     saveBehavior: {editor: "profile", domain: "behaviours", label: "Edited a behaviour"},
-    addBehavior: {editor: "profile", domain: "behaviours", label: "Added a behaviour"},
     deleteBehavior: {editor: "profile", domain: "behaviours", label: "Removed a behaviour"},
     retargetBehavior: {editor: "profile", domain: "behaviours", label: message => message.conflict === "swap" ? "Swapped two behaviours" : "Moved a behaviour"},
     updateLayerColor: {editor: "profile", domain: "lighting", label: "Edited lighting"},

@@ -37,7 +37,9 @@ export function behaviourEditorRow(/** @type {Model} */ model, /** @type {string
     const defaults = model?.behaviorEditing?.keyDefaults?.[key];
     return {...(existing || {keycode: key, steps: [], tapHoldTerm: "0", longerHoldTerm: "0", multiTapTerm: "0",
         keepsAutoMouseAnchored: false, builtIn: defaults?.builtIn || {}}),
-        stored: Boolean(existing), timingDefaults: defaults?.timing || model?.behaviorTimingDefaults || {}};
+        stored: Boolean(existing), timingDefaults: defaults?.timing || model?.behaviorTimingDefaults || {},
+        // Unknown counts as yes, so nothing that might matter is dropped.
+        timingAlone: defaults?.timingAlone !== false};
 }
 
 export function behaviourTimingField(/** @type {import("../../contracts/panel.js").BehaviorView} */ behaviour, /** @type {"tapHoldTerm" | "longerHoldTerm" | "multiTapTerm"} */ name) {
@@ -48,13 +50,20 @@ export function behaviourTimingField(/** @type {import("../../contracts/panel.js
         ...timingInput(stored, fallback, followsDefault)};
 }
 
-// A stored behaviour row with nothing in it: no branches, no timing of its own
-// and not anchoring auto-mouse. A row without branches is no row (firmware
-// D-F27 "Rows without steps"), and its switch and layers gate only what it
-// holds, so the keyboard runs the key as if the row were not there.
-export function behaviourIsEmpty(/** @type {import("../../contracts/panel.js").BehaviorView} */ behaviour) {
+// Whether a behaviour as the editor holds it has a timing of its own: stored
+// zero, or nothing written, follows the default.
+export const behaviourHasTiming = (/** @type {Pick<import("../../contracts/edits.js").Behavior, "tapHoldTerm" | "longerHoldTerm" | "multiTapTerm">} */ behaviour) =>
+    [behaviour.tapHoldTerm, behaviour.longerHoldTerm, behaviour.multiTapTerm].some((value) => !/^0*$/.test(String(value ?? "").trim()));
+
+// A behaviour that changes nothing: no branches, not keeping the mouse layer
+// on, and no timing that applies to its key. A row without branches is no row
+// (firmware D-F27 "Rows without steps"): its timing counts only where
+// `timingAlone` says a timing alone does something, and its switch and layers
+// gate only what it holds. Review notes a stored one by the same rule
+// (core/model/inert-behaviors.js), and the editor keeps none.
+export function behaviourChangesNothing(/** @type {import("../../contracts/edits.js").Behavior} */ behaviour) {
     return !(behaviour.steps || []).length && !behaviour.keepsAutoMouseAnchored
-        && ["tapHoldTerm", "longerHoldTerm", "multiTapTerm"].every((name) => Number(behaviour[/** @type {"tapHoldTerm"} */ (name)] ?? 0) === 0);
+        && (!behaviourHasTiming(behaviour) || behaviour.timingAlone === false);
 }
 
 // The thresholds a behaviour actually runs on, in ms — its own, or the
