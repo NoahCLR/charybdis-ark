@@ -1217,3 +1217,86 @@ test("combo-output permissions post, review, discard and survive backups and lay
     assert.equal(decoded(draft).settings.comboOutputBehaviors, true);
     assert.equal(decoded(draft).combos.rows[0].useOutputBehavior, false);
 });
+
+// ── the picker's Hold slot (decisions R7) ────────────────────────────────
+
+test("a hold from the picker posts one undoable edit the draft takes", async () => {
+    const {holdEdit, pickerChoice} = await import("../../webview/view/picker-choice.mjs");
+    const draft = session();
+    const model = () => buildSnapshotModel(draft.current, capabilities, {editable: true, reason: ""});
+    const target = {layer: "Layer 1", layoutIndex: 5, current: "KC_NO"};
+    const layerAt = () => draft.document.layers[1][slotOf(5)];
+
+    // Ctrl held over Esc: a mod-tap on the key.
+    let pick = {keys: ["KC_ESC"], mods: [], hold: {kind: "mod", mod: "MOD_LCTL"}};
+    let message = holdEdit(model(), target, pick, pickerChoice(model(), pick, {key: true}));
+    assert.deepEqual(message, {type: "updateLayoutKeys", layer: "Layer 1", changes: [{layoutIndex: 5, keycode: "MT(MOD_LCTL, KC_ESC)"}]});
+    stage(draft, message);
+    assert.equal(layerAt(), 0x2129);
+
+    // A layer held over F: a layer-tap.
+    pick = {keys: ["KC_F"], mods: [], hold: {kind: "layer", layer: 3}};
+    message = holdEdit(model(), target, pick, pickerChoice(model(), pick, {key: true}));
+    assert.deepEqual(message.changes, [{layoutIndex: 5, keycode: "LT(3, KC_F)"}]);
+    stage(draft, message);
+    assert.equal(layerAt(), 0x4309);
+
+    // A trackball mode held over Space, every Space: the row on KC_SPACE and
+    // Space put on the key, one step.
+    const before = draft.revision;
+    pick = {keys: ["KC_SPC"], mods: [], hold: {kind: "mode", slot: 0}};
+    message = holdEdit(model(), {...target, current: "LT(3, KC_F)"}, pick, pickerChoice(model(), pick, {key: true}));
+    assert.equal(message.type, "saveBehavior");
+    assert.deepEqual(message.behavior.steps, [{tapCount: 0, hold: {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "PD_SLOT_0", repeatHz: "0"}}]);
+    assert.deepEqual(message.then, {type: "updateLayoutKeys", layer: "Layer 1", changes: [{layoutIndex: 5, keycode: "KC_SPC"}]});
+    stage(draft, message);
+    assert.equal(draft.revision, before + 1, "one draft step");
+    assert.equal(layerAt(), 0x2c);
+    assert.ok(model().keyBehaviors.some((row) => row.keycode === "KC_SPACE" && row.steps.some((step) => step.hold?.action === "PD_SLOT_0")));
+    draft.undo(draft.revision);
+    assert.equal(layerAt(), 0x4309, "one undo takes the key and the row back");
+    assert.ok(!model().keyBehaviors.some((row) => row.keycode === "KC_SPACE"));
+});
+
+test("a hold for only this key makes a custom key sending the tap, its row and the key, in one step", async () => {
+    const {holdEdit, pickerChoice} = await import("../../webview/view/picker-choice.mjs");
+    const {unusedCustomKey} = await import("../../webview/view/custom-key.mjs");
+    const draft = session();
+    const model = () => buildSnapshotModel(draft.current, capabilities, {editable: true, reason: ""});
+    const spare = unusedCustomKey(model(), model().layers);
+    assert.ok(spare, "the fixture has a spare custom key");
+    const pick = {keys: ["KC_SPC"], mods: [], hold: {kind: "mode", slot: 0}};
+    const message = holdEdit(model(), {layer: "Layer 0", layoutIndex: 7, current: "KC_SPC"}, pick, pickerChoice(model(), pick, {key: true}),
+        {onlyThisKey: true, spare, name: "Space"});
+    assert.equal(message.type, "updateCustomKeyShortcut");
+    assert.equal(message.keycode, spare.keycode);
+    assert.deepEqual(message.shortcut, {mods: 0, key: 0x2c});
+    assert.equal(message.name, "Space");
+    assert.deepEqual(message.then.map((edit) => edit.type), ["saveBehavior", "updateLayoutKeys"]);
+    assert.equal(message.then[0].behavior.keycode, spare.keycode);
+    const before = draft.revision;
+    stage(draft, message);
+    assert.equal(draft.revision, before + 1);
+    assert.equal(draft.document.layers[0][slotOf(7)], customKeyCode(spare.slot));
+    const after = model();
+    assert.ok(after.keyBehaviors.some((row) => row.keycode === spare.keycode && row.steps.some((step) => step.hold?.action === "PD_SLOT_0")));
+    assert.ok(!after.keyBehaviors.some((row) => row.keycode === "KC_SPACE"), "other Space keys keep no hold");
+});
+
+test("a mod-tap over a key that is not plain goes through a custom key with a hold row", async () => {
+    const {holdEdit, pickerChoice} = await import("../../webview/view/picker-choice.mjs");
+    const {unusedCustomKey} = await import("../../webview/view/custom-key.mjs");
+    const draft = session();
+    const model = () => buildSnapshotModel(draft.current, capabilities, {editable: true, reason: ""});
+    const pick = {keys: ["KC_A"], mods: ["S"], hold: {kind: "mod", mod: "MOD_LCTL"}};
+    const choice = pickerChoice(model(), pick, {key: true});
+    assert.equal(choice.expression, "");
+    assert.equal(choice.customKey, true);
+    assert.match(choice.problem, /plain key/);
+    const spare = unusedCustomKey(model(), model().layers);
+    const message = holdEdit(model(), {layer: "Layer 0", layoutIndex: 8}, pick, choice, {spare, name: "Shift + A"});
+    assert.deepEqual(message.shortcut, {mods: 0x02, key: 0x04});
+    assert.deepEqual(message.then[0].behavior.steps, [{tapCount: 0, hold: {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "KC_LEFT_CTRL", repeatHz: "0"}}]);
+    stage(draft, message);
+    assert.equal(draft.document.layers[0][slotOf(8)], customKeyCode(spare.slot));
+});
