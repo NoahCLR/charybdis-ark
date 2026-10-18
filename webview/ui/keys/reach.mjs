@@ -66,7 +66,8 @@ export const sourceLabel = (entry) =>
     esc(layerName(entry.layer)) + (entry.whileHeld ? " when held" : "");
 
 // The keys are named as the board names them; a combo's row already names
-// its inputs, so it says only where they come from, or nothing.
+// its inputs, so it says only where they come from, and stays blank when
+// there is nothing to add.
 /** @param {(ReturnType<typeof resolvedPositions>[number] & {reference?: boolean})[]} keys @param {{names?: boolean}} [options] */
 export const keysReach = (keys, {names = true} = {}) => {
     const model = getModel();
@@ -74,7 +75,7 @@ export const keysReach = (keys, {names = true} = {}) => {
     const sources = [...new Set(keys.filter((entry) => entry.fellThrough).map(sourceLabel))];
     const matched = [...new Set(keys.filter((entry) => entry.reference).map((entry) => esc(layerName(entry.layer))))];
     return [named.join(", "), sources.length ? `on ${sources.join(", ")}` : "", matched.length ? `matched on ${matched.join(", ")}` : ""]
-        .filter(Boolean).join(" · ") || "—";
+        .filter(Boolean).join(" · ") || (names ? "—" : "");
 };
 // A behaviour that only answers through a transparent key still fires its
 // branches, so it belongs here — named with the layer that holds it, because
