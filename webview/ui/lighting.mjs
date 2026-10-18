@@ -7,7 +7,7 @@
 import {css, isOff} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {TRACKBALL_LED} from "../view/geometry.mjs";
-import {baseColour, feedbackColours, layerColourRow, pdColourRow, stageEnabled, stageIdle, stageInEffect} from "../view/lighting.mjs";
+import {baseColour, feedbackColours, layerColourRow, pdColourRow, pdTrigger, stageEnabled, stageIdle, stageInEffect} from "../view/lighting.mjs";
 import {slotCalled, stageOrder} from "../view/vocabulary.mjs";
 import {currentLayer, getModel, layerName, layers, post, render, state, writable, heldLayers} from "../store.mjs";
 import * as edits from "../view/edits.mjs";
@@ -49,7 +49,7 @@ export function screenLighting() {
         held: onGroups ? [] : heldLayers(),
         picks: state.ledPicks,
         trackball: state.trackball,
-        pdActive: preview ? {mode: preview.pointingMode, color: preview.color, locality: preview.locality, triggerIndex: undefined} : null,
+        pdActive: preview ? {mode: preview.pointingMode, color: preview.color, locality: preview.locality, triggerIndex: pdTrigger(model, layer, state.pdSlot)?.layoutIndex} : null,
         onKey: onGroups ? (index) => {
             state.ledPicks = state.ledPicks.includes(index)
                 ? state.ledPicks.filter((value) => value !== index) : [...state.ledPicks, index];
