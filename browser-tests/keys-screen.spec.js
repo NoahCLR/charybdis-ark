@@ -110,3 +110,14 @@ test("the hover card names the key's actions by press, with no index pill or foo
     await page.keyboard.press("Escape");
     await expect(card).toBeHidden();
 });
+
+test("the Macros and Trackball modes reach tabs fold empty groups into one line and open each row's editor", async ({page}) => {
+    await openControls(page, "keys", {tab: "pointing", layer: 0});
+    await expect(page.locator(".reach-rows .rowgroup-none-line")).toHaveCount(1);
+    await expect(page.locator('.reach-rows [data-reach^="view:"]')).toHaveCount(0);
+    const open = page.locator(".reach-rows [data-editpd]").first();
+    await expect(open).toHaveText("Open →");
+    await open.click();
+    expect(await page.evaluate(async () => (await import("/webview/store.mjs")).state.screen)).toBe("pointing");
+    expect(await page.evaluate(() => window.__posted.length)).toBe(0);
+});

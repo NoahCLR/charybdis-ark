@@ -859,6 +859,9 @@ button.tier:hover { background: var(--surface-3); }
 .rowlist .group-h[aria-expanded="false"] { border-bottom: 0; }
 .rowlist .rowgroup + .rowgroup .group-h { border-top: 1px solid var(--line); }
 .reach-table { padding: 2px 0; }
+/* The Macros and Trackball modes reach tabs: 40 px rows, Open → at the end. */
+.reach-rows tr[data-reach] > td { height: 40px; vertical-align: middle; }
+.reach-rows .rowgroup-none-line .note { padding: var(--s-2) var(--s-3); }
 
 /* The behaviour editor (ui/keys/behaviour-editor.mjs): a head with its name
    and On · Layers ▾ · More ▾, one 40 px timing strip, then the grid. Its open

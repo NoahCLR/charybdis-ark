@@ -5,7 +5,7 @@
 
 import {el, esc} from "../../lib/dom.mjs";
 import {macroReach} from "../../view/reach.mjs";
-import {getModel, layers, render, state} from "../../store.mjs";
+import {addedLayers, getModel, layers, render, state} from "../../store.mjs";
 import {draftDot, draftMarks} from "../../view/review.mjs";
 import {attachReachRows, reachAttrs, reachTable} from "../groups.mjs";
 import {reachEntries} from "../../view/reach-groups.mjs";
@@ -18,7 +18,7 @@ export function tabMacros(body, right) {
     const slots = model?.viaMacros || [];
     const reach = {...macroReach(model, layers(), state.layer), inView: macroView(model)};
     right.replaceChildren();
-    const open = el(`<button class="btn tiny ghost">Open the Macros view</button>`);
+    const open = el(`<button class="btn text compact">Macros →</button>`);
     open.addEventListener("click", () => { state.screen = "macros"; render(); });
     right.appendChild(open);
 
@@ -30,7 +30,7 @@ export function tabMacros(body, right) {
             <td>${actionMarked(model, keycode)}${(code => code ? ` ${code}` : "")(keycodeMark("reachRow", keycode))}${changedMacros.has(keycode) ? draftDot() : ""}</td>
             <td>${slot?.payload ? macroSteps(model, slot.payload) : `<span class="muted">${slot ? "empty" : "—"}</span>`}</td>
             <td class="muted">${reachedBy}</td>
-            <td class="reach-edit">${slot ? `<button class="btn tiny ghost" data-editmacro="${esc(keycode)}">Edit</button>` : ""}</td></tr>`;
+            <td class="reach-edit">${slot ? `<button class="btn text compact" data-editmacro="${esc(keycode)}">Open →</button>` : ""}</td></tr>`;
     };
     /** @type {{id: string, rows: string[], empty: string, drafted?: boolean, ids?: string[]}[]} */
     const groups = [
@@ -55,7 +55,9 @@ export function tabMacros(body, right) {
     // A folded group holding a changed macro says so on its header.
     for (const group of groups) group.drafted = (group.id === "elsewhere" ? reach.elsewhere : reachEntries(reach, group.id).map((entry) => entry.name))
         .some((keycode) => changedMacros.has(keycode));
-    const node = reachTable("macros", groups, [["Slot", "24%"], ["Steps", "44%"], ["Reached by", "24%"], ["", "8%"]]);
+    // "On this view" says something only while other layers are added to the
+    // view; over the default layers alone it repeats this layer and below.
+    const node = reachTable("macros", groups.filter((group) => group.id !== "view" || addedLayers().length > 0), [["Slot", "24%"], ["Steps", "42%"], ["Reached by", "24%"], ["", "10%"]], {collapseEmpty: true});
     attachReachRows(node, "macros");
     /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-editmacro]")).forEach((button) => button.addEventListener("click", () => {
         const keycode = button.dataset.editmacro;

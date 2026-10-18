@@ -57,8 +57,10 @@ export const reachAttrs = (tab, group, name) => {
 // group. One table keeps the columns lined up across the groups being
 // compared, which is the point of showing them together. Each column is given
 // its width, so unfolding a group never re-sizes the ones already on screen.
-/** @param {string} tab @param {{id: string, rows: string[], drafted?: boolean, detail?: string, empty?: string}[]} groups @param {string[][]} columns */
-export function reachTable(tab, groups, columns) {
+// `collapseEmpty` (the Macros and Trackball modes reach tabs) folds every
+// group with nothing in it into one quiet line after the others.
+/** @param {string} tab @param {{id: string, rows: string[], drafted?: boolean, detail?: string, empty?: string}[]} groups @param {string[][]} columns @param {{collapseEmpty?: boolean}} [options] */
+export function reachTable(tab, groups, columns, {collapseEmpty = false} = {}) {
     /** @param {{id: string, rows: string[], drafted?: boolean, detail?: string, empty?: string}} group */
     const section = (group) => `<tbody class="rowgroup">
         <tr><td colspan="${columns.length}" class="t-group">${groupHeader(tab, group.id, group.rows.length, group.drafted, group.detail)}</td></tr>
@@ -66,10 +68,16 @@ export function reachTable(tab, groups, columns) {
             ? (group.rows.length ? group.rows.join("")
                 : `<tr><td colspan="${columns.length}"><p class="note">${esc(group.empty)}</p></td></tr>`)
             : ""}</tbody>`;
-    const node = el(`<div class="reach-table"><table class="t fixed">
+    const ordered = inGroupOrder(groups);
+    const empty = collapseEmpty ? ordered.filter((group) => !group.rows.length) : [];
+    const shown = ordered.filter((group) => !empty.includes(group));
+    const none = empty.length ? `<tbody class="rowgroup-none-line"><tr><td colspan="${columns.length}"><p class="note">Nothing ${empty
+        .map((group) => GROUP_TITLES[/** @type {keyof typeof GROUP_TITLES} */ (group.id)].replace(/^On /, "on ").replace(/^Through /, "through ").replace(/^Unreachable /, "unreachable "))
+        .join(" · ")}.</p></td></tr></tbody>` : "";
+    const node = el(`<div class="reach-table${collapseEmpty ? " reach-rows" : ""}"><table class="t fixed">
         <colgroup>${columns.map(([, width]) => `<col style="width:${width}">`).join("")}</colgroup>
         <thead><tr>${columns.map(([name]) => `<th>${esc(name)}</th>`).join("")}</tr></thead>
-        ${inGroupOrder(groups).map(section).join("")}
+        ${shown.map(section).join("")}${none}
     </table></div>`);
     attachGroupToggles(node);
     return node;
