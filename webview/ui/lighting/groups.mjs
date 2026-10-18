@@ -26,7 +26,7 @@ function groupBuilder(model, canEdit) {
     const node = el(`<aside class="stack gap-12">
         <div class="sect-h"><h4>New row from the selection</h4><span class="right tag">${state.ledPicks.length} LEDs</span></div>
         <label class="field"><span>Table</span><select class="input" data-f="lighting:groups:target" data-target ${canEdit ? "" : "disabled"}>
-            ${[["layer", "Layer LED groups"], ["pdMode", "Pointing-mode LED groups"], ["combo", "Combo feedback LED groups"], ["keyBehavior", "Key feedback LED groups"]]
+            ${[["layer", "Layer LED groups"], ["pdMode", "Trackball mode LED groups"], ["combo", "Combo feedback LED groups"], ["keyBehavior", "Key feedback LED groups"]]
                 .map(([value, text]) => option(value, text, draft.target)).join("")}</select></label>
         ${owners.length ? `<label class="field"><span>Owner</span><select class="input" data-f="lighting:groups:owner" data-owner ${canEdit ? "" : "disabled"}>
             ${owners.map(([value, text]) => option(value, text, draft.owner)).join("")}</select></label>` : ""}

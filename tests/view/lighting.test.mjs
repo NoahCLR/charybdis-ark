@@ -242,3 +242,12 @@ test("zero brightness keeps explicit black distinct from layer pass-through and 
     m.rgb.layerColors[1].color = black;
     assert.deepEqual(keyLight(m, {index: 3}, position(13, "KC_A")), {colour: black, source: "layer", layer: 3});
 });
+
+test("black on a feedback stage is said as what goes dark, where it lights", async () => {
+    const {blackConsequence} = await import("../../webview/view/lighting.mjs");
+    assert.equal(blackConsequence("While Dragscroll runs", "Right half"), "While Dragscroll runs, the right half goes dark.");
+    assert.equal(blackConsequence("While a combo's keys are held", "Both halves"), "While a combo's keys are held, both halves go dark.");
+    assert.equal(blackConsequence("While this shows", "Only the trigger key"), "While this shows, only the trigger key goes dark.");
+    assert.equal(blackConsequence("While this shows", "The half holding the trigger key"), "While this shows, the half holding the trigger key goes dark.");
+    assert.equal(blackConsequence("While this shows", ""), "While this shows, its LEDs go dark.");
+});
