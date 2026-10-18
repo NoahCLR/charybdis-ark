@@ -3,7 +3,7 @@
 /** @typedef {import("../../../contracts/panel.js").MacroSlot} MacroSlot */
 /** @typedef {import("../../view/types.js").MacroStep} MacroStep */
 import {el, esc} from "../../lib/dom.mjs";
-import {unreleased} from "../../view/macro.mjs";
+import {samePayload, unreleased} from "../../view/macro.mjs";
 import {readMacro} from "../../view/macro-cache.mjs";
 import {actionLabel} from "../../view/keyface.mjs";
 import {canEdit as canEditArea, getModel, macroForm, post, setMacroForm, state} from "../../store.mjs";
@@ -81,7 +81,7 @@ function refreshFeedback(keycode) {
 
 /** @param {HTMLElement} card @param {Model} model @param {MacroSlot} slot */
 export function paintFeedback(card, model, slot) {
-    const form = macroForm(slot.keycode), local = form.draft !== undefined;
+    const form = macroForm(slot.keycode), local = form.draft !== undefined && !samePayload(form.draft, slot.payload, model?.qmkKeycodeAliases);
     const payload = form.draft ?? slot.payload;
     const parsed = readMacro(model, slot.keycode, payload, "feedback");
     const held = unreleased(parsed.steps, model?.qmkKeycodeAliases);
@@ -95,7 +95,7 @@ export function paintFeedback(card, model, slot) {
         ${error ? `<div class="unavailable">${esc(error)} ${local ? "This edit is not staged." : "This stored macro cannot play with the current Host settings."}</div>` : ""}
         ${note ? `<p class="note">${esc(note)}</p>` : ""}
     </div>`));
-    const dirty = local && payload !== slot.payload;
+    const dirty = local;
     /** @type {HTMLElement} */ (card.querySelector("[data-local-state]")).replaceChildren(el(`<i class="dot ${dirty ? "draft" : "on"}"></i>`), document.createTextNode(dirty ? "edited here" : "as read"));
     /** @type {HTMLButtonElement} */ (card.querySelector('[data-act="discard"]')).disabled = form.draft === undefined || form.draft === slot.payload;
 }

@@ -7,6 +7,34 @@ import {serializeMacroStep} from "./macro.mjs";
 /** @typedef {{step: import('./types.js').MacroStep, time: number, end: number}} TimedStep */
 /** @typedef {{explicit?: boolean, delays?: boolean, threshold?: number, round?: number, finished?: boolean, finishedAt?: number}} RecordingOptions */
 
+// Every browser key code the macro format can send, by the QMK name the
+// payload stores. Keys the format has no code for stay unrecorded, and the
+// recorder says so rather than letting them pass as a pause.
+/** @type {Readonly<Record<string, string>>} */
+const EVENT_CODES = Object.freeze({
+    Space: "KC_SPC", Enter: "KC_ENT", Tab: "KC_TAB", Backspace: "KC_BSPC", Escape: "KC_ESC",
+    Minus: "KC_MINS", Equal: "KC_EQL", BracketLeft: "KC_LBRC", BracketRight: "KC_RBRC",
+    Backslash: "KC_BSLS", Semicolon: "KC_SCLN", Quote: "KC_QUOT", Comma: "KC_COMM",
+    Period: "KC_DOT", Slash: "KC_SLSH", Backquote: "KC_GRV", IntlBackslash: "KC_NUBS",
+    IntlRo: "KC_INT1", IntlYen: "KC_INT3", Lang1: "KC_LNG1", Lang2: "KC_LNG2",
+    ShiftLeft: "KC_LSFT", ShiftRight: "KC_RSFT", ControlLeft: "KC_LCTL", ControlRight: "KC_RCTL",
+    AltLeft: "KC_LALT", AltRight: "KC_RALT", MetaLeft: "KC_LGUI", MetaRight: "KC_RGUI",
+    ArrowUp: "KC_UP", ArrowDown: "KC_DOWN", ArrowLeft: "KC_LEFT", ArrowRight: "KC_RGHT",
+    Delete: "KC_DEL", Insert: "KC_INS", Home: "KC_HOME", End: "KC_END", PageUp: "KC_PGUP", PageDown: "KC_PGDN",
+    CapsLock: "KC_CAPS", NumLock: "KC_NUM", ScrollLock: "KC_SCRL", Pause: "KC_PAUS",
+    PrintScreen: "KC_PSCR", ContextMenu: "KC_APP",
+    NumpadDivide: "KC_PSLS", NumpadMultiply: "KC_PAST", NumpadSubtract: "KC_PMNS", NumpadAdd: "KC_PPLS",
+    NumpadEnter: "KC_PENT", NumpadDecimal: "KC_PDOT", NumpadEqual: "KC_PEQL", NumpadComma: "KC_PCMM",
+    AudioVolumeMute: "KC_KB_MUTE", AudioVolumeUp: "KC_KB_VOLUME_UP", AudioVolumeDown: "KC_KB_VOLUME_DOWN",
+});
+
+/** The macro keycode a browser key code records as, or "" when a macro cannot send it. @param {string} code */
+export const recordedKeycode = code => EVENT_CODES[code]
+    || (/^Key([A-Z])$/.test(code) ? `KC_${code.slice(3)}` : "")
+    || (/^Digit(\d)$/.test(code) ? `KC_${code.slice(5)}` : "")
+    || (/^Numpad(\d)$/.test(code) ? `KC_P${code.slice(6)}` : "")
+    || (/^F([1-9]|1\d|2[0-4])$/.test(code) ? `KC_${code}` : "");
+
 const modifier = (/** @type {string} */ key) => /^KC_(LCTL|LSFT|LALT|LGUI|RCTL|RSFT|RALT|RGUI)$/.test(key);
 
 // A take may end before a physical release. Balance only keys this take
