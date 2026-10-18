@@ -126,6 +126,10 @@ export function placeCellEditor(editor, pop, cell) {
         if (flip) return;
         const room = at.bottom - box.top + gap + height - box.height;
         if (room > 0) editor.style.paddingBottom = `${room + gap}px`;
-        if (pop.getBoundingClientRect().bottom > floor) pop.scrollIntoView({block: "nearest"});
+        // Scroll just enough to show it, but never the cell under the
+        // workbench tabs.
+        const over = pop.getBoundingClientRect().bottom - floor;
+        const scroller = editor.closest(".content");
+        if (over > 0 && scroller) scroller.scrollBy({top: Math.min(over, Math.max(0, at.top - ceiling - gap))});
     });
 }
