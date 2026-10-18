@@ -10,7 +10,7 @@ import {getModel, layers, render, state} from "../../store.mjs";
 import {draftDot, draftMarks} from "../../view/review.mjs";
 import {attachReachRows, reachAttrs, reachTable} from "../groups.mjs";
 import {reachEntries} from "../../view/reach-groups.mjs";
-import {slotLight} from "../marks.mjs";
+import {keycodeMark, slotLight} from "../marks.mjs";
 import {vocabulary, word} from "../../view/vocabulary.mjs";
 import {branchReach, comboReach, keysReach, pointingView} from "./reach.mjs";
 
@@ -19,7 +19,7 @@ export function tabPointing(body, right) {
     const model = getModel();
     const reach = {...pointingReach(model, layers(), state.layer), inView: pointingView(model)};
     right.replaceChildren();
-    const open = el(`<button class="btn tiny ghost">Open the Pointing modes view</button>`);
+    const open = el(`<button class="btn tiny ghost">Open Trackball modes →</button>`);
     open.addEventListener("click", () => { state.screen = "pointing"; render(); });
     right.appendChild(open);
 
@@ -33,13 +33,13 @@ export function tabPointing(body, right) {
         const row = pdColourRow(model, slot.id);
         // Named by the keycode the row is about, as a macro row is; a row that
         // is not one of the two names both.
-        const keycodes = variant === "toggle" ? [slot.binding.lock] : variant === "hold" ? [slot.binding.hold] : [slot.binding.hold, slot.binding.lock];
+        const keycodes = variant === "lock" ? [slot.binding.lock] : variant === "hold" ? [slot.binding.hold] : [slot.binding.hold, slot.binding.lock];
         const paints = slot.kind ? `Its colour paints ${row?.locality ? word(vocabulary(model).localities, row.locality).toLowerCase() : "its locality"} while the mode runs — not this key.` : "";
         return `<tr${reachAttrs("pointing", group, slot.id)}>
             <td><span${paints ? ` data-tip="${esc(paints)}"` : ""}>${slotLight(model, slot).swatch()}</span>
-                ${esc(slot.displayName || `Slot ${slot.id}`)}${variant ? ` · ${esc(variant)}` : ""} <code class="dim">${esc(keycodes.join(" · "))}</code>${changedSlots.has(slot.id) ? draftDot() : ""}</td>
+                ${esc(slot.displayName || `Mode ${slot.id}`)}${variant ? ` · ${esc(variant)}` : ""} <span class="tag">P${slot.id}</span>${(code => code ? ` ${code}` : "")(keycodeMark("reachRow", keycodes.join(" · ")))}${changedSlots.has(slot.id) ? draftDot() : ""}</td>
             <td class="muted">${slot.kind
-                ? `${slot.kind === 2 ? "Scrolling" : "Directional"}${slot.dpi ? ` · ${slot.dpi} DPI` : " · normal pointer speed"}`
+                ? `${slot.kind === 2 ? "Scrolling" : "Directional"}${slot.dpi ? ` · ${slot.dpi} DPI` : " · normal ball speed"}`
                 : "Empty · these keys do nothing yet"}</td>
             <td class="muted">${reachedBy}</td>
             <td class="reach-edit"><button class="btn tiny ghost" data-editpd="${slot.id}">Edit</button></td></tr>`;
@@ -84,7 +84,7 @@ export function tabPointing(body, right) {
     // A folded group holding a changed slot says so on its header.
     for (const group of groups) group.drafted = (group.ids || reachEntries(reach, group.id).map((entry) => entry.name))
         .some((id) => changedSlots.has(Number(id)));
-    const node = reachTable("pointing", groups, [["Slot", "30%"], ["Mode", "26%"], ["Reached by", "36%"], ["", "8%"]]);
+    const node = reachTable("pointing", groups, [["Trackball mode", "30%"], ["Movement", "26%"], ["Reached by", "36%"], ["", "8%"]]);
     attachReachRows(node, "pointing");
     /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-editpd]")).forEach((button) => button.addEventListener("click", () => {
         state.pdSlot = Number(button.dataset.editpd);

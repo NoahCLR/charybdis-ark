@@ -6,6 +6,7 @@ import {vocabulary, word} from "../../view/vocabulary.mjs";
 import {render, state} from "../../store.mjs";
 import {slotLight} from "../marks.mjs";
 import {bindingName} from "./common.mjs";
+import {keycodeAside} from "../../view/show-keycodes.mjs";
 
 /** @param {import("../../../contracts/panel.js").PublishedModel} model @param {import("../surface-types.js").PresentedSlot} slot @param {boolean} canEdit */
 export function slotReach(model, slot, canEdit) {
@@ -22,8 +23,8 @@ export function slotReach(model, slot, canEdit) {
         <div class="card-b pd-lines">
             <span class="lbl">Keys</span>
             <div class="val">
-                <span class="act"><span class="k">${esc(bindingName(slot))}</span><span class="how">hold</span></span>
-                <span class="act"><span class="k">${esc(slot.binding?.lock || "")}</span><span class="how">toggle</span></span>
+                <span class="act"><span class="k">${esc(keycodeAside(state, "reachRow", bindingName(slot)) || slot.displayName || `Mode ${slot.id}`)}</span><span class="how">hold</span></span>
+                <span class="act"><span class="k">${esc(keycodeAside(state, "reachRow", slot.binding?.lock || "") || slot.displayName || `Mode ${slot.id}`)}</span><span class="how">lock</span></span>
                 <span class="note">${esc(placedOn(model, slot))}</span></div>
             <button class="btn tiny ghost" data-act="place" ${disabled}>Place on a layer…</button>
             <span class="lbl">Light</span>

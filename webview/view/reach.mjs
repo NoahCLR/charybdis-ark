@@ -398,11 +398,11 @@ export function pointingSlotFor(model, keycode) {
 /** @param {ViewModel} model @param {string | number | undefined} keycode */
 export function pointingVariant(model, keycode) {
     const alias = model?.qmkKeycodeAliases?.[keycode ?? ""] ?? keycode;
-    if (/_LOCK$/.test(String(alias))) return "toggle";
+    if (/_LOCK$/.test(String(alias))) return "lock";
     const slot = pointingSlotFor(model, keycode);
     const value = typeof keycode === "number" ? keycode
         : /^0x[0-9a-f]+$/i.test(String(keycode)) ? Number(keycode) : NaN;
-    if (slot && Number.isInteger(value) && slotKeycodes(slot)[1] === value) return "toggle";
+    if (slot && Number.isInteger(value) && slotKeycodes(slot)[1] === value) return "lock";
     return "hold";
 }
 
@@ -439,7 +439,7 @@ export function macroAction(model, action) {
 /** @param {ViewModel} model @param {string} action @returns {import("./keyface-types.js").NamedAction | null} */
 export function namedAction(model, action) {
     const pd = pointingAction(model, action);
-    if (pd) return {kind: "pointing", word: "pointing mode", name: pd.name, slot: pd.slot, tags: [pd.how, ...(pd.empty ? ["empty"] : [])]};
+    if (pd) return {kind: "pointing", word: "trackball mode", name: pd.name, slot: pd.slot, tags: [pd.how, ...(pd.empty ? ["empty"] : [])]};
     const macro = macroAction(model, action);
     if (macro) return {kind: "macro", word: "macro", name: macro.name, slot: macro.slot, tags: macro.empty ? ["empty"] : []};
     return null;

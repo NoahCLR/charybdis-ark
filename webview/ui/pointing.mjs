@@ -30,22 +30,22 @@ export function screenPointing() {
     const canEdit = canEditArea("pointing");
 
     const main = el(`<div class="main">${topbar(
-        "Pointing modes",
-        `Hold or toggle a key to make the trackball do something else: scroll, or press arrows and shortcuts as it moves. Up to ${slots.length || 32} modes.`
+        "Trackball modes",
+        `Hold or lock a key to make the trackball do something else: scroll, or press arrows and shortcuts as it moves. Up to ${slots.length || 32} modes.`
     )}</div>`);
     const content = el(`<div class="content"><div class="pad pd-page"></div></div>`);
     const pad = /** @type {HTMLElement} */ (content.firstElementChild);
 
     if (!model || !slots.length) {
         pad.classList.remove("pd-page");
-        pad.appendChild(el(`<div class="screen-stub"><h3>No pointing modes read</h3>
-            <p class="note">${esc(unavailable(model) || "Choose Read keyboard to load this keyboard's pointing modes.")}</p></div>`));
+        pad.appendChild(el(`<div class="screen-stub"><h3>No trackball modes read</h3>
+            <p class="note">${esc(unavailable(model) || "Choose Read keyboard to load this keyboard's trackball modes.")}</p></div>`));
         main.appendChild(content);
         return main;
     }
 
     const compact = slots.length > FULL_CARD_SLOTS;
-    const list = el(`<nav class="pd-slots ${compact ? "many" : ""}" aria-label="Pointing slots"></nav>`);
+    const list = el(`<nav class="pd-slots ${compact ? "many" : ""}" aria-label="Trackball modes"></nav>`);
     const changedSlots = draftMarks(model?.draft?.changes).pointing;
     /** @param {import("./surface-types.js").PresentedSlot} slot */
     const pick = (slot) => { state.pdSlot = slot.id; state.pdKind = null; state.pdButtons = null; state.pdTaps = null; render(); };
@@ -56,7 +56,7 @@ export function screenPointing() {
         const inert = bindings ? bindings.keys.length + bindings.behaviours.length + bindings.combos.length : 0;
         const card = el(`<button class="slotcard ${slot.kind ? "" : "empty"}" data-slot="${slot.id}" aria-current="${state.pdSlot === slot.id}">
             ${swatch()}
-            <span class="nm">${slot.kind ? esc(slot.name) : "Empty slot"}</span><span class="no">${changedSlots.has(slot.id) ? draftDot("Changed in your draft", "lead") : ""}${slot.id}</span>
+            <span class="nm">${slot.kind ? esc(slot.name) : "Empty slot"}</span><span class="no">${changedSlots.has(slot.id) ? draftDot("Changed in your draft", "lead") : ""}P${slot.id}</span>
             <span class="meta">${slot.kind === KIND.SCROLLING ? `Scrolling${slot.axis ? ` · ${esc(word(words(model).scrollAxes, slot.axis))}` : ""}` : slot.kind === KIND.DIRECTIONAL ? `Directional · ${esc(axisLabel(model, slot.axis))}` : "Available"}</span>
             ${inert ? `<span class="meta warn">${inert} action${inert === 1 ? "" : "s"} reach it · inert</span>` : ""}</button>`);
         card.addEventListener("click", () => pick(slot));
@@ -81,9 +81,9 @@ function emptyChips(model, empties, changedSlots, pick) {
     for (const slot of empties) {
         const {keys, behaviours, combos} = bindingsForSlot(model, slot);
         const inert = keys.length + behaviours.length + combos.length;
-        const tip = `Slot ${slot.id} · empty${inert ? ` · ${inert} action${inert === 1 ? "" : "s"} reach it` : ""}`;
+        const tip = `P${slot.id} · empty${inert ? ` · ${inert} action${inert === 1 ? "" : "s"} reach it` : ""}`;
         const chip = el(`<button class="slotchip ${inert ? "warn" : ""}" data-slot="${slot.id}" aria-current="${state.pdSlot === slot.id}"
-            aria-label="${esc(tip)}" data-tip="${esc(tip)}">${slot.id}${changedSlots.has(slot.id) ? draftDot("Changed in your draft", "corner") : ""}</button>`);
+            aria-label="${esc(tip)}" data-tip="${esc(tip)}">P${slot.id}${changedSlots.has(slot.id) ? draftDot("Changed in your draft", "corner") : ""}</button>`);
         chip.addEventListener("click", () => pick(slot));
         grid.append(chip);
     }

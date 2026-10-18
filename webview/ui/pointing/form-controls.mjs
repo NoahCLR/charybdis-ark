@@ -4,6 +4,8 @@ import {keyName, pointingMacro} from "../../view/keyvalues.mjs";
 import {modifierGrid} from "../modifier-grid.mjs";
 import {render} from "../../store.mjs";
 import {openPicker} from "../picker.mjs";
+import {actionLabel} from "../../view/keyface.mjs";
+import {keyNameMarked} from "../marks.mjs";
 
 /** @param {import("../../../contracts/panel.js").PublishedModel} model @param {import("../surface-types.js").PresentedSlot} slot @param {boolean} canEdit @param {() => void} stageCurrent */
 export function formControls(model, slot, canEdit, stageCurrent) {
@@ -33,6 +35,10 @@ export function formControls(model, slot, canEdit, stageCurrent) {
         const node = el(`<label class="field ${options.klass || ""}"><span>${options.labelHtml || esc(label)}</span>
             <div class="input-row"><input data-f="pointing:${slot.id}:${esc(key)}" class="input mono" value="${esc(name)}" placeholder="nothing" ${disabled}>
             <button class="btn" data-pick ${disabled}>Choose…</button></div></label>`);
+        // The field holds the keycode, where you act on it; its words sit
+        // under it, so a direction reads as the key it sends.
+        const words = name ? actionLabel(model, name) : "";
+        if (words && words !== name && !pointingMacro(model, code)) node.append(el(`<span class="note">${keyNameMarked(model, words, name)}</span>`));
         const macro = pointingMacro(model, code);
         if (macro) {
             node.append(el(`<span class="note">${esc(macro.name)}${macro.empty ? " · empty: does nothing yet" : ""}</span>`));
@@ -46,7 +52,7 @@ export function formControls(model, slot, canEdit, stageCurrent) {
             // (model.pdModeEditing.tapKeys); a key typed instead is checked
             // when it is staged.
             openPicker({
-                title: label, context: `${slot.name} · slot ${slot.id}`,
+                title: label, context: `${slot.name} · P${slot.id}`,
                 seed: name ? [name] : [],
                 allowedKeys: model.pdModeEditing?.tapKeys?.plain ?? null,
                 modifiable: model.pdModeEditing?.tapKeys?.modified ?? null,

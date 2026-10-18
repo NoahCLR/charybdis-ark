@@ -13,10 +13,10 @@ const COUNT_WORDS = {
     behaviourSteps: {label: "Behaviour tap counts", what: "Each behaviour's tap counts, up to the deepest one it sets, added up across all behaviours."},
     combos: {label: "Combos", what: "Combos on any layer."},
     lightingGroups: {label: "LED groups", what: "Named LED groups on Lighting."},
-    lightingGroupRows: {label: "LED overrides", what: "LED override rows on layers, pointing modes, combo feedback and key feedback."},
+    lightingGroupRows: {label: "LED overrides", what: "LED override rows on layers, trackball modes, combo feedback and key feedback."},
     macros: {label: "Macros", what: "Macro slots with steps.", fixed: true},
     customKeys: {label: "Custom keys", what: "Custom keys with a name, a shortcut or a behaviour.", fixed: true},
-    pointingModes: {label: "Pointing modes", what: "Slots that hold a pointing mode.", fixed: true},
+    pointingModes: {label: "Trackball modes", what: "Slots that hold a trackball mode.", fixed: true},
 };
 /** @param {{id: string, limit: number, unavailable?: number}} count @param {number} [reserveTaps] */
 const countTip = (count, reserveTaps) => {

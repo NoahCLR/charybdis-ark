@@ -6,6 +6,7 @@ import {post, render, state} from "../../store.mjs";
 import * as edits from "../../view/edits.mjs";
 import {slotLight} from "../marks.mjs";
 import {bindingName, words} from "./common.mjs";
+import {keycodeAside} from "../../view/show-keycodes.mjs";
 import {formControls} from "./form-controls.mjs";
 import {movement} from "./movement.mjs";
 import {slotReach} from "./reach.mjs";
@@ -30,7 +31,7 @@ export function editor(model, slot, canEdit, slots) {
     const head = el(`<div class="card">
         <div class="card-h">
             ${light.swatch("lg")}
-            <h3>${esc(slot.displayName || `Slot ${slot.id}`)}</h3><span class="tag">slot ${slot.id} · ${esc(bindingName(slot))}</span>
+            <h3>${esc(slot.displayName || `Mode ${slot.id}`)}</h3><span class="tag">P${slot.id}${(code => code ? ` · ${esc(code)}` : "")(keycodeAside(state, "behaviourTitle", bindingName(slot)))}</span>
             <span class="right">
                 ${empties ? `<button class="btn tiny ghost" data-act="duplicate" ${disabled}
                     data-tip="Copy this mode into the first empty slot.">Duplicate</button>` : ""}
@@ -48,8 +49,8 @@ export function editor(model, slot, canEdit, slots) {
         // fields start empty, so staging now would post an invalid record.
         // The slot is staged once a field of the new form is changed.
         {onChange: (event) => { event.stopPropagation(); state.pdKind = {slot: slot.id, kind: Number(/** @type {HTMLSelectElement} */ (event.target).value)}; render(); }}));
-    headBody.append(select("Pointer speed while active", dpiOptions(model.pdModeEditing?.dpiChoices, slot.dpi), slot.dpi ?? 0, "dpi",
-        {tip: "Sensor DPI while this mode runs. Normal pointer speed keeps the DPI set in Mouse → Pointer speed."}));
+    headBody.append(select("Ball speed", dpiOptions(model.pdModeEditing?.dpiChoices, slot.dpi), slot.dpi ?? 0, "dpi",
+        {tip: "Ball speed while this mode runs, in DPI. Normal keeps the speed set in Trackball → Ball speed."}));
     wrap.append(head);
 
     const controls = {form, disabled, field, select, shortcut, modifiers};
