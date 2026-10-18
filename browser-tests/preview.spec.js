@@ -170,20 +170,20 @@ for (const theme of ["plain", "vscode-dark", "vscode-light"]) {
 for (const theme of ["plain", "vscode-dark", "vscode-light"]) {
     test(`the keyboard's name is posted on change, with its byte count kept live (${theme})`, async ({page}) => {
         await openPreview(page, theme);
-        await page.locator('[data-screen="settings"]').click();
+        // The name is the Keyboard screen's title (it was a Settings card).
+        await page.locator('[data-screen="device"]').click();
         const field = page.getByRole("textbox", {name: "Keyboard name", exact: true});
         await expect(field).toHaveAttribute("placeholder", "Charybdis 4x6");
-        await expect(page.locator(".settings-pad > .card").first()).toHaveAttribute("data-section", "keyboard");
         await page.evaluate(() => {window.__posted.length = 0;});
         await field.fill("777 · é");
-        await expect(page.locator('[data-section="keyboard"] [data-name-count]')).toHaveText("9 / 32 bytes");
+        await expect(page.locator('.keyboard-title [data-name-count]')).toHaveText("9 / 32 bytes");
         expect(await page.evaluate(() => window.__posted)).toEqual([], "typing posts nothing");
         await field.blur();
         await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([
             expect.objectContaining({type: "renameKeyboard", name: "777 · é", expectedFingerprint: expect.any(String), draftId: expect.any(String)}),
         ]);
         await field.fill("x".repeat(33));
-        await expect(page.locator('[data-section="keyboard"] [data-name-count]')).toHaveClass(/warn/);
+        await expect(page.locator('.keyboard-title [data-name-count]')).toHaveClass(/warn/);
     });
 }
 
@@ -240,8 +240,10 @@ test("the extension's panel has no theme toggle, picker, build line or browser r
     await expect(page.locator('[data-act="choose-keyboard"]')).toHaveCount(0);
     await expect(page.locator(".rail-build")).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBeUndefined();
+    // VS Code keeps its copies as files: the card says where, and lists none.
     await page.locator('[data-screen="profile"]').click();
-    await expect(page.locator(".card.recoveries")).toHaveCount(0);
+    await expect(page.locator(".card.recoveries .recovery-row")).toHaveCount(0);
+    await expect(page.locator(".card.recoveries")).toContainText("VS Code's storage");
     await expect(page.locator('[data-act="upgrade"]')).toHaveCount(0, {message: "the retired PD upgrade export is offered by no host"});
 });
 
@@ -285,7 +287,8 @@ test("the demo's controls post their messages", async ({page}) => {
     await expect.poll(posted).toEqual([expect.objectContaining({type: "leaveDemo"})]);
     expect(JSON.stringify(await posted())).not.toContain("discardDemo");
     await page.locator('[data-screen="device"]').click();
-    await expect(page.locator(".main h1")).toHaveText("Keyboard");
+    // Keyboard's title is the keyboard's name (here the demo's), renamed in place.
+    await expect(page.locator('.main [data-f="keyboard:name"]')).toHaveCount(1);
     await expect(page.locator(".main")).toContainText("no keyboard");
 
     // With an edit not exported: the review has Export in Apply's place, and

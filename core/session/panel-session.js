@@ -153,7 +153,8 @@ function buildPanelModel(session, state) {
         busy,
         progress: state.portableProgress,
         review: session.portableReview ? {incoming: summary(session.portableReview.document), current: session.portableReview.before.summary,
-            fileName: session.portableReview.fileName || null, differences: importDifferences({...session, portableReview: session.portableReview})} : null,
+            fileName: session.portableReview.fileName || null, differences: importDifferences({...session, portableReview: session.portableReview}),
+            fits: fileFits(session.portableReview.document, state.capabilities)} : null,
         layers: session.portableLayers ? {key: session.portableLayers.before.fingerprint, order: session.portableLayers.order, names: session.portableLayers.names, keysFollow: session.portableLayers.keysFollow !== false} : null,
         usage: usageOf(session, state, draft),
         putBack: session.beforeApply && session.beforeApply.deviceId === state.selectedDeviceId ? session.beforeApply.savedAt : null,
@@ -190,6 +191,17 @@ function usageOf(session, state, draft) {
     const fromDraft = Boolean(session.draft && draft?.matching);
     const usage = profileUsage(fromDraft && session.draft ? session.draft.current : session.service?.portable, state.capabilities || undefined);
     return usage && {...usage, source: fromDraft && session.draft?.dirty ? "draft" : session.demo ? "demo" : "keyboard"};
+}
+
+// Whether a chosen file fits this keyboard's profile memory.
+/** @param {import("../model/types.js").PortableDocument} document @param {State["capabilities"]} capabilities */
+function fileFits(document, capabilities) {
+    try {
+        const usage = profileUsage({document, fingerprint: fingerprint(document), summary: summary(document)}, capabilities || undefined);
+        return usage ? {used: usage.used, capacity: usage.capacity} : null;
+    } catch {
+        return null;
+    }
 }
 
 // A chosen profile file against what the keyboard holds, not the draft: that

@@ -223,6 +223,10 @@ export interface SettingFieldBase extends SettingBits {
     max?: number;
     choices?: (number | {value: number; label?: string})[];
     readOnly?: boolean;
+    /** The firmware was built without it: it does nothing, whatever it reads. */
+    notBuilt?: boolean;
+    /** QMK owns the live value, so keys on the keyboard (or VIA) change it too. */
+    keyboardKeys?: boolean;
     governs?: {kind: 'tier'; tier: string} | {kind: 'branch'; count: number} | {kind: 'layer'; layer: number};
 }
 export interface StoredSettingField extends SettingFieldBase {

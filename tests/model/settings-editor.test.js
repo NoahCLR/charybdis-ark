@@ -219,7 +219,7 @@ test("all native controls preserve a complete profile unchanged, including unkno
     assert.equal(fields.find(field => field.macro === "effectMode").choices[0].label, "Solid colour", "spelled as the rest of the app spells colour");
     const next = editSettings(current, message(current, "keyboardOptions", {swapLeftAltGui:false, swapControlCaps:true}));
     assert.equal(validateSnapshot(next).settings.values[24], 0x8001);
-    assert.throws(() => editSettings(current, message(current, "keyboardOptions", {autocorrect:true})), /not enabled/);
+    assert.throws(() => editSettings(current, message(current, "keyboardOptions", {autocorrect:true})), /Not in this firmware/);
 });
 test("startup layers validate the final mask, and combo references edit only their layer's record", () => {
     const current = withSettings(() => {});
