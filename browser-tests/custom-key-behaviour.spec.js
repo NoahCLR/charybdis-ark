@@ -7,10 +7,16 @@ const {openControls, clearPosts, posted, change, publishAccepted} = require("./c
 // for a key on a layer or on none, posting the same draft edits.
 
 const editor = (page) => page.locator(".custom-key-behaviour");
-const pick = (page, slot) => page.locator(`.macro-grid [data-custom-key="CUSTOM_KEY_${slot}"]`).click();
+// Picks a key; one with no behaviour yet shows one line and "Add taps and
+// holds…", which opens its grid (unless the test asks to see the fold).
+const pick = async (page, slot, {open = true} = {}) => {
+    await page.locator(`.macro-grid [data-custom-key="CUSTOM_KEY_${slot}"]`).click();
+    const add = editor(page).locator('[data-act="add-behaviour"]');
+    if (open && await add.count()) await add.click();
+};
 
 test("the custom key bank scrolls on its own and keeps its place, so the editor stays beside it", async ({page}) => {
-    await openControls(page, "customKeys");
+    await openControls(page, "customKeys", {customKeyEmptyOpen: true});
     const bank = page.locator(".pad.library .bank-scroll");
     const content = page.locator(".content");
     const tile = page.locator('.macro-grid [data-custom-key="CUSTOM_KEY_100"]');
@@ -39,7 +45,7 @@ test("the custom key bank scrolls on its own and keeps its place, so the editor 
 });
 
 test("a custom key tile hovers its tip, not the board's key card", async ({page}) => {
-    await openControls(page, "customKeys");
+    await openControls(page, "customKeys", {customKeyEmptyOpen: true});
     const tile = page.locator('.macro-grid [data-custom-key="CUSTOM_KEY_5"]');
     await tile.hover();
     await expect(page.locator(".tip")).toBeVisible();
@@ -50,9 +56,16 @@ test("a custom key tile hovers its tip, not the board's key card", async ({page}
 test("an unplaced custom key gets its behaviour on the Custom keys screen, with its built-in defaults", async ({page}) => {
     const errors = [];
     page.on("pageerror", error => errors.push(error.message));
-    await openControls(page, "customKeys");
-    await pick(page, 5);
-    await expect(editor(page).locator(".card-h .tag")).toHaveText("No behaviour yet");
+    await openControls(page, "customKeys", {customKeyEmptyOpen: true});
+    await pick(page, 5, {open: false});
+    // Folded to one line until it has a behaviour; opening it posts nothing.
+    await expect(editor(page).locator(".custom-key-row")).toContainText("Taps and holds");
+    await expect(editor(page).locator(".custom-key-row")).toContainText("none");
+    await expect(page.locator(".bgrid")).toHaveCount(0);
+    await clearPosts(page);
+    await editor(page).locator('[data-act="add-behaviour"]').click();
+    expect(await posted(page)).toEqual([]);
+    await expect(editor(page).locator(".beh-title"), "no title repeating the card's").toBeHidden();
     await expect(editor(page).locator('[data-act="show-behaviour"]'), "a key on no layer has nothing to show on the board").toHaveCount(0);
     await expect(editor(page).locator('[data-act="remove"]'), "an unstored grid has nothing to remove").toHaveCount(0);
     await expect(page.locator(".bgrid")).toHaveCount(1);
@@ -94,7 +107,7 @@ test("an unplaced custom key gets its behaviour on the Custom keys screen, with 
 });
 
 test("once stored, the behaviour shows its dashed cells and can be removed from Custom keys", async ({page}) => {
-    await openControls(page, "customKeys");
+    await openControls(page, "customKeys", {customKeyEmptyOpen: true});
     await pick(page, 5);
     // What the host publishes once it accepts a tap and a Long hold.
     await page.evaluate(async () => {
@@ -106,7 +119,7 @@ test("once stored, the behaviour shows its dashed cells and can be removed from 
         model.customKeys[5].hasBehavior = true;
         store.setModel(model); store.render();
     });
-    await expect(editor(page).locator(".card-h .tag")).toHaveText("Behaviour");
+    await expect(editor(page).locator('[data-act="add-behaviour"]'), "a stored behaviour is never folded").toHaveCount(0);
     const dashed = editor(page).locator('[data-cell="0-hold"]');
     await expect(dashed).toHaveClass(/inherited/);
     await expect(dashed).toContainText("released before Long hold threshold");
@@ -116,7 +129,7 @@ test("once stored, the behaviour shows its dashed cells and can be removed from 
 });
 
 test("the open cell belongs to one behaviour across keys and screens", async ({page}) => {
-    await openControls(page, "customKeys");
+    await openControls(page, "customKeys", {customKeyEmptyOpen: true});
     await pick(page, 0);
     await expect(editor(page).locator('[data-act="show-behaviour"]'), "CUSTOM_KEY_0 is placed").toHaveCount(1);
     await editor(page).locator('[data-cell="0-tap"]').click();
@@ -171,7 +184,7 @@ test("the open cell belongs to one behaviour across keys and screens", async ({p
 });
 
 test("the behaviour editor on Custom keys follows the behaviours edit gate", async ({page}) => {
-    await openControls(page, "customKeys");
+    await openControls(page, "customKeys", {customKeyEmptyOpen: true});
     await page.evaluate(async () => {
         const store = await import("/webview/store.mjs");
         const model = structuredClone(store.getModel());
@@ -186,7 +199,7 @@ test("the behaviour editor on Custom keys follows the behaviours edit gate", asy
 });
 
 test("Change key… on Custom keys moves the behaviour and the screen follows it to another custom key", async ({page}) => {
-    await openControls(page, "customKeys");
+    await openControls(page, "customKeys", {customKeyEmptyOpen: true});
     await pick(page, 0);
     await editor(page).locator('[data-act="rekey"]').click();
     await expect(page.locator(".picker")).toHaveCount(1);
@@ -208,7 +221,7 @@ test("Change key… on Custom keys moves the behaviour and the screen follows it
 });
 
 test("Show on the Keys screen shows a layer that reaches the key", async ({page}) => {
-    await openControls(page, "customKeys");
+    await openControls(page, "customKeys", {customKeyEmptyOpen: true});
     await pick(page, 0);
     const layout = await page.evaluate(async () => {
         const store = await import("/webview/store.mjs");
@@ -242,7 +255,7 @@ test("Show on the Keys screen shows a layer that reaches the key", async ({page}
 });
 
 test("Change key… on Custom keys to an ordinary key opens the behaviour on the Keys screen", async ({page}) => {
-    await openControls(page, "customKeys");
+    await openControls(page, "customKeys", {customKeyEmptyOpen: true});
     await pick(page, 0);
     await editor(page).locator('[data-act="rekey"]').click();
     await clearPosts(page);
@@ -261,7 +274,7 @@ test("Change key… on Custom keys to an ordinary key opens the behaviour on the
 });
 
 test("Delete on Custom keys clears the open cell of the selected key's behaviour, and only that", async ({page}) => {
-    await openControls(page, "customKeys");
+    await openControls(page, "customKeys", {customKeyEmptyOpen: true});
     await pick(page, 5);
     await page.evaluate(async () => {
         const store = await import("/webview/store.mjs");
@@ -279,7 +292,7 @@ test("Delete on Custom keys clears the open cell of the selected key's behaviour
 
     await editor(page).locator('[data-cell="0-tap"]').click();
     await expect(page.locator(".cell-editor")).toHaveCount(1);
-    await page.locator(".custom-key-behaviour .card-h h3").click();
+    await page.locator(".custom-key-behaviour .custom-key-row .eyebrow").click();
     await clearPosts(page);
     await page.locator("body").press("Delete");
     await expect.poll(() => posted(page)).toEqual([expect.objectContaining({type: "saveBehavior", behavior: expect.objectContaining({keycode: "CUSTOM_KEY_5"})})]);
@@ -295,7 +308,7 @@ test("Delete on Custom keys clears the open cell of the selected key's behaviour
 });
 
 test("a custom key is named by its title, as a macro is: Enter commits, Escape cancels", async ({page}) => {
-    await openControls(page, "customKeys");
+    await openControls(page, "customKeys", {customKeyEmptyOpen: true});
     await pick(page, 3);
     const title = page.getByRole("textbox", {name: "Custom key name", exact: true});
     await expect(page.locator(".main [data-name]"), "the title is the only name field").toHaveCount(1);
@@ -309,4 +322,15 @@ test("a custom key is named by its title, as a macro is: Enter commits, Escape c
     await title.fill("Cancelled"); await title.press("Escape");
     await expect(title).toHaveValue("");
     expect((await posted(page)).filter(row => row.type === "updateCustomKey")).toEqual([]);
+});
+
+test("+ New custom key opens the first unused key and posts nothing", async ({page}) => {
+    await openControls(page, "customKeys");
+    await clearPosts(page);
+    await page.locator('[data-act="new-custom-key"]').click();
+    const first = await page.evaluate(async () => (await import("/webview/store.mjs")).getModel().customKeys
+        .find(key => !key.name && !key.hasBehavior && !(key.shortcut.mods || key.shortcut.key)).keycode);
+    await expect(page.locator(`[data-custom-key="${first}"]`)).toHaveAttribute("aria-current", "true");
+    await expect(editor(page).locator('[data-act="add-behaviour"]')).toHaveCount(1);
+    expect(await posted(page)).toEqual([]);
 });

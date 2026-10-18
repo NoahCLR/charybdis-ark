@@ -201,3 +201,29 @@ test('Discard during a take restores an existing macro and preserves its name/pr
     await page.locator('[data-sequence-tiles]').focus(); await page.keyboard.press('Control+z');
     await expect(page.locator('[data-step-text]')).toHaveValue('local edit');
 });
+
+// Every key a macro can send is recorded, and captured so the page never acts
+// on it; a key a macro cannot send is named, not turned into a pause. While
+// recording, Record is loud and a listening tile ends the sequence.
+test("the recorder keeps navigation keys, names keys it cannot record, and says it is listening", async ({page}) => {
+    await openControls(page, "macros", {macroSlot: "VIA_MACRO_17", macroEmptyOpen: true, recordDelays: false});
+    const record = page.locator('[data-act="record"]');
+    await expect(record).toHaveText("Record");
+    await expect(page.locator('[data-recorder]')).toContainText("Shortcuts your computer keeps (⌘Tab, ⌘Space, screenshots) can't be recorded");
+    await record.click();
+    await expect(record).toHaveText("Recording · Stop (Esc)");
+    await expect(record).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator("[data-listening]")).toHaveCount(1);
+    const scroll = () => page.locator(".content").evaluate(node => node.scrollTop);
+    const before = await scroll();
+    for (const key of ["PageDown", "Home", "Delete", "Insert", "Numpad7"]) await page.keyboard.press(key);
+    await page.evaluate(() => document.dispatchEvent(new KeyboardEvent("keydown", {code: "BrowserBack", key: "BrowserBack", bubbles: true, cancelable: true})));
+    await expect(page.locator("[data-skipped-keys]")).toContainText("Not recorded: BrowserBack");
+    expect(await scroll()).toBe(before);
+    await page.keyboard.press("Escape");
+    await expect.poll(() => updates(page).then(rows => rows.at(-1)?.payload)).toBe("{KC_PGDN}{KC_HOME}{KC_DEL}{KC_INS}{KC_P7}");
+    await expect(page.locator("[data-listening]")).toHaveCount(0);
+    await expect(record).toHaveText("Record");
+    await expect(page.locator('[data-act="clear-take"]')).toHaveText("Undo recording");
+    await expect(page.locator('[data-recorder]')).not.toContainText(/idle/i);
+});

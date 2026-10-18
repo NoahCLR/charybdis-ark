@@ -42,7 +42,9 @@ for (const theme of ["plain", "vscode-dark"]) {
             store.setModel(model); store.render();
             window.__posted.length = 0;
         });
-        await expect(page.locator('[data-f="custom-key:1:shortcut"]')).toHaveValue("Left Ctrl + Right Alt + K");
+        // Sends is a keycap that opens the picker; its tip names the shortcut in words.
+        await expect(page.locator('[data-act="pick-shortcut"]')).toHaveAttribute("data-tip", /^Left Ctrl \+ Right Alt \+ K · /);
+        await expect(page.locator('[data-act="pick-shortcut"]')).toHaveText(/K$/);
         await page.locator('[data-act="pick-shortcut"]').click();
         await expect(page.locator('.picker [data-mod="C"]')).toHaveClass(/\bon\b/);
         await expect(page.locator('.picker [data-mod="RALT"]')).toHaveClass(/\bon\b/);
@@ -175,7 +177,7 @@ test("the picker uses a custom key that already holds the shortcut", async ({pag
 // A behaviour cell takes the same offer: the custom key is made and the cell
 // sends it, in one message.
 test("a behaviour cell's picker makes a custom key for mixed-side modifiers, and sends it", async ({page}) => {
-    await openControls(page, "customKeys", {customKey: "CUSTOM_KEY_5"});
+    await openControls(page, "customKeys", {customKey: "CUSTOM_KEY_5", customKeyAddBehaviour: "CUSTOM_KEY_5"});
     await page.locator('.custom-key-behaviour [data-cell="0-hold"]').click();
     await page.locator('.cell-editor [data-act="pick"]').click();
     for (const mod of ["C", "S", "RCTL", "RSFT"]) await page.locator(`.picker [data-mod="${mod}"]`).click();
@@ -240,7 +242,7 @@ test("a matching custom key with a behaviour is offered beside a new one on a la
 // In a behaviour cell the step sends only the shortcut, never the matching
 // key's behaviour, so the match is used as it is with nothing new offered.
 test("a behaviour cell uses a matching custom key even when it has a behaviour", async ({page}) => {
-    await openControls(page, "customKeys", {customKey: "CUSTOM_KEY_5"});
+    await openControls(page, "customKeys", {customKey: "CUSTOM_KEY_5", customKeyAddBehaviour: "CUSTOM_KEY_5"});
     await page.evaluate(async () => {
         const store = await import("/webview/store.mjs");
         const model = structuredClone(store.getModel());
