@@ -115,6 +115,11 @@ The same kind of control looks and sits the same on every screen.
   `lib/scroll.mjs` keeps the bank's position across same-screen renders. A
   narrower window shows two across, and below 720 px the bank stacks above
   the editor.
+- A list beside its editor (Lighting's layers and pointing modes) scrolls on
+  its own past eight rows, `.rowlist.many`, with its heading kept in view. Its
+  `data-scroll-list` key lets `lib/scroll.mjs` keep each list's position across
+  same-screen renders without carrying it into another list, and bring the
+  picked row into view.
 - A heading inside a workbench column uses the column's `sect-h` style.
 - Pages of cards (Mouse, Settings, Profile & backups, Device) share one width,
   `--page`. Side-by-side tables start at the top rather than stretching to

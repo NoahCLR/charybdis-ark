@@ -503,6 +503,10 @@ Keys screen stays open there.
 
 ### Lighting
 
+On **Layer colours** and **Pointing modes**, the list beside the editor scrolls
+on its own, keeps its place when you pick a row, and shows the picked row when
+you switch back to it.
+
 The lighting **Idle timeout** uses seconds or minutes: `60000` milliseconds
 reads as `1` minute. Choose the unit beside the value; changing units alone
 does not edit the draft. Fractions are accepted and rounded to the nearest

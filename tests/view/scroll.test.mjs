@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import {captureContentScroll, captureKeysBenchHeight, revealSelectedContentRow, restoreContentScroll, restoreKeysBenchHeight, scrollContentTo} from "../../webview/lib/scroll.mjs";
+import {captureContentScroll, captureKeysBenchHeight, revealSelectedContentRow, revealSelectedListRow, restoreContentScroll, restoreKeysBenchHeight, scrollContentTo} from "../../webview/lib/scroll.mjs";
 
 const rootWith = (content) => ({querySelector: (selector) => selector === ".content" ? content : null});
 
@@ -38,6 +38,36 @@ test("a taller Keys tab keeps enough page height when another tab is shown", () 
         "leaving Keys starts the other screen at its own height");
     assert.equal(captureKeysBenchHeight(previous, "keys", "keys", true), 0,
         "an explicit section toggle lets a collapsed workbench shrink");
+});
+
+test("a list that scrolls beside its editor keeps its place, under its own key", () => {
+    const rootOf = (content, list) => ({querySelector: (selector) =>
+        selector === ".content" ? content : selector === "[data-scroll-list]" ? list : null});
+    const layers = {scrollTop: 557, dataset: {scrollList: "layers"}};
+    const scroll = captureContentScroll(rootOf({scrollTop: 0, scrollLeft: 0}, layers), "lighting", "lighting");
+    assert.deepEqual(scroll, {top: 0, left: 0, list: {key: "layers", top: 557}});
+    const redrawn = {scrollTop: 0, dataset: {scrollList: "layers"}};
+    restoreContentScroll(rootOf({scrollTop: 0, scrollLeft: 0}, redrawn), scroll);
+    assert.equal(redrawn.scrollTop, 557);
+    const pointing = {scrollTop: 0, dataset: {scrollList: "pd"}};
+    restoreContentScroll(rootOf({scrollTop: 0, scrollLeft: 0}, pointing), scroll);
+    assert.equal(pointing.scrollTop, 0, "another list does not take this one's place");
+});
+
+test("a list's picked row is brought into view below its heading, and left alone when visible", () => {
+    const row = {getBoundingClientRect: () => ({top: 700, bottom: 760})};
+    const list = {scrollTop: 0, getBoundingClientRect: () => ({top: 100, bottom: 660}),
+        querySelector: (selector) => selector === ".rowitem.on" ? row : selector === ".rowlist-h" ? {getBoundingClientRect: () => ({height: 34})} : null};
+    const root = {querySelector: (selector) => selector === "[data-scroll-list]" ? list : null};
+    revealSelectedListRow(root);
+    assert.equal(list.scrollTop, 100, "scrolled just far enough to show the row");
+    row.getBoundingClientRect = () => ({top: 110, bottom: 170});
+    revealSelectedListRow(root);
+    assert.equal(list.scrollTop, 76, "a row under the sticky heading comes out below it");
+    row.getBoundingClientRect = () => ({top: 300, bottom: 360});
+    revealSelectedListRow(root);
+    assert.equal(list.scrollTop, 76, "a visible row stays put");
+    assert.doesNotThrow(() => revealSelectedListRow({querySelector: () => null}));
 });
 
 test("navigating to another screen starts at the top", () => {

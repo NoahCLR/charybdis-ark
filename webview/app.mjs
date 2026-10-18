@@ -8,7 +8,7 @@
 import {createPanelMessages} from "./messages.mjs";
 import * as controls from "./view/controls.mjs";
 import {el, esc} from "./lib/dom.mjs";
-import {captureContentScroll, captureKeysBenchHeight, revealSelectedContentRow, restoreContentScroll, restoreKeysBenchHeight} from "./lib/scroll.mjs";
+import {captureContentScroll, captureKeysBenchHeight, revealSelectedContentRow, revealSelectedListRow, restoreContentScroll, restoreKeysBenchHeight} from "./lib/scroll.mjs";
 import {activateOnKey, captureFocus, focusDialog, restoreFocus, trapTab} from "./lib/focus.mjs";
 import {mountNumberEntry} from "./lib/number-entry.mjs";
 import {getModel, post, postLeavingDemo, setRenderer, state} from "./store.mjs";
@@ -77,6 +77,7 @@ function render({keepScreen = false} = {}) {
     restoreKeysBenchHeight(root, benchHeight);
     restoreContentScroll(root, scroll);
     revealSelectedContentRow(root);
+    revealSelectedListRow(root);
     renderedScreen = state.screen;
 
     const picker = pickerOverlay();

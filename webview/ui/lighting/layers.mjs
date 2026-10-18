@@ -16,7 +16,9 @@ export function stageLayers(model) {
     const marks = draftMarks(model?.draft?.changes);
 
     node.className = "tab-split";
-    const list = el(`<aside class="rowlist"><div class="rowlist-h">Layers</div></aside>`);
+    // Past eight layers the list scrolls on its own beside the editor, as the
+    // pointing modes' list does.
+    const list = el(`<aside class="rowlist ${layers().length > 8 ? "many" : ""}" data-scroll-list="layers"><div class="rowlist-h">Layers</div></aside>`);
     layers().forEach((layer, index) => {
         const row = layerColourRow(model, layer.index);
         const lit = row && !isOff(row.color);
