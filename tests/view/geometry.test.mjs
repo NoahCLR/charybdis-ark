@@ -106,3 +106,45 @@ test("the board outline draws every key and the trackball", () => {
     assert.equal(markup.match(/<circle /g)?.length, 1);
     assert.equal(markup.match(/rotate\(/g)?.length, 7, "the angled thumb keys stay angled");
 });
+
+test("legend sizes follow the drawn key: clamp(9, .22k, 14) and clamp(8.5, .16k, 10.5) px", async () => {
+    const {legendSize} = await import("../../webview/view/geometry.mjs");
+    const px = (k, line) => legendSize(k, line).size * k / GEO.keyW;
+    assert.ok(Math.abs(px(40, "main") - 9) < 1e-9, "a small key holds the 9 px floor");
+    assert.ok(Math.abs(px(52, "main") - 0.22 * 52) < 1e-9, "a middling key scales");
+    assert.ok(Math.abs(px(80, "main") - 14) < 1e-9, "a large key stops at 14 px");
+    assert.ok(Math.abs(px(40, "sub") - 8.5) < 1e-9);
+    assert.ok(Math.abs(px(80, "sub") - 10.5) < 1e-9);
+    assert.ok(Math.abs(legendSize(40, "main").floor * 40 / GEO.keyW - 9) < 1e-9, "the floor is 9 px on screen at any size");
+});
+
+test("a long legend shrinks to the floor, then wraps, then squeezes no further than 0.85", async () => {
+    const {legendFit, legendSize, wrapLegend, MAX_SQUEEZE} = await import("../../webview/view/geometry.mjs");
+    const k = 44, width = GEO.keyW - 10, floor = legendSize(k, "main").floor;
+    const short = legendFit("Esc", {k, line: "main", width, wrap: true});
+    assert.deepEqual(short.lines, ["Esc"]);
+    assert.equal(short.squeeze, 0);
+    assert.ok(Math.abs(short.size - legendSize(k, "main").size) < 0.01, "a short legend takes the nominal size");
+
+    const command = legendFit("Left Command", {k, line: "main", width, wrap: true});
+    assert.deepEqual(command.lines, ["Left", "Command"], "two words too long for one line wrap before any squeeze");
+    assert.ok(command.size >= floor - 0.01 && !command.belowFloor);
+
+    const noWrap = legendFit("Left Command", {k, line: "main", width, wrap: false});
+    assert.deepEqual(noWrap.lines, ["Left Command"]);
+    assert.ok(noWrap.squeeze > 0 || noWrap.belowFloor, "without room to wrap it squeezes");
+    if (noWrap.squeeze) assert.ok(noWrap.squeeze >= width * 0.99);
+
+    const word = legendFit("Supercalifragilistic", {k, line: "main", width, wrap: true});
+    assert.equal(word.lines.length, 1, "one word never wraps");
+    assert.ok(word.squeeze > 0, "it is squeezed");
+    assert.ok(word.belowFloor, "and goes below the floor only when 0.85 is not enough");
+    assert.equal(MAX_SQUEEZE, 0.85);
+
+    const parts = wrapLegend("Print Screen Now");
+    assert.equal(parts?.length, 2, "a label with spaces splits in two");
+    assert.equal(parts?.join(" "), "Print Screen Now", "keeping every word, in order");
+    assert.equal(wrapLegend("Esc"), null);
+    const room = legendFit("Esc", {k, line: "sub", width, room: 5});
+    assert.equal(room.size, 5, "a row with less room caps the size, even under the floor");
+});

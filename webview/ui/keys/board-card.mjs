@@ -4,7 +4,7 @@
  */
 // The parts of the Keys board card around the board itself: the bar over it
 // while a keycode is placed or combo inputs are picked, the caption under it
-// in a layer preview, and the legend that reads under the card.
+// in a layer preview, and what its marks mean behind its "?".
 
 import {css, isOff} from "../../lib/colour.mjs";
 import {el, esc} from "../../lib/dom.mjs";
@@ -36,25 +36,41 @@ export function placementBar() {
     return node;
 }
 
+// What the board's marks mean, and its shortcuts, behind a "?" at the board
+// card's top right: read once, then out of the way of the board.
 /** @param {Model} model */
-export function legend(model) {
+export function boardHelp(model) {
     const colours = feedbackColours(model);
     const on = stageEnabled(model, "key");
     /** @param {import("../../../contracts/edits.js").Colour} colour */
     const dot = (colour) => on && !isOff(colour) ? `<i class="ldot" style="background:${css(colour)}"></i>` : `<i class="ldot off"></i>`;
-    return el(`<div class="board-legend">
-        <span class="legend-item">the board shows the light this layer paints</span>
-        <span class="legend-item"><i class="lkey sel"></i> selected key</span>
-        <span class="legend-item"><i class="lkey indicated"></i> keys for the picked row or the combo being built</span>
-        <span class="legend-item">${dot(colours.tap)} tap branch</span>
-        <span class="legend-item">${dot(colours.hold)} hold branch</span>
-        <span class="legend-item">${dot(colours.long)} long hold branch</span>
-        <span class="legend-item">${comboBadge(model, "C0")} combo input</span>
-        <span class="legend-item"><i class="lkey transparent"></i> transparent · falls through</span>
-        ${model?.draft?.dirty ? `<span class="legend-item">${draftDot()} changed in your draft</span>` : ""}
-        <span class="legend-item dim">${writable() ? "double-click to pick a keycode" : "select a key to read it"}${writable() ? " · drag one key onto another to swap · ⌘C and ⌘V copy between keys · delete makes a key transparent" : " · ⌘C copies a key"}</span>
-        ${state.keyClipboard ? `<span class="legend-item">copied <code class="n">${esc(state.keyClipboard.keycode)}</code></span>` : ""}
-    </div>`);
+    const edits = writable();
+    const shortcuts = [
+        edits ? ["Double-click", "choose what a key does"] : ["Click", "read a key"],
+        ...(edits ? [["Drag", "one key onto another swaps them"], ["Delete", "makes the picked key transparent"]] : []),
+        edits ? ["⌘C  ⌘V", "copy a key and paste it onto the picked one"] : ["⌘C", "copy a key"],
+        ["⌘-click a layer tab", "preview layers on together"],
+    ];
+    return el(`<details class="board-help">
+        <summary class="btn ghost icon" aria-label="What the board shows, and its shortcuts" data-tip="What the board shows, and its shortcuts">?</summary>
+        <div class="board-help-panel">
+            <div class="eyebrow">On the board</div>
+            <div class="board-legend">
+                <span class="legend-item">the light this layer paints</span>
+                <span class="legend-item"><i class="lkey sel"></i> selected key</span>
+                <span class="legend-item"><i class="lkey indicated"></i> keys for the picked row or the combo being built</span>
+                <span class="legend-item">${dot(colours.tap)} tap branch</span>
+                <span class="legend-item">${dot(colours.hold)} hold branch</span>
+                <span class="legend-item">${dot(colours.long)} long hold branch</span>
+                <span class="legend-item">${comboBadge(model, "C0")} combo input</span>
+                <span class="legend-item"><i class="lkey transparent"></i> transparent · falls through</span>
+                ${model?.draft?.dirty ? `<span class="legend-item">${draftDot()} changed in your draft</span>` : ""}
+            </div>
+            <div class="eyebrow">Shortcuts</div>
+            <dl class="board-shortcuts">${shortcuts.map(([keys, does]) => `<dt>${esc(keys)}</dt><dd>${esc(does)}</dd>`).join("")}</dl>
+            ${state.keyClipboard ? `<p class="note">Copied <code class="n">${esc(state.keyClipboard.keycode)}</code></p>` : ""}
+        </div>
+    </details>`);
 }
 
 export function pickBar() {

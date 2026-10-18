@@ -143,3 +143,81 @@ export function fitText(text, {max, min, width}) {
     const preferred = unit > 0 ? Math.min(max, width / unit) : max;
     return {size: Math.round(Math.max(min, preferred) * 100) / 100, squeeze: unit * max > width ? width : 0};
 }
+
+// ── legend sizes from the drawn key size ─────────────────────────────────
+//
+// A legend is sized in screen pixels from the key it is drawn on, `k` (the
+// cap's width on screen), then converted into the board's own units: the main
+// legend clamp(9, .22k, 14) px and the second line clamp(8.5, .16k, 10.5) px.
+// A legend too long for its row first shrinks, down to that floor; then the
+// main legend wraps onto two lines at a space; only then are its glyphs
+// squeezed, never past 0.85 of their width. Only a word that still overruns
+// at the floor and the full squeeze goes smaller (`belowFloor`).
+export const LEGEND_PX = Object.freeze({
+    main: Object.freeze({min: 9, per: 0.22, max: 14}),
+    sub: Object.freeze({min: 8.5, per: 0.16, max: 10.5}),
+});
+export const MAX_SQUEEZE = 0.85;
+
+/** @param {number} value @param {number} low @param {number} high */
+const clamp = (value, low, high) => Math.min(high, Math.max(low, value));
+// How wide a legend runs at a size of 1, in board units.
+/** @param {string} text */
+export const textUnits = (text) => [...text].reduce((total, char) => total + charWidth(char), 0);
+const round = (/** @type {number} */ value) => Math.round(value * 100) / 100;
+
+// The legend's nominal size and floor, in board units, on a key `k` px wide.
+/** @param {number} k @param {"main" | "sub"} line */
+export function legendSize(k, line) {
+    const px = LEGEND_PX[line];
+    const perUnit = GEO.keyW / Math.max(1, k);
+    return {size: clamp(px.per * k, px.min, px.max) * perUnit, floor: px.min * perUnit};
+}
+
+// The two halves of a label split at the space nearest its middle, or null
+// when it has no space to split at.
+/** @param {string} text @returns {[string, string] | null} */
+export function wrapLegend(text) {
+    const words = text.trim().split(/\s+/);
+    if (words.length < 2) return null;
+    let best = /** @type {[string, string] | null} */ (null), widest = Infinity;
+    for (let at = 1; at < words.length; at += 1) {
+        const pair = /** @type {[string, string]} */ ([words.slice(0, at).join(" "), words.slice(at).join(" ")]);
+        const wide = Math.max(textUnits(pair[0]), textUnits(pair[1]));
+        if (wide < widest) { widest = wide; best = pair; }
+    }
+    return best;
+}
+
+/**
+ * How one legend line is drawn on a key `k` px wide: its lines (one, or two
+ * for a wrapped main legend), its size in board units, and the width to
+ * squeeze its glyphs into when even the floor overruns (0: no squeeze).
+ * `room` caps the size where the cap's rows leave less height than the
+ * nominal size needs; that cap can sit below the floor.
+ */
+/** @param {unknown} text @param {{k: number, line: "main" | "sub", width: number, room?: number, wrap?: boolean}} options */
+export function legendFit(text, {k, line, width, room = Infinity, wrap = false}) {
+    const label = String(text ?? "");
+    const {size: nominal, floor: rawFloor} = legendSize(k, line);
+    const top = Math.min(nominal, room), floor = Math.min(rawFloor, top);
+    const units = textUnits(label);
+    /** @param {string[]} lines @param {number} size @param {number} [squeeze] */
+    const result = (lines, size, squeeze = 0) => ({lines, size: round(size), squeeze: squeeze ? round(squeeze) : 0, belowFloor: size < floor - 0.005});
+    if (!units) return result([label], top);
+    // One line, from the nominal size down to the floor.
+    const oneLine = width / units;
+    if (oneLine >= floor) return result([label], Math.min(top, oneLine));
+    // Two lines, if the row has the height for them.
+    const halves = wrap ? wrapLegend(label) : null;
+    if (halves) {
+        const wider = Math.max(textUnits(halves[0]), textUnits(halves[1]));
+        const twoLines = Math.min(top, width / wider);
+        if (twoLines >= floor) return result(halves, twoLines);
+        if (wider * floor * MAX_SQUEEZE <= width) return result(halves, floor, width);
+    }
+    // Squeezed at the floor, no further than 0.85.
+    if (units * floor * MAX_SQUEEZE <= width) return result([label], floor, width);
+    // A single word too long for the cap even so: smaller, fully squeezed.
+    return result([label], width / (units * MAX_SQUEEZE), width);
+}

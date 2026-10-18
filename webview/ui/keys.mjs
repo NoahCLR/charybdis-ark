@@ -18,7 +18,7 @@ import {layerBar} from "./layerbar.mjs";
 import {attachLayersControl} from "./layers.mjs";
 import {topbar, unavailable} from "./shell.mjs";
 import {bench} from "./keys/bench.mjs";
-import {legend, pickBar, placementBar, previewFoot} from "./keys/board-card.mjs";
+import {boardHelp, pickBar, placementBar, previewFoot} from "./keys/board-card.mjs";
 import {behaviourKey, selectBehaviourKey} from "./keys/behaviour-selection.mjs";
 import {pickKeycodeFor, swapKeys} from "./keys/key-edits.mjs";
 import {reachHighlight} from "./keys/reach.mjs";
@@ -44,13 +44,14 @@ export function screenKeys() {
 
     const bar = layerBar();
     attachLayersControl(bar);
-    const content = el(`<div class="content"><div class="pad keys-pad"></div></div>`);
+    const content = el(`<div class="content"><div class="pad keys-pad${state.hideBoard ? " board-hidden" : ""}"></div></div>`);
     const pad = /** @type {HTMLElement} */ (content.firstElementChild);
 
     // The board, how that layer is lit and the layer tabs under them are one
-    // card; the legend reads under it. The tabs sit at the card's foot, next to
+    // card, held at the top of the page while the workbench scrolls under it
+    // (Hide board folds it to its tabs). What the board's marks mean and its
+    // shortcuts are behind its "?". The tabs sit at the card's foot, next to
     // the workbench, so switching layers mid-edit is a short reach.
-    const stage = el(`<div class="stack keys-stage"></div>`);
     const card = el(`<div class="board-card"></div>`);
     const row = layerColourRow(model, layer.index);
     const lit = stageEnabled(model, "layers") && row && !isOff(row.color);
@@ -92,8 +93,8 @@ export function screenKeys() {
         ? `lit ${esc(hsvLabel(row.color))} on ${row.mode === "ALL_KEYS" ? "every key" : "keys mapped here"}`
         : "no layer colour · the base effect shows through"}</span></div>`));
     card.append(bar);
-    stage.append(card, legend(model));
-    pad.append(stage, bench());
+    card.prepend(boardHelp(model));
+    pad.append(card, bench());
     main.appendChild(content);
     return main;
 }

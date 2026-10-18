@@ -8,7 +8,7 @@ import {comboGroups} from "../../view/combo-reach.mjs";
 import {mappedKeyCount} from "../../view/lighting.mjs";
 import {currentLayer, getModel, layers, render, selectedPosition, state} from "../../store.mjs";
 import {draftDot, draftMarks} from "../../view/review.mjs";
-import {keepInView} from "../layerbar.mjs";
+import {attachBoardToggle, keepInView} from "../layerbar.mjs";
 import {behaviourKey, selectBehaviourKey} from "./behaviour-selection.mjs";
 import {tabBehaviours} from "./behaviours-tab.mjs";
 import {tabCombos} from "./combos-tab.mjs";
@@ -57,6 +57,7 @@ export function bench() {
         render();
     }));
     keepInView(/** @type {HTMLElement} */ (node.querySelector(".bench-tablist")));
+    attachBoardToggle(/** @type {HTMLElement} */ (node.querySelector(".bench-tabs")));
     const body = /** @type {HTMLElement} */ (node.querySelector("#benchBody")), right = /** @type {HTMLElement} */ (node.querySelector("#benchRight"));
     const tabs = /** @type {Record<string, (body: HTMLElement, right: HTMLElement) => void>} */ ({key: tabKey, behaviours: tabBehaviours, combos: tabCombos, macros: tabMacros, pointing: tabPointing});
     (tabs[state.tab] || tabKey)(body, right);

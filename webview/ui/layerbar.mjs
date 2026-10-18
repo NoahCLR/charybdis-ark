@@ -4,7 +4,7 @@
 // Selector assertions refer to elements created by this module's authored markup.
 import {css, isOff, label as hsvLabel} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
-import {getModel, heldLayers, layerName, layers, previewing, render, showLayer, state, toggleLayerOn} from "../store.mjs";
+import {getModel, heldLayers, layerName, layers, previewing, render, setPreference, showLayer, state, toggleLayerOn} from "../store.mjs";
 import {layerColourRow, stageEnabled} from "../view/lighting.mjs";
 import {draftMarks} from "../view/review.mjs";
 
@@ -81,4 +81,19 @@ export function keepInView(strip) {
         else if (right > strip.scrollLeft + strip.clientWidth) strip.scrollLeft = right - strip.clientWidth;
         edges();
     });
+}
+
+// Hide board, at the right end of a workbench's tab strip on Keys and
+// Lighting: the board folds to its layer tabs for a long edit, and comes back
+// when pressed again. Remembered per host (view/preferences.mjs).
+/** @param {HTMLElement} strip the workbench's .bench-tabs */
+export function attachBoardToggle(strip) {
+    const hidden = state.hideBoard;
+    const button = el(`<button class="btn compact toggle board-toggle" data-act="hide-board" aria-pressed="${hidden}"
+        data-tip="${hidden ? "Show the board again above the workbench." : "Fold the board to its layer tabs, to give the workbench the height."}">Hide board</button>`);
+    button.addEventListener("click", () => {
+        setPreference("hideBoard", !state.hideBoard);
+        render();
+    });
+    strip.append(button);
 }

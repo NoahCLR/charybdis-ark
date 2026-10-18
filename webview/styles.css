@@ -411,7 +411,7 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
    the picked tab can cover it. The strip scrolls sideways when it does not fit. */
 .board-card { position: relative; border: 1px solid var(--line); border-radius: var(--r-sheet); background: var(--surface); min-width: 0; }
 .board-card .board { border: 0; border-radius: 0; background: var(--surface); }
-.board-card > :first-child { border-radius: var(--r-sheet) var(--r-sheet) 0 0; }
+.board-card > :first-child:not(.board-help), .board-card > .board-help + * { border-radius: var(--r-sheet) var(--r-sheet) 0 0; }
 .board-card > :last-child { border-radius: 0 0 var(--r-sheet) var(--r-sheet); }
 .board-card > .layerbar-wrap {
   display: flex; align-items: flex-start; background: var(--surface-2); box-shadow: inset 0 1px 0 var(--line);
@@ -530,6 +530,7 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 }
 :root[data-theme="light"] .board { background: radial-gradient(120% 90% at 50% 0%, rgba(0,0,0,.02), transparent 60%), var(--surface); }
 .board svg { display: block; width: 100%; height: auto; }
+.board-card .board svg { height: 100%; max-width: calc(1082px * 64 / 58); max-height: calc(478px * 64 / 58); margin: 0 auto; }
 /* The board is a control, not text: nothing on it highlights. */
 .board, .board-legend { -webkit-user-select: none; user-select: none; }
 /* the board spans the pad, the same width as the workbench beneath it */
@@ -601,7 +602,7 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 .kc-led { opacity: .95; }
 .kc-glow { filter: blur(7px); opacity: .5; }
 .board-legend { display: flex; gap: 8px 16px; padding: 8px 6px 4px; flex-wrap: wrap; align-items: center; }
-.legend-item { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-small); line-height: 12px; color: var(--text-3); }
+.legend-item { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-small); line-height: var(--lh-small); color: var(--text-2); }
 .legend-item .lkey { width: 12px; height: 12px; border-radius: var(--r-chip); display: inline-block; flex: none; border: 1.5px solid var(--ring); }
 .legend-item .lkey.sel { background: var(--key-hi); }
 .legend-item .lkey.indicated { border-style: dotted; }
@@ -647,13 +648,44 @@ button.tier:hover { background: var(--surface-3); }
 .act .how { color: var(--text-3); font-family: var(--sans); font-size: var(--fs-micro); }
 .act.empty { border-style: dashed; color: var(--text-3); background: none; font-family: var(--sans); font-size: var(--fs-small); }
 /* ── workbench ───────────────────────────────────────────────────────── */
-.keys-pad { display: grid; gap: 16px; }
+/* The frame on Keys and Lighting: the board card holds at the top of the page
+   at --board-h (its keys at most --key-max), and the workbench's tab strip
+   holds under it while the workbench scrolls beneath both. Hide board folds
+   the card to its layer tabs. */
+.keys-pad { display: grid; gap: 12px; --board-top: var(--board-h); }
+.keys-pad.board-hidden { --board-top: calc(var(--h-tab) + 2px); }
+.keys-pad > .board-card {
+  position: sticky; top: 0; z-index: 4; height: var(--board-h);
+  display: flex; flex-direction: column;
+  /* What scrolls up behind the card's rounded corners is covered. */
+  box-shadow: 0 -24px 0 0 var(--bg);
+}
+.keys-pad > .board-card > .board { flex: 1 1 auto; min-height: 0; padding: 8px 12px 0; }
+.keys-pad > .board-card > :not(.board) { flex: none; }
+.keys-pad.board-hidden > .board-card { height: auto; }
+.keys-pad.board-hidden > .board-card > :not(.layerbar-wrap) { display: none; }
+.keys-pad.board-hidden > .board-card > .layerbar-wrap { border-radius: var(--r-sheet); }
+.keys-pad > .bench > .bench-tabs { position: sticky; top: var(--board-top); z-index: 3; }
+.bench-tabs > .board-toggle { flex: none; align-self: center; margin: 0 0 4px 8px; }
+/* The board's "?": what its marks mean, and its shortcuts. */
+.board-help { position: absolute; top: 8px; right: 8px; z-index: 45; }
+.board-help > summary { min-height: 0; color: var(--text-2); }
+.board-help[open] > summary { background: var(--surface-3); color: var(--text); }
+.board-help-panel {
+  position: absolute; top: calc(100% + 6px); right: 0; width: 360px; display: grid; gap: 8px;
+  padding: 12px; border: 1px solid var(--line-2); border-radius: var(--r-card);
+  background: var(--surface); box-shadow: var(--shadow-1);
+}
+.board-help-panel .board-legend { display: grid; gap: 6px; padding: 0 0 4px; }
+.board-shortcuts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 12px; margin: 0;
+  font-size: var(--fs-small); color: var(--text-2); }
+.board-shortcuts dt { font-family: var(--mono); color: var(--text); }
+.board-shortcuts dd { margin: 0; }
 /* The pad's one column may shrink to the window: a grid item's automatic
    minimum is its content, so without minmax(0, …) a strip of nowrap tabs
    would set the width of the page and push it sideways. */
 .keys-pad { grid-template-columns: minmax(0, 1fr); }
-.bench { overflow: hidden; }
-.keys-pad .bench { min-height: 580px; }
+.bench { overflow: clip; }
 /* Like the layer tabs, the picked workbench tab joins the surface it opens.
    The strip scrolls when narrow; the stage switch stays outside it. */
 .bench-tabs { display: flex; align-items: flex-end; padding: 6px 10px 0; border-bottom: 1px solid var(--line); background: var(--surface-2); }
@@ -813,8 +845,6 @@ button.tier:hover { background: var(--surface-3); }
    The fixed sizes and gaps its templates used to carry inline. Colours the
    model supplies stay inline. These follow .row, .stack, .card and
    .swatch-lg so they win where they meet. */
-/* The board card and its legend read as one, closer than the pad's rhythm. */
-.keys-stage { gap: 10px; }
 .pickbar .right { margin-left: auto; }
 .pickbar .pickbar-actions { display: flex; gap: 6px; }
 /* A legend dot for a tier whose colour is off, or while key feedback is off. */

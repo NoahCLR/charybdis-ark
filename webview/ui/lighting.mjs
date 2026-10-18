@@ -12,7 +12,7 @@ import {slotCalled, stageOrder} from "../view/vocabulary.mjs";
 import {currentLayer, getModel, layerName, layers, post, render, state, writable, heldLayers} from "../store.mjs";
 import * as edits from "../view/edits.mjs";
 import {board} from "./board.mjs";
-import {keepInView, layerBar} from "./layerbar.mjs";
+import {attachBoardToggle, keepInView, layerBar} from "./layerbar.mjs";
 import {attachLayersControl} from "./layers.mjs";
 import {topbar, unavailable} from "./shell.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
@@ -36,7 +36,7 @@ export function screenLighting() {
         "What the keyboard lights, and when. Each stage paints over the one before it, and the board shows the result of your draft."
     )}</div>`);
 
-    const content = el(`<div class="content"><div class="pad keys-pad"></div></div>`);
+    const content = el(`<div class="content"><div class="pad keys-pad${state.hideBoard ? " board-hidden" : ""}"></div></div>`);
     const pad = /** @type {HTMLElement} */ (content.firstElementChild);
     // The board, what it is showing and the layer tabs under them are one
     // card, as on Keys; on LED groups the board is the LED selector instead.
@@ -113,6 +113,7 @@ export function screenLighting() {
     if (bit !== undefined) right.appendChild(stageSwitch(model, state.stage, bit));
     stageBody(/** @type {HTMLElement} */ (bench.querySelector("#benchBody")));
     keepInView(/** @type {HTMLElement} */ (bench.querySelector(".bench-tablist")));
+    attachBoardToggle(/** @type {HTMLElement} */ (bench.querySelector(".bench-tabs")));
     pad.appendChild(bench);
 
     main.appendChild(content);

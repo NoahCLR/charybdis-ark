@@ -15,13 +15,36 @@
 
 // Selector assertions refer to elements created by this module's authored markup.
 import {css, idealText, isOff} from "../lib/colour.mjs";
-import {GEO, LED_INDEX, TRACKBALL_LED, fitText, keyFaceRows, keyVisual} from "../view/geometry.mjs";
+import {GEO, LED_INDEX, TRACKBALL_LED, keyFaceRows, keyVisual, legendFit, textUnits} from "../view/geometry.mjs";
 import {behaviourFor, behaviourTiers, keyFace, keyMeaning} from "../view/keyface.mjs";
 import {combosShownAt} from "../view/combo-reach.mjs";
 import {resolvedPositions} from "../view/layer-resolution.mjs";
 import {keyLight, ownLight, stageEnabled, tierColour, trackballLight} from "../view/lighting.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {hideHover} from "./hover.mjs";
+import {render} from "../store.mjs";
+
+// How wide a key is drawn on screen, in px. Legends are sized from it
+// (view/geometry.mjs legendFit), so the board measures itself once drawn and
+// draws again when the size it drew at was off by a pixel or more.
+let drawnKey = 48;
+/** @type {ResizeObserver | null} */
+let measuring = null;
+const [, , VIEW_W, VIEW_H] = GEO.viewBox.split(" ").map(Number);
+/** @param {SVGSVGElement} svg */
+function measureKeys(svg) {
+    measuring?.disconnect();
+    if (typeof ResizeObserver !== "function") return;
+    measuring = new ResizeObserver(([entry]) => {
+        const {width, height} = entry.contentRect;
+        if (!width || !height) return;
+        const key = GEO.keyW * Math.min(width / VIEW_W, height / VIEW_H);
+        if (Math.abs(key - drawnKey) < 1) return;
+        drawnKey = key;
+        requestAnimationFrame(() => render());
+    });
+    measuring.observe(svg);
+}
 
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/panel.js").Layer | undefined} layer @param {import("./surface-types.js").BoardOptions} [options] */
 export function board(model, layer, options = {}) {
@@ -110,17 +133,27 @@ export function board(model, layer, options = {}) {
         /** @param {string} name */
         const ring = (name) => `<rect class="${name}" x="${visual.x + 1.4}" y="${visual.y + 1.4}" width="${GEO.keyW - 2.8}" height="${GEO.keyH - 2.8}" rx="${GEO.radius - 1}"></rect>`;
         const main = mode === "leds" ? String(LED_INDEX[index] ?? index) : face.main;
-        const above = (tiers.length ? 1 : 0) + (combos.length ? 1 : 0);
-        // A legend is sized to the room its row leaves, so one typeface at one
-        // weight carries every cap instead of stepping between faces by length.
-        const mainFit = fitText(main, sub
-            ? (above ? {max: 9.1, min: 6.4, width: GEO.keyW - 12} : {max: 12, min: 7, width: GEO.keyW - 12})
-            : {max: 12, min: 7, width: GEO.keyW - 10});
-        const subFit = sub ? fitText(sub, above
-            ? {max: 6.4, min: 5.2, width: GEO.keyW - 12}
-            : {max: 8, min: 6.2, width: GEO.keyW - 12}) : null;
-        /** @param {ReturnType<typeof fitText>} fit */
-        const squeeze = (fit) => fit.squeeze ? ` textLength="${fit.squeeze}" lengthAdjust="spacingAndGlyphs"` : "";
+        // A legend is sized from the key's drawn size and the room its row
+        // leaves (view/geometry.mjs legendFit), so one typeface at one weight
+        // carries every cap: a long one shrinks to its floor, then a main
+        // legend with nothing under it wraps onto two lines, and only then
+        // are its glyphs squeezed.
+        const marksBottom = rows.comboY !== undefined ? rows.comboY + rows.comboHeight
+            : rows.tierY !== undefined ? rows.tierY + 4 : visual.y;
+        const roomOf = (/** @type {number} */ height) => Math.max(0, height) * 1.7;
+        const separatorY = rows.separatorY ?? 0, subY = rows.subY ?? 0;
+        const mainFit = legendFit(main, sub
+            ? {k: drawnKey, line: "main", width: GEO.keyW - 12, room: roomOf(Math.min(separatorY - rows.mainY, rows.mainY - marksBottom))}
+            : {k: drawnKey, line: "main", width: GEO.keyW - 10, room: roomOf((rows.mainY - marksBottom) * 2), wrap: true});
+        const subFit = sub ? legendFit(sub, {k: drawnKey, line: "sub", width: GEO.keyW - 12,
+            room: roomOf(Math.min(visual.y + GEO.keyH - subY, subY - separatorY))}) : null;
+        /** @param {string} part */
+        const squeeze = (part) => textUnits(part) * mainFit.size > (GEO.keyW - 10) + 0.01
+            ? ` textLength="${GEO.keyW - 10}" lengthAdjust="spacingAndGlyphs"` : "";
+        // A wrapped legend's two lines sit either side of where one would.
+        const lines = mainFit.lines.length === 2
+            ? mainFit.lines.map((part, row) => `<tspan x="${cx}" y="${rows.mainY + (row ? 0.56 : -0.56) * mainFit.size}"${squeeze(part)}>${esc(part)}</tspan>`).join("")
+            : esc(main);
 
         keys += `<g class="${classes}${selected === index ? " sel" : ""}" data-key="${index}" tabindex="0" role="button"
             aria-label="${esc(keyMeaning(shown))} at index ${index}${from ? `, from ${esc(from.displayName || from.name || `layer ${from.index}`)}` : ""}"${transform}>
@@ -130,8 +163,8 @@ export function board(model, layer, options = {}) {
             ${marks}
             ${drafted?.has(index) ? `<circle class="kc-draft" cx="${visual.x + GEO.keyW - 5.5}" cy="${visual.y + 5.5}" r="2.6"></circle>` : ""}
             ${sub ? `<line class="kc-sep" x1="${visual.x + 8}" y1="${rows.separatorY}" x2="${visual.x + GEO.keyW - 8}" y2="${rows.separatorY}" stroke="${text || "var(--light-detail)"}" stroke-width="1"></line>` : ""}
-            <text class="kc-label" x="${cx}" y="${rows.mainY}" font-size="${mainFit.size}"${squeeze(mainFit)}${text ? ` style="fill:${text}"` : ""}>${esc(main)}</text>
-            ${subFit ? `<text class="kc-sub" x="${cx}" y="${rows.subY}" font-size="${subFit.size}"${squeeze(subFit)}${text ? ` style="fill:${text}"` : ""}>${esc(sub)}</text>` : ""}
+            <text class="kc-label" x="${cx}" y="${rows.mainY}" font-size="${mainFit.size}"${mainFit.lines.length === 1 && mainFit.squeeze ? ` textLength="${mainFit.squeeze}" lengthAdjust="spacingAndGlyphs"` : ""}${text ? ` style="fill:${text}"` : ""}>${lines}</text>
+            ${subFit ? `<text class="kc-sub" x="${cx}" y="${rows.subY}" font-size="${subFit.size}"${subFit.squeeze ? ` textLength="${subFit.squeeze}" lengthAdjust="spacingAndGlyphs"` : ""}${text ? ` style="fill:${text}"` : ""}>${esc(sub)}</text>` : ""}
         </g>`;
     }
 
@@ -150,6 +183,7 @@ export function board(model, layer, options = {}) {
         if (onSwap) dragToSwap(node, group, index, onSwap);
     });
     /** @type {SVGGElement | null} */ (node.querySelector("[data-trackball]"))?.addEventListener("click", () => onTrackball?.());
+    measureKeys(/** @type {SVGSVGElement} */ (node.querySelector("svg")));
     return node;
 }
 
