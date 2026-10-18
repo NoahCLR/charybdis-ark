@@ -84,10 +84,8 @@ export function screenSettings() {
 
 // The default combo window and the combo hold threshold apply to every combo,
 // so they are edited with the other combo settings. The keyboard stores them
-// with the combos rather than in the settings domain, so each saves as a combo
-// edit. A keyboard that stores them once has them even without combos; an
-// older one has no default, and repeats the threshold on every combo, so there
-// is nothing to store it on until a combo exists.
+// once with the combos rather than in the settings domain (combo readback
+// v3), so each saves as a combo edit, with or without any combos.
 // A combo follows the default window unless it has its own, so changing it
 // re-times those combos. QMK waits for the hold threshold only on combos that
 // must be held or are tap only — the longer of it and the combo's own window
@@ -95,14 +93,11 @@ export function screenSettings() {
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/model.js").ComboTimingField} entry */
 function comboTimingRow(model, entry) {
     const readback = model?.comboReadback || {};
-    const stores = readback.version === 2;
     const hold = entry.id === "hold";
     const value = hold ? readback.holdTermMs : readback.defaultTermMs;
     const stored = String(value ?? "");
-    const combos = model?.combos || [];
-    const editable = canEditArea("combos") && (stores || (hold && combos.length > 0));
-    const hint = stores ? entry.hint : hold ? (combos.length ? entry.hint : "Stored with the combos, so it can be set once the keyboard has one. Flash the updated firmware pair to set it without one.")
-        : "This keyboard keeps each combo's own window. Flash the updated firmware pair to set a default.";
+    const editable = canEditArea("combos");
+    const hint = entry.hint;
     const row = el(`<div class="setrow" data-tip="${esc(hint)}">
         <div><div class="nm">${esc(entry.label)}</div>
             <div class="hint">${esc(hint)}</div></div>
