@@ -87,7 +87,7 @@ export function stageBase(model) {
     if (brightness) effect.append(el(`<p class="note" data-base-brightness>${limit === undefined
         ? `Brightness ${esc(brightness.value)}. ${esc(brightness.hint || "")}`
         : `Brightness ${esc(brightness.value)} of ${esc(limit)}, the keyboard's limit.`} Layer colours and feedback have their own brightness.</p>`));
-    if (!canEdit) effect.append(el(`<div class="unavailable">${esc(unavailable(model) || "The base effect cannot be edited right now.")}</div>`));
+    if (!canEdit && !model?.draft?.busy) effect.append(el(`<div class="unavailable">${esc(unavailable(model) || "The base effect cannot be edited right now.")}</div>`));
     node.append(colour, effect);
     return node;
 }

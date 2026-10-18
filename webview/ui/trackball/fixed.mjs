@@ -37,7 +37,7 @@ export function fixedEntry(model, id, slots) {
             <p class="note">${esc(unavailable(model) || "Choose Read keyboard to load this keyboard's trackball settings.")}</p></div>`));
         return wrap;
     }
-    if (!canEdit) wrap.append(el(`<div class="unavailable">${esc(unavailable(model) || "These settings cannot be edited right now.")}</div>`));
+    if (!canEdit && !model?.draft?.busy) wrap.append(el(`<div class="unavailable">${esc(unavailable(model) || "These settings cannot be edited right now.")}</div>`));
     /** @param {string} section @param {string[]} macros */
     const rows = (section, macros) => settingRows(model, /** @type {import("../../../contracts/panel.js").PresentedSection} */ (sectionOf(model, section)), macros, canEdit);
     if (id === "pointer") wrap.append(pointer(model, slots, rows));

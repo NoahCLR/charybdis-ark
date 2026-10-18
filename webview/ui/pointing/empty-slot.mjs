@@ -49,7 +49,7 @@ export function emptySlot(model, slot, canEdit, slots) {
                 <button class="btn" data-act="duplicate" ${disabled}>Duplicate into this slot</button></div>`
                 : ""}
             </div></details>
-        ${canEdit ? "" : `<div class="unavailable">${esc(unavailable(model) || "This slot cannot be edited right now.")}</div>`}
+        ${canEdit || model?.draft?.busy ? "" : `<div class="unavailable">${esc(unavailable(model) || "This slot cannot be edited right now.")}</div>`}
     </div></div></div>`);
     const starter = scrollStarter(slots);
     /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-template]")).forEach((button) => button.addEventListener("click", () =>
