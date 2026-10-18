@@ -14,7 +14,7 @@ export interface MacroForm {
     moveNotice?: string;
     selectionAnchor?: string | null; selectedSteps?: string[]; stepHistory?: MacroHistory;
 }
-export interface PickerState {title: string; context?: string; contextKeycode?: string; mode: 'single' | 'list'; allowedKeys: string[] | null; modifiable?: string[] | null; shortcut?: boolean; maxKeys: number; section: string; search: string; mods: string[]; keys: string[]; layerTap: string | null; onPick?: (expression: string) => void; onShortcut?: (shortcut: {mods: number; key: number}) => void; onCustomKey?: (keycode: string, shortcut: {mods: number; key: number}, name: string) => void; customKeyRuns?: 'behaviour' | 'shortcut'}
+export interface PickerState {title: string; context?: string; contextKeycode?: string; mode: 'single' | 'list'; allowedKeys: string[] | null; modifiable?: string[] | null; shortcut?: boolean; maxKeys: number; section: string; search: string; mods: string[]; keys: string[]; layerTap: string | null; onPick?: (expression: string) => void; onShortcut?: (shortcut: {mods: number; key: number}) => void; onCustomKey?: (keycode: string, shortcut: {mods: number; key: number}, name: string) => void; customKeyRuns?: 'behaviour' | 'shortcut'; layoutKey?: boolean}
 export interface PanelState {
     screen: ScreenId; layer: number; layersOn: number[]; selected: number; tab: string;
     behaviourRow: string | null; behaviourRowShown: string | null; behaviourRoute: {row: string; group: string} | null;

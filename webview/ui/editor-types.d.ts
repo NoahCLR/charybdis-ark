@@ -16,4 +16,6 @@ export interface PickerOptions {
     onCustomKey?: (keycode: string, shortcut: {mods: number; key: number}, name: string) => void;
     /** What the field does with a custom key: runs its behaviour too (default), or sends only its shortcut (a behaviour step). */
     customKeyRuns?: 'behaviour' | 'shortcut';
+    /** A layout key: Use stays off for a key the draft would refuse. */
+    layoutKey?: boolean;
 }

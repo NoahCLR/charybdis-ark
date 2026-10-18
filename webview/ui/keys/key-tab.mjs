@@ -14,6 +14,7 @@ import {currentLayer, getModel, heldLayers, layerName, layers, openComboBuilder,
 import {participationAt} from "../../view/participation.mjs";
 import * as edits from "../../view/edits.mjs";
 import {canHaveBehaviour} from "../../view/behavior-editor.mjs";
+import {keyProblem} from "../../view/keycode-expression.mjs";
 import {actionMarked, comboBadge, comboOutputMarked, keyNameMarked} from "../marks.mjs";
 import {customKeyBypassText, customKeyOf} from "../../view/custom-key.mjs";
 import {unavailable} from "../shell.mjs";
@@ -73,8 +74,20 @@ export function tabKey(body) {
     </div>`);
     /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="pick"]'))?.addEventListener("click", () => pickKeycodeFor(position.layoutIndex));
     /** @type {HTMLInputElement | null} */ (node.querySelector("#keycodeField"))?.addEventListener("change", (event) => {
-        const written = /** @type {HTMLInputElement} */ (event.target).value.trim();
-        if (!written || written === keyMeaning(position)) return;
+        const field = /** @type {HTMLInputElement} */ (event.target);
+        const written = field.value.trim();
+        const note = /** @type {HTMLElement | null} */ (node.querySelector(".keycode-problem"));
+        if (!written || written === keyMeaning(position)) { note?.remove(); field.removeAttribute("aria-invalid"); return; }
+        // A key the draft would refuse stays in the field with the reason
+        // under it, and posts nothing; the rail is not where you are typing.
+        const problem = keyProblem(getModel(), written);
+        if (problem) {
+            field.setAttribute("aria-invalid", "true");
+            if (note) note.textContent = problem;
+            else field.closest(".field")?.append(el(`<p class="note keycode-problem" role="status">${esc(problem)}</p>`));
+            return;
+        }
+        note?.remove(); field.removeAttribute("aria-invalid");
         post(edits.setKey(layer.name, position.layoutIndex, written));
     });
     /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-golayer]")).forEach((button) => button.addEventListener("click", () => {
