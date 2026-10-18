@@ -14,7 +14,7 @@ export function participationAt(model, layer, position, definition, kind = "beha
     if (!((behavior ? policy.behaviorLayers : policy.comboLayers) & bit)) reasons.push(behavior ? "Settings has behaviours off on this layer" : "Settings has combos off on this layer");
     if (definition?.enabled === false) reasons.push(behavior ? "Use this behaviour is off" : "Use this combo is off");
     if (definition && !((definition.allowedLayers ?? 0xffff) & bit)) reasons.push("this layer is not one it runs on");
-    if (!placementOn) reasons.push(behavior ? "this key's Use behaviour is off" : "this key's Join combos is off");
+    if (!placementOn) reasons.push(behavior ? "Runs its behaviour here is off for this key" : "Can start combos here is off for this key");
     return {placementOn, enabled: reasons.length === 0, reasons};
 }
 

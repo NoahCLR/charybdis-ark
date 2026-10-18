@@ -30,8 +30,10 @@ export function previewFoot(layer, lead = "") {
 export function placementBar() {
     const placement = state.placement;
     const node = el(`<div class="pickbar">
-        <span><b>Placing ${placement?.keycode ? actionMarked(getModel(), placement.keycode) : "keycode"}</b> — choose a layer, then click its destination key</span>
-        ${keycodeMark("placeBar", placement?.keycode, "", "n")}
+        <span><b>Placing ${placement?.label ? esc(placement.label) : placement?.keycode ? actionMarked(getModel(), placement.keycode) : "keycode"}</b> — ${placement?.layerTap !== undefined
+            ? "click the key whose tap it keeps"
+            : "choose a layer, then click its destination key"}</span>
+        ${placement?.layerTap !== undefined ? "" : keycodeMark("placeBar", placement?.keycode, "", "n")}
         <span class="right"><button class="btn tiny ghost" data-act="cancel">Cancel</button></span></div>`);
     /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="cancel"]')).addEventListener("click", () => { state.placement = null; render(); });
     return node;
@@ -51,6 +53,11 @@ export function boardHelp(model) {
         ...(edits ? [["Drag", "one key onto another swaps them"], ["Delete", "makes the picked key transparent"]] : []),
         edits ? ["⌘C  ⌘V", "copy a key and paste it onto the picked one"] : ["⌘C", "copy a key"],
         ["⌘-click a layer tab", "preview layers on together"],
+        ["Tab", "reach the board: one stop, on the picked key"],
+        ["← → ↑ ↓", "move to the next key that way"],
+        ["[  ]", "the layer before or after"],
+        ["0 – 9", "jump to that layer"],
+        ...(edits ? [["Enter", "choose what the picked key does"]] : []),
     ];
     return el(`<details class="board-help">
         <summary class="btn ghost icon" aria-label="What the board shows, and its shortcuts" data-tip="What the board shows, and its shortcuts">?</summary>
@@ -63,7 +70,9 @@ export function boardHelp(model) {
                 <span class="legend-item">${dot(colours.tap)} tap</span>
                 <span class="legend-item">${dot(colours.hold)} hold</span>
                 <span class="legend-item">${dot(colours.long)} long hold</span>
-                <span class="legend-item">${comboBadge(model, "C0")} combo input</span>
+                <span class="legend-item">${comboBadge(model, "")} starts a combo · ${comboBadge(model, "2")} starts 2</span>
+                <span class="legend-item">⚠ stops or erases the keyboard</span>
+                <span class="legend-item">"not in this firmware": does nothing here</span>
                 <span class="legend-item"><i class="lkey transparent"></i> Transparent (falls through)</span>
                 <span class="legend-item">— Nothing (blocks lower layers)</span>
                 ${model?.draft?.dirty ? `<span class="legend-item">${draftDot()} changed in your draft</span>` : ""}

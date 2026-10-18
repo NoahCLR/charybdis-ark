@@ -26,7 +26,7 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
             store.setModel({...store.getModel(), ...patch}); store.render();
         }, patch);
         await expect(page.locator("#keycodeField")).toHaveValue("QK_USER_20");
-        await expect(page.locator(".key-details")).toContainText("QK_USER_20");
+        await expect(page.locator(".key-tab .key-more")).toContainText("QK_USER_20");
         await page.locator('[data-act="pick"]').click();
         const picker = page.getByRole("dialog", {name: "Choose a key"});
         // Custom keys holds the named custom keys, Basics holds Nothing and

@@ -6,6 +6,8 @@ const {openControls, clearPosts, expectPost, change, publishAccepted} = require(
 for (const [index, destination] of [[1, 14], [9, 6]]) {
     test(`dragging Layer 15 into visual row ${index} posts slot ${destination}`, async ({page}) => {
         await openControls(page, "keys", {layersOpen: true});
+        // Layer 15 is empty, so it is folded until its fold is opened.
+        await page.locator('.layerpanel [data-act="empties"]').click();
         await expect(page.locator('.layerpanel [data-grip="15"]')).toBeVisible();
         await page.evaluate(index => {
             const list = document.querySelector(".layerpanel .list");

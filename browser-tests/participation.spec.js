@@ -11,11 +11,11 @@ test("participation controls post placements, shared definitions and master/sour
     const clear = () => page.evaluate(() => {window.__posted.length = 0;});
     const posted = () => page.evaluate(() => window.__posted);
     await clear();
-    await page.getByText('Use behaviour', {exact: true}).click();
+    // Esc has a behaviour, so its switch shows; it is in no combo, so that
+    // switch is hidden until it would change something.
+    await expect(page.locator('.key-participation label').filter({has: page.locator('[data-join-combos]')})).toBeHidden();
+    await page.getByText('Runs its behaviour here', {exact: true}).click();
     await expect.poll(posted).toEqual([expect.objectContaining({type: "updatePlacementPolicy", layer: 0, layoutIndex: 0, useBehavior: false, joinCombos: true})]);
-    await clear();
-    await page.getByText('Join combos', {exact: true}).click();
-    await expect.poll(posted).toEqual([expect.objectContaining({type: "updatePlacementPolicy", useBehavior: false, joinCombos: false})]);
 
     await page.locator('[data-tab="behaviours"]').click();
     await clear();
@@ -53,7 +53,7 @@ test("participation controls post placements, shared definitions and master/sour
     expect(errors).toEqual([]);
 });
 
-test("a transparent late-layer key explains its source and opens that placement", async ({page}) => {
+test("a transparent late-layer key says what answers from below and shows it there", async ({page}) => {
     await page.goto("/preview/index.html");
     await page.locator('[data-screen="keys"]').click();
     const model = await page.evaluate(async () => {
@@ -75,12 +75,14 @@ test("a transparent late-layer key explains its source and opens that placement"
         const store = await import("/webview/store.mjs");
         store.setModel(model); store.showLayer(15); store.render();
     }, model);
-    await expect(page.locator('[data-source-layer]')).toBeVisible();
-    await expect(page.locator('.bench-body')).toContainText("This transparent key inherits its permissions");
+    // A transparent key says what answers from below, with a way to show it
+    // there, and runs neither behaviour nor combos of its own.
+    await expect(page.locator('.key-does [data-show-layer="0"]')).toBeVisible();
+    await expect(page.locator('.key-does')).toContainText("Transparent →");
     await expect(page.locator('[data-use-behavior]')).toHaveCount(0);
-    await page.locator('[data-source-layer]').click();
+    await page.locator('.key-does [data-show-layer="0"]').click();
     await expect(page.locator('[data-use-behavior]')).toBeEnabled();
     await page.evaluate(() => {window.__posted.length = 0;});
-    await page.getByText('Use behaviour', {exact: true}).click();
+    await page.getByText('Runs its behaviour here', {exact: true}).click();
     await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([expect.objectContaining({type: "updatePlacementPolicy", layer: 0, layoutIndex: 0})]);
 });

@@ -9,10 +9,10 @@ test("policy uses the supplied source layer and every applicable off scope expla
     assert.deepEqual(participationAt(model, 2, position, definition).reasons, ["Settings has behaviours off on this layer"]);
     const disabled = structuredClone(model); disabled.participation.behaviorsEnabled = false; disabled.participation.layers[15].bypass = [0];
     assert.deepEqual(participationAt(disabled, 15, position, {enabled: false, allowedLayers: 1}).reasons,
-        ["behaviours are off in Settings", "Use this behaviour is off", "this layer is not one it runs on", "this key's Use behaviour is off"]);
+        ["behaviours are off in Settings", "Use this behaviour is off", "this layer is not one it runs on", "Runs its behaviour here is off for this key"]);
     assert.equal(participationAt(disabled, 15, position, definition, "combo").enabled, true, "behaviour bypass and combo exclusion are independent");
     disabled.participation.layers[15].exclude = [0];
-    assert.deepEqual(participationAt(disabled, 15, position, definition, "combo").reasons, ["this key's Join combos is off"]);
+    assert.deepEqual(participationAt(disabled, 15, position, definition, "combo").reasons, ["Can start combos here is off for this key"]);
 });
 
 test("a key is handled by the keyboard only while its behaviour row runs there; otherwise by QMK", () => {

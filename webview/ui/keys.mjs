@@ -6,12 +6,10 @@
 // the key, its behaviour, its combos, and what this layer reaches. The board
 // card's parts, the workbench and each of its tabs live in ui/keys/.
 
-import {isOff, label as hsvLabel} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {comboAnswers, comboInputKeys} from "../view/combo-reach.mjs";
 import {builderInputs, pickComboInput} from "./keys/combo-builder.mjs";
-import {layerColourRow, stageEnabled} from "../view/lighting.mjs";
-import {currentLayer, getModel, heldLayers, layers, post, previewing, render, state, writable} from "../store.mjs";
+import {currentLayer, getModel, heldLayers, layers, positionAt, post, render, showLayer, state, writable} from "../store.mjs";
 import * as edits from "../view/edits.mjs";
 import {draftMarks} from "../view/review.mjs";
 import {board} from "./board.mjs";
@@ -20,9 +18,11 @@ import {attachLayersControl} from "./layers.mjs";
 import {topbar, unavailable} from "./shell.mjs";
 import {bench} from "./keys/bench.mjs";
 import {boardHelp, pickBar, placementBar, previewFoot} from "./keys/board-card.mjs";
+import {layerPlate, placedKeycode} from "./keys/layer-plate.mjs";
 import {behaviourKey, selectBehaviourKey} from "./keys/behaviour-selection.mjs";
 import {pickKeycodeFor, swapKeys} from "./keys/key-edits.mjs";
 import {reachHighlight} from "./keys/reach.mjs";
+import {ARROWS, layerKeyTarget, neighbour} from "../view/board-nav.mjs";
 
 export {keysShortcut} from "./keys/shortcuts.mjs";
 export {previewFoot};
@@ -54,14 +54,12 @@ export function screenKeys() {
     // shortcuts are behind its "?". The tabs sit at the card's foot, next to
     // the workbench, so switching layers mid-edit is a short reach.
     const card = el(`<div class="board-card"></div>`);
-    const row = layerColourRow(model, layer.index);
-    const lit = stageEnabled(model, "layers") && row && !isOff(row.color);
     if (state.placement) card.appendChild(placementBar());
     else if (state.combo.picking) card.appendChild(pickBar());
     // One indication at a time: while a combo is being built its inputs are
     // the keys in question, otherwise the keys that reach the picked row.
     const building = state.combo.picking || (state.combo.open && state.tab === "combos");
-    card.appendChild(board(model, layer, {
+    const node = board(model, layer, {
         selected: state.selected,
         drafted: draftMarks(model?.draft?.changes).keys.get(layer.index),
         reach: building ? comboInputKeys(model, layers(), state.layer, heldLayers(), builderInputs()) : reachHighlight(model),
@@ -72,7 +70,10 @@ export function screenKeys() {
                 const placement = state.placement;
                 state.placement = null;
                 state.selected = index;
-                if (writable()) post(edits.setKey(layer.name, index, placement.keycode));
+                const keycode = placedKeycode(placement, positionAt(layer, index));
+                if (!writable()) { /* nothing to place */ }
+                else if (keycode) post(edits.setKey(layer.name, index, keycode));
+                else pickKeycodeFor(index, {hold: true});
             } else if (state.combo.picking) {
                 // The key the keyboard would answer with here, taken now: a
                 // transparent key picks what shows through it, and switching
@@ -88,13 +89,45 @@ export function screenKeys() {
         },
         onOpen: writable() ? (/** @type {number} */ index) => pickKeycodeFor(index) : undefined,
         onSwap: writable() ? (/** @type {number} */ from, /** @type {number} */ to) => swapKeys(from, to) : undefined,
-    }));
-    card.appendChild(previewing() ? previewFoot(layer) : el(`<div class="board-foot"><span class="board-foot-text">${lit
-        ? `lit ${esc(hsvLabel(row.color))} on ${row.mode === "ALL_KEYS" ? "every key" : "keys mapped here"}`
-        : "no layer colour · the base effect shows through"}</span></div>`));
+        // What layer this is, what it is shown over and how it is reached sit
+        // in the board's empty centre rather than in a caption under it.
+        centre: layerPlate(layer),
+    });
+    node.addEventListener("keydown", (event) => boardKey(event, layer));
+    card.appendChild(node);
     card.append(bar);
     card.prepend(boardHelp(model));
     pad.append(card, bench());
     main.appendChild(content);
     return main;
+}
+
+// The board from the keyboard (decisions §4): the arrow keys move the picked
+// key by where keys sit, [ and ] step through the layers and a digit jumps to
+// one; Enter on the picked key opens the picker (lib/focus.mjs activateOnKey).
+/** @param {KeyboardEvent} event @param {import("../../contracts/panel.js").Layer} layer */
+function boardKey(event, layer) {
+    if (event.metaKey || event.ctrlKey || event.altKey || !(event.target instanceof Element) || !event.target.closest("[data-key]")) return;
+    const direction = ARROWS[event.key];
+    if (direction) {
+        event.preventDefault();
+        const next = neighbour(state.selected, direction, layer.positions.map((position) => position.layoutIndex));
+        if (next === state.selected) return;
+        state.selected = next;
+        if (!state.placement && !state.combo.picking) selectBehaviourKey(behaviourKey(next).keycode);
+        render();
+        focusKey(next);
+        return;
+    }
+    const target = layerKeyTarget(event.key, state.layer, layers().length);
+    if (target === null) return;
+    event.preventDefault();
+    showLayer(target);
+    render();
+    focusKey(state.selected);
+}
+
+/** @param {number} index */
+function focusKey(index) {
+    /** @type {SVGGElement | null} */ (document.querySelector(`.keys-pad .board [data-key="${index}"]`))?.focus();
 }

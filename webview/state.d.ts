@@ -22,14 +22,14 @@ export interface PickerState {title: string; heading?: string; context?: string;
     target: import('./ui/editor-types.js').PickerTarget | null;
     onPick?: (expression: string) => void; onEdit?: (message: import('../contracts/edits.js').PanelEdit) => void; onShortcut?: (shortcut: {mods: number; key: number}) => void; onCustomKey?: (keycode: string, shortcut: {mods: number; key: number}, name: string) => void; customKeyRuns?: 'behaviour' | 'shortcut'}
 export interface PanelState {
-    screen: ScreenId; layer: number; layersOn: number[]; selected: number; tab: string;
+    screen: ScreenId; layer: number; layersOn: number[]; layerOnly: boolean; plateAdd: boolean; selected: number; tab: string;
     behaviourRow: string | null; behaviourRowShown: string | null; behaviourRoute: {row: string; group: string} | null;
     reachGroups: Record<string, boolean>; resetBenchHeight: boolean; reachRow: {macros: string | null; combos: string | null; pointing: string | null};
     cell: string | null; cellRow: string | null; behaviourMenu: 'layers' | 'more' | null; reveal: string | null; pickCombo: number | null; settingsOpen: string[]; keyDetailsOpen: boolean; stackOpen: boolean; showKeycodes: boolean; hideBoard: boolean; allTapCounts: boolean; railMenu: boolean;
     cellHow: {cell: string; keycode: string; helper?: BranchHelper; repeatHz?: Scalar} | null;
     combo: {open: boolean; picking: boolean; inputs: string[]; form: Omit<Combo, 'inputs'> & {output: string; termMs: string}; awaiting: boolean; editId: number | null};
-    placement: {keycode: string} | null; retarget: {from: string; to: string; existing: string} | null; keyClipboard: {keycode: string; label: string} | null;
-    stage: string; layersOpen: boolean; layersAsked: boolean; layerGripFocus?: number; pdSlot: number; pdKind: {slot: number; kind: number} | null;
+    placement: {keycode: string; layerTap?: number; label?: string} | null; retarget: {from: string; to: string; existing: string} | null; keyClipboard: {keycode: string; label: string} | null;
+    stage: string; layersOpen: boolean; layersAsked: boolean; layersEmptyOpen: boolean; layerGripFocus?: number; pdSlot: number; pdKind: {slot: number; kind: number} | null;
     pdButtons: {slot: number; rows: Record<number, PdButton>} | null; pdTaps: {slot: number; rows: Record<string, PdTap>} | null;
     pdAdvanced: boolean; tbEntry: 'pointer' | 'sniping' | 'mouseLayer'; tbEmptiesOpen: boolean; tbFineTuning: boolean; pdStartEmpty: boolean; applyDismissed: number; applied: number; appliedDismissed: number; applyWait: {id: number; since: number} | null; applyReread: number; pdPreview: boolean; feedbackRow: string | undefined;
     macroSlot: string | null; macroSearch: string; macroEmptyOpen: boolean; customKey: string | null; customKeySearch: string; customKeyEmptyOpen: boolean; customKeyAddBehaviour: string | null; macroForms: Record<string, MacroForm>;

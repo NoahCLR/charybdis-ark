@@ -245,7 +245,17 @@ async function draftControl(session, message, host = {}) {
 const PORTABLE_ACTIONS = Object.freeze({
     cancel: ({session}) => {closeEditors(session);},
     choose: context => PORTABLE_ACTIONS.reviewImport(context),
-    editLayer: ({session, message}) => {applyLayerEdit(session.portableLayers, /** @type {import('../../contracts/messages.js').LayerEditControl} */ (message));},
+    // With a draft open, each rename, move or Make base is its own draft edit,
+    // undone like any other; the panel then edits on from the draft as it now
+    // is. With none (a keyboard restored directly), the edits wait for Save.
+    editLayer: ({session, message}) => {
+        const edit = applyLayerEdit(session.portableLayers, /** @type {import('../../contracts/messages.js').LayerEditControl} */ (message));
+        const draft = session.draft;
+        if (!draft || !edit) return;
+        if (edit.revision !== draft.revision || (edit.draftId !== undefined && edit.draftId !== draft.id)) throw new Error("These layers belong to an older draft. Open Layers… again.");
+        draft.editLayers(layerEditDocument(edit), draft.revision, edit.order);
+        session.portableLayers = {...startLayerEdit(draft.current, draft.revision), keysFollow: edit.keysFollow, deviceId: edit.deviceId, draftId: draft.id};
+    },
     saveLayers: context => PORTABLE_ACTIONS.restore(context),
     reviewImport: async ({session, message, host, service}) => {
         // The host answers with the file's text, and its name when it has one.

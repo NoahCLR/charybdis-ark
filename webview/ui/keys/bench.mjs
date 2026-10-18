@@ -5,7 +5,6 @@
 import {el, esc} from "../../lib/dom.mjs";
 import {behaviourGroups, macroReach, pointingReach} from "../../view/reach.mjs";
 import {comboGroups} from "../../view/combo-reach.mjs";
-import {mappedKeyCount} from "../../view/lighting.mjs";
 import {currentLayer, getModel, layers, render, selectedPosition, state} from "../../store.mjs";
 import {draftDot, draftMarks} from "../../view/review.mjs";
 import {attachBoardToggle, keepInView} from "../layerbar.mjs";
@@ -31,7 +30,8 @@ export function bench() {
     const layer = currentLayer();
     /** @type {Record<string, string>} */
     const counts = {
-        key: String(mappedKeyCount(layer)),
+        // The Key tab is the picked key, so it carries no count.
+        key: "",
         behaviours: String((({here, combos}) => new Set([...here, ...combos.map((entry) => entry.row)]).size)(behaviourGroups(model, layers(), state.layer))),
         combos: String(comboGroups(model, layers(), state.layer).onKeys.length),
         macros: String(storedCount(macroReach(model, layers(), state.layer))),
@@ -45,7 +45,7 @@ export function bench() {
     const node = el(`<div class="card bench">
         <div class="bench-tabs"><div class="bench-tablist" role="tablist">
             ${TABS.map((tab) => `<button role="tab" data-tab="${tab.id}" aria-selected="${state.tab === tab.id}">
-                <span class="tab-label">${tab.label}</span><span class="c">${esc(counts[tab.id])}</span>${drafted[tab.id] ? draftDot() : ""}</button>`).join("")}</div>
+                <span class="tab-label">${tab.label}</span>${counts[tab.id] ? `<span class="c">${esc(counts[tab.id])}</span>` : ""}${drafted[tab.id] ? draftDot() : ""}</button>`).join("")}</div>
             <span class="bench-right" id="benchRight"></span>
         </div>
         <div class="bench-body" id="benchBody"></div>

@@ -6,7 +6,7 @@ import {el, esc} from "../../lib/dom.mjs";
 import {keyMeaning} from "../../view/keyface.mjs";
 import {pointingReach, pointingVariant, reachInView} from "../../view/reach.mjs";
 import {pdColourRow} from "../../view/lighting.mjs";
-import {getModel, layers, render, state} from "../../store.mjs";
+import {addedLayers, getModel, layers, render, state} from "../../store.mjs";
 import {draftDot, draftMarks} from "../../view/review.mjs";
 import {attachReachRows, reachAttrs, reachTable} from "../groups.mjs";
 import {reachEntries} from "../../view/reach-groups.mjs";
@@ -19,7 +19,7 @@ export function tabPointing(body, right) {
     const model = getModel();
     const reach = {...pointingReach(model, layers(), state.layer), inView: pointingView(model)};
     right.replaceChildren();
-    const open = el(`<button class="btn tiny ghost">Open Trackball modes →</button>`);
+    const open = el(`<button class="btn text compact">Trackball modes →</button>`);
     open.addEventListener("click", () => { state.screen = "pointing"; render(); });
     right.appendChild(open);
 
@@ -42,7 +42,7 @@ export function tabPointing(body, right) {
                 ? `${slot.kind === 2 ? "Scrolling" : "Directional"}${slot.dpi ? ` · ${slot.dpi} DPI` : " · normal ball speed"}`
                 : "Empty · these keys do nothing yet"}</td>
             <td class="muted">${reachedBy}</td>
-            <td class="reach-edit"><button class="btn tiny ghost" data-editpd="${slot.id}">Edit</button></td></tr>`;
+            <td class="reach-edit"><button class="btn text compact" data-editpd="${slot.id}">Open →</button></td></tr>`;
     };
     // Holding a mode and toggling it on are the same mode reached two ways, so
     // the card is named for the one its route uses. A route that uses both
@@ -84,7 +84,9 @@ export function tabPointing(body, right) {
     // A folded group holding a changed slot says so on its header.
     for (const group of groups) group.drafted = (group.ids || reachEntries(reach, group.id).map((entry) => entry.name))
         .some((id) => changedSlots.has(Number(id)));
-    const node = reachTable("pointing", groups, [["Trackball mode", "30%"], ["Movement", "26%"], ["Reached by", "36%"], ["", "8%"]]);
+    // "On this view" says something only while other layers are added to the
+    // view; over the default layers alone it repeats this layer and below.
+    const node = reachTable("pointing", groups.filter((group) => group.id !== "view" || addedLayers().length > 0), [["Trackball mode", "30%"], ["Movement", "24%"], ["Reached by", "36%"], ["", "10%"]], {collapseEmpty: true});
     attachReachRows(node, "pointing");
     /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-editpd]")).forEach((button) => button.addEventListener("click", () => {
         state.pdSlot = Number(button.dataset.editpd);

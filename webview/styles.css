@@ -457,7 +457,17 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 }
 .layer-tab.on:hover { background: color-mix(in srgb, var(--tab-tint, var(--text-3)) 24%, var(--surface-2)); }
 .layer-tab .swatch { width: 9px; height: 9px; border-radius: var(--r-chip); border: 1px solid var(--line-2); flex: none; }
-.layer-tab .idx { font-family: var(--mono); font-size: var(--fs-micro); color: var(--text-3); }
+.layer-tab .idx, .layer-empties-menu .idx { min-width: 2ch; font-family: var(--mono); font-size: var(--fs-micro); color: var(--text-3); font-variant-numeric: tabular-nums; }
+/* Empty layers fold into one "+N empty" tab beside the strip, whose menu lists them. */
+.layer-empties { position: relative; flex: none; }
+.layer-empties > summary { list-style: none; cursor: pointer; }
+.layer-empties > summary::-webkit-details-marker { display: none; }
+.layer-empties-menu {
+  position: absolute; z-index: 6; top: calc(100% + var(--s-1)); left: 0; min-width: 160px; max-height: 300px; overflow-y: auto;
+  display: flex; flex-direction: column; align-items: stretch; gap: var(--s-1); padding: var(--s-2);
+  background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--r-card); box-shadow: var(--shadow-1);
+}
+.layer-empties-menu .btn { justify-content: space-between; gap: var(--s-3); }
 /* Rename & Reorder stays in reach at the strip's end, outside what scrolls. */
 .layerbar-wrap > .layer-edit { flex: none; margin: 0 10px 0 10px; }
 /* One line at a fixed height, so the board does not move when the caption
@@ -467,6 +477,37 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 .board-foot > .board-foot-text { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .board-foot b { color: var(--text); font-weight: var(--fw-strong); }
 .board-foot .right { margin-left: auto; display: flex; gap: 6px; }
+/* The layer plate, laid over the board's empty centre (ui/board.mjs places
+   it): the layer's name, what it is shown over, how it is reached. */
+.board-centre { position: absolute; z-index: 1; }
+.layer-plate {
+  display: flex; flex-direction: column; justify-content: center; gap: var(--s-2);
+  padding: var(--s-2); color: var(--text-2); font-size: var(--fs-small); line-height: var(--lh-small);
+}
+.plate-name { display: flex; align-items: center; gap: var(--s-2); min-width: 0; color: var(--text); }
+.plate-name .swatch { width: 12px; height: 12px; border-radius: var(--r-chip); border: 1px solid var(--line-2); flex: none; }
+.plate-title { font-size: var(--fs-heading); line-height: var(--lh-heading); font-weight: var(--fw-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plate-row { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s-1) var(--s-2); }
+.plate-over { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plate-note { color: var(--text-3); }
+.plate-reach { display: flex; flex-direction: column; align-items: flex-start; gap: 0; min-width: 0; }
+.plate-reach .eyebrow { margin-bottom: var(--s-1); }
+.plate-way { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); text-align: left; }
+button.plate-way:hover { text-decoration: underline; }
+.plate-more { color: var(--text-3); }
+.plate-warn { color: var(--warning); font-weight: var(--fw-medium); }
+.plate-foot { display: flex; }
+.plate-pop { position: relative; }
+.plate-pop > summary { list-style: none; display: inline-flex; align-items: center; margin-left: calc(-1 * var(--s-2)); }
+.plate-pop > summary::-webkit-details-marker { display: none; }
+.plate-menu {
+  position: absolute; z-index: 6; left: 0; top: calc(100% + var(--s-1)); min-width: 200px; max-height: 240px; overflow-y: auto;
+  display: flex; flex-direction: column; align-items: stretch; gap: var(--s-1); padding: var(--s-2);
+  background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--r-card); box-shadow: var(--shadow-1);
+}
+.plate-menu .btn { justify-content: flex-start; gap: var(--s-2); }
+.plate-menu .swatch { width: 9px; height: 9px; border-radius: var(--r-chip); border: 1px solid var(--line-2); flex: none; }
+.plate-menu .note { white-space: normal; }
 /* A layer named elsewhere as a link to it (Macros) is a chip. */
 .layer-chip {
   display: inline-flex; align-items: center; gap: 8px; height: 28px; padding: 0 10px 0 8px;
@@ -508,8 +549,12 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 .layerpanel .list-row { gap: 10px; }
 /* A layer row: the grip, its number, its name, what it holds, Make base. The
    base row keeps the grip's column empty, since it does not move. */
-.lp-row { grid-template-columns: 18px 20px minmax(0, 1fr) 92px 82px; align-items: center; }
-.lp-row .lp-base, .lp-row [data-base] { justify-self: end; }
+.lp-row { grid-template-columns: 18px 12px 20px minmax(0, 1fr) 92px 56px 92px; align-items: center; }
+.lp-row .lp-default { grid-column: 6; justify-self: start; }
+.lp-row [data-base] { grid-column: 7; justify-self: end; }
+.lp-row .lp-swatch { width: 12px; height: 12px; border-radius: var(--r-chip); border: 1px solid var(--line-2); }
+.lp-row[hidden] { display: none; }
+.layerpanel .lp-fold { align-self: flex-start; margin: var(--s-1) 0; }
 .lp-row.base { box-shadow: inset 0 1px 0 var(--line-2); }
 .lp-grip {
   width: 18px; height: var(--h-compact); display: grid; place-items: center; padding: 0; border: 0; border-radius: var(--r-chip);
@@ -612,7 +657,6 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 .kc-ball circle { transition: fill .12s ease, stroke .12s ease; }
 .kc-ball[data-trackball] { cursor: crosshair; }
 .kc-ball[data-trackball]:hover circle { stroke: var(--text); }
-.kc-dotn { font-family: var(--mono); font-size: 5.8px; font-weight: 700; text-anchor: middle; dominant-baseline: central; }
 .kc-badgetext { fill: var(--badge-text); font-family: var(--mono); font-weight: 700; text-anchor: middle; dominant-baseline: central; }
 /* Every legend mark sits in the same 12px-high slot with the same stroke, so
    the row reads as one scale: squares for key states, dots for branches, the
@@ -815,6 +859,9 @@ button.tier:hover { background: var(--surface-3); }
 .rowlist .group-h[aria-expanded="false"] { border-bottom: 0; }
 .rowlist .rowgroup + .rowgroup .group-h { border-top: 1px solid var(--line); }
 .reach-table { padding: 2px 0; }
+/* The Macros and Trackball modes reach tabs: 40 px rows, Open → at the end. */
+.reach-rows tr[data-reach] > td { height: 40px; vertical-align: middle; }
+.reach-rows .rowgroup-none-line .note { padding: var(--s-2) var(--s-3); }
 
 /* The behaviour editor (ui/keys/behaviour-editor.mjs): a head with its name
    and On · Layers ▾ · More ▾, one 40 px timing strip, then the grid. Its open
@@ -920,6 +967,30 @@ button.tier:hover { background: var(--surface-3); }
 .stackrow.folded .nm { color: var(--text-2); }
 .stackrow .swatch-lg { width: 12px; height: 12px; border-radius: var(--r-chip); }
 .key-reaches { gap: 8px; }
+/* The inspector: title, Does, the Key row, what it reaches. */
+.key-tab.tab-grid.two { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); }
+.key-main { display: flex; flex-direction: column; gap: var(--s-3); }
+.key-title { display: flex; align-items: center; gap: var(--s-2); min-width: 0; }
+.key-title h3 { font-size: var(--fs-heading); line-height: var(--lh-heading); font-weight: var(--fw-strong); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.key-title .key-title-swatch { width: 12px; height: 12px; border-radius: var(--r-chip); border: 1px solid var(--line-2); flex: none; }
+.key-title .key-where { margin-left: auto; font-size: var(--fs-small); }
+.key-warn { color: var(--warning); }
+.key-does { margin: 0; }
+.key-does dd { min-width: 0; font-family: var(--sans); font-size: var(--fs-body); }
+.key-does dd .btn.text { margin-left: var(--s-1); vertical-align: middle; }
+.key-inert { color: var(--warning); }
+.key-row .input-row { flex-wrap: wrap; }
+.key-row .input-row .input { flex: 1 1 160px; min-width: 0; }
+.key-field-error { color: var(--warning); margin-top: var(--s-1); }
+.key-reach-rows { display: grid; gap: var(--s-1); border-top: 1px solid var(--line); padding-top: var(--s-2); }
+.key-line { display: grid; grid-template-columns: 112px minmax(0, 1fr) auto; gap: var(--s-2); align-items: center; min-height: var(--h-control); font-size: var(--fs-body); }
+.key-line .mk-swatch { vertical-align: middle; }
+.key-combo-list { display: grid; gap: 2px; min-width: 0; }
+.key-row-link { display: flex; gap: var(--s-2); justify-content: space-between; text-align: left; min-width: 0; padding: 2px 0; }
+.key-row-link > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.key-row-link:hover > span:first-child { text-decoration: underline; }
+.stack-show { color: var(--text-3); font-size: var(--fs-small); visibility: hidden; }
+.stackrow:hover .stack-show, .stackrow:focus-visible .stack-show { visibility: visible; color: var(--text-2); }
 .key-participation { gap: 8px; margin-top: 16px; }
 .key-participation > .sect-h { margin: 6px 0 2px; }
 .def-layers > summary { cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
@@ -1234,6 +1305,7 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .hc-head { padding: 10px 12px 10px; border-bottom: 1px solid var(--line); }
 .hc-title { display: flex; align-items: center; gap: 8px; }
 .hc-title .t { font-size: var(--fs-heading); font-weight: var(--fw-strong); letter-spacing: -.02em; }
+.hc-warn { color: var(--warning); }
 .hc-pill { margin-left: auto; font-family: var(--mono); font-size: var(--fs-micro); color: var(--text-3);
   border: 1px solid var(--line); border-radius: var(--r-chip); padding: 1px 6px; }
 .hc-code { display: block; margin-top: 4px; font-family: var(--mono); font-size: var(--fs-micro); color: var(--text-3); }

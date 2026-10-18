@@ -22,4 +22,5 @@ test("the layer panel posts every typed name with a toggle, a move and a save", 
     assert.deepEqual(controls.moveLayer(1, {to: 3}, names), {type: "editPortableLayer", id: 1, to: 3, names});
     assert.deepEqual(controls.moveLayer(1, {direction: -1}, names), {type: "editPortableLayer", id: 1, direction: -1, names});
     assert.deepEqual(controls.moveLayer(1, {makeBase: true}, names), {type: "editPortableLayer", id: 1, makeBase: true, names});
+    assert.deepEqual(controls.renameLayer(1, "Symbols"), {type: "editPortableLayer", id: 1, name: "Symbols"});
 });

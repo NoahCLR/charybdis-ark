@@ -122,21 +122,23 @@ const holdPhrase = (index, name, longer) => `${index === 0 ? `Hold ${name}` : `T
 // action, less the parts its behaviour row replaces, and each branch of that
 // row. A hold branch that presses and holds until release holds the layer; any
 // other hold, like a tap, sends the action once.
-/** @param {number} code @param {BehaviorRow | undefined} row @param {readonly number[]} [values] @returns {(LayerEffect & {how: string, note?: string})[]} */
+/** @param {number} code @param {BehaviorRow | undefined} row @param {readonly number[]} [values] @returns {(LayerEffect & {how: string, note?: string, press: import("../../contracts/model.js").LayerWay["press"], tapIndex: number, own?: boolean})[]} */
 function keyEffects(code, row, values) {
-    /** @type {(LayerEffect & {how: string, note?: string})[]} */
+    /** @type {(LayerEffect & {how: string, note?: string, press: import("../../contracts/model.js").LayerWay["press"], tapIndex: number, own?: boolean})[]} */
     const effects = [];
     const first = row?.steps.find((step) => step.tapIndex === 0);
     for (const effect of layerEffects(code)) {
         if (effect.taps && row) continue;
         if (effect.kind === "hold" && !effect.oneShot ? first?.hold : first?.tap) continue;
-        effects.push({...effect, how: effect.taps ? `Tap ${codeName(code)} ${effect.taps} times` : effect.kind === "hold" && !effect.oneShot ? `Hold ${codeName(code)}` : `Tap ${codeName(code)}`});
+        const held = effect.kind === "hold" && !effect.oneShot;
+        effects.push({...effect, press: held ? "hold" : "tap", tapIndex: effect.taps ? effect.taps - 1 : 0, own: true,
+            how: effect.taps ? `Tap ${codeName(code)} ${effect.taps} times` : held ? `Hold ${codeName(code)}` : `Tap ${codeName(code)}`});
     }
     for (const step of row?.steps || []) {
         /** @param {Action | undefined} action */
         const sends = (action) => `its behaviour sends ${actionName(/** @type {Action} */ (action))}`;
         for (const effect of actionEffects(step.tap)) {
-            if (effect.kind !== "hold" || effect.oneShot) effects.push({...effect, how: tapPhrase(step.tapIndex, codeName(code)), note: sends(step.tap)});
+            if (effect.kind !== "hold" || effect.oneShot) effects.push({...effect, press: "tap", tapIndex: step.tapIndex, how: tapPhrase(step.tapIndex, codeName(code)), note: sends(step.tap)});
         }
         for (const [part, longer] of /** @type {const} */ ([["hold", false], ["longHold", true]])) {
             if (part === "hold" && values && row && releaseHoldUnreachable(step, effectiveTimings(row, values))) continue;
@@ -144,7 +146,7 @@ function keyEffects(code, row, values) {
             for (const effect of actionEffects(hold?.action)) {
                 const press = hold?.mode === KEY_BEHAVIOR_HOLD_MODES.PRESS_AND_HOLD_UNTIL_RELEASE;
                 if (effect.kind === "hold" && !press) continue;
-                effects.push({...effect, how: holdPhrase(step.tapIndex, codeName(code), longer), note: sends(hold?.action)});
+                effects.push({...effect, press: part, tapIndex: step.tapIndex, how: holdPhrase(step.tapIndex, codeName(code), longer), note: sends(hold?.action)});
             }
         }
     }
@@ -609,6 +611,61 @@ function findings(facts, walked) {
     return results;
 }
 
+// How each layer is turned on, for the Keys screen's layer plate: every key,
+// behaviour, combo and the trackball that holds, locks or moves to a layer,
+// counted only where it can answer — on a layer the walk reaches, not under a
+// default layer that covers it — and never a key that acts on its own layer
+// (that is its way out, not in). `reached` is null when the walk could not
+// establish which layers are reached, so nothing is claimed either way.
+/** @param {import("./types.js").DecodedProfile} decoded @returns {import("../../contracts/model.js").LayerWays | null} */
+function layerWays(decoded) {
+    if (decoded?.document?.layers?.length !== LAYERS) return null;
+    const facts = profileFacts(decoded);
+    const compact = compactWalk(facts);
+    const walked = compact.complete || compact.reachabilityComplete ? compact : {...boundedWalk(facts), uncertainty: compact};
+    const complete = Boolean(walked.reachabilityComplete ?? walked.complete);
+    const reached = walked.reachedLayers ?? [...(walked.parent?.keys() || [])].reduce((mask, state) => mask | locksOf(state) | heldOf(state), facts.always);
+    /** @type {import("../../contracts/model.js").LayerWay[][]} */
+    const ways = Array.from({length: LAYERS}, () => []);
+    /** @param {LayerEffect & {press: import("../../contracts/model.js").LayerWay["press"], tapIndex: number, own?: boolean}} effect @param {import("../../contracts/model.js").LayerWay["from"]} from @param {number} [source] */
+    const add = (effect, from, source) => {
+        if (effect.kind === "unowned" || effect.layer >= LAYERS || effect.layer === source) return;
+        const verb = effect.kind === "hold" ? (effect.oneShot ? "oneShot" : "hold") : effect.kind;
+        const way = {verb, press: effect.press, tapIndex: effect.tapIndex, own: Boolean(effect.own), from};
+        const key = JSON.stringify(way);
+        if (!ways[effect.layer].some((known) => JSON.stringify(known) === key)) ways[effect.layer].push(/** @type {import("../../contracts/model.js").LayerWay} */ (way));
+    };
+    for (let layer = 0; layer < LAYERS; layer++) {
+        if (complete && !(reached & bit(layer))) continue;
+        // Default layers above this one cover it wherever they are not transparent.
+        const above = facts.always & ~((bit(layer) << 1) - 1);
+        facts.layers[layer].forEach((code, position) => {
+            if (code === TRANSPARENT || code === NOTHING) return;
+            if (layersIn(above).some((over) => facts.layers[over][position] !== TRANSPARENT)) return;
+            const row = facts.rows.get(code);
+            for (const effect of keyEffects(code, facts.behaviorUsed(row, layer, position) ? row : undefined, facts.values)) add(effect, {layer, layoutIndex: position}, layer);
+        });
+    }
+    let reachable = walked.reachableCombos;
+    if (!reachable) {
+        reachable = new Set();
+        for (const active of walked.cache.keys()) {
+            const present = comboCodes(facts, active);
+            for (const combo of facts.combos) if (combo.inputs.length && combo.inputs.every(code => (present.get(code) || []).some(layer => combo.allowedLayers & bit(layer)))) reachable.add(combo.index);
+        }
+    }
+    for (const combo of facts.combos) {
+        if (complete && !reachable.has(combo.index)) continue;
+        const outputCode = /** @type {number} */ (nativeCode(combo.output)), row = facts.rows.get(outputCode);
+        const effects = facts.generatedLayers(row, combo) ? keyEffects(outputCode, row, facts.values)
+            : actionEffects(combo.output).map((effect) => ({...effect, press: /** @type {"hold" | "tap"} */ (effect.kind === "hold" && !effect.oneShot ? "hold" : "tap"), tapIndex: 0, own: true}));
+        for (const effect of effects) add(effect, {combo: combo.index});
+    }
+    if (facts.pointer !== undefined && facts.pointer < LAYERS) add({kind: "hold", layer: facts.pointer, press: "hold", tapIndex: 0, own: true}, {trackball: true});
+    return {complete, defaults: layersIn(facts.always),
+        layers: ways.map((entries, layer) => ({layer, reached: complete ? Boolean(reached & bit(layer)) : null, ways: entries}))};
+}
+
 // A finding's identity across two profiles: what kind it is and which layers it
 // is about, named by the keyboard layer each slot holds (`order[slot]`, as
 // model/layer-order.js keeps it).
@@ -650,4 +707,4 @@ function draftChecks(keyboard, draft, order = IDENTITY) {
     return compareFindings(keyboard ? layerReach(keyboard) : [], layerReach(draft), order);
 }
 
-module.exports = {layerReach, draftChecks, compareFindings, findingKey, LEVELS};
+module.exports = {layerReach, layerWays, draftChecks, compareFindings, findingKey, LEVELS};

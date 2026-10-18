@@ -57,6 +57,8 @@ export interface DraftView {
     reason: DraftBlock;
     canUndo: boolean; canRedo: boolean; undoLabel: string | null; redoLabel: string | null; historyLength: number; reviewed: boolean;
     changes: ReviewChange[]; checks: Check[]; steps?: HistoryStep[];
+    /** How each layer of this draft is turned on (core/model/layer-reach.js layerWays), for the Keys layer plate. */
+    layerWays?: import('./model.js').LayerWays | null;
     /** What changed on the keyboard since the draft began, one line each (stale bar). */
     keyboardChanged?: string[];
 }

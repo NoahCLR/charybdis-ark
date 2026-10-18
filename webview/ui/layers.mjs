@@ -20,6 +20,8 @@
 import * as controls from "../view/controls.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {mappedKeyCount} from "../view/lighting.mjs";
+import {layerIsEmpty} from "../view/layer-tabs.mjs";
+import {layerSwatch} from "./layerbar.mjs";
 import {NAME_MAX_BYTES, NAME_TIP} from "../view/names.mjs";
 import {getModel, layers, post, render, state, canEdit as canEditArea} from "../store.mjs";
 
@@ -101,8 +103,13 @@ function editor(model, portable, busy) {
     const names = [...portable.layers.names];
     const order = [...portable.layers.order].reverse();
     const follow = portable.layers.keysFollow !== false;
+    // With a draft open each rename and move is its own draft edit, undone
+    // like any other (the host commits it and the panel edits on from the
+    // draft); with none, the edits wait for Save, which restores the keyboard.
+    const live = Boolean(model?.draft);
+    const defaults = new Set(model?.draft?.layerWays?.defaults || [0]);
     const node = el(`<div class="layerpanel-body">
-        <div class="sect-h"><h4>Layers</h4><span class="note">higher layers win · drag a row to move it</span></div>
+        <div class="sect-h"><h4>Layers</h4><span class="note">higher layers win · drag a row to move it${live ? " · each change is in your draft at once" : ""}</span></div>
         <div class="list"></div>
         <div class="stack layerpanel-actions">
             <div class="stack">
@@ -112,32 +119,46 @@ function editor(model, portable, busy) {
                     ? "Layer keys (MO, LT, TG, TO, TT, OSL…) are renumbered with the move, so each still reaches the same layer. Make base swaps the two roles: a key that reached the new base reaches the old one."
                     : "Layer keys keep their numbers: a key set to MO(1) reaches whatever layer is now 1. Names, colours and the pointer and sniping settings still move with their layer, and Make base still swaps the keys that reach the two layers."}</span>
             </div>
-            <div class="row">
-                <button class="btn primary" data-act="save" ${busy ? "disabled" : ""}>Add to draft</button>
+            ${live ? "" : `<div class="row">
+                <button class="btn primary" data-act="save" ${busy ? "disabled" : ""}>Save to keyboard</button>
                 <button class="btn ghost" data-act="cancel" ${busy ? "disabled" : ""}>Discard</button>
-            </div>
+            </div>`}
         </div></div>`);
 
     const list = /** @type {HTMLElement} */ (node.querySelector(".list"));
+    /** @type {string[]} */
+    const folded = [];
     order.forEach((layerId) => {
         const position = portable.layers.order.indexOf(layerId);
         const layer = layers().find((entry) => entry.index === layerId);
         const mapped = mappedKeyCount(layer);
         const base = position === 0;
         const label = names[layerId] || (layerId ? `Layer ${layerId}` : "Base");
-        const row = el(`<div class="list-row lp-row${base ? " base" : ""}" data-row="${layerId}">
+        const swatch = layer ? layerSwatch(model, layer, "lp-swatch").html : `<span class="lp-swatch swatch swatch-off"></span>`;
+        // An empty layer (no name, keys or colour) is folded away.
+        const empty = !base && layer && layerIsEmpty(model, layer);
+        const row = `<div class="list-row lp-row${base ? " base" : ""}${empty ? " lp-empty" : ""}" data-row="${layerId}" ${empty && !state.layersEmptyOpen ? "hidden" : ""}>
             ${base ? `<span class="lp-grip-slot" aria-hidden="true"></span>`
                 : `<button class="lp-grip" data-grip="${layerId}" ${busy ? "disabled" : ""} aria-label="Move ${esc(label)}: drag, or press the up and down arrows"
                     data-tip="Drag to move this layer, or focus it and press ↑ ↓.">${GRIP}</button>`}
-            <span class="note mono">${layerId}</span>
+            ${swatch}<span class="note mono">${layerId}</span>
             <input data-f="layer:${layerId}:name" class="input" value="${esc(names[layerId])}" data-name="${layerId}" maxlength="${NAME_MAX_BYTES}" ${busy ? "disabled" : ""} data-tip="${esc(NAME_TIP)}"
                 aria-label="${layerId ? `Name for layer ${layerId}` : "Base layer name"}">
             <span class="note ${mapped ? "" : "dim"}">${mapped ? `${mapped} key${mapped === 1 ? "" : "s"}` : "nothing mapped"}</span>
-            ${base ? `<span class="tag lp-base" data-tip="Always on, and what every transparent key falls through to.">base</span>`
-                : `<button class="btn tiny ghost" data-base="${layerId}" ${busy ? "disabled" : ""}
-                    data-tip="Put this layer at the bottom. Its Transparent keys become Nothing; Nothing on the former base becomes Transparent. An uncoloured former base gets the saved base colour.">Make base</button>`}</div>`);
-        list.append(row);
+            ${defaults.has(layerId) ? `<span class="tag lp-default" data-tip="A default layer: always on underneath every other layer.">default</span>` : ""}
+            ${base ? "" : `<button class="btn text compact" data-base="${layerId}" ${busy ? "disabled" : ""}
+                    data-tip="Put this layer at the bottom. Its Transparent keys become Nothing; Nothing on the former base becomes Transparent. An uncoloured former base gets the saved base colour.">Make base</button>`}</div>`;
+        if (empty) folded.push(row);
+        list.append(el(row));
     });
+    // The empty layers keep their places (a row's place is its slot) but are
+    // hidden behind one line before the first of them.
+    if (folded.length) {
+        const first = list.querySelector(".lp-empty");
+        const fold = el(`<button class="btn text compact lp-fold" data-act="empties">${state.layersEmptyOpen ? "Hide" : "Show"} ${folded.length} empty layer${folded.length === 1 ? "" : "s"}</button>`);
+        list.insertBefore(fold, first);
+        fold.addEventListener("click", () => { state.layersEmptyOpen = !state.layersEmptyOpen; render(); });
+    }
 
     const currentNames = () => {
         /** @type {NodeListOf<HTMLInputElement>} */ (node.querySelectorAll("[data-name]")).forEach((input) => { names[Number(input.dataset.name)] = input.value.trim(); });
@@ -168,12 +189,17 @@ function editor(model, portable, busy) {
     // Both close the panel here rather than waiting for the host's answer: the
     // row underneath shows the result, and a panel left open over it would only
     // hide what it changed.
-    /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="save"]')).addEventListener("click", () => {
+    // A name is posted as it is changed: in the draft, as its own edit.
+    if (live) /** @type {NodeListOf<HTMLInputElement>} */ (node.querySelectorAll("[data-name]")).forEach((input) => input.addEventListener("change", () => {
+        const id = Number(input.dataset.name), name = input.value.trim();
+        if (name !== (portable.layers.names[id] || "")) post(controls.renameLayer(id, name));
+    }));
+    /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="save"]'))?.addEventListener("click", () => {
         post(controls.saveLayers(currentNames()));
         closeLayers();
         render();
     });
-    /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="cancel"]')).addEventListener("click", () => {
+    /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="cancel"]'))?.addEventListener("click", () => {
         post(controls.control("cancelPortableReview"));
         closeLayers();
         render();

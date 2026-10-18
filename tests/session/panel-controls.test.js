@@ -343,9 +343,11 @@ test("the layer panel's keys-follow toggle decides whether layer keys are renumb
             assert.equal(session.portableLayers.keysFollow, false);
             assert.equal(session.portableLayers.names[2], "Typed", "a name typed before the toggle is kept");
         }
-        for (let step = 0; step < 3; step++) await portableControl(session, {type: "editPortableLayer", id: 4, direction: -1, names: session.portableLayers.names});
         const before = draft.current.document;
-        await portableControl(session, {type: "savePortableLayers", names: session.portableLayers.names});
+        // Each move is its own draft edit, and the panel goes on from the
+        // draft as it now is, so the layer is found at its new slot each time.
+        for (let step = 0; step < 3; step++) await portableControl(session, {type: "editPortableLayer", id: 4 - step, direction: -1, names: session.portableLayers.names});
+        assert.ok(session.portableLayers, "the panel stays open on the draft");
         const after = draft.current.document;
         assert.deepEqual(after.layers[1].slice(2), before.layers[4].slice(2), "layer 4 moved to 1 with its keys");
         assert.equal(draft.current.summary.names[1], layer4Name, "its name moved with it");

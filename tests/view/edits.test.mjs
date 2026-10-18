@@ -1257,7 +1257,7 @@ test("literal step messages inspect and stage the exact text with undo intact", 
     assert.deepEqual(draft.document, before);
 });
 
-test("the layer panel's toggle, moves and save reach the draft through the real layer editor", async () => {
+test("the layer panel's rename, toggle and moves are each a draft edit through the real layer editor", async () => {
     const {portableControl} = require("../../core/session/panel-controls");
     const {routeMessage} = require("../../core/session/panel-session");
     const draft = session(), before = draft.document;
@@ -1269,24 +1269,20 @@ test("the layer panel's toggle, moves and save reach the draft through the real 
         await portableControl(panel, payload);
     };
     await send(controls.control("managePortableLayers"));
+    await send(controls.renameLayer(3, "777"));
+    assert.equal(draft.current.summary.names[3], "777", "a rename is in the draft at once");
     const typed = [...panel.portableLayers.names];
-    typed[2] = "777";
     await send(controls.layersFollow(false, typed));
-    assert.equal(panel.portableLayers.keysFollow, false);
-    assert.equal(panel.portableLayers.names[2], "777", "the toggle keeps the names typed with it");
+    assert.equal(panel.portableLayers.keysFollow, false, "the switch holds for the moves after it");
     await send(controls.moveLayer(4, {direction: -1}, panel.portableLayers.names));
-    await send(controls.moveLayer(1, {to: 3}, panel.portableLayers.names));
+    assert.deepEqual(draft.order, [0, 1, 2, 4, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], "the move is in the draft at once");
+    assert.equal(draft.current.summary.names[4], "777", "the renamed layer moved up past it");
     await send(controls.moveLayer(5, {makeBase: true}, panel.portableLayers.names));
-    const order = [5, 2, 4, 1, 3, 0, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
-    assert.deepEqual(panel.portableLayers.order, order);
-    assert.deepEqual(draft.document, before, "the layer panel stages nothing until it is saved");
-    await send(controls.saveLayers(panel.portableLayers.names));
-    assert.equal(panel.portableLayers, undefined);
-    assert.deepEqual(draft.order, order);
-    assert.equal(draft.current.summary.names[1], "777", "the renamed layer moved to its new slot");
+    assert.deepEqual(draft.order, [5, 1, 2, 4, 3, 0, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
     assert.deepEqual(draft.document.layers[0], before.layers[5], "Make base put layer 5's keys at the bottom");
-    draft.undo(draft.revision);
-    assert.deepEqual(draft.document, before);
+    assert.ok(panel.portableLayers, "the panel stays open");
+    for (let step = 0; step < 3; step++) draft.undo(draft.revision);
+    assert.deepEqual(draft.document, before, "each was one undoable step");
 });
 
 test("pointing macros stage inherit-only outputs and survive review, history and backup import", async () => {

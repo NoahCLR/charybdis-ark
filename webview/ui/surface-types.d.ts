@@ -19,6 +19,8 @@ export interface BoardOptions {
     onOpen?: (index: number) => void;
     onSwap?: (from: number, to: number) => void;
     onTrackball?: () => void;
+    /** Drawn in the board's empty centre, between the halves and above the thumbs (Keys' layer plate). */
+    centre?: HTMLElement | null;
 }
 export type BoardNode = HTMLElement & {justDragged?: boolean};
 export interface KeyDrag {x: number; y: number; moved: boolean; target: SVGGElement | null}
