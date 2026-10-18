@@ -15,6 +15,9 @@ import {STEP_KINDS, insertStep, sequenceEditor, saveSteps, focusSteps} from "./s
 import {inspectEdit, paintFeedback, matchingValidation, requestInspection} from "./validation.mjs";
 import {ensureMacroHistory, finishMacroHistoryGroup, rememberMacroEdit} from "./history.mjs";
 import {cancelRecording, recorder} from "./recorder.mjs";
+// What Uninterruptible playback does, said where it is set (Noah keeps the
+// label; the hint says the consequence).
+const PROTECTION_HINT = "Other key presses are ignored while it plays (not the trackball or other keyboards).";
 /** @param {import("../../../contracts/panel.js").PublishedModel} model @param {MacroSlot} slot @param {boolean} canEdit */
 export function editor(model, slot, canEdit) {
     const form = macroForm(slot.keycode);
@@ -36,8 +39,9 @@ export function editor(model, slot, canEdit) {
                 <button class="btn tiny ghost" data-act="clear" ${canEdit && !state.recording ? "" : "disabled"}>Clear macro</button></span></div>
         <div class="card-b stack">
             <div class="macro-context">${placedOn(model, slot)}
-            <label class="macro-protection"><span>Uninterruptible playback</span><select class="input" data-f="macro:${esc(slot.keycode)}:protection" data-protection ${canEdit ? "" : "disabled"}>
-                ${(model.macroProtectionChoices || []).map(({value, label}) => `<option value="${esc(value)}" ${slot.protection === value ? "selected" : ""}>${esc(label)}${value === "auto" ? ` · ${slot.uninterruptible ? "on" : "off"}` : ""}</option>`).join("")}</select></label></div>
+            <label class="macro-protection" data-tip="${esc(PROTECTION_HINT)}"><span>Uninterruptible playback</span><select class="input" data-f="macro:${esc(slot.keycode)}:protection" data-protection ${canEdit ? "" : "disabled"}>
+                ${(model.macroProtectionChoices || []).map(({value, label}) => `<option value="${esc(value)}" ${slot.protection === value ? "selected" : ""}>${esc(label)}${value === "auto" ? ` · ${slot.uninterruptible ? "on" : "off"}` : ""}</option>`).join("")}</select>
+                <span class="note">${esc(PROTECTION_HINT)}</span></label></div>
             <div class="macro-sequence-heading"><h4>Sequence</h4></div>
             <div class="macro-insert-tools" aria-label="Add a macro step">
                 ${STEP_KINDS.map(([value, label]) => `<button class="btn" data-insert-kind="${value}" data-act="macro-insert:${esc(slot.keycode)}:${value}" ${editable ? "" : "disabled"}>+ ${value === "tap" ? "Key / chord" : value === "press" ? "Press" : label}</button>`).join("")}
