@@ -25,7 +25,7 @@ const {TIER_FIELDS} = edits;
 const helperLabel = (kind, helper) => helperWord(getModel(), kind, helper || "");
 
 // An empty timing field falls back to the keyboard's own default, which it
-// reports and Settings · Tap & Hold Timing edits — so the note names both.
+// reports and Settings · Tap & hold timing edits — so the note names both.
 /** @param {EditorBehavior} behaviour */
 function timingDefaultsNote(behaviour) {
     const defaults = behaviour.timingDefaults;
@@ -33,8 +33,8 @@ function timingDefaultsNote(behaviour) {
         .filter(([, value]) => String(value ?? "").trim() !== "")
         .map(([name, value]) => `${name} ${value} ms`);
     return values.length
-        ? `Keyboard defaults from Settings · Tap & Hold Timing: ${values.join(", ")}. Clear an override to follow its default.`
-        : "Clear a timing override to follow the keyboard default from Settings · Tap & Hold Timing.";
+        ? `Keyboard defaults from Settings · Tap & hold timing: ${values.join(", ")}. Clear an override to follow its default.`
+        : "Clear a timing override to follow the keyboard default from Settings · Tap & hold timing.";
 }
 
 // The cell open in this behaviour's grid: one opened in another behaviour's
@@ -50,9 +50,9 @@ export function behaviourEditor(behaviour) {
     /** @param {"tapHoldTerm" | "longerHoldTerm" | "multiTapTerm"} name @param {string} label */
     const timingControl = (name, label) => {
         const field = behaviourTimingField(behaviour, name);
-        return `<label class="field bterm-field"><span>${esc(label)} · ms</span>
-            <input class="input mono" data-f="behaviour:${esc(behaviour.keycode)}:timing:${name}" data-term="${name}" data-stored="${esc(field.stored)}" inputmode="numeric" value="${esc(field.value)}"
-                placeholder="${esc(field.fallback === "" ? "default unavailable" : field.placeholder)}" ${canEdit ? "" : "disabled"}></label>`;
+        return `<label class="field bterm-field"><span>${esc(label)}</span>
+            <span class="affix unit"><input class="input mono" data-f="behaviour:${esc(behaviour.keycode)}:timing:${name}" data-term="${name}" data-stored="${esc(field.stored)}" inputmode="numeric" value="${esc(field.value)}"
+                placeholder="${esc(field.fallback === "" ? "default unavailable" : field.placeholder)}" ${canEdit ? "" : "disabled"}><i>ms</i></span></label>`;
     };
 
     /** @param {import("../../../contracts/panel.js").BehaviorView["steps"][number]} step @param {import("../../../contracts/edits.js").Tier} kind */
@@ -110,9 +110,9 @@ export function behaviourEditor(behaviour) {
                 ${behaviour.stored ? "" : `<p class="note">Using the key’s defaults. A behaviour is added to the draft when you change a timing, switch or grid action.</p>`}
             </div>
             ${behaviour.stored ? `<div class="right row beh-actions">
-                <button class="btn ghost" data-act="rekey" ${canEdit ? "" : "disabled"}
+                <button class="btn tiny ghost" data-act="rekey" ${canEdit ? "" : "disabled"}
                     data-tip="Pick the key this behaviour listens to. Everything it does moves with it.">Change key…</button>
-                <button class="btn ghost" data-act="remove" ${canEdit ? "" : "disabled"}
+                <button class="btn tiny ghost" data-act="remove" ${canEdit ? "" : "disabled"}
                     data-tip="Remove this behaviour from the draft. Its keys then send their plain keycode.">Remove behaviour</button>
             </div>` : ""}
         </div>

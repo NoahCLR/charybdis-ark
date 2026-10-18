@@ -32,9 +32,9 @@ export function editor(model, slot, canEdit, slots) {
             ${light.swatch("lg")}
             <h3>${esc(slot.displayName || `Slot ${slot.id}`)}</h3><span class="tag">slot ${slot.id} · ${esc(bindingName(slot))}</span>
             <span class="right">
-                ${empties ? `<button class="btn tiny" data-act="duplicate" ${disabled}
+                ${empties ? `<button class="btn tiny ghost" data-act="duplicate" ${disabled}
                     data-tip="Copy this mode into the first empty slot.">Duplicate</button>` : ""}
-                <button class="btn tiny" data-act="clear" ${disabled}
+                <button class="btn tiny ghost" data-act="clear" ${disabled}
                     data-tip="Empty this slot. Keys bound to it stay on the board and do nothing until it is configured again.">Clear slot</button>
             </span></div>
         <div class="card-b pd-identity"></div></div>`);
@@ -49,7 +49,7 @@ export function editor(model, slot, canEdit, slots) {
         // The slot is staged once a field of the new form is changed.
         {onChange: (event) => { event.stopPropagation(); state.pdKind = {slot: slot.id, kind: Number(/** @type {HTMLSelectElement} */ (event.target).value)}; render(); }}));
     headBody.append(select("Pointer speed while active", dpiOptions(model.pdModeEditing?.dpiChoices, slot.dpi), slot.dpi ?? 0, "dpi",
-        {tip: "Sensor DPI while this mode runs. Normal pointer speed keeps the DPI set in Mouse → Pointer Speed."}));
+        {tip: "Sensor DPI while this mode runs. Normal pointer speed keeps the DPI set in Mouse → Pointer speed."}));
     wrap.append(head);
 
     const controls = {form, disabled, field, select, shortcut, modifiers};

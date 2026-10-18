@@ -80,7 +80,7 @@ function profileFindings(decoded, destination = {}) {
         findings.push({kind: "brightnessBlocker", level: "blocker", layers: [], identity: String(lighting.brightness),
             title: `Base brightness exceeds this keyboard's limit of ${max}`,
             detail: `This profile stores brightness ${lighting.brightness}; the keyboard accepts at most ${max}. Apply will refuse the profile.`,
-            fix: `Set Base Lighting brightness to ${max} or lower.`, place: {kind: "settings", area: "Settings", section: "rgbAppearance"}});
+            fix: `Set Base lighting brightness to ${max} or lower.`, place: {kind: "settings", area: "Settings", section: "rgbAppearance"}});
     }
     if (Array.isArray(destination.effects) && !destination.effects.some(effect => effect.id === lighting.effect)) {
         findings.push({kind: "effectBlocker", level: "blocker", layers: [], identity: String(lighting.effect),

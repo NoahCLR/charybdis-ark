@@ -2,7 +2,7 @@
 // The Checks section at the top of the review (view/checks.mjs): profiles
 // that cannot apply, actions that cannot run, and layer reachability.
 
-import {esc} from "../lib/dom.mjs";
+import {DISCLOSURE, esc} from "../lib/dom.mjs";
 import {checkGroups, checkTags} from "../view/checks.mjs";
 
 // One check: its level and title, what it means, the steps into it, and the
@@ -26,7 +26,7 @@ export function checksSection(checks, show, source = () => "") {
     return `<section class="rv-sect ck">
         <div class="sect-h"><h4>Checks</h4><span class="note">what can run, what layers you can reach, and what must be fixed before Apply</span></div>
         ${groups.map((group) => `<details class="ck-group" ${group.open ? "open" : ""}>
-            <summary>${esc(group.title)} <span class="tag">${group.items.length}</span></summary>
+            <summary>${DISCLOSURE}${esc(group.title)} <span class="tag">${group.items.length}</span></summary>
             ${group.items.map((check) => checkItem(check, show, source)).join("")}</details>`).join("")}
     </section>`;
 }

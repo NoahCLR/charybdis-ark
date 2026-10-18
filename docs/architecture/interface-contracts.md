@@ -26,12 +26,12 @@ currently previewed on. **On this layer** means a key stored on the selected
 layer, and the other route groups describe ways it can reach an item under
 different activations. The view can therefore overlap those groups; it is the
 current activation, not another storage location. A combo in the view requires
-all inputs in that activation and uses the configured Combo Layer Matching
+all inputs in that activation and uses the configured Combo layer matching
 reference when one is set. Tab counts still count the selected layer's stored
 routes. On the board, a key the selected layer stores keeps its own marks; a
 transparent key answered from below wears that key's behaviour dots and the
 badges of the combos On this view lists it in (`combosInPreview` in
-webview/view/combo-reach.mjs). Under Combo Layer Matching the reference layer's keys
+webview/view/combo-reach.mjs). Under Combo layer matching the reference layer's keys
 are matched instead, so no answer from below adds a badge.
 
 Combo grouping skips activation enumeration when there are no combos. For
@@ -71,6 +71,38 @@ only vertical scroller.
   marks use the same function. A device-model test holds every published
   name to carrying its layer's name, and `tests/view/key-names-marked.test.mjs`
   refuses a screen that escapes a key's name.
+
+## Shared controls
+
+The same kind of control looks and sits the same on every screen.
+
+- A number field's unit (`ms`) rides inside the input at its right edge, the
+  `.affix.unit` wrapper in `webview/styles.css`, so its label names only the
+  value. A label stored with its unit, such as "Timeout (ms)" for the review's
+  words, drops it where the field shows it (`fieldRow` in `ui/settings.mjs`,
+  `scrollLabel` in `ui/pointing/common.mjs`).
+- Whatever folds is a `<details>` whose summary starts with `DISCLOSURE`
+  (`webview/lib/dom.mjs`): one chevron, turned down while open. A closed card
+  summary drops its bottom rule. A card that does not fold has no chevron.
+- A sheet (Review, the keycode picker, Draft history) closes with one ghost
+  **Close** at the right of its header, and by Escape; its footer holds only
+  actions that change something and never repeats the dismissal.
+- An editor's own actions sit at the right of its title bar as small text
+  buttons (`btn tiny ghost`): a behaviour, a pointing mode, a macro, a custom key.
+- Card and section names are sentence case, as the rail and the review name
+  them. A settings card shows its setting count, including a card of one.
+- A slot bank (Macros, Custom keys) heads its card with its name and count,
+  then its search across the column. Its tiles sit three across in a 340 px
+  column and scroll inside the card, which stays in view beside the editor;
+  `lib/scroll.mjs` keeps the bank's position across same-screen renders. A
+  narrower window shows two across, and below 720 px the bank stacks above
+  the editor.
+- A heading inside a workbench column uses the column's `sect-h` style.
+- Pages of cards (Mouse, Settings, Profile & backups, Device) share one width,
+  `--page`. Side-by-side tables start at the top rather than stretching to
+  each other's height.
+- Keys and Lighting draw the same layer strip, Rename & Reorder included
+  (`layerBar` and `attachLayersControl`).
 
 ## Pointing tap outputs
 
@@ -168,7 +200,7 @@ import silently substitutes a keyboard shortcut.
   caches display words across model updates. `hostKeyVocabulary()` in the same
   module derives all eight modifier controls, their stable picker wrappers,
   grid headings, summaries and accessibility labels from the modifier
-  vocabulary. Key Options uses the same host naming rule. Auto with an unknown
+  vocabulary. Key options uses the same host naming rule. Auto with an unknown
   host uses neutral Alt/GUI wording. The webview has no modifier-name table;
   an unnamed value falls back to its stored code. Compact keycodes have one
   modifier-side flag. The picker folds modifiers alone, or with a modifier
@@ -313,8 +345,9 @@ Discard/Clear macro controls use bordered 36 px buttons; Record/Stop uses a
 42 px button with the same dimensions in either state. Raw payload has a persistent
 checkbox toggle at the right of the add-step row; its panel opens above the
 sequence, including automatically for an unparseable payload. Protection and all
-recorder settings stay visible. The macro bank has its own scroll area, so a
-slot change does not require scrolling past the editor. The shared scroll path
+recorder settings stay visible. The macro bank has its own scroll area, as
+every slot bank does (Shared controls), so a slot change does not require
+scrolling past the editor. The shared scroll path
 captures and restores both the bank and outer content positions during same-screen
 renders, including slot selection, accepted edits and captured recording events.
 

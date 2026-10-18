@@ -41,6 +41,9 @@
   --radius-s: 7px;
   --rail: 232px;
   --inspector: 404px;
+  /* Pages of cards (Mouse, Settings, Profile & backups, Device) share one
+     measure, so their right edges hold when switching between them. */
+  --page: 980px;
   --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
   --sans: -apple-system, "SF Pro Text", "Inter", system-ui, "Segoe UI", sans-serif;
   color-scheme: dark;
@@ -206,7 +209,7 @@ a.rail-build:hover { color: var(--text-2); }
 .theme-toggle svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 1.4; }
 .content { flex: 1; overflow: auto; min-height: 0; }
 .pad { padding: 20px 24px 120px; }
-.device-pad { max-width: 940px; }
+.device-pad { max-width: var(--page); }
 
 /* ── controls ────────────────────────────────────────────────────────── */
 .btn {
@@ -247,8 +250,15 @@ a.rail-build:hover { color: var(--text-2); }
 .input:focus { border-color: var(--line-3); background: var(--surface-3); }
 .input.mono { font-family: var(--mono); font-size: 12px; }
 select.input { background-image: linear-gradient(45deg, transparent 50%, var(--text-3) 50%), linear-gradient(135deg, var(--text-3) 50%, transparent 50%); background-position: calc(100% - 15px) 14px, calc(100% - 10px) 14px; background-size: 5px 5px; background-repeat: no-repeat; padding-right: 28px; }
-.input-row { display: flex; gap: 6px; }
-.input-row .input { flex: 1; }
+.input-row { display: flex; align-items: center; gap: 6px; }
+.input-row .input, .input-row .affix { flex: 1; min-width: 0; }
+/* A unit rides inside its input on every screen, so a label names the value
+   and never repeats its unit, and every field in a row keeps one width. */
+.affix { position: relative; display: block; }
+.affix i { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); pointer-events: none;
+  font-style: normal; font-family: var(--mono); font-size: 10.5px; color: var(--text-3); }
+.affix.unit .input { padding-right: 30px; }
+.affix.unit.wide .input { padding-right: 78px; }
 .duration-control input { min-width: 0; }
 .duration-control select.input { flex: 0 0 auto; width: auto; }
 
@@ -520,7 +530,9 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 .kv { display: grid; grid-template-columns: 96px 1fr; gap: 4px 10px; font-size: 12px; }
 .kv dt { color: var(--text-3); }
 .kv dd { margin: 0; font-family: var(--mono); font-size: 11.5px; }
-.kv.device-kv { grid-template-columns: 170px 1fr; }
+.kv.device-kv { grid-template-columns: 170px 1fr; margin: 0; }
+/* What the keyboard says about itself is sentences, not codes. */
+.kv.device-kv dd { font-family: var(--sans); font-size: 12px; }
 .kv.wide { grid-template-columns: 150px 1fr; }
 
 /* ── behaviour timeline ──────────────────────────────────────────────── */
@@ -669,7 +681,7 @@ button.tier:hover { background: var(--surface-3); }
 /* One row per tap count the keyboard allows, all shown; a column per tier.
    Each timing heads what it governs: Multi tap window the tap counts, Tap /
    hold and Long hold their tiers. */
-.bgrid { display: grid; grid-template-columns: 140px repeat(3, minmax(150px, 1fr)); gap: 6px; align-items: stretch; overflow-x: auto; padding-bottom: 2px; }
+.bgrid { display: grid; grid-template-columns: 150px repeat(3, minmax(150px, 1fr)); gap: 6px; align-items: stretch; overflow-x: auto; padding-bottom: 2px; }
 .bgrid .bterm-field { gap: 5px; align-self: end; min-width: 0; margin-bottom: 6px; }
 .bterm { display: flex; align-items: center; align-self: end; height: 32px; margin-bottom: 6px; padding: 0 2px; font-size: 11px; color: var(--text-3); }
 .bhead { display: flex; align-items: center; gap: 7px; padding: 0 2px; font-size: 11.5px; color: var(--text-2); }
@@ -731,6 +743,9 @@ button.tier:hover { background: var(--surface-3); }
 .stackrow .swatch-lg { width: 12px; height: 12px; border-radius: 4px; }
 .key-reaches { gap: 8px; }
 .key-participation { gap: 9px; margin-top: 16px; }
+.key-participation > .sect-h { margin: 6px 0 2px; }
+.def-layers > summary { cursor: pointer; display: inline-flex; align-items: center; gap: 7px; }
+.def-layers > summary:hover { color: var(--text-2); }
 /* The Behaviours tab: an empty group, and the open behaviour's title, its
    keycode, the notes under them and its actions (ui/keys/behaviour-editor.mjs). */
 .rowgroup-empty { padding: 10px 12px; }
@@ -865,8 +880,7 @@ table.t td.t-act { text-align: right; }
    through the card and Apply confirmation; fixed findings stay quiet. */
 .ck .sect-h .note { margin-left: 10px; }
 .ck-group { margin-bottom: 8px; }
-.ck-group > summary { cursor: pointer; font-size: 12px; color: var(--text-2); padding: 4px 0 6px; list-style-position: inside; }
-.ck-group > summary .tag { margin-left: 6px; }
+.ck-group > summary { cursor: pointer; display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--text-2); padding: 4px 0 6px; }
 .ck-item { border: 1px solid var(--line); border-radius: 9px; background: var(--surface); margin-bottom: 8px; padding: 9px 12px; display: grid; gap: 6px; }
 .ck-item.warning:not(.fixed) { border-color: color-mix(in srgb, var(--warning) 55%, var(--line)); background: color-mix(in srgb, var(--warning) 14%, var(--surface)); }
 .ck-item.trap:not(.fixed) { border-color: color-mix(in srgb, var(--danger) 60%, var(--line)); background: color-mix(in srgb, var(--danger) 14%, var(--surface)); }
@@ -1190,12 +1204,6 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .pd-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px 24px; align-items: start;
   padding-top: 14px; border-top: 1px solid var(--line); }
 .pd-copy { display: grid; grid-template-columns: minmax(0, 260px) auto; justify-content: start; gap: 8px; align-items: end; }
-/* A unit rides inside its input, so every field in a row keeps one width. */
-.affix { position: relative; display: block; }
-.affix i { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); pointer-events: none;
-  font-style: normal; font-family: var(--mono); font-size: 10.5px; color: var(--text-3); }
-.affix.unit .input { padding-right: 38px; }
-.affix.unit.wide .input { padding-right: 78px; }
 .field.inline { display: flex; align-items: center; gap: 8px; }
 .field.inline > span { white-space: nowrap; }
 .field.inline select.input { height: 28px; width: auto; min-width: 150px; background-position: calc(100% - 15px) 12px, calc(100% - 10px) 12px; }
@@ -1235,8 +1243,6 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .pd-lines .foot { grid-column: 2 / -1; padding-top: 10px; border-top: 1px solid var(--line); }
 .pd-advanced > summary { cursor: pointer; border-bottom-color: transparent; }
 .pd-advanced[open] > summary { border-bottom-color: var(--line); }
-.pd-advanced .chev { width: 10px; height: 10px; fill: none; stroke: var(--text-3); stroke-width: 1.5; transition: transform .12s ease; }
-.pd-advanced[open] .chev { transform: rotate(90deg); }
 .pd-sect + .pd-sect { padding-top: 14px; border-top: 1px solid var(--line); }
 .pd-ratio { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 6px; align-items: center; }
 .pd-ratio i { font-style: normal; color: var(--text-3); font-family: var(--mono); }
@@ -1277,18 +1283,24 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .meter i { display: block; height: 100%; background: var(--text-2); }
 .macro-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 5px; }
 /* Macros and Custom keys: the list beside the one it opens. */
+/* A slot bank (Macros, Custom keys): three tiles across, scrolling inside its
+   own card, which stays in view beside the editor, so picking a slot far down
+   never scrolls the editor away (lib/scroll.mjs keeps the bank's place). */
 .pad.library { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 20px; align-items: start; }
-.pad.library.macros-library { grid-template-columns: minmax(170px, 240px) minmax(0, 1fr); gap: 18px; }
-.macros-library > .card:first-child { position: sticky; top: 14px; }
-.macros-library .macro-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); max-height: 540px; overflow-y: auto; scrollbar-width: thin; padding: 2px; }
-.macros-library .card-search { min-width: 0; }
-.macros-library > .card:first-child .card-h { flex-wrap: wrap; }
-.macros-library > .card:first-child .card-search { flex: 1 1 100%; }
-.macros-library .mslot { min-width: 0; }
-.macros-library .mslot .v { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-@media (max-width: 980px) { .pad.library.macros-library { grid-template-columns: 170px minmax(0, 1fr); gap: 12px; } }
-@media (max-width: 720px) { .pad.library.macros-library { grid-template-columns: 1fr; }.macros-library > .card:first-child { position: static; }.macros-library .macro-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); max-height: 150px; } }
-.sect-h.memory-h { margin-top: 14px; }
+.pad.library > .card:first-child { position: sticky; top: 14px; }
+.pad.library .macro-grid { max-height: 540px; overflow-y: auto; scrollbar-width: thin; padding: 2px; }
+/* A slot bank's header reads the same on Macros and Custom keys at any width:
+   its name and count, then the search across the column under them. */
+.pad.library > .card:first-child .card-h { flex-wrap: wrap; row-gap: 10px; }
+.pad.library > .card:first-child .card-h .tag { margin-left: auto; }
+.pad.library > .card:first-child .card-search { order: 1; flex: 1 1 100%; width: auto; min-width: 0; margin-left: 0; }
+.pad.library .mslot { min-width: 0; }
+.pad.library .mslot .v { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 980px) { .pad.library { grid-template-columns: 240px minmax(0, 1fr); gap: 12px; } }
+@media (max-width: 720px) { .pad.library { grid-template-columns: 1fr; } .pad.library > .card:first-child { position: static; } .pad.library .macro-grid { max-height: 150px; } }
+.sect-h.memory-h { margin-top: 14px; align-items: flex-start; }
+.sect-h.memory-h h4 { white-space: nowrap; }
+.sect-h.memory-h .note { text-align: right; }
 /* What a memory meter counts, said under it. */
 .meter-note { margin-top: 6px; }
 .mslot { height: 46px; border-radius: 7px; border: 1px solid var(--line); background: var(--surface-2); display: grid; place-items: center; align-content: center; gap: 2px; }
@@ -1302,7 +1314,7 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .mslot.warn .v { color: var(--danger); }
 .meter.over i { background: var(--danger); }
 .meter.near i { background: var(--warning); }
-.usage-tables { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
+.usage-tables { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; align-items: start; }
 .tok { display: inline-flex; align-items: center; height: 22px; padding: 0 7px; border-radius: 5px; background: var(--surface-3); border: 1px solid var(--line); font-family: var(--mono); font-size: 11px; }
 .macro-step { display: grid; gap: 10px; min-width: 0; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); }
 .macro-step[hidden] { display: none; }
@@ -1395,7 +1407,7 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .macro-add, .macro-actions { flex-wrap: wrap; }
 .macro-add select.input { width: auto; }
 .record-opts { gap: 12px; align-items: end; flex-wrap: wrap; }
-.record-opts .ms-field { width: 88px; }
+.record-opts .ms-field { width: 96px; }
 [data-raw] summary { cursor: pointer; color: var(--text-2); font-size: 12px; }
 [data-raw] > .field { margin-top: 10px; }
 [data-raw] > .note { margin-top: 8px; }
@@ -1416,9 +1428,10 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .stagecard .nm { font-size: 12.5px; font-weight: 520; }
 .stagecard .note { grid-column: 2 / -1; font-size: 11px; color: var(--text-3); line-height: 1.35; }
 .settings-group + .settings-group { margin-top: 14px; }
-.pad.settings-pad { max-width: 980px; }
+.pad.settings-pad { max-width: var(--page); }
 .settings-pad > .unavailable { margin-bottom: 14px; }
 .settings-group > summary { cursor: pointer; list-style: none; }
+.settings-group:not([open]) > summary { border-bottom-color: transparent; }
 .card-b.settings-intro { padding-bottom: 0; }
 .import-diff td:first-child { white-space: nowrap; }
 .import-diff td:last-child { white-space: nowrap; text-align: right; }
@@ -1441,7 +1454,7 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .profile-recovery .copy { display: grid; gap: 2px; }
 .profile-recovery .state { margin-left: auto; }
 .profile-recovery > .dot { margin-top: 6px; }
-.pad.profile-pad { max-width: 960px; }
+.pad.profile-pad { max-width: var(--page); }
 .setrow { display: grid; grid-template-columns: minmax(0,1fr) 190px; gap: 16px; align-items: center; padding: 12px 15px; border-bottom: 1px solid var(--line); }
 .setrow:last-child { border-bottom: 0; }
 .setrow.ro { opacity: .72; }
@@ -1504,6 +1517,10 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .main { position: relative; }
 details > summary::-webkit-details-marker { display: none; }
 details > summary { list-style: none; }
+/* Whatever folds says so with one chevron, turned down while open
+   (DISCLOSURE in lib/dom.mjs). */
+details > summary .chev { width: 10px; height: 10px; flex: none; fill: none; stroke: var(--text-3); stroke-width: 1.5; transition: transform .12s ease; }
+details[open] > summary .chev { transform: rotate(90deg); }
 
 
 /* ── panel fit ─────────────────────────────────────────────────────────── */

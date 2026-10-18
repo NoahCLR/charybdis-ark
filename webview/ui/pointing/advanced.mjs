@@ -1,5 +1,5 @@
 // @ts-check
-import {el, esc} from "../../lib/dom.mjs";
+import {DISCLOSURE, el, esc} from "../../lib/dom.mjs";
 import {AXIS, BUTTON, MODIFIER_POLICY, SCROLL_FIELDS, TAP_ROWS, axisReads, modeDpi, readsHorizontal, readsVertical, thresholdDistance} from "../../view/pointing-config.mjs";
 import {modifierNames, pointingMacro} from "../../view/keyvalues.mjs";
 import {word} from "../../view/vocabulary.mjs";
@@ -11,7 +11,7 @@ import {ARROWS, SCROLL_LEAD, SCROLL_RATIOS, SCROLL_SINGLES, scrollLabel, words} 
 export function advancedControls(model, slot, scrolling, {form, disabled, field, select, shortcut, modifiers}) {
     // ── advanced ──────────────────────────────────────────────────────────
     const advanced = /** @type {HTMLDetailsElement} */ (el(`<details class="card pd-advanced" ${state.pdAdvanced ? "open" : ""}><summary class="card-h">
-        <svg class="chev" viewBox="0 0 10 10" aria-hidden="true"><path d="M3.5 2l3 3-3 3"/></svg><h3>Advanced</h3><span class="right note">thresholds, ratios, mouse buttons</span></summary>
+        ${DISCLOSURE}<h3>Advanced</h3><span class="right note">thresholds, ratios, mouse buttons</span></summary>
         <div class="card-b stack"></div></details>`));
     const advancedBody = /** @type {HTMLElement} */ (advanced.querySelector(".card-b"));
     /** @param {string} title */

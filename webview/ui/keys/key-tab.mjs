@@ -103,7 +103,7 @@ export function tabKey(body) {
         const cp = /** @type {NonNullable<ReturnType<typeof participationAt>>} */ (participationAt(model, source.index, /** @type {import("../../../contracts/panel.js").Position & {row: number, column: number}} */ (key), undefined, "combo"));
         const inherited = source.index !== layer.index;
         const controls = el(`<div class="stack key-participation">
-            <h4>Participation · ${esc(layerName(source))}</h4>
+            <div class="sect-h"><h4>Participation on ${esc(layerName(source))}</h4></div>
             ${inherited ? `<p class="note">This transparent key inherits its permissions from ${esc(layerName(source))}.</p><button class="btn tiny" data-source-layer>Open source placement</button>` : `
             <label class="sw"><input type="checkbox" data-f="key:${source.index}:${key.layoutIndex}:behaviour" data-use-behavior ${bp.placementOn ? "checked" : ""} ${writable() ? "" : "disabled"}><span class="track"></span><span class="txt">Use behaviour</span></label>
             <label class="sw"><input type="checkbox" data-f="key:${source.index}:${key.layoutIndex}:combos" data-join-combos ${cp.placementOn ? "checked" : ""} ${writable() ? "" : "disabled"}><span class="track"></span><span class="txt">Join combos</span></label>`}

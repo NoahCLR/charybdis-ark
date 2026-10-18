@@ -79,7 +79,7 @@ export function reviewOverlay() {
     const node = el(`<div class="scrim"><div class="sheet" role="dialog" aria-modal="true" aria-label="Review changes">
         <div class="sheet-h"><h2>Review ${draft.changes.length} change${draft.changes.length === 1 ? "" : "s"}</h2>
             ${summary ? `<span class="note">${esc(summary)}</span>` : ""}
-            <span class="right"><button class="btn ghost" data-act="close">Keep editing</button></span></div>
+            <span class="right"><button class="btn ghost" data-act="close">Close</button></span></div>
         <div class="sheet-b rv">
             ${checks}
             ${sections}
@@ -87,15 +87,13 @@ export function reviewOverlay() {
                 : "Apply writes a recovery copy, stages the changed blocks on both halves, then publishes one generation. The keyboard keeps running its saved profile until both halves confirm. If it is interrupted, the recovery copy restores it."}</div></div>
         </div>
         ${demo.active ? `<div class="sheet-f demo-apply"><span class="note"><i class="dot demo"></i> ${esc(DEMO_WORDS.status)}</span>
-            <span class="right"><button class="btn" data-act="close">Keep editing</button>
-                <button class="btn primary" data-act="export">Export…</button></span></div>`
+            <span class="right"><button class="btn primary" data-act="export">Export…</button></span></div>`
         : confirming ? `<div class="sheet-f ck-confirm ${hasTrap ? "trap" : "warning"}" role="alertdialog" aria-label="Confirm profile checks">
             <span class="ck-confirm-t"><i class="dot ${hasTrap ? "err" : "warn"}"></i>${esc(confirmText(confirmChecks))}</span>
             <span class="right"><button class="btn" data-act="unconfirm">Go back</button>
                 <button class="btn primary" data-act="apply-anyway" ${canApply ? "" : "disabled"}>Apply anyway</button></span></div>`
         : `<div class="sheet-f"><span class="note">${esc(model?.device?.label || "")} · ${esc(model?.device?.summary || "")}</span>
-            <span class="right"><button class="btn" data-act="close">Cancel</button>
-                <button class="btn primary" data-act="apply" ${canApply ? "" : "disabled"}
+            <span class="right"><button class="btn primary" data-act="apply" ${canApply ? "" : "disabled"}
                     ${blockers.length ? `data-tip="${esc("Resolve the blockers in Checks before applying.")}"` : confirmChecks.length ? `data-tip="${esc("Warnings and traps will be asked about before anything is written.")}"` : ""}>Apply to keyboard</button></span></div>`}
     </div></div>`);
     // Pointing at a group's Discard lights what it takes back, in every area

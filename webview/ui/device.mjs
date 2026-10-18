@@ -64,11 +64,11 @@ export function screenDevice() {
             <div class="grid2">
                 <div class="card"><div class="card-h"><h3>Connection</h3>
                     ${page.connectionChip}</div>
-                    <div class="card-b">${page.connectionBody}
-                        <button class="btn" data-act="read" ${device?.health?.busy ? "disabled" : ""}>Read from keyboard</button></div></div>
+                    <div class="card-b stack gap-12">${page.connectionBody}
+                        <button class="btn self-start" data-act="read" ${device?.health?.busy ? "disabled" : ""}>Read from keyboard</button></div></div>
                 <div class="card"><div class="card-h"><h3>${page.setupTitle}</h3>
                     ${page.setupChip}</div>
-                    <div class="card-b">${page.setupBody}</div></div>
+                    <div class="card-b stack gap-12">${page.setupBody}</div></div>
             </div>
             ${whatWasRead(model)}
         </div></div></div>`);
