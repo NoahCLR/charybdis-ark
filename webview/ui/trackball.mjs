@@ -13,7 +13,7 @@
 // Lighting) still lands on that mode.
 
 // Selector assertions refer to elements created by this module's authored markup.
-import {el, esc} from "../lib/dom.mjs";
+import {DISCLOSURE, el, esc} from "../lib/dom.mjs";
 import {bindingsForSlot} from "../view/reach.mjs";
 import {fixedSummaries, reachCount, reachLine, sendsLine} from "../view/trackball.mjs";
 import {getModel, render, state, canEdit as canEditArea} from "../store.mjs";
@@ -113,7 +113,7 @@ function trackballList(model, slots, entry) {
 function emptyChips(model, empties, changedSlots, current, pick) {
     const open = state.tbEmptiesOpen || empties.some((slot) => slot.id === current);
     const node = /** @type {HTMLDetailsElement} */ (el(`<details class="pd-empties" ${open ? "open" : ""}>
-        <summary class="pd-empties-h">Empty slots · ${empties.length}</summary><div class="pd-chips"></div></details>`));
+        <summary class="pd-empties-h">${DISCLOSURE}Empty slots · ${empties.length}</summary><div class="pd-chips"></div></details>`));
     node.addEventListener("toggle", () => { state.tbEmptiesOpen = node.open; });
     const grid = /** @type {HTMLElement} */ (node.querySelector(".pd-chips"));
     for (const slot of empties) {

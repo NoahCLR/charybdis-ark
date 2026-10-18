@@ -178,8 +178,7 @@ What each screen edits:
 | Custom keys | The 128 custom keys' names, shortcuts and, for each, its behaviour: timings, the tap count × tap/hold/long hold grid and participation, for a key on a layer or on none; where each is placed |
 | Lighting | Six stages, the stage mask, layer and trackball mode colours with where they light, combo and key feedback, mouse layer fade with its hold as a share of the timeout, LED group rows and reusable groups |
 | Macros | Named slots: literal Text, a compact sequence of key/delay/press/release tiles, drag reordering and a selected-step editor, raw payload, live size feedback, configurable recorder and placement; search by name, and the layers that set each macro off — by key, behaviour or combo — in their layer colour, each opening that layer in Keys with the macro picked |
-| Trackball | Ball speed, sniping and the mouse layer — the Settings sections the keyboard's model files under Trackball, drawn with the same cards and posted whole |
-| Trackball modes | All 32 slots: movement, speed, direction shortcuts and how often they send (every step, or once per movement until the ball pauses or moves back the other way), scroll tuning and which way a scrolling mode scrolls (both axes, horizontal only or vertical only), what each direction's shortcut does with held modifiers, thresholds shown as ball movement at the mode's DPI, buttons, bindings, placement, clear and duplicate |
+| Trackball | Pointer (ball speed), Sniping (its speed, auto-sniping and where its keys are placed) and the Mouse layer — the Settings sections the keyboard's model files under Trackball, each posted whole — then all 32 trackball mode slots: movement, step distance in millimetres with the stored counts, sensitivity, direction shortcuts and how often they send, which layer it keeps while it runs, scroll tuning with each field's rule, what each shortcut does with held modifiers, button overrides, placement, templates, clear and duplicate |
 | Settings | The keyboard's own name, then every other section the keyboard reports, posted whole, read-only where the firmware build leaves an option out; the Combos section also carries the default combo window and the combo hold threshold, which the keyboard stores with its combos |
 | Backups | Back up (Save a backup file…) and Restore (Choose a backup file…: the file against the keyboard, counted by what it configures — keys, lighting, macros, trackball, trackball modes — before it becomes the draft), profile memory, previous profiles, saves in progress |
 | Keyboard | Read-only: connection, the saved profile's generation, what was read |
@@ -280,9 +279,9 @@ where Ark knows what answers it says so ("Transparent → Esc from Base").
 Settings calls QMK's default layers **Default layers**: always on underneath
 every other layer, normally only Base. The section about the computer is **Your
 computer**, with its **Operating system**. The rail groups the screens as
-CONFIGURE and MANAGE; the trackball's screens are **Trackball** and
-**Trackball modes**, and the mouse layer QMK calls auto-mouse is the **Mouse
-layer**. Slots are numbered from 0 as their keycodes are and tagged **M5**,
+CONFIGURE and MANAGE; the trackball has one screen, **Trackball**, whose modes
+are **Trackball modes**, and the mouse layer QMK calls auto-mouse is the **Mouse
+layer**. Sniping is **Sniping (precision speed)** where it is first named. Slots are numbered from 0 as their keycodes are and tagged **M5**,
 **K5** and **P5** for macro, custom key and trackball mode 5; one with no name
 reads "Macro 5", "Custom key 5" or "Mode 5". A combo is named by its keys and
 what it sends, "Space + Delete → Hold Number", with its C-number as a quiet
@@ -296,8 +295,9 @@ footer, **Where it is stored**, a macro's raw payload and a review value's
 tooltip. Everywhere else the switch decides: with it on, the hover card,
 behaviour rows, titles and cells, combo Sends, the Key tab's "This key on every
 layer" rows, reach rows and picker buttons add the keycode as a muted suffix;
-with it off they show only words. A trackball mode's direction field holds its
-keycode, where you act on it, with the key's words under it.
+with it off they show only words. A trackball mode's directions and button
+taps read as the computer's keys ("Command + Z"); with the switch on, each
+also has its keycode field for typed entry.
 
 ### The board
 
@@ -688,16 +688,77 @@ custom-key, trackball mode and keyboard names allow up to 32 UTF-8 bytes; accent
 can use more than one byte. All edits go through the draft, Review, Undo and
 Apply, including switches and layer allowances.
 
-## Trackball modes
+## Trackball
 
-Current firmware has 32 trackball mode slots. Trackball modes lists the configured
-slots as cards, each with its name, colour and movement (its keycodes are in
-the editor's title), and the empty ones as a grid of chips tagged P0…P31 beneath them (a
-chip in amber still has keys reaching it); the key picker lists the slots in
-two columns; Lighting's slot list scrolls beside the colour editor. Each slot
-keeps its own Hold and Lock key (`PD_SLOT_n`, `PD_SLOT_n_LOCK`) and lighting
-row. An empty slot takes no room in the profile, so 32 slots cost only what you
-configure.
+**Trackball** is one screen for everything the ball does. Its list starts with
+three fixed entries, then the modes, then the empty slots folded into chips.
+
+- **Pointer**: the ball speed (DPI) for ordinary movement. It lists the modes
+  kept at Normal speed, which follow it. The DPI keys on the keyboard change it
+  too; Ark shows the speed the keyboard reports.
+- **Sniping (precision speed)**: a slower speed for precise work, on while a
+  sniping key is held (`SNIPING`) or toggled (`SNP_TOG`), and while the
+  auto-sniping layer is on. It shows where each sniping key is placed, with
+  **Place on a key…**. Sniping also slows directional modes; scrolling ignores
+  it.
+- **Mouse layer**: the layer moving the ball turns on, and its timeout. It
+  turns off as soon as you type a key that is not a mouse key, and stays off
+  while the auto-sniping layer is on. **Fine-tuning** holds the movement
+  debounce, the delay after typing and the threshold, in sensor counts with
+  their distance at the pointer speed. While the mouse layer is off, the fields
+  that depend on it say so. **Edit the fade in Lighting →** opens its fade.
+
+Each fixed entry is Settings' rows, and a change saves its whole section, as
+Settings does.
+
+Current firmware has 32 trackball mode slots. Each mode's card says what it
+sends ("↑ Volume Up ↓ Volume Down") and where it is reached: its keys on
+layers, and the behaviours and combos that run it. **+ New mode** opens the
+first empty slot. The key picker lists the slots in two columns; Lighting's
+slot list scrolls beside the colour editor. Each slot keeps its own Hold and
+Lock key (`PD_SLOT_n`, `PD_SLOT_n_LOCK`) and lighting row. An empty slot takes
+no room in the profile, so 32 slots cost only what you configure.
+
+A mode's editor reads in the order you set one up:
+
+1. **Name** and **Movement** (directional keys and shortcuts, or scrolling).
+2. **Step distance**: how far the ball turns for each step, in millimetres,
+   with the counts the keyboard stores beside it ("2.5 mm · 40 counts at 400
+   DPI"). Either can be edited. A step is counts at a DPI, so the millimetres
+   hold at the speed shown; while sniping is on, a directional mode's step is
+   longer, and the line says by how much. A scrolling mode shows its distance
+   per wheel step the same way.
+3. **Sensitivity**: the mode's DPI, from 100 up to the sensor's 12000, or
+   **Normal (400 DPI)** to follow the pointer.
+4. What each direction sends, as the computer's keys. **When a direction is
+   empty** appears only while one is, and **Send both neighbours** only in
+   eight directions. A scrolling mode instead says which way it scrolls, which
+   of those axes are reversed, and the modifiers it holds.
+5. **While this mode runs**: keep the mouse layer on, so its buttons stay
+   under your fingers, or go back to the typing layer, so keys type as usual.
+   The keyboard decides this when the mode starts and keeps it until it ends.
+6. **Where it is reached**, with **Place on a key…**, and its **Light** with
+   **Edit in Lighting →**.
+7. **Advanced**: held modifiers per direction; every scroll field with what it
+   does and what it accepts; and the button overrides, **1 · left click**,
+   **2 · right click** and **3 · middle click**: pass through, **Block the
+   click**, tap a shortcut (with its own held-modifier choice: Inherit, Ignore
+   the chosen ones, or Exact) or hold modifiers.
+
+A value the keyboard would refuse is not added to the draft: the field says
+which rule it breaks — thresholds, divisors and the lock timeout above 0,
+gesture expiry at least the lock timeout, ratios at least 1:1, retention at
+most selection, decay at least 2 — and keeps what you typed.
+
+**Duplicate** copies a mode into the first empty slot with its colour, named
+"<name> copy". A new or switched-to scrolling mode starts from this keyboard's
+Dragscroll: its speed, direction and tuning.
+
+An empty slot starts from a template — **Volume**, **Brightness**, **Zoom**,
+**Scroll**, **Arrows** and **Undo / Redo** as the firmware ships them, and
+**Back / Forward** (mouse buttons 4 and 5) and **Tabs** (Ctrl Shift Tab /
+Ctrl Tab) — each one ordinary edit in the draft. **Start empty…** keeps a
+blank directional or scrolling mode, and **Copy from** another mode.
 
 ### Cleared trackball modes
 
@@ -706,7 +767,7 @@ mode keycodes in a fixed registry and its runtime refuses to activate a slot
 with an empty record, so such a key is inert, not invalid — it does nothing
 until the slot is configured again. The clear goes through even while something
 still reaches the slot, the validated profile counts what
-still points at the empty slot, and the Trackball modes screen and the hover card
+still points at the empty slot, and the Trackball screen and the hover card
 say the key does nothing for now.
 
 The same reasoning runs the other way, so the keycode picker offers **every**
@@ -719,7 +780,8 @@ on its second line until the slot is filled in.
 
 A straight direction, diagonal or physical-button tap override can send a
 plain **Mouse Button 1–8**, including buttons 3 and 4.
-Use **Choose…** or enter its QMK name, such as `MS_BTN3`. The pointing picker
+Choose it from the direction's button, or, with **Show keycodes** on, enter
+its QMK name, such as `MS_BTN3`. The pointing picker
 offers only outputs that field accepts: keyboard keys and shortcuts, media
 and system keys, and supported mouse buttons. Pointer movement, wheel,
 acceleration, layer controls and mode controls are refused. Supported macros
@@ -739,7 +801,7 @@ mean Back and Forward.
 
 ### Trackball mode macros
 
-**Pick… → Macros** offers all 128 VIA slots
+A direction's button **→ Macros** offers all 128 VIA slots
 by their names for a direction, diagonal or button tap override. The output
 shows the name beside its stored keycode. An empty macro is allowed and marked
 **does nothing yet**; add its steps on Macros. It sends nothing and leaves a
