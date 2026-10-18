@@ -119,15 +119,15 @@ function wireProfileDrop(card) {
         card.classList.remove("drag-over");
         if (!available()) return;
         const dropped = Array.from(/** @type {DataTransfer} */ (event.dataTransfer).files);
-        if (dropped.length !== 1) {tell("Drop one backup file at a time."); return;}
+        if (dropped.length !== 1) {tell("Drop one profile file at a time."); return;}
         const file = dropped[0];
-        if (file.size > 262144) {tell("This backup file is too large."); return;}
+        if (file.size > 262144) {tell("This profile file is too large."); return;}
         const draft = getModel()?.draft;
         if (!draft) return;
         const {id, revision} = draft;
         reading = true;
         choose.disabled = true;
-        tell("Reading the backup file…");
+        tell("Reading profile…");
         try {
             const text = await file.text();
             if (!card.isConnected) return;
@@ -138,7 +138,7 @@ function wireProfileDrop(card) {
             tell("");
             post(reviewPortableProfile(text, file.name));
         } catch {
-            tell("This backup file could not be read. Try Choose profile… instead.");
+            tell("This profile file could not be read. Try Choose profile… instead.");
         } finally {
             reading = false;
             choose.disabled = !canEditArea("import");
