@@ -17,7 +17,7 @@ function model(extra = {}) {
             "MO(1)": {builtIn: {hold: {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "MO(1)", fromPress: true}}, timing, timingSources: sources},
             PD_SLOT_0: {builtIn: {hold: {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "0x7E80", fromPress: true}}, timing, timingSources: sources},
             KC_ESCAPE: {builtIn: {tap: {helper: "TAP_SENDS", action: "KC_ESCAPE"}}, timing, timingSources: sources},
-            KC_A: {builtIn: {tap: {helper: "TAP_SENDS", action: "KC_A"}}, timing, timingSources: sources},
+            KC_A: {builtIn: {tap: {helper: "TAP_SENDS", action: "KC_A"}, hold: {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "KC_A"}}, timing, timingSources: sources},
         }},
         keyBehaviors: [],
         ...extra,
@@ -30,7 +30,7 @@ test("a layer key says what it does to its layer, and a plain key is just itself
     assert.equal(layer.effect, "on while held");
     assert.deepEqual(layer.parts, []);
     const plain = keySummary(model(), at(0, "KC_A"));
-    assert.deepEqual([plain.kind, plain.parts, plain.timing, plain.costs], ["key", [], [], []]);
+    assert.deepEqual([plain.kind, plain.parts, plain.timing, plain.costs], ["key", [], [], []], "held down, a plain key is just itself");
 });
 
 test("a layer-tap reads as its tap and its hold, waiting on the dual-role setting", () => {

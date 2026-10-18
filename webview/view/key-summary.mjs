@@ -78,7 +78,10 @@ export function keySummary(model, position, {stack = model?.layers || [], at = 0
     };
     let holds = false, holdTier = false;
     for (const step of steps) {
-        for (const [tier, branch] of /** @type {const} */ ([["tap", step.tap || inheritedBranch(row, step, "tap")], ["hold", step.hold || inheritedBranch(row, step, "hold")], ["long", step.longHold]])) {
+        // A plain key held down is the key itself, so its built-in hold says nothing.
+        const builtHold = step.hold ? null : inheritedBranch(row, step, "hold");
+        const ownHold = builtHold && canonicalKeycode(model, String(builtHold.action)) === canonicalKeycode(model, meaning) ? null : builtHold;
+        for (const [tier, branch] of /** @type {const} */ ([["tap", step.tap || inheritedBranch(row, step, "tap")], ["hold", step.hold || ownHold], ["long", step.longHold]])) {
             const shown = resolve(branch);
             if (!shown || !branch) continue;
             // A hold from the press (MO, a trackball mode) waits for nothing.
