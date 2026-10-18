@@ -1,5 +1,15 @@
+/** The layout key a picker changes: its layer, its position and what it holds now. */
+export interface PickerTarget {layer: import('../../contracts/edits.js').LayerReference; layoutIndex: number; current?: string}
 export interface PickerOptions {
     title: string;
+    /** The sheet's heading, "Change F on Base"; "Choose a key" when absent. */
+    heading?: string;
+    /** The layout key being changed: offers the Hold slot and Transparent, and checks layer keys as the keyboard does. */
+    target?: PickerTarget | null;
+    /** Opens with the Hold slot's menu open ("Add a hold…"). */
+    hold?: boolean;
+    /** Posts a hold built in the picker: one draft edit (view/picker-choice.mjs holdEdit). */
+    onEdit?: (message: import('../../contracts/edits.js').PanelEdit) => void;
     context?: string;
     contextKeycode?: string;
     seed?: string[];

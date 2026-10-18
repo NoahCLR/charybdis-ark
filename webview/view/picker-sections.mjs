@@ -52,20 +52,27 @@ const unbuilt = (entry) => UNBUILT_GROUPS.has(entry.group) || UNBUILT.test(value
 export const pickable = (entry) => !NATIVE_MACRO.test(valueOf(entry)) && !RETIRED_USER.test(valueOf(entry)) && !UNSUPPORTED.has(valueOf(entry)) && !unbuilt(entry);
 // The Charybdis's own keys: DPI and sniping.
 const isKeyboardKey = inGroups("kb");
-// The keyboard's 128 custom keys, by the names the model gives them, and KC_NO/KC_TRNS.
-const isCustom = inGroups("Custom keys", "internal");
+// The keyboard's 128 custom keys, by the names the model gives them. Nothing
+// and Transparent lead the picker in its Basics strip instead.
+const isCustom = inGroups("Custom keys");
 /** @param {Entry} entry */
 const isSymbol = (entry) => entry.group === "shifted" || (entry.group === "basic" && SYMBOLS.has(valueOf(entry)));
 /** @param {Entry} entry */
 const isNavigation = (entry) => entry.group === "basic" && NAVIGATION.has(valueOf(entry));
 /** @param {Entry} entry */
 const isNumpad = (entry) => entry.group === "basic" && /^KC_(?:KP|NUMPAD)_/.test(valueOf(entry));
+// Keys the board above already draws: letters and digits.
 /** @param {Entry} entry */
-const isFunction = (entry) => entry.group === "basic" && /^KC_F(?:[1-9]|1\d|2[0-4])$/.test(valueOf(entry));
+const onBoard = (entry) => entry.group === "basic" && /^KC_(?:[A-Z]|[0-9])$/.test(valueOf(entry));
+const isMouse = (/** @type {Entry} */ entry) => entry.group === "mouse" || isKeyboardKey(entry);
+const isMedia = inGroups("media", "audio");
+const isLighting = inGroups("backlight", "led_matrix", "underglow", "rgb", "rgb_matrix");
+const isKeyOption = inGroups("magic", "swap_hands");
+// Everything no other section holds: function keys, modifiers, the system
+// and quantum keys, and whatever else the catalogue carries.
 /** @param {Entry} entry */
-const isMoreKey = (entry) => entry.group === "modifiers" || (entry.group === "basic"
-    && !isSymbol(entry) && !isNavigation(entry) && !isNumpad(entry)
-    && (isFunction(entry) || !/^KC_(?:[A-Z]|[0-9])$/.test(valueOf(entry))));
+const isEverythingElse = (entry) => ![isSymbol, isNavigation, isNumpad, onBoard, isMouse, isMedia, isLighting, isKeyOption, isCustom,
+    inGroups("internal", "Pointing modes")].some((filter) => filter(entry));
 
 /** @returns {import("./types.js").PickerSection[]} */
 export function pickerSections() {
@@ -77,16 +84,12 @@ export function pickerSections() {
         {id: "layers", label: "Layers", kind: "layers"},
         {id: "modes", label: "Trackball modes", kind: "modes"},
         {id: "macros", label: "Macros", kind: "macros"},
-        {id: "mouse", label: "Mouse", kind: "catalogue", filter: (entry) => entry.group === "mouse" || isKeyboardKey(entry)},
-        {id: "media", label: "Media", kind: "catalogue", filter: inGroups("media", "audio")},
-        {id: "lighting", label: "Lighting", kind: "catalogue", filter: inGroups("backlight", "led_matrix", "underglow", "rgb", "rgb_matrix")},
-        {id: "magic", label: "Key options", kind: "catalogue", filter: inGroups("magic", "swap_hands")},
+        {id: "mouse", label: "Mouse", kind: "catalogue", filter: isMouse},
+        {id: "media", label: "Media", kind: "catalogue", filter: isMedia},
+        {id: "lighting", label: "Lighting", kind: "catalogue", filter: isLighting},
+        {id: "magic", label: "Key options", kind: "catalogue", filter: isKeyOption},
         {id: "custom", label: "Custom keys", kind: "catalogue", filter: isCustom},
-        {id: "more", label: "More keys", kind: "catalogue", filter: isMoreKey},
-        {id: "other", label: "Other QMK", kind: "catalogue", filter: inGroups(
-            "connection", "joystick", "midi", "programmable_button", "quantum", "sequencer", "steno", "system",
-        )},
-        {id: "all", label: "All keycodes", kind: "catalogue", filter: () => true},
+        {id: "else", label: "Everything else", kind: "catalogue", filter: isEverythingElse},
     ];
 }
 

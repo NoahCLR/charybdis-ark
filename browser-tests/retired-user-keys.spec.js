@@ -29,7 +29,7 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
         await expect(page.locator(".key-details")).toContainText("QK_USER_20");
         await page.locator('[data-act="pick"]').click();
         const picker = page.getByRole("dialog", {name: "Choose a key"});
-        for (const section of ["custom", "all"]) {
+        for (const section of ["custom", "else"]) {
             await picker.locator(`[data-sec="${section}"]`).click();
             await expect(picker.locator('[data-pick^="QK_USER_"]')).toHaveCount(0);
             for (const key of ["CUSTOM_KEY_0", "CUSTOM_KEY_1", "CUSTOM_KEY_2", "KC_NO", "KC_TRANSPARENT"])
