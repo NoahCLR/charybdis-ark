@@ -77,3 +77,24 @@ test("the Key tab's rows go to the behaviour and combos they name", async ({page
     await expect(page.locator('[data-tab="combos"]')).toHaveAttribute("aria-selected", "true");
     await expect(page.locator('[data-tab="key"] .c')).toHaveCount(0);
 });
+
+test("the board is one Tab stop; arrows move the picked key, [ ] and digits switch layers, Enter opens the picker", async ({page}) => {
+    await openControls(page, "keys", {tab: "key", selected: 0, layer: 0});
+    await expect(page.locator('.keys-pad .board [data-key][tabindex="0"]')).toHaveCount(1);
+    await page.locator('.keys-pad .board [data-key="0"]').focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(page.locator('.keys-pad .board [data-key="1"]')).toBeFocused();
+    await expect(page.locator('.keys-pad .board [data-key="1"]')).toHaveClass(/\bsel\b/);
+    await page.keyboard.press("ArrowDown");
+    await expect(page.locator('.keys-pad .board [data-key="13"]')).toBeFocused();
+    await page.keyboard.press("]");
+    await expect(page.locator('.layer-tabs [data-layer="1"]')).toHaveAttribute("aria-selected", "true");
+    await expect(page.locator('.keys-pad .board [data-key="13"]')).toBeFocused();
+    await page.keyboard.press("3");
+    await expect(page.locator('.layer-tabs [data-layer="3"]')).toHaveAttribute("aria-selected", "true");
+    await page.keyboard.press("[");
+    await expect(page.locator('.layer-tabs [data-layer="2"]')).toHaveAttribute("aria-selected", "true");
+    expect(await page.evaluate(() => window.__posted.length)).toBe(0);
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("dialog", {name: "Choose a key"})).toBeVisible();
+});

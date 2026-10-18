@@ -18,6 +18,8 @@ import {css, idealText, isOff} from "../lib/colour.mjs";
 import {GEO, LED_INDEX, TRACKBALL_LED, keyFaceRows, keyVisual, legendFit, textUnits} from "../view/geometry.mjs";
 import {behaviourFor, behaviourTiers, keyFace, keyMeaning} from "../view/keyface.mjs";
 import {combosShownAt} from "../view/combo-reach.mjs";
+import {unbuiltKeycode} from "../view/picker-sections.mjs";
+import {dangerOf} from "../view/picker-choice.mjs";
 import {resolvedPositions} from "../view/layer-resolution.mjs";
 import {keyLight, ownLight, stageEnabled, tierColour, trackballLight} from "../view/lighting.mjs";
 import {el, esc} from "../lib/dom.mjs";
@@ -81,6 +83,9 @@ export function board(model, layer, options = {}) {
     const comboColour = model?.rgb?.comboFeedback?.color;
     const comboLit = stageEnabled(model, "combo") && comboColour && !isOff(comboColour);
 
+    // One Tab stop for the whole board: the picked key (roving tabindex);
+    // the arrow keys move from there (ui/keys.mjs).
+    const stop = positions.some((position) => position.layoutIndex === selected) ? selected : positions[0]?.layoutIndex;
     let glow = "", keys = "";
     for (const position of positions) {
         const index = position.layoutIndex;
@@ -111,7 +116,11 @@ export function board(model, layer, options = {}) {
 
         const tiers = dots && mode !== "leds" ? behaviourTiers(behaviourFor(model, keyMeaning(shown))) : [];
         const combos = badges && mode !== "leds" ? combosShownAt(model, stack, layer?.index ?? 0, held, index) : [];
-        const sub = mode === "leds" ? "" : face.sub;
+        // A key this firmware does not build does nothing: its cap says so
+        // on its second line. A key that stops or erases the keyboard is
+        // marked ⚠ (view/picker-choice.mjs dangerOf).
+        const inert = mode !== "leds" && face.kind === "key" && unbuiltKeycode(model, shown.keycode);
+        const sub = mode === "leds" ? "" : inert ? "not in this firmware" : face.sub;
         const rows = keyFaceRows(visual.y,
             {tiers: tiers.length > 0, combos: combos.length > 0, sub: Boolean(sub)});
 
@@ -123,36 +132,27 @@ export function board(model, layer, options = {}) {
             if (!feedbackOn || isOff(colour)) {
                 return `<circle cx="${x}" cy="${rows.tierY}" r="3.9" fill="none" stroke="${text || "var(--light-detail)"}" stroke-width="1.1" stroke-dasharray="2 1.6"></circle>`;
             }
-            return `<circle cx="${x}" cy="${rows.tierY}" r="3.9" fill="${css(colour)}" stroke="${text || "var(--light-detail)"}" stroke-width="1.1"></circle>`
-                + (tier.count > 1 ? `<text x="${x}" y="${/** @type {number} */ (rows.tierY) + 0.5}" class="kc-dotn" fill="${idealText(colour)}">${tier.count}</text>` : "");
+            // A dot per tier, without a count: how many actions use it is
+            // the hover card's and the Behaviours tab's to say.
+            return `<circle cx="${x}" cy="${rows.tierY}" r="3.9" fill="${css(colour)}" stroke="${text || "var(--light-detail)"}" stroke-width="1.1"></circle>`;
         }).join("");
 
         if (combos.length) {
-            // Each badge is as wide as its own text, and the row scales down
-            // together when it would overrun the cap — three badges never reach
-            // the edges the way a fixed width makes them.
-            const gap = 1.5;
-            const natural = combos.map((combo) => Math.max(11.5, 5 + String(combo.badge || "C").length * 3.2));
-            const room = GEO.keyW - 8, between = gap * (combos.length - 1);
-            const total = natural.reduce((sum, width) => sum + width, 0);
-            const scale = total + between > room ? Math.max(0.68, (room - between) / total) : 1;
-            const widths = natural.map((width) => width * scale);
-            const fontSize = Math.max(4.9, 5.8 * scale);
-            let x = cx - (widths.reduce((sum, width) => sum + width, 0) + between) / 2;
-            marks += combos.map((combo, order) => {
-                const width = widths[order];
-                const badge = `<rect x="${x}" y="${rows.comboY}" width="${width}" height="${rows.comboHeight}" rx="${rows.comboHeight * 0.22}" fill="var(--badge-ink)" stroke="${comboLit ? css(comboColour) : "var(--badge-outline)"}" stroke-width="${rows.comboHeight * 0.08}"></rect>`
-                    + `<text x="${x + width / 2}" y="${/** @type {number} */ (rows.comboY) + rows.comboHeight / 2 + 0.1}" class="kc-badgetext" font-size="${fontSize}">${esc(combo.badge || "C")}</text>`;
-                x += width + gap;
-                return badge;
-            }).join("");
+            // One combo mark per key, with how many combos it starts when
+            // more than one: combo numbers are no identity (they renumber when
+            // one is deleted), so the hover card and Combos tab name them.
+            const label = combos.length > 1 ? String(combos.length) : "";
+            const width = label ? 15 : 11;
+            const x = cx - width / 2;
+            marks += `<rect class="kc-combo" x="${x}" y="${rows.comboY}" width="${width}" height="${rows.comboHeight}" rx="${rows.comboHeight / 2}" fill="var(--badge-ink)" stroke="${comboLit ? css(comboColour) : "var(--badge-outline)"}" stroke-width="${rows.comboHeight * 0.12}"></rect>`
+                + (label ? `<text x="${cx}" y="${/** @type {number} */ (rows.comboY) + rows.comboHeight / 2 + 0.1}" class="kc-badgetext" font-size="6.4">${label}</text>` : "");
         }
 
         // The selection and indication rings ride on top: the light owns the key
         // face, so state is never told by recolouring it.
         /** @param {string} name */
         const ring = (name) => `<rect class="${name}" x="${visual.x + 1.4}" y="${visual.y + 1.4}" width="${GEO.keyW - 2.8}" height="${GEO.keyH - 2.8}" rx="${GEO.radius - 1}"></rect>`;
-        const main = mode === "leds" ? String(LED_INDEX[index] ?? index) : face.main;
+        const main = mode === "leds" ? String(LED_INDEX[index] ?? index) : dangerOf(model, shown.keycode) ? `⚠ ${face.main}` : face.main;
         // A legend is sized from the key's drawn size and the room its row
         // leaves (view/geometry.mjs legendFit), so one typeface at one weight
         // carries every cap: a long one shrinks to its floor, then a main
@@ -175,7 +175,7 @@ export function board(model, layer, options = {}) {
             ? mainFit.lines.map((part, row) => `<tspan x="${cx}" y="${rows.mainY + (row ? 0.56 : -0.56) * mainFit.size}"${squeeze(part)}>${esc(part)}</tspan>`).join("")
             : esc(main);
 
-        keys += `<g class="${classes}${selected === index ? " sel" : ""}" data-key="${index}" tabindex="0" role="button"
+        keys += `<g class="${classes}${selected === index ? " sel" : ""}" data-key="${index}" tabindex="${index === stop ? 0 : -1}" role="button"
             aria-label="${esc(keyMeaning(shown))} at index ${index}${from ? `, from ${esc(from.displayName || from.name || `layer ${from.index}`)}` : ""}"${transform}>
             <rect class="kc-rect${picked}" x="${visual.x}" y="${visual.y}" width="${GEO.keyW}" height="${GEO.keyH}" rx="${GEO.radius}"${fill}></rect>
             ${selected === index || (mode !== "leds" && picks.includes(index)) ? ring("kc-ring") : ""}
