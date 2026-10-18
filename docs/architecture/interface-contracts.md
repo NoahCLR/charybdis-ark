@@ -137,7 +137,7 @@ mouse buttons 1–8 (`0x00d1..0x00d8`, Profile Wire feature bit 28) and VIA
 macro outputs (`0x7700..0x777f`, feature bit 29), which take inherit policy
 and mask zero (firmware D-F23); Ark requires both features (D-L64). Mouse movement, wheel,
 acceleration and modifier-wrapped mouse codes remain invalid. The firmware
-owns the click runtime contract (D-F22); the [guide](../GUIDE.md#pointing-mode-clicks)
+owns the click runtime contract (D-F22); the [guide](../GUIDE.md#trackball-mode-clicks)
 describes its effect for users.
 
 `core/model/pointing-taps.js` supplies the allowed picker names and aliases,
