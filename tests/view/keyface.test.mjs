@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {actionNaming, dualRole, keyFace, layerOfKeycode, keyName, visibleKeycode, cellLabel, behaviourFor, canonicalKeycode, behaviourListeningTo, behaviourTiers, behaviourGridSteps, inheritedBranch, impliedBranch} from "../../webview/view/keyface.mjs";
+import {actionNaming, dualRole, keyFace, layerOfKeycode, keyName, visibleKeycode, cellLabel, behaviourFor, canonicalKeycode, behaviourListeningTo, behaviourTiers, behaviourGridSteps, behaviourGridLayout, behaviourDepth, inheritedBranch, impliedBranch} from "../../webview/view/keyface.mjs";
 import keyNames from "../../core/model/key-names.js";
 
 test("visible macro keycodes use the VIA slot name for both QMK's named and unnamed values", () => {
@@ -156,7 +156,7 @@ test("an empty tap inherits the key's own tap at every count the row reaches, on
     assert.equal(inheritedBranch(behaviour, {tapCount: 0}, "tap"), tap);
     assert.deepEqual(inheritedBranch(behaviour, {tapCount: 1}, "tap"), {...tap, times: 2}, "a double tap sends the key's tap twice");
     assert.deepEqual(inheritedBranch(behaviour, {tapCount: 2, hold: {action: "KC_A"}}, "tap"), {...tap, times: 3});
-    assert.equal(inheritedBranch(behaviour, {tapCount: 3}, "tap"), null, "past the deepest authored count the presses are separate gestures");
+    assert.equal(inheritedBranch(behaviour, {tapCount: 3}, "tap"), null, "past the deepest authored count the keyboard cycles back to a single tap");
     assert.equal(inheritedBranch({...behaviour, steps: []}, {tapCount: 1}, "tap"), null, "an unstored row reaches only a single tap");
     assert.equal(inheritedBranch({...behaviour, steps: []}, {tapCount: 0}, "tap"), tap);
     assert.equal(inheritedBranch(behaviour, {tapCount: 1, tap: {action: "KC_B"}}, "tap"), null, "an authored cell replaces it");
@@ -226,4 +226,31 @@ test("a behaviour row counts its actions, one per cell set, not its tap counts",
     assert.equal(actionsWords(row), "3 actions");
     assert.equal(actionsWords({steps: [{tapCount: 0, tap: {action: "KC_A"}}]}), "1 action");
     assert.equal(actionsWords({steps: []}), "No actions yet");
+});
+
+test("the grid shows the tap counts in use and the next, or every one, and says where the keyboard cycles", () => {
+    const esc = {keycode: "KC_ESCAPE", steps: [{tapCount: 1, tap: {action: "KC_GRAVE"}}]};
+    assert.equal(behaviourDepth(esc), 2);
+    const compact = behaviourGridLayout(esc, 5);
+    assert.deepEqual(compact.rows.map((row) => [row.step.tapCount, row.add]), [[0, false], [1, false], [2, true]]);
+    assert.deepEqual(compact.cycle, {taps: 3}, "a third tap starts again at a single tap");
+    const all = behaviourGridLayout(esc, 5, true);
+    assert.deepEqual(all.rows.map((row) => row.like), [null, null, null, 1, 0], "4 taps answer as 2x, 5 as 1x: (count % depth) + 1");
+    const none = behaviourGridLayout({keycode: "KC_A", steps: []}, 5);
+    assert.deepEqual(none.rows.map((row) => [row.step.tapCount, row.add]), [[0, false], [1, true]]);
+    assert.equal(none.cycle, null, "a single-tap row never accumulates taps");
+    assert.equal(behaviourDepth({steps: [{tapCount: 3}]}), 0, "a tap count with nothing set does not count");
+    assert.equal(behaviourGridLayout({steps: [{tapCount: 4, hold: {action: "KC_A"}}]}, 5).rows.length, 5);
+});
+
+test("a pointing-mode key holds its mode from the press, unless a later tap count holds another mode", () => {
+    const hold = {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "PD_SLOT_0", fromPress: true};
+    const behaviour = {keycode: "PD_SLOT_0", builtIn: {hold}, steps: []};
+    assert.equal(inheritedBranch(behaviour, {tapCount: 0}, "hold"), hold);
+    const same = {...behaviour, steps: [{tapCount: 1, hold: {action: "PD_SLOT_0_LOCK"}}]};
+    assert.equal(inheritedBranch(same, {tapCount: 0}, "hold").fromPress, true, "its own mode does not defer it");
+    const other = {...behaviour, steps: [{tapCount: 1, longHold: {action: "PD_SLOT_3"}}]};
+    assert.deepEqual(inheritedBranch(other, {tapCount: 0}, "hold"), {...hold, fromPress: false}, "another mode waits for Tap / hold");
+    const layer = {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "MO(2)", fromPress: true};
+    assert.equal(inheritedBranch({keycode: "MO(2)", builtIn: {hold: layer}, steps: [{tapCount: 1, hold: {action: "PD_SLOT_3"}}]}, {tapCount: 0}, "hold"), layer);
 });

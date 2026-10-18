@@ -49,6 +49,7 @@ export const STATE_FIELDS = {
     settingsOpen: kept([]),    // settings sections opened by hand or by a Show, so a render keeps them open
     keyDetailsOpen: kept(false), // the Key tab's folded position details, open on every key once opened
     showKeycodes: kept(false),   // the Show keycodes preference: QMK keycodes beside names everywhere (decisions R2, §3); remembered per host (setPreference)
+    allTapCounts: kept(false),   // Show all tap counts in a behaviour's grid, not only those in use and the next; remembered per host (setPreference)
     hideBoard: kept(false),      // Hide board on Keys and Lighting: the board folds to its layer tabs; remembered per host (setPreference)
     railMenu: kept(false),       // the rail's "⋯" menu is open
     stackOpen: kept(false),    // the Key tab's runs of transparent layers, shown in full once asked
@@ -126,7 +127,7 @@ Object.assign(state, readPreferences(vscode.getState?.()));
 
 // Change a remembered preference: now, and in the host's panel state for the
 // next session (view/preferences.mjs).
-/** @param {"showKeycodes" | "hideBoard"} name @param {boolean} value */
+/** @param {"showKeycodes" | "hideBoard" | "allTapCounts"} name @param {boolean} value */
 export function setPreference(name, value) {
     state[name] = value;
     vscode.setState?.(withPreference(vscode.getState?.(), name, value));
