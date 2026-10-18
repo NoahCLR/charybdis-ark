@@ -16,6 +16,7 @@ import * as controls from "../../webview/view/controls.mjs";
 import {behaviourEditorRow, behaviourTimingEdit, behaviourTimingField} from "../../webview/view/behavior-editor.mjs";
 import {shareHold} from "../../webview/view/share.mjs";
 import {durationMilliseconds, durationValue} from "../../webview/view/duration.mjs";
+import {TEMPLATES, modeProblems, templateMode} from "../../webview/view/trackball.mjs";
 import {AXIS, BUTTON, DIRECTIONAL_STARTER_THRESHOLD, KIND, MODIFIER_POLICY, SCROLL_AXES, SCROLL_STARTER, SHIPPED_SCROLL, dpiOptions, scrollStarter, modeDpi, newMode, readConfig, settleButtons, settleTaps, startingRecord, thresholdDistance} from "../../webview/view/pointing-config.mjs";
 
 const require = createRequire(import.meta.url);
@@ -894,6 +895,38 @@ test("a new or switched-to scrolling mode scrolls like Dragscroll: its speed and
     assert.deepEqual([switched.dpi, switched.scroll.invert], [dragscroll.dpi, dragscroll.scroll.invert]);
     stage(draft, edits.pdMode(4, readConfig(switched, formOf({kind: KIND.SCROLLING, name: "Arrow", dpi: String(switched.dpi)})), draft.identity()));
     assert.deepEqual([decoded(draft).pdModes[4].dpi, decoded(draft).pdModes[4].scroll.invert], [dragscroll.dpi, dragscroll.scroll.invert]);
+});
+
+test("every empty-slot template posts a mode the draft stores as the firmware ships it", () => {
+    const draft = session();
+    const starter = scrollStarter(decoded(draft).pdModes);
+    stage(draft, edits.clearPdMode(5, draft.identity()));
+    for (const template of TEMPLATES) {
+        stage(draft, edits.clearPdMode(5, draft.identity()));
+        const config = templateMode(decoded(draft).pdModes[5], template.id, starter);
+        stage(draft, edits.pdMode(5, config, draft.identity()));
+        const made = decoded(draft).pdModes[5];
+        assert.equal(made.name, template.label, template.id);
+        assert.equal(made.kind, config.kind, template.id);
+        assert.deepEqual(modeProblems(config), {}, `${template.id} breaks no rule`);
+    }
+    // Volume as pd_config.c ships it: vertical, 60 counts, normal speed.
+    stage(draft, edits.clearPdMode(5, draft.identity()));
+    stage(draft, edits.pdMode(5, templateMode(decoded(draft).pdModes[5], "volume", starter), draft.identity()));
+    const volume = decoded(draft).pdModes[5];
+    assert.deepEqual([volume.axis, volume.thresholdY, volume.dpi], [AXIS.VERTICAL, 60, 0]);
+    assert.ok(volume.directions.up.keycode > 0 && volume.directions.down.keycode > 0);
+    // Arrows keeps its modifier policies and button overrides.
+    stage(draft, edits.clearPdMode(5, draft.identity()));
+    stage(draft, edits.pdMode(5, templateMode(decoded(draft).pdModes[5], "arrows", starter), draft.identity()));
+    const arrows = decoded(draft).pdModes[5];
+    assert.deepEqual([arrows.pointerLayer, arrows.directions.up.modifierPolicy, arrows.directions.up.mask], [1, MODIFIER_POLICY.MASK, 0x44]);
+    assert.deepEqual(arrows.buttons.map((button) => button.kind), [BUTTON.HOLD_MODIFIERS, BUTTON.TAP, BUTTON.TAP]);
+    assert.equal(arrows.buttons[1].tap.modifierPolicy, MODIFIER_POLICY.EXACT);
+    // Scroll copies Dragscroll.
+    stage(draft, edits.clearPdMode(5, draft.identity()));
+    stage(draft, edits.pdMode(5, templateMode(decoded(draft).pdModes[5], "scroll", starter), draft.identity()));
+    assert.deepEqual(decoded(draft).pdModes[5].scroll, decoded(draft).pdModes[0].scroll);
 });
 
 test("duplicating needs a configured source and an empty destination", () => {
