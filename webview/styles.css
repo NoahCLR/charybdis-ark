@@ -211,7 +211,7 @@ select.rail-picker:disabled { cursor: default; opacity: .6; }
 /* What a web page's host adds to the rail: its picker, what it is doing, and
    the build it is. The extension has none of them. */
 .rail-choose { margin-top: 16px; display: grid; gap: 8px; }
-.rail-choose .btn { width: 100%; justify-content: center; min-height: 28px; }
+.rail-choose .btn { width: 100%; justify-content: center; }
 .rail-progress { margin: 0 12px 10px; display: flex; align-items: center; gap: 8px; font-size: var(--fs-small); color: var(--text-2); }
 .rail-build { display: flex; align-items: center; gap: 6px; padding: 0 12px 10px; font-size: var(--fs-micro); font-family: var(--mono); color: var(--text-3); text-decoration: none; white-space: nowrap; }
 .rail-build span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
@@ -243,27 +243,55 @@ a.rail-build:hover { color: var(--text-2); }
 .device-pad { max-width: var(--page); }
 
 /* ── controls ────────────────────────────────────────────────────────── */
+/* The action grammar (docs/architecture/interface-contracts.md):
+     .btn.primary           commit: filled, one per surface
+     .btn                   create or open: outlined ("…" when more input follows)
+     .btn.text (.ghost.tiny) object actions and "Go → Somewhere": text, 28 px
+     .btn.text.destructive  destructive: text, last, red on hover
+     .btn.ghost             dismiss
+     .btn.icon              28 × 28, always with an aria-label
+     .btn.toggle            view state: pressed or not (aria-pressed)
+     .sw                    a stored on/off value
+   Heights: 24 chips, 28 compact buttons and inline selects, 32 buttons and
+   fields, 36 tabs and navigation. */
 .btn {
   display: inline-flex; align-items: center; gap: 6px;
-  height: 30px; padding: 0 12px; border-radius: var(--r-control);
+  height: var(--h-control); padding: 0 12px; border-radius: var(--r-control);
   border: 1px solid var(--line-2); color: var(--text);
   font-size: var(--fs-body); font-weight: var(--fw-medium); white-space: nowrap;
   background: var(--surface-2);
-  transition: background .12s ease, border-color .12s ease, opacity .12s ease;
+  transition: background .12s ease, border-color .12s ease, color .12s ease;
 }
 .btn:hover { background: var(--surface-3); border-color: var(--line-3); }
 .btn.ghost { background: none; border-color: transparent; color: var(--text-2); }
 .btn.ghost:hover { background: var(--surface-2); color: var(--text); }
 .btn.primary { background: var(--inv-bg); color: var(--inv-text); border-color: transparent; font-weight: var(--fw-strong); }
-.btn.primary:hover { opacity: .88; background: var(--inv-bg); }
-.btn.tiny { height: 24px; padding: 0 8px; font-size: var(--fs-small); border-radius: var(--r-control); }
-.btn.icon { width: 30px; padding: 0; justify-content: center; }
-.btn[disabled] { opacity: .4; pointer-events: none; }
+.btn.primary:hover { background: color-mix(in srgb, var(--inv-bg) 86%, var(--bg)); }
+/* Compact: 28 px, for title bars, rows and the rail. */
+.btn.tiny, .btn.compact { height: var(--h-compact); padding: 0 10px; font-size: var(--fs-small); font-weight: var(--fw-medium); }
+/* A text button: compact and borderless, for an object's own actions and
+   for going somewhere else. */
+.btn.text { height: var(--h-compact); padding: 0 10px; font-size: var(--fs-small); background: none; border-color: transparent; color: var(--text-2); }
+.btn.text:hover { background: var(--surface-2); color: var(--text); }
+.btn.destructive:hover, .btn.text.destructive:hover { color: var(--danger); }
+.btn.icon { width: var(--h-compact); height: var(--h-compact); padding: 0; justify-content: center; }
+/* A view state (Raw, Preview on board, Hide board): pressed or not. */
+.btn.toggle[aria-pressed="true"] { background: var(--surface-3); border-color: var(--line-3); color: var(--text); }
+/* A button that shows its value (a keycap, a name) and opens a picker on it. */
+.value-btn {
+  display: inline-flex; align-items: center; gap: 6px; height: var(--h-control); padding: 0 10px; max-width: 100%;
+  border: 1px solid var(--line-2); border-radius: var(--r-control); background: var(--key);
+  font-size: var(--fs-body); color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.value-btn:hover { border-color: var(--line-3); background: var(--key-hi); }
+/* Disabled reads by colour, never by fading: the words stay legible. */
+.btn[disabled], .value-btn[disabled] { color: var(--text-disabled); border-color: var(--line); background: var(--surface); pointer-events: none; }
+.btn.ghost[disabled], .btn.text[disabled] { background: none; border-color: transparent; }
 .btn svg { width: 13px; height: 13px; stroke: currentColor; fill: none; stroke-width: 1.5; }
 
 .seg { display: inline-flex; padding: 2px; gap: 2px; background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-control); }
 .seg button {
-  height: 24px; padding: 0 10px; border-radius: var(--r-control); font-size: var(--fs-small); color: var(--text-2);
+  height: var(--h-chip); padding: 0 10px; border-radius: var(--r-control); font-size: var(--fs-small); color: var(--text-2);
 }
 .seg button[aria-pressed="true"] { background: var(--surface-3); color: var(--text); font-weight: var(--fw-medium); box-shadow: 0 1px 0 rgba(0,0,0,.25); }
 
@@ -279,7 +307,7 @@ a.rail-build:hover { color: var(--text-2); }
 .field { display: grid; gap: 6px; }
 .field > span, .label { font-size: var(--fs-small); color: var(--text-2); letter-spacing: .01em; }
 .input, select.input {
-  height: 32px; padding: 0 10px; width: 100%;
+  height: var(--h-control); padding: 0 10px; width: 100%;
   background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-control);
   color: var(--text); font-size: var(--fs-body); outline: none;
   transition: border-color .12s ease, background .12s ease;
@@ -302,25 +330,32 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 
 /* The hidden input must stay beside its visible switch when the editor scrolls;
    focusing an absolutely positioned input elsewhere can move the viewport. */
-.sw { position: relative; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+/* The label is part of the target: at least 28 px tall, track 32 × 18. */
+.sw { position: relative; display: inline-flex; align-items: center; gap: 8px; min-height: var(--h-compact); cursor: pointer; }
 .sw input { position: absolute; opacity: 0; pointer-events: none; }
 .sw .track {
-  width: 30px; height: 18px; border-radius: var(--r-card); background: var(--surface-3);
+  width: 32px; height: 18px; border-radius: var(--r-card); background: var(--surface-3);
   border: 1px solid var(--line-2); position: relative; transition: background .15s ease, border-color .15s ease;
   flex: none;
 }
 .sw .track::after {
-  content: ""; position: absolute; inset: 2px auto 2px 2px; width: 12px; border-radius: 50%;
+  content: ""; position: absolute; inset: 1px auto 1px 1px; width: 14px; border-radius: 50%;
   background: var(--text-3); transition: transform .15s cubic-bezier(.3,.8,.3,1), background .15s ease;
 }
 .sw input:checked + .track { background: var(--inv-bg); border-color: transparent; }
-.sw input:checked + .track::after { transform: translateX(12px); background: var(--inv-text); }
+.sw input:checked + .track::after { transform: translateX(14px); background: var(--inv-text); }
+.sw:has(input:disabled) { cursor: default; }
+.sw input:disabled + .track { background: var(--surface-2); border-color: var(--line); }
+.sw input:disabled + .track::after { background: var(--text-disabled); }
+.sw input:disabled:checked + .track { background: var(--text-disabled); }
+.sw input:disabled:checked + .track::after { background: var(--surface-2); }
+.sw input:disabled ~ .txt { color: var(--text-disabled); }
 .sw .txt { font-size: var(--fs-body); }
 /* Switches folded under a summary, in a row that wraps. */
 .sw-group { flex-wrap: wrap; margin-top: 10px; }
 
 .chip {
-  display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 8px;
+  display: inline-flex; align-items: center; gap: 6px; height: var(--h-chip); padding: 0 8px;
   border-radius: var(--r-control); background: var(--surface-2); border: 1px solid var(--line);
   font-size: var(--fs-small); color: var(--text-2);
 }
@@ -364,7 +399,7 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 .layer-tabs::-webkit-scrollbar { display: none; }
 .layer-tabs > * { flex: none; }
 .layer-tab {
-  display: inline-flex; align-items: center; gap: 8px; height: 33px; padding: 0 12px 0 10px;
+  display: inline-flex; align-items: center; gap: 8px; height: var(--h-tab); padding: 0 12px 0 10px;
   border: 1px solid transparent; border-top: 0; border-radius: 0 0 var(--r-control) var(--r-control);
   color: var(--text-2); font-size: var(--fs-body); white-space: nowrap;
 }
@@ -408,7 +443,7 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
    panel's own surface, joined to it as the picked layer's tab is to the board:
    it sits over the panel's bottom edge and covers it across its width. */
 .layer-edit {
-  position: relative; z-index: 41; display: inline-flex; align-items: center; gap: 6px; height: 33px; padding: 0 12px 0 10px;
+  position: relative; z-index: 41; display: inline-flex; align-items: center; gap: 6px; height: var(--h-tab); padding: 0 12px 0 10px;
   border: 1px solid transparent; border-top: 0; border-radius: 0 0 var(--r-control) var(--r-control);
   color: var(--text-2); font-size: var(--fs-body); white-space: nowrap;
 }
@@ -434,7 +469,7 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 .lp-row .lp-base, .lp-row [data-base] { justify-self: end; }
 .lp-row.base { box-shadow: inset 0 1px 0 var(--line-2); }
 .lp-grip {
-  width: 18px; height: 26px; display: grid; place-items: center; padding: 0; border: 0; border-radius: var(--r-chip);
+  width: 18px; height: var(--h-compact); display: grid; place-items: center; padding: 0; border: 0; border-radius: var(--r-chip);
   background: none; color: var(--text-3); cursor: grab; touch-action: none;
 }
 .lp-grip svg { width: 10px; height: 16px; fill: currentColor; }
@@ -583,7 +618,7 @@ button.tier:hover { background: var(--surface-3); }
 .tier.off .ta { font-size: var(--fs-small); }
 .tier.editing { grid-template-columns: 62px minmax(0,1fr); align-items: start; background: var(--surface-3); padding: 8px 8px; }
 .tier-edit { display: grid; gap: 8px; }
-.act { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 8px; border-radius: var(--r-control); background: var(--surface-3); border: 1px solid var(--line); font-family: var(--mono); font-size: var(--fs-small); max-width: 100%; overflow: hidden; }
+.act { display: inline-flex; align-items: center; gap: 6px; height: var(--h-chip); padding: 0 8px; border-radius: var(--r-control); background: var(--surface-3); border: 1px solid var(--line); font-family: var(--mono); font-size: var(--fs-small); max-width: 100%; overflow: hidden; }
 .act .k { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .act .how { color: var(--text-3); font-family: var(--sans); font-size: var(--fs-micro); }
 .act.empty { border-style: dashed; color: var(--text-3); background: none; font-family: var(--sans); font-size: var(--fs-small); }
@@ -607,13 +642,13 @@ button.tier:hover { background: var(--surface-3); }
   mask-image: linear-gradient(to right, transparent, #000 28px, #000 calc(100% - 28px), transparent); }
 .bench-tablist > * { flex: none; }
 .bench-tabs button[role="tab"] {
-  position: relative; display: inline-flex; align-items: center; gap: 6px; height: 35px; padding: 0 10px;
+  position: relative; display: inline-flex; align-items: center; gap: 6px; height: var(--h-tab); padding: 0 10px;
   border: 1px solid transparent; border-bottom: 0; border-radius: var(--r-control) var(--r-control) 0 0;
   font-size: var(--fs-body); color: var(--text-2); font-weight: var(--fw-regular); white-space: nowrap;
 }
 .bench-tabs button[role="tab"]:hover { color: var(--text); background: var(--surface-3); }
 .bench-tabs button[role="tab"][aria-selected="true"] {
-  height: 36px; margin-bottom: -1px; background: var(--surface); border-color: var(--line); color: var(--text); font-weight: var(--fw-medium);
+  height: var(--h-tab); margin-bottom: -1px; background: var(--surface); border-color: var(--line); color: var(--text); font-weight: var(--fw-medium);
 }
 .bench-tabs .tab-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 /* Fixed tab widths keep neighbouring tabs in place. The count reserves three
@@ -676,7 +711,7 @@ button.tier:hover { background: var(--surface-3); }
    Every tab that answers "what does this layer reach" heads its groups the
    same way, whatever it lists underneath: rows, table sections or cards. */
 .group-h {
-  display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+  display: flex; align-items: center; gap: 8px; width: 100%; min-height: var(--h-control); text-align: left;
   padding: 8px 12px; background: var(--surface-2);
   transition: background .12s ease, color .12s ease;
 }
@@ -707,7 +742,7 @@ button.tier:hover { background: var(--surface-3); }
    hold and Long hold their tiers. */
 .bgrid { display: grid; grid-template-columns: 150px repeat(3, minmax(150px, 1fr)); gap: 6px; align-items: stretch; overflow-x: auto; padding-bottom: 2px; }
 .bgrid .bterm-field { gap: 4px; align-self: end; min-width: 0; margin-bottom: 6px; }
-.bterm { display: flex; align-items: center; align-self: end; height: 32px; margin-bottom: 6px; padding: 0 2px; font-size: var(--fs-small); color: var(--text-3); }
+.bterm { display: flex; align-items: center; align-self: end; height: var(--h-control); margin-bottom: 6px; padding: 0 2px; font-size: var(--fs-small); color: var(--text-3); }
 .bhead { display: flex; align-items: center; gap: 6px; padding: 0 2px; font-size: var(--fs-small); color: var(--text-2); }
 .bhead .bn { font-family: var(--mono); font-size: var(--fs-micro); color: var(--text-3); border: 1px solid var(--line); border-radius: var(--r-chip); padding: 1px 4px; }
 .bhead .bx { margin-left: auto; color: var(--text-3); font-size: var(--fs-small); }
@@ -1143,7 +1178,7 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .pk-value { margin-left: 10px; color: var(--text); }
 .pk-problem { padding: 0 16px 12px; background: var(--surface-2); }
 .pk-mods { display: flex; align-items: center; gap: 6px; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--surface-2); }
-.pk-mod { height: 26px; padding: 0 10px; border-radius: var(--r-control); border: 1px solid var(--line); background: var(--surface); font-size: var(--fs-small); color: var(--text-2); }
+.pk-mod { height: var(--h-compact); padding: 0 10px; border-radius: var(--r-control); border: 1px solid var(--line); background: var(--surface); font-size: var(--fs-small); color: var(--text-2); }
 .pk-mod:hover { border-color: var(--line-3); color: var(--text); }
 .pk-mod.on { background: var(--inv-bg); color: var(--inv-text); border-color: transparent; font-weight: var(--fw-medium); }
 .picker-side { border-right: 1px solid var(--line); padding: 12px 8px; display: grid; align-content: start; gap: 1px; min-height: 420px; }
@@ -1204,7 +1239,7 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .pd-empties-h { padding: 4px 2px 6px; }
 .pd-chips { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; }
 .slotchip {
-  position: relative; height: 28px; padding: 0; border: 1px dashed var(--line-2); border-radius: var(--r-control); background: transparent;
+  position: relative; height: var(--h-compact); padding: 0; border: 1px dashed var(--line-2); border-radius: var(--r-control); background: transparent;
   font-family: var(--mono); font-size: var(--fs-small); color: var(--text-3); transition: border-color .12s ease, background .12s ease;
 }
 .slotchip:hover { border-color: var(--line-3); color: var(--text-2); }
@@ -1240,7 +1275,7 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .pd-copy { display: grid; grid-template-columns: minmax(0, 260px) auto; justify-content: start; gap: 8px; align-items: end; }
 .field.inline { display: flex; align-items: center; gap: 8px; }
 .field.inline > span { white-space: nowrap; }
-.field.inline select.input { height: 28px; width: auto; min-width: 150px; background-position: calc(100% - 15px) 12px, calc(100% - 10px) 12px; }
+.field.inline select.input { height: var(--h-compact); width: auto; min-width: 150px; background-position: calc(100% - 15px) 12px, calc(100% - 10px) 12px; }
 .pd-mods { display: grid; gap: 6px 8px; align-items: center; justify-items: start; }
 .pd-mods .h { font-size: var(--fs-micro); color: var(--text-3); }
 .pd-mods .s { font-size: var(--fs-small); color: var(--text-2); }
@@ -1357,7 +1392,7 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
    for, .mslot.out on Macros) fill the bar's end in red. */
 .usage-counts .meter { position: relative; }
 .usage-counts .meter .out { position: absolute; top: 0; right: 0; bottom: 0; background: var(--danger); }
-.tok { display: inline-flex; align-items: center; height: 22px; padding: 0 6px; border-radius: var(--r-chip); background: var(--surface-3); border: 1px solid var(--line); font-family: var(--mono); font-size: var(--fs-small); }
+.tok { display: inline-flex; align-items: center; height: var(--h-chip); padding: 0 6px; border-radius: var(--r-chip); background: var(--surface-3); border: 1px solid var(--line); font-family: var(--mono); font-size: var(--fs-small); }
 .macro-step { display: grid; gap: 10px; min-width: 0; padding: 10px; border: 1px solid var(--line); border-radius: var(--r-control); background: var(--surface-2); }
 .macro-step[hidden] { display: none; }
 /* A slot's name is its editor's title (ui/title-name.mjs): Macros, Custom keys. */
@@ -1374,11 +1409,11 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .title-name:focus-within .title-name-count, .title-name-count.warn { opacity: 1; }
 .macro-context { display: flex; gap: 10px 20px; flex-wrap: wrap; align-items: center; justify-content: space-between; padding-bottom: 15px; border-bottom: 1px solid var(--line); }
 .macro-protection { display: flex; align-items: center; gap: 8px; font-size: var(--fs-small); color: var(--text-2); }
-.macro-protection select.input { width: auto; min-width: 135px; height: 30px; padding: 4px 26px 4px 8px; font-size: var(--fs-small); }
+.macro-protection select.input { width: auto; min-width: 135px; height: var(--h-compact); padding: 4px 26px 4px 8px; font-size: var(--fs-small); }
 .macro-sequence-heading { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
 .macro-sequence-heading .note { font-size: var(--fs-micro); }
 .macro-insert-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.macro-insert-tools .btn { height: 36px; padding: 0 12px; }
+.macro-insert-tools .btn { height: var(--h-tab); padding: 0 12px; }
 .macro-raw-toggle { margin-left: auto; font-size: var(--fs-small); white-space: nowrap; }
 .macro-raw-toggle input { inset: 0; width: 100%; height: 100%; margin: 0; pointer-events: auto; cursor: pointer; }
 .macro-raw:not([open]) { display: none; }
@@ -1542,10 +1577,11 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 
 .main { position: relative; }
 details > summary::-webkit-details-marker { display: none; }
-details > summary { list-style: none; }
+/* A disclosure's summary is a 32 px target with a 12 px chevron. */
+details > summary { list-style: none; min-height: var(--h-control); display: flex; align-items: center; gap: 8px; cursor: pointer; }
 /* Whatever folds says so with one chevron, turned down while open
    (DISCLOSURE in lib/dom.mjs). */
-details > summary .chev { width: 10px; height: 10px; flex: none; fill: none; stroke: var(--text-3); stroke-width: 1.5; transition: transform .12s ease; }
+details > summary .chev { width: 12px; height: 12px; flex: none; fill: none; stroke: var(--text-3); stroke-width: 1.5; transition: transform .12s ease; }
 details[open] > summary .chev { transform: rotate(90deg); }
 
 

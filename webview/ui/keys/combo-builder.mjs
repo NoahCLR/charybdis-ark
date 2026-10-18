@@ -51,11 +51,11 @@ export function comboBuilder(canEdit, holdTerm) {
                     ${state.combo.inputs.length ? state.combo.inputs.map((input) => `<span class="chip"${shown(input) ? ""
                         : ` data-tip="No key on the board presses this from here, so nothing rings for it. It stays an input unless you remove it."`}>
                         <span class="mono">${keyNameMarked(model, comboInputLabel(model, input), input)}</span>
-                        <button data-remove="${esc(input)}">✕</button></span>`).join("")
+                        <button data-remove="${esc(input)}" aria-label="Remove ${esc(comboInputLabel(model, input))} from the inputs">✕</button></span>`).join("")
                         : `<span class="note">no inputs yet</span>`}
                 </div>
                 <div class="row combo-pick">
-                    <button class="btn tiny ${state.combo.picking ? "primary" : ""}" data-act="pickboard" ${canEdit ? "" : "disabled"}
+                    <button class="btn tiny toggle" aria-pressed="${state.combo.picking}" data-act="pickboard" ${canEdit ? "" : "disabled"}
                         data-tip="Switch the board into input-picking mode; click keys to add or remove them.">${state.combo.picking ? "Picking on board…" : "Pick on board"}</button>
                 </div>
             </div>

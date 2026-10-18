@@ -68,7 +68,7 @@ export function screenLighting() {
                 : ""}`}</span>
         ${onGroups ? `<span class="right">
             <button class="btn tiny ghost" data-act="clearleds">Clear selection</button>
-            <button class="btn tiny ${state.trackball ? "primary" : "ghost"}" data-act="trackball"
+            <button class="btn tiny toggle" aria-pressed="${state.trackball}" data-act="trackball"
                 data-tip="Add or remove the trackball LED, index ${TRACKBALL_LED}, from this selection.">Trackball LED</button></span>`
             : ""}
     </div>`));
