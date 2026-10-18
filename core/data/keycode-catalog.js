@@ -12,6 +12,7 @@
 // truthful rather than as a hex number.
 
 const catalog = require("./keycode-catalog.json");
+const legacy = require("./keycode-legacy");
 
 const BY_VALUE = new Map(catalog.entries.map((entry) => [entry.value, entry]));
 /** @type {Map<string, typeof catalog.entries[number]>} */
@@ -195,6 +196,12 @@ function encode(expression) {
     if (direct) {
         return direct.value;
     }
+    // QMK's other spellings: a name QMK compiles to an expression, a
+    // mod-tap shorthand, a deprecated wrapper (keycode-legacy.js).
+    if (Object.hasOwn(legacy.NAMES, text)) return encode(legacy.NAMES[text]);
+    const shorthand = text.match(/^([A-Z_]+)\(\s*(.+?)\s*\)$/);
+    if (shorthand && Object.hasOwn(legacy.MOD_TAP_SHORTHANDS, shorthand[1])) return encode(`MT(${legacy.MOD_TAP_SHORTHANDS[shorthand[1]]}, ${shorthand[2]})`);
+    if (shorthand && Object.hasOwn(legacy.WRAPPER_ALIASES, shorthand[1])) return encode(`${legacy.WRAPPER_ALIASES[shorthand[1]]}(${shorthand[2]})`);
 
     const layerForm = text.match(/^(MO|TG|OSL|TO|DF|TT|PDF)\(\s*(\d+)\s*\)$/);
     if (layerForm) {
@@ -211,11 +218,12 @@ function encode(expression) {
         const bits = combineModifiers((key >> 8) & 0x1f, modifier);
         return bits === undefined ? undefined : (key & 0xff) | (bits << 8);
     }
+    // A mod-tap or layer-tap taps a plain key (0x00-0xFF), by any name.
     const modTap = text.match(/^MT\(\s*([^,]+)\s*,\s*([A-Za-z0-9_]+)\s*\)$/);
     if (modTap) {
         const bits = encodeModifiers(modTap[1]);
-        const tapped = BY_NAME.get(modTap[2]);
-        return bits !== undefined && tapped && tapped.value <= 0xff ? 0x2000 | (bits << 8) | tapped.value : undefined;
+        const tapped = plainKey(modTap[2]);
+        return bits !== undefined && tapped !== undefined ? 0x2000 | (bits << 8) | tapped : undefined;
     }
     const oneshot = text.match(/^OSM\(\s*(.+)\s*\)$/);
     if (oneshot) {
@@ -233,9 +241,9 @@ function encode(expression) {
     const layerTap = text.match(/^LT\(\s*(\d+)\s*,\s*([A-Za-z0-9_]+)\s*\)$/);
     if (layerTap) {
         const layer = Number(layerTap[1]);
-        const tapped = BY_NAME.get(layerTap[2]);
-        if (layer < 16 && tapped && tapped.value <= 0xff) {
-            return 0x4000 | (layer << 8) | tapped.value;
+        const tapped = plainKey(layerTap[2]);
+        if (layer < 16 && tapped !== undefined) {
+            return 0x4000 | (layer << 8) | tapped;
         }
         return undefined;
     }
@@ -246,6 +254,12 @@ function encode(expression) {
     }
 
     return undefined;
+}
+
+/** @param {string} name */
+function plainKey(name) {
+    const value = BY_NAME.get(name)?.value ?? (Object.hasOwn(legacy.NAMES, name) ? encode(legacy.NAMES[name]) : undefined);
+    return value !== undefined && value <= 0xff ? value : undefined;
 }
 
 /** @param {string} expression */
@@ -290,6 +304,11 @@ function aliasTable() {
                 aliases[alias] = entry.name;
             }
         }
+    }
+    // QMK's other names for a catalogued key (KC_BTN1 is MS_BTN1).
+    for (const [alias, target] of Object.entries(legacy.NAMES)) {
+        const entry = BY_NAME.get(target);
+        if (entry && !aliases[alias]) aliases[alias] = entry.name;
     }
     aliases._______ = "_______";
     aliases.XXXXXXX = "XXXXXXX";
