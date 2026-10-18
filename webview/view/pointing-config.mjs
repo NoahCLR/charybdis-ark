@@ -54,10 +54,11 @@ export const SCROLL_FIELDS = [["thresholdH"], ["thresholdV"], ["divisorH"], ["di
 // one DPI list, which arrives with the model (core/model/pointer-dpi.js); a
 // stored value outside it is shown in its place as stored, never replaced,
 // because the firmware accepts it.
-/** @param {{value: number, label: string}[] | null | undefined} choices @param {Scalar | null | undefined} current */
-export function dpiOptions(choices, current) {
+// With the normal speed known, its choice says what it is: "Normal (400 DPI)".
+/** @param {{value: number, label: string}[] | null | undefined} choices @param {Scalar | null | undefined} current @param {number} [normal] */
+export function dpiOptions(choices, current, normal = 0) {
     /** @type {[number, string][]} */
-    const options = (choices || []).map(({value, label}) => [value, label]);
+    const options = (choices || []).map(({value, label}) => [value, value === 0 && normal ? `Normal (${normal} DPI)` : label]);
     const value = Number(current ?? 0);
     if (Number.isInteger(value) && !options.some(([choice]) => choice === value)) {
         const at = options.findIndex(([choice]) => choice > value);
@@ -134,7 +135,9 @@ export function readConfig(slot, form) {
         buttons: (slot.buttons || []).map((button, index) => buttonRecord({
             kind: form[`button:${index}:kind`]?.() ?? button.kind,
             modifiers: form[`button:${index}:modifiers`]?.() ?? button.modifiers,
-            tap: {...button.tap, keycode: form[`button:${index}:tap`]?.() ?? button.tap?.keycode},
+            tap: {...button.tap, keycode: form[`button:${index}:tap`]?.() ?? button.tap?.keycode,
+                modifierPolicy: form[`button:${index}:policy`]?.() ?? button.tap?.modifierPolicy,
+                mask: form[`button:${index}:mask`]?.() ?? button.tap?.mask},
         })),
     };
     if (kind === KIND.DIRECTIONAL) {
@@ -250,7 +253,9 @@ export function buttonRecord({kind, modifiers, tap}) {
 // the shortcut, holding modifiers needs at least one.
 /** @param {PdButton} button */
 export function buttonReady(button) {
-    if (button.kind === BUTTON.TAP) return String(button.tap?.keycode ?? "0") !== "0";
+    // Ignoring held modifiers needs at least one to ignore.
+    if (button.kind === BUTTON.TAP) return String(button.tap?.keycode ?? "0") !== "0"
+        && (button.tap?.modifierPolicy !== MODIFIER_POLICY.MASK || Number(button.tap?.mask) !== 0);
     if (button.kind === BUTTON.HOLD_MODIFIERS) return Number(button.modifiers) !== 0;
     return true;
 }

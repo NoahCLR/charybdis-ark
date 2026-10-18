@@ -1346,7 +1346,18 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .pd-editor { container: pd / inline-size; min-width: 0; }
 .pd-editor .card-h .tag { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .pd-empty-note { max-width: 64ch; }
-.pd-identity { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, .8fr); gap: 12px; }
+.pd-identity { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--s-3); }
+.pd-steps { display: grid; gap: var(--s-3); padding-top: var(--s-3); border-top: 1px solid var(--line); }
+.pd-steps > .field { max-width: none; }
+.pd-steps > label.field select.input { max-width: 260px; }
+.pd-step-row { display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; }
+.pd-step-row .affix { width: 120px; flex: none; }
+.pd-step-row .affix.wide { width: 140px; }
+.pd-problem { color: var(--danger); }
+.pd-problem[hidden] { display: none; }
+.input[aria-invalid="true"] { border-color: var(--danger); }
+.pd-while > .field { max-width: 340px; }
+.pd-split.pd-split-top { padding-top: 0; border-top: 0; }
 .pd-grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-items: end; }
 .pd-grid4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; align-items: end; }
 .pd-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px 24px; align-items: start;
@@ -1396,9 +1407,9 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .pd-taps > .h { font-size: var(--fs-micro); color: var(--text-3); }
 .pd-taps .n { font-size: var(--fs-small); color: var(--text-2); }
 .pd-taps .mods { grid-column: 2 / -1; padding-bottom: 6px; }
-.pd-buttons { display: grid; grid-template-columns: 52px minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, .8fr); gap: 8px 12px; align-items: center; }
+.pd-buttons { display: grid; grid-template-columns: 112px minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, .8fr); gap: 8px 12px; align-items: center; }
 .pd-buttons > .h { font-size: var(--fs-micro); color: var(--text-3); }
-.pd-buttons .n { font-family: var(--mono); font-size: var(--fs-small); color: var(--text-2); }
+.pd-buttons .n { font-size: var(--fs-small); color: var(--text-2); }
 .pd-buttons .narrow { display: none; }
 /* A button that holds modifiers opens its switches under its own row. */
 .pd-buttons .mods { grid-column: 2 / -1; padding-bottom: 6px; }
@@ -1412,7 +1423,7 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
   .pd-cross.pd-cross { grid-template-columns: minmax(0, 1fr); grid-template-areas: none; }
   .pd-cross .arm.arm { grid-area: auto; }
   .pd-cross .hub { display: none; }
-  .pd-buttons { grid-template-columns: 28px minmax(0, 1fr); }
+  .pd-buttons { grid-template-columns: 96px minmax(0, 1fr); }
   .pd-taps { grid-template-columns: minmax(0, 1fr); }
   .pd-taps > .h { display: none; }
   .pd-taps .mods { grid-column: 1; }

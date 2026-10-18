@@ -620,11 +620,32 @@ test("a mouse-button override is set up kind first, and reaches the keyboard onc
         "pass through carries nothing it does not read");
 });
 
+test("a button's tapped shortcut posts its held-modifier policy, and Ignore waits for a modifier to leave out", () => {
+    const draft = session();
+    const id = decoded(draft).pdModes.find((candidate) => candidate.kind && candidate.buttons?.length).id;
+    const post = (fields) => {
+        const slot = decoded(draft).pdModes[id];
+        const settled = settleButtons(slot, readConfig(slot, formOf({kind: slot.kind, name: slot.name, dpi: String(slot.dpi), ...fields})));
+        stage(draft, edits.pdMode(id, settled.config, draft.identity()));
+        return settled.pending;
+    };
+    const stored = () => decoded(draft).pdModes[id].buttons[0];
+    post({"button:0:kind": BUTTON.TAP, "button:0:tap": "KC_C", "button:0:policy": MODIFIER_POLICY.EXACT});
+    assert.deepEqual([stored().kind, stored().tap.modifierPolicy], [BUTTON.TAP, MODIFIER_POLICY.EXACT]);
+    const pending = post({"button:0:kind": BUTTON.TAP, "button:0:tap": "KC_C", "button:0:policy": MODIFIER_POLICY.MASK, "button:0:mask": 0});
+    assert.equal(pending[0].tap.modifierPolicy, MODIFIER_POLICY.MASK, "Ignore with nothing to ignore is held by the editor");
+    assert.equal(stored().tap.modifierPolicy, MODIFIER_POLICY.EXACT, "while the keyboard keeps what it had");
+    post({"button:0:kind": BUTTON.TAP, "button:0:tap": "KC_C", "button:0:policy": MODIFIER_POLICY.MASK, "button:0:mask": 0x02});
+    assert.deepEqual([stored().tap.modifierPolicy, stored().tap.mask], [MODIFIER_POLICY.MASK, 0x02]);
+});
+
 test("a pointing mode picks its speed from the model's DPI list, and keeps a stored speed outside it", () => {
     const choices = buildDeviceModel({}).pdModeEditing.dpiChoices;
     const options = dpiOptions(choices, 400);
     assert.deepEqual(options.map(([value, label]) => ({value, label})), choices, "exactly the shared list");
     assert.deepEqual(options[0], [0, "Normal pointer speed"]);
+    assert.deepEqual(dpiOptions(choices, 0, 400)[0], [0, "Normal (400 DPI)"], "with the normal speed known, it says what it is");
+    assert.equal(dpiOptions(choices, 0).at(-1)[0], 12000, "up to the sensor's 12000");
     assert.deepEqual(dpiOptions(choices, 250).find(([dpi]) => dpi === 250), [250, "250 DPI · as stored"]);
     assert.deepEqual(dpiOptions(choices, 250).map(([dpi]) => dpi).slice(2, 5), [200, 250, 300], "in its place in the list");
     assert.deepEqual(dpiOptions(choices, 12500).at(-1), [12500, "12500 DPI · as stored"]);

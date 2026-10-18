@@ -1,17 +1,21 @@
 // @ts-check
 import {DISCLOSURE, el, esc} from "../../lib/dom.mjs";
-import {AXIS, BUTTON, MODIFIER_POLICY, SCROLL_FIELDS, TAP_ROWS, axisReads, modeDpi, readsHorizontal, readsVertical, thresholdDistance} from "../../view/pointing-config.mjs";
+import {AXIS, BUTTON, MODIFIER_POLICY, TAP_ROWS, axisReads} from "../../view/pointing-config.mjs";
+import {SCROLL_HELP} from "../../view/trackball.mjs";
 import {modifierNames, pointingMacro} from "../../view/keyvalues.mjs";
 import {word} from "../../view/vocabulary.mjs";
 import {state} from "../../store.mjs";
-import {ARROWS, SCROLL_LEAD, SCROLL_RATIOS, SCROLL_SINGLES, scrollLabel, words} from "./common.mjs";
+import {ARROWS, SCROLL_RATIOS, SCROLL_SINGLES, scrollLabel, words} from "./common.mjs";
+
+// Buttons 1–3 by what they usually do, as the keyboard numbers them.
+const BUTTON_NAMES = ["1 · left click", "2 · right click", "3 · middle click"];
 
 /** @typedef {ReturnType<typeof import("./form-controls.mjs").formControls>} FormControls */
 /** @param {import("../../../contracts/panel.js").PublishedModel} model @param {import("../surface-types.js").PresentedSlot} slot @param {boolean} scrolling @param {FormControls} controls */
 export function advancedControls(model, slot, scrolling, {form, disabled, field, select, shortcut, modifiers}) {
     // ── advanced ──────────────────────────────────────────────────────────
     const advanced = /** @type {HTMLDetailsElement} */ (el(`<details class="card pd-advanced" ${state.pdAdvanced ? "open" : ""}><summary class="card-h">
-        ${DISCLOSURE}<h3>Advanced</h3><span class="right note">thresholds, ratios, mouse buttons</span></summary>
+        ${DISCLOSURE}<h3>Advanced</h3><span class="right note">${scrolling ? "scroll tuning, " : "held modifiers, "}mouse buttons</span></summary>
         <div class="card-b stack"></div></details>`));
     const advancedBody = /** @type {HTMLElement} */ (advanced.querySelector(".card-b"));
     /** @param {string} title */
@@ -20,23 +24,6 @@ export function advancedControls(model, slot, scrolling, {form, disabled, field,
         advancedBody.append(node);
         return node;
     };
-
-    const behaviour = el(`<div class="pd-grid3"></div>`);
-    behaviour.append(select("While this mode runs", words(model).pointerLayer, slot.pointerLayer, "pointerLayer"));
-    if (!scrolling) {
-        // An axis the mode does not read has no threshold to set. Sending
-        // once per movement, the threshold is how far a movement has to go.
-        const per = slot.directionOutput === 1 ? "movement before it sends" : "movement per tap";
-        const dpi = modeDpi(slot, model.configDefaults);
-        /** @param {number} counts */
-        const distance = (counts) => {
-            const shown = thresholdDistance(counts, dpi);
-            return shown ? {unit: shown.short, wide: true, tip: shown.long} : {tip: "Sensor counts at this mode's pointer speed."};
-        };
-        if (readsHorizontal(slot.axis)) behaviour.append(field(`Horizontal ${per}`, slot.thresholdX, "thresholdX", distance(slot.thresholdX)));
-        if (readsVertical(slot.axis)) behaviour.append(field(`Vertical ${per}`, slot.thresholdY, "thresholdY", distance(slot.thresholdY)));
-    }
-    section("Behaviour").append(behaviour);
 
     if (!scrolling) {
         // Each shortcut's own handling of modifiers held while it sends. A
@@ -76,15 +63,21 @@ export function advancedControls(model, slot, scrolling, {form, disabled, field,
     }
 
     if (scrolling) {
+        // Every scroll field but the two per-wheel-step distances drawn above,
+        // each with what it does, what it accepts, and room for the reason
+        // the keyboard would refuse it.
         const tuning = el(`<div class="pd-grid3"></div>`);
-        const drawn = new Set(SCROLL_LEAD.map(([key]) => key));
-        for (const [key, unit] of SCROLL_SINGLES) {
-            tuning.append(field(scrollLabel(model, key, unit), slot.scroll?.[key], `scroll:${key}`, {unit}));
-            drawn.add(key);
-        }
+        /** @param {string} key @param {string} [unit] */
+        const single = (key, unit) => {
+            const help = SCROLL_HELP[key];
+            tuning.append(field(scrollLabel(model, key, unit), slot.scroll?.[key], `scroll:${key}`, {unit, tip: help?.help, hint: help?.range}));
+        };
+        for (const [key, unit] of SCROLL_SINGLES) single(key, unit);
         for (const [top, bottom] of SCROLL_RATIOS) {
             const label = scrollLabel(model, top).replace(/\s*·\s*numerator$/, "");
-            const pair = el(`<div class="field"><span>${esc(label)}</span><div class="pd-ratio"></div></div>`);
+            const help = SCROLL_HELP[top];
+            const pair = el(`<div class="field" data-problem-for="scroll:${esc(top)}"><span>${esc(label)}</span><div class="pd-ratio" data-tip="${esc(help?.help || "")}"></div>
+                <span class="note">${esc(help?.range || "")}</span><span class="note pd-problem" data-problem role="alert" hidden></span></div>`);
             const inputs = /** @type {HTMLElement} */ (pair.querySelector(".pd-ratio"));
             for (const [index, key] of [top, bottom].entries()) {
                 const input = /** @type {HTMLInputElement} */ (el(`<input data-f="pointing:${slot.id}:scroll:${esc(key)}" class="input mono" value="${esc(slot.scroll?.[key] ?? "")}" inputmode="numeric"
@@ -92,20 +85,13 @@ export function advancedControls(model, slot, scrolling, {form, disabled, field,
                 form[`scroll:${key}`] = () => input.value;
                 if (index) inputs.append(el(`<i>:</i>`));
                 inputs.append(input);
-                drawn.add(key);
             }
             tuning.append(pair);
-        }
-        // Anything the record gains later is still drawn, once.
-        for (const [key] of SCROLL_FIELDS) {
-            const label = scrollLabel(model, key);
-            if (!drawn.has(key)) tuning.append(field(label, slot.scroll?.[key], `scroll:${key}`));
         }
         section("Scroll tuning").append(tuning);
     }
 
     const buttons = section("Mouse button overrides");
-    buttons.append(el(`<p class="note">A tap override can click mouse buttons 1–8, including its own number, without running the clicked button's behaviour or overrides. A button already held stays held, with no extra click.</p>`));
     if ((slot.buttons || []).length) {
         // An override still being set up is drawn as chosen, not as stored.
         const unfinished = state.pdButtons?.slot === slot.id ? state.pdButtons.rows : {};
@@ -113,20 +99,36 @@ export function advancedControls(model, slot, scrolling, {form, disabled, field,
             <span class="h">Shortcut</span><span class="h">Held modifiers</span></div>`);
         (slot.buttons || []).forEach((stored, index) => {
             const button = unfinished[index] || stored;
-            const kindSelect = select(`Button ${index + 1}`, words(model).buttons, button.kind, `button:${index}:kind`);
+            const name = BUTTON_NAMES[index] || `${index + 1}`;
+            const kindSelect = select(`Button ${index + 1}`, words(model).buttons, button.kind, `button:${index}:kind`,
+                {tip: "Pass through: the click works as usual. Block the click: it does nothing while this mode runs. Tap a shortcut or hold modifiers instead of clicking."});
             /** @type {HTMLElement} */ (kindSelect.querySelector("span")).classList.add("sr");
             const tapping = button.kind === BUTTON.TAP, holding = button.kind === BUTTON.HOLD_MODIFIERS;
             const tap = tapping
                 ? shortcut(`Button ${index + 1} shortcut`, button.tap?.keycode, `button:${index}:tap`,
                     typeof button.tap?.keycode === "string" ? {name: button.tap.keycode === "0" ? "" : button.tap.keycode} : {})
                 : el(`<span class="note blank">—</span>`);
-            tap.querySelector?.("span")?.classList.add("sr");
+            tap.querySelector?.(":scope > span")?.classList.add("sr");
             const macro = tapping ? pointingMacro(model, button.tap?.keycode) : null;
-            const held = macro ? `${word(words(model).modifierPolicy, MODIFIER_POLICY.INHERIT)} · the macro continues after its trigger` : holding ? modifierNames(model, button.modifiers).join(", ") || "choose at least one below" : "—";
-            table.append(el(`<span class="n">${index + 1}</span>`), kindSelect, tap,
-                el(`<span class="note"><span class="narrow">Held modifiers: </span>${esc(held)}</span>`));
+            // A tapped shortcut keeps its own handling of held modifiers, as a
+            // direction's does: Inherit, Ignore the chosen ones, or Exact.
+            let held;
+            if (tapping && !macro) {
+                held = select(`Button ${index + 1} with held modifiers`, words(model).modifierPolicy, button.tap?.modifierPolicy ?? 0, `button:${index}:policy`,
+                    {tip: "Inherit: modifiers you hold apply to the shortcut. Ignore: the modifiers chosen below are left out. Exact: it sends exactly its shortcut, whatever you hold."});
+                /** @type {HTMLElement} */ (held.querySelector("span")).classList.add("sr");
+            } else {
+                const text = macro ? `${word(words(model).modifierPolicy, MODIFIER_POLICY.INHERIT)} · the macro continues after its trigger` : holding ? modifierNames(model, button.modifiers).join(", ") || "choose at least one below" : "—";
+                held = el(`<span class="note"><span class="narrow">Held modifiers: </span>${esc(text)}</span>`);
+            }
+            table.append(el(`<span class="n">${esc(name)}</span>`), kindSelect, tap, held);
             if (holding) {
                 const mods = modifiers(`Button ${index + 1} holds`, button.modifiers ?? 0, `button:${index}:modifiers`);
+                mods.classList.add("mods");
+                table.append(mods);
+            }
+            if (tapping && !macro && button.tap?.modifierPolicy === MODIFIER_POLICY.MASK) {
+                const mods = modifiers(`Button ${index + 1} leaves out`, button.tap?.mask ?? 0, `button:${index}:mask`);
                 mods.classList.add("mods");
                 table.append(mods);
             }
@@ -135,7 +137,6 @@ export function advancedControls(model, slot, scrolling, {form, disabled, field,
     } else {
         buttons.append(el(`<p class="note">This slot stores no button overrides.</p>`));
     }
-
 
     // Open stays open from slot to slot, so two modes' tuning can be compared.
     advanced.addEventListener("toggle", () => {

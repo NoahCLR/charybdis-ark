@@ -139,6 +139,8 @@ export interface PdForm {
     [key: `button:${number}:kind`]: (() => number) | undefined;
     [key: `button:${number}:modifiers`]: (() => number) | undefined;
     [key: `button:${number}:tap`]: (() => Scalar) | undefined;
+    [key: `button:${number}:policy`]: (() => number) | undefined;
+    [key: `button:${number}:mask`]: (() => number) | undefined;
     [key: `dir:${string}`]: (() => Scalar) | undefined;
     [key: `dirPolicy:${string}`]: (() => number) | undefined;
     [key: `dirMask:${string}`]: (() => number) | undefined;

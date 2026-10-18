@@ -15,13 +15,13 @@ export const scrollLabel = (model, key, unit) => {
 /** @type {Readonly<Record<string, string>>} */
 export const ARROWS = {up: "↑", left: "←", right: "→", down: "↓", upLeft: "↖", upRight: "↗", downLeft: "↙", downRight: "↘"};
 
-// The four scroll fields the Scrolling card shows itself. A field rendered
-// twice registers its reader twice, and the second input silently wins, so
-// Advanced shows only what the card above does not.
-export const SCROLL_LEAD = [["divisorH"], ["divisorV"], ["intervalMs", "ms"], ["lockMs", "ms"]];
+// The two scroll fields the mode's step rows show; Advanced draws the rest.
+// A field rendered twice registers its reader twice, and the second input
+// silently wins, so each is drawn in one place only.
+export const SCROLL_LEAD = [["divisorH"], ["divisorV"]];
 // The rest of the scroll record, as Advanced lays it out: single values, then
 // the two axis ratios, each as one numerator : denominator pair.
-export const SCROLL_SINGLES = [["thresholdH"], ["thresholdV"], ["expireMs", "ms"], ["decayDivisor"]];
+export const SCROLL_SINGLES = [["thresholdH"], ["thresholdV"], ["intervalMs", "ms"], ["lockMs", "ms"], ["expireMs", "ms"], ["decayDivisor"]];
 export const SCROLL_RATIOS = [["startNumerator", "startDenominator"], ["sustainNumerator", "sustainDenominator"]];
 // A slot's binding keycodes come with the model (data/pd-bindings.js).
 /** @param {import("../surface-types.js").PresentedSlot} slot */
