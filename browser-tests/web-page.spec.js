@@ -130,7 +130,7 @@ test("choose a keyboard, read it, stage an edit, keep a recovery copy, and recon
 
     // Nothing is allowed yet: the page offers Chrome's picker, in its own words.
     const placeholder = page.locator(".read-placeholder");
-    await expect(placeholder.locator("h2")).toHaveText("Connect your keyboard");
+    await expect(placeholder.locator("h2")).toHaveText("Connect your Charybdis");
     await expect(placeholder).toContainText("pick it in Chrome's list with Choose keyboard");
     await page.locator('.rail [data-act="more"]').click();
     await expect(page.locator(".rail-build")).toHaveText(/^Ark \d{4}\.\d+\.\d+\S* · \S+$/);
@@ -250,7 +250,7 @@ test("explore the demo: edit on several screens, review with no Apply, export, o
     const {keyboard, ownFilesOnly} = await withKeyboard(context, baseURL);
     const errors = await open(page);
     const placeholder = page.locator(".read-placeholder");
-    await expect(placeholder.locator("h2")).toHaveText("Connect your keyboard");
+    await expect(placeholder.locator("h2")).toHaveText("Connect your Charybdis");
     await expect(placeholder.locator('[data-act="choose-keyboard"]')).toBeVisible();
     await placeholder.locator('[data-act="explore-demo"]').click();
     await ready(page);
@@ -320,7 +320,7 @@ test("explore the demo: edit on several screens, review with no Apply, export, o
     await expect(ask.locator('[data-act="export"]')).toBeVisible();
     await ask.locator('[data-act="confirm-leave"]').click();
     await expect(banner).toHaveCount(0);
-    await expect(placeholder.locator("h2")).toHaveText("Connect your keyboard");
+    await expect(placeholder.locator("h2")).toHaveText("Connect your Charybdis");
 
     expect(keyboard.requests).toEqual([], "nothing was sent to a keyboard");
     expect(await page.evaluate(() => window.__fakeHid)).toEqual({requested: 0, refusedWithoutClick: 0, opened: 0});
@@ -406,7 +406,7 @@ test("a narrow window on a computer still gets Ark", async ({browser, baseURL}) 
         await withKeyboard(context, baseURL);
         const page = await context.newPage();
         const errors = await open(page);
-        await expect(page.locator(".read-placeholder h2")).toHaveText("Connect your keyboard");
+        await expect(page.locator(".read-placeholder h2")).toHaveText("Connect your Charybdis");
         await expect(page.locator(".phone-notice")).toHaveCount(0);
         expect(errors).toEqual([]);
     } finally {
@@ -466,7 +466,7 @@ test("Disconnect lets go of the keyboard, and the page does not reopen it", asyn
     expect(await page.evaluate(() => window.__fakeHid.forgotten)).toBe(1);
 
     await page.reload();
-    await expect(page.locator(".read-placeholder h2")).toHaveText("Connect your keyboard");
+    await expect(page.locator(".read-placeholder h2")).toHaveText("Connect your Charybdis");
     expect(await page.evaluate(() => window.__fakeHid.opened)).toBe(0);
 });
 

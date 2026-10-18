@@ -1723,6 +1723,16 @@ details[open] > summary .chev { transform: rotate(90deg); }
 .read-placeholder h2, .read-placeholder p { margin: 0; }
 .read-placeholder p { max-width: 52ch; color: var(--text-2); }
 .read-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
+/* The first run: a neutral card, not an error. */
+.read-placeholder.first-run { max-width: 440px; margin: 48px auto 0; background: var(--surface); }
+.read-placeholder.first-run h2 { font-size: var(--fs-title); line-height: var(--lh-title); }
+.read-placeholder .first-run-what { color: var(--text); }
+.read-placeholder .first-run-firmware { display: flex; align-items: center; gap: 4px; }
+/* A half missing or out of sync, under the title on every screen. */
+.halves-banner { flex: none; display: flex; align-items: center; gap: 12px; min-height: var(--h-tab); padding: 0 24px;
+  border-bottom: 1px solid var(--line); border-left: 2px solid var(--warning); background: var(--surface-2);
+  font-size: var(--fs-small); color: var(--text); }
+.halves-banner .btn { margin-left: auto; }
 
 /* ── the demo ──────────────────────────────────────────────────────────── */
 /* A demo is never a keyboard: a strip across the whole window says so on every

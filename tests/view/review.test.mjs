@@ -64,6 +64,7 @@ test("Show goes to where each kind of item is edited", () => {
     const layers = [{index: 0}, {index: 1}, {index: 2}];
     assert.deepEqual(placeState({kind: "key", layer: 2, layoutIndex: 13}, layers), {screen: "keys", tab: "key", layer: 2, selected: 13});
     assert.equal(placeState({kind: "behaviour", keycode: "KC_ESCAPE"}).behaviourRow, "KC_ESCAPE");
+    assert.deepEqual(placeState({kind: "settings", section: "keyboard"}), {screen: "device", reveal: ".keyboard-title"}, "the name is edited as the Keyboard screen's title");
     assert.equal(placeState({kind: "macro", index: 4}).macroSlot, "VIA_MACRO_4");
     assert.deepEqual(placeState({kind: "customKey", index: 2}), {screen: "customKeys", customKey: "CUSTOM_KEY_2"});
     assert.ok(draftMarks([{place: {kind: "customKey", index: 2}, status: "changed"}]).customKeys.has("CUSTOM_KEY_2"));

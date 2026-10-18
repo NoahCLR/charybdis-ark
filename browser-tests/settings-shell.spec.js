@@ -164,3 +164,22 @@ test("the review's Apply note is neutral and true, and its footer says where the
     await expect(note).not.toContainText("restores");
     await expect(page.locator(".sheet-f .rv-target")).toHaveText(/^To .+ · both halves connected$/);
 });
+
+test("first run is neutral, offers both ways in and the firmware; a missing half is said on every screen", async ({page}) => {
+    await page.goto("/preview/index.html?host=web-none");
+    const card = page.locator(".read-placeholder.first-run");
+    await expect(card.locator("h2")).toHaveText("Connect your Charybdis");
+    await expect(card.locator(".dot")).toHaveCount(0);
+    await expect(card.locator('[data-act="choose-keyboard"]')).toHaveClass(/primary/);
+    await expect(card.locator('[data-act="explore-demo"]')).not.toHaveClass(/ghost|primary/);
+    await expect(card.locator('a[href*="charybdis-4x6/releases"]')).toHaveCount(1);
+    await page.goto("/preview/index.html");
+    await expect(page.locator('[data-screen="settings"]')).toBeEnabled();
+    for (const screen of ["keys", "settings", "profile"]) {
+        await page.locator(`[data-screen="${screen}"]`).click();
+        await expect(page.locator(".halves-banner")).toContainText("The left half isn't answering");
+    }
+    await page.locator('.halves-banner [data-act="to-keyboard"]').click();
+    await expect(page.locator('[data-screen="device"]')).toHaveAttribute("aria-current", "true");
+    await expect(page.locator('.halves-banner [data-act="to-keyboard"]')).toHaveCount(0);
+});

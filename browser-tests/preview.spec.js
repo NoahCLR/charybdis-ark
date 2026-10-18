@@ -220,7 +220,7 @@ test("the web host's controls post their messages", async ({page}) => {
 test("with no keyboard the web host offers its picker first, and without WebHID says why", async ({page}) => {
     await page.goto("/preview/index.html?host=web-none");
     const placeholder = page.locator(".read-placeholder");
-    await expect(placeholder.locator("h2")).toHaveText("Connect your keyboard");
+    await expect(placeholder.locator("h2")).toHaveText("Connect your Charybdis");
     await page.evaluate(() => {window.__posted.length = 0;});
     await placeholder.locator('[data-act="choose-keyboard"]').click();
     await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([expect.objectContaining({type: "chooseKeyboard"})]);

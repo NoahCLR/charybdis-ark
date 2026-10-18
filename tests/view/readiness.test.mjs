@@ -63,6 +63,7 @@ test("a host that cannot reach a keyboard says why, and a host's words say how t
     assert.deepEqual(readScreen(blocked, "profile").state, "blocked");
     const web = {host: {words: {connectHint: "Choose keyboard and pick it."}}, load: {state: "unavailable"}, device: {connected: false}};
     assert.equal(readScreen(web).detail, "Choose keyboard and pick it.");
+    assert.deepEqual([readScreen(web).state, readScreen(web).title], ["connect", "Connect your Charybdis"], "not being connected yet is no error");
     assert.equal(readScreen({...web, device: {connected: false, health: {error: "Unplugged."}}}).detail, "Unplugged.", "what the keyboard said comes first");
 });
 

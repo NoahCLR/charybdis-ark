@@ -17,6 +17,7 @@ import {chooseKeyboard, hostOf, otherTheme, setTheme} from "./view/host.mjs";
 import {DEMO_WORDS, demoOf, leaveDemo, openDemo, openDemoProfile} from "./view/demo.mjs";
 import {readScreen, screenAvailable} from "./view/readiness.mjs";
 import {SCREENS, screenDefinition, secondaryScreen} from "./view/screens.mjs";
+import {FIRMWARE_RELEASES, halvesBanner} from "./view/keyboard-view.mjs";
 import {bindLayerIndex, hideHover, mountHover} from "./ui/hover.mjs";
 import {pickerOverlay} from "./ui/picker.mjs";
 import {keysShortcut, screenKeys} from "./ui/keys.mjs";
@@ -68,6 +69,8 @@ function render({keepScreen = false} = {}) {
         const detail = keptScreen.querySelector(".read-placeholder > p");
         if (read && detail) detail.textContent = read.detail;
     }
+    screen.querySelector(":scope > .halves-banner")?.remove();
+    addHalvesBanner(screen, model);
     app.appendChild(screen);
     const bar = commitBar();
     if (bar) screen.appendChild(bar);
@@ -103,16 +106,20 @@ function readPlaceholder(read, model) {
     const demoHere = demoOf(model).offered && (read.state !== "blocked" || Boolean(hostOf(model).blocked?.demo));
     const screenTitle = screenDefinition(state.screen)?.title || "Keyboard";
     const secondary = secondaryScreen(model, state.screen);
-    const screen = el(`<div class="main">${topbar(screenTitle, "Ark changes what your Charybdis does — keys, layers, lighting, macros and the trackball — and saves nothing until you review it.")}
-        <div class="content"><div class="pad"><div class="read-placeholder" role="status" aria-live="polite">
-            ${loading ? '<span class="spin" aria-hidden="true"></span>' : '<i class="dot err" aria-hidden="true"></i>'}
-            <h2>${esc(read.title)}</h2><p>${esc(read.detail)}</p>
+    // Not connected yet is the first run, not an error: neutral, with the
+    // firmware Ark needs and where to get it, then the two ways in.
+    const connect = read.state === "connect";
+    const screen = el(`<div class="main">${topbar(connect ? "Charybdis Ark" : screenTitle, "Ark changes what your Charybdis does — keys, layers, lighting, macros and the trackball — and saves nothing until you review it.")}
+        <div class="content"><div class="pad"><div class="read-placeholder${connect ? " first-run" : ""}" role="status" aria-live="polite">
+            ${loading ? '<span class="spin" aria-hidden="true"></span>' : connect ? "" : '<i class="dot" aria-hidden="true"></i>'}
+            <h2>${esc(read.title)}</h2>${connect ? `<p class="first-run-what">${esc(FIRST_RUN_WORDS)}</p>` : ""}<p>${esc(read.detail)}</p>
             ${loading ? '<p class="note">The menus open when their keyboard data is ready.</p>'
                 : read.state === "blocked" ? (demoHere ? `<div class="read-actions">${exploreButton("primary")}</div>` : "")
                 : `<div class="read-actions">${choose ? '<button class="btn primary" data-act="choose-keyboard">Choose keyboard</button>' : ""}
                     ${model?.device?.connected || !hostOf(model).chooseKeyboard ? '<button class="btn primary" data-act="retry">Read keyboard</button>' : ""}
-                    ${demoHere ? exploreButton("ghost") : ""}
-                    ${secondary ? `<button class="btn ghost" data-act="secondary">${esc(secondary.label)}</button>` : ""}</div>`}
+                    ${demoHere ? exploreButton(connect ? "" : "ghost") : ""}
+                    ${secondary ? `<button class="btn ghost" data-act="secondary">${esc(secondary.label)}</button>` : ""}</div>
+                    ${connect ? `<p class="note first-run-firmware">Need the firmware? <a class="btn text" href="${esc(FIRMWARE_RELEASES)}" target="_blank" rel="noopener">How to install →</a></p>` : ""}`}
         </div></div></div></div>`);
     screen.querySelector('[data-act="explore-demo"]')?.addEventListener("click", () => post(openDemo()));
     screen.querySelector('[data-act="choose-keyboard"]')?.addEventListener("click", () => post(chooseKeyboard()));
@@ -121,8 +128,23 @@ function readPlaceholder(read, model) {
     return screen;
 }
 
+const FIRST_RUN_WORDS = "Ark edits a Charybdis 4x6 running the charybdis-4x6 firmware. Nothing changes on it until you review and apply.";
+
 /** @param {string} tone */
 const exploreButton = (tone) => `<button class="btn ${tone}" data-act="explore-demo" data-tip="${esc(DEMO_WORDS.exploreTip)}">${esc(DEMO_WORDS.explore)}</button>`;
+
+// While a half is missing or the halves disagree, every screen says so under
+// its title, with the way to the Keyboard screen that explains it.
+/** @param {Element} screen @param {import("../contracts/panel.js").PublishedModel | null} model */
+function addHalvesBanner(screen, model) {
+    const words = halvesBanner(model);
+    const topbar = screen.querySelector(":scope > .topbar");
+    if (!words || !topbar) return;
+    const banner = el(`<div class="halves-banner" role="status"><span>${esc(words)}</span>
+        ${state.screen === "device" ? "" : '<button class="btn text" data-act="to-keyboard">Keyboard →</button>'}</div>`);
+    banner.querySelector('[data-act="to-keyboard"]')?.addEventListener("click", () => { state.screen = "device"; render(); });
+    topbar.after(banner);
+}
 
 // The demo's strip across the window: it is a demo, nothing is connected, and
 // the two things only the demo has, another file and the way out.

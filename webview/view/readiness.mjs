@@ -52,7 +52,7 @@ export function readScreen(model, screen = "keys") {
     if (!screenAvailable(model, screen) && definition.unavailable) return {state: "unavailable", ...definition.unavailable};
     if (configureReady(model)) return null;
     const device = model.device || {};
-    if (!device.connected) return {state: "unavailable", title: "Connect your keyboard",
+    if (!device.connected) return {state: "connect", title: "Connect your Charybdis",
         detail: device.health?.error || model.host?.words?.connectHint || "Connect a Charybdis, then read it to begin editing."};
     // Halves that are not together are the usual reason, and say what to do.
     const halves = device.health?.halves;

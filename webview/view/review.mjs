@@ -160,6 +160,8 @@ export function placeState(place, layers = []) {
         // for a Lighting one, Mouse, or Settings.
         case "settings": {
             if (place.stage) return {screen: "lighting", stage: place.stage};
+            // The keyboard's name is the Keyboard screen's title.
+            if (place.section === "keyboard") return {screen: "device", reveal: ".keyboard-title"};
             const screen = place.area === "Trackball" ? "mouse" : "settings";
             return place.section
                 ? {screen, settingsSearch: "", settingsOpen: [place.section], reveal: `.settings-group[data-section="${place.section}"]`}
