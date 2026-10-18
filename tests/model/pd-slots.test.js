@@ -33,13 +33,12 @@ test("layer ordering keeps the profile in the formats the keyboard stores", () =
     assert.equal(domainOf(result.document, 0x50).version, 3);
 });
 
-test("the profile meter counts a sparse PD domain by its stored bytes", () => {
+test("the profile meter counts a sparse PD domain by its stored bytes, and its slots by the ones in use", () => {
     const {profileUsage} = require("../../core/model/profile-usage");
     const wide = document32();
     const usage = profileUsage({document: wide}, {maxProfilePayload: 5088});
     const value = validateSnapshot(wide);
-    assert.equal(usage.used, value.profile.length);
-    assert.equal(usage.areas.reduce((total, area) => total + area.bytes, 0), usage.used);
-    const records = value.pdModes.filter(slot => slot.kind || slot.name).length;
-    assert.equal(usage.areas.find(area => area.id === "pointing").bytes, 4 + 8 + 128 * records, "envelope, header and one record per stored slot");
+    assert.equal(usage.used, value.profile.length, "the stored blob, empty slots left out");
+    assert.deepEqual(usage.counts.find(count => count.id === "pointingModes"),
+        {id: "pointingModes", used: value.pdModes.filter(slot => slot.kind).length, limit: 32}, "slots that hold a mode, out of all 32");
 });

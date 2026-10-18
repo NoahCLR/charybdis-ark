@@ -64,12 +64,12 @@ export function screenMacros() {
         const {steps} = readMacro(model, row.keycode, row.payload, "grid");
         const peek = macroPeekSteps(readMacro(model, row.keycode, row.payload, "peek").steps, (name) => model?.qmkKeyLabels?.[name] || name);
         const out = row.available === false;
-        const tip = out ? `Slot ${index} · no room: the free macro memory is kept for the lower empty slots. Shorten or clear a macro to open it.`
+        const tip = out ? `Slot ${index} · unavailable: macro memory keeps its free room for the lower empty slots. Shorten or clear a macro to make it available.`
             : row.empty ? `Slot ${index} · empty` : `Slot ${index} · ${steps.length} step${steps.length === 1 ? "" : "s"} · ${row.payload}`;
         const cell = el(`<button class="mslot ${row.empty ? "" : "filled"} ${out ? "out" : ""} ${row.playable === false ? "warn" : ""}" data-slot="${esc(row.keycode)}"
             aria-current="${row.keycode === slot?.keycode}" ${out ? "disabled" : ""} data-tip="${esc(tip)}">
             <span class="n">M${index}</span>${changedMacros.has(row.keycode) ? draftDot("Changed in your draft", "corner") : ""}
-            <span class="v">${row.needsUnicodeSetup ? vocabulary(model).macroPlayback?.setup : row.playable === false ? vocabulary(model).macroPlayback?.blocked : row.name ? esc(row.name.length > 13 ? `${row.name.slice(0, 12)}…` : row.name) : row.empty ? (out ? vocabulary(model).macroPlayback?.noRoom : "—") : esc(peek.length > 13 ? `${peek.slice(0, 12)}…` : peek)}</span></button>`);
+            <span class="v">${row.needsUnicodeSetup ? vocabulary(model).macroPlayback?.setup : row.playable === false ? vocabulary(model).macroPlayback?.blocked : row.name ? esc(row.name.length > 13 ? `${row.name.slice(0, 12)}…` : row.name) : row.empty ? (out ? vocabulary(model).macroPlayback?.unavailable : "—") : esc(peek.length > 13 ? `${peek.slice(0, 12)}…` : peek)}</span></button>`);
         cell.addEventListener("click", () => { state.macroSlot = row.keycode; render(); });
         cells.append(cell);
     });
@@ -85,9 +85,9 @@ export function screenMacros() {
 function memoryMeter(memory) {
     if (!memory) return "";
     const used = memory.stored, share = Math.min(100, (used / memory.capacity) * 100);
-    const closed = memory.slots - memory.available;
+    const unavailable = memory.slots - memory.available;
     return `<div class="sect-h memory-h"><h4>Macro memory</h4>
             <span class="right note">${used.toLocaleString("en-US")} of ${memory.capacity.toLocaleString("en-US")} bytes used · ${memory.free.toLocaleString("en-US")} free</span></div>
         <div class="meter"><i style="width:${share}%"></i></div>
-        <p class="note meter-note">A key tap takes 3 bytes; text uses its UTF-8 bytes. Every empty slot keeps room for ${memory.reserveTaps} key taps${closed ? `; ${closed} slot${closed === 1 ? " has" : "s have"} no room left` : ""}.</p>`;
+        <p class="note meter-note">A key tap takes 3 bytes; text uses its UTF-8 bytes. Every empty slot keeps room for ${memory.reserveTaps} key taps${unavailable ? `; ${unavailable} slot${unavailable === 1 ? " is" : "s are"} unavailable until there is room again` : ""}.</p>`;
 }

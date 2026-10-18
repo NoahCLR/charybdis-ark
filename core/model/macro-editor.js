@@ -15,7 +15,7 @@ const fail = (message, code = "MACRO_EDIT_CONFLICT") => Object.assign(new Error(
 
 // Every empty slot keeps room for ten key taps (3 bytes each, the slot's end
 // marker already counted). When the free bytes cannot keep that for every
-// empty slot, the highest-numbered empty slots are shown as out of room.
+// empty slot, the highest-numbered empty slots are shown as unavailable.
 const SLOT_RESERVE_TAPS = 10, KEY_TAP_BYTES = 3;
 
 /** @param {Buffer[]} slots @param {number} capacity */
@@ -24,7 +24,7 @@ function macroBudget(slots, capacity) {
     const free = Math.max(0, capacity - stored);
     const empty = slots.flatMap((bytes, index) => bytes.length === 0 || (bytes.length === 3 && bytes[0] === 1 && bytes[1] === 5) ? [index] : []);
     const room = Math.min(empty.length, Math.floor(free / (SLOT_RESERVE_TAPS * KEY_TAP_BYTES)));
-    return {capacity, stored, free, outOfRoom: new Set(empty.slice(room)), available: slots.length - (empty.length - room)};
+    return {capacity, stored, free, empty: empty.length, outOfRoom: new Set(empty.slice(room)), available: slots.length - (empty.length - room)};
 }
 
 /** @param {import("./types.js").ProfileSnapshot | null | undefined} snapshot @param {import("./types.js").ProfileDestination} [capabilities] */

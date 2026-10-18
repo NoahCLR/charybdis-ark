@@ -74,7 +74,7 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     phases: PHASE_WORDS,
     halves: HALVES_WORDS,
     hostOs: [[0, "Auto"], [1, "macOS"], [2, "Windows"], [3, "Linux"]],
-    macroPlayback: {setup: "setup", blocked: "blocked", noRoom: "no room"},
+    macroPlayback: {setup: "setup", blocked: "blocked", unavailable: "unavailable"},
     macroProtection: [["auto", "Automatic"], ["on", "On"], ["off", "Off"]],
     // A host layout names its OS, since German on macOS and on Windows differ.
     hostLayouts: hostLayouts().map(/** @returns {[number, string]} */ layout => [layout.id, layout.os === "any" ? layout.name : `${layout.name} (${OS_WORDS[layout.os]})`]),

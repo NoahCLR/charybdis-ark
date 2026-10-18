@@ -1308,13 +1308,23 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .mslot .v { font-size: 11.5px; }
 .mslot.filled { background: var(--surface-3); border-color: var(--line-2); }
 .mslot[aria-current="true"] { border-color: var(--line-3); background: var(--key-hi); }
-/* A slot with no room left in macro memory reads as closed, not as empty. */
+/* A slot macro memory has no room left for reads as unavailable, not as empty. */
 .mslot.out { opacity: .38; border-style: dashed; cursor: not-allowed; }
 .mslot.warn { border-color: var(--danger); }
 .mslot.warn .v { color: var(--danger); }
 .meter.over i { background: var(--danger); }
 .meter.near i { background: var(--warning); }
-.usage-tables { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; align-items: start; }
+/* Profile memory's counts: the figure on its last digit, then a short bar of
+   how much of that limit or set of slots is used. */
+.usage-counts { table-layout: fixed; }
+.usage-counts th:first-child { width: 32%; }
+.usage-counts th.count { width: 16%; }
+.usage-counts th:last-child { width: 112px; }
+.usage-counts td.bar { vertical-align: middle; padding-left: 18px; }
+/* Free slots the keyboard cannot use now (macro slots macro memory has no room
+   for, .mslot.out on Macros) fill the bar's end in red. */
+.usage-counts .meter { position: relative; }
+.usage-counts .meter .out { position: absolute; top: 0; right: 0; bottom: 0; background: var(--danger); }
 .tok { display: inline-flex; align-items: center; height: 22px; padding: 0 7px; border-radius: 5px; background: var(--surface-3); border: 1px solid var(--line); font-family: var(--mono); font-size: 11px; }
 .macro-step { display: grid; gap: 10px; min-width: 0; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); }
 .macro-step[hidden] { display: none; }

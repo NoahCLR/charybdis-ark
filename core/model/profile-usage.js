@@ -1,39 +1,46 @@
 // @ts-check
 "use strict";
 
-// How full the keyboard's profile is: one block the behaviours, combos,
-// lighting, pointing modes, settings and every name share, against the size the
-// firmware advertises (maxProfilePayload). Each area also has a counted limit;
-// the profile can fill up before any of them is reached.
+// How full the keyboard's profile is, told the way its owner thinks of it: how
+// much of the profile's storage is used (maxProfilePayload, as the firmware
+// advertises it), and how many of each thing they set up against how many the
+// keyboard holds. Behaviours, tap counts, combos, LED groups and LED overrides
+// are counted against the limits the firmware refuses an edit past; macros,
+// custom keys and pointing modes are fixed sets of slots, counted as how many
+// are in use, the way their own screens count them. Macro slots can also be
+// unavailable: every empty one keeps room in the separate macro memory, and
+// when that runs short the highest empty ones have none (macro-editor.js
+// macroBudget).
 //
-// The bytes are the canonical blob the snapshot already holds, so the areas add
-// up to exactly what Apply would write. Macro steps live in the separate VIA
-// bank (macro-editor.js macroBudget) and are not counted here.
+// The bytes are the canonical blob the snapshot already holds, so the total is
+// exactly what Apply would write. Macro steps are not part of it.
 
-const {decodedOf} = require("./portable-profile");
-const {PROFILE_BLOB_V1, PROFILE_DOMAIN_IDS} = require("../schema/profile-blob-v1");
-
-const {profileDomain} = require("../schema/profile-domains");
-// The order the areas are listed in: what an edit most often grows first.
-const AREAS = ["behaviours", "combos", "names", "lighting", "pointing", "settings"];
-
-// Bytes the settings domain spends on names: a length byte plus the text of
-// each layer, macro and custom-key name, and the keyboard's own.
-/** @param {Pick<import("../schema/types.js").SettingsDomain, 'names' | 'macroNames' | 'customKeyNames' | 'keyboardName'>} settings */
-function nameBytes(settings) {
-    const records = [...settings.names, ...settings.macroNames, ...settings.customKeyNames, settings.keyboardName];
-    return records.reduce((total, name) => total + 1 + Buffer.byteLength(name), 0);
-}
+const {MACRO_BANK_BYTES, decodedOf} = require("./portable-profile");
+const {macroBudget} = require("./macro-editor");
+const {PROFILE_ACTION_KINDS: ACTION, PROFILE_BLOB_V1, PROFILE_DOMAIN_IDS} = require("../schema/profile-blob-v1");
 
 /** @param {number | undefined} value @returns {value is number} */
 const positive = value => typeof value === "number" && Number.isInteger(value) && value > 0;
 /** @type {WeakMap<import("./types.js").DecodedProfile, {capabilities: import("./types.js").ProfileDestination, usage: import("../../contracts/model.js").ProfileUsage}>} */
 const cache = new WeakMap();
 
+// The RGB domain's payload, whose header counts the LED groups and overrides.
+// A validated complete profile always contains RGB.
+/** @param {Buffer} profile @returns {Buffer} */
+function rgbPayload(profile) {
+    for (let offset = /** @type {number} */ (PROFILE_BLOB_V1.HEADER_SIZE); offset < profile.length;) {
+        const id = profile[offset], length = profile.readUInt16LE(offset + 2), start = offset + PROFILE_BLOB_V1.DOMAIN_HEADER_SIZE;
+        if (id === PROFILE_DOMAIN_IDS.RGB) return profile.subarray(start, start + length);
+        offset = start + length;
+    }
+    throw new Error("A complete profile carries its lighting.");
+}
+
 /**
- * The profile's use of its block, or null when there is nothing true to show:
- * no complete snapshot, or firmware that does not advertise its profile size.
- * Counts are listed only for limits the firmware advertises.
+ * The profile's use of its storage and its counts, or null when there is
+ * nothing true to show: no complete snapshot, or firmware that does not
+ * advertise its profile size. A limit is listed only when the firmware
+ * advertises it; the fixed slots are always listed.
  */
 /** @param {import("./types.js").ProfileSnapshot | null | undefined} snapshot @param {import("./types.js").ProfileDestination} [capabilities] @returns {import("../../contracts/model.js").ProfileUsage | null} */
 function profileUsage(snapshot, capabilities) {
@@ -43,42 +50,34 @@ function profileUsage(snapshot, capabilities) {
     const decoded = decodedOf(snapshot), cached = cache.get(decoded);
     if (cached?.capabilities === capabilities) return cached.usage;
 
-    const profile = decoded.profile;
-    /** @type {Record<string, number>} */
-    const bytes = Object.fromEntries(AREAS.map(area => [area, 0]));
-    bytes.settings += PROFILE_BLOB_V1.HEADER_SIZE;
-    /** @type {Buffer | undefined} */
-    let rgb;
-    for (let offset = /** @type {number} */ (PROFILE_BLOB_V1.HEADER_SIZE); offset < profile.length;) {
-        const id = profile[offset], length = profile.readUInt16LE(offset + 2), end = offset + PROFILE_BLOB_V1.DOMAIN_HEADER_SIZE + length;
-        if (id === PROFILE_DOMAIN_IDS.RGB) rgb = profile.subarray(end - length, end);
-        bytes[/** @type {NonNullable<ReturnType<typeof profileDomain>>} */ (profileDomain(id)).area] += end - offset;
-        offset = end;
-    }
-    const names = nameBytes(decoded.settings);
-    bytes.names += names;
-    bytes.settings -= names;
-
+    const {profile, settings, behaviors, combos, pdModes, document} = decoded;
     // RGB header: byte 4 is the group count; bytes 6, 8, 9 and 11 count the
-    // layer, pointing, combo and key-feedback group rows.
-    // A validated complete profile always contains RGB.
-    const lighting = /** @type {Buffer} */ (rgb);
-    const counts = /** @type {[string, number, number | undefined][]} */ ([
-        ["behaviours", decoded.behaviors.rows.length, capabilities.maxBehaviorRows],
-        ["behaviourSteps", decoded.behaviors.populatedStepCount, capabilities.maxPopulatedBehaviorSteps],
-        ["combos", decoded.combos.rows.length, capabilities.maxCombos],
+    // layer, pointing, combo and key-feedback override rows.
+    const lighting = rgbPayload(profile);
+    // A custom key is in use once it has a name, a shortcut or a behaviour, as
+    // the Custom keys screen marks its tile; a pointing slot once it has a mode.
+    const behaved = new Set(behaviors.rows.filter(row => row.target.kind === ACTION.CUSTOM_KEY).map(row => row.target.operand));
+    const customKeys = settings.customKeyNames.filter((name, slot) =>
+        name || settings.customKeyShortcuts[slot].mods || settings.customKeyShortcuts[slot].key || behaved.has(slot)).length;
+    // A macro slot is in use once it has steps; the rest are free unless the
+    // macro memory has no room left for them.
+    const macroSlots = document.macros.map(value => Buffer.from(value, "base64"));
+    const macros = macroBudget(macroSlots, capabilities.viaMacroBytes ?? MACRO_BANK_BYTES);
+    const counts = /** @type {[string, number, number | undefined, number?][]} */ ([
+        ["behaviours", behaviors.rows.length, capabilities.maxBehaviorRows],
+        ["behaviourSteps", behaviors.populatedStepCount, capabilities.maxPopulatedBehaviorSteps],
+        ["combos", combos.rows.length, capabilities.maxCombos],
         ["lightingGroups", lighting[4], capabilities.maxReusableRgbGroups],
         ["lightingGroupRows", lighting[6] + lighting[8] + lighting[9] + lighting[11], capabilities.maxRgbStageGroupRows],
-    ]).filter(([, , limit]) => positive(limit)).map(([id, used, limit]) => ({id, used, limit: /** @type {number} */ (limit)}));
+        ["macros", macroSlots.length - macros.empty, macroSlots.length, macros.outOfRoom.size],
+        ["customKeys", customKeys, settings.customKeyNames.length],
+        ["pointingModes", pdModes.filter(slot => slot.kind).length, pdModes.length],
+    ]).filter(([, , limit]) => positive(limit)).map(([id, used, limit, unavailable]) =>
+        ({id, used, limit: /** @type {number} */ (limit), ...(unavailable ? {unavailable} : {})}));
 
-    const usage = {
-        used: profile.length,
-        capacity: capabilities.maxProfilePayload,
-        areas: AREAS.map(id => ({id, bytes: bytes[id]})),
-        counts,
-    };
+    const usage = {used: profile.length, capacity: capabilities.maxProfilePayload, counts};
     cache.set(decoded, {capabilities, usage});
     return usage;
 }
 
-module.exports = {profileUsage, AREAS};
+module.exports = {profileUsage};

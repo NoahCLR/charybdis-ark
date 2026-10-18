@@ -114,7 +114,7 @@ export function editor(model, slot, canEdit) {
         saveSteps(slot, [], true);
         setMacroForm(slot.keycode, {cancelBlur: false, selectedStep: null, selectionAnchor: null, selectedSteps: [], moveNotice: ""}); render();
     });
-    if (slot.available === false) /** @type {HTMLElement} */ (card.querySelector(".card-b")).prepend(el(`<div class="unavailable">This slot has no room. Shorten or clear another macro to open it.</div>`));
+    if (slot.available === false) /** @type {HTMLElement} */ (card.querySelector(".card-b")).prepend(el(`<div class="unavailable">This slot is unavailable: macro memory has no room left for it. Shorten or clear another macro to make it available.</div>`));
     paintFeedback(card, model, slot);
     if (form.draft !== undefined && !matchingValidation(form, model, slot) && !form.stepError) requestInspection(slot);
     /** @type {HTMLElement} */ (card.querySelector(".card-b")).insertBefore(recorder(model, slot, canEdit), card.querySelector(".macro-footer"));

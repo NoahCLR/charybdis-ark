@@ -445,8 +445,8 @@ input and its feedback remain local. Field input updates feedback without
 replacing the field, preserving native editing and composition.
 
 Every empty slot keeps room for ten key taps (30 bytes); when free memory
-cannot keep that for every empty slot, the highest-numbered empty slots show no
-room and cannot be edited until space is freed. The firmware does not enforce the reserve, so the
+cannot keep that for every empty slot, the highest-numbered empty slots are
+unavailable and cannot be edited until space is freed. The firmware does not enforce the reserve, so the
 app shows what a VIA edit left. The current settings version gives every macro
 name up to 32 UTF-8 bytes, following the shared counted-name contract; see the
 [portable profile](../upstream/firmware/docs/architecture/portable-profile-v1.md).
