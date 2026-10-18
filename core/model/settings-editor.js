@@ -99,7 +99,7 @@ const sections = [
         share("mouseFadeHold", SETTING.AUTO_MOUSE_DEAD_TIME, SETTING.AUTO_MOUSE_TIMEOUT, "Hold before fading", "The share of the auto-mouse timeout the colour holds before it starts to fade, 0–99%."),
     ]},
     {id: "rgbAppearance", label: "Base lighting", fields: [
-        {...toggle("lightingEnabled", SETTING.RGB_MODE, "Lighting", "Enable the saved base lighting effect."), shift: 0},
+        {...toggle("lightingEnabled", SETTING.RGB_MODE, "All lighting", "Off, every LED stays dark: the base effect, layer colours and feedback."), tooltip: "QMK's RGB Matrix enable switch, saved with the base lighting.", shift: 0},
         {...byte("hue", SETTING.RGB_COLOR, 0, "Hue"), tooltip: "The colour of the saved base lighting effect, around the colour wheel."},
         byte("saturation", SETTING.RGB_COLOR, 8, "Saturation", "0 is white; 255 is fully saturated."),
         {...byte("brightness", SETTING.RGB_COLOR, 16, "Brightness", "Saved brightness, 0–255. The keyboard applies its hardware brightness limit."), tooltip: "Brightness of the saved base lighting effect. Layer colours and feedback have their own brightness."},
@@ -113,8 +113,8 @@ const sections = [
 
 /** @type {[string, string, string][]} */
 const optionLabels = [
-    ["swapControlCaps", "Swap Left Control and Caps Lock", "Exchange the actions of Left Control and Caps Lock across all layers."],
-    ["capsToControl", "Use Caps Lock as Left Control", "Make Caps Lock send Left Control instead; Left Control keeps its own action."],
+    ["swapControlCaps", "Swap left Control and Caps Lock", "Exchange the actions of left Control and Caps Lock across all layers."],
+    ["capsToControl", "Use Caps Lock as left Control", "Make Caps Lock send left Control instead; left Control keeps its own action."],
     ["swapLeftAltGui", "Swap left Alt and GUI", "Exchange the left Alt and GUI modifier actions across all layers."],
     ["swapRightAltGui", "Swap right Alt and GUI", "Exchange the right Alt and GUI modifier actions across all layers."],
     ["disableGui", "Disable GUI keys", "Prevent either GUI modifier from being sent. Other modifiers still work."],
@@ -198,9 +198,9 @@ function settingsSections(snapshot, settings) {
     const everyLayer = make => Array.from({length: SETTINGS.LAYERS}, (_, i) => make(i));
     // Each section's one-per-layer switches are one setting to a person: the
     // interface draws them as one row of layers, worded by `layerGroup`.
-    result.push({id: "startupLayers", area: "Settings", label: "Startup layers", expanded: false,
-        layerGroup: {label: "On at startup", hint: "The layers active when the keyboard starts. Keep at least one on; higher layers take priority."}, fields:
-        everyLayer(i => ({...toggle(`startupLayer${i}`, SETTING.DEFAULT_LAYERS, name(i), `Layer ${i}`), tooltip: "Make this layer active when the keyboard starts. Keep at least one startup layer on; higher layers take priority.", bitMask: 2 ** i, governs: {kind: /** @type {const} */ ("layer"), layer: i}}))});
+    result.push({id: "startupLayers", area: "Settings", label: "Default layers", expanded: false, search: "startup layers always on default_layer_state",
+        layerGroup: {label: "Default layers", hint: "Always on underneath every other layer. Normally only Base. QMK calls these default layers."}, fields:
+        everyLayer(i => ({...toggle(`startupLayer${i}`, SETTING.DEFAULT_LAYERS, name(i), `Layer ${i}`), tooltip: "Make this layer a default layer: always on underneath every other layer. Keep at least one on; a higher default layer covers a lower one.", bitMask: 2 ** i, keyboardKeys: true, governs: {kind: /** @type {const} */ ("layer"), layer: i}}))});
     // Behaviours and combos each have a master switch and one per layer
     // (participation-policy.md): a key takes part only where every switch that
     // applies is on, judged by the layer its key came from. Each behaviour and
@@ -215,19 +215,19 @@ function settingsSections(snapshot, settings) {
     // the keyboard stores with the combos rather than here.
     result.push({id: "comboSettings", comboTiming: COMBO_TIMING, area: "Settings", label: "Combos",
         layerGroup: {label: "On these layers", hint: "A key can be part of a combo only when the layer it comes from is on here."}, fields:
-        [toggle("combosEnabled", SETTING.COMBOS_ENABLED, "Enabled", "Turn every combo on or off. Each combo's own window and conditions are set in Keys · Combos."),
+        [{...toggle("combosEnabled", SETTING.COMBOS_ENABLED, "Enabled", "Turn every combo on or off. Each combo's own window and conditions are set in Keys · Combos."), keyboardKeys: true},
             {macro: "comboOutputBehaviors", header: "comboOutputBehaviors", kind: "toggle", label: "Combo outputs use behaviours",
                 hint: "Off, combos still fire but use their normal output action. Physical-key behaviours stay eligible. A bypassed custom key sends its shortcut, or nothing if it has none."},
             ...everyLayer(i => ({...toggle(`combosOnLayer${i}`, SETTING.LAYER_COMBOS, `On ${name(i)}`, "Keys that come from this layer can join combos."), bitMask: 2 ** i, governs: {kind: /** @type {const} */ ("layer"), layer: i}}))]});
     // A layer's combo reference is in its layer record, not a setting value.
     result.push({id: "comboReferences", area: "Settings", label: "Combo layer matching", expanded: false, description: "Choose which layer supplies the key assignments used to match combos on each layer. Select the same layer to keep its combos independent.", fields:
         everyLayer(i => ({...layer(`comboReference${i}`, undefined, `Combos on ${name(i)}`, "The layer whose key assignments are used to match combos on this layer. Choose the same layer to keep its combos independent."), record: /** @type {const} */ ("reference"), layer: i, governs: {kind: /** @type {const} */ ("layer"), layer: i}}))});
-    result.push({id: "keyboardOptions", area: "Settings", label: "Key options", expanded: false, description: options ? "Keyboard-wide remapping and typing options. These apply across all layers." : "Read the keyboard to see the key options it supports.", fields:
-        options ? optionLabels.map(([macro, label, hint], i) => ({...toggle(macro, SETTING.KEYMAP_OPTIONS, hostKeyLabel(label, host.effective)), tooltip: hostKeyLabel(hint, host.effective), bitMask: options.keymapMasks[i], readOnly: !(options.supportedKeymapOptions & (1 << i)), hint: options.supportedKeymapOptions & (1 << i) ? "" : "This option is not enabled in the running firmware."})) : []});
+    result.push({id: "keyboardOptions", area: "Settings", label: "Key options", expanded: false, search: "magic keymap options keyboard options", description: options ? "Keyboard-wide remapping and typing options. These apply across all layers." : "Read the keyboard to see the key options it supports.", fields:
+        options ? optionLabels.map(([macro, label, hint], i) => ({...toggle(macro, SETTING.KEYMAP_OPTIONS, hostKeyLabel(label, host.effective)), tooltip: hostKeyLabel(hint, host.effective), bitMask: options.keymapMasks[i], keyboardKeys: true, readOnly: !(options.supportedKeymapOptions & (1 << i)), notBuilt: !(options.supportedKeymapOptions & (1 << i)), hint: options.supportedKeymapOptions & (1 << i) ? "" : "Not in this firmware (does nothing)."})) : []});
     /** @param {number} id */
     const label = id => VOCABULARY.hostOs.find(([value]) => value === id)?.[1] || "Unknown";
     const macos = host.effective === 1;
-    const setup = ["Select a host OS manually if detection is unknown.",
+    const setup = ["Choose the operating system yourself if detection is unknown.",
         "For emoji and other characters your layout cannot type, choose the Unicode Hex Input layout and make it your active input source.",
         "Install and run WinCompose with Right Alt as Compose.", "Use an input method/application accepting Ctrl+Shift+U, hex digits and Space. Some Linux applications do not support it."][host.effective];
     // The effective OS's layouts first, then US; with no known OS, all of them.
@@ -235,17 +235,17 @@ function settingsSections(snapshot, settings) {
     const offered = hostLayouts().filter(layout => !osName || layout.os === "any" || layout.os === osName || layout.id === host.layout);
     /** @param {number} id */
     const layoutWord = id => VOCABULARY.hostLayouts.find(([value]) => value === id)?.[1];
-    result.push({id: "host", area: "Settings", label: "Host",
+    result.push({id: "host", area: "Settings", label: "Your computer", search: "host os unicode UNICODE_HOST_MODE",
         ...(host.effective === 2 && host.unicodeEnabled
             ? {githubLink: {label: "WinCompose on GitHub", url: "https://github.com/samhocevar/wincompose"}} : {}),
         // Auto can follow detection onto another OS than the layout's; a
-        // Host OS chosen here carries the layout along (followHostOs).
+        // operating system chosen here carries the layout along (followHostOs).
         ...(!host.layoutFits
-            ? {warning: `${layoutWord(host.layout)} is not a ${label(host.effective)} layout, so macros may type the wrong characters on ${label(host.effective)}. Choose a ${label(host.effective)} layout, or set Host OS to the computer you use.`}
+            ? {warning: `${layoutWord(host.layout)} is not a ${label(host.effective)} layout, so macros may type the wrong characters on ${label(host.effective)}. Choose a ${label(host.effective)} layout, or set Operating system to the one your computer runs.`}
             : macos && host.unicodeMode
             ? {warning: "While Unicode Hex Input is active on your Mac, Option-based symbols and shortcuts may stop working, including Option+Left/Right for word navigation. This affects ordinary typing and key-step shortcuts too. Ark does not switch your Mac's input source; switch back to your usual source when you need those keys, and match the layout here before playing macros."} : {}),
         description: `Detected: ${host.detected ? label(host.detected) : "Unknown"}. Effective: ${host.effective ? label(host.effective) : "Unknown"}. Detection is a best guess; override it if incorrect. ${setup} The keyboard cannot confirm your input setup.`, fields: [
-        {...number("hostOs", SETTING.UNICODE_HOST_MODE, "Host OS", "Auto uses the keyboard’s USB detection. This controls display names, the layouts offered and Unicode entry; it does not swap keys.", {max: 3, unit: undefined}), bitMask: 3, kind: "number",
+        {...number("hostOs", SETTING.UNICODE_HOST_MODE, "Operating system", "Auto uses the keyboard’s USB detection. This controls display names, the layouts offered and Unicode entry; it does not swap keys.", {max: 3, unit: undefined}), bitMask: 3, kind: "number",
             choices: VOCABULARY.hostOs.map(([value, label]) => ({value, label}))},
         {...byte("hostLayout", SETTING.UNICODE_HOST_MODE, LAYOUT_SHIFT, "Keyboard layout"), kind: "number",
             hint: "The layout your computer types with. Macros type through it, accents included; pick the one that is active on the computer.",
@@ -254,7 +254,7 @@ function settingsSections(snapshot, settings) {
         // On macOS, Unicode entry is the Unicode Hex Input layout, not a switch.
         ...(macos && !host.unicodeEnabled ? [] : [{...toggle("unicodeEnabled", SETTING.UNICODE_HOST_MODE, "Unicode playback", macos
             ? "On macOS, choose the Unicode Hex Input layout instead; this switch only applies with US."
-            : `${setup} Enable only after configuring the host. Avoid typing during playback.`), bitMask: UNICODE_ENABLED}]),
+            : `${setup} Turn on only after setting up your computer. Avoid typing during playback.`), bitMask: UNICODE_ENABLED}]),
     ]});
     return result;
 }
@@ -331,7 +331,7 @@ function editSettings(snapshot, message, capabilities) {
     }
     rescaleShares(value.settings.values, before);
     if (section.id === "host") followHostOs(value.settings.values, before, snapshot.hostOs?.detected);
-    if (!value.settings.values[SETTING.DEFAULT_LAYERS]) throw fail("Keep at least one startup layer selected.");
+    if (!value.settings.values[SETTING.DEFAULT_LAYERS]) throw fail("Keep at least one default layer on.");
     if (!value.settings.values.every((number, id) => validSetting(id, number))) throw fail("A setting is outside the keyboard's supported range.");
     // A timing displayed as default follows that default, including an older
     // profile's explicit value equal to it. Adopt inheritance only for changed

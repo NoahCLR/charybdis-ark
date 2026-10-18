@@ -9,6 +9,15 @@
    work and layer checks.
    ───────────────────────────────────────────────────────────────────────── */
 :root {
+  /* Size tokens for the Settings, Keyboard and Backups screens (from #156's
+     scale); the rest of the sheet keeps its own literals. */
+  --fs-micro: 10.5px; --fs-small: 12px; --fs-body: 13px; --fs-heading: 15px; --fs-title: 20px;
+  --lh-micro: 14px; --lh-small: 17px; --lh-body: 19px; --lh-heading: 20px; --lh-title: 26px;
+  --fw-regular: 400; --fw-medium: 500; --fw-strong: 600;
+  --h-chip: 24px; --h-compact: 28px; --h-control: 32px; --h-tab: 36px;
+  --r-chip: 4px; --r-control: 6px; --r-card: 10px; --r-sheet: 14px;
+  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 24px; --s-6: 32px; --s-7: 48px;
+  --topbar: 64px;
   --bg: #08080a;
   --bg-deep: #050506;
   --surface: #0f0f12;
@@ -210,6 +219,25 @@ a.rail-build:hover { color: var(--text-2); }
 .content { flex: 1; overflow: auto; min-height: 0; }
 .pad { padding: 20px 24px 120px; }
 .device-pad { max-width: var(--page); }
+/* Keyboard: the keyboard's name is the screen's title, renamed in place; the
+   reconnect note shows while it is being edited. */
+.keyboard-topbar { height: auto; min-height: var(--topbar); }
+.keyboard-title { display: grid; min-width: 0; }
+.keyboard-title > .title-name { max-width: 520px; margin-left: -5px; }
+.keyboard-title .rename-note { display: none; }
+.keyboard-title:focus-within .rename-note { display: block; }
+.keyboard-title:focus-within > .sub { display: none; }
+.keyboard-title .title-name-count { position: static; display: none; padding-left: 5px; }
+.keyboard-title:focus-within .title-name-count, .keyboard-title .title-name-count.warn { display: block; }
+.device-pad .halves { display: grid; gap: 2px; }
+.device-pad .half.ok { color: var(--text); }
+.device-pad .half.warn { color: var(--warning); }
+.device-pad .half .note { color: var(--text-3); }
+.device-pad .ok-words { color: var(--text); }
+.device-pad .warn-words { color: var(--warning); }
+.device-pad .callout.danger-note { border-left-color: var(--danger); color: var(--text); }
+.device-pad .callout .steps { margin: 6px 0 0 18px; padding: 0; }
+.device-pad details.card > summary .right .btn { margin: -4px 0; }
 
 /* ── controls ────────────────────────────────────────────────────────── */
 .btn {
@@ -222,6 +250,13 @@ a.rail-build:hover { color: var(--text-2); }
 }
 .btn:hover { background: var(--surface-3); border-color: var(--line-3); }
 .btn.ghost { background: none; border-color: transparent; color: var(--text-2); }
+/* Settings, Keyboard and Backups: a compact button, and a text button for an
+   object's own actions (a destructive one goes red on hover). */
+.btn.compact { height: var(--h-compact); padding: 0 10px; font-size: var(--fs-small); font-weight: var(--fw-medium); }
+.btn.text { height: var(--h-compact); padding: 0 10px; font-size: var(--fs-small); background: none; border-color: transparent; color: var(--text-2); }
+.btn.text:hover { background: var(--surface-2); color: var(--text); }
+.btn.text.destructive:hover { color: var(--danger); }
+.btn.text[disabled] { background: none; border-color: transparent; }
 .btn.ghost:hover { background: var(--surface-2); color: var(--text); }
 .btn.primary { background: var(--inv-bg); color: var(--inv-text); border-color: transparent; font-weight: 560; }
 .btn.primary:hover { opacity: .88; background: var(--inv-bg); }
@@ -301,6 +336,10 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 .stack { display: grid; gap: 14px; }
 .hr { height: 1px; background: var(--line); margin: 14px -15px; }
 /* A row or stack spaced off its default; declared after them so it wins. */
+.gap-4 { gap: 4px; }
+/* Mouse: the sniping keys under Auto-sniping, each with where it is placed. */
+.sniping-keys { display: grid; gap: 8px; border-top: 1px solid var(--line); }
+.sniping-key .sniping-name { min-width: 140px; color: var(--text); }
 .gap-8 { gap: 8px; }
 .gap-10 { gap: 10px; }
 .gap-12 { gap: 12px; }
@@ -796,9 +835,10 @@ button.tier:hover { background: var(--surface-3); }
 .list-row:hover { background: var(--surface-2); }
 .list-row[aria-current="true"] { background: var(--surface-3); }
 .list-row.note-row { grid-template-columns: 1fr; }
-.recovery-row { grid-template-columns: minmax(0, 1fr) auto auto; }
-.recovery-row .mono { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.swatch-lg { width: 26px; height: 26px; border-radius: 6px; border: 1px solid var(--line-2); flex: none; }
+.recovery-row { grid-template-columns: minmax(0, 1fr) auto; min-height: var(--s-7); padding-top: 8px; padding-bottom: 8px; }
+.recovery-row .recovery-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recovery-row .right { display: flex; align-items: center; gap: 4px; }
+.swatch-lg { width: 26px; height: 26px; border-radius: var(--r-control); border: 1px solid var(--line-2); flex: none; }
 .swatch-off { background: repeating-linear-gradient(45deg, var(--surface-3) 0 4px, transparent 4px 8px); }
 table.t { width: 100%; border-collapse: collapse; font-size: 12px; }
 table.t th { text-align: left; font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); font-weight: 600; padding: 0 12px 8px; }
@@ -1453,6 +1493,23 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .settings-group > summary { cursor: pointer; list-style: none; }
 .settings-group:not([open]) > summary { border-bottom-color: transparent; }
 .card-b.settings-intro { padding-bottom: 0; }
+/* A card that groups sections (Where behaviours and combos run): each keeps
+   its own rows and saves whole, under its name as an eyebrow. */
+.settings-grouped > .settings-sub > summary { cursor: default; padding: 16px 16px 4px; border-bottom: 0; }
+.settings-grouped > .settings-sub + .settings-sub { border-top: 1px solid var(--line); }
+/* Combo layer matching: a select per layer, four across. */
+.reference-grid { gap: 10px 16px; }
+.reference-cell { display: grid; gap: 4px; min-width: 0; }
+.reference-cell .txt { font-size: var(--fs-small); color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reference-cell select.input { height: var(--h-compact); background-position: calc(100% - 15px) 12px, calc(100% - 10px) 12px; }
+/* QMK keeps the live value: keys on the keyboard change it too. */
+.kk-mark { margin-left: 8px; font-size: var(--fs-small); color: var(--text-3); white-space: nowrap; }
+.setrow .fact-value { font-family: var(--mono); font-size: var(--fs-small); color: var(--text-2); }
+.settings-empty { margin: 16px 0; }
+.settings-group[open] > summary > .tag { display: none; }
+.card-h > .kk-mark { margin-left: 0; }
+.settings-elsewhere { margin-top: 12px; flex-wrap: wrap; }
+.settings-pad > .settings-search { margin-bottom: 12px; }
 .import-diff td:first-child { white-space: nowrap; }
 .import-diff td:last-child { white-space: nowrap; text-align: right; }
 .import-diff tr.cat td:first-child { font-weight: 600; }
@@ -1471,7 +1528,11 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .profile-action.drag-over { border-color: var(--text); background: var(--surface-2); }
 .profile-action .profile-drop-status { color: var(--text); }
 .pad.profile-pad { max-width: var(--page); }
-.setrow { display: grid; grid-template-columns: minmax(0,1fr) 190px; gap: 16px; align-items: center; padding: 12px 15px; border-bottom: 1px solid var(--line); }
+/* Backups: the comparison of a chosen file opens as a narrower sheet. */
+.sheet.import-sheet { width: min(720px, 100%); }
+.import-sheet .sheet-b { padding: 16px; }
+.import-fits.warn { color: var(--warning); }
+.setrow { display: grid; grid-template-columns: minmax(0,1fr) 190px; gap: 16px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line); }
 .setrow:last-child { border-bottom: 0; }
 .setrow.ro { opacity: .72; }
 .setrow .nm { font-size: 12.5px; }

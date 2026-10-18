@@ -28,7 +28,7 @@ export const themeLabel = (theme) => `Switch to ${otherTheme(theme)} theme`;
 
 // "Ark 2026.10.5+1 · 47eae26".
 /** @param {import("../../contracts/model.js").BuildInfo | null | undefined} build */
-export const buildLine = (build) => (build ? `Ark ${build.version} · ${build.commit}` : "");
+export const buildLine = (build) => (build ? `Ark ${build.version}${build.commit ? ` · ${build.commit}` : ""}` : "");
 
 // The build's commit on GitHub, when it is one: a build with uncommitted
 // changes ("-dirty") or no commit at all has nothing there to show.
@@ -46,5 +46,14 @@ export const githubMark = (className) => `<svg class="${className}" viewBox="0 0
 /** @param {string | number} savedAt */
 export function savedWhen(savedAt) {
     const date = new Date(savedAt);
-    return Number.isNaN(date.getTime()) ? String(savedAt ?? "") : date.toLocaleString();
+    return Number.isNaN(date.getTime()) ? String(savedAt ?? "") : date.toLocaleString("en-GB", {day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit"});
 }
+
+// A copy saved before an Apply, named by what it is, the keyboard and when.
+/** @param {string} keyboard @param {string} savedAt */
+export const copyTitle = (keyboard, savedAt) => ["Before Apply", keyboard, savedWhen(savedAt)].filter(Boolean).join(" · ");
+
+/** @param {string | number} id @returns {{type: 'useRecovery', id: string | number}} */
+export const useRecovery = (id) => ({type: "useRecovery", id});
+/** @param {string | number} id @returns {{type: 'deleteRecovery', id: string | number}} */
+export const deleteRecovery = (id) => ({type: "deleteRecovery", id});

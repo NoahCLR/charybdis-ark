@@ -9,7 +9,7 @@ for (const host of ["", "?host=web", "?host=demo"]) {
         await page.goto(`/preview/index.html${host}`);
         await page.locator('[data-screen="profile"]').click();
         const card = page.locator("[data-profile-drop]");
-        await expect(card).toContainText("drop a complete backup here");
+        await expect(card).toContainText("drop a backup file here");
         await page.evaluate(() => {window.__posted.length = 0;});
         const file = {name: "777.charybdis.json", text: '{"sentinel":777}'};
         await card.evaluate((node) => {
@@ -19,10 +19,10 @@ for (const host of ["", "?host=web", "?host=demo"]) {
         });
         await expect(card).toHaveClass(/drag-over/);
         expect(await dropFiles(page, [file, file])).toBe(true);
-        await expect(card.locator('[role="status"]')).toHaveText("Drop one profile file at a time.");
+        await expect(card.locator('[role="status"]')).toHaveText("Drop one backup file at a time.");
         await expect(card).not.toHaveClass(/drag-over/);
         await dropFiles(page, [{...file, text: "x".repeat(262145)}]);
-        await expect(card.locator('[role="status"]')).toHaveText("This profile file is too large.");
+        await expect(card.locator('[role="status"]')).toHaveText("This backup file is too large.");
         await page.evaluate(() => {
             const text = File.prototype.text;
             File.prototype.text = () => Promise.reject(new Error("unreadable"));
@@ -84,7 +84,7 @@ test("dropping respects every Import gate and cancels a read when the surface ch
     });
     await dropFiles(page, [file]);
     await expect(page.locator('[data-act="import"]')).toBeDisabled();
-    await expect(page.locator('.profile-drop-status')).toHaveText("Reading profile…");
+    await expect(page.locator('.profile-drop-status')).toHaveText("Reading the backup file…");
     await page.evaluate(() => {
         window.__setDropModel({draft: {revision: window.__dropModel.draft.revision + 1}});
         window.__finishDropRead("{}");
@@ -170,20 +170,20 @@ for (const theme of ["plain", "vscode-dark", "vscode-light"]) {
 for (const theme of ["plain", "vscode-dark", "vscode-light"]) {
     test(`the keyboard's name is posted on change, with its byte count kept live (${theme})`, async ({page}) => {
         await openPreview(page, theme);
-        await page.locator('[data-screen="settings"]').click();
+        // The name is the Keyboard screen's title (it was a Settings card).
+        await page.locator('[data-screen="device"]').click();
         const field = page.getByRole("textbox", {name: "Keyboard name", exact: true});
         await expect(field).toHaveAttribute("placeholder", "Charybdis 4x6");
-        await expect(page.locator(".settings-pad > .card").first()).toHaveAttribute("data-section", "keyboard");
         await page.evaluate(() => {window.__posted.length = 0;});
         await field.fill("777 · é");
-        await expect(page.locator('[data-section="keyboard"] [data-name-count]')).toHaveText("9 / 32 bytes");
+        await expect(page.locator('.keyboard-title [data-name-count]')).toHaveText("9 / 32 bytes");
         expect(await page.evaluate(() => window.__posted)).toEqual([], "typing posts nothing");
         await field.blur();
         await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([
             expect.objectContaining({type: "renameKeyboard", name: "777 · é", expectedFingerprint: expect.any(String), draftId: expect.any(String)}),
         ]);
         await field.fill("x".repeat(33));
-        await expect(page.locator('[data-section="keyboard"] [data-name-count]')).toHaveClass(/warn/);
+        await expect(page.locator('.keyboard-title [data-name-count]')).toHaveClass(/warn/);
     });
 }
 
@@ -235,8 +235,10 @@ test("the extension's panel has no theme toggle, picker, build line or browser r
     await expect(page.locator('[data-act="choose-keyboard"]')).toHaveCount(0);
     await expect(page.locator(".rail-build")).toHaveCount(0);
     expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBeUndefined();
+    // VS Code keeps its copies as files: the card says where, and lists none.
     await page.locator('[data-screen="profile"]').click();
-    await expect(page.locator(".card.recoveries")).toHaveCount(0);
+    await expect(page.locator(".card.recoveries .recovery-row")).toHaveCount(0);
+    await expect(page.locator(".card.recoveries")).toContainText("VS Code's storage");
     await expect(page.locator('[data-act="upgrade"]')).toHaveCount(0, {message: "the retired PD upgrade export is offered by no host"});
 });
 
@@ -280,7 +282,8 @@ test("the demo's controls post their messages", async ({page}) => {
     await expect.poll(posted).toEqual([expect.objectContaining({type: "leaveDemo"})]);
     expect(JSON.stringify(await posted())).not.toContain("discardDemo");
     await page.locator('[data-screen="device"]').click();
-    await expect(page.locator(".main h1")).toHaveText("Device");
+    // Keyboard's title is the keyboard's name (here the demo's), renamed in place.
+    await expect(page.locator('.main [data-f="keyboard:name"]')).toHaveCount(1);
     await expect(page.locator(".main")).toContainText("no keyboard");
 
     // With an edit not exported: the review has Export in Apply's place, and

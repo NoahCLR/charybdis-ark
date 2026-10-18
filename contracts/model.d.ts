@@ -225,6 +225,10 @@ export interface SettingFieldBase extends SettingBits {
     max?: number;
     choices?: (number | {value: number; label?: string})[];
     readOnly?: boolean;
+    /** The firmware was built without it: it does nothing, whatever it reads. */
+    notBuilt?: boolean;
+    /** QMK owns the live value, so keys on the keyboard (or VIA) change it too. */
+    keyboardKeys?: boolean;
     governs?: {kind: 'tier'; tier: string} | {kind: 'branch'; count: number} | {kind: 'layer'; layer: number};
 }
 export interface StoredSettingField extends SettingFieldBase {
@@ -268,6 +272,8 @@ export interface SettingsSection {
     stage?: string;
     expanded?: boolean;
     description?: string;
+    /** Other words the section is found by in Settings search: QMK's names and earlier ones. */
+    search?: string;
     warning?: string;
     githubLink?: {label: string; url: string};
     /** The words for the section's one-per-layer switches, shown together as one row of layers. */

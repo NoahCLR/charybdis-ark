@@ -24,7 +24,7 @@ export const DEMO_WORDS = Object.freeze({
     banner: "No keyboard is connected. Change anything: edits stay in this window, and Export saves them as a profile file for your keyboard.",
     explore: "Explore a demo",
     exploreTip: "Open Ark on a demo setup, with no keyboard. Every screen works and every edit shows in the review; only Apply needs a keyboard.",
-    exportNote: "Save the demo setup, with your edits, as a complete profile file. On your keyboard, Import it to review and apply it.",
+    exportNote: "Save the demo setup, with your edits, as a complete backup file. On your keyboard, restore it to review and apply it.",
 });
 
 // Leaving the demo, or opening another file in it, loses edits not exported
