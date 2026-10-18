@@ -40,10 +40,14 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
             const store = await import("/webview/store.mjs");
             store.state.screen = "macros"; store.state.macroSlot = "VIA_MACRO_1"; store.render();
         });
-        await expect(page.locator('[data-slot="VIA_MACRO_1"]')).toContainText("blocked");
+        // The tile keeps what the macro is, with a red mark and the reason in its tip.
+        await expect(page.locator('[data-slot="VIA_MACRO_1"] .slot-problem')).toHaveCount(1);
+        await expect(page.locator('[data-slot="VIA_MACRO_1"]')).not.toContainText("blocked");
+        await expect(page.locator('[data-slot="VIA_MACRO_1"]')).toHaveAttribute("data-tip", /cannot play: .*Settings → Your computer/);
         await expect(page.locator('[data-macro-feedback]')).toContainText("Release ordinary keys");
         await expect(page.locator('[data-macro-feedback]')).toContainText("stored macro cannot play");
-        await expect(page.locator('[data-macro-feedback]')).not.toContainText("This edit is not staged");
+        await expect(page.locator('[data-macro-feedback] [data-feedback-settings]')).toHaveText("Your computer in Settings →");
+        await expect(page.locator('[data-macro-feedback]')).not.toContainText("not in your draft");
         await page.evaluate(async () => {
             const store = await import("/webview/store.mjs");
             store.state.overlay = "review"; store.render();
@@ -63,7 +67,7 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
         draft.discard(draft.revision, discard.group);
         await publish();
         await expect(review).toHaveCount(0);
-        await expect(page.locator('[data-slot="VIA_MACRO_1"]')).not.toContainText("blocked");
+        await expect(page.locator('[data-slot="VIA_MACRO_1"] .slot-problem')).toHaveCount(0);
         expect(draft.document.macros).toEqual(snapshot.document.macros);
     });
 }

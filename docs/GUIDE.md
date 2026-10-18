@@ -541,20 +541,29 @@ editor, including slots whose QMK values have no named constant.
 
 ### Custom keys
 
-**Custom keys** lists the 128 custom keys: rename one by clicking its
-editor's title, as on Macros, give it a shortcut,
-add or edit its behaviour, place it on a key, and see where it is used; the
-key picker offers them in its own Custom keys section, each tip naming the
-shortcut it sends. Their names are stored on the keyboard; a keyboard with
-none stored reports the names authored in `keymap.c`. The keys sit three
-across in a list that scrolls on its own beside the editor, as the Macros
-slots do, so picking one far down keeps the editor in view, and the list keeps
-its place while you edit.
+**Custom keys** lists the 128 custom keys. A custom key is a named shortcut
+held as long as you hold the key (a macro plays and finishes), with taps and
+holds of its own. Rename one by clicking its editor's title, as on Macros, give
+it a shortcut, add or edit its behaviour, place it on a key, and see where it
+is used; the key picker offers them in its own Custom keys section, each tip
+naming the shortcut it sends. Their names are stored on the keyboard; a
+keyboard with none stored reports the names authored in `keymap.c`.
 
-A custom key's **Shortcut** is its own action, the way an ordinary key's
-keycode is: one key and any of the eight modifiers, held while the custom key
-is held and tapped when it is tapped. **Choose…** opens the keycode picker as
-on the Keys screen: click the key, from those a shortcut can hold (letters,
+The list works as Macros' does: **+ New custom key** opens the first unused
+key, the keys in use (named, sending a shortcut or carrying a behaviour) stay
+in view and are counted "5 in use", and the rest fold behind **Show N
+unused**. An unnamed key's tile shows the shortcut it sends (⌃⌥Space on macOS,
+Ctrl+Alt+Space elsewhere). Search finds a key by name, by "K5" or by its
+shortcut. The list scrolls on its own beside the editor, so picking one far
+down keeps the editor in view, and keeps its place while you edit. The amber
+draft mark by the title says the key differs from the keyboard in your draft.
+
+The editor is one card: the title and K5, **Placed on** with **Place on a
+key…**, then **Sends** and **Taps and holds**. What a custom key sends is its
+own action, the way an ordinary key's keycode is: one key and any of the eight
+modifiers, held while the custom key is held and tapped when it is tapped.
+**Sends** shows it as a keycap (its words in the tip); clicking it opens the
+keycode picker as on the Keys screen: click the key, from those a shortcut can hold (letters,
 digits, symbols, navigation, function keys and mouse buttons 1–8), and the
 modifiers in the row above the board. A modifier key on the board is its
 button in that row, and a shifted symbol is Shift and its key, so picking
@@ -563,9 +572,9 @@ less those a shortcut cannot send (media, layers and the like). Here left
 and right mix freely (Left
 Ctrl + Right Alt + K), which a single keycode cannot store, and **Use
 shortcut** saves it. Modifiers alone (a held Hyper) and a key alone are both
-shortcuts; **Clear** removes it. **What it does** says whether the
-key sends its shortcut, its behaviour, both, or nothing yet, above the key's
-behaviour editor (below). A behaviour on
+shortcuts; **Clear** removes it. One sentence under it says whether the
+key sends its shortcut, its behaviour, both, or nothing yet ("Does nothing
+yet: choose what it sends"). A behaviour on
 the key works on top: an empty tap or hold sends the shortcut, as an
 ordinary key's empty cells send its keycode. A behaviour step on another key
 may send a custom key; it sends that key's shortcut only, never its
@@ -573,8 +582,11 @@ behaviour, and Review warns about a step naming a custom key that has no
 shortcut. Shortcut changes are draft edits, reviewed beside the name with
 Discard, Undo and Redo, and saved by Apply.
 
-Under the key, **What it does** also holds its behaviour editor, the same one
-as Keys → Behaviours: timings, the grid of actions and participation, and once
+**Taps and holds** reads "none" with **Add taps and holds…** until the key has
+a behaviour; that button opens the key's behaviour editor, posting nothing
+until you set something. With a behaviour, the editor is always open: the
+same one as Keys → Behaviours, without a title of its own (the card's title
+names the key): timings, the grid of actions and participation, and once
 the key has a behaviour, **Move to another key…** and **Remove behaviour**. It works for
 a key on no layer yet, so a custom key can get its taps and holds where it is
 defined. A key with no behaviour shows the key's defaults, with its shortcut
@@ -584,7 +596,7 @@ screen, with the same review, undo and redo, and with a cell open, Delete, ⌘C
 and ⌘V act on it as they do there. **Move to another key…** to another custom key moves
 the screen to that key; to any other key, it opens the behaviour on the Keys
 screen, where that key's behaviours are. A key that is placed also offers
-**Show on the Keys screen**, which opens its behaviour there with the board
+**Show on the Keys screen →**, which opens its behaviour there with the board
 showing the keys that reach it, on a layer that reaches the key. Picking
 another key closes the cell open in this key's behaviour; a cell open on the
 Keys screen stays open there.
@@ -888,6 +900,13 @@ keys automatically, while explicit key steps still send the keys you chose.
 
 ## Text macros
 
+The Macros list starts with **+ New macro**, which opens the first free slot,
+then a search, the slots in use and **Show N empty**, which folds the rest. A
+macro that is a single shortcut is usually simpler as a custom key, which the
+screen's subtitle says and the editor offers with a link to Custom keys: a
+custom key holds its shortcut as long as you hold the key and uses no macro
+memory.
+
 An empty macro starts with no steps. Choose **Text**, **Key / chord**, **Delay**,
 **Press** or **Release** above the sequence, or start **Record** below it.
 Key actions open their picker immediately; cancelling leaves the sequence
@@ -935,21 +954,38 @@ draft through draft Undo/Redo, import, Apply or changing keyboard starts fresh.
 The editor follows a moved step. A release before
 that key's press, a repeated press of a held key, or an unfinished hold marks the
 affected tiles and stays local for correction; it never replaces the valid draft.
-Uninterruptible playback and placement stay beside the title and context.
-The sequence and add actions come first, with validation errors shown underneath;
+Under the title (click to rename) and its M5 tag, **Placed on** lists the
+layers that set the macro off, with **Place on a key…** beside them, and
+**Uninterruptible playback** follows with its consequence. The amber draft
+mark by the title says the macro differs from the keyboard in your draft.
+The add-step row comes next, with validation errors under the sequence;
 **Typing & playback help** opens the longer explanation.
-Your computer settings and that help sit at the bottom, below the recorder. Add-step actions
-use larger, bordered buttons; **Discard local edits** and **Clear macro** are
-text buttons at the right of the title, after Place on a key…; Record / Stop is the
-prominent recording action, under a Record heading styled like Sequence's. The **Raw payload** toggle sits at the right of
-the add-step row and reveals its editor above the sequence. All recorder options remain
+Your computer in Settings and that help sit at the bottom, below the recorder.
+**Clear macro** is a text button at the right of the title, last; **Discard
+this edit** joins it only while an edit is still local (typed but not yet in
+your draft). **Raw payload** is a pressed toggle at the right of the add-step
+row and reveals its editor above the sequence. All recorder options remain
 visible below. The slots sit three across in a bank that scrolls independently
 of the editor and keeps its position when selecting a slot, editing or recording.
+
+A chord stays one step: Ark stores it as the firmware does (the keys pressed
+in order, the last one tapped, the rest released in reverse) and reads that
+back, and Ark's older all-pressed-then-all-released form, as one chord, so a
+chord authored in the firmware's `keymap.c` shows as one tile too.
 Key pickers offer only the basic keys macros can send;
 a chord takes up to 16 distinct keys, and a press or release takes one.
-Record appends key steps; **Clear take** restores what was there before recording.
-**Discard local edits** cancels an active take and returns to the draft macro
-without keeping the recorded keys.
+**Record** is an ordinary outlined button; while recording it turns red,
+reads **Recording · Stop (Esc)**, and a listening tile ends the sequence where
+the next key lands. Record appends key steps; **Undo recording** restores what
+was there before recording. **Discard this edit** cancels an active take and
+returns to the draft macro without keeping the recorded keys.
+The recorder takes every key a macro can send, Delete, Home, End, Page Up and
+Down, Insert, Caps Lock, the numpad, the ISO key beside Shift, Print Screen,
+Menu, F13–F24 and the volume keys included, and keeps them from acting on the
+page while recording. A key a macro cannot send is named under the recorder as
+not recorded rather than passing as a pause. Shortcuts your computer keeps for
+itself (⌘Tab, ⌘Space, screenshots) never reach Ark; add them with **+ Key /
+chord**.
 During recording, step Undo/Redo/Copy/Paste and selection shortcuts are suspended.
 Their chords are captured as ordinary macro keys.
 Recording groups keys pressed together into one editable
@@ -1002,14 +1038,16 @@ does not change macOS Unicode Hex Input's effect on Option shortcuts.
 Text edits and renames preserve the choice. Review, undo/redo, discard, exports
 and imports carry it with the macro.
 
-Shared macro memory stays in the slot bank. Every empty slot keeps room there
-for ten key taps; when it cannot, the highest empty slots read **unavailable**
-and cannot be picked until a macro is shortened or cleared. The bank's heading
-counts the slots in use, "20 of 128 used", as Custom keys counts its named keys,
-and adds how many slots are without room only when there are some. The editor shows checking status and
-validation errors without routine memory or staging notes. Valid edits enter the draft when you finish editing a field or change a key step. Incomplete,
+Shared macro memory is one line under the slot bank, "408 of 34,903 bytes",
+with its bar. Every empty slot keeps room there for ten key taps (Ark's
+reserve, not a keyboard rule); when it cannot, the highest empty slots read
+**unavailable** and cannot be picked until a macro is shortened or cleared.
+That sentence shows only when a slot is out of room or memory is more than 80%
+used. The bank's heading counts the slots in use, "18 in use", as Custom keys
+counts its keys. The editor shows "Checking this edit…" or an error only while
+an edit is still local, without routine memory or staging notes. Valid edits enter the draft when you finish editing a field or change a key step. Incomplete,
 invalid or oversized edits stay visible locally with their reason and never
-replace the last valid draft. **Discard local edits** returns to the draft's
+replace the last valid draft. **Discard this edit** returns to the draft's
 current macro; use step Undo while editing the macro, or draft Undo from the rail
 to reverse a draft change. Text boxes
 keep long content inside their step editor, with scrolling and preserved line breaks.
@@ -1037,10 +1075,12 @@ edits require a known effective OS.
 
 A layout change can make a stored macro unplayable, for example when an
 ordinary key is held across `é` and the new layout needs Unicode entry for it.
-The slot shows **blocked**, the editor explains the reason, and Review warns
-before Apply. Release that key before the text, or choose a layout that can type
-the character. Characters with no native route or Unicode setup show **setup**.
-Ark cannot repair those sequences without changing what you authored.
+The slot keeps its name with a red mark and the reason in its tip, the editor
+says "This stored macro cannot play" with the reason and a link to **Your
+computer in Settings**, and Review warns before Apply. Release that key before
+the text, or choose a layout that can type the character; characters with no
+native route need Unicode setup. Ark cannot repair those sequences without
+changing what you authored.
 
 Bank usage counts UTF-8 bytes. The keyboard plays a stored macro in windows,
 so one macro can use all the free memory. Valid supplementary characters and joined emoji count
@@ -1062,7 +1102,8 @@ one leaves the same default label; Review explains the stored name and its
 fallback separately. A disabled trackball mode slot's retained name is reviewed too.
 In Review and Draft history, combo badges have
 space before their names, and tap-count badges and tap and hold dots occupy separate
-aligned positions. Things made by the same edit (a key swap, a
+aligned positions. A macro's steps read as the editor's tiles (text, keys,
+chords and delays), with the stored payload in the value's tooltip. Things made by the same edit (a key swap, a
 moved behaviour) go back together, as one undoable step. Layers are compared
 by which layer they are, not where they sit, so a reorder is one **Layer
 priority** item and a key edited or a layer renamed after it is its own item;

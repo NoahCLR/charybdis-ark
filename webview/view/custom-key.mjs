@@ -24,9 +24,9 @@ export const customKeyOf = (model, keycode) => /^CUSTOM_KEY_\d+$/.test(String(ke
 export function customKeyDoes(key) {
     const sends = hasShortcut(key) ? key.shortcutLabel : "";
     if (sends && key.hasBehavior) return `Its behaviour, on top of ${sends}: a tap or hold the behaviour leaves empty sends ${sends}.`;
-    if (sends) return `Sends ${sends}: held while the key is held, tapped when it is tapped. Add a behaviour to give it more taps and holds.`;
+    if (sends) return `Sends ${sends}: held while the key is held, tapped when it is tapped.`;
     if (key.hasBehavior) return "Only what its behaviour says. Give it a shortcut to send one where the behaviour leaves a tap or hold empty.";
-    return "Nothing yet. Give it a shortcut, or add a behaviour to give it taps and holds.";
+    return "Does nothing yet: choose what it sends.";
 }
 
 // What the shortcut does on this key, in one line: held and tapped as the key
@@ -34,7 +34,7 @@ export function customKeyDoes(key) {
 // (firmware D-F26).
 /** @param {CustomKey} key */
 export function customKeyShortcutLine(key) {
-    if (!hasShortcut(key)) return "No shortcut: it does only what its behaviour says.";
+    if (!hasShortcut(key)) return key.hasBehavior ? "No shortcut: it does only what its behaviour says." : "Does nothing yet: choose what it sends.";
     return key.hasBehavior ? `Sends ${key.shortcutLabel} where its behaviour leaves a tap or hold empty.`
         : `Sends ${key.shortcutLabel}: held while the key is held, tapped when it is tapped.`;
 }
@@ -179,4 +179,44 @@ export function offeredName(model, shortcut) {
     if (nameBytes(label) <= NAME_MAX_BYTES) return label;
     const short = shortcutPickLabel(model, shortcut).split(" + ").map((part) => part.replace(/^Left /, "L").replace(/^Right /, "R")).join("+");
     return nameBytes(short) <= NAME_MAX_BYTES ? short : "";
+}
+
+// Whether a custom key is in use: named, sending a shortcut or carrying a
+// behaviour. The list counts these and keeps them in view.
+/** @param {CustomKey} key */
+export const customKeyInUse = (key) => Boolean(key.name) || hasShortcut(key) || key.hasBehavior;
+
+// The Custom keys list: keys in use (and the open one), then the rest folded
+// behind their count. A search finds a key by name, by "K5" or by its slot
+// number, and shows every key it finds.
+/** @param {readonly CustomKey[]} keys @param {{query?: string, current?: string | null}} [options] */
+export function customKeyBankList(keys, {query = "", current = null} = {}) {
+    const needle = String(query).trim().toLowerCase();
+    /** @param {CustomKey} key */
+    const matches = (key) => !needle || key.name.toLowerCase().includes(needle) || String(key.slot) === needle
+        || `k${key.slot}` === needle || key.shortcutLabel.toLowerCase().includes(needle);
+    /** @type {CustomKey[]} */
+    const shown = [];
+    /** @type {CustomKey[]} */
+    const folded = [];
+    for (const key of keys) {
+        if (!matches(key)) continue;
+        (customKeyInUse(key) || needle || key.keycode === current ? shown : folded).push(key);
+    }
+    return {shown, folded, firstFree: keys.find((key) => !customKeyInUse(key))};
+}
+
+// A shortcut drawn short, as a keycap prints it: modifier symbols on macOS
+// (⌃⌥⇧⌘, in Apple's order), words joined by + elsewhere, then the key's
+// label. A modifier held on both sides shows once. Empty for no shortcut.
+const MAC_GLYPHS = [[0x11, "⌃"], [0x44, "⌥"], [0x22, "⇧"], [0x88, "⌘"]];
+const PC_WORDS = [[0x11, "Ctrl"], [0x44, "Alt"], [0x22, "Shift"], [0x88, "Win"]];
+/** @param {Model} model @param {{mods: number, key: number}} shortcut */
+export function shortcutGlyphs(model, shortcut) {
+    if (!shortcut.mods && !shortcut.key) return "";
+    const mac = model?.hostSettings?.effective === 1;
+    const mods = /** @type {[number, string][]} */ (mac ? MAC_GLYPHS : PC_WORDS).filter(([bits]) => shortcut.mods & bits).map(([, glyph]) => glyph);
+    const entry = shortcut.key ? (model?.qmkKeycodes || []).find((row) => row.keycode === shortcut.key) : undefined;
+    const key = entry ? model?.qmkKeyLabels?.[entry.value] || entry.label || entry.value : "";
+    return mac ? `${mods.join("")}${key}` : [...mods, key].filter(Boolean).join("+");
 }

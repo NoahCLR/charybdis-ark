@@ -41,7 +41,8 @@ test("Text accepts code literally and inspection measures pending input without 
     await expect.poll(() => updates(page).then(rows => rows.at(-1)?.payload)).toBe(text.replaceAll("{", "{{").replaceAll("}", "}}"));
     await expect(page.locator("[data-raw]")).not.toHaveAttribute("open");
     await expect(page.locator("[data-macro-feedback] .unavailable")).toHaveCount(0);
-    await expect(page.locator("[data-local-state]")).toHaveText("edited here");
+    // Posted but not yet accepted: still local, so Discard this edit is offered.
+    await expect(page.locator('.macro-titlebar [data-act="discard"]')).toBeVisible();
 });
 
 test("a long macro stages up to the free memory", async ({page}) => {
@@ -56,7 +57,7 @@ test("a long macro stages up to the free memory", async ({page}) => {
     await field.fill("a".repeat(available + 1));
     await field.dispatchEvent("change");
     await expect(page.locator("[data-macro-feedback]")).toContainText(`${available} are available for this slot`);
-    await expect(page.locator("[data-macro-feedback]")).toContainText("This edit is not staged");
+    await expect(page.locator("[data-macro-feedback]")).toContainText("This edit is not in your draft");
     expect(await updates(page)).toHaveLength(1);
 });
 
@@ -66,7 +67,7 @@ test("oversized text remains editable and recovers as soon as it fits", async ({
     await field.fill("a".repeat(501));
     await field.dispatchEvent("change");
     await expect(page.locator("[data-macro-feedback]")).toContainText("500 are available for this slot");
-    await expect(page.locator("[data-macro-feedback]")).toContainText("This edit is not staged");
+    await expect(page.locator("[data-macro-feedback]")).toContainText("This edit is not in your draft");
     expect(await updates(page)).toHaveLength(0);
     await expect(field).toHaveValue("a".repeat(501));
     await field.fill("a".repeat(500));

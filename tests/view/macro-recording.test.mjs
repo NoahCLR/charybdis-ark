@@ -1,9 +1,18 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {createRequire} from "node:module";
-import {recordedTakePayload} from "../../webview/view/macro-recording.mjs";
+import {recordedKeycode, recordedTakePayload} from "../../webview/view/macro-recording.mjs";
 import {parseMacro, unreleased} from "../../webview/view/macro.mjs";
-const {parsePayload} = createRequire(import.meta.url)("../../core/schema/macro-payload.js");
+const {parsePayload, macroKeycodes} = createRequire(import.meta.url)("../../core/schema/macro-payload.js");
+
+test("the recorder maps every key a macro can send, and nothing a macro cannot", () => {
+    const accepted = new Set(macroKeycodes());
+    const codes = ["KeyA", "Digit0", "F1", "F24", "Delete", "Home", "End", "PageUp", "PageDown", "Insert", "CapsLock",
+        "Numpad0", "Numpad9", "NumpadAdd", "NumpadEnter", "NumpadDecimal", "IntlBackslash", "PrintScreen", "ContextMenu",
+        "ShiftLeft", "MetaRight", "ArrowLeft", "Backquote", "AudioVolumeUp"];
+    for (const code of codes) assert.ok(accepted.has(recordedKeycode(code)), `${code} → ${recordedKeycode(code)}`);
+    for (const code of ["Fn", "F25", "MediaPlayPause", "BrowserBack", ""]) assert.equal(recordedKeycode(code), "", code);
+});
 
 const down = (keycode, time) => ({keycode, time, type: "keydown"});
 const up = (keycode, time) => ({keycode, time, type: "keyup"});

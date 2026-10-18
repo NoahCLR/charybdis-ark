@@ -1,7 +1,7 @@
 import test from "node:test";
 import {withAnswers} from "../fixtures/layer-answers.mjs";
 import assert from "node:assert/strict";
-import {customKeyBypassText, customKeyDoes, customKeyHeadline, customKeyShortcutOnly, customKeyOf, customKeySendsNote, customKeyShortcutLine, hasShortcut, shortcutKeyCode, shortcutPick, shortcutPickLabel, shortcutPickMods, shortcutOffer, shortcutModifiers, unusedCustomKey, offeredName, customKeyWithShortcut, customKeyChoice} from "../../webview/view/custom-key.mjs";
+import {customKeyBankList, customKeyInUse, shortcutGlyphs, customKeyBypassText, customKeyDoes, customKeyHeadline, customKeyShortcutOnly, customKeyOf, customKeySendsNote, customKeyShortcutLine, hasShortcut, shortcutKeyCode, shortcutPick, shortcutPickLabel, shortcutPickMods, shortcutOffer, shortcutModifiers, unusedCustomKey, offeredName, customKeyWithShortcut, customKeyChoice} from "../../webview/view/custom-key.mjs";
 
 const key = (slot, shortcut = {mods: 0, key: 0}, shortcutLabel = "", hasBehavior = false) =>
     ({slot, keycode: `CUSTOM_KEY_${slot}`, code: 0x7f00 + slot, name: "", hasBehavior, shortcut, shortcutLabel});
@@ -28,14 +28,15 @@ test("a shortcut is modifiers, a key, or both; neither is none", () => {
 });
 
 test("what a custom key does says its shortcut, its behaviour on top, both, or nothing", () => {
-    assert.match(customKeyDoes(model.customKeys[0]), /^Nothing yet/);
+    assert.equal(customKeyDoes(model.customKeys[0]), "Does nothing yet: choose what it sends.");
     assert.match(customKeyDoes(model.customKeys[1]), /^Sends Left Ctrl \+ Right Alt \+ K: held while the key is held, tapped when it is tapped/);
     assert.match(customKeyDoes(model.customKeys[2]), /^Its behaviour, on top of Left Ctrl \+ Left Shift \+ Left Alt \+ Left GUI: a tap or hold the behaviour leaves empty sends/);
     // Under a behaviour the shortcut is not held from the press: it fills
     // the taps and holds the behaviour leaves empty (firmware D-F26).
     assert.equal(customKeyShortcutLine(model.customKeys[1]), "Sends Left Ctrl + Right Alt + K: held while the key is held, tapped when it is tapped.");
     assert.equal(customKeyShortcutLine(model.customKeys[2]), "Sends Left Ctrl + Left Shift + Left Alt + Left GUI where its behaviour leaves a tap or hold empty.");
-    assert.equal(customKeyShortcutLine(model.customKeys[0]), "No shortcut: it does only what its behaviour says.");
+    assert.equal(customKeyShortcutLine(model.customKeys[0]), "Does nothing yet: choose what it sends.", "no behaviour to defer to");
+    assert.equal(customKeyShortcutLine({...model.customKeys[0], hasBehavior: true}), "No shortcut: it does only what its behaviour says.");
     assert.match(customKeyDoes({...model.customKeys[0], hasBehavior: true}), /^Only what its behaviour says/);
     assert.equal(customKeySendsNote(model, "CUSTOM_KEY_1"), "Custom key · sends Left Ctrl + Right Alt + K");
     assert.match(customKeySendsNote(model, "CUSTOM_KEY_0"), /no shortcut/);
@@ -141,4 +142,25 @@ test("a match with a behaviour is offered beside a new key where the behaviour w
     assert.deepEqual(choose([both(1, true), free(3)], true), {existing: "CUSTOM_KEY_1", withBehaviour: true, spare: "CUSTOM_KEY_3"}, "a key or combo output: use it with its behaviour, or make a new one");
     assert.deepEqual(choose([both(1, true), free(3)], false), {existing: "CUSTOM_KEY_1", withBehaviour: false, spare: undefined}, "a step sends only the shortcut: used as it is");
     assert.deepEqual(choose([free(3)], true), {existing: undefined, withBehaviour: false, spare: "CUSTOM_KEY_3"});
+});
+
+test("the list keeps keys in use in view, counts them, and folds the rest", () => {
+    const keys = [key(0), key(1, {mods: 0x41, key: 0x0e}, "Left Ctrl + Right Alt + K"), {...key(2), name: "Named"}, {...key(3), hasBehavior: true}, key(4)];
+    assert.deepEqual(keys.map(customKeyInUse), [false, true, true, true, false]);
+    const list = customKeyBankList(keys);
+    assert.deepEqual(list.shown.map((row) => row.slot), [1, 2, 3]);
+    assert.deepEqual(list.folded.map((row) => row.slot), [0, 4]);
+    assert.equal(list.firstFree?.slot, 0);
+    assert.deepEqual(customKeyBankList(keys, {current: "CUSTOM_KEY_4"}).shown.map((row) => row.slot), [1, 2, 3, 4]);
+    assert.deepEqual(customKeyBankList(keys, {query: "k4"}).shown.map((row) => row.slot), [4]);
+    assert.deepEqual(customKeyBankList(keys, {query: "alt"}).shown.map((row) => row.slot), [1]);
+});
+
+test("a shortcut drawn short: symbols on macOS, words elsewhere", () => {
+    const mac = {...model, hostSettings: {effective: 1}}, pc = {...model, hostSettings: {effective: 2}};
+    assert.equal(shortcutGlyphs(mac, {mods: 0x0a, key: 0x1e}), "⇧⌘1");
+    assert.equal(shortcutGlyphs(mac, {mods: 0x41, key: 0x0e}), "⌃⌥K");
+    assert.equal(shortcutGlyphs(pc, {mods: 0x0a, key: 0x1e}), "Shift+Win+1");
+    assert.equal(shortcutGlyphs(pc, {mods: 0x02, key: 0}), "Shift");
+    assert.equal(shortcutGlyphs(mac, {mods: 0, key: 0}), "");
 });

@@ -6,8 +6,8 @@ const updates = page => page.evaluate(() => window.__posted.filter(m => m.type =
 
 for (const theme of ["vscode-dark", "vscode-light"]) {
     test(`macro bank keeps its scroll when selecting, editing and recording a later slot (${theme})`, async ({page}) => {
-        await openControls(page, "macros", {macroSlot: "VIA_MACRO_17", recordDelays: false}, theme);
-        const bank = page.locator(".macros-library .macro-grid");
+        await openControls(page, "macros", {macroSlot: "VIA_MACRO_17", macroEmptyOpen: true, recordDelays: false}, theme);
+        const bank = page.locator(".macros-library .bank-scroll");
         const slot = page.locator('[data-slot="VIA_MACRO_100"]');
         await slot.scrollIntoViewIfNeeded();
         const position = await bank.evaluate(node => node.scrollTop);
@@ -39,7 +39,7 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
 }
 
 test("dropping in the space before the first tile inserts the dragged step first", async ({page}) => {
-    await openControls(page, "macros", {macroSlot: "VIA_MACRO_17"});
+    await openControls(page, "macros", {macroSlot: "VIA_MACRO_17", macroEmptyOpen: true});
     await page.locator("[data-raw-toggle]").click();
     await page.locator("[data-raw-payload]").fill("{KC_A}{KC_C}");
     await page.locator("[data-raw-payload]").press("Tab");
@@ -54,7 +54,7 @@ test("the first step can move to trailing whitespace after wrapped rows", async 
     // Narrow enough that five tiles wrap in the full-width editor the
     // library stacks into below 820 px of content.
     await page.setViewportSize({width: 640, height: 900});
-    await openControls(page, "macros", {macroSlot: "VIA_MACRO_17"});
+    await openControls(page, "macros", {macroSlot: "VIA_MACRO_17", macroEmptyOpen: true});
     await page.locator('[data-raw-toggle]').click();
     await page.locator('[data-raw-payload]').fill('{KC_A}{KC_B}{KC_C}{KC_D}{KC_ENT}');
     await page.locator('[data-raw-payload]').press('Tab');
@@ -73,7 +73,7 @@ test("the first step can move to trailing whitespace after wrapped rows", async 
 });
 
 test("the macro title is the only name input, with Enter to commit and Escape to cancel", async ({page}) => {
-    await openControls(page, "macros", {macroSlot: "VIA_MACRO_17"});
+    await openControls(page, "macros", {macroSlot: "VIA_MACRO_17", macroEmptyOpen: true});
     const title = page.getByRole("textbox", {name: "Macro name", exact: true});
     await expect(page.locator("[data-name]")).toHaveCount(1);
     await expect(page.locator(".macro-titlebar [data-name]")).toHaveCount(1);
@@ -88,7 +88,7 @@ test("the macro title is the only name input, with Enter to commit and Escape to
 });
 
 test("an empty macro has no placeholder; key picking cancels cleanly and Delay creates one step", async ({page}) => {
-    await openControls(page, "macros", {macroSlot: "VIA_MACRO_17"});
+    await openControls(page, "macros", {macroSlot: "VIA_MACRO_17", macroEmptyOpen: true});
     await expect(page.locator(".macro-empty")).toBeVisible();
     await expect(page.locator(".macro-token")).toHaveCount(0);
     await page.locator('[data-insert-kind="tap"]').click();
@@ -106,7 +106,7 @@ test("an empty macro has no placeholder; key picking cancels cleanly and Delay c
 });
 
 test("a blank Text starter is replaced by a shortcut; written text is retained before another shortcut", async ({page}) => {
-    await openControls(page, "macros", {macroSlot: "VIA_MACRO_17"});
+    await openControls(page, "macros", {macroSlot: "VIA_MACRO_17", macroEmptyOpen: true});
     await page.locator('[data-insert-kind="text"]').click();
     await expect(page.locator("[data-step-text]")).toBeFocused();
     await page.locator('[data-insert-kind="tap"]').click();
@@ -128,7 +128,7 @@ test("a blank Text starter is replaced by a shortcut; written text is retained b
 for (const theme of ["vscode-dark", "vscode-light"]) {
     test(`sequence stays above optional guidance and recorder controls stay visible (${theme})`, async ({page}) => {
         await page.setViewportSize({width: 1400, height: 1200});
-        await openControls(page, "macros", {macroSlot: "VIA_MACRO_17"}, theme);
+        await openControls(page, "macros", {macroSlot: "VIA_MACRO_17", macroEmptyOpen: true}, theme);
         await page.locator('[data-insert-kind="text"]').click();
         await page.locator('[data-step-text]').fill("Thanks, I'll take a look.");
         await page.locator('[data-step-text]').press("Tab");
@@ -156,7 +156,7 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
 }
 
 async function writePayload(page, payload) {
-    await page.locator('[data-raw-toggle]').check();
+    await page.locator('[data-raw-toggle]').click();
     await page.locator('[data-raw-payload]').fill(payload);
     await page.locator('[data-raw-payload]').press('Tab');
     await expect.poll(() => updates(page).then(rows => rows.at(-1)?.payload)).toBe(payload);
@@ -165,7 +165,7 @@ async function writePayload(page, payload) {
 
 for (const key of ['Delete', 'Backspace']) {
     test(`${key} removes the focused step and keeps focus through deleting the last step`, async ({page}) => {
-        await openControls(page, 'macros', {macroSlot: 'VIA_MACRO_17'});
+        await openControls(page, 'macros', {macroSlot: 'VIA_MACRO_17', macroEmptyOpen: true});
         await writePayload(page, '{KC_A}{KC_B}{KC_C}');
         const tiles = page.locator('[data-step-tile]');
         const lastId = await tiles.nth(2).getAttribute('data-step-id');
@@ -192,7 +192,7 @@ for (const key of ['Delete', 'Backspace']) {
 }
 
 test('deletion uses step identity after a reorder and consumes auto-repeat', async ({page}) => {
-    await openControls(page, 'macros', {macroSlot: 'VIA_MACRO_17'});
+    await openControls(page, 'macros', {macroSlot: 'VIA_MACRO_17', macroEmptyOpen: true});
     await writePayload(page, '{KC_A}{KC_B}{KC_C}');
     await page.locator('[data-step-tile="0"]').click();
     await page.locator('[data-step="0"] [data-move="1"]').click();
@@ -210,7 +210,7 @@ test('deletion uses step identity after a reorder and consumes auto-repeat', asy
 });
 
 test('Delete and Backspace keep editing text, delay, raw payload and the title', async ({page}) => {
-    await openControls(page, 'macros', {macroSlot: 'VIA_MACRO_17'});
+    await openControls(page, 'macros', {macroSlot: 'VIA_MACRO_17', macroEmptyOpen: true});
     await writePayload(page, 'hello{120}{KC_C}');
     await page.locator('[data-step-tile="0"]').click();
     const text = page.locator('[data-step-text="0"]');
@@ -231,7 +231,7 @@ test('Delete and Backspace keep editing text, delay, raw payload and the title',
 });
 
 test('read-only macro tiles cannot be deleted', async ({page}) => {
-    await openControls(page, 'macros', {macroSlot: 'VIA_MACRO_17'});
+    await openControls(page, 'macros', {macroSlot: 'VIA_MACRO_17', macroEmptyOpen: true});
     await writePayload(page, '{KC_A}{KC_C}');
     await page.evaluate(async () => {
         const store = await import('/webview/store.mjs'), model = store.getModel();
@@ -244,10 +244,10 @@ test('read-only macro tiles cannot be deleted', async ({page}) => {
 });
 
 for (const theme of ['vscode-dark', 'vscode-light']) {
-    test(`Raw payload is a persistent toggle on the right of the add row; tile focus has no extra outline (${theme})`, async ({page}) => {
+    test(`Raw payload is a persistent pressed toggle on the right of the add row; tile focus has no extra outline (${theme})`, async ({page}) => {
         await page.setViewportSize({width: 1400, height: 1000});
-        await openControls(page, 'macros', {macroSlot: 'VIA_MACRO_17'}, theme);
-        const toggle = page.getByRole('checkbox', {name: 'Raw payload', exact: true});
+        await openControls(page, 'macros', {macroSlot: 'VIA_MACRO_17', macroEmptyOpen: true}, theme);
+        const toggle = page.getByRole('button', {name: 'Raw payload', exact: true});
         const positions = await page.locator('.macro-insert-tools').evaluate(row => {
             const add = row.querySelector('[data-insert-kind="text"]').getBoundingClientRect();
             const raw = row.querySelector('.macro-raw-toggle').getBoundingClientRect();
@@ -255,21 +255,21 @@ for (const theme of ['vscode-dark', 'vscode-light']) {
         });
         expect(Math.abs(positions.addY - positions.rawY)).toBeLessThan(1);
         expect(positions.rightGap).toBeLessThan(1);
-        await expect(toggle).not.toBeChecked();
+        await expect(toggle).toHaveAttribute('aria-pressed', 'false');
         await expect(page.locator('[data-raw-payload]')).toBeHidden();
         await writePayload(page, '{KC_A}{KC_C}');
         await page.locator('[data-step-tile="0"]').click();
         await page.locator('[data-step="0"] [data-move="1"]').click();
-        await expect(toggle).toBeChecked();
+        await expect(toggle).toHaveAttribute('aria-pressed', 'true');
         await expect(page.locator('[data-raw-payload]')).toBeVisible();
         const tile = page.locator('[data-step-tile="1"]');
         await expect(tile).toBeFocused();
         expect(await tile.evaluate(node => getComputedStyle(node).outlineStyle)).toBe('none');
         await expect(tile).toHaveAttribute('aria-pressed', 'true');
-        await toggle.uncheck();
+        await toggle.click();
         await expect(page.locator('[data-raw-payload]')).toBeHidden();
         await page.locator('[data-step="1"] [data-close-step]').click();
-        await expect(toggle).not.toBeChecked();
+        await expect(toggle).toHaveAttribute('aria-pressed', 'false');
         await expect(page.locator('[data-raw-payload]')).toBeHidden();
     });
 }

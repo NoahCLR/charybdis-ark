@@ -3,10 +3,10 @@
 /** @typedef {import("../../../contracts/panel.js").MacroSlot} MacroSlot */
 /** @typedef {import("../../view/types.js").MacroStep} MacroStep */
 import {el, esc} from "../../lib/dom.mjs";
-import {unreleased} from "../../view/macro.mjs";
+import {samePayload, unreleased} from "../../view/macro.mjs";
 import {readMacro} from "../../view/macro-cache.mjs";
 import {actionLabel} from "../../view/keyface.mjs";
-import {canEdit as canEditArea, getModel, macroForm, post, setMacroForm, state} from "../../store.mjs";
+import {canEdit as canEditArea, getModel, macroForm, post, render, setMacroForm, state} from "../../store.mjs";
 import * as edits from "../../view/edits.mjs";
 // Input remains local until the host has inspected this exact payload under
 // the current draft. A late reply can never stage a newer or discarded edit.
@@ -79,25 +79,30 @@ function refreshFeedback(keycode) {
     if (card && slot) paintFeedback(card, getModel(), slot);
 }
 
+// What the editor says under the sequence. A local edit (one not yet in the
+// draft) shows "Checking…" until the host has inspected it, or the reason it
+// cannot be kept. A stored macro (the draft's own) that cannot play says so,
+// with the way to Settings → Your computer, where most such problems are fixed.
 /** @param {HTMLElement} card @param {Model} model @param {MacroSlot} slot */
 export function paintFeedback(card, model, slot) {
-    const form = macroForm(slot.keycode), local = form.draft !== undefined;
+    const form = macroForm(slot.keycode), local = form.draft !== undefined && !samePayload(form.draft, slot.payload, model?.qmkKeycodeAliases);
     const payload = form.draft ?? slot.payload;
     const parsed = readMacro(model, slot.keycode, payload, "feedback");
     const held = unreleased(parsed.steps, model?.qmkKeycodeAliases);
     /** @type {import("../../../contracts/messages.js").MacroValidation | null | undefined} */
     const inspection = matchingValidation(form, model, slot) ? form.validation?.validation : null;
     const error = form.stepError || parsed.error || (held.length ? `Release ${held.map(key => actionLabel(model, key)).join(", ")} before the macro ends.` : "") || inspection?.error || (!local && slot.playbackError);
-    const note = error ? (local ? "Fix this edit before it can be kept in your draft." : "Change Settings → Your computer or fix the macro before playing it.") : local && !inspection ? "Checking this edit…" : "";
+    const checking = local && !error && !inspection;
     const feedback = /** @type {HTMLElement} */ (card.querySelector("[data-macro-feedback]"));
-    feedback.hidden = !error && !note;
+    feedback.hidden = !error && !checking;
     feedback.replaceChildren(el(`<div class="stack">
-        ${error ? `<div class="unavailable">${esc(error)} ${local ? "This edit is not staged." : "This stored macro cannot play with the current settings under Settings → Your computer."}</div>` : ""}
-        ${note ? `<p class="note">${esc(note)}</p>` : ""}
+        ${error ? `<div class="unavailable${local ? "" : " stored"}">${local ? `${esc(error)} This edit is not in your draft until it is fixed.`
+            : `<span>This stored macro cannot play: ${esc(error)}</span><span><button class="btn text" data-feedback-settings>Your computer in Settings →</button></span>`}</div>` : ""}
+        ${checking ? `<p class="note">Checking this edit…</p>` : ""}
     </div>`));
-    const dirty = local && payload !== slot.payload;
-    /** @type {HTMLElement} */ (card.querySelector("[data-local-state]")).replaceChildren(el(`<i class="dot ${dirty ? "draft" : "on"}"></i>`), document.createTextNode(dirty ? "edited here" : "as read"));
-    /** @type {HTMLButtonElement} */ (card.querySelector('[data-act="discard"]')).disabled = form.draft === undefined || form.draft === slot.payload;
+    /** @type {HTMLElement | null} */ (feedback.querySelector("[data-feedback-settings]"))?.addEventListener("click", () => { state.screen = "settings"; render(); });
+    const discard = /** @type {HTMLButtonElement | null} */ (card.querySelector('[data-act="discard"]'));
+    if (discard) discard.hidden = !local;
 }
 
 /** @param {Model} model @param {MacroSlot} slot @param {string} payload */

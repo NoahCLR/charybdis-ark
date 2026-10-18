@@ -60,9 +60,9 @@ test("every corner radius is a radius token, a circle or square", () => {
 
 // The controls' heights: 24 chips, 28 compact, 32 default, 36 tabs.
 const CONTROL = /\.btn\b|\.input\b|\bbutton\b|\binput\b|\bselect\b|\[role="tab"\]|\.chip\b|\.layer-tab\b|\.layer-edit\b|\.pk-mod\b|\.slotchip\b|\.value-btn\b|\.tok\b|\.act\b/;
-// The macro recorder's Record button is the one control drawn larger, on
-// purpose (decisions R: macro design A stands).
-const HEIGHT_EXCEPTIONS = [/\[data-act="record"\]/];
+// No control is drawn at a height of its own: Record is an ordinary outlined
+// button at rest (decisions §4), loud only in colour while recording.
+const HEIGHT_EXCEPTIONS = [];
 // Whether a rule sizes a control itself, not something inside one: the
 // subject of one of its selectors (its last compound) is a control.
 const sizesControl = (selector) => selector.split(",").some((part) => CONTROL.test(part.trim().split(/\s*[\s>+~]\s*/).pop() || ""));

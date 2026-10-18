@@ -6,7 +6,7 @@
 import {esc} from "../lib/dom.mjs";
 import {css, isOff} from "../lib/colour.mjs";
 import {FIELDS_SHOWN} from "../view/review.mjs";
-import {layerNameMarked, mark, marked} from "./marks.mjs";
+import {layerNameMarked, macroSteps, mark, marked} from "./marks.mjs";
 import {tierName} from "../view/vocabulary.mjs";
 
 // A colour is shown as the keyboard would light it, beside its value; an
@@ -22,6 +22,8 @@ const swatch = (colour) => colour
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/edits.js").Scalar | null} text @param {string} klass @param {import("../../contracts/edits.js").Colour | null | undefined} colour @param {import("../../contracts/model.js").ReviewMark | null | undefined} marker */
 const value = (model, text, klass, colour, marker) => {
     if (text === null) return "";
+    // A macro's steps read as the editor's tiles, the payload in the tip.
+    if (marker?.kind === "macro") return `<span class="rv-val" data-tip="${esc(text)}"><span class="${klass}">${macroSteps(model, String(text))}</span></span>`;
     const inline = marker?.kind === "layer" ? layerNameMarked(model, marker.layer, String(text)) : "";
     return inline && inline !== esc(String(text))
         ? `<span class="rv-val">${swatch(colour)}<span class="${klass}">${inline}</span></span>`

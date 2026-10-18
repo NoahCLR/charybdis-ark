@@ -4,10 +4,14 @@
 /** @typedef {import("../../view/types.js").MacroStep} MacroStep */
 import {el, esc} from "../../lib/dom.mjs";
 import {readMacro} from "../../view/macro-cache.mjs";
+import {samePayload} from "../../view/macro.mjs";
 import {macroPlacements} from "../../view/reach.mjs";
 import {titleName, attachTitleName} from "../title-name.mjs";
 import {ROUTE_WORDS, setReachGroupOpen} from "../../view/reach-groups.mjs";
 import {getModel, layerName, layers, macroForm, post, render, setMacroForm, state, writable} from "../../store.mjs";
+import {draftDot, draftMarks} from "../../view/review.mjs";
+import {singleShortcut} from "../../view/macro-bank.mjs";
+import {keycodeAside} from "../../view/show-keycodes.mjs";
 import * as edits from "../../view/edits.mjs";
 import {layerSwatch} from "../layerbar.mjs";
 import {vocabulary, word} from "../../view/vocabulary.mjs";
@@ -27,25 +31,30 @@ export function editor(model, slot, canEdit) {
     let steps = focusSteps(slot, form.steps ?? parsed.steps);
     ensureMacroHistory(slot, parsed.error && !form.steps ? undefined : steps);
     const editable = canEdit && !state.recording && (!parsed.error || Boolean(form.steps));
-    const dirty = form.draft !== undefined && payload !== slot.payload;
+    // An edit still local to this screen (typed but not yet in the draft) can
+    // be dropped; once staged, the draft's own undo and Review own it.
+    const local = form.draft !== undefined && !samePayload(form.draft, slot.payload, model.qmkKeycodeAliases);
+    const changed = draftMarks(model.draft?.changes).macros.has(slot.keycode);
     const rawOpen = Boolean(form.rawOpen || (parsed.error && !form.steps));
+    const shortcut = parsed.error ? null : singleShortcut(steps, model.qmkKeycodeAliases);
+    const tagTip = keycodeAside(state, "behaviourTitle", slot.keycode);
     const wrap = el(`<div class="stack"></div>`);
     const card = el(`<div class="card macro-editor-card" data-macro-editor="${esc(slot.keycode)}">
         <div class="card-h name-titlebar macro-titlebar">${nameField(model, slot, canEdit)}
-            <span class="tag">M${esc(slot.keycode.split("_").at(-1))}</span>
-            <span class="right row actions"><span class="chip" data-local-state><i class="dot ${dirty ? "draft" : "on"}"></i>${dirty ? "edited here" : "as read"}</span>
-                <button class="btn tiny ghost" data-act="place" ${writable() ? "" : "disabled"}>Place on a key…</button>
-                <button class="btn tiny ghost" data-act="discard" ${dirty ? "" : "disabled"}>Discard local edits</button>
-                <button class="btn tiny ghost" data-act="clear" ${canEdit && !state.recording ? "" : "disabled"}>Clear macro</button></span></div>
+            ${changed ? draftDot("This macro differs from the keyboard in your draft") : ""}
+            <span class="tag"${tagTip ? ` data-tip="${esc(tagTip)}"` : ""}>M${esc(slot.keycode.split("_").at(-1))}</span>
+            <span class="right row actions">
+                <button class="btn text" data-act="discard" ${local ? "" : "hidden"} data-tip="Put back what the draft holds for this macro.">Discard this edit</button>
+                <button class="btn text destructive" data-act="clear" ${canEdit && !state.recording ? "" : "disabled"}>Clear macro</button></span></div>
         <div class="card-b stack">
-            <div class="macro-context">${placedOn(model, slot)}
+            <div class="macro-context"><span class="eyebrow">Placed on</span>${placedOn(model, slot)}
+                <button class="btn compact" data-act="place" ${writable() ? "" : "disabled"}>Place on a key…</button>
             <label class="macro-protection" data-tip="${esc(PROTECTION_HINT)}"><span>Uninterruptible playback</span><select class="input" data-f="macro:${esc(slot.keycode)}:protection" data-protection ${canEdit ? "" : "disabled"}>
                 ${(model.macroProtectionChoices || []).map(({value, label}) => `<option value="${esc(value)}" ${slot.protection === value ? "selected" : ""}>${esc(label)}${value === "auto" ? ` · ${slot.uninterruptible ? "on" : "off"}` : ""}</option>`).join("")}</select>
                 <span class="note">${esc(PROTECTION_HINT)}</span></label></div>
-            <div class="macro-sequence-heading"><h4>Sequence</h4></div>
             <div class="macro-insert-tools" aria-label="Add a macro step">
                 ${STEP_KINDS.map(([value, label]) => `<button class="btn" data-insert-kind="${value}" data-act="macro-insert:${esc(slot.keycode)}:${value}" ${editable ? "" : "disabled"}>+ ${value === "tap" ? "Key / chord" : value === "press" ? "Press" : label}</button>`).join("")}
-                <label class="sw macro-raw-toggle"><input type="checkbox" data-f="macro:${esc(slot.keycode)}:raw-toggle" data-raw-toggle aria-controls="macro-raw-${esc(slot.keycode)}" ${rawOpen ? "checked" : ""}><span class="track"></span><span>Raw payload</span></label>
+                <button class="btn toggle compact macro-raw-toggle" data-raw-toggle aria-pressed="${rawOpen}" aria-controls="macro-raw-${esc(slot.keycode)}">Raw payload</button>
             </div>
             <details class="macro-raw" id="macro-raw-${esc(slot.keycode)}" data-raw ${rawOpen ? "open" : ""}>
                 <summary hidden>Raw payload</summary>
@@ -54,12 +63,13 @@ export function editor(model, slot, canEdit) {
             </details>
             <div data-macro-steps class="stack"></div>
             <div data-macro-feedback role="status" aria-live="polite"></div>
+            ${shortcut ? `<p class="note macro-shortcut-offer" data-shortcut-offer>This macro is one shortcut. A custom key sends it too, held as long as you hold the key, and uses no macro memory. <button class="btn text" data-act="custom-keys">Custom keys →</button></p>` : ""}
             <div class="stack macro-footer">
-            <div class="macro-utilities"><button class="btn tiny ghost" data-host-settings>${esc(model.macroUnicode?.layoutName || "Your computer")} · Your computer settings →</button>
-                <button class="btn tiny ghost macro-help-link" data-show-help aria-controls="macro-help-${esc(slot.keycode)}" aria-expanded="${Boolean(form.guidanceOpen)}">Typing & playback help</button>
+            <div class="macro-utilities"><button class="btn text" data-host-settings>${esc(model.macroUnicode?.layoutName || "Your computer")} · Your computer in Settings →</button>
+                <button class="btn text macro-help-link" data-show-help aria-controls="macro-help-${esc(slot.keycode)}" aria-expanded="${Boolean(form.guidanceOpen)}">Typing & playback help</button>
             </div>
             <details class="macro-guidance" id="macro-help-${esc(slot.keycode)}" data-guidance ${form.guidanceOpen ? "open" : ""}>
-                <summary>Typing & playback help</summary>${unicodeSetup(model, slot)}
+                <summary hidden>Typing & playback help</summary>${unicodeSetup(model, slot)}
                 <p class="note">Automatic turns protection on when this layout needs Unicode entry. Protected playback starts immediately and suspends ordinary keys already held. Only the macro types; new presses are ignored and releases still work. Held modifiers resume afterward. Suspended ordinary keys need to be released and pressed again; ignored presses are never replayed. Pointing and other keyboards can still interfere.</p>
             </details>
             </div>
@@ -70,6 +80,7 @@ export function editor(model, slot, canEdit) {
         if (/** @type {HTMLElement | null} */ (/** @type {Element} */ (event.target).closest('[data-act="discard"], [data-act="clear"]'))) setMacroForm(slot.keycode, {cancelBlur: true});
     });
     /** @type {HTMLElement | null} */ (card.querySelector("[data-host-settings]"))?.addEventListener("click", () => { state.screen = "settings"; render(); });
+    /** @type {HTMLElement | null} */ (card.querySelector('[data-act="custom-keys"]'))?.addEventListener("click", () => { state.screen = "customKeys"; render(); });
     /** @type {HTMLSelectElement} */ (card.querySelector("[data-protection]")).addEventListener("change", event => post(edits.macroProtectionMessage(slot.keycode, /** @type {"auto" | "on" | "off"} */ (/** @type {HTMLSelectElement} */ (event.target).value), model.macroEditing.identity)));
     if (model.macroNameSpace) attachTitleName(card, {stored: slot.name || "", perName: model.macroNameSpace.perName,
         rename: name => post(edits.macroNameMessage(slot.keycode, name, getModel()?.macroEditing?.identity))});
@@ -99,14 +110,15 @@ export function editor(model, slot, canEdit) {
     });
     raw.addEventListener("change", () => {finishMacroHistoryGroup(slot); inspectEdit(slot, true);});
     const rawPanel = /** @type {HTMLDetailsElement} */ (card.querySelector("[data-raw]"));
-    const rawToggle = /** @type {HTMLInputElement} */ (card.querySelector("[data-raw-toggle]"));
-    rawToggle.addEventListener("change", () => {
-        rawPanel.open = rawToggle.checked;
+    const rawToggle = /** @type {HTMLButtonElement} */ (card.querySelector("[data-raw-toggle]"));
+    rawToggle.addEventListener("click", () => {
+        rawPanel.open = !rawPanel.open;
+        rawToggle.setAttribute("aria-pressed", String(rawPanel.open));
         setMacroForm(slot.keycode, {rawOpen: rawPanel.open});
     });
     rawPanel.addEventListener("toggle", () => {
         if (!rawPanel.isConnected) return;
-        rawToggle.checked = rawPanel.open;
+        rawToggle.setAttribute("aria-pressed", String(rawPanel.open));
         setMacroForm(slot.keycode, {rawOpen: rawPanel.open});
     });
     /** @type {HTMLButtonElement} */ (card.querySelector('[data-act="discard"]')).addEventListener("click", () => {
@@ -157,7 +169,7 @@ function placedOn(model, slot) {
             <span>${esc(layerName(layer))}</span><span class="idx">${esc(how)}</span></button>`;
     }).join("");
     return chips ? `<div class="row layer-chips" aria-label="Used on layers">${chips}</div>`
-        : `<span class="note" data-tip="No key, behaviour or combo sets this macro off. Place it on a key to use it.">Not placed yet</span>`;
+        : `<span class="note" data-tip="No key, behaviour or combo sets this macro off. Place it on a key to use it.">Not on a key yet</span>`;
 }
 
 /** @param {string} keycode @param {number} at */

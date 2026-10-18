@@ -14,7 +14,9 @@ A repeated element sits in the same place every time it appears, so a screen
 reads as a grid rather than as text that wraps wherever it lands.
 Review and Draft history reserve separate positions for tap-count badges and
 tier dots, including when either is absent; title slots fit a full combo badge
-with space before its name.
+with space before its name. A macro's Steps field carries a `{kind: "macro"}`
+mark, and `ui/review-items.mjs` draws its value as `macroSteps` chips with the
+payload in the value's tooltip.
 The Keys workbench tabs count what the selected layer stores. The Key tab counts
 mapped keys, excluding transparent and disabled positions; its selected key's
 layout index, matrix position, LED index and stored keycode belong in the key
@@ -94,8 +96,9 @@ The same kind of control looks and sits the same on every screen.
   actions that change something and never repeats the dismissal.
 - An editor's own actions sit at the right of its title bar as small text
   buttons (`btn tiny ghost`), a destructive one last: a behaviour, a pointing
-  mode, a macro (Place on a key…, Discard local edits, Clear macro), a custom
-  key. A button that takes you to another screen (Place on a layer…, Edit in
+  mode, a macro (Discard this edit while an edit is local, Clear macro), a
+  custom key. Place on a key… is an outlined compact button in the macro's and
+  custom key's **Placed on** row. A button that takes you to another screen (Place on a layer…, Edit in
   Lighting, Show on the Keys screen, Edit groups) is the same small text button.
 - A macro and a custom key are named by their editor's title, the shared
   `titleName` in `ui/title-name.mjs`: the title is the only name field, Enter
@@ -111,12 +114,27 @@ The same kind of control looks and sits the same on every screen.
   fit the key (`legendFits` in `view/picker-board.mjs`).
 - Card and section names are sentence case, as the rail and the review name
   them. A settings card shows its setting count, including a card of one.
-- A slot bank (Macros, Custom keys) heads its card with its name and count,
-  then its search across the column. Its tiles sit three across in a 340 px
-  column and scroll inside the card, which stays in view beside the editor;
-  `lib/scroll.mjs` keeps the bank's position across same-screen renders. A
-  narrower window shows two across, and below 720 px the bank stacks above
-  the editor.
+- A slot bank (Macros, Custom keys) heads its card with its name and "N in
+  use", then its **+ New …** button (the first free slot; a view change that
+  posts nothing) and its search across the column. Slots in use, and the open
+  one, show; the rest fold behind "Show N empty" (`view/macro-bank.mjs`
+  `macroBankList`, `view/custom-key.mjs` `customKeyBankList`), and a search
+  shows every slot it finds. Its tiles sit three across in a 320 px
+  (`--list`) column beside an editor of at most `--editor-max`; `.bank-scroll`
+  scrolls inside the card, which stays in view beside the editor, and
+  `lib/scroll.mjs` keeps its position across same-screen renders. A narrower
+  window shows two across, and below 720 px the bank stacks above the editor.
+  A macro's memory is one line under the bank (`macroMemoryLine`), with Ark's
+  reserve sentence only when a slot is out of room or use passes 80%. A stored
+  macro that cannot play keeps its name on its tile with a red mark and the
+  reason in its tip (`macroProblem`).
+- A custom key's editor is one card: title and K5, the draft mark, **Placed
+  on** with Place on a key…, **Sends** as a `.value-btn` keycap
+  (`shortcutGlyphs`: ⌃⌥⇧⌘ on macOS, words joined by + elsewhere) that opens
+  the picker, Clear, and one sentence from `customKeyDoes`. **Taps and holds**
+  is one line with Add taps and holds… (view state `customKeyAddBehaviour`,
+  posting nothing) until the key has a behaviour; then the shared behaviour
+  editor shows with its own title hidden (`.custom-key-behaviour .beh-title`).
 - A list beside its editor (Lighting's layers and trackball modes) scrolls on
   its own past eight rows, `.rowlist.many`, with its heading kept in view. Its
   `data-scroll-list` key lets `lib/scroll.mjs` keep each list's position across
@@ -490,13 +508,21 @@ recompute their target from the actual drop coordinates, not a stale hover marke
 leaving the sequence clears the marker. Read-only and recording sequences
 do not offer dragging. The name, protection, placement, recorder, clear/discard,
 raw input, shared bank-memory feedback and draft history paths remain available.
-The sequence leads the editor; lengthy typing/protection guidance is a separate
-disclosure in the footer below the recorder, beside Host settings. Add-step controls use
-bordered 36 px buttons; Discard local edits and Clear macro are title-bar text
-buttons. Record/Stop uses a 42 px button with the same dimensions in either
-state, and the Record heading takes the Sequence heading's style. Raw payload has a persistent
-checkbox toggle at the right of the add-step row; its panel opens above the
-sequence, including automatically for an unparseable payload. Protection and all
+The title bar holds the name, the amber draft mark when the slot differs from
+the keyboard (the draft's review marks, as the bank tile), the M5 tag, then
+Discard this edit (shown only while `form.draft` differs from `slot.payload`
+by `samePayload`, which reads key names through the catalogue's aliases) and
+Clear macro, last. There is no local-state chip. Placement and protection
+share the **Placed on** row. Lengthy typing/protection guidance is a separate
+disclosure in the footer below the recorder, beside Your computer in Settings.
+Add-step controls use bordered 36 px buttons. Record is an outlined default
+button; while recording it is `aria-pressed`, red, reads "Recording · Stop
+(Esc)", and `steps.mjs` ends the sequence with a listening tile (not a step,
+not a drop target). Raw payload is a pressed toggle (`.btn.toggle`,
+`aria-pressed`) at the right of the add-step row; its panel opens above the
+sequence, including automatically for an unparseable payload. A macro that is
+one chord of modifiers and one key (`singleShortcut`) shows one line offering
+a custom key, with a link to Custom keys; converting it is not automated. Protection and all
 recorder settings stay visible. The macro bank has its own scroll area, as
 every slot bank does (Shared controls), so a slot change does not require
 scrolling past the editor. The shared scroll path
@@ -511,7 +537,9 @@ still judges the complete payload and prevents invalid, unsupported or oversized
 edits from replacing the last valid draft. Local step diagnostics do not replace
 the firmware decoder or the host's validation authority. Routine per-macro memory
 and successful-staging notes are omitted; the feedback area collapses when there
-is no error or pending inspection. Shared bank memory remains visible.
+is no error or pending inspection. "Checking this edit…" and a local error show
+only while the edit is local; a stored macro's playback error says "This stored
+macro cannot play" with a button to Settings → Your computer. Shared bank memory remains visible.
 
 `recorder.mjs` owns capture listeners and finishes a take when its slot is no
 longer the editable, visible Macros slot, a dialog opens, or the user clicks
@@ -525,7 +553,12 @@ captured held keys before validation. Outside clicks keep their intended action,
 including native disclosure toggles, before the editor redraws.
 
 `view/macro-recording.mjs` owns captured-event normalization and macro encoding,
-without DOM or host access. The recorder defaults to taps and chords, with no
+without DOM or host access, and `recordedKeycode`, the map from a browser key
+code to the macro keycode it records as: every key the macro format accepts
+(navigation, Caps Lock, numpad, IntlBackslash, Print Screen, Menu, F1–F24,
+volume). The recorder prevents the default action of every key it captures; a
+key with no macro keycode is prevented too and named under the recorder as not
+recorded, never folded into a delay. The recorder defaults to taps and chords, with no
 capture-style selector. All recorder settings are visible, including **Preserve
 hold timing**, off by default and disabled during a take. The boolean preference
 survives renders and draft changes. Enabling the preference

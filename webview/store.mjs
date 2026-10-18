@@ -90,8 +90,11 @@ export const STATE_FIELDS = {
     feedbackRow: kept("hold"),
     macroSlot: kept(null),
     macroSearch: kept(""),
+    macroEmptyOpen: kept(false), // the Macros list's "Show N empty" fold
     customKey: kept(null),
     customKeySearch: kept(""),
+    customKeyEmptyOpen: kept(false), // the Custom keys list's "Show N empty" fold
+    customKeyAddBehaviour: kept(null), // the custom key whose "Add taps and holds…" was pressed, opening its empty grid
     // keycode → one macro slot's local steps, raw input and validation. A take
     // being recorded is typing in progress, not a stale form: its slot keeps
     // the text it is building on.

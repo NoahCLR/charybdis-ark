@@ -173,7 +173,9 @@ export type ReviewMark =
     | {kind: 'tier'; tier: string; branch?: number}
     | {kind: 'branch'; count: number}
     | {kind: 'combo'; badge?: string}
-    | {kind: 'stage'; on: boolean};
+    | {kind: 'stage'; on: boolean}
+    /** A macro's steps: the value is its payload, drawn as step chips. */
+    | {kind: 'macro'};
 export interface ReviewField {
     label: string;
     status?: ReviewChange['status'];
