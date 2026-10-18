@@ -60,6 +60,8 @@ export interface ApplyView {
     detail: string;
     bytes: {completed: number; total: number} | null;
     failure: ApplyFailure | null;
+    /** The keyboard waits for every key to be let go (and locked layers or modes off) before it saves. */
+    waiting: boolean;
 }
 
 export type WordList<T = Scalar> = readonly (readonly [T, string])[];

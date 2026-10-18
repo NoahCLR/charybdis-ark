@@ -83,3 +83,84 @@ test("Backups: a copy saved before Apply can be used as a draft or deleted, and 
     await sheet.locator('[data-act="cancel"]').click();
     await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([expect.objectContaining({type: "cancelPortableReview"})]);
 });
+
+// The Apply moment, drawn from the model the host would publish.
+async function withApply(page, patch) {
+    await page.goto("/preview/index.html?host=web");
+    await expect(page.locator('[data-screen="keys"]')).toBeEnabled();
+    await page.evaluate(async (patch) => {
+        const store = await import("/webview/store.mjs");
+        const model = structuredClone(store.getModel());
+        const steps = ["check", "backup", "upload", "validate", "stage", "peer", "commit", "converge", "local", "verify"];
+        const at = steps.indexOf(patch.at || "peer");
+        const state = patch.state || "applying";
+        model.apply = {id: 7, state, current: steps[at], detail: patch.detail || "", bytes: null, waiting: Boolean(patch.waiting),
+            failure: state === "failed" ? {step: steps[at], label: steps[at], reason: "The keyboard stopped answering.", saved: patch.saved} : null,
+            steps: steps.map((id, index) => ({id, label: id, state: index < at ? "done" : index === at ? (state === "failed" ? "failed" : "active") : "pending"}))};
+        model.draft.busy = state !== "failed";
+        if (patch.apply === null) model.apply = null;
+        Object.assign(model.draft, patch.draft || {});
+        Object.assign(model.portable, patch.portable || {});
+        Object.assign(store.state, patch.store || {});
+        store.setModel(model); store.render();
+        window.__posted.length = 0;
+    }, patch);
+}
+
+test("Apply: three steps with the ten in Details, and the wait for a quiet keyboard as the headline", async ({page}) => {
+    await withApply(page, {at: "stage"});
+    const bar = page.locator(".commit.ap");
+    await expect(bar.locator(".ap-user-steps li")).toHaveText(["Save a copy", "Write both halves", "Switch over"].map((word) => new RegExp(word)));
+    await expect(bar.locator(".ap-user-steps li.active")).toContainText("Write both halves");
+    await expect(bar.locator(".ap-more .ap-steps li")).toHaveCount(10);
+    await expect(bar.locator(".ap-more .ap-steps")).toBeHidden();
+    await withApply(page, {at: "peer", waiting: true});
+    await expect(page.locator(".commit.ap.waiting [data-countdown]")).toHaveText(/^Let go of every key to finish · (60|59) s$/);
+    await expect(page.locator(".unavailable")).toHaveCount(0);
+});
+
+test("Apply: each failure says what was saved, never Restore, and a decided save is read again by itself", async ({page}) => {
+    for (const [saved, words] of [["none", "Nothing was saved"], ["decided", "finishes this save by itself"], ["unknown", "can't tell what was saved"]]) {
+        await withApply(page, {state: "failed", at: saved === "none" ? "upload" : "converge", saved});
+        await expect(page.locator(".commit.failed .ap-head")).toContainText(words);
+        await expect(page.locator(".commit.failed")).not.toContainText(/restore|part of it/i);
+    }
+    await expect(page.locator(".commit.failed")).not.toContainText("Reading the keyboard again");
+    await withApply(page, {state: "failed", at: "converge", saved: "decided"});
+    await expect(page.locator(".commit.failed")).toContainText("Reading the keyboard again in 15 s.");
+});
+
+test("Apply: success stays with Put back what it had, which posts its control", async ({page}) => {
+    await withApply(page, {apply: null, store: {applied: 7, appliedDismissed: 0}, draft: {dirty: false, busy: false, stale: false, changes: []}, portable: {putBack: "2026-10-18T07:12:00Z"}});
+    const bar = page.locator(".commit.done");
+    await expect(bar).toContainText("✓ Saved to both halves");
+    await bar.locator('[data-act="put-back"]').click();
+    await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([expect.objectContaining({type: "putBackProfile"})]);
+});
+
+test("a stale draft names what changed on the keyboard and offers Update draft", async ({page}) => {
+    await withApply(page, {apply: null, draft: {busy: false, stale: true, connectionChanged: false, keyboardChanged: ["Ball speed: Normal 400 → 600"]}});
+    const bar = page.locator(".commit.stale");
+    await expect(bar).toContainText("Changed on the keyboard: Ball speed: Normal 400 → 600");
+    await expect(bar).toContainText(/your 1 change is kept|your \d+ changes are kept/);
+    await bar.locator('[data-act="rebase"]').click();
+    await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([expect.objectContaining({type: "rebaseProfileDraft"})]);
+});
+
+test("the review's Apply note is neutral and true, and its footer says where the draft goes", async ({page}) => {
+    await page.goto("/preview/index.html?host=web");
+    await expect(page.locator('[data-screen="keys"]')).toBeEnabled();
+    await page.evaluate(async () => {
+        const store = await import("/webview/store.mjs");
+        const model = structuredClone(store.getModel());
+        model.draft.dirty = true; model.draft.changes = [{area: "Settings", unit: "settings", title: "Tap & hold timing", status: "changed", group: 1, fields: []}];
+        model.draft.checks = [];
+        model.device.health.halves = "agree";
+        store.setModel(model); store.state.overlay = "review"; store.render();
+    });
+    const note = page.locator(".rv-apply-note .callout");
+    await expect(note).not.toHaveClass(/warn/);
+    await expect(note).toContainText("Apply first saves a copy of what the keyboard has now.");
+    await expect(note).not.toContainText("restores");
+    await expect(page.locator(".sheet-f .rv-target")).toHaveText(/^To .+ · both halves connected$/);
+});

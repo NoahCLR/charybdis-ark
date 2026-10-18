@@ -13,6 +13,7 @@ import {isScreenId, screenGroups} from "../view/screens.mjs";
 import {buildLine, chooseKeyboard, forgetKeyboard, commitUrl, githubMark, hostOf, themeLabel} from "../view/host.mjs";
 import {boardOutlineMarkup} from "../view/geometry.mjs";
 import {demoOf} from "../view/demo.mjs";
+import {REREAD_SECONDS, SUCCESS, WAIT_DETAIL, staleWords, userSteps, verdict, waitHeadline, waitLeft} from "../view/apply.mjs";
 import {openHistory} from "./history.mjs";
 
 // The review opens at once; the host marks it reviewed when it answers.
@@ -197,6 +198,16 @@ function applySteps(apply) {
     return `<ol class="ap-steps">${rows}</ol>`;
 }
 
+// The wait's headline counts down each second without redrawing the bar.
+/** @param {HTMLElement} node @param {{id: number, since: number}} wait */
+function countdown(node, wait) {
+    const timer = setInterval(() => {
+        const text = node.querySelector("[data-countdown]");
+        if (!node.isConnected || !text) { clearInterval(timer); return; }
+        text.textContent = waitHeadline(waitLeft(wait.since, Date.now()));
+    }, 1000);
+}
+
 // The host republishes the panel for every read page. Start each replacement
 // at the same document-time phase so the spinner keeps rotating smoothly.
 function spinner() {
@@ -204,11 +215,18 @@ function spinner() {
     return `<span class="spin" aria-hidden="true" style="animation-delay:-${Math.round(time % 800)}ms"></span>`;
 }
 
-/** @type {Readonly<Record<string, string>>} */
-const SAVED_VERDICT = {
-    none: "Nothing was saved. The keyboard kept the profile it had.",
-    unknown: "The keyboard may have saved part of it. Read the keyboard to see what it runs now.",
-};
+// The three steps a person follows, the running one with what it is doing
+// and how many bytes are through; the keyboard's ten wait in Details.
+/** @param {import("../../contracts/model.js").ApplyView} apply @param {boolean} [open] */
+function userStepRow(apply, open = false) {
+    const steps = userSteps(apply).map((step) => `<li class="${step.state}"><span class="mark">${step.state === "active" ? spinner() : step.state === "done" ? "✓" : ""}</span>
+        <span class="lbl">${esc(step.label)}</span></li>`).join("");
+    const counted = apply.bytes ? `<span class="ap-bar"><i style="width:${Math.round((apply.bytes.completed / apply.bytes.total) * 100)}%"></i></span>
+        <span class="ap-bytes" style="min-width:${`${apply.bytes.total} / ${apply.bytes.total} bytes`.length}ch">${apply.bytes.completed} / ${apply.bytes.total} bytes</span>` : "";
+    return `<ol class="ap-user-steps">${steps}</ol>
+        ${apply.state === "applying" && (apply.detail || counted) ? `<span class="ap-detail"><span class="ap-text" title="${esc(apply.detail)}">${esc(apply.detail)}</span>${counted}</span>` : ""}
+        <details class="ap-more" ${open ? "open" : ""}><summary class="btn text">Details</summary>${applySteps(apply)}</details>`;
+}
 
 export function commitBar() {
     const model = getModel();
@@ -217,36 +235,72 @@ export function commitBar() {
     if (!draft) return null;
 
     if (draft.busy && apply?.state === "applying") {
-        const index = apply.steps.findIndex((step) => step.state === "active");
-        return el(`<div class="commit applying ap">
-            <div class="ap-head"><strong>Applying to the keyboard</strong>
-                <span class="muted">step ${index + 1} of ${apply.steps.length}</span></div>
-            ${applySteps(apply)}
-            <div class="note">The keyboard keeps running its saved profile until both halves confirm.</div></div>`);
+        state.applied = apply.id;
+        // The keyboard waits for a quiet keyboard before it decides: that is
+        // the one thing to do, so it is the headline, with the time left.
+        if (apply.waiting && state.applyWait?.id !== apply.id) state.applyWait = {id: apply.id, since: Date.now()};
+        const waiting = apply.waiting && state.applyWait?.id === apply.id;
+        const name = model?.keyboardName?.name || model?.device?.label || "the keyboard";
+        const node = el(`<div class="commit applying ap${waiting ? " waiting" : ""}" role="status" aria-live="polite">
+            <div class="ap-head">${waiting ? `<strong data-countdown>${esc(waitHeadline(waitLeft(state.applyWait?.since ?? Date.now(), Date.now())))}</strong>`
+                : `<strong>Applying to ${esc(name)}</strong>`}</div>
+            ${waiting ? `<p class="ap-saved">${esc(WAIT_DETAIL)}</p>` : ""}
+            ${userStepRow(apply)}</div>`);
+        if (waiting) countdown(node, /** @type {{id: number, since: number}} */ (state.applyWait));
+        return node;
     }
     if (draft.busy && apply?.state === "done") {
+        state.applied = apply.id;
         return el(`<div class="commit applying readback" role="status" aria-live="polite">
             ${spinner()}<strong>Applied — reading back the keyboard</strong>
             <span class="readback-detail">${esc(postApplyReadText(model.postApplyRead))}</span>
             <span class="readback-note">Editing resumes when this read finishes.</span></div>`);
     }
-    // A failed Apply stays on screen until it is dismissed, so where it
-    // stopped and why can be read after the fact.
+    // A failed Apply stays on screen until it is dismissed, so what was saved
+    // and why it stopped can be read after the fact.
     if (!draft.busy && apply?.state === "failed" && state.applyDismissed !== apply.id) {
-        const node = el(`<div class="commit ap failed">
-            <div class="ap-head"><i class="dot err"></i><strong>Apply stopped at: ${esc(apply.failure?.label)}</strong></div>
-            <p class="ap-reason">${esc(apply.failure?.reason)}</p>
-            <p class="ap-saved">${esc(SAVED_VERDICT[apply.failure?.saved ?? ""] || SAVED_VERDICT.unknown)}</p>
-            ${applySteps(apply)}
-            <div class="ap-actions"><button class="btn ghost tiny" data-act="dismiss">Dismiss</button>
-                <button class="btn tiny" data-act="read">Read keyboard</button></div></div>`);
+        const said = verdict(apply.failure?.saved);
+        const decided = apply.failure?.saved === "decided";
+        const stopped = userSteps(apply).find((step) => step.state === "failed");
+        const node = el(`<div class="commit ap failed" role="alert">
+            <div class="ap-head"><i class="dot err"></i><strong>Apply stopped · ${esc(said.title)}</strong></div>
+            <p class="ap-saved">${esc(said.words)}</p>
+            <p class="ap-reason">${stopped ? `${esc(stopped.label)}: ` : ""}${esc(apply.failure?.reason)}</p>
+            ${userStepRow(apply)}
+            <div class="ap-actions">${decided ? `<span class="note">Reading the keyboard again in ${REREAD_SECONDS} s.</span>` : ""}
+                <button class="btn ghost compact" data-act="dismiss">Dismiss</button>
+                <button class="btn compact" data-act="read">Read keyboard</button></div></div>`);
         /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="dismiss"]')).addEventListener("click", () => {
             state.applyDismissed = apply.id;
             render();
         });
         /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="read"]')).addEventListener("click", () => post(controls.control("refresh")));
+        // The keyboard finishes by itself; read it again once it has.
+        if (decided && state.applyReread !== apply.id) {
+            state.applyReread = apply.id;
+            setTimeout(() => { if (getModel()?.apply?.id === apply.id) post(controls.control("refresh")); }, REREAD_SECONDS * 1000);
+        }
         return node;
     }
+    // Saved: said where the eye is, with the way back, until dismissed or
+    // the next edit.
+    if (!draft.busy && !draft.dirty && !draft.stale && draft.matching && state.applied && state.appliedDismissed !== state.applied && !apply) {
+        const node = el(`<div class="commit done" role="status">
+            <span class="n"><strong>${esc(SUCCESS)}</strong></span>
+            ${model?.portable?.putBack ? `<button class="btn text" data-act="put-back"
+                data-tip="Make what the keyboard had before this Apply your draft, to review and apply. Undo takes it back.">Put back what it had</button>` : ""}
+            <button class="btn text icon" data-act="dismiss-success" aria-label="Dismiss">✕</button></div>`);
+        /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="put-back"]'))?.addEventListener("click", () => {
+            state.appliedDismissed = state.applied;
+            post(controls.control("putBackProfile"));
+        });
+        /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="dismiss-success"]')).addEventListener("click", () => {
+            state.appliedDismissed = state.applied;
+            render();
+        });
+        return node;
+    }
+    if (draft.dirty && state.applied) state.appliedDismissed = state.applied;
 
     if (draft.busy) {
         const busy = busyText(model?.device?.health?.phase, model);
@@ -266,11 +320,12 @@ export function commitBar() {
         return node;
     }
     if (draft.stale) {
-        const node = el(`<div class="commit draft">
-            <span class="n"><i class="dot draft"></i> <strong>${draft.connectionChanged ? "Keyboard connection changed" : "The keyboard changed"}</strong>
-            <span class="muted">${draft.connectionChanged ? "Review the current keyboard before continuing" : "since this draft began"} — your ${draft.changes.length} change${draft.changes.length === 1 ? "" : "s"} are kept</span></span>
+        const words = staleWords(draft);
+        const node = el(`<div class="commit draft stale">
+            <span class="n"><i class="dot draft"></i> <strong class="stale-title" title="${esc((draft.keyboardChanged || []).join("\n"))}">${esc(words.title)}</strong>
+            <span class="muted">${esc(words.detail)}</span></span>
             <span class="sep"></span>
-            <button class="btn" data-act="rebase">Review against the keyboard</button>
+            <button class="btn primary" data-act="rebase">Update draft</button>
             <button class="btn ghost" data-act="discard">Discard draft</button></div>`);
         /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="rebase"]')).addEventListener("click", () => post(controls.control("rebaseProfileDraft")));
         /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="discard"]')).addEventListener("click", () => post(controls.control("discardProfileDraft")));

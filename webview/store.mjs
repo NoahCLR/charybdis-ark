@@ -82,6 +82,10 @@ export const STATE_FIELDS = {
     pdTaps: resets(null),      // {slot, rows: {"dir:up": tap}}: direction shortcuts set to ignore modifiers before any is chosen
     pdAdvanced: kept(false),  // Advanced open on the pointing editor, whichever slot is shown
     applyDismissed: kept(0),  // the failed Apply (by id) the person closed, so it stays closed
+    applied: kept(0),         // the last Apply (by id) seen to finish, whose success the bar shows until dismissed or the next edit
+    appliedDismissed: kept(0), // that success, closed by hand
+    applyWait: kept(null),    // {id, since}: when this Apply began waiting for every key to be let go
+    applyReread: kept(0),     // the "decided" failure (by id) whose re-read is already scheduled
     pdPreview: kept(false),
     feedbackRow: kept("hold"),
     macroSlot: kept(null),

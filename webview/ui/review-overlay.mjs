@@ -7,6 +7,7 @@ import {discardLabel, groupNote, placeState, reviewBlocks, statusBesideCount, st
 import {reviewColumns, reviewItem} from "./review-items.mjs";
 import {checksSection} from "./checks.mjs";
 import {checkSourceGroup, checksToConfirm, confirmText} from "../view/checks.mjs";
+import {APPLY_NOTE, applyTarget} from "../view/apply.mjs";
 
 export function reviewOverlay() {
     const model = getModel();
@@ -83,8 +84,7 @@ export function reviewOverlay() {
         <div class="sheet-b rv">
             ${checks}
             ${sections}
-            <div class="rv-apply-note"><div class="callout warn">${demo.active ? esc(demo.applyNeedsKeyboard)
-                : "Apply saves the previous profile, writes the changes to both halves, then switches both to them at once. Until then the keyboard keeps running its saved profile; if anything interrupts Apply, the previous profile restores it."}</div></div>
+            <div class="rv-apply-note"><div class="callout">${esc(demo.active ? demo.applyNeedsKeyboard : APPLY_NOTE)}</div></div>
         </div>
         ${demo.active ? `<div class="sheet-f demo-apply"><span class="note"><i class="dot demo"></i> ${esc(DEMO_WORDS.status)}</span>
             <span class="right"><button class="btn primary" data-act="export">Save a backup file…</button></span></div>`
@@ -92,7 +92,7 @@ export function reviewOverlay() {
             <span class="ck-confirm-t"><i class="dot ${hasTrap ? "err" : "warn"}"></i>${esc(confirmText(confirmChecks))}</span>
             <span class="right"><button class="btn" data-act="unconfirm">Go back</button>
                 <button class="btn primary" data-act="apply-anyway" ${canApply ? "" : "disabled"}>Apply anyway</button></span></div>`
-        : `<div class="sheet-f"><span class="note">${esc(model?.device?.label || "")} · ${esc(model?.device?.summary || "")}</span>
+        : `<div class="sheet-f"><span class="note rv-target" data-tip="${esc(model?.device?.summary || "")}">${esc(applyTarget(model))}</span>
             <span class="right"><button class="btn primary" data-act="apply" ${canApply ? "" : "disabled"}
                     ${blockers.length ? `data-tip="${esc("Resolve the blockers in Checks before applying.")}"` : confirmChecks.length ? `data-tip="${esc("Warnings and traps will be asked about before anything is written.")}"` : ""}>Apply to keyboard</button></span></div>`}
     </div></div>`);

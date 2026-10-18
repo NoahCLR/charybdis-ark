@@ -47,6 +47,8 @@ export interface DraftView {
     reason: DraftBlock;
     canUndo: boolean; canRedo: boolean; undoLabel: string | null; redoLabel: string | null; historyLength: number; reviewed: boolean;
     changes: ReviewChange[]; checks: Check[]; steps?: HistoryStep[];
+    /** What changed on the keyboard since the draft began, one line each (stale bar). */
+    keyboardChanged?: string[];
 }
 export interface LedGroup {name: string; id: number; ledIndices: number[]; expression: string; usageCount: number; usages: {target: string; owner: string}[]}
 export interface LedRow {index: number; owner: string; color: Colour; ledGroup: string; ledGroupKind: string; ledIndices: number[]}

@@ -1125,7 +1125,29 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .ap-bar i { display: block; height: 100%; background: var(--text); }
 .ap-text { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ap-bytes { flex: none; white-space: nowrap; text-align: right; font-family: var(--mono); font-size: var(--fs-micro); color: var(--text-3); }
-.ap-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.ap-actions { display: flex; justify-content: flex-end; align-items: center; gap: 8px; }
+.ap-actions > .note { margin-right: auto; }
+/* The three steps a person follows, in a row; the ten in Details. */
+.ap-user-steps { list-style: none; margin: 0; padding: 0; display: flex; gap: 24px; flex-wrap: wrap; }
+.ap-user-steps li { display: flex; align-items: center; gap: 8px; font-size: var(--fs-small); color: var(--text-3); }
+.ap-user-steps .mark { width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--line-3); display: grid; place-items: center; font-size: var(--fs-micro); }
+.ap-user-steps li.done { color: var(--text-2); }
+.ap-user-steps li.done .mark { border-color: var(--text-2); }
+.ap-user-steps li.active { color: var(--text); font-weight: var(--fw-medium); }
+.ap-user-steps li.active .mark { border: 0; }
+.ap-user-steps li.failed { color: var(--danger); font-weight: var(--fw-medium); }
+.ap-user-steps li.failed .mark { border-color: var(--danger); }
+.commit.ap > .ap-detail { grid-column: auto; }
+.ap-more > summary { list-style: none; width: max-content; margin-left: -10px; }
+.ap-more > summary::-webkit-details-marker { display: none; }
+.ap-more[open] > summary { margin-bottom: 6px; }
+/* Waiting for a quiet keyboard: the one thing to do is the headline. */
+.commit.ap.waiting .ap-head strong { font-size: var(--fs-heading); line-height: var(--lh-heading); }
+/* Saved: stays until dismissed or the next edit, with the way back. */
+.commit.done { border-top-color: var(--ok); }
+.commit.done > .btn:first-of-type { margin-left: auto; }
+.commit.stale .stale-title { overflow: hidden; text-overflow: ellipsis; max-width: 560px; }
+.commit.stale .n { min-width: 0; }
 .spin { width: 11px; height: 11px; flex: none; border-radius: 50%; border: 1.5px solid var(--line-3); border-top-color: var(--text); display: inline-block; animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
