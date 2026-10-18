@@ -51,7 +51,7 @@ export function comboBuilder(canEdit, holdTerm) {
                     ${state.combo.inputs.length ? state.combo.inputs.map((input) => `<span class="chip"${shown(input) ? ""
                         : ` data-tip="No key on the board presses this from here, so nothing rings for it. It stays an input unless you remove it."`}>
                         <span class="mono">${keyNameMarked(model, comboInputLabel(model, input), input)}</span>
-                        <button data-remove="${esc(input)}" aria-label="Remove ${esc(comboInputLabel(model, input))} from the inputs">✕</button></span>`).join("")
+                        <button data-remove="${esc(input)}" aria-label="Remove this input">✕</button></span>`).join("")
                         : `<span class="note">no inputs yet</span>`}
                 </div>
                 <div class="row combo-pick">
