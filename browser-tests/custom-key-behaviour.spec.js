@@ -293,3 +293,20 @@ test("Delete on Custom keys clears the open cell of the selected key's behaviour
     await page.locator("body").press("Delete");
     expect(await posted(page)).toEqual([]);
 });
+
+test("a custom key is named by its title, as a macro is: Enter commits, Escape cancels", async ({page}) => {
+    await openControls(page, "customKeys");
+    await pick(page, 3);
+    const title = page.getByRole("textbox", {name: "Custom key name", exact: true});
+    await expect(page.locator(".main [data-name]"), "the title is the only name field").toHaveCount(1);
+    await expect(page.locator(".name-titlebar [data-name]")).toHaveCount(1);
+    await expect(title).toHaveAttribute("placeholder", "Custom key 3");
+    await clearPosts(page);
+    await title.fill("Copy line");
+    await title.press("Enter");
+    await expect.poll(() => posted(page).then(rows => rows.filter(row => row.type === "updateCustomKey").at(-1)?.name)).toBe("Copy line");
+    await clearPosts(page);
+    await title.fill("Cancelled"); await title.press("Escape");
+    await expect(title).toHaveValue("");
+    expect((await posted(page)).filter(row => row.type === "updateCustomKey")).toEqual([]);
+});

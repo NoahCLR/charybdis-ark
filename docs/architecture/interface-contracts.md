@@ -83,12 +83,30 @@ The same kind of control looks and sits the same on every screen.
   `scrollLabel` in `ui/pointing/common.mjs`).
 - Whatever folds is a `<details>` whose summary starts with `DISCLOSURE`
   (`webview/lib/dom.mjs`): one chevron, turned down while open. A closed card
-  summary drops its bottom rule. A card that does not fold has no chevron.
+  summary drops its bottom rule. A card that does not fold has no chevron. The
+  Keys tabs' groups keep their open state in the panel state, so each is a
+  button (`groupHeader` in `ui/groups.mjs`) that starts with the same
+  `DISCLOSURE`, turned down while `aria-expanded`.
 - A sheet (Review, the keycode picker, Draft history) closes with one ghost
   **Close** at the right of its header, and by Escape; its footer holds only
   actions that change something and never repeats the dismissal.
 - An editor's own actions sit at the right of its title bar as small text
-  buttons (`btn tiny ghost`): a behaviour, a pointing mode, a macro, a custom key.
+  buttons (`btn tiny ghost`), a destructive one last: a behaviour, a pointing
+  mode, a macro (Place on a key…, Discard local edits, Clear macro), a custom
+  key. A button that takes you to another screen (Place on a layer…, Edit in
+  Lighting, Show on the Keys screen, Edit groups) is the same small text button.
+- A macro and a custom key are named by their editor's title, the shared
+  `titleName` in `ui/title-name.mjs`: the title is the only name field, Enter
+  commits, Escape restores the stored name, and the byte counter shows on focus
+  or when over the limit.
+- A tap-count badge (`branchBadge` in `ui/marks.mjs`) takes its branch colour as
+  border and fill; the count stays in the text colour, so a dark colour reads.
+- A table's number column (`th.num`, `td.num`) is right-aligned with tabular
+  digits.
+- A status card names its state in a chip with a dot at the right of its title,
+  as Device and Automatic recovery do.
+- The keycode picker draws a key's single legend smaller only when it does not
+  fit the key (`legendFits` in `view/picker-board.mjs`).
 - Card and section names are sentence case, as the rail and the review name
   them. A settings card shows its setting count, including a card of one.
 - A slot bank (Macros, Custom keys) heads its card with its name and count,
@@ -277,9 +295,8 @@ model uses fresh host parsing options. Labels are resolved while rendering.
 Parsed host steps carry no local focus metadata: step identity is assigned to
 copies by the existing focus path, and serialization excludes that identity.
 
-The macro title itself is the sole name field, with the same stable `data-f`
-identity and host-posted name edit. Enter blurs/commits it, Escape restores the
-model's name, and the byte counter appears on focus or when over the limit.
+The macro title itself is the sole name field (`titleName`, Shared controls),
+with the same stable `data-f` identity and host-posted name edit.
 An empty macro has zero editor steps. Direct Text, Key/chord, Delay, Press and
 Release actions replace the step-type selector. Text and Delay focus their
 fields; key actions open the existing basic-key picker before inserting a step,
@@ -340,9 +357,10 @@ leaving the sequence clears the marker. Read-only and recording sequences
 do not offer dragging. The name, protection, placement, recorder, clear/discard,
 raw input, shared bank-memory feedback and draft history paths remain available.
 The sequence leads the editor; lengthy typing/protection guidance is a separate
-disclosure in the footer below the recorder, beside Host settings. Add-step and
-Discard/Clear macro controls use bordered 36 px buttons; Record/Stop uses a
-42 px button with the same dimensions in either state. Raw payload has a persistent
+disclosure in the footer below the recorder, beside Host settings. Add-step controls use
+bordered 36 px buttons; Discard local edits and Clear macro are title-bar text
+buttons. Record/Stop uses a 42 px button with the same dimensions in either
+state, and the Record heading takes the Sequence heading's style. Raw payload has a persistent
 checkbox toggle at the right of the add-step row; its panel opens above the
 sequence, including automatically for an unparseable payload. Protection and all
 recorder settings stay visible. The macro bank has its own scroll area, as

@@ -6,8 +6,8 @@
 // Custom keys: the keyboard's 128 named keys. A key here is its name, its
 // shortcut, which is the key's own action (firmware D-F26), and its behaviour,
 // which works on top. The selected key shows two cards: the key itself (its
-// name, shortcut and where it is placed; each field is one entry in
-// `keyFields`) and what it does, which is the Keys screen's behaviour editor for
+// name as the card's title, as a macro's is, then its shortcut and where it is
+// placed; each field is one entry in `keyFields`) and what it does, which is the Keys screen's behaviour editor for
 // that key, placed or not. A key with no stored behaviour shows the unstored
 // grid with its built-in defaults; the first edit adds the row. This is the
 // only behaviour editor on screen, so the open cell and the timing fields it
@@ -16,7 +16,8 @@
 
 import {el, esc} from "../lib/dom.mjs";
 import {customKeyPlacements} from "../view/reach.mjs";
-import {NAME_MAX_BYTES, NAME_TIP, nameCount} from "../view/names.mjs";
+import {NAME_MAX_BYTES} from "../view/names.mjs";
+import {titleName, attachTitleName} from "./title-name.mjs";
 import {ROUTE_WORDS, setReachGroupOpen} from "../view/reach-groups.mjs";
 import {canEdit as canEditArea, getModel, layerName, layers, post, render, state, writable} from "../store.mjs";
 import * as edits from "../view/edits.mjs";
@@ -94,12 +95,14 @@ export function screenCustomKeys() {
 /** @param {Model} model @param {import("../../contracts/panel.js").CustomKey} key @param {boolean} canEdit */
 function editor(model, key, canEdit) {
     const card = el(`<div class="card">
-        <div class="card-h"><h3>${esc(key.name || `Custom key ${key.slot}`)}</h3>
+        <div class="card-h name-titlebar">${titleName({f: `custom-key:${key.slot}:name`, value: key.name, placeholder: `Custom key ${key.slot}`,
+            label: "Custom key name", perName: (model?.customKeyNameSpace || {perName: NAME_MAX_BYTES}).perName, canEdit})}
             <span class="tag" data-tip="${esc(key.keycode)}">Key ${esc(key.slot)}</span>
             <span class="right row actions">
                 <button class="btn tiny ghost" data-act="place" ${writable() ? "" : "disabled"}>Place on a key…</button></span></div>
-        <div class="card-b stack">${keyFields(model, key, canEdit).join("")}</div></div>`);
-    attachNameField(card, model, key);
+        <div class="card-b stack">${keyFields(model, key).join("")}</div></div>`);
+    attachTitleName(card, {stored: key.name, perName: (model?.customKeyNameSpace || {perName: NAME_MAX_BYTES}).perName,
+        rename: (name) => post(edits.customKeyNameMessage(key.keycode, name, model?.customKeyEditing?.identity))});
     /** @type {HTMLElement} */ (card.querySelector("[data-shortcut]")).replaceWith(shortcutField(model, key, canEdit));
     /** @type {HTMLElement} */ (card.querySelector('[data-act="place"]')).addEventListener("click", () => {
         state.placement = {keycode: key.keycode};
@@ -110,31 +113,11 @@ function editor(model, key, canEdit) {
     return card;
 }
 
-// The key's own fields, in the order the card shows them. The shortcut is a
-// placeholder filled in once the card exists (shortcutField).
-/** @param {Model} model @param {import("../../contracts/panel.js").CustomKey} key @param {boolean} canEdit */
-const keyFields = (model, key, canEdit) => [nameField(model, key, canEdit), `<div data-shortcut></div>`, placedOn(model, key)];
-
-/** @param {Model} model @param {import("../../contracts/panel.js").CustomKey} key @param {boolean} canEdit */
-function nameField(model, key, canEdit) {
-    const count = nameCount(key.name, (model?.customKeyNameSpace || {perName: NAME_MAX_BYTES}).perName);
-    return `<label class="field"><span>Name</span>
-        <input data-f="custom-key:${key.slot}:name" class="input" data-name value="${esc(key.name)}" placeholder="Custom key ${esc(key.slot)}" ${canEdit ? "" : "disabled"}
-            data-tip="${esc(NAME_TIP)}">
-        <span class="note${count.over ? " warn" : ""}" data-name-count>${esc(count.label)}</span></label>`;
-}
-
-/** @param {HTMLElement} card @param {Model} model @param {import("../../contracts/panel.js").CustomKey} key */
-function attachNameField(card, model, key) {
-    const space = model?.customKeyNameSpace || {perName: NAME_MAX_BYTES};
-    const nameInput = /** @type {HTMLInputElement} */ (card.querySelector("[data-name]"));
-    nameInput.addEventListener("input", () => {
-        const now = nameCount(nameInput.value, space.perName), node = /** @type {HTMLElement} */ (card.querySelector("[data-name-count]"));
-        node.textContent = now.label;
-        node.classList.toggle("warn", now.over);
-    });
-    nameInput.addEventListener("change", () => post(edits.customKeyNameMessage(key.keycode, nameInput.value, model?.customKeyEditing?.identity)));
-}
+// The key's own fields, in the order the card shows them; its name is the
+// card's title. The shortcut is a placeholder filled in once the card exists
+// (shortcutField).
+/** @param {Model} model @param {import("../../contracts/panel.js").CustomKey} key */
+const keyFields = (model, key) => [`<div data-shortcut></div>`, placedOn(model, key)];
 
 // What the key does: in words (its shortcut, its behaviour on top, both, or
 // nothing yet), then its behaviour editor, the same one the Keys screen's

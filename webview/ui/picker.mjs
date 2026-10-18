@@ -12,7 +12,7 @@
 import {el, esc} from "../lib/dom.mjs";
 import {getModel, layerName, layers, render, state} from "../store.mjs";
 import {actionMarked} from "./marks.mjs";
-import {PICKER_BOARD, pickerBoardKey} from "../view/picker-board.mjs";
+import {PICKER_BOARD, legendFits, pickerBoardKey} from "../view/picker-board.mjs";
 import {pickerExpression} from "../view/edits.mjs";
 import {modifierPick, pickerModifierProblem} from "../view/keyvalues.mjs";
 import {entriesForPickerSection, pickable, pickerSections} from "../view/picker-sections.mjs";
@@ -138,7 +138,7 @@ function sectionBody(model) {
                     : shifted
                     ? `<text class="pkb-alt" x="${key.x + key.w / 2}" y="${key.y + key.h * 0.36}">${esc(key.labels[1])}</text>
                        <text class="pkb-main" x="${key.x + key.w / 2}" y="${key.y + key.h * 0.74}">${esc(key.labels[0])}</text>`
-                    : `<text class="pkb-main ${key.labels[0].length > 4 ? "sm" : ""}" x="${key.x + key.w / 2}" y="${key.y + key.h / 2 + 5}">${esc(key.labels[0])}</text>`}
+                    : `<text class="pkb-main ${legendFits(key.labels[0], key.w) ? "" : "sm"}" x="${key.x + key.w / 2}" y="${key.y + key.h / 2 + 5}">${esc(key.labels[0])}</text>`}
             </g>`;
         }).join("");
         return `<div class="pk-body"><div class="pkb"><svg viewBox="0 0 ${PICKER_BOARD.width} ${PICKER_BOARD.height}" xmlns="http://www.w3.org/2000/svg">${keys}</svg></div>

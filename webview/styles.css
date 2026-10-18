@@ -656,12 +656,8 @@ button.tier:hover { background: var(--surface-3); }
 }
 .group-h:hover { background: var(--surface-3); color: var(--text-2); }
 .group-h[aria-expanded="true"] { color: var(--text-2); }
-.group-h .chev {
-  display: inline-flex; align-items: center; justify-content: center; flex: none;
-  width: 17px; height: 17px; border: 1px solid var(--line-3); border-radius: 4px;
-  color: var(--text); background: var(--surface-3); font-family: var(--mono);
-  font-size: 14px; font-weight: 600; line-height: 1; letter-spacing: 0;
-}
+.group-h .chev { width: 10px; height: 10px; flex: none; fill: none; stroke: var(--text-3); stroke-width: 1.5; transition: transform .12s ease; }
+.group-h[aria-expanded="true"] .chev { transform: rotate(90deg); }
 .group-h .ttl { flex: 1; min-width: 0; }
 .group-h .n { flex: none; font-family: var(--mono); font-size: 10px; letter-spacing: 0; }
 /* In the behaviour rail the list already carries that surface, so the header
@@ -800,6 +796,8 @@ table.t td.mono { font-family: var(--mono); font-size: 11.5px; }
 table.t td.t-group { padding: 0; }
 table.t.fixed { table-layout: fixed; }
 table.t td.t-act { text-align: right; }
+/* Numbers line up on their last digit. */
+table.t .num { text-align: right; font-variant-numeric: tabular-nums; }
 /* The rail's change count opens the review. */
 .stat.link { background: none; border: 0; padding: 0; font-family: inherit; color: inherit; cursor: pointer; text-align: left; }
 .stat.link:hover { color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
@@ -1042,6 +1040,8 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .hc-branch { display: grid; grid-template-columns: 22px minmax(0,1fr); gap: 8px; align-items: start; }
 .hc-branch + .hc-branch { margin-top: 7px; padding-top: 7px; border-top: 1px dashed var(--line); }
 .hc-n { font-family: var(--mono); font-size: 9.5px; color: var(--text-3); border: 1px solid var(--line); border-radius: 4px; text-align: center; padding: 1px 0; }
+/* A tap-count badge in its branch colour (branchBadge in ui/marks.mjs). */
+.bn.lit { border-color: var(--tint); background: color-mix(in srgb, var(--tint) 28%, transparent); color: var(--text); }
 .hc-act { display: grid; grid-template-columns: 70px minmax(0,1fr); gap: 7px; align-items: start; font-size: 11px; line-height: 18px; }
 .hc-act + .hc-act { margin-top: 4px; }
 .hc-stage { color: var(--text-3); display: flex; align-items: center; gap: 5px; white-space: nowrap; }
@@ -1318,19 +1318,23 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .tok { display: inline-flex; align-items: center; height: 22px; padding: 0 7px; border-radius: 5px; background: var(--surface-3); border: 1px solid var(--line); font-family: var(--mono); font-size: 11px; }
 .macro-step { display: grid; gap: 10px; min-width: 0; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); }
 .macro-step[hidden] { display: none; }
-.macro-titlebar { gap: 10px; flex-wrap: wrap; padding: 18px; }
-.macro-title-control { flex: 1 1 180px; min-width: 0; position: relative; }
-.macro-title-input { display: block; width: 100%; min-width: 0; font: 550 19px/1.3 var(--sans); letter-spacing: -.025em; color: var(--text); background: transparent; padding: 3px 5px; border: 1px solid transparent; border-radius: 5px; }
-.macro-title-input::placeholder { color: var(--text); opacity: 1; }
-.macro-title-input:not(:disabled):hover { border-color: var(--line-2); background: var(--surface-2); }
-.macro-title-input:focus { border-color: var(--line-3); outline: none; background: var(--surface-2); }
-.macro-name-count { position: absolute; top: 100%; left: 6px; opacity: 0; pointer-events: none; font-size: 10px; }
-.macro-title-control:focus-within .macro-name-count, .macro-name-count.warn { opacity: 1; }
+/* A slot's name is its editor's title (ui/title-name.mjs): Macros, Custom keys. */
+.name-titlebar { gap: 10px; flex-wrap: wrap; padding: 18px; }
+/* Its actions wrap under each other in a narrow window rather than widening the editor. */
+.name-titlebar > .right { flex-wrap: wrap; justify-content: flex-end; min-width: 0; }
+.name-titlebar > .right > * { white-space: nowrap; }
+.title-name { flex: 1 1 180px; min-width: 0; position: relative; }
+.title-name-input { display: block; width: 100%; min-width: 0; font: 550 19px/1.3 var(--sans); letter-spacing: -.025em; color: var(--text); background: transparent; padding: 3px 5px; border: 1px solid transparent; border-radius: 5px; }
+.title-name-input::placeholder { color: var(--text); opacity: 1; }
+.title-name-input:not(:disabled):hover { border-color: var(--line-2); background: var(--surface-2); }
+.title-name-input:focus { border-color: var(--line-3); outline: none; background: var(--surface-2); }
+.title-name-count { position: absolute; top: 100%; left: 6px; opacity: 0; pointer-events: none; font-size: 10px; }
+.title-name:focus-within .title-name-count, .title-name-count.warn { opacity: 1; }
 .macro-context { display: flex; gap: 10px 20px; flex-wrap: wrap; align-items: center; justify-content: space-between; padding-bottom: 15px; border-bottom: 1px solid var(--line); }
 .macro-protection { display: flex; align-items: center; gap: 9px; font-size: 11px; color: var(--text-2); }
 .macro-protection select.input { width: auto; min-width: 135px; height: 30px; padding: 4px 26px 4px 8px; font-size: 11px; }
 .macro-sequence-heading { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
-.macro-sequence-heading h4 { font-size: 10px; text-transform: uppercase; letter-spacing: .1em; color: var(--text-3); }
+.macro-sequence-heading h4, .macro-editor-card [data-recorder] .card-h h3 { font-size: 10px; text-transform: uppercase; letter-spacing: .1em; color: var(--text-3); }
 .macro-sequence-heading .note { font-size: 10px; }
 .macro-insert-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .macro-insert-tools .btn { height: 36px; padding: 0 14px; }
@@ -1386,10 +1390,6 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .macro-guidance:not([open]) { display: none; }
 .macro-guidance summary { font-size: 11px; color: var(--text-2); cursor: pointer; }
 .macro-guidance .note { margin-top: 10px; line-height: 1.55; }
-.macro-editor-card .macro-actions { gap: 8px; }
-.macro-editor-card .macro-actions .btn { height: 36px; padding: 0 14px; }
-.macro-editor-card .macro-actions .btn svg { width: 15px; height: 15px; }
-.macro-editor-card .macro-actions [data-act="clear"] { color: var(--danger); }
 .macro-editor-card [data-recorder] { border: 0; border-top: 1px solid var(--line); border-radius: 0; background: transparent; padding-top: 14px; }
 .macro-editor-card [data-recorder] .card-h { border-bottom: 0; padding: 0; margin-bottom: 12px; }
 .macro-editor-card [data-recorder] .card-b { padding: 0; gap: 10px; }
@@ -1404,7 +1404,7 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .macro-step .kind { font-size: 11px; color: var(--text-2); }
 .macro-step textarea.input, [data-raw] textarea.input { height: auto; min-height: 90px; padding: 10px; resize: vertical; white-space: pre-wrap; overflow-wrap: anywhere; }
 .macro-step .tok { display: block; flex: 1; min-width: 0; height: auto; min-height: 22px; padding: 3px 7px; overflow-wrap: anywhere; }
-.macro-add, .macro-actions { flex-wrap: wrap; }
+.macro-add { flex-wrap: wrap; }
 .macro-add select.input { width: auto; }
 .record-opts { gap: 12px; align-items: end; flex-wrap: wrap; }
 .record-opts .ms-field { width: 96px; }
@@ -1450,10 +1450,6 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .profile-action[data-profile-drop] { border-style: dashed; }
 .profile-action.drag-over { border-color: var(--text); background: var(--surface-2); }
 .profile-action .profile-drop-status { color: var(--text); }
-.profile-recovery { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
-.profile-recovery .copy { display: grid; gap: 2px; }
-.profile-recovery .state { margin-left: auto; }
-.profile-recovery > .dot { margin-top: 6px; }
 .pad.profile-pad { max-width: var(--page); }
 .setrow { display: grid; grid-template-columns: minmax(0,1fr) 190px; gap: 16px; align-items: center; padding: 12px 15px; border-bottom: 1px solid var(--line); }
 .setrow:last-child { border-bottom: 0; }
