@@ -17,6 +17,7 @@ const CONTROLS = Object.freeze({
     discardProfileDraftChanges: Object.freeze({route: "draft", action: "discardChanges", binding: "none", demo: "allow", phase: "panel", identity: true}),
     applyProfileDraft: Object.freeze({route: "draft", action: "apply", binding: "apply", demo: "refuse", phase: "apply", identity: true}),
     rebaseProfileDraft: Object.freeze({route: "draft", action: "rebase", binding: "none", demo: "refuse", phase: "panel", identity: true}),
+    putBackProfile: Object.freeze({route: "draft", action: "putBack", binding: "none", demo: "refuse", phase: "panel", identity: true}),
     closeProfileDraftReview: Object.freeze({route: "draft", action: "closeReview", binding: "none", demo: "allow", phase: "panel", identity: true}),
     exportPortableProfile: Object.freeze({route: "portable", action: "export", binding: "none", demo: "export", phase: "panel", identity: false}),
     choosePortableProfile: Object.freeze({route: "portable", action: "choose", binding: "profile", demo: "allow", phase: "panel", identity: false}),
@@ -38,6 +39,8 @@ const CONTROLS = Object.freeze({
     forgetKeyboard: Object.freeze({route: "host", action: "forgetKeyboard", binding: "none", demo: "allow", phase: "host", identity: false}),
     setTheme: Object.freeze({route: "host", action: "setTheme", binding: "none", demo: "allow", phase: "host", identity: false}),
     downloadRecovery: Object.freeze({route: "host", action: "downloadRecovery", binding: "none", demo: "allow", phase: "host", identity: false}),
+    useRecovery: Object.freeze({route: "host", action: "useRecovery", binding: "none", demo: "refuse", phase: "host", identity: false}),
+    deleteRecovery: Object.freeze({route: "host", action: "deleteRecovery", binding: "none", demo: "allow", phase: "host", identity: false}),
     validateViaMacro: Object.freeze({route: "inspect", action: "validateMacro", binding: "inspect", demo: "allow", phase: "inspect", identity: false}),
 });
 

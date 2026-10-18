@@ -31,7 +31,7 @@ export function screenKeys() {
     const layer = currentLayer();
     const main = el(`<div class="main">${topbar(
         "Keys",
-        "Pick a key on the board, then work in the tab you need: the key, its behaviour, its combos, or what this layer reaches.",
+        "Click a key to change what it does. The tabs under the board edit its behaviour, its combos and what this layer reaches.",
     )}</div>`);
 
     const blocked = unavailable(model);

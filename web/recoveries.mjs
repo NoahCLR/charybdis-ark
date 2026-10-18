@@ -59,6 +59,18 @@ export function openRecoveries(indexedDB) {
             return all.map(({id, name, savedAt}) => ({id, name, savedAt})).reverse();
         },
         /** @param {number | string} id */
+        async delete(id) {
+            const transaction = (await database()).transaction(STORE, "readwrite");
+            /** @type {Promise<void>} */
+            const done = new Promise((resolve, reject) => {
+                transaction.oncomplete = () => resolve();
+                transaction.onerror = () => reject(transaction.error);
+                transaction.onabort = () => reject(transaction.error || new Error("The copy was not deleted."));
+            });
+            transaction.objectStore(STORE).delete(id);
+            await done;
+        },
+        /** @param {number | string} id */
         async get(id) {
             return request(/** @type {IDBRequest<import("./types.js").StoredRecovery | undefined>} */ ((await store()).get(id)));
         },

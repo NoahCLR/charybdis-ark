@@ -48,7 +48,7 @@ test("an unknown screen cannot silently render Keys or pass readiness", () => {
 
 test("unavailable screens offer backups before device diagnostics and never link to themselves", () => {
     const connected = {load: {state: "unavailable"}, device: {connected: true}, portable: {available: true}};
-    assert.deepEqual(secondaryScreen(connected, "keys"), {screen: "profile", label: "Profile & backups"});
+    assert.deepEqual(secondaryScreen(connected, "keys"), {screen: "profile", label: "Backups"});
     assert.deepEqual(secondaryScreen(connected, "profile"), {screen: "device", label: "Device details"});
     assert.deepEqual(secondaryScreen({...connected, portable: {available: false}}, "keys"), {screen: "device", label: "Device details"});
     assert.equal(secondaryScreen({...connected, portable: {available: false}}, "device"), null);

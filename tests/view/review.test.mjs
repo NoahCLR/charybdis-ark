@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {categorySummary, discardLabel, draftMarks, groupNote, placeState, reviewBlocks, statusSummary, stillShown} from "../../webview/view/review.mjs";
+import {categorySummary, discardLabel, draftMarks, groupNote, placeState, reviewBlocks, statusBesideCount, statusSummary, stillShown} from "../../webview/view/review.mjs";
 
 const item = (area, title, group, extra = {}) => ({area, title, group, status: "changed", fields: [], ...extra});
 
@@ -49,6 +49,9 @@ test("a group's header says how much of it is here and where the rest is", () =>
 test("the header counts items by what happened to them", () => {
     const changes = [item("Layout", "a", 0), item("Layout", "b", 1, {status: "added"}), item("Macros", "c", 2, {status: "added"})];
     assert.equal(statusSummary(changes), "2 added · 1 changed");
+    assert.equal(statusBesideCount(changes), "2 added · 1 changed", "a mix says what kinds");
+    assert.equal(statusBesideCount([{status: "changed"}, {status: "changed"}]), "", "only changes repeat the count beside it");
+    assert.equal(statusBesideCount([{status: "removed"}]), "1 removed", "a removal still says so");
 });
 
 test("a Discard says how much it takes back", () => {

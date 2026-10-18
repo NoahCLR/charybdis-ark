@@ -1,6 +1,6 @@
 // @ts-check
 import {el, esc} from "../../lib/dom.mjs";
-import {KIND, newMode} from "../../view/pointing-config.mjs";
+import {KIND, newMode, scrollStarter} from "../../view/pointing-config.mjs";
 import {bindingsForSlot} from "../../view/reach.mjs";
 import {post} from "../../store.mjs";
 import * as edits from "../../view/edits.mjs";
@@ -38,10 +38,10 @@ export function emptySlot(model, slot, canEdit, slots) {
                 ${sources.map((row) => `<option value="${row.id}">Slot ${row.id} · ${esc(row.name)}</option>`).join("")}</select></label>
             <button class="btn" data-act="duplicate" ${canEdit ? "" : "disabled"}>Duplicate into this slot</button></div>`
             : ""}
-        ${canEdit ? "" : `<div class="unavailable">${esc(unavailable(model) || "This slot cannot be edited right now.")}</div>`}
+        ${canEdit || model?.draft?.busy ? "" : `<div class="unavailable">${esc(unavailable(model) || "This slot cannot be edited right now.")}</div>`}
     </div></div></div>`);
     /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-new]")).forEach((button) => button.addEventListener("click", () =>
-        post(edits.pdMode(slot.id, newMode(slot, Number(button.dataset.new)), model.profileIdentity))));
+        post(edits.pdMode(slot.id, newMode(slot, Number(button.dataset.new), scrollStarter(slots)), model.profileIdentity))));
     /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="duplicate"]'))?.addEventListener("click", () =>
         post(edits.duplicatePdMode(slot.id, Number(/** @type {HTMLSelectElement} */ (node.querySelector("[data-source]")).value), model.profileIdentity)));
     return node;

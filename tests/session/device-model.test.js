@@ -31,7 +31,7 @@ test("behaviour rows claim their keys' built-in first actions", () => {
 const MODEL_FIELDS = [
     "layers", "keyBehaviors", "combos", "viaMacros", "macroNameSpace", "behaviorTimingDefaults",
     "configDefaults", "rgb", "qmkKeycodes", "qmkKeyLabels", "qmkKeyLayers", "qmkKeyShortLabels", "qmkKeycodeAliases",
-    "qmkKeycodeSource", "macroPayloadKeycodes", "diagnostics",
+    "qmkKeycodeSource", "qmkSpellings", "macroPayloadKeycodes", "diagnostics",
 ];
 
 function layoutWith(keys) {
@@ -520,6 +520,7 @@ test("snapshot presentation uses its decoded configuration and real device diagn
     draft.stage({type: "updateLayoutKeys", draftRevision: draft.revision, layer: "Layer 0", changes: [
         {layoutIndex: 0, keycode: "PD_SLOT_0"}, {layoutIndex: 1, keycode: "VIA_MACRO_0"},
         {layoutIndex: 2, keycode: "CUSTOM_KEY_0"}, {layoutIndex: 3, keycode: "LT(3,KC_F)"},
+        {layoutIndex: 4, keycode: "MT(MOD_LSFT,KC_A)"}, {layoutIndex: 5, keycode: "MO(2)"},
     ]});
     draft.stage({type: "updateViaMacro", draftRevision: draft.revision, keycode: "VIA_MACRO_0", name: "Sign-off", payload: "hello"});
     draft.stage({type: "updateCustomKey", draftRevision: draft.revision, keycode: "CUSTOM_KEY_0", name: "Right Thumb"});
@@ -532,6 +533,17 @@ test("snapshot presentation uses its decoded configuration and real device diagn
     assert.equal(model.layers[0].displayName, "Base");
     assert.equal(model.behaviorEditing.keyDefaults["LT(3,KC_F)"].timing.tapHoldTerm, "200");
     assert.equal(model.behaviorEditing.keyDefaults["LT(3,KC_F)"].builtIn.hold.action, "MO(3)");
+    assert.deepEqual(model.behaviorEditing.keyDefaults["LT(3,KC_F)"].timingSources,
+        {tapHoldTerm: "tappingTerm", longerHoldTerm: "longHoldTerm", multiTapTerm: "multiTapTerm"});
+    assert.equal(model.behaviorEditing.keyDefaults["LT(3,KC_F)"].withoutRow, undefined, "LT follows the dual-role term with or without a row");
+    // B5: an MT key with no row is QMK's own, on the dual-role term; a row puts it on the behaviour term.
+    const mt = Object.entries(model.behaviorEditing.keyDefaults).find(([name]) => /^(LSFT_T|MT)\(/.test(name))?.[1];
+    assert.ok(mt, "the MT key has defaults");
+    assert.equal(mt.timingSources.tapHoldTerm, "tapHoldTerm");
+    assert.equal(mt.withoutRow.tapHoldSource, "tappingTerm");
+    assert.equal(mt.withoutRow.tapHoldTerm, model.behaviorEditing.keyDefaults["LT(3,KC_F)"].timing.tapHoldTerm);
+    // B6: MO holds its layer from the press.
+    assert.equal(model.behaviorEditing.keyDefaults["MO(2)"].builtIn.hold.fromPress, true);
     assert.equal(model.viaMacros[0].payload, "hello");
     assert.equal(model.pdModes.length, 32);
     assert.equal(model.combos[0].termMs, 50);

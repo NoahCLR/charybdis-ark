@@ -15,6 +15,7 @@ import {actionMarked} from "./marks.mjs";
 import {PICKER_BOARD, legendFits, pickerBoardKey} from "../view/picker-board.mjs";
 import {pickerExpression} from "../view/edits.mjs";
 import {modifierPick, pickerModifierProblem} from "../view/keyvalues.mjs";
+import {keyProblem} from "../view/keycode-expression.mjs";
 import {entriesForPickerSection, pickable, pickerSections} from "../view/picker-sections.mjs";
 import {macroMatches} from "../view/macro.mjs";
 import {customKeyChoice, offeredName, shortcutOffer, shortcutPick, shortcutPickLabel, shortcutPickMods, shortcutModifiers} from "../view/custom-key.mjs";
@@ -33,10 +34,10 @@ const modifierControls = model => vocabulary(model).pickerModifiers || [];
 // made it. The picker names the key either way. `customKeyRuns` says what the
 // field does with a custom key: runs its behaviour too (a layout key, a combo
 // output), or sends only its shortcut (a behaviour step).
-export function openPicker({title, context, contextKeycode, seed = [], mode = "single", allowedKeys = null, modifiable = null, shortcut = null, maxKeys = Infinity, onPick, onShortcut, onCustomKey, customKeyRuns = "behaviour"}) {
+export function openPicker({title, context, contextKeycode, seed = [], mode = "single", allowedKeys = null, modifiable = null, shortcut = null, maxKeys = Infinity, onPick, onShortcut, onCustomKey, customKeyRuns = "behaviour", layoutKey = false}) {
     const keys = allowedKeys ? seed.map(key => getModel()?.qmkKeycodeAliases?.[key] || key) : seed.slice();
     const mods = shortcut ? shortcutPickMods(getModel(), shortcut.mods) : [];
-    state.picker = {title, context, contextKeycode, mode, allowedKeys, modifiable, shortcut: Boolean(shortcut), maxKeys, section: "board", search: "", mods, keys, layerTap: null, onPick, onShortcut, onCustomKey, customKeyRuns};
+    state.picker = {title, context, contextKeycode, mode, allowedKeys, modifiable, shortcut: Boolean(shortcut), maxKeys, section: "board", search: "", mods, keys, layerTap: null, onPick, onShortcut, onCustomKey, customKeyRuns, layoutKey};
     render();
 }
 
@@ -204,7 +205,10 @@ export function pickerOverlay() {
     if (!picker) return null;
     const model = getModel();
     const value = expression();
-    const problem = pickerModifierProblem(model, stored(model, picker));
+    // A key the draft would refuse never enables Use: the dialog must not
+    // close into an error. Shortcuts and holds keep their own checks.
+    const plain = picker.layoutKey && !picker.shortcut && value ? keyProblem(model, value) : "";
+    const problem = pickerModifierProblem(model, stored(model, picker)) || plain;
     // Modifiers no keycode can hold, offered as a custom key's shortcut.
     const fold = folded(model, picker);
     const offer = !picker.onCustomKey || picker.mode !== "single" || picker.shortcut || picker.layerTap ? null

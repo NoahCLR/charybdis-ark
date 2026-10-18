@@ -47,10 +47,16 @@ export function behaviourEditor(behaviour) {
     const model = getModel();
     const steps = behaviourGridSteps(behaviour, model?.behaviorEditing?.maxTapStepsPerBehavior);
     const canEdit = canEditArea("behaviours");
+    // What each timing means is said where it is set, on hover.
+    const TIMING_TIPS = {
+        multiTapTerm: "The time allowed from releasing the key to pressing it again for another tap. A Double tap Hold is press, release, then press and keep holding.",
+        tapHoldTerm: "How long a press must last to count as a hold rather than a tap.",
+        longerHoldTerm: "How long a press must last to count as a long hold.",
+    };
     /** @param {"tapHoldTerm" | "longerHoldTerm" | "multiTapTerm"} name @param {string} label */
     const timingControl = (name, label) => {
         const field = behaviourTimingField(behaviour, name);
-        return `<label class="field bterm-field"><span>${esc(label)}</span>
+        return `<label class="field bterm-field" data-tip="${esc(TIMING_TIPS[name])}"><span>${esc(label)}</span>
             <span class="affix unit"><input class="input mono" data-f="behaviour:${esc(behaviour.keycode)}:timing:${name}" data-term="${name}" data-stored="${esc(field.stored)}" inputmode="numeric" value="${esc(field.value)}"
                 placeholder="${esc(field.fallback === "" ? "default unavailable" : field.placeholder)}" ${canEdit ? "" : "disabled"}><i>ms</i></span></label>`;
     };
@@ -117,10 +123,9 @@ export function behaviourEditor(behaviour) {
             </div>` : ""}
         </div>
         <div class="beh-intro">
-            <p class="note">Multi tap window is the time allowed from releasing the key to pressing it again. The Tap / hold threshold separates a tap from a hold. Double hold means press, release, then press and keep holding.</p>
-            <label class="sw" data-tip="Treat this row as a mouse gesture, so pressing it keeps the pointer layer up instead of letting auto-mouse reset.">
+            <label class="sw" data-tip="Treat this key as part of using the mouse, so pressing it keeps the auto-mouse layer on instead of turning it off.">
                 <input type="checkbox" data-f="behaviour:${esc(behaviour.keycode)}:anchor" data-anchor ${behaviour.keepsAutoMouseAnchored ? "checked" : ""} ${canEdit ? "" : "disabled"}>
-                <span class="track"></span><span class="txt">Keeps auto-mouse anchored</span></label>
+                <span class="track"></span><span class="txt">Keeps the mouse layer on</span></label>
         </div>
         ${behaviourTimingChecks(model, behaviour.keycode).map(check => `<p class="note beh-note" role="status"><strong>${check.level === "notice" ? "Timing advice." : "Timing warning."}</strong> ${esc(check.detail)} ${esc(check.fix)}</p>`).join("")}
         <div class="bgrid">
@@ -164,9 +169,11 @@ export function behaviourEditor(behaviour) {
         input.value = behaviourTimingField({...behaviour, [term]: input.dataset.stored}, term).value;
     }));
     /** @type {HTMLInputElement | null} */ (node.querySelector("[data-anchor]"))?.addEventListener("change", commit);
-    /** @type {HTMLElement} */ (node.querySelector(".beh-intro")).appendChild(definitionControls(layers().map(layer => ({...layer, label: layerName(layer)})), behaviour, canEdit, (/** @type {{enabled: boolean, allowedLayers: number}} */ permissions) => {
+    // Whether the behaviour runs, and where, leads; the mouse-layer switch
+    // sits at the end of the row.
+    /** @type {HTMLElement} */ (node.querySelector(".beh-intro")).prepend(definitionControls(layers().map(layer => ({...layer, label: layerName(layer)})), behaviour, canEdit, (/** @type {{enabled: boolean, allowedLayers: number}} */ permissions) => {
         const message = edits.saveBehaviour(behaviour, permissions, model?.profileIdentity);
         if (message) post(message);
-    }, `behaviour:${behaviour.keycode}:definition`));
+    }, `behaviour:${behaviour.keycode}:definition`, "behaviour"));
     return node;
 }

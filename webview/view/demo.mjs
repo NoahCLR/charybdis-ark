@@ -21,7 +21,7 @@ export const leaveDemo = () => ({type: "leaveDemo"});
 // What the panel says in the demo.
 export const DEMO_WORDS = Object.freeze({
     status: "Demo · no keyboard",
-    banner: "This is a demo. No keyboard is connected, so nothing here reaches one. Edits stay in this window; Export saves them as a profile file.",
+    banner: "No keyboard is connected. Change anything: edits stay in this window, and Export saves them as a profile file for your keyboard.",
     explore: "Explore a demo",
     exploreTip: "Open Ark on a demo setup, with no keyboard. Every screen works and every edit shows in the review; only Apply needs a keyboard.",
     exportNote: "Save the demo setup, with your edits, as a complete profile file. On your keyboard, Import it to review and apply it.",

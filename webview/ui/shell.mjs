@@ -7,7 +7,7 @@ import * as controls from "../view/controls.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {getModel, post, postLeavingDemo, render, state} from "../store.mjs";
 import {halvesWords, phaseWords} from "../view/vocabulary.mjs";
-import {statusSummary} from "../view/review.mjs";
+import {statusBesideCount} from "../view/review.mjs";
 import {busyText, postApplyReadText, screenAvailable} from "../view/readiness.mjs";
 import {isScreenId, screenGroups} from "../view/screens.mjs";
 import {buildLine, chooseKeyboard, forgetKeyboard, commitUrl, githubMark, hostOf, themeLabel} from "../view/host.mjs";
@@ -85,14 +85,14 @@ export function rail() {
         <nav class="rail-nav">${nav}</nav>
         ${host.progress ? `<div class="rail-progress" role="status">${spinner()}<span>${esc(host.progress)}</span></div>` : ""}
         ${railMessage()}
-        <div class="rail-foot">
-            <button class="btn tiny ghost rail-history" data-act="history" ${draft ? "" : "disabled"}
+        ${draft ? `<div class="rail-foot">
+            <button class="btn tiny ghost rail-history" data-act="history"
                 data-tip="Every step of the draft, newest first, with what each one changed. Go back or forward to any of them.">Draft history${draft && draft.historyLength > 1 ? ` <span class="c">${draft.historyLength - 1}</span>` : ""}</button>
-            <button class="btn tiny ghost icon" data-act="undo" ${draft?.canUndo ? "" : "disabled"}
+            <button class="btn tiny ghost icon" data-act="undo" aria-label="Undo" aria-keyshortcuts="Meta+Z" ${draft?.canUndo ? "" : "disabled"}
                 data-tip="${esc(draft?.undoLabel ? `Undo: ${draft.undoLabel} (⌘Z)` : "Undo the last edit in the draft (⌘Z). The keyboard is not touched until you apply.")}">↺</button>
-            <button class="btn tiny ghost icon" data-act="redo" ${draft?.canRedo ? "" : "disabled"}
+            <button class="btn tiny ghost icon" data-act="redo" aria-label="Redo" aria-keyshortcuts="Meta+Shift+Z" ${draft?.canRedo ? "" : "disabled"}
                 data-tip="${esc(draft?.redoLabel ? `Redo: ${draft.redoLabel} (⇧⌘Z)` : "Redo the edit you just undid (⇧⌘Z).")}">↻</button>
-        </div>
+        </div>` : ""}
         ${railBuild(host.build)}
     </aside>`);
 
@@ -108,9 +108,10 @@ export function rail() {
     /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="forget-keyboard"]'))?.addEventListener("click", () => post(forgetKeyboard()));
     /** @type {HTMLSelectElement | null} */ (node.querySelector('[data-act="select-device"]'))?.addEventListener("change", (event) => post(controls.selectDevice(/** @type {HTMLSelectElement} */ (event.target).value)));
     /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="open-review"]'))?.addEventListener("click", openReview);
-    /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="history"]')).addEventListener("click", openHistory);
-    /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="undo"]')).addEventListener("click", () => post(controls.control("undoProfileDraft")));
-    /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="redo"]')).addEventListener("click", () => post(controls.control("redoProfileDraft")));
+    // Draft history, undo and redo show once there is a draft to step through.
+    /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="history"]'))?.addEventListener("click", openHistory);
+    /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="undo"]'))?.addEventListener("click", () => post(controls.control("undoProfileDraft")));
+    /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="redo"]'))?.addEventListener("click", () => post(controls.control("redoProfileDraft")));
     return node;
 }
 
@@ -181,9 +182,12 @@ function spinner() {
 }
 
 /** @type {Readonly<Record<string, string>>} */
+// What can honestly be said about what was saved when Apply stops: a save is
+// all or nothing, so never "part of it" (core's failure.saved).
 const SAVED_VERDICT = {
     none: "Nothing was saved. The keyboard kept the profile it had.",
-    unknown: "The keyboard may have saved part of it. Read the keyboard to see what it runs now.",
+    decided: "The keyboard had already decided to save the new profile, and finishes it by itself about 15 seconds after both halves are connected. Read the keyboard then.",
+    unknown: "Ark can't tell which profile was saved. Read the keyboard to see what it runs now.",
 };
 
 export function commitBar() {
@@ -261,7 +265,7 @@ export function commitBar() {
     const node = el(`<div class="commit">
         <span class="n"><i class="dot draft"></i> <strong>${draft.changes.length} change${draft.changes.length === 1 ? "" : "s"}</strong>
         <span class="muted">in your draft</span></span>
-        <span class="peek"><span class="note">${esc(statusSummary(draft.changes))}</span></span>
+        ${statusBesideCount(draft.changes) ? `<span class="peek"><span class="note">${esc(statusBesideCount(draft.changes))}</span></span>` : ""}
         <span class="sep"></span>
         <button class="btn ghost tiny" data-act="discard"
             data-tip="${demo ? "Put every change back to the demo setup." : "Put every change back to what the keyboard holds."} Undo (⌘Z) brings them back.">Discard all</button>

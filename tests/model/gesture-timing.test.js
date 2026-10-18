@@ -41,3 +41,12 @@ test("an empty long action cannot shadow a release hold", () => {
     const r = row(); r.steps[0].longHold.action = code(0);
     assert.equal(releaseHoldUnreachable(r.steps[0], effectiveTimings(r, [])), false);
 });
+test("with no row, QMK's MT and OSM keys follow the dual-role term; a row puts them on the behaviour term", () => {
+    const values = [200, 150, 400, 150];
+    for (const operand of [0x2204, 0x52a2]) {
+        assert.equal(effectiveTimings({target: code(operand)}, values, {stored: false}).hold, 200);
+        assert.equal(effectiveTimings({target: code(operand)}, values).hold, 150);
+    }
+    assert.equal(effectiveTimings({target: code(0x432f)}, values, {stored: false}).hold, 200);
+    assert.equal(effectiveTimings({target: code(4)}, values, {stored: false}).hold, 150);
+});

@@ -55,9 +55,10 @@ your Host setup can't play. **Apply** saves a recovery copy, writes both halves
 and reads the result back to prove it, and you can stay in the editor while it
 does.
 
-**Export profile** saves your whole setup as one file. **Import profile**
-takes a backup by choosing a file or dropping it onto the Import card, then
-restores it after the same review.
+On **Backups**, **Export profile** saves your whole setup as one file, and
+**Import profile** takes one by choosing it or dropping it onto the Import
+card, then restores it after the same review. Every Apply keeps a copy of what it
+replaced, ready to use again.
 
 No keyboard to hand? **Explore a demo** opens Ark on a complete setup with nothing
 connected. Every screen works and every edit shows up in the review; only Apply

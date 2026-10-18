@@ -11,13 +11,13 @@
 // Selector assertions refer to elements created by this module's authored markup.
 import * as edits from "../view/edits.mjs";
 import {DISCLOSURE, el, esc} from "../lib/dom.mjs";
-import {getModel, layers, post, render, state, canEdit as canEditArea} from "../store.mjs";
+import {getModel, layerName, layers, post, render, state, canEdit as canEditArea} from "../store.mjs";
 import {topbar, unavailable} from "./shell.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {marked} from "./marks.mjs";
 import {githubMark} from "../view/host.mjs";
 import {durationControl} from "./duration.mjs";
-import {NAME_MAX_BYTES, NAME_TIP, nameCount} from "../view/names.mjs";
+import {elsewhereWords, firmwareFacts, foldedCount, matchesElsewhere, matchesQuery, noMatchWords, settingsCards} from "../view/settings-layout.mjs";
 
 // The sections a screen draws, by the area the keyboard's model files them in.
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} area */
@@ -29,7 +29,7 @@ export function screenSettings() {
     const canEdit = canEditArea("settings");
     const main = el(`<div class="main">${topbar(
         "Settings",
-        "The keyboard's global policy: every value it stores that applies on all layers. Values this firmware cannot report stay read-only rather than disappearing."
+        "Timing, where behaviours and combos run, key options and your computer: what applies to the whole keyboard."
     )}</div>`);
 
     const content = el(`<div class="content"><div class="pad settings-pad"></div></div>`);
@@ -38,13 +38,13 @@ export function screenSettings() {
         pad.appendChild(el(`<div class="screen-stub"><h3>No settings read</h3>
             <p class="note">${esc(unavailable(model) || "Choose Read keyboard to load this keyboard's policy.")}</p></div>`));
     }
-    if (!canEdit && sections.length) {
-        pad.appendChild(el(`<div class="unavailable">${esc(unavailable(model)
-            || "These settings cannot be edited right now.")}</div>`));
-    }
+    // Why nothing here can be edited, said once; while the keyboard is busy
+    // the draft bar already says what it is doing.
+    const reason = canEdit || !sections.length || model?.draft?.busy ? "" : unavailable(model);
+    if (reason) pad.appendChild(el(`<div class="unavailable">${esc(reason)}</div>`));
 
     if (sections.length) {
-        const search = el(`<input class="input search settings-search" id="settingsSearch" data-f="settings:search" type="search" placeholder="Search settings" value="${esc(state.settingsSearch || "")}">`);
+        const search = el(`<input class="input search settings-search" id="settingsSearch" data-f="settings:search" type="search" placeholder="Search settings" aria-label="Search settings" value="${esc(state.settingsSearch || "")}">`);
         search.addEventListener("input", () => {
             state.settingsSearch = /** @type {HTMLInputElement} */ (search).value;
             render();
@@ -52,27 +52,54 @@ export function screenSettings() {
         pad.appendChild(search);
     }
     const query = (state.settingsSearch || "").trim().toLowerCase();
-    if (model?.keyboardName && (!query || matches(KEYBOARD_NAME, query))) pad.appendChild(keyboardCard(model, model.keyboardName, canEdit));
     /** @param {import("../../contracts/panel.js").PresentedSection} section */
-    const matching = (section) => query ? section.fields.filter((field) => matches(field, query)) : section.fields;
-    for (const section of sections) {
-        const fields = matching(section);
-        const timing = section.id === "comboSettings" ? (section.comboTiming || []).filter((entry) => !query || matches(entry, query)) : [];
-        if (!fields.length && !timing.length) continue;
-        const card = sectionCard(model, section, fields, canEdit, Boolean(query));
-        if (section.id === "comboSettings") {
-            for (const entry of timing) /** @type {HTMLElement} */ (card.querySelector(".rows")).appendChild(comboTimingRow(model, entry));
-            /** @type {HTMLElement} */ (card.querySelector(".card-h .tag")).textContent = `${section.fields.length + (section.comboTiming || []).length} settings`;
+    // A section found by one of its other names (section.search: QMK's,
+    // or the one Ark used before) shows whole.
+    const matching = (section) => !query || matchesQuery({label: section.label, hint: section.search}, query) ? section.fields : section.fields.filter((field) => matchesQuery(field, query));
+    const combos = sections.find((section) => section.id === "comboSettings");
+    const timing = (combos?.comboTiming || []).filter((entry) => matchesQuery(entry, query));
+    let shown = 0;
+    for (const card of settingsCards(sections)) {
+        if (card.id === "comboTiming") {
+            if (!timing.length) continue;
+            const node = el(`<section class="card settings-group" data-section="comboTiming">
+                <div class="card-h"><h3>Combo timing</h3></div><div class="rows"></div></section>`);
+            for (const entry of timing) /** @type {HTMLElement} */ (node.querySelector(".rows")).appendChild(comboTimingRow(model, entry));
+            pad.appendChild(node);
+            shown++;
+            continue;
         }
-        pad.appendChild(card);
+        if (card.id === "builtIn") {
+            const facts = firmwareFacts(model).filter((fact) => matchesQuery(fact, query) || matchesQuery({label: "Built into this firmware firmware build compiled"}, query));
+            if (!sections.length || !facts.length) continue;
+            pad.appendChild(builtInCard(facts, Boolean(query)));
+            shown++;
+            continue;
+        }
+        const parts = card.sections.map((section) => ({section, fields: matching(section)})).filter((part) => part.fields.length);
+        if (!parts.length) continue;
+        shown++;
+        if (card.id === "comboReferences") {
+            pad.appendChild(comboReferenceCard(model, parts[0].section, parts[0].fields, canEdit, Boolean(query)));
+            continue;
+        }
+        if (card.title) {
+            pad.appendChild(groupedCard(model, card.id, card.title, parts, canEdit, Boolean(query)));
+            continue;
+        }
+        for (const {section, fields} of parts) pad.appendChild(foldCount(sectionCard(model, section, fields, canEdit, Boolean(query)), section));
     }
-    // A search for something that moved to Mouse says where it went.
-    const elsewhere = query ? sectionsIn(model, "Mouse").reduce((total, section) => total + matching(section).length, 0) : 0;
-    if (elsewhere) {
-        const note = el(`<div class="callout row gap-10">
-            <span>${elsewhere} matching setting${elsewhere === 1 ? " is" : "s are"} on the Mouse screen.</span>
-            <button class="btn tiny" data-act="mouse">Open Mouse</button></div>`);
-        /** @type {HTMLButtonElement} */ (note.querySelector('[data-act="mouse"]')).addEventListener("click", () => { state.screen = "mouse"; render(); });
+    if (query && sections.length && !shown) pad.appendChild(el(`<p class="note settings-empty" role="status">${esc(noMatchWords(state.settingsSearch || ""))}</p>`));
+    // A search for something edited on another screen says where it is.
+    const elsewhere = matchesElsewhere(model, query);
+    if (elsewhere.length) {
+        const note = el(`<div class="settings-elsewhere row gap-8">${elsewhere.map((entry) =>
+            `<button class="btn text compact" data-go="${esc(entry.screen)}">${esc(elsewhereWords(entry))}</button>`).join("")}</div>`);
+        /** @type {NodeListOf<HTMLButtonElement>} */ (note.querySelectorAll("[data-go]")).forEach((button) => button.addEventListener("click", () => {
+            const screen = button.dataset.go;
+            if (screen === "mouse" || screen === "lighting" || screen === "device") state.screen = screen;
+            render();
+        }));
         pad.appendChild(note);
     }
 
@@ -80,12 +107,105 @@ export function screenSettings() {
     return main;
 }
 
+// A folded section names what it holds in words; an open one does not.
+/** @param {HTMLElement} node @param {import("../../contracts/panel.js").PresentedSection} section */
+function foldCount(node, section) {
+    const tag = node.querySelector(":scope > .card-h > .tag");
+    if (tag) {
+        if (section.expanded === false) tag.textContent = foldedCount(section);
+        else tag.remove();
+    }
+    // A section QMK owns whole says so once, by its title, not on every row.
+    if (section.fields.length > 1 && section.fields.every((field) => field.keyboardKeys)) {
+        node.querySelectorAll(".rows .kk-mark").forEach((mark) => mark.remove());
+        node.querySelector(":scope > .card-h > h3")?.insertAdjacentHTML("afterend", keyboardKeysMark(section.fields[0]));
+    }
+    return node;
+}
+
+// Several sections under one title, each still saved whole by its own card,
+// shown open with its own name as the group's eyebrow.
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} id @param {string} title @param {{section: import("../../contracts/panel.js").PresentedSection, fields: import("../../contracts/panel.js").PresentedField[]}[]} parts @param {boolean} canEdit @param {boolean} searching */
+function groupedCard(model, id, title, parts, canEdit, searching) {
+    const marks = draftMarks(model?.draft?.changes).settings;
+    const node = el(`<section class="card settings-group settings-grouped" data-section="${esc(id)}">
+        <div class="card-h"><h3>${esc(title)}${parts.some(({section}) => marks.has(section.id)) ? draftDot() : ""}</h3></div></section>`);
+    for (const {section, fields} of parts) {
+        const sub = sectionCard(model, {...section, expanded: true}, fields, canEdit, searching);
+        sub.classList.remove("card");
+        sub.classList.add("settings-sub");
+        sub.open = true;
+        const summary = /** @type {HTMLElement} */ (sub.querySelector(":scope > summary"));
+        summary.querySelector(".tag")?.remove();
+        summary.querySelector(".disclosure")?.remove();
+        summary.querySelector("svg")?.remove();
+        // Its title is a label here, not a fold.
+        summary.addEventListener("click", (event) => event.preventDefault());
+        summary.tabIndex = -1;
+        summary.classList.add("eyebrow");
+        node.appendChild(sub);
+    }
+    return node;
+}
+
+// Combo layer matching: one select per layer, four across, the sentence
+// said once. Saved whole, as every section is.
+/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/panel.js").PresentedSection} section @param {import("../../contracts/panel.js").PresentedField[]} shown @param {boolean} canEdit @param {boolean} searching */
+function comboReferenceCard(model, section, shown, canEdit, searching) {
+    const open = searching || (state.settingsOpen || []).includes(section.id);
+    const node = /** @type {HTMLDetailsElement} */ (el(`<details class="card settings-group" data-section="${esc(section.id)}" ${open ? "open" : ""}>
+        <summary class="card-h">${DISCLOSURE}<h3>${esc(section.label)}${draftMarks(model?.draft?.changes).settings.has(section.id) ? draftDot() : ""}</h3>
+            <span class="right tag">${esc(foldedCount(section))}</span></summary>
+        ${section.description ? `<div class="card-b settings-intro"><p class="note">${esc(section.description)}</p></div>` : ""}
+        <div class="card-b"><div class="layer-grid reference-grid" role="group" aria-label="${esc(section.label)}"></div></div>
+    </details>`));
+    node.addEventListener("toggle", () => {
+        const others = (state.settingsOpen || []).filter((id) => id !== section.id);
+        state.settingsOpen = node.open ? [...others, section.id] : others;
+    });
+    const grid = /** @type {HTMLElement} */ (node.querySelector(".reference-grid"));
+    const submit = () => post(edits.settingsSection(section, (field) => {
+        const input = /** @type {HTMLSelectElement | null} */ (node.querySelector(`[data-macro="${cssEscape(field.macro)}"]`));
+        return input ? input.value : undefined;
+    }, model?.settingsEditing?.identity));
+    for (const field of section.fields) {
+        const at = field.governs?.kind === "layer" ? field.governs.layer : -1;
+        const layer = layers().find((entry) => entry.index === at);
+        const editable = canEdit && !field.readOnly;
+        const cell = el(`<label class="reference-cell" data-tip="${esc([field.tooltip, field.hint].filter(Boolean).join(" "))}" ${shown.includes(field) ? "" : "hidden"}>
+            <span class="txt">${marked(model, field.governs, layer ? layerName(layer) : field.label)}</span>
+            <select class="input compact" data-macro="${esc(field.macro)}" data-f="setting:${esc(field.macro)}" aria-label="${esc(field.label)}" ${editable ? "" : "disabled"}>
+            ${layers().map((entry) => `<option value="Layer ${entry.index}" ${field.value === `Layer ${entry.index}` ? "selected" : ""}>${esc(entry.displayName || entry.name)}</option>`).join("")}</select></label>`);
+        /** @type {HTMLSelectElement} */ (cell.querySelector("select")).addEventListener("change", submit);
+        grid.appendChild(cell);
+    }
+    return node;
+}
+
+// What this firmware was built with, read-only, folded: each fact needs a
+// firmware build to change.
+/** @param {ReturnType<typeof firmwareFacts>} facts @param {boolean} searching */
+function builtInCard(facts, searching) {
+    const open = searching || (state.settingsOpen || []).includes("builtIn");
+    const node = /** @type {HTMLDetailsElement} */ (el(`<details class="card settings-group" data-section="builtIn" ${open ? "open" : ""}>
+        <summary class="card-h">${DISCLOSURE}<h3>Built into this firmware</h3>
+            <span class="right tag">${facts.length} facts</span></summary>
+        <div class="card-b settings-intro"><p class="note">Set when the firmware was built, not stored in the profile: changing any of these needs a new firmware build on both halves.</p></div>
+        <div class="rows">${facts.map((fact) => `<div class="setrow ro" data-tip="${esc(fact.hint)}">
+            <div><div class="nm">${esc(fact.label)}</div><div class="hint">${esc(fact.hint)}</div></div>
+            <div class="control"><span class="fact-value">${esc(fact.value)}</span></div></div>`).join("")}</div>
+    </details>`));
+    node.addEventListener("toggle", () => {
+        const others = (state.settingsOpen || []).filter((id) => id !== "builtIn");
+        state.settingsOpen = node.open ? [...others, "builtIn"] : others;
+    });
+    return node;
+}
+
 // The default combo window and the combo hold threshold apply to every combo,
 // so they are edited with the other combo settings. The keyboard stores them
-// with the combos rather than in the settings domain, so each saves as a combo
-// edit. A keyboard that stores them once has them even without combos; an
-// older one has no default, and repeats the threshold on every combo, so there
-// is nothing to store it on until a combo exists.
+// once with the combos rather than in the settings domain (combo readback
+// v3), so each saves as a combo edit, with or without any combos.
 // A combo follows the default window unless it has its own, so changing it
 // re-times those combos. QMK waits for the hold threshold only on combos that
 // must be held or are tap only — the longer of it and the combo's own window
@@ -93,18 +213,15 @@ export function screenSettings() {
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/model.js").ComboTimingField} entry */
 function comboTimingRow(model, entry) {
     const readback = model?.comboReadback || {};
-    const stores = readback.version === 2;
     const hold = entry.id === "hold";
     const value = hold ? readback.holdTermMs : readback.defaultTermMs;
     const stored = String(value ?? "");
-    const combos = model?.combos || [];
-    const editable = canEditArea("combos") && (stores || (hold && combos.length > 0));
-    const hint = stores ? entry.hint : hold ? (combos.length ? entry.hint : "Stored with the combos, so it can be set once the keyboard has one. Flash the updated firmware pair to set it without one.")
-        : "This keyboard keeps each combo's own window. Flash the updated firmware pair to set a default.";
+    const editable = canEditArea("combos");
+    const hint = entry.hint;
     const row = el(`<div class="setrow" data-tip="${esc(hint)}">
         <div><div class="nm">${esc(entry.label)}</div>
             <div class="hint">${esc(hint)}</div></div>
-        <div class="control"><div class="input-row"><input class="input mono" id="${hold ? "comboHoldTerm" : "comboDefaultTerm"}" data-f="settings:combo:${hold ? "hold" : "default"}" inputmode="numeric" value="${esc(stored)}" ${editable ? "" : "disabled"}></div></div>
+        <div class="control"><span class="affix unit"><input class="input mono" id="${hold ? "comboHoldTerm" : "comboDefaultTerm"}" data-f="settings:combo:${hold ? "hold" : "default"}" inputmode="numeric" value="${esc(stored)}" ${editable ? "" : "disabled"}><i>ms</i></span></div>
     </div>`);
     // Posted on its own rather than riding along with whichever combo is saved
     // next. The keyboard always stores a number, so an emptied field is put
@@ -116,37 +233,6 @@ function comboTimingRow(model, entry) {
         post(hold ? edits.comboHoldTerm(written, model?.profileIdentity) : edits.comboDefaultTerm(written, model?.profileIdentity));
     });
     return row;
-}
-
-/** @param {{label: string, hint?: string}} field @param {string} query */
-const matches = (field, query) => `${field.label} ${field.hint || ""}`.toLowerCase().includes(query);
-
-// The keyboard's own name, which it stores with its settings and reports over
-// USB. Empty is the firmware's built-in name, shown as the placeholder when
-// the keyboard reports it. Changing it is one draft edit, posted on change.
-const KEYBOARD_NAME = {label: "Keyboard name",
-    hint: "Shown in Chrome's keyboard chooser, your computer's list of devices and Ark's keyboard menu. Leave it empty for the built-in name. After Apply the keyboard reconnects for a moment to take its new name."};
-/** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {NonNullable<import("../../contracts/panel.js").PublishedModel["keyboardName"]>} keyboard @param {boolean} canEdit */
-function keyboardCard(model, keyboard, canEdit) {
-    const count = nameCount(keyboard.name, keyboard.perName || NAME_MAX_BYTES);
-    const node = el(`<section class="card settings-group" data-section="keyboard">
-        <div class="card-h"><h3>Keyboard${draftMarks(model?.draft?.changes).settings.has("keyboard") ? draftDot() : ""}</h3>
-            <span class="right tag">1 setting</span></div>
-        <div class="rows"><div class="setrow" data-tip="${esc(KEYBOARD_NAME.hint)}">
-            <div><div class="nm">Name</div><div class="hint">${esc(KEYBOARD_NAME.hint)}</div></div>
-            <div class="control field"><input class="input" data-f="settings:keyboard-name" data-keyboard-name value="${esc(keyboard.name)}"
-                placeholder="${esc(keyboard.builtIn || "Built-in name")}" aria-label="Keyboard name" data-tip="${esc(KEYBOARD_NAME.hint + " " + NAME_TIP)}" ${canEdit ? "" : "disabled"}>
-                <span class="note${count.over ? " warn" : ""}" data-name-count>${esc(count.label)}</span></div>
-        </div></div>
-    </section>`);
-    const input = /** @type {HTMLInputElement} */ (node.querySelector("[data-keyboard-name]"));
-    input.addEventListener("input", () => {
-        const now = nameCount(input.value, keyboard.perName || NAME_MAX_BYTES), counter = /** @type {HTMLElement} */ (node.querySelector("[data-name-count]"));
-        counter.textContent = now.label;
-        counter.classList.toggle("warn", now.over);
-    });
-    input.addEventListener("change", () => post(edits.keyboardNameMessage(input.value, keyboard.identity)));
-    return node;
 }
 
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {import("../../contracts/panel.js").PresentedSection} section @param {import("../../contracts/panel.js").PresentedField[]} fields @param {boolean} canEdit @param {boolean} [searching] */
@@ -184,11 +270,47 @@ export function sectionCard(model, section, fields, canEdit, searching = false) 
         }, model?.settingsEditing?.identity));
     };
 
+    // A section's one-per-layer switches read as one setting, so they are one
+    // row of layers rather than a row each.
+    const grouped = section.layerGroup ? section.fields.filter(layerSwitch) : [];
+    const slot = section.fields.some((entry) => entry.governs && !grouped.includes(entry));
     for (const field of section.fields) {
+        if (grouped.includes(field)) {
+            if (field === grouped[0] && section.layerGroup) rows.appendChild(layerGroupRow(section.layerGroup, grouped, fields, canEdit, submit));
+            continue;
+        }
         const hidden = !fields.includes(field);
-        rows.appendChild(fieldRow(field, canEdit, submit, hidden, section.fields.some((entry) => entry.governs), durations));
+        rows.appendChild(fieldRow(field, canEdit, submit, hidden, slot, durations));
     }
     return node;
+}
+
+/** @param {import("../../contracts/panel.js").PresentedField} field */
+const layerSwitch = (field) => field.kind === "toggle" && field.governs?.kind === "layer";
+
+// One switch per layer, each named by its layer and marked in its colour, in
+// the order the layer tabs read. Each keeps its own field identity, so the
+// section still saves whole and a search still finds a single layer.
+/** @param {{label: string, hint: string}} group @param {import("../../contracts/panel.js").PresentedField[]} fields @param {import("../../contracts/panel.js").PresentedField[]} shown @param {boolean} canEdit @param {() => void} submit */
+function layerGroupRow(group, fields, shown, canEdit, submit) {
+    const model = getModel();
+    const row = el(`<div class="setrow layer-switches" data-tip="${esc(group.hint)}" ${fields.some((field) => shown.includes(field)) ? "" : "hidden"}>
+        <div><div class="nm">${esc(group.label)}${keyboardKeysMark(fields[0])}</div><div class="hint">${esc(group.hint)}</div></div>
+        <div class="layer-grid" role="group" aria-label="${esc(group.label)}"></div>
+    </div>`);
+    const grid = /** @type {HTMLElement} */ (row.querySelector(".layer-grid"));
+    for (const field of fields) {
+        const at = field.governs?.kind === "layer" ? field.governs.layer : -1;
+        const layer = layers().find((entry) => entry.index === at);
+        const editable = canEdit && !field.readOnly;
+        const tip = [field.tooltip, field.hint, field.readOnly ? "This setting cannot be edited with the connected firmware." : ""].filter(Boolean).join(" ");
+        const node = el(`<label class="sw" data-tip="${esc(tip)}" ${shown.includes(field) ? "" : "hidden"}>
+            <input type="checkbox" data-macro="${esc(field.macro)}" data-f="setting:${esc(field.macro)}" ${field.enabled ? "checked" : ""} ${editable ? "" : "disabled"}>
+            <span class="track"></span><span class="txt">${marked(model, field.governs, layer ? layerName(layer) : field.label)}</span></label>`);
+        /** @type {HTMLInputElement} */ (node.querySelector("input")).addEventListener("change", submit);
+        grid.appendChild(node);
+    }
+    return row;
 }
 
 /** @param {import("../../contracts/panel.js").PresentedField} field @param {boolean} canEdit @param {() => void} submit @param {boolean} hidden @param {boolean} slot @param {Map<string, ReturnType<typeof durationControl>>} durations */
@@ -200,14 +322,14 @@ function fieldRow(field, canEdit, submit, hidden, slot, durations) {
         && field.kind !== "toggle" && field.kind !== "layer" && !field.choices?.length;
     const label = affixed ? field.label.replace(new RegExp(`\\s*\\(${field.unit}\\)$`), "") : field.label;
     const row = el(`<div class="setrow ${field.readOnly ? "ro" : ""}" data-tip="${esc([field.tooltip, field.hint].filter(Boolean).join(" "))}" ${hidden ? "hidden" : ""}>
-        <div><div class="nm">${marked(getModel(), field.governs, label, {slot})}</div>${field.hint ? `<div class="hint">${esc(field.hint)}</div>` : ""}</div>
+        <div><div class="nm">${marked(getModel(), field.governs, label, {slot})}${keyboardKeysMark(field)}</div>${field.hint ? `<div class="hint">${esc(field.hint)}</div>` : ""}</div>
         <div class="control"></div>
     </div>`);
     const control = /** @type {HTMLElement} */ (row.querySelector(".control"));
 
     if (field.readOnly) {
         control.appendChild(el(`<span class="chip"
-            data-tip="${esc([field.tooltip, field.hint, "This setting cannot be edited with the connected firmware."].filter(Boolean).join(" "))}">read-only · ${esc(field.kind === "toggle" ? (field.enabled ? "on" : "off") : field.value)}</span>`));
+            data-tip="${esc([field.tooltip, field.hint, field.notBuilt ? "" : "This setting cannot be edited with the connected firmware."].filter(Boolean).join(" "))}">${field.notBuilt ? "Not in this firmware" : `read-only · ${esc(field.kind === "toggle" ? (field.enabled ? "on" : "off") : field.value)}`}</span>`));
         return row;
     }
     if (field.presentation === "duration") {
@@ -245,6 +367,13 @@ function fieldRow(field, canEdit, submit, hidden, slot, durations) {
     control.appendChild(node);
     return row;
 }
+
+// QMK keeps the live value of these, so a key on the keyboard (a Magic,
+// DF() or combo toggle key) or VIA changes it too, and the draft then asks
+// to be updated.
+const KEYBOARD_KEYS_TIP = "Keys on the keyboard (and VIA) can change this too. If they do, the draft bar asks you to update the draft.";
+/** @param {import("../../contracts/panel.js").PresentedField | undefined} field */
+const keyboardKeysMark = (field) => field?.keyboardKeys ? ` <span class="kk-mark" data-tip="${esc(KEYBOARD_KEYS_TIP)}">↺ keyboard keys change this too</span>` : "";
 
 /** @param {string} value */
 const cssEscape = (value) => String(value).replace(/["\\]/g, "\\$&");

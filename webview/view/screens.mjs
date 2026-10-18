@@ -55,14 +55,14 @@ export const SCREENS = Object.freeze({
         available: configureReady, render: renderers => renderers.screenSettings(),
     }),
     profile: screen({
-        label: "Profile & backups", group: "Keyboard", title: "Profile & backups", keepOnPublish: false,
-        secondaryLabel: "Profile & backups",
+        label: "Backups", group: "Keyboard", title: "Backups", keepOnPublish: false,
+        secondaryLabel: "Backups",
         icon: '<svg viewBox="0 0 16 16"><path d="M8 1.8v8.4M5 7.4 8 10.4l3-3M2.8 12.2v1.4h10.4v-1.4"/></svg>',
         available: model => Boolean(model.portable?.available), render: renderers => renderers.screenProfile(),
         unavailable: {title: "Backups unavailable", detail: "Connect a keyboard with complete-profile firmware, then read it to manage backups."},
     }),
     device: screen({
-        label: "Device", group: "Keyboard", title: "Device", keepOnPublish: false,
+        label: "Keyboard", group: "Keyboard", title: "Keyboard", keepOnPublish: false,
         secondaryLabel: "Device details",
         icon: '<svg viewBox="0 0 16 16"><rect x="2.5" y="2.5" width="11" height="11" rx="2.5"/><path d="M6 6.5h4v3H6z"/></svg>',
         available: model => Boolean(model.device?.connected || model.demo?.active), render: renderers => renderers.screenDevice(),

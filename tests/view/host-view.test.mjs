@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {buildLine, chooseKeyboard, forgetKeyboard, commitUrl, downloadRecovery, githubMark, hostOf, otherTheme, savedWhen, setTheme, themeLabel} from "../../webview/view/host.mjs";
+import {buildLine, copyTitle, deleteRecovery, useRecovery, chooseKeyboard, forgetKeyboard, commitUrl, downloadRecovery, githubMark, hostOf, otherTheme, savedWhen, setTheme, themeLabel} from "../../webview/view/host.mjs";
 
 test("a model without a host description offers nothing extra", () => {
     assert.deepEqual(hostOf(undefined), {chooseKeyboard: false, blocked: null, theme: null, recoveries: null, build: null, progress: null, words: {}});
@@ -26,7 +26,10 @@ test("the build and a copy's time read as words", () => {
     assert.equal(buildLine({version: "2026.10.5+1", commit: "47eae264eab0"}), "Ark 2026.10.5+1 · 47eae264eab0");
     assert.equal(buildLine(null), "");
     assert.equal(savedWhen("not a date"), "not a date");
-    assert.ok(savedWhen("2026-10-06T09:14:03.512Z").length > 0);
+    assert.match(savedWhen("2026-10-06T09:14:03.512Z"), /^6 Oct 2026, \d\d:\d\d$/, "British dates");
+    assert.match(copyTitle("Charybdis - Home", "2026-10-18T07:12:00Z"), /^Before Apply · Charybdis - Home · 18 Oct 2026, \d\d:\d\d$/);
+    assert.deepEqual(useRecovery(2), {type: "useRecovery", id: 2});
+    assert.deepEqual(deleteRecovery(2), {type: "deleteRecovery", id: 2});
 });
 
 test("a build links to its commit on GitHub only when it names one", () => {

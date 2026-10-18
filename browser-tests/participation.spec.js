@@ -19,17 +19,17 @@ test("participation controls post placements, shared definitions and master/sour
 
     await page.locator('[data-tab="behaviours"]').click();
     await clear();
-    await page.getByText('Definition enabled', {exact: true}).click();
+    await page.getByText('Use this behaviour', {exact: true}).click();
     await expect.poll(posted).toEqual([expect.objectContaining({type: "saveBehavior", behavior: expect.objectContaining({enabled: false, allowedLayers: 65535})})]);
-    await page.getByText("Allowed source layers", {exact: true}).click();
+    await page.getByText("Layers it runs on", {exact: true}).click();
     await clear();
     await page.locator('label').filter({has: page.locator('[data-allowed-layer="15"]')}).click();
     await expect.poll(posted).toEqual([expect.objectContaining({type: "saveBehavior", behavior: expect.objectContaining({enabled: false, allowedLayers: 32767})})]);
 
     await page.locator('[data-tab="combos"]').click();
     await page.getByRole("button", {name: "New combo", exact: true}).click();
-    await page.getByText('Definition enabled', {exact: true}).click();
-    await page.getByText("Allowed source layers", {exact: true}).click();
+    await page.getByText('Use this combo', {exact: true}).click();
+    await page.getByText("Layers it runs on", {exact: true}).click();
     await page.locator('label').filter({has: page.locator('[data-allowed-layer="15"]')}).click();
     await page.locator('[data-output]').fill("KC_A");
     await page.locator('[data-act="pickboard"]').click();

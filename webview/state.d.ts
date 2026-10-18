@@ -14,12 +14,12 @@ export interface MacroForm {
     moveNotice?: string;
     selectionAnchor?: string | null; selectedSteps?: string[]; stepHistory?: MacroHistory;
 }
-export interface PickerState {title: string; context?: string; contextKeycode?: string; mode: 'single' | 'list'; allowedKeys: string[] | null; modifiable?: string[] | null; shortcut?: boolean; maxKeys: number; section: string; search: string; mods: string[]; keys: string[]; layerTap: string | null; onPick?: (expression: string) => void; onShortcut?: (shortcut: {mods: number; key: number}) => void; onCustomKey?: (keycode: string, shortcut: {mods: number; key: number}, name: string) => void; customKeyRuns?: 'behaviour' | 'shortcut'}
+export interface PickerState {title: string; context?: string; contextKeycode?: string; mode: 'single' | 'list'; allowedKeys: string[] | null; modifiable?: string[] | null; shortcut?: boolean; maxKeys: number; section: string; search: string; mods: string[]; keys: string[]; layerTap: string | null; onPick?: (expression: string) => void; onShortcut?: (shortcut: {mods: number; key: number}) => void; onCustomKey?: (keycode: string, shortcut: {mods: number; key: number}, name: string) => void; customKeyRuns?: 'behaviour' | 'shortcut'; layoutKey?: boolean}
 export interface PanelState {
     screen: ScreenId; layer: number; layersOn: number[]; selected: number; tab: string;
     behaviourRow: string | null; behaviourRowShown: string | null; behaviourRoute: {row: string; group: string} | null;
     reachGroups: Record<string, boolean>; resetBenchHeight: boolean; reachRow: {macros: string | null; combos: string | null; pointing: string | null};
-    cell: string | null; cellRow: string | null; reveal: string | null; pickCombo: number | null; settingsOpen: string[];
+    cell: string | null; cellRow: string | null; reveal: string | null; pickCombo: number | null; settingsOpen: string[]; keyDetailsOpen: boolean; stackOpen: boolean;
     cellHow: {cell: string; keycode: string; helper?: BranchHelper; repeatHz?: Scalar} | null;
     combo: {open: boolean; picking: boolean; inputs: string[]; form: Omit<Combo, 'inputs'> & {output: string; termMs: string}; awaiting: boolean; editId: number | null};
     placement: {keycode: string} | null; retarget: {from: string; to: string; existing: string} | null; keyClipboard: {keycode: string; label: string} | null;

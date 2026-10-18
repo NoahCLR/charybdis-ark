@@ -17,7 +17,9 @@ tier dots, including when either is absent; title slots fit a full combo badge
 with space before its name.
 The Keys workbench tabs count what the selected layer stores. The Key tab counts
 mapped keys, excluding transparent and disabled positions; its selected key's
-layout index belongs in the key details. Every Keys tab is at least as tall as
+layout index, matrix position, LED index and stored keycode belong in the key
+details, folded under **Where it is stored**. Reach rows and tables name keys
+as the board does, never by layout index. Every Keys tab is at least as tall as
 the Behaviours tab; a taller editor carries its height across tab changes, so
 changing tabs does not move the page's scroll position.
 The Behaviours, Combos, Macros and Pointing modes reach lists lead with **On
@@ -121,7 +123,7 @@ The same kind of control looks and sits the same on every screen.
   same-screen renders without carrying it into another list, and bring the
   picked row into view.
 - A heading inside a workbench column uses the column's `sect-h` style.
-- Pages of cards (Mouse, Settings, Profile & backups, Device) share one width,
+- Pages of cards (Mouse, Settings, Backups, Keyboard) share one width,
   `--page`. Side-by-side tables start at the top rather than stretching to
   each other's height.
 - Keys and Lighting draw the same layer strip, Rename & Reorder included
@@ -471,12 +473,14 @@ permissions while retaining normal native outputs.
 
 ## Keyboard name
 
-Settings opens with a **Keyboard** card (`.settings-group[data-section="keyboard"]`)
-holding one text field, `data-f="settings:keyboard-name"`, in the ordinary
-(not monospace) face, with a live byte count against the 32-byte name rule.
-Its placeholder is `model.keyboardName.builtIn`, the firmware's built-in name
-while the connected keyboard stores none and reports it over USB, else
-"Built-in name". It follows `canEdit("settings")` and the Settings search.
+The Keyboard screen's title is the name: the shared title-name component
+(`ui/title-name.mjs`, as macro and custom-key titles), `data-f="keyboard:name"`
+inside `.keyboard-title`, with a byte count against the 32-byte name rule and
+the reconnect note shown only while it has focus. Its placeholder is
+`model.keyboardName.builtIn`, the firmware's built-in name while the
+connected keyboard stores none and reports it over USB, else the device's
+label. It follows `canEdit("settings")`; a Settings search that matches the
+name points to Keyboard (`view/settings-layout.mjs matchesElsewhere`).
 
 On `change` it posts `renameKeyboard` built by `keyboardNameMessage` in
 `webview/view/edits.mjs`: `{name, expectedFingerprint}`, the name trimmed. Core

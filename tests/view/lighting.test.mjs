@@ -242,3 +242,38 @@ test("zero brightness keeps explicit black distinct from layer pass-through and 
     m.rgb.layerColors[1].color = black;
     assert.deepEqual(keyLight(m, {index: 3}, position(13, "KC_A")), {colour: black, source: "layer", layer: 3});
 });
+
+// The base effect's LED classes, as the draft's Settings · Base lighting stores them.
+const baseSettings = (leds) => ({id: "rgbAppearance", area: "Settings", label: "Base lighting", fields: [{macro: "effectLeds", label: "LEDs", value: String(leds)}]});
+test("a base-effect LED class the effect skips stays unlit; an animated effect is drawn lit", async () => {
+    const {baseAnimated, baseReaches} = await import("../../webview/view/lighting.mjs");
+    const keysOnly = {...model(), configDefaults: [baseSettings(4)]};
+    assert.equal(baseReaches(keysOnly, 0), true);
+    assert.equal(baseReaches(keysOnly, 50), false, "a thumb key is not a main key");
+    assert.equal(baseReaches(keysOnly, undefined), false, "nor is the trackball LED");
+    assert.equal(baseReaches(model(), 50), true, "without the setting every LED is reached");
+    assert.equal(baseAnimated(model()), false);
+    const animated = model({rgb: {...model().rgb, layerColors: [], baseEffect: {state: "read", enabled: true, effectId: 13, hue: 10, saturation: 200, brightness: 255, previewColor: undefined}}});
+    assert.equal(baseAnimated(animated), true);
+    const light = keyLight(animated, {index: 0, positions: [position(0, "KC_A")]}, position(0, "KC_A"));
+    assert.equal(light.source, "animated");
+    assert.ok(!isOff(light.colour), "lit, never drawn as off");
+    const skipped = {...model({rgb: {...model().rgb, layerColors: []}}), configDefaults: [baseSettings(4)]};
+    assert.equal(keyLight(skipped, {index: 0, positions: []}, position(50, "KC_SPC")).source, "off");
+    assert.equal(keyLight(skipped, {index: 0, positions: []}, position(0, "KC_A")).source, "base");
+});
+
+test("a trackball mode previews from its first placed key, and black paints dark", async () => {
+    const {pdTrigger} = await import("../../webview/view/lighting.mjs");
+    const pd = {pdModes: [{id: 0, kind: 2, binding: {slot: 0, hold: "PD_SLOT_0", lock: "PD_LOCK_0"}}]};
+    const base = {index: 0, positions: [position(0, "KC_A"), {layoutIndex: 40, keycode: "QK_USER_16", semantic: "PD_SLOT_0"}]};
+    const other = {index: 3, positions: [{layoutIndex: 5, keycode: "QK_USER_17", semantic: "PD_LOCK_0"}]};
+    const m = {...model(), ...pd, layers: [base, other]};
+    assert.deepEqual(pdTrigger(m, base, 0), {layoutIndex: 40, layer: 0});
+    assert.deepEqual(pdTrigger(m, other, 0), {layoutIndex: 5, layer: 3}, "the viewed layer's key first");
+    assert.equal(pdTrigger(m, base, 1), null);
+    const black = {mode: "PD_MODE_DRAGSCROLL", color: colour(0, 0, 0), locality: "RGB_RIGHT_HALF"};
+    const light = keyLight(model(), {index: 0, positions: []}, position(11, "KC_A"), {pdActive: black});
+    assert.equal(light.source, "pointing");
+    assert.ok(isOff(light.colour), "the right half goes dark");
+});

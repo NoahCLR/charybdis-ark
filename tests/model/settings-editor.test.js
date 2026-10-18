@@ -183,7 +183,7 @@ test("every DPI field offers the one list, limited only where the keyboard limit
         assert.ok(field.choices.every(choice => choice.value === 0 || POINTER_DPI.includes(choice.value)), `${field.macro} picks from the shared list`);
     }
     const values = macro => fields.find(field => field.macro === macro).choices.map(choice => choice.value);
-    assert.deepEqual(values("normalDpi"), POINTER_DPI.filter(v => v >= 400 && v % 200 === 0), "the steps the firmware stores");
+    assert.deepEqual(values("normalDpi"), POINTER_DPI.filter(v => v >= 400 && v <= 3400 && v % 200 === 0), "the steps the firmware stores");
     assert.deepEqual(values("snipingDpi"), [100, 200, 300, 400], "the steps the firmware stores");
     assert.throws(() => editSettings(current, {sectionId: "pointingModeSpeeds", expectedFingerprint: current.fingerprint, fields: []}),
         /complete settings section/, "the old per-mode speeds are no longer a settings section");
@@ -216,9 +216,10 @@ test("all native controls preserve a complete profile unchanged, including unkno
     assert.equal(fields.find(field => field.macro === "swapLeftAltGui").enabled, true);
     assert.equal(fields.find(field => field.macro === "autocorrect").readOnly, true);
     assert.equal(fields.find(field => field.macro === "effectMode").choices[1].label, "Breathing");
+    assert.equal(fields.find(field => field.macro === "effectMode").choices[0].label, "Solid colour", "spelled as the rest of the app spells colour");
     const next = editSettings(current, message(current, "keyboardOptions", {swapLeftAltGui:false, swapControlCaps:true}));
     assert.equal(validateSnapshot(next).settings.values[24], 0x8001);
-    assert.throws(() => editSettings(current, message(current, "keyboardOptions", {autocorrect:true})), /not enabled/);
+    assert.throws(() => editSettings(current, message(current, "keyboardOptions", {autocorrect:true})), /Not in this firmware/);
 });
 test("startup layers validate the final mask, and combo references edit only their layer's record", () => {
     const current = withSettings(() => {});

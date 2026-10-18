@@ -27,6 +27,7 @@ const ADD_KEY = /Mac|iPhone|iPad/.test(globalThis.navigator?.platform || "") ? "
 // The layer tabs. Which layer you are looking at is a property of the
 // keyboard, not of a screen, so Keys and Lighting share one control, and it
 // sits on the board it chooses for: the picked layer's tab opens into it.
+// A layer named only by its number shows that number once.
 // ⌘-click previews more layers on together (view/layer-set.mjs); the highest
 // keeps the tab that opens into the board, the others and base show as on.
 // ⌘-clicking base alone previews the picked layer over base.
@@ -49,7 +50,7 @@ export function layerBar(trailing = "") {
         const tint = on && swatch.colour ? ` style="--tab-tint:${swatch.colour}"` : "";
         return `<button class="layer-tab${on ? " on" : ""}"${tint} role="tab" data-layer="${index}" aria-selected="${state.layer === index}"
             data-tip="${esc(swatch.tip)}${drafted.has(layer.index) ? " · changed in your draft" : ""}${esc(how)}">${swatch.html}
-            <span>${esc(layerName(layer))}</span><span class="idx">${layer.index}</span>${drafted.has(layer.index) ? '<i class="draft-dot"></i>' : ""}</button>`;
+            <span>${esc(layerName(layer))}</span>${layerName(layer) === `Layer ${layer.index}` ? "" : `<span class="idx">${layer.index}</span>`}${drafted.has(layer.index) ? '<i class="draft-dot"></i>' : ""}</button>`;
     }).join("");
     const node = el(`<div class="layerbar-wrap"><div class="layer-tabs" role="tablist" aria-label="Layers">${tabs}${trailing}</div></div>`);
     /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-layer]")).forEach((button) => button.addEventListener("click", (event) => {

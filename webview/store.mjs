@@ -46,6 +46,8 @@ export const STATE_FIELDS = {
     reveal: kept(null),        // a selector the next render scrolls into view and marks, then forgets
     pickCombo: kept(null),     // a combo id to pick in the Combos tab, wherever this layer lists it
     settingsOpen: kept([]),    // settings sections opened by hand or by a Show, so a render keeps them open
+    keyDetailsOpen: kept(false), // the Key tab's folded position details, open on every key once opened
+    stackOpen: kept(false),    // the Key tab's runs of transparent layers, shown in full once asked
     settingsDurationUnits: kept({}), // display preferences; stored settings remain milliseconds
     // {cell, keycode, helper, repeatHz}: how the open empty cell runs, chosen
     // before it sends anything. Historically kept across draft replacement;
