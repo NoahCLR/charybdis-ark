@@ -467,6 +467,37 @@ select.input { background-image: linear-gradient(45deg, transparent 50%, var(--t
 .board-foot > .board-foot-text { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .board-foot b { color: var(--text); font-weight: var(--fw-strong); }
 .board-foot .right { margin-left: auto; display: flex; gap: 6px; }
+/* The layer plate, laid over the board's empty centre (ui/board.mjs places
+   it): the layer's name, what it is shown over, how it is reached. */
+.board-centre { position: absolute; z-index: 1; }
+.layer-plate {
+  display: flex; flex-direction: column; justify-content: center; gap: var(--s-2);
+  padding: var(--s-2); color: var(--text-2); font-size: var(--fs-small); line-height: var(--lh-small);
+}
+.plate-name { display: flex; align-items: center; gap: var(--s-2); min-width: 0; color: var(--text); }
+.plate-name .swatch { width: 12px; height: 12px; border-radius: var(--r-chip); border: 1px solid var(--line-2); flex: none; }
+.plate-title { font-size: var(--fs-heading); line-height: var(--lh-heading); font-weight: var(--fw-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plate-row { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s-1) var(--s-2); }
+.plate-over { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plate-note { color: var(--text-3); }
+.plate-reach { display: flex; flex-direction: column; align-items: flex-start; gap: 0; min-width: 0; }
+.plate-reach .eyebrow { margin-bottom: var(--s-1); }
+.plate-way { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); text-align: left; }
+button.plate-way:hover { text-decoration: underline; }
+.plate-more { color: var(--text-3); }
+.plate-warn { color: var(--warning); font-weight: var(--fw-medium); }
+.plate-foot { display: flex; }
+.plate-pop { position: relative; }
+.plate-pop > summary { list-style: none; display: inline-flex; align-items: center; margin-left: calc(-1 * var(--s-2)); }
+.plate-pop > summary::-webkit-details-marker { display: none; }
+.plate-menu {
+  position: absolute; z-index: 6; left: 0; bottom: calc(100% + var(--s-1)); min-width: 200px; max-height: 260px; overflow-y: auto;
+  display: flex; flex-direction: column; align-items: stretch; gap: var(--s-1); padding: var(--s-2);
+  background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--r-card); box-shadow: var(--shadow-1);
+}
+.plate-menu .btn { justify-content: flex-start; gap: var(--s-2); }
+.plate-menu .swatch { width: 9px; height: 9px; border-radius: var(--r-chip); border: 1px solid var(--line-2); flex: none; }
+.plate-menu .note { white-space: normal; }
 /* A layer named elsewhere as a link to it (Macros) is a chip. */
 .layer-chip {
   display: inline-flex; align-items: center; gap: 8px; height: 28px; padding: 0 10px 0 8px;

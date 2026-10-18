@@ -111,6 +111,9 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     // placeholders name it ("200 · dual-role").
     timingSources: {tappingTerm: "dual-role", tapHoldTerm: "behaviour default", longHoldTerm: "default", multiTapTerm: "default"},
     tiers: {tap: "Tap", hold: "Hold", long: "Long hold"},
+    // What a way into a layer does to it (layer-reach.js layerWays), as the
+    // Keys layer plate says it after the gesture: "Double-tap Left Thumb (lock)".
+    layerWayVerbs: {hold: "hold", lock: "lock", move: "move to", oneShot: "one-shot"},
     // A behaviour's tap count, the row its actions sit on, by how many taps
     // start it.
     branches: ["Single tap", "Double tap", "Triple tap", "Quadruple tap", "Quintuple tap"],

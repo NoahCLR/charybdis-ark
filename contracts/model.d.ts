@@ -80,6 +80,7 @@ export interface Vocabulary {
     holdFromPress: string;
     timingSources: Record<string, string>;
     tiers: Readonly<Record<string, string>>;
+    layerWayVerbs: Readonly<Record<LayerWay['verb'], string>>;
     branches: readonly string[];
     localities: WordList<string>;
     paintModes: WordList<string>;
@@ -143,6 +144,8 @@ export interface LayerWay {
     /** The press: a tap, a hold, or a longer hold; `tapIndex` 0 is the first press, 1 a double tap. */
     press: 'tap' | 'hold' | 'longHold';
     tapIndex: number;
+    /** The key's own keycode does it (its name says how: "Hold Number"); false for one of its behaviour's actions. */
+    own: boolean;
     from: {layer: number; layoutIndex: number} | {combo: number} | {trackball: true};
 }
 /** How each layer is reached, by keyboard layer; `reached` null when the walk could not tell. */

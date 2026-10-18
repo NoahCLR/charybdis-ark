@@ -31,13 +31,31 @@ let drawnKey = 48;
 /** @type {ResizeObserver | null} */
 let measuring = null;
 const [, , VIEW_W, VIEW_H] = GEO.viewBox.split(" ").map(Number);
-/** @param {SVGSVGElement} svg */
-function measureKeys(svg) {
+// The empty centre of the board in its own units: between the inner columns,
+// above the thumb cluster. The layer plate sits there.
+const CENTRE = {x: 434, y: 108, w: 254, h: 286};
+const [VIEW_X, VIEW_Y] = GEO.viewBox.split(" ").map(Number);
+// Lays the centre's content over that area of the drawn board, wherever the
+// board's box puts the scaled drawing.
+/** @param {SVGSVGElement} svg @param {HTMLElement | null} centre */
+function placeCentre(svg, centre) {
+    if (!centre || !centre.isConnected) return;
+    const box = svg.getBoundingClientRect(), host = /** @type {HTMLElement} */ (centre.offsetParent || svg.parentElement).getBoundingClientRect();
+    if (!box.width || !box.height) return;
+    const scale = Math.min(box.width / VIEW_W, box.height / VIEW_H);
+    const left = box.left - host.left + (box.width - VIEW_W * scale) / 2, top = box.top - host.top + (box.height - VIEW_H * scale) / 2;
+    Object.assign(centre.style, {left: `${left + (CENTRE.x - VIEW_X) * scale}px`, top: `${top + (CENTRE.y - VIEW_Y) * scale}px`,
+        width: `${CENTRE.w * scale}px`, height: `${CENTRE.h * scale}px`});
+    centre.hidden = false;
+}
+/** @param {SVGSVGElement} svg @param {HTMLElement | null} [centre] */
+function measureKeys(svg, centre = null) {
     measuring?.disconnect();
     if (typeof ResizeObserver !== "function") return;
     measuring = new ResizeObserver(([entry]) => {
         const {width, height} = entry.contentRect;
         if (!width || !height) return;
+        placeCentre(svg, centre);
         const key = GEO.keyW * Math.min(width / VIEW_W, height / VIEW_H);
         if (Math.abs(key - drawnKey) < 1) return;
         drawnKey = key;
@@ -185,7 +203,15 @@ export function board(model, layer, options = {}) {
         if (onSwap) dragToSwap(node, group, index, onSwap);
     });
     /** @type {SVGGElement | null} */ (node.querySelector("[data-trackball]"))?.addEventListener("click", () => onTrackball?.());
-    measureKeys(/** @type {SVGSVGElement} */ (node.querySelector("svg")));
+    const svg = /** @type {SVGSVGElement} */ (node.querySelector("svg"));
+    const centre = options.centre || null;
+    if (centre) {
+        centre.classList.add("board-centre");
+        centre.hidden = true;
+        node.append(centre);
+        requestAnimationFrame(() => placeCentre(svg, centre));
+    }
+    measureKeys(svg, centre);
     return node;
 }
 

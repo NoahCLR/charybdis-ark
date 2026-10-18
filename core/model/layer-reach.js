@@ -122,16 +122,16 @@ const holdPhrase = (index, name, longer) => `${index === 0 ? `Hold ${name}` : `T
 // action, less the parts its behaviour row replaces, and each branch of that
 // row. A hold branch that presses and holds until release holds the layer; any
 // other hold, like a tap, sends the action once.
-/** @param {number} code @param {BehaviorRow | undefined} row @param {readonly number[]} [values] @returns {(LayerEffect & {how: string, note?: string, press: import("../../contracts/model.js").LayerWay["press"], tapIndex: number})[]} */
+/** @param {number} code @param {BehaviorRow | undefined} row @param {readonly number[]} [values] @returns {(LayerEffect & {how: string, note?: string, press: import("../../contracts/model.js").LayerWay["press"], tapIndex: number, own?: boolean})[]} */
 function keyEffects(code, row, values) {
-    /** @type {(LayerEffect & {how: string, note?: string, press: import("../../contracts/model.js").LayerWay["press"], tapIndex: number})[]} */
+    /** @type {(LayerEffect & {how: string, note?: string, press: import("../../contracts/model.js").LayerWay["press"], tapIndex: number, own?: boolean})[]} */
     const effects = [];
     const first = row?.steps.find((step) => step.tapIndex === 0);
     for (const effect of layerEffects(code)) {
         if (effect.taps && row) continue;
         if (effect.kind === "hold" && !effect.oneShot ? first?.hold : first?.tap) continue;
         const held = effect.kind === "hold" && !effect.oneShot;
-        effects.push({...effect, press: held ? "hold" : "tap", tapIndex: effect.taps ? effect.taps - 1 : 0,
+        effects.push({...effect, press: held ? "hold" : "tap", tapIndex: effect.taps ? effect.taps - 1 : 0, own: true,
             how: effect.taps ? `Tap ${codeName(code)} ${effect.taps} times` : held ? `Hold ${codeName(code)}` : `Tap ${codeName(code)}`});
     }
     for (const step of row?.steps || []) {
@@ -627,11 +627,11 @@ function layerWays(decoded) {
     const reached = walked.reachedLayers ?? [...(walked.parent?.keys() || [])].reduce((mask, state) => mask | locksOf(state) | heldOf(state), facts.always);
     /** @type {import("../../contracts/model.js").LayerWay[][]} */
     const ways = Array.from({length: LAYERS}, () => []);
-    /** @param {LayerEffect & {press: import("../../contracts/model.js").LayerWay["press"], tapIndex: number}} effect @param {import("../../contracts/model.js").LayerWay["from"]} from @param {number} [source] */
+    /** @param {LayerEffect & {press: import("../../contracts/model.js").LayerWay["press"], tapIndex: number, own?: boolean}} effect @param {import("../../contracts/model.js").LayerWay["from"]} from @param {number} [source] */
     const add = (effect, from, source) => {
         if (effect.kind === "unowned" || effect.layer >= LAYERS || effect.layer === source) return;
         const verb = effect.kind === "hold" ? (effect.oneShot ? "oneShot" : "hold") : effect.kind;
-        const way = {verb, press: effect.press, tapIndex: effect.tapIndex, from};
+        const way = {verb, press: effect.press, tapIndex: effect.tapIndex, own: Boolean(effect.own), from};
         const key = JSON.stringify(way);
         if (!ways[effect.layer].some((known) => JSON.stringify(known) === key)) ways[effect.layer].push(/** @type {import("../../contracts/model.js").LayerWay} */ (way));
     };
@@ -658,10 +658,10 @@ function layerWays(decoded) {
         if (complete && !reachable.has(combo.index)) continue;
         const outputCode = /** @type {number} */ (nativeCode(combo.output)), row = facts.rows.get(outputCode);
         const effects = facts.generatedLayers(row, combo) ? keyEffects(outputCode, row, facts.values)
-            : actionEffects(combo.output).map((effect) => ({...effect, press: /** @type {"hold" | "tap"} */ (effect.kind === "hold" && !effect.oneShot ? "hold" : "tap"), tapIndex: 0}));
+            : actionEffects(combo.output).map((effect) => ({...effect, press: /** @type {"hold" | "tap"} */ (effect.kind === "hold" && !effect.oneShot ? "hold" : "tap"), tapIndex: 0, own: true}));
         for (const effect of effects) add(effect, {combo: combo.index});
     }
-    if (facts.pointer !== undefined && facts.pointer < LAYERS) add({kind: "hold", layer: facts.pointer, press: "hold", tapIndex: 0}, {trackball: true});
+    if (facts.pointer !== undefined && facts.pointer < LAYERS) add({kind: "hold", layer: facts.pointer, press: "hold", tapIndex: 0, own: true}, {trackball: true});
     return {complete, defaults: layersIn(facts.always),
         layers: ways.map((entries, layer) => ({layer, reached: complete ? Boolean(reached & bit(layer)) : null, ways: entries}))};
 }

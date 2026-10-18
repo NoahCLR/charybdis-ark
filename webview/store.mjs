@@ -27,6 +27,8 @@ export const STATE_FIELDS = {
     screen: kept("keys"),
     layer: kept(0),
     layersOn: kept([]),       // layers previewed on with `layer`, which is the highest of them (view/layer-set.mjs)
+    layerOnly: kept(false),   // Keys' "This layer only": a layer shown as stored, not over the default layers
+    plateAdd: kept(false),    // the layer plate's "+ Add layer to view" list open
     layerGripFocus: kept(undefined), // the layer grip a reorder refocuses after the next render
     selected: kept(0),
     tab: kept("key"),
@@ -213,7 +215,28 @@ export const layers = () => getModel()?.layers || [];
 export const currentLayer = () => layers()[state.layer] || layers()[0];
 // The layers previewed on under the current one, and whether any are: the board
 // then shows what the keyboard answers with, not what the layer stores.
-export const heldLayers = () => layersOn(state.layer, state.layersOn, layers().length);
+// On Keys a layer is shown as the keyboard runs it, over the default layers
+// that are always on under it, unless "This layer only" is pressed or other
+// layers were added to the view (the ⌘-click preview).
+export const heldLayers = () => {
+    const chosen = layersOn(state.layer, state.layersOn, layers().length);
+    if (chosen.length || state.layerOnly || state.layer <= 0 || state.screen !== "keys") return chosen;
+    return defaultLayersUnder(state.layer);
+};
+// The default layers (always on) under the layer at stack position `top`, as
+// stack positions: core's draft.layerWays names them; Base when it does not.
+/** @param {number} top */
+export function defaultLayersUnder(top) {
+    const named = getModel()?.draft?.layerWays?.defaults;
+    const stack = layers();
+    const positions = (named?.length ? named : [stack[0]?.index ?? 0]).map((index) => stack.findIndex((layer) => layer.index === index));
+    return positions.filter((at) => at >= 0 && at < top).sort((a, b) => a - b);
+}
+// Whether the view shows more than the default layers under the top one.
+export const addedLayers = () => {
+    const under = new Set(defaultLayersUnder(state.layer));
+    return heldLayers().filter((at) => !under.has(at));
+};
 export const previewing = () => heldLayers().length > 0;
 // A plain pick shows one layer; ⌘-click adds or removes one from the preview.
 /** @param {number} index */
@@ -228,6 +251,9 @@ export function toggleLayerOn(index) {
     const next = toggleLayer(state.layer, heldLayers(), index);
     state.layer = next.top;
     state.layersOn = next.on;
+    // Turning Base off under a layer shows that layer alone.
+    if (state.screen === "keys" && index === 0 && next.top > 0 && !next.on.length) state.layerOnly = true;
+    else if (state.screen === "keys" && next.on.length) state.layerOnly = false;
     const row = behaviourRowAfterPreview(state.behaviourRow, before, selectedKey());
     if (row === state.behaviourRow) return;
     Object.assign(state, {behaviourRow: row, behaviourRoute: {row, group: "view"}, cell: null, cellHow: null});

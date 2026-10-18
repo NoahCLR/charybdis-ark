@@ -30,8 +30,10 @@ export function previewFoot(layer, lead = "") {
 export function placementBar() {
     const placement = state.placement;
     const node = el(`<div class="pickbar">
-        <span><b>Placing ${placement?.keycode ? actionMarked(getModel(), placement.keycode) : "keycode"}</b> — choose a layer, then click its destination key</span>
-        ${keycodeMark("placeBar", placement?.keycode, "", "n")}
+        <span><b>Placing ${placement?.label ? esc(placement.label) : placement?.keycode ? actionMarked(getModel(), placement.keycode) : "keycode"}</b> — ${placement?.layerTap !== undefined
+            ? "click the key whose tap it keeps"
+            : "choose a layer, then click its destination key"}</span>
+        ${placement?.layerTap !== undefined ? "" : keycodeMark("placeBar", placement?.keycode, "", "n")}
         <span class="right"><button class="btn tiny ghost" data-act="cancel">Cancel</button></span></div>`);
     /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="cancel"]')).addEventListener("click", () => { state.placement = null; render(); });
     return node;

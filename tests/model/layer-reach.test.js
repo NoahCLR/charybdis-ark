@@ -548,14 +548,14 @@ test("layerWays names each way a layer is turned on, only where it can answer", 
     const ways = layerWays(p);
     assert.equal(ways.complete, true);
     assert.deepEqual(ways.defaults, [0]);
-    assert.deepEqual(ways.layers[1].ways, [{verb: "hold", press: "hold", tapIndex: 0, from: {layer: 0, layoutIndex: 0}}],
+    assert.deepEqual(ways.layers[1].ways, [{verb: "hold", press: "hold", tapIndex: 0, own: true, from: {layer: 0, layoutIndex: 0}}],
         "the MO(1) on layer 1 itself is its way out, not in");
     assert.deepEqual(ways.layers[2].ways, [
-        {verb: "lock", press: "tap", tapIndex: 1, from: {layer: 0, layoutIndex: 1}},
-        {verb: "hold", press: "hold", tapIndex: 0, from: {layer: 1, layoutIndex: 5}},
-        {verb: "lock", press: "tap", tapIndex: 4, from: {layer: 1, layoutIndex: 5}},
+        {verb: "lock", press: "tap", tapIndex: 1, own: false, from: {layer: 0, layoutIndex: 1}},
+        {verb: "hold", press: "hold", tapIndex: 0, own: true, from: {layer: 1, layoutIndex: 5}},
+        {verb: "lock", press: "tap", tapIndex: 4, own: true, from: {layer: 1, layoutIndex: 5}},
     ]);
-    assert.deepEqual(ways.layers[3].ways, [{verb: "hold", press: "hold", tapIndex: 0, from: {combo: 0}}]);
+    assert.deepEqual(ways.layers[3].ways, [{verb: "hold", press: "hold", tapIndex: 0, own: true, from: {combo: 0}}]);
     // Layer 6 is never reached, so its MO(5) is no way into layer 5.
     assert.deepEqual([ways.layers[5].reached, ways.layers[5].ways], [false, []]);
     assert.equal(ways.layers[6].reached, false);
