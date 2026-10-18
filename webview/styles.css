@@ -885,6 +885,8 @@ button.tier:hover { background: var(--surface-3); }
    .swatch-lg so they win where they meet. */
 .pickbar .right { margin-left: auto; }
 .pickbar .pickbar-actions { display: flex; gap: 6px; }
+/* The board's "?" sits at the card's top right, over the bar's end. */
+.board-card > .pickbar { padding-right: calc(var(--h-compact) + 16px); }
 /* A legend dot for a tier whose colour is off, or while key feedback is off. */
 .legend-item .ldot.off { background: none; border-style: dashed; }
 /* The Key tab (ui/keys/key-tab.mjs): the position's details, the stack's
