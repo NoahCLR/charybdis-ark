@@ -1289,14 +1289,33 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .sheet-f .chip { cursor: pointer; }
 
 /* ── misc screens ────────────────────────────────────────────────────── */
-/* ── pointing modes ──────────────────────────────────────────────────── */
-.pd-page { display: grid; grid-template-columns: 236px minmax(0, 1fr); gap: 20px; align-items: start; }
-/* The slot list stays in reach while a long mode is scrolled. */
-.pd-slots { position: sticky; top: 0; display: grid; gap: 6px; }
-/* 32 slots: configured cards, then the empty ones as chips, scrolling on their own. */
-.pd-slots.many { max-height: calc(100vh - 96px); overflow-y: auto; overscroll-behavior: contain; padding-right: 2px; }
+/* ── trackball (ui/trackball.mjs, ui/trackball/, ui/pointing/) ───────── */
+/* The list (Pointer, Sniping, Mouse layer, then the modes) beside what it
+   opens, the editor no wider than it reads well. */
+.tb-page { display: grid; grid-template-columns: var(--list-trackball) minmax(0, var(--editor-max)); gap: var(--s-5); align-items: start; }
+/* The list stays in reach while a long mode is scrolled, and scrolls on its own. */
+.tb-list { position: sticky; top: 0; display: grid; gap: 6px; align-content: start;
+  max-height: calc(100vh - var(--topbar) - var(--s-7)); overflow-y: auto; overscroll-behavior: contain; padding: 2px; }
+.tb-list .slotcard { min-height: 56px; }
+.tb-list .slotcard.tb-fixed { min-height: var(--s-7); grid-template-columns: minmax(0, 1fr) auto; }
+.tb-list .slotcard.tb-fixed .meta { grid-column: 1 / -1; }
+.tb-list .slotcard.tb-mode .meta .placed { color: var(--text-2); }
+.tb-modes-h { padding: var(--s-3) 2px var(--s-1); }
+.tb-new { justify-self: start; margin-top: var(--s-1); }
+.tb-editor { min-width: 0; }
+.tb-panel .tb-intro { max-width: var(--measure); }
+.tb-panel .card-b + .rows { border-top: 1px solid var(--line); }
+.tb-panel .rows + .rows { border-top: 1px solid var(--line); }
+.tb-facts { display: grid; gap: var(--s-1); border-top: 1px solid var(--line); }
+.tb-keys { display: grid; gap: var(--s-2); border-top: 1px solid var(--line); }
+.tb-key { display: grid; grid-template-columns: minmax(0, 220px) minmax(0, 1fr) auto; gap: var(--s-3); align-items: center; }
+.tb-fold { border-top: 1px solid var(--line); }
+.tb-fold > summary { cursor: pointer; list-style: none; border-bottom-color: transparent; }
+.tb-fold[open] > summary { border-bottom-color: var(--line); }
+.setrow.inert .nm, .setrow.inert .hint { color: var(--text-3); }
+.tb-off { color: var(--text-3); font-weight: var(--fw-regular); }
 .pd-empties { margin-top: 4px; }
-.pd-empties-h { padding: 4px 2px 6px; }
+.pd-empties-h { padding: 4px 2px 6px; cursor: pointer; }
 .pd-chips { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 4px; }
 .slotchip {
   position: relative; height: var(--h-compact); padding: 0; border: 1px dashed var(--line-2); border-radius: var(--r-control); background: transparent;
@@ -1327,7 +1346,23 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .pd-editor { container: pd / inline-size; min-width: 0; }
 .pd-editor .card-h .tag { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .pd-empty-note { max-width: 64ch; }
-.pd-identity { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, .8fr); gap: 12px; }
+.pd-identity { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--s-3); }
+.pd-steps { display: grid; gap: var(--s-3); padding-top: var(--s-3); border-top: 1px solid var(--line); }
+.pd-steps > .field { max-width: none; }
+.pd-steps > label.field select.input { max-width: 260px; }
+.pd-step-row { display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; }
+.pd-step-row .affix { width: 120px; flex: none; }
+.pd-step-row .affix.wide { width: 140px; }
+.pd-problem { color: var(--danger); }
+.pd-problem[hidden] { display: none; }
+.input[aria-invalid="true"] { border-color: var(--danger); }
+.pd-while > .field { max-width: 340px; }
+.pd-templates { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+.pd-start-empty > summary { display: inline-flex; align-items: center; gap: 6px; height: var(--h-control); cursor: pointer; list-style: none; color: var(--text-2); font-size: var(--fs-small); }
+.pd-start-empty > summary:hover { color: var(--text); }
+.pd-start-empty[open] > summary .chev { transform: rotate(90deg); }
+.pd-start-empty-b { padding-top: var(--s-2); }
+.pd-split.pd-split-top { padding-top: 0; border-top: 0; }
 .pd-grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-items: end; }
 .pd-grid4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; align-items: end; }
 .pd-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px 24px; align-items: start;
@@ -1377,9 +1412,9 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
 .pd-taps > .h { font-size: var(--fs-micro); color: var(--text-3); }
 .pd-taps .n { font-size: var(--fs-small); color: var(--text-2); }
 .pd-taps .mods { grid-column: 2 / -1; padding-bottom: 6px; }
-.pd-buttons { display: grid; grid-template-columns: 52px minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, .8fr); gap: 8px 12px; align-items: center; }
+.pd-buttons { display: grid; grid-template-columns: 112px minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, .8fr); gap: 8px 12px; align-items: center; }
 .pd-buttons > .h { font-size: var(--fs-micro); color: var(--text-3); }
-.pd-buttons .n { font-family: var(--mono); font-size: var(--fs-small); color: var(--text-2); }
+.pd-buttons .n { font-size: var(--fs-small); color: var(--text-2); }
 .pd-buttons .narrow { display: none; }
 /* A button that holds modifiers opens its switches under its own row. */
 .pd-buttons .mods { grid-column: 2 / -1; padding-bottom: 6px; }
@@ -1393,7 +1428,7 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
   .pd-cross.pd-cross { grid-template-columns: minmax(0, 1fr); grid-template-areas: none; }
   .pd-cross .arm.arm { grid-area: auto; }
   .pd-cross .hub { display: none; }
-  .pd-buttons { grid-template-columns: 28px minmax(0, 1fr); }
+  .pd-buttons { grid-template-columns: 96px minmax(0, 1fr); }
   .pd-taps { grid-template-columns: minmax(0, 1fr); }
   .pd-taps > .h { display: none; }
   .pd-taps .mods { grid-column: 1; }
@@ -1403,8 +1438,9 @@ table.t tr[data-picked] > td:first-child { box-shadow: inset 2px 0 0 var(--text)
   .pd-buttons > :not(.n) { grid-column: 2; }
 }
 @container content (max-width: 788px) { /* window 1020 */
-  .pd-page { grid-template-columns: minmax(0, 1fr); }
-  .pd-slots { position: static; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+  .tb-page { grid-template-columns: minmax(0, 1fr); }
+  .tb-list { position: static; max-height: none; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+  .tb-list .tb-modes-h, .tb-list .pd-empties { grid-column: 1 / -1; }
 }
 .meter { height: 4px; border-radius: var(--r-chip); background: var(--surface-3); overflow: hidden; }
 .meter i { display: block; height: 100%; background: var(--text-2); }

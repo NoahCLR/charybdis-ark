@@ -1,16 +1,19 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {SCREENS, configureReady, isScreenId, screenAvailable, screenDefinition, screenGroups, secondaryScreen} from "../../webview/view/screens.mjs";
+import {SCREENS, configureReady, isScreenId, railScreen, screenAvailable, screenDefinition, screenGroups, secondaryScreen} from "../../webview/view/screens.mjs";
 
 test("the registry owns every rail screen and renderer in the existing order", () => {
     assert.deepEqual(screenGroups().map(({group, items}) => [group, items.map(({id}) => id)]), [
-        ["Configure", ["keys", "lighting", "macros", "customKeys", "mouse", "pointing", "settings"]],
+        ["Configure", ["keys", "lighting", "macros", "customKeys", "mouse", "settings"]],
         ["Manage", ["profile", "device"]],
     ]);
-    const renderers = Object.fromEntries(["Keys", "Lighting", "Macros", "CustomKeys", "Mouse", "Pointing", "Settings", "Profile", "Device"]
+    const renderers = Object.fromEntries(["Keys", "Lighting", "Macros", "CustomKeys", "Trackball", "Settings", "Profile", "Device"]
         .map(name => [`screen${name}`, () => name[0].toLowerCase() + name.slice(1)]));
+    // Trackball is one screen with two ids: "mouse" on its fixed entries and
+    // "pointing" on a mode, which lights the rail's Trackball item.
+    const own = {mouse: "trackball", pointing: "trackball"};
     for (const [id, definition] of Object.entries(SCREENS)) {
-        assert.equal(definition.render(renderers), id, `${id} selects its own screen`);
+        assert.equal(definition.render(renderers), own[id] || id, `${id} selects its own screen`);
         assert.ok(definition.label && definition.title && definition.icon.startsWith("<svg"), id);
         assert.equal(isScreenId(id), true);
         assert.equal(screenDefinition(id), definition);
@@ -54,4 +57,11 @@ test("unavailable screens offer backups before device diagnostics and never link
     assert.equal(secondaryScreen({...connected, portable: {available: false}}, "device"), null);
     assert.equal(secondaryScreen({...connected, load: {state: "loading"}}, "keys"), null);
     assert.equal(secondaryScreen(null, "keys"), null);
+});
+
+test("the Trackball screen's mode id lights the Trackball rail item", () => {
+    assert.equal(railScreen("pointing"), "mouse");
+    assert.equal(railScreen("mouse"), "mouse");
+    assert.equal(railScreen("keys"), "keys");
+    assert.equal(railScreen("missing"), null);
 });

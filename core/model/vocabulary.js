@@ -163,8 +163,8 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
         directionOutput: [[0, "Every step"], [1, "Once per movement"]],
         modifierPolicy: [[0, "Inherit modifiers"], [1, "Ignore"], [2, "Exact shortcut"]],
         scrollFields: [
-            ["thresholdH", "Horizontal activation threshold"], ["thresholdV", "Vertical activation threshold"],
-            ["divisorH", "Movement per wheel step ↔"], ["divisorV", "Movement per wheel step ↕"],
+            ["thresholdH", "Sideways activation threshold"], ["thresholdV", "Up and down activation threshold"],
+            ["divisorH", "Sideways · counts per wheel step"], ["divisorV", "Up and down · counts per wheel step"],
             ["intervalMs", "Minimum interval (ms)"], ["expireMs", "Gesture expiry (ms)"], ["lockMs", "Axis lock timeout (ms)"],
             ["startNumerator", "Axis selection ratio · numerator"], ["startDenominator", "Axis selection ratio · denominator"],
             ["sustainNumerator", "Axis retention ratio · numerator"], ["sustainDenominator", "Axis retention ratio · denominator"],

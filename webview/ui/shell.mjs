@@ -9,7 +9,7 @@ import {getModel, post, postLeavingDemo, render, setPreference, state} from "../
 import {halvesWords, phaseWords} from "../view/vocabulary.mjs";
 import {statusBesideCount} from "../view/review.mjs";
 import {busyText, postApplyReadText, screenAvailable} from "../view/readiness.mjs";
-import {isScreenId, screenGroups} from "../view/screens.mjs";
+import {isScreenId, railScreen, screenGroups} from "../view/screens.mjs";
 import {buildLine, chooseKeyboard, forgetKeyboard, commitUrl, githubMark, hostOf, themeLabel} from "../view/host.mjs";
 import {boardOutlineMarkup} from "../view/geometry.mjs";
 import {demoOf} from "../view/demo.mjs";
@@ -57,7 +57,7 @@ export function rail() {
         : {tone: health.halves === "agree" ? "ok" : health.halves === "unread" ? "" : "warn", words: halves.label, tip: `${busyWords}${halves.label}. ${halves.detail}`};
 
     const nav = screenGroups().map((group) => `<div class="rail-group">${esc(group.group)}</div>` + group.items.map(({id, definition}) => `
-        <button class="nav-item" data-screen="${id}" aria-current="${state.screen === id}"
+        <button class="nav-item" data-screen="${id}" aria-current="${railScreen(state.screen) === id}"
             ${screenAvailable(model, id) ? "" : "disabled"}>
             ${definition.icon}<span>${esc(definition.label)}</span>
         </button>`).join("")).join("");

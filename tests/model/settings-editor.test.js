@@ -183,7 +183,7 @@ test("every DPI field offers the one list, limited only where the keyboard limit
         assert.ok(field.choices.every(choice => choice.value === 0 || POINTER_DPI.includes(choice.value)), `${field.macro} picks from the shared list`);
     }
     const values = macro => fields.find(field => field.macro === macro).choices.map(choice => choice.value);
-    assert.deepEqual(values("normalDpi"), POINTER_DPI.filter(v => v >= 400 && v % 200 === 0), "the steps the firmware stores");
+    assert.deepEqual(values("normalDpi"), POINTER_DPI.filter(v => v >= 400 && v <= 3400 && v % 200 === 0), "the steps the firmware stores");
     assert.deepEqual(values("snipingDpi"), [100, 200, 300, 400], "the steps the firmware stores");
     assert.throws(() => editSettings(current, {sectionId: "pointingModeSpeeds", expectedFingerprint: current.fingerprint, fields: []}),
         /complete settings section/, "the old per-mode speeds are no longer a settings section");
@@ -326,7 +326,8 @@ test("settings presentation owns combo timing words and explicit duration units"
     for (const macro of ["tappingTerm", "tapHoldTerm", "longerHoldTerm", "multiTapTerm", "mouseTimeout", "mouseDebounce", "mouseDelay", "lightingTimeout", "feedbackFlash"]) {
         assert.equal(fields.find(field => field.macro === macro).unit, "ms", macro);
     }
-    for (const macro of ["normalDpi", "snipingDpi", "mouseThreshold", "hue", "brightness", "hostOs"]) {
+    for (const macro of ["normalDpi", "snipingDpi", "hue", "brightness", "hostOs"]) {
         assert.equal(fields.find(field => field.macro === macro).unit, undefined, macro);
     }
+    assert.equal(fields.find(field => field.macro === "mouseThreshold").unit, "counts", "the mouse layer threshold is sensor counts");
 });

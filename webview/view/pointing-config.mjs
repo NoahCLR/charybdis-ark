@@ -54,10 +54,11 @@ export const SCROLL_FIELDS = [["thresholdH"], ["thresholdV"], ["divisorH"], ["di
 // one DPI list, which arrives with the model (core/model/pointer-dpi.js); a
 // stored value outside it is shown in its place as stored, never replaced,
 // because the firmware accepts it.
-/** @param {{value: number, label: string}[] | null | undefined} choices @param {Scalar | null | undefined} current */
-export function dpiOptions(choices, current) {
+// With the normal speed known, its choice says what it is: "Normal (400 DPI)".
+/** @param {{value: number, label: string}[] | null | undefined} choices @param {Scalar | null | undefined} current @param {number} [normal] */
+export function dpiOptions(choices, current, normal = 0) {
     /** @type {[number, string][]} */
-    const options = (choices || []).map(({value, label}) => [value, label]);
+    const options = (choices || []).map(({value, label}) => [value, value === 0 && normal ? `Normal (${normal} DPI)` : label]);
     const value = Number(current ?? 0);
     if (Number.isInteger(value) && !options.some(([choice]) => choice === value)) {
         const at = options.findIndex(([choice]) => choice > value);
@@ -67,28 +68,46 @@ export function dpiOptions(choices, current) {
 }
 
 // A slot switched to another kind of movement starts from the firmware's own
-// shipped tuning for that kind — Dragscroll's scroll record and Volume's
-// vertical threshold — wherever the stored record is still empty, so the first
-// field changed posts a valid mode instead of an all-zero one.
+// shipped tuning for that kind — Dragscroll's scroll record, speed and
+// reversal, and Volume's vertical threshold — wherever the stored record is
+// still empty, so the first field changed posts a valid mode instead of an
+// all-zero one. Dragscroll reverses vertical scrolling and runs at 100 DPI
+// (pd_config.c, NOAH_DRAGSCROLL_REVERSE_Y); a scrolling mode started at 0 and
+// unreversed would scroll the other way, four or more times as fast.
 export const SCROLL_STARTER = {thresholdH: 2, thresholdV: 3, divisorH: 6, divisorV: 8, intervalMs: 8, expireMs: 80, lockMs: 55,
-    startNumerator: 7, startDenominator: 4, sustainNumerator: 5, sustainDenominator: 4, decayDivisor: 4, invert: 0};
-/** @param {PdSlot} slot @param {number} kind */
-export function startingRecord(slot, kind) {
-    if (kind === KIND.SCROLLING && !SCROLL_FIELDS.some(([key]) => Number(slot.scroll?.[key]))) return {...slot, scroll: {...SCROLL_STARTER}};
+    startNumerator: 7, startDenominator: 4, sustainNumerator: 5, sustainDenominator: 4, decayDivisor: 4, invert: 2};
+export const SCROLL_STARTER_DPI = 100;
+/** @typedef {{dpi: number, scroll: Record<string, number>}} ScrollStarter */
+/** @type {ScrollStarter} */
+export const SHIPPED_SCROLL = Object.freeze({dpi: SCROLL_STARTER_DPI, scroll: Object.freeze({...SCROLL_STARTER})});
+// What a new scrolling mode copies: this keyboard's own Dragscroll (slot 0
+// when it scrolls, else its first scrolling mode), so a new mode scrolls
+// the way the one already in use does; the shipped tuning when there is none.
+/** @param {readonly PdSlot[] | null | undefined} slots @returns {ScrollStarter} */
+export function scrollStarter(slots) {
+    const list = slots || [];
+    const source = [list[0], ...list].find((slot) => slot?.kind === KIND.SCROLLING && SCROLL_FIELDS.some(([key]) => Number(slot.scroll?.[key])));
+    if (!source) return SHIPPED_SCROLL;
+    return {dpi: Number(source.dpi) || 0, scroll: {...Object.fromEntries(SCROLL_FIELDS.map(([key]) => [key, Number(source.scroll?.[key] ?? 0)])), invert: Number(source.scroll?.invert ?? 0)}};
+}
+/** @param {PdSlot} slot @param {number} kind @param {ScrollStarter} [starter] */
+export function startingRecord(slot, kind, starter = SHIPPED_SCROLL) {
+    if (kind === KIND.SCROLLING && !SCROLL_FIELDS.some(([key]) => Number(slot.scroll?.[key]))) return {...slot, dpi: starter.dpi, scroll: {...starter.scroll}};
     if (kind === KIND.DIRECTIONAL && !Number(slot.thresholdX) && !Number(slot.thresholdY)) return {...slot, axis: AXIS.VERTICAL, thresholdX: 0, thresholdY: DIRECTIONAL_STARTER_THRESHOLD};
     return slot;
 }
 // A new mode for an empty slot, from the firmware's shipped tuning: a
 // directional mode reads the dominant axis at Volume's threshold with no
-// shortcuts yet, a scrolling mode starts from Dragscroll's record. It is named
-// after its slot and posted like any edit, so the keyboard stores a valid mode
-// straight away and every field can then be changed.
-/** @param {PdSlot} slot @param {number} kind */
-export function newMode(slot, kind) {
-    const starter = kind === KIND.SCROLLING
-        ? {...slot, kind, axis: 0, thresholdX: 0, thresholdY: 0, heldModifiers: 0, scroll: {...SCROLL_STARTER}}
+// shortcuts yet, a scrolling mode copies Dragscroll's record and speed. It is
+// named after its slot and posted like any edit, so the keyboard stores a
+// valid mode straight away and every field can then be changed.
+/** @param {PdSlot} slot @param {number} kind @param {ScrollStarter} [starter] */
+export function newMode(slot, kind, starter = SHIPPED_SCROLL) {
+    const scrolling = kind === KIND.SCROLLING;
+    const starting = scrolling
+        ? {...slot, kind, axis: 0, thresholdX: 0, thresholdY: 0, heldModifiers: 0, scroll: {...starter.scroll}}
         : {...slot, kind, axis: AXIS.DOMINANT, thresholdX: DIRECTIONAL_STARTER_THRESHOLD, thresholdY: DIRECTIONAL_STARTER_THRESHOLD, emptyDirection: 0, directionOutput: 0};
-    return readConfig(starter, {kind: () => kind, name: () => `Mode ${slot.id}`, dpi: () => "0"});
+    return readConfig(starting, {kind: () => kind, name: () => `Mode ${slot.id}`, dpi: () => String(scrolling ? starter.dpi : 0)});
 }
 // Volume's vertical threshold, the firmware's shipped tuning for a directional
 // axis. An axis the stored record did not read has a zero threshold, which the
@@ -116,7 +135,9 @@ export function readConfig(slot, form) {
         buttons: (slot.buttons || []).map((button, index) => buttonRecord({
             kind: form[`button:${index}:kind`]?.() ?? button.kind,
             modifiers: form[`button:${index}:modifiers`]?.() ?? button.modifiers,
-            tap: {...button.tap, keycode: form[`button:${index}:tap`]?.() ?? button.tap?.keycode},
+            tap: {...button.tap, keycode: form[`button:${index}:tap`]?.() ?? button.tap?.keycode,
+                modifierPolicy: form[`button:${index}:policy`]?.() ?? button.tap?.modifierPolicy,
+                mask: form[`button:${index}:mask`]?.() ?? button.tap?.mask},
         })),
     };
     if (kind === KIND.DIRECTIONAL) {
@@ -232,7 +253,9 @@ export function buttonRecord({kind, modifiers, tap}) {
 // the shortcut, holding modifiers needs at least one.
 /** @param {PdButton} button */
 export function buttonReady(button) {
-    if (button.kind === BUTTON.TAP) return String(button.tap?.keycode ?? "0") !== "0";
+    // Ignoring held modifiers needs at least one to ignore.
+    if (button.kind === BUTTON.TAP) return String(button.tap?.keycode ?? "0") !== "0"
+        && (button.tap?.modifierPolicy !== MODIFIER_POLICY.MASK || Number(button.tap?.mask) !== 0);
     if (button.kind === BUTTON.HOLD_MODIFIERS) return Number(button.modifiers) !== 0;
     return true;
 }

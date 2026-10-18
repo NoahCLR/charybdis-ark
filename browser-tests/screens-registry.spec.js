@@ -7,7 +7,8 @@ test("every registered screen opens from the rail with its own title and keeps t
     await expect(page.locator('[data-screen="keys"]')).toBeEnabled();
     const screens = await page.evaluate(async () => {
         const {SCREENS} = await import("/webview/view/screens.mjs");
-        return Object.entries(SCREENS).map(([id, definition]) => ({id, label: definition.label}));
+        // An alias ("pointing", the Trackball screen on a mode) has no rail item of its own.
+        return Object.entries(SCREENS).filter(([, definition]) => !definition.aliasOf).map(([id, definition]) => ({id, label: definition.label}));
     });
     await expect(page.locator(".rail-group")).toHaveText(["Configure", "Manage"]);
     await expect(page.locator(".rail [data-screen]")).toHaveCount(screens.length);

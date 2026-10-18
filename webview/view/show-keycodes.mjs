@@ -13,7 +13,7 @@
 export const ALWAYS = Object.freeze(["keycodeField", "pickerFooter", "stored", "rawPayload", "reviewTooltip"]);
 /** The places the Show keycodes preference governs. */
 export const OPTIONAL = Object.freeze(["hover", "behaviourRow", "behaviourTitle", "behaviourCell", "comboSends",
-    "stackRow", "pickerButton", "reachRow", "placeBar"]);
+    "stackRow", "pickerButton", "reachRow", "placeBar", "pointingShortcut"]);
 
 /** @typedef {typeof ALWAYS[number] | typeof OPTIONAL[number]} KeycodePlace */
 

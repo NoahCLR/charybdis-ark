@@ -123,8 +123,10 @@ The same kind of control looks and sits the same on every screen.
   same-screen renders without carrying it into another list, and bring the
   picked row into view.
 - A heading inside a workbench column uses the column's `sect-h` style.
-- Pages of cards (Trackball, Settings, Backups, Keyboard) share one width,
-  `--page`. Side-by-side tables start at the top rather than stretching to
+- Pages of cards (Settings, Backups, Keyboard) share one width,
+  `--page`. Trackball is a list and its editor: the list `--list-trackball`
+  (280 px) wide and sticky, scrolling on its own; the editor at most
+  `--editor-max`; below 788 px of content the list stacks above it. Side-by-side tables start at the top rather than stretching to
   each other's height.
 - Keys and Lighting draw the same layer strip, Rename & Reorder included
   (`layerBar` and `attachLayersControl`).
@@ -301,12 +303,29 @@ Settings always matches QMK names.
   hides those channels. `view/lighting.mjs` owns layer pass-through (zero
   saturation and brightness) and LED-row inheritance (all three channels
   zero); an explicit black row remains distinct from an inherited colour.
-- Pointing: `webview/ui/pointing.mjs` owns slot selection; `ui/pointing/`
-  composes the slot editor from movement, reach and Advanced surfaces, with an
-  empty-slot surface for creation and copying. Its form controls register one
-  reader per rendered field, sharing the editor's complete-record staging
-  callback. Switching movement rebuilds the readers for the new kind; pending
-  button and modifier choices stay with the editor until a valid record posts.
+- Trackball: `webview/ui/trackball.mjs` owns the list and what it opens. The
+  registry gives it two ids: `mouse`, opened on the fixed entry in
+  `state.tbEntry`, and `pointing`, opened on the mode in `state.pdSlot`; the
+  second has `aliasOf: "mouse"`, so it has no rail item and lights
+  Trackball's (`railScreen`). A reveal of a Trackball settings section opens
+  the fixed entry that draws it. `ui/trackball/fixed.mjs` draws Pointer,
+  Sniping and Mouse layer with Settings' `settingRows`, so each row saves its
+  whole section and a field not drawn keeps what was read.
+  `view/trackball.mjs` holds the pure rules: counts and millimetres, where a
+  keycode is reached, a mode's summary, the firmware's mode rules by field
+  (`modeProblems`), scroll field help, and the templates.
+- Pointing: `ui/pointing/` composes the slot editor from identity, step
+  distance (`step.mjs`: millimetres and counts, both editable; the counts post
+  unless the millimetres were changed), movement, While this mode runs, reach
+  and Advanced surfaces, with an empty-slot surface for templates, creation and
+  copying. Its form controls register one reader per rendered field, sharing
+  the editor's complete-record staging callback. A direction's shortcut is a
+  value button that opens the picker; its keycode input exists only under Show
+  keycodes (`pointingShortcut`). Before posting, the editor checks
+  `modeProblems`: a broken rule is written under the field named by
+  `data-problem-for` and nothing posts. Switching movement rebuilds the readers
+  for the new kind; pending button and modifier choices stay with the editor
+  until a valid record posts.
 - App surfaces: `webview/ui/device.mjs` owns device facts;
   `ui/review-overlay.mjs` owns the review sheet, check confirmation, Show and
   Discard listeners; `ui/leave-demo.mjs` owns the unsaved-demo dialog. The app

@@ -16,7 +16,8 @@ import * as controls from "../../webview/view/controls.mjs";
 import {behaviourEditorRow, behaviourTimingEdit, behaviourTimingField} from "../../webview/view/behavior-editor.mjs";
 import {shareHold} from "../../webview/view/share.mjs";
 import {durationMilliseconds, durationValue} from "../../webview/view/duration.mjs";
-import {AXIS, BUTTON, DIRECTIONAL_STARTER_THRESHOLD, KIND, MODIFIER_POLICY, SCROLL_AXES, SCROLL_STARTER, dpiOptions, modeDpi, newMode, readConfig, settleButtons, settleTaps, startingRecord, thresholdDistance} from "../../webview/view/pointing-config.mjs";
+import {TEMPLATES, modeProblems, templateMode} from "../../webview/view/trackball.mjs";
+import {AXIS, BUTTON, DIRECTIONAL_STARTER_THRESHOLD, KIND, MODIFIER_POLICY, SCROLL_AXES, SCROLL_STARTER, SHIPPED_SCROLL, dpiOptions, scrollStarter, modeDpi, newMode, readConfig, settleButtons, settleTaps, startingRecord, thresholdDistance} from "../../webview/view/pointing-config.mjs";
 
 const require = createRequire(import.meta.url);
 const {SETTING} = require("../../core/schema/settings-domain-v1");
@@ -619,14 +620,35 @@ test("a mouse-button override is set up kind first, and reaches the keyboard onc
         "pass through carries nothing it does not read");
 });
 
+test("a button's tapped shortcut posts its held-modifier policy, and Ignore waits for a modifier to leave out", () => {
+    const draft = session();
+    const id = decoded(draft).pdModes.find((candidate) => candidate.kind && candidate.buttons?.length).id;
+    const post = (fields) => {
+        const slot = decoded(draft).pdModes[id];
+        const settled = settleButtons(slot, readConfig(slot, formOf({kind: slot.kind, name: slot.name, dpi: String(slot.dpi), ...fields})));
+        stage(draft, edits.pdMode(id, settled.config, draft.identity()));
+        return settled.pending;
+    };
+    const stored = () => decoded(draft).pdModes[id].buttons[0];
+    post({"button:0:kind": BUTTON.TAP, "button:0:tap": "KC_C", "button:0:policy": MODIFIER_POLICY.EXACT});
+    assert.deepEqual([stored().kind, stored().tap.modifierPolicy], [BUTTON.TAP, MODIFIER_POLICY.EXACT]);
+    const pending = post({"button:0:kind": BUTTON.TAP, "button:0:tap": "KC_C", "button:0:policy": MODIFIER_POLICY.MASK, "button:0:mask": 0});
+    assert.equal(pending[0].tap.modifierPolicy, MODIFIER_POLICY.MASK, "Ignore with nothing to ignore is held by the editor");
+    assert.equal(stored().tap.modifierPolicy, MODIFIER_POLICY.EXACT, "while the keyboard keeps what it had");
+    post({"button:0:kind": BUTTON.TAP, "button:0:tap": "KC_C", "button:0:policy": MODIFIER_POLICY.MASK, "button:0:mask": 0x02});
+    assert.deepEqual([stored().tap.modifierPolicy, stored().tap.mask], [MODIFIER_POLICY.MASK, 0x02]);
+});
+
 test("a pointing mode picks its speed from the model's DPI list, and keeps a stored speed outside it", () => {
     const choices = buildDeviceModel({}).pdModeEditing.dpiChoices;
     const options = dpiOptions(choices, 400);
     assert.deepEqual(options.map(([value, label]) => ({value, label})), choices, "exactly the shared list");
     assert.deepEqual(options[0], [0, "Normal pointer speed"]);
+    assert.deepEqual(dpiOptions(choices, 0, 400)[0], [0, "Normal (400 DPI)"], "with the normal speed known, it says what it is");
+    assert.equal(dpiOptions(choices, 0).at(-1)[0], 12000, "up to the sensor's 12000");
     assert.deepEqual(dpiOptions(choices, 250).find(([dpi]) => dpi === 250), [250, "250 DPI · as stored"]);
     assert.deepEqual(dpiOptions(choices, 250).map(([dpi]) => dpi).slice(2, 5), [200, 250, 300], "in its place in the list");
-    assert.deepEqual(dpiOptions(choices, 8000).at(-1), [8000, "8000 DPI · as stored"]);
+    assert.deepEqual(dpiOptions(choices, 12500).at(-1), [12500, "12500 DPI · as stored"]);
 
     // The select posts a number; the record carries it as the slot's DPI.
     const draft = session();
@@ -873,6 +895,61 @@ test("an empty slot can start a new mode of either kind, which the draft accepts
     assert.equal(slot.scroll.divisorV, SCROLL_STARTER.divisorV);
 });
 
+test("a new or switched-to scrolling mode scrolls like Dragscroll: its speed and its reversal", () => {
+    const draft = session();
+    const dragscroll = decoded(draft).pdModes[0];
+    const starter = scrollStarter(decoded(draft).pdModes);
+    assert.equal(starter.dpi, dragscroll.dpi);
+    assert.equal(starter.scroll.invert, dragscroll.scroll.invert);
+    stage(draft, edits.clearPdMode(5, draft.identity()));
+    stage(draft, edits.pdMode(5, newMode(decoded(draft).pdModes[5], KIND.SCROLLING, starter), draft.identity()));
+    const made = decoded(draft).pdModes[5];
+    assert.deepEqual([made.dpi, made.scroll.invert, made.scroll.divisorV], [dragscroll.dpi, dragscroll.scroll.invert, dragscroll.scroll.divisorV]);
+    // Without a scrolling mode to copy, the firmware's shipped Dragscroll.
+    assert.deepEqual(scrollStarter([]), SHIPPED_SCROLL);
+    assert.deepEqual([SHIPPED_SCROLL.dpi, SHIPPED_SCROLL.scroll.invert], [100, 2], "100 DPI, vertical reversed (pd_config.c)");
+    const directional = newMode({id: 7, buttons: []}, KIND.SCROLLING);
+    assert.deepEqual([directional.dpi, directional.scroll.invert], [100, 2]);
+    // A directional mode switched to scrolling takes the same speed and reversal.
+    const arrow = decoded(draft).pdModes[4];
+    const switched = startingRecord(arrow, KIND.SCROLLING, starter);
+    assert.deepEqual([switched.dpi, switched.scroll.invert], [dragscroll.dpi, dragscroll.scroll.invert]);
+    stage(draft, edits.pdMode(4, readConfig(switched, formOf({kind: KIND.SCROLLING, name: "Arrow", dpi: String(switched.dpi)})), draft.identity()));
+    assert.deepEqual([decoded(draft).pdModes[4].dpi, decoded(draft).pdModes[4].scroll.invert], [dragscroll.dpi, dragscroll.scroll.invert]);
+});
+
+test("every empty-slot template posts a mode the draft stores as the firmware ships it", () => {
+    const draft = session();
+    const starter = scrollStarter(decoded(draft).pdModes);
+    stage(draft, edits.clearPdMode(5, draft.identity()));
+    for (const template of TEMPLATES) {
+        stage(draft, edits.clearPdMode(5, draft.identity()));
+        const config = templateMode(decoded(draft).pdModes[5], template.id, starter);
+        stage(draft, edits.pdMode(5, config, draft.identity()));
+        const made = decoded(draft).pdModes[5];
+        assert.equal(made.name, template.label, template.id);
+        assert.equal(made.kind, config.kind, template.id);
+        assert.deepEqual(modeProblems(config), {}, `${template.id} breaks no rule`);
+    }
+    // Volume as pd_config.c ships it: vertical, 60 counts, normal speed.
+    stage(draft, edits.clearPdMode(5, draft.identity()));
+    stage(draft, edits.pdMode(5, templateMode(decoded(draft).pdModes[5], "volume", starter), draft.identity()));
+    const volume = decoded(draft).pdModes[5];
+    assert.deepEqual([volume.axis, volume.thresholdY, volume.dpi], [AXIS.VERTICAL, 60, 0]);
+    assert.ok(volume.directions.up.keycode > 0 && volume.directions.down.keycode > 0);
+    // Arrows keeps its modifier policies and button overrides.
+    stage(draft, edits.clearPdMode(5, draft.identity()));
+    stage(draft, edits.pdMode(5, templateMode(decoded(draft).pdModes[5], "arrows", starter), draft.identity()));
+    const arrows = decoded(draft).pdModes[5];
+    assert.deepEqual([arrows.pointerLayer, arrows.directions.up.modifierPolicy, arrows.directions.up.mask], [1, MODIFIER_POLICY.MASK, 0x44]);
+    assert.deepEqual(arrows.buttons.map((button) => button.kind), [BUTTON.HOLD_MODIFIERS, BUTTON.TAP, BUTTON.TAP]);
+    assert.equal(arrows.buttons[1].tap.modifierPolicy, MODIFIER_POLICY.EXACT);
+    // Scroll copies Dragscroll.
+    stage(draft, edits.clearPdMode(5, draft.identity()));
+    stage(draft, edits.pdMode(5, templateMode(decoded(draft).pdModes[5], "scroll", starter), draft.identity()));
+    assert.deepEqual(decoded(draft).pdModes[5].scroll, decoded(draft).pdModes[0].scroll);
+});
+
 test("duplicating needs a configured source and an empty destination", () => {
     const draft = session();
     assert.throws(() => stage(draft, edits.duplicatePdMode(0, 1, draft.identity())), /empty destination/i,
@@ -880,6 +957,22 @@ test("duplicating needs a configured source and an empty destination", () => {
     stage(draft, edits.clearPdMode(5, draft.identity()));
     stage(draft, edits.duplicatePdMode(5, 1, draft.identity()));
     assert.equal(decoded(draft).pdModes[5].kind, decoded(draft).pdModes[1].kind);
+});
+
+test("a duplicate is named as a copy and takes the source's colour and locality", () => {
+    const draft = session();
+    const colour = (id) => decoded(draft).rgb.pdModeColors.find((row) => row.pdModeId === id);
+    const source = decoded(draft).pdModes[1];
+    stage(draft, edits.clearPdMode(5, draft.identity()));
+    assert.notDeepEqual(colour(5).color, colour(1).color, "the fixture's two slots start with different colours");
+    stage(draft, edits.duplicatePdMode(5, 1, draft.identity()));
+    assert.equal(decoded(draft).pdModes[5].name, `${source.name} copy`);
+    assert.deepEqual([colour(5).color, colour(5).locality], [colour(1).color, colour(1).locality]);
+    // A name at the limit is cut a whole character at a time to fit " copy".
+    stage(draft, edits.pdMode(1, readConfig(decoded(draft).pdModes[1], formOf({kind: KIND.DIRECTIONAL, name: "é".repeat(16), dpi: "0"})), draft.identity()));
+    stage(draft, edits.clearPdMode(6, draft.identity()));
+    stage(draft, edits.duplicatePdMode(6, 1, draft.identity()));
+    assert.equal(decoded(draft).pdModes[6].name, `${"é".repeat(13)} copy`);
 });
 
 // ── settings ────────────────────────────────────────────────────────────
@@ -980,7 +1073,8 @@ test("on the 32-slot firmware, the same builders reach slots past seven", () => 
     stage(draft, edits.pdMode(27, newMode(wide().pdModes[27], KIND.SCROLLING), draft.identity()));
     assert.equal(wide().pdModes[27].kind, KIND.SCROLLING);
     stage(draft, edits.duplicatePdMode(30, 12, draft.identity()));
-    assert.equal(wide().pdModes[30].name, "Tabs");
+    assert.equal(wide().pdModes[30].name, "Tabs copy");
+    assert.deepEqual(wide().rgb.pdModeColors[30].color, {h: 200, s: 255, v: 200}, "with slot 12's colour");
     stage(draft, edits.pdModeColour("PD_MODE_SLOT_25", "RGB_LEFT_HALF", {h: 1, s: 2, v: 3}));
     assert.deepEqual(wide().rgb.pdModeColors[25], {pdModeId: 25, color: {h: 1, s: 2, v: 3}, locality: RGB_LOCALITIES.RGB_LEFT_HALF});
     stage(draft, edits.setKey("Layer 1", 27, "PD_SLOT_31_LOCK"));
