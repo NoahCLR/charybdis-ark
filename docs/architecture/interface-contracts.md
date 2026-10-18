@@ -17,7 +17,9 @@ tier dots, including when either is absent; title slots fit a full combo badge
 with space before its name.
 The Keys workbench tabs count what the selected layer stores. The Key tab counts
 mapped keys, excluding transparent and disabled positions; its selected key's
-layout index belongs in the key details. Every Keys tab is at least as tall as
+layout index, matrix position, LED index and stored keycode belong in the key
+details, folded under **Where it is stored**. Reach rows and tables name keys
+as the board does, never by layout index. Every Keys tab is at least as tall as
 the Behaviours tab; a taller editor carries its height across tab changes, so
 changing tabs does not move the page's scroll position.
 The Behaviours, Combos, Macros and Pointing modes reach lists lead with **On

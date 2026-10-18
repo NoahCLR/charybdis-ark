@@ -1,6 +1,6 @@
 // @ts-check
 import {el, esc} from "../../lib/dom.mjs";
-import {css, isOff, label as hsvLabel} from "../../lib/colour.mjs";
+import {css, isOff} from "../../lib/colour.mjs";
 import {post, render, state, writable} from "../../store.mjs";
 import {PD_MODE_IDS, pdColourRow} from "../../view/lighting.mjs";
 import {slotCalled as slotName, vocabulary} from "../../view/vocabulary.mjs";
@@ -23,7 +23,7 @@ export function stagePointing(model) {
         const lit = row && !isOff(row.color);
         const item = el(`<button class="rowitem ${slot.id === state.pdSlot ? "on" : ""} ${slot.kind ? "" : "quiet"}" data-slot="${slot.id}">
             <span class="t"><span class="mk-swatch lead ${lit ? "" : "swatch-off"}" style="${lit ? `background:${css(row.color)}` : ""}"></span>${esc(slot.displayName || `Slot ${slot.id}`)}${marks.lightingSlots.has(slot.id) ? draftDot() : ""}</span>
-            <span class="m mono">${esc(row ? hsvLabel(row.color) : "not reported")} · ${esc(localityLabel(row?.locality).toLowerCase())}</span></button>`);
+            <span class="m">${esc(!row ? "not reported" : lit ? localityLabel(row.locality).toLowerCase() : "no colour")}</span></button>`);
         item.addEventListener("click", () => { state.pdSlot = slot.id; render(); });
         list.append(item);
     });

@@ -3,7 +3,7 @@ import * as controls from "../view/controls.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {getModel, post, render as rerender, state, writable} from "../store.mjs";
 import {DEMO_WORDS, demoOf} from "../view/demo.mjs";
-import {discardLabel, groupNote, placeState, reviewBlocks, statusSummary, stillShown} from "../view/review.mjs";
+import {discardLabel, groupNote, placeState, reviewBlocks, statusBesideCount, stillShown} from "../view/review.mjs";
 import {reviewColumns, reviewItem} from "./review-items.mjs";
 import {checksSection} from "./checks.mjs";
 import {checkSourceGroup, checksToConfirm, confirmText} from "../view/checks.mjs";
@@ -57,7 +57,7 @@ export function reviewOverlay() {
                     <span class="note">${esc(groupNote(block))}</span></span><span class="rv-act wide">${discard}</span></div>${items}</div>`
                 : `<div class="rv-block${sourceClass}" data-group="${esc(block.group)}">${items}</div>`;
         }).join(""))(blocks.some((block) => block.items.some((entry) => entry.titleMark)))}</section>`).join("");
-    const summary = statusSummary(draft.changes);
+    const summary = statusBesideCount(draft.changes);
     // Checks that point at a key or a combo open it as review items do.
     /** @type {import("../../contracts/model.js").Check[]} */
     const checked = [];
@@ -84,7 +84,7 @@ export function reviewOverlay() {
             ${checks}
             ${sections}
             <div class="rv-apply-note"><div class="callout warn">${demo.active ? esc(demo.applyNeedsKeyboard)
-                : "Apply writes a recovery copy, stages the changed blocks on both halves, then publishes one generation. The keyboard keeps running its saved profile until both halves confirm. If it is interrupted, the recovery copy restores it."}</div></div>
+                : "Apply saves a recovery copy, writes the changes to both halves, then switches both to them at once. Until then the keyboard keeps running its saved profile; if anything interrupts Apply, the recovery copy restores it."}</div></div>
         </div>
         ${demo.active ? `<div class="sheet-f demo-apply"><span class="note"><i class="dot demo"></i> ${esc(DEMO_WORDS.status)}</span>
             <span class="right"><button class="btn primary" data-act="export">Export…</button></span></div>`

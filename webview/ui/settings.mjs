@@ -11,7 +11,7 @@
 // Selector assertions refer to elements created by this module's authored markup.
 import * as edits from "../view/edits.mjs";
 import {DISCLOSURE, el, esc} from "../lib/dom.mjs";
-import {getModel, layers, post, render, state, canEdit as canEditArea} from "../store.mjs";
+import {getModel, layerName, layers, post, render, state, canEdit as canEditArea} from "../store.mjs";
 import {topbar, unavailable} from "./shell.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {marked} from "./marks.mjs";
@@ -29,7 +29,7 @@ export function screenSettings() {
     const canEdit = canEditArea("settings");
     const main = el(`<div class="main">${topbar(
         "Settings",
-        "The keyboard's global policy: every value it stores that applies on all layers. Values this firmware cannot report stay read-only rather than disappearing."
+        "What applies to the whole keyboard: its name, tap and hold timing, base lighting, where behaviours and combos run, and the computer it types on."
     )}</div>`);
 
     const content = el(`<div class="content"><div class="pad settings-pad"></div></div>`);
@@ -104,7 +104,7 @@ function comboTimingRow(model, entry) {
     const row = el(`<div class="setrow" data-tip="${esc(hint)}">
         <div><div class="nm">${esc(entry.label)}</div>
             <div class="hint">${esc(hint)}</div></div>
-        <div class="control"><div class="input-row"><input class="input mono" id="${hold ? "comboHoldTerm" : "comboDefaultTerm"}" data-f="settings:combo:${hold ? "hold" : "default"}" inputmode="numeric" value="${esc(stored)}" ${editable ? "" : "disabled"}></div></div>
+        <div class="control"><span class="affix unit"><input class="input mono" id="${hold ? "comboHoldTerm" : "comboDefaultTerm"}" data-f="settings:combo:${hold ? "hold" : "default"}" inputmode="numeric" value="${esc(stored)}" ${editable ? "" : "disabled"}><i>ms</i></span></div>
     </div>`);
     // Posted on its own rather than riding along with whichever combo is saved
     // next. The keyboard always stores a number, so an emptied field is put
@@ -184,11 +184,47 @@ export function sectionCard(model, section, fields, canEdit, searching = false) 
         }, model?.settingsEditing?.identity));
     };
 
+    // A section's one-per-layer switches read as one setting, so they are one
+    // row of layers rather than a row each.
+    const grouped = section.layerGroup ? section.fields.filter(layerSwitch) : [];
+    const slot = section.fields.some((entry) => entry.governs && !grouped.includes(entry));
     for (const field of section.fields) {
+        if (grouped.includes(field)) {
+            if (field === grouped[0] && section.layerGroup) rows.appendChild(layerGroupRow(section.layerGroup, grouped, fields, canEdit, submit));
+            continue;
+        }
         const hidden = !fields.includes(field);
-        rows.appendChild(fieldRow(field, canEdit, submit, hidden, section.fields.some((entry) => entry.governs), durations));
+        rows.appendChild(fieldRow(field, canEdit, submit, hidden, slot, durations));
     }
     return node;
+}
+
+/** @param {import("../../contracts/panel.js").PresentedField} field */
+const layerSwitch = (field) => field.kind === "toggle" && field.governs?.kind === "layer";
+
+// One switch per layer, each named by its layer and marked in its colour, in
+// the order the layer tabs read. Each keeps its own field identity, so the
+// section still saves whole and a search still finds a single layer.
+/** @param {{label: string, hint: string}} group @param {import("../../contracts/panel.js").PresentedField[]} fields @param {import("../../contracts/panel.js").PresentedField[]} shown @param {boolean} canEdit @param {() => void} submit */
+function layerGroupRow(group, fields, shown, canEdit, submit) {
+    const model = getModel();
+    const row = el(`<div class="setrow layer-switches" data-tip="${esc(group.hint)}" ${fields.some((field) => shown.includes(field)) ? "" : "hidden"}>
+        <div><div class="nm">${esc(group.label)}</div><div class="hint">${esc(group.hint)}</div></div>
+        <div class="layer-grid" role="group" aria-label="${esc(group.label)}"></div>
+    </div>`);
+    const grid = /** @type {HTMLElement} */ (row.querySelector(".layer-grid"));
+    for (const field of fields) {
+        const at = field.governs?.kind === "layer" ? field.governs.layer : -1;
+        const layer = layers().find((entry) => entry.index === at);
+        const editable = canEdit && !field.readOnly;
+        const tip = [field.tooltip, field.hint, field.readOnly ? "This setting cannot be edited with the connected firmware." : ""].filter(Boolean).join(" ");
+        const node = el(`<label class="sw" data-tip="${esc(tip)}" ${shown.includes(field) ? "" : "hidden"}>
+            <input type="checkbox" data-macro="${esc(field.macro)}" data-f="setting:${esc(field.macro)}" ${field.enabled ? "checked" : ""} ${editable ? "" : "disabled"}>
+            <span class="track"></span><span class="txt">${marked(model, field.governs, layer ? layerName(layer) : field.label)}</span></label>`);
+        /** @type {HTMLInputElement} */ (node.querySelector("input")).addEventListener("change", submit);
+        grid.appendChild(node);
+    }
+    return row;
 }
 
 /** @param {import("../../contracts/panel.js").PresentedField} field @param {boolean} canEdit @param {() => void} submit @param {boolean} hidden @param {boolean} slot @param {Map<string, ReturnType<typeof durationControl>>} durations */

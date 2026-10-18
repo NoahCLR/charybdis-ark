@@ -182,7 +182,7 @@ What each screen edits:
 | Pointing modes | All 32 slots: movement, speed, direction shortcuts and how often they send (every step, or once per movement until the ball pauses or moves back the other way), scroll tuning and which way a scrolling mode scrolls (both axes, horizontal only or vertical only), what each direction's shortcut does with held modifiers, thresholds shown as ball movement at the mode's DPI, buttons, bindings, placement, clear and duplicate |
 | Settings | The keyboard's own name, then every other section the keyboard reports, posted whole, read-only where the firmware build leaves an option out; the Combos section also carries the default combo window and the combo hold threshold, which the keyboard stores with its combos |
 | Profile & backups | Import (the file against the keyboard, counted by what it configures — keys, lighting, macros, mouse, pointing — before it becomes the draft), export, profile memory, recovery state |
-| Device | Read-only: connection, committed generation, what was read |
+| Device | Read-only: connection, the saved profile's generation, what was read |
 
 ## The interface
 
@@ -201,8 +201,14 @@ and other characters typed or pasted into it do not appear. A time's unit sits
 inside its field at the right, on every screen, so the label names only the
 value; the review still names the unit.
 
+A Settings section's one-per-layer switches (Startup layers, and where
+Behaviours and Combos run) are one row: its label and what it means, then a
+switch for each layer in a grid, named and marked in the layer's colour. A
+search for one layer's name still finds its switch. Settings and the
+behaviour editor call the time between taps the **Multi tap window**.
+
 Anything that folds has a chevron before its name, turned down while it is
-open: a Settings section, a behaviour's allowed source layers, a group of
+open: a Settings section, a behaviour's **Layers it runs on**, a group of
 review checks, a pointing mode's Advanced, a group in a Keys tab. Review, the keycode picker and
 Draft history each close with **Close** at their top right, or Escape; their
 footers hold only what acts, such as Apply, Export…, Clear and Use keycode.
@@ -272,7 +278,9 @@ On the board, drag one key onto another to swap them, ⌘C and ⌘V copy a key
 onto the selected key, and Delete or Backspace makes it transparent. ⌘Z undoes
 and ⇧⌘Z or ⌘Y redoes the draft outside the macro editor. A focused macro
 editor uses its own step history, while a text field keeps its native text undo. Open dialogs keep their keyboard shortcuts; Undo/Redo
-there does not move draft history. **Draft history** in the rail opens every step of the
+there does not move draft history. **Draft history**, with undo and redo
+beside it, sits at the foot of the rail once a keyboard or the demo has been
+read into a draft; it opens every step of the
 draft, newest first, each with when it was made and what it changed from the
 step before it (not from the keyboard, as the review compares); go straight
 back or forward to any of them. Board keys work from the keyboard too: Space or Enter
@@ -284,6 +292,8 @@ The standard firmware reserves 16 layers, so ordinary editing never changes
 the layer count or needs a reflash. **Rename & Reorder** lists them with the
 highest-priority layer first and Base at the bottom.
 
+A layer tab shows its layer's number after its name, except for a layer named
+only by its number ("Layer 8"), so the number is never said twice.
 The layers are tabs along the foot of the board card, next to the workbench
 rather than in it, since a layer is not a property of the selected key; the
 picked one opens into the board
@@ -387,8 +397,15 @@ and `DF()`/`PDF()` are refused.
 
 In **Keys → Combos**, **Pick on board** brings the board into view so its keys
 can be selected as combo inputs.
-The **Key** tab count is the number of mapped keys on the selected layer;
-the selected key's layout index appears in its details.
+The **Key** tab count is the number of mapped keys on the selected layer.
+The Key tab says what the selected key does; **Where it is stored** unfolds
+its stored keycode, matrix row and column, layout index and LED index, and
+stays open for every key once opened. **This key on every layer** lists the
+position from the highest layer down; three or more transparent layers in a
+row fold into one line that says they fall through, and clicking it shows
+each of them. Reach tables name the keys that reach a row, as the board
+labels them, rather than their layout indexes; a combo's row already names
+its inputs, so it says only which layer answers a transparent one.
 In **Keys → Behaviours**, reach sections open independently. Matching sections
 share their expanded or collapsed state across the Behaviours, Combos, Macros
 and Pointing modes tabs. The full list scrolls with the Keys page rather than
@@ -505,7 +522,16 @@ Keys screen stays open there.
 
 On **Layer colours** and **Pointing modes**, the list beside the editor scrolls
 on its own, keeps its place when you pick a row, and shows the picked row when
-you switch back to it.
+you switch back to it. Each row's swatch is its colour; under its name it says
+where the colour paints (the keys it lights, or the half), or **no colour**.
+The numbers of a colour are in its editor, where they are changed. Key
+feedback lists its **Feedback colours**, with **When and where** beside them.
+
+**Base effect** shows the colour the keyboard reports as a swatch, with its
+effect, colour and speed. The keyboard keeps the base effect with its other
+settings, so it is changed in Settings → Base lighting, which **Open Settings →
+Base lighting** opens. The six stages, LED groups and the stage switch fit
+across a laptop-wide window.
 
 The lighting **Idle timeout** uses seconds or minutes: `60000` milliseconds
 reads as `1` minute. Choose the unit beside the value; changing units alone
@@ -541,16 +567,17 @@ its actions, inputs, outputs, timing and names, ready to enable again.
 
 | Scope | Where to change it | What it controls |
 | --- | --- | --- |
-| Whole keyboard | Settings → Behaviours or Combos | Master switch for that engine |
-| Source layer | The same Settings section | Whether that layer uses behaviours or joins combos |
-| Definition | Keys → Behaviours, a custom key's **What it does** on Custom keys, or the combo editor | Enabled switch and allowed layers for that shared definition |
+| Whole keyboard | Settings → Behaviours or Combos | **Enabled**, the master switch for that engine |
+| Source layer | The same Settings section | **On these layers**: one switch per layer, in a grid, for whether keys from that layer use behaviours or join combos |
+| Definition | Keys → Behaviours, a custom key's **What it does** on Custom keys, or the combo editor | **Use this behaviour** or **Use this combo**, and **Layers it runs on** for that shared definition |
 | Physical placement | Pick a key in Keys | **Use behaviour** and **Join combos** for that source layer and position |
 
 All applicable switches must allow an event. The layer that supplies the
 non-transparent keycode owns its policy: a transparent overlay inherits the
 lower source layer's controls. The key inspector explains an inherited
-placement and offers **Open source placement**, and lists the scopes keeping
-behaviour or combo participation off.
+placement and offers **Open source placement**, and names each switch keeping
+the behaviour or combos off there, in the words its control uses ("Settings has
+behaviours off on this layer", "Use this behaviour is off").
 
 For a plain gaming key, disable **Use behaviour** on that placement to emit
 its underlying keycode directly; disabling **Join combos** independently stops
@@ -562,7 +589,7 @@ policy captured when it started.
 A combo output uses the source layer of its last declared input, regardless
 of which input you press last. Its behaviour follows the behaviour master,
 **Combo outputs use behaviours** in Settings → Combos, **Use output behaviour**
-in that combo's editor, and the behaviour definition's enabled and allowed-layer controls; physical placement
+in that combo's editor, and the behaviour's **Use this behaviour** and **Layers it runs on**; physical placement
 controls and source-layer behaviour switches do not apply to that generated
 output. Another input's allowance cannot enable it.
 
@@ -582,7 +609,8 @@ Apply, including switches and layer allowances.
 ## Pointing modes
 
 Current firmware has 32 pointing slots. Pointing modes lists the configured
-slots as cards and the empty ones as a grid of numbered chips beneath them (a
+slots as cards, each with its name, colour and movement (its keycodes are in
+the editor's title), and the empty ones as a grid of numbered chips beneath them (a
 chip in amber still has keys reaching it); the key picker lists the slots in
 two columns; Lighting's slot list scrolls beside the colour editor. Each slot
 keeps its own Hold and Toggle key (`PD_SLOT_n`, `PD_SLOT_n_LOCK`) and lighting
@@ -832,7 +860,9 @@ and imports carry it with the macro.
 
 Shared macro memory stays in the slot bank. Every empty slot keeps room there
 for ten key taps; when it cannot, the highest empty slots read **unavailable**
-and cannot be picked until a macro is shortened or cleared. The editor shows checking status and
+and cannot be picked until a macro is shortened or cleared. The bank's heading
+counts the slots in use, "20 of 128 used", as Custom keys counts its named keys,
+and adds how many slots are without room only when there are some. The editor shows checking status and
 validation errors without routine memory or staging notes. Valid edits enter the draft when you finish editing a field or change a key step. Incomplete,
 invalid or oversized edits stay visible locally with their reason and never
 replace the last valid draft. **Discard local edits** returns to the draft's
@@ -898,6 +928,11 @@ rather than writing it directly.
 
 Removing one combo appears as one deletion in Review and Draft history; later
 combo numbers shift because the device stores them in a packed table.
+
+The floating bar and the review's title count the draft's changes. They add
+how many were added, changed and removed only when that says more than the
+count: "3 changes" alone when all three changed something, "3 changes · 2
+added · 1 changed" when they differ.
 
 Before anything is applied, the review **checks** what the layers let you
 reach: whether you can reach your layers and combos and get back to Base after

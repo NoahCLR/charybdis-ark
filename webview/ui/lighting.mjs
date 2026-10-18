@@ -33,7 +33,7 @@ export function screenLighting() {
     const layer = currentLayer();
     const main = el(`<div class="main">${topbar(
         "Lighting",
-        "The only colour in this app is colour the keyboard emits. Stages paint in order, and the board below is the result — your draft's result, before anything is applied."
+        "What the keyboard lights, and when. Each stage paints over the one before it, and the board shows the result of your draft."
     )}</div>`);
 
     const content = el(`<div class="content"><div class="pad keys-pad"></div></div>`);

@@ -40,14 +40,14 @@ export function screenDevice() {
         ]),
         read: () => postLeavingDemo(controls.control("refresh")),
     } : {
-        sub: "What the keyboard says about itself. Everything this app shows comes from here — it never reads a firmware repository.",
+        sub: "The keyboard that is connected: whether its halves are together, and what Ark has read from it.",
         connectionChip: chip(device?.connected ? "ok" : "err", device?.connected ? "connected" : "disconnected"),
         connectionBody: `${kv([
             ["Product", device?.label],
             ["Status", device?.subtitle],
             ["Phase", phaseWords(model, device?.health?.phase)?.label],
         ])}<p class="note">The master half connects over USB; the slave half connects to it through the cable between the halves.</p>`,
-        setupTitle: "Committed profile",
+        setupTitle: "Saved profile",
         setupChip: chip(device?.health?.halves === "agree" ? "ok" : "warn", halvesWords(model, device?.health?.halves).label.toLowerCase()),
         setupBody: `${kv([
             ["Generation and digest", device?.summary],

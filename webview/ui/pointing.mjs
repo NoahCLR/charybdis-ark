@@ -16,7 +16,7 @@ import {slotLight} from "./marks.mjs";
 import {word} from "../view/vocabulary.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {topbar, unavailable} from "./shell.mjs";
-import {axisLabel, bindingName, words} from "./pointing/common.mjs";
+import {axisLabel, words} from "./pointing/common.mjs";
 import {editor} from "./pointing/editor.mjs";
 import {emptySlot} from "./pointing/empty-slot.mjs";
 
@@ -31,7 +31,7 @@ export function screenPointing() {
 
     const main = el(`<div class="main">${topbar(
         "Pointing modes",
-        `${slots.length && slots.length !== 8 ? slots.length : "Eight"} device-owned slots. Each re-reads the trackball while its key is held or toggled — as scrolling, or as directional keys and shortcuts.`
+        `Hold or toggle a key to make the trackball do something else: scroll, or press arrows and shortcuts as it moves. Up to ${slots.length || 32} modes.`
     )}</div>`);
     const content = el(`<div class="content"><div class="pad pd-page"></div></div>`);
     const pad = /** @type {HTMLElement} */ (content.firstElementChild);
@@ -58,7 +58,6 @@ export function screenPointing() {
             ${swatch()}
             <span class="nm">${slot.kind ? esc(slot.name) : "Empty slot"}</span><span class="no">${changedSlots.has(slot.id) ? draftDot("Changed in your draft", "lead") : ""}${slot.id}</span>
             <span class="meta">${slot.kind === KIND.SCROLLING ? `Scrolling${slot.axis ? ` · ${esc(word(words(model).scrollAxes, slot.axis))}` : ""}` : slot.kind === KIND.DIRECTIONAL ? `Directional · ${esc(axisLabel(model, slot.axis))}` : "Available"}</span>
-            <span class="meta mono">${esc(bindingName(slot))}</span>
             ${inert ? `<span class="meta warn">${inert} action${inert === 1 ? "" : "s"} reach it · inert</span>` : ""}</button>`);
         card.addEventListener("click", () => pick(slot));
         list.append(card);

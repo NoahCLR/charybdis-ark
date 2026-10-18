@@ -61,10 +61,12 @@ const COMBO_TIMING = Object.freeze([
 // `timing`.
 /** @type {Omit<import("../../contracts/model.js").SettingsSection, "fields"> & {fields: import("../../contracts/model.js").StoredSettingField[]}} */
 const keyTiming = {id: "keyTiming", label: "Tap & hold timing", fields: [
-    number("tappingTerm", SETTING.TAPPING_TERM, "Dual-role tap / hold threshold", "How long LT(), MT(), TT(), OSL() and OSM() keys wait before a press counts as a hold (QMK's tapping term). LT() behaviours with an empty Tap / hold threshold use it too; other behaviours use the Behaviour tap / hold threshold."),
+    // Said in words first; the QMK names are in its hover help.
+    number("tappingTerm", SETTING.TAPPING_TERM, "Dual-role tap / hold threshold", "How long a key that types on tap and holds a layer or modifier waits before a press counts as a hold. Behaviours use the threshold below instead.",
+        {tooltip: "QMK's tapping term, used by LT(), MT(), TT(), OSL() and OSM() keys. An LT() key's behaviour with an empty Tap / hold threshold uses it too."}),
     number("tapHoldTerm", SETTING.TAP_HOLD_TERM, "Behaviour tap / hold threshold", "Used when a behaviour leaves its Tap / hold threshold empty.", {governs: {kind: "tier", tier: "hold"}}),
     number("longerHoldTerm", SETTING.LONG_HOLD_TERM, "Long hold threshold", "Used when a behaviour leaves its Long hold threshold empty.", {governs: {kind: "tier", tier: "long"}}),
-    number("multiTapTerm", SETTING.MULTI_TAP_TERM, "Repeated taps", "Maximum gap between repeated taps when a behaviour has no override.", {governs: {kind: "branch", count: 2}}),
+    number("multiTapTerm", SETTING.MULTI_TAP_TERM, "Multi tap window", "How long after releasing a key the next press still counts as another tap. Used when a behaviour leaves its Multi tap window empty.", {governs: {kind: "branch", count: 2}}),
 ]};
 /** @type {import("../../contracts/model.js").SettingsSection[]} */
 const sections = [
@@ -179,7 +181,8 @@ function settingsSections(snapshot, settings) {
     const result = sections.map(section => ({area: "Settings", ...section, fields: section.fields.map(field => ({...field}))}));
     const rgb = /** @type {import("../../contracts/model.js").SettingsSection} */ (result.find(section => section.id === "rgbAppearance"));
     const {effect: currentEffect, leds: currentFlags} = baseLighting(settings.values);
-    const effects = options?.effects.map(effect => ({value: effect.id, label: effect.name.toLowerCase().replace(/_/g, " ").replace(/^./, c => c.toUpperCase())})) || [];
+    // QMK names effects in American English; the app spells colour one way.
+    const effects = options?.effects.map(effect => ({value: effect.id, label: effect.name.toLowerCase().replace(/_/g, " ").replace(/\bcolor\b/g, "colour").replace(/^./, c => c.toUpperCase())})) || [];
     if (!effects.some(effect => effect.value === currentEffect)) effects.push({value: currentEffect, label: `Current effect (${currentEffect})`});
     /** @type {[number, string][]} */
     const ledNames = [[1, "Modifiers"], [2, "Underlighting"], [4, "Keys"], [8, "Indicators"]];
@@ -193,20 +196,25 @@ function settingsSections(snapshot, settings) {
     const name = i => layerName(settings.names, i);
     /** @template T @param {(i: number) => T} make */
     const everyLayer = make => Array.from({length: SETTINGS.LAYERS}, (_, i) => make(i));
-    result.push({id: "startupLayers", area: "Settings", label: "Startup layers", expanded: false, description: "Choose the layers active when the keyboard starts. Keep at least one selected; higher layers take priority.", fields:
+    // Each section's one-per-layer switches are one setting to a person: the
+    // interface draws them as one row of layers, worded by `layerGroup`.
+    result.push({id: "startupLayers", area: "Settings", label: "Startup layers", expanded: false,
+        layerGroup: {label: "On at startup", hint: "The layers active when the keyboard starts. Keep at least one on; higher layers take priority."}, fields:
         everyLayer(i => ({...toggle(`startupLayer${i}`, SETTING.DEFAULT_LAYERS, name(i), `Layer ${i}`), tooltip: "Make this layer active when the keyboard starts. Keep at least one startup layer on; higher layers take priority.", bitMask: 2 ** i, governs: {kind: /** @type {const} */ ("layer"), layer: i}}))});
     // Behaviours and combos each have a master switch and one per layer
     // (participation-policy.md): a key takes part only where every switch that
     // applies is on, judged by the layer its key came from. Each behaviour and
     // combo has its own switch and layers in Keys, and each key position its
     // own in the key's editor.
-    result.push({id: "behaviorSettings", area: "Settings", label: "Behaviours", fields:
+    result.push({id: "behaviorSettings", area: "Settings", label: "Behaviours",
+        layerGroup: {label: "On these layers", hint: "A key uses its behaviour only when the layer it comes from is on here. Off, it does what it would without one."}, fields:
         [toggle("behaviorsEnabled", SETTING.BEHAVIORS_ENABLED, "Enabled", "Turn every behaviour on or off. Off, each key does what it would without one: a plain key, or its own LT() or MT()."),
             ...everyLayer(i => ({...toggle(`behaviorsOnLayer${i}`, SETTING.LAYER_BEHAVIORS, `On ${name(i)}`, "Keys that come from this layer use their behaviours."), bitMask: 2 ** i, governs: {kind: /** @type {const} */ ("layer"), layer: i}}))]});
     // Combos get a section of their own beside their layer matching. The
     // Interface adds the default window and hold threshold to it, which
     // the keyboard stores with the combos rather than here.
-    result.push({id: "comboSettings", comboTiming: COMBO_TIMING, area: "Settings", label: "Combos", fields:
+    result.push({id: "comboSettings", comboTiming: COMBO_TIMING, area: "Settings", label: "Combos",
+        layerGroup: {label: "On these layers", hint: "A key can be part of a combo only when the layer it comes from is on here."}, fields:
         [toggle("combosEnabled", SETTING.COMBOS_ENABLED, "Enabled", "Turn every combo on or off. Each combo's own window and conditions are set in Keys · Combos."),
             {macro: "comboOutputBehaviors", header: "comboOutputBehaviors", kind: "toggle", label: "Combo outputs use behaviours",
                 hint: "Off, combos still fire but use their normal output action. Physical-key behaviours stay eligible. A bypassed custom key sends its shortcut, or nothing if it has none."},

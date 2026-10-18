@@ -13,9 +13,10 @@ export function slotReach(model, slot, canEdit) {
     const disabled = canEdit ? "" : "disabled";
     // ── how it is reached ─────────────────────────────────────────────────
     const {row} = light;
+    // The swatch shows the colour; the words say where it paints.
     const lightText = row
-        ? `HSV(${[row.color.h, row.color.s, row.color.v].join(", ")}) · ${esc(word(vocabulary(model).localities, row.locality).toLowerCase())}${stageEnabled(model, "pd") ? "" : " · stage off"}`
-        : "no colour reported";
+        ? `${esc(light.lit || !stageEnabled(model, "pd") ? word(vocabulary(model).localities, row.locality) : "No colour")}${stageEnabled(model, "pd") ? "" : " · stage off"}`
+        : "No colour reported";
     const reach = el(`<div class="card">
         <div class="card-h"><h3>How it is reached</h3></div>
         <div class="card-b pd-lines">
@@ -26,9 +27,8 @@ export function slotReach(model, slot, canEdit) {
                 <span class="note">${esc(placedOn(model, slot))}</span></div>
             <button class="btn tiny ghost" data-act="place" ${disabled}>Place on a layer…</button>
             <span class="lbl">Light</span>
-            <div class="val">${light.swatch()}<span class="note mono">${lightText}</span></div>
+            <div class="val">${light.swatch()}<span class="note">${lightText}</span></div>
             <button class="btn tiny ghost" data-act="lighting">Edit in Lighting</button>
-            <p class="note foot">Clearing the slot leaves its keys where they are. The keyboard keeps its mode keycodes whatever a slot holds, and refuses to activate an empty one — so they do nothing until this slot is configured again.</p>
         </div></div>`);
     /** @type {HTMLButtonElement} */ (reach.querySelector('[data-act="lighting"]')).addEventListener("click", () => {
         state.screen = "lighting"; state.stage = "pd"; render();

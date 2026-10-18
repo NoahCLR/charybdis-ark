@@ -216,6 +216,7 @@ test("all native controls preserve a complete profile unchanged, including unkno
     assert.equal(fields.find(field => field.macro === "swapLeftAltGui").enabled, true);
     assert.equal(fields.find(field => field.macro === "autocorrect").readOnly, true);
     assert.equal(fields.find(field => field.macro === "effectMode").choices[1].label, "Breathing");
+    assert.equal(fields.find(field => field.macro === "effectMode").choices[0].label, "Solid colour", "spelled as the rest of the app spells colour");
     const next = editSettings(current, message(current, "keyboardOptions", {swapLeftAltGui:false, swapControlCaps:true}));
     assert.equal(validateSnapshot(next).settings.values[24], 0x8001);
     assert.throws(() => editSettings(current, message(current, "keyboardOptions", {autocorrect:true})), /not enabled/);

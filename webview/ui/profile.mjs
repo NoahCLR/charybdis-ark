@@ -13,7 +13,7 @@ import * as controls from "../view/controls.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {getModel, post, canEdit as canEditArea} from "../store.mjs";
 import {topbar} from "./shell.mjs";
-import {categorySummary, statusSummary} from "../view/review.mjs";
+import {categorySummary, statusBesideCount} from "../view/review.mjs";
 import {stageOrder} from "../view/vocabulary.mjs";
 import {profileUsageView} from "../view/profile-usage.mjs";
 import {downloadRecovery, hostOf, savedWhen} from "../view/host.mjs";
@@ -202,7 +202,7 @@ function reviewCard(model, portable, busy) {
     const holds = demoOf(model).active ? "the demo setup holds" : "the keyboard runs";
     const summary = differences ? categorySummary(differences, {names: incoming.names, stages: stageOrder(model)}) : [];
     const counted = differences?.length
-        ? `${differences.length} difference${differences.length === 1 ? "" : "s"} from ${demoOf(model).active ? "the demo setup" : "the keyboard"} · ${statusSummary(differences)}` : "";
+        ? `${differences.length} difference${differences.length === 1 ? "" : "s"} from ${demoOf(model).active ? "the demo setup" : "the keyboard"}${statusBesideCount(differences) ? ` · ${statusBesideCount(differences)}` : ""}` : "";
     const callout = !current
         ? "An interrupted restore left an incomplete configuration, so this file cannot be compared with it. This profile replaces it; the interrupted data is kept as a diagnostic copy, so keep your original backup as well."
         : draft

@@ -31,7 +31,9 @@ const comboNote = (entry) => entry.combos.map(({combo, keys}) => {
 const viewBehaviourNote = (entry) => {
     const indexes = [...new Set(entry.keys.map((key) => key.position.layoutIndex))];
     const sources = [...new Set(entry.keys.filter((key) => key.fellThrough).map((key) => esc(layerName(key.layer))))];
-    return [indexes.length ? `index ${indexes.join(", ")}${sources.length ? ` · on ${sources.join(", ")}` : ""}` : "",
+    // The row is titled with its key; more than one position is counted, and
+    // the board rings them all when the row is picked.
+    return [indexes.length > 1 ? `${indexes.length} keys` : "", sources.length ? `on ${sources.join(", ")}` : "",
         entry.combos.length ? comboNote(entry) : ""].filter(Boolean).join(" · ");
 };
 

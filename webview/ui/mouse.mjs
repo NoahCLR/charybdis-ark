@@ -20,7 +20,7 @@ export function screenMouse() {
     const canEdit = canEditArea("settings");
     const main = el(`<div class="main">${topbar(
         "Mouse",
-        "How the trackball moves the pointer: its speed, sniping for fine control, and the mouse layer that movement turns on by itself."
+        "How the trackball moves the pointer: its speed, sniping (a slower speed for precise work), and the mouse layer that moving the ball turns on."
     )}</div>`);
 
     const content = el(`<div class="content"><div class="pad settings-pad"></div></div>`);

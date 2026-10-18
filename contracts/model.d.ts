@@ -260,6 +260,8 @@ export interface SettingsSection {
     description?: string;
     warning?: string;
     githubLink?: {label: string; url: string};
+    /** The words for the section's one-per-layer switches, shown together as one row of layers. */
+    layerGroup?: {label: string; hint: string};
     fields: SettingField[];
     comboTiming?: readonly ComboTimingField[];
 }

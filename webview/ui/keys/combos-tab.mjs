@@ -61,7 +61,7 @@ export function tabCombos(body, right) {
             <td class="muted">${reachedBy}</td></tr>`;
     };
     /** @param {string} group @param {ReturnType<typeof comboGroups>["onKeys"][number] & {inputs?: number, covered?: number}} entry */
-    const reachedBy = (group, entry) => group !== "elsewhere" ? keysReach(entry.keys)
+    const reachedBy = (group, entry) => group !== "elsewhere" ? keysReach(entry.keys, {names: false})
         : entry.inputs ? `${entry.covered} of ${entry.inputs} inputs, never at once` : "no inputs";
     // The selected key as the layers in view answer it, and every combo that
     // takes it as an input. Each row still says how this layer reaches that
@@ -78,7 +78,7 @@ export function tabCombos(body, right) {
             }),
             drafted: onKey.combos.some((combo) => changedCombos.has(combo.id)),
             empty: onKey.position ? "No combo takes this key as an input." : "Every layer in view is transparent at the selected key."},
-        {id: "view", rows: inView.map((entry) => row("view", entry, keysReach(entry.keys))),
+        {id: "view", rows: inView.map((entry) => row("view", entry, keysReach(entry.keys, {names: false}))),
             drafted: inView.some((entry) => changedCombos.has(entry.combo.id)),
             empty: "No combo fires with the layers in this view."},
         {id: "here", rows: groupsOf.onKeys.map((entry) => row("here", entry, reachedBy("here", entry))), drafted: groupsOf.onKeys.some((entry) => changedCombos.has(entry.combo.id)),

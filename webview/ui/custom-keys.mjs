@@ -39,7 +39,7 @@ export function screenCustomKeys() {
 
     const main = el(`<div class="main">${topbar(
         "Custom keys",
-        "Named keys with a shortcut of their own and a behaviour on top. Place one on a key or send it from a combo; a behaviour step sends its shortcut.",
+        "Keys you name yourself. Each can send a shortcut and have its own taps and holds, and goes on any key or combo.",
     )}</div>`);
 
     const content = el(`<div class="content"><div class="pad library"></div></div>`);
