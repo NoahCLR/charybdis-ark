@@ -84,6 +84,7 @@ export const STATE_FIELDS = {
     stage: kept("layers"),
     layersOpen: kept(false),  // the layer-stack panel on the layer row
     layersAsked: kept(false), // its stack is requested once per opening
+    layersEmptyOpen: kept(false), // the Layers… panel's empty layers unfolded
     pdSlot: kept(0),
     pdKind: resets(null),      // movement selection while the rebuilt form catches up: {slot, kind}
     pdButtons: resets(null),   // {slot, rows: {index: override}}: button overrides whose kind is chosen but not yet its shortcut or modifiers

@@ -18,6 +18,8 @@ export const selectDevice = (deviceId) => ({type: 'selectDevice', deviceId});
 export const saveLayers = (names) => ({type: 'savePortableLayers', names});
 /** @param {boolean} keysFollow @param {string[]} names @returns {import("../../contracts/messages.js").LayerEditControl} */
 export const layersFollow = (keysFollow, names) => ({type: 'editPortableLayer', keysFollow, names});
+/** @param {number} id @param {string} name @returns {import("../../contracts/messages.js").LayerEditControl} */
+export const renameLayer = (id, name) => ({type: 'editPortableLayer', id, name});
 /** One move of a layer: to a slot, one step up or down, or swapped with the base. @typedef {{to: number} | {direction: 1 | -1} | {makeBase: true}} LayerMove */
 /** @param {number} id @param {LayerMove} change @param {string[]} names @returns {import("../../contracts/messages.js").LayerEditControl} */
 export const moveLayer = (id, change, names) => ({type: 'editPortableLayer', id, ...change, names});

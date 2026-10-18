@@ -2,11 +2,12 @@
 // The layer tabs, and the swatch a layer is shown with wherever it is named.
 
 // Selector assertions refer to elements created by this module's authored markup.
-import {css, isOff, label as hsvLabel} from "../lib/colour.mjs";
+import {css, isOff} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {getModel, heldLayers, layerName, layers, previewing, render, setPreference, showLayer, state, toggleLayerOn} from "../store.mjs";
 import {layerColourRow, stageEnabled} from "../view/lighting.mjs";
 import {draftMarks} from "../view/review.mjs";
+import {layerTabs} from "../view/layer-tabs.mjs";
 
 // A layer's swatch and how it is lit, the same wherever a layer is named: a
 // layer whose colour is off, or whose stage is off, shows as unlit.
@@ -16,7 +17,7 @@ export function layerSwatch(model, layer, className = "") {
     const lit = stageEnabled(model, "layers") && row && !isOff(row.color);
     return {
         html: `<span class="${className ? `${esc(className)} ` : ""}swatch ${lit ? "" : "swatch-off"}" style="${lit ? `background:${css(row.color)}` : ""}"></span>`,
-        tip: `${layerName(layer)} · ${lit ? hsvLabel(row.color) : "no layer colour"}`,
+        tip: `${layerName(layer)} · ${lit ? "lit in its own colour" : "no layer colour"}`,
         colour: lit ? css(row.color) : null,
     };
 }
@@ -35,7 +36,11 @@ export function layerBar(trailing = "") {
     const model = getModel();
     const drafted = draftMarks(model?.draft?.changes).layers;
     const held = new Set(heldLayers());
-    const tabs = layers().map((layer, index) => {
+    // Empty, unnamed, uncoloured layers fold into one "+N empty" tab
+    // (view/layer-tabs.mjs); the picked layer always has its own.
+    const {shown, empty} = layerTabs(model, layers(), state.layer);
+    const tabs = shown.map((index) => {
+        const layer = layers()[index];
         const swatch = layerSwatch(model, layer);
         const on = held.has(index) || (index === 0 && previewing());
         const baseOnly = held.size === 1 && held.has(0);
@@ -50,9 +55,15 @@ export function layerBar(trailing = "") {
         const tint = on && swatch.colour ? ` style="--tab-tint:${swatch.colour}"` : "";
         return `<button class="layer-tab${on ? " on" : ""}"${tint} role="tab" data-layer="${index}" aria-selected="${state.layer === index}"
             data-tip="${esc(swatch.tip)}${drafted.has(layer.index) ? " · changed in your draft" : ""}${esc(how)}">${swatch.html}
-            <span>${esc(layerName(layer))}</span>${layerName(layer) === `Layer ${layer.index}` ? "" : `<span class="idx">${layer.index}</span>`}${drafted.has(layer.index) ? '<i class="draft-dot"></i>' : ""}</button>`;
+            <span>${esc(layerName(layer))}</span><span class="idx">${layer.index}</span>${drafted.has(layer.index) ? '<i class="draft-dot"></i>' : ""}</button>`;
     }).join("");
-    const node = el(`<div class="layerbar-wrap"><div class="layer-tabs" role="tablist" aria-label="Layers">${tabs}${trailing}</div></div>`);
+    const empties = empty.length ? `<details class="layer-empties">
+        <summary class="layer-tab" data-tip="Layers with no name, no keys and no colour">+${empty.length} empty</summary>
+        <div class="layer-empties-menu" role="menu">${empty.map((index) => {
+            const layer = layers()[index];
+            return `<button class="btn compact" role="menuitem" data-layer="${index}" data-tip="Show this empty layer">${esc(layerName(layer))}<span class="idx">${layer.index}</span></button>`;
+        }).join("")}</div></details>` : "";
+    const node = el(`<div class="layerbar-wrap"><div class="layer-tabs" role="tablist" aria-label="Layers">${tabs}${trailing}</div>${empties}</div>`);
     /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-layer]")).forEach((button) => button.addEventListener("click", (event) => {
         if (event.metaKey || event.ctrlKey) toggleLayerOn(Number(button.dataset.layer));
         else showLayer(Number(button.dataset.layer));

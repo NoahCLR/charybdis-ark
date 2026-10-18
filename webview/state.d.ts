@@ -29,7 +29,7 @@ export interface PanelState {
     cellHow: {cell: string; keycode: string; helper?: BranchHelper; repeatHz?: Scalar} | null;
     combo: {open: boolean; picking: boolean; inputs: string[]; form: Omit<Combo, 'inputs'> & {output: string; termMs: string}; awaiting: boolean; editId: number | null};
     placement: {keycode: string; layerTap?: number; label?: string} | null; retarget: {from: string; to: string; existing: string} | null; keyClipboard: {keycode: string; label: string} | null;
-    stage: string; layersOpen: boolean; layersAsked: boolean; layerGripFocus?: number; pdSlot: number; pdKind: {slot: number; kind: number} | null;
+    stage: string; layersOpen: boolean; layersAsked: boolean; layersEmptyOpen: boolean; layerGripFocus?: number; pdSlot: number; pdKind: {slot: number; kind: number} | null;
     pdButtons: {slot: number; rows: Record<number, PdButton>} | null; pdTaps: {slot: number; rows: Record<string, PdTap>} | null;
     pdAdvanced: boolean; tbEntry: 'pointer' | 'sniping' | 'mouseLayer'; tbEmptiesOpen: boolean; tbFineTuning: boolean; pdStartEmpty: boolean; applyDismissed: number; applied: number; appliedDismissed: number; applyWait: {id: number; since: number} | null; applyReread: number; pdPreview: boolean; feedbackRow: string | undefined;
     macroSlot: string | null; macroSearch: string; macroEmptyOpen: boolean; customKey: string | null; customKeySearch: string; customKeyEmptyOpen: boolean; customKeyAddBehaviour: string | null; macroForms: Record<string, MacroForm>;

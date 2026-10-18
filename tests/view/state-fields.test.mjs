@@ -44,9 +44,9 @@ test("a draft change resets forms, applies each field's rule to the state before
 const RESETS = ["retarget", "pdKind", "pdButtons", "pdTaps", "lastTake"];
 const CUSTOM = ["combo", "macroForms"];
 const KEPT = [
-    "screen", "layer", "layersOn", "layerGripFocus", "selected", "tab", "behaviourRow", "behaviourRowShown", "behaviourRoute",
+    "screen", "layer", "layersOn", "layerOnly", "plateAdd", "layerGripFocus", "selected", "tab", "behaviourRow", "behaviourRowShown", "behaviourRoute",
     "reachGroups", "resetBenchHeight", "reachRow", "cell", "cellRow", "behaviourMenu", "reveal", "pickCombo", "settingsOpen", "keyDetailsOpen", "stackOpen", "showKeycodes", "hideBoard", "allTapCounts", "railMenu", "cellHow", "placement",
-    "macroClipboard", "keyClipboard", "stage", "layersOpen", "layersAsked", "pdSlot", "pdAdvanced", "tbEntry", "tbEmptiesOpen", "tbFineTuning", "pdStartEmpty", "applyDismissed", "applied", "appliedDismissed", "applyWait", "applyReread", "pdPreview", "feedbackRow",
+    "macroClipboard", "keyClipboard", "stage", "layersOpen", "layersAsked", "layersEmptyOpen", "pdSlot", "pdAdvanced", "tbEntry", "tbEmptiesOpen", "tbFineTuning", "pdStartEmpty", "applyDismissed", "applied", "appliedDismissed", "applyWait", "applyReread", "pdPreview", "feedbackRow",
     "macroSlot", "macroSearch", "macroEmptyOpen", "customKey", "customKeySearch", "customKeyEmptyOpen", "customKeyAddBehaviour", "recording", "recordDelays", "recordPreserveHoldTiming", "recordDelayThreshold",
     "recordDelayRound", "ledPicks", "trackball", "rowColour", "ledRow", "colourPicks", "colourRow", "settingsSearch", "overlay", "leaveDemo", "confirmChecks",
     "picker", "notice", "error", "settingsDurationUnits",
