@@ -1,13 +1,14 @@
 // @ts-check
 "use strict";
-// Ark supports only current firmware: every feature it reports is required
-// here (PROFILE_WIRE_KNOWN_MASKS), and nothing past these gates asks whether
-// the keyboard has one. The gates answer different questions. A read needs the
-// read surface; a complete document also needs every domain, current layers,
-// a known action ABI and current firmware's features. Complete Apply adds what
-// a build that saves profiles reports. The live mutation diagnostic
-// additionally checks the link, candidate transfer and established read
-// compatibility.
+// Ark supports only current firmware: the exact Profile Wire and schema
+// versions of the base it was built for (D-L64), which imply everything the
+// keyboard does, so nothing past these gates asks whether it has a feature.
+// The feature word only describes the build (firmware D-F28). The gates answer
+// different questions. A read needs the current base; a complete document also
+// needs every domain, current layers and a known action ABI. Complete Apply
+// adds a build that saves and copies to the other half. The live mutation
+// diagnostic additionally checks the link, candidate transfer and established
+// read compatibility.
 const {LAYERS} = require("../data/charybdis-layout");
 const {knownActionAbi} = require("../schema/actions");
 const {PROFILE_BLOB_V1} = require("../schema/profile-blob-v1");
@@ -15,16 +16,14 @@ const {KEY_BEHAVIOR_LIMITS} = require("../schema/key-behavior-domain-v1");
 const {PROFILE_WIRE_DOMAINS, PROFILE_DOMAIN_MASK} = require("../schema/profile-domains");
 const {RAW_HID_REPORT_SIZE} = require("../transport/device-adapter");
 const {PROFILE_ACTIVE_KIND, PROFILE_STATE_FLAGS,
-    PROFILE_WIRE_KNOWN_MASKS, PROFILE_WIRE_V1, VIA_READS} = require("../protocol/profile-wire-v1");
+    PROFILE_WIRE_KNOWN_MASKS, PROFILE_WIRE_V1} = require("../protocol/profile-wire-v1");
 /** @typedef {import("./types.js").DeviceCapabilities} Caps */
 /** @typedef {import("./types.js").ProfileStatus} Status */
-/** @typedef {Awaited<ReturnType<typeof import("../protocol/profile-wire-v1.js").readViaIdentity>>} ViaIdentity */
 
-const SUPPORTED_PROFILE_PROTOCOL = Object.freeze({major: 1, minor: 0});
+const SUPPORTED_PROFILE_PROTOCOL = Object.freeze({major: PROFILE_WIRE_V1.PROTOCOL_MAJOR, minor: PROFILE_WIRE_V1.PROTOCOL_MINOR});
 const SUPPORTED_PROFILE_SCHEMA = Object.freeze({major: PROFILE_BLOB_V1.SCHEMA_MAJOR, minor: PROFILE_BLOB_V1.SCHEMA_MINOR});
 const PROFILE_DOMAIN_FLAGS = Object.freeze({RGB: PROFILE_WIRE_DOMAINS.RGB, KEY_BEHAVIORS: PROFILE_WIRE_DOMAINS.KEY_BEHAVIORS});
 const REQUIRED_PROFILE_DOMAIN_MASK = PROFILE_DOMAIN_FLAGS.RGB | PROFILE_DOMAIN_FLAGS.KEY_BEHAVIORS;
-const CURRENT_FEATURES = PROFILE_WIRE_KNOWN_MASKS.CURRENT_FEATURES;
 const REQUIRED_LIVE_MUTATION_FEATURES = PROFILE_WIRE_KNOWN_MASKS.CURRENT_MUTATION_FEATURES;
 /** @param {Partial<Caps> | null | undefined} capabilities */
 const hasCurrentLayers = capabilities => capabilities?.compiledLayerCount === LAYERS;
@@ -32,9 +31,16 @@ const hasCurrentLayers = capabilities => capabilities?.compiledLayerCount === LA
 /** @param {number | undefined} flags @param {number} mask */
 const hasAll = (flags, mask) => (((Number(flags) || 0) & mask) >>> 0) === mask >>> 0;
 
+// The exact base, major and minor (D-L64): a later minor is a later capability
+// Ark does not know, an earlier one lacks one it relies on.
+/** @param {{major?: number, minor?: number} | undefined} actual @param {{major: number, minor: number}} expected */
+const sameVersion = (actual, expected) => actual?.major === expected.major && actual?.minor === expected.minor;
+/** @param {Partial<Caps> | null | undefined} capabilities */
+const isCurrentBase = capabilities => sameVersion(capabilities?.protocol, SUPPORTED_PROFILE_PROTOCOL)
+    && sameVersion(capabilities?.schema, SUPPORTED_PROFILE_SCHEMA);
+
 /** @param {Partial<Caps> | null | undefined} capabilities @returns {capabilities is Partial<Caps>} */
-const canEdit = capabilities => hasCurrentLayers(capabilities)
-    && hasAll(capabilities?.featureFlags, CURRENT_FEATURES)
+const canEdit = capabilities => isCurrentBase(capabilities) && hasCurrentLayers(capabilities)
     && ((capabilities?.supportedDomainMask || 0) & PROFILE_DOMAIN_MASK) === PROFILE_DOMAIN_MASK
     && knownActionAbi(capabilities?.actionAbiDigest ?? 0);
 
@@ -42,8 +48,8 @@ const canEdit = capabilities => hasCurrentLayers(capabilities)
 /** @param {Partial<Caps> | null | undefined} capabilities */
 const canApply = capabilities => canEdit(capabilities) && hasAll(capabilities.featureFlags, REQUIRED_LIVE_MUTATION_FEATURES);
 
-/** @param {Partial<Caps> | null | undefined} capabilities @param {Partial<ViaIdentity> | null} [viaIdentity] */
-const canRead = (capabilities, viaIdentity) => evaluateProfileCompatibility(capabilities, viaIdentity).compatible;
+/** @param {Partial<Caps> | null | undefined} capabilities */
+const canRead = capabilities => evaluateProfileCompatibility(capabilities).compatible;
 
 // Keep the old entry point for portable-session clients while panels import
 // this module directly rather than loading the Apply orchestrator for a gate.
@@ -94,16 +100,13 @@ function editableDomains(state) {
 
 // Read compatibility deliberately ignores capacities and the action ABI:
 // the keyboard advertises its capacities; editors and Apply enforce them.
-/** @param {Partial<Caps> | null | undefined} capabilities @param {Partial<ViaIdentity> | null} [viaIdentity] */
-function evaluateProfileCompatibility(capabilities, viaIdentity = {}) {
+/** @param {Partial<Caps> | null | undefined} capabilities */
+function evaluateProfileCompatibility(capabilities) {
     const checks = [
-        equalityCheck("Protocol major", capabilities?.protocol?.major, SUPPORTED_PROFILE_PROTOCOL.major),
-        equalityCheck("Schema major", capabilities?.schema?.major, SUPPORTED_PROFILE_SCHEMA.major),
-        equalityCheck("VIA protocol version", viaIdentity?.protocolVersion, VIA_READS.PROTOCOL_VERSION),
-        equalityCheck("VIA firmware version", viaIdentity?.firmwareVersion, capabilities?.firmwareVersion),
+        versionCheck("Profile Wire version", capabilities?.protocol, SUPPORTED_PROFILE_PROTOCOL),
+        versionCheck("Profile schema", capabilities?.schema, SUPPORTED_PROFILE_SCHEMA),
         equalityCheck("Raw HID report size", capabilities?.reportSize, RAW_HID_REPORT_SIZE),
         minimumCheck("Status pages", capabilities?.statusPageCount, PROFILE_WIRE_V1.STATUS_PAGE_COUNT),
-        maskCheck("Current firmware features", capabilities?.featureFlags, CURRENT_FEATURES),
         maskCheck("Required profile domains", capabilities?.supportedDomainMask, REQUIRED_PROFILE_DOMAIN_MASK),
     ];
     const reasons = checks.filter((check) => !check.ok).map((check) => check.message);
@@ -119,6 +122,13 @@ function evaluateProfileCompatibility(capabilities, viaIdentity = {}) {
 function equalityCheck(label, actual, expected) {
     const ok = Number(actual) === Number(expected);
     return {label, ok, actual, limit: expected, message: ok ? "" : `${label} is ${actual}; Charybdis Ark requires ${expected}.`};
+}
+
+/** @param {string} label @param {{major?: number, minor?: number} | undefined} actual @param {{major: number, minor: number}} expected */
+function versionCheck(label, actual, expected) {
+    const ok = sameVersion(actual, expected);
+    const shown = `${actual?.major}.${actual?.minor}`, limit = `${expected.major}.${expected.minor}`;
+    return {label, ok, actual: shown, limit, message: ok ? "" : `${label} is ${shown}; Charybdis Ark requires ${limit}. Update both halves.`};
 }
 
 /** @param {string} label @param {number | undefined} actual @param {number} expected */
@@ -141,7 +151,7 @@ function evaluateLiveMutationCompatibility(capabilities, compatibility, connecte
     if (!compatibility?.compatible) reasons.push(...(compatibility?.reasons || ["Read compatibility has not been established."]));
     const flags = Number(capabilities?.featureFlags) || 0;
     if (!hasAll(flags, REQUIRED_LIVE_MUTATION_FEATURES)) {
-        reasons.push(`Firmware mutation flags 0x${flags.toString(16)} do not include required persistent split apply mask 0x${REQUIRED_LIVE_MUTATION_FEATURES.toString(16)}.`);
+        reasons.push(`Firmware features 0x${flags.toString(16)} do not include a split build that saves (0x${REQUIRED_LIVE_MUTATION_FEATURES.toString(16)}).`);
     }
     if (!Number.isInteger(capabilities?.candidateChunkMax) || (capabilities?.candidateChunkMax ?? 0) < 1) {
         reasons.push("Firmware does not advertise a candidate upload chunk size.");
@@ -163,7 +173,7 @@ function evaluateLiveMutationCompatibility(capabilities, compatibility, connecte
 }
 
 // What the connected firmware says about itself, for the Keyboard screen and
-// Settings' "Built into this firmware": its version (VIA's u32, major.minor.patch
+// Settings' "Built into this firmware": its version (the capability u32, major.minor.patch
 // in its top three bytes), whether this Ark works with it, and the ceilings it
 // was compiled with. Only what the keyboard reports, or Ark's own schema
 // limits; never a guess. Nothing without capabilities.
@@ -185,8 +195,8 @@ function firmwareView(capabilities) {
         behaviours: count(capabilities.maxBehaviorRows),
         combos: count(capabilities.maxCombos),
         keysPerCombo: count(capabilities.maxKeysPerCombo),
-        macros: count(capabilities.viaMacroSlots),
-        macroBytes: count(capabilities.viaMacroBytes),
+        macros: count(capabilities.macroSlots),
+        macroBytes: count(capabilities.macroBytes),
         customKeys: count(capabilities.customKeySlots),
         leds: count(capabilities.physicalLedCount),
         profileBytes: count(capabilities.maxProfilePayload),
@@ -194,7 +204,7 @@ function firmwareView(capabilities) {
     };
 }
 
-module.exports = {firmwareView, canRead, canEdit, canApply, hasCurrentLayers, editableDomains, canCapture,
+module.exports = {firmwareView, canRead, canEdit, canApply, isCurrentBase, hasCurrentLayers, editableDomains, canCapture,
     canReadIdentity, identityStateFlags, supportsCompleteProfile, requireReady,
     evaluateProfileCompatibility, evaluateLiveMutationCompatibility, PROFILE_DOMAIN_FLAGS,
     SUPPORTED_PROFILE_PROTOCOL, SUPPORTED_PROFILE_SCHEMA, REQUIRED_PROFILE_DOMAIN_MASK,

@@ -23,6 +23,7 @@ const {
     candidateMetadataForBlob,
     candidateMutationResponseMatcher,
     decodeCandidateAcknowledgement,
+    decodeCandidateErrorResponse,
     decodeCandidateStatusResponse,
     readCandidateStatus,
 } = require("../../core/protocol/profile-candidate-v1");
@@ -43,17 +44,21 @@ test("reuse bounds and source identities are canonical before encoding", () => {
     const range = {offset: 20, sourceOffset: 40, length: 1024, source};
     const request = buildCandidateReuseRequest(0x1234, range);
     assert.equal(request[2], 0x1b);
-    assert.equal(request.readUInt16LE(5), 20);
-    assert.equal(request.readUInt16LE(7), 40);
-    assert.equal(request.readUInt16LE(9), 1024);
-    assert.equal(request.subarray(25).every(byte => byte === 0), true);
-    for (const invalid of [{length: 0}, {length: 1025}, {offset: 65504}, {sourceOffset: 65504},
+    // Profile Wire 2: destination, source and length are 32 bits each.
+    assert.equal(request.readUInt32LE(5), 20);
+    assert.equal(request.readUInt32LE(9), 40);
+    assert.equal(request.readUInt32LE(13), 1024);
+    assert.equal(request.readUInt32LE(17), 7);
+    assert.equal(request.readUInt32LE(21), 123);
+    assert.equal(request.readUInt32LE(25), 456);
+    assert.equal(request[31], 0);
+    for (const invalid of [{length: 0}, {length: 1025}, {offset: 130048 - 1023}, {sourceOffset: 130048 - 1023}, {offset: 0x20000},
         {source: {...source, generation: 0}}, {source: {...source, origin: 2}}, {source: {...source, kind: 2}},
         {source: {...source, kind: 0, origin: 255}}]) {
         assert.throws(() => buildCandidateReuseRequest(0x1234, {...range, ...invalid}), RangeError);
     }
     const compiled = buildCandidateReuseRequest(0x1234, {...range, source: {...source, kind: 0, origin: 255, generation: 0}});
-    assert.equal(compiled[23], 0); assert.equal(compiled[24], 255);
+    assert.equal(compiled[29], 0); assert.equal(compiled[30], 255);
 });
 
 test("JavaScript emits the exact candidate frames consumed by the firmware fixture", () => {
@@ -67,7 +72,7 @@ test("JavaScript emits the exact candidate frames consumed by the firmware fixtu
     assert.equal(CANDIDATE_STATE.CONVERGING_PEER, 9);
     const fixtures = goldenFixtures();
     const metadata = {
-        schemaMajor: 3,
+        schemaMajor: 4,
         schemaMinor: 0,
         requestedDomains: 3,
         flags: 0,
@@ -75,13 +80,11 @@ test("JavaScript emits the exact candidate frames consumed by the firmware fixtu
         crc32: 0x11223344,
         digest: 0x88776655,
         actionAbiDigest: 0xccbbaa99,
-        storeFormatVersion: 5,
-        viaGeneration: 6,
-        viaDigest: 0xabcdef01,
+        storeFormatVersion: 6,
     };
     assert.deepEqual(buildCandidateBeginRequest(0x1234, metadata), fixtures["begin-request"]);
     assert.deepEqual(
-        buildCandidateChunkRequest(0x1234, 0, Buffer.from("4e4c503103000001", "hex")),
+        buildCandidateChunkRequest(0x1234, 0, Buffer.from("4e4c503104000001", "hex")),
         fixtures["chunk-request"]
     );
     assert.deepEqual(buildCandidateValidateRequest(0x1234), fixtures["validate-request"]);
@@ -150,7 +153,7 @@ test("candidate status uses normal request correlation and decodes structured lo
     const fixtures = goldenFixtures();
     const request = fixtures["operation-status-request"];
     assert.deepEqual(decodeCandidateStatusResponse(fixtures["operation-status-response"], request), {
-        layoutVersion: 1,
+        layoutVersion: 2,
         state: CANDIDATE_STATE.REJECTED,
         lastOperation: CANDIDATE_OPERATION.VALIDATE,
         flags: 3,
@@ -160,27 +163,51 @@ test("candidate status uses normal request correlation and decodes structured lo
         nextOffset: 8,
         payloadLength: 8,
         digest: 0x88776655,
+        // Page 0 names the error; where it is comes from page 3.
         error: {
             id: CANDIDATE_ERROR.VALIDATION_REJECTED,
             name: "VALIDATION_REJECTED",
-            domainId: 0x20,
-            tableId: 2,
-            rowIndex: 5,
-            tapIndex: 3,
-            fieldId: 4,
-            byteOffset: 0x1122,
+            domainId: 0xff,
+            tableId: 0xff,
+            rowIndex: 0xffff,
+            tapIndex: 0xff,
+            fieldId: 0xff,
+            byteOffset: 0xffffffff,
         },
         operationSequence: 0x3344,
+        errorSequence: 0x6677,
+    });
+    const errorRequest = buildCandidateStatusRequest(0x41, 3);
+    assert.deepEqual(decodeCandidateErrorResponse(fixtures["operation-error-response"], errorRequest), {
+        id: CANDIDATE_ERROR.VALIDATION_REJECTED,
+        name: "VALIDATION_REJECTED",
+        domainId: 0x20,
+        tableId: 2,
+        rowIndex: 5,
+        tapIndex: 3,
+        fieldId: 4,
+        // A 32-bit offset, past what a 16-bit one could say.
+        byteOffset: 0x11122,
+        transactionId: 0x1234,
+        operationSequence: 0x3344,
+        errorSequence: 0x6677,
     });
 
+    const pages = [];
     const connection = {
         async request(actual, options) {
-            assert.deepEqual(actual, request);
-            assert.equal(options.matchResponse(fixtures["operation-status-response"], actual), true);
-            return fixtures["operation-status-response"];
+            pages.push(actual[4]);
+            assert.deepEqual(actual, actual[4] === 3 ? errorRequest : request);
+            const response = fixtures[actual[4] === 3 ? "operation-error-response" : "operation-status-response"];
+            assert.equal(options.matchResponse(response, actual), true);
+            return response;
         },
     };
-    assert.equal((await readCandidateStatus(connection, {requestId: 0x41})).transactionId, 0x1234);
+    const joined = await readCandidateStatus(connection, {requestId: 0x41});
+    assert.deepEqual(pages, [0, 3]);
+    assert.equal(joined.transactionId, 0x1234);
+    assert.deepEqual(joined.error, {id: CANDIDATE_ERROR.VALIDATION_REJECTED, name: "VALIDATION_REJECTED",
+        domainId: 0x20, tableId: 2, rowIndex: 5, tapIndex: 3, fieldId: 4, byteOffset: 0x11122});
 
     const commit = decodeCandidateStatusResponse(fixtures["commit-status-response"], request);
     assert.equal(commit.state, CANDIDATE_STATE.ACTIVATING);
@@ -191,11 +218,55 @@ test("candidate status uses normal request correlation and decodes structured lo
     assert.equal(commit.operationSequence, 0x3345);
 });
 
+test("an error page is kept only when it belongs to the page 0 it follows", async () => {
+    const fixtures = goldenFixtures();
+    // The error moved between the reads: page 3's error sequence is newer.
+    const moved = Buffer.from(fixtures["operation-error-response"]);
+    moved.writeUInt16LE(0x6678, 7 + 16);
+    const otherOperation = Buffer.from(fixtures["operation-error-response"]);
+    otherOperation.writeUInt16LE(0x3345, 7 + 14);
+    for (const [name, stale] of [["error sequence", moved], ["operation sequence", otherOperation]]) {
+        const pages = [];
+        let errorReads = 0;
+        const connection = {async request(actual) {
+            pages.push(actual[4]);
+            if (actual[4] !== 3) return fixtures["operation-status-response"];
+            // The second error read belongs to page 0 again.
+            return errorReads++ === 0 ? stale : fixtures["operation-error-response"];
+        }};
+        const status = await readCandidateStatus(connection, {requestId: 0x41});
+        assert.deepEqual(pages, [0, 3, 0, 3], `${name}: page 0 is read again`);
+        assert.equal(status.error.byteOffset, 0x11122);
+    }
+    // An error that never settles keeps page 0's id and an unknown location.
+    let reads = 0;
+    const restless = {async request(actual) {
+        reads++;
+        if (actual[4] !== 3) return fixtures["operation-status-response"];
+        return moved;
+    }};
+    const unsettled = await readCandidateStatus(restless, {requestId: 0x41});
+    assert.equal(reads, 6);
+    assert.equal(unsettled.error.id, CANDIDATE_ERROR.VALIDATION_REJECTED);
+    assert.equal(unsettled.error.byteOffset, 0xffffffff);
+    // A status with no error never asks for page 3.
+    const asked = [];
+    const quiet = {async request(actual) { asked.push(actual[4]); return fixtures["commit-status-response"]; }};
+    await readCandidateStatus(quiet, {requestId: 0x41});
+    assert.deepEqual(asked, [0]);
+    // Page 3 without an error must carry every sentinel.
+    const none = Buffer.from(fixtures["operation-error-response"]);
+    none[7 + 1] = 0;
+    assert.throws(() => decodeCandidateErrorResponse(none, buildCandidateStatusRequest(0x41, 3)), /sentinels/);
+    assert.throws(() => buildCandidateStatusRequest(0x41, 1), /page 0 or the error page/);
+});
+
 test("candidate codecs reject noncanonical padding, invalid bounds, and unknown status values", () => {
     const fixtures = goldenFixtures();
     assert.throws(() => buildCandidateChunkRequest(1, 0, Buffer.alloc(0)), /1 through 20/);
-    assert.throws(() => buildCandidateChunkRequest(1, 53200, Buffer.alloc(20)), /end at or before/);
-    assert.equal(buildCandidateChunkRequest(1, 53196, Buffer.alloc(20)).readUInt16LE(5), 53196, "the last chunk of a full slot");
+    assert.throws(() => buildCandidateChunkRequest(1, 130032, Buffer.alloc(20)), /end at or before/);
+    assert.equal(buildCandidateChunkRequest(1, 130028, Buffer.alloc(20)).readUInt32LE(5), 130028, "the last chunk of a full slot");
+    assert.equal(buildCandidateChunkRequest(1, 130028, Buffer.alloc(20))[9], 20);
     assert.throws(() => buildCandidateAbortRequest(0), /nonzero/);
 
     const badAck = Buffer.from(fixtures["begin-queued-ack"]);
@@ -204,6 +275,13 @@ test("candidate codecs reject noncanonical padding, invalid bounds, and unknown 
     const badQueued = Buffer.from(fixtures["begin-queued-ack"]);
     badQueued[7] = 0;
     assert.throws(() => decodeCandidateAcknowledgement(badQueued, fixtures["begin-request"]), /queued acknowledgment/);
+
+    const reserved = Buffer.from(fixtures["operation-status-response"]);
+    reserved[7 + 23] = 1;
+    assert.throws(() => decodeCandidateStatusResponse(reserved, fixtures["operation-status-request"]), /reserved/);
+    const layout1 = Buffer.from(fixtures["operation-status-response"]);
+    layout1[7] = 1;
+    assert.throws(() => decodeCandidateStatusResponse(layout1, fixtures["operation-status-request"]), /layout 1/);
 
     const badStatus = Buffer.from(fixtures["operation-status-response"]);
     badStatus[8] = 11;
@@ -220,76 +298,72 @@ test("candidate codecs reject noncanonical padding, invalid bounds, and unknown 
     assert.equal(decodeCandidateStatusResponse(failed, fixtures["operation-status-request"]).state, CANDIDATE_STATE.AUTHORITY_FAILED);
 });
 
-const SCHEMA_3 = {major: 3, minor: 0};
-const binding = {viaGeneration: 9, viaDigest: 0x89abcdef};
+const SCHEMA_4 = {major: 4, minor: 0};
 
 test("metadata is derived from the canonical blob and its exact domain mask", () => {
     const blob = encodeProfileBlob({
-        schema: SCHEMA_3,
+        schema: SCHEMA_4,
         domains: [{id: PROFILE_DOMAIN_IDS.RGB, version: 4, payload: Buffer.alloc(3)}],
     });
-    const metadata = candidateMetadataForBlob(blob, {actionAbiDigest: 0x12345678, ...binding});
-    assert.equal(metadata.schemaMajor, 3);
+    const metadata = candidateMetadataForBlob(blob, {actionAbiDigest: 0x12345678});
+    assert.equal(metadata.schemaMajor, 4);
     assert.equal(metadata.schemaMinor, 0);
     assert.equal(metadata.requestedDomains, 1);
     assert.equal(metadata.payloadLength, blob.length);
     assert.equal(metadata.actionAbiDigest, 0x12345678);
-    assert.equal(metadata.storeFormatVersion, 5);
+    assert.equal(metadata.storeFormatVersion, 6);
     assert.notEqual(metadata.crc32, metadata.digest);
     assert.throws(
-        () => candidateMetadataForBlob(blob, {actionAbiDigest: 1, requestedDomains: 2, ...binding}),
+        () => candidateMetadataForBlob(blob, {actionAbiDigest: 1, requestedDomains: 2}),
         (error) => error.code === "DOMAIN_MASK_MISMATCH"
     );
 });
 
-test("every candidate begin binds the target VIA identity in store format 5", () => {
-    const blob = encodeProfileBlob({schema: SCHEMA_3, domains: []});
-    const metadata = candidateMetadataForBlob(blob, {actionAbiDigest: 0x12345678, ...binding});
+test("every candidate begin carries a 32-bit length and zero reserved bytes", () => {
+    const blob = encodeProfileBlob({schema: SCHEMA_4, domains: []});
+    const metadata = candidateMetadataForBlob(blob, {actionAbiDigest: 0x12345678});
     const report = buildCandidateBeginRequest(0x4321, metadata);
-    assert.equal(report[5], 3);
-    assert.equal(report[23], 5);
-    assert.equal(report.readUInt32LE(24), 9);
-    assert.equal(report.readUInt32LE(28), 0x89abcdef);
+    assert.equal(report[5], 4);
+    assert.equal(report.readUInt32LE(8), blob.length);
+    assert.equal(report.readUInt32LE(20), 0x12345678);
+    assert.equal(report.readUInt32LE(24), 0);
+    assert.equal(report.readUInt32LE(28), 0);
 });
 
-test("a candidate without a nonzero VIA binding fails before anything is sent", () => {
-    const blob = encodeProfileBlob({schema: SCHEMA_3, domains: []});
-    const unbound = (error) => error.code === "VIA_BINDING_REQUIRED";
-    assert.throws(() => candidateMetadataForBlob(blob, {actionAbiDigest: 1}), unbound);
-    assert.throws(() => candidateMetadataForBlob(blob, {actionAbiDigest: 1, viaGeneration: 9}), unbound);
-    assert.throws(() => candidateMetadataForBlob(blob, {actionAbiDigest: 1, viaDigest: 0x89abcdef}), unbound);
-    assert.throws(() => candidateMetadataForBlob(blob, {actionAbiDigest: 1, ...binding, viaGeneration: 0}), unbound);
-    assert.throws(() => candidateMetadataForBlob(blob, {actionAbiDigest: 1, ...binding, viaDigest: 0}), unbound);
-
-    const metadata = candidateMetadataForBlob(blob, {actionAbiDigest: 1, ...binding});
-    for (const without of ["viaGeneration", "viaDigest"]) {
-        const partial = {...metadata};
-        delete partial[without];
-        assert.throws(() => buildCandidateBeginRequest(1, partial), unbound);
-    }
-    assert.throws(() => buildCandidateBeginRequest(1, {...metadata, viaGeneration: 0}), unbound);
-    assert.throws(() => buildCandidateBeginRequest(1, {...metadata, viaDigest: 0}), unbound);
+test("candidate identity comes entirely from the blob and action vocabulary", () => {
+    const blob = encodeProfileBlob({schema: SCHEMA_4, domains: []});
+    const metadata = candidateMetadataForBlob(blob, {actionAbiDigest: 1});
+    assert.equal(metadata.payloadLength, blob.length);
+    assert.equal(metadata.digest, require("../../core/schema/profile-blob-v1").fnv1a32(blob));
+    assert.ok(buildCandidateBeginRequest(1, metadata).subarray(24).every(byte => byte === 0));
+    assert.throws(() => candidateMetadataForBlob(blob, {}), /Action-ABI digest/);
 });
 
-test("every store format but current firmware's 5 is refused, the custom-only format 0 included", () => {
-    const blob = encodeProfileBlob({schema: SCHEMA_3, domains: []});
-    const metadata = candidateMetadataForBlob(blob, {actionAbiDigest: 1, ...binding});
-    for (const storeFormatVersion of [0, 1, 2, 3, 4, 6, undefined]) {
+test("every store format but current firmware's 6 is refused, the custom-only format 0 included", () => {
+    const blob = encodeProfileBlob({schema: SCHEMA_4, domains: []});
+    const metadata = candidateMetadataForBlob(blob, {actionAbiDigest: 1});
+    for (const storeFormatVersion of [0, 1, 2, 3, 4, 5, 7]) {
         assert.throws(() => buildCandidateBeginRequest(1, {...metadata, storeFormatVersion}), /store format/);
     }
+    // Profile Wire 2 implies the format, so leaving it out means format 6.
+    assert.deepEqual(buildCandidateBeginRequest(1, {...metadata, storeFormatVersion: undefined}), buildCandidateBeginRequest(1, metadata));
     // Format 0 carried no binding; dropping it as well changes nothing.
-    assert.throws(() => buildCandidateBeginRequest(1, {...metadata, storeFormatVersion: 0, viaGeneration: 0, viaDigest: 0}), /store format/);
+    assert.throws(() => buildCandidateBeginRequest(1, {...metadata, storeFormatVersion: 0}), /store format/);
 });
 
-test("only schema 3.0 candidates are built, up to the 53,216-byte payload", () => {
+test("only schema 4.0 candidates are built, up to the 130,048-byte payload", () => {
     const schema1 = Buffer.from("4e4c503101000001", "hex");
-    assert.throws(() => candidateMetadataForBlob(schema1, {actionAbiDigest: 1, ...binding}), (error) => error.code === "INCOMPATIBLE_SCHEMA");
-    const metadata = candidateMetadataForBlob(encodeProfileBlob({schema: SCHEMA_3, domains: []}), {actionAbiDigest: 1, ...binding});
+    assert.throws(() => candidateMetadataForBlob(schema1, {actionAbiDigest: 1}), (error) => error.code === "INCOMPATIBLE_SCHEMA");
+    const metadata = candidateMetadataForBlob(encodeProfileBlob({schema: SCHEMA_4, domains: []}), {actionAbiDigest: 1});
     assert.throws(() => buildCandidateBeginRequest(1, {...metadata, schemaMajor: 1}), (error) => error.code === "INCOMPATIBLE_SCHEMA");
     assert.throws(() => buildCandidateBeginRequest(1, {...metadata, schemaMinor: 1}), (error) => error.code === "INCOMPATIBLE_SCHEMA");
-    assert.throws(() => candidateMetadataForBlob(Buffer.from("4e4c503102000001", "hex"), {actionAbiDigest: 1, ...binding}), (error) => error.code === "INCOMPATIBLE_SCHEMA");
-    assert.equal(buildCandidateBeginRequest(1, {...metadata, payloadLength: 53216}).readUInt16LE(9), 53216);
-    assert.throws(() => buildCandidateBeginRequest(1, {...metadata, payloadLength: 53217}), /payload length/);
+    assert.throws(() => candidateMetadataForBlob(Buffer.from("4e4c503102000001", "hex"), {actionAbiDigest: 1}), (error) => error.code === "INCOMPATIBLE_SCHEMA");
+    assert.throws(() => candidateMetadataForBlob(Buffer.from("4e4c503103000001", "hex"), {actionAbiDigest: 1}), (error) => error.code === "INCOMPATIBLE_SCHEMA");
+    assert.throws(() => buildCandidateBeginRequest(1, {...metadata, schemaMajor: 3}), (error) => error.code === "INCOMPATIBLE_SCHEMA");
+    assert.equal(buildCandidateBeginRequest(1, {...metadata, payloadLength: 130048}).readUInt32LE(8), 130048);
+    // A length whose low 16 bits are in range but whose high bytes are not.
+    assert.throws(() => buildCandidateBeginRequest(1, {...metadata, payloadLength: 0x20000 + 8}), /payload length/);
+    assert.throws(() => buildCandidateBeginRequest(1, {...metadata, payloadLength: 130049}), /payload length/);
 });
 
 test("request and transaction id allocators wrap without emitting zero", () => {
@@ -315,14 +389,14 @@ function peerResponse(request, {status = 0, payload = null} = {}) {
 }
 function peerPayload() {
     const payload = Buffer.alloc(25);
-    payload[0] = 1;
+    payload[0] = 2;
     payload[1] = CANDIDATE_PEER_PHASE.SENDING;
     payload[2] = 6;
     payload[3] = 0x03;
-    payload.writeUInt16LE(40, 4);
-    payload.writeUInt16LE(120, 6);
-    payload.writeUInt32LE(7, 8);
-    payload.writeUInt32LE(2, 12);
+    payload.writeUInt32LE(40, 4);
+    payload.writeUInt32LE(0x10078, 8);
+    payload.writeUInt32LE(7, 12);
+    payload.writeUInt32LE(2, 16);
     return payload;
 }
 test("candidate status page 1 reports the copy to the other half", async () => {
@@ -330,11 +404,12 @@ test("candidate status page 1 reports the copy to the other half", async () => {
     const reply = (options) => ({async request(actual) { return peerResponse(actual, options); }});
     const peer = await readCandidatePeerStatus(reply({payload: peerPayload()}), {nextRequestId: () => ids++});
     assert.deepEqual(peer, {phase: CANDIDATE_PEER_PHASE.SENDING, phaseName: "SENDING", lastStatus: 6, lastStatusName: "BUSY",
-        cleanupPending: true, master: true, waitingSafeBoundary: false, transferOffset: 40, transferLength: 120, retryCount: 7, transportFailureCount: 2,
+        cleanupPending: true, master: true, waitingSafeBoundary: false, transferOffset: 40, transferLength: 0x10078, retryCount: 7, transportFailureCount: 2,
         busyStreak: 0, busyReason: "UNSPECIFIED", busyStoreState: "UNINITIALIZED", busyOwner: "NONE", busyAdmission: "NONE"});
     assert.equal(buildCandidatePeerStatusRequest(0x51)[4], 1, "page 1");
     // Why the other half keeps saying BUSY: a stale earlier copy it is still receiving.
-    const busy = peerPayload(); busy.writeUInt16LE(300, 16); busy[18] = 3; busy[19] = 2; busy[20] = 1; busy[21] = 2;
+    // Layout 2 packs the transfer owner (low nibble) and admission (high).
+    const busy = peerPayload(); busy.writeUInt16LE(300, 20); busy[22] = 3; busy[23] = 2; busy[24] = 0x21;
     assert.deepEqual(await readCandidatePeerStatus(reply({payload: busy}), {nextRequestId: () => ids++}).then(({busyStreak, busyReason, busyStoreState, busyOwner, busyAdmission}) => ({busyStreak, busyReason, busyStoreState, busyOwner, busyAdmission})),
         {busyStreak: 300, busyReason: "OTHER_COPY", busyStoreState: "RECEIVING", busyOwner: "REMOTE_PUSH", busyAdmission: "PEER"});
     // The copy is ready and the decision waits for this half to go idle.
@@ -343,7 +418,7 @@ test("candidate status page 1 reports the copy to the other half", async () => {
 
     await assert.rejects(readCandidatePeerStatus(reply({status: 2}), {nextRequestId: () => ids++}), {code: "DEVICE_REJECTED"}, "a refused page is an error");
 
-    for (const [offset, value, pattern] of [[1, 10, /phase/], [2, 11, /peer status/], [3, 0x08, /flag/], [18, 8, /busy detail/], [19, 10, /busy detail/], [20, 3, /busy detail/], [21, 3, /busy detail/], [22, 1, /reserved/]]) {
+    for (const [offset, value, pattern] of [[0, 1, /layout/], [1, 10, /phase/], [2, 11, /peer status/], [3, 0x08, /flag/], [22, 8, /busy detail/], [23, 10, /busy detail/], [24, 0x03, /busy detail/], [24, 0x30, /busy detail/]]) {
         const payload = peerPayload();
         payload[offset] = value;
         await assert.rejects(readCandidatePeerStatus(reply({payload}), {nextRequestId: () => ids++}), pattern);
@@ -351,7 +426,7 @@ test("candidate status page 1 reports the copy to the other half", async () => {
 });
 
 test("a candidate fits the capacity the keyboard reports", () => {
-    const blob = encodeProfileBlob({schema: SCHEMA_3, domains: []});
-    assert.equal(candidateMetadataForBlob(blob, {actionAbiDigest: 1, ...binding, capabilities: {maxProfilePayload: blob.length}}).payloadLength, blob.length);
-    assert.throws(() => candidateMetadataForBlob(blob, {actionAbiDigest: 1, ...binding, capabilities: {maxProfilePayload: blob.length - 1}}), /capacity/);
+    const blob = encodeProfileBlob({schema: SCHEMA_4, domains: []});
+    assert.equal(candidateMetadataForBlob(blob, {actionAbiDigest: 1, capabilities: {maxProfilePayload: blob.length}}).payloadLength, blob.length);
+    assert.throws(() => candidateMetadataForBlob(blob, {actionAbiDigest: 1, capabilities: {maxProfilePayload: blob.length - 1}}), /capacity/);
 });

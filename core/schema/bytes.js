@@ -32,6 +32,15 @@ function u16(value, label, options = {}) {
     return number;
 }
 
+/** @param {unknown} value @param {string} label @param {{nonzero?: boolean}} [options] */
+function u32(value, label, options = {}) {
+    const number = Number(value);
+    if (!Number.isInteger(number) || number < (options.nonzero ? 1 : 0) || number > 0xffffffff) {
+        throw new RangeError(`${label} must be ${options.nonzero ? "a nonzero " : "an "}unsigned 32-bit integer.`);
+    }
+    return number;
+}
+
 /** @param {string} name */
 function protocolError(name) {
     const ProtocolError = class extends Error {
@@ -64,4 +73,4 @@ function canonical(bytes, value, encode, refuse) {
     return value;
 }
 
-module.exports = {asBytes, copyBytes, u8, u16, zeroRange, protocolError, canonical};
+module.exports = {asBytes, copyBytes, u8, u16, u32, zeroRange, protocolError, canonical};

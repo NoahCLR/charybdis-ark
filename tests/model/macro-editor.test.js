@@ -1,10 +1,11 @@
 "use strict";
+const {profileMacros} = require("../fixtures/profile-document");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const {document, CURRENT_CAPABILITIES} = require("../fixtures/portable-profile");
 const {document: pdDocument} = require("../fixtures/pd-profile");
 const {fingerprint, validateSnapshot} = require("../../core/model/portable-profile");
-const {macroEditorView, editMacro, macroInputStatus, macroBudget, SLOT_RESERVE_TAPS} = require("../../core/model/macro-editor");
+const {profileMacroBudget, macroEditorView, editMacro, macroInputStatus, macroBudget, SLOT_RESERVE_TAPS} = require("../../core/model/macro-editor");
 const {decodeProfileBlob} = require("../../core/schema/profile-blob-v1");
 const {editSettings, settingsEditorView} = require("../../core/model/settings-editor");
 const {buildDeviceModel} = require("../../core/session/device-model");
@@ -25,7 +26,7 @@ test("per-macro protection follows Unicode entry automatically, and explicit pol
         assert.equal(view().protection, "off"); assert.equal(view().name, "Accent");
         edit({protection: "on"}); assert.equal(view().uninterruptible, true);
         edit({protection: "auto"}); assert.equal(view().uninterruptible, layout === 3);
-        assert.equal(Buffer.from(current.document.macros[0], "base64").toString("utf8"), "éé");
+        assert.equal(Buffer.from(profileMacros(current.document)[0], "base64").toString("utf8"), "éé");
     }
 });
 
@@ -54,7 +55,7 @@ test("the 128 VIA macros populate the model, including empty slots and their nam
     let current = snapshot(pdDocument());
     current = snapshot(editMacro(current, {keycode: "VIA_MACRO_127", payload: "{KC_LGUI,KC_N}", name: "New note", expectedFingerprint: current.fingerprint}));
     const view = macroEditorView(current);
-    const model = buildDeviceModel({macroView: view, capabilities: {compiledLayerCount: 16, actionAbiDigest: 0x837cf479}});
+    const model = buildDeviceModel({macroView: view, capabilities: {compiledLayerCount: 16, actionAbiDigest: 0x6fd70b90}});
     assert.equal(model.viaMacros.length, 128);
     assert.equal(model.viaMacros[0].empty, true);
     assert.equal(model.viaMacros[127].name, "New note");
@@ -75,7 +76,7 @@ test("naming a macro changes its name and nothing else", () => {
     const source = pdDocument(), current = snapshot(source);
     assert.equal(settingsDomain(source).version, 8);
     const named = editMacro(current, {keycode: "VIA_MACRO_3", name: "  Zoom mute ", expectedFingerprint: current.fingerprint});
-    assert.deepEqual(named.macros, source.macros, "a rename leaves every macro's steps alone");
+    assert.deepEqual(profileMacros(named), profileMacros(source), "a rename leaves every macro's steps alone");
     const domain = settingsDomain(named);
     assert.equal(domain.version, 8);
     assert.equal(domain.payload[0], 8, "the payload repeats the envelope's version");
@@ -92,7 +93,7 @@ test("naming a macro changes its name and nothing else", () => {
     // Steps and name together, then clearing the name.
     const both = editMacro(snapshot(named), {keycode: "VIA_MACRO_3", payload: "hello", name: "Greeting", expectedFingerprint: fingerprint(named)});
     assert.equal(validateSnapshot(both).settings.macroNames[3], "Greeting");
-    assert.equal(Buffer.from(both.macros[3], "base64").toString(), "hello");
+    assert.equal(Buffer.from(profileMacros(both)[3], "base64").toString(), "hello");
     const cleared = editMacro(snapshot(both), {keycode: "VIA_MACRO_3", name: "", expectedFingerprint: fingerprint(both)});
     assert.equal(validateSnapshot(cleared).settings.macroNames[3], "");
     // A steps-only edit leaves the settings as they were.
@@ -126,7 +127,7 @@ test("stale drafts and wrong slots are rejected before a write", () => {
     const message = {keycode: "VIA_MACRO_0", payload: "hello", expectedFingerprint: current.fingerprint};
     assert.throws(() => editMacro(current, {...message, expectedFingerprint: "stale"}), /changed/);
     for (const keycode of ["VIA_MACRO_128", "VIA_MACRO_01", "KC_A", "MACRO_2", "CUSTOM_KEY_2"]) assert.throws(() => editMacro(current, {...message, keycode}), /slot/);
-    assert.equal(Buffer.from(editMacro(current, {...message, keycode: "VIA_MACRO_127"}).macros[127], "base64").toString(), "hello", "the last slot is a slot");
+    assert.equal(Buffer.from(profileMacros(editMacro(current, {...message, keycode: "VIA_MACRO_127"}))[127], "base64").toString(), "hello", "the last slot is a slot");
     assert.throws(() => editMacro(current, {keycode: "VIA_MACRO_0", expectedFingerprint: current.fingerprint}), /steps, its name/);
     assert.throws(() => editMacro(current, {...message, payload: "x".repeat(34903)}), /bytes/);
 });
@@ -134,14 +135,14 @@ test("stale drafts and wrong slots are rejected before a write", () => {
 test("every empty slot keeps room for ten key taps; the highest ones run out of room first", () => {
     assert.equal(SLOT_RESERVE_TAPS, 10);
     const empty = () => Buffer.alloc(0);
-    // 128 empty slots in 10,327 bytes: 129 bytes stored, all 128 keep 30 bytes.
+    // 128 empty slots in 10,327 bytes: 128 bytes stored, all 128 keep 30 bytes.
     let budget = macroBudget(Array.from({length: 128}, empty), 10327);
-    assert.equal(budget.stored, 129);
+    assert.equal(budget.stored, 128);
     assert.equal(budget.available, 128);
     assert.equal(budget.outOfRoom.size, 0);
     // Fill slot 0 so exactly five empty slots keep their 30 bytes.
     const slots = Array.from({length: 128}, empty);
-    slots[0] = Buffer.alloc(10327 - 129 - 5 * 30, 97);
+    slots[0] = Buffer.alloc(10327 - 128 - 5 * 30, 97);
     budget = macroBudget(slots, 10327);
     assert.equal(budget.free, 150);
     assert.equal(budget.available, 6, "the full slot and five with room");
@@ -156,7 +157,7 @@ test("every empty slot keeps room for ten key taps; the highest ones run out of 
 test("the model reports the bank and each macro's room; a macro past the free memory is refused", () => {
     let current = snapshot(pdDocument());
     current = snapshot(editMacro(current, {keycode: "VIA_MACRO_2", payload: "{KC_A}{KC_B}", expectedFingerprint: current.fingerprint}));
-    const view = macroEditorView(current, {viaMacroBytes: 34903});
+    const view = macroEditorView(current, {macroBytes: 34903});
     const slot = view.viaMacros[2];
     assert.equal(slot.playable, true);
     assert.equal(slot.available, true);
@@ -165,7 +166,7 @@ test("the model reports the bank and each macro's room; a macro past the free me
     assert.equal(view.macroBank.slots, 128);
     assert.equal(view.macroBank.reserveTaps, 10);
     assert.equal(view.macroBank.available, 128);
-    const model = buildDeviceModel({macroView: view, capabilities: {compiledLayerCount: 16, actionAbiDigest: 0x837cf479}});
+    const model = buildDeviceModel({macroView: view, capabilities: {compiledLayerCount: 16, actionAbiDigest: 0x6fd70b90}});
     assert.deepEqual(model.macroBank, view.macroBank);
     // The keyboard streams a macro in windows, so only the free memory bounds it.
     assert.doesNotThrow(() => editMacro(current, {keycode: "VIA_MACRO_2", payload: "{KC_A}".repeat(171), expectedFingerprint: current.fingerprint}));
@@ -193,7 +194,7 @@ test("Unicode host setup persists with the profile", () => {
         assert.deepEqual(unicodeView, {mode, enabled: true, os: mode, layout: 0, layoutFits: true, layoutName: "US"});
         assert.equal(layoutChars.length, 97);
         assert.equal(view.viaMacros[0].payload, "café 🙂 e\u0301 👩‍💻");
-        assert.equal(Buffer.from(current.document.macros[0], "base64").toString("utf8"), "café 🙂 e\u0301 👩‍💻");
+        assert.equal(Buffer.from(profileMacros(current.document)[0], "base64").toString("utf8"), "café 🙂 e\u0301 👩‍💻");
     }
     const off = snapshot(setHost(0, false));
     const offView = macroEditorView(off, capabilities);
@@ -213,7 +214,7 @@ test("live macro inspection and staging agree without inspection changing the sn
         const message = {keycode: "VIA_MACRO_17", payload, expectedFingerprint: current.fingerprint};
         const result = macroInputStatus(current, message);
         if (result.error) assert.throws(() => editMacro(current, message), error => error.code === result.code && error.message === result.error);
-        else assert.equal(Buffer.from(editMacro(current, message).macros[17], "base64").length, result.bytes);
+        else assert.equal(Buffer.from(profileMacros(editMacro(current, message))[17], "base64").length, result.bytes);
     }
     assert.deepEqual(current, before);
 });
@@ -249,7 +250,7 @@ test("macro text is judged against the host layout the keyboard types through", 
 });
 
 test("macros use the free bank and filled high slots survive lower empty slots running out of room", () => {
-    const capabilities = {...CURRENT_CAPABILITIES, viaMacroBytes: 34903, maxProfilePayload: 53216};
+    const capabilities = {...CURRENT_CAPABILITIES, macroBytes: 34903, maxProfilePayload: 53216};
     let current = snapshot(document());
     const update = payload => {current = snapshot(editMacro(current, {keycode: "VIA_MACRO_127", payload, expectedFingerprint: current.fingerprint}, capabilities));};
     const free = macroEditorView(current, capabilities).macroBank.free;
@@ -275,5 +276,48 @@ test("macros use the free bank and filled high slots survive lower empty slots r
 
 test("a long macro plays whatever its length while it fits the bank", () => {
     const current = snapshot(document()), payload = "a".repeat(600);
-    assert.equal(macroInputStatus(current, {keycode: "VIA_MACRO_0", payload}, {viaMacroBytes: 34903}).error, "");
+    assert.equal(macroInputStatus(current, {keycode: "VIA_MACRO_0", payload}, {macroBytes: 34903}).error, "");
+});
+
+test("names and other domains consume the shared space offered to macros", () => {
+    const {editKeyboardName} = require("../../core/model/keyboard-name");
+    const current = snapshot(document());
+    const caps = {...CURRENT_CAPABILITIES, macroBytes: 34903,
+        maxProfilePayload: validateSnapshot(current.document).candidate.length + 60};
+    assert.equal(macroEditorView(current, caps).macroBank.free, 60);
+    const named = snapshot(editKeyboardName(current, {name: "a".repeat(32), expectedFingerprint: current.fingerprint}, caps));
+    assert.equal(macroEditorView(named, caps).macroBank.free, 28);
+    assert.equal(macroInputStatus(named, {keycode: "VIA_MACRO_0", payload: "a".repeat(29)}, caps).code, "MACRO_BANK_FULL");
+    assert.throws(() => editMacro(named, {keycode: "VIA_MACRO_0", payload: "a".repeat(29), expectedFingerprint: named.fingerprint}, caps),
+        error => error.code === "MACRO_BANK_FULL");
+    assert.doesNotThrow(() => editMacro(named, {keycode: "VIA_MACRO_0", payload: "a".repeat(28), expectedFingerprint: named.fingerprint}, caps));
+});
+
+test("the macro domain can use its full advertised capacity without an extra VIA sentinel", () => {
+    const current = snapshot(document());
+    const caps = {...CURRENT_CAPABILITIES, macroBytes: 34903, maxProfilePayload: 130048};
+    const free = macroEditorView(current, caps).macroBank.free;
+    const changed = editMacro(current, {keycode: "VIA_MACRO_0", payload: "a".repeat(free), expectedFingerprint: current.fingerprint}, caps);
+    assert.equal(macroEditorView(snapshot(changed), caps).macroBank.free, 0);
+    const decoded = validateSnapshot(changed, caps);
+    assert.equal(decoded.macroSlots.reduce((size, slot) => size + slot.length + 1, 0), 34903);
+    const domains = require("../../core/schema/profile-blob-v1").decodeProfileBlob(decoded.candidate).domains;
+    assert.equal(domains.find(domain => domain.id === 0x70).payload.length, 34903);
+});
+
+test("unused macro tails survive names and layer edits, while stream edits reclaim their shared space", () => {
+    const {replaceDomain} = require("../../core/schema/profile-domains");
+    const {reorderLayers} = require("../../core/model/portable-profile");
+    const source = pdDocument();
+    source.profile = replaceDomain(Buffer.from(source.profile, "base64"), 112, payload => Buffer.concat([payload, Buffer.alloc(99, 65), Buffer.from([0])])).toString("base64");
+    const current = snapshot(source), bytes = Buffer.from(source.profile, "base64");
+    const caps = {...CURRENT_CAPABILITIES, macroBytes: 34903, maxProfilePayload: bytes.length};
+    assert.equal(profileMacroBudget(validateSnapshot(source), caps).free, 100);
+    const changed = editMacro(current, {keycode: "VIA_MACRO_0", payload: "a".repeat(100), expectedFingerprint: current.fingerprint}, caps);
+    assert.equal(Buffer.from(changed.profile, "base64").length, bytes.length, "the replacement uses the reclaimed tail");
+    const named = editMacro(current, {keycode: "VIA_MACRO_0", name: "Named", expectedFingerprint: current.fingerprint});
+    const macros = document => decodeProfileBlob(Buffer.from(document.profile, "base64")).domains.find(row => row.id === 112).payload;
+    assert.deepEqual(macros(named), macros(source));
+    assert.deepEqual(macros(reorderLayers(source, [0, 2, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])), macros(source));
+    assert.deepEqual(Buffer.from(JSON.parse(JSON.stringify(source)).profile, "base64"), bytes, "portable JSON retains the exact complete blob");
 });

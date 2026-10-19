@@ -1,4 +1,5 @@
 "use strict";
+const {editLayers} = require("../tests/fixtures/profile-document");
 const {test, expect} = require("@playwright/test");
 const {openControls, clearPosts, posted} = require("./control-preview");
 const {document: pdDocument} = require("../tests/fixtures/pd-profile");
@@ -13,8 +14,8 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
         await openControls(page, "keys", {tab: "key", selected: 0}, theme);
         // Publish a real draft with named custom keys and a retained retired code.
         const value = pdDocument();
-        value.layers[0][0] = 0x7e54;
-        const capabilities = {compiledLayerCount: 16, supportedDomainMask: 31, actionAbiDigest: value.actionAbiDigest, featureFlags: PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES};
+        editLayers(value, layers => layers[0][0] = 0x7e54);
+        const capabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 0}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: value.actionAbiDigest, featureFlags: PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES};
         const draft = new ProfileDraftSession({document: value, fingerprint: fingerprint(value), summary: summary(value)}, "board", capabilities);
         for (const [slot, name] of ["Right Thumb", "Left Thumb", "Click Spam"].entries())
             draft.stage({type: "updateCustomKey", keycode: `CUSTOM_KEY_${slot}`, name, draftId: draft.id, draftRevision: draft.revision});
@@ -51,6 +52,6 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
         expect(messages).toEqual([expect.objectContaining({type: "updateLayoutKeys",
             changes: [expect.objectContaining({layoutIndex: 0, keycode: "CUSTOM_KEY_2"})]})]);
         draft.stage(messages[0]);
-        expect(validateSnapshot(draft.document).document.layers[0][0]).toBe(0x7f02);
+        expect(validateSnapshot(draft.document).layers[0][0]).toBe(0x7f02);
     });
 }

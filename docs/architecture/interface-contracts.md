@@ -133,9 +133,10 @@ The same kind of control looks and sits the same on every screen.
 
 Straight directions, diagonals and physical-button tap overrides use one tap
 vocabulary, owned by `core/schema/pd-mode-domain-v1.js`. It includes plain
-mouse buttons 1–8 (`0x00d1..0x00d8`, Profile Wire feature bit 28) and VIA
-macro outputs (`0x7700..0x777f`, feature bit 29), which take inherit policy
-and mask zero (firmware D-F23); Ark requires both features (D-L64). Mouse movement, wheel,
+mouse buttons 1–8 (`0x00d1..0x00d8`) and VIA macro outputs
+(`0x7700..0x777f`), which take inherit policy and mask zero (firmware D-F23);
+every Profile Wire 2 firmware accepts both (Profile Wire 1's feature bits 28
+and 29, D-L64). Mouse movement, wheel,
 acceleration and modifier-wrapped mouse codes remain invalid. The firmware
 owns the click runtime contract (D-F22); the [guide](../GUIDE.md#pointing-mode-clicks)
 describes its effect for users.
@@ -461,7 +462,8 @@ exposes **Use output behaviour**. Both default on. Switching either off changes
 output processing while preserving the chord, timing and participation policy.
 Explain the native fallback beside the controls, and that a custom key sends
 its shortcut, or nothing without one; the combo builder names the output's
-shortcut. They are firmware feature bit 30, which Ark requires (D-L64).
+shortcut. Every Profile Wire 2 firmware has them (Profile Wire 1's feature
+bit 30, D-L64).
 
 The global value is a tagged header field in the existing Settings section,
 not another scalar ID. Review and section Discard include it. Per-combo edits,

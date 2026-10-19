@@ -92,12 +92,12 @@ function buildSnapshotModel(snapshot, capabilities, binding, deviceState = {}) {
     const lighting = baseLighting(settings.values);
     const baseEffect = max === undefined ? baseRgbForView(deviceState.baseRgb) : baseEffectForView({
         effectId: lighting.enabled ? lighting.effect : 0,
-        brightness: max ? Math.min(255, Math.round(lighting.brightness * 255 / max)) : 0,
+        brightness: lighting.brightness,
         hue: lighting.hue, saturation: lighting.saturation, speed: lighting.speed,
     }, max);
     const editable = binding.editable;
     const model = configurationModel({
-        layers: value.document.layers.map((values, layer) => ({layer, keys: CHARYBDIS_4X6_LAYOUT_MATRIX.map(([row, column], layoutIndex) => ({row, column, layoutIndex, keycode: values[matrixPosition(layoutIndex)], resolved: keycodeCatalog.resolve(values[matrixPosition(layoutIndex)])}))})),
+        layers: value.layers.map((values, layer) => ({layer, keys: CHARYBDIS_4X6_LAYOUT_MATRIX.map(([row, column], layoutIndex) => ({row, column, layoutIndex, keycode: values[matrixPosition(layoutIndex)], resolved: keycodeCatalog.resolve(values[matrixPosition(layoutIndex)])}))})),
         domains: {rgb: value.rgb, keyBehaviors: value.behaviors, settings, pdModes: value.pdModes},
         comboRows: runningComboRows(combos),
         comboInfo: {state: "read", enabled: Boolean(settings.values[SETTING.COMBOS_ENABLED]), layerReferences: settings.layers.map(record => record.reference),
@@ -376,6 +376,7 @@ function deviceHeader(state) {
                 halves: /** @type {import("../../contracts/model.js").HalvesId} */ ("unread"),
                 recoveryPending: false,
                 restartNeeded: false,
+                earlierFormat: false,
                 busy: false,
                 phase: state.phase || PHASE.IDLE,
                 error: state.error?.message || "",
@@ -418,6 +419,10 @@ function deviceHeader(state) {
             // The slave half never confirmed a cancelled save. Only a restart
             // releases it, and the keyboard refuses new saves until then.
             restartNeeded: Boolean(status?.peerCleanupPending),
+            // A slot holds a profile from an earlier store format or test layout, which the
+            // keyboard neither reads nor converts (D-L64): it runs its built-in
+            // defaults until a profile is saved.
+            earlierFormat: Boolean(status?.storedEarlierFormat),
             busy: Boolean(state.busy),
             phase: state.phase || PHASE.CONNECTED,
             error: state.error?.message || state.liveApply?.failure?.reason || "",
@@ -465,7 +470,7 @@ function diagnosticsFor(state) {
     if (state.committed?.state === "read") {
         notes.push(
             state.committed.source === "compiled"
-                ? `Showing the firmware's compiled defaults (${state.committed.byteLength} bytes). Nothing is committed to the keyboard yet, so this is what it runs.`
+                ? `Showing the firmware's compiled defaults (${state.committed.byteLength} bytes). This is what the keyboard is running, even if a newer profile is saved.`
                 : `Committed profile generation ${state.committed.generation} read from the keyboard (${state.committed.byteLength} bytes).`
         );
         for (const failure of state.committed.failures || []) {

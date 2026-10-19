@@ -1,5 +1,6 @@
 // @ts-check
 "use strict";
+const {editLayers, editMacros} = require("./profile-document");
 const assert = require("node:assert/strict");
 const {document32: document} = require("./pd-slots-32");
 const {fingerprint, validateSnapshot} = require("../../core/model/portable-profile");
@@ -16,7 +17,7 @@ const capabilities = {...decodeCapabilityPages([0, 1, 2].map(page => {
 /** @param {{source?: import('../../core/model/types.js').PortableDocument, generation?: number, compiledOnly?: boolean}} [input] */
 function fixture({source = document(), generation = 4, compiledOnly = false} = {}) {
     const targetDocument = structuredClone(source);
-    targetDocument.layers[0][0] ^= 1; targetDocument.macros[0] = Buffer.from("hello").toString("base64");
+    editLayers(targetDocument, layers => layers[0][0] ^= 1); editMacros(targetDocument, macros => macros[0] = Buffer.from("hello").toString("base64"));
     const target = validateSnapshot(targetDocument);
     const keyboard = writableKeyboard({document: source, generation, compiledOnly});
     let id = 0;

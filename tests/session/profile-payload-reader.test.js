@@ -70,3 +70,19 @@ test("a commit during metadata-only reuse retries with fresh bytes", async () =>
     assert.deepEqual(result.bytes, second.bytes);
     assert.deepEqual(requests, [0, 0, 0, 1, 2, 0]);
 });
+
+// The firmware's validated maximum profile exercises real envelopes and all
+// seven domains beyond a uint16 byte offset, not just synthetic metadata.
+test("a complete seven-domain profile above 64 KiB survives payload readback", async () => {
+    const text = require("node:fs").readFileSync(require("node:path").resolve(__dirname,
+        "../../upstream/firmware/tests/fixtures/maximum_profile_v4.fixture"), "utf8");
+    const bytes = Buffer.from(text.match(/^profile\.hex=(.*)$/m)[1], "hex");
+    const {decodeProfileBlob, encodeProfileBlob} = require("../../core/schema/profile-blob-v1");
+    assert.ok(bytes.length > 65535);
+    const device = payloadDevice({bytes, generation: 9, schemaMajor: 4, schemaMinor: 0, domainMask: 127});
+    const read = await new ProfilePayloadReader(device).readCommitted();
+    assert.deepEqual(read.bytes, bytes);
+    assert.deepEqual(encodeProfileBlob(decodeProfileBlob(read.bytes)), bytes);
+    assert.equal(device.requests.at(-2), Math.ceil(bytes.length / 25));
+    assert.ok(device.requests.at(-2) < 65536, "the 16-bit page index covers the flash slot");
+});

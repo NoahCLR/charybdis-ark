@@ -1,6 +1,6 @@
 // @ts-check
 "use strict";
-const {isUnhandledEcho, orUnhandled, unhandledError} = require("./via-unhandled-v1");
+const {isUnhandledEcho, orUnhandled, unhandledError} = require("./raw-hid-unhandled");
 const {buildProfileGetRequest, decodeProfileResponse, profileResponseMatcher} = require("./profile-wire-v1");
 /** @param {string} message */
 const fail = message => Object.assign(new Error(message), {code: "INVALID_KEYBOARD_OPTIONS"});

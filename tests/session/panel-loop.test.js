@@ -1,4 +1,5 @@
 "use strict";
+const {editLayers} = require("../fixtures/profile-document");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const {exportedProfile, openPanelLoop} = require("../../core/session/panel-loop");
@@ -10,7 +11,7 @@ const {document: currentDocument} = require("../fixtures/portable-profile");
 const {fakeKeyboardAdapter, fakeKeyboard} = require("../fixtures/fake-keyboard");
 const {PHASE} = require("../../core/model/vocabulary");
 
-const capabilities = {compiledLayerCount: 16, supportedDomainMask: 31, actionAbiDigest: 0x837cf479, featureFlags: require("../../core/protocol/profile-wire-v1").PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES};
+const capabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 0}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x6fd70b90, featureFlags: require("../../core/protocol/profile-wire-v1").PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES};
 const snapshot = () => {
     const doc = document();
     return {document: doc, fingerprint: fingerprint(doc), summary: summary(doc), limits: {brightnessMax: 200}};
@@ -95,7 +96,7 @@ test("dropped files use the chooser's validation and review without opening a ho
         draftId: draft.id, draftRevision: draft.revision});
     const before = draft.document;
     const changed = structuredClone(before);
-    changed.layers[0][0] = 5;
+    editLayers(changed, layers => layers[0][0] = 5);
     await loop.handleMessage(message(JSON.stringify(changed)));
     const review = loop.session.portableReview;
     assert.equal(last(host).model.portable.review.fileName, "desk.charybdis.json");
@@ -150,7 +151,7 @@ test("fresh reads follow clean drafts, retain dirty edits, and rebase only the c
     const host = fakeHost(), service = fakeService(), loop = openPanelLoop(host, {service});
     loop.serviceChanged();
     const draft = loop.session.draft, id = draft.id;
-    const next = structuredClone(draft.document); next.layers[0][0] = 5;
+    const next = structuredClone(draft.document); editLayers(next, layers => layers[0][0] = 5);
     service.portable = {...snapshot(), document: next, fingerprint: fingerprint(next), summary: summary(next)};
     loop.serviceChanged();
     assert.equal(loop.session.draft, draft);

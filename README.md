@@ -27,7 +27,7 @@ Key and modifier names follow that OS throughout the editors and Review.
 - **Combos, macros and custom keys.** Build combos, write named macros or
   record taps and chords with optional hold timing, and build, reorder, copy
   and paste macro steps with their own undo and redo. Macros share the
-  keyboard's macro memory, and one macro can use all of it. Name your own
+  profile's free space, up to the keyboard's macro limit, and one macro can use all of it. Name your own
   custom keys and give each a shortcut (any modifiers, left and right mixed,
   and one key, held as long as you hold the key) and a behaviour, even before
   it sits on a layer. There are 128 slots in each bank; a combo can have up to
@@ -52,13 +52,14 @@ Every edit goes into a draft with undo, redo and a full history. **Review**
 lists what changed and checks what the layers let you reach. It warns you
 about a layer you could lock yourself into, combos that can't fire and macros
 your Host setup can't play. **Apply** saves a recovery copy, writes both halves
-and reads the result back to prove it, and you can stay in the editor while it
-does.
+as one complete profile and reads the result back, and you can stay in the
+editor while it does.
 
 On **Backups**, **Export profile** saves your whole setup as one file, and
 **Import profile** takes one by choosing it or dropping it onto the Import
 card, then restores it after the same review. Every Apply keeps a copy of what it
-replaced, ready to use again.
+replaced, ready to use again. During save recovery, Ark shows only a layout
+it can verify the keyboard is running.
 
 No keyboard to hand? **Explore a demo** opens Ark on a complete setup with nothing
 connected. Every screen works and every edit shows up in the review; only Apply
@@ -87,7 +88,7 @@ Ark** from the command palette.
 The keyboard needs the left/right pair from the
 [latest firmware release](https://github.com/NoahCLR/charybdis-4x6/releases/latest):
 Ark works with current firmware only, and reads or restores nothing older,
-backups from older firmware included. A plain `qmk compile` image can't be
+backups from older firmware included. VIA is no longer supported. A plain `qmk compile` image can't be
 read or saved by Ark.
 
 ## Learn more

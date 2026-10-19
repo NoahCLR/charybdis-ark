@@ -1,4 +1,5 @@
 "use strict";
+const {profileLayers} = require("../fixtures/profile-document");
 const test = require("node:test"), assert = require("node:assert/strict");
 const {IDENTITY, compose, inverse, isIdentity, layerUnit, rearranged} = require("../../core/model/layer-order");
 const {fingerprint, summary} = require("../../core/model/portable-profile");
@@ -19,7 +20,7 @@ test("a rearranged document moves each layer with its name, and moving it back r
     assert.deepEqual(summary(moved).names.slice(2, 4), ["Navigation", "Symbols"]);
     assert.equal(fingerprint(rearranged(moved, inverse(SWAP))), fingerprint(value));
     const renumbered = rearranged(value, [0, 2, 1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]);
-    assert.notEqual(renumbered.layers[0][0], value.layers[0][0], "a key reaching a moved layer follows it");
+    assert.notEqual(profileLayers(renumbered)[0][0], profileLayers(value)[0][0], "a key reaching a moved layer follows it");
 });
 
 test("units that belong to a layer are named by the layer, not the slot", () => {

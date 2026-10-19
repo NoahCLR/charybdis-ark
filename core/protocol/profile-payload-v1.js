@@ -1,7 +1,7 @@
 // @ts-check
 "use strict";
 
-const {requestHandled} = require("./via-unhandled-v1");
+const {requestHandled} = require("./raw-hid-unhandled");
 // Reads the committed profile payload off the keyboard.
 //
 // The device serves page 0 as metadata and pages 1..N as raw payload, a full
@@ -30,12 +30,14 @@ const PROFILE_PAYLOAD_V1 = Object.freeze({
     // same page layout. A keyboard with nothing committed is still running
     // something, and this is it.
     COMPILED_VALUE: 0x05,
-    LAYOUT_VERSION: 1,
+    // Layout 2 (Profile Wire 2, firmware D-F28): a 32-bit payload length at
+    // offset 2, every later field two bytes on from layout 1's.
+    LAYOUT_VERSION: 2,
     METADATA_PAGE: 0,
-    METADATA_SIZE: 21,
+    METADATA_SIZE: 23,
     DEFAULT_GENERATION_RETRIES: 3,
-    // A page index is 16 bits (feature bit 19): a full 53,216-byte payload is
-    // 2,129 chunks.
+    // A page index is 16 bits: a full 130,048-byte payload is 5,202 chunks of
+    // 25 bytes, and 16 bits of page reach 1.6 MB.
     MAX_CHUNKS: 0xffff,
 });
 
@@ -45,14 +47,14 @@ function decodePayloadMetadata(payload) {
     const decoded = {
         layoutVersion: page[0],
         chunkSize: page[1],
-        payloadLength: readU16(page, 2),
-        generation: readU32(page, 4),
-        digest: readU32(page, 8),
-        crc32: readU32(page, 12),
-        schema: {major: page[16], minor: page[17]},
-        domainMask: page[18],
-        originHalf: page[19],
-        flags: page[20],
+        payloadLength: readU32(page, 2),
+        generation: readU32(page, 6),
+        digest: readU32(page, 10),
+        crc32: readU32(page, 14),
+        schema: {major: page[18], minor: page[19]},
+        domainMask: page[20],
+        originHalf: page[21],
+        flags: page[22],
     };
 
     assertZeroRange(page, PROFILE_PAYLOAD_V1.METADATA_SIZE, PROFILE_WIRE_V1.PAYLOAD_SIZE, "profile payload metadata page");
@@ -229,11 +231,6 @@ function assertConnection(connection) {
     if (!connection || typeof connection.request !== "function") {
         throw new TypeError("connection must provide request(report, options).");
     }
-}
-
-/** @param {Uint8Array} buffer @param {number} offset */
-function readU16(buffer, offset) {
-    return buffer[offset] | (buffer[offset + 1] << 8);
 }
 
 /** @param {Uint8Array} buffer @param {number} offset */

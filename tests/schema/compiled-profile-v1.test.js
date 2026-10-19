@@ -41,7 +41,7 @@ const milestoneCapabilities = {
     maxTapStepsPerBehavior: 5,
     maxPopulatedBehaviorSteps: 640,
     customKeySlots: 128,
-    viaMacroSlots: 128,
+    macroSlots: 128,
     maxProfilePayload: 65504,
     physicalLedCount: 58,
 };

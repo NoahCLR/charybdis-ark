@@ -1,7 +1,7 @@
 /** Observable read states retain error details for the published model. */
 export interface PublicError {code: string; message: string}
 export type PendingRead = {state?: 'unread' | 'reading' | 'unavailable'; error?: PublicError; progress?: import('../../contracts/model.js').CountedProgress | null; layers?: []; readAt?: string};
-export type BaseRgbRead = PendingRead | (Awaited<ReturnType<typeof import('../protocol/via-rgb-matrix-v1.js').readViaRgbMatrix>> & {state: 'read'; readAt?: string; error?: undefined});
+export type BaseRgbRead = PendingRead | ({effectId: number; brightness: number; hue: number; saturation: number; speed: number} & {state: 'read'; readAt?: string; error?: undefined});
 export type ComboRead = PendingRead | (Omit<ReturnType<typeof import('../protocol/combo-readback-v1.js').decodeComboPages>, 'digest' | 'noTimer' | 'strictTimer' | 'customTrigger' | 'customRelease' | 'customRepress' | 'fixedReference'> & {digest?: number; noTimer?: boolean; strictTimer?: boolean; customTrigger?: boolean; customRelease?: boolean; customRepress?: boolean; fixedReference?: boolean} & {state: 'read'; readAt?: string; error?: undefined});
 
 export type ConnectionToken = number | string | null;
@@ -96,8 +96,8 @@ export interface CandidateDriverOptions {
     readPeerStatus?: typeof import('../protocol/profile-candidate-v1.js').readCandidatePeerStatus | null;
     onProgress?: (progress: CandidateProgress) => void;
 }
-export interface CaptureIdentity {profile: string; storageGeneration: number; storageDigest: number; settingsCrc: number; settingsDigest: number}
-export interface HeldStorage {layout: Buffer; macros: Buffer; profile?: Buffer}
+export interface CaptureIdentity {profile: string; settingsCrc: number; settingsDigest: number}
+export interface HeldStorage {profile: Buffer}
 export interface CaptureFacts {
     status: ProfileStatus;
     identity?: CaptureIdentity;
@@ -232,7 +232,6 @@ export interface ServiceSnapshot extends PanelDeviceState {
     devices: (import('../transport/types.js').DeviceDescriptor & {label: string; number?: number})[];
     scanned: boolean;
     candidateStatus: (Omit<CandidateStatus, 'error'> & {stateName: string; error: CandidateStatus['error'] | null}) | null;
-    viaIdentity: Awaited<ReturnType<typeof import('../protocol/profile-wire-v1.js').readViaIdentity>> | null;
     compatibility: ReturnType<typeof import('./firmware-support.js').evaluateProfileCompatibility> | null;
     mutationCompatibility: ReturnType<typeof import('./firmware-support.js').evaluateLiveMutationCompatibility>;
     lastRefreshedAt: string;

@@ -53,7 +53,9 @@ const KEY_BEHAVIOR_LIMITS = Object.freeze({
     maxTapStepsPerBehavior: 5,
     maxLayers: LAYERS,
     maxRepeatHz: 100,
-    maxPayloadSize: PROFILE_BLOB_V1.MAX_SIZE - PROFILE_BLOB_V1.HEADER_SIZE - PROFILE_BLOB_V1.DOMAIN_HEADER_SIZE,
+    // The domain's own offsets are 16 bits (unchanged by schema 4, firmware
+    // D-F28), so its payload stays within 65,535 bytes whatever the blob's.
+    maxPayloadSize: Math.min(PROFILE_BLOB_V1.MAX_SIZE - PROFILE_BLOB_V1.HEADER_SIZE - PROFILE_BLOB_V1.DOMAIN_HEADER_SIZE, 0xffff),
 });
 
 /** @param {{rows?: import("./types.js").BehaviorRowInput[]}} [value] @param {import("./types.js").BehaviorOptions} [options] */

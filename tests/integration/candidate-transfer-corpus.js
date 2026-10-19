@@ -63,8 +63,9 @@ async function run(label, source, target, optimized, corruptSource = false) {
     const connection = {request: async (report, options) => {
         const frame = Buffer.from(report);
         requests++;
-        if (frame[0] === 7 && [0x11, 0x1c].includes(frame[2])) uploaded += frame[7];
-        if (frame[0] === 7 && frame[2] === 0x1b) reused += frame.readUInt16LE(9);
+        // Profile Wire 2: a chunk's length at byte 9, a reuse's 32-bit length at 13.
+        if (frame[0] === 7 && [0x11, 0x1c].includes(frame[2])) uploaded += frame[9];
+        if (frame[0] === 7 && frame[2] === 0x1b) reused += frame.readUInt32LE(13);
         const response = Buffer.from(await exchange(frame.toString("hex")), "hex");
         assert(options?.matchResponse, "The coordinator must supply a response matcher.");
         assert.equal(options.matchResponse(response, frame), true); return response;
@@ -73,7 +74,7 @@ async function run(label, source, target, optimized, corruptSource = false) {
         if (corruptSource) assert.equal(await exchange("corrupt 500"), "ok");
         // Simulated scan opportunities, not a prediction of device timings.
         const coordinator = new CandidateUploadCoordinator(connection, {sleep: async () => {assert.equal(await exchange("tick 20"), "ok");}});
-        const uploading = coordinator.upload(target, {actionAbiDigest: CAPABILITIES_32.actionAbiDigest, capabilities, viaGeneration: 2, viaDigest: 123,
+        const uploading = coordinator.upload(target, {actionAbiDigest: CAPABILITIES_32.actionAbiDigest, capabilities,
             ...(optimized ? {baseSource: {bytes: source, kind: 0, origin: 255, generation: 0, crc32: crc32(source), digest: fnv1a32(source)}} : {})});
         if (corruptSource) {
             await assert.rejects(uploading, error => error instanceof CandidateUploadError && error.code === "DEVICE_REJECTED" && error.deviceError?.name === "CHECKSUM_MISMATCH");
@@ -87,11 +88,12 @@ async function run(label, source, target, optimized, corruptSource = false) {
     } finally {child.kill(); reader.close();}
 }
 (async () => {
-    const ordinary = validateSnapshot(document32(), CAPABILITIES_32).profile;
-    const fixture = fs.readFileSync(path.join(__dirname, "../../upstream/firmware/tests/fixtures/maximum_profile_v3.fixture"), "utf8");
+    const ordinary = validateSnapshot(document32(), CAPABILITIES_32).candidate;
+    const fixture = fs.readFileSync(path.join(__dirname, "../../upstream/firmware/tests/fixtures/maximum_profile_v4.fixture"), "utf8");
     const match = fixture.match(/^profile\.hex=(.*)$/m);
     assert(match, "The maximum profile fixture must contain profile.hex.");
     const maximum = Buffer.from(match[1], "hex");
+    assert(maximum.length > 65535, "the complete profile transfer crosses 64 KiB");
     /** @type {[string, Buffer, Buffer][]} */
     const cases = [["ordinary-name", ordinary, rename(ordinary, "Fast Apply")],
         ["maximum-name", maximum, rename(maximum, "Changed name")], ["unchanged-custom", maximum, maximum]];

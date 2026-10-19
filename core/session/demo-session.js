@@ -43,9 +43,9 @@ const DEMO_DEVICE_ID = "demo";
 // tests/session/demo-session.test.js holds this to what the simulated current
 // keyboard (tests/fixtures/fake-keyboard.js) reports.
 const DEMO_CAPABILITIES = Object.freeze({
-    responseVersion: 2,
-    protocol: Object.freeze({major: 1, minor: 0}),
-    schema: Object.freeze({major: 3, minor: 0}),
+    responseVersion: 3,
+    protocol: Object.freeze({major: 2, minor: 0}),
+    schema: Object.freeze({major: 4, minor: 0}),
     reportSize: 32,
     candidateChunkMax: 20,
     statusPageCount: 2,
@@ -63,11 +63,11 @@ const DEMO_CAPABILITIES = Object.freeze({
     physicalLedCount: 58,
     ledBitmapSize: 8,
     customKeySlots: 128,
-    viaMacroSlots: 128,
-    maxProfilePayload: 53216,
-    profileSlotPayload: 53216,
-    profileSlotSize: 53248,
-    viaMacroBytes: 34903,
+    macroSlots: 128,
+    maxProfilePayload: 130048,
+    profileSlotPayload: 130048,
+    profileSlotSize: 131072,
+    macroBytes: 34903,
     supportedDomainMask: PROFILE_WIRE_KNOWN_MASKS.SUPPORTED_DOMAINS,
     nameMaxBytes: 32,
     layerMaskBits: 32,
@@ -277,7 +277,7 @@ function demoHeader(session, busy) {
         label: DEMO_WORDS.label,
         summary: `No keyboard · ${session.demo.name}`,
         subtitle: "Nothing here was read from a keyboard, and nothing can be applied to one.",
-        health: {profile: "demo", converged: false, halves: /** @type {import("../../contracts/model.js").HalvesId} */ ("unread"), recoveryPending: false, restartNeeded: false, busy: Boolean(busy), phase: PHASE.DEMO, error: ""},
+        health: {profile: "demo", converged: false, halves: /** @type {import("../../contracts/model.js").HalvesId} */ ("unread"), recoveryPending: false, earlierFormat: false, restartNeeded: false, busy: Boolean(busy), phase: PHASE.DEMO, error: ""},
     };
 }
 

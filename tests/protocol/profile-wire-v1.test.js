@@ -10,18 +10,12 @@ const {
     PROFILE_WIRE_KNOWN_MASKS,
     PROFILE_WIRE_FEATURES,
     PROFILE_WIRE_V1,
-    VIA_READS,
-    buildViaFirmwareVersionRequest,
-    buildViaProtocolVersionRequest,
     buildProfileGetRequest,
     decodeCapabilityPages,
     decodeProfileResponse,
     decodeStatusPages,
-    decodeViaFirmwareVersion,
-    decodeViaProtocolVersion,
     profileResponseMatcher,
     readProfileCapabilities,
-    readViaIdentity,
 } = require("../../core/protocol/profile-wire-v1");
 
 function goldenFixtures() {
@@ -44,58 +38,49 @@ function response(request, payload, status = 0) {
     return report;
 }
 
-// Capability layout 2 (firmware D-F14): three pages, the third holding the
-// fields wider than a byte.
+// Capability layout 3 (firmware D-F28): page 1 the ceilings that fit a byte,
+// page 2 the wider ones, every byte count 32 bits. A split build that saves
+// and has a pointing device, profiles past 64 KiB.
 function compiledOnlyPages() {
     const identity = Buffer.alloc(PROFILE_WIRE_V1.PAYLOAD_SIZE);
-    identity.set([2, 3, 1, 0, 3, 0, 32, 20, 2, 0x3f], 0);
+    identity.set([3, 3, 2, 0, 4, 0, 32, 20, 2, 0x07], 0);
     const capacity = Buffer.from([
-        16, 16, 128, 5, 0, 128, 16, 16, 32, 58, 8, 128, 128,
-        0xe0, 0xff, 0xe0, 0xff, 0x00, 0x00, 0x57, 0x28, 3, 0, 0, 0,
+        16, 16, 128, 5, 128, 16, 16, 32, 58, 8, 128, 128, 31, 32, 32, 60,
+        0, 0, 0, 0, 0, 0, 0, 0, 0,
     ]);
     const wide = Buffer.alloc(PROFILE_WIRE_V1.PAYLOAD_SIZE);
     wide.writeUInt16LE(640, 0);
-    wide[2] = 5;
-    wide.writeUInt32LE(65536, 3);
-    wide.set([32, 32, 60], 7);
+    wide.writeUInt32LE(131072, 2);
+    wide.writeUInt32LE(100000, 6);
+    wide.writeUInt32LE(131040, 10);
+    wide.writeUInt32LE(70000, 14);
     return [identity, capacity, wide];
 }
 
-test("macro protection does not advertise candidate transfer extensions", () => {
-    assert.equal(PROFILE_WIRE_FEATURES.CANDIDATE_REUSE, 1 << 24);
-    assert.equal(PROFILE_WIRE_FEATURES.CANDIDATE_STREAM, 1 << 25);
-    const pages = compiledOnlyPages();
-    pages[0].writeUInt32LE((pages[0].readUInt32LE(9) | (1 << 23)) & ~PROFILE_WIRE_FEATURES.CANDIDATE_WRITE, 9);
-    pages[0][7] = 0;
-    const capabilities = decodeCapabilityPages(pages);
-    assert.equal(capabilities.featureFlags & (PROFILE_WIRE_FEATURES.CANDIDATE_REUSE | PROFILE_WIRE_FEATURES.CANDIDATE_STREAM), 0);
-});
-
-test("candidate transfer extensions require candidate-write capability", () => {
-    for (const feature of [PROFILE_WIRE_FEATURES.CANDIDATE_REUSE, PROFILE_WIRE_FEATURES.CANDIDATE_STREAM]) {
+test("the feature word holds only what a build varies by: split, saves and pointing", () => {
+    assert.deepEqual(PROFILE_WIRE_FEATURES, {SPLIT_KEYBOARD: 1, SAVES: 2, POINTING: 4});
+    assert.equal(PROFILE_WIRE_KNOWN_MASKS.FEATURE_FLAGS, 0x07);
+    for (const flags of [0, 1, 4, 5]) {
         const pages = compiledOnlyPages();
-        pages[0].writeUInt32LE(pages[0].readUInt32LE(9) | feature, 9);
-        assert.ok(decodeCapabilityPages(pages).featureFlags & feature);
-        pages[0].writeUInt32LE(pages[0].readUInt32LE(9) & ~PROFILE_WIRE_FEATURES.CANDIDATE_WRITE, 9);
+        pages[0].writeUInt32LE(flags, 9);
         pages[0][7] = 0;
-        assert.throws(() => decodeCapabilityPages(pages), /extensions require candidate-write/);
+        assert.equal(decodeCapabilityPages(pages).featureFlags, flags, "a build that cannot save yet");
+    }
+    // Every Profile Wire 1 bit is retired: an earlier word is unknown here.
+    for (const bit of [3, 4, 19, 24, 31]) {
+        const pages = compiledOnlyPages();
+        pages[0].writeUInt32LE((pages[0].readUInt32LE(9) | 2 ** bit) >>> 0, 9);
+        assert.throws(() => decodeCapabilityPages(pages), (error) => error.code === "INCOMPATIBLE_RESPONSE" && /unknown bits/.test(error.message), `bit ${bit}`);
     }
 });
 
-test("pointing, combo-output and unified tapping support decode through bit 31, the last of the word", () => {
-    const pages = compiledOnlyPages();
-    assert.equal(decodeCapabilityPages(pages).featureFlags & PROFILE_WIRE_FEATURES.POINTING_CLICKS, 0);
-    pages[0].writeUInt32LE(pages[0].readUInt32LE(9) | (1 << 28), 9);
-    assert.equal(decodeCapabilityPages(pages).featureFlags & PROFILE_WIRE_FEATURES.POINTING_CLICKS, 1 << 28);
-    pages[0].writeUInt32LE(pages[0].readUInt32LE(9) | (1 << 29), 9);
-    assert.equal(decodeCapabilityPages(pages).featureFlags & PROFILE_WIRE_FEATURES.POINTING_MACROS, 1 << 29);
-    pages[0].writeUInt32LE(pages[0].readUInt32LE(9) | (1 << 30), 9);
-    assert.equal(decodeCapabilityPages(pages).featureFlags & PROFILE_WIRE_FEATURES.COMBO_OUTPUT_BEHAVIORS, 1 << 30);
-    pages[0].writeUInt32LE((pages[0].readUInt32LE(9) | 0x80000000) >>> 0, 9);
-    const decoded = decodeCapabilityPages(pages);
-    assert.equal(PROFILE_WIRE_FEATURES.UNIFIED_TAPPING, 0x80000000);
-    assert.ok(decoded.featureFlags > 0, "read unsigned");
-    assert.equal((decoded.featureFlags & PROFILE_WIRE_FEATURES.UNIFIED_TAPPING) >>> 0, PROFILE_WIRE_FEATURES.UNIFIED_TAPPING);
+test("save support and the candidate chunk capacity agree", () => {
+    const withoutSaves = compiledOnlyPages();
+    withoutSaves[0].writeUInt32LE(PROFILE_WIRE_FEATURES.SPLIT_KEYBOARD, 9);
+    assert.throws(() => decodeCapabilityPages(withoutSaves), /Save support and candidate chunk capacity disagree/);
+    const withoutChunks = compiledOnlyPages();
+    withoutChunks[0][7] = 0;
+    assert.throws(() => decodeCapabilityPages(withoutChunks), /Save support and candidate chunk capacity disagree/);
 });
 
 test("Profile Wire get requests are canonical 32-byte frames", () => {
@@ -104,7 +89,7 @@ test("Profile Wire get requests are canonical 32-byte frames", () => {
     assert.deepEqual(Array.from(request.subarray(0, 5)), [0x08, 0, 1, 0x42, 1]);
     assert.equal(request.subarray(5).every((byte) => byte === 0), true);
     assert.throws(() => buildProfileGetRequest(1, 0, 0), /nonzero/);
-    // A wide page (feature bit 19): byte 4 its low byte, byte 5 its high byte.
+    // A wide page: byte 4 its low byte, byte 5 its high byte.
     const wide = buildProfileGetRequest(PROFILE_WIRE_V1.VALUE_PAYLOAD ?? 0x04, 2621, 0x43);
     assert.deepEqual(Array.from(wide.subarray(4, 6)), [2621 & 0xff, 2621 >> 8]);
     assert.equal(wide.subarray(6).every((byte) => byte === 0), true);
@@ -122,13 +107,13 @@ test("JavaScript consumes the same golden reports as the C firmware codec", () =
         pages[prefix] = decodeProfileResponse(fixtures[`${prefix}-response`], request);
     }
     assert.deepEqual(decodeCapabilityPages([pages["capabilities-page-0"], pages["capabilities-page-1"], pages["capabilities-page-2"]]), {
-        responseVersion: 2,
-        protocol: {major: 1, minor: 0},
-        schema: {major: 3, minor: 0},
+        responseVersion: 3,
+        protocol: {major: 2, minor: 0},
+        schema: {major: 4, minor: 0},
         reportSize: 32,
         candidateChunkMax: 0,
         statusPageCount: 2,
-        featureFlags: 0x48080c1f,
+        featureFlags: 0x05,
         actionAbiDigest: 0x12345678,
         firmwareVersion: 0x00010000,
         compiledDefaultDigest: 0x89abcdef,
@@ -144,11 +129,12 @@ test("JavaScript consumes the same golden reports as the C firmware codec", () =
         physicalLedCount: 58,
         ledBitmapSize: 8,
         customKeySlots: 128,
-        viaMacroSlots: 128,
-        maxProfilePayload: 53216,
-        profileSlotPayload: 53216,
-        profileSlotSize: 53248,
-        viaMacroBytes: 34903,
+        macroSlots: 128,
+        // The firmware's golden capacities are past 64 KiB, as 32 bits allow.
+        maxProfilePayload: 130048,
+        profileSlotPayload: 130048,
+        profileSlotSize: 131072,
+        macroBytes: 70000,
         supportedDomainMask: 3,
         nameMaxBytes: 32,
         layerMaskBits: 32,
@@ -179,6 +165,7 @@ test("JavaScript consumes the same golden reports as the C firmware codec", () =
         peerConverged: true,
         waitingSafeBoundary: true,
         peerCleanupPending: false,
+        storedEarlierFormat: false,
     });
 });
 
@@ -192,58 +179,60 @@ test("response correlation includes value, request id, and page", () => {
 
 test("capability pages decode the bigger profile's capacities", () => {
     const decoded = decodeCapabilityPages(compiledOnlyPages());
-    assert.deepEqual(decoded.protocol, {major: 1, minor: 0});
-    assert.deepEqual(decoded.schema, {major: 3, minor: 0});
-    assert.equal(decoded.featureFlags, 0x3f);
+    assert.deepEqual(decoded.protocol, {major: 2, minor: 0});
+    assert.deepEqual(decoded.schema, {major: 4, minor: 0});
+    assert.equal(decoded.featureFlags, 0x07);
     assert.equal(decoded.compiledLayerCount, 16);
     assert.equal(decoded.maxBehaviorRows, 128);
     assert.equal(decoded.maxPopulatedBehaviorSteps, 640);
     assert.equal(decoded.physicalLedCount, 58);
-    assert.equal(decoded.maxProfilePayload, 65504);
-    assert.equal(decoded.profileSlotSize, 65536);
-    assert.equal(decoded.viaMacroBytes, 10327);
+    assert.equal(decoded.supportedDomainMask, 31);
+    assert.equal(decoded.maxProfilePayload, 100000);
+    assert.equal(decoded.profileSlotPayload, 131040);
+    assert.equal(decoded.profileSlotSize, 131072);
+    assert.equal(decoded.macroBytes, 70000);
     assert.equal(decoded.nameMaxBytes, 32);
-    // An image from before 16 layers reports layout 1 with two pages.
-    const older = compiledOnlyPages().map((page) => Buffer.from(page));
-    older[0].set([1, 2], 0);
-    assert.throws(() => decodeCapabilityPages(older), (error) => error.code === "INCOMPATIBLE_RESPONSE");
-    // Page 1's moved fields stay zero, and both pages agree on the tap depth.
-    for (const [page, offset] of [[1, 4], [1, 17], [1, 18], [2, 10], [2, 24]]) {
+    assert.equal(decoded.placementPositions, 60);
+    // Profile Wire 1's layouts 1 and 2 are refused, so is any later one.
+    for (const layout of [1, 2, 4]) {
+        const older = compiledOnlyPages().map((page) => Buffer.from(page));
+        older[0][0] = layout;
+        assert.throws(() => decodeCapabilityPages(older), (error) => error.code === "INCOMPATIBLE_RESPONSE" && /Update both halves/.test(error.message));
+    }
+    // The bytes past each page's fields stay zero.
+    for (const [page, offset] of [[1, 16], [1, 24], [2, 18], [2, 24]]) {
         const bytes = compiledOnlyPages().map((value) => Buffer.from(value));
         bytes[page][offset] = 1;
-        assert.throws(() => decodeCapabilityPages(bytes), `page ${page} byte ${offset}`);
+        assert.throws(() => decodeCapabilityPages(bytes), (error) => error.code === "NONCANONICAL_RESPONSE", `page ${page} byte ${offset}`);
     }
-    const depth = compiledOnlyPages().map((page) => Buffer.from(page));
-    depth[2][2] = 8;
-    assert.throws(() => decodeCapabilityPages(depth), /tap depths/);
+    const inconsistent = compiledOnlyPages().map((page) => Buffer.from(page));
+    inconsistent[2].writeUInt32LE(131041, 6);
+    assert.throws(() => decodeCapabilityPages(inconsistent), /internally inconsistent/);
 });
 
 test("patterned capability vectors decode every semantic field exactly", () => {
     const identity = Buffer.alloc(25);
-    identity.set([2, 3, 1, 7, 3, 9, 32, 20, 2], 0);
-    identity.writeUInt32LE(0x00000fff, 9);
+    identity.set([3, 3, 2, 7, 4, 9, 32, 20, 2], 0);
+    identity.writeUInt32LE(0x00000003, 9);
     identity.writeUInt32LE(0x12345678, 13);
     identity.writeUInt32LE(0x89abcdef, 17);
     identity.writeUInt32LE(0x0badf00d, 21);
     const capacity = Buffer.alloc(25);
-    capacity.set([12, 16, 100, 5, 0, 96, 12, 16, 32, 58, 8, 120, 110], 0);
-    capacity.writeUInt16LE(40000, 13);
-    capacity.writeUInt16LE(65504, 15);
-    capacity.writeUInt16LE(9999, 19);
-    capacity[21] = 3;
+    capacity.set([12, 16, 100, 5, 96, 12, 16, 32, 58, 8, 120, 110, 3, 31, 32, 64], 0);
     const wide = Buffer.alloc(25);
     wide.writeUInt16LE(500, 0);
-    wide[2] = 5;
-    wide.writeUInt32LE(0x00010000, 3);
-    wide.set([31, 32, 64], 7);
+    wide.writeUInt32LE(0x00030000, 2);
+    wide.writeUInt32LE(0x00012345, 6);
+    wide.writeUInt32LE(0x0002fff0, 10);
+    wide.writeUInt32LE(0x00010203, 14);
     assert.deepEqual(decodeCapabilityPages([identity, capacity, wide]), {
-        responseVersion: 2,
-        protocol: {major: 1, minor: 7},
-        schema: {major: 3, minor: 9},
+        responseVersion: 3,
+        protocol: {major: 2, minor: 7},
+        schema: {major: 4, minor: 9},
         reportSize: 32,
         candidateChunkMax: 20,
         statusPageCount: 2,
-        featureFlags: 0x00000fff,
+        featureFlags: 0x00000003,
         actionAbiDigest: 0x12345678,
         firmwareVersion: 0x89abcdef,
         compiledDefaultDigest: 0x0badf00d,
@@ -251,7 +240,6 @@ test("patterned capability vectors decode every semantic field exactly", () => {
         maxLogicalLayers: 16,
         maxBehaviorRows: 100,
         maxTapStepsPerBehavior: 5,
-        maxPopulatedBehaviorSteps: 500,
         maxCombos: 96,
         maxKeysPerCombo: 12,
         maxReusableRgbGroups: 16,
@@ -259,15 +247,16 @@ test("patterned capability vectors decode every semantic field exactly", () => {
         physicalLedCount: 58,
         ledBitmapSize: 8,
         customKeySlots: 120,
-        viaMacroSlots: 110,
-        maxProfilePayload: 40000,
-        profileSlotPayload: 65504,
-        profileSlotSize: 65536,
-        viaMacroBytes: 9999,
+        macroSlots: 110,
         supportedDomainMask: 3,
         nameMaxBytes: 31,
         layerMaskBits: 32,
         placementPositions: 64,
+        maxPopulatedBehaviorSteps: 500,
+        profileSlotSize: 0x00030000,
+        maxProfilePayload: 0x00012345,
+        profileSlotPayload: 0x0002fff0,
+        macroBytes: 0x00010203,
     });
 });
 
@@ -331,7 +320,20 @@ test("patterned status vectors decode every semantic field exactly", () => {
         peerConverged: true,
         waitingSafeBoundary: true,
         peerCleanupPending: false,
+        storedEarlierFormat: false,
     });
+});
+
+test("status says a slot holds a profile in an earlier store format (flag 9)", () => {
+    assert.equal(PROFILE_STATE_FLAGS.STORED_EARLIER_FORMAT, 1 << 9);
+    const identity = Buffer.alloc(25);
+    identity.set([1, 2], 0);
+    identity.writeUInt16LE(PROFILE_STATE_FLAGS.STORED_EARLIER_FORMAT | PROFILE_STATE_FLAGS.ACTIVE_IS_COMPILED_DEFAULT, 2);
+    const decoded = decodeStatusPages([identity, Buffer.alloc(25)]);
+    assert.equal(decoded.storedEarlierFormat, true);
+    assert.equal(decoded.activeKind, 0);
+    identity.writeUInt16LE(1 << 10, 2);
+    assert.throws(() => decodeStatusPages([identity, Buffer.alloc(25)]), /unknown bits 0x400/);
 });
 
 test("status reports a cancelled save the peer never confirmed", () => {
@@ -346,38 +348,18 @@ test("status reports a cancelled save the peer never confirmed", () => {
 
 test("decoders reject unknown masks, active kinds, and invalid ranges", () => {
     const capabilities = compiledOnlyPages();
-    // Bit 31 filled the feature word, so no feature bit is unknown any more.
-    assert.equal(PROFILE_WIRE_KNOWN_MASKS.FEATURE_FLAGS, 0xffffffff);
-    // Bit 18 identifies runtime-owned tapping without changing profile bytes.
-    const functions = capabilities.map((page) => Buffer.from(page));
-    functions[0].writeUInt32LE(functions[0].readUInt32LE(9) | (1 << 18), 9);
-    assert.ok(decodeCapabilityPages(functions).featureFlags & (1 << 18));
     const unknownDomain = capabilities.map((page) => Buffer.from(page));
-    unknownDomain[1][21] = 0x80;
+    unknownDomain[1][12] = 0x80;
     assert.throws(() => decodeCapabilityPages(unknownDomain), (error) => error.code === "INCOMPATIBLE_RESPONSE");
     const invalidChunk = capabilities.map((page) => Buffer.from(page));
     invalidChunk[0][7] = 21;
     assert.throws(() => decodeCapabilityPages(invalidChunk), /chunk capacity/);
-
-    const missingCandidateFeature = capabilities.map((page) => Buffer.from(page));
-    missingCandidateFeature[0].writeUInt32LE(missingCandidateFeature[0].readUInt32LE(9) & ~PROFILE_WIRE_FEATURES.CANDIDATE_WRITE, 9);
-    assert.throws(() => decodeCapabilityPages(missingCandidateFeature), /candidate chunk capacity disagree/i);
-
-    const missingRgbSchema = capabilities.map((page) => Buffer.from(page));
-    missingRgbSchema[0].writeUInt32LE(missingRgbSchema[0].readUInt32LE(9) & ~PROFILE_WIRE_FEATURES.RGB_SCHEMA, 9);
-    assert.throws(() => decodeCapabilityPages(missingRgbSchema), /domains and schema feature flags disagree/i);
-
-    const commitWithoutCandidate = capabilities.map((page) => Buffer.from(page));
-    commitWithoutCandidate[0][7] = 0;
-    commitWithoutCandidate[0].writeUInt32LE(
-        (commitWithoutCandidate[0].readUInt32LE(9) | PROFILE_WIRE_FEATURES.PERSISTENT_COMMIT) & ~PROFILE_WIRE_FEATURES.CANDIDATE_WRITE,
-        9
-    );
-    assert.throws(() => decodeCapabilityPages(commitWithoutCandidate), /Persistent commit requires candidate-write support/);
-
-    const peerWithoutCommit = capabilities.map((page) => Buffer.from(page));
-    peerWithoutCommit[0].writeUInt32LE(peerWithoutCommit[0].readUInt32LE(9) | PROFILE_WIRE_FEATURES.PEER_RECONCILIATION, 9);
-    assert.throws(() => decodeCapabilityPages(peerWithoutCommit), /Peer reconciliation requires/);
+    const layers = capabilities.map((page) => Buffer.from(page));
+    layers[1][0] = 17;
+    assert.throws(() => decodeCapabilityPages(layers), /logical-layer capacity/);
+    const leds = capabilities.map((page) => Buffer.from(page));
+    leds[1][9] = 7;
+    assert.throws(() => decodeCapabilityPages(leds), /LED bitmap/);
 
     const statusIdentity = Buffer.alloc(25);
     statusIdentity.set([1, 2], 0);
@@ -392,31 +374,14 @@ test("decoders reject unknown masks, active kinds, and invalid ranges", () => {
     assert.throws(() => decodeStatusPages([statusIdentity, invalidOrigin]), /origin half/);
 });
 
-test("standard VIA identity reads use canonical frames and big-endian values", async () => {
-    const protocolRequest = buildViaProtocolVersionRequest();
-    const firmwareRequest = buildViaFirmwareVersionRequest();
-    assert.equal(protocolRequest.length, 32);
-    assert.deepEqual(Array.from(protocolRequest.subarray(0, 3)), [1, 0, 0]);
-    assert.deepEqual(Array.from(firmwareRequest.subarray(0, 3)), [2, 4, 0]);
-    const writes = [];
-    const connection = {
-        async request(request, options) {
-            writes.push(Buffer.from(request));
-            const result = Buffer.from(request);
-            if (request[0] === 1) {
-                result[1] = 0;
-                result[2] = 12;
-            } else {
-                result.set([0x89, 0xab, 0xcd, 0xef], 2);
-            }
-            assert.equal(options.matchResponse(result, request), true);
-            return result;
-        },
-    };
-    assert.equal(decodeViaProtocolVersion(Buffer.from([1, 0, 12, ...Buffer.alloc(29)])), 12);
-    assert.equal(decodeViaFirmwareVersion(Buffer.from([2, 4, 0x89, 0xab, 0xcd, 0xef, ...Buffer.alloc(26)])), 0x89abcdef);
-    assert.deepEqual(await readViaIdentity(connection), {protocolVersion: 12, firmwareVersion: 0x89abcdef});
-    assert.deepEqual(writes.map((report) => report[0]), [1, 2]);
+test("capability read alone reports the firmware identity, with no VIA command", async () => {
+    const {fakeKeyboard} = require("../fixtures/fake-keyboard");
+    const {document} = require("../fixtures/portable-profile");
+    const keyboard = fakeKeyboard({document: document(), firmwareVersion: 0x89abcdef});
+    let id = 0;
+    const caps = await readProfileCapabilities({request: async report => keyboard.answer(report)[0]}, {nextRequestId: () => ++id});
+    assert.equal(caps.firmwareVersion, 0x89abcdef);
+    assert.deepEqual(keyboard.requests.map(r => [r[0], r[1], r[2]]), [[8, 0, 1], [8, 0, 1], [8, 0, 1]]);
 });
 
 test("decoder rejects error, noncanonical, and mismatched responses", () => {
@@ -445,29 +410,14 @@ test("capability reads serialize through the transport connection", async () => 
     const decoded = await readProfileCapabilities(connection, {requestId: 0xfe});
     assert.deepEqual(requests.map((request) => request[4]), [0, 1, 2]);
     assert.equal(new Set(requests.map((request) => request[3])).size, 3, "each page has its own request id");
-    assert.equal(decoded.maxProfilePayload, 65504);
+    assert.equal(decoded.maxProfilePayload, 100000);
 });
 
-test("what current firmware reports is one set of masks, and never the bits it does not advertise", () => {
-    const {CURRENT_FEATURES, CURRENT_MUTATION_FEATURES, CURRENT_PAIR_FEATURES} = PROFILE_WIRE_KNOWN_MASKS;
-    assert.equal(CURRENT_FEATURES & CURRENT_MUTATION_FEATURES, 0);
-    assert.equal(CURRENT_PAIR_FEATURES, (CURRENT_FEATURES | CURRENT_MUTATION_FEATURES | PROFILE_WIRE_FEATURES.SPLIT_KEYBOARD) >>> 0);
-    // Bit 13 is retired; RGB preview and participation are never advertised.
-    assert.equal(CURRENT_PAIR_FEATURES & ((1 << 13) | PROFILE_WIRE_FEATURES.RGB_PREVIEW | PROFILE_WIRE_FEATURES.PARTICIPATION_CONTROLS), 0);
-    assert.equal(Object.values(PROFILE_WIRE_FEATURES).some((bit) => bit === 1 << 13), false);
-    const pages = compiledOnlyPages().map((page) => Buffer.from(page));
-    pages[0].writeUInt32LE(CURRENT_PAIR_FEATURES, 9);
-    pages[0][7] = 20; pages[1][21] = 31;
-    assert.equal(decodeCapabilityPages(pages).featureFlags, CURRENT_PAIR_FEATURES);
-});
-
-test("macro output isolation requires protection and stays separate from transfer extensions", () => {
-    assert.equal(PROFILE_WIRE_FEATURES.MACRO_OUTPUT_ISOLATION, 1 << 26);
-    const pages = compiledOnlyPages();
-    pages[0].writeUInt32LE(pages[0].readUInt32LE(9) | (1 << 26), 9);
-    assert.throws(() => decodeCapabilityPages(pages), error => error.code === "MALFORMED_RESPONSE" && /requires macro protection/.test(error.message));
-    pages[0].writeUInt32LE(pages[0].readUInt32LE(9) | (1 << 23), 9);
-    const actual = decodeCapabilityPages(pages);
-    assert.equal(actual.featureFlags & (1 << 26), 1 << 26);
-    assert.equal(actual.featureFlags & (PROFILE_WIRE_FEATURES.CANDIDATE_REUSE | PROFILE_WIRE_FEATURES.CANDIDATE_STREAM), 0);
+test("what current firmware reports is one set of masks", () => {
+    const {CURRENT_MUTATION_FEATURES, CURRENT_PAIR_FEATURES} = PROFILE_WIRE_KNOWN_MASKS;
+    // Apply needs a split build that saves; the pair also has pointing.
+    assert.equal(CURRENT_MUTATION_FEATURES, PROFILE_WIRE_FEATURES.SPLIT_KEYBOARD | PROFILE_WIRE_FEATURES.SAVES);
+    assert.equal(CURRENT_PAIR_FEATURES, PROFILE_WIRE_KNOWN_MASKS.FEATURE_FLAGS);
+    assert.equal("CURRENT_FEATURES" in PROFILE_WIRE_KNOWN_MASKS, false, "reading needs no bit: the version says it");
+    assert.equal(decodeCapabilityPages(compiledOnlyPages()).featureFlags, CURRENT_PAIR_FEATURES);
 });

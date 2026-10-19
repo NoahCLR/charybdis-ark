@@ -36,11 +36,12 @@ const {layerOfRef} = require("../schema/actions");
 // what the layer stored, which is why the label reads the document before it.
 /** @param {import("../../contracts/edits.js").EditOf<"updateLayoutKeys">} message @param {Document} document */
 function layoutLabel({layer, changes}, document) {
+    const layers = require("./portable-profile").validateSnapshot(document).layers;
     const [first, second] = changes;
     /** @param {{layoutIndex: number}} change */
     const stored = change => {
         const position = CHARYBDIS_4X6_LAYOUT_MATRIX[change.layoutIndex];
-        return position && document.layers[/** @type {number} */ (layerOfRef(layer))]?.[matrixPosition(change.layoutIndex)];
+        return position && layers[/** @type {number} */ (layerOfRef(layer))]?.[matrixPosition(change.layoutIndex)];
     };
     if (changes.length === 2 && keycodes.encode(first.keycode) === stored(second) && keycodes.encode(second.keycode) === stored(first)) return "Swapped two keys";
     return changes.length > 1 ? `Changed ${changes.length} keys at once` : "Changed a key";

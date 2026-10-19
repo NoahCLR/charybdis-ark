@@ -1,6 +1,6 @@
 // @ts-check
 "use strict";
-const {isUnhandledEcho, orUnhandled} = require("./via-unhandled-v1");
+const {isUnhandledEcho, orUnhandled} = require("./raw-hid-unhandled");
 const {buildProfileGetRequest, decodeProfileResponse, profileResponseMatcher} = require("./profile-wire-v1");
 const {crc32, firmwareUpdateRequired, fnv1a32} = require("../schema/profile-blob-v1");
 const {SETTINGS, decodeSettings} = require("../schema/settings-domain-v1");
@@ -32,14 +32,6 @@ async function readSettings(connection, ids) {
     return bytes;
 }
 /** @param {import("../transport/types.js").RequestConnection} connection @param {import("./types.js").RequestIds} ids */
-async function readStorageStatus(connection, ids) {
-    const bytes = await page(connection, 8, 0, ids);
-    if (bytes.length !== 25 || bytes[0] !== 1 || (bytes[1] & ~31)) throw fail("Invalid storage status.");
-    const result = {ready: false, flags: bytes[1], generation: bytes.readUInt32LE(2), digest: bytes.readUInt32LE(6), peerGeneration: bytes.readUInt32LE(10), peerDigest: bytes.readUInt32LE(14), acknowledgedGeneration: bytes.readUInt32LE(18), error: bytes[22], conflicts: bytes.readUInt16LE(23)};
-    result.ready = result.flags === 4 && !result.error && !result.conflicts && result.generation === result.peerGeneration && result.digest === result.peerDigest;
-    return result;
-}
-/** @param {import("../transport/types.js").RequestConnection} connection @param {import("./types.js").RequestIds} ids */
 async function readSettingsLimits(connection, ids) {
     const request = buildProfileGetRequest(8, 1, ids.next());
     const response = await connection.request(request, {matchResponse: orUnhandled(profileResponseMatcher, request)});
@@ -47,18 +39,4 @@ async function readSettingsLimits(connection, ids) {
     if (bytes.length !== 2 || bytes[0] !== 1) throw fail("Unsupported keyboard settings limits.");
     return {brightnessMax: bytes[1]};
 }
-/** @param {number} ms @returns {Promise<void>} */
-const defaultSleep = ms => new Promise(resolve => setTimeout(resolve, ms));
-// `sleep` waits between polls; a host whose timers are throttled passes its own.
-/** @param {import("../transport/types.js").RequestConnection} connection @param {import("./types.js").RequestIds} ids @param {{timeoutMs?: number, pollMs?: number, sleep?: (ms: number) => Promise<void>}} [options] */
-async function waitForStorage(connection, ids, {timeoutMs = 90000, pollMs = 150, sleep = defaultSleep} = {}) {
-    const deadline = Date.now() + timeoutMs;
-    do {
-        const status = await readStorageStatus(connection, ids);
-        if (status.ready) return status;
-        if (status.conflicts || (status.flags & 2)) throw fail("The halves need storage recovery before restoring a profile.");
-        await sleep(pollMs);
-    } while (Date.now() < deadline);
-    throw fail("The two halves have not finished saving. Keep the recovery file and reconnect both halves.");
-}
-module.exports = {readSettings, readSettingsLimits, readStorageStatus, waitForStorage};
+module.exports = {readSettings, readSettingsLimits};

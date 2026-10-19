@@ -1,9 +1,10 @@
 "use strict";
+const {profileLayers, profileMacros, editMacros} = require("../fixtures/profile-document");
 
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const {execFileSync} = require("node:child_process");
-const {PROFILE_DOMAINS, PROFILE_DOMAIN_IDS, PROFILE_DOMAIN_VERSIONS, PROFILE_WIRE_DOMAINS, PROFILE_DOMAIN_MASK,
+const {DOCUMENT_PROFILE_DOMAINS, PROFILE_DOMAINS, PROFILE_DOMAIN_IDS, PROFILE_DOMAIN_VERSIONS, PROFILE_WIRE_DOMAINS, PROFILE_DOMAIN_MASK,
     profileDomain, domainCodec, encodeProfileDomains, replaceDomain} = require("../../core/schema/profile-domains");
 const {decodeProfileBlob, encodeProfileBlob} = require("../../core/schema/profile-blob-v1");
 const {validateSnapshot} = require("../../core/model/portable-profile");
@@ -16,8 +17,10 @@ test("one canonical registry pins every current domain's identity, version, wire
         {name: "COMBOS", id: 48, key: "combos", readKey: "combos", version: 3, wireBit: 4, area: "combos"},
         {name: "SETTINGS", id: 64, key: "settings", readKey: "settings", version: 8, wireBit: 8, area: "settings"},
         {name: "PD_MODES", id: 80, key: "pdModes", readKey: "pdModes", version: 3, wireBit: 16, area: "pointing"},
+        {name: "KEYMAP", id: 96, key: "keymap", readKey: undefined, version: 1, wireBit: 32, area: "keys"},
+        {name: "MACROS", id: 112, key: "macros", readKey: undefined, version: 1, wireBit: 64, area: "macros"},
     ]);
-    assert.equal(PROFILE_DOMAIN_MASK, 31);
+    assert.equal(PROFILE_DOMAIN_MASK, 127);
     assert.equal(require("../../core/protocol/profile-wire-v1").PROFILE_WIRE_DOMAINS, PROFILE_WIRE_DOMAINS);
     assert.equal(require("../../core/schema/profile-blob-v1").PROFILE_DOMAIN_VERSIONS, PROFILE_DOMAIN_VERSIONS);
     assert.ok(Object.isFrozen(PROFILE_DOMAINS));
@@ -33,28 +36,34 @@ test("one canonical registry pins every current domain's identity, version, wire
 });
 
 test("registered codecs round-trip every fixture domain without changing canonical bytes", () => {
-    const snapshot = validateSnapshot(fixture.document());
-    const blob = decodeProfileBlob(snapshot.profile);
+    const snapshot = validateSnapshot(editMacros(fixture.document(), macros => macros[0] = Buffer.from("hello").toString("base64")));
+    const blob = decodeProfileBlob(snapshot.candidate);
+    const models = {...snapshot, keymap: profileLayers(snapshot.document),
+        macros: profileMacros(snapshot.document).map(value => Buffer.from(value, "base64"))};
     const versions = [require("../../core/schema/rgb-domain-v1").RGB_DOMAIN_V1.DOMAIN_VERSION,
         require("../../core/schema/key-behavior-domain-v1").KEY_BEHAVIOR_DOMAIN_V1.VERSION,
         require("../../core/schema/combo-domain-v1").COMBO_DOMAIN_VERSION,
         require("../../core/schema/settings-domain-v1").SETTINGS.VERSION,
-        require("../../core/schema/pd-mode-domain-v1").PD_DOMAIN.VERSION];
+        require("../../core/schema/pd-mode-domain-v1").PD_DOMAIN.VERSION,
+        require("../../core/schema/keymap-domain-v1").KEYMAP_DOMAIN_V1.VERSION,
+        require("../../core/schema/macro-domain-v1").MACRO_DOMAIN_V1.VERSION];
     assert.deepEqual(versions, PROFILE_DOMAINS.map(domain => domain.version));
     for (const domain of blob.domains) {
         const codec = profileDomain(domain.id), value = codec.decode(domain.payload, snapshot.codecOptions);
-        assert.deepEqual(value, snapshot[codec.key], codec.key);
+        assert.deepEqual(value, models[codec.key], codec.key);
         assert.deepEqual(codec.encode(value, snapshot.codecOptions), domain.payload, codec.key);
     }
-    assert.deepEqual(encodeProfileBlob({domains: encodeProfileDomains(snapshot, snapshot.codecOptions)}), snapshot.profile);
+    assert.deepEqual(encodeProfileBlob({domains: encodeProfileDomains(models, snapshot.codecOptions)}), snapshot.candidate);
 });
 
 // Each domain's error identity as it stands: the codecs share the canonical
 // check, not an error class, so these are pinned rather than unified.
-const ERROR_NAMES = {rgb: ["RgbDomainProtocolError"], behaviors: ["ProfileBlobProtocolError"], combos: ["Error", "ProfileBlobProtocolError"], settings: ["Error"], pdModes: ["Error"]};
+const ERROR_NAMES = {rgb: ["RgbDomainProtocolError"], behaviors: ["ProfileBlobProtocolError"], combos: ["Error", "ProfileBlobProtocolError"], settings: ["Error"], pdModes: ["Error"], keymap: ["KeymapDomainError"], macros: ["MacroDomainError"]};
 // One encoding of each domain that its encoder would never write, made from
 // the fixture's own payload, and the refusal it meets.
 const NONCANONICAL = {
+    keymap: payload => ({bytes: payload.subarray(0, -1), refusal: {name: "KeymapDomainError", code: "INVALID_LENGTH"}}),
+    macros: payload => ({bytes: Buffer.concat([Buffer.from([0xc0, 0xaf]), payload]), refusal: {name: "MacroDomainError", code: "INVALID_MACRO"}}),
     // The two LED groups swapped: ids still count from zero, but the
     // dictionary is not in bitmap order.
     rgb: payload => {
@@ -90,11 +99,11 @@ const NONCANONICAL = {
     },
 };
 
-test("every registered codec decodes bytes to a value, encodes it back exactly, and refuses a noncanonical encoding", () => {
-    const snapshot = validateSnapshot(fixture.document());
+test("each embedded document domain round-trips and refuses a noncanonical encoding", () => {
+    const snapshot = validateSnapshot(editMacros(fixture.document(), macros => macros[0] = Buffer.from("hello").toString("base64")));
     const blob = decodeProfileBlob(snapshot.profile);
-    assert.deepEqual(Object.keys(NONCANONICAL), PROFILE_DOMAINS.map(domain => domain.key));
-    for (const codec of PROFILE_DOMAINS) {
+    assert.deepEqual(Object.keys(NONCANONICAL).sort(), DOCUMENT_PROFILE_DOMAINS.map(domain => domain.key).sort());
+    for (const codec of DOCUMENT_PROFILE_DOMAINS) {
         const payload = /** @type {Buffer} */ (blob.domains.find(domain => domain.id === codec.id)?.payload);
         assert.equal(typeof codec.decode, "function", codec.key);
         assert.equal(typeof codec.encode, "function", codec.key);
@@ -111,12 +120,14 @@ test("every registered codec decodes bytes to a value, encodes it back exactly, 
     }
 });
 
-test("every registered codec accepts only bytes it would write itself, and refuses the rest with a stable code", () => {
-    const snapshot = validateSnapshot(fixture.document());
+test("each embedded document domain accepts only canonical bytes and refuses the rest with a stable code", () => {
+    const snapshot = validateSnapshot(editMacros(fixture.document(), macros => macros[0] = Buffer.from("hello").toString("base64")));
     const blob = decodeProfileBlob(snapshot.profile);
-    for (const codec of PROFILE_DOMAINS) {
+    for (const codec of DOCUMENT_PROFILE_DOMAINS) {
         const payload = /** @type {Buffer} */ (blob.domains.find(domain => domain.id === codec.id)?.payload);
         let accepted = 0, refused = 0;
+        const structural = NONCANONICAL[codec.key](payload);
+        assert.throws(() => codec.decode(structural.bytes, snapshot.codecOptions), structural.refusal); refused++;
         for (let at = 0; at < payload.length; at++) {
             for (const value of new Set([0, 0xff, (payload[at] + 1) & 0xff])) {
                 if (value === payload[at]) continue;
@@ -129,7 +140,14 @@ test("every registered codec accepts only bytes it would write itself, and refus
                     continue;
                 }
                 accepted++;
-                assert.deepEqual(codec.encode(decoded, snapshot.codecOptions), bytes, `${codec.key} byte ${at} = ${value}`);
+                const encoded = codec.encode(decoded, snapshot.codecOptions);
+                if (codec.key === "macros") {
+                    // The firmware permits unused macro capacity after slot 127.
+                    // An editor writes just the streams; the portable blob keeps
+                    // exact bytes, including that optional tail, until edited.
+                    assert.ok(encoded.length <= bytes.length);
+                    assert.deepEqual(codec.decode(encoded), decoded, `macro streams at byte ${at} = ${value}`);
+                } else assert.deepEqual(encoded, bytes, `${codec.key} byte ${at} = ${value}`);
             }
         }
         assert.ok(accepted > 0 && refused > 0, codec.key);
@@ -144,12 +162,12 @@ test("metadata can be imported before any codec, avoiding partially initialized 
         const fixture = require('./tests/fixtures/portable-profile').document();
         const portable = require('./core/model/portable-profile');
         const value = portable.validateSnapshot(fixture);
-        assert.equal(registry.domainCodec('rgb').decode(registry.encodeProfileDomains(value)[0].payload).layerColors.length, 16);`;
+        assert.equal(registry.domainCodec('rgb').decode(registry.encodeProfileDomains({rgb: value.rgb})[0].payload).layerColors.length, 16);`;
     execFileSync(process.execPath, ["-e", source], {cwd: require("node:path").resolve(__dirname, "../..")});
 });
 
 test("replacing a domain preserves every other envelope and lets the caller retain capacity error wording", () => {
-    const snapshot = validateSnapshot(fixture.document());
+    const snapshot = validateSnapshot(editMacros(fixture.document(), macros => macros[0] = Buffer.from("hello").toString("base64")));
     let calls = 0;
     const changed = replaceDomain(snapshot.profile, PROFILE_DOMAIN_IDS.SETTINGS, payload => {
         calls++;

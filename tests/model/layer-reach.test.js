@@ -1,4 +1,5 @@
 "use strict";
+const {profileLayers, editLayers} = require("../fixtures/profile-document");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const {layerReach, draftChecks, compareFindings, LEVELS} = require("../../core/model/layer-reach");
@@ -28,7 +29,7 @@ function profile({keys = {}, fill = {}, rows = [], combos = [], settings = {}} =
     values[23] = 1; values[20] = 1; values[28] = 1; values[29] = 0xffff; values[30] = 0xffff;
     for (const [id, value] of Object.entries(settings)) if (id !== "references" && id !== "layers" && id !== "comboOutputBehaviors") values[id] = value;
     const records = Array.from({length: 16}, (_, layer) => ({reference: settings.references?.[layer] ?? layer, bypass: [], exclude: [], ...settings.layers?.[layer]}));
-    return {document: {layers}, settings: {values, layers: records, comboOutputBehaviors: settings.comboOutputBehaviors, names: ["Base", "Numbers", "Symbols", "Navigation", "Pointer", "Extra 1", "Extra 2", "Extra 3", ...Array(8).fill("")]},
+    return {layers, settings: {values, layers: records, comboOutputBehaviors: settings.comboOutputBehaviors, names: ["Base", "Numbers", "Symbols", "Navigation", "Pointer", "Extra 1", "Extra 2", "Extra 3", ...Array(8).fill("")]},
         behaviors: {rows}, combos: {version: 3, defaultTermMs: 50, holdTermMs: 200, rows: combos}};
 }
 const traps = (value) => layerReach(value).filter((finding) => finding.level === LEVELS.TRAP);
@@ -55,7 +56,7 @@ test("a generated custom escape uses the last declared member's source layer", (
     row.enabled = false;
     assert.equal(traps(p).length, 1);
     row.enabled = true; row.allowedLayers = 1;
-    p.document.layers[1][2] = TRNS; p.document.layers[0][2] = KC_B;
+    (layers => layers[1][2] = TRNS)(p.layers); (layers => layers[0][2] = KC_B)(p.layers);
     p.combos.rows[0].allowedLayers = 3;
     assert.deepEqual(traps(p), [], "the last declared member B inherits the permitted Base origin");
     p.combos.rows[0].inputs.reverse();
@@ -69,9 +70,9 @@ for (const [name, output, target, tap, expected] of [
     test(`validated mixed-source combos ${name} through a non-owner's behaviour allowance`, () => {
         const policy = settings(); policy.values[4] = 0; policy.values[8] = 0;
         const document = compiled({policy, combos: [{inputs: [KC_A, KC_B], output, allowedLayers: 3, termMs: 50}]});
-        document.layers.forEach(layer => layer.fill(NO));
-        document.layers[0][0] = TG(1); document.layers[0][1] = KC_B;
-        document.layers[1][0] = KC_A; document.layers[1][1] = TRNS;
+        profileLayers(document).forEach(layer => layer.fill(NO));
+        editLayers(document, layers => layers[0][0] = TG(1)); editLayers(document, layers => layers[0][1] = KC_B);
+        editLayers(document, layers => layers[1][0] = KC_A); editLayers(document, layers => layers[1][1] = TRNS);
         const blob = decodeProfileBlob(Buffer.from(document.profile, "base64"));
         blob.domains.find(domain => domain.id === 32).payload = encodeKeyBehaviorDomain({rows: [
             {target, allowedLayers: 2, steps: [{tapIndex: 0, tap: code(tap)}]},
@@ -237,10 +238,10 @@ test("a combo on the top layer uses keys inherited through transparency", () => 
 
     const entrance = {inputs: [code(KC_A), code(KC_B)], output: code(TG(2))};
     const locked = profile({keys: {"0:0": MO(1), "0:2": KC_B, "1:1": KC_A, "2:0": NO}, combos: [entrance]});
-    locked.document.layers[0].fill(NO);
+    (layers => layers[0].fill(NO))(locked.layers);
     for (const [index, value] of [[0, MO(1)], [2, KC_B]]) {
         const [row, column] = CHARYBDIS_4X6_LAYOUT_MATRIX[index];
-        locked.document.layers[0][row * 6 + column] = value;
+        (layers => layers[0][row * 6 + column] = value)(locked.layers);
     }
     assert.deepEqual(traps(locked).map(row => row.layers), [[2]], "the inherited input can also enter a trap");
 });
@@ -249,9 +250,9 @@ test("a combo using another reference layer reads that layer's raw keys", () => 
     const combo = {inputs: [code(KC_A), code(KC_B)], output: code(TO(0))};
     const keys = {"0:0": TG(1), "1:0": NO, "2:1": KC_A, "2:2": KC_B};
     const source = profile({keys, combos: [combo]});
-    source.document.layers[0].fill(NO);
+    (layers => layers[0].fill(NO))(source.layers);
     const [row, column] = CHARYBDIS_4X6_LAYOUT_MATRIX[0];
-    source.document.layers[0][row * 6 + column] = TG(1);
+    (layers => layers[0][row * 6 + column] = TG(1))(source.layers);
     assert.deepEqual(traps(source).map(row => row.layers), [[1]], "resolved keys on layer 1 cannot supply the combo");
     source.settings.layers[1].reference = 2;
     assert.deepEqual(traps(source), [], "layer 1 can instead match the inactive layer 2's raw assignments");
@@ -260,7 +261,7 @@ test("a combo using another reference layer reads that layer's raw keys", () => 
 test("a combo whose inputs never occur together is a warning", () => {
     const combo = {inputs: [code(KC_A), code(KC_B)], output: code(KC_ESC)};
     const source = profile({combos: [combo]});
-    source.document.layers[0].fill(NO);
+    (layers => layers[0].fill(NO))(source.layers);
     assert.equal(layerReach(source).find(row => row.kind === "unreachableCombo")?.title, "Combo 0 cannot fire");
 });
 
@@ -430,16 +431,16 @@ test("compiled source and declared-owner conditions agree with an exhaustive pro
         // Seed mixed origins deliberately as well as sampling arbitrary
         // profiles: sparse random chords alone seldom exercise generated rows.
         if (example >= 100) {
-            p.document.layers.forEach((layer, index) => layer.fill(index === 0 ? NO : TRNS));
-            p.document.layers[1].fill(NO);
-            p.document.layers[0][0] = TG(1); p.document.layers[0][1] = KC_ESC;
-            p.document.layers[1][0] = KC_B; p.document.layers[1][1] = TRNS;
-            if (example % 2) p.document.layers[1][2] = KC_ESC;
+            p.layers.forEach((layer, index) => layer.fill(index === 0 ? NO : TRNS));
+            (layers => layers[1].fill(NO))(p.layers);
+            (layers => layers[0][0] = TG(1))(p.layers); (layers => layers[0][1] = KC_ESC)(p.layers);
+            (layers => layers[1][0] = KC_B)(p.layers); (layers => layers[1][1] = TRNS)(p.layers);
+            if (example % 2) (layers => layers[1][2] = KC_ESC)(p.layers);
             p.settings.values[23] = 1; p.settings.values[28] = 1; p.settings.values[29] = 0xffff; p.settings.values[30] = 0xffff;
             p.settings.layers.forEach((record, layer) => {record.reference = layer; record.bypass = []; record.exclude = [];});
             if (example % 4 === 0) {
                 p.settings.layers[1].reference = 2;
-                p.document.layers[2][0] = KC_B; p.document.layers[2][1] = KC_ESC;
+                (layers => layers[2][0] = KC_B)(p.layers); (layers => layers[2][1] = KC_ESC)(p.layers);
             }
             row.allowedLayers = 2; row.enabled = true;
             row.steps[0].tap = code(output.kind === 7 ? TO(0) : KC_ESC);
@@ -459,8 +460,8 @@ test("compiled source and declared-owner conditions agree with an exhaustive pro
             const locks = state & 65535, held = state >>> 16, mask = locks | held | p.settings.values[23] | 1;
             reached |= mask;
             const resolved = CHARYBDIS_4X6_LAYOUT_MATRIX.map(([r, c], position) => {
-                for (let layer = 15; layer >= 0; layer--) if ((mask & (1 << layer)) && p.document.layers[layer][r * 6 + c] !== TRNS)
-                    return {layer, position, code: p.document.layers[layer][r * 6 + c]};
+                for (let layer = 15; layer >= 0; layer--) if ((mask & (1 << layer)) && p.layers[layer][r * 6 + c] !== TRNS)
+                    return {layer, position, code: p.layers[layer][r * 6 + c]};
                 return null;
             });
             const effects = resolved.flatMap(key => {
@@ -477,7 +478,7 @@ test("compiled source and declared-owner conditions agree with an exhaustive pro
                 const [r, c] = CHARYBDIS_4X6_LAYOUT_MATRIX[key.position];
                 return !p.settings.layers[key.layer].exclude.includes(r * 6 + c);
             }).map(key => ({layer: key.layer,
-                code: reference === top ? key.code : p.document.layers[reference][CHARYBDIS_4X6_LAYOUT_MATRIX[key.position][0] * 6 + CHARYBDIS_4X6_LAYOUT_MATRIX[key.position][1]]}));
+                code: reference === top ? key.code : p.layers[reference][CHARYBDIS_4X6_LAYOUT_MATRIX[key.position][0] * 6 + CHARYBDIS_4X6_LAYOUT_MATRIX[key.position][1]]}));
             p.combos.rows.forEach((combo, index) => {
                 if (combo.inputs.every(input => members.some(key => key.code === input.operand && (combo.allowedLayers & (1 << key.layer))))) {
                     comboReached.add(index);
@@ -509,7 +510,7 @@ test("compiled source and declared-owner conditions agree with an exhaustive pro
         assert.ok(!findings.some(f => f.kind === "reachabilityIncomplete"));
         assert.equal(trapCount, minimal.length, `traps in example ${example}`);
         const unreachable = Array.from({length: 3}, (_, i) => i + 1).filter(layer => !(reached & (1 << layer))
-            && p.document.layers[layer].some(code => code !== TRNS && code !== NO));
+            && p.layers[layer].some(code => code !== TRNS && code !== NO));
         assert.deepEqual(findings.filter(f => f.kind === "unreachable").flatMap(f => f.layers), unreachable);
         assert.equal(findings.some(f => f.kind === "unreachableCombo"), !comboReached.has(0));
     }
@@ -528,7 +529,7 @@ test("global and per-combo bypass remove generated custom escapes while preservi
     combo.useOutputBehavior = true; p.settings.comboOutputBehaviors = false;
     assert.deepEqual(traps(p).map(f => f.layers), [[1]]);
     p.settings.values[29] = 0xffff;
-    p.document.layers[1][3] = 0x7f00;
+    (layers => layers[1][3] = 0x7f00)(p.layers);
     assert.deepEqual(traps(p), [], "the global switch leaves a physical custom-key escape eligible");
 });
 

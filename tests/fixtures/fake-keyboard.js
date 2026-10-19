@@ -16,17 +16,14 @@
 
 const {FakeDeviceAdapter} = require("../../core/transport/fake-device-adapter");
 const {RAW_HID_REPORT_SIZE} = require("../../core/transport/device-adapter");
-const {VIA_UNHANDLED} = require("../../core/protocol/via-unhandled-v1");
-const {PROFILE_ACTIVE_KIND, PROFILE_STATE_FLAGS, PROFILE_WIRE_KNOWN_MASKS, PROFILE_WIRE_V1, VIA_READS} = require("../../core/protocol/profile-wire-v1");
+const {RAW_HID_UNHANDLED} = require("../../core/protocol/raw-hid-unhandled");
+const {PROFILE_ACTIVE_KIND, PROFILE_STATE_FLAGS, PROFILE_WIRE_KNOWN_MASKS, PROFILE_WIRE_V1} = require("../../core/protocol/profile-wire-v1");
 const {PROFILE_PAYLOAD_V1} = require("../../core/protocol/profile-payload-v1");
 const {COMBO_READBACK_V1} = require("../../core/protocol/combo-readback-v1");
 const {PROFILE_CANDIDATE_V1, CANDIDATE_STATE} = require("../../core/protocol/profile-candidate-v1");
-const {VIA_LAYOUT_COMMANDS} = require("../../core/protocol/via-layout-v1");
-const {VIA_STORAGE, viaStorageDigest} = require("../../core/protocol/via-storage-v1");
 const {PROFILE_DOMAIN_IDS, crc32, decodeProfileBlob, fnv1a32} = require("../../core/schema/profile-blob-v1");
 const {nativeCode} = require("../../core/schema/actions");
 const {validateSnapshot} = require("../../core/model/portable-profile");
-const {baseLighting} = require("../../core/model/settings-editor");
 const {rehash} = require("./device-combos");
 const keyboardOptions = require("./keyboard-options");
 
@@ -42,7 +39,7 @@ const MUTATING_COMMANDS = new Set([0x03, 0x05, 0x06, 0x07, 0x09, 0x0a, 0x0b, 0x0
 const FEATURES = PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES;
 
 // The domain versions current firmware stores, and refuses any other.
-const CURRENT_DOMAINS = "16:4,32:2,48:3,64:8,80:3";
+const CURRENT_DOMAINS = "16:4,32:2,48:3,64:8,80:3,96:1,112:1";
 
 // `compiled` is the profile it was built with, which GET 0x05 serves: the
 // document's own unless given (current firmware's carries every domain, with
@@ -53,30 +50,28 @@ const CURRENT_DOMAINS = "16:4,32:2,48:3,64:8,80:3";
 /** @param {import("./types.js").FakeKeyboardOptions} options @returns {import("./types.js").FakeKeyboard} */
 function fakeKeyboard({document, compiled, settingsVersion = 8, compiledOnly = false, peerKnown = true, generation = 42, firmwareVersion = 0x00010000, brightnessMax = 255, options = keyboardOptions.wire()}) {
     const held = validateSnapshot(document);
-    held.macros = require("../../core/model/portable-profile").macroBank(document.macros.map(value => Buffer.from(value, "base64")), 34903);
-    if (document.version !== 3 || document.layers.length !== 16) throw new Error("The fake keyboard runs current firmware: a schema-3, sixteen-layer document.");
+    if (document.version !== 5 || held.layers.length !== 16) throw new Error("The fake keyboard runs current firmware: a schema-4, sixteen-layer document.");
     /** @param {Buffer} blob */
     const versions = blob => decodeProfileBlob(blob).domains.map(domain => `${domain.id}:${domain.version}`).join();
-    if (versions(held.profile) !== CURRENT_DOMAINS || (compiled && versions(compiled) !== CURRENT_DOMAINS)) throw new Error("The fake keyboard runs current firmware: RGB 4, key behaviours 2, combos 3, settings 8 and PD 3.");
-    const profile = held.profile, digest = fnv1a32(profile), defaults = compiled || profile;
+    if (versions(held.candidate) !== CURRENT_DOMAINS || (compiled && versions(compiled) !== CURRENT_DOMAINS)) throw new Error("The fake keyboard runs current firmware: RGB 4, key behaviours 2, combos 3, settings 8, PD 3, keymap 1 and macros 1.");
+    const profile = held.candidate, digest = fnv1a32(profile), defaults = compiled || profile;
     const settingsDomain = decodeProfileBlob(profile).domains.find(domain => domain.id === PROFILE_DOMAIN_IDS.SETTINGS);
     if (!settingsDomain) throw new Error("The fake keyboard fixture must contain settings.");
     const settings = settingsDomain.payload;
-    const storageDigest = viaStorageDigest({layout: held.layout, macros: held.macros});
 
     const capabilities = [page(25, (p) => {
-        p.set([2, 3, 1, 0, 3, 0, RAW_HID_REPORT_SIZE, PROFILE_CANDIDATE_V1.CHUNK_MAX, PROFILE_WIRE_V1.STATUS_PAGE_COUNT]);
+        p.set([PROFILE_WIRE_V1.CAPABILITY_LAYOUT, 3, PROFILE_WIRE_V1.PROTOCOL_MAJOR, PROFILE_WIRE_V1.PROTOCOL_MINOR, 4, 0, RAW_HID_REPORT_SIZE, PROFILE_CANDIDATE_V1.CHUNK_MAX, PROFILE_WIRE_V1.STATUS_PAGE_COUNT]);
         p.writeUInt32LE(FEATURES, 9); p.writeUInt32LE(document.actionAbiDigest, 13);
         p.writeUInt32LE(firmwareVersion, 17); p.writeUInt32LE(fnv1a32(defaults), 21);
     }), page(25, (p) => {
-        // Layers, behaviour rows, tap depth, (steps on page 2), combos, keys
-        // per combo, RGB groups, stage rows, LEDs, LED bitmap, custom keys, macros.
-        p.set([16, 16, 128, 5, 0, 128, 16, 16, 32, 58, 8, 128, 128]);
-        p.writeUInt16LE(53216, 13); p.writeUInt16LE(53216, 15);
-        p.writeUInt16LE(held.macros.length, 19); p[21] = 31;
+        // Layers, behaviour rows, tap depth, combos, keys per combo, RGB
+        // groups, stage rows, LEDs, LED bitmap, custom keys, macros, domain
+        // mask, name bytes, mask bits, positions.
+        p.set([16, 16, 128, 5, 128, 16, 16, 32, 58, 8, 128, 128, 127, 32, 32, 60]);
     }), page(25, (p) => {
-        // Populated steps, tap depth, slot size, name bytes, mask bits, positions.
-        p.writeUInt16LE(640, 0); p[2] = 5; p.writeUInt32LE(53248, 3); p.set([32, 32, 60], 7);
+        // Populated steps, slot size, profile payload, slot payload, macro bank.
+        p.writeUInt16LE(640, 0); p.writeUInt32LE(131072, 2); p.writeUInt32LE(130048, 6);
+        p.writeUInt32LE(130048, 10); p.writeUInt32LE(34903, 14);
     })];
     // Committed (or running its defaults), converged with the slave half,
     // nothing pending.
@@ -91,15 +86,11 @@ function fakeKeyboard({document, compiled, settingsVersion = 8, compiledOnly = f
         if (compiledOnly) return;
         p.writeUInt32LE(generation, 0); p.writeUInt32LE(generation, 5); p.writeUInt32LE(generation, 10);
     })];
+    // Page 0 is idle with no error, so a reader never asks for page 3.
     const candidateStatus = [page(25, (p) => {
-        p.set([1, CANDIDATE_STATE.IDLE, 0, 0]);
-        p.fill(0xff, 15, 23);
+        p.set([PROFILE_CANDIDATE_V1.STATUS_LAYOUT_VERSION, CANDIDATE_STATE.IDLE, 0, 0]);
     })];
-    const storage = [page(25, (p) => {
-        p.set([1, 4]);
-        p.writeUInt32LE(generation, 2); p.writeUInt32LE(storageDigest, 6);
-        p.writeUInt32LE(generation, 10); p.writeUInt32LE(storageDigest, 14); p.writeUInt32LE(generation, 18);
-    }), Buffer.from([1, brightnessMax]), options.metadata, ...chunks(options.bytes)];
+    const storage = [undefined, Buffer.from([1, brightnessMax]), options.metadata, ...chunks(options.bytes)];
     /** @type {Partial<Record<number, Buffer[]>>} */
     const values = {
         [VALUE.CAPABILITIES]: capabilities,
@@ -112,19 +103,6 @@ function fakeKeyboard({document, compiled, settingsVersion = 8, compiledOnly = f
         [0x0b]: [Buffer.from([1, 0])],
         [VALUE.CANDIDATE_STATUS]: candidateStatus,
     };
-    // The macro read map: which 256-byte blocks of the bank hold anything.
-    const metadata = page(13, p => {
-        p[0] = 1; p.writeUInt16LE(256, 1); p.writeUInt16LE(held.macros.length, 3);
-        p.writeUInt32LE(generation, 5); p.writeUInt32LE(storageDigest, 9);
-    });
-    const bitmap = Buffer.alloc(Math.ceil(Math.ceil(held.macros.length / 256) / 8));
-    for (let i = 0; i < held.macros.length; i++) if (held.macros[i]) bitmap[Math.floor(i / 2048)] |= 1 << (Math.floor(i / 256) % 8);
-    values[0x0c] = [metadata];
-    for (let offset = 0; offset < bitmap.length; offset += 25) values[0x0c].push(bitmap.subarray(offset, offset + 25));
-    const lighting = baseLighting(held.settings.values);
-    /** @type {Partial<Record<number, number[]>>} */
-    const rgb = {1: [lighting.brightness], 2: [lighting.effect], 3: [lighting.speed], 4: [lighting.hue, lighting.saturation]};
-
     /** @type {import("./types.js").FakeKeyboard} */
     const keyboard = {requests: [], mutations: [], unhandled: [], answer};
     /** @param {Uint8Array} report */
@@ -136,46 +114,18 @@ function fakeKeyboard({document, compiled, settingsVersion = 8, compiledOnly = f
         const response = serve(request);
         if (response) return [response];
         keyboard.unhandled.push(request);
-        const echo = Buffer.from(request); echo[0] = VIA_UNHANDLED;
+        const echo = Buffer.from(request); echo[0] = RAW_HID_UNHANDLED;
         return [echo];
     }
     /** @param {Buffer} request */
     function serve(request) {
         const reply = Buffer.from(request);
         switch (request[0]) {
-            case VIA_READS.COMMAND_GET_PROTOCOL_VERSION:
-                reply.fill(0, 1); reply.writeUInt16BE(VIA_READS.PROTOCOL_VERSION, 1);
-                return reply;
-            case VIA_READS.COMMAND_GET_KEYBOARD_VALUE:
-                if (request[1] !== VIA_READS.VALUE_FIRMWARE_VERSION) return undefined;
-                reply.fill(0, 2); reply.writeUInt32BE(firmwareVersion, 2);
-                return reply;
-            case VIA_LAYOUT_COMMANDS.GET_KEYCODE: {
-                const [layer, row, column] = request.subarray(1, 4);
-                if (layer >= 16 || row >= 10 || column >= 6) return undefined;
-                reply.fill(0, 4); reply.writeUInt16BE(document.layers[layer][row * 6 + column], 4);
-                return reply;
-            }
             case PROFILE_WIRE_V1.COMMAND_GET:
-                if (request[1] === 3) return rgbValue(request, reply);
                 if (request[1] !== PROFILE_WIRE_V1.CHANNEL) return undefined;
                 return profileValue(values[request[2]]?.[request[4] | (request[5] << 8)], reply);
-            case VIA_STORAGE.LAYER_COUNT: return scalar(reply, [16]);
-            case VIA_STORAGE.MACRO_COUNT: return scalar(reply, [128]);
-            case VIA_STORAGE.MACRO_SIZE: return scalar(reply, [held.macros.length >> 8, held.macros.length & 255]);
-            case VIA_STORAGE.LAYOUT_READ: return region(held.layout, request, reply);
-            case VIA_STORAGE.MACRO_READ: return region(held.macros, request, reply);
             default: return undefined;
         }
-    }
-    // VIA's RGB Matrix channel: brightness, effect, speed and colour, as the
-    // document's saved base lighting has them.
-    /** @param {Buffer} request @param {Buffer} reply */
-    function rgbValue(request, reply) {
-        const bytes = rgb[request[2]];
-        if (!bytes) return undefined;
-        reply.fill(0, 3); reply.set(bytes, 3);
-        return reply;
     }
     return keyboard;
 }
@@ -188,19 +138,6 @@ function profileValue(payload, reply) {
     reply.fill(0, 5); reply[6] = payload.length; payload.copy(reply, PROFILE_WIRE_V1.PAYLOAD_OFFSET);
     return reply;
 }
-/** @param {Buffer} reply @param {number[]} bytes */
-function scalar(reply, bytes) {
-    reply.fill(0, 1); reply.set(bytes, 1);
-    return reply;
-}
-/** @param {Buffer} bytes @param {Buffer} request @param {Buffer} reply */
-function region(bytes, request, reply) {
-    const offset = request.readUInt16BE(1), count = request[3];
-    if (count < 1 || count > VIA_STORAGE.CHUNK || offset + count > bytes.length) return undefined;
-    reply.fill(0, 4); bytes.copy(reply, 4, offset, offset + count);
-    return reply;
-}
-
 /** @param {number} length @param {(bytes: Buffer) => unknown} fill */
 function page(length, fill) {
     const bytes = Buffer.alloc(length); fill(bytes); return bytes;
@@ -216,9 +153,9 @@ function chunks(bytes) {
 function payloadPages(blob, generation) {
     const metadata = page(25, (p) => {
         p.set([PROFILE_PAYLOAD_V1.LAYOUT_VERSION, PAGE]);
-        p.writeUInt16LE(blob.length, 2); p.writeUInt32LE(generation, 4);
-        p.writeUInt32LE(fnv1a32(blob), 8); p.writeUInt32LE(crc32(blob), 12);
-        p.set([2, 0, 31, 0, 0], 16);
+        p.writeUInt32LE(blob.length, 2); p.writeUInt32LE(generation, 6);
+        p.writeUInt32LE(fnv1a32(blob), 10); p.writeUInt32LE(crc32(blob), 14);
+        p.set([4, 0, 31, 0, 0], 18);
     });
     return [metadata, ...chunks(blob)];
 }

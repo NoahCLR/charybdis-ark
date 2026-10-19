@@ -73,11 +73,13 @@ function revertUnits(before, after, units, capabilities) {
         const rest = parts.join(":");
         if (kind === "layout") {
             const [layer, position] = parts.map(Number);
-            document.layers[layer][position] = a.document.layers[layer][position];
+            const keys = domain("keymap");
+            keys.mine[layer][position] = keys.theirs[layer][position];
         } else if (kind === "macro") {
             // A macro is its steps and its name; the name lives in settings.
             const index = Number(rest);
-            document.macros[index] = a.document.macros[index];
+            const macros = domain("macros");
+            macros.mine[index] = macros.theirs[index];
             const settings = domain("settings");
             settings.mine.macroNames[index] = settings.theirs.macroNames[index];
         } else if (kind === "customKey") {

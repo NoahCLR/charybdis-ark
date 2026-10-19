@@ -15,11 +15,13 @@ const {PROFILE_ACTION_KINDS: ACTION} = require("./profile-blob-v1");
 const {resolveNativeQmkExpression} = require("./compiled-profile-v1");
 
 // The native action ABI whose semantic actions map onto VIA keycodes: the
-// 32-slot firmware's, with the userspace keycode blocks (Profile Wire feature
-// bit 16) and pointing slots 0..31 (firmware D-F09). A keyboard advertising
-// another vocabulary numbers its keys differently, so Ark reads it but
-// neither names its keys nor edits it.
-const ACTION_ABI = 0x837cf479;
+// 32-slot firmware's, with the userspace keycode blocks and pointing slots
+// 0..31 (firmware D-F09), under schema 4. The firmware folds the schema major
+// into the digest, so schema 4 moved it from schema 3's 0x837cf479 (firmware
+// D-F28) with no keycode changed. A keyboard advertising another vocabulary
+// numbers its keys differently, so Ark reads it but neither names its keys
+// nor edits it.
+const ACTION_ABI = 0x6fd70b90;
 const KNOWN_ACTION_ABIS = Object.freeze([ACTION_ABI]);
 /** @param {number} value */
 const knownActionAbi = value => KNOWN_ACTION_ABIS.includes(value);

@@ -309,14 +309,16 @@ class ProfileDraftSession {
         const layer = layerOfRef(reference);
         if (layer === undefined || !(layer < LAYERS) || !Array.isArray(changes)) throw fail("Choose a layer reported by this keyboard.");
         const document = copy(base);
+        const layers = validateSnapshot(base).layers;
         for (const change of changes) {
             const position = Number.isInteger(change.layoutIndex) && CHARYBDIS_4X6_LAYOUT_MATRIX[change.layoutIndex];
             const code = keycodes.encode(change.keycode) ?? (knownActionAbi(this.capabilities.actionAbiDigest ?? 0) ? resolveNativeQmkExpression(change.keycode, {}) : undefined);
             if (!position || code === undefined || !Number.isInteger(code)) throw fail(`Cannot represent the key ${change.keycode} on this keyboard.`);
             const misplaced = keyPlacementProblem(code, {layerCount: this.capabilities.compiledLayerCount ?? LAYERS});
             if (misplaced) throw fail(misplaced);
-            document.layers[layer][matrixPosition(change.layoutIndex)] = code;
+            layers[layer][matrixPosition(change.layoutIndex)] = code;
         }
+        document.profile = require("../schema/profile-domains").replaceDomain(Buffer.from(base.profile, "base64"), 0x60, () => require("../schema/keymap-domain-v1").encodeKeymapDomain(layers)).toString("base64");
         return document;
     }
     // The keyboard's profile rearranged into an order, with the order it

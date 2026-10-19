@@ -11,7 +11,7 @@ const {PROFILE_WIRE_KNOWN_MASKS} = require("../core/protocol/profile-wire-v1");
 for (const theme of ["vscode-dark", "vscode-light"]) {
     test(`pointing macro picks stage directions, diagonals and buttons (${theme})`, async ({page}) => {
         const value = document();
-        const capabilities = {compiledLayerCount: 16, supportedDomainMask: 31, actionAbiDigest: value.actionAbiDigest, featureFlags: PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES};
+        const capabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 0}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: value.actionAbiDigest, featureFlags: PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES};
         const draft = new ProfileDraftSession({document: value, fingerprint: fingerprint(value), summary: summary(value)}, "board", capabilities);
         const connection = {connected: true, selectedDeviceId: "board", capabilities};
         draft.stage({type: "updateViaMacro", keycode: "VIA_MACRO_0", payload: "777", name: "Greeting <&>", draftId: draft.id, draftRevision: draft.revision});

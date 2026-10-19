@@ -77,8 +77,7 @@ function exerciseCore(core, inputs) {
     // summary, and the document written again from what was decoded.
     const documents = inputs.documents.map(({name, document}) => attempt(() => {
         const decoded = portable.validateSnapshot(document);
-        const rewritten = portable.createSnapshot({profile: decoded.profile, actionAbiDigest: document.actionAbiDigest,
-            via: {layers: document.layers.length, layout: decoded.layout, macros: decoded.macros, macroSlots: document.macros.length}});
+        const rewritten = portable.createSnapshot({profile: decoded.candidate, actionAbiDigest: document.actionAbiDigest});
         return {name, decoded, fingerprint: portable.fingerprint(document), summary: portable.summary(document), rewritten};
     }));
 

@@ -1,4 +1,5 @@
 "use strict";
+const {profileLayers, editLayers} = require("../fixtures/profile-document");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const {draftControl, portableControl, readKeyboard, rereadKeyboard} = require("../../core/session/panel-controls");
@@ -7,7 +8,7 @@ const {ProfileDraftSession} = require("../../core/session/profile-draft-session"
 const {fingerprint, summary} = require("../../core/model/portable-profile");
 const {document} = require("../fixtures/pd-profile");
 
-const capabilities = {compiledLayerCount: 16, supportedDomainMask: 31, actionAbiDigest: 0x837cf479, featureFlags: require("../../core/protocol/profile-wire-v1").PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES};
+const capabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 0}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x6fd70b90, featureFlags: require("../../core/protocol/profile-wire-v1").PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES};
 const snapshot = () => {
     const doc = document();
     return {document: doc, fingerprint: fingerprint(doc), summary: summary(doc), limits: {brightnessMax: 200}};
@@ -79,7 +80,7 @@ test("a failed committed-profile read keeps the layout and the optional reads, a
 });
 
 test("a keyboard not on current firmware is read no further, and told to update", async () => {
-    for (const older of [{...capabilities, supportedDomainMask: 3}, {...capabilities, featureFlags: capabilities.featureFlags & ~(1 << 30)}]) {
+    for (const older of [{...capabilities, supportedDomainMask: 3}, {...capabilities, protocol: {major: 1, minor: 0}, schema: {major: 3, minor: 0}}, {...capabilities, protocol: {major: 2, minor: 1}}]) {
         const service = fakeService({capabilities: older});
         const session = {service};
         assert.equal(await readKeyboard(session, undefined, host()), false);
@@ -312,12 +313,12 @@ test("a layer editor opened on one keyboard cannot replace another keyboard's dr
     const oldEdit = session.portableLayers;
     const firstDraft = session.draft;
     const other = snapshot();
-    other.document.layers[0][0] = 5;
+    editLayers(other.document, layers => layers[0][0] = 5);
     other.fingerprint = fingerprint(other.document);
     session.draft = new ProfileDraftSession(other, "other", capabilities);
     session.service.snapshot = () => ({connected: true, selectedDeviceId: "other", capabilities});
     await assert.rejects(portableControl(session, {type: "savePortableLayers", names: oldEdit.names}), /another keyboard/);
-    assert.equal(session.draft.document.layers[0][0], 5);
+    assert.equal(profileLayers(session.draft.document)[0][0], 5);
     assert.notEqual(session.draft.id, firstDraft.id);
 });
 
@@ -347,13 +348,13 @@ test("the layer panel's keys-follow toggle decides whether layer keys are renumb
         const before = draft.current.document;
         await portableControl(session, {type: "savePortableLayers", names: session.portableLayers.names});
         const after = draft.current.document;
-        assert.deepEqual(after.layers[1].slice(2), before.layers[4].slice(2), "layer 4 moved to 1 with its keys");
+        assert.deepEqual(profileLayers(after)[1].slice(2), profileLayers(before)[4].slice(2), "layer 4 moved to 1 with its keys");
         assert.equal(draft.current.summary.names[1], layer4Name, "its name moved with it");
         assert.deepEqual(draft.order, [0, 4, 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], "the draft knows which layer each slot now holds");
         const units = draft.changes().map((row) => row.unit);
         assert.equal(units.filter((unit) => unit === "layerOrder").length, 1, "the move is one item");
         if (keysFollow) assert.deepEqual(units.filter((unit) => unit.startsWith("layout:")).sort(), ["layout:0:0", "layout:0:1"], "only the keys edited before the move");
-        return after.layers[0].slice(0, 2);
+        return profileLayers(after)[0].slice(0, 2);
     };
     assert.deepEqual(await moveLayer4Down(true), [0x5221, 0x5262], "following: MO(4) becomes MO(1), TG(1) becomes TG(2)");
     assert.deepEqual(await moveLayer4Down(false), [0x5224, 0x5261], "not following: both keep their numbers");

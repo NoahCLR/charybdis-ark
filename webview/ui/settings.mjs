@@ -369,9 +369,9 @@ function fieldRow(field, canEdit, submit, hidden, slot, durations) {
 }
 
 // QMK keeps the live value of these, so a key on the keyboard (a Magic,
-// DF() or combo toggle key) or VIA changes it too, and the draft then asks
-// to be updated.
-const KEYBOARD_KEYS_TIP = "Keys on the keyboard (and VIA) can change this too. If they do, the draft bar asks you to update the draft.";
+// DF() or combo toggle key) changes it too, and the draft then asks to be
+// updated.
+const KEYBOARD_KEYS_TIP = "Keys on the keyboard can change this too. If they do, the draft bar asks you to update the draft.";
 /** @param {import("../../contracts/panel.js").PresentedField | undefined} field */
 const keyboardKeysMark = (field) => field?.keyboardKeys ? ` <span class="kk-mark" data-tip="${esc(KEYBOARD_KEYS_TIP)}">↺ keyboard keys change this too</span>` : "";
 

@@ -19,7 +19,7 @@ export type CandidateTransferRange =
     | {kind: 'write'; offset: number; length: number}
     | {kind: 'reuse'; offset: number; length: number; sourceOffset: number};
 
-export interface StorageCapabilities {compiledLayerCount?: number; viaMacroSlots?: number; viaMacroBytes?: number}
+export interface StorageCapabilities {compiledLayerCount?: number; macroSlots?: number; macroBytes?: number}
 export interface StorageIdentity {generation: number; digest: number}
 export interface StorageRange {offset: number; bytes: Buffer}
 export interface ReadRegionOptions extends Pick<RequestOptions, 'signal' | 'timeoutMs'> {
@@ -56,15 +56,12 @@ export interface CandidateMetadata {
     crc32: number;
     digest: number;
     actionAbiDigest: number;
+    /** Store format 6, implied by Profile Wire 2 and not on the wire. */
     storeFormatVersion: number;
-    viaGeneration: number;
-    viaDigest: number;
 }
-export type CandidateMetadataInput = Omit<CandidateMetadata, 'flags'> & {flags?: number};
+export type CandidateMetadataInput = Omit<CandidateMetadata, 'flags' | 'storeFormatVersion'> & {flags?: number; storeFormatVersion?: number};
 export interface CandidateBlobOptions {
     actionAbiDigest: number;
-    viaGeneration: number;
-    viaDigest: number;
     requestedDomains?: number;
     storeFormatVersion?: number;
     capabilities?: {maxProfilePayload?: number};

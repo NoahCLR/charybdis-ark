@@ -4,7 +4,7 @@
 // empty, so creation and duplication have destinations whatever the profile
 // configures there; any behaviour step reaching those slots goes too, so a
 // deliberately empty destination raises no unrelated warning.
-const {createSnapshot} = require("../../core/model/portable-profile");
+const {createSnapshot, validateSnapshot} = require("../../core/model/portable-profile");
 const {decodeProfileBlob, encodeProfileBlob} = require("../../core/schema/profile-blob-v1");
 const {decodePdDomain, encodePdDomain} = require("../../core/schema/pd-mode-domain-v1");
 const {decodeKeyBehaviorDomain, encodeKeyBehaviorDomain} = require("../../core/schema/key-behavior-domain-v1");
@@ -12,7 +12,7 @@ const {compiled} = require("./portable-profile");
 
 function document() {
     const doc = compiled();
-    const blob = decodeProfileBlob(Buffer.from(doc.profile, "base64"));
+    const blob = decodeProfileBlob(validateSnapshot(doc).candidate);
     /** @param {import("../../core/schema/types.js").SemanticAction | undefined} action */
     const reachesExtension = action => action && [4, 5].includes(action.kind) && action.operand >= 6;
     const profile = encodeProfileBlob({domains: blob.domains.map(domain => {
@@ -25,6 +25,6 @@ function document() {
         }
         return domain;
     })});
-    return createSnapshot({profile, actionAbiDigest: doc.actionAbiDigest, via: {layers: 16, layout: Buffer.alloc(1920), macros: Buffer.alloc(10327), macroSlots: 128}});
+    return createSnapshot({profile, actionAbiDigest: doc.actionAbiDigest});
 }
 module.exports = {document};

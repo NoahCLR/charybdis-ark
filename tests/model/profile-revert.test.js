@@ -1,4 +1,5 @@
 "use strict";
+const {profileLayers, profileMacros} = require("../fixtures/profile-document");
 const test = require("node:test"), assert = require("node:assert/strict");
 const {revertUnits} = require("../../core/model/profile-revert");
 const {profileReview} = require("../../core/model/profile-review");
@@ -7,7 +8,7 @@ const {settingsEditorView} = require("../../core/model/settings-editor");
 const {ProfileDraftSession} = require("../../core/session/profile-draft-session");
 const {document: pdDocument} = require("../fixtures/pd-profile");
 
-const capabilities = {compiledLayerCount: 16, supportedDomainMask: 31, actionAbiDigest: 0x837cf479};
+const capabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 0}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x6fd70b90};
 const snapshotOf = (document) => ({document, fingerprint: fingerprint(document), summary: summary(document), limits: {brightnessMax: 200}});
 
 // A draft with one edit of every kind the review describes.
@@ -84,8 +85,8 @@ test("several units revert together, and every one of them back is the keyboard'
     const document = revertUnits(base, current, units, capabilities);
     const left = profileReview(base, {...current, document, fingerprint: fingerprint(document)});
     assert.ok(left.every((row) => row.unit === "profile"), "nothing described is left");
-    assert.deepEqual(document.layers, validateSnapshot(base.document, capabilities).document.layers);
-    assert.deepEqual(document.macros, validateSnapshot(base.document, capabilities).document.macros);
+    assert.deepEqual(profileLayers(document), profileLayers(validateSnapshot(base.document, capabilities).document));
+    assert.deepEqual(profileMacros(document), profileMacros(validateSnapshot(base.document, capabilities).document));
 });
 
 test("a unit this module does not know is refused rather than skipped", () => {

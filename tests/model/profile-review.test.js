@@ -1,4 +1,5 @@
 "use strict";
+const {profileMacros, editLayers} = require("../fixtures/profile-document");
 const test = require("node:test"), assert = require("node:assert/strict");
 const {profileReview} = require("../../core/model/profile-review");
 const {document} = require("../fixtures/portable-profile");
@@ -34,7 +35,7 @@ test("Host changes review affected text macros while leaving key steps and ident
     }
     assert.match(effects[1].fields.find(field => field.label === "Playback").after, /Release ordinary keys/);
     assert.equal(effects[1].fields.find(field => field.label === "Playback").before, "Ready to play");
-    assert.deepEqual(after.document.macros, before.document.macros);
+    assert.deepEqual(profileMacros(after.document), profileMacros(before.document));
     assert.equal(profileReview(after, before).filter(row => row.area === "Macros").at(-1).fields.find(field => field.label === "Playback").after, "Ready to play");
 });
 
@@ -70,8 +71,8 @@ test("a combo's keys read as the screens read them, with no stored name where no
 });
 test("a key changed for another with the same label is still a visible change", () => {
     const before=snapshot(document()), changed=structuredClone(before.document);
-    changed.layers[1][7]=0x1e; const base=snapshot(changed);
-    const after=structuredClone(changed); after.layers[1][7]=0x59; // KC_1 → KC_KP_1, both labelled "1"
+    editLayers(changed, layers => layers[1][7]=0x1e); const base=snapshot(changed);
+    const after=structuredClone(changed); editLayers(after, layers => layers[1][7]=0x59); // KC_1 → KC_KP_1, both labelled "1"
     const rows=profileReview(base,snapshot(after));
     assert.equal(rows.length,1);
     assert.equal(rows[0].area,"Layout");
@@ -82,7 +83,7 @@ test("a key changed for another with the same label is still a visible change", 
 
 test("a key changed to a layer key carries that layer's mark, and one changed to a pointing mode its slot", () => {
     const before=snapshot(document()), after=structuredClone(before.document);
-    after.layers[0][7]=0x5225; after.layers[0][8]=0x4338; after.layers[0][9]=0x7e80; after.layers[0][10]=0x04; // MO(5), LT(3,KC_SLASH), PD slot 0, KC_A
+    editLayers(after, layers => layers[0][7]=0x5225); editLayers(after, layers => layers[0][8]=0x4338); editLayers(after, layers => layers[0][9]=0x7e80); editLayers(after, layers => layers[0][10]=0x04); // MO(5), LT(3,KC_SLASH), PD slot 0, KC_A
     const marks=profileReview(before,snapshot(after)).filter(row=>row.area==="Layout").map(row=>row.fields[0].afterMark);
     assert.deepEqual(marks,[{kind:"layer",layer:5},{kind:"layer",layer:3},{kind:"pointing",slot:0},undefined]);
 });
@@ -91,7 +92,7 @@ test("a key's participation is named where the key sits, as its layout change is
     const {editDeviceProfile}=require("../../core/model/device-profile-edits");
     const {matrixPosition}=require("../../core/data/charybdis-layout");
     const before=snapshot(document()), after=structuredClone(before.document);
-    after.layers[0][matrixPosition(7)]=0x05; // KC_B
+    editLayers(after, layers => layers[0][matrixPosition(7)]=0x05); // KC_B
     after.profile=editDeviceProfile(Buffer.from(after.profile,"base64"),{type:"updatePlacementPolicy",layer:0,layoutIndex:7,useBehavior:false,joinCombos:true}).toString("base64");
     const rows=profileReview(before,snapshot(after));
     const key=rows.find(row=>row.unit.startsWith("layout:")), placement=rows.find(row=>row.unit.startsWith("placement:"));
@@ -319,7 +320,7 @@ test("layer-mod labels use each Review side's host vocabulary and profile layer 
     for(const [detected,alt,gui] of [[0,'Alt','GUI'],[1,'Option','Command'],[2,'Alt','Windows'],[3,'Alt','Super']]) {
         const before=snapshot(document()), after=snapshot(document());
         before.hostOs=after.hostOs={detected};
-        after.document.layers[0][0]=0x502c;
+        editLayers(after.document, layers => layers[0][0]=0x502c);
         const rows=profileReview(before,after);
         const field=rows.find(row=>row.unit==='layout:0:0').fields[0];
         assert.equal(field.after,`${validateSnapshot(after.document).settings.names[1]} + ${alt}+${gui}`);
@@ -333,7 +334,7 @@ test("Space Cadet modifiers use current host names on the board and in Review", 
         const before=snapshot(document()), after=snapshot(document());
         before.hostOs=after.hostOs={detected};
         const keys=['SC_LAPO','SC_RAPC'].map(key=>lookup(key).value);
-        after.document.layers[0][0]=keys[0];
+        editLayers(after.document, layers => layers[0][0]=keys[0]);
         assert.equal(profileReview(before,after).find(r=>r.unit==='layout:0:0').fields[0].after,`Left ${alt}/(`);
         const model=buildDeviceModel({settingsView:{host:{effective:detected}},layout:{state:'read',layers:[{layer:0,keys:keys.map((keycode,layoutIndex)=>({keycode,layoutIndex,resolved:resolve(keycode)}))}]}});
         assert.deepEqual(model.layers[0].positions.map(p=>p.editLabel),[`Left ${alt}/(`,`Right ${alt}/)`]);
@@ -353,7 +354,7 @@ test("layout and Review labels follow the host layout on each side, including ma
         [{effective: 1, layout: 2, macosIso: true}, 1 | (2 << 16) | (1 << 24), 0x35, "§"],
     ]) {
         const before = snapshot(withHost(word)), after = snapshot(structuredClone(before.document));
-        after.document.layers[0][0] = code;
+        editLayers(after.document, layers => layers[0][0] = code);
         assert.equal(profileReview(before, after).find(row => row.unit === "layout:0:0").fields[0].after, label);
         const model = buildDeviceModel({settingsView: {host}, layout: {state: "read", layers: [{layer: 0, keys: [{keycode: code, layoutIndex: 0, resolved: resolve(code)}]}]}});
         assert.equal(model.layers[0].positions[0].editLabel, label);

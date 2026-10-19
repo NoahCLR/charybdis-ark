@@ -42,6 +42,7 @@ export function screenDevice() {
     const restart = !demo && health?.restartNeeded ? `<div class="callout danger-note" role="alert"><strong>Restart the keyboard.</strong>
         The left half did not confirm a cancelled save, so the keyboard refuses new saves until it restarts. Nothing was lost.
         <ol class="steps"><li>Unplug the USB cable from the right half (not the cable between the halves).</li><li>Wait a few seconds, then plug it back in.</li><li>Choose Read from keyboard below.</li></ol></div>` : "";
+    const earlier = !demo && health?.earlierFormat ? `<p class="note">A saved profile uses an earlier format or test layout that this firmware does not read, so the keyboard runs its built-in defaults. Apply saves your profile in the current format.</p>` : "";
     const saving = !demo && health?.recoveryPending ? `<p class="note">A save is in progress on the keyboard: it keeps its previous profile until both halves confirm the new one.</p>` : "";
     const halves = halvesRows(model).map((half) => `<span class="half ${half.ok ? "ok" : "warn"}">${esc(half.side)} · ${esc(half.role)} ${half.ok ? "✓" : "!"}<span class="note"> ${esc(half.words)}</span></span>`).join("");
     const identity = kv([
@@ -58,7 +59,7 @@ export function screenDevice() {
             <p class="sub">${esc(sub)}</p><p class="note rename-note">${esc(RENAME_NOTE)}</p></div></header>
         <div class="content"><div class="pad stack device-pad">
             <section class="card"><div class="card-h"><h3>This keyboard</h3></div>
-                <div class="card-b stack gap-12">${identity}${restart}${saving}</div></section>
+                <div class="card-b stack gap-12">${identity}${restart}${earlier}${saving}</div></section>
             ${usage ? usageCard(usage) : ""}
             <details class="card settings-group" data-section="diagnostics" ${diagnosticsOpen ? "open" : ""}>
                 <summary class="card-h">${DISCLOSURE}<h3>Diagnostics</h3>

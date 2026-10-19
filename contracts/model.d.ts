@@ -42,7 +42,7 @@ export interface StatusModel {
     draft?: {changes?: readonly unknown[]};
 }
 
-export type ApplyStep = 'check' | 'backup' | 'upload' | 'validate' | 'stage' | 'peer' | 'commit' | 'converge' | 'local' | 'verify';
+export type ApplyStep = 'check' | 'backup' | 'upload' | 'validate' | 'peer' | 'commit' | 'converge' | 'verify';
 /** `saved`: "none" nothing was saved; "decided" the keyboard decided to save and finishes by itself; "unknown". */
 export interface ApplyFailure {step: ApplyStep; label: string; reason: string; saved: string}
 /** What the connected firmware reports about itself (core/session/firmware-support.js firmwareView). */

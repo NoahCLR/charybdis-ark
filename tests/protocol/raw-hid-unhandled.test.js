@@ -1,12 +1,12 @@
 "use strict";
 const assert = require("node:assert/strict");
 const test = require("node:test");
-const {VIA_UNHANDLED, isUnhandledEcho, orUnhandled, requestHandled} = require("../../core/protocol/via-unhandled-v1");
+const {RAW_HID_UNHANDLED, isUnhandledEcho, orUnhandled, requestHandled} = require("../../core/protocol/raw-hid-unhandled");
 const {readProfilePages} = require("../../core/protocol/profile-wire-v1");
 
 const request = () => Buffer.from([0x08, 0x00, 0x0c, 7, 2, ...Array(27).fill(0)]);
 // What QMK sends when nothing handles a report (quantum/via.c).
-const echo = (sent) => Object.assign(Buffer.from(sent), {0: VIA_UNHANDLED});
+const echo = (sent) => Object.assign(Buffer.from(sent), {0: RAW_HID_UNHANDLED});
 
 test("only the keyboard's echo of this request counts as unhandled", () => {
     const sent = request();

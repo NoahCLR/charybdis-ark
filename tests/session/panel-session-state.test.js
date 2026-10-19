@@ -7,7 +7,7 @@ const {DEMO_CAPABILITIES, DEMO_DEVICE_ID, demoProfile, demoSnapshot, demoState} 
 const {fingerprint, summary} = require("../../core/model/portable-profile");
 const {document} = require("../fixtures/pd-profile");
 
-const capabilities = {compiledLayerCount: 16, supportedDomainMask: 31, actionAbiDigest: 0x837cf479, featureFlags: require("../../core/protocol/profile-wire-v1").PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES};
+const capabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 0}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x6fd70b90, featureFlags: require("../../core/protocol/profile-wire-v1").PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES};
 const snapshot = () => {
     const doc = document();
     return {document: doc, fingerprint: fingerprint(doc), summary: summary(doc), limits: {brightnessMax: 200}};
@@ -27,7 +27,7 @@ test("each thing that stands between the draft and an edit is named", () => {
     assert.equal(reason(withDraft(), connected({connectionToken: 2})), "connection-changed");
     assert.equal(reason(withDraft(), connected({connectionToken: undefined})), "connection-changed", "no token is not the draft's token");
     assert.equal(reason(withDraft(), connected({capabilities: {...capabilities, compiledLayerCount: 5}})), "unsupported");
-    assert.equal(reason(withDraft(), connected({capabilities: {...capabilities, featureFlags: capabilities.featureFlags & ~(1 << 30)}})), "unsupported", "firmware without a current feature takes no edit");
+    assert.equal(reason(withDraft(), connected({capabilities: {...capabilities, protocol: {major: 1, minor: 0}}})), "unsupported", "firmware on an earlier base takes no edit");
     const stale = withDraft();
     stale.draft.noteConnection(9);
     assert.equal(reason(stale, connected()), "stale");

@@ -8,14 +8,16 @@
 // Firmware states its contract (tests/host/run_contract_probe.sh: the Profile
 // Wire capability pages the keyboard answers, its BK pin, its fixture hashes);
 // this judges it with Ark's own runtime code. Contract checks fail the run:
-// the pages decode with Ark's Profile Wire decoder, Ark knows the action-ABI
-// digest, protocol and schema versions are ones Ark speaks, the firmware
-// reports every feature Ark requires (Ark supports only current firmware, so
-// its gates would refuse a keyboard lacking one), Ark's BK keycode
-// and layout inputs equal those at firmware's BK pin (--qmk must contain that
-// commit), and Ark's pinned fixtures equal firmware's. Everything else
-// (firmware version, compiled-default digest, capacities) is reported only:
-// it changes with ordinary keymap edits. Never loaded by the app; reads only
+// the pages decode with Ark's Profile Wire decoder, the Profile Wire and
+// schema versions are exactly the base Ark requires (major and minor, D-L64:
+// the version implies everything the keyboard does), Ark knows the action-ABI
+// digest, the firmware supports every profile domain Ark registers, it is a
+// split build that saves (what Apply needs; the feature word holds only build
+// differences), Ark's BK keycode and layout inputs equal those at firmware's
+// BK pin (--qmk must contain that commit), and Ark's pinned fixtures equal
+// firmware's. Everything else (firmware version, compiled-default digest,
+// capacities, the pointing bit) is reported only: it changes with ordinary
+// keymap edits or build options. Never loaded by the app; reads only
 // the checkouts it is given and runs firmware's probe with the host compiler.
 const fs = require("node:fs");
 const os = require("node:os");
@@ -24,13 +26,15 @@ const {createHash} = require("node:crypto");
 const {execFileSync} = require("node:child_process");
 const {decodeCapabilityPages, PROFILE_WIRE_KNOWN_MASKS} = require("../core/protocol/profile-wire-v1");
 const {knownActionAbi, KNOWN_ACTION_ABIS} = require("../core/schema/actions");
-const {PROFILE_BLOB_V1} = require("../core/schema/profile-blob-v1");
+const {PROFILE_DOMAIN_MASK} = require("../core/schema/profile-domains");
+const {SUPPORTED_PROFILE_PROTOCOL, SUPPORTED_PROFILE_SCHEMA} = require("../core/session/firmware-support");
 
 const FIRMWARE = "https://github.com/NoahCLR/charybdis-4x6";
 const QMK = "https://github.com/NoahCLR/bastardkb-qmk";
-const PROTOCOL_MAJORS = [1];
-/** @type {number[]} */
-const SCHEMA_MAJORS = [PROFILE_BLOB_V1.SCHEMA_MAJOR];
+/** @param {{major: number, minor: number}} version */
+const shown = version => `${version.major}.${version.minor}`;
+/** @param {{major: number, minor: number}} actual @param {{major: number, minor: number}} expected */
+const same = (actual, expected) => actual.major === expected.major && actual.minor === expected.minor;
 
 /**
  * @param {string | NodeJS.ArrayBufferView} bytes
@@ -85,16 +89,19 @@ function judge(contract, manifest, qmkRoot) {
         add("Profile Wire capability pages decode with Ark's decoder", false, (error instanceof Error ? error.message : String(error)));
     }
     if (decoded) {
-        add("Profile Wire protocol is one Ark speaks", PROTOCOL_MAJORS.includes(decoded.protocol.major),
-            `firmware ${decoded.protocol.major}.${decoded.protocol.minor}; Ark ${PROTOCOL_MAJORS.join(", ")}`);
-        add("profile schema is one Ark reads", SCHEMA_MAJORS.includes(decoded.schema.major),
-            `firmware ${decoded.schema.major}.${decoded.schema.minor}; Ark ${SCHEMA_MAJORS.join(", ")}`);
+        add("Profile Wire version is the one Ark requires", same(decoded.protocol, SUPPORTED_PROFILE_PROTOCOL),
+            `firmware ${shown(decoded.protocol)}; Ark ${shown(SUPPORTED_PROFILE_PROTOCOL)}`);
+        add("profile schema is the one Ark reads", same(decoded.schema, SUPPORTED_PROFILE_SCHEMA),
+            `firmware ${shown(decoded.schema)}; Ark ${shown(SUPPORTED_PROFILE_SCHEMA)}`);
         add("action-ABI digest is known to Ark", knownActionAbi(decoded.actionAbiDigest),
             `firmware ${hex(decoded.actionAbiDigest)}; Ark knows ${KNOWN_ACTION_ABIS.map(hex).join(", ")}`);
-        const required = (PROFILE_WIRE_KNOWN_MASKS.CURRENT_FEATURES | PROFILE_WIRE_KNOWN_MASKS.CURRENT_MUTATION_FEATURES) >>> 0;
+        const domainsMissing = PROFILE_DOMAIN_MASK & ~decoded.supportedDomainMask;
+        add("firmware supports every profile domain Ark registers", domainsMissing === 0,
+            `firmware 0x${decoded.supportedDomainMask.toString(16)}; Ark 0x${PROFILE_DOMAIN_MASK.toString(16)}${domainsMissing ? `, missing 0x${domainsMissing.toString(16)}` : ""}`);
+        const required = PROFILE_WIRE_KNOWN_MASKS.CURRENT_MUTATION_FEATURES;
         const missing = (required & ~decoded.featureFlags) >>> 0;
-        add("firmware reports every feature Ark requires", missing === 0,
-            `firmware ${hex(decoded.featureFlags)}; Ark requires ${hex(required)}${missing ? `, missing ${hex(missing)}` : ""}`);
+        add("firmware is a split build that saves", missing === 0,
+            `firmware ${hex(decoded.featureFlags)}; Apply needs ${hex(required)}${missing ? `, missing ${hex(missing)}` : ""}`);
     }
 
     // BK inputs: Ark's keycode and layout snapshots against firmware's BK pin.
@@ -135,7 +142,7 @@ function judge(contract, manifest, qmkRoot) {
         "compiled-default digest": hex(decoded.compiledDefaultDigest),
         "layers": `${decoded.compiledLayerCount} of ${decoded.maxLogicalLayers}`,
         "custom keys": decoded.customKeySlots,
-        "VIA macros": `${decoded.viaMacroSlots} slots, ${decoded.viaMacroBytes} bytes`,
+        "Profile macros": `${decoded.macroSlots} slots, ${decoded.macroBytes} bytes`,
         "feature flags": hex(decoded.featureFlags),
         "domains": `0x${decoded.supportedDomainMask.toString(16)}`,
     } : {};

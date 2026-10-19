@@ -25,12 +25,13 @@ for (const {screen, source, initial} of [
             }}, {adapter: {listDevices: async () => [], connect: async () => {throw Error("fixture must not connect");}}});
             const service = loop.session.service;
             service.connectionPublicId = "fixture"; service.connectionToken = 1;
-            service.capabilities = {compiledLayerCount: 16, supportedDomainMask: 31, actionAbiDigest: 0x837cf479, featureFlags};
+            service.capabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 0}, reportSize: 32, statusPageCount: 2, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x6fd70b90, featureFlags};
             if (!initial) service.portable = {document: doc};
-            const bytes = core.Buffer.from(doc.profile, "base64"), metadata = core.Buffer.alloc(25);
-            metadata[0] = 1; metadata[1] = 25; metadata.writeUInt16LE(bytes.length, 2);
-            metadata.writeUInt32LE(core.profileBlob.fnv1a32(bytes), 8);
-            metadata.writeUInt32LE(core.profileBlob.crc32(bytes), 12); metadata[16] = 2; metadata[18] = 31;
+            const bytes = core.portable.validateSnapshot(doc).candidate, metadata = core.Buffer.alloc(25);
+            // Payload metadata layout 2 (Profile Wire 2): a 32-bit length.
+            metadata[0] = 2; metadata[1] = 25; metadata.writeUInt32LE(bytes.length, 2);
+            metadata.writeUInt32LE(core.profileBlob.fnv1a32(bytes), 10);
+            metadata.writeUInt32LE(core.profileBlob.crc32(bytes), 14); metadata[18] = 4; metadata[20] = 127;
             let requestId = 0; service.requestIds = {next: () => (++requestId % 255) + 1};
             service.connection = {connected: true, request: async report => {
                 if (!readContent) readContent = document.querySelector(".content");
@@ -53,17 +54,11 @@ for (const {screen, source, initial} of [
                     readContent = document.querySelector(".content");
                 }
                 replies++;
-                if (source === "layout") {
-                    const response = core.Buffer.from(report);
-                    const offset = report.readUInt16BE(1), count = report[3];
-                    for (let index = 0; index < count; index += 2) {
-                        const position = (offset + index) / 2, layer = Math.floor(position / 60);
-                        response.writeUInt16BE(doc.layers[layer][position % 60], 4 + index);
-                    }
-                    return response;
-                }
                 const identity = core.Buffer.alloc(25); identity[0] = 1; identity[1] = 2;
                 identity.writeUInt16LE(0x31, 2); identity[24] = 0;
+                // Running compiled defaults: status must identify the bytes
+                // served below, including the check after the last chunk.
+                for (const offset of [4, 8, 12]) identity.writeUInt32LE(core.profileBlob.fnv1a32(bytes), offset);
                 const page = report[4];
                 const payload = report[2] === 2 ? (page ? core.Buffer.alloc(25) : identity)
                     : page ? bytes.subarray((page - 1) * 25, page * 25) : metadata;
@@ -88,16 +83,17 @@ for (const {screen, source, initial} of [
             window.dispatchEvent(new MessageEvent("message", {data: lastProgress}));
             staleIgnored &&= ended === store.getModel();
             return {preserved, models, replies, elapsed, lastBar, progress: lastProgress?.read.progress,
-                layoutMatches: source !== "layout" || service.layout.layers.every(({layer, keys}) => keys.every(key => key.keycode === doc.layers[layer][key.row * 6 + key.column])),
+                layoutMatches: source !== "layout" || service.layout.layers.every(({layer, keys}) => keys.every(key => key.keycode === core.portable.validateSnapshot(doc).layers[layer][key.row * 6 + key.column])),
                 profileBytes: bytes.length, staleIgnored, error: service.error?.message,
                 localTextPreserved: store.macroForm("VIA_MACRO_17").draft === localText,
                 posts: window.__posted.length - beforePosts};
         }, {screen, source, initial, coreFile, doc: document(), featureFlags: PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES});
         expect(result.error).toBeUndefined();
         if (source === "layout") {
-            expect(result.replies).toBe(69);
-            expect(result.progress).toMatchObject({done: 896, total: 896});
-            expect(result.lastBar).toContain("of 896");
+            // Two payload metadata pages, plus status before and after read.
+            expect(result.replies).toBe(Math.ceil(result.profileBytes / 25) + 6);
+            expect(result.progress).toMatchObject({done: result.profileBytes, total: result.profileBytes});
+            expect(result.lastBar).toContain(`of ${result.profileBytes}`);
         } else expect(result.lastBar).toContain(`${result.profileBytes} of ${result.profileBytes}`);
         expect(result.preserved).toBe(true);
         expect(result.staleIgnored).toBe(true);

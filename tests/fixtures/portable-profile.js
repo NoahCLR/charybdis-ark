@@ -1,21 +1,26 @@
 // @ts-check
 "use strict";
 // Current firmware's profile as Ark's tests build it: the firmware's frozen
-// populated profile (populated_profile_v3.fixture: schema 3.0, RGB 4, key
-// behaviours 2, combos 3, settings 8, sparse PD 3, slots 0-5 configured),
-// materialized the way a keyboard read does, with these settings and a combo
-// table standing in for the live readbacks. It is a format sample, never the
-// firmware's authored defaults, so editing the keymap changes nothing here.
+// populated profile (populated_profile_v4.fixture: schema 4.0, RGB 4, key
+// behaviours 2, combos 3, settings 8, sparse PD 3, slots 0-5 configured,
+// keymap 1 and macros 1), materialized the way a keyboard read does, with
+// these settings and a combo table standing in for the live readbacks, and
+// the given layers and empty macros in place of the fixture's. It is a format
+// sample, never the firmware's authored defaults, so editing the keymap
+// changes nothing here.
 const fs = require("node:fs");
 const path = require("node:path");
 const {createSnapshot, materializeProfile} = require("../../core/model/portable-profile");
+const {decodeProfileBlob, encodeProfileBlob} = require("../../core/schema/profile-blob-v1");
+const {encodeKeymapDomain} = require("../../core/schema/keymap-domain-v1");
+const {encodeMacroDomain} = require("../../core/schema/macro-domain-v1");
 const {encodeSettings, defaultLayerRecord} = require("../../core/schema/settings-domain-v1");
 const {ACTION_ABI} = require("../../core/schema/actions");
 const {LAYER_LOCK_BASE} = require("../../core/data/user-keycodes");
 const {PROFILE_WIRE_KNOWN_MASKS} = require("../../core/protocol/profile-wire-v1");
 
-const FIXTURE = path.resolve(__dirname, "../../upstream/firmware/tests/fixtures/populated_profile_v3.fixture");
-const CURRENT_CAPABILITIES = Object.freeze({compiledLayerCount: 16, supportedDomainMask: 31, schema: {major: 3}, actionAbiDigest: ACTION_ABI,
+const FIXTURE = path.resolve(__dirname, "../../upstream/firmware/tests/fixtures/populated_profile_v4.fixture");
+const CURRENT_CAPABILITIES = Object.freeze({protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 0}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: ACTION_ABI,
     featureFlags: PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES});
 
 // Settings v8: values 10..14 are the retired pointing DPI and 27 the retired
@@ -36,22 +41,27 @@ const profileBytes = () => {
     return Buffer.from(match[1], "hex");
 };
 
-// The profile with an empty layout and no combos, unless given.
+const emptyLayers = () => Array.from({length: 16}, () => Array(60).fill(0));
+
+// The profile with an empty layout, no macros and no combos, unless given.
 /** @param {import("./types.js").CompiledOptions} [options] */
-function compiled({combos = [], layout = Buffer.alloc(1920), policy = settings()} = {}) {
-    const bytes = profileBytes();
+function compiled({combos = [], layers = emptyLayers(), policy = settings()} = {}) {
+    const fixture = decodeProfileBlob(profileBytes());
+    const bytes = encodeProfileBlob({domains: fixture.domains.map(domain =>
+        domain.id === 0x60 ? {...domain, payload: encodeKeymapDomain(layers)}
+            : domain.id === 0x70 ? {...domain, payload: encodeMacroDomain(Array.from({length: 128}, () => Buffer.alloc(0)))} : domain)});
     const table = {version: 3, defaultTermMs: 50, holdTermMs: 200, rows: combos};
     const profile = materializeProfile(bytes, bytes, table, encodeSettings(policy));
-    return createSnapshot({profile, actionAbiDigest: ACTION_ABI, via: {layers: 16, layout, macros: Buffer.alloc(10327), macroSlots: 128}});
+    return createSnapshot({profile, actionAbiDigest: ACTION_ABI});
 }
 
 // A backup with keys on its layout (MO(1), LT(1, KC_N), LOCK_LAYER(4), a
-// layer-mod and TT(1)) and a combo that follows the default window, so both
-// banks and the combo readback carry something.
+// layer-mod and TT(1)) and a combo that follows the default window, so the
+// keymap and the combo readback carry something.
 function document() {
-    const layout = Buffer.alloc(1920);
-    [0x5221, 0x4131, LAYER_LOCK_BASE + 4, 0x5022, 0x52c1].forEach((code, index) => layout.writeUInt16BE(code, index * 2));
-    return compiled({layout, combos: [{id: 0, inputs: [4, 5], output: 8, termMs: 50, followsDefault: true, mustHold: false, mustTap: false, ordered: false}]});
+    const layers = emptyLayers();
+    [0x5221, 0x4131, LAYER_LOCK_BASE + 4, 0x5022, 0x52c1].forEach((code, index) => {layers[0][index] = code;});
+    return compiled({layers, combos: [{id: 0, inputs: [4, 5], output: 8, termMs: 50, followsDefault: true, mustHold: false, mustTap: false, ordered: false}]});
 }
 
 module.exports = {settings, compiled, document, CURRENT_CAPABILITIES};

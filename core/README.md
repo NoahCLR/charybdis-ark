@@ -10,8 +10,8 @@ enforces it.
 
 `session/profile-device-service.js` enumerates matching interfaces, keeps
 native paths and handles out of the webview, and reads what the keyboard says
-about itself: VIA and firmware versions, the Profile Wire capability and status
-pages, the layout, the committed profile, combos, macro banks, settings,
+about itself: firmware identity from Profile Wire capabilities and status
+pages, the profile keymap and macro domains, the committed profile, combos, settings,
 keyboard options and the base RGB effect. It publishes a sanitized snapshot;
 `session/device-model.js` adapts those independent reads for the read-only
 view. With a draft open, its `buildSnapshotModel` renders the complete snapshot
@@ -43,17 +43,19 @@ behind it, which the loop answers to in place of the device service's state
 while it is open.
 
 `session/firmware-support.js` owns the firmware gates and their diagnostics.
-Ark supports only current firmware (D-L64): every feature it reports, named in
-`protocol/profile-wire-v1.js` as `CURRENT_FEATURES` and
-`CURRENT_MUTATION_FEATURES`, is required here, and no code past these gates
-asks whether a feature is there. They answer different questions and retain
-different requirements:
+Ark supports only current firmware (D-L64): the exact Profile Wire (2.0) and
+schema (4.0) versions of the base, major and minor, which imply everything the
+keyboard does. The feature word (`PROFILE_WIRE_FEATURES` in
+`protocol/profile-wire-v1.js`) only describes the build: split, saves and
+pointing. Apply needs a split build that saves (`CURRENT_MUTATION_FEATURES`),
+and no code past these gates asks whether a feature is there. They answer
+different questions and retain different requirements:
 
 | Predicate | Requirements |
 | --- | --- |
-| `canRead` / `evaluateProfileCompatibility` | Supported protocol/schema and VIA protocol 13, report framing, status pages, current firmware's features, RGB and behaviour domains; advertised capacities and the action ABI are not compared |
-| `canEdit` (also exported as `supportsCompleteProfile`) | Current layer count, every registered profile domain, a known action ABI and current firmware's features |
-| `canApply` | The complete-document gate plus every mutation feature current firmware reports, candidate reuse and streaming included |
+| `canRead` / `evaluateProfileCompatibility` | The exact Profile Wire and schema versions, report framing, status pages, RGB and behaviour domains; advertised capacities and the action ABI are not compared |
+| `canEdit` (also exported as `supportsCompleteProfile`) | The exact base (`isCurrentBase`), current layer count, every registered profile domain and a known action ABI |
+| `canApply` | The complete-document gate plus a split build that saves (feature bits 0 and 1), which brings candidate reuse and streaming with it |
 | `evaluateLiveMutationCompatibility` | Connection and established read compatibility, the mutation features, candidate chunk size, known and converged peer; it publishes the existing ordered reasons and recovery facts |
 | `editableDomains` | Independent view gates: complete idle read for behaviours/pointing, committed idle read for combos, current layers and the corresponding idle view for macros/settings, and an idle custom-key view |
 
@@ -116,11 +118,11 @@ comparison includes all new model fields by default. Data, vocabulary,
 permission, connection and form-reset changes rebuild the editor. Device and
 Profile screens still rebuild for their diagnostics and backup state.
 
-`protocol/via-layout-v1.js` reads the matrix through the existing 28-byte VIA
-buffer-read path, then produces visible positions in the pinned layout order.
+`schema/keymap-domain-v1.js` decodes every matrix position from the active
+profile, falling back to the compiled domain when absent.
 `data/charybdis-layout.js` owns the layer count and matrix geometry alongside
-that layout. `matrixPosition(layoutIndex)` translates a visible key into its
-stored matrix slot for reads, edits, participation and review.
+the visible layout. `matrixPosition(layoutIndex)` translates a visible key
+into its stored slot for reads, edits, participation and review.
 `session/profile-payload-reader.js` owns `ProfilePayloadReader`: verified byte
 reuse behind a small interface. Its stateless protocol codec checks complete
 metadata identities, retries coherent reads and verifies CRC/FNV. `ProfileDeviceService` owns one reader per connection;
@@ -142,7 +144,8 @@ and combos and settings from their own live readbacks. The compiled read
 carries all five domains, but its combos are the authored ones and its settings
 the immutable factory ones, so neither ever stands in for what the keyboard
 runs, and no domain is taken twice. The retired pointing-mode page (GET
-`0x09`, feature bit 13) is never read.
+`0x09`) is never read. The payload readback's metadata page is layout 2: a
+32-bit payload length, then generation, digest and CRC.
 
 Custom Profile Wire pages use one monotonically increasing nonzero request-id
 sequence per connected session (wrapping `255` to `1`), so a delayed response
@@ -187,15 +190,21 @@ session; pure domain presentation lives beside them in `model/device-profile-vie
 Draft history keeps each frozen document and its origin, label, time and layer
 order in one entry, so branching and trimming preserve them together.
 
-Apply goes through `session/portable-profile-session.js`: a recovery copy is
-written before the first device write, the profile is staged on both halves
-through the candidate mailbox (`protocol/profile-candidate-v1.js`,
-`session/candidate-upload-coordinator.js`) and the peer VIA stage
-(`session/logical-via-stage-coordinator.js`), and one generation is published.
-Every candidate is schema 3.0 in logical store format 5 (`NT`), bound to the
-VIA store generation and digest it publishes with: `candidateMetadataForBlob`
-refuses a missing binding or a zero generation or digest before anything is
-sent, and there is no custom-only format 0.
+Apply goes through `session/portable-profile-session.js`: the reviewed base
+is checked, a recovery copy is saved before the first device write, and one
+complete candidate goes through `protocol/profile-candidate-v1.js` and
+`session/candidate-upload-coordinator.js`. The base is checked again under the
+lease. Firmware prepares both halves, makes its durable decision and activates
+one generation after confirming the peer. No VIA bindings, staging, separate
+generations or USB-half roll-forward remain. BEGIN bytes 24–31 are reserved
+zero. Schema 4.0 implies logical store format 6 through Profile Wire 2.
+CHUNK
+and REUSE offsets and lengths are 32 bits. Candidate status page 0 (layout 2)
+carries progress and the error id; `readCandidateStatus` reads page 3 for
+where the error is only after a page 0 reporting one, and keeps it only when
+its transaction, operation sequence and error sequence match that page 0,
+rereading the pair otherwise (an error that never settles keeps its id, with
+the location unknown).
 Staging never retries an ambiguous transport outcome, commit is
 transaction/digest-correlated and idempotent across a lost acknowledgement, and
 success is accepted only after a fresh status read reports the new generation
@@ -239,8 +248,9 @@ string `code`; `tests/schema/profile-domains.test.js` pins the contract and
 these identities for every registered domain.
 
 `schema/profile-blob-v1.js` encodes and strictly decodes the `NLP1` header and
-its ordered domain envelopes, the four-byte semantic action values, and the
-FNV-1a 32-bit and CRC32 helpers. It accepts schema 3.0 only; unknown domains
+its ordered domain envelopes (6 bytes: id, version and a 32-bit payload
+length, schema 4), the four-byte semantic action values, and the FNV-1a 32-bit
+and CRC32 helpers. It accepts schema 4.0 only; unknown domains
 and every other domain version are rejected, and `decodeStoredProfileBlob`
 says so to a keyboard storing one. Complete snapshots use sixteen layers and
 the current 32-slot action vocabulary; an older backup is refused, never
@@ -254,6 +264,27 @@ its firmware counterpart is `users/noah/lib/profile/schema/profile_rgb_v1.c`.
 `schema/compiled-profile-v1.js` resolves expressions in the keyboard's
 vocabulary (`KC_A`, `LT(1, KC_A)`, `PD_SLOT_0`, `VIA_MACRO_3`) to actions and
 native keycodes, refusing any whose bits would land on another keycode.
+
+The keymap codec (`keymap-domain-v1.js`, domain `0x60` v1) retains all 60
+matrix positions on each of 16 layers, including unwired positions, in
+little-endian order. The macro codec (`macro-domain-v1.js`, `0x70` v1) checks
+the firmware’s bank grammar and reads 128 streams; unused bank tails are
+accepted, while writing streams produces their canonical terminators alone.
+The registry describes all seven domains. Version-5 portable documents carry
+one complete canonical base64 blob: `format`, `version`, `keyboard`,
+`actionAbiDigest`, `profile`. `validateSnapshot` returns decoded `layers` and
+`macroSlots` views; they are not extra serialized fields. Domain replacements
+keep every unrelated domain, including during review, undo, partial discard
+and layer reordering. Version-4 separate-field files and older formats are
+refused. Files are limited to 196,608 UTF-8 bytes; the blob is limited to
+130,048. The extension, web host and drop importer enforce that bound.
+
+Capture materializes omitted domains from compiled defaults and overlays the
+live combo/settings readbacks. Base lighting uses those captured settings;
+standalone lighting reads also use Profile Wire scalars 21/22. All seven
+domains count toward usage and macro room, which is bounded by both remaining
+profile space and the advertised macro-domain capacity. Exact active bytes
+are retained only as a verified differential-transfer source.
 
 ## Adapter contract
 
@@ -328,8 +359,7 @@ invalidates the session. Chrome's `disconnect` event for the open device ends
 the connection; `close()` removes both listeners and closes the device once.
 
 A browser tab in the background has its timers throttled, so the waits between
-polls while reading and saving a profile (the candidate and VIA stage
-coordinators, and the storage wait) take a `sleep(ms)` the host passes as an
+polls while saving a profile (the candidate coordinator) take a `sleep(ms)` the host passes as an
 option of `ProfileDeviceService` (or of `openPanelLoop`); the web page passes
 one kept by a worker. Without it they use `setTimeout`, as the extension does.
 
@@ -360,9 +390,9 @@ const response = await connection.request(report, {
 The default matcher compares byte 0. Versioned custom live-profile frames must
 supply a matcher that also checks their transaction id.
 
-When nothing on the keyboard handles a report, QMK answers with the request
+When nothing on the keyboard handles a report, the firmware answers with the request
 echoed back and byte 0 set to `0xFF`. Every protocol module accepts exactly that
-echo of its own request (`protocol/via-unhandled-v1.js`) and treats it as a
+echo of its own request (`protocol/raw-hid-unhandled.js`) and treats it as a
 definite refusal: a stable error such as `UNHANDLED` or `KEYBOARD_NOT_READY`,
 with the connection left open. A `0xFF` report that is not an echo of the
 request — another client's reply — is never taken for an answer.

@@ -1,5 +1,6 @@
 // @ts-check
 "use strict";
+const {editLayers, editMacros} = require("../fixtures/profile-document");
 const test = require("node:test"), assert = require("node:assert/strict");
 const {document} = require("../fixtures/portable-profile");
 const {profileReview} = require("../../core/model/profile-review");
@@ -69,8 +70,8 @@ function candidates(value) {
 test("every editable decoded field has a specific review item", () => {
     const base = completeFixture(), decoded = validateSnapshot(base), before = snapshot(base);
     const missed = [], unmutated = [];
-    for (const codec of PROFILE_DOMAINS) {
-        const model = decoded[codec.key], inventory = new Map();
+    for (const codec of PROFILE_DOMAINS.filter(codec => codec.document === "profile")) {
+        const model = codec.key === "keymap" ? decoded.layers : codec.key === "macros" ? decoded.macroSlots.map(bytes => [...bytes]) : decoded[codec.key], inventory = new Map();
         for (const leaf of leaves(model)) {
             // Each setting ID has a separate acceptance rule and presentation.
             const id = codec.key === "settings" && leaf.path[0] === "values" ? `settings.values[${leaf.path[1]}]` : shape([codec.key, ...leaf.path]);
@@ -95,10 +96,11 @@ test("every editable decoded field has a specific review item", () => {
                 if (id === "pdModes[].kind" && next === 0) changed[path[0]] = {id: path[0], kind: 0, name: changed[path[0]].name};
                 let after;
                 try {
-                    after = rewrite(base, codec, changed, decoded.codecOptions);
+                    after = rewrite(base, codec, codec.key === "macros" ? changed.map(bytes => Buffer.from(bytes)) : changed, decoded.codecOptions);
                     // Reject candidates that the codec drops (inactive union
                     // fields) or that violate a complete-document invariant.
-                    const accepted = validateSnapshot(after)[codec.key];
+                    const result = validateSnapshot(after);
+                    const accepted = codec.key === "keymap" ? result.layers : codec.key === "macros" ? result.macroSlots : result[codec.key];
                     if (read(accepted, path) === value || read(accepted, path) !== next) continue;
                 } catch (error) {
                     // Invalid candidate values are expected; an unrelated
@@ -119,10 +121,10 @@ test("every editable decoded field has a specific review item", () => {
 
 test("layout keys and authored macro bytes produce review items", () => {
     const base = document(), before = snapshot(base);
-    const layout = structuredClone(base); layout.layers[0][matrixPosition(0)] = 4;
+    const layout = structuredClone(base); editLayers(layout, layers => layers[0][matrixPosition(0)] = 4);
     assert.ok(profileReview(before, snapshot(layout)).some(row => row.unit.startsWith("layout:")));
     const macro = structuredClone(base);
-    macro.macros[0] = Buffer.from("A").toString("base64");
+    editMacros(macro, macros => macros[0] = Buffer.from("A").toString("base64"));
     assert.ok(profileReview(before, snapshot(macro)).some(row => row.unit === "macro:0"));
 });
 

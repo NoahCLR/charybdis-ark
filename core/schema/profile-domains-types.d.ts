@@ -7,6 +7,8 @@ export interface DomainModels {
     combos: {version: typeof import('./profile-domains.js').PROFILE_DOMAIN_VERSIONS[typeof import('./profile-domains.js').PROFILE_DOMAIN_IDS.COMBOS]; defaultTermMs: number; holdTermMs: number; rows: {id: number; inputs: (SemanticAction & {flags: 0})[]; output: SemanticAction & {flags: 0}; termMs: number | null; mustHold: boolean; mustTap: boolean; ordered: boolean; enabled: boolean; useOutputBehavior: boolean; allowedLayers: number}[]};
     settings: SettingsDomain & {comboOutputBehaviors: boolean; formatVersion: typeof import('./profile-domains.js').PROFILE_DOMAIN_VERSIONS[typeof import('./profile-domains.js').PROFILE_DOMAIN_IDS.SETTINGS]};
     pdModes: PdSlot[];
+    keymap: number[][];
+    macros: Buffer[];
 }
 export type DomainKey = keyof DomainModels;
 export interface DomainCodec<K extends DomainKey> {

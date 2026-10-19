@@ -143,7 +143,9 @@ test("a corrupted payload is refused, not decoded", async () => {
 test("metadata that does not describe a readable payload is refused", () => {
     const bytes = payloadOf(10);
     for (const [overrides, code] of [
-        [{layoutVersion: 2}, "INCOMPATIBLE_RESPONSE"],
+        // Layout 1 is Profile Wire 1's, with a 16-bit length.
+        [{layoutVersion: 1}, "INCOMPATIBLE_RESPONSE"],
+        [{layoutVersion: 3}, "INCOMPATIBLE_RESPONSE"],
         [{chunkSize: 0}, "MALFORMED_RESPONSE"],
         [{chunkSize: 26}, "MALFORMED_RESPONSE"],
         [{payloadLength: 0}, "MALFORMED_RESPONSE"],
@@ -159,8 +161,9 @@ test("metadata that does not describe a readable payload is refused", () => {
 });
 
 test("wide pages address a whole 52 KiB slot", () => {
-    // Pages are 16 bits (feature bit 19): past 255 pages, up to 53,216 bytes.
-    for (const payloadLength of [25 * 256, 53216]) {
+    // Pages are 16 bits: past 255 pages, up to 53,216 bytes; the length is 32
+    // bits (layout 2), so a profile past 64 KiB is described too.
+    for (const payloadLength of [25 * 256, 53216, 65536, 131040]) {
         assert.equal(decodePayloadMetadata(metadataPage({bytes: payloadOf(10), generation: 1, payloadLength})).payloadLength, payloadLength);
     }
 });

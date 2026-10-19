@@ -11,7 +11,7 @@
  * @typedef {import("./types.js").CandidateProgress} Progress
  * @typedef {import("./candidate-upload-types.js").FailureDetails} FailureDetails
  */
-const {isUnhandledEcho, orUnhandled} = require("../protocol/via-unhandled-v1");
+const {isUnhandledEcho, orUnhandled} = require("../protocol/raw-hid-unhandled");
 const {
     CANDIDATE_ADMISSION,
     CANDIDATE_ERROR,
@@ -157,15 +157,13 @@ class CandidateUploadCoordinator {
             context.blob = copyBytes(value, "Candidate profile blob");
             context.totalBytes = context.blob.length;
             if (options.metadata === undefined) {
-                // Authored uploads supply VIA identity; the codec validates every value,
+                // The codec validates the complete candidate identity,
                 // including absent fields from an untyped caller, before returning metadata.
                 context.metadata = candidateMetadataForBlob(context.blob, /** @type {import("../protocol/types.js").CandidateBlobOptions} */ ({
                     actionAbiDigest: options.actionAbiDigest,
                     storeFormatVersion: options.storeFormatVersion,
                     capabilities: options.capabilities,
                     requestedDomains: options.requestedDomains,
-                    viaGeneration: options.viaGeneration,
-                    viaDigest: options.viaDigest,
                 }));
             } else {
                 const supplied = normalizeCandidateMetadata(options.metadata);
@@ -173,8 +171,6 @@ class CandidateUploadCoordinator {
                     actionAbiDigest: supplied.actionAbiDigest,
                     storeFormatVersion: supplied.storeFormatVersion,
                     requestedDomains: supplied.requestedDomains,
-                    viaGeneration: supplied.viaGeneration,
-                    viaDigest: supplied.viaDigest,
                 });
                 for (const field of /** @type {const} */ (["schemaMajor", "schemaMinor", "requestedDomains", "flags", "payloadLength", "crc32", "digest", "actionAbiDigest", "storeFormatVersion"])) {
                     if (supplied[field] !== derived[field]) {
@@ -627,10 +623,9 @@ class CandidateUploadCoordinator {
                 throw uploadError("CANDIDATE_IDENTITY_MISMATCH", "Commit status digest changed during persistence.", context, {status, safeToRetry: false});
             }
             if (status.state === CANDIDATE_STATE.CONVERGING_PEER && context.afterDecision && !context.decisionHandled) {
-                // CONVERGING_PEER begins only after the local custom-profile
-                // commit marker is durable. The caller may now roll the VIA
-                // store forward on the USB half while the peer remains the
-                // recovery copy for an interrupted post-decision write.
+                // CONVERGING_PEER proves the one-store commit decision.
+                // Firmware completes peer commit and activation from here;
+                // this callback reports progress and sends no second-store writes.
                 context.decisionHandled = true;
                 await context.afterDecision({
                     transactionId: context.transactionId,
@@ -1014,6 +1009,7 @@ function statusProgressFingerprint(status) {
         status.operationSequence,
         status.nextOffset,
         status.error?.id,
+        status.errorSequence,
     ].join(":");
 }
 

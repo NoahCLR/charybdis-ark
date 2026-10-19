@@ -186,7 +186,7 @@ test("a profile carries the PD domain only as version 3, and the retired payload
     const payload = bytes();
     assert.deepEqual(decodeProfileBlob(encodeProfileBlob({domains: [{id: PD_DOMAIN.ID, version: 3, payload}]})).domains[0].payload, payload);
     for (const version of [1, 2]) reject(() => encodeProfileBlob({domains: [{id: PD_DOMAIN.ID, version, payload}]}), "UNKNOWN_DOMAIN_VERSION");
-    const envelope = Buffer.from([0x4e, 0x4c, 0x50, 0x31, 3, 0, 1, 1, 0x50, 1, 8, 3]);
+    const envelope = Buffer.from([0x4e, 0x4c, 0x50, 0x31, 4, 0, 1, 1, 0x50, 1, 8, 3, 0, 0]);
     reject(() => decodeProfileBlob(Buffer.concat([envelope, Buffer.from(fixture.hex, "hex")])), "UNKNOWN_DOMAIN_VERSION");
     assert.throws(() => decodePdDomain(Buffer.from(fixture.hex, "hex")), error => error.code === "INVALID_HEADER" && error.offset === 0);
 });

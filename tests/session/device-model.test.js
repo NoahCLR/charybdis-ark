@@ -67,7 +67,7 @@ test("every custom key has built-in behaviour defaults, placed or not", () => {
     const keys = [0, 5].map(slot => ({slot, keycode: `CUSTOM_KEY_${slot}`, code: 0x7f00 + slot, name: "", hasBehavior: false}));
     const model = buildDeviceModel({
         layout: layoutWith([0x7f00, 0x04].map((keycode, layoutIndex) => ({keycode, layoutIndex, resolved: resolve(keycode)}))),
-        committed: decodedDeviceProfile(), capabilities: {actionAbiDigest: 0x837cf479},
+        committed: decodedDeviceProfile(), capabilities: {actionAbiDigest: 0x6fd70b90},
         settingsView: {timing: {tappingTerm: "210", tapHoldTerm: "150", longerHoldTerm: "400", multiTapTerm: "170"}},
         customKeyView: {keys},
     });
@@ -82,7 +82,7 @@ test("device shortcut labels stay complete and semantic names require the advert
     const values = [0x0806, 0x0a1d, 0x7e80, 0x7ec5, 0x7ec6, 0x7f02];
     const state = {
         layout: layoutWith(values.map((keycode, layoutIndex) => ({keycode, layoutIndex, resolved: resolve(keycode)}))),
-        committed: decodedDeviceProfile(), capabilities: {actionAbiDigest: 0x837cf479},
+        committed: decodedDeviceProfile(), capabilities: {actionAbiDigest: 0x6fd70b90},
     };
     const model = buildDeviceModel(state);
     assert.deepEqual(model.layers[0].positions.map(key => key.display), ["GUI+C", "Shift+GUI+Z", "Pd slot 0", "Lock Layer 5", "Lock Layer 6", "Custom key 2"],
@@ -100,7 +100,7 @@ test("a position carries what its value means, not only what the keyboard calls 
     const model = buildDeviceModel({
         layout: layoutWith(values.map((keycode, layoutIndex) => ({keycode, layoutIndex, resolved: resolve(keycode)}))),
         committed: decodedDeviceProfile(),
-        capabilities: {actionAbiDigest: 0x837cf479},
+        capabilities: {actionAbiDigest: 0x6fd70b90},
         macroView: {viaMacros: [{keycode: "VIA_MACRO_0", kind: "via", name: "Sign-off"}]},
         customKeyView: {keys: [{slot: 0, keycode: "CUSTOM_KEY_0", code: 0x7f00, name: "Right Thumb", hasBehavior: true}]},
     });
@@ -264,7 +264,7 @@ test("the Settings card gets the stored name, and the built-in one only while th
     const {document} = require("../fixtures/portable-profile");
     const {fingerprint, summary} = require("../../core/model/portable-profile");
     const value = document(), snapshot = {document: value, fingerprint: fingerprint(value), summary: summary(value)};
-    const caps = {compiledLayerCount: 16, supportedDomainMask: 31, actionAbiDigest: 0x837cf479};
+    const caps = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 0}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x6fd70b90};
     const binding = {editable: true, reason: ""}, device = {product: "Charybdis (4x6) Splinky"};
     assert.deepEqual(buildSnapshotModel(snapshot, caps, binding, {device, storedKeyboardName: ""}).keyboardName,
         {name: "", builtIn: "Charybdis (4x6) Splinky", identity: snapshot.fingerprint, perName: 32});
@@ -308,6 +308,7 @@ test("the header exposes one health model for connection, convergence and recove
         halves: "unread",
         recoveryPending: false,
         restartNeeded: false,
+        earlierFormat: false,
         busy: false,
         phase: "empty",
         error: "Keyboard unavailable",
@@ -331,6 +332,12 @@ test("the header exposes one health model for connection, convergence and recove
         status: {committedGeneration: 4, activeGeneration: 4, peerGeneration: 4, committedDigest: 1, peerKnown: true, peerConverged: true, peerCleanupPending: true},
     }).device;
     assert.equal(wedged.health.restartNeeded, true, "the rail asks for a restart while the peer holds a cancelled save");
+    assert.equal(wedged.health.earlierFormat, false);
+    const earlier = buildDeviceModel({
+        capabilities: {compiledLayerCount: 16},
+        status: {committedGeneration: 0, activeGeneration: 0, peerKnown: true, peerConverged: true, storedEarlierFormat: true},
+    }).device;
+    assert.equal(earlier.health.earlierFormat, true, "the keyboard says its saved profile is in an earlier format");
 });
 
 test("the subtitle says what to do next", () => {
@@ -420,7 +427,7 @@ test("compiled defaults are shown, and labelled as compiled", () => {
     assert.equal(model.rgb.layerColors.length, 16, "the tabs must populate from compiled defaults");
     assert.equal(model.keyBehaviors.length, 37);
     assert.match(model.diagnostics.join(" "), /compiled defaults/);
-    assert.match(model.diagnostics.join(" "), /Nothing is committed/);
+    assert.match(model.diagnostics.join(" "), /what the keyboard is running/);
     assert.match(model.device.subtitle, /compiled defaults/);
 });
 
@@ -453,8 +460,8 @@ test("a behaviour on a key never renames what the vocabulary already names", () 
         row({kind: 6, flags: 0, operand: 0}),   // VIA_MACRO_0
     ]}};
     const macroView = {viaMacros: [{kind: "via", keycode: "VIA_MACRO_0", payload: ""}], hardcodedMacros: []};
-    const labels = buildDeviceModel({committed, macroView, capabilities: {actionAbiDigest: 0x837cf479}}).qmkKeyLabels;
-    const plain = buildDeviceModel({macroView, capabilities: {actionAbiDigest: 0x837cf479}}).qmkKeyLabels;
+    const labels = buildDeviceModel({committed, macroView, capabilities: {actionAbiDigest: 0x6fd70b90}}).qmkKeyLabels;
+    const plain = buildDeviceModel({macroView, capabilities: {actionAbiDigest: 0x6fd70b90}}).qmkKeyLabels;
     assert.equal(labels["MO(1)"], plain["MO(1)"], "MO(1) reads as it does with no behaviour on it, not \"Mo(1)\"");
     assert.equal(labels.QK_MACRO_0, "Macro 0", "the macro screen's name");
     assert.equal(labels["0x7EC2"], "Lock Layer 2", "a bare user slot reads by what it does to which layer");
@@ -574,8 +581,8 @@ test("snapshot presentation reuses a matching decode and follows the binding for
     for (const binding of [{editable: true, reason: ""}, ...["busy", "stale", "disconnected", "connection-changed"].map(reason => ({editable: false, reason}))]) {
         const model = buildSnapshotModel(snapshot, CURRENT_CAPABILITIES, binding);
         assert.equal(model.rgb.maximumBrightness, 0);
-        assert.equal(model.rgb.baseEffect.brightness, 0);
-        assert.equal(model.rgb.baseEffect.previewColor.v, "0");
+        assert.equal(model.rgb.baseEffect.brightness, current.decoded.settings.values[22] >>> 16);
+        assert.equal(model.rgb.baseEffect.previewColor.v, String(current.decoded.settings.values[22] >>> 16));
         for (const field of ["behaviorEditing", "pdModeEditing", "comboReadback", "macroEditing", "settingsEditing", "customKeyEditing"]) {
             assert.equal(model[field].writable, binding.editable, `${field} follows the same binding`);
         }

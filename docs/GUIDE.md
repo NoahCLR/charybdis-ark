@@ -220,7 +220,7 @@ reports, and that QMK's tap-hold options are not used, since the keyboard
 decides every key's tap or hold itself; each needs a firmware build to change. A folded section says what it holds in
 words ("16 layers", "13 options"). Settings that QMK keeps live (combos on or
 off, default layers, key options) say **↺ keyboard keys change this too**: a
-key on the keyboard, or VIA, can change them, and the draft then asks to be
+key on the keyboard can change them, and the draft then asks to be
 updated. Search reads each setting's words, its hover help (where QMK's names
 are) and a section's other names; it says when nothing matches, and points to
 matches on another screen ("3 matches on Mouse →").
@@ -920,7 +920,8 @@ does not change macOS Unicode Hex Input's effect on Option shortcuts.
 Text edits and renames preserve the choice. Review, undo/redo, discard, exports
 and imports carry it with the macro.
 
-Shared macro memory stays in the slot bank. Every empty slot keeps room there
+Macros share the profile’s storage with keys, behaviours, names and settings,
+within the keyboard’s separate macro-domain limit (34,903 bytes). Every empty slot keeps room in the remaining space
 for ten key taps; when it cannot, the highest empty slots read **unavailable**
 and cannot be picked until a macro is shortened or cleared. The bank's heading
 counts the slots in use, "20 of 128 used", as Custom keys counts its named keys,
@@ -986,7 +987,11 @@ by which layer they are, not where they sit, so a reorder is one **Layer
 priority** item and a key edited or a layer renamed after it is its own item;
 each can be discarded without the other. A keyboard the app cannot open a draft for — its
 complete profile could not be read — is read-only: the host refuses any edit
-rather than writing it directly.
+rather than writing it directly. During save recovery, the keyboard may still
+run its previous profile while a newer one is saved. Ark shows the running
+layout only when it can verify those exact bytes; otherwise the layout is
+unavailable until recovery finishes. A keyboard running its built-in defaults
+shows those defaults, even if a newer profile is saved.
 
 Removing one combo appears as one deletion in Review and Draft history; later
 combo numbers shift because the device stores them in a packed table.
@@ -1067,13 +1072,11 @@ discard names what it reads and says nothing about saving, because it writes
 nothing to the keyboard.
 
 Apply reports the transaction's steps in order: check the keyboard, save a
-recovery copy, send the profile, let the keyboard check it, stage keys and
-macros on the slave half, copy the profile to that half, save on the master
-half, finish the slave half, write the master's keys and macros, then check
+recovery copy, send the profile, let the keyboard check it, copy the profile
+to the slave half, save on the master half, finish the slave half, then check
 both halves. A failure keeps its step, the keyboard's reason and one of three
 verdicts on screen until you dismiss it: nothing was saved; the keyboard had
-already decided to save and finishes by itself about 15 seconds after both
-halves are connected; or Ark cannot tell which profile was saved. A save is
+already decided to save and finishes by itself once both halves are connected; or Ark cannot tell which profile was saved. A save is
 all or nothing, so none of them is "part of it". The later editor readback
 is separate from those transaction steps.
 
@@ -1087,30 +1090,20 @@ What to expect while it applies:
   profile unchanged. A save the app abandoned before the decision is cancelled
   by the keyboard within about 15 seconds, and the next save can start once
   both halves are connected.
-- It then holds key input for the few moments while the master half's keys and
-  macros are rewritten and the new profile activates. If the app is closed in
-  that window, the keyboard finishes the save on its own from the slave half's
-  copy within about 15 seconds. Most failures after the decision end the same
-  way: Ark says the keyboard finishes by itself, and you read it again once
-  both halves have been connected for about 15 seconds.
-- Rarely, the halves stop agreeing on the saved profile after the decision:
-  the slave half reports a newer one, or another save ran at the same time.
-  The keyboard cannot finish that save by itself, and waiting does nothing.
-  If it had already started holding key input, the master half types nothing
-  until it restarts. Ark says so and asks you to unplug the USB cable (not the
-  cable between the halves), wait a few seconds, plug it back in and read the
-  keyboard again; the recovery file stays the fallback. When Ark can tell that
-  key input was never held, it says the master half keeps typing the old
-  profile until then; when it cannot tell, it says the master half may type
-  nothing.
-- If the cable between the halves comes out after the decision, the master half
-  keeps typing the old profile until the rewrite starts, and the save resumes
-  when the cable goes back in. If it comes out during the rewrite, the master
-  half finishes and switches to the new profile, and the app says the slave
-  half is not connected.
-- After power loss in the middle of a save, the master half types nothing until
-  its keys and macros are one complete version again, which may need the slave
-  half connected.
+- Once it decides, the keyboard completes the same profile on both halves.
+  Each half keeps typing a complete old generation until activation, with no
+  separate rewrite of keys or macros. Closing Ark does not cancel that decision.
+- Rarely, split authority is lost or another save conflicts after the decision.
+  The keyboard then needs a restart. Ark asks you to unplug the USB cable
+  (not the cable between the halves), wait a few seconds, plug it back in and
+  read it again. Keep the recovery file as a fallback.
+- A lost cable before the decision cancels safely; after the decision, saving
+  resumes when the halves reconnect. Once firmware has confirmed the peer's
+  saved record, a later cable loss cannot hold up activation. Ark reports the
+  peer as out of sight until it reconnects.
+- After power loss, firmware selects a complete saved generation and completes
+  a decided save when both halves are connected. Physical interruption checks
+  at every durable boundary are still owed; keep the recovery copy.
 - After an Apply that changes the keyboard's name, the master half restarts its
   USB connection by itself once it is safe: both halves hold the new profile,
   no key is held, no macro runs and Ark has been quiet for a second. The
@@ -1139,9 +1132,10 @@ progress, so keep the recovery file that Apply creates.
 ## Profiles and backups
 
 Charybdis Ark's **Export profile…** saves the configuration read from the
-keyboard: every layer and key position, behaviours, combos, named VIA macros,
+keyboard: every layer and key position, behaviours, combos, named macros,
 lighting and global settings. Flashed defaults and live edits become one
-portable file.
+portable file containing one complete profile. Earlier separate-field backups
+are refused; export a new backup from current firmware.
 Exporting leaves the editor and any local draft unchanged, even if the keyboard
 has changed since its last editor read.
 
@@ -1161,7 +1155,7 @@ first.
 On **Backups**, use **Choose profile…** or drop one backup file
 onto the **Import profile** card. Both open the same comparison, as a sheet over the
 screen, including in the demo: what the file changes, counted by what it
-configures, and whether it fits ("This file fits: 4,101 of 53,216 bytes"). **Use as draft** replaces the draft; Undo brings it back, and the keyboard
+configures, and whether it fits ("This file fits: 5,408 of 130,048 bytes"). **Use as draft** replaces the draft; Undo brings it back, and the keyboard
 changes only after Review and Apply. A file that holds exactly what the
 keyboard runs changes nothing and cannot be used, unless the draft has edits:
 then using it puts the draft back to the keyboard's profile, as **Discard all**
@@ -1171,7 +1165,7 @@ files are refused without replacing your draft.
 
 **Memory**, on the Keyboard screen, shows how full the profile is. Its bar is the space the
 keyboard stores behaviours, combos, lighting, pointing modes, custom keys,
-settings and every name in: 53,216 bytes on current firmware, the size the
+settings, keys, macros and every name in: 130,048 bytes on current firmware, the size the
 keyboard reports. Under it, **In use** counts what you have set up against what
 the keyboard holds, each with a short bar, in the words of the screen that
 edits it. Behaviours, behaviour tap counts, combos, LED groups and LED
@@ -1179,7 +1173,7 @@ overrides count toward limits: at one, the row says full and the keyboard
 refuses one more. Macro slots with steps, custom keys with a name, a shortcut
 or a behaviour, and pointing-mode slots that hold a mode count out of the 128,
 128 and 32 the keyboard has, each bar showing the slots in use against the free
-ones. Every empty macro slot keeps room in macro memory for ten key taps; when
+ones. Every empty macro slot keeps room in the shared profile for ten key taps; when
 the memory cannot, the highest empty slots are unavailable until a macro is
 shortened or cleared, and the Macros bar fills its free end in red for them,
 its row saying how many are unavailable. Hover a row for what it counts. The

@@ -1,7 +1,7 @@
 // @ts-check
 "use strict";
 const {LAYERS} = require("../data/charybdis-layout");
-const {isUnhandledEcho, orUnhandled} = require("./via-unhandled-v1");
+const {isUnhandledEcho, orUnhandled} = require("./raw-hid-unhandled");
 const {buildProfileGetRequest, decodeProfileResponse, profileResponseMatcher} = require("./profile-wire-v1");
 const {fnv1a32} = require("../schema/profile-blob-v1");
 
