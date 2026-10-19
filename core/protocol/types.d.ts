@@ -13,6 +13,8 @@ export interface PayloadReadOptions extends ReadOptions {
     generationRetries?: number;
     onProgress?: (progress: import('../../contracts/model.js').CountedProgress) => void;
     previous?: PayloadRead;
+    /** Bytes read from the keyboard moments ago that may be this payload: used, without downloading it, only if they have its length, CRC and digest. */
+    sameAs?: Uint8Array;
 }
 
 export type CandidateTransferRange =

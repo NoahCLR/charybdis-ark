@@ -68,9 +68,12 @@ function reconnectNotice(expected, notice) {
 /** @param {import("./types.js").ControlService} service @param {(step: import("../../contracts/messages.js").ReadStep) => void} [onStep] */
 async function rereadKeyboard(service, onStep = () => {}) {
     onStep("layout");
+    // The layout comes from the saved profile, downloaded and checked here:
+    // the fresh read of what the keyboard stored. The profile step takes
+    // those bytes again while the keyboard still names exactly them.
     await service.readLayout();
     onStep("profile");
-    await service.readCommittedProfile();
+    await service.readCommittedProfile({reuse: true});
     onStep("combos");
     await service.readCombos();
     onStep("baseRgb");

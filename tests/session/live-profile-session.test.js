@@ -28,6 +28,28 @@ test("over compiled defaults, the saved profile is the compiled one", async t =>
     assert.ok(read.live.working.equals(keyboard.working), "the working copy's own bytes, for splices");
 });
 
+// Connecting reads what the keyboard runs; with nothing unsaved that is the
+// saved record itself, served from flash, so the saved profile's read takes
+// those bytes once they pass its checks instead of downloading them again.
+test("with nothing unsaved the saved profile is not downloaded again", async t => {
+    const {PROFILE_PAYLOAD_V1} = require("../../core/protocol/profile-payload-v1");
+    const {keyboard, capture} = await live(t);
+    const savedChunks = () => keyboard.requests.filter(r => r[0] === 0x08 && r[2] === PROFILE_PAYLOAD_V1.VALUE && (r[4] | r[5] << 8) > 0).length;
+    keyboard.requests.length = 0;
+    const read = await capture();
+    assert.equal(read.live.unsaved, false);
+    assert.equal(savedChunks(), 0);
+    assert.ok(read.live.saved.equals(read.live.working));
+    const edited = document(); editLayers(edited, layers => {layers[0][1] = 0x05;});
+    keyboard.externalEdit(Buffer.from(edited.profile, "base64"));
+    keyboard.requests.length = 0;
+    const unsaved = await capture();
+    assert.equal(unsaved.live.unsaved, true);
+    assert.ok(savedChunks() > 0, "with unsaved edits the saved profile is downloaded");
+    assert.ok(!unsaved.live.saved.equals(unsaved.live.working));
+    assert.ok(unsaved.live.saved.equals(read.live.saved));
+});
+
 test("a working copy that moves during the read is refused, never mixed", async t => {
     const {keyboard, capture} = await live(t);
     const edited = document(); editLayers(edited, layers => {layers[0][1] = 0x05;});

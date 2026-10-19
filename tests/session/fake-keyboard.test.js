@@ -67,7 +67,7 @@ for (const [name, document] of [["the compiled pointing profile", document32()],
     });
 }
 
-test("profile verification reads fresh committed bytes, reuses immutable defaults, and clears reuse on reconnect", async () => {
+test("profile verification reads fresh committed bytes, reuses immutable defaults, and clears the reader on reconnect", async () => {
     const source = document32(), host = recordingHost(), adapter = fakeKeyboardAdapter({document: source});
     const loop = openPanelLoop(host, {adapter, defaultTimeoutMs: 200});
     const chunks = value => adapter.keyboard.requests.filter(request => request[0] === 0x08 && request[2] === value && (request[4] || request[5])).length;
@@ -96,8 +96,28 @@ test("profile verification reads fresh committed bytes, reuses immutable default
         await service.disconnect();
         assert.equal(service.payloadReader, undefined);
         await loop.handleMessage({type: "refresh"});
-        assert.equal(chunks(5), count * 2, "a new connection reads compiled defaults again");
+        assert.equal(chunks(5), count, "a new connection reuses the defaults verified before: metadata only");
         assert.deepEqual(adapter.keyboard.mutations, []);
+    } finally {await loop.close();}
+});
+
+// After Apply the layout step downloads and checks the saved profile; the
+// profile step right after takes those bytes while the keyboard still names
+// them, so the readback downloads the saved profile once, not twice.
+test("the read after a save downloads the saved profile once", async () => {
+    const {rereadKeyboard} = require("../../core/session/panel-controls");
+    const source = document32(), host = recordingHost(), adapter = fakeKeyboardAdapter({document: source});
+    const loop = openPanelLoop(host, {adapter, defaultTimeoutMs: 200});
+    const chunks = value => adapter.keyboard.requests.filter(request => request[0] === 0x08 && request[2] === value && (request[4] || request[5])).length;
+    const count = Math.ceil(validateSnapshot(source).candidate.length / 25);
+    try {
+        await loop.handleMessage({type: "ready"});
+        const service = loop.session.service, before = chunks(4);
+        await rereadKeyboard(service);
+        assert.equal(chunks(4) - before, count);
+        assert.equal(service.committed.state, "read");
+        await service.readCommittedProfile();
+        assert.equal(chunks(4) - before, count * 2, "a read on its own still downloads");
     } finally {await loop.close();}
 });
 

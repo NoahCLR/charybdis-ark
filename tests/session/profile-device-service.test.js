@@ -557,3 +557,29 @@ test("a retired capability layout gets the update notice without any profile rea
     await assert.rejects(service.connect(scanned.devices[0].id), {code: "FIRMWARE_UPDATE_REQUIRED", message: /Update both halves/});
     assert.ok(adapter.lastConnection().writes.every(report => report[0] === 8 && report[2] === 1));
 });
+
+// The firmware's compiled defaults are the same bytes until it is flashed
+// again: a reconnect reuses the copy this service verified, and a host that
+// keeps it between runs (`compiledDefaults`) spares Ark's first read too. The
+// keyboard's metadata is still read, and a copy is used only for exactly its
+// bytes.
+test("compiled defaults download once across reconnects, and across runs where the host keeps them", async t => {
+    const {liveKeyboard} = require("../fixtures/live-keyboard");
+    const keyboard = liveKeyboard({document: require("../fixtures/portable-profile").document()});
+    const compiledChunks = () => keyboard.requests.filter(r => r[0] === 0x08 && r[2] === PROFILE_PAYLOAD_V1.COMPILED_VALUE && (r[4] | r[5] << 8) > 0).length;
+    const store = {value: /** @type {unknown} */ ("not a stored copy"), sets: 0, get() {return this.value;}, /** @param {string} value */ set(value) {this.value = value; this.sets++;}};
+    const {service, id} = await connectedService(t, {keyboard}, {sleep: async () => {}, compiledDefaults: store});
+    await service.readKeyboardProfile();
+    assert.ok(compiledChunks() > 0, "an unreadable stored copy is ignored: the defaults download");
+    assert.equal(store.sets, 1);
+    keyboard.requests.length = 0;
+    await service.disconnect();
+    await service.connect(id);
+    await service.readKeyboardProfile();
+    assert.equal(compiledChunks(), 0, "a reconnect reuses them");
+    const {service: reopened} = await connectedService(t, {keyboard}, {sleep: async () => {}, compiledDefaults: store});
+    keyboard.requests.length = 0;
+    await reopened.readKeyboardProfile();
+    assert.equal(compiledChunks(), 0, "Ark opened again reuses the host's copy");
+    assert.equal(store.sets, 1, "the same defaults are not stored again");
+});

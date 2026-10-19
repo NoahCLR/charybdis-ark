@@ -34,7 +34,7 @@ const {decodeKeymapDomain} = require("../schema/keymap-domain-v1");
 const keycodeCatalog = require("../data/keycode-catalog");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX, LAYERS, matrixPosition} = require("../data/charybdis-layout");
 const {readDeviceCombos} = require("../protocol/combo-readback-v1");
-const {ProfilePayloadReader, payloadMatchesActive} = require("./profile-payload-reader");
+const {ProfilePayloadReader, payloadMatchesActive, encodeCompiledRead, decodeCompiledRead} = require("./profile-payload-reader");
 const {PROFILE_DOMAIN_IDS, decodeStoredProfileBlob, fnv1a32} = require("../schema/profile-blob-v1");
 const {CANDIDATE_STATE_NAMES, readCandidateStatus} = require("../protocol/profile-candidate-v1");
 const {PROFILE_ACTIVE_KIND, PROFILE_WIRE_FEATURES, readProfileCapabilities, readProfileStatus} = require("../protocol/profile-wire-v1");
@@ -161,6 +161,14 @@ class ProfileDeviceService {
         this.settingsView = undefined;
         /** @type {InstanceType<typeof ProfilePayloadReader> | undefined} */
         this.payloadReader = undefined;
+        // The compiled defaults last verified on any connection, so a
+        // reconnect does not download them again; a host that keeps them
+        // between runs (`compiledDefaults`) spares the first read too. A
+        // reader takes them only for a keyboard whose metadata names exactly
+        // those bytes.
+        this.compiledDefaultsStore = options.compiledDefaults && typeof options.compiledDefaults.get === "function" && typeof options.compiledDefaults.set === "function" ? options.compiledDefaults : undefined;
+        /** @type {import("../protocol/types.js").PayloadRead | undefined} */
+        this.knownCompiled = undefined;
         // How edits reach this keyboard (firmware D-F32), read with its
         // capabilities; undefined when the keyboard does not say.
         /** @type {(import("../protocol/types.js").EditModeRead & {notStored?: boolean}) | undefined} */
@@ -325,8 +333,8 @@ class ProfileDeviceService {
         return decodeKeymapDomain(found.payload);
     }
 
-    /** @param {Connection} connection @param {import("../protocol/types.js").ReadOptions} options */
-    async #readActivePayload(connection, options) {
+    /** @param {Connection} connection @param {import("../protocol/types.js").ReadOptions} options @param {boolean} [reuse] */
+    async #readActivePayload(connection, options, reuse = false) {
         const status = await readProfileStatus(connection, options);
         this.status = status;
         const source = status.activeKind === PROFILE_ACTIVE_KIND.COMPILED_ONLY ? "compiled" : "committed";
@@ -334,7 +342,7 @@ class ProfileDeviceService {
             throw this.#activePayloadUnavailable();
         }
         const reader = this.profilePayloadReader();
-        const read = source === "compiled" ? await reader.readCompiled(options) : await reader.readCommitted(options);
+        const read = source === "compiled" ? await reader.readCompiled(options) : await reader.readCommitted({...options, reuse});
         // Read status again even if the first identity did not match: health
         // must report the keyboard now, including recovery that just finished.
         await this.#confirmActivePayload(connection, read, source, options);
@@ -384,7 +392,12 @@ class ProfileDeviceService {
     // authored source describes them. A domain that fails to decode is
     // reported as such and leaves the others readable; the alternative is
     // discarding a whole profile because one section drifted.
-    async readCommittedProfile() {
+    // `reuse`: a read made right after one that downloaded and checked the
+    // saved profile may take those bytes again, only while the keyboard's
+    // fresh metadata still names exactly them (rereadKeyboard). Otherwise the
+    // saved bytes always download.
+    /** @param {{reuse?: boolean}} [options] */
+    async readCommittedProfile({reuse = false} = {}) {
         if (!this.connection?.connected) this.refuse("Connect to a keyboard before reading its profile.");
 
         return this.runOperation(PHASE.READ_PROFILE, async () => {
@@ -396,7 +409,7 @@ class ProfileDeviceService {
                 nextRequestId: () => this.nextRequestId(),
                 onProgress: progress => this.reportReadProgress("profile", progress),
             };
-            const {read, source} = await this.#readActivePayload(connection, readOptions);
+            const {read, source} = await this.#readActivePayload(connection, readOptions, reuse);
             if (this.connection !== connection || !connection.connected) {
                 throw new Error("The keyboard disconnected while its profile was being read.");
             }
@@ -1135,8 +1148,25 @@ class ProfileDeviceService {
     }
 
     profilePayloadReader() {
-        if (!this.payloadReader || this.payloadReader.connection !== this.connection) this.payloadReader = new ProfilePayloadReader(this.connectedConnection());
+        if (!this.payloadReader || this.payloadReader.connection !== this.connection) {
+            this.payloadReader = new ProfilePayloadReader(this.connectedConnection(), {compiled: this.#compiledDefaults(), onCompiled: read => this.#keepCompiledDefaults(read)});
+        }
         return this.payloadReader;
+    }
+
+    #compiledDefaults() {
+        if (!this.knownCompiled && this.compiledDefaultsStore) {
+            try {this.knownCompiled = decodeCompiledRead(this.compiledDefaultsStore.get());} catch {}
+        }
+        return this.knownCompiled;
+    }
+
+    /** @param {import("../protocol/types.js").PayloadRead} read */
+    #keepCompiledDefaults(read) {
+        const known = this.knownCompiled;
+        this.knownCompiled = read;
+        if (!this.compiledDefaultsStore || (known && known.metadata.digest === read.metadata.digest && known.metadata.crc32 === read.metadata.crc32 && known.bytes.equals(read.bytes))) return;
+        try {void this.compiledDefaultsStore.set(encodeCompiledRead(read));} catch {}
     }
 
     emitChange() {

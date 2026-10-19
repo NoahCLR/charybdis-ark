@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {connectPanel} from "../web/panel-channel.mjs";
 import {workerSleep} from "../web/sleep.mjs";
-import {BLOCKED, PROFILE_FILE_LIMIT, WEB_WORDS, initialTheme, leaving, readProfileFile} from "../web/web-host.mjs";
+import {BLOCKED, COMPILED_DEFAULTS_KEY, PROFILE_FILE_LIMIT, WEB_WORDS, compiledDefaultsStore, initialTheme, leaving, readProfileFile} from "../web/web-host.mjs";
 import {recoveryName} from "../web/recoveries.mjs";
 
 // A MessageChannel delivers on a later task, but not within any fixed time: a
@@ -70,6 +70,19 @@ test("the theme starts from a saved choice, then the system's", () => {
     assert.equal(initialTheme("dark", true), "dark");
     assert.equal(initialTheme(null, true), "light");
     assert.equal(initialTheme("sepia", false), "dark");
+});
+
+test("the compiled defaults are kept in the page's storage, and a refusing storage keeps nothing", () => {
+    const saved = new Map();
+    const store = compiledDefaultsStore({getItem: key => saved.get(key) ?? null, setItem: (key, value) => {saved.set(key, value);}});
+    assert.equal(store.get(), undefined);
+    store.set("copy");
+    assert.equal(saved.get(COMPILED_DEFAULTS_KEY), "copy");
+    assert.equal(store.get(), "copy");
+    const full = compiledDefaultsStore({getItem: () => {throw new Error("denied");}, setItem: () => {throw new Error("quota");}});
+    assert.doesNotThrow(() => full.set("copy"));
+    assert.equal(full.get(), undefined);
+    assert.equal(compiledDefaultsStore(undefined).get(), undefined);
 });
 
 test("leaving asks first with unapplied edits or an Apply running", () => {

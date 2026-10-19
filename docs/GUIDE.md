@@ -137,10 +137,13 @@ the halves to agree.
 
 The initial read uses one verified capture for the editor, draft and complete
 backup, so keys, saved profile bytes and combos are downloaded once. Keys are
-read in chunks, and immutable firmware defaults can be reused within the
-connection. The loading message names the transfer and shows its byte count.
-Read-status changes retain the editor; changed data or edit permissions redraw
-it. Reconnecting starts fresh.
+read in chunks. The firmware's own defaults are downloaded once: Ark keeps the
+copy it checked (in VS Code's storage, or the browser's) and reuses it, also
+after a reconnect or a restart, for as long as the keyboard reports exactly
+those bytes. In the live modes, with nothing unsaved, what the keyboard runs is
+its saved profile, so that is read once too; with unsaved edits both are read.
+The loading message names the transfer and shows its byte count. Read-status
+changes retain the editor; changed data or edit permissions redraw it.
 
 When more than one compatible keyboard is connected, the selector at the top
 left chooses which one to read and edit. Each is listed by the name it reports;
@@ -1162,7 +1165,8 @@ bar names each read and shows its progress; editing resumes when it finishes.
 You can stay on any screen during this readback, including Macros; the progress
 counter updates without rebuilding the visible editor. An initial keyboard read
 updates its loading message in the same way. Saved profile bytes are always
-read back and checked after Apply. Only that readback is shown as following an Apply. A later read, export or
+read back and checked after Apply, once: the keys come from that read, and the
+profile domains reuse it while the keyboard still reports the same bytes. Only that readback is shown as following an Apply. A later read, export or
 discard names what it reads and says nothing about saving, because it writes
 nothing to the keyboard.
 

@@ -191,3 +191,20 @@ test("reads require a connection that can issue requests", async () => {
         TypeError
     );
 });
+
+// Bytes the keyboard just served from the same record (`sameAs`) stand in for
+// the download only when they have its length, CRC and digest; the metadata is
+// still read before and after them.
+test("bytes already read stand in for a payload only when they pass its checks", async () => {
+    const bytes = payloadOf(60);
+    const device = payloadDevice({bytes, generation: 7});
+    const same = await readCommittedPayload(device, {sameAs: Buffer.from(bytes)});
+    assert.deepEqual(same.bytes, bytes);
+    assert.deepEqual(device.requests, [0, 0], "no chunk is downloaded");
+    for (const other of [Buffer.concat([bytes, Buffer.from([0])]), Buffer.from(bytes).fill(1, 10, 11), bytes.subarray(1)]) {
+        const fresh = payloadDevice({bytes, generation: 7});
+        const read = await readCommittedPayload(fresh, {sameAs: other});
+        assert.deepEqual(read.bytes, bytes, "the keyboard's own bytes, not the stand-in");
+        assert.deepEqual(fresh.requests, [0, 1, 2, 3, 0]);
+    }
+});

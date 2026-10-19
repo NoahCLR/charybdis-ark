@@ -253,7 +253,7 @@ export interface ControlService extends DraftApplyService {
     disconnect(): Promise<unknown>;
     refresh(): Promise<unknown>;
     readLayout(): Promise<unknown>;
-    readCommittedProfile(): Promise<unknown>;
+    readCommittedProfile(options?: {reuse?: boolean}): Promise<unknown>;
     readCombos(): Promise<unknown>;
     readBaseRgb(): Promise<unknown>;
     readKeyboardProfile(): Promise<CompleteCapture>;
@@ -302,6 +302,8 @@ export interface DeviceServiceOptions {
     onChange?: (state?: PanelDeviceState) => void;
     onApplyProgress?: (view: import('../../contracts/model.js').ApplyView) => void;
     onReadProgress?: (view: import('../../contracts/messages.js').ReadProgress) => void;
+    /** Where the host keeps the last verified compiled defaults between runs, as text (profile-payload-reader.js). */
+    compiledDefaults?: {get(): unknown; set(value: string): unknown};
 }
 
 export type DeviceConnection = Awaited<ReturnType<InstanceType<typeof import('../transport/request-coordinator.js').DeviceRequestCoordinator>['connect']>>;

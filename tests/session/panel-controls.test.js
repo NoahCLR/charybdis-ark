@@ -115,6 +115,13 @@ test("rebasing against an incomplete recovery capture retains the authored draft
     assert.equal(draft.view(session.service.snapshot()).reviewed, true);
 });
 
+test("the read after a save reuses the saved bytes only in the step right after the layout's", async () => {
+    const calls = [];
+    const step = name => async (...args) => {calls.push([name, ...args]);};
+    await rereadKeyboard({readLayout: step("readLayout"), readCommittedProfile: step("readCommittedProfile"), readCombos: step("readCombos"), readBaseRgb: step("readBaseRgb")});
+    assert.deepEqual(calls, [["readLayout"], ["readCommittedProfile", {reuse: true}], ["readCombos"], ["readBaseRgb"]]);
+});
+
 test("apply writes a recovery copy through the host, then reads the keyboard again", async () => {
     const session = sessionWithDraft(), draft = session.draft, h = host();
     const readSteps = [];

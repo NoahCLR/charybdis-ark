@@ -2,7 +2,7 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const {PROFILE_PAYLOAD_V1} = require("../../core/protocol/profile-payload-v1");
-const {ProfilePayloadReader} = require("../../core/session/profile-payload-reader");
+const {ProfilePayloadReader, encodeCompiledRead, decodeCompiledRead} = require("../../core/session/profile-payload-reader");
 const {payloadOf, payloadDevice} = require("../fixtures/profile-payload");
 
 test("a verified payload is reused only when explicitly allowed and fresh metadata matches", async () => {
@@ -51,6 +51,53 @@ test("compiled defaults reuse stays in its connection and source", async () => {
     compiled.requests.length = 0;
     await new ProfilePayloadReader(connection).readCompiled();
     assert.deepEqual(compiled.requests, [0, 1, 2, 3, 0], "a new connection reader downloads defaults afresh");
+});
+
+// A reconnect, or Ark opened again, need not download the firmware's defaults
+// again: a new reader may start from the last verified copy, which it uses
+// only when the keyboard's metadata names exactly those bytes.
+test("a new connection's reader reuses verified compiled defaults only for the same bytes", async () => {
+    const bytes = payloadOf(60);
+    const first = payloadDevice({bytes, generation: 0}, PROFILE_PAYLOAD_V1.COMPILED_VALUE);
+    /** @type {import("../../core/protocol/types.js").PayloadRead[]} */
+    const kept = [];
+    await new ProfilePayloadReader(first, {onCompiled: read => kept.push(read)}).readCompiled();
+    assert.equal(kept.length, 1);
+    kept[0].bytes[0] ^= 1;
+    const again = payloadDevice({bytes, generation: 0}, PROFILE_PAYLOAD_V1.COMPILED_VALUE);
+    await assert.doesNotReject(new ProfilePayloadReader(again, {compiled: kept[0]}).readCompiled());
+    assert.deepEqual(again.requests, [0, 1, 2, 3, 0], "a copy that fails its own checks is no copy: the defaults download");
+    kept[0].bytes[0] ^= 1;
+    const same = payloadDevice({bytes, generation: 0}, PROFILE_PAYLOAD_V1.COMPILED_VALUE);
+    assert.deepEqual((await new ProfilePayloadReader(same, {compiled: kept[0]}).readCompiled()).bytes, bytes);
+    assert.deepEqual(same.requests, [0, 0], "the same firmware's defaults: metadata only");
+    const other = payloadOf(61);
+    const flashed = payloadDevice({bytes: other, generation: 0}, PROFILE_PAYLOAD_V1.COMPILED_VALUE);
+    assert.deepEqual((await new ProfilePayloadReader(flashed, {compiled: kept[0]}).readCompiled()).bytes, other);
+    assert.deepEqual(flashed.requests, [0, 1, 2, 3, 0], "other firmware: its own defaults");
+    const committed = payloadDevice({bytes, generation: 9});
+    await new ProfilePayloadReader(committed, {compiled: kept[0]}).readCommitted({reuse: true});
+    assert.deepEqual(committed.requests, [0, 1, 2, 3, 0], "compiled defaults never stand in for a saved profile");
+});
+
+test("compiled defaults kept between runs come back only whole and verified", async () => {
+    const bytes = payloadOf(60);
+    const device = payloadDevice({bytes, generation: 0}, PROFILE_PAYLOAD_V1.COMPILED_VALUE);
+    /** @type {import("../../core/protocol/types.js").PayloadRead[]} */
+    const kept = [];
+    await new ProfilePayloadReader(device, {onCompiled: read => kept.push(read)}).readCompiled();
+    const text = encodeCompiledRead(kept[0]);
+    const restored = decodeCompiledRead(text);
+    assert.ok(restored);
+    const again = payloadDevice({bytes, generation: 0}, PROFILE_PAYLOAD_V1.COMPILED_VALUE);
+    await new ProfilePayloadReader(again, {compiled: restored}).readCompiled();
+    assert.deepEqual(again.requests, [0, 0], "a restored copy is reused like a kept one");
+    const stored = JSON.parse(text);
+    const tampered = Buffer.from(stored.bytes, "base64"); tampered[3] ^= 1;
+    for (const bad of [undefined, 42, "", "{", JSON.stringify({...stored, version: 2}), JSON.stringify({...stored, bytes: tampered.toString("base64")}),
+        JSON.stringify({...stored, metadata: {...stored.metadata, generation: 9}}), JSON.stringify({...stored, metadata: {...stored.metadata, payloadLength: 1e9}}), "x".repeat(300000)]) {
+        assert.equal(decodeCompiledRead(bad), undefined);
+    }
 });
 
 test("a commit during metadata-only reuse retries with fresh bytes", async () => {

@@ -24,6 +24,7 @@ const {writingProfile} = require("./core/session/panel-control-registry");
 const {getHtml} = require("./panel-html");
 
 const VIEW_TYPE = "charybdisArk.panel";
+const COMPILED_DEFAULTS_KEY = "charybdisArk.compiledDefaults";
 // VS Code keys an extension's storage by its identity, and the app was once
 // Charybdis Live (D-L47). Its recovery copies are adopted from these folders.
 const FORMER_IDENTITIES = ["noah.charybdis-live", "noah.charybdis-live-v2"];
@@ -92,7 +93,10 @@ function openPanel(context) {
     openedPanel = panel;
     let disposed = false;
 
-    const loop = openPanelLoop(vscodeHost(panel, context.globalStorageUri, () => disposed));
+    // The keyboard firmware's compiled defaults, last verified, kept between
+    // runs so a connect need not download them again (profile-payload-reader.js).
+    const compiledDefaults = {get: () => context.globalState.get(COMPILED_DEFAULTS_KEY), set: (/** @type {string} */ value) => context.globalState.update(COMPILED_DEFAULTS_KEY, value)};
+    const loop = openPanelLoop(vscodeHost(panel, context.globalStorageUri, () => disposed), {compiledDefaults});
     // A live keyboard's own saves and key adjustments show up between edits.
     loop.watch();
     /** @type {Set<Promise<unknown>>} */

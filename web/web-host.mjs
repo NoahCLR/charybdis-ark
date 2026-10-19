@@ -34,6 +34,7 @@ export const BLOCKED = Object.freeze({
 // Both hosts use the portable document's byte ceiling.
 export const PROFILE_FILE_LIMIT = FILE_MAX_BYTES;
 export const THEME_KEY = "charybdis-ark.theme";
+export const COMPILED_DEFAULTS_KEY = "charybdis-ark.compiled-defaults";
 const LOCK = "charybdis-ark.keyboard";
 
 // A saved choice wins; otherwise the system's setting.
@@ -105,7 +106,7 @@ export function startWebHost(env) {
         panel: () => ({chooseKeyboard: Boolean(hid) && !blocked, blocked, theme, recoveries: recoveryList, build, progress}),
     };
 
-    const loop = openPanelLoop(host, {adapter, sleep: workerSleep(worker)});
+    const loop = openPanelLoop(host, {adapter, sleep: workerSleep(worker), compiledDefaults: compiledDefaultsStore(localStorage)});
     // A live keyboard's own saves and key adjustments show up between edits,
     // looked for only while the page can hear the answer (native-popups.mjs).
     loop.watch({paused: nativePopups(document).paused});
@@ -262,6 +263,18 @@ export function startWebHost(env) {
         recoveries.list().then((list) => {recoveryList = list;}, () => {});
     }
     return {loop, panel, api: panel.api};
+}
+
+// The keyboard firmware's compiled defaults, last verified, kept between
+// visits so a connect need not download them again (profile-payload-reader.js
+// checks them against the keyboard). A full or refused storage keeps nothing.
+/** @param {Pick<Storage, 'getItem' | 'setItem'> | undefined} localStorage */
+export function compiledDefaultsStore(localStorage) {
+    return {
+        get: () => safely(() => localStorage?.getItem(COMPILED_DEFAULTS_KEY)) ?? undefined,
+        /** @param {string} value */
+        set: (value) => {safely(() => localStorage?.setItem(COMPILED_DEFAULTS_KEY, value));},
+    };
 }
 
 /** @template T @param {() => T} read @returns {T | undefined} */
