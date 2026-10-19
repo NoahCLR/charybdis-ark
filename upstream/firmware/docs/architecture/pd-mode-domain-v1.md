@@ -24,7 +24,7 @@ and restore preserve them without the repository.
   stays a layer/CPI policy and uses no slot.
 - There are two engine families, **directional** (four or eight directions,
   single axis or dominant axis; see D-L24 and D-L28 in the
-  [direction](https://github.com/NoahCLR/charybdis-4x6/blob/299ce9bd3e43b9795f73f453b768881cfc4650aa/docs/LIVE_EDIT_APP_DIRECTION.md)) and **scrolling**. Optional
+  [direction](https://github.com/NoahCLR/charybdis-4x6/blob/83366a07185aa6399ca80e2cb493a3e4278c1edb/docs/LIVE_EDIT_APP_DIRECTION.md)) and **scrolling**. Optional
   modifier and mouse-button policies cover Arrow and Pinch. No behavior depends
   on a slot's name.
 
@@ -52,7 +52,7 @@ keycode allocation.
 | 7–31 | Empty | Disabled | Inert actions; not stored; retained, editable RGB row |
 
 Dragscroll and Pinch run this repository's
-[`pd_mode_dragscroll.c`](https://github.com/NoahCLR/charybdis-4x6/blob/299ce9bd3e43b9795f73f453b768881cfc4650aa/users/noah/lib/pointing/modes/pd_mode_dragscroll.c),
+[`pd_mode_dragscroll.c`](https://github.com/NoahCLR/charybdis-4x6/blob/83366a07185aa6399ca80e2cb493a3e4278c1edb/users/noah/lib/pointing/modes/pd_mode_dragscroll.c),
 not the fork's native `DRAGSCROLL_MODE`; never activate both engines.
 
 ### Slot operations and RGB identity
@@ -248,11 +248,11 @@ The allowlist is tied to the audited QMK 0.0.8 native ABI:
 - Modified keyboard taps: high byte `0x01..0x1f` with at least one of its low
   four modifier bits set, low byte `0x04..0xa4`.
 - Mouse-button clicks: plain `0x00d1..0x00d8`, buttons 1–8 (D-F22, added
-  2026-10-12). Capability feature bit 28 says the keyboard accepts them; a
-  client writes them only to a keyboard that sets it. Older firmware rejects
-  them as `INVALID_ACTION`, so the domain version is unchanged.
+  2026-10-12). Every Profile Wire 2 firmware accepts them (feature bit 28
+  advertised them before D-F28). Older firmware rejects them as
+  `INVALID_ACTION`, so the domain version is unchanged.
 
-- VIA macro triggers: plain `0x7700..0x777f`, slots 0–127 (D-F23). Feature
+- Macro triggers: plain `0x7700..0x777f`, slots 0–127 (D-F23). Feature
   bit 29 advertises them. Their modifier policy must be inherit and their mask
   zero; older firmware rejects them as `INVALID_ACTION` without a version change.
 
@@ -284,7 +284,7 @@ apart from the keyboard's. QMK sends a button's report at once from the report
 the pointing task is building, which still holds that poll's motion; a click
 from motion clears that motion first, so it cannot move the held-still cursor.
 
-A macro starts through the existing VIA provider and runs across scans. A start
+A macro starts through the profile macro provider and runs across scans. A start
 counts as one output and spends a once-per-movement movement only if playback
 actually starts. Empty, invalid/unplayable or busy slots send nothing and leave
 it unspent. Every attempted direction still consumes the existing per-report
@@ -305,7 +305,7 @@ A button press a mode consumes never reaches the button's own behavior, and
 its release goes to the mode that took the press, even after another mode
 replaced it; the release of a press the mode did not take stays with the
 behavior. The key runtime owns that routing; see
-[Runtime Flow](https://github.com/NoahCLR/charybdis-4x6/blob/299ce9bd3e43b9795f73f453b768881cfc4650aa/docs/architecture/runtime-flow.md#key-press-flow).
+[Runtime Flow](https://github.com/NoahCLR/charybdis-4x6/blob/83366a07185aa6399ca80e2cb493a3e4278c1edb/docs/architecture/runtime-flow.md#key-press-flow).
 
 ## Validation and evidence
 
@@ -349,31 +349,33 @@ and prove that current readers reject legacy envelopes.
 
 ## Storage geometry
 
-Current firmware uses one geometry:
+Current firmware uses one geometry (D-F29, D-F31):
 
 | Range | Bytes | Owner |
 | --- | ---: | --- |
-| `0x00000..0x08fff` | 36,864 | QMK/VIA allocation |
-| `0x09000..0x15fff` | 53,248 | Profile slot A, 32-byte header + 53,216-byte payload |
-| `0x16000..0x22fff` | 53,248 | Profile slot B, same layout |
+| logical EEPROM `0x00000..0x00fff` | 4,096 | QMK eeconfig and its datablocks |
+| slot region `0x00000..0x1ffff` (flash `0x100000`) | 131,072 | Profile slot A, 32-byte header + 130,048-byte payload |
+| slot region `0x20000..0x3ffff` (flash `0x120000`) | 131,072 | Profile slot B, same layout |
 
-Logical EEPROM is 143,360 bytes; RP2040 wear-level backing is 286,720 bytes
-(D-F14). Older layouts are not interpreted in place, and a backup from earlier
+Logical EEPROM is 4,096 bytes; RP2040 wear-level backing is QMK's default 8,192 bytes. The
+slots are a flash region of their own, read in place
+([storage baseline](storage-and-resource-baseline.md#profile-slot-flash-region-d-f29)). Older layouts are not interpreted in place, and a backup from earlier
 firmware cannot be restored here; keep it with its matching firmware pair.
 Physical geometry migration acceptance remains outstanding. Resource accounting
 belongs to [memory budgets](memory-budgets.md).
 
 ## Integration and identity gates
 
-Schema 3.0 includes domain `0x50`, advertised by domain-mask bit 4. Format 5
-(`NT`) stores five domain bits, origin in bit 5, flags in bit 6 and reserved
-bit 7. It binds schema 3.0 and nonzero VIA identity. `NP`, `NQ`, `NR` and `NS`
-headers are rejected. Header CRC, marker-last publication and bounded I/O remain unchanged.
+Schema 4.0 includes domain `0x50`, advertised by domain-mask bit 4. Store
+format 6 (D-F28, D-F30) stores seven domain bits in its header's first byte;
+origin and override flags have their own byte 5. The header is 36 bytes. It binds schema 4.0; bytes 22–32 are reserved zero
+(the VIA identity until D-F31). `NP`, `NQ`, `NR`, `NS` and `NT` headers are rejected. Header CRC,
+marker-last publication and bounded I/O remain unchanged.
 
 Synchronous validation, bounded boot scanning and commit shape validation
 share the current version rules in `profile_versions.h`: RGB v4, key behaviors
 v2, combos v3, settings v8 and sparse PD v3. Blob magic remains `NLP1`; schema
-bytes must be 3.0. Domain bodies also require semantic validation. Store tests
+bytes must be 4.0. Domain bodies also require semantic validation. Store tests
 cover all mask/origin/flag combinations, both boot paths, old-header rejection,
 reserved bits with repaired CRCs, incompatible versions, one-byte commit steps,
 durable prepare/abort and interrupted writes. These do not prove physical flash
@@ -383,9 +385,8 @@ The current action-ABI digest is the one capability page 0 reports; it covers
 the layer count, so the sixteen-layer bank changed it (D-F14). Older action
 vocabularies are refused.
 Candidate metadata, owner, peer storage and background stale-peer repair all
-use format 5 and require a
-correlated VIA bind before PREPARE_BEGIN. Retry preserves the bind for that exact
-generation/digest. Incompatible peers cannot Apply.
+use format 6 with no binding: PREPARE_BEGIN opens a copy (D-F31).
+Incompatible peers cannot Apply.
 
 GET subcommand 9 and feature bit 13 are retired. Firmware neither advertises nor
 serves legacy source definitions, and has no version-1 PD envelope validator.
@@ -462,7 +463,7 @@ profile digest and both-half state for each case:
 4. Held or locked modes make Apply wait with a useful reason; no modifier or
    mouse button stays stuck.
 5. Power or link interruption on either side of the logical decision recovers
-   the old or new complete generation, with no mode, RGB or VIA mixture.
+   the old or new complete generation, with no mode or RGB mixture.
 6. Mixed-version halves, stale drafts and old clients refuse mutation without
    losing the prior configuration.
 7. Pointing cadence, save time and per-half memory and stack evidence.
@@ -471,7 +472,7 @@ profile digest and both-half state for each case:
    held while a mode clicks it; the cursor staying still. Record the events the
    host actually receives; do not infer Back or Forward from a button number.
 
-9. VIA macro outputs (D-F23): delayed and mouse-click macros from straight and
+9. Macro outputs (D-F23): delayed and mouse-click macros from straight and
    diagonal motion, Once per movement and Every step, and physical button tap
    overrides. Confirm triggers while busy are dropped, empty macros leave a
    movement unspent, held modifiers follow inherited playback and mouse clicks

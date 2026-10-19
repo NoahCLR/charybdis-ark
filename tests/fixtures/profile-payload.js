@@ -14,15 +14,15 @@ function metadataPage(state) {
     const page = Buffer.alloc(PROFILE_WIRE_V1.PAYLOAD_SIZE);
     page[0] = state.layoutVersion ?? PROFILE_PAYLOAD_V1.LAYOUT_VERSION;
     page[1] = state.chunkSize ?? PROFILE_WIRE_V1.PAYLOAD_SIZE;
-    page.writeUInt16LE(state.payloadLength ?? state.bytes.length, 2);
-    page.writeUInt32LE(state.generation, 4);
-    page.writeUInt32LE(state.digest ?? fnv1a32(state.bytes), 8);
-    page.writeUInt32LE(state.crc ?? crc32(state.bytes), 12);
-    page[16] = state.schemaMajor ?? 1;
-    page[17] = state.schemaMinor ?? 0;
-    page[18] = state.domainMask ?? 0x30;
-    page[19] = state.originHalf ?? 1;
-    page[20] = state.flags ?? 0;
+    page.writeUInt32LE(state.payloadLength ?? state.bytes.length, 2);
+    page.writeUInt32LE(state.generation, 6);
+    page.writeUInt32LE(state.digest ?? fnv1a32(state.bytes), 10);
+    page.writeUInt32LE(state.crc ?? crc32(state.bytes), 14);
+    page[18] = state.schemaMajor ?? 1;
+    page[19] = state.schemaMinor ?? 0;
+    page[20] = state.domainMask ?? 0x30;
+    page[21] = state.originHalf ?? 1;
+    page[22] = state.flags ?? 0;
     return page;
 }
 

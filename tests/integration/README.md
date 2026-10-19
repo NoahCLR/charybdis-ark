@@ -25,6 +25,17 @@ profiles and rejects corrupted reused bytes. The probe ends at validation;
 firmware's separate host suites exercise committed-source reuse through the
 production owner, both-half saving and reboot. No device is opened.
 
-The macro-read-map runner links the selected firmware's production checksum
-worker against Ark's sparse macro reader and requires exact reconstructed
-banks and matching store digests.
+The macro-domain runner links the selected firmware's production incremental
+macro validator. C-produced streams decode and re-encode in Ark; JS-produced
+empty, sparse, dense and full-capacity domains, UTF-8, protection, keys, delays,
+unused tails and malformed data receive matching C/JS judgements, with exact
+transported bytes and source offsets beyond 64 KiB. Both variants run under
+the bridge, with no VIA code or hardware.
+
+The schema-4 candidate corpus uses all seven domains. The maximum frozen
+profile is 74,801 bytes, so full and differential uploads exercise offsets
+past 64 KiB through the production C validator and store, in both normal and
+sanitizer builds. The probe’s byte media models the dedicated profile region,
+independent of QMK’s eeconfig EEPROM. Production matrix dimensions set the keymap
+validator’s placement count. The compiled-defaults runner also validates
+Ark-generated seven-domain candidates, including populated macro streams.

@@ -32,7 +32,7 @@ test("a failure is pinned to the running step, and nothing moves after it", () =
     const view = progress.view();
     assert.equal(view.state, "failed");
     assert.equal(view.steps.find(step => step.id === "peer").state, "failed");
-    assert.equal(view.steps.find(step => step.id === "stage").state, "done");
+    assert.equal(view.steps.find(step => step.id === "validate").state, "done");
     assert.equal(view.steps.find(step => step.id === "commit").state, "pending");
     progress.report("commit");
     assert.equal(progress.beforeDecision, true);
@@ -44,7 +44,7 @@ test("a finished Apply shows every step done", () => {
     progress.finish();
     assert.equal(progress.view().state, "done");
     assert.ok(progress.view().steps.every(step => step.state === "done"));
-    assert.equal(APPLY_STEPS.length, 10);
+    assert.equal(APPLY_STEPS.length, 8);
     assert.notEqual(new ApplyProgress().view().id, progress.view().id, "each Apply is told apart from the next");
 });
 

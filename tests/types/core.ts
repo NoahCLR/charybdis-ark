@@ -18,8 +18,6 @@ import {editDeviceProfile} from '../../core/model/device-profile-edits.js';
 import {ApplyProgress} from '../../core/session/apply-progress.js';
 import {ProfilePayloadReader} from '../../core/session/profile-payload-reader.js';
 import {candidateMetadataForBlob} from '../../core/protocol/profile-candidate-v1.js';
-import {readViaLayout} from '../../core/protocol/via-layout-v1.js';
-import {LogicalViaStageCoordinator} from '../../core/session/logical-via-stage-coordinator.js';
 import type {PortableDocument, CompleteSnapshot, IncompleteSnapshot} from '../../core/model/types.js';
 import {CandidateUploadCoordinator} from '../../core/session/candidate-upload-coordinator.js';
 import {ProfileDeviceService} from '../../core/session/profile-device-service.js';
@@ -90,13 +88,11 @@ function profileContracts(document: PortableDocument, snapshot: CompleteSnapshot
     editMacro(snapshot, {keycode: 'VIA_MACRO_0', payload: 'hello'});
     // @ts-expect-error Portable documents store encoded macro streams, not numeric keycodes.
     document.macros = [4];
-    // @ts-expect-error A candidate must identify the VIA store it publishes alongside.
-    candidateMetadataForBlob(Buffer.alloc(32), {actionAbiDigest: 1});
-    // @ts-expect-error The layer count comes from numeric device readback.
-    readViaLayout(connection, {layerCount: '16'});
-    const stage = new LogicalViaStageCoordinator(connection, {requestIds: {next: () => 1}});
-    // @ts-expect-error Staging needs both current and target bytes to find changed ranges.
-    stage.stage({transactionId: 1, generation: 1, digest: 1, target: {layout: Buffer.alloc(1920), macros: Buffer.alloc(129)}});
+    // @ts-expect-error Candidate metadata needs its action vocabulary identity.
+    candidateMetadataForBlob(Buffer.alloc(32), {});
+    // @ts-expect-error VIA staging is no longer an Apply step.
+    apply.report('stage');
+
 }
 
 function recoveryContracts(snapshot: IncompleteSnapshot) {
@@ -177,10 +173,10 @@ function orchestrationContracts(connection: Awaited<ReturnType<InstanceType<type
     const loop = openPanelLoop({post: message => {const reply: PanelResponse = message; void reply;}, saveExport: async () => undefined}, {service});
     loop.handleMessage({type: 'jumpProfileDraft', step: 1, draftRevision: 0});
     const upload = new CandidateUploadCoordinator(connection);
-    upload.upload(Buffer.alloc(32), {actionAbiDigest: 1, viaGeneration: 1, viaDigest: 1});
-    upload.commit(1, {afterDecision: async decision => {const digest: number = decision.digest; void digest;}});
-    // @ts-expect-error An authored upload needs its metadata or a complete VIA identity.
     upload.upload(Buffer.alloc(32), {actionAbiDigest: 1});
+    upload.commit(1, {afterDecision: async decision => {const digest: number = decision.digest; void digest;}});
+    // @ts-expect-error An authored upload needs its action vocabulary or exact metadata.
+    upload.upload(Buffer.alloc(32), {});
     // The loop takes posted data unchecked and narrows it itself.
     loop.handleMessage(JSON.parse('"untrusted"') as unknown);
     // @ts-expect-error A history jump identifies the chosen step.

@@ -23,11 +23,10 @@ const {
 } = require("../../core/session/candidate-upload-coordinator");
 
 // Every candidate publishes with the VIA store generation it is bound to.
-const BINDING = Object.freeze({viaGeneration: 6, viaDigest: 0xabcdef01});
 
 function representativeBlob(payloadSize = 41) {
     return encodeProfileBlob({
-        schema: {major: 3, minor: 0},
+        schema: {major: 4, minor: 0},
         domains: [{
             id: PROFILE_DOMAIN_IDS.RGB,
             version: 4,
@@ -77,6 +76,13 @@ class CandidateFirmwareHarness {
             error.code = this.options.transportErrorCode || "TIMEOUT";
             throw error;
         }
+        if (report[0] === 0x08 && report[2] === PROFILE_CANDIDATE_V1.VALUE_STATUS && report[4] === PROFILE_CANDIDATE_V1.ERROR_PAGE) {
+            // The error page reports the status as it stands; reading it
+            // moves nothing on.
+            const response = encodeErrorPage(report, this.status, this.errorSequence);
+            assert.equal(requestOptions.matchResponse(response, report), true);
+            return response;
+        }
         if (report[0] === 0x08 && report[2] === PROFILE_CANDIDATE_V1.VALUE_STATUS) {
             if (this.options.beforeFirstStatusResponse && !this.firstStatusDelayed) {
                 this.firstStatusDelayed = true;
@@ -113,7 +119,7 @@ class CandidateFirmwareHarness {
                 this.status.state = CANDIDATE_STATE.VALIDATED;
             }
             if (operation === CANDIDATE_OPERATION.CHUNK && this.options.makeBusyChunkUnsafe) {
-                this.status.nextOffset = report.readUInt16LE(5) + 1;
+                this.status.nextOffset = report.readUInt32LE(5) + 1;
             }
             if (operation === CANDIDATE_OPERATION.ABORT && this.options.poisonOnBusyAbort) {
                 this.status.state = CANDIDATE_STATE.REJECTED;
@@ -137,7 +143,7 @@ class CandidateFirmwareHarness {
     statusReport(request) {
         if (this.mailbox && this.pendingStatusReads > 0) {
             this.pendingStatusReads -= 1;
-            return encodeStatus(request, {...this.status, flags: 1});
+            return encodeStatus(request, {...this.status, flags: 1}, this.trackError());
         }
         if (this.mailbox) {
             const report = this.mailbox;
@@ -198,7 +204,18 @@ class CandidateFirmwareHarness {
                 }
             }
         }
-        return encodeStatus(request, this.status);
+        return encodeStatus(request, this.status, this.trackError());
+    }
+
+    // The error sequence moves whenever the error or its location does, as
+    // firmware's (Profile Wire 2 status page 0 and page 3).
+    trackError() {
+        const key = JSON.stringify(this.status.error);
+        if (key !== this.reportedError) {
+            if (this.reportedError !== undefined) this.errorSequence = ((this.errorSequence || 0) + 1) & 0xffff;
+            this.reportedError = key;
+        }
+        return this.errorSequence || 0;
     }
 
     process(report) {
@@ -212,24 +229,24 @@ class CandidateFirmwareHarness {
                 state: CANDIDATE_STATE.RECEIVING,
                 lastOperation: operation,
                 transactionId,
-                payloadLength: report.readUInt16LE(9),
-                digest: report.readUInt32LE(15),
+                payloadLength: report.readUInt32LE(8),
+                digest: report.readUInt32LE(16),
                 operationSequence: this.status.operationSequence,
             };
         } else if (operation === CANDIDATE_OPERATION.CHUNK) {
-            if (report.readUInt16LE(5) === this.options.chunkErrorAt) {
+            if (report.readUInt32LE(5) === this.options.chunkErrorAt) {
                 this.status.state = CANDIDATE_STATE.REJECTED;
                 this.status.error = {...noError(), id: CANDIDATE_ERROR.STORAGE_FAILURE};
                 return;
             }
             this.status.transactionId = transactionId;
-            this.status.nextOffset = report.readUInt16LE(5) + report[7];
+            this.status.nextOffset = report.readUInt32LE(5) + report[9];
             this.status.state = this.status.nextOffset === this.status.payloadLength
                 ? CANDIDATE_STATE.COMPLETE
                 : CANDIDATE_STATE.RECEIVING;
             this.status.error = noError();
         } else if (operation === CANDIDATE_OPERATION.REUSE) {
-            this.status.nextOffset = report.readUInt16LE(5) + report.readUInt16LE(9);
+            this.status.nextOffset = report.readUInt32LE(5) + report.readUInt32LE(13);
             this.status.state = this.status.nextOffset === this.status.payloadLength ? CANDIDATE_STATE.COMPLETE : CANDIDATE_STATE.RECEIVING;
         } else if (operation === CANDIDATE_OPERATION.VALIDATE) {
             this.status.transactionId = transactionId;
@@ -266,7 +283,7 @@ function noError() {
         rowIndex: 0xffff,
         tapIndex: 0xff,
         fieldId: 0xff,
-        byteOffset: 0xffff,
+        byteOffset: 0xffffffff,
     };
 }
 
@@ -293,28 +310,44 @@ function acknowledgement(request, admission, errorId) {
     return response;
 }
 
-function encodeStatus(request, status) {
+function encodeStatus(request, status, errorSequence = 0) {
     const response = Buffer.from(request);
     response.fill(0, 5);
     response[5] = 0;
     response[6] = 25;
     const payload = response.subarray(7);
-    payload[0] = 1;
+    payload[0] = PROFILE_CANDIDATE_V1.STATUS_LAYOUT_VERSION;
     payload[1] = status.state;
     payload[2] = status.lastOperation;
     payload[3] = status.flags || 0;
     payload.writeUInt16LE(status.transactionId, 4);
-    payload.writeUInt16LE(status.nextOffset, 6);
-    payload.writeUInt16LE(status.payloadLength, 8);
-    payload.writeUInt32LE(status.digest, 10);
-    payload[14] = status.error.id;
-    payload[15] = status.error.domainId;
-    payload[16] = status.error.tableId;
-    payload.writeUInt16LE(status.error.rowIndex, 17);
-    payload[19] = status.error.tapIndex;
-    payload[20] = status.error.fieldId;
-    payload.writeUInt16LE(status.error.byteOffset, 21);
-    payload.writeUInt16LE(status.operationSequence, 23);
+    payload.writeUInt32LE(status.nextOffset, 6);
+    payload.writeUInt32LE(status.payloadLength, 10);
+    payload.writeUInt32LE(status.digest, 14);
+    payload[18] = status.error.id;
+    payload.writeUInt16LE(status.operationSequence, 19);
+    payload.writeUInt16LE(errorSequence, 21);
+    return response;
+}
+
+// Status page 3: where the error is, tied to page 0 by transaction,
+// operation sequence and error sequence.
+function encodeErrorPage(request, status, errorSequence = 0) {
+    const response = Buffer.from(request);
+    response.fill(0, 5);
+    response[6] = 25;
+    const payload = response.subarray(7);
+    payload[0] = PROFILE_CANDIDATE_V1.ERROR_LAYOUT_VERSION;
+    payload[1] = status.error.id;
+    payload[2] = status.error.domainId;
+    payload[3] = status.error.tableId;
+    payload.writeUInt16LE(status.error.rowIndex, 4);
+    payload[6] = status.error.tapIndex;
+    payload[7] = status.error.fieldId;
+    payload.writeUInt32LE(status.error.byteOffset, 8);
+    payload.writeUInt16LE(status.transactionId, 12);
+    payload.writeUInt16LE(status.operationSequence, 14);
+    payload.writeUInt16LE(errorSequence, 16);
     return response;
 }
 
@@ -346,21 +379,22 @@ test("upload streams sequential 20-byte chunks and validates only after completi
     const harness = new CandidateFirmwareHarness({validationReads: 2, scanBetweenReports: true});
     const progress = [];
     const blob = representativeBlob();
-    assert.equal(blob.length, 53);
+    // 8-byte header, 6-byte domain envelope (schema 4), 41 payload bytes.
+    assert.equal(blob.length, 55);
     const result = await coordinator(harness, {
         transactionIds: new CandidateTransactionIdSequence(0xffff),
         requestIds: new CandidateRequestIdSequence(0xff),
         onProgress(value) {
             progress.push(value);
         },
-    }).upload(blob, {...BINDING, actionAbiDigest: 0x12345678});
+    }).upload(blob, {actionAbiDigest: 0x12345678});
 
     assert.equal(result.transactionId, 0xffff);
     assert.equal(result.status.state, CANDIDATE_STATE.VALIDATED);
     const chunks = operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_STREAM_CHUNK);
-    assert.deepEqual(chunks.map((report) => report.readUInt16LE(5)), [0, 20, 40]);
-    assert.deepEqual(chunks.map((report) => report[7]), [20, 20, 13]);
-    assert.deepEqual(Buffer.concat(chunks.map((report) => report.subarray(8, 8 + report[7]))), blob);
+    assert.deepEqual(chunks.map((report) => report.readUInt32LE(5)), [0, 20, 40]);
+    assert.deepEqual(chunks.map((report) => report[9]), [20, 20, 15]);
+    assert.deepEqual(Buffer.concat(chunks.map((report) => report.subarray(10, 10 + report[9]))), blob);
     assert.equal(harness.writes.every((report) => report.length === 32), true);
     assert.equal(progress.at(-1).phase, "complete");
     assert.equal(progress.at(-1).bytesSent, blob.length);
@@ -372,7 +406,7 @@ test("upload streams sequential 20-byte chunks and validates only after completi
 test("a prepared candidate commits through custom-save and waits for activation", async () => {
     const harness = new CandidateFirmwareHarness({commitReads: 2, activationReads: 2});
     const client = coordinator(harness);
-    const prepared = await client.upload(representativeBlob(1), {...BINDING, actionAbiDigest: 1, transactionId: 0x1234});
+    const prepared = await client.upload(representativeBlob(1), {actionAbiDigest: 1, transactionId: 0x1234});
     const result = await client.commit(prepared.transactionId, {digest: prepared.metadata.digest});
 
     assert.equal(result.status.state, CANDIDATE_STATE.IDLE);
@@ -392,7 +426,7 @@ test("a split commit polls through peer preparation and convergence before activ
         activationReads: 2,
     });
     const client = coordinator(harness);
-    const prepared = await client.upload(representativeBlob(1), {...BINDING, actionAbiDigest: 1, transactionId: 0x1234});
+    const prepared = await client.upload(representativeBlob(1), {actionAbiDigest: 1, transactionId: 0x1234});
     const decisions = [];
     const result = await client.commit(prepared.transactionId, {digest: prepared.metadata.digest, afterDecision: async decision => {
         decisions.push(decision);
@@ -418,7 +452,7 @@ test("a split commit polls through peer preparation and convergence before activ
 test("resuming a post-decision commit invokes local roll-forward once", async () => {
     const harness = new CandidateFirmwareHarness({splitBarrier: true, convergenceReads: 2, activationReads: 2});
     const blob = representativeBlob(1);
-    const metadata = candidateMetadataForBlob(blob, {...BINDING, actionAbiDigest: 1});
+    const metadata = candidateMetadataForBlob(blob, {actionAbiDigest: 1});
     harness.status = {
         ...harness.status,
         state: CANDIDATE_STATE.CONVERGING_PEER,
@@ -448,7 +482,7 @@ test("lost commit acknowledgement is safely resolved from progressing status", a
         activationReads: 2,
     });
     const client = coordinator(harness);
-    const prepared = await client.upload(representativeBlob(1), {...BINDING, actionAbiDigest: 1, transactionId: 0x1234});
+    const prepared = await client.upload(representativeBlob(1), {actionAbiDigest: 1, transactionId: 0x1234});
 
     await assert.rejects(
         client.commit(prepared.transactionId, {digest: prepared.metadata.digest}),
@@ -467,7 +501,7 @@ test("terminal postcommit authority failure is surfaced without retrying or abor
         authorityErrorId: CANDIDATE_ERROR.POSTCOMMIT_AUTHORITY_LOST,
     });
     const client = coordinator(harness);
-    const prepared = await client.upload(representativeBlob(1), {...BINDING, actionAbiDigest: 1, transactionId: 0x1234});
+    const prepared = await client.upload(representativeBlob(1), {actionAbiDigest: 1, transactionId: 0x1234});
 
     await assert.rejects(
         client.commit(prepared.transactionId, {digest: prepared.metadata.digest}),
@@ -485,7 +519,7 @@ test("terminal postcommit authority failure is surfaced without retrying or abor
 test("commit preflight refuses a mismatched digest before custom-save", async () => {
     const harness = new CandidateFirmwareHarness();
     const client = coordinator(harness);
-    const prepared = await client.upload(representativeBlob(1), {...BINDING, actionAbiDigest: 1, transactionId: 0x1234});
+    const prepared = await client.upload(representativeBlob(1), {actionAbiDigest: 1, transactionId: 0x1234});
     await assert.rejects(
         client.commit(prepared.transactionId, {digest: (prepared.metadata.digest ^ 1) >>> 0}),
         (error) => error.code === "CANDIDATE_IDENTITY_MISMATCH" && error.safeToRetry === false
@@ -496,7 +530,7 @@ test("commit preflight refuses a mismatched digest before custom-save", async ()
 test("activation failure remains visible after durable commit", async () => {
     const harness = new CandidateFirmwareHarness({activationError: true});
     const client = coordinator(harness);
-    const prepared = await client.upload(representativeBlob(1), {...BINDING, actionAbiDigest: 1, transactionId: 0x1234});
+    const prepared = await client.upload(representativeBlob(1), {actionAbiDigest: 1, transactionId: 0x1234});
     await assert.rejects(
         client.commit(prepared.transactionId, {digest: prepared.metadata.digest}),
         (error) => error.code === "DEVICE_REJECTED"
@@ -512,7 +546,7 @@ test("unknown marker durability is an ambiguous outcome that requires reconcilia
         activationErrorId: CANDIDATE_ERROR.DURABILITY_UNKNOWN,
     });
     const client = coordinator(harness);
-    const prepared = await client.upload(representativeBlob(1), {...BINDING, actionAbiDigest: 1, transactionId: 0x1234});
+    const prepared = await client.upload(representativeBlob(1), {actionAbiDigest: 1, transactionId: 0x1234});
     await assert.rejects(
         client.commit(prepared.transactionId, {digest: prepared.metadata.digest}),
         (error) => error.code === "DURABILITY_UNKNOWN"
@@ -538,7 +572,7 @@ test("preflight refuses every non-idle firmware candidate without sending a muta
         harness.status.state = state;
         harness.status.transactionId = 0x4321;
         await assert.rejects(
-            coordinator(harness).upload(representativeBlob(1), {...BINDING, actionAbiDigest: 1}),
+            coordinator(harness).upload(representativeBlob(1), {actionAbiDigest: 1}),
             (error) => error.code === "ACTIVE_CANDIDATE"
                 && error.phase === "preflight"
                 && error.transactionId === 0x4321
@@ -565,14 +599,14 @@ test("upload snapshots caller-owned bytes before asynchronous preflight", async 
     });
     const blob = representativeBlob(21);
     const expected = Buffer.from(blob);
-    const upload = coordinator(harness).upload(blob, {...BINDING, actionAbiDigest: 1});
+    const upload = coordinator(harness).upload(blob, {actionAbiDigest: 1});
     await reached;
     blob.fill(0xee);
     releasePreflight();
     await upload;
 
     const chunks = operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_STREAM_CHUNK);
-    assert.deepEqual(Buffer.concat(chunks.map((report) => report.subarray(8, 8 + report[7]))), expected);
+    assert.deepEqual(Buffer.concat(chunks.map((report) => report.subarray(10, 10 + report[9]))), expected);
 });
 
 test("busy frames are resubmitted only from a safe status and exact bytes are preserved", async () => {
@@ -581,7 +615,7 @@ test("busy frames are resubmitted only from a safe status and exact bytes are pr
         processBusyValidate: true,
     });
     const blob = representativeBlob(1);
-    const result = await coordinator(harness).upload(blob, {...BINDING, actionAbiDigest: 1, transactionId: 7});
+    const result = await coordinator(harness).upload(blob, {actionAbiDigest: 1, transactionId: 7});
     assert.equal(result.status.state, CANDIDATE_STATE.VALIDATED);
     const chunks = operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_STREAM_CHUNK);
     assert.equal(chunks.length, 2);
@@ -596,7 +630,7 @@ for (const transportErrorCode of ["TIMEOUT", "DISCONNECTED"]) {
             transportErrorCode,
         });
         await assert.rejects(
-            coordinator(harness).upload(representativeBlob(), {...BINDING, actionAbiDigest: 1}),
+            coordinator(harness).upload(representativeBlob(), {actionAbiDigest: 1}),
             (error) => error.code === "TRANSPORT_OUTCOME_AMBIGUOUS"
                 && error.phase === "writing"
                 && error.ambiguous === true
@@ -611,7 +645,7 @@ for (const transportErrorCode of ["TIMEOUT", "DISCONNECTED"]) {
 test("a queued operation that never advances returns bounded structured ambiguity", async () => {
     const harness = new CandidateFirmwareHarness({neverProcess: true});
     await assert.rejects(
-        coordinator(harness, {maxStatusPolls: 2}).upload(representativeBlob(1), {...BINDING, actionAbiDigest: 1}),
+        coordinator(harness, {maxStatusPolls: 2}).upload(representativeBlob(1), {actionAbiDigest: 1}),
         (error) => error.code === "OPERATION_OUTCOME_AMBIGUOUS"
             && error.phase === "begin"
             && error.operation === CANDIDATE_OPERATION.BEGIN
@@ -653,7 +687,7 @@ test("observable split state progress renews the stall deadline", async () => {
             now += milliseconds;
         },
     });
-    const prepared = await client.upload(representativeBlob(1), {...BINDING, actionAbiDigest: 1, transactionId: 0x1234});
+    const prepared = await client.upload(representativeBlob(1), {actionAbiDigest: 1, transactionId: 0x1234});
     const result = await client.commit(prepared.transactionId, {digest: prepared.metadata.digest});
     assert.equal(result.status.state, CANDIDATE_STATE.IDLE);
     assert.equal(now > 2, true);
@@ -668,7 +702,7 @@ test("the copy to the other half moving on keeps a long peer preparation alive, 
             pollIntervalMs: 1, statusStallTimeoutMs: 3, now: () => now, async sleep(ms) { now += ms; },
             readPeerStatus, onProgress: (progress) => { if (progress.peer) peers.push(progress.peer.transferOffset); },
         });
-        const prepared = await client.upload(representativeBlob(1), {...BINDING, actionAbiDigest: 1, transactionId: 0x1234});
+        const prepared = await client.upload(representativeBlob(1), {actionAbiDigest: 1, transactionId: 0x1234});
         return {result: await client.commit(prepared.transactionId, {digest: prepared.metadata.digest}), peers};
     };
     // Page 0 stays identical through PREPARING_PEER, so without page 1 the
@@ -690,7 +724,7 @@ test("an unexpected polling failure cleans up the admitted candidate before retr
                 sleepCalls += 1;
                 if (sleepCalls === 1) throw new Error("poll scheduler failed");
             },
-        }).upload(representativeBlob(1), {...BINDING, actionAbiDigest: 1}),
+        }).upload(representativeBlob(1), {actionAbiDigest: 1}),
         (error) => error.code === "UPLOAD_FAILED"
             && error.abortAttempted === true
             && error.abortSucceeded === true
@@ -704,7 +738,7 @@ test("semantic validation failures retain phase, progress, and firmware location
     const harness = new CandidateFirmwareHarness({validationError: true});
     const blob = representativeBlob(1);
     await assert.rejects(
-        coordinator(harness).upload(blob, {...BINDING, actionAbiDigest: 1, transactionId: 0x1234}),
+        coordinator(harness).upload(blob, {actionAbiDigest: 1, transactionId: 0x1234}),
         (error) => {
             assert.equal(error.code, "DEVICE_REJECTED");
             assert.equal(error.phase, "validating");
@@ -730,7 +764,7 @@ test("semantic validation failures retain phase, progress, and firmware location
     assert.equal(harness.status.state, CANDIDATE_STATE.IDLE);
 
     harness.options.validationError = false;
-    const retry = await coordinator(harness).upload(blob, {...BINDING, actionAbiDigest: 1, transactionId: 0x1235});
+    const retry = await coordinator(harness).upload(blob, {actionAbiDigest: 1, transactionId: 0x1235});
     assert.equal(retry.status.state, CANDIDATE_STATE.VALIDATED);
 });
 
@@ -741,7 +775,7 @@ test("cleanup resubmits an idempotent abort after busy status becomes poisoned",
         validationError: true,
     });
     await assert.rejects(
-        coordinator(harness).upload(representativeBlob(1), {...BINDING, actionAbiDigest: 1}),
+        coordinator(harness).upload(representativeBlob(1), {actionAbiDigest: 1}),
         (error) => error.code === "DEVICE_REJECTED"
             && error.abortAttempted === true
             && error.abortSucceeded === true
@@ -755,7 +789,7 @@ test("a profile changed after BEGIN is aborted before any chunks or commit", asy
     const firmware = new CandidateFirmwareHarness();
     const coordinator = new CandidateUploadCoordinator(firmware, {pollIntervalMs: 0});
     let checked = false;
-    await assert.rejects(coordinator.upload(representativeBlob(), {...BINDING, actionAbiDigest: 0x12345678, verifyBase: async () => {
+    await assert.rejects(coordinator.upload(representativeBlob(), {actionAbiDigest: 0x12345678, verifyBase: async () => {
         checked = true;
         assert.ok(firmware.writes.some(report => report[2] === PROFILE_CANDIDATE_V1.VALUE_BEGIN));
         throw Object.assign(new Error("Profile changed"), {code: "PROFILE_EDIT_CONFLICT"});
@@ -767,7 +801,7 @@ test("a profile changed after BEGIN is aborted before any chunks or commit", asy
 
 test("a keyboard that is not ready refuses the frame outright, and that is not a lost response", async () => {
     const harness = new CandidateFirmwareHarness({unhandledOperation: CANDIDATE_OPERATION.BEGIN});
-    await assert.rejects(coordinator(harness).upload(representativeBlob(), {...BINDING, actionAbiDigest: 0x12345678}), (error) => {
+    await assert.rejects(coordinator(harness).upload(representativeBlob(), {actionAbiDigest: 0x12345678}), (error) => {
         assert.ok(error instanceof CandidateUploadError);
         assert.equal(error.code, "KEYBOARD_NOT_READY");
         assert.equal(error.ambiguous, false, "the keyboard answered: nothing was admitted");
@@ -777,42 +811,31 @@ test("a keyboard that is not ready refuses the frame outright, and that is not a
     assert.equal(operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_CHUNK).length, 0, "nothing is staged after the refusal");
 });
 
-test("an upload without a nonzero VIA binding fails before anything reaches the keyboard", async () => {
+test("an upload without a valid candidate identity fails before any report", async () => {
     const blob = representativeBlob(1);
-    const unbound = [
-        {actionAbiDigest: 1},
-        {actionAbiDigest: 1, viaGeneration: 6},
-        {...BINDING, actionAbiDigest: 1, viaGeneration: 0},
-        {...BINDING, actionAbiDigest: 1, viaDigest: 0},
-        {metadata: {...candidateMetadataForBlob(blob, {...BINDING, actionAbiDigest: 1}), viaDigest: 0}},
-        {metadata: {...candidateMetadataForBlob(blob, {...BINDING, actionAbiDigest: 1}), storeFormatVersion: 0, viaGeneration: 0, viaDigest: 0}},
-    ];
-    for (const options of unbound) {
+    for (const options of [{}, {metadata: {...candidateMetadataForBlob(blob, {actionAbiDigest: 1}), storeFormatVersion: 0}}]) {
         const harness = new CandidateFirmwareHarness();
-        await assert.rejects(coordinator(harness).upload(blob, options), (error) => {
-            assert.ok(error instanceof CandidateUploadError);
-            assert.equal(error.code, "INVALID_CANDIDATE");
-            assert.equal(error.safeToRetry, true);
-            return true;
-        });
-        assert.equal(harness.writes.length, 0, "not even the preflight status read");
+        await assert.rejects(coordinator(harness).upload(blob, options), error => error instanceof CandidateUploadError && error.code === "INVALID_CANDIDATE" && error.safeToRetry);
+        assert.equal(harness.writes.length, 0);
     }
 });
 
-test("BEGIN carries store format 5 and the VIA binding it was given", async () => {
+test("BEGIN carries schema 4, a 32-bit length and zero reserved bytes", async () => {
     const harness = new CandidateFirmwareHarness();
-    await coordinator(harness).upload(representativeBlob(1), {...BINDING, actionAbiDigest: 1});
+    const blob = representativeBlob(1);
+    await coordinator(harness).upload(blob, {actionAbiDigest: 1});
     const [begin] = operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_BEGIN);
-    assert.equal(begin[5], 3);
-    assert.equal(begin[23], 5);
-    assert.equal(begin.readUInt32LE(24), BINDING.viaGeneration);
-    assert.equal(begin.readUInt32LE(28), BINDING.viaDigest);
+    assert.equal(begin[5], 4);
+    // Profile Wire 2 implies store format 6; BEGIN no longer names it.
+    assert.equal(begin.readUInt32LE(8), blob.length);
+    assert.equal(begin.readUInt32LE(24), 0);
+    assert.equal(begin.readUInt32LE(28), 0);
 });
 
 test("streaming checks bounded batches without bypassing validation", async () => {
     const blob = representativeBlob(401);
     const harness = new CandidateFirmwareHarness({scanBetweenReports: true});
-    const result = await coordinator(harness).upload(blob, {...BINDING, actionAbiDigest: 1});
+    const result = await coordinator(harness).upload(blob, {actionAbiDigest: 1});
     assert.equal(result.status.state, CANDIDATE_STATE.VALIDATED);
     const chunks = operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_STREAM_CHUNK).length;
     assert.equal(chunks, Math.ceil(blob.length / 20));
@@ -825,7 +848,7 @@ test("streaming checks bounded batches without bypassing validation", async () =
 test("streaming drains mailbox BUSY before retrying the unadmitted suffix", async () => {
     const harness = new CandidateFirmwareHarness();
     const blob = representativeBlob(121);
-    const result = await coordinator(harness).upload(blob, {...BINDING, actionAbiDigest: 1});
+    const result = await coordinator(harness).upload(blob, {actionAbiDigest: 1});
     assert.equal(result.status.nextOffset, blob.length);
     assert.equal(result.status.state, CANDIDATE_STATE.VALIDATED);
     assert.equal(result.progress.chunkIndex, Math.ceil(blob.length / 20) - 1);
@@ -834,13 +857,13 @@ test("streaming drains mailbox BUSY before retrying the unadmitted suffix", asyn
 });
 test("streaming storage failure stays visible and prevents validation or commit", async () => {
     const harness = new CandidateFirmwareHarness({scanBetweenReports: true, chunkErrorAt: 20});
-    await assert.rejects(coordinator(harness).upload(representativeBlob(121), {...BINDING, actionAbiDigest: 1}), /rejected|STORAGE_FAILURE/);
+    await assert.rejects(coordinator(harness).upload(representativeBlob(121), {actionAbiDigest: 1}), /rejected|STORAGE_FAILURE/);
     assert.equal(operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_VALIDATE).length, 0);
     assert.equal(operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_COMMIT).length, 0);
 });
 test("a lost streaming acknowledgement stops without replaying the ambiguous chunk", async () => {
     const harness = new CandidateFirmwareHarness({scanBetweenReports: true, processThenThrowOnOperation: CANDIDATE_OPERATION.CHUNK});
-    await assert.rejects(coordinator(harness).upload(representativeBlob(121), {...BINDING, actionAbiDigest: 1}),
+    await assert.rejects(coordinator(harness).upload(representativeBlob(121), {actionAbiDigest: 1}),
         error => error.code === "TRANSPORT_OUTCOME_AMBIGUOUS" && error.ambiguous === true && error.safeToRetry === false
             && error.progress.chunkIndex === 0 && error.progress.bytesUploaded === 0);
     assert.equal(operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_STREAM_CHUNK).length, 1);
@@ -854,14 +877,14 @@ test("reuse describes the verified source and still validates the entire target"
     const bytes = representativeBlob(3001), blob = Buffer.from(bytes); blob[1000] = 0xff;
     const harness = new CandidateFirmwareHarness({scanBetweenReports: true});
     const baseSource = {bytes, generation: 4, origin: 0, kind: 1, digest: fnv1a32(bytes), crc32: crc32(bytes)};
-    const result = await coordinator(harness).upload(blob, {...BINDING, actionAbiDigest: 1, baseSource});
+    const result = await coordinator(harness).upload(blob, {actionAbiDigest: 1, baseSource});
     assert.equal(result.status.state, CANDIDATE_STATE.VALIDATED);
     const copies = operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_REUSE);
     assert.ok(copies.length >= 3 && copies.length <= 5);
     assert.ok(operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_STREAM_CHUNK).length <= 1);
     for (const frame of copies) {
-        assert.equal(frame.readUInt32LE(11), 4); assert.equal(frame.readUInt32LE(15), baseSource.digest);
-        assert.equal(frame.readUInt32LE(19), baseSource.crc32);
+        assert.equal(frame.readUInt32LE(17), 4); assert.equal(frame.readUInt32LE(21), baseSource.digest);
+        assert.equal(frame.readUInt32LE(25), baseSource.crc32);
     }
     assert.equal(operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_VALIDATE).length, 1);
     assert.equal(operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_COMMIT).length, 0);
@@ -870,7 +893,7 @@ test("reuse describes the verified source and still validates the entire target"
 test("invalid reuse source fails before BEGIN", async () => {
     const harness = new CandidateFirmwareHarness();
     const bytes = representativeBlob(121);
-    await assert.rejects(coordinator(harness).upload(bytes, {...BINDING, actionAbiDigest: 1,
+    await assert.rejects(coordinator(harness).upload(bytes, {actionAbiDigest: 1,
         baseSource: {bytes, crc32: 0, digest: 0, generation: 0, origin: 255, kind: 0}}), /source bytes/);
     assert.equal(harness.writes.length, 0);
 });
@@ -881,12 +904,12 @@ test("full and reuse progress count actual chunks and separate prepared bytes", 
     for (const transfer of [{}, {
         baseSource: {bytes: source, generation: 4, origin: 0, kind: 1, digest: fnv1a32(source), crc32: crc32(source)}}]) {
         const harness = new CandidateFirmwareHarness({scanBetweenReports: true}), reports = [];
-        const result = await coordinator(harness).upload(target, {...BINDING, actionAbiDigest: 1, ...transfer,
+        const result = await coordinator(harness).upload(target, {actionAbiDigest: 1, ...transfer,
             onProgress(progress) { reports.push(progress); }});
         const chunks = harness.writes.filter(frame => [PROFILE_CANDIDATE_V1.VALUE_CHUNK, PROFILE_CANDIDATE_V1.VALUE_STREAM_CHUNK].includes(frame[2]));
         assert.equal(result.progress.chunkCount, chunks.length);
         assert.equal(result.progress.chunkIndex, chunks.length - 1);
-        assert.equal(result.progress.bytesUploaded, chunks.reduce((n, frame) => n + frame[7], 0));
+        assert.equal(result.progress.bytesUploaded, chunks.reduce((n, frame) => n + frame[9], 0));
         assert.equal(result.progress.bytesReused, target.length - result.progress.bytesUploaded);
         assert.equal(result.progress.bytesPrepared, target.length);
         assert.equal(result.progress.bytesSent, result.progress.bytesPrepared);
@@ -900,8 +923,8 @@ for (const compiledOnly of [true, false]) {
         const {PROFILE_WIRE_FEATURES} = require("../../core/protocol/profile-wire-v1");
         const {fixture, capabilities} = require("../fixtures/portable-restore");
         const f = fixture({compiledOnly});
-        const caps = {...capabilities, featureFlags: capabilities.featureFlags
-            | PROFILE_WIRE_FEATURES.CANDIDATE_REUSE | PROFILE_WIRE_FEATURES.CANDIDATE_STREAM};
+        // Reuse and streaming come with saves (Profile Wire 2).
+        const caps = {...capabilities, featureFlags: capabilities.featureFlags | PROFILE_WIRE_FEATURES.SAVES};
         const captured = await f.capture();
         assert.equal(captured.status.activeKind, compiledOnly ? 0 : 1);
         assert.equal(captured.status.activeGeneration, compiledOnly ? 0 : f.keyboard.generation);
@@ -912,9 +935,9 @@ for (const compiledOnly of [true, false]) {
         const reused = f.keyboard.mutations.filter(report => report[0] === 7 && report[2] === PROFILE_CANDIDATE_V1.VALUE_REUSE);
         assert.ok(reused.length > 0);
         for (const report of reused) {
-            assert.equal(report[23], compiledOnly ? 0 : 1);
-            assert.equal(report.readUInt32LE(11), captured.status.activeGeneration);
-            assert.equal(report[24], compiledOnly ? 255 : 0, "only committed REUSE has a physical origin");
+            assert.equal(report[29], compiledOnly ? 0 : 1);
+            assert.equal(report.readUInt32LE(17), captured.status.activeGeneration);
+            assert.equal(report[30], compiledOnly ? 255 : 0, "only committed REUSE has a physical origin");
         }
         assert.equal(f.keyboard.mutations.filter(report => report[0] === 7 && report[2] === PROFILE_CANDIDATE_V1.VALUE_VALIDATE).length, 1);
     });

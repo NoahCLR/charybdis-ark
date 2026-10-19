@@ -13,12 +13,22 @@ const {decodeSettings, encodeSettings} = require("../../core/schema/settings-dom
 const {decodePdDomain, encodePdDomain} = require("../../core/schema/pd-mode-domain-v1");
 
 // Each domain's own codec, which must write back exactly what it read.
+const {decodeKeymapDomain, encodeKeymapDomain} = require("../../core/schema/keymap-domain-v1");
+const {decodeMacroDomain, encodeMacroDomain} = require("../../core/schema/macro-domain-v1");
 const CODECS = new Map([
     [0x10, payload => encodeRgbDomainV1(decodeRgbDomainV1(payload))],
     [0x20, payload => encodeKeyBehaviorDomain(decodeKeyBehaviorDomain(payload))],
     [0x30, payload => encodeComboDomain(decodeComboDomain(payload))],
     [0x40, payload => encodeSettings(decodeSettings(payload))],
     [0x50, payload => encodePdDomain(decodePdDomain(payload))],
+    [0x60, payload => encodeKeymapDomain(decodeKeymapDomain(payload))],
+    // Macro domain accepts unused capacity after slot 127. Re-encoding the
+    // streams drops that tail; this fixture guard separately preserves it.
+    [0x70, payload => {
+        const canonical = encodeMacroDomain(decodeMacroDomain(payload));
+        assert.deepEqual(canonical, payload.subarray(0, canonical.length));
+        return Buffer.concat([canonical, payload.subarray(canonical.length)]);
+    }],
 ]);
 
 /** @param {string} name */
@@ -30,7 +40,7 @@ function fixture(name) {
 
 // The firmware's whole current profiles: every table at its maximum, and one
 // populated as a keyboard holds it, with every macro and custom key named.
-for (const name of ["maximum_profile_v3.fixture", "populated_profile_v3.fixture"]) {
+for (const name of ["maximum_profile_v4.fixture", "populated_profile_v4.fixture"]) {
     test(`${name} decodes as the firmware describes it and every domain writes back exactly its bytes`, () => {
         const values = fixture(name), bytes = Buffer.from(values.get("profile.hex"), "hex");
         const decoded = decodeProfileBlob(bytes);

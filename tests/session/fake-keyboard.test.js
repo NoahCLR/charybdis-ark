@@ -1,8 +1,9 @@
 "use strict";
+const {profileLayers} = require("../fixtures/profile-document");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const {openPanelLoop} = require("../../core/session/panel-loop");
-const {fingerprint} = require("../../core/model/portable-profile");
+const {validateSnapshot, fingerprint} = require("../../core/model/portable-profile");
 const {fakeKeyboardAdapter} = require("../fixtures/fake-keyboard");
 const {backup32, document32} = require("../fixtures/pd-slots-32");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../../core/data/charybdis-layout");
@@ -48,17 +49,17 @@ for (const [name, document] of [["the compiled pointing profile", document32()],
 
             const keyboard = adapter.keyboard;
             assert.equal(keyboard.requests.filter(request => request[0] === 0x04).length, 0, "layout reads never fall back to one request per key");
-            assert.equal(keyboard.requests.filter(request => request[0] === 0x12).length, 69,
-                "one coherent layout capture feeds the editor and complete backup");
+            assert.equal(keyboard.requests.filter(request => request[0] === 0x12).length, 0,
+                "layout comes from the one coherent profile capture");
             const profileChunks = keyboard.requests.filter(request => request[0] === 0x08 && request[2] === 4 && (request[4] || request[5]));
-            assert.equal(profileChunks.length, Math.ceil(Buffer.from(document.profile, "base64").length / 25),
+            assert.equal(profileChunks.length, Math.ceil(validateSnapshot(document).candidate.length / 25),
                 "the shared capture downloads committed bytes once");
             assert.ok(keyboard.requests.length > 100, "the whole keyboard was read over the wire");
-            assert.ok(keyboard.requests.some(request => request[0] === 8 && request[2] === 0x0c), "macros are read through the keyboard's macro read map");
+            assert.equal(keyboard.requests.some(request => request[0] === 8 && request[2] === 0x0c), false, "macros come from the profile domain");
             assert.equal(keyboard.requests.filter(request => request[0] === 8 && request[1] === 0 && request[2] === 6).length,
                 3 + 2 * loop.session.service.combos.rows.length, "one verified combo capture feeds both views");
             assert.deepEqual(loop.session.service.layout.layers.flatMap(({layer, keys}) => keys.map(key => key.keycode)),
-                document.layers.flatMap(layer => CHARYBDIS_4X6_LAYOUT_MATRIX.map(([row, column]) => layer[row * 6 + column])));
+                profileLayers(document).flatMap(layer => CHARYBDIS_4X6_LAYOUT_MATRIX.map(([row, column]) => layer[row * 6 + column])));
             assert.deepEqual(keyboard.mutations, [], "a read and a staged edit write nothing to the keyboard");
         } finally {
             await loop.close();
@@ -70,7 +71,7 @@ test("profile verification reads fresh committed bytes, reuses immutable default
     const source = document32(), host = recordingHost(), adapter = fakeKeyboardAdapter({document: source});
     const loop = openPanelLoop(host, {adapter, defaultTimeoutMs: 200});
     const chunks = value => adapter.keyboard.requests.filter(request => request[0] === 0x08 && request[2] === value && (request[4] || request[5])).length;
-    const count = Math.ceil(Buffer.from(source.profile, "base64").length / 25);
+    const count = Math.ceil(validateSnapshot(source).candidate.length / 25);
     try {
         await loop.handleMessage({type: "ready"});
         const service = loop.session.service;
@@ -118,11 +119,12 @@ test("the fake keyboard runs current firmware, and refuses to serve an older pro
 });
 
 for (const compiledOnly of [false, true]) {
-    test(`shared capture keeps ${compiledOnly ? "compiled" : "committed"} identity and tolerates unavailable base RGB`, async () => {
+    test(`shared capture keeps ${compiledOnly ? "compiled" : "committed"} identity and derives base RGB from its captured settings`, async () => {
         const source = backup32(), host = recordingHost(), adapter = fakeKeyboardAdapter({document: source, compiledOnly});
         const original = adapter.keyboard.answer;
+        let settingHeaders = 0;
         adapter.keyboard.answer = request => {
-            if (request[0] === 8 && request[1] === 3) {
+            if (request[0] === 8 && request[1] === 0 && request[2] === 7 && request.readUInt16LE(4) === 0 && ++settingHeaders > 4) {
                 const rejected = Buffer.from(request); rejected[0] = 0xff; return [rejected];
             }
             return original(request);
@@ -133,7 +135,8 @@ for (const compiledOnly of [false, true]) {
             assert.equal(loop.session.readReady, true, last(host).notice);
             const service = loop.session.service;
             assert.equal(service.committed.source, compiledOnly ? "compiled" : "committed");
-            assert.equal(service.baseRgb.state, "unavailable");
+            assert.equal(service.baseRgb.state, "read");
+            assert.equal(settingHeaders, 4, "no independent RGB read can race the coherent capture");
             assert.equal(service.combos.rows.length, 1);
             assert.equal(service.portable.readback, undefined, "raw capture handoff does not live on the portable snapshot");
             assert.equal(fingerprint(service.portable.document), fingerprint(source));
@@ -146,11 +149,11 @@ for (const compiledOnly of [false, true]) {
 test("a configuration that changes during shared capture leaves only partial diagnostics and disables edits", async () => {
     const source = document32(), host = recordingHost(), adapter = fakeKeyboardAdapter({document: source});
     const original = adapter.keyboard.answer;
-    let storageReads = 0;
+    let statusReads = 0;
     adapter.keyboard.answer = request => {
         const responses = original(request);
-        if (request[0] === 8 && request[1] === 0 && request[2] === 8 && request[4] === 0 && ++storageReads === 2) {
-            responses[0].writeUInt32LE(43, 9);
+        if (request[0] === 8 && request[1] === 0 && request[2] === 2 && request[4] === 1 && ++statusReads === 4) {
+            responses[0].writeUInt32LE(43, 7);
         }
         return responses;
     };
@@ -162,7 +165,7 @@ test("a configuration that changes during shared capture leaves only partial dia
         assert.equal(loop.session.service.portable, undefined);
         assert.equal(loop.session.service.layout.state, "read", "independent layout diagnostics remain available");
         assert.equal(last(host).model.load.state, "unavailable");
-        assert.match(last(host).notice, /changed during the backup/);
+        assert.match(last(host).notice, /payload did not match its active identity/);
         assert.deepEqual(adapter.keyboard.mutations, []);
     } finally {await loop.close();}
 });

@@ -1,5 +1,6 @@
 // @ts-check
 "use strict";
+const {editLayers} = require("../tests/fixtures/profile-document");
 
 // Developer preview: render the interface against a profile from the test
 // fixtures, with no keyboard attached.
@@ -14,7 +15,7 @@ const {ProfileDraftSession} = require("../core/session/profile-draft-session");
 const {buildPanelModel, observeService, startLayerEdit} = require("../core/session/panel-session");
 const portable = require("../core/model/portable-profile");
 const keycodes = require("../core/data/keycode-catalog");
-const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../core/protocol/via-layout-v1");
+const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../core/data/charybdis-layout");
 const {PROFILE_WIRE_KNOWN_MASKS} = require("../core/protocol/profile-wire-v1");
 const {document32} = require("../tests/fixtures/pd-slots-32");
 const {ACTION_ABI} = require("../core/schema/actions");
@@ -42,29 +43,31 @@ const PREVIEW_PD_BINDINGS = {50: 0x7e80, 52: 0x7e86, 48: 0x7700, 49: 0x7f00, 53:
 function fillPreviewLayer(document) {
     for (const [layoutIndex, code] of Object.entries(PREVIEW_PD_BINDINGS)) {
         const position = CHARYBDIS_4X6_LAYOUT_MATRIX[Number(layoutIndex)];
-        if (position) document.layers[0][position[0] * 6 + position[1]] = code;
+        if (position) editLayers(document, layers => layers[0][position[0] * 6 + position[1]] = code);
     }
     PREVIEW_BASE.forEach((name, layoutIndex) => {
         if (PREVIEW_PD_BINDINGS[layoutIndex] !== undefined) return;
         const position = CHARYBDIS_4X6_LAYOUT_MATRIX[layoutIndex];
         const code = keycodes.encode(name);
-        if (position && typeof code === "number" && Number.isInteger(code)) document.layers[0][position[0] * 6 + position[1]] = code;
+        if (position && typeof code === "number" && Number.isInteger(code)) editLayers(document, layers => layers[0][position[0] * 6 + position[1]] = code);
     });
     return document;
 }
 
 /** @type {Partial<import("../core/session/types.js").DeviceCapabilities> & {brightnessMax: number}} */
 const capabilities = {
+    protocol: {major: 2, minor: 0},
+    schema: {major: 4, minor: 0},
     compiledLayerCount: 16,
-    supportedDomainMask: 31,
+    supportedDomainMask: 127,
     actionAbiDigest: ACTION_ABI,
     // Current firmware: everything the flashable pair reports.
     featureFlags: PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES,
-    responseVersion: 2,
+    responseVersion: 3,
     reportSize: 32,
     brightnessMax: 255,
     // The sizes current firmware advertises, so Profile & backups shows its meter.
-    maxProfilePayload: 53216,
+    maxProfilePayload: 130048,
     maxBehaviorRows: 128,
     maxPopulatedBehaviorSteps: 640,
     maxCombos: 128,
@@ -72,7 +75,7 @@ const capabilities = {
     maxTapStepsPerBehavior: 5,
     maxReusableRgbGroups: 16,
     maxRgbStageGroupRows: 32,
-    viaMacroBytes: 34903,
+    macroBytes: 34903,
 };
 
 // The hosts the preview stands in for. The extension's is what it always was;

@@ -1,3 +1,4 @@
+import {profileLayers, profileMacros, editLayers, editMacros} from "../fixtures/profile-document.js";
 // The payloads this interface posts have to be the ones the tested core
 // accepts. Every screen builds its messages with webview/view/edits.mjs (and
 // pointing records with view/pointing-config.mjs, layer-panel controls with
@@ -26,11 +27,11 @@ const {ProfileDraftSession} = require(path.join(here, "..", "..", "core", "sessi
 const portable = require(path.join(here, "..", "..", "core", "model", "portable-profile"));
 const {settingsEditorView} = require(path.join(here, "..", "..", "core", "model", "settings-editor"));
 const {buildDeviceModel, buildSnapshotModel} = require(path.join(here, "..", "..", "core", "session", "device-model"));
-const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require(path.join(here, "..", "..", "core", "protocol", "via-layout-v1"));
+const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require(path.join(here, "..", "..", "core", "data", "charybdis-layout"));
 const {RGB_LOCALITIES} = require(path.join(here, "..", "..", "core", "schema", "rgb-domain-v1"));
 const {document: pdDocument} = require(path.join(here, "..", "fixtures", "pd-profile"));
 
-const capabilities = {compiledLayerCount: 16, supportedDomainMask: 31, actionAbiDigest: 0x837cf479,
+const capabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 0}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x6fd70b90,
     featureFlags: require(path.join(here, "..", "..", "core", "protocol", "profile-wire-v1")).PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES};
 
 test("the playback protection control stages a portable policy and Review/discard/undo preserve text", () => {
@@ -45,9 +46,9 @@ test("the playback protection control stages a portable policy and Review/discar
     const change = draft.changes().find(row => row.unit === "macro:0");
     assert.deepEqual(change.fields.map(field => [field.label, field.before, field.after]), [["Uninterruptible playback", "Automatic · on", "Off"]]);
     const exported = JSON.parse(JSON.stringify(draft.document));
-    assert.deepEqual(portable.validateSnapshot(exported).document.macros, draft.document.macros);
+    assert.deepEqual(profileMacros(portable.validateSnapshot(exported).document), profileMacros(draft.document));
     draft.discard(draft.revision, change.group);
-    assert.deepEqual(draft.document.macros, fixture.snapshot.document.macros);
+    assert.deepEqual(profileMacros(draft.document), profileMacros(fixture.snapshot.document));
     draft.undo(draft.revision);
     assert.equal(macroEditorView(draft.current, fixture.capabilities).viaMacros[0].protection, "off");
 });
@@ -68,7 +69,7 @@ test("a dropped profile's payload opens a review before an undoable draft replac
     const {routeMessage} = require("../../core/session/panel-session");
     const draft = session(), before = draft.document;
     const incoming = structuredClone(before);
-    incoming.layers[0][0] = 5;
+    editLayers(incoming, layers => layers[0][0] = 5);
     const state = {selectedDeviceId: "test-device", connected: true, capabilities};
     const panel = {draft, service: {snapshot: () => state}};
     const payload = {...edits.reviewPortableProfile(JSON.stringify(incoming), "777.charybdis.json"),
@@ -78,7 +79,7 @@ test("a dropped profile's payload opens a review before an undoable draft replac
     assert.equal(panel.portableReview.fileName, "777.charybdis.json");
     assert.deepEqual(draft.document, before, "opening review leaves the draft untouched");
     await portableControl(panel, {type: "restorePortableProfile"});
-    assert.equal(draft.document.layers[0][0], 5);
+    assert.equal(profileLayers(draft.document)[0][0], 5);
     draft.undo(draft.revision);
     assert.deepEqual(draft.document, before);
 });
@@ -87,10 +88,10 @@ test("a dropped profile's payload opens a review before an undoable draft replac
 
 test("a key picked in the interface lands at its position on the layer the board was showing", () => {
     const draft = session();
-    const before = draft.document.layers.map((layer) => layer.slice());
+    const before = profileLayers(draft.document).map((layer) => layer.slice());
     stage(draft, edits.setKey("Layer 3", 27, "KC_B"));
-    assert.equal(draft.document.layers[3][slotOf(27)], 0x05, "KC_B at matrix row/column of layout index 27");
-    draft.document.layers.forEach((layer, index) => {
+    assert.equal(profileLayers(draft.document)[3][slotOf(27)], 0x05, "KC_B at matrix row/column of layout index 27");
+    profileLayers(draft.document).forEach((layer, index) => {
         const changed = layer.filter((code, slot) => code !== before[index][slot]).length;
         assert.equal(changed, index === 3 ? 1 : 0, `layer ${index}`);
     });
@@ -100,23 +101,23 @@ test("a key picked in the interface lands at its position on the layer the board
 test("Delete stores the key as transparent, and nothing else moves", () => {
     const draft = session();
     stage(draft, edits.setKey("Layer 2", 27, "KC_B"));
-    const before = draft.document.layers[2].slice();
+    const before = profileLayers(draft.document)[2].slice();
     stage(draft, edits.clearKey("Layer 2", 27));
-    const after = draft.document.layers[2];
+    const after = profileLayers(draft.document)[2];
     assert.deepEqual(after.map((code, slot) => code !== before[slot] ? slot : -1).filter((slot) => slot >= 0), [slotOf(27)]);
     assert.equal(after[slotOf(27)], 1, "KC_TRANSPARENT");
 });
 
 test("a modifier around a macro or pointing key is refused, not stored as another keycode", () => {
     const draft = session();
-    const before = draft.document.layers[0].slice();
+    const before = profileLayers(draft.document)[0].slice();
     // the picker builds Cmd + VIA macro 3 as G(VIA_MACRO_3)
     const picked = edits.pickerExpression({keys: ["VIA_MACRO_3"], mods: ["G"]});
     assert.equal(picked, "G(VIA_MACRO_3)");
     for (const keycode of [picked, "C(PD_SLOT_0)", "LOCK_LAYER(16)", "LT(60, 0x00)"]) {
         assert.throws(() => stage(draft, edits.setKey("Layer 0", 3, keycode)), /Cannot represent/, keycode);
     }
-    assert.deepEqual(draft.document.layers[0], before);
+    assert.deepEqual(profileLayers(draft.document)[0], before);
     assert.equal(draft.dirty, false);
 });
 
@@ -124,12 +125,12 @@ test("swapping two keys is one message and one draft step", () => {
     const draft = session();
     stage(draft, edits.setKey("Layer 1", 0, "KC_A"));
     stage(draft, edits.setKey("Layer 1", 1, "KC_B"));
-    const before = draft.document.layers[1].slice();
+    const before = profileLayers(draft.document)[1].slice();
     stage(draft, edits.swapKeys("Layer 1", {layoutIndex: 0, keycode: "KC_A"}, {layoutIndex: 1, keycode: "KC_B"}));
-    assert.equal(draft.document.layers[1][slotOf(0)], 0x05);
-    assert.equal(draft.document.layers[1][slotOf(1)], 0x04);
+    assert.equal(profileLayers(draft.document)[1][slotOf(0)], 0x05);
+    assert.equal(profileLayers(draft.document)[1][slotOf(1)], 0x04);
     draft.undo(draft.revision);
-    assert.deepEqual(draft.document.layers[1], before, "one undo takes both keys back");
+    assert.deepEqual(profileLayers(draft.document)[1], before, "one undo takes both keys back");
 });
 
 test("an edit from a stale form is refused rather than silently rebased", () => {
@@ -148,7 +149,7 @@ test("the picker posts layer keys by index, and wraps the key in modifiers and L
         edits.pickerExpression({keys: ["KC_A"], mods: ["C", "S"]})]) {
         stage(draft, edits.setKey("Layer 0", 5, keycode));
     }
-    assert.equal(draft.document.layers[0][slotOf(5)], 0x0304, "C(S(KC_A))");
+    assert.equal(profileLayers(draft.document)[0][slotOf(5)], 0x0304, "C(S(KC_A))");
 });
 
 // ── keyboard shortcuts ──────────────────────────────────────────────────
@@ -292,7 +293,7 @@ test("a custom key on no layer gets its behaviour row from the Custom keys scree
     const draft = session();
     const slot = 5;
     const isRow = (entry) => entry.target.kind === 7 && entry.target.operand === slot;
-    assert.ok(!draft.document.layers.some((layer) => layer.includes(customKeyCode(slot))), "CUSTOM_KEY_5 is on no layer");
+    assert.ok(!profileLayers(draft.document).some((layer) => layer.includes(customKeyCode(slot))), "CUSTOM_KEY_5 is on no layer");
     assert.ok(!decoded(draft).behaviors.rows.some(isRow));
     const row = behaviourEditorRow({behaviorTimingDefaults: {tapHoldTerm: "150", longerHoldTerm: "400", multiTapTerm: "150"}}, "CUSTOM_KEY_5");
     stage(draft, edits.saveBehaviour(row, {change: {tapCount: 0, kind: "long", branch: edits.cellBranch("long", {action: "KC_B", helper: "TAP_AT_HOLD_THRESHOLD"})}}, draft.identity()));
@@ -494,23 +495,23 @@ test("a macro payload is posted as the text the keyboard stores", () => {
 test("a macro name is posted without its steps, and review shows the rename", () => {
     const draft = session();
     stage(draft, edits.macroMessage("VIA_MACRO_5", "hello", draft.current.fingerprint));
-    const before = decoded(draft).document.macros[5];
+    const before = profileMacros(decoded(draft).document)[5];
     const message = edits.macroNameMessage("VIA_MACRO_5", "  Sign-off ", draft.current.fingerprint);
     assert.deepEqual(Object.keys(message).sort(), ["expectedFingerprint", "keycode", "name", "type"], "no payload travels with a rename");
     stage(draft, message);
     const after = decoded(draft);
     assert.equal(after.settings.macroNames[5], "Sign-off");
-    assert.equal(after.document.macros[5], before, "the steps are untouched");
+    assert.equal(profileMacros(after.document)[5], before, "the steps are untouched");
     assert.ok(draft.view({selectedDeviceId: "test-device", connected: true}).changes.some((change) => change.unit === "macro:5" && change.fields.some((field) => field.label === "Name" && field.after === "Sign-off")));
 });
 
 test("a custom key's name is posted trimmed against the draft it was read from, and review shows the rename", () => {
-    const draft = session(), read = draft.current.fingerprint, layers = draft.document.layers;
+    const draft = session(), read = draft.current.fingerprint, layers = profileLayers(draft.document);
     const message = edits.customKeyNameMessage("CUSTOM_KEY_2", "  Click Spam ", read);
     assert.deepEqual(message, {type: "updateCustomKey", keycode: "CUSTOM_KEY_2", name: "Click Spam", expectedFingerprint: read});
     stage(draft, message);
     assert.equal(decoded(draft).settings.customKeyNames[2], "Click Spam");
-    assert.deepEqual(draft.document.layers, layers, "a name moves no key");
+    assert.deepEqual(profileLayers(draft.document), layers, "a name moves no key");
     const view = draft.view({selectedDeviceId: "test-device", connected: true});
     assert.ok(view.changes.some((change) => change.unit === "customKey:2" && change.fields.some((field) => field.label === "Name" && field.after === "Click Spam")));
     assert.equal(view.undoLabel, "Renamed a custom key");
@@ -523,12 +524,12 @@ test("a custom key's name is posted trimmed against the draft it was read from, 
 });
 
 test("a custom key's shortcut is posted as a mask and a key, reviewed, undone and redone", () => {
-    const draft = session(), read = draft.current.fingerprint, layers = draft.document.layers;
+    const draft = session(), read = draft.current.fingerprint, layers = profileLayers(draft.document);
     const message = edits.customKeyShortcutMessage("CUSTOM_KEY_2", 0x41, 0x0e, read);
     assert.deepEqual(message, {type: "updateCustomKeyShortcut", keycode: "CUSTOM_KEY_2", shortcut: {mods: 0x41, key: 0x0e}, expectedFingerprint: read});
     stage(draft, message);
     assert.deepEqual(decoded(draft).settings.customKeyShortcuts[2], {mods: 0x41, key: 0x0e});
-    assert.deepEqual(draft.document.layers, layers, "a shortcut moves no key");
+    assert.deepEqual(profileLayers(draft.document), layers, "a shortcut moves no key");
     const view = draft.view({selectedDeviceId: "test-device", connected: true});
     assert.ok(view.changes.some((change) => change.unit === "customKey:2" && change.fields.some((field) => field.label === "Shortcut" && field.after === "Left Ctrl + Right Alt + K")));
     assert.equal(view.undoLabel, "Changed a custom key's shortcut");
@@ -553,7 +554,7 @@ test("a custom key made for a shortcut no keycode holds is named and placed in o
     const after = decoded(draft);
     assert.deepEqual(after.settings.customKeyShortcuts[9], {mods: 0x88, key: 0}, "both GUIs, no key");
     assert.equal(after.settings.customKeyNames[9], "Left GUI + Right GUI");
-    assert.equal(draft.document.layers[0][slotOf(27)], customKeyCode(9), "placed on the key the picker was for");
+    assert.equal(profileLayers(draft.document)[0][slotOf(27)], customKeyCode(9), "placed on the key the picker was for");
     assert.equal(draft.view({selectedDeviceId: "test-device", connected: true}).undoLabel, "Made a custom key for a shortcut");
     draft.undo(draft.revision);
     assert.deepEqual(draft.document, before, "one undo takes back the key, its name and its shortcut");
@@ -577,18 +578,18 @@ test("a custom key made for a behaviour cell's shortcut is sent by that cell in 
     // the key is only named and given the shortcut.
     stage(draft, edits.customKeyForShortcut("CUSTOM_KEY_9", {mods: 0x11, key: 0}, "Left Ctrl + Right Ctrl"));
     assert.deepEqual(decoded(draft).settings.customKeyShortcuts[9], {mods: 0x11, key: 0});
-    assert.deepEqual(draft.document.layers, before.layers);
+    assert.deepEqual(profileLayers(draft.document), profileLayers(before));
     assert.throws(() => stage(draft, {...edits.customKeyForShortcut("CUSTOM_KEY_8", {mods: 0x11, key: 0}, ""), then: /** @type {any} */ ({type: "renameKeyboard", name: "x"})}),
         /goes on a key or in a behaviour/, "only a layout key or a behaviour follows");
 });
 
 test("the keyboard's name is posted trimmed against the draft it was read from, and review shows the rename", () => {
-    const draft = session(), read = draft.current.fingerprint, layers = draft.document.layers;
+    const draft = session(), read = draft.current.fingerprint, layers = profileLayers(draft.document);
     const message = edits.keyboardNameMessage("  Noah’s Charybdis ", read);
     assert.deepEqual(message, {type: "renameKeyboard", name: "Noah’s Charybdis", expectedFingerprint: read});
     stage(draft, message);
     assert.equal(decoded(draft).settings.keyboardName, "Noah’s Charybdis");
-    assert.deepEqual(draft.document.layers, layers, "a name moves no key");
+    assert.deepEqual(profileLayers(draft.document), layers, "a name moves no key");
     const view = draft.view({selectedDeviceId: "test-device", connected: true});
     assert.ok(view.changes.some((change) => change.unit === "keyboardName" && change.fields.some((field) => field.label === "Name" && field.before === "built-in name" && field.after === "Noah’s Charybdis")));
     assert.equal(view.undoLabel, "Renamed the keyboard");
@@ -605,8 +606,8 @@ test("a macro left holding a key is refused, and macro and custom keys land as t
     const draft = session();
     assert.throws(() => stage(draft, edits.macroMessage("VIA_MACRO_0", "{+KC_A}", draft.current.fingerprint)), /Release/);
     stage(draft, edits.layoutKeys("Layer 0", [{layoutIndex: 0, keycode: "VIA_MACRO_63"}, {layoutIndex: 1, keycode: "CUSTOM_KEY_15"}]));
-    assert.equal(draft.document.layers[0][slotOf(0)], 0x773f);
-    assert.equal(draft.document.layers[0][slotOf(1)], 0x7f0f);
+    assert.equal(profileLayers(draft.document)[0][slotOf(0)], 0x773f);
+    assert.equal(profileLayers(draft.document)[0][slotOf(1)], 0x7f0f);
     assert.throws(() => stage(draft, edits.layoutKeys("Layer 0", [{layoutIndex: 1, keycode: "MACRO_15"}])), /Cannot represent/, "the retired user macros are gone");
 });
 
@@ -1077,7 +1078,7 @@ test("on the 32-slot firmware, the same builders reach slots past seven", () => 
     stage(draft, edits.pdModeColour("PD_MODE_SLOT_25", "RGB_LEFT_HALF", {h: 1, s: 2, v: 3}));
     assert.deepEqual(wide().rgb.pdModeColors[25], {pdModeId: 25, color: {h: 1, s: 2, v: 3}, locality: RGB_LOCALITIES.RGB_LEFT_HALF});
     stage(draft, edits.setKey("Layer 1", 27, "PD_SLOT_31_LOCK"));
-    assert.equal(draft.document.layers[1][slotOf(27)], 0x7ebf);
+    assert.equal(profileLayers(draft.document)[1][slotOf(27)], 0x7ebf);
     stage(draft, edits.clearPdMode(12, draft.identity()));
     assert.equal(wide().pdModes[12].kind, 0);
     assert.ok(reviewAreas(draft).includes("Pointing modes"));
@@ -1161,10 +1162,10 @@ test("the Host section posts staged settings with Review, undo, redo and backup 
     assert.equal(decoded(draft).settings.values[27], 0x102);
     assert.ok(reviewAreas(draft).includes("Settings"));
     stage(draft, edits.macroMessage("VIA_MACRO_0", "café 🙂 e\u0301", portable.fingerprint(draft.document)));
-    assert.equal(Buffer.from(draft.document.macros[0], "base64").toString("utf8"), "café 🙂 e\u0301");
+    assert.equal(Buffer.from(profileMacros(draft.document)[0], "base64").toString("utf8"), "café 🙂 e\u0301");
     const backup = JSON.parse(JSON.stringify(draft.document));
     assert.equal(portable.validateSnapshot(backup, caps).settings.values[27], 0x102);
-    draft.undo(draft.revision); assert.equal(draft.document.macros[0], doc.macros[0]);
+    draft.undo(draft.revision); assert.equal(profileMacros(draft.document)[0], profileMacros(doc)[0]);
     draft.undo(draft.revision); assert.equal(decoded(draft).settings.values[27], 2);
     draft.undo(draft.revision); assert.equal(decoded(draft).settings.values[27], 0);
     draft.redo(draft.revision); draft.redo(draft.revision); draft.redo(draft.revision); assert.deepEqual(draft.document, backup);
@@ -1181,7 +1182,7 @@ test("the Host section stages a keyboard layout and the macOS ISO bit", () => {
     stage(draft, message);
     assert.equal(decoded(draft).settings.values[27], (2 << 16) | 0x1000000);
     stage(draft, edits.macroMessage("VIA_MACRO_0", "café “hello” €", portable.fingerprint(draft.document)));
-    assert.equal(Buffer.from(draft.document.macros[0], "base64").toString("utf8"), "café “hello” €");
+    assert.equal(Buffer.from(profileMacros(draft.document)[0], "base64").toString("utf8"), "café “hello” €");
 });
 
 test("literal step messages inspect and stage the exact text with undo intact", async () => {
@@ -1194,7 +1195,7 @@ test("literal step messages inspect and stage the exact text with undo intact", 
     assert.equal(macroInputStatus(draft.current, message, draft.capabilities).error, "");
     const before = draft.document;
     stage(draft, edits.macroMessage(message.keycode, message.payload, draft.current.fingerprint));
-    assert.equal(Buffer.from(draft.document.macros[17], "base64").subarray(0, Buffer.byteLength(text)).toString(), text);
+    assert.equal(Buffer.from(profileMacros(draft.document)[17], "base64").subarray(0, Buffer.byteLength(text)).toString(), text);
     assert.ok(reviewAreas(draft).includes("Macros"));
     draft.undo(draft.revision);
     assert.deepEqual(draft.document, before);
@@ -1227,7 +1228,7 @@ test("the layer panel's toggle, moves and save reach the draft through the real 
     assert.equal(panel.portableLayers, undefined);
     assert.deepEqual(draft.order, order);
     assert.equal(draft.current.summary.names[1], "777", "the renamed layer moved to its new slot");
-    assert.deepEqual(draft.document.layers[0], before.layers[5], "Make base put layer 5's keys at the bottom");
+    assert.deepEqual(profileLayers(draft.document)[0], profileLayers(before)[5], "Make base put layer 5's keys at the bottom");
     draft.undo(draft.revision);
     assert.deepEqual(draft.document, before);
 });

@@ -3,107 +3,104 @@
 The app contract behind
 [D-L23](../LIVE_EDIT_APP_DIRECTION.md#d-l23--apply-shows-its-steps-and-a-failure-says-where-why-and-what-was-saved).
 The [guide](../GUIDE.md#applying-changes) describes Apply for the person using
-Ark; this specification owns capture integrity, progress correlation and
-renderer updates. Firmware owns the wire and transaction contracts linked
-below.
+Ark. Firmware owns the [one-store transaction](../../upstream/firmware/docs/architecture/logical-profile-transaction-v1.md)
+and [Profile Wire](../../upstream/firmware/docs/architecture/profile-wire-v1.md).
 
 ## Apply and read progress
 
-`core/session/apply-progress.js` names the ten steps of an Apply and tracks
-them forward only: check the keyboard, save a recovery copy, send the profile,
-keyboard checks it, stage keys and macros on the slave half, copy the profile
-to the slave half, save it on the master half, finish the slave half, write keys
-and macros on the master half, check both halves. The master half is the one
-connected over USB; the slave half is its partner over the split cable. These
-roles do not imply left or right, and the Keyboard screen explains them.
-`restoreProfile()` reports at each real boundary with byte counts. A failure keeps its step, a reason from the
-keyboard's own error (or the slave half's last answer), and whether anything
-was saved. After the decision it says how the save ends. Ordinarily the
-keyboard finishes it from the slave half's copy. When the candidate is (or
-reads back as) `AUTHORITY_FAILED`, only a restart ends it: the message asks
-for an unplug and replug, and says whether the master half types nothing
-(VIA ACCEPT seen, or read back as queued, acknowledged, failed or rolled
-forward), keeps typing (staged with nothing queued) or may type nothing (VIA
-status unreadable), with that keyboard reason in place of the failed step's own.
-The commit bar keeps a failed Apply on screen until dismissed.
-Transfer progress uses a separate `applyProgress` panel message, correlated to
-the current draft ID and revision. The service retains the latest view for
-full snapshots; progress alone updates the commit bar without rebuilding the
-profile model or the visible editor. Connection, profile and busy-state changes
-still publish full models. The active screen must not add work to each copy
-chunk, including when a macro's local Text or Advanced input is present.
-Read counters use a separate `readProgress` message for layout, profile pages
-and portable capture. The service retains these counters for full snapshots;
-the panel updates its commit bar or initial-read placeholder in place. A read
-message must match the active operation ID, phase, device, connection token
-and draft ID/revision (including an absent draft during the initial read), and
-is ignored once that operation ends. Full models still publish operation
-boundaries, completed data and failures. This rule covers initial reads and
-post-Apply readback in both hosts; progress must not reconstruct the draft's
-presentation model on every device reply.
+`core/session/apply-progress.js` names eight steps, moving forward only:
+check the keyboard, save a recovery copy, send the profile, keyboard checks
+it, copy the profile to the slave half, save it on the master half, finish
+the slave half, check both halves. Master means the half on USB; slave its
+partner over the split cable. Progress follows actual firmware states, so a
+state completed between polls need not be displayed as active.
+
+A failure keeps its step, the keyboard's reason (or the peer's last answer)
+and what was saved. A confirmed pre-decision cancel means nothing was saved.
+An ambiguous outcome keeps the recovery file and never silently retries.
+After an observed decision, firmware completes the same generation once both
+halves are connected. `AUTHORITY_FAILED` requires a USB replug; each half
+keeps a complete generation until activation. There is no VIA input fence,
+staged bank or host roll-forward to diagnose. The commit bar retains a failed
+Apply until dismissed.
+
+Transfer progress travels in separate `applyProgress` messages correlated to
+the draft ID and revision. The service retains the latest view for snapshots;
+progress updates only the commit bar, preserving the visible editor and local
+forms. Connection, profile and busy-state changes still publish full models.
+
+`readProgress` messages carry layout, profile or capture counters. They must
+match operation ID, phase, device, connection token and draft ID/revision,
+including an absent draft during initial reading. Late messages are ignored
+once the operation ends. The service keeps counters for full snapshots;
+individual replies never reconstruct a draft presentation model. Configure
+editors retain their DOM when a full model changes only transient read status;
+profile, vocabulary, permission, connection or form-reset changes redraw them.
 
 ## Complete captures and integrity
 
-Layout reads use the existing VIA buffer command (`0x12`) in 28-byte chunks,
-decode the full 10 × 6 matrix per layer in big-endian keycodes, and expose only
-the pinned visible positions in layout order. Sixteen layers take 69 requests;
-progress counts visible keys, including the final 896-key total.
-Profile payload reuse belongs to the connection's `ProfilePayloadReader`. It
-can retain only bytes actually read and verified by CRC32 and FNV-1a. Compiled
-defaults can be reused while that connection holds. Initial reading uses one
-coherent complete capture for the editor and portable draft: layout, committed
-payload and live combos are downloaded once and installed together after the
-capture's checks pass. Initial committed reads, exports and post-Apply readback
-download bytes afresh. A failed capture leaves independent diagnostics readable
-but never opens an editable draft. Every reuse checks the complete fresh metadata identity before
-and after, verifies both hashes, retries or downloads afresh on a mismatch,
-and retains the capture's status, storage and settings coherence checks.
-Reconnect discards the reader. Authored Apply target bytes never seed its cache:
-the stored metadata alone is not a fresh integrity read of flash. The complete
-macro bank, including unused trailing bytes, remains freshly verified because
-Apply compares the actual stored bank. The macro read map reconstructs
-firmware-confirmed zero blocks and downloads every marked block; while the
-keyboard reports the map unavailable (its storage not yet settled), the whole
-bank is read. Portable progress names each read
-and reports transferred bytes. Configure editors retain their DOM when a full
-model changes only transient read status; data, vocabulary, permission or
-connection changes and form-reset/edit replies redraw. New model fields are
-included in this comparison by default; Device and Profile retain full renders.
-After a successful Apply, the app reads layout, committed domains, combos and
-VIA base lighting again. The editor and rail stay visible but busy; the commit
-bar names the current read and its page progress until editing resumes. This
-readback is separate from the ten transaction steps and does not claim another
-two-half verification. A finished Apply reaches the model only while its own
-control still runs; any later busy operation (read, export, discard, review
-against the keyboard) gets the generic busy bar, which names the operation and
-mentions the saved profile only while a profile is being written.
+Capabilities identify the firmware, including its version. There are no VIA
+identity, layout, macro or RGB commands. Unsupported bases are read no further
+than capabilities and receive the update notice.
+
+A capture reads compiled defaults, the active saved profile when present,
+effective native combos and settings through Profile Wire. Missing active
+domains come from the keyboard's own compiled profile. The resulting complete
+blob has all seven domains once. Keymap `0x60` v1 carries all 16 × 60 matrix
+positions as little-endian uint16 values, including the four unwired positions;
+the visible layout projects the geometry in `core/data/charybdis-layout.js`.
+Macros come from domain `0x70` v1. Base lighting comes from the captured
+settings scalars 21/22; brightness is absolute HSV, never scaled by a limit.
+Keyboard options, effect inventory, brightness limit and host metadata retain
+their separate Profile Wire editor reads.
+
+Profile payloads are checked against their metadata CRC32/FNV and active
+status identity: generation, digest and, for a saved record, origin half.
+Independent layout and domain reads use the same rule and recheck active
+status after downloading. An active compiled profile always uses compiled
+bytes, even with a newer saved record. If the running saved record cannot be
+retrieved, the layout is unavailable; the latest committed record never
+stands in for it. Macros and every other editable area come from the coherent
+capture and remain unavailable when it fails. Settings are read coherently and checked again before the
+final status read. Both halves must be converged, with no preview, candidate
+or conflict during an ordinary capture. A changed identity refuses the capture.
+One capture supplies the editable layout, domains, macros, base RGB and backup;
+a failed capture leaves independent diagnostics but opens no editable draft.
+
+`ProfilePayloadReader` belongs to one connection. Only bytes actually read
+and verified may populate it. Compiled defaults may be reused on that
+connection; initial saved reads, Refresh and Export download saved bytes afresh.
+A metadata mismatch retries or downloads afresh and both hashes remain
+required. Reconnect discards the reader. Authored target bytes never seed it.
+
+A reviewed capture may serve as the recovery base only after a fresh profile
+and settings identity check. Apply saves its recovery copy before any mutation,
+checks the identity again under the candidate lease, and reuses exact active
+bytes only when their digest matches that identity. Missing or mismatching
+source bytes cause full upload. Candidate transfer keeps bounded batches and
+differential REUSE; firmware validates the entire result. BEGIN bytes 24–31
+are zero. Commit publishes one new generation, confirmed by transaction,
+digest, local committed/active identity and peer identity when visible. A
+lost peer link after firmware confirmed its record does not invalidate an
+already active target; Ark reports that the peer is out of sight.
+
+After Apply, the editor reads the configuration again while it stays visible
+and busy. This readback is separate from the eight transaction steps. A later
+read or export gets the generic operation bar rather than an old finished
+Apply. No automated check establishes physical interruption acceptance.
 
 ## Candidate peer progress
 
-Candidate status page 1 (see
-[Profile Wire V1](../../upstream/firmware/docs/architecture/profile-wire-v1.md#candidate-operation-status))
-reports the peer phase, transferred bytes and the peer's last split status. The
-host counts its movement as progress while the keyboard is `PREPARING_PEER`, so
-a slow copy no longer runs into the stall window. Firmware without page 1
-answers `UNKNOWN_PAGE` and keeps the old behaviour.
+Candidate status page 1 reports phase, transferred bytes, safe-boundary waits
+and the last split answer. Movement extends the no-progress budget during
+`PREPARING_PEER`. Bounded cancellation, decided recovery and activation belong
+to firmware. Removed GET `0x0c` macro maps and VIA staging values are never
+requested; the current base is required rather than using an older fallback.
 
-## Sparse VIA macro reads
+## Portable files
 
-When a keyboard implements optional Profile Wire GET `0x0c`, a complete capture
-reads its macro map and storage identity, downloads marked 256-byte blocks,
-reconstructs omitted blocks as zero, rereads the metadata and verifies the
-canonical full VIA-store digest. The map must match the capture's initial
-storage identity; the final profile, storage and settings checks stay in place.
-Adjacent blocks share one transfer range. Progress counts bytes actually
-transferred, and an empty bank completes with zero macro data exchanges.
-
-A stale nonzero tail is included even when it belongs to no macro. The final
-write-validity byte is included in the map and retains its incomplete-write
-check. Unsupported or initially unavailable maps use the full-bank reader,
-including clean nonzero VIA layout options written by another client;
-malformed maps, later unavailability, changed identities and corruption fail
-the read. Freshness and exact stored bytes are preserved for initial capture,
-Refresh, Export, recovery and differential Apply. Storage and backup formats
-stay unchanged. The firmware owns the
-[wire contract](../../upstream/firmware/docs/architecture/profile-wire-v1.md#sparse-via-macro-read-map--get-value-0x0c),
-imported from its published implementation.
+[D-L15](../LIVE_EDIT_APP_DIRECTION.md#d-l15--a-portable-profile-is-the-complete-effective-configuration)
+owns Ark's version-5 JSON envelope: one complete base64 profile blob, with no
+separate keymap or macro fields. Decoded domain views serve editors, review,
+undo and layer rewrites. Exact active bytes retained for REUSE are separate
+from that materialized effective document and never become a second authority.

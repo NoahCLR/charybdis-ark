@@ -1,4 +1,5 @@
 "use strict";
+const {profileLayers} = require("../fixtures/profile-document");
 const test = require("node:test"), assert = require("node:assert/strict");
 const fs = require("node:fs"), path = require("node:path");
 const {DRAFT_EDIT_TYPES, DRAFT_EDITS, editedBy, inDomain, draftEditLabel} = require("../../core/model/draft-edits");
@@ -58,7 +59,7 @@ test("every registered edit names its editor, its words and, on the profile, its
 function draft() {
     const doc = pdDocument();
     const snapshot = {document: doc, fingerprint: portable.fingerprint(doc), summary: portable.summary(doc), limits: {brightnessMax: 200}};
-    return new ProfileDraftSession(snapshot, "test-device", {compiledLayerCount: 16, supportedDomainMask: 31, actionAbiDigest: 0x837cf479});
+    return new ProfileDraftSession(snapshot, "test-device", {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 0}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x6fd70b90});
 }
 
 test("every registered edit reaches its editor, and anything else is refused as unsupported", () => {
@@ -77,7 +78,7 @@ test("every registered edit reaches its editor, and anything else is refused as 
 
 test("each edit is recorded in its own words", () => {
     const session = draft(), document = session.document;
-    const stored = (layoutIndex) => keycodes.resolve(document.layers[1][CHARYBDIS_4X6_LAYOUT_MATRIX[layoutIndex][0] * 6 + CHARYBDIS_4X6_LAYOUT_MATRIX[layoutIndex][1]]).name;
+    const stored = (layoutIndex) => keycodes.resolve(profileLayers(document)[1][CHARYBDIS_4X6_LAYOUT_MATRIX[layoutIndex][0] * 6 + CHARYBDIS_4X6_LAYOUT_MATRIX[layoutIndex][1]]).name;
     const layout = (changes) => draftEditLabel({type: "updateLayoutKeys", layer: "Layer 1", changes}, document);
     assert.equal(layout([{layoutIndex: 0, keycode: "KC_A"}]), "Changed a key");
     assert.equal(layout([{layoutIndex: 0, keycode: "KC_A"}, {layoutIndex: 1, keycode: "KC_B"}, {layoutIndex: 2, keycode: "KC_C"}]), "Changed 3 keys at once");

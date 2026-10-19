@@ -4,6 +4,7 @@
 // context, as localhost is — with a fake navigator.hid whose keyboard is
 // tests/fixtures/fake-keyboard.js, answering in Node. playwright.config.js
 // builds the page before these run.
+const {profileMacros, editLayers} = require("../tests/fixtures/profile-document");
 const {test, expect} = require("@playwright/test");
 const {installFakeHid} = require("./fake-hid");
 const {fakeKeyboard} = require("../tests/fixtures/fake-keyboard");
@@ -15,8 +16,7 @@ const PAGE = "/dist/web/index.html";
 
 // A browser context with the fake keyboard plugged in, recording every request
 // any of its pages or workers makes.
-async function withKeyboard(context, baseURL, keyboards = 1) {
-    const keyboard = fakeKeyboard({document: pdDocument()});
+async function withKeyboard(context, baseURL, keyboards = 1, keyboard = fakeKeyboard({document: pdDocument()})) {
     await context.exposeFunction("__fakeKeyboard", (reportId, bytes) => {
         if (reportId !== 0) throw new Error(`unexpected report id ${reportId}`);
         return keyboard.answer(Buffer.from(bytes)).map((reply) => Array.from(reply));
@@ -67,7 +67,7 @@ for (const demo of [false, true]) test(`drop a profile into the real ${demo ? "d
     await page.locator('[data-screen="profile"]').click();
     // Choosing remains available and uses the same review card.
     const file = pdDocument();
-    file.layers[0][0] = 5;
+    editLayers(file, layers => layers[0][0] = 5);
     const [chooser] = await Promise.all([page.waitForEvent("filechooser"), page.locator('[data-act="import"]').click()]);
     await chooser.setFiles({name: "chosen.charybdis.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(file))});
     await expect(page.locator(".import-sheet")).toContainText("chosen.charybdis.json");
@@ -105,7 +105,7 @@ test("a file that matches the keyboard changes nothing, but still puts a draft w
     await expect(page.locator('[data-act="restore"]')).toHaveCount(0);
     // One edit in the draft, from another file.
     const edited = pdDocument();
-    edited.layers[0][0] = edited.layers[0][0] === 5 ? 6 : 5;
+    editLayers(edited, layers => layers[0][0] = layers[0][0] === 5 ? 6 : 5);
     await dropFiles(page, [{name: "edited.charybdis.json", text: JSON.stringify(edited), type: ""}]);
     await expect(page.locator('[data-act="restore"]')).toBeEnabled();
     await page.locator('[data-act="restore"]').click();
@@ -430,7 +430,7 @@ test("literal macro steps stage through the real web host, export exactly, undo 
     await page.locator('.commit [data-act="review"]').click();
     const [exported] = await Promise.all([page.waitForEvent("download"), page.locator('.sheet [data-act="export"]').click()]);
     const file = JSON.parse(await (await exported.createReadStream()).toArray().then(chunks => Buffer.concat(chunks).toString("utf8")));
-    expect(Buffer.from(file.macros[17], "base64").toString("utf8")).toBe(text);
+    expect(Buffer.from(profileMacros(file)[17], "base64").toString("utf8")).toBe(text);
     await page.locator('.sheet [data-act="close"]').first().click();
     await page.locator('.rail [data-act="undo"]').click();
     await expect(page.locator(".macro-empty")).toBeVisible();
@@ -516,4 +516,34 @@ test("every keyboard Chrome allows is the connected one or in the selector, as t
     await expect(page.locator(".rail-product")).toHaveText("No keyboard connected");
     await page.evaluate((index) => window.__fakeHidPlug(index, true), left);
     await expect(name.locator(".dot.ok")).toHaveCount(1);
+});
+
+test("the web host reads, edits and Applies one profile generation without VIA", async ({page, context, baseURL}) => {
+    const {writableKeyboard} = require("../tests/fixtures/writable-keyboard");
+    const {validateSnapshot} = require("../core/model/portable-profile");
+    const keyboard = writableKeyboard({document: pdDocument(), generation: 7});
+    const {ownFilesOnly} = await withKeyboard(context, baseURL, 1, keyboard);
+    const errors = await open(page);
+    await page.locator('.read-placeholder [data-act="choose-keyboard"]').click();
+    await ready(page);
+    await page.locator('[data-screen="mouse"]').click();
+    const dpi = page.locator('select[data-macro="normalDpi"]');
+    const next = await dpi.evaluate(select => [...select.options].find(option => !option.selected).value);
+    await dpi.selectOption(next);
+    await expect(page.locator(".rail-status")).toContainText("1 change in draft");
+    await page.locator('.commit [data-act="review"]').click();
+    await page.locator('.sheet [data-act="apply"]').click();
+    const confirm = page.locator('[data-act="apply-anyway"]');
+    if (await confirm.count()) await confirm.click();
+    await expect(page.locator(".rail-status")).not.toContainText(/changes? in draft/, {timeout: 20000});
+    await expect(dpi).toBeEnabled({timeout: 20000});
+    await expect(dpi).toHaveValue(next);
+    expect(keyboard.generation).toBe(8);
+    expect(keyboard.local.profile).toEqual(keyboard.peer.profile);
+    const document = {format: "charybdis-profile", version: 5, keyboard: "charybdis-4x6", actionAbiDigest: pdDocument().actionAbiDigest, profile: keyboard.active.toString("base64")};
+    expect(validateSnapshot(document).settings.values[require("../core/schema/settings-domain-v1").SETTING.DEFAULT_DPI]).toBe(Number(next));
+    expect(keyboard.events).toEqual(["begin", "validated", "commit", "decision", "activated"]);
+    expect(keyboard.mutations.every(report => [7, 9].includes(report[0]) && report[1] === 0)).toBe(true);
+    expect(keyboard.requests.some(report => [1, 2, 0x0c, 0x0e, 0x12].includes(report[0]))).toBe(false);
+    expect(errors).toEqual([]); ownFilesOnly();
 });

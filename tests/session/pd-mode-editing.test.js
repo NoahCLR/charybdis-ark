@@ -1,4 +1,5 @@
 "use strict";
+const {profileLayers} = require("../fixtures/profile-document");
 const test = require("node:test"), assert = require("node:assert/strict");
 const {document} = require("../fixtures/pd-profile");
 const {ProfileDraftSession} = require("../../core/session/profile-draft-session");
@@ -8,14 +9,14 @@ const {candidateMetadataForBlob, buildCandidateBeginRequest} = require("../../co
 const {buildSnapshotModel} = require("../../core/session/device-model");
 function fixture() {
     const value = document(), snapshot = {document: value, fingerprint: fingerprint(value), summary: summary(value)};
-    const caps = {compiledLayerCount: 16, supportedDomainMask: 31, actionAbiDigest: value.actionAbiDigest};
+    const caps = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 0}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: value.actionAbiDigest};
     const draft = new ProfileDraftSession(snapshot, "board", caps);
     const stage = message => draft.stage({...message, draftRevision: draft.revision});
     return {draft, stage, caps};
 }
 test("the six factory modes stay data, with 32 RGB rows and the remaining slots empty", () => {
     const value = validateSnapshot(document());
-    assert.equal(value.document.version, 3);
+    assert.equal(value.document.version, 5);
     assert.deepEqual(value.pdModes.map(mode => mode.name), ["Dragscroll", "Volume", "Brightness", "Zoom", "Arrow", "Pinch", ...Array(26).fill("")]);
     assert.equal(value.rgb.formatVersion, 4); assert.equal(value.rgb.pdModeColors.length, 32);
     assert.equal(value.pdModes[4].buttons[0].modifiers, 32);
@@ -76,12 +77,13 @@ test("keycode-picker modifier expressions are accepted as directional actions", 
     assert.equal(mode.directions.up.keycode, 0x081d);
     assert.equal(mode.directions.down.keycode, 0x081c);
 });
-test("logical Apply declares schema three, all five domains and storage format five", () => {
+test("logical Apply declares schema four, all seven domains and storage format six", () => {
     const value = validateSnapshot(document());
-    const metadata = candidateMetadataForBlob(value.profile, {actionAbiDigest: value.document.actionAbiDigest, viaGeneration: 3, viaDigest: 42});
-    assert.equal(metadata.schemaMajor, 3); assert.equal(metadata.requestedDomains, 31); assert.equal(metadata.storeFormatVersion, 5);
+    const metadata = candidateMetadataForBlob(value.profile, {actionAbiDigest: value.document.actionAbiDigest});
+    assert.equal(metadata.schemaMajor, 4); assert.equal(metadata.requestedDomains, 127); assert.equal(metadata.storeFormatVersion, 6);
     const frame = buildCandidateBeginRequest(1, metadata);
-    assert.equal(frame[23], 5); assert.equal(frame.readUInt32LE(24), 3); assert.equal(frame.readUInt32LE(28), 42);
+    // Profile Wire 2 implies the store format: BEGIN carries a 32-bit length.
+    assert.equal(frame.readUInt32LE(8), value.profile.length); assert.equal(frame.readUInt32LE(24), 0); assert.equal(frame.readUInt32LE(28), 0);
 });
 
 test("a cleared slot keeps its bindings, because the keyboard keeps its keycodes", () => {
@@ -101,7 +103,7 @@ test("a cleared slot keeps its bindings, because the keyboard keeps its keycodes
     const cleared = validateSnapshot(draft.document);
     assert.equal(cleared.pdModes[7].kind, 0, "the slot is empty");
     assert.equal(cleared.danglingPdBindings[7], 1, "and the key that still reaches it is counted, not refused");
-    assert.equal(cleared.document.layers[0][0] !== 0, true, "the button stays on the board");
+    assert.equal(profileLayers(cleared.document)[0][0] !== 0, true, "the button stays on the board");
     assert.equal(modelNow().qmkKeycodes.find(key => key.value === "PD_SLOT_7").label, "Slot 7 · hold (empty)",
         "and the keycode stays in the catalogue, described as empty rather than by a name that is gone");
 

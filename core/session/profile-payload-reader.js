@@ -1,6 +1,17 @@
 // @ts-check
 "use strict";
 const {PROFILE_PAYLOAD_V1, readCommittedPayload, readCompiledPayload} = require("../protocol/profile-payload-v1");
+const {PROFILE_ACTIVE_KIND} = require("../protocol/profile-wire-v1");
+
+// GET committed serves the newest saved record, which may not be running yet.
+// Compiled defaults have no record origin; saved profiles must match all three
+// parts of the active identity, even when their bytes happen to be identical.
+/** @param {import("../protocol/types.js").PayloadRead} read @param {import("./types.js").ProfileStatus} status */
+function payloadMatchesActive({metadata}, status) {
+    return (status.activeKind === PROFILE_ACTIVE_KIND.COMPILED_ONLY || status.activeKind === PROFILE_ACTIVE_KIND.COMMITTED)
+        && metadata.generation === status.activeGeneration && metadata.digest === status.activeDigest
+        && (status.activeKind === PROFILE_ACTIVE_KIND.COMPILED_ONLY || metadata.originHalf === status.activeOriginHalf);
+}
 
 // One connection's verified reads. Compiled defaults are immutable within a
 // connection; a committed read always downloads bytes unless a caller is
@@ -27,4 +38,4 @@ class ProfilePayloadReader {
     }
 }
 
-module.exports = {ProfilePayloadReader};
+module.exports = {ProfilePayloadReader, payloadMatchesActive};

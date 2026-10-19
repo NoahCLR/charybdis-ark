@@ -354,13 +354,13 @@ function profileReview(before, after, capabilities) {
     const layerName = (value, i) => layerCalled(value.settings.names, i);
     const macrosA = /** @type {Macros} */ (macroEditorView(before, capabilities)), macrosB = /** @type {Macros} */ (macroEditorView(after, capabilities));
     const namesA = namesIn(a, macrosA, before.hostOs?.detected), namesB = namesIn(b, macrosB, after.hostOs?.detected);
-    a.document.layers.forEach((keys, l) => keys.forEach((code, p) => {
-        if (code === b.document.layers[l][p]) return;
+    a.layers.forEach((keys, l) => keys.forEach((code, p) => {
+        if (code === b.layers[l][p]) return;
         // Each side reads by its own snapshot's names: a renamed macro is
         // its old name on the keyboard and its new one in the draft.
         /** @param {number} code @param {Names} names */
         const values = (code, names) => ({text: keyLabel(names.keys, code), detail: keyLabelWithName(names.keys, code), key: code, mark: keyMark(code)});
-        item("Layout", `layout:${l}:${p}`, `${layerName(b, l)} · ${positionName(p)}`, new Map([["", values(code, namesA)]]), new Map([["", values(b.document.layers[l][p], namesB)]]),
+        item("Layout", `layout:${l}:${p}`, `${layerName(b, l)} · ${positionName(p)}`, new Map([["", values(code, namesA)]]), new Map([["", values(b.layers[l][p], namesB)]]),
             {kind: "key", layer: l, layoutIndex: LAYOUT_INDEX.get(p)}, undefined, {kind: "layer", layer: l});
     }));
     a.settings.names.forEach((name, i) => {

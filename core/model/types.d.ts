@@ -6,9 +6,7 @@ export interface PortableDocument {
     version: number;
     keyboard: 'charybdis-4x6';
     actionAbiDigest: number;
-    layers: number[][];
     profile: string;
-    macros: string[];
 }
 
 /** Destination facts used by portable documents and editors, not a wire response. */
@@ -26,8 +24,8 @@ export interface ProfileDestination extends Partial<ActionLimits> {
     customKeySlots?: number;
     maxReusableRgbGroups?: number;
     maxRgbStageGroupRows?: number;
-    viaMacroBytes?: number;
-    viaMacroSlots?: number;
+    macroBytes?: number;
+    macroSlots?: number;
     brightnessMax?: number;
     effects?: {id: number; name: string}[];
     detectedHostOs?: number;
@@ -36,8 +34,10 @@ export interface ProfileDestination extends Partial<ActionLimits> {
 export interface DecodedProfile {
     document: PortableDocument;
     profile: Buffer;
-    layout: Buffer;
-    macros: Buffer;
+    /** The whole profile a save uploads: the profile's domains, the keymap and the macros. */
+    candidate: Buffer;
+    layers: number[][];
+    macroSlots: Buffer[];
     settings: ReturnType<typeof import('../schema/settings-domain-v1.js').decodeSettings>;
     rgb: ReturnType<typeof import('../schema/rgb-domain-v1.js').decodeRgbDomainV1>;
     behaviors: ReturnType<typeof import('../schema/key-behavior-domain-v1.js').decodeKeyBehaviorDomain>;

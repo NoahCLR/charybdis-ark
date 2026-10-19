@@ -23,11 +23,9 @@ const APPLY_STEPS = Object.freeze(/** @type {const} */ ([
     {id: "backup", label: "Save a recovery copy"},
     {id: "upload", label: "Send the profile"},
     {id: "validate", label: "Keyboard checks the profile"},
-    {id: "stage", label: "Stage keys and macros on the slave half"},
     {id: "peer", label: "Copy the profile to the slave half"},
     {id: "commit", label: "Save it on the master half"},
     {id: "converge", label: "Finish the slave half"},
-    {id: "local", label: "Write keys and macros on the master half"},
     {id: "verify", label: "Check both halves"},
 ]));
 /** @type {Readonly<Record<string, number>>} */

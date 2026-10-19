@@ -183,14 +183,15 @@ record carries the decision through tapping and admission, and the pending
 completion and active owner retain it for release. Each delivered output takes
 the oldest fired completion not yet delivered, so two chords with one output
 that wait together keep their own decisions
-([pairing](https://github.com/NoahCLR/charybdis-4x6/blob/299ce9bd3e43b9795f73f453b768881cfc4650aa/docs/KEY_RUNTIME.md#combo-origin-compatibility-contract)). Changing
+([pairing](https://github.com/NoahCLR/charybdis-4x6/blob/83366a07185aa6399ca80e2cb493a3e4278c1edb/docs/KEY_RUNTIME.md#combo-origin-compatibility-contract)). Changing
 either switch, the definition or active layers cannot reclassify an already
 completed output or lose its matching release. Suppressed completions discard their
 snapshots. If origin reconstruction is unresolved, dispatch conservatively
 bypasses behaviour whenever any combo definition sharing that output bypasses
 it; it never borrows another definition's permission.
 
-Capability feature bit 30 advertises this extension. The stored switches are
+Every Profile Wire 2 firmware accepts this extension (feature bit 30 advertised
+it before D-F28). The stored switches are
 inverted: settings header byte 5 bit 0 bypasses all combo output behaviours;
 combo v3 row flag bit 4 bypasses that row's output behaviour. Zero preserves
 existing profiles and compiled defaults, without a
@@ -251,10 +252,9 @@ storage, and costs one masked bit test per scope on an ordinary press.
 - **Tap-hold.** QMK decides whether a record is a tap-hold through BK's
   `is_tap_record_user()`, a per-record weak hook given QMK's own answer and
   `is_tap_keycode_user()`'s. The userspace override keeps the keycode hook's
-  answer for a press that uses its row, and for one that bypasses it answers
-  as the key does without a row. Every `LT()`, `MT()` and `OSM()` key is the
-  runtime's either way (D-F27), so neither answer lets QMK's tapping engine
-  classify it.
+  answer for every record. Every `LT()`, `MT()` and `OSM()` key is the
+  runtime's with its row or without it (D-F27), so a press that bypasses its
+  row answers the same, and QMK's tapping engine classifies none of them.
 - **Combos.** `combo_key_record_allowed()` in
   `users/noah/lib/compat/qmk_combo_origin.c` vetoes a member press unless its
   stored combo decision and the combo row both allow it on its source layer.

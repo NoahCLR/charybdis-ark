@@ -20,7 +20,7 @@ const {knownActionAbi} = require("../schema/actions");
 const {customKeyOfCode, layerLockOfCode} = require("../data/user-keycodes");
 const {pdBindingOfCode} = require("../data/pd-bindings");
 const {layerName} = require("../model/vocabulary");
-const {readSettingsLimits} = require("../protocol/portable-profile-v1");
+const {readSettings, readSettingsLimits} = require("../protocol/portable-profile-v1");
 const {deviceLabels, editorViews} = require("./device-model");
 const {storedKeyboardName} = require("../model/keyboard-name");
 const {readHostOs} = require("../protocol/host-os-v1");
@@ -30,15 +30,14 @@ const {profileDepthOptions} = require("../schema/profile-depth");
 const {captureProfile, restoreProfile, validateSnapshot} = require("./portable-profile-session");
 const {NodeHidDeviceAdapter} = require("../transport/node-hid-adapter");
 const {DeviceRequestCoordinator} = require("../transport/request-coordinator");
-const {readViaLayout, decodeViaLayout} = require("../protocol/via-layout-v1");
+const {decodeKeymapDomain} = require("../schema/keymap-domain-v1");
 const keycodeCatalog = require("../data/keycode-catalog");
-const {LAYERS} = require("../data/charybdis-layout");
-const {readViaRgbMatrix} = require("../protocol/via-rgb-matrix-v1");
+const {CHARYBDIS_4X6_LAYOUT_MATRIX, LAYERS, matrixPosition} = require("../data/charybdis-layout");
 const {readDeviceCombos} = require("../protocol/combo-readback-v1");
-const {ProfilePayloadReader} = require("./profile-payload-reader");
+const {ProfilePayloadReader, payloadMatchesActive} = require("./profile-payload-reader");
 const {PROFILE_DOMAIN_IDS, decodeStoredProfileBlob} = require("../schema/profile-blob-v1");
 const {CANDIDATE_STATE_NAMES, readCandidateStatus} = require("../protocol/profile-candidate-v1");
-const {PROFILE_ACTIVE_KIND, PROFILE_STATE_FLAGS, PROFILE_WIRE_FEATURES, readProfileCapabilities, readProfileStatus, readViaIdentity} = require("../protocol/profile-wire-v1");
+const {PROFILE_ACTIVE_KIND, PROFILE_WIRE_FEATURES, readProfileCapabilities, readProfileStatus} = require("../protocol/profile-wire-v1");
 
 /** @type {(capabilities: Partial<Caps> | null | undefined, writing?: boolean) => asserts capabilities is Partial<Caps>} */
 const checkReady = requireReady;
@@ -117,8 +116,6 @@ class ProfileDeviceService {
         this.status = undefined;
         /** @type {import("./types.js").CandidateStatus | undefined} */
         this.candidateStatus = undefined;
-        /** @type {Awaited<ReturnType<typeof readViaIdentity>> | undefined} */
-        this.viaIdentity = undefined;
         /** @type {import("../protocol/types.js").RequestIds | undefined} */
         this.requestIds = undefined;
         /** @type {PublishedError | undefined} */
@@ -211,10 +208,16 @@ class ProfileDeviceService {
         if (!this.connection?.connected) this.refuse("Connect to a keyboard before refreshing live capabilities.");
         return this.runOperation(PHASE.REFRESH, async () => {
             const connection = this.connectedConnection();
-            const viaIdentity = await readViaIdentity(connection);
-            const capabilities = await readProfileCapabilities(connection, {nextRequestId: () => this.nextRequestId()});
-            const status = await readProfileStatus(connection, {nextRequestId: () => this.nextRequestId()});
-            const candidateStatus = (capabilities.featureFlags & PROFILE_WIRE_FEATURES.CANDIDATE_WRITE) !== 0
+            let capabilities;
+            try {capabilities = await readProfileCapabilities(connection, {nextRequestId: () => this.nextRequestId()});}
+            catch (error) {
+                const code = /** @type {{code?: string}} */ (error).code;
+                if (code === "INCOMPATIBLE_RESPONSE" || code === "UNHANDLED") throw Object.assign(new Error("Ark supports only current firmware. Update both halves, then read the keyboard again."), {code: "FIRMWARE_UPDATE_REQUIRED", cause: error});
+                throw error; // Timeouts and broken correlation remain transport failures.
+            }
+            const compatibility = evaluateProfileCompatibility(capabilities);
+            const status = compatibility.compatible ? await readProfileStatus(connection, {nextRequestId: () => this.nextRequestId()}) : undefined;
+            const candidateStatus = compatibility.compatible && (capabilities.featureFlags & PROFILE_WIRE_FEATURES.SAVES) !== 0
                 ? await this.readCandidateStatus(connection, {nextRequestId: () => this.nextRequestId()})
                 : undefined;
             if (this.connection !== connection || !connection.connected) {
@@ -223,13 +226,11 @@ class ProfileDeviceService {
             this.capabilities = capabilities;
             this.status = status;
             this.candidateStatus = candidateStatus;
-            this.viaIdentity = viaIdentity;
             this.lastRefreshedAt = new Date().toISOString();
             this.phase = PHASE.CONNECTED;
-            const compatibility = evaluateProfileCompatibility(capabilities, viaIdentity);
             this.addDiagnostic(
                 compatibility.compatible
-                    ? "Live protocol, schema, VIA identity and required features are compatible."
+                    ? "Profile Wire capabilities identify compatible current firmware."
                     : `Live compatibility check found ${compatibility.reasons.length} blocking issue${compatibility.reasons.length === 1 ? "" : "s"}.`
             );
         });
@@ -249,19 +250,70 @@ class ProfileDeviceService {
         return this.runOperation(PHASE.READ_LAYOUT, async () => {
             const connection = this.connectedConnection();
 
-            const layers = await readViaLayout(connection, {
-                layerCount,
-                onProgress: progress => this.reportReadProgress("layout", progress),
-            });
+            let keymap;
+            try {
+                keymap = await this.#readKeymap(connection, progress => this.reportReadProgress("layout", progress));
+            } catch (error) {
+                this.layout = {state: "unavailable", error: publicError(error), layers: [], progress: null};
+                throw error;
+            }
             if (this.connection !== connection || !connection.connected) {
                 throw new Error("The keyboard disconnected while its layout was being read.");
             }
 
-            this.#acceptLayout(layers);
+            this.#acceptLayout(layoutOf(keymap, /** @type {number} */ (layerCount)));
         }, {initialize: () => {this.layout = {state: "reading", progress: {done: 0, total: 0}, layers: [], readAt: ""};}});
     }
 
-    /** @param {Awaited<ReturnType<typeof readViaLayout>>} layers */
+    // The keymap the keyboard types: its active profile's keymap domain, or
+    // the compiled default's when the saved profile has none (the firmware
+    // falls back to it the same way).
+    /** @param {Connection} connection @param {(progress: import("../../contracts/model.js").CountedProgress) => void} onProgress */
+    async #readKeymap(connection, onProgress) {
+        this.#requireCurrentRead();
+        const options = {nextRequestId: () => this.nextRequestId(), onProgress};
+        const {read, source} = await this.#readActivePayload(connection, options);
+        /** @param {Uint8Array} bytes */
+        const keymapOf = bytes => decodeStoredProfileBlob(bytes).domains.find(domain => domain.id === PROFILE_DOMAIN_IDS.KEYMAP);
+        let found = keymapOf(read.bytes);
+        if (!found && source === "committed") {
+            found = keymapOf((await this.profilePayloadReader().readCompiled(options)).bytes);
+            await this.#confirmActivePayload(connection, read, source, options);
+        }
+        if (!found) throw new Error("The keyboard's profile has no keymap.");
+        return decodeKeymapDomain(found.payload);
+    }
+
+    /** @param {Connection} connection @param {import("../protocol/types.js").ReadOptions} options */
+    async #readActivePayload(connection, options) {
+        const status = await readProfileStatus(connection, options);
+        this.status = status;
+        const source = status.activeKind === PROFILE_ACTIVE_KIND.COMPILED_ONLY ? "compiled" : "committed";
+        if (status.activeKind !== PROFILE_ACTIVE_KIND.COMPILED_ONLY && status.activeKind !== PROFILE_ACTIVE_KIND.COMMITTED) {
+            throw this.#activePayloadUnavailable();
+        }
+        const reader = this.profilePayloadReader();
+        const read = source === "compiled" ? await reader.readCompiled(options) : await reader.readCommitted(options);
+        // Read status again even if the first identity did not match: health
+        // must report the keyboard now, including recovery that just finished.
+        await this.#confirmActivePayload(connection, read, source, options);
+        if (!payloadMatchesActive(read, status)) throw this.#activePayloadUnavailable();
+        return {read, source};
+    }
+
+    /** @param {Connection} connection @param {import("../protocol/types.js").PayloadRead} read @param {string} source @param {import("../protocol/types.js").ReadOptions} options */
+    async #confirmActivePayload(connection, read, source, options) {
+        const status = await readProfileStatus(connection, options);
+        this.status = status;
+        if ((source === "compiled") !== (status.activeKind === PROFILE_ACTIVE_KIND.COMPILED_ONLY)
+            || !payloadMatchesActive(read, status)) throw this.#activePayloadUnavailable();
+    }
+
+    #activePayloadUnavailable() {
+        return Object.assign(new Error("The keyboard's active profile is unavailable: its readable payload does not match the profile it is running. Let both halves finish recovery, then read the keyboard again."), {code: "ACTIVE_PROFILE_UNAVAILABLE"});
+    }
+
+    /** @param {ReturnType<typeof layoutOf>} layers */
     #acceptLayout(layers) {
         this.layout = {
             state: "read",
@@ -295,25 +347,15 @@ class ProfileDeviceService {
         if (!this.connection?.connected) this.refuse("Connect to a keyboard before reading its profile.");
 
         return this.runOperation(PHASE.READ_PROFILE, async () => {
+            this.#requireCurrentRead();
             const connection = this.connectedConnection();
 
-            // Decide from a fresh status before requesting payload pages. A
-            // rejected committed chunk can mean a read failed mid-transfer;
-            // it must not be interpreted as proof that nothing is committed.
-            const status = await readProfileStatus(connection, {nextRequestId: () => this.nextRequestId()});
-            if (this.connection !== connection || !connection.connected) {
-                throw new Error("The keyboard disconnected while its profile status was being read.");
-            }
-            this.status = status;
-            const source = status.activeKind === PROFILE_ACTIVE_KIND.COMPILED_ONLY
-                && !(status.stateFlags & PROFILE_STATE_FLAGS.COMMITTED_VALID) ? "compiled" : "committed";
-            const reader = this.profilePayloadReader();
             /** @type {import("../protocol/types.js").ReadOptions & {onProgress: (progress: import("../../contracts/model.js").CountedProgress) => void}} */
             const readOptions = {
                 nextRequestId: () => this.nextRequestId(),
                 onProgress: progress => this.reportReadProgress("profile", progress),
             };
-            const read = source === "compiled" ? await reader.readCompiled(readOptions) : await reader.readCommitted(readOptions);
+            const {read, source} = await this.#readActivePayload(connection, readOptions);
             if (this.connection !== connection || !connection.connected) {
                 throw new Error("The keyboard disconnected while its profile was being read.");
             }
@@ -332,7 +374,9 @@ class ProfileDeviceService {
         for (const domain of blob.domains) {
             try {
                 const registered = profileDomain(domain.id);
-                if (registered) Object.assign(domains, {[registered.readKey]: registered.decode(domain.payload, depth)});
+                // The keymap and macros reach the editors through the layout
+                // and the complete read, not this readback.
+                if (registered?.readKey) Object.assign(domains, {[registered.readKey]: registered.decode(domain.payload, depth)});
             } catch (error) {
                 failures.push({domainId: domain.id, message: error instanceof Error ? error.message : String(error)});
             }
@@ -362,6 +406,19 @@ class ProfileDeviceService {
         );
     }
 
+    #requireCurrentRead() {
+        if (!evaluateProfileCompatibility(this.capabilities).compatible) throw Object.assign(new Error("Ark supports only current firmware. Update both halves, then read the keyboard again."), {code: "FIRMWARE_UPDATE_REQUIRED"});
+    }
+
+    /** @param {Connection} connection */
+    async #readBaseLighting(connection) {
+        this.#requireCurrentRead();
+        const {decodeSettings} = require("../schema/settings-domain-v1");
+        const lighting = baseLighting(decodeSettings(await readSettings(connection, this.requestSequence())).values);
+        return {effectId: lighting.enabled ? lighting.effect : 0, brightness: lighting.brightness,
+            hue: lighting.hue, saturation: lighting.saturation, speed: lighting.speed};
+    }
+
     // Optional: never rejects. A failure while connected is recorded as
     // `combos: {state: "unavailable", error}`; a lost connection clears it.
     async readCombos() {
@@ -369,6 +426,7 @@ class ProfileDeviceService {
             const connection = this.connection;
             try {
                 if (!connection?.connected) throw new Error("Connect to a keyboard before reading combos.");
+                this.#requireCurrentRead();
                 const read = await readDeviceCombos(connection, {nextRequestId: () => this.nextRequestId()});
                 if (this.connection !== connection || !connection.connected) return this.snapshot();
                 this.combos = {state: "read", ...read, readAt: new Date().toISOString()};
@@ -388,7 +446,7 @@ class ProfileDeviceService {
             const connection = this.connection;
             try {
                 if (!connection?.connected) throw new Error("Connect to a keyboard before reading base RGB.");
-                const settings = await readViaRgbMatrix(connection);
+                const settings = await this.#readBaseLighting(connection);
                 if (this.connection !== connection || !connection.connected) return this.snapshot();
                 this.baseRgb = {state: "read", ...settings, readAt: new Date().toISOString()};
             } catch (error) {
@@ -469,17 +527,17 @@ class ProfileDeviceService {
                 Object.assign(result, await this.#readDeviceFacts(connection));
                 if (forEditor) {
                     if (capture.incomplete) throw new Error("The keyboard did not return a complete editor profile.");
-                    /** @type {import("./types.js").BaseRgbRead} */
-                    let baseRgb;
-                    try {baseRgb = {state: "read", ...await readViaRgbMatrix(connection), readAt: new Date().toISOString()};}
-                    catch (error) {baseRgb = {state: "unavailable", error: publicError(error)};}
+                    const decoded = validateSnapshot(capture.document);
+                    const lighting = baseLighting(decoded.settings.values);
+                    const baseRgb = {state: /** @type {const} */ ("read"), effectId: lighting.enabled ? lighting.effect : 0,
+                        brightness: lighting.brightness, hue: lighting.hue, saturation: lighting.saturation, speed: lighting.speed,
+                        readAt: new Date().toISOString()};
                     if (this.connection !== connection || !connection.connected) throw new Error("The keyboard disconnected while its configuration was being read.");
-                    this.#acceptLayout(decodeViaLayout(capture.storage.layout, capture.document.layers.length));
+                    this.#acceptLayout(layoutOf(decoded.layers, decoded.layers.length));
                     this.#acceptCommitted(capture.readback.active, capture.readback.source);
                     this.status = result.status;
                     this.combos = {state: "read", ...capture.readback.combos, readAt: new Date().toISOString()};
                     this.baseRgb = baseRgb;
-                    if (baseRgb.error) this.addDiagnostic(`Base RGB: ${baseRgb.error.message}`);
                 }
                 // Export is an independent capture. Only an editor read or a
                 // restore/rebase read changes the state the editor follows.
@@ -550,7 +608,7 @@ class ProfileDeviceService {
                 this.#adoptPortable(result);
                 if (result.performance) {
                     const seconds = (result.performance.elapsedMs / 1000).toFixed(1);
-                    this.addDiagnostic(`Saved the complete profile in ${seconds} s; transferred ${result.performance.layoutBytes} changed layout bytes and ${result.performance.macroBytes} changed macro bytes.`);
+                    this.addDiagnostic(`Saved the complete profile in ${seconds} s; published one ${result.performance.profileBytes}-byte profile.`);
                 }
             } finally {
                 this.portableProgress = "";
@@ -594,13 +652,12 @@ class ProfileDeviceService {
             capabilities: this.capabilities ? {...this.capabilities} : null,
             status: this.status ? {...this.status} : null,
             candidateStatus: this.candidateStatus ? cloneCandidateStatus(this.candidateStatus) : null,
-            viaIdentity: this.viaIdentity ? {...this.viaIdentity} : null,
             compatibility: this.capabilities
-                ? evaluateProfileCompatibility(this.capabilities, this.viaIdentity)
+                ? evaluateProfileCompatibility(this.capabilities)
                 : null,
             mutationCompatibility: evaluateLiveMutationCompatibility(
                 this.capabilities,
-                this.capabilities ? evaluateProfileCompatibility(this.capabilities, this.viaIdentity) : null,
+                this.capabilities ? evaluateProfileCompatibility(this.capabilities) : null,
                 Boolean(this.connection?.connected),
                 this.status
             ),
@@ -734,7 +791,6 @@ class ProfileDeviceService {
         this.capabilities = undefined;
         this.status = undefined;
         this.candidateStatus = undefined;
-        this.viaIdentity = undefined;
         this.requestIds = undefined;
         this.lastRefreshedAt = "";
         this.liveApply = {state: "idle"};
@@ -824,7 +880,7 @@ class ProfileDeviceService {
     }
 
     async refreshStatus() {
-        if (!this.connection?.connected || !this.requestIds) return;
+        if (!this.connection?.connected || !this.requestIds || !evaluateProfileCompatibility(this.capabilities).compatible) return;
         try {
             this.status = await readProfileStatus(this.connection, {nextRequestId: () => this.nextRequestId()});
             this.candidateStatus = await this.readCandidateStatus(this.connection, {
@@ -889,6 +945,13 @@ class ProfileRequestIdSequence {
         this.value = current === 0xff ? 1 : current + 1;
         return current;
     }
+}
+
+// The visible keys of each layer, in layout order, from matrix-order layers.
+/** @param {readonly (readonly number[])[]} keymap @param {number} layerCount */
+function layoutOf(keymap, layerCount) {
+    return keymap.slice(0, layerCount).map((keys, layer) => ({layer,
+        positions: CHARYBDIS_4X6_LAYOUT_MATRIX.map(([row, column], layoutIndex) => ({layoutIndex, row, column, keycode: keys[matrixPosition(layoutIndex)]}))}));
 }
 
 /** @param {unknown} value */

@@ -158,7 +158,7 @@ function keyEffects(code, row, values) {
 function profileFacts(decoded) {
     const values = decoded.settings.values;
     const names = decoded.settings.names;
-    const layers = decoded.document.layers.map((codes) => CHARYBDIS_4X6_LAYOUT_MATRIX.map((position, layoutIndex) => codes[matrixPosition(layoutIndex)]));
+    const layers = decoded.layers.map((codes) => CHARYBDIS_4X6_LAYOUT_MATRIX.map((position, layoutIndex) => codes[matrixPosition(layoutIndex)]));
     /** @type {Map<number, BehaviorRow>} */
     const rows = new Map();
     for (const row of decoded.behaviors?.rows || []) {
@@ -620,7 +620,7 @@ const findingKey = (finding, order = IDENTITY) => `${finding.kind}:${finding.lay
 // The findings for a validated profile.
 /** @param {import("./types.js").DecodedProfile} decoded @returns {Finding[]} */
 function layerReach(decoded) {
-    if (decoded?.document?.layers?.length !== LAYERS) return [];
+    if (decoded?.layers?.length !== LAYERS) return [];
     const facts = profileFacts(decoded);
     const compact = compactWalk(facts);
     const walked = compact.complete || compact.reachabilityComplete ? compact : {...boundedWalk(facts), uncertainty: compact};

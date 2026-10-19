@@ -1,11 +1,12 @@
 "use strict";
+const {editMacros} = require("../fixtures/profile-document");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const {applyLayerEdit, buildPanelModel: projectPanelModel, observeService, discardDraftForDevice, layerEditDocument, panelRequest, routeMessage, startLayerEdit} = require("../../core/session/panel-session");
 const {fingerprint, summary, validateSnapshot} = require("../../core/model/portable-profile");
 const {document} = require("../fixtures/pd-profile");
 
-const capabilities = {compiledLayerCount: 16, supportedDomainMask: 31, actionAbiDigest: 0x837cf479, featureFlags: require("../../core/protocol/profile-wire-v1").PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES};
+const capabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 0}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x6fd70b90, featureFlags: require("../../core/protocol/profile-wire-v1").PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES};
 const snapshot = () => {
     const doc = document();
     return {document: doc, fingerprint: fingerprint(doc), summary: summary(doc), limits: {brightnessMax: 200}};
@@ -35,7 +36,7 @@ test("projecting a model does not open a draft or observe a new connection", () 
     const before = session.draft.view(connected({connectionToken: 1}));
     projectPanelModel(session, connected({connectionToken: 2}));
     assert.deepEqual(session.draft.view(connected({connectionToken: 1})), before, "projection cannot mark a retained draft stale");
-    const changed = structuredClone(session.draft.document); changed.macros[0] = Buffer.from("test").toString("base64");
+    const changed = structuredClone(session.draft.document); editMacros(changed, macros => macros[0] = Buffer.from("test").toString("base64"));
     session.portableReview = Object.freeze({document: changed, before: snapshot()});
     const first = projectPanelModel(session, connected({connectionToken: 1}));
     const second = projectPanelModel(session, connected({connectionToken: 1}));
@@ -464,11 +465,11 @@ test("a layer is dragged to any place above the base, and Make base swaps it wit
 });
 
 test("the profile meter follows the draft, and is absent without a keyboard or an advertised size", () => {
-    const sized = {...capabilities, maxProfilePayload: 5088, maxBehaviorRows: 64};
+    const sized = {...capabilities, maxProfilePayload: 130048, maxBehaviorRows: 64};
     const session = {service: {portable: snapshot()}};
     const keyboard = buildPanelModel(session, connected({capabilities: sized})).portable.usage;
     assert.equal(keyboard.source, "keyboard", "with nothing changed, the figures are the keyboard's");
-    assert.equal(keyboard.capacity, 5088);
+    assert.equal(keyboard.capacity, 130048);
     const draft = session.draft;
     const behaviours = keyboard.counts.find((entry) => entry.id === "behaviours").used;
     routeMessage(session, {type: "saveBehavior", draftId: draft.id, draftRevision: draft.revision,

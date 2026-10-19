@@ -38,12 +38,12 @@ pins that are not on the published trunks).
 
 The bridge then runs the seven Ark-owned integration runners under
 `tests/integration/` in turn, the five below and then the candidate-transfer and
-macro-read-map runners described after them:
+macro-domain runners described after them:
 
 - `run_qmk_portable_editor_tests.sh`: firmware option pages → app reader.
 - `run_qmk_portable_profile_tests.sh`: firmware settings pages → app reader.
 - `run_profile_compiled_defaults_v1_tests.sh`: app profiles → C validation. A
-  profile Ark writes for current firmware (schema 3.0, RGB 4, key behaviours 2,
+  profile Ark writes for current firmware (schema 4.0, RGB 4, key behaviours 2,
   combos 3, settings 8, PD 3) is accepted directly. The eight-slot profiles are
   frozen firmware-owned rejection evidence: refused as they are. The bridge
   also checks maximum names and the simultaneous maximum profile in normal and
@@ -71,19 +71,18 @@ report; an incomplete report is not a pass. Do not edit the checkouts during a
 run: this tests working copies, not immutable snapshots or a dirty-tree archive.
 
 The candidate-transfer runner adds Ark upload → production C candidate/store/
-validator checks, including exact reconstructed bytes and corruption rejection,
+validator checks, including exact reconstructed bytes, all seven domains,
+a valid 74,801-byte profile across the 64 KiB boundary, and corruption rejection,
 in normal and sanitizer builds. Ark supports only current firmware (D-L64), so
 firmware without the transfer extension fails this runner rather than skipping
 it. Its scan opportunities are simulated and establish no hardware timing.
 
-The macro-read-map runner exercises firmware's production checksum worker
-against Ark's sparse reader, in normal and sanitizer builds, with empty,
-sparse (including stale tail bytes) and dense banks at both 34,903 and 65,535
-bytes. It requires exact reconstructed bytes and matching whole-store digests,
-and full-read fallback when firmware's hashed VIA config has nonzero layout
-options. The complete-capture regression also retains that actual storage identity.
-Firmware without the read map fails it. Transfer counts are not hardware
-read timings.
+The macro-domain runner links firmware's incremental `profile_macros_v1`
+validator. C-generated protected UTF-8/key/delay streams decode and re-encode
+in Ark; Ark encodings, empty/sparse/dense/full domains, optional unused tails
+and malformed corpora pass through C validation in normal and sanitizer
+builds. Wide source offsets and exact transported bytes are checked. These
+checks establish encoding agreement, not hardware latency or playback.
 
 ## Agreement with a firmware contract
 
@@ -97,13 +96,16 @@ containing firmware's pin:
 
 - the capability pages decode with Ark's Profile Wire decoder (all its
   consistency rules);
-- the protocol and profile schema are ones Ark speaks, and Ark knows the
-  action-ABI digest (`KNOWN_ACTION_ABIS`);
-- the firmware reports every feature Ark requires (`CURRENT_FEATURES` and
-  `CURRENT_MUTATION_FEATURES` in `core/protocol/profile-wire-v1.js`, D-L64),
-  through bit 31, the last bit of the feature word (every dual-role key is
-  the keyboard's, firmware D-F27); a capability after it needs a new field
-  that Ark's decoder learns first;
+- the Profile Wire and profile schema versions are exactly the base Ark
+  requires, major and minor (`SUPPORTED_PROFILE_PROTOCOL` and
+  `SUPPORTED_PROFILE_SCHEMA` in `core/session/firmware-support.js`, D-L64): the
+  version implies everything the keyboard does, and a later capability raises
+  the minor;
+- Ark knows the action-ABI digest (`KNOWN_ACTION_ABIS`);
+- the firmware supports every profile domain Ark registers;
+- it is a split build that saves (`CURRENT_MUTATION_FEATURES`, feature bits 0
+  and 1): the feature word holds only build differences (firmware D-F28), so
+  the pointing bit is reported, not compared;
 - Ark's BK keycode and layout inputs equal those at firmware's BK pin (file
   equality, not commit equality);
 - Ark's pinned fixtures equal the firmware's.
@@ -112,11 +114,11 @@ What can break Ark, and what checks it:
 
 | Surface | Defined in | Ark learns it from | Checked by |
 | --- | --- | --- | --- |
-| Profile Wire channel | firmware `compat/qmk_via_profile_channel.c` | protocol and schema versions, feature flags | agreement (pages decode, versions, required features); golden fixtures |
+| Profile Wire channel | firmware `compat/qmk_profile_channel.c` | protocol and schema versions, feature flags | agreement (pages decode, versions, required features); golden fixtures |
 | Stored profile format (blob, domains, settings, compiled defaults) | firmware `lib/profile/schema/` | schema version | the bridge's runners; agreement (fixtures equal) |
 | Action vocabulary and action-ABI digest | firmware, and BK keycode values | digest against `KNOWN_ACTION_ABIS` | agreement (digest known) |
 | Keycode catalog and layout | BK | Ark's pinned BK snapshot | agreement (files equal at firmware's BK pin); `npm run keycodes -- --check` |
-| VIA surface (layers, macro buffer, macro format) | BK's VIA and firmware config | capacities on the capability pages | agreement (decoder consistency rules); macro-read-map runner |
+| Keymap and macro domains | firmware profile codecs and config | domain versions and capability capacities | golden codecs, candidate and macro-domain runners |
 | Keyboard options (RGB effects and order, LED flags) | BK's RGB matrix and firmware config | reported at runtime | portable-editor runner |
 | Behaviour on the keyboard | firmware | nothing | keyboard checks only; not automatable |
 
@@ -156,3 +158,10 @@ shell runners: Ark owns the compilation recipes and checks. If firmware moves
 sources or changes build wiring, update Ark's integration recipes accordingly.
 Ark's ordinary `npm run check` checks bridge orchestration using temporary test
 repositories but never invokes the real firmware integration runners.
+
+Ark talks to firmware-owned Raw HID: identity comes from capabilities and
+base RGB/key options from Profile Wire. Apply publishes one complete blob
+and one generation. Ark's version-5 portable envelope is specified in
+[D-L15](LIVE_EDIT_APP_DIRECTION.md#d-l15--a-portable-profile-is-the-complete-effective-configuration);
+the imported portable spec retains a historical JSON section for the retired
+client and is not the current Ark file format.

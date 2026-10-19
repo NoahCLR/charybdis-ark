@@ -1,4 +1,5 @@
 "use strict";
+const {profileMacros, editMacros} = require("../fixtures/profile-document");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const {profileUsage} = require("../../core/model/profile-usage");
@@ -11,8 +12,8 @@ const {encodeComboDomain} = require("../../core/schema/combo-domain-v1");
 const {document: pdDocument} = require("../fixtures/pd-profile");
 
 const snapshot = value => ({document: value, fingerprint: fingerprint(value)});
-const schema2 = {maxProfilePayload: 5088, maxBehaviorRows: 64, maxPopulatedBehaviorSteps: 128, maxCombos: 32, maxReusableRgbGroups: 16, maxRgbStageGroupRows: 32};
-const customKeyCapabilities = {compiledLayerCount: 16, supportedDomainMask: 31, actionAbiDigest: 0x837cf479};
+const schema2 = {maxProfilePayload: 130048, maxBehaviorRows: 64, maxPopulatedBehaviorSteps: 128, maxCombos: 32, maxReusableRgbGroups: 16, maxRgbStageGroupRows: 32};
+const customKeyCapabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 0}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x6fd70b90};
 const count = (usage, id) => usage.counts.find(entry => entry.id === id);
 
 // The fixture with no behaviours and no combos.
@@ -25,8 +26,8 @@ function emptied(value) {
 
 test("the bar is the bytes Apply writes, and each count is what its screen sets up", () => {
     const value = pdDocument(), usage = profileUsage(snapshot(value), schema2);
-    assert.equal(usage.used, Buffer.from(value.profile, "base64").length);
-    assert.equal(usage.capacity, 5088, "the size is the one the firmware advertises");
+    assert.equal(usage.used, validateSnapshot(value).candidate.length);
+    assert.equal(usage.capacity, 130048, "the size is the one the firmware advertises");
     assert.deepEqual(usage.counts.map(entry => entry.id),
         ["behaviours", "behaviourSteps", "combos", "lightingGroups", "lightingGroupRows", "macros", "customKeys", "pointingModes"], "in the rail's order");
     const {behaviors, combos, pdModes, settings} = validateSnapshot(value);
@@ -59,10 +60,10 @@ test("macro slots in use are the ones with steps; the highest empty ones are una
     assert.deepEqual(count(profileUsage(snapshot(value), schema2), "macros"), {id: "macros", used: 0, limit: 128}, "nothing unavailable, nothing said");
     // Three long text macros leave room for fewer empty slots than there are.
     const capacity = 34903, text = Buffer.alloc(11000, "a");
-    const macros = value.macros.map((slot, index) => index < 3 ? text.toString("base64") : slot);
-    const stored = 3 * (text.length + 1) + 125 + 1;
+    const macros = profileMacros(value).map((slot, index) => index < 3 ? text.toString("base64") : slot);
+    const stored = 3 * (text.length + 1) + 125;
     const open = Math.floor((capacity - stored) / 30);
-    const usage = profileUsage(snapshot({...value, macros}), {...schema2, viaMacroBytes: capacity});
+    const usage = profileUsage(snapshot(editMacros(value, slots => slots.splice(0, slots.length, ...macros))), {...schema2, macroBytes: capacity});
     assert.deepEqual(count(usage, "macros"), {id: "macros", used: 3, limit: 128, unavailable: 125 - open},
         "every empty slot keeps room for ten 3-byte taps; the rest are unavailable");
 });
@@ -92,7 +93,7 @@ test("nothing is shown that the keyboard did not report", () => {
     assert.equal(profileUsage(snapshot(value), undefined), null);
     assert.equal(profileUsage({incomplete: true}, schema2), null, "an interrupted read has nothing to measure");
     assert.equal(profileUsage(null, schema2), null);
-    const usage = profileUsage(snapshot(value), {maxProfilePayload: 5088, maxCombos: 32});
+    const usage = profileUsage(snapshot(value), {maxProfilePayload: 130048, maxCombos: 32});
     assert.deepEqual(usage.counts.map(entry => entry.id), ["combos", "macros", "customKeys", "pointingModes"],
         "only limits the firmware advertises are counted; the fixed slots always are");
 });

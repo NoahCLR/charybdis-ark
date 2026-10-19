@@ -1,7 +1,7 @@
 "use strict";
 const {test} = require("node:test");
 const assert = require("node:assert/strict");
-const {readSettings, readSettingsLimits, readStorageStatus, waitForStorage} = require("../../core/protocol/portable-profile-v1");
+const {readSettings, readSettingsLimits} = require("../../core/protocol/portable-profile-v1");
 const {encodeSettings} = require("../../core/schema/settings-domain-v1");
 const {crc32, fnv1a32} = require("../../core/schema/profile-blob-v1");
 const ids = () => {let value = 0; return {next: () => value = value % 255 + 1};};
@@ -31,22 +31,17 @@ test("settings in another version than current firmware's are refused, older or 
 test("old firmware cannot silently produce a partial backup", async () => {
     await assert.rejects(readSettings({request: async () => Buffer.alloc(32,255)},ids()), /Update both halves/);
 });
-test("convergence requires matching peer identity, valid digest and no pending writes", async () => {
-    const bytes = Buffer.alloc(25); bytes.set([1,4]); bytes.writeUInt32LE(4,2); bytes.writeUInt32LE(99,6); bytes.writeUInt32LE(4,10); bytes.writeUInt32LE(99,14);
-    const connection = {request: async request => response(request, bytes)};
-    assert.equal((await waitForStorage(connection,ids())).ready,true);
-    bytes[1] |= 8; assert.equal((await readStorageStatus(connection,ids())).ready,false);
-    await assert.rejects(waitForStorage(connection,ids(),{timeoutMs:1,pollMs:1}),/not finished/);
-    bytes[1] = 6; await assert.rejects(waitForStorage(connection,ids()),/recovery/);
+test("coherent settings refuse corrupted bytes even when the metadata stays unchanged", async () => {
+    const bytes = settings(), metadata = Buffer.alloc(12); metadata.set([1, 25]); metadata.writeUInt16LE(bytes.length, 2); metadata.writeUInt32LE(crc32(bytes), 4); metadata.writeUInt32LE(fnv1a32(bytes), 8);
+    const connection = {request: async request => {const page = request.readUInt16LE(4); const reply = response(request, page ? bytes.subarray((page - 1) * 25, page * 25) : metadata); if (page === 1) reply[7] ^= 1; return reply;}};
+    await assert.rejects(readSettings(connection, ids()), /changed/);
 });
 
-test("waiting for storage sleeps with the host's sleep", async () => {
-    const bytes = Buffer.alloc(25); bytes.set([1,4|8]); bytes.writeUInt32LE(4,2); bytes.writeUInt32LE(99,6); bytes.writeUInt32LE(4,10); bytes.writeUInt32LE(99,14);
-    const connection = {request: async request => response(request, bytes)};
-    const slept = [];
-    const status = await waitForStorage(connection, ids(), {pollMs: 40, sleep: async ms => {slept.push(ms); bytes[1] = 4;}});
-    assert.equal(status.ready, true);
-    assert.deepEqual(slept, [40]);
+test("settings reads treat an exact unhandled echo as a definite refusal", async () => {
+    let requests = 0;
+    const connection = {request: async (request, options) => {requests++; const echo = Buffer.from(request); echo[0] = 255; assert.equal(options.matchResponse(echo), true); return echo;}};
+    await assert.rejects(readSettings(connection, ids()), /Update both halves/);
+    assert.equal(requests, 1);
 });
 
 

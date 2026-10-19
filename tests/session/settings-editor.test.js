@@ -1,4 +1,5 @@
 "use strict";
+const {editLayers} = require("../fixtures/profile-document");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const {settingsEditorView} = require("../../core/model/settings-editor");
@@ -30,7 +31,7 @@ test("an unavailable lighting effect is refused before recovery or profile stagi
 
 test("a restore that starts re-reads the keyboard's status, even when it fails", async t => {
     const {service, keyboard} = await connectedService(t);
-    const target = document(); target.layers[0][0] = 5;
+    const target = document(); editLayers(target, layers => layers[0][0] = 5);
     let refreshed = 0;
     const refresh = service.refreshStatus.bind(service);
     service.refreshStatus = async () => {refreshed++; return refresh();};

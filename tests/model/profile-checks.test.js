@@ -9,7 +9,7 @@ test("whole-profile checks report inert actions and destination blockers", () =>
     const decoded = validateSnapshot(document());
     decoded.danglingPdBindings = {7: 2};
     // Text the US layout cannot type, with Unicode playback off.
-    decoded.document.macros[0] = Buffer.from("é").toString("base64");
+    decoded.macroSlots[0] = Buffer.from("é");
     const checks = profileFindings(decoded, {brightnessMax: 100, effects: [{id: 2}]});
     assert.equal(checks.find(row => row.kind === "inertPointing")?.count, 2);
     assert.equal(checks.find(row => row.kind === "unplayableMacro")?.place.index, 0);

@@ -27,7 +27,9 @@ const RGB_DOMAIN_V1 = Object.freeze({
     MAX_LOGICAL_LAYERS: LAYERS,
     MAX_STAGE_GROUP_ROWS: 32,
     MAX_TAP_BRANCH_COLORS: 4,
-    MAX_PAYLOAD_SIZE: PROFILE_BLOB_V1.MAX_SIZE - PROFILE_BLOB_V1.HEADER_SIZE - PROFILE_BLOB_V1.DOMAIN_HEADER_SIZE,
+    // The domain's own offsets are 16 bits (unchanged by schema 4, firmware
+    // D-F28), so its payload stays within 65,535 bytes whatever the blob's.
+    MAX_PAYLOAD_SIZE: Math.min(PROFILE_BLOB_V1.MAX_SIZE - PROFILE_BLOB_V1.HEADER_SIZE - PROFILE_BLOB_V1.DOMAIN_HEADER_SIZE, 0xffff),
     SELECTOR_ALL: 0xff,
 });
 

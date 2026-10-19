@@ -85,12 +85,11 @@ export function screenProfile() {
 const FIRMWARE_LINE = "A backup restores onto the same firmware release; check the release notes before updating firmware.";
 
 // Not built yet, and said so rather than half-built: Ark reads the
-// firmware's built-in setup only in parts, and the keymap and macros need
-// firmware support.
+// firmware’s complete defaults, but has no whole-defaults draft control yet.
 function defaultsCard() {
     return el(`<div class="card profile-defaults">
         <div class="card-h"><h3>Start from the firmware's defaults</h3><span class="right"><span class="chip">Not yet available</span></span></div>
-        <div class="card-b"><p class="note">A draft of the setup the firmware was built with. Ark can't read it as a whole yet: the keymap and macros need firmware support first. Until then, restore a backup made before your changes.</p></div>
+        <div class="card-b"><p class="note">A draft of the setup the firmware was built with. The firmware reports its complete defaults, but Ark does not yet offer them as a whole draft. Until then, restore a backup made before your changes.</p></div>
     </div>`);
 }
 
@@ -121,7 +120,7 @@ function wireProfileDrop(card) {
         const dropped = Array.from(/** @type {DataTransfer} */ (event.dataTransfer).files);
         if (dropped.length !== 1) {tell("Drop one profile file at a time."); return;}
         const file = dropped[0];
-        if (file.size > 262144) {tell("This profile file is too large."); return;}
+        if (file.size > 196608) {tell("This profile file is too large."); return;}
         const draft = getModel()?.draft;
         if (!draft) return;
         const {id, revision} = draft;

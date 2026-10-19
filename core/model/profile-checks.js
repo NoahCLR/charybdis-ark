@@ -54,8 +54,7 @@ function profileFindings(decoded, destination = {}) {
     }
     const host = hostSettings(decoded.settings.values, destination.detectedHostOs);
     const emptyMacros = new Set();
-    (decoded.document?.macros || []).forEach((encoded, index) => {
-        const bytes = Buffer.from(encoded, "base64");
+    (decoded.macroSlots || []).forEach((bytes, index) => {
         if (!bytes.length) { emptyMacros.add(index); return; }
         const payload = decodeMacroPayload(bytes);
         if (!payload) emptyMacros.add(index);

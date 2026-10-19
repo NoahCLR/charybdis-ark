@@ -1,4 +1,5 @@
 "use strict";
+const {profileLayers} = require("../fixtures/profile-document");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const {document: pdDocument} = require("../fixtures/pd-profile");
@@ -8,7 +9,7 @@ const {macroEditorView, editMacro} = require("../../core/model/macro-editor");
 const {profileReview} = require("../../core/model/profile-review");
 const {revertUnits} = require("../../core/model/profile-revert");
 const {buildDeviceModel} = require("../../core/session/device-model");
-const capabilities = {compiledLayerCount: 16, supportedDomainMask: 31, actionAbiDigest: 0x837cf479};
+const capabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 0}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x6fd70b90};
 const snapshot = value => ({document: value, fingerprint: fingerprint(value)});
 
 test("all 128 custom keys are listed, and a name changes nothing else", () => {
@@ -26,11 +27,11 @@ test("all 128 custom keys are listed, and a name changes nothing else", () => {
     assert.equal(after.settings.formatVersion, 8);
     assert.equal(after.settings.customKeyNames[2], "Click Spam", "trimmed");
     assert.deepEqual(after.settings.macroNames, validateSnapshot(before.document).settings.macroNames, "the macros keep their names");
-    assert.deepEqual(named.layers, before.document.layers);
+    assert.deepEqual(profileLayers(named), profileLayers(before.document));
     const [item] = profileReview(before, snapshot(named)).filter(row => row.unit === "customKey:2");
     assert.equal(item.title, "Custom key 2 · Click Spam");
     assert.equal(item.fields.find(field => field.label === "Name").after, "Click Spam");
-    assert.deepEqual(revertUnits(before, snapshot(named), new Set(["customKey:2"]), capabilities).layers, before.document.layers);
+    assert.deepEqual(profileLayers(revertUnits(before, snapshot(named), new Set(["customKey:2"]), capabilities)), profileLayers(before.document));
     assert.equal(validateSnapshot(revertUnits(before, snapshot(named), new Set(["customKey:2"]), capabilities)).settings.customKeyNames[2], "", "discarded alone");
     const model = buildDeviceModel({customKeyView: customKeyEditorView(snapshot(named), capabilities), capabilities});
     assert.equal(model.customKeys[2].name, "Click Spam");
@@ -85,7 +86,7 @@ test("wrong keys, stale drafts, long names and older firmware are refused", () =
 
 test("a name that meets the profile's ceiling says the profile is full", () => {
     const {encodeNamedProfile} = require("../../core/model/portable-profile");
-    assert.throws(() => encodeNamedProfile({schema: {major: 3, minor: 0}, domains: [{id: 0x40, version: 8, payload: Buffer.alloc(65500)}]}),
+    assert.throws(() => encodeNamedProfile({schema: {major: 4, minor: 0}, domains: [{id: 0x40, version: 8, payload: Buffer.alloc(130048)}]}),
         error => error.code === "PROFILE_FULL" && /profile is full/.test(error.message));
 });
 
@@ -97,7 +98,7 @@ test("a shortcut is staged, reviewed beside the name, discarded alone and named 
     assert.deepEqual(after.settings.customKeyShortcuts[2], {mods: 0x41, key: 0x0e}, "Left Ctrl + Right Alt + K, mixed sides");
     assert.equal(after.settings.customKeyNames[2], "", "the name is untouched");
     assert.deepEqual(after.settings.customKeyShortcuts.filter(({mods, key}) => mods || key).length, 1, "no other key changes");
-    assert.deepEqual(changed.layers, before.document.layers);
+    assert.deepEqual(profileLayers(changed), profileLayers(before.document));
     const [item] = profileReview(before, snapshot(changed)).filter(row => row.unit === "customKey:2");
     assert.equal(item.status, "added", "a key with no name or shortcut gains one");
     assert.deepEqual(item.fields.map(field => [field.label, field.before, field.after]), [["Shortcut", null, "Left Ctrl + Right Alt + K"]]);

@@ -418,9 +418,10 @@ boot and 213,880 B of flash image sections.
 
 ## Complete compiled defaults representation
 
-D-F12 retains a 40-byte compiled-profile handle: metadata and five domain
-offset/length pairs. Factory RGB adds one 551-byte encoded cache, a 40-byte
-reader view and readiness state in SRAM0–3. It shares the stored RGB decoder;
+D-F12 retains a compiled-profile handle of metadata and five domain
+offset/length pairs: 40 bytes, 60 since D-F28 made the pairs 32-bit. Factory
+RGB adds one 551-byte encoded cache, a 40-byte reader view and readiness state
+in SRAM0–3. It shares the stored RGB decoder;
 ordinary frames do no serialization. Compiled combos and settings warm the
 existing effective caches instead of allocating another profile buffer.
 
@@ -605,3 +606,205 @@ of 768. SRAM0–3 `.data + .bss` is 208,352 bytes per half, 1,568 below the
 209,920-byte tripwire: 16 bytes of LTO partition padding, no new state. These
 are link-time values for the named paths only, not runtime high-water or a
 global or interrupt-stack maximum.
+
+Later changes no longer pass the reviewed-path gate: the manifests carry
+adjacencies the linker no longer makes and miss indirect call sites from
+`process_record_user` (an [open issue](https://github.com/NoahCLR/charybdis-4x6/blob/83366a07185aa6399ca80e2cb493a3e4278c1edb/docs/LIVE_EDIT_APP_DIRECTION.md#open-issues)).
+Until they are reviewed, the figures above are the last ones the gate accepted.
+
+## The new base: 32-bit profile lengths — D-F28, 2026-10-19
+
+Every profile length and offset the firmware holds is now 32 bits, so the
+structures that hold them grow. Pair build of the pinned image
+(`tools/build-firmware-pair.sh`, GCC 15.2.0, BK `d280a4471e`), left half
+(`FORCE_SLAVE`, the half built last), against the same build of
+`chore/trial-review-fixes` at `fe4958a8` (`dev` with trial merges of #104 and
+#105):
+
+| | This change | `fe4958a8` |
+| --- | ---: | ---: |
+| SRAM0–3 `.data + .bss` | 208,668 bytes | 208,376 |
+| Below the 209,920-byte tripwire | 1,252 bytes | 1,544 |
+| Live-profile owner (`runtime_owner`) | 11,328 bytes | 11,068 |
+| Compiled-profile handle | 60 bytes | 36 |
+
+On Cortex-M0+ the owner's parts grow as follows: the candidate store backend
+by 128 bytes (its sixteen remembered reuse ranges by 96, its validator by 20),
+the split reconciler by 36 to its 896-byte allowance exactly, the store by
+24, the effective-profile provider by 16, the peer store by 12 and the host
+transaction by 8. The owner's engineering policy rises from 11,264 to 11,520
+bytes and the validator's from 384 to 400; neither is a physical SRAM limit.
+These are link-time values, not runtime high-water; the reviewed-path stack
+gate was not run for this change (it already fails on `dev`, an
+[open issue](https://github.com/NoahCLR/charybdis-4x6/blob/83366a07185aa6399ca80e2cb493a3e4278c1edb/docs/LIVE_EDIT_APP_DIRECTION.md#open-issues)).
+
+Pulled chunks then moved into replies as large as pushed ones (D-F28), which
+costs 184 bytes more per half in the same build: QMK's slave-to-master RPC
+buffer rises from 32 to 128 bytes in the split shared memory (96), and the
+reconciler's cached reply from 32 to 128 (96, so the owner links at 11,424
+bytes, inside its 11,520 policy). The transport CRC's staging buffer already
+held the 128-byte request and does not grow; LTO packing recovers 8 bytes.
+SRAM0–3 `.data + .bss` is 208,852 bytes on the left half, 1,068 below the
+unchanged 209,920-byte tripwire. The reconciler's own 32-bit policy rises from
+896 to 1,024 bytes; it links at 992.
+
+## Profile slots in their own flash region — D-F29, 2026-10-19
+
+The two profile slots leave QMK's logical EEPROM for a flash region of their
+own and are read in place, so the wear-leveling cache mirrors only the 36 KiB
+VIA region: `WEAR_LEVELING_BACKING_SIZE` 73,728 bytes and `wear_leveling`
+36,872 bytes per half, 106,496 fewer. Pair build of the pinned image
+(`tools/build-firmware-pair.sh`, GCC 15.2.0, BK `d280a4471e`), against the
+same build of the new base (`refactor/new-base-with-32-bit-profile-lengths`
+at `86d7fd89`):
+
+| | Right (`FORCE_MASTER`) | Left (`FORCE_SLAVE`) | New base, left |
+| --- | ---: | ---: | ---: |
+| SRAM0–3 `.data` | 4,360 bytes | 4,360 | — |
+| SRAM0–3 `.bss` | 98,568 bytes | 98,568 | — |
+| SRAM0–3 `.data + .bss` | 102,928 bytes | 102,928 | 208,852 |
+| Static-data tripwire | 103,424 bytes | 103,424 | 209,920 |
+| Below it | 496 bytes | 496 | 1,068 |
+| Linker/core-memory span at boot | 159,208 bytes | 159,208 | — |
+| Image end (`__flash_binary_end`) | 273,872 bytes | 273,840 | — |
+
+The tripwire drops by exactly the 106,496 cache bytes, from 209,920 to
+103,424 (`tests/host/run_firmware_memory_budget_checks.sh`); it stays a
+regression policy, not a physical limit. The change itself costs 572 bytes:
+the flash backend (`noah_qmk_profile_flash`, 336 bytes, its 256-byte page
+buffer included), the other half's pulled pause figures, and the store's I/O
+table, which gains reset and sync (the owner links at 11,440 bytes, inside its
+11,520-byte policy). The boot span is the allocator's range, not runtime-free
+memory; allocator and stack high-water on both halves remain keyboard
+evidence.
+
+After review the backend keeps an erase frontier, a write frontier, a failure
+flag and a marker-step count: `noah_qmk_profile_flash` links at 352 bytes (16
+more). The instrumented resource build of the right half
+(`NOAH_RESOURCE_CHECKS=yes sh tools/build-firmware-pair.sh`, same compiler and
+BK) links SRAM0–3 `.data` 4,356 and `.bss` 98,584 bytes, 102,940 together,
+484 below the 103,424-byte tripwire.
+
+Reviewed-path stack gates, on that right-half ELF, against the same build of
+the new base at `86d7fd89`. Both manifests now name the flash backend: reads
+(`flash_read`, `read_flash`, `rp2040_read`), writes and page programs
+(`flash_write`, `write_flash`, `flush`, `rp2040_program_page`), syncs
+(`io_sync`, `flash_sync`), the erase ahead of a save
+(`noah_qmk_durable_io_matrix_scan` → `erase_next` → `rp2040_erase_sector`) and
+the boot-time forget (`main` → `rp2040_erase_sector`); the profile step is
+reached through `noah_qmk_durable_io_profile_step`, its flash gate, into which
+the compiler inlines the store runtime step. Paths stop at the driver
+functions: the checker accepts no `bx ip` tail as evidence, so it cannot
+follow the linker veneer into pico-sdk's RAM-resident `flash_range_erase` and
+`flash_range_program`, whose frames add 40 bytes (plus the boot ROM's) with
+interrupts off.
+
+| Manifest | New base `86d7fd89` | This branch |
+| --- | --- | --- |
+| `firmware_stack_budget.json` | 6 key-runtime paths over the 1,920-byte budget (1,952–2,304) | the same 6, same figures; storage paths pass (boot discovery 672, behaviour lookups 1,072–1,336) |
+| `firmware_stack_budget_live_profile_owner.json` | 2 over: peer large chunk write 1,984, repeated chunk read 1,952 | the same 2, now 2,024 (+40) and 2,016 (+64): the flash backend's write and read frames replace the EEPROM adapter's |
+
+No path fails that passed before. The new flash paths pass: erase ahead in a
+quiet grant 312 bytes, a write that erases first 1,016, the commit sync
+1,080, the boot forget 168. The resource build stops at the right half's first
+failing manifest, so the left half was not analysed.
+
+
+## Profile keymap and macro domains — D-F30
+
+The effective keymap/macro binding borrows one immutable reader and two domain
+ranges instead of copying the matrix or bank. Key lookup reads two bytes from
+the stored matrix, or directly reads authored const data for compiled fallback;
+it never copies a provider snapshot or serializes compiled defaults on a key
+path. Macro playback keeps the existing 516-byte IR window and decoder. Its
+new slot metadata (128 bytes) and cached bank offset/length (6 bytes) coexist
+with the VIA provider during this additive transition: the VIA provider is
+still linked (its load, byte reader and invalidation symbols are in the right
+ELF), so the named-macro subtotal includes both providers; the shared engine
+window is counted once.
+
+Writing the compiled defaults never compiles a macro: the authored macros are
+generated already in the bank encoding (`authored_macro_bank.h`, about 330
+bytes of flash), so the writer copies bytes. A save that reuses the macro
+domain while the compiled defaults are active therefore no longer holds a
+516-byte IR on the scan stack.
+
+An instrumented right-half pair at firmware `ba24d84d`, based on the reviewed
+D-F29 fixes at `1a8bdd5e`, uses GCC 15.2.0 in the pinned build image and BK
+`d280a4471e`. SRAM0–3 `.data` is 4,352 bytes and `.bss` 98,792: 103,144
+combined, 280 bytes below the unchanged 103,424-byte regression tripwire. The
+named-macro subtotal is 826 bytes. These are linked figures, not runtime free
+memory or high-water.
+
+Ordinary manifest, macro paths: physical key lookup 432 bytes, compiled-default
+macro parse 1,728, saved macro slot search 1,784, held-sequence decode 1,852 and
+saved macro storage read 1,904. The decoder reads through the runtime's own
+byte reader, which calls the published reader's callback for a range bounded
+at publication, so the storage read is two frames shorter. Deferring the first
+window to the scan refill was not taken: every window must pass preflight
+before the first key is typed, on the key press. The slot search reads the bank
+32 bytes at a time: host full-bank tests take 1,093 profile-bank reads to find
+and play slot 127 (VIA's provider: 34,803) and 36,686 for a long macro after a
+17,000-byte one (VIA: 69,624). Those are operation counts, not scan timings.
+
+The resource build passes the static gate, then stops at the ordinary
+manifest's six inherited key-runtime overruns (1,952–2,304 bytes), so it does
+not build an instrumented left image. The owner manifest, run separately on
+the preserved right ELF, fails only the two paths already over on D-F29: peer
+large chunk write 1,968 and repeated chunk read 1,960 (D-F29 base 2,024 and
+2,016). Everything else passes, including peer reuse mailbox admission and its
+rejected reply (1,848 each, previously 1,936), large chunk mailbox decode
+(1,840, previously 1,928), and the compiled keymap and macro reuse paths (peer
+1,672, candidate 1,464; both writers are inlined into `write_domain`). The
+review traced the earlier admission and decode overruns to two frames, not to
+the domain metadata. `noah_qmk_durable_io_profile_step` had grown 24 bytes by
+inlining `initialize_runtime_graph`, whose invalidator array had become the
+provider's maximum of eight. That function is now boot-only and out of line,
+with its array sized to the runtimes compiled in. `scan_running` copied the
+whole split reconciler status to read two fields; it now reads only the
+transfer offset and phase. No budgets or tests were weakened. The complete
+stack gate and scan-cadence acceptance remain unresolved. Both halves' typing,
+layers, combos and macros from flashed defaults, scan cadence and runtime
+high-water remain keyboard acceptance.
+
+## VIA removed: one store — D-F31, 2026-10-19
+
+VIA leaves the build, and QMK's logical EEPROM holds only its eeconfig: the
+wear-leveling backing returns to QMK's RP2040 default of 8,192 bytes, so its
+RAM mirror (`wear_leveling`) is 4,104 bytes instead of 36,872. The VIA split
+sync, mirror and staging state, its macro provider and its defaults seeder go
+with it.
+
+An instrumented right-half resource build (`NOAH_RESOURCE_CHECKS=yes`
+`tools/build-firmware-pair.sh`, pinned GCC 15.2.0 image, BK `d280a4471e`) on
+the keymap-and-macro domains' reviewed head `3d17afc0` plus this change links
+4,332 bytes of `.data` and 65,440 of `.bss` in SRAM0–3: 69,772 combined,
+33,372 fewer than D-F30's 103,144 (32,768 of them the mirror). The static-data
+tripwire drops by exactly the mirror's 32,768 bytes, from 103,424 to 70,656
+(`tests/host/run_firmware_memory_budget_checks.sh`), leaving 884 bytes. The
+SRAM0–3 fixed prefix is 69,784 bytes and the boot linker/core-memory span
+192,360; fixed linked occupancy across unique SRAM banks is 77,240 bytes.
+Named macro storage is 692 bytes, with the profile provider's slot metadata
+now the required symbol. These are linked figures, not runtime free memory
+or high-water.
+
+Stack (reviewed paths, same ELF): the ordinary manifest fails only on the six
+handled-key paths D-F30 recorded (1,952–2,304 bytes against 1,920), so the
+instrumented pair still stops before the left half. Its macro paths pass:
+saved macro storage read 1,896, slot search 1,776, compiled-default macro
+parse 1,720, physical key lookup 432. The owner manifest, run separately on
+the preserved right ELF, now passes every path, including the two chunk paths
+over budget since D-F29: peer large chunk write 1,896 and repeated chunk read
+1,888 (D-F30: 1,968 and 1,960). Reuse mailbox admission and its rejected reply
+are 1,776 (1,848), large chunk mailbox decode 1,752 (1,840), and compiled
+keymap and macro reuse 1,632 on the peer and 1,432 on the candidate (1,672 and
+1,464). The manifests drop every VIA path and name the Raw HID dispatcher
+where they named VIA's custom-value hook. With a single stored caller left,
+LTO inlined the macro window decoder, the macro compiler and the durable-I/O
+scan, so all three are now `noinline` in every build
+(`macro_payload_decode_qmk.c`, `macro_payload_parse.c`, `qmk_durable_io.c`),
+keeping the measured call shape in the flashed firmware; inlined, the compiler
+widened the provider's frame on the saved-macro storage read to 1,968 bytes.
+The decoder's byte reads are a direct call. The complete stack gate remains
+failing on the six inherited paths; no budget or test was weakened. Allocator
+and stack high-water on both physical halves remain keyboard acceptance.

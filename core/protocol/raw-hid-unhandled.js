@@ -1,28 +1,19 @@
 // @ts-check
 "use strict";
 
-// QMK's answer to a command nothing on the keyboard handled.
-//
-// quantum/via.c always replies: when no handler takes a report — a candidate
-// frame while the profile owner is not ready, a GET page this firmware does
-// not have — byte 0 becomes id_unhandled (0xFF) and bytes 1–31 come back
-// exactly as sent. That echo is a definite answer: the keyboard received the
-// request and did nothing with it. Treating it as silence would wait out the
-// timeout, drop the connection, and report an unknown outcome for a request
-// the keyboard plainly refused.
-//
-// Only the full echo counts, so a stray 0xFF report — another VIA client's
-// reply, or one for a different request — is never taken for this one.
+// Firmware-owned Raw HID refusal (D-F31): byte 0 is 0xff and bytes 1–31
+// echo the request exactly. Only the full correlated echo is a definite
+// refusal; unrelated reports must not replace a timeout or disconnect.
 
 const {normalizeRawHidReport} = require("../transport/device-adapter");
 
-const VIA_UNHANDLED = 0xff;
+const RAW_HID_UNHANDLED = 0xff;
 
 /** @param {Uint8Array} response @param {Uint8Array} request */
 function isUnhandledEcho(response, request) {
     const actual = normalizeRawHidReport(response, "Raw HID response");
     const sent = normalizeRawHidReport(request, "Raw HID request");
-    return actual[0] === VIA_UNHANDLED && sent[0] !== VIA_UNHANDLED && actual.subarray(1).equals(sent.subarray(1));
+    return actual[0] === RAW_HID_UNHANDLED && sent[0] !== RAW_HID_UNHANDLED && actual.subarray(1).equals(sent.subarray(1));
 }
 
 // A matcher for `request` that also accepts the keyboard's unhandled echo of
@@ -50,4 +41,4 @@ async function requestHandled(connection, request, options, what) {
     return response;
 }
 
-module.exports = {VIA_UNHANDLED, isUnhandledEcho, orUnhandled, requestHandled, unhandledError};
+module.exports = {RAW_HID_UNHANDLED, isUnhandledEcho, orUnhandled, requestHandled, unhandledError};

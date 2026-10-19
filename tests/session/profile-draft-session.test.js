@@ -1,4 +1,5 @@
 "use strict";
+const {profileLayers, profileMacros, editLayers, editMacros} = require("../fixtures/profile-document");
 const test = require("node:test"), assert = require("node:assert/strict");
 const {ProfileDraftSession} = require("../../core/session/profile-draft-session");
 const {document} = require("../fixtures/portable-profile");
@@ -9,7 +10,7 @@ const {settingsEditorView} = require("../../core/model/settings-editor");
 const {behaviorRowsForView} = require("../../core/model/device-profile-view");
 function fixture() {
     const value = document(), snapshot = {document:value, fingerprint:fingerprint(value), summary:summary(value), limits:{brightnessMax:200}, options:options()};
-    const caps = {compiledLayerCount:16,supportedDomainMask:31,actionAbiDigest:value.actionAbiDigest};
+    const caps = {compiledLayerCount:16,supportedDomainMask:127,actionAbiDigest:value.actionAbiDigest};
     return {snapshot, caps, draft:new ProfileDraftSession(snapshot, "board", caps)};
 }
 function settings(draft, id, updates) {
@@ -67,7 +68,7 @@ test("switching to a native layout fixes stored text without rewriting it", () =
     assert.equal(macroEditorView(draft.current, draft.capabilities).viaMacros[0].playable, false);
     stage(draft, settings(draft, "host", {hostLayout: "2"}));
     assert.equal(macroEditorView(draft.current, draft.capabilities).viaMacros[0].playable, true);
-    assert.deepEqual(draft.document.macros, snapshot.document.macros);
+    assert.deepEqual(profileMacros(draft.document), profileMacros(snapshot.document));
     assert.equal(draft.checks().find(row => row.kind === "unplayableMacro").status, "fixed");
     assert.equal(draft.changes().find(row => row.area === "Macros").fields.find(field => field.label === "Playback").after, "Ready to play");
 });
@@ -220,7 +221,7 @@ test("bounded history and a new branch retain each step's time, label, document 
     draft.now = () => clock;
     const replaceMacro = (text, label) => {
         const next = draft.document;
-        next.macros[0] = encodeMacroPayload(text).toString("base64");
+        editMacros(next, macros => macros[0] = encodeMacroPayload(text).toString("base64"));
         draft.replace(next, draft.revision, "edit", label);
     };
     let oldestDecode;
@@ -333,7 +334,7 @@ test("layer reordering is undoable and updates layout and settings references to
     const {draft,snapshot} = fixture();
     draft.replace(reorderLayers(draft.document,[0,2,1,3,4,5,6,7,8,9,10,11,12,13,14,15],["Base","Symbols","Numbers","Navigation","Pointer","Extra 1","Extra 2","Extra 3",...Array(8).fill("")]),draft.revision);
     assert.equal(draft.current.summary.names[1],"Symbols");
-    assert.equal(draft.document.layers[0][0],0x5222);
+    assert.equal(profileLayers(draft.document)[0][0],0x5222);
     draft.undo(draft.revision); assert.equal(draft.current.fingerprint,snapshot.fingerprint);
 });
 
@@ -355,11 +356,11 @@ test("rows are grouped by the edit that made them, and by any later edit that jo
 });
 test("a unit edited back to the keyboard's value no longer ties anything together", () => {
     const {draft,snapshot} = fixture();
-    const original = snapshot.document.layers[1][1];
+    const original = profileLayers(snapshot.document)[1][1];
     stage(draft,{type:"updateLayoutKeys",layer:"Layer 1",changes:[{layoutIndex:0,keycode:"KC_A"},{layoutIndex:1,keycode:"KC_B"}]});
     stage(draft,{type:"updateLayoutKeys",layer:"Layer 1",changes:[{layoutIndex:1,keycode:"KC_Z"},{layoutIndex:2,keycode:"KC_C"}]});
     assert.equal(unitsOf(draft,groupOf(draft,"layout:1:0")).length,3);
-    draft.replace({...draft.document,layers:draft.document.layers.map((keys,l)=>l===1?keys.map((code,p)=>p===1?original:code):keys)},draft.revision);
+    draft.replace(editLayers(draft.document, layers => layers[1][1] = original),draft.revision);
     assert.equal(groupOf(draft,"layout:1:1"),undefined,"the key is back");
     assert.notEqual(groupOf(draft,"layout:1:0"),groupOf(draft,"layout:1:2"),"and the keys it linked are apart again");
 });
@@ -367,11 +368,11 @@ test("discarding a group puts every row of it back, as one undoable step, and le
     const {draft,snapshot} = fixture();
     stage(draft,{type:"updateLayoutKeys",layer:"Layer 1",changes:[{layoutIndex:0,keycode:"KC_A"},{layoutIndex:1,keycode:"KC_B"}]});
     stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_0",payload:"kept"});
-    const kept = draft.document.macros[0];
+    const kept = profileMacros(draft.document)[0];
     draft.discard(draft.revision,groupOf(draft,"layout:1:1"));
     assert.deepEqual(draft.changes().map(row => row.unit),["macro:0"]);
-    assert.deepEqual(draft.document.layers,snapshot.document.layers);
-    assert.equal(draft.document.macros[0],kept);
+    assert.deepEqual(profileLayers(draft.document),profileLayers(snapshot.document));
+    assert.equal(profileMacros(draft.document)[0],kept);
     draft.undo(draft.revision);
     assert.deepEqual(draft.changes().map(row => row.unit).sort(),["layout:1:0","layout:1:1","macro:0"],"undo brings the group back");
     assert.throws(()=>draft.discard(draft.revision,99),/no longer in the draft/);
@@ -391,7 +392,7 @@ test("a discard from a current review keeps it current, and discarding the last 
 });
 test("a macro name discarded back leaves no indescribable settings difference", () => {
     const value = require("../fixtures/pd-profile").document();
-    const draft = new ProfileDraftSession({document:value,fingerprint:fingerprint(value),summary:summary(value),limits:{brightnessMax:200}}, "board", {compiledLayerCount:16,supportedDomainMask:31,actionAbiDigest:value.actionAbiDigest});
+    const draft = new ProfileDraftSession({document:value,fingerprint:fingerprint(value),summary:summary(value),limits:{brightnessMax:200}}, "board", {compiledLayerCount:16,supportedDomainMask:127,actionAbiDigest:value.actionAbiDigest});
     stage(draft,{type:"updateViaMacro",keycode:"VIA_MACRO_3",name:"Hello",expectedFingerprint:draft.current.fingerprint});
     draft.discard(draft.revision,groupOf(draft,"macro:3"));
     assert.equal(draft.dirty,false,"discard restores the original settings bytes too");
@@ -424,7 +425,7 @@ test("a revision is decoded once and its history entry cannot be edited in place
     stage(draft,{type:"updateLayoutKeys",layer:"Layer 0",changes:[{layoutIndex:0,keycode:"KC_A"}]});
     assert.equal(draft.current.decoded, draft.current.decoded, "the same decode serves every read of this revision");
     assert.equal(draft.current.document, draft.current.decoded.document, "and belongs to the document it is handed with");
-    assert.throws(() => { "use strict"; draft.current.document.layers[0][0] = 5; }, TypeError, "history is frozen");
+    assert.throws(() => { "use strict"; editLayers(draft.current.document, layers => layers[0][0] = 5); }, TypeError, "history is frozen");
     const copyOf = {...draft.current, document: structuredClone(draft.current.document)};
     const {decodedOf} = require("../../core/model/portable-profile");
     assert.notEqual(decodedOf(copyOf), draft.current.decoded, "a snapshot with another document is decoded afresh, never with a stale decode");
@@ -515,7 +516,7 @@ test("swapping back leaves no layer order, and names alone never make one", () =
 test("keys that keep their numbers through a reorder are listed as the changes they are", () => {
     const {draft,snapshot} = fixture();
     layers(draft,[0,2,1,3,4,5,6,7,8,9,10,11,12,13,14,15],{keysFollow:false});
-    assert.equal(draft.document.layers[0][0],snapshot.document.layers[0][0],"the key kept its number");
+    assert.equal(profileLayers(draft.document)[0][0],profileLayers(snapshot.document)[0][0],"the key kept its number");
     assert.ok(units(draft).includes("layerOrder"));
     assert.ok(units(draft).includes("layout:0:0"),"and now reaches another layer, which the review says");
 });
@@ -559,18 +560,18 @@ test("Unicode survives real draft Review, history, undo/redo and an unrelated ed
     stage(draft,{type:'updateViaMacro',keycode:'VIA_MACRO_0',payload:text});
     assert.ok(draft.changes().some(row=>row.unit==='macro:0'));
     assert.ok(draft.steps().at(-1).changes.some(row=>row.unit==='macro:0'));
-    const encoded = draft.document.macros[0];
+    const encoded = profileMacros(draft.document)[0];
     const {macroEditorView} = require('../../core/model/macro-editor');
     assert.equal(macroEditorView(draft.current,caps).viaMacros[0].payload,text);
-    draft.undo(draft.revision); assert.notEqual(draft.document.macros[0],encoded);
+    draft.undo(draft.revision); assert.notEqual(profileMacros(draft.document)[0],encoded);
     assert.doesNotThrow(()=>draft.steps());
-    draft.redo(draft.revision); assert.equal(draft.document.macros[0],encoded);
+    draft.redo(draft.revision); assert.equal(profileMacros(draft.document)[0],encoded);
     const next = new ProfileDraftSession(draft.current,'board',caps);
     stage(next,settings(next,'keyTiming',{tapHoldTerm:'175'}));
     assert.doesNotThrow(()=>next.changes()); assert.doesNotThrow(()=>next.steps());
     const {profileReview} = require('../../core/model/profile-review');
     assert.doesNotThrow(()=>profileReview(next.baseSnapshot,next.current));
-    assert.equal(validateSnapshot(next.document).document.macros[0],encoded);
+    assert.equal(profileMacros(validateSnapshot(next.document).document)[0],encoded);
 });
 test("new detection refreshes dirty draft labels and Unicode gates without altering history or edits", () => {
     const {draft,snapshot,caps} = unicodeDraft(0);

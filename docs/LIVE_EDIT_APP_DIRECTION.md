@@ -50,8 +50,8 @@ matrix.
 | Keyboard name | The keyboard's own name, its USB product string, edited as the Keyboard screen's title and stored in the settings domain; an Apply that renames it is followed through the keyboard's USB restart (D-L62) |
 | Backup and restore | Complete current-format backup files, restore review against the keyboard, the copies saved before each Apply (each usable as a draft) and verified restore; older formats are refused, never converted (D-L15, D-L23, D-L54, D-L64) |
 | Drafts and Apply | One draft with item-by-item review, discard by edit group, Show, undo/redo and history; the review checks reachable actions, confirms warnings and traps and blocks what the destination cannot save; Apply names its steps and halves and says where a failure happened (D-L19, D-L23, D-L29, D-L30, D-L36, D-L60, D-L61) |
-| Firmware supported | Current firmware only: every feature it reports is required, through bit 31 (every dual-role key decided by the keyboard, with or without a behaviour row), and a keyboard on anything older is read no further than its identity and told to update (D-L48, D-L64) |
-| Recovery | Atomic logical Apply, differential custom and VIA transfer, reboot recovery fencing, firmware roll-forward after the decision, resume after a lost or power-cycled peer link, bounded cancel owned by the keyboard (D-L20–D-L22, D-L27, D-L39, D-L58) |
+| Firmware supported | Current firmware only: the new base, Profile Wire 2.0 and profile schema 4.0, required exactly (major and minor), whose version implies everything the keyboard does; the feature word only describes the build (split, saves, pointing). A keyboard on anything else, the previous base included, is read no further than its identity and told to update; a keyboard whose saved profile is in an earlier store format or retired test layout says it runs its built-in defaults (D-L48, D-L64) |
+| Recovery | One-store atomic Apply, differential profile transfer, firmware commit recovery after the decision, resume after a lost or power-cycled peer link, verified running-layout reads or an unavailable layout during recovery, bounded cancel owned by the keyboard (D-L20–D-L22, D-L27, D-L39, D-L58) |
 | Where it runs | The VS Code extension, and a web page in Chrome or Edge over WebHID; Cloudflare Git integration publishes `dev` to `ark-dev.ncleroy.dev`, `main` to `ark.ncleroy.dev`, and task branches to PR previews; a phone gets only a notice (D-L02, D-L52) |
 | Demo without a keyboard | The bundled demo profile in a real draft, in both hosts: every screen editable and reviewed, Apply refused, Export saves the draft (D-L53) |
 
@@ -68,7 +68,6 @@ review before Apply.
 Remaining before calling the product complete:
 
 - physical interruption acceptance at every durable boundary;
-- adoption or conflict reporting for writes by external VIA clients;
 - guided recovery, and an explicit reset to compiled defaults;
 - broad hardware acceptance, including blank-firmware restore and the
   [PD-mode hardware matrix](../upstream/firmware/docs/architecture/pd-mode-domain-v1.md#hardware-acceptance).
@@ -97,25 +96,23 @@ Remaining before calling the product complete:
   recovery restore, and another keyboard already using the target name.
   Automated tests use fake adapters only.
 
-- **Replugging after an Apply the halves disagreed on needs keyboard acceptance
-  (D-L23).** An Apply that fails after the decision with post-commit authority
-  lost or a concurrent commit (`AUTHORITY_FAILED`) stays failed until the
-  keyboard restarts, and from the VIA ACCEPT request the master half types
-  nothing until then. Ark tells the user to unplug and replug, and says the
-  master half types nothing when it saw or reads back that ACCEPT, keeps
-  typing when the VIA status proves ACCEPT was never requested, and may type
-  nothing when it cannot tell. A real keyboard cannot be made to hit this on
-  demand: when it happens, confirm the message matches whether the master half
-  typed, and that a replug leaves one complete profile on both halves.
-  Automated tests use the fake keyboard only.
+- **Post-decision failures need keyboard acceptance (D-L23).** Lost split
+  authority or a concurrent commit (`AUTHORITY_FAILED`) requires a USB replug.
+  Each half keeps a complete profile; there is no input fence or host rewrite.
+  Confirm the restart guidance and that both halves recover one complete
+  generation. Automated checks cannot establish physical interruption safety.
 
 - **Refusing older firmware needs keyboard acceptance (D-L64).** Read a
-  keyboard on an older firmware release and confirm Ark names the update and
-  reads nothing it could edit, in VS Code and in Chrome.
-- **Sparse macro read timing needs hardware acceptance (D-L23).** Compare
-  first read, Refresh and Export with mostly empty and full macro banks, and
-  after shortening a macro. Automated counts prove reduced transfer volume;
-  they do not measure USB latency or typing/pointing cadence.
+  keyboard on an older firmware release, the previous base (Profile Wire 1,
+  schema 3) included, and confirm Ark names the update and reads nothing it
+  could edit, in VS Code and in Chrome. After flashing the new base over a
+  saved schema-3 profile, confirm the Keyboard screen says the keyboard runs
+  its built-in defaults, and that an Apply clears it.
+- **The one-store base needs keyboard acceptance (D-L64).** Read, edit and
+  Apply from both hosts, including keys, macros, shared profile-space limits,
+  both halves, reboot and interrupted saves. Measure first read, Refresh,
+  Export and save pauses with small and large profiles. Firmware exposes
+  per-half pause diagnostics, but Ark has no diagnostics view for them yet.
 - **The picker's list of unbuilt QMK features is written by hand** (D-L05).
   `webview/view/picker-sections.mjs` hides keycodes for features this build
   does not include, matched against its rules files and QMK's defaults. It
@@ -143,10 +140,10 @@ Remaining before calling the product complete:
 
 ## Remaining Load-Bearing Contracts
 
-The firmware direction records three contracts the app must preserve: the
-canonical profile format (D-L15), one logical generation across the VIA and
-custom stores (D-L21), and adopting or surfacing writes by external VIA clients,
-which is not yet built.
+The firmware direction owns one-store publication and recovery (D-L21,
+D-F31). Ark preserves a complete effective profile (D-L15), uploads one
+candidate and accepts success only for the confirmed complete generation.
+VIA is unsupported; the firmware answers Raw HID itself.
 
 ## Firmware decision pointers
 
@@ -162,7 +159,7 @@ text in the firmware repository.
 | <a id="d-l14--device-edits-are-saved-as-a-complete-generation-bound-profile"></a>D-L14 | Device edits are saved as a complete, generation-bound profile | [Firmware direction](https://github.com/NoahCLR/charybdis-4x6/blob/dev/docs/LIVE_EDIT_APP_DIRECTION.md#d-l14--device-edits-are-saved-as-a-complete-generation-bound-profile) |
 | <a id="d-l17--the-keyboard-reports-its-brightness-limit"></a>D-L17 | The keyboard reports its brightness limit | [Firmware direction](https://github.com/NoahCLR/charybdis-4x6/blob/dev/docs/LIVE_EDIT_APP_DIRECTION.md#d-l17--the-keyboard-reports-its-brightness-limit) |
 | <a id="d-l18--native-settings-use-device-reported-capabilities"></a>D-L18 | Native settings use device-reported capabilities | [Firmware direction](https://github.com/NoahCLR/charybdis-4x6/blob/dev/docs/LIVE_EDIT_APP_DIRECTION.md#d-l18--native-settings-use-device-reported-capabilities) |
-| <a id="d-l21--apply-publishes-one-atomic-logical-generation"></a>D-L21 | Apply publishes one atomic logical generation | [Firmware direction](https://github.com/NoahCLR/charybdis-4x6/blob/dev/docs/LIVE_EDIT_APP_DIRECTION.md#d-l21--apply-publishes-one-atomic-logical-generation) |
+| <a id="d-l21--apply-publishes-one-atomic-logical-generation"></a>D-L21 | Apply publishes one atomic logical generation in one store (D-F31) | [Firmware direction](https://github.com/NoahCLR/charybdis-4x6/blob/dev/docs/LIVE_EDIT_APP_DIRECTION.md#d-l21--apply-publishes-one-atomic-logical-generation) |
 | <a id="d-l22--a-cancelled-save-ends-in-bounded-time-and-says-why-it-ended"></a>D-L22 | A cancelled save ends in bounded time, and says why it ended | [Firmware direction](https://github.com/NoahCLR/charybdis-4x6/blob/dev/docs/LIVE_EDIT_APP_DIRECTION.md#d-l22--a-cancelled-save-ends-in-bounded-time-and-says-why-it-ended) |
 | <a id="d-l24--directional-modes-can-read-eight-directions"></a>D-L24 | Directional modes can read eight directions | [Firmware direction](https://github.com/NoahCLR/charybdis-4x6/blob/dev/docs/LIVE_EDIT_APP_DIRECTION.md#d-l24--directional-modes-can-read-eight-directions) |
 | <a id="d-l25--via-macros-have-names-user-macros-are-retired"></a>D-L25 | VIA macros have names; user macros are retired | [Firmware direction](https://github.com/NoahCLR/charybdis-4x6/blob/dev/docs/LIVE_EDIT_APP_DIRECTION.md#d-l25--via-macros-have-names-user-macros-are-retired) |
@@ -208,7 +205,7 @@ Ark edits device profiles and does not import or export C source.
 
 A build step (`npm run keycodes`) reads QMK's `*.hjson` keycode files once and
 emits a checked-in JSON catalog inside Ark, stamped with the QMK
-version it came from. Keycodes arrive from VIA as bare `uint16`, and the app
+version it came from. Keycodes arrive in the profile keymap domain as `uint16`, and the app
 needs both directions without a firmware workspace. Vendoring also turns QMK
 version drift into a diffable file rather than a silent behaviour change.
 
@@ -228,7 +225,7 @@ placed. A key or a combo output runs QMK's full key handling, so any keycode
 works there. A behaviour sends QMK and keyboard functions (keycodes past the
 layer keycodes and below the user range: the DPI and sniping keys, RGB Matrix,
 Magic, `QK_BOOT`) as a synthetic QMK record, so they run as on a key, and says
-so with Profile Wire feature bit 15. A key whose own keycode is one keeps a
+so (Profile Wire 1's feature bit 15; every Profile Wire 2 firmware does). A key whose own keycode is one keeps a
 plain key's fallback hold: with only a double-tap branch on `SNIPING`, holding
 it still holds sniping, as with no behaviour at all.
 
@@ -295,25 +292,26 @@ values stay visible, with the unreported firmware default stated. Recorded
 device bytes are test-only fixtures, never runtime data.
 
 The Configure screens reveal the keyboard only after the complete portable
-read has opened an editable draft. Layout, committed domains, VIA base RGB and
-the complete profile arrive in separate reads and are published separately for
-diagnostics, but their partial previews must stay behind one loading state.
+read has opened an editable draft. One coherent capture supplies layout,
+macros, base lighting and every profile domain. Independent reads remain
+available for diagnostics after a capture failure, behind one loading state.
 Every screen menu is disabled during that read. Afterwards, Configure requires
 an editable draft; Backups requires complete-profile support; Keyboard requires a connected
 keyboard that reported its capabilities.
 
 ### D-L12 — RGB rule identity and preview appearance are separate
 
-Pass-through is a layer paint operation, not a colour. The app reads QMK RGB
-Matrix settings over standard VIA channel 3 (brightness, effect, speed,
-hue/saturation), outside custom-profile generation identity, requiring
-consecutive matching samples since VIA has no atomic snapshot. An unstable read
-clears the base colour and leaves custom-profile readback intact.
+Pass-through is a layer paint operation, not a colour. Base RGB comes from
+Profile Wire settings scalars 21 and 22. Brightness is absolute HSV (0–255),
+just like layer colours; the reported keyboard limit constrains editing and
+never rescales a read. The complete capture uses its already verified settings
+for the base preview. A standalone base-lighting read remains optional: a
+failure clears that preview without discarding the profile.
 
 The board is a **selected-layer preview**: base plus the selected layer, their
 colours in layer order, then their LED groups in reported order, following the
 firmware's membership, pass-through and inheritance rules. It is not LED
-telemetry: brightness is scaled to a ceiling, and effects, animation phase,
+telemetry: editing respects the reported brightness ceiling, and effects, animation phase,
 active layers and transient feedback are not reported. Exact live appearance
 would need a future device-frame readout, not host reconstruction.
 
@@ -327,11 +325,21 @@ sentinel for an explicit black colour.
 
 Export and import own the whole keyboard snapshot. Flashed and committed
 domains are materialized into the same document from device reads: every
-matrix position, the VIA macros and their names (D-L25), RGB, behaviours,
+matrix position, all 128 macros and their names (D-L25), RGB, behaviours,
 effective combos, pointing slots, global settings and layer names. Missing and
 explicitly empty domains mean different things; a complete file carries every
-domain and never falls back to destination authored data. The contract is in
+domain and never falls back to destination authored data. Domain contracts are in
 [portable-profile-v1.md](../upstream/firmware/docs/architecture/portable-profile-v1.md).
+Ark owns the JSON envelope: document version 5 has exactly `format`, `version`,
+`keyboard`, `actionAbiDigest` and `profile`. `profile` is the complete canonical
+schema-4 blob in base64, all seven domains once. Keymap and macros are decoded
+views, with edits replacing their domains. The UTF-8 file limit is 196,608 bytes,
+enough for a 130,048-byte blob and its JSON envelope. Earlier separate-field
+files, including document version 4, are refused without conversion. Unrelated
+edits preserve optional unused macro-tail bytes; replacing macro content
+reclaims that capacity when calculating shared profile headroom. The
+imported spec's historical portable-document section describes that retired
+client format; it does not define Ark's version-5 envelope.
 
 The standard image reserves 16 layers; base stays at index zero and the app
 moves overlays and rewrites references together. The action ABI describes the
@@ -358,8 +366,9 @@ in `webview/view/review.mjs`.
 
 ### D-L19 — One whole-profile draft and review
 
-A complete device snapshot seeds one window-local draft. Every editor, import
-and layer edit updates it, with one undo history. Keep does not write HID.
+A complete device snapshot seeds one window-local draft. Its single profile
+blob contains all seven domains (D-L15); editors use decoded domain views.
+Every editor, import and layer edit updates it, with one undo history. Keep does not write HID.
 Each frozen history entry holds its document, edit origin, label, time and
 layer order together; branching and trimming move the whole entry, while its
 document retains its cached decode.
@@ -368,33 +377,22 @@ device; draft revisions are never device generations. Unfinished forms survive
 keeping another section and re-reading the device; undo, redo and review
 require them to be kept or discarded first. An external change preserves the
 draft and blocks a stale Apply; **Review against the keyboard** compares it
-against a fresh read and never silently merges. An incomplete read is labelled
-as recovery, never as a complete backup. Export captures the saved keyboard,
+against a fresh read and never silently merges. A failed complete capture
+leaves independent diagnostics and opens no editable draft or complete backup.
+Export captures the saved keyboard,
 not unapplied changes. Closing the editor loses the draft.
 
 ### D-L20 — Differential Apply
 
-The VIA macro bank is 34,903 bytes and a 32-byte Raw HID report carries 28
-data bytes, so one complete macro read is 1,247 exchanges; the old path read the
-profile four times and rewrote the whole bank. Apply now verifies and reuses
-the snapshot already loaded as its recovery base, uses custom, VIA and settings
-identities for the compare-and-swap checks, writes only changed 28-byte blocks
-and reads those back exactly. Refresh and Export remain independent complete
-reads.
-
-"Changed" means changed from the bank the keyboard holds, not from one rebuilt
-from the document: a valid bank may keep stale bytes after its 128th macro,
-which a document cannot carry. A capture keeps the exact layout and macro
-bytes it read, and an Apply result the target it proved; a cached snapshot
-without them is read again. See
-[Portable Profile V1](../upstream/firmware/docs/architecture/portable-profile-v1.md#portable-document).
-
-Most of the remaining delay was split scheduling: every mutating split RPC
-first returns `BUSY` to acknowledge mailbox admission, and the sender treated
-that like a failure and waited 50 ms per 14-byte chunk. Expected admission now
-gets one bounded 5 ms retry; a peer that stays busy still enters the
-100–1000 ms backoff and transport failures keep the 50–1000 ms path. On
-hardware this took a layer-name-only Apply from 13.05 s to 5.51 s.
+Apply checks the reviewed capture's live profile and settings identity before
+saving its recovery copy, then checks again under the acquired candidate lease.
+It reuses exact verified active-profile ranges with the source kind, origin,
+generation, CRC32 and FNV digest, and streams changed bytes in bounded batches.
+Reconstructed or edited target bytes never seed the readback cache. A missing
+or mismatched source falls back to a full upload. Firmware validates the complete
+candidate and publishes one new generation on both halves. Refresh and Export
+remain independent integrity reads. There is no second store, VIA staging,
+ACCEPT wait or USB-half roll-forward (firmware D-F31).
 
 ### D-L23 — Apply shows its steps, and a failure says where, why and what was saved
 
@@ -405,10 +403,10 @@ them. A complete coherent capture opens the draft; fresh integrity checks and
 exact stored bytes remain required wherever the contract calls for a new read.
 
 After the decision, a failure also says what ends it: the keyboard finishing
-from the slave half's copy by itself, or, when the keyboard reports lost split
+the same generation by itself once both halves are connected, or, when it reports lost split
 authority or a concurrent commit, a restart by unplugging and replugging it.
-Where Ark cannot tell whether the master half's output is fenced, it gives the
-restart advice and says the master half may type nothing.
+Each half keeps running a complete generation until activation; Ark never
+claims that a removed VIA input fence is holding keys.
 
 This makes a slow or failed operation explainable without allowing progress
 traffic or cached authored bytes to change the draft's meaning. The detailed
@@ -417,17 +415,18 @@ the user flow is in the [guide](GUIDE.md#applying-changes).
 
 ### D-L26 — Macro slots share one visible memory, and every slot says what fits
 
-All 128 slots share the keyboard's macro memory, whose size the keyboard
-reports (34,903 bytes on current firmware; a key tap takes 3 bytes, ASCII text
+All 128 slots share the profile’s remaining space, subject to the macro-domain
+limit the keyboard reports (34,903 bytes on current firmware; a key tap takes 3 bytes, ASCII text
 1 byte per character, Unicode text its UTF-8 bytes). The keyboard plays a
-stored macro in 512-byte windows (streaming macro playback, feature bit 27,
-firmware D-F14), so the only limit on one macro is the free memory.
+stored macro in 512-byte windows (streaming macro playback,
+firmware D-F14; Profile Wire 1's feature bit 27, part of the base since D-F28), so the only limit on one macro is the free memory.
 Reviewing a retained draft against a reconnected keyboard adopts its reported
 capabilities and invalidates the draft's cached decoding and checks before
 editing resumes.
 
-A portable profile stores macro streams, not a bank size. Restore pads them to
-the destination's bank or refuses them, naming how many bytes are over; a
+A portable profile stores macro streams, not a bank size. Apply encodes them
+with their terminators in domain `0x70`, subject to the destination’s domain
+limit and the remaining whole-profile capacity; a
 profile's fingerprint covers the streams, so the same macros match across bank
 sizes.
 
@@ -455,11 +454,11 @@ replacing the field, preserving native editing and composition.
 Every empty slot keeps room for ten key taps (30 bytes); when free memory
 cannot keep that for every empty slot, the highest-numbered empty slots are
 unavailable and cannot be edited until space is freed. The firmware does not enforce the reserve, so the
-app shows what a VIA edit left. The current settings version gives every macro
+app reports the remaining shared space after every profile edit. The current settings version gives every macro
 name up to 32 UTF-8 bytes, following the shared counted-name contract; see the
 [portable profile](../upstream/firmware/docs/architecture/portable-profile-v1.md).
 
-The keyboard accepts canonical UTF-8 text (feature bit 21) and settings
+The keyboard accepts canonical UTF-8 text and settings
 scalar 27’s Host settings: bits 0..1 select Auto/macOS/Windows/Linux; bit 8
 independently enables Unicode. Text and backups preserve exact scalar
 sequences. Settings → Host owns both
@@ -471,8 +470,9 @@ Detected OS metadata is volatile: a complete Read keyboard refreshes the
 current draft and its presentation caches without changing stored edits,
 history, revision or conflict fingerprints. Saved OS overrides remain part
 of the document and take precedence over that metadata.
-Scalar 27 also holds the keyboard layout (feature bit 22: bits 16–23, with
-bit 24 for a macOS ISO keyboard); see D-L56.
+Scalar 27 also holds the keyboard layout (bits 16–23, with bit 24 for a
+macOS ISO keyboard); see D-L56. Profile Wire 1 announced these with feature
+bits 21 and 22; every Profile Wire 2 firmware has them (firmware D-F28).
 See the [guide](GUIDE.md#text-macros). Physical host insertion remains
 an acceptance requirement, separate from codec and UI verification.
 
@@ -725,11 +725,11 @@ extension: it names the keyboard, not the app.
 
 ### D-L48 — Gesture timing advice follows firmware capability
 
-Current firmware times gestures from physical presses (Profile Wire feature
-bit 17), owns the tapping of authored LT(), MT() and OSM() rows (bit 18) and,
-since bit 31 (firmware D-F27), decides every LT(), MT() and OSM() key with or
-without a row, holding every dual-role key at the dual-role threshold unless
-its row sets its own. Ark requires all three (D-L64). So Ark gives no advice
+Current firmware times gestures from physical presses, owns the tapping of
+authored LT(), MT() and OSM() rows and, since firmware D-F27, decides every
+LT(), MT() and OSM() key with or without a row, holding every dual-role key at
+the dual-role threshold unless its row sets its own. Profile Wire 1 announced
+these with feature bits 17, 18 and 31; Profile Wire 2 implies them (D-L64). So Ark gives no advice
 about combo buffering or native QMK tap classification, which only firmware
 without them needed, and never says who decides a key's tap or hold: the
 keyboard always does.
@@ -853,7 +853,7 @@ export of a real keyboard shipped as data (`core/data/demo-profile.charybdis.jso
 never hand-edited and never read from a firmware checkout), or a profile file
 opened in its place and checked as Import checks one. It runs under the
 capabilities current firmware reports (the 32-slot action vocabulary
-`0x837cf479`, its 16-layer/128-slot limits and keyboard options), held equal to what the fake
+`0x6fd70b90`, its 16-layer/128-slot limits and keyboard options), held equal to what the fake
 current keyboard reports by test.
 
 Inside the session the demo is the draft's device: while `session.demo` is set,
@@ -871,12 +871,22 @@ keyboard only where the host says so (`model.host.blocked.demo`).
 
 ### D-L54 — Current live formats, and nothing older
 
-Ark's live codecs follow firmware D-F14: schema 3.0, RGB 4, key behaviours 2,
-combos 3, settings 8 (D-L62, D-L63) and sparse PD 3; 16 layers, 128 VIA macros and 128 custom
-keys; action vocabulary `0x837cf479`. Three capability pages report the wider
-counts, 52 KiB storage slots, a 53,216-byte payload capacity and a
-34,903-byte macro bank. Candidate uploads use store format 5 and a nonzero VIA
-binding. Each domain is read and written in that one version (D-L64).
+Ark's live codecs follow firmware D-F14 and D-F28: Profile Wire 2.0, schema
+4.0, RGB 4, key behaviours 2, combos 3, settings 8 (D-L62, D-L63) and sparse
+PD 3, keymap 1 and macros 1; 16 layers, 128 VIA macros and 128 custom keys; action vocabulary
+`0x6fd70b90` (schema 4's: the firmware folds the schema major into the digest,
+so it moved from schema 3's `0x837cf479` with no keycode changed). Every
+profile length and offset is 32 bits: the blob's 6-byte domain envelopes, the
+payload readback's metadata (layout 2), candidate BEGIN, CHUNK and REUSE, the
+candidate status pages and the capability pages. Capability layout 3 reports
+the counts that fit a byte on page 1 and the wider ones on page 2: 128 KiB
+flash slots, a 130,048-byte payload capacity and a 34,903-byte macro domain.
+Candidate status page 0 (layout 2) carries progress and the error id; page 3
+says where the error is, and is kept only when its transaction, operation
+sequence and error sequence match the page 0 it follows. Candidate uploads
+store in format 6, which Profile Wire 2 implies (BEGIN no longer carries it),
+with BEGIN bytes 24–31 reserved zero. Each domain is read and written in that one
+version (D-L64).
 
 The connected firmware's advertised tap depth governs both behaviour steps
 and the RGB tap-branch palette throughout read, edit, history, reorder and
@@ -902,7 +912,7 @@ with their layers. Disabling retains definitions and timing. A bypassed native
 key falls through normally; a bypassed custom key sends its shortcut, or
 nothing without one (D-L63).
 
-The firmware also exposes (feature bit 30) a default-on global **Combo outputs
+The firmware also exposes a default-on global **Combo outputs
 use behaviours** switch in Settings → Combos and **Use output behaviour** per
 combo. These veto shared behaviour use by generated outputs independently of
 chord participation. Native outputs fall through; a custom output sends its
@@ -982,8 +992,8 @@ includes its three bytes while playback accounting excludes it.
 
 ### D-L58 — Transfer less, validate the complete saved result
 
-Current firmware reuses and streams candidate data (D-F18; feature bits 24 and
-25, which Ark requires to Apply). Apply plans changes against the exact raw
+Current firmware reuses and streams candidate data (D-F18); both come with a
+build that saves (feature bit 1, which Ark requires to Apply). Apply plans changes against the exact raw
 active profile retained by the coherent capture, rather than the portable
 document's materialized live settings. Domains
 are aligned by identity so resizing one preserves reuse of unchanged later
@@ -1015,7 +1025,7 @@ corruption, in normal and sanitizer builds. Its scheduling is simulated; reduced
 bytes or exchanges do not establish keyboard timings or physical acceptance.
 That probe ends at validation. Firmware's separate host suites cover committed
 reuse through the production owner, both-half saving and reboot, with hardware
-eligibility and the peer VIA bank supplied by their test adapters.
+eligibility supplied by their test adapters. No host test proves hardware acceptance.
 
 ### D-L59 — Strict types at the existing seams, source execution retained
 
@@ -1223,19 +1233,44 @@ stores and reports, and converts nothing. Firmware and Ark are one stack
 (D-L50): each Ark release is built against a firmware release, and an older
 keyboard is updated rather than accommodated.
 
-What current firmware is lives in one place per kind.
-`core/schema/profile-domains.js` registers each profile domain with the one
-version it is read and written in. `core/protocol/profile-wire-v1.js` names
-every Profile Wire feature and groups what current firmware reports:
-`CURRENT_FEATURES` (what it reads and plays), `CURRENT_MUTATION_FEATURES`
-(what a build that saves profiles adds) and `CURRENT_PAIR_FEATURES` (all the
-flashable pair reports, which the demo and test keyboards report too). Store
-format 5 and the 53,216-byte payload are in `profile-candidate-v1.js`, VIA
-protocol 13 in `VIA_READS`. `core/session/firmware-support.js` requires them:
-`canEdit` needs current layers, every domain, the known action ABI and every
-current feature; `canApply` adds the mutation features; the compatibility
-diagnostic lists what a keyboard lacks. Past those gates no code asks whether
-a feature is there.
+What current firmware is lives in one place per kind:
+
+| What | Current | Where |
+| --- | --- | --- |
+| Profile Wire | 2.0, exactly | `PROFILE_WIRE_V1` in `core/protocol/profile-wire-v1.js` |
+| Profile schema | 4.0, exactly | `PROFILE_BLOB_V1` in `core/schema/profile-blob-v1.js` |
+| Domain versions | RGB 4, key behaviours 2, combos 3, settings 8, PD 3, keymap 1, macros 1 | `core/schema/profile-domains.js` |
+| Store format | 6 (implied by Profile Wire 2, not on the wire) | `PROFILE_CANDIDATE_V1` in `core/protocol/profile-candidate-v1.js` |
+| Payload size | 130,048 bytes, lengths and offsets 32 bits | `PROFILE_CANDIDATE_V1`, `PROFILE_BLOB_V1` |
+| Action vocabulary | `0x6fd70b90` | `ACTION_ABI` in `core/schema/actions.js` |
+| Transport and identity | Firmware-owned Raw HID, usage page `0xFF60`; firmware version in capability page 0 | `core/protocol/profile-wire-v1.js`, `raw-hid-unhandled.js` |
+| Portable file | Version 5, one complete blob; 196,608-byte UTF-8 limit | `DOCUMENT_VERSION`, `FILE_MAX_BYTES` in `core/model/portable-profile.js` |
+| Feature word | split, saves, pointing (bits 0–2) | `PROFILE_WIRE_FEATURES` |
+
+Keymap `0x60` v1 holds all sixteen layers and sixty matrix positions as
+little-endian uint16 values. Macro `0x70` v1 holds all 128 streams in the
+existing bank grammar. Effective reads materialize absent domains from the
+keyboard’s compiled defaults. The candidate always contains all seven domains;
+profile usage and macro headroom include them all.
+
+Apply sends that one candidate and publishes one generation (firmware D-F31).
+Capture retains exact active bytes only for differential transfer. Identity is
+reported by Profile Wire capabilities; base lighting and key options use
+Profile Wire settings and editor metadata. VIA commands, staging, bindings,
+separate generations and roll-forward are removed. Macro keycode aliases keep
+the historical `VIA_MACRO_n` names; they do not imply VIA support.
+
+The version stands for everything the base does (firmware D-F28): the feature
+word holds only what a build genuinely varies by, never a step in the
+firmware's history, and a later capability raises the minor version.
+`CURRENT_MUTATION_FEATURES` (a split build that saves) is what Apply needs and
+`CURRENT_PAIR_FEATURES` all the flashable pair reports, which the demo and
+test keyboards report too. `core/session/firmware-support.js` requires them:
+reads and `canEdit` need the exact Profile Wire and schema versions, major and
+minor; `canEdit` also needs current layers, every domain and the known action
+ABI; `canApply` adds a split build that saves; the compatibility diagnostic
+lists what a keyboard lacks. Past those gates no code asks whether a feature
+is there.
 
 A keyboard that fails them, or stores a schema or domain in another version
 (`decodeStoredProfileBlob` and `readSettings` raise `FIRMWARE_UPDATE_REQUIRED`),
@@ -1244,15 +1279,21 @@ notice to update both halves. A backup in another format is refused at
 Import, in the demo and at restore. Independent per-area reads remain only for
 current firmware whose complete capture failed.
 
-The next firmware that adds a feature or bumps a domain version reaches Ark as
-one change to these tables, its codec and tests, pinned and released with it
-(D-L44, D-L50); the agreement check fails a firmware that does not report
-every feature Ark requires. Bit 31 (firmware D-F27) filled the 32-bit feature
-word, so every bit is now known and the decoder has none left to refuse; a
-later capability reaches Ark as a new field or a protocol change, which its
-decoder must learn first. A firmware update that changes the stored format
-starts the keyboard from flashed defaults, and backups from before it no
-longer import.
+The next firmware that adds a capability (a new Profile Wire or schema minor)
+or bumps a domain version reaches Ark as one change to these tables, its
+codec and tests, pinned and released with it (D-L44, D-L50); the agreement
+check fails a firmware whose versions are not exactly Ark's, which lacks a
+registered domain, or which is not a split build that saves. Profile Wire 2
+retired every bit of the earlier feature word (firmware `profile-wire-v1.md`
+records what each meant), so a keyboard reporting one is on the previous base
+and refused. A firmware update that changes the stored format starts the
+keyboard from flashed defaults, and backups from before it no longer import:
+schema-3 backups (document version 3, action vocabulary `0x837cf479`) and
+schema-4 separate-field backups (document version 4) are refused. Version 5
+contains every domain in one blob. The keyboard says so too: Profile Wire state flag 9
+means a slot was refused as an earlier store format or retired test layout,
+which it neither reads nor converts; the Keyboard screen says it runs its built-in defaults
+until Apply saves the current format.
 
 This replaces the read-only display of older keyboards (formerly in D-L63),
 the preceding-backup translation (formerly in D-L54) and every per-feature
@@ -1295,4 +1336,6 @@ every posted edit built by `webview/view/edits.mjs` and staged against a real
 draft in `tests/view/edits.test.mjs`, and a board that shows what the firmware does.
 Edits exist only as a reviewed draft; a keyboard the app cannot open a draft for
 is read-only, and the host refuses edits rather than writing them directly. v1
-was frozen by this decision and has since been removed.
+was frozen by this decision and has since been removed. The current core
+reads and applies the one-store profile through firmware-owned Profile Wire;
+no VIA transport or second-bank writer remains (D-L64, firmware D-F31).

@@ -38,6 +38,8 @@ const {CAPABILITIES_32, document32} = require(app + "/tests/fixtures/pd-slots-32
 // at their 32-byte maximum and four custom-key shortcuts, plus the maximum
 // profile.
 let current = document32();
+current = editMacro({document: current, fingerprint: fingerprint(current)},
+    {keycode: "VIA_MACRO_0", payload: "hello{KC_A}", expectedFingerprint: fingerprint(current)});
 for (let slot = 0; slot < 128; slot++) current = editMacro({document: current, fingerprint: fingerprint(current)},
     {keycode: `VIA_MACRO_${slot}`, name: `Macro ${slot} name`.padEnd(32, "!"), expectedFingerprint: fingerprint(current)});
 for (let slot = 0; slot < 128; slot++) current = editCustomKey({document: current, fingerprint: fingerprint(current)},
@@ -46,8 +48,8 @@ for (let slot = 0; slot < 128; slot++) current = editCustomKey({document: curren
 // alone, a mouse button alone, and every modifier with the last basic key.
 for (const [slot, mods, key] of [[0, 0x41, 0x0e], [63, 0x0f, 0], [64, 0, 0xd1], [127, 0xff, 0xa4]]) current = editCustomKey({document: current, fingerprint: fingerprint(current)},
     {keycode: `CUSTOM_KEY_${slot}`, shortcut: {mods, key}, expectedFingerprint: fingerprint(current)}, CAPABILITIES_32);
-fs.writeFileSync(process.argv[2], validateSnapshot(current, CAPABILITIES_32).profile);
-const fixture = fs.readFileSync(app + "/upstream/firmware/tests/fixtures/maximum_profile_v3.fixture", "utf8");
+fs.writeFileSync(process.argv[2], validateSnapshot(current, CAPABILITIES_32).candidate);
+const fixture = fs.readFileSync(app + "/upstream/firmware/tests/fixtures/maximum_profile_v4.fixture", "utf8");
 const maximum = Buffer.from(fixture.match(/^profile\.hex=(.*)$/m)[1], "hex");
 const {decodeProfileBlob, encodeProfileBlob} = require(app + "/core/schema/profile-blob-v1");
 if (!encodeProfileBlob(decodeProfileBlob(maximum)).equals(maximum)) throw new Error("Maximum profile does not round-trip through Ark");
@@ -67,7 +69,7 @@ for (const [name, global, perCombo] of [["global", false, true], ["row", true, f
     const document = {...current, profile: encodeProfileBlob(blob).toString("base64")};
     const checked = validateSnapshot(document, CAPABILITIES_32);
     if (checked.settings.comboOutputBehaviors !== global || checked.combos.rows[1].useOutputBehavior !== perCombo) throw new Error("Permission lost before firmware validation");
-    fs.writeFileSync(`${process.argv[4]}.${name}.bin`, checked.profile);
+    fs.writeFileSync(`${process.argv[4]}.${name}.bin`, checked.candidate);
 }
 
 JS
@@ -82,10 +84,10 @@ build_and_run() {
         -DPOINTING_DEVICE_ENABLE \
         -DRGB_MATRIX_ENABLE \
         -DRGB_MATRIX_WS2812 \
-        -DVIA_ENABLE \
+        \
         -DMCU_RP \
-        -DTOTAL_EEPROM_BYTE_COUNT=0x23000u \
-        -DQMK_STUB_SUPPRESS_LAYER_COUNT \
+        -DTOTAL_EEPROM_BYTE_COUNT=0x9000u \
+        -DNOAH_HOST_PRODUCTION_MATRIX -DQMK_STUB_SUPPRESS_LAYER_COUNT \
         -DQMK_KEYBOARD_H='"noah_real_profile_keyboard.h"' \
         -I"$ROOT" \
         -I"$ROOT/users/noah" \
@@ -98,6 +100,11 @@ build_and_run() {
         "$ROOT/users/noah/lib/profile/runtime/effective_pd_runtime.c" \
         "$KEYMAP_PATH/rgb_config.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_compiled_defaults_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_keymap_compiled_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_macros_compiled_v1.c" \
+        "$ROOT/users/noah/lib/macro/macro_payload_parse.c" \
+        "$ROOT/users/noah/lib/macro/macro_payload_encode.c" \
+        "$ROOT/users/noah/lib/macro/macro_payload_keycodes.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_rgb_compiled_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/key_behavior_compiled_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_combo_compiled_v1.c" \
@@ -112,6 +119,8 @@ build_and_run() {
         "$ROOT/users/noah/lib/profile/schema/key_behavior_domain_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_rgb_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_validator_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_keymap_v1.c" \
+        "$ROOT/users/noah/lib/profile/schema/profile_macros_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_combo_v1.c" \
         "$ROOT/users/noah/lib/profile/schema/profile_settings_v1.c" \
         "$ROOT/users/noah/lib/profile/storage/profile_checksum.c" \
@@ -140,10 +149,10 @@ build_and_run empty -DNOAH_PD_PROFILE_ENABLE -DNOAH_KEYMAP_EMPTY_KEY_BEHAVIORS -
 # the canonical key-behavior domain alone and must remain warning-clean.
 cc -std=c11 -Wall -Wextra -Werror -Wno-unused-parameter -pedantic \
     -DNOAH_PD_PROFILE_ENABLE \
-    -DVIA_ENABLE \
+    \
     -DMCU_RP \
-    -DTOTAL_EEPROM_BYTE_COUNT=0x23000u \
-    -DQMK_STUB_SUPPRESS_LAYER_COUNT \
+    -DTOTAL_EEPROM_BYTE_COUNT=0x9000u \
+    -DNOAH_HOST_PRODUCTION_MATRIX -DQMK_STUB_SUPPRESS_LAYER_COUNT \
     -DQMK_KEYBOARD_H='"noah_real_profile_keyboard.h"' \
     -I"$ROOT" \
     -I"$ROOT/users/noah" \

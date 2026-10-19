@@ -114,10 +114,10 @@ writing them. A successful enumeration is not an Apply/recovery hardware test.
 
 Restore tests call `restoreProfile` with a request connection, the same interface
 used by both hosts. `tests/fixtures/writable-keyboard.js` answers candidate and
-logical VIA staging reports, keeps separate local and peer banks, and admits
-local VIA writes only after the durable decision and peer acceptance. Its
+one-store Profile Wire reports, keeps local and peer profile records, and
+models the durable decision, peer commit and complete-generation activation. Its
 report-level faults exercise BUSY, lost replies, cancellation and disconnected
-recovery; assertions inspect bank bytes, identities and fresh captures. Restore
+recovery; assertions inspect profile bytes, identities and fresh captures. Restore
 does not expose its internal coordinators or readers as replaceable options.
 The read-only fake remains the preview adapter. These fakes model protocol state
 and transfer correctness, not flash durability, split scheduling or physical
@@ -260,7 +260,7 @@ To try the page, run `npm run web`: it builds, then serves `dist/web/` at
 only). Open that in Chrome or Edge; `localhost` is a secure context, so WebHID
 works there as over HTTPS. Choose keyboard asks Chrome for the keyboard once;
 after that the page reconnects to it on load. The page holds the keyboard as
-the extension does, so close Ark in VS Code (and VIA) first. Recovery copies
+the extension does, so close another Ark session in VS Code first. Recovery copies
 saved while trying it live in that origin's storage
 (`http://localhost:8975`), not in VS Code's.
 

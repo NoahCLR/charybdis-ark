@@ -11,7 +11,7 @@ const {ProfileDraftSession} = require("../../core/session/profile-draft-session"
 const {fingerprint, summary} = require("../../core/model/portable-profile");
 const {document} = require("../fixtures/pd-profile");
 
-const capabilities = {compiledLayerCount: 16, supportedDomainMask: 31, actionAbiDigest: 0x837cf479, featureFlags: require("../../core/protocol/profile-wire-v1").PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES};
+const capabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 0}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x6fd70b90, featureFlags: require("../../core/protocol/profile-wire-v1").PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES};
 const state = (extra = {}) => ({connected: true, busy: false, selectedDeviceId: "kb", connectionToken: 1, devices: [{id: "kb"}], capabilities, ...extra});
 function session() {
     const doc = document(), snapshot = {document: doc, fingerprint: fingerprint(doc), summary: summary(doc), limits: {brightnessMax: 200}};

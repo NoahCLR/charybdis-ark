@@ -1,4 +1,5 @@
 "use strict";
+const {editLayers} = require("../fixtures/profile-document");
 // The 32 pointing slots: actions reach all of them, and edits keep the sparse
 // PD domain and its RGB rows in the formats the keyboard stores.
 const {test} = require("node:test");
@@ -18,7 +19,7 @@ test("a profile's actions reach every one of the 32 slots", () => {
     behaviors.rows[0].steps[0] = {tapIndex: 0, tap: {kind: 5, operand: 12}};
     blob.domains[1].payload = encodeKeyBehaviorDomain(behaviors, options);
     const reaching = {...wide, profile: encodeProfileBlob(blob).toString("base64")};
-    reaching.layers[0][0] = 0x7e9f; // PD_SLOT_31, an empty slot: allowed, and counted as inert
+    editLayers(reaching, layers => layers[0][0] = 0x7e9f); // PD_SLOT_31, an empty slot: allowed, and counted as inert
     const value = validateSnapshot(reaching, CAPABILITIES_32);
     assert.deepEqual(value.behaviors.rows[0].steps[0].tap, {kind: 5, flags: 0, operand: 12});
     assert.equal(value.danglingPdBindings[31], 1);
@@ -36,9 +37,9 @@ test("layer ordering keeps the profile in the formats the keyboard stores", () =
 test("the profile meter counts a sparse PD domain by its stored bytes, and its slots by the ones in use", () => {
     const {profileUsage} = require("../../core/model/profile-usage");
     const wide = document32();
-    const usage = profileUsage({document: wide}, {maxProfilePayload: 5088});
+    const usage = profileUsage({document: wide}, {maxProfilePayload: 130048});
     const value = validateSnapshot(wide);
-    assert.equal(usage.used, value.profile.length, "the stored blob, empty slots left out");
+    assert.equal(usage.used, value.candidate.length, "the stored blob, empty slots left out");
     assert.deepEqual(usage.counts.find(count => count.id === "pointingModes"),
         {id: "pointingModes", used: value.pdModes.filter(slot => slot.kind).length, limit: 32}, "slots that hold a mode, out of all 32");
 });

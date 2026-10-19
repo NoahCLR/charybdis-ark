@@ -1,4 +1,5 @@
 "use strict";
+const {profileLayers, profileMacros} = require("../fixtures/profile-document");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const {document: pdDocument} = require("../fixtures/pd-profile");
@@ -7,7 +8,7 @@ const {storedKeyboardName, keyboardNameView, editKeyboardName} = require("../../
 const {profileReview} = require("../../core/model/profile-review");
 const {revertUnits} = require("../../core/model/profile-revert");
 const {decodeProfileBlob} = require("../../core/schema/profile-blob-v1");
-const capabilities = {compiledLayerCount: 16, supportedDomainMask: 31, actionAbiDigest: 0x837cf479};
+const capabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 0}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x6fd70b90};
 const snapshot = value => ({document: value, fingerprint: fingerprint(value)});
 
 test("a profile stores no keyboard name until one is given, and the view says what stands in", () => {
@@ -27,8 +28,8 @@ test("renaming the keyboard changes its name and nothing else, and is reviewed a
     const after = validateSnapshot(named, capabilities), original = validateSnapshot(before.document, capabilities);
     assert.equal(after.settings.keyboardName, "Noah’s Charybdis", "trimmed");
     for (const field of ["values", "names", "layers", "macroNames", "customKeyNames"]) assert.deepEqual(after.settings[field], original.settings[field], field);
-    assert.deepEqual(named.layers, before.document.layers);
-    assert.deepEqual(named.macros, before.document.macros);
+    assert.deepEqual(profileLayers(named), profileLayers(before.document));
+    assert.deepEqual(profileMacros(named), profileMacros(before.document));
     const domains = blob => decodeProfileBlob(Buffer.from(blob.profile, "base64")).domains.filter(domain => domain.id !== 0x40);
     assert.deepEqual(domains(named), domains(before.document), "only the settings domain changes");
 

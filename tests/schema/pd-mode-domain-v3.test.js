@@ -145,6 +145,6 @@ test("the v3 encoder refuses what the keyboard would refuse", () => {
 
 test("a schema-3 blob carries the sparse domain as version 3", () => {
     const payload = encodePdDomain(slots32());
-    const blob = encodeProfileBlob({schema: {major: 3, minor: 0}, domains: [{id: 0x50, version: 3, payload}]});
+    const blob = encodeProfileBlob({schema: {major: 4, minor: 0}, domains: [{id: 0x50, version: 3, payload}]});
     assert.deepEqual(decodeProfileBlob(blob).domains[0].payload, payload);
 });

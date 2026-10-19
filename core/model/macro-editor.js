@@ -18,10 +18,10 @@ const fail = (message, code = "MACRO_EDIT_CONFLICT") => Object.assign(new Error(
 // empty slot, the highest-numbered empty slots are shown as unavailable.
 const SLOT_RESERVE_TAPS = 10, KEY_TAP_BYTES = 3;
 
-/** @param {Buffer[]} slots @param {number} capacity */
-function macroBudget(slots, capacity) {
-    const stored = slots.reduce((total, bytes) => total + bytes.length + 1, 1);
-    const free = Math.max(0, capacity - stored);
+/** @param {Buffer[]} slots @param {number} capacity @param {number} [sharedFree] */
+function macroBudget(slots, capacity, sharedFree = Infinity) {
+    const stored = slots.reduce((total, bytes) => total + bytes.length + 1, 0);
+    const free = Math.max(0, Math.min(capacity - stored, sharedFree));
     const empty = slots.flatMap((bytes, index) => bytes.length === 0 || (bytes.length === 3 && bytes[0] === 1 && bytes[1] === 5) ? [index] : []);
     const room = Math.min(empty.length, Math.floor(free / (SLOT_RESERVE_TAPS * KEY_TAP_BYTES)));
     return {capacity, stored, free, empty: empty.length, outOfRoom: new Set(empty.slice(room)), available: slots.length - (empty.length - room)};
@@ -30,13 +30,13 @@ function macroBudget(slots, capacity) {
 /** @param {import("./types.js").ProfileSnapshot | null | undefined} snapshot @param {import("./types.js").ProfileDestination} [capabilities] */
 function macroEditorView(snapshot, capabilities) {
     if (!snapshot?.document || snapshot.incomplete) return null;
-    const {document, settings} = decodedOf(snapshot);
+    const {macroSlots, settings} = decodedOf(snapshot);
     const host = hostSettings(settings.values, snapshot.hostOs?.detected);
     const names = settings.macroNames;
     // hostSettings selects an existing layout, with US as its fallback.
     const layout = /** @type {NonNullable<ReturnType<typeof hostLayout>>} */ (hostLayout(host.layout));
-    const slots = document.macros.map(value => Buffer.from(value, "base64"));
-    const budget = macroBudget(slots, capabilities?.viaMacroBytes ?? MACRO_BANK_BYTES);
+    const slots = macroSlots;
+    const budget = profileMacroBudget(decodedOf(snapshot), capabilities);
     /** @param {Buffer} bytes @param {number} index */
     const slot = (bytes, index) => {
         const payload = decodeMacroPayload(bytes);
@@ -70,9 +70,9 @@ function macroEditorView(snapshot, capabilities) {
 /** @param {import("./types.js").CompleteSnapshot} snapshot @param {{keycode: string, payload?: string, protection?: 'auto' | 'on' | 'off'}} message @param {import("./types.js").ProfileDestination} [capabilities] */
 function macroInputStatus(snapshot, message, capabilities) {
     const index = macroIndex(message.keycode);
-    const {document, settings} = decodedOf(snapshot);
-    const slots = document.macros.map(value => Buffer.from(value, "base64"));
-    const budget = macroBudget(slots, capabilities?.viaMacroBytes ?? MACRO_BANK_BYTES);
+    const {macroSlots, settings} = decodedOf(snapshot);
+    const slots = macroSlots;
+    const budget = profileMacroBudget(decodedOf(snapshot), capabilities);
     const host = hostSettings(settings.values, snapshot.hostOs?.detected);
     return inspectMacroInput(message.payload, {mode: host.unicodeMode, protection: message.protection ?? macroProtectionOf(slots[index]),
         enabled: Boolean(host.unicodeMode), layout: host.layout, os: host.effective, macosIso: host.macosIso, currentBytes: slots[index].length, bankFree: budget.free});
@@ -94,19 +94,20 @@ function editMacro(snapshot, message, capabilities) {
     const value = validateSnapshot(snapshot.document, capabilities);
     /** @type {import("./types.js").PortableDocument} */
     const document = JSON.parse(JSON.stringify(value.document));
+    const slots = value.macroSlots.map(bytes => Buffer.from(bytes));
     if (message.payload !== undefined) {
         const host = hostSettings(value.settings.values, snapshot.hostOs?.detected);
         const status = macroInputStatus(snapshot, message, capabilities);
         if (status.error) throw fail(status.error, status.code);
-        const protection = message.protection ?? macroProtectionOf(Buffer.from(document.macros[index], "base64"));
+        const protection = message.protection ?? macroProtectionOf(slots[index]);
         const bytes = encodeMacroPayload(message.payload, {textEntry: Boolean(host.unicodeMode), layout: host.layout, protection});
-        document.macros[index] = bytes.toString("base64");
+        slots[index] = bytes;
     }
     if (message.protection !== undefined && message.payload === undefined) {
-        const bytes = Buffer.from(document.macros[index], "base64");
+        const bytes = slots[index];
         const previous = macroProtectionOf(bytes);
         const prefix = encodeMacroPayload("", {protection: message.protection});
-        document.macros[index] = Buffer.concat([prefix, bytes.subarray(previous === "auto" ? 0 : 3)]).toString("base64");
+        slots[index] = Buffer.concat([prefix, bytes.subarray(previous === "auto" ? 0 : 3)]);
     }
     if (message.name !== undefined && message.name !== value.settings.macroNames[index]) {
         if (typeof message.name !== "string") throw fail("A macro name must be text.");
@@ -115,8 +116,22 @@ function editMacro(snapshot, message, capabilities) {
         settings.macroNames[index] = message.name.trim();
         document.profile = replaceDomain(value.profile, PROFILE_DOMAIN_IDS.SETTINGS, () => encodeSettings(settings), encodeNamedProfile).toString("base64");
     }
+    if (message.payload !== undefined || message.protection !== undefined) document.profile = replaceDomain(Buffer.from(document.profile, "base64"), PROFILE_DOMAIN_IDS.MACROS, () => require("../schema/macro-domain-v1").encodeMacroDomain(slots)).toString("base64");
     validateSnapshot(document, capabilities);
     return document;
 }
 
-module.exports = {macroEditorView, editMacro, macroInputStatus, macroBudget, SLOT_RESERVE_TAPS};
+/** @param {import("./types.js").DecodedProfile} decoded @param {import("./types.js").ProfileDestination} [capabilities] */
+function profileMacroBudget(decoded, capabilities) {
+    const slots = decoded.macroSlots;
+    const {decodeProfileBlob, PROFILE_BLOB_V1} = require("../schema/profile-blob-v1");
+    const storedDomain = decodeProfileBlob(decoded.profile).domains.find(domain => domain.id === PROFILE_DOMAIN_IDS.MACROS);
+    const canonicalSize = slots.reduce((size, bytes) => size + bytes.length + 1, 0);
+    // Replacing macro streams reclaims optional unused domain capacity. Other
+    // edits retain those exact bytes, so ordinary profile usage includes them.
+    const reclaimed = Math.max(0, (storedDomain?.payload.length ?? canonicalSize) - canonicalSize);
+    const sharedFree = (capabilities?.maxProfilePayload ?? PROFILE_BLOB_V1.MAX_SIZE) - decoded.candidate.length + reclaimed;
+    return macroBudget(slots, capabilities?.macroBytes ?? MACRO_BANK_BYTES, sharedFree);
+}
+
+module.exports = {profileMacroBudget, macroEditorView, editMacro, macroInputStatus, macroBudget, SLOT_RESERVE_TAPS};

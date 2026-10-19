@@ -1,4 +1,5 @@
 "use strict";
+const {editLayers} = require("../fixtures/profile-document");
 
 const assert = require("node:assert/strict");
 const test = require("node:test");
@@ -12,7 +13,7 @@ const {
     evaluateProfileCompatibility,
     evaluateLiveMutationCompatibility,
 } = require("../../core/session/profile-device-service");
-const {PROFILE_ACTIVE_KIND, PROFILE_WIRE_FEATURES, PROFILE_WIRE_KNOWN_MASKS, PROFILE_WIRE_STATUS, PROFILE_WIRE_V1, VIA_READS} = require("../../core/protocol/profile-wire-v1");
+const {PROFILE_ACTIVE_KIND, PROFILE_WIRE_FEATURES, PROFILE_WIRE_KNOWN_MASKS, PROFILE_WIRE_STATUS, PROFILE_WIRE_V1} = require("../../core/protocol/profile-wire-v1");
 const {document} = require("../fixtures/pd-profile");
 const {fakeKeyboard} = require("../fixtures/fake-keyboard");
 const {connectedService} = require("../fixtures/connected-service");
@@ -41,22 +42,23 @@ test("a restore reads what the keyboard accepts, including its host OS, before w
     // The keyboard stops answering its host OS after connecting.
     adapter.keyboard = {...keyboard, answer: report => report[0] === PROFILE_WIRE_V1.COMMAND_GET && report[2] === 0x0b
         ? [Object.assign(Buffer.from(report), {0: 0xff})] : keyboard.answer(report)};
-    const target = document(); target.layers[0][0] = 5;
+    const target = document(); editLayers(target, layers => layers[0][0] = 5);
     await assert.rejects(service.restorePortableProfile(target, {saveRecovery: () => {throw Error("must not start restore");}}));
     assert.deepEqual(keyboard.mutations, [], "a failed facts read refuses before the first write");
 });
 
-test("a restore to firmware without a current feature is refused before recovery or any write", async t => {
+test("a restore to firmware on another base is refused before recovery or any write", async t => {
     const source = fakeKeyboard({document: document()});
+    // A later Profile Wire minor: a capability this Ark does not know.
     const keyboard = {...source, answer: report => {
         const responses = source.answer(report);
         if (report[0] === PROFILE_WIRE_V1.COMMAND_GET && report[2] === PROFILE_WIRE_V1.VALUE_CAPABILITIES && report[4] === 0) {
-            for (const response of responses) response.writeUInt32LE((response.readUInt32LE(16) & ~(1 << 28)) >>> 0, 16);
+            for (const response of responses) response[PROFILE_WIRE_V1.PAYLOAD_OFFSET + 3] = 1;
         }
         return responses;
     }};
     const {service} = await connectedService(t, {keyboard});
-    assert.equal(service.capabilities.featureFlags & (1 << 28), 0);
+    assert.deepEqual(service.capabilities.protocol, {major: 2, minor: 1});
     let recovery = 0;
     await assert.rejects(service.restorePortableProfile(document(), {saveRecovery: () => {recovery++;}}), {code: "FIRMWARE_UPDATE_REQUIRED"});
     assert.equal(recovery, 0);
@@ -116,18 +118,18 @@ function response(request, payload) {
 
 function readPages(options = {}) {
     const capabilityIdentity = Buffer.alloc(25);
-    const featureFlags = (PROFILE_WIRE_KNOWN_MASKS.CURRENT_FEATURES | PROFILE_WIRE_FEATURES.SPLIT_KEYBOARD
+    const featureFlags = (PROFILE_WIRE_FEATURES.SPLIT_KEYBOARD | PROFILE_WIRE_FEATURES.POINTING
         | (options.mutation ? PROFILE_WIRE_KNOWN_MASKS.CURRENT_MUTATION_FEATURES : 0)) >>> 0;
-    capabilityIdentity.set([2, 3, 1, 0, options.schemaMajor || 3, 0, 32, options.mutation ? 20 : 0, 2], 0);
+    capabilityIdentity.set([options.capabilityLayout ?? 3, 3, 2, 0, options.schemaMajor || 4, 0, 32, options.mutation ? 20 : 0, 2], 0);
     capabilityIdentity.writeUInt32LE(featureFlags, 9);
     capabilityIdentity.writeUInt32LE(options.actionAbiDigest ?? 0x12345678, 13);
     const capacity = Buffer.from([
-        5, options.maxLayers || 16, 128, 5, 0, 128, 16, 16, 32, 58, 8, 128, 128,
-        0xe0, 0xff, 0xe0, 0xff, 0, 0, 0x57, 0x28, 3, 0, 0, 0,
+        5, options.maxLayers || 16, 128, 5, 128, 16, 16, 32, 58, 8, 128, 128, 3, 32, 32, 60,
+        0, 0, 0, 0, 0, 0, 0, 0, 0,
     ]);
     const wide = Buffer.alloc(25);
-    wide.writeUInt16LE(640, 0); wide[2] = 5;
-    wide.writeUInt32LE(65536, 3); wide[7] = 32; wide[8] = 32; wide[9] = 60;
+    wide.writeUInt16LE(640, 0); wide.writeUInt32LE(65536, 2);
+    wide.writeUInt32LE(65504, 6); wide.writeUInt32LE(65504, 10); wide.writeUInt32LE(10327, 14);
     const statusIdentity = Buffer.alloc(25);
     statusIdentity.set([1, 2], 0);
     const stateFlags = options.stateFlags ?? (options.mutation ? 0x31 : 0x81);
@@ -171,17 +173,8 @@ function serviceHarness(options = {}) {
             serialNumber: "SERIAL-1",
         }],
         onWrite({connection, report}) {
-            if (report[0] === VIA_READS.COMMAND_GET_PROTOCOL_VERSION) {
-                const viaResponse = Buffer.from(report);
-                viaResponse[1] = 0;
-                viaResponse[2] = VIA_READS.PROTOCOL_VERSION;
-                queueMicrotask(() => connection.emitReport(viaResponse));
-                return;
-            }
-            if (report[0] === VIA_READS.COMMAND_GET_KEYBOARD_VALUE && report[1] === VIA_READS.VALUE_FIRMWARE_VERSION) {
-                queueMicrotask(() => connection.emitReport(Buffer.from(report)));
-                return;
-            }
+
+
             assert.equal(report[0], PROFILE_WIRE_V1.COMMAND_GET, "Stage 01 service must only send read requests");
             const payload = pages[`${report[2]}:${report[4]}`];
             assert.ok(payload, `unexpected Profile Wire read ${report[2]} page ${report[4]}`);
@@ -256,14 +249,14 @@ test("service exposes opaque descriptors and performs only capability/status rea
     const connected = await service.connect(scanned.devices[0].id);
     assert.equal(connected.connected, true);
     assert.equal(connected.connectionToken, 1);
-    assert.equal(connected.capabilities.schema.major, 3);
+    assert.equal(connected.capabilities.schema.major, 4);
     assert.equal(connected.status.activeKind, 0);
     assert.equal(connected.compatibility.compatible, true);
-    assert.ok(connected.diagnostics.includes("Live protocol, schema, VIA identity and required features are compatible."));
-    assert.equal(adapter.lastConnection().writes.length, 7);
-    assert.deepEqual(adapter.lastConnection().writes.map((report) => report[0]), [1, 2, 8, 8, 8, 8, 8]);
-    assert.deepEqual(adapter.lastConnection().writes.slice(2).map((report) => report[2]), [1, 1, 1, 2, 2]);
-    assert.deepEqual(adapter.lastConnection().writes.slice(2).map((report) => report[3]), [1, 2, 3, 4, 5]);
+    assert.ok(connected.diagnostics.includes("Profile Wire capabilities identify compatible current firmware."));
+    assert.equal(adapter.lastConnection().writes.length, 5);
+    assert.deepEqual(adapter.lastConnection().writes.map((report) => report[0]), [8, 8, 8, 8, 8]);
+    assert.deepEqual(adapter.lastConnection().writes.map((report) => report[2]), [1, 1, 1, 2, 2]);
+    assert.deepEqual(adapter.lastConnection().writes.map((report) => report[3]), [1, 2, 3, 4, 5]);
 
     const disconnected = await service.disconnect();
     assert.equal(disconnected.connected, false);
@@ -344,7 +337,7 @@ test("compatibility reports a schema blocker, and the diagnostic says what was c
     const scanned = await service.enumerate();
     const connected = await service.connect(scanned.devices[0].id);
     assert.equal(connected.compatibility.compatible, false);
-    assert.match(connected.compatibility.reasons.join("\n"), /Schema major/);
+    assert.match(connected.compatibility.reasons.join("\n"), /Profile schema is 1\.0; Charybdis Ark requires 4\.0/);
     assert.match(connected.diagnostics.join("\n"), /found \d+ blocking issue/);
 });
 
@@ -360,18 +353,18 @@ test("compatibility compares only what the keyboard reports with what this app r
     assert.match(compatibility.reasons.join("\n"), /Raw HID report size/);
     assert.match(compatibility.reasons.join("\n"), /Required profile domains/);
     assert.deepEqual(compatibility.checks.map((check) => check.label), [
-        "Protocol major", "Schema major", "VIA protocol version", "VIA firmware version",
-        "Raw HID report size", "Status pages", "Current firmware features", "Required profile domains",
+        "Profile Wire version", "Profile schema",
+        "Raw HID report size", "Status pages", "Required profile domains",
     ], "no capacity is compared: the keyboard advertises its own and nothing here has another to compare");
 });
 
-test("compatibility accepts VIA 13, which current firmware reports, and nothing else", () => {
-    const via = (protocolVersion) => evaluateProfileCompatibility({}, {protocolVersion, firmwareVersion: 0})
-        .checks.find((check) => check.label === "VIA protocol version");
-    assert.equal(via(13).ok, true);
-    for (const version of [11, 12, 14, undefined]) {
-        assert.equal(via(version).ok, false);
-        assert.match(via(version).message, /requires 13/);
+test("compatibility uses the exact Profile Wire and schema versions in capabilities", () => {
+    const {capabilities} = require("../fixtures/portable-restore");
+    assert.equal(evaluateProfileCompatibility(capabilities).compatible, true);
+    for (const protocol of [{major: 1, minor: 0}, {major: 2, minor: 1}]) {
+        const result = evaluateProfileCompatibility({...capabilities, protocol});
+        assert.equal(result.compatible, false);
+        assert.match(result.reasons.join("\n"), /Update both halves/);
     }
 });
 
@@ -382,20 +375,16 @@ test("persistent live apply requires every mutation capability", () => {
     assert.equal(evaluateLiveMutationCompatibility({featureFlags: completeFlags, candidateChunkMax: 20}, compatible, true, readyStatus).available, true);
 
     const blocked = evaluateLiveMutationCompatibility({
-        featureFlags: completeFlags & ~PROFILE_WIRE_FEATURES.PEER_RECONCILIATION,
+        featureFlags: completeFlags & ~PROFILE_WIRE_FEATURES.SPLIT_KEYBOARD,
         candidateChunkMax: 20,
     }, compatible, true, readyStatus);
     assert.equal(blocked.available, false);
-    assert.match(blocked.reasons.join("\n"), /persistent split apply mask/);
+    assert.match(blocked.reasons.join("\n"), /split build that saves/);
 });
 
 test("persistent live apply requires a detected and converged second half", () => {
     const capabilities = {
-        featureFlags: PROFILE_WIRE_FEATURES.CANDIDATE_WRITE
-            | PROFILE_WIRE_FEATURES.PERSISTENT_COMMIT
-            | PROFILE_WIRE_FEATURES.RUNTIME_ACTIVATION
-            | PROFILE_WIRE_FEATURES.PEER_RECONCILIATION
-            | PROFILE_WIRE_FEATURES.ATOMIC_LOGICAL_APPLY,
+        featureFlags: PROFILE_WIRE_FEATURES.SPLIT_KEYBOARD | PROFILE_WIRE_FEATURES.SAVES,
         candidateChunkMax: 20,
     };
     const peerMissing = evaluateLiveMutationCompatibility(
@@ -424,16 +413,8 @@ test("request ids advance across refreshes and reject a delayed duplicate", asyn
     const adapter = new FakeDeviceAdapter({
         devices: [{id: "native-device", product: "Charybdis"}],
         onWrite({connection, report}) {
-            if (report[0] === VIA_READS.COMMAND_GET_PROTOCOL_VERSION) {
-                const viaResponse = Buffer.from(report);
-                viaResponse[2] = VIA_READS.PROTOCOL_VERSION;
-                queueMicrotask(() => connection.emitReport(viaResponse));
-                return;
-            }
-            if (report[0] === VIA_READS.COMMAND_GET_KEYBOARD_VALUE) {
-                queueMicrotask(() => connection.emitReport(Buffer.from(report)));
-                return;
-            }
+
+
             const current = response(report, pages[`${report[2]}:${report[4]}`]);
             customWriteCount += 1;
             if (customWriteCount === 1) delayedResponse = Buffer.from(current);
@@ -464,7 +445,7 @@ test("the layout read counts only keys the app cannot name", () => {
     const {unnamedKeyCount} = require("../../core/session/profile-device-service");
     const keycodes = require("../../core/data/keycode-catalog");
     const layers = [{layer: 0, keys: [0x0004, 0x7e42, 0x7e85, 0x7ea3, 0x7ec2, 0x7e90, 0x7ee0].map((keycode) => ({keycode, resolved: keycodes.resolve(keycode)}))}];
-    assert.equal(unnamedKeyCount(layers, {actionAbiDigest: 0x837cf479}), 1, "configured or empty pointing slots are named; a code past the blocks is not");
+    assert.equal(unnamedKeyCount(layers, {actionAbiDigest: 0x6fd70b90}), 1, "configured or empty pointing slots are named; a code past the blocks is not");
     for (const actionAbiDigest of [0x1d3fcacc, 0x61072732]) assert.equal(unnamedKeyCount(layers, {actionAbiDigest}), 5, "older firmware's user keys are not read as blocks");
 });
 
@@ -485,8 +466,8 @@ test("successful service restore installs the saved profile and returns normally
         assert.equal(f.keyboard.events[0], "backup");
         assert.ok(f.keyboard.events.includes("decision") && f.keyboard.events.includes("activated"));
         assert.ok(adapter.keyboard.mutations.length > 0, "the real service sends all writes through its request coordinator");
-        assert.deepEqual(f.keyboard.local.macros, f.target.macros);
-        assert.deepEqual(f.keyboard.peer.macros, f.target.macros);
+        assert.deepEqual(f.keyboard.active, f.target.candidate);
+        assert.deepEqual(f.keyboard.local.macros, f.keyboard.peer.macros);
         assert.equal(service.portable.fingerprint, result.fingerprint, "the service's post-Apply capture sees the saved target");
     } finally {await service.close();}
 });
@@ -502,7 +483,8 @@ test("standalone export reads the current keyboard without replacing its editor 
         const state = service.snapshot();
         // Another client has changed a key since the editor read. Export
         // captures it, but must leave the already published editor alone.
-        f.keyboard.local.layout[1] ^= 1; f.keyboard.peer.layout[1] ^= 1;
+        const changed = structuredClone(f.source); editLayers(changed, layers => layers[0][0] ^= 1);
+        adapter.keyboard = require("../fixtures/writable-keyboard").writableKeyboard({document: changed, generation: 5});
         const exported = await service.readPortableProfile();
         assert.notEqual(exported.fingerprint, editor.fingerprint);
         assert.equal(service.portable, editor);
@@ -554,4 +536,24 @@ test("a replugged keyboard takes back the number that came free, so two keyboard
     // Replugged, a keyboard is a new device to the browser.
     adapter.devices = [{id: "b", product: "Charybdis"}, {id: "c", product: "Charybdis"}];
     assert.deepEqual(await labels(), ["Keyboard 2 · Charybdis", "Keyboard 1 · Charybdis"], "the one still listed keeps its number");
+});
+
+test("an incompatible base is read only through capabilities, even for direct diagnostic reads", async t => {
+    const {service, adapter} = serviceHarness({schemaMajor: 3}); t.after(() => service.close());
+    const scanned = await service.enumerate();
+    const state = await service.connect(scanned.devices[0].id);
+    assert.equal(state.compatibility.compatible, false);
+    const connection = adapter.lastConnection();
+    assert.deepEqual(connection.writes.map(report => [report[0], report[2]]), [[8, 1], [8, 1], [8, 1]]);
+    await assert.rejects(service.readLayout(), {code: "FIRMWARE_UPDATE_REQUIRED"});
+    await assert.rejects(service.readCommittedProfile(), {code: "FIRMWARE_UPDATE_REQUIRED"});
+    await service.readBaseRgb(); await service.readCombos();
+    assert.equal(connection.writes.length, 3, "no data is read past the unsupported identity");
+});
+
+test("a retired capability layout gets the update notice without any profile read", async t => {
+    const {service, adapter} = serviceHarness({capabilityLayout: 2}); t.after(() => service.close());
+    const scanned = await service.enumerate();
+    await assert.rejects(service.connect(scanned.devices[0].id), {code: "FIRMWARE_UPDATE_REQUIRED", message: /Update both halves/});
+    assert.ok(adapter.lastConnection().writes.every(report => report[0] === 8 && report[2] === 1));
 });

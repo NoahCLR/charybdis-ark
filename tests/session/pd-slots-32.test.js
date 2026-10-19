@@ -1,4 +1,5 @@
 "use strict";
+const {profileLayers} = require("../fixtures/profile-document");
 // Editing the 32-slot firmware's pointing slots past the first eight, end to
 // end through the draft: mode, key, behaviour, colour, review and discard.
 const test = require("node:test"), assert = require("node:assert/strict");
@@ -25,7 +26,7 @@ test("slot 20 is created, bound, lit, reviewed and discarded like any other", ()
     const value = validateSnapshot(draft.document, CAPABILITIES_32);
     assert.equal(value.pdModes[20].name, "Desktops");
     assert.equal(value.pdModes[20].directions.left.keycode, 0x150);
-    assert.ok(value.document.layers[0].includes(0x7eb4), "PD_SLOT_20_LOCK on the board");
+    assert.ok(profileLayers(value.document)[0].includes(0x7eb4), "PD_SLOT_20_LOCK on the board");
     assert.deepEqual(value.rgb.pdModeColors[20], {pdModeId: 20, color: {h: 64, s: 255, v: 100}, locality: 2});
     assert.deepEqual(value.behaviors.rows.find(row => row.target.operand === 0x68).steps[0].tap, {kind: 4, flags: 0, operand: 31});
     assert.equal(decodeProfileBlob(value.profile).domains.find(domain => domain.id === 0x50).version, 3);

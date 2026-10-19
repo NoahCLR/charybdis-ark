@@ -74,9 +74,9 @@ physical-only. A bypassed native output keeps its native effects; a bypassed
 custom output supplies no escape. Both exhaustive and symbolic reach analysis
 follow this policy, as the firmware's participation contract defines.
 
-Current firmware times gestures physically (feature bit 17), owns tapping
-(bit 18) and decides every `LT()`, `MT()` and `OSM()` key with or without a row
-(bit 31, firmware D-F27): QMK's tapping engine classifies no key, a row switched
+Current firmware times gestures physically, owns tapping and decides every
+`LT()`, `MT()` and `OSM()` key with or without a row (firmware D-F27; Profile
+Wire 1's feature bits 17, 18 and 31, implied by Profile Wire 2): QMK's tapping engine classifies no key, a row switched
 off or bypassed is ignored while the key keeps its own tap and hold, every
 dual-role key holds at the dual-role threshold unless its row sets its own, and
 a row without steps is no row, so `TT()` keeps its own taps under one. Ark
@@ -147,8 +147,7 @@ there, and otherwise shows the first layer that reaches it.
 
 ## Rows that change nothing
 
-A row without steps is no row (firmware D-F27 "Rows without steps", Profile
-Wire feature bit 31): it decides neither a key's taps nor whether the keyboard
+A row without steps is no row (firmware D-F27 "Rows without steps"): it decides neither a key's taps nor whether the keyboard
 handles the key, its timing applies only to a key the keyboard handles anyway,
 and its enable and allowed layers gate only what it holds. Its auto-mouse
 anchor applies on any key. So a row **changes nothing** when it has no steps,

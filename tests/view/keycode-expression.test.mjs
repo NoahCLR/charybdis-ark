@@ -1,3 +1,4 @@
+import {profileLayers, profileMacros, editLayers, editMacros} from "../fixtures/profile-document.js";
 // The picker's validity check has to agree with the draft: every expression
 // it calls storable the draft stores as the same keycode, and every one the
 // draft refuses it refuses too (B10: S(MO(2)), G(PD_SLOT_0), LT(2, LT(…))).
@@ -12,9 +13,9 @@ const portable = require("../../core/model/portable-profile");
 const {buildSnapshotModel} = require("../../core/session/device-model");
 const {document: pdDocument} = require("../fixtures/pd-profile");
 const {PROFILE_WIRE_KNOWN_MASKS} = require("../../core/protocol/profile-wire-v1");
-const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../../core/protocol/via-layout-v1");
+const {CHARYBDIS_4X6_LAYOUT_MATRIX} = require("../../core/data/charybdis-layout");
 
-const capabilities = {compiledLayerCount: 16, supportedDomainMask: 31, actionAbiDigest: 0x837cf479, featureFlags: PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES};
+const capabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 0}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: 0x6fd70b90, featureFlags: PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES};
 const doc = pdDocument();
 const snapshot = {document: doc, fingerprint: portable.fingerprint(doc), summary: portable.summary(doc), limits: {brightnessMax: 200}};
 const model = buildSnapshotModel(snapshot, capabilities, {editable: true, reason: ""});
@@ -26,7 +27,7 @@ function drafted(expression) {
     try {
         draft.stage({draftId: draft.id, draftRevision: draft.revision, type: "updateLayoutKeys", layer: "Layer 1", changes: [{layoutIndex: 5, keycode: expression}]});
     } catch { return undefined; }
-    return draft.document.layers[1][slotOf(5)];
+    return profileLayers(draft.document)[1][slotOf(5)];
 }
 
 const EXPRESSIONS = [

@@ -8,16 +8,16 @@
 // are counted against the limits the firmware refuses an edit past; macros,
 // custom keys and pointing modes are fixed sets of slots, counted as how many
 // are in use, the way their own screens count them. Macro slots can also be
-// unavailable: every empty one keeps room in the separate macro memory, and
+// unavailable: every empty one keeps room in the shared profile space, and
 // when that runs short the highest empty ones have none (macro-editor.js
 // macroBudget).
 //
 // The bytes are the canonical blob the snapshot already holds, so the total is
-// exactly what Apply would write. Macro steps are not part of it.
+// exactly what Apply would write. Keymap and macro steps are included.
 
-const {MACRO_BANK_BYTES, decodedOf} = require("./portable-profile");
-const {macroBudget} = require("./macro-editor");
-const {PROFILE_ACTION_KINDS: ACTION, PROFILE_BLOB_V1, PROFILE_DOMAIN_IDS} = require("../schema/profile-blob-v1");
+const {decodedOf} = require("./portable-profile");
+const {profileMacroBudget} = require("./macro-editor");
+const {PROFILE_ACTION_KINDS: ACTION, PROFILE_DOMAIN_IDS, decodeProfileBlob} = require("../schema/profile-blob-v1");
 
 /** @param {number | undefined} value @returns {value is number} */
 const positive = value => typeof value === "number" && Number.isInteger(value) && value > 0;
@@ -25,15 +25,13 @@ const positive = value => typeof value === "number" && Number.isInteger(value) &
 const cache = new WeakMap();
 
 // The RGB domain's payload, whose header counts the LED groups and overrides.
-// A validated complete profile always contains RGB.
+// A validated complete profile always contains RGB. The schema's own decoder
+// walks the envelopes, so their width is written once (schema 4: 32 bits).
 /** @param {Buffer} profile @returns {Buffer} */
 function rgbPayload(profile) {
-    for (let offset = /** @type {number} */ (PROFILE_BLOB_V1.HEADER_SIZE); offset < profile.length;) {
-        const id = profile[offset], length = profile.readUInt16LE(offset + 2), start = offset + PROFILE_BLOB_V1.DOMAIN_HEADER_SIZE;
-        if (id === PROFILE_DOMAIN_IDS.RGB) return profile.subarray(start, start + length);
-        offset = start + length;
-    }
-    throw new Error("A complete profile carries its lighting.");
+    const rgb = decodeProfileBlob(profile).domains.find(domain => domain.id === PROFILE_DOMAIN_IDS.RGB);
+    if (!rgb) throw new Error("A complete profile carries its lighting.");
+    return rgb.payload;
 }
 
 /**
@@ -50,7 +48,7 @@ function profileUsage(snapshot, capabilities) {
     const decoded = decodedOf(snapshot), cached = cache.get(decoded);
     if (cached?.capabilities === capabilities) return cached.usage;
 
-    const {profile, settings, behaviors, combos, pdModes, document} = decoded;
+    const {profile, settings, behaviors, combos, pdModes, macroSlots} = decoded;
     // RGB header: byte 4 is the group count; bytes 6, 8, 9 and 11 count the
     // layer, pointing, combo and key-feedback override rows.
     const lighting = rgbPayload(profile);
@@ -61,8 +59,7 @@ function profileUsage(snapshot, capabilities) {
         name || settings.customKeyShortcuts[slot].mods || settings.customKeyShortcuts[slot].key || behaved.has(slot)).length;
     // A macro slot is in use once it has steps; the rest are free unless the
     // macro memory has no room left for them.
-    const macroSlots = document.macros.map(value => Buffer.from(value, "base64"));
-    const macros = macroBudget(macroSlots, capabilities.viaMacroBytes ?? MACRO_BANK_BYTES);
+    const macros = profileMacroBudget(decoded, capabilities);
     const counts = /** @type {[string, number, number | undefined, number?][]} */ ([
         ["behaviours", behaviors.rows.length, capabilities.maxBehaviorRows],
         ["behaviourSteps", behaviors.populatedStepCount, capabilities.maxPopulatedBehaviorSteps],
@@ -75,7 +72,7 @@ function profileUsage(snapshot, capabilities) {
     ]).filter(([, , limit]) => positive(limit)).map(([id, used, limit, unavailable]) =>
         ({id, used, limit: /** @type {number} */ (limit), ...(unavailable ? {unavailable} : {})}));
 
-    const usage = {used: profile.length, capacity: capabilities.maxProfilePayload, counts};
+    const usage = {used: decoded.candidate.length, capacity: capabilities.maxProfilePayload, counts};
     cache.set(decoded, {capabilities, usage});
     return usage;
 }

@@ -1,22 +1,24 @@
 // @ts-check
 "use strict";
 const {LAYERS} = require("../data/charybdis-layout");
-const {u8: assertU8, u16: assertU16, asBytes, copyBytes, protocolError} = require("./bytes");
+const {u8: assertU8, u16: assertU16, u32: assertU32, asBytes, copyBytes, protocolError} = require("./bytes");
 
-// The one profile format the keyboard stores: schema 3.0, up to 53,216 bytes
-// (one 52 KiB slot less its header, firmware D-F14).
+// The one profile format the keyboard stores: schema 4.0, up to 130,048 bytes
+// (one 128 KiB flash slot less its 1 KiB record, firmware D-F29). Schema 4 opens the new
+// base (firmware D-F28): a domain envelope's payload length is 32 bits, so
+// the envelope is 6 bytes; a domain's payload bytes are schema 3's.
 // Earlier schemas and domain versions are refused, as the firmware refuses
 // them (firmware D-F10).
 const PROFILE_BLOB_V1 = Object.freeze({
     MAGIC: "NLP1",
     HEADER_SIZE: 8,
-    DOMAIN_HEADER_SIZE: 4,
+    DOMAIN_HEADER_SIZE: 6,
     ACTION_SIZE: 4,
-    SCHEMA_MAJOR: 3,
+    SCHEMA_MAJOR: 4,
     SCHEMA_MINOR: 0,
     CANONICAL_FLAG: 1,
     KNOWN_FLAGS: 1,
-    MAX_SIZE: 53216,
+    MAX_SIZE: 130048,
 });
 
 const {PROFILE_DOMAIN_IDS, PROFILE_DOMAIN_VERSIONS} = require("./profile-domains");
@@ -149,7 +151,7 @@ function encodeDomainEnvelope(domain, options = {}) {
     const output = Buffer.alloc(PROFILE_BLOB_V1.DOMAIN_HEADER_SIZE + normalized.payload.length);
     output[0] = normalized.id;
     output[1] = normalized.version;
-    output.writeUInt16LE(normalized.payload.length, 2);
+    output.writeUInt32LE(normalized.payload.length, 2);
     normalized.payload.copy(output, PROFILE_BLOB_V1.DOMAIN_HEADER_SIZE);
     return output;
 }
@@ -172,12 +174,12 @@ function readDomainEnvelope(value, offset = 0, options = {}) {
         throw new RangeError("Domain offset must be within the input buffer.");
     }
     if (bytes.length - offset < PROFILE_BLOB_V1.DOMAIN_HEADER_SIZE) {
-        throw profileBlobError("TRUNCATED", "Profile domain envelope is missing its four-byte header.", {offset});
+        throw profileBlobError("TRUNCATED", "Profile domain envelope is missing its six-byte header.", {offset});
     }
     const id = bytes[offset];
     const version = bytes[offset + 1];
     assertKnownDomain(id, version, domainVersions);
-    const payloadLength = bytes.readUInt16LE(offset + 2);
+    const payloadLength = bytes.readUInt32LE(offset + 2);
     const nextOffset = offset + PROFILE_BLOB_V1.DOMAIN_HEADER_SIZE + payloadLength;
     if (nextOffset > bytes.length) {
         throw profileBlobError("TRUNCATED", `Profile domain 0x${hexByte(id)} declares ${payloadLength} payload bytes but only ${bytes.length - offset - PROFILE_BLOB_V1.DOMAIN_HEADER_SIZE} remain.`, {domainId: id, offset});
@@ -234,9 +236,8 @@ function normalizeDomain(domain, domainVersions) {
     const version = assertU8(domain?.version, "Domain version");
     assertKnownDomain(id, version, domainVersions);
     const payload = copyBytes(domain?.payload === undefined ? Buffer.alloc(0) : domain.payload, "Domain payload");
-    if (payload.length > 0xffff) {
-        throw profileBlobError("CAPACITY_EXCEEDED", "Domain payload cannot exceed 65535 bytes.", {domainId: id});
-    }
+    // The envelope's length is 32 bits; the blob's own ceiling bounds it.
+    assertU32(payload.length, "Domain payload length");
     return {id, version, payload};
 }
 
