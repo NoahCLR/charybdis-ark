@@ -545,13 +545,13 @@ now: every Profile Wire 2 firmware does what the bit promised.
 | 18 | runtime-owned tapping: every key handled by userspace bypasses native QMK tapping, including authored MT/OSM rows and intrinsic TT/OSL ownership. An authored MT/OSM row without a first hold keeps the key's modifier hold past the tap-hold term, and keys pressed while such a runtime-owned LT/MT/OSM key is undecided wait for its tap or hold (both joined the bit on the same unreleased branch). Unhandled LT/MT/OSM keep native QMK tapping. Extends bit 17 without changing its physical timestamp contract or profile bytes |
 | 19 | wide pages: the payload, compiled, combo and settings readbacks (GET `0x04`, `0x05`, `0x06`, `0x07`) take a 16-bit page, request byte 4 its low byte and byte 5 its high byte, with bytes 6–31 reserved; their responses echo bytes 0–4 and the request id correlates them |
 | 20 | reserved, never advertised: participation controls ([participation policy](participation-policy.md)) come with the current settings and combo domain versions, so no bit announces them |
-| 21 | canonical UTF-8 macro text and settings scalar 27 Host settings and GET 0x0B OS readback; require this bit before writing either extension. See [runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/fb76c5a4f767848b15bb7f12e40f506b63344a5a/docs/architecture/runtime-flow.md) |
-| 22 | host layouts: settings scalar 27 bits 16–23 name a layout from the [host layout catalogue](https://github.com/NoahCLR/charybdis-4x6/blob/fb76c5a4f767848b15bb7f12e40f506b63344a5a/docs/architecture/host-layouts-v1.md) and bit 24 marks a macOS ISO keyboard; macro text is typed through that layout. Require this bit before writing bits 16–24. See [runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/fb76c5a4f767848b15bb7f12e40f506b63344a5a/docs/architecture/runtime-flow.md) |
-| 23 | macro input protection: automatic protection when the selected layout needs Unicode entry, with optional per-macro `01 05 01` (On) or `01 05 02` (Off) prefixes. Require this bit before writing a prefix. New physical presses are ignored until released; earlier releases remain admitted. See [runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/fb76c5a4f767848b15bb7f12e40f506b63344a5a/docs/architecture/runtime-flow.md) |
+| 21 | canonical UTF-8 macro text and settings scalar 27 Host settings and GET 0x0B OS readback; require this bit before writing either extension. See [runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/e9a72ce493ec94bc3fd90bd7de6eae01884629c9/docs/architecture/runtime-flow.md) |
+| 22 | host layouts: settings scalar 27 bits 16–23 name a layout from the [host layout catalogue](https://github.com/NoahCLR/charybdis-4x6/blob/e9a72ce493ec94bc3fd90bd7de6eae01884629c9/docs/architecture/host-layouts-v1.md) and bit 24 marks a macOS ISO keyboard; macro text is typed through that layout. Require this bit before writing bits 16–24. See [runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/e9a72ce493ec94bc3fd90bd7de6eae01884629c9/docs/architecture/runtime-flow.md) |
+| 23 | macro input protection: automatic protection when the selected layout needs Unicode entry, with optional per-macro `01 05 01` (On) or `01 05 02` (Off) prefixes. Require this bit before writing a prefix. New physical presses are ignored until released; earlier releases remain admitted. See [runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/e9a72ce493ec94bc3fd90bd7de6eae01884629c9/docs/architecture/runtime-flow.md) |
 | 24 | candidate reuse: copy bounded ranges from an identified active profile into the inactive candidate (`SET 0x1B`, below) |
 | 25 | candidate streaming chunks: admit sequential chunks and prove bounded batches through status (`SET 0x1C`, below) |
-| 26 | protected macro keyboard-output isolation: suspend already-held ordinary keys, send only macro keyboard output, restore current held modifiers and suppress remaining ordinary usages until release; requires bit 23. See [runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/fb76c5a4f767848b15bb7f12e40f506b63344a5a/docs/architecture/runtime-flow.md) |
-| 27 | streaming stored macros: no separate compiled-program ceiling; slot bytes and terminators must fit the advertised macro capacity (34,903 bytes in this layout). See [runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/fb76c5a4f767848b15bb7f12e40f506b63344a5a/docs/architecture/runtime-flow.md) |
+| 26 | protected macro keyboard-output isolation: suspend already-held ordinary keys, send only macro keyboard output, restore current held modifiers and suppress remaining ordinary usages until release; requires bit 23. See [runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/e9a72ce493ec94bc3fd90bd7de6eae01884629c9/docs/architecture/runtime-flow.md) |
+| 27 | streaming stored macros: no separate compiled-program ceiling; slot bytes and terminators must fit the advertised macro capacity (34,903 bytes in this layout). See [runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/e9a72ce493ec94bc3fd90bd7de6eae01884629c9/docs/architecture/runtime-flow.md) |
 | 28 | pointing-mode clicks: a direction or button-override tap in the PD domain may be a plain mouse button 1–8 (`0x00d1..0x00d8`). Require this bit before writing one; older firmware rejects it as `INVALID_ACTION`. See [PD-mode domain](pd-mode-domain-v1.md#taps-modifiers-and-buttons) |
 | 29 | pointing-mode macros: direction, diagonal and button tap overrides may start slots 0–127 (`0x7700..0x777f`), inherit policy and zero mask only. Require this bit before writing one. See [PD-mode domain](pd-mode-domain-v1.md#taps-modifiers-and-buttons) |
 | 30 | combo output behaviour permissions: settings header byte 5 bit 0 bypasses all combo output behaviours; combo v3 row flag bit 4 bypasses one output. Both zero means allowed. Native combo readback v3 row flag bit 5 reports the per-combo bypass. Require this bit before writing either extension. See [participation policy](participation-policy.md#combo-output-behaviour-permission) |
@@ -1236,9 +1236,16 @@ carries the current pair. The pair never repeats within a boot; a client that
 sees a different session knows the keyboard restarted and its unsaved edits
 are gone.
 
-The keyboard's adjustment keys (DPI, RGB) do not touch the working copy yet;
-once they do (a later firmware change), they advance the revision too,
-and a client's next edit learns of them as STALE.
+The keyboard's adjustment keys (DPI, RGB) queue settings edits and advance
+the revision too. A client's next edit learns of them as STALE; while a
+keyboard adjustment waits to publish, new client edits are BUSY, and so is a
+new Apply: its candidate BEGIN (a transaction other than the one running) is
+answered BUSY with error `MAILBOX_BUSY`, and edit status page 0 flag 13 says
+why. Published later, the adjustment would overwrite what the Apply set.
+Retry once the flag clears. An Apply already admitted carries on to its end;
+an adjustment pressed during it stays queued, publishes after the Apply lands
+on the profile it activated (the key press is the later act, so it wins), and
+is then saved as any adjustment is.
 
 ### An edit
 
@@ -1310,8 +1317,8 @@ Every SET is answered in place: bytes 0–4 echoed, then
 | 15–16 | edit status flags (page 0) |
 
 Results: `0` OK, `1` QUEUED (the outcome comes later), `2` STALE, `3` BUSY
-(another edit, a save, an Apply, a publication waiting, or the other half not
-yet holding the same working copy), `4` INVALID_ARGUMENT (a malformed report
+(another edit, a save, an Apply, a publication waiting, a keyboard adjustment
+waiting to publish, or the other half not yet holding the same working copy), `4` INVALID_ARGUMENT (a malformed report
 too), `5` INVALID_STATE, `6` WRONG_TRANSACTION, `7` OUT_OF_ORDER, `8`
 CAPACITY_EXCEEDED, `9` CHECKSUM_MISMATCH, `10` UNSUPPORTED_DOMAIN, `11`
 INVALID_SPLICE, `12` VALIDATION_REJECTED (page 2 says where), `13` NOT_CLEAN,
@@ -1370,13 +1377,13 @@ Command `0x08`, channel `0`, the usual nonzero request id at byte 3; a
 malformed request answers status `1`, an unknown page status `2`, an owner
 not ready status `3`.
 
-**`0x20` edit status**, byte 4 the page, 25-byte payloads:
+**`0x20` edit status**, byte 4 the page (0–3), 25-byte payloads:
 
 | Page 0 offset | Size | Field |
 | ---: | ---: | --- |
 | 0 | 1 | layout, `1` |
 | 1 | 1 | phase |
-| 2 | 2 | flags: bit 0 unsaved edits, 1 the other half is required, 2 the other half holds this session and revision with nothing in progress, 3 the other half answers, 4 a new edit would be BUSY now, 5 the saved profile is the compiled defaults, 6 a save is running, 7 the halves' edit modes conflict, 8 waiting for a safe boundary, 9 a save here waits for a quiet keyboard, 10 the other half's save waits for a quiet keyboard, 11 the other half refused this working copy, edit and whole copy (apart until Revert or an Apply; Save is BUSY), 12 writing the edit mode failed and is being retried; 13–15 zero |
+| 2 | 2 | flags: bit 0 unsaved edits, 1 the other half is required, 2 the other half holds this session and revision with nothing in progress, 3 the other half answers, 4 a new edit would be BUSY now, 5 the saved profile is the compiled defaults, 6 a save is running, 7 the halves' edit modes conflict, 8 waiting for a safe boundary, 9 a save here waits for a quiet keyboard, 10 the other half's save waits for a quiet keyboard, 11 the other half refused this working copy, edit and whole copy (apart until Revert or an Apply; Save is BUSY), 12 writing the edit mode failed and is being retried, 13 a keyboard adjustment (DPI or lighting key) awaits publication: a new Apply, edit, Save, Revert and mode change are BUSY until it publishes; 14–15 zero |
 | 4 | 4 | session |
 | 8 | 4 | revision |
 | 12 | 4 | saved generation (`0`: compiled defaults) |
@@ -1419,6 +1426,22 @@ not ready status `3`.
 | 18 | 4 | length of the profile now active |
 | 22 | 3 | reserved, `0` |
 
+Page 3 records automatic saves on this USB half since boot (unreleased 2.0
+base, no version change). Counters identify an event when polling; a client
+must compare the session too after a restart. The completed event remains
+available after a subsequent explicit Save. Last save's result, error and
+transaction remain on page 1; only success increments the keyboard counter.
+
+| Page 3 offset | Size | Field |
+| ---: | ---: | --- |
+| 0 | 1 | layout, `1` |
+| 1 | 1 | flags: bit 0 automatic save in progress, bit 1 last finished save was automatic |
+| 2 | 4 | completed automatic saves since boot |
+| 6 | 4 | working revision of the last completed automatic save |
+| 10 | 4 | saved generation of that save |
+| 14 | 2 | quiet period in ms, `3000` |
+| 16 | 9 | reserved, `0` |
+
 **`0x21` the active profile**, a wide page at bytes 4–5, paged like the
 saved profile (GET `0x04`): page 0 is metadata, pages 1… carry 25 bytes each.
 Page 0: layout `1`, page size `25`, length (4), session (4), revision (4),
@@ -1453,8 +1476,22 @@ edits: the client asks Save or Revert first. A change is answered OK at
 once and takes effect at once; each half writes it to its EEPROM when its
 keyboard is quiet (no key held, the matrix unchanged for 50 ms), and a failed
 write is retried with a growing wait and reported by status flag 12 until it
-succeeds. The firmware records and reports the mode; it does not yet save on
-its own in Live.
+succeeds.
+
+In Live the USB half saves the working copy itself after 3 seconds without
+an edit and without a held key (the 50 ms quiet-matrix erase gate also
+applies), with no client connection required. Every held-key scan or
+published revision restarts the quiet interval. It starts only when the
+halves agree and no other operation holds the profile, through the ordinary
+Save transaction. There is at most one automatic attempt per revision; a
+failed attempt leaves the working copy unsaved and is reported as any Save
+failure. Explicit Save or a new edit can retry; no automatic failure loop.
+Unplugging before completion loses unsaved edits (at least the most recent
+quiet interval when it has not elapsed), with the ordinary old-or-new result
+if a save was running. Live + review never saves automatically. Apply saves
+only adjustment-only working copies, never a posted client edit mixed into
+one. No host keepalive or disconnect message controls this scheduler.
+
 
 ### Toggles and the settings QMK holds
 
@@ -1468,9 +1505,22 @@ never an edit: combos run only while the stored master and QMK's combo flag
 (its override, flipped by QMK's combo keys) both allow; behaviours only while
 the stored master and the firmware's behaviours override both allow. An
 override starts allowed at boot, is never saved or reviewed, and reads back
-through GET `0x22` beside its master. Adjustment keys (DPI, RGB) still move
-QMK's values, which GET `0x22` shows, and still write QMK's EEPROM, which no
-longer wins at boot; they become edits in a later firmware change.
+through GET `0x22` beside its master. DPI up/down and RGB adjustment keys
+use no-EEPROM setters for immediate
+local feedback and queue their four settings scalars as a compound edit.
+Repeated presses coalesce while another operation holds the working copy;
+an adjustment arriving during Save becomes a subsequent revision. Pending
+adjustments block new client edits, Save, Revert and mode changes until
+published; review sees the ordinary stored working-copy settings afterwards.
+Settings projection retains newer pending local values during an older
+publication. The settings domain is optional (a profile without one inherits
+the authored defaults), yet an adjustment replaces bytes inside one: when the
+working profile has none, the adjustment's edit creates it from the authored
+defaults with the adjusted scalars in place, so every other value is
+unchanged, and it is saved like any other adjustment. A build without the
+authored defaults cannot do this and leaves such a profile's adjustments as
+local feedback only. RGB on/off is an adjustment to lighting, distinct from the
+participation toggles. The profile remains their only durable owner.
 
 ## Flash pauses — GET value `0x0D`
 

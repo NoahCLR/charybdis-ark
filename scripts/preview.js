@@ -99,6 +99,7 @@ async function webHosts() {
         "demo-edited": {words: WEB_WORDS, panel: () => offered},
         web: {words: WEB_WORDS, panel: () => offered},
         live: VSCODE_HOST,
+        "live-auto": VSCODE_HOST,
         "web-none": {words: WEB_WORDS, panel: () => ({...offered, recoveries: []})},
         "web-unsupported": {words: WEB_WORDS, panel: () => ({...offered, chooseKeyboard: false, recoveries: [], blocked: BLOCKED.unsupported})},
     };
@@ -135,9 +136,10 @@ const DEMO_EDIT = {type: "updateConfigDefaults", sectionId: "normalPointerSpeed"
 
 // `live` renders a keyboard in Live + review (firmware D-F32): the draft is
 // its working copy, with one unsaved edit, and a combos key has turned combos
-// off for now. ?host=live shows it.
-/** @param {import("../core/session/types.js").PanelHost} [host] @param {{live?: boolean}} [options] */
-function buildModel(host = VSCODE_HOST, {live = false} = {}) {
+// off for now. ?host=live shows it; ?host=live-auto the same keyboard in Live
+// (`mode` 1), waiting to save the edit by itself.
+/** @param {import("../core/session/types.js").PanelHost} [host] @param {{live?: boolean, mode?: number}} [options] */
+function buildModel(host = VSCODE_HOST, {live = false, mode = 2} = {}) {
     const doc = fillPreviewLayer(document32());
     const snapshot = {
         document: doc,
@@ -152,7 +154,9 @@ function buildModel(host = VSCODE_HOST, {live = false} = {}) {
         const working = editLayers(fillPreviewLayer(document32()), layers => {layers[0][13] = /** @type {number} */ (keycodes.encode("KC_ESC"));});
         const bytes = Buffer.from(working.profile, "base64"), saved = Buffer.from(doc.profile, "base64");
         liveSnapshot = {...snapshot, document: working, fingerprint: portable.fingerprint(working), summary: portable.summary(working), saved: snapshot,
-            runtime: null, live: {mode: 2, session: 0x5e550001, revision: 1, savedGeneration: 42, savedOrigin: 0, unsaved: true, converged: true, working: bytes, saved, defaults: saved}};
+            runtime: null, live: {mode, session: 0x5e550001, revision: 1, savedGeneration: 42, savedOrigin: 0, unsaved: true, converged: true, working: bytes, saved, defaults: saved,
+                keyboard: {saving: false, autoSaving: false, savedByKeyboard: false, saveFailed: false, saveError: 0, lastSaveTransaction: 0,
+                    adjustmentPending: false, storagePaused: false, peerStoragePaused: false, peerRefused: false, modeNotStored: false, quietMs: 3000}}};
     }
     const session = new ProfileDraftSession(/** @type {any} */ (liveSnapshot || snapshot), deviceId, capabilities);
     /** @type {import("../core/session/types.js").PanelDeviceState} */
@@ -170,7 +174,7 @@ function buildModel(host = VSCODE_HOST, {live = false} = {}) {
         // No name of its own: the keyboard reports its built-in one.
         storedKeyboardName: "",
         // How edits reach it, stored on the keyboard: Apply here, Live + review with `live`.
-        editMode: {mode: live ? 2 : 0, counter: 1, peerMode: live ? 2 : 0, peerCounter: 1, peerKnown: true, conflict: false, agreed: true},
+        editMode: {mode: live ? mode : 0, counter: 1, peerMode: live ? mode : 0, peerCounter: 1, peerKnown: true, conflict: false, agreed: true},
         runtime: live ? {combos: {master: true, override: false}, behaviours: {master: true, override: true},
             live: {defaultDpi: 1200, snipingDpi: 400, rgbMode: 1, rgbColor: 0, defaultLayers: 1, keymapOptions: 0}} : null,
     };
@@ -256,7 +260,7 @@ Promise.all([model, webHosts(), macroHost]).then(([model, hosts, macroHost]) => 
 fs.mkdirSync(path.join(__dirname, "..", "preview"), {recursive: true});
 fs.writeFileSync(path.join(__dirname, "..", "preview", "model.json"), JSON.stringify(model));
 for (const [name, host] of Object.entries(hosts)) {
-    const web = name === "web" ? buildModel(host) : name === "live" ? buildModel(host, {live: true}) : name === "demo" ? demoModel(host) : name === "demo-edited" ? demoModel(host, [DEMO_EDIT]) : emptyModel(host);
+    const web = name === "web" ? buildModel(host) : name === "live" ? buildModel(host, {live: true}) : name === "live-auto" ? buildModel(host, {live: true, mode: 1}) : name === "demo" ? demoModel(host) : name === "demo-edited" ? demoModel(host, [DEMO_EDIT]) : emptyModel(host);
     fs.writeFileSync(path.join(__dirname, "..", "preview", `model-${name}.json`), JSON.stringify(web));
 }
 const page = `<!doctype html>

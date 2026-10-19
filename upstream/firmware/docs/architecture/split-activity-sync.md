@@ -88,7 +88,7 @@ then reads frozen pages as JSON. It uses the firmware tools' own node-hid
 installation (`npm ci --prefix tools`) and is a separate engineering tool. Close competing app
 connections. Select `--path` if more than one matching keyboard is attached.
 Capture with the procedure in
-[`measurements/pointing-cadence/`](https://github.com/NoahCLR/charybdis-4x6/blob/fb76c5a4f767848b15bb7f12e40f506b63344a5a/measurements/pointing-cadence/README.md),
+[`measurements/pointing-cadence/`](https://github.com/NoahCLR/charybdis-4x6/blob/e9a72ce493ec94bc3fd90bd7de6eae01884629c9/measurements/pointing-cadence/README.md),
 which also keeps the recorded sets.
 
 The same run reads the pointing-cadence recorder (custom value `0x03`) when

@@ -72,19 +72,27 @@ const MACRO_BANK_BYTES = 34903;
 // The whole profile the keyboard runs, every domain: each domain its active
 // profile holds, otherwise the compiled default the firmware falls back to
 // (a profile saved without the keymap or macros types the authored ones), and
-// the combos and settings as the keyboard reports them.
+// the settings as the keyboard reports them. Combos are the profile's like
+// any other domain, and it is their only durable owner (firmware D-F32), so
+// they are taken as stored: rebuilt from the table the keyboard runs, a combo
+// on a custom key or sending MO(5) came back as native keycodes, the same
+// keys in other bytes. The running table still says whether the keyboard has
+// combo hooks a profile cannot hold, and stands in only for a keyboard that
+// stores no combos at all.
 /** @param {Uint8Array} active @param {Uint8Array} defaults @param {import("./types.js").NativeComboTable} combos @param {Buffer} settings */
 function materializeProfile(active, defaults, combos, settings) {
     if (!combos || combos.noTimer || combos.customTrigger || combos.customRelease || combos.customRepress || combos.strictTimer || combos.fixedReference) throw fail("This keyboard uses combo hooks or timing that cannot be represented by a portable profile.");
     const live = decodeStoredProfileBlob(active), fallback = decodeStoredProfileBlob(defaults);
+    /** @param {number} id */
+    const stored = id => live.domains.find(d => d.id === id) || fallback.domains.find(d => d.id === id);
     /** @type {import("../schema/types.js").ProfileDomain[]} */
     const domains = [PROFILE_DOMAIN_IDS.RGB, PROFILE_DOMAIN_IDS.KEY_BEHAVIORS, PROFILE_DOMAIN_IDS.PD_MODES, PROFILE_DOMAIN_IDS.KEYMAP, PROFILE_DOMAIN_IDS.MACROS].map(id => {
-        const found = live.domains.find(d => d.id === id) || fallback.domains.find(d => d.id === id);
+        const found = stored(id);
         if (!found) throw fail("The keyboard did not report every profile domain.");
         return found;
     });
     decodeSettings(settings);
-    domains.push(domain(PROFILE_DOMAIN_IDS.COMBOS, encodeComboDomain(comboTableOf(combos))), domain(PROFILE_DOMAIN_IDS.SETTINGS, settings));
+    domains.push(stored(PROFILE_DOMAIN_IDS.COMBOS) || domain(PROFILE_DOMAIN_IDS.COMBOS, encodeComboDomain(comboTableOf(combos))), domain(PROFILE_DOMAIN_IDS.SETTINGS, settings));
     return encodeProfileBlob({domains});
 }
 // The whole profile as stored bytes say it, every domain: each domain the

@@ -114,6 +114,7 @@ static bool set(const char *name, unsigned long value) {
     FIELD("peer_storage_paused", owner.peer_storage_paused)
     FIELD("peer_refused", owner.peer_refused)
     FIELD("mode_store_failed", owner.mode_store_failed)
+    FIELD("adjustment_pending", owner.adjustment_pending)
     FIELD("saved_generation", owner.saved_generation)
     FIELD("saved_origin", owner.saved_origin)
     FIELD("peer_phase", owner.peer.phase)

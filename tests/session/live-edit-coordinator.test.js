@@ -250,3 +250,94 @@ test("a mode the keyboard could not store yet is said; an unreadable mode is rea
     assert.equal(service.snapshot().editMode.mode, EDIT_MODE.APPLY, "read again before the next read");
     assert.notEqual(service.snapshot().runtime, null, "the toggles are read in Apply too");
 });
+
+test("flushing (leaving Live) waits for the keyboard's own save, saves what is left, and looks again after a key adjustment", async t => {
+    const {keyboard, service} = await live(t, {mode: EDIT_MODE.LIVE});
+    const read = await service.readKeyboardProfile();
+    keyboard.externalEdit(target(layers => {layers[0][9] = 0x06;}));
+    keyboard.startAutoSave();
+    let polls = 0;
+    const coordinator = new LiveEditCoordinator(service.connectedConnection(), {requestIds: service.requestSequence(), sleep: async () => {if (++polls === 3) keyboard.autoSave();}});
+    const waited = await coordinator.flush();
+    assert.equal(waited.saved, false, "its own save was enough; Ark asked for none");
+    assert.ok(polls >= 3);
+    assert.equal(keyboard.mutations.filter(report => report[2] === 0x25).length, 0);
+    // Unsaved, and a key adjustment between the look and the Save: STALE, so
+    // it looks again and saves the keyboard's newest pair.
+    keyboard.externalEdit(target(layers => {layers[0][9] = 0x07;}));
+    keyboard.faults.stale = true;
+    const saved = await coordinator.flush();
+    assert.equal(saved.saved, true);
+    assert.equal(keyboard.working, null);
+    assert.equal(saved.revision, keyboard.revision);
+    assert.ok(read.live);
+    keyboard.externalEdit(target(layers => {layers[0][9] = 0x08;}));
+    keyboard.raised.peerRefused = true;
+    await assert.rejects(coordinator.flush(), {code: "LIVE_HALVES_APART"});
+});
+
+
+// In Live the keyboard saves by itself 3 s after an edit, and a save holds
+// the profile for its whole length (about 6 s for a 6 KB profile on the
+// keyboard, longer for larger ones). An edit made meanwhile waits for it,
+// however long it takes, rather than being refused after an ordinary wait.
+test("an edit made while the keyboard saves by itself waits for the save to land", async t => {
+    const {service, keyboard} = await live(t, {mode: EDIT_MODE.LIVE});
+    keyboard.externalEdit(target(layers => {layers[0][9] = 0x06;}));
+    const read = await service.readKeyboardProfile();
+    keyboard.startAutoSave();
+    let clock = 0, sleeps = 0;
+    const coordinator = new LiveEditCoordinator(service.connectedConnection(), {requestIds: service.requestSequence(), now: () => clock,
+        sleep: async () => {clock += 250; if (++sleeps === 24) keyboard.autoSave();}});
+    const result = await coordinator.post({from: read.live.working, to: target(layers => {layers[0][9] = 0x06; layers[0][10] = 0x07;}), defaults: read.live.defaults, identity: read.live, capacity: 130048});
+    assert.ok(clock >= 6000, "it waited longer than an ordinary busy wait");
+    assert.equal(result.revision, read.live.revision + 1);
+    assert.ok(keyboard.events.indexOf("auto-saved") < keyboard.events.lastIndexOf("published"), "the save landed first, then the edit");
+    assert.ok(sleeps <= 200, "it asks again at a save's pace, not every few milliseconds");
+    // Busy for any other reason still ends after the ordinary wait.
+    keyboard.faults.busy = 0x20;
+    keyboard.raised.adjustmentPending = true;
+    clock = 0;
+    await assert.rejects(coordinator.post({from: result.bytes, to: target(layers => {layers[0][11] = 0x08;}), defaults: read.live.defaults, identity: result, capacity: 130048}),
+        error => error.result === "BUSY");
+    assert.ok(clock < 6000);
+});
+
+test("a queued keyboard adjustment is decoded and blocks new mutations until it publishes", async t => {
+    const {service, keyboard} = await live(t);
+    const {buildEditBeginRequest, buildSaveRequest, buildRevertRequest, buildEditModeRequest, sendEditRequest} = require("../../core/protocol/profile-edit-v1");
+    const {buildCandidateBeginRequest, candidateMetadataForBlob, decodeCandidateAcknowledgement, CANDIDATE_ADMISSION, CANDIDATE_ERROR} = require("../../core/protocol/profile-candidate-v1");
+    keyboard.raised.adjustmentPending = true;
+    const status = await service.readLiveStatus();
+    assert.equal(status.adjustmentPending, true);
+    const identity = {session: keyboard.session, revision: keyboard.revision};
+    for (const request of [buildEditBeginRequest(101, {...identity, splices: 1, insertTotal: 2}), buildSaveRequest(102, identity), buildRevertRequest(103, identity), buildEditModeRequest(104, EDIT_MODE.LIVE)]) {
+        assert.equal((await sendEditRequest(service.connection, request)).result, EDIT_RESULT.BUSY);
+    }
+    const begin = buildCandidateBeginRequest(105, candidateMetadataForBlob(keyboard.saved, {actionAbiDigest: document().actionAbiDigest}));
+    const response = keyboard.answer(begin)[0];
+    const ack = decodeCandidateAcknowledgement(response, begin);
+    assert.deepEqual([ack.admission, ack.errorId], [CANDIDATE_ADMISSION.BUSY, CANDIDATE_ERROR.MAILBOX_BUSY]);
+    keyboard.raised.adjustmentPending = false;
+    assert.equal((await service.readLiveStatus()).adjustmentPending, false);
+    await sendEditRequest(service.connection, buildEditModeRequest(106, EDIT_MODE.LIVE));
+    assert.equal(keyboard.mode, EDIT_MODE.LIVE);
+});
+
+
+test("leaving Live waits for a queued key adjustment even before it becomes unsaved", async t => {
+    const {service, keyboard} = await live(t, {mode: EDIT_MODE.LIVE});
+    keyboard.raised.adjustmentPending = true;
+    let polls = 0;
+    const coordinator = new LiveEditCoordinator(service.connectedConnection(), {requestIds: service.requestSequence(), sleep: async () => {
+        if (++polls === 3) {
+            keyboard.raised.adjustmentPending = false;
+            keyboard.externalEdit(target(layers => {layers[0][9] = 0x06;}));
+        }
+    }});
+    const result = await coordinator.flush();
+    assert.equal(polls, 3);
+    assert.equal(result.saved, true);
+    assert.equal(keyboard.working, null);
+    assert.equal(validateSnapshot({...document(), profile: keyboard.saved.toString("base64")}).layers[0][9], 0x06);
+});

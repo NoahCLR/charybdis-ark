@@ -60,8 +60,20 @@ export interface DraftView {
     reason: DraftBlock;
     canUndo: boolean; canRedo: boolean; undoLabel: string | null; redoLabel: string | null; historyLength: number; reviewed: boolean;
     changes: ReviewChange[]; checks: Check[]; steps?: HistoryStep[];
-    /** Live + review: the keyboard runs unsaved edits; both halves hold the last one; the other half refused it (apart until Revert). Null for an Apply draft. */
-    live: {unsaved: boolean; converged: boolean; apart: boolean; mode: number} | null;
+    /** Live modes: the keyboard runs unsaved edits; both halves hold the last one; the other half refused it (apart until Revert); what it says of its own saving. Null for an Apply draft. */
+    live: {unsaved: boolean; converged: boolean; apart: boolean; mode: number; keyboard: LiveKeyboardView | null} | null;
+}
+/** What a live keyboard says of its own saving and its halves (firmware D-F32). */
+export interface LiveKeyboardView {
+    adjustmentPending: boolean;
+    saving: boolean; autoSaving: boolean;
+    /** Nothing unsaved, and the keyboard saved it by itself. */
+    savedByKeyboard: boolean;
+    /** The last save of these edits failed; they are still unsaved. */
+    saveFailed: boolean;
+    /** A save waits for a quiet keyboard (no key held) on either half. */
+    storagePaused: boolean;
+    quietMs: number;
 }
 export interface LedGroup {name: string; id: number; ledIndices: number[]; expression: string; usageCount: number; usages: {target: string; owner: string}[]}
 export interface LedRow {index: number; owner: string; color: Colour; ledGroup: string; ledGroupKind: string; ledIndices: number[]}
@@ -134,7 +146,8 @@ export interface PublishedModel {
     host: HostPanel;
     load: LoadView;
     /** A renamed keyboard that disconnected to take its new name, which the panel waits to see again. */
-    reconnecting: {name: string} | null;
+    /** Waiting for the keyboard to come back: renamed by a save, or `lost`. */
+    reconnecting: {name: string; lost: boolean} | null;
     /** What the connected firmware reports about itself; null with no keyboard read. */
     firmware: import('./model.js').FirmwareView | null;
     /** How edits reach this keyboard (stored on it): 0 Apply, 1 Live, 2 Live + review; the modes Ark offers. Null without a keyboard. */

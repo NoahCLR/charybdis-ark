@@ -978,7 +978,19 @@ keyboard's name:
 | Mode | An edit… | Made permanent by | Unplugging the keyboard with edits not made permanent |
 | --- | --- | --- | --- |
 | **Live + review** (a keyboard never set is in it) | takes effect on both halves at once | review, then **Save** | puts back the saved profile: the edits are gone |
+| **Live** (like VIA) | takes effect on both halves at once | the keyboard itself, after 3 seconds with no edit and no key held | loses every edit since the last successful save |
 | **Apply** | waits in Ark's draft; the keyboard is unchanged | review, then **Apply** | loses nothing on the keyboard; the draft lives in Ark until you close it |
+
+Closing Ark changes none of this: in Live + review the keyboard keeps running
+your unsaved edits until a replug (the web page asks before you leave it with
+some); in Live it saves them by itself whether Ark is open or not, so the page
+does not ask, unless an edit is still on its way to the keyboard.
+
+A DPI or lighting key may say **Keyboard adjustment pending** while a held
+key or another operation keeps it from reaching both halves. Release held
+keys; Ark reads the change once it takes effect. Apply waits for a pending
+adjustment before starting its upload; if the keyboard changed since your
+review, review it again.
 
 In **Live + review** the keyboard runs your edits as you make them, from every
 screen: keys, behaviours, combos, lighting, pointing, settings and macros. An
@@ -1005,23 +1017,45 @@ meanwhile, Ark reads that saved profile again and starts its history there. Read
 it stays plugged in (also after reconnecting) shows its unsaved changes and
 keeps undo; after a replug they are gone, and Ark says so.
 
-A key that adjusts DPI or lighting changes the keyboard only until a replug,
-and any settings edit, Revert, Save or Apply puts the stored values back at
-once: Ark shows the stored values, not the adjusted ones.
+In **Live** edits reach the keyboard exactly as in Live + review, with the
+same trap question, undo and redo, but there is no Save: the keyboard writes
+what it runs to flash by itself after a quiet interval of 3 seconds with no
+edit and no key held. Holding a key postpones the save. The bar says **Not saved yet** until then,
+**Saving on the keyboard** while it writes (a key held makes it wait), and the
+rail says **Saved by the keyboard** once the keyboard reports it saved them,
+while it is connected; Ark only reads that, it starts no timer of its own. Undo still sends an edit
+back, and the keyboard saves that too. Unplugging loses every edit since the
+last successful save, however long ago it was. Replugged, Ark reads what the
+keyboard kept and says whether your edits were saved before it restarted.
+A failed automatic save leaves that revision unsaved; the bar says so and
+offers **Save again** (after a recovery copy of what is saved) or **Revert**.
 
-Switching modes asks first when there is work in progress: with unsaved
-changes on the keyboard, either way, it asks you to **Save** or **Revert**
-them, since the keyboard changes mode only with nothing unsaved; going to
-Live + review with an Apply draft asks whether to **Send live** (the draft runs
-on the keyboard, unsaved) or **Discard draft**. The question lists the traps
-and warnings that Save or Send would confirm. If the keyboard refuses the
-draft, Ark tries to return to Apply and keeps it even if that return is
-refused. Return the keyboard to Apply and read it again before continuing. **Cancel** changes nothing. If the
-halves stored different modes, **Settle** beside the switch stores the shown
-one on both. If the keyboard has not managed to store a new mode yet, a mark
-beside the switch says so: unplugging it then may lose the mode. A keyboard set
-to **Live**, the mode where the keyboard saves by itself, shows it; this
-version of Ark edits it as Live + review.
+Keys on the keyboard that adjust a setting, such as DPI up or down and the
+lighting keys, edit what it runs too. Ark notices within a second (in Apply,
+once the keyboard has saved the change), reads the keyboard again and shows
+the new value; it is not an error. With an Apply draft open, the bar then says
+the keyboard changed and the review compares your draft with it again. In Live
+and in Apply the keyboard saves such a change by itself after the same quiet
+moment; in Live + review it waits in the review like any other unsaved change.
+An edit you make just as a key changed the keyboard is not sent: Ark says so,
+reads the keyboard and you make it again.
+
+Switching modes asks first when there is work in progress that the switch
+would otherwise lose, since the keyboard changes mode only with nothing
+unsaved. With unsaved changes in Live + review, either way, it asks you to
+**Save** or **Revert** them; going from Apply to Live or Live + review with a
+draft asks whether to **Send live** (the draft runs on the keyboard) or
+**Discard draft**. The question lists the traps and warnings that Save or Send
+would confirm. If the keyboard refuses the draft, Ark tries to return to Apply and keeps
+it even if that return is refused. Return the keyboard to Apply and read it
+again before continuing. **Cancel** changes nothing. Leaving Live asks nothing:
+Ark waits for a running automatic save, then keeps a recovery copy of the
+saved profile before asking the keyboard to save anything left, then switches.
+If recovery or saving fails (for example its halves are apart), the mode stays as
+it was and Ark says why. If the halves stored different modes, **Settle**
+beside the switch stores the shown one on both. If the keyboard has not
+managed to store a new mode yet, a mark beside the switch says so: unplugging
+it then may bring back the mode it had before.
 
 Some keys on the keyboard switch a feature off for now: the combos key turns
 combos off, beside the **Enabled** switch you stored. Settings marks the switch
@@ -1032,7 +1066,8 @@ and the key or a replug turns it back on.
 
 Every edit is kept in a draft. In Apply it reaches the keyboard only through
 review and apply; in Live + review it reaches the keyboard at once and review
-and Save keep it ([above](#how-edits-reach-the-keyboard)). Complete edits stage into the draft as they are made;
+and Save keep it; in Live it reaches the keyboard at once and the keyboard
+keeps it ([above](#how-edits-reach-the-keyboard)). Complete edits stage into the draft as they are made;
 incomplete builders such as a new combo keep their local form until it is
 valid. Review lists each changed thing once, under the area it is
 edited in, with the fields that changed, can open it where it is edited, and
@@ -1176,7 +1211,18 @@ What to expect while it applies:
   the restart for as long as they need; the 10-second return timeout starts
   only when the keyboard disconnects. If it does not return in that time,
   Ark says so and you read it again. The notice keeps the recovery-copy
-  location even if reconnecting fails.
+  location even if reconnecting fails. In Live and Live + review the keyboard
+  runs your edits, so renaming it there (or undoing or reverting a rename)
+  restarts it the same way, without a save, and Ark follows it back.
+- In the live modes Ark looks at the keyboard about once a second. A look the
+  keyboard does not answer in time is skipped, not a disconnect; in Chrome the
+  looks pause while a dropdown is open or the tab is hidden.
+- If the keyboard stops answering while Ark is open (or, in VS Code, drops off
+  USB), Ark waits up to 10 seconds for the same keyboard, connects it again
+  and reads it, and says briefly what happened. In Chrome a keyboard that is
+  unplugged and plugged back in is connected again as before. It does this once in 30 seconds; if the
+  keyboard fails again sooner, Ark leaves it disconnected and shows why, and
+  you choose it again.
 
 Drafts live in the editor window (in Chrome, the tab); closing it loses
 unapplied changes. In VS Code one Ark panel holds the keyboard in a window:
@@ -1246,8 +1292,8 @@ its row saying how many are unavailable. Hover a row for what it counts. The
 profile bar turns orange from 90%, when the next edit may not fit. The figures
 are your draft's while it has changes, and
 the keyboard's otherwise; they follow every edit, undo and discard. Macro steps
-are stored apart from the profile, so the card shows them as a second bar,
-counted slot by slot on Macros.
+are part of the profile within a limit of their own, so the card shows that
+limit as a second bar, counted slot by slot on Macros.
 
 ### Firmware versions
 

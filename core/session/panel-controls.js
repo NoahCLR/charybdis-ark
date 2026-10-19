@@ -28,6 +28,7 @@ const {closeEditors, whileApplying} = require("./panel-session-state");
 const {IDENTITY, compose} = require("../model/layer-order");
 const {RECONNECT_WORDS, expectReconnect, renamedTo} = require("./keyboard-reconnect");
 const {LIVE_ACTIONS, CHANGED_ELSEWHERE, proposeLive, setEditMode} = require("./live-edits");
+const {EDIT_MODE} = require("../protocol/profile-edit-v1");
 
 // Ark reads only current firmware; the compatibility diagnostics say what
 // this keyboard's firmware lacks.
@@ -136,9 +137,14 @@ async function readKeyboard(session, selectedDeviceId, host = {}) {
         session.notice = `Read the layout and ${description}.` + (failures ? ` ${failures} domain(s) could not be decoded; see diagnostics.` : "");
     }
     if (macroFailure) session.notice += macroFailure;
-    if (session.draft?.restartedWithUnsaved) {
-        session.notice += " The keyboard restarted since Ark last read it, so its unsaved edits are gone: it runs its saved profile again.";
-        session.draft.restartedWithUnsaved = false;
+    // A live keyboard that restarted (a replug, a lost connection) since Ark
+    // knew of unsaved edits: in Live it may have saved them first.
+    const restarted = session.draft?.restartedWithUnsaved;
+    if (restarted && session.draft) {
+        session.notice += restarted.kept ? " The keyboard restarted since Ark last read it and kept your edits: it saved them first."
+            : restarted.mode === EDIT_MODE.LIVE ? " The keyboard restarted before it saved your last edits, so those are gone: it runs what it saved."
+            : " The keyboard restarted since Ark last read it, so its unsaved edits are gone: it runs its saved profile again.";
+        session.draft.restartedWithUnsaved = undefined;
     }
     if (session.draft?.changedElsewhere) {
         session.notice += ` ${CHANGED_ELSEWHERE}`;

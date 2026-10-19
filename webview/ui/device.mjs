@@ -112,9 +112,9 @@ function usageCard(usage) {
                     <td class="bar"><div class="meter"><i style="width:${count.share * 100}%"></i>${count.unavailable
                         ? `<span class="out" style="width:${count.unavailableShare * 100}%"></span>` : ""}</div></td>
                     <td class="note">${esc(count.note)}</td></tr>`).join("")}</tbody></table>` : ""}
-            ${usage.macros ? `<div><div class="sect-h"><h4>Macro memory (separate)</h4>
+            ${usage.macros ? `<div><div class="sect-h"><h4>Macro memory</h4>
                 <span class="right note">${bytes(usage.macros.used)} of ${bytes(usage.macros.capacity)} bytes used</span></div>
                 <div class="meter"><i style="width:${usage.macros.share * 100}%"></i></div>
-                <p class="note meter-note">Macro steps are stored apart from the profile and counted slot by slot on Macros. Macro names count in the profile above.</p></div>` : ""}
+                <p class="note meter-note">Macro steps are part of the profile above, within their own limit, and counted slot by slot on Macros.</p></div>` : ""}
         </div></div>`;
 }

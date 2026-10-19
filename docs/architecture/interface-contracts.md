@@ -492,8 +492,11 @@ item is `keyboardName` in Settings, with place `{kind: "settings", section:
 "keyboard"}`, so Show opens the card and the draft mark is the section's.
 
 While a renamed keyboard is restarting (D-L62) the model carries
-`reconnecting: {name}` and a loading `load` whose progress names the wait; the
+`reconnecting: {name, lost: false}` and a loading `load` whose progress names the wait; the
 rail shows that name with a pulsing dot instead of "No keyboard connected".
+A keyboard lost unexpectedly is waited for the same way, with `lost: true`
+and its own words. Without a connected keyboard the draft's `live.keyboard`
+is null and the rail shows no live save state.
 
 The safe departure may wait for held keys or macros without a timeout. The
 10-second return wait starts when the connection drops. Reconnection requires

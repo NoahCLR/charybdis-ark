@@ -96,7 +96,7 @@ new edit BUSY while one is received, out-of-order and overlapping splices, an
 edit too large to stage, a damaged stream's commit CRC, a stale identity) and
 decodes every reply with Ark's decoders: the SET reply, edit status pages 0–2,
 the active profile, the mode and runtime pages, with each status flag bit
-0–12 set at least once. Both normal and sanitizer builds run. It establishes
+0–13 set at least once. Both normal and sanitizer builds run. It establishes
 wire and splice agreement on one half, not the split link, Save's flash work
 or hardware timing.
 

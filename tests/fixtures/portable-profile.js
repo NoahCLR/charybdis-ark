@@ -10,7 +10,8 @@
 // changes nothing here.
 const fs = require("node:fs");
 const path = require("node:path");
-const {createSnapshot, materializeProfile} = require("../../core/model/portable-profile");
+const {createSnapshot, materializeProfile, comboTableOf} = require("../../core/model/portable-profile");
+const {encodeComboDomain} = require("../../core/schema/combo-domain-v1");
 const {decodeProfileBlob, encodeProfileBlob} = require("../../core/schema/profile-blob-v1");
 const {encodeKeymapDomain} = require("../../core/schema/keymap-domain-v1");
 const {encodeMacroDomain} = require("../../core/schema/macro-domain-v1");
@@ -47,10 +48,13 @@ const emptyLayers = () => Array.from({length: 16}, () => Array(60).fill(0));
 /** @param {import("./types.js").CompiledOptions} [options] */
 function compiled({combos = [], layers = emptyLayers(), policy = settings()} = {}) {
     const fixture = decodeProfileBlob(profileBytes());
+    // The keyboard stores the combos it runs: the table goes into the combos
+    // domain, and is what the fake reports running.
+    const table = {version: 3, defaultTermMs: 50, holdTermMs: 200, rows: combos};
     const bytes = encodeProfileBlob({domains: fixture.domains.map(domain =>
         domain.id === 0x60 ? {...domain, payload: encodeKeymapDomain(layers)}
-            : domain.id === 0x70 ? {...domain, payload: encodeMacroDomain(Array.from({length: 128}, () => Buffer.alloc(0)))} : domain)});
-    const table = {version: 3, defaultTermMs: 50, holdTermMs: 200, rows: combos};
+            : domain.id === 0x70 ? {...domain, payload: encodeMacroDomain(Array.from({length: 128}, () => Buffer.alloc(0)))}
+                : domain.id === 0x30 ? {...domain, payload: encodeComboDomain(comboTableOf(table))} : domain)});
     const profile = materializeProfile(bytes, bytes, table, encodeSettings(policy));
     return createSnapshot({profile, actionAbiDigest: ACTION_ABI});
 }

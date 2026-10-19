@@ -12,6 +12,10 @@ const {
 } = require("./device-adapter");
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 1000;
+// A request that timed out softly keeps the connection; its reply, if it
+// comes, is the next one the keyboard sends (it answers in order), and is set
+// aside for this long rather than taken as another request's.
+const LATE_REPLY_MS = 10000;
 
 class DeviceRequestCoordinator {
     /** @param {import("./types.js").DeviceAdapter} adapter @param {import("./types.js").CoordinatorOptions} [options] */
@@ -115,6 +119,8 @@ class CoordinatedDeviceConnection {
         this.disposeDisconnectListener = undefined;
         /** @type {Promise<unknown> | undefined} */
         this.closePromise = undefined;
+        /** @type {{matchResponse: (response: Buffer, request: Buffer) => boolean, report: Buffer, until: number}[]} */
+        this.late = [];
     }
 
     start() {
@@ -194,6 +200,7 @@ class CoordinatedDeviceConnection {
                 resolve,
                 settled: false,
                 signal,
+                softTimeout: options.softTimeout === true,
                 status: "queued",
                 timeoutId: undefined,
                 timeoutMs,
@@ -214,6 +221,13 @@ class CoordinatedDeviceConnection {
         }
         this.disconnectListeners.add(listener);
         return () => this.disconnectListeners.delete(listener);
+    }
+
+    // Ends the connection as a failure, with `reason` as what its disconnect
+    // listeners hear: a keyboard that stopped answering background reads.
+    /** @param {unknown} reason */
+    abandon(reason) {
+        return this.terminate(reason, {activeError: reason, closeDevice: true, queuedError: reason});
     }
 
     async disconnect() {
@@ -275,6 +289,19 @@ class CoordinatedDeviceConnection {
                 closeDevice: true,
                 queuedError: disconnectedAfter(this.deviceId, invalidReport),
             });
+            return;
+        }
+
+        // The keyboard answers in order, so a reply to a request that timed
+        // out softly comes before the active request's own.
+        const now = Date.now();
+        this.late = this.late.filter((entry) => entry.until > now);
+        const late = this.late.findIndex((entry) => {
+            try {return Boolean(entry.matchResponse(normalizedReport, Buffer.from(entry.report)));} catch {return false;}
+        });
+        if (late !== -1) {
+            this.late.splice(late, 1);
+            this.reportUnexpected(normalizedReport, "it answers a request that timed out");
             return;
         }
 
@@ -345,8 +372,18 @@ class CoordinatedDeviceConnection {
         const error = liveLinkError(
             LIVE_LINK_ERROR_CODES.TIMEOUT,
             `Device ${this.deviceId} did not respond within ${operation.timeoutMs} ms.`,
-            {deviceId: this.deviceId}
+            // Which request went unanswered, for the diagnostics.
+            {deviceId: this.deviceId, timeoutMs: operation.timeoutMs, request: operation.report.subarray(0, 5).toString("hex")}
         );
+        // A background read the caller can miss: only it fails, and its late
+        // reply is set aside. The keyboard is still the one connected.
+        if (operation.softTimeout) {
+            this.late.push({matchResponse: operation.matchResponse, report: operation.report, until: Date.now() + LATE_REPLY_MS});
+            this.active = undefined;
+            this.settle(operation, "reject", Object.assign(error, {soft: true}));
+            queueMicrotask(() => this.pump());
+            return;
+        }
         void this.terminate(error, {
             activeError: error,
             closeDevice: true,
@@ -513,6 +550,7 @@ function disconnectedAfter(deviceId, cause) {
 
 module.exports = {
     DEFAULT_REQUEST_TIMEOUT_MS,
+    LATE_REPLY_MS,
     CoordinatedDeviceConnection,
     DeviceRequestCoordinator,
     defaultResponseMatcher,

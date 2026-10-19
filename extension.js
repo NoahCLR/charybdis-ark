@@ -93,6 +93,8 @@ function openPanel(context) {
     let disposed = false;
 
     const loop = openPanelLoop(vscodeHost(panel, context.globalStorageUri, () => disposed));
+    // A live keyboard's own saves and key adjustments show up between edits.
+    loop.watch();
     /** @type {Set<Promise<unknown>>} */
     const running = new Set();
     panel.webview.html = getHtml(panel.webview, context.extensionUri);

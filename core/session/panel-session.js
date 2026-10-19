@@ -30,7 +30,7 @@ const {demoDiagnostics, demoHeader, demoModel} = require("./demo-session");
 const {assertBound, beginRead, boundDraft, closeEditors, draftBinding, replaceDraft, setDraft} = require("./panel-session-state");
 
 const {controlsOn, panelControl} = require("./panel-control-registry");
-const {RECONNECT_WORDS} = require("./keyboard-reconnect");
+const {LOST_WORDS, RECONNECT_WORDS} = require("./keyboard-reconnect");
 // Retained exports for hosts that inspect the routes; never hand-maintained.
 const DRAFT_CONTROLS = controlsOn("draft");
 const PORTABLE_MESSAGES = controlsOn("portable");
@@ -73,6 +73,7 @@ function hostModel(host) {
 // one already open against what the keyboard now holds.
 /** @param {ModelSession} session @param {State} state @param {import("../model/types.js").ProfileSnapshot | null | undefined} [portable] */
 function observePortable(session, state, portable = session.service.portable) {
+    if (session.draft && state.connected && portable !== session.observedPortable) session.draft.follow(portable, state.selectedDeviceId);
     if (session.draft && !session.draft.dirty && state.connected && (state.selectedDeviceId !== session.draft.deviceId || !canEdit(state.capabilities))) {
         setDraft(session, undefined);
     }
@@ -137,12 +138,14 @@ function buildPanelModel(session, state) {
         if (draft.matching) {
             model.profileIdentity = session.draft.identity();
         }
-        if (draft.live && draft.matching && draft.live.unsaved) model.device.subtitle = "The keyboard runs these edits now · Save makes them permanent; unplugging it puts back what is saved";
+        if (draft.live && draft.matching && draft.live.unsaved) model.device.subtitle = draft.live.mode === 1
+            ? "The keyboard runs these edits now · it saves them by itself after 3 seconds without typing"
+            : "The keyboard runs these edits now · Save makes them permanent; unplugging it puts back what is saved";
         else if (draft.dirty && draft.matching && !draft.live) model.device.subtitle = "Showing your local draft · the keyboard still runs the last applied profile";
     }
     // How edits reach this keyboard, and an edit waiting on its trap check.
     const mode = state.editMode;
-    const editMode = mode && state.connected && !session.demo ? {mode: mode.mode, conflict: mode.conflict, offered: [0, 2], notStored: Boolean(mode.notStored)} : null;
+    const editMode = mode && state.connected && !session.demo ? {mode: mode.mode, conflict: mode.conflict, offered: [0, 1, 2], notStored: Boolean(mode.notStored)} : null;
     const proposal = session.liveProposal && session.draft && session.liveProposal.draftId === session.draft.id && session.liveProposal.revision === session.draft.revision
         ? {id: session.liveProposal.id, label: session.liveProposal.target.label, checks: session.liveProposal.checks} : null;
     // Toggles a key turned off on top of a stored "on" (plan answer 10): shown,
@@ -184,7 +187,7 @@ function buildPanelModel(session, state) {
     const host = hostModel(session.host);
     // A renamed keyboard that has gone to take its new name is coming back:
     // the panel waits for it as for a read, rather than asking to connect one.
-    const reconnecting = session.reconnect && !state.connected ? {name: session.reconnect.name} : null;
+    const reconnecting = session.reconnect && !state.connected ? {name: session.reconnect.name, lost: session.reconnect.lost !== undefined} : null;
     /** @type {import("../../contracts/model.js").LoadView} */
     const load = {
         state: session.readBusy || reconnecting ? "loading" : readReady ? "ready" : "unavailable",
@@ -192,7 +195,7 @@ function buildPanelModel(session, state) {
         operationId: state.operationId,
         operationBusy: Boolean(state.busy),
         connectionToken: state.connectionToken,
-        progress: reconnecting && !session.readBusy ? RECONNECT_WORDS.waiting : state.portableProgress || state.layout?.progress || state.committed?.progress || null,
+        progress: reconnecting && !session.readBusy ? (reconnecting.lost ? LOST_WORDS.waiting : RECONNECT_WORDS.waiting) : state.portableProgress || state.layout?.progress || state.committed?.progress || null,
     };
     // What the firmware says about itself and its ceilings (Keyboard, Settings).
     const firmware = firmwareView(state.capabilities);

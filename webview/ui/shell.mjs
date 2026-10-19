@@ -15,7 +15,7 @@ import {boardOutlineMarkup} from "../view/geometry.mjs";
 import {demoOf} from "../view/demo.mjs";
 import {openHistory} from "./history.mjs";
 import {bindEditModeSwitch, editModeSwitch} from "./edit-mode.mjs";
-import {editsAreLive} from "../view/edit-mode.mjs";
+import {LIVE, editsAreLive, liveSaveState} from "../view/edit-mode.mjs";
 
 // The review opens at once; the host marks it reviewed when it answers.
 function openReview() {
@@ -52,7 +52,7 @@ export function rail() {
     const halves = halvesWords(model, health.halves);
     const keyboardDot = demo.active
         ? {tone: "demo", tip: "Nothing is connected. The demo runs Ark's own draft over a demo setup; only Apply needs a keyboard."}
-        : reconnecting ? {tone: "", tip: "Reconnecting so the keyboard takes its new name. It comes back by itself in a moment."}
+        : reconnecting ? {tone: "", tip: reconnecting.lost ? "Ark lost the keyboard and is connecting it again." : "Reconnecting so the keyboard takes its new name. It comes back by itself in a moment."}
         : !device.connected ? {tone: "err", tip: "No keyboard is connected."}
         : {tone: health.halves === "agree" ? "ok" : health.halves === "unread" ? "" : "warn", tip: `${busyWords}${halves.label}. ${halves.detail}`};
 
@@ -76,7 +76,7 @@ export function rail() {
                 ${device.connected && !demo.active ? `<button class="btn tiny ghost" data-act="forget-keyboard" ${health.busy ? "disabled" : ""}
                     data-tip="Let go of this keyboard. The page will not open it again until you choose it.">Disconnect</button>` : ""}</div>` : ""}
             <div class="rail-status">
-                ${draft?.live ? liveStatus(draft) : !draft?.dirty ? "" : draft.matching && !draft.stale
+                ${draft?.live ? (device.connected ? liveStatus(draft) : "") : !draft?.dirty ? "" : draft.matching && !draft.stale
                     ? `<button class="stat link" data-act="open-review" data-tip="Edits waiting in this window. The keyboard still runs its saved profile. Open the review to see them."><i class="dot draft"></i> ${draft.changes.length} change${draft.changes.length === 1 ? "" : "s"} in draft</button>`
                     : line("draft", `${draft.changes.length} change${draft.changes.length === 1 ? "" : "s"} in draft`, "Edits waiting in this window. The keyboard still runs its saved profile.")}
                 ${demo.active ? "" : health.restartNeeded
@@ -119,15 +119,23 @@ export function rail() {
     return node;
 }
 
-// Live + review: what the keyboard runs that is not saved, and whether both
-// halves hold the last edit.
+// The live modes: what the keyboard runs that is not saved, whether both
+// halves hold the last edit, and in Live what the keyboard says of its own
+// saving ("saved by the keyboard").
 /** @param {NonNullable<import("../../contracts/panel.js").PublishedModel["draft"]>} draft */
 function liveStatus(draft) {
     const live = /** @type {NonNullable<typeof draft.live>} */ (draft.live);
     const count = draft.changes.length;
     const lines = [];
-    if (live.unsaved || draft.dirty) {
-        const words = `${count} unsaved change${count === 1 ? "" : "s"} on the keyboard`;
+    // The halves apart have their own line below.
+    const saving = liveSaveState(draft);
+    if (saving && saving.kind !== "refused") {
+        const words = saving.kind === "pending" ? `${count ? `${count} change${count === 1 ? "" : "s"}` : "Edits"} not saved yet` : saving.title;
+        lines.push(`<div class="stat live-save ${saving.kind}" data-tip="${esc(saving.detail)}"><i class="dot ${saving.tone}${saving.kind === "saving" ? " busy" : ""}"></i> ${esc(words)}</div>`);
+    } else if (live.unsaved || draft.dirty) {
+        // Every edit undone: the keyboard still runs its working copy, the same
+        // as what is saved, until Save or Revert (the bar says so too).
+        const words = count ? `${count} unsaved change${count === 1 ? "" : "s"} on the keyboard` : "Unsaved edits match what is saved";
         lines.push(draft.matching && !draft.stale
             ? `<button class="stat link" data-act="open-review" data-tip="The keyboard runs these edits now. Review and save them to keep them; Revert or unplugging the keyboard puts back what is saved."><i class="dot draft"></i> ${esc(words)}</button>`
             : `<div class="stat" data-tip="The keyboard runs these edits now; nothing is saved yet."><i class="dot draft"></i> ${esc(words)}</div>`);
@@ -308,12 +316,42 @@ export function commitBar() {
     return node;
 }
 
-// Live + review: the keyboard already runs the edits. Review leads to Save;
-// Revert puts back what is saved (undo sends the edits again).
+// The live modes: the keyboard already runs the edits. In Live + review the
+// review leads to Save; in Live the keyboard saves by itself, so the bar only
+// says where that stands. Revert puts back what is saved (undo sends the
+// edits again). When the keyboard's own save failed, the bar says so with
+// Save again; when the halves are apart, Revert is the only way on.
 /** @param {NonNullable<import("../../contracts/panel.js").PublishedModel["draft"]>} draft */
 function liveCommitBar(draft) {
     const live = /** @type {NonNullable<typeof draft.live>} */ (draft.live);
+    const saving = liveSaveState(draft);
+    if (saving?.kind === "failed") {
+        const node = el(`<div class="commit live ${saving.kind}">
+            <span class="n"><i class="dot ${saving.tone}"></i> <strong>${esc(saving.title)}</strong>
+            <span class="muted">${esc(saving.detail)}</span></span>
+            <span class="sep"></span>
+            <button class="btn ghost tiny" data-act="revert"
+                data-tip="Put back the profile the keyboard has saved, on both halves. Nothing is written; Undo (⌘Z) sends the edits again.">Revert</button>
+            <button class="btn primary" data-act="save-again"
+                data-tip="Ask the keyboard to save these edits again, after a recovery copy of what is saved now.">Save again</button></div>`);
+        /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="revert"]')).addEventListener("click", () => post(controls.revertDraft()));
+        /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="save-again"]')).addEventListener("click", () => post(controls.saveDraft()));
+        return node;
+    }
     if (!live.unsaved && !draft.dirty) return null;
+    if (live.mode === LIVE && !live.apart) {
+        const count = draft.changes.length;
+        const node = el(`<div class="commit live auto">
+            <span class="n"><i class="dot draft${saving?.kind === "saving" ? " busy" : ""}"></i> <strong>${esc(saving?.title || "Not saved yet")}</strong>
+            <span class="muted">${esc(saving?.detail || "")}${live.converged ? "" : " The slave half is catching up."}</span></span>
+            <span class="sep"></span>
+            <button class="btn ghost tiny" data-act="revert"
+                data-tip="Put back the profile the keyboard has saved. Nothing is written; Undo (⌘Z) sends the edits again.">Revert</button>
+            ${count ? `<button class="btn ghost tiny" data-act="review" data-tip="See what is not saved yet, against what is saved.">${count} change${count === 1 ? "" : "s"}</button>` : ""}</div>`);
+        /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="review"]'))?.addEventListener("click", openReview);
+        /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="revert"]')).addEventListener("click", () => post(controls.revertDraft()));
+        return node;
+    }
     const count = draft.changes.length;
     // Edits undone back to what is saved still leave the keyboard on its
     // working copy: Revert is then the way back, with nothing to review.

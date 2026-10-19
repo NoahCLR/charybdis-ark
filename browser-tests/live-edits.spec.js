@@ -220,3 +220,86 @@ test("custom keys: a name posts", async ({page}) => {
     await change(page.locator('[data-f="custom-key:0:name"]'), "Copy 777");
     await expect.poll(() => posted(page).then(rows => JSON.stringify(rows))).toContain("Copy 777");
 });
+
+// Live (the keyboard saves by itself): the switch into it, an edit, and the
+// bar saying what the keyboard has not saved yet, with no Save.
+test("switching into Live from Live + review asks Save or Revert; from Apply with nothing pending it switches at once", async ({page}) => {
+    await openLive(page, "keys");
+    const mode = page.locator('[data-f="rail:edit-mode"]');
+    await expect(mode.locator("option")).toHaveText(["Apply", "Live", "Live + review"]);
+    await mode.selectOption("1");
+    const ask = page.locator(".sheet.edit-mode-ask");
+    await expect(ask).toContainText("In Live the keyboard saves edits by itself");
+    await ask.locator('[data-pending="save"]').click();
+    await expectPost(page, {type: "setEditMode", mode: 1, pending: "save"});
+    await page.goto("/preview/index.html");
+    await page.evaluate(() => {window.__posted.length = 0;});
+    await page.locator('[data-f="rail:edit-mode"]').selectOption("1");
+    await expectPost(page, {type: "setEditMode", mode: 1});
+});
+
+test("in Live an edit posts as in Live + review, the bar has no Save, and leaving Live asks nothing", async ({page}) => {
+    await page.goto("/preview/index.html?host=live-auto");
+    await page.locator('[data-screen="mouse"]').click();
+    await page.evaluate(() => {window.__posted.length = 0;});
+    const mode = page.locator('[data-f="rail:edit-mode"]');
+    await expect(mode).toHaveValue("1");
+    const bar = page.locator(".commit.live.auto");
+    await expect(bar).toContainText("Not saved yet");
+    await expect(bar).toContainText("after 3 seconds without typing");
+    await expect(bar.locator('[data-act="save-again"]')).toHaveCount(0);
+    await expect(page.locator(".rail-status")).toContainText("1 change not saved yet");
+    const field = page.locator('select[data-macro="normalDpi"]');
+    const other = await field.evaluate((select) => [...select.options].find((option) => !option.selected)?.value);
+    await field.selectOption(/** @type {string} */ (other));
+    await expect.poll(async () => JSON.stringify(await posted(page))).toContain(`"${other}"`);
+    await bar.locator('[data-act="review"]').click();
+    await expect(page.locator(".sheet")).toContainText("saves them by itself");
+    await expect(page.locator('.sheet [data-act="apply"]')).toHaveCount(0);
+    await page.locator('.sheet [data-act="close"]').click();
+    await clearPosts(page);
+    await mode.selectOption("2");
+    await expect(page.locator(".sheet.edit-mode-ask")).toHaveCount(0);
+    await expectPost(page, {type: "setEditMode", mode: 2});
+});
+
+test("in Live the keyboard's own save, a failed one and halves apart each say what to do", async ({page}) => {
+    await page.goto("/preview/index.html?host=live-auto");
+    /** @param {object} keyboard @param {boolean} [unsaved] */
+    const set = (keyboard, unsaved = true) => page.evaluate(async ([keyboard, unsaved]) => {
+        const store = await import("/webview/store.mjs");
+        const model = structuredClone(store.getModel());
+        model.draft.live = {...model.draft.live, unsaved, apart: false, keyboard: {...model.draft.live.keyboard, ...keyboard}};
+        if (!unsaved) {model.draft.dirty = false; model.draft.changes = [];}
+        store.setModel(model); store.render();
+        window.__posted.length = 0;
+    }, /** @type {const} */ ([keyboard, unsaved]));
+    await set({saveFailed: true});
+    const bar = page.locator(".commit.live.failed");
+    await expect(bar).toContainText("The keyboard could not save");
+    await bar.locator('[data-act="save-again"]').click();
+    await expectPost(page, {type: "saveProfileDraft"});
+    /** @param {object} change */
+    const change = (change) => page.evaluate(async (change) => {
+        const store = await import("/webview/store.mjs");
+        const model = structuredClone(store.getModel());
+        for (const [path, value] of Object.entries(change)) {
+            const [first, second] = path.split(".");
+            model[first] = second ? {...model[first], [second]: value} : value;
+        }
+        store.setModel(model); store.render();
+        window.__posted.length = 0;
+    }, change);
+    await set({saveFailed: false});
+    await change({"draft.live": {...(await page.evaluate(async () => (await import("/webview/store.mjs")).getModel().draft.live)), apart: true}});
+    await expect(page.locator(".commit.live")).toContainText("the halves are apart");
+    await expect(page.locator(".rail-status")).toContainText("Halves apart");
+    await expect(page.locator('.commit.live [data-act="save-again"]')).toHaveCount(0);
+    await page.locator('.commit.live [data-act="revert"]').click();
+    await expectPost(page, {type: "revertProfileDraft"});
+    await change({"editMode.notStored": true});
+    await set({savedByKeyboard: true}, false);
+    await expect(page.locator(".commit.live")).toHaveCount(0);
+    await expect(page.locator(".rail-status")).toContainText("Saved by the keyboard");
+    await expect(page.locator(".rail-mode .dot.warn")).toHaveCount(1);
+});

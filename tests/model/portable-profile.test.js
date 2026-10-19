@@ -275,3 +275,26 @@ test("a complete profile above 64 KiB survives capture, portable JSON and candid
     assert.doesNotThrow(() => validateSnapshot(doc, caps));
     assert.throws(() => validateSnapshot(doc, {...caps, maxProfilePayload: bytes.length - 1}), /with its keymap and macros/);
 });
+
+// The combos domain is the profile's like any other, and the profile is its
+// only durable owner (firmware D-F32): a read takes it as the keyboard stores
+// it. Rebuilt from what the keyboard runs, a combo whose input is a custom key
+// or whose output is MO(5) came back as native keycodes: the same keys in
+// other bytes, so an Apply rewrote them and sending such a draft live showed
+// every one as changed (seen on Noah's keyboard on 2026-10-19).
+test("a read takes the combos the keyboard stores, profile actions included, not what it runs re-encoded", () => {
+    const {decodeComboDomain, encodeComboDomain, runningComboRows} = require("../../core/schema/combo-domain-v1");
+    const {semanticActionForExpression} = require("../../core/schema/compiled-profile-v1");
+    const {keycodeAction} = require("../../core/schema/actions");
+    const source = validateSnapshot(document());
+    const blob = decodeProfileBlob(source.candidate);
+    const table = {version: 3, defaultTermMs: 50, holdTermMs: 200, rows: [{inputs: [keycodeAction(0x04), keycodeAction(0x05)], output: semanticActionForExpression("MO(5)", {}),
+        termMs: null, mustHold: false, mustTap: false, ordered: false, enabled: true, useOutputBehavior: true, allowedLayers: 0xffff}]};
+    const stored = encodeComboDomain(table);
+    const active = encodeProfileBlob({schema: blob.schema, domains: blob.domains.map(domain => domain.id === 0x30 ? {...domain, payload: stored} : domain)});
+    const running = {defaultTermMs: 50, holdTermMs: 200, rows: runningComboRows(decodeComboDomain(stored))};
+    const settingsBytes = blob.domains.find(domain => domain.id === 0x40).payload;
+    const read = decodeProfileBlob(materializeProfile(active, source.candidate, running, Buffer.from(settingsBytes)));
+    assert.ok(Buffer.from(read.domains.find(domain => domain.id === 0x30).payload).equals(stored), "the stored bytes, exactly");
+    assert.equal(decodeComboDomain(read.domains.find(domain => domain.id === 0x30).payload).rows[0].output.kind, table.rows[0].output.kind);
+});

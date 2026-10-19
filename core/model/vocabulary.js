@@ -84,13 +84,12 @@ const LIVE_RESULT_WORDS = Object.freeze({
     PUBLICATION_FAILED: "the keyboard could not switch to the result.",
 });
 
-// How edits reach a keyboard (stored on it, firmware D-F32). Ark offers Apply
-// and Live + review; Live (the keyboard saving on its own) is shown when a
-// keyboard reports it, not offered yet.
+// How edits reach a keyboard (stored on it, firmware D-F32), all three
+// offered: what each does and what a replug does to edits not saved yet.
 /** @type {Readonly<Record<number, Readonly<{id: import('../../contracts/model.js').EditModeId, label: string, detail: string}>>>} */
 const EDIT_MODE_WORDS = Object.freeze({
     0: Object.freeze({id: "apply", label: "Apply", detail: "Edits stay in Ark's draft until you review and apply them. The keyboard runs its saved profile until then."}),
-    1: Object.freeze({id: "live", label: "Live", detail: "Edits take effect on the keyboard at once and the keyboard saves them by itself. This version of Ark treats it as Live + review."}),
+    1: Object.freeze({id: "live", label: "Live", detail: "Edits take effect on the keyboard at once. With or without Ark, the keyboard starts saving after 3 seconds with no edit and no key held; holding a key postpones it. Unplugging loses every edit since the last successful save. A failed automatic save leaves that revision unsaved."}),
     2: Object.freeze({id: "liveReview", label: "Live + review", detail: "Edits take effect on the keyboard at once. Nothing is permanent until you review and save; unplugging the keyboard puts back what was saved."}),
 });
 

@@ -74,7 +74,7 @@ export interface EditReply {result: number; resultName: string; phase: number; s
 export interface EditStatusFlags {
     unsaved: boolean; peerRequired: boolean; peerConverged: boolean; peerKnown: boolean; editsBlocked: boolean;
     savedCompiled: boolean; saving: boolean; modeConflict: boolean; waitingSafe: boolean; storagePaused: boolean;
-    peerStoragePaused: boolean; peerRefused: boolean; modeNotStored: boolean;
+    peerStoragePaused: boolean; peerRefused: boolean; modeNotStored: boolean; adjustmentPending: boolean;
 }
 export interface EditProgress extends EditStatusFlags {
     phase: number; flags: number; session: number; revision: number; savedGeneration: number; savedOrigin: number;
@@ -86,7 +86,10 @@ export interface EditStatus extends EditProgress {
     insertedReceived: number;
     refusal: {validatorResult: number; domainId: number; tableId: number; row: number; step: number; field: number; byteOffset: number; detailKind: number; detailCode: number};
     safeBoundaryReasons: number; activeLength: number;
+    autoSave: AutoSaveStatus;
 }
+/** The keyboard's own saves since its USB half booted (edit status page 3). */
+export interface AutoSaveStatus {inProgress: boolean; lastWasAutomatic: boolean; count: number; revision: number; generation: number; quietMs: number}
 export interface EditModeRead {mode: number; counter: number; peerMode: number; peerCounter: number; peerKnown: boolean; conflict: boolean; agreed: boolean}
 export interface RuntimeToggle {master: boolean; override: boolean}
 export interface RuntimeRead {

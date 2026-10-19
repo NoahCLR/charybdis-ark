@@ -258,7 +258,7 @@ function factoryProfile(source) {
         : domain.id === 0x30 ? {...domain, payload: encodeComboDomain(combos)} : domain)});
 }
 for (const compiledOnly of [false, true]) {
-    test(`a capture ${compiledOnly ? "of a keyboard running its defaults" : "of a committed profile"} keeps the live combos and settings beside a seven-domain compiled read`, async () => {
+    test(`a capture ${compiledOnly ? "of a keyboard running its defaults" : "of a committed profile"} keeps the live settings and the stored combos beside a seven-domain compiled read`, async () => {
         const source = backup32(), compiled = factoryProfile(source);
         assert.deepEqual(decodeProfileBlob(compiled).domains.map(domain => domain.id), [16, 32, 48, 64, 80, 96, 112], "the compiled read has every domain");
         const keyboard = fakeKeyboard({document: source, compiled, compiledOnly});
@@ -272,8 +272,12 @@ for (const compiledOnly of [false, true]) {
         const live = validateSnapshot(source);
         assert.deepEqual(decodeSettings(domains[3].payload), live.settings, "the live settings, not the factory ones");
         assert.notEqual(decodeSettings(domains[3].payload).values[0], 1600);
-        assert.ok(domains[2].payload.equals(decodeProfileBlob(live.profile).domains[2].payload), "the live combos, not the authored defaults");
-        assert.equal(captured.fingerprint, fingerprint(source), "the export is the keyboard's effective profile");
+        // Combos are the active profile's stored domain (firmware D-F32: the
+        // running table is projected from it), never the running table
+        // re-encoded: committed, the saved profile's; running defaults, theirs.
+        const active = compiledOnly ? decodeProfileBlob(compiled) : decodeProfileBlob(live.profile);
+        assert.ok(domains[2].payload.equals(active.domains[2].payload), "the active profile's combos, exactly as stored");
+        if (!compiledOnly) assert.equal(captured.fingerprint, fingerprint(source), "the export is the keyboard's effective profile");
     });
 }
 

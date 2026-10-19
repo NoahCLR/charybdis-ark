@@ -41,6 +41,9 @@ export function reviewOverlay() {
     // Live + review compares the keyboard's saved profile with what it runs
     // now; Save makes that permanent (firmware D-F32).
     const live = Boolean(draft.live);
+    // In Live the keyboard saves by itself: the review only shows what is not
+    // saved yet, with Revert, and Save again only once its own save failed.
+    const keyboardSaves = draft.live?.mode === 1;
     const columns = live ? reviewColumns("What changes", "Saved", "Running now")
         : reviewColumns("What changes", demo.active ? "In the demo setup" : "On the keyboard", "In your draft");
     const discardable = draft.changes.every((change) => Number.isInteger(change.group));
@@ -74,7 +77,7 @@ export function reviewOverlay() {
         const change = draft.changes.find((entry) => entry.group === group);
         if (!change) return "";
         return `<button class="ck-source" data-check-source="${group}" type="button">From draft: ${esc(change.groupTitle || change.title)} ↓</button>`;
-    });
+    }, draft.live ? "Save" : "Apply");
     // Ask about active warnings and traps for this revision before writing.
     const confirmChecks = checksToConfirm(draft.checks);
     const confirming = confirmChecks.length && state.confirmChecks === draft.revision;
@@ -89,6 +92,7 @@ export function reviewOverlay() {
             ${checks}
             ${sections}
             <div class="rv-apply-note"><div class="callout warn">${demo.active ? esc(demo.applyNeedsKeyboard)
+                : keyboardSaves ? "The keyboard already runs these changes and saves them by itself after 3 seconds without typing. Revert puts back what is saved."
                 : live ? "The keyboard already runs these changes. Save keeps a recovery copy of what is saved now, then writes them as its saved profile on both halves. Revert, or unplugging the keyboard, puts back what is saved."
                 : "Apply saves a recovery copy, writes the changes to both halves, then switches both to them at once. Until then the keyboard keeps running its saved profile; if anything interrupts Apply, the recovery copy restores it."}</div></div>
         </div>
@@ -100,8 +104,10 @@ export function reviewOverlay() {
                 <button class="btn primary" data-act="apply-anyway" ${canApply ? "" : "disabled"}>${live ? "Save anyway" : "Apply anyway"}</button></span></div>`
         : `<div class="sheet-f"><span class="note">${esc(model?.device?.label || "")} · ${esc(model?.device?.summary || "")}</span>
             <span class="right">${live ? `<button class="btn ghost" data-act="revert" data-tip="${esc("Put back what is saved. Nothing is written; Undo (⌘Z) sends the edits again.")}">Revert</button>` : ""}
-                <button class="btn primary" data-act="apply" ${canApply ? "" : "disabled"}
-                    ${blockers.length ? `data-tip="${esc(`Resolve the blockers in Checks before ${live ? "saving" : "applying"}.`)}"` : confirmChecks.length ? `data-tip="${esc("Warnings and traps will be asked about before anything is written.")}"` : ""}>${live ? "Save on keyboard" : "Apply to keyboard"}</button></span></div>`}
+                ${keyboardSaves ? draft.live?.keyboard?.saveFailed ? `<button class="btn primary" data-act="save-again" ${draft.connected && !draft.stale ? "" : "disabled"}
+                    data-tip="${esc("The keyboard's own save failed. Ask it to save these edits again, after a recovery copy of what is saved now.")}">Save again</button>` : ""
+                : `<button class="btn primary" data-act="apply" ${canApply ? "" : "disabled"}
+                    ${blockers.length ? `data-tip="${esc(`Resolve the blockers in Checks before ${live ? "saving" : "applying"}.`)}"` : confirmChecks.length ? `data-tip="${esc("Warnings and traps will be asked about before anything is written.")}"` : ""}>${live ? "Save on keyboard" : "Apply to keyboard"}</button>`}</span></div>`}
     </div></div>`);
     // Pointing at a group's Discard lights what it takes back, in every area
     // the group reaches.
@@ -146,6 +152,12 @@ export function reviewOverlay() {
             state.overlay = null;
             state.confirmChecks = null;
             post(live ? controls.saveDraft(true) : controls.applyDraft(true));
+            rerender();
+            return;
+        }
+        if (target.closest('[data-act="save-again"]')) {
+            state.overlay = null;
+            post(controls.saveDraft());
             rerender();
             return;
         }

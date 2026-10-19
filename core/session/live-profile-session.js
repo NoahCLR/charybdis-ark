@@ -7,7 +7,7 @@
 // is made against the working copy's own bytes, so they are kept exactly.
 
 const {readProfileStatus} = require("../protocol/profile-wire-v1");
-const {EDIT_PHASE, readActiveProfile, readEditProgress, readEditMode, readRuntime} = require("../protocol/profile-edit-v1");
+const {EDIT_PHASE, EDIT_RESULT, readActiveProfile, readEditProgress, readEditStatus, readEditMode, readRuntime} = require("../protocol/profile-edit-v1");
 const {readDeviceCombos} = require("../protocol/combo-readback-v1");
 const {ProfilePayloadReader} = require("./profile-payload-reader");
 const {createSnapshot, validateSnapshot, materializeStored, fingerprint, summary} = require("../model/portable-profile");
@@ -23,6 +23,23 @@ const CHANGED = "The keyboard changed while it was being read. Read it again.";
 // boundary) makes any read a guess: wait for it this long, then give up and
 // leave the draft to be read again (600 polls 50 ms apart: at least 30 s).
 const SETTLE_POLLS = 600, SETTLE_POLL_MS = 50;
+
+// What the keyboard says about its own saving and its halves, from the edit
+// status (pages 0, 1 and 3), in the words the panel needs. `saveMark` is the
+// save transaction last seen when the working copy last changed: a failed
+// save after it failed these edits (-1: any failure counts, as at a read).
+/** @param {import("../protocol/types.js").EditStatus} status @param {number} [saveMark] @returns {import("./types.js").LiveKeyboardStatus} */
+function liveKeyboardStatus(status, saveMark = -1) {
+    const saving = status.saving || status.save.phase !== 0 || status.autoSave.inProgress;
+    const failed = status.unsaved && !saving && status.save.lastTransactionId !== 0 && status.save.lastTransactionId !== saveMark
+        && status.save.lastResult !== EDIT_RESULT.OK;
+    return {saving, autoSaving: status.autoSave.inProgress,
+        savedByKeyboard: !status.unsaved && status.autoSave.lastWasAutomatic && status.autoSave.count > 0
+            && status.autoSave.revision === status.revision && status.autoSave.generation === status.savedGeneration,
+        saveFailed: failed, saveError: failed ? status.save.lastError : 0, lastSaveTransaction: status.save.lastTransactionId,
+        storagePaused: status.storagePaused, peerStoragePaused: status.peerStoragePaused,
+        adjustmentPending: status.adjustmentPending, peerRefused: status.peerRefused, modeNotStored: status.modeNotStored, quietMs: status.autoSave.quietMs};
+}
 
 /** @param {import("./types.js").DeviceCapabilities} capabilities @param {Buffer} stored @param {Buffer} defaults */
 function snapshotOf(capabilities, stored, defaults) {
@@ -69,7 +86,7 @@ async function captureLive(connection, ids, capabilities, {payloadReader = new P
     onProgress("Reading combos and toggles");
     const combos = await readDeviceCombos(connection, options);
     const runtime = await readRuntime(connection, options).catch(() => null);
-    const after = await readEditProgress(connection, options);
+    const after = await readEditStatus(connection, options);
     if (after.phase !== EDIT_PHASE.IDLE || after.session !== before.session || after.revision !== before.revision || after.savedGeneration !== before.savedGeneration) throw fail("PROFILE_CHANGED", CHANGED);
     const finalStatus = await readProfileStatus(connection, options);
     const current = snapshotOf(capabilities, working.bytes, defaults.bytes);
@@ -77,7 +94,8 @@ async function captureLive(connection, ids, capabilities, {payloadReader = new P
     return {...current, status: finalStatus, saved: stored, runtime, combosReadback: combos,
         live: {mode: mode.mode, modeConflict: mode.conflict, session: after.session, revision: after.revision,
             savedGeneration: after.savedGeneration, savedOrigin: after.savedOrigin, unsaved: after.unsaved,
-            converged: !after.peerRequired || after.peerConverged, apart: after.peerRefused, working: working.bytes, saved, defaults: defaults.bytes}};
+            converged: !after.peerRequired || after.peerConverged, apart: after.peerRefused, working: working.bytes, saved, defaults: defaults.bytes,
+            keyboard: liveKeyboardStatus(after), saveMark: -1}};
 }
 
-module.exports = {captureLive};
+module.exports = {captureLive, liveKeyboardStatus};

@@ -103,13 +103,14 @@ test("a refused edit is said, and the draft is read again from the keyboard", as
     assert.equal(session.draft.current.fingerprint, shown, "the refused edit is not shown as made");
 });
 
-test("a stale edit (another client, a key adjustment) is refused and the keyboard read again", async t => {
+test("a stale edit (another client, a key adjustment) is not sent, and the keyboard is read again as news, not a failure", async t => {
     const {keyboard, host, session, key} = await open(t);
     const other = Buffer.from(document().profile, "base64");
     const changed = validateSnapshot(document()).layers; changed[2][0] = 0x04;
     keyboard.externalEdit(require("../../core/schema/profile-domains").replaceDomain(other, 0x60, () => require("../../core/schema/keymap-domain-v1").encodeKeymapDomain(changed)));
     await key(0, 5, "KC_W");
-    assert.match(model(host).notice, /changed since Ark last read it/);
+    assert.match(model(host).notice, /^Not sent: the keyboard changed by itself/);
+    assert.deepEqual(host.errors, [], "no failure is raised");
     assert.equal(validateSnapshot(session.draft.current.document).layers[2][0], 0x04, "the other edit shows as unsaved");
 });
 
@@ -186,6 +187,11 @@ test("going from Apply to Live + review with a draft asks to send it live or dis
     assert.ok(session.draft.live);
     assert.ok(keyboard.working, "the draft runs on the keyboard, unsaved");
     assert.equal(layers(keyboard.working)[0].filter(code => code === 0x15).length >= 1, true);
+    // The notice says both things, whole: the send publishes the model on
+    // its way, which takes the mode's notice before the draft's is added.
+    const said = host.posted.filter(message => message.type === "model" && message.notice).map(message => message.notice);
+    assert.ok(said.some(text => /^Edits now reach the keyboard by Live \+ review: .* Your draft is running on the keyboard, unsaved\.$/.test(text)), said.join(" | "));
+    assert.ok(said.every(text => !/undefined/.test(text)), said.join(" | "));
 });
 
 test("a toggle a key turned off is published beside the stored master, not as a change", async t => {
@@ -216,6 +222,48 @@ test("a draft the keyboard refuses to take live is kept, and Ark stays in Apply"
     assert.equal(session.draft.dirty, true);
     assert.equal(session.draft.view({}).changes.length, changes);
 });
+
+// A new name takes effect by one USB restart (firmware D-F25), after which
+// the host lists the keyboard as a new device. It is the same keyboard on the
+// same boot, running the same working copy: the draft follows it, keeping its
+// history, and the rename can be saved or reverted. Seen on the keyboard on
+// 2026-10-19: the draft stayed with the old device ("belongs to another
+// keyboard") and Save and Revert were gone.
+for (const mode of [EDIT_MODE.LIVE_REVIEW, EDIT_MODE.LIVE]) test(`a live rename (${mode === EDIT_MODE.LIVE ? "Live" : "Live + review"}) restarts USB and the draft follows the same keyboard back`, async t => {
+    const keyboard = liveKeyboard({document: document(), mode});
+    const host = fakeHost();
+    const adapter = fakeKeyboardAdapter({keyboard});
+    const loop = openPanelLoop(host, {adapter, defaultTimeoutMs: 300, sleep: async () => {}, reconnect: {sleep: () => new Promise(resolve => setTimeout(resolve, 5)), waitMs: 5000}});
+    t.after(() => loop.close());
+    await loop.handleMessage({type: "refresh"});
+    /** @param {object} message */
+    const send = message => loop.handleMessage({draftId: loop.session.draft?.id, draftRevision: loop.session.draft?.revision, ...message});
+    await send({type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 10, keycode: "KC_X"}]});
+    await send({type: "renameKeyboard", name: "Desk"});
+    const draft = loop.session.draft, history = draft.history.length;
+    assert.ok(loop.session.reconnect, "Ark expects the restart the new name causes");
+    adapter.lastConnection().emitDisconnect(new Error("USB restarted."));
+    adapter.devices = [{id: "fake-charybdis-2", product: "Desk", manufacturer: "Bastard Keyboards", serialNumber: "FAKE-1"}];
+    loop.serviceChanged();
+    await loop.reconnected();
+    const published = model(host);
+    assert.equal(loop.session.draft, draft, "the same draft");
+    assert.equal(draft.history.length, history, "with its history");
+    assert.equal(published.model.draft.matching, true, "it belongs to the keyboard Ark is connected to");
+    assert.equal(published.model.draft.stale, false);
+    assert.equal(published.model.draft.live.unsaved, true);
+    assert.match(published.notice ?? posted(host).at(-1), /back as “Desk”/);
+    if (mode === EDIT_MODE.LIVE_REVIEW) {
+        await send({type: "reviewProfileDraft"});
+        await send({type: "saveProfileDraft", confirmChecks: true});
+        assert.equal(keyboard.working, null, "the rename was saved");
+    } else {
+        keyboard.autoSave();
+        await loop.handleMessage({type: "refresh"});
+        assert.equal(loop.session.draft.live.unsaved, false, "the keyboard's own save is seen");
+    }
+});
+const posted = host => host.posted.filter(message => message.notice).map(message => message.notice);
 
 test("a reconnect to the same running keyboard keeps the undo history", async t => {
     const {keyboard, session, key, send, loop} = await open(t);
@@ -273,6 +321,69 @@ test("in Apply a toggle a key turned off is shown too", async t => {
     assert.deepEqual(model(host).model.runtime, {combosOffByKey: true, behavioursOffByKey: false});
 });
 
+test("Live + review into Live with unsaved edits asks Save or Revert first, as the keyboard refuses the change otherwise", async t => {
+    const {keyboard, session, key, send, host} = await open(t);
+    await key(0, 17, "KC_Q");
+    await send({type: "setEditMode", mode: EDIT_MODE.LIVE});
+    assert.match(model(host).notice, /Save or Revert .* before switching to Live/);
+    assert.equal(keyboard.mode, EDIT_MODE.LIVE_REVIEW);
+    await send({type: "setEditMode", mode: EDIT_MODE.LIVE, pending: "save", confirmChecks: true});
+    assert.equal(keyboard.mode, EDIT_MODE.LIVE);
+    assert.equal(keyboard.working, null, "saved first");
+    assert.equal(host.recoveries.length, 1);
+    assert.equal(session.draft.live.mode, EDIT_MODE.LIVE);
+    assert.match(model(host).notice, /saves them by itself/);
+});
+
+test("Apply into Live with a draft asks to send it live or discard it", async t => {
+    const {keyboard, session, key, send, host} = await open(t, {mode: EDIT_MODE.APPLY});
+    await key(0, 18, "KC_P");
+    await send({type: "setEditMode", mode: EDIT_MODE.LIVE});
+    assert.match(model(host).notice, /before switching to Live/);
+    await send({type: "setEditMode", mode: EDIT_MODE.LIVE, pending: "discard"});
+    assert.equal(keyboard.mode, EDIT_MODE.LIVE);
+    assert.equal(keyboard.working, null, "discarded, nothing sent");
+    assert.equal(session.draft.dirty, false);
+});
+
+test("leaving Live has the keyboard save what it has not saved yet, with no question, then switches", async t => {
+    const {keyboard, session, key, send, host} = await open(t, {mode: EDIT_MODE.LIVE});
+    await key(0, 19, "KC_O");
+    assert.ok(keyboard.working);
+    await send({type: "setEditMode", mode: EDIT_MODE.LIVE_REVIEW});
+    assert.equal(keyboard.events.at(-2), "saved", "saved before the mode changed");
+    assert.equal(keyboard.events.at(-1), `mode ${EDIT_MODE.LIVE_REVIEW}`);
+    assert.equal(keyboard.mode, EDIT_MODE.LIVE_REVIEW);
+    assert.equal(session.draft.dirty, false);
+    assert.deepEqual(host.errors, []);
+    await key(0, 20, "KC_N");
+    assert.ok(keyboard.working, "Live + review edits run unsaved");
+});
+
+test("leaving Live waits for a save of the keyboard's own; when it cannot save, the mode stays and says why", async t => {
+    const {keyboard, session, key, send, host} = await open(t, {mode: EDIT_MODE.LIVE});
+    await key(0, 21, "KC_M");
+    keyboard.raised.peerRefused = true;
+    await send({type: "setEditMode", mode: EDIT_MODE.APPLY});
+    assert.match(model(host).notice, /slave half refused .* Revert/);
+    assert.equal(keyboard.mode, EDIT_MODE.LIVE, "the mode is unchanged");
+    assert.equal(session.draft.live.mode, EDIT_MODE.LIVE);
+    keyboard.raised.peerRefused = false;
+    keyboard.autoSave();
+    await send({type: "setEditMode", mode: EDIT_MODE.APPLY});
+    assert.equal(keyboard.mode, EDIT_MODE.APPLY, "nothing left to save: it switches at once");
+    assert.equal(keyboard.events.filter(event => event === "saved").length, 0, "the keyboard's own save was enough");
+});
+
+test("closing Ark loses an Apply draft or unsaved Live + review edits, but nothing in Live unless an edit is on its way", () => {
+    const {closingLoses} = require("../../core/session/live-edits");
+    assert.equal(closingLoses({draft: undefined}), false);
+    assert.equal(closingLoses({draft: /** @type {any} */ ({live: null, dirty: true})}), true);
+    assert.equal(closingLoses({draft: /** @type {any} */ ({live: {mode: EDIT_MODE.LIVE_REVIEW, unsaved: true}, dirty: true})}), true);
+    assert.equal(closingLoses({draft: /** @type {any} */ ({live: {mode: EDIT_MODE.LIVE, unsaved: true}, dirty: true}), service: {phase: "live-edit", busy: false}}), false, "the last edit finished");
+    assert.equal(closingLoses({draft: /** @type {any} */ ({live: {mode: EDIT_MODE.LIVE, unsaved: true}, dirty: true}), service: {phase: "live-edit", busy: true}}), true);
+});
+
 
 test("Revert rereads the saved profile when another client saved the same working revision", async t => {
     const {keyboard, session, key, send, host} = await open(t);
@@ -318,4 +429,71 @@ test("Send live keeps the original Apply draft when a stale send also prevents s
     await loop.handleMessage({type: "refresh"});
     assert.equal(session.draft, kept, "later observations keep the Apply edits too");
     assert.equal(kept.current.document.profile, target);
+});
+
+
+test("Revert after an unobserved automatic save shows the keyboard's actual saved profile", async t => {
+    const {keyboard, session, key, send} = await open(t, {mode: EDIT_MODE.LIVE});
+    await key(0, 7, "KC_U");
+    assert.equal(keyboard.autoSave(), true);
+    await send({type: "revertProfileDraft"});
+    assert.ok(session.draft.current.document.profile === keyboard.saved.toString("base64"));
+    assert.equal(session.draft.live.savedGeneration, keyboard.generation);
+    assert.equal(session.draft.live.unsaved, false);
+    const {checkLive} = require("../../core/session/live-watch");
+    await checkLive(session);
+    assert.ok(session.draft.current.document.profile === keyboard.saved.toString("base64"), "polling keeps the actual profile");
+});
+
+test("leaving Live stops before Save or mode change if its recovery copy is unavailable", async t => {
+    const {keyboard, session, key, send, host} = await open(t, {mode: EDIT_MODE.LIVE});
+    await key(0, 19, "KC_O");
+    const working = keyboard.working;
+    host.saveRecovery = async () => undefined;
+    await send({type: "setEditMode", mode: EDIT_MODE.APPLY});
+    assert.match(model(host).notice, /recovery copy could not be saved/i);
+    assert.equal(keyboard.mode, EDIT_MODE.LIVE);
+    assert.ok(keyboard.working.equals(working));
+    assert.equal(keyboard.mutations.filter(report => report[2] === 0x25).length, 0);
+    assert.equal(session.draft.live.unsaved, true);
+});
+
+test("leaving Live recovers the actual saved profile after an unobserved save", async t => {
+    const {keyboard, key, send, host} = await open(t, {mode: EDIT_MODE.LIVE});
+    await key(0, 19, "KC_O");
+    keyboard.autoSave();
+    const saved = keyboard.saved.toString("base64");
+    keyboard.externalEdit(Buffer.from(document().profile, "base64"));
+    let savesAtRecovery = -1;
+    const recover = host.saveRecovery;
+    host.saveRecovery = async doc => {
+        savesAtRecovery = keyboard.mutations.filter(report => report[2] === 0x25).length;
+        return recover(doc);
+    };
+    await send({type: "setEditMode", mode: EDIT_MODE.APPLY});
+    assert.equal(keyboard.mode, EDIT_MODE.APPLY);
+    assert.equal(host.recoveries.length, 1);
+    assert.equal(host.recoveries[0].profile, saved);
+    assert.equal(savesAtRecovery, 0, "recovery precedes the explicit Save");
+});
+
+
+test("a save during recovery refreshes the recovery copy before the flush writes again", async t => {
+    const {keyboard, key, send, host} = await open(t, {mode: EDIT_MODE.LIVE});
+    await key(0, 19, "KC_O");
+    const nextSaved = keyboard.working.toString("base64");
+    const recover = host.saveRecovery;
+    host.saveRecovery = async doc => {
+        const result = await recover(doc);
+        if (host.recoveries.length === 1) {
+            keyboard.autoSave();
+            keyboard.externalEdit(Buffer.from(document().profile, "base64"));
+        }
+        return result;
+    };
+    await send({type: "setEditMode", mode: EDIT_MODE.APPLY});
+    assert.equal(keyboard.mode, EDIT_MODE.APPLY);
+    assert.equal(host.recoveries.length, 2);
+    assert.equal(host.recoveries[1].profile, nextSaved);
+    assert.equal(keyboard.events.filter(event => event === "saved").length, 1);
 });

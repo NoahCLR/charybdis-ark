@@ -73,6 +73,7 @@ export interface DeviceModelInput {
 export type CandidateStatus = Awaited<ReturnType<typeof import('../protocol/profile-candidate-v1.js').readCandidateStatus>>;
 export type CandidatePeer = NonNullable<Awaited<ReturnType<typeof import('../protocol/profile-candidate-v1.js').readCandidatePeerStatus>>>;
 export interface CandidateProgress {
+    adjustmentPending?: boolean;
     phase: string;
     transactionId?: number;
     operation?: number;
@@ -94,6 +95,7 @@ export interface CandidateDriver {
     abort(transactionId: number): Promise<unknown>;
 }
 export interface CandidateDriverOptions {
+    readEditProgress?: () => Promise<import('../protocol/types.js').EditProgress>;
     chunkSize?: number;
     requestIds?: import('../protocol/types.js').RequestIds;
     sleep?: (ms: number) => Promise<void>;
@@ -162,11 +164,16 @@ export interface PanelSession extends DemoSession {
     portableLayers?: LayerEditState;
     acceptedEdit?: ReturnType<NonNullable<DemoSession['draft']>['stage']>;
     /** A live edit waiting on its trap check (plan answer 2): sent on confirmLiveEdit, dropped on cancelLiveEdit. */
+    /** What the live watch last saw of a keyboard under an Apply draft (live-watch.js). */
+    liveReadRetry?: {draftId: string; attempts: number};
+    applyWatch?: {draftId: string; session: number; revision: number; savedGeneration: number};
     liveProposal?: {id: number; draftId: string; revision: number; target: import('./profile-draft-session.js').LiveTarget;
         checks: import('../../contracts/model.js').Check[]; accepted?: ReturnType<NonNullable<DemoSession['draft']>['stage']>; replaceWhenLarge?: boolean};
     applyRunning?: boolean;
     postApplyReadStep?: import('../../contracts/messages.js').ReadStep;
     reconnect?: ExpectedReconnect;
+    /** When Ark last connected a lost keyboard again by itself (keyboard-reconnect.js). */
+    lostAt?: number;
     /** What the keyboard held before the last successful Apply, for "Put back what it had". */
     beforeApply?: {document: import('../model/types.js').PortableDocument; deviceId: string | null | undefined; savedAt: string};
     service: DemoSession['service'] & {portable?: import('../model/types.js').ProfileSnapshot | null};
@@ -198,6 +205,29 @@ export interface LiveState {
     working: Buffer;
     saved: Buffer;
     defaults: Buffer;
+    /** The keyboard's own saving and its halves, as last read (live-profile-session.js). */
+    keyboard?: LiveKeyboardStatus;
+    /** The save transaction last seen when the working copy last changed; a failed save after it failed these edits (-1: any). */
+    saveMark?: number;
+}
+export interface LiveKeyboardStatus {
+    adjustmentPending: boolean;
+    /** A save runs, Ark's or the keyboard's own. */
+    saving: boolean;
+    autoSaving: boolean;
+    /** Nothing unsaved, and the keyboard saved this revision by itself (Live). */
+    savedByKeyboard: boolean;
+    /** The last save of these edits failed; they are still unsaved. */
+    saveFailed: boolean;
+    saveError: number;
+    lastSaveTransaction: number;
+    storagePaused: boolean;
+    peerStoragePaused: boolean;
+    /** The other half refused this working copy: the halves differ until Revert or an Apply; Save is refused. */
+    peerRefused: boolean;
+    /** Storing the edit mode failed; the keyboard keeps trying. */
+    modeNotStored: boolean;
+    quietMs: number;
 }
 /** A Live + review read: the working copy as the snapshot, the saved profile beside it. */
 export type LiveCapture = import('../model/types.js').CompleteSnapshot & import('../model/types.js').SnapshotFacts & {
@@ -234,13 +264,21 @@ export interface ControlService extends DraftApplyService {
     saveWorkingCopy(identity: {session: number; revision: number}): Promise<import('../protocol/types.js').EditStatus & {saved: boolean}>;
     revertWorkingCopy(identity: {session: number; revision: number}): Promise<import('../protocol/types.js').EditProgress & {converged: boolean; apart: boolean}>;
     setEditMode(mode: number): Promise<import('../protocol/types.js').EditModeRead | undefined>;
+    /** An operation holds the keyboard. */
+    readonly busy?: boolean;
+    flushWorkingCopy(saveRecovery: (document: import('../model/types.js').PortableDocument) => Promise<string | undefined>): Promise<import('../protocol/types.js').EditStatus & {saved: boolean}>;
+    readLiveStatus(): Promise<import('../protocol/types.js').EditStatus | undefined>;
     close(): Promise<void>;
     emitChange?(): void;
     /** A save renamed the keyboard: its coming disconnect is expected (keyboard-reconnect.js). */
     expectReconnect?(expected: boolean): void;
+    /** The keyboard the connection was last lost to unexpectedly, once (keyboard-reconnect.js). */
+    takeLost?(): LostKeyboard | undefined;
 }
+/** A keyboard whose connection was lost unexpectedly: what it was, and what happened. */
+export interface LostKeyboard {deviceId: string; serialNumber: string; product: string; otherDevices: readonly {id: string; product?: string}[]; what: string; /** It left a request unanswered: Ark closed the connection, the keyboard stayed. */ unanswered: boolean}
 /** A renamed keyboard the panel waits to see again (keyboard-reconnect.js). */
-export interface ExpectedReconnect {deviceId: string; serialNumber: string; name: string; otherDevices: readonly {id: string; product?: string}[]; startedAt: number; dropped: boolean; saved?: string}
+export interface ExpectedReconnect {deviceId: string; serialNumber: string; name: string; otherDevices: readonly {id: string; product?: string}[]; startedAt: number; dropped: boolean; saved?: string; /** Lost unexpectedly rather than renamed: what happened. */ lost?: string}
 export interface ControlHost extends PanelHost {
     progress?: <T>(title: string, work: () => Promise<T>) => Promise<T>;
     saveRecovery?: SaveRecovery;
@@ -256,6 +294,8 @@ export interface DeviceServiceOptions {
     adapter?: import('../transport/types.js').DeviceAdapter;
     coordinator?: InstanceType<typeof import('../transport/request-coordinator.js').DeviceRequestCoordinator>;
     defaultTimeoutMs?: number;
+    /** How long each request of a background look waits (profile-device-service.js). */
+    watchTimeoutMs?: number;
     requestIdStart?: number;
     sleep?: (ms: number) => Promise<void>;
     readCandidateStatus?: typeof import('../protocol/profile-candidate-v1.js').readCandidateStatus;
