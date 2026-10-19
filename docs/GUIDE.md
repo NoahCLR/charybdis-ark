@@ -1007,7 +1007,10 @@ reads the keyboard again: what you see is what it runs. While the keyboard is
 still taking an edit (a held key or a locked layer keeps it waiting), Ark
 waits before reading it; release the keys. Before an edit that would add a
 layer trap or a warning reaches the keyboard, Ark asks, as Apply does; **Go
-back** sends nothing. Undo and redo send the change back the same way.
+back** sends nothing. Undo and redo send the change back the same way. A step
+that lands on exactly the saved profile (undoing every edit, redoing a Revert,
+or setting a value back by hand) is a **Revert** on the keyboard: it runs its
+saved profile again with nothing unsaved, and redo sends the edits again.
 
 The rail and the bar count the **unsaved changes** the keyboard runs. **Review
 and save** lists them against what the keyboard has saved (**Saved** and
