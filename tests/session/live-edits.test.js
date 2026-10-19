@@ -61,15 +61,56 @@ test("a keyboard in Live + review opens a live draft, and every posted edit reac
 test("undo and redo send the inverse edit through the same path", async t => {
     const {keyboard, session, key, send} = await open(t);
     await key(0, 12, "KC_Y");
+    const first = keyboard.working;
+    await key(0, 13, "KC_U");
+    const edited = keyboard.working;
+    await send({type: "undoProfileDraft"});
+    assert.equal(session.draft.cursor, 1);
+    assert.notDeepEqual(keyboard.working, edited, "undo changed the keyboard back");
+    assert.ok(keyboard.working.equals(first), "to the first edit, which still runs");
+    await send({type: "redoProfileDraft"});
+    assert.ok(keyboard.working.equals(edited));
+    assert.equal(keyboard.events.filter(event => event === "published").length, 4);
+});
+
+// A working copy identical to what is saved is no unsaved edit: "Unsaved
+// edits match what is saved" (keyboard check, 2026-10-19). A step that lands
+// on the saved profile reverts the keyboard instead, and Live has nothing to
+// save; the history keeps its steps, so redo sends the edit again.
+test("undo back to the saved profile reverts the keyboard; redo sends the edit again", async t => {
+    const {keyboard, host, session, key, send} = await open(t);
+    await key(0, 12, "KC_Y");
     const edited = keyboard.working;
     await send({type: "undoProfileDraft"});
     assert.equal(session.draft.cursor, 0);
-    assert.notDeepEqual(keyboard.working, edited, "undo changed the keyboard back");
-    assert.deepEqual(layers(keyboard.working)[0], layers(keyboard.saved)[0]);
-    assert.equal(keyboard.working !== null, true, "an undone edit is still an unsaved change to the keyboard");
+    assert.equal(keyboard.working, null, "the keyboard runs its saved profile, not a copy of it");
+    assert.deepEqual(keyboard.events.slice(-1), ["reverted"]);
+    assert.equal(model(host).model.draft.live.unsaved, false);
+    assert.equal(session.draft.dirty, false);
     await send({type: "redoProfileDraft"});
     assert.ok(keyboard.working.equals(edited));
-    assert.equal(keyboard.events.filter(event => event === "published").length, 3);
+    assert.equal(model(host).model.draft.live.unsaved, true);
+    // Revert, then undo (the edits back) and redo (the Revert again).
+    await send({type: "revertProfileDraft"});
+    assert.equal(keyboard.working, null);
+    await send({type: "undoProfileDraft"});
+    assert.ok(keyboard.working.equals(edited));
+    await send({type: "redoProfileDraft"});
+    assert.equal(keyboard.working, null, "redoing a Revert reverts");
+    assert.equal(model(host).model.draft.live.unsaved, false);
+    assert.equal(keyboard.events.filter(event => event === "reverted").length, 3);
+    assert.ok(keyboard.saved.equals(Buffer.from(document().profile, "base64")), "nothing was saved");
+});
+
+// An edit made by hand that puts the last change back is the same Revert.
+test("an edit that puts the saved value back reverts the keyboard", async t => {
+    const {keyboard, host, loop, key} = await open(t);
+    const original = loop.session.service.layout.layers[0].keys[12].keycode;
+    await key(0, 12, "KC_Y");
+    assert.ok(keyboard.working);
+    await key(0, 12, original);
+    assert.equal(keyboard.working, null);
+    assert.equal(model(host).model.draft.live.unsaved, false);
 });
 
 test("an edit that adds a trap waits for the person; cancelling sends nothing, confirming sends it", async t => {

@@ -78,6 +78,16 @@ async function proposeLive(session, target, {confirmed = false, accepted, replac
 async function sendLive(session, draft, target, {accepted, replaceWhenLarge = false}) {
     const live = /** @type {import("./types.js").LiveState} */ (draft.live);
     const before = draft.current;
+    // A step that lands on exactly the saved profile (an undo, a redo of a
+    // Revert, an edit put back by hand) is a Revert: sent as an edit it would
+    // leave the keyboard a working copy identical to what it saved, still
+    // "unsaved", which Live would save again as a new generation of the same
+    // bytes.
+    if (live.unsaved && !draft.base.incomplete && fingerprint(target.document) === draft.base.fingerprint) {
+        await revertTo(session, draft, target);
+        session.acceptedEdit = accepted;
+        return true;
+    }
     try {
         const result = await session.service.postLiveEdit({from: live.working, to: Buffer.from(target.document.profile, "base64"), defaults: live.defaults,
             identity: {session: live.session, revision: live.revision}, replaceWhenLarge: replaceWhenLarge && !live.unsaved});
@@ -102,6 +112,29 @@ async function sendLive(session, draft, target, {accepted, replaceWhenLarge = fa
         }
         throw error;
     }
+}
+
+// Revert on the keyboard, recorded as `target` (a Revert step, or the history
+// step that is the saved profile). False when the saved profile had moved on:
+// Ark read the keyboard again and said so.
+/** @param {Session} session @param {Draft} draft @param {Target} target */
+async function revertTo(session, draft, target) {
+    const live = /** @type {import("./types.js").LiveState} */ (draft.live);
+    const result = await session.service.revertWorkingCopy({session: live.session, revision: live.revision}).catch(async error => {await reread(session); throw error;});
+    // Save elsewhere can advance the saved profile without changing the
+    // working revision. Revert confirms that saved generation, not ours.
+    if (result.savedGeneration !== live.savedGeneration || result.savedOrigin !== live.savedOrigin) {
+        await reread(session);
+        session.resetDraftForms = true;
+        if (session.draft?.stale) throw refusal("Reverted on the keyboard, but its saved profile could not be read. Read the keyboard again.");
+        session.notice = "Reverted: the keyboard runs its saved profile again. It was saved elsewhere; Ark read that profile again.";
+        return false;
+    }
+    const before = draft.current;
+    draft.confirmLive(target, {session: result.session, revision: result.revision, bytes: live.saved, converged: result.converged, apart: result.apart, unsaved: false});
+    expectReconnect(session, renamedTo(before, draft.completeBase));
+    session.resetDraftForms = true;
+    return true;
 }
 
 // The keyboard as it is now, after a refusal or a lost answer. A failed read
@@ -160,25 +193,11 @@ const LIVE_ACTIONS = Object.freeze({
     // Discard all is Revert: the keyboard runs its saved profile again, and
     // the history keeps a step for it, so undo sends the edits back.
     discard: context => LIVE_ACTIONS.revert(context),
-    revert: async ({draft, revision, session, service}) => {
+    revert: async ({draft, revision, session}) => {
         draft.assertRevision(revision, {allowStale: false});
-        const live = /** @type {import("./types.js").LiveState} */ (draft.live);
-        const result = await service.revertWorkingCopy({session: live.session, revision: live.revision}).catch(async error => {await reread(session); throw error;});
-        // Save elsewhere can advance the saved profile without changing the
-        // working revision. Revert confirms that saved generation, not ours.
-        if (result.savedGeneration !== live.savedGeneration || result.savedOrigin !== live.savedOrigin) {
-            await reread(session);
-            session.resetDraftForms = true;
-            if (session.draft?.stale) throw refusal("Reverted on the keyboard, but its saved profile could not be read. Read the keyboard again.");
-            session.notice = "Reverted: the keyboard runs its saved profile again. It was saved elsewhere; Ark read that profile again.";
-            return;
+        if (await revertTo(session, draft, {document: draft.completeBase.document, label: "Reverted to the saved profile", origin: "revert", order: IDENTITY})) {
+            session.notice = "Reverted: the keyboard runs its saved profile again. Undo (⌘Z) sends the edits back.";
         }
-        const before = draft.current;
-        draft.confirmLive({document: draft.completeBase.document, label: "Reverted to the saved profile", origin: "revert", order: IDENTITY},
-            {session: result.session, revision: result.revision, bytes: live.saved, converged: result.converged, apart: result.apart, unsaved: false});
-        expectReconnect(session, renamedTo(before, draft.completeBase));
-        session.resetDraftForms = true;
-        session.notice = "Reverted: the keyboard runs its saved profile again. Undo (⌘Z) sends the edits back.";
     },
     // Save: a recovery copy of what is saved, then the keyboard writes what it
     // runs as its new saved profile on both halves.

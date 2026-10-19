@@ -1394,7 +1394,12 @@ revision (so a key swap or a custom key placed in the same step stays one
 edit). The draft's history moves only when the keyboard confirms the edit; it
 shows as made on both halves only when the other half holds the same revision.
 An edit too large to stage beside the profile is sent as a whole replacement,
-which needs nothing unsaved. A refused or stale edit is said and the keyboard
+which needs nothing unsaved. A target that is exactly the saved profile, while
+the keyboard holds a working copy, is sent as Revert instead: an edit would
+leave a working copy identical to what is saved, reported unsaved ("Unsaved
+edits match what is saved", keyboard check 2026-10-19), which Live would save
+again as a new generation of the same bytes. The history records the step as
+it would an edit. A refused or stale edit is said and the keyboard
 read again; a read that finds the same working copy keeps the history,
 anything else (another client, a restart, a Save elsewhere) starts it again
 from what the keyboard has, with no provenance invented, and says so. The
