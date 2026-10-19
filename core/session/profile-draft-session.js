@@ -48,6 +48,15 @@ const freeze = value => {
 };
 /** @param {string} text */
 const fail = text => Object.assign(new Error(text), {code: "PROFILE_DRAFT_CONFLICT"});
+/**
+ * A document a live edit would leave the keyboard with, and how the history
+ * takes it once the keyboard confirms it.
+ * @typedef {{document: Document, cursor?: number | null, origin: string | null, label: string | null, order?: Order, keepReviewed?: boolean}} LiveTarget
+ */
+// The saved profile of a live read, as the snapshot review compares with.
+/** @param {import("./types.js").LiveCapture} capture @returns {Complete} */
+const savedSnapshot = capture => ({...copy({document: capture.saved.document, fingerprint: capture.saved.fingerprint, summary: capture.saved.summary}),
+    hostOs: copy(capture.hostOs ?? null), limits: copy(capture.limits ?? null), options: copy(capture.options ?? null), incomplete: false});
 
 // What one Rename & Reorder save did: the order it changed and the names it
 // changed, each named as the layers were called before it.
@@ -80,6 +89,10 @@ class ProfileDraftSession {
         // keys as this app does can be trusted with.
         if (!knownActionAbi(capabilities.actionAbiDigest ?? 0)) throw fail("This keyboard's firmware numbers its keys differently from this app. Update both halves before editing.");
         validateSnapshot(snapshot.document, capabilities);
+        // Live + review (firmware D-F32): the draft is the keyboard's working
+        // copy, and review compares it with the saved profile beside it.
+        const live = "live" in snapshot && snapshot.live ? /** @type {import("./types.js").LiveCapture} */ (snapshot) : null;
+        if (live) validateSnapshot(live.saved.document, capabilities);
         this.deviceId = deviceId;
         this.connectionToken = connectionToken ?? null;
         this.latestConnectionToken = this.connectionToken;
@@ -89,10 +102,12 @@ class ProfileDraftSession {
         this.capabilities = copy(capabilities);
         this.latestCapabilities = copy(capabilities);
         /** @type {Snapshot} */
-        this.base = copy(snapshot);
+        this.base = live ? savedSnapshot(live) : copy(snapshot);
         /** @type {Snapshot} */
-        this.latest = copy(snapshot);
+        this.latest = copy(this.base);
         this.hostOs = copy(snapshot.hostOs ?? null);
+        /** @type {import("./types.js").LiveState | null} */
+        this.live = live ? {...live.live} : null;
         this.history = [this.historyEntry(snapshot.document)];
         this.cursor = 0;
         this.revision = 1;
@@ -111,6 +126,10 @@ class ProfileDraftSession {
     checksCache;
     /** @type {boolean | undefined} */
     needsRead;
+    /** @type {boolean | undefined} A live keyboard restarted while it had unsaved edits; the next read says they are gone. */
+    restartedWithUnsaved;
+    /** @type {boolean | undefined} A live keyboard's working copy changed under the same session without Ark (another app, a lost answer, an edit that did not land as sent); the next read says the draft started again. */
+    changedElsewhere;
     now() {return Date.now();}
     // A step keeps its document, edit grouping, words, time and layer order
     // together. All of them stay fixed as undo, branching and trimming move it.
@@ -159,7 +178,9 @@ class ProfileDraftSession {
         return base;
     }
     get dirty() {return this.decode(this.history[this.cursor].document).fingerprint !== this.base.fingerprint;}
-    get stale() {return Boolean(this.needsRead || this.connectionChanged || this.latest.fingerprint !== this.base.fingerprint);}
+    // A live draft is the keyboard's own state, so only a lost connection or
+    // a read it has not taken makes it stale; a confirmed edit is progress.
+    get stale() {return Boolean(this.needsRead || this.connectionChanged || (!this.live && this.latest.fingerprint !== this.base.fingerprint));}
     /** @param {import("./types.js").ConnectionToken} connectionToken */
     noteConnection(connectionToken) {
         const token = connectionToken ?? null;
@@ -182,6 +203,7 @@ class ProfileDraftSession {
     /** @param {Snapshot | null | undefined} snapshot @param {string | null | undefined} deviceId @param {import("./types.js").ConnectionToken} [connectionToken] @param {import("../model/types.js").ProfileDestination} [capabilities] */
     observe(snapshot, deviceId, connectionToken = null, capabilities = this.capabilities) {
         if (!snapshot || deviceId !== this.deviceId) return;
+        if (this.live) {this.observeLive(snapshot, connectionToken, capabilities); return;}
         this.latestCapabilities = copy(capabilities);
         const dirty = this.dirty;
         if (!dirty && !snapshot.incomplete && JSON.stringify(capabilities) !== JSON.stringify(this.capabilities)) {
@@ -208,6 +230,47 @@ class ProfileDraftSession {
             if (snapshot.fingerprint !== this.base.fingerprint) this.reset(snapshot);
             else {this.base = copy(snapshot); this.latest = copy(snapshot);}
         } else this.latest = copy(snapshot);
+    }
+    // A read of a live keyboard is the truth: the same working copy over the
+    // same saved profile keeps the history, over a new connection too (the
+    // keyboard vouches for it by its session and revision); anything else
+    // (another client's edit, a key adjustment, a restart, a Save elsewhere)
+    // starts the draft again from what the keyboard has, with no history it
+    // cannot vouch for, and says so.
+    /** @param {Snapshot} snapshot @param {import("./types.js").ConnectionToken} connectionToken @param {import("../model/types.js").ProfileDestination} capabilities */
+    observeLive(snapshot, connectionToken, capabilities) {
+        const token = connectionToken ?? null;
+        this.latestConnectionToken = token;
+        this.latestCapabilities = copy(capabilities);
+        if (!("live" in snapshot) || !snapshot.live) {this.needsRead = true; return;}
+        const capture = /** @type {import("./types.js").LiveCapture} */ (snapshot), live = /** @type {import("./types.js").LiveState} */ (this.live);
+        const same = capture.live.session === live.session && capture.live.revision === live.revision
+            && capture.saved.fingerprint === this.base.fingerprint && capture.fingerprint === this.current.fingerprint;
+        if (same && JSON.stringify(capabilities) === JSON.stringify(this.capabilities)) {
+            this.live = {...capture.live};
+            this.connectionToken = token;
+            this.needsRead = false;
+            this.connectionChanged = false;
+            return;
+        }
+        // A new session is a restart: whatever was unsaved is gone (D-F32).
+        if (capture.live.session !== live.session) {if (live.unsaved) this.restartedWithUnsaved = true;}
+        else if (capture.live.revision !== live.revision || capture.fingerprint !== this.current.fingerprint) this.changedElsewhere = true;
+        this.resetLive(capture);
+    }
+    /** @param {import("./types.js").LiveCapture} capture */
+    resetLive(capture) {
+        this.acceptCapabilities(this.latestCapabilities);
+        this.base = savedSnapshot(capture); this.latest = copy(this.base);
+        this.hostOs = copy(capture.hostOs ?? null);
+        this.referenceCache = new WeakMap();
+        this.reviewCache = new WeakMap();
+        this.history = [this.historyEntry(capture.document)]; this.cursor = 0;
+        this.revision++; this.reviewedRevision = null;
+        this.live = {...capture.live};
+        this.connectionToken = this.latestConnectionToken;
+        this.needsRead = false;
+        this.connectionChanged = false;
     }
     /** @param {number | undefined} revision @param {{allowStale?: boolean}} [options] */
     assertRevision(revision, {allowStale = false} = {}) {
@@ -241,6 +304,7 @@ class ProfileDraftSession {
     // A new entry keeps the entry's layer order unless it says otherwise.
     /** @param {Document} document @param {number} revision @param {string} [origin] @param {string | null} [label] @param {Order} [order] */
     replace(document, revision, origin = "edit", label = null, order = this.order) {
+        this.assertLocal();
         this.assertRevision(revision);
         const valid = validateSnapshot(document, this.capabilities).document;
         if (fingerprint(valid) === this.decode(this.history[this.cursor].document).fingerprint) return;
@@ -256,6 +320,15 @@ class ProfileDraftSession {
     // editors check the identity the form was read with.
     /** @param {Edit} message */
     stage(message) {
+        if (this.live) throw fail("This keyboard takes edits live; Ark sends each one to it.");
+        const {document, label, previousFingerprint} = this.propose(message);
+        this.replace(document, message.draftRevision, "edit", label);
+        return {message: copy(message), previousFingerprint, fingerprint: this.decode(this.history[this.cursor].document).fingerprint};
+    }
+    // The document an edit would make, without making it: Apply stages it
+    // at once, Live + review sends it to the keyboard first (live-edits.js).
+    /** @param {Edit} message @returns {{document: Document, label: string, previousFingerprint: string}} */
+    propose(message) {
         this.assertRevision(message.draftRevision);
         const current = this.current, before = current.fingerprint;
         let document;
@@ -273,8 +346,7 @@ class ProfileDraftSession {
         else if (editedBy(message, "layout")) document = this.editLayout(message);
         else if (editedBy(message, "profile")) document = this.editProfile(message, current.document);
         else throw fail("Unsupported draft edit.");
-        this.replace(document, message.draftRevision, "edit", draftEditLabel(message, current.document));
-        return {message: copy(message), previousFingerprint: before, fingerprint: this.decode(this.history[this.cursor].document).fingerprint};
+        return {document: validateSnapshot(document, this.capabilities).document, label: draftEditLabel(message, current.document), previousFingerprint: before};
     }
     // One profile-domain edit, checked against the draft's base, on `base`.
     /** @param {import("../model/device-profile-edits.js").ProfileEdit} message @param {Document} base @returns {Document} */
@@ -440,6 +512,13 @@ class ProfileDraftSession {
     // current, since what is left is part of what was reviewed.
     /** @param {number} revision @param {number} group */
     discard(revision, group) {
+        const {document, label, order, reviewed} = this.discardTarget(revision, group);
+        this.replace(document, revision, "discard", label, order);
+        if (reviewed) this.reviewedRevision = this.revision;
+    }
+    // What discarding a group would leave, and the words for it.
+    /** @param {number} revision @param {number} group */
+    discardTarget(revision, group) {
         this.assertRevision(revision);
         if (this.base.incomplete) throw fail("Review this recovery as a whole; its changes cannot be discarded one by one.");
         const items = this.changes().filter(row => row.group === group), units = new Set(items.map(row => /** @type {string} */ (row.unit)));
@@ -459,8 +538,7 @@ class ProfileDraftSession {
         const left = this.describe(validateSnapshot(document, this.capabilities).document, order);
         if (left.every(row => row.unit === "profile")) {document = copy(validateSnapshot(this.base.document, this.capabilities).document); order = IDENTITY;}
         const label = units.has("layerOrder") ? "Put the layer order back" : items.length === 1 ? `Discarded ${items[0].title}` : `Discarded ${items.length} changes made together`;
-        this.replace(document, revision, "discard", label, order);
-        if (reviewed) this.reviewedRevision = this.revision;
+        return {document: validateSnapshot(document, this.capabilities).document, label, order, reviewed};
     }
     // Discard the whole draft as one more step, so undo brings it back: the
     // keyboard is not read again, since nothing about it changed.
@@ -472,13 +550,16 @@ class ProfileDraftSession {
         const count = this.changes().length;
         this.replace(validateSnapshot(this.base.document, this.capabilities).document, revision, "discard", `Discarded the draft (${count} change${count === 1 ? "" : "s"})`, IDENTITY);
     }
+    // A live draft changes only by what the keyboard confirms (confirmLive).
+    assertLocal() {if (this.live) throw fail("This keyboard takes edits live; Ark sends each one to it.");}
     /** @param {number} revision */
-    undo(revision) {this.assertRevision(revision); if (this.cursor) {this.cursor--; this.revision++; this.reviewedRevision = null;}}
+    undo(revision) {this.assertLocal(); this.assertRevision(revision); if (this.cursor) {this.cursor--; this.revision++; this.reviewedRevision = null;}}
     /** @param {number} revision */
-    redo(revision) {this.assertRevision(revision); if (this.cursor + 1 < this.history.length) {this.cursor++; this.revision++; this.reviewedRevision = null;}}
+    redo(revision) {this.assertLocal(); this.assertRevision(revision); if (this.cursor + 1 < this.history.length) {this.cursor++; this.revision++; this.reviewedRevision = null;}}
     // Several undos or redos at once: straight to one entry of the history.
     /** @param {number} revision @param {number} step */
     jump(revision, step) {
+        this.assertLocal();
         this.assertRevision(revision);
         if (!Number.isInteger(step) || step < 0 || step >= this.history.length) throw fail("That step is no longer in the draft history.");
         if (step !== this.cursor) {this.cursor = step; this.revision++; this.reviewedRevision = null;}
@@ -490,6 +571,7 @@ class ProfileDraftSession {
     closeReview(revision) {this.assertRevision(revision, {allowStale: true}); this.reviewedRevision = null;}
     /** @param {number} revision */
     rebase(revision) {
+        this.assertLocal();
         this.assertRevision(revision, {allowStale: true});
         if (this.needsRead) throw fail("Read the latest keyboard state before reviewing this draft again.");
         const target = this.document, order = this.order;
@@ -511,6 +593,7 @@ class ProfileDraftSession {
     }
     /** @param {import("./types.js").DraftApplyService} service @param {number} revision @param {import("./types.js").SaveRecovery} saveRecovery */
     async apply(service, revision, saveRecovery) {
+        if (this.live) throw fail("This keyboard already runs these edits; Save makes them permanent.");
         this.assertRevision(revision);
         if (!this.dirty || this.reviewedRevision !== revision) throw fail("Review the current draft before applying it.");
         if (this.hasBlockers()) throw fail("Resolve the review's blockers before applying this profile.");
@@ -547,6 +630,56 @@ class ProfileDraftSession {
     // whether the draft introduced them or the keyboard already has them.
     hasChecksToConfirm() {return this.checks().some(check => check.status !== "fixed" && (/** @type {string[]} */ ([CHECK_LEVELS.TRAP, CHECK_LEVELS.WARNING])).includes(check.level));}
     hasBlockers() {return this.checks().some(check => check.status !== "fixed" && check.level === "blocker");}
+    // The traps and warnings a proposed document would add to what the
+    // keyboard runs now (plan answer 2: asked before an edit is sent live).
+    /** @param {Document} document @param {Order} [order] */
+    checksAdded(document, order = this.order) {
+        const decoded = this.decode(document).decoded;
+        return draftProfileChecks(this.current.decoded, decoded, order, {brightnessMax: this.current.limits?.brightnessMax,
+            detectedHostOs: this.current.hostOs?.detected, effects: this.current.options?.effects})
+            .filter(check => check.status === "new" && (/** @type {string[]} */ ([CHECK_LEVELS.TRAP, CHECK_LEVELS.WARNING, "blocker"])).includes(check.level));
+    }
+    // Where undo, redo and a history jump would go, as a document to send.
+    /** @param {number} revision @param {number} step @returns {LiveTarget} */
+    stepTarget(revision, step) {
+        this.assertRevision(revision);
+        if (!Number.isInteger(step) || step < 0 || step >= this.history.length) throw fail("That step is no longer in the draft history.");
+        return {document: this.history[step].document, cursor: step, label: null, origin: null, order: this.history[step].order};
+    }
+    // A live edit the keyboard confirmed: the draft moves to it, as staging
+    // moves an Apply draft. `target.cursor` moves through the history (undo,
+    // redo); otherwise the document is one more step.
+    /** @param {LiveTarget} target @param {{session: number, revision: number, bytes: Buffer, converged: boolean, apart?: boolean, unsaved?: boolean}} result */
+    confirmLive(target, result) {
+        const live = /** @type {import("./types.js").LiveState} */ (this.live);
+        this.live = {...live, session: result.session, revision: result.revision, working: result.bytes, converged: result.converged, apart: result.apart ?? false,
+            unsaved: result.unsaved ?? (result.revision !== live.revision || live.unsaved)};
+        if (target.cursor !== undefined && target.cursor !== null) {
+            if (target.cursor !== this.cursor) {this.cursor = target.cursor; this.revision++; this.reviewedRevision = null;}
+            return;
+        }
+        const valid = validateSnapshot(target.document, this.capabilities).document;
+        if (fingerprint(valid) === this.decode(this.history[this.cursor].document).fingerprint && target.origin !== "revert") return;
+        this.history = this.history.slice(0, this.cursor + 1);
+        this.history.push(this.historyEntry(valid, target.origin || "edit", target.label, target.order ?? this.order));
+        if (this.history.length > 101) this.history.shift();
+        this.cursor = this.history.length - 1;
+        this.revision++;
+        this.reviewedRevision = target.keepReviewed ? this.revision : null;
+    }
+    // Save landed: what the keyboard runs is now what it has saved.
+    /** @param {{savedGeneration: number, savedOrigin: number, session: number, revision: number}} status */
+    confirmSaved(status) {
+        const live = /** @type {import("./types.js").LiveState} */ (this.live);
+        const current = this.current;
+        this.base = {...this.base, document: copy(current.document), fingerprint: current.fingerprint, summary: copy(current.summary), incomplete: false};
+        this.latest = copy(this.base);
+        this.referenceCache = new WeakMap(); this.reviewCache = new WeakMap(); this.checksCache = new WeakMap();
+        this.history = [this.historyEntry(current.document, null, "Saved on the keyboard")]; this.cursor = 0;
+        this.revision++; this.reviewedRevision = null;
+        this.live = {...live, saved: live.working, unsaved: false, apart: false, savedGeneration: status.savedGeneration, savedOrigin: status.savedOrigin,
+            session: status.session, revision: status.revision};
+    }
     identity() {return {source: "draft", generation: this.revision, digest: this.decode(this.history[this.cursor].document).fingerprint, originHalf: this.deviceId};}
     // The draft's combos as the keyboard would report them: every window as
     // it resolves, and whether it follows the default.
@@ -574,7 +707,11 @@ class ProfileDraftSession {
             historyLength: this.history.length,
             reviewed: this.reviewedRevision === this.revision,
             changes: this.changes(),
-            checks: this.checks()};
+            checks: this.checks(),
+            // Live + review: whether the keyboard runs unsaved edits, whether
+            // both halves hold the last one, and whether the other half
+            // refused it (the halves then run different profiles).
+            live: this.live ? {unsaved: this.live.unsaved, converged: this.live.converged, apart: Boolean(this.live.apart), mode: this.live.mode} : null};
     }
 }
 // The router (panel-session.js) and the web build take the registry's list from here.

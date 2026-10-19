@@ -26,6 +26,15 @@ export interface ControlPayloads {
         discardProfileDraftChanges: {group: number};
         /** Replace the draft with what the keyboard held before the last Apply. */
         putBackProfile: Record<never, never>;
+        /** Live + review: the keyboard writes what it runs as its saved profile. */
+        saveProfileDraft: {confirmChecks?: boolean};
+        /** Live + review: the keyboard runs its saved profile again. */
+        revertProfileDraft: Record<never, never>;
+        /** Send the edit waiting on its trap check, or drop it. */
+        confirmLiveEdit: {proposal: number};
+        cancelLiveEdit: {proposal: number};
+        /** How edits reach the keyboard; `pending` says what happens to work in progress first. */
+        setEditMode: {mode: 0 | 1 | 2; pending?: 'save' | 'revert' | 'send' | 'discard'; /** The question showed the draft's traps and warnings and the person went ahead. */ confirmChecks?: boolean};
     };
     portable: {
         exportPortableProfile: {};

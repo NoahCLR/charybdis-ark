@@ -8,6 +8,7 @@ const {profileMacros, editLayers} = require("../tests/fixtures/profile-document"
 const {test, expect} = require("@playwright/test");
 const {installFakeHid} = require("./fake-hid");
 const {fakeKeyboard} = require("../tests/fixtures/fake-keyboard");
+const {liveKeyboard} = require("../tests/fixtures/live-keyboard");
 const {dropFiles} = require("./profile-drop");
 const {document32: pdDocument} = require("../tests/fixtures/pd-slots-32");
 const {CHARYBDIS_PRODUCT_ID, CHARYBDIS_VENDOR_ID, QMK_RAW_HID_USAGE, QMK_RAW_HID_USAGE_PAGE} = require("../core/transport/device-adapter");
@@ -546,4 +547,52 @@ test("the web host reads, edits and Applies one profile generation without VIA",
     expect(keyboard.mutations.every(report => [7, 9].includes(report[0]) && report[1] === 0)).toBe(true);
     expect(keyboard.requests.some(report => [1, 2, 0x0c, 0x0e, 0x12].includes(report[0]))).toBe(false);
     expect(errors).toEqual([]); ownFilesOnly();
+});
+
+// Live + review through the real web host (firmware D-F32): an edit reaches
+// the keyboard at once, review compares it with what is saved, and Save makes
+// it the saved profile, with a recovery copy of what was saved before.
+test("in Live + review an edit reaches the keyboard at once, and review and Save make it permanent", async ({page, context, baseURL}) => {
+    test.setTimeout(90000);
+    const keyboard = liveKeyboard({document: pdDocument()});
+    const {ownFilesOnly} = await withKeyboard(context, baseURL, 1, keyboard);
+    const errors = await open(page);
+    await page.locator('.read-placeholder [data-act="choose-keyboard"]').click();
+    await ready(page);
+    await expect(page.locator('[data-f="rail:edit-mode"]')).toHaveValue("2");
+
+    await page.locator('[data-screen="mouse"]').click();
+    const field = page.locator('select[data-macro="normalDpi"]');
+    await expect(field).toBeEnabled();
+    const other = await field.evaluate((select) => [...select.options].find((option) => !option.selected).value);
+    await field.selectOption(other);
+    await expect(page.locator(".rail-status")).toContainText("1 unsaved change on the keyboard");
+    expect(keyboard.working, "the keyboard runs the edit").toBeTruthy();
+    expect(keyboard.events).toContain("published");
+
+    await page.locator('.commit.live [data-act="review"]').click();
+    await expect(page.locator(".sheet")).toContainText("Running now");
+    const save = page.locator('.sheet [data-act="apply"]');
+    await expect(save).toHaveText("Save on keyboard");
+    await expect(save).toBeEnabled();
+    await save.click();
+    const anyway = page.locator('[data-act="apply-anyway"]');
+    if (await anyway.count()) await anyway.click();
+    await expect(page.locator(".rail-message")).toContainText("Saved on both halves", {timeout: 20000});
+    expect(keyboard.events).toContain("saved");
+    expect(keyboard.working).toBe(null);
+    await expect(page.locator(".commit.live")).toHaveCount(0);
+    await page.locator('[data-screen="profile"]').click();
+    await expect(page.locator(".card.recoveries .recovery-row")).toHaveCount(1);
+
+    // A key changed again, then Revert puts back what is saved.
+    await page.locator('[data-screen="mouse"]').click();
+    const again = await field.evaluate((select) => [...select.options].find((option) => !option.selected).value);
+    await field.selectOption(again);
+    await expect(page.locator(".commit.live")).toBeVisible();
+    await page.locator('.commit.live [data-act="revert"]').click();
+    await expect(page.locator(".commit.live")).toHaveCount(0);
+    expect(keyboard.events).toContain("reverted");
+    expect(errors).toEqual([]);
+    ownFilesOnly();
 });

@@ -76,6 +76,7 @@ test("bridge selects explicit checkouts, records dirty state, and stops on failu
 for (const [runner, header] of [
     ["run_candidate_transfer_tests.sh", "users/noah/lib/profile/protocol/profile_candidate_v1.h"],
     ["run_macro_domain_tests.sh", "users/noah/lib/compat/qmk_via_storage_regions.h"],
+    ["run_live_edit_tests.sh", "users/noah/lib/compat/qmk_profile_edit_channel.h"],
 ]) test(`${runner} fails, never skips, on firmware without what it checks`, () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "ark-contract-guard-"));
     try {

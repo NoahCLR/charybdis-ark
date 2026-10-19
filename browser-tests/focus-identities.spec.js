@@ -58,7 +58,8 @@ for (const [screen, state] of surfaces) {
             .evaluateAll(nodes => nodes.map(node => node.getAttribute("data-f")));
         if (screen === "lighting" && state.stage === "base") {
             // Firmware owns the base effect; this page presents its facts.
-            expect(ids).toEqual([]);
+            // The rail's controls (the edit mode) belong to every screen.
+            expect(ids.filter(id => !id?.startsWith("rail:"))).toEqual([]);
         } else expect(ids.length, "the editor exposes a form control").toBeGreaterThan(0);
         // Each assertion crosses the actual receiver's full-DOM accepted-edit
         // path; retaining the same node cannot satisfy it.

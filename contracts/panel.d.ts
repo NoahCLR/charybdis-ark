@@ -60,6 +60,8 @@ export interface DraftView {
     reason: DraftBlock;
     canUndo: boolean; canRedo: boolean; undoLabel: string | null; redoLabel: string | null; historyLength: number; reviewed: boolean;
     changes: ReviewChange[]; checks: Check[]; steps?: HistoryStep[];
+    /** Live + review: the keyboard runs unsaved edits; both halves hold the last one; the other half refused it (apart until Revert). Null for an Apply draft. */
+    live: {unsaved: boolean; converged: boolean; apart: boolean; mode: number} | null;
 }
 export interface LedGroup {name: string; id: number; ledIndices: number[]; expression: string; usageCount: number; usages: {target: string; owner: string}[]}
 export interface LedRow {index: number; owner: string; color: Colour; ledGroup: string; ledGroupKind: string; ledIndices: number[]}
@@ -135,4 +137,10 @@ export interface PublishedModel {
     reconnecting: {name: string} | null;
     /** What the connected firmware reports about itself; null with no keyboard read. */
     firmware: import('./model.js').FirmwareView | null;
+    /** How edits reach this keyboard (stored on it): 0 Apply, 1 Live, 2 Live + review; the modes Ark offers. Null without a keyboard. */
+    editMode: {mode: number; conflict: boolean; offered: number[]; /** A half could not store the mode yet (retrying): a replug now may lose it. */ notStored: boolean} | null;
+    /** A live edit waiting for the person to confirm the traps or warnings it adds. */
+    liveProposal: {id: number; label: string | null; checks: import('./model.js').Check[]} | null;
+    /** Toggles a key turned off over a stored "on": shown as turned off by key, never as a change. */
+    runtime: {combosOffByKey: boolean; behavioursOffByKey: boolean} | null;
 }

@@ -36,9 +36,9 @@ warning during local work. With `--publish`, it fails before any runner starts;
 run that form before landing an Ark change that moves a pin (`land` also refuses
 pins that are not on the published trunks).
 
-The bridge then runs the seven Ark-owned integration runners under
-`tests/integration/` in turn, the five below and then the candidate-transfer and
-macro-domain runners described after them:
+The bridge then runs the eight Ark-owned integration runners under
+`tests/integration/` in turn, the five below and then the candidate-transfer,
+macro-domain and live-edit runners described after them:
 
 - `run_qmk_portable_editor_tests.sh`: firmware option pages → app reader.
 - `run_qmk_portable_profile_tests.sh`: firmware settings pages → app reader.
@@ -83,6 +83,22 @@ in Ark; Ark encodings, empty/sparse/dense/full domains, optional unused tails
 and malformed corpora pass through C validation in normal and sanitizer
 builds. Wide source offsets and exact transported bytes are checked. These
 checks establish encoding agreement, not hardware latency or playback.
+
+The live-edit runner links firmware's production Profile Wire edit channel
+(`qmk_profile_edit_channel.c`) and working copy (`profile_working_copy.c`) with
+its whole validator; the probe (`live-edit-probe.c`) stands in for the owner
+between them, one half whose Save, edit mode and other-half facts the corpus
+sets. Ark's own `LiveEditCoordinator` sends each edit: a one-domain edit, a
+multi-domain edit whose stream crosses several 22-byte data reports, a created
+domain and a whole replacement, each leaving a C working copy equal byte for
+byte to what Ark's splicing records. It checks the refusals Ark relies on (a
+new edit BUSY while one is received, out-of-order and overlapping splices, an
+edit too large to stage, a damaged stream's commit CRC, a stale identity) and
+decodes every reply with Ark's decoders: the SET reply, edit status pages 0–2,
+the active profile, the mode and runtime pages, with each status flag bit
+0–12 set at least once. Both normal and sanitizer builds run. It establishes
+wire and splice agreement on one half, not the split link, Save's flash work
+or hardware timing.
 
 ## Agreement with a firmware contract
 

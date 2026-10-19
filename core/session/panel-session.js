@@ -78,7 +78,14 @@ function observePortable(session, state, portable = session.service.portable) {
     }
     if (!portable || portable === session.observedPortable || !state.connected || !canEdit(state.capabilities)) return;
     if (portable.incomplete && !session.draft) return;
-    if (!session.draft) setDraft(session, new ProfileDraftSession(portable, state.selectedDeviceId, state.capabilities, state.connectionToken));
+    const live = "live" in portable && Boolean(portable.live);
+    // A keyboard whose edit mode changed under an open draft: an untouched
+    // draft starts again in the new mode; one with work waits, stale, for the
+    // person to discard it (switching modes here asks first).
+    if (session.draft && Boolean(session.draft.live) !== live && state.selectedDeviceId === session.draft.deviceId && !portable.incomplete) {
+        if (session.draft.live || !session.draft.dirty) setDraft(session, new ProfileDraftSession(portable, state.selectedDeviceId, state.capabilities, state.connectionToken));
+        else session.draft.needsRead = true;
+    } else if (!session.draft) setDraft(session, new ProfileDraftSession(portable, state.selectedDeviceId, state.capabilities, state.connectionToken));
     else session.draft.observe(portable, state.selectedDeviceId, state.connectionToken, state.capabilities);
     session.observedPortable = portable;
 }
@@ -130,8 +137,18 @@ function buildPanelModel(session, state) {
         if (draft.matching) {
             model.profileIdentity = session.draft.identity();
         }
-        if (draft.dirty && draft.matching) model.device.subtitle = "Showing your local draft · the keyboard still runs the last applied profile";
+        if (draft.live && draft.matching && draft.live.unsaved) model.device.subtitle = "The keyboard runs these edits now · Save makes them permanent; unplugging it puts back what is saved";
+        else if (draft.dirty && draft.matching && !draft.live) model.device.subtitle = "Showing your local draft · the keyboard still runs the last applied profile";
     }
+    // How edits reach this keyboard, and an edit waiting on its trap check.
+    const mode = state.editMode;
+    const editMode = mode && state.connected && !session.demo ? {mode: mode.mode, conflict: mode.conflict, offered: [0, 2], notStored: Boolean(mode.notStored)} : null;
+    const proposal = session.liveProposal && session.draft && session.liveProposal.draftId === session.draft.id && session.liveProposal.revision === session.draft.revision
+        ? {id: session.liveProposal.id, label: session.liveProposal.target.label, checks: session.liveProposal.checks} : null;
+    // Toggles a key turned off on top of a stored "on" (plan answer 10): shown,
+    // never a change.
+    const runtime = state.connected && state.runtime ? {combosOffByKey: state.runtime.combos.master && !state.runtime.combos.override,
+        behavioursOffByKey: state.runtime.behaviours.master && !state.runtime.behaviours.override} : null;
     // The last Apply's steps: live while it runs, kept when it failed. A
     // successful one lasts only until its readback ends, so a later busy
     // operation is not drawn as reading back an Apply.
@@ -179,7 +196,7 @@ function buildPanelModel(session, state) {
     };
     // What the firmware says about itself and its ceilings (Keyboard, Settings).
     const firmware = firmwareView(state.capabilities);
-    return {...model, devices, selectedDeviceId, ...(draft ? {draft} : {}), demo, apply, postApplyRead, portable, host, load, reconnecting, firmware};
+    return {...model, devices, selectedDeviceId, ...(draft ? {draft} : {}), demo, apply, postApplyRead, portable, host, load, reconnecting, firmware, editMode, liveProposal: proposal, runtime};
 }
 
 // How full the profile is: the draft's, when one is open for this keyboard,
@@ -278,6 +295,9 @@ function routeMessage(session, message, state) {
             throw new Error("This keyboard has no editable draft, so the change was not written. Read the keyboard again; if it stays read-only, update both halves to current firmware.");
         }
         const draft = boundDraft(session, state, message, "Reconnect the keyboard this draft belongs to and wait for its current operation.");
+        // Live + review sends the edit to the keyboard (live-edits.js); the
+        // loop awaits it.
+        if (draft.live) return "live";
         // The command set selects the decoder; stage validates payload values.
         session.acceptedEdit = draft.stage(/** @type {import("./types.js").DraftEdit} */ (message));
         return "staged";

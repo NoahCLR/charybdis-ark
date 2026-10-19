@@ -51,9 +51,9 @@ export function checkSourceGroup(check, changes = []) {
     return matches.length === 1 && Number.isInteger(matches[0].group) ? matches[0].group : null;
 }
 
-// What the confirmation says before Apply goes ahead.
-/** @param {readonly import("../../contracts/model.js").Check[]} checks */
-export function confirmText(checks) {
+// What the confirmation says before Apply (or Save, or a live edit) goes ahead.
+/** @param {readonly import("../../contracts/model.js").Check[]} checks @param {'apply' | 'save' | 'send'} [action] */
+export function confirmText(checks, action = "apply") {
     if (!checks.length) return "";
     const traps = checks.filter((check) => check.level === "trap");
     const warnings = checks.filter((check) => check.level === "warning");
@@ -61,8 +61,9 @@ export function confirmText(checks) {
     const count = (number, word) => `${number} ${word}${number === 1 ? "" : "s"}`;
     const trapCount = traps.reduce((total, check) => total + (check.kind === "trapOverflow" ? /** @type {number} */ (check.count) : 1), 0);
     const lead = checks.length === 1 ? checks[0].title : [traps.length && count(trapCount, "trap"), warnings.length && count(warnings.length, "warning")].filter(Boolean).join(" and ");
-    return traps.length ? `${lead}. A trapped layer can leave no way back to Base until you unplug the keyboard. Apply this profile anyway?`
-        : `${lead}. Apply this profile with ${warnings.length === 1 ? "this warning" : "these warnings"}?`;
+    const ask = {apply: "Apply this profile", save: "Save these edits", send: "Send this edit"}[action];
+    return traps.length ? `${lead}. A trapped layer can leave no way back to Base until you unplug the keyboard. ${ask} anyway?`
+        : `${lead}. ${ask} with ${warnings.length === 1 ? "this warning" : "these warnings"}?`;
 }
 
 // The line a check's header shows beside its title: its level, and where it

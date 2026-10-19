@@ -72,7 +72,21 @@ test("every stable device phase has immutable words and matches the posted Phase
         if (words.read) assert.ok(words.read.trim(), id);
         if (words.busy) assert.ok(words.busy.trim(), id);
     }
-    assert.deepEqual(ids.filter(id => PHASE_WORDS[id].writes), [PHASE.RESTORE_COMPLETE]);
+    // Apply and Save write flash; a live edit, a Revert and a mode change
+    // touch only the keyboard's RAM and a small record.
+    assert.deepEqual(ids.filter(id => PHASE_WORDS[id].writes).sort(), [PHASE.LIVE_SAVE, PHASE.RESTORE_COMPLETE].sort());
+});
+
+test("every edit mode the keyboard stores has words, and the result words finish a sentence", () => {
+    const {EDIT_MODE, EDIT_RESULT} = require("../../core/protocol/profile-edit-v1");
+    const {LIVE_RESULT_WORDS} = require("../../core/model/vocabulary");
+    for (const mode of Object.values(EDIT_MODE)) {
+        const words = VOCABULARY.editModes[mode];
+        assert.ok(words?.label && words.detail && words.id, String(mode));
+    }
+    assert.equal(VOCABULARY.editModes[EDIT_MODE.LIVE_REVIEW].label, "Live + review");
+    assert.match(VOCABULARY.editModes[EDIT_MODE.LIVE_REVIEW].detail, /unplugging/);
+    for (const name of Object.keys(EDIT_RESULT).filter(name => !["OK", "QUEUED"].includes(name))) assert.match(LIVE_RESULT_WORDS[name] || "", /^[a-z].*\.$/, name);
 });
 
 test("device phase identities are independent of their existing display labels", () => {

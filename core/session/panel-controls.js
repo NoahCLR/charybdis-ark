@@ -25,8 +25,9 @@ const {validateSnapshot, FILE_MAX_BYTES} = require("../model/portable-profile");
 const {DEMO_WORDS, panelCapabilities, panelState} = require("./demo-session");
 const {applyLayerEdit, discardDraftForDevice, layerEditDocument, observePortable, startLayerEdit} = require("./panel-session");
 const {closeEditors, whileApplying} = require("./panel-session-state");
-const {IDENTITY} = require("../model/layer-order");
+const {IDENTITY, compose} = require("../model/layer-order");
 const {RECONNECT_WORDS, expectReconnect, renamedTo} = require("./keyboard-reconnect");
+const {LIVE_ACTIONS, CHANGED_ELSEWHERE, proposeLive, setEditMode} = require("./live-edits");
 
 // Ark reads only current firmware; the compatibility diagnostics say what
 // this keyboard's firmware lacks.
@@ -135,6 +136,14 @@ async function readKeyboard(session, selectedDeviceId, host = {}) {
         session.notice = `Read the layout and ${description}.` + (failures ? ` ${failures} domain(s) could not be decoded; see diagnostics.` : "");
     }
     if (macroFailure) session.notice += macroFailure;
+    if (session.draft?.restartedWithUnsaved) {
+        session.notice += " The keyboard restarted since Ark last read it, so its unsaved edits are gone: it runs its saved profile again.";
+        session.draft.restartedWithUnsaved = false;
+    }
+    if (session.draft?.changedElsewhere) {
+        session.notice += ` ${CHANGED_ELSEWHERE}`;
+        session.draft.changedElsewhere = false;
+    }
     return Boolean(!state.error && state.committed?.state === "read" && state.layout?.state === "read"
         && hasCurrentLayers(state.capabilities) && portable && !portable.incomplete);
 }
@@ -143,21 +152,39 @@ async function readKeyboard(session, selectedDeviceId, host = {}) {
 // reset) saying what happened; the caller publishes.
 /** @typedef {import('../../contracts/messages.js').DraftControl & {draftRevision: number}} DraftMessage */
 /** @typedef {{session: Session, draft: NonNullable<Session['draft']>, service: Session['service'], revision: number, message: DraftMessage, host: Host}} DraftContext */
+// In Live + review the history, discards, Save and Revert go through the
+// keyboard (live-edits.js); `local` is what an Apply draft does.
+/** @param {string} name @param {(context: DraftContext) => void | Promise<void>} [local] @returns {(context: DraftContext) => Promise<void>} */
+const liveOr = (name, local) => async (context) => {
+    if (context.draft.live) {
+        await LIVE_ACTIONS[name]({...context, saveRecovery: (document) => saveRecovery(context.host, document)});
+        if (["undo", "redo", "jump", "discardChanges", "putBack"].includes(name)) context.session.resetDraftForms = true;
+        return;
+    }
+    if (!local) throw new Error("Save, Revert and live edits are for a keyboard in Live + review.");
+    await local(context);
+};
 /** @type {Readonly<Record<string, (context: DraftContext) => void | Promise<void>>>} */
 const DRAFT_ACTIONS = Object.freeze({
     review: ({draft, revision}) => {draft.review(revision);},
     closeReview: ({draft, revision}) => {draft.closeReview(revision);},
-    undo: ({draft, revision, session}) => {draft.undo(revision); session.resetDraftForms = true;},
-    redo: ({draft, revision, session}) => {draft.redo(revision); session.resetDraftForms = true;},
-    jump: ({draft, revision, message, session}) => {
+    undo: liveOr("undo", ({draft, revision, session}) => {draft.undo(revision); session.resetDraftForms = true;}),
+    redo: liveOr("redo", ({draft, revision, session}) => {draft.redo(revision); session.resetDraftForms = true;}),
+    jump: liveOr("jump", ({draft, revision, message, session}) => {
         draft.jump(revision, /** @type {Extract<DraftMessage, {type: 'jumpProfileDraft'}>} */ (message).step);
         session.resetDraftForms = true;
-    },
-    discardChanges: ({draft, revision, message, session}) => {
+    }),
+    discardChanges: liveOr("discardChanges", ({draft, revision, message, session}) => {
         draft.discard(revision, /** @type {Extract<DraftMessage, {type: 'discardProfileDraftChanges'}>} */ (message).group);
         session.resetDraftForms = true;
-    },
-    discard: async ({draft, revision, session, service}) => {
+    }),
+    save: liveOr("save"),
+    revert: liveOr("revert"),
+    confirmLive: liveOr("confirmLive"),
+    cancelLive: async ({session}) => {session.liveProposal = undefined; session.resetDraftForms = true;},
+    setMode: ({session, message, host}) => setEditMode(session, /** @type {{mode: number, pending?: string, draftRevision: number}} */ (/** @type {unknown} */ (message)),
+        (document) => saveRecovery(host, document), host),
+    discard: liveOr("discard", async ({draft, revision, session, service}) => {
         // The draft's own keyboard, unchanged: discarding is an undoable
         // step. Otherwise the keyboard is read again and the draft starts
         // over from it.
@@ -174,8 +201,8 @@ const DRAFT_ACTIONS = Object.freeze({
         discardDraftForDevice(session, state, complete ? await service.readPortableProfile() : undefined);
         session.notice = complete ? "Draft discarded. Showing the saved keyboard configuration." : "Draft discarded. This keyboard remains read-only.";
         return;
-    },
-    rebase: async ({draft, revision, session, service}) => {
+    }),
+    rebase: liveOr("rebase", async ({draft, revision, session, service}) => {
         draft.assertRevision(revision, {allowStale: true});
         if (service.snapshot().selectedDeviceId !== draft.deviceId) throw new Error("Reconnect the keyboard this draft belongs to.");
         const snapshot = await service.readPortableProfile({forRestore: true});
@@ -184,15 +211,15 @@ const DRAFT_ACTIONS = Object.freeze({
         session.resetDraftForms = true;
         session.notice = "Review now compares your draft with the latest keyboard state. Apply will replace the differences shown.";
         return;
-    },
+    }),
     // The success state's way back: the copy saved before the last Apply
     // becomes the draft, one undoable step, reviewed and applied as any edit.
-    putBack: ({draft, revision, session}) => {
+    putBack: liveOr("putBack", ({draft, revision, session}) => {
         const before = session.beforeApply;
         if (!before || before.deviceId !== draft.deviceId) throw new Error("There is no copy from before an Apply on this keyboard to put back.");
         draft.replace(before.document, revision, "edit", "Put back what the keyboard had before Apply", IDENTITY);
         session.resetDraftForms = true;
-    },
+    }),
     apply: async ({draft, revision, message, session, service, host}) => {
         // The interface asks about active traps and warnings; the host
         // enforces that decision before writing a recovery copy or HID.
@@ -290,6 +317,16 @@ const PORTABLE_ACTIONS = Object.freeze({
             throw new Error("This profile review belongs to another keyboard. Open it again on the selected keyboard.");
         }
         const document = entry.kind === "layers" ? layerEditDocument(entry.editor) : entry.editor.document;
+        if (session.draft?.live) {
+            // Live + review: the import or the layer change goes to the
+            // keyboard as one edit; an import too large for one is a whole
+            // replacement, which needs nothing unsaved (firmware D-F32).
+            const draft = session.draft;
+            closeEditors(session, {resetForms: true});
+            if (entry.kind === "layers") await proposeLive(session, {document, origin: "layers", label: "Edited layers", order: compose(draft.order, entry.editor.order)});
+            else await proposeLive(session, {document, origin: "edit", label: "Imported a profile", order: IDENTITY}, {replaceWhenLarge: true});
+            return;
+        }
         if (session.draft) {
             // An import has no layer order to keep: its layers are
             // compared slot by slot with the keyboard's.

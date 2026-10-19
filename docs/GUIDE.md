@@ -969,10 +969,70 @@ Avoid concurrent typing and release ordinary keys before playback. Cancellation
 can leave text already typed; macOS may commit a partial hex entry. Actual text
 insertion on each host requires physical keyboard acceptance.
 
+## How edits reach the keyboard
+
+The keyboard stores how edits reach it, so the choice holds across replugs and
+in both VS Code and Chrome. Change it with **Edits** in the rail, beside the
+keyboard's name:
+
+| Mode | An edit… | Made permanent by | Unplugging the keyboard with edits not made permanent |
+| --- | --- | --- | --- |
+| **Live + review** (a keyboard never set is in it) | takes effect on both halves at once | review, then **Save** | puts back the saved profile: the edits are gone |
+| **Apply** | waits in Ark's draft; the keyboard is unchanged | review, then **Apply** | loses nothing on the keyboard; the draft lives in Ark until you close it |
+
+In **Live + review** the keyboard runs your edits as you make them, from every
+screen: keys, behaviours, combos, lighting, pointing, settings and macros. An
+edit shows as made once both halves hold it; until the slave half takes it,
+the rail says it is catching up, and the next edit waits for it. If the slave
+half refuses the keyboard's edits, the rail says **Halves apart**: the halves
+run different profiles, nothing can be saved, and **Revert** (in the bar)
+puts both back on the saved profile. If the keyboard refuses an edit, or
+something else changed it first (another window, a restart), Ark says so and
+reads the keyboard again: what you see is what it runs. While the keyboard is
+still taking an edit (a held key or a locked layer keeps it waiting), Ark
+waits before reading it; release the keys. Before an edit that would add a
+layer trap or a warning reaches the keyboard, Ark asks, as Apply does; **Go
+back** sends nothing. Undo and redo send the change back the same way.
+
+The rail and the bar count the **unsaved changes** the keyboard runs. **Review
+and save** lists them against what the keyboard has saved (**Saved** and
+**Running now**); **Save on keyboard** keeps a recovery copy of what was saved,
+then writes the running profile as the saved one on both halves, with the same
+power-loss guarantees as Apply; it says when a half waits for the keyboard to
+be quiet before writing flash. **Revert** puts back the saved profile without
+writing anything; undo sends the edits again. If another client saved
+meanwhile, Ark reads that saved profile again and starts its history there. Reading the keyboard again while
+it stays plugged in (also after reconnecting) shows its unsaved changes and
+keeps undo; after a replug they are gone, and Ark says so.
+
+A key that adjusts DPI or lighting changes the keyboard only until a replug,
+and any settings edit, Revert, Save or Apply puts the stored values back at
+once: Ark shows the stored values, not the adjusted ones.
+
+Switching modes asks first when there is work in progress: with unsaved
+changes on the keyboard, either way, it asks you to **Save** or **Revert**
+them, since the keyboard changes mode only with nothing unsaved; going to
+Live + review with an Apply draft asks whether to **Send live** (the draft runs
+on the keyboard, unsaved) or **Discard draft**. The question lists the traps
+and warnings that Save or Send would confirm. If the keyboard refuses the
+draft, Ark tries to return to Apply and keeps it even if that return is
+refused. Return the keyboard to Apply and read it again before continuing. **Cancel** changes nothing. If the
+halves stored different modes, **Settle** beside the switch stores the shown
+one on both. If the keyboard has not managed to store a new mode yet, a mark
+beside the switch says so: unplugging it then may lose the mode. A keyboard set
+to **Live**, the mode where the keyboard saves by itself, shows it; this
+version of Ark edits it as Live + review.
+
+Some keys on the keyboard switch a feature off for now: the combos key turns
+combos off, beside the **Enabled** switch you stored. Settings marks the switch
+**turned off by key**, in either mode; it is not a change, never in the review,
+and the key or a replug turns it back on.
+
 ## Review and the draft
 
-Every edit is kept in a local draft and reaches the keyboard only through
-review and apply. Complete edits stage into the draft as they are made;
+Every edit is kept in a draft. In Apply it reaches the keyboard only through
+review and apply; in Live + review it reaches the keyboard at once and review
+and Save keep it ([above](#how-edits-reach-the-keyboard)). Complete edits stage into the draft as they are made;
 incomplete builders such as a new combo keep their local form until it is
 valid. Review lists each changed thing once, under the area it is
 edited in, with the fields that changed, can open it where it is edited, and
@@ -1137,7 +1197,13 @@ lighting and global settings. Flashed defaults and live edits become one
 portable file containing one complete profile. Earlier separate-field backups
 are refused; export a new backup from current firmware.
 Exporting leaves the editor and any local draft unchanged, even if the keyboard
-has changed since its last editor read.
+has changed since its last editor read. In Live + review it exports what the
+keyboard runs, unsaved changes included.
+
+In Live + review, **Use as draft** sends the file to the keyboard as one edit,
+unsaved until you save it. A file too different to send as one edit is sent
+whole, which needs the keyboard to have nothing unsaved: Save or Revert first.
+Save keeps a copy of what was saved in the same list as Apply does.
 
 A backup restores onto the same firmware release; check the release notes
 before updating firmware ([below](#firmware-versions)).

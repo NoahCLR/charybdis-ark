@@ -50,6 +50,7 @@ matrix.
 | Keyboard name | The keyboard's own name, its USB product string, edited as the Keyboard screen's title and stored in the settings domain; an Apply that renames it is followed through the keyboard's USB restart (D-L62) |
 | Backup and restore | Complete current-format backup files, restore review against the keyboard, the copies saved before each Apply (each usable as a draft) and verified restore; older formats are refused, never converted (D-L15, D-L23, D-L54, D-L64) |
 | Drafts and Apply | One draft with item-by-item review, discard by edit group, Show, undo/redo and history; the review checks reachable actions, confirms warnings and traps and blocks what the destination cannot save; Apply names its steps and halves and says where a failure happened (D-L19, D-L23, D-L29, D-L30, D-L36, D-L60, D-L61) |
+| How edits reach the keyboard | Per keyboard, stored on it: **Live + review** (the default) sends every edit, undo and discard to the keyboard's working copy at once, asks before one adds a trap or warning, reviews the working copy against the saved profile and Saves or Reverts on the keyboard; **Apply** keeps edits in Ark's draft as before. Switching asks Save/Revert or Send/Discard first; toggles a key turned off show as turned off by key (D-L65, firmware D-F32) |
 | Firmware supported | Current firmware only: the new base, Profile Wire 2.0 and profile schema 4.0, required exactly (major and minor), whose version implies everything the keyboard does; the feature word only describes the build (split, saves, pointing). A keyboard on anything else, the previous base included, is read no further than its identity and told to update; a keyboard whose saved profile is in an earlier store format or retired test layout says it runs its built-in defaults (D-L48, D-L64) |
 | Recovery | One-store atomic Apply, differential profile transfer, firmware commit recovery after the decision, resume after a lost or power-cycled peer link, verified running-layout reads or an unavailable layout during recovery, bounded cancel owned by the keyboard (D-L20–D-L22, D-L27, D-L39, D-L58) |
 | Where it runs | The VS Code extension, and a web page in Chrome or Edge over WebHID; Cloudflare Git integration publishes `dev` to `ark-dev.ncleroy.dev`, `main` to `ark.ncleroy.dev`, and task branches to PR previews; a phone gets only a notice (D-L02, D-L52) |
@@ -113,6 +114,21 @@ Remaining before calling the product complete:
   both halves, reboot and interrupted saves. Measure first read, Refresh,
   Export and save pauses with small and large profiles. Firmware exposes
   per-half pause diagnostics, but Ark has no diagnostics view for them yet.
+- **Live + review needs keyboard acceptance (D-L65).** Edit every domain live
+  (keys, behaviours, combos, lighting, pointing, settings, macros) and confirm
+  both halves take each edit at once; Save and read back after a replug;
+  Revert; undo and redo; a replug dropping unsaved edits; the mode switch and
+  its questions, in VS Code and in Chrome; the combos key showing as turned off
+  by key. Automated tests use a fake keyboard with a working copy only.
+- **Ark has no Live mode yet (D-L65).** A keyboard set to Live (it saves by
+  itself, firmware task 9) is shown as Live and edited as Live + review; the
+  keyboard does not save on its own yet either.
+- **Adjustment keys are not edits yet (firmware D-F32).** The DPI and RGB keys
+  move QMK's values only until a replug; Ark shows the stored values, not the
+  adjusted ones (GET `0x22` reports them; Ark reads only its toggles). Any
+  settings edit, Revert, Save or Apply also undoes a key adjustment at once,
+  since the keyboard applies its stored values again; this lasts until the
+  firmware makes adjustment keys edits (firmware task 9).
 - **The picker's list of unbuilt QMK features is written by hand** (D-L05).
   `webview/view/picker-sections.mjs` hides keycodes for features this build
   does not include, matched against its rules files and QMK's defaults. It
@@ -379,8 +395,13 @@ require them to be kept or discarded first. An external change preserves the
 draft and blocks a stale Apply; **Review against the keyboard** compares it
 against a fresh read and never silently merges. A failed complete capture
 leaves independent diagnostics and opens no editable draft or complete backup.
-Export captures the saved keyboard,
+Export captures what the keyboard runs,
 not unapplied changes. Closing the editor loses the draft.
+
+In Live + review (D-L65) the same draft is the keyboard's working copy: its
+history moves only when the keyboard confirms an edit, review compares it with
+the saved profile, and Save replaces Apply. The rules above for review, checks
+and recovery copies hold for both modes.
 
 ### D-L20 — Differential Apply
 
@@ -1304,6 +1325,103 @@ settings-limit, option and macro-map pages, the combo-output, click and macro
 blockers, and the gesture-timing advice for firmware without physical timing
 (D-L48).
 
+### D-L65 — Live + review: edits reach the keyboard at once, Save keeps them
+
+*Builds on firmware D-F32 (working copy, live edits, Save, Revert, edit mode)
+and the plan's answers 1–3 and 10.*
+
+**Two modes, one draft.** How edits reach a keyboard is stored on it (Profile
+Wire `0x27`) and read with its capabilities: **Apply** keeps the existing
+draft, review and Apply; **Live + review**, the default of a keyboard never
+set, opens the draft on the keyboard's working copy. Both share the draft
+model, review, checks and history; they differ in when an edit reaches the
+keyboard and what makes it permanent. Live (the keyboard saving on its own)
+is shown when reported and edited as Live + review until Ark offers it. An
+Apply-mode keyboard still running unsaved edits (left by another client) opens
+as Live + review, since only Save or Revert can settle them.
+
+**The read.** A live read takes the working copy (GET `0x21`, which pages the
+active profile with its session and revision) and the saved profile it began
+from (GET `0x04`, or the compiled defaults over generation 0), checked as one
+pair by the edit status before and after. Both are materialized from their
+stored bytes alone: settings readback now reports stored values (firmware
+D-F32), so no readback is overlaid, and a live edit's splices are made against
+the keyboard's exact bytes. An Apply-mode read is unchanged.
+
+**An edit.** Every posted edit, undo, redo, history jump, group discard, put
+back, import and layer change computes its target document with the same
+editors as Apply, then sends the difference: one splice per changed domain,
+covering only the bytes between the common prefix and suffix, all in one
+revision (so a key swap or a custom key placed in the same step stays one
+edit). The draft's history moves only when the keyboard confirms the edit; it
+shows as made on both halves only when the other half holds the same revision.
+An edit too large to stage beside the profile is sent as a whole replacement,
+which needs nothing unsaved. A refused or stale edit is said and the keyboard
+read again; a read that finds the same working copy keeps the history,
+anything else (another client, a restart, a Save elsewhere) starts it again
+from what the keyboard has, with no provenance invented, and says so. The
+same working copy read over a new connection keeps the history: the keyboard
+vouches for it by its session and revision. A lost answer ends the
+connection; reading again shows whether the edit landed; nothing is replayed.
+After a reconnect, an edit Ark left half sent (the keyboard still receiving
+it) is aborted rather than left to its 15 s lease, and its transaction id is
+never used again on that connection. A read waits while the keyboard is still
+taking an edit (a held key keeps it from a safe boundary) and is never
+trusted until the edit status is idle; past 30 s the draft stays to be read
+again. Ark records the bytes it sent as the keyboard's (a replacement's own
+bytes, a splice edit's result) and checks the keyboard's working copy has
+their length (edit status page 2), reading it again if not.
+
+**Traps.** Before sending, the edit's checks are compared with the working
+copy's: a new trap or warning waits as a proposal the person sends anyway or
+drops (plan answer 2); a new blocker is refused. Save confirms the review's
+traps and warnings exactly as Apply does.
+
+**The other half.** An edit shows as on both halves once the other half
+holds its revision. Until then it is catching up: the next edit waits for it
+(BUSY) up to 30 s while the other half answers, since after a refusal the
+master half sends it the whole working copy once, which takes longer than an
+edit. Refused again, the halves are apart (edit status flag 11): Ark stops
+waiting at once, says the halves run different profiles, and offers Revert in
+place of Review and save, because Save and new edits are BUSY until a Revert
+or an Apply. A save waiting for a quiet keyboard on either half says so.
+
+**Save and Revert.** Discard all is Revert: the keyboard runs its saved
+profile again, one history step that undo sends back when the saved profile
+has not changed. Revert checks its returned saved generation and origin
+against the cached base; if another client saved meanwhile, Ark rereads the
+actual saved profile and starts history there. Save needs the exact
+reviewed revision, keeps a recovery copy of the saved profile, then asks the
+keyboard to write its working copy as a new generation (candidate REUSE from
+the working copy, both halves, the same power-loss guarantees). A replug boots
+the saved profile; the next read says the unsaved edits are gone.
+
+**Switching modes** (plan answer 3). The keyboard refuses any mode change
+with unsaved edits, so a live draft with unsaved edits asks Save or Revert
+first, whichever way it goes, worded for that direction; entering Live +
+review with an Apply draft asks Send live or Discard. The question lists the
+traps and warnings Save or Send confirms (as review does), so answering it is
+the confirmation. Send live keeps the Apply draft until the keyboard takes it:
+refused, Ark tries to return the keyboard to Apply and keeps the original
+draft even if that return is refused. A kept Apply draft over a live keyboard
+stays stale until the keyboard returns to Apply and is read again. Halves
+that stored different modes are settled by choosing the same mode again
+(**Settle** beside the switch). The keyboard takes a new mode at once and
+stores it when quiet; while a write is owed after a failure (flag 12) Ark
+says a replug may lose it. A mode Ark cannot read (anything but a firmware
+without it) leaves the keyboard in Apply's reads and is read again at the next
+status refresh or read.
+
+**Toggles** (plan answer 10). The combos and behaviours toggles a key turns off
+are read beside their stored masters (GET `0x22`), in either mode and again
+at every status refresh, and shown as **turned off by key** where the master
+is edited; they never enter the draft, review or backups. Export in Live +
+review captures what the keyboard runs.
+
+Considered: keeping Ark's own pending queue of unconfirmed edits, so typing
+never waits for the keyboard; rejected because a refusal would have to unwind
+edits made after it, and the keyboard confirms an edit in a few reports.
+
 ## Historical decisions
 
 These describe the retired v1 app; their lasting rules are stated in the
@@ -1335,7 +1453,9 @@ interface with its own: browser ES modules with pure, tested `view/` modules,
 every posted edit built by `webview/view/edits.mjs` and staged against a real
 draft in `tests/view/edits.test.mjs`, and a board that shows what the firmware does.
 Edits exist only as a reviewed draft; a keyboard the app cannot open a draft for
-is read-only, and the host refuses edits rather than writing them directly. v1
+is read-only, and the host refuses edits rather than writing them directly.
+Live + review (D-L65) keeps this: an edit reaches the keyboard's working copy,
+which a replug discards, and only a reviewed Save makes it permanent. v1
 was frozen by this decision and has since been removed. The current core
 reads and applies the one-store profile through firmware-owned Profile Wire;
 no VIA transport or second-bank writer remains (D-L64, firmware D-F31).

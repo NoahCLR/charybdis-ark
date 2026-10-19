@@ -38,6 +38,7 @@ const {buildPanelModel, observeService, panelRequest, routeMessage} = require(".
 const {beginRead, boundDraft, closeEditors, endRead, takeOutbox, whilePanelBusy} = require("./panel-session-state");
 const {awaitReconnect, endReconnect} = require("./keyboard-reconnect");
 const {draftControl, portableControl, readKeyboard} = require("./panel-controls");
+const {liveEdit} = require("./live-edits");
 const {demoControl, demoExport, leaveDemo, panelState} = require("./demo-session");
 const {macroInputStatus} = require("../model/macro-editor");
 const {FILE_MAX_BYTES} = require("../model/portable-profile");
@@ -118,6 +119,10 @@ async function handleMessage(session, message, host) {
         if (session.demo && message && panelControl(message.type)?.demo === "leave" && !session.portableBusy) leaveDemo(session, /** @type {import("../../contracts/messages.js").DemoControl} */ (message));
         const route = routeMessage(session, message, panelState(session));
         if (route === "draft") await draftMessage(session, /** @type {import("../../contracts/messages.js").DraftControl & Partial<import("../../contracts/edits.js").DraftIdentity>} */ (message), host);
+        else if (route === "live") {
+            try {await whilePanelBusy(session, () => liveEdit(session, /** @type {import("./types.js").DraftEdit} */ (/** @type {unknown} */ (message))));}
+            finally {publish(session, host);}
+        }
         else if (route === "demo") await demoMessage(session, /** @type {import("../../contracts/messages.js").DemoControl} */ (message), host);
         else if (route === "portable") await portableMessage(session, /** @type {import("../../contracts/messages.js").PortableControl} */ (message), host);
         else if (route === "read") await connectAndRead(session, message?.type === "selectDevice" ? message.deviceId : undefined, host);

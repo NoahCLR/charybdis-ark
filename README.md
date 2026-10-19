@@ -48,12 +48,19 @@ Key and modifier names follow that OS throughout the editors and Review.
 
 ## Nothing is saved until you say so
 
-Every edit goes into a draft with undo, redo and a full history. **Review**
+Choose how edits reach the keyboard, beside its name: **Live + review** (the
+default) or **Apply**. In Live + review every edit takes effect on the keyboard
+at once, so you can try it as you type, and nothing is permanent until you
+review and **Save**; **Revert**, or unplugging the keyboard, puts back what was
+saved. In Apply, edits wait in Ark until you apply them.
+
+Either way every edit goes into a draft with undo, redo and a full history. **Review**
 lists what changed and checks what the layers let you reach. It warns you
 about a layer you could lock yourself into, combos that can't fire and macros
-your Host setup can't play. **Apply** saves a recovery copy, writes both halves
-as one complete profile and reads the result back, and you can stay in the
-editor while it does.
+your Host setup can't play, and in Live + review it asks before an edit that
+would trap you reaches the keyboard. **Apply** (or **Save**) keeps a recovery
+copy, writes both halves as one complete profile and reads the result back,
+and you can stay in the editor while it does.
 
 On **Backups**, **Export profile** saves your whole setup as one file, and
 **Import profile** takes one by choosing it or dropping it onto the Import

@@ -211,6 +211,22 @@ success is accepted only after a fresh status read reports the new generation
 on both halves. A keyboard the app cannot open a draft for is read-only; the
 host refuses edits rather than writing them directly.
 
+Live + review (D-L65, firmware D-F32) shares that draft. The edit mode is read
+with the capabilities (`protocol/profile-edit-v1.js`); a keyboard not in Apply
+is read by `session/live-profile-session.js` as its working copy (GET `0x21`)
+and the saved profile beside it, both materialized from their stored bytes
+(`model/portable-profile.js` `materializeStored`), the working copy's exact
+bytes kept for splices. `ProfileDraftSession` then holds `live` state: review
+compares saved with working, and the history moves only through
+`confirmLive`/`confirmSaved`. `session/live-edits.js` routes every edit, undo,
+discard, import, Save, Revert and mode switch: it computes the target with the
+same editors (`propose`, `discardTarget`, `stepTarget`), asks first about a
+trap or warning the edit adds (`checksAdded`), and sends it through
+`ProfileDeviceService.postLiveEdit`, whose `session/live-edit-coordinator.js`
+diffs the bytes into one splice per changed domain (`schema/profile-splices.js`),
+streams them, waits for the keyboard's outcome and the other half, and never
+replays. A refusal or stale identity rereads the keyboard.
+
 ## Byte formats
 
 `schema/profile-domains.js` owns each domain's ID, model key, version, wire

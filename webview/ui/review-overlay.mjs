@@ -38,7 +38,11 @@ export function reviewOverlay() {
         show: stillShown(entry) && placeState(entry.place, model.layers) ? `<button class="btn tiny ghost" data-show="${index}"
             data-tip="Close the review and open this where it is edited.">Show</button>` : ""});
     const demo = demoOf(model);
-    const columns = reviewColumns("What changes", demo.active ? "In the demo setup" : "On the keyboard", "In your draft");
+    // Live + review compares the keyboard's saved profile with what it runs
+    // now; Save makes that permanent (firmware D-F32).
+    const live = Boolean(draft.live);
+    const columns = live ? reviewColumns("What changes", "Saved", "Running now")
+        : reviewColumns("What changes", demo.active ? "In the demo setup" : "On the keyboard", "In your draft");
     const discardable = draft.changes.every((change) => Number.isInteger(change.group));
     /** @type {import("../../contracts/model.js").ReviewChange[]} */
     const shown = [];
@@ -50,7 +54,8 @@ export function reviewOverlay() {
             const source = sourceCounts.get(block.group);
             const sourceClass = source ? ` source-${source.trap ? "trap" : "warning"}` : "";
             const discard = discardable ? `<button class="btn tiny ghost" data-discard="${esc(block.group)}" ${canDiscard ? "" : "disabled"}
-                data-tip="${esc(grouped ? `Put these ${block.size} changes back to what the keyboard holds. They were made together, so they go back together.` : "Put this change back to what the keyboard holds.")}">${esc(discardLabel(block))}</button>` : "";
+                data-tip="${esc(live ? (grouped ? `Put these ${block.size} changes back to what is saved, on the keyboard at once. They were made together, so they go back together.` : "Put this change back to what is saved, on the keyboard at once.")
+                    : grouped ? `Put these ${block.size} changes back to what the keyboard holds. They were made together, so they go back together.` : "Put this change back to what the keyboard holds.")}">${esc(discardLabel(block))}</button>` : "";
             const items = block.items.map((entry, index) => item(entry, shown.push(entry) - 1, grouped ? "" : discard, titleSlot, index === 0 ? sourceLabel(block.group) : "")).join("");
             return grouped
                 ? `<div class="rv-block grouped${sourceClass}" data-group="${esc(block.group)}"><div class="rv-group-h"><span class="rv-group-t"><span>${esc(block.title || "Made together")}</span>
@@ -84,17 +89,19 @@ export function reviewOverlay() {
             ${checks}
             ${sections}
             <div class="rv-apply-note"><div class="callout warn">${demo.active ? esc(demo.applyNeedsKeyboard)
+                : live ? "The keyboard already runs these changes. Save keeps a recovery copy of what is saved now, then writes them as its saved profile on both halves. Revert, or unplugging the keyboard, puts back what is saved."
                 : "Apply saves a recovery copy, writes the changes to both halves, then switches both to them at once. Until then the keyboard keeps running its saved profile; if anything interrupts Apply, the recovery copy restores it."}</div></div>
         </div>
         ${demo.active ? `<div class="sheet-f demo-apply"><span class="note"><i class="dot demo"></i> ${esc(DEMO_WORDS.status)}</span>
             <span class="right"><button class="btn primary" data-act="export">Export…</button></span></div>`
         : confirming ? `<div class="sheet-f ck-confirm ${hasTrap ? "trap" : "warning"}" role="alertdialog" aria-label="Confirm profile checks">
-            <span class="ck-confirm-t"><i class="dot ${hasTrap ? "err" : "warn"}"></i>${esc(confirmText(confirmChecks))}</span>
+            <span class="ck-confirm-t"><i class="dot ${hasTrap ? "err" : "warn"}"></i>${esc(confirmText(confirmChecks, live ? "save" : "apply"))}</span>
             <span class="right"><button class="btn" data-act="unconfirm">Go back</button>
-                <button class="btn primary" data-act="apply-anyway" ${canApply ? "" : "disabled"}>Apply anyway</button></span></div>`
+                <button class="btn primary" data-act="apply-anyway" ${canApply ? "" : "disabled"}>${live ? "Save anyway" : "Apply anyway"}</button></span></div>`
         : `<div class="sheet-f"><span class="note">${esc(model?.device?.label || "")} · ${esc(model?.device?.summary || "")}</span>
-            <span class="right"><button class="btn primary" data-act="apply" ${canApply ? "" : "disabled"}
-                    ${blockers.length ? `data-tip="${esc("Resolve the blockers in Checks before applying.")}"` : confirmChecks.length ? `data-tip="${esc("Warnings and traps will be asked about before anything is written.")}"` : ""}>Apply to keyboard</button></span></div>`}
+            <span class="right">${live ? `<button class="btn ghost" data-act="revert" data-tip="${esc("Put back what is saved. Nothing is written; Undo (⌘Z) sends the edits again.")}">Revert</button>` : ""}
+                <button class="btn primary" data-act="apply" ${canApply ? "" : "disabled"}
+                    ${blockers.length ? `data-tip="${esc(`Resolve the blockers in Checks before ${live ? "saving" : "applying"}.`)}"` : confirmChecks.length ? `data-tip="${esc("Warnings and traps will be asked about before anything is written.")}"` : ""}>${live ? "Save on keyboard" : "Apply to keyboard"}</button></span></div>`}
     </div></div>`);
     // Pointing at a group's Discard lights what it takes back, in every area
     // the group reaches.
@@ -138,7 +145,13 @@ export function reviewOverlay() {
         if (target.closest('[data-act="apply-anyway"]')) {
             state.overlay = null;
             state.confirmChecks = null;
-            post(controls.applyDraft(true));
+            post(live ? controls.saveDraft(true) : controls.applyDraft(true));
+            rerender();
+            return;
+        }
+        if (target.closest('[data-act="revert"]')) {
+            state.overlay = null;
+            post(controls.revertDraft());
             rerender();
             return;
         }
@@ -163,7 +176,7 @@ export function reviewOverlay() {
                 return;
             }
             state.overlay = null;
-            post(controls.applyDraft());
+            post(live ? controls.saveDraft() : controls.applyDraft());
             rerender();
         }
     });

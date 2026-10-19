@@ -159,6 +159,10 @@ select.rail-picker {
 }
 select.rail-picker:hover, select.rail-picker:focus-visible { background-color: var(--surface-2); border-color: var(--line); }
 select.rail-picker:disabled { cursor: default; color: var(--text-2); }
+.rail-mode { margin-top: 8px; display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--text-2); }
+.rail-mode select { flex: 1; min-width: 0; padding: 3px 6px; border: 1px solid var(--line); border-radius: 6px;
+  background: var(--surface-2); color: var(--text); font: inherit; }
+.rail-mode select:disabled { color: var(--text-2); }
 .rail-status:not(:has(*)) { display: none; }
 .rail-status { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
 .rail-message { margin: 0 12px 12px; flex: none; display: flex; align-items: flex-start; gap: 6px; padding: 7px 6px 7px 9px;
@@ -1656,6 +1660,12 @@ details[open] > summary .chev { transform: rotate(90deg); }
 .demo-banner .acts { display: flex; gap: 6px; flex: none; }
 .dot.demo { background: none; box-shadow: inset 0 0 0 1.2px var(--text-2); width: 7px; height: 7px; }
 .sheet.leave-demo { width: min(560px, 100%); }
+.sheet.edit-mode-ask, .sheet.live-ask { width: min(560px, 100%); }
+.sheet.edit-mode-ask .sheet-b, .sheet.live-ask .sheet-b { padding: 16px 18px; color: var(--text-2); font-size: 12.5px; }
+.sheet.live-ask.trap .sheet-h { box-shadow: inset 3px 0 0 var(--danger); }
+.sheet.live-ask.warning .sheet-h { box-shadow: inset 3px 0 0 var(--warning); }
+.live-ask-checks { margin: 10px 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; color: var(--text); }
+.live-ask-checks li { display: flex; align-items: center; gap: 8px; }
 .sheet.leave-demo .sheet-b { padding: 16px 18px; color: var(--text-2); font-size: 12.5px; }
 .busy-veil { position: absolute; inset: 0; background: color-mix(in srgb, var(--bg) 55%, transparent);
   display: grid; place-items: center; z-index: 30; }

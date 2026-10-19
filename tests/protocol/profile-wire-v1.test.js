@@ -14,6 +14,7 @@ const {
     decodeCapabilityPages,
     decodeProfileResponse,
     decodeStatusPages,
+    PROFILE_ACTIVE_KIND,
     profileResponseMatcher,
     readProfileCapabilities,
 } = require("../../core/protocol/profile-wire-v1");
@@ -366,7 +367,10 @@ test("decoders reject unknown masks, active kinds, and invalid ranges", () => {
     statusIdentity.writeUInt16LE(PROFILE_WIRE_KNOWN_MASKS.STATE_FLAGS + 1, 2);
     assert.throws(() => decodeStatusPages([statusIdentity, Buffer.alloc(25)]), (error) => error.code === "INCOMPATIBLE_RESPONSE");
     statusIdentity.writeUInt16LE(0, 2);
+    // Kind 4 is the working copy (firmware D-F32); 5 is unknown.
     statusIdentity[24] = 4;
+    assert.equal(decodeStatusPages([statusIdentity, Buffer.alloc(25)]).activeKind, PROFILE_ACTIVE_KIND.WORKING);
+    statusIdentity[24] = 5;
     assert.throws(() => decodeStatusPages([statusIdentity, Buffer.alloc(25)]), /Unknown active profile kind/);
     statusIdentity[24] = 0;
     const invalidOrigin = Buffer.alloc(25);

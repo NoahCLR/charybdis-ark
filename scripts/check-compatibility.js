@@ -8,7 +8,7 @@ const {createHash} = require("node:crypto");
 
 const {checkPins} = require("./check-pins");
 
-const RUNNERS = ["qmk_portable_editor", "qmk_portable_profile", "profile_compiled_defaults_v1", "profile_pd_v1", "profile_rgb_v1", "candidate_transfer", "macro_domain"]
+const RUNNERS = ["qmk_portable_editor", "qmk_portable_profile", "profile_compiled_defaults_v1", "profile_pd_v1", "profile_rgb_v1", "candidate_transfer", "macro_domain", "live_edit"]
     .map(name => `tests/integration/run_${name}_tests.sh`);
 const usage = "npm run test:compat -- --firmware PATH --ark PATH --qmk PATH --report NEW_FILE.json [--publish]";
 // A pin is published when the firmware checkout's last-fetched dev, its trunk, contains it.

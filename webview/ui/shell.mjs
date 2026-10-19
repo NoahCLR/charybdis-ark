@@ -14,6 +14,8 @@ import {buildLine, chooseKeyboard, forgetKeyboard, commitUrl, githubMark, hostOf
 import {boardOutlineMarkup} from "../view/geometry.mjs";
 import {demoOf} from "../view/demo.mjs";
 import {openHistory} from "./history.mjs";
+import {bindEditModeSwitch, editModeSwitch} from "./edit-mode.mjs";
+import {editsAreLive} from "../view/edit-mode.mjs";
 
 // The review opens at once; the host marks it reviewed when it answers.
 function openReview() {
@@ -67,13 +69,14 @@ export function rail() {
             <div class="rail-keyboard">
                 <i class="dot ${keyboardDot.tone}${(health.busy || reconnecting) && !demo.active ? " busy" : ""}" data-tip="${esc(keyboardDot.tip)}"></i>
                 ${name}</div>
+            ${device.connected && !demo.active ? editModeSwitch(Boolean(health.busy)) : ""}
             ${host.chooseKeyboard ? `<div class="rail-choose">
                 <button class="btn tiny" data-act="choose-keyboard" ${health.busy ? "disabled" : ""}
                     data-tip="Pick a Charybdis in the browser's list. Once chosen, it reconnects by itself next time.">Choose keyboard</button>
                 ${device.connected && !demo.active ? `<button class="btn tiny ghost" data-act="forget-keyboard" ${health.busy ? "disabled" : ""}
                     data-tip="Let go of this keyboard. The page will not open it again until you choose it.">Disconnect</button>` : ""}</div>` : ""}
             <div class="rail-status">
-                ${!draft?.dirty ? "" : draft.matching && !draft.stale
+                ${draft?.live ? liveStatus(draft) : !draft?.dirty ? "" : draft.matching && !draft.stale
                     ? `<button class="stat link" data-act="open-review" data-tip="Edits waiting in this window. The keyboard still runs its saved profile. Open the review to see them."><i class="dot draft"></i> ${draft.changes.length} change${draft.changes.length === 1 ? "" : "s"} in draft</button>`
                     : line("draft", `${draft.changes.length} change${draft.changes.length === 1 ? "" : "s"} in draft`, "Edits waiting in this window. The keyboard still runs its saved profile.")}
                 ${demo.active ? "" : health.restartNeeded
@@ -89,7 +92,7 @@ export function rail() {
             <button class="btn tiny ghost rail-history" data-act="history"
                 data-tip="Every step of the draft, newest first, with what each one changed. Go back or forward to any of them.">Draft history${draft && draft.historyLength > 1 ? ` <span class="c">${draft.historyLength - 1}</span>` : ""}</button>
             <button class="btn tiny ghost icon" data-act="undo" aria-label="Undo" aria-keyshortcuts="Meta+Z" ${draft?.canUndo ? "" : "disabled"}
-                data-tip="${esc(draft?.undoLabel ? `Undo: ${draft.undoLabel} (⌘Z)` : "Undo the last edit in the draft (⌘Z). The keyboard is not touched until you apply.")}">↺</button>
+                data-tip="${esc(draft?.undoLabel ? `Undo: ${draft.undoLabel} (⌘Z)${draft.live ? ". The keyboard takes it back at once." : ""}` : draft?.live ? "Undo the last edit (⌘Z). The keyboard takes it back at once." : "Undo the last edit in the draft (⌘Z). The keyboard is not touched until you apply.")}">↺</button>
             <button class="btn tiny ghost icon" data-act="redo" aria-label="Redo" aria-keyshortcuts="Meta+Shift+Z" ${draft?.canRedo ? "" : "disabled"}
                 data-tip="${esc(draft?.redoLabel ? `Redo: ${draft.redoLabel} (⇧⌘Z)` : "Redo the edit you just undid (⇧⌘Z).")}">↻</button>
         </div>` : ""}
@@ -108,11 +111,30 @@ export function rail() {
     /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="forget-keyboard"]'))?.addEventListener("click", () => post(forgetKeyboard()));
     /** @type {HTMLSelectElement | null} */ (node.querySelector('[data-act="select-device"]'))?.addEventListener("change", (event) => post(controls.selectDevice(/** @type {HTMLSelectElement} */ (event.target).value)));
     /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="open-review"]'))?.addEventListener("click", openReview);
+    bindEditModeSwitch(node);
     // Draft history, undo and redo show once there is a draft to step through.
     /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="history"]'))?.addEventListener("click", openHistory);
     /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="undo"]'))?.addEventListener("click", () => post(controls.control("undoProfileDraft")));
     /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="redo"]'))?.addEventListener("click", () => post(controls.control("redoProfileDraft")));
     return node;
+}
+
+// Live + review: what the keyboard runs that is not saved, and whether both
+// halves hold the last edit.
+/** @param {NonNullable<import("../../contracts/panel.js").PublishedModel["draft"]>} draft */
+function liveStatus(draft) {
+    const live = /** @type {NonNullable<typeof draft.live>} */ (draft.live);
+    const count = draft.changes.length;
+    const lines = [];
+    if (live.unsaved || draft.dirty) {
+        const words = `${count} unsaved change${count === 1 ? "" : "s"} on the keyboard`;
+        lines.push(draft.matching && !draft.stale
+            ? `<button class="stat link" data-act="open-review" data-tip="The keyboard runs these edits now. Review and save them to keep them; Revert or unplugging the keyboard puts back what is saved."><i class="dot draft"></i> ${esc(words)}</button>`
+            : `<div class="stat" data-tip="The keyboard runs these edits now; nothing is saved yet."><i class="dot draft"></i> ${esc(words)}</div>`);
+    }
+    if (live.apart) lines.push(`<div class="stat" data-tip="The slave half refused the keyboard's unsaved edits, so the halves run different profiles. Save waits until they agree: Revert puts both back on the saved profile."><i class="dot err"></i> Halves apart · Revert</div>`);
+    else if (!live.converged) lines.push(`<div class="stat" data-tip="The master half runs the last edit; the slave half is still taking it. The next edit waits for it; if this stays, check the cable between the halves."><i class="dot warn"></i> Slave half catching up</div>`);
+    return lines.join("");
 }
 
 // A host that leaves the theme to the panel (a web page) gets its toggle at
@@ -245,6 +267,15 @@ export function commitBar() {
         /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="discard"]'))?.addEventListener("click", () => post(controls.control("discardProfileDraft")));
         return node;
     }
+    if (draft.stale && draft.live) {
+        const node = el(`<div class="commit draft">
+            <span class="n"><i class="dot draft"></i> <strong>${draft.connectionChanged ? "Keyboard connection changed" : "Read the keyboard again"}</strong>
+            <span class="muted">the draft is what the keyboard runs, so Ark reads it again before the next edit</span></span>
+            <span class="sep"></span>
+            <button class="btn" data-act="rebase">Read keyboard</button></div>`);
+        /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="rebase"]')).addEventListener("click", () => post(controls.control("rebaseProfileDraft")));
+        return node;
+    }
     if (draft.stale) {
         const node = el(`<div class="commit draft">
             <span class="n"><i class="dot draft"></i> <strong>${draft.connectionChanged ? "Keyboard connection changed" : "The keyboard changed"}</strong>
@@ -256,6 +287,7 @@ export function commitBar() {
         /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="discard"]')).addEventListener("click", () => post(controls.control("discardProfileDraft")));
         return node;
     }
+    if (draft.live) return liveCommitBar(draft);
     if (!draft.dirty) return null;
 
     // One way on: the review, where Apply lives. What the draft holds is said
@@ -273,6 +305,30 @@ export function commitBar() {
             data-tip="${demo ? "See every change and what the checks find. Apply needs a keyboard; Export saves the setup." : "See every change, then write the draft to both halves as one generation."}">${demo ? "Review changes" : "Review and apply"}</button></div>`);
     /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="review"]')).addEventListener("click", openReview);
     /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="discard"]')).addEventListener("click", () => post(controls.control("discardProfileDraft")));
+    return node;
+}
+
+// Live + review: the keyboard already runs the edits. Review leads to Save;
+// Revert puts back what is saved (undo sends the edits again).
+/** @param {NonNullable<import("../../contracts/panel.js").PublishedModel["draft"]>} draft */
+function liveCommitBar(draft) {
+    const live = /** @type {NonNullable<typeof draft.live>} */ (draft.live);
+    if (!live.unsaved && !draft.dirty) return null;
+    const count = draft.changes.length;
+    // Edits undone back to what is saved still leave the keyboard on its
+    // working copy: Revert is then the way back, with nothing to review.
+    const node = el(`<div class="commit live">
+        <span class="n"><i class="dot draft"></i> <strong>${count ? `${count} unsaved change${count === 1 ? "" : "s"}` : "Unsaved edits"}</strong>
+        <span class="muted">${count ? "running on the keyboard" : "match what is saved"}${live.apart ? " · the halves are apart" : live.converged ? "" : " · the slave half is catching up"}</span></span>
+        ${statusBesideCount(draft.changes) ? `<span class="peek"><span class="note">${esc(statusBesideCount(draft.changes))}</span></span>` : ""}
+        <span class="sep"></span>
+        <button class="btn ${count && !live.apart ? "ghost tiny" : "primary"}" data-act="revert"
+            data-tip="${live.apart ? "The slave half refused these edits, so they cannot be saved. Revert puts both halves back on the saved profile; Undo (⌘Z) sends the edits again."
+                : "Put back the profile the keyboard has saved. Nothing is written; Undo (⌘Z) sends the edits again."}">Revert</button>
+        ${count && !live.apart ? `<button class="btn primary" data-act="review"
+            data-tip="See every unsaved change against what is saved, then save them on both halves.">Review and save</button>` : ""}</div>`);
+    /** @type {HTMLButtonElement | null} */ (node.querySelector('[data-act="review"]'))?.addEventListener("click", openReview);
+    /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="revert"]')).addEventListener("click", () => post(controls.revertDraft()));
     return node;
 }
 

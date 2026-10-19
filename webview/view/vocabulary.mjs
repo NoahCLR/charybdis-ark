@@ -9,7 +9,7 @@
 /** @typedef {{vocabulary?: import("../../contracts/model.js").Vocabulary, pdModes?: {id: number, displayName: string}[]}} VocabularyModel */
 
 /** @type {import("../../contracts/model.js").Vocabulary} */
-const NONE = {phases: /** @type {import("../../contracts/model.js").Vocabulary["phases"]} */ ({}), halves: /** @type {import("../../contracts/model.js").Vocabulary["halves"]} */ ({}), hostOs: [], macroProtection: [], hostLayouts: [], tapSends: "", holdFromPress: "", timingSources: {}, holdHelpers: {hold: [], long: []}, holdWithoutLongHold: [], tiers: {}, branches: [], localities: [], paintModes: [], fadeModes: [], tapCommit: [],
+const NONE = {phases: /** @type {import("../../contracts/model.js").Vocabulary["phases"]} */ ({}), editModes: {}, halves: /** @type {import("../../contracts/model.js").Vocabulary["halves"]} */ ({}), hostOs: [], macroProtection: [], hostLayouts: [], tapSends: "", holdFromPress: "", timingSources: {}, holdHelpers: {hold: [], long: []}, holdWithoutLongHold: [], tiers: {}, branches: [], localities: [], paintModes: [], fadeModes: [], tapCommit: [],
     feedbackOwners: [], stages: [], pointing: {kinds: [], axes: [], invert: [], pointerLayer: [], buttons: [],
         emptyDirection: [], directionOutput: [], scrollAxes: [], modifierPolicy: [], scrollFields: [], heldModifiers: ""}, modifiers: [], comboOptions: {}};
 
@@ -51,3 +51,8 @@ export const phaseWords = (model, phase) => phase ? model?.vocabulary?.phases?.[
 // does not know reads as itself.
 /** @param {{vocabulary?: Partial<Pick<import('../../contracts/model.js').Vocabulary, 'halves'>>} | null | undefined} model @param {import("../../contracts/model.js").HalvesId | undefined} halves @returns {{label: string, detail: string}} */
 export const halvesWords = (model, halves) => (halves && model?.vocabulary?.halves?.[halves]) || {label: String(halves ?? ""), detail: ""};
+
+// How edits reach the keyboard, in the words core chose: 0 Apply, 1 Live,
+// 2 Live + review. A mode the table does not know reads as its number.
+/** @param {VocabularyModel | null | undefined} model @param {number} mode @returns {{id: string, label: string, detail: string}} */
+export const editModeWords = (model, mode) => vocabulary(model).editModes?.[mode] || {id: String(mode), label: `Mode ${mode}`, detail: ""};

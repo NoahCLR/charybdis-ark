@@ -63,6 +63,10 @@ const PROFILE_ACTIVE_KIND = Object.freeze({
     COMMITTED: 1,
     PREVIEW: 2,
     PENDING: 3,
+    // Unsaved live edits (firmware D-F32): the keyboard runs its working copy.
+    // Status page 0's active digest then carries the working copy's revision,
+    // and page 1's generation and origin are its saved base's.
+    WORKING: 4,
 });
 
 const PROFILE_STATE_FLAGS = Object.freeze({
