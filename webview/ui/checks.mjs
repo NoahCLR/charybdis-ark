@@ -19,12 +19,12 @@ function checkItem(check, show, source) {
 }
 
 // The section, or nothing when the walk found nothing.
-/** @param {readonly import("../../contracts/model.js").Check[]} checks @param {(check: import("../../contracts/model.js").Check) => string} show @param {(check: import("../../contracts/model.js").Check) => string} [source] */
-export function checksSection(checks, show, source = () => "") {
+/** @param {readonly import("../../contracts/model.js").Check[]} checks @param {(check: import("../../contracts/model.js").Check) => string} show @param {(check: import("../../contracts/model.js").Check) => string} [source] @param {string} [step] what makes the edits permanent: Apply, or Save in the live modes */
+export function checksSection(checks, show, source = () => "", step = "Apply") {
     const groups = checkGroups(checks);
     if (!groups.length) return "";
     return `<section class="rv-sect ck">
-        <div class="sect-h"><h4>Checks</h4><span class="note">what can run, what layers you can reach, and what must be fixed before Apply</span></div>
+        <div class="sect-h"><h4>Checks</h4><span class="note">what can run, what layers you can reach, and what must be fixed before ${esc(step)}</span></div>
         ${groups.map((group) => `<details class="ck-group" ${group.open ? "open" : ""}>
             <summary>${DISCLOSURE}${esc(group.title)} <span class="tag">${group.items.length}</span></summary>
             ${group.items.map((check) => checkItem(check, show, source)).join("")}</details>`).join("")}

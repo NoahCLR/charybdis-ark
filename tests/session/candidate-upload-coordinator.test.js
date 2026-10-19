@@ -942,3 +942,33 @@ for (const compiledOnly of [true, false]) {
         assert.equal(f.keyboard.mutations.filter(report => report[0] === 7 && report[2] === PROFILE_CANDIDATE_V1.VALUE_VALIDATE).length, 1);
     });
 }
+
+
+test("Apply waits for a queued key adjustment to publish before retrying BEGIN", async () => {
+    const harness = new CandidateFirmwareHarness({busyOnce: new Set([CANDIDATE_OPERATION.BEGIN])});
+    const progress = [];
+    let polls = 0;
+    const result = await coordinator(harness, {
+        maxBusyResubmissions: 1,
+        readEditProgress: async () => {
+            assert.equal(operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_BEGIN).length, 1, "no retry while the adjustment is pending");
+            return {adjustmentPending: ++polls < 8};
+        },
+        onProgress: value => progress.push(value),
+    }).upload(representativeBlob(), {actionAbiDigest: 0x12345678});
+    assert.equal(result.status.state, CANDIDATE_STATE.VALIDATED);
+    assert.equal(polls, 8);
+    assert.equal(operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_BEGIN).length, 2);
+    assert.ok(progress.some(value => value.adjustmentPending));
+    assert.equal(result.progress.adjustmentPending, false);
+});
+
+test("an adjustment that cannot publish ends the Apply wait with a definite BUSY, without uploading", async () => {
+    const harness = new CandidateFirmwareHarness({busyOnce: new Set([CANDIDATE_OPERATION.BEGIN])});
+    await assert.rejects(coordinator(harness, {
+        maxStatusPolls: 3,
+        readEditProgress: async () => ({adjustmentPending: true}),
+    }).upload(representativeBlob(), {actionAbiDigest: 0x12345678}), error => error.code === "MAILBOX_BUSY" && !error.ambiguous);
+    assert.equal(operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_BEGIN).length, 1);
+    assert.equal(operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_STREAM_CHUNK).length, 0);
+});

@@ -40,12 +40,17 @@ export type TransportErrorCode =
 export interface TransportErrorOptions {
     cause?: unknown;
     deviceId?: string;
+    /** A timeout: how long the request waited, and its first bytes in hex. */
+    timeoutMs?: number;
+    request?: string;
 }
 
 export interface RequestOptions {
     timeoutMs?: number;
     signal?: AbortSignal;
     matchResponse?: (response: Buffer, request: Buffer) => boolean;
+    /** A background read that may be missed: its timeout rejects it alone and keeps the connection. */
+    softTimeout?: boolean;
 }
 
 /** Protocols need a serialized request channel, not a native device handle. */
@@ -80,6 +85,7 @@ export interface RequestOperation {
     status: "queued" | "active" | "settled";
     timeoutId?: ReturnType<typeof setTimeout>;
     timeoutMs: number;
+    softTimeout: boolean;
     abortListener?: () => void;
 }
 

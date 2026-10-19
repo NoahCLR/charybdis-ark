@@ -132,6 +132,7 @@ class CandidateUploadCoordinator {
         // Reads candidate status page 1 while the keyboard prepares the other
         // half. Optional: without it the peer phase is waited out blind.
         this.readPeerStatus = typeof options.readPeerStatus === "function" ? options.readPeerStatus : undefined;
+        this.readEditProgress = options.readEditProgress;
         this.sleep = typeof options.sleep === "function" ? options.sleep : defaultSleep;
         this.now = typeof options.now === "function" ? options.now : Date.now;
         this.transactionIds = options.transactionIds || new CandidateTransactionIdSequence(options.transactionIdStart);
@@ -548,6 +549,12 @@ class CandidateUploadCoordinator {
     async waitUntilBusyCanResolve(context, baseline, operationDetails) {
         const budget = this.createStatusBudget(context, baseline);
         while (true) {
+            // A queued DPI/lighting adjustment blocks BEGIN without occupying
+            // the candidate mailbox. Wait for publication before resubmitting;
+            // an admitted frame or a lost answer never enters this path.
+            if (context.operation === CANDIDATE_OPERATION.BEGIN && this.readEditProgress) {
+                context.adjustmentPending = (await this.readEditProgress()).adjustmentPending;
+            }
             const status = await this.readStatus(context, {ambiguous: false});
             context.status = status;
             this.emitProgress(context);
@@ -558,7 +565,7 @@ class CandidateUploadCoordinator {
                 assertSuccessfulOperationStatus(status, context, operationDetails);
                 return {processed: true, safeToResubmit: false, status};
             }
-            if (!status.mailboxPending) {
+            if (!status.mailboxPending && !context.adjustmentPending) {
                 return {
                     processed: false,
                     safeToResubmit: canSafelyResubmit(status, context, operationDetails),
@@ -1037,6 +1044,7 @@ function peerProgressFingerprint(peer) {
 /** @param {Context} context @returns {Progress} */
 function progressFor(context) {
     return {
+        adjustmentPending: context.adjustmentPending,
         peer: context.peer ? {...context.peer} : null,
         phase: context.phase,
         transactionId: context.transactionId,

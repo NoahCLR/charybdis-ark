@@ -6,8 +6,9 @@
 // errors. web/page.mjs starts it with the page's own globals; everything it
 // touches comes in through `env`, so it can be started with stand-ins.
 
-import {demoUnsaved, FILE_MAX_BYTES, openPanelLoop, WebHidDeviceAdapter, writingProfile} from "./core.mjs";
+import {closingLoses, demoUnsaved, FILE_MAX_BYTES, openPanelLoop, WebHidDeviceAdapter, writingProfile} from "./core.mjs";
 import {connectPanel} from "./panel-channel.mjs";
+import {nativePopups} from "./native-popups.mjs";
 import {openRecoveries} from "./recoveries.mjs";
 import {workerSleep} from "./sleep.mjs";
 
@@ -42,10 +43,12 @@ export function initialTheme(saved, prefersLight) {
 }
 
 // Whether leaving the page would lose something: unapplied edits (in the
-// demo, edits not exported since), or an Apply (or a restore) part way through.
+// demo, edits not exported since), edits in Live + review not saved (in Live
+// the keyboard keeps and saves them, so only an edit on its way counts), or an
+// Apply, a Save (or a restore) part way through.
 /** @param {import("../core/session/types.js").PanelSession & {service: {phase?: import("../contracts/model.js").PhaseId}}} session */
 export function leaving(session) {
-    const edits = session.demo ? demoUnsaved(session) : session.draft?.dirty;
+    const edits = session.demo ? demoUnsaved(session) : closingLoses(session);
     return Boolean(edits || writingProfile(session));
 }
 
@@ -103,6 +106,9 @@ export function startWebHost(env) {
     };
 
     const loop = openPanelLoop(host, {adapter, sleep: workerSleep(worker)});
+    // A live keyboard's own saves and key adjustments show up between edits,
+    // looked for only while the page can hear the answer (native-popups.mjs).
+    loop.watch({paused: nativePopups(document).paused});
     const panel = connectPanel({receive, gesture, target: window});
 
     // Chrome opens its picker and file chooser only inside the click, so they

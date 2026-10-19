@@ -2,7 +2,7 @@
 
 This document defines the ownership model for live editing with Charybdis Ark
 (the independent app repository in the
-[local workspace map](https://github.com/NoahCLR/charybdis-4x6/blob/fb76c5a4f767848b15bb7f12e40f506b63344a5a/docs/DEVELOPMENT.md#local-repositories-and-worktrees)). It supersedes the earlier project assumption that the three C
+[local workspace map](https://github.com/NoahCLR/charybdis-4x6/blob/e9a72ce493ec94bc3fd90bd7de6eae01884629c9/docs/DEVELOPMENT.md#local-repositories-and-worktrees)). It supersedes the earlier project assumption that the three C
 authoring files must remain the only source of truth during a live editing
 session.
 
@@ -164,7 +164,7 @@ physical capacity.
 
 The delivery slices are in Ark's product goal and the product's status in
 Ark's direction; the firmware's status is in the
-[firmware direction](https://github.com/NoahCLR/charybdis-4x6/blob/fb76c5a4f767848b15bb7f12e40f506b63344a5a/docs/LIVE_EDIT_APP_DIRECTION.md#current-firmware-status).
+[firmware direction](https://github.com/NoahCLR/charybdis-4x6/blob/e9a72ce493ec94bc3fd90bd7de6eae01884629c9/docs/LIVE_EDIT_APP_DIRECTION.md#current-firmware-status).
 The one-store commit and recovery ordering are implemented (D-F31). The
 active phase is
 acceptance: reboot, reconnect, applicable USB/role configurations,

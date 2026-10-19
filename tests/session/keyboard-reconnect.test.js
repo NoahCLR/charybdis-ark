@@ -232,7 +232,7 @@ test("in the panel loop, a renamed keyboard is followed through its restart and 
     assert.equal(service.snapshot().error, null, "no error while it restarts");
     adapter.devices = [{id: "fake-charybdis-2", product: "Desk", manufacturer: "Bastard Keyboards", serialNumber: "FAKE-1"}];
     loop.serviceChanged();
-    assert.deepEqual(posted.at(-1).model.reconnecting, {name: "Desk"});
+    assert.deepEqual(posted.at(-1).model.reconnecting, {name: "Desk", lost: false});
     assert.equal(posted.at(-1).model.load.state, "loading");
     assert.equal(posted.at(-1).model.load.progress, RECONNECT_WORDS.waiting);
     await loop.reconnected();

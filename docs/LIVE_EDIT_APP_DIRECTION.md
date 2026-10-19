@@ -50,7 +50,7 @@ matrix.
 | Keyboard name | The keyboard's own name, its USB product string, edited as the Keyboard screen's title and stored in the settings domain; an Apply that renames it is followed through the keyboard's USB restart (D-L62) |
 | Backup and restore | Complete current-format backup files, restore review against the keyboard, the copies saved before each Apply (each usable as a draft) and verified restore; older formats are refused, never converted (D-L15, D-L23, D-L54, D-L64) |
 | Drafts and Apply | One draft with item-by-item review, discard by edit group, Show, undo/redo and history; the review checks reachable actions, confirms warnings and traps and blocks what the destination cannot save; Apply names its steps and halves and says where a failure happened (D-L19, D-L23, D-L29, D-L30, D-L36, D-L60, D-L61) |
-| How edits reach the keyboard | Per keyboard, stored on it: **Live + review** (the default) sends every edit, undo and discard to the keyboard's working copy at once, asks before one adds a trap or warning, reviews the working copy against the saved profile and Saves or Reverts on the keyboard; **Apply** keeps edits in Ark's draft as before. Switching asks Save/Revert or Send/Discard first; toggles a key turned off show as turned off by key (D-L65, firmware D-F32) |
+| How edits reach the keyboard | Per keyboard, stored on it, three modes: **Live + review** (the default) sends every edit, undo and discard to the keyboard's working copy at once, asks before one adds a trap or warning, reviews the working copy against the saved profile and Saves or Reverts on the keyboard; **Live** sends edits the same way and the keyboard saves them by itself after 3 s of quiet, which Ark shows as "saved by the keyboard" from its status; **Apply** keeps edits in Ark's draft as before. Switching asks Save/Revert or Send/Discard first where work would be lost; leaving Live has the keyboard save first. Edits the keyboard's adjustment keys make are read again as news; toggles a key turned off show as turned off by key (D-L65, D-L66, firmware D-F32) |
 | Firmware supported | Current firmware only: the new base, Profile Wire 2.0 and profile schema 4.0, required exactly (major and minor), whose version implies everything the keyboard does; the feature word only describes the build (split, saves, pointing). A keyboard on anything else, the previous base included, is read no further than its identity and told to update; a keyboard whose saved profile is in an earlier store format or retired test layout says it runs its built-in defaults (D-L48, D-L64) |
 | Recovery | One-store atomic Apply, differential profile transfer, firmware commit recovery after the decision, resume after a lost or power-cycled peer link, verified running-layout reads or an unavailable layout during recovery, bounded cancel owned by the keyboard (D-L20–D-L22, D-L27, D-L39, D-L58) |
 | Where it runs | The VS Code extension, and a web page in Chrome or Edge over WebHID; Cloudflare Git integration publishes `dev` to `ark-dev.ncleroy.dev`, `main` to `ark.ncleroy.dev`, and task branches to PR previews; a phone gets only a notice (D-L02, D-L52) |
@@ -120,15 +120,29 @@ Remaining before calling the product complete:
   Revert; undo and redo; a replug dropping unsaved edits; the mode switch and
   its questions, in VS Code and in Chrome; the combos key showing as turned off
   by key. Automated tests use a fake keyboard with a working copy only.
-- **Ark has no Live mode yet (D-L65).** A keyboard set to Live (it saves by
-  itself, firmware task 9) is shown as Live and edited as Live + review; the
-  keyboard does not save on its own yet either.
-- **Adjustment keys are not edits yet (firmware D-F32).** The DPI and RGB keys
-  move QMK's values only until a replug; Ark shows the stored values, not the
-  adjusted ones (GET `0x22` reports them; Ark reads only its toggles). Any
-  settings edit, Revert, Save or Apply also undoes a key adjustment at once,
-  since the keyboard applies its stored values again; this lasts until the
-  firmware makes adjustment keys edits (firmware task 9).
+- **Live needs keyboard acceptance (D-L66).** Edit in Live, close Ark, replug:
+  the edit is kept after a successful save; unplug before saving (including
+  with a key held or a failed save): all edits since the last successful save
+  are gone and Ark says so; switch between all three modes with unsaved work and with an Apply
+  draft; a DPI or RGB key's change shows in Ark within a second and survives a
+  replug in Live and Apply; "saved by the keyboard" appears after the quiet
+  period; in VS Code and in Chrome. Automated tests use a fake keyboard whose
+  own save a test triggers; the real quiet period, flash pauses and polling
+  load are untested on hardware.
+- **Menus and a live keyboard need keyboard acceptance in Chrome on macOS
+  (D-L66).** On 2026-10-19 the web Ark, in Live on Noah's keyboard, lost the
+  connection each time a dropdown was opened. A keyboard session the same day
+  confirmed the cause in Chrome for Testing 153 on macOS: no input report
+  reaches the page while a `<select>`'s native menu is open. Looks pause while
+  a menu may be open, a missed look keeps the connection, and a lost keyboard
+  is connected again; the pause was then defeated by the focus change a real
+  press makes (now fixed and tested). Hold each dropdown open for several
+  seconds in Live and Live + review in Noah's own Chrome and confirm nothing
+  drops; if it does, note the request the diagnostics name.
+- **Ark polls a live keyboard once a second (D-L66).** Four status reports per
+  second while a live draft is open and nothing else holds the keyboard; a
+  key adjustment then rereads the whole working copy (and the saved profile),
+  which takes a moment on a large profile.
 - **The picker's list of unbuilt QMK features is written by hand** (D-L05).
   `webview/view/picker-sections.mjs` hides keycodes for features this build
   does not include, matched against its rules files and QMK's defaults. It
@@ -398,10 +412,11 @@ leaves independent diagnostics and opens no editable draft or complete backup.
 Export captures what the keyboard runs,
 not unapplied changes. Closing the editor loses the draft.
 
-In Live + review (D-L65) the same draft is the keyboard's working copy: its
-history moves only when the keyboard confirms an edit, review compares it with
-the saved profile, and Save replaces Apply. The rules above for review, checks
-and recovery copies hold for both modes.
+In Live + review (D-L65) and Live (D-L66) the same draft is the keyboard's
+working copy: its history moves only when the keyboard confirms an edit, review
+compares it with the saved profile, and Save replaces Apply (in Live the
+keyboard saves by itself). The rules above for review, checks and recovery
+copies hold for every mode.
 
 ### D-L20 — Differential Apply
 
@@ -1197,6 +1212,30 @@ also restart, so Ark expects it conservatively. Reading or choosing a keyboard
 during the wait ends it; this also ends an expectation if a repaired keyboard
 kept its name and never needed to restart.
 
+In the live modes the keyboard runs its working copy, so a live edit, undo or
+Revert that changes the stored name restarts USB the same way, without a save;
+Ark expects that restart after each such edit as it does after a save. The
+host lists the keyboard again as a new device, but the draft is not left
+behind with the old one: a live read naming the draft's edit session, which
+the keyboard chooses afresh at every boot, is the same running keyboard, so
+the draft follows it with its history, and the rename can be reviewed, saved
+or reverted (before 2026-10-19 it said the draft belonged to another keyboard
+and offered only Discard).
+
+**A keyboard lost unexpectedly** is followed the same way where nothing else
+would notice it come back. When a request goes unanswered past its timeout,
+Ark closes the connection but the keyboard stays plugged in; when a keyboard
+drops off USB in a host that shows serial numbers (node-hid), its serial
+identifies it on return. In those cases the device service records which
+keyboard it was and what happened, and the panel loop waits up to 10 s for it:
+the same listed device if it never left, otherwise by serial or unshared
+product name as above. A web page follows Chrome's own connect events for a
+keyboard that dropped off, as before. Ark connects it again,
+reads it and says what happened ("did not answer within 1000 ms",
+"disconnected"). It does this at most once in 30 s; a keyboard that fails again
+sooner is left to the person with the failure shown. The diagnostics name the
+first bytes of the request that went unanswered.
+
 ### D-L63 — A custom key's shortcut is its own action
 
 Firmware D-F26 gives each custom key an optional shortcut, stored in settings
@@ -1335,8 +1374,7 @@ Wire `0x27`) and read with its capabilities: **Apply** keeps the existing
 draft, review and Apply; **Live + review**, the default of a keyboard never
 set, opens the draft on the keyboard's working copy. Both share the draft
 model, review, checks and history; they differ in when an edit reaches the
-keyboard and what makes it permanent. Live (the keyboard saving on its own)
-is shown when reported and edited as Live + review until Ark offers it. An
+keyboard and what makes it permanent. Live, the third mode, is D-L66. An
 Apply-mode keyboard still running unsaved edits (left by another client) opens
 as Live + review, since only Save or Revert can settle them.
 
@@ -1422,6 +1460,112 @@ Considered: keeping Ark's own pending queue of unconfirmed edits, so typing
 never waits for the keyboard; rejected because a refusal would have to unwind
 edits made after it, and the keyboard confirms an edit in a few reports.
 
+### D-L66 — Live: the keyboard saves by itself, Ark says so
+
+*Builds on D-L65 and firmware D-F32 (the keyboard's own save, edit status
+page 3, status flags 10–13); plan answers 3 and 4.*
+
+**Three modes.** The mode switch offers Apply, Live and Live + review. Their
+rules, including what a replug does:
+
+| Mode | An edit | Made permanent by | Replug with edits not yet permanent |
+| --- | --- | --- | --- |
+| Apply | stays in Ark's draft | review, then Apply | nothing on the keyboard to lose; the draft is Ark's |
+| Live | reaches both halves at once | the keyboard, after 3 s with no edit and no key held, with or without Ark | loses every edit since the last successful save |
+| Live + review | reaches both halves at once | review, then Save | reverts to the saved profile |
+
+The 3 s is the quiet interval before saving starts, not a bound on possible
+loss. Holding a key postpones the save. A failed automatic save leaves that
+revision unsaved, and unplugging loses every edit since the last successful
+save, however long ago that was.
+
+**Live edits are Live + review's edits.** The same path, trap question, undo
+and redo (D-L65). There is no Save and Ark starts no timer: the keyboard's
+edit status says when it saved (page 3: an automatic save of this revision and
+generation, nothing unsaved), and only that is shown as **saved by the
+keyboard**. What is saved then moves to what runs while the history stays, so
+undo still sends an edit back (and the keyboard saves that too). A failed
+automatic save (page 1's last save failed after Ark's last edit) is shown with
+**Save again**, an ordinary Save after a recovery copy, needing no review
+since every edit was checked before it was sent; or Revert. A save holds the
+profile until it lands, and the keyboard's own starts 3 s after an edit and
+takes seconds (about 6 s for a 6 KB profile): an edit made meanwhile waits for
+it, within the save timeout, instead of being refused after the ordinary 3 s
+busy wait (seen on the keyboard on 2026-10-19, where such edits were lost).
+
+**Looking between edits.** While a live draft is open, nothing else holds the
+keyboard and the draft is current, Ark reads the edit status about once a
+second (both hosts, through the shared panel loop; the timer never keeps a
+process alive). A look that races with an edit is dropped. A look is a
+background read: each of its requests waits 3 s, and an unanswered one only
+skips that look, keeping the connection; its late answer is set aside, never
+taken as another request's. Three unanswered looks in a row mean the keyboard
+is lost (D-L62). The web page pauses looks while a `<select>`'s native menu
+may be open (Chrome on macOS holds back a page's input reports until it
+closes) and while the page is hidden. A press on the select moves focus to it,
+so the control focused before loses it just after the press; that is not the
+menu closing, only the select losing focus is (on 2026-10-19 that focus
+change let three looks go out unanswered and dropped Noah's keyboard). User
+operations keep their strict timeouts. It shows the
+keyboard's own save and the flags; a revision or mode Ark did not make (an
+adjustment key, another app) rereads the keyboard as news, not a failure, in
+every live mode. Under an Apply draft the same look notes the keyboard's
+session, revision and saved generation, and when its keys changed what it runs
+and it saved that, reads it again as Refresh would (an edited draft then says
+the keyboard changed, D-L19); an Apply keyboard opened live because it ran
+unsaved adjustments goes back to an Apply draft once it has saved them. The
+first observation is compared with the successful capture's saved identity,
+so it cannot miss a change already saved before the first poll. A transient
+`PROFILE_CHANGED` during a reread stays eligible for another automatic read;
+a cycle permits three failed captures, then leaves Read keyboard to the
+person. Other stale drafts and persistent read errors require manual recovery.
+An edit refused STALE for the same reason says "not sent", rereads, and asks the
+person to make it again: replaying it on a state they have not seen could undo
+the key's change.
+
+**Switching.** The keyboard refuses a mode change while it has unsaved edits,
+so: leaving Live + review with unsaved edits, for either other mode, asks Save
+or Revert; entering Live or Live + review from Apply with a draft asks Send
+live or Discard; leaving Live asks nothing: Ark waits for a save of the
+keyboard's own that is running, then has it save what is left (its newest
+pair, looking again if a key moved it), then switches. A save Ark asks for
+keeps a recovery copy of the actual saved profile as any Save does, including
+when an automatic save advanced the saved base since the last capture. Ark
+rereads that base inside the flush operation and rechecks the identity after
+recovery before requesting Save. A failure (recovery unavailable, halves
+apart, a failed save) leaves the mode as it was and says why. The mode answer is acknowledged
+once the keyboard reads it back; its write to EEPROM follows when the keyboard
+is quiet.
+
+**Closing and losing the connection.** In Live closing Ark, or the link
+dropping, is not an error: the keyboard continues saving without Ark, and the
+web page asks before leaving only while an edit is on its way. On reconnect
+Ark reads what the keyboard kept and says whether edits it knew of were saved
+before a restart or lost since the last successful save. In Live + review the page
+still asks with unsaved edits, since a replug discards them. What the keyboard
+said of its own saving ("saved by the keyboard", saving, a failed save) is
+shown only while it is connected; a lost keyboard is connected again by itself
+(D-L62).
+
+**Queued key adjustments.** Status flag 13 means a DPI or lighting key change
+awaits publication. Live drafts show this while it waits. If Apply BEGIN
+answers BUSY, Ark waits within its firmware-aware budget for the flag to
+clear before resubmitting BEGIN, with the reason shown in Apply progress.
+The reviewed-base identity check still runs after BEGIN acquires admission;
+a changed base requires another review, never a silent overwrite.
+
+**Flags.** D-L65's handling holds in Live too, and the look between edits
+keeps it current: the other half refusing the working copy (flag 11) is
+**halves apart** with Revert (Save, and so Live's own save, is refused); a
+save waiting for a quiet keyboard on either half (flags 9, 10) says so; an
+edit mode the keyboard has not stored yet (flag 12) marks the switch, since a
+replug may bring the previous mode back.
+
+Considered: Ark asking for Save after its own 3 s timer in Live; rejected
+because the keyboard already does it with or without Ark, and two schedulers
+would race. Considered: retrying a STALE edit on the reread state; rejected
+for the reason above.
+
 ## Historical decisions
 
 These describe the retired v1 app; their lasting rules are stated in the
@@ -1455,7 +1599,9 @@ draft in `tests/view/edits.test.mjs`, and a board that shows what the firmware d
 Edits exist only as a reviewed draft; a keyboard the app cannot open a draft for
 is read-only, and the host refuses edits rather than writing them directly.
 Live + review (D-L65) keeps this: an edit reaches the keyboard's working copy,
-which a replug discards, and only a reviewed Save makes it permanent. v1
+which a replug discards, and only a reviewed Save makes it permanent. Live
+(D-L66) is the person's choice to let the keyboard save every checked edit by
+itself instead. v1
 was frozen by this decision and has since been removed. The current core
 reads and applies the one-store profile through firmware-owned Profile Wire;
 no VIA transport or second-bank writer remains (D-L64, firmware D-F31).

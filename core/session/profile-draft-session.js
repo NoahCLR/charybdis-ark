@@ -21,6 +21,13 @@ const {SETTING} = require("../schema/settings-domain-v1");
 const {resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX, matrixPosition} = require("../data/charybdis-layout");
 const keycodes = require("../data/keycode-catalog");
+const {EDIT_MODE} = require("../protocol/profile-edit-v1");
+const {liveKeyboardStatus} = require("./live-profile-session");
+
+// What the panel shows of the keyboard's own saving and its halves.
+/** @param {import("./types.js").LiveKeyboardStatus | undefined} keyboard @returns {import("../../contracts/panel.js").LiveKeyboardView | null} */
+const liveKeyboardView = keyboard => keyboard ? {saving: keyboard.saving, autoSaving: keyboard.autoSaving, savedByKeyboard: keyboard.savedByKeyboard,
+    adjustmentPending: keyboard.adjustmentPending, saveFailed: keyboard.saveFailed, storagePaused: keyboard.storagePaused || keyboard.peerStoragePaused, quietMs: keyboard.quietMs} : null;
 /**
  * @typedef {import("../model/types.js").PortableDocument} Document
  * @typedef {import("../model/types.js").ProfileSnapshot} Snapshot
@@ -126,7 +133,7 @@ class ProfileDraftSession {
     checksCache;
     /** @type {boolean | undefined} */
     needsRead;
-    /** @type {boolean | undefined} A live keyboard restarted while it had unsaved edits; the next read says they are gone. */
+    /** @type {{kept: boolean, mode: number} | undefined} A live keyboard restarted while Ark knew of unsaved edits; the next read says whether they were kept (saved by the keyboard first) or are gone. */
     restartedWithUnsaved;
     /** @type {boolean | undefined} A live keyboard's working copy changed under the same session without Ark (another app, a lost answer, an edit that did not land as sent); the next read says the draft started again. */
     changedElsewhere;
@@ -188,6 +195,17 @@ class ProfileDraftSession {
             this.connectionChanged = true;
             this.needsRead = true;
         }
+    }
+    // The same running keyboard listed again as a new device, as after the USB
+    // restart a new name causes (firmware D-F25): a live read naming this
+    // draft's edit session, which the keyboard chooses afresh at every boot,
+    // is this keyboard, so the draft follows it there. True when it did.
+    /** @param {Snapshot | null | undefined} snapshot @param {string | null | undefined} deviceId */
+    follow(snapshot, deviceId) {
+        if (!this.live || !deviceId || deviceId === this.deviceId || !snapshot || !("live" in snapshot) || !snapshot.live) return false;
+        if (/** @type {import("./types.js").LiveCapture} */ (snapshot).live.session !== this.live.session) return false;
+        this.deviceId = deviceId;
+        return true;
     }
     // Whether this draft belongs to the keyboard `state` describes: the one it
     // was read from, connected through the connection it was read over. ""
@@ -254,7 +272,7 @@ class ProfileDraftSession {
             return;
         }
         // A new session is a restart: whatever was unsaved is gone (D-F32).
-        if (capture.live.session !== live.session) {if (live.unsaved) this.restartedWithUnsaved = true;}
+        if (capture.live.session !== live.session) {if (live.unsaved) this.restartedWithUnsaved = {kept: capture.saved.fingerprint === this.current.fingerprint, mode: capture.live.mode};}
         else if (capture.live.revision !== live.revision || capture.fingerprint !== this.current.fingerprint) this.changedElsewhere = true;
         this.resetLive(capture);
     }
@@ -652,8 +670,12 @@ class ProfileDraftSession {
     /** @param {LiveTarget} target @param {{session: number, revision: number, bytes: Buffer, converged: boolean, apart?: boolean, unsaved?: boolean}} result */
     confirmLive(target, result) {
         const live = /** @type {import("./types.js").LiveState} */ (this.live);
+        // A save that fails from here on fails these edits; one that failed
+        // before them is no longer the news.
         this.live = {...live, session: result.session, revision: result.revision, working: result.bytes, converged: result.converged, apart: result.apart ?? false,
-            unsaved: result.unsaved ?? (result.revision !== live.revision || live.unsaved)};
+            unsaved: result.unsaved ?? (result.revision !== live.revision || live.unsaved),
+            saveMark: live.keyboard?.lastSaveTransaction ?? live.saveMark,
+            ...(live.keyboard ? {keyboard: {...live.keyboard, savedByKeyboard: false, saveFailed: false, saveError: 0}} : {})};
         if (target.cursor !== undefined && target.cursor !== null) {
             if (target.cursor !== this.cursor) {this.cursor = target.cursor; this.revision++; this.reviewedRevision = null;}
             return;
@@ -666,6 +688,36 @@ class ProfileDraftSession {
         this.cursor = this.history.length - 1;
         this.revision++;
         this.reviewedRevision = target.keepReviewed ? this.revision : null;
+    }
+    // A look at the keyboard between edits (live-watch.js) with the same
+    // session and revision: its own save, its halves, its flags. "saved" when
+    // the keyboard saved what it runs; "same" when nothing visible changed.
+    /** @param {import("../protocol/types.js").EditStatus} status @returns {'saved' | 'changed' | 'same'} */
+    observeLiveStatus(status) {
+        const live = /** @type {import("./types.js").LiveState} */ (this.live);
+        const keyboard = liveKeyboardStatus(status, live.saveMark ?? -1);
+        const converged = !status.peerRequired || status.peerConverged;
+        const saved = live.unsaved && !status.unsaved && status.savedGeneration !== live.savedGeneration;
+        const changed = JSON.stringify(keyboard) !== JSON.stringify(live.keyboard) || converged !== live.converged || status.unsaved !== live.unsaved
+            || status.peerRefused !== Boolean(live.apart);
+        this.live = {...live, keyboard, converged, apart: status.peerRefused};
+        if (saved) {this.confirmKeyboardSaved(status); return "saved";}
+        if (status.unsaved !== live.unsaved) this.live.unsaved = status.unsaved;
+        return changed ? "changed" : "same";
+    }
+    // The keyboard saved what it runs by itself (Live): what is saved moves
+    // to it, and the history stays, so undo still sends the last edits back.
+    // Saved any other way (another app's Save) the draft starts there.
+    /** @param {{savedGeneration: number, savedOrigin: number, session: number, revision: number}} status */
+    confirmKeyboardSaved(status) {
+        const live = /** @type {import("./types.js").LiveState} */ (this.live);
+        if (live.mode !== EDIT_MODE.LIVE) {this.confirmSaved(status); return;}
+        const current = this.current;
+        this.base = {...this.base, document: copy(current.document), fingerprint: current.fingerprint, summary: copy(current.summary), incomplete: false};
+        this.latest = copy(this.base);
+        this.referenceCache = new WeakMap(); this.reviewCache = new WeakMap(); this.checksCache = new WeakMap();
+        this.revision++; this.reviewedRevision = null;
+        this.live = {...live, keyboard: this.live?.keyboard, saved: live.working, unsaved: false, savedGeneration: status.savedGeneration, savedOrigin: status.savedOrigin};
     }
     // Save landed: what the keyboard runs is now what it has saved.
     /** @param {{savedGeneration: number, savedOrigin: number, session: number, revision: number}} status */
@@ -708,10 +760,12 @@ class ProfileDraftSession {
             reviewed: this.reviewedRevision === this.revision,
             changes: this.changes(),
             checks: this.checks(),
-            // Live + review: whether the keyboard runs unsaved edits, whether
-            // both halves hold the last one, and whether the other half
-            // refused it (the halves then run different profiles).
-            live: this.live ? {unsaved: this.live.unsaved, converged: this.live.converged, apart: Boolean(this.live.apart), mode: this.live.mode} : null};
+            // The live modes: whether the keyboard runs unsaved edits, whether
+            // both halves hold the last one, whether the other half refused
+            // it (the halves then run different profiles), and what the
+            // keyboard says of its own saving.
+            // What the keyboard said of its own saving holds only while it is connected.
+            live: this.live ? {unsaved: this.live.unsaved, converged: this.live.converged, apart: Boolean(this.live.apart), mode: this.live.mode, keyboard: connected ? liveKeyboardView(this.live.keyboard) : null} : null};
     }
 }
 // The router (panel-session.js) and the web build take the registry's list from here.

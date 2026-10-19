@@ -39,6 +39,10 @@ class LiveLinkTransportError extends Error {
         if (options.deviceId !== undefined) {
             this.deviceId = options.deviceId;
         }
+        if (options.timeoutMs !== undefined) {
+            this.timeoutMs = options.timeoutMs;
+            this.request = options.request;
+        }
     }
 }
 

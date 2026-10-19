@@ -16,6 +16,16 @@
 //
 // The wait polls the device list, since VS Code has no hotplug events; the
 // web page stops following Chrome's own events while it runs (web-host.mjs).
+//
+// A keyboard lost unexpectedly is waited for the same way when nothing else
+// would notice it come back: it left a request unanswered (Ark then closes
+// the connection, but the keyboard stays plugged in), or it dropped off USB
+// where the host shows serial numbers (node-hid). A web page follows Chrome's
+// own connect events for a keyboard that drops off (web-host.mjs), and Chrome
+// shows no serial to tell a returning keyboard by. The same keyboard is the
+// one still listed under the same device, or else found as a renamed one is.
+// Ark connects it again and reads it once per LOST_GUARD_MS, so a keyboard
+// that keeps failing is left to the person rather than reconnected in a loop.
 
 /**
  * @typedef {import("./types.js").RunningPanelSession} Session
@@ -31,6 +41,15 @@ const RECONNECT_WORDS = Object.freeze({
     ambiguous: "Ark could not identify the renamed keyboard. Choose yours in the keyboard menu.",
     timeout: "The keyboard did not come back after taking its new name. Check its cable, then read the keyboard again.",
     failed: "The keyboard is back under its new name, but reading it again failed. Read the keyboard again.",
+});
+const LOST_GUARD_MS = 30000;
+const LOST_WORDS = Object.freeze({
+    waiting: "Lost the keyboard; connecting it again…",
+    back: /** @param {string} what */ (what) => `The keyboard ${what}; Ark connected it again and read it.`,
+    ambiguous: "Ark lost the keyboard and cannot tell which keyboard is yours now. Choose it in the keyboard menu.",
+    timeout: "The keyboard did not come back. Check its cable, then choose it.",
+    failed: "The keyboard is back, but reading it again failed. Read the keyboard again.",
+    again: "The keyboard stopped answering again soon after Ark connected it again. Check its cable, then choose it.",
 });
 
 // The name a save gives the keyboard, when it changes the one it had; null
@@ -59,6 +78,23 @@ function expectReconnect(session, name, now = Date.now) {
     return expected;
 }
 
+// Starts waiting for a keyboard lost unexpectedly (the service's takeLost),
+// unless Ark already connected one again within LOST_GUARD_MS: then it says
+// so and leaves the choice to the person.
+/** @param {Session} session @param {import("./types.js").LostKeyboard | undefined} lost @param {() => number} [now] */
+function expectLost(session, lost, now = Date.now) {
+    if (!lost || session.reconnect || session.demo || (!lost.unanswered && !lost.serialNumber)) return undefined;
+    if (session.lostAt !== undefined && now() - session.lostAt < LOST_GUARD_MS) {
+        session.notice = LOST_WORDS.again;
+        return undefined;
+    }
+    session.lostAt = now();
+    /** @type {Expected} */
+    const expected = {deviceId: lost.deviceId, serialNumber: lost.serialNumber, name: lost.product, otherDevices: lost.otherDevices, startedAt: now(), dropped: true, lost: lost.what};
+    session.reconnect = expected;
+    return expected;
+}
+
 // Stops expecting it, with what the panel should say about it, if anything.
 /** @param {Session} session @param {Expected} expected @param {string} [notice] */
 function endReconnect(session, expected, notice) {
@@ -69,8 +105,11 @@ function endReconnect(session, expected, notice) {
 }
 
 // Which listed keyboard is the renamed one: found, ambiguous, or not back yet.
-/** @param {Pick<Expected, "serialNumber" | "name" | "otherDevices">} expected @param {readonly Listed[]} devices @returns {{device: Listed} | {ambiguous: true} | null} */
+/** @param {Pick<Expected, "serialNumber" | "name" | "otherDevices"> & Partial<Pick<Expected, "deviceId" | "lost">>} expected @param {readonly Listed[]} devices @returns {{device: Listed} | {ambiguous: true} | null} */
 function reconnectTarget(expected, devices) {
+    // A lost keyboard still listed under the same device never left.
+    const same = expected.lost !== undefined && devices.find((device) => device.id === expected.deviceId);
+    if (same) return {device: same};
     if (expected.serialNumber) {
         const same = devices.filter((device) => device.serialNumber === expected.serialNumber);
         if (same.length === 1) return {device: same[0]};
@@ -99,6 +138,7 @@ function reconnectTarget(expected, devices) {
  */
 async function awaitReconnect(session, expected, {read, publish, sleep = defaultSleep, now = Date.now, waitMs = RECONNECT.WAIT_MS, pollMs = RECONNECT.POLL_MS}) {
     const service = session.service;
+    const words = expected.lost === undefined ? RECONNECT_WORDS : {...LOST_WORDS, back: () => LOST_WORDS.back(/** @type {string} */ (expected.lost))};
     const finish = /** @param {string} notice */ (notice) => {
         endReconnect(session, expected, expected.saved ? `${expected.saved} ${notice}` : notice);
         publish();
@@ -114,7 +154,7 @@ async function awaitReconnect(session, expected, {read, publish, sleep = default
         }
         const late = expected.dropped && now() - expected.startedAt >= waitMs;
         if (state.busy || session.portableBusy || session.readBusy) {
-            if (late) finish(RECONNECT_WORDS.timeout);
+            if (late) finish(words.timeout);
             continue;
         }
         if (state.connected) {
@@ -125,7 +165,7 @@ async function awaitReconnect(session, expected, {read, publish, sleep = default
         }
         try {await service.enumerate();} catch {
             // A stale list cannot establish which keyboard returned.
-            if (late) finish(RECONNECT_WORDS.timeout);
+            if (late) finish(words.timeout);
             continue;
         }
         if (session.reconnect !== expected) return;
@@ -135,16 +175,16 @@ async function awaitReconnect(session, expected, {read, publish, sleep = default
             try {await read(target.device.id);} catch {failed = true;}
             const back = service.snapshot();
             // What the save said comes first, so its recovery copy is not lost.
-            const outcome = failed || !back.connected || back.error ? RECONNECT_WORDS.failed : RECONNECT_WORDS.back(expected.name);
+            const outcome = failed || !back.connected || back.error ? words.failed : words.back(expected.name);
             finish(outcome);
             return;
         }
-        if (target) {finish(RECONNECT_WORDS.ambiguous); return;}
-        if (late) {finish(RECONNECT_WORDS.timeout); return;}
+        if (target) {finish(words.ambiguous); return;}
+        if (late) {finish(words.timeout); return;}
     }
 }
 
 /** @param {number} ms */
 const defaultSleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-module.exports = {RECONNECT, RECONNECT_WORDS, renamedTo, expectReconnect, endReconnect, reconnectTarget, awaitReconnect};
+module.exports = {RECONNECT, RECONNECT_WORDS, LOST_WORDS, LOST_GUARD_MS, renamedTo, expectReconnect, expectLost, endReconnect, reconnectTarget, awaitReconnect};

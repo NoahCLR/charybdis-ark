@@ -227,6 +227,18 @@ diffs the bytes into one splice per changed domain (`schema/profile-splices.js`)
 streams them, waits for the keyboard's outcome and the other half, and never
 replays. A refusal or stale identity rereads the keyboard.
 
+Live (D-L66) is the same draft with the keyboard saving by itself.
+`session/live-watch.js` looks at a live keyboard between edits: hosts call the
+panel loop's `watch()`, which reads the edit status about once a second
+(`ProfileDeviceService.readLiveStatus`, never while an operation runs) and hands
+it to `ProfileDraftSession.observeLiveStatus`, which moves what is saved when
+the keyboard saved by itself (`confirmKeyboardSaved`, history kept) and keeps
+its flags (`live-profile-session.js` `liveKeyboardStatus`); a revision or mode
+Ark did not make rereads the keyboard. Leaving Live calls
+`ProfileDeviceService.flushWorkingCopy` (`LiveEditCoordinator.flush`), with a
+recovery copy of the current saved profile before any explicit Save, before the
+mode changes.
+
 ## Byte formats
 
 `schema/profile-domains.js` owns each domain's ID, model key, version, wire

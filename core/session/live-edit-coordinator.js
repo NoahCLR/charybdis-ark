@@ -42,6 +42,9 @@ const DEFAULT_TIMING = Object.freeze({
     saveMs: 120000,
 });
 
+// How often a request the keyboard refuses while it saves is asked again.
+const SAVE_POLL_MS = 50;
+
 class LiveEditError extends Error {
     /** @param {string} code @param {string} message @param {Record<string, unknown>} [details] */
     constructor(code, message, details = {}) {
@@ -105,7 +108,10 @@ class LiveEditCoordinator {
 
     // A SET the keyboard may answer BUSY while the other half catches up or
     // something else holds the profile: asked again until it is taken. A
-    // BUSY because the halves are apart never ends by waiting.
+    // BUSY because the halves are apart never ends by waiting. A save holds
+    // the profile until it lands (in Live the keyboard's own starts 3 s after
+    // an edit and takes seconds, more for a large profile), so while the
+    // keyboard says one runs the wait is a save's, asked at a save's pace.
     /** @param {() => Buffer} build @param {string} what */
     async sendWhenFree(build, what) {
         const started = this.now();
@@ -113,9 +119,11 @@ class LiveEditCoordinator {
             const reply = await this.send(build());
             if (reply.result !== EDIT_RESULT.BUSY) return reply;
             if (reply.flags & EDIT_FLAGS.PEER_REFUSED) throw apart(what);
+            const saving = (reply.flags & EDIT_FLAGS.SAVING) !== 0;
             const catchingUp = (reply.flags & EDIT_FLAGS.PEER_KNOWN) && !(reply.flags & EDIT_FLAGS.PEER_CONVERGED);
-            if (this.now() - started > (catchingUp ? this.timing.catchUpMs : this.timing.busyMs)) throw refused(reply.result, what, {session: reply.session, revision: reply.revision});
-            await this.sleep(this.timing.pollMs);
+            const limit = saving ? this.timing.saveMs : catchingUp ? this.timing.catchUpMs : this.timing.busyMs;
+            if (this.now() - started > limit) throw refused(reply.result, what, {session: reply.session, revision: reply.revision});
+            await this.sleep(saving ? Math.max(this.timing.pollMs, SAVE_POLL_MS) : this.timing.pollMs);
         }
     }
 
@@ -234,6 +242,44 @@ class LiveEditCoordinator {
             if (status.save.phase === 0 && status.save.lastTransactionId === transactionId) {
                 if (status.save.lastResult !== EDIT_RESULT.OK) throw refused(status.save.lastResult, "The keyboard did not save", {session: status.session, revision: status.revision, candidateError: status.save.lastError});
                 return {saved: true, ...status};
+            }
+            if (this.now() > until) throw new LiveEditError("LIVE_SAVE_PENDING", "The keyboard has not finished saving. Keep both halves connected and read the keyboard again.");
+            await this.sleep(Math.max(this.timing.pollMs, 20));
+        }
+    }
+
+    // Leaving Live: the keyboard saves at once whatever it has not saved yet,
+    // since it refuses a mode change with unsaved edits (firmware D-F32). A
+    // save of its own that is running is waited for, not raced; the pair
+    // saved is the keyboard's own, since in Live it would save it anyway.
+    /** @param {(progress: import("../protocol/types.js").EditStatus) => void} [onProgress]
+     * @param {(status: import("../protocol/types.js").EditStatus) => Promise<void>} [beforeSave] */
+    async flush(onProgress = () => {}, beforeSave = async () => {}) {
+        const until = this.now() + this.timing.saveMs;
+        for (;;) {
+            const status = await this.status();
+            onProgress(status);
+            if (status.peerRefused) throw apart("The keyboard could not save");
+            const running = status.adjustmentPending || status.saving || status.save.phase !== 0 || status.autoSave.inProgress;
+            if (!running && !status.unsaved) return {saved: false, ...status};
+            if (!running) {
+                try {
+                    await beforeSave(status);
+                    const current = await this.status();
+                    if (!current.unsaved && !current.adjustmentPending && !current.saving && !current.autoSave.inProgress) return {saved: false, ...current};
+                    if (current.session !== status.session || current.revision !== status.revision || current.savedGeneration !== status.savedGeneration
+                        || current.savedOrigin !== status.savedOrigin || current.adjustmentPending || current.saving || current.autoSave.inProgress) {
+                        throw new LiveEditError("LIVE_EDIT_STALE", "The keyboard moved while its recovery copy was saved.");
+                    }
+                    if (this.now() > until) throw new LiveEditError("LIVE_SAVE_PENDING", "The keyboard has not finished saving. Read the keyboard again.");
+                    return await this.save({session: current.session, revision: current.revision}, onProgress);
+                }
+                catch (error) {
+                    // An edit of the keyboard's own (an adjustment key) or its
+                    // own save got in first: look again.
+                    const code = /** @type {{code?: string, result?: string}} */ (error);
+                    if (!(code.code === "LIVE_EDIT_STALE" || code.result === "BUSY")) throw error;
+                }
             }
             if (this.now() > until) throw new LiveEditError("LIVE_SAVE_PENDING", "The keyboard has not finished saving. Keep both halves connected and read the keyboard again.");
             await this.sleep(Math.max(this.timing.pollMs, 20));

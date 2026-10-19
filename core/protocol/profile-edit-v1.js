@@ -25,14 +25,15 @@ const PROFILE_EDIT_V1 = Object.freeze({
     VALUE_SAVE: 0x25,
     VALUE_REVERT: 0x26,
     VALUE_MODE: 0x27,
-    // GET values: the edit status (pages 0–2), the active profile (paged,
+    // GET values: the edit status (pages 0–3), the active profile (paged,
     // wide), the runtime overrides and QMK's live values, the edit mode.
     VALUE_STATUS: 0x20,
     VALUE_ACTIVE: 0x21,
     VALUE_RUNTIME: 0x22,
     STATUS_LAYOUT: 1,
     ACTIVE_LAYOUT: 1,
-    STATUS_PAGES: 3,
+    STATUS_PAGES: 4,
+    AUTO_SAVE_LAYOUT: 1,
     MAX_SPLICES: 8,
     DATA_MAX: 22,
     PAGE_SIZE: PROFILE_WIRE_V1.PAYLOAD_SIZE,
@@ -67,8 +68,9 @@ const EDIT_FLAGS = Object.freeze({
     PEER_STORAGE_PAUSED: 1 << 10,
     PEER_REFUSED: 1 << 11,
     MODE_NOT_STORED: 1 << 12,
+    ADJUSTMENT_PENDING: 1 << 13,
 });
-const KNOWN_EDIT_FLAGS = 0x1fff;
+const KNOWN_EDIT_FLAGS = 0x3fff;
 
 // How the client's edits reach the keyboard, stored on the keyboard outside
 // every profile. A keyboard never set is in Live + review.
@@ -192,12 +194,13 @@ const flagsOf = flags => ({
     peerStoragePaused: Boolean(flags & EDIT_FLAGS.PEER_STORAGE_PAUSED),
     peerRefused: Boolean(flags & EDIT_FLAGS.PEER_REFUSED),
     modeNotStored: Boolean(flags & EDIT_FLAGS.MODE_NOT_STORED),
+    adjustmentPending: Boolean(flags & EDIT_FLAGS.ADJUSTMENT_PENDING),
 });
 
 // Edit status: page 0 this half, page 1 the other half and the save, page 2
-// where the last refused edit failed.
+// where the last refused edit failed, page 3 the keyboard's own saves.
 /** @param {Buffer[]} pages @returns {import("./types.js").EditStatus} */
-function decodeEditStatusPages([local, peer, error]) {
+function decodeEditStatusPages([local, peer, error, auto]) {
     for (const page of [peer, error]) if (!page || page.length !== 25) throw new ProfileEditProtocolError("MALFORMED_RESPONSE", "An edit status page has 25 bytes.");
     if (error.subarray(22).some(byte => byte !== 0)) throw new ProfileEditProtocolError("NONCANONICAL_RESPONSE", "Reserved edit status bytes must be zero.");
     return {
@@ -209,7 +212,21 @@ function decodeEditStatusPages([local, peer, error]) {
         refusal: {validatorResult: error[0], domainId: error[1], tableId: error[2], row: error.readUInt16LE(3), step: error[5], field: error[6],
             byteOffset: error.readUInt32LE(7), detailKind: error[11], detailCode: error.readUInt16LE(12)},
         safeBoundaryReasons: error.readUInt32LE(14), activeLength: error.readUInt32LE(18),
+        autoSave: decodeAutoSavePage(auto),
     };
+}
+
+// Page 3: the saves the keyboard made by itself (Live, and adjustment keys in
+// Apply) since this USB half booted. The counter names an event between
+// polls; only a success counts, and a failure is the save's on page 1.
+/** @param {Buffer} page @returns {import("./types.js").AutoSaveStatus} */
+function decodeAutoSavePage(page) {
+    if (!page || page.length !== 25) throw new ProfileEditProtocolError("MALFORMED_RESPONSE", "An edit status page has 25 bytes.");
+    if (page[0] !== PROFILE_EDIT_V1.AUTO_SAVE_LAYOUT) throw new ProfileEditProtocolError("INCOMPATIBLE_RESPONSE", `Unsupported automatic save layout ${page[0]}.`);
+    if (page[1] & ~3) throw new ProfileEditProtocolError("INCOMPATIBLE_RESPONSE", "The automatic save status has unknown flags.");
+    if (page.subarray(16).some(byte => byte !== 0)) throw new ProfileEditProtocolError("NONCANONICAL_RESPONSE", "Reserved edit status bytes must be zero.");
+    return {inProgress: Boolean(page[1] & 1), lastWasAutomatic: Boolean(page[1] & 2), count: page.readUInt32LE(2),
+        revision: page.readUInt32LE(6), generation: page.readUInt32LE(10), quietMs: page.readUInt16LE(14)};
 }
 
 /** @param {import("../transport/types.js").RequestConnection} connection @param {number} value @param {number} page @param {import("./types.js").ReadOptions & {nextRequestId: () => number}} options */
@@ -308,5 +325,5 @@ async function readActiveProfile(connection, options) {
 module.exports = {PROFILE_EDIT_V1, EDIT_RESULT, EDIT_RESULT_NAMES, EDIT_PHASE, EDIT_FLAGS, EDIT_MODE, SPLICE_FLAGS, ProfileEditProtocolError,
     buildEditBeginRequest, buildEditSpliceRequest, buildEditDataRequest, buildEditCommitRequest, buildEditAbortRequest,
     buildSaveRequest, buildRevertRequest, buildEditModeRequest, editReplyMatcher, decodeEditReply, sendEditRequest,
-    decodeEditStatusPages, readEditStatus, decodeEditProgress, readEditProgress, decodeEditModePage, readEditMode, decodeRuntimePage, readRuntime,
+    decodeEditStatusPages, decodeAutoSavePage, readEditStatus, decodeEditProgress, readEditProgress, decodeEditModePage, readEditMode, decodeRuntimePage, readRuntime,
     decodeActiveMetadata, readActiveProfile};

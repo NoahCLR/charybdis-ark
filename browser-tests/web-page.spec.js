@@ -596,3 +596,86 @@ test("in Live + review an edit reaches the keyboard at once, and review and Save
     expect(errors).toEqual([]);
     ownFilesOnly();
 });
+
+// Live through the real web host: Ark switches into it (no unsaved edits, so
+// no question), an edit runs at once, and the page shows "saved by the
+// keyboard" once the keyboard's status says so; Ark never sends Save. Leaving
+// the page then loses nothing, so it does not ask.
+test("in Live the keyboard saves an edit by itself and the page says so, without asking on leaving", async ({page, context, baseURL}) => {
+    test.setTimeout(90000);
+    const keyboard = liveKeyboard({document: pdDocument(), autoSaveAfterReads: 2});
+    const {ownFilesOnly} = await withKeyboard(context, baseURL, 1, keyboard);
+    const errors = await open(page);
+    await page.locator('.read-placeholder [data-act="choose-keyboard"]').click();
+    await ready(page);
+    await page.locator('[data-f="rail:edit-mode"]').selectOption("1");
+    await expect(page.locator(".rail-message")).toContainText("Edits now reach the keyboard by Live", {timeout: 20000});
+    expect(keyboard.mode).toBe(1);
+
+    await page.locator('[data-screen="mouse"]').click();
+    const field = page.locator('select[data-macro="normalDpi"]');
+    await expect(field).toBeEnabled();
+    const other = await field.evaluate((select) => [...select.options].find((option) => !option.selected).value);
+    await field.selectOption(other);
+    await expect(page.locator(".rail-status")).toContainText("Saved by the keyboard", {timeout: 20000});
+    expect(keyboard.events).toContain("auto-saved");
+    expect(keyboard.working).toBe(null);
+    expect(keyboard.mutations.some(report => report[2] === 0x25), "Ark never asked it to save").toBe(false);
+    await expect(page.locator(".commit.live")).toHaveCount(0);
+    // A second edit, then the page closes before the keyboard saves it: the
+    // page does not ask, and opened again it reads what the keyboard kept.
+    const third = await field.evaluate((select) => [...select.options].find((option) => !option.selected).value);
+    await field.selectOption(third);
+    await expect.poll(() => keyboard.events.filter((event) => event === "auto-saved").length, {timeout: 20000}).toBe(2);
+    await expect(page.locator(".rail-status")).toContainText("Saved by the keyboard", {timeout: 20000});
+    const dialogs = [];
+    page.on("dialog", (dialog) => {dialogs.push(dialog.type()); void dialog.accept();});
+    await page.reload();
+    expect(dialogs).toEqual([]);
+    await ready(page);
+    await expect(page.locator('[data-f="rail:edit-mode"]')).toHaveValue("1");
+    await page.locator('[data-screen="mouse"]').click();
+    await expect(page.locator('select[data-macro="normalDpi"]')).toHaveValue(third);
+    await expect(page.locator(".commit.live")).toHaveCount(0);
+    expect(errors).toEqual([]);
+    ownFilesOnly();
+});
+
+// Chrome on macOS holds back a page's input reports while one of its native
+// menus is open. In Live, a press on a select pauses the looks at the keyboard
+// until the menu closes, and answers held back for longer than any timeout do
+// not drop the keyboard.
+test("in Live a held-open menu pauses the looks, and answers held back never drop the keyboard", async ({page, context, baseURL}) => {
+    test.setTimeout(60000);
+    const keyboard = liveKeyboard({document: pdDocument()});
+    await withKeyboard(context, baseURL, 1, keyboard);
+    const errors = await open(page);
+    await page.locator('.read-placeholder [data-act="choose-keyboard"]').click();
+    await ready(page);
+    await page.locator('[data-f="rail:edit-mode"]').selectOption("1");
+    await expect(page.locator(".rail-message")).toContainText("Edits now reach the keyboard by Live", {timeout: 20000});
+    await expect.poll(() => page.evaluate(() => window.__fakeHidSent), {timeout: 5000}).toBeGreaterThan(0);
+
+    // The menu opens: no look goes out while it may be open. A real press
+    // moves focus to the select, so the control focused before (a screen
+    // button clicked earlier) loses it just after the press.
+    const menu = page.locator('[data-f="rail:edit-mode"]');
+    await page.locator('[data-screen="mouse"]').focus();
+    await menu.dispatchEvent("pointerdown");
+    await menu.focus();
+    await page.evaluate(() => window.__fakeHidHold(true));
+    const sent = await page.evaluate(() => window.__fakeHidSent);
+    await page.waitForTimeout(2500);
+    expect(await page.evaluate(() => window.__fakeHidSent), "no look while the menu may be open").toBe(sent);
+
+    // It closes without a choice; looks resume while the answers are still
+    // held back past every timeout, then they arrive late.
+    await page.mouse.move(5, 5);
+    await expect.poll(() => page.evaluate(() => window.__fakeHidSent), {timeout: 5000}).toBeGreaterThan(sent);
+    await page.waitForTimeout(4000);
+    await page.evaluate(() => window.__fakeHidHold(false));
+    await page.waitForTimeout(2500);
+    await expect(page.locator(".read-placeholder")).toHaveCount(0);
+    await expect(page.locator(".rail-keyboard .dot.ok")).toHaveCount(1);
+    expect(errors).toEqual([]);
+});

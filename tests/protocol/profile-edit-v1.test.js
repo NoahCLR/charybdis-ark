@@ -4,7 +4,7 @@ const assert = require("node:assert/strict");
 const test = require("node:test");
 const {PROFILE_EDIT_V1, EDIT_RESULT, EDIT_MODE, buildEditBeginRequest, buildEditSpliceRequest, buildEditDataRequest, buildEditCommitRequest,
     buildEditAbortRequest, buildSaveRequest, buildRevertRequest, buildEditModeRequest, decodeEditReply, decodeEditStatusPages, decodeEditModePage,
-    decodeRuntimePage, decodeActiveMetadata, readActiveProfile, sendEditRequest} = require("../../core/protocol/profile-edit-v1");
+    decodeRuntimePage, decodeActiveMetadata, readActiveProfile, sendEditRequest, decodeAutoSavePage} = require("../../core/protocol/profile-edit-v1");
 const {crc32} = require("../../core/schema/profile-blob-v1");
 
 /** @param {string} hex */
@@ -46,34 +46,41 @@ test("a SET reply says the result and where the working copy is", () => {
     assert.throws(() => decodeEditReply(trailing, request), {code: "NONCANONICAL_RESPONSE"});
     const unknown = Buffer.from(reply); unknown[5] = 17;
     assert.throws(() => decodeEditReply(unknown, request), {code: "INCOMPATIBLE_RESPONSE"});
-    const refusedPeer = Buffer.from(reply); refusedPeer.writeUInt16LE(0x1800, 15);
-    assert.equal(decodeEditReply(refusedPeer, request).flags, 0x1800);
+    const refusedPeer = Buffer.from(reply); refusedPeer.writeUInt16LE(0x3800, 15);
+    assert.equal(decodeEditReply(refusedPeer, request).flags, 0x3800);
     const reserved = Buffer.from(reply); reserved.writeUInt16LE(0x8000, 15);
     assert.throws(() => decodeEditReply(reserved, request), {code: "INCOMPATIBLE_RESPONSE"});
 });
 
-test("edit status pages decode both halves, the save and the last refusal", () => {
-    const local = Buffer.alloc(25), peer = Buffer.alloc(25), error = Buffer.alloc(25);
+test("edit status pages decode both halves, the save, the last refusal and the keyboard's own saves", () => {
+    const local = Buffer.alloc(25), peer = Buffer.alloc(25), error = Buffer.alloc(25), auto = Buffer.alloc(25);
+    auto[0] = 1; auto[1] = 0b10; auto.writeUInt32LE(3, 2); auto.writeUInt32LE(12, 6); auto.writeUInt32LE(42, 10); auto.writeUInt16LE(3000, 14);
     local[0] = 1; local[1] = 4; local.writeUInt16LE(0b1_0000_1111, 2); local.writeUInt32LE(0xdeadbeef, 4); local.writeUInt32LE(12, 8);
     local.writeUInt32LE(42, 12); local[16] = 1; local[17] = EDIT_RESULT.QUEUED; local.writeUInt16LE(7, 18); local.writeUInt16LE(8, 20); local[22] = 2; local[23] = 3;
     peer[0] = 1; peer.writeUInt32LE(0xdeadbeef, 4); peer.writeUInt32LE(11, 8); peer[12] = 1; peer[13] = 2; peer.writeUInt16LE(30, 16); peer.writeUInt32LE(40, 20); peer[24] = 2;
     error[0] = 5; error[1] = 0x60; error.writeUInt32LE(99, 7); error.writeUInt32LE(3, 14); error.writeUInt32LE(5000, 18);
-    const status = decodeEditStatusPages([local, peer, error]);
+    const status = decodeEditStatusPages([local, peer, error, auto]);
     assert.equal(status.unsaved, true); assert.equal(status.peerRequired, true); assert.equal(status.peerConverged, true); assert.equal(status.peerKnown, true);
     assert.equal(status.waitingSafe, true); assert.equal(status.saving, false);
     assert.deepEqual([status.session, status.revision, status.savedGeneration, status.savedOrigin, status.mode], [0xdeadbeef, 12, 42, 1, 2]);
     assert.deepEqual(status.peer, {phase: 1, lastResult: 0, transactionId: 0, session: 0xdeadbeef, revision: 11, unsaved: true, savedCompiled: false, mode: 2});
     assert.equal(status.save.phase, 2); assert.equal(status.save.transactionId, 30);
     assert.equal(status.refusal.domainId, 0x60); assert.equal(status.refusal.byteOffset, 99); assert.equal(status.activeLength, 5000);
-    // Bits 10–12 (the other half's quiet wait, its refusal, the mode not
-    // stored) decode; bits 13–15 are reserved.
-    const late = Buffer.from(local); late.writeUInt16LE(0x1c00, 2);
-    const lateStatus = decodeEditStatusPages([late, peer, error]);
-    assert.deepEqual([lateStatus.peerStoragePaused, lateStatus.peerRefused, lateStatus.modeNotStored, lateStatus.unsaved], [true, true, true, false]);
-    const unknown = Buffer.from(local); unknown.writeUInt16LE(0x2000, 2);
-    assert.throws(() => decodeEditStatusPages([unknown, peer, error]), {code: "INCOMPATIBLE_RESPONSE"});
+    assert.deepEqual(status.autoSave, {inProgress: false, lastWasAutomatic: true, count: 3, revision: 12, generation: 42, quietMs: 3000});
+    assert.deepEqual([status.peerStoragePaused, status.peerRefused, status.modeNotStored], [false, false, false]);
+    // Bits 10–12: the other half's save waits, the other half refused this
+    // working copy, the edit mode is not stored yet. Bit 13 is a queued key adjustment; bits 14–15 are unknown.
+    const flagged = Buffer.from(local); flagged.writeUInt16LE(0x3c00, 2);
+    assert.deepEqual((({peerStoragePaused, peerRefused, modeNotStored, adjustmentPending}) => [peerStoragePaused, peerRefused, modeNotStored, adjustmentPending])(decodeEditStatusPages([flagged, peer, error, auto])), [true, true, true, true]);
+    const unknown = Buffer.from(local); unknown.writeUInt16LE(0x4000, 2);
+    assert.throws(() => decodeEditStatusPages([unknown, peer, error, auto]), {code: "INCOMPATIBLE_RESPONSE"});
     const layout = Buffer.from(local); layout[0] = 2;
-    assert.throws(() => decodeEditStatusPages([layout, peer, error]), {code: "INCOMPATIBLE_RESPONSE"});
+    assert.throws(() => decodeEditStatusPages([layout, peer, error, auto]), {code: "INCOMPATIBLE_RESPONSE"});
+    for (const broken of [(page) => {page[0] = 2;}, (page) => {page[1] = 4;}, (page) => {page[16] = 1;}]) {
+        const page = Buffer.from(auto); broken(page);
+        assert.throws(() => decodeAutoSavePage(page), /automatic save|Reserved/);
+    }
+    assert.throws(() => decodeAutoSavePage(Buffer.alloc(24)), {code: "MALFORMED_RESPONSE"});
 });
 
 test("the mode, runtime and active-profile pages decode, refusing what they never carry", () => {

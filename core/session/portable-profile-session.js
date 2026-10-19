@@ -7,6 +7,7 @@ const {readDeviceCombos} = require("../protocol/combo-readback-v1");
 const {candidateMetadataForBlob, readCandidatePeerStatus, readCandidateStatus, CANDIDATE_STATE} = require("../protocol/profile-candidate-v1");
 const {ApplyProgress, failureReason} = require("./apply-progress");
 const {CandidateUploadCoordinator} = require("./candidate-upload-coordinator");
+const {readEditProgress} = require("../protocol/profile-edit-v1");
 const {createSnapshot, validateSnapshot, materializeProfile, fingerprint, summary, reorderLayers} = require("../model/portable-profile");
 const {requireReady: checkFirmwareReady, supportsCompleteProfile, canCapture, canReadIdentity, identityStateFlags} = require("./firmware-support");
 const {encodeSettings} = require("../schema/settings-domain-v1");
@@ -151,7 +152,8 @@ function peerReport(peer) {
 /** @param {import("./types.js").CandidateProgress} progress @param {InstanceType<typeof ApplyProgress>} applyProgress */
 function coordinatorReport(progress, applyProgress) {
     const state = progress.status?.state;
-    if (["preflight", "begin", "writing"].includes(progress.phase)) applyProgress.report("upload", {completed: progress.bytesSent, total: progress.totalBytes});
+    if (["preflight", "begin", "writing"].includes(progress.phase)) applyProgress.report("upload", {completed: progress.bytesSent, total: progress.totalBytes,
+        detail: progress.adjustmentPending ? "Waiting for a DPI or lighting key change to reach both halves" : ""});
     else if (["validate", "validating", "complete"].includes(progress.phase) && !progress.operation) applyProgress.report("validate");
     else if (state === CANDIDATE_STATE.PREPARING_PEER) applyProgress.report("peer", peerReport(progress.peer));
     else if (state === CANDIDATE_STATE.COMMITTING) applyProgress.report("commit", {detail: "Writing the profile"});
@@ -226,6 +228,7 @@ async function restoreProfile(connection, ids, capabilities, input, {expectedFin
         const candidate = await readCandidateStatus(connection, options);
         if (candidate.state !== CANDIDATE_STATE.IDLE) throw fail("KEYBOARD_BUSY", "The keyboard has an unfinished profile transaction. Read the keyboard again and wait for it to finish before applying.");
         const coordinator = new CandidateUploadCoordinator(connection, {chunkSize: capabilities.candidateChunkMax, requestIds: ids, sleep,
+            readEditProgress: () => readEditProgress(connection, options),
             readPeerStatus: readCandidatePeerStatus,
             onProgress: progress => coordinatorReport(progress, applyProgress)});
         /** @type {import("./types.js").PreparedCandidate | undefined} */

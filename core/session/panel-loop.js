@@ -24,8 +24,12 @@
 // core/README.md; the native one when omitted) and `sleep(ms)` the wait between
 // polls while reading and saving (the timer's when omitted; a browser tab passes
 // one its throttling cannot slow). Tests may pass a ready-made `service` instead.
-// `reconnect` tunes the wait for a renamed keyboard to come back
+// `reconnect` tunes the wait for a renamed or lost keyboard to come back
 // (keyboard-reconnect.js): its `sleep`, `now`, `waitMs` and `pollMs`.
+//
+// A host calls `watch()` once its panel is open: between edits it looks at a
+// live keyboard about once a second (live-watch.js), for the saves it makes
+// by itself and the edits its own keys make; `close()` stops it.
 
 /**
  * @typedef {import("./types.js").RunningPanelSession} Session
@@ -36,9 +40,10 @@ const {panelControl} = require("./panel-control-registry");
 const {ProfileDeviceService} = require("./profile-device-service");
 const {buildPanelModel, observeService, panelRequest, routeMessage} = require("./panel-session");
 const {beginRead, boundDraft, closeEditors, endRead, takeOutbox, whilePanelBusy} = require("./panel-session-state");
-const {awaitReconnect, endReconnect} = require("./keyboard-reconnect");
+const {awaitReconnect, endReconnect, expectLost} = require("./keyboard-reconnect");
 const {draftControl, portableControl, readKeyboard} = require("./panel-controls");
 const {liveEdit} = require("./live-edits");
+const {watchLive} = require("./live-watch");
 const {demoControl, demoExport, leaveDemo, panelState} = require("./demo-session");
 const {macroInputStatus} = require("../model/macro-editor");
 const {FILE_MAX_BYTES} = require("../model/portable-profile");
@@ -52,17 +57,30 @@ function openPanelLoop(host, options = {}) {
     let session;
     const {service, reconnect: timing = {}, ...device} = options;
     const waiting = {timing: {sleep: device.sleep, ...timing}, running: /** @type {Promise<void> | undefined} */ (undefined)};
+    /** @type {ReturnType<typeof watchLive> | undefined} */
+    let watching;
     const loop = {
         publish: () => publish(session, host),
-        serviceChanged: () => serviceChanged(session, host),
+        serviceChanged: () => {
+            // A keyboard lost unexpectedly is waited for and connected again.
+            const lost = session.service.takeLost?.();
+            if (lost) expectLost(session, lost, waiting.timing.now);
+            serviceChanged(session, host);
+            followReconnect(session, host, waiting);
+        },
         handleMessage: /** @param {unknown} posted */ async (posted) => {
             await handleMessage(session, panelRequest(posted), host);
             followReconnect(session, host, waiting);
         },
         // Settles when a wait for a renamed keyboard ends, at once without one.
         reconnected: () => waiting.running || Promise.resolve(),
+        watch: /** @param {{intervalMs?: number, paused?: () => boolean}} [options] */ (options = {}) => {
+            watching ||= watchLive(session, {publish: () => publish(session, host), sleep: device.sleep, ...options});
+        },
         close: () => {
             if (session.reconnect) endReconnect(session, session.reconnect);
+            void watching?.stop();
+            watching = undefined;
             return session.service.close();
         },
     };
@@ -141,8 +159,8 @@ async function handleMessage(session, message, host) {
     }
 }
 
-// After a save that renamed the keyboard, wait for it to come back under its
-// new name and read it again (keyboard-reconnect.js), once at a time.
+// After a save that renamed the keyboard, or after losing it, wait for it to
+// come back and read it again (keyboard-reconnect.js), once at a time.
 /** @param {Session} session @param {Host} host @param {{timing: ReconnectTiming, running: Promise<void> | undefined}} waiting */
 function followReconnect(session, host, waiting) {
     const expected = session.reconnect;

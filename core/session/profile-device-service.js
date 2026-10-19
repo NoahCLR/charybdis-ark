@@ -38,7 +38,15 @@ const {ProfilePayloadReader, payloadMatchesActive} = require("./profile-payload-
 const {PROFILE_DOMAIN_IDS, decodeStoredProfileBlob, fnv1a32} = require("../schema/profile-blob-v1");
 const {CANDIDATE_STATE_NAMES, readCandidateStatus} = require("../protocol/profile-candidate-v1");
 const {PROFILE_ACTIVE_KIND, PROFILE_WIRE_FEATURES, readProfileCapabilities, readProfileStatus} = require("../protocol/profile-wire-v1");
-const {EDIT_MODE, readEditMode, readEditProgress, readRuntime} = require("../protocol/profile-edit-v1");
+const {EDIT_MODE, readEditMode, readEditProgress, readEditStatus, readRuntime} = require("../protocol/profile-edit-v1");
+
+// The look at a live keyboard between edits (live-watch.js) is a background
+// read: Chrome on macOS holds back a page's input reports while one of its
+// menus is open, so an answer can be late though the keyboard is fine. Each
+// of its requests waits this long, and a miss only skips that look; this many
+// misses in a row mean the keyboard is lost.
+const WATCH_TIMEOUT_MS = 3000;
+const WATCH_MISSES = 3;
 const {captureLive} = require("./live-profile-session");
 const {LiveEditCoordinator, TransactionIds} = require("./live-edit-coordinator");
 
@@ -75,6 +83,8 @@ class ProfileDeviceService {
             onUnexpectedReport: ({reason}) => this.addDiagnostic(`Ignored an unexpected Raw HID report: ${reason}.`),
         });
         this.onChange = typeof options.onChange === "function" ? options.onChange : undefined;
+        this.watchTimeoutMs = options.watchTimeoutMs || WATCH_TIMEOUT_MS;
+        this.missedLooks = 0;
         this.onApplyProgress = typeof options.onApplyProgress === "function" ? options.onApplyProgress : undefined;
         this.onReadProgress = typeof options.onReadProgress === "function" ? options.onReadProgress : undefined;
         // The wait between polls while reading and saving a profile. A host
@@ -109,6 +119,10 @@ class ProfileDeviceService {
         // A save renamed the keyboard, which then restarts USB by itself
         // (keyboard-reconnect.js): losing the connection is no failure.
         this.reconnectExpected = false;
+        // The keyboard the connection was lost to, unexpectedly, until the
+        // panel loop takes it to connect it again (keyboard-reconnect.js).
+        /** @type {import("./types.js").LostKeyboard | undefined} */
+        this.lost = undefined;
         this.scanned = false;
         /** @type {import("../../contracts/model.js").PhaseId} */
         this.phase = PHASE.IDLE;
@@ -209,6 +223,8 @@ class ProfileDeviceService {
             const connection = await this.coordinator.connect(adapterDeviceId);
             this.connection = connection;
             this.reconnectExpected = false;
+            this.lost = undefined;
+            this.missedLooks = 0;
             this.requestIds = new ProfileRequestIdSequence(this.requestIdStart);
             this.connectionPublicId = String(publicDeviceId);
             this.connectionToken = ++this.connectionSequence;
@@ -706,6 +722,66 @@ class ProfileDeviceService {
         return result;
     }
 
+    // Leaving Live: the keyboard saves at once what it has not saved yet
+    // (live-edit-coordinator.js), so its mode can change. Resolves with the
+    // edit status after it.
+    /** @param {(document: import("../model/types.js").PortableDocument) => Promise<string | undefined>} saveRecovery */
+    async flushWorkingCopy(saveRecovery) {
+        if (!this.connection?.connected) this.refuse("Connect the keyboard before changing how edits reach it.");
+        /** @type {Awaited<ReturnType<InstanceType<typeof LiveEditCoordinator>["flush"]>> | undefined} */
+        let result;
+        await this.runOperation(PHASE.LIVE_SAVE, async () => {
+            result = await this.liveCoordinator().flush(status => {
+                this.portableProgress = status.storagePaused || status.peerStoragePaused ? "Waiting for a quiet keyboard to write flash"
+                    : status.autoSave.inProgress ? "The keyboard is saving its edits" : "Saving what the keyboard has not saved yet";
+                this.emitChange();
+            }, async status => {
+                // A quiet-period save may have moved the saved base since the
+                // panel's capture. Recover what is actually saved immediately
+                // before each explicit Save, inside this operation's ownership.
+                const capture = await this.#readLiveProfile(this.connectedConnection(), this.profileCapabilities(), false);
+                if (!capture.live.unsaved) return;
+                if (capture.live.session !== status.session || capture.live.revision !== status.revision
+                    || capture.live.savedGeneration !== status.savedGeneration || capture.live.savedOrigin !== status.savedOrigin) {
+                    throw Object.assign(new Error("The keyboard changed before its recovery copy was saved."), {code: "LIVE_EDIT_STALE"});
+                }
+                const recovery = await saveRecovery(capture.saved.document);
+                if (!recovery) throw Object.assign(new Error("A recovery copy could not be saved. Nothing was saved on the keyboard."), {code: "RECOVERY_REQUIRED"});
+            });
+        }, {after: () => this.#refreshLive()});
+        this.portableProgress = "";
+        if (!result) throw new Error("The keyboard operation returned no save result.");
+        return result;
+    }
+
+    // Between edits, what a live keyboard says about itself: whether it saved
+    // by itself, whether its own keys moved the revision, how its halves are.
+    // A background read, skipped (undefined) while an operation holds the
+    // keyboard. An unanswered look is skipped too, and keeps the connection;
+    // WATCH_MISSES of them in a row end it as a lost keyboard.
+    async readLiveStatus() {
+        if (this.busy || !this.connection?.connected || !this.requestIds || !this.editMode) return undefined;
+        const connection = this.connection;
+        /** @type {import("../transport/types.js").RequestConnection} */
+        const background = {request: (report, options = {}) => connection.request(report, {...options, timeoutMs: this.watchTimeoutMs, softTimeout: true})};
+        try {
+            const status = await readEditStatus(background, this.liveCoordinator().options);
+            this.missedLooks = 0;
+            if (this.connection !== connection || !connection.connected) return undefined;
+            // The mode's write to EEPROM retried (flag 12) shows beside the switch.
+            if (this.editMode && Boolean(this.editMode.notStored) !== status.modeNotStored) {this.editMode = {...this.editMode, notStored: status.modeNotStored}; this.emitChange();}
+            return status;
+        } catch (error) {
+            // A refused read is tried again at the next look.
+            if (/** @type {{soft?: boolean}} */ (error)?.soft && this.connection === connection) {
+                this.missedLooks++;
+                this.addDiagnostic(`${this.deviceLabel(this.connectionPublicId)} missed a status look (${this.missedLooks} in a row).`);
+                if (this.missedLooks >= WATCH_MISSES) await connection.abandon(error);
+            }
+            return undefined;
+        }
+    }
+
     // How edits reach this keyboard, stored on both halves; refused while it
     // has unsaved edits (Save or Revert first).
     /** @param {number} mode */
@@ -930,13 +1006,21 @@ class ProfileDeviceService {
             return;
         }
         const label = this.deviceLabel(this.connectionPublicId);
+        const device = this.devices.find((entry) => entry.id === this.connectionPublicId);
+        const others = this.devices.filter((entry) => entry !== device).map(({id, product}) => ({id, product}));
         this.clearConnection();
         this.phase = this.scanned ? (this.devices.length ? PHASE.AVAILABLE : PHASE.EMPTY) : PHASE.IDLE;
         if (this.reconnectExpected) {
             this.addDiagnostic(`${label} disconnected to take its new name.`);
         } else {
-            this.setError(reason instanceof Error ? reason : new Error(`${label} disconnected.`));
-            this.addDiagnostic(`${label} disconnected; reconnect before sending another read request.`);
+            const error = reason instanceof Error ? reason : new Error(`${label} disconnected.`);
+            const {timeoutMs, request} = /** @type {{timeoutMs?: number, request?: string}} */ (error);
+            if (device) this.lost = {deviceId: device.id, serialNumber: device.serialNumber || "", product: device.product || "", otherDevices: others,
+                what: timeoutMs ? `did not answer within ${timeoutMs} ms` : "disconnected", unanswered: Boolean(timeoutMs)};
+            this.setError(error);
+            this.addDiagnostic(timeoutMs
+                ? `${label} did not answer request ${request} within ${timeoutMs} ms; the connection was closed.`
+                : `${label} disconnected; reconnect before sending another read request.`);
         }
         this.emitChange();
     }
@@ -946,6 +1030,14 @@ class ProfileDeviceService {
     /** @param {boolean} expected */
     expectReconnect(expected) {
         this.reconnectExpected = Boolean(expected);
+    }
+
+    // The keyboard last lost unexpectedly, once: the panel loop takes it to
+    // wait for that keyboard and connect it again (keyboard-reconnect.js).
+    takeLost() {
+        const lost = this.lost;
+        this.lost = undefined;
+        return lost;
     }
 
     clearConnection() {
@@ -1173,6 +1265,8 @@ function candidateStateName(state) {
 }
 
 module.exports = {
+    WATCH_MISSES,
+    WATCH_TIMEOUT_MS,
     PROFILE_DOMAIN_FLAGS,
     SUPPORTED_PROFILE_PROTOCOL,
     SUPPORTED_PROFILE_SCHEMA,

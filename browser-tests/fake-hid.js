@@ -16,6 +16,9 @@
 // renamed keyboard does: the old device leaves, and a new device object with
 // the new product name arrives, still allowed (Chrome keys its permission to
 // the serial number, which does not change).
+// `window.__fakeHidHold(on)` holds every answer back until it is turned off,
+// as Chrome on macOS does while one of the page's native menus is open;
+// `window.__fakeHidSent` counts the reports the page sent.
 function installFakeHid({vendorId, productId, usagePage, usage, bridge, keyboards = 1}) {
     const granted = "fake-hid-granted";
     /** @returns {number[]} */
@@ -25,6 +28,14 @@ function installFakeHid({vendorId, productId, usagePage, usage, bridge, keyboard
     };
     const allow = (list) => list.length ? localStorage.setItem(granted, JSON.stringify(list)) : localStorage.removeItem(granted);
     const log = (globalThis.__fakeHid = {requested: 0, refusedWithoutClick: 0, opened: 0});
+    globalThis.__fakeHidSent = 0;
+    /** @type {(() => void)[]} */
+    const held = [];
+    let holding = false;
+    globalThis.__fakeHidHold = (on) => {
+        holding = on;
+        if (!on) held.splice(0).forEach((deliver) => deliver());
+    };
     class FakeHidDevice extends EventTarget {
         constructor(productName = "Charybdis 4x6") {
             super();
@@ -41,10 +52,14 @@ function installFakeHid({vendorId, productId, usagePage, usage, bridge, keyboard
         async sendReport(reportId, data) {
             if (!this.opened) throw new DOMException("The device must be opened first.", "InvalidStateError");
             const bytes = Array.from(new Uint8Array(data.buffer, data.byteOffset, data.byteLength));
+            globalThis.__fakeHidSent += 1;
             const replies = await globalThis[bridge](reportId, bytes);
-            for (const reply of replies) {
-                this.dispatchEvent(Object.assign(new Event("inputreport"), {device: this, reportId: 0, data: new DataView(Uint8Array.from(reply).buffer)}));
-            }
+            const deliver = () => {
+                for (const reply of replies) {
+                    this.dispatchEvent(Object.assign(new Event("inputreport"), {device: this, reportId: 0, data: new DataView(Uint8Array.from(reply).buffer)}));
+                }
+            };
+            if (holding) held.push(deliver); else deliver();
         }
     }
     const devices = Array.from({length: keyboards}, () => new FakeHidDevice());

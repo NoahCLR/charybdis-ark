@@ -45,7 +45,13 @@ than capabilities and receive the update notice.
 
 A capture reads compiled defaults, the active saved profile when present,
 effective native combos and settings through Profile Wire. Missing active
-domains come from the keyboard's own compiled profile. The resulting complete
+domains come from the keyboard's own compiled profile. Combos are taken as the
+active profile stores them, its only durable owner (firmware D-F32); the
+native combo readback only says whether the keyboard has combo hooks a
+profile cannot hold, and stands in for a keyboard that stores no combos. (It
+used to be re-encoded into the domain, turning a combo on a custom key or
+sending MO(5) into native keycodes: the same keys in other bytes, which an
+Apply then wrote and Live + review listed as changes.) The resulting complete
 blob has all seven domains once. Keymap `0x60` v1 carries all 16 × 60 matrix
 positions as little-endian uint16 values, including the four unwired positions;
 the visible layout projects the geometry in `core/data/charybdis-layout.js`.
@@ -89,7 +95,7 @@ and busy. This readback is separate from the eight transaction steps. A later
 read or export gets the generic operation bar rather than an old finished
 Apply. No automated check establishes physical interruption acceptance.
 
-## Live + review reads, edits and Save
+## Live reads, edits and Save
 
 Revert compares its confirmed saved generation and origin with the cached
 base before using that base as the running profile. If either changed, Ark
@@ -107,10 +113,11 @@ generation 0. While the edit status's phase is not idle (an edit still being
 received, checked or waiting for a safe boundary) the read polls page 0 and
 starts only once it is idle; past 600 polls 50 ms apart it fails
 `LIVE_EDIT_PENDING` and the draft stays to be read again. The edit status is
-read again after the combos and toggles; a phase that is not idle, or a
-different session, revision or saved generation, refuses the read as
-`PROFILE_CHANGED`. Flag bit 11 (the other half refused the working copy) is
-kept as the draft's "halves apart". Both documents are materialized from stored bytes alone
+read again after the combos and toggles (pages 0–3, so the read also carries
+the keyboard's own saves and flags); a phase that is not idle, or a different
+session, revision or saved generation, refuses the read as `PROFILE_CHANGED`.
+Flag bit 11 (the other half refused the working copy) is kept as the draft's
+"halves apart". Both documents are materialized from stored bytes alone
 (no settings or combo readback overlay), and the working copy's exact bytes
 are kept: a live edit's splices are computed against them.
 
@@ -124,15 +131,19 @@ runs on the master half and the rail says the slave half is catching up), or
 stops at once when flag 11 says the other half refused it (halves apart).
 BUSY at begin, Save or a mode change is retried for 3 s, or for 30 s while
 the other half answers but does not yet hold the working copy (catching up
-after a refusal, when the master half resends the whole copy); with flag 11
-it stops at once (`LIVE_HALVES_APART`). Anything else refused, STALE included,
-is reported and the keyboard read again; a refusal Ark makes before sending
-(too large, halves apart) is not. A lost answer ends the connection (the
-transport closes it on a timeout); the next read shows whether the edit
-landed, and no edit is replayed. On every new connection Ark reads page 0 and
-aborts an edit still being received (SET `0x24` with its transaction id),
-which it never uses again on that connection; an unaborted one would end by
-the keyboard's 15 s lease, last result ABORTED.
+after a refusal, when the master half resends the whole copy), or within the
+save timeout (120 s, asked every 50 ms) while flag 6 says a save runs: in Live
+the keyboard's own save starts 3 s after an edit and holds the profile for
+seconds (about 6 s for a 6 KB profile), and an edit made then waits for it
+rather than being lost; with flag 11 it stops at once (`LIVE_HALVES_APART`). Anything else refused is reported and
+the keyboard read again; STALE (the keyboard moved first, usually an
+adjustment key) rereads and says the edit was not sent, without a failure; a
+refusal Ark makes before sending (too large, halves apart) is not. A lost
+answer ends the connection (the transport closes it on a timeout); the next
+read shows whether the edit landed, and no edit is replayed. On every new
+connection Ark reads page 0 and aborts an edit still being received (SET
+`0x24` with its transaction id), which it never uses again on that connection;
+an unaborted one would end by the keyboard's 15 s lease, last result ABORTED.
 
 Save asks for the exact reviewed revision and a recovery copy of the saved
 profile before it sends SET `0x25`; edit status page 1 reports its progress and
@@ -140,6 +151,30 @@ outcome (the save's transaction, result and candidate error), and a quiet-wait
 on either half (flags 9 and 10) or a held key is said as such. A refused save leaves the working copy as it was.
 Revert (SET `0x26`) waits for the working copy to be inactive. Neither uploads a
 candidate.
+
+Between edits (D-L66) a live draft's panel reads edit status pages 0–3 about
+once a second, only while no operation holds the keyboard and the draft is
+current; a look that overlaps an edit is dropped. The same session and
+revision with nothing unsaved and a new saved generation is the keyboard's own
+save (page 3 says whether it was automatic); a different revision or mode
+rereads the pair above. Leaving Live first waits for a running save (page 1's
+save phase, page 3's in-progress flag), then sends Save for the keyboard's
+current pair, looking again after STALE or BUSY, bounded by the save timeout;
+the other half's refusal (flag 11) ends it with the mode unchanged. Before
+each explicit flush Save, Ark captures the actual saved profile and obtains
+its recovery copy; failure stops before Save or a mode change. The identity
+is checked again after recovery, and a moved pair is retried within the same
+save budget.
+
+A refused STALE edit returns an unsuccessful publication outcome through the
+proposal path. Send live reports success only for a confirmed publication;
+otherwise it restores the original Apply draft, even if switching back fails.
+
+An automatic reread rejected as `PROFILE_CHANGED` remains eligible on the next
+poll, up to three failed captures per cycle. Success clears the retry state;
+other failures or budget exhaustion leave the stale draft for Read keyboard.
+The first Apply observation compares its saved generation and origin with the
+successful capture, so a saved adjustment before that first poll is detected.
 
 ## Candidate peer progress
 

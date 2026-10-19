@@ -25,6 +25,7 @@ export type UploadCallOptions = UploadOptions & ({metadata: CandidateMetadataInp
 export interface CommitDecision {transactionId: number; digest: number; status: CandidateStatus}
 export interface CommitOptions {onProgress?: (progress: CandidateProgress) => void; digest?: number; afterDecision?: (decision: CommitDecision) => Promise<void>}
 export interface UploadContext {
+    adjustmentPending?: boolean;
     abortNeeded: boolean;
     afterDecision?: CommitOptions['afterDecision'];
     blob?: Buffer;
