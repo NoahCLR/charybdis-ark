@@ -64,6 +64,10 @@ export interface DeviceModelInput {
     error?: {message: string} | null;
     mutationCompatibility?: {recoveryPending?: boolean} | null;
     liveApply?: import('../../contracts/model.js').ApplyView | {state: 'idle'; failure?: undefined} | null;
+    /** How edits reach the keyboard (firmware D-F32); null when it does not say. */
+    editMode?: (import('../protocol/types.js').EditModeRead & {notStored?: boolean}) | null;
+    /** The toggles' stored masters and runtime overrides. */
+    runtime?: import('../protocol/types.js').RuntimeRead | null;
 }
 
 export type CandidateStatus = Awaited<ReturnType<typeof import('../protocol/profile-candidate-v1.js').readCandidateStatus>>;
@@ -157,6 +161,9 @@ export interface PanelSession extends DemoSession {
     portableReview?: PortableReview;
     portableLayers?: LayerEditState;
     acceptedEdit?: ReturnType<NonNullable<DemoSession['draft']>['stage']>;
+    /** A live edit waiting on its trap check (plan answer 2): sent on confirmLiveEdit, dropped on cancelLiveEdit. */
+    liveProposal?: {id: number; draftId: string; revision: number; target: import('./profile-draft-session.js').LiveTarget;
+        checks: import('../../contracts/model.js').Check[]; accepted?: ReturnType<NonNullable<DemoSession['draft']>['stage']>; replaceWhenLarge?: boolean};
     applyRunning?: boolean;
     postApplyReadStep?: import('../../contracts/messages.js').ReadStep;
     reconnect?: ExpectedReconnect;
@@ -171,9 +178,35 @@ export interface PanelEnvelope {type: string; draftId?: string; draftRevision?: 
 export type PanelMessage = PanelEnvelope | (DraftEdit & {draftId?: string});
 export type PanelDraftView = ReturnType<NonNullable<DemoSession['draft']>['view']> & {busy: boolean; editable: boolean; reason: DraftBlock; steps?: import('../../contracts/model.js').HistoryStep[]};
 /** What the panel adds to the device model; the posted shape is the contract's. */
-export type PanelModelExtras = Pick<import('../../contracts/panel.js').PublishedModel, 'devices' | 'selectedDeviceId' | 'demo' | 'apply' | 'postApplyRead' | 'portable' | 'host' | 'load' | 'reconnecting' | 'firmware'> & {draft?: PanelDraftView};
+export type PanelModelExtras = Pick<import('../../contracts/panel.js').PublishedModel, 'devices' | 'selectedDeviceId' | 'demo' | 'apply' | 'postApplyRead' | 'portable' | 'host' | 'load' | 'reconnecting' | 'firmware' | 'editMode' | 'liveProposal' | 'runtime'> & {draft?: PanelDraftView};
 
 export type CompleteCapture = Extract<CapturedProfile, import('../model/types.js').CompleteSnapshot>;
+/** Where the keyboard's working copy is (firmware D-F32), with the exact bytes a live edit is made against. */
+export interface LiveState {
+    mode: number;
+    modeConflict?: boolean;
+    session: number;
+    revision: number;
+    savedGeneration: number;
+    savedOrigin: number;
+    /** The keyboard runs unsaved edits (its working copy is active). */
+    unsaved: boolean;
+    /** Both halves hold this session and revision. */
+    converged: boolean;
+    /** The other half refused this working copy: the halves run different profiles until a Revert. */
+    apart?: boolean;
+    working: Buffer;
+    saved: Buffer;
+    defaults: Buffer;
+}
+/** A Live + review read: the working copy as the snapshot, the saved profile beside it. */
+export type LiveCapture = import('../model/types.js').CompleteSnapshot & import('../model/types.js').SnapshotFacts & {
+    status: ProfileStatus;
+    saved: import('../model/types.js').CompleteSnapshot & import('../model/types.js').SnapshotFacts;
+    live: LiveState;
+    runtime: import('../protocol/types.js').RuntimeRead | null;
+    combosReadback?: Awaited<ReturnType<typeof import('../protocol/combo-readback-v1.js').readDeviceCombos>>;
+};
 export type RestoredProfile = Awaited<ReturnType<typeof import('./portable-profile-session.js').restoreProfile>> & import('../model/types.js').SnapshotFacts;
 /**
  * The device service as the panel's controls use it. A failed operation
@@ -197,6 +230,10 @@ export interface ControlService extends DraftApplyService {
     readPortableProfile(options?: {forRestore?: false; reuseReadback?: boolean}): Promise<CompleteCapture>;
     readPortableProfile(options: {forRestore: true; reuseReadback?: boolean}): Promise<CapturedProfile>;
     restorePortableProfile(document: import('../model/types.js').PortableDocument, options: RestoreOptions): Promise<RestoredProfile>;
+    postLiveEdit(edit: {from: Buffer; to: Buffer; defaults: Buffer; identity: {session: number; revision: number}; replaceWhenLarge?: boolean}): Promise<{bytes: Buffer; session: number; revision: number; converged: boolean; apart: boolean; sent: number}>;
+    saveWorkingCopy(identity: {session: number; revision: number}): Promise<import('../protocol/types.js').EditStatus & {saved: boolean}>;
+    revertWorkingCopy(identity: {session: number; revision: number}): Promise<import('../protocol/types.js').EditProgress & {converged: boolean; apart: boolean}>;
+    setEditMode(mode: number): Promise<import('../protocol/types.js').EditModeRead | undefined>;
     close(): Promise<void>;
     emitChange?(): void;
     /** A save renamed the keyboard: its coming disconnect is expected (keyboard-reconnect.js). */

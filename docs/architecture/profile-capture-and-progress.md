@@ -89,6 +89,58 @@ and busy. This readback is separate from the eight transaction steps. A later
 read or export gets the generic operation bar rather than an old finished
 Apply. No automated check establishes physical interruption acceptance.
 
+## Live + review reads, edits and Save
+
+Revert compares its confirmed saved generation and origin with the cached
+base before using that base as the running profile. If either changed, Ark
+rereads the pair; a failed read leaves the draft stale. An unsuccessful Send
+live keeps the original Apply draft even if returning to Apply fails; it stays
+stale over a live keyboard, so it cannot post as a live edit.
+
+
+A keyboard not in Apply mode (or one still running unsaved live edits) is read
+as a pair (D-L65, firmware D-F32): the edit status (GET `0x20` page 0), the
+working copy through GET `0x21` with its session and revision, read twice
+around its bytes, and the saved profile it began from, GET `0x04` with the
+generation and origin the edit status names, or the compiled defaults over
+generation 0. While the edit status's phase is not idle (an edit still being
+received, checked or waiting for a safe boundary) the read polls page 0 and
+starts only once it is idle; past 600 polls 50 ms apart it fails
+`LIVE_EDIT_PENDING` and the draft stays to be read again. The edit status is
+read again after the combos and toggles; a phase that is not idle, or a
+different session, revision or saved generation, refuses the read as
+`PROFILE_CHANGED`. Flag bit 11 (the other half refused the working copy) is
+kept as the draft's "halves apart". Both documents are materialized from stored bytes alone
+(no settings or combo readback overlay), and the working copy's exact bytes
+are kept: a live edit's splices are computed against them.
+
+A live edit is begin, splices, inserted data and commit, then edit status page
+0 until this half's last finished transaction is the edit's and nothing is in
+progress. Edit status page 2's active length must then equal the bytes Ark
+records as the working copy (a splice edit's result, a replacement's own
+bytes), else the keyboard is read again (`LIVE_EDIT_MISMATCH`). Then it waits
+until the other half holds the same session and revision (3 s; past it the edit
+runs on the master half and the rail says the slave half is catching up), or
+stops at once when flag 11 says the other half refused it (halves apart).
+BUSY at begin, Save or a mode change is retried for 3 s, or for 30 s while
+the other half answers but does not yet hold the working copy (catching up
+after a refusal, when the master half resends the whole copy); with flag 11
+it stops at once (`LIVE_HALVES_APART`). Anything else refused, STALE included,
+is reported and the keyboard read again; a refusal Ark makes before sending
+(too large, halves apart) is not. A lost answer ends the connection (the
+transport closes it on a timeout); the next read shows whether the edit
+landed, and no edit is replayed. On every new connection Ark reads page 0 and
+aborts an edit still being received (SET `0x24` with its transaction id),
+which it never uses again on that connection; an unaborted one would end by
+the keyboard's 15 s lease, last result ABORTED.
+
+Save asks for the exact reviewed revision and a recovery copy of the saved
+profile before it sends SET `0x25`; edit status page 1 reports its progress and
+outcome (the save's transaction, result and candidate error), and a quiet-wait
+on either half (flags 9 and 10) or a held key is said as such. A refused save leaves the working copy as it was.
+Revert (SET `0x26`) waits for the working copy to be inactive. Neither uploads a
+candidate.
+
 ## Candidate peer progress
 
 Candidate status page 1 reports phase, transferred bytes, safe-boundary waits

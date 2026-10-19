@@ -35,6 +35,7 @@ import {screenProfile} from "./ui/profile.mjs";
 import {screenDevice} from "./ui/device.mjs";
 import {reviewOverlay} from "./ui/review-overlay.mjs";
 import {leaveDemoOverlay} from "./ui/leave-demo.mjs";
+import {editModeOverlay, liveProposalOverlay} from "./ui/edit-mode.mjs";
 import {commitBar, rail, topbar} from "./ui/shell.mjs";
 
 const root = /** @type {HTMLElement} */ (document.getElementById("root"));
@@ -88,6 +89,10 @@ function render({keepScreen = false} = {}) {
     if (history) root.appendChild(history);
     const leave = leaveDemoOverlay();
     if (leave) root.appendChild(leave);
+    const ask = editModeOverlay();
+    if (ask) root.appendChild(ask);
+    const proposal = liveProposalOverlay();
+    if (proposal) root.appendChild(proposal);
     restoreFocus(root, focus);
     focusDialog(root);
     reveal();
@@ -211,8 +216,13 @@ addEventListener("keydown", (event) => {
         if (state.overlay === "history") post(controls.control("closeProfileDraftHistory"));
         state.overlay = null;
         state.leaveDemo = null;
+        state.modeAsk = null;
         render();
+        return;
     }
+    // Esc on a live edit's question is Go back: nothing is sent.
+    const proposal = getModel()?.liveProposal;
+    if (proposal) post(controls.cancelLiveEdit(proposal.id));
 });
 addEventListener("resize", () => {
     /** @type {HTMLElement | null} */ (root.querySelector(".keys-pad .bench"))?.style.removeProperty("min-height");

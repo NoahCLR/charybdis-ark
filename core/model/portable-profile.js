@@ -87,6 +87,22 @@ function materializeProfile(active, defaults, combos, settings) {
     domains.push(domain(PROFILE_DOMAIN_IDS.COMBOS, encodeComboDomain(comboTableOf(combos))), domain(PROFILE_DOMAIN_IDS.SETTINGS, settings));
     return encodeProfileBlob({domains});
 }
+// The whole profile as stored bytes say it, every domain: each domain the
+// profile holds, otherwise the compiled default the firmware falls back to.
+// Live + review compares the saved profile with the working copy this way
+// (firmware D-F32: settings readback reports the stored values, and the
+// profile is their only durable owner), and a live edit's splices are made
+// against these bytes, so they must be the keyboard's own, not a re-encoding.
+/** @param {Uint8Array} stored @param {Uint8Array} defaults */
+function materializeStored(stored, defaults) {
+    const own = decodeStoredProfileBlob(stored), fallback = decodeStoredProfileBlob(defaults);
+    const domains = DOMAIN_IDS.map(id => {
+        const found = own.domains.find(d => d.id === id) || fallback.domains.find(d => d.id === id);
+        if (!found) throw fail("The keyboard did not report every profile domain.");
+        return found;
+    });
+    return encodeProfileBlob({domains});
+}
 // The combo table the keyboard runs, as it stores it: which combos follow the
 // default window, and the two shared values.
 /** @param {import("./types.js").NativeComboTable} combos */
@@ -306,4 +322,4 @@ function summaryOf(value) {
         macros: value.macroSlots.filter(bytes => bytes.length).length,
         names: value.settings.names.map((name, index) => layerName(value.settings.names, index))};
 }
-module.exports = {LAYERS, MACRO_SLOTS, MACRO_BANK_BYTES, FILE_MAX_BYTES, DOCUMENT_VERSION, encodeNamedProfile, comboTableOf, createSnapshot, validateSnapshot, materializeProfile, validateViaMacro, fingerprint, fingerprintOf, decodedOf, reorderLayers, summary, summaryOf};
+module.exports = {LAYERS, MACRO_SLOTS, MACRO_BANK_BYTES, FILE_MAX_BYTES, DOCUMENT_VERSION, encodeNamedProfile, comboTableOf, createSnapshot, validateSnapshot, materializeProfile, materializeStored, validateViaMacro, fingerprint, fingerprintOf, decodedOf, reorderLayers, summary, summaryOf};

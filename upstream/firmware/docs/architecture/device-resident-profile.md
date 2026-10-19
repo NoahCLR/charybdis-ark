@@ -2,7 +2,7 @@
 
 This document defines the ownership model for live editing with Charybdis Ark
 (the independent app repository in the
-[local workspace map](https://github.com/NoahCLR/charybdis-4x6/blob/83366a07185aa6399ca80e2cb493a3e4278c1edb/docs/DEVELOPMENT.md#local-repositories-and-worktrees)). It supersedes the earlier project assumption that the three C
+[local workspace map](https://github.com/NoahCLR/charybdis-4x6/blob/fb76c5a4f767848b15bb7f12e40f506b63344a5a/docs/DEVELOPMENT.md#local-repositories-and-worktrees)). It supersedes the earlier project assumption that the three C
 authoring files must remain the only source of truth during a live editing
 session.
 
@@ -48,6 +48,16 @@ Every editor draft records the device generation and digest it was based on. A
 commit uses compare-and-swap semantics: if the device generation changed after
 the draft was opened, the app refuses the write and asks the user to refresh or
 resolve the conflict.
+
+**The working copy** (D-F32). Between saves the keyboard may run unsaved live
+edits: a working copy in RAM on each half, named by a session (per boot) and
+a revision, over the saved generation it began from. It has no authority at
+boot: a replug runs the saved generation. Live edits carry the session and
+revision they were made against, compare-and-swap at that grain; Save makes
+the working copy a new generation through the same commit path; Revert and
+an Apply end it. The saved profile (GET `0x04`), the compiled defaults
+(`0x05`) and the active one, working copy included (`0x21`), read separately
+([Profile Wire, Live Edits](profile-wire-v1.md#live-edits)).
 
 ## Profile domains own layout and macros
 
@@ -98,6 +108,10 @@ edits all current domains, exports/imports a materialized snapshot of the whole 
 and applies one profile generation without consulting repository sources.
 Both halves are durably prepared before the decision marker; activation
 waits until the other half has been seen holding the commit.
+
+Live edits change the running profile on both halves without a save, and
+Save, Revert and the edit mode are the keyboard's own operations (D-F32); the
+app's use of them follows.
 
 Remaining product work is physical interruption acceptance across each durable
 boundary, guided recovery, the known one-half reconnect transition, broad
@@ -150,7 +164,7 @@ physical capacity.
 
 The delivery slices are in Ark's product goal and the product's status in
 Ark's direction; the firmware's status is in the
-[firmware direction](https://github.com/NoahCLR/charybdis-4x6/blob/83366a07185aa6399ca80e2cb493a3e4278c1edb/docs/LIVE_EDIT_APP_DIRECTION.md#current-firmware-status).
+[firmware direction](https://github.com/NoahCLR/charybdis-4x6/blob/fb76c5a4f767848b15bb7f12e40f506b63344a5a/docs/LIVE_EDIT_APP_DIRECTION.md#current-firmware-status).
 The one-store commit and recovery ordering are implemented (D-F31). The
 active phase is
 acceptance: reboot, reconnect, applicable USB/role configurations,

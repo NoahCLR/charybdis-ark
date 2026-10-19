@@ -34,5 +34,6 @@ export interface PanelState {
     settingsSearch: string; overlay: string | null;
     settingsDurationUnits: Record<string, 'seconds' | 'minutes'>;
     leaveDemo: {ask: {title: string; detail: string; confirm: string}; message: PanelCommand} | null;
+    modeAsk: {mode: number; question: 'saveOrRevert' | 'sendOrDiscard'} | null;
     confirmChecks: number | null; picker: PickerState | null; notice: string; error: string;
 }

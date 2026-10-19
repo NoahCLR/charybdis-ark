@@ -30,6 +30,12 @@ const PHASE = Object.freeze({
     DISCONNECT: "disconnect",
     READ_COMBOS: "read-combos",
     READ_BASE_RGB: "read-base-rgb",
+    // Live + review (firmware D-F32): an edit reaching the keyboard's working
+    // copy, Save writing it, Revert discarding it, the edit mode changing.
+    LIVE_EDIT: "live-edit",
+    LIVE_SAVE: "live-save",
+    LIVE_REVERT: "live-revert",
+    EDIT_MODE: "edit-mode",
 });
 /** @type {Readonly<Record<import('../../contracts/model.js').PhaseId, Readonly<import('../../contracts/model.js').PhaseWords>>>} */
 const PHASE_WORDS = Object.freeze({
@@ -48,6 +54,44 @@ const PHASE_WORDS = Object.freeze({
     [PHASE.DISCONNECT]: Object.freeze({label: "disconnecting", writes: false}),
     [PHASE.READ_COMBOS]: Object.freeze({label: "reading combos", read: "Checking active combos", busy: "Checking active combos", writes: false}),
     [PHASE.READ_BASE_RGB]: Object.freeze({label: "reading base RGB", read: "Checking base lighting", busy: "Checking base lighting", writes: false}),
+    // An edit and a Revert change only the keyboard's RAM; closing the page
+    // during one loses nothing saved. A Save writes flash.
+    [PHASE.LIVE_EDIT]: Object.freeze({label: "sending an edit", busy: "Sending the edit to both halves", writes: false}),
+    [PHASE.LIVE_SAVE]: Object.freeze({label: "saving", busy: "Saving the keyboard's edits on both halves", writes: true}),
+    [PHASE.LIVE_REVERT]: Object.freeze({label: "reverting", busy: "Putting back the saved profile", writes: false}),
+    [PHASE.EDIT_MODE]: Object.freeze({label: "changing how edits reach the keyboard", busy: "Changing how edits reach the keyboard", writes: false}),
+});
+
+// Why the keyboard did not take a live edit, Save, Revert or mode change, by
+// the result it answered (firmware D-F32). Each finishes a sentence that
+// starts with what did not happen.
+/** @type {Readonly<Record<string, string>>} */
+const LIVE_RESULT_WORDS = Object.freeze({
+    STALE: "the keyboard changed since Ark last read it (another edit, a key adjustment or a restart).",
+    BUSY: "the keyboard was busy with another edit, a save or its other half.",
+    INVALID_ARGUMENT: "the keyboard did not understand the request.",
+    INVALID_STATE: "the keyboard was not ready for it.",
+    WRONG_TRANSACTION: "another edit was in progress.",
+    OUT_OF_ORDER: "part of the edit arrived out of order.",
+    CAPACITY_EXCEEDED: "the edit does not fit the keyboard's profile memory.",
+    CHECKSUM_MISMATCH: "the edit arrived damaged.",
+    UNSUPPORTED_DOMAIN: "the keyboard does not know part of the profile it changes.",
+    INVALID_SPLICE: "the keyboard could not place the change in its profile.",
+    VALIDATION_REJECTED: "the keyboard's checks refused the result.",
+    NOT_CLEAN: "the keyboard has unsaved edits. Save or Revert them first.",
+    READ_ERROR: "the keyboard could not read or store it.",
+    ABORTED: "a save, an Apply or the other half replaced the profile meanwhile, or the edit was left unfinished (a Revert, or nothing arrived for 15 seconds).",
+    PUBLICATION_FAILED: "the keyboard could not switch to the result.",
+});
+
+// How edits reach a keyboard (stored on it, firmware D-F32). Ark offers Apply
+// and Live + review; Live (the keyboard saving on its own) is shown when a
+// keyboard reports it, not offered yet.
+/** @type {Readonly<Record<number, Readonly<{id: import('../../contracts/model.js').EditModeId, label: string, detail: string}>>>} */
+const EDIT_MODE_WORDS = Object.freeze({
+    0: Object.freeze({id: "apply", label: "Apply", detail: "Edits stay in Ark's draft until you review and apply them. The keyboard runs its saved profile until then."}),
+    1: Object.freeze({id: "live", label: "Live", detail: "Edits take effect on the keyboard at once and the keyboard saves them by itself. This version of Ark treats it as Live + review."}),
+    2: Object.freeze({id: "liveReview", label: "Live + review", detail: "Edits take effect on the keyboard at once. Nothing is permanent until you review and save; unplugging the keyboard puts back what was saved."}),
 });
 
 // Whether the two halves agree, in words for someone who has never heard of
@@ -73,6 +117,7 @@ const OS_WORDS = {macos: "macOS", windows: "Windows", linux: "Linux"};
 const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.js").Vocabulary} */ ({
     phases: PHASE_WORDS,
     halves: HALVES_WORDS,
+    editModes: EDIT_MODE_WORDS,
     hostOs: [[0, "Auto"], [1, "macOS"], [2, "Windows"], [3, "Linux"]],
     macroPlayback: {setup: "setup", blocked: "blocked", unavailable: "unavailable"},
     macroProtection: [["auto", "Automatic"], ["on", "On"], ["off", "Off"]],
@@ -192,4 +237,4 @@ const branchName = (count) => VOCABULARY.branches[count - 1] || `${count} taps`;
 /** @param {number} mask */
 const modifierNames = (mask) => VOCABULARY.modifiers.filter(([bit]) => mask & bit).map(([, name]) => name);
 
-module.exports = {PHASE, PHASE_WORDS, HALVES_WORDS, VOCABULARY, word, layerName, slotName, branchName, modifierNames};
+module.exports = {PHASE, PHASE_WORDS, HALVES_WORDS, LIVE_RESULT_WORDS, EDIT_MODE_WORDS, VOCABULARY, word, layerName, slotName, branchName, modifierNames};

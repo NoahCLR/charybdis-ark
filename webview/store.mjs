@@ -109,6 +109,7 @@ export const STATE_FIELDS = {
     settingsSearch: kept(""),
     overlay: kept(null),
     leaveDemo: kept(null),     // {ask, message}: leaving the demo (or replacing its file) waiting on its question
+    modeAsk: kept(null),       // {mode, question}: a switch of edit mode waiting on Save/Revert or Send/Discard
     confirmChecks: kept(null), // the draft revision whose checks Apply is asking about
     picker: kept(null),
     notice: kept(""),

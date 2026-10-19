@@ -32,6 +32,13 @@ unused tails and malformed data receive matching C/JS judgements, with exact
 transported bytes and source offsets beyond 64 KiB. Both variants run under
 the bridge, with no VIA code or hardware.
 
+The live-edit runner owns its C probe here and links the selected firmware's
+production edit channel and working copy; the probe is the owner between them
+(one half; Save, the edit mode and the other half's facts are fields the corpus
+sets). Ark's coordinator sends real edits and the C working copy must equal
+Ark's splicing byte for byte; refusals and every reply layout and status flag
+pass through Ark's decoders, in normal and sanitizer builds.
+
 The schema-4 candidate corpus uses all seven domains. The maximum frozen
 profile is 74,801 bytes, so full and differential uploads exercise offsets
 past 64 KiB through the production C validator and store, in both normal and

@@ -98,6 +98,7 @@ async function webHosts() {
         demo: VSCODE_HOST,
         "demo-edited": {words: WEB_WORDS, panel: () => offered},
         web: {words: WEB_WORDS, panel: () => offered},
+        live: VSCODE_HOST,
         "web-none": {words: WEB_WORDS, panel: () => ({...offered, recoveries: []})},
         "web-unsupported": {words: WEB_WORDS, panel: () => ({...offered, chooseKeyboard: false, recoveries: [], blocked: BLOCKED.unsupported})},
     };
@@ -132,8 +133,11 @@ function demoModel(host, edits = []) {
 /** @type {Extract<import("../contracts/edits.js").PanelEdit, {type: "updateConfigDefaults"}>} */
 const DEMO_EDIT = {type: "updateConfigDefaults", sectionId: "normalPointerSpeed", fields: [{macro: "normalDpi", value: "1400"}, {macro: "snipingDpi", value: "200"}]};
 
-/** @param {import("../core/session/types.js").PanelHost} [host] */
-function buildModel(host = VSCODE_HOST) {
+// `live` renders a keyboard in Live + review (firmware D-F32): the draft is
+// its working copy, with one unsaved edit, and a combos key has turned combos
+// off for now. ?host=live shows it.
+/** @param {import("../core/session/types.js").PanelHost} [host] @param {{live?: boolean}} [options] */
+function buildModel(host = VSCODE_HOST, {live = false} = {}) {
     const doc = fillPreviewLayer(document32());
     const snapshot = {
         document: doc,
@@ -143,7 +147,14 @@ function buildModel(host = VSCODE_HOST) {
         hostOs: {detected: 1},
     };
     const deviceId = "preview-charybdis";
-    const session = new ProfileDraftSession(snapshot, deviceId, capabilities);
+    let liveSnapshot;
+    if (live) {
+        const working = editLayers(fillPreviewLayer(document32()), layers => {layers[0][13] = /** @type {number} */ (keycodes.encode("KC_ESC"));});
+        const bytes = Buffer.from(working.profile, "base64"), saved = Buffer.from(doc.profile, "base64");
+        liveSnapshot = {...snapshot, document: working, fingerprint: portable.fingerprint(working), summary: portable.summary(working), saved: snapshot,
+            runtime: null, live: {mode: 2, session: 0x5e550001, revision: 1, savedGeneration: 42, savedOrigin: 0, unsaved: true, converged: true, working: bytes, saved, defaults: saved}};
+    }
+    const session = new ProfileDraftSession(/** @type {any} */ (liveSnapshot || snapshot), deviceId, capabilities);
     /** @type {import("../core/session/types.js").PanelDeviceState} */
     const state = {
         selectedDeviceId: deviceId,
@@ -158,6 +169,10 @@ function buildModel(host = VSCODE_HOST) {
         baseRgb: {state: "read", effectId: 1, brightness: 180, hue: 140, saturation: 210, speed: 60},
         // No name of its own: the keyboard reports its built-in one.
         storedKeyboardName: "",
+        // How edits reach it, stored on the keyboard: Apply here, Live + review with `live`.
+        editMode: {mode: live ? 2 : 0, counter: 1, peerMode: live ? 2 : 0, peerCounter: 1, peerKnown: true, conflict: false, agreed: true},
+        runtime: live ? {combos: {master: true, override: false}, behaviours: {master: true, override: true},
+            live: {defaultDpi: 1200, snipingDpi: 400, rgbMode: 1, rgbColor: 0, defaultLayers: 1, keymapOptions: 0}} : null,
     };
     // The host's own model builder, so the preview cannot drift from it. The
     // layer editor is open so Rename & Reorder has something to show.
@@ -241,7 +256,7 @@ Promise.all([model, webHosts(), macroHost]).then(([model, hosts, macroHost]) => 
 fs.mkdirSync(path.join(__dirname, "..", "preview"), {recursive: true});
 fs.writeFileSync(path.join(__dirname, "..", "preview", "model.json"), JSON.stringify(model));
 for (const [name, host] of Object.entries(hosts)) {
-    const web = name === "web" ? buildModel(host) : name === "demo" ? demoModel(host) : name === "demo-edited" ? demoModel(host, [DEMO_EDIT]) : emptyModel(host);
+    const web = name === "web" ? buildModel(host) : name === "live" ? buildModel(host, {live: true}) : name === "demo" ? demoModel(host) : name === "demo-edited" ? demoModel(host, [DEMO_EDIT]) : emptyModel(host);
     fs.writeFileSync(path.join(__dirname, "..", "preview", `model-${name}.json`), JSON.stringify(web));
 }
 const page = `<!doctype html>

@@ -67,3 +67,30 @@ export interface CandidateBlobOptions {
     capabilities?: {maxProfilePayload?: number};
 }
 export interface ReuseSource {kind: number; origin: number; generation: number; digest: number; crc32: number}
+
+// Live edits (profile-edit-v1.js, firmware D-F32).
+export interface EditSplice {domainId: number; offset: number; remove: number; insert: number; create?: boolean; drop?: boolean}
+export interface EditReply {result: number; resultName: string; phase: number; session: number; revision: number; flags: number}
+export interface EditStatusFlags {
+    unsaved: boolean; peerRequired: boolean; peerConverged: boolean; peerKnown: boolean; editsBlocked: boolean;
+    savedCompiled: boolean; saving: boolean; modeConflict: boolean; waitingSafe: boolean; storagePaused: boolean;
+    peerStoragePaused: boolean; peerRefused: boolean; modeNotStored: boolean;
+}
+export interface EditProgress extends EditStatusFlags {
+    phase: number; flags: number; session: number; revision: number; savedGeneration: number; savedOrigin: number;
+    lastResult: number; lastTransactionId: number; transactionId: number; mode: number; splicesReceived: number;
+}
+export interface EditStatus extends EditProgress {
+    peer: {phase: number; lastResult: number; transactionId: number; session: number; revision: number; unsaved: boolean; savedCompiled: boolean; mode: number};
+    save: {phase: number; lastResult: number; lastError: number; transactionId: number; lastTransactionId: number};
+    insertedReceived: number;
+    refusal: {validatorResult: number; domainId: number; tableId: number; row: number; step: number; field: number; byteOffset: number; detailKind: number; detailCode: number};
+    safeBoundaryReasons: number; activeLength: number;
+}
+export interface EditModeRead {mode: number; counter: number; peerMode: number; peerCounter: number; peerKnown: boolean; conflict: boolean; agreed: boolean}
+export interface RuntimeToggle {master: boolean; override: boolean}
+export interface RuntimeRead {
+    combos: RuntimeToggle; behaviours: RuntimeToggle;
+    live: {defaultDpi: number; snipingDpi: number; rgbMode: number; rgbColor: number; defaultLayers: number; keymapOptions: number};
+}
+export interface ActiveProfileMetadata {length: number; session: number; revision: number; savedGeneration: number; savedOrigin: number; domainMask: number; unsaved: boolean}

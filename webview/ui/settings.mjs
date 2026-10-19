@@ -322,7 +322,7 @@ function fieldRow(field, canEdit, submit, hidden, slot, durations) {
         && field.kind !== "toggle" && field.kind !== "layer" && !field.choices?.length;
     const label = affixed ? field.label.replace(new RegExp(`\\s*\\(${field.unit}\\)$`), "") : field.label;
     const row = el(`<div class="setrow ${field.readOnly ? "ro" : ""}" data-tip="${esc([field.tooltip, field.hint].filter(Boolean).join(" "))}" ${hidden ? "hidden" : ""}>
-        <div><div class="nm">${marked(getModel(), field.governs, label, {slot})}${keyboardKeysMark(field)}</div>${field.hint ? `<div class="hint">${esc(field.hint)}</div>` : ""}</div>
+        <div><div class="nm">${marked(getModel(), field.governs, label, {slot})}${keyboardKeysMark(field)}${offByKeyMark(field)}</div>${field.hint ? `<div class="hint">${esc(field.hint)}</div>` : ""}</div>
         <div class="control"></div>
     </div>`);
     const control = /** @type {HTMLElement} */ (row.querySelector(".control"));
@@ -368,12 +368,22 @@ function fieldRow(field, canEdit, submit, hidden, slot, durations) {
     return row;
 }
 
-// QMK keeps the live value of these, so a key on the keyboard (a Magic,
-// DF() or combo toggle key) changes it too, and the draft then asks to be
-// updated.
-const KEYBOARD_KEYS_TIP = "Keys on the keyboard can change this too. If they do, the draft bar asks you to update the draft.";
+// QMK keeps the live value of these, so a key on the keyboard (a Magic, DF()
+// or DPI key) changes it too, until the keyboard restarts: the profile is
+// their only saved owner (firmware D-F32), and a combos key is a toggle over
+// it, shown beside the switch rather than as a change.
+const KEYBOARD_KEYS_TIP = "Keys on the keyboard can change this too, until the keyboard restarts; it then comes back to the value set here.";
 /** @param {import("../../contracts/panel.js").PresentedField | undefined} field */
 const keyboardKeysMark = (field) => field?.keyboardKeys ? ` <span class="kk-mark" data-tip="${esc(KEYBOARD_KEYS_TIP)}">↺ keyboard keys change this too</span>` : "";
+
+// A toggle key turned this off over a stored "on" (plan answer 10): said
+// beside the switch, never a change in the review.
+/** @param {import("../../contracts/panel.js").PresentedField | undefined} field */
+function offByKeyMark(field) {
+    const runtime = getModel()?.runtime;
+    const off = field?.macro === "combosEnabled" ? runtime?.combosOffByKey : field?.macro === "behaviorsEnabled" ? runtime?.behavioursOffByKey : false;
+    return off ? ` <span class="kk-mark off-by-key" data-tip="${esc("A key on the keyboard turned this off for now. It stays on here; the key turns it back on, and so does unplugging the keyboard. Nothing to save.")}">turned off by key</span>` : "";
+}
 
 /** @param {string} value */
 const cssEscape = (value) => String(value).replace(/["\\]/g, "\\$&");

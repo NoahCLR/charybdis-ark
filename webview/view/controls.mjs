@@ -21,3 +21,16 @@ export const layersFollow = (keysFollow, names) => ({type: 'editPortableLayer', 
 /** One move of a layer: to a slot, one step up or down, or swapped with the base. @typedef {{to: number} | {direction: 1 | -1} | {makeBase: true}} LayerMove */
 /** @param {number} id @param {LayerMove} change @param {string[]} names @returns {import("../../contracts/messages.js").LayerEditControl} */
 export const moveLayer = (id, change, names) => ({type: 'editPortableLayer', id, ...change, names});
+
+// Live + review (firmware D-F32): the keyboard's Save and Revert, the answer to
+// a live edit's trap check, and how edits reach the keyboard.
+/** @param {boolean} [confirmChecks] @returns {import("../../contracts/messages.js").DraftControl} */
+export const saveDraft = (confirmChecks) => ({type: 'saveProfileDraft', ...(confirmChecks === undefined ? {} : {confirmChecks})});
+/** @returns {import("../../contracts/messages.js").DraftControl} */
+export const revertDraft = () => ({type: 'revertProfileDraft'});
+/** @param {number} proposal @returns {import("../../contracts/messages.js").DraftControl} */
+export const confirmLiveEdit = (proposal) => ({type: 'confirmLiveEdit', proposal});
+/** @param {number} proposal @returns {import("../../contracts/messages.js").DraftControl} */
+export const cancelLiveEdit = (proposal) => ({type: 'cancelLiveEdit', proposal});
+/** @param {0 | 1 | 2} mode @param {'save' | 'revert' | 'send' | 'discard'} [pending] @param {boolean} [confirmChecks] @returns {import("../../contracts/messages.js").DraftControl} */
+export const setEditMode = (mode, pending, confirmChecks) => ({type: 'setEditMode', mode, ...(pending ? {pending} : {}), ...(confirmChecks ? {confirmChecks} : {})});

@@ -1,0 +1,271 @@
+// @ts-check
+"use strict";
+
+// Live + review in the panel (firmware D-F32, plan answers 1–3): every edit
+// the panel posts, every undo, redo, discard, import and layer change, goes
+// to the keyboard's working copy through one path, and the draft moves only
+// once the keyboard confirms it. Save and Revert are the keyboard's; the
+// mode switch asks what to do with work in progress before it changes.
+//
+//   proposeLive   the trap check, then the edit: asks first when the edit
+//                 would add a trap or warning, as review does (answer 2)
+//   LIVE_ACTIONS  the draft controls a live draft runs instead of local ones
+//   setEditMode   Apply ⇄ Live + review, with Save/Revert or Send/Discard first
+
+/**
+ * @typedef {import("./types.js").RunningPanelSession} Session
+ * @typedef {import("./types.js").ControlHost} Host
+ * @typedef {NonNullable<Session["draft"]>} Draft
+ * @typedef {import("./profile-draft-session.js").LiveTarget} Target
+ */
+const {fingerprint} = require("../model/portable-profile");
+const {EDIT_MODE} = require("../protocol/profile-edit-v1");
+const {IDENTITY} = require("../model/layer-order");
+const {ProfileDraftSession} = require("./profile-draft-session");
+const {replaceDraft} = require("./panel-session-state");
+
+/** @param {string} message @param {string} [code] */
+const refusal = (message, code = "LIVE_EDIT_REFUSED") => Object.assign(new Error(message), {code});
+
+// What a read says when the working copy moved under the same session.
+const CHANGED_ELSEWHERE = "The keyboard's unsaved edits are not what Ark last saw (another app, a lost answer, or an edit that did not land as sent): the draft shows what it runs now, and its history starts again here.";
+// Refusals Ark makes before the keyboard's working copy could change: no
+// read is needed to know what it runs.
+const LOCAL_REFUSALS = new Set(["LIVE_EDIT_TOO_LARGE", "LIVE_HALVES_APART"]);
+/** @param {unknown} error */
+const codeOf = error => /** @type {{code?: string}} */ (error)?.code || "";
+
+// The halves are apart: the other half refused the working copy, so only a
+// Revert brings them together. The draft says so without reading again.
+/** @param {Draft} draft */
+function markApart(draft) {
+    if (draft.live) draft.live = {...draft.live, apart: true, converged: false};
+}
+
+/** @param {Session} session */
+function liveDraft(session) {
+    const draft = session.draft;
+    if (!draft?.live) throw refusal("Read the keyboard again before editing it live.");
+    return draft;
+}
+
+// Sends `target` to the keyboard, unless it adds a trap or warning the person
+// has not confirmed: then it waits as the panel's proposal. On any failure
+// the keyboard is read again, so the draft shows what it actually runs.
+/** @param {Session} session @param {Target} target @param {{confirmed?: boolean, accepted?: Session["acceptedEdit"], replaceWhenLarge?: boolean}} [options] */
+async function proposeLive(session, target, {confirmed = false, accepted, replaceWhenLarge = false} = {}) {
+    const draft = liveDraft(session);
+    session.liveProposal = undefined;
+    const added = draft.checksAdded(target.document, target.order ?? draft.order);
+    if (added.some(check => check.level === "blocker")) {
+        session.resetDraftForms = true;
+        throw refusal(`Not sent: ${added.find(check => check.level === "blocker")?.title || "the keyboard would refuse it"}.`, "LIVE_EDIT_BLOCKED");
+    }
+    if (added.length && !confirmed) {
+        session.liveProposal = {id: draft.revision, draftId: draft.id, revision: draft.revision, target, checks: added, accepted, replaceWhenLarge};
+        return false;
+    }
+    await sendLive(session, draft, target, {accepted, replaceWhenLarge});
+    return true;
+}
+
+/** @param {Session} session @param {Draft} draft @param {Target} target @param {{accepted?: Session["acceptedEdit"], replaceWhenLarge?: boolean}} options */
+async function sendLive(session, draft, target, {accepted, replaceWhenLarge = false}) {
+    const live = /** @type {import("./types.js").LiveState} */ (draft.live);
+    try {
+        const result = await session.service.postLiveEdit({from: live.working, to: Buffer.from(target.document.profile, "base64"), defaults: live.defaults,
+            identity: {session: live.session, revision: live.revision}, replaceWhenLarge: replaceWhenLarge && !live.unsaved});
+        draft.confirmLive(target, result);
+        session.acceptedEdit = accepted;
+        if (result.apart) session.notice = "The slave half refused this edit, so the halves run different profiles. Revert puts both back on the saved profile.";
+        else if (!result.converged) session.notice = "The edit runs on the master half; the slave half is catching up. The next edit waits for it.";
+    } catch (error) {
+        session.resetDraftForms = true;
+        if (codeOf(error) === "LIVE_HALVES_APART") markApart(draft);
+        if (!LOCAL_REFUSALS.has(codeOf(error))) await reread(session);
+        throw error;
+    }
+}
+
+// The keyboard as it is now, after a refusal or a lost answer. A failed read
+// leaves the draft stale, which says to read again.
+/** @param {Session} session */
+async function reread(session) {
+    const draft = session.draft;
+    if (draft) draft.needsRead = true;
+    if (!session.service.snapshot().connected) return;
+    try {
+        const read = await session.service.readKeyboardProfile();
+        session.draft?.observe(read, session.service.snapshot().selectedDeviceId, session.service.snapshot().connectionToken, session.service.snapshot().capabilities || undefined);
+        session.observedPortable = read;
+        if (session.draft?.changedElsewhere) {session.notice = CHANGED_ELSEWHERE; session.draft.changedElsewhere = false;}
+    } catch {}
+}
+
+// A posted edit, in Live + review: the same editors stage it, the keyboard
+// takes it.
+/** @param {Session} session @param {import("./types.js").DraftEdit} message */
+async function liveEdit(session, message) {
+    const draft = liveDraft(session);
+    const {document, label, previousFingerprint} = draft.propose(message);
+    const accepted = {message: JSON.parse(JSON.stringify(message)), previousFingerprint, fingerprint: fingerprint(document)};
+    return proposeLive(session, {document, label, origin: "edit", order: draft.order}, {accepted});
+}
+
+/** @typedef {{session: Session, draft: Draft, service: Session["service"], revision: number, message: import("../../contracts/messages.js").DraftControl & {draftRevision: number}, host: Host, saveRecovery: (document: import("../model/types.js").PortableDocument) => Promise<string | undefined>}} LiveContext */
+/** @type {Readonly<Record<string, (context: LiveContext) => Promise<unknown>>>} */
+const LIVE_ACTIONS = Object.freeze({
+    undo: ({draft, revision, session}) => proposeLive(session, draft.stepTarget(revision, Math.max(0, draft.cursor - 1))),
+    redo: ({draft, revision, session}) => proposeLive(session, draft.stepTarget(revision, Math.min(draft.history.length - 1, draft.cursor + 1))),
+    jump: ({draft, revision, session, message}) => proposeLive(session, draft.stepTarget(revision, /** @type {{step: number}} */ (/** @type {unknown} */ (message)).step)),
+    discardChanges: ({draft, revision, session, message}) => {
+        const {document, label, order, reviewed} = draft.discardTarget(revision, /** @type {{group: number}} */ (/** @type {unknown} */ (message)).group);
+        return proposeLive(session, {document, label, order, origin: "discard", keepReviewed: reviewed});
+    },
+    putBack: ({draft, revision, session}) => {
+        draft.assertRevision(revision);
+        const before = session.beforeApply;
+        if (!before || before.deviceId !== draft.deviceId) throw new Error("There is no copy from before an Apply on this keyboard to put back.");
+        return proposeLive(session, {document: before.document, label: "Put back what the keyboard had before Apply", origin: "edit", order: IDENTITY}, {replaceWhenLarge: true});
+    },
+    // Discard all is Revert: the keyboard runs its saved profile again, and
+    // the history keeps a step for it, so undo sends the edits back.
+    discard: context => LIVE_ACTIONS.revert(context),
+    revert: async ({draft, revision, session, service}) => {
+        draft.assertRevision(revision, {allowStale: false});
+        const live = /** @type {import("./types.js").LiveState} */ (draft.live);
+        const result = await service.revertWorkingCopy({session: live.session, revision: live.revision}).catch(async error => {await reread(session); throw error;});
+        // Save elsewhere can advance the saved profile without changing the
+        // working revision. Revert confirms that saved generation, not ours.
+        if (result.savedGeneration !== live.savedGeneration || result.savedOrigin !== live.savedOrigin) {
+            await reread(session);
+            session.resetDraftForms = true;
+            if (session.draft?.stale) throw refusal("Reverted on the keyboard, but its saved profile could not be read. Read the keyboard again.");
+            session.notice = "Reverted: the keyboard runs its saved profile again. It was saved elsewhere; Ark read that profile again.";
+            return;
+        }
+        draft.confirmLive({document: draft.completeBase.document, label: "Reverted to the saved profile", origin: "revert", order: IDENTITY},
+            {session: result.session, revision: result.revision, bytes: live.saved, converged: result.converged, apart: result.apart, unsaved: false});
+        session.resetDraftForms = true;
+        session.notice = "Reverted: the keyboard runs its saved profile again. Undo (⌘Z) sends the edits back.";
+    },
+    // Save: a recovery copy of what is saved, then the keyboard writes what it
+    // runs as its new saved profile on both halves.
+    save: async ({draft, revision, session, service, message, saveRecovery}) => {
+        draft.assertRevision(revision);
+        if (draft.hasBlockers()) throw new Error("Resolve the blockers in Checks before saving.");
+        if (draft.reviewedRevision !== revision) throw new Error("Review the keyboard's unsaved edits before saving them.");
+        const live = /** @type {import("./types.js").LiveState} */ (draft.live);
+        if (!live.unsaved) {session.notice = "Nothing to save: the keyboard runs its saved profile."; return;}
+        if (draft.hasChecksToConfirm() && /** @type {{confirmChecks?: boolean}} */ (message).confirmChecks !== true) throw new Error("These edits have warnings or traps. Confirm them in the review before saving.");
+        const recovery = await saveRecovery(draft.completeBase.document);
+        if (!recovery) throw refusal("A recovery copy could not be saved. Nothing was saved on the keyboard.", "RECOVERY_REQUIRED");
+        try {
+            const status = await service.saveWorkingCopy({session: live.session, revision: live.revision});
+            draft.confirmSaved(status);
+            session.notice = `Saved on both halves. Recovery copy of what was saved before: ${recovery}`;
+        } catch (error) {
+            if (codeOf(error) === "LIVE_HALVES_APART") markApart(draft);
+            else await reread(session);
+            throw error;
+        }
+    },
+    // A live draft out of step with the keyboard (a reconnect, a refused
+    // read) is brought back by reading it: what it runs is the draft.
+    rebase: async ({session}) => {
+        await reread(session);
+        session.resetDraftForms = true;
+        if (session.draft?.stale) throw new Error("Read the keyboard again; it could not be read just now.");
+        session.notice = "Read the keyboard again: the draft shows what it runs now.";
+    },
+    confirmLive: async ({session, draft, message}) => {
+        const proposal = session.liveProposal;
+        const id = /** @type {{proposal?: number}} */ (/** @type {unknown} */ (message)).proposal;
+        if (!proposal || proposal.id !== id || proposal.draftId !== draft.id || proposal.revision !== draft.revision) {
+            session.liveProposal = undefined;
+            session.resetDraftForms = true;
+            throw new Error("That edit belongs to an older draft. Make it again.");
+        }
+        await proposeLive(session, proposal.target, {confirmed: true, accepted: proposal.accepted, replaceWhenLarge: proposal.replaceWhenLarge});
+    },
+});
+
+// Apply ⇄ Live + review (plan answer 3). The keyboard changes its mode only
+// with nothing unsaved, so a live draft with unsaved edits needs Save or
+// Revert first, whichever way it goes (choosing the same mode again settles
+// halves that stored different modes); entering Live + review with an Apply
+// draft needs Send or Discard. The question shows the checks it confirms.
+// Cancel is the panel's: nothing is posted then.
+/** @param {Session} session @param {{mode: number, pending?: string, draftRevision: number, confirmChecks?: boolean}} message @param {LiveContext["saveRecovery"]} saveRecovery @param {Host} host */
+async function setEditMode(session, message, saveRecovery, host) {
+    const draft = session.draft, service = session.service;
+    if (!draft) throw new Error("Read the keyboard before changing how edits reach it.");
+    const mode = message.mode;
+    if (mode !== EDIT_MODE.APPLY && mode !== EDIT_MODE.LIVE_REVIEW) throw new Error("Ark offers Apply and Live + review.");
+    draft.assertRevision(message.draftRevision);
+    const known = service.snapshot().editMode;
+    if (known?.mode === mode && !known.conflict && Boolean(draft.live) === (mode !== EDIT_MODE.APPLY)) return;
+    const confirmChecks = message.confirmChecks === true;
+    /** @type {Draft | undefined} */
+    let send;
+    if (draft.live) {
+        if (draft.live.unsaved) {
+            if (message.pending === "save") {
+                if (draft.reviewedRevision !== draft.revision) draft.review(draft.revision);
+                await LIVE_ACTIONS.save(/** @type {LiveContext} */ ({session, draft, service, revision: draft.revision, message: {...message, type: "saveProfileDraft", confirmChecks}, host, saveRecovery}));
+            } else if (message.pending === "revert") {
+                await LIVE_ACTIONS.revert(/** @type {LiveContext} */ ({session, draft, service, revision: draft.revision, message, host, saveRecovery}));
+            } else throw refusal("Save or Revert the keyboard's unsaved edits before changing how edits reach it.", "LIVE_EDIT_NOT_CLEAN");
+        }
+    } else if (draft.dirty) {
+        if (message.pending === "send") {
+            if (draft.hasBlockers()) throw refusal("Resolve the blockers in Checks before sending your draft live.", "LIVE_EDIT_BLOCKED");
+            if (draft.hasChecksToConfirm() && !confirmChecks) throw refusal("Your draft has warnings or traps. Confirm them before sending it live.", "LIVE_EDIT_BLOCKED");
+            send = draft;
+        } else if (message.pending !== "discard") throw refusal("Send your draft to the keyboard or discard it before switching to Live + review.", "DRAFT_PENDING");
+    }
+    await service.setEditMode(mode);
+    // The draft starts again from the keyboard in its new mode.
+    const read = await service.readKeyboardProfile();
+    const state = service.snapshot();
+    replaceDraft(session, new ProfileDraftSession(read, state.selectedDeviceId, /** @type {import("../model/types.js").ProfileDestination} */ (state.capabilities), state.connectionToken));
+    session.observedPortable = read;
+    session.liveProposal = undefined;
+    const words = mode === EDIT_MODE.APPLY ? "Apply: edits wait in Ark's draft until you review and apply them." : "Live + review: edits take effect on the keyboard at once; review and Save make them permanent.";
+    session.notice = known?.mode === mode ? "Both halves now store the same edit mode." : `Edits now reach the keyboard by ${words}`;
+    if (state.editMode?.notStored) session.notice += " The keyboard has not stored the new mode yet; a replug now may lose it.";
+    if (send && session.draft) await sendApplyDraft(session, send);
+}
+
+// The Apply draft goes live as one edit, its checks confirmed by the
+// question. Until the keyboard takes it, the draft is kept: refused, the
+// keyboard goes back to Apply and the draft is there as it was.
+/** @param {Session} session @param {Draft} kept */
+async function sendApplyDraft(session, kept) {
+    const draft = /** @type {Draft} */ (session.draft), service = session.service;
+    try {
+        await proposeLive(session, {document: kept.document, label: "Sent the Apply draft live", origin: "edit", order: draft.order}, {confirmed: true, replaceWhenLarge: true});
+        session.notice += " Your draft is running on the keyboard, unsaved.";
+    } catch (error) {
+        // The Apply draft belongs to the person until publication succeeds,
+        // even if the keyboard refuses the return to Apply.
+        replaceDraft(session, kept);
+        kept.needsRead = true;
+        session.observedPortable = service.portable || undefined;
+        let back = false;
+        try {
+            await service.setEditMode(EDIT_MODE.APPLY);
+            const read = await service.readKeyboardProfile();
+            const state = service.snapshot();
+            replaceDraft(session, kept);
+            kept.observe(read, state.selectedDeviceId, state.connectionToken, state.capabilities || undefined);
+            session.observedPortable = read;
+            back = true;
+        } catch {}
+        throw Object.assign(new Error(`Your draft was not sent: ${error instanceof Error ? error.message : String(error)} ${back
+            ? "Edits reach the keyboard by Apply again, and your draft is kept."
+            : "Ark could not switch back to Apply; your draft is kept. Return the keyboard to Apply before continuing."}`), {code: codeOf(error) || "LIVE_EDIT_REFUSED"});
+    }
+}
+
+module.exports = {LIVE_ACTIONS, CHANGED_ELSEWHERE, liveEdit, proposeLive, setEditMode};
