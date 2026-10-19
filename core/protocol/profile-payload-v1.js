@@ -104,9 +104,14 @@ async function readProfilePayload(connection, value, options = {}, previous) {
 
     for (let attempt = 0; attempt <= retries; attempt += 1) {
         const metadata = decodePayloadMetadata(await requestPage(connection, value, PROFILE_PAYLOAD_V1.METADATA_PAGE, requestIds, options));
-        const reused = previous && sameMetadata(previous.metadata, metadata);
+        // The same bytes, already in hand: an earlier verified read of this
+        // payload, or bytes the keyboard just served from the same place
+        // that pass the checks a download must.
+        const known = previous && sameMetadata(previous.metadata, metadata) ? previous.bytes
+            : options.sameAs && matchesMetadata(options.sameAs, metadata) ? options.sameAs : undefined;
+        const reused = known !== undefined;
         const total = reused ? 0 : chunkCount(metadata);
-        const bytes = reused ? Buffer.from(previous.bytes) : Buffer.alloc(metadata.payloadLength);
+        const bytes = reused ? Buffer.from(known) : Buffer.alloc(metadata.payloadLength);
         let written = 0;
 
         for (let chunk = 0; chunk < total; chunk += 1) {
@@ -147,6 +152,11 @@ async function readProfilePayload(connection, value, options = {}, previous) {
 
 /** @param {import("./types.js").PayloadMetadata} left @param {import("./types.js").PayloadMetadata} right */
 function sameMetadata(left, right) { return JSON.stringify(left) === JSON.stringify(right); }
+
+/** @param {Uint8Array} bytes @param {import("./types.js").PayloadMetadata} metadata */
+function matchesMetadata(bytes, metadata) {
+    return bytes.length === metadata.payloadLength && crc32(bytes) === metadata.crc32 && fnv1a32(bytes) === metadata.digest;
+}
 
 // Both checks, not one. The CRC catches transport damage; the digest is what
 // the rest of the system identifies a generation by, so a mismatch there means

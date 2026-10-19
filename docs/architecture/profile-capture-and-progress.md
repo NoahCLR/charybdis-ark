@@ -74,10 +74,21 @@ One capture supplies the editable layout, domains, macros, base RGB and backup;
 a failed capture leaves independent diagnostics but opens no editable draft.
 
 `ProfilePayloadReader` belongs to one connection. Only bytes actually read
-and verified may populate it. Compiled defaults may be reused on that
-connection; initial saved reads, Refresh and Export download saved bytes afresh.
-A metadata mismatch retries or downloads afresh and both hashes remain
-required. Reconnect discards the reader. Authored target bytes never seed it.
+from a keyboard and verified may populate it. Compiled defaults are immutable
+while the firmware runs: they are reused on the connection, and Reconnect,
+which discards the reader, starts the next one from the copy the service last
+verified, which a host may keep between runs (`compiledDefaults`; VS Code's
+global state, the page's local storage). A kept copy must pass its own CRC32
+and FNV, and is used only when the keyboard's fresh metadata names exactly it;
+otherwise the defaults download. Refresh and Export download saved bytes
+afresh. A live capture with nothing unsaved, while the keyboard runs the saved
+record itself (active kind committed, the saved generation and origin), takes
+the bytes it just read of what the keyboard runs as the saved profile once
+they pass the saved record's fresh metadata (length, CRC32, FNV); the keyboard
+served them from that record's flash, so the read still checks it. With
+unsaved edits it downloads the saved bytes. A metadata mismatch retries or
+downloads afresh and both hashes remain required. Authored target bytes never
+seed the reader.
 
 A reviewed capture may serve as the recovery base only after a fresh profile
 and settings identity check. Apply saves its recovery copy before any mutation,
@@ -91,7 +102,11 @@ lost peer link after firmware confirmed its record does not invalidate an
 already active target; Ark reports that the peer is out of sight.
 
 After Apply, the editor reads the configuration again while it stays visible
-and busy. This readback is separate from the eight transaction steps. A later
+and busy (`rereadKeyboard`). This readback is separate from the eight
+transaction steps. Its layout step downloads the saved bytes afresh, the read
+of what was stored; the profile step right after reuses them through the
+reader's `reuse` (fresh metadata before and after, both hashes) and downloads
+on any difference. A later
 read or export gets the generic operation bar rather than an old finished
 Apply. No automated check establishes physical interruption acceptance.
 

@@ -6,7 +6,7 @@
 // puts back, read as one coherent pair. Review compares the two; a live edit
 // is made against the working copy's own bytes, so they are kept exactly.
 
-const {readProfileStatus} = require("../protocol/profile-wire-v1");
+const {PROFILE_ACTIVE_KIND, readProfileStatus} = require("../protocol/profile-wire-v1");
 const {EDIT_PHASE, EDIT_RESULT, readActiveProfile, readEditProgress, readEditStatus, readEditMode, readRuntime} = require("../protocol/profile-edit-v1");
 const {readDeviceCombos} = require("../protocol/combo-readback-v1");
 const {ProfilePayloadReader} = require("./profile-payload-reader");
@@ -77,7 +77,12 @@ async function captureLive(connection, ids, capabilities, {payloadReader = new P
     if (working.metadata.session !== before.session || working.metadata.revision !== before.revision || working.metadata.savedGeneration !== before.savedGeneration) throw fail("PROFILE_CHANGED", CHANGED);
     let saved = defaults.bytes;
     if (before.savedGeneration !== 0) {
-        const committed = await payloadReader.readCommitted({...options, onProgress: counted("Reading the saved profile")});
+        // With nothing unsaved the keyboard runs the saved record itself and
+        // has just served its bytes from flash: the saved read takes them if
+        // they pass its checks, and downloads them otherwise.
+        const runsSaved = !working.metadata.unsaved && status.activeKind === PROFILE_ACTIVE_KIND.COMMITTED
+            && status.activeGeneration === before.savedGeneration && status.activeOriginHalf === before.savedOrigin;
+        const committed = await payloadReader.readCommitted({...options, sameAs: runsSaved ? working.bytes : undefined, onProgress: counted("Reading the saved profile")});
         // GET 0x04 serves the newest saved record; it must be the one the
         // working copy began from.
         if (committed.metadata.generation !== before.savedGeneration || committed.metadata.originHalf !== before.savedOrigin) throw fail("PROFILE_CHANGED", CHANGED);
