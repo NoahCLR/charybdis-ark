@@ -1,26 +1,31 @@
 // @ts-check
 // How the Settings screen is laid out and searched: which cards it draws, in
-// what order, what a folded card counts, where a search finds things that are
-// edited on another screen, and the firmware facts it states read-only.
+// what order, which start folded, what a folded card says about itself, and
+// where a search finds things that are edited on another screen.
 // Pure: it reads the published model and returns words and ids.
+
+import {FIRMWARE_FACTS_SEARCH, firmwareFacts} from "./firmware-facts.mjs";
 
 /** @typedef {import("../../contracts/panel.js").PublishedModel} Model */
 /** @typedef {import("../../contracts/panel.js").PresentedSection} Section */
+/** @typedef {import("../../contracts/panel.js").PresentedField} Field */
 
-// The Settings cards, in order. A card draws one section, or groups several
-// under one title; `combo-timing` and `built-in` are drawn by the screen.
-// Any other Settings section the keyboard reports is drawn after Your
-// computer, in the order it came, so nothing it reports is lost.
+// The Settings cards, in the order a person reaches for them: what a key
+// press feels like, the swaps people come looking for, then where behaviours
+// and combos run, the computer it is plugged into, and the layers that are
+// always on. A card draws one section; Combos also holds the combo timing
+// and Combo layer matching, each still saved on its own. `folded` cards start
+// closed and say what they hold. Any other Settings section the keyboard
+// reports is drawn after Your computer, in the order it came, so nothing it
+// reports is lost.
 export const SETTINGS_CARDS = Object.freeze([
-    {id: "keyTiming", sections: ["keyTiming"]},
-    {id: "where", title: "Where behaviours and combos run", sections: ["behaviorSettings", "comboSettings"]},
-    {id: "comboTiming", title: "Combo timing", sections: []},
-    {id: "comboReferences", sections: ["comboReferences"]},
-    {id: "keyboardOptions", sections: ["keyboardOptions"]},
-    {id: "host", sections: ["host"]},
-    {id: "others", sections: []},
-    {id: "startupLayers", sections: ["startupLayers"]},
-    {id: "builtIn", title: "Built into this firmware", sections: []},
+    {id: "keyTiming", sections: ["keyTiming"], folded: false},
+    {id: "keyboardOptions", sections: ["keyboardOptions"], folded: true},
+    {id: "behaviorSettings", sections: ["behaviorSettings"], folded: false},
+    {id: "comboSettings", sections: ["comboSettings", "comboReferences"], folded: false},
+    {id: "host", sections: ["host"], folded: true},
+    {id: "others", sections: [], folded: false},
+    {id: "startupLayers", sections: ["startupLayers"], folded: true},
 ]);
 const PLACED = new Set(SETTINGS_CARDS.flatMap((card) => card.sections));
 
@@ -31,15 +36,82 @@ export function settingsCards(sections) {
         sections: card.id === "others" ? sections.filter((section) => !PLACED.has(section.id)) : card.sections.map((id) => byId.get(id)).filter((section) => section !== undefined)}));
 }
 
-// What a folded section holds, in words: its layers, its options or its
-// settings. One-per-layer sections count layers, not their switches.
-/** @param {Section} section */
-export function foldedCount(section) {
+// Whether a card starts folded. Your computer opens on its own while it has
+// something to say: a layout that does not fit the computer, or a Mac whose
+// Unicode setup breaks Option shortcuts.
+/** @param {{folded: boolean}} card @param {Section | undefined} section */
+export const startsFolded = (card, section) => card.folded && !section?.warning;
+
+// A section's one-per-layer switches are one setting to a person, folded
+// under their own heading inside the section's card.
+/** @param {Field} field */
+export const isLayerSwitch = (field) => field.kind === "toggle" && field.governs?.kind === "layer";
+
+/** @param {Field} field */
+const layerOf = (field) => field.governs?.kind === "layer" ? field.governs.layer : -1;
+
+// What a row of layer switches says folded: all of them, the few that are
+// off, or how many are on. `nameOf` names a layer by its index.
+/** @param {readonly Field[]} fields @param {(layer: number) => string} nameOf */
+export function layerSwitchSummary(fields, nameOf) {
+    const on = fields.filter((field) => field.enabled), off = fields.filter((field) => !field.enabled);
+    if (!off.length) return `All ${fields.length} layers`;
+    if (!on.length) return "No layers";
+    if (off.length <= 2) return `Off on ${off.map((field) => nameOf(layerOf(field))).join(" and ")}`;
+    if (on.length <= 2) return `Only ${on.map((field) => nameOf(layerOf(field))).join(" and ")}`;
+    return `${on.length} of ${fields.length} layers`;
+}
+
+// What Combo layer matching says folded: every layer matching its own keys,
+// or which layers borrow another layer's.
+/** @param {Section} section @param {(layer: number) => string} nameOf */
+export function referenceSummary(section, nameOf) {
+    const borrowed = section.fields.filter((field) => field.value !== `Layer ${layerOf(field)}`);
+    if (!borrowed.length) return "Each layer its own";
+    const words = borrowed.slice(0, 2).map((field) => `${nameOf(layerOf(field))} uses ${nameOf(Number(String(field.value).replace(/^Layer /, "")))}`);
+    return borrowed.length > 2 ? `${words.join(", ")}, +${borrowed.length - 2}` : words.join(", ");
+}
+
+// What a folded card says about itself: its state, not a count, so a setting
+// that is off can be seen without opening it.
+/** @param {Section} section @param {(layer: number) => string} nameOf */
+export function foldedSummary(section, nameOf) {
     const fields = section.fields || [];
-    const layers = fields.filter((field) => field.governs?.kind === "layer").length;
-    if (layers && layers === fields.length) return `${layers} layers`;
-    if (section.id === "keyboardOptions") return `${fields.length} option${fields.length === 1 ? "" : "s"}`;
+    if (section.id === "comboReferences") return referenceSummary(section, nameOf);
+    if (section.id === "startupLayers") {
+        const on = fields.filter((field) => field.enabled).map((field) => nameOf(layerOf(field)));
+        return on.length ? on.join(", ") : "None";
+    }
+    if (section.id === "keyboardOptions") {
+        if (!fields.length) return "Not read";
+        const on = fields.filter((field) => field.enabled && !field.notBuilt).map((field) => field.label);
+        if (!on.length) return "All off";
+        return on.length === 1 ? on[0] : `${on.length} on: ${on.join(", ")}`;
+    }
+    if (section.id === "host") {
+        const word = (/** @type {string} */ macro) => {
+            const field = fields.find((entry) => entry.macro === macro);
+            const choice = (field?.choices || []).find((entry) => typeof entry === "object" && String(entry.value) === String(field?.value));
+            return typeof choice === "object" ? choice.label : field?.value;
+        };
+        return [word("hostOs"), word("hostLayout")].filter(Boolean).join(" · ");
+    }
+    if (fields.length && fields.every(isLayerSwitch)) return layerSwitchSummary(fields, nameOf);
     return `${fields.length} setting${fields.length === 1 ? "" : "s"}`;
+}
+
+// The parts a section lists its fields under, in the order the first of
+// each comes; a section without parts is one unnamed part.
+/** @param {readonly Field[]} fields @returns {{part: string, fields: Field[]}[]} */
+export function fieldParts(fields) {
+    /** @type {Map<string, Field[]>} */
+    const parts = new Map();
+    for (const field of fields) {
+        const part = field.part || "";
+        if (!parts.has(part)) parts.set(part, []);
+        parts.get(part)?.push(field);
+    }
+    return [...parts].map(([part, list]) => ({part, fields: list}));
 }
 
 // A field or section is found by its words, its hover help (where QMK's
@@ -57,6 +129,12 @@ export const sectionMatches = (section, query) => matchesQuery({label: section.l
 export const KEYBOARD_NAME_SEARCH = {label: "Keyboard name", tooltip: "name rename product USB",
     hint: "Shown in Chrome's keyboard chooser and your computer's list of devices."};
 
+// The firmware facts a search finds on the Keyboard screen: every one when
+// the search names the card, otherwise those whose words match.
+/** @param {Model | null | undefined} model @param {string} query */
+export const factsMatching = (model, query) => matchesQuery(FIRMWARE_FACTS_SEARCH, query)
+    ? firmwareFacts(model) : firmwareFacts(model).filter((fact) => matchesQuery(fact, query));
+
 // What a search finds on other screens, one entry per screen that has any.
 /** @param {Model | null | undefined} model @param {string} query @returns {{screen: "mouse" | "lighting" | "device", label: string, count: number}[]} */
 export function matchesElsewhere(model, query) {
@@ -68,7 +146,7 @@ export function matchesElsewhere(model, query) {
     const found = [
         {screen: "lighting", label: "Lighting", count: count("Lighting")},
         {screen: "mouse", label: "Mouse", count: count("Mouse")},
-        {screen: "device", label: "Keyboard", count: model?.keyboardName && matchesQuery(KEYBOARD_NAME_SEARCH, query) ? 1 : 0},
+        {screen: "device", label: "Keyboard", count: (model?.keyboardName && matchesQuery(KEYBOARD_NAME_SEARCH, query) ? 1 : 0) + factsMatching(model, query).length},
     ];
     return found.filter((entry) => entry.count > 0);
 }
@@ -78,38 +156,3 @@ export const elsewhereWords = (entry) => `${entry.count} match${entry.count === 
 
 /** @param {string} query */
 export const noMatchWords = (query) => `No setting matches “${query.trim()}”.`;
-
-const BUILD = "Needs a firmware build to change.";
-
-// What this firmware was built with, read-only: each fact the keyboard
-// reports (model.firmware) or that the screens already show, and that QMK's
-// tap-hold options apply to no key.
-/** @param {Model | null | undefined} model @returns {{label: string, value: string, hint: string}[]} */
-export function firmwareFacts(model) {
-    const firmware = model?.firmware;
-    /** @type {{label: string, value: string, hint: string}[]} */
-    const facts = [];
-    /** @param {string} label @param {number | null | undefined} value @param {string} words @param {string} hint */
-    const add = (label, value, words, hint) => { if (Number.isInteger(value)) facts.push({label, value: `${value} ${words}`, hint: `${hint} ${BUILD}`}); };
-    add("Layers", firmware?.layers ?? (model?.layers?.length || null), "layers", "Every layer the keymap has, used or empty.");
-    add("Tap counts", firmware?.tapCounts ?? model?.behaviorEditing?.maxTapStepsPerBehavior, "per behaviour", "How many taps a behaviour can tell apart; more quick taps each send the first tap.");
-    add("Macros", firmware?.macros ?? (model?.viaMacros?.length || null), "macros", "Macro slots in the shared profile storage.");
-    add("Custom keys", firmware?.customKeys, "custom keys", "Custom key slots.");
-    add("Pointing modes", model?.pdModes?.length || null, "modes", "Pointing mode slots.");
-    add("Combos", firmware?.combos, "combos", "The most combos the profile can hold.");
-    add("LEDs", firmware?.leds, "LEDs", "Lights on both halves together.");
-    const brightness = model?.rgb?.maximumBrightness;
-    if (Number.isInteger(brightness)) facts.push({label: "Brightness ceiling", value: `${brightness}`, hint: `Brightness goes no higher than this, whatever is saved. ${BUILD}`});
-    if (Number.isInteger(firmware?.repeatHz)) facts.push({label: "Repeat ceiling", value: `${firmware?.repeatHz} Hz`, hint: `The fastest a held behaviour repeats. ${BUILD}`});
-    const dpi = (model?.configDefaults || []).find((section) => section.id === "normalPointerSpeed");
-    for (const field of dpi?.fields || []) {
-        const steps = (field.choices || []).map((choice) => typeof choice === "object" ? choice.value : choice);
-        if (steps.length) facts.push({label: `${field.label.replace(/ \(.*\)$/, "")} speed steps`, value: `${steps[0]}–${steps[steps.length - 1]} DPI, ${steps.length} steps`,
-            hint: `The DPI steps the Charybdis accepts for this speed; a trackball mode's own speed is not limited to them. ${BUILD}`});
-    }
-    // Current firmware decides every key's tap or hold itself (firmware D-F27,
-    // Profile Wire feature bit 31, which Ark requires).
-    facts.push({label: "QMK tap-hold options", value: "Not used",
-        hint: `The keyboard decides every key's tap or hold itself, so QMK's permissive hold, hold on other key press and quick tap apply to no key. ${BUILD}`});
-    return facts;
-}

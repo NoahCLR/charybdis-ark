@@ -18,4 +18,12 @@ async function openPreview(page, theme = "plain", search = "") {
     await page.locator("body").evaluate((body, name) => body.classList.add("vscode-body", name), theme);
 }
 
-module.exports = {openPreview};
+// Opens a folded Settings card or fold by its title, as a person would; one
+// already open is left open.
+/** @param {import("@playwright/test").Page} page @param {string} id a data-section or data-subfold */
+async function openFold(page, id) {
+    const fold = page.locator(`details[data-section="${id}"], details[data-subfold="${id}"]`).first();
+    if (!(await fold.evaluate((node) => /** @type {HTMLDetailsElement} */ (node).open))) await fold.locator(":scope > summary").click();
+}
+
+module.exports = {openFold, openPreview};

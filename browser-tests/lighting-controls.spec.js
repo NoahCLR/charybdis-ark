@@ -192,13 +192,11 @@ test("Lighting preview switches and screen links navigate without posting edits"
     await expect(page.locator(".board-foot-text")).toContainText("held, painting");
     expect(await posted(page)).toEqual([]);
     await page.locator('[data-ltab="base"]').click();
-    // Edited in Settings, the base effect is a swatch here: no picker that cannot move.
-    await expect(body(page).locator(".colour-head .swatch-lg")).toHaveCount(1);
-    await expect(body(page).locator("[data-channel], .sv-field, .hue-ramp")).toHaveCount(0);
-    await body(page).getByRole("button", {name: "Open Settings → Base lighting", exact: true}).click();
-    await expect(page.locator(".main h1")).toHaveText("Settings");
+    // The background effect is edited on its own stage, with the same colour
+    // picker every stage has, and nothing posts until a control changes.
+    await expect(body(page).locator(".sv-field, .hue-ramp")).toHaveCount(2);
+    await expect(body(page).getByRole("button", {name: "Turn off"})).toHaveCount(0);
     expect(await posted(page)).toEqual([]);
-    await page.locator('[data-screen="lighting"]').click();
     await expect(page.locator('.topbar [data-act="read"]')).toHaveCount(0);
     await page.locator('[data-screen="device"]').click();
     await clearPosts(page);

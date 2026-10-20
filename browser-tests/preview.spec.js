@@ -116,10 +116,9 @@ for (const theme of ["plain", "vscode-dark", "vscode-light"]) {
         await page.evaluate(async () => {
             const store = await import("/webview/store.mjs");
             const model = structuredClone(store.getModel());
-            model.configDefaults.find(section => section.id === "rgbAppearance").fields.find(field => field.macro === "lightingTimeout").value = "60000";
+            model.configDefaults.find(section => section.id === "lightingPower").fields.find(field => field.macro === "lightingTimeout").value = "60000";
             store.setModel(model);
-            store.state.screen = "settings";
-            store.state.settingsOpen = ["rgbAppearance"];
+            store.state.screen = "lighting";
             store.render();
             window.__posted.length = 0;
         });
@@ -136,11 +135,10 @@ for (const theme of ["plain", "vscode-dark", "vscode-light"]) {
             await input.fill(value);
             await input.blur();
             await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([
-                expect.objectContaining({type: "updateConfigDefaults", sectionId: "rgbAppearance", fields: expect.arrayContaining([{macro: "lightingTimeout", value: ms}])}),
+                expect.objectContaining({type: "updateConfigDefaults", sectionId: "lightingPower", fields: expect.arrayContaining([{macro: "lightingTimeout", value: ms}])}),
             ]);
             const posted = await page.evaluate(() => window.__posted[0].fields);
-            expect(posted).toHaveLength(8);
-            expect(posted.find(field => field.macro === "brightness").value).toBe("200");
+            expect(posted).toEqual([{macro: "lightingEnabled", enabled: true}, {macro: "lightingTimeout", value: ms}], "All lighting travels unchanged");
         }
         // Letters and signs never reach the field, so they cannot be posted.
         for (const [typed, kept] of [["no time", ""], ["-1", "1"], ["1.5.0", "1.50"]]) {

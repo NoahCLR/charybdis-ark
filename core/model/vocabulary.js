@@ -165,7 +165,7 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     paintModes: [["KEYS_MAPPED_ON_THIS_LAYER_ONLY", "Keys mapped on this layer only"], ["ALL_KEYS", "All keys"]],
     fadeModes: [
         ["FOLLOW_REAL_DESTINATION", "Follow the real destination"],
-        ["END_COLOR_WHERE_BASE_EFFECT_WOULD_SHOW", "End colour where the base effect would show"],
+        ["END_COLOR_WHERE_BASE_EFFECT_WOULD_SHOW", "End colour where the background effect would show"],
         ["END_COLOR_ON_ALL_KEYS", "End colour on all keys"],
     ],
     tapCommit: [["KEY_FEEDBACK_TAP_COMMIT_OFF", "Off"], ["KEY_FEEDBACK_TAP_COMMIT_NON_BASE_TAPS", "Non-base taps"]],
@@ -179,7 +179,7 @@ const VOCABULARY = Object.freeze(/** @satisfies {import("../../contracts/model.j
     // The lighting stages in the order the firmware paints them. A stage is
     // found by its id or bit, never by its words.
     stages: [
-        {id: "base", label: "Base effect"},
+        {id: "base", label: "Background effect"},
         {id: "layers", label: "Layer colours", bit: RGB_STAGE_BITS.LAYER},
         {id: "auto", label: "Auto-mouse fade", bit: RGB_STAGE_BITS.AUTOMOUSE},
         {id: "pd", label: "Pointing modes", bit: RGB_STAGE_BITS.PD_MODE},

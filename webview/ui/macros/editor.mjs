@@ -66,7 +66,12 @@ export function editor(model, slot, canEdit) {
     card.addEventListener("pointerdown", event => {
         if (/** @type {HTMLElement | null} */ (/** @type {Element} */ (event.target).closest('[data-act="discard"], [data-act="clear"]'))) setMacroForm(slot.keycode, {cancelBlur: true});
     });
-    /** @type {HTMLElement | null} */ (card.querySelector("[data-host-settings]"))?.addEventListener("click", () => { state.screen = "settings"; render(); });
+    // Your computer starts folded in Settings; this link is for it, so it opens.
+    /** @type {HTMLElement | null} */ (card.querySelector("[data-host-settings]"))?.addEventListener("click", () => {
+        Object.assign(state, {screen: "settings", settingsSearch: "", reveal: '.settings-group[data-section="host"]',
+            settingsOpen: [...(state.settingsOpen || []).filter((id) => id !== "host"), "host"]});
+        render();
+    });
     /** @type {HTMLSelectElement} */ (card.querySelector("[data-protection]")).addEventListener("change", event => post(edits.macroProtectionMessage(slot.keycode, /** @type {"auto" | "on" | "off"} */ (/** @type {HTMLSelectElement} */ (event.target).value), model.macroEditing.identity)));
     if (model.macroNameSpace) attachTitleName(card, {stored: slot.name || "", perName: model.macroNameSpace.perName,
         rename: name => post(edits.macroNameMessage(slot.keycode, name, getModel()?.macroEditing?.identity))});

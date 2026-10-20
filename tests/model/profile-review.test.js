@@ -10,10 +10,10 @@ test("idle timeout review uses human units while comparing stored milliseconds",
     const {settingsEditorView, editSettings} = require("../../core/model/settings-editor");
     let before = snapshot(document());
     for (const [value, expected] of [["60000", "1 minute"], ["90000", "90 seconds"], ["777", "0.777 seconds"], ["1000", "1 second"], ["0", "Always on"], ["86400000", "1440 minutes"]]) {
-        const section = settingsEditorView(before).sections.find(row => row.id === "rgbAppearance");
+        const section = settingsEditorView(before).sections.find(row => row.id === "lightingPower");
         const after = snapshot(editSettings(before, {sectionId: section.id, expectedFingerprint: before.fingerprint,
             fields: section.fields.map(field => field.kind === "toggle" ? {macro: field.macro, enabled: field.enabled} : {macro: field.macro, value: field.macro === "lightingTimeout" ? value : field.value})}));
-        const change = profileReview(before, after).find(row => row.unit === "settings:rgbAppearance");
+        const change = profileReview(before, after).find(row => row.unit === "settings:lightingPower");
         assert.equal(change.fields.find(field => field.label === "Idle timeout").after, expected);
         before = after;
     }

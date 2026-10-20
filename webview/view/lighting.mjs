@@ -50,9 +50,15 @@ export function stageIdle(model, id) {
 }
 
 /** @param {Model} model @param {string} id */
-export const stageInEffect = (model, id) => stageEnabled(model, id) && !stageIdle(model, id);
+export const stageInEffect = (model, id) => stageEnabled(model, id) && !stageIdle(model, id) && !lightingOff(model);
 
-// The base effect is a VIA read, not part of the profile. Only a solid colour
+// All lighting off (QMK's matrix switch): the keyboard paints nothing, no
+// stage included, since QMK skips the hooks the stages paint from while its
+// effect is off (rgb_matrix.c).
+/** @param {Model} model */
+export const lightingOff = (model) => model?.rgb?.baseEffect?.state === "read" && !model.rgb.baseEffect.enabled;
+
+// The background effect, as the draft stores it. Only a solid colour
 // can be drawn honestly; any other effect has no single colour to show.
 /** @param {Model} model */
 export function baseColour(model) {
@@ -61,7 +67,7 @@ export function baseColour(model) {
     return base.previewColor;
 }
 
-// A base-lighting setting the draft holds (Settings · Base lighting).
+// A background-effect setting the draft holds (Lighting · Background effect).
 /** @param {Model} model @param {string} macro */
 const baseField = (model, macro) => (model?.configDefaults || []).find((section) => section.id === "rgbAppearance")?.fields.find((field) => field.macro === macro);
 
@@ -83,7 +89,7 @@ function animatedGlow(model) {
     return {h: String(base.hue ?? 0), s: String(Math.round(Number(base.saturation ?? 0) / 4)), v: String(Math.round(brightness * 0.6))};
 }
 
-// Which LEDs the base effect paints: QMK skips an LED whose class the stored
+// Which LEDs the background effect paints: QMK skips an LED whose class the stored
 // flags leave out. On this board the "modifier" class is the eight thumb keys
 // and the trackball LED, the "key" class every other key.
 /** @param {Model} model @param {number | undefined} layoutIndex undefined for the trackball LED */
@@ -151,10 +157,6 @@ export const layerPaints = (colour) => Boolean(colour) && !(Number(colour?.s) ==
 /** @param {Colour | null | undefined} colour */
 export const inheritsStageColour = (colour) => !colour || (Number(colour?.h) === 0 && Number(colour?.s) === 0 && Number(colour?.v) === 0);
 
-// The indicator stages only run under a live effect: with the matrix off the
-// firmware reports effect 0 and paints nothing at all (rgb_matrix.c).
-/** @param {Model} model */
-const matrixOff = (model) => model?.rgb?.baseEffect?.state === "read" && !model.rgb.baseEffect.enabled;
 
 // Whether a key stores something of its own on layer l. The viewed layer's
 // position is passed in; any other layer is looked up at the same place.
@@ -170,7 +172,7 @@ function mappedOn(model, layer, l, position) {
  * The colour one LED would show with the viewed layer held on top of the
  * default layer — the firmware's own stage order, per LED:
  *
- *   base effect → every active layer's solid colour, ascending (layer 0 first,
+ *   background effect → every active layer's solid colour, ascending (layer 0 first,
  *   so the default layer shows through a mapped-keys-only layer above it) →
  *   the layer LED group rows → a previewed pointing mode by locality → its
  *   LED group rows.
@@ -189,7 +191,7 @@ function mappedOn(model, layer, l, position) {
  */
 /** @param {Model} model @param {Layer} layer @param {number | undefined} led @param {Position} position @param {LightOptions} [options] @returns {import("./types.js").LedLight} */
 function ledLight(model, layer, led, position, options = {}) {
-    if (matrixOff(model)) return {colour: OFF, source: "off"};
+    if (lightingOff(model)) return {colour: OFF, source: "off"};
     const baseHere = baseReaches(model, position ? position.layoutIndex : undefined);
     const animated = baseHere && stageEnabled(model, "base") && baseAnimated(model);
     const base = !baseHere || !stageEnabled(model, "base") ? null : animated ? animatedGlow(model) : baseColour(model);
@@ -248,7 +250,7 @@ export function trackballLight(model, layer, options = {}) {
 
 // Whether an LED's light is the viewed layer's own rather than seen through it
 // from beneath: that layer or a previewed pointing mode painted it last, or the
-// viewed layer is base, which nothing lies under — the base effect is the floor
+// viewed layer is base, which nothing lies under — the background effect is the floor
 // base sits on, always on with it, not a layer below it.
 /** @param {import("./types.js").LedLight | null | undefined} light @param {number} [layerId] */
 export const ownLight = (light, layerId = 0) =>

@@ -69,8 +69,8 @@ export const CATEGORIES = ["Keys", "Lighting", "Macros", "Mouse", "Pointing mode
 // A custom key's name is counted with the keys, where its behaviour is too.
 /** @type {Readonly<Record<string, [string, string, number]>>} */
 const SECTIONS = {
-    keyTiming: ["Keys", "Tap & hold timing", 31], startupLayers: ["Keys", "Startup layers", 22], behaviorSettings: ["Keys", "Behaviour settings", 32], comboSettings: ["Keys", "Combo settings", 40], comboReferences: ["Keys", "Combo layer matching", 41],
-    keyboardOptions: ["Keys", "Key options", 50], rgbAppearance: ["Lighting", "Base effect", 1], lightingFeedback: ["Lighting", "Key feedback", 15],
+    keyTiming: ["Keys", "Tap & hold timing", 31], startupLayers: ["Keys", "Default layers", 22], behaviorSettings: ["Keys", "Behaviour settings", 32], comboSettings: ["Keys", "Combo settings", 40], comboReferences: ["Keys", "Combo layer matching", 41],
+    keyboardOptions: ["Keys", "Key swaps & typing", 50], lightingPower: ["Lighting", "All lighting", -1], rgbAppearance: ["Lighting", "Background effect", 1], lightingFeedback: ["Lighting", "Key feedback", 15],
     normalPointerSpeed: ["Mouse", "Pointer speed", 1], sniping: ["Mouse", "Auto-sniping", 2], autoMouse: ["Mouse", "Auto-mouse", 3],
 };
 // Where one difference is counted: its category, its row's words, and the
@@ -157,12 +157,14 @@ export function placeState(place, layers = []) {
         case "pointing": return {screen: "pointing", pdSlot: place.slot, pdKind: null, pdButtons: null};
         case "lighting": return place.stage ? {screen: "lighting", stage: place.stage} : {screen: "lighting"};
         // A section is edited on the screen its area names: a lighting stage
-        // for a Lighting one, Mouse, or Settings.
+        // for a Lighting one, the top of Lighting for one above every stage,
+        // Mouse, or Settings.
         case "settings": {
             if (place.stage) return {screen: "lighting", stage: place.stage};
+            if (place.area === "Lighting") return {screen: "lighting", reveal: place.section ? `.settings-group[data-section="${place.section}"]` : null};
             const screen = place.area === "Mouse" ? "mouse" : "settings";
             return place.section
-                ? {screen, settingsSearch: "", settingsOpen: [place.section], reveal: `.settings-group[data-section="${place.section}"]`}
+                ? {screen, settingsSearch: "", settingsOpen: [place.section, `${place.section}:layers`], reveal: `.settings-group[data-section="${place.section}"]`}
                 : {screen, settingsSearch: ""};
         }
         case "layers": return {screen: "keys", layersOpen: true};

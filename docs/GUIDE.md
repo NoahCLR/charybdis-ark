@@ -179,13 +179,13 @@ What each screen edits:
 | --- | --- |
 | Keys | Layout keys, key behaviours, combos, layer names and priority; reachable behaviours, macros and pointing modes are shown in place, whether a key, a behaviour branch or a combo reaches them |
 | Custom keys | The 128 custom keys' names, shortcuts and, for each, its behaviour: timings, the tap × tier grid and participation, for a key on a layer or on none; where each is placed |
-| Lighting | Six stages, the stage mask, layer and pointing-mode colours with their localities, combo and key feedback, auto-mouse fade with its hold as a share of the timeout, LED group rows and reusable groups |
+| Lighting | All lighting and its idle timeout; six stages, the stage mask, the background effect (QMK's own effect, its colour, speed and LEDs), layer and pointing-mode colours with their localities, combo and key feedback with its flash interval, auto-mouse fade with its hold as a share of the timeout, LED group rows and reusable groups |
 | Macros | Named slots: literal Text, a compact sequence of key/delay/press/release tiles, drag reordering and a selected-step editor, raw payload, live size feedback, configurable recorder and placement; search by name, and the layers that set each macro off — by key, behaviour or combo — in their layer colour, each opening that layer in Keys with the macro picked |
 | Mouse | Pointer speed, sniping (with where the sniping keys are placed, and Place on a key…) and auto-mouse — the Settings sections the keyboard's model files under Mouse, drawn with the same cards and posted whole |
 | Pointing modes | All 32 slots: movement, speed, direction shortcuts and how often they send (every step, or once per movement until the ball pauses or moves back the other way), scroll tuning and which way a scrolling mode scrolls (both axes, horizontal only or vertical only), what each direction's shortcut does with held modifiers, thresholds shown as ball movement at the mode's DPI, buttons, bindings, placement, clear and duplicate |
-| Settings | Tap & hold timing · where behaviours and combos run · combo timing (the default combo window and the combo hold threshold, which the keyboard stores with its combos) · combo layer matching · key options · your computer · base lighting · default layers · what is built into this firmware (read-only); each section posted whole, read-only where the firmware build leaves an option out |
+| Settings | Tap & hold timing · key swaps & typing · behaviours (on or off, and the layers they run on) · combos (on or off, the default combo window and combo hold threshold, whether outputs use behaviours, the layers they run on and combo layer matching) · your computer · default layers; each section posted whole, read-only where the firmware build leaves an option out |
 | Backups | Export profile, and Import profile (Choose profile…, or drop a file: the file against the keyboard, counted by what it configures, and whether it fits, before it becomes the draft); the copies saved before each Apply, each usable as a draft |
-| Keyboard | The keyboard's name (the screen's title, click to rename); its firmware and whether it works with this Ark; both halves; memory; diagnostics |
+| Keyboard | The keyboard's name (the screen's title, click to rename); its firmware and whether it works with this Ark; both halves; memory; what is built into this firmware (read-only); diagnostics |
 
 ## The interface
 
@@ -204,29 +204,33 @@ and other characters typed or pasted into it do not appear. A time's unit sits
 inside its field at the right, on every screen, so the label names only the
 value; the review still names the unit.
 
-A Settings section's one-per-layer switches (Default layers, and where
-Behaviours and Combos run) are one row: its label and what it means, then a
+A Settings section's one-per-layer switches (Default layers, and the layers
+Behaviours and Combos run on) are one row: its label and what it means, then a
 switch for each layer in a grid, named and marked in the layer's colour. A
 search for one layer's name still finds its switch. Settings and the
 behaviour editor call the time between taps the **Multi tap window**.
 
-**Settings** reads top to bottom: Tap & hold timing; Where behaviours and
-combos run (Behaviours and Combos, each with its master switch and layers);
-Combo timing (the default combo window and the combo hold threshold, editable
-on current firmware with or without combos); Combo layer matching, a select
-per layer four across; Key options, where an option the firmware was built
-without says **Not in this firmware** and does nothing; Your computer; then,
-folded, Default layers and **Built into this firmware**. That last section is
-read-only: the layers, tap counts, macro, custom key, pointing mode and combo
-slots, LEDs, brightness and repeat ceilings and DPI steps the keyboard
-reports, and that QMK's tap-hold options are not used, since the keyboard
-decides every key's tap or hold itself; each needs a firmware build to change. A folded section says what it holds in
-words ("16 layers", "13 options"). Settings that QMK keeps live (combos on or
+**Settings** is ordered by what you come to change, most often first. Open:
+**Tap & hold timing**; **Behaviours**, its master switch, with **On these
+layers** folded under it; **Combos**, its master switch, the **Default combo
+window** and **Combo hold threshold** (editable on current firmware with or
+without combos), **Combo outputs use behaviours**, then folded, **On these
+layers** and **Layer matching**, a select per layer four across. Folded:
+**Key swaps & typing**, second, listed under Modifiers, Keys and Typing, where
+an option the firmware was built without says **Not in this firmware** and
+does nothing; **Your computer**, which opens on its own while it has a
+warning; and **Default layers** last. A folded card or fold says what it
+holds now rather than how many: "All 16 layers", "Off on Gaming", "2 on: Swap
+left Ctrl and Caps Lock, …", "Auto · US", "Base". Opened by hand or by the
+review's **Show**, it stays open. Settings that QMK keeps live (combos on or
 off, default layers, key options) say **↺ keyboard keys change this too**: a
 key on the keyboard can change them, and the draft then asks to be
 updated. Search reads each setting's words, its hover help (where QMK's names
-are) and a section's other names; it says when nothing matches, and points to
-matches on another screen ("3 matches on Mouse →").
+are) and a section's other names, opening every fold; it says when nothing
+matches, and points to matches on another screen ("3 matches on Mouse →",
+"1 match on Lighting →" for the background effect, the idle timeout or the
+flash interval, "2 matches on Keyboard →" for what this firmware was built
+with).
 
 Anything that folds has a chevron before its name, turned down while it is
 open: a Settings section, a behaviour's **Layers it runs on**, a group of
@@ -261,7 +265,7 @@ grid and the review.
 
 After the complete keyboard read opens an editable draft, the board stays on
 screen, full width, painted with the light the keyboard would actually show for
-that layer — the base effect, then
+that layer — the background effect, then
 the layer's colour on the keys it owns — with the legends drawn on top in
 whichever of black or white stays readable, and the behaviour dots and combo
 badges on the key face in the feedback colours the keyboard flashes.
@@ -579,11 +583,22 @@ where the colour paints (the keys it lights, or the half), or **no colour**.
 The numbers of a colour are in its editor, where they are changed. Key
 feedback lists its **Feedback colours**, with **When and where** beside them.
 
-**Base effect** shows the colour the keyboard reports as a swatch, with its
-effect, colour and speed. The keyboard keeps the base effect with its other
-settings, so it is changed in Settings → Base lighting, which **Open Settings →
-Base lighting** opens. The six stages, LED groups and the stage switch fit
-across a laptop-wide window.
+**All lighting** and the **Idle timeout** sit at the top of the screen,
+beside its title, above every stage: with All lighting off, QMK draws nothing
+and no stage paints, so the board and every stage tab are drawn off; once the
+idle timeout runs out the keyboard goes dark the same way. The board does not
+move from where it is on Keys.
+
+The first stage, **Background effect**, is QMK's own effect, which every
+stage paints over: a layer with no colour shows it on the LEDs it lights. It is
+not the Base layer's colour, which is a layer colour like any other. Its tab
+edits the **Effect** and the **LEDs** it lights from the lists the keyboard
+reports, its **Animation speed**, and its colour with the same picker every
+stage uses, without **Turn off**, since nothing lies under it. **LEDs** limits
+the effect alone; layer colours and feedback paint any LED. Brightness waits
+for the keyboard's brightness limit; hue and saturation do not. Key feedback's
+**Flash interval** sits in **When and where**. The six stages, LED groups and
+the stage switch fit across a laptop-wide window.
 
 The lighting **Idle timeout** uses seconds or minutes: `60000` milliseconds
 reads as `1` minute. Choose the unit beside the value; changing units alone
@@ -620,7 +635,12 @@ with "works with this Ark ✓" (or that both halves need updating, with a link
 to the firmware release), Ark's own version, and the two halves: the right
 half, with the USB cable and the trackball, is the master; the left half is
 the slave. When the keyboard needs a restart it says so here with the steps.
-**Memory** shows how full the profile is ([below](#profiles-and-backups)), and
+**Memory** shows how full the profile is ([below](#profiles-and-backups)).
+**Built into this firmware**, folded, lists what the firmware was built with,
+read-only: the layers, tap counts, macro, custom key, pointing mode and combo
+slots, LEDs, brightness and repeat ceilings and DPI steps the keyboard
+reports, and that QMK's tap-hold options are not used, since the keyboard
+decides every key's tap or hold itself; each needs a firmware build to change.
 **Diagnostics**, folded, holds the saved profile's generation and digest, the
 read phase, what was read and **Read from keyboard**. While a half is missing
 or the halves disagree, every screen shows a strip under its title saying so,

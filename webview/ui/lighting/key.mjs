@@ -1,12 +1,33 @@
 // @ts-check
 import {el, esc} from "../../lib/dom.mjs";
 import {css, isOff} from "../../lib/colour.mjs";
-import {post, render, state, writable} from "../../store.mjs";
+import {canEdit as canEditArea, post, render, state, writable} from "../../store.mjs";
 import {feedbackColours, stageEnabled} from "../../view/lighting.mjs";
 import {branchName, vocabulary, word} from "../../view/vocabulary.mjs";
 import * as edits from "../../view/edits.mjs";
 import {colourControl, section, stack} from "./common.mjs";
 import {groupRowsTable} from "./led-rows.mjs";
+import {sectionsIn} from "../settings.mjs";
+
+// How fast feedback blinks. The keyboard stores it with its settings, so it
+// saves as a settings section of one field.
+/** @param {import("../../../contracts/panel.js").PublishedModel} model */
+function flashInterval(model) {
+    const flash = sectionsIn(model, "Lighting").find((entry) => entry.id === "lightingFeedback");
+    const field = flash?.fields[0];
+    if (!flash || !field) return el(`<span></span>`);
+    const editable = canEditArea("settings") && !field.readOnly;
+    const label = field.unit ? field.label.replace(new RegExp(`\\s*\\(${field.unit}\\)$`), "") : field.label;
+    const node = el(`<label class="field" data-tip="${esc([field.tooltip, field.hint].filter(Boolean).join(" "))}"><span>${esc(label)}</span>
+        <span class="affix unit"><input class="input mono" inputmode="numeric" data-macro="${esc(field.macro)}" data-f="setting:${esc(field.macro)}" value="${esc(field.value)}" ${editable ? "" : "disabled"}>${field.unit ? `<i>${esc(field.unit)}</i>` : ""}</span>
+        <span class="hint">${esc(field.hint || "")}</span></label>`);
+    /** @type {HTMLInputElement} */ (node.querySelector("input")).addEventListener("change", (event) => {
+        const written = /** @type {HTMLInputElement} */ (event.target).value.trim();
+        if (!written) { /** @type {HTMLInputElement} */ (event.target).value = field.value; return; }
+        if (written !== field.value) post(edits.settingsSection(flash, () => written, model.settingsEditing?.identity));
+    });
+    return node;
+}
 
 // The key-feedback colour rows, named as their feedback owners are.
 /** @type {{id: import("../../../contracts/edits.js").FeedbackColourField, owner: string}[]} */
@@ -56,7 +77,7 @@ export function stageKey(model) {
         ${vocabulary(model).localities.map(([id, text]) => `<option value="${id}" ${feedback.locality === id ? "selected" : ""}>${text}</option>`).join("")}</select></label>`);
     /** @type {HTMLSelectElement} */ (locality.querySelector("select")).addEventListener("change", (event) =>
         post(edits.keyFeedback(model.rgb.keyBehaviorFeedback, null, null, {locality: /** @type {HTMLSelectElement} */ (event.target).value})));
-    policy.append(stack(commit, locality, el(`<p class="note">The flash interval lives in Settings → Lighting feedback, because the keyboard stores it with its timing.</p>`)));
+    policy.append(stack(commit, locality, flashInterval(model)));
     const onBoard = section("On the board");
     onBoard.className = "span";
     const colours = feedbackColours(model);

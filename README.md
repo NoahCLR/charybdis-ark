@@ -34,8 +34,8 @@ Key and modifier names follow that OS throughout the editors and Review.
   16 inputs, with its own enable and layer controls. Choose whether combo
   outputs use shared behaviours, for every combo or one at a time; the chord
   stays active either way.
-- **Lighting.** Set layer and mode colours, combo and key feedback, and the
-  idle timeout in seconds or minutes. Tune the
+- **Lighting.** Set the background effect, layer and mode colours, combo and
+  key feedback, and the idle timeout in seconds or minutes. Tune the
   auto-mouse fade. The board on screen is painted the way the keyboard will
   light up, with black overlays kept distinct from inherited colours.
 - **Its name.** Call the keyboard what you like, and that is the name your
