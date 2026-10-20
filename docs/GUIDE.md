@@ -409,10 +409,16 @@ key and says the behaviour belongs to its keycode, so changing it changes that
 key wherever it is pressed. Turning layers on or off in the preview updates the
 open key, whichever you did first. Empty branches preserve the key's built-in
 actions until you override them. An empty cell shows, dashed and marked
-"built in", what the key does there on its own. An empty tap sends the key's
-own tap once per press, so an empty Double tap sends it twice (`×2`), at every
-tap count up to the deepest one the behaviour sets; past that, the presses are
-separate shorter gestures and the cell stays empty. On the first press, an
+"built in", what the key does there on its own. An empty tap later than the
+Single tap repeats the Single tap, once per press, so an empty Double tap sends
+it twice (`×2`): the Single tap you set, marked "first tap", or the key's own
+tap when that is empty too. A quick run of taps past the deepest tap count the
+behaviour sets is typing: every press in it sends the Single tap once, and a
+press held in it takes the Single tap's hold. So a Backspace whose Double tap
+types V sends Backspace for one tap, V for two and three Backspaces for three,
+and a Delete whose Double tap sets only holds deletes five times for five
+quick taps. The keyboard never reaches the tap counts past the deepest one, so
+those cells stay empty. On the first press, an
 `LT()` holds its layer and an `MT()` or `OSM()` its modifiers. A plain key,
 such as `-` or `Ctrl+C`, stays held down until release, unless that first
 press sets a Hold or Long hold. A custom key with a shortcut does the same

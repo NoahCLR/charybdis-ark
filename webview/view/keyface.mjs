@@ -192,19 +192,18 @@ export function behaviourGridSteps(behaviour, advertisedMaximum = 5) {
 }
 
 // How deep a behaviour's tap counts go: its deepest tap count with an action
-// set, or 0 with none. Past it the keyboard cycles (runtime.c,
-// key_runtime_core_tap_series_next_tap_count): depth + 1 taps and the press
-// counts as a single tap again, so deeper rows are never reached.
+// set, or 0 with none. A quick run past it types (firmware D-F33): the taps so
+// far are sent as the first tap and every further press is a single tap of its
+// own, so deeper rows are never reached.
 /** @param {BehaviorView | null | undefined} behaviour */
 export const behaviourDepth = (behaviour) => Math.max(0, ...(behaviour?.steps || [])
     .filter((step) => step.tap || step.hold || step.longHold).map((step) => step.tapCount + 1));
 
 // The grid's rows. Compact, it shows the tap counts in use and the next one,
 // to add (`add`); all, every tap count the keyboard allows. A row past the
-// next one is never reached while the keyboard cycles, so it says which tap
-// count answers instead (`like`, 0-based). `cycle` is the line under the
-// grid: how many taps start again at a single tap, when the row is deeper
-// than one.
+// next one is never reached, because the run types by then, so it says which
+// tap count answers instead (`like`, 0-based): the first. `typing` is how many
+// quick taps type the first tap once each, when the row is deeper than one.
 /** @param {BehaviorView | null | undefined} behaviour @param {number} [advertisedMaximum] @param {boolean} [all] */
 export function behaviourGridLayout(behaviour, advertisedMaximum = 5, all = false) {
     const steps = behaviourGridSteps(behaviour, advertisedMaximum);
@@ -212,8 +211,8 @@ export function behaviourGridLayout(behaviour, advertisedMaximum = 5, all = fals
     const shown = all ? steps.length : Math.min(steps.length, Math.max(depth, 1) + 1);
     const rows = steps.slice(0, shown).map((step) => ({step,
         add: step.tapCount >= Math.max(depth, 1),
-        like: depth > 1 && step.tapCount > depth ? step.tapCount % depth : null}));
-    return {rows, depth, cycle: depth > 1 ? {taps: depth + 1} : null};
+        like: depth > 1 && step.tapCount > depth ? 0 : null}));
+    return {rows, depth, typing: depth > 1 ? {taps: depth + 1} : null};
 }
 
 /** @param {string | undefined} action */
@@ -234,23 +233,27 @@ function builtInHoldNow(behaviour, hold) {
 }
 
 // What the keyboard does for a tier the row leaves empty (core/model/
-// built-in-behavior.js). The key's own tap fills an empty tap at every tap count
-// the row reaches, its deepest authored count, and is sent once per press, so
-// it carries `times` past a single tap. Past that depth the keyboard cycles
-// back to a single tap (behaviourGridLayout), so those cells stay empty. The
-// built-in hold belongs to the first press (`fromPress` when it starts as the
-// key goes down), and a fallback hold also gives way to an authored long hold
-// there. An authored cell and a key with nothing built in inherit nothing.
+// built-in-behavior.js). An empty first tap is the key's own. An empty later
+// tap repeats the first tap, the row's own (`first`) or else the key's, once
+// per press, so it carries `times` (firmware D-F33). It fills every tap count
+// the row reaches, its deepest authored count; past that depth the keyboard
+// starts again at a single tap (behaviourDepth), so those cells stay empty.
+// The built-in hold belongs to the first press (`fromPress` when it
+// starts as the key goes down), and a fallback hold also gives way to an
+// authored long hold there. An authored cell and a key with nothing built in
+// inherit nothing.
 /** @param {BehaviorView | null | undefined} behaviour @param {import("./keyface-types.js").BehaviorStep | null | undefined} step @param {import("./keyface-types.js").Tier} kind @returns {import("./keyface-types.js").InheritedBranch | null} */
 export function inheritedBranch(behaviour, step, kind) {
     const builtIn = behaviour?.builtIn || {};
     if (!step || !Number.isInteger(step.tapCount)) return null;
     if (kind === "tap") {
-        if (!builtIn.tap || step.tap) return null;
-        const authored = (behaviour?.steps || []).filter((entry) => entry.tap || entry.hold || entry.longHold);
-        const depth = Math.max(1, ...authored.map((entry) => entry.tapCount + 1));
-        if (step.tapCount >= depth) return null;
-        return step.tapCount ? {...builtIn.tap, times: step.tapCount + 1} : builtIn.tap;
+        if (step.tap) return null;
+        if (!step.tapCount) return builtIn.tap || null;
+        const own = (behaviour?.steps || []).find((entry) => entry.tapCount === 0)?.tap;
+        const first = own ? {...own, first: true} : builtIn.tap;
+        if (!first) return null;
+        if (step.tapCount >= Math.max(1, behaviourDepth(behaviour))) return null;
+        return {...first, times: step.tapCount + 1};
     }
     if (kind === "hold") {
         if (!builtIn.hold || step.tapCount !== 0 || step.hold || (builtIn.hold.fallback && step.longHold)) return null;
