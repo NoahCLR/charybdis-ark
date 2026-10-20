@@ -56,11 +56,12 @@ for (const [screen, state] of surfaces) {
         expect(await identityProblems(page)).toEqual([]);
         const ids = await page.locator("input:visible:enabled, select:visible:enabled, textarea:visible:enabled")
             .evaluateAll(nodes => nodes.map(node => node.getAttribute("data-f")));
-        if (screen === "lighting" && state.stage === "base") {
-            // Firmware owns the base effect; this page presents its facts.
-            // The rail's controls (the edit mode) belong to every screen.
-            expect(ids.filter(id => !id?.startsWith("rail:"))).toEqual([]);
-        } else expect(ids.length, "the editor exposes a form control").toBeGreaterThan(0);
+        // The background effect is edited on its stage; its effect and LED
+        // choices wait for the keyboard's options, which the fixture lacks.
+        if (screen === "lighting" && state.stage === "base") expect(ids).toEqual(expect.arrayContaining(["lighting:base:stage:colour:0", "setting:effectSpeed"]));
+        // All lighting and its idle timeout sit above every stage.
+        if (screen === "lighting") expect(ids).toEqual(expect.arrayContaining(["setting:lightingEnabled", "setting:lightingTimeout"]));
+        expect(ids.length, "the editor exposes a form control").toBeGreaterThan(0);
         // Each assertion crosses the actual receiver's full-DOM accepted-edit
         // path; retaining the same node cannot satisfy it.
         for (const id of ids) {

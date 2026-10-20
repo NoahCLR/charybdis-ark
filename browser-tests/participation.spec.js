@@ -2,6 +2,7 @@
 "use strict";
 const {test, expect} = require("@playwright/test");
 const {compileLayerAnswers} = require("../core/model/layer-resolution");
+const {openFold} = require("./host-page");
 
 test("participation controls post placements, shared definitions and master/source-layer settings", async ({page}) => {
     const errors = [];
@@ -41,6 +42,9 @@ test("participation controls post placements, shared definitions and master/sour
     expect((await posted())[0].inputs).toHaveLength(2);
 
     await page.locator('[data-screen="settings"]').click();
+    // The layers each runs on fold under its master switch.
+    await openFold(page, "behaviorSettings:layers");
+    await openFold(page, "comboSettings:layers");
     for (const [macro, sectionId] of [["behaviorsEnabled", "behaviorSettings"], ["behaviorsOnLayer15", "behaviorSettings"], ["combosEnabled", "comboSettings"], ["combosOnLayer15", "comboSettings"]]) {
         await clear();
         await page.locator("label").filter({has: page.locator(`[data-macro="${macro}"]`)}).click();

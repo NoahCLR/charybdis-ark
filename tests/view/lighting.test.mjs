@@ -72,6 +72,18 @@ test("the auto-mouse fade is in effect only while auto-mouse is on", () => {
     assert.equal(stageInEffect(model(), "auto"), true, "without settings readback nothing is claimed");
 });
 
+// QMK skips the hooks every stage paints from while its matrix is off, so
+// with All lighting off no stage is in effect, whatever its own switch says.
+test("with All lighting off, no stage is in effect", async () => {
+    const {lightingOff} = await import("../../webview/view/lighting.mjs");
+    const dark = model({rgb: {...model().rgb, baseEffect: {state: "read", enabled: false, effectId: 0}}});
+    assert.equal(lightingOff(dark), true);
+    assert.equal(stageEnabled(dark, "layers"), true, "the stored stage switch is left as it is");
+    for (const id of ["base", "layers", "key"]) assert.equal(stageInEffect(dark, id), false, id);
+    assert.equal(lightingOff(model()), false);
+    assert.equal(lightingOff(model({rgb: {...model().rgb, baseEffect: {state: "unread"}}})), false, "an unread effect claims nothing");
+});
+
 test("a mapped-keys-only layer paints its own keys and leaves the rest on the base", () => {
     const m = model();
     const layer = {index: 3};
@@ -243,8 +255,8 @@ test("zero brightness keeps explicit black distinct from layer pass-through and 
     assert.deepEqual(keyLight(m, {index: 3}, position(13, "KC_A")), {colour: black, source: "layer", layer: 3});
 });
 
-// The base effect's LED classes, as the draft's Settings · Base lighting stores them.
-const baseSettings = (leds) => ({id: "rgbAppearance", area: "Settings", label: "Base lighting", fields: [{macro: "effectLeds", label: "LEDs", value: String(leds)}]});
+// The background effect's LED classes, as the draft's Lighting · Background effect stores them.
+const baseSettings = (leds) => ({id: "rgbAppearance", area: "Lighting", stage: "base", label: "Background effect", fields: [{macro: "effectLeds", label: "LEDs", value: String(leds)}]});
 test("a base-effect LED class the effect skips stays unlit; an animated effect is drawn lit", async () => {
     const {baseAnimated, baseReaches} = await import("../../webview/view/lighting.mjs");
     const keysOnly = {...model(), configDefaults: [baseSettings(4)]};

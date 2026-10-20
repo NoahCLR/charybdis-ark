@@ -7,9 +7,9 @@
 import {css, isOff} from "../lib/colour.mjs";
 import {el, esc} from "../lib/dom.mjs";
 import {TRACKBALL_LED} from "../view/geometry.mjs";
-import {baseColour, feedbackColours, layerColourRow, pdColourRow, pdTrigger, stageEnabled, stageIdle, stageInEffect} from "../view/lighting.mjs";
+import {baseColour, feedbackColours, layerColourRow, lightingOff, pdColourRow, pdTrigger, stageEnabled, stageIdle, stageInEffect} from "../view/lighting.mjs";
 import {slotCalled, stageOrder} from "../view/vocabulary.mjs";
-import {currentLayer, getModel, layerName, layers, post, render, state, writable, heldLayers} from "../store.mjs";
+import {canEdit as canEditArea, currentLayer, getModel, layerName, layers, post, render, state, writable, heldLayers} from "../store.mjs";
 import * as edits from "../view/edits.mjs";
 import {board} from "./board.mjs";
 import {keepInView, layerBar} from "./layerbar.mjs";
@@ -18,6 +18,8 @@ import {topbar, unavailable} from "./shell.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {localityLabel} from "./lighting/common.mjs";
 import {stageBody} from "./lighting/stage-body.mjs";
+import {durationControl} from "./duration.mjs";
+import {sectionsIn} from "./settings.mjs";
 
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model @param {string} id */
 const stageBit = (model, id) => (model?.rgb?.stages || []).find((stage) => stage.id === id)?.bit;
@@ -35,6 +37,8 @@ export function screenLighting() {
         "Lighting",
         "What the keyboard lights, and when. Each stage paints over the one before it, and the board shows the result of your draft."
     )}</div>`);
+    const power = powerControls(model);
+    if (power) main.querySelector(".topbar-actions")?.prepend(power);
 
     const content = el(`<div class="content"><div class="pad keys-pad"></div></div>`);
     const pad = /** @type {HTMLElement} */ (content.firstElementChild);
@@ -63,7 +67,7 @@ export function screenLighting() {
             ? `click physical LEDs to build a group · ${state.ledPicks.length} selected${state.trackball ? " + trackball" : ""}`
             : `${esc(layerName(layer))}${heldLayers().some((at) => at > 0) && !onGroups
                 ? ` with ${esc(heldLayers().filter((at) => at > 0).reverse().map((at) => layerName(layers()[at])).join(", "))} on`
-                : ""} over the base effect${preview
+                : ""} over the background effect${preview
                 ? ` · ${esc(slotName(model, state.pdSlot))} held, painting ${esc(localityLabel(preview.locality).toLowerCase())}`
                 : ""}`}</span>
         ${onGroups ? `<span class="right">
@@ -91,7 +95,7 @@ export function screenLighting() {
         const on = stageInEffect(model, stage.id), colour = stageColour(model, stage.id), lit = on && colour && !isOff(colour);
         const idle = stageIdle(model, stage.id);
         return `<button role="tab" class="${on ? "" : "off"}" data-ltab="${stage.id}" aria-selected="${state.stage === stage.id}"
-            data-tip="Painted ${index + 1} of ${stages.length}${on ? "" : ` · ${esc(idle || "this stage is off")}`}">
+            data-tip="Painted ${index + 1} of ${stages.length}${on ? "" : ` · ${esc(lightingOff(model) ? "All lighting is off, so nothing paints" : idle || "this stage is off")}`}">
             <span class="n">${index + 1}</span><i class="swatch ${lit ? "" : "swatch-off"}" style="${lit ? `background:${css(colour)}` : ""}"></i>
             <span class="tab-label">${esc(stage.label)}</span>${marks.lighting.has(stage.id) ? draftDot() : ""}</button>`;
     };
@@ -120,6 +124,33 @@ export function screenLighting() {
 }
 
 const slotName = slotCalled;
+
+// All lighting and its idle timeout darken every LED, every stage with them,
+// so they sit above the stages rather than in one. The keyboard keeps them
+// with its settings, so they save as one settings section.
+/** @param {import("../../contracts/panel.js").PublishedModel} model */
+function powerControls(model) {
+    const section = sectionsIn(model, "Lighting").find((entry) => entry.id === "lightingPower");
+    if (!section) return null;
+    const toggle = section.fields.find((field) => field.macro === "lightingEnabled");
+    const timeout = section.fields.find((field) => field.macro === "lightingTimeout");
+    if (!toggle || !timeout) return null;
+    const editable = canEditArea("settings");
+    const node = el(`<div class="settings-group lighting-power" data-section="${esc(section.id)}">
+        <label class="sw" data-tip="${esc([toggle.hint, toggle.tooltip].filter(Boolean).join(" "))}"><input type="checkbox" data-macro="${esc(toggle.macro)}" data-f="setting:${esc(toggle.macro)}" ${toggle.enabled ? "checked" : ""} ${editable && !toggle.readOnly ? "" : "disabled"}>
+            <span class="track"></span><span class="txt">${esc(toggle.label)}${draftMarks(model?.draft?.changes).settings.has(section.id) ? draftDot() : ""}</span></label>
+        <span class="lighting-timeout" data-tip="${esc(timeout.hint || "")}"><span class="muted">${esc(timeout.label)}</span></span></div>`);
+    const submit = () => {
+        if (duration.read() === null) { duration.reportValidity(); return; }
+        post(edits.settingsSection(section, (field) => field.macro === toggle.macro
+            ? /** @type {HTMLInputElement} */ (node.querySelector(`[data-macro="${toggle.macro}"]`)).checked
+            : field.macro === timeout.macro ? duration.read() ?? undefined : undefined, model.settingsEditing?.identity));
+    };
+    const duration = durationControl(timeout, editable && !timeout.readOnly, submit);
+    /** @type {HTMLElement} */ (node.querySelector(".lighting-timeout")).append(duration.node);
+    /** @type {HTMLInputElement} */ (node.querySelector("input[type=checkbox]")).addEventListener("change", submit);
+    return node;
+}
 
 /** @param {import("../../contracts/panel.js").PublishedModel} model @param {string} id @param {number} bit */
 function stageSwitch(model, id, bit) {

@@ -23,8 +23,9 @@ test("a whole-number setting shows and posts only the digits typed into it", asy
 });
 
 test("a duration keeps one decimal point and no letters", async ({page}) => {
-    await openControls(page, "settings");
-    const field = page.locator('input[inputmode="decimal"]:not([disabled])').first();
+    // The idle timeout, beside All lighting at the top of Lighting.
+    await openControls(page, "lighting");
+    const field = page.locator('[data-f="setting:lightingTimeout"]');
     await field.fill("");
     await field.pressSequentially("1.5.s");
     await expect(field).toHaveValue("1.5");

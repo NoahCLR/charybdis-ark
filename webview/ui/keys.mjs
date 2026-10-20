@@ -90,7 +90,7 @@ export function screenKeys() {
     }));
     card.appendChild(previewing() ? previewFoot(layer) : el(`<div class="board-foot"><span class="board-foot-text">${lit
         ? `lit ${esc(hsvLabel(row.color))} on ${row.mode === "ALL_KEYS" ? "every key" : "keys mapped here"}`
-        : "no layer colour · the base effect shows through"}</span></div>`));
+        : "no layer colour · the background effect shows through"}</span></div>`));
     card.append(bar);
     stage.append(card, legend(model));
     pad.append(stage, bench());

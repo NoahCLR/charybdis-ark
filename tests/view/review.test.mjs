@@ -76,7 +76,7 @@ test("Show goes to where each kind of item is edited", () => {
     assert.equal(combo.pickCombo, 3, "a combo is asked for by id, since its group depends on the layer");
     assert.equal(combo.reveal, '[data-reach][data-picked="true"]');
     const section = placeState({kind: "settings", section: "keyTiming"});
-    assert.deepEqual(section.settingsOpen, ["keyTiming"], "a folded section opens");
+    assert.deepEqual(section.settingsOpen, ["keyTiming", "keyTiming:layers"], "a folded section opens, with its layer switches");
     assert.equal(section.reveal, '.settings-group[data-section="keyTiming"]');
     assert.equal(section.screen, "settings");
     assert.equal(placeState({kind: "settings"}).reveal, undefined, "settings with no section just open the screen");
@@ -85,6 +85,8 @@ test("Show goes to where each kind of item is edited", () => {
     assert.equal(mouse.reveal, '.settings-group[data-section="sniping"]');
     assert.deepEqual(placeState({kind: "settings", section: "automouseFade", area: "Lighting", stage: "auto"}), {screen: "lighting", stage: "auto"},
         "a section timed on a lighting stage opens that stage");
+    assert.deepEqual(placeState({kind: "settings", section: "lightingPower", area: "Lighting"}), {screen: "lighting", reveal: '.settings-group[data-section="lightingPower"]'},
+        "a Lighting section above every stage opens Lighting at it");
 });
 
 test("a removed thing keeps its mark and its Show only where it is still on screen", () => {
@@ -113,23 +115,23 @@ test("a settings section timed on a lighting stage marks that stage's tab too", 
 
 test("a profile file's differences are counted by what they configure, split as each screen is", () => {
     const at = (place, extra = {}) => ({status: "changed", place, ...extra});
-    const stages = [{id: "base", label: "Base effect"}, {id: "layers", label: "Layer colours"}, {id: "auto", label: "Auto-mouse fade"}, {id: "key", label: "Key feedback"}];
+    const stages = [{id: "base", label: "Background effect"}, {id: "layers", label: "Layer colours"}, {id: "auto", label: "Auto-mouse fade"}, {id: "key", label: "Key feedback"}];
     const groups = categorySummary([
         at({kind: "pointing", slot: 2}), at({kind: "settings", section: "sniping"}), at({kind: "settings", section: "autoMouse"}),
-        at({kind: "lighting", stage: "key"}), at({kind: "settings", section: "lightingFeedback"}), at({kind: "lighting", stage: "layers", layer: 3}),
-        at({kind: "lighting", stage: null}), at({kind: "settings", section: "rgbAppearance"}),
+        at({kind: "lighting", stage: "key"}), at({kind: "settings", section: "lightingFeedback", area: "Lighting", stage: "key"}), at({kind: "lighting", stage: "layers", layer: 3}),
+        at({kind: "lighting", stage: null}), at({kind: "settings", section: "rgbAppearance", area: "Lighting", stage: "base"}), at({kind: "settings", section: "lightingPower", area: "Lighting"}),
         at({kind: "settings", section: "automouseFade", area: "Lighting", stage: "auto"}),
         at({kind: "combo", index: 7}, {status: "removed"}), at({kind: "key", layer: 3}), at({kind: "key", layer: 0}), at({kind: "key", layer: 3}),
         at({kind: "settings", section: "keyTiming"}), at({kind: "behaviour"}, {status: "added"}), at({kind: "layers"}, {unit: "layerName:2"}),
         at({kind: "settings"}, {unit: "settings:otherKeyOptions"}), at({kind: "macro", index: 4}), at(null, {unit: "profile", title: "Stored profile"}),
     ], {names: ["Base", "Numbers", "Symbols", "Navigation"], stages});
     assert.deepEqual(groups.map((group) => [group.category, group.count]),
-        [["Keys", 8], ["Lighting", 6], ["Macros", 1], ["Mouse", 2], ["Pointing modes", 1], ["Other", 1]], "the rail's order");
+        [["Keys", 8], ["Lighting", 7], ["Macros", 1], ["Mouse", 2], ["Pointing modes", 1], ["Other", 1]], "the rail's order");
     const rows = (category) => groups.find((group) => group.category === category).rows.map((row) => `${row.label} ${row.count}`);
-    assert.deepEqual(rows("Keys"), ["Keys on Base 1", "Keys on Navigation 2", "Layer names 1", "Behaviours 1", "Tap & hold timing 1", "Combos 1", "Key options 1"],
+    assert.deepEqual(rows("Keys"), ["Keys on Base 1", "Keys on Navigation 2", "Layer names 1", "Behaviours 1", "Tap & hold timing 1", "Combos 1", "Key swaps & typing 1"],
         "the board's keys by layer first, then the rest of the Keys screen");
-    assert.deepEqual(rows("Lighting"), ["Stages on or off 1", "Base effect 1", "Layer colours 1", "Auto-mouse fade 1", "Key feedback 2"],
-        "stages in paint order; a setting joins what it tunes, and one timed on a stage counts with it");
+    assert.deepEqual(rows("Lighting"), ["All lighting 1", "Stages on or off 1", "Background effect 1", "Layer colours 1", "Auto-mouse fade 1", "Key feedback 2"],
+        "all lighting first, then stages in paint order; a setting edited on a stage counts with it");
     assert.deepEqual(rows("Mouse"), ["Auto-sniping 1", "Auto-mouse 1"], "the pointer's settings are filed with Mouse");
     assert.deepEqual(rows("Pointing modes"), [], "the slots are the whole category");
     assert.deepEqual(rows("Other"), ["Stored profile 1"]);

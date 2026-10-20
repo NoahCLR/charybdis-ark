@@ -2,7 +2,7 @@
 "use strict";
 
 const {test, expect} = require("@playwright/test");
-const {openPreview} = require("./host-page");
+const {openFold, openPreview} = require("./host-page");
 const {hostMacros} = require("../tests/fixtures/host-macros");
 const {ProfileDraftSession} = require("../core/session/profile-draft-session");
 const {buildSnapshotModel} = require("../core/session/device-model");
@@ -33,6 +33,7 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
         if (fs.existsSync(`preview/${theme}.html`)) await page.goto(`/preview/${theme}.html`);
         else await openPreview(page, theme);
         await publish();
+        await openFold(page, "host");
         const warning = page.locator('[data-section="host"] .callout.warn');
         await expect(warning).toHaveCount(0);
         await selectLayout("3");
@@ -71,6 +72,7 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
         if (fs.existsSync(`preview/${theme}.html`)) await page.goto(`/preview/${theme}.html`);
         else await openPreview(page, theme);
         await publish();
+        await openFold(page, "host");
         const host = page.locator('[data-section="host"]');
         const link = host.getByRole("link", {name: "WinCompose on GitHub"});
         await expect(link).toHaveCount(0);

@@ -98,34 +98,45 @@ const sections = [
     {id: "automouseFade", label: "Auto-mouse fade", area: "Lighting", stage: "auto", fields: [
         share("mouseFadeHold", SETTING.AUTO_MOUSE_DEAD_TIME, SETTING.AUTO_MOUSE_TIMEOUT, "Hold before fading", "The share of the auto-mouse timeout the colour holds before it starts to fade, 0–99%."),
     ]},
-    {id: "rgbAppearance", label: "Base lighting", fields: [
-        {...toggle("lightingEnabled", SETTING.RGB_MODE, "All lighting", "Off, every LED stays dark: the base effect, layer colours and feedback."), tooltip: "QMK's RGB Matrix enable switch, saved with the base lighting.", shift: 0},
-        {...byte("hue", SETTING.RGB_COLOR, 0, "Hue"), tooltip: "The colour of the saved base lighting effect, around the colour wheel."},
-        byte("saturation", SETTING.RGB_COLOR, 8, "Saturation", "0 is white; 255 is fully saturated."),
-        {...byte("brightness", SETTING.RGB_COLOR, 16, "Brightness", "Saved brightness, 0–255. The keyboard applies its hardware brightness limit."), tooltip: "Brightness of the saved base lighting effect. Layer colours and feedback have their own brightness."},
-        {...byte("effectSpeed", SETTING.RGB_MODE, 16, "Animation speed"), tooltip: "Speed of the saved base lighting animation. Effects without animation ignore this setting."},
+    // QMK's master switch and idle timeout darken every LED, so Ark's stages
+    // too (QMK skips its indicator hooks while the matrix is off): they are
+    // the Lighting screen's own, above every stage.
+    {id: "lightingPower", label: "All lighting", area: "Lighting", search: "rgb matrix enable on off idle timeout", fields: [
+        {...toggle("lightingEnabled", SETTING.RGB_MODE, "All lighting", "Off, every LED stays dark: the background effect, layer colours and feedback."), tooltip: "QMK's RGB Matrix enable switch.", shift: 0},
         number("lightingTimeout", SETTING.RGB_TIMEOUT, "Idle timeout", "Time without activity before lighting turns off. 0 keeps lighting on. Maximum 24 hours.", {presentation: "duration"}),
     ]},
-    {id: "lightingFeedback", label: "Lighting feedback", fields: [
-        number("feedbackFlash", SETTING.FEEDBACK_PERIOD, "Key feedback flash interval (ms)", "Time for each on or off phase; a full blink takes twice this value.", {min: SETTING_FIELD.FEEDBACK_PERIOD.min, validate: "positive-int"}),
+    // QMK's own RGB Matrix effect, which every stage paints over: its effect
+    // and LED classes are added from what the keyboard reports. Its LED
+    // classes limit the effect alone; the stages paint any LED.
+    {id: "rgbAppearance", label: "Background effect", area: "Lighting", stage: "base", search: "base lighting base effect rgb matrix mode hsv", fields: [
+        {...byte("hue", SETTING.RGB_COLOR, 0, "Hue"), tooltip: "The colour of the background effect, around the colour wheel."},
+        byte("saturation", SETTING.RGB_COLOR, 8, "Saturation", "0 is white; 255 is fully saturated."),
+        {...byte("brightness", SETTING.RGB_COLOR, 16, "Brightness", "Saved brightness, 0–255. The keyboard applies its hardware brightness limit."), tooltip: "Brightness of the background effect. Layer colours and feedback have their own brightness."},
+        {...byte("effectSpeed", SETTING.RGB_MODE, 16, "Animation speed"), tooltip: "Speed of the background effect's animation. Effects without animation ignore this setting."},
+    ]},
+    {id: "lightingFeedback", label: "Key feedback flash", area: "Lighting", stage: "key", search: "lighting feedback blink", fields: [
+        number("feedbackFlash", SETTING.FEEDBACK_PERIOD, "Flash interval (ms)", "Time for each on or off phase; a full blink takes twice this value.", {min: SETTING_FIELD.FEEDBACK_PERIOD.min, validate: "positive-int"}),
     ]},
 ];
 
-/** @type {[string, string, string][]} */
+// In the keyboard's bit order: an option's place here is its bit. `part` is
+// what it changes, the heading it is listed under: modifier keys, other
+// keys, or how typing works.
+/** @type {[string, string, string, "Modifiers" | "Keys" | "Typing"][]} */
 const optionLabels = [
-    ["swapControlCaps", "Swap left Control and Caps Lock", "Exchange the actions of left Control and Caps Lock across all layers."],
-    ["capsToControl", "Use Caps Lock as left Control", "Make Caps Lock send left Control instead; left Control keeps its own action."],
-    ["swapLeftAltGui", "Swap left Alt and GUI", "Exchange the left Alt and GUI modifier actions across all layers."],
-    ["swapRightAltGui", "Swap right Alt and GUI", "Exchange the right Alt and GUI modifier actions across all layers."],
-    ["disableGui", "Disable GUI keys", "Prevent either GUI modifier from being sent. Other modifiers still work."],
-    ["swapGraveEscape", "Swap backtick and Escape", "Exchange the backtick and Escape key actions across all layers."],
-    ["swapBackslashBackspace", "Swap backslash and Backspace", "Exchange the backslash and Backspace key actions across all layers."],
-    ["nkro", "Allow more than six simultaneous keys", "Use N-key rollover so the keyboard can report more than six ordinary keys held at once."],
-    ["swapLeftControlGui", "Swap left Control and GUI", "Exchange the left Control and GUI modifier actions across all layers."],
-    ["swapRightControlGui", "Swap right Control and GUI", "Exchange the right Control and GUI modifier actions across all layers."],
-    ["oneshot", "One-shot modifiers and layers", "Allow one-shot modifier and layer keys to affect the next key after they are released."],
-    ["swapEscapeCaps", "Swap Escape and Caps Lock", "Exchange the Escape and Caps Lock key actions across all layers."],
-    ["autocorrect", "Autocorrect", "Enable the running firmware's autocorrection of recognized typing mistakes."],
+    ["swapControlCaps", "Swap left Control and Caps Lock", "Exchange the actions of left Control and Caps Lock across all layers.", "Modifiers"],
+    ["capsToControl", "Use Caps Lock as left Control", "Make Caps Lock send left Control instead; left Control keeps its own action.", "Modifiers"],
+    ["swapLeftAltGui", "Swap left Alt and GUI", "Exchange the left Alt and GUI modifier actions across all layers.", "Modifiers"],
+    ["swapRightAltGui", "Swap right Alt and GUI", "Exchange the right Alt and GUI modifier actions across all layers.", "Modifiers"],
+    ["disableGui", "Disable GUI keys", "Prevent either GUI modifier from being sent. Other modifiers still work.", "Modifiers"],
+    ["swapGraveEscape", "Swap backtick and Escape", "Exchange the backtick and Escape key actions across all layers.", "Keys"],
+    ["swapBackslashBackspace", "Swap backslash and Backspace", "Exchange the backslash and Backspace key actions across all layers.", "Keys"],
+    ["nkro", "Allow more than six simultaneous keys", "Use N-key rollover so the keyboard can report more than six ordinary keys held at once.", "Typing"],
+    ["swapLeftControlGui", "Swap left Control and GUI", "Exchange the left Control and GUI modifier actions across all layers.", "Modifiers"],
+    ["swapRightControlGui", "Swap right Control and GUI", "Exchange the right Control and GUI modifier actions across all layers.", "Modifiers"],
+    ["oneshot", "One-shot modifiers and layers", "Allow one-shot modifier and layer keys to affect the next key after they are released.", "Typing"],
+    ["swapEscapeCaps", "Swap Escape and Caps Lock", "Exchange the Escape and Caps Lock key actions across all layers.", "Keys"],
+    ["autocorrect", "Autocorrect", "Enable the running firmware's autocorrection of recognized typing mistakes.", "Typing"],
 ];
 // Which bits of its settings word a field owns: one flag, a shifted byte or
 // nibble, or the whole word. Reading, writing and putting a field back to the
@@ -161,7 +172,7 @@ function settingValue(field, values) {
     return field.shift === undefined ? bits : bits >>> field.shift;
 }
 // The saved base lighting, read out of the two words that pack it by the same
-// field layout the Base lighting section edits.
+// field layout the Background effect and All lighting sections edit.
 const {RGB_MODE, RGB_COLOR} = SETTING;
 const LIGHTING_FIELDS = {enabled: {id: RGB_MODE, shift: 0}, effect: {id: RGB_MODE, shift: 8}, speed: {id: RGB_MODE, shift: 16}, leds: {id: RGB_MODE, shift: 24},
     hue: {id: RGB_COLOR, shift: 0}, saturation: {id: RGB_COLOR, shift: 8}, brightness: {id: RGB_COLOR, shift: 16}};
@@ -189,16 +200,16 @@ function settingsSections(snapshot, settings) {
     const flags = [{value: 255, label: "All LEDs"}, {value: 0, label: "No LEDs"}];
     if (options) for (let mask = 1; mask < 16; mask++) if (!(mask & ~options.ledFlags)) flags.push({value: mask, label: ledNames.filter(([bit]) => mask & bit).map(([, name]) => name).join(" + ")});
     if (!flags.some(choice => choice.value === currentFlags)) flags.push({value: currentFlags, label: "Current custom LED selection"});
-    rgb.fields.splice(1, 0,
-        {...byte("effectMode", SETTING.RGB_MODE, 8, "Lighting effect"), choices: effects, readOnly: !options, hint: options ? "Effects available on this keyboard. Layer colours can override the base effect." : "Read the keyboard to see the lighting effects it has."},
-        {...byte("effectLeds", SETTING.RGB_MODE, 24, "Apply base effect to"), choices: flags, readOnly: !options, hint: options ? "Choose which LED classes receive the base effect. Layer colours and feedback have their own policies." : "Read the keyboard to see its LED classes."});
+    rgb.fields.splice(0, 0,
+        {...byte("effectMode", SETTING.RGB_MODE, 8, "Effect"), choices: effects, readOnly: !options, hint: options ? "Effects available on this keyboard. Layer colours paint over it." : "Read the keyboard to see the lighting effects it has."},
+        {...byte("effectLeds", SETTING.RGB_MODE, 24, "LEDs"), choices: flags, readOnly: !options, hint: options ? "Which LED classes the background effect lights. Layer colours and feedback can paint any LED." : "Read the keyboard to see its LED classes."});
     /** @param {number} i */
     const name = i => layerName(settings.names, i);
     /** @template T @param {(i: number) => T} make */
     const everyLayer = make => Array.from({length: SETTINGS.LAYERS}, (_, i) => make(i));
     // Each section's one-per-layer switches are one setting to a person: the
     // interface draws them as one row of layers, worded by `layerGroup`.
-    result.push({id: "startupLayers", area: "Settings", label: "Default layers", expanded: false, search: "startup layers always on default_layer_state",
+    result.push({id: "startupLayers", area: "Settings", label: "Default layers", search: "startup layers always on default_layer_state",
         layerGroup: {label: "Default layers", hint: "Always on underneath every other layer. Normally only Base. QMK calls these default layers."}, fields:
         everyLayer(i => ({...toggle(`startupLayer${i}`, SETTING.DEFAULT_LAYERS, name(i), `Layer ${i}`), tooltip: "Make this layer a default layer: always on underneath every other layer. Keep at least one on; a higher default layer covers a lower one.", bitMask: 2 ** i, keyboardKeys: true, governs: {kind: /** @type {const} */ ("layer"), layer: i}}))});
     // Behaviours and combos each have a master switch and one per layer
@@ -220,10 +231,10 @@ function settingsSections(snapshot, settings) {
                 hint: "Off, combos still fire but use their normal output action. Physical-key behaviours stay eligible. A bypassed custom key sends its shortcut, or nothing if it has none."},
             ...everyLayer(i => ({...toggle(`combosOnLayer${i}`, SETTING.LAYER_COMBOS, `On ${name(i)}`, "Keys that come from this layer can join combos."), bitMask: 2 ** i, governs: {kind: /** @type {const} */ ("layer"), layer: i}}))]});
     // A layer's combo reference is in its layer record, not a setting value.
-    result.push({id: "comboReferences", area: "Settings", label: "Combo layer matching", expanded: false, description: "Choose which layer supplies the key assignments used to match combos on each layer. Select the same layer to keep its combos independent.", fields:
+    result.push({id: "comboReferences", area: "Settings", label: "Combo layer matching", search: "combo reference", description: "Choose which layer supplies the key assignments used to match combos on each layer. Select the same layer to keep its combos independent.", fields:
         everyLayer(i => ({...layer(`comboReference${i}`, undefined, `Combos on ${name(i)}`, "The layer whose key assignments are used to match combos on this layer. Choose the same layer to keep its combos independent."), record: /** @type {const} */ ("reference"), layer: i, governs: {kind: /** @type {const} */ ("layer"), layer: i}}))});
-    result.push({id: "keyboardOptions", area: "Settings", label: "Key options", expanded: false, search: "magic keymap options keyboard options", description: options ? "Keyboard-wide remapping and typing options. These apply across all layers." : "Read the keyboard to see the key options it supports.", fields:
-        options ? optionLabels.map(([macro, label, hint], i) => ({...toggle(macro, SETTING.KEYMAP_OPTIONS, hostKeyLabel(label, host.effective)), tooltip: hostKeyLabel(hint, host.effective), bitMask: options.keymapMasks[i], keyboardKeys: true, readOnly: !(options.supportedKeymapOptions & (1 << i)), notBuilt: !(options.supportedKeymapOptions & (1 << i)), hint: options.supportedKeymapOptions & (1 << i) ? "" : "Not in this firmware (does nothing)."})) : []});
+    result.push({id: "keyboardOptions", area: "Settings", label: "Key swaps & typing", search: "key options magic keymap options keyboard options", description: options ? "Keyboard-wide swaps and typing options. These apply across all layers." : "Read the keyboard to see the key options it supports.", fields:
+        options ? optionLabels.map(([macro, label, hint, part], i) => ({...toggle(macro, SETTING.KEYMAP_OPTIONS, hostKeyLabel(label, host.effective)), tooltip: hostKeyLabel(hint, host.effective), part, bitMask: options.keymapMasks[i], keyboardKeys: true, readOnly: !(options.supportedKeymapOptions & (1 << i)), notBuilt: !(options.supportedKeymapOptions & (1 << i)), hint: options.supportedKeymapOptions & (1 << i) ? "" : "Not in this firmware (does nothing)."})) : []});
     /** @param {number} id */
     const label = id => VOCABULARY.hostOs.find(([value]) => value === id)?.[1] || "Unknown";
     const macos = host.effective === 1;

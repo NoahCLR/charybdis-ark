@@ -232,6 +232,8 @@ export interface SettingFieldBase extends SettingBits {
     /** QMK owns the live value, so keys on the keyboard (or VIA) change it too. */
     keyboardKeys?: boolean;
     governs?: {kind: 'tier'; tier: string} | {kind: 'branch'; count: number} | {kind: 'layer'; layer: number};
+    /** The heading a field is listed under within its section. */
+    part?: string;
 }
 export interface StoredSettingField extends SettingFieldBase {
     header?: undefined;
@@ -272,7 +274,6 @@ export interface SettingsSection {
     label: string;
     area?: string;
     stage?: string;
-    expanded?: boolean;
     description?: string;
     /** Other words the section is found by in Settings search: QMK's names and earlier ones. */
     search?: string;

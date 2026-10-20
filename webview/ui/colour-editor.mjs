@@ -10,8 +10,10 @@ import {brightnessLimit, clampHsv, css, hsv, label as hsvLabel, rgb, valuePercen
 import {inheritsStageColour} from "../view/lighting.mjs";
 import {el, esc} from "../lib/dom.mjs";
 
-/** @param {{identity: string, colour: import("../../contracts/edits.js").Colour | null | undefined, title: string, canEdit?: boolean, onChange?: (colour: import("../../contracts/edits.js").Colour) => void, offNote?: string, maximumBrightness?: number}} options */
-export function colourEditor({identity, colour, title, canEdit = true, onChange, offNote, maximumBrightness}) {
+// `turnOff` offers storing HSV(0, 0, 0) so a stage lets what is underneath
+// show; the background effect has nothing underneath, so it does not.
+/** @param {{identity: string, colour: import("../../contracts/edits.js").Colour | null | undefined, title: string, canEdit?: boolean, onChange?: (colour: import("../../contracts/edits.js").Colour) => void, offNote?: string, maximumBrightness?: number, turnOff?: boolean}} options */
+export function colourEditor({identity, colour, title, canEdit = true, onChange, offNote, maximumBrightness, turnOff = true}) {
     const [h, s, v] = hsv(colour);
     const maximum = brightnessLimit(maximumBrightness);
     const node = el(`<div class="stack gap-12"></div>`);
@@ -34,7 +36,7 @@ export function colourEditor({identity, colour, title, canEdit = true, onChange,
         <span class="swatch-lg" style="background:${css(colour)}"></span>
         <div><div class="colour-title">${esc(title)}</div>
             <div class="note mono">${esc(hsvLabel(colour))} · rgb(${rgb(colour).join(", ")})</div></div>
-        ${canEdit ? `<button class="btn tiny ghost" data-off
+        ${canEdit && turnOff ? `<button class="btn tiny ghost" data-off
             data-tip="Store HSV(0, 0, 0) so this stage stops painting and lets what is underneath show.">Turn off</button>` : ""}</div>`);
     node.append(head);
     if (v === 0) node.append(el(`<p class="note">Brightness is zero. Hue and saturation are retained; raise brightness to use this colour again.</p>`));

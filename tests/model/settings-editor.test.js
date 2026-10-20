@@ -57,7 +57,7 @@ test("Defaults and inherited behaviour timing come entirely from the complete ke
     const current = snapshot(), view = settingsEditorView(current);
     assert.equal(view.brightnessMax, 200);
     const model = buildDeviceModel({settingsView: view, capabilities: {compiledLayerCount: 16}});
-    assert.equal(model.configDefaults.length, 13, "Combos, behaviours and the read-only macro host setup each have a section");
+    assert.equal(model.configDefaults.length, 14, "Combos, behaviours, the read-only macro host setup and All lighting each have a section");
     const fields = model.configDefaults.flatMap(section => section.fields);
     assert.equal(fields.find(field => field.macro === "volumeDpi"), undefined, "a pointing mode's speed is set on its slot, not in settings");
     assert.equal(fields.find(field => field.macro === "mouseLayer").value, "Layer 4");
@@ -73,7 +73,11 @@ test("Defaults and inherited behaviour timing come entirely from the complete ke
 test("every section names the screen it is edited on, and the pointer's own settings are Mouse", () => {
     const areas = Object.fromEntries(settingsEditorView(snapshot()).sections.map(section => [section.id, section.area]));
     assert.deepEqual(Object.keys(areas).filter(id => areas[id] === "Mouse"), ["normalPointerSpeed", "sniping", "autoMouse"]);
-    assert.deepEqual(Object.keys(areas).filter(id => areas[id] === "Lighting"), ["automouseFade"], "the fade is timed where it is coloured");
+    assert.deepEqual(Object.keys(areas).filter(id => areas[id] === "Lighting"), ["automouseFade", "lightingPower", "rgbAppearance", "lightingFeedback"],
+        "lighting is set where it is coloured: the fade's timing, all lighting, the background effect and the feedback flash");
+    const stages = Object.fromEntries(settingsEditorView(snapshot()).sections.map(section => [section.id, section.stage]));
+    assert.deepEqual([stages.automouseFade, stages.rgbAppearance, stages.lightingFeedback, stages.lightingPower], ["auto", "base", "key", undefined],
+        "a section is edited on its stage; All lighting darkens every stage, so it has none");
     assert.ok(Object.values(areas).every(area => ["Mouse", "Lighting", "Settings"].includes(area)), "a section with no area of its own is a Settings one");
 });
 
@@ -108,7 +112,7 @@ test("range hints and numeric bounds follow the stored field rules", () => {
         assert.deepEqual([field.min, field.max], [rule.min, rule.max], macro);
         assert.equal(field.hint, `${rule.min}–${rule.max}${unit}${rule.step > 1 ? ", in steps of " + rule.step : ""}`, macro);
     }
-    const next = editSettings(snapshot(), message(snapshot(), "rgbAppearance", {lightingTimeout: "86400000"}));
+    const next = editSettings(snapshot(), message(snapshot(), "lightingPower", {lightingTimeout: "86400000"}));
     assert.equal(validateSnapshot(next).settings.values[SETTING_FIELD.RGB_TIMEOUT.id], SETTING_FIELD.RGB_TIMEOUT.max, "a uint32 duration is not constrained by an unrelated uint16 fallback");
 });
 
@@ -148,9 +152,14 @@ test("the auto-mouse fade is a share of the timeout, so no edit can make it outl
     }
 });
 
-test("base lighting edits preserve the effect and flags while independently updating packed channels", () => {
+test("background effect and All lighting edits preserve the effect and flags while independently updating packed channels", () => {
     const current = snapshot(), before = validateSnapshot(current.document).settings.values;
-    const next = editSettings(current, message(current, "rgbAppearance", {hue: "23", saturation: "0", brightness: "0", effectSpeed: "255", lightingEnabled: false, lightingTimeout: "0"}));
+    const effect = editSettings(current, message(current, "rgbAppearance", {hue: "23", saturation: "0", brightness: "0", effectSpeed: "255"}));
+    const between = validateSnapshot(effect).settings.values;
+    assert.equal(between[21] & 255, before[21] & 255, "the effect's section leaves the master switch it shares a word with");
+    assert.equal(between[17], before[17], "and the idle timeout");
+    const middle = {document: effect, fingerprint: fingerprint(effect)};
+    const next = editSettings(middle, message(middle, "lightingPower", {lightingEnabled: false, lightingTimeout: "0"}));
     const values = validateSnapshot(next).settings.values;
     assert.equal(values[21] & 0xff00ff00, before[21] & 0xff00ff00);
     assert.equal(values[21] & 255, 0); assert.equal((values[21] >>> 16) & 255, 255);
@@ -168,7 +177,7 @@ test("invalid settings, incomplete sections and stale drafts fail before any dev
     for (const value of ["", "1.5", "Infinity", "-1", "65536", " 150 "]) assert.throws(() => edit("keyTiming", {tapHoldTerm: value}));
     assert.throws(() => edit("normalPointerSpeed", {normalDpi: "500"}), /range/);
     assert.throws(() => edit("lightingFeedback", {feedbackFlash: "0"}), /range/);
-    assert.throws(() => edit("rgbAppearance", {lightingTimeout: "86400001"}), /range/);
+    assert.throws(() => edit("lightingPower", {lightingTimeout: "86400001"}), /range/);
     const invalid = message(current, "keyTiming"); invalid.fields[0] = invalid.fields[1];
     assert.throws(() => editSettings(current, invalid), /repeated/);
     assert.throws(() => editSettings(current, {...invalid, fields: []}), /complete/);

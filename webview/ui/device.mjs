@@ -2,7 +2,8 @@
 // The Keyboard screen: who the keyboard is. Its name is the title (click to
 // rename), then what it is and runs (product, firmware against this Ark,
 // Ark's own version, the two halves, a restart when one is needed), how full
-// its memory is, and the diagnostics of what was read, folded.
+// its memory is, then folded, what its firmware was built with and the
+// diagnostics of what was read.
 //
 // In the demo it says what stands in for a keyboard, and that it is not one;
 // reading a keyboard from there leaves the demo, asking first.
@@ -19,6 +20,7 @@ import {profileUsageView} from "../view/profile-usage.mjs";
 import {FIRMWARE_RELEASES, firmwareLine, halvesRows} from "../view/keyboard-view.mjs";
 import {NAME_MAX_BYTES} from "../view/names.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
+import {firmwareFacts} from "../view/firmware-facts.mjs";
 import {attachTitleName, titleName} from "./title-name.mjs";
 
 /** @param {readonly (readonly [string, string])[]} rows each value already escaped markup */
@@ -54,6 +56,7 @@ export function screenDevice() {
     ]);
     const usage = model?.portable?.available ? profileUsageView(model.portable.usage, model?.macroBank) : null;
     const diagnosticsOpen = (state.settingsOpen || []).includes("diagnostics");
+    const facts = firmwareFacts(model);
     const main = el(`<div class="main">
         <header class="topbar keyboard-topbar"><div class="keyboard-title">${title}${dirty ? draftDot() : ""}
             <p class="sub">${esc(sub)}</p><p class="note rename-note">${esc(RENAME_NOTE)}</p></div></header>
@@ -61,6 +64,7 @@ export function screenDevice() {
             <section class="card"><div class="card-h"><h3>This keyboard</h3></div>
                 <div class="card-b stack gap-12">${identity}${restart}${earlier}${saving}</div></section>
             ${usage ? usageCard(usage) : ""}
+            ${facts.length ? builtInCard(facts) : ""}
             <details class="card settings-group" data-section="diagnostics" ${diagnosticsOpen ? "open" : ""}>
                 <summary class="card-h">${DISCLOSURE}<h3>Diagnostics</h3>
                     <span class="right"><button class="btn compact" data-act="read" ${health?.busy ? "disabled" : ""}>Read from keyboard</button></span></summary>
@@ -76,11 +80,11 @@ export function screenDevice() {
                     || `<div class="list-row"><span class="note">Nothing has been read yet.</span></div>`}</div>
             </details>
         </div></div></div>`);
-    const fold = /** @type {HTMLDetailsElement} */ (main.querySelector('[data-section="diagnostics"]'));
-    fold.addEventListener("toggle", () => {
-        const others = (state.settingsOpen || []).filter((id) => id !== "diagnostics");
-        state.settingsOpen = fold.open ? [...others, "diagnostics"] : others;
-    });
+    /** @type {NodeListOf<HTMLDetailsElement>} */ (main.querySelectorAll("details[data-section]")).forEach((fold) => fold.addEventListener("toggle", () => {
+        const id = /** @type {string} */ (fold.dataset.section);
+        const others = (state.settingsOpen || []).filter((entry) => entry !== id);
+        state.settingsOpen = fold.open ? [...others, id] : others;
+    }));
     const read = /** @type {HTMLButtonElement} */ (main.querySelector('[data-act="read"]'));
     // The button sits in the fold's title; pressing it does not fold.
     read.addEventListener("click", (event) => {
@@ -91,6 +95,21 @@ export function screenDevice() {
     if (keyboard) attachTitleName(/** @type {HTMLElement} */ (main.querySelector(".keyboard-title")), {stored: keyboard.name, perName: keyboard.perName || NAME_MAX_BYTES,
         rename: (name) => { post(edits.keyboardNameMessage(name, keyboard.identity)); render(); }});
     return main;
+}
+
+// What this firmware was built with, read-only, folded beside the memory its
+// numbers bound: each fact needs a firmware build to change.
+/** @param {ReturnType<typeof firmwareFacts>} facts */
+function builtInCard(facts) {
+    const open = (state.settingsOpen || []).includes("builtIn");
+    return `<details class="card settings-group" data-section="builtIn" ${open ? "open" : ""}>
+        <summary class="card-h">${DISCLOSURE}<h3>Built into this firmware</h3>
+            <span class="right fold-summary">${facts.length} facts</span></summary>
+        <div class="card-b settings-intro"><p class="note">Set when the firmware was built, not stored in the profile: changing any of these needs a new firmware build on both halves.</p></div>
+        <div class="rows">${facts.map((fact) => `<div class="setrow ro" data-tip="${esc(fact.hint)}">
+            <div><div class="nm">${esc(fact.label)}</div><div class="hint">${esc(fact.hint)}</div></div>
+            <div class="control"><span class="fact-value">${esc(fact.value)}</span></div></div>`).join("")}</div>
+    </details>`;
 }
 
 // How full the profile is, and how many of each thing are set up against what

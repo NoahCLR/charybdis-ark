@@ -977,10 +977,10 @@ test("a duplicate is named as a copy and takes the source's colour and locality"
 
 // ── settings ────────────────────────────────────────────────────────────
 
-test("human timeout units stage milliseconds and keep the rest of Base Lighting", () => {
+test("human timeout units stage milliseconds and keep the rest of All lighting", () => {
     const draft = session();
     for (const [value, unit, expected] of [["777", "seconds", 777000], ["1.5", "minutes", 90000], ["0.777", "seconds", 777], ["0", "minutes", 0], ["1440", "minutes", 86400000]]) {
-        const section = settingsEditorView(draft.current).sections.find(row => row.id === "rgbAppearance");
+        const section = settingsEditorView(draft.current).sections.find(row => row.id === "lightingPower");
         const before = decoded(draft).settings.values.slice();
         const message = edits.settingsSection(section, field => field.macro === "lightingTimeout" ? durationMilliseconds(value, unit) : undefined, draft.current.fingerprint);
         stage(draft, message);
@@ -988,11 +988,27 @@ test("human timeout units stage milliseconds and keep the rest of Base Lighting"
         before[SETTING.RGB_TIMEOUT] = expected;
         assert.deepEqual(decoded(draft).settings.values, before);
     }
-    const section = settingsEditorView(draft.current).sections.find(row => row.id === "rgbAppearance");
+    const section = settingsEditorView(draft.current).sections.find(row => row.id === "lightingPower");
     const timeout = section.fields.find(field => field.macro === "lightingTimeout");
     const before = draft.document;
     stage(draft, edits.settingsSection(section, field => field.macro === "lightingTimeout" ? durationMilliseconds(durationValue(timeout.value, "minutes"), "minutes") : undefined, draft.current.fingerprint));
     assert.deepEqual(draft.document, before);
+});
+
+// The Background effect tab posts only the control that changed (its colour
+// editor gives hue, saturation and brightness at once); the rest of the
+// section travels at its stored value, and All lighting, which shares the
+// effect's settings word, is left as it is.
+test("the background effect posts its changed channels and keeps the rest of its word", () => {
+    const draft = session();
+    const section = settingsEditorView(draft.current).sections.find(row => row.id === "rgbAppearance");
+    const before = decoded(draft).settings.values.slice();
+    stage(draft, edits.settingsSection(section, field => ({hue: "23", saturation: "200"})[field.macro], draft.current.fingerprint));
+    const after = decoded(draft).settings.values;
+    assert.equal(after[SETTING.RGB_COLOR] & 0xff, 23);
+    assert.equal((after[SETTING.RGB_COLOR] >>> 8) & 0xff, 200);
+    assert.equal(after[SETTING.RGB_COLOR] >>> 16, before[SETTING.RGB_COLOR] >>> 16, "brightness kept");
+    assert.equal(after[SETTING.RGB_MODE], before[SETTING.RGB_MODE], "effect, speed, LEDs and All lighting kept");
 });
 
 test("a settings section is posted whole, and a partial section is refused", () => {

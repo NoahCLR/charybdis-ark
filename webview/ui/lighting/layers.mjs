@@ -34,7 +34,7 @@ export function stageLayers(model) {
     const colour = section(`${layerName(layer)} colour`);
     colour.append(colourControl(model, {
         colour: row?.color, canEdit, title: `${layerName(layer)} layer`,
-        offNote: "No colour is stored for this layer, so the base effect shows through wherever it would paint.",
+        offNote: "No colour is stored for this layer, so the background effect shows through wherever it would paint.",
         onChange: (next) => { if (row) post(edits.layerColour(row.layer, row.mode, next)); },
     }));
     const where = section("Where it paints");

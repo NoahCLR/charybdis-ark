@@ -110,7 +110,10 @@ The same kind of control looks and sits the same on every screen.
 - The keycode picker draws a key's single legend smaller only when it does not
   fit the key (`legendFits` in `view/picker-board.mjs`).
 - Card and section names are sentence case, as the rail and the review name
-  them. A settings card shows its setting count, including a card of one.
+  them. A folded settings card says what it holds now, in place of its
+  rows: the layers left out, the options on, the operating system and
+  layout (`foldedSummary` in `view/settings-layout.mjs`); an open one says
+  nothing there.
 - A slot bank (Macros, Custom keys) heads its card with its name and count,
   then its search across the column. Its tiles sit three across in a 340 px
   column and scroll inside the card, which stays in view beside the editor;

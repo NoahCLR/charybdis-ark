@@ -2,7 +2,7 @@
 "use strict";
 
 const {test, expect} = require("@playwright/test");
-const {openPreview} = require("./host-page");
+const {openFold, openPreview} = require("./host-page");
 const {hostMacros} = require("../tests/fixtures/host-macros");
 const {ProfileDraftSession} = require("../core/session/profile-draft-session");
 const {buildSnapshotModel} = require("../core/session/device-model");
@@ -30,6 +30,7 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
             const store = await import("/webview/store.mjs");
             store.state.screen = "settings"; store.render(); window.__posted.length = 0;
         });
+        await openFold(page, "host");
         await page.locator('[data-macro="hostLayout"]').selectOption("3");
         const message = await page.evaluate(() => window.__posted.at(-1));
         expect(message).toMatchObject({type: "updateConfigDefaults", sectionId: "host"});
