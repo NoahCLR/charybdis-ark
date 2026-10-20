@@ -88,12 +88,14 @@ export function behaviourEditor(behaviour) {
         if (!branch && inherited) {
             const label = cellLabel(model, inherited);
             const times = inherited.times ? ` ×${inherited.times}` : "";
-            const tip = inherited.times
-                ? `What this key does on its own: its tap, once for each of the ${inherited.times} presses. Set an action here to replace it.`
-                : "What this key does on its own. Set an action here to replace it.";
+            const tip = inherited.first
+                ? `The first tap, once for each of the ${inherited.times} presses. Set an action here to replace it.`
+                : inherited.times
+                    ? `What this key does on its own: its tap, once for each of the ${inherited.times} presses. Set an action here to replace it.`
+                    : "What this key does on its own. Set an action here to replace it.";
             return `<button class="bcell inherited ${open ? "on" : ""}" data-cell="${id}" data-tip="${esc(tip)}">
                 <span class="bk named">${keyNameMarked(model, label, inherited.action)}</span>
-                <span class="bl">${esc(["built in", `${helperLabel(kind, inherited.helper)}${times}`].join(" · "))}</span></button>`;
+                <span class="bl">${esc([inherited.first ? "first tap" : "built in", `${helperLabel(kind, inherited.helper)}${times}`].join(" · "))}</span></button>`;
         }
         const implied = branch ? null : impliedBranch(behaviour, step, kind);
         if (implied?.meaning === "continues") {

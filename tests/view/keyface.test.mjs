@@ -152,7 +152,7 @@ test("an empty tap inherits the key's own tap at every count the row reaches, on
     assert.equal(inheritedBranch(behaviour, {tapCount: 0}, "tap"), tap);
     assert.deepEqual(inheritedBranch(behaviour, {tapCount: 1}, "tap"), {...tap, times: 2}, "a double tap sends the key's tap twice");
     assert.deepEqual(inheritedBranch(behaviour, {tapCount: 2, hold: {action: "KC_A"}}, "tap"), {...tap, times: 3});
-    assert.equal(inheritedBranch(behaviour, {tapCount: 3}, "tap"), null, "past the deepest authored count the presses are separate gestures");
+    assert.equal(inheritedBranch(behaviour, {tapCount: 3}, "tap"), null, "past the deepest count the keyboard starts again at a single tap");
     assert.equal(inheritedBranch({...behaviour, steps: []}, {tapCount: 1}, "tap"), null, "an unstored row reaches only a single tap");
     assert.equal(inheritedBranch({...behaviour, steps: []}, {tapCount: 0}, "tap"), tap);
     assert.equal(inheritedBranch(behaviour, {tapCount: 1, tap: {action: "KC_B"}}, "tap"), null, "an authored cell replaces it");
@@ -161,6 +161,23 @@ test("an empty tap inherits the key's own tap at every count the row reaches, on
     assert.equal(inheritedBranch(behaviour, {tapCount: 1}, "hold"), null, "later presses have no built-in hold");
     assert.equal(inheritedBranch(behaviour, {tapCount: 0}, "long"), null, "no key has a built-in long hold");
     assert.equal(inheritedBranch({keycode: "KC_A", builtIn: {}}, {tapCount: 0}, "hold"), null);
+});
+
+test("an empty later tap repeats the row's own first tap, up to the deepest tap count", () => {
+    const tap = {helper: "TAP_SENDS", action: "KC_DELETE", label: "Delete"};
+    const first = {helper: "TAP_SENDS", action: "LGUI(KC_BSPC)"};
+    const hold = {helper: "PRESS_AND_HOLD_UNTIL_RELEASE", action: "KC_K"};
+    const del = {keycode: "KC_DELETE", builtIn: {tap}, steps: [{tapCount: 1, hold}, {tapCount: 2, longHold: hold}]};
+    assert.deepEqual(inheritedBranch(del, {tapCount: 2, longHold: hold}, "tap"), {...tap, times: 3}, "three quick taps, three Deletes");
+    assert.equal(inheritedBranch(del, {tapCount: 3}, "tap"), null, "a fourth tap starts a new run, so that row is never reached");
+    const set = {...del, steps: [{tapCount: 0, tap: first}, ...del.steps]};
+    assert.deepEqual(inheritedBranch(set, {tapCount: 1, hold}, "tap"), {...first, first: true, times: 2}, "the first tap the row sets, not the key's own");
+    assert.equal(inheritedBranch(set, {tapCount: 0, tap: first}, "tap"), null, "the first tap is its own cell");
+    const custom = {keycode: "CUSTOM_KEY_0", builtIn: {}, steps: [{tapCount: 0, tap: first}, {tapCount: 1, hold}]};
+    assert.deepEqual(inheritedBranch(custom, {tapCount: 1, hold}, "tap"), {...first, first: true, times: 2}, "a key with no tap of its own repeats its set first tap");
+    const thumb = {keycode: "KC_ESCAPE", builtIn: {tap}, steps: [{tapCount: 0, tap: first}, {tapCount: 2, tap: {helper: "TAP_SENDS", action: "KC_MPLY"}}]};
+    assert.deepEqual(inheritedBranch(thumb, {tapCount: 1}, "tap"), {...first, first: true, times: 2}, "an empty count inside the depth still repeats the first tap");
+    assert.equal(inheritedBranch(thumb, {tapCount: 3}, "tap"), null, "past the depth the run types, so that row is never reached");
 });
 
 test("a plain key's fallback hold gives way to any authored first-press hold or long hold", () => {
@@ -215,19 +232,22 @@ test("a dual-role key names what its tap sends and what its hold does", () => {
     assert.equal(dualRole({}, {keycode: "KC_F", display: "F"}), null);
 });
 
-test("the grid shows the tap counts in use and the next, or every one, and says where the keyboard cycles", () => {
+test("the grid shows the tap counts in use and the next, or every one, and says where a run types", () => {
     const esc = {keycode: "KC_ESCAPE", steps: [{tapCount: 1, tap: {action: "KC_GRAVE"}}]};
     assert.equal(behaviourDepth(esc), 2);
     const compact = behaviourGridLayout(esc, 5);
     assert.deepEqual(compact.rows.map((row) => [row.step.tapCount, row.add]), [[0, false], [1, false], [2, true]]);
-    assert.deepEqual(compact.cycle, {taps: 3}, "a third tap starts again at a single tap");
+    assert.deepEqual(compact.typing, {taps: 3}, "three quick taps type the first tap three times");
     const all = behaviourGridLayout(esc, 5, true);
-    assert.deepEqual(all.rows.map((row) => row.like), [null, null, null, 1, 0], "4 taps answer as 2x, 5 as 1x: (count % depth) + 1");
+    assert.deepEqual(all.rows.map((row) => row.like), [null, null, null, 0, 0], "a press past the depth is a single tap of its own");
     const none = behaviourGridLayout({keycode: "KC_A", steps: []}, 5);
     assert.deepEqual(none.rows.map((row) => [row.step.tapCount, row.add]), [[0, false], [1, true]]);
-    assert.equal(none.cycle, null, "a single-tap row never accumulates taps");
+    assert.equal(none.typing, null, "a single-tap row never accumulates taps");
     assert.equal(behaviourDepth({steps: [{tapCount: 3}]}), 0, "a tap count with nothing set does not count");
     assert.equal(behaviourGridLayout({steps: [{tapCount: 4, hold: {action: "KC_A"}}]}, 5).rows.length, 5);
+    const counting = behaviourGridLayout({keycode: "KC_DELETE", steps: [{tapCount: 1, hold: {action: "KC_K"}}]}, 5, true);
+    assert.deepEqual(counting.typing, {taps: 3}, "a row of holds types from the third tap too");
+    assert.deepEqual(counting.rows.map((row) => row.like), [null, null, null, 0, 0], "so a fourth press holds like a single tap");
 });
 
 test("a pointing-mode key holds its mode from the press, unless a later tap count holds another mode", () => {

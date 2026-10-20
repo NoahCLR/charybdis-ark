@@ -4,8 +4,10 @@
 // What a key does where its behaviour row leaves a tier empty. The keyboard
 // fills that gap with the key's own meaning, so an empty cell is not "nothing".
 //
-// The key's own tap fills an empty tap at every tap count the row reaches, sent
-// once per press: a double tap that authors no tap sends it twice. A plain key
+// The key's own tap fills an empty first tap. An empty later tap repeats the
+// first tap, the row's own or else the key's, once per press: a double tap that
+// authors no tap sends it twice (firmware D-F33; the grid decides it,
+// webview/view/keyface.mjs). A plain key
 // (a basic keycode, alone or with modifiers) taps itself; LT() taps its key,
 // MT() taps its key and OSM() arms its one-shot. A custom key with a shortcut
 // (firmware D-F26) is a plain key whose own action is that shortcut: it taps

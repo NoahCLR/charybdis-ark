@@ -18,7 +18,8 @@ export interface ComboGroups {onKeys: ComboGroupEntry[]; throughKeys: ComboGroup
 export interface ReachRecord {directKeys: ResolvedKey[]; fellKeys: ResolvedKey[]; directRows: ReachedBehavior[]; belowRows: ReachedBehavior[]; directCombos: ReachedCombo[]; belowCombos: ReachedCombo[]}
 export type ReachOf = (model: ViewModel, stack: Layer[], at: number) => ReachGroup;
 export type NamesOf = (keycode: string | undefined) => string[];
-export type InheritedBranch = Branch & {times?: number};
+// `times`: sent once per press of that many; `first`: the row's own first tap, not the key's.
+export type InheritedBranch = Branch & {times?: number; first?: boolean};
 export type ImpliedBranch = {meaning: 'continues'; hold: InheritedBranch} | {meaning: 'tapsBeforeLong'; tap: InheritedBranch};
 
 export interface KeyFace {main: string; sub: string; kind: 'none' | 'transparent' | 'disabled' | 'layer' | 'key'}
