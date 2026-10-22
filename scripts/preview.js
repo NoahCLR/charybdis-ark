@@ -100,6 +100,8 @@ async function webHosts() {
         web: {words: WEB_WORDS, panel: () => offered},
         live: VSCODE_HOST,
         "live-auto": VSCODE_HOST,
+        // A keyboard that stopped saving (firmware D-F34), unsaved edits on it.
+        "live-stopped": VSCODE_HOST,
         "web-none": {words: WEB_WORDS, panel: () => ({...offered, recoveries: []})},
         "web-unsupported": {words: WEB_WORDS, panel: () => ({...offered, chooseKeyboard: false, recoveries: [], blocked: BLOCKED.unsupported})},
     };
@@ -137,9 +139,10 @@ const DEMO_EDIT = {type: "updateConfigDefaults", sectionId: "normalPointerSpeed"
 // `live` renders a keyboard in Live + review (firmware D-F32): the draft is
 // its working copy, with one unsaved edit, and a combos key has turned combos
 // off for now. ?host=live shows it; ?host=live-auto the same keyboard in Live
-// (`mode` 1), waiting to save the edit by itself.
-/** @param {import("../core/session/types.js").PanelHost} [host] @param {{live?: boolean, mode?: number}} [options] */
-function buildModel(host = VSCODE_HOST, {live = false, mode = 2} = {}) {
+// (`mode` 1), waiting to save the edit by itself; ?host=live-stopped one that
+// stopped saving (firmware D-F34, `stopped`), with Restart.
+/** @param {import("../core/session/types.js").PanelHost} [host] @param {{live?: boolean, mode?: number, stopped?: boolean}} [options] */
+function buildModel(host = VSCODE_HOST, {live = false, mode = 2, stopped = false} = {}) {
     const doc = fillPreviewLayer(document32());
     const snapshot = {
         document: doc,
@@ -156,7 +159,8 @@ function buildModel(host = VSCODE_HOST, {live = false, mode = 2} = {}) {
         liveSnapshot = {...snapshot, document: working, fingerprint: portable.fingerprint(working), summary: portable.summary(working), saved: snapshot,
             runtime: null, live: {mode, session: 0x5e550001, revision: 1, savedGeneration: 42, savedOrigin: 0, unsaved: true, converged: true, working: bytes, saved, defaults: saved,
                 keyboard: {saving: false, autoSaving: false, savedByKeyboard: false, saveFailed: false, saveError: 0, lastSaveTransaction: 0,
-                    adjustmentPending: false, storagePaused: false, peerStoragePaused: false, peerRefused: false, modeNotStored: false, quietMs: 3000}}};
+                    adjustmentPending: false, storagePaused: false, peerStoragePaused: false, peerRefused: false, modeNotStored: false,
+                    stopped, peerStopped: false, quietMs: 3000}}};
     }
     const session = new ProfileDraftSession(/** @type {any} */ (liveSnapshot || snapshot), deviceId, capabilities);
     /** @type {import("../core/session/types.js").PanelDeviceState} */
@@ -260,7 +264,7 @@ Promise.all([model, webHosts(), macroHost]).then(([model, hosts, macroHost]) => 
 fs.mkdirSync(path.join(__dirname, "..", "preview"), {recursive: true});
 fs.writeFileSync(path.join(__dirname, "..", "preview", "model.json"), JSON.stringify(model));
 for (const [name, host] of Object.entries(hosts)) {
-    const web = name === "web" ? buildModel(host) : name === "live" ? buildModel(host, {live: true}) : name === "live-auto" ? buildModel(host, {live: true, mode: 1}) : name === "demo" ? demoModel(host) : name === "demo-edited" ? demoModel(host, [DEMO_EDIT]) : emptyModel(host);
+    const web = name === "web" ? buildModel(host) : name === "live" ? buildModel(host, {live: true}) : name === "live-auto" ? buildModel(host, {live: true, mode: 1}) : name === "live-stopped" ? buildModel(host, {live: true, stopped: true}) : name === "demo" ? demoModel(host) : name === "demo-edited" ? demoModel(host, [DEMO_EDIT]) : emptyModel(host);
     fs.writeFileSync(path.join(__dirname, "..", "preview", `model-${name}.json`), JSON.stringify(web));
 }
 const page = `<!doctype html>

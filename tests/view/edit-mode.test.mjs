@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {APPLY, LIVE, LIVE_REVIEW, editModeChoices, editsAreLive, liveSaveState, questionWords, switchQuestion} from "../../webview/view/edit-mode.mjs";
+import {APPLY, LIVE, LIVE_REVIEW, STOPPED_WORDS, editModeChoices, editsAreLive, liveSaveState, questionWords, switchQuestion} from "../../webview/view/edit-mode.mjs";
 import * as controls from "../../webview/view/controls.mjs";
 
 const vocabulary = {editModes: {
@@ -46,6 +46,22 @@ test("in Live the keyboard's own saving is said from its status; flags show with
     assert.equal(liveSaveState(draft({mode: LIVE_REVIEW, unsaved: true, apart: true}))?.kind, "refused");
 });
 
+// Firmware D-F34: a keyboard that stopped saving used to look like "not
+// ready" and "the slave half is catching up". Now one state says so, for
+// either half, in every live mode, ahead of anything else, with Restart.
+test("a keyboard that stopped saving outranks every other state and offers Restart", () => {
+    const keyboard = {saving: false, autoSaving: false, savedByKeyboard: false, saveFailed: false, storagePaused: false, stopped: false, peerStopped: false, quietMs: 3000};
+    /** @param {object} live */
+    const draft = live => /** @type {any} */ ({live: {mode: LIVE_REVIEW, unsaved: true, converged: false, keyboard, ...live}});
+    for (const flag of ["stopped", "peerStopped"]) for (const mode of [LIVE, LIVE_REVIEW]) {
+        const state = liveSaveState(draft({mode, apart: true, keyboard: {...keyboard, saveFailed: true, saving: true, adjustmentPending: true, [flag]: true}}));
+        assert.deepEqual(state, {kind: "stopped", tone: "err", title: STOPPED_WORDS.title, detail: STOPPED_WORDS.detail, action: "restart"});
+    }
+    assert.equal(STOPPED_WORDS.title, "The keyboard stopped saving");
+    assert.match(STOPPED_WORDS.detail, /^Restart it to continue\./);
+    assert.notEqual(liveSaveState(draft({keyboard}))?.kind, "stopped", "a keyboard catching up is not stopped");
+});
+
 test("leaving Live + review with unsaved edits asks Save or Revert; entering it with a draft asks Send or Discard", () => {
     assert.equal(switchQuestion(model({live: {unsaved: true}, dirty: true}), APPLY), "saveOrRevert");
     assert.equal(switchQuestion(model({live: {unsaved: false}, dirty: false}), APPLY), null);
@@ -65,6 +81,7 @@ test("each question's answers post the mode with what happens to the work first"
     assert.match(send.detail, /1 change\b/);
     assert.deepEqual(send.answers.map(answer => answer.pending), ["discard", "send"]);
     assert.deepEqual(controls.setEditMode(APPLY, "save"), {type: "setEditMode", mode: 0, pending: "save"});
+    assert.deepEqual(controls.restartKeyboard(), {type: "restartKeyboard"});
     assert.deepEqual(controls.setEditMode(LIVE_REVIEW), {type: "setEditMode", mode: 2});
     assert.deepEqual(controls.saveDraft(true), {type: "saveProfileDraft", confirmChecks: true});
     assert.deepEqual(controls.revertDraft(), {type: "revertProfileDraft"});

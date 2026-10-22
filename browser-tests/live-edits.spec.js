@@ -303,3 +303,26 @@ test("in Live the keyboard's own save, a failed one and halves apart each say wh
     await expect(page.locator(".rail-status")).toContainText("Saved by the keyboard");
     await expect(page.locator(".rail-mode .dot.warn")).toHaveCount(1);
 });
+
+// Firmware D-F34: a keyboard that stopped saving says so in one line where it
+// used to look "not ready" or "catching up", and Restart posts its control.
+test("a keyboard that stopped saving says so, for either half, and Restart posts", async ({page}) => {
+    await page.goto("/preview/index.html?host=live-stopped");
+    const bar = page.locator(".commit.live.stopped");
+    await expect(bar).toContainText("The keyboard stopped saving");
+    await expect(bar).toContainText("Restart it to continue.");
+    await expect(page.locator(".rail-status")).toContainText("Stopped saving · Restart");
+    await expect(page.locator("body")).not.toContainText("catching up");
+    await expect(bar.locator('[data-act="review"], [data-act="save-again"], [data-act="revert"]')).toHaveCount(0);
+    await clearPosts(page);
+    await bar.locator('[data-act="restart"]').click();
+    await expectPost(page, {type: "restartKeyboard"});
+    // The slave half's stop reads the same.
+    await page.evaluate(async () => {
+        const store = await import("/webview/store.mjs");
+        const model = structuredClone(store.getModel());
+        model.draft.live = {...model.draft.live, keyboard: {...model.draft.live.keyboard, stopped: false, peerStopped: true}};
+        store.setModel(model); store.render();
+    });
+    await expect(page.locator(".commit.live.stopped")).toContainText("The keyboard stopped saving");
+});

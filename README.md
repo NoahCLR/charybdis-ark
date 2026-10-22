@@ -54,7 +54,9 @@ keyboard at once, so you can try it as you type, and nothing is permanent until
 you review and **Save**; **Revert**, or unplugging the keyboard, puts back what
 was saved. In Live, like VIA, the keyboard saves by itself after a
 quiet interval, even with Ark closed. Unplugging loses every edit since the
-last successful save. In Apply, edits wait in Ark until you apply them.
+last successful save. In Apply, edits wait in Ark until you apply them. If the
+keyboard ever stops saving, Ark says so and restarts it for you, putting your
+unsaved edits back.
 
 Either way every edit goes into a draft with undo, redo and a full history. **Review**
 lists what changed and checks what the layers let you reach. It warns you

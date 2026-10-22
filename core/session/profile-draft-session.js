@@ -27,7 +27,8 @@ const {liveKeyboardStatus} = require("./live-profile-session");
 // What the panel shows of the keyboard's own saving and its halves.
 /** @param {import("./types.js").LiveKeyboardStatus | undefined} keyboard @returns {import("../../contracts/panel.js").LiveKeyboardView | null} */
 const liveKeyboardView = keyboard => keyboard ? {saving: keyboard.saving, autoSaving: keyboard.autoSaving, savedByKeyboard: keyboard.savedByKeyboard,
-    adjustmentPending: keyboard.adjustmentPending, saveFailed: keyboard.saveFailed, storagePaused: keyboard.storagePaused || keyboard.peerStoragePaused, quietMs: keyboard.quietMs} : null;
+    adjustmentPending: keyboard.adjustmentPending, saveFailed: keyboard.saveFailed, storagePaused: keyboard.storagePaused || keyboard.peerStoragePaused,
+    stopped: Boolean(keyboard.stopped), peerStopped: Boolean(keyboard.peerStopped), quietMs: keyboard.quietMs} : null;
 /**
  * @typedef {import("../model/types.js").PortableDocument} Document
  * @typedef {import("../model/types.js").ProfileSnapshot} Snapshot

@@ -38,7 +38,8 @@ function liveKeyboardStatus(status, saveMark = -1) {
             && status.autoSave.revision === status.revision && status.autoSave.generation === status.savedGeneration,
         saveFailed: failed, saveError: failed ? status.save.lastError : 0, lastSaveTransaction: status.save.lastTransactionId,
         storagePaused: status.storagePaused, peerStoragePaused: status.peerStoragePaused,
-        adjustmentPending: status.adjustmentPending, peerRefused: status.peerRefused, modeNotStored: status.modeNotStored, quietMs: status.autoSave.quietMs};
+        adjustmentPending: status.adjustmentPending, peerRefused: status.peerRefused, modeNotStored: status.modeNotStored,
+        stopped: status.stopped, peerStopped: status.peerStopped, quietMs: status.autoSave.quietMs};
 }
 
 /** @param {import("./types.js").DeviceCapabilities} capabilities @param {Buffer} stored @param {Buffer} defaults */
@@ -103,4 +104,4 @@ async function captureLive(connection, ids, capabilities, {payloadReader = new P
             keyboard: liveKeyboardStatus(after), saveMark: -1}};
 }
 
-module.exports = {captureLive, liveKeyboardStatus};
+module.exports = {captureLive, liveKeyboardStatus, snapshotOf};

@@ -1062,6 +1062,39 @@ keyboard kept and says whether your edits were saved before it restarted.
 A failed automatic save leaves that revision unsaved; the bar says so and
 offers **Save again** (after a recovery copy of what is saved) or **Revert**.
 
+### When the keyboard stops saving
+
+A keyboard can stop saving: a flash write that failed, or another fault it
+cannot safely carry on from. Typing still works, but it refuses Save, Revert
+and edits until it restarts. Ark says so in one line, for either half, in Live
+and in Live + review: the rail says **Stopped saving · Restart**, and the bar
+says **The keyboard stopped saving. Restart it to continue.** A refused Save
+or edit says the same. Before this, a stopped keyboard looked "not ready", or
+as if the slave half were catching up.
+
+**Restart** in the bar restarts both halves without unplugging. It is exactly
+as safe as unplugging: a save cut off anywhere still leaves a whole saved
+profile on both halves. Unplugging works too, but loses the unsaved edits;
+Restart keeps them:
+
+1. With unsaved edits, Ark reads what the keyboard runs and saves it as a
+   recovery copy (on **Backups**, like the copies Apply keeps). If no
+   recovery copy can be saved, the keyboard is not restarted.
+2. The keyboard restarts, drops off for a moment and comes back; Ark follows
+   it back and reads it again.
+3. Ark sends your unsaved edits back as one edit, unsaved: in Live + review
+   review and save them; in Live the keyboard saves them by itself.
+
+If something goes wrong, Ark says what, and where the recovery copy is:
+firmware without restart changes nothing (unplug it instead); a slave half
+that did not answer the restart rejoins by itself once the keyboard is back,
+and only if the keyboard does not come back does Ark say to unplug it and plug
+it back in; a keyboard that stops saving again at once has
+a fault in its flash or firmware that another restart will not clear; a
+keyboard that does not come back needs its cable checked. Ark never restarts
+the keyboard by itself; it offers Restart only when the keyboard says it
+stopped.
+
 Keys on the keyboard that adjust a setting, such as DPI up or down and the
 lighting keys, edit what it runs too. Ark notices within a second (in Apply,
 once the keyboard has saved the change), reads the keyboard again and shows

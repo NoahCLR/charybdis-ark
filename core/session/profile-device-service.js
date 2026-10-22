@@ -38,7 +38,7 @@ const {ProfilePayloadReader, payloadMatchesActive, encodeCompiledRead, decodeCom
 const {PROFILE_DOMAIN_IDS, decodeStoredProfileBlob, fnv1a32} = require("../schema/profile-blob-v1");
 const {CANDIDATE_STATE_NAMES, readCandidateStatus} = require("../protocol/profile-candidate-v1");
 const {PROFILE_ACTIVE_KIND, PROFILE_WIRE_FEATURES, readProfileCapabilities, readProfileStatus} = require("../protocol/profile-wire-v1");
-const {EDIT_MODE, readEditMode, readEditProgress, readEditStatus, readRuntime} = require("../protocol/profile-edit-v1");
+const {EDIT_MODE, readActiveProfile, readEditMode, readEditProgress, readEditStatus, readRuntime} = require("../protocol/profile-edit-v1");
 
 // The look at a live keyboard between edits (live-watch.js) is a background
 // read: Chrome on macOS holds back a page's input reports while one of its
@@ -119,6 +119,7 @@ class ProfileDeviceService {
         // A save renamed the keyboard, which then restarts USB by itself
         // (keyboard-reconnect.js): losing the connection is no failure.
         this.reconnectExpected = false;
+        this.reconnectReason = "to take its new name";
         // The keyboard the connection was lost to, unexpectedly, until the
         // panel loop takes it to connect it again (keyboard-reconnect.js).
         /** @type {import("./types.js").LostKeyboard | undefined} */
@@ -767,6 +768,35 @@ class ProfileDeviceService {
         return result;
     }
 
+    // What the keyboard runs now (its working copy, or its saved profile),
+    // read as one revision (GET 0x21): what a restart would lose.
+    async readWorkingCopy() {
+        if (!this.connection?.connected) this.refuse("Connect the keyboard before reading it.");
+        /** @type {Awaited<ReturnType<typeof readActiveProfile>> | undefined} */
+        let result;
+        await this.runOperation(PHASE.READ_COMPLETE, async () => {
+            result = await readActiveProfile(this.connectedConnection(), {...this.liveCoordinator().options, maxLength: this.profileCapabilities().profileSlotPayload || 130048});
+        });
+        if (!result) throw new Error("The keyboard operation returned no profile.");
+        return result;
+    }
+
+    // Restart both halves (firmware D-F34): the keyboard answers, then drops
+    // off USB and comes back as from power, so that loss is expected. Resolves
+    // with whether the slave half acknowledged, and so restarts too.
+    async restartKeyboard() {
+        if (!this.connection?.connected) this.refuse("Connect the keyboard before restarting it.");
+        /** @type {{peerAcknowledged: boolean} | undefined} */
+        let result;
+        await this.runOperation(PHASE.RESTART, async () => {
+            this.expectReconnect(true, "to restart");
+            try {result = await this.liveCoordinator().restart();}
+            catch (error) {this.expectReconnect(false); throw error;}
+        });
+        if (!result) throw new Error("The keyboard operation returned no restart result.");
+        return result;
+    }
+
     // Between edits, what a live keyboard says about itself: whether it saved
     // by itself, whether its own keys moved the revision, how its halves are.
     // A background read, skipped (undefined) while an operation holds the
@@ -1024,7 +1054,7 @@ class ProfileDeviceService {
         this.clearConnection();
         this.phase = this.scanned ? (this.devices.length ? PHASE.AVAILABLE : PHASE.EMPTY) : PHASE.IDLE;
         if (this.reconnectExpected) {
-            this.addDiagnostic(`${label} disconnected to take its new name.`);
+            this.addDiagnostic(`${label} disconnected ${this.reconnectReason}.`);
         } else {
             const error = reason instanceof Error ? reason : new Error(`${label} disconnected.`);
             const {timeoutMs, request} = /** @type {{timeoutMs?: number, request?: string}} */ (error);
@@ -1039,10 +1069,12 @@ class ProfileDeviceService {
     }
 
     // Whether the next loss of the connection is the keyboard restarting USB
-    // to take a new name (keyboard-reconnect.js), rather than a failure.
-    /** @param {boolean} expected */
-    expectReconnect(expected) {
+    // to take a new name (keyboard-reconnect.js), or restarting altogether
+    // when asked to, rather than a failure.
+    /** @param {boolean} expected @param {string} [reason] */
+    expectReconnect(expected, reason = "to take its new name") {
         this.reconnectExpected = Boolean(expected);
+        this.reconnectReason = reason;
     }
 
     // The keyboard last lost unexpectedly, once: the panel loop takes it to

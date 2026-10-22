@@ -3,7 +3,7 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 const {PROFILE_EDIT_V1, EDIT_RESULT, EDIT_MODE, buildEditBeginRequest, buildEditSpliceRequest, buildEditDataRequest, buildEditCommitRequest,
-    buildEditAbortRequest, buildSaveRequest, buildRevertRequest, buildEditModeRequest, decodeEditReply, decodeEditStatusPages, decodeEditModePage,
+    buildEditAbortRequest, buildSaveRequest, buildRevertRequest, buildEditModeRequest, buildRestartRequest, decodeEditReply, decodeEditStatusPages, decodeEditModePage,
     decodeRuntimePage, decodeActiveMetadata, readActiveProfile, sendEditRequest, decodeAutoSavePage} = require("../../core/protocol/profile-edit-v1");
 const {crc32} = require("../../core/schema/profile-blob-v1");
 
@@ -48,8 +48,28 @@ test("a SET reply says the result and where the working copy is", () => {
     assert.throws(() => decodeEditReply(unknown, request), {code: "INCOMPATIBLE_RESPONSE"});
     const refusedPeer = Buffer.from(reply); refusedPeer.writeUInt16LE(0x3800, 15);
     assert.equal(decodeEditReply(refusedPeer, request).flags, 0x3800);
-    const reserved = Buffer.from(reply); reserved.writeUInt16LE(0x8000, 15);
-    assert.throws(() => decodeEditReply(reserved, request), {code: "INCOMPATIBLE_RESPONSE"});
+    // Bits 14 and 15 (firmware D-F34): a stopped keyboard; every bit is now known.
+    const stopped = Buffer.from(reply); stopped.writeUInt16LE(0xc000, 15);
+    assert.equal(decodeEditReply(stopped, request).flags, 0xc000);
+    // Byte 17 belongs to a restart's answer only.
+    const extra = Buffer.from(reply); extra[17] = 1;
+    assert.throws(() => decodeEditReply(extra, request), {code: "NONCANONICAL_RESPONSE"});
+});
+
+test("a restart carries its confirmation, and its answer says whether the slave half took it", () => {
+    const request = buildRestartRequest(0x0102);
+    assert.deepEqual(request, frame("07 00 28 0201 52455354"));
+    assert.equal(request.subarray(5, 9).toString("latin1"), "REST");
+    assert.throws(() => buildRestartRequest(0), RangeError);
+    const reply = Buffer.from(request); reply.fill(0, 5);
+    reply[5] = EDIT_RESULT.OK; reply.writeUInt16LE(0x4000, 15); reply[17] = 1;
+    assert.deepEqual(decodeEditReply(reply, request), {result: 0, resultName: "OK", phase: 0, session: 0, revision: 0, flags: 0x4000, peerAcknowledged: true});
+    reply[17] = 0;
+    assert.equal(decodeEditReply(reply, request).peerAcknowledged, false);
+    for (const [at, value] of [[17, 2], [18, 1], [31, 1]]) {
+        const broken = Buffer.from(reply); broken[at] = value;
+        assert.throws(() => decodeEditReply(broken, request), {code: "NONCANONICAL_RESPONSE"});
+    }
 });
 
 test("edit status pages decode both halves, the save, the last refusal and the keyboard's own saves", () => {
@@ -69,11 +89,16 @@ test("edit status pages decode both halves, the save, the last refusal and the k
     assert.deepEqual(status.autoSave, {inProgress: false, lastWasAutomatic: true, count: 3, revision: 12, generation: 42, quietMs: 3000});
     assert.deepEqual([status.peerStoragePaused, status.peerRefused, status.modeNotStored], [false, false, false]);
     // Bits 10–12: the other half's save waits, the other half refused this
-    // working copy, the edit mode is not stored yet. Bit 13 is a queued key adjustment; bits 14–15 are unknown.
+    // working copy, the edit mode is not stored yet. Bit 13 is a queued key
+    // adjustment; bits 14 and 15 a stopped master half and slave half (D-F34).
     const flagged = Buffer.from(local); flagged.writeUInt16LE(0x3c00, 2);
     assert.deepEqual((({peerStoragePaused, peerRefused, modeNotStored, adjustmentPending}) => [peerStoragePaused, peerRefused, modeNotStored, adjustmentPending])(decodeEditStatusPages([flagged, peer, error, auto])), [true, true, true, true]);
-    const unknown = Buffer.from(local); unknown.writeUInt16LE(0x4000, 2);
-    assert.throws(() => decodeEditStatusPages([unknown, peer, error, auto]), {code: "INCOMPATIBLE_RESPONSE"});
+    assert.deepEqual([status.stopped, status.peerStopped], [false, false]);
+    for (const [bits, expected] of [[0x4000, [true, false]], [0x8000, [false, true]], [0xc000, [true, true]]]) {
+        const page = Buffer.from(local); page.writeUInt16LE(bits, 2);
+        const decoded = decodeEditStatusPages([page, peer, error, auto]);
+        assert.deepEqual([decoded.stopped, decoded.peerStopped], expected);
+    }
     const layout = Buffer.from(local); layout[0] = 2;
     assert.throws(() => decodeEditStatusPages([layout, peer, error, auto]), {code: "INCOMPATIBLE_RESPONSE"});
     for (const broken of [(page) => {page[0] = 2;}, (page) => {page[1] = 4;}, (page) => {page[16] = 1;}]) {

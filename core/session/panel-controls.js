@@ -28,6 +28,7 @@ const {closeEditors, whileApplying} = require("./panel-session-state");
 const {IDENTITY, compose} = require("../model/layer-order");
 const {RECONNECT_WORDS, expectReconnect, renamedTo} = require("./keyboard-reconnect");
 const {LIVE_ACTIONS, CHANGED_ELSEWHERE, proposeLive, setEditMode} = require("./live-edits");
+const {restartKeyboard, putBackAfterRestart} = require("./keyboard-restart");
 const {EDIT_MODE} = require("../protocol/profile-edit-v1");
 
 // Ark reads only current firmware; the compatibility diagnostics say what
@@ -143,18 +144,22 @@ async function readKeyboard(session, selectedDeviceId, host = {}) {
     // A live keyboard that restarted (a replug, a lost connection) since Ark
     // knew of unsaved edits: in Live it may have saved them first.
     const restarted = session.draft?.restartedWithUnsaved;
-    if (restarted && session.draft) {
+    // A restart Ark asked for kept the edits itself and says what became of them.
+    if (restarted && session.draft && !session.restart) {
         session.notice += restarted.kept ? " The keyboard restarted since Ark last read it and kept your edits: it saved them first."
             : restarted.mode === EDIT_MODE.LIVE ? " The keyboard restarted before it saved your last edits, so those are gone: it runs what it saved."
             : " The keyboard restarted since Ark last read it, so its unsaved edits are gone: it runs its saved profile again.";
-        session.draft.restartedWithUnsaved = undefined;
     }
+    if (session.draft) session.draft.restartedWithUnsaved = undefined;
     if (session.draft?.changedElsewhere) {
         session.notice += ` ${CHANGED_ELSEWHERE}`;
         session.draft.changedElsewhere = false;
     }
-    return Boolean(!state.error && state.committed?.state === "read" && state.layout?.state === "read"
+    const ready = Boolean(!state.error && state.committed?.state === "read" && state.layout?.state === "read"
         && hasCurrentLayers(state.capabilities) && portable && !portable.incomplete);
+    // After a restart Ark asked for, the edits it kept go back to the keyboard.
+    if (ready && session.restart) await putBackAfterRestart(session);
+    return ready;
 }
 
 // The draft's own controls. Each leaves the session's outbox (notice, form
@@ -193,6 +198,8 @@ const DRAFT_ACTIONS = Object.freeze({
     cancelLive: async ({session}) => {session.liveProposal = undefined; session.resetDraftForms = true;},
     setMode: ({session, message, host}) => setEditMode(session, /** @type {{mode: number, pending?: string, draftRevision: number}} */ (/** @type {unknown} */ (message)),
         (document) => saveRecovery(host, document), host),
+    // A keyboard that stopped saving (firmware D-F34), in any edit mode.
+    restart: ({session, draft, host}) => restartKeyboard({session, draft, saveRecovery: (document) => saveRecovery(host, document)}),
     discard: liveOr("discard", async ({draft, revision, session, service}) => {
         // The draft's own keyboard, unchanged: discarding is an undoable
         // step. Otherwise the keyboard is read again and the draft starts

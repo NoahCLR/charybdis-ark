@@ -32,5 +32,8 @@ export const revertDraft = () => ({type: 'revertProfileDraft'});
 export const confirmLiveEdit = (proposal) => ({type: 'confirmLiveEdit', proposal});
 /** @param {number} proposal @returns {import("../../contracts/messages.js").DraftControl} */
 export const cancelLiveEdit = (proposal) => ({type: 'cancelLiveEdit', proposal});
+// A keyboard that stopped saving (firmware D-F34): restart both halves.
+/** @returns {import("../../contracts/messages.js").DraftControl} */
+export const restartKeyboard = () => ({type: 'restartKeyboard'});
 /** @param {0 | 1 | 2} mode @param {'save' | 'revert' | 'send' | 'discard'} [pending] @param {boolean} [confirmChecks] @returns {import("../../contracts/messages.js").DraftControl} */
 export const setEditMode = (mode, pending, confirmChecks) => ({type: 'setEditMode', mode, ...(pending ? {pending} : {}), ...(confirmChecks ? {confirmChecks} : {})});

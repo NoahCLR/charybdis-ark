@@ -26,6 +26,9 @@
 // one still listed under the same device, or else found as a renamed one is.
 // Ark connects it again and reads it once per LOST_GUARD_MS, so a keyboard
 // that keeps failing is left to the person rather than reconnected in a loop.
+//
+// A keyboard Ark restarted (firmware D-F34, keyboard-restart.js) is followed
+// back the same way: the same keyboard, under the same name, read again.
 
 /**
  * @typedef {import("./types.js").RunningPanelSession} Session
@@ -41,6 +44,13 @@ const RECONNECT_WORDS = Object.freeze({
     ambiguous: "Ark could not identify the renamed keyboard. Choose yours in the keyboard menu.",
     timeout: "The keyboard did not come back after taking its new name. Check its cable, then read the keyboard again.",
     failed: "The keyboard is back under its new name, but reading it again failed. Read the keyboard again.",
+});
+const RESTART_WORDS = Object.freeze({
+    waiting: "Restarting the keyboard…",
+    back: () => "The keyboard restarted; Ark connected it again and read it.",
+    ambiguous: "The keyboard restarted, but Ark cannot tell which keyboard is yours now. Choose it in the keyboard menu.",
+    timeout: "The keyboard did not come back after restarting. Check its cable, then read the keyboard again.",
+    failed: "The keyboard is back after restarting, but reading it again failed. Read the keyboard again.",
 });
 const LOST_GUARD_MS = 30000;
 const LOST_WORDS = Object.freeze({
@@ -75,6 +85,20 @@ function expectReconnect(session, name, now = Date.now) {
     const expected = {deviceId: device.id, serialNumber: device.serialNumber || "", name, otherDevices, startedAt: now(), dropped: false};
     session.reconnect = expected;
     session.service.expectReconnect?.(true);
+    return expected;
+}
+
+// Starts expecting the keyboard Ark just asked to restart to come back: the
+// same keyboard under the same name. The service already expects the drop.
+/** @param {Session} session @param {() => number} [now] */
+function expectRestart(session, now = Date.now) {
+    const state = session.service.snapshot();
+    const device = (state.devices || []).find((entry) => entry.id === state.selectedDeviceId);
+    if (!device) return undefined;
+    const otherDevices = (state.devices || []).filter((entry) => entry.id !== device.id).map(({id, product}) => ({id, product}));
+    /** @type {Expected} */
+    const expected = {deviceId: device.id, serialNumber: device.serialNumber || "", name: device.product || "", otherDevices, startedAt: now(), dropped: !state.connected, restart: true};
+    session.reconnect = expected;
     return expected;
 }
 
@@ -138,9 +162,10 @@ function reconnectTarget(expected, devices) {
  */
 async function awaitReconnect(session, expected, {read, publish, sleep = defaultSleep, now = Date.now, waitMs = RECONNECT.WAIT_MS, pollMs = RECONNECT.POLL_MS}) {
     const service = session.service;
-    const words = expected.lost === undefined ? RECONNECT_WORDS : {...LOST_WORDS, back: () => LOST_WORDS.back(/** @type {string} */ (expected.lost))};
+    const words = expected.restart ? RESTART_WORDS : expected.lost === undefined ? RECONNECT_WORDS : {...LOST_WORDS, back: () => LOST_WORDS.back(/** @type {string} */ (expected.lost))};
     const finish = /** @param {string} notice */ (notice) => {
-        endReconnect(session, expected, expected.saved ? `${expected.saved} ${notice}` : notice);
+        const said = expected.saved ? `${expected.saved} ${notice}` : notice;
+        endReconnect(session, expected, expected.after ? `${said} ${expected.after}` : said);
         publish();
     };
     while (session.reconnect === expected) {
@@ -187,4 +212,4 @@ async function awaitReconnect(session, expected, {read, publish, sleep = default
 /** @param {number} ms */
 const defaultSleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-module.exports = {RECONNECT, RECONNECT_WORDS, LOST_WORDS, LOST_GUARD_MS, renamedTo, expectReconnect, expectLost, endReconnect, reconnectTarget, awaitReconnect};
+module.exports = {RECONNECT, RECONNECT_WORDS, LOST_WORDS, RESTART_WORDS, LOST_GUARD_MS, renamedTo, expectReconnect, expectRestart, expectLost, endReconnect, reconnectTarget, awaitReconnect};

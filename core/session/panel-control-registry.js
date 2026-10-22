@@ -26,6 +26,9 @@ const CONTROLS = Object.freeze({
     confirmLiveEdit: Object.freeze({route: "draft", action: "confirmLive", binding: "apply", demo: "refuse", phase: "panel", identity: true}),
     cancelLiveEdit: Object.freeze({route: "draft", action: "cancelLive", binding: "none", demo: "allow", phase: "panel", identity: true}),
     setEditMode: Object.freeze({route: "draft", action: "setMode", binding: "apply", demo: "refuse", phase: "panel", identity: true}),
+    // A keyboard that stopped saving (firmware D-F34): restart both halves.
+    // Bound to no Apply: a stopped keyboard's draft may be stale.
+    restartKeyboard: Object.freeze({route: "draft", action: "restart", binding: "none", demo: "refuse", phase: "panel", identity: true}),
     exportPortableProfile: Object.freeze({route: "portable", action: "export", binding: "none", demo: "export", phase: "panel", identity: false}),
     choosePortableProfile: Object.freeze({route: "portable", action: "choose", binding: "profile", demo: "allow", phase: "panel", identity: false}),
     reviewPortableProfile: Object.freeze({route: "portable", action: "reviewImport", binding: "import", demo: "allow", phase: "panel", identity: false}),

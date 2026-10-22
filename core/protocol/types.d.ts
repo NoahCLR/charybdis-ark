@@ -72,11 +72,13 @@ export interface ReuseSource {kind: number; origin: number; generation: number; 
 
 // Live edits (profile-edit-v1.js, firmware D-F32).
 export interface EditSplice {domainId: number; offset: number; remove: number; insert: number; create?: boolean; drop?: boolean}
-export interface EditReply {result: number; resultName: string; phase: number; session: number; revision: number; flags: number}
+export interface EditReply {result: number; resultName: string; phase: number; session: number; revision: number; flags: number; /** A restart's answer only: the slave half acknowledged it. */ peerAcknowledged?: boolean}
 export interface EditStatusFlags {
     unsaved: boolean; peerRequired: boolean; peerConverged: boolean; peerKnown: boolean; editsBlocked: boolean;
     savedCompiled: boolean; saving: boolean; modeConflict: boolean; waitingSafe: boolean; storagePaused: boolean;
     peerStoragePaused: boolean; peerRefused: boolean; modeNotStored: boolean; adjustmentPending: boolean;
+    /** Profile storage stopped on the master half, or the slave half says its did: only a restart clears it (firmware D-F34). */
+    stopped: boolean; peerStopped: boolean;
 }
 export interface EditProgress extends EditStatusFlags {
     phase: number; flags: number; session: number; revision: number; savedGeneration: number; savedOrigin: number;

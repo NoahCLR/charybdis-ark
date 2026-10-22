@@ -30,7 +30,7 @@ const {demoDiagnostics, demoHeader, demoModel} = require("./demo-session");
 const {assertBound, beginRead, boundDraft, closeEditors, draftBinding, replaceDraft, setDraft} = require("./panel-session-state");
 
 const {controlsOn, panelControl} = require("./panel-control-registry");
-const {LOST_WORDS, RECONNECT_WORDS} = require("./keyboard-reconnect");
+const {LOST_WORDS, RECONNECT_WORDS, RESTART_WORDS} = require("./keyboard-reconnect");
 // Retained exports for hosts that inspect the routes; never hand-maintained.
 const DRAFT_CONTROLS = controlsOn("draft");
 const PORTABLE_MESSAGES = controlsOn("portable");
@@ -187,7 +187,7 @@ function buildPanelModel(session, state) {
     const host = hostModel(session.host);
     // A renamed keyboard that has gone to take its new name is coming back:
     // the panel waits for it as for a read, rather than asking to connect one.
-    const reconnecting = session.reconnect && !state.connected ? {name: session.reconnect.name, lost: session.reconnect.lost !== undefined} : null;
+    const reconnecting = session.reconnect && !state.connected ? {name: session.reconnect.name, lost: session.reconnect.lost !== undefined, ...(session.reconnect.restart ? {restart: true} : {})} : null;
     /** @type {import("../../contracts/model.js").LoadView} */
     const load = {
         state: session.readBusy || reconnecting ? "loading" : readReady ? "ready" : "unavailable",
@@ -195,7 +195,7 @@ function buildPanelModel(session, state) {
         operationId: state.operationId,
         operationBusy: Boolean(state.busy),
         connectionToken: state.connectionToken,
-        progress: reconnecting && !session.readBusy ? (reconnecting.lost ? LOST_WORDS.waiting : RECONNECT_WORDS.waiting) : state.portableProgress || state.layout?.progress || state.committed?.progress || null,
+        progress: reconnecting && !session.readBusy ? (reconnecting.restart ? RESTART_WORDS.waiting : reconnecting.lost ? LOST_WORDS.waiting : RECONNECT_WORDS.waiting) : state.portableProgress || state.layout?.progress || state.committed?.progress || null,
     };
     // What the firmware says about itself and its ceilings (Keyboard, Settings).
     const firmware = firmwareView(state.capabilities);
