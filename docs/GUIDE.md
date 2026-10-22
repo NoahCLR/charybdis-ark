@@ -1084,7 +1084,11 @@ again before continuing. **Cancel** changes nothing. Leaving Live asks nothing:
 Ark waits for a running automatic save, then keeps a recovery copy of the
 saved profile before asking the keyboard to save anything left, then switches.
 If recovery or saving fails (for example its halves are apart), the mode stays as
-it was and Ark says why. If the halves stored different modes, **Settle**
+it was and Ark says why. Both halves store the mode, so the keyboard changes it
+only while it hears its other half: with the cable between the halves
+unplugged, Ark says to connect it rather than waiting. A DPI or lighting key
+change that has not reached both halves yet holds the switch for a moment
+too. If the halves stored different modes, **Settle**
 beside the switch stores the shown one on both. If the keyboard has not
 managed to store a new mode yet, a mark beside the switch says so: unplugging
 it then may bring back the mode it had before.

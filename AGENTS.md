@@ -171,8 +171,9 @@ of a sibling checkout does not authorize editing it.
 
 The compatibility bridge reads three working copies: coordinate a stable period
 with agents changing them, and use the actual worktree paths being tested.
-The shared `verify` command serializes QMK pair builds; there is no device reservation system. Coordinate before
-sharing a QMK build directory or opening the physical keyboard; close competing
+Firmware's contract probe, which the bridge and agreement call, runs in
+firmware's build image: Docker must be running. There is no device
+reservation system. Coordinate before opening the physical keyboard; close competing
 Ark/VIA/diagnostic sessions. Fixture previews and ordinary app tests need no
 device. Do not flash or Apply a profile merely to verify an editor change.
 

@@ -118,6 +118,12 @@ class CandidateFirmwareHarness {
                 this.process(report);
                 this.status.state = CANDIDATE_STATE.VALIDATED;
             }
+            // As if an earlier COMMIT of this candidate had already finished:
+            // its outcome is in status, with no new operation to correlate.
+            if (operation === CANDIDATE_OPERATION.COMMIT && this.options.finishBusyCommit) {
+                this.status.state = CANDIDATE_STATE.IDLE;
+                this.status.lastOperation = CANDIDATE_OPERATION.COMMIT;
+            }
             if (operation === CANDIDATE_OPERATION.CHUNK && this.options.makeBusyChunkUnsafe) {
                 this.status.nextOffset = report.readUInt32LE(5) + 1;
             }
@@ -415,6 +421,38 @@ test("a prepared candidate commits through custom-save and waits for activation"
     const commits = operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_COMMIT);
     assert.equal(commits.length, 1);
     assert.equal(commits[0][0], PROFILE_CANDIDATE_V1.COMMAND_SAVE);
+});
+
+test("a COMMIT held by an edit or a save waits for it before one resubmission", async () => {
+    // Admission holds COMMIT, BUSY with an idle mailbox, while an edit is in
+    // progress or a save runs (firmware #126): Ark waits, it does not spend
+    // its resubmissions at once.
+    const harness = new CandidateFirmwareHarness({busyOnce: new Set([CANDIDATE_OPERATION.COMMIT])});
+    let polls = 0;
+    const client = coordinator(harness, {
+        maxBusyResubmissions: 1,
+        readEditProgress: async () => {
+            polls++;
+            assert.equal(operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_COMMIT).length, 1, "no resubmission while the edit holds");
+            return polls < 4 ? {phase: 1, saving: false, adjustmentPending: false} : polls < 7 ? {phase: 0, saving: true, adjustmentPending: false}
+                : {phase: 0, saving: false, adjustmentPending: false};
+        },
+    });
+    const prepared = await client.upload(representativeBlob(1), {actionAbiDigest: 1, transactionId: 0x1234});
+    const result = await client.commit(prepared.transactionId, {digest: prepared.metadata.digest});
+    assert.equal(result.status.lastOperation, CANDIDATE_OPERATION.COMMIT);
+    assert.equal(polls, 7);
+    assert.equal(operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_COMMIT).length, 2);
+});
+
+test("a COMMIT the keyboard already finished is confirmed from status, never sent again", async () => {
+    const harness = new CandidateFirmwareHarness({busyOnce: new Set([CANDIDATE_OPERATION.COMMIT]), finishBusyCommit: true});
+    const client = coordinator(harness);
+    const prepared = await client.upload(representativeBlob(1), {actionAbiDigest: 1, transactionId: 0x1234});
+    const result = await client.commit(prepared.transactionId, {digest: prepared.metadata.digest});
+    assert.equal(result.status.state, CANDIDATE_STATE.IDLE);
+    assert.equal(result.status.lastOperation, CANDIDATE_OPERATION.COMMIT);
+    assert.equal(operationWrites(harness, PROFILE_CANDIDATE_V1.VALUE_COMMIT).length, 1);
 });
 
 test("a split commit polls through peer preparation and convergence before activation", async () => {

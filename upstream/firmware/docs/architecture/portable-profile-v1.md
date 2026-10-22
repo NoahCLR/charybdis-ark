@@ -88,7 +88,7 @@ instructions. Held keys must balance. The bank is reconstructed with zero
 padding and a final zero validity byte. Both macro banks are independent:
 64 VIA slots and 16 user macro slots retain their existing key identities.
 
-See [Unicode macro playback](https://github.com/NoahCLR/charybdis-4x6/blob/e9a72ce493ec94bc3fd90bd7de6eae01884629c9/docs/architecture/runtime-flow.md) for encoding, compiled size, host setup and cancellation.
+See [Unicode macro playback](https://github.com/NoahCLR/charybdis-4x6/blob/20bae239c9772c5cde4772feb41aca3450786336/docs/architecture/runtime-flow.md) for encoding, compiled size, host setup and cancellation.
 
 The reconstructed bank is the document's, not necessarily the keyboard's. A
 valid bank may hold nonzero bytes after its 64th terminator, for instance after
@@ -134,7 +134,7 @@ scalars 10–14 must be zero; mode tuning is in domain `0x50`.
 The keyboard name is the keyboard's own name (D-F25). The firmware serves it
 as the USB product string, so hosts, browser device choosers and clients list
 the keyboard under it. Empty, the compiled default, means QMK's built-in
-`keyboard_name`. [Runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/e9a72ce493ec94bc3fd90bd7de6eae01884629c9/docs/architecture/runtime-flow.md#usb-product-name) defines when
+`keyboard_name`. [Runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/20bae239c9772c5cde4772feb41aca3450786336/docs/architecture/runtime-flow.md#usb-product-name) defines when
 a new name reaches the host.
 
 Settings header byte 5 bit 0 bypasses shared behaviours for every combo output
@@ -175,7 +175,7 @@ a set exclusion bit keeps it out of combos. The
 | 23 | Persistent default-layer bitmask |
 | 24 | QMK keymap options |
 | 25–26 | Auto-mouse activation delay (ms) and movement threshold |
-| 27 | Host settings: bits 0..1 select Auto (0), macOS (1), Windows (2), Linux (3); bit 8 enables Unicode playback; bits 16..23 name the [host layout](https://github.com/NoahCLR/charybdis-4x6/blob/e9a72ce493ec94bc3fd90bd7de6eae01884629c9/docs/architecture/host-layouts-v1.md) (0 US) and bit 24 marks a macOS ISO keyboard; other bits zero. Previously reserved zero after version 5 combo references moved to layer records |
+| 27 | Host settings: bits 0..1 select Auto (0), macOS (1), Windows (2), Linux (3); bit 8 enables Unicode playback; bits 16..23 name the [host layout](https://github.com/NoahCLR/charybdis-4x6/blob/20bae239c9772c5cde4772feb41aca3450786336/docs/architecture/host-layouts-v1.md) (0 US) and bit 24 marks a macOS ISO keyboard; other bits zero. Previously reserved zero after version 5 combo references moved to layer records |
 | 28 | Behaviour master enable |
 | 29 | Layer behaviours mask, one bit per layer |
 | 30 | Layer combos mask, one bit per layer |
@@ -188,10 +188,22 @@ of 200; sniping DPI is 100–400 in steps of 100. The default-layer mask (23) is
 nonzero with bits only in 0–15. The layer masks (29, 30) reject bits 16 and
 above; an empty mask is allowed.
 
+Scalars 18, 19, 21 and 22 are the **adjustment scalars**, the ones the
+keyboard's DPI and RGB adjustment keys set (D-F32). They are listed in scalar
+order, so an edit of any of them has its splices in canonical order. The
+settings schema (`profile_settings_v1.h`) holds the scalar encoding, this list
+and an adjustment's bytes: the adjusted scalars over the domain they land in,
+or over the authored defaults when the profile has none.
+
 Compiled defaults set scalar 28 to 1 and scalars 29 and 30 to `0xffff`; every
-layer refers combos to itself, every bitmap is zero, layers 8–15 are
-unnamed and so is the keyboard. So a profile that never sets the participation controls behaves as
-version 5 did.
+layer refers combos to itself and every bitmap is zero. So a profile that never sets the participation controls behaves as
+version 5 did. The keymap's `config.h` authors the rest of what is not QMK's
+own: the RGB idle timeout (`NOAH_RGB_IDLE_TIMEOUT_MS`), the host settings
+(`NOAH_DEFAULT_HOST_OS`, `NOAH_DEFAULT_HOST_LAYOUT`,
+`NOAH_DEFAULT_UNICODE_PLAYBACK`, `NOAH_DEFAULT_MACOS_ISO`) and the keyboard
+name (`NOAH_KEYBOARD_NAME`); without them the timeout is 15 minutes, the host
+Auto with the US layout and the keyboard unnamed. The names come from
+`keymap.c`.
 
 At publication the settings invalidator copies the bounded domain into a cold
 runtime cache using reads of at most 20 bytes. Key, RGB, pointer and macro

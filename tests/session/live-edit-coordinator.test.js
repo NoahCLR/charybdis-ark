@@ -129,6 +129,23 @@ test("the edit mode is set and confirmed, and refused while edits are unsaved", 
     assert.equal(applyRead.live, undefined);
 });
 
+test("an edit mode change says to connect an unplugged other half at once, and waits for a key change to reach both halves", async t => {
+    const {service, keyboard} = await live(t);
+    await service.readKeyboardProfile();
+    const modeChanges = () => keyboard.requests.filter(r => r[0] === 0x07 && r[2] === 0x27).length;
+    // The keyboard stays BUSY until the other half is back: asked once, never again.
+    keyboard.faults.peerAbsent = true;
+    const before = modeChanges();
+    await assert.rejects(service.setEditMode(EDIT_MODE.APPLY), error => error.code === "LIVE_PEER_ABSENT" && /Connect the cable between the halves/.test(error.message));
+    assert.equal(modeChanges() - before, 1, "no silent retry while the other half is unplugged");
+    delete keyboard.faults.peerAbsent;
+    // A DPI or lighting key change not yet saved: NOT_CLEAN, said as such.
+    keyboard.raised.adjustmentPending = true;
+    await assert.rejects(service.setEditMode(EDIT_MODE.APPLY), error => error.code === "LIVE_EDIT_NOT_CLEAN" && /key change has not reached both halves/.test(error.message));
+    keyboard.raised.adjustmentPending = false;
+    assert.equal((await service.setEditMode(EDIT_MODE.APPLY)).mode, EDIT_MODE.APPLY);
+});
+
 test("a keyboard that does not answer the edit mode is read as before", async t => {
     const {service} = await connectedService(t, {document: document()});
     assert.equal(service.snapshot().editMode, null);
@@ -311,9 +328,11 @@ test("a queued keyboard adjustment is decoded and blocks new mutations until it 
     const status = await service.readLiveStatus();
     assert.equal(status.adjustmentPending, true);
     const identity = {session: keyboard.session, revision: keyboard.revision};
-    for (const request of [buildEditBeginRequest(101, {...identity, splices: 1, insertTotal: 2}), buildSaveRequest(102, identity), buildRevertRequest(103, identity), buildEditModeRequest(104, EDIT_MODE.LIVE)]) {
+    for (const request of [buildEditBeginRequest(101, {...identity, splices: 1, insertTotal: 2}), buildSaveRequest(102, identity), buildRevertRequest(103, identity)]) {
         assert.equal((await sendEditRequest(service.connection, request)).result, EDIT_RESULT.BUSY);
     }
+    // A mode change is NOT_CLEAN, as with unsaved edits (firmware #126).
+    assert.equal((await sendEditRequest(service.connection, buildEditModeRequest(104, EDIT_MODE.LIVE))).result, EDIT_RESULT.NOT_CLEAN);
     const begin = buildCandidateBeginRequest(105, candidateMetadataForBlob(keyboard.saved, {actionAbiDigest: document().actionAbiDigest}));
     const response = keyboard.answer(begin)[0];
     const ack = decodeCandidateAcknowledgement(response, begin);

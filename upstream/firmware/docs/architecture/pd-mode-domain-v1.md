@@ -24,7 +24,7 @@ and restore preserve them without the repository.
   stays a layer/CPI policy and uses no slot.
 - There are two engine families, **directional** (four or eight directions,
   single axis or dominant axis; see D-L24 and D-L28 in the
-  [direction](https://github.com/NoahCLR/charybdis-4x6/blob/e9a72ce493ec94bc3fd90bd7de6eae01884629c9/docs/LIVE_EDIT_APP_DIRECTION.md)) and **scrolling**. Optional
+  [direction](https://github.com/NoahCLR/charybdis-4x6/blob/20bae239c9772c5cde4772feb41aca3450786336/docs/LIVE_EDIT_APP_DIRECTION.md)) and **scrolling**. Optional
   modifier and mouse-button policies cover Arrow and Pinch. No behavior depends
   on a slot's name.
 
@@ -52,7 +52,7 @@ keycode allocation.
 | 7–31 | Empty | Disabled | Inert actions; not stored; retained, editable RGB row |
 
 Dragscroll and Pinch run this repository's
-[`pd_mode_dragscroll.c`](https://github.com/NoahCLR/charybdis-4x6/blob/e9a72ce493ec94bc3fd90bd7de6eae01884629c9/users/noah/lib/pointing/modes/pd_mode_dragscroll.c),
+[`pd_mode_dragscroll.c`](https://github.com/NoahCLR/charybdis-4x6/blob/20bae239c9772c5cde4772feb41aca3450786336/users/noah/lib/pointing/modes/pd_mode_dragscroll.c),
 not the fork's native `DRAGSCROLL_MODE`; never activate both engines.
 
 ### Slot operations and RGB identity
@@ -305,13 +305,15 @@ A button press a mode consumes never reaches the button's own behavior, and
 its release goes to the mode that took the press, even after another mode
 replaced it; the release of a press the mode did not take stays with the
 behavior. The key runtime owns that routing; see
-[Runtime Flow](https://github.com/NoahCLR/charybdis-4x6/blob/e9a72ce493ec94bc3fd90bd7de6eae01884629c9/docs/architecture/runtime-flow.md#key-press-flow).
+[Runtime Flow](https://github.com/NoahCLR/charybdis-4x6/blob/20bae239c9772c5cde4772feb41aca3450786336/docs/architecture/runtime-flow.md#key-press-flow).
 
 ## Validation and evidence
 
 Firmware implements whole-payload and single-record cold validators in
 `users/noah/lib/profile/schema/profile_pd_v1.c`; no cache, heap or pointing-path
-decode is introduced. The app codec lives in
+decode is introduced. They take any buffer, aligned or not, and name every byte
+they read by its `noah_pd_config_t` field, so they and the encoder cannot drift
+from the structure. The app codec lives in
 `core/schema/pd-mode-domain-v1.js` in the independent Ark repository. It rejects unknown
 object fields, coercion, explicit null values, truncation, trailing bytes,
 reserved data, incorrect ID order and noncanonical encodings.
@@ -395,11 +397,21 @@ Current sparse PD and its record rules remain the readback/validation contract.
 The effective PD cache reads only on initialization/publication, in chunks of
 at most 20 bytes: the header, then each stored record into its slot's row,
 validating each; omitted slots are materialized disabled with an empty name,
-so the cache always holds 32 rows (3,072 bytes) before becoming ready. A
+so the cache always holds 32 rows (4,096 bytes) before becoming ready. A
 failed read or validation leaves it unavailable; the owner fails closed and
 status does not advertise an active compiled fallback. Motion performs no
 profile storage reads. Activation waits for held/locked modes and intercepted
 button releases, using the existing persistent-intent reason bit.
+
+The cache holds each slot as `noah_pd_config_t`, the structure the authored
+defaults use. It is the 128-byte record byte for byte: `profile_pd_v1.c`
+statically asserts every field's offset against the record table above, its
+2-byte alignment and little-endian byte order. Publication copies validated
+records in unchanged, the pointing engine reads named fields through the
+cache's aligned type, and only the codec reads bytes, naming each by its field.
+A separately decoded copy was not chosen because it would double the 4 KiB
+cache. Reading the earlier byte array as the structure was unsafe only because
+it had no alignment guarantee, which typing the cache provides.
 
 The compiled reader must service PD-only reads directly from the final PD
 payload, whose compiled size the authored slots fix, using the same encoder and validators as full serialization. A

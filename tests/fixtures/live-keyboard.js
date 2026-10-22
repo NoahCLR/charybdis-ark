@@ -29,7 +29,7 @@ const {PROFILE_WIRE_V1, PROFILE_ACTIVE_KIND, PROFILE_STATE_FLAGS} = require("../
 const {PROFILE_CANDIDATE_V1: C, CANDIDATE_ADMISSION: A, CANDIDATE_ERROR: CE} = require("../../core/protocol/profile-candidate-v1");
 const {PROFILE_EDIT_V1: E, EDIT_RESULT: R, EDIT_FLAGS: F, EDIT_PHASE} = require("../../core/protocol/profile-edit-v1");
 
-/** @typedef {{loseReply?: number, busy?: number, refuse?: number, peerLag?: number, stale?: boolean, saveFails?: number, peerRefuses?: number, peerCatchUp?: number, savePauses?: number, modeWriteFails?: boolean, modeReadFails?: number, lengthSkew?: number, autoSaveFails?: number}} LiveFaults */
+/** @typedef {{loseReply?: number, busy?: number, refuse?: number, peerLag?: number, stale?: boolean, saveFails?: number, peerRefuses?: number, peerCatchUp?: number, savePauses?: number, modeWriteFails?: boolean, modeReadFails?: number, lengthSkew?: number, autoSaveFails?: number, peerAbsent?: boolean}} LiveFaults */
 const LEASE_MS = 15000;
 
 /** @param {import('./types.js').FakeKeyboardOptions & {mode?: number, session?: number, combosOverride?: boolean, behavioursOverride?: boolean, autoSaveAfterReads?: number}} options */
@@ -92,7 +92,8 @@ function liveKeyboard(options) {
         // Another client's edit (or, later, an adjustment key): the revision moves.
         externalEdit(/** @type {Buffer} */ bytes) {working = Buffer.from(bytes); revision++; auto.quietReads = 0; refreshReader(); events.push("external edit");},
     };
-    const flags = () => (working ? F.UNSAVED : 0) | F.PEER_REQUIRED | F.PEER_KNOWN | (peerBehind || apart ? 0 : F.PEER_CONVERGED) | (generation === 0 ? F.SAVED_COMPILED : 0)
+    // faults.peerAbsent: the other half is unplugged (flag 3 clear).
+    const flags = () => (working ? F.UNSAVED : 0) | F.PEER_REQUIRED | (faults.peerAbsent ? 0 : F.PEER_KNOWN) | (peerBehind || apart || faults.peerAbsent ? 0 : F.PEER_CONVERGED) | (generation === 0 ? F.SAVED_COMPILED : 0)
         | (peerBehind || apart || pending ? F.EDITS_BLOCKED : 0) | (save.pauses ? F.SAVING | F.PEER_STORAGE_PAUSED : 0) | (auto.inProgress ? F.SAVING | F.EDITS_BLOCKED : 0) | (apart ? F.PEER_REFUSED : 0) | (modeNotStored ? F.MODE_NOT_STORED : 0)
         | (raised.peerStoragePaused ? F.PEER_STORAGE_PAUSED : 0) | (raised.peerRefused ? F.PEER_REFUSED : 0) | (raised.modeNotStored ? F.MODE_NOT_STORED : 0) | (raised.adjustmentPending ? F.ADJUSTMENT_PENDING | F.EDITS_BLOCKED : 0);
     // The lease: an edit being received with nothing accepted for 15 s ends.
@@ -186,7 +187,9 @@ function liveKeyboard(options) {
         }
         if (r[0] !== E.COMMAND_SET || r[1] !== 0 || r[2] < 0x20 || r[2] > 0x27) {const response = cached.answer(r)[0]; if (response[0] === 0xff) unhandled.push(r); return response;}
         const transaction = r.readUInt16LE(3);
-        if (raised.adjustmentPending && /** @type {number[]} */ ([E.VALUE_BEGIN, E.VALUE_SAVE, E.VALUE_REVERT, E.VALUE_MODE]).includes(r[2])) return reply(r, R.BUSY);
+        // A queued key adjustment holds edits, Save and Revert; a mode change is
+        // NOT_CLEAN, as with unsaved edits (Profile Wire admission).
+        if (raised.adjustmentPending && /** @type {number[]} */ ([E.VALUE_BEGIN, E.VALUE_SAVE, E.VALUE_REVERT, E.VALUE_MODE]).includes(r[2])) return reply(r, r[2] === E.VALUE_MODE ? R.NOT_CLEAN : R.BUSY);
         expire();
         if (faults.busy === r[2]) {delete faults.busy; return reply(r, R.BUSY);}
         if (faults.stale && (r[2] === E.VALUE_BEGIN || r[2] === E.VALUE_SAVE || r[2] === E.VALUE_REVERT)) {delete faults.stale; revision++; return reply(r, R.STALE);}
@@ -269,7 +272,8 @@ function liveKeyboard(options) {
             case E.VALUE_MODE: {
                 if (working) return reply(r, R.NOT_CLEAN);
                 if (r[5] > 2) return reply(r, R.INVALID_ARGUMENT);
-                if (pending || peerBehind || apart) return reply(r, R.BUSY);
+                // BUSY until the halves agree, an unplugged other half included.
+                if (pending || peerBehind || apart || faults.peerAbsent) return reply(r, R.BUSY);
                 // Taken at once, written when the keyboard is quiet: a failed
                 // write is retried and reported until it succeeds.
                 mode = r[5]; modeCounter++; modeConflict = false; modeNotStored = Boolean(faults.modeWriteFails); delete faults.modeWriteFails;

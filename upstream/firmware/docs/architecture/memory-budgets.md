@@ -99,7 +99,8 @@ cold readback workspace. These avoid profile-reader calls during ordinary key,
 macro, pointer and RGB execution. They do not enlarge logical EEPROM. The
 incremental validator and provider state policies are 360 and 784 bytes.
 
-Current automated policy is a 57,344-byte `.data + .bss` tripwire and a
+The automated policy then was a 57,344-byte `.data + .bss` tripwire (now
+203,776, below) and a
 4,096-byte minimum boot core-memory span. BSS alone is informational unless
 `--max-static-bss` is explicitly provided. The older policy failures above are
 historical, not the current gate thresholds. Neither current policy is the
@@ -170,16 +171,19 @@ Every memory report must name:
   runtime high-water;
 - the exact fresh build and command that produced it.
 
-Measure the instrumented pair, built as the firmware anyone flashes (from a
-task worktree, with `QMK_ROOT` and `BUILD_ROOT` set):
+Measure the instrumented pair, built as the firmware anyone flashes. From a
+task worktree, run the vault's `verify` with `NOAH_RESOURCE_CHECKS=yes`: it
+sets `QMK_ROOT` and `BUILD_ROOT` and runs
 
 ```sh
 NOAH_RESOURCE_CHECKS=yes sh tools/build-firmware-pair.sh
 ```
 
-It runs `tests/host/run_firmware_memory_budget_checks.sh` and both
+That build runs `tests/host/run_firmware_memory_budget_checks.sh` and both
 reviewed-path manifests on each half and keeps the ELF, map, flags and reports
-beside the pair. A PASS covers only the paths in `tools/firmware_stack_budget.json`
+beside the pair. Every gate runs on both halves, whatever an earlier one
+found; the build fails afterwards, naming each failed gate's report, if any
+did. A PASS covers only the paths in `tools/firmware_stack_budget.json`
 and `tools/firmware_stack_budget_live_profile_owner.json`. The standalone
 `tests/host/run_firmware_stack_budget_checks.sh` compiles a plain `qmk compile`
 image without the live-profile owner (D-L08), not the flashed pair.
@@ -225,9 +229,9 @@ The fresh right-half schema-2 ELF (`bastardkb_charybdis_4x6_noah_pd8_right`)
 links 4,152 bytes of `.data` and 54,556 bytes of `.bss`: 58,708 bytes combined.
 This fails the previous 57,344-byte policy by 1,364 bytes. We explicitly budget
 3,072 additional bytes for this feature, making its regression tripwire 60,416
-bytes. The measurement leaves 1,708 bytes of policy margin. The legacy geometry
-keeps its original tripwire; the gate selects the increment only when the ELF's
-recorded compiler flags enable `NOAH_PD_PROFILE_ENABLE`.
+bytes. The measurement leaves 1,708 bytes of policy margin. Every firmware build
+carries the slot engine (D-L40), so the gate applies the increment to every
+artifact; there is no build without it to keep the original tripwire for.
 
 The SRAM0–3 fixed prefix is 58,712 bytes and its boot linker/core-memory span is
 203,432 bytes. Fixed linked occupancy across the unique SRAM banks is 66,168
@@ -362,8 +366,8 @@ runtime, pd-mode state and owner tables) by 1,272, the profile owner by 24, and
 the compiled serializer's canonical behaviour order (64 rows, worked out once)
 by 68. The 63,732 bytes fail the 60,416-byte tripwire by 3,316. We explicitly budget
 4,096 additional bytes for this feature, making the schema-2 tripwire 64,512
-bytes and leaving 780 bytes of policy margin; the gate still selects it only
-from the ELF's recorded `NOAH_PD_PROFILE_ENABLE` flag. As with the eight-slot
+bytes and leaving 780 bytes of policy margin; like the eight-slot increment,
+the gate applies it to every artifact. As with the eight-slot
 increment, this is a regression policy, not a statement of capacity: the
 boot span still leaves 198,400 bytes of SRAM0–3 to the core allocator, and an
 ELF analysis on 2026-10-06 found that the only runtime allocation from it is
@@ -607,10 +611,10 @@ of 768. SRAM0–3 `.data + .bss` is 208,352 bytes per half, 1,568 below the
 are link-time values for the named paths only, not runtime high-water or a
 global or interrupt-stack maximum.
 
-Later changes no longer pass the reviewed-path gate: the manifests carry
-adjacencies the linker no longer makes and miss indirect call sites from
-`process_record_user` (an [open issue](https://github.com/NoahCLR/charybdis-4x6/blob/e9a72ce493ec94bc3fd90bd7de6eae01884629c9/docs/LIVE_EDIT_APP_DIRECTION.md#open-issues)).
-Until they are reviewed, the figures above are the last ones the gate accepted.
+Later changes no longer pass the reviewed-path gate: the records below from
+D-F29 on say which paths go over the policy (an
+[open issue](https://github.com/NoahCLR/charybdis-4x6/blob/20bae239c9772c5cde4772feb41aca3450786336/docs/LIVE_EDIT_APP_DIRECTION.md#open-issues)). Until the gate
+passes again, the figures above are the last ones it accepted.
 
 ## The new base: 32-bit profile lengths — D-F28, 2026-10-19
 
@@ -636,7 +640,7 @@ transaction by 8. The owner's engineering policy rises from 11,264 to 11,520
 bytes and the validator's from 384 to 400; neither is a physical SRAM limit.
 These are link-time values, not runtime high-water; the reviewed-path stack
 gate was not run for this change (it already fails on `dev`, an
-[open issue](https://github.com/NoahCLR/charybdis-4x6/blob/e9a72ce493ec94bc3fd90bd7de6eae01884629c9/docs/LIVE_EDIT_APP_DIRECTION.md#open-issues)).
+[open issue](https://github.com/NoahCLR/charybdis-4x6/blob/20bae239c9772c5cde4772feb41aca3450786336/docs/LIVE_EDIT_APP_DIRECTION.md#open-issues)).
 
 Pulled chunks then moved into replies as large as pushed ones (D-F28), which
 costs 184 bytes more per half in the same build: QMK's slave-to-master RPC
@@ -690,7 +694,9 @@ the new base at `86d7fd89`. Both manifests now name the flash backend: reads
 (`flash_read`, `read_flash`, `rp2040_read`), writes and page programs
 (`flash_write`, `write_flash`, `flush`, `rp2040_program_page`), syncs
 (`io_sync`, `flash_sync`), the erase ahead of a save
-(`noah_qmk_durable_io_matrix_scan` → `erase_next` → `rp2040_erase_sector`) and
+(`noah_qmk_durable_io_matrix_scan` → `noah_qmk_durable_io_begin` →
+`erase_next` → `rp2040_erase_sector`; the grant's start became its own
+out-of-line step when the grant became one module) and
 the boot-time forget (`main` → `rp2040_erase_sector`); the profile step is
 reached through `noah_qmk_durable_io_profile_step`, its flash gate, into which
 the compiler inlines the store runtime step. Paths stop at the driver
@@ -902,3 +908,268 @@ largest owner path remains peer chunk write 1,904, with repeated read 1,896
 six inherited handled-key paths (1,952–2,304); no path that passed on the
 live-edit base fails here. Neither budget was weakened. Both halves still
 owe allocator/stack high-water and measured flash pauses on the keyboard.
+
+## Keyboard restart — D-F34
+
+The restart's state (whether a restart is due, when it was noted, its delay,
+whether the other half acknowledged, the RPC registration) and the working
+copy sync's stopped flag are the only new RAM; the 8-byte split frames live on
+the stack. An instrumented right-half resource build (`NOAH_RESOURCE_CHECKS=yes`
+`tools/build-firmware-pair.sh`, the pinned build image, BK `d280a4471e`),
+against the same build of `dev` at `ad543e08`:
+
+| | This change | `dev` |
+| --- | ---: | ---: |
+| SRAM0–3 `.data` | 4,412 bytes | 4,400 |
+| SRAM0–3 `.bss` | 198,136 bytes | 198,120 |
+| SRAM0–3 `.data + .bss` | 202,548 bytes | 202,520 |
+| Below the 203,776-byte tripwire | 1,228 bytes | 1,256 |
+| Fixed linked prefix | 202,560 bytes | 202,528 |
+| Linker/core-memory span at boot | 59,584 bytes | 59,616 |
+
+These are linked figures per half, not runtime free memory or high-water.
+No regression budget changes.
+
+Stack (reviewed paths, same ELF). The owner manifest passes every path; its
+largest stays peer chunk write at 1,912 bytes, and no path that `dev` reviews
+grew. Eleven working-copy paths through `scan_working` dropped by 80 bytes:
+the other half's scan of its working-copy mailbox now links out of line,
+since a stopped half calls it too. The restart request is kept out of line
+(`noinline`), because inlined into `noah_profile_channel_dispatch` it widened
+the frame every Raw HID report passes through by 8 bytes. New reviewed paths:
+the restart asking the other half from the Raw HID handler 624 bytes, the
+reset from housekeeping 192, a stopped half answering the working copy's poll
+1,200, and the restart RPC on the split slave thread 88. The ordinary manifest
+fails only on its six inherited handled-key paths (1,960–2,312 bytes), each
+the same as on `dev`. The resource build stops there, before the left half,
+which links the same code and was not analysed separately. Both halves still
+owe allocator and stack high-water on the keyboard.
+
+## The reviewed stack paths against the linked firmware
+
+The resource build now runs every gate on both halves, whatever an earlier
+one found, and fails afterwards if any did. Both manifests were reviewed
+against the current linked callers: no path carries an adjacency the linker
+no longer makes or an undeclared indirect edge. Figures come from the
+instrumented pair (`NOAH_RESOURCE_CHECKS=yes` with the vault's `verify`,
+pinned GCC 15.2.0 image, BK `d280a4471e`); both halves give the same figure
+for every path. `dev`'s own right half, built the same way, links a
+byte-identical ELF, so `dev`'s figures are the existing paths' figures here.
+SRAM0–3 `.data + .bss` is 202,548 bytes per half, 1,228 below the
+203,776-byte tripwire; no firmware changed.
+
+On `dev` the owner manifest (79 main-process and 4 split-slave paths) passes:
+its largest paths are peer large chunk candidate write 1,912 and peer repeated
+large chunk read 1,904 bytes of the 1,920-byte budget, then 1,792; its largest
+split-slave path is mailbox decode at 608 of 768. The ordinary manifest (51
+and 4) fails only by budget, on six handled-key paths: handled press and
+handled release projection with fallback settlement 2,312 bytes each, bounded
+deferred fallback settlement 2,168, held-back record replay 2,144, active
+release decision 1,976 and pending multi-tap release decision 1,960. Its
+largest passing paths are saved macro storage read 1,904 and matrix scan
+bounded deferred fallback settlement 1,888; its split-slave paths reach 328.
+
+Code beneath every key event ran unreviewed. The ordinary manifest now
+declares all nine stage-table handlers that `process_record_user` calls
+indirectly (it declared two), and the core plan's sink, through which a
+streaming transition projects its 16 planned effects when the next is pushed
+(auto-drain). New main-process paths; those that project end in the
+fallback-settlement projection the handled paths use unless named otherwise:
+
+| Path | Bytes | Against 1,920 |
+| --- | ---: | ---: |
+| Press preflight, missed-scan planning auto-drained | 2,824 | 904 over |
+| Handled press, fallback settlement preempting a held pointing mode | 2,584 | 664 over |
+| Press preflight, its plan projected | 2,528 | 608 over |
+| Handled press, the fallback settlement's own plan auto-drained | 2,456 | 536 over |
+| Release preflight, missed-scan planning auto-drained | 2,368 | 448 over |
+| Pointing-mode press stage, a mode's tap | 2,120 | 200 over |
+| Release preflight, its plan projected | 2,072 | 152 over |
+| Matrix scan, active-scan planning auto-drained | 2,048 | 128 over |
+| Layer-tap settlement before a press, auto-drained | 2,016 | 96 over |
+| Pointing-mode release stage, a mode's tap | 2,016 | 96 over |
+| Direct action stage | 2,016 | 96 over |
+| Layer-tap settlement before a press, its plan projected | 1,760 | 160 inside |
+| Layer-tap settlement before a press, behaviour lookup | 1,592 | 328 inside |
+| Native overlap stage, its report | 1,184 | 736 inside |
+| Release slot keycode stage | 1,096 | 824 inside |
+| Idle custom key stage | 1,040 | 880 inside |
+
+The ordinary manifest (67 and 4 paths) therefore fails on seventeen paths,
+each a key-runtime path, by 40 to 904 bytes.
+
+Against the physical stack the figures are frame sums from `main`, so they
+leave out what an interrupt pushes onto the process stack (at least 64 bytes,
+taken at the deepest point). The process stack (0x20040400–0x20040E00) lies
+directly above the 1 KiB interrupt stack, so an overflow lands where the next
+interrupt pushes its frames. Press preflight auto-drained is 264 bytes past
+the 2,560-byte process stack, at least 328 with an interrupt; press preflight
+with its plan projected is 32 bytes inside it, 32 past with an interrupt.
+The existing 2,312-byte handled tail stays 184 bytes inside with an
+interrupt. These are reachable call chains: the auto-drained press preflight
+needs a press while enough keys are active that interrupt planning queues 16
+effects, a tap among them, a pending fallback hold and a pointing-mode press.
+
+The deepest direct-call projection beneath a fallback settlement is the
+preemption, which releases a held pointing mode. The reviewed path is 2,584
+bytes, but it composes the activate branch a release never takes (8 bytes
+too many) and stops at the 6KRO report build (`macro_payload_output_keys`):
+the host driver's send beneath it is called through a function pointer and
+is not reviewed. Reachable as far as the report build, it is 16 bytes past
+the process stack, 80 with an interrupt, and at least 88 (152) once the
+report is sent. A settlement whose own plan auto-drains adds 144. Both apply to every
+fallback-settlement path and compose with auto-drain above it. Auto-drain
+needs a transition whose plan already holds 16 effects; for the fallback
+settlement's own plan, more than 16 keys waiting on fallback holds at once.
+
+The frames that carry these are the key runtime's plans, held on the process
+stack: `process_record_user` 496 bytes (it inlines the release preflight with
+its transition and core plans), `key_runtime_preflight_record` 440,
+`noah_key_runtime_settle_pending_fallback_hold` 400,
+`noah_key_runtime_scan` 504 and
+`noah_key_runtime_settle_layer_taps_before_press` 456. Reducing them belongs
+to the key-runtime refactor; no budget changes and no path was dropped.
+
+The owner manifest adds the split slave thread's busy reply when its mailbox
+is full: asking the durable-I/O grant whether storage is paused
+(`noah_qmk_durable_io_storage_paused`) 288 bytes and
+encoding the busy frame 616, of 768. It passes every path on both halves.
+These are reviewed-path estimates for the named paths only, not a global or
+interrupt-stack maximum; stack high-water on both halves remains keyboard
+evidence.
+
+## One effect plan per transition
+
+The key runtime's transitions each hold one effect plan of 16 effects
+(196 bytes, `key_runtime_core_effect_plan_t`) where they held two: the
+streaming transitions kept a core plan beside their transition plan only to
+reach its sink, and the handled press and release copied a buffered core plan
+into a transition plan. The reducer now plans straight into the caller's plan;
+a streaming plan's push projects it through `key_runtime_transition_drain_plan()`
+when it is full, a direct call where the sink was a declared indirect edge.
+The plans sit in frames of their own (`noinline`), so no path carries one it
+does not use: the before-release preflight's is no longer inlined into
+`process_record_user`, nor the scan's into `matrix_scan`, and the handled
+press's and release's planning returns before their plan is projected.
+Instrumented pair (`NOAH_RESOURCE_CHECKS=yes` with the vault's `verify`, pinned
+GCC 15.2.0 image, BK `d280a4471e`); both halves give the same figure for every
+path. Against the previous record:
+
+| | This change | Before |
+| --- | ---: | ---: |
+| SRAM0–3 `.data` | 4,412 bytes | 4,412 |
+| SRAM0–3 `.bss` | 198,128 bytes | 198,136 |
+| SRAM0–3 `.data + .bss` | 202,540 bytes | 202,548 |
+| Below the 203,776-byte tripwire | 1,236 bytes | 1,228 |
+| Fixed linked prefix | 202,552 bytes | 202,560 |
+| Linker/core-memory span at boot | 59,592 bytes | 59,584 |
+
+The frames that carried the plans: `process_record_user` 496 → 96 bytes,
+`noah_key_runtime_settle_pending_fallback_hold` 400 → 216,
+`key_runtime_preflight_record` 440 → the press preflight's
+`key_runtime_preflight_settle_before_press` 264, the release preflight's
+`key_runtime_preflight_settle_before_release` 248 (out of
+`process_record_user`), `noah_key_runtime_scan` 504 → 40 with
+`noah_key_runtime_scan_core` 320, `noah_key_runtime_settle_layer_taps_before_press`
+456 → 72 with its plan's frame 216, and the handled press and release 232 → 216
+and 232, their planning helpers 264 and 256 → 80 and 88.
+
+The ordinary manifest's seventeen failing paths, against the 1,920-byte policy:
+
+| Path | Before | This change |
+| --- | ---: | ---: |
+| Press preflight, missed-scan planning auto-drained | 2,824 | 2,032 (112 over) |
+| Handled press, fallback settlement preempting a held pointing mode | 2,584 | 2,008 (88 over) |
+| Press preflight, its plan projected | 2,528 | 1,792 |
+| Handled press, the fallback settlement's own plan auto-drained | 2,456 | 1,832 |
+| Release preflight, missed-scan planning auto-drained | 2,368 | 1,992 (72 over) |
+| Handled press projection with fallback settlement | 2,312 | 1,736 |
+| Handled release projection with fallback settlement | 2,312 | 1,752 |
+| Handled release, bounded deferred fallback settlement | 2,168 | 1,592 |
+| Held-back record replay into handled press projection | 2,144 | 1,568 |
+| Pointing-mode press stage, a mode's tap | 2,120 | 1,544 |
+| Release preflight, its plan projected | 2,072 | 1,752 |
+| Matrix scan, active-scan planning auto-drained | 2,048 | 1,680 |
+| Layer-tap settlement before a press, auto-drained | 2,016 | 1,624 |
+| Pointing-mode release stage, a mode's tap | 2,016 | 1,440 |
+| Direct action stage | 2,016 | 1,440 |
+| Handled active release decision | 1,976 | 1,408 |
+| Handled pending multi-tap release decision | 1,960 | 1,392 |
+
+Fourteen now pass; no other path grew past the policy, and the ordinary
+manifest's largest passing path is the handled press with its fallback
+settlement's plan auto-drained, 1,832. Three still fail by budget. Each holds
+two plans by design: the plan being projected and, beneath an output it
+projects, the fallback settlement's own plan (216 bytes), which must hold its
+effects until its planning loop ends (no longer: the settlement holds no plan,
+[below](#fallback-settlement-holds-no-plan)). The rest of each chain is the reducer's
+scan planning under an auto-drain (some 250 bytes) or the pointing mode's
+release beneath the preemption (some 640), not plans. Against the physical
+2,560-byte process stack the worst, press preflight auto-drained, is 528 bytes
+inside, at least 464 with an interrupt's 64. The preemption, reachable as far
+as the report build (it composes 8 bytes of a branch a release never takes),
+is 2,000 bytes: 560 inside, 496 with an interrupt, and sending the report
+takes at least 72 more. The owner
+manifest passes every path on both halves; its largest stays peer large chunk
+write at 1,912 bytes. These are reviewed-path estimates for the named paths
+only, not a global or interrupt-stack maximum; stack high-water on both halves
+remains keyboard evidence.
+
+## Fallback settlement holds no plan
+
+Every output the runtime emits first registers the handled keys' due
+fallback holds (D-F27). The settlement decides which are due for every key
+first, as its plan did, keeps them as one bit per press token (eight bytes for
+the 60 tokens), and projects each registration in key order, announced and
+traced as before; it builds no effect plan. Beneath the projection of an
+output, that removes the second plan from every reviewed path that settles.
+The plan drain is kept out of line, as before, so the paths name one frame
+between a plan and its effects.
+
+Measured on the linked right half with the pinned firmware compiler, against
+the integration of the ten changes before it (the left half is the same):
+
+| Path | Before | This change |
+| --- | ---: | ---: |
+| Press preflight, missed-scan planning auto-drained | 2,032 (112 over) | 1,856 |
+| Handled press, fallback settlement preempting a held pointing mode | 2,008 (88 over) | 1,832 |
+| Release preflight, missed-scan planning auto-drained | 1,992 (72 over) | 1,816 |
+| Press preflight, its plan projected | 1,792 | 1,616 |
+| Handled press and release projection with fallback settlement | 1,736 and 1,752 | 1,560 and 1,576 |
+
+Eighteen settlement paths are 176 bytes smaller and none grew. The ordinary
+manifest passes every path on both halves for the first time; its worst path,
+press preflight auto-drained, is 1,856 bytes of the 1,920-byte policy. The
+path that modelled the settlement plan's own auto-drain now names the
+decision that replaced it (1,144). No owner-manifest path changed. These are
+reviewed-path estimates for the named paths only, not a global or
+interrupt-stack maximum; stack high-water on both halves remains keyboard
+evidence.
+
+## Pointing-mode owners as one list
+
+The owners of the active pointing mode are one ordered list of
+`{key index + 1, press-time sides}`, two bytes per entry for the 60 keys,
+where each of 60 entries held 12 bytes including a mode of its own. Every
+change of the active mode clears the owners, so the per-entry mode modelled
+nothing. The list keeps the first owner first, which combo lighting reads.
+
+Measured on the instrumented pair of the firmware that carries this change
+and those landed with it (`NOAH_RESOURCE_CHECKS=yes` with the vault's `verify`, pinned GCC 15.2.0 image,
+BK `d280a4471e`; both halves give the same figures):
+
+| | Per half |
+| --- | ---: |
+| SRAM0–3 `.data + .bss` | 201,940 bytes |
+| Below the 203,776-byte tripwire | 1,836 bytes |
+| Change from the list | −608 bytes |
+
+Both manifests pass every path on both halves. The ordinary manifest's worst
+is press preflight with missed-scan planning auto-drained, 1,856 bytes of the
+1,920-byte policy; the owner manifest's is peer large chunk candidate write,
+1,912 bytes. On its own the list moved three main-loop paths by 8 bytes, in
+functions it does not change: LTO kept a loop-invariant address in one more
+stack slot under the smaller `.bss`. With the fallback settlement holding no
+plan (above), each of them is inside the policy. These are reviewed-path
+estimates for the named paths only, not a global or interrupt-stack maximum;
+stack and allocator high-water on both halves remain keyboard evidence.

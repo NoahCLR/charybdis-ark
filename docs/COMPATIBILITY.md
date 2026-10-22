@@ -15,8 +15,10 @@ npm run test:compat -- \
 Run from the main Ark checkout, with the firmware and QMK checkouts beside it
 (from a worktree, use their paths in the workspace). All four arguments are required; checkout paths must be Git
 repository roots. Use a new report filename for each run, outside the checkouts.
-Git, Node, Python 3, a C compiler with the runners' sanitizer support, and the selected
-QMK tree are required. Missing checkouts or required integration inputs fail before any tests run. No dependency installation, fetching, device
+Git, Node, Python 3, a C compiler with the runners' sanitizer support, Docker
+(running) and the selected QMK tree are required: firmware's contract probe
+(`tests/host/run_contract_probe.sh`) runs itself in the firmware's build
+image, the one its host tests and releases use, and the runners call it. Missing checkouts or required integration inputs fail before any tests run. No dependency installation, fetching, device
 access or firmware flashing occurs.
 Optional-feature runners skip only when a readable contract lacks the feature.
 A missing search tool or an unreadable contract fails the runner and the bridge.
@@ -106,7 +108,9 @@ The bridge proves byte-level equivalence of codecs; the agreement check answers
 the release question: does this Ark speak that firmware? Firmware states its
 contract with `tests/host/run_contract_probe.sh`: the exact Profile Wire
 capability pages its keyboard answers, its BK pin (`qmk-pin.json`) and the
-hashes of its fixtures. `npm run agreement -- --firmware PATH --qmk PATH`
+hashes of its fixtures. The probe runs in firmware's build image, so Docker
+must be running (on CI's runners it pulls the image, which is public).
+`npm run agreement -- --firmware PATH --qmk PATH`
 judges it with Ark's own runtime code, where `--qmk` is a BK checkout
 containing firmware's pin:
 

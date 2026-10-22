@@ -12,6 +12,7 @@
  * @typedef {import("./candidate-upload-types.js").FailureDetails} FailureDetails
  */
 const {isUnhandledEcho, orUnhandled} = require("../protocol/raw-hid-unhandled");
+const {EDIT_PHASE} = require("../protocol/profile-edit-v1");
 const {
     CANDIDATE_ADMISSION,
     CANDIDATE_ERROR,
@@ -549,11 +550,17 @@ class CandidateUploadCoordinator {
     async waitUntilBusyCanResolve(context, baseline, operationDetails) {
         const budget = this.createStatusBudget(context, baseline);
         while (true) {
-            // A queued DPI/lighting adjustment blocks BEGIN without occupying
-            // the candidate mailbox. Wait for publication before resubmitting;
-            // an admitted frame or a lost answer never enters this path.
-            if (context.operation === CANDIDATE_OPERATION.BEGIN && this.readEditProgress) {
-                context.adjustmentPending = (await this.readEditProgress()).adjustmentPending;
+            // Admission holds every candidate frame, COMMIT included, while an
+            // edit is received, loaded, checked or waits, a Revert waits or a
+            // save runs, and a new Apply's BEGIN also while a DPI/lighting
+            // adjustment awaits publication (Profile Wire admission, "Apply");
+            // none of these occupies the candidate mailbox. Wait them out
+            // before resubmitting; an admitted frame or a lost answer never
+            // enters this path.
+            if (this.readEditProgress) {
+                const progress = await this.readEditProgress();
+                context.adjustmentPending = context.operation === CANDIDATE_OPERATION.BEGIN && Boolean(progress.adjustmentPending);
+                context.editHolds = (progress.phase !== undefined && progress.phase !== EDIT_PHASE.IDLE) || Boolean(progress.saving);
             }
             const status = await this.readStatus(context, {ambiguous: false});
             context.status = status;
@@ -565,7 +572,12 @@ class CandidateUploadCoordinator {
                 assertSuccessfulOperationStatus(status, context, operationDetails);
                 return {processed: true, safeToResubmit: false, status};
             }
-            if (!status.mailboxPending && !context.adjustmentPending) {
+            // A COMMIT the keyboard already finished is confirmed from status,
+            // never sent again.
+            if (context.operation === CANDIDATE_OPERATION.COMMIT && commitIsComplete(status, /** @type {CommitContext} */ (context))) {
+                return {processed: true, safeToResubmit: false, status};
+            }
+            if (!status.mailboxPending && !context.adjustmentPending && !context.editHolds) {
                 return {
                     processed: false,
                     safeToResubmit: canSafelyResubmit(status, context, operationDetails),
@@ -857,9 +869,10 @@ function canSafelyResubmit(status, context, operationDetails) {
         case CANDIDATE_OPERATION.VALIDATE:
             return status.transactionId === context.transactionId && status.state === CANDIDATE_STATE.COMPLETE;
         case CANDIDATE_OPERATION.COMMIT:
+            // A finished COMMIT is confirmed from status (commitIsComplete),
+            // not resubmitted.
             return status.transactionId === context.transactionId
-                && ([CANDIDATE_STATE.VALIDATED, ...COMMIT_IN_PROGRESS_STATES].includes(status.state)
-                    || (status.state === CANDIDATE_STATE.IDLE && status.lastOperation === CANDIDATE_OPERATION.COMMIT));
+                && [CANDIDATE_STATE.VALIDATED, ...COMMIT_IN_PROGRESS_STATES].includes(status.state);
         default:
             return false;
     }

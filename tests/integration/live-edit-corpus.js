@@ -197,11 +197,11 @@ async function edit(keyboard, to, {replace = false, defaults} = {}) {
         console.log("refusals: BUSY while receiving, out-of-order and overlapping splices, too large, a damaged stream, a stale identity");
 
         // Every status flag, the other half's page, the mode and runtime pages.
-        const flagFields = /** @type {const} */ ([["peer_required", "peerRequired", EDIT_FLAGS.PEER_REQUIRED], ["peer_converged", "peerConverged", EDIT_FLAGS.PEER_CONVERGED],
+        const flagFields = /** @type {const} */ ([["peer_required", "peerRequired", EDIT_FLAGS.PEER_REQUIRED], ["halves_agree", "peerConverged", EDIT_FLAGS.PEER_CONVERGED],
             ["peer_known", "peerKnown", EDIT_FLAGS.PEER_KNOWN], ["edits_blocked", "editsBlocked", EDIT_FLAGS.EDITS_BLOCKED], ["saved_compiled", "savedCompiled", EDIT_FLAGS.SAVED_COMPILED],
             ["save_phase", "saving", EDIT_FLAGS.SAVING], ["mode_conflict", "modeConflict", EDIT_FLAGS.MODE_CONFLICT], ["storage_paused", "storagePaused", EDIT_FLAGS.STORAGE_PAUSED],
             ["peer_storage_paused", "peerStoragePaused", EDIT_FLAGS.PEER_STORAGE_PAUSED], ["peer_refused", "peerRefused", EDIT_FLAGS.PEER_REFUSED], ["mode_store_failed", "modeNotStored", EDIT_FLAGS.MODE_NOT_STORED], ["adjustment_pending", "adjustmentPending", EDIT_FLAGS.ADJUSTMENT_PENDING]]);
-        for (const name of ["peer_required", "peer_converged", "peer_known", "edits_blocked", "saved_compiled", "save_phase", "mode_conflict", "storage_paused", "peer_storage_paused", "peer_refused", "mode_store_failed", "adjustment_pending"]) await keyboard.set(name, 0);
+        for (const name of ["peer_required", "halves_agree", "peer_known", "edits_blocked", "saved_compiled", "save_phase", "mode_conflict", "storage_paused", "peer_storage_paused", "peer_refused", "mode_store_failed", "adjustment_pending"]) await keyboard.set(name, 0);
         let seen = 0;
         for (const [field, key, bit] of flagFields) {
             await keyboard.set(field, 1);

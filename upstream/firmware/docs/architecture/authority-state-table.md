@@ -67,7 +67,8 @@ unknown) does that until it restarts. The unbounded retry held the host's own
 `ABORT` in the candidate mailbox, and the host timeout, which requires an empty
 mailbox, never ran, so only a power cycle released the keyboard. A peer that
 never acknowledges still needs a restart, but the keyboard now says so instead
-of hanging.
+of hanging, and a client can restart both halves without a replug (Profile
+Wire SET `0x28`, D-F34).
 
 ### Interrupted prepare, peer
 
@@ -84,6 +85,20 @@ that stale, well-formed reply mid-copy as converged, polled metadata once a
 second, and never sent the next chunk. A converged push cannot be cancelled,
 so the owner's no-progress timeout could not end it, and the host's `ABORT`
 sat unprocessed in the candidate mailbox until a power cycle.
+
+### Abandoned prepare, peer
+
+A peer's prepared copy waits for its sender's decision as long as that takes;
+no lease times it. A sender that restarts forgets its push without ending it,
+and the copy used to hold the peer's storage, and the halves apart, until the
+peer restarted too (D-F34). The sender's metadata poll now says when it holds
+no prepared push. The peer releases its prepared copy when such a poll
+carries a readable saved profile other than the copy: neither half has a
+commit marker for it, so durable authority is unchanged. When the saved profile
+is the copy, the sender's commit marker landed and its repair commits the
+copy. A copy committing or of unknown durability is never released. The rule
+and why it is exact are in the
+[split protocol](profile-split-v1.md#an-abandoned-prepared-copy-d-f34).
 
 ## User Operations
 

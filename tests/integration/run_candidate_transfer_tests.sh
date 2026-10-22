@@ -23,7 +23,7 @@ build_and_run() {
     cc -std=c11 -Wall -Wextra -Werror -pedantic "$@" \
         -DQMK_KEYBOARD_H='"noah_real_profile_keyboard.h"' \
         -DNOAH_HOST_PRODUCTION_MATRIX -DQMK_STUB_SUPPRESS_LAYER_COUNT \
-        -DPOINTING_DEVICE_ENABLE -DNOAH_PD_PROFILE_ENABLE -DNOAH_PORTABLE_PROFILE_ENABLE \
+        -DPOINTING_DEVICE_ENABLE -DNOAH_PORTABLE_PROFILE_ENABLE \
         -DTOTAL_EEPROM_BYTE_COUNT=0x9000u \
         -I"$ROOT" \
         -I"$ROOT/users/noah" \
