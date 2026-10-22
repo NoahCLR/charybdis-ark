@@ -1,8 +1,8 @@
 # Firmware / Ark compatibility check
 
 Ordinary Ark UI work runs `npm run check` without firmware or QMK. Before
-merging wire, schema, encoder/decoder or macro-sizing changes, run this separate
-bridge against the working copies involved in the change:
+merging wire, schema, encoder/decoder or macro-sizing changes, run the
+compatibility bridge against the working copies involved in the change (D-L45):
 
 ```sh
 npm run test:compat -- \
@@ -32,9 +32,11 @@ pinned spec that differs only lags: it is printed as a warning and listed under
 `upstream.specs` in the report. Review it deliberately; it does not fail.
 
 It also records whether every firmware and QMK source pin is published. Firmware pins must be contained in
-the firmware checkout's `refs/remotes/origin/dev`, its trunk. The bridge never fetches,
+the firmware checkout's `refs/remotes/origin/dev`, its trunk; firmware `main`
+moves only by promotion merges of `dev`, so a pin on `dev` stays reachable from
+both. The bridge never fetches,
 so fetch both dependency checkouts first for a current answer. QMK pins must be contained in `refs/remotes/origin/noah-userspace-contracts-dev`, the BK fork's development branch. An unpublished pin is a
-warning during local work. With `--publish`, it fails before any runner starts;
+warning during local work, where any committed revision may be pinned. With `--publish`, it fails before any runner starts;
 run that form before landing an Ark change that moves a pin (`land` also refuses
 pins that are not on the published trunks).
 
@@ -158,7 +160,8 @@ reproduces exactly from them (`npm run upstream -- --check`), and runs the bridg
 with `--publish` against exactly the firmware and QMK commits Ark pins, on the
 promotion pull request. Gating on the pins lets firmware move ahead without
 turning Ark red: Ark claims compatibility with what it pins, and agreement proves
-the released pair speaks one contract.
+the released pair speaks one contract (D-L50). A release may keep an older pin
+that still agrees; a newer pin or a matching commit date is not the criterion.
 A separate job, `compatibility with firmware dev (early warning)`, runs the bridge
 against firmware `dev` and the BK trunk as they are now, nightly and on demand. It is not required and never blocks landing or
 promotion; red means firmware moved in a way Ark must follow (re-pin with
@@ -181,7 +184,8 @@ repositories but never invokes the real firmware integration runners.
 
 Ark talks to firmware-owned Raw HID: identity comes from capabilities and
 base RGB/key options from Profile Wire. Apply publishes one complete blob
-and one generation. Ark's version-5 portable envelope is specified in
-[D-L15](LIVE_EDIT_APP_DIRECTION.md#d-l15--a-portable-profile-is-the-complete-effective-configuration);
-the imported portable spec retains a historical JSON section for the retired
-client and is not the current Ark file format.
+and one generation. A backup is Ark's version-5 envelope
+([D-L15](adr/0015-a-backup-is-the-complete-effective-configuration.md),
+rules in [`core/README.md`](../core/README.md)); the imported portable spec
+retains a historical JSON section for the retired client and is not the current
+Ark file format.

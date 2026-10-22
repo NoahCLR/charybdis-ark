@@ -4,11 +4,10 @@ This app edits the **connected keyboard**. Authored C defaults are edited
 directly in the firmware repository; the app never edits those files.
 
 Start with `git status --short`, then read the development setup in
-[docs/REPOSITORY.md](docs/REPOSITORY.md#development-and-installation) and the reading map in [docs/README.md](docs/README.md). Read Current Product
-Status and Open Issues in [the direction](docs/LIVE_EDIT_APP_DIRECTION.md)
-before changing behavior; read its relevant decisions before architecture work.
-The interface's rules are in [the guide](docs/GUIDE.md)'s "The interface"
-section and the direction's decisions; `npm run preview` renders the real interface.
+[docs/REPOSITORY.md](docs/REPOSITORY.md#development-and-installation) and the reading map in [docs/README.md](docs/README.md). Read the
+decisions in [`docs/adr/`](docs/adr/) that touch the area before changing
+behavior or architecture. The interface's rules are in [the guide](docs/GUIDE.md)'s "The interface"
+section and those decisions; `npm run preview` renders the real interface.
 
 ## How a change is made
 
@@ -115,16 +114,16 @@ is for people using Ark in depth: how each screen, review, apply and backups
 behave. Keep development material out of both: setup, commands, the code's layout, CI,
 compatibility and release mechanics go in
 [docs/REPOSITORY.md](docs/REPOSITORY.md#development-and-installation).
-Architecture decisions update the direction or an app-owned spec. Keep Current Product Status and Open Issues accurate.
-Each decision has one home: app decisions continue the D-L series here, while a
-D-L identifier marked as a firmware decision is only a pointer to the firmware
-repository's direction, which owns that text. Change a firmware decision there,
-as firmware work, not here.
+An architecture decision is an ADR in [`docs/adr/`](docs/adr/), continuing the
+D-L series ([domain docs](docs/agents/domain.md)); the rules it sets go into an
+app-owned spec. Known product gaps are notes in the work-queue vault.
+Firmware decisions (firmware D-F…) live in the firmware repository; change one
+there, as firmware work, not here.
 Do not put app plans or new app specifications under `upstream/`.
 
 Active plans live in the work-queue vault (below), not in this repository;
 include scope, acceptance criteria and remaining work. When complete, fold
-lasting rules into the governing document here and delete the plan (D-L07). Test logs and session narratives belong in reports,
+lasting rules into the governing document here and delete the plan. Test logs and session narratives belong in reports,
 commit messages or the final handoff, not permanent finding registers. Record
 which checks actually ran and any limitations; never imply unit tests prove
 hardware acceptance.
@@ -138,6 +137,21 @@ Work is filed, refined and planned in the work-queue vault,
 handed back. It never overrides this file: every change here follows the
 rules above, whichever way the task arrived. From a worktree, find it as
 described under "How a change is made"; never copy it into this repository.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in the private work-queue vault beside this checkout, whose
+`_agents/tracker.md` maps every tracker operation. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Triage roles are the vault's `status` and `kind` values. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `GLOSSARY.md` and `docs/adr/` at the root. See `docs/agents/domain.md`.
 
 ## Branches
 

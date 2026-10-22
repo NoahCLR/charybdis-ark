@@ -32,7 +32,7 @@ const UNSUPPORTED = new Set(["DRGSCRL", "DRG_TOG"]);
 // on any key: the build enables bootmagic, mouse keys, extra keys, RGB Matrix,
 // pointing, combos and VIA, with QMK's default Magic, Grave Escape and Space
 // Cadet. A stopgap written against that build until the keyboard reports its
-// features; see Open Issues in docs/LIVE_EDIT_APP_DIRECTION.md.
+// features.
 const UNBUILT_GROUPS = new Set([
     "audio", "backlight", "connection", "joystick", "led_matrix", "midi", "programmable_button",
     "rgb", "sequencer", "steno", "swap_hands", "underglow",

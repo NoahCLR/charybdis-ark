@@ -67,6 +67,47 @@ identity. All masks use named schema/protocol flags. The panel imports this
 small support module directly; portable-session and service exports retain
 their existing entry points for callers.
 
+What current firmware is lives in one place per kind:
+
+| What | Current | Where |
+| --- | --- | --- |
+| Profile Wire | 2.0, exactly | `PROFILE_WIRE_V1` in `protocol/profile-wire-v1.js` |
+| Profile schema | 4.0, exactly | `PROFILE_BLOB_V1` in `schema/profile-blob-v1.js` |
+| Domain versions | RGB 4, key behaviours 2, combos 3, settings 8, PD 3, keymap 1, macros 1 | `schema/profile-domains.js` |
+| Store format | 6 (implied by Profile Wire 2, not on the wire) | `PROFILE_CANDIDATE_V1` in `protocol/profile-candidate-v1.js` |
+| Payload size | 130,048 bytes, lengths and offsets 32 bits | `PROFILE_CANDIDATE_V1` |
+| Action vocabulary | `0x6fd70b90` | `ACTION_ABI` in `schema/actions.js` |
+| Transport and identity | Firmware-owned Raw HID, usage page `0xFF60`; firmware version in capability page 0 | `protocol/profile-wire-v1.js`, `protocol/raw-hid-unhandled.js` |
+| Backup file | Version 5, one complete blob; 196,608-byte UTF-8 limit | `DOCUMENT_VERSION`, `FILE_MAX_BYTES` in `model/portable-profile.js` |
+| Feature word | split, saves, pointing (bits 0–2) | `PROFILE_WIRE_FEATURES` |
+
+The version stands for everything the base does (firmware D-F28): the feature
+word holds only what a build genuinely varies by, never a step in the
+firmware's history, and a later capability raises the minor version.
+`CURRENT_PAIR_FEATURES` is everything the flashable pair reports, which the
+demo and test keyboards report too. Profile Wire 2 retired every bit of the
+earlier feature word (the firmware's `profile-wire-v1.md` records what each
+meant), so a keyboard reporting one fails the capability decode: it is on the
+previous base.
+
+A keyboard that fails these gates, or stores a schema or domain in another
+version (`decodeStoredProfileBlob`, and `readSettings` in
+`protocol/portable-profile-v1.js`, raise `FIRMWARE_UPDATE_REQUIRED`), is read
+no further than its identity: no independent reads, no draft, and a notice to
+update both halves. Independent per-area reads remain only for current
+firmware whose complete capture failed. Profile Wire state flag 9
+(`STORED_EARLIER_FORMAT`) means a slot was refused as an earlier store format
+or retired test layout, which the keyboard neither reads nor converts; the
+Keyboard screen says it runs its built-in defaults until Apply saves the
+current format.
+
+The next firmware that adds a capability (a new Profile Wire or schema minor)
+or bumps a domain version reaches Ark as one change to the table above, its
+codec and tests, pinned and released with it (D-L44, D-L50). The agreement
+check (`scripts/check-agreement.js`) fails a firmware whose versions are not
+exactly Ark's, whose action-ABI digest Ark does not know, which lacks a
+registered domain, or which is not a split build that saves.
+
 A device operation that fails rejects, with the error it also records in the
 snapshot (`error`, and a line in `diagnostics`), so the panel shows the failure
 whoever awaited it; a refusal before one starts (not connected, not refreshed,
@@ -135,7 +176,7 @@ stored schema or domain version (`FIRMWARE_UPDATE_REQUIRED`), is read no
 further. Normal committed reads
 always fetch bytes, including initial reads, post-Apply readback and standalone exports. Compiled defaults
 are immutable during a connection and use verified reuse; reconnect drops the
-reader. No Apply target or portable document seeds it.
+reader. No Apply target or backup seeds it.
 
 The complete portable read (`session/portable-profile-session.js`
 `captureProfile`) takes lighting, behaviours and pointing from the running
@@ -293,26 +334,109 @@ its firmware counterpart is `users/noah/lib/profile/schema/profile_rgb_v1.c`.
 vocabulary (`KC_A`, `LT(1, KC_A)`, `PD_SLOT_0`, `VIA_MACRO_3`) to actions and
 native keycodes, refusing any whose bits would land on another keycode.
 
+Every profile length and offset is 32 bits: the blob's 6-byte domain
+envelopes, the payload readback's metadata (layout 2), candidate BEGIN, CHUNK
+and REUSE, the candidate status pages and the capability pages. Capability
+layout 3 (`decodeCapabilityPages` in `protocol/profile-wire-v1.js`) reports the
+counts that fit a byte on page 1 and the wider ones on page 2; any other
+layout is refused. Current firmware reports 16 layers, 128 VIA macros, 128
+custom keys, 128 KiB flash slots, a 130,048-byte payload capacity and a
+34,903-byte macro domain. The action vocabulary `0x6fd70b90` is schema 4's:
+the firmware folds the schema major into the digest, so it differs from schema
+3's `0x837cf479` with no keycode changed. The action ABI describes the engine
+vocabulary independently of authored rows, so empty and populated builds
+advertise the same ABI. Macro keycodes keep the historical `VIA_MACRO_n`
+names; they do not imply VIA support (firmware D-F31). The connected
+keyboard's advertised tap depth governs behaviour steps and the RGB tap-branch
+palette throughout read, edit, history, reorder and partial discard
+(`schema/profile-depth.js`); a backup carries its depth in the counted RGB
+palette, and import and Apply validate it against the destination's advertised
+limits.
+
 The keymap codec (`keymap-domain-v1.js`, domain `0x60` v1) retains all 60
-matrix positions on each of 16 layers, including unwired positions, in
-little-endian order. The macro codec (`macro-domain-v1.js`, `0x70` v1) checks
-the firmware’s bank grammar and reads 128 streams; unused bank tails are
-accepted, while writing streams produces their canonical terminators alone.
-The registry describes all seven domains. Version-5 portable documents carry
-one complete canonical base64 blob: `format`, `version`, `keyboard`,
-`actionAbiDigest`, `profile`. `validateSnapshot` returns decoded `layers` and
-`macroSlots` views; they are not extra serialized fields. Domain replacements
-keep every unrelated domain, including during review, undo, partial discard
-and layer reordering. Version-4 separate-field files and older formats are
-refused. Files are limited to 196,608 UTF-8 bytes; the blob is limited to
-130,048. The extension, web host and drop importer enforce that bound.
+matrix positions on each of 16 layers, including unwired positions, as
+little-endian uint16 values. The macro codec (`macro-domain-v1.js`, `0x70` v1)
+checks the firmware’s bank grammar and reads 128 streams; unused bank tails
+are accepted, while writing streams produces their canonical terminators
+alone. The registry describes all seven domains.
+
+A backup is a version-5 document (`DOCUMENT_VERSION` in
+`model/portable-profile.js`) with exactly `format`, `version`, `keyboard`,
+`actionAbiDigest` and `profile`, where `profile` is the complete canonical
+schema-4 blob in base64 with all seven domains once (D-L15). Ark owns this
+envelope; the firmware's
+[portable profile](../upstream/firmware/docs/architecture/portable-profile-v1.md)
+owns the domain contracts, and its "Portable document" section describes a
+retired client format, not this one. A backup carries every domain and never
+falls back to the destination's compiled data. `validateSnapshot` returns
+decoded `layers` and `macroSlots` views; they are not extra serialized fields,
+and edits to them replace their domains. Domain replacements keep every
+unrelated domain, including during review, undo, partial discard and layer
+reordering; a reorder (`reorderLayers`) moves layers and rewrites the
+references that follow them together, the base staying the layer at index
+zero (D-L37). Unrelated edits preserve optional unused macro-tail bytes;
+replacing macro content reclaims that capacity when calculating shared
+profile headroom. Import, demo file opening and restore take only this format:
+version-4 separate-field files and older formats, and any other schema, action
+vocabulary or domain version, are refused, never translated, and malformed
+input fails without a data-dropping fallback (D-L54). Files are limited to
+196,608 UTF-8 bytes (`FILE_MAX_BYTES`), enough for a 130,048-byte blob and its
+envelope. The extension, web host and drop importer enforce that bound.
 
 Capture materializes omitted domains from compiled defaults and overlays the
-live combo/settings readbacks. Base lighting uses those captured settings;
+live combo/settings readbacks: a domain absent from the keyboard's profile
+means its compiled default, while an explicitly empty one stays empty. Base lighting uses those captured settings;
 standalone lighting reads also use Profile Wire scalars 21/22. All seven
 domains count toward usage and macro room, which is bounded by both remaining
 profile space and the advertised macro-domain capacity. Exact active bytes
 are retained only as a verified differential-transfer source.
+
+All 128 macro slots share the profile's remaining space, within the
+macro-domain limit the keyboard reports (`macroBytes`): a key tap takes 3
+bytes, ASCII text 1 byte per character, Unicode text its UTF-8 bytes. The
+keyboard plays a stored macro in 512-byte windows (firmware D-F14), so the only
+limit on one macro is free memory. Apply encodes the streams with their
+terminators in domain `0x70`, subject to the destination's domain limit and
+the remaining whole-profile capacity (`validateSnapshot`). The domain stores
+streams, not a bank size, so the profile fingerprint (`fingerprintOf`) does not
+depend on the keyboard's bank. `model/macro-editor.js` (`profileMacroBudget`)
+keeps room for ten key taps (30 bytes) in every empty slot, which the firmware
+does not enforce; when free memory cannot, the highest-numbered empty slots are
+unavailable until space is freed (D-L26). A retained draft reviewed against a
+reconnected keyboard adopts its reported capabilities and drops its cached
+decoding, review and checks before editing resumes (`acceptCapabilities` in
+`session/profile-draft-session.js`). Each macro name holds up to 32 UTF-8 bytes
+in the settings domain's counted names.
+
+Settings scalar 27 holds the Host settings (`schema/host-settings.js`): bits
+0..1 the host OS (Auto, macOS, Windows, Linux), bit 8 Unicode playback, bits
+16..23 the host keyboard layout and bit 24 a Mac that classified the keyboard
+as ISO (D-L56). The keyboard accepts canonical UTF-8 text; text and backups
+preserve exact Unicode scalar sequences. The detected OS is read with GET
+`0x0B` (`protocol/host-os-v1.js`); Auto follows it, falls back when it is
+unknown, and a saved OS override takes precedence. The detected OS is volatile:
+a complete Read refreshes the current draft's presentation caches without
+changing stored edits, history, revision or conflict fingerprints. Physical
+host insertion remains a hardware acceptance requirement, separate from codec
+and UI verification.
+
+## Keycode catalog
+
+`npm run keycodes` (`scripts/generate-keycode-catalog.js`) writes the
+checked-in `data/keycode-catalog.json` from Ark's pinned QMK snapshot, stamped
+with the QMK version it came from (D-L05); `npm run keycodes -- --check` fails
+when the two differ. Besides QMK's keycode data it reads the layout extras'
+shifted US symbols (`S(KC_1)` is `KC_EXLM`) and the keyboard's own keycodes
+from `enum charybdis_keycodes` in `keyboards/bastardkb/charybdis/charybdis.h`.
+Those take their `QK_KB` slots under the header's short name (`DRGSCRL`), with
+the long name and `QK_KB_n` kept as aliases, so every spelling resolves. The
+`QK_KB` range is fixed by QMK and the keyboard code, not by the userspace action
+ABI, so these keys need no matching vocabulary. Their drag scroll is the
+keyboard code's own, at a fixed `CHARYBDIS_DRAGSCROLL_DPI` that the Pointing
+modes settings do not reach. Drag scroll is the `PD_SLOT_0` pointing mode, so
+the picker does not offer `DRGSCRL` or `DRG_TOG` (`UNSUPPORTED` in
+`webview/view/picker-sections.mjs`); a key already holding one still reads back
+as "Built-in drag scroll".
 
 ## Adapter contract
 

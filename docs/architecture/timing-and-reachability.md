@@ -1,7 +1,9 @@
 # Timing, built-in branches and reachability
 
 The app contract behind
-[D-L49](../LIVE_EDIT_APP_DIRECTION.md#d-l49--timing-findings-constrain-the-reachability-graph-conservatively).
+[D-L36](../adr/0036-review-checks-reach-and-save-blockers.md),
+[D-L48](../adr/0048-timing-advice-follows-firmware-capability.md) and
+[D-L49](../adr/0049-timing-findings-constrain-reachability-conservatively.md).
 The [guide](../GUIDE.md#timing-checks) describes the findings shown to users.
 Firmware owns timing and participation semantics; this specification owns
 conservative analysis, its limits, and presentation of inherited behaviour.
@@ -35,6 +37,59 @@ Unknown paths remain in the graph rather than inventing traps. Invalid timing
 relationships are reported even for unplaced rows so moving one later cannot
 hide the problem. Revisit the rule against firmware release-matrix tests when
 release precedence changes.
+
+## The layer walk
+
+A **trap** is a set of locked layers the profile can reach from which Base
+cannot be reached once every key is let go: `TG(n)` on Base when layer n covers
+that key and has no `TG(n)`, `TO(0)` or `LOCK_LAYER(n)` of its own, a chain of
+locks where the second hides the first one's way out, `TT()`'s fifth tap
+(QMK's `TAPPING_TOGGLE`), a behaviour branch or combo that locks. The firmware
+has no timeout and no "clear all" key, so only unplugging recovers, and the
+keyboard accepts such a profile; Review says so before Apply (D-L36).
+
+`core/model/layer-reach.js` walks every state a profile can reach from a
+keyboard at rest: a set of locked layers with any layers held on top. In each
+state every key resolves as the firmware does (the highest active layer that is
+not transparent answers), and the walk follows each key's own layer action, its
+behaviour branches, the combos that match, and the trackball waking the pointer
+layer, unless the sniping layer keeps it off. Holding is not limited by
+fingers, and a one-shot counts as a hold, so the walk finds every way out a
+person could find and never invents a trap.
+
+A combo whose reference layer differs from the highest active layer uses the
+reference's raw keys; otherwise its inputs come from the resolved active stack,
+including keys inherited through transparency. A combo no reachable stack can
+supply all its inputs for is a warning.
+
+Besides traps, the walk reports warnings for a layer with keys that nothing
+reaches, a pointer layer that is always on, and layer keys the keyboard leaves
+to QMK (`DF()`, `PDF()`, a layer past the bank); and notices for a layer key
+onto a layer with no keys of its own, a layer key that holds or toggles Base
+(always on, so it does nothing), transparent and `KC_NO` keys on Base (separate
+notices) and a pointer layer with no keys of its own.
+
+Two firmware facts shape the walk. The firmware takes back the lock QMK's
+auto-mouse would keep of its own on `TG()`/`TO()` of the pointer layer, which
+`TO(0)` would not release, and holds auto-mouse on for as long as the pointer
+layer is locked. And the keyboard's save check covers behaviours and combos
+only, so a layout key the keyboard does not own is refused where it is placed
+(`keyPlacementProblem` in core/model/profile-placement.js); one already on the
+keyboard is reported, not refused, so it never blocks an unrelated Apply.
+
+## Whole-profile checks
+
+`core/model/profile-checks.js` (`profileFindings`) adds to the walk, the
+timing findings and [rows that change nothing](#rows-that-change-nothing) the
+whole-profile findings: bindings that reach empty pointing slots (keys,
+behaviours and combo outputs), a pointing output that runs an empty macro,
+macros that cannot play with the Host setup, behaviour steps naming a custom
+key without a shortcut (D-L63), and destination brightness or lighting effects
+the keyboard would refuse. The last two are **blockers**: Review shows them,
+Apply is disabled, and the host refuses Apply before writing a recovery copy;
+a live edit that adds one is not sent. Other invalid data is refused by its
+editor, the profile decoder or save preflight rather than offered for
+confirmation.
 
 ## Layer reachability and escape
 
@@ -80,9 +135,14 @@ Wire 1's feature bits 17, 18 and 31, implied by Profile Wire 2): QMK's tapping e
 off or bypassed is ignored while the key keeps its own tap and hold, every
 dual-role key holds at the dual-role threshold unless its row sets its own, and
 a row without steps is no row, so `TT()` keeps its own taps under one. Ark
-requires all three (D-L64), so it gives no native-buffering warnings, and layer
-reach drops `TT()`'s locking tap only under a row with steps. None of these
-capabilities changes stored profile bytes.
+requires all three (D-L64), so it gives no advice about combo buffering or
+native QMK tap classification, never says anything but the keyboard decides a
+key's tap or hold, and layer reach drops `TT()`'s locking tap only under a row
+with steps. General guidance still explains double hold as
+press–release–press-and-hold, the released repeat gap, and tap/hold
+classification; firmware buffering can postpone output even when it preserves
+physical gesture eligibility. None of these capabilities changes stored
+profile bytes.
 Firmware owns that policy and its native-key controls; Ark owns these findings
 and their presentation.
 
@@ -109,6 +169,9 @@ or built in; Ark claims this for plain keys, custom keys and macros
 pointing keys (their own hold) or bare modifiers.
 A dashed cell is display only; setting an action in it authors the tier
 (core/model/built-in-behavior.js, `impliedBranch` in webview/view/keyface.mjs).
+Built-in branches and inherited defaults are resolved once, from the profile
+and the firmware's advertised semantics, for the editor and Review alike
+(D-L49).
 New behaviour editors start with no authored branches, preserving these defaults.
 Selecting a key opens its row or an unstored grid; there is no separate Add
 behaviour edit. Only an edit that leaves the row changing something creates a
