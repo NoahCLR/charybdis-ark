@@ -7,7 +7,7 @@ Tests, fixture previews and catalog maintenance use the files here.
 
 For ongoing firmware development, inspect the real checkout, `charybdis-4x6`
 beside this one in Noah's workspace, not these snapshots. The
-[workspace map](../docs/REPOSITORY.md#local-development-workspace) explains how
+[workspace map](../docs/development.md#local-development-workspace) explains how
 to locate task worktrees and distinguish current source from this pinned baseline.
 
 | Directory | Purpose | Owner |
@@ -70,7 +70,7 @@ Node dependencies have been installed.
    regenerates from its keymap or authored defaults. Agreement requires every
    imported fixture to equal the firmware's, so such a file would block a
    firmware release on an ordinary keymap edit, which agreement deliberately
-   never compares ([COMPATIBILITY.md](../docs/COMPATIBILITY.md)). Ark builds
+   never compares ([agreement](../docs/development.md#agreement-with-a-firmware-contract)). Ark builds
    older-format inputs for its refusal tests itself.
 4. Review the diff, then run `npm run check`, `npm run keycodes -- --check` and
    `npm run upstream -- --check --firmware PATH --qmk PATH`, which rebuilds every
@@ -85,7 +85,7 @@ Node dependencies have been installed.
 Ark owns cross-language runners under `tests/integration/`. They compile
 probes from the selected firmware and compare readers, writers, candidate
 transfers and sparse macro reads with Ark's current implementation. Use the separate
-[compatibility bridge](../docs/COMPATIBILITY.md); it also fails when a pinned
+[compatibility bridge](../docs/development.md#the-compatibility-bridge); it also fails when a pinned
 fixture differs from the selected firmware and lists specs that lag it. Firmware itself does not require
 Ark; it keeps independent regression fixtures and C tests. The imported
 snapshots here remain unchanged and do not replace integration or physical

@@ -1,514 +1,295 @@
-# Profile capture and operation progress
+# Reading, applying and progress
 
-The app contract behind reading the keyboard
-([D-L11](../adr/0011-current-state-comes-from-the-keyboard.md)), the draft
-([D-L19](../adr/0019-one-whole-profile-draft-and-review.md)), Apply and its
-progress ([D-L20](../adr/0020-differential-apply.md),
-[D-L23](../adr/0023-apply-shows-its-steps-and-failures.md),
-[D-L58](../adr/0058-transfer-less-validate-the-complete-saved-result.md)) and
-the live edit modes
-([D-L65](../adr/0065-live-and-review-edits-reach-the-keyboard-at-once.md),
-[D-L66](../adr/0066-in-live-the-keyboard-saves-by-itself.md),
-[D-L67](../adr/0067-a-stopped-keyboard-says-so-and-ark-restarts-it.md)).
-The guide describes [Apply](../GUIDE.md#applying-changes) and
-[the edit modes](../GUIDE.md#how-edits-reach-the-keyboard) for the person
-using Ark. Firmware owns the [one-store transaction](../../upstream/firmware/docs/architecture/logical-profile-transaction-v1.md)
+How a read, an Apply and a live edit run through Ark's layers, and what holds
+across them ([D-L11](../adr/0011-current-state-comes-from-the-keyboard.md),
+[D-L19](../adr/0019-one-whole-profile-draft-and-review.md)). Firmware owns the
+[one-store transaction](../../upstream/firmware/docs/architecture/logical-profile-transaction-v1.md)
 and [Profile Wire](../../upstream/firmware/docs/architecture/profile-wire-v1.md).
 
-## Apply and read progress
+## Who does what
 
-`core/session/apply-progress.js` names eight steps, moving forward only:
-check the keyboard, save a recovery copy, send the profile, keyboard checks
-it, copy the profile to the slave half, save it on the master half, finish
-the slave half, check both halves. Master means the half on USB; slave its
-partner over the split cable. Progress follows actual firmware states, so a
-state completed between polls need not be displayed as active.
+- The shell (`extension.js`, `web/web-host.mjs`) supplies recovery copies,
+  file choosers, downloads, progress, a store for compiled defaults and, on
+  the web, a sleep that tab throttling cannot slow.
+- `core/session/panel-loop.js`, shared by both shells, hands each message to
+  `routeMessage` (`core/session/panel-session.js`), runs `panel-controls.js` or `live-edits.js` and publishes
+  the model with the session's outbox (notice, `resetDraftForms`).
+- `core/session/profile-device-service.js` owns the connection: one operation
+  at a time (`runOperation`, else `SERVICE_BUSY`), each failure recorded in
+  `snapshot().error`, every change published as `snapshot()`.
+- Below it: `portable-profile-session.js` (Apply-mode snapshot, Apply),
+  `live-profile-session.js`, `live-edit-coordinator.js` and
+  `candidate-upload-coordinator.js`.
+- `core/transport/request-coordinator.js` sends one request at a time; a
+  timeout closes the connection, except for a background look (below).
 
-A failure keeps its step, the keyboard's reason (or the peer's last answer)
-and what was saved. A confirmed pre-decision cancel means nothing was saved.
-An ambiguous outcome keeps the recovery copy and never silently retries.
-After an observed decision, firmware completes the same generation once both
-halves are connected, and a failure after the decision says what ends it:
-the keyboard finishing that generation by itself, or, when it reports lost
-split authority (`AUTHORITY_FAILED`) or a concurrent commit, a USB replug.
-Each half keeps a complete generation until activation. There is no VIA input
-fence, staged bank, ACCEPT wait or host roll-forward to diagnose (firmware
-D-F31), and Ark never claims that an input fence is holding keys. The commit
-bar retains a failed Apply until dismissed.
+## Complete snapshots and integrity
 
-If BEGIN answers BUSY while status flag 13 says a DPI or lighting key change
-awaits publication, Apply waits within its firmware-aware budget for the flag
-to clear before resubmitting BEGIN, and Apply progress shows the reason. The
-reviewed-base identity check still runs after BEGIN acquires admission; a
-changed base requires another review, never a silent overwrite (D-L66).
+`readKeyboard` (`panel-controls.js`) runs in this order:
 
-Transfer progress travels in separate `applyProgress` messages correlated to
-the draft ID and revision. The service retains the latest view for snapshots;
-progress updates only the commit bar, preserving the visible editor and local
-forms. Connection, profile and busy-state changes still publish full models.
-Upload progress separates prepared (`bytesSent`), uploaded (`bytesUploaded`)
-and reused (`bytesReused`) bytes; chunk index and count describe actual host
-data chunks, excluding reuse commands.
+1. List keyboards and connect; each connection gets a new `connectionToken`.
+2. `refresh` reads capabilities; a keyboard not on the current base
+   ([D-L64](../adr/0064-ark-supports-only-current-firmware.md)) is read no
+   further. Then profile and candidate status, the edit mode, the toggles a
+   key turned off (GET `0x22`) and edit progress. An edit the keyboard is
+   still receiving is aborted, its transaction id retired.
+3. `readKeyboardProfile` takes one snapshot: live (below) when the keyboard is
+   not in Apply mode or still runs unsaved live edits, else `captureProfile`.
+4. If the snapshot fails, the independent reads (`readLayout`,
+   `readCommittedProfile`, `readBaseRgb`, `readCombos`) still run for
+   diagnostics, and no editable draft opens.
 
-`readProgress` messages carry layout, profile or capture counters. They must
-match operation ID, phase, device, connection token and draft ID/revision,
-including an absent draft during initial reading. Late messages are ignored
-once the operation ends. The service keeps counters for full snapshots;
-individual replies never reconstruct a draft presentation model. Configure
-editors retain their DOM when a full model changes only transient read status;
-profile, vocabulary, permission, connection or form-reset changes redraw them.
+`captureProfile` refuses a keyboard without its slave half, with unconverged
+halves, or showing a preview, a pending candidate or a conflict. It reads
+status, the compiled defaults, the active saved profile, native combos, the
+settings twice and status again; any difference refuses the read as
+`PROFILE_CHANGED`. `materializeProfile` (`core/model/portable-profile.js`)
+then builds one seven-domain blob. Each domain comes from the active profile,
+else the compiled defaults; settings come from the settings readback. Combos
+come from the stored domain, their only durable owner (firmware D-F32). The
+native readback stands in only when neither profile holds one, and refuses
+combo hooks a profile cannot hold. Re-encoding it would turn a combo on a
+custom key, or one sending `MO(5)`, into other bytes for the same keys, which
+Apply would write and Live + review would list as changes.
 
-## Where current state comes from
+A snapshot keeps two things apart. Its `document` is the materialized profile
+that editors, review and backups use. Its `storage.profile` is the exact
+active bytes, kept only as the next Apply's reuse source.
 
-Ark parses no C file and reads no firmware or repository file at runtime;
-`tests/layering.test.js` fails if a module under `core/`, `webview/` or
-`web/`, or `extension.js`, names one. A keyboard with nothing saved still runs
-its compiled defaults, which Profile Wire value `0x05` serves over the same
-page layout as a saved payload. If the flashed firmware was built from other
-data than a repository holds, Ark shows what is flashed. Compiled defaults are
-labelled as such; generation 0 reads as no saved profile.
+Every payload read (`core/protocol/profile-payload-v1.js`) reads metadata,
+chunks and metadata again, retries when the metadata moved, and verifies
+CRC32 and the FNV digest. The service then matches it to the active identity
+(`payloadMatchesActive`: generation, digest and, for a saved record, origin
+half) and reads status again. A keyboard running compiled defaults is read
+from compiled bytes even when a newer saved record exists. GET `0x04` serves
+the newest saved record, which may not be the one running; it never stands
+in for it (`ACTIVE_PROFILE_UNAVAILABLE`).
 
-Compiled defaults are authored data in the firmware's keymap files: layer
-names beside the layouts, each macro's name beside its payload, a combo's own
-window on its row (`COMBO_WINDOW`), and LED groups in `rgb_config.c`. The
-firmware's userspace only serves them. With nothing stored, the settings
-readback reports those names and the combos run with those windows; saved LED
-groups ride in the compiled RGB domain. A stored profile keeps its own.
-
-Keyboard-definition data that no device command exposes ships with the app as
-decoding data in `core/data/`: the vendored keycode catalog (D-L05) and the
-Charybdis layout matrix. Neither carries configuration; they only decode what
-the device sends.
-
-Readback is tested through the posted model and rendered controls, not only
-the byte decoders. Semantic links to native keycodes are enabled only for a
-known action ABI advertised by the keyboard. Layer preview membership follows
-the firmware: transparent and no-action keycodes are unmapped whatever their
-alias. Every decoded `uint16` must encode back to its original value. Zero
-timing values stay visible, with the unreported firmware default stated.
-Recorded device bytes are test-only fixtures, never runtime data.
-
-## Complete captures and integrity
-
-Capabilities identify the firmware, including its version. There are no VIA
-identity, layout, macro or RGB commands. Unsupported bases are read no further
-than capabilities and receive the update notice.
-
-A capture reads compiled defaults, the active saved profile when present,
-effective native combos and settings through Profile Wire. Missing active
-domains come from the keyboard's own compiled profile. Combos are taken as the
-active profile stores them, its only durable owner (firmware D-F32); the
-native combo readback only says whether the keyboard has combo hooks a
-profile cannot hold, and stands in for a keyboard that stores no combos. It
-is never re-encoded into the domain: a combo on a custom key or sending MO(5)
-would come back as native keycodes, the same keys in other bytes, which an
-Apply would write and Live + review would list as changes. The resulting complete
-blob has all seven domains once. Keymap `0x60` v1 carries all 16 × 60 matrix
-positions as little-endian uint16 values, including the four unwired positions;
-the visible layout projects the geometry in `core/data/charybdis-layout.js`.
-Macros come from domain `0x70` v1. Base lighting comes from the captured
-settings scalars 21/22; brightness is absolute HSV, never scaled by a limit.
-Keyboard options, effect inventory, brightness limit and host metadata retain
-their separate Profile Wire editor reads.
-
-Profile payloads are checked against their metadata CRC32/FNV and active
-status identity: generation, digest and, for a saved record, origin half.
-Independent layout and domain reads use the same rule and recheck active
-status after downloading. An active compiled profile always uses compiled
-bytes, even with a newer saved record. If the running saved record cannot be
-retrieved, the layout is unavailable; the latest committed record never
-stands in for it. Macros and every other editable area come from the coherent
-capture and remain unavailable when it fails. Settings are read coherently and checked again before the
-final status read. Both halves must be converged, with no preview, candidate
-or conflict during an ordinary capture. A changed identity refuses the capture.
-One capture supplies the editable layout, domains, macros, base RGB and backup;
-a failed capture leaves independent diagnostics but opens no editable draft.
-
-The Configure screens show the keyboard only after the complete read has
-opened an editable draft. Independent reads stay available for diagnostics
-after a failed snapshot, behind one loading state, and every screen menu is
-disabled while the read runs. Afterwards Configure requires an editable draft,
-Backups complete-profile support, and Keyboard a connected keyboard that
-reported its capabilities.
-
-`ProfilePayloadReader` belongs to one connection. Only bytes actually read
-from a keyboard and verified may populate it. Compiled defaults are immutable
-while the firmware runs: they are reused on the connection, and Reconnect,
-which discards the reader, starts the next one from the copy the service last
-verified, which a host may keep between runs (`compiledDefaults`; VS Code's
-global state, the page's local storage). A kept copy must pass its own CRC32
-and FNV, and is used only when the keyboard's fresh metadata names exactly it;
-otherwise the defaults download. Refresh and Export download saved bytes
-afresh. A live capture with nothing unsaved, while the keyboard runs the saved
-record itself (active kind committed, the saved generation and origin), takes
-the bytes it just read of what the keyboard runs as the saved profile once
-they pass the saved record's fresh metadata (length, CRC32, FNV); the keyboard
-served them from that record's flash, so the read still checks it. With
-unsaved edits it downloads the saved bytes. A metadata mismatch retries or
-downloads afresh and both hashes remain required. Authored target bytes never
-seed the reader.
-
-A reviewed capture may serve as the recovery base only after a fresh profile
-and settings identity check. Apply saves its recovery copy before any mutation,
-checks the identity again under the candidate lease, and reuses exact active
-bytes only when their digest matches that identity; the transfer itself is
-[candidate transfer](#candidate-transfer). BEGIN bytes 24–31
-are zero. Commit publishes one new generation, confirmed by transaction,
-digest, local committed/active identity and peer identity when visible. A
-lost peer link after firmware confirmed its record does not invalidate an
-already active target; Ark reports that the peer is out of sight.
-
-After Apply, the editor reads the configuration again while it stays visible
-and busy (`rereadKeyboard`). This readback is separate from the eight
-transaction steps. Its layout step downloads the saved bytes afresh, the read
-of what was stored; the profile step right after reuses them through the
-reader's `reuse` (fresh metadata before and after, both hashes) and downloads
-on any difference. A later
-read or export gets the generic operation bar rather than an old finished
-Apply. No automated check establishes physical interruption acceptance.
-
-## Candidate transfer
-
-Apply requires a build that saves (Profile Wire feature bit 1); current
-firmware's candidate reuse and streaming come with it (firmware D-F18). Apply
-plans the candidate against the exact raw active profile the snapshot
-retained, not the backup document's materialized live settings. Domains are
-aligned by identity, so resizing one keeps unchanged later ones reusable.
-Firmware copies unchanged ranges into its inactive candidate (REUSE, naming
-the source's kind, origin, generation, CRC32 and FNV digest); the host streams
-short or changed ranges. A missing or mismatched source streams the whole
-profile. Compiled defaults are an origin-independent reuse source: the status
-page's unused origin becomes REUSE's sentinel `255`, with generation zero.
-Committed sources keep their reported generation and physical origin. The
-captured status and stale-base identity are unchanged by that translation.
-
-Streaming admits at most four host chunks before a completion check, still
-through the serialized connection. A check proves the admitted prefix's exact
-transaction, target digest, length, next offset and operation-sequence
-advance. BUSY drains that prefix before retrying the definitely unadmitted
-suffix. A lost reply stays ambiguous and is never retried blindly. Firmware
-validates the complete candidate and publishes one new generation on both
-halves; recovery copies, stale-base checks, verification and the fresh
-post-Apply readback stay required. Refresh and Export remain independent
-integrity reads. No app-authored, reconstructed or edited bytes seed the
-payload reader's verified-read cache; a proven Apply result may keep its raw
-target only as the next differential upload's source.
-
-The compatibility bridge (`tests/integration/run_candidate_transfer_tests.sh`)
-exercises Ark's uploader against firmware's production candidate transaction,
-dual-slot backend and whole-profile validator, including a corrupted source,
-in normal and sanitizer builds. Its scheduling is simulated: fewer bytes or
-exchanges there establish no keyboard timing or physical acceptance, and the
-probe ends at validation. Firmware's own host suites cover committed reuse
-through the production owner, both-half saving and reboot. No host test proves
-hardware acceptance.
+`ProfilePayloadReader` (`profile-payload-reader.js`) belongs to one
+connection, and only bytes read from the keyboard and verified enter it.
+Compiled defaults cannot change while the firmware runs, so the reader reuses
+them, and a new connection may start from the copy the shell kept, used only
+when its CRC32 and FNV pass and the keyboard's fresh metadata names exactly
+it. Saved bytes download afresh except for two reads bound to fresh metadata:
+the profile step after Apply (`reuse`) and a live read with nothing unsaved
+(`sameAs`). Authored or reconstructed bytes have no way in
+(`tests/session/profile-payload-reader.test.js`,
+`tests/session/active-profile-reads.test.js`).
 
 ## The draft
 
-A complete snapshot seeds one window-local draft: a single profile blob with
-all seven domains
-([D-L15](../adr/0015-a-backup-is-the-complete-effective-configuration.md)),
-of which editors use decoded domain views. Every editor, import and layer
-edit updates it, with one undo history
-(`core/session/profile-draft-session.js`). Each frozen history entry holds its
-document, edit origin, label, time and layer order together; branching and
-trimming move the whole entry, and its document keeps its cached decode. In
-Apply mode keeping a form changes only the draft and writes nothing to the
-keyboard.
+`observePortable` (`panel-session.js`) opens a `ProfileDraftSession`
+(`profile-draft-session.js`) from a complete snapshot of an editable keyboard
+and follows later snapshots. Its history holds up to 101 frozen entries, each
+with its document, origin, label, time and layer order.
 
-An incomplete form, such as a new combo before it has an output and two
-inputs, keeps its own state outside the draft until it is kept; it survives
-keeping another area and reading the keyboard again. An undo, redo, history
-jump, discard, rebase, Apply, import, another keyboard or the demo replaces
-the draft under the forms and starts each form again from the model
-(`STATE_FIELDS` in `webview/store.mjs`).
+- The draft is bound to the device and `connectionToken` it was read over. An
+  untouched draft follows the keyboard. One with edits stays, marked stale,
+  when the connection changes or a read finds the keyboard changed; Apply
+  then refuses until **Review against the keyboard** (`rebase`) compares it
+  with a fresh read.
+- Each edit message names `draftId` and the draft revision; an older one is
+  refused.
+- An incomplete form keeps its state in the interface until kept. When the
+  draft is replaced under it (undo, redo, jump, discard, rebase, Apply,
+  import, another keyboard), the session sets `resetDraftForms` and each field
+  in `STATE_FIELDS` (`webview/store.mjs`) does what it declares.
+- The draft lives only in the open session; when leaving the web page asks
+  first is in the
+  [interface contracts](../spec/interface-contracts.md#draft-binding-and-panel-controls).
 
-Apply requires the exact reviewed draft revision and the matching connected
-keyboard; draft revisions are never device generations. A change on the
-keyboard keeps the draft and makes it stale, which blocks Apply; **Review
-against the keyboard** compares it with a fresh read and never merges
-silently. A failed snapshot leaves independent diagnostics and opens no
-editable draft and no complete backup. Export writes what the keyboard runs,
-not unapplied changes. Closing the editor loses the draft.
+## Apply
 
-In Live + review and Live the same draft is the keyboard's working copy: its
-history moves only when the keyboard confirms an edit, review compares it
-with the saved profile, and Save replaces Apply (in Live the keyboard saves by
-itself). The rules for review, checks and recovery copies hold in every mode.
+[D-L20](../adr/0020-differential-apply.md),
+[D-L23](../adr/0023-apply-shows-its-steps-and-failures.md) and
+[D-L58](../adr/0058-transfer-less-validate-the-complete-saved-result.md);
+for the person, the [guide](../GUIDE.md#applying-changes).
+
+1. `DRAFT_ACTIONS.apply` (`panel-controls.js`) refuses blockers and
+   unconfirmed traps or warnings before any recovery copy or HID write, in
+   core and not only in the interface
+   ([D-L36](../adr/0036-review-checks-reach-and-save-blockers.md)).
+   `ProfileDraftSession.apply` requires the reviewed revision and the bound
+   keyboard.
+2. `restorePortableProfile` (service) refuses what the keyboard would: a
+   brightness over its limit, an effect it lacks, an action placed where it
+   cannot run (`profilePlacementProblem`).
+3. `restoreProfile` (`portable-profile-session.js`) reuses the reviewed
+   snapshot as its base only when the fingerprint matches and a fresh
+   profile-and-settings identity read agrees; otherwise it reads a new one.
+4. The shell saves a recovery copy of the base. No copy, no write.
+5. `CandidateUploadCoordinator.upload` plans against the snapshot's exact
+   active bytes (`candidate-transfer-plan.js`), aligning domains by identity
+   so a resized domain keeps later ones reusable. BEGIN takes the firmware's
+   store admission, and `verifyBase` reads the identity again under it. REUSE
+   copies unchanged ranges, naming the source's kind, origin (`255` for
+   compiled defaults), generation, CRC32 and digest. Changed ranges stream at
+   most four chunks per confirmed batch; on BUSY the admitted part drains
+   before a resend, and a lost reply stays ambiguous. A missing or mismatched
+   source uploads everything. The firmware validates the whole candidate.
+6. `commit` polls the candidate states. `CONVERGING_PEER` proves the commit
+   decision; from there the firmware finishes the slave half and activation.
+7. The final status must show the target digest committed and active, a newer
+   generation, this transaction, no conflict and, when the peer is visible,
+   its matching generation. A peer that dropped out after confirming is
+   reported as out of sight. The draft resets to the result, and
+   `rereadKeyboard` reads layout, profile (`reuse`), combos and base lighting.
+
+`withFailure` pins a failure to its step, the keyboard's reason
+(`failureReason`) and what was saved. Before the commit, or after a cancel the
+keyboard confirmed, nothing was saved (`RESTORE_NOT_SAVED`). After the
+decision the keyboard finishes the same generation once both halves are
+connected, unless it reports `AUTHORITY_FAILED`, which only a replug ends.
+Otherwise the outcome is unknown and the recovery copy is named; nothing
+retries silently. Each half runs a complete generation until activation:
+there is no input fence and no roll-forward by Ark (firmware D-F31). BEGIN
+answered BUSY while a DPI or lighting key change awaits publication waits
+within the status budget and says so; any frame waits while a live edit or
+save holds admission.
+
+`ApplyProgress` (`apply-progress.js`) names eight steps and only moves
+forward, since polling can report an earlier phase late. Each view goes out
+as an `applyProgress` message tagged with draft id and revision and is kept in
+`snapshot().liveApply`; `webview/messages.mjs` takes it only for its busy
+draft, never going back, and redraws only the bar. A failed Apply stays in
+the bar until dismissed; a finished one shows only while its control runs.
+Read counters go as `readProgress`, taken only when operation id, phase,
+device, connection token and draft id and revision match, and never rebuild
+an editor (`tests/view/messages.test.mjs`). Apply's order and outcomes are
+held by `tests/session/portable-profile-session.test.js`; the compatibility
+bridge (`tests/integration/run_candidate_transfer_tests.sh`) runs the uploader
+against the firmware's candidate transaction and validator.
 
 ## Live reads, edits and Save
 
-How edits reach a keyboard is stored on it (Profile Wire `0x27`) and read
-with its capabilities (D-L65, firmware D-F32). Apply keeps the draft, review
-and Apply above. Live + review, the mode of a keyboard never set, and Live
-open the draft on the keyboard's working copy. The modes share the draft
-model, review, checks and history, and differ in when an edit reaches the
-keyboard and what makes it permanent; the
-[guide's table](../GUIDE.md#how-edits-reach-the-keyboard) says what a replug
-does in each. An Apply-mode keyboard still running unsaved edits (left by
-another client) opens as Live + review, since only Save or Revert can settle
-them. If reading the mode fails on firmware that has one, Ark keeps to
-Apply's reads and reads the mode again at the next status refresh or read.
+[D-L65](../adr/0065-live-and-review-edits-reach-the-keyboard-at-once.md),
+[D-L66](../adr/0066-in-live-the-keyboard-saves-by-itself.md) and
+[D-L67](../adr/0067-a-stopped-keyboard-says-so-and-ark-restarts-it.md);
+for the person, the [guide](../GUIDE.md#how-edits-reach-the-keyboard). The
+keyboard stores its edit mode (firmware D-F32), and `refresh` reads it; when
+it cannot, Ark uses Apply's reads until the next `refresh`. Live + review (the
+mode of a keyboard never set) and Live open the draft on the keyboard's
+working copy. All modes share the draft, review, checks and history.
 
 ### Reading a live keyboard
 
-A keyboard not in Apply mode (or one still running unsaved live edits) is read
-as a pair (D-L65, firmware D-F32): the edit status (GET `0x20` page 0), the
-working copy through GET `0x21` with its session and revision, read twice
-around its bytes, and the saved profile it began from, GET `0x04` with the
-generation and origin the edit status names, or the compiled defaults over
-generation 0. While the edit status's phase is not idle (an edit still being
-received, checked or waiting for a safe boundary, such as a held key) the read
-polls page 0 and starts only once it is idle; past 600 polls 50 ms apart it
-fails `LIVE_EDIT_PENDING` and the draft stays to be read again. The edit
-status is read again after the combos and toggles (pages 0–3, so the read also
-carries the keyboard's own saves and flags); a phase that is not idle, or a
-different session, revision or saved generation, refuses the read as
-`PROFILE_CHANGED`. Flag bit 11 (the other half refused the working copy) is
-kept as the draft's "halves apart". Both documents are materialized from
-stored bytes alone (no settings or combo readback overlay), and the working
-copy's exact bytes are kept: a live edit's splices are computed against them.
+`captureLive` (`live-profile-session.js`) reads a pair. It waits for the edit
+status to go idle (no edit being received, checked or waiting for a held key;
+`LIVE_EDIT_PENDING` after 600 polls 50 ms apart). It reads the working copy
+(GET `0x21`) and checks its session, revision and saved generation, then the
+saved profile it began from (GET `0x04`, or the compiled defaults over
+generation 0). With nothing unsaved and the saved record running, the working
+copy's bytes serve as the saved bytes once they pass that record's fresh
+metadata (`sameAs`). Combos, toggles and the edit status follow; any move
+refuses the read as `PROFILE_CHANGED`. Both documents come from stored bytes
+alone (`materializeStored`, no readback overlay), and the working copy's
+exact bytes are kept: every live edit is a splice against them.
 
-A read that finds the same working copy keeps the draft's history, also over
-a new connection: the keyboard vouches for it by its session and revision.
-Anything else (another client, a restart, a Save elsewhere) starts the history
-again from what the keyboard has, with no provenance invented, and says so. A
-replug boots the saved profile; the next read says the unsaved edits are gone.
+`ProfileDraftSession.observeLive` keeps the history only while the keyboard
+vouches for it (same session and revision, same saved and current
+fingerprints), also over a new connection. Anything else starts again from
+the keyboard and says why: a new session is a restart, after which unsaved
+edits are gone or were saved first (`restartedWithUnsaved`); a moved revision
+is `changedElsewhere`. `follow` keeps the draft on the same keyboard listed
+under a new device id after a rename, by its session.
 
 ### A live edit
 
-Every posted edit, undo, redo, history jump, group discard, put back, import
-and layer change computes its target document with the same editors as Apply,
-then sends the difference: one splice per changed domain, covering only the
-bytes between the common prefix and suffix, all in one revision (so a key swap,
-or a custom key placed in the same step, stays one edit). The draft's history
-moves only when the keyboard confirms the edit, and the edit shows as made on
-both halves only once the other half holds the same revision. An edit too
-large to stage beside the profile is sent as a whole replacement, which needs
-nothing unsaved. A target that is exactly the saved profile, while the
-keyboard holds a working copy, is sent as Revert: as an edit it would leave a
-working copy identical to what is saved but reported unsaved, which Live would
-save again as a new generation of the same bytes. The history records that
-step as it would an edit.
+Every posted edit, undo, redo, jump, group discard, put back, import and
+layer change goes through `proposeLive` (`live-edits.js`):
 
-Before sending, the edit's checks are compared with the working copy's: a new
-trap or warning waits as a proposal the person sends anyway or drops; a new
-blocker is refused.
+1. The draft's own editors compute the target (`propose`, or `stepTarget`).
+2. `checksAdded` compares its checks with what the keyboard runs: a new
+   blocker is refused; a new trap or warning waits as a proposal the person
+   sends or drops.
+3. A target equal to the saved profile, while edits are unsaved, goes as
+   Revert; as an edit it would leave an "unsaved" copy of the saved bytes,
+   which Live would save as a new generation.
+4. `LiveEditCoordinator.post` sends begin, one splice per changed domain, the
+   inserted bytes and commit, as one revision. Splices that do not fit beside
+   the profile are refused `LIVE_EDIT_TOO_LARGE`, except that an import, put
+   back, Send live or restart put-back goes as a whole replacement when
+   nothing is unsaved. It waits for this half to finish, checks the active
+   length against the bytes it recorded (`LIVE_EDIT_MISMATCH`), then waits
+   up to 3 s for the slave half: not yet is "catching up", a refusal is
+   "halves apart".
+5. Only then does `confirmLive` move the draft's history.
 
-A live edit is begin, splices, inserted data and commit, then edit status page
-0 until this half's last finished transaction is the edit's and nothing is in
-progress. Edit status page 2's active length must then equal the bytes Ark
-records as the working copy (a splice edit's result, a replacement's own
-bytes), else the keyboard is read again (`LIVE_EDIT_MISMATCH`). Then it waits
-until the other half holds the same session and revision (3 s; past it the edit
-runs on the master half and the rail says the slave half is catching up), or
-stops at once when flag 11 says the other half refused it (halves apart).
-BUSY at begin, Save or a mode change is retried for 3 s, or for 30 s while
-the other half answers but does not yet hold the working copy (catching up
-after a refusal, when the master half resends the whole copy), or within the
-save timeout (120 s, asked every 50 ms) while flag 6 says a save runs: in Live
-the keyboard's own save starts 3 s after an edit and holds the profile for
-seconds (about 6 s for a 6 KB profile), and an edit made then waits for it
-rather than being lost; with flag 11 it stops at once (`LIVE_HALVES_APART`).
-When the halves are apart, Ark says they run different profiles and offers Revert in
-place of Review and save, since Save and new edits are BUSY until a Revert or
-an Apply. Anything else refused is reported and
-the keyboard read again; STALE (the keyboard moved first, usually an
-adjustment key) rereads and says the edit was not sent, without a failure; a
-refusal Ark makes before sending (too large, halves apart) is not. A lost
-answer ends the connection (the transport closes it on a timeout); the next
-read shows whether the edit landed, and no edit is replayed. On every new
-connection Ark reads page 0 and aborts an edit still being received (SET
-`0x24` with its transaction id), which it never uses again on that connection;
-an unaborted one would end by the keyboard's 15 s lease, last result ABORTED.
+`sendWhenFree` retries a BUSY begin, Save, Revert or mode change for 3 s, 30 s
+while the slave half is catching up, and 120 s while a save runs (Live's own
+starts 3 s after the last edit). It stops at once when the halves are apart,
+the slave half is absent or a half has stopped. A refusal reads the keyboard
+again (`reread`); refusals that leave the working copy untouched (too
+large, halves apart) need no read. STALE means the keyboard moved first,
+usually an adjustment key: Ark reads again and asks for the edit again,
+without a failure. A lost answer closes the connection; the next
+read shows whether the edit landed, and no edit is replayed.
 
 ### Save and Revert
 
-**Discard all** is Revert: the keyboard runs its saved profile again, one
-history step that undo sends back while the saved profile has not changed.
-Revert compares its confirmed saved generation and origin with the cached
-base before using that base as the running profile. If either changed (another
-client saved meanwhile), Ark rereads the pair and starts the history at the
-actual saved profile; a failed read leaves the draft stale.
+**Save** (Live + review) needs the reviewed revision, confirms traps and
+warnings as Apply does and refuses blockers. The shell saves a recovery copy
+of the saved profile; the keyboard then writes its working copy as a new
+generation on both halves through the candidate path. A refused save leaves
+the working copy as it was. **Discard all** is Revert, one history step that
+undo sends back. When Revert's confirmed saved generation or origin differs
+from the draft's, another client saved meanwhile, and Ark reads the pair
+again instead of trusting its cached saved profile.
 
-Save asks for the exact reviewed revision and a recovery copy of the saved
-profile before it sends SET `0x25`, and confirms the review's traps and
-warnings exactly as Apply does. The keyboard writes its working copy as a new
-generation (candidate REUSE from the working copy, both halves, the same
-power-loss guarantees as Apply). Edit status page 1 reports its progress and
-outcome (the save's transaction, result and candidate error), and a quiet-wait
-on either half (flags 9 and 10) or a held key is said as such. A refused save
-leaves the working copy as it was. Revert (SET `0x26`) waits for the working
-copy to be inactive. Neither uploads a candidate.
+### Live, and looking between edits
 
-### Live: the keyboard's own save
+In Live the keyboard saves 3 s after the last edit with no key held, with or
+without Ark, which starts no timer. Save is refused until that save fails;
+**Save again** then saves after a recovery copy, with no review, since every
+edit was checked before it was sent.
 
-In Live an edit follows the same path, trap question, undo and redo as in
-Live + review (D-L66), but there is no Save and Ark starts no timer. The
-keyboard starts saving after 3 s with no edit and no key held, with or without
-Ark; the 3 s is that quiet interval, not a bound on possible loss. Holding a
-key postpones the save, a failed automatic save leaves that revision unsaved,
-and unplugging loses every edit since the last successful save, however long
-ago that was.
+`core/session/live-watch.js`, run by `panel-loop.js` for both shells, looks at
+the edit status about once a second. It skips while an operation, an Apply or
+a proposal holds the keyboard, and drops a look that raced one. A look is a
+background read (`softTimeout`): a missed answer skips it and keeps the
+connection, and the late reply is set aside; three misses in a row mean the
+keyboard is lost and Ark follows it back (`keyboard-reconnect.js`,
+[D-L62](../adr/0062-the-keyboard-is-named-in-its-profile.md)). The web page
+pauses looks while a `<select>` menu may be open, since Chrome on macOS holds
+back input reports then, and while hidden (`web/native-popups.mjs`).
 
-Only edit status page 3 saying so (an automatic save of this revision and
-generation, nothing unsaved) is shown as **saved by the keyboard**. What is
-saved then moves to what runs while the history stays, so undo still sends an
-edit back, and the keyboard saves that too. A failed automatic save (page 1's
-last save failed after Ark's last edit) is shown with **Save again**, an
-ordinary Save after a recovery copy that needs no review, since every edit was
-checked before it was sent, or with Revert. An edit made while the keyboard's
-own save holds the profile waits for it within the save timeout (above).
-
-### Looking between edits
-
-Between edits (D-L66) a live draft's panel reads edit status pages 0–3 about
-once a second, only while no operation holds the keyboard and the draft is
-current; a look that overlaps an edit is dropped. Both shells run the look
-through the shared panel loop (`core/session/live-watch.js`,
-`core/session/panel-loop.js`), and its timer never keeps a process alive. A
-look is a background read: each of its requests waits 3 s, and an unanswered
-one only skips that look, keeping the connection; its late answer is set
-aside, never taken as another request's. Three unanswered looks in a row mean
-the keyboard is lost, and it is followed back
-([D-L62](../adr/0062-the-keyboard-is-named-in-its-profile.md)). User
-operations keep their strict timeouts. The web page pauses looks while a
-`<select>`'s native menu may be open (Chrome on macOS holds back a page's
-input reports until it closes) and while the page is hidden
-(`web/native-popups.mjs`). A press on the select moves focus to it, so the
-control focused before blurs just after the press; that is not the menu
-closing, only the select losing focus is.
-
-The same session and revision with nothing unsaved and a new saved generation
-is the keyboard's own save (page 3 says whether it was automatic). A revision
-or mode Ark did not make (an adjustment key, another app) rereads the pair
-above as news, not a failure, in every live mode. An edit refused STALE for
-that reason says it was not sent, rereads, and asks the person to make it
-again; it is never replayed on a state they have not seen. Under an Apply
-draft the same look notes the keyboard's session, revision and saved
-generation; when its keys changed what it runs and it saved that, Ark reads
-the keyboard again as Refresh would (an edited draft then becomes stale). An
-Apply keyboard opened live because it ran unsaved adjustments goes back to an
-Apply draft once it has saved them.
-
-An automatic reread rejected as `PROFILE_CHANGED` remains eligible on the next
-poll, up to three failed captures per cycle. Success clears the retry state;
-other failures or budget exhaustion leave the stale draft for Read keyboard.
-The first Apply observation compares its saved generation and origin with the
-successful capture, so a saved adjustment before that first poll is detected.
-
-The look keeps the flags current in every live mode: flag 11 (the other half
-refused the working copy) is **halves apart** with Revert (Save, and so
-Live's own save, is refused); flags 9 and 10 (a save waiting for a quiet
-keyboard on either half) say so; flag 12 (an edit mode not stored yet) marks
-the switch, since a replug may bring the previous mode back; flag 13 (a DPI or
-lighting key change awaiting publication) is shown on a live draft while it
-waits.
+- Same pair, new saved generation, nothing unsaved: the keyboard saved by
+  itself. What is saved moves to what runs; the history stays.
+- A revision, session or mode Ark did not make: Ark reads the pair again, as
+  news.
+- Under an Apply draft: a key adjustment the keyboard has saved is read again;
+  the first look compares with the snapshot's saved generation and origin.
+- A read refused `PROFILE_CHANGED` is retried, up to three times per draft.
 
 ### Switching edit modes
 
-The keyboard refuses a mode change while it has unsaved edits. Leaving Live +
-review with unsaved edits, for either other mode, asks Save or Revert first,
-worded for that direction; entering Live or Live + review from Apply with a
-draft asks Send live or Discard. The question lists the traps and warnings
-Save or Send live confirms, as review does, so answering it is the
-confirmation.
+`setEditMode` (`live-edits.js`) settles work first, as the keyboard refuses a
+mode change with unsaved edits. Leaving Live asks nothing: `flush` waits for
+a running save and, before each Save, reads the actual saved profile (an
+automatic save may have moved it) and saves its recovery copy. Leaving
+Live + review with unsaved edits needs Save or Revert. Entering a live mode
+from a dirty Apply draft needs Send live (checks confirmed) or Discard; Send
+live keeps the Apply draft until the keyboard confirms the edit; on a
+refusal it tries to switch back to Apply and keeps the draft, stale until
+read again. A failure leaves the mode as it was; after a change the draft
+starts from a fresh read.
 
-Send live keeps the Apply draft until the keyboard takes it. A refused STALE
-edit returns an unsuccessful publication outcome through the proposal path,
-and Send live reports success only for a confirmed publication. Otherwise Ark
-tries to return the keyboard to Apply and keeps the original Apply draft even
-if that return is refused; the kept draft stays stale over a live keyboard, so
-it cannot post as a live edit, until the keyboard is back in Apply and read
-again.
+### A stopped keyboard and Restart
 
-Leaving Live asks nothing. Ark first waits for a running save (page 1's save
-phase, page 3's in-progress flag), then sends Save for the keyboard's current
-pair, looking again after STALE or BUSY, bounded by the save timeout; the
-other half's refusal (flag 11) ends it with the mode unchanged. Before each
-explicit flush Save, Ark captures the actual saved profile, including when an
-automatic save advanced it since the last snapshot, and obtains its recovery
-copy; failure stops before Save or a mode change. The identity is checked
-again after recovery, and a moved pair is retried within the same save budget.
-A failure (recovery unavailable, halves apart, a failed save) leaves the mode
-as it was and says why.
+A stopped half outranks every other live state, and refusals then fail
+`LIVE_KEYBOARD_STOPPED`. `restartKeyboard` (`keyboard-restart.js`) saves the
+unsaved working copy (read, or else the draft's copy) as a recovery copy
+first, and restarts only once it is saved. It then expects the keyboard to
+drop off USB, follows it back, and `putBackAfterRestart` sends the kept edits
+as one unsaved live edit. Ark offers Restart only when the keyboard says it
+stopped.
 
-A mode answer is acknowledged once the keyboard reads it back; its write to
-EEPROM follows when the keyboard is quiet, and while a write is owed after a
-failure (flag 12) Ark says a replug may lose it. Halves that stored different
-modes are settled by choosing the same mode again (**Settle** beside the
-switch).
+## Backups
 
-### Closing and losing the connection
-
-In Live, closing Ark or the link dropping is not an error: the keyboard goes
-on saving without Ark, and the web page asks before leaving only while an edit
-is on its way. In Live + review the page asks while there are unsaved edits,
-since a replug discards them (`leaving` in `web/web-host.mjs`). On reconnect
-Ark reads what the keyboard kept and says whether the edits it knew of were
-saved before a restart or lost since the last successful save. What the
-keyboard said of its own saving (saved by the keyboard, saving, a failed save)
-is shown only while it is connected; a lost keyboard is connected again by
-itself (D-L62).
-
-### Toggles a key turns off
-
-The combos and behaviours toggles a key turns off are read beside their
-stored masters (GET `0x22`), in every mode and again at every status refresh,
-and shown as **turned off by key** where the master is edited. They never
-enter the draft, review or backups. Export in Live + review writes what the
-keyboard runs.
-
-### A stopped keyboard
-
-Edit status flag 14 (the master half stopped) or 15 (the slave half says it
-did) is one state, **stopped** (D-L67; firmware D-F34,
-[a stopped keyboard, and Restart](../../upstream/firmware/docs/architecture/profile-wire-v1.md#a-stopped-keyboard-and-restart)).
-It outranks every other live state (halves apart, a failed save, an adjustment
-pending, catching up): the rail says **Stopped saving · Restart**, the bar
-**The keyboard stopped saving. Restart it to continue.** with Restart as its
-only action, and a refusal the keyboard gives while its flags say so
-(`LIVE_KEYBOARD_STOPPED`) ends with the same sentence instead of "not ready".
-
-Restart (`core/session/keyboard-restart.js`) is a draft control bound to no
-Apply, since a stopped keyboard's draft may be stale. With unsaved edits Ark
-reads what the keyboard runs (GET `0x21`, or, if that read fails, the draft's
-own copy of it, which is what Ark last confirmed), saves it as a recovery copy
-exactly as Apply saves one, and restarts only once that copy is saved. It
-sends the restart (SET `0x28`), expects the keyboard to drop off without
-reporting an error, and follows the same keyboard back as after a rename
-(D-L62), by serial number or else by its unchanged name. Once that keyboard is
-read again, the kept edits go back unsaved as one live edit, a whole
-replacement when too large for one: Live + review leaves them for review and
-Save, Live's own save takes them. The notice says how the restart ended, then
-what became of the edits.
-
-When it goes wrong, Ark says what and names the recovery copy: firmware
-without restart answers unhandled and nothing happens (unplug instead); a
-slave half that did not acknowledge the restart rejoins by itself (firmware
-D-F34), and Ark says to unplug if the halves still do not agree; a keyboard
-that stops again at once has a fault in flash or firmware, and the edits are
-not sent to it; a keyboard that does not come back is said at the wait's
-bound.
-
-Ark offers Restart only when the keyboard says it stopped and never restarts
-it by itself. There is no capability check: firmware D-F34 adds no feature
-bit (firmware D-F28), and firmware without restart never sets the flags, so
-Ark never offers it there; one that answers SET `0x28` unhandled is told apart
-above.
-
-## Candidate peer progress
-
-Candidate status page 1 reports phase, transferred bytes, safe-boundary waits
-and the last split answer. Movement extends the no-progress budget during
-`PREPARING_PEER`. Bounded cancellation, decided recovery and activation belong
-to firmware. Removed GET `0x0c` macro maps and VIA staging values are never
-requested; the current base is required rather than using an older fallback.
-
-## Portable files
-
-[D-L15](../adr/0015-a-backup-is-the-complete-effective-configuration.md)
-owns Ark's version-5 JSON envelope: one complete base64 profile blob, with no
-separate keymap or macro fields. Decoded domain views serve editors, review,
-undo and layer rewrites. Exact active bytes retained for REUSE are separate
-from that materialized effective document and never become a second authority.
+A backup is the snapshot's `document`
+([D-L15](../adr/0015-a-backup-is-the-complete-effective-configuration.md));
+its envelope is in [`core/README.md`](../../core/README.md#backups). Export reads the keyboard again
+(`readPortableProfile`) and writes what it runs: the working copy in a live
+mode, never the draft. A reviewed import becomes one draft edit (one live
+edit in a live mode); on a keyboard with no editable draft it is written at
+once through Apply's path, recovery copy first.

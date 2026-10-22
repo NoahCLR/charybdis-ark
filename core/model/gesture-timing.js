@@ -24,7 +24,7 @@ const DUAL_ROLE = /** @type {const} */ ([[0x2000, 0x3fff], [0x4000, 0x4fff], [0x
 // The setting a key's Tap / hold threshold follows when its row sets none, or
 // when it has no row. A dual-role key follows the dual-role term either way,
 // every other row the behaviour term (firmware D-F27 "Every dual-role key",
-// Profile Wire feature bit 31, which Ark requires).
+// part of the Profile Wire base Ark requires, D-L64).
 /** @param {import("../schema/types.js").SemanticAction} target */
 function holdTermSetting(target) {
     const code = nativeCode(target);

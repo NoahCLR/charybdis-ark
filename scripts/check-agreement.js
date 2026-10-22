@@ -18,7 +18,8 @@
 // firmware's. Everything else (firmware version, compiled-default digest,
 // capacities, the pointing bit) is reported only: it changes with ordinary
 // keymap edits or build options. Never loaded by the app; reads only
-// the checkouts it is given and runs firmware's probe with the host compiler.
+// the checkouts it is given and runs firmware's probe, which compiles in
+// firmware's build image (Docker must be running).
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");

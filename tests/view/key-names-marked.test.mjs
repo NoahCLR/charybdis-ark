@@ -7,7 +7,7 @@ import {join} from "node:path";
 
 // A key or action is named with the layer it acts on marked, through
 // actionMarked, keyNameMarked or the combo helpers in ui/marks.mjs
-// (docs/architecture/interface-contracts.md). These are the ways a screen
+// (docs/spec/interface-contracts.md). These are the ways a screen
 // could name one as plain text instead.
 const PLAIN = [
     // Escaping anything that holds a key's name, unless the name is already

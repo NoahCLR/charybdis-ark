@@ -3,7 +3,7 @@
 const {defineConfig} = require("@playwright/test");
 // The tests build the web page first, unless ARK_WEB_BUILT says dist/web/ is
 // already the build to test: a manual Pages upload tests the very files it
-// then uploads (docs/REPOSITORY.md).
+// then uploads (docs/development.md).
 const buildWeb = process.env.ARK_WEB_BUILT ? "" : " && npm run build:web";
 module.exports = defineConfig({
     testDir: "./browser-tests",

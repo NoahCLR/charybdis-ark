@@ -6,7 +6,7 @@ const path = require("node:path");
 const test = require("node:test");
 
 // The structure only holds if something checks it. These assertions encode the
-// rules in AGENTS.md so a violating import fails here rather than being noticed
+// rules in docs/architecture/README.md so a violating import fails here rather than being noticed
 // later, which is how the 14,539-line file this app replaced came to exist.
 
 const APP_ROOT = path.resolve(__dirname, "..");

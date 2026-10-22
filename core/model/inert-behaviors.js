@@ -2,7 +2,7 @@
 "use strict";
 
 // Behaviour rows that change nothing. A row without steps is no row (firmware
-// D-F27 "Rows without steps", Profile Wire feature bit 31): it decides neither
+// D-F27 "Rows without steps", part of the Profile Wire base, D-L64): it decides neither
 // a key's taps nor whether the keyboard handles the key, its timing applies
 // only to a key the keyboard handles anyway, and its switch and layers gate
 // only what it holds. Its auto-mouse anchor applies on any key. So a row

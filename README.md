@@ -106,5 +106,5 @@ read or saved by Ark.
 
 - [Ark guide](docs/GUIDE.md): every screen, Review's checks, what happens
   while a profile is applied, backups, and using Ark in Chrome
-- [Product goal](docs/PRODUCT_GOAL.md): what Ark is meant to become
-- [Developing Ark](docs/REPOSITORY.md#development-and-installation)
+- [What Ark is for](docs/adr/0068-the-keyboard-alone-is-enough.md): what Ark is meant to be
+- [Developing Ark](docs/development.md#development-and-installation)
