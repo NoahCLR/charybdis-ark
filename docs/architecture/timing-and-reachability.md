@@ -1,274 +1,194 @@
 # Timing, built-in branches and reachability
 
-The app contract behind
-[D-L36](../adr/0036-review-checks-reach-and-save-blockers.md),
-[D-L48](../adr/0048-timing-advice-follows-firmware-capability.md) and
-[D-L49](../adr/0049-timing-findings-constrain-reachability-conservatively.md).
-The [guide](../GUIDE.md#timing-checks) describes the findings shown to users.
-Firmware owns timing and participation semantics; this specification owns
-conservative analysis, its limits, and presentation of inherited behaviour.
+How Ark's checks are made from a profile and reach Review, and the
+conservative analysis behind them
+([D-L36](../adr/0036-review-checks-reach-and-save-blockers.md),
+[D-L48](../adr/0048-timing-advice-follows-firmware-capability.md),
+[D-L49](../adr/0049-timing-findings-constrain-reachability-conservatively.md);
+for the person, the [guide](../GUIDE.md#timing-checks)). Firmware owns timing
+and [participation](../../upstream/firmware/docs/architecture/participation-policy.md).
+Ark owns the analysis, its limits and how inherited behaviour is shown.
+
+## From profile to Review
+
+1. `ProfileDraftSession.checks()` (`core/session/profile-draft-session.js`)
+   passes the keyboard's decoded profile, the draft's, the draft's layer
+   order and the snapshot's destination facts (brightness limit, effects,
+   detected host OS) to `draftProfileChecks` (`core/model/profile-checks.js`).
+   The result is cached per history entry and keyboard.
+2. `profileFindings` runs on each side. It joins the layer walk
+   (`layer-reach.js`), timing (`gesture-timing.js`), rows that change nothing
+   (`inert-behaviors.js`) and whole-profile checks, among them the two
+   **blockers**: brightness over the keyboard's limit, and an effect it lacks.
+3. `compareFindings` (`layer-reach.js`) marks each check new, existing or
+   fixed. Its `findingKey` names layers through the draft's order, so a check
+   follows its layer through a reorder.
+
+Core enforces each level, not only the interface:
+
+- **Blocker.** Apply, and Save in Live + review, refuse it before a recovery
+  copy or HID write. A live edit that adds one is not sent, nor is a draft
+  holding one sent live.
+- **Trap or warning.** Apply, and Save in Live + review, need `confirmChecks`
+  for the reviewed revision, whether the draft made it or the keyboard had
+  it. A live edit that adds one waits as a proposal (`checksAdded`).
+- **Notice.** It only informs.
+
+Data the keyboard would refuse outright is refused by its editor, the decoder
+or Apply's preflight, never offered as a check. Held by
+`tests/session/panel-controls.test.js` ("a destination blocker refuses Apply
+before recovery or HID") and `tests/session/live-edits.test.js` ("an edit that
+adds a trap waits for the person; cancelling sends nothing, confirming sends
+it").
 
 ## Timing findings and analysis limits
 
-Ark resolves each row's timing overrides against the connected settings, including
-the dual-role default of every dual-role key (`LT()`, `MT()`, `OSM()`, `TT()`,
-`OSL()`). A Hold and Long hold that both
-tap on release ("tap on release after Tap / hold threshold", "… after Long
-hold threshold") have
-an impossible Hold branch when Long hold is
-at or before Tap / hold: no release interval selects Hold. Review and the
-behaviour editor warn, and the layer graph removes that proven-impossible edge,
-including behaviours reached through combo outputs. Global-default edits are
-analyzed in the same draft, with new/existing/fixed findings.
+`effectiveTimings` (`core/model/gesture-timing.js`) takes a row's own value,
+else the setting. Every dual-role key (`MT()`, `LT()`, `OSL()`, `OSM()`,
+`TT()`) follows the dual-role term, with or without a row. Any other row
+follows the behaviour term. The checks, the layer walk, the editor's defaults
+(`behaviorDefaults` in `core/session/device-model.js`), review and default
+normalization all use this one function. So the editor and Review resolve a
+key alike (D-L49).
 
-Other equal or reversed thresholds warn about overlapping tiers without claiming
-which action is impossible: immediate actions, scan order and release modes
-matter. Positive hold-tier gaps under 50 ms, first-tap and repeat windows under
-50 ms, and enabled combo windows under 50 ms receive notices. This is an explicit
-comfort heuristic, never a validity rule or a model of the person's dexterity.
-Warnings remain confirmable and notices need no confirmation. No values change
-automatically. Combo waits are not subtracted from physical repeat windows.
+`gestureTimingFindings` checks every row, placed or not, so moving a key
+later cannot hide a problem:
 
-This is conservative static analysis, not a complete input-state simulator.
-Stored layer-source resolution and participation policies are modeled; pointing
-interception, interruption, host bindings, scan cadence, fingers and overlapping
-chord sequences are not proven feasible.
-Unknown paths remain in the graph rather than inventing traps. Invalid timing
-relationships are reported even for unplaced rows so moving one later cannot
-hide the problem. Revisit the rule against firmware release-matrix tests when
-release precedence changes.
+- **Proof.** Hold and Long hold both tap on release, and Long hold is at or
+  before Tap / hold: no release selects Hold. This warning is the only timing
+  finding that removes an edge. The layer walk drops that Hold branch, on
+  combo outputs too.
+- **Overlap.** Other equal or reversed thresholds warn without naming an
+  impossible action. Hold modes, input delivery and scan order decide that.
+- **Comfort.** Windows and gaps under 50 ms are notices. This is a heuristic,
+  never a validity rule, and no value is rewritten. Combo waits are not
+  subtracted from repeat windows: the keyboard times repeats from presses.
 
-## The layer walk
+Current firmware decides every `LT()`, `MT()` and `OSM()` key itself, with or
+without a row (firmware D-F27). So Ark gives no advice about combo buffering
+or QMK's tap classification (D-L48).
 
-A **trap** is a set of locked layers the profile can reach from which Base
-cannot be reached once every key is let go: `TG(n)` on Base when layer n covers
-that key and has no `TG(n)`, `TO(0)` or `LOCK_LAYER(n)` of its own, a chain of
-locks where the second hides the first one's way out, `TT()`'s fifth tap
-(QMK's `TAPPING_TOGGLE`), a behaviour branch or combo that locks. The firmware
-has no timeout and no "clear all" key, so only unplugging recovers, and the
-keyboard accepts such a profile; Review says so before Apply (D-L36).
-
-`core/model/layer-reach.js` walks every state a profile can reach from a
-keyboard at rest: a set of locked layers with any layers held on top. In each
-state every key resolves as the firmware does (the highest active layer that is
-not transparent answers), and the walk follows each key's own layer action, its
-behaviour branches, the combos that match, and the trackball waking the pointer
-layer, unless the sniping layer keeps it off. Holding is not limited by
-fingers, and a one-shot counts as a hold, so the walk finds every way out a
-person could find and never invents a trap.
-
-A combo whose reference layer differs from the highest active layer uses the
-reference's raw keys; otherwise its inputs come from the resolved active stack,
-including keys inherited through transparency. A combo no reachable stack can
-supply all its inputs for is a warning.
-
-Besides traps, the walk reports warnings for a layer with keys that nothing
-reaches, a pointer layer that is always on, and layer keys the keyboard leaves
-to QMK (`DF()`, `PDF()`, a layer past the bank); and notices for a layer key
-onto a layer with no keys of its own, a layer key that holds or toggles Base
-(always on, so it does nothing), transparent and `KC_NO` keys on Base (separate
-notices) and a pointer layer with no keys of its own.
-
-Two firmware facts shape the walk. The firmware takes back the lock QMK's
-auto-mouse would keep of its own on `TG()`/`TO()` of the pointer layer, which
-`TO(0)` would not release, and holds auto-mouse on for as long as the pointer
-layer is locked. And the keyboard's save check covers behaviours and combos
-only, so a layout key the keyboard does not own is refused where it is placed
-(`keyPlacementProblem` in core/model/profile-placement.js); one already on the
-keyboard is reported, not refused, so it never blocks an unrelated Apply.
-
-## Whole-profile checks
-
-`core/model/profile-checks.js` (`profileFindings`) adds to the walk, the
-timing findings and [rows that change nothing](#rows-that-change-nothing) the
-whole-profile findings: bindings that reach empty pointing slots (keys,
-behaviours and combo outputs), a pointing output that runs an empty macro,
-macros that cannot play with the Host setup, behaviour steps naming a custom
-key without a shortcut (D-L63), and destination brightness or lighting effects
-the keyboard would refuse. The last two are **blockers**: Review shows them,
-Apply is disabled, and the host refuses Apply before writing a recovery copy;
-a live edit that adds one is not sent. Other invalid data is refused by its
-editor, the profile decoder or save preflight rather than offered for
-confirmation.
+This is static analysis, not an input simulator. It models layer-source
+resolution and participation. It does not prove pointing interception,
+interruption, host bindings, scan cadence, fingers or overlapping chords
+feasible, and unknown paths stay possible. Revisit the proof against the
+firmware's release-matrix tests when release precedence changes.
 
 ## Layer reachability and escape
 
-Ark checks sets of held/locked states through shared Boolean decisions, so
-independent layer controls do not expand into an exponential list of states.
-A permanently available TO(0), or universally available toggles for every
-lockable layer, proves a way home directly. Other profiles receive complete
-forward reachability and backward escape checks under the same conservative
-action model. A held layer can be released; traps concern locks that remain
-after release. Two separately escapable layers can still cover each other's
-exits together, so those interactions remain part of the check.
+A **trap** is a set of locked layers, reachable from rest, from which Base
+cannot be reached once every key is let go. The firmware has no timeout and
+no "clear all" key, so only unplugging recovers. The keyboard accepts such a
+profile, so Review says so before Apply (D-L36).
 
-Review reports the smallest trapping layer combinations, with concrete entry
-paths and repairs. Unrelated safe locks do not multiply one trap into thousands
-of findings. Paths include a hold release when it is needed to reach a later
-action. Up to four trapping combinations are named; any additional minimal
-combinations are counted. New, existing and fixed findings continue to follow
-layer identity through reordering.
+`layerReach` (`core/model/layer-reach.js`) models a state as locked layers
+plus layers held on top. Each key resolves as the firmware does: the highest
+active layer that is not transparent answers. A key moves the state by:
 
-Memory and work budgets keep checks responsive. If the compact proof cannot
-finish, a bounded explicit walk may still resolve a small graph (4,096 states,
-65,536 edges). Any remaining warning names the involved layers and opens one
-for inspection. If reachability was established but escape was not, layer and
-combo reachability findings remain valid and only escape is marked uncertain.
-A partial check never reports an unproved absence or marks an earlier finding
-fixed in the area that remains uncertain.
-Generated combo-output behaviours honor the source layer of the last declared
-combo member, which owns the output independently of physical press order.
-Reference remapping changes the matched code, never that physical source.
-When the owner code has several eligible placements, each placement's source
-conditions separately admit the row or its native fallback; another member's
-permissions cannot admit the output behaviour. Generated outputs have no
-physical placement: the behaviour master, global combo-output permission,
-per-combo output permission and behaviour row enable/allowed-origin-layer mask
-all apply. Layer behaviour switches and physical placement bypasses remain
-physical-only. A bypassed native output keeps its native effects; a bypassed
-custom output supplies no escape. Both exhaustive and symbolic reach analysis
-follow this policy, as the firmware's participation contract defines.
+- its own layer action, less what its row replaces (a row with steps drops
+  `TT()`'s fifth-tap lock);
+- its row's branches (a hold branch holds a layer only when it presses and
+  holds until release);
+- the combos its presses complete;
+- the trackball, which turns on the pointer layer unless the sniping layer
+  keeps it off.
 
-Current firmware times gestures physically, owns tapping and decides every
-`LT()`, `MT()` and `OSM()` key with or without a row (firmware D-F27; Profile
-Wire 1's feature bits 17, 18 and 31, implied by Profile Wire 2): QMK's tapping engine classifies no key, a row switched
-off or bypassed is ignored while the key keeps its own tap and hold, every
-dual-role key holds at the dual-role threshold unless its row sets its own, and
-a row without steps is no row, so `TT()` keeps its own taps under one. Ark
-requires all three (D-L64), so it gives no advice about combo buffering or
-native QMK tap classification, never says anything but the keyboard decides a
-key's tap or hold, and layer reach drops `TT()`'s locking tap only under a row
-with steps. General guidance still explains double hold as
-press–release–press-and-hold, the released repeat gap, and tap/hold
-classification; firmware buffering can postpone output even when it preserves
-physical gesture eligibility. None of these capabilities changes stored
-profile bytes.
-Firmware owns that policy and its native-key controls; Ark owns these findings
-and their presentation.
+Holding is not limited by fingers, and a one-shot counts as a hold. So the
+walk finds every way out a person could, and never invents a trap.
 
-## Built-in branches and behaviour previews
+`compactWalk` compiles keys and combos into conditions on active layers.
+`analyzeLayerStates` (`layer-state-graph.js`) explores them as shared Boolean
+decisions, so independent layers do not multiply into separate states.
 
-An empty tap or first-press hold is not "nothing": the keyboard runs the key's
-own action there. The behaviour grid shows it as a dashed "built in" cell,
-derived from the stored keycode. An empty tap sends the key's own tap once per
-press, so it is claimed at every tap count up to the row's deepest stored step
-and marked `×N` past a single tap; deeper counts are separate gestures and stay
-empty. The hold belongs to the first press. A plain key (a basic keycode, alone
-or with modifiers) taps itself and holds itself down as a fallback that any
-first-press hold or long hold replaces. Bare modifiers are buffered, not
-tapped, and claim nothing. Dual-role keys claim their own meaning too: an LT()
-row's tap and layer hold, an MT() or OSM() row's tap and modifier hold.
-The other hold tier also fills a cell. With no Long hold, nothing happens at
-its threshold and a release never selects it, so the press's Hold, set or
-built in, carries on as its helper runs (held, repeating, sending on release,
-or already sent at the Tap / hold threshold); the vocabulary's `holdWithoutLongHold`
-words it. With a Long hold and no Hold at all, the press stays in its tap
-window until Long hold, and a release in between sends that count's tap, set
-or built in; Ark claims this for plain keys, custom keys and macros
-(`releaseTaps`), not for layer keys (no tap once held past Tap / hold),
-pointing keys (their own hold) or bare modifiers.
-A dashed cell is display only; setting an action in it authors the tier
-(core/model/built-in-behavior.js, `impliedBranch` in webview/view/keyface.mjs).
-Built-in branches and inherited defaults are resolved once, from the profile
-and the firmware's advertised semantics, for the editor and Review alike
-(D-L49).
-New behaviour editors start with no authored branches, preserving these defaults.
-Selecting a key opens its row or an unstored grid; there is no separate Add
-behaviour edit. Only an edit that leaves the row changing something creates a
-draft row ([Rows that change nothing](#rows-that-change-nothing)). Previews never
-enter the host model's stored behaviour list, counts or board marks. Transparent keys and `KC_NO` have no
-behaviour editor, and the host rejects them as new or retargeted row targets.
-Behaviour rows are keyed by keycode, so in a layer preview selecting a
-transparent position opens the keycode the board shows there, answered from
-below (`behaviourKeyAt` in webview/view/behavior-editor.mjs), naming the layer
-that supplies it and that the row is shared by that keycode. A position answered
-by `KC_NO`, by nothing, or shown alone outside a preview keeps no editor.
-Changing the previewed layers re-resolves a row opened from the selected key; a
-row picked from the list stays (`toggleLayerOn` in webview/store.mjs).
-Opening a custom key's behaviour follows the same rule. A custom key with a
-shortcut (firmware D-F26) is built in like a plain key: its shortcut is its
-own tap and its fallback hold, and the dashed cells read as the shortcut
-(`builtInActions` with the profile's `customKeyShortcuts`). Without a
-shortcut it claims only `releaseTaps`.
-A custom key's behaviour follows the same rule on the Custom keys screen, which
-shows the selected key's editor in place, whether or not any layer holds the key.
-The host publishes built-in defaults for every custom key as well as for every
-keycode the profile holds (`behaviorDefaults` in core/session/device-model.js),
-so an unplaced key's unstored grid matches a placed one's (`releaseTaps`). Each
-screen shows at most one behaviour editor. The open cell belongs to the
-behaviour it was opened in (`cellRow` in webview/store.mjs), so it never opens
-in another behaviour's grid or takes the other screen's shortcuts, and a save
-reads the timing fields by their identity, which names the behaviour. The cell
-shortcuts (`keysShortcut` in webview/ui/keys/shortcuts.mjs) act on the cell
-open in the behaviour on screen: the Behaviours tab's row, or the custom key
-the Custom keys screen shows. Picking another custom key closes only a cell
-that key owned. **Change key…** on Custom keys follows the behaviour: to the
-custom key that now holds it, or to the Keys screen's Behaviours tab when it
-moved to any other key (`retargetBehaviour` in webview/ui/keys/retarget.mjs).
-**Show on the Keys screen** keeps the previewed layer if the key is reached
-there, and otherwise shows the first layer that reaches it.
+- A permanent `TO(0)`, or a toggle for every lockable layer, proves escape at
+  once. Otherwise a backward pass finds the states with a way home.
+- Separately escapable layers can still cover each other's exits, so layers
+  are checked together.
+- Review names up to four smallest trapping combinations, each with an entry
+  path and a fix, and counts the rest.
+- When the budget runs out before reachability is proved, `boundedWalk`
+  enumerates up to 4,096 states and 65,536 edges.
+- A check that still cannot finish is a `reachabilityIncomplete` warning
+  naming the layers involved. When only escape is unproved, the reachability
+  findings stand. Nothing is marked fixed where the check stayed uncertain.
+
+Besides traps, the walk reports unreachable layers and combos, layer keys left
+to QMK, and layer keys that do nothing (`findings` in `layer-reach.js`).
+
+Combo inputs follow QMK: the reference layer's raw keys when it differs from
+the highest active layer, else the resolved stack, transparency included.
+Outputs follow the firmware's
+[generated-output policy](../../upstream/firmware/docs/architecture/participation-policy.md#generated-outputs):
+the last declared member owns the output, and placement bypasses and layer
+behaviour switches are physical-only. A bypassed custom output supplies no
+escape.
+
+Held by `tests/model/layer-reach.test.js` ("compiled source and
+declared-owner conditions agree with an exhaustive profile oracle") and
+`tests/model/layer-state-graph.test.js` ("compact analysis agrees with
+exhaustive enumeration on seeded interacting graphs").
+
+## Built-in branches
+
+An empty tier is not "nothing": the keyboard runs the key's own meaning
+there.
+
+1. `builtInActions` (`core/model/built-in-behavior.js`) decides a key's
+   built-in tap and hold.
+2. `behaviorDefaults` (`core/session/device-model.js`) publishes them, with
+   the effective timing, its source setting and `timingAlone`. It does so for
+   every keycode the profile holds and every custom key, placed or not.
+3. The editor draws them as dashed cells (`impliedBranch` in
+   `webview/view/keyface.mjs`).
+
+A dashed cell is display only; setting an action in it authors that tier. A
+key's grid stays in the interface until an edit stores a row. The built-in
+tap of `LT(n, kc)` is `kc`. The `LT()` keycode is only the row's lookup key:
+copied into a tap branch, it would break the firmware's placement rules.
+Core refuses transparent keys and `KC_NO` as row targets
+(`key-behavior-edits.js`).
 
 ## Rows that change nothing
 
-A row without steps is no row (firmware D-F27 "Rows without steps"): it decides neither a key's taps nor whether the keyboard
-handles the key, its timing applies only to a key the keyboard handles anyway,
-and its enable and allowed layers gate only what it holds. Its auto-mouse
-anchor applies on any key. So a row **changes nothing** when it has no steps,
-does not keep the mouse layer on and has no timing that applies to its key.
-Keys handled anyway, as the firmware's key runtime classifies them
-(`key_behavior_lookup.c` and the action registry's runtime-handled kinds):
-dual-role keys (`MT()`, `LT()`, `OSM()`), the keys that hold a layer while
-down (`MO()`, `TT()`, `OSL()`, `LM()`) on a layer the keyboard has,
-pointing-mode holds and custom keys with a shortcut. `TO()`, `TG()`,
-`LOCK_LAYER()`, pointing-mode toggles, `DF()` and `PDF()` are not, so a row
-with only a timing on one of them changes nothing. The contract's own words
-("dual-role, layer and pd-mode keys") are broader; Ark follows the
-classification itself (Noah, 2026-10-19), and a firmware change to it is an
-Ark follow-up.
+A row without steps is no row (firmware D-F27, "Rows without steps"). Its
+timing applies only to a key the keyboard handles anyway. Its switch and
+layers gate only what it holds. Its auto-mouse anchor applies on any key. So
+`changesNothing` (`core/model/inert-behaviors.js`) holds for a row with no
+steps, no anchor and no timing that applies to its key.
 
-The rule is `changesNothing` in core/model/inert-behaviors.js. The host
-publishes it twice: each stored row's `changesNothing`, and each key's
-`timingAlone` in its behaviour defaults (whether a timing alone does
-something there; a key with none published counts as yes). The editor composes
-the same rule for the row it is about to post (`behaviourChangesNothing` in
-webview/view/behavior-editor.mjs); a test stages each case against a real
-draft and checks the two agree.
+`timingAlone` follows the firmware key runtime's classification. It is
+narrower than the contract's words ("dual-role, layer and pd-mode keys"):
+`TO()`, `TG()`, `LOCK_LAYER()`, pointing-mode toggles, `DF()` and `PDF()` are
+not handled anyway. A firmware change to it is an Ark follow-up.
 
-The editor keeps no such row. An edit that would create one posts nothing; an
-edit that leaves a stored row changing nothing posts its removal, so history
-says "Removed a behaviour", Review lists it as removed and Undo restores it.
-On a key where a timing alone does nothing, the timing fields wait for a
-branch, and the row's switch and layers wait for anything to gate; **Keeps the
-mouse layer on** stays available on every key and alone makes a row. Rows that
-already change nothing, read from the keyboard, imported or left by a retarget
-or a cleared shortcut, are kept until edited or removed: Review notes each as
-an `inertBehavior` notice opening its behaviour, the editor says why it
-changes nothing, and the hover card says so in place of its details. Ark
-removes nothing on read and refuses nothing the keyboard accepts.
+The rule crosses to the interface twice. `device-profile-view.js` publishes
+`changesNothing` per stored row. `behaviorDefaults` publishes `timingAlone`
+per key; a key with none counts as yes. `saveBehaviour`
+(`webview/view/edits.mjs`) composes the same rule for the row it would post:
 
-## Inherited timing and review
+- An edit that would create such a row posts nothing.
+- An edit that would leave a stored row so posts `deleteBehavior`, an
+  undoable "Removed a behaviour".
 
-The timing controls lead with **Multi tap window** (release to next press),
-followed by Tap / hold and Long hold. Behaviour and combo timing inputs show
-inherited or default-matching values as muted placeholders (`150 · default`),
-with no default/custom marker after `ms` in the label. Other values remain entered.
-Presentation alone never rewrites an explicit override that matches the default.
-When a behaviour timing default changes, explicit row values equal to that
-specific old default become inheritance zeros in the same draft step. Existing
-zeros follow naturally; distinct custom values stay fixed. A dual-role key's
-Tap / hold follows the dual-role default, other rows the normal threshold. Unchanged defaults and
-unrelated settings edits do not normalize rows.
-Review lists each inherited effective-time change under Tap & hold timing, with
-the affected behaviour and old/new milliseconds. Explicit matches adopting
-inheritance appear as stored behaviour changes grouped with the settings edit.
-Inherited effects are not independent discard units, so discarding the default
-does not discard unrelated edits on rows that already inherited it. Undo restores
-the entire step, including any former explicit values.
-The host supplies per-key defaults using the same timing
-resolution as review, including the dual-role threshold, which a dual-role key
-follows with or without a row. Displaying a default
-keeps the stored inheritance zero; changing another field never freezes it as an
-override. Clearing an override restores the default. An unchanged empty preview
-posts nothing.
-The target is a lookup key, not an implicit authored tap action: copying an
-`LT()` target into a tap branch would fail the firmware's placement rules.
+`tests/view/edits.test.mjs` ("the editor removes exactly the rows the host's
+review notes as changing nothing") holds both sides together. Rows read or
+imported that already change nothing are kept, each with an `inertBehavior`
+notice. Ark removes nothing on read.
+
+## Inherited timing defaults
+
+A stored timing of 0 follows the default.
+
+1. When a default changes, `editSettings` (`core/model/settings-editor.js`)
+   sets to 0 every explicit row value equal to the old effective default, in
+   the same draft step. An unrelated settings edit rewrites no row.
+2. `profileReview` (`core/model/profile-review.js`) lists each inherited-only
+   effect as a field of the Tap & hold timing change, and the rewritten rows
+   as behaviour changes.
+3. Review groups changes by the edit that made them, so discarding the
+   default discards both.
+
+The editor shows defaults from `behaviorDefaults` without writing them, so a
+displayed default stays a stored 0. Held by
+`tests/session/profile-draft-session.test.js` ("default timing edits move
+matching behaviours, report inherited effects, and discard atomically").

@@ -3,7 +3,7 @@
 The long version of the [README](../README.md): what each screen edits, how
 the interface behaves, what Review checks, what happens while a profile is
 applied, and how backups work. Developing Ark is described in
-[REPOSITORY.md](REPOSITORY.md#development-and-installation).
+[Developing Ark](development.md#development-and-installation).
 
 ## Installing and upgrading
 
