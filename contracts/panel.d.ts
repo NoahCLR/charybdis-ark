@@ -73,6 +73,9 @@ export interface LiveKeyboardView {
     saveFailed: boolean;
     /** A save waits for a quiet keyboard (no key held) on either half. */
     storagePaused: boolean;
+    /** The master half stopped saving, or the slave half did: only a restart clears it (firmware D-F34). */
+    stopped: boolean;
+    peerStopped: boolean;
     quietMs: number;
 }
 export interface LedGroup {name: string; id: number; ledIndices: number[]; expression: string; usageCount: number; usages: {target: string; owner: string}[]}
@@ -147,7 +150,7 @@ export interface PublishedModel {
     load: LoadView;
     /** A renamed keyboard that disconnected to take its new name, which the panel waits to see again. */
     /** Waiting for the keyboard to come back: renamed by a save, or `lost`. */
-    reconnecting: {name: string; lost: boolean} | null;
+    reconnecting: {name: string; lost: boolean; /** Ark restarted it (firmware D-F34). */ restart?: boolean} | null;
     /** What the connected firmware reports about itself; null with no keyboard read. */
     firmware: import('./model.js').FirmwareView | null;
     /** How edits reach this keyboard (stored on it): 0 Apply, 1 Live, 2 Live + review; the modes Ark offers. Null without a keyboard. */

@@ -15,7 +15,7 @@
 // landed. An edit is never replayed.
 
 const {PROFILE_EDIT_V1, EDIT_RESULT, EDIT_RESULT_NAMES, EDIT_PHASE, EDIT_FLAGS, buildEditBeginRequest, buildEditSpliceRequest, buildEditDataRequest,
-    buildEditCommitRequest, buildEditAbortRequest, buildSaveRequest, buildRevertRequest, buildEditModeRequest, sendEditRequest,
+    buildEditCommitRequest, buildEditAbortRequest, buildSaveRequest, buildRevertRequest, buildEditModeRequest, buildRestartRequest, sendEditRequest,
     readEditProgress, readEditStatus, readEditMode} = require("../protocol/profile-edit-v1");
 const {diffProfiles, applySplices, spliceEditFits} = require("../schema/profile-splices");
 const {PROFILE_DOMAIN_IDS} = require("../schema/profile-blob-v1");
@@ -55,11 +55,15 @@ class LiveEditError extends Error {
     }
 }
 
-/** @param {number} result @param {string} what @param {{session?: number, revision?: number, refusal?: unknown, candidateError?: number}} [details] */
+// A keyboard whose profile storage stopped refuses everything but a restart
+// (firmware D-F34); it says so in its flags, and then so does the refusal.
+/** @param {number} result @param {string} what @param {{session?: number, revision?: number, flags?: number, refusal?: unknown, candidateError?: number}} [details] */
 function refused(result, what, details = {}) {
     const name = EDIT_RESULT_NAMES[result] || `RESULT_${result}`;
-    const code = result === EDIT_RESULT.STALE ? "LIVE_EDIT_STALE" : result === EDIT_RESULT.NOT_CLEAN ? "LIVE_EDIT_NOT_CLEAN" : "LIVE_EDIT_REFUSED";
-    return new LiveEditError(code, `${what}: ${LIVE_RESULT_WORDS[name] || `the keyboard answered ${name}.`}`, {result: name, ...details});
+    const stopped = result !== EDIT_RESULT.OK && Boolean((details.flags ?? 0) & (EDIT_FLAGS.STOPPED | EDIT_FLAGS.PEER_STOPPED));
+    const code = stopped ? "LIVE_KEYBOARD_STOPPED" : result === EDIT_RESULT.STALE ? "LIVE_EDIT_STALE" : result === EDIT_RESULT.NOT_CLEAN ? "LIVE_EDIT_NOT_CLEAN" : "LIVE_EDIT_REFUSED";
+    const words = stopped ? LIVE_RESULT_WORDS.STOPPED : LIVE_RESULT_WORDS[name] || `the keyboard answered ${name}.`;
+    return new LiveEditError(code, `${what}: ${words}`, {result: name, ...details});
 }
 
 // The other half refused the working copy, as an edit and as a whole copy:
@@ -115,8 +119,8 @@ class LiveEditCoordinator {
 
     // A SET the keyboard may answer BUSY while the other half catches up or
     // something else holds the profile: asked again until it is taken. A
-    // BUSY because the halves are apart, or the other half is not connected,
-    // never ends by waiting. A save holds
+    // BUSY because the halves are apart, the other half is not connected or a
+    // half stopped never ends by waiting. A save holds
     // the profile until it lands (in Live the keyboard's own starts 3 s after
     // an edit and takes seconds, more for a large profile), so while the
     // keyboard says one runs the wait is a save's, asked at a save's pace.
@@ -127,11 +131,13 @@ class LiveEditCoordinator {
             const reply = await this.send(build());
             if (reply.result !== EDIT_RESULT.BUSY) return reply;
             if (reply.flags & EDIT_FLAGS.PEER_REFUSED) throw apart(what);
+            // A stopped half ends only by a restart (D-F34): no waiting.
+            if (reply.flags & (EDIT_FLAGS.STOPPED | EDIT_FLAGS.PEER_STOPPED)) throw refused(reply.result, what, {session: reply.session, revision: reply.revision, flags: reply.flags});
             if ((reply.flags & EDIT_FLAGS.PEER_REQUIRED) && !(reply.flags & EDIT_FLAGS.PEER_KNOWN)) throw absent(what);
             const saving = (reply.flags & EDIT_FLAGS.SAVING) !== 0;
             const catchingUp = (reply.flags & EDIT_FLAGS.PEER_KNOWN) && !(reply.flags & EDIT_FLAGS.PEER_CONVERGED);
             const limit = saving ? this.timing.saveMs : catchingUp ? this.timing.catchUpMs : this.timing.busyMs;
-            if (this.now() - started > limit) throw refused(reply.result, what, {session: reply.session, revision: reply.revision});
+            if (this.now() - started > limit) throw refused(reply.result, what, {session: reply.session, revision: reply.revision, flags: reply.flags});
             await this.sleep(saving ? Math.max(this.timing.pollMs, SAVE_POLL_MS) : this.timing.pollMs);
         }
     }
@@ -166,14 +172,14 @@ class LiveEditCoordinator {
         const before = await this.progress();
         const transactionId = this.transactionIds.next(before.lastTransactionId, before.transactionId);
         const begin = await this.sendWhenFree(() => buildEditBeginRequest(transactionId, {...identity, splices: replacement ? 0 : diff.splices.length, insertTotal: stream.length, replacement}), "The keyboard did not take the edit");
-        if (begin.result !== EDIT_RESULT.OK) throw refused(begin.result, "The keyboard did not take the edit", {session: begin.session, revision: begin.revision});
+        if (begin.result !== EDIT_RESULT.OK) throw refused(begin.result, "The keyboard did not take the edit", {session: begin.session, revision: begin.revision, flags: begin.flags});
         try {
             if (!replacement) for (const [index, splice] of diff.splices.entries()) await this.expect(buildEditSpliceRequest(transactionId, index, splice), "The keyboard refused part of the edit");
             for (let offset = 0; offset < stream.length; offset += PROFILE_EDIT_V1.DATA_MAX) {
                 await this.expect(buildEditDataRequest(transactionId, offset, stream.subarray(offset, offset + PROFILE_EDIT_V1.DATA_MAX)), "The keyboard refused part of the edit");
             }
             const commit = await this.send(buildEditCommitRequest(transactionId, stream));
-            if (commit.result !== EDIT_RESULT.QUEUED && commit.result !== EDIT_RESULT.OK) throw refused(commit.result, "The keyboard refused the edit", {session: commit.session, revision: commit.revision});
+            if (commit.result !== EDIT_RESULT.QUEUED && commit.result !== EDIT_RESULT.OK) throw refused(commit.result, "The keyboard refused the edit", {session: commit.session, revision: commit.revision, flags: commit.flags});
         } catch (error) {
             await this.send(buildEditAbortRequest(transactionId)).catch(() => {});
             throw error;
@@ -182,7 +188,7 @@ class LiveEditCoordinator {
         const status = await this.status();
         if (done.lastResult !== EDIT_RESULT.OK) {
             const details = done.lastResult === EDIT_RESULT.VALIDATION_REJECTED ? {refusal: status.refusal} : {};
-            throw refused(done.lastResult, "The keyboard refused the edit", {session: done.session, revision: done.revision, ...details});
+            throw refused(done.lastResult, "The keyboard refused the edit", {session: done.session, revision: done.revision, flags: status.flags, ...details});
         }
         const bytes = replacement ? Buffer.from(to) : result;
         // A tripwire on Ark's own splicing: the keyboard's working copy must
@@ -196,7 +202,7 @@ class LiveEditCoordinator {
     /** @param {Buffer} request @param {string} what */
     async expect(request, what) {
         const reply = await this.send(request);
-        if (reply.result !== EDIT_RESULT.OK) throw refused(reply.result, what, {session: reply.session, revision: reply.revision});
+        if (reply.result !== EDIT_RESULT.OK) throw refused(reply.result, what, {session: reply.session, revision: reply.revision, flags: reply.flags});
         return reply;
     }
 
@@ -243,13 +249,13 @@ class LiveEditCoordinator {
         const transactionId = this.transactionIds.next(before.save.lastTransactionId, before.save.transactionId);
         const reply = await this.sendWhenFree(() => buildSaveRequest(transactionId, identity), "The keyboard did not save");
         if (reply.result === EDIT_RESULT.OK) return {saved: false, ...(await this.status())};
-        if (reply.result !== EDIT_RESULT.QUEUED) throw refused(reply.result, "The keyboard did not save", {session: reply.session, revision: reply.revision});
+        if (reply.result !== EDIT_RESULT.QUEUED) throw refused(reply.result, "The keyboard did not save", {session: reply.session, revision: reply.revision, flags: reply.flags});
         const until = this.now() + this.timing.saveMs;
         for (;;) {
             const status = await this.status();
             onProgress(status);
             if (status.save.phase === 0 && status.save.lastTransactionId === transactionId) {
-                if (status.save.lastResult !== EDIT_RESULT.OK) throw refused(status.save.lastResult, "The keyboard did not save", {session: status.session, revision: status.revision, candidateError: status.save.lastError});
+                if (status.save.lastResult !== EDIT_RESULT.OK) throw refused(status.save.lastResult, "The keyboard did not save", {session: status.session, revision: status.revision, flags: status.flags, candidateError: status.save.lastError});
                 return {saved: true, ...status};
             }
             if (this.now() > until) throw new LiveEditError("LIVE_SAVE_PENDING", "The keyboard has not finished saving. Keep both halves connected and read the keyboard again.");
@@ -301,7 +307,7 @@ class LiveEditCoordinator {
         const before = await this.progress();
         const transactionId = this.transactionIds.next(before.lastTransactionId, before.transactionId);
         const reply = await this.sendWhenFree(() => buildRevertRequest(transactionId, identity), "The keyboard did not revert");
-        if (reply.result !== EDIT_RESULT.OK && reply.result !== EDIT_RESULT.QUEUED) throw refused(reply.result, "The keyboard did not revert", {session: reply.session, revision: reply.revision});
+        if (reply.result !== EDIT_RESULT.OK && reply.result !== EDIT_RESULT.QUEUED) throw refused(reply.result, "The keyboard did not revert", {session: reply.session, revision: reply.revision, flags: reply.flags});
         const until = this.now() + this.timing.editMs;
         for (;;) {
             const progress = await this.progress();
@@ -309,6 +315,16 @@ class LiveEditCoordinator {
             if (this.now() > until) throw new LiveEditError("LIVE_EDIT_PENDING", "The keyboard has not finished reverting. Release held keys; Ark reads the keyboard again.");
             await this.sleep(this.timing.pollMs);
         }
+    }
+
+    // Restart both halves (firmware D-F34): the way out of a keyboard whose
+    // profile storage stopped. Taken in any state, so never asked again; the
+    // keyboard drops off USB right after it answers. Whether the slave half
+    // acknowledged says whether it restarts too.
+    async restart() {
+        const reply = await this.send(buildRestartRequest(this.transactionIds.next()));
+        if (reply.result !== EDIT_RESULT.OK) throw refused(reply.result, "The keyboard did not restart", {flags: 0});
+        return {peerAcknowledged: Boolean(reply.peerAcknowledged)};
     }
 
     // The edit mode, stored on both halves; confirmed by reading it back.
@@ -324,7 +340,7 @@ class LiveEditCoordinator {
         if (reply.result === EDIT_RESULT.NOT_CLEAN && (reply.flags & EDIT_FLAGS.ADJUSTMENT_PENDING) && !(reply.flags & EDIT_FLAGS.UNSAVED)) {
             throw new LiveEditError("LIVE_EDIT_NOT_CLEAN", `${what}: a DPI or lighting key change has not reached both halves yet. Wait a moment and try again.`, {result: "NOT_CLEAN"});
         }
-        if (reply.result !== EDIT_RESULT.OK) throw refused(reply.result, what);
+        if (reply.result !== EDIT_RESULT.OK) throw refused(reply.result, what, {flags: reply.flags});
         const read = await this.mode();
         if (read.mode !== mode) throw new LiveEditError("LIVE_MODE_UNCONFIRMED", "The keyboard did not confirm its new edit mode. Read the keyboard again.");
         return {...read, notStored: (await this.progress()).modeNotStored};

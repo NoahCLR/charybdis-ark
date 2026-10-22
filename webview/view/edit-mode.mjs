@@ -69,16 +69,28 @@ export function questionWords(question, changes, {mode = question === "saveOrRev
         answers: [{pending: /** @type {const} */ ("discard"), label: "Discard draft"}, {pending: /** @type {const} */ ("send"), label: checks.length ? "Send anyway" : "Send live", primary: true}]};
 }
 
+// A keyboard that stopped saving (firmware D-F34) says so, for either half;
+// nothing but a restart clears it, so that is the one thing offered.
+export const STOPPED_WORDS = Object.freeze({
+    title: "The keyboard stopped saving",
+    detail: "Restart it to continue. Ark keeps any unsaved edits and puts them back once it is back; typing works meanwhile.",
+    rail: "Stopped saving · Restart",
+    tip: "The keyboard stopped saving and refuses Save, Revert and edits until it restarts. Restart it from the bar below; unplugging works too, but loses unsaved edits.",
+});
+
 /**
  * Where a live keyboard's edits stand, by what it says (edit status), as one
  * line with its tone and the one action that helps. Null when there is
  * nothing to say. Live + review's ordinary "unsaved" is the commit bar's own.
  * @param {Draft | null | undefined} draft
- * @returns {null | {kind: 'refused' | 'failed' | 'saving' | 'pending' | 'saved', tone: 'err' | 'warn' | 'draft' | 'ok', title: string, detail: string, action: null | 'revert' | 'save'}}
+ * @returns {null | {kind: 'stopped' | 'refused' | 'failed' | 'saving' | 'pending' | 'saved', tone: 'err' | 'warn' | 'draft' | 'ok', title: string, detail: string, action: null | 'restart' | 'revert' | 'save'}}
  */
 export function liveSaveState(draft) {
     const live = draft?.live, keyboard = live?.keyboard;
     if (!live) return null;
+    // Stopped outranks everything: "catching up" and "not ready" were what
+    // a stopped keyboard used to look like.
+    if (keyboard?.stopped || keyboard?.peerStopped) return {kind: "stopped", tone: "err", title: STOPPED_WORDS.title, detail: STOPPED_WORDS.detail, action: "restart"};
     if (live.apart) return {kind: "refused", tone: "err", title: "Halves apart",
         detail: "The slave half refused these edits, so the halves run different profiles and nothing can be saved. Revert puts both back on the saved profile; Undo (⌘Z) sends the edits again.", action: "revert"};
     if (keyboard?.adjustmentPending) return {kind: "pending", tone: "draft", title: "Keyboard adjustment pending",

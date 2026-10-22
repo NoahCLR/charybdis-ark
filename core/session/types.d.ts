@@ -176,6 +176,8 @@ export interface PanelSession extends DemoSession {
     lostAt?: number;
     /** What the keyboard held before the last successful Apply, for "Put back what it had". */
     beforeApply?: {document: import('../model/types.js').PortableDocument; deviceId: string | null | undefined; savedAt: string};
+    /** A restart Ark asked for (keyboard-restart.js): the unsaved edits it keeps to send back once the keyboard is read again, and their recovery copy. */
+    restart?: {deviceId: string | null | undefined; serialNumber: string; kept?: import('../model/types.js').PortableDocument; recovery?: string; peerAcknowledged: boolean};
     service: DemoSession['service'] & {portable?: import('../model/types.js').ProfileSnapshot | null};
 }
 /** Model publication reads portable data without invoking device operations. */
@@ -227,6 +229,9 @@ export interface LiveKeyboardStatus {
     peerRefused: boolean;
     /** Storing the edit mode failed; the keyboard keeps trying. */
     modeNotStored: boolean;
+    /** The master half's profile storage stopped, or the slave half says its did: only a restart clears it (firmware D-F34). */
+    stopped: boolean;
+    peerStopped: boolean;
     quietMs: number;
 }
 /** A Live + review read: the working copy as the snapshot, the saved profile beside it. */
@@ -270,15 +275,19 @@ export interface ControlService extends DraftApplyService {
     readLiveStatus(): Promise<import('../protocol/types.js').EditStatus | undefined>;
     close(): Promise<void>;
     emitChange?(): void;
-    /** A save renamed the keyboard: its coming disconnect is expected (keyboard-reconnect.js). */
-    expectReconnect?(expected: boolean): void;
+    /** A save renamed the keyboard, or Ark restarted it: its coming disconnect is expected (keyboard-reconnect.js). */
+    expectReconnect?(expected: boolean, reason?: string): void;
+    /** What the keyboard runs now, read as one revision (GET 0x21). */
+    readWorkingCopy(): Promise<{metadata: import('../protocol/types.js').ActiveProfileMetadata; bytes: Buffer}>;
+    /** Restart both halves (firmware D-F34); whether the slave half acknowledged. */
+    restartKeyboard(): Promise<{peerAcknowledged: boolean}>;
     /** The keyboard the connection was last lost to unexpectedly, once (keyboard-reconnect.js). */
     takeLost?(): LostKeyboard | undefined;
 }
 /** A keyboard whose connection was lost unexpectedly: what it was, and what happened. */
 export interface LostKeyboard {deviceId: string; serialNumber: string; product: string; otherDevices: readonly {id: string; product?: string}[]; what: string; /** It left a request unanswered: Ark closed the connection, the keyboard stayed. */ unanswered: boolean}
 /** A renamed keyboard the panel waits to see again (keyboard-reconnect.js). */
-export interface ExpectedReconnect {deviceId: string; serialNumber: string; name: string; otherDevices: readonly {id: string; product?: string}[]; startedAt: number; dropped: boolean; saved?: string; /** Lost unexpectedly rather than renamed: what happened. */ lost?: string}
+export interface ExpectedReconnect {deviceId: string; serialNumber: string; name: string; otherDevices: readonly {id: string; product?: string}[]; startedAt: number; dropped: boolean; saved?: string; /** Lost unexpectedly rather than renamed: what happened. */ lost?: string; /** Restarted because Ark asked, rather than renamed. */ restart?: boolean; /** Said after how the wait ended: what followed the read. */ after?: string}
 export interface ControlHost extends PanelHost {
     progress?: <T>(title: string, work: () => Promise<T>) => Promise<T>;
     saveRecovery?: SaveRecovery;

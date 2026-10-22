@@ -50,7 +50,7 @@ matrix.
 | Keyboard name | The keyboard's own name, its USB product string, edited as the Keyboard screen's title and stored in the settings domain; an Apply that renames it is followed through the keyboard's USB restart (D-L62) |
 | Backup and restore | Complete current-format backup files, restore review against the keyboard, the copies saved before each Apply (each usable as a draft) and verified restore; older formats are refused, never converted (D-L15, D-L23, D-L54, D-L64) |
 | Drafts and Apply | One draft with item-by-item review, discard by edit group, Show, undo/redo and history; the review checks reachable actions, confirms warnings and traps and blocks what the destination cannot save; Apply names its steps and halves and says where a failure happened (D-L19, D-L23, D-L29, D-L30, D-L36, D-L60, D-L61) |
-| How edits reach the keyboard | Per keyboard, stored on it, three modes: **Live + review** (the default) sends every edit, undo and discard to the keyboard's working copy at once, asks before one adds a trap or warning, reviews the working copy against the saved profile and Saves or Reverts on the keyboard; **Live** sends edits the same way and the keyboard saves them by itself after 3 s of quiet, which Ark shows as "saved by the keyboard" from its status; **Apply** keeps edits in Ark's draft as before. Switching asks Save/Revert or Send/Discard first where work would be lost; leaving Live has the keyboard save first. Edits the keyboard's adjustment keys make are read again as news; toggles a key turned off show as turned off by key (D-L65, D-L66, firmware D-F32) |
+| How edits reach the keyboard | Per keyboard, stored on it, three modes: **Live + review** (the default) sends every edit, undo and discard to the keyboard's working copy at once, asks before one adds a trap or warning, reviews the working copy against the saved profile and Saves or Reverts on the keyboard; **Live** sends edits the same way and the keyboard saves them by itself after 3 s of quiet, which Ark shows as "saved by the keyboard" from its status; **Apply** keeps edits in Ark's draft as before. Switching asks Save/Revert or Send/Discard first where work would be lost; leaving Live has the keyboard save first. Edits the keyboard's adjustment keys make are read again as news; toggles a key turned off show as turned off by key. A keyboard that stopped saving says so in place of "not ready" or "catching up", and **Restart** restarts both halves, keeping unsaved edits with a recovery copy and sending them back once it is back (D-L65, D-L66, D-L67, firmware D-F32, D-F34) |
 | Firmware supported | Current firmware only: the new base, Profile Wire 2.0 and profile schema 4.0, required exactly (major and minor), whose version implies everything the keyboard does; the feature word only describes the build (split, saves, pointing). A keyboard on anything else, the previous base included, is read no further than its identity and told to update; a keyboard whose saved profile is in an earlier store format or retired test layout says it runs its built-in defaults (D-L48, D-L64) |
 | Recovery | One-store atomic Apply, differential profile transfer, firmware commit recovery after the decision, resume after a lost or power-cycled peer link, verified running-layout reads or an unavailable layout during recovery, bounded cancel owned by the keyboard (D-L20–D-L22, D-L27, D-L39, D-L58) |
 | Where it runs | The VS Code extension, and a web page in Chrome or Edge over WebHID; Cloudflare Git integration publishes `dev` to `ark-dev.ncleroy.dev`, `main` to `ark.ncleroy.dev`, and task branches to PR previews; a phone gets only a notice (D-L02, D-L52) |
@@ -97,8 +97,22 @@ Remaining before calling the product complete:
   recovery restore, and another keyboard already using the target name.
   Automated tests use fake adapters only.
 
+- **Restart needs keyboard acceptance (D-L67).** With unsaved edits in Live +
+  review and in Live, press Restart (on firmware with D-F34, the stop forced
+  as the firmware direction describes): both halves come back once, the
+  recovery copy holds the edits, and they come back unsaved (Live + review)
+  or saved by the keyboard (Live). Restart with nothing unsaved. In VS Code
+  and in Chrome: Ark follows the same keyboard back without a choice, and
+  Chrome keeps its permission. Automated tests use a fake keyboard that
+  drops off and comes back.
+- **A stopped keyboard under an Apply draft is not named yet (D-L67).** The
+  stopped flags reach live drafts only; an Apply draft still shows a refused
+  Apply as the keyboard not being ready. The look between edits already reads
+  the flags under an Apply draft; the Apply bar does not show them.
 - **Post-decision failures need keyboard acceptance (D-L23).** Lost split
-  authority or a concurrent commit (`AUTHORITY_FAILED`) requires a USB replug.
+  authority or a concurrent commit (`AUTHORITY_FAILED`) stops the keyboard
+  (firmware D-F34): in a live mode Ark offers Restart; otherwise it requires a
+  USB replug.
   Each half keeps a complete profile; there is no input fence or host rewrite.
   Confirm the restart guidance and that both halves recover one complete
   generation. Automated checks cannot establish physical interruption safety.
@@ -1570,6 +1584,60 @@ Considered: Ark asking for Save after its own 3 s timer in Live; rejected
 because the keyboard already does it with or without Ark, and two schedulers
 would race. Considered: retrying a STALE edit on the reread state; rejected
 for the reason above.
+
+### D-L67 — A keyboard that stopped saving says so, and Ark restarts it
+
+*Builds on D-L62 (following a keyboard back), D-L65, D-L66 and firmware D-F34
+(edit status flags 14 and 15, Profile Wire SET `0x28`; see
+[a stopped keyboard, and Restart](../upstream/firmware/docs/architecture/profile-wire-v1.md#a-stopped-keyboard-and-restart)).*
+
+On 2026-10-19 a Live + review Save stopped the keyboard's profile storage:
+every later Save, Revert and edit was refused `INVALID_STATE`, Ark said "the
+keyboard was not ready", the rail said the slave half was catching up, and
+only unplugging got it going again, which lost the unsaved edits.
+
+**Saying so.** Flag 14 (the master half stopped) or 15 (the slave half says it
+did) is one state, **stopped**, which outranks every other live state (halves
+apart, a failed save, an adjustment pending, catching up): the rail says
+**Stopped saving · Restart**, the bar **The keyboard stopped saving. Restart it
+to continue.** with Restart as its only action, and a refusal the keyboard
+gives while its flags say so (code `LIVE_KEYBOARD_STOPPED`) ends with the same
+sentence instead of "not ready".
+
+**Restarting.** Restart is a draft control bound to no Apply, since a stopped
+keyboard's draft may be stale. With unsaved edits Ark reads what the keyboard
+runs (GET `0x21`; the draft's own copy of it if that read fails, which is what
+Ark last confirmed), saves it as a recovery copy exactly as Apply saves one,
+and restarts only once that copy is saved. It sends the restart, expects the
+keyboard to drop off (no error), and follows the same keyboard back as after
+a rename (D-L62), by serial number or else by its unchanged name. Once that
+keyboard is read again, the kept edits go back as one live edit, a whole
+replacement when too large for one, unsaved: Live + review leaves them for
+review and Save, Live's own save takes them. The notice says how the restart
+ended, then what became of the edits.
+
+**When it goes wrong**, Ark says what and names the recovery copy: firmware
+without restart answers unhandled and nothing happens (unplug instead); a
+slave half that did not acknowledge may leave the halves apart, since a
+prepared copy it holds is released by nothing until it restarts too (firmware
+D-F34's open issue), so Ark says to unplug if they do not agree; a keyboard
+that stops again at once has a fault in flash or firmware, and the edits are
+not sent to it; a keyboard that does not come back is said at the wait's
+bound.
+
+**Never automatic.** Ark offers Restart only when the keyboard says it
+stopped, and never restarts it by itself: a restart loses what runs unsaved,
+and only a person should choose that over unplugging.
+
+**No capability check.** Firmware D-F34 adds no feature bit (its D-F28: the
+2.0 base is unreleased). Firmware without restart never sets the flags, so
+Ark never offers it there; one that answers SET `0x28` unhandled is told
+apart above.
+
+Considered: offering Restart in the keyboard menu at any time. Not decided
+here: it would also help a keyboard whose halves stay apart after an
+unacknowledged restart, but a restart then is a choice about losing unsaved
+edits that the stopped state makes for the person.
 
 ## Historical decisions
 

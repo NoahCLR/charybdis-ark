@@ -360,3 +360,36 @@ test("leaving Live waits for a queued key adjustment even before it becomes unsa
     assert.equal(keyboard.working, null);
     assert.equal(validateSnapshot({...document(), profile: keyboard.saved.toString("base64")}).layers[0][9], 0x06);
 });
+
+// Firmware D-F34: restart is taken in any state and answers whether the slave
+// half acknowledged; a stopped keyboard's refusals say so instead of "not ready".
+test("restart is sent with its confirmation and says whether the slave half took it", async t => {
+    for (const unanswered of [false, true]) {
+        const {service, keyboard} = await live(t);
+        keyboard.raised.stopped = true;
+        if (unanswered) keyboard.faults.restartUnacknowledged = true;
+        const coordinator = service.liveCoordinator();
+        assert.deepEqual(await coordinator.restart(), {peerAcknowledged: !unanswered});
+        const sent = keyboard.mutations.at(-1);
+        assert.equal(sent[2], 0x28);
+        assert.equal(sent.subarray(5, 9).toString("latin1"), "REST");
+        assert.equal(keyboard.restarting.restarts, 1);
+    }
+});
+
+test("a stopped keyboard's refusals name the stop and carry their own code", async t => {
+    const {service, keyboard} = await live(t);
+    keyboard.raised.peerStopped = true;
+    const status = await service.liveCoordinator().status();
+    assert.deepEqual([status.stopped, status.peerStopped], [false, true]);
+    await assert.rejects(service.liveCoordinator().save({session: status.session, revision: status.revision}),
+        error => error.code === "LIVE_KEYBOARD_STOPPED" && /The keyboard did not save: the keyboard stopped saving\. Restart it to continue\./.test(error.message));
+    // BUSY with flag 15 (the other half stopped) ends only by a restart: asked once.
+    const modeChanges = () => keyboard.requests.filter(r => r[0] === 0x07 && r[2] === 0x27).length;
+    const before = modeChanges();
+    await assert.rejects(service.liveCoordinator().setMode(EDIT_MODE.LIVE), {code: "LIVE_KEYBOARD_STOPPED"});
+    assert.equal(modeChanges() - before, 1, "no retry while a half is stopped");
+    keyboard.raised.peerStopped = false;
+    await assert.rejects(service.liveCoordinator().post({from: keyboard.saved, to: target(layers => {layers[0][3] = 0x05;}), identity: {session: 0, revision: 0}, capacity: 130048}),
+        error => error.code !== "LIVE_KEYBOARD_STOPPED", "a keyboard that is not stopped is refused as before");
+});

@@ -15,7 +15,7 @@ import {boardOutlineMarkup} from "../view/geometry.mjs";
 import {demoOf} from "../view/demo.mjs";
 import {openHistory} from "./history.mjs";
 import {bindEditModeSwitch, editModeSwitch} from "./edit-mode.mjs";
-import {LIVE, editsAreLive, liveSaveState} from "../view/edit-mode.mjs";
+import {LIVE, editsAreLive, liveSaveState, STOPPED_WORDS} from "../view/edit-mode.mjs";
 
 // The review opens at once; the host marks it reviewed when it answers.
 function openReview() {
@@ -52,7 +52,7 @@ export function rail() {
     const halves = halvesWords(model, health.halves);
     const keyboardDot = demo.active
         ? {tone: "demo", tip: "Nothing is connected. The demo runs Ark's own draft over a demo setup; only Apply needs a keyboard."}
-        : reconnecting ? {tone: "", tip: reconnecting.lost ? "Ark lost the keyboard and is connecting it again." : "Reconnecting so the keyboard takes its new name. It comes back by itself in a moment."}
+        : reconnecting ? {tone: "", tip: reconnecting.restart ? "The keyboard is restarting. It comes back by itself in a moment, and Ark reads it again." : reconnecting.lost ? "Ark lost the keyboard and is connecting it again." : "Reconnecting so the keyboard takes its new name. It comes back by itself in a moment."}
         : !device.connected ? {tone: "err", tip: "No keyboard is connected."}
         : {tone: health.halves === "agree" ? "ok" : health.halves === "unread" ? "" : "warn", tip: `${busyWords}${halves.label}. ${halves.detail}`};
 
@@ -129,6 +129,8 @@ function liveStatus(draft) {
     const lines = [];
     // The halves apart have their own line below.
     const saving = liveSaveState(draft);
+    // A keyboard that stopped saving: one line, in place of the halves'.
+    if (saving?.kind === "stopped") return `<div class="stat live-save stopped" data-tip="${esc(STOPPED_WORDS.tip)}"><i class="dot err"></i> ${esc(STOPPED_WORDS.rail)}</div>`;
     if (saving && saving.kind !== "refused") {
         const words = saving.kind === "pending" ? `${count ? `${count} change${count === 1 ? "" : "s"}` : "Edits"} not saved yet` : saving.title;
         lines.push(`<div class="stat live-save ${saving.kind}" data-tip="${esc(saving.detail)}"><i class="dot ${saving.tone}${saving.kind === "saving" ? " busy" : ""}"></i> ${esc(words)}</div>`);
@@ -325,6 +327,16 @@ export function commitBar() {
 function liveCommitBar(draft) {
     const live = /** @type {NonNullable<typeof draft.live>} */ (draft.live);
     const saving = liveSaveState(draft);
+    if (saving?.kind === "stopped") {
+        const node = el(`<div class="commit live stopped">
+            <span class="n"><i class="dot err"></i> <strong>${esc(saving.title)}</strong>
+            <span class="muted">${esc(saving.detail)}</span></span>
+            <span class="sep"></span>
+            <button class="btn primary" data-act="restart" ${draft.connected ? "" : "disabled"}
+                data-tip="Restart both halves. A recovery copy of any unsaved edits is saved first; the keyboard comes back in a moment and Ark puts them back.">Restart</button></div>`);
+        /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="restart"]')).addEventListener("click", () => post(controls.restartKeyboard()));
+        return node;
+    }
     if (saving?.kind === "failed") {
         const node = el(`<div class="commit live ${saving.kind}">
             <span class="n"><i class="dot ${saving.tone}"></i> <strong>${esc(saving.title)}</strong>

@@ -36,6 +36,9 @@ const PHASE = Object.freeze({
     LIVE_SAVE: "live-save",
     LIVE_REVERT: "live-revert",
     EDIT_MODE: "edit-mode",
+    // Restarting both halves (firmware D-F34), the way out of a keyboard
+    // that stopped saving.
+    RESTART: "restart",
 });
 /** @type {Readonly<Record<import('../../contracts/model.js').PhaseId, Readonly<import('../../contracts/model.js').PhaseWords>>>} */
 const PHASE_WORDS = Object.freeze({
@@ -60,6 +63,8 @@ const PHASE_WORDS = Object.freeze({
     [PHASE.LIVE_SAVE]: Object.freeze({label: "saving", busy: "Saving the keyboard's edits on both halves", writes: true}),
     [PHASE.LIVE_REVERT]: Object.freeze({label: "reverting", busy: "Putting back the saved profile", writes: false}),
     [PHASE.EDIT_MODE]: Object.freeze({label: "changing how edits reach the keyboard", busy: "Changing how edits reach the keyboard", writes: false}),
+    // A restart writes nothing: the keyboard reads its saved profile again.
+    [PHASE.RESTART]: Object.freeze({label: "restarting", busy: "Restarting both halves", writes: false}),
 });
 
 // Why the keyboard did not take a live edit, Save, Revert or mode change, by
@@ -82,6 +87,8 @@ const LIVE_RESULT_WORDS = Object.freeze({
     READ_ERROR: "the keyboard could not read or store it.",
     ABORTED: "a save, an Apply or the other half replaced the profile meanwhile, or the edit was left unfinished (a Revert, or nothing arrived for 15 seconds).",
     PUBLICATION_FAILED: "the keyboard could not switch to the result.",
+    // Not a result: the keyboard's flags say its profile storage stopped.
+    STOPPED: "the keyboard stopped saving. Restart it to continue.",
 });
 
 // How edits reach a keyboard (stored on it, firmware D-F32), all three

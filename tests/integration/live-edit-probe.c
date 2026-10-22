@@ -1,13 +1,15 @@
 // Ark's live-edit reports against the selected firmware's production Profile
 // Wire edit channel and working copy (D-F32). The owner between them is this
 // probe's: one half, whose Save, mode and other-half facts are fields the
-// corpus sets, so every reply layout and flag reaches Ark's decoders. No
-// keyboard or HID is opened.
+// corpus sets, so every reply layout and flag reaches Ark's decoders. The
+// restart (D-F34) is the probe's too: it counts what the channel asks for and
+// answers whether the other half acknowledged. No keyboard or HID is opened.
 #include QMK_KEYBOARD_H
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "users/noah/lib/compat/qmk_keyboard_restart.h"
 #include "users/noah/lib/compat/qmk_profile_edit_channel.h"
 #include "users/noah/lib/compat/qmk_portable_profile.h"
 #include "users/noah/lib/key/behavior/participation.h"
@@ -28,11 +30,12 @@ static struct {
     uint16_t transaction;
     uint32_t session, revision;
 } saving;
+static unsigned long restarts, restart_acknowledged = 1u;
 
-// Restart (SET 0x28): whether the other half acknowledged it, reply byte 17.
-static bool restart_peer_acknowledges;
+// The channel asks for a restart only after the confirmation checked out.
 bool noah_qmk_keyboard_restart_request(void) {
-    return restart_peer_acknowledges;
+    restarts++;
+    return restart_acknowledged != 0u;
 }
 
 // Held keys, as the owner's safe-boundary check reports them.
@@ -106,7 +109,6 @@ static bool set(const char *name, unsigned long value) {
     }
     FIELD("peer_required", owner.peer_required)
     FIELD("halves_agree", owner.halves_agree) /* edit status flag 2 */
-    FIELD("restart_peer_acknowledges", restart_peer_acknowledges)
     FIELD("peer_known", owner.peer.known)
     FIELD("edits_blocked", owner.edits_blocked)
     FIELD("saved_compiled", owner.saved_compiled)
@@ -122,6 +124,9 @@ static bool set(const char *name, unsigned long value) {
     FIELD("peer_refused", owner.peer_refused)
     FIELD("mode_store_failed", owner.mode_store_failed)
     FIELD("adjustment_pending", owner.adjustment_pending)
+    FIELD("stopped", owner.stopped)
+    FIELD("peer_stopped", owner.peer_stopped)
+    FIELD("restart_acknowledged", restart_acknowledged)
     FIELD("saved_generation", owner.saved_generation)
     FIELD("saved_origin", owner.saved_origin)
     FIELD("peer_phase", owner.peer.phase)
@@ -196,6 +201,8 @@ int main(int argc, char **argv) {
             assert(noah_profile_working_copy_status(&copy, &status) && noah_profile_working_copy_read(&copy, 0, active, status.length));
             for (uint32_t n = 0; n < status.length; n++) printf("%02x", active[n]);
             puts("");
+        } else if (strcmp(line, "restarts\n") == 0) {
+            printf("%lu\n", restarts);
         } else if (strcmp(line, "saved\n") == 0) {
             printf("%04x %08lx %08lx\n", saving.transaction, (unsigned long)saving.session, (unsigned long)saving.revision);
         } else if (sscanf(line, "set %47s %lu", name, &value) == 2) {

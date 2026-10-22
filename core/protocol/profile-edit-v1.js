@@ -3,8 +3,8 @@
 
 // Live edits on the wire (firmware D-F32, profile-wire-v1.md "Live Edits"):
 // the frames that send an edit to the keyboard's working copy, Save it,
-// Revert it and set the edit mode, and the reads that say where the working
-// copy is. One report per call; the order of an edit, polling and retries are
+// Revert it, set the edit mode and restart the keyboard (firmware D-F34),
+// and the reads that say where the working copy is. One report per call; the order of an edit, polling and retries are
 // the session's (core/session/live-edit-coordinator.js).
 
 const {u8, u16, u32, asBytes, protocolError} = require("../schema/bytes");
@@ -25,6 +25,9 @@ const PROFILE_EDIT_V1 = Object.freeze({
     VALUE_SAVE: 0x25,
     VALUE_REVERT: 0x26,
     VALUE_MODE: 0x27,
+    // SET only: restart both halves, confirmed by "REST" (firmware D-F34).
+    VALUE_RESTART: 0x28,
+    RESTART_CONFIRM: 0x54534552,
     // GET values: the edit status (pages 0–3), the active profile (paged,
     // wide), the runtime overrides and QMK's live values, the edit mode.
     VALUE_STATUS: 0x20,
@@ -69,8 +72,12 @@ const EDIT_FLAGS = Object.freeze({
     PEER_REFUSED: 1 << 11,
     MODE_NOT_STORED: 1 << 12,
     ADJUSTMENT_PENDING: 1 << 13,
+    // The master half's profile storage stopped, or the slave half says its
+    // did: only a restart clears it (firmware D-F34).
+    STOPPED: 1 << 14,
+    PEER_STOPPED: 1 << 15,
 });
-const KNOWN_EDIT_FLAGS = 0x3fff;
+const KNOWN_EDIT_FLAGS = 0xffff;
 
 // How the client's edits reach the keyboard, stored on the keyboard outside
 // every profile. A keyboard never set is in Live + review.
@@ -147,6 +154,15 @@ function identityRequest(value, transactionId, {session, revision}) {
 const buildSaveRequest = (transactionId, identity) => identityRequest(PROFILE_EDIT_V1.VALUE_SAVE, transactionId, identity);
 /** @param {number} transactionId @param {{session: number, revision: number}} identity */
 const buildRevertRequest = (transactionId, identity) => identityRequest(PROFILE_EDIT_V1.VALUE_REVERT, transactionId, identity);
+// Restart: the confirmation is what keeps a stray report from restarting
+// the keyboard. Taken in any state; the keyboard drops off USB right after
+// its answer.
+/** @param {number} transactionId */
+function buildRestartRequest(transactionId) {
+    const report = header(PROFILE_EDIT_V1.VALUE_RESTART, transactionId);
+    report.writeUInt32LE(PROFILE_EDIT_V1.RESTART_CONFIRM, 5);
+    return report;
+}
 /** @param {number} transactionId @param {number} mode */
 function buildEditModeRequest(transactionId, mode) {
     if (!(/** @type {number[]} */ (Object.values(EDIT_MODE))).includes(mode)) throw new RangeError("Unknown edit mode.");
@@ -161,16 +177,19 @@ function editReplyMatcher(response, request) {
     return actual.subarray(0, 5).equals(sent.subarray(0, 5));
 }
 
-// The answer to every SET: its result and where the working copy is now.
+// The answer to every SET: its result and where the working copy is now. A
+// restart's answer also says, in byte 17, whether the slave half took it.
 /** @param {Uint8Array} response @param {Uint8Array} request @returns {import("./types.js").EditReply} */
 function decodeEditReply(response, request) {
     const report = Buffer.from(normalizeRawHidReport(response, "edit reply"));
     if (!editReplyMatcher(report, request)) throw new ProfileEditProtocolError("CORRELATION_MISMATCH", "The edit reply does not match its request.");
-    if (report.subarray(17).some(byte => byte !== 0)) throw new ProfileEditProtocolError("NONCANONICAL_RESPONSE", "The edit reply has nonzero trailing bytes.");
+    const restart = report[2] === PROFILE_EDIT_V1.VALUE_RESTART;
+    if (report.subarray(restart ? 18 : 17).some(byte => byte !== 0) || (restart && report[17] > 1)) throw new ProfileEditProtocolError("NONCANONICAL_RESPONSE", "The edit reply has nonzero trailing bytes.");
     const result = report[5], flags = report.readUInt16LE(15);
     if (!(result in EDIT_RESULT_NAMES)) throw new ProfileEditProtocolError("INCOMPATIBLE_RESPONSE", `Unknown edit result ${result}.`);
     if (flags & ~KNOWN_EDIT_FLAGS) throw new ProfileEditProtocolError("INCOMPATIBLE_RESPONSE", "The edit reply has unknown flags.");
-    return {result, resultName: EDIT_RESULT_NAMES[result], phase: report[6], session: report.readUInt32LE(7), revision: report.readUInt32LE(11), flags};
+    return {result, resultName: EDIT_RESULT_NAMES[result], phase: report[6], session: report.readUInt32LE(7), revision: report.readUInt32LE(11), flags,
+        ...(restart ? {peerAcknowledged: report[17] === 1} : {})};
 }
 
 /** @param {import("../transport/types.js").RequestConnection} connection @param {Buffer} request @param {import("./types.js").ReadOptions} [options] */
@@ -195,6 +214,8 @@ const flagsOf = flags => ({
     peerRefused: Boolean(flags & EDIT_FLAGS.PEER_REFUSED),
     modeNotStored: Boolean(flags & EDIT_FLAGS.MODE_NOT_STORED),
     adjustmentPending: Boolean(flags & EDIT_FLAGS.ADJUSTMENT_PENDING),
+    stopped: Boolean(flags & EDIT_FLAGS.STOPPED),
+    peerStopped: Boolean(flags & EDIT_FLAGS.PEER_STOPPED),
 });
 
 // Edit status: page 0 this half, page 1 the other half and the save, page 2
@@ -324,6 +345,6 @@ async function readActiveProfile(connection, options) {
 
 module.exports = {PROFILE_EDIT_V1, EDIT_RESULT, EDIT_RESULT_NAMES, EDIT_PHASE, EDIT_FLAGS, EDIT_MODE, SPLICE_FLAGS, ProfileEditProtocolError,
     buildEditBeginRequest, buildEditSpliceRequest, buildEditDataRequest, buildEditCommitRequest, buildEditAbortRequest,
-    buildSaveRequest, buildRevertRequest, buildEditModeRequest, editReplyMatcher, decodeEditReply, sendEditRequest,
+    buildSaveRequest, buildRevertRequest, buildEditModeRequest, buildRestartRequest, editReplyMatcher, decodeEditReply, sendEditRequest,
     decodeEditStatusPages, decodeAutoSavePage, readEditStatus, decodeEditProgress, readEditProgress, decodeEditModePage, readEditMode, decodeRuntimePage, readRuntime,
     decodeActiveMetadata, readActiveProfile};

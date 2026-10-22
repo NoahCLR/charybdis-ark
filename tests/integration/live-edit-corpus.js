@@ -18,7 +18,7 @@ const {crc32, decodeProfileBlob, encodeProfileBlob, PROFILE_DOMAIN_IDS} = requir
 const {decodeSettings, encodeSettings} = require("../../core/schema/settings-domain-v1");
 const {decodeCapabilityPages} = require("../../core/protocol/profile-wire-v1");
 const {PROFILE_EDIT_V1, EDIT_RESULT, EDIT_RESULT_NAMES, EDIT_FLAGS, EDIT_PHASE, buildEditBeginRequest, buildEditSpliceRequest, buildEditDataRequest, buildEditCommitRequest,
-    buildEditAbortRequest, buildSaveRequest, buildEditModeRequest, sendEditRequest, readEditStatus, readEditProgress, readEditMode, readRuntime,
+    buildEditAbortRequest, buildSaveRequest, buildEditModeRequest, buildRestartRequest, sendEditRequest, readEditStatus, readEditProgress, readEditMode, readRuntime,
     readActiveProfile} = require("../../core/protocol/profile-edit-v1");
 const {validateSnapshot} = require("../../core/model/portable-profile");
 const {document32, CAPABILITIES_32} = require("../fixtures/pd-slots-32");
@@ -93,6 +93,7 @@ async function probe(label, saved) {
         /** @param {string} name @param {number} value */
         set: async (name, value) => assert.equal(await exchange(`set ${name} ${value}`), "ok", name),
         saved: async () => (await exchange("saved")).split(" ").map(word => parseInt(word, 16)),
+        restarts: async () => Number(await exchange("restarts")),
         close: () => {child.stdin.end(); child.kill(); reader.close();},
     };
 }
@@ -200,8 +201,9 @@ async function edit(keyboard, to, {replace = false, defaults} = {}) {
         const flagFields = /** @type {const} */ ([["peer_required", "peerRequired", EDIT_FLAGS.PEER_REQUIRED], ["halves_agree", "peerConverged", EDIT_FLAGS.PEER_CONVERGED],
             ["peer_known", "peerKnown", EDIT_FLAGS.PEER_KNOWN], ["edits_blocked", "editsBlocked", EDIT_FLAGS.EDITS_BLOCKED], ["saved_compiled", "savedCompiled", EDIT_FLAGS.SAVED_COMPILED],
             ["save_phase", "saving", EDIT_FLAGS.SAVING], ["mode_conflict", "modeConflict", EDIT_FLAGS.MODE_CONFLICT], ["storage_paused", "storagePaused", EDIT_FLAGS.STORAGE_PAUSED],
-            ["peer_storage_paused", "peerStoragePaused", EDIT_FLAGS.PEER_STORAGE_PAUSED], ["peer_refused", "peerRefused", EDIT_FLAGS.PEER_REFUSED], ["mode_store_failed", "modeNotStored", EDIT_FLAGS.MODE_NOT_STORED], ["adjustment_pending", "adjustmentPending", EDIT_FLAGS.ADJUSTMENT_PENDING]]);
-        for (const name of ["peer_required", "halves_agree", "peer_known", "edits_blocked", "saved_compiled", "save_phase", "mode_conflict", "storage_paused", "peer_storage_paused", "peer_refused", "mode_store_failed", "adjustment_pending"]) await keyboard.set(name, 0);
+            ["peer_storage_paused", "peerStoragePaused", EDIT_FLAGS.PEER_STORAGE_PAUSED], ["peer_refused", "peerRefused", EDIT_FLAGS.PEER_REFUSED], ["mode_store_failed", "modeNotStored", EDIT_FLAGS.MODE_NOT_STORED], ["adjustment_pending", "adjustmentPending", EDIT_FLAGS.ADJUSTMENT_PENDING],
+            ["stopped", "stopped", EDIT_FLAGS.STOPPED], ["peer_stopped", "peerStopped", EDIT_FLAGS.PEER_STOPPED]]);
+        for (const name of ["peer_required", "halves_agree", "peer_known", "edits_blocked", "saved_compiled", "save_phase", "mode_conflict", "storage_paused", "peer_storage_paused", "peer_refused", "mode_store_failed", "adjustment_pending", "stopped", "peer_stopped"]) await keyboard.set(name, 0);
         let seen = 0;
         for (const [field, key, bit] of flagFields) {
             await keyboard.set(field, 1);
@@ -230,7 +232,18 @@ async function edit(keyboard, to, {replace = false, defaults} = {}) {
         assert.deepEqual([published.lastResult, published.unsaved], [EDIT_RESULT.OK, true]);
         assert.ok((await keyboard.read()).equals(to));
         seen |= published.flags;
-        assert.equal(seen, 0x3fff, "every status flag reached Ark's decoder");
+        assert.equal(seen, 0xffff, "every status flag reached Ark's decoder");
+        // Restart (D-F34): Ark's frame through the firmware's channel, its
+        // confirmation checked there, the answer's byte 17 decoded here.
+        await keyboard.set("stopped", 1);
+        assert.deepEqual(await coordinator.restart(), {peerAcknowledged: true}, "taken while stopped");
+        await keyboard.set("restart_acknowledged", 0);
+        assert.deepEqual(await coordinator.restart(), {peerAcknowledged: false});
+        const stray = buildRestartRequest(0x22); stray[8] ^= 1;
+        assert.equal((await sendEditRequest(connection, stray, options)).resultName, "INVALID_ARGUMENT", "a wrong confirmation restarts nothing");
+        assert.equal(await keyboard.restarts(), 2);
+        await keyboard.set("stopped", 0);
+        console.log("restart: the confirmed frame is taken in any state, a wrong confirmation is refused, and the answer says whether the slave half took it");
         for (const [name, value] of /** @type {[string, number][]} */ ([["peer_phase", 1], ["peer_last_result", EDIT_RESULT.ABORTED], ["peer_transaction", 0x4321], ["peer_session", 0x5e550001], ["peer_revision", 9],
             ["peer_flags", 3], ["peer_mode", 1], ["save_last_result", EDIT_RESULT.PUBLICATION_FAILED], ["save_last_error", 9], ["save_last_transaction", 0x0bb0],
             ["saved_generation", 42], ["saved_origin", 1], ["peer_mode_counter", 7], ["peer_known", 1], ["mode_conflict", 1]])) await keyboard.set(name, value);
@@ -247,6 +260,6 @@ async function edit(keyboard, to, {replace = false, defaults} = {}) {
         const runtime = await readRuntime(connection, options);
         assert.deepEqual([runtime.combos, runtime.behaviours], [{master: true, override: false}, {master: true, override: true}]);
         assert.deepEqual([runtime.live.defaultDpi, runtime.live.rgbColor, runtime.live.defaultLayers, runtime.live.keymapOptions], [1600, 0xc8ff55, 5, 3]);
-        console.log("replies: the SET reply, status pages 0-2, the active profile's page 0, the mode and runtime pages, and flag bits 0-13 decode in Ark");
+        console.log("replies: the SET reply, status pages 0-2, the active profile's page 0, the mode and runtime pages, and flag bits 0-15 decode in Ark");
     } finally {keyboard.close();}
 })().catch(error => {console.error(error); process.exitCode = 1;});

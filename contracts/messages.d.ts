@@ -35,6 +35,8 @@ export interface ControlPayloads {
         cancelLiveEdit: {proposal: number};
         /** How edits reach the keyboard; `pending` says what happens to work in progress first. */
         setEditMode: {mode: 0 | 1 | 2; pending?: 'save' | 'revert' | 'send' | 'discard'; /** The question showed the draft's traps and warnings and the person went ahead. */ confirmChecks?: boolean};
+        /** Restart both halves (firmware D-F34), keeping unsaved edits to put back. */
+        restartKeyboard: Record<never, never>;
     };
     portable: {
         exportPortableProfile: {};

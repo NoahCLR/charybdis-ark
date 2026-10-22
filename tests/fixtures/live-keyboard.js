@@ -17,6 +17,12 @@
 // edit the other half refuses is sent to it once more as a whole copy, and
 // refused again leaves the halves apart (flag 11) until a Revert, with Save
 // and new edits BUSY meanwhile.
+//
+// A stopped keyboard (firmware D-F34: `raised.stopped`, `raised.peerStopped`)
+// says so in its flags and answers every SET but a restart INVALID_STATE. A
+// restart (SET 0x28 with "REST") answers, then boots as from power: what it
+// saved runs, nothing unsaved, a new session; `onRestart` is called just
+// after, so a test can drop the connection as USB would.
 
 const assert = require("node:assert/strict");
 const {fakeKeyboard} = require("./fake-keyboard");
@@ -29,7 +35,7 @@ const {PROFILE_WIRE_V1, PROFILE_ACTIVE_KIND, PROFILE_STATE_FLAGS} = require("../
 const {PROFILE_CANDIDATE_V1: C, CANDIDATE_ADMISSION: A, CANDIDATE_ERROR: CE} = require("../../core/protocol/profile-candidate-v1");
 const {PROFILE_EDIT_V1: E, EDIT_RESULT: R, EDIT_FLAGS: F, EDIT_PHASE} = require("../../core/protocol/profile-edit-v1");
 
-/** @typedef {{loseReply?: number, busy?: number, refuse?: number, peerLag?: number, stale?: boolean, saveFails?: number, peerRefuses?: number, peerCatchUp?: number, savePauses?: number, modeWriteFails?: boolean, modeReadFails?: number, lengthSkew?: number, autoSaveFails?: number, peerAbsent?: boolean}} LiveFaults */
+/** @typedef {{loseReply?: number, busy?: number, refuse?: number, peerLag?: number, stale?: boolean, saveFails?: number, peerRefuses?: number, peerCatchUp?: number, savePauses?: number, modeWriteFails?: boolean, modeReadFails?: number, lengthSkew?: number, autoSaveFails?: number, restartUnacknowledged?: boolean, noRestart?: boolean, stopsAgain?: boolean, workingReadFails?: boolean, peerAbsent?: boolean}} LiveFaults */
 const LEASE_MS = 15000;
 
 /** @param {import('./types.js').FakeKeyboardOptions & {mode?: number, session?: number, combosOverride?: boolean, behavioursOverride?: boolean, autoSaveAfterReads?: number}} options */
@@ -48,7 +54,7 @@ function liveKeyboard(options) {
     // raises directly: the other half refusing, storage waiting, the mode
     // unstored (beside the faults that bring them about).
     const auto = {inProgress: false, lastWasAutomatic: false, count: 0, revision: 0, generation: 0, quietReads: 0, transaction: 0x8000};
-    const raised = {peerRefused: false, peerStoragePaused: false, modeNotStored: false, adjustmentPending: false};
+    const raised = {peerRefused: false, peerStoragePaused: false, modeNotStored: false, adjustmentPending: false, stopped: false, peerStopped: false};
     const overrides = {combos: options.combosOverride ?? true, behaviours: options.behavioursOverride ?? true};
     /** @type {LiveFaults} */
     const faults = {};
@@ -78,7 +84,9 @@ function liveKeyboard(options) {
     }
     // A save of the keyboard's own that is running until `autoSave()` ends it.
     const startAutoSave = () => {auto.inProgress = true;};
-    const keyboard = {requests, mutations, unhandled, events, faults, overrides, raised, answer, startAutoSave,
+    /** @type {{restarts: number, onRestart?: () => void}} */
+    const restarting = {restarts: 0};
+    const keyboard = {requests, mutations, unhandled, events, faults, overrides, raised, answer, startAutoSave, restarting,
         autoSave() {auto.inProgress = false; return autoSave();},
         get working() {return working && Buffer.from(working);}, get saved() {return Buffer.from(saved);},
         get session() {return session;}, get revision() {return revision;}, get mode() {return mode;}, get generation() {return generation;},
@@ -95,7 +103,8 @@ function liveKeyboard(options) {
     // faults.peerAbsent: the other half is unplugged (flag 3 clear).
     const flags = () => (working ? F.UNSAVED : 0) | F.PEER_REQUIRED | (faults.peerAbsent ? 0 : F.PEER_KNOWN) | (peerBehind || apart || faults.peerAbsent ? 0 : F.PEER_CONVERGED) | (generation === 0 ? F.SAVED_COMPILED : 0)
         | (peerBehind || apart || pending ? F.EDITS_BLOCKED : 0) | (save.pauses ? F.SAVING | F.PEER_STORAGE_PAUSED : 0) | (auto.inProgress ? F.SAVING | F.EDITS_BLOCKED : 0) | (apart ? F.PEER_REFUSED : 0) | (modeNotStored ? F.MODE_NOT_STORED : 0)
-        | (raised.peerStoragePaused ? F.PEER_STORAGE_PAUSED : 0) | (raised.peerRefused ? F.PEER_REFUSED : 0) | (raised.modeNotStored ? F.MODE_NOT_STORED : 0) | (raised.adjustmentPending ? F.ADJUSTMENT_PENDING | F.EDITS_BLOCKED : 0);
+        | (raised.peerStoragePaused ? F.PEER_STORAGE_PAUSED : 0) | (raised.peerRefused ? F.PEER_REFUSED : 0) | (raised.modeNotStored ? F.MODE_NOT_STORED : 0) | (raised.adjustmentPending ? F.ADJUSTMENT_PENDING | F.EDITS_BLOCKED : 0)
+        | (raised.stopped ? F.STOPPED | F.EDITS_BLOCKED : 0) | (raised.peerStopped ? F.PEER_STOPPED | F.EDITS_BLOCKED : 0);
     // The lease: an edit being received with nothing accepted for 15 s ends.
     function expire() {
         if (!pending || clock - pending.touched <= LEASE_MS) return;
@@ -139,12 +148,27 @@ function liveKeyboard(options) {
     /** @param {Uint8Array} report */
     function answer(report) {
         const request = Buffer.from(report); requests.push(request);
-        const set = request[0] === E.COMMAND_SET && request[1] === 0 && request[2] >= 0x20 && request[2] <= 0x27;
+        const set = request[0] === E.COMMAND_SET && request[1] === 0 && request[2] >= 0x20 && request[2] <= E.VALUE_RESTART;
         if (set) mutations.push(request);
         const response = serve(request);
         // A lost answer: the keyboard took the report, the host hears nothing.
         if (set && faults.loseReply === request[2]) {delete faults.loseReply; return [];}
         return [response];
+    }
+    // Restart (firmware D-F34): answered, then the keyboard boots again.
+    /** @param {Buffer} r */
+    function restart(r) {
+        if (faults.noRestart) {const response = Buffer.from(r); response[0] = 0xff; unhandled.push(r); return response;}
+        if (r.readUInt16LE(3) === 0 || r.readUInt32LE(5) !== E.RESTART_CONFIRM || r.subarray(9).some(byte => byte !== 0)) return reply(r, R.INVALID_ARGUMENT);
+        const response = reply(r, R.OK);
+        response[17] = faults.restartUnacknowledged ? 0 : 1;
+        const stops = Boolean(faults.stopsAgain);
+        delete faults.restartUnacknowledged; delete faults.stopsAgain;
+        working = null; revision = 0; session = (session + 1) >>> 0; pending = null; peerBehind = 0; apart = false;
+        overrides.combos = true; overrides.behaviours = true; raised.stopped = stops; raised.peerStopped = false;
+        restarting.restarts++; refreshReader(); events.push("restart");
+        setTimeout(() => restarting.onRestart?.(), 1);
+        return response;
     }
     /** @param {Buffer} r */
     function serve(r) {
@@ -166,6 +190,7 @@ function liveKeyboard(options) {
                 return page(r, p);
             }
             if (r[2] === E.VALUE_ACTIVE) {
+                if (faults.workingReadFails && at === 0) {delete faults.workingReadFails; return page(r, Buffer.alloc(3));}
                 const bytes = active();
                 if (at === 0) {
                     const p = Buffer.alloc(25); p.set([E.ACTIVE_LAYOUT, 25]); p.writeUInt32LE(bytes.length, 2); p.writeUInt32LE(session, 6); p.writeUInt32LE(revision, 10);
@@ -185,7 +210,13 @@ function liveKeyboard(options) {
             if (response[0] === 0xff) unhandled.push(r);
             return response;
         }
-        if (r[0] !== E.COMMAND_SET || r[1] !== 0 || r[2] < 0x20 || r[2] > 0x27) {const response = cached.answer(r)[0]; if (response[0] === 0xff) unhandled.push(r); return response;}
+        if (r[0] !== E.COMMAND_SET || r[1] !== 0 || r[2] < 0x20 || r[2] > E.VALUE_RESTART) {const response = cached.answer(r)[0]; if (response[0] === 0xff) unhandled.push(r); return response;}
+        if (r[2] === E.VALUE_RESTART) return restart(r);
+        // Stopped: everything but a restart is refused (firmware D-F34); with
+        // the other half stopped this half's owner runs, and what needs both
+        // halves is BUSY (flag 15) until a restart.
+        if (raised.stopped) return reply(r, R.INVALID_STATE);
+        if (raised.peerStopped) return reply(r, R.BUSY);
         const transaction = r.readUInt16LE(3);
         // A queued key adjustment holds edits, Save and Revert; a mode change is
         // NOT_CLEAN, as with unsaved edits (Profile Wire admission).
