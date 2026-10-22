@@ -1634,10 +1634,11 @@ and only a person should choose that over unplugging.
 Ark never offers it there; one that answers SET `0x28` unhandled is told
 apart above.
 
-Considered: offering Restart in the keyboard menu at any time. Not decided
-here: it would also help a keyboard whose halves stay apart after an
-unacknowledged restart, but a restart then is a choice about losing unsaved
-edits that the stopped state makes for the person.
+Considered: offering Restart in the keyboard menu at any time. Dropped
+(Noah, 2026-10-22): Ark offers Restart only when the keyboard says it stopped.
+It would also have helped halves left apart after an unacknowledged restart,
+but since D-F34 such a half rejoins by itself, and a restart otherwise is a
+choice about losing unsaved edits that the stopped state makes for the person.
 
 ## Historical decisions
 
