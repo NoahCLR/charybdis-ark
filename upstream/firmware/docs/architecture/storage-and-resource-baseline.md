@@ -204,7 +204,19 @@ Inactive-slot commit ordering is:
 
 At boot, firmware selects the newest valid compatible slot. If neither slot is
 valid, it uses compiled defaults. Interrupted writes never invalidate the
-previous valid slot.
+previous valid slot. Boot selection is the only path that validates and adopts a
+saved slot from scratch; it runs the header, checksum and shape checks in bounded steps,
+and the store says what it found in each slot (`boot_slot_result`).
+
+The store answers its own state questions, and its callers ask them rather
+than read its fields: the committed record, whether a prepare is active,
+whether the store is settled (no prepare and no outstanding destructive-write
+reservation), the admitted candidate, whether the payload is fully staged,
+whether it is durably prepared and waiting for a decision, and whether a final
+marker awaits a boot scan (`profile_store.h`). They are static inline;
+the compiler may keep one out of line as a small leaf of its own, and the reviewed stack paths are measured as built. Slot addressing (a slot's start, and its
+payload's after the 36-byte header) has its one home there too; where those
+addresses fall on flash pages stays with the flash backend (D-F29).
 
 Generation counters are strictly monotonic unsigned 32-bit values. Zero is
 invalid and `UINT32_MAX` is an exhausted terminal generation: v1 never wraps to
@@ -386,9 +398,12 @@ policy decides when one may run.
   erase never shares a grant with the writer, and a save simply waits while
   the keyboard is busy. Should a write still reach unerased flash, the backend
   erases first rather than write it.
-- **A grant programs at most one page.** The writer's grant writes at most
-  one split chunk (106 bytes) in store writes of at most 20, so its pages fill
-  at most once; each commit step writes one record and syncs it.
+- **A grant programs at most one page.** A grant repeats the store's steps
+  only until one erases or programs (D-F29, "Pacing"), and a step writes, in
+  order and in store writes of at most 20 bytes, at most a page: a REUSE step
+  copies up to 256 bytes of its range, a received split chunk is at most 106
+  bytes, and each commit step writes one record and syncs it. So a step fills
+  at most one page, and a grant programs at most one.
 
 A save waits while the keyboard cannot safely erase. D-F32 excludes that
 wait from the owner's host and split no-progress clocks: the waiting half

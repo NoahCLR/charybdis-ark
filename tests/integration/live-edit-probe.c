@@ -29,6 +29,12 @@ static struct {
     uint32_t session, revision;
 } saving;
 
+// Restart (SET 0x28): whether the other half acknowledged it, reply byte 17.
+static bool restart_peer_acknowledges;
+bool noah_qmk_keyboard_restart_request(void) {
+    return restart_peer_acknowledges;
+}
+
 // Held keys, as the owner's safe-boundary check reports them.
 static uint32_t safe(void *context) {
     (void)context;
@@ -99,7 +105,8 @@ static bool set(const char *name, unsigned long value) {
         return true; \
     }
     FIELD("peer_required", owner.peer_required)
-    FIELD("peer_converged", owner.peer_converged)
+    FIELD("halves_agree", owner.halves_agree) /* edit status flag 2 */
+    FIELD("restart_peer_acknowledges", restart_peer_acknowledges)
     FIELD("peer_known", owner.peer.known)
     FIELD("edits_blocked", owner.edits_blocked)
     FIELD("saved_compiled", owner.saved_compiled)

@@ -96,7 +96,7 @@ Metadata, prepare begin, prepare commit, and abort use this layout:
 | 0 | 1 | framing version, `4` |
 | 1 | 1 | frame kind |
 | 2 | 1 | status |
-| 3 | 1 | bit 0 has committed profile; bit 1 metadata readable; bit 2 reserved zero (a VIA-bound record until D-F31); bit 3 stable physical origin half; bit 4 the persistent override flag; bits 5–7 zero |
+| 3 | 1 | bit 0 has committed profile; bit 1 metadata readable; bit 2 reserved zero (a VIA-bound record until D-F31); bit 3 stable physical origin half; bit 4 the persistent override flag; bit 5 in METADATA only, its sender holds no prepared push (D-F34), zero in every other kind; bits 6–7 zero |
 | 4 | 1 | schema major, exactly the current schema major |
 | 5 | 1 | schema minor, exactly the current schema minor |
 | 6 | 1 | Profile Wire domain mask derived from the canonical payload |
@@ -113,10 +113,15 @@ domain mask in byte 30 beside a 16-bit length; version 3 packs both into the
 flags byte (the store allows one persistent flag, override) to make room for a
 32-bit length.
 
+Bit 5 is not the descriptor's: it says what the half that sent a METADATA
+frame holds, beside any descriptor, unreadable included
+([An abandoned prepared copy](#an-abandoned-prepared-copy-d-f34)).
+
 A readable compiled-default descriptor has no committed profile. Its
 generation, payload length, payload identities, persistent flags, and origin
 are all zero, while schema and firmware compatibility digests remain present.
-An unreadable descriptor is entirely zero apart from the frame header. A
+An unreadable descriptor is entirely zero apart from the frame header and
+bit 5. A
 committed descriptor requires a nonzero generation, a blob-sized payload, a
 valid physical origin, and only known persistent flags. Its domain mask may
 contain only advertised RGB, key-behavior, combo, settings and PD bits and must match the domains found by
@@ -190,7 +195,8 @@ The source identity is Profile Wire's candidate REUSE source (compiled sources
 have generation zero). The receiver holds a reuse like a chunk: only for the
 copy it is receiving, at or before its next offset (a later start is a gap and
 rejects the copy). It copies from its next offset to the range's end, at most
-106 bytes a scan in reads and writes of at most 20, checking the source's
+a flash page (256 bytes) a scan in reads and writes of at most 20, so a scan
+programs at most one page (D-F29, "Pacing"), checking the source's
 whole identity and its compiled-default and action-ABI digests on every read,
 as Profile Wire's REUSE does. Meanwhile it answers BUSY with reason `8`
 (copying) and its progress as the offset, and the ACK with the range's end
@@ -303,6 +309,17 @@ marker-last commit advance through the existing bounded scan-step interfaces.
 Success is reported only after marker readback and an explicit field-by-field
 comparison of the durable record, excluding only the local slot number.
 
+The peer store answers its own state questions, and the reconciler and owner
+ask them rather than spell out sets of states: whether it holds an unfinished
+copy (`holds_copy`), has a bounded step due (`working`), can still abort the
+copy because no commit decision is durable yet, though a prepared copy's
+marker is (`abortable`), holds a committed copy whose
+storage is still held for it so it waits to be published
+(`awaiting_activation`), or last admitted a given copy (`copy_matches`).
+They are static inline in `profile_peer_store_backend.h`; the compiler may keep one out of line as a small leaf of its own, and the reviewed stack paths are measured as built. The identity comparisons between a store record,
+a staged candidate and a split descriptor live in one header,
+`profile_record_identity.h`.
+
 The store now treats compiled-default digest as boot and candidate
 compatibility, derives the domain mask from the checksummed canonical payload,
 and latches an unconfirmed final marker as reconciliation-required. No later
@@ -311,6 +328,21 @@ that latch. The gated owner does not publish a boot-discovered exact record
 until it has also advanced the bounded whole-profile adoption validator for
 that exact selected record; the ordinary shell remains read-only and never
 activates the record.
+
+The owner publishes a received record's descriptor only while the half still
+holds its storage for that copy (`PEER` admission): first as the scan step
+that committed it returns, then again after each reconciler step that works
+until the copy activates and the admission is released. Each publishes the
+same descriptor, so a repeat is harmless. The peer store stays committed
+after the copy activates, so it can answer a sender's retry of the finished
+copy; that state alone is no sign of a new copy. A half that took the other
+half's copy (at start, when its own saved profile is gone, for example after
+an EEPROM clear) used to publish it again at every later reconciler step,
+long after the copy activated. During the next Apply or Save, which holds the
+storage for its own candidate, that publication failed and stopped the owner
+with a storage error: the save froze, the other half was no longer polled,
+and Save, Revert and edits answered `INVALID_STATE` until a restart (keyboard
+check, 2026-10-20).
 
 ## Scan-Owned Reconciler And QMK Adapter
 
@@ -328,8 +360,10 @@ before any deadline return; unchanged values need neither revalidation nor a
 replacement copy. This does not cache payload bytes or defer local changes.
 
 Matrix scan performs at most one transport exchange, one received chunk or
-one scan's share of a reuse range (at most 106 bytes, stored in writes of at
-most 20), or one validator/marker-last commit step of at most 20 bytes. It supports newer-local
+one scan's share of a reuse range (at most 256 bytes, stored in writes of at
+most 20), one validation step (up to twelve validator calls of at most 20
+bytes), or one marker-last commit step (one operation of at most 20 bytes; the
+payload readback up to 256 bytes in reads of at most 20). It supports newer-local
 push, newer-peer pull, staged-source prepare/pause/commit/abort,
 byte-identical retries, 50–1,000 ms backoff, disconnect/reconnect, prepared-
 sender preservation across role changes, passive-peer expiry, and terminal
@@ -390,6 +424,70 @@ plus `NOAH_PHYSICAL_HALF=right`. The physical setting overrides handedness in
   boundary and registers the split transport exactly once. The additional
   mutation gate exposes the path only in labeled hardware-test artifacts.
 
+## An abandoned prepared copy (D-F34)
+
+A prepared copy (the receiver's store `PREPARED`: every byte validated, its
+prepared marker durable, no commit asked for) is ended only by its push:
+`PREPARE_COMMIT` commits it and `ABORT` releases it. The receive lease never
+times it, since a sender pauses at the barrier, sending nothing, for as long
+as its owner takes to write its own commit marker. A push lives in its
+sender's RAM, so a sender that restarts (a USB half restarted alone, or by
+its watchdog) forgets it without ending it. The copy then held the
+receiver's storage, and the halves apart, until the receiver restarted too.
+
+So a METADATA request says when its sender holds no prepared push: bit 5 of
+byte 3. A master sets it in every poll while it holds none: from boot, and
+from the end of a push (it converged, its `ABORT` was acknowledged or
+answered with a storage error, it was cancelled before its `PREPARE_BEGIN`
+was sent, or it was released with its `ABORT` unacknowledged) until the next
+push begins. From the start of a push to its end the bit is clear, through
+the pause at the barrier, a fall back to the metadata poll and an `ABORT`
+under way. Clear claims nothing: a METADATA reply, every other kind and a
+build that does not know the bit all send it clear.
+
+The receiver releases the copy, writing its invalid commit marker and giving
+back its `PEER` admission, when it takes a poll with bit 5 set whose
+descriptor:
+
+- is readable: the sender has read what it saved. A sender still booting
+  releases nothing;
+- is not the copy. A sender authorizes the commit only once its own commit
+  marker is durable, so a sender whose saved profile is the copy decided to
+  commit it. It is the newer half, and its repair commits the copy:
+  `PREPARE_BEGIN` is answered at the copy's end and `PREPARE_COMMIT` follows,
+  with no byte sent again.
+
+It releases only a copy exactly `PREPARED` and not being pulled by this half.
+The peer store answers whether a poll's descriptor abandons its prepared
+copy (`noah_profile_peer_store_backend_prepared_copy_abandoned`); the
+reconciler adds only bit 5 and the pull. A copy committing, or of unknown durability (`RECONCILE_REQUIRED`), is never
+released. A poll that arrives while the copy is still being validated or
+prepared is taken once that step ends, since the scan advances the store
+before its mailbox, and so releases the copy once prepared. A poll that
+finds the mailbox full is answered but not queued, so the release comes at
+the first such poll this half takes. Besides a role change, nothing else
+releases a prepared copy: not time, and not the sender's silence (the
+passive peer timeout invalidates the peer's observation, not the copy).
+
+The claim is exact. The receiver's mailbox holds one request, the sender
+sends one at a time, and nothing is answered from the cached reply while a
+request waits in the mailbox, so a poll is taken before any request of a
+push begun after it, and a copy becomes prepared only by its push's `PREPARE_DURABLE`.
+A poll with bit 5 set therefore never meets a copy of a push its sender
+holds. The release runs in the scan step that takes the poll from the
+mailbox, its one storage operation; the split callback only copies the
+request there, as for every request.
+
+**No framing version moved.** A version moves when a frame both builds
+accept would mean different things to them. Every receiver refuses a
+descriptor frame with an unknown flag bit set, so a build without bit 5
+refuses a poll that sets it as an invalid frame and the halves fail closed,
+as they do on a version mismatch; and such a build never sets the bit, which
+a build with it reads as no claim, as the older build meant. Both halves run
+one build in any case, so this holds even for a pair that should not exist.
+It is also why the bit says "holds none" rather than "holds one": the clear
+bit, the only one an older build sends, is the reading that releases nothing.
+
 ## Working copy sync (D-F32)
 
 Live edits change each half's working copy in RAM (see
@@ -424,8 +522,15 @@ Every reply is 32 bytes: byte 0 kind with bit 7 set, 1–2 the sequence, 3 the
 result (the working copy's codes, Profile Wire), then the receiver's state:
 4–7 session, 8–11 revision, 12 phase, 13 last result, 14–15 transaction (in
 progress, else last), 16 flags (bit 0 unsaved edits, 1 its saved profile is
-the compiled defaults), 17–20 saved generation, 21 saved origin, 22–25 mode
-counter, 26 mode, 30–31 CRC-16.
+the compiled defaults, 2 its owner stopped), 17–20 saved generation, 21 saved
+origin, 22–25 mode counter, 26 mode, 30–31 CRC-16.
+
+A half whose live-profile owner stopped (D-F34: a state only a restart
+leaves) keeps answering: a status poll with OK, anything else with
+INVALID_STATE, every reply with flag bit 2, and acts on nothing. The USB half
+then sends it nothing but a status poll once a second, counts it apart (no
+edit, Save or mode change waits on it in vain) and reports it as Profile
+Wire edit status flag 15. A stopped USB half sends nothing.
 
 The USB half polls every 100 ms while the halves differ or an edit is on its
 way, every second while they agree, and forgets the other half after 3 s
@@ -461,6 +566,34 @@ when its keyboard is quiet (no key held and the matrix unchanged for 50 ms,
 the rule before a slot erase, D-F29), because QMK's EEPROM is wear-levelled
 flash that may erase. A failed write is tried again after 1 s, the wait
 doubling to 64 s, and reported (edit status flag bit 12) until one succeeds.
+
+## Keyboard restart (D-F34)
+
+A client's restart of both halves (Profile Wire SET `0x28`) reaches the other
+half on `PUT_KEYBOARD_RESTART`, a split RPC of its own. Each half registers
+it from housekeeping at start, apart from the profile owner, so a half takes
+it whatever state its owner is in, or if the owner never started.
+
+Both frames are 8 bytes: byte 0 kind (`1` request, `0x81` acknowledgement),
+1–4 the confirmation `52 45 53 54` ("REST"), 5 version `1`, 6–7 CRC-16
+(CCITT) of bytes 0–5. Each is one fixed sequence of bytes; any other request
+is answered with zeros and changes nothing. The receiving half's callback, on
+the split slave thread, notes the restart and answers the acknowledgement;
+its housekeeping resets the half 20 ms later, between main-loop passes, so
+never inside a flash erase or program. A request repeated before then is
+acknowledged again and keeps the first time. The USB half asks again every
+5 ms until it is acknowledged or 250 ms have passed, so a sector erase (45 ms
+typical) on the other half only delays it, and restarts itself either way.
+
+A USB half that restarts alone (the other half did not acknowledge), or is
+reset by its watchdog, forgets a save in flight. The other half's copy of it
+ends by itself: one still being received when its lease runs out
+(`NOAH_PROFILE_SPLIT_PREPARE_LEASE_MS`), a prepared one at the first poll
+the other half takes from the restarted half once it has read its saved
+profile, released if that is
+the old profile and committed by repair if the restarted half's commit
+marker had landed ([An abandoned prepared copy](#an-abandoned-prepared-copy-d-f34)).
+Each half keeps a whole saved profile throughout, and the halves rejoin.
 
 ## Remaining Exposure And Acceptance Pieces
 

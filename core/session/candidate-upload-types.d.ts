@@ -26,6 +26,8 @@ export interface CommitDecision {transactionId: number; digest: number; status: 
 export interface CommitOptions {onProgress?: (progress: CandidateProgress) => void; digest?: number; afterDecision?: (decision: CommitDecision) => Promise<void>}
 export interface UploadContext {
     adjustmentPending?: boolean;
+    /** An edit, a Revert or a save holds admission (the keyboard's edit progress). */
+    editHolds?: boolean;
     abortNeeded: boolean;
     afterDecision?: CommitOptions['afterDecision'];
     blob?: Buffer;

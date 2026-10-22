@@ -69,6 +69,13 @@ function refused(result, what, details = {}) {
 const apart = what => new LiveEditError("LIVE_HALVES_APART",
     `${what}: the slave half refused the keyboard's unsaved edits, so the halves run different profiles. Revert puts both back on the saved profile.`);
 
+// The other half is not heard (edit status flag 3 clear for 3 s): what needs
+// both halves stays BUSY until it is back, so waiting never ends it
+// (Profile Wire admission, "Edit mode").
+/** @param {string} what */
+const absent = what => new LiveEditError("LIVE_PEER_ABSENT",
+    `${what}: the slave half is not connected. Connect the cable between the halves and try again.`);
+
 // 16-bit transaction ids, nonzero, never one the keyboard last finished or is
 // still receiving.
 class TransactionIds {
@@ -108,7 +115,8 @@ class LiveEditCoordinator {
 
     // A SET the keyboard may answer BUSY while the other half catches up or
     // something else holds the profile: asked again until it is taken. A
-    // BUSY because the halves are apart never ends by waiting. A save holds
+    // BUSY because the halves are apart, or the other half is not connected,
+    // never ends by waiting. A save holds
     // the profile until it lands (in Live the keyboard's own starts 3 s after
     // an edit and takes seconds, more for a large profile), so while the
     // keyboard says one runs the wait is a save's, asked at a save's pace.
@@ -119,6 +127,7 @@ class LiveEditCoordinator {
             const reply = await this.send(build());
             if (reply.result !== EDIT_RESULT.BUSY) return reply;
             if (reply.flags & EDIT_FLAGS.PEER_REFUSED) throw apart(what);
+            if ((reply.flags & EDIT_FLAGS.PEER_REQUIRED) && !(reply.flags & EDIT_FLAGS.PEER_KNOWN)) throw absent(what);
             const saving = (reply.flags & EDIT_FLAGS.SAVING) !== 0;
             const catchingUp = (reply.flags & EDIT_FLAGS.PEER_KNOWN) && !(reply.flags & EDIT_FLAGS.PEER_CONVERGED);
             const limit = saving ? this.timing.saveMs : catchingUp ? this.timing.catchUpMs : this.timing.busyMs;
@@ -309,8 +318,13 @@ class LiveEditCoordinator {
     /** @param {number} mode */
     async setMode(mode) {
         const transactionId = this.transactionIds.next();
-        const reply = await this.sendWhenFree(() => buildEditModeRequest(transactionId, mode), "The keyboard did not change its edit mode");
-        if (reply.result !== EDIT_RESULT.OK) throw refused(reply.result, "The keyboard did not change its edit mode");
+        const what = "The keyboard did not change its edit mode";
+        const reply = await this.sendWhenFree(() => buildEditModeRequest(transactionId, mode), what);
+        // NOT_CLEAN also while a DPI or lighting key change awaits saving.
+        if (reply.result === EDIT_RESULT.NOT_CLEAN && (reply.flags & EDIT_FLAGS.ADJUSTMENT_PENDING) && !(reply.flags & EDIT_FLAGS.UNSAVED)) {
+            throw new LiveEditError("LIVE_EDIT_NOT_CLEAN", `${what}: a DPI or lighting key change has not reached both halves yet. Wait a moment and try again.`, {result: "NOT_CLEAN"});
+        }
+        if (reply.result !== EDIT_RESULT.OK) throw refused(reply.result, what);
         const read = await this.mode();
         if (read.mode !== mode) throw new LiveEditError("LIVE_MODE_UNCONFIRMED", "The keyboard did not confirm its new edit mode. Read the keyboard again.");
         return {...read, notStored: (await this.progress()).modeNotStored};

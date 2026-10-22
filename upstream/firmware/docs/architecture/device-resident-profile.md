@@ -2,7 +2,7 @@
 
 This document defines the ownership model for live editing with Charybdis Ark
 (the independent app repository in the
-[local workspace map](https://github.com/NoahCLR/charybdis-4x6/blob/e9a72ce493ec94bc3fd90bd7de6eae01884629c9/docs/DEVELOPMENT.md#local-repositories-and-worktrees)). It supersedes the earlier project assumption that the three C
+[local workspace map](https://github.com/NoahCLR/charybdis-4x6/blob/20bae239c9772c5cde4772feb41aca3450786336/docs/DEVELOPMENT.md#local-repositories-and-worktrees)). It supersedes the earlier project assumption that the three C
 authoring files must remain the only source of truth during a live editing
 session.
 
@@ -55,7 +55,10 @@ a revision, over the saved generation it began from. It has no authority at
 boot: a replug runs the saved generation. Live edits carry the session and
 revision they were made against, compare-and-swap at that grain; Save makes
 the working copy a new generation through the same commit path; Revert and
-an Apply end it. The saved profile (GET `0x04`), the compiled defaults
+an Apply end it. A restart (Profile Wire SET `0x28`, D-F34), the way out of
+an owner stopped by a storage or authority error, is a replug without
+unplugging: both halves boot their saved profile, and a client that kept the
+unsaved edits sends them back. The saved profile (GET `0x04`), the compiled defaults
 (`0x05`) and the active one, working copy included (`0x21`), read separately
 ([Profile Wire, Live Edits](profile-wire-v1.md#live-edits)).
 
@@ -65,8 +68,8 @@ The canonical schema-4 profile includes keymap domain `0x60` v1 (16 × 60
 little-endian keycodes) and macro domain `0x70` v1 (128 streams in the existing
 bank encoding, up to 34,903 bytes). Authored C remains the compiled default for
 both; the authored macros are also generated already in the bank encoding
-(`authored_macro_bank.h`, rebuilt with the firmware's encoder by
-`tools/profile_introspect.py --write` and checked by real-profile validation),
+(`authored_macro_bank.h`, rebuilt with the firmware's encoder by real-profile
+validation run with `NOAH_WRITE_AUTHORED_MACRO_BANK=1`, which otherwise checks it),
 so writing the compiled defaults copies bytes and compiles no macro. Domain
 omission falls back to those authored defaults, just as for the other optional
 domains, and so does a domain bit whose range cannot be found. Complete exports
@@ -164,7 +167,7 @@ physical capacity.
 
 The delivery slices are in Ark's product goal and the product's status in
 Ark's direction; the firmware's status is in the
-[firmware direction](https://github.com/NoahCLR/charybdis-4x6/blob/e9a72ce493ec94bc3fd90bd7de6eae01884629c9/docs/LIVE_EDIT_APP_DIRECTION.md#current-firmware-status).
+[firmware direction](https://github.com/NoahCLR/charybdis-4x6/blob/20bae239c9772c5cde4772feb41aca3450786336/docs/LIVE_EDIT_APP_DIRECTION.md#current-firmware-status).
 The one-store commit and recovery ordering are implemented (D-F31). The
 active phase is
 acceptance: reboot, reconnect, applicable USB/role configurations,

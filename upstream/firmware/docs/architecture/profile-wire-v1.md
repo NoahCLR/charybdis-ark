@@ -545,13 +545,13 @@ now: every Profile Wire 2 firmware does what the bit promised.
 | 18 | runtime-owned tapping: every key handled by userspace bypasses native QMK tapping, including authored MT/OSM rows and intrinsic TT/OSL ownership. An authored MT/OSM row without a first hold keeps the key's modifier hold past the tap-hold term, and keys pressed while such a runtime-owned LT/MT/OSM key is undecided wait for its tap or hold (both joined the bit on the same unreleased branch). Unhandled LT/MT/OSM keep native QMK tapping. Extends bit 17 without changing its physical timestamp contract or profile bytes |
 | 19 | wide pages: the payload, compiled, combo and settings readbacks (GET `0x04`, `0x05`, `0x06`, `0x07`) take a 16-bit page, request byte 4 its low byte and byte 5 its high byte, with bytes 6–31 reserved; their responses echo bytes 0–4 and the request id correlates them |
 | 20 | reserved, never advertised: participation controls ([participation policy](participation-policy.md)) come with the current settings and combo domain versions, so no bit announces them |
-| 21 | canonical UTF-8 macro text and settings scalar 27 Host settings and GET 0x0B OS readback; require this bit before writing either extension. See [runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/e9a72ce493ec94bc3fd90bd7de6eae01884629c9/docs/architecture/runtime-flow.md) |
-| 22 | host layouts: settings scalar 27 bits 16–23 name a layout from the [host layout catalogue](https://github.com/NoahCLR/charybdis-4x6/blob/e9a72ce493ec94bc3fd90bd7de6eae01884629c9/docs/architecture/host-layouts-v1.md) and bit 24 marks a macOS ISO keyboard; macro text is typed through that layout. Require this bit before writing bits 16–24. See [runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/e9a72ce493ec94bc3fd90bd7de6eae01884629c9/docs/architecture/runtime-flow.md) |
-| 23 | macro input protection: automatic protection when the selected layout needs Unicode entry, with optional per-macro `01 05 01` (On) or `01 05 02` (Off) prefixes. Require this bit before writing a prefix. New physical presses are ignored until released; earlier releases remain admitted. See [runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/e9a72ce493ec94bc3fd90bd7de6eae01884629c9/docs/architecture/runtime-flow.md) |
+| 21 | canonical UTF-8 macro text and settings scalar 27 Host settings and GET 0x0B OS readback; require this bit before writing either extension. See [runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/20bae239c9772c5cde4772feb41aca3450786336/docs/architecture/runtime-flow.md) |
+| 22 | host layouts: settings scalar 27 bits 16–23 name a layout from the [host layout catalogue](https://github.com/NoahCLR/charybdis-4x6/blob/20bae239c9772c5cde4772feb41aca3450786336/docs/architecture/host-layouts-v1.md) and bit 24 marks a macOS ISO keyboard; macro text is typed through that layout. Require this bit before writing bits 16–24. See [runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/20bae239c9772c5cde4772feb41aca3450786336/docs/architecture/runtime-flow.md) |
+| 23 | macro input protection: automatic protection when the selected layout needs Unicode entry, with optional per-macro `01 05 01` (On) or `01 05 02` (Off) prefixes. Require this bit before writing a prefix. New physical presses are ignored until released; earlier releases remain admitted. See [runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/20bae239c9772c5cde4772feb41aca3450786336/docs/architecture/runtime-flow.md) |
 | 24 | candidate reuse: copy bounded ranges from an identified active profile into the inactive candidate (`SET 0x1B`, below) |
 | 25 | candidate streaming chunks: admit sequential chunks and prove bounded batches through status (`SET 0x1C`, below) |
-| 26 | protected macro keyboard-output isolation: suspend already-held ordinary keys, send only macro keyboard output, restore current held modifiers and suppress remaining ordinary usages until release; requires bit 23. See [runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/e9a72ce493ec94bc3fd90bd7de6eae01884629c9/docs/architecture/runtime-flow.md) |
-| 27 | streaming stored macros: no separate compiled-program ceiling; slot bytes and terminators must fit the advertised macro capacity (34,903 bytes in this layout). See [runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/e9a72ce493ec94bc3fd90bd7de6eae01884629c9/docs/architecture/runtime-flow.md) |
+| 26 | protected macro keyboard-output isolation: suspend already-held ordinary keys, send only macro keyboard output, restore current held modifiers and suppress remaining ordinary usages until release; requires bit 23. See [runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/20bae239c9772c5cde4772feb41aca3450786336/docs/architecture/runtime-flow.md) |
+| 27 | streaming stored macros: no separate compiled-program ceiling; slot bytes and terminators must fit the advertised macro capacity (34,903 bytes in this layout). See [runtime flow](https://github.com/NoahCLR/charybdis-4x6/blob/20bae239c9772c5cde4772feb41aca3450786336/docs/architecture/runtime-flow.md) |
 | 28 | pointing-mode clicks: a direction or button-override tap in the PD domain may be a plain mouse button 1–8 (`0x00d1..0x00d8`). Require this bit before writing one; older firmware rejects it as `INVALID_ACTION`. See [PD-mode domain](pd-mode-domain-v1.md#taps-modifiers-and-buttons) |
 | 29 | pointing-mode macros: direction, diagonal and button tap overrides may start slots 0–127 (`0x7700..0x777f`), inherit policy and zero mask only. Require this bit before writing one. See [PD-mode domain](pd-mode-domain-v1.md#taps-modifiers-and-buttons) |
 | 30 | combo output behaviour permissions: settings header byte 5 bit 0 bypasses all combo output behaviours; combo v3 row flag bit 4 bypasses one output. Both zero means allowed. Native combo readback v3 row flag bit 5 reports the per-combo bypass. Require this bit before writing either extension. See [participation policy](participation-policy.md#combo-output-behaviour-permission) |
@@ -592,7 +592,8 @@ was never acknowledged, so the USB half released its own side after
 [authority state table](authority-state-table.md#cancelled-prepare-peer)). No
 marker exists on either half, and durable authority is unchanged. Until the
 peer acknowledges the retried ABORT, the keyboard starts no new save or split
-transfer; a peer that never does needs a restart. A decoder that predates the
+transfer; a peer that never does needs a restart (SET `0x28`, below, or a
+replug). A decoder that predates the
 bit rejects the status while it is set, as it rejects any unknown flag.
 
 Bit 9 (D-F28) means a slot holds a profile written in an earlier store format
@@ -735,14 +736,14 @@ generation. Destination ranges must start at the exact next staged offset.
 Ranges cannot exceed the source or declared target. Each read checks the active
 source's kind, origin, generation and both checksums, plus the build's compiled
 default and action ABI identities. The source stays active; only the inactive
-candidate is written. Read and write alternate in scan context, each accessing
-at most 20 bytes. Progress advances `next_offset` after each write, and the
-mailbox remains pending until the range finishes. REUSE increments the operation
+candidate is written. A scan step copies up to one flash page (256 bytes) of the
+range, each piece read and then written in at most 20 bytes, so a step programs
+at most one page (D-F29, "Pacing"). Progress advances `next_offset` after each
+write, and the mailbox remains pending until the range finishes. REUSE increments the operation
 sequence once, at completion; its operation ID is `6`. Source/read/write failure
 poisons the candidate. There is no implicit retry of a partially copied range.
 The range ceiling bounds one occupied mailbox and the wait before an abort can
-be admitted. Owner supersession can discard it earlier, including its scratch
-read. The transaction remains within the existing 256-byte state ceiling and
+be admitted. Owner supersession can discard it earlier, part copied. The transaction remains within the existing 256-byte state ceiling and
 holds only a 20-byte copy buffer, never a profile-sized RAM buffer.
 
 STREAM_CHUNK has CHUNK's layout and status operation ID (`2`), but admission
@@ -778,7 +779,9 @@ Commit is admitted only for the matching validated transaction. The scan owner
 writes and reads back the non-marker header, streams one payload readback,
 checks canonical top-level shape, writes the two-byte commit marker last, reads
 that marker back, and only then requests provider activation. Each scan step
-performs exactly one EEPROM operation of at most 20 bytes. Behavior activation
+performs one storage operation of at most 20 bytes, except the payload
+readback, which reads up to a flash page (256 bytes) a step in reads of at most
+20 (D-F29, "Pacing"). Behavior activation
 may remain in the activating state until the safe-boundary predicate clears;
 the prior generation remains active meanwhile. A duplicate commit for the same
 transaction is a no-op while commit/activation is progressing and after final
@@ -1048,6 +1051,7 @@ unhandled reply (command byte `0xFF`).
 | custom set | `0x25` | save the working copy | Live Edits, below |
 | custom set | `0x26` | revert the working copy | Live Edits, below |
 | custom get/set | `0x27` | edit mode | Live Edits, below |
+| custom set | `0x28` | restart both halves | Live Edits, below (D-F34) |
 
 Every mutating operation includes a nonzero transaction id. Candidate begin
 declares schema, length, CRC, digest, and requested domain mask. Chunks include
@@ -1061,7 +1065,9 @@ last operation, and operation sequence.
 
 USB receive context performs exact frame decoding and one bounded mailbox copy
 only. Semantic validation, EEPROM work, safe activation, and split convergence
-run from scan context.
+run from scan context. Restart (SET `0x28`) is the one exception: its handler
+asks the other half over a split RPC, for at most 250 ms, before it answers,
+since the keyboard restarts right after; it touches no profile state.
 
 ## Error Model
 
@@ -1154,6 +1160,13 @@ Input actions must be distinct, including after native translation;
 no-action/transparent inputs and callback/no-action outputs are rejected.
 Semantic references must exist in the compiled action ABI. Unknown versions,
 unknown flags, a short or overlong row and trailing bytes are rejected.
+The combo module states the native half once
+(`noah_profile_combo_v1_natives_valid`). The whole-profile validator applies it
+to what the firmware's translation hook returns, and the effective combo table
+applies it to the natives it materializes, so a profile the keyboard accepts
+always materializes its combos. The hook stays: calling the translator
+directly would make the QMK-free validator link QMK keycode translation in
+every runner and probe that compiles it.
 
 The output bypass flag does not disable the chord or change its inputs,
 output, timing or chord-layer mask. It is independent of the global output
@@ -1221,7 +1234,8 @@ edited the keyboard runs its saved profile (a committed slot, or the compiled
 defaults when nothing is saved) and the working copy is unused; the first
 edit starts it from the saved profile, and from then until Save, Revert, an
 Apply or a replug the keyboard runs the working copy: it has **unsaved
-edits**. A replug always boots the saved profile.
+edits**. A replug always boots the saved profile, and so does a restart
+(SET `0x28`, below).
 
 ### Identity: session and revision
 
@@ -1299,6 +1313,7 @@ Multi-byte fields are little-endian.
 | `0x25` save | 5–8 session, 9–12 revision |
 | `0x26` revert | 5–8 session, 9–12 revision |
 | `0x27` edit mode | 5 mode: `0` Apply, `1` Live, `2` Live + review |
+| `0x28` restart | 5–8 the confirmation `52 45 53 54` ("REST"); nothing after it (D-F34) |
 
 Splices and data arrive in order; a repeated report whose answer was lost is
 accepted again when it matches what was taken (a data report's bytes are
@@ -1315,13 +1330,15 @@ Every SET is answered in place: bytes 0–4 echoed, then
 | 7–10 | session |
 | 11–14 | revision |
 | 15–16 | edit status flags (page 0) |
+| 17 | restart only: `1` the other half acknowledged and restarts too, `0` it did not answer |
 
 Results: `0` OK, `1` QUEUED (the outcome comes later), `2` STALE, `3` BUSY
-(another edit, a save, an Apply, a publication waiting, a keyboard adjustment
-waiting to publish, or the other half not yet holding the same working copy), `4` INVALID_ARGUMENT (a malformed report
+(see Admission, below), `4` INVALID_ARGUMENT (a malformed report
 too), `5` INVALID_STATE, `6` WRONG_TRANSACTION, `7` OUT_OF_ORDER, `8`
 CAPACITY_EXCEEDED, `9` CHECKSUM_MISMATCH, `10` UNSUPPORTED_DOMAIN, `11`
-INVALID_SPLICE, `12` VALIDATION_REJECTED (page 2 says where), `13` NOT_CLEAN,
+INVALID_SPLICE, `12` VALIDATION_REJECTED (page 2 says where), `13` NOT_CLEAN
+(a mode change with unsaved edits or a keyboard adjustment not yet saved; a
+replacement over unsaved edits),
 `14` READ_ERROR (also: this half has nowhere to store the edit mode), `15`
 ABORTED (a save, an Apply or the other half's newer profile replaced the
 profile the edit was made against, or the edit was left unfinished: a
@@ -1329,16 +1346,32 @@ Revert, or no accepted report for 15 s), `16` PUBLICATION_FAILED. Phases: `0` id
 receiving, `2` loading (the first edit copying the saved profile), `3`
 validating, `4` waiting for a safe boundary, `5` reverting.
 
-A new edit, Save and a mode change are BUSY while anything else holds the
-profile and until the other half holds the same session and revision; an
-edit that has begun carries on. Revert never waits for the other half, which
-follows. An edit being received (phase `1`) holds a lease: with no accepted
-begin, splice or data report for 15 s on the keyboard's clock (which, as for
-an Apply, stops while storage waits for a quiet keyboard), the keyboard
-aborts it, last result ABORTED. A client that lost track of its edit can
-also Revert: Revert aborts an edit being received, then reverts. While an edit is being received or checked, or a save runs, a
-candidate's begin, chunk, reuse, validate and commit are answered BUSY; abort
-is not.
+**Admission.** Which edit, Save, Revert, mode change or Apply report may
+start, and the answer when it may not, is one rule per operation, its
+refusals in the order they are answered. Every edit SET answers
+INVALID_ARGUMENT first for a malformed report (transaction 0, non-zero
+padding), then INVALID_STATE when this half's owner is not ready or has
+stopped, then INVALID_ARGUMENT for a value the owner refuses, then:
+
+| Operation | Refused, in this order |
+| --- | --- |
+| Edit begin | A repeat of the begin already admitted is answered as before. STALE, else BUSY, while a keyboard adjustment awaits or is being published, anything else holds the profile (an Apply's candidate, a save, a publication waiting for its boundary) or the other half does not hold the same session and revision; then BUSY while another edit is received, loaded, checked or waits, or a Revert waits. |
+| Save | QUEUED to the client's repeat of the save it started, BUSY to anything else while a save runs; then STALE; then BUSY on the edit begin's holders, or while an edit is in progress. |
+| Revert | BUSY while a keyboard adjustment awaits or is being published, or anything else holds the profile. It never waits for the other half itself, which follows, but an adjustment publishes only once the halves agree: while they do not, a queued one holds Revert too, and with flag 11 set it never publishes, so only a restart (SET `0x28`) ends it. It aborts an edit being received, then reverts. |
+| Edit mode | NOT_CLEAN with unsaved edits or a keyboard adjustment not yet saved; then BUSY while a save runs or an edit is in progress, and until the other half holds the same session and revision: a change takes a counter above both halves' (Edit mode, below), which only a half that hears the other knows. With the other half unplugged it stays BUSY until that half is back (flag 3 clear; flag 15 if it stopped): a client says to reconnect it rather than retrying. An Apply does not hold it by itself, since the mode is stored outside the profile; while an Apply copies to the other half, the halves do not agree. |
+| Apply | A candidate's begin, chunk, stream chunk, reuse, validate and commit are answered BUSY (error `MAILBOX_BUSY`) while an edit is received, loaded, checked or waits, a Revert waits, or a save runs; the begin of a new Apply (a transaction other than the one running) also while a keyboard adjustment awaits publication. Abort and reads never are. |
+
+The keyboard's own steps, publishing queued adjustments and starting Live's
+automatic save, wait while anything holds the profile, the halves disagree or
+an edit is in progress. Flag 4 of the edit status is the edit begin's answer
+to a new edit naming the current identity.
+
+An edit that has begun carries on. An edit being received (phase `1`) holds a
+lease: with no accepted begin, splice or data report for 15 s on the
+keyboard's clock (which, as for an Apply, stops while storage waits for a
+quiet keyboard), the keyboard aborts it, last result ABORTED. A client that
+lost track of its edit can also Revert: Revert aborts an edit being
+received, then reverts.
 
 ### Save
 
@@ -1349,7 +1382,13 @@ nothing is uploaded and the other half copies its own working copy too
 both halves, marker-last decision and convergence as any Apply, and the same
 power-loss guarantees. Its transaction is the candidate's: candidate status
 (GET `0x18`) follows it exactly as it follows an Apply. With no unsaved edits
-Save answers OK at once and writes nothing. When it lands, the saved profile
+Save answers OK at once and writes nothing. A working copy byte for byte the
+saved profile it began from (edits undone, a value set back) is not written
+either: when its checksum, length and domains are the saved profile's, Save
+compares the bytes (save phase `7`), and if they are the same the keyboard
+runs its saved profile again at the next safe boundary (phase `8`), with
+nothing unsaved and the same revision, and the other half follows as after a
+Revert. The keyboard's own save in Live does the same. When it lands, the saved profile
 holds the working copy's bytes: no unsaved edits, the same revision. A save
 the keyboard cannot finish is reported as an Apply's would be, and the
 working copy is left as it was. A save waits for a quiet keyboard before each
@@ -1383,7 +1422,7 @@ not ready status `3`.
 | ---: | ---: | --- |
 | 0 | 1 | layout, `1` |
 | 1 | 1 | phase |
-| 2 | 2 | flags: bit 0 unsaved edits, 1 the other half is required, 2 the other half holds this session and revision with nothing in progress, 3 the other half answers, 4 a new edit would be BUSY now, 5 the saved profile is the compiled defaults, 6 a save is running, 7 the halves' edit modes conflict, 8 waiting for a safe boundary, 9 a save here waits for a quiet keyboard, 10 the other half's save waits for a quiet keyboard, 11 the other half refused this working copy, edit and whole copy (apart until Revert or an Apply; Save is BUSY), 12 writing the edit mode failed and is being retried, 13 a keyboard adjustment (DPI or lighting key) awaits publication: a new Apply, edit, Save, Revert and mode change are BUSY until it publishes; 14–15 zero |
+| 2 | 2 | flags: bit 0 unsaved edits, 1 the other half is required, 2 the other half holds this session and revision with nothing in progress, 3 the other half answers, 4 a new edit would be BUSY now, 5 the saved profile is the compiled defaults, 6 a save is running, 7 the halves' edit modes conflict, 8 waiting for a safe boundary, 9 a save here waits for a quiet keyboard, 10 the other half's save waits for a quiet keyboard, 11 the other half refused this working copy, edit and whole copy (apart until Revert or an Apply, or with flag 13 set until a restart; Save is BUSY), 12 writing the edit mode failed and is being retried, 13 a keyboard adjustment (DPI or lighting key) awaits publication: a new Apply, edit, Save and Revert are BUSY and a mode change NOT_CLEAN until it publishes, and then, as any unsaved edit, until it is saved or reverted; 14 this half stopped: only a restart clears it, 15 the other half answers that it stopped (both D-F34, below) |
 | 4 | 4 | session |
 | 8 | 4 | revision |
 | 12 | 4 | saved generation (`0`: compiled defaults) |
@@ -1403,7 +1442,7 @@ not ready status `3`.
 | 4 | 4 | its session |
 | 8 | 4 | its revision |
 | 12 | 1 | its flags: bit 0 unsaved edits, 1 its saved profile is the compiled defaults |
-| 13 | 1 | save phase (`0` idle) |
+| 13 | 1 | save phase: `0` idle, `1` checksumming the working copy, `2`–`4` beginning, filling and validating its candidate, `6` waiting for its commit; `7` and `8` a save that found nothing to write (comparing, then returning to the saved profile). `5` is reserved and never reported |
 | 14 | 1 | last save's result |
 | 15 | 1 | last save's candidate error id (`0` none) |
 | 16 | 2 | save transaction in progress |
@@ -1471,8 +1510,12 @@ zero bytes, a counter, CRC-32 of the first twelve), the newer valid one
 counting, a write going to the other and read back. A change takes a counter
 above both halves'; the USB half sends it to the other half, and on
 reconnect the higher counter wins. Equal counters that disagree are a
-conflict the next change resolves. A change is refused NOT_CLEAN with unsaved
-edits: the client asks Save or Revert first. A change is answered OK at
+conflict the next change resolves. A change answers NOT_CLEAN with unsaved
+edits or a keyboard adjustment not yet saved (the client asks Save or Revert
+first), and BUSY while a save runs or an edit is in progress and until the
+halves agree: a half that has not heard the other cannot know a counter
+above both, and a change made by one half alone could lose to the other
+half's higher counter on reconnect. A change is answered OK at
 once and takes effect at once; each half writes it to its EEPROM when its
 keyboard is quiet (no key held, the matrix unchanged for 50 ms), and a failed
 write is retried with a growing wait and reported by status flag 12 until it
@@ -1492,6 +1535,82 @@ if a save was running. Live + review never saves automatically. Apply saves
 only adjustment-only working copies, never a posted client edit mixed into
 one. No host keepalive or disconnect message controls this scheduler.
 
+### A stopped keyboard, and Restart
+
+A half's live-profile owner **stops** in a state nothing but a restart
+leaves, a fresh read of flash at boot (D-F34). Stopped, the half saves,
+edits, reverts and follows the other half no more: Save, Revert, edits and
+the edit mode answer INVALID_STATE, and an Apply is refused. Reads go on:
+edit status, the working copy (GET `0x21`, so a client can keep unsaved
+edits) and the profile status. Edit status page 0 flag 14 says this half
+stopped; flag 15 says the other half answers that it did (it says so in every
+working-copy sync reply, [split protocol](profile-split-v1.md#working-copy-sync-d-f32)).
+A slow save is never either: a save under way is flag 6, a save waiting for a
+quiet keyboard flags 9 and 10, a half catching up flags 2 and 3. A client that
+sees flag 14 or 15 says the keyboard stopped saving and offers Restart.
+
+| Owner state | Reached when | What a restart does |
+| --- | --- | --- |
+| `STORAGE_ERROR` | a slot read, write or readback failed: at boot, in a save, in a copy from the other half, or publishing a record | reads flash afresh: the last whole saved profile runs |
+| `DURABILITY_UNKNOWN` | the commit marker's write or readback failed, so the decision may or may not be durable | boot reads the marker: the old or the new profile runs, and the halves reconcile |
+| `POSTCOMMIT_AUTHORITY_LOST` | after the decision, the other half reported a newer profile | boot reconciliation compares the halves again |
+| `CONCURRENT_COMMIT` | both halves committed one generation, or the other half prepared one that wins | boot reconciliation compares the halves again |
+| `INTEGRATION_ERROR` | a runtime could not install, or the owner could not start | starts it again; a fault in the build returns at once |
+| `GENERATION_CONFLICT` | at boot, two different saved profiles of one generation | nothing: the conflict is in flash and returns at once |
+| `COMPILED_ERROR` | the compiled defaults did not validate | nothing: the fault is in the firmware |
+
+A flag back at once after a restart means the fault is in flash or in the
+firmware; a client says so rather than offering Restart again. An EEPROM
+reset (bootmagic) forgets the saved profiles (D-F29) and so clears a conflict
+in flash, at the cost of the saved profile. An owner that never started
+answers edit status with status `3`, as one still starting does; Restart is
+taken then too.
+
+**Restart**, SET `0x28`: bytes 5–8 the confirmation `52 45 53 54` ("REST"),
+every byte after them zero, a nonzero transaction. Anything else answers
+INVALID_ARGUMENT and restarts nothing. It is taken in any owner state and
+edit mode, mid-save or mid-edit, and reads nothing of the profile. It is
+never automatic: the firmware does not restart itself, however it stopped.
+The USB half sends the other half a restart frame on a split RPC of its own
+([split protocol](profile-split-v1.md#keyboard-restart-d-f34)), asking again
+every 5 ms until it acknowledges or 250 ms have passed, then answers: result
+OK, byte 17 whether the other half acknowledged. 50 ms later, its reply sent,
+it resets (QMK's `soft_reset_keyboard`); the other half resets 20 ms after it
+acknowledged. A restart asked again before the reset answers as the first.
+USB drops and comes back, and each half starts as from power: it reads its
+saved profile, the halves reconcile, and the working copy has a new session.
+Everything in RAM is gone, unsaved edits and runtime toggles included; the
+edit mode is stored and stays. A client that wants unsaved edits back reads
+the working copy first (or has them in its own draft) and sends them as one
+replacement edit once the keyboard is back.
+
+**Why it is safe.** A restart resets each half between two main-loop passes,
+so it is exactly as safe as unplugging: every slot's commit marker is written
+last and a record without it is no candidate at boot, so a power cut anywhere
+in a save leaves the previous saved profile, or the new one once the USB
+half's commit marker is durable, on both halves
+([power-loss outcomes](logical-profile-transaction-v1.md#power-loss-outcomes),
+[storage](storage-and-resource-baseline.md)). QMK handles Raw HID in its main
+loop after the scan, and housekeeping, where each half resets, after both.
+Every flash erase and program runs inside the scan's durable-I/O step with
+interrupts off, so a reset never falls inside one (unplugging can, and the
+store survives that too); the other half's split callback only notes the
+request. Host tests restart both halves at sampled scans across a whole save
+and find both on one whole profile, old or new.
+
+**When the other half does not acknowledge** (byte 17 is `0`: the link is
+down, or that half does not answer), the USB half restarts alone. Each
+half's saved profile is still whole, and the halves rejoin once the link
+answers: the other half's copy of a save in flight is released, or committed
+when the USB half's commit marker had landed, as soon as the restarted half
+polls it ([split protocol](profile-split-v1.md#an-abandoned-prepared-copy-d-f34)).
+A client whose restart was not acknowledged, and whose other half still does
+not answer once it is back, asks the user to unplug the keyboard and plug it
+back in, which restarts both.
+
+Restart and flags 14–15 join the unreleased 2.0 base; no version or feature
+bit moves (D-F28). Firmware without them never sets the flags and answers
+SET `0x28` unhandled (command byte `0xFF`), changing nothing.
 
 ### Toggles and the settings QMK holds
 
@@ -1507,11 +1626,13 @@ the stored master and the firmware's behaviours override both allow. An
 override starts allowed at boot, is never saved or reviewed, and reads back
 through GET `0x22` beside its master. DPI up/down and RGB adjustment keys
 use no-EEPROM setters for immediate
-local feedback and queue their four settings scalars as a compound edit.
+local feedback and queue the four adjustment scalars
+([portable profile](portable-profile-v1.md#settings-domain-0x40-version-8)) as
+a compound edit.
 Repeated presses coalesce while another operation holds the working copy;
 an adjustment arriving during Save becomes a subsequent revision. Pending
-adjustments block new client edits, Save, Revert and mode changes until
-published; review sees the ordinary stored working-copy settings afterwards.
+adjustments make new client edits, Save and Revert BUSY and a mode change
+NOT_CLEAN until published; review sees the ordinary stored working-copy settings afterwards.
 Settings projection retains newer pending local values during an older
 publication. The settings domain is optional (a profile without one inherits
 the authored defaults), yet an adjustment replaces bytes inside one: when the
@@ -1529,8 +1650,16 @@ Each half measures how long its profile slot flash work pauses the keyboard
 channel 0, value `0x0D`, with the usual request id (nonzero), byte page and
 reserved zero bytes 5–31; a malformed request answers status `1`, a page past
 1 status `2`. Page 0 is the half answering USB; page 1 the other half, as the
-USB half last pulled it over the split link (once a second), or status `3`
-until a pull has succeeded. Each page's 25-byte payload, little-endian:
+USB half last pulled it over the split link, or status `3` until a pull has
+succeeded. A valid page-1 request queues one refresh in housekeeping and
+returns the cached figures immediately; the Raw HID handler never waits for
+the split link. Requests coalesce, and pull attempts are at least one second
+apart, including failures. A failed attempt preserves the previous cache and
+does not retry without another page-1 request. With no requests there is no
+periodic diagnostic traffic; page 0 and invalid requests queue nothing.
+To refresh a previously cached value, request page 1, allow housekeeping and
+the rate limit to run, then read it again. Cached figures carry no freshness
+or connection guarantee. Each page's 25-byte payload, little-endian:
 
 | Offset | Size | Field |
 | ---: | ---: | --- |

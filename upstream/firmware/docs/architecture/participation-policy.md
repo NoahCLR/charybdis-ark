@@ -183,7 +183,7 @@ record carries the decision through tapping and admission, and the pending
 completion and active owner retain it for release. Each delivered output takes
 the oldest fired completion not yet delivered, so two chords with one output
 that wait together keep their own decisions
-([pairing](https://github.com/NoahCLR/charybdis-4x6/blob/e9a72ce493ec94bc3fd90bd7de6eae01884629c9/docs/KEY_RUNTIME.md#combo-origin-compatibility-contract)). Changing
+([pairing](https://github.com/NoahCLR/charybdis-4x6/blob/20bae239c9772c5cde4772feb41aca3450786336/docs/KEY_RUNTIME.md#combo-origin-compatibility-contract)). Changing
 either switch, the definition or active layers cannot reclassify an already
 completed output or lose its matching release. Suppressed completions discard their
 snapshots. If origin reconstruction is unresolved, dispatch conservatively
