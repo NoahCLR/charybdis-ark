@@ -15,7 +15,8 @@ source and worktrees; `upstream/` is the pinned baseline, not that checkout.
 | --- | --- | --- |
 | [GUIDE.md](GUIDE.md) | Current user behavior: each screen, the interface's rules, Review, Apply, backups | Changing anything a user sees or does |
 | [PRODUCT_GOAL.md](PRODUCT_GOAL.md) | Product promise and completion criteria | Understanding what the app should become |
-| [LIVE_EDIT_APP_DIRECTION.md](LIVE_EDIT_APP_DIRECTION.md) | Product status, open issues and the app's D-L decisions; firmware decisions are pointers to the firmware direction | Changing behavior or architecture |
+| [adr/](adr/) | The app's decisions, one file per D-L number; firmware decisions (firmware D-F…) live in the firmware repository | Changing behavior or architecture |
+| [agents/](agents/) | How the engineering skills find the issue tracker, triage roles and domain docs | Running one of those skills |
 | [REPOSITORY.md](REPOSITORY.md) | Repository ownership, source provenance, development setup, commands, CI and publishing | Starting in a new checkout |
 | [COMPATIBILITY.md](COMPATIBILITY.md) | Explicit cross-repository integration workflow | Changing wire formats, schemas or shared codec assumptions |
 | [architecture/profile-capture-and-progress.md](architecture/profile-capture-and-progress.md) | Coherent captures, operation-correlated progress and Apply readback | Changing reads, progress or capture reuse |
@@ -38,7 +39,8 @@ locations only when a new document is warranted; create directories as needed.
 
 | Location | Content |
 | --- | --- |
-| `docs/architecture/<subject>.md` | App-owned technical contracts too substantial for the direction or core guide |
+| `docs/adr/00NN-<slug>.md` | One decision and why, numbered as its D-L identifier |
+| `docs/architecture/<subject>.md` | App-owned technical contracts too substantial for an ADR or the core guide |
 | `docs/<workflow>.md` | Contributor procedures, setup and integration workflows |
 | `upstream/` | Imported source snapshots only, governed by its manifest and instructions |
 
@@ -46,9 +48,8 @@ Link new durable documents from this map or the document that governs them.
 Keep one authoritative description of each rule; link instead of copying it.
 Retain D-L identifiers when amending decisions. Do not introduce parallel
 backlogs, dated review folders, agent diaries or completion reports in `docs/`.
-Current product gaps belong in the direction's Open Issues; tasks and active
-plans belong in the work-queue vault (`charybdis-notes`, see the
-[workspace map](REPOSITORY.md#local-development-workspace)), not in `docs/`.
+Current product gaps, tasks and active plans belong in the work-queue vault
+(`charybdis-notes`, see the [workspace map](REPOSITORY.md#local-development-workspace)), not in `docs/`.
 
 ## Authority and evidence
 

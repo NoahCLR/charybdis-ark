@@ -6,8 +6,7 @@
 // Thin on purpose. It owns the VS Code surface (command, panel, message relay)
 // and nothing else. Device, protocol and profile decisions live in core/, which
 // has no vscode import so this shell can be replaced by a standalone app later
-// without touching it. Nothing here parses a firmware repository; see
-// docs/LIVE_EDIT_APP_DIRECTION.md.
+// without touching it. Nothing here parses a firmware repository (D-L11).
 //
 // The webview renders a keyboard-backed `model` and posts typed edits back.
 // What the model holds, where each message goes and the loop that answers it

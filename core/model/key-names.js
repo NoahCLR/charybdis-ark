@@ -24,7 +24,7 @@ const {layerName, slotName} = require("./vocabulary");
 const {hostLayout, US_HOST_LAYOUT} = require("../data/host-layouts");
 
 // What a layer key does to its layer, in the picker's words. TG is a lock on
-// this firmware (D-L34).
+// this firmware (firmware D-F46).
 /** @type {Readonly<Record<string, string>>} */
 const LAYER_VERBS = {MO: "Hold", TG: "Lock", LOCK_LAYER: "Lock", TT: "Tap-toggle", OSL: "One-shot", TO: "Move to", DF: "Default", PDF: "Default"};
 const LAYER_KEY = /^(MO|TG|TT|OSL|TO|DF|PDF|LOCK_LAYER)\((\d+)\)$/;

@@ -36,7 +36,7 @@ its workspace file or supplied checkout paths and verify the repository roots;
 do not hardcode these machine-specific paths into app code or ordinary tests.
 
 For **current firmware development**, read the actual firmware checkout's
-`AGENTS.md`, `docs/LIVE_EDIT_APP_DIRECTION.md`, relevant specs under
+`AGENTS.md`, its decisions in `docs/adr/`, relevant specs under
 `docs/architecture/`, and implementation under `users/noah/`. It may contain
 uncommitted work: report the revision and dirty state when comparing behavior.
 Developer read-only inspection is allowed and does not couple the application
@@ -55,10 +55,10 @@ The initial app source is `tools/charybdis-live/` from
 [`NoahCLR/charybdis-4x6` at `624e7185b7b85876bab14c63ce3ce510c00bd5d1`](https://github.com/NoahCLR/charybdis-4x6/tree/624e7185b7b85876bab14c63ce3ce510c00bd5d1/tools/charybdis-live).
 This repository starts with a new Git history. Earlier app history, including
 its former `tools/charybdis-live-v2/` location, remains in that source repository.
-The root LICENSE, product goal and direction were brought from the same commit;
-the product documents are now maintained here. Existing D-L decision numbers
-remain stable. Firmware decisions retained in the direction are context for
-client behavior and do not transfer ownership of firmware implementation.
+The root LICENSE, product goal and the app's decisions were brought from the
+same commit; the product documents are now maintained here. Existing D-L
+decision numbers remain stable, one ADR each in `docs/adr/`. Firmware decisions
+they cite (firmware D-F…) stay owned by the firmware repository.
 
 The imported inputs have individual source records and update instructions in
 [`upstream/`](../upstream/README.md). Protocol specifications there are snapshots
@@ -80,16 +80,21 @@ checked-in `.nvmrc`), run `npm ci`, then `npm run check` and
 `npm run keycodes -- --check`. Press F5 with **Run Charybdis Ark**
 (`.vscode/launch.json`) to launch an Extension Development Host with a
 debugger attached. No firmware repository, QMK checkout, or multi-root
-workspace is required.
+workspace is required: ordinary app commands read only this checkout (D-L44).
+Only an explicit refresh of the imported inputs (`npm run upstream`) or a
+catalog comparison against a candidate QMK checkout
+(`npm run keycodes -- --qmk PATH`) reads another.
 
-The extension identity is `noah.charybdis-ark`; the checkout's path does not
-identify device profiles or recovery files. Recovery files saved under the
-former identities `noah.charybdis-live` and `noah.charybdis-live-v2` are copied
-into Ark's storage on start (D-L47). For a local installation, check the
-extension symlink points at the intended Ark checkout; F5 tests a worktree
-without retargeting that installed copy. Recovery files live under VS Code's
-extension-global storage, outside every source checkout. Preserve those files
-and profile backups during a switch.
+The extension identity is `noah.charybdis-ark` and its commands are
+`charybdisArk.*` (D-L47); the checkout's path does not identify device profiles
+or recovery copies. VS Code keys an extension's storage by its identity, so on
+start the extension copies every recovery copy saved under the former
+identities `noah.charybdis-live` and `noah.charybdis-live-v2` into its own
+storage, never moving an original or overwriting a file already there. For a
+local installation, check the extension symlink points at the intended Ark
+checkout; F5 tests a worktree without retargeting that installed copy. Recovery
+copies live under VS Code's extension-global storage, outside every source
+checkout. Preserve them and backups during a switch.
 
 The root `.editorconfig` defines indentation and whitespace conventions.
 Folder settings select VS Code's built-in JavaScript, JSON, HTML and CSS
@@ -113,7 +118,7 @@ loads the native HID module and enumerates matching devices without opening or
 writing them. A successful enumeration is not an Apply/recovery hardware test.
 
 Restore tests call `restoreProfile` with a request connection, the same interface
-used by both hosts. `tests/fixtures/writable-keyboard.js` answers candidate and
+used by both shells. `tests/fixtures/writable-keyboard.js` answers candidate and
 one-store Profile Wire reports, keeps local and peer profile records, and
 models the durable decision, peer commit and complete-generation activation. Its
 report-level faults exercise BUSY, lost replies, cancellation and disconnected
@@ -130,8 +135,9 @@ interruption acceptance.
   `core/session/panel-loop.js` runs.
 - `panel-html.js` — the panel's HTML shell, the only host file that knows
   webview URIs.
-- `core/` — the device, with no host dependency, layered so imports point one
-  way: `transport/`, `schema/`, `protocol/`, `model/`, `session/`, `data/`.
+- `core/` — the device, with no shell dependency (no `vscode` import, D-L02),
+  layered so imports point one way: `transport/`, `schema/`, `protocol/`,
+  `model/`, `session/`, `data/` (D-L10).
 - `webview/` — the interface as browser ES modules, no build step. `lib/` and
   `view/` are pure and carry tests; `ui/` draws; `styles.css` is the design
   system.
@@ -187,7 +193,8 @@ checks.
 types and no DOM. `tsconfig.json` adds the extension shell, under the VS Code
 types pinned to its minimum supported host version; its `vscode` import brings
 global types (such as `Thenable`) that only the foundation check keeps out of
-core. The renderer check keeps Node types out of the interface. The
+core. The renderer check (`tsconfig.webview.json`) keeps Node types out of the
+interface. The
 browser-host check (`tsconfig.hosts.json`) combines page APIs with the core the
 web build bundles, and has no Node globals: `process`, `setImmediate` or
 `__dirname` in `web/` fails it. Its one Node-shaped global is `Buffer`, which
@@ -196,7 +203,8 @@ the build injects from the `buffer` package (`web/buffer.mjs`);
 added there. Where the build puts `web/no-native-hid.js` in place of the
 native HID adapter, the check resolves `core/transport/node-hid-adapter.browser.d.ts`
 instead (`moduleSuffixes`), so node-hid stays out of it too. The clock worker
-has its own WebWorker configuration, with neither Node globals nor a page DOM.
+has its own WebWorker configuration (`tsconfig.worker.json`), with neither Node
+globals nor a page DOM.
 `tsconfig.developer.json` checks Node-only scripts and shared fixtures. The
 preview builder imports browser-host APIs, so `tsconfig.preview.json` checks
 it and the browser macro inspector with Node and DOM declarations.
@@ -204,7 +212,7 @@ it and the browser macro inspector with Node and DOM declarations.
 its own minimum VS Code version (1.85), independently of Ark's 1.90 SDK pin.
 
 Shared posted data lives in `contracts/messages.d.ts` and
-`contracts/panel.d.ts`. Both hosts, the renderer store, reply handler, pure
+`contracts/panel.d.ts`. Both shells, the renderer store, reply handler, pure
 edit/control builders and screen implementations consume those contracts.
 Compile-time cases check actual core publication against them and reject
 incomplete model replies, commands without payloads and invalid view inputs.
@@ -247,13 +255,28 @@ the version (`package.json`) and commit (git, or `ARK_COMMIT` in the
 environment) the build came from. It runs only the host: the host starts, then
 loads the panel itself (the build names it to the host, and `index.html` only
 fetches it early), so the panel finds `acquireVsCodeApi` waiting. On a phone the
-host starts nothing and shows a notice instead (`web/phone.mjs`, D-L52). `_headers` (from `web/_headers`) is what
+host starts nothing and shows a notice instead (below). `_headers` (from `web/_headers`) is what
 Cloudflare Pages sends with the page when it is [published](#publishing-the-web-page).
 `dist/web-manifest.json`, beside the site rather than in it, lists the hashed
 names for tests and tools; it is never published and the page never fetches it.
 Each build empties the folder first. `npm run check:site`
 (`scripts/check-static-site.js`) checks that `dist/web/` holds only what the
-build writes, with no server code Pages would run.
+build writes, with no server code Pages would run: no `_worker.js`,
+`_routes.json` or Pages Functions folder.
+
+Both shells run the same `core/` and interface through the shared panel loop,
+and what differs between them reaches the interface as `model.host`
+([`core/README.md`](../core/README.md)); the interface never asks which shell it
+is in.
+
+A phone gets a notice instead of Ark (`web/phone.mjs`, D-L52): Ark runs on a
+computer, with links to Ark's and the firmware's repositories and to BastardKB,
+the keyboard's official seller. Neither the host nor the panel starts. A phone
+is touch only with a screen whose shorter side is under 600 pixels
+(`PHONE_SCREEN`): the screen, not the window, so a narrow desktop window is
+never a phone, and a tablet gets Ark, where it offers the demo. The page
+decides once, as it loads, so turning a phone or resizing a window never swaps
+Ark out from under a draft.
 
 To try the page, run `npm run web`: it builds, then serves `dist/web/` at
 `http://localhost:8975/` (`scripts/serve.js`, a static server for this machine
@@ -284,7 +307,8 @@ tab waits rather than connecting; warns on `beforeunload` while the draft has
 unapplied edits or Apply runs; passes `core/` a `sleep` driven by a dedicated
 worker, whose timers Chrome does not throttle in a background tab as it does the
 page's; and keeps recovery copies in IndexedDB after asking for persistent
-storage.
+storage. A VS Code panel cannot ask before it closes, so a panel closed during
+Apply keeps its connection until the save ends, then releases the keyboard.
 
 It is a separate output, not a step of the extension: the extension still runs
 `core/` and `webview/` as they are, and `webview/` stays build-free source. No
@@ -473,7 +497,8 @@ when the promotion's hidden release marker names a joint release. Nightly,
 never blocking, CI checks
 `dev` (app suite, browser, early-warning bridge and agreement with firmware
 `dev`) and whether the published mains still agree. Reports are retained in
-Actions.
+Actions. Before it merges a promotion, the work-queue `release --publish`
+rechecks agreement for the pair being published.
 
 `npm run test:browser` builds the fixture preview and the web page, serves
 them, and runs every spec in `browser-tests/` in Chromium: the screens'
