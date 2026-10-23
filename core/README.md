@@ -105,9 +105,9 @@ slots are views for the editors, never extra fields. Anything else (version 4
 or older, another schema, action vocabulary or domain version, an unknown
 field) is refused, never translated (D-L54), and a file over
 `FILE_MAX_BYTES` is refused before parsing. The firmware's
-[portable profile](../upstream/firmware/docs/architecture/portable-profile-v1.md)
-owns the domain contracts; its "Portable document" section is a retired
-client format, not this one. `tests/model/portable-profile.test.js` holds it.
+[portable profile](../upstream/firmware/docs/spec/portable-profile-v1.md) and
+[Profile Wire](../upstream/firmware/docs/spec/profile-wire-v1/README.md) own
+the domain contracts. `tests/model/portable-profile.test.js` holds it.
 
 ## Adapter contract
 

@@ -10,7 +10,7 @@ const {crc32} = require("../../core/schema/profile-blob-v1");
 /** @param {string} hex */
 const frame = hex => {const bytes = Buffer.alloc(32); Buffer.from(hex.replace(/\s/g, ""), "hex").copy(bytes); return bytes;};
 
-test("SET frames carry the firmware's fields at the firmware's offsets (profile-wire-v1.md, Live Edits)", () => {
+test("SET frames carry the firmware's fields at the firmware's offsets (profile-wire-v1/live-edits.md)", () => {
     assert.deepEqual(buildEditBeginRequest(0x1234, {session: 0xa1b2c3d4, revision: 7, splices: 2, insertTotal: 300}),
         frame("07 00 20 3412 d4c3b2a1 07000000 02 00 2c010000"));
     assert.deepEqual(buildEditBeginRequest(1, {session: 1, revision: 0, splices: 0, insertTotal: 74801, replacement: true}),

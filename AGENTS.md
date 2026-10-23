@@ -64,7 +64,8 @@ skipped; [Developing Ark](docs/development.md) has the rest.
 - [`docs/adr/`](docs/adr/): decisions (D-L<n>); read those touching the area
   before changing behaviour or architecture.
 - [`docs/spec/`](docs/spec/): contracts, such as the interface's; firmware's
-  wire specs are under `upstream/firmware/docs/`.
+  specs are under [`upstream/firmware/docs/spec/`](upstream/firmware/docs/spec/README.md)
+  and its words in [`upstream/firmware/GLOSSARY.md`](upstream/firmware/GLOSSARY.md).
 - [`docs/architecture/`](docs/architecture/README.md): the layers, where new
   work goes, and the flows that cross them.
 - [`CODING_STANDARDS.md`](CODING_STANDARDS.md): what review holds a change to.

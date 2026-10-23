@@ -6,7 +6,7 @@ conservative analysis behind them
 [D-L48](../adr/0048-timing-advice-follows-firmware-capability.md),
 [D-L49](../adr/0049-timing-findings-constrain-reachability-conservatively.md);
 for the person, the [guide](../guide/review-and-apply.md#timing-checks)). Firmware owns timing
-and [participation](../../upstream/firmware/docs/architecture/participation-policy.md).
+and [participation](../../upstream/firmware/docs/spec/participation-policy.md).
 Ark owns the analysis, its limits and how inherited behaviour is shown.
 
 ## From profile to Review
@@ -118,7 +118,7 @@ to QMK, and layer keys that do nothing (`findings` in `layer-reach.js`).
 Combo inputs follow QMK: the reference layer's raw keys when it differs from
 the highest active layer, else the resolved stack, transparency included.
 Outputs follow the firmware's
-[generated-output policy](../../upstream/firmware/docs/architecture/participation-policy.md#generated-outputs):
+[generated-output policy](../../upstream/firmware/docs/spec/participation-policy.md#combo-outputs):
 the last declared member owns the output, and placement bypasses and layer
 behaviour switches are physical-only. A bypassed custom output supplies no
 escape.

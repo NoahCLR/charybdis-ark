@@ -2,7 +2,7 @@
 "use strict";
 const {copyBytes, protocolError} = require("./bytes");
 
-// Macro domain 0x70, version 1 (firmware portable-profile-v1.md): the 128
+// Macro domain 0x70, version 1 (firmware profile-wire-v1/macro-domain.md): the 128
 // macros in the bank encoding VIA's dynamic macros use, slot 0 first, each
 // ended by a zero byte. A bank may continue after the 128th terminator with
 // unused capacity, possibly stale bytes a writer left after shortening a

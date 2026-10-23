@@ -2,7 +2,7 @@
 "use strict";
 
 // One live edit, Save, Revert or mode change at a time, in the order the
-// firmware takes them (D-F32, profile-wire-v1.md "Live Edits"): an edit is
+// firmware takes them (D-F32, profile-wire-v1/live-edits.md): an edit is
 // begin, its splices, the inserted bytes, commit, then the edit status until
 // the keyboard says how it ended and whether the other half holds it too.
 // Nothing here decides what to send; the draft does (profile-draft-session.js).

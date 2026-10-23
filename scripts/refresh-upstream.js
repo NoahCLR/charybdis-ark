@@ -10,8 +10,9 @@
 // and fails on any difference. Without it, every file is re-pinned to one
 // revision per repository (default: firmware's local dev, and the BK commit
 // that firmware's qmk-pin.json names), the manifest and QMK version stamp are
-// rewritten, and the keycode catalog and host layouts are regenerated.
-// Adding a file is still a manifest edit; this tool refreshes what is listed.
+// rewritten, the keycode catalog and host layouts are regenerated, and any
+// file under upstream/ the manifest no longer lists is removed. Adding, moving
+// or dropping a file is a manifest edit; this tool refreshes what is listed.
 const fs = require("node:fs");
 const path = require("node:path");
 const {createHash} = require("node:crypto");
@@ -26,6 +27,8 @@ const LINK_NOTE = "Relative Markdown links resolve locally where available, othe
 const STAMP_PATH = "upstream/qmk/version.txt";
 const STAMP_NOTE = "Version stamp synthesized as `git describe --tags --exclude 'v2*'` of the pinned QMK commit; not an upstream source file.";
 const LINK = /(\]\()([^)\s]+)(\))/g;
+// Ark's own files in upstream/; every other file there is a listed import.
+const OWN_FILES = new Set(["upstream/README.md", "upstream/AGENTS.md", "upstream/manifest.json"]);
 
 /**
  * @param {string | NodeJS.ArrayBufferView} bytes
@@ -93,6 +96,36 @@ function transformMarkdown(text, {sourcePath, localPath, url, commit, imported})
         });
 }
 
+// Files under upstream/ that are neither Ark's own nor listed, as
+// repository-relative paths. Finder metadata is ignored by Git and skipped.
+/**
+ * @param {string} arkRoot
+ * @param {import("./contract-types.js").UpstreamManifest} manifest
+ */
+function unlisted(arkRoot, manifest) {
+    const listed = new Set(manifest.files.map(file => file.path));
+    const upstream = path.join(arkRoot, "upstream");
+    if (!fs.existsSync(upstream)) return [];
+    return fs.readdirSync(upstream, {recursive: true, withFileTypes: true})
+        .filter(entry => !entry.isDirectory() && entry.name !== ".DS_Store")
+        .map(entry => path.relative(arkRoot, path.join(entry.parentPath, entry.name)).split(path.sep).join("/"))
+        .filter(file => !OWN_FILES.has(file) && !listed.has(file))
+        .sort();
+}
+
+// Remove `files` and every folder under upstream/ they leave empty.
+/**
+ * @param {string} arkRoot
+ * @param {string[]} files
+ */
+function prune(arkRoot, files) {
+    const upstream = path.join(arkRoot, "upstream");
+    for (const file of files) {
+        fs.rmSync(path.join(arkRoot, file));
+        for (let dir = path.dirname(path.join(arkRoot, file)); dir !== upstream && !fs.readdirSync(dir).length; dir = path.dirname(dir)) fs.rmdirSync(dir);
+    }
+}
+
 /**
  * @param {string} root
  * @param {string} commit
@@ -155,6 +188,7 @@ function check(arkRoot, roots) {
         if (file.sourceSha256 !== sha256(source)) problems.push(`${file.path} sourceSha256 is stale`);
         if (file.sha256 !== sha256(output)) problems.push(`${file.path} sha256 is stale`);
     }
+    for (const file of unlisted(arkRoot, manifest)) problems.push(`${file} is not listed in the manifest`);
     return problems;
 }
 
@@ -186,7 +220,7 @@ function refresh(arkRoot, roots, revisions = {}, {catalog = true} = {}) {
     // Both repository keys were populated by the loop above, in declaration order.
     const commits = /** @type {Record<import("./contract-types.js").RepositoryName, string>} */ (selectedCommits);
     /** @type {import("./contract-types.js").RefreshReport} */
-    const report = {commits, content: [], links: [], fixtures: []};
+    const report = {commits, content: [], links: [], fixtures: [], removed: []};
     for (const {file, repository, source, output} of render(manifest, roots, commits)) {
         const local = path.join(arkRoot, file.path);
         const before = fs.existsSync(local) ? fs.readFileSync(local) : null;
@@ -202,6 +236,8 @@ function refresh(arkRoot, roots, revisions = {}, {catalog = true} = {}) {
         if (file.path === STAMP_PATH) file.transformation = STAMP_NOTE;
         else if (file.path.endsWith(".md")) file.transformation = LINK_NOTE;
     }
+    report.removed = unlisted(arkRoot, manifest);
+    prune(arkRoot, report.removed);
     manifest.sources = Object.fromEntries(Object.entries(commits).map(([name, commit]) => [name, {repository: REPOSITORIES[/** @type {import("./contract-types.js").RepositoryName} */ (name)].url, commit}]));
     fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
     if (catalog) execFileSync(process.execPath, [path.join(arkRoot, "scripts/generate-keycode-catalog.js")], {cwd: arkRoot, stdio: "inherit"});
@@ -245,7 +281,7 @@ function run(argv, arkRoot = path.resolve(__dirname, "..")) {
     }
     const report = refresh(arkRoot, roots, {firmware: flags.firmwareRev, qmk: flags.qmkRev});
     console.log(`Pinned firmware ${report.commits.firmware}, QMK ${report.commits.qmk}`);
-    for (const [label, list] of /** @type {[string, string[]][]} */ ([["Content changed", report.content], ["Pinned links only", report.links]])) {
+    for (const [label, list] of /** @type {[string, string[]][]} */ ([["Content changed", report.content], ["Pinned links only", report.links], ["Removed, no longer listed", report.removed]])) {
         console.log(`${label}: ${list.length ? "" : "none"}`);
         for (const file of list) console.log(`  ${file}`);
     }

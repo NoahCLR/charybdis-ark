@@ -27,7 +27,7 @@ test("bridge selects explicit checkouts, records dirty state, and stops on failu
         }
         for (const file of ["package.json", "core/schema/macro-payload.js", "tests/fixtures/pd-profile.js"]) write(roots.ark, file);
         const sha = text => require("node:crypto").createHash("sha256").update(text).digest("hex");
-        const pinned = [["tests/fixtures/golden.fixture", "bytes"], ["docs/architecture/spec.md", "spec"]];
+        const pinned = [["tests/fixtures/golden.fixture", "bytes"], ["docs/spec/spec.md", "spec"]];
         const pin = execFileSync("git", ["-C", roots.firmware, "rev-parse", "HEAD"], {encoding: "utf8"}).trim();
         execFileSync("git", ["-C", roots.firmware, "update-ref", "refs/remotes/origin/dev", pin]);
         write(roots.ark, "upstream/manifest.json", JSON.stringify({format: 1, sources: {firmware: {commit: pin, repository: "https://github.com/NoahCLR/charybdis-4x6"}},
@@ -56,10 +56,10 @@ test("bridge selects explicit checkouts, records dirty state, and stops on failu
         report = JSON.parse(fs.readFileSync(path.join(base, "fail.json")));
         assert.equal(report.passed, false); assert.equal(report.results.length, 2); assert.equal(report.results[1].exitCode, 7);
         write(roots.ark, RUNNERS[1], script);
-        write(roots.firmware, "docs/architecture/spec.md", "spec, revised");
+        write(roots.firmware, "docs/spec/spec.md", "spec, revised");
         assert.equal(run(args("lagging-spec.json")), 0);
         report = JSON.parse(fs.readFileSync(path.join(base, "lagging-spec.json")));
-        assert.equal(report.passed, true); assert.deepEqual(report.upstream.specs, [{path: "docs/architecture/spec.md", missing: false}]);
+        assert.equal(report.passed, true); assert.deepEqual(report.upstream.specs, [{path: "docs/spec/spec.md", missing: false}]);
         fs.unlinkSync(path.join(roots.firmware, "tests/fixtures/golden.fixture"));
         assert.equal(run(args("stale-fixture.json")), 1);
         report = JSON.parse(fs.readFileSync(path.join(base, "stale-fixture.json")));

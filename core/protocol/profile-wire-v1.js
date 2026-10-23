@@ -33,8 +33,8 @@ const PROFILE_WIRE_STATUS = Object.freeze({
 
 // The feature word describes the build, never a step in the firmware's
 // history: everything the base does is implied by its version (firmware
-// D-F28). What each Profile Wire 1 bit meant is recorded once, in the
-// firmware's profile-wire-v1.md.
+// D-F28, which retired every Profile Wire 1 bit). The bits are in firmware's
+// profile-wire-v1/hid-channel.md, "The feature word".
 const PROFILE_WIRE_FEATURES = Object.freeze({
     // One half of a split pair: a save copies the profile to the other half.
     SPLIT_KEYBOARD: 1 << 0,
