@@ -58,17 +58,28 @@ test("Keyboard: the title renames the keyboard, and memory and diagnostics live 
     await expect(page.locator('[data-f="settings:keyboard-name"]')).toHaveCount(0);
 });
 
-test("Backups: a copy saved before Apply can be used as a draft or deleted, and a chosen file opens as a sheet", async ({page}) => {
+test("Backups: a recovery copy is named by what made it and its keyboard, can be used as a draft or deleted, and a chosen file opens as a sheet", async ({page}) => {
     await page.goto("/preview/index.html?host=web");
     await page.locator('[data-screen="profile"]').click();
     await expect(page.locator(".card.usage")).toHaveCount(0);
-    await expect(page.locator(".recovery-row .recovery-name").first()).toHaveText(/^Before Apply · .+ · 6 Oct 2026, \d\d:\d\d/);
+    const names = page.locator(".recovery-row .recovery-name");
+    await expect(names.nth(0)).toHaveText(/^Before Save · Charybdis - Home · 6 Oct 2026, \d\d:\d\d$/);
+    await expect(names.nth(1)).toHaveText(/^Before leaving Live · Charybdis - Home · 4 Oct 2026, \d\d:\d\d$/);
+    await expect(names.nth(2)).toHaveText(/^Before Apply · Charybdis - Office · 3 Oct 2026, \d\d:\d\d$/);
+    await expect(names.nth(3)).toHaveText(/^Recovery copy · 1 Oct 2026, \d\d:\d\d$/);
+    await expect(page.locator(".card.recoveries h3")).toHaveText("Recovery copies");
     await clearPosts(page);
     await page.locator(".recovery-row [data-use]").first().click();
-    await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([expect.objectContaining({type: "useRecovery", id: 2})]);
+    await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([expect.objectContaining({type: "useRecovery", id: 4})]);
     await clearPosts(page);
     await page.locator(".recovery-row [data-delete]").first().click();
-    await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([expect.objectContaining({type: "deleteRecovery", id: 2})]);
+    await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([expect.objectContaining({type: "deleteRecovery", id: 4})]);
+    // A copy stored before causes were recorded works as any other.
+    for (const [attribute, type] of [["data-use", "useRecovery"], ["data-recovery", "downloadRecovery"], ["data-delete", "deleteRecovery"]]) {
+        await clearPosts(page);
+        await page.locator(`.recovery-row [${attribute}]`).nth(3).click();
+        await expect.poll(() => page.evaluate(() => window.__posted)).toEqual([expect.objectContaining({type, id: 1})]);
+    }
     await page.evaluate(async () => {
         const store = await import("/webview/store.mjs");
         const model = structuredClone(store.getModel());

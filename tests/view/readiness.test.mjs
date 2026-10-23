@@ -99,3 +99,26 @@ test("a keyboard whose halves are not together says what is wrong and what to do
     assert.deepEqual(halvesWords({vocabulary: VOCABULARY}, "alone"), VOCABULARY.halves.alone);
     assert.deepEqual(halvesWords(null, "alone"), {label: "alone", detail: ""}, "an unknown table reads as the state itself");
 });
+
+test("a draft that holds editing says why, not that the read failed", () => {
+    const held = (reason, extra = {}) => readScreen({vocabulary: VOCABULARY, load: {state: "unavailable", held: reason}, device: {connected: true, health: {halves: "agree"}}, ...extra});
+    const stale = held("stale", {draft: {live: null}});
+    assert.equal(stale.title, "The keyboard changed since this draft began");
+    assert.match(stale.detail, /Review against the keyboard/);
+    assert.doesNotMatch(stale.detail, /could not be read/);
+    assert.match(held("stale", {draft: {live: {unsaved: true}}}).detail, /Choose Read keyboard in the bar/, "a live draft is read again, as its bar says");
+    assert.equal(held("connection-changed").title, "Keyboard connection changed");
+    assert.match(held("connection-changed").detail, /Review against the keyboard/);
+    const other = held("other-keyboard");
+    assert.equal(other.title, "Draft belongs to another keyboard");
+    assert.match(other.detail, /Select it to continue editing, or discard the draft/);
+});
+
+test("only a read that failed says the complete profile could not be read; halves and errors keep their words", () => {
+    const failed = readScreen({vocabulary: VOCABULARY, load: {state: "unavailable"}, device: {connected: true, health: {halves: "agree"}}});
+    assert.deepEqual(failed, {state: "unavailable", title: "Keyboard not ready for edits", detail: "A complete profile could not be read. Read the keyboard again to retry."});
+    const withHalves = (halves, error = "") => readScreen({vocabulary: VOCABULARY, load: {state: "unavailable", held: "stale"}, device: {connected: true, health: {halves, error}}});
+    assert.equal(withHalves("alone").detail, VOCABULARY.halves.alone.detail);
+    assert.equal(withHalves("apart").detail, VOCABULARY.halves.apart.detail);
+    assert.equal(withHalves("agree", "The keyboard did not answer.").detail, "The keyboard did not answer.");
+});

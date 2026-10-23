@@ -10,6 +10,7 @@ import {el, esc} from "../lib/dom.mjs";
 import {getModel, post, render, state} from "../store.mjs";
 import {statusSummary} from "../view/review.mjs";
 import {historyEntries, stepTime} from "../view/history.mjs";
+import {historyFooter} from "../view/edit-mode.mjs";
 import {reviewColumns, reviewItem} from "./review-items.mjs";
 
 export function openHistory() {
@@ -67,7 +68,7 @@ export function historyOverlay() {
                 ${entries.map((entry) => stepCard(model, entry, now)).join("")}`
                 : `<p class="note hs-empty">Reading the history…</p>`}
         </div>
-        <div class="sheet-f"><span class="note">Going to a step changes only the draft. The keyboard is not touched until you apply.</span></div>
+        <div class="sheet-f"><span class="note">${esc(historyFooter(draft))}</span></div>
     </div></div>`);
     node.addEventListener("click", (event) => {
         const step = /** @type {HTMLElement | null} */ (/** @type {Element} */ (event.target).closest("[data-step]"));

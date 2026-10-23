@@ -7,7 +7,7 @@ import test from "node:test";
 import {connectPanel} from "../web/panel-channel.mjs";
 import {workerSleep} from "../web/sleep.mjs";
 import {BLOCKED, COMPILED_DEFAULTS_KEY, PROFILE_FILE_LIMIT, WEB_WORDS, compiledDefaultsStore, initialTheme, leaving, readProfileFile} from "../web/web-host.mjs";
-import {recoveryName} from "../web/recoveries.mjs";
+import {listed} from "../web/recoveries.mjs";
 
 // A MessageChannel delivers on a later task, but not within any fixed time: a
 // loaded runner can take longer than a few milliseconds. Wait for the delivery
@@ -109,10 +109,12 @@ test("a chosen profile file has the extension's size limit", async () => {
     await assert.rejects(readProfileFile(file(PROFILE_FILE_LIMIT + 1)), /too large/);
 });
 
-test("a recovery copy downloads under the extension's name for it", () => {
-    const at = new Date("2026-10-06T09:14:03.512Z");
-    assert.equal(recoveryName({format: "charybdis-profile"}, at), "recovery-2026-10-06T09-14-03-512Z.charybdis.json");
-    assert.equal(recoveryName({format: "charybdis-recovery-capture"}, at), "recovery-2026-10-06T09-14-03-512Z.diagnostic.json");
+test("a stored recovery copy lists with what made it and its keyboard, an older one without", () => {
+    const savedAt = "2026-10-06T09:14:03.512Z";
+    assert.deepEqual(listed({id: 2, name: "recovery-x-before-save-home.charybdis.json", savedAt, cause: "save", keyboard: "Home", text: "{}"}),
+        {id: 2, name: "recovery-x-before-save-home.charybdis.json", savedAt, cause: "save", keyboard: "Home"});
+    assert.deepEqual(listed({id: 1, name: "recovery-2026-10-06T09-14-03-512Z.charybdis.json", savedAt, text: "{}"}),
+        {id: 1, name: "recovery-2026-10-06T09-14-03-512Z.charybdis.json", savedAt});
 });
 
 test("the page's words are its own", () => {

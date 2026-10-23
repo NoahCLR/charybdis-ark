@@ -167,6 +167,30 @@ test("the panel marks a retained draft stale after reconnecting to the same devi
     assert.equal(model.draft.stale, true);
 });
 
+test("a read held by its draft says why on the load, and a failed read does not", () => {
+    // Stale: the keyboard changed since the read the draft began from.
+    const session = panelWithDraft();
+    session.readReady = true;
+    session.draft.stage({type: "updateLayoutKeys", draftRevision: session.draft.revision, layer: "Layer 1", changes: [{layoutIndex: 0, keycode: "KC_B"}]});
+    session.draft.noteConnection(3);
+    const stale = buildPanelModel(session, connected());
+    assert.equal(stale.draft.stale, true);
+    assert.deepEqual([stale.load.state, stale.load.held], ["unavailable", "stale"]);
+    // Another keyboard selected: the draft is that keyboard's.
+    const other = {id: "other", manufacturer: "Bastard Keyboards", product: "Charybdis 4x6"};
+    const elsewhere = panelWithDraft();
+    elsewhere.readReady = true;
+    elsewhere.draft.stage({type: "updateLayoutKeys", draftRevision: elsewhere.draft.revision, layer: "Layer 1", changes: [{layoutIndex: 0, keycode: "KC_B"}]});
+    const model = buildPanelModel(elsewhere, connected({selectedDeviceId: "other", devices: [device, other]}));
+    assert.deepEqual([model.load.state, model.load.held], ["unavailable", "other-keyboard"]);
+    // A read that failed holds nothing for the draft to explain.
+    session.readReady = false;
+    const failed = buildPanelModel(session, connected());
+    assert.deepEqual([failed.load.state, failed.load.held], ["unavailable", undefined]);
+    // An editable draft is ready, and holds nothing.
+    assert.equal(buildPanelModel(panelWithDraft(), connected()).load.held, undefined);
+});
+
 test("a new connection blocks draft edits before portable readback finishes", () => {
     const session = {service: {portable: snapshot()}};
     buildPanelModel(session, connected({connectionToken: 1}));

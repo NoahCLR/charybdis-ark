@@ -254,8 +254,8 @@ const LIVE_ACTIONS = Object.freeze({
 // posts nothing. Leaving Live needs no question: the keyboard saves what it
 // has not saved yet, as it would have a moment later, then switches. A
 // failure leaves the mode as it was.
-/** @param {Session} session @param {{mode: number, pending?: string, draftRevision: number, confirmChecks?: boolean}} message @param {LiveContext["saveRecovery"]} saveRecovery @param {Host} host */
-async function setEditMode(session, message, saveRecovery, host) {
+/** @param {Session} session @param {{mode: number, pending?: string, draftRevision: number, confirmChecks?: boolean}} message @param {(cause: import("../../contracts/model.js").RecoveryCause) => LiveContext["saveRecovery"]} recoveryFor @param {Host} host */
+async function setEditMode(session, message, recoveryFor, host) {
     const draft = session.draft, service = session.service;
     if (!draft) throw new Error("Read the keyboard before changing how edits reach it.");
     const mode = message.mode;
@@ -267,15 +267,15 @@ async function setEditMode(session, message, saveRecovery, host) {
     /** @type {Draft | undefined} */
     let send;
     if (draft.live && known?.mode === EDIT_MODE.LIVE) {
-        const flushed = await service.flushWorkingCopy(saveRecovery);
+        const flushed = await service.flushWorkingCopy(recoveryFor("leave-live"));
         if (flushed.saved) draft.confirmKeyboardSaved(flushed);
     } else if (draft.live) {
         if (draft.live.unsaved) {
             if (message.pending === "save") {
                 if (draft.reviewedRevision !== draft.revision) draft.review(draft.revision);
-                await LIVE_ACTIONS.save(/** @type {LiveContext} */ ({session, draft, service, revision: draft.revision, message: {...message, type: "saveProfileDraft", confirmChecks}, host, saveRecovery}));
+                await LIVE_ACTIONS.save(/** @type {LiveContext} */ ({session, draft, service, revision: draft.revision, message: {...message, type: "saveProfileDraft", confirmChecks}, host, saveRecovery: recoveryFor("save")}));
             } else if (message.pending === "revert") {
-                await LIVE_ACTIONS.revert(/** @type {LiveContext} */ ({session, draft, service, revision: draft.revision, message, host, saveRecovery}));
+                await LIVE_ACTIONS.revert(/** @type {LiveContext} */ ({session, draft, service, revision: draft.revision, message, host, saveRecovery: recoveryFor("save")}));
             } else throw refusal(`Save or Revert the keyboard's unsaved edits before switching to ${EDIT_MODE_WORDS[mode].label}.`, "LIVE_EDIT_NOT_CLEAN");
         }
     } else if (draft.dirty && mode !== EDIT_MODE.APPLY) {

@@ -203,12 +203,20 @@ test("the web host's controls post their messages", async ({page}) => {
     await expect.poll(() => page.evaluate(() => document.documentElement.dataset.theme)).toBe("light");
     await expect(page.locator('.topbar [data-act="theme"]')).toHaveCount(1);
 
+    // The Keyboard screen builds its own header, with the toggle too.
+    await page.locator('[data-screen="device"]').click();
+    await expect(page.locator('.keyboard-topbar [data-act="theme"]')).toHaveCount(1);
+    await page.evaluate(() => {window.__posted.length = 0;});
+    await page.locator('.keyboard-topbar [data-act="theme"]').click();
+    await expect.poll(posted).toEqual([expect.objectContaining({type: "setTheme", theme: "dark"})]);
+    await expect.poll(() => page.evaluate(() => document.documentElement.dataset.theme)).toBe("dark");
+
     await page.locator('[data-screen="profile"]').click();
-    await expect(page.locator(".card.recoveries .recovery-row")).toHaveCount(2);
+    await expect(page.locator(".card.recoveries .recovery-row")).toHaveCount(4);
     await expect(page.locator('[data-act="upgrade"]')).toHaveCount(0);
     await page.evaluate(() => {window.__posted.length = 0;});
     await page.locator(".card.recoveries [data-recovery]").first().click();
-    await expect.poll(posted).toEqual([expect.objectContaining({type: "downloadRecovery", id: 2})]);
+    await expect.poll(posted).toEqual([expect.objectContaining({type: "downloadRecovery", id: 4})]);
     expect(errors).toEqual([]);
 });
 

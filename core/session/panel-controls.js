@@ -10,7 +10,9 @@
 // the host's own functions as `host`, of which these use three,
 //
 //   host.progress(title, run)      runs `run` behind a progress indicator
-//   host.saveRecovery(document)    writes a recovery copy, resolves to where it went
+//   host.saveRecovery(document, about)
+//                                  writes a recovery copy with what made it and
+//                                  the keyboard's name, resolves to where it went
 //   host.chooseProfile()           resolves to a chosen file's text, or undefined
 //
 // and `host.words.noneFound`, when a host says "no keyboard found" its own way.
@@ -30,6 +32,7 @@ const {RECONNECT_WORDS, expectReconnect, renamedTo} = require("./keyboard-reconn
 const {LIVE_ACTIONS, CHANGED_ELSEWHERE, proposeLive, setEditMode} = require("./live-edits");
 const {restartKeyboard, putBackAfterRestart} = require("./keyboard-restart");
 const {EDIT_MODE} = require("../protocol/profile-edit-v1");
+const {keyboardLabel} = require("./device-model");
 
 // Ark reads only current firmware; the compatibility diagnostics say what
 // this keyboard's firmware lacks.
@@ -171,7 +174,7 @@ async function readKeyboard(session, selectedDeviceId, host = {}) {
 /** @param {string} name @param {(context: DraftContext) => void | Promise<void>} [local] @returns {(context: DraftContext) => Promise<void>} */
 const liveOr = (name, local) => async (context) => {
     if (context.draft.live) {
-        await LIVE_ACTIONS[name]({...context, saveRecovery: (document) => saveRecovery(context.host, document)});
+        await LIVE_ACTIONS[name]({...context, saveRecovery: recoveryFor(context.host, context.session, "save")});
         if (["undo", "redo", "jump", "discardChanges", "putBack"].includes(name)) context.session.resetDraftForms = true;
         return;
     }
@@ -197,9 +200,9 @@ const DRAFT_ACTIONS = Object.freeze({
     confirmLive: liveOr("confirmLive"),
     cancelLive: async ({session}) => {session.liveProposal = undefined; session.resetDraftForms = true;},
     setMode: ({session, message, host}) => setEditMode(session, /** @type {{mode: number, pending?: string, draftRevision: number}} */ (/** @type {unknown} */ (message)),
-        (document) => saveRecovery(host, document), host),
+        (cause) => recoveryFor(host, session, cause), host),
     // A keyboard that stopped saving (firmware D-F34), in any edit mode.
-    restart: ({session, draft, host}) => restartKeyboard({session, draft, saveRecovery: (document) => saveRecovery(host, document)}),
+    restart: ({session, draft, host}) => restartKeyboard({session, draft, saveRecovery: recoveryFor(host, session, "restart")}),
     discard: liveOr("discard", async ({draft, revision, session, service}) => {
         // The draft's own keyboard, unchanged: discarding is an undoable
         // step. Otherwise the keyboard is read again and the draft starts
@@ -250,7 +253,7 @@ const DRAFT_ACTIONS = Object.freeze({
             let saved;
             const before = draft.base;
             const result = await run(host, "Applying the complete profile to both halves",
-                () => draft.apply(service, revision, async (document) => {if (document.format === "charybdis-profile") saved = /** @type {import("../model/types.js").PortableDocument} */ (document); return (recovery = await saveRecovery(host, document));}));
+                () => draft.apply(service, revision, async (document) => {if (document.format === "charybdis-profile") saved = /** @type {import("../model/types.js").PortableDocument} */ (document); return (recovery = await recoveryFor(host, session, "apply")(document));}));
             session.resetDraftForms = true;
             // What the keyboard held before, for "Put back what it had".
             session.beforeApply = saved ? {document: saved, deviceId: draft.deviceId, savedAt: new Date().toISOString()} : undefined;
@@ -354,7 +357,7 @@ const PORTABLE_ACTIONS = Object.freeze({
         /** @type {string | undefined} */
         let recovery = "";
         const result = await service.restorePortableProfile(document, {expectedFingerprint: before.fingerprint,
-            saveRecovery: async (copy) => (recovery = await saveRecovery(host, copy))});
+            saveRecovery: async (copy) => (recovery = await recoveryFor(host, session, "restore")(copy))});
         closeEditors(session);
         const expected = reconnectAfter(session, before, result);
         let reread = "";
@@ -379,10 +382,14 @@ function requireReview(value) {
     return value;
 }
 
-/** @param {Host} host @param {Parameters<import("./types.js").SaveRecovery>[0]} document */
-function saveRecovery(host, document) {
+// The host's recovery copy, saying what made it and the keyboard it comes
+// from, named as the Keyboard screen's title names it at that moment.
+/** @param {Host} host @param {Session} session @param {import("../../contracts/model.js").RecoveryCause} cause @returns {import("./types.js").SaveRecovery} */
+const recoveryFor = (host, session, cause) => (document) => {
     if (typeof host.saveRecovery !== "function") throw new TypeError("host.saveRecovery is not a function");
-    return host.saveRecovery(document);
-}
+    const state = session.service.snapshot();
+    const device = state.devices?.find((entry) => entry.id === state.selectedDeviceId);
+    return host.saveRecovery(document, {cause, keyboard: keyboardLabel({...state, device})});
+};
 
 module.exports = {readKeyboard, draftControl, portableControl, rereadKeyboard, DRAFT_ACTIONS, PORTABLE_ACTIONS};

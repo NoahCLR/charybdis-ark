@@ -20,6 +20,7 @@ const vscode = require("vscode");
 
 const {openPanelLoop, FILE_MAX_BYTES} = require("./core/session/panel-loop");
 const {writingProfile} = require("./core/session/panel-control-registry");
+const {recoveryFileName} = require("./core/session/recovery-copy");
 const {getHtml} = require("./panel-html");
 
 const VIEW_TYPE = "charybdisArk.panel";
@@ -128,7 +129,7 @@ function vscodeHost(panel, recoveryRoot, disposed = () => false) {
         post: (message) => disposed() ? Promise.resolve(false) : panel.webview.postMessage(message),
         showError: (text) => vscode.window.showErrorMessage(`Charybdis Ark: ${text}`),
         progress: async (title, work) => await vscode.window.withProgress({location: vscode.ProgressLocation.Notification, title}, work),
-        saveRecovery: (document) => saveRecoveryFile(recoveryRoot, document),
+        saveRecovery: (document, about) => saveRecoveryFile(recoveryRoot, document, about),
         chooseProfile: async () => {
             const files = await vscode.window.showOpenDialog({title: "Choose a keyboard profile", canSelectMany: false, filters: {"Charybdis profile": ["charybdis.json", "json"]}});
             if (!files?.length) return undefined;
@@ -150,11 +151,12 @@ function vscodeHost(panel, recoveryRoot, disposed = () => false) {
 
 module.exports = {activate, deactivate, adoptFormerRecoveries, openPanel};
 
-/** @param {import("vscode").Uri} recoveryRoot @param {Parameters<NonNullable<import("./core/session/types.js").LoopHost["saveRecovery"]>>[0]} document */
-async function saveRecoveryFile(recoveryRoot, document) {
+// Named by when, what made it and the keyboard it came from, as the browser
+// names its copies.
+/** @param {import("vscode").Uri} recoveryRoot @param {Parameters<import("./core/session/types.js").HostSaveRecovery>[0]} document @param {import("./core/session/types.js").RecoveryAbout} about */
+async function saveRecoveryFile(recoveryRoot, document, about) {
     await vscode.workspace.fs.createDirectory(recoveryRoot);
-    const suffix = document.format === "charybdis-profile" ? ".charybdis.json" : ".diagnostic.json";
-    const uri = vscode.Uri.joinPath(recoveryRoot, "recovery-" + new Date().toISOString().replace(/[:.]/g, "-") + suffix);
+    const uri = vscode.Uri.joinPath(recoveryRoot, recoveryFileName(document, about, new Date()));
     await vscode.workspace.fs.writeFile(uri, Buffer.from(JSON.stringify(document, null, 2) + "\n"));
     return uri.fsPath;
 }

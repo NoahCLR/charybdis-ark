@@ -6,6 +6,10 @@ export type ComboRead = PendingRead | (Omit<ReturnType<typeof import('../protoco
 
 export type ConnectionToken = number | string | null;
 export type SaveRecovery = (document: import('../model/types.js').PortableDocument | import('../model/types.js').RecoveryCaptureDocument) => Promise<string | undefined>;
+/** What a recovery copy records besides its profile (recovery-copy.js): what made it and the keyboard's name. */
+export interface RecoveryAbout {cause: import('../../contracts/model.js').RecoveryCause; keyboard: string}
+/** The host's seam: keeps the copy with what it records, and resolves to where it went. */
+export type HostSaveRecovery = (document: Parameters<SaveRecovery>[0], about: RecoveryAbout) => Promise<string | undefined>;
 export interface DraftDeviceContext {
     connected: boolean;
     selectedDeviceId?: string | null;
@@ -290,7 +294,7 @@ export interface LostKeyboard {deviceId: string; serialNumber: string; product: 
 export interface ExpectedReconnect {deviceId: string; serialNumber: string; name: string; otherDevices: readonly {id: string; product?: string}[]; startedAt: number; dropped: boolean; saved?: string; /** Lost unexpectedly rather than renamed: what happened. */ lost?: string; /** Restarted because Ark asked, rather than renamed. */ restart?: boolean; /** Said after how the wait ended: what followed the read. */ after?: string}
 export interface ControlHost extends PanelHost {
     progress?: <T>(title: string, work: () => Promise<T>) => Promise<T>;
-    saveRecovery?: SaveRecovery;
+    saveRecovery?: HostSaveRecovery;
 }
 export interface LoopHost extends ControlHost {
     post(message: import('../../contracts/messages.js').PanelResponse): unknown;

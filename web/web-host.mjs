@@ -88,8 +88,8 @@ export function startWebHost(env) {
             try {return await work();}
             finally {progress = null;}
         },
-        saveRecovery: async (copy) => {
-            const name = await recoveries.save(copy);
+        saveRecovery: async (copy, about) => {
+            const name = await recoveries.save(copy, about);
             recoveryList = await recoveries.list();
             return `${name}, kept in this browser (Backups)`;
         },
@@ -160,8 +160,8 @@ export function startWebHost(env) {
                 else loop.session.notice = "Failed: That recovery copy is no longer in this browser.";
                 return loop.publish();
             }
-            // A copy saved before an Apply opens as a backup file does: its
-            // comparison with the keyboard first, then Use as draft.
+            // A recovery copy opens as a backup file does: its comparison
+            // with the keyboard first, then Use as draft.
             case "useRecovery": {
                 const copy = await recoveries.get(message.id).catch(() => undefined);
                 if (!copy) {

@@ -49,9 +49,18 @@ export function savedWhen(savedAt) {
     return Number.isNaN(date.getTime()) ? String(savedAt ?? "") : date.toLocaleString("en-GB", {day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit"});
 }
 
-// A copy saved before an Apply, named by what it is, the keyboard and when.
-/** @param {string} keyboard @param {string} savedAt */
-export const copyTitle = (keyboard, savedAt) => ["Before Apply", keyboard, savedWhen(savedAt)].filter(Boolean).join(" · ");
+// What made a recovery copy, as its title says it.
+/** @type {Readonly<Record<import("../../contracts/model.js").RecoveryCause, string>>} */
+const MADE_BY = Object.freeze({apply: "Before Apply", restore: "Before restoring a backup", save: "Before Save", restart: "Before Restart", "leave-live": "Before leaving Live"});
+
+// A recovery copy named by what made it, the keyboard it came from and when.
+// A copy stored before those were recorded is named only by when, rather
+// than by a guessed cause or the keyboard selected now.
+/** @param {Pick<import("../../contracts/model.js").RecoveryCopy, "cause" | "keyboard" | "savedAt">} copy */
+export function copyTitle({cause, keyboard, savedAt}) {
+    const made = cause && Object.hasOwn(MADE_BY, cause) ? MADE_BY[cause] : "";
+    return (made ? [made, keyboard, savedWhen(savedAt)] : ["Recovery copy", savedWhen(savedAt)]).filter(Boolean).join(" · ");
+}
 
 /** @param {string | number} id @returns {{type: 'useRecovery', id: string | number}} */
 export const useRecovery = (id) => ({type: "useRecovery", id});

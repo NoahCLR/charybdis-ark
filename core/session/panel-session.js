@@ -184,6 +184,9 @@ function buildPanelModel(session, state) {
     // finishes, so an Apply's readback keeps the editor shown.
     const editableDraft = binding.editable || binding.reason === "busy";
     const readReady = (session.readReady ?? editableDraft) && editableDraft;
+    // A read that did not fail, held only by its draft (stale, or another
+    // keyboard's): the panel says that, not that the read failed.
+    const held = !readReady && session.readReady !== false && binding.reason !== "no-draft" ? binding.reason : "";
     const host = hostModel(session.host);
     // A renamed keyboard that has gone to take its new name is coming back:
     // the panel waits for it as for a read, rather than asking to connect one.
@@ -191,6 +194,7 @@ function buildPanelModel(session, state) {
     /** @type {import("../../contracts/model.js").LoadView} */
     const load = {
         state: session.readBusy || reconnecting ? "loading" : readReady ? "ready" : "unavailable",
+        ...(held && !session.readBusy && !reconnecting ? {held} : {}),
         phase: state.phase || PHASE.IDLE,
         operationId: state.operationId,
         operationBusy: Boolean(state.busy),

@@ -15,7 +15,8 @@ import {boardOutlineMarkup} from "../view/geometry.mjs";
 import {demoOf} from "../view/demo.mjs";
 import {openHistory} from "./history.mjs";
 import {bindEditModeSwitch, editModeSwitch} from "./edit-mode.mjs";
-import {LIVE, editsAreLive, liveSaveState, STOPPED_WORDS} from "../view/edit-mode.mjs";
+import {LIVE, editsAreLive, liveSaveState, railSaveLines} from "../view/edit-mode.mjs";
+import {keyboardStatusLine} from "../view/keyboard-view.mjs";
 
 // The review opens at once; the host marks it reviewed when it answers.
 function openReview() {
@@ -56,6 +57,10 @@ export function rail() {
         : !device.connected ? {tone: "err", tip: "No keyboard is connected."}
         : {tone: health.halves === "agree" ? "ok" : health.halves === "unread" ? "" : "warn", tip: `${busyWords}${halves.label}. ${halves.detail}`};
 
+    const keyboardLine = keyboardStatusLine(model);
+    // Under an Apply draft the keyboard says only that an adjustment is pending.
+    const applySaving = draft && !draft.live ? railSaveLines(draft) : [];
+
     const nav = screenGroups().map((group) => `<div class="rail-group">${esc(group.group)}</div>` + group.items.map(({id, definition}) => `
         <button class="nav-item" data-screen="${id}" aria-current="${state.screen === id}"
             ${screenAvailable(model, id) ? "" : "disabled"}>
@@ -79,10 +84,8 @@ export function rail() {
                 ${draft?.live ? (device.connected ? liveStatus(draft) : "") : !draft?.dirty ? "" : draft.matching && !draft.stale
                     ? `<button class="stat link" data-act="open-review" data-tip="Edits waiting in this window. The keyboard still runs its saved profile. Open the review to see them."><i class="dot draft"></i> ${draft.changes.length} change${draft.changes.length === 1 ? "" : "s"} in draft</button>`
                     : line("draft", `${draft.changes.length} change${draft.changes.length === 1 ? "" : "s"} in draft`, "Edits waiting in this window. The keyboard still runs its saved profile.")}
-                ${demo.active ? "" : health.restartNeeded
-                    ? line("err", "Restart the keyboard",
-                        "The slave half did not confirm a cancelled save, so the keyboard refuses new saves. Unplug the USB cable (not the cable between the halves), wait a few seconds and plug it back in. Nothing was lost.")
-                    : health.recoveryPending ? line("draft", "Recovery pending", "A recovery copy is written before every apply.") : ""}
+                ${applySaving.map(saveLine).join("")}
+                ${keyboardLine ? line(keyboardLine.tone, keyboardLine.text, keyboardLine.tip) : ""}
             </div>
         </div>
         <nav class="rail-nav">${nav}</nav>
@@ -128,13 +131,12 @@ function liveStatus(draft) {
     const count = draft.changes.length;
     const lines = [];
     // The halves apart have their own line below.
-    const saving = liveSaveState(draft);
+    const saving = railSaveLines(draft);
     // A keyboard that stopped saving: one line, in place of the halves'.
-    if (saving?.kind === "stopped") return `<div class="stat live-save stopped" data-tip="${esc(STOPPED_WORDS.tip)}"><i class="dot err"></i> ${esc(STOPPED_WORDS.rail)}</div>`;
-    if (saving && saving.kind !== "refused") {
-        const words = saving.kind === "pending" ? `${count ? `${count} change${count === 1 ? "" : "s"}` : "Edits"} not saved yet` : saving.title;
-        lines.push(`<div class="stat live-save ${saving.kind}" data-tip="${esc(saving.detail)}"><i class="dot ${saving.tone}${saving.kind === "saving" ? " busy" : ""}"></i> ${esc(words)}</div>`);
-    } else if (live.unsaved || draft.dirty) {
+    if (saving[0]?.kind === "stopped") return saveLine(saving[0]);
+    lines.push(...saving.map(saveLine));
+    // A pending adjustment is the keyboard's own: unsaved edits still say so.
+    if (saving.every((line) => line.kind === "adjustment") && (live.unsaved || draft.dirty)) {
         // Every edit undone: the keyboard still runs its working copy, the same
         // as what is saved, until Save or Revert (the bar says so too).
         const words = count ? `${count} unsaved change${count === 1 ? "" : "s"} on the keyboard` : "Unsaved edits match what is saved";
@@ -147,8 +149,12 @@ function liveStatus(draft) {
     return lines.join("");
 }
 
+/** @param {ReturnType<typeof railSaveLines>[number]} saving */
+const saveLine = (saving) => `<div class="stat live-save ${saving.kind}" data-tip="${esc(saving.tip)}"><i class="dot ${saving.tone}${saving.kind === "saving" ? " busy" : ""}"></i> ${esc(saving.text)}</div>`;
+
 // A host that leaves the theme to the panel (a web page) gets its toggle at
-// the top right of every screen; in VS Code the panel follows VS Code's theme.
+// the top right of every screen, the Keyboard screen's own header included; in
+// VS Code the panel follows VS Code's theme.
 /** @param {string} title @param {string} subtitle @param {string} [actions] */
 export const topbar = (title, subtitle, actions = "") => `<header class="topbar">
     <div><h1>${esc(title)}</h1><p class="sub">${esc(subtitle)}</p></div>
@@ -159,7 +165,7 @@ const THEME_ICONS = {
     dark: '<svg viewBox="0 0 16 16"><path d="M13.2 10.1A5.6 5.6 0 0 1 5.9 2.8a5.6 5.6 0 1 0 7.3 7.3z"/></svg>',
     light: '<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.8"/><path d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1"/></svg>',
 };
-function themeToggle() {
+export function themeToggle() {
     const theme = hostOf(getModel()).theme;
     if (!theme) return "";
     return `<button class="btn tiny ghost icon theme-toggle" data-act="theme" data-theme-now="${esc(theme)}"

@@ -13,7 +13,8 @@
 //   - Its halves and flags: the other half refusing the working copy, a save
 //     waiting for a quiet keyboard, the edit mode not yet stored.
 //   - Under an Apply draft: a change its keys made and it then saved is read
-//     again, as a Refresh would.
+//     again, as a Refresh would; until then, what it says of itself (an
+//     adjustment still reaching both halves) is shown.
 //
 // It never runs while an operation or the panel holds the keyboard, and a
 // look that raced with one (the draft moved meanwhile) is dropped. It pauses
@@ -70,6 +71,9 @@ async function checkLive(session) {
 // draft shows it, one with edits says the keyboard changed (review again).
 /** @param {import("./types.js").RunningPanelSession} session @param {NonNullable<import("./types.js").RunningPanelSession["draft"]>} draft @param {import("../protocol/types.js").EditStatus} status */
 async function checkApply(session, draft, status) {
+    // What it says of itself meanwhile, such as an adjustment still reaching
+    // both halves, is shown as it is.
+    const told = draft.observeApplyStatus(status);
     const seen = session.applyWatch?.draftId === draft.id ? session.applyWatch : undefined;
     session.applyWatch = {draftId: draft.id, session: status.session, revision: status.revision, savedGeneration: status.savedGeneration};
     const captured = session.observedPortable;
@@ -78,7 +82,7 @@ async function checkApply(session, draft, status) {
     // an adjustment may already have been saved before this poll exists.
     const same = seen ? (seen.session === status.session && seen.revision === status.revision && seen.savedGeneration === status.savedGeneration)
         : base && base.committedGeneration === status.savedGeneration && base.committedOriginHalf === status.savedOrigin;
-    if (status.unsaved || same) return false;
+    if (status.unsaved || same) return told;
     await readAgain(session);
     if (session.draft && !session.draft.stale) session.notice = MOVED;
     return true;

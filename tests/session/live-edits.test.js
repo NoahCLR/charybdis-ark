@@ -13,10 +13,10 @@ const {EDIT_MODE, EDIT_RESULT} = require("../../core/protocol/profile-edit-v1");
 
 function fakeHost() {
     const host = {
-        posted: [], errors: [], recoveries: [],
+        posted: [], errors: [], recoveries: [], made: [],
         post: (message) => {host.posted.push(message);},
         showError: (text) => {host.errors.push(text);},
-        saveRecovery: async (doc) => {host.recoveries.push(doc); return `/recovery/${host.recoveries.length}.json`;},
+        saveRecovery: async (doc, about) => {host.recoveries.push(doc); host.made.push(about); return `/recovery/${host.recoveries.length}.json`;},
         saveExport: async () => undefined,
     };
     return host;
@@ -168,6 +168,8 @@ test("Save asks for review, keeps a recovery copy of what was saved, and makes t
     assert.equal(keyboard.working, null);
     assert.equal(host.recoveries.length, 1);
     assert.equal(host.recoveries[0].profile, document().profile, "the recovery copy is what was saved before");
+    assert.deepEqual(host.made, [{cause: "save", keyboard: model(host).model.device.label}], "named for the Save and this keyboard");
+    assert.ok(host.made[0].keyboard);
     assert.equal(session.draft.dirty, false);
     assert.equal(session.draft.live.unsaved, false);
     assert.match(model(host).notice, /Saved on both halves/);
@@ -507,14 +509,15 @@ test("leaving Live recovers the actual saved profile after an unobserved save", 
     keyboard.externalEdit(Buffer.from(document().profile, "base64"));
     let savesAtRecovery = -1;
     const recover = host.saveRecovery;
-    host.saveRecovery = async doc => {
+    host.saveRecovery = async (doc, about) => {
         savesAtRecovery = keyboard.mutations.filter(report => report[2] === 0x25).length;
-        return recover(doc);
+        return recover(doc, about);
     };
     await send({type: "setEditMode", mode: EDIT_MODE.APPLY});
     assert.equal(keyboard.mode, EDIT_MODE.APPLY);
     assert.equal(host.recoveries.length, 1);
     assert.equal(host.recoveries[0].profile, saved);
+    assert.equal(host.made[0].cause, "leave-live", "named for leaving Live");
     assert.equal(savesAtRecovery, 0, "recovery precedes the explicit Save");
 });
 
@@ -524,8 +527,8 @@ test("a save during recovery refreshes the recovery copy before the flush writes
     await key(0, 19, "KC_O");
     const nextSaved = keyboard.working.toString("base64");
     const recover = host.saveRecovery;
-    host.saveRecovery = async doc => {
-        const result = await recover(doc);
+    host.saveRecovery = async (doc, about) => {
+        const result = await recover(doc, about);
         if (host.recoveries.length === 1) {
             keyboard.autoSave();
             keyboard.externalEdit(Buffer.from(document().profile, "base64"));

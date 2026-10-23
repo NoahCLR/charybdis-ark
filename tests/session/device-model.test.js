@@ -342,7 +342,7 @@ test("the header exposes one health model for connection, convergence and recove
 
 test("the subtitle says what to do next", () => {
     const idle = buildDeviceModel({capabilities: {}}).device;
-    assert.match(idle.subtitle, /Read from keyboard/);
+    assert.match(idle.subtitle, /Choose Read keyboard/);
 
     const read = buildDeviceModel({
         capabilities: {},

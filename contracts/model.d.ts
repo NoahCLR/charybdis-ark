@@ -7,7 +7,10 @@ export interface PhaseWords {label: string; read?: string; busy?: string; writes
 
 export interface CountedProgress {done: number; total: number}
 export interface BuildInfo {version: string; commit: string}
-export interface RecoveryCopy {id: string | number; name: string; savedAt: string}
+/** What made a recovery copy: an Apply, an Import restore, a Save, a restart, or leaving Live. */
+export type RecoveryCause = 'apply' | 'restore' | 'save' | 'restart' | 'leave-live';
+/** `cause` and `keyboard` are absent on copies stored before they were recorded. */
+export interface RecoveryCopy {id: string | number; name: string; savedAt: string; cause?: RecoveryCause; keyboard?: string}
 export interface HostPanel {
     chooseKeyboard: boolean;
     blocked: {title: string; detail: string; demo?: boolean} | null;
@@ -27,6 +30,8 @@ export interface DemoView {
 }
 export interface LoadView {
     state: 'loading' | 'ready' | 'unavailable';
+    /** Unavailable, though the read did not fail: why the open draft holds editing (core/session/panel-session-state.js draftBinding). */
+    held?: import('./panel.js').DraftBlock;
     phase: PhaseId;
     operationId?: number;
     operationBusy?: boolean;
@@ -40,7 +45,7 @@ export interface StatusModel {
     host?: HostPanel;
     demo?: DemoView;
     portable?: {available?: boolean; progress?: CountedProgress | string | null};
-    draft?: {changes?: readonly unknown[]};
+    draft?: {changes?: readonly unknown[]; live?: unknown};
 }
 
 export type ApplyStep = 'check' | 'backup' | 'upload' | 'validate' | 'peer' | 'commit' | 'converge' | 'verify';

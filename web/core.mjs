@@ -32,6 +32,7 @@ export {readKeyboard, draftControl, portableControl, rereadKeyboard} from "../co
 export {exportedProfile, openPanelLoop} from "../core/session/panel-loop.js";
 export {DEMO_CAPABILITIES, demoUnsaved, openDemo} from "../core/session/demo-session.js";
 export {closingLoses} from "../core/session/live-edits.js";
+export {recoveryFileName} from "../core/session/recovery-copy.js";
 export {validateSnapshot} from "../core/session/portable-profile-session.js";
 export {APPLY_STEPS, ApplyProgress, failureReason} from "../core/session/apply-progress.js";
 export {DEFAULT_REQUEST_TIMEOUT_MS, DeviceRequestCoordinator} from "../core/transport/request-coordinator.js";

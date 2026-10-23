@@ -17,16 +17,16 @@ import {demoOf} from "../view/demo.mjs";
 import {halvesWords, phaseWords} from "../view/vocabulary.mjs";
 import {hostOf} from "../view/host.mjs";
 import {profileUsageView} from "../view/profile-usage.mjs";
-import {FIRMWARE_RELEASES, firmwareLine, halvesRows} from "../view/keyboard-view.mjs";
+import {FIRMWARE_RELEASES, SAVE_IN_PROGRESS, firmwareLine, halvesRows, productName} from "../view/keyboard-view.mjs";
 import {NAME_MAX_BYTES} from "../view/names.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {firmwareFacts} from "../view/firmware-facts.mjs";
 import {attachTitleName, titleName} from "./title-name.mjs";
+import {themeToggle} from "./shell.mjs";
+import {renameNote} from "../view/edit-mode.mjs";
 
 /** @param {readonly (readonly [string, string])[]} rows each value already escaped markup */
 const kv = (rows) => `<dl class="kv device-kv">${rows.map(([key, value]) => `<dt>${esc(key)}</dt><dd>${value || "—"}</dd>`).join("")}</dl>`;
-
-const RENAME_NOTE = "Your computer and Chrome show this name after Apply; the keyboard reconnects for a moment to take it.";
 
 export function screenDevice() {
     const model = getModel();
@@ -43,12 +43,13 @@ export function screenDevice() {
     const build = hostOf(model).build;
     const restart = !demo && health?.restartNeeded ? `<div class="callout danger-note" role="alert"><strong>Restart the keyboard.</strong>
         The left half did not confirm a cancelled save, so the keyboard refuses new saves until it restarts. Nothing was lost.
-        <ol class="steps"><li>Unplug the USB cable from the right half (not the cable between the halves).</li><li>Wait a few seconds, then plug it back in.</li><li>Choose Read from keyboard below.</li></ol></div>` : "";
+        <ol class="steps"><li>Unplug the USB cable from the right half (not the cable between the halves).</li><li>Wait a few seconds, then plug it back in.</li><li>Choose Read keyboard below.</li></ol></div>` : "";
     const earlier = !demo && health?.earlierFormat ? `<p class="note">A saved profile uses an earlier format or test layout that this firmware does not read, so the keyboard runs its built-in defaults. Apply saves your profile in the current format.</p>` : "";
-    const saving = !demo && health?.recoveryPending ? `<p class="note">A save is in progress on the keyboard: it keeps its previous profile until both halves confirm the new one.</p>` : "";
+    const saving = !demo && health?.recoveryPending ? `<p class="note">${esc(SAVE_IN_PROGRESS.detail)}</p>` : "";
     const halves = halvesRows(model).map((half) => `<span class="half ${half.ok ? "ok" : "warn"}">${esc(half.side)} · ${esc(half.role)} ${half.ok ? "✓" : "!"}<span class="note"> ${esc(half.words)}</span></span>`).join("");
+    const product = productName(model);
     const identity = kv([
-        ["Product", esc(device?.label || "")],
+        ...(product ? /** @type {const} */ ([["Product", esc(product)]]) : []),
         ["Firmware", demo ? "Current firmware (demo)" : `${esc(firmware.version)} · ${firmware.works ? `<span class="ok-words">${esc(firmware.words)}</span>`
             : `<span class="warn-words">${esc(firmware.words)}</span> <a class="btn text compact" href="${esc(FIRMWARE_RELEASES)}" target="_blank" rel="noopener">How to install →</a>`}`],
         ...(build?.version ? /** @type {const} */ ([["Ark", esc(`Ark ${build.version}`)]]) : []),
@@ -59,7 +60,8 @@ export function screenDevice() {
     const facts = firmwareFacts(model);
     const main = el(`<div class="main">
         <header class="topbar keyboard-topbar"><div class="keyboard-title">${title}${dirty ? draftDot() : ""}
-            <p class="sub">${esc(sub)}</p><p class="note rename-note">${esc(RENAME_NOTE)}</p></div></header>
+            <p class="sub">${esc(sub)}</p><p class="note rename-note">${esc(renameNote(model?.draft))}</p></div>
+            <div class="topbar-actions">${themeToggle()}</div></header>
         <div class="content"><div class="pad stack device-pad">
             <section class="card"><div class="card-h"><h3>This keyboard</h3></div>
                 <div class="card-b stack gap-12">${identity}${restart}${earlier}${saving}</div></section>
@@ -67,7 +69,7 @@ export function screenDevice() {
             ${facts.length ? builtInCard(facts) : ""}
             <details class="card settings-group" data-section="diagnostics" ${diagnosticsOpen ? "open" : ""}>
                 <summary class="card-h">${DISCLOSURE}<h3>Diagnostics</h3>
-                    <span class="right"><button class="btn compact" data-act="read" ${health?.busy ? "disabled" : ""}>Read from keyboard</button></span></summary>
+                    <span class="right"><button class="btn compact" data-act="read" ${health?.busy ? "disabled" : ""}>Read keyboard</button></span></summary>
                 <div class="card-b stack gap-12">${kv([
                     ["Saved profile", esc(device?.summary || "")],
                     ["Halves", esc(halvesWords(model, health?.halves).label)],
