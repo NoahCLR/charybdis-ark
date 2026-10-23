@@ -28,21 +28,21 @@ test("every file the build writes is named by its content, and the manifest besi
         fs.writeFileSync(path.join(outdir, "manifest.json"), "{}");
         const build = {version: "1.2.3", commit: "abc123"};
         const manifest = await buildWeb({outdir, build});
-        assert.deepEqual(Object.keys(manifest).sort(), ["core", "host", "panel", "styles", "worker"]);
+        assert.deepEqual(Object.keys(manifest).sort(), ["core", "panel", "shell", "styles", "worker"]);
         assert.match(manifest.core, /^core-[A-Z0-9]{8}\.js$/);
-        assert.match(manifest.host, /^host-[A-Z0-9]{8}\.js$/);
+        assert.match(manifest.shell, /^shell-[A-Z0-9]{8}\.js$/);
         assert.match(manifest.worker, /^worker-[A-Z0-9]{8}\.js$/);
         assert.match(manifest.panel, /^panel-[A-Z0-9]{8}\.js$/);
         assert.match(manifest.styles, /^styles-[A-Z0-9]{8}\.css$/);
         assert.deepEqual(JSON.parse(fs.readFileSync(path.join(root, "web-manifest.json"), "utf8")), manifest, "the manifest is beside the site, never published");
         const written = fs.readdirSync(outdir).sort();
         const chunks = written.filter((name) => /^chunk-[A-Z0-9]{8}\.js$/.test(name));
-        assert.ok(chunks.length, "host and core share their code");
+        assert.ok(chunks.length, "shell and core share their code");
         assert.deepEqual(written, [...Object.values(manifest), ...chunks, "_headers", "index.html"].sort(), "an earlier build's files are gone");
 
         // The same sources give the same names; the hash follows the content.
         assert.deepEqual(await buildWeb({outdir, build}), manifest);
-        // core/ for a browser is the core entry with the chunk it shares with the host.
+        // core/ for a browser is the core entry with the chunk it shares with the shell.
         const core = [manifest.core, ...chunks].map((file) => fs.readFileSync(path.join(outdir, file), "utf8")).join("\n");
         assert.ok(!core.includes("node-hid-adapter.js") && !/require\("(node:)?(fs|crypto|path)"\)/.test(core), "the core bundle carries no Node module");
         assert.ok(core.includes("web/no-native-hid.js"), "the native adapter's stand-in takes its place");
@@ -62,10 +62,10 @@ test("the page names its files itself, carries its policy, and says what it was 
         const page = fs.readFileSync(path.join(outdir, "index.html"), "utf8");
         assert.ok(!page.includes("{{"), "every name is filled in");
         assert.ok(page.includes(`href="./${manifest.styles}"`));
-        // The page runs only the host. The host loads the panel once it has
+        // The page runs only the shell. The shell loads the panel once it has
         // defined acquireVsCodeApi, or on a phone never does; the page only
         // fetches the panel early.
-        assert.ok(page.includes(`<script type="module" src="./${manifest.host}"></script>`));
+        assert.ok(page.includes(`<script type="module" src="./${manifest.shell}"></script>`));
         assert.ok(!page.includes(`src="./${manifest.panel}"`), "the panel is not a script of the page's own");
         assert.ok(page.includes(`<link rel="modulepreload" href="./${manifest.panel}">`));
         assert.match(page, /Charybdis Ark 1\.2\.3 \(abc123\)/);
@@ -76,13 +76,13 @@ test("the page names its files itself, carries its policy, and says what it was 
         }
         assert.doesNotMatch(policy, /script-src[^;]*unsafe/, "no inline script");
         assert.doesNotMatch(page, /<script(?![^>]*\bsrc=)/, "every script is a file");
-        // The page fetches nothing once loaded: the host names the worker it
+        // The page fetches nothing once loaded: the shell names the worker it
         // starts, and nothing it bundles opens a connection.
-        const host = fs.readFileSync(path.join(outdir, manifest.host), "utf8");
-        assert.ok(host.includes(`"./${manifest.worker}"`), "the host starts the hashed worker");
-        assert.ok(host.includes(`"./${manifest.panel}"`), "the host loads the hashed panel");
-        assert.ok(host.includes('"abc123"'), "the host carries the build it was made from");
-        for (const file of [manifest.host, manifest.panel, ...fs.readdirSync(outdir).filter((name) => name.startsWith("chunk-"))]) {
+        const shell = fs.readFileSync(path.join(outdir, manifest.shell), "utf8");
+        assert.ok(shell.includes(`"./${manifest.worker}"`), "the shell starts the hashed worker");
+        assert.ok(shell.includes(`"./${manifest.panel}"`), "the shell loads the hashed panel");
+        assert.ok(shell.includes('"abc123"'), "the shell carries the build it was made from");
+        for (const file of [manifest.shell, manifest.panel, ...fs.readdirSync(outdir).filter((name) => name.startsWith("chunk-"))]) {
             assert.doesNotMatch(fs.readFileSync(path.join(outdir, file), "utf8"), /\bfetch\(|XMLHttpRequest|WebSocket|EventSource|sendBeacon/, file);
         }
     } finally {

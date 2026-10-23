@@ -36,7 +36,7 @@ export const NEARLY_FULL = 0.9;
 /** @param {number} used @param {number} capacity */
 const share = (used, capacity) => (capacity > 0 ? Math.min(1, used / capacity) : 0);
 
-// The card's figures, or null when the host sent none (no keyboard, or
+// The card's figures, or null when the core sent none (no keyboard, or
 // firmware that does not advertise its profile size).
 /** @param {import("../../contracts/model.js").ProfileUsage | null | undefined} usage @param {{stored: number, capacity: number, reserveTaps?: number} | null} [macroBank] */
 export function profileUsageView(usage, macroBank) {

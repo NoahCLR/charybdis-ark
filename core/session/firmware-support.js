@@ -71,7 +71,7 @@ function canReadIdentity(status, allowCandidate = true) {
 }
 
 /** @param {Pick<Status, "stateFlags" | "conflictCount" | "activeKind">} status @param {boolean} [allowCandidate] */
-function canCapture(status, allowCandidate = false) {
+function canSnapshot(status, allowCandidate = false) {
     const active = status.activeKind === PROFILE_ACTIVE_KIND.COMMITTED || status.activeKind === PROFILE_ACTIVE_KIND.COMPILED_ONLY;
     return active && Boolean(status.stateFlags & PROFILE_STATE_FLAGS.PEER_CONVERGED) && canReadIdentity(status, allowCandidate);
 }
@@ -79,7 +79,7 @@ function canCapture(status, allowCandidate = false) {
 /** @param {Pick<Status, "stateFlags">} status */
 const identityStateFlags = status => status.stateFlags & ~PROFILE_STATE_FLAGS.CANDIDATE_PENDING;
 
-// Independent device views, read when a complete capture fails, keep per-area
+// Independent device views, read when a complete read fails, keep per-area
 // gates. A failed domain prevents behaviours/pointing editing but does not
 // close combos; a custom-key view does not acquire an extra layer-count
 // requirement.
@@ -204,7 +204,7 @@ function firmwareView(capabilities) {
     };
 }
 
-module.exports = {firmwareView, canRead, canEdit, canApply, isCurrentBase, hasCurrentLayers, editableDomains, canCapture,
+module.exports = {firmwareView, canRead, canEdit, canApply, isCurrentBase, hasCurrentLayers, editableDomains, canSnapshot,
     canReadIdentity, identityStateFlags, supportsCompleteProfile, requireReady,
     evaluateProfileCompatibility, evaluateLiveMutationCompatibility, PROFILE_DOMAIN_FLAGS,
     SUPPORTED_PROFILE_PROTOCOL, SUPPORTED_PROFILE_SCHEMA, REQUIRED_PROFILE_DOMAIN_MASK,

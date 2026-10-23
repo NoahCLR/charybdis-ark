@@ -52,7 +52,7 @@ const CATALOG_SOURCE = "vendored QMK keycode catalog";
  * @typedef {{busy: boolean, behaviors: boolean, pointing: boolean, combos: boolean, macros: boolean, settings: boolean, customKeys: boolean}} Editing
  */
 
-// Independent readback remains useful when a complete capture fails.
+// Independent readback remains useful when a complete read fails.
 /** @param {import("./types.js").DeviceModelInput} [state] */
 function buildDeviceModel(state = {}) {
     const committed = state.committed?.state === "read";
@@ -123,7 +123,7 @@ function configurationModel(content, capabilities, editing) {
         macosIso: content.settingsView?.host?.macosIso,
         layers: content.domains?.settings?.names,
         actionsKnown: knownActionAbi(capabilities?.actionAbiDigest ?? 0),
-        macros: content.macroView?.viaMacros,
+        macros: content.macroView?.macros,
         customKeys: content.customKeyView?.keys,
         behaviors: content.domains.keyBehaviors?.rows || [],
         pdModes: content.domains?.pdModes,
@@ -195,10 +195,10 @@ function configurationModel(content, capabilities, editing) {
             ...(Number.isInteger(content.settingsView?.brightnessMax) ? {maximumBrightness: content.settingsView?.brightnessMax} : {}),
             baseEffect: content.baseEffect},
 
-        // Native combo values, resolved from either capture or snapshot.
+        // Native combo values, resolved from either the readback or the snapshot.
         combos: comboRowsForView(content.comboRows, catalog.labels),
         comboReadback: {...content.comboInfo, writable: editing.combos},
-        viaMacros: content.macroView?.viaMacros || [],
+        macros: content.macroView?.macros || [],
         macroNameSpace: content.macroView?.names || null,
         macroBank: content.macroView?.macroBank || null,
         hostSettings: content.settingsView?.host || null,

@@ -17,7 +17,7 @@ test("the default combo window and the combo hold threshold are editable on curr
     await expect(page.getByText("Flash the updated firmware")).toHaveCount(0);
     const window = page.locator('[data-f="settings:combo:default"]');
     await change(window, 77);
-    await expectPost(page, {type: "updateComboDefaultTerm", defaultTermMs: "77"});
+    await expectPost(page, {type: "updateComboDefaultWindow", defaultTermMs: "77"});
     await clearPosts(page);
     await change(page.locator('[data-f="settings:combo:hold"]'), 233);
     await expectPost(page, {type: "updateComboHoldTerm", holdTermMs: "233"});
@@ -59,7 +59,7 @@ test("Keyboard: the title renames the keyboard, and memory and diagnostics live 
 });
 
 test("Backups: a recovery copy is named by what made it and its keyboard, can be used as a draft or deleted, and a chosen file opens as a sheet", async ({page}) => {
-    await page.goto("/preview/index.html?host=web");
+    await page.goto("/preview/index.html?shell=web");
     await page.locator('[data-screen="profile"]').click();
     await expect(page.locator(".card.usage")).toHaveCount(0);
     const names = page.locator(".recovery-row .recovery-name");

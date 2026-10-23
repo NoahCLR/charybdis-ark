@@ -57,7 +57,7 @@ function behaviorLabel({behavior}, document) {
 const DRAFT_EDIT_TYPES = Object.freeze(/** @satisfies {{[K in DraftEditType]: Entry<K>}} */ ({
     updateLayoutKeys: {editor: "keymap", label: layoutLabel},
     updateConfigDefaults: {editor: "settings", label: "Saved a settings section"},
-    updateViaMacro: {editor: "macro", label: "Edited a macro"},
+    updateMacro: {editor: "macro", label: "Edited a macro"},
     updateCustomKey: {editor: "customKey", label: "Renamed a custom key"},
     updateCustomKeyShortcut: {editor: "customKey", label: message => message.then || message.name !== undefined ? "Made a custom key for a shortcut"
         : message.shortcut.mods || message.shortcut.key ? "Changed a custom key's shortcut" : "Cleared a custom key's shortcut"},
@@ -70,7 +70,7 @@ const DRAFT_EDIT_TYPES = Object.freeze(/** @satisfies {{[K in DraftEditType]: En
     saveCombo: {editor: "profile", domain: "combos", label: "Edited a combo"},
     deleteCombo: {editor: "profile", domain: "combos", label: "Removed a combo"},
     updateComboHoldTerm: {editor: "profile", domain: "combos", label: "Changed the combo hold threshold"},
-    updateComboDefaultTerm: {editor: "profile", domain: "combos", label: "Changed the default combo window"},
+    updateComboDefaultWindow: {editor: "profile", domain: "combos", label: "Changed the default combo window"},
     saveBehavior: {editor: "profile", domain: "behaviours", label: behaviorLabel},
     deleteBehavior: {editor: "profile", domain: "behaviours", label: "Removed a behaviour"},
     retargetBehavior: {editor: "profile", domain: "behaviours", label: message => message.conflict === "swap" ? "Swapped two behaviours" : "Moved a behaviour"},

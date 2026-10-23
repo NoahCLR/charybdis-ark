@@ -14,7 +14,7 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
         const capabilities = {protocol: {major: 2, minor: 0}, schema: {major: 4, minor: 0}, compiledLayerCount: 16, supportedDomainMask: 127, actionAbiDigest: value.actionAbiDigest, featureFlags: PROFILE_WIRE_KNOWN_MASKS.CURRENT_PAIR_FEATURES};
         const draft = new ProfileDraftSession({document: value, fingerprint: fingerprint(value), summary: summary(value)}, "board", capabilities);
         const connection = {connected: true, selectedDeviceId: "board", capabilities};
-        draft.stage({type: "updateViaMacro", keycode: "VIA_MACRO_0", payload: "777", name: "Greeting <&>", draftId: draft.id, draftRevision: draft.revision});
+        draft.stage({type: "updateMacro", keycode: "VIA_MACRO_0", payload: "777", name: "Greeting <&>", draftId: draft.id, draftRevision: draft.revision});
         const publish = async () => {
             const editing = draftBinding({draft}, connection);
             const patch = {...buildSnapshotModel(draft.current, capabilities, editing, connection), draft: {...draft.view(connection), ...editing}};

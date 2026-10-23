@@ -1063,7 +1063,7 @@ function progressFor(context) {
         transactionId: context.transactionId,
         operation: context.operation,
         // bytesSent is retained for callers using it as completed progress.
-        // Explicit counts distinguish reconstructed bytes from host uploads.
+        // Explicit counts distinguish reconstructed bytes from what Ark uploads.
         bytesSent: context.bytesSent,
         bytesPrepared: context.bytesSent,
         bytesUploaded: context.bytesUploaded,

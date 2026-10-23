@@ -1,6 +1,6 @@
 // @ts-check
 // Keep a person's place when the current screen is rebuilt. Every edit comes
-// back through the host model and the webview deliberately redraws from that
+// back through the core's model and the webview deliberately redraws from that
 // model, but replacing `.content` must not make an ordinary click feel like
 // navigation. A slot bank (Macros, Custom keys) keeps its own scroll position
 // too, as does a list that scrolls beside its editor ([data-scroll-list], the

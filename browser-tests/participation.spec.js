@@ -2,7 +2,7 @@
 "use strict";
 const {test, expect} = require("@playwright/test");
 const {compileLayerAnswers} = require("../core/model/layer-resolution");
-const {openFold} = require("./host-page");
+const {openFold} = require("./shell-page");
 
 test("participation controls post placements, shared definitions and master/source-layer settings", async ({page}) => {
     const errors = [];
@@ -64,7 +64,7 @@ test("a transparent late-layer key explains its source and opens that placement"
         return model;
     });
     // This fixture changes a native layout value, so republish the same core
-    // facts the production host regenerates after accepting that edit.
+    // facts the production core regenerates after accepting that edit.
     const answers = compileLayerAnswers(model.layers.map(layer => {
         const codes = [];
         for (const key of layer.positions) codes[key.layoutIndex] = key.value;

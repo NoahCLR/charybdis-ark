@@ -4,10 +4,10 @@
 // model fields, invalidates the editor unless explicitly excluded here.
 /** @param {ComparedModel} model */
 const editorContent = (model) => {
-    const {diagnostics, apply, postApplyRead, load, device, host, portable, ...content} = model;
+    const {diagnostics, apply, postApplyRead, load, device, shell, portable, ...content} = model;
     return {...content, load: load && {...load, phase: undefined, operationId: undefined, operationBusy: undefined, progress: undefined},
         device: device && {...device, health: {...device.health, phase: undefined}},
-        host: host && {...host, progress: undefined},
+        shell: shell && {...shell, progress: undefined},
         portable: portable && {...portable, progress: undefined}};
 };
 

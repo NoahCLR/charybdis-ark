@@ -43,7 +43,7 @@ function base64(value, max, label) {
     return bytes;
 }
 /** @param {Buffer} bytes @param {import("../schema/types.js").MacroOptions} [options] */
-function validateViaMacro(bytes, {textEntry = false, layout} = {}) {
+function validateMacro(bytes, {textEntry = false, layout} = {}) {
     decodeMacroPayload(bytes, {textEntry, layout});
     const held = new Set(); let index = 0;
     /** @param {number} v */
@@ -149,14 +149,14 @@ function validateSnapshot(value, capabilities) {
     const payload = key => /** @type {import("../schema/types.js").ProfileDomain} */ (domains.find(domain => domain.id === domainCodec(key).id)).payload;
     const layers = domainCodec("keymap").decode(payload("keymap"));
     const macros = domainCodec("macros").decode(payload("macros"));
-    macros.forEach(slot => validateViaMacro(slot));
+    macros.forEach(slot => validateMacro(slot));
     const pdModes = domainCodec("pdModes").decode(payload("pdModes"));
     const codecOptions = profileDepthOptions(capabilities, payload("rgb"));
     const rgb = domainCodec("rgb").decode(payload("rgb"), codecOptions), behaviors = domainCodec("behaviors").decode(payload("behaviors"), codecOptions),
         combos = domainCodec("combos").decode(payload("combos")), settings = domainCodec("settings").decode(payload("settings"));
     // With Unicode playback on, a held ordinary key cannot span text the
     // layout leaves to Unicode entry.
-    if (settings.values[SETTING.UNICODE_HOST_MODE] & 0x100) for (const macro of macros) validateViaMacro(macro, {textEntry: true, layout: hostSettings(settings.values).layout});
+    if (settings.values[SETTING.UNICODE_HOST_MODE] & 0x100) for (const macro of macros) validateMacro(macro, {textEntry: true, layout: hostSettings(settings.values).layout});
     if (rgb.layerColors.length !== LAYERS || rgb.layerColors.some(row => row.layerId >= LAYERS)) throw fail(`RGB does not cover all ${LAYERS} layers.`);
     // A binding for an empty slot is allowed, because the keyboard allows it:
     // the mode keycodes are a fixed registry, and the runtime refuses to
@@ -330,4 +330,4 @@ function summaryOf(value) {
         macros: value.macroSlots.filter(bytes => bytes.length).length,
         names: value.settings.names.map((name, index) => layerName(value.settings.names, index))};
 }
-module.exports = {LAYERS, MACRO_SLOTS, MACRO_BANK_BYTES, FILE_MAX_BYTES, DOCUMENT_VERSION, encodeNamedProfile, comboTableOf, createSnapshot, validateSnapshot, materializeProfile, materializeStored, validateViaMacro, fingerprint, fingerprintOf, decodedOf, reorderLayers, summary, summaryOf};
+module.exports = {LAYERS, MACRO_SLOTS, MACRO_BANK_BYTES, FILE_MAX_BYTES, DOCUMENT_VERSION, encodeNamedProfile, comboTableOf, createSnapshot, validateSnapshot, materializeProfile, materializeStored, validateMacro, fingerprint, fingerprintOf, decodedOf, reorderLayers, summary, summaryOf};

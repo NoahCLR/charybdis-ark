@@ -8,7 +8,7 @@ import {readMacro} from "../../view/macro-cache.mjs";
 import {actionLabel} from "../../view/keyface.mjs";
 import {canEdit as canEditArea, getModel, macroForm, post, setMacroForm, state} from "../../store.mjs";
 import * as edits from "../../view/edits.mjs";
-// Input remains local until the host has inspected this exact payload under
+// Input remains local until the core has inspected this exact payload under
 // the current draft. A late reply can never stage a newer or discarded edit.
 let nextInspection = 0;
 /** @type {Map<string, {context: string, payload: string, requestId: number}>} */
@@ -21,7 +21,7 @@ export const matchingValidation = (form, model, slot) => form.validation != null
     form.validation.context === inspectionContext(model, slot);
 
 /** @param {string} keycode */
-function currentSlot(keycode) { return getModel()?.viaMacros?.find(slot => slot.keycode === keycode); }
+function currentSlot(keycode) { return getModel()?.macros?.find(slot => slot.keycode === keycode); }
 
 /** @param {MacroSlot} slot */
 export function requestInspection(slot) {

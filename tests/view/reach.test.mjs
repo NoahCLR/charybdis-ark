@@ -21,7 +21,7 @@ test("a branch action that sends a pointing mode reads as the mode, held or lock
 });
 
 test("a branch action that plays a macro reads as the macro by the name it was given", () => {
-    const model = {viaMacros: [{keycode: "VIA_MACRO_0", name: "Sign-off", empty: false}, {keycode: "VIA_MACRO_1", name: "", empty: true}]};
+    const model = {macros: [{keycode: "VIA_MACRO_0", name: "Sign-off", empty: false}, {keycode: "VIA_MACRO_1", name: "", empty: true}]};
     assert.equal(macroAction(model, "VIA_MACRO_0").name, "Sign-off");
     const unnamed = macroAction(model, "VIA_MACRO_1");
     assert.deepEqual([unnamed.name, unnamed.empty], ["Macro 1", true], "an unnamed macro goes by its number");
@@ -32,7 +32,7 @@ test("a branch action that plays a macro reads as the macro by the name it was g
 test("pointing modes and macros read as what they are; plain keycodes read as themselves", () => {
     const model = {
         pdModes: [{id: 4, displayName: "Arrow", kind: 1, binding: {hold: "PD_SLOT_4", lock: "PD_SLOT_4_LOCK", holdCode: 0x7e54, lockCode: 0x7e5a}}],
-        viaMacros: [{keycode: "VIA_MACRO_2", name: "", empty: true}],
+        macros: [{keycode: "VIA_MACRO_2", name: "", empty: true}],
     };
     const pd = namedAction(model, "PD_SLOT_4_LOCK");
     assert.deepEqual([pd.kind, pd.word, pd.name, pd.tags], ["pointing", "pointing mode", "Arrow", ["lock"]]);
@@ -256,7 +256,7 @@ test("a behaviour picked under one route rings only that route's keys", () => {
 
 test("a macro fired from a behaviour branch is reached, though no key shows it", () => {
     const model = {
-        viaMacros: [
+        macros: [
             {kind: "via", keycode: "VIA_MACRO_0", payload: "{KC_A}", bytes: 3, empty: false},
             {kind: "via", keycode: "VIA_MACRO_1", payload: "{KC_B}", bytes: 3, empty: false},
             {kind: "via", keycode: "VIA_MACRO_2", payload: "{KC_C}", bytes: 3, empty: false},
@@ -300,7 +300,7 @@ test("a macro fired from a behaviour branch is reached, though no key shows it",
 test("a thing reached several ways is listed under each of them", () => {
     const at = (layoutIndex, keycode) => ({layoutIndex, keycode, display: keycode});
     const model = {
-        viaMacros: [
+        macros: [
             {kind: "via", keycode: "VIA_MACRO_0", payload: "{KC_A}", bytes: 3, empty: false},
             {kind: "via", keycode: "VIA_MACRO_1", payload: "{KC_B}", bytes: 3, empty: false},
         ],
@@ -332,7 +332,7 @@ test("reach lists read down the stack, the default layer first", () => {
     const at = (layoutIndex, keycode) => ({layoutIndex, keycode, display: keycode});
     const clear = (indexes) => indexes.map((i) => at(i, "KC_TRANSPARENT"));
     const model = {
-        viaMacros: [0, 1, 2].map((n) => ({kind: "via", keycode: `VIA_MACRO_${n}`, payload: "{KC_A}", bytes: 3, empty: false})),
+        macros: [0, 1, 2].map((n) => ({kind: "via", keycode: `VIA_MACRO_${n}`, payload: "{KC_A}", bytes: 3, empty: false})),
         keyBehaviors: [
             {keycode: "KC_A", steps: [{tapCount: 0, tap: {action: "KC_A"}}]},
             {keycode: "KC_B", steps: [{tapCount: 0, tap: {action: "KC_B"}}]},
@@ -379,7 +379,7 @@ test("a combo reaches the macro it sends, and what a behaviour it sends reaches"
     // is on any key, so without this both read as unreachable.
     const at = (layoutIndex, keycode, semantic) => ({layoutIndex, keycode, semantic, display: keycode});
     const model = {
-        viaMacros: [
+        macros: [
             {keycode: "VIA_MACRO_0", payload: "{KC_A}", empty: false},
             {keycode: "VIA_MACRO_1", payload: "{KC_B}", empty: false},
             {keycode: "VIA_MACRO_2", payload: "{KC_C}", empty: false},
@@ -450,7 +450,7 @@ test("cold macro placement lookup avoids combinations of layers that cannot chan
 test("a macro's layers are the ones that hold a way to it themselves", () => {
     const at = (layoutIndex, keycode, semantic) => ({layoutIndex, keycode, semantic, display: keycode});
     const model = {
-        viaMacros: [1, 2, 3, 10].map((n) => ({keycode: `VIA_MACRO_${n}`, payload: "{KC_A}", empty: false})),
+        macros: [1, 2, 3, 10].map((n) => ({keycode: `VIA_MACRO_${n}`, payload: "{KC_A}", empty: false})),
         qmkKeycodeAliases: {QK_MACRO_3: "VIA_MACRO_3"},
         keyBehaviors: [{keycode: "KC_ESCAPE", steps: [{tapCount: 1, tap: {action: "VIA_MACRO_2"}}]}],
         combos: [{id: 0, badge: "C1", inputs: ["KC_B", "KC_C"], output: "QK_MACRO_3"}],
@@ -513,7 +513,7 @@ test("generated behaviour lists use the declared owner's physical source rather 
     const combo = {id: 0, inputs: ["KC_A", "KC_B"], output: "CUSTOM_KEY_0"};
     const model = {keyBehaviors: [row], combos: [combo],
         participation: {behaviorsEnabled: true, comboOutputBehaviors: true, behaviorLayers: 0, layers: []},
-        viaMacros: [{keycode: "VIA_MACRO_0", empty: false}]};
+        macros: [{keycode: "VIA_MACRO_0", empty: false}]};
     const stack = withAnswers([
         {index: 0, name: "Base", positions: [at(0, "KC_C"), at(1, "KC_B")]},
         {index: 1, name: "Overlay", positions: [at(0, "KC_A"), at(1, "KC_TRANSPARENT")]},

@@ -3,7 +3,7 @@ import test from "node:test";
 import {actionNaming, dualRole, keyFace, layerOfKeycode, keyName, visibleKeycode, cellLabel, behaviourFor, canonicalKeycode, behaviourListeningTo, behaviourTiers, behaviourGridSteps, behaviourDepth, behaviourGridLayout, inheritedBranch, impliedBranch} from "../../webview/view/keyface.mjs";
 import keyNames from "../../core/model/key-names.js";
 
-test("visible macro keycodes use the VIA slot name for both QMK's named and unnamed values", () => {
+test("visible macro keycodes use the VIA_MACRO_n name for both QMK's named and unnamed values", () => {
     const model = {qmkKeycodeAliases: {QK_MACRO_9: "VIA_MACRO_9", "0x773F": "VIA_MACRO_63", QK_USER_16: "PD_SLOT_0"}};
     assert.equal(visibleKeycode(model, "QK_MACRO_9"), "VIA_MACRO_9");
     assert.equal(visibleKeycode(model, "0x773F"), "VIA_MACRO_63");
@@ -81,7 +81,7 @@ test("a picked key finds the behaviour it would collide with, whatever its spell
     assert.equal(behaviourListeningTo(model, "KC_A"), undefined);
 });
 
-test("a key's name outside a cap is the host's whole name, not the cap's short legend", () => {
+test("a key's name outside a cap is the core's whole name, not the cap's short legend", () => {
     assert.equal(keyName({keycode: "LT(3,KC_F)", display: "F", editLabel: "F / Navigation", layerLabel: "Navigation"}), "F / Navigation",
         "a layer-tap is a layer key too, which its cap's top line alone does not say");
     assert.equal(keyName({keycode: "KC_A", display: "A", editLabel: "A"}), "A");
@@ -89,7 +89,7 @@ test("a key's name outside a cap is the host's whole name, not the cap's short l
     assert.equal(keyName({keycode: "KC_NO", display: "", editLabel: "N/A"}), "Unmapped");
 });
 
-test("a layer key knows the layer the host says it acts on, however the keyboard stores it", () => {
+test("a layer key knows the layer the core says it acts on, however the keyboard stores it", () => {
     const model = {qmkKeycodeAliases: {QK_USER_31: "LOCK_LAYER(3)", KC_ENT: "KC_ENTER"},
         qmkKeyLayers: {"MO(3)": 3, "LT(2,KC_J)": 2, "LOCK_LAYER(3)": 3, "LGUI(KC_3)": undefined}};
     assert.equal(layerOfKeycode(model, "MO(3)"), 3);
@@ -98,10 +98,10 @@ test("a layer key knows the layer the host says it acts on, however the keyboard
     assert.equal(layerOfKeycode(model, "QK_USER_31"), 3, "a layer lock stored as a user slot");
     assert.equal(layerOfKeycode(model, "KC_ENT"), null);
     assert.equal(layerOfKeycode(model, "LGUI(KC_3)"), null, "a number inside a keycode is not a layer");
-    assert.equal(layerOfKeycode(model, "MO(4)"), null, "a layer the host has not named is not worked out here");
+    assert.equal(layerOfKeycode(model, "MO(4)"), null, "a layer the core has not named is not worked out here");
 });
 
-test("a layer-tap cap names its layer on the second line, as the host names it", () => {
+test("a layer-tap cap names its layer on the second line, as the core names it", () => {
     assert.deepEqual(keyFace({keycode: "LT(3,KC_SLASH)", display: "/", layerLabel: "Navigation"}), {main: "/", sub: "Navigation", kind: "layer"});
     assert.deepEqual(keyFace({keycode: "MO(3)", display: "Navigation", layerLabel: "Navigation"}), {main: "Navigation", sub: "momentary", kind: "layer"});
 });
@@ -130,13 +130,13 @@ test("a key cap tells layer keys and mod-taps apart from plain keys", () => {
     assert.deepEqual(face("KC_A", "A"), {main: "A", sub: "", kind: "key"}, "a plain A has no second line");
 });
 
-test("a behaviour cell reads by the host's name for its key, and by its keycode when it has none", () => {
-    // The host names every keycode, layer keys by their layer's name
+test("a behaviour cell reads by the core's name for its key, and by its keycode when it has none", () => {
+    // The core names every keycode, layer keys by their layer's name
     // (core/model/key-names.js); the cell never composes a name itself.
     const names = keyNames.profileKeyNames({layers: ["Base", "Numbers"], actionsKnown: true});
     const model = {qmkKeyLabels: {KC_HASH: "#", KC_F: "F", ...names.labels, "LT(1,KC_F)": keyNames.keyLabel(names, 0x4109)}};
     assert.equal(cellLabel(model, {action: "KC_HASH"}), "#");
-    assert.equal(cellLabel(model, {action: "LSFT(KC_ENTER)", label: "Shift+Enter"}), "Shift+Enter", "an expression takes the host's name");
+    assert.equal(cellLabel(model, {action: "LSFT(KC_ENTER)", label: "Shift+Enter"}), "Shift+Enter", "an expression takes the core's name");
     assert.equal(cellLabel(model, {action: "CUSTOM_KEY_2", label: "Left Ctrl + K"}), "Left Ctrl + K", "a custom key's own action reads as its shortcut");
     assert.equal(cellLabel(model, {action: "MO(1)"}), "Hold Numbers", "a layer action names the layer, in the picker's words");
     assert.equal(cellLabel(model, {action: "LOCK_LAYER(1)"}), "Lock Numbers");
@@ -226,7 +226,7 @@ test("with only a Long hold set, a release before it sends the press's tap on ke
 
 test("a dual-role key names what its tap sends and what its hold does", () => {
     assert.deepEqual(dualRole({qmkKeyLayers: {"LT(3,KC_F)": 3}}, {keycode: "LT(3,KC_F)", display: "F", layerLabel: "Navigation"}), {tap: "F", hold: {layer: 3, name: "Navigation"}},
-        "the layer its hold reaches is the one the host names");
+        "the layer its hold reaches is the one the core names");
     assert.deepEqual(dualRole({}, {keycode: "MT(MOD_LSFT,KC_A)", display: "A", modifierLabel: "Shift"}), {tap: "A", hold: {modifier: "Shift"}});
     assert.equal(dualRole({}, {keycode: "MO(3)", display: "Hold Navigation"}), null, "a layer key has no tap half");
     assert.equal(dualRole({}, {keycode: "KC_F", display: "F"}), null);

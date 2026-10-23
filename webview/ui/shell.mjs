@@ -10,7 +10,7 @@ import {halvesWords, phaseWords} from "../view/vocabulary.mjs";
 import {changesKept, statusBesideCount} from "../view/review.mjs";
 import {busyText, postApplyReadText, screenAvailable} from "../view/readiness.mjs";
 import {isScreenId, screenGroups} from "../view/screens.mjs";
-import {buildLine, chooseKeyboard, forgetKeyboard, commitUrl, githubMark, hostOf, themeLabel} from "../view/host.mjs";
+import {buildLine, chooseKeyboard, forgetKeyboard, commitUrl, githubMark, shellOf, themeLabel} from "../view/shell-panel.mjs";
 import {boardOutlineMarkup} from "../view/geometry.mjs";
 import {DEMO_WORDS, demoOf} from "../view/demo.mjs";
 import {openHistory} from "./history.mjs";
@@ -19,7 +19,7 @@ import {LIVE, editsAreLive, liveSaveState, railSaveLines} from "../view/edit-mod
 import {keyboardStatusLine} from "../view/keyboard-view.mjs";
 import {ariaShortcut, shortcut} from "../view/shortcuts.mjs";
 
-// The review opens at once; the host marks it reviewed when it answers.
+// The review opens at once; the core marks it reviewed when it answers.
 function openReview() {
     state.overlay = "review";
     post(controls.control("reviewProfileDraft"));
@@ -33,7 +33,7 @@ export function rail() {
     /** @type {Partial<import("../../contracts/panel.js").PublishedModel["device"]["health"]>} */
     const health = device.health || {};
     const draft = model?.draft;
-    const host = hostOf(model);
+    const shell = shellOf(model);
     const demo = demoOf(model);
     const devices = model?.devices || [];
     // A keyboard that went to take its new name is shown under it, coming back.
@@ -76,7 +76,7 @@ export function rail() {
                 <i class="dot ${keyboardDot.tone}${(health.busy || reconnecting) && !demo.active ? " busy" : ""}" data-tip="${esc(keyboardDot.tip)}"></i>
                 ${name}</div>
             ${device.connected && !demo.active ? editModeSwitch(Boolean(health.busy)) : ""}
-            ${host.chooseKeyboard ? `<div class="rail-choose">
+            ${shell.chooseKeyboard ? `<div class="rail-choose">
                 <button class="btn tiny" data-act="choose-keyboard" ${health.busy ? "disabled" : ""}
                     data-tip="Pick a Charybdis in the browser's list. Once chosen, it reconnects by itself next time.">Choose keyboard</button>
                 ${device.connected && !demo.active ? `<button class="btn tiny ghost" data-act="forget-keyboard" ${health.busy ? "disabled" : ""}
@@ -90,7 +90,7 @@ export function rail() {
             </div>
         </div>
         <nav class="rail-nav">${nav}</nav>
-        ${host.progress ? `<div class="rail-progress" role="status">${spinner()}<span>${esc(host.progress)}</span></div>` : ""}
+        ${shell.progress ? `<div class="rail-progress" role="status">${spinner()}<span>${esc(shell.progress)}</span></div>` : ""}
         ${railMessage()}
         ${draft ? `<div class="rail-foot">
             <button class="btn tiny ghost rail-history" data-act="history"
@@ -100,7 +100,7 @@ export function rail() {
             <button class="btn tiny ghost icon" data-act="redo" aria-label="Redo" aria-keyshortcuts="${ariaShortcut("Z", {shift: true})}" ${draft?.canRedo ? "" : "disabled"}
                 data-tip="${esc(draft?.redoLabel ? `Redo: ${draft.redoLabel} (${shortcut("Z", {shift: true})})` : `Redo the edit you just undid (${shortcut("Z", {shift: true})}).`)}">↻</button>
         </div>` : ""}
-        ${railBuild(host.build)}
+        ${railBuild(shell.build)}
     </aside>`);
 
     /** @type {NodeListOf<HTMLElement>} */ (node.querySelectorAll("[data-screen]")).forEach((button) => button.addEventListener("click", () => {
@@ -153,7 +153,7 @@ function liveStatus(draft) {
 /** @param {ReturnType<typeof railSaveLines>[number]} saving */
 const saveLine = (saving) => `<div class="stat live-save ${saving.kind}" data-tip="${esc(saving.tip)}"><i class="dot ${saving.tone}${saving.kind === "saving" ? " busy" : ""}"></i> ${esc(saving.text)}</div>`;
 
-// A host that leaves the theme to the panel (a web page) gets its toggle at
+// A shell that leaves the theme to the panel (a web page) gets its toggle at
 // the top right of every screen, the Keyboard screen's own header included; in
 // VS Code the panel follows VS Code's theme.
 /** @param {string} title @param {string} subtitle @param {string} [actions] */
@@ -167,18 +167,18 @@ const THEME_ICONS = {
     light: '<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.8"/><path d="M8 1.5v1.6M8 12.9v1.6M1.5 8h1.6M12.9 8h1.6M3.4 3.4l1.1 1.1M11.5 11.5l1.1 1.1M3.4 12.6l1.1-1.1M11.5 4.5l1.1-1.1"/></svg>',
 };
 export function themeToggle() {
-    const theme = hostOf(getModel()).theme;
+    const theme = shellOf(getModel()).theme;
     if (!theme) return "";
     return `<button class="btn tiny ghost icon theme-toggle" data-act="theme" data-theme-now="${esc(theme)}"
         aria-label="${esc(themeLabel(theme))}" data-tip="${esc(themeLabel(theme))}">${THEME_ICONS[theme]}</button>`;
 }
 
-// What the keyboard or the host last said — a read, a save, a refusal — sits
+// What the keyboard or the shell last said — a read, a save, a refusal — sits
 // in the rail's free space above the draft history: not over the screen being
 // worked in, and below the navigation so nothing moves when it appears.
 // The build the page came from, as a link to its commit on GitHub, in a new
 // tab so the draft stays where it is.
-/** @param {import("../../contracts/model.js").HostPanel["build"]} build */
+/** @param {import("../../contracts/model.js").ShellPanel["build"]} build */
 function railBuild(build) {
     if (!build) return "";
     const url = commitUrl(build);
@@ -213,7 +213,7 @@ function applySteps(apply) {
     return `<ol class="ap-steps">${rows}</ol>`;
 }
 
-// The host republishes the panel for every read page. Start each replacement
+// The core republishes the panel for every read page. Start each replacement
 // at the same document-time phase so the spinner keeps rotating smoothly.
 function spinner() {
     const time = Number(document.timeline?.currentTime ?? performance.now());
@@ -392,7 +392,7 @@ function liveCommitBar(draft) {
 // Read-only reasons, said plainly where the control is.
 /** @param {import("../../contracts/panel.js").PublishedModel | null} model */
 export function unavailable(model) {
-    if (!model?.device?.connected && !demoOf(model).active) return hostOf(model).blocked?.title || hostOf(model).words.noKeyboard || "";
+    if (!model?.device?.connected && !demoOf(model).active) return shellOf(model).blocked?.title || shellOf(model).words.noKeyboard || "";
     if (!model?.layers?.length) return "Nothing has been read from the keyboard yet. Choose Read keyboard.";
     if (!model?.draft) return "The keyboard's complete profile could not be read, so edits cannot be drafted here. Read the keyboard again.";
     if (!model.draft.matching) return "The local draft belongs to another keyboard. Select it again or discard the draft here.";

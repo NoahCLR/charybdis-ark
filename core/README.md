@@ -4,7 +4,7 @@ The app without a shell: no `vscode` import, no DOM (D-L02), layers that
 import one way (D-L10, [architecture](../docs/architecture/README.md)). This page maps the modules
 and the contracts a shell or adapter must keep. The rules for reading, the
 draft, Apply and the live modes are in
-[reading, applying and progress](../docs/architecture/profile-capture-and-progress.md);
+[reading, applying and progress](../docs/architecture/profile-snapshot-and-progress.md);
 the draft binding, panel controls and model are in the
 [interface contracts](../docs/spec/interface-contracts.md).
 
@@ -15,8 +15,8 @@ the draft binding, panel controls and model are in the
 build requests and decode answers; `schema/` decodes the stored bytes.
 `session/profile-device-service.js` owns the connection and publishes what it
 holds as `snapshot()`. Its complete read, `readKeyboardProfile`, takes one
-verified snapshot: `captureProfile` (`session/portable-profile-session.js`)
-for a keyboard in Apply, `captureLive` (`session/live-profile-session.js`) for
+verified snapshot: `snapshotProfile` (`session/portable-profile-session.js`)
+for a keyboard in Apply, `snapshotLive` (`session/live-profile-session.js`) for
 one in a live edit mode or still running unsaved live edits; that read also
 keeps the working copy's exact bytes, which live edits splice against.
 
@@ -46,7 +46,7 @@ publish the model, turn a failure into the panel's notice. A shell passes in
 only what it has, as listed at the top of that file, plus the device
 service's `adapter` and `sleep(ms)`. A background tab throttles timers, so
 the web page passes a `sleep` kept by a worker; otherwise `setTimeout` is
-used. What differs between shells reaches the panel only as `model.host`.
+used. What differs between shells reaches the panel only as `model.shell`.
 (`tests/session/panel-loop.test.js`)
 
 ## Current firmware, in one place each

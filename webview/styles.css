@@ -40,7 +40,7 @@
   /* Rings ride on top of the light a key emits, so they are the one colour
      that has to stay legible against any of it. */
   --ring: #ffffff;
-  /* Fixed contrast ink over device light, independent of the host theme. */
+  /* Fixed contrast ink over device light, independent of the shell's theme. */
   --light-outline: rgba(255,255,255,.3);
   --light-detail: rgba(255,255,255,.9);
   --badge-ink: rgba(8,8,10,.86);
@@ -105,7 +105,7 @@ p { margin: 0; }
 button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
 input, select, textarea { font: inherit; color: inherit; }
 code, .mono { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0; }
-/* The host paints <code> as a chip in its own theme colours. This interface is
+/* VS Code paints <code> as a chip in its own theme colours. This interface is
    black and white and marks its own code, so take the dressing back off. */
 code { color: inherit; background: none; padding: 0; border-radius: 0; }
 .muted { color: var(--text-2); }
@@ -200,7 +200,7 @@ select.rail-picker:disabled { cursor: default; color: var(--text-2); }
 .rail-foot .rail-history { margin-right: auto; margin-left: -9px; color: var(--text-3); }
 .rail-foot .rail-history:hover { color: var(--text); }
 .rail-history .c { font-family: var(--mono); font-size: 10.5px; color: var(--text-3); margin-left: 5px; }
-/* What a web page's host adds to the rail: its picker, what it is doing, and
+/* What the web shell adds to the rail: its picker, what it is doing, and
    the build it is. The extension has none of them. */
 .rail-choose { margin-top: 16px; display: grid; gap: 8px; }
 .rail-choose .btn { width: 100%; justify-content: center; min-height: 28px; }

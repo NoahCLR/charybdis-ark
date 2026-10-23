@@ -1,6 +1,6 @@
 // The renderer's reply handler (webview/messages.mjs): a progress reply only
 // changes the model while it still belongs to the read or draft it came from.
-// The branches tested here touch no page, so a stub host is enough.
+// The branches tested here touch no page, so a stub shell is enough.
 import assert from "node:assert/strict";
 import test from "node:test";
 

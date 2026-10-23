@@ -468,7 +468,7 @@ test("successful service restore installs the saved profile and returns normally
         assert.ok(adapter.keyboard.mutations.length > 0, "the real service sends all writes through its request coordinator");
         assert.deepEqual(f.keyboard.active, f.target.candidate);
         assert.deepEqual(f.keyboard.local.macros, f.keyboard.peer.macros);
-        assert.equal(service.portable.fingerprint, result.fingerprint, "the service's post-Apply capture sees the saved target");
+        assert.equal(service.portable.fingerprint, result.fingerprint, "the service's post-Apply snapshot sees the saved target");
     } finally {await service.close();}
 });
 
@@ -482,7 +482,7 @@ test("standalone export reads the current keyboard without replacing its editor 
         const editor = await service.readKeyboardProfile();
         const state = service.snapshot();
         // Another client has changed a key since the editor read. Export
-        // captures it, but must leave the already published editor alone.
+        // takes a snapshot of it, but must leave the already published editor alone.
         const changed = structuredClone(f.source); editLayers(changed, layers => layers[0][0] ^= 1);
         adapter.keyboard = require("../fixtures/writable-keyboard").writableKeyboard({document: changed, generation: 5});
         const exported = await service.readPortableProfile();
@@ -559,11 +559,11 @@ test("a retired capability layout gets the update notice without any profile rea
 });
 
 // The firmware's compiled defaults are the same bytes until it is flashed
-// again: a reconnect reuses the copy this service verified, and a host that
+// again: a reconnect reuses the copy this service verified, and a shell that
 // keeps it between runs (`compiledDefaults`) spares Ark's first read too. The
 // keyboard's metadata is still read, and a copy is used only for exactly its
 // bytes.
-test("compiled defaults download once across reconnects, and across runs where the host keeps them", async t => {
+test("compiled defaults download once across reconnects, and across runs where the shell keeps them", async t => {
     const {liveKeyboard} = require("../fixtures/live-keyboard");
     const keyboard = liveKeyboard({document: require("../fixtures/portable-profile").document()});
     const compiledChunks = () => keyboard.requests.filter(r => r[0] === 0x08 && r[2] === PROFILE_PAYLOAD_V1.COMPILED_VALUE && (r[4] | r[5] << 8) > 0).length;
@@ -580,6 +580,6 @@ test("compiled defaults download once across reconnects, and across runs where t
     const {service: reopened} = await connectedService(t, {keyboard}, {sleep: async () => {}, compiledDefaults: store});
     keyboard.requests.length = 0;
     await reopened.readKeyboardProfile();
-    assert.equal(compiledChunks(), 0, "Ark opened again reuses the host's copy");
+    assert.equal(compiledChunks(), 0, "Ark opened again reuses the shell's copy");
     assert.equal(store.sets, 1, "the same defaults are not stored again");
 });

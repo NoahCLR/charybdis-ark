@@ -1,5 +1,5 @@
 // @ts-check
-// The words for keyboard values and operations, as the host sends them.
+// The words for keyboard values and operations, as the core sends them.
 //
 // `model.vocabulary` is core/model/vocabulary.js: the one table the review is
 // written from. Every editor names things from here too, so a dropdown, a
@@ -27,7 +27,7 @@ export const branchName = (model, count) => vocabulary(model).branches[count - 1
 /** @param {VocabularyModel | null | undefined} model */
 export const stageOrder = (model) => vocabulary(model).stages;
 
-// A pointing slot's name as the host gives it.
+// A pointing slot's name as the core gives it.
 /** @param {VocabularyModel | null | undefined} model @param {number} id */
 export const slotCalled = (model, id) => (model?.pdModes || []).find((slot) => slot.id === id)?.displayName || `Slot ${id}`;
 

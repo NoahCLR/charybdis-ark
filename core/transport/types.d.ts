@@ -106,7 +106,7 @@ export interface NativeHidDevice {
 
 /**
  * node-hid's device listing entry, declared here so this file needs no Node
- * types: the browser-host check reads it too. Loading node-hid as a
+ * types: the web page's type check reads it too. Loading node-hid as a
  * NativeHidModule (node-hid-adapter.js) checks that node-hid still matches it.
  */
 export interface NativeHidDeviceInfo {
@@ -127,7 +127,7 @@ export interface NativeHidModule {
     HIDAsync: {open(path: string, options?: {nonExclusive?: boolean}): MaybePromise<NativeHidDevice>};
 }
 
-/** WebHID's required surface, independent of the host's DOM library. */
+/** WebHID's required surface, independent of any DOM library. */
 export interface WebHidInputReport {
     reportId: number;
     data: ArrayBufferView;

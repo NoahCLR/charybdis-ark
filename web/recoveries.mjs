@@ -40,7 +40,7 @@ export function openRecoveries(indexedDB) {
     return {
         // Resolves to the copy's name once it is stored: the file name it
         // downloads as, the extension's name for it.
-        /** @param {Parameters<import("../core/session/types.js").HostSaveRecovery>[0]} document @param {import("../core/session/types.js").RecoveryAbout} about */
+        /** @param {Parameters<import("../core/session/types.js").ShellSaveRecovery>[0]} document @param {import("../core/session/types.js").RecoveryAbout} about */
         async save(document, {cause, keyboard}, now = new Date()) {
             const name = recoveryFileName(document, {cause, keyboard}, now);
             const text = JSON.stringify(document, null, 2) + "\n";

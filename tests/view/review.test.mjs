@@ -17,7 +17,7 @@ test("every item sits under its own area; a group that spans areas shows its par
     assert.deepEqual(sections.map((section) => section.area), ["Keys", "Behaviours", "Macros", "Lighting"], "areas in rail order");
     const [layout, behaviours, , lighting] = sections;
     assert.deepEqual(layout.blocks.map((block) => block.items.map((entry) => entry.title)),
-        [["Base · Left · row 1, column 1"], ["Base · Left thumb 1"]], "the group's key sits with the other keys, in host order");
+        [["Base · Left · row 1, column 1"], ["Base · Left thumb 1"]], "the group's key sits with the other keys, in the core's order");
     assert.equal(layout.count, 2);
     assert.deepEqual(behaviours.blocks[0].items.map((entry) => entry.title), ["Esc", "Q"], "a group's items in one area stay one block");
     assert.equal(behaviours.count, 2);

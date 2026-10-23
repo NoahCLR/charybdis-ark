@@ -38,8 +38,7 @@ function fail(code, offset, message) {
 }
 /** @param {Uint8Array} bytes */
 function zero(bytes) { return bytes.every(byte => byte === 0); }
-// A tap may click a plain mouse button 1–8 (firmware D-F22) or run a VIA
-// macro.
+// A tap may click a plain mouse button 1–8 (firmware D-F22) or run a macro.
 const PD_MACROS = Object.freeze({FIRST: 0x7700, LAST: 0x777f});
 /** @param {number} keycode */
 const isPdMacro = keycode => Number.isInteger(keycode) && keycode >= PD_MACROS.FIRST && keycode <= PD_MACROS.LAST;

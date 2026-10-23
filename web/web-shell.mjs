@@ -1,6 +1,6 @@
 // @ts-check
-// The browser host: in a page, what extension.js does in VS Code. It runs the
-// shared host loop (core/session/panel-loop.js) over WebHID and hands the
+// The web shell: in a page, what extension.js does in VS Code. It runs the
+// shared panel loop (core/session/panel-loop.js) over WebHID and hands the
 // panel what a browser has — Chrome's keyboard picker, IndexedDB for recovery
 // copies, the file chooser, downloads, and the page itself for progress and
 // errors. web/page.mjs starts it with the page's own globals; everything it
@@ -12,14 +12,14 @@ import {nativePopups} from "./native-popups.mjs";
 import {openRecoveries} from "./recoveries.mjs";
 import {workerSleep} from "./sleep.mjs";
 
-// What the panel says about connecting in a browser (model.host.words).
+// What the panel says about connecting in a browser (model.shell.words).
 export const WEB_WORDS = Object.freeze({
     noKeyboard: "No keyboard is connected. Choose keyboard to connect one.",
     connectHint: "Plug in your Charybdis, then pick it in Chrome's list with Choose keyboard.",
     noneFound: "Chrome has no Charybdis this page may open yet. Choose keyboard and pick yours.",
 });
 
-// Why a tab cannot reach a keyboard at all (model.host.blocked). `demo` says
+// Why a tab cannot reach a keyboard at all (model.shell.blocked). `demo` says
 // the demo is still offered there: it needs no keyboard. A tab waiting on
 // another does not offer it, since it takes the keyboard over when that one
 // closes.
@@ -31,7 +31,7 @@ export const BLOCKED = Object.freeze({
         detail: "One tab holds the keyboard at a time. Keep working in the other Ark tab, or close it: this tab takes over when it does."}),
 });
 
-// Both hosts use the portable document's byte ceiling.
+// Both shells use the portable document's byte ceiling.
 export const PROFILE_FILE_LIMIT = FILE_MAX_BYTES;
 export const THEME_KEY = "charybdis-ark.theme";
 export const COMPILED_DEFAULTS_KEY = "charybdis-ark.compiled-defaults";
@@ -62,11 +62,11 @@ export async function readProfileFile(file) {
 }
 
 /** @param {import("./types.js").WebEnvironment} env */
-export function startWebHost(env) {
+export function startWebShell(env) {
     const {hid, locks, storage, indexedDB, localStorage, matchMedia, document, window, worker, build} = env;
     const recoveries = openRecoveries(indexedDB);
     const adapter = new WebHidDeviceAdapter({hid});
-    /** @type {import("../contracts/model.js").HostPanel["blocked"]} */
+    /** @type {import("../contracts/model.js").ShellPanel["blocked"]} */
     let blocked = hid ? null : BLOCKED.unsupported;
     let theme = initialTheme(safely(() => localStorage?.getItem(THEME_KEY)), Boolean(matchMedia?.("(prefers-color-scheme: light)")?.matches));
     /** @type {import("../contracts/model.js").RecoveryCopy[]} */
@@ -79,8 +79,8 @@ export function startWebHost(env) {
     let choosing;
     document.documentElement.dataset.theme = theme;
 
-    /** @type {import("../core/session/types.js").LoopHost} */
-    const host = {
+    /** @type {import("../core/session/types.js").LoopShell} */
+    const shell = {
         post: (message) => panel.post(message),
         progress: async (title, work) => {
             progress = title;
@@ -106,7 +106,7 @@ export function startWebHost(env) {
         panel: () => ({chooseKeyboard: Boolean(hid) && !blocked, blocked, theme, recoveries: recoveryList, build, progress}),
     };
 
-    const loop = openPanelLoop(host, {adapter, sleep: workerSleep(worker), compiledDefaults: compiledDefaultsStore(localStorage)});
+    const loop = openPanelLoop(shell, {adapter, sleep: workerSleep(worker), compiledDefaults: compiledDefaultsStore(localStorage)});
     // A live keyboard's own saves and key adjustments show up between edits,
     // looked for only while the page can hear the answer (native-popups.mjs).
     loop.watch({paused: nativePopups(document).paused});

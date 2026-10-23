@@ -46,7 +46,7 @@ test("a macro name edit keeps the custom-key names", () => {
     const settings = validateSnapshot(current.document).settings;
     assert.equal(settings.formatVersion, 8);
     assert.equal(settings.customKeyNames[0], "Right Thumb");
-    assert.equal(macroEditorView(current).viaMacros[3].name, "OCR Copy");
+    assert.equal(macroEditorView(current).macros[3].name, "OCR Copy");
 });
 
 test("an imported profile without custom-key names can take one name back from the keyboard", () => {

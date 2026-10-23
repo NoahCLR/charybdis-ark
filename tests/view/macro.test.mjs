@@ -58,12 +58,12 @@ test("a slot's cell shows what the macro sends, not the modifier they all start 
     assert.equal(macroPeek("", label), "");
 });
 
-test("the preview refuses exactly what the host refuses", async () => {
+test("the preview refuses exactly what the core refuses", async () => {
     const {createRequire} = await import("node:module");
     const require = createRequire(import.meta.url);
     const {parsePayload, macroKeycodes} = require("../../core/schema/macro-payload.js");
     const keys = macroKeycodes();
-    const hostAccepts = (payload) => { try { parsePayload(payload); return true; } catch { return false; } };
+    const coreAccepts = (payload) => { try { parsePayload(payload); return true; } catch { return false; } };
     const previewAccepts = (payload) => { const {steps, error} = parseMacro(payload, {keys}); return !error && !unreleased(steps).length; };
     for (const payload of [
         "hello{120}{KC_ENT}", "{+KC_LGUI}{KC_LSFT,KC_4}{-KC_LGUI}", "{65535}", "a{{b}}c",
@@ -71,22 +71,22 @@ test("the preview refuses exactly what the host refuses", async () => {
         "{+KC_A}", "{KC_NOT_A_KEY}", "café", "{KC_A", "a}", "x".repeat(32769),
         `{${Array.from({length: 17}, (_, index) => ["KC_A", "KC_B", "KC_C", "KC_D", "KC_E", "KC_F", "KC_G", "KC_H", "KC_I", "KC_J", "KC_K", "KC_L", "KC_M", "KC_N", "KC_O", "KC_P", "KC_Q"][index]).join(",")}}`,
     ]) {
-        assert.equal(previewAccepts(payload), hostAccepts(payload), payload.length > 40 ? `${payload.slice(0, 40)}…` : payload);
+        assert.equal(previewAccepts(payload), coreAccepts(payload), payload.length > 40 ? `${payload.slice(0, 40)}…` : payload);
     }
-    assert.equal(parseMacro("{KC_NOT_A_KEY}").error, "", "without the host's key list, names are not judged");
+    assert.equal(parseMacro("{KC_NOT_A_KEY}").error, "", "without the core's key list, names are not judged");
 });
 
-test("with Unicode playback on, only non-ASCII text refuses a held ordinary key, in preview and host alike", async () => {
+test("with Unicode playback on, only non-ASCII text refuses a held ordinary key, in preview and core alike", async () => {
     const {createRequire} = await import("node:module");
     const require = createRequire(import.meta.url);
     const {parsePayload, macroKeycodes, macroModifierKeycodes} = require("../../core/schema/macro-payload.js");
     const options = {unicode: true, textEntry: true};
-    const hostAccepts = (payload) => { try { parsePayload(payload, options); return true; } catch { return false; } };
+    const coreAccepts = (payload) => { try { parsePayload(payload, options); return true; } catch { return false; } };
     const previewAccepts = (payload) => !parseMacro(payload, {...options, keys: macroKeycodes(), modifierKeys: macroModifierKeycodes()}).error;
     const expected = {"{+KC_A}text{-KC_A}": true, "{+KC_A}tab\there\n{-KC_A}": true, "{+KC_LSFT}café{-KC_LSFT}": true,
         "{+KC_A}café{-KC_A}": false, "{+KC_A}🙂{-KC_A}": false};
     for (const [payload, accepted] of Object.entries(expected)) {
-        assert.equal(hostAccepts(payload), accepted, `host: ${payload}`);
+        assert.equal(coreAccepts(payload), accepted, `core: ${payload}`);
         assert.equal(previewAccepts(payload), accepted, `preview: ${payload}`);
     }
 });
@@ -142,16 +142,16 @@ test("canonical names and aliases are one key for holds, releases and chord limi
     assert.match(parseMacro("{+KC_LGUI}{KC_LEFT_GUI}{-KC_LGUI}", {aliases, keys}).error, /already held/);
 });
 
-test("a held key may span text the host layout types, in preview and host alike", async () => {
+test("a held key may span text the host layout types, in preview and core alike", async () => {
     const {createRequire} = await import("node:module");
     const require = createRequire(import.meta.url);
     const {parsePayload, macroKeycodes, macroModifierKeycodes} = require("../../core/schema/macro-payload.js");
     const {hostLayout} = require("../../core/data/host-layouts.js");
     for (const [layout, expected] of [[9, {"{+KC_A}ö{-KC_A}": true, "{+KC_A}🙂{-KC_A}": false}], [2, {"{+KC_A}é€{-KC_A}": true, "{+KC_A}ö{-KC_A}": true}], [0, {"{+KC_A}é{-KC_A}": false}]]) {
-        const hostAccepts = (payload) => { try { parsePayload(payload, {unicode: true, textEntry: true, layout}); return true; } catch { return false; } };
+        const coreAccepts = (payload) => { try { parsePayload(payload, {unicode: true, textEntry: true, layout}); return true; } catch { return false; } };
         const previewAccepts = (payload) => !parseMacro(payload, {unicode: true, textEntry: true, layoutChars: hostLayout(layout).chars, keys: macroKeycodes(), modifierKeys: macroModifierKeycodes()}).error;
         for (const [payload, accepted] of Object.entries(expected)) {
-            assert.equal(hostAccepts(payload), accepted, `host ${layout}: ${payload}`);
+            assert.equal(coreAccepts(payload), accepted, `core ${layout}: ${payload}`);
             assert.equal(previewAccepts(payload), accepted, `preview ${layout}: ${payload}`);
         }
     }
@@ -213,7 +213,7 @@ test("a macro's chip tells an unkept edit, a change kept in the draft and the ma
     const changes = () => draft.view({selectedDeviceId: "test-device", connected: true}).changes;
     assert.equal(macroLocalState(changes(), "VIA_MACRO_0", false).text, "as read");
     assert.deepEqual(macroLocalState(changes(), "VIA_MACRO_0", true), {state: "local", dot: "draft", text: "edited here"});
-    draft.stage({draftId: draft.id, draftRevision: draft.revision, type: "updateViaMacro", keycode: "VIA_MACRO_0", payload: "Hi"});
+    draft.stage({draftId: draft.id, draftRevision: draft.revision, type: "updateMacro", keycode: "VIA_MACRO_0", payload: "Hi"});
     assert.deepEqual(macroLocalState(changes(), "VIA_MACRO_0", false), {state: "draft", dot: "draft", text: "changed in draft"});
     assert.equal(macroLocalState(changes(), "VIA_MACRO_1", false).text, "as read", "another macro is as read");
     assert.equal(macroLocalState(changes(), "VIA_MACRO_0", true).text, "edited here", "an unkept edit over it still says so");

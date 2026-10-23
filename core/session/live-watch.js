@@ -18,7 +18,7 @@
 //
 // It never runs while an operation or the panel holds the keyboard, and a
 // look that raced with one (the draft moved meanwhile) is dropped. It pauses
-// while the host says it may not be answered (`paused`): a web page whose
+// while the shell says it may not be answered (`paused`): a web page whose
 // menu is open, or which is hidden. A look that goes unanswered is skipped
 // (profile-device-service.js).
 
@@ -76,9 +76,9 @@ async function checkApply(session, draft, status) {
     const told = draft.observeApplyStatus(status);
     const seen = session.applyWatch?.draftId === draft.id ? session.applyWatch : undefined;
     session.applyWatch = {draftId: draft.id, session: status.session, revision: status.revision, savedGeneration: status.savedGeneration};
-    const captured = session.observedPortable;
-    const base = captured && "status" in captured ? /** @type {import("./types.js").CompleteCapture} */ (captured).status : undefined;
-    // The first poll must compare with the successful profile capture, since
+    const observed = session.observedPortable;
+    const base = observed && "status" in observed ? /** @type {import("./types.js").CompleteReadSnapshot} */ (observed).status : undefined;
+    // The first poll must compare with the successful profile snapshot, since
     // an adjustment may already have been saved before this poll exists.
     const same = seen ? (seen.session === status.session && seen.revision === status.revision && seen.savedGeneration === status.savedGeneration)
         : base && base.committedGeneration === status.savedGeneration && base.committedOriginHalf === status.savedOrigin;
@@ -111,7 +111,7 @@ const unrefSleep = ms => new Promise(resolve => {
 });
 
 /**
- * Looks until stopped; `publish` shows what changed. The host's `sleep` is
+ * Looks until stopped; `publish` shows what changed. The shell's `sleep` is
  * the wait (a browser tab passes one its throttling cannot slow); `paused`
  * says when not to look. `check` is the look (tests pass their own).
  * @param {import("./types.js").RunningPanelSession} session

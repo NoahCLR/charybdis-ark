@@ -5,7 +5,7 @@ import {behaviourEditorRow, behaviourChangesNothing, behaviourHasTiming, behavio
 import {impliedBranch} from "../../webview/view/keyface.mjs";
 import {VOCABULARY} from "../../core/model/vocabulary.js";
 
-test("opening an unstored behaviour leaves the model unchanged and takes built-ins from the host", () => {
+test("opening an unstored behaviour leaves the model unchanged and takes built-ins from the core", () => {
     const builtIn = {tap: {helper: "TAP_SENDS", action: "KC_F"}};
     const timing = {tapHoldTerm: "210", multiTapTerm: "150", longerHoldTerm: "400"};
     const model = {keyBehaviors: [], behaviorEditing: {keyDefaults: {"LT(3,KC_F)": {builtIn, timing}}}};
@@ -20,7 +20,7 @@ test("opening an unstored behaviour leaves the model unchanged and takes built-i
 });
 
 test("an unstored custom key's grid shows the tap a release before Long hold sends", () => {
-    // Custom keys shows this editor for a key on no layer, with the host's
+    // Custom keys shows this editor for a key on no layer, with the core's
     // defaults for every custom key (tests/session/device-model.test.js).
     const model = {keyBehaviors: [], behaviorEditing: {keyDefaults: {CUSTOM_KEY_9: {builtIn: {releaseTaps: true}, timing: {}}}}};
     const unplaced = behaviourEditorRow(model, "CUSTOM_KEY_9");
@@ -109,7 +109,7 @@ test("each timing placeholder names where its default comes from, and storing is
     assert.equal(behaviourTimingField(plain, "multiTapTerm").placeholder, "150 · default");
     assert.equal(behaviourTimingField({...plain, timingDefaults: {}}, "tapHoldTerm").placeholder, "ms", "no default reads ms");
     const unsourced = behaviourEditorRow({...model, behaviorEditing: {keyDefaults: {"LT(3,KC_F)": {builtIn: {}, timing}}}}, "LT(3,KC_F)");
-    assert.equal(behaviourTimingField(unsourced, "tapHoldTerm").placeholder, "200 · default", "without the host's sources, no source is guessed");
+    assert.equal(behaviourTimingField(unsourced, "tapHoldTerm").placeholder, "200 · default", "without the core's sources, no source is guessed");
     for (const row of [dual, plain]) {
         const field = behaviourTimingField(row, "tapHoldTerm");
         assert.equal(behaviourTimingEdit(field.fallback, field), "0", "typing the default follows it");
@@ -175,5 +175,5 @@ test("the editor row carries whether a timing alone does something on its key", 
     const model = {behaviorEditing: {keyDefaults: {KC_DELETE: {builtIn: {}, timing: {}, timingAlone: false}, "LT(3,KC_F)": {builtIn: {}, timing: {}, timingAlone: true}}}};
     assert.equal(behaviourEditorRow(model, "KC_DELETE")?.timingAlone, false);
     assert.equal(behaviourEditorRow(model, "LT(3,KC_F)")?.timingAlone, true);
-    assert.equal(behaviourEditorRow(model, "KC_Q")?.timingAlone, true, "a key the host published nothing for keeps its timing");
+    assert.equal(behaviourEditorRow(model, "KC_Q")?.timingAlone, true, "a key the core published nothing for keeps its timing");
 });

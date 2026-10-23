@@ -176,7 +176,7 @@ export function reviewOverlay() {
             rerender();
             return;
         }
-        // The sheet closes at once; the host's answer only refreshes what it says.
+        // The sheet closes at once; the core's answer only refreshes what it says.
         if (event.target === node || target.closest('[data-act="close"]')) {
             state.overlay = null;
             state.confirmChecks = null;

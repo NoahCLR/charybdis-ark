@@ -5,7 +5,7 @@ const {hostMacros} = require("../tests/fixtures/host-macros");
 const {ProfileDraftSession} = require("../core/session/profile-draft-session");
 const {buildSnapshotModel} = require("../core/session/device-model");
 const {draftBinding} = require("../core/session/panel-session-state");
-const {openPreview} = require("./host-page");
+const {openPreview} = require("./shell-page");
 const fs = require("node:fs");
 
 for (const theme of ["vscode-dark", "vscode-light"]) {
@@ -40,7 +40,7 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
         await expect(policy.locator("option:checked")).toHaveText("Automatic · on");
         await expect(page.locator('[data-macro-editor]')).not.toContainText("Avoid typing while a text macro plays");
         await policy.selectOption("off");
-        expect(await stagePosted()).toMatchObject({type: "updateViaMacro", keycode: "VIA_MACRO_0", protection: "off"});
+        expect(await stagePosted()).toMatchObject({type: "updateMacro", keycode: "VIA_MACRO_0", protection: "off"});
         await expect(policy).toHaveValue("off");
         await expect(page.locator('[data-macro-editor]')).toContainText("Avoid typing while a text macro plays");
         await page.evaluate(async () => {const store = await import("/webview/store.mjs"); store.state.overlay = "review"; store.render();});

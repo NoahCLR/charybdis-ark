@@ -53,7 +53,7 @@ test("type dependencies follow the runtime layer rules", () => {
     for (const file of sourceFiles("core", true)) {
         const layer = path.basename(path.dirname(file));
         for (const target of typeImportsIn(file)) {
-            assert.notEqual(target, "vscode", `${file} imports host types below the shell`);
+            assert.notEqual(target, "vscode", `${file} imports the VS Code shell's types below it`);
             if (!target.startsWith(".")) continue;
             const relative = path.relative(APP_ROOT, path.resolve(path.dirname(file), target));
             if (relative.startsWith(`contracts${path.sep}`)) continue;
@@ -115,12 +115,12 @@ test("core layers import only downward", () => {
 });
 
 test("the extension shell reaches core only through session/", () => {
-    // What a host does with a panel is core/session/panel-loop.js; a host that
+    // What a shell does with a panel is core/session/panel-loop.js; a shell that
     // needed a lower layer would be doing the loop's work itself.
     const core = requiresIn(path.join(APP_ROOT, "extension.js")).filter((target) => target.startsWith("./core/"));
     assert.ok(core.length, "extension.js runs the shared panel loop");
     for (const target of core) {
-        assert.ok(target.startsWith("./core/session/"), `extension.js imports ${target}; only core/session/ is the host's`);
+        assert.ok(target.startsWith("./core/session/"), `extension.js imports ${target}; only core/session/ is the shell's`);
     }
 });
 
@@ -137,7 +137,7 @@ test("only the extension shell knows about VS Code", () => {
 });
 
 test("the webview stays a renderer", () => {
-    // The interface renders the model the host posts and nothing else. It does
+    // The interface renders the model the core posts and nothing else. It does
     // not reach into core/ at all — not even the vendored catalog, which
     // arrives inside the model like every other device fact.
     const forbidden = ["core/", "../core"];

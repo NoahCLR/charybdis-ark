@@ -15,7 +15,7 @@ import {DISCLOSURE, el, esc} from "../lib/dom.mjs";
 import {canEdit, getModel, post, postLeavingDemo, render, state} from "../store.mjs";
 import {demoOf} from "../view/demo.mjs";
 import {halvesWords, phaseWords} from "../view/vocabulary.mjs";
-import {hostOf} from "../view/host.mjs";
+import {shellOf} from "../view/shell-panel.mjs";
 import {profileUsageView} from "../view/profile-usage.mjs";
 import {FIRMWARE_RELEASES, SAVE_IN_PROGRESS, firmwareLine, halvesRows, productName} from "../view/keyboard-view.mjs";
 import {NAME_MAX_BYTES} from "../view/names.mjs";
@@ -40,7 +40,7 @@ export function screenDevice() {
     const sub = demo ? "The demo stands in for a keyboard running current firmware. Nothing here reaches a keyboard."
         : "Your Charybdis: its firmware, its two halves and how full it is.";
     const firmware = firmwareLine(model);
-    const build = hostOf(model).build;
+    const build = shellOf(model).build;
     const restart = !demo && health?.restartNeeded ? `<div class="callout danger-note" role="alert"><strong>Restart the keyboard.</strong>
         The left half did not confirm a cancelled save, so the keyboard refuses new saves until it restarts. Nothing was lost.
         <ol class="steps"><li>Unplug the USB cable from the right half (not the cable between the halves).</li><li>Wait a few seconds, then plug it back in.</li><li>Choose Read keyboard below.</li></ol></div>` : "";

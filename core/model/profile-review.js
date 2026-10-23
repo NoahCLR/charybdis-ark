@@ -52,7 +52,7 @@ const actionField = (value, names, extra = {}) => ({text: action(value, names), 
 const namesIn = (value, macros, detected) => {
     const host = hostSettings(value.settings.values, detected);
     return {layers: value.settings.names,
-        keys: profileKeyNames({hostOs: host.effective, hostLayout: host.layout, macosIso: host.macosIso, actionsKnown: true, layers: value.settings.names, macros: macros?.viaMacros, behaviors: value.behaviors.rows, pdModes: value.pdModes,
+        keys: profileKeyNames({hostOs: host.effective, hostLayout: host.layout, macosIso: host.macosIso, actionsKnown: true, layers: value.settings.names, macros: macros?.macros, behaviors: value.behaviors.rows, pdModes: value.pdModes,
             customKeys: value.settings.customKeyNames.map((name, slot) => ({slot, name}))})};
 };
 // The layers a behaviour or combo runs on, each named as everywhere else (an
@@ -405,17 +405,17 @@ function profileReview(before, after, capabilities) {
         }
     }
     item("Settings", "comboTiming", "Combo timing", comboTimingFields(a.combos), comboTimingFields(b.combos), {kind: "settings", section: "comboSettings", area: "Settings"}, [true, true]);
-    macrosA.viaMacros.forEach((_, i) => {
-        /** @param {Macros["viaMacros"][number]} macro @returns {Fields} */
+    macrosA.macros.forEach((_, i) => {
+        /** @param {Macros["macros"][number]} macro @returns {Fields} */
         const fields = (macro) => new Map(/** @type {[string, Field][]} */ ([["Steps", macro.payload || "empty"], ["Name", macro.name || "no name"],
             ["Uninterruptible playback", {key: macro.protection,
                 text: macro.protection === "auto" ? `${word(VOCABULARY.macroProtection, macro.protection)} · ${macro.uninterruptible ? "on" : "off"}` : word(VOCABULARY.macroProtection, macro.protection)}]]));
-        const old = macrosA.viaMacros[i], next = macrosB.viaMacros[i], has = /** @param {Macros["viaMacros"][number]} macro */ (macro) => Boolean(macro.payload || macro.name || macro.protection !== "auto");
+        const old = macrosA.macros[i], next = macrosB.macros[i], has = /** @param {Macros["macros"][number]} macro */ (macro) => Boolean(macro.payload || macro.name || macro.protection !== "auto");
         item("Macros", `macro:${i}`, `Macro ${i}${(next.name || old.name) ? ` · ${next.name || old.name}` : ""}`, fields(old), fields(next), {kind: "macro", index: i}, [has(old), has(next)]);
     });
     if (a.settings.values[HOST_SETTING] !== b.settings.values[HOST_SETTING]) {
         const oldHost = hostSettings(a.settings.values, before.hostOs?.detected), nextHost = hostSettings(b.settings.values, after.hostOs?.detected);
-        macrosB.viaMacros.forEach((macro, index) => {
+        macrosB.macros.forEach((macro, index) => {
             if (!macro.payload) return;
             // Compare the current authored text under each host setup. An
             // independent text edit belongs to its own macro change above.

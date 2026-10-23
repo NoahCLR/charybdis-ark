@@ -38,5 +38,5 @@ test("semantic domain lookups do not use a position's stored keycode name", () =
 test("both profile file choosers use the portable document's byte limit", () => {
     assert.equal(require("../../core/session/panel-loop").FILE_MAX_BYTES, require("../../core/model/portable-profile").FILE_MAX_BYTES);
     assert.match(read("extension.js"), /\.size > FILE_MAX_BYTES/);
-    assert.match(read("web/web-host.mjs"), /PROFILE_FILE_LIMIT = FILE_MAX_BYTES/);
+    assert.match(read("web/web-shell.mjs"), /PROFILE_FILE_LIMIT = FILE_MAX_BYTES/);
 });

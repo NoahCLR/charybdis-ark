@@ -7,11 +7,11 @@
 //
 //     index.html                the page (web/index.html, with the names below)
 //     _headers                  what Cloudflare Pages sends with it (web/_headers)
-//     host-<hash>.js            the page's host (web/page.mjs), with the core it runs;
+//     shell-<hash>.js           the page's shell (web/page.mjs), with the core it runs;
 //                               it loads the panel, or on a phone shows a notice instead
-//     core-<hash>.js            core/ for a browser host (web/core.mjs)
-//     chunk-<hash>.js           what host and core share
-//     worker-<hash>.js          the host's clock (web/sleep-worker.js)
+//     core-<hash>.js            core/ for the web page (web/core.mjs)
+//     chunk-<hash>.js           what shell and core share
+//     worker-<hash>.js          the shell's clock (web/sleep-worker.js)
 //     panel-<hash>.js           the panel (webview/app.mjs)
 //     styles-<hash>.css         its styles
 //
@@ -49,7 +49,7 @@ const NO_NATIVE_HID = path.join(APP_ROOT, "web", "no-native-hid.js");
 // A current Chrome, which WebHID needs anyway.
 const TARGET = ["chrome120"];
 const NODE_BUILTINS = new Set(builtinModules);
-const HOST_PACKAGES = ["vscode", "node-hid"];
+const EXTENSION_PACKAGES = ["vscode", "node-hid"];
 // What a bundle may take from node_modules: the buffer package and its two dependencies.
 /** @type {Record<"core" | "panel" | "worker", string[]>} */
 const PACKAGES = {core: ["buffer", "base64-js", "ieee754"], panel: [], worker: []};
@@ -74,7 +74,7 @@ const browserOnly = {
     setup(build) {
         build.onResolve({filter: /.*/}, (args) => {
             const name = args.path.split("/")[0];
-            if (NODE_BUILTINS.has(args.path) || args.path.startsWith("node:") || HOST_PACKAGES.includes(name)) {
+            if (NODE_BUILTINS.has(args.path) || args.path.startsWith("node:") || EXTENSION_PACKAGES.includes(name)) {
                 const importer = args.importer ? path.relative(APP_ROOT, args.importer) : "the entry";
                 return {errors: [{text: `${args.path} cannot be in the web build (imported by ${importer})`}]};
             }
@@ -184,7 +184,7 @@ const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (character) => `
 // Builds into `outdir`, emptied first so no earlier release's file lingers, and
 // returns the manifest it wrote.
 /** @param {import("./build-types.js").WebBuildOptions} [options] */
-async function buildWeb({outdir = OUTDIR, manifestFile = manifestFileFor(outdir), entries = {core: "web/core.mjs", host: "web/page.mjs"}, build = buildInfo()} = {}) {
+async function buildWeb({outdir = OUTDIR, manifestFile = manifestFileFor(outdir), entries = {core: "web/core.mjs", shell: "web/page.mjs"}, build = buildInfo()} = {}) {
     fs.rmSync(outdir, {recursive: true, force: true});
     fs.rmSync(manifestFile, {force: true});
     fs.mkdirSync(outdir, {recursive: true});
@@ -205,7 +205,7 @@ async function buildWeb({outdir = OUTDIR, manifestFile = manifestFileFor(outdir)
             },
         }),
     };
-    if (manifest.host) {
+    if (manifest.shell) {
         const names = {...manifest, version: build.version, commit: build.commit, csp: pagePolicy()};
         const page = fill(fs.readFileSync(path.join(APP_ROOT, "web", "index.html"), "utf8"), "web/index.html", names, escapeHtml);
         fs.writeFileSync(path.join(outdir, "index.html"), page);

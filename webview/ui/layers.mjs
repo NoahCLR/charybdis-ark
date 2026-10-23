@@ -6,7 +6,7 @@
 // themselves, so the control sits after the last layer and opens upward over
 // the board, since the tabs sit at the board's foot.
 //
-// The order is the host's to hold. Moving a layer rewrites every key, behaviour
+// The order is the core's to hold. Moving a layer rewrites every key, behaviour
 // and setting that refers to it, so the edit is staged there and arrives back
 // as `portable.layers`. "Keys follow their layers" (on by default) decides
 // whether layer keys are renumbered with the move or keep their numbers.
@@ -167,7 +167,7 @@ function editor(model, portable, busy) {
         state.layerGripFocus = undefined;
         requestAnimationFrame(() => /** @type {HTMLElement | null} */ (list.querySelector(`[data-grip="${focused}"]`))?.focus());
     }
-    // Both close the panel here rather than waiting for the host's answer: the
+    // Both close the panel here rather than waiting for the core's answer: the
     // row underneath shows the result, and a panel left open over it would only
     // hide what it changed.
     /** @type {HTMLButtonElement} */ (node.querySelector('[data-act="save"]')).addEventListener("click", () => {
@@ -238,7 +238,7 @@ export function closeLayers() {
     state.layersAsked = false;
 }
 
-// Moves and Make base stay pending in the host until Keep layers in draft, so
+// Moves and Make base stay pending in the core until Keep layers in draft, so
 // every other way of closing the panel (Discard, Escape, a click outside it or
 // on its trigger) drops them, and it opens again on the draft's order.
 export function discardLayers() {

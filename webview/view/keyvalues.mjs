@@ -116,7 +116,8 @@ export function pickerModifierProblem(model, picker) {
         ? "A keycode can hold left modifiers or right modifiers together. Choose modifiers from one side." : "";
 }
 
-// The stored VIA macro identity, including the names accepted by the writer.
+// The macro slot a stored keycode names (VIA_MACRO_n), including the other
+// names the writer accepts.
 /** @param {string | number | null | undefined} code */
 export function macroIndex(code) {
     const text = String(code ?? "").trim();
@@ -129,6 +130,6 @@ export function macroIndex(code) {
 export function pointingMacro(model, code) {
     const index = macroIndex(code);
     if (index === null) return null;
-    const slot = model?.viaMacros?.find(slot => slot.keycode === `VIA_MACRO_${index}`);
+    const slot = model?.macros?.find(slot => slot.keycode === `VIA_MACRO_${index}`);
     return {index, name: slot?.name || `Macro ${index}`, empty: Boolean(slot?.empty)};
 }

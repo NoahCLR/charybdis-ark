@@ -38,7 +38,7 @@ function fakeService(extra = {}) {
     };
     return service;
 }
-const host = () => {
+const shell = () => {
     const saved = [], made = [];
     return {saved, made, progress: async (title, work) => work(), saveRecovery: async (doc, about) => { saved.push(doc); made.push(about); return `/recovery/${saved.length}.json`; }};
 };
@@ -54,14 +54,14 @@ const stage = (session, change) => session.draft.stage({draftId: session.draft.i
 test("reading the keyboard connects, reads in dependency order and says what it read", async () => {
     const service = fakeService();
     const session = {service};
-    assert.equal(await readKeyboard(session, undefined, host()), true);
+    assert.equal(await readKeyboard(session, undefined, shell()), true);
     assert.deepEqual(service.calls, ["enumerate", "refresh", "readKeyboardProfile"]);
     assert.match(session.notice, /committed profile generation 7/);
     const empty = {service: fakeService({snapshot: () => ({devices: []})})};
-    assert.equal(await readKeyboard(empty, undefined, host()), false);
+    assert.equal(await readKeyboard(empty, undefined, shell()), false);
     assert.match(empty.notice, /No Charybdis Raw HID interface/);
     const failed = {service: fakeService({readKeyboardProfile: async () => {throw new Error("interrupted");}})};
-    assert.equal(await readKeyboard(failed, undefined, host()), false);
+    assert.equal(await readKeyboard(failed, undefined, shell()), false);
     assert.match(failed.notice, /Macros and global settings could not be read/);
     assert.deepEqual(failed.service.calls, ["enumerate", "refresh", "readLayout", "readCommittedProfile", "readBaseRgb", "readCombos"]);
 });
@@ -74,7 +74,7 @@ test("a failed committed-profile read keeps the layout and the optional reads, a
         readCommittedProfile: async () => {state.error = {code: "TIMEOUT", message: "no answer"}; throw new Error("no answer");}});
     service.calls.length = 0;
     const session = {service};
-    assert.equal(await readKeyboard(session, undefined, host()), false);
+    assert.equal(await readKeyboard(session, undefined, shell()), false);
     assert.deepEqual(service.calls, ["enumerate", "refresh", "readLayout", "readBaseRgb", "readCombos"]);
     assert.equal(session.notice, "The keyboard profile could not be read: no answer. Macros and global settings could not be read: interrupted");
 });
@@ -83,22 +83,22 @@ test("a keyboard not on current firmware is read no further, and told to update"
     for (const older of [{...capabilities, supportedDomainMask: 3}, {...capabilities, protocol: {major: 1, minor: 0}, schema: {major: 3, minor: 0}}, {...capabilities, protocol: {major: 2, minor: 1}}]) {
         const service = fakeService({capabilities: older});
         const session = {service};
-        assert.equal(await readKeyboard(session, undefined, host()), false);
+        assert.equal(await readKeyboard(session, undefined, shell()), false);
         assert.deepEqual(service.calls, ["enumerate", "refresh"]);
         assert.match(session.notice, /the only one Ark supports\. Update both halves/);
     }
     // Firmware with every feature that stores an older domain version is told
-    // so by the complete capture, and its profile is not read independently.
+    // so by the complete snapshot, and its profile is not read independently.
     const stored = fakeService({readKeyboardProfile: async () => {throw Object.assign(new Error("stores its profile in a format Ark does not read"), {code: "FIRMWARE_UPDATE_REQUIRED"});}});
     const session = {service: stored};
-    assert.equal(await readKeyboard(session, undefined, host()), false);
+    assert.equal(await readKeyboard(session, undefined, shell()), false);
     assert.deepEqual(stored.calls, ["enumerate", "refresh"]);
     assert.equal(session.notice, "stores its profile in a format Ark does not read");
 });
 
 test("a failed device read fails the whole read with its own error", async () => {
     const service = fakeService({refresh: async () => {throw Object.assign(new Error("lost"), {code: "DISCONNECTED"});}});
-    await assert.rejects(readKeyboard({service}, undefined, host()), {code: "DISCONNECTED"});
+    await assert.rejects(readKeyboard({service}, undefined, shell()), {code: "DISCONNECTED"});
     assert.deepEqual(service.calls, ["enumerate"]);
 });
 
@@ -108,7 +108,7 @@ test("rebasing against an incomplete recovery capture retains the authored draft
     const document = structuredClone(draft.document);
     const recovery = {incomplete: true, fingerprint: "incomplete:device", document: {format: "charybdis-recovery-capture"}};
     session.service.readPortableProfile = async () => recovery;
-    await draftControl(session, {type: "rebaseProfileDraft", draftRevision: draft.revision}, host());
+    await draftControl(session, {type: "rebaseProfileDraft", draftRevision: draft.revision}, shell());
     assert.equal(draft.baseSnapshot.incomplete, true);
     assert.deepEqual(draft.document, document);
     assert.equal(draft.stale, false);
@@ -122,8 +122,8 @@ test("the read after a save reuses the saved bytes only in the step right after 
     assert.deepEqual(calls, [["readLayout"], ["readCommittedProfile", {reuse: true}], ["readCombos"], ["readBaseRgb"]]);
 });
 
-test("apply writes a recovery copy through the host, then reads the keyboard again", async () => {
-    const session = sessionWithDraft(), draft = session.draft, h = host();
+test("apply writes a recovery copy through the shell, then reads the keyboard again", async () => {
+    const session = sessionWithDraft(), draft = session.draft, h = shell();
     const readSteps = [];
     session.service.emitChange = () => readSteps.push([session.postApplyReadStep, session.applyRunning]);
     stage(session, {type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_A"}]});
@@ -142,7 +142,7 @@ test("apply writes a recovery copy through the host, then reads the keyboard aga
 });
 
 test("after Apply, Put back makes what the keyboard held before it the draft, one undoable step", async () => {
-    const session = sessionWithDraft(), draft = session.draft, h = host();
+    const session = sessionWithDraft(), draft = session.draft, h = shell();
     stage(session, {type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_A"}]});
     draft.review(draft.revision);
     await assert.rejects(draftControl(session, {type: "putBackProfile", draftRevision: draft.revision}, h), /no copy from before an Apply/);
@@ -168,7 +168,7 @@ test("an Apply that renames the keyboard expects it to reconnect, and a readback
         if (interrupted) session.service.readCommittedProfile = async () => {session.service.snapshot().connected = false; throw new Error("The keyboard disconnected while its profile was being read.");};
         stage(session, {type: "renameKeyboard", name});
         session.draft.review(session.draft.revision);
-        await draftControl(session, {type: "applyProfileDraft", draftRevision: session.draft.revision}, host());
+        await draftControl(session, {type: "applyProfileDraft", draftRevision: session.draft.revision}, shell());
         assert.deepEqual(session.reconnect, {deviceId: "kb", serialNumber: "", name, otherDevices: [], startedAt: session.reconnect.startedAt, dropped: false,
             saved: "Complete profile applied to both halves and verified. Recovery copy: /recovery/1.json"});
         assert.deepEqual(expecting, [true]);
@@ -179,12 +179,12 @@ test("an Apply that renames the keyboard expects it to reconnect, and a readback
     const session = sessionWithDraft();
     stage(session, {type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_A"}]});
     session.draft.review(session.draft.revision);
-    await draftControl(session, {type: "applyProfileDraft", draftRevision: session.draft.revision}, host());
+    await draftControl(session, {type: "applyProfileDraft", draftRevision: session.draft.revision}, shell());
     assert.equal(session.reconnect, undefined);
     assert.doesNotMatch(session.notice, /Reconnecting/);
 });
 
-test("restoring a named backup over an incomplete capture expects the safe USB restart", async () => {
+test("restoring a named backup over an incomplete read expects the safe USB restart", async () => {
     const {RECONNECT_WORDS} = require("../../core/session/keyboard-reconnect");
     const {editKeyboardName} = require("../../core/model/keyboard-name");
     const service = fakeService(), before = {...service.portable, incomplete: true};
@@ -193,7 +193,7 @@ test("restoring a named backup over an incomplete capture expects the safe USB r
     const expecting = [];
     service.expectReconnect = (on) => {expecting.push(on);};
     service.readCommittedProfile = async () => {service.snapshot().connected = false; throw new Error("USB restarted");};
-    await portableControl(session, {type: "restorePortableProfile"}, host());
+    await portableControl(session, {type: "restorePortableProfile"}, shell());
     assert.equal(session.reconnect?.name, "Desk");
     assert.deepEqual(expecting, [true]);
     assert.match(session.notice, /Interrupted data retained for diagnosis: \/recovery\/1\.json/);
@@ -206,19 +206,19 @@ test("a failed post-Apply read clears its progress stage and is said after the s
     stage(session, {type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_A"}]});
     session.draft.review(session.draft.revision);
     session.service.readCommittedProfile = async () => {throw new Error("readback interrupted");};
-    await draftControl(session, {type: "applyProfileDraft", draftRevision: session.draft.revision}, host());
+    await draftControl(session, {type: "applyProfileDraft", draftRevision: session.draft.revision}, shell());
     assert.equal(session.postApplyReadStep, undefined);
     assert.equal(session.applyRunning, false);
     assert.match(session.notice, /^Complete profile applied to both halves and verified\. Reading the keyboard again failed: readback interrupted\. Recovery copy: \/recovery\/1\.json$/);
 });
 
 test("a destination blocker refuses Apply before recovery or HID", async () => {
-    const service = fakeService(), h = host();
+    const service = fakeService(), h = shell();
     service.portable.limits.brightnessMax = 50;
     const session = {service};
     observeService(session, service.snapshot());
     buildPanelModel(session, service.snapshot());
-    stage(session, {type: "updateViaMacro", keycode: "VIA_MACRO_0", payload: "hello"});
+    stage(session, {type: "updateMacro", keycode: "VIA_MACRO_0", payload: "hello"});
     session.draft.review(session.draft.revision);
     assert.equal(session.draft.hasBlockers(), true);
     await assert.rejects(draftControl(session, {type: "applyProfileDraft", draftRevision: session.draft.revision, confirmChecks: true}, h), /blockers/);
@@ -227,7 +227,7 @@ test("a destination blocker refuses Apply before recovery or HID", async () => {
 });
 
 test("a draft that can lock a layer with no way back applies only once the trap is confirmed", async () => {
-    const session = sessionWithDraft(), draft = session.draft, h = host();
+    const session = sessionWithDraft(), draft = session.draft, h = shell();
     stage(session, {type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "TG(1)"}]});
     stage(session, {type: "updateLayoutKeys", layer: "Layer 1", changes: [{layoutIndex: 0, keycode: "KC_B"}]});
     const trap = draft.view({}).checks.find((check) => check.level === "trap");
@@ -244,7 +244,7 @@ test("a draft that can lock a layer with no way back applies only once the trap 
 });
 
 test("a draft with a warning requires confirmation before writing a recovery copy or HID", async () => {
-    const session = sessionWithDraft(), draft = session.draft, h = host();
+    const session = sessionWithDraft(), draft = session.draft, h = shell();
     stage(session, {type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_A"}]});
     draft.checks = () => [{level: "warning", status: "new", title: "Nothing reaches Number"}];
     draft.review(draft.revision);
@@ -257,7 +257,7 @@ test("a draft with a warning requires confirmation before writing a recovery cop
 });
 
 test("an apply that finished with the slave half unplugged says so instead of claiming a readback", async () => {
-    const session = sessionWithDraft(), draft = session.draft, h = host();
+    const session = sessionWithDraft(), draft = session.draft, h = shell();
     const restore = session.service.restorePortableProfile;
     session.service.restorePortableProfile = async (doc, options) => ({...await restore(doc, options), peerUnseen: true});
     stage(session, {type: "updateLayoutKeys", layer: "Layer 0", changes: [{layoutIndex: 0, keycode: "KC_A"}]});
@@ -295,20 +295,20 @@ test("layer edits and imports are kept in the draft; without one they restore to
     const text = JSON.stringify(document());
     await portableControl(session, {type: "choosePortableProfile"}, {chooseProfile: async () => text});
     assert.ok(session.portableReview, "a chosen file opens for review first");
-    assert.equal(session.portableReview.fileName, null, "a host that gives only the text leaves the file unnamed");
+    assert.equal(session.portableReview.fileName, null, "a shell that gives only the text leaves the file unnamed");
     await portableControl(session, {type: "choosePortableProfile"}, {chooseProfile: async () => ({text, name: "desk.charybdis.json"})});
     const review = buildPanelModel(session, session.service.snapshot()).portable.review;
     assert.equal(review.fileName, "desk.charybdis.json");
     assert.deepEqual(review.differences, [], "compared with the keyboard, not the draft: the draft's rename is not a difference of this file");
     const changed = new ProfileDraftSession(snapshot(), "kb", capabilities);
-    changed.stage({type: "updateViaMacro", keycode: "VIA_MACRO_2", payload: "hello", draftRevision: changed.revision});
+    changed.stage({type: "updateMacro", keycode: "VIA_MACRO_2", payload: "hello", draftRevision: changed.revision});
     await portableControl(session, {type: "choosePortableProfile"}, {chooseProfile: async () => JSON.stringify(changed.document)});
     assert.deepEqual(buildPanelModel(session, session.service.snapshot()).portable.review.differences, [{unit: "macro:2", title: "Macro 2", status: "added", place: {kind: "macro", index: 2}}],
         "each difference by what it is, what happened and where it is edited, without its fields");
     await portableControl(session, {type: "cancelPortableReview"});
     assert.equal(session.portableReview, undefined);
 
-    const bare = {service: fakeService()}, h = host();
+    const bare = {service: fakeService()}, h = shell();
     bare.portableReview = {document: document(), before: bare.service.portable};
     await portableControl(bare, {type: "restorePortableProfile"}, h);
     assert.deepEqual(bare.service.calls, ["restorePortableProfile", "readLayout", "readCommittedProfile", "readCombos", "readBaseRgb"]);

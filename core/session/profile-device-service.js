@@ -6,8 +6,8 @@ const {PHASE} = require("../model/vocabulary");
  * @typedef {import("./types.js").DeviceConnection} Connection
  * @typedef {import("./types.js").DeviceCapabilities} Caps
  * @typedef {import("./types.js").ProfileStatus} Status
- * @typedef {import("./types.js").CapturedProfile} Capture
- * @typedef {import("./types.js").CompleteCapture} CompleteCapture
+ * @typedef {import("./types.js").ReadSnapshot} ReadSnapshot
+ * @typedef {import("./types.js").CompleteReadSnapshot} CompleteReadSnapshot
  * @typedef {import("./types.js").RestoredProfile} Restored
  * @typedef {import("./types.js").PublicError & Partial<Record<'step' | 'stepLabel' | 'reason' | 'saved', string>>} PublishedError
  */
@@ -27,7 +27,7 @@ const {readHostOs} = require("../protocol/host-os-v1");
 const {readKeyboardOptions} = require("../protocol/keyboard-options-v1");
 const {profileDomain} = require("../schema/profile-domains");
 const {profileDepthOptions} = require("../schema/profile-depth");
-const {captureProfile, restoreProfile, validateSnapshot} = require("./portable-profile-session");
+const {snapshotProfile, restoreProfile, validateSnapshot} = require("./portable-profile-session");
 const {NodeHidDeviceAdapter} = require("../transport/node-hid-adapter");
 const {DeviceRequestCoordinator} = require("../transport/request-coordinator");
 const {decodeKeymapDomain} = require("../schema/keymap-domain-v1");
@@ -47,7 +47,7 @@ const {EDIT_MODE, readActiveProfile, readEditMode, readEditProgress, readEditSta
 // misses in a row mean the keyboard is lost.
 const WATCH_TIMEOUT_MS = 3000;
 const WATCH_MISSES = 3;
-const {captureLive} = require("./live-profile-session");
+const {snapshotLive} = require("./live-profile-session");
 const {LiveEditCoordinator, TransactionIds} = require("./live-edit-coordinator");
 
 /** @type {(capabilities: Partial<Caps> | null | undefined, writing?: boolean) => asserts capabilities is Partial<Caps>} */
@@ -87,7 +87,7 @@ class ProfileDeviceService {
         this.missedLooks = 0;
         this.onApplyProgress = typeof options.onApplyProgress === "function" ? options.onApplyProgress : undefined;
         this.onReadProgress = typeof options.onReadProgress === "function" ? options.onReadProgress : undefined;
-        // The wait between polls while reading and saving a profile. A host
+        // The wait between polls while reading and saving a profile. A shell
         // whose timers are throttled (a background browser tab) passes its
         // own; the timer's is used otherwise.
         this.sleep = typeof options.sleep === "function" ? options.sleep : undefined;
@@ -151,7 +151,7 @@ class ProfileDeviceService {
         this.baseRgb = undefined;
         /** @type {import("./types.js").ComboRead | undefined} */
         this.combos = undefined;
-        /** @type {Capture | Restored | undefined} */
+        /** @type {ReadSnapshot | Restored | undefined} */
         this.portable = undefined;
         this.portableProgress = "";
         /** @type {ReturnType<typeof editorViews>["macroView"] | undefined} */
@@ -163,7 +163,7 @@ class ProfileDeviceService {
         /** @type {InstanceType<typeof ProfilePayloadReader> | undefined} */
         this.payloadReader = undefined;
         // The compiled defaults last verified on any connection, so a
-        // reconnect does not download them again; a host that keeps them
+        // reconnect does not download them again; a shell that keeps them
         // between runs (`compiledDefaults`) spares the first read too. A
         // reader takes them only for a keyboard whose metadata names exactly
         // those bytes.
@@ -548,26 +548,26 @@ class ProfileDeviceService {
         return this.snapshot();
     }
 
-    // One coherent capture supplies the editor and the draft. Standalone
+    // One coherent snapshot supplies the editor and the draft. Standalone
     // exports use the same reader without replacing the editor's state.
-    /** @returns {Promise<import("./types.js").CompleteCapture>} */
+    /** @returns {Promise<import("./types.js").CompleteReadSnapshot>} */
     async readKeyboardProfile() {
         const read = await this.#readCompleteProfile({forEditor: true});
         if (read.incomplete) throw new Error("The keyboard did not return a complete editor profile.");
         return read;
     }
 
-    /** @overload @param {{forRestore: true; reuseReadback?: boolean}} options @returns {Promise<import("./types.js").CapturedProfile>} */
-    /** @overload @param {{forRestore?: false; reuseReadback?: boolean}} [options] @returns {Promise<import("./types.js").CompleteCapture>} */
-    /** @param {{forRestore?: boolean; reuseReadback?: boolean}} [options] @returns {Promise<import("./types.js").CapturedProfile>} */
+    /** @overload @param {{forRestore: true; reuseReadback?: boolean}} options @returns {Promise<import("./types.js").ReadSnapshot>} */
+    /** @overload @param {{forRestore?: false; reuseReadback?: boolean}} [options] @returns {Promise<import("./types.js").CompleteReadSnapshot>} */
+    /** @param {{forRestore?: boolean; reuseReadback?: boolean}} [options] @returns {Promise<import("./types.js").ReadSnapshot>} */
     async readPortableProfile(options = {}) {
         return this.#readCompleteProfile(options);
     }
 
-    /** @param {{forRestore?: boolean; reuseReadback?: boolean; forEditor?: boolean}} [options] @returns {Promise<Capture>} */
+    /** @param {{forRestore?: boolean; reuseReadback?: boolean; forEditor?: boolean}} [options] @returns {Promise<ReadSnapshot>} */
     async #readCompleteProfile({forRestore = false, reuseReadback = false, forEditor = false} = {}) {
         if (!this.connection?.connected || this.busy) this.refuse("Connect the keyboard and wait for the current operation to finish.");
-        /** @type {Capture | undefined} */
+        /** @type {ReadSnapshot | undefined} */
         let result;
         await this.runOperation(PHASE.READ_COMPLETE, async () => {
             this.portableProgress = "";
@@ -579,29 +579,29 @@ class ProfileDeviceService {
                     if (forEditor || forRestore) this.#adoptPortable(result);
                     return;
                 }
-                const capture = await captureProfile(connection, this.requestSequence(), capabilities,
+                const snapshot = await snapshotProfile(connection, this.requestSequence(), capabilities,
                     message => this.reportReadProgress("portable", message), false, forRestore,
                     {sleep: this.sleep, payloadReader: this.profilePayloadReader(), reuseReadback});
-                const {readback, ...captured} = capture;
-                result = captured;
+                const {readback, ...withoutReadback} = snapshot;
+                result = withoutReadback;
                 Object.assign(result, await this.#readDeviceFacts(connection));
                 if (forEditor) {
-                    if (capture.incomplete) throw new Error("The keyboard did not return a complete editor profile.");
-                    const decoded = validateSnapshot(capture.document);
+                    if (snapshot.incomplete) throw new Error("The keyboard did not return a complete editor profile.");
+                    const decoded = validateSnapshot(snapshot.document);
                     const lighting = baseLighting(decoded.settings.values);
                     const baseRgb = {state: /** @type {const} */ ("read"), effectId: lighting.enabled ? lighting.effect : 0,
                         brightness: lighting.brightness, hue: lighting.hue, saturation: lighting.saturation, speed: lighting.speed,
                         readAt: new Date().toISOString()};
                     if (this.connection !== connection || !connection.connected) throw new Error("The keyboard disconnected while its configuration was being read.");
                     this.#acceptLayout(layoutOf(decoded.layers, decoded.layers.length));
-                    this.#acceptCommitted(capture.readback.active, capture.readback.source);
+                    this.#acceptCommitted(snapshot.readback.active, snapshot.readback.source);
                     this.status = result.status;
-                    this.combos = {state: "read", ...capture.readback.combos, readAt: new Date().toISOString()};
+                    this.combos = {state: "read", ...snapshot.readback.combos, readAt: new Date().toISOString()};
                     this.baseRgb = baseRgb;
                     // Apply mode shows a toggle a key turned off as well.
                     await this.#readLiveFacts(connection);
                 }
-                // Export is an independent capture. Only an editor read or a
+                // Export is an independent snapshot. Only an editor read or a
                 // restore/rebase read changes the state the editor follows.
                 if (forEditor || forRestore) this.#adoptPortable(result);
                 this.portableProgress = "";
@@ -652,28 +652,28 @@ class ProfileDeviceService {
         return this.status.activeKind === PROFILE_ACTIVE_KIND.WORKING;
     }
 
-    /** @param {Connection} connection @param {Caps} capabilities @param {boolean} forEditor @returns {Promise<import("./types.js").LiveCapture>} */
+    /** @param {Connection} connection @param {Caps} capabilities @param {boolean} forEditor @returns {Promise<import("./types.js").LiveSnapshot>} */
     async #readLiveProfile(connection, capabilities, forEditor) {
-        const capture = await captureLive(connection, this.requestSequence(), capabilities, {payloadReader: this.profilePayloadReader(), sleep: this.sleep,
+        const snapshot = await snapshotLive(connection, this.requestSequence(), capabilities, {payloadReader: this.profilePayloadReader(), sleep: this.sleep,
             onProgress: message => this.reportReadProgress("portable", message)});
         const facts = await this.#readDeviceFacts(connection);
         if (this.connection !== connection || !connection.connected) throw new Error("The keyboard disconnected while its configuration was being read.");
-        /** @type {import("./types.js").LiveCapture} */
-        const result = {...capture, ...facts, saved: {...capture.saved, ...facts}};
-        this.status = capture.status;
-        this.runtime = capture.runtime;
-        if (this.editMode) this.editMode = {...this.editMode, mode: capture.live.mode};
+        /** @type {import("./types.js").LiveSnapshot} */
+        const result = {...snapshot, ...facts, saved: {...snapshot.saved, ...facts}};
+        this.status = snapshot.status;
+        this.runtime = snapshot.runtime;
+        if (this.editMode) this.editMode = {...this.editMode, mode: snapshot.live.mode};
         if (forEditor) {
             const decoded = validateSnapshot(result.document);
             const lighting = baseLighting(decoded.settings.values);
             this.#acceptLayout(layoutOf(decoded.layers, decoded.layers.length));
             // What the editors follow is what the keyboard runs; its schema
             // is the blob's own, its generation the saved one it began from.
-            const working = capture.live.working;
-            this.#acceptCommitted({metadata: {generation: capture.live.savedGeneration, digest: fnv1a32(working),
-                schema: decodeStoredProfileBlob(working).schema, originHalf: capture.live.savedOrigin},
-            bytes: working}, capture.live.unsaved ? "working" : capture.live.savedGeneration ? "committed" : "compiled");
-            if (capture.combosReadback) this.combos = {state: "read", ...capture.combosReadback, readAt: new Date().toISOString()};
+            const working = snapshot.live.working;
+            this.#acceptCommitted({metadata: {generation: snapshot.live.savedGeneration, digest: fnv1a32(working),
+                schema: decodeStoredProfileBlob(working).schema, originHalf: snapshot.live.savedOrigin},
+            bytes: working}, snapshot.live.unsaved ? "working" : snapshot.live.savedGeneration ? "committed" : "compiled");
+            if (snapshot.combosReadback) this.combos = {state: "read", ...snapshot.combosReadback, readAt: new Date().toISOString()};
             this.baseRgb = {state: "read", effectId: lighting.enabled ? lighting.effect : 0, brightness: lighting.brightness,
                 hue: lighting.hue, saturation: lighting.saturation, speed: lighting.speed, readAt: new Date().toISOString()};
         }
@@ -751,15 +751,15 @@ class ProfileDeviceService {
                 this.emitChange();
             }, async status => {
                 // A quiet-period save may have moved the saved base since the
-                // panel's capture. Recover what is actually saved immediately
+                // panel's snapshot. Recover what is actually saved immediately
                 // before each explicit Save, inside this operation's ownership.
-                const capture = await this.#readLiveProfile(this.connectedConnection(), this.profileCapabilities(), false);
-                if (!capture.live.unsaved) return;
-                if (capture.live.session !== status.session || capture.live.revision !== status.revision
-                    || capture.live.savedGeneration !== status.savedGeneration || capture.live.savedOrigin !== status.savedOrigin) {
+                const snapshot = await this.#readLiveProfile(this.connectedConnection(), this.profileCapabilities(), false);
+                if (!snapshot.live.unsaved) return;
+                if (snapshot.live.session !== status.session || snapshot.live.revision !== status.revision
+                    || snapshot.live.savedGeneration !== status.savedGeneration || snapshot.live.savedOrigin !== status.savedOrigin) {
                     throw Object.assign(new Error("The keyboard changed before its recovery copy was saved."), {code: "LIVE_EDIT_STALE"});
                 }
-                const recovery = await saveRecovery(capture.saved.document);
+                const recovery = await saveRecovery(snapshot.saved.document);
                 if (!recovery) throw Object.assign(new Error("A recovery copy could not be saved. Nothing was saved on the keyboard."), {code: "RECOVERY_REQUIRED"});
             });
         }, {after: () => this.#refreshLive()});
@@ -842,7 +842,7 @@ class ProfileDeviceService {
     // lighting effects and the host OS it detected. A profile already read
     // from this connection supplies the first two; the host OS is always read
     // fresh. Read before anything is written.
-    /** @param {Connection} connection @param {Pick<Capture, "limits" | "options">} [known] */
+    /** @param {Connection} connection @param {Pick<ReadSnapshot, "limits" | "options">} [known] */
     async #readDeviceFacts(connection, known) {
         const limits = known?.limits || await readSettingsLimits(connection, this.requestSequence());
         const options = known?.options || await readKeyboardOptions(connection, this.requestSequence());
@@ -850,7 +850,7 @@ class ProfileDeviceService {
     }
 
     // The profile the editors follow, with their views (device-model.js).
-    /** @param {Capture} result */
+    /** @param {ReadSnapshot} result */
     #adoptPortable(result) {
         this.portable = result;
         ({settingsView: this.settingsView, macroView: this.macroView, customKeyView: this.customKeyView} = editorViews(result, this.capabilities));
@@ -1135,7 +1135,7 @@ class ProfileDeviceService {
         return this.devices.find((device) => device.id === publicDeviceId)?.label || "Charybdis keyboard";
     }
 
-    // Transfer progress changes no profile data. Hosts that can display it
+    // Transfer progress changes no profile data. Shells that can display it
     // separately avoid rebuilding and sending the complete panel per chunk.
     /** @param {import("../../contracts/model.js").ApplyView} view */
     reportApplyProgress(view) {

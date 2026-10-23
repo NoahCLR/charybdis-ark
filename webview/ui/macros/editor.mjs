@@ -129,7 +129,7 @@ export function editor(model, slot, canEdit) {
     return wrap;
 }
 
-// Every slot can hold a full-length name. The host enforces the rule; the
+// Every slot can hold a full-length name. The core enforces the rule; the
 // counter says where the name stands in bytes, which is what the keyboard
 // counts.
 /** @param {Model} model @param {MacroSlot} slot @param {boolean} canEdit */

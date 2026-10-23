@@ -17,7 +17,7 @@
     "web/**/*.mjs",
     "web/**/*.js",
     "web/**/*.d.ts",
-    "tests/types/hosts.mts"
+    "tests/types/shells.mts"
   ],
   "exclude": [
     "web/sleep-worker.js"

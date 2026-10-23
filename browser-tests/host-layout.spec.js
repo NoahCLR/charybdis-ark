@@ -1,7 +1,7 @@
 // @ts-check
 "use strict";
 const {test, expect} = require("@playwright/test");
-const {openPreview} = require("./host-page");
+const {openPreview} = require("./shell-page");
 const {buildDeviceModel} = require("../core/session/device-model");
 
 // Sends the production model for a host layout, as the host would after the

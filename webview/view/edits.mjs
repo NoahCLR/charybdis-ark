@@ -1,7 +1,7 @@
 // @ts-check
 // Every edit the interface posts, built from plain values.
 //
-// The screens gather what the person chose and call these; the host stages
+// The screens gather what the person chose and call these; the core stages
 // what they return against the draft. Keeping the builders pure is what lets
 // tests/view/edits.test.mjs stage the exact messages the screens send, so a change
 // of shape fails there rather than on a keyboard.
@@ -27,7 +27,7 @@ import {behaviourChangesNothing} from "./behavior-editor.mjs";
 // before a read. It goes out as the edit's expectedBase, null as absent, and
 // the draft compares every field, so an incomplete one is refused, not trusted.
 
-// A dropped file opens the same import review as the host's file chooser.
+// A dropped file opens the same import review as the shell's file chooser.
 /** @param {string} text @param {string} name @returns {import("../../contracts/edits.js").EditOf<'reviewPortableProfile'>} */
 export const reviewPortableProfile = (text, name) => ({type: "reviewPortableProfile", text, name});
 
@@ -149,8 +149,8 @@ export const comboKept = (combo, made, identity) => made && combo.output === mad
 export const deleteCombo = (id) => ({type: "deleteCombo", id});
 /** @param {Scalar} holdTermMs @param {Partial<BaseIdentity> | null} [identity] @returns {import("../../contracts/edits.js").EditOf<'updateComboHoldTerm'>} */
 export const comboHoldTerm = (holdTermMs, identity) => ({type: "updateComboHoldTerm", holdTermMs, expectedBase: identity ?? undefined});
-/** @param {Scalar} defaultTermMs @param {Partial<BaseIdentity> | null} [identity] @returns {import("../../contracts/edits.js").EditOf<'updateComboDefaultTerm'>} */
-export const comboDefaultTerm = (defaultTermMs, identity) => ({type: "updateComboDefaultTerm", defaultTermMs, expectedBase: identity ?? undefined});
+/** @param {Scalar} defaultTermMs @param {Partial<BaseIdentity> | null} [identity] @returns {import("../../contracts/edits.js").EditOf<'updateComboDefaultWindow'>} */
+export const comboDefaultWindow = (defaultTermMs, identity) => ({type: "updateComboDefaultWindow", defaultTermMs, expectedBase: identity ?? undefined});
 // QMK keeps one hold threshold for every combo. A keyboard that stores it
 // once always has one; an older one stores it on each combo, so a first combo
 // there starts from the keyboard's tapping term, which is QMK's own default
@@ -161,7 +161,7 @@ export const comboHoldTermValue = (model, written) => String(String(written ?? "
 // The window a new combo, or one that follows the default, runs with; empty
 // on a keyboard that has no default.
 /** @param {ComboTimings | null | undefined} model */
-export const comboDefaultTermValue = (model) => String(model?.comboReadback?.defaultTermMs ?? "");
+export const comboDefaultWindowValue = (model) => String(model?.comboReadback?.defaultTermMs ?? "");
 
 // ── lighting ────────────────────────────────────────────────────────────
 
@@ -224,15 +224,15 @@ export const deleteLedGroup = (name) => ({type: "deleteRgbReusableLedGroup", nam
 
 // ── macros, pointing, settings ──────────────────────────────────────────
 
-/** @param {string} keycode @param {string} payload @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'updateViaMacro'> & {payload: string}} */
-export const macroMessage = (keycode, payload, identity) => ({type: "updateViaMacro", keycode, payload, expectedFingerprint: identity});
-/** @param {string} keycode @param {string} payload @param {number} requestId @returns {import("../../contracts/edits.js").EditOf<'validateViaMacro'>} */
-export const macroValidationMessage = (keycode, payload, requestId) => ({type: "validateViaMacro", keycode, payload, requestId});
-// A VIA macro's name; its steps stay as they are.
-/** @param {string} keycode @param {string} name @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'updateViaMacro'> & {name: string}} */
-export const macroNameMessage = (keycode, name, identity) => ({type: "updateViaMacro", keycode, name: String(name ?? "").trim(), expectedFingerprint: identity});
-/** @param {string} keycode @param {'auto' | 'on' | 'off'} protection @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'updateViaMacro'> & {protection: 'auto' | 'on' | 'off'}} */
-export const macroProtectionMessage = (keycode, protection, identity) => ({type: "updateViaMacro", keycode, protection, expectedFingerprint: identity});
+/** @param {string} keycode @param {string} payload @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'updateMacro'> & {payload: string}} */
+export const macroMessage = (keycode, payload, identity) => ({type: "updateMacro", keycode, payload, expectedFingerprint: identity});
+/** @param {string} keycode @param {string} payload @param {number} requestId @returns {import("../../contracts/edits.js").EditOf<'validateMacro'>} */
+export const macroValidationMessage = (keycode, payload, requestId) => ({type: "validateMacro", keycode, payload, requestId});
+// A macro's name; its steps stay as they are.
+/** @param {string} keycode @param {string} name @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'updateMacro'> & {name: string}} */
+export const macroNameMessage = (keycode, name, identity) => ({type: "updateMacro", keycode, name: String(name ?? "").trim(), expectedFingerprint: identity});
+/** @param {string} keycode @param {'auto' | 'on' | 'off'} protection @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'updateMacro'> & {protection: 'auto' | 'on' | 'off'}} */
+export const macroProtectionMessage = (keycode, protection, identity) => ({type: "updateMacro", keycode, protection, expectedFingerprint: identity});
 /** @param {string} keycode @param {string} name @param {string} [identity] @returns {import("../../contracts/edits.js").EditOf<'updateCustomKey'>} */
 export const customKeyNameMessage = (keycode, name, identity) => ({type: "updateCustomKey", keycode, name: String(name ?? "").trim(), expectedFingerprint: identity});
 // A custom key's shortcut: the eight-bit modifier mask the grid reads and one

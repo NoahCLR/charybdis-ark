@@ -213,9 +213,9 @@ test("an expected disconnect is no error to the device service; an unexpected on
 
 test("in the panel loop, a renamed keyboard is followed through its restart and read again under its new name", async (t) => {
     const posted = [];
-    const host = {post: (message) => {posted.push(message);}, progress: async (title, work) => work(), saveRecovery: async () => "/r.json", saveExport: async () => undefined};
+    const shell = {post: (message) => {posted.push(message);}, progress: async (title, work) => work(), saveRecovery: async () => "/r.json", saveExport: async () => undefined};
     const {service, adapter} = await connectedService(t);
-    const loop = openPanelLoop(host, {service, reconnect: {sleep: () => new Promise((resolve) => setTimeout(resolve, 5)), waitMs: 5000}});
+    const loop = openPanelLoop(shell, {service, reconnect: {sleep: () => new Promise((resolve) => setTimeout(resolve, 5)), waitMs: 5000}});
     await loop.handleMessage({type: "refresh"});
     const before = loop.session.draft;
     assert.ok(before, "a complete read opened the draft");

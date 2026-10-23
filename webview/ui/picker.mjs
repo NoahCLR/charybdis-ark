@@ -60,7 +60,7 @@ const heldModifiers = (value) => state.picker?.shortcut ? shortcutModifiers(getM
 const allowed = (value) => !state.picker?.allowedKeys || state.picker?.allowedKeys?.includes(value) || Boolean(heldModifiers(value));
 /** @param {Model} model */
 const sections = (model) => pickerSections().filter(section => !state.picker?.allowedKeys || section.kind === "board"
-    || (section.kind === "macros" && (model?.viaMacros || []).some(slot => allowed(slot.keycode)))
+    || (section.kind === "macros" && (model?.macros || []).some(slot => allowed(slot.keycode)))
     || entriesForPickerSection(model?.qmkKeycodes || [], section).some(entry => allowed(entry.value)));
 
 // Modifiers alone, or with a modifier key, are one set of modifiers, stored as
@@ -111,7 +111,7 @@ function sectionBody(model) {
 
     if (picker.search) {
         const query = picker.search.toLowerCase();
-        const macros = (model?.viaMacros || []).filter((slot) => allowed(slot.keycode) && macroMatches(slot, query));
+        const macros = (model?.macros || []).filter((slot) => allowed(slot.keycode) && macroMatches(slot, query));
         const matches = catalogue.filter((entry) => allowed(entry.value) && pickable(entry)
             && (entry.search?.includes(query) || entry.value.toLowerCase().includes(query))).slice(0, 64);
         if (!matches.length && !macros.length) return `<p class="note pk-empty">Nothing in the keyboard's catalogue or macros matches “${esc(picker.search)}”.</p>`;
@@ -190,7 +190,7 @@ function sectionBody(model) {
             <p class="note pk-note">Hold re-reads the trackball while the key is down. Lock keeps the mode on until the key is pressed again. A key for an empty slot does nothing until the slot is configured.</p></div>`;
     }
     if (section.kind === "macros") {
-        const slots = (model?.viaMacros || []).filter(slot => allowed(slot.keycode));
+        const slots = (model?.macros || []).filter(slot => allowed(slot.keycode));
         if (!slots.length) return `<p class="note pk-empty">This keyboard has not reported its macros.</p>`;
         return `<div class="pk-body"><div class="pk-rows">${chunk(slots, 8).map((row) => `<div class="pk-row">${row.map((slot) =>
             macroButton(slot, picked(slot.keycode))).join("")}</div>`).join("")}</div></div>`;

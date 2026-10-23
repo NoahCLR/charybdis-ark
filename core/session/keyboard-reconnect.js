@@ -7,7 +7,7 @@
 // reconnecting rather than reporting a failure, waits a bounded time for the
 // same keyboard to come back, connects it and reads it again.
 //
-// "The same keyboard" is the one with the same serial number where the host
+// "The same keyboard" is the one with the same serial number where the shell
 // shows serial numbers (node-hid; the serial is the master half's hardware ID
 // and survives the restart). A browser shows none, so there it is the one
 // reporting the new name, excluding keyboards present before the save. A name
@@ -15,13 +15,13 @@
 // cannot establish identity: the person chooses.
 //
 // The wait polls the device list, since VS Code has no hotplug events; the
-// web page stops following Chrome's own events while it runs (web-host.mjs).
+// web page stops following Chrome's own events while it runs (web-shell.mjs).
 //
 // A keyboard lost unexpectedly is waited for the same way when nothing else
 // would notice it come back: it left a request unanswered (Ark then closes
 // the connection, but the keyboard stays plugged in), or it dropped off USB
-// where the host shows serial numbers (node-hid). A web page follows Chrome's
-// own connect events for a keyboard that drops off (web-host.mjs), and Chrome
+// where the shell shows serial numbers (node-hid). A web page follows Chrome's
+// own connect events for a keyboard that drops off (web-shell.mjs), and Chrome
 // shows no serial to tell a returning keyboard by. The same keyboard is the
 // one still listed under the same device, or else found as a renamed one is.
 // Ark connects it again and reads it once per LOST_GUARD_MS, so a keyboard
@@ -64,7 +64,7 @@ const LOST_WORDS = Object.freeze({
 
 // The name a save gives the keyboard, when it changes the one it had; null
 // when the keyboard keeps its name, or the saved profile cannot say. A repair
-// with an incomplete previous capture may rename it, so expect that restart.
+// with an incomplete previous read may rename it, so expect that restart.
 /** @param {import("../model/types.js").ProfileSnapshot | null | undefined} before @param {import("../model/types.js").ProfileSnapshot | null | undefined} after */
 function renamedTo(before, after) {
     const old = storedKeyboardName(before), next = storedKeyboardName(after);

@@ -1,4 +1,4 @@
-/** Posted values are editor values; the host validates and converts them to wire values. */
+/** Posted values are editor values; the core validates and converts them to wire values. */
 export type LayerReference = `Layer ${number}`;
 export type Scalar = string | number;
 export interface Hsv {h: number; s: number; v: number}
@@ -81,7 +81,7 @@ export interface EditPayloads {
     saveCombo: Combo & {id: number};
     deleteCombo: {id: number};
     updateComboHoldTerm: {holdTermMs: Scalar; expectedBase?: Partial<BaseIdentity>};
-    updateComboDefaultTerm: {defaultTermMs: Scalar; expectedBase?: Partial<BaseIdentity>};
+    updateComboDefaultWindow: {defaultTermMs: Scalar; expectedBase?: Partial<BaseIdentity>};
     updateRgbStages: {stageEnableMask: number};
     updateLayerColor: Hsv & {layer: LayerReference; mode: string};
     updateAutomouseFade: Hsv & {mode: string};
@@ -92,12 +92,12 @@ export interface EditPayloads {
     deleteRgbLedGroup: {target: string; index: number};
     saveRgbReusableLedGroup: {group: {ledIndices: number[]; originalName?: string}};
     deleteRgbReusableLedGroup: {name: string};
-    updateViaMacro: {keycode: string; expectedFingerprint?: string} & (
+    updateMacro: {keycode: string; expectedFingerprint?: string} & (
         {payload: string; name?: string; protection?: 'auto' | 'on' | 'off'}
         | {name: string; payload?: string; protection?: 'auto' | 'on' | 'off'}
         | {protection: 'auto' | 'on' | 'off'; payload?: string; name?: string}
     );
-    validateViaMacro: {keycode: string; payload: string; requestId: number};
+    validateMacro: {keycode: string; payload: string; requestId: number};
     updateCustomKey: {keycode: string; name: string; expectedFingerprint?: string};
     /**
      * A custom key's shortcut (firmware D-F26): a HID report modifier mask and one key, `{mods: 0, key: 0}` to clear it.
@@ -116,7 +116,7 @@ export interface EditPayloads {
 export type EditOf<K extends keyof EditPayloads> = {type: K} & EditPayloads[K];
 export type PanelEdit = {[K in keyof EditPayloads]: EditOf<K>}[keyof EditPayloads];
 /** Every posted edit the draft stages: an import opens a review and a macro check is answered, neither an edit. core/model/draft-edits.js registers each one. */
-export type DraftEditType = Exclude<keyof EditPayloads, 'reviewPortableProfile' | 'validateViaMacro'>;
+export type DraftEditType = Exclude<keyof EditPayloads, 'reviewPortableProfile' | 'validateMacro'>;
 
 /** A dense decoded slot has values even for inactive fields. */
 export interface PdSlot extends PdConfig {

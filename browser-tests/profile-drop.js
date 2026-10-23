@@ -2,7 +2,7 @@
 "use strict";
 
 // Browser-native File/DataTransfer values, as an operating-system file drop
-// delivers them. The panel still reads the File and posts through its host.
+// delivers them. The panel still reads the File and posts through its shell.
 async function dropFiles(page, files, selector = "[data-profile-drop]") {
     return page.evaluate(({files, selector}) => {
         const transfer = new DataTransfer();

@@ -36,9 +36,9 @@ test("rail screens follow the read and the capability each screen needs", () => 
     assert.equal(screenAvailable(unsupported, "profile"), false, "unsupported firmware cannot export a complete current profile");
     assert.equal(screenAvailable(unsupported, "device"), true);
 
-    const failedCapture = {...unsupported, portable: {available: true}};
-    assert.equal(screenAvailable(failedCapture, "profile"), true, "a connected device can retry profile export after capture failed");
-    const ready = {...failedCapture, load: {state: "ready"}};
+    const failedRead = {...unsupported, portable: {available: true}};
+    assert.equal(screenAvailable(failedRead, "profile"), true, "a connected device can retry profile export after the read failed");
+    const ready = {...failedRead, load: {state: "ready"}};
     for (const screen of ["keys", "lighting", "profile", "device"]) assert.equal(screenAvailable(ready, screen), true, screen);
 });
 
@@ -57,11 +57,11 @@ test("a read or export names what it reads and claims nothing about saving", () 
     assert.deepEqual(busyText("restore-complete", {vocabulary: VOCABULARY}), {detail: "Saving the profile to both halves", writes: true});
 });
 
-test("a host that cannot reach a keyboard says why, and a host's words say how to connect", () => {
-    const blocked = {host: {blocked: {title: "Ark is open in another tab", detail: "One tab holds the keyboard."}}, load: {state: "unavailable"}, device: {connected: false}};
+test("a shell that cannot reach a keyboard says why, and a shell's words say how to connect", () => {
+    const blocked = {shell: {blocked: {title: "Ark is open in another tab", detail: "One tab holds the keyboard."}}, load: {state: "unavailable"}, device: {connected: false}};
     assert.deepEqual(readScreen(blocked), {state: "blocked", title: "Ark is open in another tab", detail: "One tab holds the keyboard."});
     assert.deepEqual(readScreen(blocked, "profile").state, "blocked");
-    const web = {host: {words: {connectHint: "Choose keyboard and pick it."}}, load: {state: "unavailable"}, device: {connected: false}};
+    const web = {shell: {words: {connectHint: "Choose keyboard and pick it."}}, load: {state: "unavailable"}, device: {connected: false}};
     assert.equal(readScreen(web).detail, "Choose keyboard and pick it.");
     assert.equal(readScreen({...web, device: {connected: false, health: {error: "Unplugged."}}}).detail, "Unplugged.", "what the keyboard said comes first");
 });

@@ -17,7 +17,7 @@ test("per-macro protection follows Unicode entry automatically, and explicit pol
     for (const layout of [2, 3]) {
         const fixture = hostMacros(1 | (layout << 16), ["é"]);
         let current = fixture.snapshot;
-        const view = () => macroEditorView(current, fixture.capabilities).viaMacros[0];
+        const view = () => macroEditorView(current, fixture.capabilities).macros[0];
         const edit = message => {current = snapshot(editMacro(current, {keycode: "VIA_MACRO_0", expectedFingerprint: current.fingerprint, ...message}, fixture.capabilities));};
         assert.equal(view().protection, "auto");
         assert.equal(view().uninterruptible, layout === 3);
@@ -35,7 +35,7 @@ test("an empty macro may store protection and keeps its empty-slot reserve", () 
     const {snapshot: current, capabilities} = hostMacros(1, []);
     const protectedEmpty = snapshot(editMacro(current, {keycode: "VIA_MACRO_0", protection: "on", expectedFingerprint: current.fingerprint}, capabilities));
     const view = macroEditorView(protectedEmpty, capabilities);
-    assert.equal(view.viaMacros[0].empty, true); assert.equal(view.viaMacros[0].protection, "on");
+    assert.equal(view.macros[0].empty, true); assert.equal(view.macros[0].protection, "on");
     assert.equal(view.macroBank.stored, macroEditorView(current, capabilities).macroBank.stored + 3);
 });
 
@@ -43,7 +43,7 @@ test("stored macro status agrees with editing after a host layout change", () =>
     const {hostMacros} = require("../fixtures/host-macros");
     for (const host of [1 | (2 << 16), 1 | (3 << 16)]) {
         const {snapshot, capabilities} = hostMacros(host, ["{+KC_A}é{-KC_A}"]);
-        const slot = macroEditorView(snapshot, capabilities).viaMacros[0];
+        const slot = macroEditorView(snapshot, capabilities).macros[0];
         const status = macroInputStatus(snapshot, {keycode: slot.keycode, payload: slot.payload}, capabilities);
         assert.equal(slot.playable, !status.error);
         assert.equal(slot.playbackError, status.error);
@@ -51,15 +51,15 @@ test("stored macro status agrees with editing after a host layout change", () =>
     }
 });
 
-test("the 128 VIA macros populate the model, including empty slots and their names", () => {
+test("the 128 macros populate the model, including empty slots and their names", () => {
     let current = snapshot(pdDocument());
     current = snapshot(editMacro(current, {keycode: "VIA_MACRO_127", payload: "{KC_LGUI,KC_N}", name: "New note", expectedFingerprint: current.fingerprint}));
     const view = macroEditorView(current);
     const model = buildDeviceModel({macroView: view, capabilities: {compiledLayerCount: 16, actionAbiDigest: 0x6fd70b90}});
-    assert.equal(model.viaMacros.length, 128);
-    assert.equal(model.viaMacros[0].empty, true);
-    assert.equal(model.viaMacros[127].name, "New note");
-    assert.match(model.viaMacros[127].payload, /KC_N/);
+    assert.equal(model.macros.length, 128);
+    assert.equal(model.macros[0].empty, true);
+    assert.equal(model.macros[127].name, "New note");
+    assert.match(model.macros[127].payload, /KC_N/);
     assert.equal(model.macroEditing.writable, true);
     assert.deepEqual(model.macroNameSpace, {perName: 32}, "a name is counted in bytes of UTF-8");
     // A named macro reads by its name wherever a key is labelled; the
@@ -158,7 +158,7 @@ test("the model reports the bank and each macro's room; a macro past the free me
     let current = snapshot(pdDocument());
     current = snapshot(editMacro(current, {keycode: "VIA_MACRO_2", payload: "{KC_A}{KC_B}", expectedFingerprint: current.fingerprint}));
     const view = macroEditorView(current, {macroBytes: 34903});
-    const slot = view.viaMacros[2];
+    const slot = view.macros[2];
     assert.equal(slot.playable, true);
     assert.equal(slot.available, true);
     assert.equal(slot.roomTaps, Math.floor(view.macroBank.free / 3));
@@ -193,13 +193,13 @@ test("Unicode host setup persists with the profile", () => {
         const {layoutChars, ...unicodeView} = view.unicode;
         assert.deepEqual(unicodeView, {mode, enabled: true, os: mode, layout: 0, layoutFits: true, layoutName: "US"});
         assert.equal(layoutChars.length, 97);
-        assert.equal(view.viaMacros[0].payload, "café 🙂 e\u0301 👩‍💻");
+        assert.equal(view.macros[0].payload, "café 🙂 e\u0301 👩‍💻");
         assert.equal(Buffer.from(profileMacros(current.document)[0], "base64").toString("utf8"), "café 🙂 e\u0301 👩‍💻");
     }
     const off = snapshot(setHost(0, false));
     const offView = macroEditorView(off, capabilities);
-    assert.equal(offView.viaMacros[0].needsUnicodeSetup, true);
-    assert.equal(offView.viaMacros[0].playable, false);
+    assert.equal(offView.macros[0].needsUnicodeSetup, true);
+    assert.equal(offView.macros[0].playable, false);
     assert.throws(() => change({payload: "{+KC_A}é{-KC_A}"}), /Release ordinary keys/);
     assert.doesNotThrow(() => change({payload: "{+KC_LALT}é{-KC_LALT}"}));
     assert.throws(() => setHost(4, true), /supported range/);
@@ -241,7 +241,7 @@ test("macro text is judged against the host layout the keyboard types through", 
     assert.equal(validateSnapshot(current.document).settings.values[27], 1 | (2 << 16) | 0x1000000);
     current = snapshot(change("café “hello” €"));
     const view = macroEditorView(current, capabilities);
-    assert.equal(view.viaMacros[0].needsUnicodeSetup, false);
+    assert.equal(view.macros[0].needsUnicodeSetup, false);
     assert.equal(view.unicode.layoutName, "Dutch");
     assert.throws(() => change("🙂"), error => /Dutch layout cannot type “🙂”/.test(error.message) && /Unicode Hex Input/.test(error.message));
     setHost(1, 3);
@@ -258,18 +258,18 @@ test("macros use the free bank and filled high slots survive lower empty slots r
     let view = macroEditorView(current, capabilities);
     assert.equal(view.macroBank.free, 0);
     assert.equal(view.macroBank.available, 1);
-    assert.equal(view.viaMacros[127].available, true);
-    assert.equal(view.viaMacros[127].playable, true);
-    assert.ok(view.viaMacros.slice(0, 127).every(slot => slot.empty && !slot.available));
+    assert.equal(view.macros[127].available, true);
+    assert.equal(view.macros[127].playable, true);
+    assert.ok(view.macros.slice(0, 127).every(slot => slot.empty && !slot.available));
     assert.equal(macroInputStatus(current, {keycode: "VIA_MACRO_127", payload: "b".repeat(free)}, capabilities).error, "");
     assert.equal(macroInputStatus(current, {keycode: "VIA_MACRO_127", payload: "a".repeat(free + 1)}, capabilities).code, "MACRO_BANK_FULL");
     update("a".repeat(free - 60));
     view = macroEditorView(current, capabilities);
     assert.equal(view.macroBank.available, 3);
-    assert.equal(view.viaMacros[0].available, true);
-    assert.equal(view.viaMacros[1].available, true);
-    assert.equal(view.viaMacros[2].available, false);
-    assert.equal(view.viaMacros[127].available, true);
+    assert.equal(view.macros[0].available, true);
+    assert.equal(view.macros[1].available, true);
+    assert.equal(view.macros[2].available, false);
+    assert.equal(view.macros[127].available, true);
     update("");
     assert.equal(macroEditorView(current, capabilities).macroBank.available, 128);
 });

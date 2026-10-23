@@ -21,13 +21,13 @@ test("unchanged bank reads parse each slot once per purpose while changed payloa
     assert.equal(calls, 258, "only the latest payload stays cached");
 });
 
-test("local step focus metadata stays outside cached host parsing", () => {
+test("local step focus metadata stays outside the core's cached parsing", () => {
     const read = createMacroReader(), model = {};
     const parsed = read(model, "VIA_MACRO_0", "text{120}", "editor");
     const identified = withStepFocus(parsed.steps, undefined, () => "local-id");
     identified[0].text = "local edit";
     assert.deepEqual(read(model, "VIA_MACRO_0", "text{120}", "editor").steps,
-        [{kind: "text", text: "text"}, {kind: "delay", delay: 120}], "the host payload and focus metadata remain separate");
+        [{kind: "text", text: "text"}, {kind: "delay", delay: 120}], "the core's payload and focus metadata remain separate");
 });
 
 test("a new published model cannot reuse parsing under old host settings", () => {

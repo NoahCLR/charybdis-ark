@@ -37,8 +37,8 @@ async function open(t, timing = {}) {
     };
     const release = () => {silence.hold = false; silence.held.splice(0).forEach((send) => send());};
     const posted = [];
-    const host = {post: (message) => {posted.push(message);}, showError: () => {}, saveRecovery: async () => "/r.json", saveExport: async () => undefined};
-    const loop = openPanelLoop(host, {adapter, defaultTimeoutMs: 100, watchTimeoutMs: 50, sleep: async () => {}, reconnect: {sleep: async () => {}, ...timing}});
+    const shell = {post: (message) => {posted.push(message);}, showError: () => {}, saveRecovery: async () => "/r.json", saveExport: async () => undefined};
+    const loop = openPanelLoop(shell, {adapter, defaultTimeoutMs: 100, watchTimeoutMs: 50, sleep: async () => {}, reconnect: {sleep: async () => {}, ...timing}});
     t.after(() => loop.close());
     await loop.handleMessage({type: "refresh"});
     const send = (message) => loop.handleMessage({draftId: loop.session.draft?.id, draftRevision: loop.session.draft?.revision, ...message});
@@ -68,7 +68,7 @@ test("a missed look is skipped: the keyboard stays connected, and the late answe
     assert.equal(models().at(-1).device.connected, true);
 });
 
-test("the look pauses while the host says a menu may be open, and resumes after", async () => {
+test("the look pauses while the shell says a menu may be open, and resumes after", async () => {
     const looks = [];
     const session = {service: {snapshot: () => ({})}};
     let paused = true, ticks = 0;

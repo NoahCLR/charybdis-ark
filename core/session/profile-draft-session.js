@@ -16,7 +16,7 @@ const {editKeyboardName} = require("../model/keyboard-name");
 const {editDeviceProfile} = require("../model/device-profile-edits");
 const {DRAFT_EDITS, editedBy, draftEditLabel} = require("../model/draft-edits");
 const {actionName, knownActionAbi, layerOfRef, nativeCode} = require("../schema/actions");
-const {effectiveComboTerm} = require("../schema/combo-domain-v1");
+const {effectiveComboWindow} = require("../schema/combo-domain-v1");
 const {SETTING} = require("../schema/settings-domain-v1");
 const {resolveNativeQmkExpression} = require("../schema/compiled-profile-v1");
 const {CHARYBDIS_4X6_LAYOUT_MATRIX, matrixPosition} = require("../data/charybdis-layout");
@@ -63,9 +63,9 @@ const fail = text => Object.assign(new Error(text), {code: "PROFILE_DRAFT_CONFLI
  * @typedef {{document: Document, cursor?: number | null, origin: string | null, label: string | null, order?: Order, keepReviewed?: boolean}} LiveTarget
  */
 // The saved profile of a live read, as the snapshot review compares with.
-/** @param {import("./types.js").LiveCapture} capture @returns {Complete} */
-const savedSnapshot = capture => ({...copy({document: capture.saved.document, fingerprint: capture.saved.fingerprint, summary: capture.saved.summary}),
-    hostOs: copy(capture.hostOs ?? null), limits: copy(capture.limits ?? null), options: copy(capture.options ?? null), incomplete: false});
+/** @param {import("./types.js").LiveSnapshot} snapshot @returns {Complete} */
+const savedSnapshot = snapshot => ({...copy({document: snapshot.saved.document, fingerprint: snapshot.saved.fingerprint, summary: snapshot.saved.summary}),
+    hostOs: copy(snapshot.hostOs ?? null), limits: copy(snapshot.limits ?? null), options: copy(snapshot.options ?? null), incomplete: false});
 
 // What one Rename & Reorder save did: the order it changed and the names it
 // changed, each named as the layers were called before it.
@@ -100,13 +100,13 @@ class ProfileDraftSession {
         validateSnapshot(snapshot.document, capabilities);
         // Live + review (firmware D-F32): the draft is the keyboard's working
         // copy, and review compares it with the saved profile beside it.
-        const live = "live" in snapshot && snapshot.live ? /** @type {import("./types.js").LiveCapture} */ (snapshot) : null;
+        const live = "live" in snapshot && snapshot.live ? /** @type {import("./types.js").LiveSnapshot} */ (snapshot) : null;
         if (live) validateSnapshot(live.saved.document, capabilities);
         this.deviceId = deviceId;
         this.connectionToken = connectionToken ?? null;
         this.latestConnectionToken = this.connectionToken;
         this.connectionChanged = false;
-        // Web Crypto, which Node and the browser both have, so one line serves both hosts.
+        // Web Crypto, which Node and the browser both have, so one line serves both shells.
         this.id = globalThis.crypto.randomUUID();
         this.capabilities = copy(capabilities);
         this.latestCapabilities = copy(capabilities);
@@ -209,7 +209,7 @@ class ProfileDraftSession {
     /** @param {Snapshot | null | undefined} snapshot @param {string | null | undefined} deviceId */
     follow(snapshot, deviceId) {
         if (!this.live || !deviceId || deviceId === this.deviceId || !snapshot || !("live" in snapshot) || !snapshot.live) return false;
-        if (/** @type {import("./types.js").LiveCapture} */ (snapshot).live.session !== this.live.session) return false;
+        if (/** @type {import("./types.js").LiveSnapshot} */ (snapshot).live.session !== this.live.session) return false;
         this.deviceId = deviceId;
         return true;
     }
@@ -267,31 +267,31 @@ class ProfileDraftSession {
         this.latestConnectionToken = token;
         this.latestCapabilities = copy(capabilities);
         if (!("live" in snapshot) || !snapshot.live) {this.needsRead = true; return;}
-        const capture = /** @type {import("./types.js").LiveCapture} */ (snapshot), live = /** @type {import("./types.js").LiveState} */ (this.live);
-        const same = capture.live.session === live.session && capture.live.revision === live.revision
-            && capture.saved.fingerprint === this.base.fingerprint && capture.fingerprint === this.current.fingerprint;
+        const liveSnapshot = /** @type {import("./types.js").LiveSnapshot} */ (snapshot), live = /** @type {import("./types.js").LiveState} */ (this.live);
+        const same = liveSnapshot.live.session === live.session && liveSnapshot.live.revision === live.revision
+            && liveSnapshot.saved.fingerprint === this.base.fingerprint && liveSnapshot.fingerprint === this.current.fingerprint;
         if (same && JSON.stringify(capabilities) === JSON.stringify(this.capabilities)) {
-            this.live = {...capture.live};
+            this.live = {...liveSnapshot.live};
             this.connectionToken = token;
             this.needsRead = false;
             this.connectionChanged = false;
             return;
         }
         // A new session is a restart: whatever was unsaved is gone (D-F32).
-        if (capture.live.session !== live.session) {if (live.unsaved) this.restartedWithUnsaved = {kept: capture.saved.fingerprint === this.current.fingerprint, mode: capture.live.mode};}
-        else if (capture.live.revision !== live.revision || capture.fingerprint !== this.current.fingerprint) this.changedElsewhere = true;
-        this.resetLive(capture);
+        if (liveSnapshot.live.session !== live.session) {if (live.unsaved) this.restartedWithUnsaved = {kept: liveSnapshot.saved.fingerprint === this.current.fingerprint, mode: liveSnapshot.live.mode};}
+        else if (liveSnapshot.live.revision !== live.revision || liveSnapshot.fingerprint !== this.current.fingerprint) this.changedElsewhere = true;
+        this.resetLive(liveSnapshot);
     }
-    /** @param {import("./types.js").LiveCapture} capture */
-    resetLive(capture) {
+    /** @param {import("./types.js").LiveSnapshot} snapshot */
+    resetLive(snapshot) {
         this.acceptCapabilities(this.latestCapabilities);
-        this.base = savedSnapshot(capture); this.latest = copy(this.base);
-        this.hostOs = copy(capture.hostOs ?? null);
+        this.base = savedSnapshot(snapshot); this.latest = copy(this.base);
+        this.hostOs = copy(snapshot.hostOs ?? null);
         this.referenceCache = new WeakMap();
         this.reviewCache = new WeakMap();
-        this.history = [this.historyEntry(capture.document)]; this.cursor = 0;
+        this.history = [this.historyEntry(snapshot.document)]; this.cursor = 0;
         this.revision++; this.reviewedRevision = null;
-        this.live = {...capture.live};
+        this.live = {...snapshot.live};
         this.connectionToken = this.latestConnectionToken;
         this.needsRead = false;
         this.connectionChanged = false;
@@ -761,7 +761,7 @@ class ProfileDraftSession {
         const native = action => /** @type {number} */ (nativeCode(action));
         return {state: "read", enabled: Boolean(settings.values[SETTING.COMBOS_ENABLED]), layerReferences: settings.layers.map(record => record.reference),
             version: combos.version, defaultTermMs: combos.defaultTermMs, holdTermMs: combos.holdTermMs,
-            rows: combos.rows.map(row => ({...row, termMs: effectiveComboTerm(combos, row), followsDefault: row.termMs === null, inputs: row.inputs.map(native), output: native(row.output)}))};
+            rows: combos.rows.map(row => ({...row, termMs: effectiveComboWindow(combos, row), followsDefault: row.termMs === null, inputs: row.inputs.map(native), output: native(row.output)}))};
     }
     /** @param {import("./types.js").DraftDeviceContext} state */
     view(state) {

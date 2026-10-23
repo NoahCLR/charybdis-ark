@@ -16,7 +16,7 @@ export interface ActionInput {
 export interface ActionLimits {
     maxLogicalLayers: number;
     maxPdModes: number;
-    maxViaMacroSlots: number;
+    maxMacroSlots: number;
     maxCustomKeys: number;
 }
 

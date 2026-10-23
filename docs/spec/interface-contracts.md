@@ -181,7 +181,7 @@ A name the catalog gives a key is what the key does wherever it is placed
 
 Straight directions, diagonals and physical-button tap overrides share one tap
 vocabulary, owned by `core/schema/pd-mode-domain-v1.js`: keys, mouse buttons
-1–8 (firmware D-F22) and VIA macros (firmware D-F23), which take inherit
+1–8 (firmware D-F22) and macros (firmware D-F23), which take inherit
 policy and mask zero. Mouse movement, wheel, acceleration and
 modifier-wrapped mouse codes are refused, and backups keep click and macro
 records exactly (`tests/schema/pd-mode-domain-v1.test.js`).
@@ -191,7 +191,7 @@ records exactly (`tests/schema/pd-mode-domain-v1.test.js`).
   `pdModeEditing` and keeps no allowlist of its own
   (`tests/model/pointing-taps.test.js`). Typed outputs are checked before
   staging, with a reason (`browser-tests/pointing-clicks.spec.js`).
-- The picker offers all 128 VIA macros by profile name, and `tapRecord` resets
+- The picker offers all 128 macros by profile name, and `tapRecord` resets
   a newly chosen macro to inherit and mask zero. A macro row says it inherits
   and why, and that a busy trigger is dropped
   (`tests/view/keyvalues.test.mjs`, `browser-tests/pointing-macros.spec.js`).
@@ -250,7 +250,7 @@ only an operation stands in the way. The demo's draft is bound to the demo
 - Closing the web page asks first only when it would lose edits (an unapplied
   draft, unsaved Live + review edits, a Live edit on its way, the demo's
   unexported edits) or while an Apply, a Save or a restore writes the profile
-  (`leaving` in `web/web-host.mjs`; `tests/web-host.test.mjs`, live cases: no
+  (`leaving` in `web/web-shell.mjs`; `tests/web-shell.test.mjs`, live cases: no
   test).
 
 ## Snapshot model and device model

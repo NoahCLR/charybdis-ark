@@ -4,7 +4,7 @@ const {editLayers, editMacros} = require("./profile-document");
 const assert = require("node:assert/strict");
 const {document32: document} = require("./pd-slots-32");
 const {fingerprint, validateSnapshot} = require("../../core/model/portable-profile");
-const {captureProfile, restoreProfile} = require("../../core/session/portable-profile-session");
+const {snapshotProfile, restoreProfile} = require("../../core/session/portable-profile-session");
 const {writableKeyboard} = require("./writable-keyboard");
 const {fakeKeyboard} = require("./fake-keyboard");
 const {buildProfileGetRequest, decodeProfileResponse, decodeCapabilityPages} = require("../../core/protocol/profile-wire-v1");
@@ -35,7 +35,7 @@ function fixture({source = document(), generation = 4, compiledOnly = false} = {
         keyboard.events.push("backup"); return "/recovery.json";
     }};
     const f = {source, targetDocument, target, keyboard, connection, ids, options,
-        capture: () => captureProfile(connection, ids, capabilities, undefined, false, true),
+        snapshot: () => snapshotProfile(connection, ids, capabilities, undefined, false, true),
         restore: () => restoreProfile(connection, ids, capabilities, f.targetDocument, options)};
     return f;
 }

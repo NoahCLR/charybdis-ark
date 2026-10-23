@@ -1,4 +1,4 @@
-// The browser-host check has no Node globals. Its one exception is `Buffer`,
+// The web page's type check has no Node globals. Its one exception is `Buffer`,
 // which core/ uses as a global: the web build injects web/buffer.mjs, the
 // `buffer` package, as every bare `Buffer` in the bundle. These are the members
 // core/ uses, with Node's signatures, which the package implements; the

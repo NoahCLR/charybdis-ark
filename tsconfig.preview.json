@@ -9,7 +9,7 @@
   },
   "include": [
     "scripts/preview.js",
-    "scripts/preview-macro-host.mjs",
+    "scripts/preview-macro-shell.mjs",
     "scripts/**/*.d.ts",
     "tests/types/preview.mts"
   ]

@@ -57,7 +57,7 @@ function editKeyBehaviors(payload, message, capabilities = {}) {
     /** @param {Row[]} rows */
     const encode = (rows) => checkPlacements(rows) ?? encodeKeyBehaviorDomain({rows}, {
         limits: {maxRows: capabilities.maxBehaviorRows, maxPopulatedSteps: capabilities.maxPopulatedBehaviorSteps, maxTapStepsPerBehavior: capabilities.maxTapStepsPerBehavior},
-        actionLimits: {maxPdModes, maxLogicalLayers: capabilities.compiledLayerCount, maxViaMacroSlots: capabilities.macroSlots, maxCustomKeys: capabilities.customKeySlots},
+        actionLimits: {maxPdModes, maxLogicalLayers: capabilities.compiledLayerCount, maxMacroSlots: capabilities.macroSlots, maxCustomKeys: capabilities.customKeySlots},
     });
     /** @param {unknown} value @param {Action} [previous] @returns {Action} */
     const action = (value, previous) => {

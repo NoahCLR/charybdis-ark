@@ -31,7 +31,7 @@ export function behaviourRowAfterPreview(/** @type {string | null} */ row, /** @
 }
 
 // A preview is never inserted into model.keyBehaviors: counts, reach markers
-// and the board continue to describe only the host's stored draft.
+// and the board continue to describe only the core's stored draft.
 export function behaviourEditorRow(/** @type {Model} */ model, /** @type {string} */ keycode) {
     if (!canHaveBehaviour(model, keycode)) return undefined;
     const existing = behaviourListeningTo(model, keycode);
@@ -45,7 +45,7 @@ export function behaviourEditorRow(/** @type {Model} */ model, /** @type {string
         timingAlone: defaults?.timingAlone !== false};
 }
 
-// The words naming where each timing field's default comes from, as the host
+// The words naming where each timing field's default comes from, as the core
 // says it per key (device-model.js behaviorDefaults); without it, the
 // placeholder says only "default".
 /** @param {Model} model @param {Record<string, import("../../contracts/panel.js").TimingSource> | undefined} sources @returns {Record<string, string>} */

@@ -1,5 +1,5 @@
 // While a <select>'s native menu may be open (Chrome on macOS holds back the
-// page's input reports then) or the page is hidden, the web host pauses its
+// page's input reports then) or the page is hidden, the web shell pauses its
 // looks at a live keyboard (web/native-popups.mjs).
 import assert from "node:assert/strict";
 import test from "node:test";

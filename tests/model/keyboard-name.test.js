@@ -15,7 +15,7 @@ test("a profile stores no keyboard name until one is given, and the view says wh
     const before = snapshot(pdDocument());
     assert.equal(storedKeyboardName(before), "", "the factory default is the built-in name");
     assert.deepEqual(keyboardNameView(before, "Charybdis (4x6) Splinky"), {name: "", builtIn: "Charybdis (4x6) Splinky", identity: before.fingerprint, perName: 32});
-    assert.equal(keyboardNameView(before).builtIn, "", "a host that does not know the built-in name says so by leaving it empty");
+    assert.equal(keyboardNameView(before).builtIn, "", "a shell that does not know the built-in name says so by leaving it empty");
     for (const missing of [null, undefined, {document: null}, {...before, incomplete: true}]) {
         assert.equal(storedKeyboardName(missing), undefined);
         assert.equal(keyboardNameView(missing), null);

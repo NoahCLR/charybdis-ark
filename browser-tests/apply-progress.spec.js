@@ -17,7 +17,7 @@ for (const screen of ["macros", "keys", "device"]) {
             model.device.health.busy = true;
             model.macroUnicode = {mode: 1, enabled: true};
             const text = ' {"key": "{KC_A}"}\ncafé “hello” 🙂. ';
-            const slot = model.viaMacros.find(slot => slot.keycode === "VIA_MACRO_17");
+            const slot = model.macros.find(slot => slot.keycode === "VIA_MACRO_17");
             slot.payload = text.replaceAll("{", "{{").replaceAll("}", "}}"); slot.empty = false;
             store.state.screen = screen; store.state.macroSlot = slot.keycode;
             store.setMacroForm(slot.keycode, {draft: slot.payload});

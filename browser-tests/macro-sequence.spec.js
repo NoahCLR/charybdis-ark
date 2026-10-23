@@ -12,7 +12,7 @@ async function payload(page, text) {
     await expect(page.locator("[data-macro-feedback] .unavailable")).toHaveCount(0);
     await page.evaluate(() => {window.__posted.length = 0;});
 }
-const updates = page => page.evaluate(() => window.__posted.filter(m => m.type === "updateViaMacro"));
+const updates = page => page.evaluate(() => window.__posted.filter(m => m.type === "updateMacro"));
 
 for (const theme of ["vscode-dark", "vscode-light"]) {
     test(`fixed tiles, full names and retained name/protection controls (${theme})`, async ({page}) => {

@@ -7,19 +7,19 @@
 //
 // This used to live in extension.js. It is sequencing and session state, not
 // VS Code, so it sits here with a test; core/session/panel-loop.js runs it with
-// the host's own functions as `host`, of which these use three,
+// the shell's own functions as `shell`, of which these use three,
 //
-//   host.progress(title, run)      runs `run` behind a progress indicator
-//   host.saveRecovery(document, about)
+//   shell.progress(title, run)     runs `run` behind a progress indicator
+//   shell.saveRecovery(document, about)
 //                                  writes a recovery copy with what made it and
 //                                  the keyboard's name, resolves to where it went
-//   host.chooseProfile()           resolves to a chosen file's text, or undefined
+//   shell.chooseProfile()          resolves to a chosen file's text, or undefined
 //
-// and `host.words.noneFound`, when a host says "no keyboard found" its own way.
+// and `shell.words.noneFound`, when a shell says "no keyboard found" its own way.
 
 /**
  * @typedef {import("./types.js").RunningPanelSession} Session
- * @typedef {import("./types.js").ControlHost} Host
+ * @typedef {import("./types.js").ControlShell} Shell
  */
 const {panelControl} = require("./panel-control-registry");
 const {canEdit, hasCurrentLayers} = require("./firmware-support");
@@ -38,8 +38,8 @@ const {keyboardLabel} = require("./device-model");
 // this keyboard's firmware lacks.
 const FIRMWARE_UPDATE = "This keyboard's firmware is not the current firmware, which is the only one Ark supports. Update both halves, then read the keyboard again. The keyboard has not been changed.";
 
-/** @template T @param {Host} host @param {string} title @param {() => Promise<T>} work */
-const run = (host, title, work) => host.progress ? host.progress(title, work) : work();
+/** @template T @param {Shell} shell @param {string} title @param {() => Promise<T>} work */
+const run = (shell, title, work) => shell.progress ? shell.progress(title, work) : work();
 // The slave half confirmed its copy before the keyboard switched, but the
 // cable between the halves may have come out since; say so instead of
 // claiming a readback of both halves that did not happen.
@@ -88,15 +88,15 @@ async function rereadKeyboard(service, onStep = () => {}) {
 // rejects with what failed (and leaves it in the keyboard's state), which
 // fails the read and becomes the panel's notice. The notice says what was
 // read and what could not be: a keyboard not on current firmware is read no
-// further, a failed complete capture falls back to the independent reads, and
+// further, a failed complete read falls back to the independent reads, and
 // a failed committed-profile read keeps the layout and the optional reads.
-/** @param {Session} session @param {string | undefined} selectedDeviceId @param {Host} [host] */
-async function readKeyboard(session, selectedDeviceId, host = {}) {
+/** @param {Session} session @param {string | undefined} selectedDeviceId @param {Shell} [shell] */
+async function readKeyboard(session, selectedDeviceId, shell = {}) {
     const service = session.service;
     await service.enumerate();
     const devices = service.snapshot().devices;
     if (!devices.length) {
-        session.notice = host.words?.noneFound || "No Charybdis Raw HID interface found. Connect the keyboard and choose Read keyboard again.";
+        session.notice = shell.words?.noneFound || "No Charybdis Raw HID interface found. Connect the keyboard and choose Read keyboard again.";
         return false;
     }
     if (selectedDeviceId && !devices.some((device) => device.id === selectedDeviceId)) {
@@ -116,7 +116,7 @@ async function readKeyboard(session, selectedDeviceId, host = {}) {
         return false;
     }
     let macroFailure = "", portable;
-    try {portable = await run(host, "Reading the complete keyboard configuration", () => service.readKeyboardProfile());}
+    try {portable = await run(shell, "Reading the complete keyboard configuration", () => service.readKeyboardProfile());}
     catch (error) {
         if (/** @type {Error & {code?: string}} */ (error).code === "FIRMWARE_UPDATE_REQUIRED") {
             session.notice = /** @type {Error} */ (error).message;
@@ -126,10 +126,10 @@ async function readKeyboard(session, selectedDeviceId, host = {}) {
     }
     if (!portable) {
         // A partly readable keyboard still gets its independent diagnostics.
-        // A failed complete capture never opens an editable draft.
-        await run(host, "Reading layout from the keyboard", () => service.readLayout());
+        // A failed complete read never opens an editable draft.
+        await run(shell, "Reading layout from the keyboard", () => service.readLayout());
         // A failure stays in the keyboard's state, said below.
-        await run(host, "Reading keyboard profile", () => service.readCommittedProfile()).catch(() => {});
+        await run(shell, "Reading keyboard profile", () => service.readCommittedProfile()).catch(() => {});
         await service.readBaseRgb();
         await service.readCombos();
     }
@@ -168,13 +168,13 @@ async function readKeyboard(session, selectedDeviceId, host = {}) {
 // The draft's own controls. Each leaves the session's outbox (notice, form
 // reset) saying what happened; the caller publishes.
 /** @typedef {import('../../contracts/messages.js').DraftControl & {draftRevision: number}} DraftMessage */
-/** @typedef {{session: Session, draft: NonNullable<Session['draft']>, service: Session['service'], revision: number, message: DraftMessage, host: Host}} DraftContext */
+/** @typedef {{session: Session, draft: NonNullable<Session['draft']>, service: Session['service'], revision: number, message: DraftMessage, shell: Shell}} DraftContext */
 // In Live + review the history, discards, Save and Revert go through the
 // keyboard (live-edits.js); `local` is what an Apply draft does.
 /** @param {string} name @param {(context: DraftContext) => void | Promise<void>} [local] @returns {(context: DraftContext) => Promise<void>} */
 const liveOr = (name, local) => async (context) => {
     if (context.draft.live) {
-        await LIVE_ACTIONS[name]({...context, saveRecovery: recoveryFor(context.host, context.session, "save")});
+        await LIVE_ACTIONS[name]({...context, saveRecovery: recoveryFor(context.shell, context.session, "save")});
         if (["undo", "redo", "jump", "discardChanges", "putBack"].includes(name)) context.session.resetDraftForms = true;
         return;
     }
@@ -199,10 +199,10 @@ const DRAFT_ACTIONS = Object.freeze({
     revert: liveOr("revert"),
     confirmLive: liveOr("confirmLive"),
     cancelLive: async ({session}) => {session.liveProposal = undefined; session.resetDraftForms = true;},
-    setMode: ({session, message, host}) => setEditMode(session, /** @type {{mode: number, pending?: string, draftRevision: number}} */ (/** @type {unknown} */ (message)),
-        (cause) => recoveryFor(host, session, cause), host),
+    setMode: ({session, message, shell}) => setEditMode(session, /** @type {{mode: number, pending?: string, draftRevision: number}} */ (/** @type {unknown} */ (message)),
+        (cause) => recoveryFor(shell, session, cause), shell),
     // A keyboard that stopped saving (firmware D-F34), in any edit mode.
-    restart: ({session, draft, host}) => restartKeyboard({session, draft, saveRecovery: recoveryFor(host, session, "restart")}),
+    restart: ({session, draft, shell}) => restartKeyboard({session, draft, saveRecovery: recoveryFor(shell, session, "restart")}),
     discard: liveOr("discard", async ({draft, revision, session, service}) => {
         // The draft's own keyboard, unchanged: discarding is an undoable
         // step. Otherwise the keyboard is read again and the draft starts
@@ -239,8 +239,8 @@ const DRAFT_ACTIONS = Object.freeze({
         draft.replace(before.document, revision, "edit", "Put back what the keyboard had before Apply", IDENTITY);
         session.resetDraftForms = true;
     }),
-    apply: async ({draft, revision, message, session, service, host}) => {
-        // The interface asks about active traps and warnings; the host
+    apply: async ({draft, revision, message, session, service, shell}) => {
+        // The interface asks about active traps and warnings; the shell
         // enforces that decision before writing a recovery copy or HID.
         if (draft.hasBlockers()) throw new Error("Resolve the blockers in Checks before applying this profile.");
         if (draft.hasChecksToConfirm() && /** @type {Extract<DraftMessage, {type: 'applyProfileDraft'}>} */ (message).confirmChecks !== true) throw new Error("This draft has warnings or traps. Confirm them in the review before applying.");
@@ -252,8 +252,8 @@ const DRAFT_ACTIONS = Object.freeze({
             /** @type {import("../model/types.js").PortableDocument | undefined} */
             let saved;
             const before = draft.base;
-            const result = await run(host, "Applying the complete profile to both halves",
-                () => draft.apply(service, revision, async (document) => {if (document.format === "charybdis-profile") saved = /** @type {import("../model/types.js").PortableDocument} */ (document); return (recovery = await recoveryFor(host, session, "apply")(document));}));
+            const result = await run(shell, "Applying the complete profile to both halves",
+                () => draft.apply(service, revision, async (document) => {if (document.format === "charybdis-profile") saved = /** @type {import("../model/types.js").PortableDocument} */ (document); return (recovery = await recoveryFor(shell, session, "apply")(document));}));
             session.resetDraftForms = true;
             // What the keyboard held before, for "Put back what it had".
             session.beforeApply = saved ? {document: saved, deviceId: draft.deviceId, savedAt: new Date().toISOString()} : undefined;
@@ -269,8 +269,8 @@ const DRAFT_ACTIONS = Object.freeze({
     },
 });
 
-/** @param {Session} session @param {DraftMessage} message @param {Host} [host] */
-async function draftControl(session, message, host = {}) {
+/** @param {Session} session @param {DraftMessage} message @param {Shell} [shell] */
+async function draftControl(session, message, shell = {}) {
     const draft = session.draft, service = session.service;
     if (!draft) throw new Error("Read a complete keyboard profile before editing.");
     const control = panelControl(message.type);
@@ -279,24 +279,24 @@ async function draftControl(session, message, host = {}) {
     }
     const action = control?.route === "draft" ? DRAFT_ACTIONS[control.action] : undefined;
     if (!action) throw new Error("Unsupported draft control.");
-    await action({draft, service, session, message, revision: message.draftRevision, host});
+    await action({draft, service, session, message, revision: message.draftRevision, shell});
 }
 
 // The portable flows that are not just file dialogs: reviewing an import,
 // editing layer names and order, and keeping either in the draft — or, on a
 // keyboard with no draft, restoring it to the keyboard.
 /** @typedef {import('../../contracts/messages.js').PortableControl} PortableMessage */
-/** @typedef {{session: Session, message: PortableMessage, host: Host, service: Session['service']}} PortableContext */
+/** @typedef {{session: Session, message: PortableMessage, shell: Shell, service: Session['service']}} PortableContext */
 /** @type {Readonly<Record<string, (context: PortableContext) => void | Promise<void>>>} */
 const PORTABLE_ACTIONS = Object.freeze({
     cancel: ({session}) => {closeEditors(session);},
     choose: context => PORTABLE_ACTIONS.reviewImport(context),
     editLayer: ({session, message}) => {applyLayerEdit(session.portableLayers, /** @type {import('../../contracts/messages.js').LayerEditControl} */ (message));},
     saveLayers: context => PORTABLE_ACTIONS.restore(context),
-    reviewImport: async ({session, message, host, service}) => {
-        // The host answers with the file's text, and its name when it has one.
+    reviewImport: async ({session, message, shell, service}) => {
+        // The shell answers with the file's text, and its name when it has one.
         // A drop carries those same values directly from the panel.
-        const chosen = message.type === "reviewPortableProfile" ? message : await host.chooseProfile?.();
+        const chosen = message.type === "reviewPortableProfile" ? message : await shell.chooseProfile?.();
         if (chosen === undefined) return;
         const text = typeof chosen === "string" ? chosen : chosen.text;
         if (typeof text !== "string") throw new Error("This profile file could not be read.");
@@ -316,7 +316,7 @@ const PORTABLE_ACTIONS = Object.freeze({
         session.portableLayers.draftId = session.draft?.id;
         return;
     },
-    restore: async ({session, message, host, service}) => {
+    restore: async ({session, message, shell, service}) => {
         const layers = message.type === "savePortableLayers";
         const entry = layers
             ? {kind: /** @type {const} */ ("layers"), editor: requireReview(session.portableLayers)}
@@ -357,7 +357,7 @@ const PORTABLE_ACTIONS = Object.freeze({
         /** @type {string | undefined} */
         let recovery = "";
         const result = await service.restorePortableProfile(document, {expectedFingerprint: before.fingerprint,
-            saveRecovery: async (copy) => (recovery = await recoveryFor(host, session, "restore")(copy))});
+            saveRecovery: async (copy) => (recovery = await recoveryFor(shell, session, "restore")(copy))});
         closeEditors(session);
         const expected = reconnectAfter(session, before, result);
         let reread = "";
@@ -367,13 +367,13 @@ const PORTABLE_ACTIONS = Object.freeze({
     },
 });
 
-/** @param {Session} session @param {PortableMessage} message @param {Host} [host] */
-async function portableControl(session, message, host = {}) {
+/** @param {Session} session @param {PortableMessage} message @param {Shell} [shell] */
+async function portableControl(session, message, shell = {}) {
     if (message.type === "savePortableLayers" && message.names !== undefined) applyLayerEdit(session.portableLayers, message);
     const control = panelControl(message.type);
     const action = control?.route === "portable" ? PORTABLE_ACTIONS[control.action] : undefined;
     if (!action) throw new Error("Unsupported portable control.");
-    await action({session, message, host, service: session.service});
+    await action({session, message, shell, service: session.service});
 }
 
 /** @template T @param {T | null | undefined} value @returns {T} */
@@ -382,14 +382,14 @@ function requireReview(value) {
     return value;
 }
 
-// The host's recovery copy, saying what made it and the keyboard it comes
+// The shell's recovery copy, saying what made it and the keyboard it comes
 // from, named as the Keyboard screen's title names it at that moment.
-/** @param {Host} host @param {Session} session @param {import("../../contracts/model.js").RecoveryCause} cause @returns {import("./types.js").SaveRecovery} */
-const recoveryFor = (host, session, cause) => (document) => {
-    if (typeof host.saveRecovery !== "function") throw new TypeError("host.saveRecovery is not a function");
+/** @param {Shell} shell @param {Session} session @param {import("../../contracts/model.js").RecoveryCause} cause @returns {import("./types.js").SaveRecovery} */
+const recoveryFor = (shell, session, cause) => (document) => {
+    if (typeof shell.saveRecovery !== "function") throw new TypeError("shell.saveRecovery is not a function");
     const state = session.service.snapshot();
     const device = state.devices?.find((entry) => entry.id === state.selectedDeviceId);
-    return host.saveRecovery(document, {cause, keyboard: keyboardLabel({...state, device})});
+    return shell.saveRecovery(document, {cause, keyboard: keyboardLabel({...state, device})});
 };
 
 module.exports = {readKeyboard, draftControl, portableControl, rereadKeyboard, DRAFT_ACTIONS, PORTABLE_ACTIONS};

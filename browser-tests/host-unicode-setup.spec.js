@@ -2,7 +2,7 @@
 "use strict";
 
 const {test, expect} = require("@playwright/test");
-const {openFold, openPreview} = require("./host-page");
+const {openFold, openPreview} = require("./shell-page");
 const {hostMacros} = require("../tests/fixtures/host-macros");
 const {ProfileDraftSession} = require("../core/session/profile-draft-session");
 const {buildSnapshotModel} = require("../core/session/device-model");

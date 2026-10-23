@@ -8,7 +8,7 @@ export interface MacroForm {
     draft?: string; steps?: MacroStep[]; stepError?: string; cancelBlur?: boolean; wantsStage?: boolean; requestId?: number;
     validation?: Extract<PanelResponse, {type: 'macroValidation'}> & {context: string};
     view?: string; rawOpen?: boolean; guidanceOpen?: boolean;
-    /** Focus metadata only; untouched steps still come from the host payload. */
+    /** Focus metadata only; untouched steps still come from the core's payload. */
     stepFocus?: MacroStep[];
     selectedStep?: string | null;
     moveNotice?: string;

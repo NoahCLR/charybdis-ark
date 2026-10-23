@@ -1,8 +1,8 @@
 // @ts-check
 // The panel's state is declared one field at a time: its starting value, and
-// what becomes of it when the host replaces the draft under it: undo, redo, a
+// what becomes of it when the core replaces the draft under it: undo, redo, a
 // jump, discard, rebase, Apply, an import, another keyboard or the demo (the
-// host's model then carries resetDraftForms).
+// core's model then carries resetDraftForms).
 //
 // Each field explicitly keeps its value, resets to its starting value, or
 // computes its replacement from the state before the change (`resetsTo`).

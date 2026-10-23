@@ -2,7 +2,7 @@
 // The draft history: every step the draft took, newest first, each with when
 // it was made and what it changed from the step before it.
 //
-// The host sends the steps oldest first while the history sheet is open.
+// The core sends the steps oldest first while the history sheet is open.
 // These arrange them for reading: newest on top, a step's items in rail order
 // with the area each lives in, and a time a person can place.
 

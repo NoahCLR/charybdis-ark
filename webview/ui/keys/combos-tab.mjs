@@ -24,7 +24,7 @@ export function tabCombos(body, right) {
     right.replaceChildren();
     const toggle = el(`<button class="btn tiny" ${canEdit ? "" : "disabled"}>${state.combo.open ? "Close builder" : "New combo"}</button>`);
     toggle.addEventListener("click", () => {
-        if (state.combo.open) closeComboBuilder(); else openComboBuilder(null, edits.comboDefaultTermValue(model));
+        if (state.combo.open) closeComboBuilder(); else openComboBuilder(null, edits.comboDefaultWindowValue(model));
         render();
     });
     right.appendChild(toggle);

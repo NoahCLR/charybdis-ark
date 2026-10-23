@@ -15,7 +15,7 @@ import {actionMarked, macroSteps} from "../marks.mjs";
 /** @param {HTMLElement} body @param {HTMLElement} right */
 export function tabMacros(body, right) {
     const model = getModel();
-    const slots = model?.viaMacros || [];
+    const slots = model?.macros || [];
     const reach = {...macroReach(model, layers(), state.layer), inView: macroView(model)};
     right.replaceChildren();
     const open = el(`<button class="btn tiny ghost">Open the Macros screen</button>`);

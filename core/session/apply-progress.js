@@ -181,7 +181,7 @@ const PEER_BUSY_REASONS = Object.freeze({
 });
 
 // The keyboard's own reason when it gave one, else the slave half's last
-// answer, else the host's message.
+// answer, else Ark's own message.
 /** @param {FailureDetails | null | undefined} error @param {PeerFailure | null | undefined} peer */
 function failureReason(error, peer) {
     const device = error?.deviceError || error?.status?.error;

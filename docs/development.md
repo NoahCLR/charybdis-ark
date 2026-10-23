@@ -121,7 +121,7 @@ webview/         the interface: browser ES modules, no build step
   lib/ view/     pure helpers and model → presentation, with tests
   ui/            screens and components
   styles.css     the design system
-web/             the web page's shell and build entries
+web/             the web shell and build entries
 scripts/         developer entry points and build steps
 tools/           developer tools outside the app (the branch-window extension)
 tests/           mirrors core/; view/ the interface, scripts/ the developer tools,
@@ -165,7 +165,7 @@ automatically:
 | --- | --- | --- |
 | `tsconfig.foundation.json` | `core/`, `contracts/` | Node types only; fails if core leans on a global the `vscode` types bring (such as `Thenable`) |
 | `tsconfig.json` | core plus `extension.js`, `panel-html.js` | Node and the VS Code types at the minimum supported version (1.90) |
-| `tsconfig.hosts.json` | `web/` | page DOM, no Node globals |
+| `tsconfig.shells.json` | `web/` | page DOM, no Node globals |
 | `tsconfig.webview.json` | `webview/` | page DOM, no Node types |
 | `tsconfig.worker.json` | `web/sleep-worker.js` | WebWorker |
 | `tsconfig.developer.json` | `scripts/`, `tests/fixtures/`, integration corpora | Node |
@@ -224,7 +224,7 @@ durability, split scheduling or a physical interruption. A successful
 Run `npm run preview`, serve the folder (`node scripts/serve.js . --port 8972`)
 and open `preview/index.html`. The page stands in for the shell: it answers
 the panel's `ready` with one fixture model and logs every edit posted back.
-`?host=` answers as other shells and states (the web page, no keyboard, the
+`?shell=` answers as other shells and states (the web page, no keyboard, the
 demo, a live keyboard; each is commented in `scripts/preview.js`), and `?screen=lighting` opens a screen.
 `npm run preview -- --multiple` adds a second keyboard to the selector.
 
@@ -316,7 +316,7 @@ bundle, or a bundle takes any package but `buffer`. To give the web shell more
 of `core/`, export it from `web/core.mjs`.
 
 Both shells run the same `core/` and interface through the shared panel loop;
-what differs reaches the interface only as `model.host`, so the interface
+what differs reaches the interface only as `model.shell`, so the interface
 never asks which shell it is in. What the web shell does differently, and
 why, is in the file comments of `web/`: the click-time `gesture` path Chrome's
 keyboard picker and file chooser need (`web/panel-channel.mjs`), the Web Lock

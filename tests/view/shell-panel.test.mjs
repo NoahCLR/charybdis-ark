@@ -1,15 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {buildLine, copyTitle, deleteRecovery, useRecovery, chooseKeyboard, forgetKeyboard, commitUrl, downloadRecovery, githubMark, hostOf, otherTheme, savedWhen, setTheme, themeLabel} from "../../webview/view/host.mjs";
+import {buildLine, copyTitle, deleteRecovery, useRecovery, chooseKeyboard, forgetKeyboard, commitUrl, downloadRecovery, githubMark, shellOf, otherTheme, savedWhen, setTheme, themeLabel} from "../../webview/view/shell-panel.mjs";
 
-test("a model without a host description offers nothing extra", () => {
-    assert.deepEqual(hostOf(undefined), {chooseKeyboard: false, blocked: null, theme: null, recoveries: null, build: null, progress: null, words: {}});
-    const host = hostOf({host: {chooseKeyboard: true, theme: "dark", words: {noKeyboard: "Choose keyboard."}}});
-    assert.equal(host.chooseKeyboard, true);
-    assert.equal(host.words.noKeyboard, "Choose keyboard.");
+test("a model without a shell description offers nothing extra", () => {
+    assert.deepEqual(shellOf(undefined), {chooseKeyboard: false, blocked: null, theme: null, recoveries: null, build: null, progress: null, words: {}});
+    const shell = shellOf({shell: {chooseKeyboard: true, theme: "dark", words: {noKeyboard: "Choose keyboard."}}});
+    assert.equal(shell.chooseKeyboard, true);
+    assert.equal(shell.words.noKeyboard, "Choose keyboard.");
 });
 
-test("the host's controls post these messages", () => {
+test("the shell's controls post these messages", () => {
     assert.deepEqual(chooseKeyboard(), {type: "chooseKeyboard"});
     assert.deepEqual(forgetKeyboard(), {type: "forgetKeyboard"});
     assert.deepEqual(setTheme("light"), {type: "setTheme", theme: "light"});

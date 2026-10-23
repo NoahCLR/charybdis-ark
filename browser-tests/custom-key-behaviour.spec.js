@@ -75,7 +75,7 @@ test("an unplaced custom key gets its behaviour on the Custom keys screen, with 
     // A timing alone does nothing on a custom key without a shortcut (firmware
     // D-F27 "Rows without steps"), so its fields wait for a branch.
     await expect(page.locator('[data-f="behaviour:CUSTOM_KEY_5:timing:multiTapTerm"]')).toBeDisabled();
-    // Where the host says a timing alone counts, as for a custom key with a
+    // Where the core says a timing alone counts, as for a custom key with a
     // shortcut, a timing posts the row too, with the timing as typed.
     await page.evaluate(async () => {
         const store = await import("/webview/store.mjs");
@@ -106,7 +106,7 @@ test("an unplaced custom key gets its behaviour on the Custom keys screen, with 
 test("once stored, the behaviour shows its dashed cells and can be removed from Custom keys", async ({page}) => {
     await openControls(page, "customKeys");
     await pick(page, 5);
-    // What the host publishes once it accepts a tap and a Long hold.
+    // What the core publishes once it accepts a tap and a Long hold.
     await page.evaluate(async () => {
         const store = await import("/webview/store.mjs");
         const model = structuredClone(store.getModel());

@@ -60,7 +60,7 @@ Around the core:
 
 ## Flows that cross layers
 
-- [Reading, applying and progress](profile-capture-and-progress.md): how a
+- [Reading, applying and progress](profile-snapshot-and-progress.md): how a
   snapshot is read and checked, how the draft is applied or saved, live edits,
   and the progress each operation reports.
 - [Timing, built-in branches and reachability](timing-and-reachability.md):

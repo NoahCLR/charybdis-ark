@@ -5,7 +5,7 @@
 // impossibility; scan order, immediate holds and transparent inheritance are
 // deliberately not collapsed into the same rule.
 const {KEY_BEHAVIOR_HOLD_MODES: MODE} = require("../schema/key-behavior-domain-v1");
-const {effectiveComboTerm} = require("../schema/combo-domain-v1");
+const {effectiveComboWindow} = require("../schema/combo-domain-v1");
 const {SETTING} = require("../schema/settings-domain-v1");
 const {nativeCode, actionName} = require("../schema/actions");
 
@@ -77,11 +77,11 @@ function gestureTimingFindings(decoded) {
         }
     }
     if (decoded.settings.values[SETTING.COMBOS_ENABLED]) (decoded.combos?.rows || []).forEach((combo, index) => {
-        const term = effectiveComboTerm(decoded.combos, combo);
-        if (term >= SHORT_WINDOW_MS) return;
+        const comboWindow = effectiveComboWindow(decoded.combos, combo);
+        if (comboWindow >= SHORT_WINDOW_MS) return;
         results.push({kind: "comboTiming", level: "notice", layers: [], identity: String(index),
             title: `Combo ${index} has a short chord window`,
-            detail: `Its ${combo.inputs.length} keys must complete a chord within the effective ${term} ms window. This may be difficult to perform; it is not proof that the chord is impossible.`,
+            detail: `Its ${combo.inputs.length} keys must complete a chord within the effective ${comboWindow} ms window. This may be difficult to perform; it is not proof that the chord is impossible.`,
             fix: "Increase the combo window if needed. Longer windows can postpone individual-key output; they do not consume the repeat gap, which the keyboard times from the physical presses.",
             place: {kind: "combo", index}});
     });

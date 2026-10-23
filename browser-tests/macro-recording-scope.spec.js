@@ -7,7 +7,7 @@ const take = page => page.evaluate(async () => {
     const {state, macroForm} = await import("/webview/store.mjs");
     return {recording: state.recording?.slot ?? null, payload: macroForm("VIA_MACRO_17").draft};
 });
-const updates = page => page.evaluate(() => window.__posted.filter(message => message.type === "updateViaMacro"));
+const updates = page => page.evaluate(() => window.__posted.filter(message => message.type === "updateMacro"));
 
 test("compact recording captures Command+A as one chord in the original slot", async ({page}) => {
     await openControls(page, "macros", {macroSlot: "VIA_MACRO_17", recordDelays: false});
@@ -184,7 +184,7 @@ test('Discard during a take restores an existing macro and preserves its name/pr
     await openControls(page, 'macros', {macroSlot: 'VIA_MACRO_17', recordDelays: false});
     await page.evaluate(async () => {
         const store = await import('/webview/store.mjs'), model = structuredClone(store.getModel());
-        Object.assign(model.viaMacros[17], {payload: 'original', bytes: 8, empty: false, name: 'Keep me', protection: 'off'});
+        Object.assign(model.macros[17], {payload: 'original', bytes: 8, empty: false, name: 'Keep me', protection: 'off'});
         store.setModel(model); store.resetDraftForms(); store.render();
     });
     await page.locator('[data-step-text]').fill('local edit'); await page.locator('[data-step-text]').press('Tab');

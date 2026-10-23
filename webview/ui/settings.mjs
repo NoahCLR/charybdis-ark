@@ -15,7 +15,7 @@ import {getModel, layerName, layers, post, render, state, canEdit as canEditArea
 import {topbar, unavailable} from "./shell.mjs";
 import {draftDot, draftMarks} from "../view/review.mjs";
 import {marked} from "./marks.mjs";
-import {githubMark} from "../view/host.mjs";
+import {githubMark} from "../view/shell-panel.mjs";
 import {durationControl} from "./duration.mjs";
 import {elsewhereWords, fieldParts, foldedSummary, isLayerSwitch, layerSwitchSummary, matchesElsewhere, matchesQuery, noMatchWords, settingsCards, startsFolded} from "../view/settings-layout.mjs";
 
@@ -188,7 +188,7 @@ function comboTimingRow(model, entry) {
     const row = el(`<div class="setrow" data-tip="${esc(hint)}" data-timing="${esc(entry.id)}">
         <div><div class="nm">${esc(entry.label)}</div>
             <div class="hint">${esc(hint)}</div></div>
-        <div class="control"><span class="affix unit"><input class="input mono" id="${hold ? "comboHoldTerm" : "comboDefaultTerm"}" data-f="settings:combo:${hold ? "hold" : "default"}" inputmode="numeric" value="${esc(stored)}" ${editable ? "" : "disabled"}><i>ms</i></span></div>
+        <div class="control"><span class="affix unit"><input class="input mono" id="${hold ? "comboHoldTerm" : "comboDefaultWindow"}" data-f="settings:combo:${hold ? "hold" : "default"}" inputmode="numeric" value="${esc(stored)}" ${editable ? "" : "disabled"}><i>ms</i></span></div>
     </div>`);
     // Posted on its own rather than riding along with whichever combo is saved
     // next. The keyboard always stores a number, so an emptied field is put
@@ -197,7 +197,7 @@ function comboTimingRow(model, entry) {
         const written = /** @type {HTMLInputElement} */ (event.target).value.trim();
         if (!written) { /** @type {HTMLInputElement} */ (event.target).value = stored; return; }
         if (written === stored) return;
-        post(hold ? edits.comboHoldTerm(written, model?.profileIdentity) : edits.comboDefaultTerm(written, model?.profileIdentity));
+        post(hold ? edits.comboHoldTerm(written, model?.profileIdentity) : edits.comboDefaultWindow(written, model?.profileIdentity));
     });
     return row;
 }

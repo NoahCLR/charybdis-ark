@@ -10,7 +10,7 @@ function tools(adapter: DeviceAdapter) {
     probe({adapter, argv: ['--json']});
     checkStaticSite('/tmp/ark', {project: '/tmp'});
     buildWeb({outdir: '/tmp/ark', entries: {core: 'web/core.mjs'}, build: {version: 'test', commit: 'abc'}});
-    bundle('core', {macroHost: 'scripts/preview-macro-host.mjs'}, '/tmp/ark', {inject: ['web/buffer.mjs']});
+    bundle('core', {macroShell: 'scripts/preview-macro-shell.mjs'}, '/tmp/ark', {inject: ['web/buffer.mjs']});
     buildInfo({ARK_COMMIT: 'abc'});
     // @ts-expect-error A static server listens on a numeric port.
     serve('/tmp/ark', '8975');
@@ -21,7 +21,7 @@ function tools(adapter: DeviceAdapter) {
     // @ts-expect-error The static-site checker needs a project path.
     checkStaticSite('/tmp/ark', {project: 1});
     // @ts-expect-error The bundle allowlist groups are core, panel and worker.
-    bundle('host', {host: 'web/page.mjs'}, '/tmp/ark');
+    bundle('shell', {shell: 'web/page.mjs'}, '/tmp/ark');
     // @ts-expect-error Output inspection needs an esbuild metafile.
     bundle('core', {core: 'web/core.mjs'}, '/tmp/ark', {metafile: false});
     // @ts-expect-error Build identity needs both version and commit.

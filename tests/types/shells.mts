@@ -1,24 +1,24 @@
-// These host-boundary cases compile but never open a keyboard or a window.
+// These shell-boundary cases compile but never open a keyboard or a window.
 import {connectPanel} from '../../web/panel-channel.mjs';
-import {startWebHost} from '../../web/web-host.mjs';
+import {startWebShell} from '../../web/web-shell.mjs';
 import type {WebEnvironment} from '../../web/types.js';
 import type {PanelRequest, PanelResponse} from '../../contracts/messages.js';
 
-function hosts(environment: WebEnvironment, response: PanelResponse) {
-    const {api} = startWebHost(environment);
+function shells(environment: WebEnvironment, response: PanelResponse) {
+    const {api} = startWebShell(environment);
     const channel = connectPanel({receive: request => {const command: PanelRequest = request; void command;}});
     channel.post(response);
     api.postMessage({type: 'downloadRecovery', id: 1});
-    // @ts-expect-error The browser host and extension share the same theme command.
+    // @ts-expect-error The web page and the extension share the same theme command.
     api.postMessage({type: 'setTheme', theme: 'blue'});
     // @ts-expect-error A model reply carries the complete published model.
     channel.post({type: 'model', model: {layers: []}});
     // @ts-expect-error A browser reply cannot stand in for an authored panel request.
     api.postMessage({type: 'macroValidation', keycode: 'VIA_MACRO_0', payload: '', requestId: 1, validation: {error: '', code: ''}});
 }
-void hosts;
+void shells;
 
-// The browser host has page globals, plus the `buffer` package the web build
+// The web shell has page globals, plus the `buffer` package the web build
 // injects as `Buffer`; Node's own globals do not exist in Chrome.
 function browserGlobals() {
     const report: Buffer = Buffer.from([1, 0]).subarray(0, 2);

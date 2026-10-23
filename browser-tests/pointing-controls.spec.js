@@ -102,7 +102,7 @@ test("eight directions draw and post every diagonal shortcut and modifier policy
     await openControls(page, "pointing", {pdSlot: 4});
     await field(page, "Reads").selectOption("3");
     await configPost(page, 4, {axis: 3});
-    // The host accepts the axis change before the four new fields are drawn.
+    // The core accepts the axis change before the four new fields are drawn.
     await page.evaluate(async () => {
         const store = await import("/webview/store.mjs");
         const model = structuredClone(store.getModel());

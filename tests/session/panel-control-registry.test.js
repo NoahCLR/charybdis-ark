@@ -43,8 +43,8 @@ test("every policy is complete and every routed action resolves", () => {
         assert.equal(panelControl(type), entry);
         assert.ok(Object.isFrozen(entry), type);
         assert.ok(["none", "apply", "import", "profile", "inspect"].includes(entry.binding), type);
-        assert.ok(["allow", "refuse", "ignore", "leave", "export", "open", "replace", "close", "host-leave"].includes(entry.demo), type);
-        assert.ok(["panel", "apply", "restore", "read", "view", "host", "inspect"].includes(entry.phase), type);
+        assert.ok(["allow", "refuse", "ignore", "leave", "export", "open", "replace", "close", "shell-leave"].includes(entry.demo), type);
+        assert.ok(["panel", "apply", "restore", "read", "view", "shell", "inspect"].includes(entry.phase), type);
         assert.equal(typeof entry.identity, "boolean", type);
         const handlers = {draft: DRAFT_ACTIONS, portable: PORTABLE_ACTIONS, demo: DEMO_ACTIONS}[entry.route];
         if (handlers && entry.action !== "export") assert.equal(typeof handlers[entry.action], "function", type);
@@ -60,10 +60,10 @@ test("every policy is complete and every routed action resolves", () => {
 test("every control keeps its route, including history before the busy guard", () => {
     for (const [type, entry] of Object.entries(CONTROLS)) {
         const current = session(), message = request(type, current);
-        const route = ["view", "host", "inspect"].includes(entry.route) ? "none" : entry.route;
+        const route = ["view", "shell", "inspect"].includes(entry.route) ? "none" : entry.route;
         assert.equal(routeMessage(current, message, state()), route, type);
         const busy = {...session(), readBusy: true};
-        // Work waits out loud; a model request and host controls are answered.
+        // Work waits out loud; a model request and shell controls are answered.
         if (["draft", "portable", "demo", "read"].includes(entry.route) && type !== "ready") assert.throws(() => routeMessage(busy, request(type, busy), state()), /current operation/, type);
         else assert.equal(routeMessage(busy, request(type, busy), state()), "none", type);
         if (entry.route === "view") assert.equal(busy.historyOpen, entry.action === "openHistory", type);
@@ -119,7 +119,7 @@ test("local macro inspection replies before the ordinary busy guard without stag
     const loop = openPanelLoop({post: response => replies.push(response)}, {service: {snapshot: () => state(), close: async () => {}}});
     Object.assign(loop.session, current, {service: {...current.service, snapshot: () => state()}, readBusy: true, portableBusy: true});
     const revision = current.draft.revision;
-    await loop.handleMessage({...request("validateViaMacro", current), keycode: "VIA_MACRO_0", payload: "hello", requestId: 7});
+    await loop.handleMessage({...request("validateMacro", current), keycode: "VIA_MACRO_0", payload: "hello", requestId: 7});
     assert.equal(replies.length, 1);
     assert.equal(replies[0].type, "macroValidation");
     assert.equal(replies[0].requestId, 7);

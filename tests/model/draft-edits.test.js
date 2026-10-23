@@ -12,7 +12,7 @@ const {document: pdDocument} = require("../fixtures/pd-profile");
 const ROOT = path.join(__dirname, "..", "..");
 // Posted beside the edits but never staged: a dropped profile opens an import
 // review, and a macro check is answered without touching the draft.
-const NOT_DRAFT_EDITS = ["reviewPortableProfile", "validateViaMacro"];
+const NOT_DRAFT_EDITS = ["reviewPortableProfile", "validateMacro"];
 
 // The contract is declarations only, so its keys are read from the text: each
 // `name:` that opens a line of the EditPayloads interface.

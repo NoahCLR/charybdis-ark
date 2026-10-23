@@ -83,11 +83,11 @@ test("a combo follows the default window until it has its own, and the default i
     assert.equal(comboRows(custom)[2].termMs, 80);
     const back = editDeviceProfile(custom, {type: "saveCombo", id: 2, inputs: ["KC_A", "KC_B"], output: "KC_C", termMs: "80", followsDefault: true}, context);
     assert.equal(comboRows(back)[2].termMs, null);
-    const retimed = editDeviceProfile(custom, {type: "updateComboDefaultTerm", defaultTermMs: "70"}, context);
+    const retimed = editDeviceProfile(custom, {type: "updateComboDefaultWindow", defaultTermMs: "70"}, context);
     assert.equal(comboTable(retimed).defaultTermMs, 70);
     // Only the combos that follow the default move with it.
     assert.deepEqual(comboRows(retimed).map(row => row.termMs), [null, null, 80]);
-    for (const defaultTermMs of ["0", "", "abc", 65536]) assert.throws(() => editDeviceProfile(custom, {type: "updateComboDefaultTerm", defaultTermMs}, context));
+    for (const defaultTermMs of ["0", "", "abc", 65536]) assert.throws(() => editDeviceProfile(custom, {type: "updateComboDefaultWindow", defaultTermMs}, context));
     // With every combo deleted, both combo-wide values stay stored.
     let empty = retimed;
     for (let id = 2; id >= 0; id--) empty = editDeviceProfile(empty, {type: "deleteCombo", id}, context);
@@ -128,7 +128,7 @@ test("save verification requires the running combo table to match the saved doma
     assert.throws(() => assertEffectiveCombos(next, context.combos), /running combo/);
     assert.throws(() => assertEffectiveCombos(next, null), /could not be verified/);
     assert.doesNotThrow(() => assertEffectiveCombos(next, {...context.combos, holdTermMs: 300}));
-    const retimed = editDeviceProfile(bytes, {type: "updateComboDefaultTerm", defaultTermMs: 70}, context);
+    const retimed = editDeviceProfile(bytes, {type: "updateComboDefaultWindow", defaultTermMs: 70}, context);
     assert.throws(() => assertEffectiveCombos(retimed, context.combos), /running combo/);
     assert.doesNotThrow(() => assertEffectiveCombos(retimed, {...context.combos, defaultTermMs: 70, rows: context.combos.rows.map(row => ({...row, termMs: 70}))}));
 });

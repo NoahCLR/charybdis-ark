@@ -118,17 +118,17 @@ function stopRecording(model = getModel(), slot = null, redraw = true) {
     detachCapture();
     state.lastTake = state.recording ? {slot: state.recording.slot, before: state.recording.before, after: payload} : null;
     state.recording = null;
-    const target = slot || (model?.viaMacros || [])
+    const target = slot || (model?.macros || [])
         .find((candidate) => candidate.keycode === recordedSlot);
     if (target) {rememberMacroEdit(target, payload); stageMacro(model, target, payload);}
     if (redraw) render();
 }
 
 // Every render checks the recorder's owner, so navigation through the rail,
-// a placement jump or a host update follows the same stop policy. A finished
+// a placement jump or a model update follows the same stop policy. A finished
 // take ends once its macro changes (takeStands), whatever changed it.
 export function reconcileRecording() {
-    const model = getModel(), bank = model?.viaMacros || [];
+    const model = getModel(), bank = model?.macros || [];
     const selected = bank.find(slot => slot.keycode === state.macroSlot) || bank[0];
     if (state.recording && (state.screen !== "macros" || state.overlay || state.picker
         || selected?.keycode !== state.recording.slot || !canEdit("macros") || selected?.available === false)) {

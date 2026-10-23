@@ -29,7 +29,7 @@ test("behaviour rows claim their keys' built-in first actions", () => {
 // is most exposed to.
 
 const MODEL_FIELDS = [
-    "layers", "keyBehaviors", "combos", "viaMacros", "macroNameSpace", "behaviorTimingDefaults",
+    "layers", "keyBehaviors", "combos", "macros", "macroNameSpace", "behaviorTimingDefaults",
     "configDefaults", "rgb", "qmkKeycodes", "qmkKeyLabels", "qmkKeyLayers", "qmkKeyShortLabels", "qmkKeycodeAliases",
     "qmkKeycodeSource", "qmkSpellings", "macroPayloadKeycodes", "diagnostics",
 ];
@@ -101,7 +101,7 @@ test("a position carries what its value means, not only what the keyboard calls 
         layout: layoutWith(values.map((keycode, layoutIndex) => ({keycode, layoutIndex, resolved: resolve(keycode)}))),
         committed: decodedDeviceProfile(),
         capabilities: {actionAbiDigest: 0x6fd70b90},
-        macroView: {viaMacros: [{keycode: "VIA_MACRO_0", kind: "via", name: "Sign-off"}]},
+        macroView: {macros: [{keycode: "VIA_MACRO_0", kind: "via", name: "Sign-off"}]},
         customKeyView: {keys: [{slot: 0, keycode: "CUSTOM_KEY_0", code: 0x7f00, name: "Right Thumb", hasBehavior: true}]},
     });
     assert.deepEqual(model.layers[0].positions.map((key) => [key.keycode, key.semantic]), [
@@ -219,7 +219,7 @@ test("domains awaiting the payload read stay empty rather than invented", () => 
     assert.deepEqual(model.rgb, {baseEffect: {state: "unread", message: "Base RGB has not been read from the keyboard."}});
     assert.deepEqual(model.keyBehaviors, []);
     assert.deepEqual(model.combos, []);
-    assert.deepEqual(model.viaMacros, []);
+    assert.deepEqual(model.macros, []);
     assert.match(model.diagnostics.join(" "), /committed profile read/);
 });
 
@@ -462,7 +462,7 @@ test("a behaviour on a key never renames what the vocabulary already names", () 
         row({kind: 3, flags: 0, operand: 2}),   // LOCK_LAYER(2)
         row({kind: 6, flags: 0, operand: 0}),   // VIA_MACRO_0
     ]}};
-    const macroView = {viaMacros: [{kind: "via", keycode: "VIA_MACRO_0", payload: ""}], hardcodedMacros: []};
+    const macroView = {macros: [{kind: "via", keycode: "VIA_MACRO_0", payload: ""}], hardcodedMacros: []};
     const labels = buildDeviceModel({committed, macroView, capabilities: {actionAbiDigest: 0x6fd70b90}}).qmkKeyLabels;
     const plain = buildDeviceModel({macroView, capabilities: {actionAbiDigest: 0x6fd70b90}}).qmkKeyLabels;
     assert.equal(labels["MO(1)"], plain["MO(1)"], "MO(1) reads as it does with no behaviour on it, not \"Mo(1)\"");
@@ -538,7 +538,7 @@ test("snapshot presentation uses its decoded configuration and real device diagn
         {layoutIndex: 2, keycode: "CUSTOM_KEY_0"}, {layoutIndex: 3, keycode: "LT(3,KC_F)"},
         {layoutIndex: 4, keycode: "MT(MOD_LSFT,KC_A)"}, {layoutIndex: 5, keycode: "MO(2)"},
     ]});
-    draft.stage({type: "updateViaMacro", draftRevision: draft.revision, keycode: "VIA_MACRO_0", name: "Sign-off", payload: "hello"});
+    draft.stage({type: "updateMacro", draftRevision: draft.revision, keycode: "VIA_MACRO_0", name: "Sign-off", payload: "hello"});
     draft.stage({type: "updateCustomKey", draftRevision: draft.revision, keycode: "CUSTOM_KEY_0", name: "Right Thumb"});
     const state = {capabilities, phase: "reading", error: {message: "Read unavailable"}, committed: {state: "unavailable"},
         combos: {state: "unavailable", error: {message: "Combo read unavailable"}}};
@@ -560,7 +560,7 @@ test("snapshot presentation uses its decoded configuration and real device diagn
     assert.equal(model.behaviorEditing.keyDefaults["KC_A"]?.timingSources?.tapHoldTerm, "tapHoldTerm");
     // B6: MO holds its layer from the press.
     assert.equal(model.behaviorEditing.keyDefaults["MO(2)"].builtIn.hold.fromPress, true);
-    assert.equal(model.viaMacros[0].payload, "hello");
+    assert.equal(model.macros[0].payload, "hello");
     assert.equal(model.pdModes.length, 32);
     assert.equal(model.combos[0].termMs, 50);
     assert.equal(model.combos[0].followsDefault, true);

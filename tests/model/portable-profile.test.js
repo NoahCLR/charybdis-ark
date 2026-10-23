@@ -260,7 +260,7 @@ test("a keyboard storing a domain in another version than current firmware's is 
     assert.doesNotThrow(() => materializeProfile(source.candidate, source.candidate, combos, current));
 });
 
-test("a complete profile above 64 KiB survives capture, portable JSON and candidate assembly", () => {
+test("a complete profile above 64 KiB survives a snapshot, portable JSON and candidate assembly", () => {
     const fs = require("node:fs"), path = require("node:path");
     const text = fs.readFileSync(path.resolve(__dirname, "../../upstream/firmware/tests/fixtures/maximum_profile_v4.fixture"), "utf8");
     const bytes = Buffer.from(text.match(/^profile\.hex=(.*)$/m)[1], "hex");

@@ -328,7 +328,7 @@ test("explore the demo: edit on several screens, review with no Apply, export, o
 });
 
 // A phone (web/phone.mjs): touch only, with a phone-sized screen. It gets a
-// notice and nothing else: no panel, and no host to take the keyboard's lock,
+// notice and nothing else: no panel, and no shell to take the keyboard's lock,
 // open IndexedDB or start the worker. A tablet or a narrow desktop window
 // still gets Ark.
 const phone = {viewport: {width: 390, height: 844}, screen: {width: 390, height: 844}, deviceScaleFactor: 3, isMobile: true, hasTouch: true};
@@ -362,7 +362,7 @@ test("a phone gets a notice that Ark runs on a computer, with the repositories, 
         await expectBuildLink(notice.locator(".phone-build"), "phone-build-mark");
         expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBe("light");
 
-        // Nothing of Ark: no panel, and no host behind it.
+        // Nothing of Ark: no panel, and no shell behind it.
         await expect(page.locator(".app, .read-placeholder")).toHaveCount(0);
         expect(await page.evaluate(() => typeof window.acquireVsCodeApi)).toBe("undefined");
         expect(await page.evaluate(async () => {
@@ -414,7 +414,7 @@ test("a narrow window on a computer still gets Ark", async ({browser, baseURL}) 
 });
 
 
-test("literal macro steps stage through the real web host, export exactly, undo and redo", async ({page, context, baseURL}) => {
+test("literal macro steps stage through the real web shell, export exactly, undo and redo", async ({page, context, baseURL}) => {
     const {keyboard, ownFilesOnly} = await withKeyboard(context, baseURL);
     const errors = await open(page);
     await page.locator('.read-placeholder [data-act="explore-demo"]').click();
@@ -438,7 +438,7 @@ test("literal macro steps stage through the real web host, export exactly, undo 
     await expect(page.locator("[data-step-text]")).toHaveCount(0);
     await page.locator('.rail [data-act="redo"]').click();
     await expect(page.locator("[data-step-text]")).toHaveValue(text);
-    // Step history must also work after the real host accepts a deletion.
+    // Step history must also work after the real web shell accepts a deletion.
     await page.locator('[data-step-tile="0"]').click(); await page.keyboard.press('Delete');
     await expect(page.locator('.macro-empty')).toBeVisible();
     await expect(page.locator('.macro-titlebar [data-local-state]')).toHaveText('as read');
@@ -519,7 +519,7 @@ test("every keyboard Chrome allows is the connected one or in the selector, as t
     await expect(name.locator(".dot.ok")).toHaveCount(1);
 });
 
-test("the web host reads, edits and Applies one profile generation without VIA", async ({page, context, baseURL}) => {
+test("the web shell reads, edits and Applies one profile generation without VIA", async ({page, context, baseURL}) => {
     const {writableKeyboard} = require("../tests/fixtures/writable-keyboard");
     const {validateSnapshot} = require("../core/model/portable-profile");
     const keyboard = writableKeyboard({document: pdDocument(), generation: 7});
@@ -549,7 +549,7 @@ test("the web host reads, edits and Applies one profile generation without VIA",
     expect(errors).toEqual([]); ownFilesOnly();
 });
 
-// Live + review through the real web host (firmware D-F32): an edit reaches
+// Live + review through the real web shell (firmware D-F32): an edit reaches
 // the keyboard at once, review compares it with what is saved, and Save makes
 // it the saved profile, with a recovery copy of what was saved before.
 test("in Live + review an edit reaches the keyboard at once, and review and Save make it permanent", async ({page, context, baseURL}) => {
@@ -597,7 +597,7 @@ test("in Live + review an edit reaches the keyboard at once, and review and Save
     ownFilesOnly();
 });
 
-// Live through the real web host: Ark switches into it (no unsaved edits, so
+// Live through the real web shell: Ark switches into it (no unsaved edits, so
 // no question), an edit runs at once, and the page shows "saved by the
 // keyboard" once the keyboard's status says so; Ark never sends Save. Leaving
 // the page then loses nothing, so it does not ask.

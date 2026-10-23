@@ -9,14 +9,14 @@ const {ApplyProgress, failureReason} = require("./apply-progress");
 const {CandidateUploadCoordinator} = require("./candidate-upload-coordinator");
 const {readEditProgress} = require("../protocol/profile-edit-v1");
 const {createSnapshot, validateSnapshot, materializeProfile, fingerprint, summary, reorderLayers} = require("../model/portable-profile");
-const {requireReady: checkFirmwareReady, supportsCompleteProfile, canCapture, canReadIdentity, identityStateFlags} = require("./firmware-support");
+const {requireReady: checkFirmwareReady, supportsCompleteProfile, canSnapshot, canReadIdentity, identityStateFlags} = require("./firmware-support");
 const {encodeSettings} = require("../schema/settings-domain-v1");
 const {crc32, fnv1a32} = require("../schema/profile-blob-v1");
 /**
  * @typedef {import("../transport/types.js").RequestConnection} Connection
  * @typedef {import("../protocol/types.js").RequestIds} Ids
  * @typedef {import("./types.js").DeviceCapabilities} Caps
- * @typedef {import("./types.js").CapturedProfile} Capture
+ * @typedef {import("./types.js").ReadSnapshot} ReadSnapshot
  * @typedef {import("./types.js").OperationFailure} Failure
  */
 /** @type {(capabilities: Partial<Caps> | null | undefined, writing?: boolean) => asserts capabilities is Partial<Caps>} */
@@ -27,14 +27,14 @@ const fail = (code, message) => Object.assign(new Error(message), {code});
 const statusKey = s => JSON.stringify([s.activeKind, s.activeDigest, s.activeGeneration, s.activeOriginHalf, s.committedDigest, s.committedGeneration, s.stateFlags]);
 /** @param {import("./types.js").ProfileStatus} s */
 const identityStatusKey = s => JSON.stringify([s.activeKind, s.activeDigest, s.activeGeneration, s.activeOriginHalf, s.committedDigest, s.committedGeneration, identityStateFlags(s)]);
-/** @param {import("./types.js").CaptureIdentity} identity */
+/** @param {import("./types.js").SnapshotIdentity} identity */
 const identityKey = identity => JSON.stringify(identity);
 /** @param {import("./types.js").ProfileStatus} profile @param {Buffer} settings */
 const snapshotIdentity = (profile, settings) => ({profile: identityStatusKey(profile), settingsCrc: crc32(settings), settingsDigest: fnv1a32(settings)});
 // Exact active bytes, retained only as a verified differential-transfer source.
 /** @param {Buffer} profile */
 const heldStorage = profile => ({profile: Buffer.from(profile)});
-/** @param {Capture} before @returns {import("./types.js").CandidateBaseSource | undefined} */
+/** @param {ReadSnapshot} before @returns {import("./types.js").CandidateBaseSource | undefined} */
 function candidateBaseSource(before) {
     const bytes = before.storage?.profile, status = before.status;
     if (!bytes || !status
@@ -53,9 +53,9 @@ async function requirePeer(connection, options) {
         throw fail("KEYBOARD_NOT_READY", "The slave half is not connected. Connect the cable between the halves and read again.");
     }
 }
-// `sleep`, here and below, is the host's wait between polls (the timer's when omitted).
-/** @param {Connection} connection @param {Ids} ids @param {Caps} capabilities @param {(text: string) => void} [onProgress] @param {boolean} [allowCandidate] @param {boolean} [allowIncomplete] @param {import("./types.js").CaptureOptions} [options] @returns {Promise<import("./types.js").VerifiedCapture>} */
-async function captureProfile(connection, ids, capabilities, onProgress = () => {}, allowCandidate = false, allowIncomplete = false,
+// `sleep`, here and below, is the shell's wait between polls (the timer's when omitted).
+/** @param {Connection} connection @param {Ids} ids @param {Caps} capabilities @param {(text: string) => void} [onProgress] @param {boolean} [allowCandidate] @param {boolean} [allowIncomplete] @param {import("./types.js").SnapshotOptions} [options] @returns {Promise<import("./types.js").VerifiedSnapshot>} */
+async function snapshotProfile(connection, ids, capabilities, onProgress = () => {}, allowCandidate = false, allowIncomplete = false,
     {sleep, payloadReader = new ProfilePayloadReader(connection), reuseReadback = false} = {}) {
     requireReady(capabilities);
     if (payloadReader.connection !== connection) throw fail("PROFILE_CHANGED", "The profile reader belongs to another connection. Read the keyboard again.");
@@ -63,7 +63,7 @@ async function captureProfile(connection, ids, capabilities, onProgress = () => 
     onProgress("Reading the complete keyboard configuration");
     await requirePeer(connection, options);
     const before = await readProfileStatus(connection, options);
-    if (!canCapture(before, allowCandidate)) throw fail("KEYBOARD_NOT_READY", "Let both halves finish saving before taking a backup.");
+    if (!canSnapshot(before, allowCandidate)) throw fail("KEYBOARD_NOT_READY", "Let both halves finish saving before taking a backup.");
     /** @param {string} label */
     const counted = label => /** @param {import("../../contracts/model.js").CountedProgress} progress */ progress => onProgress(`${label} · ${progress.done} of ${progress.total} bytes`);
     const defaults = await payloadReader.readCompiled({...options, onProgress: counted("Reading compiled defaults")});
@@ -206,9 +206,9 @@ async function restoreProfile(connection, ids, capabilities, input, {expectedFin
         const document = target.document;
         const saveCopy = saveRecovery;
         if (typeof saveCopy !== "function") throw fail("RECOVERY_REQUIRED", "Save a copy of what the keyboard has before applying.");
-        /** @type {Capture} */
+        /** @type {ReadSnapshot} */
         let before;
-        // Reuse a reviewed capture only after checking its live identity.
+        // Reuse a reviewed snapshot only after checking its live identity.
         if (baseSnapshot?.document && baseSnapshot.identity && !baseSnapshot.incomplete && (!expectedFingerprint || baseSnapshot.fingerprint === expectedFingerprint)) {
             if (!baseSnapshot.incomplete) validateSnapshot(baseSnapshot.document, capabilities);
             applyProgress.report("check", {detail: "Comparing with the reviewed profile"});
@@ -216,7 +216,7 @@ async function restoreProfile(connection, ids, capabilities, input, {expectedFin
             if (identityKey(liveIdentity) !== identityKey(baseSnapshot.identity)) throw fail("PROFILE_CHANGED", "The keyboard changed since this was reviewed. Review it again.");
             before = baseSnapshot;
         } else {
-            before = await captureProfile(connection, ids, capabilities, message => applyProgress.report("check", {detail: message}), false, true, {sleep});
+            before = await snapshotProfile(connection, ids, capabilities, message => applyProgress.report("check", {detail: message}), false, true, {sleep});
         }
         if (expectedFingerprint && before.fingerprint !== expectedFingerprint) throw fail("PROFILE_CHANGED", "The keyboard changed since this was reviewed. Review it again.");
         applyProgress.report("backup");
@@ -288,4 +288,4 @@ async function restoreProfile(connection, ids, capabilities, input, {expectedFin
         }
     }
 }
-module.exports = {requireReady, supportsCompleteProfile, captureProfile, readIdentity, restoreProfile, validateSnapshot, summary, fingerprint, reorderLayers, peerReport};
+module.exports = {requireReady, supportsCompleteProfile, snapshotProfile, readIdentity, restoreProfile, validateSnapshot, summary, fingerprint, reorderLayers, peerReport};

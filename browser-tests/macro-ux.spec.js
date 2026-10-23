@@ -2,7 +2,7 @@
 "use strict";
 const {test, expect} = require("@playwright/test");
 const {openControls, publishAccepted} = require("./control-preview");
-const updates = page => page.evaluate(() => window.__posted.filter(m => m.type === "updateViaMacro"));
+const updates = page => page.evaluate(() => window.__posted.filter(m => m.type === "updateMacro"));
 
 for (const theme of ["vscode-dark", "vscode-light"]) {
     test(`macro bank keeps its scroll when selecting, editing and recording a later slot (${theme})`, async ({page}) => {
@@ -22,7 +22,7 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
         await page.locator("[data-step-delay]").fill("777");
         await page.locator("[data-step-delay]").press("Tab");
         await expect.poll(() => updates(page).then(rows => rows.at(-1)?.payload)).toBe("{777}");
-        await publishAccepted(page, ["viaMacros", 100, "payload"], "{777}");
+        await publishAccepted(page, ["macros", 100, "payload"], "{777}");
         await expectPosition();
 
         await page.locator('[data-act="record"]').click();
@@ -43,11 +43,11 @@ test("dropping in the space before the first tile inserts the dragged step first
     await page.locator("[data-raw-toggle]").click();
     await page.locator("[data-raw-payload]").fill("{KC_A}{KC_C}");
     await page.locator("[data-raw-payload]").press("Tab");
-    await expect.poll(() => page.evaluate(() => window.__posted.filter(m => m.type === "updateViaMacro").at(-1)?.payload)).toBe("{KC_A}{KC_C}");
+    await expect.poll(() => page.evaluate(() => window.__posted.filter(m => m.type === "updateMacro").at(-1)?.payload)).toBe("{KC_A}{KC_C}");
     const dragged = await page.locator('[data-step-tile="1"]').getAttribute("data-step-id");
     await page.locator('[data-step-tile="1"]').dragTo(page.locator("[data-sequence-tiles]"), {targetPosition: {x: 1, y: 50}});
     await expect(page.locator('[data-step-tile="0"]')).toHaveAttribute("data-step-id", dragged, {timeout: 1000});
-    await expect.poll(() => page.evaluate(() => window.__posted.filter(m => m.type === "updateViaMacro").at(-1)?.payload)).toBe("{KC_C}{KC_A}");
+    await expect.poll(() => page.evaluate(() => window.__posted.filter(m => m.type === "updateMacro").at(-1)?.payload)).toBe("{KC_C}{KC_A}");
 });
 
 test("the first step can move to trailing whitespace after wrapped rows", async ({page}) => {
@@ -148,7 +148,7 @@ for (const theme of ["vscode-dark", "vscode-light"]) {
         await page.locator('[data-show-help]').click();
         await page.getByRole('textbox', {name: 'Macro name', exact: true}).fill('Quick reply');
         await page.getByRole('textbox', {name: 'Macro name', exact: true}).press('Enter');
-        await publishAccepted(page, ['viaMacros', 17, 'name'], 'Quick reply');
+        await publishAccepted(page, ['macros', 17, 'name'], 'Quick reply');
         await page.locator('.macros-library').screenshot({path: `/tmp/ark-macro-ux-${theme}.png`});
     });
 }
@@ -178,7 +178,7 @@ for (const key of ['Delete', 'Backspace']) {
         await expect.poll(() => updates(page).then(rows => rows.at(-1)?.payload)).toBe('{KC_A}');
         // The fixture does not apply posts itself. Accept the last nonempty
         // draft so clearing it must post, rather than returning to its original empty value.
-        await publishAccepted(page, ['viaMacros', 17, 'payload'], '{KC_A}');
+        await publishAccepted(page, ['macros', 17, 'payload'], '{KC_A}');
         await expect(tiles.first()).toBeFocused();
         await page.keyboard.press(key);
         await expect(page.locator('.macro-empty')).toBeVisible();

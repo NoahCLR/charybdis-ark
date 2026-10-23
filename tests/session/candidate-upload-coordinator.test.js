@@ -956,25 +956,25 @@ test("full and reuse progress count actual chunks and separate prepared bytes", 
 });
 
 for (const compiledOnly of [true, false]) {
-    test(`Apply from a ${compiledOnly ? "compiled-default" : "committed"} capture sends canonical reuse identity`, async () => {
+    test(`Apply from a ${compiledOnly ? "compiled-default" : "committed"} snapshot sends canonical reuse identity`, async () => {
         const {restoreProfile} = require("../../core/session/portable-profile-session");
         const {PROFILE_WIRE_FEATURES} = require("../../core/protocol/profile-wire-v1");
         const {fixture, capabilities} = require("../fixtures/portable-restore");
         const f = fixture({compiledOnly});
         // Reuse and streaming come with saves (Profile Wire 2).
         const caps = {...capabilities, featureFlags: capabilities.featureFlags | PROFILE_WIRE_FEATURES.SAVES};
-        const captured = await f.capture();
-        assert.equal(captured.status.activeKind, compiledOnly ? 0 : 1);
-        assert.equal(captured.status.activeGeneration, compiledOnly ? 0 : f.keyboard.generation);
-        assert.equal(captured.status.activeOriginHalf, 0);
-        f.options.baseSnapshot = captured;
+        const snapshot = await f.snapshot();
+        assert.equal(snapshot.status.activeKind, compiledOnly ? 0 : 1);
+        assert.equal(snapshot.status.activeGeneration, compiledOnly ? 0 : f.keyboard.generation);
+        assert.equal(snapshot.status.activeOriginHalf, 0);
+        f.options.baseSnapshot = snapshot;
         const result = await restoreProfile(f.connection, f.ids, caps, f.targetDocument, f.options);
         assert.equal(result.fingerprint, require("../../core/model/portable-profile").fingerprint(f.targetDocument));
         const reused = f.keyboard.mutations.filter(report => report[0] === 7 && report[2] === PROFILE_CANDIDATE_V1.VALUE_REUSE);
         assert.ok(reused.length > 0);
         for (const report of reused) {
             assert.equal(report[29], compiledOnly ? 0 : 1);
-            assert.equal(report.readUInt32LE(17), captured.status.activeGeneration);
+            assert.equal(report.readUInt32LE(17), snapshot.status.activeGeneration);
             assert.equal(report[30], compiledOnly ? 255 : 0, "only committed REUSE has a physical origin");
         }
         assert.equal(f.keyboard.mutations.filter(report => report[0] === 7 && report[2] === PROFILE_CANDIDATE_V1.VALUE_VALIDATE).length, 1);

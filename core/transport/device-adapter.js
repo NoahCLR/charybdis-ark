@@ -4,7 +4,7 @@
 const RAW_HID_REPORT_SIZE = 32;
 
 // The four identifiers of the Charybdis QMK Raw HID interface. Every adapter
-// matches on all four, whatever its host calls them.
+// matches on all four, whatever its shell calls them.
 const CHARYBDIS_VENDOR_ID = 0xA8F8;
 const CHARYBDIS_PRODUCT_ID = 0x1833;
 const QMK_RAW_HID_USAGE_PAGE = 0xFF60;

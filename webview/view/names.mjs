@@ -2,7 +2,7 @@
 // Names as the keyboard stores them (firmware D-F14): every layer, macro,
 // custom-key and pointing-slot name is at most 32 bytes of UTF-8. Limits count
 // bytes, not characters: an accented letter takes two, most symbols three,
-// an emoji four. The host checks the rule; these let a field say where a name
+// an emoji four. The core checks the rule; these let a field say where a name
 // stands before it is posted.
 
 export const NAME_MAX_BYTES = 32;
