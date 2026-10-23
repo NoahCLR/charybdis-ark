@@ -4,8 +4,8 @@ How a client changes the working copy over Profile Wire so an edit runs on
 both halves at once without a save, then saves it, reverts it, or has the
 keyboard save it in Live; the edit mode stored beside the profile; keyboard
 adjustments; and how a stopped keyboard says so and is restarted
-([D-F32](https://github.com/NoahCLR/charybdis-4x6/blob/494acd48b99bd2260f349f68bac34c7196f3a9d6/docs/adr/0032-live-edits-working-copy-and-save.md),
-[D-F34](https://github.com/NoahCLR/charybdis-4x6/blob/494acd48b99bd2260f349f68bac34c7196f3a9d6/docs/adr/0034-stopped-keyboard-says-so-and-restarts.md)). The
+([D-F32](https://github.com/NoahCLR/charybdis-4x6/blob/62f47aa07f059fc33ad68521070c979ff041ae1f/docs/adr/0032-live-edits-working-copy-and-save.md),
+[D-F34](https://github.com/NoahCLR/charybdis-4x6/blob/62f47aa07f059fc33ad68521070c979ff041ae1f/docs/adr/0034-stopped-keyboard-says-so-and-restarts.md)). The
 Raw HID framing and read envelope are in [the HID channel](hid-channel.md);
 every result code is in [errors](errors.md); Save writes through
 [candidate transfer](candidate-transfer.md). How the slave half follows the
@@ -244,7 +244,7 @@ was; its result (`VALIDATION_REJECTED`, or `PUBLICATION_FAILED` with the
 candidate's error id) and transaction are on page 1, and a working copy
 replaced before the save began writing ends it `ABORTED`. A save waits for
 a quiet keyboard before each flash erase
-([D-F29](https://github.com/NoahCLR/charybdis-4x6/blob/494acd48b99bd2260f349f68bac34c7196f3a9d6/docs/adr/0029-profile-slots-in-their-own-flash-region.md)); that
+([D-F29](https://github.com/NoahCLR/charybdis-4x6/blob/62f47aa07f059fc33ad68521070c979ff041ae1f/docs/adr/0029-profile-slots-in-their-own-flash-region.md)); that
 wait counts toward no timeout on either half.
 
 An Apply still works and replaces the working copy: unsaved edits are gone
@@ -468,10 +468,10 @@ Held by: `tests/host/run_profile_working_sync_tests.sh` (`test_edit_mode_follows
 
 In Live the master half saves the working copy itself after 3 s without a
 published revision and without a held key, the matrix also quiet for 50 ms,
-with no client connected. Every held-key scan and every published revision
-restarts the interval. It starts only when the keyboard step is admitted
-([admission](#admission)) and the edit modes do not conflict, through the
-ordinary Save. There is at most one automatic attempt per revision: a failed
+whether or not a client is connected. Every held-key scan and every published
+revision restarts the interval. It starts only when the keyboard step is
+admitted ([admission](#admission)) and the edit modes do not conflict, through
+the ordinary Save. There is at most one automatic attempt per revision: a failed
 attempt leaves the working copy unsaved and is reported as any Save is, and
 only an explicit Save, a new edit or a new adjustment tries again. Unplugging
 before it completes loses the unsaved edits; a save already running has the
